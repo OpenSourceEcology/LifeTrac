@@ -12,6 +12,7 @@ LifeTrac/
 ├── README.md                    # This file
 ├── QUICKSTART.md               # Easy navigation guide
 ├── CONTRIBUTING.md             # Community contribution guidelines
+├── Lifetrac-Controller-25/     # Controller system for LifeTrac 25
 ├── versions/                   # Historical LifeTrac versions
 │   ├── lifetrac-prototype/    # Original prototype designs
 │   ├── lifetrac-i/           # LifeTrac I
@@ -29,6 +30,9 @@ LifeTrac/
 
 ### Historical LifeTrac Versions
 Standard production versions progressing through documented design improvements and field-tested enhancements.
+
+### LifeTrac 25 Controller System
+Advanced control system using Arduino OPTA Wifi and relay expansion module for next generation automation and remote control capabilities.
 
 ### Experimental Designs
 LifeTrac 25 represents the next generation development incorporating experimental features, advanced technologies, and future capabilities.
@@ -84,6 +88,12 @@ This section recreates the genealogy from the [OpenSourceEcology LifeTrac Wiki](
 - **Status**: Development - Next generation
 - **Description**: Next generation LifeTrac incorporating experimental features and advanced technologies
 - **Key Features**: Latest design innovations, experimental technology integration, advanced control systems
+
+### [LifeTrac Controller 25](https://wiki.opensourceecology.org/wiki/LifeTrac_Controller_25)
+- **Location**: [Lifetrac-Controller-25/](./Lifetrac-Controller-25/)
+- **Status**: Development - Advanced control system
+- **Description**: Arduino OPTA Wifi-based controller with relay expansion for LifeTrac 25
+- **Key Features**: WiFi connectivity, relay control, remote operation, safety interlocks
 
 ### Complete Genealogy Reference
 For the most current and detailed genealogy information, visit the complete [LifeTrac Genealogy Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_Genealogy).

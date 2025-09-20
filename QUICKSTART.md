@@ -25,6 +25,11 @@ LifeTrac is an open-source skidded tractor designed for everyday agricultural an
 - See design evolution
 - Learn from each generation
 
+**Interested in Advanced Control?** → Check out [LifeTrac Controller 25](Lifetrac-Controller-25/)
+- Arduino OPTA Wifi-based system
+- WiFi connectivity and remote control
+- Advanced automation capabilities
+
 **Researcher/Developer?** → Explore [LifeTrac 25](versions/lifetrac-25/)
 - Next generation development
 - Experimental features integration
@@ -42,6 +47,7 @@ LifeTrac is an open-source skidded tractor designed for everyday agricultural an
 | [LifeTrac V](versions/lifetrac-v/) | Generation 5 | Historical | Mature platform | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_V) |
 | [LifeTrac VI](versions/lifetrac-vi/) | Generation 6 | Current | Latest design | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_VI) |
 | [LifeTrac 25](versions/lifetrac-25/) | Next Gen | Development | Future development | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_25) |
+| [Controller 25](Lifetrac-Controller-25/) | Control System | Development | Advanced control | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_Controller_25) |
 
 ## What You'll Find
 
