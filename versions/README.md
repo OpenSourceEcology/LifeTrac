@@ -1,24 +1,28 @@
 # LifeTrac Versions
 
-This directory contains different versions of the LifeTrac tractor CAD designs. Each version is organized by generation and control type.
+This directory contains different versions of the LifeTrac tractor CAD designs. Each version represents a specific generation from the LifeTrac development history.
 
 ## Version Organization
 
-### Directory Structure
+### Historical LifeTrac Versions
 ```
 versions/
-├── v1-prototype/           # Early prototype versions
-├── v2-hydraulic-manual/    # Standard manual hydraulic valve controls
-├── v3-hydraulic-solenoid/  # Solenoid remote control valves
-├── v4-autonomous/          # Semi-autonomous control with GPS and camera
-└── experimental/           # Experimental designs and concepts
+├── lifetrac-prototype/     # Original prototype designs
+├── lifetrac-i/            # LifeTrac I
+├── lifetrac-ii/           # LifeTrac II  
+├── lifetrac-iii/          # LifeTrac III
+├── lifetrac-iv/           # LifeTrac IV
+├── lifetrac-v/            # LifeTrac V
+├── lifetrac-vi/           # LifeTrac VI
+└── experimental/          # Experimental designs and future concepts
 ```
 
-### Control Types
+### Version Types
 
-1. **Manual Hydraulic** - Traditional manual valve controls
-2. **Solenoid Remote** - Remote-controlled solenoid valves
-3. **Autonomous** - GPS and camera-based semi-autonomous control
+Each LifeTrac version represents different design iterations and improvements:
+- **Prototype**: Original concept and early designs
+- **Numbered Versions (I-VI)**: Production versions with documented specifications
+- **Experimental**: Research and development for future versions
 
 ## Version History
 

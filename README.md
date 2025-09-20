@@ -23,14 +23,11 @@ LifeTrac/
 
 ## Version Types
 
-### Manual Hydraulic (V2)
-Standard manual hydraulic valve controls for traditional operation. These versions provide reliable, field-tested designs suitable for immediate production and use.
+### Historical LifeTrac Versions
+Standard production versions progressing through documented design improvements and field-tested enhancements.
 
-### Solenoid Remote Control (V3)
-Remote-controlled solenoid valves that enable operator control from a distance. This serves as a bridge technology toward autonomous systems.
-
-### Semi-Autonomous (V4)
-GPS and camera-based control systems for semi-autonomous operation. These versions represent the future of automated farming equipment with human oversight capabilities.
+### Experimental Designs
+Research and development projects exploring new technologies, control systems, and future capabilities including potential autonomous systems.
 
 ## Version History
 

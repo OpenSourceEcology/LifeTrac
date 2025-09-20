@@ -8,37 +8,40 @@ LifeTrac is an open-source skidded tractor designed for everyday agricultural an
 
 ## Finding the Right Version
 
-### Choose by Control Type:
+### Choose by Generation:
 
-**New to LifeTrac?** → Start with [V2 Manual Hydraulic](versions/v2-hydraulic-manual/)
-- Proven, field-tested design
-- Traditional manual controls
-- Production-ready
+**Learning about LifeTrac?** → Start with [LifeTrac I](versions/lifetrac-i/)
+- First production version
+- Established design principles
+- Foundation for all later versions
 
-**Want Remote Control?** → Check out [V3 Solenoid Remote](versions/v3-hydraulic-solenoid/)
-- Remote-controlled valves
-- Electronics included
-- Bridge to autonomous systems
+**Current Production?** → Check out [LifeTrac VI](versions/lifetrac-vi/)
+- Latest generation design
+- Most recent improvements
+- Current capabilities
 
-**Interested in Autonomous?** → Explore [V4 Autonomous](versions/v4-autonomous/)
-- GPS and camera systems
-- Semi-autonomous operation
-- Cutting-edge technology
+**Historical Interest?** → Browse [All Versions](versions/)
+- Complete development history
+- See design evolution
+- Learn from each generation
 
-**Researcher/Developer?** → Browse [Experimental](versions/experimental/)
+**Researcher/Developer?** → Explore [Experimental](versions/experimental/)
 - Latest research projects
-- Experimental concepts
-- Future technologies
+- Future technology concepts
+- Development opportunities
 
 ## Quick Navigation
 
 | Version | Type | Status | Best For |
 |---------|------|--------|----------|
-| [V1](versions/v1-prototype/) | Prototype | Concept | Learning, reference |
-| [V2](versions/v2-hydraulic-manual/) | Manual | Production | Building, using |
-| [V3](versions/v3-hydraulic-solenoid/) | Remote | Development | Advanced users |
-| [V4](versions/v4-autonomous/) | Autonomous | R&D | Researchers |
-| [Experimental](versions/experimental/) | Various | Research | Developers |
+| [Prototype](versions/lifetrac-prototype/) | Original | Historical | Learning, reference |
+| [LifeTrac I](versions/lifetrac-i/) | Generation 1 | Historical | Foundation, reference |
+| [LifeTrac II](versions/lifetrac-ii/) | Generation 2 | Historical | Improved design |
+| [LifeTrac III](versions/lifetrac-iii/) | Generation 3 | Historical | Enhanced features |
+| [LifeTrac IV](versions/lifetrac-iv/) | Generation 4 | Historical | Advanced design |
+| [LifeTrac V](versions/lifetrac-v/) | Generation 5 | Historical | Mature platform |
+| [LifeTrac VI](versions/lifetrac-vi/) | Generation 6 | Current | Latest design |
+| [Experimental](versions/experimental/) | Various | Research | Future development |
 
 ## What You'll Find
 
