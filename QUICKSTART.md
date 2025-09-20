@@ -32,16 +32,16 @@ LifeTrac is an open-source skidded tractor designed for everyday agricultural an
 
 ## Quick Navigation
 
-| Version | Type | Status | Best For |
-|---------|------|--------|----------|
-| [Prototype](versions/lifetrac-prototype/) | Original | Historical | Learning, reference |
-| [LifeTrac I](versions/lifetrac-i/) | Generation 1 | Historical | Foundation, reference |
-| [LifeTrac II](versions/lifetrac-ii/) | Generation 2 | Historical | Improved design |
-| [LifeTrac III](versions/lifetrac-iii/) | Generation 3 | Historical | Enhanced features |
-| [LifeTrac IV](versions/lifetrac-iv/) | Generation 4 | Historical | Advanced design |
-| [LifeTrac V](versions/lifetrac-v/) | Generation 5 | Historical | Mature platform |
-| [LifeTrac VI](versions/lifetrac-vi/) | Generation 6 | Current | Latest design |
-| [Experimental](versions/experimental/) | Various | Research | Future development |
+| Version | Type | Status | Best For | Wiki Link |
+|---------|------|--------|----------|-----------|
+| [Prototype](versions/lifetrac-prototype/) | Original | Historical | Learning, reference | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_Prototype) |
+| [LifeTrac I](versions/lifetrac-i/) | Generation 1 | Historical | Foundation, reference | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_I) |
+| [LifeTrac II](versions/lifetrac-ii/) | Generation 2 | Historical | Improved design | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_II) |
+| [LifeTrac III](versions/lifetrac-iii/) | Generation 3 | Historical | Enhanced features | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_III) |
+| [LifeTrac IV](versions/lifetrac-iv/) | Generation 4 | Historical | Advanced design | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_IV) |
+| [LifeTrac V](versions/lifetrac-v/) | Generation 5 | Historical | Mature platform | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_V) |
+| [LifeTrac VI](versions/lifetrac-vi/) | Generation 6 | Current | Latest design | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_VI) |
+| [Experimental](versions/experimental/) | Various | Research | Future development | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_Experimental) |
 
 ## What You'll Find
 

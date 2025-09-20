@@ -10,13 +10,17 @@ This repository contains multiple versions of CAD designs for the LifeTrac tract
 ```
 LifeTrac/
 ├── README.md                    # This file
-├── versions/                    # All LifeTrac versions
-│   ├── README.md               # Version overview and guidelines
-│   ├── v1-prototype/           # Early prototype versions
-│   ├── v2-hydraulic-manual/    # Standard manual hydraulic controls
-│   ├── v3-hydraulic-solenoid/  # Solenoid remote control valves
-│   ├── v4-autonomous/          # Semi-autonomous GPS and camera control
-│   └── experimental/           # Research and experimental designs
+├── QUICKSTART.md               # Easy navigation guide
+├── CONTRIBUTING.md             # Community contribution guidelines
+├── versions/                   # Historical LifeTrac versions
+│   ├── lifetrac-prototype/    # Original prototype designs
+│   ├── lifetrac-i/           # LifeTrac I
+│   ├── lifetrac-ii/          # LifeTrac II
+│   ├── lifetrac-iii/         # LifeTrac III
+│   ├── lifetrac-iv/          # LifeTrac IV
+│   ├── lifetrac-v/           # LifeTrac V
+│   ├── lifetrac-vi/          # LifeTrac VI
+│   └── experimental/         # Research and experimental designs
 ├── docs/                       # General documentation
 └── resources/                  # Shared resources and references
 ```
@@ -29,7 +33,64 @@ Standard production versions progressing through documented design improvements 
 ### Experimental Designs
 Research and development projects exploring new technologies, control systems, and future capabilities including potential autonomous systems.
 
+## LifeTrac Genealogy
+
+This section recreates the genealogy from the [OpenSourceEcology LifeTrac Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_Genealogy) to provide quick access to version information and links.
+
+### [LifeTrac Prototype](https://wiki.opensourceecology.org/wiki/LifeTrac_Prototype)
+- **Location**: [versions/lifetrac-prototype/](./versions/lifetrac-prototype/)
+- **Status**: Historical - Original concept
+- **Description**: Initial prototype designs and proof-of-concept development for the LifeTrac platform
+- **Key Features**: Foundation design concepts, basic skidded tractor architecture
+
+### [LifeTrac I](https://wiki.opensourceecology.org/wiki/LifeTrac_I)
+- **Location**: [versions/lifetrac-i/](./versions/lifetrac-i/)
+- **Status**: Historical - First production version
+- **Description**: First production-ready LifeTrac establishing core design principles
+- **Key Features**: Production manufacturing, field-tested design, established architecture
+
+### [LifeTrac II](https://wiki.opensourceecology.org/wiki/LifeTrac_II)
+- **Location**: [versions/lifetrac-ii/](./versions/lifetrac-ii/)
+- **Status**: Historical - Second generation
+- **Description**: Improved design incorporating lessons learned from LifeTrac I deployment
+- **Key Features**: Enhanced reliability, refined manufacturing, improved performance
+
+### [LifeTrac III](https://wiki.opensourceecology.org/wiki/LifeTrac_III)
+- **Location**: [versions/lifetrac-iii/](./versions/lifetrac-iii/)
+- **Status**: Historical - Third generation
+- **Description**: Third generation with continued design improvements and feature enhancements
+- **Key Features**: Advanced design elements, enhanced capabilities, improved user experience
+
+### [LifeTrac IV](https://wiki.opensourceecology.org/wiki/LifeTrac_IV)
+- **Location**: [versions/lifetrac-iv/](./versions/lifetrac-iv/)
+- **Status**: Historical - Fourth generation
+- **Description**: Fourth generation incorporating significant design advancements
+- **Key Features**: Advanced design improvements, enhanced reliability, optimized performance
+
+### [LifeTrac V](https://wiki.opensourceecology.org/wiki/LifeTrac_V)
+- **Location**: [versions/lifetrac-v/](./versions/lifetrac-v/)
+- **Status**: Historical - Fifth generation
+- **Description**: Fifth generation representing mature development of the LifeTrac platform
+- **Key Features**: Mature design platform, proven reliability, established manufacturing
+
+### [LifeTrac VI](https://wiki.opensourceecology.org/wiki/LifeTrac_VI)
+- **Location**: [versions/lifetrac-vi/](./versions/lifetrac-vi/)
+- **Status**: Current - Latest generation
+- **Description**: Most recent generation incorporating all previous improvements and innovations
+- **Key Features**: Latest design innovations, current generation features, modern capabilities
+
+### [Experimental Designs](https://wiki.opensourceecology.org/wiki/LifeTrac_Experimental)
+- **Location**: [versions/experimental/](./versions/experimental/)
+- **Status**: Research and Development
+- **Description**: Future concepts, research projects, and experimental technologies
+- **Key Features**: New technology integration, autonomous systems research, innovative concepts
+
+### Complete Genealogy Reference
+For the most current and detailed genealogy information, visit the complete [LifeTrac Genealogy Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_Genealogy).
+
 ## Version History
+
+## Additional Resources
 
 For complete LifeTrac genealogy and historical context, visit:
 [LifeTrac Genealogy Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_Genealogy)
