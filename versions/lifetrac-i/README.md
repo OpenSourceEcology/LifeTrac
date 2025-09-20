@@ -12,7 +12,7 @@ First production version of the LifeTrac skidded tractor.
 ```
 lifetrac-i/
 ├── README.md              # This file
-├── cad/                   # CAD files (STEP, STL, etc.)
+├── cad/                   # CAD files (FreeCAD .FCStd and exports)
 ├── documentation/         # Technical documentation
 ├── specifications/        # Technical specifications
 ├── assembly/              # Assembly instructions

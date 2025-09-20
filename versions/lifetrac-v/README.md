@@ -12,7 +12,7 @@ Fifth generation LifeTrac with mature design and proven performance characterist
 ```
 lifetrac-v/
 ├── README.md              # This file
-├── cad/                   # CAD files (STEP, STL, etc.)
+├── cad/                   # CAD files (FreeCAD .FCStd and exports)
 ├── documentation/         # Technical documentation
 ├── specifications/        # Technical specifications
 ├── assembly/              # Assembly instructions

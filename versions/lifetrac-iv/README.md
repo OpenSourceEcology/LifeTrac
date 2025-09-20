@@ -12,7 +12,7 @@ Fourth generation LifeTrac incorporating advanced design elements and improved f
 ```
 lifetrac-iv/
 ├── README.md              # This file
-├── cad/                   # CAD files (STEP, STL, etc.)
+├── cad/                   # CAD files (FreeCAD .FCStd and exports)
 ├── documentation/         # Technical documentation
 ├── specifications/        # Technical specifications
 ├── assembly/              # Assembly instructions

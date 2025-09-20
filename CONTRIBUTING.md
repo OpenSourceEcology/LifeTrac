@@ -60,8 +60,9 @@ versions/vX-description/
 ## CAD File Requirements
 
 ### Formats
-- **Primary**: STEP (.step, .stp) for maximum compatibility
-- **Secondary**: STL (.stl) for 3D printing and visualization
+- **Primary**: FreeCAD (.FCStd) for maximum compatibility and editability
+- **Export**: STEP (.step, .stp) for CAD data exchange
+- **Manufacturing**: STL (.stl) for 3D printing and visualization
 - **2D Drawings**: PDF (.pdf) for documentation
 
 ### Quality Standards

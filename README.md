@@ -109,7 +109,7 @@ For complete LifeTrac genealogy and historical context, visit:
 
 1. **Browse Versions**: Explore the [versions/](./versions/) directory to find the appropriate design for your needs
 2. **Read Documentation**: Each version includes comprehensive documentation and specifications
-3. **Download CAD Files**: Access complete CAD files in standard formats (STEP, STL, etc.)
+3. **Download CAD Files**: Access complete CAD files in FreeCAD format (.FCStd) and standard export formats
 4. **Follow Assembly**: Use provided assembly instructions and documentation
 
 ## Contributing

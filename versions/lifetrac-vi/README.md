@@ -12,7 +12,7 @@ Sixth generation LifeTrac representing the latest evolution in the LifeTrac desi
 ```
 lifetrac-vi/
 ├── README.md              # This file
-├── cad/                   # CAD files (STEP, STL, etc.)
+├── cad/                   # CAD files (FreeCAD .FCStd and exports)
 ├── documentation/         # Technical documentation
 ├── specifications/        # Technical specifications
 ├── assembly/              # Assembly instructions

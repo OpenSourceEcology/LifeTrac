@@ -52,7 +52,7 @@ LifeTrac is an open-source skidded tractor designed for everyday agricultural an
 ## What You'll Find
 
 Each version includes:
-- 📁 **CAD Files** - Complete 3D models and drawings
+- 📁 **CAD Files** - Complete 3D models and drawings in FreeCAD format (.FCStd)
 - 📖 **Documentation** - Technical specs and assembly guides
 - 🔧 **Assembly Instructions** - Step-by-step build guides
 - ⚡ **Electronics** (V3, V4) - Schematics and control systems

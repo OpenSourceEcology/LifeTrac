@@ -12,7 +12,7 @@ Original prototype designs and concept development for the LifeTrac skidded trac
 ```
 lifetrac-prototype/
 ├── README.md              # This file
-├── cad/                   # CAD files (STEP, STL, etc.)
+├── cad/                   # CAD files (FreeCAD .FCStd and exports)
 ├── documentation/         # Technical documentation
 ├── specifications/        # Technical specifications
 └── images/               # Photos and renderings

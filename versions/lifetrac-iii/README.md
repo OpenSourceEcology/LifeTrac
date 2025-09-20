@@ -12,7 +12,7 @@ Third generation LifeTrac with continued improvements and feature enhancements.
 ```
 lifetrac-iii/
 ├── README.md              # This file
-├── cad/                   # CAD files (STEP, STL, etc.)
+├── cad/                   # CAD files (FreeCAD .FCStd and exports)
 ├── documentation/         # Technical documentation
 ├── specifications/        # Technical specifications
 ├── assembly/              # Assembly instructions

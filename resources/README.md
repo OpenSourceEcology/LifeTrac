@@ -31,15 +31,23 @@ Common components used across multiple LifeTrac versions:
 
 ## CAD Software Recommendations
 
-- **FreeCAD**: Open-source parametric 3D CAD modeler
+- **FreeCAD**: Primary CAD software - open-source parametric 3D CAD modeler
 - **OpenSCAD**: Script-based 3D CAD modeler
 - **LibreCAD**: Open-source 2D CAD application
 - **Blender**: Open-source 3D creation suite (for rendering and visualization)
 
 ## File Formats
 
-Standard file formats used throughout the repository:
-- **STEP (.step, .stp)**: Standard for CAD data exchange
-- **STL (.stl)**: Standard for 3D printing and prototyping
+Primary CAD file format used throughout the repository:
+- **FreeCAD (.FCStd)**: Primary CAD file format for all LifeTrac designs
+- **STEP (.step, .stp)**: Export format for CAD data exchange
+- **STL (.stl)**: Export format for 3D printing and prototyping
 - **DXF (.dxf)**: 2D drawing exchange format
 - **PDF (.pdf)**: Documentation and drawings
+
+## CAD Software
+
+- **FreeCAD**: Primary CAD software - open-source parametric 3D CAD modeler
+- **OpenSCAD**: Script-based 3D CAD modeler (for parametric designs)
+- **LibreCAD**: Open-source 2D CAD application
+- **Blender**: Open-source 3D creation suite (for rendering and visualization)
