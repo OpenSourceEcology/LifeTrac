@@ -20,7 +20,7 @@ LifeTrac/
 │   ├── lifetrac-iv/          # LifeTrac IV
 │   ├── lifetrac-v/           # LifeTrac V
 │   ├── lifetrac-vi/          # LifeTrac VI
-│   └── experimental/         # Research and experimental designs
+│   └── lifetrac-25/          # LifeTrac 25 - Next generation
 ├── docs/                       # General documentation
 └── resources/                  # Shared resources and references
 ```
@@ -31,7 +31,7 @@ LifeTrac/
 Standard production versions progressing through documented design improvements and field-tested enhancements.
 
 ### Experimental Designs
-Research and development projects exploring new technologies, control systems, and future capabilities including potential autonomous systems.
+LifeTrac 25 represents the next generation development incorporating experimental features, advanced technologies, and future capabilities.
 
 ## LifeTrac Genealogy
 
@@ -79,11 +79,11 @@ This section recreates the genealogy from the [OpenSourceEcology LifeTrac Wiki](
 - **Description**: Most recent generation incorporating all previous improvements and innovations
 - **Key Features**: Latest design innovations, current generation features, modern capabilities
 
-### [Experimental Designs](https://wiki.opensourceecology.org/wiki/LifeTrac_Experimental)
-- **Location**: [versions/experimental/](./versions/experimental/)
-- **Status**: Research and Development
-- **Description**: Future concepts, research projects, and experimental technologies
-- **Key Features**: New technology integration, autonomous systems research, innovative concepts
+### [LifeTrac 25](https://wiki.opensourceecology.org/wiki/LifeTrac_25)
+- **Location**: [versions/lifetrac-25/](./versions/lifetrac-25/)
+- **Status**: Development - Next generation
+- **Description**: Next generation LifeTrac incorporating experimental features and advanced technologies
+- **Key Features**: Latest design innovations, experimental technology integration, advanced control systems
 
 ### Complete Genealogy Reference
 For the most current and detailed genealogy information, visit the complete [LifeTrac Genealogy Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_Genealogy).

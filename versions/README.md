@@ -14,15 +14,15 @@ versions/
 ├── lifetrac-iv/           # LifeTrac IV
 ├── lifetrac-v/            # LifeTrac V
 ├── lifetrac-vi/           # LifeTrac VI
-└── experimental/          # Experimental designs and future concepts
+└── lifetrac-25/           # LifeTrac 25 - Next generation
 ```
 
 ### Version Types
 
 Each LifeTrac version represents different design iterations and improvements:
 - **Prototype**: Original concept and early designs
-- **Numbered Versions (I-VI)**: Production versions with documented specifications
-- **Experimental**: Research and development for future versions
+- **Numbered Versions (I-VI)**: Historical production versions with documented specifications
+- **LifeTrac 25**: Next generation version incorporating experimental features and advanced technologies
 
 ## Version History
 

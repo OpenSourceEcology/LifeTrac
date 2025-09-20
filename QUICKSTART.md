@@ -25,10 +25,10 @@ LifeTrac is an open-source skidded tractor designed for everyday agricultural an
 - See design evolution
 - Learn from each generation
 
-**Researcher/Developer?** → Explore [Experimental](versions/experimental/)
-- Latest research projects
-- Future technology concepts
-- Development opportunities
+**Researcher/Developer?** → Explore [LifeTrac 25](versions/lifetrac-25/)
+- Next generation development
+- Experimental features integration
+- Advanced technology concepts
 
 ## Quick Navigation
 
@@ -41,7 +41,7 @@ LifeTrac is an open-source skidded tractor designed for everyday agricultural an
 | [LifeTrac IV](versions/lifetrac-iv/) | Generation 4 | Historical | Advanced design | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_IV) |
 | [LifeTrac V](versions/lifetrac-v/) | Generation 5 | Historical | Mature platform | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_V) |
 | [LifeTrac VI](versions/lifetrac-vi/) | Generation 6 | Current | Latest design | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_VI) |
-| [Experimental](versions/experimental/) | Various | Research | Future development | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_Experimental) |
+| [LifeTrac 25](versions/lifetrac-25/) | Next Gen | Development | Future development | [Wiki](https://wiki.opensourceecology.org/wiki/LifeTrac_25) |
 
 ## What You'll Find
 
