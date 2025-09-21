@@ -1,34 +1,14 @@
 # LifeTrac CAD Resources
 
-This document provides links to CAD files and resources available from the OpenSourceEcology repositories that can be useful for LifeTrac development.
+This document provides links to CAD files and resources specifically for LifeTrac development.
 
-## Available CAD Files from OSE Repositories
+## Available CAD Files for LifeTrac
 
-### Electronic Systems
-- **RAMPS 1.4 Controller (FreeCAD)**: [Download](https://raw.githubusercontent.com/OpenSourceEcology/RAMPS_1.4/5ae24abdd6eb188d4974695590ce7c39e9895c91/RAMPS.fcstd)
-  - Electronic control system used in many OSE machines
-
-### Mechanical Components (FreeCAD Files)
-From the [3D Printer Part Library](https://github.com/OpenSourceEcology/3D-Printer-Part-Library):
-
-- **Base Extruder**: [Download](https://raw.githubusercontent.com/OpenSourceEcology/3D-Printer-Part-Library/90af6c0ab122793cda09325b895f5398233d2436/Base%20Extruder.fcstd)
-- **Heater Block**: [Download](https://raw.githubusercontent.com/OpenSourceEcology/3D-Printer-Part-Library/90af6c0ab122793cda09325b895f5398233d2436/heaterblock.fcstd)
-- **Fan Holder**: [Download](https://raw.githubusercontent.com/OpenSourceEcology/3D-Printer-Part-Library/90af6c0ab122793cda09325b895f5398233d2436/fan%20holder.fcstd)
-
-### Parametric Designs (OpenSCAD Files)
+### LifeTrac-Specific Components (OpenSCAD Files)
 From the [OpenSCAD Repository](https://github.com/OpenSourceEcology/OpenSCAD):
 
 - **Tractor Interface**: [Download](https://raw.githubusercontent.com/OpenSourceEcology/OpenSCAD/c1e08b996b10f4922244565ce13293ec50e64600/tractor_interace.scad)
 - **Bucket Design**: [Download](https://raw.githubusercontent.com/OpenSourceEcology/OpenSCAD/c1e08b996b10f4922244565ce13293ec50e64600/bucket.scad)
-- **Rotor**: [Download](https://raw.githubusercontent.com/OpenSourceEcology/OpenSCAD/c1e08b996b10f4922244565ce13293ec50e64600/rotor.scad)
-- **Warehouse**: [Download](https://raw.githubusercontent.com/OpenSourceEcology/OpenSCAD/c1e08b996b10f4922244565ce13293ec50e64600/warehouse.scad)
-
-### Other OSE Machine Repositories with CAD Files
-
-- **[CEB Press](https://github.com/OpenSourceEcology/CEB-Press)** - Compressed Earth Block Press designs
-- **[D3D v19.04](https://github.com/OpenSourceEcology/D3D_v19.04)** - 3D Printer designs
-- **[Extruder](https://github.com/OpenSourceEcology/Extruder)** - Plastic extruder designs
-- **[Planetary Geardown](https://github.com/OpenSourceEcology/Planetary-Geardown)** - Gear reduction systems
 
 ## File Format Guide
 
