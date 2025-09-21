@@ -13,4 +13,4 @@ Skidded Tractor For Everday Use
 * [LifeTrac v16](https://wiki.opensourceecology.org/wiki/LifeTrac_v16) (LifeTrac VIII) - 2016 - Tracked tractor designed purely as a simplified traction machine with 7000 lb of pull.
 * [Microtrac v17.10](https://wiki.opensourceecology.org/wiki/MicroTrac_v17.10) (LifeTrac IX) - In use in 2021 but modified to shorter tracks.
 * [LifeTrac v17.10](https://wiki.opensourceecology.org/wiki/LifeTrac_v17.10) - Universal Wheel Unit no longer the main drive option to promote 5 Minute Part Replacement.
-* [LifeTrac v20.12](https://wiki.opensourceecology.org/wiki/LifeTrac_v20.12) - Build during Summer X 2021. Includes work on UTU and UWU. Test bed for 5 Minute Part Replacement.
+* [LifeTrac v20.12](https://wiki.opensourceecology.org/wiki/LifeTrac_v20.12) - Built during Summer X 2021. Includes work on UTU and UWU. Test bed for 5 Minute Part Replacement.
