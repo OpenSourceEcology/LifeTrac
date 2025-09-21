@@ -5,3 +5,4 @@ Skidded Tractor For Everday Use
 
 * [LifeTrac I](https://wiki.opensourceecology.org/wiki/LifeTrac_I) - 2008
 * [LifeTrac II](https://wiki.opensourceecology.org/wiki/LifeTrac_II)
+* [LifeTrac III](https://wiki.opensourceecology.org/wiki/LifeTrac_III) - Civilization Starter Kit v0.01 
