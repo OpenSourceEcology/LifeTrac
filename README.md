@@ -6,6 +6,9 @@ Skidded Tractor For Everday Use
 Each LifeTrac version has its own dedicated folder containing:
 - Detailed README.md with specifications and features
 - CAD folder for SketchUp and FreeCAD files
+- Links to available CAD resources from OSE repositories
+
+**🔧 [CAD Resources Guide](./CAD_RESOURCES.md)** - Comprehensive guide to available CAD files and resources
 
 Browse the versions below:
 
