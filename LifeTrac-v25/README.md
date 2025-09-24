@@ -1,5 +1,8 @@
 # Onboard BOM
 
+* (4) Hydraulic Directional Valve: 20 gpm Max Flow Rate, D03 NFPA Size, Three Positions, 12V DC 
+* (1) Electronically Adjustable Pressure Compensated Proportional Flow Control https://www.brand-hyd.com/Products/Valves/Flow_Controls/EFC/
+
 * Arduino Opta WiFi - $199.00
 * Arduino Pro Opta Ext D1608S - $151.00
 * Arduino Pro Opta Ext A0602 - $229.00
