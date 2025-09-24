@@ -64,26 +64,26 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, pro
          │║▲▲│   │║  ▲▲▲ │ │║▲│▲║  │ │║▲│▲║  │                    │
          │║▲▲│   │║ ▲▲▲▲▲│ │║ ▼ ║  │ │║ ▼ ║  │                    │
          │║▼▼│   │║  ▼▼▼ │ │╚═══╝  │ │╚═══╝  │                    │
-         │║▼▼│   │╚══════│ └───┬───┘ └───┬───┘                    │
-         │╚══│   └───┬───┘     │         │                        │
-         └─┬─┘       │         │         │                        │
-           │         │         │         │                        │
-         ┌─▼──┐   ┌──▼──────┐ ┌──▼───┐ ┌──▼───┐                   │
+         │║▼▼│   │╚══════│ └─A─┬─B─┘ └─A─┬─B─┘                    │
+         │╚══│   └─A─┬─B─┘     │   │     │   │                    │
+         └A┬B┘       │   │     │   │     │   │                    │
+          ││         │   │     │   │     │   │                    │
+         ┌▼▼──┐   ┌──▼───▼──┐ ┌▼───▼┐ ┌──▼───▼┐                   │
          │LEFT│   │ RIGHT   │ │ ARMS │ │BUCKET│                   │
          │TRCK│   │ TRACK   │ │ CYL. │ │ CYL. │                   │
-         │MOTR│   │ MOTOR   │ │      │ │      │                   │
-         │╔═══│   │ ╔═════╗ │ │ ╔══╗ │ │ ╔══╗ │                   │
+         │MOTR│   │ MOTOR   │ │  A B │ │  A B │                   │
+         │╔═══│   │ ╔═════╗ │ │ ╔▼▲╗ │ │ ╔▼▲╗ │                   │
          │║ M │   │ ║  M  ║ │ │ ║▲▲║ │ │ ║▲▲║ │                   │
-         │║   │   │ ║     ║ │ │ ║▲▲║ │ │ ║▲▲║ │                   │
-         │║   │   │ ║     ║ │ │ ║▼▼║ │ │ ║▼▼║ │                   │
+         │║ ▲ │   │ ║  ▲  ║ │ │ ║▲▲║ │ │ ║▲▲║ │                   │
+         │║ ▲ │   │ ║  ▲  ║ │ │ ║▼▼║ │ │ ║▼▼║ │                   │
          │║▲▲▲│   │ ║ ▲▲▲ ║ │ │ ║▼▼║ │ │ ║▼▼║ │                   │
-         │║▲▲▲│   │ ║▲▲▲▲▲║ │ │ ╚══╝ │ │ ╚══╝ │                   │
+         │║▲▲▲│   │ ║▲▲▲▲▲║ │ │ ╚▲▼╝ │ │ ╚▲▼╝ │                   │
          │║▲▲▲│   │ ║▲▲▲▲▲║ │ └──────┘ └──────┘                   │
          │║▼▼▼│   │ ║ ▼▼▼ ║ │                                     │
-         │╚═══│   │ ╚═════╝ │                                     │
-         └────┘   └─────────┘                                     │
-                                                                  │
-                                                                  │
+         │╚═▲═│   │ ╚═▲═▲═╝ │                                     │
+         └──▲─┘   └───▲─▲───┘                                     │
+            │         │ │                                        │
+            │         │ │                                        │
                                 └──────────────────────────────────┘
                                               Return Line
 ```
@@ -100,17 +100,17 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, pro
 
 ### Control Valves
 
-- **LEFT TRACK VALVE (D1/D2)**: 3-position, 4-way valve controlling left track motor
-- **RIGHT TRACK VALVE (D3/D4)**: 3-position, 4-way valve controlling right track motor  
-- **ARMS VALVE (D5/D6)**: 3-position, 4-way valve controlling arms cylinder
-- **BUCKET VALVE (D7/D8)**: 3-position, 4-way valve controlling bucket cylinder
+- **LEFT TRACK VALVE (D1/D2)**: 3-position, 4-way valve controlling left track motor via A and B ports
+- **RIGHT TRACK VALVE (D3/D4)**: 3-position, 4-way valve controlling right track motor via A and B ports
+- **ARMS VALVE (D5/D6)**: 3-position, 4-way valve controlling arms cylinder via A and B ports
+- **BUCKET VALVE (D7/D8)**: 3-position, 4-way valve controlling bucket cylinder via A and B ports
 
 ### Actuators
 
-- **LEFT TRACK MOTOR**: Hydraulic motor driving left track
-- **RIGHT TRACK MOTOR**: Hydraulic motor driving right track
-- **ARMS CYLINDER**: Hydraulic cylinder for loader arms up/down
-- **BUCKET CYLINDER**: Hydraulic cylinder for bucket curl/dump
+- **LEFT TRACK MOTOR**: Hydraulic motor driving left track (A and B ports for bi-directional rotation)
+- **RIGHT TRACK MOTOR**: Hydraulic motor driving right track (A and B ports for bi-directional rotation)
+- **ARMS CYLINDER**: Hydraulic cylinder for loader arms up/down (A port extends, B port retracts)
+- **BUCKET CYLINDER**: Hydraulic cylinder for bucket curl/dump (A port extends, B port retracts)
 
 ## Flow Path Description
 
@@ -127,6 +127,9 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, pro
 - **Loader Operations**: Arms and bucket operate independently 
 - **Speed Control**: Proportional flow valve regulates overall system speed
 - **Safety**: All valves return to neutral position when de-energized
+- **Port Control**: Each 4-way valve has A and B ports that control actuator direction:
+  - **Motors**: A port = forward rotation, B port = reverse rotation
+  - **Cylinders**: A port = extend, B port = retract
 
 ## Arduino Pin Assignments
 
