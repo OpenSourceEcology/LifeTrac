@@ -40,9 +40,10 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, pro
     │  ║   ◄═══►   ║──┼──────────────────┐                          │
     │  ║     ◄     ║  │                  │                          │
     │  ╚═══════════╝  │                  │                          │
-    └─────────────────┘                  │                          │  
-                                         ▼                          │
-    ┌───────────────────────────────────────────────────────────┐   │
+    └─────┬───────────┘                  │                          │  
+          │ Return                       ▼                          │
+          │                                                         │
+    ┌─────▼─────────────────────────────────────────────────────┐   │
     │                    MANIFOLD BLOCK                        │   │
     │  ╔═══════════════════════════════════════════════════╗   │   │
     │  ║  ▲     ▲     ▲     ▲     ▲     ▲     ▲     ▲     ║   │   │
@@ -51,9 +52,9 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, pro
     │  ║  │     │     │     │     │     │     │     │     ║   │   │
     │  ║  ▼     ▼     ▼     ▼     ▼     ▼     ▼     ▼     ║   │   │
     │  ╚═══════════════════════════════════════════════════╝   │   │
-    └──────┬─────────┬─────────┬─────────┬────────────────────┘   │
-           │         │         │         │                        │
-           │         │         │         │                        │
+    └──┬───┬─────────┬─────────┬─────────┬────────────────────┘   │
+       │   │         │         │         │                        │
+       │   │         │         │         │                        │
          ┌─▼─┐   ┌───▼───┐ ┌───▼───┐ ┌───▼───┐                    │
          │LFT│   │ RIGHT │ │ ARMS  │ │BUCKET │                    │
          │TRK│   │ TRACK │ │ VALVE │ │ VALVE │                    │
@@ -77,14 +78,16 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, pro
          │║ ▲ │   │ ║  ▲  ║ │ │ ║▼▼║ │ │ ║▼▼║ │                   │
          │║▲▲▲│   │ ║ ▲▲▲ ║ │ │ ║▼▼║ │ │ ║▼▼║ │                   │
          │║▲▲▲│   │ ║▲▲▲▲▲║ │ │ ╚▲▼╝ │ │ ╚▲▼╝ │                   │
-         │║▲▲▲│   │ ║▲▲▲▲▲║ │ └──────┘ └──────┘                   │
-         │║▼▼▼│   │ ║ ▼▼▼ ║ │                                     │
-         │╚═▲═│   │ ╚═▲═▲═╝ │                                     │
-         └──▲─┘   └───▲─▲───┘                                     │
-            │         │ │                                        │
-            │         │ │                                        │
-                                └──────────────────────────────────┘
-                                              Return Line
+         │║▲▲▲│   │ ║▲▲▲▲▲║ │ └──┬───┘ └──┬───┘                   │
+         │║▼▼▼│   │ ║ ▼▼▼ ║ │    │        │                       │
+         │╚═▲═│   │ ╚═▲═▲═╝ │    │        │                       │
+         └──▲─┘   └───▲─▲───┘    │        │                       │
+            │         │ │        │        │                       │
+            └─────────┼─┼────────┼────────┼───────────────────────┤
+                      └─┼────────┼────────┼──── Single Return     │
+                        └────────┼────────┼──── Line              │
+                                 └────────┼───────────────────────┤
+                                          └───────────────────────┘
 ```
 
 ## Component Descriptions
@@ -93,8 +96,8 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, pro
 
 - **RESERVOIR**: Stores hydraulic fluid and allows for thermal expansion
 - **PUMP**: Pressurizes hydraulic fluid from reservoir
-- **FLOW CONTROL VALVE (A0)**: Proportional valve controlling system flow rate
-- **MANIFOLD BLOCK**: Distribution block where all directional control valves are mounted
+- **FLOW CONTROL VALVE (A0)**: Proportional valve controlling system flow rate with return line for excess flow
+- **MANIFOLD BLOCK**: Distribution block where all directional control valves are mounted, includes return manifold
 - **COOLER**: Heat exchanger to maintain optimal fluid temperature
 
 ### Control Valves
@@ -116,9 +119,11 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, pro
 1. **Supply**: Pump draws fluid from reservoir and pressurizes the system
 2. **Distribution**: Pressurized fluid flows through the proportional flow control valve
 3. **Manifold**: Flow is distributed through the manifold block to all directional control valves
-4. **Control**: Each valve directs flow to its respective motor or cylinder
+4. **Control**: Each valve directs flow to its respective motor or cylinder via A and B ports
 5. **Actuation**: Motors and cylinders perform their designated functions
-6. **Return**: Used fluid returns through the cooler back to the reservoir
+6. **Return**: Used fluid returns from actuators through a single consolidated return line
+7. **Flow Control Return**: Excess flow from the proportional flow control valve returns to manifold
+8. **Manifold Return**: Combined return flow exits manifold and passes through cooler back to reservoir
 
 ## Control Logic
 
@@ -129,6 +134,7 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, pro
 - **Port Control**: Each 4-way valve has A and B ports that control actuator direction:
   - **Motors**: A port = forward rotation, B port = reverse rotation
   - **Cylinders**: A port = extend, B port = retract
+- **Return System**: Single consolidated return line collects fluid from all actuators and returns to reservoir via cooler
 
 ## Arduino Pin Assignments
 
