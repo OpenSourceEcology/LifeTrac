@@ -19,8 +19,6 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 ### Hydraulic Functions  
 - **Right Joystick Y-axis:** Arms up/down control
 - **Right Joystick X-axis:** Bucket up/down control
-- **Button 1:** Arms override (full up when pressed)
-- **Button 2:** Bucket override (full up when pressed)
 
 ### Speed Control
 - **Proportional Flow Valve:** Automatically adjusts system speed based on maximum joystick input
@@ -41,7 +39,6 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 
 * SparkFun Qwiic Joystick (2x units) - https://www.sparkfun.com/products/15168
 * SparkFun Thing Plus - ESP32 WROOM (USB-C) - https://www.sparkfun.com/products/20168
-* Push buttons (2x) for override functions
 * Enclosure for handheld remote control
 * Li-Po battery pack with charging circuit
 

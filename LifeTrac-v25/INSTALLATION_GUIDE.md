@@ -22,7 +22,6 @@ The LifeTrac v25 remote control system consists of three main components:
 ### Remote Control Unit
 - SparkFun Thing Plus - ESP32 WROOM (USB-C)
 - 2x SparkFun Qwiic Joystick
-- 2x Push buttons for arms/bucket override
 - Qwiic cables for joystick connections
 - Enclosure for handheld remote
 - Battery pack (Li-Po recommended)
@@ -147,11 +146,6 @@ sudo systemctl status mosquitto
 - Left Joystick: Connect to Qwiic bus with I2C address 0x20
 - Right Joystick: Connect to Qwiic bus with I2C address 0x21
 
-**Button Connections:**
-- Button 1 (Arms Override): GPIO 14 to GND
-- Button 2 (Bucket Override): GPIO 27 to GND
-- Status LED: GPIO 2 (built-in LED)
-
 **Power:**
 - Connect Li-Po battery or USB-C power supply
 
@@ -202,8 +196,6 @@ Each joystick needs a unique I2C address. Use the SparkFun Qwiic Joystick librar
 **Hydraulic Functions Test:**
 - Right joystick Y-axis: Arms up/down
 - Right joystick X-axis: Bucket up/down
-- Button 1: Arms override (full up)
-- Button 2: Bucket override (full up)
 
 **Flow Control Test:**
 - Move joysticks with varying intensity
@@ -230,7 +222,7 @@ Each joystick needs a unique I2C address. Use the SparkFun Qwiic Joystick librar
 2. Power up Arduino Opta controller
 3. Wait for WiFi and MQTT connection (check status LED)
 4. Power up ESP32 remote control
-5. Verify joystick connectivity and button function
+5. Verify joystick connectivity
 6. Test movement in safe area before full operation
 
 ### 5.2 Control Operation
@@ -246,8 +238,6 @@ Each joystick needs a unique I2C address. Use the SparkFun Qwiic Joystick librar
 - Right joystick down: Arms down
 - Right joystick left: Bucket down
 - Right joystick right: Bucket up
-- Button 1: Override arms to full up
-- Button 2: Override bucket to full up
 
 **Speed Control:**
 - System speed is automatically controlled by proportional flow valve
@@ -264,12 +254,11 @@ Each joystick needs a unique I2C address. Use the SparkFun Qwiic Joystick librar
 
 **Control Issues:**
 - Verify joystick I2C addresses are correct (0x20, 0x21)
-- Check button wiring (active low with pullup)
 - Monitor serial output for debugging information
 
 **Safety Issues:**
 - If system becomes unresponsive, power cycle all components
-- Use emergency stop button or serial command
+- Use emergency stop serial command
 - Check safety timeout is functioning (1-second limit)
 
 ## Step 6: Maintenance and Updates
@@ -308,8 +297,6 @@ Each joystick needs a unique I2C address. Use the SparkFun Qwiic Joystick librar
 ### ESP32 Remote Control
 | Pin | Function |
 |-----|----------|
-| GPIO 14 | Button 1 (Arms Override) |
-| GPIO 27 | Button 2 (Bucket Override) |
 | GPIO 2  | Status LED |
 | SDA/SCL | Qwiic Joysticks |
 

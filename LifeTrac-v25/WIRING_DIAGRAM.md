@@ -80,16 +80,9 @@ ESP32 Thing Plus            Left Joystick (0x20)
                             └──────────────────────┘
 ```
 
-### Button Connections
+### Status LED
 ```
-ESP32 GPIO              Buttons
-┌─────────────────────┐  ┌──────────────────────────┐
-│ GPIO 14 ────────────────│ Button 1 (Arms Override) │─── GND
-│ GPIO 27 ────────────────│ Button 2 (Bucket Override) │─── GND
-│ GPIO 2 (Built-in LED)   │ Status LED               │
-└─────────────────────┘  └──────────────────────────┘
-
-Note: ESP32 internal pull-up resistors are enabled in software
+ESP32 GPIO 2 ─── Built-in LED (status indication)
 ```
 
 ## Hydraulic Valve Specifications
@@ -164,7 +157,6 @@ Raspberry Pi 4B
 - **Material:** Impact-resistant plastic
 - **Features:** 
   - Joystick mounting holes
-  - Button access
   - Battery compartment
   - Charging port access
   - Status LED visibility

@@ -7,13 +7,10 @@
  * Hardware:
  * - SparkFun Thing Plus - ESP32 WROOM (USB-C)
  * - SparkFun Qwiic Joystick (2x units for dual joystick control)
- * - Additional buttons for arms and bucket control
  * 
  * Control scheme:
  * - Left joystick: tank steering (Y=forward/back, X=turning)
  * - Right joystick: arms (Y) and bucket (X) control
- * - Button 1: Arms override (full up)
- * - Button 2: Bucket override (full up)
  */
 
 #include <Wire.h>
@@ -40,9 +37,7 @@ const char* remote_status_topic = "lifetrac/v25/remote_status";
 JOYSTICK leftJoystick;   // I2C address 0x20
 JOYSTICK rightJoystick;  // I2C address 0x21
 
-// Button pins
-const int BUTTON1_PIN = 14;  // Arms override button
-const int BUTTON2_PIN = 27;  // Bucket override button
+// Status LED pin
 const int LED_PIN = 2;       // Built-in LED for status indication
 
 // WiFi and MQTT clients
@@ -55,8 +50,6 @@ struct ControlData {
   int left_y = 0;       // Left joystick Y (-100 to 100)
   int right_x = 0;      // Right joystick X (-100 to 100)
   int right_y = 0;      // Right joystick Y (-100 to 100)
-  bool button1 = false; // Arms control button
-  bool button2 = false; // Bucket control button
 };
 
 ControlData currentControl;
@@ -91,9 +84,7 @@ void setup() {
     Serial.println("Right joystick connected!");
   }
   
-  // Initialize button pins
-  pinMode(BUTTON1_PIN, INPUT_PULLUP);
-  pinMode(BUTTON2_PIN, INPUT_PULLUP);
+  // Initialize button pins - removed (no buttons needed)
   
   // Initialize LED
   pinMode(LED_PIN, OUTPUT);
@@ -210,10 +201,6 @@ void readInputs() {
     if (abs(currentControl.right_x) < 10) currentControl.right_x = 0;
     if (abs(currentControl.right_y) < 10) currentControl.right_y = 0;
   }
-  
-  // Read buttons (active low with pullup)
-  currentControl.button1 = !digitalRead(BUTTON1_PIN);
-  currentControl.button2 = !digitalRead(BUTTON2_PIN);
 }
 
 bool shouldSendUpdate() {
@@ -221,9 +208,7 @@ bool shouldSendUpdate() {
   bool dataChanged = (currentControl.left_x != lastSentControl.left_x ||
                      currentControl.left_y != lastSentControl.left_y ||
                      currentControl.right_x != lastSentControl.right_x ||
-                     currentControl.right_y != lastSentControl.right_y ||
-                     currentControl.button1 != lastSentControl.button1 ||
-                     currentControl.button2 != lastSentControl.button2);
+                     currentControl.right_y != lastSentControl.right_y);
   
   // Or send at regular intervals to maintain connection
   bool timeToSend = (millis() - lastSendTime > SEND_INTERVAL);
@@ -242,8 +227,6 @@ void sendControlData() {
   doc["left_y"] = currentControl.left_y;
   doc["right_x"] = currentControl.right_x;
   doc["right_y"] = currentControl.right_y;
-  doc["button1"] = currentControl.button1;
-  doc["button2"] = currentControl.button2;
   doc["timestamp"] = millis();
   
   String message;
@@ -284,8 +267,6 @@ void publishRemoteStatus() {
   doc["current_left_y"] = currentControl.left_y;
   doc["current_right_x"] = currentControl.right_x;
   doc["current_right_y"] = currentControl.right_y;
-  doc["current_button1"] = currentControl.button1;
-  doc["current_button2"] = currentControl.button2;
   
   String statusMessage;
   serializeJson(doc, statusMessage);
@@ -330,7 +311,7 @@ void updateStatusLED() {
   }
 }
 
-// Emergency stop function (can be called via serial or button)
+// Emergency stop function (can be called via serial)
 void emergencyStop() {
   Serial.println("EMERGENCY STOP ACTIVATED!");
   
@@ -339,8 +320,6 @@ void emergencyStop() {
   currentControl.left_y = 0;
   currentControl.right_x = 0;
   currentControl.right_y = 0;
-  currentControl.button1 = false;
-  currentControl.button2 = false;
   
   // Send stop command immediately
   sendControlData();
@@ -381,11 +360,7 @@ void serialEvent() {
       Serial.print(" RX:");
       Serial.print(currentControl.right_x);
       Serial.print(" RY:");
-      Serial.print(currentControl.right_y);
-      Serial.print(" B1:");
-      Serial.print(currentControl.button1);
-      Serial.print(" B2:");
-      Serial.println(currentControl.button2);
+      Serial.println(currentControl.right_y);
     }
   }
 }

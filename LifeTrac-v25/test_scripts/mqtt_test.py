@@ -62,16 +62,13 @@ class LifeTracMQTTTest:
             print(f"Error connecting to MQTT broker: {e}")
             return False
     
-    def send_control_command(self, left_x=0, left_y=0, right_x=0, right_y=0, 
-                           button1=False, button2=False):
+    def send_control_command(self, left_x=0, left_y=0, right_x=0, right_y=0):
         """Send a control command to the LifeTrac"""
         command = {
             "left_x": left_x,
             "left_y": left_y,
             "right_x": right_x,
             "right_y": right_y,
-            "button1": button1,
-            "button2": button2,
             "timestamp": int(time.time() * 1000)
         }
         
@@ -88,30 +85,28 @@ class LifeTracMQTTTest:
         print("\n=== Starting Demo Sequence ===")
         
         sequences = [
-            # (description, left_x, left_y, right_x, right_y, button1, button2, duration)
-            ("Stop (all zeros)", 0, 0, 0, 0, False, False, 2),
-            ("Forward movement", 0, 50, 0, 0, False, False, 3),
-            ("Stop", 0, 0, 0, 0, False, False, 1),
-            ("Backward movement", 0, -50, 0, 0, False, False, 3),
-            ("Stop", 0, 0, 0, 0, False, False, 1),
-            ("Left turn", -30, 30, 0, 0, False, False, 3),
-            ("Stop", 0, 0, 0, 0, False, False, 1),
-            ("Right turn", 30, 30, 0, 0, False, False, 3),
-            ("Stop", 0, 0, 0, 0, False, False, 1),
-            ("Arms up", 0, 0, 0, 70, False, False, 3),
-            ("Arms down", 0, 0, 0, -70, False, False, 3),
-            ("Stop", 0, 0, 0, 0, False, False, 1),
-            ("Bucket up", 0, 0, 70, 0, False, False, 3),
-            ("Bucket down", 0, 0, -70, 0, False, False, 3),
-            ("Stop", 0, 0, 0, 0, False, False, 1),
-            ("Button 1 test (arms override)", 0, 0, 0, 0, True, False, 2),
-            ("Button 2 test (bucket override)", 0, 0, 0, 0, False, True, 2),
-            ("Final stop", 0, 0, 0, 0, False, False, 2),
+            # (description, left_x, left_y, right_x, right_y, duration)
+            ("Stop (all zeros)", 0, 0, 0, 0, 2),
+            ("Forward movement", 0, 50, 0, 0, 3),
+            ("Stop", 0, 0, 0, 0, 1),
+            ("Backward movement", 0, -50, 0, 0, 3),
+            ("Stop", 0, 0, 0, 0, 1),
+            ("Left turn", -30, 30, 0, 0, 3),
+            ("Stop", 0, 0, 0, 0, 1),
+            ("Right turn", 30, 30, 0, 0, 3),
+            ("Stop", 0, 0, 0, 0, 1),
+            ("Arms up", 0, 0, 0, 70, 3),
+            ("Arms down", 0, 0, 0, -70, 3),
+            ("Stop", 0, 0, 0, 0, 1),
+            ("Bucket up", 0, 0, 70, 0, 3),
+            ("Bucket down", 0, 0, -70, 0, 3),
+            ("Stop", 0, 0, 0, 0, 1),
+            ("Final stop", 0, 0, 0, 0, 2),
         ]
         
-        for description, lx, ly, rx, ry, b1, b2, duration in sequences:
+        for description, lx, ly, rx, ry, duration in sequences:
             print(f"\n{description}...")
-            self.send_control_command(lx, ly, rx, ry, b1, b2)
+            self.send_control_command(lx, ly, rx, ry)
             time.sleep(duration)
         
         print("\n=== Demo Sequence Complete ===")
@@ -124,14 +119,12 @@ class LifeTracMQTTTest:
         print("  a/d - left/right turn")
         print("  i/k - arms up/down")
         print("  j/l - bucket left(down)/right(up)")
-        print("  1/2 - button 1/2 toggle")
         print("  0 - emergency stop (all zeros)")
         print("  demo - run demo sequence")
         print("  quit - exit")
         
         left_x, left_y = 0, 0
         right_x, right_y = 0, 0
-        button1, button2 = False, False
         
         while True:
             try:
@@ -155,26 +148,18 @@ class LifeTracMQTTTest:
                     right_x = -70
                 elif cmd == 'l':
                     right_x = 70
-                elif cmd == '1':
-                    button1 = not button1
-                    print(f"Button 1: {'ON' if button1 else 'OFF'}")
-                elif cmd == '2':
-                    button2 = not button2
-                    print(f"Button 2: {'ON' if button2 else 'OFF'}")
                 elif cmd == '0':
                     left_x = left_y = right_x = right_y = 0
-                    button1 = button2 = False
                     print("Emergency stop - all controls zeroed")
                 elif cmd == 'demo':
                     self.run_demo_sequence()
                     left_x = left_y = right_x = right_y = 0
-                    button1 = button2 = False
                     continue
                 else:
                     print("Unknown command")
                     continue
                 
-                self.send_control_command(left_x, left_y, right_x, right_y, button1, button2)
+                self.send_control_command(left_x, left_y, right_x, right_y)
                 
             except KeyboardInterrupt:
                 print("\nExiting...")
@@ -229,7 +214,7 @@ def main():
             elif choice == '3':
                 tester.run_demo_sequence()
             elif choice == '4':
-                tester.send_control_command(0, 0, 0, 0, False, False)
+                self.send_control_command(0, 0, 0, 0)
                 print("Emergency stop command sent!")
             elif choice == '5':
                 break

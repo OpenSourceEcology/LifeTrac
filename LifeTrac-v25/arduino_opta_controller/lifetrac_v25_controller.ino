@@ -56,8 +56,6 @@ struct JoystickData {
   int left_y = 0;      // Left joystick Y (-100 to 100)
   int right_x = 0;     // Right joystick X (-100 to 100)
   int right_y = 0;     // Right joystick Y (-100 to 100)
-  bool button1 = false; // Arms control
-  bool button2 = false; // Bucket control
 };
 
 JoystickData currentInput;
@@ -183,8 +181,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   currentInput.left_y = doc["left_y"] | 0;
   currentInput.right_x = doc["right_x"] | 0;
   currentInput.right_y = doc["right_y"] | 0;
-  currentInput.button1 = doc["button1"] | false;
-  currentInput.button2 = doc["button2"] | false;
   
   lastCommandTime = millis();
 }
@@ -211,18 +207,12 @@ void processJoystickInput() {
   // Control right track
   controlTrack(rightTrackSpeed, RIGHT_TRACK_FORWARD_PIN, RIGHT_TRACK_BACKWARD_PIN);
   
-  // Control arms (right joystick Y or button1)
+  // Control arms (right joystick Y)
   int armControl = currentInput.right_y;
-  if (currentInput.button1) {
-    armControl = 100; // Full up when button pressed
-  }
   controlValve(armControl, ARMS_UP_PIN, ARMS_DOWN_PIN);
   
-  // Control bucket (button2 or right joystick X)
+  // Control bucket (right joystick X)
   int bucketControl = currentInput.right_x;
-  if (currentInput.button2) {
-    bucketControl = 100; // Full up when button pressed
-  }
   controlValve(bucketControl, BUCKET_UP_PIN, BUCKET_DOWN_PIN);
   
   // Set proportional flow control based on maximum input
@@ -319,8 +309,6 @@ void publishStatus() {
   doc["input_left_y"] = currentInput.left_y;
   doc["input_right_x"] = currentInput.right_x;
   doc["input_right_y"] = currentInput.right_y;
-  doc["input_button1"] = currentInput.button1;
-  doc["input_button2"] = currentInput.button2;
   
   String statusMessage;
   serializeJson(doc, statusMessage);
