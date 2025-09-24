@@ -1,3 +1,8 @@
+# General Operation
+
+* Joy Stick control of hydrauicly powered skidded track motors and hydraulic cylinders for arms and bucket
+* Options for future control methods using MQTT
+
 # Onboard BOM
 
 * (4) Hydraulic Directional Valve: 20 gpm Max Flow Rate, D03 NFPA Size, Three Positions, 12V DC 
@@ -12,6 +17,6 @@
 * SparkFun Qwiic Joystick https://www.sparkfun.com/sparkfun-qwiic-joystick.html
 * SparkFun Thing Plus - ESP32 WROOM https://www.sparkfun.com/sparkfun-thing-plus-esp32-wroom-usb-c.html
 
-# MQTT Broker
+# MQTT Broker BOM
 
 * Raspberry Pi for [Mosquitto](https://github.com/eclipse-mosquitto/mosquitto)
