@@ -7,7 +7,7 @@
 # Remote Control BOM
 
 * SparkFun Qwiic Joystick https://www.sparkfun.com/sparkfun-qwiic-joystick.html
-* 
+* SparkFun Thing Plus - ESP32 WROOM https://www.sparkfun.com/sparkfun-thing-plus-esp32-wroom-usb-c.html
 
 # MQTT Broker
 
