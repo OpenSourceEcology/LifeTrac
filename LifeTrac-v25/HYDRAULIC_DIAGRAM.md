@@ -4,7 +4,7 @@ This document provides an ASCII text art representation of the LifeTrac v25 hydr
 
 ## System Overview
 
-The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, directional control valves, hydraulic motors for track drive, hydraulic cylinders for arms and bucket, proportional flow control, and a cooler for temperature management.
+The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, proportional flow control valve, manifold block for valve mounting, directional control valves, hydraulic motors for track drive, hydraulic cylinders for arms and bucket, and a cooler for temperature management.
 
 ## Complete Hydraulic System Diagram
 
@@ -37,56 +37,53 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, dir
     │ VALVE (A0)      │                                              │
     │  ╔═══════════╗  │                                              │
     │  ║     ►     ║  │                                              │
-    │  ║   ◄═══►   ║──┼──────────┬─────────────┬─────────────┬──────┤
-    │  ║     ◄     ║  │          │             │             │      │
-    │  ╚═══════════╝  │          │             │             │      │
-    └─────────────────┘          │             │             │      │
-                                 │             │             │      │
-         ┌───────────────────────┴──┐      ┌───┴──┐      ┌───┴──┐   │
-         │   LEFT TRACK VALVE       │      │ ARMS │      │BUCKET│   │
-         │        (D1/D2)           │      │VALVE │      │VALVE │   │
-         │  ╔═══════════════════╗   │      │(D5/D6│      │(D7/D8│   │
-         │  ║ ▲               ▲ ║   │      │  )   │      │  )   │   │
-         │  ║ │               │ ║   │      │╔═══╗ │      │╔═══╗ │   │
-         │  ║ │       ▲       │ ║   │      │║ ▲ ║ │      │║ ▲ ║ │   │
-         │  ║ │      ▲▲▲      │ ║   │      │║▲│▲║ │      │║▲│▲║ │   │
-         │  ║ │     ▲▲▲▲▲     │ ║   │      │║ ▼ ║ │      │║ ▼ ║ │   │
-         │  ║ │               │ ║   │      │╚═══╝ │      │╚═══╝ │   │
-         │  ║ ▼               ▼ ║   │      └──┬───┘      └──┬───┘   │
-         │  ╚═══════════════════╝   │         │             │      │
-         └──────┬─────────┬─────────┘         │             │      │
-                │         │                   │             │      │
-                │         │                   │             │      │
-         ┌──────▼──┐   ┌──▼──────┐         ┌──▼───┐      ┌──▼───┐  │
-         │ LEFT    │   │ RIGHT   │         │ ARMS │      │BUCKET│  │
-         │ TRACK   │   │ TRACK   │         │ CYL. │      │ CYL. │  │
-         │ MOTOR   │   │ VALVE   │         │      │      │      │  │
-         │ ╔═════╗ │   │ (D3/D4) │         │ ╔══╗ │      │ ╔══╗ │  │
-         │ ║  M  ║ │   │╔══════╗ │         │ ║▲▲║ │      │ ║▲▲║ │  │
-         │ ║     ║ │   │║  ▲▲▲ ║ │         │ ║▲▲║ │      │ ║▲▲║ │  │
-         │ ║     ║ │   │║ ▲▲▲▲▲║ │         │ ║▼▼║ │      │ ║▼▼║ │  │
-         │ ║ ▲▲▲ ║ │   │║  ▼▼▼ ║ │         │ ║▼▼║ │      │ ║▼▼║ │  │
-         │ ║▲▲▲▲▲║ │   │╚══════╝ │         │ ╚══╝ │      │ ╚══╝ │  │
-         │ ║▲▲▲▲▲║ │   └──┬─────┬┘         └──────┘      └──────┘  │
-         │ ║ ▼▼▼ ║ │      │     │                                  │
-         │ ╚═════╝ │      │     │                                  │
-         └─────────┘      │     │                                  │
-                          │     │                                  │
-                   ┌──────▼──┐  │                                  │
-                   │ RIGHT   │  │                                  │
-                   │ TRACK   │  │                                  │
-                   │ MOTOR   │  │                                  │
-                   │ ╔═════╗ │  │                                  │
-                   │ ║  M  ║ │  │                                  │
-                   │ ║     ║ │  │                                  │
-                   │ ║     ║ │  │                                  │
-                   │ ║ ▲▲▲ ║ │  │                                  │
-                   │ ║▲▲▲▲▲║ │  │                                  │
-                   │ ║▲▲▲▲▲║ │  │                                  │
-                   │ ║ ▼▼▼ ║ │  │                                  │
-                   │ ╚═════╝ │  │                                  │
-                   └─────────┘  │                                  │
-                                │                                  │
+    │  ║   ◄═══►   ║──┼──────────────────┐                          │
+    │  ║     ◄     ║  │                  │                          │
+    │  ╚═══════════╝  │                  │                          │
+    └─────────────────┘                  │                          │  
+                                         ▼                          │
+    ┌───────────────────────────────────────────────────────────┐   │
+    │                    MANIFOLD BLOCK                        │   │
+    │  ╔═══════════════════════════════════════════════════╗   │   │
+    │  ║  ▲     ▲     ▲     ▲     ▲     ▲     ▲     ▲     ║   │   │
+    │  ║  │     │     │     │     │     │     │     │     ║   │   │
+    │  ║──┼─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────║   │   │
+    │  ║  │     │     │     │     │     │     │     │     ║   │   │
+    │  ║  ▼     ▼     ▼     ▼     ▼     ▼     ▼     ▼     ║   │   │
+    │  ╚═══════════════════════════════════════════════════╝   │   │
+    └──────┬─────────┬─────────┬─────────┬────────────────────┘   │
+           │         │         │         │                        │
+           │         │         │         │                        │
+         ┌─▼─┐   ┌───▼───┐ ┌───▼───┐ ┌───▼───┐                    │
+         │LFT│   │ RIGHT │ │ ARMS  │ │BUCKET │                    │
+         │TRK│   │ TRACK │ │ VALVE │ │ VALVE │                    │
+         │VLV│   │ VALVE │ │(D5/D6)│ │(D7/D8)│                    │
+         │D1/│   │(D3/D4)│ │       │ │       │                    │
+         │D2 │   │       │ │╔═══╗  │ │╔═══╗  │                    │
+         │╔══│   │╔══════│ │║ ▲ ║  │ │║ ▲ ║  │                    │
+         │║▲▲│   │║  ▲▲▲ │ │║▲│▲║  │ │║▲│▲║  │                    │
+         │║▲▲│   │║ ▲▲▲▲▲│ │║ ▼ ║  │ │║ ▼ ║  │                    │
+         │║▼▼│   │║  ▼▼▼ │ │╚═══╝  │ │╚═══╝  │                    │
+         │║▼▼│   │╚══════│ └───┬───┘ └───┬───┘                    │
+         │╚══│   └───┬───┘     │         │                        │
+         └─┬─┘       │         │         │                        │
+           │         │         │         │                        │
+         ┌─▼──┐   ┌──▼──────┐ ┌──▼───┐ ┌──▼───┐                   │
+         │LEFT│   │ RIGHT   │ │ ARMS │ │BUCKET│                   │
+         │TRCK│   │ TRACK   │ │ CYL. │ │ CYL. │                   │
+         │MOTR│   │ MOTOR   │ │      │ │      │                   │
+         │╔═══│   │ ╔═════╗ │ │ ╔══╗ │ │ ╔══╗ │                   │
+         │║ M │   │ ║  M  ║ │ │ ║▲▲║ │ │ ║▲▲║ │                   │
+         │║   │   │ ║     ║ │ │ ║▲▲║ │ │ ║▲▲║ │                   │
+         │║   │   │ ║     ║ │ │ ║▼▼║ │ │ ║▼▼║ │                   │
+         │║▲▲▲│   │ ║ ▲▲▲ ║ │ │ ║▼▼║ │ │ ║▼▼║ │                   │
+         │║▲▲▲│   │ ║▲▲▲▲▲║ │ │ ╚══╝ │ │ ╚══╝ │                   │
+         │║▲▲▲│   │ ║▲▲▲▲▲║ │ └──────┘ └──────┘                   │
+         │║▼▼▼│   │ ║ ▼▼▼ ║ │                                     │
+         │╚═══│   │ ╚═════╝ │                                     │
+         └────┘   └─────────┘                                     │
+                                                                  │
+                                                                  │
                                 └──────────────────────────────────┘
                                               Return Line
 ```
@@ -98,6 +95,7 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, dir
 - **RESERVOIR**: Stores hydraulic fluid and allows for thermal expansion
 - **PUMP**: Pressurizes hydraulic fluid from reservoir
 - **FLOW CONTROL VALVE (A0)**: Proportional valve controlling system flow rate
+- **MANIFOLD BLOCK**: Distribution block where all directional control valves are mounted
 - **COOLER**: Heat exchanger to maintain optimal fluid temperature
 
 ### Control Valves
@@ -118,9 +116,10 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, dir
 
 1. **Supply**: Pump draws fluid from reservoir and pressurizes the system
 2. **Distribution**: Pressurized fluid flows through the proportional flow control valve
-3. **Control**: Flow is distributed to four directional control valves
-4. **Actuation**: Each valve directs flow to its respective motor or cylinder
-5. **Return**: Used fluid returns through the cooler back to the reservoir
+3. **Manifold**: Flow is distributed through the manifold block to all directional control valves
+4. **Control**: Each valve directs flow to its respective motor or cylinder
+5. **Actuation**: Motors and cylinders perform their designated functions
+6. **Return**: Used fluid returns through the cooler back to the reservoir
 
 ## Control Logic
 
