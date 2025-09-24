@@ -214,7 +214,7 @@ def main():
             elif choice == '3':
                 tester.run_demo_sequence()
             elif choice == '4':
-                self.send_control_command(0, 0, 0, 0)
+                tester.send_control_command(0, 0, 0, 0)
                 print("Emergency stop command sent!")
             elif choice == '5':
                 break
