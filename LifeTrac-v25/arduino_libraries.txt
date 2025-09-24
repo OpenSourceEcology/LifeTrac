@@ -1,0 +1,51 @@
+# Arduino Library Requirements for LifeTrac v25
+
+## Required Libraries for Arduino Opta Controller
+
+### Core Libraries (built-in)
+- WiFi - ESP32 WiFi connectivity
+- Wire - I2C communication
+
+### External Libraries (install via Library Manager)
+- PubSubClient by Nick O'Leary - MQTT client functionality
+- ArduinoJson by Benoit Blanchon - JSON parsing and generation
+
+## Required Libraries for ESP32 Remote Control
+
+### Core Libraries (built-in)
+- WiFi - ESP32 WiFi connectivity  
+- Wire - I2C communication for joysticks
+
+### External Libraries (install via Library Manager)
+- PubSubClient by Nick O'Leary - MQTT client functionality
+- ArduinoJson by Benoit Blanchon - JSON parsing and generation
+- SparkFun Qwiic Joystick Arduino Library - Joystick control
+
+## Installation Instructions
+
+1. Open Arduino IDE
+2. Go to Tools → Manage Libraries
+3. Search for each library by name and author
+4. Click Install for each required library
+5. Restart Arduino IDE
+
+## Library Versions (Tested)
+- PubSubClient: v2.8 or newer
+- ArduinoJson: v6.21 or newer
+- SparkFun Qwiic Joystick: v1.0.3 or newer
+
+## Alternative Installation Methods
+
+### Manual Installation
+1. Download library ZIP files from GitHub
+2. Go to Sketch → Include Library → Add .ZIP Library
+3. Select downloaded ZIP files
+
+### PlatformIO (if using PlatformIO IDE)
+Add to platformio.ini:
+```
+lib_deps = 
+    knolleary/PubSubClient@^2.8
+    bblanchon/ArduinoJson@^6.21
+    sparkfun/SparkFun Qwiic Joystick Arduino Library@^1.0.3
+```
