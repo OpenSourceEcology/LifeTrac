@@ -1,0 +1,44 @@
+# WiFi Configuration for LifeTrac v25 Components
+
+## Raspberry Pi WiFi Setup (wpa_supplicant.conf)
+Place this file in the boot partition of your SD card before first boot:
+
+```
+country=US
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+
+network={
+    ssid="YOUR_WIFI_SSID"
+    psk="YOUR_WIFI_PASSWORD"
+    key_mgmt=WPA-PSK
+}
+```
+
+## Recommended Network Settings
+- Network: 192.168.1.0/24
+- Router: 192.168.1.1
+- Raspberry Pi: 192.168.1.100 (static recommended)
+- Arduino Opta: DHCP (dynamic)
+- ESP32 Remote: DHCP (dynamic)
+
+## Static IP Configuration for Raspberry Pi
+Edit /etc/dhcpcd.conf:
+
+```
+interface wlan0
+static ip_address=192.168.1.100/24
+static routers=192.168.1.1
+static domain_name_servers=192.168.1.1 8.8.8.8
+```
+
+## Port Forwarding (if needed for remote access)
+- MQTT: Port 1883 → Raspberry Pi:1883
+- SSH: Port 2222 → Raspberry Pi:22 (for maintenance)
+
+## Security Recommendations
+- Change default passwords
+- Use WPA3 if available
+- Enable MAC address filtering for production use
+- Consider VPN for remote access
+- Regular security updates
