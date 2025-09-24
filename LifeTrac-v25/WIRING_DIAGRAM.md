@@ -28,14 +28,14 @@ GND ──────────────┬─── Arduino Opta GND
 ```
 Arduino Opta D1608S          Hydraulic Valves
 ┌─────────────────────┐      ┌──────────────────────────┐
-│ D0 ─────────────────────── │ Left Track Forward       │
-│ D1 ─────────────────────── │ Left Track Backward      │
-│ D2 ─────────────────────── │ Right Track Forward      │
-│ D3 ─────────────────────── │ Right Track Backward     │
-│ D4 ─────────────────────── │ Arms Up                  │
-│ D5 ─────────────────────── │ Arms Down                │
-│ D6 ─────────────────────── │ Bucket Up                │
-│ D7 ─────────────────────── │ Bucket Down              │
+│ D1 ─────────────────────── │ Left Track Forward       │
+│ D2 ─────────────────────── │ Left Track Backward      │
+│ D3 ─────────────────────── │ Right Track Forward      │
+│ D4 ─────────────────────── │ Right Track Backward     │
+│ D5 ─────────────────────── │ Arms Up                  │
+│ D6 ─────────────────────── │ Arms Down                │
+│ D7 ─────────────────────── │ Bucket Up                │
+│ D8 ─────────────────────── │ Bucket Down              │
 └─────────────────────┘      └──────────────────────────┘
 ```
 

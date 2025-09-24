@@ -108,14 +108,14 @@ sudo systemctl status mosquitto
 ### 2.1 Hardware Connections
 
 **Digital I/O Extension (D1608S) Connections:**
-- D0: Left Track Forward Valve
-- D1: Left Track Backward Valve
-- D2: Right Track Forward Valve
-- D3: Right Track Backward Valve
-- D4: Arms Up Valve
-- D5: Arms Down Valve
-- D6: Bucket Up Valve
-- D7: Bucket Down Valve
+- D1: Left Track Forward Valve
+- D2: Left Track Backward Valve
+- D3: Right Track Forward Valve
+- D4: Right Track Backward Valve
+- D5: Arms Up Valve
+- D6: Arms Down Valve
+- D7: Bucket Up Valve
+- D8: Bucket Down Valve
 
 **Analog Extension (A0602) Connections:**
 - A0: Proportional Flow Control Valve (PWM output)
@@ -291,14 +291,14 @@ Each joystick needs a unique I2C address. Use the SparkFun Qwiic Joystick librar
 ### Arduino Opta Digital I/O (D1608S)
 | Pin | Function |
 |-----|----------|
-| D0  | Left Track Forward |
-| D1  | Left Track Backward |
-| D2  | Right Track Forward |
-| D3  | Right Track Backward |
-| D4  | Arms Up |
-| D5  | Arms Down |
-| D6  | Bucket Up |
-| D7  | Bucket Down |
+| D1  | Left Track Forward |
+| D2  | Left Track Backward |
+| D3  | Right Track Forward |
+| D4  | Right Track Backward |
+| D5  | Arms Up |
+| D6  | Arms Down |
+| D7  | Bucket Up |
+| D8  | Bucket Down |
 
 ### Arduino Opta Analog (A0602)
 | Pin | Function |

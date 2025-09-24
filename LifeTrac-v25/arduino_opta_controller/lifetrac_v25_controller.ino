@@ -38,14 +38,14 @@ const char* control_topic = "lifetrac/v25/control";
 const char* status_topic = "lifetrac/v25/status";
 
 // Pin definitions for hydraulic valve control
-const int LEFT_TRACK_FORWARD_PIN = 0;   // D0
-const int LEFT_TRACK_BACKWARD_PIN = 1;  // D1
-const int RIGHT_TRACK_FORWARD_PIN = 2;  // D2
-const int RIGHT_TRACK_BACKWARD_PIN = 3; // D3
-const int ARMS_UP_PIN = 4;              // D4
-const int ARMS_DOWN_PIN = 5;            // D5
-const int BUCKET_UP_PIN = 6;            // D6
-const int BUCKET_DOWN_PIN = 7;          // D7
+const int LEFT_TRACK_FORWARD_PIN = 1;   // D1
+const int LEFT_TRACK_BACKWARD_PIN = 2;  // D2
+const int RIGHT_TRACK_FORWARD_PIN = 3;  // D3
+const int RIGHT_TRACK_BACKWARD_PIN = 4; // D4
+const int ARMS_UP_PIN = 5;              // D5
+const int ARMS_DOWN_PIN = 6;            // D6
+const int BUCKET_UP_PIN = 7;            // D7
+const int BUCKET_DOWN_PIN = 8;          // D8
 
 // Pin for proportional flow control (PWM)
 const int FLOW_CONTROL_PIN = 0;         // A0 (PWM capable)
