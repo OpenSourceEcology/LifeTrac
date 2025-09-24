@@ -10,6 +10,8 @@ The LifeTrac v25 remote control system consists of three main components:
 2. **ESP32 Remote Control** - Handheld remote with dual joysticks
 3. **MQTT Broker** - Raspberry Pi running Mosquitto for communication
 
+For a detailed view of the hydraulic system layout and component connections, see [HYDRAULIC_DIAGRAM.md](HYDRAULIC_DIAGRAM.md).
+
 ## Hardware Requirements
 
 ### Onboard Controller (LifeTrac)
