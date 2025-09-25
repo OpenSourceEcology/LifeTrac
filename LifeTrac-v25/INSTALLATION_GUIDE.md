@@ -20,6 +20,7 @@ For a detailed view of the hydraulic system layout and component connections, se
 - Arduino Pro Opta Ext A0602 - Analog Extension ($229.00)
 - 4x Hydraulic Directional Valves (20 gpm, D03 NFPA, 12V DC)
 - 1x Electronically Adjustable Proportional Flow Control Valve
+- 1x Burkert 8605 Type 316532 Flow Valve Controller
 
 ### Remote Control Unit
 - SparkFun Thing Plus - ESP32 WROOM (USB-C)
@@ -119,11 +120,12 @@ sudo systemctl status mosquitto
 - D8: Bucket Down Valve
 
 **Analog Extension (A0602) Connections:**
-- A0: Proportional Flow Control Valve (PWM output)
+- O2: Burkert 8605 Controller Interface (4-20mA current loop output)
 
 **Power Connections:**
 - 12V DC supply for hydraulic valves
-- 24V DC supply for Arduino Opta (if required)
+- 12V DC supply for Arduino Opta (shared with valve supply)
+- 12V DC supply for Burkert 8605 Controller (shared with valve supply)
 
 ### 2.2 Software Configuration
 
@@ -203,6 +205,8 @@ Each joystick needs a unique I2C address. Use the SparkFun Qwiic Joystick librar
 - Move joysticks with varying intensity
 - Verify proportional flow control responds to maximum input
 - Check minimum flow threshold activation
+- Ensure Burkert 8605 controller provides smooth flow modulation
+- Test response time and accuracy of flow control
 
 ### 4.3 Safety System Tests
 
@@ -294,7 +298,7 @@ Each joystick needs a unique I2C address. Use the SparkFun Qwiic Joystick librar
 ### Arduino Opta Analog (A0602)
 | Pin | Function |
 |-----|----------|
-| A0  | Proportional Flow Control (PWM) |
+| O2  | Burkert 8605 Controller Interface (4-20mA current loop) |
 
 ### ESP32 Remote Control
 | Pin | Function |

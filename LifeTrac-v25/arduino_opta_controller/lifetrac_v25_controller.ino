@@ -10,6 +10,7 @@
  * - Arduino Pro Opta Ext A0602 (Analog extension)
  * - 4x Hydraulic Directional Valves (12V DC)
  * - 1x Proportional Flow Control Valve
+ * - 1x Burkert 8605 Type 316532 Flow Valve Controller
  * 
  * Control scheme:
  * - Left track: forward/backward valve
@@ -22,6 +23,7 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include <OptaController.h>  // Required for Opta A0602 4-20mA current output
 
 // WiFi credentials - update these for your network
 const char* ssid = "YOUR_WIFI_SSID";
@@ -47,8 +49,8 @@ const int ARMS_DOWN_PIN = 6;            // D6
 const int BUCKET_UP_PIN = 7;            // D7
 const int BUCKET_DOWN_PIN = 8;          // D8
 
-// Pin for proportional flow control (PWM)
-const int FLOW_CONTROL_PIN = 0;         // A0 (PWM capable)
+// Pin for proportional flow control (4-20mA) - connects to Burkert 8605 Controller
+const int FLOW_CONTROL_PIN = 2;         // O2 (4-20mA current loop output) - interfaces with Burkert controller
 
 // Control variables
 struct JoystickData {
@@ -83,8 +85,10 @@ void setup() {
   pinMode(BUCKET_UP_PIN, OUTPUT);
   pinMode(BUCKET_DOWN_PIN, OUTPUT);
   
-  // Initialize PWM pin for flow control
-  pinMode(FLOW_CONTROL_PIN, OUTPUT);
+  // Initialize 4-20mA current output pin for flow control
+  OptaController.begin();  // Initialize Opta controller library
+  // Configure O2 as 4-20mA current output
+  OptaController.analogWriteMode(FLOW_CONTROL_PIN, CURRENT_OUTPUT_4_20MA);
   
   // Ensure all outputs are off initially
   stopAllMovement();
@@ -254,6 +258,7 @@ void controlValve(int control, int upPin, int downPin) {
 void setFlowControl() {
   // Find the maximum absolute value from all inputs
   // This determines the overall system speed
+  // 4-20mA current loop output interfaces with Burkert 8605 Controller for precise flow control
   int maxInput = 0;
   
   maxInput = max(maxInput, abs(currentInput.left_x));
@@ -261,15 +266,20 @@ void setFlowControl() {
   maxInput = max(maxInput, abs(currentInput.right_x));
   maxInput = max(maxInput, abs(currentInput.right_y));
   
-  // Convert to PWM value (0-255)
-  int pwmValue = map(maxInput, 0, 100, 0, 255);
+  // Convert to 4-20mA value (4mA = minimum, 20mA = maximum)
+  // Map from joystick range (0-100) to current range (4-20mA)
+  int currentValue = map(maxInput, 0, 100, 4, 20);
   
   // Apply minimum flow when any movement is commanded
   if (maxInput > DEADZONE) {
-    pwmValue = max(pwmValue, 50); // Minimum 20% flow
+    currentValue = max(currentValue, 6); // Minimum ~12.5% flow (6mA)
+  } else {
+    currentValue = 4; // 4mA = no flow
   }
   
-  analogWrite(FLOW_CONTROL_PIN, pwmValue);
+  // Output true 4-20mA current using Opta A0602 current loop hardware
+  // currentValue is already in mA (4-20 range)
+  OptaController.analogWriteCurrent(FLOW_CONTROL_PIN, currentValue);
 }
 
 void stopAllMovement() {
@@ -283,8 +293,8 @@ void stopAllMovement() {
   digitalWrite(BUCKET_UP_PIN, LOW);
   digitalWrite(BUCKET_DOWN_PIN, LOW);
   
-  // Stop flow control
-  analogWrite(FLOW_CONTROL_PIN, 0);
+  // Stop flow control - set to 4mA (no flow) using true current output
+  OptaController.analogWriteCurrent(FLOW_CONTROL_PIN, 4);
 }
 
 void publishStatus() {

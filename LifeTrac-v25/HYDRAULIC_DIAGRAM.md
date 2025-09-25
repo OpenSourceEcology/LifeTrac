@@ -34,7 +34,7 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, pro
               ▼                                                      │
     ┌─────────────────┐                                              │
     │ FLOW CONTROL    │                                              │
-    │ VALVE (A0)      │                                              │
+    │ VALVE (O2)      │                                              │
     │  ╔═══════════╗  │                                              │
     │  ║     ►     ║  │                                              │
     │  ║   ◄═══►   ║──┼──────────────────────────────────────────────│
@@ -87,7 +87,8 @@ The LifeTrac v25 hydraulic system consists of a pressurized reservoir, pump, pro
 
 - **RESERVOIR**: Stores hydraulic fluid and allows for thermal expansion
 - **PUMP**: Pressurizes hydraulic fluid from reservoir
-- **FLOW CONTROL VALVE (A0)**: Proportional valve controlling system flow rate with return line for excess flow
+- **FLOW CONTROL VALVE (O2)**: Proportional valve controlling system flow rate with return line for excess flow
+- **BURKERT 8605 CONTROLLER**: Digital flow valve controller (Type 316532) providing precise flow control with analog or digital interface
 - **MANIFOLD BLOCK**: Distribution block where all directional control valves are mounted, includes return manifold
 - **COOLER**: Heat exchanger to maintain optimal fluid temperature
 
@@ -136,8 +137,9 @@ D2 - Left Track Backward   D6 - Arms Down
 D3 - Right Track Forward   D7 - Bucket Up
 D4 - Right Track Backward  D8 - Bucket Down
 
-Analog Output (PWM):
-D9 (PWM) - Flow Control Valve (requires 0-10V output: use PWM + RC filter and op-amp or external driver)
+Analog Output (4-20mA):
+O2 (4-20mA) - Burkert 8605 Controller Interface (current loop)
+Note: Burkert controller provides enhanced flow control capabilities
 ```
 
 ## Specifications
