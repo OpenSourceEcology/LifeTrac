@@ -41,13 +41,21 @@ Arduino Opta D1608S          Hydraulic Valves
 
 ### Analog Extension (A0602) Connections
 ```
-Arduino Opta A0602           Flow Control Valve
+Arduino Opta A0602           Flow Control System
 ┌─────────────────────┐      ┌──────────────────────────┐
-│ O2+ (4-20mA) ───────────── │ Current Loop Input (+)   │
-│ O2- (4-20mA) ───────────── │ Current Loop Input (-)   │
+│ O2+ (4-20mA) ───────────── │ Burkert 8605 Controller  │
+│ O2- (4-20mA) ───────────── │ Current Input            │
 │ +12V ───────────────────── │ Power Supply (+)         │
 │ GND ────────────────────── │ Power Supply (-)         │
 └─────────────────────┘      └──────────────────────────┘
+                                        │
+                                        │ Control Output
+                                        ▼
+                             ┌──────────────────────────┐
+                             │ Brand Hydraulics EFC     │
+                             │ Flow Control Valve Coil  │
+                             │ (Proportional)           │
+                             └──────────────────────────┘
 ```
 
 ## ESP32 Remote Control Wiring
@@ -102,27 +110,38 @@ Valve Solenoid B ── Arduino Digital Output ── 12V Supply
 Valve Common ────── Ground
 ```
 
-### Proportional Flow Control Valve
-- **Input:** 4-20mA current loop (industrial standard)
-- **Control:** 4-20mA from Arduino Opta A0602 O2 output
+### Brand Hydraulics EFC Proportional Flow Control Valve
+- **Model:** Electronically Adjustable Pressure Compensated Proportional Flow Control
+- **Input:** Controlled by Burkert 8605 Controller
+- **Control Signal:** 4-20mA from Arduino Opta A0602 O2 output via Burkert controller
 - **Response:** Flow rate proportional to current signal
+- **Flow Range:** Up to 20 GPM (system specification)
 
 ### Burkert 8605 Type 316532 Flow Valve Controller
+- **Role:** Electronic controller for Brand Hydraulics EFC valve
 - **Power Supply:** 12V DC (compatible with existing system supply)
-- **Control Interface:** 4-20mA current loop (industrial standard)
-- **Flow Range:** Depends on connected valve size (up to 30 GPM typical)
+- **Control Interface:** 4-20mA current loop input (industrial standard)
+- **Output:** Proportional control signal to Brand Hydraulics valve coil
+- **Flow Range:** Up to 30 GPM (controller capability)
 - **Response Time:** <100ms typical
 - **Connection:** Arduino Opta A0602 O2 output (4-20mA current loop)
 
-### Burkert Controller 4-20mA Interface
+### Burkert Controller to Brand Hydraulics Valve Interface
 ```
-Arduino Opta A0602           Burkert 8605 Controller
-┌─────────────────────┐      ┌──────────────────────────┐
-│ O2+ (4-20mA) ───────────── │ Current Input (+)        │
-│ O2- (4-20mA) ───────────── │ Current Input (-)        │
-│                     │      │ Power: 12V DC Supply     │
-└─────────────────────┘      └──────────────────────────┘
+Arduino Opta A0602           Burkert 8605 Controller      Brand Hydraulics EFC Valve
+┌─────────────────────┐      ┌──────────────────────┐      ┌────────────────────────┐
+│ O2+ (4-20mA) ───────────── │ Current Input (+)    │      │                        │
+│ O2- (4-20mA) ───────────── │ Current Input (-)    │      │                        │
+│                     │      │                      │      │                        │
+│                     │      │ Valve Control Output ─────► │ Proportional Coil     │
+│                     │      │                      │      │ (Flow Control)        │
+│                     │      │ Power: 12V DC Supply │      │                        │
+└─────────────────────┘      └──────────────────────┘      └────────────────────────┘
 
+Signal Flow:
+1. Arduino O2 sends 4-20mA current signal to Burkert controller
+2. Burkert controller converts current signal to proportional valve control
+3. Burkert controller drives Brand Hydraulics EFC valve coil for flow control
 4-20mA current loop provides superior noise immunity and precision
 over PWM/voltage control for industrial applications.
 ```
