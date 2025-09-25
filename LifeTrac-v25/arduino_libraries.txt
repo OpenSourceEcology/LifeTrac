@@ -6,6 +6,9 @@
 - WiFi - ESP32 WiFi connectivity
 - Wire - I2C communication
 
+### Arduino Opta Specific Libraries
+- OptaController - Arduino Opta controller library for 4-20mA current output and hardware control
+
 ### External Libraries (install via Library Manager)
 - PubSubClient by Nick O'Leary - MQTT client functionality
 - ArduinoJson by Benoit Blanchon - JSON parsing and generation
@@ -25,11 +28,16 @@
 
 1. Open Arduino IDE
 2. Go to Tools → Manage Libraries
-3. Search for each library by name and author
+3. Search for each library by name and author:
+   - "OptaController" - Arduino official library for Opta hardware
+   - "PubSubClient" by Nick O'Leary
+   - "ArduinoJson" by Benoit Blanchon
+   - "SparkFun Qwiic Joystick Arduino Library" by SparkFun
 4. Click Install for each required library
 5. Restart Arduino IDE
 
 ## Library Versions (Tested)
+- OptaController: Latest version (Arduino official library)
 - PubSubClient: v2.8 or newer
 - ArduinoJson: v6.21 or newer
 - SparkFun Qwiic Joystick: v1.0.3 or newer
@@ -45,6 +53,7 @@
 Add to platformio.ini:
 ```
 lib_deps = 
+    arduino/OptaController
     knolleary/PubSubClient@^2.8
     bblanchon/ArduinoJson@^6.21
     sparkfun/SparkFun Qwiic Joystick Arduino Library@^1.0.3

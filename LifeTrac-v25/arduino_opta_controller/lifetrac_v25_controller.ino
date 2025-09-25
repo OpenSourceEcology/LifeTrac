@@ -23,6 +23,7 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include <OptaController.h>  // Required for Opta A0602 4-20mA current output
 
 // WiFi credentials - update these for your network
 const char* ssid = "YOUR_WIFI_SSID";
@@ -84,8 +85,10 @@ void setup() {
   pinMode(BUCKET_UP_PIN, OUTPUT);
   pinMode(BUCKET_DOWN_PIN, OUTPUT);
   
-  // Initialize 4-20mA output pin for flow control
-  pinMode(FLOW_CONTROL_PIN, OUTPUT);
+  // Initialize 4-20mA current output pin for flow control
+  OptaController.begin();  // Initialize Opta controller library
+  // Configure O2 as 4-20mA current output
+  OptaController.analogWriteMode(FLOW_CONTROL_PIN, CURRENT_OUTPUT_4_20MA);
   
   // Ensure all outputs are off initially
   stopAllMovement();
@@ -274,10 +277,9 @@ void setFlowControl() {
     currentValue = 4; // 4mA = no flow
   }
   
-  // Output 4-20mA current (implementation depends on Opta A0602 library)
-  // For now using analogWrite as placeholder - replace with proper 4-20mA function
-  int analogValue = map(currentValue, 4, 20, 51, 255); // Convert 4-20mA to analogWrite range
-  analogWrite(FLOW_CONTROL_PIN, analogValue);
+  // Output true 4-20mA current using Opta A0602 current loop hardware
+  // currentValue is already in mA (4-20 range)
+  OptaController.analogWriteCurrent(FLOW_CONTROL_PIN, currentValue);
 }
 
 void stopAllMovement() {
@@ -291,8 +293,8 @@ void stopAllMovement() {
   digitalWrite(BUCKET_UP_PIN, LOW);
   digitalWrite(BUCKET_DOWN_PIN, LOW);
   
-  // Stop flow control (4mA = no flow)
-  analogWrite(FLOW_CONTROL_PIN, 51); // 51 ≈ 4mA in analogWrite scale
+  // Stop flow control - set to 4mA (no flow) using true current output
+  OptaController.analogWriteCurrent(FLOW_CONTROL_PIN, 4);
 }
 
 void publishStatus() {
