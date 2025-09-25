@@ -120,8 +120,7 @@ sudo systemctl status mosquitto
 - D8: Bucket Down Valve
 
 **Analog Extension (A0602) Connections:**
-- A0: Proportional Flow Control Valve (PWM output)
-- A0: Burkert 8605 Controller Interface (analog input, may require voltage scaling)
+- O2: Burkert 8605 Controller Interface (4-20mA current loop output)
 
 **Power Connections:**
 - 12V DC supply for hydraulic valves
@@ -299,7 +298,7 @@ Each joystick needs a unique I2C address. Use the SparkFun Qwiic Joystick librar
 ### Arduino Opta Analog (A0602)
 | Pin | Function |
 |-----|----------|
-| A0  | Proportional Flow Control (PWM) / Burkert 8605 Interface |
+| O2  | Burkert 8605 Controller Interface (4-20mA current loop) |
 
 ### ESP32 Remote Control
 | Pin | Function |

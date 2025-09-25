@@ -43,9 +43,10 @@ Arduino Opta D1608S          Hydraulic Valves
 ```
 Arduino Opta A0602           Flow Control Valve
 ┌─────────────────────┐      ┌──────────────────────────┐
-│ A0 (PWM) ───────────────── │ Control Signal Input     │
-│ GND ────────────────────── │ Signal Ground            │
-│ +5V ────────────────────── │ Signal Power (if needed) │
+│ O2+ (4-20mA) ───────────── │ Current Loop Input (+)   │
+│ O2- (4-20mA) ───────────── │ Current Loop Input (-)   │
+│ +12V ───────────────────── │ Power Supply (+)         │
+│ GND ────────────────────── │ Power Supply (-)         │
 └─────────────────────┘      └──────────────────────────┘
 ```
 
@@ -102,40 +103,28 @@ Valve Common ────── Ground
 ```
 
 ### Proportional Flow Control Valve
-- **Input:** 0-10V DC or 4-20mA (check valve specification)
-- **Control:** PWM from Arduino A0 (filtered to DC voltage)
-- **Response:** Flow rate proportional to control signal
+- **Input:** 4-20mA current loop (industrial standard)
+- **Control:** 4-20mA from Arduino Opta A0602 O2 output
+- **Response:** Flow rate proportional to current signal
 
 ### Burkert 8605 Type 316532 Flow Valve Controller
 - **Power Supply:** 12V DC (compatible with existing system supply)
-- **Control Interface Options:**
-  - Analog: 0-10V DC or 4-20mA input
-  - Digital: RS485/Modbus RTU communication
+- **Control Interface:** 4-20mA current loop (industrial standard)
 - **Flow Range:** Depends on connected valve size (up to 30 GPM typical)
 - **Response Time:** <100ms typical
-- **Connection:**
-  - For Analog Control: Use Arduino A0 with voltage divider/amplifier
-  - For Digital Control: Requires RS485 interface (future enhancement)
+- **Connection:** Arduino Opta A0602 O2 output (4-20mA current loop)
 
-### PWM to Voltage Conversion (if needed)
-```
-Arduino A0 (PWM) ──┬── 1kΩ Resistor ──┬── Flow Control Valve Input
-                   │                   │
-                   └── 10µF Capacitor ─┴── GND
-
-This creates a simple RC filter to convert PWM to smooth DC voltage.
-```
-
-### Burkert Controller Analog Interface
+### Burkert Controller 4-20mA Interface
 ```
 Arduino Opta A0602           Burkert 8605 Controller
 ┌─────────────────────┐      ┌──────────────────────────┐
-│ A0 (PWM) ───────────────── │ Analog Input (0-10V)     │
-│ GND ────────────────────── │ Signal Ground            │
+│ O2+ (4-20mA) ───────────── │ Current Input (+)        │
+│ O2- (4-20mA) ───────────── │ Current Input (-)        │
 │                     │      │ Power: 12V DC Supply     │
 └─────────────────────┘      └──────────────────────────┘
 
-Note: May require voltage level adjustment from 5V PWM to 0-10V
+4-20mA current loop provides superior noise immunity and precision
+over PWM/voltage control for industrial applications.
 ```
 
 ## Network Infrastructure

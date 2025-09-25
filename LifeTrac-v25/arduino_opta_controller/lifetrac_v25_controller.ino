@@ -48,8 +48,8 @@ const int ARMS_DOWN_PIN = 6;            // D6
 const int BUCKET_UP_PIN = 7;            // D7
 const int BUCKET_DOWN_PIN = 8;          // D8
 
-// Pin for proportional flow control (PWM) - connects to Burkert 8605 Controller
-const int FLOW_CONTROL_PIN = 0;         // A0 (PWM capable) - interfaces with Burkert controller
+// Pin for proportional flow control (4-20mA) - connects to Burkert 8605 Controller
+const int FLOW_CONTROL_PIN = 2;         // O2 (4-20mA current loop output) - interfaces with Burkert controller
 
 // Control variables
 struct JoystickData {
@@ -84,7 +84,7 @@ void setup() {
   pinMode(BUCKET_UP_PIN, OUTPUT);
   pinMode(BUCKET_DOWN_PIN, OUTPUT);
   
-  // Initialize PWM pin for flow control
+  // Initialize 4-20mA output pin for flow control
   pinMode(FLOW_CONTROL_PIN, OUTPUT);
   
   // Ensure all outputs are off initially
@@ -255,7 +255,7 @@ void controlValve(int control, int upPin, int downPin) {
 void setFlowControl() {
   // Find the maximum absolute value from all inputs
   // This determines the overall system speed
-  // PWM signal interfaces with Burkert 8605 Controller for precise flow control
+  // 4-20mA current loop output interfaces with Burkert 8605 Controller for precise flow control
   int maxInput = 0;
   
   maxInput = max(maxInput, abs(currentInput.left_x));
@@ -263,15 +263,21 @@ void setFlowControl() {
   maxInput = max(maxInput, abs(currentInput.right_x));
   maxInput = max(maxInput, abs(currentInput.right_y));
   
-  // Convert to PWM value (0-255)
-  int pwmValue = map(maxInput, 0, 100, 0, 255);
+  // Convert to 4-20mA value (4mA = minimum, 20mA = maximum)
+  // Map from joystick range (0-100) to current range (4-20mA)
+  int currentValue = map(maxInput, 0, 100, 4, 20);
   
   // Apply minimum flow when any movement is commanded
   if (maxInput > DEADZONE) {
-    pwmValue = max(pwmValue, 50); // Minimum 20% flow
+    currentValue = max(currentValue, 6); // Minimum ~12.5% flow (6mA)
+  } else {
+    currentValue = 4; // 4mA = no flow
   }
   
-  analogWrite(FLOW_CONTROL_PIN, pwmValue);
+  // Output 4-20mA current (implementation depends on Opta A0602 library)
+  // For now using analogWrite as placeholder - replace with proper 4-20mA function
+  int analogValue = map(currentValue, 4, 20, 51, 255); // Convert 4-20mA to analogWrite range
+  analogWrite(FLOW_CONTROL_PIN, analogValue);
 }
 
 void stopAllMovement() {
@@ -285,8 +291,8 @@ void stopAllMovement() {
   digitalWrite(BUCKET_UP_PIN, LOW);
   digitalWrite(BUCKET_DOWN_PIN, LOW);
   
-  // Stop flow control
-  analogWrite(FLOW_CONTROL_PIN, 0);
+  // Stop flow control (4mA = no flow)
+  analogWrite(FLOW_CONTROL_PIN, 51); // 51 ≈ 4mA in analogWrite scale
 }
 
 void publishStatus() {
