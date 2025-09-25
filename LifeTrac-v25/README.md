@@ -30,6 +30,7 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 
 * (4) Hydraulic Directional Valve: 20 gpm Max Flow Rate, D03 NFPA Size, Three Positions, 12V DC 
 * (1) Electronically Adjustable Pressure Compensated Proportional Flow Control https://www.brand-hyd.com/Products/Valves/Flow_Controls/EFC/
+* (1) Burkert 8605 Type 316532 Flow Valve Controller https://www.burkert-usa.com/en/products/solenoid-control-valves/controllers/316532
 
 * Arduino Opta WiFi - $199.00
 * Arduino Pro Opta Ext D1608S - $151.00  

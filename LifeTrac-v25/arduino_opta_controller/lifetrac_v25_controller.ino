@@ -10,6 +10,7 @@
  * - Arduino Pro Opta Ext A0602 (Analog extension)
  * - 4x Hydraulic Directional Valves (12V DC)
  * - 1x Proportional Flow Control Valve
+ * - 1x Burkert 8605 Type 316532 Flow Valve Controller
  * 
  * Control scheme:
  * - Left track: forward/backward valve
@@ -47,8 +48,8 @@ const int ARMS_DOWN_PIN = 6;            // D6
 const int BUCKET_UP_PIN = 7;            // D7
 const int BUCKET_DOWN_PIN = 8;          // D8
 
-// Pin for proportional flow control (PWM)
-const int FLOW_CONTROL_PIN = 0;         // A0 (PWM capable)
+// Pin for proportional flow control (PWM) - connects to Burkert 8605 Controller
+const int FLOW_CONTROL_PIN = 0;         // A0 (PWM capable) - interfaces with Burkert controller
 
 // Control variables
 struct JoystickData {
@@ -254,6 +255,7 @@ void controlValve(int control, int upPin, int downPin) {
 void setFlowControl() {
   // Find the maximum absolute value from all inputs
   // This determines the overall system speed
+  // PWM signal interfaces with Burkert 8605 Controller for precise flow control
   int maxInput = 0;
   
   maxInput = max(maxInput, abs(currentInput.left_x));

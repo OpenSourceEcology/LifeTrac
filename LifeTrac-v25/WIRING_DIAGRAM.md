@@ -106,6 +106,17 @@ Valve Common ────── Ground
 - **Control:** PWM from Arduino A0 (filtered to DC voltage)
 - **Response:** Flow rate proportional to control signal
 
+### Burkert 8605 Type 316532 Flow Valve Controller
+- **Power Supply:** 24V DC (separate from Arduino supply)
+- **Control Interface Options:**
+  - Analog: 0-10V DC or 4-20mA input
+  - Digital: RS485/Modbus RTU communication
+- **Flow Range:** Depends on connected valve size (up to 30 GPM typical)
+- **Response Time:** <100ms typical
+- **Connection:**
+  - For Analog Control: Use Arduino A0 with voltage divider/amplifier
+  - For Digital Control: Requires RS485 interface (future enhancement)
+
 ### PWM to Voltage Conversion (if needed)
 ```
 Arduino A0 (PWM) ──┬── 1kΩ Resistor ──┬── Flow Control Valve Input
@@ -113,6 +124,18 @@ Arduino A0 (PWM) ──┬── 1kΩ Resistor ──┬── Flow Control Valv
                    └── 10µF Capacitor ─┴── GND
 
 This creates a simple RC filter to convert PWM to smooth DC voltage.
+```
+
+### Burkert Controller Analog Interface
+```
+Arduino Opta A0602           Burkert 8605 Controller
+┌─────────────────────┐      ┌──────────────────────────┐
+│ A0 (PWM) ───────────────── │ Analog Input (0-10V)     │
+│ GND ────────────────────── │ Signal Ground            │
+│                     │      │ Power: 24V DC Supply     │
+└─────────────────────┘      └──────────────────────────┘
+
+Note: May require voltage level adjustment from 5V PWM to 0-10V
 ```
 
 ## Network Infrastructure
