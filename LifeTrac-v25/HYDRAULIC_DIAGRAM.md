@@ -137,7 +137,7 @@ D3 - Right Track Forward   D7 - Bucket Up
 D4 - Right Track Backward  D8 - Bucket Down
 
 Analog Output (PWM):
-A0 - Flow Control Valve (0-10V via PWM + RC filter)
+D9 (PWM) - Flow Control Valve (requires 0-10V output: use PWM + RC filter and op-amp or external driver)
 ```
 
 ## Specifications
