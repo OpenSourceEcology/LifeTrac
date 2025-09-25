@@ -61,6 +61,7 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 ## Documentation
 - **INSTALLATION_GUIDE.md**: Complete setup and installation instructions
 - **WIRING_DIAGRAM.md**: Detailed wiring and connection diagrams
+- **HYDRAULIC_DIAGRAM.md**: ASCII hydraulic system diagram showing component layout
 
 ## Testing Tools
 - **test_scripts/**: MQTT testing and debugging utilities
