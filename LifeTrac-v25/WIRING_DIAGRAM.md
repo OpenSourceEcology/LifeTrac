@@ -107,7 +107,7 @@ Valve Common ────── Ground
 - **Response:** Flow rate proportional to control signal
 
 ### Burkert 8605 Type 316532 Flow Valve Controller
-- **Power Supply:** 24V DC (separate from Arduino supply)
+- **Power Supply:** 12V DC (compatible with existing system supply)
 - **Control Interface Options:**
   - Analog: 0-10V DC or 4-20mA input
   - Digital: RS485/Modbus RTU communication
@@ -132,7 +132,7 @@ Arduino Opta A0602           Burkert 8605 Controller
 ┌─────────────────────┐      ┌──────────────────────────┐
 │ A0 (PWM) ───────────────── │ Analog Input (0-10V)     │
 │ GND ────────────────────── │ Signal Ground            │
-│                     │      │ Power: 24V DC Supply     │
+│                     │      │ Power: 12V DC Supply     │
 └─────────────────────┘      └──────────────────────────┘
 
 Note: May require voltage level adjustment from 5V PWM to 0-10V
