@@ -124,7 +124,7 @@ sudo systemctl status mosquitto
 
 **Power Connections:**
 - 12V DC supply for hydraulic valves
-- 24V DC supply for Arduino Opta (if required)
+- 12V DC supply for Arduino Opta (shared with valve supply)
 - 12V DC supply for Burkert 8605 Controller (shared with valve supply)
 
 ### 2.2 Software Configuration
