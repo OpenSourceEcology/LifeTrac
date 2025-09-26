@@ -36,12 +36,18 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 * Arduino Pro Opta Ext D1608S - $151.00  
 * Arduino Pro Opta Ext A0602 - $229.00
 
-## Remote Control Unit
+## Remote Control Options
 
+### ESP32 Hardware Remote
 * SparkFun Qwiic Joystick (2x units) - https://www.sparkfun.com/products/15168
 * SparkFun Thing Plus - ESP32 WROOM (USB-C) - https://www.sparkfun.com/products/20168
 * Enclosure for handheld remote control
 * Li-Po battery pack with charging circuit
+
+### Android MQTT App Remote
+* Android smartphone or tablet (Android 7.0+)
+* WiFi connectivity to same network as LifeTrac system
+* **android_mqtt_app/**: Kodular.io mobile app for wireless control
 
 ## MQTT Broker Infrastructure
 
@@ -54,6 +60,9 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 ## Arduino Code
 - **arduino_opta_controller/**: Main controller code for Arduino Opta
 - **esp32_remote_control/**: Remote control code for ESP32
+
+## Mobile App
+- **android_mqtt_app/**: Kodular.io Android app for smartphone/tablet control
 
 ## Configuration Files
 - **config/**: MQTT broker and WiFi configuration files
@@ -69,11 +78,19 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 
 # Quick Start
 
+## Option 1: ESP32 Hardware Remote
 1. **Set up MQTT Broker:** Install Mosquitto on Raspberry Pi using config/mosquitto.conf
 2. **Program Controllers:** Upload Arduino code to Opta and ESP32 boards
 3. **Configure Network:** Update WiFi credentials and MQTT settings in code
 4. **Wire System:** Follow WIRING_DIAGRAM.md for all connections
 5. **Test System:** Use test_scripts/mqtt_test.py for validation
+
+## Option 2: Android App Remote
+1. **Set up MQTT Broker:** Install Mosquitto on Raspberry Pi using config/mosquitto.conf
+2. **Program Controller:** Upload Arduino code to Opta board only
+3. **Build Android App:** Follow android_mqtt_app/KODULAR_BUILD_INSTRUCTIONS.md
+4. **Install App:** Load APK on Android device and configure MQTT settings
+5. **Test System:** Use android_mqtt_app/mqtt_test_listener.py for validation
 
 For detailed instructions, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md).
 
@@ -89,6 +106,7 @@ For detailed instructions, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md).
 ✅ **Completed:**
 - Arduino Opta controller code with MQTT integration
 - ESP32 remote control with dual joystick support  
+- Android MQTT app with Kodular.io implementation
 - Proportional flow control implementation
 - Safety systems and emergency stop functionality
 - Complete installation and wiring documentation

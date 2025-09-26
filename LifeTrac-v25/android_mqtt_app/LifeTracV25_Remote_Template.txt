@@ -1,0 +1,165 @@
+# LifeTrac v25 Remote Control - Kodular Template
+
+This is a template file describing the structure of the LifeTracV25_Remote.aia project.
+The actual .aia file needs to be created in Kodular.io by following the KODULAR_BUILD_INSTRUCTIONS.md
+
+## Project Properties
+- Project Name: LifeTracV25_Remote
+- Package Name: com.opensourceecology.lifetracv25remote
+- Version: 1.0
+- Target SDK: Android 10 (API level 29)
+- Min SDK: Android 7.0 (API level 24)
+
+## Required Extensions
+Download and import these extensions in Kodular:
+1. UrsPahoMqttClient - MQTT client library for Android
+   - Used for connecting to MQTT broker and sending control messages
+   - Available from Kodular extension gallery
+
+## Screen Structure
+
+### MainScreen (Primary Interface)
+Components:
+- VerticalArrangement (Main container)
+  - HorizontalArrangement (Header)
+    - Label: "LifeTrac v25 Remote Control" (Title)
+    - Label: "Status:" (Status indicator)
+  - HorizontalArrangement (Connection Status)
+    - Label: "WiFi:" + WiFi indicator
+    - Label: "MQTT:" + MQTT indicator  
+  - HorizontalArrangement (Joystick Area)
+    - VerticalArrangement (Left Side)
+      - Label: "Movement" (Left joystick label)
+      - Canvas: LeftJoystickCanvas (200x200 pixels)
+    - VerticalArrangement (Right Side)
+      - Label: "Hydraulics" (Right joystick label)
+      - Canvas: RightJoystickCanvas (200x200 pixels)
+  - HorizontalArrangement (Control Buttons)
+    - Button: ConnectButton ("Connect")
+    - Button: EStopButton ("E-STOP") 
+    - Button: SettingsButton ("Settings")
+    - Button: InfoButton ("Info")
+
+### SettingsScreen (Configuration)
+Components:
+- VerticalArrangement (Main container)
+  - Label: "MQTT Settings" (Header)
+  - TableArrangement (Settings grid)
+    - Row 1: Label "Broker IP:", TextBox: BrokerIPTextBox
+    - Row 2: Label "Port:", TextBox: PortTextBox
+    - Row 3: Label "Username:", TextBox: UsernameTextBox
+    - Row 4: Label "Password:", PasswordTextBox: PasswordTextBox
+    - Row 5: Label "Topic:", TextBox: TopicTextBox
+  - HorizontalArrangement (Action buttons)
+    - Button: SaveButton ("Save")
+    - Button: CancelButton ("Cancel")
+    - Button: TestButton ("Test Connection")
+
+### Additional Components (Non-visual)
+- UrsPahoMqttClient: MqttClient
+- Clock: ControlTimer (50ms interval for 20Hz)
+- Clock: StatusTimer (500ms interval for status updates)
+- TinyDB: SettingsDB (for persistent storage)
+- Notifier: AlertNotifier (for user notifications)
+
+## Key Variables (Global)
+```
+mqttConnected = false
+leftJoyX = 0 (-100 to 100)
+leftJoyY = 0 (-100 to 100)
+rightJoyX = 0 (-100 to 100)
+rightJoyY = 0 (-100 to 100)
+mqttBrokerIP = "192.168.1.100"
+mqttPort = 1883
+mqttUsername = "lifetrac"
+mqttPassword = "lifetrac_pass"
+controlTopic = "lifetrac/v25/control"
+sendInterval = 50
+deadzone = 10
+```
+
+## Canvas Drawing Properties
+### Left Joystick Canvas
+- Width: 200 pixels
+- Height: 200 pixels
+- Background Color: Light Gray (#E0E0E0)
+- Paint Color: Blue (#2196F3)
+- Text Color: Black (#000000)
+
+### Right Joystick Canvas  
+- Width: 200 pixels
+- Height: 200 pixels
+- Background Color: Light Gray (#E0E0E0)
+- Paint Color: Green (#4CAF50)
+- Text Color: Black (#000000)
+
+## Button Properties
+### Connect Button
+- Text: "Connect" / "Disconnect" (dynamic)
+- Background Color: Green (#4CAF50) / Red (#F44336)
+- Text Color: White (#FFFFFF)
+- Width: Fill Parent
+
+### E-Stop Button
+- Text: "E-STOP"
+- Background Color: Red (#F44336)
+- Text Color: White (#FFFFFF)
+- Font Bold: True
+- Width: Fill Parent
+
+### Settings Button
+- Text: "Settings"
+- Background Color: Blue (#2196F3)
+- Text Color: White (#FFFFFF)
+- Width: Fill Parent
+
+## Color Scheme
+- Primary: Blue (#2196F3)
+- Primary Dark: Dark Blue (#1976D2)
+- Accent: Green (#4CAF50)
+- Error: Red (#F44336)
+- Warning: Orange (#FF9800)
+- Background: Light Gray (#F5F5F5)
+- Surface: White (#FFFFFF)
+- Text: Black (#000000)
+
+## Permissions Required
+Add these permissions in Kodular project settings:
+- INTERNET (for MQTT communication)
+- ACCESS_NETWORK_STATE (for connection monitoring)
+- ACCESS_WIFI_STATE (for WiFi status detection)
+- WAKE_LOCK (to prevent sleep during operation)
+
+## App Icon
+Design a simple icon incorporating:
+- LifeTrac silhouette or tractor symbol
+- Wireless signal indicator
+- Primary blue color scheme
+
+## Build Configuration
+- Compile SDK Version: 30
+- Build Tools Version: 30.0.3
+- Minimum SDK Version: 24 (Android 7.0)
+- Target SDK Version: 29 (Android 10)
+- Proguard: Enabled for release builds
+
+## Testing Notes
+Before building the final APK:
+1. Test all UI interactions in Kodular companion app
+2. Verify MQTT connection with test broker
+3. Test joystick responsiveness and accuracy
+4. Validate emergency stop functionality
+5. Test settings persistence across app restarts
+6. Verify proper handling of network disconnections
+
+## Installation Package
+The final deliverable should be:
+- LifeTracV25_Remote.aia (Kodular project file)
+- LifeTracV25_Remote.apk (compiled Android app)
+- This documentation set
+
+To create the actual .aia file:
+1. Import this template structure into Kodular
+2. Follow the detailed block programming in KODULAR_BUILD_INSTRUCTIONS.md
+3. Test thoroughly with companion app
+4. Export as .aia file for distribution

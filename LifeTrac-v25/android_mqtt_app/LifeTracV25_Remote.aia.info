@@ -1,0 +1,108 @@
+# LifeTracV25_Remote.aia File Information
+
+## About This File
+
+The `LifeTracV25_Remote.aia` file is a Kodular.io (MIT App Inventor) project file that contains the complete Android app for controlling LifeTrac v25 via MQTT.
+
+**Note:** The actual .aia file cannot be created without using the Kodular.io web interface. This documentation explains how to create it.
+
+## How to Create the .aia File
+
+### Step 1: Set Up Kodular Account
+1. Go to https://kodular.io
+2. Create a free account or log in
+3. Click "Start Creating" to access the project creator
+
+### Step 2: Create New Project
+1. Click "Projects" → "Start new project"
+2. Enter project name: `LifeTracV25_Remote`
+3. Click "OK" to create the project
+
+### Step 3: Import Required Extensions
+1. Go to "Extensions" in the palette
+2. Import the UrsPahoMqttClient extension:
+   - Click "Import Extension"
+   - Upload the UrsPahoMqttClient.aix file
+   - Or use the built-in extension if available
+
+### Step 4: Build the App Structure
+Follow the detailed instructions in `KODULAR_BUILD_INSTRUCTIONS.md`:
+1. Create the MainScreen layout with joystick canvases
+2. Create the SettingsScreen for configuration
+3. Add all required components (buttons, labels, etc.)
+4. Program all the blocks logic
+
+### Step 5: Test the App
+1. Use Kodular Companion app to test on your device
+2. Test MQTT connectivity with a test broker
+3. Verify joystick controls work properly
+4. Test emergency stop functionality
+
+### Step 6: Export Project
+1. Once testing is complete, go to "Projects"
+2. Select your project and click "Export selected project (.aia) to my computer"
+3. Save the file as `LifeTracV25_Remote.aia`
+4. Place this file in the android_mqtt_app directory
+
+## File Structure
+
+When created, the .aia file will contain:
+- **Project metadata**: App name, version, settings
+- **Screen definitions**: MainScreen and SettingsScreen layouts
+- **Component properties**: All UI element configurations
+- **Block code**: Complete app logic and MQTT handling 
+- **Assets**: Any images or media files used
+- **Extensions**: UrsPahoMqttClient and any other imported extensions
+
+## File Size
+
+The completed .aia file should be approximately:
+- **Size**: 1-5 MB (depending on assets and extensions)
+- **Components**: ~20-30 UI components
+- **Blocks**: ~100-200 programming blocks
+- **Screens**: 2 (Main control + Settings)
+
+## Installation After Creation
+
+Once you have the .aia file:
+1. Keep it in this directory for distribution
+2. Users can import it into their own Kodular accounts
+3. Build APK files for installation on Android devices
+4. Share the project with the community
+
+## Version Control
+
+The .aia file should be:
+- **Versioned**: Update version number for each release
+- **Documented**: Include comments in blocks explaining logic
+- **Tested**: Fully tested before each release
+- **Backed up**: Keep copies of working versions
+
+## Alternatives to .aia File
+
+If you cannot create the .aia file, you can:
+1. **Use the documentation**: Follow KODULAR_BUILD_INSTRUCTIONS.md to build from scratch
+2. **Use the template**: Reference LifeTracV25_Remote_Template.txt for structure
+3. **Use the simulator**: Test MQTT integration with simulate_android_app.py
+4. **Community contribution**: Ask the community to help create the .aia file
+
+## License and Distribution
+
+The .aia file, when created, should be:
+- **Open Source**: Free to use and modify
+- **Well Documented**: Include clear usage instructions
+- **Community Friendly**: Easy for others to understand and extend
+
+## Support
+
+For help creating the .aia file:
+1. Review all documentation in this directory
+2. Check Kodular community forums
+3. Reference the yaseralie robot arm example project
+4. Test with the provided Python simulation tools
+
+Once created, the LifeTracV25_Remote.aia file will enable anyone to:
+- Import the project into Kodular
+- Customize the app for their needs  
+- Build and install on Android devices
+- Contribute improvements back to the project
