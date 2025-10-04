@@ -207,12 +207,12 @@ ros2 topic echo /lifetrac/remote_status
 
 ## Control Values
 
-All control values use the same ranges as the existing MQTT interface:
+All control values use floating point ranges compatible with DroidPad and similar joystick interfaces:
 
-- **Left joystick X (left_x)**: -100 to 100 (negative = left turn, positive = right turn)
-- **Left joystick Y (left_y)**: -100 to 100 (negative = backward, positive = forward)
-- **Right joystick X (right_x)**: -100 to 100 (negative = bucket down, positive = bucket up)
-- **Right joystick Y (right_y)**: -100 to 100 (negative = arms down, positive = arms up)
+- **Left joystick X (left_x)**: -1.0 to 1.0 (negative = left turn, positive = right turn)
+- **Left joystick Y (left_y)**: -1.0 to 1.0 (negative = backward, positive = forward)
+- **Right joystick X (right_x)**: -1.0 to 1.0 (negative = bucket down, positive = bucket up)
+- **Right joystick Y (right_y)**: -1.0 to 1.0 (negative = arms down, positive = arms up)
 
 ## Safety Features
 

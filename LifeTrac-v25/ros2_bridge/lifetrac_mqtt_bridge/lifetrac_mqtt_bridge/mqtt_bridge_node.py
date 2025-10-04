@@ -96,10 +96,10 @@ class LifeTracMQTTBridge(Node):
     def _validate_command(self, msg):
         """Validate that control command values are within acceptable ranges."""
         return (
-            -100 <= msg.left_x <= 100 and
-            -100 <= msg.left_y <= 100 and
-            -100 <= msg.right_x <= 100 and
-            -100 <= msg.right_y <= 100
+            -1.0 <= msg.left_x <= 1.0 and
+            -1.0 <= msg.left_y <= 1.0 and
+            -1.0 <= msg.right_x <= 1.0 and
+            -1.0 <= msg.right_y <= 1.0
         )
 
 

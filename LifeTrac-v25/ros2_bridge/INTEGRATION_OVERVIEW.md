@@ -26,8 +26,8 @@ Your ROS2 Code → ROS2 Topic → mqtt_client → MQTT Broker → Arduino Opta �
 ```python
 # Publish control command from your ROS2 node
 msg = ControlCommand()
-msg.left_y = 50  # Move forward
-msg.right_y = 30  # Raise arms
+msg.left_y = 0.5  # Move forward at 50% speed
+msg.right_y = 0.3  # Raise arms at 30% speed
 publisher.publish(msg)
 ```
 
@@ -40,7 +40,7 @@ That's it! The bridge handles everything else.
 **lifetrac_msgs**
 - Defines the `ControlCommand` message type
 - Matches the existing MQTT JSON format
-- Simple integer values from -100 to 100
+- Floating point values from -1.0 to 1.0 (compatible with DroidPad)
 
 **lifetrac_mqtt_bridge**
 - Bridge node for logging and validation
@@ -86,8 +86,8 @@ Uses the [ika-rwth-aachen/mqtt_client](https://github.com/ika-rwth-aachen/mqtt_c
 def cmd_vel_callback(self, msg):
     # Translate velocity commands to tank steering
     control = ControlCommand()
-    control.left_y = int(msg.linear.x * 100)
-    control.left_x = int(msg.angular.z * 100)
+    control.left_y = float(msg.linear.x)  # Assumes cmd_vel is already -1.0 to 1.0
+    control.left_x = float(msg.angular.z)
     self.publisher.publish(control)
 ```
 
@@ -96,8 +96,8 @@ def cmd_vel_callback(self, msg):
 # Example: Object detection driving
 if object_detected:
     control = ControlCommand()
-    control.right_y = 70  # Raise arms
-    control.right_x = 50  # Adjust bucket
+    control.right_y = 0.7  # Raise arms at 70% speed
+    control.right_x = 0.5  # Adjust bucket at 50% speed
     self.publisher.publish(control)
 ```
 
@@ -106,15 +106,15 @@ if object_detected:
 # Example: Automated digging sequence
 def dig_sequence(self):
     # Lower arms
-    self.publish_command(right_y=-70)
+    self.publish_command(right_y=-0.7)
     time.sleep(2)
     
     # Move forward
-    self.publish_command(left_y=50)
+    self.publish_command(left_y=0.5)
     time.sleep(3)
     
     # Raise arms
-    self.publish_command(right_y=70)
+    self.publish_command(right_y=0.7)
 ```
 
 ### 4. Remote Operation

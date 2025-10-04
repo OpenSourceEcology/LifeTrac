@@ -62,21 +62,21 @@ class LifeTracTestPublisher(Node):
     def demo_callback(self):
         """Demo sequence timer callback."""
         demo_sequence = [
-            ("Stop", 0, 0, 0, 0),
-            ("Forward", 0, 50, 0, 0),
-            ("Stop", 0, 0, 0, 0),
-            ("Backward", 0, -50, 0, 0),
-            ("Stop", 0, 0, 0, 0),
-            ("Left turn", -30, 30, 0, 0),
-            ("Stop", 0, 0, 0, 0),
-            ("Right turn", 30, 30, 0, 0),
-            ("Stop", 0, 0, 0, 0),
-            ("Arms up", 0, 0, 0, 70),
-            ("Arms down", 0, 0, 0, -70),
-            ("Stop", 0, 0, 0, 0),
-            ("Bucket up", 0, 0, 70, 0),
-            ("Bucket down", 0, 0, -70, 0),
-            ("Stop", 0, 0, 0, 0),
+            ("Stop", 0.0, 0.0, 0.0, 0.0),
+            ("Forward", 0.0, 0.5, 0.0, 0.0),
+            ("Stop", 0.0, 0.0, 0.0, 0.0),
+            ("Backward", 0.0, -0.5, 0.0, 0.0),
+            ("Stop", 0.0, 0.0, 0.0, 0.0),
+            ("Left turn", -0.3, 0.3, 0.0, 0.0),
+            ("Stop", 0.0, 0.0, 0.0, 0.0),
+            ("Right turn", 0.3, 0.3, 0.0, 0.0),
+            ("Stop", 0.0, 0.0, 0.0, 0.0),
+            ("Arms up", 0.0, 0.0, 0.0, 0.7),
+            ("Arms down", 0.0, 0.0, 0.0, -0.7),
+            ("Stop", 0.0, 0.0, 0.0, 0.0),
+            ("Bucket up", 0.0, 0.0, 0.7, 0.0),
+            ("Bucket down", 0.0, 0.0, -0.7, 0.0),
+            ("Stop", 0.0, 0.0, 0.0, 0.0),
         ]
         
         if self.demo_step < len(demo_sequence):
@@ -100,8 +100,8 @@ class LifeTracTestPublisher(Node):
         print("  quit - exit")
         print()
         
-        left_x, left_y = 0, 0
-        right_x, right_y = 0, 0
+        left_x, left_y = 0.0, 0.0
+        right_x, right_y = 0.0, 0.0
         
         while rclpy.ok():
             try:
@@ -110,23 +110,23 @@ class LifeTracTestPublisher(Node):
                 if cmd == 'quit':
                     break
                 elif cmd == 'w':
-                    left_y = 50
+                    left_y = 0.5
                 elif cmd == 's':
-                    left_y = -50
+                    left_y = -0.5
                 elif cmd == 'a':
-                    left_x = -50
+                    left_x = -0.5
                 elif cmd == 'd':
-                    left_x = 50
+                    left_x = 0.5
                 elif cmd == 'i':
-                    right_y = 70
+                    right_y = 0.7
                 elif cmd == 'k':
-                    right_y = -70
+                    right_y = -0.7
                 elif cmd == 'j':
-                    right_x = -70
+                    right_x = -0.7
                 elif cmd == 'l':
-                    right_x = 70
+                    right_x = 0.7
                 elif cmd == '0':
-                    left_x = left_y = right_x = right_y = 0
+                    left_x = left_y = right_x = right_y = 0.0
                     print("Emergency stop - all controls zeroed")
                 else:
                     print("Unknown command")
