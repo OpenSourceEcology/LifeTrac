@@ -202,8 +202,8 @@ void processJoystickInput() {
   float rightTrackSpeed = baseSpeed - turnRate;
   
   // Constrain to valid range
-  leftTrackSpeed = constrain(leftTrackSpeed, -1.0, 1.0);
-  rightTrackSpeed = constrain(rightTrackSpeed, -1.0, 1.0);
+  leftTrackSpeed = fmaxf(-1.0, fminf(leftTrackSpeed, 1.0));
+  rightTrackSpeed = fmaxf(-1.0, fminf(rightTrackSpeed, 1.0));
   
   // Control left track
   controlTrack(leftTrackSpeed, LEFT_TRACK_FORWARD_PIN, LEFT_TRACK_BACKWARD_PIN);
