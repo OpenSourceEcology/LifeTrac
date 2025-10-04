@@ -6,6 +6,7 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 
 * **Remote Joystick Control:** Dual joystick setup for tank steering and hydraulic functions
 * **WiFi Communication:** Reliable wireless control with MQTT protocol
+* **ROS2 Integration:** Control LifeTrac from BeagleBone or any ROS2-enabled device
 * **Proportional Flow Control:** Speed regulation based on joystick input intensity
 * **Safety Features:** Emergency stop, communication timeout, and fail-safe operation
 * **Status Monitoring:** Real-time system status and diagnostics
@@ -55,6 +56,12 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 - **arduino_opta_controller/**: Main controller code for Arduino Opta
 - **esp32_remote_control/**: Remote control code for ESP32
 
+## ROS2 Integration
+- **ros2_bridge/**: ROS2 packages for BeagleBone control via MQTT
+  - **lifetrac_msgs/**: Custom ROS2 message definitions
+  - **lifetrac_mqtt_bridge/**: Bridge node using mqtt_client package
+  - See [ros2_bridge/README.md](ros2_bridge/README.md) for complete ROS2 setup
+
 ## Configuration Files
 - **config/**: MQTT broker and WiFi configuration files
 - **arduino_libraries.txt**: Required Arduino libraries
@@ -63,12 +70,14 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 - **INSTALLATION_GUIDE.md**: Complete setup and installation instructions
 - **WIRING_DIAGRAM.md**: Detailed wiring and connection diagrams
 - **HYDRAULIC_DIAGRAM.md**: ASCII hydraulic system diagram showing component layout
+- **ros2_bridge/README.md**: ROS2 integration and BeagleBone setup guide
 
 ## Testing Tools
 - **test_scripts/**: MQTT testing and debugging utilities
 
 # Quick Start
 
+## Standard ESP32 Remote Control
 1. **Set up MQTT Broker:** Install Mosquitto on Raspberry Pi using config/mosquitto.conf
 2. **Program Controllers:** Upload Arduino code to Opta and ESP32 boards
 3. **Configure Network:** Update WiFi credentials and MQTT settings in code
@@ -76,6 +85,15 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 5. **Test System:** Use test_scripts/mqtt_test.py for validation
 
 For detailed instructions, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md).
+
+## ROS2 Control from BeagleBone
+1. **Set up MQTT Broker:** Same as above
+2. **Program Arduino Opta:** Upload controller code
+3. **Install ROS2 on BeagleBone:** Follow ROS2 installation guide
+4. **Build ROS2 packages:** Build lifetrac_msgs and lifetrac_mqtt_bridge
+5. **Launch bridge:** `ros2 launch lifetrac_mqtt_bridge lifetrac_bridge.launch.py`
+
+For detailed ROS2 instructions, see [ros2_bridge/README.md](ros2_bridge/README.md).
 
 # Safety Features
 
@@ -93,6 +111,9 @@ For detailed instructions, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md).
 - Safety systems and emergency stop functionality
 - Complete installation and wiring documentation
 - MQTT test utilities for debugging
+- ROS2 integration packages for BeagleBone control
+- Custom ROS2 message definitions for control commands
+- Bridge using mqtt_client for ROS2-MQTT communication
 
 🔄 **In Progress:**
 - Field testing and calibration

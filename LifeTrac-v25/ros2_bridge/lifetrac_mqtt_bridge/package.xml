@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>lifetrac_mqtt_bridge</name>
+  <version>1.0.0</version>
+  <description>ROS2 to MQTT bridge for LifeTrac v25 control system using mqtt_client</description>
+  
+  <maintainer email="info@opensourceecology.org">Open Source Ecology</maintainer>
+  <license>GPL-3.0</license>
+  
+  <author email="info@opensourceecology.org">Open Source Ecology</author>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>lifetrac_msgs</depend>
+  <depend>mqtt_client</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

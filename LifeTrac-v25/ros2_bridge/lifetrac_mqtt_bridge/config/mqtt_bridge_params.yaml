@@ -1,0 +1,50 @@
+# LifeTrac v25 MQTT Bridge Configuration
+# This configuration file is used by the mqtt_client package to bridge ROS2 topics to MQTT
+# Reference: https://github.com/ika-rwth-aachen/mqtt_client
+
+mqtt_client:
+  ros__parameters:
+    # MQTT Broker connection settings
+    broker:
+      host: "192.168.1.100"  # IP address of Raspberry Pi MQTT broker
+      port: 1883
+      user: "lifetrac"
+      pass: "lifetrac_pass"
+    
+    # Client settings
+    client:
+      id: "lifetrac_ros2_bridge"
+      protocol: 5  # MQTT protocol version (5 = MQTT v5.0)
+      transport: "tcp"
+      qos: 1  # Quality of Service level
+      keep_alive: 60
+      
+    # Bridge configuration - ROS2 to MQTT
+    bridge:
+      # Control commands: ROS2 -> MQTT
+      - ros_topic: "/lifetrac/control_cmd"
+        mqtt_topic: "lifetrac/v25/control"
+        ros_msg_type: "lifetrac_msgs/msg/ControlCommand"
+        direction: "ros2mqtt"
+        
+      # Status monitoring: MQTT -> ROS2 (optional, for feedback)
+      - ros_topic: "/lifetrac/status"
+        mqtt_topic: "lifetrac/v25/status"
+        ros_msg_type: "std_msgs/msg/String"
+        direction: "mqtt2ros"
+        
+      # Remote status: MQTT -> ROS2 (optional, for monitoring)
+      - ros_topic: "/lifetrac/remote_status"
+        mqtt_topic: "lifetrac/v25/remote_status"
+        ros_msg_type: "std_msgs/msg/String"
+        direction: "mqtt2ros"
+
+lifetrac_mqtt_bridge:
+  ros__parameters:
+    # Bridge node specific parameters
+    mqtt_broker_host: "192.168.1.100"
+    mqtt_broker_port: 1883
+    mqtt_username: "lifetrac"
+    mqtt_password: "lifetrac_pass"
+    control_topic: "lifetrac/v25/control"
+    ros2_control_topic: "/lifetrac/control_cmd"
