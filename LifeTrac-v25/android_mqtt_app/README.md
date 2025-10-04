@@ -183,6 +183,20 @@ The app can be extended with additional features:
 - Ensure all personnel are clear of the operating area
 - Use appropriate personal protective equipment
 
+## Distribution
+
+### Google Play Store
+Building with Kodular allows for direct APK generation that can be uploaded to Google Play Store or distributed as APK files.
+
+### F-Droid Open Source Repository
+For distribution through F-Droid (the open-source Android app store), see the comprehensive guide:
+- **[F-DROID_SUBMISSION_GUIDE.md](F-DROID_SUBMISSION_GUIDE.md)** - Complete instructions for submitting to F-Droid
+
+Note: F-Droid requires building from source using standard Android tools, so the app may need to be converted from Kodular to native Android for F-Droid compliance.
+
+### Direct APK Distribution
+APK files can also be distributed directly through GitHub releases for users who prefer to sideload applications.
+
 ## Support
 
 For technical support:

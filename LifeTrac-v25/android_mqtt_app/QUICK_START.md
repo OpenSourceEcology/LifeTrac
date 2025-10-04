@@ -116,6 +116,12 @@ mosquitto_sub -h 192.168.1.100 -t "lifetrac/v25/#" -u lifetrac -P your_password
 3. **Check hardware**: Verify LifeTrac v25 system status
 4. **Kodular help**: Check community forums for app issues
 
+## 📦 Distribution Options
+
+- **Direct APK**: Build in Kodular and sideload
+- **Google Play**: Upload APK to Play Store  
+- **F-Droid**: See F-DROID_SUBMISSION_GUIDE.md for open-source distribution
+
 ## 🎯 Next Steps
 
 After basic operation:
