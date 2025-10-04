@@ -86,22 +86,22 @@ class LifeTracMQTTTest:
         
         sequences = [
             # (description, left_x, left_y, right_x, right_y, duration)
-            ("Stop (all zeros)", 0, 0, 0, 0, 2),
-            ("Forward movement", 0, 50, 0, 0, 3),
-            ("Stop", 0, 0, 0, 0, 1),
-            ("Backward movement", 0, -50, 0, 0, 3),
-            ("Stop", 0, 0, 0, 0, 1),
-            ("Left turn", -30, 30, 0, 0, 3),
-            ("Stop", 0, 0, 0, 0, 1),
-            ("Right turn", 30, 30, 0, 0, 3),
-            ("Stop", 0, 0, 0, 0, 1),
-            ("Arms up", 0, 0, 0, 70, 3),
-            ("Arms down", 0, 0, 0, -70, 3),
-            ("Stop", 0, 0, 0, 0, 1),
-            ("Bucket up", 0, 0, 70, 0, 3),
-            ("Bucket down", 0, 0, -70, 0, 3),
-            ("Stop", 0, 0, 0, 0, 1),
-            ("Final stop", 0, 0, 0, 0, 2),
+            ("Stop (all zeros)", 0.0, 0.0, 0.0, 0.0, 2),
+            ("Forward movement", 0.0, 0.5, 0.0, 0.0, 3),
+            ("Stop", 0.0, 0.0, 0.0, 0.0, 1),
+            ("Backward movement", 0.0, -0.5, 0.0, 0.0, 3),
+            ("Stop", 0.0, 0.0, 0.0, 0.0, 1),
+            ("Left turn", -0.3, 0.3, 0.0, 0.0, 3),
+            ("Stop", 0.0, 0.0, 0.0, 0.0, 1),
+            ("Right turn", 0.3, 0.3, 0.0, 0.0, 3),
+            ("Stop", 0.0, 0.0, 0.0, 0.0, 1),
+            ("Arms up", 0.0, 0.0, 0.0, 0.7, 3),
+            ("Arms down", 0.0, 0.0, 0.0, -0.7, 3),
+            ("Stop", 0.0, 0.0, 0.0, 0.0, 1),
+            ("Bucket up", 0.0, 0.0, 0.7, 0.0, 3),
+            ("Bucket down", 0.0, 0.0, -0.7, 0.0, 3),
+            ("Stop", 0.0, 0.0, 0.0, 0.0, 1),
+            ("Final stop", 0.0, 0.0, 0.0, 0.0, 2),
         ]
         
         for description, lx, ly, rx, ry, duration in sequences:
@@ -123,8 +123,8 @@ class LifeTracMQTTTest:
         print("  demo - run demo sequence")
         print("  quit - exit")
         
-        left_x, left_y = 0, 0
-        right_x, right_y = 0, 0
+        left_x, left_y = 0.0, 0.0
+        right_x, right_y = 0.0, 0.0
         
         while True:
             try:
@@ -133,27 +133,27 @@ class LifeTracMQTTTest:
                 if cmd == 'quit':
                     break
                 elif cmd == 'w':
-                    left_y = 50
+                    left_y = 0.5
                 elif cmd == 's':
-                    left_y = -50
+                    left_y = -0.5
                 elif cmd == 'a':
-                    left_x = -50
+                    left_x = -0.5
                 elif cmd == 'd':
-                    left_x = 50
+                    left_x = 0.5
                 elif cmd == 'i':
-                    right_y = 70
+                    right_y = 0.7
                 elif cmd == 'k':
-                    right_y = -70
+                    right_y = -0.7
                 elif cmd == 'j':
-                    right_x = -70
+                    right_x = -0.7
                 elif cmd == 'l':
-                    right_x = 70
+                    right_x = 0.7
                 elif cmd == '0':
-                    left_x = left_y = right_x = right_y = 0
+                    left_x = left_y = right_x = right_y = 0.0
                     print("Emergency stop - all controls zeroed")
                 elif cmd == 'demo':
                     self.run_demo_sequence()
-                    left_x = left_y = right_x = right_y = 0
+                    left_x = left_y = right_x = right_y = 0.0
                     continue
                 else:
                     print("Unknown command")

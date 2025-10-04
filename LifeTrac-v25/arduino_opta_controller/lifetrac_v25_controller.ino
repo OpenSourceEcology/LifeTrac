@@ -54,18 +54,18 @@ const int FLOW_CONTROL_PIN = 2;         // O2 (4-20mA current loop output) - int
 
 // Control variables
 struct JoystickData {
-  int left_x = 0;      // Left joystick X (-100 to 100)
-  int left_y = 0;      // Left joystick Y (-100 to 100)
-  int right_x = 0;     // Right joystick X (-100 to 100)
-  int right_y = 0;     // Right joystick Y (-100 to 100)
+  float left_x = 0.0;  // Left joystick X (-1.0 to 1.0)
+  float left_y = 0.0;  // Left joystick Y (-1.0 to 1.0)
+  float right_x = 0.0; // Right joystick X (-1.0 to 1.0)
+  float right_y = 0.0; // Right joystick Y (-1.0 to 1.0)
 };
 
 JoystickData currentInput;
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-// Deadzone for joystick input
-const int DEADZONE = 10;
+// Deadzone for joystick input (0.1 = 10% of range)
+const float DEADZONE = 0.1;
 
 // Safety timeout (stop all movement if no commands received)
 unsigned long lastCommandTime = 0;
@@ -194,16 +194,16 @@ void processJoystickInput() {
   // Left joystick Y controls forward/backward movement
   // Left joystick X controls turning (differential steering)
   
-  int baseSpeed = currentInput.left_y; // Forward/backward
-  int turnRate = currentInput.left_x;  // Left/right turning
+  float baseSpeed = currentInput.left_y; // Forward/backward
+  float turnRate = currentInput.left_x;  // Left/right turning
   
   // Calculate individual track speeds
-  int leftTrackSpeed = baseSpeed + turnRate;
-  int rightTrackSpeed = baseSpeed - turnRate;
+  float leftTrackSpeed = baseSpeed + turnRate;
+  float rightTrackSpeed = baseSpeed - turnRate;
   
   // Constrain to valid range
-  leftTrackSpeed = constrain(leftTrackSpeed, -100, 100);
-  rightTrackSpeed = constrain(rightTrackSpeed, -100, 100);
+  leftTrackSpeed = constrain(leftTrackSpeed, -1.0, 1.0);
+  rightTrackSpeed = constrain(rightTrackSpeed, -1.0, 1.0);
   
   // Control left track
   controlTrack(leftTrackSpeed, LEFT_TRACK_FORWARD_PIN, LEFT_TRACK_BACKWARD_PIN);
@@ -212,18 +212,18 @@ void processJoystickInput() {
   controlTrack(rightTrackSpeed, RIGHT_TRACK_FORWARD_PIN, RIGHT_TRACK_BACKWARD_PIN);
   
   // Control arms (right joystick Y)
-  int armControl = currentInput.right_y;
+  float armControl = currentInput.right_y;
   controlValve(armControl, ARMS_UP_PIN, ARMS_DOWN_PIN);
   
   // Control bucket (right joystick X)
-  int bucketControl = currentInput.right_x;
+  float bucketControl = currentInput.right_x;
   controlValve(bucketControl, BUCKET_UP_PIN, BUCKET_DOWN_PIN);
   
   // Set proportional flow control based on maximum input
   setFlowControl();
 }
 
-void controlTrack(int speed, int forwardPin, int backwardPin) {
+void controlTrack(float speed, int forwardPin, int backwardPin) {
   if (abs(speed) < DEADZONE) {
     // Within deadzone - stop movement
     digitalWrite(forwardPin, LOW);
@@ -239,7 +239,7 @@ void controlTrack(int speed, int forwardPin, int backwardPin) {
   }
 }
 
-void controlValve(int control, int upPin, int downPin) {
+void controlValve(float control, int upPin, int downPin) {
   if (abs(control) < DEADZONE) {
     // Within deadzone - stop movement
     digitalWrite(upPin, LOW);
@@ -259,7 +259,7 @@ void setFlowControl() {
   // Find the maximum absolute value from all inputs
   // This determines the overall system speed
   // 4-20mA current loop output interfaces with Burkert 8605 Controller for precise flow control
-  int maxInput = 0;
+  float maxInput = 0.0;
   
   maxInput = max(maxInput, abs(currentInput.left_x));
   maxInput = max(maxInput, abs(currentInput.left_y));
@@ -267,8 +267,9 @@ void setFlowControl() {
   maxInput = max(maxInput, abs(currentInput.right_y));
   
   // Convert to 4-20mA value (4mA = minimum, 20mA = maximum)
-  // Map from joystick range (0-100) to current range (4-20mA)
-  int currentValue = map(maxInput, 0, 100, 4, 20);
+  // Map from joystick range (0.0-1.0) to current range (4-20mA)
+  // Using linear interpolation: currentValue = 4 + (maxInput * 16)
+  int currentValue = 4 + (int)(maxInput * 16.0);
   
   // Apply minimum flow when any movement is commanded
   if (maxInput > DEADZONE) {

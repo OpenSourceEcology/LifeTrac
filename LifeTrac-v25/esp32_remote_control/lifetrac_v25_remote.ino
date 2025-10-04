@@ -46,10 +46,10 @@ PubSubClient client(espClient);
 
 // Control data structure
 struct ControlData {
-  int left_x = 0;       // Left joystick X (-100 to 100)
-  int left_y = 0;       // Left joystick Y (-100 to 100)
-  int right_x = 0;      // Right joystick X (-100 to 100)
-  int right_y = 0;      // Right joystick Y (-100 to 100)
+  float left_x = 0.0;   // Left joystick X (-1.0 to 1.0)
+  float left_y = 0.0;   // Left joystick Y (-1.0 to 1.0)
+  float right_x = 0.0;  // Right joystick X (-1.0 to 1.0)
+  float right_y = 0.0;  // Right joystick Y (-1.0 to 1.0)
 };
 
 ControlData currentControl;
@@ -179,13 +179,13 @@ void readInputs() {
     int leftX = leftJoystick.getHorizontal();  // 0-1023
     int leftY = leftJoystick.getVertical();    // 0-1023
     
-    // Convert to -100 to 100 range and invert Y for intuitive control
-    currentControl.left_x = map(leftX, 0, 1023, -100, 100);
-    currentControl.left_y = map(leftY, 0, 1023, 100, -100); // Inverted
+    // Convert to -1.0 to 1.0 range and invert Y for intuitive control
+    currentControl.left_x = (leftX - 511.5) / 511.5;
+    currentControl.left_y = (511.5 - leftY) / 511.5; // Inverted
     
-    // Apply deadzone
-    if (abs(currentControl.left_x) < 10) currentControl.left_x = 0;
-    if (abs(currentControl.left_y) < 10) currentControl.left_y = 0;
+    // Apply deadzone (0.1 = 10% of range)
+    if (abs(currentControl.left_x) < 0.1) currentControl.left_x = 0.0;
+    if (abs(currentControl.left_y) < 0.1) currentControl.left_y = 0.0;
   }
   
   // Read right joystick (arms and bucket)
@@ -193,13 +193,13 @@ void readInputs() {
     int rightX = rightJoystick.getHorizontal(); // 0-1023
     int rightY = rightJoystick.getVertical();   // 0-1023
     
-    // Convert to -100 to 100 range and invert Y for intuitive control
-    currentControl.right_x = map(rightX, 0, 1023, -100, 100);
-    currentControl.right_y = map(rightY, 0, 1023, 100, -100); // Inverted
+    // Convert to -1.0 to 1.0 range and invert Y for intuitive control
+    currentControl.right_x = (rightX - 511.5) / 511.5;
+    currentControl.right_y = (511.5 - rightY) / 511.5; // Inverted
     
-    // Apply deadzone
-    if (abs(currentControl.right_x) < 10) currentControl.right_x = 0;
-    if (abs(currentControl.right_y) < 10) currentControl.right_y = 0;
+    // Apply deadzone (0.1 = 10% of range)
+    if (abs(currentControl.right_x) < 0.1) currentControl.right_x = 0.0;
+    if (abs(currentControl.right_y) < 0.1) currentControl.right_y = 0.0;
   }
 }
 
@@ -316,10 +316,10 @@ void emergencyStop() {
   Serial.println("EMERGENCY STOP ACTIVATED!");
   
   // Send zero values for all controls
-  currentControl.left_x = 0;
-  currentControl.left_y = 0;
-  currentControl.right_x = 0;
-  currentControl.right_y = 0;
+  currentControl.left_x = 0.0;
+  currentControl.left_y = 0.0;
+  currentControl.right_x = 0.0;
+  currentControl.right_y = 0.0;
   
   // Send stop command immediately
   sendControlData();
