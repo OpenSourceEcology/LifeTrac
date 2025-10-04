@@ -5,6 +5,7 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 ## Features
 
 * **Remote Joystick Control:** Dual joystick setup for tank steering and hydraulic functions
+* **DroidPad Compatible:** Native support for DroidPad and other joystick interfaces using -1.0 to 1.0 value range
 * **WiFi Communication:** Reliable wireless control with MQTT protocol
 * **ROS2 Integration:** Control LifeTrac from BeagleBone or any ROS2-enabled device
 * **Proportional Flow Control:** Speed regulation based on joystick input intensity
@@ -68,6 +69,7 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 
 ## Documentation
 - **INSTALLATION_GUIDE.md**: Complete setup and installation instructions
+- **DROIDPAD_INTEGRATION.md**: Guide for DroidPad integration and float value range
 - **WIRING_DIAGRAM.md**: Detailed wiring and connection diagrams
 - **HYDRAULIC_DIAGRAM.md**: ASCII hydraulic system diagram showing component layout
 - **ros2_bridge/README.md**: ROS2 integration and BeagleBone setup guide
