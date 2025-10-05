@@ -76,11 +76,14 @@ echo -e "${YELLOW}[7/8] Installing systemd service...${NC}"
 
 # Update service file paths
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-sed -i "s|/home/pi/LifeTrac|${USER_HOME}/LifeTrac|g" lifetrac-web-controller.service
-sed -i "s|User=pi|User=${ACTUAL_USER}|g" lifetrac-web-controller.service
+TMP_SERVICE_FILE="/tmp/lifetrac-web-controller.service"
+cp lifetrac-web-controller.service "$TMP_SERVICE_FILE"
+sed -i "s|/home/pi/LifeTrac|${USER_HOME}/LifeTrac|g" "$TMP_SERVICE_FILE"
+sed -i "s|User=pi|User=${ACTUAL_USER}|g" "$TMP_SERVICE_FILE"
 
 # Install service
-cp lifetrac-web-controller.service /etc/systemd/system/
+cp "$TMP_SERVICE_FILE" /etc/systemd/system/
+rm -f "$TMP_SERVICE_FILE"
 systemctl daemon-reload
 systemctl enable lifetrac-web-controller.service
 
