@@ -1,0 +1,223 @@
+# LifeTrac v25 Web Controller Configuration Examples
+# Copy this file to config.yaml and customize for your setup
+
+# =============================================================================
+# PRODUCTION CONFIGURATION (Raspberry Pi 4, Arducam IMX335)
+# =============================================================================
+# Uncomment and customize this section for production use
+
+# mqtt:
+#   broker: "192.168.1.100"  # Your Raspberry Pi's IP
+#   port: 1883
+#   username: "lifetrac"
+#   password: "lifetrac_pass"  # CHANGE THIS IN PRODUCTION!
+#   topics:
+#     control: "lifetrac/v25/control"
+#     status: "lifetrac/v25/status"
+#     remote_status: "lifetrac/v25/remote_status"
+# 
+# camera:
+#   width: 1280
+#   height: 720
+#   fps: 30
+#   codec: "mjpeg"
+#   device: "/dev/video0"
+# 
+# web:
+#   host: "0.0.0.0"
+#   port: 5000
+#   debug: false
+# 
+# control:
+#   send_rate_hz: 20
+#   deadzone: 0.1
+#   max_value: 1.0
+# 
+# safety:
+#   timeout_ms: 1000
+#   emergency_stop_enabled: true
+
+# =============================================================================
+# RASPBERRY PI 3B+ CONFIGURATION (Lower Resolution)
+# =============================================================================
+# Optimized for older hardware with limited CPU
+
+# mqtt:
+#   broker: "192.168.1.100"
+#   port: 1883
+#   username: "lifetrac"
+#   password: "lifetrac_pass"
+#   topics:
+#     control: "lifetrac/v25/control"
+#     status: "lifetrac/v25/status"
+#     remote_status: "lifetrac/v25/remote_status"
+# 
+# camera:
+#   width: 800
+#   height: 600
+#   fps: 20
+#   codec: "mjpeg"
+#   device: "/dev/video0"
+# 
+# web:
+#   host: "0.0.0.0"
+#   port: 5000
+#   debug: false
+# 
+# control:
+#   send_rate_hz: 15  # Reduced for lower CPU usage
+#   deadzone: 0.1
+#   max_value: 1.0
+# 
+# safety:
+#   timeout_ms: 1000
+#   emergency_stop_enabled: true
+
+# =============================================================================
+# LOW BANDWIDTH CONFIGURATION (Remote Access)
+# =============================================================================
+# For use over slower connections or mobile data
+
+# mqtt:
+#   broker: "192.168.1.100"
+#   port: 1883
+#   username: "lifetrac"
+#   password: "lifetrac_pass"
+#   topics:
+#     control: "lifetrac/v25/control"
+#     status: "lifetrac/v25/status"
+#     remote_status: "lifetrac/v25/remote_status"
+# 
+# camera:
+#   width: 640
+#   height: 480
+#   fps: 15
+#   codec: "mjpeg"
+#   device: "/dev/video0"
+# 
+# web:
+#   host: "0.0.0.0"
+#   port: 5000
+#   debug: false
+# 
+# control:
+#   send_rate_hz: 10  # Lower rate for bandwidth conservation
+#   deadzone: 0.15  # Slightly larger deadzone
+#   max_value: 1.0
+# 
+# safety:
+#   timeout_ms: 2000  # Longer timeout for slower connections
+#   emergency_stop_enabled: true
+
+# =============================================================================
+# DEVELOPMENT CONFIGURATION (Testing)
+# =============================================================================
+# For local development and testing without full hardware
+
+# mqtt:
+#   broker: "localhost"  # Local MQTT broker
+#   port: 1883
+#   username: "lifetrac"
+#   password: "lifetrac_pass"
+#   topics:
+#     control: "lifetrac/v25/control"
+#     status: "lifetrac/v25/status"
+#     remote_status: "lifetrac/v25/remote_status"
+# 
+# camera:
+#   width: 640
+#   height: 480
+#   fps: 15
+#   codec: "mjpeg"
+#   device: "/dev/video0"
+# 
+# web:
+#   host: "127.0.0.1"  # Only accessible from localhost
+#   port: 5000
+#   debug: true  # Enable Flask debug mode
+# 
+# control:
+#   send_rate_hz: 10
+#   deadzone: 0.1
+#   max_value: 1.0
+# 
+# safety:
+#   timeout_ms: 1000
+#   emergency_stop_enabled: true
+
+# =============================================================================
+# HIGH QUALITY CONFIGURATION (Raspberry Pi 5, Low Latency)
+# =============================================================================
+# Maximum quality for powerful hardware
+
+# mqtt:
+#   broker: "192.168.1.100"
+#   port: 1883
+#   username: "lifetrac"
+#   password: "lifetrac_pass"
+#   topics:
+#     control: "lifetrac/v25/control"
+#     status: "lifetrac/v25/status"
+#     remote_status: "lifetrac/v25/remote_status"
+# 
+# camera:
+#   width: 1920
+#   height: 1080
+#   fps: 30
+#   codec: "mjpeg"
+#   device: "/dev/video0"
+# 
+# web:
+#   host: "0.0.0.0"
+#   port: 5000
+#   debug: false
+# 
+# control:
+#   send_rate_hz: 30  # Higher update rate
+#   deadzone: 0.05  # Smaller deadzone for precision
+#   max_value: 1.0
+# 
+# safety:
+#   timeout_ms: 500  # Shorter timeout for quick response
+#   emergency_stop_enabled: true
+
+# =============================================================================
+# NOTES
+# =============================================================================
+# 
+# MQTT Broker:
+# - Use Raspberry Pi's IP address if broker is on the Pi
+# - Use external broker IP if hosted elsewhere
+# - Ensure firewall allows port 1883
+# 
+# Camera Settings:
+# - Higher resolution = more bandwidth and CPU
+# - Lower fps = reduced bandwidth but choppier video
+# - Test different settings to find optimal balance
+# 
+# Web Server:
+# - host "0.0.0.0" = accessible from network
+# - host "127.0.0.1" = only accessible from localhost
+# - Change port if 5000 is already in use
+# 
+# Control Settings:
+# - send_rate_hz: Commands per second (10-30 typical)
+# - deadzone: Prevents joystick drift (0.05-0.2 typical)
+# - Higher rate = more responsive but more network traffic
+# 
+# Safety:
+# - timeout_ms: How long without commands before auto-stop
+# - Keep emergency_stop_enabled: true for safety!
+# 
+# Performance Tips:
+# - Use Ethernet instead of WiFi for lower latency
+# - Keep Raspberry Pi cool (add heatsink/fan)
+# - Close other applications on the Pi
+# - Use quality WiFi router with good signal strength
+# 
+# Security:
+# - ALWAYS change default MQTT password
+# - Use strong passwords (16+ characters)
+# - Consider SSL/TLS for MQTT (port 8883)
+# - Don't expose to internet without VPN
+# - Keep Raspberry Pi OS updated

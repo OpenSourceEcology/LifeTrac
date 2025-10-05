@@ -45,17 +45,27 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 * Enclosure for handheld remote control
 * Li-Po battery pack with charging circuit
 
-## MQTT Broker Infrastructure
+## MQTT Broker & Web Controller Infrastructure
 
-* Raspberry Pi (3B+ or newer) for [Mosquitto](https://github.com/eclipse-mosquitto/mosquitto)
-* MicroSD card (16GB minimum)
+* Raspberry Pi (3B+ or newer, 4GB+ recommended) for [Mosquitto](https://github.com/eclipse-mosquitto/mosquitto) and web interface
+* MicroSD card (16GB minimum, 32GB recommended)
 * WiFi router or access point
+* Arducam IMX335 Camera Module (5MP) - https://www.arducam.com/imx335-camera-module-for-rpi-arducam-opensource-camera.html
+* Camera cable (included with Arducam)
 
 # Software Components
 
 ## Arduino Code
 - **arduino_opta_controller/**: Main controller code for Arduino Opta
 - **esp32_remote_control/**: Remote control code for ESP32
+
+## Raspberry Pi Web Controller
+- **raspberry_pi_web_controller/**: Browser-based control with live video feed
+  - Live camera streaming from Arducam IMX335 using libcamera
+  - Touch-enabled on-screen joysticks for phone/tablet control
+  - Keyboard shortcuts for desktop control
+  - WebSocket for real-time communication
+  - See [raspberry_pi_web_controller/README.md](raspberry_pi_web_controller/README.md) for setup
 
 ## ROS2 Integration
 - **ros2_bridge/**: ROS2 packages for BeagleBone control via MQTT
@@ -73,13 +83,23 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 - **WIRING_DIAGRAM.md**: Detailed wiring and connection diagrams
 - **HYDRAULIC_DIAGRAM.md**: ASCII hydraulic system diagram showing component layout
 - **ros2_bridge/README.md**: ROS2 integration and BeagleBone setup guide
+- **raspberry_pi_web_controller/README.md**: Web interface setup and usage guide
 
 ## Testing Tools
 - **test_scripts/**: MQTT testing and debugging utilities
 
 # Quick Start
 
-## Standard ESP32 Remote Control
+## Option 1: Raspberry Pi Web Controller (Recommended)
+1. **Set up MQTT Broker:** Install Mosquitto on Raspberry Pi using config/mosquitto.conf
+2. **Program Arduino Opta:** Upload controller code
+3. **Install Web Controller:** Run `sudo ./install.sh` in raspberry_pi_web_controller/
+4. **Connect Camera:** Attach Arducam IMX335 to Raspberry Pi
+5. **Access Interface:** Open `http://<raspberry-pi-ip>:5000` in any browser
+
+For detailed instructions, see [raspberry_pi_web_controller/README.md](raspberry_pi_web_controller/README.md).
+
+## Option 2: ESP32 Handheld Remote Control
 1. **Set up MQTT Broker:** Install Mosquitto on Raspberry Pi using config/mosquitto.conf
 2. **Program Controllers:** Upload Arduino code to Opta and ESP32 boards
 3. **Configure Network:** Update WiFi credentials and MQTT settings in code
@@ -88,7 +108,7 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 
 For detailed instructions, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md).
 
-## ROS2 Control from BeagleBone
+## Option 3: ROS2 Control from BeagleBone
 1. **Set up MQTT Broker:** Same as above
 2. **Program Arduino Opta:** Upload controller code
 3. **Install ROS2 on BeagleBone:** Follow ROS2 installation guide
@@ -116,13 +136,15 @@ For detailed ROS2 instructions, see [ros2_bridge/README.md](ros2_bridge/README.m
 - ROS2 integration packages for BeagleBone control
 - Custom ROS2 message definitions for control commands
 - Bridge using mqtt_client for ROS2-MQTT communication
+- **Raspberry Pi web controller with live video feed and browser-based joysticks**
 
 🔄 **In Progress:**
 - Field testing and calibration
-- Mobile app interface (future enhancement)
 
 # External Links
 
 - [Arduino Opta Documentation](https://docs.arduino.cc/hardware/opta)
 - [SparkFun Qwiic Joystick Guide](https://learn.sparkfun.com/tutorials/qwiic-joystick-hookup-guide)
 - [Eclipse Mosquitto MQTT Broker](https://mosquitto.org/)
+- [Arducam IMX335 Documentation](https://docs.arducam.com/Raspberry-Pi-Camera/Native-camera/5MP-IMX335)
+- [Raspberry Pi libcamera Guide](https://www.raspberrypi.com/documentation/computers/camera_software.html)
