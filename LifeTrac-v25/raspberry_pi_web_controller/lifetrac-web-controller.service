@@ -1,0 +1,19 @@
+[Unit]
+Description=LifeTrac v25 Web Controller
+After=network.target mosquitto.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/LifeTrac/LifeTrac-v25/raspberry_pi_web_controller
+ExecStart=/usr/bin/python3 /home/pi/LifeTrac/LifeTrac-v25/raspberry_pi_web_controller/app.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target

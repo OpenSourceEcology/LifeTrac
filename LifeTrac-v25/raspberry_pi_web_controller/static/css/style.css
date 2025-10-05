@@ -1,0 +1,361 @@
+/* LifeTrac v25 Web Controller Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    color: #fff;
+    overflow-x: hidden;
+    touch-action: none; /* Prevent default touch behaviors */
+}
+
+#main-container {
+    max-width: 1920px;
+    margin: 0 auto;
+    padding: 10px;
+}
+
+/* Header Styles */
+#header {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+#header h1 {
+    font-size: 2em;
+    color: #ffd700;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+#status-bar {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.status-indicator {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 0.9em;
+}
+
+.status-connected {
+    color: #00ff00;
+    font-weight: bold;
+}
+
+.status-disconnected {
+    color: #ff4444;
+    font-weight: bold;
+}
+
+.status-active {
+    color: #00ff00;
+    font-weight: bold;
+}
+
+/* Video Feed Styles */
+#video-container {
+    position: relative;
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto 20px;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+}
+
+#video-feed {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+#video-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+#connection-warning {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 68, 68, 0.9);
+    padding: 20px 40px;
+    border-radius: 10px;
+    font-size: 1.5em;
+    font-weight: bold;
+    text-align: center;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Control Panel Styles */
+#control-panel {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.joystick-container {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 20px;
+    border-radius: 15px;
+    text-align: center;
+    min-width: 280px;
+    flex: 1;
+    max-width: 400px;
+}
+
+.joystick-container h3 {
+    margin-bottom: 15px;
+    color: #ffd700;
+    font-size: 1.3em;
+}
+
+.joystick {
+    width: 200px;
+    height: 200px;
+    margin: 0 auto 15px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    position: relative;
+}
+
+.joystick-values {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 1.1em;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.joystick-labels {
+    font-size: 0.85em;
+    color: #ccc;
+    margin-top: 10px;
+}
+
+.joystick-labels div {
+    margin: 5px 0;
+}
+
+/* Emergency Stop Button */
+.emergency-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+    min-width: 250px;
+    max-width: 400px;
+}
+
+.emergency-button {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+    color: white;
+    font-size: 1.3em;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    transition: all 0.3s;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.emergency-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 20px rgba(255, 0, 0, 0.5);
+}
+
+.emergency-button:active {
+    transform: scale(0.95);
+    background: linear-gradient(135deg, #cc0000 0%, #990000 100%);
+}
+
+#keyboard-help {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 15px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    text-align: center;
+    line-height: 1.6;
+}
+
+#keyboard-help strong {
+    color: #ffd700;
+    display: block;
+    margin-bottom: 10px;
+}
+
+/* Debug Console Styles */
+#debug-console {
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 10px;
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+#debug-toggle {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #fff;
+    font-size: 1em;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.3s;
+}
+
+#debug-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+#debug-content {
+    padding: 15px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+#debug-messages {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    line-height: 1.4;
+}
+
+#debug-messages div {
+    margin: 3px 0;
+    padding: 3px 5px;
+    border-left: 3px solid #4CAF50;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+#debug-messages div.error {
+    border-left-color: #f44336;
+}
+
+#debug-messages div.warning {
+    border-left-color: #ff9800;
+}
+
+/* Nipplejs Joystick Customization */
+.joystick .front {
+    background: radial-gradient(circle, #4CAF50 0%, #2E7D32 100%);
+    border: 3px solid #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.joystick .back {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    #control-panel {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .joystick-container,
+    .emergency-container {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    #header h1 {
+        font-size: 1.5em;
+    }
+    
+    #status-bar {
+        font-size: 0.8em;
+    }
+    
+    .joystick {
+        width: 180px;
+        height: 180px;
+    }
+    
+    .emergency-button {
+        width: 180px;
+        height: 180px;
+        font-size: 1.1em;
+    }
+}
+
+@media (max-width: 480px) {
+    #header {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    #status-bar {
+        justify-content: center;
+    }
+    
+    .joystick {
+        width: 150px;
+        height: 150px;
+    }
+    
+    .emergency-button {
+        width: 150px;
+        height: 150px;
+        font-size: 1em;
+    }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}

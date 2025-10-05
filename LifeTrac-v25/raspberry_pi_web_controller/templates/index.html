@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LifeTrac v25 Control</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
+</head>
+<body>
+    <div id="main-container">
+        <!-- Header -->
+        <div id="header">
+            <h1>LifeTrac v25 Control</h1>
+            <div id="status-bar">
+                <span id="mqtt-status" class="status-indicator">MQTT: <span class="status-disconnected">Disconnected</span></span>
+                <span id="camera-status" class="status-indicator">Camera: <span class="status-active">Active</span></span>
+                <span id="latency" class="status-indicator">Latency: <span id="latency-value">--</span> ms</span>
+            </div>
+        </div>
+
+        <!-- Video Feed Container -->
+        <div id="video-container">
+            <img id="video-feed" src="{{ url_for('video_feed') }}" alt="Camera Feed">
+            <div id="video-overlay">
+                <div id="connection-warning" class="hidden">
+                    ⚠️ Connection Lost - Reconnecting...
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div id="control-panel">
+            <!-- Left Joystick - Tank Steering -->
+            <div class="joystick-container">
+                <h3>Tank Steering</h3>
+                <div id="left-joystick" class="joystick"></div>
+                <div class="joystick-values">
+                    <span>X: <span id="left-x-value">0.00</span></span>
+                    <span>Y: <span id="left-y-value">0.00</span></span>
+                </div>
+                <div class="joystick-labels">
+                    <div>↑ Forward / ↓ Backward</div>
+                    <div>← Left Turn / → Right Turn</div>
+                </div>
+            </div>
+
+            <!-- Emergency Stop Button -->
+            <div class="emergency-container">
+                <button id="emergency-stop" class="emergency-button">
+                    🛑 EMERGENCY STOP
+                </button>
+                <div id="keyboard-help">
+                    <strong>Keyboard Shortcuts:</strong><br>
+                    WASD: Tank Steering<br>
+                    IJKL: Hydraulics<br>
+                    Space: Emergency Stop
+                </div>
+            </div>
+
+            <!-- Right Joystick - Hydraulics -->
+            <div class="joystick-container">
+                <h3>Hydraulics</h3>
+                <div id="right-joystick" class="joystick"></div>
+                <div class="joystick-values">
+                    <span>X: <span id="right-x-value">0.00</span></span>
+                    <span>Y: <span id="right-y-value">0.00</span></span>
+                </div>
+                <div class="joystick-labels">
+                    <div>↑ Arms Up / ↓ Arms Down</div>
+                    <div>← Bucket Down / → Bucket Up</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Debug Console (collapsible) -->
+        <div id="debug-console">
+            <button id="debug-toggle">Debug Console ▼</button>
+            <div id="debug-content" class="hidden">
+                <div id="debug-messages"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/controller.js') }}"></script>
+</body>
+</html>

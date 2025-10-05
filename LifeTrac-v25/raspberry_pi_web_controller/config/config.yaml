@@ -1,0 +1,46 @@
+# LifeTrac v25 Web Controller Configuration
+
+# MQTT Broker Settings
+mqtt:
+  broker: "192.168.1.100"  # Raspberry Pi's IP or external MQTT broker
+  port: 1883
+  username: "lifetrac"
+  password: "lifetrac_pass"
+  topics:
+    control: "lifetrac/v25/control"
+    status: "lifetrac/v25/status"
+    remote_status: "lifetrac/v25/remote_status"
+
+# Camera Settings
+camera:
+  width: 1280
+  height: 720
+  fps: 30
+  codec: "mjpeg"  # mjpeg or h264
+  # For Arducam IMX335, libcamera is used automatically
+  device: "/dev/video0"  # Default camera device
+
+# Web Server Settings
+web:
+  host: "0.0.0.0"  # Listen on all interfaces
+  port: 5000
+  debug: false
+  
+# Control Settings
+control:
+  send_rate_hz: 20  # Commands per second
+  deadzone: 0.1     # 10% deadzone for joysticks
+  max_value: 1.0    # Maximum control value
+  
+# Safety Settings
+safety:
+  timeout_ms: 1000  # Stop if no commands for 1 second
+  emergency_stop_enabled: true
+  
+# Network Settings
+network:
+  wifi_ssid: "YOUR_WIFI_SSID"
+  wifi_password: "YOUR_WIFI_PASSWORD"
+  static_ip: "192.168.1.100"
+  gateway: "192.168.1.1"
+  netmask: "255.255.255.0"
