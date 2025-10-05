@@ -157,35 +157,40 @@ def generate_camera_frames():
         camera_stream_active = True
         print("Camera stream started")
         
-        # Read MJPEG stream
+        # Read MJPEG stream efficiently
+        buffer = b''
+        start_marker = b'\xff\xd8'
+        end_marker = b'\xff\xd9'
+        chunk_size = 4096
         while camera_stream_active:
-            # Find JPEG start marker (0xFFD8)
-            start_marker = b'\xff\xd8'
-            end_marker = b'\xff\xd9'
-            
-            # Read until we find start marker
-            frame_data = b''
+            # Read a chunk of data from the camera process
+            chunk = camera_process.stdout.read(chunk_size)
+            if not chunk:
+                break
+            buffer += chunk
+
+            # Search for JPEG frames in the buffer
             while True:
-                chunk = camera_process.stdout.read(1)
-                if not chunk:
+                start_idx = buffer.find(start_marker)
+                if start_idx == -1:
+                    # No start marker found, keep reading
+                    # To avoid buffer bloat, keep only the last 1KB
+                    if len(buffer) > 1024:
+                        buffer = buffer[-1024:]
                     break
-                frame_data += chunk
-                if frame_data.endswith(start_marker):
-                    frame_data = start_marker
+                end_idx = buffer.find(end_marker, start_idx)
+                if end_idx == -1:
+                    # No end marker found yet, wait for more data
+                    # Keep only from start marker onwards to save memory
+                    if start_idx > 0:
+                        buffer = buffer[start_idx:]
                     break
-            
-            # Read until we find end marker
-            while True:
-                chunk = camera_process.stdout.read(1)
-                if not chunk:
-                    break
-                frame_data += chunk
-                if frame_data.endswith(end_marker):
-                    break
-            
-            if len(frame_data) > 0:
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
+                # Found a complete JPEG frame
+                frame_data = buffer[start_idx:end_idx+2]
+                buffer = buffer[end_idx+2:]
+                if len(frame_data) > 0:
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + frame_data + b'\r\n')
     
     except Exception as e:
         print(f"Camera error: {e}")
