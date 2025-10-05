@@ -118,29 +118,62 @@ sudo systemctl status mosquitto
 - D6: Arms Down Valve
 - D7: Bucket Up Valve
 - D8: Bucket Down Valve
+- D9: Mode Switch Pin A (optional - for MQTT/BLE selection)
+- D10: Mode Switch Pin B (optional - for MQTT/BLE selection)
 
 **Analog Extension (A0602) Connections:**
 - O2: Burkert 8605 Controller Interface (4-20mA current loop output)
 
+**Mode Selection Switch (Optional 3-position DPDT switch):**
+- Position 1 (OFF): Cuts 12V power to Opta (no operation)
+- Position 2 (MQTT): Connects power + sets D9=HIGH, D10=LOW for WiFi/MQTT mode
+- Position 3 (BLE): Connects power + sets D9=LOW, D10=LOW for Bluetooth mode
+- If no switch installed: Defaults to BLE mode (D9 and D10 use internal pulldown)
+
 **Power Connections:**
 - 12V DC supply for hydraulic valves
-- 12V DC supply for Arduino Opta (shared with valve supply)
+- 12V DC supply for Arduino Opta (via mode switch or direct)
 - 12V DC supply for Burkert 8605 Controller (shared with valve supply)
+- GND connection to mode switch common
 
 ### 2.2 Software Configuration
 
 1. Open `arduino_opta_controller/lifetrac_v25_controller.ino` in Arduino IDE
-2. Update WiFi credentials:
+2. Install required libraries via Library Manager:
+   - PubSubClient by Nick O'Leary
+   - ArduinoJson by Benoit Blanchon
+   - ArduinoBLE (Arduino official library)
+   - OptaController (Arduino official library)
+3. Update WiFi credentials (for MQTT mode):
    ```cpp
    const char* ssid = "YOUR_WIFI_SSID";
    const char* password = "YOUR_WIFI_PASSWORD";
    ```
-3. Update MQTT broker IP address:
+4. Update MQTT broker IP address (for MQTT mode):
    ```cpp
    const char* mqtt_server = "192.168.1.100";  // Your Pi's IP
    ```
-4. Select Board: "Arduino Opta WiFi"
-5. Upload the code to Arduino Opta
+5. Select Board: "Arduino Opta WiFi"
+6. Upload the code to Arduino Opta
+
+### 2.3 Control Mode Selection
+
+The controller supports two control modes selected via hardware switch:
+
+**MQTT Mode (Traditional):**
+- Requires WiFi network and MQTT broker (Raspberry Pi)
+- Use with ESP32 remote control or web interface
+- Set mode switch to MQTT position (D9=HIGH, D10=LOW)
+
+**BLE Mode (Direct Control - Default):**
+- Direct Bluetooth connection to DroidPad app
+- No WiFi or broker required
+- Set mode switch to BLE position (D9=LOW, D10=LOW)
+- Automatically selected if no mode switch is installed
+
+**OFF Mode:**
+- Hardware power cutoff via mode switch
+- No power to Opta controller
 
 ## Step 3: Build ESP32 Remote Control
 
@@ -253,13 +286,27 @@ Each joystick needs a unique I2C address. Use the SparkFun Qwiic Joystick librar
 
 ### 5.3 Troubleshooting
 
-**Connection Issues:**
+**Connection Issues (MQTT Mode):**
 - Check WiFi signal strength (LED blink patterns)
 - Verify MQTT broker is running: `sudo systemctl status mosquitto`
 - Check IP addresses in code match network configuration
 
+**Connection Issues (BLE Mode):**
+- Ensure Bluetooth is enabled on control device
+- Check that mode switch is in BLE position (or not installed)
+- Verify "LifeTrac-v25" appears in BLE device scan
+- Keep control device within 30-100 feet (10-30m) of controller
+- Check serial output for "BLE LifeTrac Control Service started" message
+
+**Mode Selection Issues:**
+- Verify mode switch connections to D9 and D10
+- Check serial output for mode detection: "Mode: MQTT" or "Mode: BLE (Default)"
+- If switch not working, verify 12V power reaches switch and Opta
+
 **Control Issues:**
-- Verify joystick I2C addresses are correct (0x20, 0x21)
+- Verify joystick I2C addresses are correct (0x20, 0x21) for ESP32 remote
+- For DroidPad BLE: Verify correct BLE characteristic UUIDs
+- For DroidPad MQTT: Verify MQTT broker connection and topic
 - Monitor serial output for debugging information
 
 **Safety Issues:**
@@ -294,6 +341,8 @@ Each joystick needs a unique I2C address. Use the SparkFun Qwiic Joystick librar
 | D6  | Arms Down |
 | D7  | Bucket Up |
 | D8  | Bucket Down |
+| D9  | Mode Switch Pin A (Optional) |
+| D10 | Mode Switch Pin B (Optional) |
 
 ### Arduino Opta Analog (A0602)
 | Pin | Function |

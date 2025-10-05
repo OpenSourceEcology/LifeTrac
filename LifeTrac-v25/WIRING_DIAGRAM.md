@@ -13,20 +13,44 @@ This document describes the electrical connections for the LifeTrac v25 remote c
 
 ## Arduino Opta Controller Wiring
 
-### Power Supply
+### Power Supply with Mode Switch
 ```
-12V DC Supply ────┬─── Arduino Opta VIN
-                  ├─── Hydraulic Valve Commons
-                  └─── Flow Control Valve (+)
+                                    ┌─────────────────┐
+                                    │  3-Position     │
+                                    │  Double Throw   │
+12V DC Supply ──────────────────────│  Switch         │
+                                    │  (DPDT)         │
+                                    └─────────────────┘
+                                           │
+                          ┌────────────────┼────────────────┐
+                          │                │                │
+                       [OFF]            [MQTT]            [BLE]
+                          │                │                │
+                          X                │                │
+                     (Open/No        ┌─────┴─────┐    ┌─────┴─────┐
+                      Power)         │           │    │           │
+                                     │  12V to   │    │  12V to   │
+                                     │  Opta VIN │    │  Opta VIN │
+                                     │           │    │           │
+                                     │  D9=HIGH  │    │  D9=LOW   │
+                                     │  D10=LOW  │    │  D10=LOW  │
+                                     └───────────┘    └───────────┘
 
-GND ──────────────┬─── Arduino Opta GND
-                  ├─── Hydraulic Valve Commons
-                  └─── Flow Control Valve (-)
+Note: If switch is not installed, D9 and D10 are LOW (internal pulldown) -> BLE mode (default)
+
+12V DC Supply (after switch) ─┬─── Arduino Opta VIN
+                              ├─── Hydraulic Valve Commons
+                              └─── Flow Control Valve (+)
+
+GND ──────────────────────────┬─── Arduino Opta GND
+                              ├─── Hydraulic Valve Commons
+                              ├─── Flow Control Valve (-)
+                              └─── Mode Switch Common
 ```
 
 ### Digital I/O Extension (D1608S) Connections
 ```
-Arduino Opta D1608S          Hydraulic Valves
+Arduino Opta D1608S          Hydraulic Valves / Mode Switch
 ┌─────────────────────┐      ┌──────────────────────────┐
 │ D1 ─────────────────────── │ Left Track Forward       │
 │ D2 ─────────────────────── │ Left Track Backward      │
@@ -36,7 +60,14 @@ Arduino Opta D1608S          Hydraulic Valves
 │ D6 ─────────────────────── │ Arms Down                │
 │ D7 ─────────────────────── │ Bucket Up                │
 │ D8 ─────────────────────── │ Bucket Down              │
+│ D9 ─────────────────────── │ Mode Switch Pin A        │
+│ D10 ────────────────────── │ Mode Switch Pin B        │
 └─────────────────────┘      └──────────────────────────┘
+
+Mode Switch Logic:
+- D9=LOW,  D10=LOW  -> BLE mode (default when switch not installed)
+- D9=HIGH, D10=LOW  -> MQTT mode
+- OFF position -> No 12V power (hardware cutoff)
 ```
 
 ### Analog Extension (A0602) Connections
