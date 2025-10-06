@@ -63,12 +63,13 @@ const int FLOW_CONTROL_PIN = 2;         // O2 (4-20mA current loop output) - int
 // Mode selection switch pins (HONEYWELL 2NT1-1 On/Off/On switch)
 // The switch selects between MQTT and BLE modes
 // Center OFF position cuts 12V power to Opta (hardware power cutoff)
-const int MODE_SWITCH_PIN_A = 9;        // D9 - First switch position pin
-const int MODE_SWITCH_PIN_B = 10;       // D10 - Second switch position pin
+const int MODE_SWITCH_PIN_A = 9;        // D9 - Mode detection pin (used)
+const int MODE_SWITCH_PIN_B = 10;       // D10 - Reserved for future expansion (currently unused)
 // Switch Logic (HONEYWELL 2NT1-1):
-// Position 1 (MQTT): A=HIGH, B=LOW  -> MQTT mode
+// Position 1 (MQTT): A=HIGH -> MQTT mode
 // Position 2 (OFF):  No power - hardware cutoff at center position
-// Position 3 (BLE):  A=LOW,  B=LOW  -> BLE mode (default if switch not installed - internal pulldown)
+// Position 3 (BLE):  A=LOW  -> BLE mode (default if switch not installed - internal pulldown)
+// Note: Only D9 is used for mode detection. D10 is reserved for future multi-mode expansion.
 
 // Control mode enumeration
 enum ControlMode {
@@ -403,20 +404,21 @@ void publishStatus() {
 void readModeSwitch() {
   // Read mode switch pins
   bool pinA = digitalRead(MODE_SWITCH_PIN_A);
-  bool pinB = digitalRead(MODE_SWITCH_PIN_B);
+  bool pinB = digitalRead(MODE_SWITCH_PIN_B);  // Read for debugging, but not used in logic
   
   // Determine mode based on switch position
-  // If switch is not installed, both pins will be LOW (pulldown) -> BLE mode (default)
-  if (pinA == HIGH && pinB == LOW) {
+  // Only D9 (pinA) is used for mode detection in current HONEYWELL 2NT1-1 configuration
+  // If switch is not installed, pinA will be LOW (pulldown) -> BLE mode (default)
+  if (pinA == HIGH) {
     currentMode = MODE_MQTT;
   } else {
-    currentMode = MODE_BLE; // Default for all other combinations
+    currentMode = MODE_BLE; // Default when pinA is LOW
   }
   
   Serial.print("Mode switch: A=");
   Serial.print(pinA);
   Serial.print(" B=");
-  Serial.print(pinB);
+  Serial.print(pinB);  // Display for debugging purposes
   Serial.print(" -> Mode: ");
   Serial.println(currentMode == MODE_MQTT ? "MQTT" : "BLE");
 }
