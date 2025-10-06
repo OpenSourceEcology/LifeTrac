@@ -70,9 +70,6 @@ Mode Switch Logic (HONEYWELL 2NT1-1):
 
 
 
-
-```
-
 ### Analog Extension (A0602) Connections
 ```
 Arduino Opta A0602           Flow Control System
