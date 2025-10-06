@@ -136,6 +136,9 @@ void setup() {
   // Ensure all outputs are off initially
   stopAllMovement();
   
+  // Wait for switch pins to stabilize before reading
+  delay(1000);  // 1 second delay for hardware stabilization
+  
   // Read mode switch and initialize appropriate control mode
   readModeSwitch();
   
