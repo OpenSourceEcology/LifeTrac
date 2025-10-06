@@ -85,10 +85,13 @@ ControlMode currentMode = MODE_BLE; // Default to BLE
 #define BLE_JOYSTICK_LEFT_UUID  "19B10001-E8F2-537E-4F6C-D104768A1214"  // left_x, left_y
 #define BLE_JOYSTICK_RIGHT_UUID "19B10002-E8F2-537E-4F6C-D104768A1214" // right_x, right_y
 
+// BLE data size constant
+const int JOYSTICK_DATA_SIZE = 8;  // 2 floats = 8 bytes (4 bytes per float)
+
 // BLE Objects
 BLEService lifeTracService(BLE_SERVICE_UUID);
-BLECharacteristic leftJoystickChar(BLE_JOYSTICK_LEFT_UUID, BLERead | BLEWrite, 8); // 2 floats = 8 bytes
-BLECharacteristic rightJoystickChar(BLE_JOYSTICK_RIGHT_UUID, BLERead | BLEWrite, 8); // 2 floats = 8 bytes
+BLECharacteristic leftJoystickChar(BLE_JOYSTICK_LEFT_UUID, BLERead | BLEWrite, JOYSTICK_DATA_SIZE);
+BLECharacteristic rightJoystickChar(BLE_JOYSTICK_RIGHT_UUID, BLERead | BLEWrite, JOYSTICK_DATA_SIZE);
 
 // Control variables
 struct JoystickData {
@@ -455,14 +458,26 @@ void setupBLE() {
   
   // Initialize characteristic values to zero
   float zeros[2] = {0.0, 0.0};
-  leftJoystickChar.writeValue((uint8_t*)zeros, 8);
-  rightJoystickChar.writeValue((uint8_t*)zeros, 8);
+  leftJoystickChar.writeValue((uint8_t*)zeros, JOYSTICK_DATA_SIZE);
+  rightJoystickChar.writeValue((uint8_t*)zeros, JOYSTICK_DATA_SIZE);
   
   // Start advertising
   BLE.advertise();
   
   Serial.println("BLE LifeTrac Control Service started");
   Serial.println("Waiting for connections...");
+}
+
+// Helper function to validate and clamp joystick axis values
+void validateAndClampJoystickValue(float& value, const char* axisName) {
+  if (value < -1.0 || value > 1.0) {
+    Serial.print("Warning: ");
+    Serial.print(axisName);
+    Serial.print(" out of range (");
+    Serial.print(value);
+    Serial.println("), clamping to [-1.0, 1.0]");
+    value = constrain(value, -1.0, 1.0);
+  }
 }
 
 bool readBLEJoystickData() {
@@ -472,28 +487,18 @@ bool readBLEJoystickData() {
   if (leftJoystickChar.written()) {
     int dataLength = leftJoystickChar.valueLength();
     
-    // Validate data length before copying (should be 8 bytes for 2 floats)
-    if (dataLength == 8) {
+    // Validate data length before copying (should be JOYSTICK_DATA_SIZE bytes for 2 floats)
+    if (dataLength == JOYSTICK_DATA_SIZE) {
       const uint8_t* data = leftJoystickChar.value();
       
       // Validate data pointer is not null before memcpy
       if (data != nullptr) {
         float values[2];
-        memcpy(values, data, 8);
+        memcpy(values, data, JOYSTICK_DATA_SIZE);
         
         // Validate and clamp values to expected range (-1.0 to 1.0)
-        if (values[0] < -1.0 || values[0] > 1.0) {
-          Serial.print("Warning: Left X out of range (");
-          Serial.print(values[0]);
-          Serial.println("), clamping to [-1.0, 1.0]");
-          values[0] = constrain(values[0], -1.0, 1.0);
-        }
-        if (values[1] < -1.0 || values[1] > 1.0) {
-          Serial.print("Warning: Left Y out of range (");
-          Serial.print(values[1]);
-          Serial.println("), clamping to [-1.0, 1.0]");
-          values[1] = constrain(values[1], -1.0, 1.0);
-        }
+        validateAndClampJoystickValue(values[0], "Left X");
+        validateAndClampJoystickValue(values[1], "Left Y");
         
         currentInput.left_x = values[0];
         currentInput.left_y = values[1];
@@ -508,7 +513,9 @@ bool readBLEJoystickData() {
         Serial.println("Warning: Left joystick data pointer is null");
       }
     } else {
-      Serial.print("Warning: Left joystick data length mismatch. Expected 8, got ");
+      Serial.print("Warning: Left joystick data length mismatch. Expected ");
+      Serial.print(JOYSTICK_DATA_SIZE);
+      Serial.print(", got ");
       Serial.println(dataLength);
     }
   }
@@ -517,28 +524,18 @@ bool readBLEJoystickData() {
   if (rightJoystickChar.written()) {
     int dataLength = rightJoystickChar.valueLength();
     
-    // Validate data length before copying (should be 8 bytes for 2 floats)
-    if (dataLength == 8) {
+    // Validate data length before copying (should be JOYSTICK_DATA_SIZE bytes for 2 floats)
+    if (dataLength == JOYSTICK_DATA_SIZE) {
       const uint8_t* data = rightJoystickChar.value();
       
       // Validate data pointer is not null before memcpy
       if (data != nullptr) {
         float values[2];
-        memcpy(values, data, 8);
+        memcpy(values, data, JOYSTICK_DATA_SIZE);
         
         // Validate and clamp values to expected range (-1.0 to 1.0)
-        if (values[0] < -1.0 || values[0] > 1.0) {
-          Serial.print("Warning: Right X out of range (");
-          Serial.print(values[0]);
-          Serial.println("), clamping to [-1.0, 1.0]");
-          values[0] = constrain(values[0], -1.0, 1.0);
-        }
-        if (values[1] < -1.0 || values[1] > 1.0) {
-          Serial.print("Warning: Right Y out of range (");
-          Serial.print(values[1]);
-          Serial.println("), clamping to [-1.0, 1.0]");
-          values[1] = constrain(values[1], -1.0, 1.0);
-        }
+        validateAndClampJoystickValue(values[0], "Right X");
+        validateAndClampJoystickValue(values[1], "Right Y");
         
         currentInput.right_x = values[0];
         currentInput.right_y = values[1];
@@ -553,7 +550,9 @@ bool readBLEJoystickData() {
         Serial.println("Warning: Right joystick data pointer is null");
       }
     } else {
-      Serial.print("Warning: Right joystick data length mismatch. Expected 8, got ");
+      Serial.print("Warning: Right joystick data length mismatch. Expected ");
+      Serial.print(JOYSTICK_DATA_SIZE);
+      Serial.print(", got ");
       Serial.println(dataLength);
     }
   }
