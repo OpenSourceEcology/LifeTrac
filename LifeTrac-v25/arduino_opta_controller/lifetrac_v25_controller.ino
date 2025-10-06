@@ -430,7 +430,15 @@ void setupBLE() {
   // Initialize BLE
   if (!BLE.begin()) {
     Serial.println("Starting BLE failed!");
-    while (1); // Halt if BLE initialization fails
+    Serial.println("Falling back to MQTT mode...");
+    
+    // Fallback to MQTT mode instead of hanging
+    currentMode = MODE_MQTT;
+    setupWiFi();
+    client.setServer(mqtt_server, mqtt_port);
+    client.setCallback(mqttCallback);
+    Serial.println("Fallback to MQTT mode complete");
+    return;
   }
   
   // Set BLE device name
@@ -462,31 +470,47 @@ void setupBLE() {
 void readBLEJoystickData() {
   // Read left joystick characteristic (left_x, left_y)
   if (leftJoystickChar.written()) {
-    const uint8_t* data = leftJoystickChar.value();
-    float values[2];
-    memcpy(values, data, 8);
+    int dataLength = leftJoystickChar.valueLength();
     
-    currentInput.left_x = values[0];
-    currentInput.left_y = values[1];
-    
-    Serial.print("BLE Left: X=");
-    Serial.print(currentInput.left_x);
-    Serial.print(" Y=");
-    Serial.println(currentInput.left_y);
+    // Validate data length before copying (should be 8 bytes for 2 floats)
+    if (dataLength == 8) {
+      const uint8_t* data = leftJoystickChar.value();
+      float values[2];
+      memcpy(values, data, 8);
+      
+      currentInput.left_x = values[0];
+      currentInput.left_y = values[1];
+      
+      Serial.print("BLE Left: X=");
+      Serial.print(currentInput.left_x);
+      Serial.print(" Y=");
+      Serial.println(currentInput.left_y);
+    } else {
+      Serial.print("Warning: Left joystick data length mismatch. Expected 8, got ");
+      Serial.println(dataLength);
+    }
   }
   
   // Read right joystick characteristic (right_x, right_y)
   if (rightJoystickChar.written()) {
-    const uint8_t* data = rightJoystickChar.value();
-    float values[2];
-    memcpy(values, data, 8);
+    int dataLength = rightJoystickChar.valueLength();
     
-    currentInput.right_x = values[0];
-    currentInput.right_y = values[1];
-    
-    Serial.print("BLE Right: X=");
-    Serial.print(currentInput.right_x);
-    Serial.print(" Y=");
-    Serial.println(currentInput.right_y);
+    // Validate data length before copying (should be 8 bytes for 2 floats)
+    if (dataLength == 8) {
+      const uint8_t* data = rightJoystickChar.value();
+      float values[2];
+      memcpy(values, data, 8);
+      
+      currentInput.right_x = values[0];
+      currentInput.right_y = values[1];
+      
+      Serial.print("BLE Right: X=");
+      Serial.print(currentInput.right_x);
+      Serial.print(" Y=");
+      Serial.println(currentInput.right_y);
+    } else {
+      Serial.print("Warning: Right joystick data length mismatch. Expected 8, got ");
+      Serial.println(dataLength);
+    }
   }
 }
