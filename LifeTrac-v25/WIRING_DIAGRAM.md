@@ -13,28 +13,27 @@ This document describes the electrical connections for the LifeTrac v25 remote c
 
 ## Arduino Opta Controller Wiring
 
-### Power Supply with Mode Switch
+### Power Supply with HONEYWELL 2NT1-1 Mode Switch (On/Off/On)
 ```
                                     ┌─────────────────┐
-                                    │  3-Position     │
-                                    │  Double Throw   │
-12V DC Supply ──────────────────────│  Switch         │
-                                    │  (DPDT)         │
+                                    │  HONEYWELL      │
+                                    │  2NT1-1 Switch  │
+12V DC Supply ──────────────────────│  (On/Off/On)    │
+                                    │  DPDT           │
                                     └─────────────────┘
                                            │
                           ┌────────────────┼────────────────┐
                           │                │                │
-                       [OFF]            [MQTT]            [BLE]
+                       [MQTT]            [OFF]            [BLE]
                           │                │                │
-                          X                │                │
-                     (Open/No        ┌─────┴─────┐    ┌─────┴─────┐
-                      Power)         │           │    │           │
-                                     │  12V to   │    │  12V to   │
-                                     │  Opta VIN │    │  Opta VIN │
-                                     │           │    │           │
-                                     │  D9=HIGH  │    │  D9=LOW   │
-                                     │  D10=LOW  │    │  D10=LOW  │
-                                     └───────────┘    └───────────┘
+                    ┌─────┴─────┐          X          ┌─────┴─────┐
+                    │           │     (Open/No        │           │
+                    │  12V to   │      Power)         │  12V to   │
+                    │  Opta VIN │   (Center Pos)      │  Opta VIN │
+                    │           │                     │           │
+                    │  D9=HIGH  │                     │  D9=LOW   │
+                    │  D10=LOW  │                     │  D10=LOW  │
+                    └───────────┘                     └───────────┘
 
 Note: If switch is not installed, D9 and D10 are LOW (internal pulldown) -> BLE mode (default)
 
@@ -64,10 +63,14 @@ Arduino Opta D1608S          Hydraulic Valves / Mode Switch
 │ D10 ────────────────────── │ Mode Switch Pin B        │
 └─────────────────────┘      └──────────────────────────┘
 
-Mode Switch Logic:
-- D9=LOW,  D10=LOW  -> BLE mode (default when switch not installed)
-- D9=HIGH, D10=LOW  -> MQTT mode
-- OFF position -> No 12V power (hardware cutoff)
+Mode Switch Logic (HONEYWELL 2NT1-1):
+- Position 1 (MQTT): D9=HIGH, D10=LOW
+- Position 2 (OFF): No 12V power (hardware cutoff at center)
+- Position 3 (BLE): D9=LOW, D10=LOW (default when switch not installed)
+
+
+
+
 ```
 
 ### Analog Extension (A0602) Connections

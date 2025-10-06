@@ -7,10 +7,10 @@
 
 ### Summary
 
-Added support for a 3-position hardware switch that allows users to select between:
-1. **OFF mode** - Complete power cutoff (hardware switch disconnects 12V)
-2. **MQTT mode** - Traditional WiFi/MQTT control via broker
-3. **BLE mode** - Direct Bluetooth Low Energy control from DroidPad app (default)
+Added support for a HONEYWELL 2NT1-1 On/Off/On switch that allows users to select between:
+1. **Position 1 (MQTT mode)** - Traditional WiFi/MQTT control via broker
+2. **Position 2 (OFF mode)** - Complete power cutoff at center (hardware switch disconnects 12V)
+3. **Position 3 (BLE mode)** - Direct Bluetooth Low Energy control from DroidPad app (default)
 
 ### Key Features
 
@@ -26,18 +26,20 @@ Added support for a 3-position hardware switch that allows users to select betwe
 - **D9 (MODE_SWITCH_PIN_A)**: First switch position pin
 - **D10 (MODE_SWITCH_PIN_B)**: Second switch position pin (unused but available for future expansion)
 
-#### Switch Logic
+#### Switch Logic (HONEYWELL 2NT1-1)
 ```
-D9=LOW,  D10=LOW  -> BLE mode (default when switch not installed)
-D9=HIGH, D10=LOW  -> MQTT mode
-OFF position      -> Hardware power cutoff (no power to controller)
+Position 1 (MQTT): D9=HIGH, D10=LOW  -> MQTT mode
+Position 2 (OFF):  Hardware power cutoff at center (no power to controller)
+Position 3 (BLE):  D9=LOW,  D10=LOW  -> BLE mode (default when switch not installed)
 ```
 
 #### Recommended Switch
-- 3-position DPDT switch (ON-OFF-ON type)
+- **HONEYWELL 2NT1-1** On/Off/On switch
+- Part: https://www.grainger.com/product/HONEYWELL-Toggle-Switch-3-Position-24D402
+- Type: 3-position DPDT (On/Off/On type)
 - Pole 1: Controls 12V power to Arduino Opta VIN
 - Pole 2: Controls D9 signal pin for mode detection
-- Rating: 10A @ 12VDC minimum
+- Center position provides hardware power cutoff
 
 ### Software Changes
 

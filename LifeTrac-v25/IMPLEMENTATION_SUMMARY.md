@@ -13,11 +13,11 @@ All requirements have been fully implemented with comprehensive documentation.
 
 ### 1. Hardware Switch Support ✅
 
-**3-Position Switch Configuration:**
+**HONEYWELL 2NT1-1 Switch Configuration (On/Off/On):**
 ```
 ┌─────────────────────────────────┐
-│  Position 1: OFF                │ → 12V power disconnected (hardware cutoff)
-│  Position 2: MQTT               │ → WiFi/MQTT control (D9=HIGH)
+│  Position 1: MQTT               │ → WiFi/MQTT control (D9=HIGH)
+│  Position 2: OFF (center)       │ → 12V power disconnected (hardware cutoff)
 │  Position 3: BLE (Default)      │ → Bluetooth control (D9=LOW)
 └─────────────────────────────────┘
 ```
@@ -113,10 +113,10 @@ Updated Files:           6 existing documents
 
 ## Technical Specifications
 
-### Power Management
-- **OFF Mode**: Hardware switch disconnects 12V completely
-- **MQTT Mode**: Normal 12V power + D9=HIGH
-- **BLE Mode**: Normal 12V power + D9=LOW (default)
+### Power Management (HONEYWELL 2NT1-1 Switch)
+- **Position 1 (MQTT Mode)**: Normal 12V power + D9=HIGH
+- **Position 2 (OFF Mode)**: Hardware switch disconnects 12V completely at center
+- **Position 3 (BLE Mode)**: Normal 12V power + D9=LOW (default)
 
 ### Mode Detection Logic
 ```cpp
@@ -188,16 +188,16 @@ if (pinA == HIGH && pinB == LOW) {
 5. Start controlling!
 
 ### For MQTT Mode
-1. Install 3-position switch (see MODE_SWITCH_WIRING.md)
+1. Install HONEYWELL 2NT1-1 switch (see MODE_SWITCH_WIRING.md)
 2. Upload firmware to Arduino Opta
-3. Set switch to MQTT position
+3. Set switch to Position 1 (MQTT)
 4. Ensure WiFi network and MQTT broker running
 5. Connect via ESP32 remote, web interface, or ROS2
 
 ### For Switchable Operation
-1. Install 3-position switch (see MODE_SWITCH_WIRING.md)
+1. Install HONEYWELL 2NT1-1 switch (see MODE_SWITCH_WIRING.md)
 2. Upload firmware to Arduino Opta
-3. Wire switch for OFF/MQTT/BLE selection
+3. Wire switch: Position 1=MQTT, Position 2=OFF (center), Position 3=BLE
 4. Toggle between modes as needed
 5. Power cycle after mode change
 

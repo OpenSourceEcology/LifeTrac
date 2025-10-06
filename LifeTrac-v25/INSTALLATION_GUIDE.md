@@ -124,9 +124,9 @@ sudo systemctl status mosquitto
 **Analog Extension (A0602) Connections:**
 - O2: Burkert 8605 Controller Interface (4-20mA current loop output)
 
-**Mode Selection Switch (Optional 3-position DPDT switch):**
-- Position 1 (OFF): Cuts 12V power to Opta (no operation)
-- Position 2 (MQTT): Connects power + sets D9=HIGH, D10=LOW for WiFi/MQTT mode
+**Mode Selection Switch (Optional HONEYWELL 2NT1-1 On/Off/On switch):**
+- Position 1 (MQTT): Connects power + sets D9=HIGH, D10=LOW for WiFi/MQTT mode
+- Position 2 (OFF): Cuts 12V power to Opta at center position (no operation)
 - Position 3 (BLE): Connects power + sets D9=LOW, D10=LOW for Bluetooth mode
 - If no switch installed: Defaults to BLE mode (D9 and D10 use internal pulldown)
 
@@ -158,22 +158,23 @@ sudo systemctl status mosquitto
 
 ### 2.3 Control Mode Selection
 
-The controller supports two control modes selected via hardware switch:
+The controller supports two control modes selected via HONEYWELL 2NT1-1 hardware switch:
 
-**MQTT Mode (Traditional):**
+**Position 1 - MQTT Mode (Traditional):**
 - Requires WiFi network and MQTT broker (Raspberry Pi)
 - Use with ESP32 remote control or web interface
-- Set mode switch to MQTT position (D9=HIGH, D10=LOW)
+- Set mode switch to Position 1 (MQTT): D9=HIGH, D10=LOW
 
-**BLE Mode (Direct Control - Default):**
+**Position 2 - OFF Mode:**
+- Hardware power cutoff at center position via mode switch
+- Complete shutdown of controller
+- No power to Opta controller
+
+**Position 3 - BLE Mode (Direct Control - Default):**
 - Direct Bluetooth connection to DroidPad app
 - No WiFi or broker required
-- Set mode switch to BLE position (D9=LOW, D10=LOW)
+- Set mode switch to Position 3 (BLE): D9=LOW, D10=LOW
 - Automatically selected if no mode switch is installed
-
-**OFF Mode:**
-- Hardware power cutoff via mode switch
-- No power to Opta controller
 
 ## Step 3: Build ESP32 Remote Control
 

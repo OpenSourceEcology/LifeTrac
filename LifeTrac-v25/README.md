@@ -4,7 +4,7 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 
 ## Features
 
-* **Multiple Control Modes:** 3-position switch for OFF/MQTT/BLE mode selection (BLE default)
+* **Multiple Control Modes:** HONEYWELL 2NT1-1 switch for MQTT/OFF/BLE mode selection (BLE default)
 * **BLE Direct Control:** Direct Bluetooth connection to DroidPad app (no WiFi/broker needed)
 * **Remote Joystick Control:** Dual joystick setup for tank steering and hydraulic functions
 * **DroidPad Compatible:** Native support for DroidPad via BLE or MQTT using -1.0 to 1.0 value range
@@ -83,7 +83,7 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 - **INSTALLATION_GUIDE.md**: Complete setup and installation instructions
 - **DROIDPAD_INTEGRATION.md**: Guide for DroidPad integration via BLE or MQTT
 - **DROIDPAD_BLE_SETUP.md**: Step-by-step BLE direct control setup for DroidPad
-- **MODE_SWITCH_WIRING.md**: Hardware switch wiring for OFF/MQTT/BLE selection
+- **MODE_SWITCH_WIRING.md**: Hardware switch wiring for MQTT/OFF/BLE selection
 - **WIRING_DIAGRAM.md**: Detailed wiring and connection diagrams
 - **HYDRAULIC_DIAGRAM.md**: ASCII hydraulic system diagram showing component layout
 - **ros2_bridge/README.md**: ROS2 integration and BeagleBone setup guide

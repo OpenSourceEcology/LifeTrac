@@ -1,13 +1,13 @@
 # LifeTrac v25 - Mode Switch Quick Reference Card
 
-## 🔌 Switch Positions
+## 🔌 Switch Positions (HONEYWELL 2NT1-1)
 
 ```
-╔══════════════════════════════════════════╗
-║  Position 1: [OFF]   → Power OFF        ║
-║  Position 2: [MQTT]  → WiFi/MQTT Mode   ║
-║  Position 3: [BLE]   → Bluetooth Mode   ║
-╚══════════════════════════════════════════╝
+╔═══════════════════════════════════════════╗
+║  Position 1: [MQTT]  → WiFi/MQTT Mode    ║
+║  Position 2: [OFF]   → Power OFF (center)║
+║  Position 3: [BLE]   → Bluetooth Mode    ║
+╚═══════════════════════════════════════════╝
 ```
 
 ## 🎮 Control Modes
@@ -34,9 +34,9 @@
 
 | Mode | D9 Pin | D10 Pin | Power |
 |------|--------|---------|-------|
-| OFF  | n/a    | n/a     | ❌    |
-| MQTT | HIGH   | LOW     | ✅    |
-| BLE  | LOW    | LOW     | ✅    |
+| Position 1 (MQTT) | HIGH | LOW | ✅ |
+| Position 2 (OFF) | n/a | n/a | ❌ |
+| Position 3 (BLE) | LOW | LOW | ✅ |
 | No Switch | LOW* | LOW* | ✅ |
 
 *Internal pulldown → BLE default
@@ -44,13 +44,13 @@
 ## 🚀 Quick Start
 
 ### For BLE Mode (Easiest)
-1. Power on (switch to BLE or no switch)
+1. Power on (switch to Position 3 or no switch)
 2. Open DroidPad app
 3. Scan for "LifeTrac-v25"
 4. Connect and control!
 
 ### For MQTT Mode
-1. Set switch to MQTT position
+1. Set switch to Position 1 (MQTT)
 2. Ensure WiFi & broker running
 3. Use ESP32 remote or web interface
 4. Start controlling!

@@ -20,11 +20,11 @@
  * - Bucket: up/down valve
  * - Proportional flow control: speed regulation
  * 
- * Mode Selection (via 3-position switch):
- * - OFF: No power to Opta (hardware cutoff of 12V power)
- * - MQTT: Traditional WiFi/MQTT control via broker
- * - BLE: Direct Bluetooth Low Energy control from DroidPad app
- * - Default: BLE mode if switch is not installed (floating pins)
+ * Mode Selection (HONEYWELL 2NT1-1 On/Off/On switch):
+ * - Position 1 (MQTT): WiFi/MQTT control via broker
+ * - Position 2 (OFF): No power to Opta (hardware cutoff at center position)
+ * - Position 3 (BLE): Direct Bluetooth Low Energy control from DroidPad app (default)
+ * - Default: BLE mode if switch is not installed (internal pulldown resistors)
  */
 
 #include <WiFi.h>
@@ -60,16 +60,15 @@ const int BUCKET_DOWN_PIN = 8;          // D8
 // Pin for proportional flow control (4-20mA) - connects to Burkert 8605 Controller
 const int FLOW_CONTROL_PIN = 2;         // O2 (4-20mA current loop output) - interfaces with Burkert controller
 
-// Mode selection switch pins (3-position double throw switch)
+// Mode selection switch pins (HONEYWELL 2NT1-1 On/Off/On switch)
 // The switch selects between MQTT and BLE modes
-// OFF position cuts 12V power to Opta (hardware power cutoff)
+// Center OFF position cuts 12V power to Opta (hardware power cutoff)
 const int MODE_SWITCH_PIN_A = 9;        // D9 - First switch position pin
 const int MODE_SWITCH_PIN_B = 10;       // D10 - Second switch position pin
-// Switch Logic:
-// A=LOW,  B=LOW  -> BLE mode (default if switch not installed - internal pulldown)
-// A=HIGH, B=LOW  -> MQTT mode
-// A=LOW,  B=HIGH -> (unused position)
-// A=HIGH, B=HIGH -> (unused position)
+// Switch Logic (HONEYWELL 2NT1-1):
+// Position 1 (MQTT): A=HIGH, B=LOW  -> MQTT mode
+// Position 2 (OFF):  No power - hardware cutoff at center position
+// Position 3 (BLE):  A=LOW,  B=LOW  -> BLE mode (default if switch not installed - internal pulldown)
 
 // Control mode enumeration
 enum ControlMode {

@@ -2,14 +2,15 @@
 
 ## Overview
 
-The LifeTrac v25 controller supports three operating modes via a 3-position double pole double throw (DPDT) switch:
-- **OFF**: No power to controller
-- **MQTT**: WiFi/MQTT network control
-- **BLE**: Bluetooth Low Energy direct control (default)
+The LifeTrac v25 controller supports three operating modes via a HONEYWELL 2NT1-1 On/Off/On switch (3-position DPDT):
+- **Position 1 (MQTT)**: WiFi/MQTT network control
+- **Position 2 (OFF)**: No power to controller (center position)
+- **Position 3 (BLE)**: Bluetooth Low Energy direct control (default)
 
 ## Required Components
 
-- 1x 3-position DPDT switch (ON-OFF-ON type)
+- 1x HONEYWELL 2NT1-1 switch (On/Off/On, 3-position DPDT)
+  - Part: https://www.grainger.com/product/HONEYWELL-Toggle-Switch-3-Position-24D402
 - Wire for connections (22-24 AWG recommended)
 - Arduino Opta controller with D1608S extension
 
@@ -18,8 +19,8 @@ The LifeTrac v25 controller supports three operating modes via a 3-position doub
 ```
 Switch Position    Power    D9 Pin    D10 Pin    Mode
 ─────────────────────────────────────────────────────
-Position 1 (OFF)    OFF     n/a       n/a        No Operation
-Position 2 (MQTT)   ON      HIGH      LOW        WiFi/MQTT
+Position 1 (MQTT)   ON      HIGH      LOW        WiFi/MQTT
+Position 2 (OFF)    OFF     n/a       n/a        No Operation (center)
 Position 3 (BLE)    ON      LOW       LOW        Bluetooth
 No Switch           ON      LOW*      LOW*       Bluetooth (Default)
 
@@ -31,13 +32,13 @@ No Switch           ON      LOW*      LOW*       Bluetooth (Default)
 ### Simple Wiring (Recommended)
 
 ```
-                        3-Position DPDT Switch
+                        HONEYWELL 2NT1-1 Switch (On/Off/On)
                     ┌─────────────────────────┐
                     │      [1]  [2]  [3]      │
                     │       │    │    │        │
-                    │   OFF │ MQTT│  BLE      │
+                    │  MQTT │ OFF │  BLE      │
                     │       │    │    │        │
-12V Supply ─────────┤   A   X────●────●        │
+12V Supply ─────────┤   A   ●────X────●        │
                     │       │    │    │        │
 GND ────────────────┤   B   ●────●────●        │
                     │       │    │    │        │
@@ -62,31 +63,31 @@ GND ────────────────┤   B   ●────●
 ```
 12V+ ────┬──────────────────────────────┐
          │                              │
-         │   3-Position Switch          │
+         │   HONEYWELL 2NT1-1 Switch    │
          │   Pole 1 (Power)             │
          └─► Common                     │
                 │                       │
           ┌─────┼─────┬─────┐          │
           │     │     │     │          │
-        [OFF] [MQTT] [BLE]  │          │
-          X     │     │     │          │
-               ├─────┴─────┤           │
-               │           │           │
-               └─── TO ────┴───────────┘
+        [MQTT] [OFF] [BLE]  │          │
+          │     X     │     │          │
+          ├───────────┴─────┤          │
+          │                 │          │
+          └───── TO ────────┴──────────┘
                     Opta VIN
 
 
 GND ─────┬──────────────────────────────┬─────────────────┐
-         │   3-Position Switch          │                 │
+         │   HONEYWELL 2NT1-1 Switch    │                 │
          │   Pole 2 (Signal)            │                 │
          └─► Common                     │                 │
                 │                       │                 │
           ┌─────┼─────┬─────┐          │                 │
           │     │     │     │          │                 │
-        [OFF] [MQTT] [BLE]  │          │                 │
-          X     │     │     │          │                 │
-               12V    │     │          │                 │
-                │     │     │          │                 │
+        [MQTT] [OFF] [BLE]  │          │                 │
+          │     X     │     │          │                 │
+          12V         │     │          │                 │
+          │           │     │          │                 │
                 │     └─────┴──────────┼─────────────────┘
                 │                      │
                 └─────── TO ───────────┘
@@ -98,17 +99,17 @@ GND ─────┬───────────────────�
 
 ## Switch Configuration Details
 
-### Position 1: OFF
-- **Power Switch Pole**: Open circuit (no connection)
-- **Signal Switch Pole**: Open circuit (no connection)
-- **Result**: No power to Arduino Opta - complete shutdown
-
-### Position 2: MQTT Mode
+### Position 1: MQTT Mode
 - **Power Switch Pole**: Connects 12V+ to Opta VIN
 - **Signal Switch Pole**: Connects 12V+ to D9
 - **D9**: HIGH (12V)
 - **D10**: LOW (internal pulldown)
 - **Result**: Controller boots in MQTT mode
+
+### Position 2: OFF (Center Position)
+- **Power Switch Pole**: Open circuit (no connection)
+- **Signal Switch Pole**: Open circuit (no connection)
+- **Result**: No power to Arduino Opta - complete shutdown
 
 ### Position 3: BLE Mode
 - **Power Switch Pole**: Connects 12V+ to Opta VIN
@@ -127,51 +128,44 @@ GND ─────┬───────────────────�
 
 | Component | Description | Quantity | Notes |
 |-----------|-------------|----------|-------|
-| DPDT Switch | 3-position, ON-OFF-ON, 12V 10A rated | 1 | Center position is OFF |
+| HONEYWELL 2NT1-1 | 3-position, On/Off/On, DPDT toggle switch | 1 | Center position is OFF |
 | Wire | 22-24 AWG stranded, multiple colors | ~3 feet | Red for 12V, Black for GND, Yellow for D9 |
 | Terminal Block | Optional, for secure connections | 2 | Makes installation cleaner |
 | Switch Mounting | Panel mount hardware | 1 set | Depends on enclosure |
 
-## Recommended Switch Models
+## Recommended Switch
 
-- **Heavy Duty**: Toggle switch, DPDT 3-position (ON-OFF-ON)
-  - Part example: Carling Technologies LT Series
-  - Rating: 20A @ 12VDC
-  
-- **Compact**: Miniature DPDT switch 3-position
-  - Part example: C&K Components 7101 Series
-  - Rating: 6A @ 12VDC
-  
-- **Industrial**: Selector switch with positions labeled
-  - Part example: Eaton M22 Series
-  - Rating: 10A @ 12VDC
-  - Features: Labeled positions, panel mount
+- **HONEYWELL 2NT1-1** (Specified)
+  - Part: https://www.grainger.com/product/HONEYWELL-Toggle-Switch-3-Position-24D402
+  - Type: Toggle switch, DPDT 3-position (On/Off/On)
+  - Rating: Suitable for 12VDC applications
+  - Features: Center OFF position, panel mount
 
 ## Installation Steps
 
 ### Step 1: Prepare Switch
 1. Mount switch in accessible location on enclosure
-2. Label positions: OFF, MQTT, BLE
+2. Label positions: MQTT (left), OFF (center), BLE (right)
 3. Ensure switch is in OFF position
 
 ### Step 2: Wire Power Path
 1. Connect 12V+ supply to switch common terminal (Pole 1)
-2. Connect switch Pole 1 Position 2 (MQTT) to Opta VIN
+2. Connect switch Pole 1 Position 1 (MQTT) to Opta VIN
 3. Connect switch Pole 1 Position 3 (BLE) to Opta VIN
-4. Leave Position 1 (OFF) unconnected
+4. Leave Position 2 (center OFF) unconnected
 5. Connect GND directly to Opta GND
 
 ### Step 3: Wire Signal Path
 1. Connect switch common terminal (Pole 2) to GND
-2. Connect switch Pole 2 Position 2 (MQTT) to 12V+ (via resistor if desired)
-3. Wire from switch Pole 2 Position 2 to Opta D9
+2. Connect switch Pole 2 Position 1 (MQTT) to 12V+ (via resistor if desired)
+3. Wire from switch Pole 2 Position 1 to Opta D9
 4. Leave Position 3 (BLE) unconnected on Pole 2
 5. Leave Opta D10 unconnected (uses internal pulldown)
 
 ### Step 4: Test Connections
 1. Use multimeter to verify:
-   - Position 1 (OFF): No voltage at Opta VIN
-   - Position 2 (MQTT): 12V at Opta VIN, 12V at D9
+   - Position 1 (MQTT): 12V at Opta VIN, 12V at D9
+   - Position 2 (OFF): No voltage at Opta VIN
    - Position 3 (BLE): 12V at Opta VIN, 0V at D9
 2. Verify GND continuity to Opta
 
@@ -192,16 +186,16 @@ GND ─────┬───────────────────�
 For a simpler installation, you can use just the power switching:
 
 ```
-12V+ ──► Switch Position 2 & 3 ──► Opta VIN
-         (Position 1 = OFF)
+12V+ ──► Switch Position 1 & 3 ──► Opta VIN
+         (Position 2 = center OFF)
 
 D9 ◄──── Direct 12V connection (permanent HIGH for MQTT only)
 D10 ◄─── Leave disconnected (LOW via pulldown)
 ```
 
 In this method:
-- Position 1: OFF (no power)
-- Position 2 & 3: ON (always MQTT mode since D9 is HIGH)
+- Position 1 & 3: ON (always MQTT mode since D9 is HIGH)
+- Position 2: OFF (center, no power)
 - No BLE mode available
 - Simpler wiring, less flexibility
 

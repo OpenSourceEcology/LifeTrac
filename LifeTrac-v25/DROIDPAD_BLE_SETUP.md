@@ -15,11 +15,11 @@ This guide provides step-by-step instructions for connecting DroidPad to the Lif
 
 ### 1. Mode Switch Configuration
 
-The LifeTrac v25 uses a 3-position switch to select control mode:
+The LifeTrac v25 uses a HONEYWELL 2NT1-1 On/Off/On switch to select control mode:
 
 ```
-Position 1: OFF  - No power (hardware cutoff)
-Position 2: MQTT - WiFi/MQTT control mode
+Position 1: MQTT - WiFi/MQTT control mode
+Position 2: OFF  - No power (hardware cutoff at center)
 Position 3: BLE  - Bluetooth direct control (default)
 ```
 
