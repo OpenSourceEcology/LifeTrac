@@ -478,6 +478,20 @@ void readBLEJoystickData() {
       float values[2];
       memcpy(values, data, 8);
       
+      // Validate and clamp values to expected range (-1.0 to 1.0)
+      if (values[0] < -1.0 || values[0] > 1.0) {
+        Serial.print("Warning: Left X out of range (");
+        Serial.print(values[0]);
+        Serial.println("), clamping to [-1.0, 1.0]");
+        values[0] = constrain(values[0], -1.0, 1.0);
+      }
+      if (values[1] < -1.0 || values[1] > 1.0) {
+        Serial.print("Warning: Left Y out of range (");
+        Serial.print(values[1]);
+        Serial.println("), clamping to [-1.0, 1.0]");
+        values[1] = constrain(values[1], -1.0, 1.0);
+      }
+      
       currentInput.left_x = values[0];
       currentInput.left_y = values[1];
       
@@ -500,6 +514,20 @@ void readBLEJoystickData() {
       const uint8_t* data = rightJoystickChar.value();
       float values[2];
       memcpy(values, data, 8);
+      
+      // Validate and clamp values to expected range (-1.0 to 1.0)
+      if (values[0] < -1.0 || values[0] > 1.0) {
+        Serial.print("Warning: Right X out of range (");
+        Serial.print(values[0]);
+        Serial.println("), clamping to [-1.0, 1.0]");
+        values[0] = constrain(values[0], -1.0, 1.0);
+      }
+      if (values[1] < -1.0 || values[1] > 1.0) {
+        Serial.print("Warning: Right Y out of range (");
+        Serial.print(values[1]);
+        Serial.println("), clamping to [-1.0, 1.0]");
+        values[1] = constrain(values[1], -1.0, 1.0);
+      }
       
       currentInput.right_x = values[0];
       currentInput.right_y = values[1];
