@@ -477,37 +477,36 @@ bool readBLEJoystickData() {
       const uint8_t* data = leftJoystickChar.value();
       
       // Validate data pointer is not null before memcpy
-      if (data == nullptr) {
+      if (data != nullptr) {
+        float values[2];
+        memcpy(values, data, 8);
+        
+        // Validate and clamp values to expected range (-1.0 to 1.0)
+        if (values[0] < -1.0 || values[0] > 1.0) {
+          Serial.print("Warning: Left X out of range (");
+          Serial.print(values[0]);
+          Serial.println("), clamping to [-1.0, 1.0]");
+          values[0] = constrain(values[0], -1.0, 1.0);
+        }
+        if (values[1] < -1.0 || values[1] > 1.0) {
+          Serial.print("Warning: Left Y out of range (");
+          Serial.print(values[1]);
+          Serial.println("), clamping to [-1.0, 1.0]");
+          values[1] = constrain(values[1], -1.0, 1.0);
+        }
+        
+        currentInput.left_x = values[0];
+        currentInput.left_y = values[1];
+        
+        Serial.print("BLE Left: X=");
+        Serial.print(currentInput.left_x);
+        Serial.print(" Y=");
+        Serial.println(currentInput.left_y);
+        
+        dataProcessed = true;
+      } else {
         Serial.println("Warning: Left joystick data pointer is null");
-        return dataProcessed;
       }
-      
-      float values[2];
-      memcpy(values, data, 8);
-      
-      // Validate and clamp values to expected range (-1.0 to 1.0)
-      if (values[0] < -1.0 || values[0] > 1.0) {
-        Serial.print("Warning: Left X out of range (");
-        Serial.print(values[0]);
-        Serial.println("), clamping to [-1.0, 1.0]");
-        values[0] = constrain(values[0], -1.0, 1.0);
-      }
-      if (values[1] < -1.0 || values[1] > 1.0) {
-        Serial.print("Warning: Left Y out of range (");
-        Serial.print(values[1]);
-        Serial.println("), clamping to [-1.0, 1.0]");
-        values[1] = constrain(values[1], -1.0, 1.0);
-      }
-      
-      currentInput.left_x = values[0];
-      currentInput.left_y = values[1];
-      
-      Serial.print("BLE Left: X=");
-      Serial.print(currentInput.left_x);
-      Serial.print(" Y=");
-      Serial.println(currentInput.left_y);
-      
-      dataProcessed = true;
     } else {
       Serial.print("Warning: Left joystick data length mismatch. Expected 8, got ");
       Serial.println(dataLength);
@@ -523,37 +522,36 @@ bool readBLEJoystickData() {
       const uint8_t* data = rightJoystickChar.value();
       
       // Validate data pointer is not null before memcpy
-      if (data == nullptr) {
+      if (data != nullptr) {
+        float values[2];
+        memcpy(values, data, 8);
+        
+        // Validate and clamp values to expected range (-1.0 to 1.0)
+        if (values[0] < -1.0 || values[0] > 1.0) {
+          Serial.print("Warning: Right X out of range (");
+          Serial.print(values[0]);
+          Serial.println("), clamping to [-1.0, 1.0]");
+          values[0] = constrain(values[0], -1.0, 1.0);
+        }
+        if (values[1] < -1.0 || values[1] > 1.0) {
+          Serial.print("Warning: Right Y out of range (");
+          Serial.print(values[1]);
+          Serial.println("), clamping to [-1.0, 1.0]");
+          values[1] = constrain(values[1], -1.0, 1.0);
+        }
+        
+        currentInput.right_x = values[0];
+        currentInput.right_y = values[1];
+        
+        Serial.print("BLE Right: X=");
+        Serial.print(currentInput.right_x);
+        Serial.print(" Y=");
+        Serial.println(currentInput.right_y);
+        
+        dataProcessed = true;
+      } else {
         Serial.println("Warning: Right joystick data pointer is null");
-        return dataProcessed;
       }
-      
-      float values[2];
-      memcpy(values, data, 8);
-      
-      // Validate and clamp values to expected range (-1.0 to 1.0)
-      if (values[0] < -1.0 || values[0] > 1.0) {
-        Serial.print("Warning: Right X out of range (");
-        Serial.print(values[0]);
-        Serial.println("), clamping to [-1.0, 1.0]");
-        values[0] = constrain(values[0], -1.0, 1.0);
-      }
-      if (values[1] < -1.0 || values[1] > 1.0) {
-        Serial.print("Warning: Right Y out of range (");
-        Serial.print(values[1]);
-        Serial.println("), clamping to [-1.0, 1.0]");
-        values[1] = constrain(values[1], -1.0, 1.0);
-      }
-      
-      currentInput.right_x = values[0];
-      currentInput.right_y = values[1];
-      
-      Serial.print("BLE Right: X=");
-      Serial.print(currentInput.right_x);
-      Serial.print(" Y=");
-      Serial.println(currentInput.right_y);
-      
-      dataProcessed = true;
     } else {
       Serial.print("Warning: Right joystick data length mismatch. Expected 8, got ");
       Serial.println(dataLength);
