@@ -431,26 +431,11 @@ void readModeSwitch() {
 void setupBLE() {
   // Initialize BLE
   if (!BLE.begin()) {
-    Serial.println("Starting BLE failed!");
-    Serial.println("Attempting fallback to MQTT mode...");
-    
-    // Fallback to MQTT mode instead of hanging
-    currentMode = MODE_MQTT;
-    
-    // Try to setup WiFi with error handling
-    setupWiFi();
-    
-    // Check if WiFi connection was successful
-    if (WiFi.status() != WL_CONNECTED) {
-      Serial.println("ERROR: WiFi fallback failed. Entering safe state with all outputs disabled.");
-      Serial.println("Please check WiFi credentials or ensure BLE hardware is functioning.");
-      // Stay in MODE_MQTT but with no connection - safety timeout will keep outputs off
-      return;
-    }
-    
-    client.setServer(mqtt_server, mqtt_port);
-    client.setCallback(mqttCallback);
-    Serial.println("Fallback to MQTT mode complete");
+    Serial.println("ERROR: Starting BLE failed!");
+    Serial.println("BLE hardware initialization error. Entering safe state.");
+    Serial.println("All hydraulic outputs will remain disabled.");
+    Serial.println("Please check BLE hardware or switch to MQTT mode using the mode switch.");
+    // Stay in BLE mode but without functional BLE - safety timeout will keep outputs off
     return;
   }
   
@@ -490,6 +475,13 @@ bool readBLEJoystickData() {
     // Validate data length before copying (should be 8 bytes for 2 floats)
     if (dataLength == 8) {
       const uint8_t* data = leftJoystickChar.value();
+      
+      // Validate data pointer is not null before memcpy
+      if (data == nullptr) {
+        Serial.println("Warning: Left joystick data pointer is null");
+        return dataProcessed;
+      }
+      
       float values[2];
       memcpy(values, data, 8);
       
@@ -529,6 +521,13 @@ bool readBLEJoystickData() {
     // Validate data length before copying (should be 8 bytes for 2 floats)
     if (dataLength == 8) {
       const uint8_t* data = rightJoystickChar.value();
+      
+      // Validate data pointer is not null before memcpy
+      if (data == nullptr) {
+        Serial.println("Warning: Right joystick data pointer is null");
+        return dataProcessed;
+      }
+      
       float values[2];
       memcpy(values, data, 8);
       
