@@ -476,9 +476,33 @@ void readBLEJoystickData() {
     if (dataLength == 8) {
       const uint8_t* data = leftJoystickChar.value();
       float values[2];
-      memcpy(values, data, 8);
-      
-      // Validate and clamp values to expected range (-1.0 to 1.0)
+      if (data != nullptr) {
+        memcpy(values, data, 8);
+        
+        // Validate and clamp values to expected range (-1.0 to 1.0)
+        if (values[0] < -1.0 || values[0] > 1.0) {
+          Serial.print("Warning: Left X out of range (");
+          Serial.print(values[0]);
+          Serial.println("), clamping to [-1.0, 1.0]");
+          values[0] = constrain(values[0], -1.0, 1.0);
+        }
+        if (values[1] < -1.0 || values[1] > 1.0) {
+          Serial.print("Warning: Left Y out of range (");
+          Serial.print(values[1]);
+          Serial.println("), clamping to [-1.0, 1.0]");
+          values[1] = constrain(values[1], -1.0, 1.0);
+        }
+        
+        currentInput.left_x = values[0];
+        currentInput.left_y = values[1];
+        
+        Serial.print("BLE Left: X=");
+        Serial.print(currentInput.left_x);
+        Serial.print(" Y=");
+        Serial.println(currentInput.left_y);
+      } else {
+        Serial.println("Warning: leftJoystickChar.value() returned null pointer, skipping memcpy.");
+      }
       if (values[0] < -1.0 || values[0] > 1.0) {
         Serial.print("Warning: Left X out of range (");
         Serial.print(values[0]);
