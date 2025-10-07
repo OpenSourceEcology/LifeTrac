@@ -475,7 +475,7 @@ void validateAndClampJoystickValue(float& value, const char* axisName) {
   static unsigned long lastWarningTimeRightX = 0;
   static unsigned long lastWarningTimeRightY = 0;
   unsigned long now = millis();
-  unsigned long* lastWarningTime = nullptr;
+  unsigned long* lastWarningTime = NULL;
 
   // Map axisName to the correct static variable
   if (strcmp(axisName, "Left X") == 0) {
@@ -514,7 +514,7 @@ bool readBLEJoystickData() {
       const uint8_t* data = leftJoystickChar.value();
       
       // Validate data pointer is not null before memcpy
-      if (data != nullptr) {
+      if (data != NULL) {
         float values[2];
         memcpy(values, data, JOYSTICK_DATA_SIZE);
         
@@ -551,7 +551,7 @@ bool readBLEJoystickData() {
       const uint8_t* data = rightJoystickChar.value();
       
       // Validate data pointer is not null before memcpy
-      if (data != nullptr) {
+      if (data != NULL) {
         float values[2];
         memcpy(values, data, JOYSTICK_DATA_SIZE);
         
