@@ -469,23 +469,28 @@ void setupBLE() {
 }
 
 // Helper function to validate and clamp joystick axis values
+// Struct to hold last warning times for joystick axes
+struct JoystickWarningTimes {
+  unsigned long leftX;
+  unsigned long leftY;
+  unsigned long rightX;
+  unsigned long rightY;
+};
+
 void validateAndClampJoystickValue(float& value, const char* axisName) {
-  static unsigned long lastWarningTimeLeftX = 0;
-  static unsigned long lastWarningTimeLeftY = 0;
-  static unsigned long lastWarningTimeRightX = 0;
-  static unsigned long lastWarningTimeRightY = 0;
+  static JoystickWarningTimes lastWarningTimes = {0, 0, 0, 0};
   unsigned long now = millis();
   unsigned long* lastWarningTime = NULL;
 
-  // Map axisName to the correct static variable
+  // Map axisName to the correct struct member
   if (strcmp(axisName, "Left X") == 0) {
-    lastWarningTime = &lastWarningTimeLeftX;
+    lastWarningTime = &lastWarningTimes.leftX;
   } else if (strcmp(axisName, "Left Y") == 0) {
-    lastWarningTime = &lastWarningTimeLeftY;
+    lastWarningTime = &lastWarningTimes.leftY;
   } else if (strcmp(axisName, "Right X") == 0) {
-    lastWarningTime = &lastWarningTimeRightX;
+    lastWarningTime = &lastWarningTimes.rightX;
   } else if (strcmp(axisName, "Right Y") == 0) {
-    lastWarningTime = &lastWarningTimeRightY;
+    lastWarningTime = &lastWarningTimes.rightY;
   }
 
   if (value < -1.0 || value > 1.0) {
