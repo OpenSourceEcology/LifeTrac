@@ -470,12 +470,34 @@ void setupBLE() {
 
 // Helper function to validate and clamp joystick axis values
 void validateAndClampJoystickValue(float& value, const char* axisName) {
+  static unsigned long lastWarningTimeLeftX = 0;
+  static unsigned long lastWarningTimeLeftY = 0;
+  static unsigned long lastWarningTimeRightX = 0;
+  static unsigned long lastWarningTimeRightY = 0;
+  unsigned long now = millis();
+  unsigned long* lastWarningTime = nullptr;
+
+  // Map axisName to the correct static variable
+  if (strcmp(axisName, "Left X") == 0) {
+    lastWarningTime = &lastWarningTimeLeftX;
+  } else if (strcmp(axisName, "Left Y") == 0) {
+    lastWarningTime = &lastWarningTimeLeftY;
+  } else if (strcmp(axisName, "Right X") == 0) {
+    lastWarningTime = &lastWarningTimeRightX;
+  } else if (strcmp(axisName, "Right Y") == 0) {
+    lastWarningTime = &lastWarningTimeRightY;
+  }
+
   if (value < -1.0 || value > 1.0) {
-    Serial.print("Warning: ");
-    Serial.print(axisName);
-    Serial.print(" out of range (");
-    Serial.print(value);
-    Serial.println("), clamping to [-1.0, 1.0]");
+    // Only print warning if at least 1000ms have passed since last warning for this axis
+    if (lastWarningTime && (now - *lastWarningTime >= 1000)) {
+      Serial.print("Warning: ");
+      Serial.print(axisName);
+      Serial.print(" out of range (");
+      Serial.print(value);
+      Serial.println("), clamping to [-1.0, 1.0]");
+      *lastWarningTime = now;
+    }
     value = constrain(value, -1.0, 1.0);
   }
 }
