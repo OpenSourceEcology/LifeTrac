@@ -518,8 +518,8 @@ bool readBLEJoystickData() {
     if (dataLength == JOYSTICK_DATA_SIZE) {
       const uint8_t* data = leftJoystickChar.value();
       
-      // Validate data pointer is not null and re-check length before memcpy (defensive programming)
-      if (data != NULL && dataLength == JOYSTICK_DATA_SIZE) {
+      // Validate data pointer is not null before memcpy
+      if (data != NULL) {
         float values[2];
         memcpy(values, data, JOYSTICK_DATA_SIZE);
         
@@ -555,8 +555,8 @@ bool readBLEJoystickData() {
     if (dataLength == JOYSTICK_DATA_SIZE) {
       const uint8_t* data = rightJoystickChar.value();
       
-      // Validate data pointer is not null and re-check length before memcpy (defensive programming)
-      if (data != NULL && dataLength == JOYSTICK_DATA_SIZE) {
+      // Validate data pointer is not null before memcpy
+      if (data != NULL) {
         float values[2];
         memcpy(values, data, JOYSTICK_DATA_SIZE);
         
