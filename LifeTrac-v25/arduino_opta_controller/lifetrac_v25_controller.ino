@@ -86,7 +86,7 @@ ControlMode currentMode = MODE_BLE; // Default to BLE
 #define BLE_JOYSTICK_RIGHT_UUID "19B10002-E8F2-537E-4F6C-D104768A1214" // right_x, right_y
 
 // BLE data size constant
-const int JOYSTICK_DATA_SIZE = 8;  // 2 floats = 8 bytes (4 bytes per float)
+constexpr int JOYSTICK_DATA_SIZE = 8;  // 2 floats = 8 bytes (4 bytes per float)
 
 // BLE Objects
 BLEService lifeTracService(BLE_SERVICE_UUID);
