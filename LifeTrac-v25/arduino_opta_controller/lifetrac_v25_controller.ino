@@ -132,6 +132,11 @@ PubSubClient client(espClient);
 // Deadzone for joystick input (0.1 = 10% of range)
 const float DEADZONE = 0.1;
 
+// Flow control current constants (4-20mA current loop)
+const int BASE_CURRENT = 4;          // 4mA = no flow
+const int MIN_ACTIVE_CURRENT = 6;    // 6mA = minimum active flow (~12.5%)
+const int CURRENT_RANGE = 16;        // 16mA range (4-20mA span)
+
 // Safety timeout (stop all movement if no commands received)
 unsigned long lastCommandTime = 0;
 const unsigned long SAFETY_TIMEOUT = 1000; // 1 second
@@ -377,6 +382,20 @@ void controlValve(float control, int upPin, int downPin) {
   }
 }
 
+// Helper function to convert input magnitude to flow control current (4-20mA)
+// magnitude: Input magnitude (0.0 to 1.0)
+// hasInput: Whether there is active input above deadzone
+// Returns: Current value in mA (4-20 range)
+int flowCurrentFromInput(float magnitude, bool hasInput) {
+  if (!hasInput) {
+    return BASE_CURRENT; // 4mA = no flow
+  }
+  
+  int currentValue = BASE_CURRENT + (int)(magnitude * CURRENT_RANGE);
+  currentValue = max(currentValue, MIN_ACTIVE_CURRENT); // Minimum active flow
+  return currentValue;
+}
+
 void setFlowControl() {
   if (flowConfig == ONE_VALVE) {
     // Single valve mode: One valve controls all hydraulics
@@ -403,19 +422,13 @@ void setFlowControl() {
       hasInput = true;
     }
     
-    // Convert to 4-20mA value (4mA = minimum, 20mA = maximum)
-    int currentValue;
-    if (hasInput) {
-      currentValue = 4 + (int)(minInput * 16.0);
-      currentValue = max(currentValue, 6); // Minimum ~12.5% flow (6mA)
-    } else {
-      currentValue = 4; // 4mA = no flow
-    }
+    // Convert to 4-20mA value using helper function
+    int currentValue = flowCurrentFromInput(minInput, hasInput);
     
     // Output to primary flow valve
     OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_1, currentValue);
     // Disable secondary valve in single valve mode
-    OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_2, 4);
+    OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_2, BASE_CURRENT);
     
   } else {
     // Dual valve mode: Two independent valves
@@ -431,25 +444,15 @@ void setFlowControl() {
     float maxInput1 = 0.0;
     maxInput1 = max(maxInput1, abs(leftTrackSpeed));  // Left track speed
     maxInput1 = max(maxInput1, abs(currentInput.right_y)); // Arms
-    
-    int currentValue1 = 4 + (int)(maxInput1 * 16.0);
-    if (maxInput1 > DEADZONE) {
-      currentValue1 = max(currentValue1, 6);
-    } else {
-      currentValue1 = 4;
-    }
+    bool hasInput1 = maxInput1 > DEADZONE;
+    int currentValue1 = flowCurrentFromInput(maxInput1, hasInput1);
     
     // Calculate flow for Valve 2 (right track + bucket)
     float maxInput2 = 0.0;
     maxInput2 = max(maxInput2, abs(rightTrackSpeed)); // Right track speed
     maxInput2 = max(maxInput2, abs(currentInput.right_x)); // Bucket
-    
-    int currentValue2 = 4 + (int)(maxInput2 * 16.0);
-    if (maxInput2 > DEADZONE) {
-      currentValue2 = max(currentValue2, 6);
-    } else {
-      currentValue2 = 4;
-    }
+    bool hasInput2 = maxInput2 > DEADZONE;
+    int currentValue2 = flowCurrentFromInput(maxInput2, hasInput2);
     
     // Output to both flow valves
     OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_1, currentValue1);
@@ -468,9 +471,9 @@ void stopAllMovement() {
   digitalWrite(BUCKET_UP_PIN, LOW);
   digitalWrite(BUCKET_DOWN_PIN, LOW);
   
-  // Stop flow control - set to 4mA (no flow) for both valves
-  OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_1, 4);
-  OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_2, 4);
+  // Stop flow control - set to BASE_CURRENT (no flow) for both valves
+  OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_1, BASE_CURRENT);
+  OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_2, BASE_CURRENT);
 }
 
 void publishStatus() {
