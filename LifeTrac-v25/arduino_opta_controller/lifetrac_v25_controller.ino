@@ -9,8 +9,8 @@
  * - Arduino Pro Opta Ext D1608S (Digital I/O extension)
  * - Arduino Pro Opta Ext A0602 (Analog extension)
  * - 4x Hydraulic Directional Valves (12V DC)
- * - 1x Proportional Flow Control Valve
- * - 1x Burkert 8605 Type 316532 Flow Valve Controller
+ * - 1-2x Proportional Flow Control Valves (configurable)
+ * - 1-2x Burkert 8605 Type 316532 Flow Valve Controllers
  * - 3-position switch for OFF/MQTT/BLE mode selection
  * 
  * Control scheme:
@@ -25,6 +25,14 @@
  * - Position 2 (OFF): No power to Opta (hardware cutoff at center position)
  * - Position 3 (BLE): Direct Bluetooth Low Energy control from DroidPad app (default)
  * - Default: BLE mode if switch is not installed (internal pulldown resistors)
+ * 
+ * Flow Valve Configuration (Jumper on D11):
+ * - No jumper (D11=LOW): ONE_VALVE mode - Single valve controls all hydraulics (default)
+ *   Speed limited to smallest joystick input. Limited turning capability.
+ * - Jumper installed (D11=HIGH): TWO_VALVES mode - Independent valve control
+ *   Valve 1 (O2): Controls left track + arms
+ *   Valve 2 (O3): Controls right track + bucket
+ *   Allows fully adjustable turning with different speeds for left/right sides.
  */
 
 #include <WiFi.h>
@@ -57,8 +65,9 @@ const int ARMS_DOWN_PIN = 6;            // D6
 const int BUCKET_UP_PIN = 7;            // D7
 const int BUCKET_DOWN_PIN = 8;          // D8
 
-// Pin for proportional flow control (4-20mA) - connects to Burkert 8605 Controller
-const int FLOW_CONTROL_PIN = 2;         // O2 (4-20mA current loop output) - interfaces with Burkert controller
+// Pins for proportional flow control (4-20mA) - connects to Burkert 8605 Controller(s)
+const int FLOW_CONTROL_PIN_1 = 2;       // O2 (4-20mA current loop output) - Primary flow valve
+const int FLOW_CONTROL_PIN_2 = 3;       // O3 (4-20mA current loop output) - Secondary flow valve (for dual valve config)
 
 // Mode selection switch pins (HONEYWELL 2NT1-1 On/Off/On switch)
 // The switch selects between MQTT and BLE modes
@@ -71,6 +80,13 @@ const int MODE_SWITCH_PIN_B = 10;       // D10 - Reserved for future expansion (
 // Position 3 (BLE):  A=LOW  -> BLE mode (default if switch not installed - internal pulldown)
 // Note: Only D9 is used for mode detection. D10 is reserved for future multi-mode expansion.
 
+// Flow valve configuration jumper pins
+// These pins detect which proportional flow valve configuration is installed
+const int FLOW_CONFIG_JUMPER_PIN = 11;  // D11 - Flow valve configuration jumper
+// Jumper Logic (with internal pullup resistor):
+// D11=HIGH (no jumper): ONE_VALVE mode - Single valve controls all hydraulics (default)
+// D11=LOW (jumper to GND): TWO_VALVES mode - Valve 1 controls left track + arms, Valve 2 controls right track + bucket
+
 // Control mode enumeration
 enum ControlMode {
   MODE_BLE,   // Bluetooth Low Energy direct control
@@ -78,6 +94,14 @@ enum ControlMode {
 };
 
 ControlMode currentMode = MODE_BLE; // Default to BLE
+
+// Flow valve configuration enumeration
+enum FlowValveConfig {
+  ONE_VALVE,   // Single proportional flow valve controls all hydraulics (default)
+  TWO_VALVES   // Two proportional flow valves: Valve 1 for left track + arms, Valve 2 for right track + bucket
+};
+
+FlowValveConfig flowConfig = ONE_VALVE; // Default to single valve
 
 // BLE Service and Characteristics UUIDs
 // Using custom UUIDs for LifeTrac control service
@@ -108,6 +132,11 @@ PubSubClient client(espClient);
 // Deadzone for joystick input (0.1 = 10% of range)
 const float DEADZONE = 0.1;
 
+// Flow control current constants (4-20mA current loop)
+const int BASE_CURRENT = 4;          // 4mA = no flow
+const int MIN_ACTIVE_CURRENT = 6;    // 6mA = minimum active flow (~12.5%)
+const int CURRENT_RANGE = 16;        // 16mA range (4-20mA span)
+
 // Safety timeout (stop all movement if no commands received)
 unsigned long lastCommandTime = 0;
 const unsigned long SAFETY_TIMEOUT = 1000; // 1 second
@@ -121,6 +150,10 @@ void setup() {
   pinMode(MODE_SWITCH_PIN_A, INPUT_PULLDOWN);
   pinMode(MODE_SWITCH_PIN_B, INPUT_PULLDOWN);
   
+  // Initialize flow valve configuration jumper pin with internal pullup
+  // This ensures ONE_VALVE mode is default when jumper is not installed
+  pinMode(FLOW_CONFIG_JUMPER_PIN, INPUT_PULLUP);
+  
   // Initialize digital output pins
   pinMode(LEFT_TRACK_FORWARD_PIN, OUTPUT);
   pinMode(LEFT_TRACK_BACKWARD_PIN, OUTPUT);
@@ -131,16 +164,21 @@ void setup() {
   pinMode(BUCKET_UP_PIN, OUTPUT);
   pinMode(BUCKET_DOWN_PIN, OUTPUT);
   
-  // Initialize 4-20mA current output pin for flow control
+  // Initialize 4-20mA current output pins for flow control
   OptaController.begin();  // Initialize Opta controller library
-  // Configure O2 as 4-20mA current output
-  OptaController.analogWriteMode(FLOW_CONTROL_PIN, CURRENT_OUTPUT_4_20MA);
+  // Configure O2 as 4-20mA current output (primary flow valve)
+  OptaController.analogWriteMode(FLOW_CONTROL_PIN_1, CURRENT_OUTPUT_4_20MA);
+  // Configure O3 as 4-20mA current output (secondary flow valve for dual valve config)
+  OptaController.analogWriteMode(FLOW_CONTROL_PIN_2, CURRENT_OUTPUT_4_20MA);
   
   // Ensure all outputs are off initially
   stopAllMovement();
   
   // Wait for switch pins to stabilize before reading
   delay(1000);  // 1 second delay for hardware stabilization
+  
+  // Read flow valve configuration jumper
+  readFlowValveConfig();
   
   // Read mode switch and initialize appropriate control mode
   readModeSwitch();
@@ -271,21 +309,28 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   lastCommandTime = millis();
 }
 
+// Helper function to compute track speeds from joystick input
+// Centralizes tank steering math to avoid duplication
+void computeTrackSpeeds(float left_y, float left_x, float* leftSpeed, float* rightSpeed) {
+  float baseSpeed = left_y;  // Forward/backward
+  float turnRate = left_x;   // Left/right turning
+  
+  // Calculate individual track speeds using differential steering
+  *leftSpeed = baseSpeed + turnRate;
+  *rightSpeed = baseSpeed - turnRate;
+  
+  // Constrain to valid range [-1.0, 1.0]
+  *leftSpeed = fmaxf(-1.0, fminf(*leftSpeed, 1.0));
+  *rightSpeed = fmaxf(-1.0, fminf(*rightSpeed, 1.0));
+}
+
 void processJoystickInput() {
   // Calculate track movements (tank steering)
   // Left joystick Y controls forward/backward movement
   // Left joystick X controls turning (differential steering)
   
-  float baseSpeed = currentInput.left_y; // Forward/backward
-  float turnRate = currentInput.left_x;  // Left/right turning
-  
-  // Calculate individual track speeds
-  float leftTrackSpeed = baseSpeed + turnRate;
-  float rightTrackSpeed = baseSpeed - turnRate;
-  
-  // Constrain to valid range
-  leftTrackSpeed = fmaxf(-1.0, fminf(leftTrackSpeed, 1.0));
-  rightTrackSpeed = fmaxf(-1.0, fminf(rightTrackSpeed, 1.0));
+  float leftTrackSpeed, rightTrackSpeed;
+  computeTrackSpeeds(currentInput.left_y, currentInput.left_x, &leftTrackSpeed, &rightTrackSpeed);
   
   // Control left track
   controlTrack(leftTrackSpeed, LEFT_TRACK_FORWARD_PIN, LEFT_TRACK_BACKWARD_PIN);
@@ -337,32 +382,82 @@ void controlValve(float control, int upPin, int downPin) {
   }
 }
 
-void setFlowControl() {
-  // Find the maximum absolute value from all inputs
-  // This determines the overall system speed
-  // 4-20mA current loop output interfaces with Burkert 8605 Controller for precise flow control
-  float maxInput = 0.0;
-  
-  maxInput = max(maxInput, abs(currentInput.left_x));
-  maxInput = max(maxInput, abs(currentInput.left_y));
-  maxInput = max(maxInput, abs(currentInput.right_x));
-  maxInput = max(maxInput, abs(currentInput.right_y));
-  
-  // Convert to 4-20mA value (4mA = minimum, 20mA = maximum)
-  // Map from joystick range (0.0-1.0) to current range (4-20mA)
-  // Using linear interpolation: currentValue = 4 + (maxInput * 16)
-  int currentValue = 4 + (int)(maxInput * 16.0);
-  
-  // Apply minimum flow when any movement is commanded
-  if (maxInput > DEADZONE) {
-    currentValue = max(currentValue, 6); // Minimum ~12.5% flow (6mA)
-  } else {
-    currentValue = 4; // 4mA = no flow
+// Helper function to convert input magnitude to flow control current (4-20mA)
+// magnitude: Input magnitude (0.0 to 1.0)
+// hasInput: Whether there is active input above deadzone
+// Returns: Current value in mA (4-20 range)
+int flowCurrentFromInput(float magnitude, bool hasInput) {
+  if (!hasInput) {
+    return BASE_CURRENT; // 4mA = no flow
   }
   
-  // Output true 4-20mA current using Opta A0602 current loop hardware
-  // currentValue is already in mA (4-20 range)
-  OptaController.analogWriteCurrent(FLOW_CONTROL_PIN, currentValue);
+  int currentValue = BASE_CURRENT + (int)(magnitude * CURRENT_RANGE);
+  currentValue = max(currentValue, MIN_ACTIVE_CURRENT); // Minimum active flow
+  return currentValue;
+}
+
+void setFlowControl() {
+  if (flowConfig == ONE_VALVE) {
+    // Single valve mode: One valve controls all hydraulics
+    // Speed limited to the smallest non-zero joystick input
+    // Find the minimum non-zero absolute value from all inputs
+    float minInput = 1.0; // Start with maximum possible value
+    bool hasInput = false;
+    
+    // Check each input and find minimum non-zero value
+    if (abs(currentInput.left_x) > DEADZONE) {
+      minInput = min(minInput, abs(currentInput.left_x));
+      hasInput = true;
+    }
+    if (abs(currentInput.left_y) > DEADZONE) {
+      minInput = min(minInput, abs(currentInput.left_y));
+      hasInput = true;
+    }
+    if (abs(currentInput.right_x) > DEADZONE) {
+      minInput = min(minInput, abs(currentInput.right_x));
+      hasInput = true;
+    }
+    if (abs(currentInput.right_y) > DEADZONE) {
+      minInput = min(minInput, abs(currentInput.right_y));
+      hasInput = true;
+    }
+    
+    // Convert to 4-20mA value using helper function
+    int currentValue = flowCurrentFromInput(minInput, hasInput);
+    
+    // Output to primary flow valve
+    OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_1, currentValue);
+    // Disable secondary valve in single valve mode
+    OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_2, BASE_CURRENT);
+    
+  } else {
+    // Dual valve mode: Two independent valves
+    // Valve 1 controls: left track + arms
+    // Valve 2 controls: right track + bucket
+    // This allows independent speed control for each side
+    
+    // Calculate track speeds using shared helper function
+    float leftTrackSpeed, rightTrackSpeed;
+    computeTrackSpeeds(currentInput.left_y, currentInput.left_x, &leftTrackSpeed, &rightTrackSpeed);
+    
+    // Calculate flow for Valve 1 (left track + arms)
+    float maxInput1 = 0.0;
+    maxInput1 = max(maxInput1, abs(leftTrackSpeed));  // Left track speed
+    maxInput1 = max(maxInput1, abs(currentInput.right_y)); // Arms
+    bool hasInput1 = maxInput1 > DEADZONE;
+    int currentValue1 = flowCurrentFromInput(maxInput1, hasInput1);
+    
+    // Calculate flow for Valve 2 (right track + bucket)
+    float maxInput2 = 0.0;
+    maxInput2 = max(maxInput2, abs(rightTrackSpeed)); // Right track speed
+    maxInput2 = max(maxInput2, abs(currentInput.right_x)); // Bucket
+    bool hasInput2 = maxInput2 > DEADZONE;
+    int currentValue2 = flowCurrentFromInput(maxInput2, hasInput2);
+    
+    // Output to both flow valves
+    OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_1, currentValue1);
+    OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_2, currentValue2);
+  }
 }
 
 void stopAllMovement() {
@@ -376,8 +471,9 @@ void stopAllMovement() {
   digitalWrite(BUCKET_UP_PIN, LOW);
   digitalWrite(BUCKET_DOWN_PIN, LOW);
   
-  // Stop flow control - set to 4mA (no flow) using true current output
-  OptaController.analogWriteCurrent(FLOW_CONTROL_PIN, 4);
+  // Stop flow control - set to BASE_CURRENT (no flow) for both valves
+  OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_1, BASE_CURRENT);
+  OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_2, BASE_CURRENT);
 }
 
 void publishStatus() {
@@ -407,6 +503,24 @@ void publishStatus() {
   serializeJson(doc, statusMessage);
   
   client.publish(status_topic, statusMessage.c_str());
+}
+
+void readFlowValveConfig() {
+  // Read flow valve configuration jumper pin
+  bool pinState = digitalRead(FLOW_CONFIG_JUMPER_PIN);
+  
+  // Determine flow valve configuration
+  // With internal pullup: HIGH (no jumper) = ONE_VALVE, LOW (jumper to GND) = TWO_VALVES
+  if (pinState == LOW) {
+    flowConfig = TWO_VALVES;
+  } else {
+    flowConfig = ONE_VALVE; // Default when no jumper (pullup keeps pin HIGH)
+  }
+  
+  Serial.print("Flow valve configuration jumper: D11=");
+  Serial.print(pinState ? "HIGH" : "LOW");
+  Serial.print(" -> Config: ");
+  Serial.println(flowConfig == ONE_VALVE ? "ONE_VALVE (Single valve for all)" : "TWO_VALVES (Valve 1: left+arms, Valve 2: right+bucket)");
 }
 
 void readModeSwitch() {
