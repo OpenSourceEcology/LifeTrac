@@ -469,35 +469,36 @@ void setupBLE() {
 }
 
 // Helper function to validate and clamp joystick axis values
-// Struct to hold last warning times for joystick axes
-struct JoystickWarningTimes {
-  unsigned long leftX;
-  unsigned long leftY;
-  unsigned long rightX;
-  unsigned long rightY;
+// Enum and array to hold last warning times for joystick axes
+enum JoystickAxis {
+  LEFT_X = 0,
+  LEFT_Y = 1,
+  RIGHT_X = 2,
+  RIGHT_Y = 3,
+  JOYSTICK_AXIS_COUNT
 };
 
-void validateAndClampJoystickValue(float& value, const char* axisName) {
-  static JoystickWarningTimes lastWarningTimes = {0, 0, 0, 0};
-  unsigned long now = millis();
-  unsigned long* lastWarningTime = NULL;
+const char* JoystickAxisNames[JOYSTICK_AXIS_COUNT] = {
+  "Left X",
+  "Left Y",
+  "Right X",
+  "Right Y"
+};
 
-  // Map axisName to the correct struct member
-  if (strcmp(axisName, "Left X") == 0) {
-    lastWarningTime = &lastWarningTimes.leftX;
-  } else if (strcmp(axisName, "Left Y") == 0) {
-    lastWarningTime = &lastWarningTimes.leftY;
-  } else if (strcmp(axisName, "Right X") == 0) {
-    lastWarningTime = &lastWarningTimes.rightX;
-  } else if (strcmp(axisName, "Right Y") == 0) {
-    lastWarningTime = &lastWarningTimes.rightY;
-  }
+struct JoystickWarningTimes {
+  unsigned long lastWarning[JOYSTICK_AXIS_COUNT];
+};
+
+void validateAndClampJoystickValue(float& value, JoystickAxis axis) {
+  static JoystickWarningTimes lastWarningTimes = {{0, 0, 0, 0}};
+  unsigned long now = millis();
+  unsigned long* lastWarningTime = &lastWarningTimes.lastWarning[axis];
 
   if (value < -1.0 || value > 1.0) {
     // Only print warning if at least 1000ms have passed since last warning for this axis
-    if (lastWarningTime && (now - *lastWarningTime >= 1000)) {
+    if (now - *lastWarningTime >= 1000) {
       Serial.print("Warning: ");
-      Serial.print(axisName);
+      Serial.print(JoystickAxisNames[axis]);
       Serial.print(" out of range (");
       Serial.print(value);
       Serial.println("), clamping to [-1.0, 1.0]");
