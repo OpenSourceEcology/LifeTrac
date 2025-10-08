@@ -468,7 +468,6 @@ void setupBLE() {
   Serial.println("Waiting for connections...");
 }
 
-// Helper function to validate and clamp joystick axis values
 // Enum and array to hold last warning times for joystick axes
 enum JoystickAxis {
   LEFT_X = 0,
@@ -489,6 +488,7 @@ struct JoystickWarningTimes {
   unsigned long lastWarning[JOYSTICK_AXIS_COUNT];
 };
 
+// Helper function to validate and clamp joystick axis values
 void validateAndClampJoystickValue(float& value, JoystickAxis axis) {
   static JoystickWarningTimes lastWarningTimes = {{0, 0, 0, 0}};
   unsigned long now = millis();
