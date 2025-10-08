@@ -260,7 +260,7 @@ Scenario 3: Zero-radius turning (spin in place)
    - Verify jumper connects D11 to GND
 2. Power cycle the Arduino Opta
 3. Check serial output during startup
-4. Measure voltage at D11 pin (should be 0V with jumper, 3.3V without)
+4. Measure voltage at D11 pin (should be ~0V with jumper to GND, ~3.3V without jumper)
 
 ### One Valve Not Working in Dual Mode
 
@@ -328,7 +328,7 @@ During startup, the system will output configuration information:
 **Single Valve Mode:**
 ```
 LifeTrac v25 Controller Starting...
-Flow valve configuration jumper: D11=LOW -> Config: ONE_VALVE (Single valve for all)
+Flow valve configuration jumper: D11=HIGH -> Config: ONE_VALVE (Single valve for all)
 Mode switch: A=LOW B=LOW -> Mode: BLE
 Controller initialized successfully!
 ```
@@ -336,7 +336,7 @@ Controller initialized successfully!
 **Dual Valve Mode:**
 ```
 LifeTrac v25 Controller Starting...
-Flow valve configuration jumper: D11=HIGH -> Config: TWO_VALVES (Valve 1: left+arms, Valve 2: right+bucket)
+Flow valve configuration jumper: D11=LOW -> Config: TWO_VALVES (Valve 1: left+arms, Valve 2: right+bucket)
 Mode switch: A=LOW B=LOW -> Mode: BLE
 Controller initialized successfully!
 ```

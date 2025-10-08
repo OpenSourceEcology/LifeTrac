@@ -70,8 +70,8 @@ Mode Switch Logic (HONEYWELL 2NT1-1):
 - Position 3 (BLE): D9=LOW, D10=LOW (default when switch not installed)
 
 Flow Valve Configuration Jumper (D11):
-- No jumper (D11=LOW): ONE_VALVE mode - Single valve controls all (default)
-- Jumper to GND (D11=HIGH): TWO_VALVES mode - Independent valve control
+- No jumper (D11=HIGH): ONE_VALVE mode - Single valve controls all (default)
+- Jumper to GND (D11=LOW): TWO_VALVES mode - Independent valve control
   See FLOW_VALVE_CONFIGURATION.md for details
 
 

@@ -83,9 +83,9 @@ const int MODE_SWITCH_PIN_B = 10;       // D10 - Reserved for future expansion (
 // Flow valve configuration jumper pins
 // These pins detect which proportional flow valve configuration is installed
 const int FLOW_CONFIG_JUMPER_PIN = 11;  // D11 - Flow valve configuration jumper
-// Jumper Logic:
+// Jumper Logic (with internal pullup resistor):
 // D11=HIGH (no jumper): ONE_VALVE mode - Single valve controls all hydraulics (default)
-// D11=LOW (jumper installed to GND): TWO_VALVES mode - Valve 1 controls left track + arms, Valve 2 controls right track + bucket
+// D11=LOW (jumper to GND): TWO_VALVES mode - Valve 1 controls left track + arms, Valve 2 controls right track + bucket
 
 // Control mode enumeration
 enum ControlMode {
@@ -145,9 +145,9 @@ void setup() {
   pinMode(MODE_SWITCH_PIN_A, INPUT_PULLDOWN);
   pinMode(MODE_SWITCH_PIN_B, INPUT_PULLDOWN);
   
-  // Initialize flow valve configuration jumper pin with internal pulldown
+  // Initialize flow valve configuration jumper pin with internal pullup
   // This ensures ONE_VALVE mode is default when jumper is not installed
-  pinMode(FLOW_CONFIG_JUMPER_PIN, INPUT_PULLDOWN);
+  pinMode(FLOW_CONFIG_JUMPER_PIN, INPUT_PULLUP);
   
   // Initialize digital output pins
   pinMode(LEFT_TRACK_FORWARD_PIN, OUTPUT);
@@ -504,18 +504,18 @@ void publishStatus() {
 
 void readFlowValveConfig() {
   // Read flow valve configuration jumper pin
-  bool jumperInstalled = digitalRead(FLOW_CONFIG_JUMPER_PIN);
+  bool pinState = digitalRead(FLOW_CONFIG_JUMPER_PIN);
   
   // Determine flow valve configuration
-  // If jumper is not installed, jumperPin will be LOW (pulldown) -> ONE_VALVE mode (default)
-  if (jumperInstalled == HIGH) {
+  // With internal pullup: HIGH (no jumper) = ONE_VALVE, LOW (jumper to GND) = TWO_VALVES
+  if (pinState == LOW) {
     flowConfig = TWO_VALVES;
   } else {
-    flowConfig = ONE_VALVE; // Default when no jumper
+    flowConfig = ONE_VALVE; // Default when no jumper (pullup keeps pin HIGH)
   }
   
   Serial.print("Flow valve configuration jumper: D11=");
-  Serial.print(jumperInstalled ? "HIGH" : "LOW");
+  Serial.print(pinState ? "HIGH" : "LOW");
   Serial.print(" -> Config: ");
   Serial.println(flowConfig == ONE_VALVE ? "ONE_VALVE (Single valve for all)" : "TWO_VALVES (Valve 1: left+arms, Valve 2: right+bucket)");
 }
