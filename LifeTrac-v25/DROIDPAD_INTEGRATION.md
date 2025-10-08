@@ -2,7 +2,12 @@
 
 ## Overview
 
-LifeTrac v25 now supports DroidPad and other joystick interfaces that output values in the range of **-1.0 to 1.0** (floating point). This document explains the changes made to enable this compatibility.
+LifeTrac v25 now supports DroidPad and other joystick interfaces that output values in the range of **-1.0 to 1.0** (floating point). DroidPad can connect to the LifeTrac v25 controller in two ways:
+
+1. **BLE Direct Control (New)**: Direct Bluetooth Low Energy connection to Arduino Opta
+2. **MQTT Control (Traditional)**: Via WiFi network and MQTT broker
+
+This document explains both methods and the changes made to enable this compatibility.
 
 ## What Changed
 
@@ -46,9 +51,63 @@ LifeTrac v25 now supports DroidPad and other joystick interfaces that output val
   - All test sequences use float values (e.g., 0.5 instead of 50)
   - Interactive mode commands updated
 
+## Control Mode Selection
+
+The Arduino Opta controller supports two control modes via a 3-position hardware switch:
+
+### BLE Mode (Default)
+- Direct Bluetooth connection to DroidPad app
+- No WiFi network or MQTT broker required
+- Lower latency, simpler setup
+- Automatically selected if mode switch is not installed
+- Range: Typical BLE range of 30-100 feet (10-30m)
+
+### MQTT Mode (Traditional)
+- WiFi network with MQTT broker required
+- Supports multiple control interfaces (ESP32 remote, web, ROS2)
+- Longer range via WiFi network
+- Selected by setting mode switch to MQTT position
+
+### OFF Mode
+- Hardware power cutoff
+- Completely powers down the Opta controller
+
 ## Using DroidPad
 
-DroidPad outputs joystick values from **1.0 to -1.0**. The LifeTrac v25 system now natively accepts these values through MQTT.
+DroidPad outputs joystick values from **1.0 to -1.0**. The LifeTrac v25 system now natively accepts these values through both BLE and MQTT.
+
+### Method 1: BLE Direct Control (Recommended for DroidPad)
+
+**Setup Steps:**
+1. Ensure mode switch is in BLE position (or not installed for default BLE mode)
+2. Power on the LifeTrac v25 controller
+3. Open DroidPad app on your Android/iOS device
+4. Enable Bluetooth on your mobile device
+5. In DroidPad, scan for BLE devices and connect to "LifeTrac-v25"
+6. Configure DroidPad to use BLE GATT characteristics:
+   - Service UUID: `19B10000-E8F2-537E-4F6C-D104768A1214`
+   - Left Joystick Characteristic: `19B10001-E8F2-537E-4F6C-D104768A1214`
+   - Right Joystick Characteristic: `19B10002-E8F2-537E-4F6C-D104768A1214`
+
+**Data Format for BLE:**
+Each characteristic accepts 8 bytes (2 floats):
+- Left Joystick: [left_x (float), left_y (float)]
+- Right Joystick: [right_x (float), right_y (float)]
+- Each float value should be in range -1.0 to 1.0
+- Send as little-endian IEEE 754 32-bit floats
+
+**BLE Control Mapping:**
+| DroidPad Control | BLE Characteristic | Bytes | Function |
+|-----------------|-------------------|-------|----------|
+| Left Stick | Left Joystick Char | 0-3: left_x, 4-7: left_y | Forward/Backward + Turning |
+| Right Stick | Right Joystick Char | 0-3: right_x, 4-7: right_y | Bucket + Arms |
+
+### Method 2: MQTT Control (Traditional)
+
+**Setup Steps:**
+1. Set mode switch to MQTT position
+2. Ensure WiFi network and MQTT broker are running
+3. Configure DroidPad to send MQTT messages
 
 ### MQTT Message Format
 

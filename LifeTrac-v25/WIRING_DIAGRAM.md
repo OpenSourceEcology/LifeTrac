@@ -13,20 +13,43 @@ This document describes the electrical connections for the LifeTrac v25 remote c
 
 ## Arduino Opta Controller Wiring
 
-### Power Supply
+### Power Supply with HONEYWELL 2NT1-1 Mode Switch (On/Off/On)
 ```
-12V DC Supply ────┬─── Arduino Opta VIN
-                  ├─── Hydraulic Valve Commons
-                  └─── Flow Control Valve (+)
+                                    ┌─────────────────┐
+                                    │  HONEYWELL      │
+                                    │  2NT1-1 Switch  │
+12V DC Supply ──────────────────────│  (On/Off/On)    │
+                                    │  DPDT           │
+                                    └─────────────────┘
+                                           │
+                          ┌────────────────┼────────────────┐
+                          │                │                │
+                       [MQTT]            [OFF]            [BLE]
+                          │                │                │
+                    ┌─────┴─────┐          X          ┌─────┴─────┐
+                    │           │     (Open/No        │           │
+                    │  12V to   │      Power)         │  12V to   │
+                    │  Opta VIN │   (Center Pos)      │  Opta VIN │
+                    │           │                     │           │
+                    │  D9=HIGH  │                     │  D9=LOW   │
+                    │  D10=LOW  │                     │  D10=LOW  │
+                    └───────────┘                     └───────────┘
 
-GND ──────────────┬─── Arduino Opta GND
-                  ├─── Hydraulic Valve Commons
-                  └─── Flow Control Valve (-)
+Note: If switch is not installed, D9 and D10 are LOW (internal pulldown) -> BLE mode (default)
+
+12V DC Supply (after switch) ─┬─── Arduino Opta VIN
+                              ├─── Hydraulic Valve Commons
+                              └─── Flow Control Valve (+)
+
+GND ──────────────────────────┬─── Arduino Opta GND
+                              ├─── Hydraulic Valve Commons
+                              ├─── Flow Control Valve (-)
+                              └─── Mode Switch Common
 ```
 
 ### Digital I/O Extension (D1608S) Connections
 ```
-Arduino Opta D1608S          Hydraulic Valves
+Arduino Opta D1608S          Hydraulic Valves / Mode Switch
 ┌─────────────────────┐      ┌──────────────────────────┐
 │ D1 ─────────────────────── │ Left Track Forward       │
 │ D2 ─────────────────────── │ Left Track Backward      │
@@ -36,8 +59,16 @@ Arduino Opta D1608S          Hydraulic Valves
 │ D6 ─────────────────────── │ Arms Down                │
 │ D7 ─────────────────────── │ Bucket Up                │
 │ D8 ─────────────────────── │ Bucket Down              │
+│ D9 ─────────────────────── │ Mode Switch Pin A        │
+│ D10 ────────────────────── │ Mode Switch Pin B        │
 └─────────────────────┘      └──────────────────────────┘
-```
+
+Mode Switch Logic (HONEYWELL 2NT1-1):
+- Position 1 (MQTT): D9=HIGH, D10=LOW
+- Position 2 (OFF): No 12V power (hardware cutoff at center)
+- Position 3 (BLE): D9=LOW, D10=LOW (default when switch not installed)
+
+
 
 ### Analog Extension (A0602) Connections
 ```

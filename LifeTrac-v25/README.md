@@ -1,11 +1,13 @@
 # LifeTrac v25 - Remote Control System
 
-LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT communication for hydraulic operation control.
+LifeTrac v25 features a comprehensive remote control system with multiple control modes including WiFi/MQTT and direct Bluetooth (BLE) communication for hydraulic operation control.
 
 ## Features
 
+* **Multiple Control Modes:** HONEYWELL 2NT1-1 switch for MQTT/OFF/BLE mode selection (BLE default)
+* **BLE Direct Control:** Direct Bluetooth connection to DroidPad app (no WiFi/broker needed)
 * **Remote Joystick Control:** Dual joystick setup for tank steering and hydraulic functions
-* **DroidPad Compatible:** Native support for DroidPad and other joystick interfaces using -1.0 to 1.0 value range
+* **DroidPad Compatible:** Native support for DroidPad via BLE or MQTT using -1.0 to 1.0 value range
 * **WiFi Communication:** Reliable wireless control with MQTT protocol
 * **ROS2 Integration:** Control LifeTrac from BeagleBone or any ROS2-enabled device
 * **Proportional Flow Control:** Speed regulation based on joystick input intensity
@@ -79,7 +81,9 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 
 ## Documentation
 - **INSTALLATION_GUIDE.md**: Complete setup and installation instructions
-- **DROIDPAD_INTEGRATION.md**: Guide for DroidPad integration and float value range
+- **DROIDPAD_INTEGRATION.md**: Guide for DroidPad integration via BLE or MQTT
+- **DROIDPAD_BLE_SETUP.md**: Step-by-step BLE direct control setup for DroidPad
+- **MODE_SWITCH_WIRING.md**: Hardware switch wiring for MQTT/OFF/BLE selection
 - **WIRING_DIAGRAM.md**: Detailed wiring and connection diagrams
 - **HYDRAULIC_DIAGRAM.md**: ASCII hydraulic system diagram showing component layout
 - **ros2_bridge/README.md**: ROS2 integration and BeagleBone setup guide
@@ -90,30 +94,42 @@ LifeTrac v25 features a comprehensive remote control system using WiFi and MQTT 
 
 # Quick Start
 
-## Option 1: Raspberry Pi Web Controller (Recommended)
+## Option 1: DroidPad via BLE (Simplest - Recommended for Mobile)
+1. **Program Arduino Opta:** Upload controller code with BLE support
+2. **Set Mode:** Set mode switch to BLE position (or leave switch uninstalled for default BLE)
+3. **Connect DroidPad:** Open DroidPad app, scan for "LifeTrac-v25" via Bluetooth
+4. **Configure:** Set up BLE characteristics using provided UUIDs
+5. **Control:** Start controlling immediately - no WiFi/network needed!
+
+For detailed instructions, see [DROIDPAD_BLE_SETUP.md](DROIDPAD_BLE_SETUP.md).
+
+## Option 2: Raspberry Pi Web Controller (Best for Fixed Installation)
 1. **Set up MQTT Broker:** Install Mosquitto on Raspberry Pi using config/mosquitto.conf
 2. **Program Arduino Opta:** Upload controller code
-3. **Install Web Controller:** Run `sudo ./install.sh` in raspberry_pi_web_controller/
-4. **Connect Camera:** Attach Arducam IMX335 to Raspberry Pi
-5. **Access Interface:** Open `http://<raspberry-pi-ip>:5000` in any browser
+3. **Set Mode:** Set mode switch to MQTT position
+4. **Install Web Controller:** Run `sudo ./install.sh` in raspberry_pi_web_controller/
+5. **Connect Camera:** Attach Arducam IMX335 to Raspberry Pi
+6. **Access Interface:** Open `http://<raspberry-pi-ip>:5000` in any browser
 
 For detailed instructions, see [raspberry_pi_web_controller/README.md](raspberry_pi_web_controller/README.md).
 
-## Option 2: ESP32 Handheld Remote Control
+## Option 3: ESP32 Handheld Remote Control
 1. **Set up MQTT Broker:** Install Mosquitto on Raspberry Pi using config/mosquitto.conf
 2. **Program Controllers:** Upload Arduino code to Opta and ESP32 boards
-3. **Configure Network:** Update WiFi credentials and MQTT settings in code
-4. **Wire System:** Follow WIRING_DIAGRAM.md for all connections
-5. **Test System:** Use test_scripts/mqtt_test.py for validation
+3. **Set Mode:** Set mode switch to MQTT position
+4. **Configure Network:** Update WiFi credentials and MQTT settings in code
+5. **Wire System:** Follow WIRING_DIAGRAM.md for all connections
+6. **Test System:** Use test_scripts/mqtt_test.py for validation
 
 For detailed instructions, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md).
 
-## Option 3: ROS2 Control from BeagleBone
+## Option 4: ROS2 Control from BeagleBone
 1. **Set up MQTT Broker:** Same as above
 2. **Program Arduino Opta:** Upload controller code
-3. **Install ROS2 on BeagleBone:** Follow ROS2 installation guide
-4. **Build ROS2 packages:** Build lifetrac_msgs and lifetrac_mqtt_bridge
-5. **Launch bridge:** `ros2 launch lifetrac_mqtt_bridge lifetrac_bridge.launch.py`
+3. **Set Mode:** Set mode switch to MQTT position
+4. **Install ROS2 on BeagleBone:** Follow ROS2 installation guide
+5. **Build ROS2 packages:** Build lifetrac_msgs and lifetrac_mqtt_bridge
+6. **Launch bridge:** `ros2 launch lifetrac_mqtt_bridge lifetrac_bridge.launch.py`
 
 For detailed ROS2 instructions, see [ros2_bridge/README.md](ros2_bridge/README.md).
 
