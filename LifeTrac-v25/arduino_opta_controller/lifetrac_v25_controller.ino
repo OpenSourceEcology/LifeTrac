@@ -403,10 +403,17 @@ void setFlowControl() {
     // Valve 2 controls: right track + bucket
     // This allows independent speed control for each side
     
+    // Calculate track speeds (same as in processJoystickInput)
+    float baseSpeed = currentInput.left_y;
+    float turnRate = currentInput.left_x;
+    float leftTrackSpeed = baseSpeed + turnRate;
+    float rightTrackSpeed = baseSpeed - turnRate;
+    leftTrackSpeed = fmaxf(-1.0, fminf(leftTrackSpeed, 1.0));
+    rightTrackSpeed = fmaxf(-1.0, fminf(rightTrackSpeed, 1.0));
+    
     // Calculate flow for Valve 1 (left track + arms)
     float maxInput1 = 0.0;
-    maxInput1 = max(maxInput1, abs(currentInput.left_x));
-    maxInput1 = max(maxInput1, abs(currentInput.left_y));
+    maxInput1 = max(maxInput1, abs(leftTrackSpeed));  // Left track speed
     maxInput1 = max(maxInput1, abs(currentInput.right_y)); // Arms
     
     int currentValue1 = 4 + (int)(maxInput1 * 16.0);
@@ -418,8 +425,7 @@ void setFlowControl() {
     
     // Calculate flow for Valve 2 (right track + bucket)
     float maxInput2 = 0.0;
-    maxInput2 = max(maxInput2, abs(currentInput.left_x));
-    maxInput2 = max(maxInput2, abs(currentInput.left_y));
+    maxInput2 = max(maxInput2, abs(rightTrackSpeed)); // Right track speed
     maxInput2 = max(maxInput2, abs(currentInput.right_x)); // Bucket
     
     int currentValue2 = 4 + (int)(maxInput2 * 16.0);
