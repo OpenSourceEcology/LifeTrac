@@ -84,8 +84,8 @@ const int MODE_SWITCH_PIN_B = 10;       // D10 - Reserved for future expansion (
 // These pins detect which proportional flow valve configuration is installed
 const int FLOW_CONFIG_JUMPER_PIN = 11;  // D11 - Flow valve configuration jumper
 // Jumper Logic:
-// D11=LOW (no jumper): ONE_VALVE mode - Single valve controls all hydraulics (default)
-// D11=HIGH (jumper installed): TWO_VALVES mode - Valve 1 controls left track + arms, Valve 2 controls right track + bucket
+// D11=HIGH (no jumper): ONE_VALVE mode - Single valve controls all hydraulics (default)
+// D11=LOW (jumper installed to GND): TWO_VALVES mode - Valve 1 controls left track + arms, Valve 2 controls right track + bucket
 
 // Control mode enumeration
 enum ControlMode {
