@@ -10,6 +10,9 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 * **DroidPad Compatible:** Native support for DroidPad via BLE or MQTT using -1.0 to 1.0 value range
 * **WiFi Communication:** Reliable wireless control with MQTT protocol
 * **ROS2 Integration:** Control LifeTrac from BeagleBone or any ROS2-enabled device
+* **Configurable Flow Control:** Choose between single or dual proportional flow valves via jumper
+  - Single valve: Simpler setup, all functions share flow rate
+  - Dual valve: Independent control, advanced maneuvering with variable turning radius
 * **Proportional Flow Control:** Speed regulation based on joystick input intensity
 * **Safety Features:** Emergency stop, communication timeout, and fail-safe operation
 * **Status Monitoring:** Real-time system status and diagnostics
@@ -33,8 +36,10 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 ## Onboard Controller (LifeTrac)
 
 * (4) Hydraulic Directional Valve: 20 gpm Max Flow Rate, D03 NFPA Size, Three Positions, 12V DC 
-* (1) Electronically Adjustable Pressure Compensated Proportional Flow Control https://www.brand-hyd.com/Products/Valves/Flow_Controls/EFC/
-* (1) Burkert 8605 Type 316532 Flow Valve Controller https://www.burkert-usa.com/en/products/solenoid-control-valves/controllers/316532
+* (1-2) Electronically Adjustable Pressure Compensated Proportional Flow Control https://www.brand-hyd.com/Products/Valves/Flow_Controls/EFC/
+* (1-2) Burkert 8605 Type 316532 Flow Valve Controller https://www.burkert-usa.com/en/products/solenoid-control-valves/controllers/316532
+  - One valve for basic configuration
+  - Two valves for advanced maneuvering (see FLOW_VALVE_CONFIGURATION.md)
 
 * Arduino Opta WiFi - $199.00
 * Arduino Pro Opta Ext D1608S - $151.00  
@@ -81,6 +86,7 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 
 ## Documentation
 - **INSTALLATION_GUIDE.md**: Complete setup and installation instructions
+- **FLOW_VALVE_CONFIGURATION.md**: Proportional flow valve configuration (single vs dual valve)
 - **DROIDPAD_INTEGRATION.md**: Guide for DroidPad integration via BLE or MQTT
 - **DROIDPAD_BLE_SETUP.md**: Step-by-step BLE direct control setup for DroidPad
 - **MODE_SWITCH_WIRING.md**: Hardware switch wiring for MQTT/OFF/BLE selection
