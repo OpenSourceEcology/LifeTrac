@@ -484,15 +484,13 @@ const char* JoystickAxisNames[JOYSTICK_AXIS_COUNT] = {
   "Right Y"
 };
 
-struct JoystickWarningTimes {
-  unsigned long lastWarning[JOYSTICK_AXIS_COUNT];
-};
+// Removed JoystickWarningTimes struct; use direct array instead
 
 // Helper function to validate and clamp joystick axis values
 void validateAndClampJoystickValue(float& value, JoystickAxis axis) {
-  static JoystickWarningTimes lastWarningTimes = {{0, 0, 0, 0}};
+  static unsigned long lastWarningTimes[JOYSTICK_AXIS_COUNT] = {0, 0, 0, 0};
   unsigned long now = millis();
-  unsigned long* lastWarningTime = &lastWarningTimes.lastWarning[axis];
+  unsigned long* lastWarningTime = &lastWarningTimes[axis];
 
   if (value < -1.0 || value > 1.0) {
     // Only print warning if at least 1000ms have passed since last warning for this axis
