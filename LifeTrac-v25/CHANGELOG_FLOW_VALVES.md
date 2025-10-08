@@ -122,9 +122,9 @@ This feature addresses the need for more advanced maneuvering capabilities while
 
 ### Single Valve Mode
 - All hydraulic functions (left track, right track, arms, bucket) share one flow rate
-- Flow rate determined by maximum joystick input across all axes
+- Flow rate determined by the minimum non-zero joystick input across all axes
 - Simple turning: can drive forward on one side while stopping the other
-- Speed limited by the highest demand movement
+- Speed limited by the lowest non-zero demand movement
 - Adequate for most operations
 
 ### Dual Valve Mode
