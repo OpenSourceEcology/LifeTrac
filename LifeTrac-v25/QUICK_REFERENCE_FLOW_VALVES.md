@@ -10,7 +10,7 @@
 
 **Choose Dual Valve if:**
 - ✅ Need precise maneuvering
-- ✅ Require zero-radius turning
+- ✅ Require enhanced zero-radius turning with full power
 - ✅ Work in tight spaces frequently
 - ✅ Budget allows for advanced system
 

@@ -200,8 +200,9 @@ Flow:
 BOTH tracks get FULL INDEPENDENT POWER
 Perfect zero-radius turn!
 
-⚠️ This is ONLY possible with dual valve configuration!
-Single valve would limit both to same 20mA, but split between them.
+⚠️ Note: Zero-radius turning works in BOTH configurations, but:
+- Single valve: Both tracks share the same 20mA flow (power split between them)
+- Dual valve: Each track gets its own independent 20mA flow (full power to each)
 ```
 
 ## Comparison Chart

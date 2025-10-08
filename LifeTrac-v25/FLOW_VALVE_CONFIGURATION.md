@@ -106,7 +106,7 @@ Scenario 2: Turning
 - Independent flow control for each valve group
 - Left side (track + arms) can operate at different speed than right side (track + bucket)
 - Advanced turning: variable speed differential between left and right
-- Zero-radius turning capability
+- Enhanced zero-radius turning with full independent power to each track
 
 **Example Scenarios:**
 ```
@@ -234,7 +234,7 @@ Scenario 3: Zero-radius turning (spin in place)
 **Advantages:**
 ✅ Independent left/right speed control
 ✅ Fully adjustable turning radius
-✅ Zero-radius turning (spin in place)
+✅ Enhanced zero-radius turning with full independent power to each side
 ✅ More precise maneuvering
 ✅ Better control in tight spaces
 ✅ Can perform complex movements simultaneously

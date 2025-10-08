@@ -304,21 +304,28 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   lastCommandTime = millis();
 }
 
+// Helper function to compute track speeds from joystick input
+// Centralizes tank steering math to avoid duplication
+void computeTrackSpeeds(float left_y, float left_x, float* leftSpeed, float* rightSpeed) {
+  float baseSpeed = left_y;  // Forward/backward
+  float turnRate = left_x;   // Left/right turning
+  
+  // Calculate individual track speeds using differential steering
+  *leftSpeed = baseSpeed + turnRate;
+  *rightSpeed = baseSpeed - turnRate;
+  
+  // Constrain to valid range [-1.0, 1.0]
+  *leftSpeed = fmaxf(-1.0, fminf(*leftSpeed, 1.0));
+  *rightSpeed = fmaxf(-1.0, fminf(*rightSpeed, 1.0));
+}
+
 void processJoystickInput() {
   // Calculate track movements (tank steering)
   // Left joystick Y controls forward/backward movement
   // Left joystick X controls turning (differential steering)
   
-  float baseSpeed = currentInput.left_y; // Forward/backward
-  float turnRate = currentInput.left_x;  // Left/right turning
-  
-  // Calculate individual track speeds
-  float leftTrackSpeed = baseSpeed + turnRate;
-  float rightTrackSpeed = baseSpeed - turnRate;
-  
-  // Constrain to valid range
-  leftTrackSpeed = fmaxf(-1.0, fminf(leftTrackSpeed, 1.0));
-  rightTrackSpeed = fmaxf(-1.0, fminf(rightTrackSpeed, 1.0));
+  float leftTrackSpeed, rightTrackSpeed;
+  computeTrackSpeeds(currentInput.left_y, currentInput.left_x, &leftTrackSpeed, &rightTrackSpeed);
   
   // Control left track
   controlTrack(leftTrackSpeed, LEFT_TRACK_FORWARD_PIN, LEFT_TRACK_BACKWARD_PIN);
@@ -403,13 +410,9 @@ void setFlowControl() {
     // Valve 2 controls: right track + bucket
     // This allows independent speed control for each side
     
-    // Calculate track speeds (same as in processJoystickInput)
-    float baseSpeed = currentInput.left_y;
-    float turnRate = currentInput.left_x;
-    float leftTrackSpeed = baseSpeed + turnRate;
-    float rightTrackSpeed = baseSpeed - turnRate;
-    leftTrackSpeed = fmaxf(-1.0, fminf(leftTrackSpeed, 1.0));
-    rightTrackSpeed = fmaxf(-1.0, fminf(rightTrackSpeed, 1.0));
+    // Calculate track speeds using shared helper function
+    float leftTrackSpeed, rightTrackSpeed;
+    computeTrackSpeeds(currentInput.left_y, currentInput.left_x, &leftTrackSpeed, &rightTrackSpeed);
     
     // Calculate flow for Valve 1 (left track + arms)
     float maxInput1 = 0.0;
