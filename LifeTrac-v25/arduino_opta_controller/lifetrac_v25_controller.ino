@@ -380,20 +380,33 @@ void controlValve(float control, int upPin, int downPin) {
 void setFlowControl() {
   if (flowConfig == ONE_VALVE) {
     // Single valve mode: One valve controls all hydraulics
-    // Speed limited to the smallest joystick input (maximum absolute value)
-    // Find the maximum absolute value from all inputs
-    float maxInput = 0.0;
+    // Speed limited to the smallest non-zero joystick input
+    // Find the minimum non-zero absolute value from all inputs
+    float minInput = 1.0; // Start with maximum possible value
+    bool hasInput = false;
     
-    maxInput = max(maxInput, abs(currentInput.left_x));
-    maxInput = max(maxInput, abs(currentInput.left_y));
-    maxInput = max(maxInput, abs(currentInput.right_x));
-    maxInput = max(maxInput, abs(currentInput.right_y));
+    // Check each input and find minimum non-zero value
+    if (abs(currentInput.left_x) > DEADZONE) {
+      minInput = min(minInput, abs(currentInput.left_x));
+      hasInput = true;
+    }
+    if (abs(currentInput.left_y) > DEADZONE) {
+      minInput = min(minInput, abs(currentInput.left_y));
+      hasInput = true;
+    }
+    if (abs(currentInput.right_x) > DEADZONE) {
+      minInput = min(minInput, abs(currentInput.right_x));
+      hasInput = true;
+    }
+    if (abs(currentInput.right_y) > DEADZONE) {
+      minInput = min(minInput, abs(currentInput.right_y));
+      hasInput = true;
+    }
     
     // Convert to 4-20mA value (4mA = minimum, 20mA = maximum)
-    int currentValue = 4 + (int)(maxInput * 16.0);
-    
-    // Apply minimum flow when any movement is commanded
-    if (maxInput > DEADZONE) {
+    int currentValue;
+    if (hasInput) {
+      currentValue = 4 + (int)(minInput * 16.0);
       currentValue = max(currentValue, 6); // Minimum ~12.5% flow (6mA)
     } else {
       currentValue = 4; // 4mA = no flow

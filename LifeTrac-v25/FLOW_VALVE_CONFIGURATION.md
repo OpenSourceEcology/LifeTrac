@@ -9,7 +9,7 @@ The LifeTrac v25 supports two different proportional flow valve configurations:
 ### Option 1: Single Valve (Default)
 - **Hardware**: One proportional flow control valve controls flow to all hydraulic functions
 - **Control**: All movements (left track, right track, arms, bucket) share the same flow rate
-- **Speed**: Limited to the maximum joystick input across all functions
+- **Speed**: Limited to the smallest non-zero joystick input across all active functions
 - **Turning**: Limited capability - cannot have different speeds for left and right tracks
 - **Use Case**: Simpler installation, lower cost, adequate for basic operations
 
@@ -80,7 +80,7 @@ Arduino Opta A0602               Flow Control System
 
 **Characteristics:**
 - All hydraulic functions share a single flow rate
-- System speed determined by the maximum joystick input across all axes
+- System speed determined by the smallest non-zero joystick input across all active axes
 - Simple turning: full speed one side, no power to other side OR equal forward/backward on both sides
 
 **Example Scenarios:**
@@ -88,16 +88,16 @@ Arduino Opta A0602               Flow Control System
 Scenario 1: Forward driving with bucket movement
 - Left joystick: Y=0.8 (forward)
 - Right joystick: X=0.5 (bucket)
-- Result: Flow rate = max(0.8, 0.5) = 0.8 (16.8mA)
-- Both tracks move at same speed, bucket operates at same flow rate
+- Result: Flow rate = min(0.8, 0.5) = 0.5 (12mA)
+- All movements limited to the slowest commanded speed
 
 Scenario 2: Turning
 - Left joystick: Y=1.0 (forward), X=0.5 (right turn)
 - Result: 
   - Left track: 1.0 + 0.5 = 1.0 (clamped to max)
   - Right track: 1.0 - 0.5 = 0.5
-  - Flow rate: max(1.0, 0.5) = 1.0 (20mA)
-  - Speed limited by single valve flow rate
+  - Flow rate: min(1.0, 0.5) = 0.5 (12mA)
+  - All movements limited to slowest commanded speed (right track at 0.5)
 ```
 
 ### Dual Valve Mode (Jumper Installed)

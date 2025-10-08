@@ -72,7 +72,7 @@ JUMPER INSTALLED:   TWO_VALVES Mode (Dual independent valves)
     Backward)     Backward)
 
 ALL movements share the SAME flow rate
-Speed = maximum of all joystick inputs
+Speed = minimum non-zero joystick input across active functions
 ```
 
 ### Control Flow
@@ -84,13 +84,13 @@ Joystick Input:
   right_y: -1.0 to 1.0 (arms)
 
 Flow Calculation:
-  maxInput = max(|left_x|, |left_y|, |right_x|, |right_y|)
+  minInput = min(non-zero |left_x|, |left_y|, |right_x|, |right_y|)
   
-  O2 current = 4 + (maxInput × 16) mA
+  O2 current = 4 + (minInput × 16) mA
   O3 current = 4 mA (off)
 
 Result:
-  All hydraulics limited to same flow rate
+  All hydraulics limited to slowest commanded movement
 ```
 
 ### Turning Example
@@ -102,10 +102,10 @@ Track Speeds:
   Right: 1.0 - 0.5 = 0.5            █████       50%
 
 Flow:
-  O2: max(1.0, 0.5) = 1.0 → 20mA    ███████████ 100%
+  O2: min(1.0, 0.5) = 0.5 → 12mA    █████       50%
   
-Both tracks limited by single valve at 20mA
-Right track only gets partial power
+Both tracks limited to slowest commanded speed (right track at 0.5)
+All movements proportionally slower
 ```
 
 ## Option 2: Dual Valve Configuration (Advanced)
