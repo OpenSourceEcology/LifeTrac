@@ -111,30 +111,34 @@ Scenario 2: Turning
 **Example Scenarios:**
 ```
 Scenario 1: Forward driving with bucket movement
-- Left joystick: Y=0.8 (forward)
-- Right joystick: X=0.5 (bucket)
+- Left joystick: Y=0.8 (forward), X=0
+- Right joystick: X=0.5 (bucket), Y=0
 - Result: 
-  - Valve 1 (left+arms): max(0.8) = 0.8 (16.8mA)
-  - Valve 2 (right+bucket): max(0.8, 0.5) = 0.8 (16.8mA)
-  - Both sides can move independently
+  - Left track speed: 0.8 + 0 = 0.8
+  - Right track speed: 0.8 - 0 = 0.8
+  - Valve 1 (left track + arms): max(0.8, 0) = 0.8 (16.8mA)
+  - Valve 2 (right track + bucket): max(0.8, 0.5) = 0.8 (16.8mA)
+  - Both sides move forward, bucket operates independently
 
-Scenario 2: Advanced turning
+Scenario 2: Advanced turning with different speeds
 - Left joystick: Y=1.0 (forward), X=0.5 (right turn)
 - Result:
-  - Left track: 1.0 + 0.5 = 1.0 (clamped)
-  - Right track: 1.0 - 0.5 = 0.5
-  - Valve 1: max(1.0) = 1.0 (20mA to left track)
-  - Valve 2: max(0.5) = 0.5 (12mA to right track)
-  - Different flow rates enable smooth turning
+  - Left track speed: 1.0 + 0.5 = 1.0 (clamped to max)
+  - Right track speed: 1.0 - 0.5 = 0.5
+  - Valve 1 (left track): max(1.0) = 1.0 (20mA)
+  - Valve 2 (right track): max(0.5) = 0.5 (12mA)
+  - Left track runs at full speed, right at half speed
+  - Creates smooth, variable-radius turn
 
-Scenario 3: Zero-radius turning
+Scenario 3: Zero-radius turning (spin in place)
 - Left joystick: Y=0, X=1.0 (full right turn)
 - Result:
-  - Left track: 0 + 1.0 = 1.0 (forward)
-  - Right track: 0 - 1.0 = -1.0 (backward)
-  - Valve 1: 1.0 (20mA forward)
-  - Valve 2: 1.0 (20mA backward)
-  - Tank rotates in place with independent speeds
+  - Left track speed: 0 + 1.0 = 1.0 (forward)
+  - Right track speed: 0 - 1.0 = -1.0 (backward)
+  - Valve 1 (left track): max(1.0) = 1.0 (20mA forward)
+  - Valve 2 (right track): max(1.0) = 1.0 (20mA backward)
+  - Tank rotates in place with full power to both sides
+  - This is only possible with independent valve control!
 ```
 
 ## Installation Instructions
