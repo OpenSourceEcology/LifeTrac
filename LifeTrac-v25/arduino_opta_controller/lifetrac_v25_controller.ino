@@ -525,8 +525,8 @@ bool readBLEJoystickData() {
         memcpy(values, data, JOYSTICK_DATA_SIZE);
         
         // Validate and clamp values to expected range (-1.0 to 1.0)
-        validateAndClampJoystickValue(values[0], "Left X");
-        validateAndClampJoystickValue(values[1], "Left Y");
+        validateAndClampJoystickValue(values[0], LEFT_X);
+        validateAndClampJoystickValue(values[1], LEFT_Y);
         
         currentInput.left_x = values[0];
         currentInput.left_y = values[1];
@@ -562,8 +562,8 @@ bool readBLEJoystickData() {
         memcpy(values, data, JOYSTICK_DATA_SIZE);
         
         // Validate and clamp values to expected range (-1.0 to 1.0)
-        validateAndClampJoystickValue(values[0], "Right X");
-        validateAndClampJoystickValue(values[1], "Right Y");
+        validateAndClampJoystickValue(values[0], RIGHT_X);
+        validateAndClampJoystickValue(values[1], RIGHT_Y);
         
         currentInput.right_x = values[0];
         currentInput.right_y = values[1];
