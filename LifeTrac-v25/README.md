@@ -11,7 +11,7 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 * **WiFi Communication:** Reliable wireless control with MQTT protocol
 * **ROS2 Integration:** Control LifeTrac from BeagleBone or any ROS2-enabled device
 * **Configurable Flow Control:** Choose between single or dual proportional flow valves via jumper
-  - Single valve: Simpler setup, all functions share flow rate
+  - Single valve: Simpler setup, all functions share flow rate (flow is limited by the minimum non-zero joystick input)
   - Dual valve: Independent control, advanced maneuvering with variable turning radius
 * **Proportional Flow Control:** Speed regulation based on joystick input intensity
 * **Safety Features:** Emergency stop, communication timeout, and fail-safe operation
