@@ -31,7 +31,7 @@ This feature addresses the need for more advanced maneuvering capabilities while
 
 **`setFlowControl()`:**
 - Complete rewrite to support both configurations
-- **Single valve mode**: Uses maximum of all joystick inputs (backward compatible)
+- **Single valve mode**: Uses minimum non-zero absolute value of all joystick inputs (flow limiting strategy)
 - **Dual valve mode**: 
   - Calculates actual left and right track speeds
   - Valve 1 flow based on: left track speed + arms
