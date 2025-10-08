@@ -484,8 +484,6 @@ const char* JoystickAxisNames[JOYSTICK_AXIS_COUNT] = {
   "Right Y"
 };
 
-// Removed JoystickWarningTimes struct; use direct array instead
-
 // Helper function to validate and clamp joystick axis values
 void validateAndClampJoystickValue(float& value, JoystickAxis axis) {
   static unsigned long lastWarningTimes[JOYSTICK_AXIS_COUNT] = {0, 0, 0, 0};
