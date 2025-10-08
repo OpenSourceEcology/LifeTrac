@@ -25,7 +25,7 @@ This feature addresses the need for more advanced maneuvering capabilities while
 #### 3. Modified Functions
 
 **`setup()`:**
-- Added initialization of D11 as INPUT_PULLDOWN for jumper detection
+- Added initialization of D11 as INPUT_PULLUP for jumper detection
 - Added initialization of O3 analog output for second flow valve
 - Added call to `readFlowValveConfig()` before mode switch detection
 
@@ -108,13 +108,13 @@ This feature addresses the need for more advanced maneuvering capabilities while
 
 ### Default (Single Valve)
 - Leave D11 pin disconnected (no jumper)
-- System reads D11=LOW (internal pulldown)
+- System reads D11=HIGH (internal pullup)
 - Controller operates in ONE_VALVE mode
 - Serial output: "ONE_VALVE (Single valve for all)"
 
 ### Advanced (Dual Valve)
 - Install jumper connecting D11 to GND
-- System reads D11=HIGH
+- System reads D11=LOW
 - Controller operates in TWO_VALVES mode
 - Serial output: "TWO_VALVES (Valve 1: left+arms, Valve 2: right+bucket)"
 
@@ -218,7 +218,7 @@ Possible future improvements:
 ### Pin Usage
 | Pin | Function | Single Valve | Dual Valve |
 |-----|----------|--------------|------------|
-| D11 | Config Jumper | LOW (no jumper) | HIGH (jumper to GND) |
+| D11 | Config Jumper | HIGH (no jumper) | LOW (jumper to GND) |
 | O2 | Flow Valve 1 | Active (all hydraulics) | Active (left + arms) |
 | O3 | Flow Valve 2 | Inactive (4mA) | Active (right + bucket) |
 

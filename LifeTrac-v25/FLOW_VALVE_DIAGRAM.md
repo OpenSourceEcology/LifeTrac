@@ -235,8 +235,8 @@ Perfect zero-radius turn!
                           │
             ┌─────────────┴─────────────┐
             │                           │
-       D11 = LOW                   D11 = HIGH
-    (No jumper)                  (Jumper installed)
+       D11 = HIGH                  D11 = LOW
+    (No jumper)              (Jumper to GND)
             │                           │
             ▼                           ▼
     ┌───────────────┐          ┌────────────────┐
