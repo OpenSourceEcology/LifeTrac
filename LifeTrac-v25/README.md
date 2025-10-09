@@ -74,6 +74,9 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
   - WebSocket for real-time communication
   - See [raspberry_pi_web_controller/README.md](raspberry_pi_web_controller/README.md) for setup
 
+![Web Controller Preview](raspberry_pi_web_controller/preview/web-controller-preview.png)
+*Browser-based control interface with live camera feed and on-screen joysticks*
+
 ## ROS2 Integration
 - **ros2_bridge/**: ROS2 packages for BeagleBone control via MQTT
   - **lifetrac_msgs/**: Custom ROS2 message definitions

@@ -1,0 +1,108 @@
+name: Generate Web Controller Preview
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'LifeTrac-v25/raspberry_pi_web_controller/static/**'
+      - 'LifeTrac-v25/raspberry_pi_web_controller/templates/**'
+      - 'LifeTrac-v25/raspberry_pi_web_controller/preview/**'
+      - '.github/workflows/generate-web-controller-preview.yml'
+
+jobs:
+  generate-screenshot:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install --save-dev @playwright/test
+          npx playwright install --with-deps chromium
+      
+      - name: Start HTTP server
+        run: |
+          cd LifeTrac-v25/raspberry_pi_web_controller/preview
+          python3 -m http.server 8080 &
+          echo "HTTP_SERVER_PID=$!" >> $GITHUB_ENV
+          sleep 2
+      
+      - name: Create screenshot script
+        run: |
+          cat > screenshot.js << 'EOF'
+          const { chromium } = require('@playwright/test');
+
+          (async () => {
+            const browser = await chromium.launch();
+            const context = await browser.newContext({
+              viewport: { width: 1920, height: 1080 }
+            });
+            const page = await context.newPage();
+            
+            console.log('Navigating to page...');
+            await page.goto('http://localhost:8080/standalone.html');
+            
+            console.log('Waiting for page to be ready...');
+            await page.waitForSelector('[data-ready="true"]', { timeout: 10000 });
+            
+            // Wait a bit more for joysticks to fully render
+            await page.waitForTimeout(2000);
+            
+            console.log('Taking screenshot...');
+            await page.screenshot({ 
+              path: 'web-controller-preview.png',
+              fullPage: false
+            });
+            
+            console.log('Screenshot saved!');
+            await browser.close();
+          })();
+          EOF
+      
+      - name: Generate screenshot
+        run: node screenshot.js
+      
+      - name: Verify screenshot was created
+        run: |
+          if [ -f "web-controller-preview.png" ]; then
+            echo "Screenshot created successfully"
+            ls -lh web-controller-preview.png
+          else
+            echo "ERROR: Screenshot was not created"
+            exit 1
+          fi
+      
+      - name: Move screenshot to preview directory
+        run: |
+          mv web-controller-preview.png LifeTrac-v25/raspberry_pi_web_controller/preview/
+      
+      - name: Upload screenshot as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-controller-preview
+          path: LifeTrac-v25/raspberry_pi_web_controller/preview/web-controller-preview.png
+          retention-days: 90
+      
+      - name: Commit and push screenshot
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add LifeTrac-v25/raspberry_pi_web_controller/preview/web-controller-preview.png
+          git diff --staged --quiet || (git commit -m "Update web controller preview screenshot [skip ci]" && git push)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Stop HTTP server
+        if: always()
+        run: |
+          if [ ! -z "$HTTP_SERVER_PID" ]; then
+            kill $HTTP_SERVER_PID || true
+          fi
