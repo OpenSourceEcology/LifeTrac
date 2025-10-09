@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LifeTrac v25 Control - Preview</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
+    <style>
+        /* LifeTrac v25 Web Controller Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            overflow-x: hidden;
+            touch-action: none;
+        }
+
+        #main-container {
+            max-width: 1920px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+
+        /* Header Styles */
+        #header {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        #header h1 {
+            font-size: 2em;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+        }
+
+        #status-bar {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .status-indicator {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .status-connected {
+            color: #00ff00;
+            font-weight: bold;
+        }
+
+        .status-active {
+            color: #00ff00;
+            font-weight: bold;
+        }
+
+        /* Video Feed Styles */
+        #video-container {
+            position: relative;
+            width: 100%;
+            max-width: 1280px;
+            margin: 0 auto 20px;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        #video-feed {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Control Panel Styles */
+        #control-panel {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 20px;
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        .joystick-container {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            min-width: 280px;
+        }
+
+        .joystick-container h3 {
+            margin-bottom: 15px;
+            color: #ffd700;
+            font-size: 1.3em;
+        }
+
+        .joystick {
+            width: 220px;
+            height: 220px;
+            margin: 0 auto 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .joystick-values {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+        }
+
+        .joystick-labels {
+            font-size: 0.85em;
+            color: #aaa;
+            margin-top: 10px;
+        }
+
+        .joystick-labels div {
+            margin: 5px 0;
+        }
+
+        .emergency-container {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            min-width: 280px;
+        }
+
+        .emergency-button {
+            width: 100%;
+            padding: 30px;
+            font-size: 1.5em;
+            font-weight: bold;
+            background: linear-gradient(135deg, #c62828 0%, #b71c1c 100%);
+            color: #fff;
+            border: 3px solid #fff;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .emergency-button:hover {
+            background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(0, 0, 0, 0.6);
+        }
+
+        .emergency-button:active {
+            transform: translateY(0);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        #keyboard-help {
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #aaa;
+            line-height: 1.6;
+        }
+
+        /* Debug Console Styles */
+        #debug-console {
+            max-width: 1280px;
+            margin: 20px auto;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #debug-toggle {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            text-align: left;
+            transition: background 0.2s;
+        }
+
+        #debug-toggle:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #debug-content {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        #debug-messages {
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.6;
+        }
+
+        .debug-info { color: #4CAF50; }
+        .debug-warning { color: #FFC107; }
+        .debug-error { color: #f44336; }
+    </style>
+</head>
+<body>
+    <div id="main-container">
+        <!-- Header -->
+        <div id="header">
+            <h1>LifeTrac v25 Control</h1>
+            <div id="status-bar">
+                <span id="mqtt-status" class="status-indicator">MQTT: <span class="status-connected">Connected</span></span>
+                <span id="camera-status" class="status-indicator">Camera: <span class="status-active">Active</span></span>
+                <span id="latency" class="status-indicator">Latency: <span id="latency-value">45</span> ms</span>
+            </div>
+        </div>
+
+        <!-- Video Feed Container -->
+        <div id="video-container">
+            <img id="video-feed" src="camera-placeholder.svg" alt="Camera Feed">
+        </div>
+
+        <!-- Control Panel -->
+        <div id="control-panel">
+            <!-- Left Joystick - Tank Steering -->
+            <div class="joystick-container">
+                <h3>Tank Steering</h3>
+                <div id="left-joystick" class="joystick"></div>
+                <div class="joystick-values">
+                    <span>X: <span id="left-x-value">0.00</span></span>
+                    <span>Y: <span id="left-y-value">0.00</span></span>
+                </div>
+                <div class="joystick-labels">
+                    <div>↑ Forward / ↓ Backward</div>
+                    <div>← Left Turn / → Right Turn</div>
+                </div>
+            </div>
+
+            <!-- Emergency Stop Button -->
+            <div class="emergency-container">
+                <button id="emergency-stop" class="emergency-button">
+                    🛑 EMERGENCY STOP
+                </button>
+                <div id="keyboard-help">
+                    <strong>Keyboard Shortcuts:</strong><br>
+                    WASD: Tank Steering<br>
+                    IJKL: Hydraulics<br>
+                    Space: Emergency Stop
+                </div>
+            </div>
+
+            <!-- Right Joystick - Hydraulics -->
+            <div class="joystick-container">
+                <h3>Hydraulics</h3>
+                <div id="right-joystick" class="joystick"></div>
+                <div class="joystick-values">
+                    <span>X: <span id="right-x-value">0.00</span></span>
+                    <span>Y: <span id="right-y-value">0.00</span></span>
+                </div>
+                <div class="joystick-labels">
+                    <div>↑ Arms Up / ↓ Arms Down</div>
+                    <div>← Bucket Down / → Bucket Up</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Debug Console (collapsible) -->
+        <div id="debug-console">
+            <button id="debug-toggle">Debug Console ▼</button>
+            <div id="debug-content" class="hidden">
+                <div id="debug-messages"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Control state
+        let leftJoystick = null;
+        let rightJoystick = null;
+        let currentControl = {
+            left_x: 0.0,
+            left_y: 0.0,
+            right_x: 0.0,
+            right_y: 0.0
+        };
+
+        /**
+         * Initialize the application
+         */
+        function init() {
+            initJoysticks();
+            initDebugConsole();
+            logDebug('LifeTrac v25 Web Controller initialized (Preview Mode)');
+            
+            // Mark as ready for screenshot
+            document.body.setAttribute('data-ready', 'true');
+        }
+
+        /**
+         * Initialize on-screen joysticks using nipplejs
+         */
+        function initJoysticks() {
+            // Left joystick - Tank steering
+            leftJoystick = nipplejs.create({
+                zone: document.getElementById('left-joystick'),
+                mode: 'static',
+                position: { left: '50%', top: '50%' },
+                color: '#4CAF50',
+                size: 180,
+                threshold: 0.1,
+                fadeTime: 250
+            });
+
+            leftJoystick.on('move', (evt, data) => {
+                if (data.direction) {
+                    const angle = data.angle.radian;
+                    const force = Math.min(data.force, 2) / 2;
+                    
+                    currentControl.left_x = Math.cos(angle) * force;
+                    currentControl.left_y = Math.sin(angle) * force;
+                    
+                    updateJoystickDisplay('left', currentControl.left_x, currentControl.left_y);
+                }
+            });
+
+            leftJoystick.on('end', () => {
+                currentControl.left_x = 0.0;
+                currentControl.left_y = 0.0;
+                updateJoystickDisplay('left', 0.0, 0.0);
+            });
+
+            // Right joystick - Hydraulics
+            rightJoystick = nipplejs.create({
+                zone: document.getElementById('right-joystick'),
+                mode: 'static',
+                position: { left: '50%', top: '50%' },
+                color: '#FF9800',
+                size: 180,
+                threshold: 0.1,
+                fadeTime: 250
+            });
+
+            rightJoystick.on('move', (evt, data) => {
+                if (data.direction) {
+                    const angle = data.angle.radian;
+                    const force = Math.min(data.force, 2) / 2;
+                    
+                    currentControl.right_x = Math.cos(angle) * force;
+                    currentControl.right_y = Math.sin(angle) * force;
+                    
+                    updateJoystickDisplay('right', currentControl.right_x, currentControl.right_y);
+                }
+            });
+
+            rightJoystick.on('end', () => {
+                currentControl.right_x = 0.0;
+                currentControl.right_y = 0.0;
+                updateJoystickDisplay('right', 0.0, 0.0);
+            });
+        }
+
+        /**
+         * Update joystick value displays
+         */
+        function updateJoystickDisplay(side, x, y) {
+            document.getElementById(`${side}-x-value`).textContent = x.toFixed(2);
+            document.getElementById(`${side}-y-value`).textContent = y.toFixed(2);
+        }
+
+        /**
+         * Initialize debug console
+         */
+        function initDebugConsole() {
+            const debugToggle = document.getElementById('debug-toggle');
+            const debugContent = document.getElementById('debug-content');
+            
+            debugToggle.addEventListener('click', () => {
+                debugContent.classList.toggle('hidden');
+                debugToggle.textContent = debugContent.classList.contains('hidden') 
+                    ? 'Debug Console ▼' 
+                    : 'Debug Console ▲';
+            });
+        }
+
+        function logDebug(message, type = 'info') {
+            const debugMessages = document.getElementById('debug-messages');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = `debug-${type}`;
+            const line = `<div class="${className}">[${timestamp}] ${message}</div>`;
+            debugMessages.innerHTML += line;
+            debugMessages.scrollTop = debugMessages.scrollHeight;
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
