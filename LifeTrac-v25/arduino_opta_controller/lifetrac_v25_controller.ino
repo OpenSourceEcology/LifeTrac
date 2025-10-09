@@ -27,9 +27,9 @@
  * - Default: BLE mode if switch is not installed (internal pulldown resistors)
  * 
  * Flow Valve Configuration (Jumper on D11):
- * - No jumper (D11=LOW): ONE_VALVE mode - Single valve controls all hydraulics (default)
+ * - No jumper (D11=HIGH): ONE_VALVE mode - Single valve controls all hydraulics (default)
  *   Speed limited to smallest joystick input. Limited turning capability.
- * - Jumper installed (D11=HIGH): TWO_VALVES mode - Independent valve control
+ * - Jumper installed (D11=LOW): TWO_VALVES mode - Independent valve control
  *   Valve 1 (O2): Controls left track + arms
  *   Valve 2 (O3): Controls right track + bucket
  *   Allows fully adjustable turning with different speeds for left/right sides.
@@ -288,17 +288,21 @@ void reconnectMQTT() {
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   // Parse incoming MQTT message
-  payload[length] = '\0'; // Null terminate
-  String message = String((char*)payload);
-  
   Serial.print("Received message on ");
   Serial.print(topic);
-  Serial.print(": ");
-  Serial.println(message);
+  Serial.print(" (");
+  Serial.print(length);
+  Serial.println(" bytes)");
   
-  // Parse JSON message
+  // Parse JSON message directly from payload with length (safe - no null termination required)
   DynamicJsonDocument doc(512);
-  deserializeJson(doc, message);
+  DeserializationError error = deserializeJson(doc, payload, length);
+  
+  if (error) {
+    Serial.print("JSON parse error: ");
+    Serial.println(error.c_str());
+    return;
+  }
   
   // Update joystick data
   currentInput.left_x = doc["left_x"] | 0;
