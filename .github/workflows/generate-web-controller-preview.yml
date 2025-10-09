@@ -96,7 +96,12 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add LifeTrac-v25/raspberry_pi_web_controller/preview/web-controller-preview.png
-          git diff --staged --quiet || (git commit -m "Update web controller preview screenshot [skip ci]" && git push)
+          if ! git diff --staged --quiet; then
+            git commit -m "Update web controller preview screenshot [skip ci]"
+            git push --force-with-lease origin HEAD || { echo "ERROR: git push failed. Please check for conflicts or permission issues."; exit 1; }
+          else
+            echo "No changes to commit."
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
