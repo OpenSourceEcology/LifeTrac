@@ -141,6 +141,27 @@ const int CURRENT_RANGE = 16;        // 16mA range (4-20mA span)
 unsigned long lastCommandTime = 0;
 const unsigned long SAFETY_TIMEOUT = 1000; // 1 second
 
+// Deceleration feature configuration
+bool ENABLE_DECELERATION = true; // Can be changed to disable deceleration
+
+// Deceleration state tracking
+struct DecelerationState {
+  bool isDecelerating = false;
+  unsigned long decelerationStartTime = 0;
+  unsigned long decelerationDuration = 0;
+  float startSpeed = 0.0;
+  float targetSpeed = 0.0;
+};
+
+// Separate deceleration states for each control axis
+DecelerationState leftXDecel;
+DecelerationState leftYDecel;
+DecelerationState rightXDecel;
+DecelerationState rightYDecel;
+
+// Store previous input values to detect zero transitions
+JoystickData previousInput;
+
 void setup() {
   Serial.begin(115200);
   Serial.println("LifeTrac v25 Controller Starting...");
@@ -328,13 +349,121 @@ void computeTrackSpeeds(float left_y, float left_x, float* leftSpeed, float* rig
   *rightSpeed = fmaxf(-1.0, fminf(*rightSpeed, 1.0));
 }
 
+// Helper function to calculate deceleration duration based on speed
+// For wheels: full speed = 2s, half speed = 1s, 25% speed = 0.5s
+// For arms: full speed = 1s, half speed = 0.5s, 25% speed = 0.25s
+unsigned long calculateDecelerationDuration(float speed, bool isArm) {
+  float absSpeed = fabs(speed);
+  
+  if (isArm) {
+    // Arms operate at half the time of wheels
+    if (absSpeed >= 0.75) return 1000;      // Full speed: 1 second
+    if (absSpeed >= 0.375) return 500;      // Half speed: 0.5 second
+    return 250;                              // 25% speed: 0.25 second
+  } else {
+    // Wheels
+    if (absSpeed >= 0.75) return 2000;      // Full speed: 2 seconds
+    if (absSpeed >= 0.375) return 1000;     // Half speed: 1 second
+    return 500;                              // 25% speed: 0.5 second
+  }
+}
+
+// Helper function to initiate deceleration for a control axis
+void startDeceleration(DecelerationState& decel, float currentSpeed, float targetSpeed, unsigned long duration) {
+  decel.isDecelerating = true;
+  decel.decelerationStartTime = millis();
+  decel.decelerationDuration = duration;
+  decel.startSpeed = currentSpeed;
+  decel.targetSpeed = targetSpeed;
+}
+
+// Helper function to calculate current deceleration value
+float getDeceleratedValue(DecelerationState& decel) {
+  if (!decel.isDecelerating) {
+    return decel.targetSpeed;
+  }
+  
+  unsigned long elapsed = millis() - decel.decelerationStartTime;
+  
+  // Check if deceleration is complete
+  if (elapsed >= decel.decelerationDuration) {
+    decel.isDecelerating = false;
+    return decel.targetSpeed;
+  }
+  
+  // Linear interpolation from startSpeed to targetSpeed
+  float progress = (float)elapsed / (float)decel.decelerationDuration;
+  float currentValue = decel.startSpeed + (decel.targetSpeed - decel.startSpeed) * progress;
+  
+  return currentValue;
+}
+
+// Helper function to check if other inputs are still active (excluding the one that just went to zero)
+// This is used to detect mixed mode - if other inputs are active when one goes to zero,
+// we skip deceleration to allow quick transitions
+bool hasOtherActiveInputs() {
+  int activeInputs = 0;
+  
+  if (fabs(currentInput.left_x) > DEADZONE) activeInputs++;
+  if (fabs(currentInput.left_y) > DEADZONE) activeInputs++;
+  if (fabs(currentInput.right_x) > DEADZONE) activeInputs++;
+  if (fabs(currentInput.right_y) > DEADZONE) activeInputs++;
+  
+  // If any input is still active, we're in mixed mode (an axis went to zero but others remain)
+  return activeInputs > 0;
+}
+
+// Helper function to check if emergency stop is active
+// Emergency stop is considered active when the safety timeout has been exceeded
+bool isEmergencyStopActive() {
+  return (millis() - lastCommandTime > SAFETY_TIMEOUT);
+}
+
+// Helper function to handle deceleration for an axis
+void handleAxisDeceleration(float currentValue, float previousValue, DecelerationState& decel, bool isArm) {
+  bool wasActive = fabs(previousValue) > DEADZONE;
+  bool isActive = fabs(currentValue) > DEADZONE;
+  
+  // Check if input transitioned from active to zero
+  if (wasActive && !isActive) {
+    // Input went to zero - check if we should start deceleration
+    // Skip deceleration if:
+    // - Feature is disabled
+    // - Emergency stop is active (safety timeout exceeded)
+    // - Other inputs are still active (mixed mode)
+    if (ENABLE_DECELERATION && !isEmergencyStopActive() && !hasOtherActiveInputs()) {
+      // Start deceleration from previous value to zero
+      unsigned long duration = calculateDecelerationDuration(previousValue, isArm);
+      startDeceleration(decel, previousValue, 0.0, duration);
+    } else {
+      // Skip deceleration - stop immediately
+      decel.isDecelerating = false;
+    }
+  } else if (isActive) {
+    // Input is active - cancel any ongoing deceleration
+    decel.isDecelerating = false;
+  }
+}
+
 void processJoystickInput() {
+  // Handle deceleration for each axis
+  handleAxisDeceleration(currentInput.left_x, previousInput.left_x, leftXDecel, false);
+  handleAxisDeceleration(currentInput.left_y, previousInput.left_y, leftYDecel, false);
+  handleAxisDeceleration(currentInput.right_x, previousInput.right_x, rightXDecel, true);
+  handleAxisDeceleration(currentInput.right_y, previousInput.right_y, rightYDecel, true);
+  
+  // Apply deceleration or use current input values
+  float effectiveLeftX = leftXDecel.isDecelerating ? getDeceleratedValue(leftXDecel) : currentInput.left_x;
+  float effectiveLeftY = leftYDecel.isDecelerating ? getDeceleratedValue(leftYDecel) : currentInput.left_y;
+  float effectiveRightX = rightXDecel.isDecelerating ? getDeceleratedValue(rightXDecel) : currentInput.right_x;
+  float effectiveRightY = rightYDecel.isDecelerating ? getDeceleratedValue(rightYDecel) : currentInput.right_y;
+  
   // Calculate track movements (tank steering)
   // Left joystick Y controls forward/backward movement
   // Left joystick X controls turning (differential steering)
   
   float leftTrackSpeed, rightTrackSpeed;
-  computeTrackSpeeds(currentInput.left_y, currentInput.left_x, &leftTrackSpeed, &rightTrackSpeed);
+  computeTrackSpeeds(effectiveLeftY, effectiveLeftX, &leftTrackSpeed, &rightTrackSpeed);
   
   // Control left track
   controlTrack(leftTrackSpeed, LEFT_TRACK_FORWARD_PIN, LEFT_TRACK_BACKWARD_PIN);
@@ -343,19 +472,29 @@ void processJoystickInput() {
   controlTrack(rightTrackSpeed, RIGHT_TRACK_FORWARD_PIN, RIGHT_TRACK_BACKWARD_PIN);
   
   // Control arms (right joystick Y)
-  float armControl = currentInput.right_y;
+  float armControl = effectiveRightY;
   controlValve(armControl, ARMS_UP_PIN, ARMS_DOWN_PIN);
   
   // Control bucket (right joystick X)
-  float bucketControl = currentInput.right_x;
+  float bucketControl = effectiveRightX;
   controlValve(bucketControl, BUCKET_UP_PIN, BUCKET_DOWN_PIN);
   
-  // Set proportional flow control based on maximum input
-  setFlowControl();
+  // Set proportional flow control based on effective input values
+  // We need to pass the effective values to setFlowControl, so we'll use a temporary struct
+  JoystickData effectiveInput;
+  effectiveInput.left_x = effectiveLeftX;
+  effectiveInput.left_y = effectiveLeftY;
+  effectiveInput.right_x = effectiveRightX;
+  effectiveInput.right_y = effectiveRightY;
+  
+  setFlowControl(effectiveInput);
+  
+  // Store current input for next iteration
+  previousInput = currentInput;
 }
 
 void controlTrack(float speed, int forwardPin, int backwardPin) {
-  if (abs(speed) < DEADZONE) {
+  if (fabs(speed) < DEADZONE) {
     // Within deadzone - stop movement
     digitalWrite(forwardPin, LOW);
     digitalWrite(backwardPin, LOW);
@@ -371,7 +510,7 @@ void controlTrack(float speed, int forwardPin, int backwardPin) {
 }
 
 void controlValve(float control, int upPin, int downPin) {
-  if (abs(control) < DEADZONE) {
+  if (fabs(control) < DEADZONE) {
     // Within deadzone - stop movement
     digitalWrite(upPin, LOW);
     digitalWrite(downPin, LOW);
@@ -400,7 +539,7 @@ int flowCurrentFromInput(float magnitude, bool hasInput) {
   return currentValue;
 }
 
-void setFlowControl() {
+void setFlowControl(const JoystickData& inputData) {
   if (flowConfig == ONE_VALVE) {
     // Single valve mode: One valve controls all hydraulics
     // Speed limited to the smallest non-zero joystick input
@@ -409,20 +548,20 @@ void setFlowControl() {
     bool hasInput = false;
     
     // Check each input and find minimum non-zero value
-    if (abs(currentInput.left_x) > DEADZONE) {
-      minInput = min(minInput, abs(currentInput.left_x));
+    if (fabs(inputData.left_x) > DEADZONE) {
+      minInput = min(minInput, fabs(inputData.left_x));
       hasInput = true;
     }
-    if (abs(currentInput.left_y) > DEADZONE) {
-      minInput = min(minInput, abs(currentInput.left_y));
+    if (fabs(inputData.left_y) > DEADZONE) {
+      minInput = min(minInput, fabs(inputData.left_y));
       hasInput = true;
     }
-    if (abs(currentInput.right_x) > DEADZONE) {
-      minInput = min(minInput, abs(currentInput.right_x));
+    if (fabs(inputData.right_x) > DEADZONE) {
+      minInput = min(minInput, fabs(inputData.right_x));
       hasInput = true;
     }
-    if (abs(currentInput.right_y) > DEADZONE) {
-      minInput = min(minInput, abs(currentInput.right_y));
+    if (fabs(inputData.right_y) > DEADZONE) {
+      minInput = min(minInput, fabs(inputData.right_y));
       hasInput = true;
     }
     
@@ -442,19 +581,19 @@ void setFlowControl() {
     
     // Calculate track speeds using shared helper function
     float leftTrackSpeed, rightTrackSpeed;
-    computeTrackSpeeds(currentInput.left_y, currentInput.left_x, &leftTrackSpeed, &rightTrackSpeed);
+    computeTrackSpeeds(inputData.left_y, inputData.left_x, &leftTrackSpeed, &rightTrackSpeed);
     
     // Calculate flow for Valve 1 (left track + arms)
     float maxInput1 = 0.0;
-    maxInput1 = max(maxInput1, abs(leftTrackSpeed));  // Left track speed
-    maxInput1 = max(maxInput1, abs(currentInput.right_y)); // Arms
+    maxInput1 = max(maxInput1, fabs(leftTrackSpeed));  // Left track speed
+    maxInput1 = max(maxInput1, fabs(inputData.right_y)); // Arms
     bool hasInput1 = maxInput1 > DEADZONE;
     int currentValue1 = flowCurrentFromInput(maxInput1, hasInput1);
     
     // Calculate flow for Valve 2 (right track + bucket)
     float maxInput2 = 0.0;
-    maxInput2 = max(maxInput2, abs(rightTrackSpeed)); // Right track speed
-    maxInput2 = max(maxInput2, abs(currentInput.right_x)); // Bucket
+    maxInput2 = max(maxInput2, fabs(rightTrackSpeed)); // Right track speed
+    maxInput2 = max(maxInput2, fabs(inputData.right_x)); // Bucket
     bool hasInput2 = maxInput2 > DEADZONE;
     int currentValue2 = flowCurrentFromInput(maxInput2, hasInput2);
     
@@ -478,6 +617,12 @@ void stopAllMovement() {
   // Stop flow control - set to BASE_CURRENT (no flow) for both valves
   OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_1, BASE_CURRENT);
   OptaController.analogWriteCurrent(FLOW_CONTROL_PIN_2, BASE_CURRENT);
+  
+  // Cancel all ongoing decelerations
+  leftXDecel.isDecelerating = false;
+  leftYDecel.isDecelerating = false;
+  rightXDecel.isDecelerating = false;
+  rightYDecel.isDecelerating = false;
 }
 
 void publishStatus() {
