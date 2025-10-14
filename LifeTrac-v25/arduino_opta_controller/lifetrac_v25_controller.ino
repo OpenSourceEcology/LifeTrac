@@ -398,8 +398,10 @@ float getDeceleratedValue(DecelerationState& decel) {
   return currentValue;
 }
 
-// Helper function to check if we're in mixed mode (multiple inputs active simultaneously)
-bool isInMixedMode() {
+// Helper function to check if other inputs are still active (excluding the one that just went to zero)
+// This is used to detect mixed mode - if other inputs are active when one goes to zero,
+// we skip deceleration to allow quick transitions
+bool hasOtherActiveInputs() {
   int activeInputs = 0;
   
   if (abs(currentInput.left_x) > DEADZONE) activeInputs++;
@@ -407,7 +409,8 @@ bool isInMixedMode() {
   if (abs(currentInput.right_x) > DEADZONE) activeInputs++;
   if (abs(currentInput.right_y) > DEADZONE) activeInputs++;
   
-  return activeInputs > 1;
+  // If any input is still active, we're in mixed mode (an axis went to zero but others remain)
+  return activeInputs > 0;
 }
 
 // Helper function to check if emergency stop is active
@@ -424,7 +427,11 @@ void handleAxisDeceleration(float currentValue, float previousValue, Deceleratio
   // Check if input transitioned from active to zero
   if (wasActive && !isActive) {
     // Input went to zero - check if we should start deceleration
-    if (ENABLE_DECELERATION && !isEmergencyStopActive() && !isInMixedMode()) {
+    // Skip deceleration if:
+    // - Feature is disabled
+    // - Emergency stop is active (safety timeout exceeded)
+    // - Other inputs are still active (mixed mode)
+    if (ENABLE_DECELERATION && !isEmergencyStopActive() && !hasOtherActiveInputs()) {
       // Start deceleration from previous value to zero
       unsigned long duration = calculateDecelerationDuration(previousValue, isArm);
       startDeceleration(decel, previousValue, 0.0, duration);
