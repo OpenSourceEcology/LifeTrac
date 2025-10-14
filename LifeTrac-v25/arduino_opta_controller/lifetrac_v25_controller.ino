@@ -353,7 +353,7 @@ void computeTrackSpeeds(float left_y, float left_x, float* leftSpeed, float* rig
 // For wheels: full speed = 2s, half speed = 1s, 25% speed = 0.5s
 // For arms: full speed = 1s, half speed = 0.5s, 25% speed = 0.25s
 unsigned long calculateDecelerationDuration(float speed, bool isArm) {
-  float absSpeed = abs(speed);
+  float absSpeed = fabs(speed);
   
   if (isArm) {
     // Arms operate at half the time of wheels
@@ -404,10 +404,10 @@ float getDeceleratedValue(DecelerationState& decel) {
 bool hasOtherActiveInputs() {
   int activeInputs = 0;
   
-  if (abs(currentInput.left_x) > DEADZONE) activeInputs++;
-  if (abs(currentInput.left_y) > DEADZONE) activeInputs++;
-  if (abs(currentInput.right_x) > DEADZONE) activeInputs++;
-  if (abs(currentInput.right_y) > DEADZONE) activeInputs++;
+  if (fabs(currentInput.left_x) > DEADZONE) activeInputs++;
+  if (fabs(currentInput.left_y) > DEADZONE) activeInputs++;
+  if (fabs(currentInput.right_x) > DEADZONE) activeInputs++;
+  if (fabs(currentInput.right_y) > DEADZONE) activeInputs++;
   
   // If any input is still active, we're in mixed mode (an axis went to zero but others remain)
   return activeInputs > 0;
@@ -421,8 +421,8 @@ bool isEmergencyStopActive() {
 
 // Helper function to handle deceleration for an axis
 void handleAxisDeceleration(float currentValue, float previousValue, DecelerationState& decel, bool isArm) {
-  bool wasActive = abs(previousValue) > DEADZONE;
-  bool isActive = abs(currentValue) > DEADZONE;
+  bool wasActive = fabs(previousValue) > DEADZONE;
+  bool isActive = fabs(currentValue) > DEADZONE;
   
   // Check if input transitioned from active to zero
   if (wasActive && !isActive) {
@@ -494,7 +494,7 @@ void processJoystickInput() {
 }
 
 void controlTrack(float speed, int forwardPin, int backwardPin) {
-  if (abs(speed) < DEADZONE) {
+  if (fabs(speed) < DEADZONE) {
     // Within deadzone - stop movement
     digitalWrite(forwardPin, LOW);
     digitalWrite(backwardPin, LOW);
@@ -510,7 +510,7 @@ void controlTrack(float speed, int forwardPin, int backwardPin) {
 }
 
 void controlValve(float control, int upPin, int downPin) {
-  if (abs(control) < DEADZONE) {
+  if (fabs(control) < DEADZONE) {
     // Within deadzone - stop movement
     digitalWrite(upPin, LOW);
     digitalWrite(downPin, LOW);
@@ -548,20 +548,20 @@ void setFlowControl(const JoystickData& inputData) {
     bool hasInput = false;
     
     // Check each input and find minimum non-zero value
-    if (abs(inputData.left_x) > DEADZONE) {
-      minInput = min(minInput, abs(inputData.left_x));
+    if (fabs(inputData.left_x) > DEADZONE) {
+      minInput = min(minInput, fabs(inputData.left_x));
       hasInput = true;
     }
-    if (abs(inputData.left_y) > DEADZONE) {
-      minInput = min(minInput, abs(inputData.left_y));
+    if (fabs(inputData.left_y) > DEADZONE) {
+      minInput = min(minInput, fabs(inputData.left_y));
       hasInput = true;
     }
-    if (abs(inputData.right_x) > DEADZONE) {
-      minInput = min(minInput, abs(inputData.right_x));
+    if (fabs(inputData.right_x) > DEADZONE) {
+      minInput = min(minInput, fabs(inputData.right_x));
       hasInput = true;
     }
-    if (abs(inputData.right_y) > DEADZONE) {
-      minInput = min(minInput, abs(inputData.right_y));
+    if (fabs(inputData.right_y) > DEADZONE) {
+      minInput = min(minInput, fabs(inputData.right_y));
       hasInput = true;
     }
     
@@ -585,15 +585,15 @@ void setFlowControl(const JoystickData& inputData) {
     
     // Calculate flow for Valve 1 (left track + arms)
     float maxInput1 = 0.0;
-    maxInput1 = max(maxInput1, abs(leftTrackSpeed));  // Left track speed
-    maxInput1 = max(maxInput1, abs(inputData.right_y)); // Arms
+    maxInput1 = max(maxInput1, fabs(leftTrackSpeed));  // Left track speed
+    maxInput1 = max(maxInput1, fabs(inputData.right_y)); // Arms
     bool hasInput1 = maxInput1 > DEADZONE;
     int currentValue1 = flowCurrentFromInput(maxInput1, hasInput1);
     
     // Calculate flow for Valve 2 (right track + bucket)
     float maxInput2 = 0.0;
-    maxInput2 = max(maxInput2, abs(rightTrackSpeed)); // Right track speed
-    maxInput2 = max(maxInput2, abs(inputData.right_x)); // Bucket
+    maxInput2 = max(maxInput2, fabs(rightTrackSpeed)); // Right track speed
+    maxInput2 = max(maxInput2, fabs(inputData.right_x)); // Bucket
     bool hasInput2 = maxInput2 > DEADZONE;
     int currentValue2 = flowCurrentFromInput(maxInput2, hasInput2);
     
