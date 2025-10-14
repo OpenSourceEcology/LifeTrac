@@ -35,11 +35,31 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 
 ## Onboard Controller (LifeTrac)
 
-* (4) Hydraulic Directional Valve: 20 gpm Max Flow Rate, D03 NFPA Size, Three Positions, 12V DC 
+### Hydraulic Components
+
+* (4) Parker Hydraulic Directional Solenoid Valve: 21.1 gpm Max Flow Rate, D03 NFPA Size, Three Positions, 12V DC, Closed Center - $314.84 each
+  - https://www.grainger.com/product/PARKER-Hydraulic-Directional-Valve-2NMU7
+* (8) Hirschmann Connectors - $7.95 each
+  - https://www.surpluscenter.com/Hydraulics/Hydraulic-Valves/Solenoid-Valves/Hirschmann-Connector-5100-1080000-11-2457.axd
+
+#### Manifold Subplates
+
+**For dual proportional valve setup:**
+* (2) 2 Station D03 Parallel CC Manifold Subplate - $90.00 each
+  - https://www.surpluscenter.com/Hydraulics/Hydraulic-Adapters-Fittings/Subplates-Cover-Plates-Manifolds/2-Station-D03-Parallel-CC-Manifold-Subplate-SFP-10002-9-4070-2.axd
+
+**For single and no proportional valve setup:**
+* (1) 4 Station D03 Parallel CC Manifold Subplate - $183.00
+  - https://www.surpluscenter.com/Hydraulics/Hydraulic-Adapters-Fittings/Subplates-Cover-Plates-Manifolds/4-Station-D03-Parallel-CC-Manifold-Subplate-SFP10004-9-4070-4.axd
+
+### Flow Control Valves
+
 * (1-2) Electronically Adjustable Pressure Compensated Proportional Flow Control https://www.brand-hyd.com/Products/Valves/Flow_Controls/EFC/
 * (1-2) Burkert 8605 Type 316532 Flow Valve Controller https://www.burkert-usa.com/en/products/solenoid-control-valves/controllers/316532
   - One valve for basic configuration
   - Two valves for advanced maneuvering (see FLOW_VALVE_CONFIGURATION.md)
+
+### Arduino Controllers
 
 * Arduino Opta WiFi - $199.00
 * Arduino Pro Opta Ext D1608S - $151.00  
