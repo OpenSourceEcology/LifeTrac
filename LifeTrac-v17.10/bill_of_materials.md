@@ -89,7 +89,7 @@ The bill of materials is specifically designed to support rapid field maintenanc
 
 **Total Key Features:** 4
 
-**Grand Total System Components:** 19 (2 Primary Docs + 4 Working Docs + 3 Component Categories + 3 Sourcing Strategies + 6 Documentation Integration + 4 Key Features) - Note: Some items counted in multiple categories for organizational purposes
+**Grand Total Documentation Items:** 22 (2 Primary Docs + 4 Working Docs + 3 Component Categories + 3 Sourcing Strategies + 6 Documentation Integration + 4 Key Features)
 
 ## Access Information
 
