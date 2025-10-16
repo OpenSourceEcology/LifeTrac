@@ -31,6 +31,8 @@ The complete bill of materials for LifeTrac II is available in the following res
 
 **Total Components:** 6 major assemblies
 
+**Grand Total:** 9 items (3 Resources + 6 Components)
+
 ## Notes
 
 For the most up-to-date and detailed parts information, please refer to the wiki links above as they contain comprehensive lists with part numbers, suppliers, and current pricing.
