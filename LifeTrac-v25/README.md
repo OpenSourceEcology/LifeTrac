@@ -39,10 +39,11 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 
 | Qty | Item | Description | Unit Price | Total |
 |-----|------|-------------|------------|-------|
-| 4 | Parker Hydraulic Directional Solenoid Valve | 21.1 gpm Max Flow Rate, D03 NFPA Size, Three Positions, 12V DC, Closed Center | $314.84 | $1,259.36 |
-| | | [Product Link](https://www.grainger.com/product/PARKER-Hydraulic-Directional-Valve-2NMU7) | | |
+| 4 | Parker Hydraulic Directional Solenoid Valve (Model 2NMU7) | 21.1 gpm Max Flow Rate, D03 NFPA Size, Three Positions, 12V DC, Closed Center | $314.84 | $1,259.36 |
+| | | **Purchase:** [Grainger](https://www.grainger.com/product/PARKER-Hydraulic-Directional-Valve-2NMU7) | | |
+| | | **Manual:** [Parker D1VW Series Manuals](https://www.manualslib.com/products/Parker-D-1vw-Series-11678625.html) \| [Product Info](https://ph.parker.com/ca/en/product/directional-control-valve-series-d1vw-d1vw-ee/d1vw001cnkw) | | |
 | 8 | Hirschmann Connectors | Standard hydraulic valve connectors | $7.95 | $63.60 |
-| | | [Product Link](https://www.surpluscenter.com/Hydraulics/Hydraulic-Valves/Solenoid-Valves/Hirschmann-Connector-5100-1080000-11-2457.axd) | | |
+| | | **Purchase:** [Surplus Center](https://www.surpluscenter.com/Hydraulics/Hydraulic-Valves/Solenoid-Valves/Hirschmann-Connector-5100-1080000-11-2457.axd) | | |
 | | | | **Subtotal:** | **$1,322.96** |
 
 ### Manifold Subplates
@@ -52,7 +53,7 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 | Qty | Item | Description | Unit Price | Total |
 |-----|------|-------------|------------|-------|
 | 2 | 2 Station D03 Parallel CC Manifold Subplate | For dual valve configuration | $90.00 | $180.00 |
-| | | [Product Link](https://www.surpluscenter.com/Hydraulics/Hydraulic-Adapters-Fittings/Subplates-Cover-Plates-Manifolds/2-Station-D03-Parallel-CC-Manifold-Subplate-SFP-10002-9-4070-2.axd) | | |
+| | | **Purchase:** [Surplus Center](https://www.surpluscenter.com/Hydraulics/Hydraulic-Adapters-Fittings/Subplates-Cover-Plates-Manifolds/2-Station-D03-Parallel-CC-Manifold-Subplate-SFP-10002-9-4070-2.axd) | | |
 | | | | **Subtotal:** | **$180.00** |
 
 **Option B - For single and no proportional valve setup:**
@@ -60,18 +61,21 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 | Qty | Item | Description | Unit Price | Total |
 |-----|------|-------------|------------|-------|
 | 1 | 4 Station D03 Parallel CC Manifold Subplate | For single or no valve configuration | $183.00 | $183.00 |
-| | | [Product Link](https://www.surpluscenter.com/Hydraulics/Hydraulic-Adapters-Fittings/Subplates-Cover-Plates-Manifolds/4-Station-D03-Parallel-CC-Manifold-Subplate-SFP10004-9-4070-4.axd) | | |
+| | | **Purchase:** [Surplus Center](https://www.surpluscenter.com/Hydraulics/Hydraulic-Adapters-Fittings/Subplates-Cover-Plates-Manifolds/4-Station-D03-Parallel-CC-Manifold-Subplate-SFP10004-9-4070-4.axd) | | |
 | | | | **Subtotal:** | **$183.00** |
 
 ### Flow Control Valves
 
 | Qty | Item | Description | Unit Price | Total |
 |-----|------|-------------|------------|-------|
-| 1-2 | Electronically Adjustable Pressure Compensated Proportional Flow Control | One for basic, two for advanced maneuvering | TBD | TBD |
-| | | [Product Link](https://www.brand-hyd.com/Products/Valves/Flow_Controls/EFC/) | | |
-| 1-2 | Burkert 8605 Type 316532 Flow Valve Controller | Controller for flow valves | TBD | TBD |
-| | | [Product Link](https://www.burkert-usa.com/en/products/solenoid-control-valves/controllers/316532) | | |
-| | | | **Subtotal:** | **TBD** |
+| 1-2 | Brand Hydraulics PEFC12-20 Electronically Adjustable Proportional Flow Control Valve | 0-20 GPM, 3000 PSI. One for basic, two for advanced maneuvering | $449.99 | $449.99 - $899.98 |
+| | | **Purchase:** [Northern Tool](https://www.northerntool.com/products/brand-hydraulics-electronically-adjustable-flow-control-valve-0-20-gpm-3-000-psi-model-pefc12-20-12-20166) \| [Motion](https://www.motion.com/products/sku/11364850) | | |
+| | | **Manual:** [Installation & User Guide (PDF)](https://www.brand-hyd.com/wfdata/files/install/valves/EFC-Installation-Sheet-09-24.pdf) \| [Product Info](https://www.brand-hyd.com/Products/Valves/Flow_Controls/EFC/) | | |
+| 1-2 | Burkert 8605 Type 316532 Flow Valve Controller | PWM control electronics for proportional valves | $319.50 | $319.50 - $639.00 |
+| | | **Purchase:** [Valves Direct](https://www.valves-direct.com/burkert-new-products/114143-burkert-316532-type-8605-g-kl-e-f-00-q-b.html) \| [RS Components](https://us.rs-online.com/product/burkert-fluid-control-systems/316532/74474892/) | | |
+| | | **Manual:** [Type 8605 Manual (PDF)](https://www.burkert.com/en/content/download/287474/file/MA8605-Manual-EU-EN.pdf) \| [Product Info](https://www.burkert.com/en/products/316532) | | |
+| | | | **Subtotal (Single Valve):** | **$769.49** |
+| | | | **Subtotal (Dual Valve):** | **$1,538.98** |
 
 *Note: See FLOW_VALVE_CONFIGURATION.md for single vs dual valve configuration details*
 
@@ -80,34 +84,44 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 | Qty | Item | Description | Unit Price | Total |
 |-----|------|-------------|------------|-------|
 | 1 | Arduino Opta WiFi | Main controller board | $199.00 | $199.00 |
-| 1 | Arduino Pro Opta Ext D1608S | Digital I/O expansion | $151.00 | $151.00 |
-| 1 | Arduino Pro Opta Ext A0602 | Analog I/O expansion | $229.00 | $229.00 |
+| | | **Purchase:** [Arduino Store](https://store.arduino.cc/products/opta-wifi) | | |
+| | | **Documentation:** [Arduino Opta Docs](https://docs.arduino.cc/hardware/opta) | | |
+| 1 | Arduino Pro Opta Ext D1608S | Digital I/O expansion (16 digital inputs, 8 solid state outputs) | $151.00 | $151.00 |
+| | | **Purchase:** [Arduino Store](https://store.arduino.cc/products/opta-ext-d1608s) | | |
+| 1 | Arduino Pro Opta Ext A0602 | Analog I/O expansion (6 analog inputs, 2 analog outputs) | $229.00 | $229.00 |
+| | | **Purchase:** [Arduino Store](https://store.arduino.cc/products/opta-ext-a0602) | | |
 | | | | **Subtotal:** | **$579.00** |
 
 ## Remote Control Unit
 
 | Qty | Item | Description | Unit Price | Total |
 |-----|------|-------------|------------|-------|
-| 2 | SparkFun Qwiic Joystick | Dual joystick controllers | TBD | TBD |
-| | | [Product Link](https://www.sparkfun.com/products/15168) | | |
-| 1 | SparkFun Thing Plus - ESP32 WROOM (USB-C) | Remote control microcontroller | TBD | TBD |
-| | | [Product Link](https://www.sparkfun.com/products/20168) | | |
-| 1 | Enclosure for handheld remote control | Custom or off-the-shelf enclosure | TBD | TBD |
-| 1 | Li-Po battery pack with charging circuit | Power supply for remote | TBD | TBD |
-| | | | **Subtotal:** | **TBD** |
+| 2 | SparkFun Qwiic Joystick (COM-15168) | Dual joystick controllers with I2C interface | $12.50 | $25.00 |
+| | | **Purchase:** [SparkFun](https://www.sparkfun.com/products/15168) \| [DigiKey](https://www.digikey.com/en/products/detail/sparkfun-electronics/15168/9953917) | | |
+| | | **Guide:** [Hookup Guide](https://learn.sparkfun.com/tutorials/qwiic-joystick-hookup-guide) | | |
+| 1 | SparkFun Thing Plus - ESP32 WROOM (USB-C) | Remote control microcontroller with WiFi/BLE | $33.73 | $33.73 |
+| | | **Purchase:** [SparkFun](https://www.sparkfun.com/products/20168) \| [DigiKey](https://www.digikey.com/en/products/detail/sparkfun-electronics/20168/16688100) | | |
+| | | **Guide:** [Product Documentation](https://learn.sparkfun.com/tutorials/sparkfun-thing-plus-esp32-wroom-usb-c-hookup-guide) | | |
+| 1 | Enclosure for handheld remote control | Custom or off-the-shelf enclosure | Est. $20-50 | $35.00 |
+| 1 | Li-Po battery pack with charging circuit | 3.7V Li-Po battery with USB charging | Est. $15-25 | $20.00 |
+| | | | **Subtotal:** | **$113.73** |
 
 ## MQTT Broker & Web Controller Infrastructure
 
 | Qty | Item | Description | Unit Price | Total |
 |-----|------|-------------|------------|-------|
-| 1 | Raspberry Pi | 3B+ or newer, 4GB+ RAM recommended for Mosquitto and web interface | TBD | TBD |
-| | | [Mosquitto MQTT Broker](https://github.com/eclipse-mosquitto/mosquitto) | | |
-| 1 | MicroSD card | 16GB minimum, 32GB recommended | TBD | TBD |
-| 1 | WiFi router or access point | Network infrastructure | TBD | TBD |
-| 1 | Arducam IMX335 Camera Module (5MP) | Camera for web interface | TBD | TBD |
-| | | [Product Link](https://www.arducam.com/imx335-camera-module-for-rpi-arducam-opensource-camera.html) | | |
-| 1 | Camera cable | Included with Arducam | Included | $0.00 |
-| | | | **Subtotal:** | **TBD** |
+| 1 | Raspberry Pi 4 Model B (4GB) | 4GB+ RAM recommended for Mosquitto MQTT broker and web interface | $55.00 | $55.00 |
+| | | **Purchase:** [PiShop](https://www.pishop.us/product/raspberry-pi-4-model-b-4gb/) \| [Authorized Resellers](https://www.raspberrypi.com/products/raspberry-pi-4-model-b/) | | |
+| | | **Software:** [Mosquitto MQTT Broker](https://github.com/eclipse-mosquitto/mosquitto) | | |
+| 1 | SanDisk Ultra MicroSD Card (32GB) | Class 10, minimum 32GB recommended | $8.99 | $8.99 |
+| | | **Purchase:** [Amazon](https://www.amazon.com/micro-sd-card-32gb/s?k=micro+sd-card+32gb) | | |
+| 1 | WiFi router or access point | Network infrastructure (TP-Link or similar) | $55.00 | $55.00 |
+| | | **Example:** [TP-Link AX1800](https://www.amazon.com/best-wifi-router-2023/s?k=best+wifi+router+2023) | | |
+| 1 | Arducam IMX335 Camera Module (5MP) | Low-light camera for web interface live feed | $33.99 | $33.99 |
+| | | **Purchase:** [Amazon](https://www.amazon.com/Arducam-Raspberry-15-15pin-15-22pin-Included/dp/B0FG6W8HC9) \| [RobotShop](https://www.robotshop.com/products/arducam-imx335-mipi-camera-module-rpi) | | |
+| | | **Documentation:** [Arducam IMX335 Docs](https://docs.arducam.com/Raspberry-Pi-Camera/Native-camera/5MP-IMX335) | | |
+| 1 | Camera cable | 15-pin to 15-pin or 15-pin to 22-pin (included with Arducam) | Included | $0.00 |
+| | | | **Subtotal:** | **$152.98** |
 
 ---
 
@@ -115,9 +129,17 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 
 | Configuration | Components | Total |
 |--------------|------------|-------|
-| **Base System** (without flow valves, remote, or web infrastructure) | Hydraulic Components + Manifold (Option A or B) + Arduino Controllers | **$2,081.96** (Option A) or **$2,084.96** (Option B) |
-| **With Priced Components Only** | All items with specified prices | **$2,081.96 - $2,084.96** |
-| **Complete System** | All components including TBD items | **TBD** (pending pricing for flow valves, remote unit, and infrastructure) |
+| **Base System** (without flow valves, remote, or web infrastructure) | Hydraulic Components + Manifold + Arduino Controllers | **$2,081.96** (Option A) or **$2,084.96** (Option B) |
+| **Base + Single Flow Valve** | Base System + 1 Flow Control Valve + 1 Controller | **$2,851.45** (Option A) or **$2,854.45** (Option B) |
+| **Base + Dual Flow Valves** | Base System + 2 Flow Control Valves + 2 Controllers | **$3,620.94** (Option A) or **$3,623.94** (Option B) |
+| **Complete - Single Valve** | Base + Single Flow Valve + Remote Unit + Infrastructure | **$3,118.16** (Option A) or **$3,121.16** (Option B) |
+| **Complete - Dual Valves** | Base + Dual Flow Valves + Remote Unit + Infrastructure | **$3,887.65** (Option A) or **$3,890.65** (Option B) |
+
+**Configuration Notes:**
+- **Option A (Manifold)**: 2-station manifold for dual proportional valve setup ($180.00)
+- **Option B (Manifold)**: 4-station manifold for single/no proportional valve setup ($183.00)
+- **Single Valve**: Basic configuration suitable for most applications
+- **Dual Valves**: Advanced maneuvering with independent flow control and variable turning radius
 
 *Note: Prices are subject to change. Check vendor websites for current pricing. Total does not include shipping, taxes, or additional hardware like hydraulic hoses, fittings, and mounting hardware.*
 
