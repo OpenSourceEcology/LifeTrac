@@ -39,10 +39,10 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 
 | Qty | Item | Description | Unit Price | Total |
 |-----|------|-------------|------------|-------|
-| 4 | Parker Hydraulic Directional Solenoid Valve (Model 2NMU7) | 21.1 gpm Max Flow Rate, D03 NFPA Size, Three Positions, 12V DC, Closed Center | $314.84 | $1,259.36 |
+| 4 | Parker Hydraulic Directional Solenoid Valve (D1VW001CNKW) | 21.1 gpm Max Flow Rate, D03 NFPA Size, Three Positions, 12V DC, Closed Center | $314.84 | $1,259.36 |
 | | | **Purchase:** [Grainger](https://www.grainger.com/product/PARKER-Hydraulic-Directional-Valve-2NMU7) | | |
 | | | **Manual:** [Parker D1VW Series Manuals](https://www.manualslib.com/products/Parker-D-1vw-Series-11678625.html) \| [Product Info](https://ph.parker.com/ca/en/product/directional-control-valve-series-d1vw-d1vw-ee/d1vw001cnkw) | | |
-| 8 | Hirschmann Connectors | Standard hydraulic valve connectors | $7.95 | $63.60 |
+| 8 | Hirschmann DIN Connector (5100-1080000) | Standard hydraulic valve connectors | $7.95 | $63.60 |
 | | | **Purchase:** [Surplus Center](https://www.surpluscenter.com/Hydraulics/Hydraulic-Valves/Solenoid-Valves/Hirschmann-Connector-5100-1080000-11-2457.axd) | | |
 | | | | **Subtotal:** | **$1,322.96** |
 
@@ -99,7 +99,7 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 | 2 | SparkFun Qwiic Joystick (COM-15168) | Dual joystick controllers with I2C interface | $12.50 | $25.00 |
 | | | **Purchase:** [SparkFun](https://www.sparkfun.com/products/15168) \| [DigiKey](https://www.digikey.com/en/products/detail/sparkfun-electronics/15168/9953917) | | |
 | | | **Guide:** [Hookup Guide](https://learn.sparkfun.com/tutorials/qwiic-joystick-hookup-guide) | | |
-| 1 | SparkFun Thing Plus - ESP32 WROOM (USB-C) | Remote control microcontroller with WiFi/BLE | $33.73 | $33.73 |
+| 1 | SparkFun Thing Plus - ESP32 WROOM (USB-C) (DEV-20168) | Remote control microcontroller with WiFi/BLE | $33.73 | $33.73 |
 | | | **Purchase:** [SparkFun](https://www.sparkfun.com/products/20168) \| [DigiKey](https://www.digikey.com/en/products/detail/sparkfun-electronics/20168/16688100) | | |
 | | | **Guide:** [Product Documentation](https://learn.sparkfun.com/tutorials/sparkfun-thing-plus-esp32-wroom-usb-c-hookup-guide) | | |
 | 1 | Enclosure for handheld remote control | Custom or off-the-shelf enclosure | Est. $20-50 | $35.00 |
