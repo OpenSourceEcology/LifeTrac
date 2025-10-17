@@ -66,16 +66,29 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 
 ### Flow Control Valves
 
+**Option A - Single Valve Configuration (Basic):**
+
 | Qty | Item | Description | Unit Price | Total |
 |-----|------|-------------|------------|-------|
-| 1-2 | Brand Hydraulics PEFC12-20 Electronically Adjustable Proportional Flow Control Valve | 0-20 GPM, 3000 PSI. One for basic, two for advanced maneuvering | $449.99 | $449.99 - $899.98 |
+| 1 | Brand Hydraulics PEFC12-20 Electronically Adjustable Proportional Flow Control Valve | 0-20 GPM, 3000 PSI. For basic configuration | $449.99 | $449.99 |
 | | | **Purchase:** [Northern Tool](https://www.northerntool.com/products/brand-hydraulics-electronically-adjustable-flow-control-valve-0-20-gpm-3-000-psi-model-pefc12-20-12-20166) \| [Motion](https://www.motion.com/products/sku/11364850) | | |
 | | | **Manual:** [Installation & User Guide (PDF)](https://www.brand-hyd.com/wfdata/files/install/valves/EFC-Installation-Sheet-09-24.pdf) \| [Product Info](https://www.brand-hyd.com/Products/Valves/Flow_Controls/EFC/) | | |
-| 1-2 | Burkert 8605 Type 316532 Flow Valve Controller | PWM control electronics for proportional valves | $319.50 | $319.50 - $639.00 |
+| 1 | Burkert 8605 Type 316532 Flow Valve Controller | PWM control electronics for proportional valves | $319.50 | $319.50 |
 | | | **Purchase:** [Valves Direct](https://www.valves-direct.com/burkert-new-products/114143-burkert-316532-type-8605-g-kl-e-f-00-q-b.html) \| [RS Components](https://us.rs-online.com/product/burkert-fluid-control-systems/316532/74474892/) | | |
 | | | **Manual:** [Type 8605 Manual (PDF)](https://www.burkert.com/en/content/download/287474/file/MA8605-Manual-EU-EN.pdf) \| [Product Info](https://www.burkert.com/en/products/316532) | | |
-| | | | **Subtotal (Single Valve):** | **$769.49** |
-| | | | **Subtotal (Dual Valve):** | **$1,538.98** |
+| | | | **Subtotal:** | **$769.49** |
+
+**Option B - Dual Valve Configuration (Advanced Maneuvering):**
+
+| Qty | Item | Description | Unit Price | Total |
+|-----|------|-------------|------------|-------|
+| 2 | Brand Hydraulics PEFC12-20 Electronically Adjustable Proportional Flow Control Valve | 0-20 GPM, 3000 PSI. For advanced maneuvering with independent flow control | $449.99 | $899.98 |
+| | | **Purchase:** [Northern Tool](https://www.northerntool.com/products/brand-hydraulics-electronically-adjustable-flow-control-valve-0-20-gpm-3-000-psi-model-pefc12-20-12-20166) \| [Motion](https://www.motion.com/products/sku/11364850) | | |
+| | | **Manual:** [Installation & User Guide (PDF)](https://www.brand-hyd.com/wfdata/files/install/valves/EFC-Installation-Sheet-09-24.pdf) \| [Product Info](https://www.brand-hyd.com/Products/Valves/Flow_Controls/EFC/) | | |
+| 2 | Burkert 8605 Type 316532 Flow Valve Controller | PWM control electronics for proportional valves | $319.50 | $639.00 |
+| | | **Purchase:** [Valves Direct](https://www.valves-direct.com/burkert-new-products/114143-burkert-316532-type-8605-g-kl-e-f-00-q-b.html) \| [RS Components](https://us.rs-online.com/product/burkert-fluid-control-systems/316532/74474892/) | | |
+| | | **Manual:** [Type 8605 Manual (PDF)](https://www.burkert.com/en/content/download/287474/file/MA8605-Manual-EU-EN.pdf) \| [Product Info](https://www.burkert.com/en/products/316532) | | |
+| | | | **Subtotal:** | **$1,538.98** |
 
 *Note: See FLOW_VALVE_CONFIGURATION.md for single vs dual valve configuration details*
 
