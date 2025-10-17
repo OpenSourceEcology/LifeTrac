@@ -39,12 +39,12 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 
 | Qty | Item | Description | Unit Price | Total |
 |-----|------|-------------|------------|-------|
-| 4 | Parker Hydraulic Directional Solenoid Valve (D1VW001CNKW) | 21.1 gpm Max Flow Rate, D03 NFPA Size, Three Positions, 12V DC, Closed Center | $314.84 | $1,259.36 |
-| | | **Purchase:** [Grainger](https://www.grainger.com/product/PARKER-Hydraulic-Directional-Valve-2NMU7) | | |
-| | | **Manual:** [Parker D1VW Series Manuals](https://www.manualslib.com/products/Parker-D-1vw-Series-11678625.html) \| [Product Info](https://ph.parker.com/ca/en/product/directional-control-valve-series-d1vw-d1vw-ee/d1vw001cnkw) | | |
-| 8 | Hirschmann DIN Connector (5100-1080000) | Standard hydraulic valve connectors | $7.95 | $63.60 |
-| | | **Purchase:** [Surplus Center](https://www.surpluscenter.com/Hydraulics/Hydraulic-Valves/Solenoid-Valves/Hirschmann-Connector-5100-1080000-11-2457.axd) | | |
-| | | | **Subtotal:** | **$1,322.96** |
+| 4   | Parker Hydraulic Directional Solenoid Valve (D1VW001CNKW) | 21.1 gpm Max Flow Rate, D03 NFPA Size, Three Positions, 12V DC, Closed Center | $314.84  | $1,259.36   |
+|     | **Purchase:** [Grainger](https://www.grainger.com/product/PARKER-Hydraulic-Directional-Valve-2NMU7) |  |  |  |
+|     | **Manual:** [Parker D1VW Series Manuals](https://www.manualslib.com/products/Parker-D-1vw-Series-11678625.html) \| [Product Info](https://ph.parker.com/ca/en/product/directional-control-valve-series-d1vw-d1vw-ee/d1vw001cnkw) |  |  |  |
+| 8   | Hirschmann DIN Connector (5100-1080000)                   | Standard hydraulic valve connectors | $7.95    | $63.60      |
+|     | **Purchase:** [Surplus Center](https://www.surpluscenter.com/Hydraulics/Hydraulic-Valves/Solenoid-Valves/Hirschmann-Connector-5100-1080000-11-2457.axd) |  |  |  |
+|     |  |  | **Subtotal:** | **$1,322.96** |
 
 ### Manifold Subplates
 
