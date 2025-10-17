@@ -102,8 +102,8 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 | 1 | SparkFun Thing Plus - ESP32 WROOM (USB-C) (DEV-20168) | Remote control microcontroller with WiFi/BLE | $33.73 | $33.73 |
 | | | **Purchase:** [SparkFun](https://www.sparkfun.com/products/20168) \| [DigiKey](https://www.digikey.com/en/products/detail/sparkfun-electronics/20168/16688100) | | |
 | | | **Guide:** [Product Documentation](https://learn.sparkfun.com/tutorials/sparkfun-thing-plus-esp32-wroom-usb-c-hookup-guide) | | |
-| 1 | Enclosure for handheld remote control | Custom or off-the-shelf enclosure | Est. $20-50 | $35.00 |
-| 1 | Li-Po battery pack with charging circuit | 3.7V Li-Po battery with USB charging | Est. $15-25 | $20.00 |
+| 1 | Enclosure for handheld remote control | Custom or off-the-shelf enclosure | $35.00 | $35.00 |
+| 1 | Li-Po battery pack with charging circuit | 3.7V Li-Po battery with USB charging | $20.00 | $20.00 |
 | | | | **Subtotal:** | **$113.73** |
 
 ## MQTT Broker & Web Controller Infrastructure
