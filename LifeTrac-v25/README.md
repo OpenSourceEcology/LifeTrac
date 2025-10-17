@@ -115,13 +115,14 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 | | | **Software:** [Mosquitto MQTT Broker](https://github.com/eclipse-mosquitto/mosquitto) | | |
 | 1 | SanDisk Ultra MicroSD Card (32GB) | Class 10, minimum 32GB recommended | $8.99 | $8.99 |
 | | | **Purchase:** [Amazon](https://www.amazon.com/micro-sd-card-32gb/s?k=micro+sd-card+32gb) | | |
-| 1 | WiFi router or access point | Network infrastructure (TP-Link or similar) | $55.00 | $55.00 |
-| | | **Example:** [TP-Link AX1800](https://www.amazon.com/best-wifi-router-2023/s?k=best+wifi+router+2023) | | |
+| 1 | eero 6 Dual-Band Mesh Wi-Fi 6 Router | WiFi 6 mesh router with coverage up to 1,500 sq ft | $89.99 | $89.99 |
+| | | **Purchase:** [Best Buy](https://www.bestbuy.com/product/eero-6-dual-band-mesh-wi-fi-6-router-1-pack-white/J39QV832QV) \| [Amazon](https://www.amazon.com/Amazon-eero-6-mesh-Wi-Fi-6-router/dp/B085VM9ZDD) | | |
+| | | **Alternative:** [eero 6+ (faster, $139.99)](https://www.amazon.com/Amazon-eero-Wi-Fi-router-newest/dp/B08ZK39NSL) | | |
 | 1 | Arducam IMX335 Camera Module (5MP) | Low-light camera for web interface live feed | $33.99 | $33.99 |
 | | | **Purchase:** [Amazon](https://www.amazon.com/Arducam-Raspberry-15-15pin-15-22pin-Included/dp/B0FG6W8HC9) \| [RobotShop](https://www.robotshop.com/products/arducam-imx335-mipi-camera-module-rpi) | | |
 | | | **Documentation:** [Arducam IMX335 Docs](https://docs.arducam.com/Raspberry-Pi-Camera/Native-camera/5MP-IMX335) | | |
 | 1 | Camera cable | 15-pin to 15-pin or 15-pin to 22-pin (included with Arducam) | Included | $0.00 |
-| | | | **Subtotal:** | **$152.98** |
+| | | | **Subtotal:** | **$187.97** |
 
 ---
 
@@ -132,8 +133,8 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 | **Base System** (without flow valves, remote, or web infrastructure) | Hydraulic Components + Manifold + Arduino Controllers | **$2,081.96** (Option A) or **$2,084.96** (Option B) |
 | **Base + Single Flow Valve** | Base System + 1 Flow Control Valve + 1 Controller | **$2,851.45** (Option A) or **$2,854.45** (Option B) |
 | **Base + Dual Flow Valves** | Base System + 2 Flow Control Valves + 2 Controllers | **$3,620.94** (Option A) or **$3,623.94** (Option B) |
-| **Complete - Single Valve** | Base + Single Flow Valve + Remote Unit + Infrastructure | **$3,118.16** (Option A) or **$3,121.16** (Option B) |
-| **Complete - Dual Valves** | Base + Dual Flow Valves + Remote Unit + Infrastructure | **$3,887.65** (Option A) or **$3,890.65** (Option B) |
+| **Complete - Single Valve** | Base + Single Flow Valve + Remote Unit + Infrastructure | **$3,153.15** (Option A) or **$3,156.15** (Option B) |
+| **Complete - Dual Valves** | Base + Dual Flow Valves + Remote Unit + Infrastructure | **$3,922.64** (Option A) or **$3,925.64** (Option B) |
 
 **Configuration Notes:**
 - **Option A (Manifold)**: 2-station manifold for dual proportional valve setup ($180.00)
