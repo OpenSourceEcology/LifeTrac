@@ -1,0 +1,80 @@
+name: Arduino CI
+
+on:
+  push:
+    paths:
+      - 'LifeTrac-v25/arduino_opta_controller/**'
+      - 'LifeTrac-v25/esp32_remote_control/**'
+      - 'LifeTrac-v25/arduino_libraries.txt'
+      - '.github/workflows/arduino-ci.yml'
+  pull_request:
+    paths:
+      - 'LifeTrac-v25/arduino_opta_controller/**'
+      - 'LifeTrac-v25/esp32_remote_control/**'
+      - 'LifeTrac-v25/arduino_libraries.txt'
+      - '.github/workflows/arduino-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  compile-opta-controller:
+    runs-on: ubuntu-latest
+    name: Compile Arduino Opta Controller
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Compile Arduino Opta sketch
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: 'arduino:mbed_opta:opta'
+          platforms: |
+            - name: arduino:mbed_opta
+          libraries: |
+            - name: PubSubClient
+            - name: ArduinoJson
+            - name: ArduinoBLE
+          sketch-paths: |
+            - LifeTrac-v25/arduino_opta_controller
+          enable-deltas-report: true
+          sketches-report-path: sketches-reports
+
+      - name: Upload compilation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opta-controller-report
+          path: sketches-reports
+          retention-days: 30
+
+  compile-esp32-remote:
+    runs-on: ubuntu-latest
+    name: Compile ESP32 Remote Control
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Compile ESP32 sketch
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: 'esp32:esp32:esp32thing_plus:FlashFreq=80,PartitionScheme=default'
+          platforms: |
+            - name: esp32:esp32
+              source-url: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          libraries: |
+            - name: PubSubClient
+            - name: ArduinoJson
+            - name: SparkFun Qwiic Joystick Arduino Library
+          sketch-paths: |
+            - LifeTrac-v25/esp32_remote_control
+          enable-deltas-report: true
+          sketches-report-path: sketches-reports
+
+      - name: Upload compilation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: esp32-remote-report
+          path: sketches-reports
+          retention-days: 30
