@@ -19,6 +19,8 @@ jobs:
   compile-opta-controller:
     runs-on: ubuntu-latest
     name: Compile Arduino Opta Controller
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout repository
@@ -51,6 +53,8 @@ jobs:
   compile-esp32-remote:
     runs-on: ubuntu-latest
     name: Compile ESP32 Remote Control
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout repository
