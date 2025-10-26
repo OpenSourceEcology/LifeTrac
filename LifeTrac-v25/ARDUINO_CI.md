@@ -44,7 +44,7 @@ When a compilation error occurs, the workflow automatically creates a GitHub iss
 - Commit and branch information
 - Details about the sketch and board configuration
 - The issue is automatically labeled with `bug`, `arduino`, and `ci`
-- The issue is automatically assigned to @Copilot for investigation
+- The issue is automatically assigned to @copilot for investigation
 
 This ensures compilation failures are tracked and addressed promptly.
 
