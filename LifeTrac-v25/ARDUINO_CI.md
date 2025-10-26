@@ -36,6 +36,18 @@ The workflow generates compilation reports showing:
 
 These reports are uploaded as artifacts and retained for 30 days.
 
+## Automatic Issue Creation
+
+When a compilation error occurs, the workflow automatically creates a GitHub issue with:
+- A descriptive title indicating which sketch failed (Opta Controller or ESP32 Remote)
+- Link to the failed workflow run
+- Commit and branch information
+- Details about the sketch and board configuration
+- The issue is automatically labeled with `bug`, `arduino`, and `ci`
+- The issue is automatically assigned to @Copilot for investigation
+
+This ensures compilation failures are tracked and addressed promptly.
+
 ## Running CI Manually
 
 The workflow can be triggered manually:
