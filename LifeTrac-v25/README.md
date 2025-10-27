@@ -7,7 +7,7 @@ LifeTrac v25 features a comprehensive remote control system with multiple contro
 * **Multiple Control Modes:** switch for MQTT/OFF/BLE mode selection (BLE default)
 * **BLE Direct Control:** Direct Bluetooth connection to DroidPad app (no WiFi/broker needed)
 * **Remote Joystick Control:** Dual joystick setup for tank steering and hydraulic functions
-* **DroidPad Compatible:** Native support for DroidPad via BLE or MQTT using -1.0 to 1.0 value range
+* **DroidPad Compatible:** Native support for DroidPad via BLE or MQTT
 * **WiFi Communication:** Reliable wireless control with MQTT protocol
 * **ROS2 Integration:** Control LifeTrac from BeagleBone or any ROS2-enabled device
 * **Configurable Flow Control:** Choose between single or dual proportional flow valves via jumper
