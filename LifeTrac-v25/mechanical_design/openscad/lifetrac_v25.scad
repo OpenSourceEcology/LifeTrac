@@ -26,6 +26,9 @@ show_standing_deck = true;
 exploded_view = false;
 explode_distance = exploded_view ? 200 : 0;
 
+// Drive configuration
+all_wheel_drive = true;  // true = 4 wheels powered, false = 2 front wheels only
+
 // Machine dimensions (in mm)
 // Target size: between Toro Dingo (915mm wide) and Bobcat (1830mm wide)
 // Chosen dimensions: ~1200mm wide, ~1800mm long, ~1000mm tall (without loader)
@@ -143,8 +146,9 @@ module wheel_assemblies() {
                 rotate([0, 90, 0])
                 wheel(WHEEL_DIAMETER, WHEEL_WIDTH, 150, true);
                 
-                // Hydraulic motor (for powered wheels - typically front 2 or all 4)
-                if (i < 2 || true) {  // All 4 wheels powered in this config
+                // Hydraulic motor (for powered wheels)
+                // Front 2 wheels (i < 2) always powered, rear 2 optional based on config
+                if (i < 2 || all_wheel_drive) {
                     translate([0, 0, -80])
                     rotate([0, 0, 0])
                     hydraulic_motor(100, 25.4, 80, true);

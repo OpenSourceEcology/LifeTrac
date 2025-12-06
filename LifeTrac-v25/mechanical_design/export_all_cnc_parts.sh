@@ -57,16 +57,26 @@ for part_info in "${parts[@]}"; do
     
     echo "[$current/$total_parts] Exporting $part_name to $output_file"
     
-    # Export DXF
-    openscad -o "$output_file" \
+    # Export DXF and capture output
+    output=$(openscad -o "$output_file" \
              -D "part=\"$part_name\"" \
-             export_for_cnc.scad 2>&1 | grep -v "WARNING: Ignoring unknown" || true
+             export_for_cnc.scad 2>&1)
+    exit_code=$?
     
-    if [ -f "$output_file" ]; then
+    # Filter out known harmless warnings but show real errors
+    filtered_output=$(echo "$output" | grep -v "WARNING: Ignoring unknown" || true)
+    
+    if [ $exit_code -ne 0 ]; then
+        echo "           ✗ Export failed with exit code $exit_code"
+        if [ -n "$filtered_output" ]; then
+            echo "           Error details:"
+            echo "$filtered_output" | sed 's/^/             /'
+        fi
+    elif [ -f "$output_file" ]; then
         size=$(du -h "$output_file" | cut -f1)
         echo "           ✓ Created ($size)"
     else
-        echo "           ✗ Failed to create file"
+        echo "           ✗ Failed to create file (no error reported)"
     fi
     echo ""
 done

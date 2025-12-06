@@ -61,10 +61,11 @@ module powered_wheel(diameter=500, width=200, motor_displacement=100) {
     wheel(diameter, width, 150, true);
     
     // Hydraulic motor mounted to hub
-    translate([0, width/2 + 50, 0])
-    rotate([90, 0, 0])
-    import("hydraulics.scad");
-    // Note: In practice, use: use <hydraulics.scad>; hydraulic_motor(motor_displacement);
+    // Note: Actual motor is displayed in main assembly
+    // To display here, uncomment and ensure hydraulics.scad is in scope:
+    // translate([0, width/2 + 50, 0])
+    // rotate([90, 0, 0])
+    // hydraulic_motor(motor_displacement);
 }
 
 /**
