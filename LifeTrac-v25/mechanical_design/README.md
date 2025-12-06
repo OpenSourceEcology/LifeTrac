@@ -27,8 +27,7 @@ mechanical_design/
 │   ├── fasteners.scad     # Hex bolts, nuts, washers
 │   ├── hydraulics.scad    # Hydraulic cylinders and motors
 │   └── wheels.scad        # Wheel and axle assemblies
-├── output/                # Generated files (STL, DXF, PNG)
-│   ├── stl/              # 3D printable models
+├── output/                # Generated files (DXF, PNG)
 │   ├── dxf/              # CNC cutting layouts
 │   └── renders/          # Rendered images
 ├── documentation/         # Design documentation
@@ -148,18 +147,18 @@ Wheel and axle components:
 
 ## Manufacturing Outputs
 
-### STL Export (3D Printing/Visualization)
-
-```bash
-openscad -o output/stl/base_frame.stl openscad/lifetrac_v25.scad
-```
-
 ### DXF Export (CNC Cutting)
 
 For 2D parts (plates), export individual parts:
 
 ```bash
 openscad -o output/dxf/wheel_mounting_plate.dxf modules/plate_steel.scad
+```
+
+Or use the batch export script:
+
+```bash
+./export_all_cnc_parts.sh
 ```
 
 ### PNG Rendering
@@ -173,9 +172,9 @@ openscad -o output/renders/lifetrac_v25.png --camera=2000,2000,1500,0,0,0 \
 
 GitHub Actions automatically:
 1. Validates OpenSCAD syntax on every commit
-2. Generates STL files for all major assemblies
-3. Creates DXF files grouped by plate thickness
-4. Renders preview images
+2. Generates assembly.png (3D render of complete assembly)
+3. Generates cnclayout.svg (2D layout for CNC cutting)
+4. Renders preview images from multiple angles
 5. Generates assembly animations
 
 See `.github/workflows/openscad-render.yml` for details.

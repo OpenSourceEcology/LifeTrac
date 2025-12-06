@@ -41,7 +41,6 @@ Tools for going from design to physical parts:
 - **GitHub Actions Workflow** - Automated rendering
   - Syntax validation
   - Multi-angle preview renders
-  - STL generation for 3D printing
   - 36-frame animation
   - Module examples
   - Automatic assembly.png and cnclayout.svg generation
