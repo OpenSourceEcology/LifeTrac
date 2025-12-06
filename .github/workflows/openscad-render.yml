@@ -56,6 +56,29 @@ jobs:
           cd LifeTrac-v25/mechanical_design
           mkdir -p output/{stl,dxf,renders,animations}
       
+      - name: Generate assembly.png and cnclayout.svg
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          # Generate assembly.png (1024x768 matching CEB-Press example)
+          echo "Generating assembly.png..."
+          xvfb-run openscad -o assembly.png \
+            --camera=3000,3000,2000,0,0,500 \
+            --imgsize=1024,768 \
+            --projection=p \
+            --colorscheme=Nature \
+            openscad/lifetrac_v25.scad
+          
+          # Generate cnclayout.svg (2D projection for CNC cutting)
+          echo "Generating cnclayout.svg..."
+          xvfb-run openscad -o cnclayout.svg \
+            --projection=o \
+            --viewall \
+            cnclayout.scad
+          
+          echo "✓ assembly.png and cnclayout.svg generated successfully"
+          ls -lh assembly.png cnclayout.svg
+      
       - name: Render preview images
         run: |
           cd LifeTrac-v25/mechanical_design
@@ -227,6 +250,28 @@ jobs:
           name: openscad-animations
           path: LifeTrac-v25/mechanical_design/output/animations/
           retention-days: 90
+      
+      - name: Commit and push assembly.png and cnclayout.svg
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # Add the generated files
+          git add assembly.png cnclayout.svg
+          
+          # Check if there are changes
+          if ! git diff --staged --quiet; then
+            git commit -m "Update assembly.png and cnclayout.svg [skip ci]"
+            git push --force-with-lease origin HEAD || {
+              echo "INFO: git push failed. This is expected on PRs from forks."
+              echo "The files are available as workflow artifacts."
+            }
+          else
+            echo "No changes to assembly.png or cnclayout.svg"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Comment on PR with results
         if: github.event_name == 'pull_request'

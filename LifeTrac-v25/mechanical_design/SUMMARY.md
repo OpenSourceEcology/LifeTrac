@@ -27,12 +27,24 @@ A complete parametric 3D CAD system built from scratch:
 ### Manufacturing Support
 Tools for going from design to physical parts:
 
+- **Assembly Visualization**
+  - `assembly.png` - 1024×768 3D render (auto-generated)
+  - Shows complete machine from optimal viewing angle
+  - Updated automatically via GitHub Actions
+
+- **CNC Cutting Layout**
+  - `cnclayout.svg` - Vector layout for plasma cutting (auto-generated)
+  - All plate parts organized by thickness
+  - Color-coded (blue=1/4", red=1/2")
+  - Ready for CAM software import
+
 - **GitHub Actions Workflow** - Automated rendering
   - Syntax validation
   - Multi-angle preview renders
   - STL generation for 3D printing
   - 36-frame animation
   - Module examples
+  - Automatic assembly.png and cnclayout.svg generation
   
 - **CNC Export System**
   - Individual part DXF export
