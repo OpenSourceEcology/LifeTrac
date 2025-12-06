@@ -1,0 +1,261 @@
+name: OpenSCAD Render and Export
+
+on:
+  push:
+    paths:
+      - 'LifeTrac-v25/mechanical_design/**/*.scad'
+      - '.github/workflows/openscad-render.yml'
+  pull_request:
+    paths:
+      - 'LifeTrac-v25/mechanical_design/**/*.scad'
+  workflow_dispatch:
+
+jobs:
+  validate-and-render:
+    runs-on: ubuntu-latest
+    name: Validate OpenSCAD and Generate Outputs
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install OpenSCAD
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openscad xvfb
+          openscad --version
+      
+      - name: Validate OpenSCAD syntax
+        run: |
+          echo "Validating OpenSCAD files..."
+          cd LifeTrac-v25/mechanical_design
+          
+          # Check main design file
+          xvfb-run openscad -o /dev/null --export-format echo openscad/lifetrac_v25.scad
+          if [ $? -eq 0 ]; then
+            echo "✓ Main design file is valid"
+          else
+            echo "✗ Main design file has errors"
+            exit 1
+          fi
+          
+          # Check module files
+          for module in modules/*.scad; do
+            echo "Checking $module..."
+            xvfb-run openscad -o /dev/null --export-format echo "$module"
+            if [ $? -eq 0 ]; then
+              echo "✓ $module is valid"
+            else
+              echo "✗ $module has errors"
+              exit 1
+            fi
+          done
+      
+      - name: Create output directories
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          mkdir -p output/{stl,dxf,renders,animations}
+      
+      - name: Render preview images
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          # Main assembly view
+          echo "Rendering main assembly..."
+          xvfb-run openscad -o output/renders/lifetrac_v25_main.png \
+            --camera=3000,3000,2000,0,0,500 \
+            --imgsize=1920,1080 \
+            --projection=p \
+            --colorscheme=Nature \
+            openscad/lifetrac_v25.scad
+          
+          # Front view
+          echo "Rendering front view..."
+          xvfb-run openscad -o output/renders/lifetrac_v25_front.png \
+            --camera=0,3000,1000,0,0,500 \
+            --imgsize=1920,1080 \
+            --projection=p \
+            --colorscheme=Nature \
+            openscad/lifetrac_v25.scad
+          
+          # Side view
+          echo "Rendering side view..."
+          xvfb-run openscad -o output/renders/lifetrac_v25_side.png \
+            --camera=3000,0,1000,0,0,500 \
+            --imgsize=1920,1080 \
+            --projection=p \
+            --colorscheme=Nature \
+            openscad/lifetrac_v25.scad
+          
+          # Top view
+          echo "Rendering top view..."
+          xvfb-run openscad -o output/renders/lifetrac_v25_top.png \
+            --camera=0,0,3000,0,0,500 \
+            --imgsize=1920,1080 \
+            --projection=o \
+            --colorscheme=Nature \
+            openscad/lifetrac_v25.scad
+          
+          echo "Preview images rendered successfully"
+      
+      - name: Generate STL files
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          echo "Generating STL export..."
+          # Full assembly STL (may be large)
+          xvfb-run openscad -o output/stl/lifetrac_v25_assembly.stl \
+            openscad/lifetrac_v25.scad
+          
+          echo "STL files generated"
+      
+      - name: Render module examples
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          # Render each module's example
+          for module in modules/*.scad; do
+            filename=$(basename "$module" .scad)
+            echo "Rendering $filename examples..."
+            xvfb-run openscad -o "output/renders/${filename}_examples.png" \
+              --camera=500,500,500,0,0,0 \
+              --imgsize=1600,900 \
+              --projection=p \
+              --colorscheme=Nature \
+              "$module"
+          done
+      
+      - name: Generate animation frames
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          echo "Generating animation frames..."
+          mkdir -p output/animations/frames
+          
+          # Generate 36 frames for animation (every 10 degrees)
+          for i in {0..35}; do
+            t=$(echo "scale=4; $i/36" | bc)
+            printf "Frame %d (t=%.4f)\n" $i $t
+            xvfb-run openscad -o "output/animations/frames/frame_$(printf %03d $i).png" \
+              --camera=3000,3000,2000,0,0,500 \
+              --imgsize=1280,720 \
+              --projection=p \
+              --colorscheme=Nature \
+              -D "\$t=$t" \
+              openscad/lifetrac_v25.scad
+          done
+          
+          echo "Animation frames generated"
+      
+      - name: Create animation GIF (if imagemagick available)
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y imagemagick
+          cd LifeTrac-v25/mechanical_design/output/animations
+          
+          if command -v convert &> /dev/null; then
+            echo "Creating animation GIF..."
+            convert -delay 10 -loop 0 frames/frame_*.png lifetrac_v25_animation.gif
+            echo "Animation GIF created"
+          else
+            echo "ImageMagick not available, skipping GIF creation"
+          fi
+      
+      - name: Generate summary report
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          cat > output/RENDER_REPORT.md << 'EOF'
+          # OpenSCAD Render Report
+          
+          **Generated:** $(date)
+          **Commit:** ${{ github.sha }}
+          **Branch:** ${{ github.ref_name }}
+          
+          ## Files Generated
+          
+          ### Preview Renders
+          - Main assembly view
+          - Front view
+          - Side view
+          - Top view
+          - Module examples (5 modules)
+          
+          ### 3D Models
+          - Full assembly STL
+          
+          ### Animations
+          - 36 animation frames
+          - Animation GIF (if ImageMagick available)
+          
+          ## Validation Results
+          
+          ✓ All OpenSCAD files validated successfully
+          ✓ Main design file compiled without errors
+          ✓ All module files syntax-checked
+          
+          ## Next Steps
+          
+          1. Review rendered images in the artifacts
+          2. Download STL files for 3D printing or further editing
+          3. Use animation frames to create videos
+          4. Import STL to FreeCAD for DXF generation
+          
+          ---
+          Generated by GitHub Actions
+          EOF
+      
+      - name: Upload render artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openscad-renders
+          path: |
+            LifeTrac-v25/mechanical_design/output/renders/
+            LifeTrac-v25/mechanical_design/output/RENDER_REPORT.md
+          retention-days: 90
+      
+      - name: Upload STL artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openscad-stl-files
+          path: LifeTrac-v25/mechanical_design/output/stl/
+          retention-days: 90
+      
+      - name: Upload animation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openscad-animations
+          path: LifeTrac-v25/mechanical_design/output/animations/
+          retention-days: 90
+      
+      - name: Comment on PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const comment = `## OpenSCAD Render Results 🎨
+            
+            ✅ All OpenSCAD files validated successfully!
+            
+            ### Generated Outputs
+            - 📸 Preview renders (main, front, side, top views)
+            - 🎬 Animation frames (36 frames)
+            - 📦 STL files for 3D printing
+            - 🔧 Module examples
+            
+            ### Artifacts
+            Download the generated files from the workflow artifacts:
+            - \`openscad-renders\` - Preview images
+            - \`openscad-stl-files\` - 3D models
+            - \`openscad-animations\` - Animation frames and GIF
+            
+            **Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
