@@ -29,6 +29,12 @@ explode_distance = exploded_view ? 200 : 0;
 // Drive configuration
 all_wheel_drive = true;  // true = 4 wheels powered, false = 2 front wheels only
 
+// Material constants
+PLATE_1_4_INCH = 6.35;  // 1/4" = 6.35mm
+PLATE_1_2_INCH = 12.7;  // 1/2" = 12.7mm
+TUBE_3X3_1_4 = [76.2, 6.35];   // 3"x3" x 1/4" wall
+TUBE_4X4_1_4 = [101.6, 6.35];  // 4"x4" x 1/4" wall (OSE standard)
+
 // Machine dimensions (in mm)
 // Target size: between Toro Dingo (915mm wide) and Bobcat (1830mm wide)
 // Chosen dimensions: ~1200mm wide, ~1800mm long, ~1000mm tall (without loader)
@@ -57,68 +63,89 @@ LIFT_CYLINDER_STROKE = 400;
 BUCKET_CYLINDER_STROKE = 300;
 
 /**
- * Part A1 - Base Frame Assembly
- * Main structural frame using 4x4" square tubing
- * Connects to: All wheel assemblies (B1-B4), loader arm pivots (C1), standing deck (F1)
+ * Part A1 - Triangular Side Panel (Left)
+ * Plate steel triangular side panel that sandwiches arm joints
+ * Connects to: Right side panel (A1-R), back plate (A3), wheel assemblies (B1, B3), arm pivots (C1)
  */
-module base_frame() {
-    color("Silver")
-    {
-        // Longitudinal frame members (left and right)
-        translate([-TRACK_WIDTH/2, 0, 0])
-        rotate([90, 0, 0])
-        square_tubing(MACHINE_LENGTH, FRAME_TUBE_SIZE, true);
-        
-        translate([TRACK_WIDTH/2, 0, 0])
-        rotate([90, 0, 0])
-        square_tubing(MACHINE_LENGTH, FRAME_TUBE_SIZE, true);
-        
-        // Cross members
-        // Front cross member
-        translate([0, MACHINE_LENGTH/2, 0])
-        rotate([0, 90, 0])
-        square_tubing(TRACK_WIDTH + FRAME_TUBE_SIZE[0], FRAME_TUBE_SIZE, true);
-        
-        // Center cross member
-        rotate([0, 90, 0])
-        square_tubing(TRACK_WIDTH + FRAME_TUBE_SIZE[0], FRAME_TUBE_SIZE, true);
-        
-        // Rear cross member
-        translate([0, -MACHINE_LENGTH/2, 0])
-        rotate([0, 90, 0])
-        square_tubing(TRACK_WIDTH + FRAME_TUBE_SIZE[0], FRAME_TUBE_SIZE, true);
-        
-        // Front upright supports for loader mounting
-        translate([-TRACK_WIDTH/2, MACHINE_LENGTH/2, 0])
-        square_tubing(MACHINE_HEIGHT, FRAME_TUBE_SIZE, false);
-        
-        translate([TRACK_WIDTH/2, MACHINE_LENGTH/2, 0])
-        square_tubing(MACHINE_HEIGHT, FRAME_TUBE_SIZE, false);
-        
-        // Top cross member for loader pivot
-        translate([0, MACHINE_LENGTH/2, MACHINE_HEIGHT])
-        rotate([0, 90, 0])
-        square_tubing(TRACK_WIDTH + FRAME_TUBE_SIZE[0], FRAME_TUBE_SIZE, true);
-    }
+module side_panel_left() {
+    color("DarkSlateGray")
+    translate([-TRACK_WIDTH/2 - PLATE_1_2_INCH/2, 0, 0])
+    rotate([0, 90, 0])
+    linear_extrude(height=PLATE_1_2_INCH)
+    offset(r=6.35)  // Rounded corners
+    offset(r=-6.35)
+    polygon([
+        [0, 0],                          // Bottom rear (wheel position)
+        [0, MACHINE_LENGTH/2],           // Bottom front (wheel position)
+        [MACHINE_HEIGHT, MACHINE_LENGTH/2], // Top front (arm pivot)
+        [MACHINE_HEIGHT*0.7, 0]          // Top rear
+    ]);
 }
 
 /**
- * Part A2 - Wheel Mounting Plates
- * 1/2" plate steel mounting plates for wheel assemblies
- * Connects to: Base frame (A1), wheel assemblies (B1-B4)
+ * Part A2 - Triangular Side Panel (Right)
+ * Plate steel triangular side panel that sandwiches arm joints
+ * Connects to: Left side panel (A1-L), back plate (A3), wheel assemblies (B2, B4), arm pivots (C1)
+ */
+module side_panel_right() {
+    color("DarkSlateGray")
+    translate([TRACK_WIDTH/2 + PLATE_1_2_INCH/2, 0, 0])
+    rotate([0, -90, 0])
+    linear_extrude(height=PLATE_1_2_INCH)
+    offset(r=6.35)  // Rounded corners
+    offset(r=-6.35)
+    polygon([
+        [0, 0],                          // Bottom rear (wheel position)
+        [0, MACHINE_LENGTH/2],           // Bottom front (wheel position)
+        [MACHINE_HEIGHT, MACHINE_LENGTH/2], // Top front (arm pivot)
+        [MACHINE_HEIGHT*0.7, 0]          // Top rear
+    ]);
+}
+
+/**
+ * Part A3 - Back Connecting Plate
+ * Plate steel connecting the two side panels at the rear
+ * Connects to: Left side panel (A1-L), right side panel (A1-R), standing deck (F1)
+ */
+module back_plate() {
+    back_plate_height = MACHINE_HEIGHT * 0.7;
+    
+    color("DarkSlateGray")
+    translate([0, -MACHINE_LENGTH/2, back_plate_height/2])
+    rotate([90, 0, 0])
+    linear_extrude(height=PLATE_1_4_INCH)
+    offset(r=6.35)  // Rounded corners
+    offset(r=-6.35)
+    square([TRACK_WIDTH + PLATE_1_2_INCH, back_plate_height], center=true);
+}
+
+/**
+ * Base Frame Assembly - calls all frame components
+ */
+module base_frame() {
+    side_panel_left();
+    side_panel_right();
+    back_plate();
+}
+
+/**
+ * Part A4 - Wheel Mounting Brackets
+ * Mounting brackets welded to base of triangular side panels
+ * Connects to: Side panels (A1-L, A1-R), wheel assemblies (B1-B4)
  */
 module wheel_mounting_plates() {
-    plate_size = 300;
+    plate_size = 250;
     
+    // Wheels positioned along the base of the triangular panels
     positions = [
-        [-TRACK_WIDTH/2, MACHINE_LENGTH/2 - 200],   // Front left
-        [TRACK_WIDTH/2, MACHINE_LENGTH/2 - 200],    // Front right
-        [-TRACK_WIDTH/2, -MACHINE_LENGTH/2 + 200],  // Rear left
-        [TRACK_WIDTH/2, -MACHINE_LENGTH/2 + 200]    // Rear right
+        [-TRACK_WIDTH/2, MACHINE_LENGTH/2 - 100],   // Front left
+        [TRACK_WIDTH/2, MACHINE_LENGTH/2 - 100],    // Front right
+        [-TRACK_WIDTH/2, 0],                        // Rear left
+        [TRACK_WIDTH/2, 0]                          // Rear right
     ];
     
     for (pos = positions) {
-        translate([pos[0], pos[1], -50])
+        translate([pos[0], pos[1], -80])
         color("DarkSlateGray")
         plate_with_holes(plate_size, plate_size, PLATE_1_2_INCH, 13, 40);
     }
@@ -131,11 +158,12 @@ module wheel_mounting_plates() {
  */
 module wheel_assemblies() {
     if (show_wheels) {
+        // Wheels at base of triangular panels
         positions = [
-            [-TRACK_WIDTH/2 - explode_distance, MACHINE_LENGTH/2 - 200 + explode_distance, 0],   // Front left
-            [TRACK_WIDTH/2 + explode_distance, MACHINE_LENGTH/2 - 200 + explode_distance, 0],    // Front right
-            [-TRACK_WIDTH/2 - explode_distance, -MACHINE_LENGTH/2 + 200 - explode_distance, 0],  // Rear left
-            [TRACK_WIDTH/2 + explode_distance, -MACHINE_LENGTH/2 + 200 - explode_distance, 0]    // Rear right
+            [-TRACK_WIDTH/2 - explode_distance, MACHINE_LENGTH/2 - 100 + explode_distance, 0],   // Front left
+            [TRACK_WIDTH/2 + explode_distance, MACHINE_LENGTH/2 - 100 + explode_distance, 0],    // Front right
+            [-TRACK_WIDTH/2 - explode_distance, 0 - explode_distance, 0],                        // Rear left
+            [TRACK_WIDTH/2 + explode_distance, 0 + explode_distance, 0]                          // Rear right
         ];
         
         for (i = [0:3]) {
