@@ -25,13 +25,19 @@ jobs:
           sudo apt-get install -y openscad xvfb
           openscad --version
       
+      - name: Start Xvfb
+        run: |
+          Xvfb :99 -screen 0 1024x768x16 &
+          sleep 2
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+      
       - name: Validate OpenSCAD syntax
         run: |
           echo "Validating OpenSCAD files..."
           cd LifeTrac-v25/mechanical_design
           
           # Check main design file
-          xvfb-run openscad -o /dev/null --export-format echo openscad/lifetrac_v25.scad
+          openscad -o /dev/null --export-format echo openscad/lifetrac_v25.scad
           if [ $? -eq 0 ]; then
             echo "✓ Main design file is valid"
           else
@@ -42,7 +48,7 @@ jobs:
           # Check module files
           for module in modules/*.scad; do
             echo "Checking $module..."
-            xvfb-run openscad -o /dev/null --export-format echo "$module"
+            openscad -o /dev/null --export-format echo "$module"
             if [ $? -eq 0 ]; then
               echo "✓ $module is valid"
             else
@@ -62,7 +68,7 @@ jobs:
           
           # Generate assembly.png (1024x768 matching CEB-Press example)
           echo "Generating assembly.png..."
-          xvfb-run openscad -o assembly.png \
+          openscad -o assembly.png \
             --camera=3000,3000,2000,0,0,500 \
             --imgsize=1024,768 \
             --projection=p \
@@ -71,7 +77,7 @@ jobs:
           
           # Generate cnclayout.svg (2D projection for CNC cutting)
           echo "Generating cnclayout.svg..."
-          xvfb-run openscad -o cnclayout.svg \
+          openscad -o cnclayout.svg \
             --projection=o \
             --viewall \
             cnclayout.scad
@@ -85,7 +91,7 @@ jobs:
           
           # Main assembly view
           echo "Rendering main assembly..."
-          xvfb-run openscad -o output/renders/lifetrac_v25_main.png \
+          openscad -o output/renders/lifetrac_v25_main.png \
             --camera=3000,3000,2000,0,0,500 \
             --imgsize=1920,1080 \
             --projection=p \
@@ -94,7 +100,7 @@ jobs:
           
           # Front view
           echo "Rendering front view..."
-          xvfb-run openscad -o output/renders/lifetrac_v25_front.png \
+          openscad -o output/renders/lifetrac_v25_front.png \
             --camera=0,3000,1000,0,0,500 \
             --imgsize=1920,1080 \
             --projection=p \
@@ -103,7 +109,7 @@ jobs:
           
           # Side view
           echo "Rendering side view..."
-          xvfb-run openscad -o output/renders/lifetrac_v25_side.png \
+          openscad -o output/renders/lifetrac_v25_side.png \
             --camera=3000,0,1000,0,0,500 \
             --imgsize=1920,1080 \
             --projection=p \
@@ -112,7 +118,7 @@ jobs:
           
           # Top view
           echo "Rendering top view..."
-          xvfb-run openscad -o output/renders/lifetrac_v25_top.png \
+          openscad -o output/renders/lifetrac_v25_top.png \
             --camera=0,0,3000,0,0,500 \
             --imgsize=1920,1080 \
             --projection=o \
@@ -129,7 +135,7 @@ jobs:
           for module in modules/*.scad; do
             filename=$(basename "$module" .scad)
             echo "Rendering $filename examples..."
-            xvfb-run openscad -o "output/renders/${filename}_examples.png" \
+            openscad -o "output/renders/${filename}_examples.png" \
               --camera=500,500,500,0,0,0 \
               --imgsize=1600,900 \
               --projection=p \
@@ -148,7 +154,7 @@ jobs:
           for i in {0..35}; do
             t=$(awk "BEGIN {print $i/36}")
             printf "Frame %d (t=%.4f)\n" $i $t
-            xvfb-run openscad -o "output/animations/frames/frame_$(printf %03d $i).png" \
+            openscad -o "output/animations/frames/frame_$(printf %03d $i).png" \
               --camera=3000,3000,2000,0,0,500 \
               --imgsize=1280,720 \
               --projection=p \
