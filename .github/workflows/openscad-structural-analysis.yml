@@ -109,6 +109,122 @@ jobs:
           
           cat structural_report.md
       
+      - name: Create persistent structural analysis log
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          # Create or update the persistent log file
+          echo "# Structural Analysis Test Log" > STRUCTURAL_ANALYSIS_LOG.md
+          echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "This file tracks the history of structural analysis test results." >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "---" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "## Latest Analysis" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "**Commit:** ${{ github.sha }}" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "**Branch:** ${{ github.ref_name }}" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "**Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+          
+          # Extract and format the structural analysis results
+          if grep -q "COMPLETE STRUCTURAL ANALYSIS SUMMARY" structural_analysis.log; then
+            echo "### Results Summary" >> STRUCTURAL_ANALYSIS_LOG.md
+            echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+            echo "\`\`\`" >> STRUCTURAL_ANALYSIS_LOG.md
+            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/========================================/{p;/========================================/q}' structural_analysis.log | tail -n +2 >> STRUCTURAL_ANALYSIS_LOG.md || \
+            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,$p' structural_analysis.log | tail -n +2 | head -n 20 >> STRUCTURAL_ANALYSIS_LOG.md
+            echo "\`\`\`" >> STRUCTURAL_ANALYSIS_LOG.md
+            echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+            
+            # Extract detailed failure information if any tests failed
+            if grep -q "FAIL" structural_analysis.log; then
+              echo "### ⚠️ Failed Components" >> STRUCTURAL_ANALYSIS_LOG.md
+              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+              
+              # Extract rated capacity
+              CAPACITY=$(grep "RATED LIFT CAPACITY:" structural_analysis.log | head -1 | sed 's/ECHO: "RATED LIFT CAPACITY:", //')
+              echo "**Current Rated Capacity:** $CAPACITY" >> STRUCTURAL_ANALYSIS_LOG.md
+              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+              
+              # List each failed component with details
+              echo "#### Detailed Failure Analysis" >> STRUCTURAL_ANALYSIS_LOG.md
+              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+              
+              # Arm Bending
+              if grep -q "Arm Bending.*FAIL" structural_analysis.log; then
+                echo "**1. Arm Bending Stress**" >> STRUCTURAL_ANALYSIS_LOG.md
+                grep -A 5 "=== ARM BENDING STRESS ANALYSIS ===" structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
+                echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+              fi
+              
+              # Arm Deflection
+              if grep -q "Arm Deflection.*FAIL" structural_analysis.log; then
+                echo "**2. Arm Deflection**" >> STRUCTURAL_ANALYSIS_LOG.md
+                grep -A 5 "=== ARM DEFLECTION ANALYSIS ===" structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
+                echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+              fi
+              
+              # Cross Beam
+              if grep -q "Cross Beam.*FAIL" structural_analysis.log; then
+                echo "**3. Cross Beam Bending**" >> STRUCTURAL_ANALYSIS_LOG.md
+                grep -A 5 "=== CROSS BEAM STRESS ANALYSIS ===" structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
+                echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+              fi
+              
+              # Pivot Ring Welds
+              if grep -q "Pivot Ring.*FAIL" structural_analysis.log; then
+                echo "**4. Pivot Ring Welds**" >> STRUCTURAL_ANALYSIS_LOG.md
+                grep -A 5 "=== PIVOT RING WELD ANALYSIS ===" structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
+                echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+              fi
+              
+              echo "### Recommended Actions" >> STRUCTURAL_ANALYSIS_LOG.md
+              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+              echo "See [STRUCTURAL_ANALYSIS.md](STRUCTURAL_ANALYSIS.md) for design modification recommendations." >> STRUCTURAL_ANALYSIS_LOG.md
+              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+            else
+              echo "### ✅ All Tests Passed" >> STRUCTURAL_ANALYSIS_LOG.md
+              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+              echo "All structural analysis checks passed successfully." >> STRUCTURAL_ANALYSIS_LOG.md
+              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+            fi
+          else
+            echo "### Error" >> STRUCTURAL_ANALYSIS_LOG.md
+            echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+            echo "No structural analysis summary found in output. Check the workflow logs for errors." >> STRUCTURAL_ANALYSIS_LOG.md
+            echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+          fi
+          
+          echo "---" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "_This file is automatically updated by the OpenSCAD Structural Analysis workflow._" >> STRUCTURAL_ANALYSIS_LOG.md
+          
+          cat STRUCTURAL_ANALYSIS_LOG.md
+      
+      - name: Commit structural analysis log
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # Add the log file
+          git add STRUCTURAL_ANALYSIS_LOG.md
+          
+          # Check if there are changes
+          if ! git diff --staged --quiet; then
+            git commit -m "Update structural analysis log [skip ci]"
+            git push --force-with-lease origin HEAD || {
+              echo "INFO: git push failed. This is expected on PRs from forks."
+              echo "The log file is available as a workflow artifact."
+            }
+          else
+            echo "No changes to structural analysis log"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
       - name: Upload structural analysis artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -116,6 +232,7 @@ jobs:
           path: |
             LifeTrac-v25/mechanical_design/structural_analysis.log
             LifeTrac-v25/mechanical_design/structural_report.md
+            LifeTrac-v25/mechanical_design/STRUCTURAL_ANALYSIS_LOG.md
           retention-days: 90
       
       - name: Cleanup Xvfb
@@ -163,6 +280,10 @@ jobs:
             ✅ Structural analysis completed!
             
             ${reportContent}
+            
+            ### Persistent Log
+            A detailed log with failure descriptions has been committed to:
+            - \`LifeTrac-v25/mechanical_design/STRUCTURAL_ANALYSIS_LOG.md\`
             
             ### Artifacts
             Download the detailed analysis from the workflow artifacts:
