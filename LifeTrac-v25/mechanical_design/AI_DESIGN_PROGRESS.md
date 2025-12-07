@@ -104,6 +104,189 @@ This document tracks the AI-assisted hardware design process for the LifeTrac v2
    - Create build workshops
    - Document lessons learned
 
+---
+
+### Session 2 - Major Design Refinement (2025-12-07)
+
+This session involved comprehensive geometry fixes, parametric calculations, parts standardization, fastener rendering, and structural engineering analysis.
+
+#### ✅ Geometry Fixes
+
+- **Wheel/Frame Overlap Resolution**
+  - Added `GROUND_CLEARANCE` (150mm) constant
+  - Created `FRAME_Z_OFFSET` to lift frame above ground
+  - Positioned wheels so bottom touches Z=0 (ground plane)
+  - Moved front tires back so front of tire aligns with front of machine body
+
+- **Cylinder Positioning**
+  - Fixed lift cylinder base mounts to attach on side walls between sandwich plates
+  - Repositioned bucket cylinders from arm tops to cross beam attachment
+  - Added `BUCKET_CYL_X_SPACING` to ensure clearance from inner panels
+
+- **Side Wall Orientation**
+  - Corrected triangular side panels to be vertical (YZ plane) not horizontal
+  - Fixed tall end at rear (Y=0) tapering to shorter front (Y=WHEEL_BASE)
+
+- **Arm Positioning**
+  - Created inline hollow square tubing using `difference()` for arms
+  - Positioned arms between inner and outer sandwich plates
+  - Arms pivot at high point on rear of side panels
+
+- **Cross Beam Alignment**
+  - Centered cross beams on X=0 (machine centerline)
+  - Added parametric arc slot cutouts in inner side wall panels for arm clearance
+
+- **Bucket Positioning**
+  - Shifted bucket up so bottom clears ground in all positions
+  - Fixed pivot point at bottom of QA plate with cylinders attaching at top
+  - Added `BOBCAT_QA_HEIGHT` offset for proper positioning
+
+#### ✅ Parametric Calculations
+
+- **Arm Length Calculation**
+  - Used trigonometry to calculate arm length from reach requirements
+  - `ARM_LENGTH = sqrt(ARM_PIVOT_Z² + MIN_HORIZONTAL_REACH²)`
+  - `ARM_GROUND_ANGLE = asin(ARM_PIVOT_Z / ARM_LENGTH)`
+  - Echo statements output calculated values for verification
+
+- **Hydraulic Cylinder Sizing**
+  - `lift_cyl_length(arm_angle)` - calculates cylinder length at any arm position
+  - `bucket_cyl_length(arm_angle, bucket_tilt)` - calculates bucket cylinder length
+  - Automatic stroke calculation with 15% safety margin
+  - Selection of standard stroke sizes (150, 200, 250... 600mm)
+
+- **Cross Beam Cutout Geometry**
+  - `cross_beam_local_pos(beam_dist, angle)` - transforms beam position to panel coords
+  - Trigonometric arc slot cutouts based on arm rotation range
+  - Accounts for `ARM_MIN_ANGLE` to `ARM_MAX_ANGLE` sweep
+
+#### ✅ Parts Standardization
+
+Created `CUSTOM_PARTS_LIST.md` documenting standardized fabricated parts:
+
+- **Type A: U-Channel Lug**
+  - Made from torch-cut square tubing (3"×3" or 4"×4")
+  - Top and bottom removed to create U-shape
+  - Hole drilled through both walls for clevis pin
+  - Used for all cylinder attachments
+
+- **Type B: Large Pivot Ring**
+  - CNC plasma cut from 3/4" plate steel
+  - Used for arm pivot reinforcement
+  - Welded to arm tube at pivot point
+
+- **Type C: Small Pivot Ring**
+  - CNC plasma cut from 1" plate steel
+  - Used for QA plate pivot bosses
+
+- **Round Bar Stock**
+  - 1.5" diameter for main pivots
+  - 1" diameter for clevis pins
+
+#### ✅ Fastener Rendering
+
+Added hex bolt heads and nuts throughout the assembly:
+
+- **New Modules Created**
+  - `hex_nut(bolt_dia)` - renders hex nut with proper sizing
+  - `hex_bolt_head(bolt_dia)` - renders hex bolt head
+  - `hex_bolt_assembly(bolt_dia, length, show_nut)` - complete bolt with nut
+  - `clevis_pin(pin_dia, length)` - clevis pin with cotter pin holes
+  - `u_channel_lug_with_pin()` - U-channel with clevis pin installed
+
+- **Fasteners Added At**
+  - Arm pivot pins (1.5" with hex nuts both ends)
+  - Bucket pivot pin (1.5" with hex nuts both ends)
+  - All hydraulic cylinder clevis connections
+  - Cylinder mounting lugs (clevis pins with cotter pins)
+  - Cross beam cylinder brackets
+  - QA plate cylinder attachments
+  - Standing deck mounting bolts (3/4" hex bolts)
+
+#### ✅ Lifting Capacity Calculations
+
+- **Hydraulic Force**
+  - Operating pressure: 3000 PSI
+  - Lift cylinder bore: 63.5mm (2.5")
+  - Calculates force per cylinder and total force
+
+- **Lever Arm Geometry Functions**
+  - `lift_cyl_moment_arm(arm_angle)` - perpendicular distance from pivot to cylinder force line
+  - `load_moment_arm(arm_angle)` - horizontal distance from pivot to bucket load
+  - `lift_capacity_kg(arm_angle)` - lifting capacity at any arm position
+
+- **Capacity Analysis**
+  - Calculates capacity at ground, horizontal, 45°, and max positions
+  - Rated capacity = minimum across all positions (conservative)
+  - Outputs mechanical advantage ratios
+
+#### ✅ Structural Analysis (Mechanics of Deformable Bodies)
+
+- **Material Properties Defined**
+  - A36 Steel: 250 MPa yield, 200 GPa modulus
+  - Grade 8 Bolts: 130 ksi yield, 90 ksi shear
+  - Safety factors: 2.0 static, 3.0 fatigue, 2.5 bolts
+
+- **Arm Bending Stress Analysis**
+  - Moment of inertia for hollow square tube: `I = (b⁴ - b_inner⁴) / 12`
+  - Section modulus: `S = I / c`
+  - Bending stress: `σ = M / S`
+  - Compares to allowable stress with safety factor
+
+- **Arm Deflection Analysis**
+  - Cantilever tip deflection: `δ = PL³ / (3EI)`
+  - Allowable deflection: L/180
+
+- **Pivot Pin Shear Analysis**
+  - Double shear: `τ = F / (2A)`
+  - Compares to allowable shear (0.6 × yield)
+
+- **Bearing Stress Analysis**
+  - Bearing stress on pin holes: `σ = F / (d × t × 2)`
+  - Allowable bearing: 1.5 × yield
+
+- **Clevis Pin Analysis**
+  - Grade 8 bolt shear strength
+  - Double shear at cylinder attachments
+
+- **Cross Beam Stress Analysis**
+  - Point load bending: `M = FL/4`
+  - 2"×2"×1/4" tube section properties
+
+- **Weld Stress Analysis**
+  - Pivot ring welds (fillet around tube perimeter)
+  - Cross beam welds (shear loading)
+  - E70XX electrode allowable: 145 MPa / SF
+
+- **Results Summary Output**
+  - Table with stress ratios for all components
+  - Pass/fail status for each check
+  - Overall structural assessment
+
+#### 📄 Documentation Created
+
+- `STRUCTURAL_ANALYSIS.md` - Comprehensive explanation of all engineering calculations with formulas and design modification recommendations
+
+#### 🔧 Technical Improvements
+
+- All calculations output to console via `echo()` statements
+- Parametric design allows easy scaling and optimization
+- Stress ratios indicate how close to limits (< 1.0 = safe)
+- Design modifications suggested if any check fails
+
+#### 📋 Key Constants Added
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `GROUND_CLEARANCE` | 150mm | Frame bottom above ground |
+| `FRAME_Z_OFFSET` | 150mm | Vertical offset for frame |
+| `ARM_GROUND_ANGLE` | Calculated | Angle to reach ground |
+| `HYDRAULIC_PRESSURE_PSI` | 3000 | Operating pressure |
+| `STEEL_YIELD_STRENGTH_MPA` | 250 | A36 steel yield |
+| `SAFETY_FACTOR_STATIC` | 2.0 | Static load SF |
+
+---
+
 ## Design Decisions
 
 ### Material Choices
@@ -179,7 +362,7 @@ The design successfully meets all requirements specified in the original issue:
 ✅ Complete part numbering and descriptions  
 ✅ AI progress tracking document
 
-**Ready for:** Prototype fabrication and testing
+**Ready for:** Prototype fabrication and testing, with engineering calculations to verify structural adequacy
 
 ---
-Last Updated: 2025-12-06
+Last Updated: 2025-12-07
