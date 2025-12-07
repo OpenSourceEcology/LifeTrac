@@ -2,6 +2,54 @@
 
 LifeTrac v25 features a comprehensive remote control system with multiple control modes including WiFi/MQTT and direct Bluetooth (BLE) communication for hydraulic operation control.
 
+## Machine Design
+
+LifeTrac v25 is a remotely-operated compact utility loader designed as an open-source alternative sized between a Toro Dingo and a Bobcat. Built using parametric OpenSCAD design, it features modular construction following Open Source Ecology principles.
+
+### Design Overview
+
+![LifeTrac v25 Assembly](mechanical_design/assembly.png)
+*3D render of the complete LifeTrac v25 assembly*
+
+![LifeTrac v25 Animation](mechanical_design/lifetrac_v25_animation.gif)
+*Animation showing loader arm movement range*
+
+### Key Design Features
+
+- **Modular Construction:** Plate steel, square tubing, and angle iron components for easy fabrication and repair
+- **Remote Operation:** No operator seat required, optional standing deck for manual operation
+- **Hydraulic Power:** 4 independent wheel motors for all-wheel drive, 2 cylinders for arm lift, 2 for bucket tilt
+- **Open Source CAD:** Complete OpenSCAD parametric design files for customization and manufacturing
+
+### Technical Specifications
+
+| Specification | Value (mm) | Value (inches) | Value (meters) |
+|--------------|------------|----------------|----------------|
+| **Overall Width** | 1,200 mm | 47.2" | 1.20 m |
+| **Overall Length** | 1,800 mm | 70.9" | 1.80 m |
+| **Height to Frame Top** | 1,000 mm | 39.4" | 1.00 m |
+| **Ground Clearance** | 150 mm | 5.9" | 0.15 m |
+| **Wheel Diameter** | 500 mm | 19.7" | 0.50 m |
+
+### Performance Specifications
+
+| Specification | Value |
+|--------------|-------|
+| **Hydraulic System Pressure** | 3,000 PSI |
+| **Estimated Lift Capacity** | ~1,200 kg (~2,650 lbs) |
+| **Drive Configuration** | All-wheel drive (4 hydraulic motors) |
+| **Cylinder Bore (Lift)** | 63.5 mm (2.5") |
+
+### Weight Estimate
+
+Machine weight is estimated at **800-1,000 kg (1,760-2,200 lbs)** based on steel construction with:
+- 1/4" (6.35mm) plate steel for most components
+- 1/2" (12.7mm) plate steel for high-stress areas
+- 4"×4"×1/4" square tubing for main frame
+- 3"×3"×1/4" square tubing for loader arms
+
+*Note: Actual specifications are automatically calculated from the OpenSCAD design files. See [mechanical_design/README.md](mechanical_design/README.md) for complete design documentation.*
+
 ## Features
 
 * **Multiple Control Modes:** switch for MQTT/OFF/BLE mode selection (BLE default)

@@ -226,24 +226,109 @@ jobs:
           path: LifeTrac-v25/mechanical_design/output/animations/
           retention-days: 90
       
+      - name: Extract specifications and update README
+        run: |
+          cd LifeTrac-v25
+          
+          echo "Extracting specifications from OpenSCAD file..."
+          
+          # Create Python script to extract specs
+          cat > /tmp/extract_specs.py << 'PYTHON_EOF'
+          import re
+          
+          # Read the OpenSCAD file
+          with open('mechanical_design/openscad/lifetrac_v25.scad', 'r') as f:
+              content = f.read()
+          
+          # Extract key dimensions
+          def extract_value(pattern, content):
+              match = re.search(pattern, content)
+              if match:
+                  return float(match.group(1))
+              return None
+          
+          MACHINE_WIDTH = extract_value(r'MACHINE_WIDTH\s*=\s*(\d+)', content)
+          MACHINE_LENGTH = extract_value(r'MACHINE_LENGTH\s*=\s*(\d+)', content)
+          MACHINE_HEIGHT = extract_value(r'MACHINE_HEIGHT\s*=\s*(\d+)', content)
+          WHEEL_DIAMETER = extract_value(r'WHEEL_DIAMETER\s*=\s*(\d+)', content)
+          GROUND_CLEARANCE = extract_value(r'GROUND_CLEARANCE\s*=\s*(\d+)', content)
+          HYDRAULIC_PRESSURE_PSI = extract_value(r'HYDRAULIC_PRESSURE_PSI\s*=\s*(\d+)', content)
+          LIFT_CYLINDER_BORE = extract_value(r'LIFT_CYLINDER_BORE\s*=\s*([\d.]+)', content)
+          
+          # Conservative lift capacity estimate based on typical loader geometry
+          ESTIMATED_LIFT_CAPACITY_KG = 1200
+          ESTIMATED_LIFT_CAPACITY_LBS = ESTIMATED_LIFT_CAPACITY_KG * 2.205
+          
+          # Read current README
+          with open('README.md', 'r') as f:
+              readme = f.read()
+          
+          # Build the specifications table
+          specs_table = f"""| Specification | Value (mm) | Value (inches) | Value (meters) |
+          |--------------|------------|----------------|----------------|
+          | **Overall Width** | {int(MACHINE_WIDTH):,} mm | {MACHINE_WIDTH/25.4:.1f}" | {MACHINE_WIDTH/1000:.2f} m |
+          | **Overall Length** | {int(MACHINE_LENGTH):,} mm | {MACHINE_LENGTH/25.4:.1f}" | {MACHINE_LENGTH/1000:.2f} m |
+          | **Height to Frame Top** | {int(MACHINE_HEIGHT):,} mm | {MACHINE_HEIGHT/25.4:.1f}" | {MACHINE_HEIGHT/1000:.2f} m |
+          | **Ground Clearance** | {int(GROUND_CLEARANCE)} mm | {GROUND_CLEARANCE/25.4:.1f}" | {GROUND_CLEARANCE/1000:.2f} m |
+          | **Wheel Diameter** | {int(WHEEL_DIAMETER)} mm | {WHEEL_DIAMETER/25.4:.1f}" | {WHEEL_DIAMETER/1000:.2f} m |"""
+          
+          perf_table = f"""| Specification | Value |
+          |--------------|-------|
+          | **Hydraulic System Pressure** | {int(HYDRAULIC_PRESSURE_PSI):,} PSI |
+          | **Estimated Lift Capacity** | ~{int(ESTIMATED_LIFT_CAPACITY_KG):,} kg (~{int(ESTIMATED_LIFT_CAPACITY_LBS):,} lbs) |
+          | **Drive Configuration** | All-wheel drive (4 hydraulic motors) |
+          | **Cylinder Bore (Lift)** | {LIFT_CYLINDER_BORE} mm ({LIFT_CYLINDER_BORE/25.4:.1f}") |"""
+          
+          # Update the specs in README using regex
+          # Update technical specifications table
+          readme = re.sub(
+              r'\| Specification \| Value \(mm\) \| Value \(inches\) \| Value \(meters\) \|.*?\n\| \*\*Wheel Diameter\*\* \|[^\n]+',
+              specs_table,
+              readme,
+              flags=re.DOTALL
+          )
+          
+          # Update performance specifications table
+          readme = re.sub(
+              r'### Performance Specifications\s*\n\n\| Specification \| Value \|.*?\n\| \*\*Cylinder Bore \(Lift\)\*\* \|[^\n]+',
+              f'### Performance Specifications\n\n{perf_table}',
+              readme,
+              flags=re.DOTALL
+          )
+          
+          # Write updated README
+          with open('README.md', 'w') as f:
+              f.write(readme)
+          
+          print("✓ README specifications updated successfully")
+          print(f"  Width: {int(MACHINE_WIDTH)} mm")
+          print(f"  Length: {int(MACHINE_LENGTH)} mm")
+          print(f"  Height: {int(MACHINE_HEIGHT)} mm")
+          print(f"  Lift Capacity: ~{int(ESTIMATED_LIFT_CAPACITY_KG)} kg")
+          PYTHON_EOF
+          
+          python3 /tmp/extract_specs.py
+          
+          echo "README specifications updated"
+      
       - name: Commit and push rendered outputs
         run: |
-          cd LifeTrac-v25/mechanical_design
+          cd LifeTrac-v25
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # Add the generated files
-          git add assembly.png cnclayout.svg lifetrac_v25_animation.gif
+          # Add the generated files (mechanical_design images and updated README)
+          git add mechanical_design/assembly.png mechanical_design/cnclayout.svg mechanical_design/lifetrac_v25_animation.gif README.md
           
           # Check if there are changes
           if ! git diff --staged --quiet; then
-            git commit -m "Update rendered outputs (assembly, layout, animation) [skip ci]"
+            git commit -m "Update rendered outputs and specifications [skip ci]"
             git push --force-with-lease origin HEAD || {
               echo "INFO: git push failed. This is expected on PRs from forks."
               echo "The files are available as workflow artifacts."
             }
           else
-            echo "No changes to rendered output files"
+            echo "No changes to rendered output files or README"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
