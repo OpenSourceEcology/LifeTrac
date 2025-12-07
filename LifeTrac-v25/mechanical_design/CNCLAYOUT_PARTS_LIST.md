@@ -83,10 +83,11 @@ Note: These four panels form a sandwich structure with 100mm spacing. The loader
 - All parts designed for CNC plasma cutting
 - Rounded corners reduce stress concentrations
 
-## Fixed Issues
-The original cnclayout.svg was only rendering text labels and missing all part geometries. This was fixed by:
-1. Converting 3D projection() calls to direct 2D geometry
-2. Ensuring all shapes are rendered at the same 2D level as text
-3. Regenerating the SVG file with OpenSCAD
+## Code Improvements
+The cnclayout.scad source file was updated to improve code quality and maintainability:
+1. Simplified geometry generation by replacing 3D projection() calls with direct 2D geometry (offset + square)
+2. Improved code clarity - easier to understand and modify
+3. Slightly more precise corner calculations
+4. Regenerated the SVG file with the improved code
 
-All 23 parts are now correctly rendered in the SVG file.
+All 23 parts were already present and are correctly rendered in the SVG file.
