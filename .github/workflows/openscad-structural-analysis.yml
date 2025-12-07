@@ -1,0 +1,177 @@
+name: OpenSCAD Structural Analysis
+
+on:
+  push:
+    paths:
+      - 'LifeTrac-v25/mechanical_design/**/*.scad'
+      - '.github/workflows/openscad-structural-analysis.yml'
+  pull_request:
+    paths:
+      - 'LifeTrac-v25/mechanical_design/**/*.scad'
+  workflow_dispatch:
+
+jobs:
+  structural-analysis:
+    runs-on: ubuntu-latest
+    name: Validate Structural Design
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install OpenSCAD
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openscad xvfb
+          openscad --version
+      
+      - name: Start Xvfb
+        run: |
+          Xvfb :99 -screen 0 1024x768x16 &
+          XVFB_PID=$!
+          echo "XVFB_PID=$XVFB_PID" >> $GITHUB_ENV
+          
+          # Wait for Xvfb to be ready (max 10 seconds)
+          for i in {1..10}; do
+            if xdpyinfo -display :99 >/dev/null 2>&1; then
+              echo "Xvfb is ready on display :99"
+              break
+            fi
+            if [ $i -eq 10 ]; then
+              echo "Timeout waiting for Xvfb to start"
+              exit 1
+            fi
+            sleep 1
+          done
+          
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+      
+      - name: Validate OpenSCAD syntax
+        run: |
+          echo "Validating OpenSCAD files..."
+          cd LifeTrac-v25/mechanical_design
+          
+          # Check main design file
+          openscad -o /dev/null --export-format echo openscad/lifetrac_v25.scad
+          if [ $? -eq 0 ]; then
+            echo "✓ Main design file is valid"
+          else
+            echo "✗ Main design file has errors"
+            exit 1
+          fi
+          
+          # Check module files
+          for module in modules/*.scad; do
+            echo "Checking $module..."
+            openscad -o /dev/null --export-format echo "$module"
+            if [ $? -eq 0 ]; then
+              echo "✓ $module is valid"
+            else
+              echo "✗ $module has errors"
+              exit 1
+            fi
+          done
+      
+      - name: Run structural analysis
+        run: |
+          echo "Running structural analysis on main design..."
+          cd LifeTrac-v25/mechanical_design
+          
+          # Run OpenSCAD with echo output to capture structural analysis
+          openscad -o /dev/null --export-format echo openscad/lifetrac_v25.scad 2>&1 | tee structural_analysis.log
+          
+          echo "Structural analysis complete. Check logs for results."
+      
+      - name: Generate structural analysis report
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          # Extract key metrics from the log
+          echo "# Structural Analysis Report" > structural_report.md
+          echo "" >> structural_report.md
+          echo "**Generated:** $(date)" >> structural_report.md
+          echo "**Commit:** ${{ github.sha }}" >> structural_report.md
+          echo "**Branch:** ${{ github.ref_name }}" >> structural_report.md
+          echo "" >> structural_report.md
+          
+          # Extract structural summary if present
+          if grep -q "COMPLETE STRUCTURAL ANALYSIS SUMMARY" structural_analysis.log; then
+            echo "## Structural Analysis Results" >> structural_report.md
+            echo "" >> structural_report.md
+            echo "\`\`\`" >> structural_report.md
+            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/========================================/p' structural_analysis.log | tail -n +2 >> structural_report.md
+            echo "\`\`\`" >> structural_report.md
+          else
+            echo "No structural analysis summary found in output." >> structural_report.md
+          fi
+          
+          cat structural_report.md
+      
+      - name: Upload structural analysis artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: structural-analysis
+          path: |
+            LifeTrac-v25/mechanical_design/structural_analysis.log
+            LifeTrac-v25/mechanical_design/structural_report.md
+          retention-days: 90
+      
+      - name: Cleanup Xvfb
+        if: always()
+        run: |
+          if [ -n "$XVFB_PID" ]; then
+            echo "Stopping Xvfb process (PID: $XVFB_PID)"
+            # Try graceful shutdown first
+            kill -TERM $XVFB_PID 2>/dev/null || true
+            # Wait up to 5 seconds for process to terminate
+            for i in {1..5}; do
+              if ! kill -0 $XVFB_PID 2>/dev/null; then
+                echo "Xvfb stopped gracefully"
+                exit 0
+              fi
+              sleep 1
+            done
+            # Force kill if still running
+            kill -KILL $XVFB_PID 2>/dev/null || true
+            echo "Xvfb force stopped"
+          fi
+      
+      - name: Comment on PR with structural analysis
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Read the structural report
+            let reportContent = 'Structural analysis completed. Check artifacts for detailed results.';
+            try {
+              const report = fs.readFileSync('LifeTrac-v25/mechanical_design/structural_report.md', 'utf8');
+              // Extract just the results section
+              const match = report.match(/## Structural Analysis Results[\s\S]*$/);
+              if (match) {
+                reportContent = match[0];
+              }
+            } catch (err) {
+              console.log('Could not read structural report:', err);
+            }
+            
+            const comment = `## OpenSCAD Structural Analysis Results 🔧
+            
+            ✅ Structural analysis completed!
+            
+            ${reportContent}
+            
+            ### Artifacts
+            Download the detailed analysis from the workflow artifacts:
+            - \`structural-analysis\` - Complete logs and report
+            
+            **Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
