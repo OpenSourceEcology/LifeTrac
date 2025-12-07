@@ -25,10 +25,12 @@ row_height = 0;
 
 module layout_part(width, height, thickness, label, x, y) {
     translate([x, y, 0]) {
-        projection(cut=false) {
-            color(thickness == PLATE_1_4 ? COLOR_1_4 : COLOR_1_2)
-            plate_steel(width, height, thickness, 6.35);
-        }
+        // Create the actual part shape as 2D geometry
+        color(thickness == PLATE_1_4 ? COLOR_1_4 : COLOR_1_2)
+        offset(r=6.35)
+        offset(r=-6.35)
+        square([width, height]);
+        
         // Part label
         translate([5, 5, 0])
         text(label, size=8, font="Liberation Sans:style=Bold");
