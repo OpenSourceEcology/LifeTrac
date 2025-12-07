@@ -48,7 +48,7 @@ Machine weight is estimated at **800-1,000 kg (1,760-2,200 lbs)** based on steel
 - 4"×4"×1/4" square tubing for main frame
 - 3"×3"×1/4" square tubing for loader arms
 
-*Note: Actual specifications are automatically calculated from the OpenSCAD design files. See [mechanical_design/README.md](mechanical_design/README.md) for complete design documentation.*
+*Note: Weight estimate is a manual calculation based on material specifications. Dimensional specifications in the tables above are automatically extracted from the OpenSCAD design files and updated when the design changes. See [mechanical_design/README.md](mechanical_design/README.md) for complete design documentation.*
 
 ## Features
 

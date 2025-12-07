@@ -279,10 +279,18 @@ jobs:
           missing_values = [k for k, v in required_values.items() if v is None]
           if missing_values:
               print(f"ERROR: Missing required values: {', '.join(missing_values)}", file=sys.stderr)
+              print("The following patterns failed to match:", file=sys.stderr)
+              for val in missing_values:
+                  print(f"  - {val}", file=sys.stderr)
               print("Skipping README update to avoid breaking existing content", file=sys.stderr)
+              print("If OpenSCAD file structure changed, update the regex patterns in this workflow", file=sys.stderr)
               sys.exit(0)  # Exit gracefully without updating
           
           # Conservative lift capacity estimate based on typical loader geometry
+          # NOTE: This is a simplified estimate. The actual lift capacity calculation in the 
+          # OpenSCAD file uses complex lever arm geometry and moment calculations which would
+          # require additional extraction logic. For now, we use a conservative estimate.
+          # If design changes significantly, this value should be reviewed and updated.
           ESTIMATED_LIFT_CAPACITY_KG = 1200
           ESTIMATED_LIFT_CAPACITY_LBS = ESTIMATED_LIFT_CAPACITY_KG * 2.205
           
