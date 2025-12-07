@@ -62,86 +62,148 @@ BUCKET_TILT_ANGLE = animation_time * 90;  // 0-90 degrees
 LIFT_CYLINDER_STROKE = 400;
 BUCKET_CYLINDER_STROKE = 300;
 
+// Sandwich spacing - distance between paired triangular plates
+SANDWICH_SPACING = 100;  // ~4 inches (101.6mm)
+
 /**
- * Part A1 - Triangular Side Panel (Left)
- * Plate steel triangular side panel that sandwiches arm joints
- * Connects to: Right side panel (A1-R), back plate (A3), wheel assemblies (B1, B3), arm pivots (C1)
+ * Part A1-L-Outer - Left Outer Triangular Side Panel
+ * Outer left plate of the sandwich structure
+ * Connects to: A1-L-Inner, wheel assemblies (B1, B3), back crossmember
  */
-module side_panel_left() {
+module side_panel_left_outer() {
     color("DarkSlateGray")
-    translate([-TRACK_WIDTH/2 - PLATE_1_2_INCH/2, 0, 0])
-    rotate([0, 90, 0])
+    translate([-TRACK_WIDTH/2 - SANDWICH_SPACING/2, 0, 0])
+    rotate([90, 0, 90])
     linear_extrude(height=PLATE_1_2_INCH)
     offset(r=6.35)  // Rounded corners
     offset(r=-6.35)
     polygon([
-        [0, 0],                          // Bottom rear (wheel position)
-        [0, MACHINE_LENGTH/2],           // Bottom front (wheel position)
-        [MACHINE_HEIGHT, MACHINE_LENGTH/2], // Top front (arm pivot)
-        [MACHINE_HEIGHT*0.7, 0]          // Top rear
+        [0, 0],                              // Rear bottom (rear wheel)
+        [WHEEL_BASE, 0],                     // Front bottom (front wheel)
+        [WHEEL_BASE, MACHINE_HEIGHT],        // Front top (arm pivot)
+        [0, MACHINE_HEIGHT*0.6]              // Rear top
     ]);
 }
 
 /**
- * Part A2 - Triangular Side Panel (Right)
- * Plate steel triangular side panel that sandwiches arm joints
- * Connects to: Left side panel (A1-L), back plate (A3), wheel assemblies (B2, B4), arm pivots (C1)
+ * Part A1-L-Inner - Left Inner Triangular Side Panel  
+ * Inner left plate of the sandwich structure, sandwiches arm pivot
+ * Connects to: A1-L-Outer, A1-R-Inner, arm pivots (C1)
  */
-module side_panel_right() {
+module side_panel_left_inner() {
     color("DarkSlateGray")
-    translate([TRACK_WIDTH/2 + PLATE_1_2_INCH/2, 0, 0])
-    rotate([0, -90, 0])
+    translate([-SANDWICH_SPACING/2, 0, 0])
+    rotate([90, 0, 90])
     linear_extrude(height=PLATE_1_2_INCH)
     offset(r=6.35)  // Rounded corners
     offset(r=-6.35)
     polygon([
-        [0, 0],                          // Bottom rear (wheel position)
-        [0, MACHINE_LENGTH/2],           // Bottom front (wheel position)
-        [MACHINE_HEIGHT, MACHINE_LENGTH/2], // Top front (arm pivot)
-        [MACHINE_HEIGHT*0.7, 0]          // Top rear
+        [0, 0],                              // Rear bottom (rear wheel)
+        [WHEEL_BASE, 0],                     // Front bottom (front wheel)
+        [WHEEL_BASE, MACHINE_HEIGHT],        // Front top (arm pivot)
+        [0, MACHINE_HEIGHT*0.6]              // Rear top
     ]);
 }
 
 /**
- * Part A3 - Back Connecting Plate
- * Plate steel connecting the two side panels at the rear
- * Connects to: Left side panel (A1-L), right side panel (A1-R), standing deck (F1)
+ * Part A1-R-Inner - Right Inner Triangular Side Panel
+ * Inner right plate of the sandwich structure, sandwiches arm pivot
+ * Connects to: A1-R-Outer, A1-L-Inner, arm pivots (C1)
  */
-module back_plate() {
-    back_plate_height = MACHINE_HEIGHT * 0.7;
+module side_panel_right_inner() {
+    color("DarkSlateGray")
+    translate([SANDWICH_SPACING/2, 0, 0])
+    rotate([90, 0, -90])
+    linear_extrude(height=PLATE_1_2_INCH)
+    offset(r=6.35)  // Rounded corners
+    offset(r=-6.35)
+    polygon([
+        [0, 0],                              // Rear bottom (rear wheel)
+        [WHEEL_BASE, 0],                     // Front bottom (front wheel)
+        [WHEEL_BASE, MACHINE_HEIGHT],        // Front top (arm pivot)
+        [0, MACHINE_HEIGHT*0.6]              // Rear top
+    ]);
+}
+
+/**
+ * Part A1-R-Outer - Right Outer Triangular Side Panel
+ * Outer right plate of the sandwich structure
+ * Connects to: A1-R-Inner, wheel assemblies (B2, B4), back crossmember
+ */
+module side_panel_right_outer() {
+    color("DarkSlateGray")
+    translate([TRACK_WIDTH/2 + SANDWICH_SPACING/2, 0, 0])
+    rotate([90, 0, -90])
+    linear_extrude(height=PLATE_1_2_INCH)
+    offset(r=6.35)  // Rounded corners
+    offset(r=-6.35)
+    polygon([
+        [0, 0],                              // Rear bottom (rear wheel)
+        [WHEEL_BASE, 0],                     // Front bottom (front wheel)
+        [WHEEL_BASE, MACHINE_HEIGHT],        // Front top (arm pivot)
+        [0, MACHINE_HEIGHT*0.6]              // Rear top
+    ]);
+}
+
+/**
+ * Part A2 - Rear Crossmember
+ * Connects the four triangular panels at the rear
+ * Connects to: All four side panels, standing deck (F1)
+ */
+module rear_crossmember() {
+    back_plate_height = MACHINE_HEIGHT * 0.6;
     
     color("DarkSlateGray")
-    translate([0, -MACHINE_LENGTH/2, back_plate_height/2])
+    translate([0, 0, back_plate_height/2])
     rotate([90, 0, 0])
     linear_extrude(height=PLATE_1_4_INCH)
     offset(r=6.35)  // Rounded corners
     offset(r=-6.35)
-    square([TRACK_WIDTH + PLATE_1_2_INCH, back_plate_height], center=true);
+    square([TRACK_WIDTH + SANDWICH_SPACING + PLATE_1_2_INCH, back_plate_height], center=true);
+}
+
+/**
+ * Part A3 - Front Crossmember  
+ * Connects the four triangular panels at the front, supports arm pivot
+ * Connects to: All four side panels, arm pivots (C1)
+ */
+module front_crossmember() {
+    color("DarkSlateGray")
+    translate([0, WHEEL_BASE, MACHINE_HEIGHT - PLATE_1_4_INCH/2])
+    rotate([0, 90, 0])
+    linear_extrude(height=PLATE_1_4_INCH)
+    offset(r=6.35)  // Rounded corners
+    offset(r=-6.35)
+    square([PLATE_1_4_INCH*2, TRACK_WIDTH + SANDWICH_SPACING + PLATE_1_2_INCH], center=true);
 }
 
 /**
  * Base Frame Assembly - calls all frame components
  */
 module base_frame() {
-    side_panel_left();
-    side_panel_right();
-    back_plate();
+    side_panel_left_outer();
+    side_panel_left_inner();
+    side_panel_right_inner();
+    side_panel_right_outer();
+    rear_crossmember();
+    front_crossmember();
 }
 
 /**
  * Part A4 - Wheel Mounting Brackets
  * Mounting brackets welded to base of triangular side panels
- * Connects to: Side panels (A1-L, A1-R), wheel assemblies (B1-B4)
+ * Connects to: Side panels, wheel assemblies (B1-B4)
  */
 module wheel_mounting_plates() {
     plate_size = 250;
     
     // Wheels positioned along the base of the triangular panels
+    // Front wheels at front of wheelbase, rear wheels at rear (Y=0)
     positions = [
-        [-TRACK_WIDTH/2, MACHINE_LENGTH/2 - 100],   // Front left
-        [TRACK_WIDTH/2, MACHINE_LENGTH/2 - 100],    // Front right
-        [-TRACK_WIDTH/2, 0],                        // Rear left
-        [TRACK_WIDTH/2, 0]                          // Rear right
+        [-TRACK_WIDTH/2, WHEEL_BASE],   // Front left
+        [TRACK_WIDTH/2, WHEEL_BASE],    // Front right
+        [-TRACK_WIDTH/2, 0],            // Rear left
+        [TRACK_WIDTH/2, 0]              // Rear right
     ];
     
     for (pos = positions) {
@@ -158,12 +220,12 @@ module wheel_mounting_plates() {
  */
 module wheel_assemblies() {
     if (show_wheels) {
-        // Wheels at base of triangular panels
+        // Wheels at base of triangular panels - front at wheelbase, rear at origin
         positions = [
-            [-TRACK_WIDTH/2 - explode_distance, MACHINE_LENGTH/2 - 100 + explode_distance, 0],   // Front left
-            [TRACK_WIDTH/2 + explode_distance, MACHINE_LENGTH/2 - 100 + explode_distance, 0],    // Front right
-            [-TRACK_WIDTH/2 - explode_distance, 0 - explode_distance, 0],                        // Rear left
-            [TRACK_WIDTH/2 + explode_distance, 0 + explode_distance, 0]                          // Rear right
+            [-TRACK_WIDTH/2 - explode_distance, WHEEL_BASE + explode_distance, 0],   // Front left
+            [TRACK_WIDTH/2 + explode_distance, WHEEL_BASE + explode_distance, 0],    // Front right
+            [-TRACK_WIDTH/2 - explode_distance, 0 - explode_distance, 0],            // Rear left
+            [TRACK_WIDTH/2 + explode_distance, 0 + explode_distance, 0]              // Rear right
         ];
         
         for (i = [0:3]) {
@@ -196,7 +258,8 @@ module loader_arms() {
         arm_width = 150;
         
         color("Orange")
-        translate([0, MACHINE_LENGTH/2, MACHINE_HEIGHT])
+        // Arms pivot at front of wheelbase, at top of triangular panels
+        translate([0, WHEEL_BASE, MACHINE_HEIGHT])
         rotate([ARM_LIFT_ANGLE, 0, 0])
         {
             // Left arm
