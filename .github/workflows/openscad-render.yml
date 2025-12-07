@@ -282,7 +282,19 @@ jobs:
         run: |
           if [ -n "$XVFB_PID" ]; then
             echo "Stopping Xvfb process (PID: $XVFB_PID)"
-            kill $XVFB_PID || true
+            # Try graceful shutdown first
+            kill -TERM $XVFB_PID 2>/dev/null || true
+            # Wait up to 5 seconds for process to terminate
+            for i in {1..5}; do
+              if ! kill -0 $XVFB_PID 2>/dev/null; then
+                echo "Xvfb stopped gracefully"
+                exit 0
+              fi
+              sleep 1
+            done
+            # Force kill if still running
+            kill -KILL $XVFB_PID 2>/dev/null || true
+            echo "Xvfb force stopped"
           fi
       
       - name: Comment on PR with results
