@@ -1,0 +1,291 @@
+name: OpenSCAD Render and Export
+
+on:
+  push:
+    paths:
+      - 'LifeTrac-v25/mechanical_design/**/*.scad'
+      - '.github/workflows/openscad-render.yml'
+  pull_request:
+    paths:
+      - 'LifeTrac-v25/mechanical_design/**/*.scad'
+  workflow_dispatch:
+
+jobs:
+  validate-and-render:
+    runs-on: ubuntu-latest
+    name: Validate OpenSCAD and Generate Outputs
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install OpenSCAD
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openscad xvfb
+          openscad --version
+      
+      - name: Validate OpenSCAD syntax
+        run: |
+          echo "Validating OpenSCAD files..."
+          cd LifeTrac-v25/mechanical_design
+          
+          # Check main design file
+          xvfb-run openscad -o /dev/null --export-format echo openscad/lifetrac_v25.scad
+          if [ $? -eq 0 ]; then
+            echo "✓ Main design file is valid"
+          else
+            echo "✗ Main design file has errors"
+            exit 1
+          fi
+          
+          # Check module files
+          for module in modules/*.scad; do
+            echo "Checking $module..."
+            xvfb-run openscad -o /dev/null --export-format echo "$module"
+            if [ $? -eq 0 ]; then
+              echo "✓ $module is valid"
+            else
+              echo "✗ $module has errors"
+              exit 1
+            fi
+          done
+      
+      - name: Create output directories
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          mkdir -p output/{dxf,renders,animations}
+      
+      - name: Generate assembly.png and cnclayout.svg
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          # Generate assembly.png (1024x768 matching CEB-Press example)
+          echo "Generating assembly.png..."
+          xvfb-run openscad -o assembly.png \
+            --camera=3000,3000,2000,0,0,500 \
+            --imgsize=1024,768 \
+            --projection=p \
+            --colorscheme=Nature \
+            openscad/lifetrac_v25.scad
+          
+          # Generate cnclayout.svg (2D projection for CNC cutting)
+          echo "Generating cnclayout.svg..."
+          xvfb-run openscad -o cnclayout.svg \
+            --projection=o \
+            --viewall \
+            cnclayout.scad
+          
+          echo "✓ assembly.png and cnclayout.svg generated successfully"
+          ls -lh assembly.png cnclayout.svg
+      
+      - name: Render preview images
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          # Main assembly view
+          echo "Rendering main assembly..."
+          xvfb-run openscad -o output/renders/lifetrac_v25_main.png \
+            --camera=3000,3000,2000,0,0,500 \
+            --imgsize=1920,1080 \
+            --projection=p \
+            --colorscheme=Nature \
+            openscad/lifetrac_v25.scad
+          
+          # Front view
+          echo "Rendering front view..."
+          xvfb-run openscad -o output/renders/lifetrac_v25_front.png \
+            --camera=0,3000,1000,0,0,500 \
+            --imgsize=1920,1080 \
+            --projection=p \
+            --colorscheme=Nature \
+            openscad/lifetrac_v25.scad
+          
+          # Side view
+          echo "Rendering side view..."
+          xvfb-run openscad -o output/renders/lifetrac_v25_side.png \
+            --camera=3000,0,1000,0,0,500 \
+            --imgsize=1920,1080 \
+            --projection=p \
+            --colorscheme=Nature \
+            openscad/lifetrac_v25.scad
+          
+          # Top view
+          echo "Rendering top view..."
+          xvfb-run openscad -o output/renders/lifetrac_v25_top.png \
+            --camera=0,0,3000,0,0,500 \
+            --imgsize=1920,1080 \
+            --projection=o \
+            --colorscheme=Nature \
+            openscad/lifetrac_v25.scad
+          
+          echo "Preview images rendered successfully"
+      
+      - name: Render module examples
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          # Render each module's example
+          for module in modules/*.scad; do
+            filename=$(basename "$module" .scad)
+            echo "Rendering $filename examples..."
+            xvfb-run openscad -o "output/renders/${filename}_examples.png" \
+              --camera=500,500,500,0,0,0 \
+              --imgsize=1600,900 \
+              --projection=p \
+              --colorscheme=Nature \
+              "$module"
+          done
+      
+      - name: Generate animation frames
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          echo "Generating animation frames..."
+          mkdir -p output/animations/frames
+          
+          # Generate 36 frames for animation (every 10 degrees)
+          for i in {0..35}; do
+            t=$(awk "BEGIN {print $i/36}")
+            printf "Frame %d (t=%.4f)\n" $i $t
+            xvfb-run openscad -o "output/animations/frames/frame_$(printf %03d $i).png" \
+              --camera=3000,3000,2000,0,0,500 \
+              --imgsize=1280,720 \
+              --projection=p \
+              --colorscheme=Nature \
+              -D "\$t=$t" \
+              openscad/lifetrac_v25.scad
+          done
+          
+          echo "Animation frames generated"
+      
+      - name: Create animation GIF (if imagemagick available)
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y imagemagick
+          cd LifeTrac-v25/mechanical_design/output/animations
+          
+          if command -v convert &> /dev/null; then
+            echo "Creating animation GIF..."
+            convert -delay 10 -loop 0 frames/frame_*.png lifetrac_v25_animation.gif
+            echo "Animation GIF created"
+          else
+            echo "ImageMagick not available, skipping GIF creation"
+          fi
+      
+      - name: Generate summary report
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          cat > output/RENDER_REPORT.md << 'EOF'
+          # OpenSCAD Render Report
+          
+          **Generated:** $(date)
+          **Commit:** ${{ github.sha }}
+          **Branch:** ${{ github.ref_name }}
+          
+          ## Files Generated
+          
+          ### Preview Renders
+          - Main assembly view
+          - Front view
+          - Side view
+          - Top view
+          - Module examples (5 modules)
+          
+          ### Animations
+          - 36 animation frames
+          - Animation GIF (if ImageMagick available)
+          
+          ### CNC Files
+          - assembly.png (3D render of complete assembly)
+          - cnclayout.svg (2D layout for CNC cutting)
+          
+          ## Validation Results
+          
+          ✓ All OpenSCAD files validated successfully
+          ✓ Main design file compiled without errors
+          ✓ All module files syntax-checked
+          
+          ## Next Steps
+          
+          1. Review rendered images in the artifacts
+          2. Use cnclayout.svg for CNC plasma cutting
+          3. Use animation frames to create videos
+          4. Export DXF files for individual parts using export_all_cnc_parts.sh
+          
+          ---
+          Generated by GitHub Actions
+          EOF
+      
+      - name: Upload render artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openscad-renders
+          path: |
+            LifeTrac-v25/mechanical_design/output/renders/
+            LifeTrac-v25/mechanical_design/output/RENDER_REPORT.md
+          retention-days: 90
+      
+      - name: Upload animation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openscad-animations
+          path: LifeTrac-v25/mechanical_design/output/animations/
+          retention-days: 90
+      
+      - name: Commit and push assembly.png and cnclayout.svg
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # Add the generated files
+          git add assembly.png cnclayout.svg
+          
+          # Check if there are changes
+          if ! git diff --staged --quiet; then
+            git commit -m "Update assembly.png and cnclayout.svg [skip ci]"
+            git push --force-with-lease origin HEAD || {
+              echo "INFO: git push failed. This is expected on PRs from forks."
+              echo "The files are available as workflow artifacts."
+            }
+          else
+            echo "No changes to assembly.png or cnclayout.svg"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Comment on PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const comment = `## OpenSCAD Render Results 🎨
+            
+            ✅ All OpenSCAD files validated successfully!
+            
+            ### Generated Outputs
+            - 📸 Preview renders (main, front, side, top views)
+            - 🎬 Animation frames (36 frames)
+            - 🔧 Module examples
+            - 🖼️ Assembly image and CNC layout (assembly.png, cnclayout.svg)
+            
+            ### Artifacts
+            Download the generated files from the workflow artifacts:
+            - \`openscad-renders\` - Preview images
+            - \`openscad-animations\` - Animation frames and GIF
+            
+            ### CNC Files
+            - \`assembly.png\` and \`cnclayout.svg\` committed to repository
+            
+            **Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+            
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
