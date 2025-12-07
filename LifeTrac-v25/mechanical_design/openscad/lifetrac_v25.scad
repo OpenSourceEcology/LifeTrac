@@ -187,6 +187,7 @@ module base_frame() {
     side_panel_right_outer();
     rear_crossmember();
     front_crossmember();
+    cylinder_mounting_lugs();
 }
 
 /**
@@ -211,6 +212,28 @@ module wheel_mounting_plates() {
         color("DarkSlateGray")
         plate_with_holes(plate_size, plate_size, PLATE_1_2_INCH, 13, 40);
     }
+}
+
+/**
+ * Part A5 - Cylinder Mounting Lugs
+ * Mounting plates for base of lift cylinders, positioned between inner sandwich panels
+ * Connects to: Inner sandwich panels (A1-L-Inner, A1-R-Inner), lift cylinders (D1-D2)
+ */
+module cylinder_mounting_lugs() {
+    lug_height = 150;
+    lug_width = 100;
+    
+    // Left side lug - between the two inner panels
+    translate([-SANDWICH_SPACING/4, WHEEL_BASE * 0.5, MACHINE_HEIGHT * 0.5])
+    rotate([0, 90, 0])
+    color("DarkSlateGray")
+    plate_steel(lug_height, lug_width, PLATE_1_2_INCH, 6.35);
+    
+    // Right side lug - between the two inner panels
+    translate([SANDWICH_SPACING/4, WHEEL_BASE * 0.5, MACHINE_HEIGHT * 0.5])
+    rotate([0, 90, 0])
+    color("DarkSlateGray")
+    plate_steel(lug_height, lug_width, PLATE_1_2_INCH, 6.35);
 }
 
 /**
@@ -353,18 +376,38 @@ module bucket() {
 /**
  * Part D1-D2 - Loader Lift Cylinders
  * Two hydraulic cylinders for raising/lowering loader arms
- * Connects to: Base frame (A1), loader arms (C1)
+ * Mounted directly underneath arms, one end between sandwich plates, other end to arm bottom
+ * Connects to: Base frame sandwich panels (A1-L-Inner, A1-R-Inner), loader arms (C1)
  */
 module lift_cylinders() {
     if (show_hydraulics) {
-        cylinder_positions = [
-            [-TRACK_WIDTH/2 + 100, MACHINE_LENGTH/2, MACHINE_HEIGHT/2],
-            [TRACK_WIDTH/2 - 100, MACHINE_LENGTH/2, MACHINE_HEIGHT/2]
-        ];
+        // Cylinder mounting positions on each side
+        // Base attachment point is between the inner sandwich plates at mid-height
+        base_attachment_height = MACHINE_HEIGHT * 0.5;  // Mid-height on sandwich panels
+        base_attachment_y = WHEEL_BASE * 0.5;           // Midway along wheelbase
         
-        for (pos = cylinder_positions) {
-            translate(pos)
-            rotate([ARM_LIFT_ANGLE/2, 0, 0])
+        // Arm attachment point is underneath the arm at its base
+        arm_attachment_offset = 200;  // Distance along arm from pivot point
+        
+        // Left side cylinder
+        translate([0, WHEEL_BASE, MACHINE_HEIGHT])
+        rotate([ARM_LIFT_ANGLE, 0, 0])
+        translate([-TRACK_WIDTH/2, arm_attachment_offset, -50])
+        {
+            // Calculate cylinder orientation to connect base mount to arm bottom
+            cylinder_angle = ARM_LIFT_ANGLE;
+            rotate([-(90 - cylinder_angle), 0, 0])
+            hydraulic_cylinder(63.5, 31.75, LIFT_CYLINDER_STROKE, 
+                             false, animation_time * LIFT_CYLINDER_STROKE, "clevis");
+        }
+        
+        // Right side cylinder
+        translate([0, WHEEL_BASE, MACHINE_HEIGHT])
+        rotate([ARM_LIFT_ANGLE, 0, 0])
+        translate([TRACK_WIDTH/2, arm_attachment_offset, -50])
+        {
+            cylinder_angle = ARM_LIFT_ANGLE;
+            rotate([-(90 - cylinder_angle), 0, 0])
             hydraulic_cylinder(63.5, 31.75, LIFT_CYLINDER_STROKE, 
                              false, animation_time * LIFT_CYLINDER_STROKE, "clevis");
         }

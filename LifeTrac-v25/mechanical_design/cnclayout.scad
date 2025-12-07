@@ -80,13 +80,13 @@ layout_part(250, 250, PLATE_1_2, "A4-2 Wheel Mount FR", START_X + 250 + SPACING,
 layout_part(250, 250, PLATE_1_2, "A4-3 Wheel Mount RL", START_X + 2*(250 + SPACING), START_Y + 2*(1400 + SPACING) + 600 + SPACING);
 layout_part(250, 250, PLATE_1_2, "A4-4 Wheel Mount RR", START_X + 3*(250 + SPACING), START_Y + 2*(1400 + SPACING) + 600 + SPACING);
 
-// Row 3: Half-inch plates continued
-layout_part(200, 200, PLATE_1_2, "C2-1 Bucket Attach L", START_X, START_Y + 2*(1400 + SPACING) + 600 + 250 + 2*SPACING);
-layout_part(200, 200, PLATE_1_2, "C2-2 Bucket Attach R", START_X + 200 + SPACING, START_Y + 2*(1400 + SPACING) + 600 + 250 + 2*SPACING);
-layout_part(100, 150, PLATE_1_2, "Cyl Lug 1", START_X + 2*(200 + SPACING), START_Y + 2*(1400 + SPACING) + 600 + 250 + 2*SPACING);
-layout_part(100, 150, PLATE_1_2, "Cyl Lug 2", START_X + 2*(200 + SPACING) + 100 + SPACING, START_Y + 2*(1400 + SPACING) + 600 + 250 + 2*SPACING);
-layout_part(100, 150, PLATE_1_2, "Cyl Lug 3", START_X + 2*(200 + SPACING) + 2*(100 + SPACING), START_Y + 2*(1400 + SPACING) + 600 + 250 + 2*SPACING);
-layout_part(100, 150, PLATE_1_2, "Cyl Lug 4", START_X + 2*(200 + SPACING) + 3*(100 + SPACING), START_Y + 2*(1400 + SPACING) + 600 + 250 + 2*SPACING);
+// Row 3: Half-inch plates continued (cylinder mounts and bucket attach)
+layout_part(100, 150, PLATE_1_2, "A5-L Lift Cyl Mount L", START_X, START_Y + 2*(1400 + SPACING) + 600 + 250 + 2*SPACING);
+layout_part(100, 150, PLATE_1_2, "A5-R Lift Cyl Mount R", START_X + 100 + SPACING, START_Y + 2*(1400 + SPACING) + 600 + 250 + 2*SPACING);
+layout_part(200, 200, PLATE_1_2, "C2-1 Bucket Attach L", START_X + 2*(100 + SPACING), START_Y + 2*(1400 + SPACING) + 600 + 250 + 2*SPACING);
+layout_part(200, 200, PLATE_1_2, "C2-2 Bucket Attach R", START_X + 2*(100 + SPACING) + 200 + SPACING, START_Y + 2*(1400 + SPACING) + 600 + 250 + 2*SPACING);
+layout_part(100, 150, PLATE_1_2, "Bucket Cyl Lug 1", START_X + 2*(100 + SPACING) + 2*(200 + SPACING), START_Y + 2*(1400 + SPACING) + 600 + 250 + 2*SPACING);
+layout_part(100, 150, PLATE_1_2, "Bucket Cyl Lug 2", START_X + 2*(100 + SPACING) + 2*(200 + SPACING) + 100 + SPACING, START_Y + 2*(1400 + SPACING) + 600 + 250 + 2*SPACING);
 
 // Base Y for quarter-inch bucket parts
 base_y = START_Y + 2*(1400 + SPACING) + 600 + 250 + 200 + 3*SPACING;
