@@ -22,7 +22,7 @@ jobs:
       - name: Install OpenSCAD
         run: |
           sudo apt-get update
-          sudo apt-get install -y openscad xvfb
+          sudo apt-get install -y openscad xvfb x11-utils
           openscad --version
       
       - name: Start Xvfb
@@ -99,7 +99,9 @@ jobs:
             echo "## Structural Analysis Results" >> structural_report.md
             echo "" >> structural_report.md
             echo "\`\`\`" >> structural_report.md
-            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/========================================/p' structural_analysis.log | tail -n +2 >> structural_report.md
+            # Extract from summary start to next delimiter or end of relevant section
+            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/========================================/{p;/========================================/q}' structural_analysis.log | tail -n +2 >> structural_report.md || \
+            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,$p' structural_analysis.log | tail -n +2 | head -n 20 >> structural_report.md
             echo "\`\`\`" >> structural_report.md
           else
             echo "No structural analysis summary found in output." >> structural_report.md
@@ -127,7 +129,7 @@ jobs:
             for i in {1..5}; do
               if ! kill -0 $XVFB_PID 2>/dev/null; then
                 echo "Xvfb stopped gracefully"
-                exit 0
+                break
               fi
               sleep 1
             done
