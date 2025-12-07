@@ -28,7 +28,22 @@ jobs:
       - name: Start Xvfb
         run: |
           Xvfb :99 -screen 0 1024x768x16 &
-          sleep 2
+          XVFB_PID=$!
+          echo "XVFB_PID=$XVFB_PID" >> $GITHUB_ENV
+          
+          # Wait for Xvfb to be ready (max 10 seconds)
+          for i in {1..10}; do
+            if xdpyinfo -display :99 >/dev/null 2>&1; then
+              echo "Xvfb is ready on display :99"
+              break
+            fi
+            if [ $i -eq 10 ]; then
+              echo "Timeout waiting for Xvfb to start"
+              exit 1
+            fi
+            sleep 1
+          done
+          
           echo "DISPLAY=:99" >> $GITHUB_ENV
       
       - name: Validate OpenSCAD syntax
@@ -261,6 +276,14 @@ jobs:
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Cleanup Xvfb
+        if: always()
+        run: |
+          if [ -n "$XVFB_PID" ]; then
+            echo "Stopping Xvfb process (PID: $XVFB_PID)"
+            kill $XVFB_PID || true
+          fi
       
       - name: Comment on PR with results
         if: github.event_name == 'pull_request'
