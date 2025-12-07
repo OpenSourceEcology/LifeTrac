@@ -235,25 +235,52 @@ jobs:
           # Create Python script to extract specs
           cat > /tmp/extract_specs.py << 'PYTHON_EOF'
           import re
+          import sys
           
           # Read the OpenSCAD file
-          with open('mechanical_design/openscad/lifetrac_v25.scad', 'r') as f:
-              content = f.read()
+          try:
+              with open('mechanical_design/openscad/lifetrac_v25.scad', 'r') as f:
+                  content = f.read()
+          except FileNotFoundError:
+              print("ERROR: OpenSCAD file not found", file=sys.stderr)
+              sys.exit(1)
           
-          # Extract key dimensions
-          def extract_value(pattern, content):
-              match = re.search(pattern, content)
-              if match:
-                  return float(match.group(1))
-              return None
+          # Extract key dimensions with error handling
+          def extract_value(pattern, content, name):
+              try:
+                  match = re.search(pattern, content)
+                  if match:
+                      return float(match.group(1))
+                  print(f"WARNING: Could not find {name} in OpenSCAD file", file=sys.stderr)
+                  return None
+              except (ValueError, AttributeError) as e:
+                  print(f"ERROR: Failed to extract {name}: {e}", file=sys.stderr)
+                  return None
           
-          MACHINE_WIDTH = extract_value(r'MACHINE_WIDTH\s*=\s*(\d+)', content)
-          MACHINE_LENGTH = extract_value(r'MACHINE_LENGTH\s*=\s*(\d+)', content)
-          MACHINE_HEIGHT = extract_value(r'MACHINE_HEIGHT\s*=\s*(\d+)', content)
-          WHEEL_DIAMETER = extract_value(r'WHEEL_DIAMETER\s*=\s*(\d+)', content)
-          GROUND_CLEARANCE = extract_value(r'GROUND_CLEARANCE\s*=\s*(\d+)', content)
-          HYDRAULIC_PRESSURE_PSI = extract_value(r'HYDRAULIC_PRESSURE_PSI\s*=\s*(\d+)', content)
-          LIFT_CYLINDER_BORE = extract_value(r'LIFT_CYLINDER_BORE\s*=\s*([\d.]+)', content)
+          MACHINE_WIDTH = extract_value(r'MACHINE_WIDTH\s*=\s*(\d+)', content, 'MACHINE_WIDTH')
+          MACHINE_LENGTH = extract_value(r'MACHINE_LENGTH\s*=\s*(\d+)', content, 'MACHINE_LENGTH')
+          MACHINE_HEIGHT = extract_value(r'MACHINE_HEIGHT\s*=\s*(\d+)', content, 'MACHINE_HEIGHT')
+          WHEEL_DIAMETER = extract_value(r'WHEEL_DIAMETER\s*=\s*(\d+)', content, 'WHEEL_DIAMETER')
+          GROUND_CLEARANCE = extract_value(r'GROUND_CLEARANCE\s*=\s*(\d+)', content, 'GROUND_CLEARANCE')
+          HYDRAULIC_PRESSURE_PSI = extract_value(r'HYDRAULIC_PRESSURE_PSI\s*=\s*(\d+)', content, 'HYDRAULIC_PRESSURE_PSI')
+          LIFT_CYLINDER_BORE = extract_value(r'LIFT_CYLINDER_BORE\s*=\s*([\d.]+)', content, 'LIFT_CYLINDER_BORE')
+          
+          # Validate that all required values were found
+          required_values = {
+              'MACHINE_WIDTH': MACHINE_WIDTH,
+              'MACHINE_LENGTH': MACHINE_LENGTH,
+              'MACHINE_HEIGHT': MACHINE_HEIGHT,
+              'WHEEL_DIAMETER': WHEEL_DIAMETER,
+              'GROUND_CLEARANCE': GROUND_CLEARANCE,
+              'HYDRAULIC_PRESSURE_PSI': HYDRAULIC_PRESSURE_PSI,
+              'LIFT_CYLINDER_BORE': LIFT_CYLINDER_BORE
+          }
+          
+          missing_values = [k for k, v in required_values.items() if v is None]
+          if missing_values:
+              print(f"ERROR: Missing required values: {', '.join(missing_values)}", file=sys.stderr)
+              print("Skipping README update to avoid breaking existing content", file=sys.stderr)
+              sys.exit(0)  # Exit gracefully without updating
           
           # Conservative lift capacity estimate based on typical loader geometry
           ESTIMATED_LIFT_CAPACITY_KG = 1200
@@ -279,28 +306,62 @@ jobs:
           | **Drive Configuration** | All-wheel drive (4 hydraulic motors) |
           | **Cylinder Bore (Lift)** | {LIFT_CYLINDER_BORE} mm ({LIFT_CYLINDER_BORE/25.4:.1f}") |"""
           
-          # Update the specs in README using regex
+          # Update the specs in README using regex with validation
+          original_readme = readme
+          
           # Update technical specifications table
-          readme = re.sub(
-              r'\| Specification \| Value \(mm\) \| Value \(inches\) \| Value \(meters\) \|.*?\n\| \*\*Wheel Diameter\*\* \|[^\n]+',
+          updated_readme = re.sub(
+              r'(\| Specification \| Value \(mm\) \| Value \(inches\) \| Value \(meters\) \|.*?\n)(\| \*\*Wheel Diameter\*\* \|[^\n]+)',
               specs_table,
               readme,
+              count=1,
               flags=re.DOTALL
           )
+          
+          if updated_readme == readme:
+              print("WARNING: Technical specifications table pattern not found, trying alternative pattern", file=sys.stderr)
+              # Try simpler pattern that looks for the table header
+              pattern_start = readme.find('### Technical Specifications')
+              if pattern_start != -1:
+                  # Find the end of the table
+                  table_start = readme.find('| Specification | Value (mm)', pattern_start)
+                  if table_start != -1:
+                      # Find next section header or blank line after table
+                      table_end = readme.find('\n\n###', table_start)
+                      if table_end == -1:
+                          table_end = readme.find('\n\n| Specification | Value |', table_start)
+                      if table_end != -1:
+                          # Extract table and replace
+                          old_table = readme[table_start:readme.find('\n', readme.rfind('|', table_start, table_end))+1]
+                          updated_readme = readme.replace(old_table, specs_table + '\n', 1)
+          
+          readme = updated_readme
           
           # Update performance specifications table
-          readme = re.sub(
-              r'### Performance Specifications\s*\n\n\| Specification \| Value \|.*?\n\| \*\*Cylinder Bore \(Lift\)\*\* \|[^\n]+',
+          updated_readme = re.sub(
+              r'(### Performance Specifications\s*\n\n\| Specification \| Value \|.*?\n)(\| \*\*Cylinder Bore \(Lift\)\*\* \|[^\n]+)',
               f'### Performance Specifications\n\n{perf_table}',
               readme,
+              count=1,
               flags=re.DOTALL
           )
           
-          # Write updated README
-          with open('README.md', 'w') as f:
-              f.write(readme)
+          if updated_readme == readme:
+              print("WARNING: Performance specifications table pattern not found", file=sys.stderr)
+          else:
+              readme = updated_readme
           
-          print("✓ README specifications updated successfully")
+          # Only write if changes were made
+          if readme != original_readme:
+              try:
+                  with open('README.md', 'w') as f:
+                      f.write(readme)
+                  print("✓ README specifications updated successfully")
+              except IOError as e:
+                  print(f"ERROR: Failed to write README: {e}", file=sys.stderr)
+                  sys.exit(1)
+          else:
+              print("INFO: No changes needed to README specifications")
           print(f"  Width: {int(MACHINE_WIDTH)} mm")
           print(f"  Length: {int(MACHINE_LENGTH)} mm")
           print(f"  Height: {int(MACHINE_HEIGHT)} mm")
