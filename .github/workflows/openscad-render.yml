@@ -11,9 +11,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  validate-and-render:
+  render:
     runs-on: ubuntu-latest
-    name: Validate OpenSCAD and Generate Outputs
+    name: Generate Renders and Outputs
     
     steps:
       - name: Checkout repository
@@ -22,35 +22,31 @@ jobs:
       - name: Install OpenSCAD
         run: |
           sudo apt-get update
-          sudo apt-get install -y openscad xvfb
+          sudo apt-get install -y openscad xvfb x11-utils
           openscad --version
       
-      - name: Validate OpenSCAD syntax
+      - name: Start Xvfb
         run: |
-          echo "Validating OpenSCAD files..."
-          cd LifeTrac-v25/mechanical_design
+          Xvfb :99 -screen 0 1024x768x16 &
+          XVFB_PID=$!
+          echo "XVFB_PID=$XVFB_PID" >> $GITHUB_ENV
           
-          # Check main design file
-          xvfb-run openscad -o /dev/null --export-format echo openscad/lifetrac_v25.scad
-          if [ $? -eq 0 ]; then
-            echo "✓ Main design file is valid"
-          else
-            echo "✗ Main design file has errors"
-            exit 1
-          fi
-          
-          # Check module files
-          for module in modules/*.scad; do
-            echo "Checking $module..."
-            xvfb-run openscad -o /dev/null --export-format echo "$module"
-            if [ $? -eq 0 ]; then
-              echo "✓ $module is valid"
-            else
-              echo "✗ $module has errors"
+          # Wait for Xvfb to be ready (max 10 seconds)
+          for i in {1..10}; do
+            if xdpyinfo -display :99 >/dev/null 2>&1; then
+              echo "Xvfb is ready on display :99"
+              break
+            fi
+            if [ $i -eq 10 ]; then
+              echo "Timeout waiting for Xvfb to start"
               exit 1
             fi
+            sleep 1
           done
+          
+          echo "DISPLAY=:99" >> $GITHUB_ENV
       
+
       - name: Create output directories
         run: |
           cd LifeTrac-v25/mechanical_design
@@ -62,7 +58,7 @@ jobs:
           
           # Generate assembly.png (1024x768 matching CEB-Press example)
           echo "Generating assembly.png..."
-          xvfb-run openscad -o assembly.png \
+          openscad -o assembly.png \
             --camera=3000,3000,2000,0,0,500 \
             --imgsize=1024,768 \
             --projection=p \
@@ -71,7 +67,7 @@ jobs:
           
           # Generate cnclayout.svg (2D projection for CNC cutting)
           echo "Generating cnclayout.svg..."
-          xvfb-run openscad -o cnclayout.svg \
+          openscad -o cnclayout.svg \
             --projection=o \
             --viewall \
             cnclayout.scad
@@ -85,7 +81,7 @@ jobs:
           
           # Main assembly view
           echo "Rendering main assembly..."
-          xvfb-run openscad -o output/renders/lifetrac_v25_main.png \
+          openscad -o output/renders/lifetrac_v25_main.png \
             --camera=3000,3000,2000,0,0,500 \
             --imgsize=1920,1080 \
             --projection=p \
@@ -94,7 +90,7 @@ jobs:
           
           # Front view
           echo "Rendering front view..."
-          xvfb-run openscad -o output/renders/lifetrac_v25_front.png \
+          openscad -o output/renders/lifetrac_v25_front.png \
             --camera=0,3000,1000,0,0,500 \
             --imgsize=1920,1080 \
             --projection=p \
@@ -103,7 +99,7 @@ jobs:
           
           # Side view
           echo "Rendering side view..."
-          xvfb-run openscad -o output/renders/lifetrac_v25_side.png \
+          openscad -o output/renders/lifetrac_v25_side.png \
             --camera=3000,0,1000,0,0,500 \
             --imgsize=1920,1080 \
             --projection=p \
@@ -112,7 +108,7 @@ jobs:
           
           # Top view
           echo "Rendering top view..."
-          xvfb-run openscad -o output/renders/lifetrac_v25_top.png \
+          openscad -o output/renders/lifetrac_v25_top.png \
             --camera=0,0,3000,0,0,500 \
             --imgsize=1920,1080 \
             --projection=o \
@@ -129,7 +125,7 @@ jobs:
           for module in modules/*.scad; do
             filename=$(basename "$module" .scad)
             echo "Rendering $filename examples..."
-            xvfb-run openscad -o "output/renders/${filename}_examples.png" \
+            openscad -o "output/renders/${filename}_examples.png" \
               --camera=500,500,500,0,0,0 \
               --imgsize=1600,900 \
               --projection=p \
@@ -148,7 +144,7 @@ jobs:
           for i in {0..35}; do
             t=$(awk "BEGIN {print $i/36}")
             printf "Frame %d (t=%.4f)\n" $i $t
-            xvfb-run openscad -o "output/animations/frames/frame_$(printf %03d $i).png" \
+            openscad -o "output/animations/frames/frame_$(printf %03d $i).png" \
               --camera=3000,3000,2000,0,0,500 \
               --imgsize=1280,720 \
               --projection=p \
@@ -159,19 +155,19 @@ jobs:
           
           echo "Animation frames generated"
       
-      - name: Create animation GIF (if imagemagick available)
-        continue-on-error: true
+      - name: Create animation GIF
         run: |
           sudo apt-get install -y imagemagick
           cd LifeTrac-v25/mechanical_design/output/animations
           
-          if command -v convert &> /dev/null; then
-            echo "Creating animation GIF..."
-            convert -delay 10 -loop 0 frames/frame_*.png lifetrac_v25_animation.gif
-            echo "Animation GIF created"
-          else
-            echo "ImageMagick not available, skipping GIF creation"
-          fi
+          echo "Creating animation GIF of arm movement..."
+          convert -delay 10 -loop 0 frames/frame_*.png lifetrac_v25_animation.gif
+          
+          # Copy to parent directory for easy access
+          cp lifetrac_v25_animation.gif ../../lifetrac_v25_animation.gif
+          
+          echo "✓ Animation GIF created successfully"
+          ls -lh ../../lifetrac_v25_animation.gif
       
       - name: Generate summary report
         run: |
@@ -194,25 +190,21 @@ jobs:
           - Module examples (5 modules)
           
           ### Animations
-          - 36 animation frames
-          - Animation GIF (if ImageMagick available)
+          - 36 animation frames (1280x720 PNG)
+          - Animated GIF showing arm movement (lifetrac_v25_animation.gif)
           
           ### CNC Files
           - assembly.png (3D render of complete assembly)
           - cnclayout.svg (2D layout for CNC cutting)
           
-          ## Validation Results
-          
-          ✓ All OpenSCAD files validated successfully
-          ✓ Main design file compiled without errors
-          ✓ All module files syntax-checked
-          
           ## Next Steps
           
           1. Review rendered images in the artifacts
-          2. Use cnclayout.svg for CNC plasma cutting
-          3. Use animation frames to create videos
-          4. Export DXF files for individual parts using export_all_cnc_parts.sh
+          2. View lifetrac_v25_animation.gif to see arm movement
+          3. Use cnclayout.svg for CNC plasma cutting
+          4. Use animation frames to create videos
+          5. Export DXF files for individual parts using export_all_cnc_parts.sh
+          6. Check the Structural Analysis workflow for design validation results
           
           ---
           Generated by GitHub Actions
@@ -234,27 +226,47 @@ jobs:
           path: LifeTrac-v25/mechanical_design/output/animations/
           retention-days: 90
       
-      - name: Commit and push assembly.png and cnclayout.svg
+      - name: Commit and push rendered outputs
         run: |
           cd LifeTrac-v25/mechanical_design
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
           # Add the generated files
-          git add assembly.png cnclayout.svg
+          git add assembly.png cnclayout.svg lifetrac_v25_animation.gif
           
           # Check if there are changes
           if ! git diff --staged --quiet; then
-            git commit -m "Update assembly.png and cnclayout.svg [skip ci]"
+            git commit -m "Update rendered outputs (assembly, layout, animation) [skip ci]"
             git push --force-with-lease origin HEAD || {
               echo "INFO: git push failed. This is expected on PRs from forks."
               echo "The files are available as workflow artifacts."
             }
           else
-            echo "No changes to assembly.png or cnclayout.svg"
+            echo "No changes to rendered output files"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Cleanup Xvfb
+        if: always()
+        run: |
+          if [ -n "$XVFB_PID" ]; then
+            echo "Stopping Xvfb process (PID: $XVFB_PID)"
+            # Try graceful shutdown first
+            kill -TERM $XVFB_PID 2>/dev/null || true
+            # Wait up to 5 seconds for process to terminate
+            for i in {1..5}; do
+              if ! kill -0 $XVFB_PID 2>/dev/null; then
+                echo "Xvfb stopped gracefully"
+                break
+              fi
+              sleep 1
+            done
+            # Force kill if still running
+            kill -KILL $XVFB_PID 2>/dev/null || true
+            echo "Xvfb force stopped"
+          fi
       
       - name: Comment on PR with results
         if: github.event_name == 'pull_request'
@@ -264,11 +276,12 @@ jobs:
             const fs = require('fs');
             const comment = `## OpenSCAD Render Results 🎨
             
-            ✅ All OpenSCAD files validated successfully!
+            ✅ Rendering completed successfully!
             
             ### Generated Outputs
             - 📸 Preview renders (main, front, side, top views)
             - 🎬 Animation frames (36 frames)
+            - 🎞️ Animated GIF of arm movement (lifetrac_v25_animation.gif)
             - 🔧 Module examples
             - 🖼️ Assembly image and CNC layout (assembly.png, cnclayout.svg)
             
@@ -277,8 +290,13 @@ jobs:
             - \`openscad-renders\` - Preview images
             - \`openscad-animations\` - Animation frames and GIF
             
-            ### CNC Files
-            - \`assembly.png\` and \`cnclayout.svg\` committed to repository
+            ### Committed Files
+            The following files have been committed to the repository:
+            - \`assembly.png\` - 3D assembly render
+            - \`cnclayout.svg\` - 2D CNC cutting layout
+            - \`lifetrac_v25_animation.gif\` - Animation showing arm movement
+            
+            _Note: Check the **OpenSCAD Structural Analysis** workflow for design validation and structural analysis results._
             
             **Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
             `;
