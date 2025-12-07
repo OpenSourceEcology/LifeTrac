@@ -141,14 +141,17 @@ jobs:
           mkdir -p output/animations/frames
           
           # Generate 36 frames for animation (every 10 degrees)
-          for i in {0..35}; do
-            t=$(awk "BEGIN {print $i/36}")
-            printf "Frame %d (t=%.4f)\n" $i $t
+          total_frames=36
+          for i in $(seq 0 $((total_frames-1))); do
+            # Use total_frames-1 so last frame lands exactly at t=1.0
+            t=$(awk "BEGIN {print $i/($total_frames-1)}")
+            printf "Frame %d (t=%.4f)\n" "$i" "$t"
             openscad -o "output/animations/frames/frame_$(printf %03d $i).png" \
               --camera=3000,3000,2000,0,0,500 \
               --imgsize=1280,720 \
               --projection=p \
               --colorscheme=Nature \
+              -D "animation_time=$t" \
               -D "\$t=$t" \
               openscad/lifetrac_v25.scad
           done
