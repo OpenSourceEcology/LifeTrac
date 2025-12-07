@@ -18,6 +18,7 @@ Each LifeTrac version has its own folder containing detailed documentation:
 * **[Microtrac v17.10](Microtrac-v17.10/)** - (LifeTrac IX) Compact modular design
 * **[LifeTrac v17.10](LifeTrac-v17.10/)** - 5 Minute Part Replacement focus
 * **[LifeTrac v20.12](LifeTrac-v20.12/)** - Latest version with UTU and UWU systems
+* **[LifeTrac v25](LifeTrac-v25/)** - Remote control system with WiFi/MQTT and BLE communication (Work in Progress)
 
 ## Genealogy
 
@@ -32,6 +33,7 @@ Each LifeTrac version has its own folder containing detailed documentation:
 * [Microtrac v17.10](https://wiki.opensourceecology.org/wiki/MicroTrac_v17.10) (LifeTrac IX) - In use in 2021 but modified to shorter tracks.
 * [LifeTrac v17.10](https://wiki.opensourceecology.org/wiki/LifeTrac_v17.10) - Universal Wheel Unit no longer the main drive option to promote 5 Minute Part Replacement.
 * [LifeTrac v20.12](https://wiki.opensourceecology.org/wiki/LifeTrac_v20.12) - Built during Summer X 2021. Includes work on UTU and UWU. Test bed for 5 Minute Part Replacement.
+* [LifeTrac v25](https://wiki.opensourceecology.org/wiki/LifeTrac_v25) - Remote control system featuring WiFi/MQTT and Bluetooth (BLE) communication for hydraulic operation control. Includes Arduino Opta controller, ROS2 integration, and web-based interface with live camera feed. (Work in Progress)
 
 ## Repository Structure
 
