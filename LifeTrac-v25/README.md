@@ -36,7 +36,7 @@ LifeTrac v25 is a remotely-operated compact utility loader designed as an open-s
 | Specification | Value |
 |--------------|-------|
 | **Hydraulic System Pressure** | 3,000 PSI |
-| **Estimated Lift Capacity** | ~1,200 kg (~2,650 lbs) |
+| **Estimated Lift Capacity** | ~1,200 kg (~2,646 lbs) |
 | **Drive Configuration** | All-wheel drive (4 hydraulic motors) |
 | **Cylinder Bore (Lift)** | 63.5 mm (2.5") |
 
