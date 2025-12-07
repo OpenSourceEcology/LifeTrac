@@ -226,24 +226,178 @@ jobs:
           path: LifeTrac-v25/mechanical_design/output/animations/
           retention-days: 90
       
+      - name: Extract specifications and update README
+        run: |
+          cd LifeTrac-v25
+          
+          echo "Extracting specifications from OpenSCAD file..."
+          
+          # Create Python script to extract specs
+          cat > /tmp/extract_specs.py << 'PYTHON_EOF'
+          import re
+          import sys
+          
+          # Read the OpenSCAD file
+          try:
+              with open('mechanical_design/openscad/lifetrac_v25.scad', 'r') as f:
+                  content = f.read()
+          except FileNotFoundError:
+              print("ERROR: OpenSCAD file not found", file=sys.stderr)
+              sys.exit(1)
+          
+          # Extract key dimensions with error handling
+          def extract_value(pattern, content, name):
+              try:
+                  match = re.search(pattern, content)
+                  if match:
+                      return float(match.group(1))
+                  print(f"WARNING: Could not find {name} in OpenSCAD file", file=sys.stderr)
+                  return None
+              except (ValueError, AttributeError) as e:
+                  print(f"ERROR: Failed to extract {name}: {e}", file=sys.stderr)
+                  return None
+          
+          MACHINE_WIDTH = extract_value(r'MACHINE_WIDTH\s*=\s*(\d+)', content, 'MACHINE_WIDTH')
+          MACHINE_LENGTH = extract_value(r'MACHINE_LENGTH\s*=\s*(\d+)', content, 'MACHINE_LENGTH')
+          MACHINE_HEIGHT = extract_value(r'MACHINE_HEIGHT\s*=\s*(\d+)', content, 'MACHINE_HEIGHT')
+          WHEEL_DIAMETER = extract_value(r'WHEEL_DIAMETER\s*=\s*(\d+)', content, 'WHEEL_DIAMETER')
+          GROUND_CLEARANCE = extract_value(r'GROUND_CLEARANCE\s*=\s*(\d+)', content, 'GROUND_CLEARANCE')
+          HYDRAULIC_PRESSURE_PSI = extract_value(r'HYDRAULIC_PRESSURE_PSI\s*=\s*(\d+)', content, 'HYDRAULIC_PRESSURE_PSI')
+          LIFT_CYLINDER_BORE = extract_value(r'LIFT_CYLINDER_BORE\s*=\s*([\d.]+)', content, 'LIFT_CYLINDER_BORE')
+          
+          # Validate that all required values were found
+          required_values = {
+              'MACHINE_WIDTH': MACHINE_WIDTH,
+              'MACHINE_LENGTH': MACHINE_LENGTH,
+              'MACHINE_HEIGHT': MACHINE_HEIGHT,
+              'WHEEL_DIAMETER': WHEEL_DIAMETER,
+              'GROUND_CLEARANCE': GROUND_CLEARANCE,
+              'HYDRAULIC_PRESSURE_PSI': HYDRAULIC_PRESSURE_PSI,
+              'LIFT_CYLINDER_BORE': LIFT_CYLINDER_BORE
+          }
+          
+          missing_values = [k for k, v in required_values.items() if v is None]
+          if missing_values:
+              print(f"ERROR: Missing required values: {', '.join(missing_values)}", file=sys.stderr)
+              print("The following patterns failed to match:", file=sys.stderr)
+              for val in missing_values:
+                  print(f"  - {val}", file=sys.stderr)
+              print("Skipping README update to avoid breaking existing content", file=sys.stderr)
+              print("If OpenSCAD file structure changed, update the regex patterns in this workflow", file=sys.stderr)
+              sys.exit(0)  # Exit gracefully without updating
+          
+          # Conservative lift capacity estimate based on typical loader geometry
+          # NOTE: This is a simplified estimate. The actual lift capacity calculation in the 
+          # OpenSCAD file uses complex lever arm geometry and moment calculations which would
+          # require additional extraction logic. For now, we use a conservative estimate.
+          # If design changes significantly, this value should be reviewed and updated.
+          ESTIMATED_LIFT_CAPACITY_KG = 1200
+          ESTIMATED_LIFT_CAPACITY_LBS = ESTIMATED_LIFT_CAPACITY_KG * 2.205
+          
+          # Read current README
+          with open('README.md', 'r') as f:
+              readme = f.read()
+          
+          # Build the specifications table
+          specs_table = f"""| Specification | Value (mm) | Value (inches) | Value (meters) |
+          |--------------|------------|----------------|----------------|
+          | **Overall Width** | {int(MACHINE_WIDTH):,} mm | {MACHINE_WIDTH/25.4:.1f}" | {MACHINE_WIDTH/1000:.2f} m |
+          | **Overall Length** | {int(MACHINE_LENGTH):,} mm | {MACHINE_LENGTH/25.4:.1f}" | {MACHINE_LENGTH/1000:.2f} m |
+          | **Height to Frame Top** | {int(MACHINE_HEIGHT):,} mm | {MACHINE_HEIGHT/25.4:.1f}" | {MACHINE_HEIGHT/1000:.2f} m |
+          | **Ground Clearance** | {int(GROUND_CLEARANCE)} mm | {GROUND_CLEARANCE/25.4:.1f}" | {GROUND_CLEARANCE/1000:.2f} m |
+          | **Wheel Diameter** | {int(WHEEL_DIAMETER)} mm | {WHEEL_DIAMETER/25.4:.1f}" | {WHEEL_DIAMETER/1000:.2f} m |"""
+          
+          perf_table = f"""| Specification | Value |
+          |--------------|-------|
+          | **Hydraulic System Pressure** | {int(HYDRAULIC_PRESSURE_PSI):,} PSI |
+          | **Estimated Lift Capacity** | ~{int(ESTIMATED_LIFT_CAPACITY_KG):,} kg (~{int(ESTIMATED_LIFT_CAPACITY_LBS):,} lbs) |
+          | **Drive Configuration** | All-wheel drive (4 hydraulic motors) |
+          | **Cylinder Bore (Lift)** | {LIFT_CYLINDER_BORE} mm ({LIFT_CYLINDER_BORE/25.4:.1f}") |"""
+          
+          # Update the specs in README using regex with validation
+          original_readme = readme
+          
+          # Update technical specifications table
+          updated_readme = re.sub(
+              r'(\| Specification \| Value \(mm\) \| Value \(inches\) \| Value \(meters\) \|.*?\n)(\| \*\*Wheel Diameter\*\* \|[^\n]+)',
+              specs_table,
+              readme,
+              count=1,
+              flags=re.DOTALL
+          )
+          
+          if updated_readme == readme:
+              print("WARNING: Technical specifications table pattern not found, trying alternative pattern", file=sys.stderr)
+              # Try simpler pattern that looks for the table header
+              pattern_start = readme.find('### Technical Specifications')
+              if pattern_start != -1:
+                  # Find the end of the table
+                  table_start = readme.find('| Specification | Value (mm)', pattern_start)
+                  if table_start != -1:
+                      # Find next section header or blank line after table
+                      table_end = readme.find('\n\n###', table_start)
+                      if table_end == -1:
+                          table_end = readme.find('\n\n| Specification | Value |', table_start)
+                      if table_end != -1:
+                          # Extract table and replace
+                          old_table = readme[table_start:readme.find('\n', readme.rfind('|', table_start, table_end))+1]
+                          updated_readme = readme.replace(old_table, specs_table + '\n', 1)
+          
+          readme = updated_readme
+          
+          # Update performance specifications table
+          updated_readme = re.sub(
+              r'(### Performance Specifications\s*\n\n\| Specification \| Value \|.*?\n)(\| \*\*Cylinder Bore \(Lift\)\*\* \|[^\n]+)',
+              f'### Performance Specifications\n\n{perf_table}',
+              readme,
+              count=1,
+              flags=re.DOTALL
+          )
+          
+          if updated_readme == readme:
+              print("WARNING: Performance specifications table pattern not found", file=sys.stderr)
+          else:
+              readme = updated_readme
+          
+          # Only write if changes were made
+          if readme != original_readme:
+              try:
+                  with open('README.md', 'w') as f:
+                      f.write(readme)
+                  print("✓ README specifications updated successfully")
+              except IOError as e:
+                  print(f"ERROR: Failed to write README: {e}", file=sys.stderr)
+                  sys.exit(1)
+          else:
+              print("INFO: No changes needed to README specifications")
+          print(f"  Width: {int(MACHINE_WIDTH)} mm")
+          print(f"  Length: {int(MACHINE_LENGTH)} mm")
+          print(f"  Height: {int(MACHINE_HEIGHT)} mm")
+          print(f"  Lift Capacity: ~{int(ESTIMATED_LIFT_CAPACITY_KG)} kg")
+          PYTHON_EOF
+          
+          python3 /tmp/extract_specs.py
+          
+          echo "README specifications updated"
+      
       - name: Commit and push rendered outputs
         run: |
-          cd LifeTrac-v25/mechanical_design
+          cd LifeTrac-v25
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # Add the generated files
-          git add assembly.png cnclayout.svg lifetrac_v25_animation.gif
+          # Add the generated files (mechanical_design images and updated README)
+          git add mechanical_design/assembly.png mechanical_design/cnclayout.svg mechanical_design/lifetrac_v25_animation.gif README.md
           
           # Check if there are changes
           if ! git diff --staged --quiet; then
-            git commit -m "Update rendered outputs (assembly, layout, animation) [skip ci]"
+            git commit -m "Update rendered outputs and specifications [skip ci]"
             git push --force-with-lease origin HEAD || {
               echo "INFO: git push failed. This is expected on PRs from forks."
               echo "The files are available as workflow artifacts."
             }
           else
-            echo "No changes to rendered output files"
+            echo "No changes to rendered output files or README"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
