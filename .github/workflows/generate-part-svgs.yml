@@ -139,12 +139,15 @@ jobs:
           echo "📝 Committing changes..."
           git commit -m "Update individual part SVG cutouts [skip ci]"
           
-          # Pull any remote changes and rebase our commit on top
-          echo "🔄 Pulling latest changes..."
-          if ! git pull --rebase --autostash origin ${{ github.head_ref || github.ref_name }}; then
+          # Fetch and rebase to incorporate any remote changes
+          echo "🔄 Fetching latest changes..."
+          git fetch origin ${{ github.head_ref || github.ref_name }}
+          
+          echo "🔄 Rebasing on latest changes..."
+          if ! git rebase origin/${{ github.head_ref || github.ref_name }}; then
             echo "❌ Failed to rebase. There may be conflicts."
             echo "Aborting rebase and exiting..."
-            git rebase --abort || true
+            git rebase --abort
             exit 1
           fi
           
