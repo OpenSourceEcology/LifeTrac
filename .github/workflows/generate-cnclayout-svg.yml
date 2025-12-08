@@ -1,0 +1,123 @@
+name: Generate CNC Layout SVG
+
+on:
+  push:
+    branches: [ main, master ]
+    paths: 
+      - 'LifeTrac-v25/mechanical_design/cnclayout.scad'
+      - 'LifeTrac-v25/mechanical_design/parts/*.scad'
+      - 'LifeTrac-v25/mechanical_design/openscad/lifetrac_v25_params.scad'
+  pull_request:
+    branches: [ main, master ]
+    paths: 
+      - 'LifeTrac-v25/mechanical_design/cnclayout.scad'
+      - 'LifeTrac-v25/mechanical_design/parts/*.scad'
+      - 'LifeTrac-v25/mechanical_design/openscad/lifetrac_v25_params.scad'
+  workflow_dispatch:
+
+jobs:
+  generate-cnclayout:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        # Ensure the workflow checks out the PR branch (not the base branch) for pull_request events
+        ref: ${{ github.head_ref || github.ref_name }}
+    
+    - name: Install OpenSCAD
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openscad xvfb
+    
+    - name: Generate Combined CNC Layout SVG
+      run: |
+        cd LifeTrac-v25/mechanical_design
+        
+        echo "========================================="
+        echo "Generating Combined CNC Layout SVG"
+        echo "========================================="
+        
+        # Use xvfb-run to provide a virtual display for OpenSCAD rendering
+        # For 2D projections, use top-down orthographic view
+        xvfb-run -a openscad --render \
+          --imgsize=4096,8192 \
+          --colorscheme=Tomorrow \
+          --projection=ortho \
+          --camera=0,0,0,0,0,0,3000 \
+          -o cnclayout.svg \
+          cnclayout.scad 2>&1 | grep -v "WARNING" || true
+        
+        # Verify the SVG was created
+        if [ -f cnclayout.svg ]; then
+          echo "✅ Combined CNC Layout SVG generated successfully"
+          ls -lh cnclayout.svg
+          du -h cnclayout.svg
+          
+          # Count paths/shapes in SVG as a sanity check
+          echo "Checking SVG content..."
+          path_count=$(grep -o "<path" cnclayout.svg | wc -l)
+          echo "Number of paths in SVG: ${path_count}"
+          
+          if [ ${path_count} -gt 50 ]; then
+            echo "✅ SVG contains ${path_count} paths (expected 50+)"
+          else
+            echo "⚠️  SVG only contains ${path_count} paths - may be incomplete"
+          fi
+        else
+          echo "❌ Failed to generate Combined CNC Layout SVG"
+          exit 1
+        fi
+    
+    - name: Update README with CNC layout SVG
+      run: |
+        cd LifeTrac-v25/mechanical_design
+        
+        # Check if README already has CNC layout section
+        if ! grep -q "## CNC Cutting Layout" README.md; then
+          echo "Adding CNC layout section to README..."
+          
+          cat >> README.md << 'EOF'
+
+## CNC Cutting Layout
+
+### Combined Layout (All Parts)
+![CNC Cutting Layout - All Parts](cnclayout.svg)
+
+The combined CNC layout includes all 23 sheet metal parts with complete manufacturing details:
+- Mounting holes with proper clearances
+- Pivot holes for arm and cylinder connections
+- Arc slots for cross beam clearance (inner panels)
+- Lightening holes for weight reduction
+- Anti-slip hole patterns (standing deck)
+- All parts properly spaced for efficient cutting
+
+**Material Specifications:**
+- Half-inch (1/2") plate parts: 14 parts total
+- Quarter-inch (1/4") plate parts: 9 parts total
+
+EOF
+          echo "✓ README updated with CNC layout section"
+        else
+          echo "ℹ️  README already has CNC layout section"
+        fi
+    
+    - name: Commit and push if changed
+      run: |
+        cd LifeTrac-v25/mechanical_design
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add cnclayout.svg README.md || true
+        
+        if git diff --staged --quiet; then
+          echo "ℹ️  No changes to commit"
+        else
+          echo "📝 Committing changes..."
+          git commit -m "Update combined CNC layout SVG with detailed parts [skip ci]"
+          git push
+          echo "✅ Changes pushed successfully"
+        fi
