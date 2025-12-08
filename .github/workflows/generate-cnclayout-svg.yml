@@ -81,26 +81,26 @@ jobs:
         if ! grep -q "## CNC Cutting Layout" README.md; then
           echo "Adding CNC layout section to README..."
           
-          cat >> README.md << 'EOF'
-
-## CNC Cutting Layout
-
-### Combined Layout (All Parts)
-![CNC Cutting Layout - All Parts](cnclayout.svg)
-
-The combined CNC layout includes all 23 sheet metal parts with complete manufacturing details:
-- Mounting holes with proper clearances
-- Pivot holes for arm and cylinder connections
-- Arc slots for cross beam clearance (inner panels)
-- Lightening holes for weight reduction
-- Anti-slip hole patterns (standing deck)
-- All parts properly spaced for efficient cutting
-
-**Material Specifications:**
-- Half-inch (1/2") plate parts: 14 parts total
-- Quarter-inch (1/4") plate parts: 9 parts total
-
-EOF
+          {
+            echo ""
+            echo "## CNC Cutting Layout"
+            echo ""
+            echo "### Combined Layout (All Parts)"
+            echo '![CNC Cutting Layout - All Parts](cnclayout.svg)'
+            echo ""
+            echo "The combined CNC layout includes all 23 sheet metal parts with complete manufacturing details:"
+            echo "- Mounting holes with proper clearances"
+            echo "- Pivot holes for arm and cylinder connections"
+            echo "- Arc slots for cross beam clearance (inner panels)"
+            echo "- Lightening holes for weight reduction"
+            echo "- Anti-slip hole patterns (standing deck)"
+            echo "- All parts properly spaced for efficient cutting"
+            echo ""
+            echo "**Material Specifications:**"
+            echo '- Half-inch (1/2") plate parts: 14 parts total'
+            echo '- Quarter-inch (1/4") plate parts: 9 parts total'
+            echo ""
+          } >> README.md
           echo "✓ README updated with CNC layout section"
         else
           echo "ℹ️  README already has CNC layout section"
