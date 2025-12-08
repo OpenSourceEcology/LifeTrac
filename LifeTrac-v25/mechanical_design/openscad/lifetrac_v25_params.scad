@@ -3,6 +3,13 @@
 // This file contains only the constants needed for part design
 // Full assembly uses lifetrac_v25.scad
 
+// -----------------------------------------------------------------------------
+// Compatibility helper
+// OpenSCAD throws warnings when the BOSL2 helper `parent_modules()` is missing.
+// We provide a stub that returns an empty list so part files can run cleanly
+// when opened directly without pulling in BOSL2.
+function parent_modules() = is_undef($parent_modules) ? [] : $parent_modules;
+
 // =============================================================================
 // MATERIAL CONSTANTS
 // =============================================================================
