@@ -138,6 +138,21 @@ jobs:
         else
           echo "📝 Committing changes..."
           git commit -m "Update individual part SVG cutouts [skip ci]"
+          
+          # Fetch and rebase to incorporate any remote changes
+          BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
+          echo "🔄 Fetching latest changes from branch: ${BRANCH_NAME}..."
+          git fetch origin "${BRANCH_NAME}"
+          
+          echo "🔄 Rebasing on latest changes..."
+          if ! git rebase "origin/${BRANCH_NAME}"; then
+            echo "❌ Failed to rebase. There may be conflicts."
+            echo "Aborting rebase and exiting..."
+            git rebase --abort
+            exit 1
+          fi
+          
+          echo "📤 Pushing changes..."
           git push
           echo "✅ Changes pushed successfully"
         fi
