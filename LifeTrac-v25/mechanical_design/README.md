@@ -305,3 +305,21 @@ The combined CNC layout includes all 23 sheet metal parts with complete manufact
 - Half-inch (1/2") plate parts: 14 parts total
 - Quarter-inch (1/4") plate parts: 9 parts total
 
+
+## Individual Part SVGs
+
+2D CNC cutting layouts for each individual plate part:
+
+### Half-Inch (1/2") Plate Parts
+- [Side Panel Outer](output/svg/parts/side_panel_outer.svg) - 2× needed
+- [Side Panel Inner](output/svg/parts/side_panel_inner.svg) - 2× needed
+- [Wheel Mount](output/svg/parts/wheel_mount.svg) - 4× needed
+- [Cylinder Lug](output/svg/parts/cylinder_lug.svg) - 6× needed
+- [Rear Crossmember](output/svg/parts/rear_crossmember.svg) - 1× needed
+
+### Quarter-Inch (1/4") Plate Parts
+- [Standing Deck](output/svg/parts/standing_deck.svg) - 1× needed
+- [Bucket Bottom](output/svg/parts/bucket_bottom.svg) - 1× needed
+- [Bucket Side](output/svg/parts/bucket_side.svg) - 2× needed (mirror for opposite)
+
+Total: 23 parts from 8 unique designs
