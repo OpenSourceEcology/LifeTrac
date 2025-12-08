@@ -6,10 +6,10 @@ This file tracks the history of structural analysis test results.
 
 ## Latest Analysis
 
-**Date:** 2025-12-07 07:34:53 UTC
-**Commit:** 6af488f1e4c1a8f421320b96ce13f2898a2f8fcb
-**Branch:** main
-**Workflow Run:** https://github.com/OpenSourceEcology/LifeTrac/actions/runs/20000954034
+**Date:** 2025-12-08 02:04:56 UTC
+**Commit:** 23351ca0794535cb24a790765d110d8eccc21fc6
+**Branch:** copilot/fix-cnclayout-rendering-issue
+**Workflow Run:** https://github.com/OpenSourceEcology/LifeTrac/actions/runs/20013666015
 
 ### Error
 

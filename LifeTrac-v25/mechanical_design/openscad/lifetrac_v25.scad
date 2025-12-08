@@ -10,6 +10,15 @@ use <../modules/fasteners.scad>
 use <../modules/hydraulics.scad>
 use <../modules/wheels.scad>
 
+// Import individual part files
+use <../parts/side_panel.scad>
+use <../parts/rear_crossmember.scad>
+use <../parts/standing_deck.scad>
+use <../parts/wheel_mount.scad>
+use <../parts/cylinder_lug.scad>
+use <../parts/bucket_bottom.scad>
+use <../parts/bucket_side.scad>
+
 // =============================================================================
 // GLOBAL PARAMETERS
 // =============================================================================
@@ -1188,7 +1197,7 @@ module side_panel_left_outer() {
     color("DarkSlateGray")
     translate([-(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), 0, FRAME_Z_OFFSET])
     rotate([90, 0, 90])
-    side_panel_with_holes(false);
+    side_panel(is_inner=false);
 }
 
 // Left inner panel
@@ -1196,7 +1205,7 @@ module side_panel_left_inner() {
     color("DarkSlateGray")
     translate([-(TRACK_WIDTH/2 - SANDWICH_SPACING/2), 0, FRAME_Z_OFFSET])
     rotate([90, 0, 90])
-    side_panel_with_holes(true);
+    side_panel(is_inner=true);
 }
 
 // Right inner panel
@@ -1204,7 +1213,7 @@ module side_panel_right_inner() {
     color("DarkSlateGray")
     translate([(TRACK_WIDTH/2 - SANDWICH_SPACING/2 - PANEL_THICKNESS), 0, FRAME_Z_OFFSET])
     rotate([90, 0, 90])
-    side_panel_with_holes(true);
+    side_panel(is_inner=true);
 }
 
 // Right outer panel
@@ -1212,20 +1221,20 @@ module side_panel_right_outer() {
     color("DarkSlateGray")
     translate([(TRACK_WIDTH/2 + SANDWICH_SPACING/2), 0, FRAME_Z_OFFSET])
     rotate([90, 0, 90])
-    side_panel_with_holes(false);
+    side_panel(is_inner=false);
 }
 
 // =============================================================================
 // CROSSMEMBERS
 // =============================================================================
 
-module rear_crossmember() {
+module rear_crossmember_assembly() {
+    // Positioned rear crossmember for assembly
     back_height = MACHINE_HEIGHT * 0.55;
-    crossmember_width = TRACK_WIDTH + SANDWICH_SPACING + PANEL_THICKNESS * 2;
     
     color("DarkSlateGray")
     translate([0, -PANEL_THICKNESS/2, FRAME_Z_OFFSET + back_height/2])
-    cube([crossmember_width, PANEL_THICKNESS, back_height], center=true);
+    rear_crossmember();
 }
 
 module front_crossmember() {
