@@ -1,0 +1,143 @@
+name: Generate Individual Part SVGs
+
+on:
+  push:
+    branches: [ main, master ]
+    paths: 
+      - 'LifeTrac-v25/mechanical_design/parts/*.scad'
+      - 'LifeTrac-v25/mechanical_design/openscad/lifetrac_v25_params.scad'
+  pull_request:
+    branches: [ main, master ]
+    paths: 
+      - 'LifeTrac-v25/mechanical_design/parts/*.scad'
+      - 'LifeTrac-v25/mechanical_design/openscad/lifetrac_v25_params.scad'
+  workflow_dispatch:
+
+jobs:
+  generate-svgs:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ github.head_ref || github.ref_name }}
+    
+    - name: Install OpenSCAD
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openscad xvfb
+    
+    - name: Generate Individual Part SVGs
+      run: |
+        cd LifeTrac-v25/mechanical_design
+        mkdir -p output/svg/parts
+        
+        echo "========================================="
+        echo "Generating Individual Part SVG Cutouts"
+        echo "========================================="
+        
+        # Function to export a part
+        export_part() {
+          local name=$1
+          local scad=$2
+          local svg=$3
+          echo "Exporting ${name}..."
+          xvfb-run -a openscad --render --export-format=svg -o "${svg}" "${scad}" 2>&1 | grep -v "WARNING" || true
+          if [ -f "${svg}" ]; then
+            echo "  ✓ ${name} exported"
+            ls -lh "${svg}"
+          else
+            echo "  ✗ Failed to export ${name}"
+          fi
+        }
+        
+        # Export all parts
+        export_part "Side Panel Outer" \
+          "parts/export_side_panel_outer.scad" \
+          "output/svg/parts/side_panel_outer.svg"
+        
+        export_part "Side Panel Inner" \
+          "parts/export_side_panel_inner.scad" \
+          "output/svg/parts/side_panel_inner.svg"
+        
+        export_part "Wheel Mount" \
+          "parts/export_wheel_mount.scad" \
+          "output/svg/parts/wheel_mount.svg"
+        
+        export_part "Cylinder Lug" \
+          "parts/export_cylinder_lug.scad" \
+          "output/svg/parts/cylinder_lug.svg"
+        
+        export_part "Rear Crossmember" \
+          "parts/export_rear_crossmember.scad" \
+          "output/svg/parts/rear_crossmember.svg"
+        
+        export_part "Standing Deck" \
+          "parts/export_standing_deck.scad" \
+          "output/svg/parts/standing_deck.svg"
+        
+        export_part "Bucket Bottom" \
+          "parts/export_bucket_bottom.scad" \
+          "output/svg/parts/bucket_bottom.svg"
+        
+        export_part "Bucket Side" \
+          "parts/export_bucket_side.scad" \
+          "output/svg/parts/bucket_side.svg"
+        
+        echo "========================================="
+        echo "Export Complete!"
+        echo "========================================="
+        ls -lh output/svg/parts/
+    
+    - name: Update README with part SVG links
+      run: |
+        cd LifeTrac-v25/mechanical_design
+        
+        # Check if README already has part SVG section
+        if ! grep -q "Individual Part SVGs" README.md; then
+          echo "Adding Individual Part SVG section to README..."
+          
+          cat >> README.md << 'EOF'
+
+## Individual Part SVGs
+
+2D CNC cutting layouts for each individual plate part:
+
+### Half-Inch (1/2") Plate Parts
+- [Side Panel Outer](output/svg/parts/side_panel_outer.svg) - 2× needed
+- [Side Panel Inner](output/svg/parts/side_panel_inner.svg) - 2× needed
+- [Wheel Mount](output/svg/parts/wheel_mount.svg) - 4× needed
+- [Cylinder Lug](output/svg/parts/cylinder_lug.svg) - 6× needed
+- [Rear Crossmember](output/svg/parts/rear_crossmember.svg) - 1× needed
+
+### Quarter-Inch (1/4") Plate Parts
+- [Standing Deck](output/svg/parts/standing_deck.svg) - 1× needed
+- [Bucket Bottom](output/svg/parts/bucket_bottom.svg) - 1× needed
+- [Bucket Side](output/svg/parts/bucket_side.svg) - 2× needed (mirror for opposite)
+
+Total: 23 parts from 8 unique designs
+EOF
+          echo "✓ README updated with part SVG links"
+        else
+          echo "ℹ️  README already has part SVG section"
+        fi
+    
+    - name: Commit and push if changed
+      run: |
+        cd LifeTrac-v25/mechanical_design
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add output/svg/parts/*.svg README.md || true
+        
+        if git diff --staged --quiet; then
+          echo "ℹ️  No changes to commit"
+        else
+          echo "📝 Committing changes..."
+          git commit -m "Update individual part SVG cutouts [skip ci]"
+          git push
+          echo "✅ Changes pushed successfully"
+        fi
