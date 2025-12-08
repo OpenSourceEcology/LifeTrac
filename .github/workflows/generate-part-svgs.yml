@@ -141,7 +141,12 @@ jobs:
           
           # Pull any remote changes and rebase our commit on top
           echo "🔄 Pulling latest changes..."
-          git pull --rebase origin ${{ github.head_ref || github.ref_name }}
+          if ! git pull --rebase --autostash origin ${{ github.head_ref || github.ref_name }}; then
+            echo "❌ Failed to rebase. There may be conflicts."
+            echo "Aborting rebase and exiting..."
+            git rebase --abort || true
+            exit 1
+          fi
           
           echo "📤 Pushing changes..."
           git push
