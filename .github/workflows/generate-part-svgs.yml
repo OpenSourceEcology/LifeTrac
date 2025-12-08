@@ -140,11 +140,12 @@ jobs:
           git commit -m "Update individual part SVG cutouts [skip ci]"
           
           # Fetch and rebase to incorporate any remote changes
-          echo "🔄 Fetching latest changes..."
-          git fetch origin ${{ github.head_ref || github.ref_name }}
+          BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
+          echo "🔄 Fetching latest changes from branch: ${BRANCH_NAME}..."
+          git fetch origin "${BRANCH_NAME}"
           
           echo "🔄 Rebasing on latest changes..."
-          if ! git rebase origin/${{ github.head_ref || github.ref_name }}; then
+          if ! git rebase "origin/${BRANCH_NAME}"; then
             echo "❌ Failed to rebase. There may be conflicts."
             echo "Aborting rebase and exiting..."
             git rebase --abort
