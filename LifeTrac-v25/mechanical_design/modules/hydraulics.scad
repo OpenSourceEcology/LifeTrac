@@ -16,19 +16,24 @@ $fn = 32;
  */
 module hydraulic_cylinder(bore_diameter=63.5, rod_diameter=31.75, 
                          stroke=300, retracted=true, extension=0,
-                         mounting_type="clevis") {
-    
-    body_length = stroke + 100; // Body is longer than stroke
-    actual_extension = retracted ? 0 : (extension > 0 ? extension : stroke);
+                         mounting_type="clevis", total_length=0) {
+    // Clamp requested extension to realistic range to avoid flipped visuals
+    desired_extension = retracted ? 0 : max(0, min(extension, stroke));
+    // If a total mount-to-mount length is provided, keep extension within it
+    actual_extension = (total_length > 0) ? min(desired_extension, total_length) : desired_extension;
+    // Pick body length so body + rod extension spans the requested total length when given
+    body_length = (total_length > 0)
+        ? max(total_length - actual_extension, rod_diameter * 2 + 20)
+        : stroke + 100; // Legacy fallback sizing
     
     // Cylinder body
     color("Orange")
     cylinder(d=bore_diameter, h=body_length);
     
-    // Rod
+    // Rod (extends with increasing extension value)
     color("Silver")
     translate([0, 0, body_length])
-    cylinder(d=rod_diameter, h=stroke - actual_extension);
+    cylinder(d=rod_diameter, h=actual_extension);
     
     // Base mounting
     color("DimGray")
@@ -53,9 +58,9 @@ module hydraulic_cylinder(bore_diameter=63.5, rod_diameter=31.75,
         cylinder(d=bore_diameter*1.3, h=20);
     }
     
-    // Rod end mounting
+    // Rod end mounting follows the rod tip
     color("DimGray")
-    translate([0, 0, body_length + stroke - actual_extension])
+    translate([0, 0, body_length + actual_extension])
     if (mounting_type == "clevis") {
         // Clevis at rod end
         cylinder(d=rod_diameter*2, h=30);

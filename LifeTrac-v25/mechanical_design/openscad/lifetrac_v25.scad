@@ -138,9 +138,13 @@ echo("CLEARANCE_FROM_FRONT_WHEELS =", ARM_PIVOT_Y + ARM_HORIZONTAL_REACH - WHEEL
 ARM_TUBE_SIZE = TUBE_3X3_1_4;         // 3"x3" arm tubing
 ARM_SPACING = TRACK_WIDTH;            // Distance between arm centerlines
 
-// Default arm position: lowered to ground (animation_time=0)
+// Looping animation: 0->0.5 = arms go up, 0.5->1 = arms come back down
+// This creates a smooth loop where the animation returns to start position
+animation_phase = animation_time < 0.5 ? (animation_time * 2) : (2 - animation_time * 2);
+
+// Default arm position: lowered to ground (animation_phase=0)
 // ARM_GROUND_ANGLE is the angle below horizontal needed to reach ground
-ARM_LIFT_ANGLE = -ARM_GROUND_ANGLE + (animation_time * (60 + ARM_GROUND_ANGLE)); // Animate from ground to raised
+ARM_LIFT_ANGLE = -ARM_GROUND_ANGLE + (animation_phase * (60 + ARM_GROUND_ANGLE)); // Animate from ground to raised and back
 
 // Cross beam positions along arm length (from pivot)
 // First cross beam positioned for bucket cylinder attachment
@@ -217,7 +221,11 @@ BUCKET_HEIGHT = 450;
 // At ground position (ARM_LIFT_ANGLE = -ARM_GROUND_ANGLE), bucket tilts forward to lay flat
 // The bucket bottom is horizontal when bucket tilt = ARM_GROUND_ANGLE (compensates for arm angle)
 BUCKET_GROUND_TILT = ARM_GROUND_ANGLE;  // Tilt needed to make bottom flat when arm at ground
-BUCKET_TILT_ANGLE = BUCKET_GROUND_TILT + (animation_time * (45 - BUCKET_GROUND_TILT));  // From flat to curled
+BUCKET_MAX_CURL = 60;  // Maximum curl angle when fully raised
+
+// Bucket actuates with the arm using the same animation_phase for looping
+// Starts flat on ground, curls up as arm rises, then uncurls as arm lowers
+BUCKET_TILT_ANGLE = BUCKET_GROUND_TILT + (animation_phase * (BUCKET_MAX_CURL - BUCKET_GROUND_TILT));  // From flat to curled and back
 
 // =============================================================================
 // HYDRAULIC CYLINDER MOUNTING POINTS
@@ -882,11 +890,12 @@ module oriented_cylinder(base_pt, target_pt, bore, rod, stroke, extension) {
     
     translate(base_pt)
     rotate(a = angle, v = axis) {
-        hydraulic_cylinder(bore, rod, stroke, false, extension, "clevis");
+        // Scale cylinder to exactly span between mounts using total_length
+        hydraulic_cylinder(bore, rod, stroke, false, extension, "clevis", len);
         
-        // Base clevis pin with nuts
+        // Base clevis pin with nuts (pin axis along X to match lug holes)
         translate([0, 0, -10])
-        rotate([90, 0, 0]) {
+        rotate([0, 90, 0]) {
             // Pin
             color("Silver")
             cylinder(d=clevis_pin_dia, h=clevis_pin_length, center=true, $fn=24);
@@ -906,7 +915,7 @@ module oriented_cylinder(base_pt, target_pt, bore, rod, stroke, extension) {
     
     translate(target_pt)
     rotate(a = angle, v = axis)
-    rotate([90, 0, 0]) {
+    rotate([0, 90, 0]) {  // Pin axis along X to match lug holes
         // Pin
         color("Silver")
         cylinder(d=rod_pin_dia, h=rod_pin_length, center=true, $fn=24);
@@ -1376,7 +1385,7 @@ module wheel_assemblies() {
         for (i = [0:3]) {
             translate(positions[i])
             rotate([0, 0, 90])
-            rotate([animation_time * 360, 0, 0])  // Spin animation
+            rotate([0, animation_time * 360, 0])  // Spin around axle (wheel axis is Y)
             {
                 wheel(WHEEL_DIAMETER, WHEEL_WIDTH, 150, true);
                 
@@ -1535,9 +1544,12 @@ module bobcat_quick_attach_plate() {
     }
     
     // Bucket cylinder attachment points - TYPE A: U-Channel from 3"x3" tube with pins
-    for (x = [-flange_spacing/2, flange_spacing/2]) {
-        translate([x, plate_thick + 40, -60])  // Near top of plate
-        rotate([0, 0, 90])
+    // Bucket cylinder lugs: align with cylinder line and bring inward toward machine center
+    for (side = [-1, 1]) {
+        x = side * BUCKET_CYL_X_SPACING;          // Match arm-side cylinder X offset
+        y = plate_thick + 20;                     // Tuck closer to the plate (inboard)
+        z = -60;                                  // Height on plate
+        translate([x, y, z])
         u_channel_lug_with_pin(TUBE_3X3_1_4, 80, BOLT_DIA_3_4 + 2);
     }
 }
