@@ -60,10 +60,10 @@ jobs:
           
           # Generate assembly.png (1024x768 matching CEB-Press example)
           # Camera positioned to center on midpoint between wheels (Y=700)
-          # Zoomed out to show full range of arm motion
+          # Zoomed out to show full range of arm motion including arms at highest point
           echo "Generating assembly.png..."
           openscad -o assembly.png \
-            --camera=3500,3500,2500,0,700,500 \
+            --camera=4200,4200,3000,0,700,800 \
             --imgsize=1024,768 \
             --projection=p \
             --colorscheme=Nature \
@@ -85,10 +85,10 @@ jobs:
           
           # Main assembly view
           # Camera positioned to center on midpoint between wheels (Y=700)
-          # Zoomed out to show full range of arm motion
+          # Zoomed out to show full range of arm motion including arms at highest point
           echo "Rendering main assembly..."
           openscad -o output/renders/lifetrac_v25_main.png \
-            --camera=3500,3500,2500,0,700,500 \
+            --camera=4200,4200,3000,0,700,800 \
             --imgsize=1920,1080 \
             --projection=p \
             --colorscheme=Nature \
@@ -96,9 +96,10 @@ jobs:
           
           # Front view
           # Camera positioned to center on midpoint between wheels (Y=700)
+          # Zoomed out to show full range of arm motion
           echo "Rendering front view..."
           openscad -o output/renders/lifetrac_v25_front.png \
-            --camera=0,3500,1000,0,700,500 \
+            --camera=0,4200,1200,0,700,800 \
             --imgsize=1920,1080 \
             --projection=p \
             --colorscheme=Nature \
@@ -106,9 +107,10 @@ jobs:
           
           # Side view
           # Camera positioned to center on midpoint between wheels (Y=700)
+          # Zoomed out to show full range of arm motion
           echo "Rendering side view..."
           openscad -o output/renders/lifetrac_v25_side.png \
-            --camera=3500,700,1000,0,700,500 \
+            --camera=4200,700,1200,0,700,800 \
             --imgsize=1920,1080 \
             --projection=p \
             --colorscheme=Nature \
@@ -119,7 +121,7 @@ jobs:
           # Zoomed out for better overview
           echo "Rendering top view..."
           openscad -o output/renders/lifetrac_v25_top.png \
-            --camera=0,700,3500,0,700,500 \
+            --camera=0,700,4200,0,700,800 \
             --imgsize=1920,1080 \
             --projection=o \
             --colorscheme=Nature \
@@ -152,14 +154,14 @@ jobs:
           
           # Generate 36 frames for animation (every 10 degrees)
           # Camera positioned to center on midpoint between wheels (Y=700)
-          # Zoomed out to show full range of arm motion
+          # Zoomed out to show full range of arm motion including arms at highest point
           total_frames=36
           for i in $(seq 0 $((total_frames-1))); do
             # Use total_frames-1 so last frame lands exactly at t=1.0
             t=$(awk "BEGIN {print $i/($total_frames-1)}")
             printf "Frame %d (t=%.4f)\n" "$i" "$t"
             openscad -o "output/animations/frames/frame_$(printf %03d $i).png" \
-              --camera=3500,3500,2500,0,700,500 \
+              --camera=4200,4200,3000,0,700,800 \
               --imgsize=1280,720 \
               --projection=p \
               --colorscheme=Nature \
