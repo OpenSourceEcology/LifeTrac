@@ -58,13 +58,64 @@ jobs:
         run: |
           cd LifeTrac-v25/mechanical_design
           
-          # Generate assembly.png (1024x768 matching CEB-Press example)
-          # Camera positioned to center on midpoint between wheels (Y=700)
-          # Zoomed out to show full range of arm motion including arms at highest point
+          # Calculate camera position dynamically based on machine dimensions
+          # Extract parameters from OpenSCAD file
+          MACHINE_HEIGHT=$(grep -E "^MACHINE_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          WHEEL_BASE=$(grep -E "^WHEEL_BASE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          GROUND_CLEARANCE=$(grep -E "^GROUND_CLEARANCE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          ARM_MAX_ANGLE=$(grep -E "^ARM_MAX_ANGLE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          BUCKET_HEIGHT=$(grep -E "^BUCKET_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          
+          # Calculate key dimensions
+          FRAME_Z_OFFSET=$GROUND_CLEARANCE
+          ARM_PIVOT_Z=$((FRAME_Z_OFFSET + MACHINE_HEIGHT - 50))
+          WHEEL_MIDPOINT_Y=$((WHEEL_BASE / 2))
+          
+          # Calculate maximum height when arms are raised to ARM_MAX_ANGLE (60 degrees)
+          # ARM_LENGTH is approximately sqrt(ARM_PIVOT_Z^2 + HORIZONTAL_REACH^2)
+          # For this machine: ARM_LENGTH ≈ 1600mm
+          # Max height = ARM_PIVOT_Z + ARM_LENGTH * sin(60°) + BUCKET_HEIGHT
+          # Using approximation: sin(60°) ≈ 0.866
+          ARM_LENGTH_APPROX=1600
+          MAX_ARM_TIP_HEIGHT=$(awk "BEGIN {print int($ARM_PIVOT_Z + $ARM_LENGTH_APPROX * 0.866 + $BUCKET_HEIGHT)}")
+          
+          # Calculate camera position to frame the scene properly
+          # Bottom margin: wheels at ground (Z=0) should be near bottom with small margin
+          # Top margin: max arm height should reach near top with small margin
+          # Height range to capture: 0 to MAX_ARM_TIP_HEIGHT
+          SCENE_HEIGHT=$MAX_ARM_TIP_HEIGHT
+          MARGIN_FACTOR="1.15"  # 15% margin on top and bottom
+          
+          # Center point: halfway between ground and max height, at wheel midpoint Y
+          CENTER_Y=$WHEEL_MIDPOINT_Y
+          CENTER_Z=$(awk "BEGIN {print int($SCENE_HEIGHT / 2)}")
+          
+          # Camera distance: calculate to fit scene in square 720x720 frame
+          # Using 45-degree isometric view angle (sqrt(2) factor for diagonal)
+          CAMERA_DISTANCE=$(awk "BEGIN {print int($SCENE_HEIGHT * $MARGIN_FACTOR * 1.414)}")
+          
+          echo "=== Camera Calculation ==="
+          echo "Machine dimensions:"
+          echo "  MACHINE_HEIGHT: $MACHINE_HEIGHT mm"
+          echo "  WHEEL_BASE: $WHEEL_BASE mm"
+          echo "  GROUND_CLEARANCE: $GROUND_CLEARANCE mm"
+          echo "  ARM_MAX_ANGLE: $ARM_MAX_ANGLE degrees"
+          echo "  BUCKET_HEIGHT: $BUCKET_HEIGHT mm"
+          echo "Calculated values:"
+          echo "  ARM_PIVOT_Z: $ARM_PIVOT_Z mm"
+          echo "  MAX_ARM_TIP_HEIGHT: $MAX_ARM_TIP_HEIGHT mm"
+          echo "  SCENE_HEIGHT: $SCENE_HEIGHT mm"
+          echo "  CAMERA_DISTANCE: $CAMERA_DISTANCE mm"
+          echo "  CENTER_Y: $CENTER_Y mm"
+          echo "  CENTER_Z: $CENTER_Z mm"
+          echo "Camera position: --camera=$CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,0,$CENTER_Y,$CENTER_Z"
+          echo "=========================="
+          
+          # Generate assembly.png (720x720 square as requested)
           echo "Generating assembly.png..."
           openscad -o assembly.png \
-            --camera=4200,4200,3000,0,700,800 \
-            --imgsize=1024,768 \
+            --camera=$CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,0,$CENTER_Y,$CENTER_Z \
+            --imgsize=720,720 \
             --projection=p \
             --colorscheme=Nature \
             openscad/lifetrac_v25.scad
@@ -83,46 +134,55 @@ jobs:
         run: |
           cd LifeTrac-v25/mechanical_design
           
-          # Main assembly view
-          # Camera positioned to center on midpoint between wheels (Y=700)
-          # Zoomed out to show full range of arm motion including arms at highest point
+          # Calculate camera position dynamically (same as assembly.png)
+          MACHINE_HEIGHT=$(grep -E "^MACHINE_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          WHEEL_BASE=$(grep -E "^WHEEL_BASE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          GROUND_CLEARANCE=$(grep -E "^GROUND_CLEARANCE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          BUCKET_HEIGHT=$(grep -E "^BUCKET_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          
+          FRAME_Z_OFFSET=$GROUND_CLEARANCE
+          ARM_PIVOT_Z=$((FRAME_Z_OFFSET + MACHINE_HEIGHT - 50))
+          WHEEL_MIDPOINT_Y=$((WHEEL_BASE / 2))
+          ARM_LENGTH_APPROX=1600
+          MAX_ARM_TIP_HEIGHT=$(awk "BEGIN {print int($ARM_PIVOT_Z + $ARM_LENGTH_APPROX * 0.866 + $BUCKET_HEIGHT)}")
+          SCENE_HEIGHT=$MAX_ARM_TIP_HEIGHT
+          MARGIN_FACTOR="1.15"
+          CENTER_Y=$WHEEL_MIDPOINT_Y
+          CENTER_Z=$(awk "BEGIN {print int($SCENE_HEIGHT / 2)}")
+          CAMERA_DISTANCE=$(awk "BEGIN {print int($SCENE_HEIGHT * $MARGIN_FACTOR * 1.414)}")
+          
+          # Main assembly view (720x720 square)
           echo "Rendering main assembly..."
           openscad -o output/renders/lifetrac_v25_main.png \
-            --camera=4200,4200,3000,0,700,800 \
-            --imgsize=1920,1080 \
+            --camera=$CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,0,$CENTER_Y,$CENTER_Z \
+            --imgsize=720,720 \
             --projection=p \
             --colorscheme=Nature \
             openscad/lifetrac_v25.scad
           
-          # Front view
-          # Camera positioned to center on midpoint between wheels (Y=700)
-          # Zoomed out to show full range of arm motion
+          # Front view (720x720 square, uses calculated camera position)
           echo "Rendering front view..."
           openscad -o output/renders/lifetrac_v25_front.png \
-            --camera=0,4200,1200,0,700,800 \
-            --imgsize=1920,1080 \
+            --camera=0,$CAMERA_DISTANCE,$CENTER_Z,0,$CENTER_Y,$CENTER_Z \
+            --imgsize=720,720 \
             --projection=p \
             --colorscheme=Nature \
             openscad/lifetrac_v25.scad
           
-          # Side view
-          # Camera positioned to center on midpoint between wheels (Y=700)
-          # Zoomed out to show full range of arm motion
+          # Side view (720x720 square, uses calculated camera position)
           echo "Rendering side view..."
           openscad -o output/renders/lifetrac_v25_side.png \
-            --camera=4200,700,1200,0,700,800 \
-            --imgsize=1920,1080 \
+            --camera=$CAMERA_DISTANCE,$CENTER_Y,$CENTER_Z,0,$CENTER_Y,$CENTER_Z \
+            --imgsize=720,720 \
             --projection=p \
             --colorscheme=Nature \
             openscad/lifetrac_v25.scad
           
-          # Top view
-          # Camera positioned to center on midpoint between wheels (Y=700)
-          # Zoomed out for better overview
+          # Top view (720x720 square, uses calculated camera position)
           echo "Rendering top view..."
           openscad -o output/renders/lifetrac_v25_top.png \
-            --camera=0,700,4200,0,700,800 \
-            --imgsize=1920,1080 \
+            --camera=0,$CENTER_Y,$CAMERA_DISTANCE,0,$CENTER_Y,$CENTER_Z \
+            --imgsize=720,720 \
             --projection=o \
             --colorscheme=Nature \
             openscad/lifetrac_v25.scad
@@ -149,20 +209,37 @@ jobs:
         run: |
           cd LifeTrac-v25/mechanical_design
           
-          echo "Generating animation frames..."
+          # Calculate camera position dynamically (same as assembly.png)
+          MACHINE_HEIGHT=$(grep -E "^MACHINE_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          WHEEL_BASE=$(grep -E "^WHEEL_BASE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          GROUND_CLEARANCE=$(grep -E "^GROUND_CLEARANCE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          BUCKET_HEIGHT=$(grep -E "^BUCKET_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          
+          FRAME_Z_OFFSET=$GROUND_CLEARANCE
+          ARM_PIVOT_Z=$((FRAME_Z_OFFSET + MACHINE_HEIGHT - 50))
+          WHEEL_MIDPOINT_Y=$((WHEEL_BASE / 2))
+          ARM_LENGTH_APPROX=1600
+          MAX_ARM_TIP_HEIGHT=$(awk "BEGIN {print int($ARM_PIVOT_Z + $ARM_LENGTH_APPROX * 0.866 + $BUCKET_HEIGHT)}")
+          SCENE_HEIGHT=$MAX_ARM_TIP_HEIGHT
+          MARGIN_FACTOR="1.15"
+          CENTER_Y=$WHEEL_MIDPOINT_Y
+          CENTER_Z=$(awk "BEGIN {print int($SCENE_HEIGHT / 2)}")
+          CAMERA_DISTANCE=$(awk "BEGIN {print int($SCENE_HEIGHT * $MARGIN_FACTOR * 1.414)}")
+          
+          echo "Generating animation frames with calculated camera position..."
+          echo "Camera: $CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,0,$CENTER_Y,$CENTER_Z"
           mkdir -p output/animations/frames
           
           # Generate 36 frames for animation (every 10 degrees)
-          # Camera positioned to center on midpoint between wheels (Y=700)
-          # Zoomed out to show full range of arm motion including arms at highest point
+          # Using dynamically calculated camera position that adapts to machine dimensions
           total_frames=36
           for i in $(seq 0 $((total_frames-1))); do
             # Use total_frames-1 so last frame lands exactly at t=1.0
             t=$(awk "BEGIN {print $i/($total_frames-1)}")
             printf "Frame %d (t=%.4f)\n" "$i" "$t"
             openscad -o "output/animations/frames/frame_$(printf %03d $i).png" \
-              --camera=4200,4200,3000,0,700,800 \
-              --imgsize=1280,720 \
+              --camera=$CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,0,$CENTER_Y,$CENTER_Z \
+              --imgsize=720,720 \
               --projection=p \
               --colorscheme=Nature \
               -D "animation_time=$t" \
