@@ -60,24 +60,29 @@ jobs:
           
           # Calculate camera position dynamically based on machine dimensions
           # Extract parameters from OpenSCAD file
-          MACHINE_HEIGHT=$(grep -E "^MACHINE_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
-          WHEEL_BASE=$(grep -E "^WHEEL_BASE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
-          GROUND_CLEARANCE=$(grep -E "^GROUND_CLEARANCE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
-          ARM_MAX_ANGLE=$(grep -E "^ARM_MAX_ANGLE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
-          BUCKET_HEIGHT=$(grep -E "^BUCKET_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          MACHINE_HEIGHT=$(grep -E "^MACHINE_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "1000")
+          WHEEL_BASE=$(grep -E "^WHEEL_BASE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "1400")
+          GROUND_CLEARANCE=$(grep -E "^GROUND_CLEARANCE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "150")
+          ARM_MAX_ANGLE=$(grep -E "^ARM_MAX_ANGLE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "60")
+          BUCKET_HEIGHT=$(grep -E "^BUCKET_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "450")
+          
+          # Validate extracted parameters
+          if [ -z "$MACHINE_HEIGHT" ] || [ -z "$WHEEL_BASE" ] || [ -z "$GROUND_CLEARANCE" ]; then
+            echo "ERROR: Failed to extract required parameters from OpenSCAD file"
+            exit 1
+          fi
           
           # Calculate key dimensions
           FRAME_Z_OFFSET=$GROUND_CLEARANCE
           ARM_PIVOT_Z=$((FRAME_Z_OFFSET + MACHINE_HEIGHT - 50))
           WHEEL_MIDPOINT_Y=$((WHEEL_BASE / 2))
           
-          # Calculate maximum height when arms are raised to ARM_MAX_ANGLE (60 degrees)
+          # Calculate maximum height when arms are raised to ARM_MAX_ANGLE
           # ARM_LENGTH is approximately sqrt(ARM_PIVOT_Z^2 + HORIZONTAL_REACH^2)
           # For this machine: ARM_LENGTH ≈ 1600mm
-          # Max height = ARM_PIVOT_Z + ARM_LENGTH * sin(60°) + BUCKET_HEIGHT
-          # Using approximation: sin(60°) ≈ 0.866
+          # Max height = ARM_PIVOT_Z + ARM_LENGTH * sin(ARM_MAX_ANGLE) + BUCKET_HEIGHT
           ARM_LENGTH_APPROX=1600
-          MAX_ARM_TIP_HEIGHT=$(awk "BEGIN {print int($ARM_PIVOT_Z + $ARM_LENGTH_APPROX * 0.866 + $BUCKET_HEIGHT)}")
+          MAX_ARM_TIP_HEIGHT=$(awk "BEGIN {pi=3.14159; print int($ARM_PIVOT_Z + $ARM_LENGTH_APPROX * sin($ARM_MAX_ANGLE * pi / 180) + $BUCKET_HEIGHT)}")
           
           # Calculate camera position to frame the scene properly
           # Bottom margin: wheels at ground (Z=0) should be near bottom with small margin
@@ -135,16 +140,17 @@ jobs:
           cd LifeTrac-v25/mechanical_design
           
           # Calculate camera position dynamically (same as assembly.png)
-          MACHINE_HEIGHT=$(grep -E "^MACHINE_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
-          WHEEL_BASE=$(grep -E "^WHEEL_BASE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
-          GROUND_CLEARANCE=$(grep -E "^GROUND_CLEARANCE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
-          BUCKET_HEIGHT=$(grep -E "^BUCKET_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          MACHINE_HEIGHT=$(grep -E "^MACHINE_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "1000")
+          WHEEL_BASE=$(grep -E "^WHEEL_BASE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "1400")
+          GROUND_CLEARANCE=$(grep -E "^GROUND_CLEARANCE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "150")
+          ARM_MAX_ANGLE=$(grep -E "^ARM_MAX_ANGLE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "60")
+          BUCKET_HEIGHT=$(grep -E "^BUCKET_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "450")
           
           FRAME_Z_OFFSET=$GROUND_CLEARANCE
           ARM_PIVOT_Z=$((FRAME_Z_OFFSET + MACHINE_HEIGHT - 50))
           WHEEL_MIDPOINT_Y=$((WHEEL_BASE / 2))
           ARM_LENGTH_APPROX=1600
-          MAX_ARM_TIP_HEIGHT=$(awk "BEGIN {print int($ARM_PIVOT_Z + $ARM_LENGTH_APPROX * 0.866 + $BUCKET_HEIGHT)}")
+          MAX_ARM_TIP_HEIGHT=$(awk "BEGIN {pi=3.14159; print int($ARM_PIVOT_Z + $ARM_LENGTH_APPROX * sin($ARM_MAX_ANGLE * pi / 180) + $BUCKET_HEIGHT)}")
           SCENE_HEIGHT=$MAX_ARM_TIP_HEIGHT
           MARGIN_FACTOR="1.15"
           CENTER_Y=$WHEEL_MIDPOINT_Y
@@ -210,16 +216,17 @@ jobs:
           cd LifeTrac-v25/mechanical_design
           
           # Calculate camera position dynamically (same as assembly.png)
-          MACHINE_HEIGHT=$(grep -E "^MACHINE_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
-          WHEEL_BASE=$(grep -E "^WHEEL_BASE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
-          GROUND_CLEARANCE=$(grep -E "^GROUND_CLEARANCE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
-          BUCKET_HEIGHT=$(grep -E "^BUCKET_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+")
+          MACHINE_HEIGHT=$(grep -E "^MACHINE_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "1000")
+          WHEEL_BASE=$(grep -E "^WHEEL_BASE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "1400")
+          GROUND_CLEARANCE=$(grep -E "^GROUND_CLEARANCE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "150")
+          ARM_MAX_ANGLE=$(grep -E "^ARM_MAX_ANGLE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "60")
+          BUCKET_HEIGHT=$(grep -E "^BUCKET_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "450")
           
           FRAME_Z_OFFSET=$GROUND_CLEARANCE
           ARM_PIVOT_Z=$((FRAME_Z_OFFSET + MACHINE_HEIGHT - 50))
           WHEEL_MIDPOINT_Y=$((WHEEL_BASE / 2))
           ARM_LENGTH_APPROX=1600
-          MAX_ARM_TIP_HEIGHT=$(awk "BEGIN {print int($ARM_PIVOT_Z + $ARM_LENGTH_APPROX * 0.866 + $BUCKET_HEIGHT)}")
+          MAX_ARM_TIP_HEIGHT=$(awk "BEGIN {pi=3.14159; print int($ARM_PIVOT_Z + $ARM_LENGTH_APPROX * sin($ARM_MAX_ANGLE * pi / 180) + $BUCKET_HEIGHT)}")
           SCENE_HEIGHT=$MAX_ARM_TIP_HEIGHT
           MARGIN_FACTOR="1.15"
           CENTER_Y=$WHEEL_MIDPOINT_Y
