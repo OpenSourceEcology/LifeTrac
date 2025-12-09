@@ -54,15 +54,91 @@ jobs:
           cd LifeTrac-v25/mechanical_design
           mkdir -p output/{dxf,renders,animations}
       
+      - name: Calculate camera position
+        run: |
+          cd LifeTrac-v25/mechanical_design
+          
+          # Calculate camera position dynamically based on machine dimensions
+          # Extract parameters from OpenSCAD file
+          MACHINE_HEIGHT=$(grep -E "^MACHINE_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "1000")
+          WHEEL_BASE=$(grep -E "^WHEEL_BASE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "1400")
+          GROUND_CLEARANCE=$(grep -E "^GROUND_CLEARANCE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "150")
+          ARM_MAX_ANGLE=$(grep -E "^ARM_MAX_ANGLE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "60")
+          BUCKET_HEIGHT=$(grep -E "^BUCKET_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "450")
+          
+          # Validate all extracted parameters
+          if [ -z "$MACHINE_HEIGHT" ] || [ -z "$WHEEL_BASE" ] || [ -z "$GROUND_CLEARANCE" ] || [ -z "$ARM_MAX_ANGLE" ] || [ -z "$BUCKET_HEIGHT" ]; then
+            echo "ERROR: Failed to extract required parameters from OpenSCAD file"
+            echo "  MACHINE_HEIGHT: $MACHINE_HEIGHT"
+            echo "  WHEEL_BASE: $WHEEL_BASE"
+            echo "  GROUND_CLEARANCE: $GROUND_CLEARANCE"
+            echo "  ARM_MAX_ANGLE: $ARM_MAX_ANGLE"
+            echo "  BUCKET_HEIGHT: $BUCKET_HEIGHT"
+            exit 1
+          fi
+          
+          # Calculate key dimensions
+          FRAME_Z_OFFSET=$GROUND_CLEARANCE
+          ARM_PIVOT_Z=$((FRAME_Z_OFFSET + MACHINE_HEIGHT - 50))
+          WHEEL_MIDPOINT_Y=$((WHEEL_BASE / 2))
+          
+          # Calculate maximum height when arms are raised to ARM_MAX_ANGLE
+          # ARM_LENGTH_APPROX: Approximation of arm length based on design geometry
+          # This is derived from the OpenSCAD formula: ARM_LENGTH = ceil(sqrt(pow(ARM_PIVOT_Z, 2) + pow(MIN_HORIZONTAL_REACH, 2)))
+          # For the current machine dimensions (ARM_PIVOT_Z=1100mm, MIN_HORIZONTAL_REACH≈1200mm), this yields approximately 1600mm
+          # If machine geometry changes significantly, this value should be recalculated or extracted from OpenSCAD
+          ARM_LENGTH_APPROX=1600
+          
+          # Max height = ARM_PIVOT_Z + ARM_LENGTH * sin(ARM_MAX_ANGLE) + BUCKET_HEIGHT
+          MAX_ARM_TIP_HEIGHT=$(awk "BEGIN {pi=3.14159; print int($ARM_PIVOT_Z + $ARM_LENGTH_APPROX * sin($ARM_MAX_ANGLE * pi / 180) + $BUCKET_HEIGHT)}")
+          
+          # Calculate camera position to frame the scene properly
+          # Bottom margin: wheels at ground (Z=0) should be near bottom with small margin
+          # Top margin: max arm height should reach near top with small margin
+          # Height range to capture: 0 to MAX_ARM_TIP_HEIGHT
+          SCENE_HEIGHT=$MAX_ARM_TIP_HEIGHT
+          MARGIN_FACTOR="1.15"  # 15% margin on top and bottom
+          
+          # Center point: halfway between ground and max height, at wheel midpoint Y
+          CENTER_Y=$WHEEL_MIDPOINT_Y
+          CENTER_Z=$(awk "BEGIN {print int($SCENE_HEIGHT / 2)}")
+          
+          # Camera distance: calculate to fit scene in square 720x720 frame
+          # Using 45-degree isometric view angle (sqrt(2) factor for diagonal)
+          CAMERA_DISTANCE=$(awk "BEGIN {print int($SCENE_HEIGHT * $MARGIN_FACTOR * 1.414)}")
+          
+          echo "=== Camera Calculation ==="
+          echo "Machine dimensions:"
+          echo "  MACHINE_HEIGHT: $MACHINE_HEIGHT mm"
+          echo "  WHEEL_BASE: $WHEEL_BASE mm"
+          echo "  GROUND_CLEARANCE: $GROUND_CLEARANCE mm"
+          echo "  ARM_MAX_ANGLE: $ARM_MAX_ANGLE degrees"
+          echo "  BUCKET_HEIGHT: $BUCKET_HEIGHT mm"
+          echo "Calculated values:"
+          echo "  ARM_PIVOT_Z: $ARM_PIVOT_Z mm"
+          echo "  ARM_LENGTH_APPROX: $ARM_LENGTH_APPROX mm (see comment for derivation)"
+          echo "  MAX_ARM_TIP_HEIGHT: $MAX_ARM_TIP_HEIGHT mm"
+          echo "  SCENE_HEIGHT: $SCENE_HEIGHT mm"
+          echo "  CAMERA_DISTANCE: $CAMERA_DISTANCE mm"
+          echo "  CENTER_Y: $CENTER_Y mm"
+          echo "  CENTER_Z: $CENTER_Z mm"
+          echo "Camera position: --camera=$CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,0,$CENTER_Y,$CENTER_Z"
+          echo "=========================="
+          
+          # Export calculated values as environment variables for subsequent steps
+          echo "CAMERA_DISTANCE=$CAMERA_DISTANCE" >> $GITHUB_ENV
+          echo "CENTER_Y=$CENTER_Y" >> $GITHUB_ENV
+          echo "CENTER_Z=$CENTER_Z" >> $GITHUB_ENV
+      
       - name: Generate assembly.png and cnclayout.svg
         run: |
           cd LifeTrac-v25/mechanical_design
           
-          # Generate assembly.png (1024x768 matching CEB-Press example)
+          # Generate assembly.png (720x720 square as requested)
           echo "Generating assembly.png..."
           openscad -o assembly.png \
-            --camera=3000,3000,2000,0,0,500 \
-            --imgsize=1024,768 \
+            --camera=$CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,0,$CENTER_Y,$CENTER_Z \
+            --imgsize=720,720 \
             --projection=p \
             --colorscheme=Nature \
             openscad/lifetrac_v25.scad
@@ -81,38 +157,40 @@ jobs:
         run: |
           cd LifeTrac-v25/mechanical_design
           
-          # Main assembly view
+          # Use camera parameters calculated in previous step (from environment variables)
+          
+          # Main assembly view (720x720 square)
           echo "Rendering main assembly..."
           openscad -o output/renders/lifetrac_v25_main.png \
-            --camera=3000,3000,2000,0,0,500 \
-            --imgsize=1920,1080 \
+            --camera=$CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,0,$CENTER_Y,$CENTER_Z \
+            --imgsize=720,720 \
             --projection=p \
             --colorscheme=Nature \
             openscad/lifetrac_v25.scad
           
-          # Front view
+          # Front view (720x720 square, uses calculated camera position)
           echo "Rendering front view..."
           openscad -o output/renders/lifetrac_v25_front.png \
-            --camera=0,3000,1000,0,0,500 \
-            --imgsize=1920,1080 \
+            --camera=0,$CAMERA_DISTANCE,$CENTER_Z,0,$CENTER_Y,$CENTER_Z \
+            --imgsize=720,720 \
             --projection=p \
             --colorscheme=Nature \
             openscad/lifetrac_v25.scad
           
-          # Side view
+          # Side view (720x720 square, uses calculated camera position)
           echo "Rendering side view..."
           openscad -o output/renders/lifetrac_v25_side.png \
-            --camera=3000,0,1000,0,0,500 \
-            --imgsize=1920,1080 \
+            --camera=$CAMERA_DISTANCE,$CENTER_Y,$CENTER_Z,0,$CENTER_Y,$CENTER_Z \
+            --imgsize=720,720 \
             --projection=p \
             --colorscheme=Nature \
             openscad/lifetrac_v25.scad
           
-          # Top view
+          # Top view (720x720 square, uses calculated camera position)
           echo "Rendering top view..."
           openscad -o output/renders/lifetrac_v25_top.png \
-            --camera=0,0,3000,0,0,500 \
-            --imgsize=1920,1080 \
+            --camera=0,$CENTER_Y,$CAMERA_DISTANCE,0,$CENTER_Y,$CENTER_Z \
+            --imgsize=720,720 \
             --projection=o \
             --colorscheme=Nature \
             openscad/lifetrac_v25.scad
@@ -139,18 +217,21 @@ jobs:
         run: |
           cd LifeTrac-v25/mechanical_design
           
-          echo "Generating animation frames..."
+          # Use camera parameters calculated in previous step (from environment variables)
+          echo "Generating animation frames with calculated camera position..."
+          echo "Camera: $CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,0,$CENTER_Y,$CENTER_Z"
           mkdir -p output/animations/frames
           
           # Generate 36 frames for animation (every 10 degrees)
+          # Using dynamically calculated camera position that adapts to machine dimensions
           total_frames=36
           for i in $(seq 0 $((total_frames-1))); do
             # Use total_frames-1 so last frame lands exactly at t=1.0
             t=$(awk "BEGIN {print $i/($total_frames-1)}")
             printf "Frame %d (t=%.4f)\n" "$i" "$t"
             openscad -o "output/animations/frames/frame_$(printf %03d $i).png" \
-              --camera=3000,3000,2000,0,0,500 \
-              --imgsize=1280,720 \
+              --camera=$CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,0,$CENTER_Y,$CENTER_Z \
+              --imgsize=720,720 \
               --projection=p \
               --colorscheme=Nature \
               -D "animation_time=$t" \
@@ -195,7 +276,7 @@ jobs:
           - Module examples (5 modules)
           
           ### Animations
-          - 36 animation frames (1280x720 PNG)
+          - 36 animation frames (720x720 PNG square format)
           - Animated GIF showing arm movement (lifetrac_v25_animation.gif)
           
           ### CNC Files
