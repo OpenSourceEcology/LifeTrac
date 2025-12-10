@@ -97,11 +97,10 @@ jobs:
           # Top margin: max arm height should reach near top with small margin
           # Height range to capture: 0 to MAX_ARM_TIP_HEIGHT
           SCENE_HEIGHT=$MAX_ARM_TIP_HEIGHT
-          MARGIN_FACTOR="1.50"  # 50% margin on top and bottom for better visibility of full arm range of motion
+          MARGIN_FACTOR="1.75"  # 75% margin on top and bottom for better visibility of full arm range of motion
           
-          # Center point: position so wheel midpoint is properly centered in the render
-          # Looking at Y=0 (origin) shifts the assembly backward in the frame as requested
-          CENTER_Y=0
+          # Center point: halfway between ground and max height, at wheel midpoint Y
+          CENTER_Y=$WHEEL_MIDPOINT_Y
           CENTER_Z=$(awk "BEGIN {print int($SCENE_HEIGHT / 2)}")
           
           # Camera distance: calculate to fit scene in square 720x720 frame
@@ -121,9 +120,8 @@ jobs:
           echo "  MAX_ARM_TIP_HEIGHT: $MAX_ARM_TIP_HEIGHT mm"
           echo "  SCENE_HEIGHT: $SCENE_HEIGHT mm"
           echo "  CAMERA_DISTANCE: $CAMERA_DISTANCE mm"
-          echo "  CENTER_Y: $CENTER_Y mm (looking at origin, shifting assembly backward in frame)"
+          echo "  CENTER_Y: $CENTER_Y mm"
           echo "  CENTER_Z: $CENTER_Z mm"
-          echo "  WHEEL_MIDPOINT_Y: $WHEEL_MIDPOINT_Y mm (for reference)"
           echo "Camera position: --camera=$CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,0,$CENTER_Y,$CENTER_Z"
           echo "=========================="
           
