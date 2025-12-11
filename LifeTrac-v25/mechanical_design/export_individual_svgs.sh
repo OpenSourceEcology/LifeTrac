@@ -44,23 +44,23 @@ echo "Exporting Half-Inch (1/2\") Plate Parts:"
 echo "-----------------------------------------"
 
 export_part "Side Panel Outer" \
-    "parts/export_side_panel_outer.scad" \
+    "openscad/parts/export_side_panel_outer.scad" \
     "output/svg/parts/side_panel_outer.svg"
 
 export_part "Side Panel Inner" \
-    "parts/export_side_panel_inner.scad" \
+    "openscad/parts/export_side_panel_inner.scad" \
     "output/svg/parts/side_panel_inner.svg"
 
 export_part "Wheel Mount" \
-    "parts/export_wheel_mount.scad" \
+    "openscad/parts/export_wheel_mount.scad" \
     "output/svg/parts/wheel_mount.svg"
 
 export_part "Cylinder Lug" \
-    "parts/export_cylinder_lug.scad" \
+    "openscad/parts/export_cylinder_lug.scad" \
     "output/svg/parts/cylinder_lug.svg"
 
 export_part "Rear Crossmember" \
-    "parts/export_rear_crossmember.scad" \
+    "openscad/parts/export_rear_crossmember.scad" \
     "output/svg/parts/rear_crossmember.svg"
 
 echo ""
@@ -68,15 +68,15 @@ echo "Exporting Quarter-Inch (1/4\") Plate Parts:"
 echo "-------------------------------------------"
 
 export_part "Standing Deck" \
-    "parts/export_standing_deck.scad" \
+    "openscad/parts/export_standing_deck.scad" \
     "output/svg/parts/standing_deck.svg"
 
 export_part "Bucket Bottom" \
-    "parts/export_bucket_bottom.scad" \
+    "openscad/parts/export_bucket_bottom.scad" \
     "output/svg/parts/bucket_bottom.svg"
 
 export_part "Bucket Side" \
-    "parts/export_bucket_side.scad" \
+    "openscad/parts/export_bucket_side.scad" \
     "output/svg/parts/bucket_side.svg"
 
 echo "========================================="

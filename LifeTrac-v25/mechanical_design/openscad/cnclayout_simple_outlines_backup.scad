@@ -3,7 +3,7 @@
 // Generates 2D projection for plasma cutting
 // Part of LifeTrac v25 OpenSCAD design
 
-use <openscad/modules/plate_steel.scad>
+use <modules/plate_steel.scad>
 
 // Plate thicknesses
 PLATE_1_4 = 6.35;  // 1/4"
