@@ -8,7 +8,7 @@
 // Example:
 //   openscad -o output/dxf/wheel_mount_plate.dxf -D "part=\"wheel_mount\"" export_for_cnc.scad
 
-use <modules/plate_steel.scad>
+use <openscad/modules/plate_steel.scad>
 
 // Part selection parameter
 part = "wheel_mount"; // Options: wheel_mount, deck, bucket_bottom, bucket_back, bucket_side

@@ -3,7 +3,7 @@
 // CNC cut from 1/2" plate steel
 // Mounts hydraulic wheel motor
 
-include <../openscad/lifetrac_v25_params.scad>
+include <../lifetrac_v25_params.scad>
 
 module wheel_mount() {
     plate_size = 250;

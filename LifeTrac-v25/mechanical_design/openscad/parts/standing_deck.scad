@@ -2,7 +2,7 @@
 // Standing platform deck for LifeTrac v25 operator
 // CNC cut from 1/4" plate with anti-slip hole pattern
 
-include <../openscad/lifetrac_v25_params.scad>
+include <../lifetrac_v25_params.scad>
 
 module standing_deck() {
     // Main deck plate with anti-slip pattern

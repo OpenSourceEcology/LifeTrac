@@ -4,7 +4,7 @@
 // Part of the "sandwich" design with 4 panels total (2 inner, 2 outer)
 
 // Include necessary parameters from main assembly
-include <../openscad/lifetrac_v25_params.scad>
+include <../lifetrac_v25_params.scad>
 
 // Triangular profile for side panels
 // Tall end at rear (Y=0), shorter sloped end at front (Y=WHEEL_BASE)

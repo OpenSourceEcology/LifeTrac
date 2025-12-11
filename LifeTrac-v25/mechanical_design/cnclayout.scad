@@ -5,13 +5,13 @@
 // Following CEB-Press pattern with individual part files
 
 // Import individual part modules
-use <parts/side_panel.scad>
-use <parts/rear_crossmember.scad>
-use <parts/wheel_mount.scad>
-use <parts/cylinder_lug.scad>
-use <parts/standing_deck.scad>
-use <parts/bucket_bottom.scad>
-use <parts/bucket_side.scad>
+use <openscad/parts/side_panel.scad>
+use <openscad/parts/rear_crossmember.scad>
+use <openscad/parts/wheel_mount.scad>
+use <openscad/parts/cylinder_lug.scad>
+use <openscad/parts/standing_deck.scad>
+use <openscad/parts/bucket_bottom.scad>
+use <openscad/parts/bucket_side.scad>
 
 // Import parameters
 include <openscad/lifetrac_v25_params.scad>

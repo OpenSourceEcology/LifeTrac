@@ -2,7 +2,7 @@
 // Bucket bottom plate for LifeTrac v25
 // CNC cut from 1/4" plate steel
 
-include <../openscad/lifetrac_v25_params.scad>
+include <../lifetrac_v25_params.scad>
 
 module bucket_bottom() {
     difference() {

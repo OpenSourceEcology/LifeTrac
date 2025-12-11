@@ -2,7 +2,7 @@
 // Rear crossmember plate for LifeTrac v25
 // Connects left and right side panels at the rear
 
-include <../openscad/lifetrac_v25_params.scad>
+include <../lifetrac_v25_params.scad>
 
 module rear_crossmember() {
     back_height = MACHINE_HEIGHT * 0.55;
