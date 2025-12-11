@@ -60,7 +60,7 @@ for part_info in "${parts[@]}"; do
     # Export DXF and capture output
     output=$(openscad -o "$output_file" \
              -D "part=\"$part_name\"" \
-             export_for_cnc.scad 2>&1)
+             openscad/export_for_cnc.scad 2>&1)
     exit_code=$?
     
     # Filter out known harmless warnings but show real errors

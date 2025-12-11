@@ -4,20 +4,20 @@
 // License: GPL v3
 
 // Import modules
-use <../modules/plate_steel.scad>
-use <../modules/structural_steel.scad>
-use <../modules/fasteners.scad>
-use <../modules/hydraulics.scad>
-use <../modules/wheels.scad>
+use <modules/plate_steel.scad>
+use <modules/structural_steel.scad>
+use <modules/fasteners.scad>
+use <modules/hydraulics.scad>
+use <modules/wheels.scad>
 
 // Import individual part files
-use <../parts/side_panel.scad>
-use <../parts/rear_crossmember.scad>
-use <../parts/standing_deck.scad>
-use <../parts/wheel_mount.scad>
-use <../parts/cylinder_lug.scad>
-use <../parts/bucket_bottom.scad>
-use <../parts/bucket_side.scad>
+use <parts/side_panel.scad>
+use <parts/rear_crossmember.scad>
+use <parts/standing_deck.scad>
+use <parts/wheel_mount.scad>
+use <parts/cylinder_lug.scad>
+use <parts/bucket_bottom.scad>
+use <parts/bucket_side.scad>
 
 // =============================================================================
 // GLOBAL PARAMETERS

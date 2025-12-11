@@ -2,7 +2,7 @@
 // Hydraulic cylinder mounting lug for LifeTrac v25
 // CNC cut from 1/2" plate steel with center pivot hole
 
-include <../openscad/lifetrac_v25_params.scad>
+include <../lifetrac_v25_params.scad>
 
 module cylinder_lug() {
     lug_width = 100;

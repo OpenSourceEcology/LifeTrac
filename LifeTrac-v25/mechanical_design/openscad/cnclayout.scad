@@ -14,7 +14,7 @@ use <parts/bucket_bottom.scad>
 use <parts/bucket_side.scad>
 
 // Import parameters
-include <openscad/lifetrac_v25_params.scad>
+include <lifetrac_v25_params.scad>
 
 // Layout spacing
 SPACING = 20; // mm between parts

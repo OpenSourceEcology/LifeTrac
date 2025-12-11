@@ -3,7 +3,7 @@
 // CNC cut from 1/4" plate steel
 // Trapezoidal shape
 
-include <../openscad/lifetrac_v25_params.scad>
+include <../lifetrac_v25_params.scad>
 
 module bucket_side() {
     plate_thickness = PLATE_1_4_INCH;
