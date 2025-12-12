@@ -1206,7 +1206,14 @@ module side_panel_left_outer() {
     color("DarkSlateGray")
     translate([-(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), 0, FRAME_Z_OFFSET])
     rotate([90, 0, 90])
-    side_panel(is_inner=false);
+    difference() {
+        side_panel(is_inner=false);
+        
+        // Subtract stiffener holes
+        rotate([-90, 0, 0]) rotate([0, 0, -90])
+        translate([(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), 0, -FRAME_Z_OFFSET])
+        stiffener_side_panel_cutters(is_inner=false, is_left=true);
+    }
 }
 
 // Left inner panel
@@ -1214,7 +1221,17 @@ module side_panel_left_inner() {
     color("DarkSlateGray")
     translate([-(TRACK_WIDTH/2 - SANDWICH_SPACING/2), 0, FRAME_Z_OFFSET])
     rotate([90, 0, 90])
-    side_panel(is_inner=true);
+    difference() {
+        side_panel(is_inner=true);
+        // Trim back for stiffener plate (Y < 31.75 in world coords -> X < 31.75 in part coords)
+        translate([-10, -50, -10]) // Start before 0 to be safe, Z range covers panel thickness
+        cube([31.75 + 10, MACHINE_HEIGHT + 100, 50]); // Cutout
+        
+        // Subtract stiffener holes
+        rotate([-90, 0, 0]) rotate([0, 0, -90])
+        translate([(TRACK_WIDTH/2 - SANDWICH_SPACING/2), 0, -FRAME_Z_OFFSET])
+        stiffener_side_panel_cutters(is_inner=true, is_left=true);
+    }
 }
 
 // Right inner panel
@@ -1222,7 +1239,17 @@ module side_panel_right_inner() {
     color("DarkSlateGray")
     translate([(TRACK_WIDTH/2 - SANDWICH_SPACING/2 - PANEL_THICKNESS), 0, FRAME_Z_OFFSET])
     rotate([90, 0, 90])
-    side_panel(is_inner=true);
+    difference() {
+        side_panel(is_inner=true);
+        // Trim back for stiffener plate (Y < 31.75 in world coords -> X < 31.75 in part coords)
+        translate([-10, -50, -10]) // Start before 0 to be safe, Z range covers panel thickness
+        cube([31.75 + 10, MACHINE_HEIGHT + 100, 50]); // Cutout
+        
+        // Subtract stiffener holes
+        rotate([-90, 0, 0]) rotate([0, 0, -90])
+        translate([-(TRACK_WIDTH/2 - SANDWICH_SPACING/2 - PANEL_THICKNESS), 0, -FRAME_Z_OFFSET])
+        stiffener_side_panel_cutters(is_inner=true, is_left=false);
+    }
 }
 
 // Right outer panel
@@ -1230,7 +1257,14 @@ module side_panel_right_outer() {
     color("DarkSlateGray")
     translate([(TRACK_WIDTH/2 + SANDWICH_SPACING/2), 0, FRAME_Z_OFFSET])
     rotate([90, 0, 90])
-    side_panel(is_inner=false);
+    difference() {
+        side_panel(is_inner=false);
+        
+        // Subtract stiffener holes
+        rotate([-90, 0, 0]) rotate([0, 0, -90])
+        translate([-(TRACK_WIDTH/2 + SANDWICH_SPACING/2), 0, -FRAME_Z_OFFSET])
+        stiffener_side_panel_cutters(is_inner=false, is_left=false);
+    }
 }
 
 // =============================================================================
@@ -1350,6 +1384,353 @@ module arm_pivot_assembly() {
 }
 
 // =============================================================================
+// VERTICAL STIFFENER PLATES
+// =============================================================================
+
+// Helper function for bolt heights
+function get_stiffener_holes_a(h) = [for(i=[0:3]) h * (0.2 + i*0.2)];
+function get_stiffener_holes_b(h) = [for(i=[0:3]) h * (0.1 + i*0.2)];
+
+module vertical_angle_iron_smart(height, size=[50.8, 6.35]) {
+    leg = size[0];
+    thick = size[1];
+    bolt_dia = 9.525; // 3/8" bolts
+    hole_offset = leg * 0.6; // Shift holes away from corner for tool clearance
+    
+    difference() {
+        // Extrude L-shape along Z
+        // Origin at corner [0,0,0]. Legs along +X and +Y.
+        linear_extrude(height=height)
+        polygon([
+            [0, 0],
+            [leg, 0],
+            [leg, thick],
+            [thick, thick],
+            [thick, leg],
+            [0, leg]
+        ]);
+        
+        // Holes on Face A (X-leg)
+        // Leg extends along X. Normal is Y (inner face at y=thick, outer at y=0).
+        // We assume bolting through the leg in Y direction.
+        for (z = get_stiffener_holes_a(height)) {
+            translate([hole_offset, 0, z]) // Centered on Y=0 plane
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+        }
+        
+        // Holes on Face B (Y-leg)
+        // Leg extends along Y. Normal is X.
+        // We assume bolting through the leg in X direction.
+        for (z = get_stiffener_holes_b(height)) {
+            translate([0, hole_offset, z]) // Centered on X=0 plane
+            rotate([0, 90, 0])
+            cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+        }
+    }
+}
+
+// Module to generate hole cutters for the side panels
+module stiffener_side_panel_cutters(is_inner, is_left) {
+    // Mid Plate Parameters
+    mid_y = 800;
+    mid_z_start = FRAME_Z_OFFSET + 100;
+    mid_z_end = FRAME_Z_OFFSET + 825 - 25.4;
+    mid_h = mid_z_end - mid_z_start;
+    mid_angle_size = [50.8, 6.35];
+    mid_leg = mid_angle_size[0];
+    mid_hole_offset = mid_leg * 0.6;
+    
+    // Back Plate Parameters
+    back_y = 25.4;
+    back_z_start = FRAME_Z_OFFSET + 350;
+    back_z_end = FRAME_Z_OFFSET + MACHINE_HEIGHT;
+    back_h = back_z_end - back_z_start;
+    back_angle_size = [50.8, 6.35];
+    back_leg = back_angle_size[0];
+    back_hole_offset = back_leg * 0.6;
+    
+    bolt_dia = 9.525;
+    
+    // Mid Plate Holes (Only on Inner Panels)
+    if (is_inner) {
+        // Left Inner Panel (is_left=true)
+        if (is_left) {
+            // Left Front: Face B (Y-leg). Rot 0.
+            // Global Hole: [-plate_width/2, mid_y + thick + leg/2, z]
+            for (z = get_stiffener_holes_b(mid_h)) {
+                translate([-(TRACK_WIDTH - SANDWICH_SPACING - 2*PANEL_THICKNESS)/2, mid_y + PLATE_1_4_INCH + mid_hole_offset, mid_z_start + z])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+            
+            // Left Rear: Face A (X-leg -> -Y leg). Rot -90.
+            // Global Hole: [-plate_width/2, mid_y - leg/2, z]
+            for (z = get_stiffener_holes_a(mid_h)) {
+                translate([-(TRACK_WIDTH - SANDWICH_SPACING - 2*PANEL_THICKNESS)/2, mid_y - mid_hole_offset, mid_z_start + z])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+        }
+        
+        // Right Inner Panel (is_left=false)
+        if (!is_left) {
+             // Right Front: Face A (X-leg -> +Y leg). Rot 90.
+             // Global Hole: [plate_width/2, mid_y + thick + leg/2, z]
+             for (z = get_stiffener_holes_a(mid_h)) {
+                translate([(TRACK_WIDTH - SANDWICH_SPACING - 2*PANEL_THICKNESS)/2, mid_y + PLATE_1_4_INCH + mid_hole_offset, mid_z_start + z])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+            
+            // Right Rear: Face B (Y-leg -> -Y leg). Rot 180.
+            // Global Hole: [plate_width/2, mid_y - leg/2, z]
+            for (z = get_stiffener_holes_b(mid_h)) {
+                translate([(TRACK_WIDTH - SANDWICH_SPACING - 2*PANEL_THICKNESS)/2, mid_y - mid_hole_offset, mid_z_start + z])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+        }
+        
+        // Back Plate Inner Angles (Inner Panels)
+        // Left Inner Panel (is_left=true)
+        if (is_left) {
+            // Left Side Angle: Face A (Y-leg -> +Y leg). Rot 90.
+            // Corner at [-(TW/2 - SS/2), back_y + thick, z].
+            // Global Hole: [corner_x, back_y + thick + leg/2, z].
+            for (z = get_stiffener_holes_a(back_h)) {
+                translate([-(TRACK_WIDTH/2 - SANDWICH_SPACING/2), back_y + PLATE_1_4_INCH + back_hole_offset, back_z_start + z])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+            
+            // Right Side Angle: Face B (Y-leg). Rot 0.
+            // Corner at [-(TW/2 - SS/2) + PT, back_y + thick, z].
+            // Global Hole: [corner_x, back_y + thick + leg/2, z].
+            for (z = get_stiffener_holes_b(back_h)) {
+                translate([-(TRACK_WIDTH/2 - SANDWICH_SPACING/2) + PANEL_THICKNESS, back_y + PLATE_1_4_INCH + back_hole_offset, back_z_start + z])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+        }
+        
+        // Right Inner Panel (is_left=false)
+        if (!is_left) {
+            // Left Side Angle: Face A (Y-leg -> +Y leg). Rot 90.
+            // Corner at [inner_offset - PT, back_y + thick, z].
+            for (z = get_stiffener_holes_a(back_h)) {
+                translate([(TRACK_WIDTH/2 - SANDWICH_SPACING/2) - PANEL_THICKNESS, back_y + PLATE_1_4_INCH + back_hole_offset, back_z_start + z])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+            
+            // Right Side Angle: Face B (Y-leg). Rot 0.
+            // Corner at [inner_offset, back_y + thick, z].
+            for (z = get_stiffener_holes_b(back_h)) {
+                translate([(TRACK_WIDTH/2 - SANDWICH_SPACING/2), back_y + PLATE_1_4_INCH + back_hole_offset, back_z_start + z])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+        }
+    }
+    
+    // Back Plate Outer Angles (Outer Panels)
+    if (!is_inner) {
+        // Left Outer Panel (is_left=true)
+        if (is_left) {
+            // Legs +X, +Y. Rot 0. Face B (Y-leg) touches panel.
+            // Corner at [-(TW/2 + SS/2 + PT), back_y + thick, z].
+            for (z = get_stiffener_holes_b(back_h)) {
+                translate([-(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), back_y + PLATE_1_4_INCH + back_hole_offset, back_z_start + z])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+        }
+        
+        // Right Outer Panel (is_left=false)
+        if (!is_left) {
+            // Legs -X, +Y. Rot 90. Face A (X-leg -> +Y leg) touches panel.
+            // Corner at [TW/2 + SS/2, back_y + thick, z].
+            for (z = get_stiffener_holes_a(back_h)) {
+                translate([(TRACK_WIDTH/2 + SANDWICH_SPACING/2), back_y + PLATE_1_4_INCH + back_hole_offset, back_z_start + z])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+        }
+    }
+}
+
+module mid_stiffener_plate(y_pos, z_start, z_end) {
+    plate_width = TRACK_WIDTH - SANDWICH_SPACING - 2*PANEL_THICKNESS;
+    plate_height = z_end - z_start;
+    plate_thickness = PLATE_1_4_INCH; 
+    angle_size = [50.8, 6.35];
+    leg = angle_size[0];
+    bolt_dia = 9.525;
+    hole_offset = leg * 0.6;
+    
+    difference() {
+        // Plate
+        color("Silver")
+        translate([-plate_width/2, y_pos, z_start])
+        cube([plate_width, plate_thickness, plate_height]);
+        
+        // Subtract holes for angle irons
+        // Left Front: Legs +X, +Y. Face A (X-leg) on plate. Holes z_A.
+        // Pos: [-plate_width/2, y_pos + thick, z].
+        // Hole: [-plate_width/2 + offset, y_pos + thick, z].
+        for (z = get_stiffener_holes_a(plate_height)) {
+            translate([-plate_width/2 + hole_offset, y_pos + plate_thickness, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Left Rear: Legs +X, -Y. Rot -90. Face B (Y->X) on plate. Holes z_B.
+        // Pos: [-plate_width/2, y_pos, z].
+        // Hole: [-plate_width/2 + offset, y_pos, z].
+        for (z = get_stiffener_holes_b(plate_height)) {
+            translate([-plate_width/2 + hole_offset, y_pos, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Right Front: Legs -X, +Y. Rot 90. Face B (Y->-X) on plate. Holes z_B.
+        // Pos: [plate_width/2, y_pos + thick, z].
+        // Hole: [plate_width/2 - offset, y_pos + thick, z].
+        for (z = get_stiffener_holes_b(plate_height)) {
+            translate([plate_width/2 - hole_offset, y_pos + plate_thickness, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Right Rear: Legs -X, -Y. Rot 180. Face A (X->-X) on plate. Holes z_A.
+        // Pos: [plate_width/2, y_pos, z].
+        // Hole: [plate_width/2 - offset, y_pos, z].
+        for (z = get_stiffener_holes_a(plate_height)) {
+            translate([plate_width/2 - hole_offset, y_pos, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+    }
+    
+    // Angles
+    // Left Front (Legs +X, +Y)
+    translate([-plate_width/2, y_pos + plate_thickness, z_start])
+    vertical_angle_iron_smart(plate_height, angle_size);
+    
+    // Left Rear (Legs +X, -Y) -> Rot Z -90
+    translate([-plate_width/2, y_pos, z_start])
+    rotate([0, 0, -90])
+    vertical_angle_iron_smart(plate_height, angle_size);
+    
+    // Right Front (Legs -X, +Y) -> Rot Z 90
+    translate([plate_width/2, y_pos + plate_thickness, z_start])
+    rotate([0, 0, 90])
+    vertical_angle_iron_smart(plate_height, angle_size);
+    
+    // Right Rear (Legs -X, -Y) -> Rot Z 180
+    translate([plate_width/2, y_pos, z_start])
+    rotate([0, 0, 180])
+    vertical_angle_iron_smart(plate_height, angle_size);
+}
+
+module back_stiffener_plate() {
+    plate_width = TRACK_WIDTH + SANDWICH_SPACING; 
+    plate_thickness = PLATE_1_4_INCH;
+    y_pos = 25.4; 
+    z_start = FRAME_Z_OFFSET + 350;
+    z_end = FRAME_Z_OFFSET + MACHINE_HEIGHT;
+    plate_height = z_end - z_start;
+    angle_size = [50.8, 6.35];
+    leg = angle_size[0];
+    bolt_dia = 9.525;
+    hole_offset = leg * 0.6;
+    
+    inner_offset = TRACK_WIDTH/2 - SANDWICH_SPACING/2;
+    
+    difference() {
+        // Plate
+        color("Silver")
+        translate([-plate_width/2, y_pos, z_start])
+        cube([plate_width, plate_thickness, plate_height]);
+        
+        // Subtract holes
+        // Left Outer: Legs +X, +Y. Face A (X) on plate. Holes z_A.
+        for (z = get_stiffener_holes_a(plate_height)) {
+            translate([-plate_width/2 + hole_offset, y_pos + plate_thickness, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Right Outer: Legs -X, +Y. Rot 90. Face B (Y->-X) on plate. Holes z_B.
+        for (z = get_stiffener_holes_b(plate_height)) {
+            translate([plate_width/2 - hole_offset, y_pos + plate_thickness, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Left Inner Panel Left Side: Legs -X, +Y. Rot 90. Face B (Y->-X) on plate. Holes z_B.
+        for (z = get_stiffener_holes_b(plate_height)) {
+            translate([-inner_offset - hole_offset, y_pos + plate_thickness, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Left Inner Panel Right Side: Legs +X, +Y. Rot 0. Face A (X) on plate. Holes z_A.
+        for (z = get_stiffener_holes_a(plate_height)) {
+            translate([-inner_offset + PANEL_THICKNESS + hole_offset, y_pos + plate_thickness, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Right Inner Panel Left Side: Legs -X, +Y. Rot 90. Face B (Y->-X) on plate. Holes z_B.
+        for (z = get_stiffener_holes_b(plate_height)) {
+            translate([inner_offset - PANEL_THICKNESS - hole_offset, y_pos + plate_thickness, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Right Inner Panel Right Side: Legs +X, +Y. Rot 0. Face A (X) on plate. Holes z_A.
+        for (z = get_stiffener_holes_a(plate_height)) {
+            translate([inner_offset + hole_offset, y_pos + plate_thickness, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+    }
+    
+    // Angles
+    // Left Outer (Legs +X, +Y)
+    translate([-plate_width/2, y_pos + plate_thickness, z_start])
+    vertical_angle_iron_smart(plate_height, angle_size);
+    
+    // Right Outer (Legs -X, +Y) -> Rot Z 90
+    translate([plate_width/2, y_pos + plate_thickness, z_start])
+    rotate([0, 0, 90])
+    vertical_angle_iron_smart(plate_height, angle_size);
+    
+    // Inner Angles
+    // Left Inner Panel
+    // Left Side (Legs -X, +Y) -> Rot Z 90
+    translate([-inner_offset, y_pos + plate_thickness, z_start])
+    rotate([0, 0, 90])
+    vertical_angle_iron_smart(plate_height, angle_size);
+    
+    // Right Side (Legs +X, +Y)
+    translate([-inner_offset + PANEL_THICKNESS, y_pos + plate_thickness, z_start])
+    vertical_angle_iron_smart(plate_height, angle_size);
+    
+    // Right Inner Panel
+    // Left Side (Legs -X, +Y) -> Rot Z 90
+    translate([inner_offset - PANEL_THICKNESS, y_pos + plate_thickness, z_start])
+    rotate([0, 0, 90])
+    vertical_angle_iron_smart(plate_height, angle_size);
+    
+    // Right Side (Legs +X, +Y)
+    translate([inner_offset, y_pos + plate_thickness, z_start])
+    vertical_angle_iron_smart(plate_height, angle_size);
+}
+
+// =============================================================================
 // BASE FRAME ASSEMBLY
 // =============================================================================
 
@@ -1363,6 +1744,14 @@ module base_frame() {
     bottom_crossmembers();
     cylinder_mounting_lugs();
     arm_pivot_assembly();
+    
+    // Vertical stiffener plates
+    // Back plate (1 inch from rear)
+    back_stiffener_plate();
+    
+    // Mid plate (at Y=800 to avoid cylinder bolts at 700)
+    // Top height at Y=800 is approx 825mm above frame bottom
+    mid_stiffener_plate(800, FRAME_Z_OFFSET + 100, FRAME_Z_OFFSET + 825 - 25.4);
 }
 
 // =============================================================================
