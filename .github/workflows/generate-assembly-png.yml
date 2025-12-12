@@ -25,6 +25,7 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         ref: ${{ github.head_ref || github.ref_name }}
+        fetch-depth: 0
 
     - name: Install OpenSCAD
       run: |
@@ -133,8 +134,8 @@ jobs:
     - name: Commit and push assembly.png
       run: |
         cd LifeTrac-v25/mechanical_design
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
         git add assembly.png || true
 
         if git diff --staged --quiet; then
@@ -146,19 +147,25 @@ jobs:
           # Fetch and rebase to incorporate any remote changes
           BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
           echo "🔄 Fetching latest changes from branch: ${BRANCH_NAME}..."
-          git fetch origin "${BRANCH_NAME}"
-
-          echo "🔄 Rebasing on latest changes..."
-          if ! git rebase "origin/${BRANCH_NAME}"; then
-            echo "❌ Failed to rebase. There may be conflicts."
-            echo "Aborting rebase and exiting..."
-            git rebase --abort
-            exit 1
+          if git fetch origin "${BRANCH_NAME}"; then
+            echo "🔄 Rebasing on latest changes..."
+            if ! git rebase "origin/${BRANCH_NAME}"; then
+              echo "❌ Failed to rebase. There may be conflicts."
+              echo "Aborting rebase and exiting..."
+              git rebase --abort
+              exit 1
+            fi
+          else
+            echo "⚠️  Could not fetch branch ${BRANCH_NAME} from origin. This may be a PR from a fork. Skipping fetch/rebase."
           fi
 
-          echo "📤 Pushing changes..."
-          git push
-          echo "✅ Changes pushed successfully"
+          echo "📤 Pushing changes with --force-with-lease..."
+          if git push --force-with-lease; then
+            echo "✅ Changes pushed successfully"
+          else
+            echo "⚠️  Push failed. This is expected for PRs from forks or if you do not have write permissions."
+            echo "The files are available as workflow artifacts."
+          fi
         fi
 
     - name: Cleanup Xvfb
