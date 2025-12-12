@@ -165,8 +165,8 @@ jobs:
     - name: Commit and push animation GIF
       run: |
         cd LifeTrac-v25/mechanical_design
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        git config --local user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
         git add lifetrac_v25_animation.gif || true
 
         if git diff --staged --quiet; then
