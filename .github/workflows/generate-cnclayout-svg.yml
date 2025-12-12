@@ -50,7 +50,7 @@ jobs:
           --projection=ortho \
           --camera=0,0,0,0,0,0,3000 \
           -o cnclayout.svg \
-          cnclayout.scad 2>&1 | grep -v "WARNING" || true
+          openscad/cnclayout.scad 2>&1 | grep -v "WARNING" || true
         
         # Verify the SVG was created
         if [ -f cnclayout.svg ]; then
