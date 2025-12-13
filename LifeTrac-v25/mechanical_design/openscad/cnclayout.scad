@@ -69,6 +69,8 @@ bucket_side_height_rotated = BUCKET_DEPTH;  // 600mm (becomes height when rotate
 // =============================================================================
 // CALCULATE X POSITIONS (parametric, left-to-right)
 // =============================================================================
+// Note: OpenSCAD requires all variables to be defined at once (no reassignment)
+// This sequential calculation ensures proper spacing and no overlaps
 
 // X positions calculated sequentially
 x_pos_0 = START_X;
@@ -95,19 +97,20 @@ x_pos_18 = x_pos_17 + cylinder_lug_width + SPACING;
 // LAYOUT ALL PARTS (LEFT TO RIGHT)
 // =============================================================================
 
-// Part 0: Side panel outer (rotated 90°)
+// Part 0: Side panel outer - Left side (rotated 90°)
 layout_part(x_pos_0, START_Y, 90)
 side_panel(is_inner=false);
 
-// Part 1: Side panel inner (rotated 90°)
+// Part 1: Side panel inner - Left side (rotated 90°)
 layout_part(x_pos_1, START_Y, 90)
 side_panel(is_inner=true);
 
-// Part 2: Side panel inner (duplicate) (rotated 90°)
+// Part 2: Side panel inner - Right side (rotated 90°)
+// Note: Four panels total create a sandwich design with arms between inner pair
 layout_part(x_pos_2, START_Y, 90)
 side_panel(is_inner=true);
 
-// Part 3: Side panel outer (duplicate) (rotated 90°)
+// Part 3: Side panel outer - Right side (rotated 90°)
 layout_part(x_pos_3, START_Y, 90)
 side_panel(is_inner=false);
 
@@ -123,11 +126,11 @@ bucket_bottom();
 layout_part(x_pos_6, START_Y, 0)
 standing_deck();
 
-// Part 7: Bucket side (rotated 90°)
+// Part 7: Bucket side - Left (rotated 90°)
 layout_part(x_pos_7, START_Y, 90)
 bucket_side();
 
-// Part 8: Bucket side (duplicate, rotated 90°)
+// Part 8: Bucket side - Right (rotated 90°)
 layout_part(x_pos_8, START_Y, 90)
 bucket_side();
 
