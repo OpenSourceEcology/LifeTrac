@@ -98,9 +98,32 @@ PIVOT_PANEL_Y = ARM_PIVOT_Z - FRAME_Z_OFFSET;         // Pivot Y in panel coords
 // =============================================================================
 
 // Lift cylinder mounting points (arms pivot at rear, cylinders attach forward)
-LIFT_CYL_BASE_Y = WHEEL_BASE * 0.5;          // Base mount Y position (forward of pivot)
-LIFT_CYL_BASE_Z = FRAME_Z_OFFSET + MACHINE_HEIGHT * 0.4;      // Base mount Z position
+// Optimized for leverage at bottom position (cylinder pushes up/forward from low rear point)
+
+// 1. Define Arm Attachment Point
 LIFT_CYL_ARM_OFFSET = ARM_LENGTH * 0.25;     // Attachment point along arm from pivot (proportional)
+
+// 2. Calculate Arm Attachment Position in World Coords at Lowest Angle (Bucket on Ground)
+//    Pivot is at [0, ARM_PIVOT_Y, ARM_PIVOT_Z]
+_theta_min = -ARM_GROUND_ANGLE;
+_attach_y_world = ARM_PIVOT_Y + LIFT_CYL_ARM_OFFSET * cos(_theta_min);
+_attach_z_world = ARM_PIVOT_Z + LIFT_CYL_ARM_OFFSET * sin(_theta_min);
+
+// 3. Determine Base Z Height (Constrained by Axle Clearance)
+//    Must clear the rear axle (FRAME_Z_OFFSET + WHEEL_DIAMETER/2)
+_min_base_z = FRAME_Z_OFFSET + WHEEL_DIAMETER/2 + 80; // 80mm clearance
+LIFT_CYL_BASE_Z = _min_base_z;
+
+// 4. Calculate Base Y for Optimal Leverage Angle
+//    We want the cylinder to push at an angle ~45-50 degrees from horizontal
+//    to be roughly perpendicular to the arm (which is at ~-45 degrees).
+//    Slope m = tan(target_angle).
+//    Y = Attach_Y - (Attach_Z - Base_Z) / m
+_target_cyl_angle = 50; // Degrees
+_calc_base_y = _attach_y_world - (_attach_z_world - LIFT_CYL_BASE_Z) / tan(_target_cyl_angle);
+
+// 5. Clamp Y to valid frame range (0 to WHEEL_BASE/2)
+LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y));
 
 // =============================================================================
 // BUCKET DIMENSIONS

@@ -94,11 +94,10 @@ module side_panel(is_inner = false) {
         translate([ARM_PIVOT_Y, MACHINE_HEIGHT - 50, PANEL_THICKNESS/2])
         cylinder(d=PIVOT_PIN_DIA + 2, h=PANEL_THICKNESS+4, center=true, $fn=48);
         
-        // Lift cylinder base mount hole (only on inner panels)
-        if (is_inner) {
-            translate([WHEEL_BASE - LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z, PANEL_THICKNESS/2])
-            cylinder(d=BOLT_DIA_1 + 2, h=PANEL_THICKNESS+4, center=true, $fn=32);
-        }
+        // Lift cylinder base mount hole (on both inner and outer panels)
+        // Position matches LIFT_CYL_BASE_Y in world coordinates (Y=0 is rear)
+        translate([LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z - FRAME_Z_OFFSET, PANEL_THICKNESS/2])
+        cylinder(d=BOLT_DIA_1 + 2, h=PANEL_THICKNESS+4, center=true, $fn=32);
         
         // Wheel axle holes
         translate([0, WHEEL_DIAMETER/2 - 50, PANEL_THICKNESS/2])
