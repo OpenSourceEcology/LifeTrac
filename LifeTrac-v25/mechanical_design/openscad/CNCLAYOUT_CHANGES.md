@@ -31,14 +31,14 @@ Benefits:
 The layout now:
 - Defines dimensions for each part type
 - Calculates X positions based on actual part widths
-- Uses the `SPACING` parameter (20mm) consistently between all parts
+- Uses the `SPACING` parameter (25.4mm / ~1 inch) consistently between all parts
 - Automatically adjusts if part dimensions change in the future
 
 ### 4. No Overlapping Parts
 Each part's position is calculated by adding:
 - Previous part's X position
 - Previous part's width
-- Spacing constant (20mm)
+- Spacing constant (25.4mm / ~1 inch)
 
 This ensures no parts overlap, even if dimensions are changed in the parameter file.
 
@@ -56,9 +56,9 @@ Total: 19 parts in a single horizontal line
 
 ## Layout Dimensions
 
-- **Total Width**: ~9.9 meters
+- **Total Width**: ~9.81 meters (9812mm calculated parametrically)
 - **Total Height**: ~1.4 meters
-- **Spacing**: 20mm between all parts
+- **Spacing**: 25.4mm (~1 inch) between all parts
 - **Start Position**: (10, 10)
 
 ## Usage
@@ -77,7 +77,7 @@ openscad --export-format=dxf -o output/cnclayout.dxf cnclayout.scad
 ### Adjust Spacing
 To change the spacing between parts, edit the `SPACING` parameter in `cnclayout.scad`:
 ```openscad
-SPACING = 20; // mm between parts - change this value as needed
+SPACING = 25.4; // mm between parts (~1 inch) - change this value as needed
 ```
 
 ## Technical Details

@@ -20,8 +20,8 @@ use <parts/bucket_side.scad>
 // Import parameters
 include <lifetrac_v25_params.scad>
 
-// Layout spacing
-SPACING = 20; // mm between parts
+// Layout spacing - approximately 1 inch between parts
+SPACING = 25.4; // mm between parts (~1 inch)
 START_X = 10;
 START_Y = 10;
 
@@ -44,7 +44,7 @@ side_panel_width_rotated = MACHINE_HEIGHT;  // ~1000mm (becomes width when rotat
 side_panel_height_rotated = WHEEL_BASE;      // ~1400mm (becomes height when rotated)
 
 // Rear crossmember dimensions
-crossmember_width = TRACK_WIDTH + SANDWICH_SPACING + PANEL_THICKNESS * 2;  // ~1152mm
+crossmember_width = TRACK_WIDTH + SANDWICH_SPACING + PANEL_THICKNESS * 2;  // ~1045mm
 crossmember_height = MACHINE_HEIGHT * 0.55;  // ~550mm
 
 // Wheel mount dimensions
@@ -92,6 +92,9 @@ x_pos_15 = x_pos_14 + cylinder_lug_width + SPACING;
 x_pos_16 = x_pos_15 + cylinder_lug_width + SPACING;
 x_pos_17 = x_pos_16 + cylinder_lug_width + SPACING;
 x_pos_18 = x_pos_17 + cylinder_lug_width + SPACING;
+
+// Calculate total layout width (last part position + last part width)
+total_layout_width = x_pos_18 + cylinder_lug_width;
 
 // =============================================================================
 // LAYOUT ALL PARTS (LEFT TO RIGHT)
