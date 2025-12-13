@@ -90,6 +90,19 @@ FRAME_Z_OFFSET = GROUND_CLEARANCE;
 WHEEL_X_OFFSET = TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS + WHEEL_WIDTH/2 + WHEEL_CLEARANCE;
 
 // =============================================================================
+// ENGINE CONFIGURATION
+// =============================================================================
+
+ENGINE_HP = 25; // Desired horsepower (e.g., 25HP V-Twin)
+// Estimate engine weight (kg) based on HP (approximate for small engines)
+// Base 30kg + 1.2kg per HP
+ENGINE_WEIGHT_KG = 30 + (ENGINE_HP * 1.2); 
+
+// Engine Position (Middle near back)
+ENGINE_POS_Y = 400; // Forward from rear of frame
+ENGINE_POS_Z = FRAME_Z_OFFSET + 200; // Height above frame bottom
+
+// =============================================================================
 // LOADER ARM DIMENSIONS - PARAMETRIC CALCULATION
 // =============================================================================
 
@@ -1778,6 +1791,173 @@ module base_frame() {
 }
 
 // =============================================================================
+// ENGINE
+// =============================================================================
+
+module engine() {
+    // V-Twin Engine Representation
+    // Dimensions approx for 25HP engine
+    eng_width = 450;
+    eng_depth = 400;
+    eng_height = 450;
+    
+    translate([0, ENGINE_POS_Y, ENGINE_POS_Z])
+    {
+        color("DimGray")
+        union() {
+            // Crankcase base
+            translate([0, 0, 100])
+            cube([eng_width, eng_depth, 200], center=true);
+            
+            // Cylinders (V-Twin)
+            for (rot = [-45, 45]) {
+                rotate([0, rot, 0])
+                translate([0, 0, 200])
+                cylinder(d=120, h=150, center=true);
+            }
+            
+            // Flywheel/Fan cover
+            translate([0, -eng_depth/2 - 20, 150])
+            rotate([90, 0, 0])
+            cylinder(d=250, h=50, center=true);
+            
+            // Muffler
+            translate([0, eng_depth/2 + 50, 150])
+            cube([300, 100, 100], center=true);
+        }
+    }
+}
+
+// =============================================================================
+// WEIGHT DISTRIBUTION & STABILITY ANALYSIS
+// =============================================================================
+
+module calculate_cog() {
+    // --- WEIGHT ESTIMATES (kg) ---
+    w_frame = 350;      // Chassis, panels, crossmembers
+    w_wheel = 40;       // Tire + Rim + Motor (x4)
+    w_arm = 180;        // Arms + Crossbeams + Cylinders
+    w_bucket = 120;     // Bucket + QA Plate
+    w_engine = ENGINE_WEIGHT_KG;
+    w_operator = 90;    // Operator on rear deck
+    w_fluids = 40;      // Hydraulic oil + fuel
+    
+    // Max Load Calculation (Tipping Load)
+    // We calculate moments about the FRONT AXLE
+    
+    // --- POSITIONS (Y, Z) relative to World Origin ---
+    // Frame: Centroid approx middle of machine
+    pos_frame = [MACHINE_LENGTH/2, FRAME_Z_OFFSET + 300];
+    
+    // Wheels:
+    // Front axle Y is calculated in wheel_assemblies
+    front_axle_y = WHEEL_BASE - WHEEL_RADIUS;
+    // Rear axle Y is calculated in wheel_assemblies (re-calculating here for logic)
+    rear_axle_y_target = LIFT_CYL_BASE_Y + WHEEL_RADIUS + 100;
+    
+    // Re-calculate wheel positions to match wheel_assemblies logic
+    _front_y = WHEEL_BASE - WHEEL_RADIUS;
+    _rear_y_target = LIFT_CYL_BASE_Y + WHEEL_RADIUS + 100; // Moved forward of cylinder
+    _min_wb = WHEEL_DIAMETER + 50;
+    _max_rear_y = _front_y - _min_wb;
+    _rear_y = min(_rear_y_target, _max_rear_y);
+    
+    pos_wheels_front = [_front_y, WHEEL_RADIUS];
+    pos_wheels_rear = [_rear_y, WHEEL_RADIUS];
+    
+    // Engine
+    pos_engine = [ENGINE_POS_Y, ENGINE_POS_Z + 200];
+    
+    // Operator (Standing on deck at rear)
+    pos_operator = [-200, 300]; // Behind machine
+    
+    // Arms (Dynamic based on angle)
+    // Centroid approx 40% along arm
+    arm_cg_dist = ARM_LENGTH * 0.4;
+    pos_arm = [
+        ARM_PIVOT_Y + arm_cg_dist * cos(ARM_LIFT_ANGLE),
+        ARM_PIVOT_Z + arm_cg_dist * sin(ARM_LIFT_ANGLE)
+    ];
+    
+    // Bucket (Dynamic)
+    // At tip of arm
+    pos_bucket = [
+        ARM_PIVOT_Y + ARM_LENGTH * cos(ARM_LIFT_ANGLE),
+        ARM_PIVOT_Z + ARM_LENGTH * sin(ARM_LIFT_ANGLE)
+    ];
+    
+    // --- MOMENT CALCULATION (About Rear Axle for CoG Y) ---
+    // We use World Y=0 (Rear of frame) as reference datum.
+    
+    moment_frame = w_frame * pos_frame[0];
+    moment_wheels = 2 * w_wheel * pos_wheels_front[0] + 2 * w_wheel * pos_wheels_rear[0];
+    moment_engine = w_engine * pos_engine[0];
+    moment_operator = w_operator * pos_operator[0];
+    moment_arm = w_arm * pos_arm[0];
+    moment_bucket = w_bucket * pos_bucket[0];
+    moment_fluids = w_fluids * (MACHINE_LENGTH * 0.3); // Tank usually near back
+    
+    total_weight_empty = w_frame + 4*w_wheel + w_engine + w_arm + w_bucket + w_fluids; 
+    total_moment_empty = moment_frame + moment_wheels + moment_engine + moment_arm + moment_bucket + moment_fluids;
+    
+    cog_y_empty = total_moment_empty / total_weight_empty;
+    
+    // --- TIPPING LOAD CALCULATION ---
+    // Tipping happens when moment about Front Axle is zero.
+    // Counter-balance moments (behind front axle) vs Load moments (in front)
+    // Distances relative to Front Axle
+    
+    // Note: Positive distance = Behind axle (Counter-weight)
+    //       Negative distance = In front of axle (Load)
+    
+    // Sum of counter-moments (Weight * Distance from Front Axle)
+    // We want the machine to stay flat, so Sum(Weight_i * (Front_Y - Y_i)) > 0
+    
+    tipping_moment_capacity = 
+        w_frame * (_front_y - pos_frame[0]) +
+        2 * w_wheel * 0 + // Front wheels have 0 moment arm
+        2 * w_wheel * (_front_y - pos_wheels_rear[0]) +
+        w_engine * (_front_y - pos_engine[0]) +
+        w_operator * (_front_y - pos_operator[0]) +
+        w_fluids * (_front_y - (MACHINE_LENGTH * 0.3)) +
+        w_arm * (_front_y - pos_arm[0]) +
+        w_bucket * (_front_y - pos_bucket[0]);
+        
+    // Load is at bucket position. 
+    // Load Moment = Load_Weight * (pos_bucket[0] - _front_y)  <-- Distance in front
+    // Tipping occurs when Load_Moment = Tipping_Moment_Capacity
+    
+    load_dist_from_axle = pos_bucket[0] - _front_y;
+    
+    // If load is behind axle (e.g. fully raised and back), it won't tip forward
+    tipping_load_kg = (load_dist_from_axle > 0) ? (tipping_moment_capacity / load_dist_from_axle) : 9999;
+    
+    rated_load_kg = tipping_load_kg * 0.5; // 50% of tipping load is safe rating (ISO standard)
+    
+    // --- VISUALIZATION ---
+    // Draw CoG Sphere (Empty)
+    color("Magenta")
+    translate([0, cog_y_empty, FRAME_Z_OFFSET + 400])
+    sphere(d=100);
+    
+    // Console Output
+    echo("=========================================");
+    echo("STABILITY ANALYSIS");
+    echo("=========================================");
+    echo("Engine HP:", ENGINE_HP);
+    echo("Engine Weight:", w_engine, "kg");
+    echo("Total Machine Weight (Empty):", total_weight_empty, "kg");
+    echo("CoG Y Position (Empty):", cog_y_empty, "mm from rear");
+    echo("Front Axle Position:", _front_y, "mm");
+    echo("Rear Axle Position:", _rear_y, "mm");
+    echo("Wheelbase:", _front_y - _rear_y, "mm");
+    echo("Load Distance from Front Axle:", load_dist_from_axle, "mm");
+    echo("TIPPING LOAD (at current arm reach):", tipping_load_kg, "kg");
+    echo("RATED OPERATING CAPACITY (50%):", rated_load_kg, "kg");
+    echo("=========================================");
+}
+
+// =============================================================================
 // WHEEL ASSEMBLIES
 // =============================================================================
 
@@ -1785,13 +1965,36 @@ module wheel_assemblies() {
     if (show_wheels) {
         // Wheel positions - outside the outer panels with clearance
         // Wheel centers at Z=WHEEL_RADIUS so bottom of wheel touches Z=0 (ground)
-        // Front wheels moved back so front of tire aligns with front of machine body
-        front_wheel_y = WHEEL_BASE - WHEEL_RADIUS;  // Front of tire at Y=WHEEL_BASE
+        
+        // Front wheels: Standard position relative to frame front
+        front_wheel_y = WHEEL_BASE - WHEEL_RADIUS;
+        
+        // Rear wheels: Moved forward of cylinder mount
+        // Cylinder mount is at LIFT_CYL_BASE_Y
+        // We want rear axle > LIFT_CYL_BASE_Y
+        // Add clearance for cylinder body and wheel rotation
+        rear_wheel_target_y = LIFT_CYL_BASE_Y + WHEEL_RADIUS + 100; 
+        
+        // Check for collision with front wheels
+        // Ensure minimum wheelbase
+        min_wheelbase = WHEEL_DIAMETER + 50; // 50mm gap between tires
+        
+        // Let's calculate the max Y the rear wheel can be at without hitting front wheel
+        max_rear_y = front_wheel_y - min_wheelbase;
+        
+        // Use the target, but clamp to max
+        final_rear_y = min(rear_wheel_target_y, max_rear_y);
+        
+        // Warn if we couldn't meet the "in front of cylinder" constraint due to space
+        if (final_rear_y < LIFT_CYL_BASE_Y) {
+            echo("WARNING: Rear wheels could not be placed in front of cylinder mount due to lack of space!");
+        }
+        
         positions = [
             [-WHEEL_X_OFFSET, front_wheel_y, WHEEL_RADIUS],   // Front left
             [ WHEEL_X_OFFSET, front_wheel_y, WHEEL_RADIUS],   // Front right
-            [-WHEEL_X_OFFSET, 0, WHEEL_RADIUS],               // Rear left
-            [ WHEEL_X_OFFSET, 0, WHEEL_RADIUS]                // Rear right
+            [-WHEEL_X_OFFSET, final_rear_y, WHEEL_RADIUS],    // Rear left
+            [ WHEEL_X_OFFSET, final_rear_y, WHEEL_RADIUS]     // Rear right
         ];
         
         for (i = [0:3]) {
@@ -2249,6 +2452,7 @@ module lifetrac_v25_assembly() {
     if (show_frame) {
         base_frame();
         control_housing();
+        engine();
     }
     
     wheel_assemblies();
@@ -2264,6 +2468,7 @@ module lifetrac_v25_assembly() {
 // =============================================================================
 
 lifetrac_v25_assembly();
+calculate_cog();
 
 // Ground plane reference at Z=0 (shifted down slightly so wheels visibly touch it)
 color("Green", 0.2)

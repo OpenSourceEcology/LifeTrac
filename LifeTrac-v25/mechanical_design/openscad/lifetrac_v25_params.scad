@@ -126,6 +126,19 @@ _calc_base_y = _attach_y_world - (_attach_z_world - LIFT_CYL_BASE_Z) / tan(_targ
 LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y));
 
 // =============================================================================
+// ENGINE CONFIGURATION
+// =============================================================================
+
+ENGINE_HP = 25; // Desired horsepower (e.g., 25HP V-Twin)
+// Estimate engine weight (kg) based on HP (approximate for small engines)
+// Base 30kg + 1.2kg per HP
+ENGINE_WEIGHT_KG = 30 + (ENGINE_HP * 1.2); 
+
+// Engine Position (Middle near back)
+ENGINE_POS_Y = 400; // Forward from rear of frame
+ENGINE_POS_Z = FRAME_Z_OFFSET + 200; // Height above frame bottom
+
+// =============================================================================
 // BUCKET DIMENSIONS
 // =============================================================================
 
