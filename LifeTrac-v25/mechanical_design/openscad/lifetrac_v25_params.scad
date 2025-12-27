@@ -169,10 +169,20 @@ DECK_HEIGHT = 250;  // Height above ground
 // 5-component folding platform: 1x deck plate + 2x pivot brackets + 2x angle arms
 // Folds from stowed (vertical against rear) to deployed (horizontal)
 
+// --- Configurable dimensions ---
+PLATFORM_THICKNESS = PLATE_1_4_INCH;  // Deck plate thickness
+PLATFORM_DEPTH = 400;           // Front-to-back depth of deck (mm)
+PLATFORM_ARM_LENGTH = 350;      // Length of angle iron arms (mm)
+PLATFORM_PIVOT_HEIGHT = 250;    // Height of pivot point / deck surface when deployed (mm)
+
 // --- Derived dimensions (calculated from frame geometry) ---
 // Platform width fits between inner side panels with clearance
-PLATFORM_CLEARANCE = 20;  // Clearance from inner walls (mm) - minimal for wider platform
-PLATFORM_WIDTH = TRACK_WIDTH - SANDWICH_SPACING - PLATFORM_CLEARANCE;  // ~760mm (fills space between inner panels)
+PLATFORM_GAP = 3.175; // 1/8 inch gap between deck and pivot plate
+// Inner wall inner face X position
+_inner_wall_inner_face_x = TRACK_WIDTH/2 - SANDWICH_SPACING/2 - PANEL_THICKNESS;
+// Platform width calculated to leave GAP between deck and pivot plate face
+// Pivot plate is PLATFORM_THICKNESS thick and sits against inner wall
+PLATFORM_WIDTH = 2 * (_inner_wall_inner_face_x - PLATFORM_THICKNESS - PLATFORM_GAP);
 
 // Inner side panel X position (from center of machine)
 // Inner panel inner face is at: TRACK_WIDTH/2 - SANDWICH_SPACING/2
@@ -182,12 +192,6 @@ _INNER_PANEL_X = TRACK_WIDTH/2 - SANDWICH_SPACING/2;  // = 450 - 60 = 390mm
 // Inset slightly from panel edge for structural strength
 PLATFORM_PIVOT_X_INSET = 0;  // Distance inward from inner panel face (mm)
 PLATFORM_PIVOT_X = _INNER_PANEL_X - PLATFORM_PIVOT_X_INSET;  // X position of pivot from center (~390mm)
-
-// --- Configurable dimensions ---
-PLATFORM_DEPTH = 400;           // Front-to-back depth of deck (mm)
-PLATFORM_ARM_LENGTH = 350;      // Length of angle iron arms (mm)
-PLATFORM_PIVOT_HEIGHT = 250;    // Height of pivot point / deck surface when deployed (mm)
-PLATFORM_THICKNESS = PLATE_1_4_INCH;  // Deck plate thickness
 
 // --- Pivot bracket dimensions ---
 PLATFORM_BRACKET_LENGTH = 150;  // Length of pivot bracket plate (mm)

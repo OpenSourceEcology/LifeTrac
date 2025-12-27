@@ -67,7 +67,8 @@ module platform_pivot_bracket() {
                 translate([0, corner_y, 0])
                 cylinder(d=width, h=thickness, center=true, $fn=48);
                 
-                translate([bolt_2_x + width/2, corner_y, 0]) // Extend slightly past last bolt
+                // Extended to reach back of platform deck (PLATFORM_ARM_LENGTH)
+                translate([PLATFORM_ARM_LENGTH - width/2, corner_y, 0]) 
                 cylinder(d=width, h=thickness, center=true, $fn=48);
             }
         }
