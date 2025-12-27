@@ -2442,7 +2442,7 @@ module platform_angle_iron() {
     
     difference() {
         // Extrusion
-        linear_extrude(height=PLATFORM_ARM_LENGTH)
+        linear_extrude(height=PLATFORM_ARM_LENGTH - PLATFORM_BRACKET_WIDTH/2)
         polygon([
             [0, 0],
             [PLATFORM_ANGLE_LEG, 0],
@@ -2593,7 +2593,7 @@ module folding_platform_assembly(fold_angle=90) {
         translate([0, pivot_y, pivot_z - 60])
         rotate([fold_angle, 0, 0])  // Same rotation as angle irons
         // Deck sits on top of angle iron horizontal legs
-        translate([0, PLATFORM_THICKNESS/2, arm_deck_bolt_dist])
+        translate([0, PLATFORM_THICKNESS/2, PLATFORM_DEPTH/2 - PLATFORM_BRACKET_WIDTH/2])
         rotate([90, 0, 0])  // Rotate deck to be horizontal in local coords
         platform_deck();
         

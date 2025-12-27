@@ -33,7 +33,7 @@ include <../lifetrac_v25_params.scad>
  */
 module platform_angle_arm(show_holes=true) {
     // Local variables for clarity
-    length = PLATFORM_ARM_LENGTH;
+    length = PLATFORM_ARM_LENGTH - PLATFORM_BRACKET_WIDTH/2;
     leg = PLATFORM_ANGLE_LEG;        // 50.8mm (2")
     thick = PLATFORM_ANGLE_THICK;    // 6.35mm (1/4")
     

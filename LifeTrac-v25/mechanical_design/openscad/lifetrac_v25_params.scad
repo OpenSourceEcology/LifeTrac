@@ -169,10 +169,14 @@ DECK_HEIGHT = 250;  // Height above ground
 // 5-component folding platform: 1x deck plate + 2x pivot brackets + 2x angle arms
 // Folds from stowed (vertical against rear) to deployed (horizontal)
 
+// --- Pivot bracket dimensions ---
+PLATFORM_BRACKET_LENGTH = 150;  // Length of pivot bracket plate (mm)
+PLATFORM_BRACKET_WIDTH = 100;   // Width of pivot bracket plate (mm)
+
 // --- Configurable dimensions ---
 PLATFORM_THICKNESS = PLATE_1_4_INCH;  // Deck plate thickness
-PLATFORM_DEPTH = 400;           // Front-to-back depth of deck (mm)
 PLATFORM_ARM_LENGTH = 350;      // Length of angle iron arms (mm)
+PLATFORM_DEPTH = PLATFORM_ARM_LENGTH + PLATFORM_BRACKET_WIDTH/2;           // Front-to-back depth of deck (mm)
 PLATFORM_PIVOT_HEIGHT = 250;    // Height of pivot point / deck surface when deployed (mm)
 
 // --- Derived dimensions (calculated from frame geometry) ---
@@ -192,10 +196,6 @@ _INNER_PANEL_X = TRACK_WIDTH/2 - SANDWICH_SPACING/2;  // = 450 - 60 = 390mm
 // Inset slightly from panel edge for structural strength
 PLATFORM_PIVOT_X_INSET = 0;  // Distance inward from inner panel face (mm)
 PLATFORM_PIVOT_X = _INNER_PANEL_X - PLATFORM_PIVOT_X_INSET;  // X position of pivot from center (~390mm)
-
-// --- Pivot bracket dimensions ---
-PLATFORM_BRACKET_LENGTH = 150;  // Length of pivot bracket plate (mm)
-PLATFORM_BRACKET_WIDTH = 100;   // Width of pivot bracket plate (mm)
 
 // --- Hardware dimensions ---
 PLATFORM_PIVOT_PIN_DIA = BOLT_DIA_1;    // 1" (25.4mm) pivot pin diameter
