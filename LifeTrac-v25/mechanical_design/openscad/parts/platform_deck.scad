@@ -26,30 +26,19 @@ module platform_deck() {
     
     // Bolt hole parameters
     bolt_hole_dia = PLATFORM_BOLT_DIA + PLATFORM_BOLT_CLEARANCE;
-    bolt_edge_margin = 40;  // Distance from rear edge to bolt holes
     
     // Angle iron attachment positions (X coordinates)
-    // Position at PLATFORM_PIVOT_X (where the angle irons are)
-    // If pivot X is outside deck width, clamp to deck edge minus margin
     deck_half_width = width / 2;
-    arm_margin = 35;  // Minimum distance from deck edge to bolt hole center
-    
-    // Clamp arm X position to be within the deck
+    arm_margin = 35;
     arm_x_pos = min(PLATFORM_PIVOT_X, deck_half_width - arm_margin);
     arm_x_left = -arm_x_pos;
     arm_x_right = arm_x_pos;
-    
-    bolt_y = depth/2 - bolt_edge_margin;  // Near rear edge
-    
-    // Bolt spacing along angle iron (centered, with one above and one below center)
-    bolt_spacing = PLATFORM_ANGLE_BOLT_OFFSET;  // ~30mm
     
     difference() {
         // Base plate
         cube([width, depth, thickness], center=true);
         
         // Anti-slip hole pattern
-        // Grid of holes for traction and drainage
         for (x = [-width/2 + PLATFORM_ANTISLIP_EDGE_MARGIN : 
                    PLATFORM_ANTISLIP_SPACING : 
                    width/2 - PLATFORM_ANTISLIP_EDGE_MARGIN]) {
@@ -57,8 +46,10 @@ module platform_deck() {
                        PLATFORM_ANTISLIP_SPACING : 
                        depth/2 - PLATFORM_ANTISLIP_EDGE_MARGIN]) {
                 // Skip holes that would interfere with bolt hole areas
-                if (!(abs(x - arm_x_left) < 50 && y > bolt_y - 50) &&
-                    !(abs(x - arm_x_right) < 50 && y > bolt_y - 50)) {
+                // Expanded exclusion zones for new transverse angles
+                if (!(abs(x - arm_x_left) < 50) && 
+                    !(abs(x - arm_x_right) < 50) &&
+                    !(abs(y) > depth/2 - 60)) {
                     translate([x, y, 0])
                     cylinder(d=PLATFORM_ANTISLIP_HOLE_DIA, 
                              h=thickness + 4, 
@@ -68,16 +59,27 @@ module platform_deck() {
             }
         }
         
-        // Left angle iron mounting holes (3 holes in Y direction along rear edge)
-        for (y_off = [-bolt_spacing, 0, bolt_spacing]) {
-            translate([arm_x_left, bolt_y + y_off, 0])
+        // Left angle iron mounting holes (Side Angle)
+        // Y positions: -125, 125 (relative to center) - Adjusted for new arm length
+        for (y_pos = [-125, 125]) {
+            translate([arm_x_left, y_pos, 0])
             cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
         }
         
-        // Right angle iron mounting holes (3 holes in Y direction along rear edge)
-        for (y_off = [-bolt_spacing, 0, bolt_spacing]) {
-            translate([arm_x_right, bolt_y + y_off, 0])
+        // Right angle iron mounting holes (Side Angle)
+        for (y_pos = [-125, 125]) {
+            translate([arm_x_right, y_pos, 0])
             cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
+        }
+        
+        // Transverse Angle Holes (Front and Rear)
+        // Y positions: -187.3 (Front), 187.3 (Rear) - 1/2 inch from edges
+        // X positions: 0, -100, 100
+        for (y_pos = [-187.3, 187.3]) {
+            for (x_pos = [-100, 0, 100]) {
+                translate([x_pos, y_pos, 0])
+                cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
+            }
         }
         
         // Corner mounting holes (optional, for additional support straps)
