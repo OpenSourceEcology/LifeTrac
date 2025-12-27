@@ -18,67 +18,73 @@ include <../lifetrac_v25_params.scad>
  * Coordinate system when rendered:
  *   - Centered at origin in X and Y
  *   - Thickness in Z direction
- *   - Pivot hole end at +X, bolt holes at -X
+ *   - Pivot hole at Origin
+ *   - Bolt holes at +X
  *   - Designed to be oriented vertically when installed
  */
 module platform_pivot_bracket() {
-    // Local variables for clarity
-    length = PLATFORM_BRACKET_LENGTH;
-    width = PLATFORM_BRACKET_WIDTH;
+    // Local variables
     thickness = PLATFORM_THICKNESS;
+    width = PLATFORM_BRACKET_WIDTH;
     
-    // Pivot hole parameters
+    // Dimensions
+    pivot_to_corner_dist = 60; // Distance from pivot to corner (Vertical offset)
+    corner_to_bolt_dist = 60;  // Distance from corner to first bolt (Horizontal offset)
+    bolt_spacing = 50;
+    
+    // Derived positions
+    // Top Section (Vertical)
+    // Pivot at [0,0]
+    // Lock pin position (Above pivot)
+    lock_pin_y = 60; 
+    
+    // Bottom Section (Horizontal)
+    // Corner position (Down from pivot)
+    corner_y = -pivot_to_corner_dist;
+    
+    // Bolt positions (relative to corner along X)
+    bolt_1_x = corner_to_bolt_dist;
+    bolt_2_x = corner_to_bolt_dist + bolt_spacing;
+    
+    // Hole diameters
     pivot_hole_dia = PLATFORM_PIVOT_PIN_DIA + PLATFORM_BOLT_CLEARANCE;
-    pivot_x = length/2 - PLATFORM_PIVOT_PIN_DIA/2 - 10;  // 10mm from edge
-    
-    // Lock pin hole parameters
-    lock_hole_dia = PLATFORM_LOCK_PIN_DIA + PLATFORM_BOLT_CLEARANCE;
-    lock_x = pivot_x - PLATFORM_LOCK_OFFSET;  // Offset toward bolt end
-    
-    // Angle iron bolt hole parameters
     bolt_hole_dia = PLATFORM_BOLT_DIA + PLATFORM_BOLT_CLEARANCE;
-    bolt_x = -length/2 + PLATFORM_ANGLE_LEG/2 + 15;  // Position for angle iron attachment
-    bolt_spacing = PLATFORM_ANGLE_BOLT_OFFSET;  // Vertical spacing
+    lock_hole_dia = PLATFORM_LOCK_PIN_DIA + PLATFORM_BOLT_CLEARANCE;
     
     difference() {
-        // Base plate - rectangular with rounded corners for strength
-        hull() {
-            for (x = [-length/2 + 10, length/2 - 10]) {
-                for (y = [-width/2 + 10, width/2 - 10]) {
-                    translate([x, y, 0])
-                    cylinder(r=10, h=thickness, center=true, $fn=24);
-                }
+        union() {
+            // Top Section (Vertical Leg)
+            hull() {
+                translate([0, lock_pin_y, 0])
+                cylinder(d=width, h=thickness, center=true, $fn=48);
+                
+                translate([0, corner_y, 0])
+                cylinder(d=width, h=thickness, center=true, $fn=48);
+            }
+            
+            // Bottom Section (Horizontal Leg)
+            hull() {
+                translate([0, corner_y, 0])
+                cylinder(d=width, h=thickness, center=true, $fn=48);
+                
+                translate([bolt_2_x + width/2, corner_y, 0]) // Extend slightly past last bolt
+                cylinder(d=width, h=thickness, center=true, $fn=48);
             }
         }
         
-        // Pivot pin hole (1" diameter + clearance)
-        translate([pivot_x, 0, 0])
+        // Pivot hole at Origin
         cylinder(d=pivot_hole_dia, h=thickness + 4, center=true, $fn=48);
         
-        // Lock pin hole (3/8" diameter + clearance)
-        // Located between pivot and bolt holes, for deployed position lock
-        translate([lock_x, 0, 0])
+        // Lock pin hole
+        translate([0, lock_pin_y, 0])
         cylinder(d=lock_hole_dia, h=thickness + 4, center=true, $fn=32);
         
-        // Angle iron mounting bolt holes (3 holes in vertical line)
-        // These align with holes in the angle iron
-        for (y_off = [-bolt_spacing, 0, bolt_spacing]) {
-            translate([bolt_x, y_off, 0])
-            cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
-        }
+        // Bolt holes
+        translate([bolt_1_x, corner_y, 0])
+        cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
         
-        // Weight reduction slot (optional, between bolt holes and pivot)
-        slot_x = (bolt_x + lock_x) / 2;
-        slot_length = abs(lock_x - bolt_x) - 30;
-        if (slot_length > 20) {
-            translate([slot_x, 0, 0])
-            hull() {
-                translate([-slot_length/4, 0, 0])
-                cylinder(d=width * 0.4, h=thickness + 4, center=true, $fn=24);
-                translate([slot_length/4, 0, 0])
-                cylinder(d=width * 0.4, h=thickness + 4, center=true, $fn=24);
-            }
-        }
+        translate([bolt_2_x, corner_y, 0])
+        cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
     }
 }
 
