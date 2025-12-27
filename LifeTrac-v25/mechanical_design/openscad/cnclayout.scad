@@ -13,7 +13,8 @@ use <parts/side_panel.scad>
 use <parts/rear_crossmember.scad>
 use <parts/wheel_mount.scad>
 use <parts/cylinder_lug.scad>
-use <parts/standing_deck.scad>
+use <parts/platform_deck.scad>
+use <parts/platform_pivot_bracket.scad>
 use <parts/bucket_bottom.scad>
 use <parts/bucket_side.scad>
 
@@ -58,9 +59,13 @@ cylinder_lug_height = 150;
 bucket_bottom_width = BUCKET_WIDTH;   // 1100mm
 bucket_bottom_height = BUCKET_DEPTH;  // 600mm
 
-// Standing deck dimensions
-standing_deck_width = DECK_WIDTH;   // 700mm
-standing_deck_height = DECK_DEPTH;  // 400mm
+// Platform deck dimensions (replaces standing_deck)
+platform_deck_width = PLATFORM_WIDTH;     // ~850mm (parametric from inner wall spacing)
+platform_deck_height = PLATFORM_DEPTH;    // 400mm
+
+// Platform pivot bracket dimensions (2 required)
+pivot_bracket_width = PLATFORM_BRACKET_LENGTH;   // 150mm
+pivot_bracket_height = PLATFORM_BRACKET_WIDTH;   // 100mm
 
 // Bucket side dimensions (rotated 90 degrees in layout)
 bucket_side_width_rotated = BUCKET_HEIGHT; // 450mm (becomes width when rotated)
@@ -79,9 +84,11 @@ x_pos_2 = x_pos_1 + side_panel_width_rotated + SPACING;
 x_pos_3 = x_pos_2 + side_panel_width_rotated + SPACING;
 x_pos_4 = x_pos_3 + side_panel_width_rotated + SPACING;
 x_pos_5 = x_pos_4 + crossmember_width + SPACING;
-x_pos_6 = x_pos_5 + bucket_bottom_width + SPACING;
-x_pos_7 = x_pos_6 + standing_deck_width + SPACING;
-x_pos_8 = x_pos_7 + bucket_side_width_rotated + SPACING;
+x_pos_6 = x_pos_5 + bucket_bottom_width + SPACING;        // Platform deck
+x_pos_7 = x_pos_6 + platform_deck_width + SPACING;         // Pivot bracket 1
+x_pos_7b = x_pos_7 + pivot_bracket_width + SPACING;        // Pivot bracket 2
+x_pos_8_base = x_pos_7b + pivot_bracket_width + SPACING;   // Bucket sides start
+x_pos_8 = x_pos_8_base + bucket_side_width_rotated + SPACING;
 x_pos_9 = x_pos_8 + bucket_side_width_rotated + SPACING;
 x_pos_10 = x_pos_9 + wheel_mount_size + SPACING;
 x_pos_11 = x_pos_10 + wheel_mount_size + SPACING;
@@ -125,12 +132,20 @@ rear_crossmember();
 layout_part(x_pos_5, START_Y, 0)
 bucket_bottom();
 
-// Part 6: Standing deck
+// Part 6: Platform deck (replaces standing_deck)
 layout_part(x_pos_6, START_Y, 0)
-standing_deck();
+platform_deck();
 
-// Part 7: Bucket side - Left (rotated 90°)
-layout_part(x_pos_7, START_Y, 90)
+// Part 7: Platform pivot bracket - Left
+layout_part(x_pos_7, START_Y, 0)
+platform_pivot_bracket();
+
+// Part 7b: Platform pivot bracket - Right
+layout_part(x_pos_7b, START_Y, 0)
+platform_pivot_bracket();
+
+// Part 8: Bucket side - Left (rotated 90°)
+layout_part(x_pos_8_base, START_Y, 90)
 bucket_side();
 
 // Part 8: Bucket side - Right (rotated 90°)

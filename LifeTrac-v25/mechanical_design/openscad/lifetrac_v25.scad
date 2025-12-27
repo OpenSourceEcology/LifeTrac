@@ -13,7 +13,9 @@ use <modules/wheels.scad>
 // Import individual part files
 use <parts/side_panel.scad>
 use <parts/rear_crossmember.scad>
-use <parts/standing_deck.scad>
+use <parts/platform_deck.scad>
+use <parts/platform_pivot_bracket.scad>
+use <parts/platform_angle_arm.scad>
 use <parts/wheel_mount.scad>
 use <parts/cylinder_lug.scad>
 use <parts/bucket_bottom.scad>
@@ -34,7 +36,8 @@ show_hydraulics = true;
 show_frame = true;
 show_loader_arms = true;
 show_bucket = true;
-show_standing_deck = true;
+show_folding_platform = true;  // Folding standing platform
+platform_fold_angle = 90;      // 0 = stowed (vertical), 90 = deployed (horizontal)
 exploded_view = false;
 explode_distance = exploded_view ? 200 : 0;
 
@@ -883,12 +886,79 @@ echo("*** OVERALL STRUCTURAL ASSESSMENT:", ALL_CHECKS_PASS_FULL ? "ALL CHECKS PA
 echo("========================================");
 
 // =============================================================================
-// STANDING DECK DIMENSIONS
+// STANDING DECK DIMENSIONS (Legacy - kept for reference)
 // =============================================================================
 
 DECK_WIDTH = 700;
 DECK_DEPTH = 400;
 DECK_HEIGHT = 250;  // Height above ground
+
+// =============================================================================
+// ANGLE IRON CONSTANTS
+// =============================================================================
+
+ANGLE_2X2_1_4 = [50.8, 6.35];   // 2"x2" x 1/4" angle iron [leg_size, thickness]
+ANGLE_3X3_1_4 = [76.2, 6.35];   // 3"x3" x 1/4" angle iron
+ANGLE_4X4_1_4 = [101.6, 6.35];  // 4"x4" x 1/4" angle iron
+
+// =============================================================================
+// FOLDING PLATFORM PARAMETERS
+// =============================================================================
+// 5-component folding platform: 1x deck plate + 2x pivot brackets + 2x angle arms
+// Folds from stowed (vertical against rear) to deployed (horizontal)
+
+// --- Derived dimensions (calculated from frame geometry) ---
+PLATFORM_CLEARANCE = 50;  // Clearance from inner walls (mm)
+PLATFORM_WIDTH = TRACK_WIDTH - SANDWICH_SPACING - PANEL_THICKNESS*2 - PLATFORM_CLEARANCE;  // ~850mm
+
+// Pivot X position - near deck edges, inside the inner panel faces
+PLATFORM_PIVOT_X_INSET = 35;  // Distance from deck edge to pivot centerline (mm)
+PLATFORM_PIVOT_X = PLATFORM_WIDTH/2 - PLATFORM_PIVOT_X_INSET;  // X position from center
+
+// --- Configurable dimensions ---
+PLATFORM_DEPTH = 400;           // Front-to-back depth of deck (mm)
+PLATFORM_ARM_LENGTH = 350;      // Length of angle iron arms (mm)
+PLATFORM_PIVOT_HEIGHT = 250;    // Height of pivot / deck surface when deployed (mm)
+PLATFORM_THICKNESS = PLATE_1_4_INCH;  // Deck plate thickness
+
+// --- Pivot bracket dimensions ---
+PLATFORM_BRACKET_LENGTH = 150;  // Length of pivot bracket plate (mm)
+PLATFORM_BRACKET_WIDTH = 100;   // Width of pivot bracket plate (mm)
+
+// --- Hardware dimensions ---
+PLATFORM_PIVOT_PIN_DIA = BOLT_DIA_1;    // 1" (25.4mm) pivot pin diameter
+PLATFORM_LOCK_PIN_DIA = 9.525;          // 3/8" (9.525mm) cotter/lock pin diameter
+PLATFORM_BOLT_DIA = BOLT_DIA_1_2;       // 1/2" (12.7mm) mounting bolts
+PLATFORM_BOLT_CLEARANCE = 2;            // Clearance for bolt holes (mm)
+PLATFORM_LOCK_OFFSET = 30;              // Distance from pivot to lock pin hole (mm)
+
+// --- Anti-slip pattern ---
+PLATFORM_ANTISLIP_HOLE_DIA = 15;   // Diameter of anti-slip holes (mm)
+PLATFORM_ANTISLIP_SPACING = 80;    // Spacing between anti-slip holes (mm)
+PLATFORM_ANTISLIP_EDGE_MARGIN = 60; // Margin from edge to first hole (mm)
+
+// --- Angle iron specification ---
+PLATFORM_ANGLE_SIZE = ANGLE_2X2_1_4;  // 2"x2" x 1/4" angle iron
+PLATFORM_ANGLE_LEG = PLATFORM_ANGLE_SIZE[0];      // Angle iron leg size (50.8mm)
+PLATFORM_ANGLE_THICK = PLATFORM_ANGLE_SIZE[1];    // Angle iron thickness (6.35mm)
+PLATFORM_ANGLE_BOLT_OFFSET = PLATFORM_ANGLE_LEG * 0.6;  // Bolt holes centered on leg
+
+// =============================================================================
+// FOLDING PLATFORM PARAMETER VALIDATION
+// =============================================================================
+
+assert(PLATFORM_ARM_LENGTH >= PLATFORM_DEPTH/2, 
+    "PLATFORM_ARM_LENGTH must be at least half of PLATFORM_DEPTH");
+assert(PLATFORM_PIVOT_X < TRACK_WIDTH/2 - SANDWICH_SPACING/2, 
+    "PLATFORM_PIVOT_X must be inside inner frame walls");
+assert(PLATFORM_PIVOT_HEIGHT > FRAME_Z_OFFSET, 
+    "PLATFORM_PIVOT_HEIGHT must be above ground clearance");
+assert(PLATFORM_WIDTH <= TRACK_WIDTH - SANDWICH_SPACING, 
+    "PLATFORM_WIDTH too wide for frame");
+assert(PLATFORM_BRACKET_LENGTH > PLATFORM_ANGLE_LEG * 2, 
+    "PLATFORM_BRACKET_LENGTH must accommodate angle iron bolt pattern");
+assert(PLATFORM_PIVOT_PIN_DIA > PLATFORM_LOCK_PIN_DIA, 
+    "PLATFORM_PIVOT_PIN_DIA must be larger than PLATFORM_LOCK_PIN_DIA");
 
 // =============================================================================
 // VECTOR MATH HELPERS
@@ -2355,71 +2425,191 @@ module bucket_cylinders() {
 }
 
 // =============================================================================
-// STANDING DECK
+// FOLDING STANDING PLATFORM
 // =============================================================================
+// 5-component folding platform system:
+//   - 1x deck plate (CNC cut)
+//   - 2x pivot bracket plates (CNC cut)
+//   - 2x angle iron arms (purchased stock, drilled)
+//
+// Folds from stowed (vertical against rear crossmember) to deployed (horizontal)
+// Uses 1" pivot pin and 3/8" cotter pin for locking in both positions
 
-module standing_deck() {
-    if (show_standing_deck) {
-        // Position at back of machine (operator stands at rear, facing forward toward bucket)
-        deck_y = -DECK_DEPTH/2 - 50;  // Behind the rear wheels
+/**
+ * Folding platform assembly with parametric fold angle
+ * @param fold_angle Angle in degrees: 0 = stowed (vertical), 90 = deployed (horizontal)
+ */
+module folding_platform_assembly(fold_angle=90) {
+    if (show_folding_platform) {
+        // =================================================================
+        // PARAMETRIC POSITION CALCULATIONS
+        // =================================================================
         
-        translate([0, deck_y, DECK_HEIGHT])
-        {
-            // Main deck plate with anti-slip pattern - CNC cut from 1/4" plate
-            color("DarkSlateGray")
-            difference() {
-                cube([DECK_WIDTH, DECK_DEPTH, PLATE_1_4_INCH], center=true);
-                
-                // Anti-slip hole pattern
-                for (x = [-DECK_WIDTH/2+60 : 80 : DECK_WIDTH/2-60]) {
-                    for (y = [-DECK_DEPTH/2+60 : 80 : DECK_DEPTH/2-60]) {
-                        translate([x, y, 0])
-                        cylinder(d=15, h=PLATE_1_4_INCH+2, center=true, $fn=16);
-                    }
-                }
-            }
+        // Pivot point is on the inner side panel at the rear
+        // X position: at inner panel face
+        // Y position: near rear of machine (clear of stiffener cutout zone)
+        // Z position: at PLATFORM_PIVOT_HEIGHT above ground
+        
+        pivot_y = 50;  // 50mm from rear of machine (clear of stiffener zone)
+        pivot_z = PLATFORM_PIVOT_HEIGHT;
+        
+        // Arm X position (same as pivot, or clamped to deck width)
+        deck_half_width = PLATFORM_WIDTH / 2;
+        arm_margin = 35;
+        arm_x_pos = min(PLATFORM_PIVOT_X, deck_half_width - arm_margin);
+        
+        // Angle iron geometry when deployed (horizontal):
+        // - Angle iron corner faces UP (apex at top)
+        // - Horizontal leg supports deck from below
+        // - Vertical leg faces toward center of machine
+        // - Arm extends from pivot toward rear (-Y direction)
+        
+        // Key dimensions
+        arm_pivot_bolt_dist = 25;  // Distance from pivot end to first bolt set
+        arm_deck_bolt_dist = PLATFORM_ARM_LENGTH - 25;  // Distance from pivot end to deck bolt set
+        deck_bolt_margin = 40;  // Distance from deck rear edge to bolt holes
+        bolt_spacing = PLATFORM_ANGLE_BOLT_OFFSET;  // ~30mm between bolts
+        
+        // When deployed, deck sits on top of horizontal leg of angle iron
+        // Deck bottom at pivot_z, angle iron corner at pivot_z
+        deck_surface_z = pivot_z + PLATFORM_THICKNESS;  // Top of deck when deployed
+        
+        // =================================================================
+        // ANGLE IRON ARMS (2x - Left and Right)
+        // =================================================================
+        // L-shaped angle iron with corner pointing UP
+        // Horizontal leg on top supports deck, vertical leg faces outward
+        // When deployed: extends BACKWARD (-Y) from pivot under the deck
+        // When stowed: extends UPWARD (+Z) against rear of machine
+        
+        for (side = [-1, 1]) {
+            arm_x = side * arm_x_pos;
             
-            // Support frame - standard 2"x2" square tubing
             color("DimGray")
-            translate([0, 0, -DECK_HEIGHT/2])
+            translate([arm_x, pivot_y, pivot_z])
+            rotate([fold_angle, 0, 0])  // Fold rotation around X axis
             {
-                // Rear support tubes
-                for (x = [-DECK_WIDTH/2 + 50, DECK_WIDTH/2 - 50]) {
-                    translate([x, 0, 0])
-                    square_tubing(DECK_HEIGHT - PLATE_1_4_INCH, TUBE_2X2_1_4, true);
-                }
-                
-                // Cross brace
-                translate([0, 0, -DECK_HEIGHT/2 + 50])
-                rotate([0, 90, 0])
-                square_tubing(DECK_WIDTH - 100, TUBE_2X2_1_4, true);
-            }
-            
-            // Connection brackets - short sections of 3"x3" square tube
-            for (x = [-DECK_WIDTH/2 + 50, DECK_WIDTH/2 - 50]) {
-                color("DarkSlateGray")
-                translate([x, DECK_DEPTH/2 + 25, -DECK_HEIGHT/2])
-                rotate([90, 0, 0])
+                // Angle iron L-profile extruded along arm length
+                // Rotated so vertical leg faces outward (toward pivot bracket)
+                translate([0, 0, 0])
+                rotate([0, 0, side * 90])  // Rotate profile so vertical leg faces outward toward wall
                 difference() {
-                    // 3"x3" tube section, 100mm long
-                    cube([TUBE_3X3_1_4[0], TUBE_3X3_1_4[0], 100], center=true);
-                    cube([TUBE_3X3_1_4[0] - 2*TUBE_3X3_1_4[1], 
-                          TUBE_3X3_1_4[0] - 2*TUBE_3X3_1_4[1], 102], center=true);
-                }
-                
-                // Mounting bolts through bracket to frame
-                translate([x, DECK_DEPTH/2 + 50 + 30, -DECK_HEIGHT/2])
-                {
-                    // Two bolts per bracket
-                    for (z_off = [-25, 25]) {
-                        translate([0, 0, z_off])
-                        rotate([-90, 0, 0])
-                        hex_bolt_assembly(BOLT_DIA_3_4, 80, true);
+                    linear_extrude(height=PLATFORM_ARM_LENGTH)
+                    // L-shape profile - vertical leg will face outward after rotation
+                    polygon([
+                        // Start at inner corner
+                        [0, 0],
+                        [PLATFORM_ANGLE_LEG, 0],
+                        [PLATFORM_ANGLE_LEG, PLATFORM_ANGLE_THICK],
+                        [PLATFORM_ANGLE_THICK, PLATFORM_ANGLE_THICK],
+                        [PLATFORM_ANGLE_THICK, PLATFORM_ANGLE_LEG],
+                        [0, PLATFORM_ANGLE_LEG]
+                    ]);
+                    
+                    // Bolt holes at pivot bracket end (through vertical leg, near Z=0)
+                    bolt_hole_dia = PLATFORM_BOLT_DIA + PLATFORM_BOLT_CLEARANCE;
+                    for (z_off = [arm_pivot_bolt_dist - bolt_spacing, arm_pivot_bolt_dist, arm_pivot_bolt_dist + bolt_spacing]) {
+                        translate([PLATFORM_ANGLE_THICK/2, PLATFORM_ANGLE_LEG/2, z_off])
+                        rotate([0, 90, 0])
+                        cylinder(d=bolt_hole_dia, h=PLATFORM_ANGLE_THICK + 2, center=true, $fn=24);
+                    }
+                    
+                    // Bolt holes at deck end (through horizontal leg, near Z=arm_deck_bolt_dist)
+                    for (z_off = [arm_deck_bolt_dist - bolt_spacing, arm_deck_bolt_dist, arm_deck_bolt_dist + bolt_spacing]) {
+                        translate([PLATFORM_ANGLE_LEG/2, PLATFORM_ANGLE_THICK/2, z_off])
+                        cylinder(d=bolt_hole_dia, h=PLATFORM_ANGLE_THICK + 2, center=true, $fn=24);
                     }
                 }
             }
         }
+        
+        // =================================================================
+        // PIVOT BRACKET PLATES (2x - Left and Right)  
+        // =================================================================
+        // Pivot brackets mount flush against INSIDE of inner wall panels
+        // They rotate with the platform and connect angle iron to pivot pin
+        
+        // Inner wall inner face X position (facing center of machine)
+        // Inner panel outer face is at TRACK_WIDTH/2 - SANDWICH_SPACING/2
+        // Inner panel inner face is at TRACK_WIDTH/2 - SANDWICH_SPACING/2 - PANEL_THICKNESS
+        inner_wall_inner_face_x = TRACK_WIDTH/2 - SANDWICH_SPACING/2 - PANEL_THICKNESS;  // ~377mm
+        
+        for (side = [-1, 1]) {
+            // Bracket X position: flush against INSIDE face of inner wall
+            // Bracket center is half thickness inward from the inner face
+            bracket_x = side * (inner_wall_inner_face_x - PLATFORM_THICKNESS/2);
+            
+            color("DarkSlateGray")
+            translate([bracket_x, pivot_y, pivot_z])
+            rotate([fold_angle, 0, 0])  // Same rotation as angle iron
+            translate([0, -PLATFORM_ANGLE_LEG/2, arm_pivot_bolt_dist])
+            rotate([90, 0, 90])
+            linear_extrude(height=PLATFORM_THICKNESS, center=true)
+            projection(cut=true)
+            platform_pivot_bracket();
+        }
+        
+        // =================================================================
+        // DECK PLATE (1x)
+        // =================================================================
+        
+        // Deck sits on top of angle iron horizontal legs
+        // When deployed (90°): deck is horizontal, extending backward from pivot
+        // When stowed (0°): deck is vertical against rear of machine
+        // Deck rotates with the angle irons around the pivot point
+        
+        // In local coords (before rotation):
+        // - Deck extends in +Z direction from pivot
+        // - Deck center is at Z = arm_deck_bolt_dist (where bolts attach to angle iron)
+        // - Deck bottom sits on angle iron horizontal leg surface
+        
+        color("DarkSlateGray")
+        translate([0, pivot_y, pivot_z])
+        rotate([fold_angle, 0, 0])  // Same rotation as angle irons
+        translate([0, PLATFORM_ANGLE_THICK + PLATFORM_THICKNESS/2, arm_deck_bolt_dist])
+        rotate([90, 0, 0])  // Rotate deck to be horizontal in local coords
+        platform_deck();
+        
+        // =================================================================
+        // PIVOT PINS (2x - visualization)
+        // =================================================================
+        
+        // Pivot pins go through inner side panel and pivot bracket
+        // Oriented in X direction (through the panel thickness)
+        color("Silver")
+        for (side = [-1, 1]) {
+            // Pin at the inner panel location
+            translate([side * PLATFORM_PIVOT_X, pivot_y, pivot_z])
+            rotate([0, 90, 0])
+            cylinder(d=PLATFORM_PIVOT_PIN_DIA, h=PANEL_THICKNESS * 2 + 30, center=true, $fn=32);
+        }
+        
+        // =================================================================
+        // LOCK PINS (visualization)
+        // =================================================================
+        
+        color("Gold")
+        for (side = [-1, 1]) {
+            if (fold_angle > 45) {
+                // Deployed position - lock pin below pivot
+                translate([side * PLATFORM_PIVOT_X, pivot_y, pivot_z - PLATFORM_LOCK_OFFSET])
+                rotate([0, 90, 0])
+                cylinder(d=PLATFORM_LOCK_PIN_DIA, h=PANEL_THICKNESS + 20, center=true, $fn=24);
+            } else {
+                // Stowed position - lock pin at arm end position
+                lock_y = pivot_y - PLATFORM_ARM_LENGTH * sin(fold_angle);
+                lock_z = pivot_z + PLATFORM_ARM_LENGTH * cos(fold_angle);
+                translate([side * PLATFORM_PIVOT_X, lock_y, lock_z])
+                rotate([0, 90, 0])
+                cylinder(d=PLATFORM_LOCK_PIN_DIA, h=PANEL_THICKNESS + 20, center=true, $fn=24);
+            }
+        }
     }
+}
+
+// Legacy module for backward compatibility (calls new folding platform)
+module standing_deck() {
+    folding_platform_assembly(platform_fold_angle);
 }
 
 // =============================================================================
@@ -2460,7 +2650,7 @@ module lifetrac_v25_assembly() {
     bucket_attachment();
     lift_cylinders();
     bucket_cylinders();
-    standing_deck();
+    folding_platform_assembly(platform_fold_angle);
 }
 
 // =============================================================================

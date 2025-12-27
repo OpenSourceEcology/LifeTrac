@@ -15,11 +15,17 @@
 
 **Total Square Tubing:** ~10 meters (33 feet)
 
-### Angle Iron (Optional - for reinforcement)
+### Angle Iron
 
 | Size | Thickness | Length | Quantity | Purpose |
 |------|-----------|--------|----------|---------|
-| 3" × 3" | 1/4" | As needed | Variable | Frame gussets and reinforcement |
+| 2" × 2" | 1/4" (6.35mm) | 350mm (14") | 2 | Folding platform arms | F2 |
+| 3" × 3" | 1/4" | As needed | Variable | Frame gussets and reinforcement (optional) |
+
+**Note:** Platform angle iron arms require drilling per template in `platform_angle_arm.scad`:
+- 3× bolt holes (1/2" + 2mm clearance) at each end
+- Hole spacing: 30mm apart, centered on leg
+- See [PLATFORM_ANGLE_ARM](../openscad/parts/platform_angle_arm.scad) for drilling template
 
 ---
 
@@ -33,7 +39,8 @@
 | Bucket back | 1100mm × 400mm | 1 | Bucket | E1 |
 | Bucket sides | 600mm × 400mm | 2 | Bucket | E1 |
 | Loader arm reinforcement | 150mm × 1200mm | 2 | Arm structure | C1 |
-| Standing deck | 1000mm × 400mm | 1 | Operator platform | F1 |
+| Platform deck | 850mm × 400mm | 1 | Folding operator platform | F1 |
+| Platform pivot brackets | 150mm × 100mm | 2 | Platform hinge mount | F3 |
 | Control housing base | 300mm × 200mm | 1 | Electronics mount | G1 |
 
 **Total 1/4" Plate:** Approximately 8-9 m² (86-97 sq ft)
@@ -128,6 +135,15 @@
 | 1" diameter | 4"-8" | 50 | Frame joints, pivot pins |
 | 1/2" diameter | 2"-6" | 100 | Plate mounting, general assembly |
 | 1/4" diameter | 1"-3" | 50 | Light-duty mounting |
+
+### Pivot Pins and Lock Pins
+
+| Size | Length | Quantity | Purpose | Part Ref |
+|------|--------|----------|---------|----------|
+| 1" (25.4mm) round bar | 50mm (2") | 2 | Folding platform pivot pins | F4 |
+| 3/8" (9.5mm) cotter pins | Standard | 4 | Platform lock pins (deployed + stowed) | F5 |
+
+**Note:** Pivot pins should be machined with a groove or hole for cotter pin retention.
 
 ### Hex Nuts (Grade 8)
 

@@ -1,9 +1,9 @@
 // export_standing_deck.scad
-// 2D export file for standing deck
-// Generates SVG for CNC cutting
+// DEPRECATED - Use export_platform_deck.scad instead
+// This file redirects to the new platform deck for backward compatibility
 
-use <standing_deck.scad>
+use <platform_deck.scad>
 
 // Create 2D projection for CNC cutting
 projection(cut=true)
-standing_deck();
+platform_deck();

@@ -105,6 +105,41 @@ module side_panel(is_inner = false) {
         
         translate([WHEEL_BASE, WHEEL_DIAMETER/2 - 50, PANEL_THICKNESS/2])
         cylinder(d=BOLT_DIA_3_4 + 2, h=PANEL_THICKNESS+4, center=true, $fn=32);
+        
+        // =================================================================
+        // FOLDING PLATFORM PIVOT HOLES (inner panels only)
+        // =================================================================
+        // These holes allow the platform pivot pin to pass through
+        // Located near rear of panel, but clear of stiffener cutout zone
+        // Stiffener cutout extends to X=31.75 in panel coords, so pivot must be beyond that
+        // X position in panel coords = Y position in world coords
+        // Y position in panel coords = Z position in world coords - FRAME_Z_OFFSET
+        if (is_inner) {
+            // Pivot Y position in world coords (clear of stiffener zone)
+            pivot_world_y = 50;  // 50mm from rear (clear of 31.75mm stiffener cutout)
+            pivot_panel_x = pivot_world_y;  // Panel X = world Y
+            pivot_panel_y = PLATFORM_PIVOT_HEIGHT - FRAME_Z_OFFSET;  // Panel Y = world Z - offset
+            
+            // Main pivot pin hole (1" + clearance)
+            translate([pivot_panel_x, pivot_panel_y, PANEL_THICKNESS/2])
+            cylinder(d=PLATFORM_PIVOT_PIN_DIA + PLATFORM_BOLT_CLEARANCE, 
+                     h=PANEL_THICKNESS+4, center=true, $fn=48);
+            
+            // Deployed position lock pin hole (below pivot in Z = below in panel Y)
+            translate([pivot_panel_x, pivot_panel_y - PLATFORM_LOCK_OFFSET, PANEL_THICKNESS/2])
+            cylinder(d=PLATFORM_LOCK_PIN_DIA + PLATFORM_BOLT_CLEARANCE, 
+                     h=PANEL_THICKNESS+4, center=true, $fn=32);
+            
+            // Stowed position lock pin hole (toward rear in Y = toward X=0 in panel)
+            // When stowed, arm extends upward, lock pin aligns with arm end
+            // This hole is at same Z as pivot but closer to rear
+            stowed_lock_panel_x = pivot_panel_x - PLATFORM_ARM_LENGTH * 0.3;  // Offset toward rear
+            if (stowed_lock_panel_x > 35) {  // Only if clear of stiffener cutout
+                translate([stowed_lock_panel_x, pivot_panel_y + PLATFORM_ARM_LENGTH, PANEL_THICKNESS/2])
+                cylinder(d=PLATFORM_LOCK_PIN_DIA + PLATFORM_BOLT_CLEARANCE, 
+                         h=PANEL_THICKNESS+4, center=true, $fn=32);
+            }
+        }
     }
 }
 
