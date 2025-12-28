@@ -43,8 +43,21 @@ module platform_pivot_bracket() {
     corner_y = -pivot_to_corner_dist;
     
     // Bolt positions (relative to corner along X)
-    bolt_1_x = corner_to_bolt_dist;
-    bolt_2_x = corner_to_bolt_dist + bolt_spacing;
+    // Updated to match new side angle iron hole pattern (30mm and 80mm from start)
+    // Pivot bracket starts at pivot. Angle iron starts at pivot bracket corner?
+    // Angle iron pivot holes are at z=30 and z=80.
+    // Pivot bracket corner is at corner_y = -60.
+    // So angle iron starts at corner_y.
+    // Bolt 1: 30mm from corner.
+    // Bolt 2: 80mm from corner.
+    bolt_1_x = corner_to_bolt_dist - 30; // Wait, corner_to_bolt_dist was 60.
+    // Let's redefine based on angle iron holes.
+    // Angle iron holes are at z=30, 80 from its start.
+    // Its start aligns with the corner of the bracket?
+    // Yes, bracket extends from pivot to corner, then along arm.
+    // So bolts should be at 30 and 80 from corner.
+    bolt_1_x = 30;
+    bolt_2_x = 80;
     
     // Hole diameters
     pivot_hole_dia = PLATFORM_PIVOT_PIN_DIA + PLATFORM_BOLT_CLEARANCE;

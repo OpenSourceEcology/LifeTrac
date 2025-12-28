@@ -2461,24 +2461,20 @@ module platform_transverse_angle(length) {
         
         // Deck Holes (Vertical, through Horizontal Leg)
         // Along Z axis
+        // 3 bolts connecting to the platform itself
         for (x_pos = [-length/2 + 100, 0, length/2 - 100]) {
             translate([x_pos, leg/2, 0])
             cylinder(d=angle_bolt_hole_dia, h=thick*3, center=true, $fn=24);
         }
         
-        // L-bracket Holes (Horizontal, through Vertical Leg)
-        // Along Y axis
-        for (x_pos = [-length/2 + 25, length/2 - 25]) {
-            translate([x_pos, thick/2, -leg/2])
-            rotate([90, 0, 0])
-            cylinder(d=angle_bolt_hole_dia, h=thick*3, center=true, $fn=24);
-        }
+        // No holes on the other side (Vertical Leg)
     }
 }
 
-module platform_angle_iron() {
+module platform_angle_iron(length=0) {
     angle_bolt_hole_dia = PLATFORM_BOLT_DIA + PLATFORM_BOLT_CLEARANCE;
-    height = PLATFORM_ARM_LENGTH - PLATFORM_BRACKET_WIDTH/2;
+    // Use provided length or default
+    height = (length > 0) ? length : (PLATFORM_ARM_LENGTH - PLATFORM_BRACKET_WIDTH/2);
     
     difference() {
         // Extrusion
@@ -2494,27 +2490,19 @@ module platform_angle_iron() {
         
         // Pivot Holes (Start) - Horizontal Holes through Vertical Leg (Leg 1)
         // Leg 1 is along X. Normal Y. Holes along Y.
-        for (z_pos = [60, 110]) {
+        // 2 holes for bolts into the L shaped pivot plate
+        for (z_pos = [30, 80]) {
             translate([PLATFORM_ANGLE_THICK/2, PLATFORM_ANGLE_LEG/2, z_pos])
             rotate([0, 90, 0]) // Align with X axis
             cylinder(d=angle_bolt_hole_dia, h=PLATFORM_ANGLE_THICK + 10, center=true, $fn=24);
         }
         
-        // Deck Holes (End) - Vertical Holes through Horizontal Leg (Leg 2)
+        // Deck Holes (Middle) - Vertical Holes through Horizontal Leg (Leg 2)
         // Leg 2 is along Y. Normal X. Holes along X.
-        // Shifted positions to Z=22.7 and Z=397.3 to align with transverse angles (1/2" from edges)
-        for (z_pos = [22.7, 397.3]) {
+        // 2 bolts upward connecting to the platform itself
+        for (z_pos = [height/3, 2*height/3]) {
             translate([PLATFORM_ANGLE_LEG/2, PLATFORM_ANGLE_THICK/2, z_pos])
             rotate([90, 0, 0]) // Align with Y axis
-            cylinder(d=angle_bolt_hole_dia, h=PLATFORM_ANGLE_THICK + 10, center=true, $fn=24);
-        }
-        
-        // L-bracket Holes (Ends) - Horizontal Holes through Vertical Leg (Leg 1)
-        // Leg 1 along X. Normal Y. Holes along Y.
-        // At Start (Pivot End) and End (Deck End) to connect to transverse angles
-        for (z_pos = [30, height - 30]) {
-            translate([PLATFORM_ANGLE_THICK/2, PLATFORM_ANGLE_LEG/2, z_pos])
-            rotate([0, 90, 0]) // Align with X axis
             cylinder(d=angle_bolt_hole_dia, h=PLATFORM_ANGLE_THICK + 10, center=true, $fn=24);
         }
     }
@@ -2540,6 +2528,80 @@ module folding_platform_assembly(fold_angle=90) {
         angle_iron_clearance = PLATFORM_THICKNESS / 2;
         angle_iron_x_from_center = inner_wall_inner_face_x - PLATFORM_THICKNESS/2 - angle_iron_clearance;
         
+        // Shift platform forward by 0.5 inches (12.7mm)
+        shift_y = 12.7;
+        
+        // Additional deck shift forward (towards front of machine)
+        // User requested ~2 inches more
+        deck_shift_y = 50.8;
+        
+        // Transverse angles now run full width (approx)
+        // Side angles fit between them with gap
+        transverse_len = 2 * angle_iron_x_from_center;
+        
+        // Calculate positions of transverse angles (Inner faces)
+        // Front Angle Inner Face (relative to pivot frame origin)
+        // Original Front Angle Pos: 37.3 - LEG. Inner Face at 37.3 - LEG + LEG = 37.3? No.
+        // Original Front Angle: Placed at 37.3 - LEG. Occupies [37.3-LEG, 37.3]. Inner Face at 37.3-LEG?
+        // Wait, Front Angle (Pivot End) is at +Y. Rear Angle is at -Y.
+        // Front Angle (Pivot End) placed at 37.3 - LEG. Occupies [-13.5, 37.3].
+        // Vertical leg is at -13.5 (Inner side).
+        // Rear Angle placed at -337.3 + LEG. Occupies [-337.3, -286.5].
+        // Vertical leg is at -286.5 (Inner side).
+        
+        // Apply Shift Forward (+50.8mm)
+        front_angle_pos_y = 37.3 - PLATFORM_ANGLE_LEG + shift_y;
+        rear_angle_pos_y = -337.3 + PLATFORM_ANGLE_LEG + shift_y;
+        
+        // Inner boundaries for side angles
+        // Front Angle Inner Boundary: front_angle_pos_y (Vertical leg face)
+        // Rear Angle Inner Boundary: rear_angle_pos_y (Vertical leg face)
+        // Gap
+        gap = 3.175; // 1/8 inch
+        
+        side_angle_start_y = front_angle_pos_y - gap;
+        side_angle_end_y = rear_angle_pos_y + gap;
+        side_angle_len = side_angle_start_y - side_angle_end_y;
+        side_angle_center_y = (side_angle_start_y + side_angle_end_y) / 2;
+        
+        // Side angle Z offset (in local frame before fold rotation)
+        // Local Z maps to World -Y (when fold=90)
+        // So World Y = -Local Z.
+        // Local Z = -World Y.
+        // But we have a base offset of `pivot_z - 60` in Z? No.
+        // The `translate([..., pivot_z - 60])` sets the origin.
+        // Then `rotate([fold_angle, 0, 0])` happens.
+        // Then `rotate([0, 0, -90])` happens.
+        // Side angle is extruded in Z (local).
+        // So we need to translate in Z (local) to position along Y (world).
+        // Wait, `platform_angle_iron` is extruded from 0 to height.
+        // If we want it centered at `side_angle_center_y` (World Y relative to pivot frame origin),
+        // We need to map World Y to Local Z.
+        // World Y = -Local Z (approx).
+        // Start of extrusion (Local Z=0) maps to World Y=0 (relative to pivot frame origin).
+        // Pivot frame origin is at `pivot_z - 60`? No.
+        // `translate([..., pivot_y, pivot_z - 60])`.
+        // Relative to this point:
+        // World Y (relative to pivot_y) = -Local Z.
+        // We want World Y (relative to pivot_y) to be `side_angle_start_y` (max Y) to `side_angle_end_y` (min Y).
+        // Wait, extrusion goes from 0 to height (positive Z).
+        // Positive Z maps to Negative Y (World).
+        // So Z=0 maps to Y=0. Z=height maps to Y=-height.
+        // We want the range [side_angle_end_y, side_angle_start_y].
+        // This corresponds to Z range [-side_angle_start_y, -side_angle_end_y].
+        // Since extrusion starts at 0, we need to translate by Z = -side_angle_start_y.
+        // Let's verify:
+        // Translate Z = -side_angle_start_y.
+        // Extrusion from -side_angle_start_y to -side_angle_start_y + length.
+        // Length = start - end.
+        // End Z = -side_angle_start_y + (start - end) = -end.
+        // Map to World Y: Y = -Z.
+        // Start Y = -(-side_angle_start_y) = side_angle_start_y.
+        // End Y = -(-end) = end.
+        // Correct.
+        
+        side_angle_z_trans = -side_angle_start_y;
+
         // =================================================================
         // ANGLE IRON ARMS (2x - Left and Right)
         // =================================================================
@@ -2548,42 +2610,36 @@ module folding_platform_assembly(fold_angle=90) {
         color("DimGray")
         translate([-angle_iron_x_from_center, pivot_y, pivot_z - 60])
         rotate([fold_angle, 0, 0])
+        translate([0, 0, side_angle_z_trans])
         rotate([0, 0, -90])
-        platform_angle_iron();
+        platform_angle_iron(length=side_angle_len);
         
         // RIGHT SIDE angle iron
         color("DimGray")
         translate([angle_iron_x_from_center, pivot_y, pivot_z - 60])
         rotate([fold_angle, 0, 0])
+        translate([0, 0, side_angle_z_trans])
         mirror([1, 0, 0])
         rotate([0, 0, -90])
-        platform_angle_iron();
+        platform_angle_iron(length=side_angle_len);
         
         // =================================================================
         // TRANSVERSE ANGLE IRONS (2x - Front and Rear)
         // =================================================================
         
-        // Fit between the horizontal legs of the side angle irons
-        transverse_len = 2 * angle_iron_x_from_center - 2 * PLATFORM_ANGLE_LEG;
-        side_angle_len = PLATFORM_ARM_LENGTH - PLATFORM_BRACKET_WIDTH/2;
-        
         // Front Transverse Angle (Pivot End)
-        // Positioned 1/2" (12.7mm) from front edge of deck
-        // Deck front edge is at pivot_y + 50. Angle at pivot_y + 37.3.
         color("DimGray")
         translate([0, pivot_y, pivot_z - 60])
         rotate([fold_angle - 90, 0, 0])
-        translate([0, 37.3, 0])
-        rotate([0, 0, 180])
+        translate([0, front_angle_pos_y, 0])
         platform_transverse_angle(transverse_len);
         
         // Rear Transverse Angle (Deck End)
-        // Positioned 1/2" (12.7mm) from rear edge of deck
-        // Deck rear edge is at pivot_y - 350. Angle at pivot_y - 337.3.
         color("DimGray")
         translate([0, pivot_y, pivot_z - 60])
         rotate([fold_angle - 90, 0, 0])
-        translate([0, -337.3, 0])
+        translate([0, rear_angle_pos_y, 0])
+        rotate([0, 0, 180])
         platform_transverse_angle(transverse_len);
 
         // =================================================================
@@ -2609,7 +2665,7 @@ module folding_platform_assembly(fold_angle=90) {
         color("DarkSlateGray")
         translate([0, pivot_y, pivot_z - 60])
         rotate([fold_angle, 0, 0])
-        translate([0, PLATFORM_THICKNESS/2, PLATFORM_DEPTH/2 - 12.7])
+        translate([0, PLATFORM_THICKNESS/2, PLATFORM_DEPTH/2 + 12.7 - shift_y - deck_shift_y])
         rotate([90, 0, 0])
         platform_deck();
         

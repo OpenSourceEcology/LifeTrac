@@ -60,19 +60,30 @@ module platform_deck() {
         }
         
         // Left angle iron mounting holes (Side Angle)
-        // Y positions: -125, 125 (relative to center) - Adjusted for new arm length
-        for (y_pos = [-125, 125]) {
+        // 2 bolts upward connecting to the platform itself
+        // Positions need to match side angle iron holes (height/3, 2*height/3)
+        // Side angle length is variable now, but roughly PLATFORM_ARM_LENGTH - BRACKET/2 - GAP?
+        // Actually, side angle length is calculated in main file.
+        // We need to approximate or pass it in.
+        // For now, let's assume standard positions relative to center.
+        // Side angle is centered between front/rear transverse angles.
+        // Front/Rear are at +/- (PLATFORM_DEPTH/2 - 12.7).
+        // Side angle length ~ PLATFORM_DEPTH - 25.4 - 2*GAP.
+        // Holes at 1/3 and 2/3 of that length.
+        // Let's put them at +/- 75mm from center Y.
+        for (y_pos = [-75, 75]) {
             translate([arm_x_left, y_pos, 0])
             cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
         }
         
         // Right angle iron mounting holes (Side Angle)
-        for (y_pos = [-125, 125]) {
+        for (y_pos = [-75, 75]) {
             translate([arm_x_right, y_pos, 0])
             cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
         }
         
         // Transverse Angle Holes (Front and Rear)
+        // 3 bolts connecting to the platform itself
         // Y positions: -187.3 (Front), 187.3 (Rear) - 1/2 inch from edges
         // X positions: 0, -100, 100
         for (y_pos = [-187.3, 187.3]) {
