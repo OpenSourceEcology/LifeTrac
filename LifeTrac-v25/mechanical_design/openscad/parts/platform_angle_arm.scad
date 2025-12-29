@@ -39,14 +39,6 @@ module platform_angle_arm(show_holes=true) {
     
     // Bolt hole parameters
     bolt_hole_dia = PLATFORM_BOLT_DIA + PLATFORM_BOLT_CLEARANCE;
-    bolt_spacing = PLATFORM_ANGLE_BOLT_OFFSET;  // ~30mm spacing between holes
-    
-    // Bolt positions along length (from pivot end, which is at Y=0)
-    pivot_end_bolt_y = -25;   // First set near pivot bracket end
-    deck_end_bolt_y = -length + 25;  // Second set near deck end
-    
-    // Bolt hole center position on leg (from corner)
-    bolt_center_on_leg = leg / 2;  // Center of leg
     
     color("DimGray")
     difference() {
@@ -67,23 +59,26 @@ module platform_angle_arm(show_holes=true) {
         
         if (show_holes) {
             // =============================================================
-            // PIVOT BRACKET END BOLT HOLES (3 holes through vertical leg)
+            // PIVOT BRACKET END BOLT HOLES (2 holes through vertical leg)
             // =============================================================
             // These holes go through the vertical leg (in X direction)
             // For attaching the pivot bracket plate
-            for (y_off = [-bolt_spacing, 0, bolt_spacing]) {
-                translate([-leg/2, pivot_end_bolt_y + y_off, -leg/2])
+            // Positions from pivot end (Y=0) extending in -Y
+            for (y_pos = [-PLATFORM_SIDE_BOLT_START, -(PLATFORM_SIDE_BOLT_START + PLATFORM_SIDE_BOLT_SPACING)]) {
+                translate([-leg/2, y_pos, -leg/2])
                 rotate([0, 90, 0])
                 cylinder(d=bolt_hole_dia, h=leg + 4, center=true, $fn=24);
             }
             
             // =============================================================
-            // DECK END BOLT HOLES (3 holes through horizontal leg)
+            // DECK END BOLT HOLES (2 holes through horizontal leg)
             // =============================================================
             // These holes go through the horizontal leg (in Z direction)
             // For attaching the deck plate from above
-            for (y_off = [-bolt_spacing, 0, bolt_spacing]) {
-                translate([leg/2 - thick/2, deck_end_bolt_y + y_off, -thick/2])
+            // Centered on length
+            center_y = -length / 2;
+            for (y_pos = [center_y - PLATFORM_SIDE_DECK_BOLT_SPACING/2, center_y + PLATFORM_SIDE_DECK_BOLT_SPACING/2]) {
+                translate([leg/2 - thick/2, y_pos, -thick/2])
                 cylinder(d=bolt_hole_dia, h=thick + 4, center=true, $fn=24);
             }
         }

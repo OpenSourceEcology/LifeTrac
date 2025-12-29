@@ -116,7 +116,7 @@ module side_panel(is_inner = false) {
         // Y position in panel coords = Z position in world coords - FRAME_Z_OFFSET
         if (is_inner) {
             // Pivot Y position in world coords (clear of stiffener zone)
-            pivot_world_y = 50;  // 50mm from rear (clear of 31.75mm stiffener cutout)
+            pivot_world_y = PLATFORM_MOUNT_Y;  // Parametric forward position
             pivot_panel_x = pivot_world_y;  // Panel X = world Y
             pivot_panel_y = PLATFORM_PIVOT_HEIGHT - FRAME_Z_OFFSET;  // Panel Y = world Z - offset
             

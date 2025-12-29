@@ -163,46 +163,51 @@ DECK_WIDTH = 700;
 DECK_DEPTH = 400;
 DECK_HEIGHT = 250;  // Height above ground
 
+
+
 // =============================================================================
 // FOLDING PLATFORM PARAMETERS
 // =============================================================================
 // 5-component folding platform: 1x deck plate + 2x pivot brackets + 2x angle arms
 // Folds from stowed (vertical against rear) to deployed (horizontal)
 
-// --- Pivot bracket dimensions ---
-PLATFORM_BRACKET_LENGTH = 150;  // Length of pivot bracket plate (mm)
-PLATFORM_BRACKET_WIDTH = 100;   // Width of pivot bracket plate (mm)
+// --- Derived dimensions (calculated from frame geometry) ---
+PLATFORM_CLEARANCE = 50;  // Clearance from inner walls (mm)
+PLATFORM_WIDTH = TRACK_WIDTH - SANDWICH_SPACING - PANEL_THICKNESS*2 - PLATFORM_CLEARANCE;  // ~850mm
+
+// Pivot X position - near deck edges, inside the inner panel faces
+PLATFORM_PIVOT_X_INSET = 35;  // Distance from deck edge to pivot centerline (mm)
+PLATFORM_PIVOT_X = PLATFORM_WIDTH/2 - PLATFORM_PIVOT_X_INSET;  // X position from center
 
 // --- Configurable dimensions ---
+PLATFORM_DEPTH = 400;           // Front-to-back depth of deck (mm)
+deck_bolt_inner_dist = 50;      // Distance from pivot end to inner deck bolt (mm)
+deck_bolt_outer_dist = PLATFORM_DEPTH * 0.75; // Distance from pivot end to outer deck bolt (mm)
+PLATFORM_ARM_LENGTH = 425;      // Length of angle iron arms (mm)
+PLATFORM_PIVOT_HEIGHT = 330;    // Height of pivot / deck surface when deployed (mm)
 PLATFORM_THICKNESS = PLATE_1_4_INCH;  // Deck plate thickness
-PLATFORM_ARM_LENGTH = 350;      // Length of angle iron arms (mm)
-PLATFORM_DEPTH = PLATFORM_ARM_LENGTH + PLATFORM_BRACKET_WIDTH/2;           // Front-to-back depth of deck (mm)
-PLATFORM_PIVOT_HEIGHT = 250;    // Height of pivot point / deck surface when deployed (mm)
 
-// --- Derived dimensions (calculated from frame geometry) ---
-// Platform width fits between inner side panels with clearance
-PLATFORM_GAP = 3.175; // 1/8 inch gap between deck and pivot plate
-// Inner wall inner face X position
-_inner_wall_inner_face_x = TRACK_WIDTH/2 - SANDWICH_SPACING/2 - PANEL_THICKNESS;
-// Platform width calculated to leave GAP between deck and pivot plate face
-// Pivot plate is PLATFORM_THICKNESS thick and sits against inner wall
-PLATFORM_WIDTH = 2 * (_inner_wall_inner_face_x - PLATFORM_THICKNESS - PLATFORM_GAP);
-
-// Inner side panel X position (from center of machine)
-// Inner panel inner face is at: TRACK_WIDTH/2 - SANDWICH_SPACING/2
-_INNER_PANEL_X = TRACK_WIDTH/2 - SANDWICH_SPACING/2;  // = 450 - 60 = 390mm
-
-// Pivot X position - at the inner side panel (pivot pin goes through panel)
-// Inset slightly from panel edge for structural strength
-PLATFORM_PIVOT_X_INSET = 0;  // Distance inward from inner panel face (mm)
-PLATFORM_PIVOT_X = _INNER_PANEL_X - PLATFORM_PIVOT_X_INSET;  // X position of pivot from center (~390mm)
+// --- Pivot bracket dimensions ---
+PLATFORM_BRACKET_WIDTH = 100;   // Width of pivot bracket plate (mm)
+PLATFORM_BRACKET_LENGTH = PLATFORM_DEPTH - PLATFORM_BRACKET_WIDTH/2;  // Length of pivot bracket plate (mm)
 
 // --- Hardware dimensions ---
 PLATFORM_PIVOT_PIN_DIA = BOLT_DIA_1;    // 1" (25.4mm) pivot pin diameter
-PLATFORM_LOCK_PIN_DIA = 9.525;          // 3/8" (9.525mm) cotter/lock pin diameter
+PLATFORM_LOCK_PIN_DIA = 15.875;         // 5/8" (15.875mm) hitch pin diameter
 PLATFORM_BOLT_DIA = BOLT_DIA_1_2;       // 1/2" (12.7mm) mounting bolts
 PLATFORM_BOLT_CLEARANCE = 2;            // Clearance for bolt holes (mm)
-PLATFORM_LOCK_OFFSET = 30;              // Distance from pivot center to lock pin hole (mm)
+PLATFORM_LOCK_OFFSET = 60;              // Distance from pivot center to lock pin hole (mm)
+
+// --- New Parametric Dimensions ---
+PLATFORM_MOUNT_Y = 75.4;                // Forward position of platform pivot (mm)
+PLATFORM_TRANSVERSE_GAP = 6.35;         // 1/4" clearance for angle irons (mm)
+PLATFORM_BRACKET_CORNER_RADIUS = 25.4;  // 1" radius for pivot bracket corner (mm)
+PLATFORM_SIDE_BOLT_SPACING = 70;        // Spacing between side bolts (mm)
+PLATFORM_SIDE_BOLT_START = 20;          // Distance to first bolt from corner (mm)
+PLATFORM_SIDE_BOLT_Y_OFFSET = -70;      // Vertical offset of side bolts from lock pin (mm)
+PLATFORM_TRANSVERSE_BOLT_END_OFFSET = 38.1; // 1.5" offset from ends for transverse bolts
+PLATFORM_SIDE_DECK_BOLT_SPACING = 150;  // Spacing for side angle deck bolts (mm)
+PLATFORM_EDGE_MARGIN = 12.7;            // 1/2" margin from deck edge to angle iron (mm)
 
 // --- Anti-slip pattern ---
 PLATFORM_ANTISLIP_HOLE_DIA = 15;   // Diameter of anti-slip holes (mm)
@@ -216,6 +221,16 @@ PLATFORM_ANGLE_THICK = PLATFORM_ANGLE_SIZE[1];    // Angle iron thickness (6.35m
 
 // --- Bolt hole positions on angle iron (relative to corner) ---
 PLATFORM_ANGLE_BOLT_OFFSET = PLATFORM_ANGLE_LEG * 0.6;  // Bolt holes centered on leg
+
+// --- Vertical Alignment Calculations ---
+// Calculate the Z-offset required to align the bottom of the angle iron with the bottom of the bracket
+// Bracket bottom relative to pivot:
+_bracket_bottom_rel = -PLATFORM_LOCK_OFFSET + PLATFORM_SIDE_BOLT_Y_OFFSET - PLATFORM_BRACKET_WIDTH/2;
+// Angle iron bottom relative to its origin is -PLATFORM_ANGLE_LEG
+// We want AngleBottom = BracketBottom
+// (Origin + Offset) - LEG = BracketBottom
+// Offset = BracketBottom + LEG
+PLATFORM_ANGLE_Z_OFFSET = _bracket_bottom_rel + PLATFORM_ANGLE_LEG;
 
 // =============================================================================
 // FOLDING PLATFORM PARAMETER VALIDATION
@@ -248,6 +263,6 @@ assert(PLATFORM_PIVOT_PIN_DIA > PLATFORM_LOCK_PIN_DIA,
     "PLATFORM_PIVOT_PIN_DIA must be larger than PLATFORM_LOCK_PIN_DIA");
 
 // Stowed lock hole must be within rear crossmember height
-_crossmember_top_z = FRAME_Z_OFFSET + MACHINE_HEIGHT * 0.55;
+_crossmember_top_z = FRAME_Z_OFFSET + MACHINE_HEIGHT * 0.7;
 assert(PLATFORM_PIVOT_HEIGHT + PLATFORM_ARM_LENGTH < _crossmember_top_z, 
     "Stowed position lock hole must be within rear crossmember height");

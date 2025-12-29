@@ -18,7 +18,8 @@ include <../lifetrac_v25_params.scad>
  * Coordinate system when rendered:
  *   - Centered at origin in X and Y
  *   - Thickness in Z direction
- *   - Pivot hole at Origin
+ *   - Lock hole at Origin [0,0]
+ *   - Pivot hole at [0, PLATFORM_LOCK_OFFSET]
  *   - Bolt holes at +X
  *   - Designed to be oriented vertically when installed
  */
@@ -27,37 +28,16 @@ module platform_pivot_bracket() {
     thickness = PLATFORM_THICKNESS;
     width = PLATFORM_BRACKET_WIDTH;
     
-    // Dimensions
-    pivot_to_corner_dist = 60; // Distance from pivot to corner (Vertical offset)
-    corner_to_bolt_dist = 60;  // Distance from corner to first bolt (Horizontal offset)
-    bolt_spacing = 50;
+    // Dimensions relative to Pivot Hole at (0,0)
+    pivot_y = 0;
+    lock_y = -PLATFORM_LOCK_OFFSET; // -60mm
+    corner_y = lock_y + PLATFORM_SIDE_BOLT_Y_OFFSET; // -130mm
     
-    // Derived positions
-    // Top Section (Vertical)
-    // Pivot at [0,0]
-    // Lock pin position (Above pivot)
-    lock_pin_y = 60; 
+    // Corner radius - using width/2 to maintain constant width and avoid pinching
+    corner_radius = width / 2; 
     
-    // Bottom Section (Horizontal)
-    // Corner position (Down from pivot)
-    corner_y = -pivot_to_corner_dist;
-    
-    // Bolt positions (relative to corner along X)
-    // Updated to match new side angle iron hole pattern (30mm and 80mm from start)
-    // Pivot bracket starts at pivot. Angle iron starts at pivot bracket corner?
-    // Angle iron pivot holes are at z=30 and z=80.
-    // Pivot bracket corner is at corner_y = -60.
-    // So angle iron starts at corner_y.
-    // Bolt 1: 30mm from corner.
-    // Bolt 2: 80mm from corner.
-    bolt_1_x = corner_to_bolt_dist - 30; // Wait, corner_to_bolt_dist was 60.
-    // Let's redefine based on angle iron holes.
-    // Angle iron holes are at z=30, 80 from its start.
-    // Its start aligns with the corner of the bracket?
-    // Yes, bracket extends from pivot to corner, then along arm.
-    // So bolts should be at 30 and 80 from corner.
-    bolt_1_x = 30;
-    bolt_2_x = 80;
+    bolt_1_x = PLATFORM_SIDE_BOLT_START; // 20mm
+    bolt_2_x = PLATFORM_SIDE_BOLT_START + PLATFORM_SIDE_BOLT_SPACING; // 90mm
     
     // Hole diameters
     pivot_hole_dia = PLATFORM_PIVOT_PIN_DIA + PLATFORM_BOLT_CLEARANCE;
@@ -66,38 +46,47 @@ module platform_pivot_bracket() {
     
     difference() {
         union() {
-            // Top Section (Vertical Leg)
+            // Vertical Leg (Pivot to Corner)
             hull() {
-                translate([0, lock_pin_y, 0])
+                // Pivot position
+                translate([0, pivot_y, 0])
                 cylinder(d=width, h=thickness, center=true, $fn=48);
                 
+                // Corner position
                 translate([0, corner_y, 0])
-                cylinder(d=width, h=thickness, center=true, $fn=48);
+                cylinder(r=corner_radius, h=thickness, center=true, $fn=48);
             }
             
-            // Bottom Section (Horizontal Leg)
+            // Horizontal Leg (Corner to End)
             hull() {
+                // Corner position
                 translate([0, corner_y, 0])
-                cylinder(d=width, h=thickness, center=true, $fn=48);
+                cylinder(r=corner_radius, h=thickness, center=true, $fn=48);
                 
-                // Extended to reach back of platform deck (PLATFORM_ARM_LENGTH)
-                translate([PLATFORM_ARM_LENGTH - width/2, corner_y, 0]) 
+                // Extended to reach back of platform deck (PLATFORM_BRACKET_LENGTH)
+                translate([PLATFORM_BRACKET_LENGTH - width/2, corner_y, 0]) 
                 cylinder(d=width, h=thickness, center=true, $fn=48);
             }
         }
         
-        // Pivot hole at Origin
+        // Pivot hole at [0, 0]
+        translate([0, pivot_y, 0])
         cylinder(d=pivot_hole_dia, h=thickness + 4, center=true, $fn=48);
         
-        // Lock pin hole
-        translate([0, lock_pin_y, 0])
+        // Lock pin hole at [0, -60]
+        translate([0, lock_y, 0])
         cylinder(d=lock_hole_dia, h=thickness + 4, center=true, $fn=32);
         
         // Bolt holes
-        translate([bolt_1_x, corner_y, 0])
+        // Positioned 1 inch (25.4mm) from the bottom edge of the bracket
+        // Bottom edge Y = corner_y - width/2
+        // Bolt Y = Bottom edge Y + 25.4
+        bolt_y = (corner_y - width/2) + 25.4;
+        
+        translate([bolt_1_x, bolt_y, 0])
         cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
         
-        translate([bolt_2_x, corner_y, 0])
+        translate([bolt_2_x, bolt_y, 0])
         cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
     }
 }

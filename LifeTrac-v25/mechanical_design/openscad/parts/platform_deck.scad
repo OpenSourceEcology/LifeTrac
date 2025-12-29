@@ -61,33 +61,32 @@ module platform_deck() {
         
         // Left angle iron mounting holes (Side Angle)
         // 2 bolts upward connecting to the platform itself
-        // Positions need to match side angle iron holes (height/3, 2*height/3)
-        // Side angle length is variable now, but roughly PLATFORM_ARM_LENGTH - BRACKET/2 - GAP?
-        // Actually, side angle length is calculated in main file.
-        // We need to approximate or pass it in.
-        // For now, let's assume standard positions relative to center.
-        // Side angle is centered between front/rear transverse angles.
-        // Front/Rear are at +/- (PLATFORM_DEPTH/2 - 12.7).
-        // Side angle length ~ PLATFORM_DEPTH - 25.4 - 2*GAP.
-        // Holes at 1/3 and 2/3 of that length.
-        // Let's put them at +/- 75mm from center Y.
-        for (y_pos = [-75, 75]) {
+        for (y_pos = [-PLATFORM_SIDE_DECK_BOLT_SPACING/2, PLATFORM_SIDE_DECK_BOLT_SPACING/2]) {
             translate([arm_x_left, y_pos, 0])
             cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
         }
         
         // Right angle iron mounting holes (Side Angle)
-        for (y_pos = [-75, 75]) {
+        for (y_pos = [-PLATFORM_SIDE_DECK_BOLT_SPACING/2, PLATFORM_SIDE_DECK_BOLT_SPACING/2]) {
             translate([arm_x_right, y_pos, 0])
             cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
         }
         
         // Transverse Angle Holes (Front and Rear)
-        // 3 bolts connecting to the platform itself
-        // Y positions: -187.3 (Front), 187.3 (Rear) - 1/2 inch from edges
-        // X positions: 0, -100, 100
-        for (y_pos = [-187.3, 187.3]) {
-            for (x_pos = [-100, 0, 100]) {
+        // 2 bolts per angle: Near ends (aligned with side rails)
+        // Angle irons are positioned with outside edge at PLATFORM_EDGE_MARGIN from deck edge.
+        // Bolt holes should be centered on the angle iron leg.
+        transverse_bolt_y_margin = PLATFORM_EDGE_MARGIN + PLATFORM_ANGLE_LEG / 2;
+        transverse_bolt_y = depth/2 - transverse_bolt_y_margin;
+        // Transverse angles fit between side angles (at arm_x_pos)
+        // So holes must be inside arm_x_pos
+        // Align with holes in platform_transverse_angle (which are at length/2 - OFFSET)
+        // length/2 = arm_x_pos - GAP
+        // So Hole X = arm_x_pos - GAP - OFFSET
+        transverse_bolt_x = arm_x_pos - (PLATFORM_TRANSVERSE_GAP + PLATFORM_TRANSVERSE_BOLT_END_OFFSET);
+        
+        for (y_pos = [-transverse_bolt_y, transverse_bolt_y]) {
+            for (x_pos = [-transverse_bolt_x, transverse_bolt_x]) {
                 translate([x_pos, y_pos, 0])
                 cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
             }
