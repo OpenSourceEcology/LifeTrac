@@ -212,13 +212,21 @@ PLATFORM_BRACKET_CORNER_RADIUS = 25.4;  // 1" radius for pivot bracket corner (m
 PLATFORM_SIDE_BOLT_SPACING = 70;        // Spacing between side bolts (mm)
 PLATFORM_SIDE_BOLT_START = 20;          // Distance to first bolt from corner (mm)
 PLATFORM_SIDE_BOLT_Y_OFFSET = -70;      // Vertical offset of side bolts from lock pin (mm)
-PLATFORM_TRANSVERSE_BOLT_END_OFFSET = 38.1; // 1.5" offset from ends for transverse bolts
+// Transverse bolts: Offset from ends of the transverse angle iron
+// Use 10% of platform width, ensuring edge clearance
+PLATFORM_TRANSVERSE_BOLT_END_OFFSET = max(PLATFORM_WIDTH * 0.10, 2 * PLATFORM_BOLT_DIA);
 PLATFORM_SIDE_DECK_BOLT_SPACING = 150;  // Spacing for side angle deck bolts (mm)
 PLATFORM_EDGE_MARGIN = 12.7;            // 1/2" margin from deck edge to angle iron (mm)
 
 // --- Bolt Offsets for Collision Avoidance ---
-deck_bolt_offset = 50;                  // Distance from ends for deck bolts (mm)
-pivot_bolt_offset = 40;                 // Distance from ends for pivot bracket bolts (mm) - Increased to ensure engagement with angle iron
+// Deck bolts (Top): Wide spacing -> Small offset from ends (e.g. 8% of length)
+// Ensure at least 2x bolt diameter for edge clearance
+deck_bolt_offset = max(PLATFORM_ARM_LENGTH * 0.08, 2 * PLATFORM_BOLT_DIA);
+
+// Pivot bolts (Side): Narrow spacing -> Large offset from ends of the bracket leg
+// Bracket leg length = PLATFORM_BRACKET_LENGTH - PLATFORM_BRACKET_WIDTH/2
+// Use 30% offset from each end (leaving 40% spacing in middle)
+pivot_bolt_offset = (PLATFORM_BRACKET_LENGTH - PLATFORM_BRACKET_WIDTH/2) * 0.30;
 
 // --- Anti-slip pattern ---
 PLATFORM_ANTISLIP_HOLE_DIA = 15;   // Diameter of anti-slip holes (mm)

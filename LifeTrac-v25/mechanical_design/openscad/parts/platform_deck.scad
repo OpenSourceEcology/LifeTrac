@@ -87,8 +87,8 @@ module platform_deck() {
         _side_angle_start_y = _front_angle_corner_y - _gap;
         _side_angle_end_y = _rear_angle_corner_y + _gap;
         
-        // Bolt Offset from Ends = 50mm (matching angle iron definition)
-        _bolt_offset = 50;
+        // Bolt Offset from Ends = deck_bolt_offset (matching angle iron definition)
+        _bolt_offset = deck_bolt_offset;
         _bolt_1_world_y = _side_angle_start_y - _bolt_offset;
         _bolt_2_world_y = _side_angle_end_y + _bolt_offset;
         
@@ -117,9 +117,9 @@ module platform_deck() {
         // Transverse angles fit between side angles (at arm_x_pos)
         // So holes must be inside arm_x_pos
         // Align with holes in platform_transverse_angle (which are at length/2 - OFFSET)
-        // length/2 = arm_x_pos - GAP
-        // So Hole X = arm_x_pos - GAP - OFFSET
-        transverse_bolt_x = arm_x_pos - (PLATFORM_TRANSVERSE_GAP + PLATFORM_TRANSVERSE_BOLT_END_OFFSET);
+        // length/2 = angle_iron_center_x - GAP
+        // So Hole X = angle_iron_center_x - GAP - OFFSET
+        transverse_bolt_x = angle_iron_center_x - (PLATFORM_TRANSVERSE_GAP + PLATFORM_TRANSVERSE_BOLT_END_OFFSET);
         
         for (y_pos = [-transverse_bolt_y, transverse_bolt_y]) {
             for (x_pos = [-transverse_bolt_x, 0, transverse_bolt_x]) {
@@ -128,13 +128,13 @@ module platform_deck() {
             }
         }
         
-        // Corner mounting holes (optional, for additional support straps)
-        for (x = [-width/2 + 40, width/2 - 40]) {
-            for (y = [-depth/2 + 40]) {  // Front corners only
-                translate([x, y, 0])
-                cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
-            }
-        }
+        // Corner mounting holes (optional, for additional support straps) - REMOVED
+        // for (x = [-width/2 + 40, width/2 - 40]) {
+        //     for (y = [-depth/2 + 40]) {  // Front corners only
+        //         translate([x, y, 0])
+        //         cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
+        //     }
+        // }
     }
 }
 

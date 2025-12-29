@@ -2417,7 +2417,7 @@ module platform_transverse_angle(length) {
         // 3 bolts: Near ends and Center
         for (x_pos = [-length/2 + PLATFORM_TRANSVERSE_BOLT_END_OFFSET, 0, length/2 - PLATFORM_TRANSVERSE_BOLT_END_OFFSET]) {
             translate([x_pos, leg/2, 0])
-            cylinder(d=angle_bolt_hole_dia, h=thick*3, center=true, $fn=24);
+            cylinder(d=angle_bolt_hole_dia, h=thick*3, center=true, $fn=100);
         }
     }
 }
@@ -2533,8 +2533,8 @@ module platform_angle_iron(length=0, is_side=false) {
             
             for (z_pos = [z_pos_1, z_pos_2]) {
                 translate([x_pos, PLATFORM_ANGLE_THICK/2, z_pos])
-                rotate([0, 90, 0]) // Align with X axis
-                cylinder(d=angle_bolt_hole_dia, h=PLATFORM_ANGLE_THICK + 10, center=true, $fn=24);
+                rotate([90, 0, 0]) // Align with Y axis
+                cylinder(d=angle_bolt_hole_dia, h=PLATFORM_ANGLE_THICK + 10, center=true, $fn=100);
             }
             
             // Deck Holes (Middle) - Vertical Holes through Horizontal Leg (Leg 2)
@@ -2544,11 +2544,11 @@ module platform_angle_iron(length=0, is_side=false) {
             // Offset from ends: PLATFORM_SIDE_DECK_BOLT_END_OFFSET
             // If not defined, use 1/4 length or similar.
             // Let's use a fixed offset from ends.
-            deck_bolt_offset = 50; // 50mm from ends
+            // deck_bolt_offset = 50; // Removed local override to use global parameter
             for (z_pos = [deck_bolt_offset, height - deck_bolt_offset]) {
                 translate([PLATFORM_ANGLE_THICK/2, PLATFORM_ANGLE_LEG/2, z_pos])
                 rotate([0, 90, 0]) // Align with X axis
-                cylinder(d=angle_bolt_hole_dia, h=PLATFORM_ANGLE_THICK + 10, center=true, $fn=24);
+                cylinder(d=angle_bolt_hole_dia, h=PLATFORM_ANGLE_THICK + 10, center=true, $fn=100);
             }
         } else {
             // Transverse Angle Iron
