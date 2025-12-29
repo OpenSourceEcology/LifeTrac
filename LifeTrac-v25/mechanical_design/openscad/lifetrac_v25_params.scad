@@ -173,11 +173,6 @@ DECK_HEIGHT = 250;  // Height above ground
 
 // --- Derived dimensions (calculated from frame geometry) ---
 PLATFORM_CLEARANCE = 50;  // Clearance from inner walls (mm)
-PLATFORM_WIDTH = TRACK_WIDTH - SANDWICH_SPACING - PANEL_THICKNESS*2 - PLATFORM_CLEARANCE;  // ~850mm
-
-// Pivot X position - near deck edges, inside the inner panel faces
-PLATFORM_PIVOT_X_INSET = 35;  // Distance from deck edge to pivot centerline (mm)
-PLATFORM_PIVOT_X = PLATFORM_WIDTH/2 - PLATFORM_PIVOT_X_INSET;  // X position from center
 
 // --- Configurable dimensions ---
 PLATFORM_DEPTH = 400;           // Front-to-back depth of deck (mm)
@@ -186,6 +181,17 @@ deck_bolt_outer_dist = PLATFORM_DEPTH * 0.75; // Distance from pivot end to oute
 PLATFORM_ARM_LENGTH = 425;      // Length of angle iron arms (mm)
 PLATFORM_PIVOT_HEIGHT = 330;    // Height of pivot / deck surface when deployed (mm)
 PLATFORM_THICKNESS = PLATE_1_4_INCH;  // Deck plate thickness
+
+// Pivot X position - Aligned with inner plate of machine walls
+// Inner Wall X = TRACK_WIDTH/2 - SANDWICH_SPACING/2 - PANEL_THICKNESS
+// Pivot Bracket Center = Inner Wall X - Bracket Thickness/2
+_inner_wall_x = TRACK_WIDTH/2 - SANDWICH_SPACING/2 - PANEL_THICKNESS;
+PLATFORM_PIVOT_X = _inner_wall_x - PLATE_1_4_INCH/2;
+
+// PLATFORM_WIDTH calculated to fill distance between L plates (Pivot Brackets) with 1/8" gap
+// Pivot Bracket Inner Face = PLATFORM_PIVOT_X - PLATFORM_THICKNESS/2
+// Gap = 1/8 inch = 3.175mm
+PLATFORM_WIDTH = 2 * (PLATFORM_PIVOT_X - PLATFORM_THICKNESS/2 - 3.175);
 
 // --- Pivot bracket dimensions ---
 PLATFORM_BRACKET_WIDTH = 100;   // Width of pivot bracket plate (mm)
@@ -242,8 +248,8 @@ assert(PLATFORM_ARM_LENGTH >= PLATFORM_DEPTH/2,
     "PLATFORM_ARM_LENGTH must be at least half of PLATFORM_DEPTH");
 
 // Pivot X must be inside the inner frame walls
-_inner_wall_x = TRACK_WIDTH/2 - SANDWICH_SPACING/2;
-assert(PLATFORM_PIVOT_X < _inner_wall_x, 
+_inner_wall_limit_x = TRACK_WIDTH/2 - SANDWICH_SPACING/2;
+assert(PLATFORM_PIVOT_X < _inner_wall_limit_x, 
     "PLATFORM_PIVOT_X must be inside inner frame walls");
 
 // Pivot must be above frame bottom

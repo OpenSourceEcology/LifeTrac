@@ -2517,7 +2517,11 @@ module folding_platform_assembly(fold_angle=90) {
         // Transverse angles now run full width (approx)
         // Side angles fit between them with gap
         // Shorten transverse angles by gap on each side
-        transverse_len = 2 * angle_iron_x_from_center - 2 * PLATFORM_TRANSVERSE_GAP;
+        // Transverse Angle Length:
+        // "parametrically lengthen the transverse angle irons so that they are 1/4 of an inch from the L plates on either side."
+        // L Plate Inner Face is at `angle_iron_x_from_center`.
+        // 1/4 inch = 6.35mm.
+        transverse_len = 2 * (angle_iron_x_from_center - 6.35);
         
         // Calculate positions of transverse angles (Inner faces)
         // The outside edge of the transverse angle irons should be 1/2 inch (PLATFORM_EDGE_MARGIN)
@@ -2556,9 +2560,10 @@ module folding_platform_assembly(fold_angle=90) {
         // Side angle Z offset (in local frame before fold rotation)
         // Maps to World -Y.
         // We want World Y = side_angle_start_y at Extrusion 0.
-        // World Y = -Local Z.
-        // side_angle_start_y = -side_angle_z_trans.
-        side_angle_z_trans = -side_angle_start_y;
+        // World Y = -(z_trans - PLATFORM_LOCK_OFFSET).
+        // side_angle_start_y = -z_trans + PLATFORM_LOCK_OFFSET.
+        // z_trans = PLATFORM_LOCK_OFFSET - side_angle_start_y.
+        side_angle_z_trans = PLATFORM_LOCK_OFFSET - side_angle_start_y;
 
         // =================================================================
         // ANGLE IRON ARMS (2x - Left and Right)
