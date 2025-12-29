@@ -36,8 +36,23 @@ module platform_pivot_bracket() {
     // Corner radius - using width/2 to maintain constant width and avoid pinching
     corner_radius = width / 2; 
     
-    bolt_1_x = PLATFORM_SIDE_BOLT_START; // 20mm
-    bolt_2_x = PLATFORM_SIDE_BOLT_START + PLATFORM_SIDE_BOLT_SPACING; // 90mm
+    // Bolt positions
+    // Moved to Leg 2 (Horizontal in File X, Vertical in Assembly Z)
+    // This places bolts on the "bottom" leg relative to the L-shape in 2D view
+    
+    // Y position is constant (centered on Leg 2)
+    // Leg 2 is centered at corner_y. Width is width.
+    // We want bolts in the "bottom half" of the leg width.
+    // Bottom edge is corner_y - width/2.
+    // Bolt Y = Bottom Edge + LEG/2.
+    bolt_y = corner_y - width/2 + PLATFORM_ANGLE_LEG/2;
+    
+    // X positions (distributed along Leg 2)
+    // Leg 2 extends from X=0 to X=PLATFORM_BRACKET_LENGTH - width/2
+    // We place bolts at pivot_bolt_offset from each end of this span
+    leg2_length = PLATFORM_BRACKET_LENGTH - width/2;
+    bolt_x_1 = pivot_bolt_offset;
+    bolt_x_2 = leg2_length - pivot_bolt_offset;
     
     // Hole diameters
     pivot_hole_dia = PLATFORM_PIVOT_PIN_DIA + PLATFORM_BOLT_CLEARANCE;
@@ -46,7 +61,7 @@ module platform_pivot_bracket() {
     
     difference() {
         union() {
-            // Vertical Leg (Pivot to Corner)
+            // Vertical Leg (Pivot to Corner) - Along Y
             hull() {
                 // Pivot position
                 translate([0, pivot_y, 0])
@@ -57,7 +72,7 @@ module platform_pivot_bracket() {
                 cylinder(r=corner_radius, h=thickness, center=true, $fn=48);
             }
             
-            // Horizontal Leg (Corner to End)
+            // Horizontal Leg (Corner to End) - Along X
             hull() {
                 // Corner position
                 translate([0, corner_y, 0])
@@ -78,16 +93,11 @@ module platform_pivot_bracket() {
         cylinder(d=lock_hole_dia, h=thickness + 4, center=true, $fn=32);
         
         // Bolt holes
-        // Positioned 1 inch (25.4mm) from the bottom edge of the bracket
-        // Bottom edge Y = corner_y - width/2
-        // Bolt Y = Bottom edge Y + 25.4
-        bolt_y = (corner_y - width/2) + 25.4;
-        
-        translate([bolt_1_x, bolt_y, 0])
-        cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
-        
-        translate([bolt_2_x, bolt_y, 0])
-        cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
+        // Positioned along Leg 2 (X axis)
+        for (bx = [bolt_x_1, bolt_x_2]) {
+            translate([bx, bolt_y, 0])
+            cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
+        }
     }
 }
 

@@ -2414,8 +2414,8 @@ module platform_transverse_angle(length) {
         }
         
         // Deck Mounting Holes (Vertical through Horizontal Leg)
-        // 2 bolts: Near ends (aligned with side rails)
-        for (x_pos = [-length/2 + PLATFORM_TRANSVERSE_BOLT_END_OFFSET, length/2 - PLATFORM_TRANSVERSE_BOLT_END_OFFSET]) {
+        // 3 bolts: Near ends and Center
+        for (x_pos = [-length/2 + PLATFORM_TRANSVERSE_BOLT_END_OFFSET, 0, length/2 - PLATFORM_TRANSVERSE_BOLT_END_OFFSET]) {
             translate([x_pos, leg/2, 0])
             cylinder(d=angle_bolt_hole_dia, h=thick*3, center=true, $fn=24);
         }
@@ -2443,19 +2443,109 @@ module platform_angle_iron(length=0, is_side=false) {
             // Pivot Holes (Start) - Horizontal Holes through Vertical Leg (Leg 1)
             // Leg 1 is along X. Normal Y. Holes along Y.
             // 2 holes for bolts into the L shaped pivot plate
-            // Positions: PLATFORM_SIDE_BOLT_START and + SPACING
-            for (z_pos = [PLATFORM_SIDE_BOLT_START, PLATFORM_SIDE_BOLT_START + PLATFORM_SIDE_BOLT_SPACING]) {
-                translate([PLATFORM_ANGLE_LEG/2, PLATFORM_ANGLE_THICK/2, z_pos])
-                rotate([90, 0, 0]) // Align with Y axis
+            
+            // Replicate calculations to align with platform_pivot_bracket
+            
+            // 1. Calculate side_angle_start_y (World Y of Angle Iron Start)
+            // From assembly:
+            deck_pivot_y = PLATFORM_BRACKET_WIDTH/2;
+            front_angle_corner_y = deck_pivot_y - PLATFORM_EDGE_MARGIN - PLATFORM_ANGLE_LEG;
+            gap = 12.7;
+            side_angle_start_y = front_angle_corner_y - gap;
+            
+            // 2. Calculate bolt positions
+            // Bracket bolts are on Leg 2 (File X -> Assembly -Y).
+            // Bracket Y is constant `bolt_y`.
+            // Bracket X varies: bolt_x_1, bolt_x_2.
+            
+            corner_y = -PLATFORM_LOCK_OFFSET + PLATFORM_SIDE_BOLT_Y_OFFSET;
+            bracket_width = PLATFORM_BRACKET_WIDTH;
+            leg2_length = PLATFORM_BRACKET_LENGTH - bracket_width/2;
+            bx_1 = pivot_bolt_offset;
+            bx_2 = leg2_length - pivot_bolt_offset;
+            
+            // 3. Map to Angle Iron Coordinates
+            // Angle Iron Local Z (Longitudinal) corresponds to Assembly -Y.
+            // Angle Iron Local X (Leg 1) corresponds to Assembly Z.
+            
+            // Longitudinal Position (z_pos)
+            // Matches Bracket X (bx).
+            // z_pos = bx.
+            // Wait. Bracket X is distance from Pivot (along Leg 2).
+            // Angle Iron Z is distance from Angle Start.
+            // Angle Start is at side_angle_start_y.
+            // Pivot is at 0 (in Y).
+            // But Angle Iron is translated by side_angle_z_trans.
+            // side_angle_z_trans = PLATFORM_LOCK_OFFSET - side_angle_start_y.
+            // This is confusing.
+            // Let's use the fact that Bracket X=0 is at Corner.
+            // Corner is at Y = corner_y (in Bracket Local Y).
+            // But Bracket Leg 2 starts at X=0.
+            // In Assembly, Bracket Leg 2 starts at Pivot Y? No.
+            // Bracket Leg 2 starts at Corner Y?
+            // Bracket Leg 2 is the Horizontal Leg.
+            // It extends from Corner (Y=-130) backwards?
+            // No, Bracket Leg 2 is along Local X.
+            // Local X maps to World -Y.
+            // So it extends from Y=0 (Pivot) to Y=-Length?
+            // No, Bracket Local X=0 is at Pivot Y?
+            // In `platform_pivot_bracket`, X=0 is at Pivot X.
+            // So Bracket Leg 2 starts at Pivot X (which is 0).
+            // So Bracket X is distance from Pivot.
+            // So bx is distance from Pivot.
+            
+            // Angle Iron Start is at side_angle_start_y (World Y).
+            // Angle Iron extends along -Y.
+            // So Angle Iron Z=0 is at side_angle_start_y.
+            // Angle Iron Z=z_pos is at Y = side_angle_start_y - z_pos.
+            // We want Y = -bx (since Bracket X maps to -Y).
+            // side_angle_start_y - z_pos = -bx.
+            // z_pos = side_angle_start_y + bx.
+            
+            z_pos_1 = side_angle_start_y + bx_1;
+            z_pos_2 = side_angle_start_y + bx_2;
+            
+            // Vertical Position (x_pos on profile)
+            // Matches Bracket Y (bolt_y).
+            // Bracket Y maps to World Z.
+            // Angle Iron X maps to World Z? No.
+            // Angle Iron Local X (Leg 1) -> Frame -Y -> World -Z.
+            // Angle Iron Local Y (Leg 2) -> Frame X -> World X.
+            // Angle Iron Local Z -> Frame Z -> World -Y.
+            
+            // Wait. If Angle Iron Local X -> World -Z.
+            // Then Angle Iron X is Vertical (Down).
+            // Bracket Y is Vertical (Up/Down).
+            // Bracket Y = corner_y - width/2 + LEG/2.
+            // This is a negative value (e.g. -155).
+            // Angle Iron Origin Z is PLATFORM_ANGLE_Z_OFFSET.
+            // Angle Iron X is distance DOWN from Origin.
+            // World Z = Origin Z - Angle_X.
+            // Angle_X = Origin Z - World Z.
+            // Angle_X = PLATFORM_ANGLE_Z_OFFSET - bolt_y.
+            
+            // Substitute PLATFORM_ANGLE_Z_OFFSET = corner_y - width/2 + LEG.
+            // Substitute bolt_y = corner_y - width/2 + LEG/2.
+            // Angle_X = (corner_y - width/2 + LEG) - (corner_y - width/2 + LEG/2).
+            // Angle_X = LEG - LEG/2 = LEG/2.
+            
+            x_pos = PLATFORM_ANGLE_LEG/2;
+            
+            for (z_pos = [z_pos_1, z_pos_2]) {
+                translate([x_pos, PLATFORM_ANGLE_THICK/2, z_pos])
+                rotate([0, 90, 0]) // Align with X axis
                 cylinder(d=angle_bolt_hole_dia, h=PLATFORM_ANGLE_THICK + 10, center=true, $fn=24);
             }
             
             // Deck Holes (Middle) - Vertical Holes through Horizontal Leg (Leg 2)
             // Leg 2 is along Y. Normal X. Holes along X.
             // 2 bolts upward connecting to the platform itself
-            // Centered on length
-            center_z = height / 2;
-            for (z_pos = [center_z - PLATFORM_SIDE_DECK_BOLT_SPACING/2, center_z + PLATFORM_SIDE_DECK_BOLT_SPACING/2]) {
+            // Symmetrical from end to end
+            // Offset from ends: PLATFORM_SIDE_DECK_BOLT_END_OFFSET
+            // If not defined, use 1/4 length or similar.
+            // Let's use a fixed offset from ends.
+            deck_bolt_offset = 50; // 50mm from ends
+            for (z_pos = [deck_bolt_offset, height - deck_bolt_offset]) {
                 translate([PLATFORM_ANGLE_THICK/2, PLATFORM_ANGLE_LEG/2, z_pos])
                 rotate([0, 90, 0]) // Align with X axis
                 cylinder(d=angle_bolt_hole_dia, h=PLATFORM_ANGLE_THICK + 10, center=true, $fn=24);
@@ -2464,13 +2554,9 @@ module platform_angle_iron(length=0, is_side=false) {
             // Transverse Angle Iron
             // Deck Holes only
             // 2 bolts: Near ends
-            center_z = height / 2;
             // Note: Transverse angle iron logic is handled by platform_transverse_angle module above
             // This else block might be unused if platform_transverse_angle is used instead
             // But if it IS used, we should update it too.
-            // However, the assembly calls platform_transverse_angle for transverse angles.
-            // So this block is likely dead code or for a different configuration.
-            // I will leave it as is or update it to match just in case.
             for (z_pos = [PLATFORM_TRANSVERSE_BOLT_END_OFFSET, height - PLATFORM_TRANSVERSE_BOLT_END_OFFSET]) {
                 translate([PLATFORM_ANGLE_THICK/2, PLATFORM_ANGLE_LEG/2, z_pos])
                 rotate([0, 90, 0]) // Align with X axis
@@ -2504,8 +2590,8 @@ module folding_platform_assembly(fold_angle=90) {
         // Bracket Thickness is assumed to be PLATE_1_4_INCH (6.35mm).
         // Angle Iron Vertical Leg (Outer Face) should be at Bracket Inner Face.
         // Bracket Inner Face X = PLATFORM_PIVOT_X - PLATE_1_4_INCH/2.
-        // So Angle Iron X = PLATFORM_PIVOT_X - 3.175.
-        angle_iron_x_from_center = PLATFORM_PIVOT_X - 3.175;
+        // So Angle Iron X = PLATFORM_PIVOT_X - PLATFORM_SIDE_GAP.
+        angle_iron_x_from_center = PLATFORM_PIVOT_X - PLATFORM_SIDE_GAP;
         
         // Shift platform forward by 0.5 inches (12.7mm)
         shift_y = 0;
@@ -2748,7 +2834,7 @@ module folding_platform_assembly(fold_angle=90) {
             color("DarkSlateGray")
             translate([bracket_x, pivot_y, pivot_z])
             rotate([fold_angle, 0, 0])
-            rotate([0, -90, 0])
+            rotate([0, -90, 0]) // Reverted rotation: X->Z (Up), Y->Y (Back), Z->-X (Side)
             linear_extrude(height=PLATFORM_THICKNESS, center=true)
             projection(cut=true)
             platform_pivot_bracket();

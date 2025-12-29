@@ -28,9 +28,13 @@ module platform_deck() {
     bolt_hole_dia = PLATFORM_BOLT_DIA + PLATFORM_BOLT_CLEARANCE;
     
     // Angle iron attachment positions (X coordinates)
-    deck_half_width = width / 2;
-    arm_margin = 35;
-    arm_x_pos = min(PLATFORM_PIVOT_X, deck_half_width - arm_margin);
+    // Aligned with the center of the angle iron leg (Leg 2)
+    // Angle Iron Center X = PLATFORM_PIVOT_X - PLATFORM_SIDE_GAP (Gap/2)
+    // Hole Offset from Center = PLATFORM_ANGLE_LEG/2 (Inward)
+    // So Hole X = (PLATFORM_PIVOT_X - PLATFORM_SIDE_GAP) - PLATFORM_ANGLE_LEG/2
+    
+    angle_iron_center_x = PLATFORM_PIVOT_X - PLATFORM_SIDE_GAP;
+    arm_x_pos = angle_iron_center_x - PLATFORM_ANGLE_LEG/2;
     arm_x_left = -arm_x_pos;
     arm_x_right = arm_x_pos;
     
@@ -39,12 +43,23 @@ module platform_deck() {
         cube([width, depth, thickness], center=true);
         
         // Anti-slip hole pattern
-        for (x = [-width/2 + PLATFORM_ANTISLIP_EDGE_MARGIN : 
-                   PLATFORM_ANTISLIP_SPACING : 
-                   width/2 - PLATFORM_ANTISLIP_EDGE_MARGIN]) {
-            for (y = [-depth/2 + PLATFORM_ANTISLIP_EDGE_MARGIN : 
-                       PLATFORM_ANTISLIP_SPACING : 
-                       depth/2 - PLATFORM_ANTISLIP_EDGE_MARGIN]) {
+        // Symmetrical grid calculation
+        // Calculate number of holes that fit within margins
+        avail_x = width - 2 * PLATFORM_ANTISLIP_EDGE_MARGIN;
+        num_x = floor(avail_x / PLATFORM_ANTISLIP_SPACING);
+        
+        avail_y = depth - 2 * PLATFORM_ANTISLIP_EDGE_MARGIN;
+        num_y = floor(avail_y / PLATFORM_ANTISLIP_SPACING);
+        
+        // Center the grid
+        start_x = - (num_x * PLATFORM_ANTISLIP_SPACING) / 2;
+        start_y = - (num_y * PLATFORM_ANTISLIP_SPACING) / 2;
+        
+        for (i = [0 : num_x]) {
+            x = start_x + i * PLATFORM_ANTISLIP_SPACING;
+            for (j = [0 : num_y]) {
+                y = start_y + j * PLATFORM_ANTISLIP_SPACING;
+                
                 // Skip holes that would interfere with bolt hole areas
                 // Expanded exclusion zones for new transverse angles
                 if (!(abs(x - arm_x_left) < 50) && 
@@ -61,19 +76,40 @@ module platform_deck() {
         
         // Left angle iron mounting holes (Side Angle)
         // 2 bolts upward connecting to the platform itself
-        for (y_pos = [-PLATFORM_SIDE_DECK_BOLT_SPACING/2, PLATFORM_SIDE_DECK_BOLT_SPACING/2]) {
+        // Symmetrical from ends of the side angle iron.
+        
+        // Replicate assembly logic to find World Y positions
+        _deck_pivot_y = PLATFORM_BRACKET_WIDTH/2;
+        _deck_far_y = -(PLATFORM_DEPTH - PLATFORM_BRACKET_WIDTH/2);
+        _front_angle_corner_y = (_deck_pivot_y - PLATFORM_EDGE_MARGIN) - PLATFORM_ANGLE_LEG;
+        _rear_angle_corner_y = (_deck_far_y + PLATFORM_EDGE_MARGIN) + PLATFORM_ANGLE_LEG;
+        _gap = 12.7;
+        _side_angle_start_y = _front_angle_corner_y - _gap;
+        _side_angle_end_y = _rear_angle_corner_y + _gap;
+        
+        // Bolt Offset from Ends = 50mm (matching angle iron definition)
+        _bolt_offset = 50;
+        _bolt_1_world_y = _side_angle_start_y - _bolt_offset;
+        _bolt_2_world_y = _side_angle_end_y + _bolt_offset;
+        
+        // Convert World Y to Deck Y
+        // Deck Y = -World Y - Shift
+        // Shift = PLATFORM_DEPTH/2 - PLATFORM_BRACKET_WIDTH/2
+        _shift = PLATFORM_DEPTH/2 - PLATFORM_BRACKET_WIDTH/2;
+        
+        _bolt_1_deck_y = -_bolt_1_world_y - _shift;
+        _bolt_2_deck_y = -_bolt_2_world_y - _shift;
+        
+        for (y_pos = [_bolt_1_deck_y, _bolt_2_deck_y]) {
             translate([arm_x_left, y_pos, 0])
             cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
-        }
-        
-        // Right angle iron mounting holes (Side Angle)
-        for (y_pos = [-PLATFORM_SIDE_DECK_BOLT_SPACING/2, PLATFORM_SIDE_DECK_BOLT_SPACING/2]) {
+            
             translate([arm_x_right, y_pos, 0])
             cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
         }
         
         // Transverse Angle Holes (Front and Rear)
-        // 2 bolts per angle: Near ends (aligned with side rails)
+        // 3 bolts per angle: Near ends and Center
         // Angle irons are positioned with outside edge at PLATFORM_EDGE_MARGIN from deck edge.
         // Bolt holes should be centered on the angle iron leg.
         transverse_bolt_y_margin = PLATFORM_EDGE_MARGIN + PLATFORM_ANGLE_LEG / 2;
@@ -86,7 +122,7 @@ module platform_deck() {
         transverse_bolt_x = arm_x_pos - (PLATFORM_TRANSVERSE_GAP + PLATFORM_TRANSVERSE_BOLT_END_OFFSET);
         
         for (y_pos = [-transverse_bolt_y, transverse_bolt_y]) {
-            for (x_pos = [-transverse_bolt_x, transverse_bolt_x]) {
+            for (x_pos = [-transverse_bolt_x, 0, transverse_bolt_x]) {
                 translate([x_pos, y_pos, 0])
                 cylinder(d=bolt_hole_dia, h=thickness + 4, center=true, $fn=32);
             }

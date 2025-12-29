@@ -191,7 +191,8 @@ PLATFORM_PIVOT_X = _inner_wall_x - PLATE_1_4_INCH/2;
 // PLATFORM_WIDTH calculated to fill distance between L plates (Pivot Brackets) with 1/8" gap
 // Pivot Bracket Inner Face = PLATFORM_PIVOT_X - PLATFORM_THICKNESS/2
 // Gap = 1/8 inch = 3.175mm
-PLATFORM_WIDTH = 2 * (PLATFORM_PIVOT_X - PLATFORM_THICKNESS/2 - 3.175);
+PLATFORM_SIDE_GAP = 3.175;
+PLATFORM_WIDTH = 2 * (PLATFORM_PIVOT_X - PLATFORM_THICKNESS/2 - PLATFORM_SIDE_GAP);
 
 // --- Pivot bracket dimensions ---
 PLATFORM_BRACKET_WIDTH = 100;   // Width of pivot bracket plate (mm)
@@ -214,6 +215,10 @@ PLATFORM_SIDE_BOLT_Y_OFFSET = -70;      // Vertical offset of side bolts from lo
 PLATFORM_TRANSVERSE_BOLT_END_OFFSET = 38.1; // 1.5" offset from ends for transverse bolts
 PLATFORM_SIDE_DECK_BOLT_SPACING = 150;  // Spacing for side angle deck bolts (mm)
 PLATFORM_EDGE_MARGIN = 12.7;            // 1/2" margin from deck edge to angle iron (mm)
+
+// --- Bolt Offsets for Collision Avoidance ---
+deck_bolt_offset = 50;                  // Distance from ends for deck bolts (mm)
+pivot_bolt_offset = 40;                 // Distance from ends for pivot bracket bolts (mm) - Increased to ensure engagement with angle iron
 
 // --- Anti-slip pattern ---
 PLATFORM_ANTISLIP_HOLE_DIA = 15;   // Diameter of anti-slip holes (mm)
