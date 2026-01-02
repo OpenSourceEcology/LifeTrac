@@ -9,12 +9,44 @@ include <../lifetrac_v25_params.scad>
 // Triangular profile for side panels
 // Tall end at rear (Y=0), shorter sloped end at front (Y=WHEEL_BASE)
 module side_panel_profile() {
+    // Calculate arm bottom slope line
+    // Pivot point in panel coordinates
+    pivot_y_panel = ARM_PIVOT_Y;
+    pivot_z_panel = MACHINE_HEIGHT - 50;
+    
+    // Arm angle (ensure it's defined)
+    arm_angle = is_undef(ARM_MIN_ANGLE) ? -45 : ARM_MIN_ANGLE;
+    
+    // Vertical offset to clear arm bottom (Half tube height + clearance)
+    // Tube is 3" (76.2mm), half is 38.1mm. Add ~40mm clearance.
+    arm_clearance_z = 80;
+    
+    // Function to calculate wall height at a given Y based on arm slope
+    function wall_height(y) = 
+        let(
+            dy = y - pivot_y_panel,
+            dz = dy * tan(arm_angle)
+        )
+        pivot_z_panel + dz - arm_clearance_z;
+
+    // Define key Y coordinates
+    y_rear = 0;
+    y_pivot_start = pivot_y_panel - 100; // Start of pivot area
+    y_pivot_end = pivot_y_panel + 100;   // End of pivot area (start of slope)
+    y_front = WHEEL_BASE;                // Front of machine
+    
+    // Calculate Z heights
+    z_pivot_end = wall_height(y_pivot_end);
+    z_front_slope = wall_height(y_front - 200); // Point before final drop
+    
     offset(r=10) offset(r=-10)  // Rounded corners
     polygon([
         [0, 0],                              // Rear bottom
         [WHEEL_BASE, 0],                     // Front bottom
-        [WHEEL_BASE, MACHINE_HEIGHT * 0.65], // Front top (sloped down)
-        [200, MACHINE_HEIGHT],               // Near-rear top (arm pivot area)
+        [WHEEL_BASE, 0],                     // Front top (drop to corner)
+        [WHEEL_BASE - 200, z_front_slope],   // End of arm slope
+        [y_pivot_end, z_pivot_end],          // Start of arm slope
+        [pivot_y_panel, MACHINE_HEIGHT],     // Pivot high point
         [0, MACHINE_HEIGHT]                  // Rear top (full height)
     ]);
 }
@@ -35,8 +67,12 @@ module cross_beam_arc_slot(beam_distance, slot_width) {
     // Generate arc by rotating around pivot
     // The arc sweeps from ARM_MIN_ANGLE to ARM_MAX_ANGLE
     // We extend slightly beyond to ensure full clearance
-    arc_start = ARM_MIN_ANGLE - 5;
-    arc_end = ARM_MAX_ANGLE + 5;
+    // Safety check for undefined angles
+    safe_min_angle = is_undef(ARM_MIN_ANGLE) ? 0 : ARM_MIN_ANGLE;
+    safe_max_angle = is_undef(ARM_MAX_ANGLE) ? 60 : ARM_MAX_ANGLE;
+    
+    arc_start = safe_min_angle - 5;
+    arc_end = safe_max_angle + 5;
     arc_steps = 60;
     
     translate([pivot_x, pivot_y])

@@ -12,6 +12,7 @@ use <modules/structural_steel.scad>
 use <modules/fasteners.scad>
 use <modules/hydraulics.scad>
 use <modules/wheels.scad>
+use <modules/loader_arm_v2.scad>
 
 // Import individual part files
 use <parts/side_panel.scad>
@@ -163,7 +164,7 @@ animation_phase = animation_time < 0.5 ? (animation_time * 2) : (2 - animation_t
 
 // Default arm position: lowered to ground (animation_phase=0)
 // ARM_GROUND_ANGLE is the angle below horizontal needed to reach ground
-ARM_LIFT_ANGLE = -ARM_GROUND_ANGLE + (animation_phase * (60 + ARM_GROUND_ANGLE)); // Animate from ground to raised and back
+ARM_LIFT_ANGLE = -ARM_GROUND_ANGLE + ARM_V2_OFFSET_ANGLE + (animation_phase * (60 + ARM_GROUND_ANGLE)); // Animate from ground to raised and back
 
 // Cross beam positions along arm length (from pivot)
 // First cross beam positioned for bucket cylinder attachment
@@ -175,8 +176,9 @@ CROSS_BEAM_SIZE = TUBE_2X2_1_4[0];    // 2"x2" tube size
 CROSS_BEAM_CLEARANCE = 15;             // Extra clearance around cross beam in cutout
 
 // Arm rotation range for cutout calculations
-ARM_MIN_ANGLE = -ARM_GROUND_ANGLE;     // Lowest position (at ground)
-ARM_MAX_ANGLE = 60;                     // Maximum raised position
+// ARM_MIN_ANGLE and ARM_MAX_ANGLE are defined in lifetrac_v25_params.scad
+// ARM_MIN_ANGLE = -ARM_GROUND_ANGLE;     // Lowest position (at ground)
+// ARM_MAX_ANGLE = 60;                     // Maximum raised position
 
 // =============================================================================
 // CROSS BEAM CUTOUT GEOMETRY FUNCTIONS
@@ -237,9 +239,9 @@ BUCKET_HEIGHT = 450;
 
 // Bucket tilt angle calculation:
 // When arm is at ARM_LIFT_ANGLE, bucket needs to counter-rotate to stay level
-// At ground position (ARM_LIFT_ANGLE = -ARM_GROUND_ANGLE), bucket tilts forward to lay flat
-// The bucket bottom is horizontal when bucket tilt = ARM_GROUND_ANGLE (compensates for arm angle)
-BUCKET_GROUND_TILT = ARM_GROUND_ANGLE;  // Tilt needed to make bottom flat when arm at ground
+// At ground position (ARM_LIFT_ANGLE = ARM_MIN_ANGLE), bucket tilts forward to lay flat
+// The bucket bottom is horizontal when bucket tilt = -ARM_MIN_ANGLE (compensates for arm angle)
+BUCKET_GROUND_TILT = -ARM_MIN_ANGLE;  // Tilt needed to make bottom flat when arm at ground
 BUCKET_MAX_CURL = 60;  // Maximum curl angle when fully raised
 
 // Bucket actuates with the arm using the same animation_phase for looping
@@ -1497,7 +1499,7 @@ module stiffener_side_panel_cutters(is_inner, is_left) {
     // Mid Plate Parameters
     mid_y = 800;
     mid_z_start = FRAME_Z_OFFSET + 100;
-    mid_z_end = FRAME_Z_OFFSET + 825 - 25.4;
+    mid_z_end = FRAME_Z_OFFSET + 350;
     mid_h = mid_z_end - mid_z_start;
     mid_angle_size = [50.8, 6.35];
     mid_leg = mid_angle_size[0];
@@ -1813,7 +1815,7 @@ module base_frame() {
     
     // Mid plate (at Y=800 to avoid cylinder bolts at 700)
     // Top height at Y=800 is approx 825mm above frame bottom
-    mid_stiffener_plate(800, FRAME_Z_OFFSET + 100, FRAME_Z_OFFSET + 825 - 25.4);
+    mid_stiffener_plate(800, FRAME_Z_OFFSET + 100, FRAME_Z_OFFSET + 350);
 }
 
 // =============================================================================
@@ -2045,84 +2047,37 @@ module wheel_assemblies() {
 // LOADER ARMS
 // =============================================================================
 
-module single_arm(side) {
-    mirror_x = (side == "left") ? -1 : 1;
-    arm_x = mirror_x * ARM_SPACING/2;
-    tube_size = ARM_TUBE_SIZE[0];
-    
-    color("Orange")
-    translate([arm_x, 0, 0])
-    {
-        // Main arm beam - extends from Y=0 (pivot) to Y=ARM_LENGTH (bucket end)
-        // Using a hollow square tube created directly with difference()
-        translate([0, ARM_LENGTH/2, 0])
-        difference() {
-            cube([tube_size, ARM_LENGTH, tube_size], center=true);
-            cube([tube_size - 2*ARM_TUBE_SIZE[1], ARM_LENGTH + 2, tube_size - 2*ARM_TUBE_SIZE[1]], center=true);
-        }
-        
-        // Pivot reinforcement - TYPE B: Two CNC plasma cut rings from 3/4" plate
-        // Welded to each side of arm tube at pivot point
-        translate([0, 0, 0])
-        rotate([0, 90, 0]) {
-            // Inner ring
-            translate([0, 0, -tube_size/2 + PLATE_3_4_INCH/2])
-            pivot_ring_large(tube_size + 30, PIVOT_PIN_DIA + 2);
-            // Outer ring
-            translate([0, 0, tube_size/2 - PLATE_3_4_INCH/2])
-            pivot_ring_large(tube_size + 30, PIVOT_PIN_DIA + 2);
-        }
-        
-        // Lift cylinder attachment - TYPE A: U-Channel from 3"x3" tube with pin
-        translate([0, LIFT_CYL_ARM_OFFSET, -tube_size/2 - TUBE_3X3_1_4[0]/2])
-        rotate([0, 0, 0])
-        u_channel_lug_with_pin(TUBE_3X3_1_4, 80, BOLT_DIA_1 + 2);
-        
-        // Note: Bucket cylinder brackets are now on the cross beam, not individual arms
-    }
-}
 
-module arm_cross_beams() {
-    tube_size = ARM_TUBE_SIZE[0];
-    cross_tube_size = TUBE_2X2_1_4[0];
-    wall_thickness = TUBE_2X2_1_4[1];
-    beam_length = ARM_SPACING + tube_size;  // Span full width including arm tubes
-    
-    // First cross beam - at bucket cylinder attachment position
-    color("Orange")
-    translate([0, CROSS_BEAM_1_POS, 0])
-    {
-        // Cross beam tube
-        difference() {
-            cube([beam_length, cross_tube_size, cross_tube_size], center=true);
-            cube([beam_length + 2, cross_tube_size - 2*wall_thickness, cross_tube_size - 2*wall_thickness], center=true);
-        }
-        
-        // Bucket cylinder mounting brackets - TYPE A: U-Channel from 3"x3" tube with pins
-        for (side = [-1, 1]) {
-            translate([side * BUCKET_CYL_X_SPACING, 0, cross_tube_size/2 + TUBE_3X3_1_4[0]/2])
-            u_channel_lug_with_pin(TUBE_3X3_1_4, 80, BOLT_DIA_3_4 + 2);
-        }
-    }
-    
-    // Second cross beam - near bucket (centered on X=0)
-    color("Orange")
-    translate([0, CROSS_BEAM_2_POS, 0])
-    difference() {
-        cube([beam_length, cross_tube_size, cross_tube_size], center=true);
-        cube([beam_length + 2, cross_tube_size - 2*wall_thickness, cross_tube_size - 2*wall_thickness], center=true);
-    }
-}
 
 module loader_arms() {
     if (show_loader_arms) {
         translate([0, ARM_PIVOT_Y, ARM_PIVOT_Z])
-        rotate([ARM_LIFT_ANGLE, 0, 0])
-        translate([0, 0, 0])  // Local arm coordinate system
+        rotate([is_undef(ARM_LIFT_ANGLE) ? 0 : ARM_LIFT_ANGLE, 0, 0])
         {
-            single_arm("left");
-            single_arm("right");
-            arm_cross_beams();
+            // Left Arm
+            translate([-ARM_SPACING/2, 0, 0]) 
+                rotate([0, 0, 90])
+                translate([0, -TUBE_2X6_1_4[0]/2, -TUBE_2X6_1_4[1]/2])
+                loader_arm_v2(angle=0, side="left");
+            
+            // Right Arm
+            translate([ARM_SPACING/2, 0, 0]) 
+                rotate([0, 0, 90])
+                translate([0, -TUBE_2X6_1_4[0]/2, -TUBE_2X6_1_4[1]/2])
+                loader_arm_v2(angle=0, side="right");
+            
+            // Cross Beam
+            // Connects the elbow assemblies at the new mounting hole position
+            // Hole is at main_tube_len - 50 from pivot
+            // Z height is 0 relative to arm pivot (center of tube)
+            // Y position is ARM_PIVOT_Y + (ARM_MAIN_LEN - 50)
+            // But we are inside the rotated arm group, so we use local coordinates
+            // The arms are at +/- ARM_SPACING/2
+            // The cross beam spans between them
+            
+            translate([0, ARM_MAIN_LEN - 50, 0]) 
+                rotate([0, 90, 0])
+                cube([50.8, 152.4, ARM_SPACING], center=true); // 2x6 tube
         }
     }
 }
@@ -2249,8 +2204,8 @@ module bucket() {
 module bucket_attachment() {
     if (show_bucket) {
         translate([0, ARM_PIVOT_Y, ARM_PIVOT_Z])
-        rotate([ARM_LIFT_ANGLE, 0, 0])
-        translate([0, ARM_LENGTH, 0])
+        rotate([is_undef(ARM_LIFT_ANGLE) ? 0 : ARM_LIFT_ANGLE, 0, 0])
+        translate([0, ARM_TIP_X, ARM_TIP_Z])
         {
             // Pivot pin connecting arms to bucket
             // This is at the arm tip, aligned with arm centerline
@@ -2275,7 +2230,7 @@ module bucket_attachment() {
             // So we offset the bucket up so that point aligns with the arm tip (Z=0 here)
             // Additional offset to keep bucket bottom above ground
             rotate([BUCKET_TILT_ANGLE, 0, 0])
-            translate([0, 0, BOBCAT_QA_HEIGHT])  // Shift bucket up fully so bottom clears ground
+            translate([0, 100, BUCKET_HEIGHT - 100])  // Shift bucket up (less 100mm) to reach ground from raised pivot
             bucket();
         }
     }

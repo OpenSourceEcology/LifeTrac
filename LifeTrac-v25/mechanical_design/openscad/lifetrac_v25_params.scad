@@ -69,7 +69,7 @@ WHEEL_X_OFFSET = TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS + WHEEL_WI
 
 // Design constraints
 BUCKET_GROUND_CLEARANCE = 0;      // Bucket bottom at ground level when lowered
-BUCKET_FRONT_CLEARANCE = 100;     // 100mm (~4") clearance between bucket back and front of machine
+BUCKET_FRONT_CLEARANCE = 0;       // Reduced from 100 to 0 to match shorter arms
 
 // Arm pivot point (at top rear of side panels - tall end)
 ARM_PIVOT_Y = 200;  // Near rear of machine, between sandwich plates  
@@ -84,9 +84,61 @@ ARM_GROUND_ANGLE = asin(ARM_PIVOT_Z / ARM_LENGTH);  // Angle below horizontal (d
 ARM_TUBE_SIZE = TUBE_3X3_1_4;         // 3"x3" arm tubing
 ARM_SPACING = TRACK_WIDTH;            // Distance between arm centerlines
 
+// =============================================================================
+// LOADER ARM V2 PARAMETERS (L-SHAPE)
+// =============================================================================
+
+TUBE_2X6_1_4 = [50.8, 152.4, 6.35]; // 2"x6" rectangular tubing
+ARM_ANGLE = 120; // Main arm angle in degrees
+ARM_PLATE_THICKNESS = PLATE_1_4_INCH;
+DOM_PIPE_OD = 50.8; // Approximate OD for pivot holder (2" DOM)
+DOM_PIPE_ID = 38.1; // ID matching 1.5" pivot pin
+JIG_WALL_THICKNESS = 4; // Standard wall thickness for 3D printed jigs
+JIG_CLEARANCE = 0.5; // Clearance for fit
+
+echo("DEBUG: Loading lifetrac_v25_params.scad - Version with Fixes");
+
+// Arm Dimensions for Calculation
+ARM_MAIN_LEN = 1100; // Reduced from 1200 to bring bucket closer
+ARM_DROP_LEN = 550; // Shortened from 600
+ARM_OVERLAP = 200;
+ARM_DROP_EXT = 80; // Extension for bucket clearance
+ARM_PIVOT_EXT = 40; // Pivot hole offset from end of drop
+
+// Calculate Effective Arm Length and Angle
+// Vector from Main Pivot to Bucket Pivot
+_bend_angle = 180 - ARM_ANGLE;
+_drop_vec_len = ARM_DROP_LEN + ARM_PIVOT_EXT;
+_tube_h = TUBE_2X6_1_4[1];
+
+_dx = _drop_vec_len * cos(_bend_angle) + (-_tube_h/2) * sin(_bend_angle);
+_dz = -_drop_vec_len * sin(_bend_angle) + (-_tube_h/2) * cos(_bend_angle);
+
+ARM_TIP_X = (ARM_MAIN_LEN + ARM_OVERLAP + 50) + _dx;
+ARM_TIP_Z = _tube_h + _dz;
+
+_x_rel = ARM_TIP_X;
+_z_rel = ARM_TIP_Z - _tube_h/2;
+
+_arm_eff_len = sqrt(pow(_x_rel, 2) + pow(_z_rel, 2));
+arm_alpha_calc = atan2(-_z_rel, _x_rel); // Angle below horizontal (positive value)
+
+// Target Angle Calculation
+_target_height = 100; // Raised to 100mm (approx 4") to keep arm tip off ground
+_theta_rad = asin((_target_height - ARM_PIVOT_Z) / _arm_eff_len);
+theta_deg_calc = _theta_rad; 
+
+echo("DEBUG: theta_deg_calc", theta_deg_calc);
+echo("DEBUG: arm_alpha_calc", arm_alpha_calc);
+
+ARM_MIN_ANGLE_COMPUTED = (is_undef(theta_deg_calc) || is_undef(arm_alpha_calc)) ? 0 : theta_deg_calc + arm_alpha_calc; 
+echo("DEBUG: ARM_MIN_ANGLE_COMPUTED", ARM_MIN_ANGLE_COMPUTED);
+
 // Arm angle limits
-ARM_MIN_ANGLE = -ARM_GROUND_ANGLE;     // Lowest position (at ground)
-ARM_MAX_ANGLE = 60;                     // Maximum raised position
+// Calculated to keep bucket pivot ~50mm above ground at lowest position
+ARM_V2_OFFSET_ANGLE = ARM_MIN_ANGLE_COMPUTED + ARM_GROUND_ANGLE; // Difference from straight arm
+ARM_MIN_ANGLE = ARM_MIN_ANGLE_COMPUTED;     // Lowest position (at ground)
+ARM_MAX_ANGLE = 60 + ARM_V2_OFFSET_ANGLE;                     // Maximum raised position
 
 // Cross beam configuration
 CROSS_BEAM_SIZE = TUBE_2X2_1_4[0];    // 2"x2" tube size
@@ -285,3 +337,12 @@ assert(PLATFORM_PIVOT_PIN_DIA > PLATFORM_LOCK_PIN_DIA,
 _crossmember_top_z = FRAME_Z_OFFSET + MACHINE_HEIGHT * 0.7;
 assert(PLATFORM_PIVOT_HEIGHT + PLATFORM_ARM_LENGTH < _crossmember_top_z, 
     "Stowed position lock hole must be within rear crossmember height");
+
+// =============================================================================
+// JIG PARAMETERS & NEW ARM PARAMETERS
+// =============================================================================
+
+
+
+
+
