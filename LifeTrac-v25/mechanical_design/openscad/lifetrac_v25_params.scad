@@ -182,6 +182,14 @@ _calc_base_y = _attach_y_world - (_attach_z_world - LIFT_CYL_BASE_Z) / tan(_targ
 // 5. Clamp Y to valid frame range (0 to WHEEL_BASE/2)
 LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y));
 
+// Bucket Cylinder Mount Parameters
+BUCKET_CYL_MOUNT_SIZE = TUBE_3X3_1_4[0]; // 3" (76.2mm)
+BUCKET_CYL_MOUNT_Y_OFFSET = -BUCKET_CYL_MOUNT_SIZE/2; // Flush with back of bucket plate
+
+// Cross Beam Cylinder Mount Parameters
+CROSS_BEAM_HEIGHT = TUBE_2X6_1_4[0]; // 2" (50.8mm)
+CROSS_BEAM_MOUNT_Z_OFFSET = -(CROSS_BEAM_HEIGHT/2 + BUCKET_CYL_MOUNT_SIZE/2); // Bottom of cross beam
+
 // =============================================================================
 // ENGINE CONFIGURATION
 // =============================================================================

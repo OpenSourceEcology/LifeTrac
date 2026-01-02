@@ -1030,6 +1030,19 @@ module u_channel_lug(tube_size, length, hole_dia) {
         // Pivot hole through both walls
         rotate([0, 90, 0])
         cylinder(d=hole_dia, h=size+4, center=true, $fn=32);
+        
+        // Base mounting holes (4 holes)
+        // 1/4 inch bolts
+        bolt_dia = 6.35; 
+        x_spacing = 40; // Fits inside 3" tube (63.5mm ID)
+        y_spacing = length - 20;
+        
+        for (x = [-x_spacing/2, x_spacing/2]) {
+            for (y = [-y_spacing/2, y_spacing/2]) {
+                translate([x, y, -(size/2 - wall/2)])
+                cylinder(d=bolt_dia, h=wall*3, center=true, $fn=16);
+            }
+        }
     }
 }
 
@@ -2075,9 +2088,17 @@ module loader_arms() {
             // The arms are at +/- ARM_SPACING/2
             // The cross beam spans between them
             
-            translate([0, ARM_MAIN_LEN - 50, 0]) 
+            translate([0, ARM_MAIN_LEN - 50, 0]) {
                 rotate([0, 90, 0])
                 cube([50.8, 152.4, ARM_SPACING], center=true); // 2x6 tube
+                
+                // Cylinder Mounts on Cross Beam
+                for (side = [-1, 1]) {
+                    translate([side * BUCKET_CYL_X_SPACING, 0, CROSS_BEAM_MOUNT_Z_OFFSET])
+                    rotate([180, 0, 0])
+                    u_channel_lug_with_pin(TUBE_3X3_1_4, 80, BOLT_DIA_3_4 + 2);
+                }
+            }
         }
     }
 }
@@ -2143,9 +2164,10 @@ module bobcat_quick_attach_plate() {
     // Bucket cylinder lugs: align with cylinder line and bring inward toward machine center
     for (side = [-1, 1]) {
         x = side * BUCKET_CYL_X_SPACING;          // Match arm-side cylinder X offset
-        y = plate_thick + 20;                     // Tuck closer to the plate (inboard)
+        y = BUCKET_CYL_MOUNT_Y_OFFSET;            // Flush with back of plate (Y=0)
         z = -60;                                  // Height on plate
         translate([x, y, z])
+        rotate([90, 0, 0])
         u_channel_lug_with_pin(TUBE_3X3_1_4, 80, BOLT_DIA_3_4 + 2);
     }
 }
