@@ -168,7 +168,7 @@ ARM_LIFT_ANGLE = -ARM_GROUND_ANGLE + ARM_V2_OFFSET_ANGLE + (animation_phase * (6
 
 // Cross beam positions along arm length (from pivot)
 // First cross beam positioned for bucket cylinder attachment
-CROSS_BEAM_1_POS = ARM_LENGTH * 0.65;   // Aligned with bucket cylinder arm mount position
+// CROSS_BEAM_1_POS = ARM_LENGTH * 0.65;   // Aligned with bucket cylinder arm mount position
 CROSS_BEAM_2_POS = ARM_LENGTH - 200;    // Second cross beam near bucket
 
 // Cross beam size (for cutout calculations)
@@ -370,20 +370,21 @@ BUCKET_MAX_TILT = 90;                   // Fully curled (bucket bottom facing up
 function bucket_cyl_length(arm_angle, bucket_tilt) = 
     let(
         // Cross beam attachment point (in arm local coords, then rotated)
-        arm_local_y = BUCKET_CYL_ARM_POS,
-        arm_local_z = CROSS_BEAM_SIZE/2 + 30,  // Above cross beam (matches bracket height)
+        arm_local_y = CROSS_BEAM_1_POS,
+        arm_local_z = CROSS_BEAM_MOUNT_Z_OFFSET,
         arm_y = arm_local_y * cos(arm_angle) - arm_local_z * sin(arm_angle),
         arm_z = arm_local_y * sin(arm_angle) + arm_local_z * cos(arm_angle),
         
         // Bucket attachment (in bucket local, tilt about arm tip, then arm rotation)
-        bucket_local_y = BUCKET_CYL_BUCKET_Y,
-        bucket_local_z = BUCKET_CYL_BUCKET_Z,
+        // Must match the translation in bucket_attachment: translate([0, 100, BUCKET_HEIGHT - 100])
+        bucket_local_y = BUCKET_CYL_MOUNT_Y_OFFSET + 100,
+        bucket_local_z = BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - 100),
         // Tilt about bucket pivot (at arm tip)
         bucket_tilted_y = bucket_local_y * cos(bucket_tilt) - bucket_local_z * sin(bucket_tilt),
         bucket_tilted_z = bucket_local_y * sin(bucket_tilt) + bucket_local_z * cos(bucket_tilt),
         // Add arm length to get position relative to arm pivot
-        bucket_arm_y = ARM_LENGTH + bucket_tilted_y,
-        bucket_arm_z = bucket_tilted_z,
+        bucket_arm_y = ARM_TIP_X + bucket_tilted_y,
+        bucket_arm_z = ARM_TIP_Z + bucket_tilted_z,
         // Rotate by arm angle
         bucket_y = bucket_arm_y * cos(arm_angle) - bucket_arm_z * sin(arm_angle),
         bucket_z = bucket_arm_y * sin(arm_angle) + bucket_arm_z * cos(arm_angle),
@@ -403,6 +404,30 @@ BUCKET_CYL_LEN_4 = bucket_cyl_length(ARM_MAX_ANGLE, BUCKET_MAX_TILT);
 BUCKET_CYL_LEN_5 = bucket_cyl_length(0, BUCKET_MIN_TILT);  // Arm horizontal
 BUCKET_CYL_LEN_6 = bucket_cyl_length(0, BUCKET_MAX_TILT);
 
+// Design Check: Specific Operational Points
+// 1. Retracted: Arm at Ground (MIN), Bucket at +10 deg absolute
+//    Bucket Tilt = Abs - Arm = 10 - ARM_MIN_ANGLE
+DESIGN_TILT_RETRACTED = 10 - ARM_MIN_ANGLE;
+DESIGN_LEN_RETRACTED = bucket_cyl_length(ARM_MIN_ANGLE, DESIGN_TILT_RETRACTED);
+
+// 2. Extended: Arm at Full Height (MAX), Bucket at -20 deg absolute
+//    Bucket Tilt = Abs - Arm = -20 - ARM_MAX_ANGLE
+DESIGN_TILT_EXTENDED = -20 - ARM_MAX_ANGLE;
+DESIGN_LEN_EXTENDED = bucket_cyl_length(ARM_MAX_ANGLE, DESIGN_TILT_EXTENDED);
+
+DESIGN_STROKE = DESIGN_LEN_EXTENDED - DESIGN_LEN_RETRACTED;
+
+echo("=== HYDRAULIC CYLINDER DESIGN CHECK ===");
+echo("ARM_MIN_ANGLE =", ARM_MIN_ANGLE);
+echo("ARM_MAX_ANGLE =", ARM_MAX_ANGLE);
+echo("DESIGN_TILT_RETRACTED (Rel) =", DESIGN_TILT_RETRACTED);
+echo("DESIGN_TILT_EXTENDED (Rel) =", DESIGN_TILT_EXTENDED);
+echo("DESIGN_LEN_RETRACTED =", DESIGN_LEN_RETRACTED);
+echo("DESIGN_LEN_EXTENDED =", DESIGN_LEN_EXTENDED);
+echo("DESIGN_STROKE REQUIRED =", DESIGN_STROKE);
+echo("TARGET STROKE = 457mm (18 inch)");
+echo("DIFF =", DESIGN_STROKE - 457);
+
 BUCKET_CYL_LEN_MIN = min(BUCKET_CYL_LEN_1, BUCKET_CYL_LEN_2, BUCKET_CYL_LEN_3, 
                           BUCKET_CYL_LEN_4, BUCKET_CYL_LEN_5, BUCKET_CYL_LEN_6);
 BUCKET_CYL_LEN_MAX = max(BUCKET_CYL_LEN_1, BUCKET_CYL_LEN_2, BUCKET_CYL_LEN_3, 
@@ -412,6 +437,12 @@ BUCKET_CYL_LEN_MAX = max(BUCKET_CYL_LEN_1, BUCKET_CYL_LEN_2, BUCKET_CYL_LEN_3,
 BUCKET_CYL_REQUIRED_STROKE = BUCKET_CYL_LEN_MAX - BUCKET_CYL_LEN_MIN;
 BUCKET_CYL_STROKE_WITH_MARGIN = ceil(BUCKET_CYL_REQUIRED_STROKE * CYLINDER_STROKE_MARGIN);
 BUCKET_CYL_CLOSED_LENGTH = ceil(BUCKET_CYL_LEN_MIN * CYLINDER_CLOSED_MARGIN);
+
+echo("=== BUCKET CYLINDER FULL RANGE ===");
+echo("MIN LENGTH =", BUCKET_CYL_LEN_MIN);
+echo("MAX LENGTH =", BUCKET_CYL_LEN_MAX);
+echo("REQUIRED STROKE (Full Range) =", BUCKET_CYL_REQUIRED_STROKE);
+echo("STROKE WITH MARGIN =", BUCKET_CYL_STROKE_WITH_MARGIN);
 
 // Select standard stroke
 BUCKET_CYLINDER_STROKE_CALC = 
@@ -2088,7 +2119,7 @@ module loader_arms() {
             // The arms are at +/- ARM_SPACING/2
             // The cross beam spans between them
             
-            translate([0, ARM_MAIN_LEN - 50, 0]) {
+            translate([0, CROSS_BEAM_1_POS, 0]) {
                 rotate([0, 90, 0])
                 cube([50.8, 152.4, ARM_SPACING], center=true); // 2x6 tube
                 
@@ -2165,7 +2196,7 @@ module bobcat_quick_attach_plate() {
     for (side = [-1, 1]) {
         x = side * BUCKET_CYL_X_SPACING;          // Match arm-side cylinder X offset
         y = BUCKET_CYL_MOUNT_Y_OFFSET;            // Flush with back of plate (Y=0)
-        z = -60;                                  // Height on plate
+        z = BUCKET_CYL_MOUNT_Z_OFFSET;            // Height on plate
         translate([x, y, z])
         rotate([90, 0, 0])
         u_channel_lug_with_pin(TUBE_3X3_1_4, 80, BOLT_DIA_3_4 + 2);
@@ -2305,11 +2336,11 @@ module bucket_cylinders() {
     if (show_hydraulics) {
         // Cylinder base on cross beam (arm local coordinates, at cross beam position)
         // Now uses BUCKET_CYL_X_SPACING for proper clearance from side walls
-        cross_beam_z = CROSS_BEAM_SIZE/2 + 30;  // Top of cross beam plus bracket
-        arm_attach_local = [0, BUCKET_CYL_ARM_POS, cross_beam_z];
+        arm_attach_local = [0, CROSS_BEAM_1_POS, CROSS_BEAM_MOUNT_Z_OFFSET];
         
         // Cylinder rod end on bucket (bucket local coordinates, before tilt)
-        bucket_attach_local = [0, BUCKET_CYL_BUCKET_Y, BUCKET_CYL_BUCKET_Z];
+        // Must match the translation in bucket_attachment: translate([0, 100, BUCKET_HEIGHT - 100])
+        bucket_attach_local = [0, BUCKET_CYL_MOUNT_Y_OFFSET + 100, BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - 100)];
         
         // Calculate actual extension based on current arm angle and bucket tilt
         current_bucket_cyl_length = bucket_cyl_length(ARM_LIFT_ANGLE, BUCKET_TILT_ANGLE);
@@ -2340,8 +2371,8 @@ module bucket_cylinders() {
             
             // Position relative to arm tip
             bucket_at_arm_tip = [bucket_tilted[0],
-                                ARM_LENGTH + bucket_tilted[1],
-                                bucket_tilted[2]];
+                                ARM_TIP_X + bucket_tilted[1],
+                                ARM_TIP_Z + bucket_tilted[2]];
             
             // Rotate by arm angle
             bucket_rotated = rot_x(bucket_at_arm_tip, ARM_LIFT_ANGLE);

@@ -140,11 +140,11 @@ ARM_V2_OFFSET_ANGLE = ARM_MIN_ANGLE_COMPUTED + ARM_GROUND_ANGLE; // Difference f
 ARM_MIN_ANGLE = ARM_MIN_ANGLE_COMPUTED;     // Lowest position (at ground)
 ARM_MAX_ANGLE = 60 + ARM_V2_OFFSET_ANGLE;                     // Maximum raised position
 
-// Cross beam configuration
-CROSS_BEAM_SIZE = TUBE_2X2_1_4[0];    // 2"x2" tube size
-CROSS_BEAM_CLEARANCE = 15;             // Extra clearance around cross beam in cutout
-CROSS_BEAM_1_POS = ARM_LENGTH * 0.65;   // First cross beam position
-CROSS_BEAM_2_POS = ARM_LENGTH * 0.95;   // Second cross beam position (near bucket)
+// Cross beam configuration (Moved to below)
+// CROSS_BEAM_SIZE = TUBE_2X2_1_4[0];    // 2"x2" tube size
+// CROSS_BEAM_CLEARANCE = 15;             // Extra clearance around cross beam in cutout
+// CROSS_BEAM_1_POS = ARM_LENGTH * 0.65;   // First cross beam position
+// CROSS_BEAM_2_POS = ARM_LENGTH * 0.95;   // Second cross beam position (near bucket)
 
 // Pivot position in panel coordinates (for arc slot calculations)
 PIVOT_PANEL_X = ARM_PIVOT_Y;                          // Pivot X in panel coords
@@ -185,14 +185,17 @@ LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y));
 // Bucket Cylinder Mount Parameters
 BUCKET_CYL_MOUNT_SIZE = TUBE_3X3_1_4[0]; // 3" (76.2mm)
 BUCKET_CYL_MOUNT_Y_OFFSET = -BUCKET_CYL_MOUNT_SIZE/2; // Flush with back of bucket plate
+BUCKET_CYL_MOUNT_Z_OFFSET = -40; // Calculated for 18" stroke cylinder
 
 // Cross Beam Cylinder Mount Parameters
 CROSS_BEAM_HEIGHT = TUBE_2X6_1_4[0]; // 2" (50.8mm)
 CROSS_BEAM_MOUNT_Z_OFFSET = -(CROSS_BEAM_HEIGHT/2 + BUCKET_CYL_MOUNT_SIZE/2); // Bottom of cross beam
 
-// =============================================================================
-// ENGINE CONFIGURATION
-// =============================================================================
+// Cross beam configuration
+CROSS_BEAM_SIZE = TUBE_2X2_1_4[0];    // 2"x2" tube size
+CROSS_BEAM_CLEARANCE = 15;             // Extra clearance around cross beam in cutout
+CROSS_BEAM_1_POS = 1050;                 // Optimized for 18" cylinder stroke
+CROSS_BEAM_2_POS = ARM_LENGTH * 0.95;   // Second cross beam position (near bucket)
 
 ENGINE_HP = 25; // Desired horsepower (e.g., 25HP V-Twin)
 // Estimate engine weight (kg) based on HP (approximate for small engines)
