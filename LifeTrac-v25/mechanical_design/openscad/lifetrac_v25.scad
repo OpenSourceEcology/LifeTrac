@@ -2149,10 +2149,11 @@ module loader_arms() {
                 difference() {
                     rotate([0, 90, 0])
                     // Rounded 2x6 tube
+                    // Oriented flat: 6" wide (Y), 2" tall (Z)
                     linear_extrude(height=ARM_SPACING, center=true)
                     hull() {
-                        w = 152.4; // 6 inches (Along arm)
-                        h = 50.8;  // 2 inches (Vertical)
+                        w = 50.8;  // 2 inches (Vertical Z)
+                        h = 152.4; // 6 inches (Along arm Y)
                         r = 12.7;  // 1/2 inch radius
                         translate([-w/2 + r, -h/2 + r]) circle(r=r);
                         translate([w/2 - r, -h/2 + r]) circle(r=r);
