@@ -14,6 +14,17 @@ HEX_1_2_INCH = 19.05;  // 3/4" hex for 1/2" bolt
 HEX_1_INCH = 38.1;     // 1.5" hex for 1" bolt
 
 /**
+ * Creates a weld bead marker
+ * @param length Length of the weld bead
+ * @param diameter Diameter of the weld bead (default 6mm ~ 1/4")
+ */
+module weld_bead(length=20, diameter=6) {
+    color("Red")
+    rotate([90, 0, 0])
+    cylinder(d=diameter, h=length, center=true, $fn=16);
+}
+
+/**
  * Creates a hex bolt
  * @param diameter Shaft diameter in mm
  * @param length Shaft length in mm

@@ -1383,48 +1383,6 @@ module side_panel_right_outer() {
 }
 
 // =============================================================================
-// CROSSMEMBERS
-// =============================================================================
-
-module rear_crossmember_assembly() {
-    // Positioned rear crossmember for assembly
-    back_height = MACHINE_HEIGHT * 0.55;
-    
-    color("DarkSlateGray")
-    translate([0, -PANEL_THICKNESS/2, FRAME_Z_OFFSET + back_height/2])
-    rear_crossmember();
-}
-
-module front_crossmember() {
-    // Top crossmember at arm pivot level
-    crossmember_width = TRACK_WIDTH - SANDWICH_SPACING;  // Spans between inner panels
-    
-    color("DarkSlateGray")
-    translate([0, WHEEL_BASE, FRAME_Z_OFFSET + MACHINE_HEIGHT - 50])
-    cube([crossmember_width, 100, PANEL_THICKNESS], center=true);
-}
-
-module bottom_crossmembers() {
-    // Floor/bottom crossmembers
-    crossmember_width = TRACK_WIDTH + SANDWICH_SPACING;
-    
-    // Front bottom
-    color("DarkSlateGray")
-    translate([0, WHEEL_BASE - 100, FRAME_Z_OFFSET + PANEL_THICKNESS/2])
-    cube([crossmember_width, 150, PANEL_THICKNESS], center=true);
-    
-    // Rear bottom
-    color("DarkSlateGray")
-    translate([0, 100, FRAME_Z_OFFSET + PANEL_THICKNESS/2])
-    cube([crossmember_width, 150, PANEL_THICKNESS], center=true);
-    
-    // Middle bottom
-    color("DarkSlateGray")
-    translate([0, WHEEL_BASE/2, FRAME_Z_OFFSET + PANEL_THICKNESS/2])
-    cube([crossmember_width, 150, PANEL_THICKNESS], center=true);
-}
-
-// =============================================================================
 // CYLINDER MOUNTING LUGS - Using Standardized U-Channel Type A Bracket
 // =============================================================================
 
@@ -1858,9 +1816,6 @@ module base_frame() {
     side_panel_left_inner();
     side_panel_right_inner();
     side_panel_right_outer();
-    rear_crossmember();
-    front_crossmember();
-    bottom_crossmembers();
     cylinder_mounting_lugs();
     arm_pivot_assembly();
     
@@ -1901,6 +1856,9 @@ module base_frame() {
 module engine() {
     // V-Twin Engine Representation
     // Dimensions approx for 25HP engine
+    // TODO: Design proper engine mounting plate and bolt pattern
+    // Currently floating in space
+    
     eng_width = 450;
     eng_depth = 400;
     eng_height = 450;
@@ -2202,17 +2160,95 @@ module loader_arms() {
 // =============================================================================
 
 module bucket() {
-    // Standard bucket (Simplified)
+    // Standard bucket with Tab & Slot construction for welding
     
-    // Bottom plate
-    color("Yellow")
-    translate([-BUCKET_WIDTH/2, 0, -BUCKET_HEIGHT])
-    cube([BUCKET_WIDTH, BUCKET_DEPTH, PLATE_1_4_INCH]);
+    tab_len = 50;
     
-    // Back plate (Simplified)
-    color("Yellow")
-    translate([-BUCKET_WIDTH/2, 0, -BUCKET_HEIGHT])
-    cube([BUCKET_WIDTH, PLATE_1_4_INCH, BUCKET_HEIGHT]);
+    // 1. Back Plate
+    difference() {
+        union() {
+            // Main Plate
+            color("Yellow")
+            translate([-BUCKET_WIDTH/2, 0, -BUCKET_HEIGHT])
+            cube([BUCKET_WIDTH, PLATE_1_4_INCH, BUCKET_HEIGHT]);
+            
+            // Tabs for Side Plates (Left and Right)
+            for (z = [-BUCKET_HEIGHT + 50 : 150 : -50]) {
+                // Left Tabs
+                translate([-BUCKET_WIDTH/2 - PLATE_1_4_INCH, 0, z])
+                cube([PLATE_1_4_INCH, PLATE_1_4_INCH, tab_len]);
+                
+                // Right Tabs
+                translate([BUCKET_WIDTH/2, 0, z])
+                cube([PLATE_1_4_INCH, PLATE_1_4_INCH, tab_len]);
+            }
+        }
+        
+        // Slots for Bottom Plate tabs
+        for (x = [-BUCKET_WIDTH/2 + 50 : 150 : BUCKET_WIDTH/2 - 50]) {
+            translate([x, -1, -BUCKET_HEIGHT])
+            cube([tab_len, PLATE_1_4_INCH + 2, PLATE_1_4_INCH]);
+        }
+    }
+    
+    // 2. Bottom Plate
+    difference() {
+        union() {
+            // Main Plate
+            color("Yellow")
+            translate([-BUCKET_WIDTH/2, PLATE_1_4_INCH, -BUCKET_HEIGHT])
+            cube([BUCKET_WIDTH, BUCKET_DEPTH - PLATE_1_4_INCH, PLATE_1_4_INCH]);
+            
+            // Tabs for Back Plate (Rear edge)
+            for (x = [-BUCKET_WIDTH/2 + 50 : 150 : BUCKET_WIDTH/2 - 50]) {
+                translate([x, 0, -BUCKET_HEIGHT])
+                cube([tab_len, PLATE_1_4_INCH, PLATE_1_4_INCH]);
+            }
+            
+            // Tabs for Side Plates (Left and Right)
+            for (y = [PLATE_1_4_INCH + 50 : 150 : BUCKET_DEPTH - 50]) {
+                // Left Tabs
+                translate([-BUCKET_WIDTH/2 - PLATE_1_4_INCH, y, -BUCKET_HEIGHT])
+                cube([PLATE_1_4_INCH, tab_len, PLATE_1_4_INCH]);
+                
+                // Right Tabs
+                translate([BUCKET_WIDTH/2, y, -BUCKET_HEIGHT])
+                cube([PLATE_1_4_INCH, tab_len, PLATE_1_4_INCH]);
+            }
+        }
+    }
+    
+    // 3. Side Plates
+    for (side = [-1, 1]) {
+        x_pos = (side == -1) ? -BUCKET_WIDTH/2 - PLATE_1_4_INCH : BUCKET_WIDTH/2;
+        
+        difference() {
+            // Main Shape
+            color("Yellow")
+            translate([x_pos, 0, -BUCKET_HEIGHT])
+            rotate([0, -90, 0])
+            linear_extrude(height=PLATE_1_4_INCH)
+            polygon([
+                [0, 0],
+                [BUCKET_HEIGHT, 0],
+                [BUCKET_HEIGHT, PLATE_1_2_INCH],
+                [BUCKET_HEIGHT * 0.3, BUCKET_DEPTH],
+                [0, BUCKET_DEPTH]
+            ]);
+            
+            // Slots for Back Plate tabs
+            for (z = [-BUCKET_HEIGHT + 50 : 150 : -50]) {
+                translate([x_pos - 1, -1, z])
+                cube([PLATE_1_4_INCH + 2, PLATE_1_4_INCH + 2, tab_len]);
+            }
+            
+            // Slots for Bottom Plate tabs
+            for (y = [PLATE_1_4_INCH + 50 : 150 : BUCKET_DEPTH - 50]) {
+                translate([x_pos - 1, y, -BUCKET_HEIGHT - 1])
+                cube([PLATE_1_4_INCH + 2, tab_len, PLATE_1_4_INCH + 2]);
+            }
+        }
+    }
     
     // Cylinder Lugs (Moved from QA plate)
     for (side = [-1, 1]) {
@@ -2225,36 +2261,29 @@ module bucket() {
         u_channel_lug_with_pin(TUBE_3X3_1_4, 80, BOLT_DIA_3_4 + 2);
     }
     
-    // Left side plate
-    color("Yellow")
-    translate([-BUCKET_WIDTH/2, 0, -BUCKET_HEIGHT])
-    rotate([0, -90, 0])
-    linear_extrude(height=PLATE_1_4_INCH)
-    polygon([
-        [0, 0],
-        [BUCKET_HEIGHT, 0],
-        [BUCKET_HEIGHT, PLATE_1_2_INCH],
-        [BUCKET_HEIGHT * 0.3, BUCKET_DEPTH],
-        [0, BUCKET_DEPTH]
-    ]);
-    
-    // Right side plate
-    color("Yellow")
-    translate([BUCKET_WIDTH/2 + PLATE_1_4_INCH, 0, -BUCKET_HEIGHT])
-    rotate([0, -90, 0])
-    linear_extrude(height=PLATE_1_4_INCH)
-    polygon([
-        [0, 0],
-        [BUCKET_HEIGHT, 0],
-        [BUCKET_HEIGHT, PLATE_1_2_INCH],
-        [BUCKET_HEIGHT * 0.3, BUCKET_DEPTH],
-        [0, BUCKET_DEPTH]
-    ]);
-    
     // Cutting edge
     color("DarkSlateGray")
     translate([-BUCKET_WIDTH/2, BUCKET_DEPTH - PLATE_3_4_INCH, -BUCKET_HEIGHT])
     cube([BUCKET_WIDTH, PLATE_3_4_INCH, 80]);
+    
+    // Weld Beads
+    // 1. Bottom-Back Corner (Inside)
+    translate([0, PLATE_1_4_INCH, -BUCKET_HEIGHT + PLATE_1_4_INCH])
+    rotate([0, 0, 90])
+    weld_bead(length=BUCKET_WIDTH - 20, diameter=8);
+    
+    // 2. Bottom-Side Corners (Inside)
+    for (x = [-BUCKET_WIDTH/2, BUCKET_WIDTH/2]) {
+        translate([x, BUCKET_DEPTH/2, -BUCKET_HEIGHT + PLATE_1_4_INCH])
+        weld_bead(length=BUCKET_DEPTH - 20, diameter=8);
+    }
+    
+    // 3. Back-Side Corners (Inside)
+    for (x = [-BUCKET_WIDTH/2, BUCKET_WIDTH/2]) {
+        translate([x, PLATE_1_4_INCH, -BUCKET_HEIGHT/2])
+        rotate([90, 0, 0])
+        weld_bead(length=BUCKET_HEIGHT - 20, diameter=8);
+    }
 }
 
 // =============================================================================
@@ -2900,35 +2929,12 @@ module standing_deck() {
 }
 
 // =============================================================================
-// CONTROL HOUSING
-// =============================================================================
-
-module control_housing() {
-    housing_width = 300;
-    housing_height = 350;
-    housing_depth = 200;
-    
-    // Position inside the frame
-    translate([0, WHEEL_BASE/2, FRAME_Z_OFFSET + 150])
-    {
-        // Housing box (transparent for visualization)
-        color("Blue", 0.3)
-        difference() {
-            cube([housing_width, housing_depth, housing_height], center=true);
-            translate([0, 0, 10])
-            cube([housing_width-20, housing_depth-20, housing_height], center=true);
-        }
-    }
-}
-
-// =============================================================================
 // MAIN ASSEMBLY
 // =============================================================================
 
 module lifetrac_v25_assembly() {
     if (show_frame) {
         base_frame();
-        control_housing();
         engine();
     }
     
@@ -2947,7 +2953,7 @@ module lifetrac_v25_assembly() {
 lifetrac_v25_assembly();
 calculate_cog();
 
-// Ground plane reference at Z=0 (shifted down slightly so wheels visibly touch it)
-color("Green", 0.2)
-translate([0, WHEEL_BASE/2, -1])
-cube([4000, 4000, 2], center=true);
+// Ground plane reference removed per user request
+// color("Green", 0.2)
+// translate([0, WHEEL_BASE/2, -1])
+// cube([4000, 4000, 2], center=true);
