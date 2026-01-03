@@ -360,8 +360,8 @@ function bucket_cyl_length(arm_angle, bucket_tilt) =
         arm_z = arm_local_y * sin(arm_angle) + arm_local_z * cos(arm_angle),
         
         // Bucket attachment (in bucket local, tilt about arm tip, then arm rotation)
-        // Must match the translation in bucket_attachment: translate([0, 100, BUCKET_HEIGHT - 100])
-        bucket_local_y = BUCKET_CYL_MOUNT_Y_OFFSET + 100,
+        // Must match the translation in bucket_attachment: translate([0, 38.1, BUCKET_HEIGHT - 100])
+        bucket_local_y = BUCKET_CYL_MOUNT_Y_OFFSET + 38.1,
         bucket_local_z = BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - 100),
         // Tilt about bucket pivot (at arm tip)
         bucket_tilted_y = bucket_local_y * cos(bucket_tilt) - bucket_local_z * sin(bucket_tilt),
@@ -970,7 +970,7 @@ module oriented_cylinder(base_pt, target_pt, bore, rod, stroke, extension) {
         hydraulic_cylinder(bore, rod, stroke, false, extension, "clevis", len);
         
         // Base clevis pin with nuts (pin axis along X to match lug holes)
-        translate([0, 0, -10])
+        translate([0, 0, 0])
         rotate([0, 90, 0]) {
             // Pin
             color("Silver")
@@ -2378,8 +2378,8 @@ module bucket_cylinders() {
         arm_attach_local = [0, CROSS_BEAM_1_POS, CROSS_BEAM_MOUNT_Z_OFFSET];
         
         // Cylinder rod end on bucket (bucket local coordinates, before tilt)
-        // Must match the translation in bucket_attachment: translate([0, 100, BUCKET_HEIGHT - 100])
-        bucket_attach_local = [0, BUCKET_CYL_MOUNT_Y_OFFSET + 100, BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - 100)];
+        // Must match the translation in bucket_attachment: translate([0, 38.1, BUCKET_HEIGHT - 100])
+        bucket_attach_local = [0, BUCKET_CYL_MOUNT_Y_OFFSET + 38.1, BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - 100)];
         
         // Calculate actual extension based on current arm angle and bucket tilt
         current_bucket_cyl_length = bucket_cyl_length(ARM_LIFT_ANGLE, BUCKET_TILT_ANGLE);

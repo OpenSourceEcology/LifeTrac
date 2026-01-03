@@ -185,7 +185,7 @@ _attach_z_world = ARM_PIVOT_Z + LIFT_CYL_ARM_OFFSET * sin(_theta_min);
 
 // 3. Determine Base Z Height (Constrained by Axle Clearance)
 //    Must clear the rear axle (FRAME_Z_OFFSET + WHEEL_DIAMETER/2)
-_min_base_z = FRAME_Z_OFFSET + WHEEL_DIAMETER/2 + 80; // 80mm clearance
+_min_base_z = FRAME_Z_OFFSET + WHEEL_DIAMETER/2 + 65; // Reduced clearance to fit 16" cylinder
 LIFT_CYL_BASE_Z = _min_base_z;
 
 // 4. Calculate Base Y for Optimal Leverage Angle
@@ -197,12 +197,13 @@ _target_cyl_angle = 50; // Degrees
 _calc_base_y = _attach_y_world - (_attach_z_world - LIFT_CYL_BASE_Z) / tan(_target_cyl_angle);
 
 // 5. Clamp Y to valid frame range (0 to WHEEL_BASE/2)
-LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y));
+// Adjusted for 16" cylinder fit
+LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y + 10));
 
 // Bucket Cylinder Mount Parameters
 BUCKET_CYL_MOUNT_SIZE = TUBE_3X3_1_4[0]; // 3" (76.2mm)
 BUCKET_CYL_MOUNT_Y_OFFSET = -BUCKET_CYL_MOUNT_SIZE/2; // Flush with back of bucket plate
-BUCKET_CYL_MOUNT_Z_OFFSET = -40; // Calculated for 18" stroke cylinder
+BUCKET_CYL_MOUNT_Z_OFFSET = -117.2; // Calculated for 45 deg dump angle
 
 // Cross Beam Cylinder Mount Parameters
 CROSS_BEAM_HEIGHT = TUBE_2X6_1_4[0]; // 2" (50.8mm)
@@ -216,12 +217,12 @@ CROSS_BEAM_CLEARANCE = 15;             // Extra clearance around cross beam in c
 // HYDRAULIC CYLINDER PARAMETRIC SIZING
 // =============================================================================
 
-// Lift Cylinder (3" Bore, 1.5" Rod, 12" Stroke)
+// Lift Cylinder (3" Bore, 1.5" Rod, 16" Stroke)
 LIFT_CYLINDER_BORE = 76.2; // 3"
 LIFT_CYLINDER_ROD = 38.1;  // 1.5"
-LIFT_CYLINDER_STROKE_DEF = 304.8; // 12" - Default/Design value
+LIFT_CYLINDER_STROKE_DEF = 406.4; // 16" - Updated for better reach
 LIFT_CYLINDER_STROKE = LIFT_CYLINDER_STROKE_DEF;
-LIFT_CYL_LEN_MIN_DEF = 304.8 + 254; // Explicit calculation to avoid undef issues
+LIFT_CYL_LEN_MIN_DEF = 406.4 + 205; // Stroke + Dead Length (approx 8")
 LIFT_CYL_LEN_MIN = LIFT_CYL_LEN_MIN_DEF;
 
 // Bucket Cylinder (3" Bore, 1.5" Rod, 18" Stroke)
@@ -248,7 +249,7 @@ _cyl_retracted = BUCKET_CYLINDER_STROKE_DEF + _cyl_dead_len;
 // This is a simplification, but gives a parametric relationship.
 // We place the crossbeam such that the cylinder fits.
 // CROSS_BEAM_1_POS = ARM_LENGTH - _cyl_retracted + adjustment
-CROSS_BEAM_1_POS = ARM_LENGTH - _cyl_retracted + 150; // 150mm adjustment for mounting geometry
+CROSS_BEAM_1_POS = 666; // Calculated for 45 deg dump angle
 
 CROSS_BEAM_2_POS = ARM_LENGTH * 0.95;   // Second cross beam position (near bucket)
 

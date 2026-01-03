@@ -6,74 +6,141 @@
 $fn = 32;
 
 /**
- * Creates a hydraulic cylinder
+ * Creates a detailed hydraulic cylinder
  * @param bore_diameter Cylinder bore diameter in mm
  * @param rod_diameter Rod diameter in mm
  * @param stroke Stroke length in mm
  * @param retracted Show in retracted position if true
  * @param extension Current extension (0 to stroke) in mm
  * @param mounting_type Type of mounting ("clevis", "eye", "trunnion")
+ * @param pin_to_pin_length If > 0, overrides extension/retracted to match this total length
  */
 module hydraulic_cylinder(bore_diameter=63.5, rod_diameter=31.75, 
                          stroke=300, retracted=true, extension=0,
-                         mounting_type="clevis", total_length=0) {
-    // Clamp requested extension to realistic range to avoid flipped visuals
-    desired_extension = retracted ? 0 : max(0, min(extension, stroke));
-    // If a total mount-to-mount length is provided, keep extension within it
-    actual_extension = (total_length > 0) ? min(desired_extension, total_length) : desired_extension;
-    // Pick body length so body + rod extension spans the requested total length when given
-    body_length = (total_length > 0)
-        ? max(total_length - actual_extension, rod_diameter * 2 + 20)
-        : stroke + 100; // Legacy fallback sizing
+                         mounting_type="clevis", pin_to_pin_length=0) {
     
-    // Cylinder body
-    color("Orange")
-    cylinder(d=bore_diameter, h=body_length);
+    // Dimensions derived from bore/rod
+    B = bore_diameter;
+    R = rod_diameter;
     
-    // Rod (extends with increasing extension value)
-    color("Silver")
-    translate([0, 0, body_length])
-    cylinder(d=rod_diameter, h=actual_extension);
+    // Component Lengths
+    base_clevis_len = B * 0.8;
+    piston_len = B * 0.4;
+    head_internal = B * 0.4;
+    head_external = B * 0.2;
+    rod_clevis_len = R * 1.5;
+    clearance = 5;
     
-    // Base mounting
-    color("DimGray")
-    translate([0, 0, -20])
-    if (mounting_type == "clevis") {
-        // Clevis mount at base
-        cylinder(d=bore_diameter*1.2, h=20);
-        translate([0, 0, 10])
-        rotate([90, 0, 0])
-            cylinder(d=25, h=bore_diameter*1.5, center=true);
-    } else if (mounting_type == "eye") {
-        // Eye mount at base
-        difference() {
-            cylinder(d=bore_diameter*1.2, h=20);
-            translate([0, 0, 10])
-                rotate([90, 0, 0])
-                    cylinder(d=25, h=bore_diameter*1.6, center=true);
-        }
-    } else {
-        // Trunnion mount
-        rotate([0, 0, 0])
-        cylinder(d=bore_diameter*1.3, h=20);
+    // Calculated Lengths
+    tube_len = stroke + piston_len + head_internal + clearance;
+    
+    // Calculate retracted length (pin-to-pin)
+    // Sum of stack at 0 extension:
+    // Base Pin (0) -> Tube Start (base_clevis_len) -> Head Top (base_clevis_len + tube_len + head_external)
+    // -> Rod Clevis Pin (Head Top + 5mm gap + rod_clevis_len)
+    calc_retracted_len = base_clevis_len + tube_len + head_external + 5 + rod_clevis_len;
+    
+    // Determine actual extension
+    target_extension = (pin_to_pin_length > 0) 
+        ? pin_to_pin_length - calc_retracted_len 
+        : (retracted ? 0 : extension);
+        
+    actual_extension = max(0, min(stroke, target_extension));
+    
+    // --- Rendering ---
+    
+    // 1. Base Clevis (Pin at 0,0,0)
+    cylinder_base_clevis(B, base_clevis_len);
+    
+    // 2. Tube
+    translate([0, 0, base_clevis_len])
+        cylinder_tube(B * 1.2, tube_len);
+        
+    // 3. Head/Gland
+    translate([0, 0, base_clevis_len + tube_len])
+        cylinder_head_gland(B * 1.2, R, head_external);
+        
+    // 4. Piston & Rod Group
+    // Piston bottom starts at base_clevis_len + clearance + actual_extension
+    piston_z = base_clevis_len + clearance + actual_extension;
+    
+    translate([0, 0, piston_z]) {
+        cylinder_piston(B, piston_len);
+        
+        // Rod
+        // Rod length needs to go from piston to rod clevis
+        // Rod length is constant regardless of extension
+        rod_len = stroke + head_internal + head_external + 5;
+        
+        translate([0, 0, piston_len])
+            color("Silver") cylinder(d=R, h=rod_len);
+            
+        // 5. Rod Clevis
+        translate([0, 0, piston_len + rod_len])
+            cylinder_rod_clevis(R, rod_clevis_len);
     }
-    
-    // Rod end mounting follows the rod tip
-    color("DimGray")
-    translate([0, 0, body_length + actual_extension])
-    if (mounting_type == "clevis") {
-        // Clevis at rod end
-        cylinder(d=rod_diameter*2, h=30);
-        translate([0, 0, 15])
-        rotate([90, 0, 0])
-            cylinder(d=20, h=rod_diameter*3, center=true);
-    } else {
-        // Eye at rod end
+}
+
+// --- Helper Modules ---
+
+module cylinder_base_clevis(bore, length) {
+    color("DimGray") {
+        // Base cap connection to tube
+        translate([0,0,length*0.6]) cylinder(d=bore*1.2, h=length*0.4);
+        
+        // Clevis ears
         difference() {
-            cylinder(d=rod_diameter*2, h=30);
-            translate([0, 0, 15])
-                rotate([90, 0, 0])
-                    cylinder(d=20, h=rod_diameter*3.2, center=true);
+            union() {
+                // Block for ears
+                translate([-bore*0.6, -bore*0.6, 0]) cube([bore*1.2, bore*1.2, length*0.6]);
+                // Rounded bottom
+                translate([0, 0, 0]) rotate([0,90,0]) cylinder(d=bore*1.2, h=bore*1.2, center=true);
+            }
+            // Pin hole
+            rotate([0,90,0]) cylinder(d=bore*0.4, h=bore*2, center=true);
+            // Gap for mounting bracket
+            cube([bore*0.4, bore*2, bore*2], center=true);
+        }
+    }
+}
+
+module cylinder_tube(od, length) {
+    color("Orange")
+        cylinder(d=od, h=length);
+}
+
+module cylinder_head_gland(od, rod_d, length) {
+    color("Black") {
+        cylinder(d=od, h=length);
+        // Wiper seal area
+        translate([0,0,length]) cylinder(d=od*0.8, h=length*0.5); 
+    }
+}
+
+module cylinder_piston(bore, thickness) {
+    color("Silver")
+        cylinder(d=bore-0.5, h=thickness); 
+}
+
+module cylinder_rod_clevis(rod_d, length) {
+    color("DimGray") {
+        // Threaded part
+        cylinder(d=rod_d*1.2, h=length*0.4);
+        
+        // Clevis part
+        translate([0,0,length*0.4]) {
+             difference() {
+                union() {
+                    // Block
+                    translate([-rod_d*0.8, -rod_d*0.8, 0]) cube([rod_d*1.6, rod_d*1.6, length*0.6]);
+                    // Rounded top
+                    translate([0, 0, length*0.6]) rotate([0,90,0]) cylinder(d=rod_d*1.6, h=rod_d*1.6, center=true);
+                }
+                // Pin hole
+                translate([0, 0, length*0.6]) rotate([0,90,0]) cylinder(d=rod_d*0.5, h=rod_d*2, center=true);
+                // Gap
+                translate([0, 0, length*0.6]) cube([rod_d*0.6, rod_d*2, rod_d*2], center=true);
+            }
         }
     }
 }
