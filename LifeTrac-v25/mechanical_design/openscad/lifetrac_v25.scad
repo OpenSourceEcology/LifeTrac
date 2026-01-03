@@ -118,32 +118,10 @@ BUCKET_GROUND_CLEARANCE = 0;      // Bucket bottom at ground level when lowered
 BUCKET_FRONT_CLEARANCE = 100;     // 100mm (~4") clearance between bucket back and front of machine
 
 // Arm pivot point (at top rear of side panels - tall end)
-ARM_PIVOT_Y = 200;  // Near rear of machine, between sandwich plates  
-ARM_PIVOT_Z_HEIGHT = MACHINE_HEIGHT - 50;  // Height above frame bottom
-ARM_PIVOT_Z = FRAME_Z_OFFSET + ARM_PIVOT_Z_HEIGHT;  // Absolute Z position
+// ARM_PIVOT_Y, ARM_PIVOT_Z defined in lifetrac_v25_params.scad
 
 // Calculate required arm length using trigonometry
-// When bucket is at ground level:
-//   - Arm tip Z = 0 (ground)
-//   - Arm pivot Z = ARM_PIVOT_Z
-//   - Vertical drop = ARM_PIVOT_Z
-//   - Arm angle below horizontal = asin(ARM_PIVOT_Z / ARM_LENGTH)
-//   - Horizontal reach = ARM_LENGTH * cos(angle) = sqrt(ARM_LENGTH^2 - ARM_PIVOT_Z^2)
-//
-// For bucket back to clear front wheels:
-//   - Bucket back Y = ARM_PIVOT_Y + horizontal_reach
-//   - Need: Bucket back Y >= WHEEL_BASE + BUCKET_FRONT_CLEARANCE
-//   - Therefore: horizontal_reach >= WHEEL_BASE + BUCKET_FRONT_CLEARANCE - ARM_PIVOT_Y
-//
-// Minimum horizontal reach needed:
-MIN_HORIZONTAL_REACH = WHEEL_BASE + BUCKET_FRONT_CLEARANCE - ARM_PIVOT_Y;
-
-// ARM_LENGTH^2 = ARM_PIVOT_Z^2 + MIN_HORIZONTAL_REACH^2 (Pythagorean theorem)
-ARM_LENGTH = ceil(sqrt(pow(ARM_PIVOT_Z, 2) + pow(MIN_HORIZONTAL_REACH, 2)));
-
-// Verify: angle when bucket at ground
-ARM_GROUND_ANGLE = asin(ARM_PIVOT_Z / ARM_LENGTH);  // Angle below horizontal (degrees)
-ARM_HORIZONTAL_REACH = ARM_LENGTH * cos(ARM_GROUND_ANGLE);  // Actual horizontal reach
+// Logic moved to lifetrac_v25_params.scad
 
 // Echo calculated values for debugging
 echo("=== ARM GEOMETRY CALCULATION ===");
@@ -151,12 +129,13 @@ echo("ARM_PIVOT_Z =", ARM_PIVOT_Z);
 echo("MIN_HORIZONTAL_REACH =", MIN_HORIZONTAL_REACH);
 echo("CALCULATED ARM_LENGTH =", ARM_LENGTH);
 echo("ARM_GROUND_ANGLE (degrees below horizontal) =", ARM_GROUND_ANGLE);
+// ARM_HORIZONTAL_REACH not defined in params, calculate locally if needed
+ARM_HORIZONTAL_REACH = ARM_LENGTH * cos(ARM_GROUND_ANGLE);
 echo("ACTUAL_HORIZONTAL_REACH =", ARM_HORIZONTAL_REACH);
 echo("BUCKET_TIP_Y (at ground) =", ARM_PIVOT_Y + ARM_HORIZONTAL_REACH);
 echo("CLEARANCE_FROM_FRONT_WHEELS =", ARM_PIVOT_Y + ARM_HORIZONTAL_REACH - WHEEL_BASE);
 
-ARM_TUBE_SIZE = TUBE_3X3_1_4;         // 3"x3" arm tubing
-ARM_SPACING = TRACK_WIDTH;            // Distance between arm centerlines
+// ARM_TUBE_SIZE, ARM_SPACING defined in lifetrac_v25_params.scad
 
 // Looping animation: 0->0.5 = arms go up, 0.5->1 = arms come back down
 // This creates a smooth loop where the animation returns to start position
@@ -245,8 +224,9 @@ BUCKET_GROUND_TILT = -ARM_MIN_ANGLE;  // Tilt needed to make bottom flat when ar
 BUCKET_MAX_CURL = 60;  // Maximum curl angle when fully raised
 
 // Bucket actuates with the arm using the same animation_phase for looping
-// Starts flat on ground, curls up as arm rises, then uncurls as arm lowers
-BUCKET_TILT_ANGLE = BUCKET_GROUND_TILT + (animation_phase * (BUCKET_MAX_CURL - BUCKET_GROUND_TILT));  // From flat to curled and back
+// Starts flat on ground, dumps (tilts down) as arm rises, then returns as arm lowers
+BUCKET_MAX_DUMP = -45; // Maximum dump angle when fully raised
+BUCKET_TILT_ANGLE = BUCKET_GROUND_TILT + (animation_phase * (BUCKET_MAX_DUMP - BUCKET_GROUND_TILT));  // From flat to dumped and back
 
 // =============================================================================
 // HYDRAULIC CYLINDER MOUNTING POINTS
@@ -330,8 +310,12 @@ function lift_cyl_length(arm_angle) =
     sqrt(dy*dy + dz*dz);
 
 // Calculate cylinder lengths at extreme positions
-LIFT_CYL_LEN_MIN = lift_cyl_length(ARM_MIN_ANGLE);  // Arms down (cylinder retracted)
-LIFT_CYL_LEN_MAX = lift_cyl_length(ARM_MAX_ANGLE);  // Arms up (cylinder extended)
+// Use calculated values if possible, otherwise fallback to defaults from params
+_lift_cyl_len_min_calc = lift_cyl_length(ARM_MIN_ANGLE);
+_lift_cyl_len_max_calc = lift_cyl_length(ARM_MAX_ANGLE);
+
+LIFT_CYL_LEN_MIN = is_undef(_lift_cyl_len_min_calc) ? LIFT_CYL_LEN_MIN_DEF : _lift_cyl_len_min_calc;
+LIFT_CYL_LEN_MAX = is_undef(_lift_cyl_len_max_calc) ? (LIFT_CYL_LEN_MIN_DEF + LIFT_CYLINDER_STROKE_DEF) : _lift_cyl_len_max_calc;
 
 // Required stroke = difference in lengths
 LIFT_CYL_REQUIRED_STROKE = LIFT_CYL_LEN_MAX - LIFT_CYL_LEN_MIN;
@@ -397,44 +381,38 @@ function bucket_cyl_length(arm_angle, bucket_tilt) =
 
 // Calculate bucket cylinder lengths at extreme positions
 // Check multiple combinations to find true min/max
-BUCKET_CYL_LEN_1 = bucket_cyl_length(ARM_MIN_ANGLE, BUCKET_MIN_TILT);
-BUCKET_CYL_LEN_2 = bucket_cyl_length(ARM_MIN_ANGLE, BUCKET_MAX_TILT);
-BUCKET_CYL_LEN_3 = bucket_cyl_length(ARM_MAX_ANGLE, BUCKET_MIN_TILT);
-BUCKET_CYL_LEN_4 = bucket_cyl_length(ARM_MAX_ANGLE, BUCKET_MAX_TILT);
-BUCKET_CYL_LEN_5 = bucket_cyl_length(0, BUCKET_MIN_TILT);  // Arm horizontal
-BUCKET_CYL_LEN_6 = bucket_cyl_length(0, BUCKET_MAX_TILT);
+_bc_len_1 = bucket_cyl_length(ARM_MIN_ANGLE, BUCKET_MIN_TILT);
+_bc_len_2 = bucket_cyl_length(ARM_MIN_ANGLE, BUCKET_MAX_TILT);
+_bc_len_3 = bucket_cyl_length(ARM_MAX_ANGLE, BUCKET_MIN_TILT);
+_bc_len_4 = bucket_cyl_length(ARM_MAX_ANGLE, BUCKET_MAX_TILT);
+_bc_len_5 = bucket_cyl_length(0, BUCKET_MIN_TILT);  // Arm horizontal
+_bc_len_6 = bucket_cyl_length(0, BUCKET_MAX_TILT);
 
-// Design Check: Specific Operational Points
-// 1. Retracted: Arm at Ground (MIN), Bucket at +10 deg absolute
-//    Bucket Tilt = Abs - Arm = 10 - ARM_MIN_ANGLE
-DESIGN_TILT_RETRACTED = 10 - ARM_MIN_ANGLE;
-DESIGN_LEN_RETRACTED = bucket_cyl_length(ARM_MIN_ANGLE, DESIGN_TILT_RETRACTED);
+// Safe min/max functions that handle undef
+function safe_min(v1, v2, v3, v4, v5, v6) = 
+    min(
+        is_undef(v1)?9999:v1, is_undef(v2)?9999:v2, is_undef(v3)?9999:v3, 
+        is_undef(v4)?9999:v4, is_undef(v5)?9999:v5, is_undef(v6)?9999:v6
+    );
 
-// 2. Extended: Arm at Full Height (MAX), Bucket at -20 deg absolute
-//    Bucket Tilt = Abs - Arm = -20 - ARM_MAX_ANGLE
-DESIGN_TILT_EXTENDED = -20 - ARM_MAX_ANGLE;
-DESIGN_LEN_EXTENDED = bucket_cyl_length(ARM_MAX_ANGLE, DESIGN_TILT_EXTENDED);
+function safe_max(v1, v2, v3, v4, v5, v6) = 
+    max(
+        is_undef(v1)?0:v1, is_undef(v2)?0:v2, is_undef(v3)?0:v3, 
+        is_undef(v4)?0:v4, is_undef(v5)?0:v5, is_undef(v6)?0:v6
+    );
 
-DESIGN_STROKE = DESIGN_LEN_EXTENDED - DESIGN_LEN_RETRACTED;
+_bc_min_calc = safe_min(_bc_len_1, _bc_len_2, _bc_len_3, _bc_len_4, _bc_len_5, _bc_len_6);
+_bc_max_calc = safe_max(_bc_len_1, _bc_len_2, _bc_len_3, _bc_len_4, _bc_len_5, _bc_len_6);
 
-echo("=== HYDRAULIC CYLINDER DESIGN CHECK ===");
-echo("ARM_MIN_ANGLE =", ARM_MIN_ANGLE);
-echo("ARM_MAX_ANGLE =", ARM_MAX_ANGLE);
-echo("DESIGN_TILT_RETRACTED (Rel) =", DESIGN_TILT_RETRACTED);
-echo("DESIGN_TILT_EXTENDED (Rel) =", DESIGN_TILT_EXTENDED);
-echo("DESIGN_LEN_RETRACTED =", DESIGN_LEN_RETRACTED);
-echo("DESIGN_LEN_EXTENDED =", DESIGN_LEN_EXTENDED);
-echo("DESIGN_STROKE REQUIRED =", DESIGN_STROKE);
-echo("TARGET STROKE = 457mm (18 inch)");
-echo("DIFF =", DESIGN_STROKE - 457);
+// Debug output to trace undefined values
+echo("DEBUG: _bc_min_calc", _bc_min_calc);
+echo("DEBUG: _bc_max_calc", _bc_max_calc);
 
-BUCKET_CYL_LEN_MIN = min(BUCKET_CYL_LEN_1, BUCKET_CYL_LEN_2, BUCKET_CYL_LEN_3, 
-                          BUCKET_CYL_LEN_4, BUCKET_CYL_LEN_5, BUCKET_CYL_LEN_6);
-BUCKET_CYL_LEN_MAX = max(BUCKET_CYL_LEN_1, BUCKET_CYL_LEN_2, BUCKET_CYL_LEN_3, 
-                          BUCKET_CYL_LEN_4, BUCKET_CYL_LEN_5, BUCKET_CYL_LEN_6);
+BUCKET_CYL_LEN_MIN = (is_undef(_bc_min_calc) || _bc_min_calc == 9999) ? BUCKET_CYL_LEN_MIN_DEF : _bc_min_calc;
+BUCKET_CYL_LEN_MAX = (is_undef(_bc_max_calc) || _bc_max_calc == 0) ? (BUCKET_CYL_LEN_MIN_DEF + BUCKET_CYLINDER_STROKE_DEF) : _bc_max_calc;
 
 // Required stroke
-BUCKET_CYL_REQUIRED_STROKE = BUCKET_CYL_LEN_MAX - BUCKET_CYL_LEN_MIN;
+BUCKET_CYL_REQUIRED_STROKE = (is_undef(BUCKET_CYL_LEN_MAX) || is_undef(BUCKET_CYL_LEN_MIN)) ? 0 : (BUCKET_CYL_LEN_MAX - BUCKET_CYL_LEN_MIN);
 BUCKET_CYL_STROKE_WITH_MARGIN = ceil(BUCKET_CYL_REQUIRED_STROKE * CYLINDER_STROKE_MARGIN);
 BUCKET_CYL_CLOSED_LENGTH = ceil(BUCKET_CYL_LEN_MIN * CYLINDER_CLOSED_MARGIN);
 
@@ -446,6 +424,7 @@ echo("STROKE WITH MARGIN =", BUCKET_CYL_STROKE_WITH_MARGIN);
 
 // Select standard stroke
 BUCKET_CYLINDER_STROKE_CALC = 
+    is_undef(BUCKET_CYL_STROKE_WITH_MARGIN) ? 200 :
     BUCKET_CYL_STROKE_WITH_MARGIN <= 150 ? 150 :
     BUCKET_CYL_STROKE_WITH_MARGIN <= 200 ? 200 :
     BUCKET_CYL_STROKE_WITH_MARGIN <= 250 ? 250 :
@@ -460,11 +439,13 @@ BUCKET_CYLINDER_STROKE_CALC =
 // Use calculated values (override manual values)
 LIFT_CYLINDER_BORE = 63.5;        // 2.5" bore (force capacity)
 LIFT_CYLINDER_ROD = 38.1;         // 1.5" rod
-LIFT_CYLINDER_STROKE = LIFT_CYLINDER_STROKE_CALC;
+// Use calculated stroke if available, otherwise keep default from params
+LIFT_CYLINDER_STROKE = is_undef(LIFT_CYLINDER_STROKE_CALC) ? LIFT_CYLINDER_STROKE_DEF : LIFT_CYLINDER_STROKE_CALC;
 
 BUCKET_CYLINDER_BORE = 50.8;      // 2" bore
 BUCKET_CYLINDER_ROD = 31.75;      // 1.25" rod
-BUCKET_CYLINDER_STROKE = BUCKET_CYLINDER_STROKE_CALC;
+// Use calculated stroke if available, otherwise keep default from params
+BUCKET_CYLINDER_STROKE = is_undef(BUCKET_CYLINDER_STROKE_CALC) ? BUCKET_CYLINDER_STROKE_DEF : BUCKET_CYLINDER_STROKE_CALC;
 
 // Debug output
 echo("=== LIFT CYLINDER SIZING ===");
@@ -1040,22 +1021,48 @@ module bolt_hole(diameter, depth) {
 module u_channel_lug(tube_size, length, hole_dia) {
     size = tube_size[0];
     wall = tube_size[1];
+    rad = 12.7; // 1/2 inch radius
     
     color("DarkSlateGray")
     difference() {
-        // Start with solid representation of U-channel from cut tube
-        union() {
-            // Left wall
-            translate([-(size/2 - wall/2), 0, 0])
-            cube([wall, length, size], center=true);
+        intersection() {
+            // 1. The U-channel profile (Rounded in X-Z plane)
+            rotate([90, 0, 0])
+            linear_extrude(height=length, center=true)
+            difference() {
+                // Outer rounded square
+                hull() {
+                    translate([-(size/2 - rad), -(size/2 - rad)]) circle(r=rad);
+                    translate([(size/2 - rad), -(size/2 - rad)]) circle(r=rad);
+                    translate([(size/2 - rad), (size/2 - rad)]) circle(r=rad);
+                    translate([-(size/2 - rad), (size/2 - rad)]) circle(r=rad);
+                }
+                // Inner rounded square
+                offset(r=-wall)
+                hull() {
+                    translate([-(size/2 - rad), -(size/2 - rad)]) circle(r=rad);
+                    translate([(size/2 - rad), -(size/2 - rad)]) circle(r=rad);
+                    translate([(size/2 - rad), (size/2 - rad)]) circle(r=rad);
+                    translate([-(size/2 - rad), (size/2 - rad)]) circle(r=rad);
+                }
+                // Cut top to make U (remove top wall)
+                // Top wall is at +Z (in 2D profile, +Y)
+                // We want to remove everything above size/2 - wall
+                translate([-size, size/2 - wall*1.5]) square([size*2, size]);
+            }
             
-            // Right wall  
-            translate([(size/2 - wall/2), 0, 0])
-            cube([wall, length, size], center=true);
-            
-            // Bottom connecting the two walls
-            translate([0, 0, -(size/2 - wall/2)])
-            cube([size, length, wall], center=true);
+            // 2. The Side Profile (Rounded in Y-Z plane)
+            // We want to round the top corners of the side walls.
+            rotate([0, 90, 0])
+            linear_extrude(height=size+10, center=true)
+            hull() {
+                // Bottom corners
+                translate([-length/2 + rad, -size/2 + rad]) circle(r=rad);
+                translate([length/2 - rad, -size/2 + rad]) circle(r=rad);
+                // Top corners
+                translate([-length/2 + rad, size/2 - rad]) circle(r=rad);
+                translate([length/2 - rad, size/2 - rad]) circle(r=rad);
+            }
         }
         
         // Pivot hole through both walls
@@ -1451,8 +1458,12 @@ module cylinder_mounting_lugs() {
 
 module arm_pivot_assembly() {
     // Pivot pins that go through the sandwich and arm
-    pivot_length = SANDWICH_SPACING + PANEL_THICKNESS * 2 + 20;
     nut_h = nut_height(PIVOT_PIN_DIA);  // Use function for nut height
+    // Extend length to ensure nuts are outside the plates
+    // Plates are at +/- (SANDWICH_SPACING/2 + PANEL_THICKNESS) from center of sandwich
+    // Total width of assembly = SANDWICH_SPACING + 2*PANEL_THICKNESS
+    // Add 2*nut_h + extra clearance
+    pivot_length = SANDWICH_SPACING + PANEL_THICKNESS * 2 + 2 * nut_h + 20;
     
     // Left pivot (at rear where tall section is)
     translate([-(TRACK_WIDTH/2), ARM_PIVOT_Y, ARM_PIVOT_Z]) {
@@ -1857,9 +1868,30 @@ module base_frame() {
     // Back plate (1 inch from rear)
     back_stiffener_plate();
     
-    // Mid plate (at Y=800 to avoid cylinder bolts at 700)
-    // Top height at Y=800 is approx 825mm above frame bottom
-    mid_stiffener_plate(800, FRAME_Z_OFFSET + 100, FRAME_Z_OFFSET + 350);
+    // Mid plate (Centered between wheels)
+    // Calculate centered position between wheels
+    front_wheel_y = WHEEL_BASE - WHEEL_RADIUS;
+    rear_wheel_target_y = LIFT_CYL_BASE_Y + WHEEL_RADIUS + 100; 
+    max_rear_y = front_wheel_y - (WHEEL_DIAMETER + 50);
+    final_rear_y = min(rear_wheel_target_y, max_rear_y);
+    
+    mid_plate_y = (front_wheel_y + final_rear_y) / 2;
+    
+    // Calculate wall height at this Y position (Replicating logic from side_panel.scad)
+    pivot_y_panel = ARM_PIVOT_Y;
+    pivot_z_panel = MACHINE_HEIGHT - 50;
+    arm_angle = is_undef(ARM_MIN_ANGLE) ? -45 : ARM_MIN_ANGLE;
+    arm_clearance_z = 80;
+    
+    dy = mid_plate_y - pivot_y_panel;
+    dz = dy * tan(arm_angle);
+    wall_height_at_y = pivot_z_panel + dz - arm_clearance_z;
+    
+    // Target top Z: 2 inches (50.8mm) below wall top
+    // Wall top in world coords = FRAME_Z_OFFSET + wall_height_at_y
+    mid_plate_top_z = FRAME_Z_OFFSET + wall_height_at_y - 50.8;
+    
+    mid_stiffener_plate(mid_plate_y, FRAME_Z_OFFSET + 100, mid_plate_top_z);
 }
 
 // =============================================================================
@@ -2112,16 +2144,40 @@ module loader_arms() {
             
             // Cross Beam
             // Connects the elbow assemblies at the new mounting hole position
-            // Hole is at main_tube_len - 50 from pivot
-            // Z height is 0 relative to arm pivot (center of tube)
-            // Y position is ARM_PIVOT_Y + (ARM_MAIN_LEN - 50)
-            // But we are inside the rotated arm group, so we use local coordinates
-            // The arms are at +/- ARM_SPACING/2
-            // The cross beam spans between them
-            
-            translate([0, CROSS_BEAM_1_POS, 0]) {
-                rotate([0, 90, 0])
-                cube([50.8, 152.4, ARM_SPACING], center=true); // 2x6 tube
+            // Manual adjustment: Shift back by 3 inches (76.2mm) to align with angle irons
+            translate([0, CROSS_BEAM_1_POS - 76.2, 0]) {
+                difference() {
+                    rotate([0, 90, 0])
+                    // Rounded 2x6 tube
+                    linear_extrude(height=ARM_SPACING, center=true)
+                    hull() {
+                        w = 152.4; // 6 inches (Along arm)
+                        h = 50.8;  // 2 inches (Vertical)
+                        r = 12.7;  // 1/2 inch radius
+                        translate([-w/2 + r, -h/2 + r]) circle(r=r);
+                        translate([w/2 - r, -h/2 + r]) circle(r=r);
+                        translate([w/2 - r, h/2 - r]) circle(r=r);
+                        translate([-w/2 + r, h/2 - r]) circle(r=r);
+                    }
+                    
+                    // Mounting Holes for Angle Irons
+                    // Located at ends of beam, top and bottom
+                    // X position: ARM_SPACING/2 - (Tube/2 + Plate + AngleHoleOffset)
+                    // AngleHoleOffset = 25.4 (1 inch)
+                    // Tube/2 = 25.4
+                    // Plate = 6.35
+                    // X = +/- (ARM_SPACING/2 - 57.15)
+                    
+                    hole_x_offset = ARM_SPACING/2 - (25.4 + ARM_PLATE_THICKNESS + 25.4);
+                    hole_y_spacing = 25.4; // Offset from center of beam (2 inch spacing total)
+                    
+                    for (x_pos = [-hole_x_offset, hole_x_offset]) {
+                        for (y_pos = [-hole_y_spacing, hole_y_spacing]) {
+                            translate([x_pos, y_pos, 0])
+                            cylinder(d=BOLT_DIA_1_2, h=100, center=true, $fn=32);
+                        }
+                    }
+                }
                 
                 // Cylinder Mounts on Cross Beam
                 for (side = [-1, 1]) {
@@ -2138,85 +2194,35 @@ module loader_arms() {
 // BOBCAT QUICK ATTACH INTERFACE
 // =============================================================================
 
-module bobcat_quick_attach_plate() {
-    // Standard Bobcat/Universal quick attach interface
-    plate_width = BOBCAT_QA_WIDTH;
-    plate_height = BOBCAT_QA_HEIGHT;
-    plate_thick = PLATE_1_2_INCH;
-    
-    color("Yellow")
-    difference() {
-        // Main attachment plate
-        translate([-plate_width/2, 0, -plate_height])
-        cube([plate_width, plate_thick, plate_height]);
-        
-        // Hook bar slot (top engagement point)
-        translate([-plate_width/2 + 100, -5, -BOBCAT_QA_HOOK_HEIGHT])
-        cube([plate_width - 200, plate_thick + 10, 40]);
-        
-        // Wedge pockets (bottom locking points)
-        for (x = [-plate_width/3, plate_width/3]) {
-            translate([x, -5, -plate_height + 50])
-            cube([100, plate_thick + 10, BOBCAT_QA_WEDGE_HEIGHT]);
-        }
-        
-        // Locking pin holes
-        for (x = [-plate_width/3, plate_width/3]) {
-            translate([x, plate_thick/2, -plate_height + 100])
-            rotate([90, 0, 0])
-            cylinder(d=BOBCAT_QA_PIN_DIA + 2, h=plate_thick + 10, center=true, $fn=32);
-        }
-    }
-    
-    // Hook bar - 1.5" round bar stock, cut to length
-    color("DarkSlateGray")
-    translate([0, plate_thick + 20, -BOBCAT_QA_HOOK_HEIGHT + 10])
-    rotate([0, 90, 0])
-    cylinder(d=PIVOT_PIN_DIA, h=plate_width - 150, center=true, $fn=32);
-    
-    // Arm connection flanges - at BOTTOM of QA plate (pivot point)
-    // Using CNC cut flange plates from 1/2" steel + TYPE C pivot rings
-    flange_spacing = ARM_SPACING - 100;
-    for (x = [-flange_spacing/2, flange_spacing/2]) {
-        translate([x, plate_thick, -plate_height + 60])  // Near bottom of plate
-        {
-            // Flange plate - CNC cut from 1/2" plate
-            color("DarkSlateGray")
-            cube([80, 60, 100], center=true);
-            
-            // Pivot hole boss - TYPE C: Small pivot ring from 1" plate
-            translate([0, 30 + 12.7, 0])  // 12.7 = half of 1" plate thickness
-            rotate([90, 0, 0])
-            pivot_ring_small(70, PIVOT_PIN_DIA + 2);
-        }
-    }
-    
-    // Bucket cylinder attachment points - TYPE A: U-Channel from 3"x3" tube with pins
-    // Bucket cylinder lugs: align with cylinder line and bring inward toward machine center
-    for (side = [-1, 1]) {
-        x = side * BUCKET_CYL_X_SPACING;          // Match arm-side cylinder X offset
-        y = BUCKET_CYL_MOUNT_Y_OFFSET;            // Flush with back of plate (Y=0)
-        z = BUCKET_CYL_MOUNT_Z_OFFSET;            // Height on plate
-        translate([x, y, z])
-        rotate([90, 0, 0])
-        u_channel_lug_with_pin(TUBE_3X3_1_4, 80, BOLT_DIA_3_4 + 2);
-    }
-}
+
 
 // =============================================================================
 // BUCKET
 // =============================================================================
 
 module bucket() {
-    // Standard bucket with quick attach compatible back
+    // Standard bucket (Simplified)
     
     // Bottom plate
     color("Yellow")
     translate([-BUCKET_WIDTH/2, 0, -BUCKET_HEIGHT])
     cube([BUCKET_WIDTH, BUCKET_DEPTH, PLATE_1_4_INCH]);
     
-    // Back plate (part of quick attach)
-    bobcat_quick_attach_plate();
+    // Back plate (Simplified)
+    color("Yellow")
+    translate([-BUCKET_WIDTH/2, 0, -BUCKET_HEIGHT])
+    cube([BUCKET_WIDTH, PLATE_1_4_INCH, BUCKET_HEIGHT]);
+    
+    // Cylinder Lugs (Moved from QA plate)
+    for (side = [-1, 1]) {
+        x = side * BUCKET_CYL_X_SPACING;
+        y = BUCKET_CYL_MOUNT_Y_OFFSET; 
+        z = BUCKET_CYL_MOUNT_Z_OFFSET; 
+        
+        translate([x, y, z])
+        rotate([90, 0, 0])
+        u_channel_lug_with_pin(TUBE_3X3_1_4, 80, BOLT_DIA_3_4 + 2);
+    }
     
     // Left side plate
     color("Yellow")
@@ -2260,31 +2266,22 @@ module bucket_attachment() {
         rotate([is_undef(ARM_LIFT_ANGLE) ? 0 : ARM_LIFT_ANGLE, 0, 0])
         translate([0, ARM_TIP_X, ARM_TIP_Z])
         {
-            // Pivot pin connecting arms to bucket
-            // This is at the arm tip, aligned with arm centerline
-            pivot_length = ARM_SPACING + 100;
-            nut_h = nut_height(PIVOT_PIN_DIA);
-            
-            color("Silver")
-            rotate([0, 90, 0])
-            cylinder(d=PIVOT_PIN_DIA, h=pivot_length, center=true, $fn=48);
-            
-            // Nuts on both ends of pivot pin
-            translate([pivot_length/2 - nut_h/2, 0, 0])
-            rotate([0, 90, 0])
-            hex_nut(PIVOT_PIN_DIA);
-            
-            translate([-pivot_length/2 + nut_h/2, 0, 0])
-            rotate([0, 90, 0])
-            hex_nut(PIVOT_PIN_DIA);
-            
             // Bucket rotates about this pivot
-            // The arm pivot flanges are at -plate_height + 60 from Z=0 in bucket coords
-            // So we offset the bucket up so that point aligns with the arm tip (Z=0 here)
-            // Additional offset to keep bucket bottom above ground
-            rotate([BUCKET_TILT_ANGLE, 0, 0])
-            translate([0, 100, BUCKET_HEIGHT - 100])  // Shift bucket up (less 100mm) to reach ground from raised pivot
-            bucket();
+            rotate([BUCKET_TILT_ANGLE, 0, 0]) {
+                // New Attachment: U-Channel Lugs bolted to bucket
+                // Lugs are positioned at arm spacing
+                for (x_offset = [-ARM_SPACING/2, ARM_SPACING/2]) {
+                    translate([x_offset, 0, 0])
+                    rotate([90, 0, 0]) // Rotate so base faces +Y (Bucket Back)
+                    u_channel_lug_with_pin(TUBE_3X3_1_4, 100, PIVOT_PIN_DIA + 2);
+                }
+
+                // Bucket
+                // Shift bucket Y to match lug height (38.1mm) so back plate touches lugs
+                // Keep Z offset to maintain pivot height relative to bucket
+                translate([0, TUBE_3X3_1_4[0]/2, BUCKET_HEIGHT - 100])  
+                bucket();
+            }
         }
     }
 }

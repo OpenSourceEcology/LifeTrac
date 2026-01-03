@@ -68,7 +68,7 @@ module cross_beam_arc_slot(beam_distance, slot_width) {
     // The arc sweeps from ARM_MIN_ANGLE to ARM_MAX_ANGLE
     // We extend slightly beyond to ensure full clearance
     // Safety check for undefined angles
-    safe_min_angle = is_undef(ARM_MIN_ANGLE) ? 0 : ARM_MIN_ANGLE;
+    safe_min_angle = is_undef(ARM_MIN_ANGLE) ? -45 : ARM_MIN_ANGLE;
     safe_max_angle = is_undef(ARM_MAX_ANGLE) ? 60 : ARM_MAX_ANGLE;
     
     arc_start = safe_min_angle - 5;

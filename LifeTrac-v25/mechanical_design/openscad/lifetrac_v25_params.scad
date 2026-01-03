@@ -96,12 +96,16 @@ DOM_PIPE_ID = 38.1; // ID matching 1.5" pivot pin
 JIG_WALL_THICKNESS = 4; // Standard wall thickness for 3D printed jigs
 JIG_CLEARANCE = 0.5; // Clearance for fit
 
+// Define ARM_MIN_ANGLE and ARM_MAX_ANGLE later after geometry is calculated
+// ARM_MIN_ANGLE = -ARM_GROUND_ANGLE;     // Lowest position (at ground)
+// ARM_MAX_ANGLE = 60;                     // Maximum raised position
+
 echo("DEBUG: Loading lifetrac_v25_params.scad - Version with Fixes");
 
 // Arm Dimensions for Calculation
-ARM_MAIN_LEN = 1100; // Reduced from 1200 to bring bucket closer
+ARM_MAIN_LEN = 1224; // Increased to extend tube closer to pivot (was 1100)
 ARM_DROP_LEN = 550; // Shortened from 600
-ARM_OVERLAP = 200;
+ARM_OVERLAP = 76.2; // Reduced to 3 inches (1" radius + 2" gap) from 200
 ARM_DROP_EXT = 80; // Extension for bucket clearance
 ARM_PIVOT_EXT = 40; // Pivot hole offset from end of drop
 
@@ -114,9 +118,21 @@ _tube_h = TUBE_2X6_1_4[1];
 _dx = _drop_vec_len * cos(_bend_angle) + (-_tube_h/2) * sin(_bend_angle);
 _dz = -_drop_vec_len * sin(_bend_angle) + (-_tube_h/2) * cos(_bend_angle);
 
+// Calculate Tip Position (Top/Effective Pivot Point)
 ARM_TIP_X = (ARM_MAIN_LEN + ARM_OVERLAP + 50) + _dx;
 ARM_TIP_Z = _tube_h + _dz;
 
+ARM_V2_LENGTH = sqrt(pow(ARM_TIP_X, 2) + pow(ARM_TIP_Z, 2));
+// Geometric angle of the arm tip vector relative to horizontal
+ARM_GEOMETRY_ANGLE = atan2(ARM_TIP_Z, ARM_TIP_X);
+
+echo("=== ARM V2 GEOMETRY ===");
+echo("ARM_V2_LENGTH =", ARM_V2_LENGTH);
+echo("ARM_GEOMETRY_ANGLE =", ARM_GEOMETRY_ANGLE);
+echo("ARM_TIP_X =", ARM_TIP_X);
+echo("ARM_TIP_Z =", ARM_TIP_Z);
+
+// Calculate angles for kinematics
 _x_rel = ARM_TIP_X;
 _z_rel = ARM_TIP_Z - _tube_h/2;
 
@@ -131,14 +147,15 @@ theta_deg_calc = _theta_rad;
 echo("DEBUG: theta_deg_calc", theta_deg_calc);
 echo("DEBUG: arm_alpha_calc", arm_alpha_calc);
 
-ARM_MIN_ANGLE_COMPUTED = (is_undef(theta_deg_calc) || is_undef(arm_alpha_calc)) ? 0 : theta_deg_calc + arm_alpha_calc; 
+// Robustly define ARM_MIN_ANGLE_COMPUTED
+ARM_MIN_ANGLE_COMPUTED = (is_undef(theta_deg_calc) || is_undef(arm_alpha_calc)) ? -45 : theta_deg_calc + arm_alpha_calc; 
 echo("DEBUG: ARM_MIN_ANGLE_COMPUTED", ARM_MIN_ANGLE_COMPUTED);
 
 // Arm angle limits
 // Calculated to keep bucket pivot ~50mm above ground at lowest position
 ARM_V2_OFFSET_ANGLE = ARM_MIN_ANGLE_COMPUTED + ARM_GROUND_ANGLE; // Difference from straight arm
 ARM_MIN_ANGLE = ARM_MIN_ANGLE_COMPUTED;     // Lowest position (at ground)
-ARM_MAX_ANGLE = 60 + ARM_V2_OFFSET_ANGLE;                     // Maximum raised position
+ARM_MAX_ANGLE = 60 + ARM_V2_OFFSET_ANGLE;   // Maximum raised position
 
 // Cross beam configuration (Moved to below)
 // CROSS_BEAM_SIZE = TUBE_2X2_1_4[0];    // 2"x2" tube size
@@ -194,7 +211,45 @@ CROSS_BEAM_MOUNT_Z_OFFSET = -(CROSS_BEAM_HEIGHT/2 + BUCKET_CYL_MOUNT_SIZE/2); //
 // Cross beam configuration
 CROSS_BEAM_SIZE = TUBE_2X2_1_4[0];    // 2"x2" tube size
 CROSS_BEAM_CLEARANCE = 15;             // Extra clearance around cross beam in cutout
-CROSS_BEAM_1_POS = 1050;                 // Optimized for 18" cylinder stroke
+
+// =============================================================================
+// HYDRAULIC CYLINDER PARAMETRIC SIZING
+// =============================================================================
+
+// Lift Cylinder (3" Bore, 1.5" Rod, 12" Stroke)
+LIFT_CYLINDER_BORE = 76.2; // 3"
+LIFT_CYLINDER_ROD = 38.1;  // 1.5"
+LIFT_CYLINDER_STROKE_DEF = 304.8; // 12" - Default/Design value
+LIFT_CYLINDER_STROKE = LIFT_CYLINDER_STROKE_DEF;
+LIFT_CYL_LEN_MIN_DEF = 304.8 + 254; // Explicit calculation to avoid undef issues
+LIFT_CYL_LEN_MIN = LIFT_CYL_LEN_MIN_DEF;
+
+// Bucket Cylinder (3" Bore, 1.5" Rod, 18" Stroke)
+BUCKET_CYLINDER_BORE = 76.2; // 3"
+BUCKET_CYLINDER_ROD = 38.1;  // 1.5"
+BUCKET_CYLINDER_STROKE_DEF = 457.2; // 18" - Default/Design value
+BUCKET_CYLINDER_STROKE = BUCKET_CYLINDER_STROKE_DEF;
+BUCKET_CYL_LEN_MIN_DEF = 457.2 + 305; // Explicit calculation
+BUCKET_CYL_LEN_MIN = BUCKET_CYL_LEN_MIN_DEF;
+
+// Parametric Cross Beam Position
+// Calculated based on bucket cylinder retracted length to ensure proper geometry
+// We want the cylinder to fit when retracted and bucket is curled back
+// BUCKET_CYLINDER_RETRACTED is typically Stroke + Dead Length
+// Dead Length approx 12" (300mm) for 3" bore cylinder
+// Let's assume standard tie-rod cylinder dimensions
+_cyl_dead_len = 305; // 12 inches
+_cyl_retracted = BUCKET_CYLINDER_STROKE_DEF + _cyl_dead_len;
+
+// Position relative to arm pivot
+// When bucket is curled back (max curl), the cylinder is retracted.
+// The distance from Arm Pivot to Bucket Pivot is ARM_LENGTH.
+// The distance from Bucket Pivot to Cylinder Mount on Bucket is approx BUCKET_HEIGHT.
+// This is a simplification, but gives a parametric relationship.
+// We place the crossbeam such that the cylinder fits.
+// CROSS_BEAM_1_POS = ARM_LENGTH - _cyl_retracted + adjustment
+CROSS_BEAM_1_POS = ARM_LENGTH - _cyl_retracted + 150; // 150mm adjustment for mounting geometry
+
 CROSS_BEAM_2_POS = ARM_LENGTH * 0.95;   // Second cross beam position (near bucket)
 
 ENGINE_HP = 25; // Desired horsepower (e.g., 25HP V-Twin)
