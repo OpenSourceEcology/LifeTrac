@@ -2159,12 +2159,12 @@ module loader_arms() {
 // BUCKET
 // =============================================================================
 
-module bucket() {
-    // Standard bucket with Tab & Slot construction for welding
-    
+// =============================================================================
+// BUCKET
+// =============================================================================
+
+module bucket_back_plate() {
     tab_len = 50;
-    
-    // 1. Back Plate
     difference() {
         union() {
             // Main Plate
@@ -2190,8 +2190,10 @@ module bucket() {
             cube([tab_len, PLATE_1_4_INCH + 2, PLATE_1_4_INCH]);
         }
     }
-    
-    // 2. Bottom Plate
+}
+
+module bucket_bottom_plate() {
+    tab_len = 50;
     difference() {
         union() {
             // Main Plate
@@ -2217,38 +2219,48 @@ module bucket() {
             }
         }
     }
+}
+
+module bucket_side_plate(is_left=true) {
+    tab_len = 50;
+    side = is_left ? -1 : 1;
+    x_pos = (side == -1) ? -BUCKET_WIDTH/2 - PLATE_1_4_INCH : BUCKET_WIDTH/2;
     
-    // 3. Side Plates
-    for (side = [-1, 1]) {
-        x_pos = (side == -1) ? -BUCKET_WIDTH/2 - PLATE_1_4_INCH : BUCKET_WIDTH/2;
+    difference() {
+        // Main Shape
+        color("Yellow")
+        translate([x_pos, 0, -BUCKET_HEIGHT])
+        rotate([0, -90, 0])
+        linear_extrude(height=PLATE_1_4_INCH)
+        polygon([
+            [0, 0],
+            [BUCKET_HEIGHT, 0],
+            [BUCKET_HEIGHT, PLATE_1_2_INCH],
+            [BUCKET_HEIGHT * 0.3, BUCKET_DEPTH],
+            [0, BUCKET_DEPTH]
+        ]);
         
-        difference() {
-            // Main Shape
-            color("Yellow")
-            translate([x_pos, 0, -BUCKET_HEIGHT])
-            rotate([0, -90, 0])
-            linear_extrude(height=PLATE_1_4_INCH)
-            polygon([
-                [0, 0],
-                [BUCKET_HEIGHT, 0],
-                [BUCKET_HEIGHT, PLATE_1_2_INCH],
-                [BUCKET_HEIGHT * 0.3, BUCKET_DEPTH],
-                [0, BUCKET_DEPTH]
-            ]);
-            
-            // Slots for Back Plate tabs
-            for (z = [-BUCKET_HEIGHT + 50 : 150 : -50]) {
-                translate([x_pos - 1, -1, z])
-                cube([PLATE_1_4_INCH + 2, PLATE_1_4_INCH + 2, tab_len]);
-            }
-            
-            // Slots for Bottom Plate tabs
-            for (y = [PLATE_1_4_INCH + 50 : 150 : BUCKET_DEPTH - 50]) {
-                translate([x_pos - 1, y, -BUCKET_HEIGHT - 1])
-                cube([PLATE_1_4_INCH + 2, tab_len, PLATE_1_4_INCH + 2]);
-            }
+        // Slots for Back Plate tabs
+        for (z = [-BUCKET_HEIGHT + 50 : 150 : -50]) {
+            translate([x_pos - 1, -1, z])
+            cube([PLATE_1_4_INCH + 2, PLATE_1_4_INCH + 2, tab_len]);
+        }
+        
+        // Slots for Bottom Plate tabs
+        for (y = [PLATE_1_4_INCH + 50 : 150 : BUCKET_DEPTH - 50]) {
+            translate([x_pos - 1, y, -BUCKET_HEIGHT - 1])
+            cube([PLATE_1_4_INCH + 2, tab_len, PLATE_1_4_INCH + 2]);
         }
     }
+}
+
+module bucket() {
+    // Standard bucket with Tab & Slot construction for welding
+    
+    bucket_back_plate();
+    bucket_bottom_plate();
+    bucket_side_plate(is_left=true);
+    bucket_side_plate(is_left=false);
     
     // Cylinder Lugs (Moved from QA plate)
     for (side = [-1, 1]) {
