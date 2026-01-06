@@ -255,7 +255,7 @@ BUCKET_CYL_LEN_MIN = BUCKET_CYL_LEN_MIN_DEF;
 // Parametric Cross Beam Position
 // Calculated based on bucket cylinder retracted length to ensure proper geometry
 // We want the cylinder to fit when retracted and bucket is curled back (MAX_CURL)
-BUCKET_CURL_MAX_ANGLE = -50; // Degrees (Negative = Curled Back)
+BUCKET_CURL_MAX_ANGLE = 45; // Degrees (Positive = Curled Back/Up)
 
 // Calculate Lug Position in Arm Frame at Max Curl
 // Lug Local Z relative to Pivot
@@ -276,6 +276,30 @@ _z_diff = _lug_z_arm - CROSS_BEAM_MOUNT_Z_OFFSET;
 _y_dist = sqrt(pow(BUCKET_CYL_LEN_MIN, 2) - pow(_z_diff, 2));
 
 CROSS_BEAM_1_POS = _lug_y_arm - _y_dist;
+
+// =============================================================================
+// DUMP GEOMETRY VERIFICATION
+// =============================================================================
+// Verify if the cylinder stroke allows for full vertical dump (-90 deg)
+// This feedback is printed to the OpenSCAD console
+
+_dump_angle_full = -90; // Vertical down
+_dump_angle_partial = -50; 
+
+// Calculate required cylinder positions for check
+_lug_y_dump = ARM_TIP_X + (0 * cos(_dump_angle_full) - _lug_z_local * sin(_dump_angle_full));
+_lug_z_dump = ARM_TIP_Z + (0 * sin(_dump_angle_full) + _lug_z_local * cos(_dump_angle_full));
+_req_len_dump = sqrt(pow(_lug_y_dump - CROSS_BEAM_1_POS, 2) + pow(_lug_z_dump - CROSS_BEAM_MOUNT_Z_OFFSET, 2));
+
+BUCKET_CYL_LEN_MAX = BUCKET_CYL_LEN_MIN + BUCKET_CYLINDER_STROKE;
+
+echo("=== BUCKET GEOMETRY VERIFICATION ===");
+echo("Max Curl Angle (Designing Point):", BUCKET_CURL_MAX_ANGLE);
+echo("Resulting Cross Beam Position:", CROSS_BEAM_1_POS);
+echo("Cylinder Retracted Length:", BUCKET_CYL_LEN_MIN);
+echo("Cylinder Extended Length (Max):", BUCKET_CYL_LEN_MAX);
+echo("Required Length for -90 Deg Dump:", _req_len_dump);
+echo("REACHES FULL DUMP?", BUCKET_CYL_LEN_MAX >= _req_len_dump ? "YES" : "NO - INCREASE STROKE");
 
 CROSS_BEAM_2_POS = ARM_LENGTH * 0.95;   // Second cross beam position (near bucket)
 
