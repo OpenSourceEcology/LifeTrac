@@ -17,9 +17,9 @@ module loader_arm_v2(angle=0, side="left") {
     tube_rad = 12.7;
     cross_beam_rad = 12.7; // 1/2 inch radius for crossbeam
     
-    // Pivot Point Configuration
-    pivot_dia = 38.1; // 1.5 inch
-    hole_x_offset = drop_ext - 25.4; // 1 inch from front edge
+    // Pivot Point Configuration (Unused here, defined in arm_plate.scad)
+    // pivot_dia = BUCKET_PIVOT_PIN_DIA; 
+    // hole_x_offset = drop_ext - 30; 
 
     // Elbow assembly parameters
     extension_len = 350;

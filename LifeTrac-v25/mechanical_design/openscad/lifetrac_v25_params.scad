@@ -29,6 +29,7 @@ ANGLE_4X4_1_4 = [101.6, 6.35];  // 4"x4" x 1/4" angle iron
 
 // Bolt/pin diameters
 PIVOT_PIN_DIA = 38.1;    // 1.5" pivot pin
+BUCKET_PIVOT_PIN_DIA = 25.4; // 1" bucket pivot pin
 BOLT_DIA_1_2 = 12.7;     // 1/2" bolt
 BOLT_DIA_3_4 = 19.05;    // 3/4" bolt
 BOLT_DIA_1 = 25.4;       // 1" bolt
@@ -70,6 +71,7 @@ WHEEL_X_OFFSET = TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS + WHEEL_WI
 // Design constraints
 BUCKET_GROUND_CLEARANCE = 0;      // Bucket bottom at ground level when lowered
 BUCKET_FRONT_CLEARANCE = 0;       // Reduced from 100 to 0 to match shorter arms
+BUCKET_PIVOT_HEIGHT_FROM_BOTTOM = 200; // Height of pivot from bottom of bucket
 
 // Arm pivot point (at top rear of side panels - tall end)
 ARM_PIVOT_Y = 200;  // Near rear of machine, between sandwich plates  
@@ -112,11 +114,12 @@ ARM_PIVOT_EXT = 40; // Pivot hole offset from end of drop
 // Calculate Effective Arm Length and Angle
 // Vector from Main Pivot to Bucket Pivot
 _bend_angle = 180 - ARM_ANGLE;
-_drop_vec_len = ARM_DROP_LEN + ARM_PIVOT_EXT;
+_drop_vec_len = ARM_DROP_LEN + ARM_DROP_EXT - 30; // Hole X position (30mm from edge)
 _tube_h = TUBE_2X6_1_4[1];
+_hole_z_offset = _tube_h - 30; // Hole Z position (30mm from top edge - corner)
 
-_dx = _drop_vec_len * cos(_bend_angle) + (-_tube_h/2) * sin(_bend_angle);
-_dz = -_drop_vec_len * sin(_bend_angle) + (-_tube_h/2) * cos(_bend_angle);
+_dx = _drop_vec_len * cos(_bend_angle) + (_hole_z_offset - _tube_h) * sin(_bend_angle);
+_dz = -_drop_vec_len * sin(_bend_angle) + (_hole_z_offset - _tube_h) * cos(_bend_angle);
 
 // Calculate Tip Position (Top/Effective Pivot Point)
 ARM_TIP_X = (ARM_MAIN_LEN + ARM_OVERLAP + 50) + _dx;
@@ -140,7 +143,7 @@ _arm_eff_len = sqrt(pow(_x_rel, 2) + pow(_z_rel, 2));
 arm_alpha_calc = atan2(-_z_rel, _x_rel); // Angle below horizontal (positive value)
 
 // Target Angle Calculation
-_target_height = 100; // Raised to 100mm (approx 4") to keep arm tip off ground
+_target_height = BUCKET_PIVOT_HEIGHT_FROM_BOTTOM + BUCKET_GROUND_CLEARANCE; // Arm tip height so bucket touches ground
 _theta_rad = asin((_target_height - ARM_PIVOT_Z) / _arm_eff_len);
 theta_deg_calc = _theta_rad; 
 
@@ -200,6 +203,10 @@ _calc_base_y = _attach_y_world - (_attach_z_world - LIFT_CYL_BASE_Z) / tan(_targ
 // Adjusted for 16" cylinder fit
 LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y + 10));
 
+// Bucket Pivot Configuration
+// BUCKET_PIVOT_HEIGHT_FROM_BOTTOM moved to top of file
+BUCKET_LUG_OFFSET = TUBE_3X3_1_4[0]/2 - TUBE_3X3_1_4[1]/2; // Offset for lug thickness (approx 35mm)
+
 // Bucket Cylinder Mount Parameters
 BUCKET_CYL_MOUNT_SIZE = TUBE_3X3_1_4[0]; // 3" (76.2mm)
 BUCKET_CYL_MOUNT_Y_OFFSET = -BUCKET_CYL_MOUNT_SIZE/2; // Flush with back of bucket plate
@@ -212,6 +219,18 @@ CROSS_BEAM_MOUNT_Z_OFFSET = -(CROSS_BEAM_HEIGHT/2 + BUCKET_CYL_MOUNT_SIZE/2); //
 // Cross beam configuration
 CROSS_BEAM_SIZE = TUBE_2X2_1_4[0];    // 2"x2" tube size
 CROSS_BEAM_CLEARANCE = 15;             // Extra clearance around cross beam in cutout
+
+// =============================================================================
+// BUCKET DIMENSIONS
+// =============================================================================
+
+BOBCAT_QA_WIDTH = 1168;           // 46" standard width
+BOBCAT_QA_HEIGHT = 457;           // 18" plate height
+BOBCAT_QA_PIN_DIA = 25.4;         // 1" locking pin
+
+BUCKET_WIDTH = 1100;              // Slightly narrower than QA plate
+BUCKET_DEPTH = 600;
+BUCKET_HEIGHT = 450;
 
 // =============================================================================
 // HYDRAULIC CYLINDER PARAMETRIC SIZING
@@ -235,21 +254,28 @@ BUCKET_CYL_LEN_MIN = BUCKET_CYL_LEN_MIN_DEF;
 
 // Parametric Cross Beam Position
 // Calculated based on bucket cylinder retracted length to ensure proper geometry
-// We want the cylinder to fit when retracted and bucket is curled back
-// BUCKET_CYLINDER_RETRACTED is typically Stroke + Dead Length
-// Dead Length approx 12" (300mm) for 3" bore cylinder
-// Let's assume standard tie-rod cylinder dimensions
-_cyl_dead_len = 305; // 12 inches
-_cyl_retracted = BUCKET_CYLINDER_STROKE_DEF + _cyl_dead_len;
+// We want the cylinder to fit when retracted and bucket is curled back (MAX_CURL)
+BUCKET_CURL_MAX_ANGLE = -50; // Degrees (Negative = Curled Back)
 
-// Position relative to arm pivot
-// When bucket is curled back (max curl), the cylinder is retracted.
-// The distance from Arm Pivot to Bucket Pivot is ARM_LENGTH.
-// The distance from Bucket Pivot to Cylinder Mount on Bucket is approx BUCKET_HEIGHT.
-// This is a simplification, but gives a parametric relationship.
-// We place the crossbeam such that the cylinder fits.
-// CROSS_BEAM_1_POS = ARM_LENGTH - _cyl_retracted + adjustment
-CROSS_BEAM_1_POS = 666; // Calculated for 45 deg dump angle
+// Calculate Lug Position in Arm Frame at Max Curl
+// Lug Local Z relative to Pivot
+_lug_z_local = BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM);
+
+// Rotate Lug by Max Curl Angle (relative to Arm)
+// Note: ARM_TIP_X corresponds to Y axis in bucket_cyl_length logic (Longitudinal)
+//       ARM_TIP_Z corresponds to Z axis (Vertical)
+// Rotation: Y' = Y*cos(a) - Z*sin(a), Z' = Y*sin(a) + Z*cos(a)
+// Lug Local Y is 0.
+_lug_y_arm = ARM_TIP_X + (0 * cos(BUCKET_CURL_MAX_ANGLE) - _lug_z_local * sin(BUCKET_CURL_MAX_ANGLE));
+_lug_z_arm = ARM_TIP_Z + (0 * sin(BUCKET_CURL_MAX_ANGLE) + _lug_z_local * cos(BUCKET_CURL_MAX_ANGLE));
+
+// Solve for Cross Beam Y Position (CROSS_BEAM_1_POS)
+// Distance^2 = (Y_lug - Y_cb)^2 + (Z_lug - Z_cb)^2
+// Y_cb = Y_lug - sqrt(Distance^2 - (Z_lug - Z_cb)^2)
+_z_diff = _lug_z_arm - CROSS_BEAM_MOUNT_Z_OFFSET;
+_y_dist = sqrt(pow(BUCKET_CYL_LEN_MIN, 2) - pow(_z_diff, 2));
+
+CROSS_BEAM_1_POS = _lug_y_arm - _y_dist;
 
 CROSS_BEAM_2_POS = ARM_LENGTH * 0.95;   // Second cross beam position (near bucket)
 
@@ -261,18 +287,6 @@ ENGINE_WEIGHT_KG = 30 + (ENGINE_HP * 1.2);
 // Engine Position (Middle near back)
 ENGINE_POS_Y = 400; // Forward from rear of frame
 ENGINE_POS_Z = FRAME_Z_OFFSET + 200; // Height above frame bottom
-
-// =============================================================================
-// BUCKET DIMENSIONS
-// =============================================================================
-
-BOBCAT_QA_WIDTH = 1168;           // 46" standard width
-BOBCAT_QA_HEIGHT = 457;           // 18" plate height
-BOBCAT_QA_PIN_DIA = 25.4;         // 1" locking pin
-
-BUCKET_WIDTH = 1100;              // Slightly narrower than QA plate
-BUCKET_DEPTH = 600;
-BUCKET_HEIGHT = 450;
 
 // =============================================================================
 // STANDING DECK DIMENSIONS (Legacy - kept for reference)

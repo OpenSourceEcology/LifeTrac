@@ -360,9 +360,12 @@ function bucket_cyl_length(arm_angle, bucket_tilt) =
         arm_z = arm_local_y * sin(arm_angle) + arm_local_z * cos(arm_angle),
         
         // Bucket attachment (in bucket local, tilt about arm tip, then arm rotation)
-        // Must match the translation in bucket_attachment: translate([0, 38.1, BUCKET_HEIGHT - 100])
-        bucket_local_y = BUCKET_CYL_MOUNT_Y_OFFSET + 38.1,
-        bucket_local_z = BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - 100),
+        // Must match the translation in bucket_attachment
+        // Bucket is at Y = BUCKET_LUG_OFFSET. Cylinder Lug is on back plate.
+        // Assuming Cylinder Lug is also rotated to point backwards, Pivot is at Y=0 relative to Arm Tip?
+        // Let's assume Cylinder Lug Pivot is at Y = 0 for now (flush with Arm Pivot Y)
+        bucket_local_y = 0,
+        bucket_local_z = BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM),
         // Tilt about bucket pivot (at arm tip)
         bucket_tilted_y = bucket_local_y * cos(bucket_tilt) - bucket_local_z * sin(bucket_tilt),
         bucket_tilted_z = bucket_local_y * sin(bucket_tilt) + bucket_local_z * cos(bucket_tilt),
@@ -2262,16 +2265,8 @@ module bucket() {
     bucket_side_plate(is_left=true);
     bucket_side_plate(is_left=false);
     
-    // Cylinder Lugs (Moved from QA plate)
-    for (side = [-1, 1]) {
-        x = side * BUCKET_CYL_X_SPACING;
-        y = BUCKET_CYL_MOUNT_Y_OFFSET; 
-        z = BUCKET_CYL_MOUNT_Z_OFFSET; 
-        
-        translate([x, y, z])
-        rotate([90, 0, 0])
-        u_channel_lug_with_pin(TUBE_3X3_1_4, 80, BOLT_DIA_3_4 + 2);
-    }
+    // Cylinder Lugs are now handled in bucket_attachment() to ensure correct alignment with arm
+    // See bucket_attachment() module for lug placement.
     
     // Cutting edge
     color("DarkSlateGray")
@@ -2312,16 +2307,18 @@ module bucket_attachment() {
             rotate([BUCKET_TILT_ANGLE, 0, 0]) {
                 // New Attachment: U-Channel Lugs bolted to bucket
                 // Lugs are positioned at arm spacing
+                // Lug Z position must match the kinematic calculation (BUCKET_CYL_MOUNT_Z_OFFSET relative to bucket top/pivot)
+                _lug_z_pos = BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM);
                 for (x_offset = [-ARM_SPACING/2, ARM_SPACING/2]) {
-                    translate([x_offset, 0, 0])
-                    rotate([90, 0, 0]) // Rotate so base faces +Y (Bucket Back)
-                    u_channel_lug_with_pin(TUBE_3X3_1_4, 100, PIVOT_PIN_DIA + 2);
+                    translate([x_offset, 0, _lug_z_pos])
+                    rotate([-90, 0, 0]) // Rotate so base faces +Y (Bucket Back), Legs face -Y (Backwards)
+                    u_channel_lug_with_pin(TUBE_3X3_1_4, 100, BUCKET_PIVOT_PIN_DIA + 2);
                 }
 
                 // Bucket
-                // Shift bucket Y to match lug height (38.1mm) so back plate touches lugs
+                // Shift bucket Y to match lug height so back plate touches lugs
                 // Keep Z offset to maintain pivot height relative to bucket
-                translate([0, TUBE_3X3_1_4[0]/2, BUCKET_HEIGHT - 100])  
+                translate([0, BUCKET_LUG_OFFSET, BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM])  
                 bucket();
             }
         }
@@ -2378,8 +2375,8 @@ module bucket_cylinders() {
         arm_attach_local = [0, CROSS_BEAM_1_POS, CROSS_BEAM_MOUNT_Z_OFFSET];
         
         // Cylinder rod end on bucket (bucket local coordinates, before tilt)
-        // Must match the translation in bucket_attachment: translate([0, 38.1, BUCKET_HEIGHT - 100])
-        bucket_attach_local = [0, BUCKET_CYL_MOUNT_Y_OFFSET + 38.1, BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - 100)];
+        // Must match the translation in bucket_attachment
+        bucket_attach_local = [0, 0, BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM)];
         
         // Calculate actual extension based on current arm angle and bucket tilt
         current_bucket_cyl_length = bucket_cyl_length(ARM_LIFT_ANGLE, BUCKET_TILT_ANGLE);

@@ -19,8 +19,8 @@ module arm_plate(is_inner_plate=false) {
     corner_rad = 25.4; // 1 inch radius for corners
     
     // Pivot Point Configuration
-    pivot_dia = 38.1; // 1.5 inch
-    hole_x_offset = drop_ext - 25.4; // 1 inch from front edge
+    pivot_dia = BUCKET_PIVOT_PIN_DIA; // 1 inch
+    hole_x_offset = drop_ext - 30; // 30mm from front edge
 
     // Elbow assembly parameters
     cross_beam_w = 152.4; // 6 inches wide
@@ -109,7 +109,7 @@ module arm_plate(is_inner_plate=false) {
         // 7. Bucket Pivot Hole
         translate([overlap + main_tube_len, 0, tube_h]) 
         rotate([0, 180-elbow_angle, 0]) 
-        translate([drop_len + hole_x_offset, plate_thick/2, -tube_h/2])
+        translate([drop_len + hole_x_offset, plate_thick/2, tube_h - 30])
             rotate([90,0,0]) cylinder(d=pivot_dia, h=plate_thick+2, center=true, $fn=32);
     }
 }
