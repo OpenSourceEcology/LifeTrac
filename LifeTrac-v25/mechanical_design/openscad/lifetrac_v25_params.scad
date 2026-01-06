@@ -255,19 +255,23 @@ BUCKET_CYL_LEN_MIN = BUCKET_CYL_LEN_MIN_DEF;
 // Parametric Cross Beam Position
 // Calculated based on bucket cylinder retracted length to ensure proper geometry
 // We want the cylinder to fit when retracted and bucket is curled back (MAX_CURL)
-BUCKET_CURL_MAX_ANGLE = 45; // Degrees (Positive = Curled Back/Up)
+// USER REQUIREMENT: Curl/Dump angles are relative to GROUND.
+BUCKET_ABS_CURL_ANGLE = 45;  // Curl Angle relative to ground (deg)
+BUCKET_ABS_DUMP_ANGLE = -90; // Dump Angle relative to ground (deg)
+
+// Calculate Relative Curl Angle at Ground Level (Design Condition)
+// At ground level, Arm Angle is ARM_MIN_ANGLE
+// Abs = Arm + Rel => Rel = Abs - Arm
+_bucket_rel_curl_angle = BUCKET_ABS_CURL_ANGLE - ARM_MIN_ANGLE;
 
 // Calculate Lug Position in Arm Frame at Max Curl
 // Lug Local Z relative to Pivot
 _lug_z_local = BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM);
 
-// Rotate Lug by Max Curl Angle (relative to Arm)
-// Note: ARM_TIP_X corresponds to Y axis in bucket_cyl_length logic (Longitudinal)
-//       ARM_TIP_Z corresponds to Z axis (Vertical)
-// Rotation: Y' = Y*cos(a) - Z*sin(a), Z' = Y*sin(a) + Z*cos(a)
+// Rotate Lug by Relative Curl Angle (relative to Arm)
 // Lug Local Y is 0.
-_lug_y_arm = ARM_TIP_X + (0 * cos(BUCKET_CURL_MAX_ANGLE) - _lug_z_local * sin(BUCKET_CURL_MAX_ANGLE));
-_lug_z_arm = ARM_TIP_Z + (0 * sin(BUCKET_CURL_MAX_ANGLE) + _lug_z_local * cos(BUCKET_CURL_MAX_ANGLE));
+_lug_y_arm = ARM_TIP_X + (0 * cos(_bucket_rel_curl_angle) - _lug_z_local * sin(_bucket_rel_curl_angle));
+_lug_z_arm = ARM_TIP_Z + (0 * sin(_bucket_rel_curl_angle) + _lug_z_local * cos(_bucket_rel_curl_angle));
 
 // Solve for Cross Beam Y Position (CROSS_BEAM_1_POS)
 // Distance^2 = (Y_lug - Y_cb)^2 + (Z_lug - Z_cb)^2
@@ -280,25 +284,31 @@ CROSS_BEAM_1_POS = _lug_y_arm - _y_dist;
 // =============================================================================
 // DUMP GEOMETRY VERIFICATION
 // =============================================================================
-// Verify if the cylinder stroke allows for full vertical dump (-90 deg)
-// This feedback is printed to the OpenSCAD console
+// Verify if the cylinder stroke allows for full vertical dump (-90 deg ground) at MAX HEIGHT
 
-_dump_angle_full = -90; // Vertical down
-_dump_angle_partial = -50; 
+// Design Condition for Dump: Max Height (ARM_MAX_ANGLE)
+// Rel = Abs - Arm
+_bucket_rel_dump_angle = BUCKET_ABS_DUMP_ANGLE - ARM_MAX_ANGLE;
 
 // Calculate required cylinder positions for check
-_lug_y_dump = ARM_TIP_X + (0 * cos(_dump_angle_full) - _lug_z_local * sin(_dump_angle_full));
-_lug_z_dump = ARM_TIP_Z + (0 * sin(_dump_angle_full) + _lug_z_local * cos(_dump_angle_full));
+_lug_y_dump = ARM_TIP_X + (0 * cos(_bucket_rel_dump_angle) - _lug_z_local * sin(_bucket_rel_dump_angle));
+_lug_z_dump = ARM_TIP_Z + (0 * sin(_bucket_rel_dump_angle) + _lug_z_local * cos(_bucket_rel_dump_angle));
 _req_len_dump = sqrt(pow(_lug_y_dump - CROSS_BEAM_1_POS, 2) + pow(_lug_z_dump - CROSS_BEAM_MOUNT_Z_OFFSET, 2));
 
 BUCKET_CYL_LEN_MAX = BUCKET_CYL_LEN_MIN + BUCKET_CYLINDER_STROKE;
 
 echo("=== BUCKET GEOMETRY VERIFICATION ===");
-echo("Max Curl Angle (Designing Point):", BUCKET_CURL_MAX_ANGLE);
+echo("Condition: Ground Level (ARM_MIN_ANGLE):", ARM_MIN_ANGLE);
+echo("Target Abs Curl Angle:", BUCKET_ABS_CURL_ANGLE);
+echo("Calculated Rel Curl Angle:", _bucket_rel_curl_angle);
+echo("Condition: Max Height (ARM_MAX_ANGLE):", ARM_MAX_ANGLE);
+echo("Target Abs Dump Angle:", BUCKET_ABS_DUMP_ANGLE);
+echo("Calculated Rel Dump Angle:", _bucket_rel_dump_angle);
+echo("---");
 echo("Resulting Cross Beam Position:", CROSS_BEAM_1_POS);
-echo("Cylinder Retracted Length:", BUCKET_CYL_LEN_MIN);
+echo("Cylinder Retracted Length (Min):", BUCKET_CYL_LEN_MIN);
 echo("Cylinder Extended Length (Max):", BUCKET_CYL_LEN_MAX);
-echo("Required Length for -90 Deg Dump:", _req_len_dump);
+echo("Required Length for Full Dump at Max Height:", _req_len_dump);
 echo("REACHES FULL DUMP?", BUCKET_CYL_LEN_MAX >= _req_len_dump ? "YES" : "NO - INCREASE STROKE");
 
 CROSS_BEAM_2_POS = ARM_LENGTH * 0.95;   // Second cross beam position (near bucket)

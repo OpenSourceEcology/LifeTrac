@@ -217,16 +217,16 @@ BUCKET_DEPTH = 600;
 BUCKET_HEIGHT = 450;
 
 // Bucket tilt angle calculation:
-// When arm is at ARM_LIFT_ANGLE, bucket needs to counter-rotate to stay level
-// At ground position (ARM_LIFT_ANGLE = ARM_MIN_ANGLE), bucket tilts forward to lay flat
-// The bucket bottom is horizontal when bucket tilt = -ARM_MIN_ANGLE (compensates for arm angle)
-BUCKET_GROUND_TILT = -ARM_MIN_ANGLE;  // Tilt needed to make bottom flat when arm at ground
-BUCKET_MAX_CURL = 60;  // Maximum curl angle when fully raised
+// ANIMATION: Sweep from Max Curl (at bottom) to Max Dump (at top)
+// We calculate the Target ABSOLUTE angle based on animation phase
+// Then subtract the current Arm Angle to get the Relative Tilt Angle needed for the transform
+_anim_abs_angle = BUCKET_ABS_CURL_ANGLE + (animation_phase * (BUCKET_ABS_DUMP_ANGLE - BUCKET_ABS_CURL_ANGLE));
+BUCKET_TILT_ANGLE = _anim_abs_angle - ARM_LIFT_ANGLE;
 
-// Bucket actuates with the arm using the same animation_phase for looping
-// Starts flat on ground, dumps (tilts down) as arm rises, then returns as arm lowers
-BUCKET_MAX_DUMP = -45; // Maximum dump angle when fully raised
-BUCKET_TILT_ANGLE = BUCKET_GROUND_TILT + (animation_phase * (BUCKET_MAX_DUMP - BUCKET_GROUND_TILT));  // From flat to dumped and back
+// Legacy definitions for reference (unused in animation now)
+BUCKET_GROUND_TILT = -ARM_MIN_ANGLE; 
+BUCKET_MAX_CURL = 60;  
+BUCKET_MAX_DUMP = -45;
 
 // =============================================================================
 // HYDRAULIC CYLINDER MOUNTING POINTS
