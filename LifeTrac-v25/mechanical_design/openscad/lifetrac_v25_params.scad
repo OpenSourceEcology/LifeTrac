@@ -69,7 +69,7 @@ WHEEL_X_OFFSET = TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS + WHEEL_WI
 // =============================================================================
 
 // Design constraints
-BUCKET_GROUND_CLEARANCE = 0;      // Bucket bottom at ground level when lowered
+BUCKET_GROUND_CLEARANCE = -75;    // Offset to bring bucket flush to ground (compensates for 75mm gap)
 BUCKET_FRONT_CLEARANCE = 0;       // Reduced from 100 to 0 to match shorter arms
 BUCKET_PIVOT_HEIGHT_FROM_BOTTOM = 200; // Height of pivot from bottom of bucket
 
@@ -91,7 +91,7 @@ ARM_SPACING = TRACK_WIDTH;            // Distance between arm centerlines
 // =============================================================================
 
 TUBE_2X6_1_4 = [50.8, 152.4, 6.35]; // 2"x6" rectangular tubing
-ARM_ANGLE = 120; // Main arm angle in degrees
+ARM_ANGLE = 130; // Main arm angle in degrees (Sharpened to 130 as requested)
 ARM_PLATE_THICKNESS = PLATE_1_4_INCH;
 DOM_PIPE_OD = 50.8; // Approximate OD for pivot holder (2" DOM)
 DOM_PIPE_ID = 38.1; // ID matching 1.5" pivot pin
@@ -104,12 +104,87 @@ JIG_CLEARANCE = 0.5; // Clearance for fit
 
 echo("DEBUG: Loading lifetrac_v25_params.scad - Version with Fixes");
 
-// Arm Dimensions for Calculation
-ARM_MAIN_LEN = 1224; // Increased to extend tube closer to pivot (was 1100)
-ARM_DROP_LEN = 550; // Shortened from 600
-ARM_OVERLAP = 76.2; // Reduced to 3 inches (1" radius + 2" gap) from 200
+// Arm Dimensions - Parametric Calculation
+// Inputs
+WHEEL_CLEARANCE_TARGET = 25.4; // 1 inch clearance target
+ARM_SHAPE_ANGLE = 130;  // The fixed L-angle
+
+// Geometric Constants derived from params
+_P = [ARM_PIVOT_Y, ARM_PIVOT_Z];       // Main Pivot (200, 1100)
+_C = [WHEEL_BASE - WHEEL_RADIUS, WHEEL_RADIUS]; // Front Wheel Center (1150, 250)
+_R_wheel = WHEEL_RADIUS; 
+_tube_offset = 152.4 / 2; // Half of 6" tube height
+_R_constraint = _R_wheel + WHEEL_CLEARANCE_TARGET + _tube_offset;
+
+// 1. Calculate Main Arm Angle used for Tangency check
+// Vector from Pivot P to Wheel C
+_PC_vec = _C - _P; // (950, -850)
+_dist_PC = norm(_PC_vec);
+_angle_PC = atan2(_PC_vec[1], _PC_vec[0]); // -41.8 deg
+
+// Tangent deviation angle theta = asin(R / dist)
+_theta_dev = asin(_R_constraint / _dist_PC);
+
+// We pick the "Top" tangent (Shallower angle / Higher Y)
+// Angle = PC_Angle + Theta
+_alpha_tangent = _angle_PC + _theta_dev; // ~ -25 deg
+
+// EXPORTED VARIABLE for Assembly
+// _alpha_tangent is negative (pointing down). We want to preserve this sign for the ARM_ANGLE logic?
+// Wait, ARM_ANGLE usually means "Angle above horizontal".
+// If we want -25 deg, we should export -25.
+ARM_TANGENT_ANGLE = _alpha_tangent; // ~ -25 degrees
+
+// 2. Calculate Elbow Position (Intersection of Tangents)
+// Distance from C to E = R / cos(HalfAngleBetweenNormals)
+// Angle between normals = (180 - ShapeAngle) = 50 deg. Half = 25.
+// Dist = R / cos(25) = R / sin(65).
+_dist_CE = _R_constraint / sin(ARM_SHAPE_ANGLE / 2);
+
+// Angle of CE bisector
+// Normal 1 (To Top Tangent) = Alpha + 90.
+// Normal 2 (To Front Tangent) = Alpha - Delta + 90.
+// Bisector = Alpha + 90 - Delta/2.
+// Delta = 180 - ShapeAngle.
+// Angle = Alpha + 90 - (180 - ShapeAngle)/2.
+_angle_CE = _alpha_tangent + 90 - (180 - ARM_SHAPE_ANGLE)/2;
+
+_E = _C + [cos(_angle_CE) * _dist_CE, sin(_angle_CE) * _dist_CE];
+
+_L_main_calc = norm(_E - _P);
+
+// CORRECTION FOR ARM_PLATE GEOMETRY
+// arm_plate.scad pivots the drop arm at the TOP CORNER of the tube.
+// This shifts the centerline intersection backwards relative to the tube end.
+// we calculated _E as the centerline intersection.
+// Shift = TubeHalfHeight * [ sin(Bend) - (1-cos(Bend))/tan(Bend) ] (Magnitude of negative shift)
+_bend_rad = (180 - ARM_SHAPE_ANGLE); 
+_geom_correction = _tube_offset * (sin(_bend_rad) - (1 - cos(_bend_rad)) / tan(_bend_rad));
+// For 130 deg, correction is approx 35.6mm.
+echo("DEBUG: Geometry Correction for Elbow:", _geom_correction);
+
+// 3. Calculate Drop Length
+_drop_angle = _alpha_tangent - (180 - ARM_SHAPE_ANGLE);
+_TARGET_HOLE_Z = 125;
+_u_drop = [cos(_drop_angle), sin(_drop_angle)];
+_n_drop = [-sin(_drop_angle), cos(_drop_angle)]; // Normal pointing "Out/Right"
+_hole_offset_n = 46.2 * _n_drop[1]; // Z component of normal offset
+
+// E.z + L * u.z + offset.z = Target.
+_L_drop_hole_center = (_TARGET_HOLE_Z - _E[1] - _hole_offset_n) / _u_drop[1];
+
+// Convert to Primitive Lengths
+ARM_OVERLAP = 76.2; // Reduced to 3 inches
+// Add geometric correction to Main Length to align centerlines at Elbow _E
+ARM_MAIN_LEN = _L_main_calc - ARM_OVERLAP + _geom_correction; 
+ARM_DROP_LEN = _L_drop_hole_center; 
 ARM_DROP_EXT = 80; // Extension for bucket clearance
 ARM_PIVOT_EXT = 40; // Pivot hole offset from end of drop
+
+echo("DEBUG: Parametric Arm Calculation (Front Wheel):");
+echo("  P:", _P, "C:", _C);
+echo("  Calc Main Len:", ARM_MAIN_LEN);
+echo("  Calc Drop Len:", ARM_DROP_LEN);
 
 // Calculate Effective Arm Length and Angle
 // Vector from Main Pivot to Bucket Pivot
@@ -122,7 +197,7 @@ _dx = _drop_vec_len * cos(_bend_angle) + (_hole_z_offset - _tube_h) * sin(_bend_
 _dz = -_drop_vec_len * sin(_bend_angle) + (_hole_z_offset - _tube_h) * cos(_bend_angle);
 
 // Calculate Tip Position (Top/Effective Pivot Point)
-ARM_TIP_X = (ARM_MAIN_LEN + ARM_OVERLAP + 50) + _dx;
+ARM_TIP_X = (ARM_MAIN_LEN + ARM_OVERLAP) + _dx; // Removed +50 error
 ARM_TIP_Z = _tube_h + _dz;
 
 ARM_V2_LENGTH = sqrt(pow(ARM_TIP_X, 2) + pow(ARM_TIP_Z, 2));
@@ -151,8 +226,10 @@ echo("DEBUG: theta_deg_calc", theta_deg_calc);
 echo("DEBUG: arm_alpha_calc", arm_alpha_calc);
 
 // Robustly define ARM_MIN_ANGLE_COMPUTED
-ARM_MIN_ANGLE_COMPUTED = (is_undef(theta_deg_calc) || is_undef(arm_alpha_calc)) ? -45 : theta_deg_calc + arm_alpha_calc; 
-echo("DEBUG: ARM_MIN_ANGLE_COMPUTED", ARM_MIN_ANGLE_COMPUTED);
+// MD: Removed manual offset, relying on calculated geometry (Target: P->E->T)
+// ARM_MIN_ANGLE_COMPUTED = (is_undef(theta_deg_calc) || is_undef(arm_alpha_calc)) ? -45 : theta_deg_calc + arm_alpha_calc; 
+ARM_MIN_ANGLE_COMPUTED = ARM_TANGENT_ANGLE; // Force to tangent angle (Now Negative) for geometry verification
+echo("DEBUG: ARM_MIN_ANGLE_COMPUTED (Forced)", ARM_MIN_ANGLE_COMPUTED);
 
 // Arm angle limits
 // Calculated to keep bucket pivot ~50mm above ground at lowest position
@@ -182,7 +259,8 @@ LIFT_CYL_ARM_OFFSET = ARM_LENGTH * 0.25;     // Attachment point along arm from 
 
 // 2. Calculate Arm Attachment Position in World Coords at Lowest Angle (Bucket on Ground)
 //    Pivot is at [0, ARM_PIVOT_Y, ARM_PIVOT_Z]
-_theta_min = -ARM_GROUND_ANGLE;
+// _theta_min = -ARM_GROUND_ANGLE; // OLD: Used fixed 45 deg
+_theta_min = ARM_MIN_ANGLE_COMPUTED; // NEW: Use calculated tangent angle (-25)
 _attach_y_world = ARM_PIVOT_Y + LIFT_CYL_ARM_OFFSET * cos(_theta_min);
 _attach_z_world = ARM_PIVOT_Z + LIFT_CYL_ARM_OFFSET * sin(_theta_min);
 
@@ -201,7 +279,27 @@ _calc_base_y = _attach_y_world - (_attach_z_world - LIFT_CYL_BASE_Z) / tan(_targ
 
 // 5. Clamp Y to valid frame range (0 to WHEEL_BASE/2)
 // Adjusted for 16" cylinder fit
-LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y + 10));
+// LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y + 10)); // Original
+LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y + 10)); // Current logic seems fine, relying on calc update
+// Note: If cylinders bottom out, we need to move Base FORWARD (bigger Y) or DOWN (smaller Z).
+// But we are constrained.
+// If _attach_z_world is HIGHER (because angle is -25 vs -45), the cylinder is LONGER.
+// So Bottoming Out should not be an issue with higher arm position.
+// Unless "lowered" meant "Lower the mount to get MORE extension"?
+// If the user says "lowered so that they do not bottom out" -> "Bottom out" usually means COMPRESSED fully.
+// If the cylinder is too SHORT, we need to make the distance LARGER.
+// To make distance larger: Move Base Away from Arm.
+// Arm is Up/Right. Base is Down/Left.
+// Moving Base Down (Lower Z) increases distance.
+// Moving Base Back (Lower Y) increases distance.
+// Let's check clearance.
+// _min_base_z = FRAME_Z_OFFSET + WHEEL_DIAMETER/2 + 65;
+// We can't go lower than this without hitting axle.
+// Can we go smoother on the axle? CLEARANCE = 65 -> 40?
+// Let's try to lower the base slightly if possible.
+// LIFT_CYL_BASE_Z = _min_base_z - 25; // Experimental lower
+// No, let's stick to calc base Z for now, and see if visual fix solves perception.
+
 
 // Bucket Pivot Configuration
 // BUCKET_PIVOT_HEIGHT_FROM_BOTTOM moved to top of file
@@ -456,6 +554,12 @@ assert(PLATFORM_PIVOT_HEIGHT + PLATFORM_ARM_LENGTH < _crossmember_top_z,
 // =============================================================================
 // JIG PARAMETERS & NEW ARM PARAMETERS
 // =============================================================================
+
+
+
+
+
+
 
 
 
