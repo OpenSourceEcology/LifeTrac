@@ -41,12 +41,19 @@ module arm_plate(is_inner_plate=false) {
                 cube([drop_len, plate_thick, tube_h]); 
                 // Extension for pivot to clear bucket
                 translate([drop_len, 0, 0]) {
-                    hull() {
-                        cube([0.1, plate_thick, tube_h]);
-                        translate([drop_ext - corner_rad, 0, tube_h - corner_rad])
-                            rotate([-90, 0, 0]) cylinder(r=corner_rad, h=plate_thick);
-                        translate([drop_ext - corner_rad, 0, corner_rad])
-                            rotate([-90, 0, 0]) cylinder(r=corner_rad, h=plate_thick);
+                    difference() {
+                        hull() {
+                            cube([0.1, plate_thick, tube_h]);
+                            translate([drop_ext - corner_rad, 0, tube_h - corner_rad])
+                                rotate([-90, 0, 0]) cylinder(r=corner_rad, h=plate_thick);
+                            translate([drop_ext - corner_rad, 0, corner_rad])
+                                rotate([-90, 0, 0]) cylinder(r=corner_rad, h=plate_thick);
+                        }
+                        // Triangular cut on bottom inside corner (tip taper)
+                        translate([0, -1, 0]) // Position in Y (Thickness)
+                        rotate([-90, 0, 0]) // Rotate to cut profile (X-Z plane)
+                        linear_extrude(height=plate_thick+2)
+                        polygon([[drop_ext+1, 1], [drop_ext-(tube_h/2), 1], [drop_ext+1, -(tube_h/2)]]);
                     }
                 }
             }
