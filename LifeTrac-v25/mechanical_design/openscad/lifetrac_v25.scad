@@ -2306,14 +2306,22 @@ module bucket_attachment() {
         {
             // Bucket rotates about this pivot
             rotate([BUCKET_TILT_ANGLE, 0, 0]) {
-                // New Attachment: U-Channel Lugs bolted to bucket
-                // Lugs are positioned at arm spacing
-                // Lug Z position must match the kinematic calculation (BUCKET_CYL_MOUNT_Z_OFFSET relative to bucket top/pivot)
-                _lug_z_pos = BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM);
+                // Pivot Lugs: U-Channel brackets bolted to bucket back plate
+                // Positioned at arm spacing and centered on bucket pivot height
+                _pivot_lug_z = 0;
                 for (x_offset = [-ARM_SPACING/2, ARM_SPACING/2]) {
-                    translate([x_offset, 0, _lug_z_pos])
-                    rotate([-90, 0, 0]) // Rotate so base faces +Y (Bucket Back), Legs face -Y (Backwards)
+                    translate([x_offset, 0, _pivot_lug_z])
+                    rotate([90, 0, 0]) // Flip front-to-back: base faces -Y (Bucket Back), legs face +Y
                     u_channel_lug_with_pin(TUBE_3X3_1_4, 100, BUCKET_PIVOT_PIN_DIA + 2);
+                }
+
+                // Cylinder Lugs: U-Channel brackets for bucket tilt cylinder clevis
+                // Positioned at cylinder spacing and mount height
+                _cyl_lug_z = BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM);
+                for (x_offset = [-BUCKET_CYL_X_SPACING, BUCKET_CYL_X_SPACING]) {
+                    translate([x_offset, 0, _cyl_lug_z])
+                    rotate([90, 0, 0]) // Match pivot lug orientation
+                    u_channel_lug_with_pin(TUBE_3X3_1_4, 100, BOLT_DIA_3_4 + 2);
                 }
 
                 // Bucket
