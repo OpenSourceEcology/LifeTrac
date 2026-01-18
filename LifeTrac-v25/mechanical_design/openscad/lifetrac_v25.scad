@@ -114,8 +114,7 @@ ENGINE_POS_Z = FRAME_Z_OFFSET + 200; // Height above frame bottom
 // =============================================================================
 
 // Design constraints
-BUCKET_GROUND_CLEARANCE = 0;      // Bucket bottom at ground level when lowered
-BUCKET_FRONT_CLEARANCE = 100;     // 100mm (~4") clearance between bucket back and front of machine
+// BUCKET_GROUND_CLEARANCE and BUCKET_FRONT_CLEARANCE are defined in lifetrac_v25_params.scad
 
 // Arm pivot point (at top rear of side panels - tall end)
 // ARM_PIVOT_Y, ARM_PIVOT_Z defined in lifetrac_v25_params.scad
@@ -2307,8 +2306,8 @@ module bucket_attachment() {
             // Bucket rotates about this pivot
             rotate([BUCKET_TILT_ANGLE, 0, 0]) {
                 // Pivot Lugs: U-Channel brackets bolted to bucket back plate
-                // Positioned at arm spacing and centered on bucket pivot height
-                _pivot_lug_z = 0;
+                // Center the lower lug pair at 1/5 the bucket back plate height
+                _pivot_lug_z = (BUCKET_HEIGHT / 5) - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM;
                 for (x_offset = [-ARM_SPACING/2, ARM_SPACING/2]) {
                     translate([x_offset, 0, _pivot_lug_z])
                     rotate([90, 0, 0]) // Flip front-to-back: base faces -Y (Bucket Back), legs face +Y
@@ -2316,7 +2315,7 @@ module bucket_attachment() {
                 }
 
                 // Cylinder Lugs: U-Channel brackets for bucket tilt cylinder clevis
-                // Positioned at cylinder spacing and mount height
+                // Positioned by kinematics (desired rotation and cylinder range)
                 _cyl_lug_z = BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM);
                 for (x_offset = [-BUCKET_CYL_X_SPACING, BUCKET_CYL_X_SPACING]) {
                     translate([x_offset, 0, _cyl_lug_z])
@@ -2327,7 +2326,7 @@ module bucket_attachment() {
                 // Bucket
                 // Shift bucket Y to match lug height so back plate touches lugs
                 // Keep Z offset to maintain pivot height relative to bucket
-                translate([0, BUCKET_LUG_OFFSET, BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM])  
+                translate([0, BUCKET_LUG_OFFSET, BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM + BUCKET_BODY_Z_OFFSET])  
                 bucket();
             }
         }

@@ -69,9 +69,14 @@ WHEEL_X_OFFSET = TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS + WHEEL_WI
 // =============================================================================
 
 // Design constraints
-BUCKET_GROUND_CLEARANCE = -75;    // Offset to bring bucket flush to ground (compensates for 75mm gap)
-BUCKET_FRONT_CLEARANCE = 0;       // Reduced from 100 to 0 to match shorter arms
-BUCKET_PIVOT_HEIGHT_FROM_BOTTOM = 200; // Height of pivot from bottom of bucket
+BUCKET_GROUND_CLEARANCE = -42; // Bucket bottom lowered 42mm to sit at ground level
+BUCKET_FRONT_CLEARANCE_BASE = 0; // Base forward clearance (mm)
+BUCKET_FRONT_CLEARANCE_ADJUST = 1.5 * 25.4; // Forward tweak (+) in mm
+BUCKET_FRONT_CLEARANCE = BUCKET_FRONT_CLEARANCE_BASE + BUCKET_FRONT_CLEARANCE_ADJUST;
+
+BUCKET_PIVOT_HEIGHT_BASE = 200; // Nominal height of pivot from bottom of bucket
+BUCKET_PIVOT_HEIGHT_ADJUST = -5 * 25.4; // Lower lug (~5")
+BUCKET_PIVOT_HEIGHT_FROM_BOTTOM = BUCKET_PIVOT_HEIGHT_BASE + BUCKET_PIVOT_HEIGHT_ADJUST;
 
 // Arm pivot point (at top rear of side panels - tall end)
 ARM_PIVOT_Y = 200;  // Near rear of machine, between sandwich plates  
@@ -180,6 +185,9 @@ ARM_MAIN_LEN = _L_main_calc - ARM_OVERLAP + _geom_correction;
 ARM_DROP_LEN = _L_drop_hole_center; 
 ARM_DROP_EXT = 80; // Extension for bucket clearance
 ARM_PIVOT_EXT = 40; // Pivot hole offset from end of drop
+PIVOT_HOLE_EDGE_OFFSET = 1.5 * 25.4; // 1.5" from front/bottom edges
+PIVOT_HOLE_X_FROM_FRONT = PIVOT_HOLE_EDGE_OFFSET;
+PIVOT_HOLE_Z_FROM_BOTTOM = PIVOT_HOLE_EDGE_OFFSET;
 
 echo("DEBUG: Parametric Arm Calculation (Front Wheel):");
 echo("  P:", _P, "C:", _C);
@@ -189,9 +197,9 @@ echo("  Calc Drop Len:", ARM_DROP_LEN);
 // Calculate Effective Arm Length and Angle
 // Vector from Main Pivot to Bucket Pivot
 _bend_angle = 180 - ARM_ANGLE;
-_drop_vec_len = ARM_DROP_LEN + ARM_DROP_EXT - 30; // Hole X position (30mm from edge)
+_drop_vec_len = ARM_DROP_LEN + ARM_DROP_EXT - PIVOT_HOLE_X_FROM_FRONT; // Hole X position (from front edge)
 _tube_h = TUBE_2X6_1_4[1];
-_hole_z_offset = _tube_h - 30; // Hole Z position (30mm from top edge - corner)
+_hole_z_offset = PIVOT_HOLE_Z_FROM_BOTTOM; // Hole Z position (from bottom edge)
 
 _dx = _drop_vec_len * cos(_bend_angle) + (_hole_z_offset - _tube_h) * sin(_bend_angle);
 _dz = -_drop_vec_len * sin(_bend_angle) + (_hole_z_offset - _tube_h) * cos(_bend_angle);
@@ -225,11 +233,9 @@ theta_deg_calc = _theta_rad;
 echo("DEBUG: theta_deg_calc", theta_deg_calc);
 echo("DEBUG: arm_alpha_calc", arm_alpha_calc);
 
-// Robustly define ARM_MIN_ANGLE_COMPUTED
-// MD: Removed manual offset, relying on calculated geometry (Target: P->E->T)
-// ARM_MIN_ANGLE_COMPUTED = (is_undef(theta_deg_calc) || is_undef(arm_alpha_calc)) ? -45 : theta_deg_calc + arm_alpha_calc; 
-ARM_MIN_ANGLE_COMPUTED = ARM_TANGENT_ANGLE; // Force to tangent angle (Now Negative) for geometry verification
-echo("DEBUG: ARM_MIN_ANGLE_COMPUTED (Forced)", ARM_MIN_ANGLE_COMPUTED);
+// Robustly define ARM_MIN_ANGLE_COMPUTED (forces bucket bottom to ground when BUCKET_GROUND_CLEARANCE = 0)
+ARM_MIN_ANGLE_COMPUTED = (is_undef(theta_deg_calc) || is_undef(arm_alpha_calc)) ? -45 : theta_deg_calc + arm_alpha_calc;
+echo("DEBUG: ARM_MIN_ANGLE_COMPUTED", ARM_MIN_ANGLE_COMPUTED);
 
 // Arm angle limits
 // Calculated to keep bucket pivot ~50mm above ground at lowest position
@@ -304,6 +310,7 @@ LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y + 10)); // Current logi
 // Bucket Pivot Configuration
 // BUCKET_PIVOT_HEIGHT_FROM_BOTTOM moved to top of file
 BUCKET_LUG_OFFSET = TUBE_3X3_1_4[0]/2 - TUBE_3X3_1_4[1]/2; // Offset for lug thickness (approx 35mm)
+BUCKET_BODY_Z_OFFSET = 0; // Keep bucket body aligned to pivot; use BUCKET_GROUND_CLEARANCE to set ground contact
 
 // Bucket Cylinder Mount Parameters
 BUCKET_CYL_MOUNT_SIZE = TUBE_3X3_1_4[0]; // 3" (76.2mm)

@@ -17,10 +17,14 @@ module arm_plate(is_inner_plate=false) {
     elbow_angle = ARM_ANGLE; 
     drop_ext = ARM_DROP_EXT;
     corner_rad = 25.4; // 1 inch radius for corners
+    pivot_circle_r = BUCKET_PIVOT_PIN_DIA; // 2x pivot pin radius
+    triangle_leg = tube_h / 2; // Triangle leg length (half the arm tip height)
+    triangle_corner_x = triangle_leg; // Shift toward tip by one leg length
+    triangle_corner_z = 0;            // Bottom corner of tip (local to extension)
     
     // Pivot Point Configuration
     pivot_dia = BUCKET_PIVOT_PIN_DIA; // 1 inch
-    hole_x_offset = drop_ext - 30; // 30mm from front edge
+    hole_x_offset = drop_ext - PIVOT_HOLE_X_FROM_FRONT; // 1.5" from front edge
 
     // Elbow assembly parameters
     cross_beam_w = 152.4; // 6 inches wide
@@ -42,18 +46,22 @@ module arm_plate(is_inner_plate=false) {
                 // Extension for pivot to clear bucket
                 translate([drop_len, 0, 0]) {
                     difference() {
-                        hull() {
-                            cube([0.1, plate_thick, tube_h]);
-                            translate([drop_ext - corner_rad, 0, tube_h - corner_rad])
-                                rotate([-90, 0, 0]) cylinder(r=corner_rad, h=plate_thick);
-                            translate([drop_ext - corner_rad, 0, corner_rad])
-                                rotate([-90, 0, 0]) cylinder(r=corner_rad, h=plate_thick);
+                        union() {
+                            // Square extension (no rounding on the front/top tip corner)
+                            cube([drop_ext, plate_thick, tube_h]);
+                            // Add pivot circle shifted one radius out and one diameter backward
+                            translate([drop_ext - pivot_circle_r, 0, tube_h])
+                                rotate([-90, 0, 0]) cylinder(r=pivot_circle_r, h=plate_thick);
                         }
-                        // Triangular cut on bottom inside corner (tip taper)
-                        translate([0, -1, 0]) // Position in Y (Thickness)
+                        // Triangular cut on bottom inside corner (back corner taper)
+                        // Expanded by 2mm to ensure clean corner cut
+                        translate([drop_ext, -1, 0]) // Position at Tip
                         rotate([-90, 0, 0]) // Rotate to cut profile (X-Z plane)
                         linear_extrude(height=plate_thick+2)
-                        polygon([[drop_ext+1, 1], [drop_ext-(tube_h/2), 1], [drop_ext+1, -(tube_h/2)]]);
+                        polygon([[2, 2], [-triangle_leg, 2], [2, -triangle_leg]]);
+                        // Pivot hole at circle center
+                        translate([drop_ext - pivot_circle_r, -1, tube_h])
+                            rotate([-90, 0, 0]) cylinder(d=pivot_dia, h=plate_thick+2, $fn=32);
                     }
                 }
             }
@@ -116,7 +124,7 @@ module arm_plate(is_inner_plate=false) {
         // 7. Bucket Pivot Hole
         translate([overlap + main_tube_len, 0, tube_h]) 
         rotate([0, 180-elbow_angle, 0]) 
-        translate([drop_len + hole_x_offset, plate_thick/2, tube_h - 30])
+        translate([drop_len + hole_x_offset, plate_thick/2, PIVOT_HOLE_Z_FROM_BOTTOM])
             rotate([90,0,0]) cylinder(d=pivot_dia, h=plate_thick+2, center=true, $fn=32);
     }
 }
