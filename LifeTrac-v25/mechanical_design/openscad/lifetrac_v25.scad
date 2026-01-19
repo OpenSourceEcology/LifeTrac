@@ -2306,10 +2306,11 @@ module bucket_attachment() {
             // Bucket rotates about this pivot
             rotate([BUCKET_TILT_ANGLE, 0, 0]) {
                 // Pivot Lugs: U-Channel brackets bolted to bucket back plate
-                // Center the lower lug pair at 1/5 the bucket back plate height
-                _pivot_lug_z = (BUCKET_HEIGHT / 5) - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM;
+                // The Pivot Lug Hole must be at (0,0,0) of this group (which is the Arm Tip/Pivot).
+                // The Bucket is shifted relative to this pivot.
+                
                 for (x_offset = [-ARM_SPACING/2, ARM_SPACING/2]) {
-                    translate([x_offset, 0, _pivot_lug_z])
+                    translate([x_offset, 0, 0]) // Zero Z offset - Hole at Pivot
                     rotate([90, 0, 0]) // Flip front-to-back: base faces -Y (Bucket Back), legs face +Y
                     u_channel_lug_with_pin(TUBE_3X3_1_4, 100, BUCKET_PIVOT_PIN_DIA + 2);
                 }
@@ -2326,7 +2327,8 @@ module bucket_attachment() {
                 // Bucket
                 // Shift bucket Y to match lug height so back plate touches lugs
                 // Keep Z offset to maintain pivot height relative to bucket
-                translate([0, BUCKET_LUG_OFFSET, BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM + BUCKET_BODY_Z_OFFSET])  
+                // Added BUCKET_VISUAL_Z_OFFSET for fine tuning
+                translate([0, BUCKET_LUG_OFFSET, BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM + BUCKET_BODY_Z_OFFSET + BUCKET_VISUAL_Z_OFFSET])  
                 bucket();
             }
         }

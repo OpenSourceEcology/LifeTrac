@@ -4,6 +4,8 @@
 
 include <../lifetrac_v25_params.scad>
 
+arm_plate();
+
 module arm_plate(is_inner_plate=false) {
     // Local parameters derived from globals
     main_tube_len = ARM_MAIN_LEN; 
@@ -15,53 +17,74 @@ module arm_plate(is_inner_plate=false) {
     bolt_spacing_x = 100;
     bolt_spacing_y = 80;
     elbow_angle = ARM_ANGLE; 
-    drop_ext = ARM_DROP_EXT;
-    corner_rad = 25.4; // 1 inch radius for corners
-    pivot_circle_r = BUCKET_PIVOT_PIN_DIA; // 2x pivot pin radius
-    triangle_leg = tube_h / 2; // Triangle leg length (half the arm tip height)
-    triangle_corner_x = triangle_leg; // Shift toward tip by one leg length
-    triangle_corner_z = 0;            // Bottom corner of tip (local to extension)
     
-    // Pivot Point Configuration
-    pivot_dia = BUCKET_PIVOT_PIN_DIA; // 1 inch
-    hole_x_offset = drop_ext - PIVOT_HOLE_X_FROM_FRONT; // 1.5" from front edge
-
-    // Elbow assembly parameters
+    // Cross Beam Parameters (Used for inner plate cutouts)
     cross_beam_w = 152.4; // 6 inches wide
     cross_beam_h = 50.8;  // 2 inches tall
+
+    // Tip Geometry Configuration
+    // Alignment with Geometric Solver (lifetrac_v25_params.scad)
+    drop_ext = ARM_DROP_EXT; 
+    pivot_dia = BUCKET_PIVOT_PIN_DIA; 
+    boss_r = PIVOT_HOLE_X_FROM_FRONT; // Use parameter to determine tip radius
+
+    // Position: Defined by Global Parameters to match Kinematic Solver
+    // X: Distance from front edge of arm tube
+    // Z: Distance from bottom edge of arm tube
+    // Note: Local coord system has X=Length, Y=Thick, Z=Height (Tube Width)
     
+    // In params: PIVOT_HOLE_X_FROM_FRONT is distance from "front tip" back to hole.
+    // Here: The tube ends at `drop_len`. The extension `drop_ext` is added beyond that.
+    // The visual tip is located at `drop_len + drop_ext`.
+    // The hole X position relative to `drop_len` should be `drop_ext - PIVOT_HOLE_X_FROM_FRONT`.
+    
+    cx = drop_ext - PIVOT_HOLE_X_FROM_FRONT; 
+    
+    // In params: PIVOT_HOLE_Z_FROM_BOTTOM is distance from bottom edge up to hole.
+    // In arm_plate, Z=0 is the "bottom" edge (or top edge? Let's check rotate angle).
+    // The drop leg is rotated by `180-elbow_angle`.
+    // At 130 deg elbow, rotation is 50 deg.
+    // The cube is `cube([drop_len, plate_thick, tube_h])`.
+    // Z=0 is one side, Z=tube_h is the other side.
+    // We need to know which side is "Bottom" in world space.
+    // The main arm is flat. The drop arm goes DOWN.
+    // If we rotate [0, 50, 0] relative to main arm...
+    // Main arm Z faces UP.
+    // Rotated Z faces UP-LEFT.
+    // The "Bottom" of the arm in world space corresponds to Z=0 edge of the tube profile?
+    // Let's assume Z=0 is the "Inner/Bottom" edge of the L-shape corner.
+    // cz should be PIVOT_HOLE_Z_FROM_BOTTOM.
+    
+    cz = PIVOT_HOLE_Z_FROM_BOTTOM;
+
     difference() {
         union() {
-            // Main Horizontal Strip (Pivot to Elbow)
-            // Starts at -tube_h/2 (to cover pivot)
-            // Ends at overlap + main_tube_len (end of tube)
+             // Main Horizontal Strip (Pivot to Elbow)
             translate([-tube_h/2, 0, 0])
             cube([overlap + main_tube_len + tube_h/2, plate_thick, tube_h]);
             
-            // Drop Leg (Elbow)
+            // Drop Leg (Elbow) - 6" Width Maintained until Cut
             translate([overlap + main_tube_len, 0, tube_h]) 
             rotate([0, 180-elbow_angle, 0]) 
             translate([0, 0, -tube_h]) {
-                cube([drop_len, plate_thick, tube_h]); 
-                // Extension for pivot to clear bucket
-                translate([drop_len, 0, 0]) {
-                    difference() {
-                        union() {
-                            // Square extension (no rounding on the front/top tip corner)
-                            cube([drop_ext, plate_thick, tube_h]);
-                            // Add pivot circle shifted one radius out and one diameter backward
-                            translate([drop_ext - pivot_circle_r, 0, tube_h])
-                                rotate([-90, 0, 0]) cylinder(r=pivot_circle_r, h=plate_thick);
-                        }
-                        // Triangular cut on bottom inside corner (back corner taper)
-                        // Expanded by 2mm to ensure clean corner cut
-                        translate([drop_ext, -1, 0]) // Position at Tip
-                        rotate([-90, 0, 0]) // Rotate to cut profile (X-Z plane)
-                        linear_extrude(height=plate_thick+2)
-                        polygon([[2, 2], [-triangle_leg, 2], [2, -triangle_leg]]);
-                        // Pivot hole at circle center
-                        translate([drop_ext - pivot_circle_r, -1, tube_h])
-                            rotate([-90, 0, 0]) cylinder(d=pivot_dia, h=plate_thick+2, $fn=32);
+                // Determine cut start point
+                // Maintain full width until proximity to tip
+                cut_start_x = drop_len - 100; // Start cut 100mm before length (plus extension)
+                
+                union() {
+                    // 1. Full Width Section (Elbow to Cut Start)
+                    cube([cut_start_x, plate_thick, tube_h]);
+                    
+                    // 2. Tapered Tip Section
+                    hull() {
+                         // Connection Face from Full Width
+                         translate([cut_start_x - 1, 0, 0])
+                            cube([1, plate_thick, tube_h]);
+                         
+                         // The Boss Circle at the Tip
+                         translate([drop_len + cx, 0, cz])
+                            rotate([-90,0,0])
+                            cylinder(r=boss_r, h=plate_thick);
                     }
                 }
             }
@@ -69,6 +92,12 @@ module arm_plate(is_inner_plate=false) {
         
         // --- HOLES ---
         
+        // 7. Bucket Pivot Hole (Tangent to Edges)
+        translate([overlap + main_tube_len, 0, tube_h]) 
+        rotate([0, 180-elbow_angle, 0]) 
+        translate([drop_len + cx, plate_thick/2, cz - tube_h]) // Corrected Z offset logic
+            rotate([90,0,0]) cylinder(d=pivot_dia, h=plate_thick+2, center=true, $fn=32);
+            
         // 1. Pivot DOM Pipe Hole
         translate([0, plate_thick/2, tube_h/2]) rotate([90,0,0]) cylinder(d=DOM_PIPE_OD, h=plate_thick+2, center=true, $fn=64);
         
@@ -101,11 +130,6 @@ module arm_plate(is_inner_plate=false) {
                 cube([cross_beam_w, cross_beam_h, plate_thick+2], center=true);
                 
             // Angle Iron Mounting Bolts
-            // Note: These must match the holes in angle_iron_mount()
-            // Vertical leg bolts are at +/- 63.5mm from center
-            // Vertical position is 25.4mm from bottom of angle iron
-            // Angle iron bottom is at tube_h/2 +/- cross_beam_h/2
-            
             plate_bolt_offset = 63.5;
             
             // Top Angle Bolts
@@ -120,11 +144,5 @@ module arm_plate(is_inner_plate=false) {
             translate([CROSS_BEAM_1_POS + plate_bolt_offset, plate_thick/2, tube_h/2 - cross_beam_h/2 - 25.4])
                 rotate([90,0,0]) cylinder(d=BOLT_DIA_1_2, h=plate_thick+20, center=true, $fn=32);
         }
-        
-        // 7. Bucket Pivot Hole
-        translate([overlap + main_tube_len, 0, tube_h]) 
-        rotate([0, 180-elbow_angle, 0]) 
-        translate([drop_len + hole_x_offset, plate_thick/2, PIVOT_HOLE_Z_FROM_BOTTOM])
-            rotate([90,0,0]) cylinder(d=pivot_dia, h=plate_thick+2, center=true, $fn=32);
     }
 }

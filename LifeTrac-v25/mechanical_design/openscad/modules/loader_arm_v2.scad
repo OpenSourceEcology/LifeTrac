@@ -121,6 +121,62 @@ module loader_arm_v2(angle=0, side="left") {
             }
         }
         
+        // 3. Leg Spacer Tube (2x6 Section)
+        spacer_len = 150;
+        translate([overlap + main_tube_len, 0, tube_h]) 
+        rotate([0, 180-elbow_angle, 0]) 
+        translate([0, 0, -tube_h]) {
+            // Calculated Taper Parameters from arm_plate geometry
+            cx = drop_len - (ARM_DROP_EXT - PIVOT_HOLE_X_FROM_FRONT); // Re-calc logic for local context? 
+            // Better: Just use local variables if available, or re-derive.
+            // arm_plate logic: cx (tip center X local) = drop_len + drop_ext - PIVOT_HOLE_X... - wait
+            // In arm_plate: cx = drop_ext - PIVOT_HOLE_X_FROM_FRONT
+            // Boss X = drop_len + cx.
+            // Boss Z = cz = PIVOT_HOLE_Z_FROM_BOTTOM.
+            
+            _plate_cx = ARM_DROP_EXT - PIVOT_HOLE_X_FROM_FRONT;
+            _boss_x = drop_len + _plate_cx;
+            _boss_z = PIVOT_HOLE_Z_FROM_BOTTOM;
+            _boss_r = PIVOT_HOLE_X_FROM_FRONT;
+            
+            // Define the Tapered Envelope (Matches arm_plate.scad logic)
+            cut_start_x = drop_len - 100;
+            
+            difference() {
+                intersection() {
+                    // The Raw 2x6 Tube Section
+                    translate([0, 0, tube_h])
+                    rotate([0, 90, 0])
+                    linear_extrude(height=spacer_len)
+                    difference() {
+                        offset(r=tube_rad) square([tube_h-tube_rad*2, tube_w-tube_rad*2], center=true);
+                         hull() { // Inner hollow
+                             translate([-tube_h/2+tube_rad, -tube_w/2+tube_rad]) circle(r=tube_rad);
+                             translate([tube_h/2-tube_rad, -tube_w/2+tube_rad]) circle(r=tube_rad);
+                             translate([tube_h/2-tube_rad, tube_w/2-tube_rad]) circle(r=tube_rad);
+                             translate([-tube_h/2+tube_rad, tube_w/2-tube_rad]) circle(r=tube_rad);
+                         }
+                    }
+                    
+                    // The Profile Envelope (Expanded Y to infinite)
+                    union() {
+                        // Full Width Part
+                        cube([cut_start_x, 100+tube_w, tube_h]);
+                        // Taper Part
+                        hull() {
+                            translate([cut_start_x - 1, -50, 0]) cube([1, 100 + tube_w, tube_h]);
+                            translate([_boss_x, -50, _boss_z]) rotate([-90,0,0]) cylinder(r=_boss_r, h=100+tube_w);
+                        }
+                    }
+                }
+                
+                // 4 Bolts for Spacer
+                for (xb = [spacer_len/3, spacer_len*2/3])
+                for (zb = [tube_h*0.3, tube_h*0.7]) // Rough placement within taper
+                    translate([xb, tube_w/2, zb]) rotate([90,0,0]) cylinder(d=BOLT_DIA_1_2, h=tube_w+50, center=true, $fn=32);
+            }
+        }
+        
         // DOM Pipe (Through everything)
         translate([0, tube_w/2, tube_h/2]) rotate([90,0,0]) 
             difference() {
