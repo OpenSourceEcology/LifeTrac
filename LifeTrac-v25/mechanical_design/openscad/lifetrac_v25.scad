@@ -219,10 +219,28 @@ BUCKET_HEIGHT = 450;
 // ANIMATION: Sweep from Max Curl (at bottom) to Max Dump (at top)
 // We calculate the Target ABSOLUTE angle based on animation phase
 // Then subtract the current Arm Angle to get the Relative Tilt Angle needed for the transform
-// MD: Default view ($t=0) overrides to 0 (flat) as per user request.
-// Fixed to force -45 degree dump at full lift
-_anim_abs_angle = ($t == 0) ? 0 : (BUCKET_ABS_CURL_ANGLE + (animation_phase * (-45 - BUCKET_ABS_CURL_ANGLE)));
+// At ground (phase=0): bucket horizontal (absolute = 0)
+// At full lift (phase=1): bucket dumps to -45 degrees below horizontal
+
+// Target absolute bucket angles at each end of animation
+_bucket_abs_at_ground = 0;          // Horizontal when on ground (flat for scooping)
+_bucket_abs_at_raised = -45;        // 45 degrees below horizontal at full lift (dumping)
+
+// Interpolate absolute bucket angle based on animation phase
+_anim_abs_angle = ($t == 0) ? _bucket_abs_at_ground : 
+                  (_bucket_abs_at_ground + (animation_phase * (_bucket_abs_at_raised - _bucket_abs_at_ground)));
+
+// Convert absolute angle to relative tilt (subtract arm rotation)
 BUCKET_TILT_ANGLE = _anim_abs_angle - ARM_LIFT_ANGLE;
+
+// Debug output for animation
+echo("=== BUCKET ANIMATION DEBUG ===");
+echo("$t:", $t);
+echo("animation_phase:", animation_phase);
+echo("ARM_LIFT_ANGLE:", ARM_LIFT_ANGLE);
+echo("_anim_abs_angle (target absolute):", _anim_abs_angle);
+echo("BUCKET_TILT_ANGLE (relative):", BUCKET_TILT_ANGLE);
+echo("Actual absolute bucket angle:", ARM_LIFT_ANGLE + BUCKET_TILT_ANGLE);
 
 // Legacy definitions for reference (unused in animation now)
 BUCKET_GROUND_TILT = -ARM_MIN_ANGLE; 
