@@ -60,11 +60,11 @@ jobs:
           
           # Calculate camera position dynamically based on machine dimensions
           # Extract parameters from OpenSCAD file
-          MACHINE_HEIGHT=$(grep -E "^MACHINE_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "1000")
-          WHEEL_BASE=$(grep -E "^WHEEL_BASE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "1400")
-          GROUND_CLEARANCE=$(grep -E "^GROUND_CLEARANCE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "150")
-          ARM_MAX_ANGLE=$(grep -E "^ARM_MAX_ANGLE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "60")
-          BUCKET_HEIGHT=$(grep -E "^BUCKET_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" || echo "450")
+          MACHINE_HEIGHT=$(grep -E "^MACHINE_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" | head -1 || echo "1000")
+          WHEEL_BASE=$(grep -E "^WHEEL_BASE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" | head -1 || echo "1400")
+          GROUND_CLEARANCE=$(grep -E "^GROUND_CLEARANCE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" | head -1 || echo "150")
+          ARM_MAX_ANGLE=$(grep -E "^ARM_MAX_ANGLE = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" | head -1 || echo "60")
+          BUCKET_HEIGHT=$(grep -E "^BUCKET_HEIGHT = " openscad/lifetrac_v25.scad | grep -oE "[0-9]+\.?[0-9]*" | head -1 || echo "450")
           
           # Validate all extracted parameters
           if [ -z "$MACHINE_HEIGHT" ] || [ -z "$WHEEL_BASE" ] || [ -z "$GROUND_CLEARANCE" ] || [ -z "$ARM_MAX_ANGLE" ] || [ -z "$BUCKET_HEIGHT" ]; then
@@ -179,17 +179,22 @@ jobs:
         run: |
           cd LifeTrac-v25/mechanical_design
           
-          # Render each module's example
-          for module in modules/*.scad; do
-            filename=$(basename "$module" .scad)
-            echo "Rendering $filename examples..."
-            openscad -o "output/renders/${filename}_examples.png" \
-              --camera=500,500,500,0,0,0 \
-              --imgsize=1600,900 \
-              --projection=p \
-              --colorscheme=Nature \
-              "$module"
-          done
+          # Only render module examples if modules directory exists and contains .scad files
+          if [ -d "modules" ] && compgen -G "modules/*.scad" > /dev/null; then
+            # Render each module's example
+            for module in modules/*.scad; do
+              filename=$(basename "$module" .scad)
+              echo "Rendering $filename examples..."
+              openscad -o "output/renders/${filename}_examples.png" \
+                --camera=500,500,500,0,0,0 \
+                --imgsize=1600,900 \
+                --projection=p \
+                --colorscheme=Nature \
+                "$module"
+            done
+          else
+            echo "No module examples to render (modules directory not found or contains no .scad files)"
+          fi
       
 
       - name: Generate summary report
