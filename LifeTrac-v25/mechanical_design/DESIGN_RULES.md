@@ -16,6 +16,7 @@ This document establishes the non-negotiable geometric rules and parametric cons
 *   **Crash Prevention**: The solver must prioritize the Target Point, but validity checks must ensure the arm tip material (steel extending below the pivot) does not crash into the ground before the bucket does.
 
 ## 3. Physical Component Alignment
+*   **Lug Flush Mounting**: The back (base) of any U-channel lug or mounting bracket must be flush with the surface it is intended to be mounted to. For bucket pivot lugs, the lug back must be flush with the back plate of the bucket. No overlap or gap between lug base and mounting surface.
 *   **Matching Tip Radii**: The radius of the Loader Arm Tip (`boss_r` in `arm_plate.scad`) must visually and dimensionally match the Bucket Pivot Lugs to ensure a clean hinge assembly.
     *   Constraint: `boss_r` == `PIVOT_HOLE_X_FROM_FRONT`.
 *   **Hole Alignment**: The physical hole cut into the *Arm Plate* must strictly match the kinematic point `_T`.

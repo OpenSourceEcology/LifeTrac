@@ -362,15 +362,16 @@ function bucket_cyl_length(arm_angle, bucket_tilt) =
         // Bucket attachment (in bucket local, tilt about arm tip, then arm rotation)
         // Must match the translation in bucket_attachment
         // Bucket is at Y = BUCKET_LUG_OFFSET. Cylinder Lug is on back plate.
-        // Assuming Cylinder Lug is also rotated to point backwards, Pivot is at Y=0 relative to Arm Tip?
-        // Let's assume Cylinder Lug Pivot is at Y = 0 for now (flush with Arm Pivot Y)
+        // BUCKET_PIVOT_Y_OFFSET shifts the entire bucket pivot assembly toward/away from arms
+        // Cylinder Lug Pivot is at Y=0 relative to the shifted bucket pivot
         bucket_local_y = 0,
         bucket_local_z = BUCKET_CYL_MOUNT_Z_OFFSET + (BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM),
         // Tilt about bucket pivot (at arm tip)
         bucket_tilted_y = bucket_local_y * cos(bucket_tilt) - bucket_local_z * sin(bucket_tilt),
         bucket_tilted_z = bucket_local_y * sin(bucket_tilt) + bucket_local_z * cos(bucket_tilt),
         // Add arm length to get position relative to arm pivot
-        bucket_arm_y = ARM_TIP_X + bucket_tilted_y,
+        // Include BUCKET_PIVOT_Y_OFFSET to match bucket_attachment positioning
+        bucket_arm_y = ARM_TIP_X + BUCKET_PIVOT_Y_OFFSET + bucket_tilted_y,
         bucket_arm_z = ARM_TIP_Z + bucket_tilted_z,
         // Rotate by arm angle
         bucket_y = bucket_arm_y * cos(arm_angle) - bucket_arm_z * sin(arm_angle),
@@ -467,6 +468,24 @@ echo("Required stroke:", BUCKET_CYL_REQUIRED_STROKE, "mm");
 echo("Stroke with margin:", BUCKET_CYL_STROKE_WITH_MARGIN, "mm");
 echo("SELECTED BUCKET CYLINDER STROKE:", BUCKET_CYLINDER_STROKE, "mm");
 echo("Recommended closed length:", BUCKET_CYL_CLOSED_LENGTH, "mm");
+
+// =============================================================================
+// BUCKET POSITION VERIFICATION (at $t=0, arms at ground)
+// =============================================================================
+// Verify bucket bottom touches ground when arms are lowered and bucket is flat
+_bucket_pivot_z_target = BUCKET_PIVOT_HEIGHT_FROM_BOTTOM + BUCKET_GROUND_CLEARANCE; // 90mm
+_bucket_translation_z = BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM + BUCKET_BODY_Z_OFFSET + BUCKET_VISUAL_Z_OFFSET;
+_bucket_bottom_offset_from_pivot = _bucket_translation_z - BUCKET_HEIGHT; // Should equal -BUCKET_PIVOT_HEIGHT_FROM_BOTTOM
+_bucket_bottom_world_z = _bucket_pivot_z_target + _bucket_bottom_offset_from_pivot; // Should be 0 for flat on ground
+
+echo("=== BUCKET POSITION VERIFICATION ===");
+echo("BUCKET_PIVOT_Z_TARGET (arm tip at ground) =", _bucket_pivot_z_target, "mm");
+echo("BUCKET_HEIGHT =", BUCKET_HEIGHT, "mm");
+echo("BUCKET_PIVOT_HEIGHT_FROM_BOTTOM =", BUCKET_PIVOT_HEIGHT_FROM_BOTTOM, "mm");
+echo("BUCKET_VISUAL_Z_OFFSET =", BUCKET_VISUAL_Z_OFFSET, "mm");
+echo("Bucket translation Z =", _bucket_translation_z, "mm");
+echo("Bucket bottom offset from pivot =", _bucket_bottom_offset_from_pivot, "mm");
+echo("BUCKET BOTTOM WORLD Z (should be 0) =", _bucket_bottom_world_z, "mm");
 
 // =============================================================================
 // LIFTING CAPACITY CALCULATIONS
@@ -2301,9 +2320,10 @@ module bucket_attachment() {
     if (show_bucket) {
         translate([0, ARM_PIVOT_Y, ARM_PIVOT_Z])
         rotate([is_undef(ARM_LIFT_ANGLE) ? 0 : ARM_LIFT_ANGLE, 0, 0])
-        translate([0, ARM_TIP_X, ARM_TIP_Z])
+        translate([0, ARM_TIP_X + BUCKET_PIVOT_Y_OFFSET, ARM_TIP_Z])
         {
             // Bucket rotates about this pivot
+            // BUCKET_PIVOT_Y_OFFSET shifts bucket and lugs together toward/away from arms
             rotate([BUCKET_TILT_ANGLE, 0, 0]) {
                 // Pivot Lugs: U-Channel brackets bolted to bucket back plate
                 // The Pivot Lug Hole must be at (0,0,0) of this group (which is the Arm Tip/Pivot).
@@ -2415,9 +2435,9 @@ module bucket_cylinders() {
             // Tilt about X at arm tip
             bucket_tilted = rot_x(bucket_local, BUCKET_TILT_ANGLE);
             
-            // Position relative to arm tip
+            // Position relative to arm tip (including BUCKET_PIVOT_Y_OFFSET)
             bucket_at_arm_tip = [bucket_tilted[0],
-                                ARM_TIP_X + bucket_tilted[1],
+                                ARM_TIP_X + BUCKET_PIVOT_Y_OFFSET + bucket_tilted[1],
                                 ARM_TIP_Z + bucket_tilted[2]];
             
             // Rotate by arm angle

@@ -86,6 +86,12 @@ BUCKET_FRONT_CLEARANCE = BUCKET_FRONT_CLEARANCE_BASE + BUCKET_FRONT_CLEARANCE_AD
 // We align the pivot to be at 1/5 of the bucket height (standard stability position)
 BUCKET_PIVOT_HEIGHT_FROM_BOTTOM = BUCKET_HEIGHT / 5; // 450 / 5 = 90mm
 
+// Bucket Pivot Y Offset: Shifts bucket and lugs together toward/away from arms
+// Negative values move toward arms (back), positive moves away (forward)
+// Used to center the lug pin with the arm tip pin hole
+// DEFINED EARLY so arm kinematics can account for it
+BUCKET_PIVOT_Y_OFFSET = -2.5 * 25.4; // -63.5mm (~2.5 inches toward arms)
+
 // =============================================================================
 // LOADER ARM DIMENSIONS
 // =============================================================================
@@ -326,22 +332,36 @@ ARM_MAIN_LEN = _L_main_kinematic - ARM_OVERLAP + _geom_correction;
 ARM_DROP_EXT = 80; 
 PIVOT_HOLE_X_FROM_FRONT = BUCKET_PIVOT_PIN_DIA; // Reverted to 1" (25.4mm) per request (Forward position)
 
-ARM_DROP_LEN = _L_drop_kinematic - ARM_DROP_EXT + PIVOT_HOLE_X_FROM_FRONT; 
+// Leg shortening adjustment - shortens visual leg WITHOUT changing arm rotation
+// This raises the pin hole higher above ground while keeping main arm angle fixed
+// Target: Pin hole center at 1/5 bucket height (90mm) from ground level
+// The arm hole is at PIVOT_HOLE_Z_FROM_BOTTOM (127mm) from tube bottom
+ARM_LEG_SHORTEN = 37 + 25.4 + 6.35 + 25.4 + 6.35; // 100.5mm - added 0.25 inch to previous value
+
+// Visual leg length (what gets rendered)
+ARM_DROP_LEN = _L_drop_kinematic - ARM_DROP_EXT + PIVOT_HOLE_X_FROM_FRONT - ARM_LEG_SHORTEN; 
+
+// Kinematic leg length (used for tip position calculation - keeps arm angle unchanged)
+_ARM_DROP_LEN_KINEMATIC = _L_drop_kinematic - ARM_DROP_EXT + PIVOT_HOLE_X_FROM_FRONT; // Original unshortened
 
 ARM_PIVOT_EXT = 40; 
 PIVOT_HOLE_EDGE_OFFSET = 1.5 * 25.4; 
-// PIVOT_HOLE_Z_FROM_BOTTOM set to Top Edge (Tangent to Top)
-// This aligns the pivot with the "Upper/Outer" edge of the arm profile.
-PIVOT_HOLE_Z_FROM_BOTTOM = TUBE_2X6_1_4[1] - PIVOT_HOLE_X_FROM_FRONT; 
+// PIVOT_HOLE_Z_FROM_BOTTOM: Original position at top edge of tube
+// This keeps the hole position on the arm profile unchanged
+PIVOT_HOLE_Z_FROM_BOTTOM = TUBE_2X6_1_4[1] - PIVOT_HOLE_X_FROM_FRONT; // 127mm - original position
 
 echo("DEBUG: Final Parameters:");
 echo("  ARM_SHAPE_ANGLE:", ARM_SHAPE_ANGLE);
 echo("  ARM_MAIN_LEN:", ARM_MAIN_LEN);
-echo("  ARM_DROP_LEN:", ARM_DROP_LEN);
+echo("  ARM_DROP_LEN (visual):", ARM_DROP_LEN);
+echo("  _ARM_DROP_LEN_KINEMATIC:", _ARM_DROP_LEN_KINEMATIC);
+echo("  ARM_LEG_SHORTEN:", ARM_LEG_SHORTEN);
+echo("  PIVOT_HOLE_Z_FROM_BOTTOM:", PIVOT_HOLE_Z_FROM_BOTTOM);
 
 // Vector from Main Pivot to Bucket Pivot (For reference)
+// Use KINEMATIC leg length to keep arm rotation unchanged
 _bend_angle = 180 - ARM_ANGLE; // Note: ARM_ANGLE is now possibly obsolete if we use SHAPE_ANGLE
-_drop_vec_len = ARM_DROP_LEN + ARM_DROP_EXT - PIVOT_HOLE_X_FROM_FRONT; // Hole X position (from front edge)
+_drop_vec_len = _ARM_DROP_LEN_KINEMATIC + ARM_DROP_EXT - PIVOT_HOLE_X_FROM_FRONT; // Use kinematic length
 _tube_h = TUBE_2X6_1_4[1];
 _hole_z_offset = PIVOT_HOLE_Z_FROM_BOTTOM; // Hole Z position (from bottom edge)
 
@@ -349,6 +369,7 @@ _dx = _drop_vec_len * cos(_bend_angle) + (_hole_z_offset - _tube_h) * sin(_bend_
 _dz = -_drop_vec_len * sin(_bend_angle) + (_hole_z_offset - _tube_h) * cos(_bend_angle);
 
 // Calculate Tip Position (Top/Effective Pivot Point)
+// This uses kinematic leg length so arm angle stays the same
 ARM_TIP_X = (ARM_MAIN_LEN + ARM_OVERLAP) + _dx; // Removed +50 error
 ARM_TIP_Z = _tube_h + _dz;
 
@@ -363,8 +384,11 @@ echo("ARM_TIP_X =", ARM_TIP_X);
 echo("ARM_TIP_Z =", ARM_TIP_Z);
 
 // Calculate angles for kinematics
-_x_rel = ARM_TIP_X;
-_z_rel = ARM_TIP_Z - _tube_h/2;
+// Use ARM_TIP_X and ARM_TIP_Z directly - these represent the bucket pivot position
+// relative to the arm pivot in arm-local coordinates (before rotation)
+// Include BUCKET_PIVOT_Y_OFFSET to get actual bucket pivot position
+_x_rel = ARM_TIP_X + BUCKET_PIVOT_Y_OFFSET;
+_z_rel = ARM_TIP_Z;  // Fixed: removed _tube_h/2 offset to match bucket_attachment()
 
 _arm_eff_len = sqrt(pow(_x_rel, 2) + pow(_z_rel, 2));
 arm_alpha_calc = atan2(-_z_rel, _x_rel); // Angle below horizontal (positive value)
@@ -491,12 +515,20 @@ LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y + 10)); // Current logi
 //   We need to verify the pin-to-base distance.
 //   For now, we set BUCKET_LUG_OFFSET to this distance.
 //   Let's assume the lug height (base to pin center) is roughly 50mm (2").
-//   User Update: Shift bucket backwards closely to align pivot holes.
-BUCKET_LUG_OFFSET = 25; // Adjusted (35->25) to align pin with leg hole (Shift backwards)
+//   User Update: Shift bucket backwards to align pivot pin with arm leg hole.
+//   The U-channel lug (3x3 tube) outer back surface is at size/2 from pin center (after 90deg rotation)
+//   Lug back must be flush with bucket back plate (see DESIGN_RULES.md)
+//   Bucket back plate back face (Y=0 in bucket local) must align with lug outer back surface
+//   So BUCKET_LUG_OFFSET = size/2 makes lug outer back flush with bucket plate back face
+BUCKET_LUG_OFFSET = TUBE_3X3_1_4[0]/2; // 38.1mm: Lug outer back flush with bucket back plate back face
 
-// Visual adjustment to shift bucket down without affecting kinematic target _T
-// Used to calibrate visual ground contact
-BUCKET_VISUAL_Z_OFFSET = -10;
+// Note: BUCKET_PIVOT_Y_OFFSET is defined earlier in this file (after BUCKET_PIVOT_HEIGHT_FROM_BOTTOM)
+// to ensure arm kinematics calculations can account for it
+
+// Visual adjustment to shift bucket without affecting kinematic target _T
+// At BUCKET_VISUAL_Z_OFFSET = 0, bucket bottom should be exactly at ground (Z=0) when flat
+// Calculation: pivot_z(90) - (BUCKET_HEIGHT(450) - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM(90)) = 0
+BUCKET_VISUAL_Z_OFFSET = 0; // Bucket bottom flat on ground
 BUCKET_BODY_Z_OFFSET = 0; // Keep bucket body aligned to pivot; use BUCKET_GROUND_CLEARANCE to set ground contact
 
 // Bucket Cylinder Mount Parameters
