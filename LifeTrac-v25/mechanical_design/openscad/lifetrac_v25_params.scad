@@ -86,11 +86,8 @@ BUCKET_FRONT_CLEARANCE = BUCKET_FRONT_CLEARANCE_BASE + BUCKET_FRONT_CLEARANCE_AD
 // We align the pivot to be at 1/5 of the bucket height (standard stability position)
 BUCKET_PIVOT_HEIGHT_FROM_BOTTOM = BUCKET_HEIGHT / 5; // 450 / 5 = 90mm
 
-// Bucket Pivot Y Offset: Shifts bucket and lugs together toward/away from arms
-// Negative values move toward arms (back), positive moves away (forward)
-// Used to center the lug pin with the arm tip pin hole
-// DEFINED EARLY so arm kinematics can account for it
-BUCKET_PIVOT_Y_OFFSET = -2.5 * 25.4; // -63.5mm (~2.5 inches toward arms)
+// BUCKET_PIVOT_Y_OFFSET: Calculated after arm geometry to align bucket lug pin with arm tip pin hole
+// See calculation below ARM_TIP_X/ARM_TIP_Z definitions
 
 // =============================================================================
 // LOADER ARM DIMENSIONS
@@ -373,6 +370,16 @@ _dz = -_drop_vec_len * sin(_bend_angle) + (_hole_z_offset - _tube_h) * cos(_bend
 ARM_TIP_X = (ARM_MAIN_LEN + ARM_OVERLAP) + _dx; // Removed +50 error
 ARM_TIP_Z = _tube_h + _dz;
 
+// =============================================================================
+// BUCKET PIVOT Y OFFSET - Aligns bucket lug pin with visual arm tip pin hole
+// =============================================================================
+// The kinematic tip (ARM_TIP_X) is based on unshortened leg length.
+// The visual arm leg is shortened by ARM_LEG_SHORTEN along the leg axis.
+// This displacement in arm-local Y is: -ARM_LEG_SHORTEN * cos(_bend_angle)
+// The bucket pivot must be shifted by this amount to align with the visual arm tip.
+BUCKET_PIVOT_Y_OFFSET = -ARM_LEG_SHORTEN * cos(_bend_angle);
+echo("BUCKET_PIVOT_Y_OFFSET (calculated) =", BUCKET_PIVOT_Y_OFFSET, "mm");
+
 ARM_V2_LENGTH = sqrt(pow(ARM_TIP_X, 2) + pow(ARM_TIP_Z, 2));
 // Geometric angle of the arm tip vector relative to horizontal
 ARM_GEOMETRY_ANGLE = atan2(ARM_TIP_Z, ARM_TIP_X);
@@ -386,9 +393,9 @@ echo("ARM_TIP_Z =", ARM_TIP_Z);
 // Calculate angles for kinematics
 // Use ARM_TIP_X and ARM_TIP_Z directly - these represent the bucket pivot position
 // relative to the arm pivot in arm-local coordinates (before rotation)
-// Include BUCKET_PIVOT_Y_OFFSET to get actual bucket pivot position
+// Include BUCKET_PIVOT_Y_OFFSET to get actual bucket pivot position (aligned with visual arm tip)
 _x_rel = ARM_TIP_X + BUCKET_PIVOT_Y_OFFSET;
-_z_rel = ARM_TIP_Z;  // Fixed: removed _tube_h/2 offset to match bucket_attachment()
+_z_rel = ARM_TIP_Z;  // Z offset from shortening is minimal due to shallow bend angle
 
 _arm_eff_len = sqrt(pow(_x_rel, 2) + pow(_z_rel, 2));
 arm_alpha_calc = atan2(-_z_rel, _x_rel); // Angle below horizontal (positive value)
