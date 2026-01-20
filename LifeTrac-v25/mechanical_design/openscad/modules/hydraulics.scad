@@ -40,10 +40,17 @@ module hydraulic_cylinder(bore_diameter=63.5, rod_diameter=31.75,
     // -> Rod Clevis Pin (Head Top + 5mm gap + rod_clevis_len)
     calc_retracted_len = base_clevis_len + tube_len + head_external + 5 + rod_clevis_len;
     
+    echo("=== HYDRAULIC_CYLINDER MODULE DEBUG ===");
+    echo("bore:", B, "rod:", R, "stroke:", stroke);
+    echo("calc_retracted_len:", calc_retracted_len);
+    echo("pin_to_pin_length:", pin_to_pin_length);
+    
     // Determine actual extension
     target_extension = (pin_to_pin_length > 0) 
         ? pin_to_pin_length - calc_retracted_len 
         : (retracted ? 0 : extension);
+    
+    echo("target_extension (before clamp):", target_extension);
         
     actual_extension = max(0, min(stroke, target_extension));
     

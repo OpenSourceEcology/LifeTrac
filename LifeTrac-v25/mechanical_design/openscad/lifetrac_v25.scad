@@ -408,66 +408,43 @@ function safe_max(v1, v2, v3, v4, v5, v6) =
 _bc_min_calc = safe_min(_bc_len_1, _bc_len_2, _bc_len_3, _bc_len_4, _bc_len_5, _bc_len_6);
 _bc_max_calc = safe_max(_bc_len_1, _bc_len_2, _bc_len_3, _bc_len_4, _bc_len_5, _bc_len_6);
 
-// Debug output to trace undefined values
-echo("DEBUG: _bc_min_calc", _bc_min_calc);
-echo("DEBUG: _bc_max_calc", _bc_max_calc);
+// Debug output to trace cylinder length calculations
+echo("DEBUG: _bc_len_1 (min_angle, min_tilt):", _bc_len_1);
+echo("DEBUG: _bc_len_2 (min_angle, max_tilt):", _bc_len_2);
+echo("DEBUG: _bc_len_3 (max_angle, min_tilt):", _bc_len_3);
+echo("DEBUG: _bc_len_4 (max_angle, max_tilt):", _bc_len_4);
+echo("DEBUG: _bc_min_calc:", _bc_min_calc);
+echo("DEBUG: _bc_max_calc:", _bc_max_calc);
 
-BUCKET_CYL_LEN_MIN = (is_undef(_bc_min_calc) || _bc_min_calc == 9999) ? BUCKET_CYL_LEN_MIN_DEF : _bc_min_calc;
-BUCKET_CYL_LEN_MAX = (is_undef(_bc_max_calc) || _bc_max_calc == 0) ? (BUCKET_CYL_LEN_MIN_DEF + BUCKET_CYLINDER_STROKE_DEF) : _bc_max_calc;
+// Note: BUCKET_CYLINDER_STROKE, BUCKET_CYL_LEN_MIN, BUCKET_CYL_LEN_MAX are defined in params file
 
-// Required stroke
-BUCKET_CYL_REQUIRED_STROKE = (is_undef(BUCKET_CYL_LEN_MAX) || is_undef(BUCKET_CYL_LEN_MIN)) ? 0 : (BUCKET_CYL_LEN_MAX - BUCKET_CYL_LEN_MIN);
-BUCKET_CYL_STROKE_WITH_MARGIN = ceil(BUCKET_CYL_REQUIRED_STROKE * CYLINDER_STROKE_MARGIN);
-BUCKET_CYL_CLOSED_LENGTH = ceil(BUCKET_CYL_LEN_MIN * CYLINDER_CLOSED_MARGIN);
-
-echo("=== BUCKET CYLINDER FULL RANGE ===");
-echo("MIN LENGTH =", BUCKET_CYL_LEN_MIN);
-echo("MAX LENGTH =", BUCKET_CYL_LEN_MAX);
-echo("REQUIRED STROKE (Full Range) =", BUCKET_CYL_REQUIRED_STROKE);
-echo("STROKE WITH MARGIN =", BUCKET_CYL_STROKE_WITH_MARGIN);
-
-// Select standard stroke
-BUCKET_CYLINDER_STROKE_CALC = 
-    is_undef(BUCKET_CYL_STROKE_WITH_MARGIN) ? 200 :
-    BUCKET_CYL_STROKE_WITH_MARGIN <= 150 ? 150 :
-    BUCKET_CYL_STROKE_WITH_MARGIN <= 200 ? 200 :
-    BUCKET_CYL_STROKE_WITH_MARGIN <= 250 ? 250 :
-    BUCKET_CYL_STROKE_WITH_MARGIN <= 300 ? 300 :
-    BUCKET_CYL_STROKE_WITH_MARGIN <= 350 ? 350 :
-    BUCKET_CYL_STROKE_WITH_MARGIN <= 400 ? 400 :
-    BUCKET_CYL_STROKE_WITH_MARGIN <= 450 ? 450 :
-    BUCKET_CYL_STROKE_WITH_MARGIN <= 500 ? 500 :
-    ceil(BUCKET_CYL_STROKE_WITH_MARGIN / 50) * 50;
+// Calculate stroke requirement from this file's calculations for verification
+_bucket_cyl_required_stroke_check = _bc_max_calc - _bc_min_calc;
+echo("DEBUG: Stroke requirement from main file calc:", _bucket_cyl_required_stroke_check);
+echo("DEBUG: Stroke from params:", BUCKET_CYLINDER_STROKE);
+echo("DEBUG: LEN_MIN from params:", BUCKET_CYL_LEN_MIN);
+echo("DEBUG: LEN_MAX from params:", BUCKET_CYL_LEN_MAX);
 
 // --- FINAL CYLINDER SPECIFICATIONS ---
-// Use calculated values (override manual values)
+// Lift cylinder specs - use values from params
 LIFT_CYLINDER_BORE = 63.5;        // 2.5" bore (force capacity)
 LIFT_CYLINDER_ROD = 38.1;         // 1.5" rod
-// Use calculated stroke if available, otherwise keep default from params
-LIFT_CYLINDER_STROKE = is_undef(LIFT_CYLINDER_STROKE_CALC) ? LIFT_CYLINDER_STROKE_DEF : LIFT_CYLINDER_STROKE_CALC;
+LIFT_CYLINDER_STROKE = is_undef(LIFT_CYLINDER_STROKE_CALC) ? 300 : LIFT_CYLINDER_STROKE_CALC;
 
-BUCKET_CYLINDER_BORE = 50.8;      // 2" bore
-BUCKET_CYLINDER_ROD = 31.75;      // 1.25" rod
-// Use calculated stroke if available, otherwise keep default from params
-BUCKET_CYLINDER_STROKE = is_undef(BUCKET_CYLINDER_STROKE_CALC) ? BUCKET_CYLINDER_STROKE_DEF : BUCKET_CYLINDER_STROKE_CALC;
+// Bucket cylinder specs are defined in params:
+// BUCKET_CYLINDER_BORE, BUCKET_CYLINDER_ROD, BUCKET_CYLINDER_STROKE
 
 // Debug output
 echo("=== LIFT CYLINDER SIZING ===");
 echo("Arm angle range:", ARM_MIN_ANGLE, "to", ARM_MAX_ANGLE, "degrees");
-echo("Cylinder length at min angle (retracted):", LIFT_CYL_LEN_MIN, "mm");
-echo("Cylinder length at max angle (extended):", LIFT_CYL_LEN_MAX, "mm");
-echo("Required stroke:", LIFT_CYL_REQUIRED_STROKE, "mm");
-echo("Stroke with margin:", LIFT_CYL_STROKE_WITH_MARGIN, "mm");
 echo("SELECTED LIFT CYLINDER STROKE:", LIFT_CYLINDER_STROKE, "mm");
-echo("Recommended closed length:", LIFT_CYL_CLOSED_LENGTH, "mm");
 
-echo("=== BUCKET CYLINDER SIZING ===");
-echo("Bucket tilt range:", BUCKET_MIN_TILT, "to", BUCKET_MAX_TILT, "degrees");
-echo("Cylinder length range:", BUCKET_CYL_LEN_MIN, "to", BUCKET_CYL_LEN_MAX, "mm");
-echo("Required stroke:", BUCKET_CYL_REQUIRED_STROKE, "mm");
-echo("Stroke with margin:", BUCKET_CYL_STROKE_WITH_MARGIN, "mm");
-echo("SELECTED BUCKET CYLINDER STROKE:", BUCKET_CYLINDER_STROKE, "mm");
-echo("Recommended closed length:", BUCKET_CYL_CLOSED_LENGTH, "mm");
+echo("=== BUCKET CYLINDER SIZING (from params) ===");
+echo("BUCKET_CYLINDER_BORE:", BUCKET_CYLINDER_BORE, "mm");
+echo("BUCKET_CYLINDER_ROD:", BUCKET_CYLINDER_ROD, "mm");
+echo("BUCKET_CYLINDER_STROKE:", BUCKET_CYLINDER_STROKE, "mm");
+echo("BUCKET_CYL_LEN_MIN:", BUCKET_CYL_LEN_MIN, "mm");
+echo("BUCKET_CYL_LEN_MAX:", BUCKET_CYL_LEN_MAX, "mm");
 
 // =============================================================================
 // BUCKET POSITION VERIFICATION (at $t=0, arms at ground)
@@ -986,10 +963,13 @@ module oriented_cylinder(base_pt, target_pt, bore, rod, stroke, extension) {
     clevis_pin_length = bore * 1.8;  // Pin spans clevis width
     nut_h = nut_height(clevis_pin_dia);
     
+    echo("oriented_cylinder: len=", len, "extension=", extension, "stroke=", stroke);
+    
     translate(base_pt)
     rotate(a = angle, v = axis) {
-        // Scale cylinder to exactly span between mounts using total_length
-        hydraulic_cylinder(bore, rod, stroke, false, extension, "clevis", len);
+        // Use explicit extension mode (pass 0 for pin_to_pin_length)
+        // This renders the cylinder at the specified extension regardless of actual mount distance
+        hydraulic_cylinder(bore, rod, stroke, false, extension, "clevis", 0);
         
         // Base clevis pin with nuts (pin axis along X to match lug holes)
         translate([0, 0, 0])
@@ -2123,9 +2103,9 @@ module loader_arms() {
                 loader_arm_v2(angle=0, side="right");
             
             // Cross Beam
-            // Connects the elbow assemblies at the new mounting hole position
-            // Manual adjustment: Shift back by 3 inches (76.2mm) to align with angle irons
-            translate([0, CROSS_BEAM_1_POS - 76.2, 0]) {
+            // Connects the elbow assemblies at the calculated mounting position
+            // CROSS_BEAM_1_POS is calculated in params to align cylinder geometry
+            translate([0, CROSS_BEAM_1_POS, 0]) {
                 difference() {
                     rotate([0, 90, 0])
                     // Rounded 2x6 tube
@@ -2412,6 +2392,15 @@ module bucket_cylinders() {
         current_bucket_cyl_length = bucket_cyl_length(ARM_LIFT_ANGLE, BUCKET_TILT_ANGLE);
         bucket_extension = current_bucket_cyl_length - BUCKET_CYL_LEN_MIN;
         
+        echo("=== BUCKET CYLINDER RENDERING DEBUG ===");
+        echo("ARM_LIFT_ANGLE:", ARM_LIFT_ANGLE);
+        echo("BUCKET_TILT_ANGLE:", BUCKET_TILT_ANGLE);
+        echo("current_bucket_cyl_length:", current_bucket_cyl_length);
+        echo("BUCKET_CYL_LEN_MIN:", BUCKET_CYL_LEN_MIN);
+        echo("bucket_extension:", bucket_extension);
+        echo("CROSS_BEAM_1_POS:", CROSS_BEAM_1_POS);
+        echo("CROSS_BEAM_MOUNT_Z_OFFSET:", CROSS_BEAM_MOUNT_Z_OFFSET);
+        
         for (side = [-1, 1]) {
             // Use BUCKET_CYL_X_SPACING to ensure clearance from inner panels
             arm_side_offset = side * BUCKET_CYL_X_SPACING;
@@ -2445,6 +2434,17 @@ module bucket_cylinders() {
             bucket_world = [bucket_rotated[0],
                            ARM_PIVOT_Y + bucket_rotated[1],
                            ARM_PIVOT_Z + bucket_rotated[2]];
+            
+            if (side == 1) {
+                echo("=== CYLINDER MOUNT POSITIONS (right side) ===");
+                echo("arm_local:", arm_local);
+                echo("arm_world:", arm_world);
+                echo("bucket_local:", bucket_local);
+                echo("bucket_at_arm_tip:", bucket_at_arm_tip);
+                echo("bucket_world:", bucket_world);
+                _cyl_dist = sqrt(pow(bucket_world[1]-arm_world[1],2) + pow(bucket_world[2]-arm_world[2],2));
+                echo("Distance between mounts:", _cyl_dist);
+            }
             
             // Place cylinder with calculated extension
             oriented_cylinder(arm_world, bucket_world,
