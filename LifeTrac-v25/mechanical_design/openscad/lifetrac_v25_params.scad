@@ -594,7 +594,7 @@ BUCKET_MAX_CURL_ANGLE = ARM_MIN_ANGLE + _bend_angle; // Max curl = bucket back p
 
 // MIN CURL (MAX DUMP): Bucket tilted down 45 degrees below horizontal when arms raised
 // When arms at ARM_MAX_ANGLE, bucket absolute angle = -45 degrees
-BUCKET_MIN_CURL_ANGLE = -45; // Bucket 45 deg below horizontal (dump position)
+BUCKET_MIN_CURL_ANGLE = -45; // Target dump angle: 45 degrees below horizontal
 
 echo("=== BUCKET CURL/DUMP DEFINITIONS ===");
 echo("ARM_SHAPE_ANGLE (elbow):", ARM_SHAPE_ANGLE);

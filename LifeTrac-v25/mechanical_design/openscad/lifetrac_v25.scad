@@ -220,7 +220,8 @@ BUCKET_HEIGHT = 450;
 // We calculate the Target ABSOLUTE angle based on animation phase
 // Then subtract the current Arm Angle to get the Relative Tilt Angle needed for the transform
 // MD: Default view ($t=0) overrides to 0 (flat) as per user request.
-_anim_abs_angle = ($t == 0) ? 0 : (BUCKET_ABS_CURL_ANGLE + (animation_phase * (BUCKET_ABS_DUMP_ANGLE - BUCKET_ABS_CURL_ANGLE)));
+// Fixed to force -45 degree dump at full lift
+_anim_abs_angle = ($t == 0) ? 0 : (BUCKET_ABS_CURL_ANGLE + (animation_phase * (-45 - BUCKET_ABS_CURL_ANGLE)));
 BUCKET_TILT_ANGLE = _anim_abs_angle - ARM_LIFT_ANGLE;
 
 // Legacy definitions for reference (unused in animation now)
