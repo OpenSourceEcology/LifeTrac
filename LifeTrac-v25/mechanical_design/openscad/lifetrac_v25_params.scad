@@ -541,7 +541,20 @@ BUCKET_BODY_Z_OFFSET = 0; // Keep bucket body aligned to pivot; use BUCKET_GROUN
 // Bucket Cylinder Mount Parameters
 BUCKET_CYL_MOUNT_SIZE = TUBE_3X3_1_4[0]; // 3" (76.2mm)
 BUCKET_CYL_MOUNT_Y_OFFSET = -BUCKET_CYL_MOUNT_SIZE/2; // Flush with back of bucket plate
+// BUCKET_CYL_MOUNT_Z_OFFSET: Position of cylinder lug relative to bucket pivot
+// OPTIONS TESTED FOR IMPROVING MAX ARM ANGLE:
+//   - Lowering lugs 2" (-50.8mm): Minimal improvement to max arm angle
+//   - Shorter cylinder (8" stroke): Changes cross beam position but limited improvement
+//   - Combined lower lugs + shorter cylinder: Still limited by parallelism geometry
+// The fundamental constraint is the angle between cylinder and bucket back plate.
+// Major geometry changes (arm shape, bucket pivot location) would be needed for significant improvement.
 BUCKET_CYL_MOUNT_Z_OFFSET = -117.2; // Calculated for 45 deg dump angle
+
+// Bucket Cylinder Stroke Override (set to 0 for auto-selection)
+// Standard strokes: 8"(203.2mm), 10"(254mm), 12"(304.8mm), 14"(355.6mm), 16"(406.4mm)
+// Shorter cylinder = shorter extended length = cross beam closer to bucket
+// Testing showed: shorter cylinders have limited impact on max arm angle
+BUCKET_CYLINDER_STROKE_OVERRIDE = 0; // 0 = auto-select based on required stroke
 
 // Cross Beam Cylinder Mount Parameters
 CROSS_BEAM_HEIGHT = TUBE_2X6_1_4[0]; // 2" (50.8mm)
@@ -648,96 +661,179 @@ _lug_y_dump = _arm_tip_x_safe + _pivot_y_offset_safe + (0 * cos(_bucket_rel_dump
 _lug_z_dump = _arm_tip_z_safe + (0 * sin(_bucket_rel_dump_angle) + _lug_z_safe * cos(_bucket_rel_dump_angle));
 
 // =============================================================================
-// STEP 3: Select standard cylinder and calculate cross beam position
+// STEP 3: Calculate ARM_MAX_ANGLE_LIMITED based on bucket cylinder parallelism
 // =============================================================================
-// Standard hydraulic cylinder strokes (inches): 8, 10, 12, 14, 16, 18, 20, 24
-// Standard closed lengths are typically: stroke + 8" to 12" for pin-to-pin
+// We calculate this FIRST (before cylinder sizing) so we know the actual operating range.
+// Use a reference cross beam position for the parallelism calculation.
 
-// First, estimate required stroke from lug travel distance
-// Lug moves from curl position to dump position - this gives approximate stroke needed
-_lug_travel_y = _lug_y_dump - _lug_y_curl;
-_lug_travel_z = _lug_z_dump - _lug_z_curl;
-_approx_stroke_raw = sqrt(pow(_lug_travel_y, 2) + pow(_lug_travel_z, 2));
-// Default to 300mm if calculation failed
-_approx_stroke_needed = is_undef(_approx_stroke_raw) ? 300 : _approx_stroke_raw;
+_cb_ref_pos = ARM_TIP_X * 0.65;  // Reference position for parallelism calculation
+_cb_z = CROSS_BEAM_MOUNT_Z_OFFSET; // Z position of cylinder mount on cross beam
+_target_dump_angle = -45;  // Target bucket absolute angle at dump
 
-echo("=== BUCKET CYLINDER SIZING ===");
-echo("Lug Y at max curl:", _lug_y_curl);
-echo("Lug Z at max curl:", _lug_z_curl);
-echo("Lug Y at max dump:", _lug_y_dump);
-echo("Lug Z at max dump:", _lug_z_dump);
-echo("Approximate stroke needed:", _approx_stroke_needed);
+// Function to calculate the angle between bucket cylinder and bucket back plate normal
+// Returns the angle in degrees (0 = parallel to back plate, 90 = perpendicular)
+function bucket_cyl_to_back_angle_v2(arm_angle, target_bucket_abs_angle, cb_y_pos) = 
+    let(
+        bucket_rel_tilt = target_bucket_abs_angle - arm_angle,
+        lug_y_bucket = 0,
+        lug_z_bucket = _lug_z_safe,
+        lug_y_arm = _arm_tip_x_safe + _pivot_y_offset_safe + 
+                    (lug_y_bucket * cos(bucket_rel_tilt) - lug_z_bucket * sin(bucket_rel_tilt)),
+        lug_z_arm = _arm_tip_z_safe + 
+                    (lug_y_bucket * sin(bucket_rel_tilt) + lug_z_bucket * cos(bucket_rel_tilt)),
+        cyl_dy = lug_y_arm - cb_y_pos,
+        cyl_dz = lug_z_arm - _cb_z,
+        back_normal_y = cos(bucket_rel_tilt),
+        back_normal_z = sin(bucket_rel_tilt),
+        cyl_len = sqrt(cyl_dy*cyl_dy + cyl_dz*cyl_dz),
+        dot_product = (cyl_dy * back_normal_y + cyl_dz * back_normal_z) / cyl_len,
+        dot_clamped = max(-1, min(1, dot_product)),
+        angle_from_normal = acos(abs(dot_clamped))
+    )
+    90 - angle_from_normal;
 
-// Select standard stroke (round up to nearest standard size)
+// Binary search to find the arm angle where cylinder is 10 degrees from parallel
+_parallelism_limit = 10;  // Degrees from parallel (safety margin)
+
+function find_parallel_limit_angle_v2(min_arm, max_arm, target_bucket_abs, limit_angle, cb_pos, iterations) =
+    iterations <= 0 ? (min_arm + max_arm) / 2 :
+    let(
+        mid_arm = (min_arm + max_arm) / 2,
+        angle_at_mid = bucket_cyl_to_back_angle_v2(mid_arm, target_bucket_abs, cb_pos)
+    )
+    angle_at_mid < limit_angle ? 
+        find_parallel_limit_angle_v2(min_arm, mid_arm, target_bucket_abs, limit_angle, cb_pos, iterations - 1) :
+        find_parallel_limit_angle_v2(mid_arm, max_arm, target_bucket_abs, limit_angle, cb_pos, iterations - 1);
+
+// Find arm angle at parallelism limit
+_arm_parallel_limit_raw = find_parallel_limit_angle_v2(ARM_MIN_ANGLE, ARM_MIN_ANGLE + 120, _target_dump_angle, _parallelism_limit, _cb_ref_pos, 15);
+_arm_parallel_limit = is_undef(_arm_parallel_limit_raw) ? ARM_MAX_ANGLE :
+                      (_arm_parallel_limit_raw != _arm_parallel_limit_raw) ? ARM_MAX_ANGLE :
+                      _arm_parallel_limit_raw;
+
+ARM_MAX_ANGLE_LIMITED = min(ARM_MAX_ANGLE, _arm_parallel_limit);
+
+echo("=== ARM ANGLE LIMIT (STEP 3) ===");
+echo("Parallelism safety margin:", _parallelism_limit, "degrees from parallel");
+echo("Arm angle at parallelism limit:", _arm_parallel_limit, "degrees");
+echo("Original ARM_MAX_ANGLE:", ARM_MAX_ANGLE, "degrees");
+echo("ARM_MAX_ANGLE_LIMITED:", ARM_MAX_ANGLE_LIMITED, "degrees");
+
+// =============================================================================
+// STEP 4: Calculate ACTUAL lug positions using LIMITED arm angle
+// =============================================================================
+// Now that we know the limited arm angle, calculate the actual dump position
+_bucket_rel_dump_limited = _target_dump_angle - ARM_MAX_ANGLE_LIMITED;
+
+_lug_y_dump_limited = _arm_tip_x_safe + _pivot_y_offset_safe + 
+                      (0 * cos(_bucket_rel_dump_limited) - _lug_z_safe * sin(_bucket_rel_dump_limited));
+_lug_z_dump_limited = _arm_tip_z_safe + 
+                      (0 * sin(_bucket_rel_dump_limited) + _lug_z_safe * cos(_bucket_rel_dump_limited));
+
+echo("=== ACTUAL LUG POSITIONS (STEP 4) ===");
+echo("Bucket rel curl angle:", _bucket_rel_curl_angle, "degrees");
+echo("Bucket rel dump angle (limited):", _bucket_rel_dump_limited, "degrees");
+echo("Lug Y at curl:", _lug_y_curl);
+echo("Lug Z at curl:", _lug_z_curl);
+echo("Lug Y at dump (limited):", _lug_y_dump_limited);
+echo("Lug Z at dump (limited):", _lug_z_dump_limited);
+
+// =============================================================================
+// STEP 5: Calculate ACTUAL required stroke based on LIMITED positions
+// =============================================================================
+// The stroke needed is the distance between curl and dump lug positions
+_actual_lug_travel_y = _lug_y_dump_limited - _lug_y_curl;
+_actual_lug_travel_z = _lug_z_dump_limited - _lug_z_curl;
+_actual_stroke_needed = sqrt(pow(_actual_lug_travel_y, 2) + pow(_actual_lug_travel_z, 2));
+
+echo("=== ACTUAL STROKE CALCULATION (STEP 5) ===");
+echo("Lug travel Y:", _actual_lug_travel_y);
+echo("Lug travel Z:", _actual_lug_travel_z);
+echo("ACTUAL stroke needed (lug travel):", _actual_stroke_needed, "mm (", _actual_stroke_needed/25.4, "inches)");
+
+// Compare with original estimate (before limiting)
+_original_lug_travel_y = _lug_y_dump - _lug_y_curl;
+_original_lug_travel_z = _lug_z_dump - _lug_z_curl;
+_original_stroke_estimate = sqrt(pow(_original_lug_travel_y, 2) + pow(_original_lug_travel_z, 2));
+echo("Original estimate (before limiting):", _original_stroke_estimate, "mm (", _original_stroke_estimate/25.4, "inches)");
+echo("Stroke SAVINGS from limiting:", _original_stroke_estimate - _actual_stroke_needed, "mm (", (_original_stroke_estimate - _actual_stroke_needed)/25.4, "inches)");
+
+// =============================================================================
+// STEP 6: Select standard cylinder based on ACTUAL stroke needed
+// =============================================================================
 // Standard strokes in mm: 203.2(8"), 254(10"), 304.8(12"), 355.6(14"), 406.4(16"), 457.2(18"), 508(20"), 609.6(24")
 _std_strokes = [203.2, 254, 304.8, 355.6, 406.4, 457.2, 508, 609.6];
 
-// Find smallest standard stroke >= needed stroke * 1.1 (10% margin)
+// Find smallest standard stroke >= needed stroke (no margin - extra capacity is wasted
+// since arm angle is limited by parallelism and curl is limited by future bumper)
 function find_std_stroke(needed, strokes, i=0) = 
     (i >= len(strokes)) ? strokes[len(strokes)-1] :
-    (strokes[i] >= needed * 1.1) ? strokes[i] : find_std_stroke(needed, strokes, i+1);
+    (strokes[i] >= needed) ? strokes[i] : find_std_stroke(needed, strokes, i+1);
 
-BUCKET_CYLINDER_STROKE = find_std_stroke(_approx_stroke_needed, _std_strokes);
-_bucket_stroke_safe = is_undef(BUCKET_CYLINDER_STROKE) ? 304.8 : BUCKET_CYLINDER_STROKE; // Default 12" stroke
+_auto_stroke = find_std_stroke(_actual_stroke_needed, _std_strokes);
+BUCKET_CYLINDER_STROKE = (BUCKET_CYLINDER_STROKE_OVERRIDE > 0) ? BUCKET_CYLINDER_STROKE_OVERRIDE : _auto_stroke;
+_bucket_stroke_safe = is_undef(BUCKET_CYLINDER_STROKE) ? 304.8 : BUCKET_CYLINDER_STROKE;
 
-// Cylinder closed length (pin-to-pin) - must match hydraulic_cylinder module's calculation
-// From hydraulics.scad: calc_retracted_len = base_clevis_len + tube_len + head_external + 5 + rod_clevis_len
-// Where: base_clevis_len = B*0.8, tube_len = stroke + B*0.4 + B*0.4 + 5, head_external = B*0.2, rod_clevis_len = R*1.5
-// Simplified: dead_length = B*1.8 + R*1.5 + 10
+echo("=== CYLINDER SELECTION (STEP 6) ===");
+echo("Auto-selected stroke:", _auto_stroke, "mm (", _auto_stroke/25.4, "inches)");
+echo("Override stroke:", BUCKET_CYLINDER_STROKE_OVERRIDE, "mm");
+echo("USING stroke:", _bucket_stroke_safe, "mm (", _bucket_stroke_safe/25.4, "inches)");
+
+// Cylinder closed length (pin-to-pin)
+// dead_length = B*1.8 + R*1.5 + 10
 BUCKET_CYL_DEAD_LENGTH = BUCKET_CYLINDER_BORE * 1.8 + BUCKET_CYLINDER_ROD * 1.5 + 10;
 BUCKET_CYL_LEN_MIN = _bucket_stroke_safe + BUCKET_CYL_DEAD_LENGTH; // Retracted length
 BUCKET_CYL_LEN_MAX = BUCKET_CYL_LEN_MIN + _bucket_stroke_safe;     // Extended length
 
-echo("Selected standard stroke:", _bucket_stroke_safe, "mm (", _bucket_stroke_safe/25.4, "inches)");
-echo("Cylinder dead length (matches module):", BUCKET_CYL_DEAD_LENGTH);
-echo("Cylinder retracted length:", BUCKET_CYL_LEN_MIN);
-echo("Cylinder extended length:", BUCKET_CYL_LEN_MAX);
+echo("Cylinder dead length:", BUCKET_CYL_DEAD_LENGTH, "mm");
+echo("Cylinder retracted length:", BUCKET_CYL_LEN_MIN, "mm");
+echo("Cylinder extended length:", BUCKET_CYL_LEN_MAX, "mm");
 
 // =============================================================================
-// STEP 4: Calculate cross beam position for retracted cylinder at max curl
+// STEP 7: Position cross beam so cylinder is fully extended at dump
 // =============================================================================
-// At max curl, cylinder is at BUCKET_CYL_LEN_MIN (retracted)
-// Cross beam mount is at Z = CROSS_BEAM_MOUNT_Z_OFFSET relative to arm
-// Solve: BUCKET_CYL_LEN_MIN^2 = (lug_y_curl - cb_y)^2 + (lug_z_curl - cb_z)^2
+_z_diff_dump = _lug_z_dump_limited - _cb_z;
+_sq_val_dump = pow(BUCKET_CYL_LEN_MAX, 2) - pow(_z_diff_dump, 2);
+_y_dist_dump_valid = !is_undef(_sq_val_dump) && (_sq_val_dump == _sq_val_dump) && (_sq_val_dump >= 0);
+_y_dist_dump = _y_dist_dump_valid ? sqrt(_sq_val_dump) : 500;
 
-_cb_z = CROSS_BEAM_MOUNT_Z_OFFSET; // Z position of cylinder mount on cross beam
-_z_diff_curl = _lug_z_curl - _cb_z;
-_sq_val_curl = pow(BUCKET_CYL_LEN_MIN, 2) - pow(_z_diff_curl, 2);
-
-// Safety check for valid geometry
-_y_dist_valid = !is_undef(_sq_val_curl) && (_sq_val_curl == _sq_val_curl) && (_sq_val_curl >= 0);
-_y_dist_curl = _y_dist_valid ? sqrt(_sq_val_curl) : 500;
-
-_cb1_calc = _lug_y_curl - _y_dist_curl;
+_cb1_calc = _lug_y_dump_limited - _y_dist_dump;
 CROSS_BEAM_1_POS = (is_undef(_cb1_calc) || _cb1_calc != _cb1_calc) ? (ARM_TIP_X * 0.65) : _cb1_calc;
 
-echo("=== CROSS BEAM POSITION DEBUG ===");
-echo("_cb_z (mount Z offset):", _cb_z);
-echo("_z_diff_curl:", _z_diff_curl);
-echo("_sq_val_curl:", _sq_val_curl);
-echo("_y_dist_valid:", _y_dist_valid);
-echo("_y_dist_curl:", _y_dist_curl);
-echo("_cb1_calc:", _cb1_calc);
-echo("CROSS_BEAM_1_POS (final):", CROSS_BEAM_1_POS);
+echo("=== CROSS BEAM POSITION (STEP 7) ===");
+echo("Target cylinder length at dump:", BUCKET_CYL_LEN_MAX, "mm (fully extended)");
+echo("CROSS_BEAM_1_POS:", CROSS_BEAM_1_POS, "mm");
 
 // =============================================================================
-// STEP 5: Verify dump geometry
+// STEP 8: Verify geometry at curl and dump positions
 // =============================================================================
-// Check that cylinder extended length reaches the dump position
-_cb1_safe = is_undef(CROSS_BEAM_1_POS) ? 1000 : CROSS_BEAM_1_POS;
-_cyl_len_max_safe = is_undef(BUCKET_CYL_LEN_MAX) ? 700 : BUCKET_CYL_LEN_MAX;
-_actual_len_dump = sqrt(pow(_lug_y_dump - _cb1_safe, 2) + pow(_lug_z_dump - _cb_z, 2));
-_dump_ok = _cyl_len_max_safe >= _actual_len_dump;
+_actual_len_curl = sqrt(pow(_lug_y_curl - CROSS_BEAM_1_POS, 2) + pow(_lug_z_curl - _cb_z, 2));
+_curl_margin = _actual_len_curl - BUCKET_CYL_LEN_MIN;
+_curl_ok = _actual_len_curl >= BUCKET_CYL_LEN_MIN;
 
-echo("=== BUCKET GEOMETRY VERIFICATION ===");
-echo("Bucket relative curl angle (at ground):", _bucket_rel_curl_angle);
-echo("Bucket relative dump angle (at raised):", _bucket_rel_dump_angle);
-echo("Cross beam position:", CROSS_BEAM_1_POS);
-echo("Required cylinder length at dump:", _actual_len_dump);
-echo("Available extended length:", BUCKET_CYL_LEN_MAX);
-echo("REACHES FULL DUMP?", _dump_ok ? "YES" : "NO - NEED LONGER STROKE");
+_actual_len_dump_check = sqrt(pow(_lug_y_dump_limited - CROSS_BEAM_1_POS, 2) + pow(_lug_z_dump_limited - _cb_z, 2));
 
-CROSS_BEAM_2_POS = ARM_TIP_X * 0.95;   // Second cross beam position (near bucket)
+_final_parallelism = bucket_cyl_to_back_angle_v2(ARM_MAX_ANGLE_LIMITED, _target_dump_angle, CROSS_BEAM_1_POS);
+
+echo("=== GEOMETRY VERIFICATION (STEP 8) ===");
+echo("--- At Max Curl ---");
+echo("Actual cylinder length at curl:", _actual_len_curl, "mm");
+echo("Cylinder retracted length:", BUCKET_CYL_LEN_MIN, "mm");
+echo("Margin at curl (extra retraction available):", _curl_margin, "mm (", _curl_margin/25.4, "inches)");
+echo("RETRACTS ENOUGH?", _curl_ok ? "YES" : "NO - CYLINDER TOO LONG");
+echo("--- At Max Dump ---");
+echo("Actual cylinder length at dump:", _actual_len_dump_check, "mm");
+echo("Cylinder extended length:", BUCKET_CYL_LEN_MAX, "mm");
+echo("FULLY EXTENDED?", abs(_actual_len_dump_check - BUCKET_CYL_LEN_MAX) < 1 ? "YES" : "CHECK");
+echo("--- Parallelism ---");
+echo("Angle from parallel at limit:", _final_parallelism, "degrees");
+echo("SAFE?", _final_parallelism >= _parallelism_limit ? "YES" : "NO");
+
+// Legacy function for compatibility
+function bucket_cyl_to_back_angle(arm_angle, target_bucket_abs_angle) = 
+    bucket_cyl_to_back_angle_v2(arm_angle, target_bucket_abs_angle, CROSS_BEAM_1_POS);
+
+CROSS_BEAM_2_POS = ARM_TIP_X * 0.95;
 
 ENGINE_HP = 25; // Desired horsepower (e.g., 25HP V-Twin)
 // Estimate engine weight (kg) based on HP (approximate for small engines)

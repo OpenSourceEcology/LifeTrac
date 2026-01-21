@@ -140,9 +140,22 @@ echo("CLEARANCE_FROM_FRONT_WHEELS =", ARM_PIVOT_Y + ARM_HORIZONTAL_REACH - WHEEL
 // This creates a smooth loop where the animation returns to start position
 animation_phase = animation_time < 0.5 ? (animation_time * 2) : (2 - animation_time * 2);
 
+// Use ARM_MAX_ANGLE_LIMITED (constrained by bucket cylinder parallelism) for animation
+// Fallback to ARM_MAX_ANGLE if LIMITED version not defined
+_arm_max_for_animation = is_undef(ARM_MAX_ANGLE_LIMITED) ? ARM_MAX_ANGLE : ARM_MAX_ANGLE_LIMITED;
+
 // Default arm position: lowered to ground (animation_phase=0)
-// ARM_GROUND_ANGLE is the angle below horizontal needed to reach ground
-ARM_LIFT_ANGLE = -ARM_GROUND_ANGLE + ARM_V2_OFFSET_ANGLE + (animation_phase * (60 + ARM_GROUND_ANGLE)); // Animate from ground to raised and back
+// Animate from ARM_MIN_ANGLE to _arm_max_for_animation
+// ARM_MIN_ANGLE = -ARM_GROUND_ANGLE + ARM_V2_OFFSET_ANGLE (calculated in params)
+ARM_LIFT_ANGLE = ARM_MIN_ANGLE + (animation_phase * (_arm_max_for_animation - ARM_MIN_ANGLE));
+
+echo("=== ARM ANIMATION PARAMETERS ===");
+echo("ARM_MIN_ANGLE:", ARM_MIN_ANGLE);
+echo("ARM_MAX_ANGLE (original):", ARM_MAX_ANGLE);
+echo("ARM_MAX_ANGLE_LIMITED:", ARM_MAX_ANGLE_LIMITED);
+echo("_arm_max_for_animation:", _arm_max_for_animation);
+echo("animation_phase:", animation_phase);
+echo("ARM_LIFT_ANGLE:", ARM_LIFT_ANGLE);
 
 // Cross beam positions along arm length (from pivot)
 // First cross beam positioned for bucket cylinder attachment
@@ -404,10 +417,13 @@ function bucket_cyl_length(arm_angle, bucket_tilt) =
 
 // Calculate bucket cylinder lengths at extreme positions
 // Check multiple combinations to find true min/max
+// Use ARM_MAX_ANGLE_LIMITED for the actual operating range
+_arm_max_calc = is_undef(ARM_MAX_ANGLE_LIMITED) ? ARM_MAX_ANGLE : ARM_MAX_ANGLE_LIMITED;
+
 _bc_len_1 = bucket_cyl_length(ARM_MIN_ANGLE, BUCKET_MIN_TILT);
 _bc_len_2 = bucket_cyl_length(ARM_MIN_ANGLE, BUCKET_MAX_TILT);
-_bc_len_3 = bucket_cyl_length(ARM_MAX_ANGLE, BUCKET_MIN_TILT);
-_bc_len_4 = bucket_cyl_length(ARM_MAX_ANGLE, BUCKET_MAX_TILT);
+_bc_len_3 = bucket_cyl_length(_arm_max_calc, BUCKET_MIN_TILT);
+_bc_len_4 = bucket_cyl_length(_arm_max_calc, BUCKET_MAX_TILT);
 _bc_len_5 = bucket_cyl_length(0, BUCKET_MIN_TILT);  // Arm horizontal
 _bc_len_6 = bucket_cyl_length(0, BUCKET_MAX_TILT);
 
@@ -428,6 +444,7 @@ _bc_min_calc = safe_min(_bc_len_1, _bc_len_2, _bc_len_3, _bc_len_4, _bc_len_5, _
 _bc_max_calc = safe_max(_bc_len_1, _bc_len_2, _bc_len_3, _bc_len_4, _bc_len_5, _bc_len_6);
 
 // Debug output to trace cylinder length calculations
+echo("DEBUG: _arm_max_calc (for cylinder sizing):", _arm_max_calc);
 echo("DEBUG: _bc_len_1 (min_angle, min_tilt):", _bc_len_1);
 echo("DEBUG: _bc_len_2 (min_angle, max_tilt):", _bc_len_2);
 echo("DEBUG: _bc_len_3 (max_angle, min_tilt):", _bc_len_3);
