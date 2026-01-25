@@ -4,6 +4,22 @@
 
 include <../lifetrac_v25_params.scad>
 
+// =============================================================================
+// PIVOT MOUNT ASSEMBLY PARAMETERS (from params file)
+// =============================================================================
+// These parameters define the replaceable pivot mount assembly
+// that slides into the arm from the bottom
+// Note: Main parameters are now in lifetrac_v25_params.scad
+// Local copies for backward compatibility:
+_PIVOT_MOUNT_PLATE_DIA = is_undef(PIVOT_MOUNT_PLATE_DIA) ? 152.4 : PIVOT_MOUNT_PLATE_DIA;
+_PIVOT_MOUNT_BOLT_COUNT = is_undef(PIVOT_MOUNT_BOLT_COUNT) ? 5 : PIVOT_MOUNT_BOLT_COUNT;
+_PIVOT_MOUNT_BOLT_DIA = is_undef(PIVOT_MOUNT_BOLT_DIA) ? BOLT_DIA_1_2 : PIVOT_MOUNT_BOLT_DIA;
+_PIVOT_MOUNT_BOLT_CIRCLE_DIA = is_undef(PIVOT_MOUNT_BOLT_CIRCLE_DIA) ? 114.3 : PIVOT_MOUNT_BOLT_CIRCLE_DIA;
+_PIVOT_MOUNT_CLEARANCE = is_undef(PIVOT_MOUNT_CLEARANCE) ? 25.4 : PIVOT_MOUNT_CLEARANCE;
+// Bolt angles array for non-uniform spacing (larger gap around slot)
+_PIVOT_MOUNT_BOLT_ANGLES = is_undef(PIVOT_MOUNT_BOLT_ANGLES) ? 
+    [295.5, 372.6, 449.8, 526.9, 604.1] : PIVOT_MOUNT_BOLT_ANGLES;
+
 arm_plate();
 
 module arm_plate(is_inner_plate=false) {
@@ -72,11 +88,27 @@ module arm_plate(is_inner_plate=false) {
     echo("hyd_bracket_pos (used):", hyd_bracket_pos);
     echo("hyd_circle_center_z:", hyd_circle_center_z);
 
+    // Pivot mount plate radius for rounded end
+    pivot_plate_r = _PIVOT_MOUNT_PLATE_DIA / 2;
+    
     difference() {
         union() {
-             // Main Horizontal Strip (Pivot to Elbow)
-            translate([-tube_h/2, 0, 0])
-            cube([overlap + main_tube_len + tube_h/2, plate_thick, tube_h]);
+            // SEMICIRCULAR END matching 6" pivot mount plate
+            // This creates a half-circle end at the pivot that matches the assembly
+            // Only the rear half (X <= 0) is the semicircle
+            intersection() {
+                translate([0, 0, tube_h/2])
+                rotate([-90, 0, 0])
+                cylinder(r=pivot_plate_r, h=plate_thick, $fn=64);
+                
+                // Cut to only keep the rear half (X <= 0)
+                translate([-pivot_plate_r, 0, tube_h/2 - pivot_plate_r])
+                cube([pivot_plate_r, plate_thick, pivot_plate_r * 2]);
+            }
+            
+            // Main Horizontal Strip (from pivot center to elbow)
+            // Starts at X=0 (pivot center) since semicircle covers X<0
+            cube([overlap + main_tube_len, plate_thick, tube_h]);
             
             // =============================================================
             // HYDRAULIC MOUNTING EXTENSION (below main tube)
@@ -139,8 +171,39 @@ module arm_plate(is_inner_plate=false) {
         translate([drop_len + cx, plate_thick/2, cz - tube_h]) // Corrected Z offset logic
             rotate([90,0,0]) cylinder(d=pivot_dia, h=plate_thick+2, center=true, $fn=32);
             
-        // 1. Pivot DOM Pipe Hole
-        translate([0, plate_thick/2, tube_h/2]) rotate([90,0,0]) cylinder(d=DOM_PIPE_OD, h=plate_thick+2, center=true, $fn=64);
+        // 1. PIVOT MOUNT SLOT AND MOUNTING HOLES
+        // Slot cut from bottom of arm to center for pivot mount assembly insertion
+        // The pivot mount assembly slides in from below and bolts to this plate
+        // Slot is oversized to accommodate welds between DOM and circular plates
+        
+        // Slot diameter includes weld clearance
+        _slot_dia = is_undef(PIVOT_MOUNT_SLOT_DIA) ? DOM_PIPE_OD + 25.4 : PIVOT_MOUNT_SLOT_DIA;
+        
+        // Slot: rectangular cut from bottom to center + semicircle for DOM + weld clearance
+        translate([0, plate_thick/2, 0]) 
+        rotate([90,0,0]) 
+        linear_extrude(height=plate_thick+2, center=true) {
+            // Rectangular slot from bottom edge to tube center
+            translate([-_slot_dia/2, -1])
+                square([_slot_dia, tube_h/2 + 1]);
+            // Semicircle at top of slot for DOM + weld clearance
+            translate([0, tube_h/2])
+                circle(d=_slot_dia, $fn=64);
+        }
+        
+        // 5 bolt holes for pivot mount assembly (on 4.5" bolt circle)
+        // These match the holes in the pivot mount circular plates
+        // NON-UNIFORM spacing: larger gap around slot, closer spacing elsewhere
+        translate([0, plate_thick/2, tube_h/2])
+        rotate([90,0,0])
+        for (i = [0:_PIVOT_MOUNT_BOLT_COUNT-1]) {
+            angle = _PIVOT_MOUNT_BOLT_ANGLES[i];
+            bolt_x = (_PIVOT_MOUNT_BOLT_CIRCLE_DIA / 2) * cos(angle);
+            bolt_z = (_PIVOT_MOUNT_BOLT_CIRCLE_DIA / 2) * sin(angle);
+            
+            translate([bolt_x, bolt_z, 0])
+                cylinder(d=_PIVOT_MOUNT_BOLT_DIA, h=plate_thick+2, center=true, $fn=24);
+        }
         
         // 2. Hydraulic Cylinder Mount Hole (in the circle below tube)
         // This is the primary mounting point for the lift cylinder
@@ -155,15 +218,18 @@ module arm_plate(is_inner_plate=false) {
             cylinder(d=BOLT_DIA_1_2, h=plate_thick+2, center=true, $fn=32);
         }
         
-        // 4. Tube Bolts (Rear Set - near pivot)
-        translate([overlap + overlap/2, plate_thick/2, tube_h/2]) // Position relative to overlap start
-            for (x = [-bolt_spacing_x/2, bolt_spacing_x/2])
+        // 4. Tube Bolts (Rear Set - near pivot mount assembly)
+        // Tube starts at 'overlap' from pivot center (pivot_plate_r + clearance)
+        // TUBE_BOLT_INSET is distance from tube edge to the NEAREST bolt
+        _tube_bolt_inset = is_undef(TUBE_BOLT_INSET) ? 50.8 : TUBE_BOLT_INSET; // Distance from tube end to nearest bolt
+        translate([overlap + _tube_bolt_inset, plate_thick/2, tube_h/2])
+            for (x = [0, bolt_spacing_x])
             for (z = [-bolt_spacing_y/2, bolt_spacing_y/2])
                 translate([x, 0, z]) rotate([90,0,0]) cylinder(d=BOLT_DIA_1_2, h=plate_thick+2, center=true, $fn=32);
 
         // 5. Tube Bolts (Front Set - near elbow)
-        translate([overlap + main_tube_len - overlap, plate_thick/2, tube_h/2])
-            for (x = [-bolt_spacing_x/2, bolt_spacing_x/2])
+        translate([overlap + main_tube_len - _tube_bolt_inset - bolt_spacing_x, plate_thick/2, tube_h/2])
+            for (x = [0, bolt_spacing_x])
             for (z = [-bolt_spacing_y/2, bolt_spacing_y/2])
                 translate([x, 0, z]) rotate([90,0,0]) cylinder(d=BOLT_DIA_1_2, h=plate_thick+2, center=true, $fn=32);
                 

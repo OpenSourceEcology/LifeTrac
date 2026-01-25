@@ -127,6 +127,81 @@ DOM_PIPE_ID = 38.1; // ID matching 1.5" pivot pin
 JIG_WALL_THICKNESS = 4; // Standard wall thickness for 3D printed jigs
 JIG_CLEARANCE = 0.5; // Clearance for fit
 
+// Tube bolt hole positioning
+TUBE_BOLT_INSET = 50.8;                 // 2" distance from tube edge to NEAREST bolt
+
+// =============================================================================
+// PIVOT MOUNT ASSEMBLY PARAMETERS
+// =============================================================================
+// Replaceable pivot mount assembly that slides into arm from bottom
+// Consists of 2 circular plates welded to a DOM tube section
+
+PIVOT_MOUNT_PLATE_DIA = 152.4;          // 6" = 152.4mm diameter circular plates
+PIVOT_MOUNT_PLATE_THICK = PLATE_1_4_INCH; // 1/4" plate thickness
+PIVOT_MOUNT_BOLT_COUNT = 5;             // Number of bolts per plate
+PIVOT_MOUNT_BOLT_DIA = BOLT_DIA_1_2;    // 1/2" mounting bolts
+PIVOT_MOUNT_BOLT_CIRCLE_DIA = 114.3;    // 4.5" bolt circle diameter
+
+// Slot position and NON-UNIFORM bolt spacing
+// Slot is at bottom (270°) for DOM to slide in from below
+// In arm plate coordinates: 0°=right (toward arm tip), 90°=up, 180°=left, 270°=down (toward slot)
+PIVOT_MOUNT_SLOT_ANGLE = 270;           // Angle where DOM slot is located (bottom)
+PIVOT_MOUNT_BOLT_SLOT_CLEARANCE = 127;  // 5" total arc clearance across slot for bolts (2.5" each side)
+
+// Calculate slot gap angle from clearance distance
+// Arc length = radius × angle(radians), so angle(deg) = clearance / radius × 180/π
+_pivot_bolt_radius = PIVOT_MOUNT_BOLT_CIRCLE_DIA / 2;  // 57.15mm
+PIVOT_MOUNT_SLOT_GAP_ANGLE = PIVOT_MOUNT_BOLT_SLOT_CLEARANCE / _pivot_bolt_radius * 180 / PI;  // ~50.9° for 2"
+
+// Non-uniform spacing: slot gap is larger, remaining bolts are closer
+// With N bolts: 1 slot gap + (N-1) regular gaps = 360°
+// regular_gap = (360° - slot_gap) / (N-1)
+_pivot_regular_gap = (360 - PIVOT_MOUNT_SLOT_GAP_ANGLE) / (PIVOT_MOUNT_BOLT_COUNT - 1);
+
+// Calculate bolt angles array
+// Two bolts flank the slot at: slot_angle ± half_slot_gap
+// Bolt A (CCW from slot): slot_angle - half_gap = 270° - 25.45° ≈ 244.55°
+// Bolt B (CW from slot):  slot_angle + half_gap = 270° + 25.45° ≈ 295.45°
+// Remaining bolts fill in with regular spacing going CCW from Bolt B
+_half_slot_gap = PIVOT_MOUNT_SLOT_GAP_ANGLE / 2;
+_bolt_A_angle = PIVOT_MOUNT_SLOT_ANGLE - _half_slot_gap;  // ~244.55° (lower-left, just before slot)
+_bolt_B_angle = PIVOT_MOUNT_SLOT_ANGLE + _half_slot_gap;  // ~295.45° (lower-right, just after slot)
+
+// Build array: start at Bolt B (after slot), go CCW around, end at Bolt A (before slot)
+PIVOT_MOUNT_BOLT_ANGLES = [
+    for (i = [0:PIVOT_MOUNT_BOLT_COUNT-1])
+        _bolt_B_angle + i * _pivot_regular_gap
+];
+// Result for 5 bolts: [295.45, 372.7, 449.9, 527.2, 604.4] = [295.45°, 12.7°, 89.9°, 167.2°, 244.4°]
+// Bolt 0 (295.45°) and Bolt 4 (244.4°) flank the 270° slot
+
+// Echo clearance info for verification
+echo("=== PIVOT MOUNT BOLT PATTERN ===");
+echo(str("Slot at: ", PIVOT_MOUNT_SLOT_ANGLE, "° (bottom of arm)"));
+echo(str("Slot gap: ", round(PIVOT_MOUNT_SLOT_GAP_ANGLE * 10) / 10, "° (", 
+         round(PIVOT_MOUNT_BOLT_SLOT_CLEARANCE * 10) / 10, "mm arc)"));
+echo(str("Regular gap: ", round(_pivot_regular_gap * 10) / 10, "°"));
+echo(str("Bolt flanking slot (CCW): ", round(_bolt_A_angle * 10) / 10, "° (lower-left)"));
+echo(str("Bolt flanking slot (CW):  ", round(_bolt_B_angle * 10) / 10, "° (lower-right)"));
+echo("All bolt angles (raw): ", PIVOT_MOUNT_BOLT_ANGLES);
+
+PIVOT_MOUNT_WIDTH = TUBE_2X6_1_4[0];    // Assembly width = arm tube width (50.8mm/2")
+PIVOT_MOUNT_DOM_LENGTH = PIVOT_MOUNT_WIDTH; // DOM tube length between plates
+PIVOT_MOUNT_CLEARANCE = 25.4;           // 1" clearance from plate OD to tube start
+
+// Weld parameters - torus (donut) shape at DOM-to-plate joints
+PIVOT_MOUNT_WELD_DIA = 6.35;            // 0.25" diameter of weld bead (torus cross-section)
+// Weld torus center is at DOM OD radius, so weld OD = DOM_OD + weld_dia
+PIVOT_MOUNT_WELD_OD = DOM_PIPE_OD + PIVOT_MOUNT_WELD_DIA;  // ~57.15mm
+
+// Slot cutout diameter = weld OD + 1/4" clearance
+PIVOT_MOUNT_WELD_SLOT_CLEARANCE = 6.35; // 0.25" clearance around weld in slot cutout
+PIVOT_MOUNT_SLOT_DIA = PIVOT_MOUNT_WELD_OD + PIVOT_MOUNT_WELD_SLOT_CLEARANCE;  // ~63.5mm
+
+// Calculate tube start offset from pivot center
+// Tube starts at: plate radius + clearance = 76.2 + 25.4 = 101.6mm
+PIVOT_MOUNT_TUBE_START = PIVOT_MOUNT_PLATE_DIA/2 + PIVOT_MOUNT_CLEARANCE;
+
 // Define ARM_MIN_ANGLE and ARM_MAX_ANGLE later after geometry is calculated
 // ARM_MIN_ANGLE = -ARM_GROUND_ANGLE;     // Lowest position (at ground)
 // ARM_MAX_ANGLE = 60;                     // Maximum raised position
@@ -323,7 +398,9 @@ _bend_rad = (180 - ARM_SHAPE_ANGLE);
 _geom_correction = _tube_offset * (sin(_bend_rad) - (1 - cos(_bend_rad)) / tan(_bend_rad));
 
 // Set Lengths
-ARM_OVERLAP = 76.2; 
+// ARM_OVERLAP defines how far the plate extends behind the tube start
+// Updated to account for 6" pivot mount plate + 1" clearance
+ARM_OVERLAP = PIVOT_MOUNT_PLATE_DIA/2 + PIVOT_MOUNT_CLEARANCE; // 76.2 + 25.4 = 101.6mm
 ARM_MAIN_LEN = _L_main_kinematic - ARM_OVERLAP + _geom_correction; 
 
 ARM_DROP_EXT = 80; 

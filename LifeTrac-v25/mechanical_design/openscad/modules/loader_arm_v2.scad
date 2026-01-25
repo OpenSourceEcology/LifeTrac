@@ -55,6 +55,7 @@ module loader_arm_v2(angle=0, side="left") {
 
     rotate([0, -angle, 0]) {
         // 1. Main Tube
+        // Tube starts at 'overlap' from pivot center (1" clearance from 6" plate)
         translate([overlap, 0, 0])
         difference() {
             // Hollow Rounded Tube
@@ -76,13 +77,14 @@ module loader_arm_v2(angle=0, side="left") {
                     translate([tube_rad, tube_w-tube_rad]) circle(r=tube_rad);
                 }
             }
-            // Rear Holes
-             for (x = [overlap/2 - bolt_spacing_x/2, overlap/2 + bolt_spacing_x/2])
+            // Rear Holes (near pivot mount - parametric inset from tube start)
+            // TUBE_BOLT_INSET is distance from tube edge to the NEAREST bolt
+            _tube_bolt_inset = is_undef(TUBE_BOLT_INSET) ? 50.8 : TUBE_BOLT_INSET; // Use param or default 2"
+             for (x = [_tube_bolt_inset, _tube_bolt_inset + bolt_spacing_x])
              for (z = [tube_h/2 - bolt_spacing_y/2, tube_h/2 + bolt_spacing_y/2])
                  translate([x, tube_w/2, z]) rotate([90,0,0]) cylinder(d=BOLT_DIA_1_2, h=tube_w+10, center=true, $fn=32);
-            // Front Holes
-            translate([main_tube_len - overlap, 0, 0])
-             for (x = [overlap/2 - bolt_spacing_x/2, overlap/2 + bolt_spacing_x/2])
+            // Front Holes (near elbow - parametric inset from tube end)
+             for (x = [main_tube_len - _tube_bolt_inset - bolt_spacing_x, main_tube_len - _tube_bolt_inset])
              for (z = [tube_h/2 - bolt_spacing_y/2, tube_h/2 + bolt_spacing_y/2])
                  translate([x, tube_w/2, z]) rotate([90,0,0]) cylinder(d=BOLT_DIA_1_2, h=tube_w+10, center=true, $fn=32);
         }
@@ -177,12 +179,96 @@ module loader_arm_v2(angle=0, side="left") {
             }
         }
         
-        // DOM Pipe (Through everything)
-        translate([0, tube_w/2, tube_h/2]) rotate([90,0,0]) 
+        // PIVOT MOUNT ASSEMBLY
+        // Replaceable assembly with DOM tube welded between two 6" circular plates
+        // Slides into arm from below and bolts to arm plates
+        // See parts/pivot_mount_assembly.scad for full assembly
+        translate([0, tube_w/2, tube_h/2]) {
+            // DOM Pipe (Through everything)
+            rotate([90, 0, 0]) 
             difference() {
                 cylinder(d=DOM_PIPE_OD, h=SANDWICH_SPACING, center=true, $fn=64);
                 cylinder(d=DOM_PIPE_ID, h=SANDWICH_SPACING + 2, center=true, $fn=64);
             }
+            
+            // Circular mounting plates (6" diameter) with 5 bolt holes
+            // These are welded to the DOM tube and bolt to the arm plates
+            _plate_dia = is_undef(PIVOT_MOUNT_PLATE_DIA) ? 152.4 : PIVOT_MOUNT_PLATE_DIA;
+            _plate_thick = PLATE_1_4_INCH;
+            _bolt_count = is_undef(PIVOT_MOUNT_BOLT_COUNT) ? 5 : PIVOT_MOUNT_BOLT_COUNT;
+            _bolt_circle_dia = is_undef(PIVOT_MOUNT_BOLT_CIRCLE_DIA) ? 114.3 : PIVOT_MOUNT_BOLT_CIRCLE_DIA;
+            _bolt_dia = is_undef(PIVOT_MOUNT_BOLT_DIA) ? BOLT_DIA_1_2 : PIVOT_MOUNT_BOLT_DIA;
+            // Bolt angles array for non-uniform spacing (larger gap around slot)
+            _bolt_angles = is_undef(PIVOT_MOUNT_BOLT_ANGLES) ? 
+                [295.5, 372.6, 449.8, 526.9, 604.1] : PIVOT_MOUNT_BOLT_ANGLES;
+            
+            color("DarkSlateGray")
+            rotate([90, 0, 0]) {
+                // Front plate with bolt holes
+                translate([0, 0, tube_w/2 - _plate_thick])
+                difference() {
+                    cylinder(d=_plate_dia, h=_plate_thick, $fn=64);
+                    translate([0, 0, -1])
+                        cylinder(d=DOM_PIPE_OD, h=_plate_thick + 2, $fn=64);
+                    // 5 bolt holes using pre-calculated angles (non-uniform spacing)
+                    for (i = [0:_bolt_count-1]) {
+                        angle = _bolt_angles[i];
+                        bolt_x = (_bolt_circle_dia / 2) * cos(angle);
+                        bolt_y = (_bolt_circle_dia / 2) * sin(angle);
+                        translate([bolt_x, bolt_y, -1])
+                            cylinder(d=_bolt_dia, h=_plate_thick + 2, $fn=24);
+                    }
+                }
+                
+                // Rear plate with bolt holes
+                translate([0, 0, -tube_w/2])
+                difference() {
+                    cylinder(d=_plate_dia, h=_plate_thick, $fn=64);
+                    translate([0, 0, -1])
+                        cylinder(d=DOM_PIPE_OD, h=_plate_thick + 2, $fn=64);
+                    // 5 bolt holes using pre-calculated angles (non-uniform spacing)
+                    for (i = [0:_bolt_count-1]) {
+                        angle = _bolt_angles[i];
+                        bolt_x = (_bolt_circle_dia / 2) * cos(angle);
+                        bolt_y = (_bolt_circle_dia / 2) * sin(angle);
+                        translate([bolt_x, bolt_y, -1])
+                            cylinder(d=_bolt_dia, h=_plate_thick + 2, $fn=24);
+                    }
+                }
+            }
+            
+            // WELD VISUALIZATION - Red torus (donut) at DOM-to-plate joints
+            // These show the welded area between DOM tube and circular plates
+            // Torus is created by rotating a circle around the DOM centerline
+            // 4 welds per plate: inside and outside face of each plate
+            _weld_dia = is_undef(PIVOT_MOUNT_WELD_DIA) ? 6.35 : PIVOT_MOUNT_WELD_DIA;  // 0.25" weld bead diameter
+            color("Red", 0.8)
+            rotate([90, 0, 0]) {
+                // FRONT PLATE WELDS
+                // Inside face (toward center of arm)
+                translate([0, 0, tube_w/2 - _plate_thick])
+                    rotate_extrude(angle=360, $fn=64)
+                    translate([DOM_PIPE_OD/2, 0])
+                        circle(d=_weld_dia, $fn=24);
+                // Outside face (toward outside of arm)
+                translate([0, 0, tube_w/2])
+                    rotate_extrude(angle=360, $fn=64)
+                    translate([DOM_PIPE_OD/2, 0])
+                        circle(d=_weld_dia, $fn=24);
+                
+                // REAR PLATE WELDS
+                // Inside face (toward center of arm)
+                translate([0, 0, -tube_w/2 + _plate_thick])
+                    rotate_extrude(angle=360, $fn=64)
+                    translate([DOM_PIPE_OD/2, 0])
+                        circle(d=_weld_dia, $fn=24);
+                // Outside face (toward outside of arm)
+                translate([0, 0, -tube_w/2])
+                    rotate_extrude(angle=360, $fn=64)
+                    translate([DOM_PIPE_OD/2, 0])
+                        circle(d=_weld_dia, $fn=24);
+            }
+        }
         
         // NOTE: Hydraulic mounting is now integrated into the arm_plate profile
         // The plates extend downward with the 3" circle mounting point
