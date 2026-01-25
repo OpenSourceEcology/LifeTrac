@@ -172,23 +172,23 @@ module arm_plate(is_inner_plate=false) {
             rotate([90,0,0]) cylinder(d=pivot_dia, h=plate_thick+2, center=true, $fn=32);
             
         // 1. PIVOT MOUNT SLOT AND MOUNTING HOLES
-        // Slot cut from bottom of arm to center for pivot mount assembly insertion
-        // The pivot mount assembly slides in from below and bolts to this plate
+        // Slot cut from back of arm to center for pivot mount assembly insertion
+        // The pivot mount assembly slides in from the rear and bolts to this plate
         // Slot is oversized to accommodate welds between DOM and circular plates
         
         // Slot diameter includes weld clearance
         _slot_dia = is_undef(PIVOT_MOUNT_SLOT_DIA) ? DOM_PIPE_OD + 25.4 : PIVOT_MOUNT_SLOT_DIA;
         
-        // Slot: rectangular cut from bottom to center + semicircle for DOM + weld clearance
-        translate([0, plate_thick/2, 0]) 
+        // Slot: rectangular cut from back edge (X negative) to center + semicircle for DOM + weld clearance
+        // Slot faces 180° (back/left, toward X negative)
+        translate([0, plate_thick/2, tube_h/2]) 
         rotate([90,0,0]) 
         linear_extrude(height=plate_thick+2, center=true) {
-            // Rectangular slot from bottom edge to tube center
-            translate([-_slot_dia/2, -1])
-                square([_slot_dia, tube_h/2 + 1]);
-            // Semicircle at top of slot for DOM + weld clearance
-            translate([0, tube_h/2])
-                circle(d=_slot_dia, $fn=64);
+            // Rectangular slot from back edge to tube center
+            translate([-pivot_plate_r - 1, -_slot_dia/2])
+                square([pivot_plate_r + 1, _slot_dia]);
+            // Semicircle at end of slot for DOM + weld clearance
+            circle(d=_slot_dia, $fn=64);
         }
         
         // 5 bolt holes for pivot mount assembly (on 4.5" bolt circle)

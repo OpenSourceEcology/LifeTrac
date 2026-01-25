@@ -143,9 +143,9 @@ PIVOT_MOUNT_BOLT_DIA = BOLT_DIA_1_2;    // 1/2" mounting bolts
 PIVOT_MOUNT_BOLT_CIRCLE_DIA = 114.3;    // 4.5" bolt circle diameter
 
 // Slot position and NON-UNIFORM bolt spacing
-// Slot is at bottom (270°) for DOM to slide in from below
-// In arm plate coordinates: 0°=right (toward arm tip), 90°=up, 180°=left, 270°=down (toward slot)
-PIVOT_MOUNT_SLOT_ANGLE = 270;           // Angle where DOM slot is located (bottom)
+// Slot is at back (180°) for DOM to slide in from rear of arm
+// In arm plate coordinates: 0°=right (toward arm tip), 90°=up, 180°=left (back), 270°=down
+PIVOT_MOUNT_SLOT_ANGLE = 180;           // Angle where DOM slot is located (back of arm)
 PIVOT_MOUNT_BOLT_SLOT_CLEARANCE = 127;  // 5" total arc clearance across slot for bolts (2.5" each side)
 
 // Calculate slot gap angle from clearance distance
