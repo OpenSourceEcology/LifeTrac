@@ -101,10 +101,89 @@ module cross_beam_arc_slot(beam_distance, slot_width) {
     }
 }
 
+// Arc slot cutout for hydraulic bracket clearance
+// Creates an arc-shaped divot with gusset profile that allows the arm's 
+// hydraulic mounting extension to rotate through without collision
+module hydraulic_bracket_arc_slot(bracket_pos, bracket_dia, clearance) {
+    // Pivot point in panel local coordinates
+    pivot_x = PIVOT_PANEL_X;
+    pivot_y = PIVOT_PANEL_Y;
+    
+    // Bracket circle parameters
+    circle_r = bracket_dia / 2;
+    tube_h = is_undef(TUBE_2X6_1_4) ? 152.4 : TUBE_2X6_1_4[1];  // 6" tube height
+    tube_w = is_undef(TUBE_2X6_1_4) ? 50.8 : TUBE_2X6_1_4[0];   // 2" tube width
+    
+    // Cutout depth - only 3" deep (not full bracket depth)
+    cutout_depth = 76.2;  // 3 inches
+    
+    // Gusset attachment length (matching arm plate: 3x tube width)
+    gusset_attach_len = tube_w * 3;
+    
+    // The cutout profile mirrors the arm plate extension but shallower
+    // Circle center offset from arm axis (at tube bottom - cutout_depth/2)
+    cutout_circle_r = cutout_depth / 2;
+    
+    // Offset perpendicular to arm axis (below the arm)
+    perp_offset = tube_h/2 + cutout_circle_r;
+    
+    // Total cutout radius (half of cutout depth + clearance)
+    cutout_r = cutout_circle_r + clearance;
+    
+    // Half of gusset attachment (for the triangular profile)
+    gusset_half = gusset_attach_len / 2 + clearance;
+    
+    // Safety check for undefined angles
+    safe_min_angle = is_undef(ARM_MIN_ANGLE) ? -45 : ARM_MIN_ANGLE;
+    safe_max_angle = is_undef(ARM_MAX_ANGLE) ? 60 : ARM_MAX_ANGLE;
+    
+    // Arc sweep with buffer
+    arc_start = safe_min_angle - 5;
+    arc_end = safe_max_angle + 5;
+    arc_steps = 40;
+    
+    // Generate arc slot with gusset profile by sweeping the shape along the arc path
+    // The gusset rotates WITH the arm, so wide edge stays perpendicular to arm direction
+    translate([pivot_x, pivot_y])
+    for (i = [0:arc_steps-1]) {
+        angle1 = arc_start + i * (arc_end - arc_start) / arc_steps;
+        angle2 = arc_start + (i + 1) * (arc_end - arc_start) / arc_steps;
+        
+        hull() {
+            // Profile at angle1 - rotates with arm
+            rotate([0, 0, angle1]) {
+                // Wide edge at tube bottom (along arm direction)
+                translate([bracket_pos - gusset_half, -tube_h/2 - clearance])
+                square([gusset_attach_len + 2*clearance, 1]);
+                
+                // Circle at bottom of gusset (perpendicular to arm, below it)
+                translate([bracket_pos, -perp_offset])
+                circle(r=cutout_r, $fn=24);
+            }
+            
+            // Profile at angle2 - rotates with arm
+            rotate([0, 0, angle2]) {
+                // Wide edge at tube bottom
+                translate([bracket_pos - gusset_half, -tube_h/2 - clearance])
+                square([gusset_attach_len + 2*clearance, 1]);
+                
+                // Circle at bottom of gusset
+                translate([bracket_pos, -perp_offset])
+                circle(r=cutout_r, $fn=24);
+            }
+        }
+    }
+}
+
 // Main side panel module with all features (holes, slots)
 // is_inner: true for inner panels (with arc slots), false for outer panels
 module side_panel(is_inner = false) {
     slot_width = CROSS_BEAM_SIZE + 2 * CROSS_BEAM_CLEARANCE;  // Total slot width with clearance
+    
+    // Hydraulic bracket parameters (with fallback defaults)
+    hyd_bracket_pos = is_undef(HYD_BRACKET_ARM_POS) ? 300 : HYD_BRACKET_ARM_POS;
+    hyd_bracket_dia = is_undef(HYD_BRACKET_CIRCLE_DIA) ? 76.2 : HYD_BRACKET_CIRCLE_DIA;
+    hyd_bracket_clearance = is_undef(HYD_BRACKET_CUTOUT_CLEARANCE) ? 15 : HYD_BRACKET_CUTOUT_CLEARANCE;
     
     difference() {
         linear_extrude(height=PANEL_THICKNESS)
@@ -122,6 +201,10 @@ module side_panel(is_inner = false) {
                 if (CROSS_BEAM_2_POS < WHEEL_BASE + 200) {
                     cross_beam_arc_slot(CROSS_BEAM_2_POS, slot_width);
                 }
+                
+                // Hydraulic bracket arc slot (inner panels only)
+                // This prevents the bracket mounting bolts from colliding with the wall
+                hydraulic_bracket_arc_slot(hyd_bracket_pos, hyd_bracket_dia, hyd_bracket_clearance);
             }
         }
         

@@ -128,7 +128,7 @@ echo("ARM_PIVOT_Z =", ARM_PIVOT_Z);
 echo("MIN_HORIZONTAL_REACH =", MIN_HORIZONTAL_REACH);
 echo("CALCULATED ARM_LENGTH =", ARM_LENGTH);
 echo("ARM_GROUND_ANGLE (degrees below horizontal) =", ARM_GROUND_ANGLE);
-// ARM_HORIZONTAL_REACH not defined in params, calculate locally if needed
+// ARM_HORIZONTAL_REACH not defined in params, calculate locally
 ARM_HORIZONTAL_REACH = ARM_LENGTH * cos(ARM_GROUND_ANGLE);
 echo("ACTUAL_HORIZONTAL_REACH =", ARM_HORIZONTAL_REACH);
 echo("BUCKET_TIP_Y (at ground) =", ARM_PIVOT_Y + ARM_HORIZONTAL_REACH);
@@ -263,48 +263,161 @@ BUCKET_MAX_DUMP = -45;
 // =============================================================================
 // HYDRAULIC CYLINDER MOUNTING POINTS
 // =============================================================================
+// 
+// DESIGN PRINCIPLES FOR CYLINDER SELECTION & MOUNTING:
+// =====================================================
+//
+// 1. MECHANICAL ADVANTAGE:
+//    - Moving mount further from pivot INCREASES mechanical advantage
+//    - Moment arm = perpendicular distance from pivot to cylinder force line
+//    - Greater moment arm = less cylinder force needed for same lift capacity
+//    - This allows using a SMALLER bore cylinder (cheaper, lighter)
+//
+// 2. STROKE REQUIREMENT:
+//    - Moving mount further out INCREASES required stroke
+//    - Arc length = radius × angle (in radians)
+//    - Must select standard stroke size that covers full range
+//
+// 3. CLOSED LENGTH CONSTRAINT:
+//    - Cylinder closed length ≈ stroke + bore + mounting hardware
+//    - Typical: closed_length = stroke × 1.3 to 1.5 (rule of thumb)
+//    - Must fit between base mount and arm mount at minimum extension
+//
+// 4. CYLINDER ANGLE:
+//    - Ideally ~90° to arm at mid-stroke for best force transfer
+//    - Too shallow = wasted force, too steep = poor leverage
+//    - Optimal: perpendicular to arm at working position
+//
+// 5. ADDITIONAL CONSIDERATIONS:
+//    a) BOTTOMING OUT: Cylinder should never fully retract or extend
+//       - Leave 5-10% margin at both ends of stroke
+//       - Hydraulic cushioning at ends protects against shock loads
+//    
+//    b) ROD BUCKLING: Rod in compression (pushing) must not buckle
+//       - Rod diameter typically 60% of bore
+//       - Long strokes may need larger rod or guided rod
+//    
+//    c) MOUNTING STYLE: Affects closed length and force angles
+//       - Clevis/pin mounts allow rotation (used here)
+//       - Flange mounts require precise alignment
+//       - Trunnion mounts for heavy loads with rotation
+//    
+//    d) SPEED CONSIDERATIONS: 
+//       - Smaller bore = faster motion for same flow rate
+//       - Consider max flow from hydraulic pump
+//    
+//    e) COST OPTIMIZATION:
+//       - Standard bore sizes are cheaper (mass produced)
+//       - Smaller bore + higher pressure often cheaper than larger bore
+//       - But higher pressure requires better seals and fittings
+//
+// 5. STANDARD SIZES (prefer these for availability & cost):
+//    Bore (inches): 1.5, 2, 2.5, 3, 3.5, 4, 5
+//    Stroke (mm):   150, 200, 250, 300, 350, 400, 450, 500, 600
+//
+// =============================================================================
 
-// Lift cylinder mounting points (arms pivot at rear, cylinders attach forward)
-// Optimized for leverage at bottom position (cylinder pushes up/forward from low rear point)
+// --- STANDARD CYLINDER SIZES ---
+STANDARD_BORES_IN = [1.5, 2, 2.5, 3, 3.5, 4, 5];  // inches
+STANDARD_BORES_MM = [38.1, 50.8, 63.5, 76.2, 88.9, 101.6, 127];  // mm
+STANDARD_STROKES_MM = [150, 200, 250, 300, 350, 400, 450, 500, 600];
 
-// 1. Define Arm Attachment Point
-LIFT_CYL_ARM_OFFSET = ARM_LENGTH * 0.25;     // Attachment point along arm from pivot (proportional)
+// Function to select next larger standard stroke
+function select_standard_stroke(required_stroke) = 
+    required_stroke <= 150 ? 150 :
+    required_stroke <= 200 ? 200 :
+    required_stroke <= 250 ? 250 :
+    required_stroke <= 300 ? 300 :
+    required_stroke <= 350 ? 350 :
+    required_stroke <= 400 ? 400 :
+    required_stroke <= 450 ? 450 :
+    required_stroke <= 500 ? 500 :
+    required_stroke <= 600 ? 600 : 
+    ceil(required_stroke / 50) * 50;
 
-// 2. Calculate Arm Attachment Position in World Coords at Lowest Angle (Bucket on Ground)
-//    Pivot is at [0, ARM_PIVOT_Y, ARM_PIVOT_Z]
-_theta_min = -ARM_GROUND_ANGLE;
-_attach_y_world = ARM_PIVOT_Y + LIFT_CYL_ARM_OFFSET * cos(_theta_min);
-_attach_z_world = ARM_PIVOT_Z + LIFT_CYL_ARM_OFFSET * sin(_theta_min);
+// Function to select next larger standard bore (in mm)
+function select_standard_bore(required_bore_mm) = 
+    let(req_in = required_bore_mm / 25.4)
+    req_in <= 1.5 ? 38.1 :
+    req_in <= 2.0 ? 50.8 :
+    req_in <= 2.5 ? 63.5 :
+    req_in <= 3.0 ? 76.2 :
+    req_in <= 3.5 ? 88.9 :
+    req_in <= 4.0 ? 101.6 : 127;
 
-// 3. Determine Base Z Height (Constrained by Axle Clearance)
-//    Must clear the rear axle (FRAME_Z_OFFSET + WHEEL_DIAMETER/2)
-_min_base_z = FRAME_Z_OFFSET + WHEEL_DIAMETER/2 + 80; // 80mm clearance
-LIFT_CYL_BASE_Z = _min_base_z;
+// Typical closed length ratio (closed_length / stroke)
+CLOSED_LENGTH_RATIO = 1.4;
 
-// 4. Calculate Base Y for Optimal Leverage Angle
-//    We want the cylinder to push at an angle ~45-50 degrees from horizontal
-//    to be roughly perpendicular to the arm (which is at ~-45 degrees).
-//    Slope m = tan(target_angle).
-//    Y = Attach_Y - (Attach_Z - Base_Z) / m
-_target_cyl_angle = 50; // Degrees
-_calc_base_y = _attach_y_world - (_attach_z_world - LIFT_CYL_BASE_Z) / tan(_target_cyl_angle);
+// --- HYDRAULIC PRESSURE ---
+HYDRAULIC_PRESSURE_PSI = 3000;         // Operating pressure (PSI)
 
-// 5. Clamp Y to valid frame range (0 to WHEEL_BASE/2)
-LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y));
+// --- MOUNTING POINT CONFIGURATION ---
+// All cylinder geometry is defined in lifetrac_v25_params.scad:
+//   LIFT_CYL_ARM_OFFSET (= HYD_BRACKET_ARM_POS = ARM_LENGTH * 0.35)
+//   LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z
+// Do not redefine these values here.
+
+// =============================================================================
+// LIFT CYLINDER SPECIFICATIONS
+// =============================================================================
+// All lift cylinder values are defined in lifetrac_v25_params.scad:
+//   LIFT_CYLINDER_BORE, LIFT_CYLINDER_ROD, LIFT_CYLINDER_STROKE
+//   LIFT_CYL_LEN_MIN, LIFT_CYL_LEN_MAX
+//   LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z
+// To change cylinder size, edit the params file.
+
+// =============================================================================
+// DERIVED VALUES FOR DISPLAY AND VERIFICATION
+// =============================================================================
+// Use the lengths calculated in params file
+// _LIFT_CYL_CLOSED_LEN and LIFT_CYL_LEN_MIN/MAX are defined in params
+
+// Local aliases for verification echo statements
+_LIFT_CYL_CLOSED = LIFT_CYL_LEN_MIN;
+_LIFT_CYL_EXTENDED = LIFT_CYL_LEN_MAX;
+
+// Pin-to-pin distance function for verification
+function _lift_pin_to_pin(angle, arm_offset, pivot_y, pivot_z, base_y, base_z) =
+    let(
+        bracket_drop = 114.3,
+        attach_y = pivot_y + arm_offset * cos(angle) + bracket_drop * sin(angle),
+        attach_z = pivot_z + arm_offset * sin(angle) - bracket_drop * cos(angle),
+        dy = attach_y - base_y,
+        dz = attach_z - base_z
+    )
+    sqrt(dy*dy + dz*dz);
+
+// Calculate pin-to-pin distances for verification
+_PIN_TO_PIN_MIN = _lift_pin_to_pin(ARM_MIN_ANGLE, LIFT_CYL_ARM_OFFSET,
+                                    ARM_PIVOT_Y, ARM_PIVOT_Z, LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z);
+_PIN_TO_PIN_MAX = _lift_pin_to_pin(ARM_MAX_ANGLE_LIMITED, LIFT_CYL_ARM_OFFSET,
+                                    ARM_PIVOT_Y, ARM_PIVOT_Z, LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z);
+
+echo("=== LIFT CYLINDER PARAMETRIC SIZING ===");
+echo("ARM_MIN_ANGLE:", ARM_MIN_ANGLE, "degrees");
+echo("ARM_MAX_ANGLE_LIMITED:", ARM_MAX_ANGLE_LIMITED, "degrees");
+echo("LIFT_CYL_ARM_OFFSET:", LIFT_CYL_ARM_OFFSET, "mm");
+echo("--- SELECTED CYLINDER ---");
+echo("LIFT_CYLINDER_STROKE:", LIFT_CYLINDER_STROKE, "mm (", LIFT_CYLINDER_STROKE/25.4, "inches)");
+echo("LIFT_CYLINDER_BORE:", LIFT_CYLINDER_BORE, "mm");
+echo("Cylinder closed length:", _LIFT_CYL_CLOSED, "mm");
+echo("Cylinder extended length:", _LIFT_CYL_EXTENDED, "mm");
+echo("--- CALCULATED MOUNT POSITIONS ---");
+echo("LIFT_CYL_BASE_Y:", LIFT_CYL_BASE_Y, "mm");
+echo("LIFT_CYL_BASE_Z:", LIFT_CYL_BASE_Z, "mm");
+echo("--- VERIFICATION ---");
+echo("Pin-to-pin at MIN angle:", _PIN_TO_PIN_MIN, "mm");
+echo("Pin-to-pin at MAX angle:", _PIN_TO_PIN_MAX, "mm");
+echo("Margin at closed (should be >= 0):", _PIN_TO_PIN_MIN - _LIFT_CYL_CLOSED, "mm");
+echo("Margin at extended (should be >= 0):", _LIFT_CYL_EXTENDED - _PIN_TO_PIN_MAX, "mm");
 
 // Bucket cylinder mounting points
-// Cylinders now attach to the cross beam instead of individual arms
-BUCKET_CYL_ARM_POS = CROSS_BEAM_1_POS;       // Mount at cross beam position
-BUCKET_CYL_ARM_Z = CROSS_BEAM_SIZE/2 + 30;   // Height above cross beam centerline
-
-// Cylinder X spacing - positioned inward to clear side wall plates
-// Inner panels are at TRACK_WIDTH/2 - SANDWICH_SPACING/2 from center
-INNER_PANEL_X = TRACK_WIDTH/2 - SANDWICH_SPACING/2;  // 390mm from center
-BUCKET_CYL_X_SPACING = INNER_PANEL_X - 100;          // 100mm clearance from inner panels
-
-// Bucket cylinder attaches to QA plate near top
-BUCKET_CYL_BUCKET_Y = 100;                   // Mount point on bucket QA plate (forward of pivot)
-BUCKET_CYL_BUCKET_Z = BOBCAT_QA_HEIGHT - 60; // Height above pivot (where cylinder attaches at top of QA)
+BUCKET_CYL_ARM_POS = CROSS_BEAM_1_POS;
+BUCKET_CYL_ARM_Z = CROSS_BEAM_SIZE/2 + 30;
+INNER_PANEL_X = TRACK_WIDTH/2 - SANDWICH_SPACING/2;
+BUCKET_CYL_X_SPACING = INNER_PANEL_X - 100;
+BUCKET_CYL_BUCKET_Y = 100;
+BUCKET_CYL_BUCKET_Z = BOBCAT_QA_HEIGHT - 60;
 
 // =============================================================================
 // HYDRAULIC CYLINDER PARAMETRIC SIZING
@@ -317,60 +430,68 @@ CYLINDER_CLOSED_MARGIN = 1.10;    // 10% margin on closed length
 // --- LIFT CYLINDER GEOMETRY CALCULATION ---
 // The lift cylinder connects:
 //   - Base: Frame side wall at (LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z)
-//   - Rod end: Arm at LIFT_CYL_ARM_OFFSET from pivot, below arm centerline
+//   - Rod end: Hydraulic bracket below arm at HYD_BRACKET_ARM_POS from pivot
+//              The bracket circle center is below the arm tube
 
-// Arm attachment point in arm local coords (Y along arm, Z perpendicular)
-LIFT_CYL_ARM_LOCAL_Y = LIFT_CYL_ARM_OFFSET;
-LIFT_CYL_ARM_LOCAL_Z = -ARM_TUBE_SIZE[0]/2 - 30;  // Below arm
+// NOTE: LIFT_CYLINDER_BORE, LIFT_CYLINDER_ROD, LIFT_CYLINDER_STROKE are defined above
+// in the "LIFT CYLINDER GEOMETRY" section
 
 // Function to calculate lift cylinder length for a given arm angle
-function lift_cyl_length(arm_angle) = 
+// All dependencies passed as parameters to avoid undefined variable issues
+function lift_cyl_length(arm_angle, arm_local_y, arm_local_z, pivot_y, pivot_z, base_y, base_z) = 
     let(
         // Arm attachment in world coordinates (pivot at origin for this calc)
-        arm_y = LIFT_CYL_ARM_LOCAL_Y * cos(arm_angle) - LIFT_CYL_ARM_LOCAL_Z * sin(arm_angle),
-        arm_z = LIFT_CYL_ARM_LOCAL_Y * sin(arm_angle) + LIFT_CYL_ARM_LOCAL_Z * cos(arm_angle),
+        arm_y = arm_local_y * cos(arm_angle) - arm_local_z * sin(arm_angle),
+        arm_z = arm_local_y * sin(arm_angle) + arm_local_z * cos(arm_angle),
         // Add pivot offset to get world position
-        arm_world_y = ARM_PIVOT_Y + arm_y,
-        arm_world_z = ARM_PIVOT_Z + arm_z,
-        // Base point (using center X for length calculation)
-        base_y = LIFT_CYL_BASE_Y,
-        base_z = LIFT_CYL_BASE_Z,
+        arm_world_y = pivot_y + arm_y,
+        arm_world_z = pivot_z + arm_z,
         // Distance
         dy = arm_world_y - base_y,
         dz = arm_world_z - base_z
     )
     sqrt(dy*dy + dz*dz);
 
-// Calculate cylinder lengths at extreme positions
-// Use calculated values if possible, otherwise fallback to defaults from params
-_lift_cyl_len_min_calc = lift_cyl_length(ARM_MIN_ANGLE);
-_lift_cyl_len_max_calc = lift_cyl_length(ARM_MAX_ANGLE);
+// Arm attachment point in arm local coords (Y along arm, Z perpendicular)
+// Calculate inline using params values directly to avoid variable ordering issues
+// arm_local_y = HYD_BRACKET_ARM_POS (from params)
+// arm_local_z = -(TUBE_2X6_1_4[1]/2 + HYD_BRACKET_CIRCLE_DIA/2) (below arm at bracket)
 
-LIFT_CYL_LEN_MIN = is_undef(_lift_cyl_len_min_calc) ? LIFT_CYL_LEN_MIN_DEF : _lift_cyl_len_min_calc;
-LIFT_CYL_LEN_MAX = is_undef(_lift_cyl_len_max_calc) ? (LIFT_CYL_LEN_MIN_DEF + LIFT_CYLINDER_STROKE_DEF) : _lift_cyl_len_max_calc;
+// Calculate actual pin-to-pin distances at extreme positions for verification
+// These use a DIFFERENT NAME to avoid conflict with LIFT_CYL_LEN_MIN/MAX from params
+// NOTE: Use ARM_MAX_ANGLE_LIMITED (not ARM_MAX_ANGLE) for the actual operating range
+_LIFT_ARM_MAX_FOR_CALC = is_undef(ARM_MAX_ANGLE_LIMITED) ? ARM_MAX_ANGLE : ARM_MAX_ANGLE_LIMITED;
+_LIFT_PIN_TO_PIN_AT_MIN = lift_cyl_length(ARM_MIN_ANGLE, 
+                                    HYD_BRACKET_ARM_POS, 
+                                    -(TUBE_2X6_1_4[1]/2 + HYD_BRACKET_CIRCLE_DIA/2), 
+                                    ARM_PIVOT_Y, ARM_PIVOT_Z, LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z);
+_LIFT_PIN_TO_PIN_AT_MAX = lift_cyl_length(_LIFT_ARM_MAX_FOR_CALC, 
+                                    HYD_BRACKET_ARM_POS, 
+                                    -(TUBE_2X6_1_4[1]/2 + HYD_BRACKET_CIRCLE_DIA/2),
+                                    ARM_PIVOT_Y, ARM_PIVOT_Z, LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z);
 
-// Required stroke = difference in lengths
-LIFT_CYL_REQUIRED_STROKE = LIFT_CYL_LEN_MAX - LIFT_CYL_LEN_MIN;
+// Required stroke = difference in lengths (for analysis only)
+_LIFT_STROKE_REQUIRED = _LIFT_PIN_TO_PIN_AT_MAX - _LIFT_PIN_TO_PIN_AT_MIN;
 
 // Add safety margin and round up to standard stroke
-LIFT_CYL_STROKE_WITH_MARGIN = ceil(LIFT_CYL_REQUIRED_STROKE * CYLINDER_STROKE_MARGIN);
+_LIFT_STROKE_WITH_MARGIN = ceil(_LIFT_STROKE_REQUIRED * CYLINDER_STROKE_MARGIN);
 
 // Closed length (minimum length minus some margin for mounting hardware)
-LIFT_CYL_CLOSED_LENGTH = ceil(LIFT_CYL_LEN_MIN * CYLINDER_CLOSED_MARGIN);
+_LIFT_CLOSED_LENGTH = ceil(_LIFT_PIN_TO_PIN_AT_MIN * CYLINDER_CLOSED_MARGIN);
 
 // Standard cylinder strokes (in mm): 150, 200, 250, 300, 350, 400, 450, 500, 600
-// Select appropriate stroke
-LIFT_CYLINDER_STROKE_CALC = 
-    LIFT_CYL_STROKE_WITH_MARGIN <= 150 ? 150 :
-    LIFT_CYL_STROKE_WITH_MARGIN <= 200 ? 200 :
-    LIFT_CYL_STROKE_WITH_MARGIN <= 250 ? 250 :
-    LIFT_CYL_STROKE_WITH_MARGIN <= 300 ? 300 :
-    LIFT_CYL_STROKE_WITH_MARGIN <= 350 ? 350 :
-    LIFT_CYL_STROKE_WITH_MARGIN <= 400 ? 400 :
-    LIFT_CYL_STROKE_WITH_MARGIN <= 450 ? 450 :
-    LIFT_CYL_STROKE_WITH_MARGIN <= 500 ? 500 :
-    LIFT_CYL_STROKE_WITH_MARGIN <= 600 ? 600 : 
-    ceil(LIFT_CYL_STROKE_WITH_MARGIN / 50) * 50;  // Round up to nearest 50
+// Select appropriate stroke (recommendation only - actual used is from params)
+_LIFT_STROKE_RECOMMENDED = 
+    _LIFT_STROKE_WITH_MARGIN <= 150 ? 150 :
+    _LIFT_STROKE_WITH_MARGIN <= 200 ? 200 :
+    _LIFT_STROKE_WITH_MARGIN <= 250 ? 250 :
+    _LIFT_STROKE_WITH_MARGIN <= 300 ? 300 :
+    _LIFT_STROKE_WITH_MARGIN <= 350 ? 350 :
+    _LIFT_STROKE_WITH_MARGIN <= 400 ? 400 :
+    _LIFT_STROKE_WITH_MARGIN <= 450 ? 450 :
+    _LIFT_STROKE_WITH_MARGIN <= 500 ? 500 :
+    _LIFT_STROKE_WITH_MARGIN <= 600 ? 600 : 
+    ceil(_LIFT_STROKE_WITH_MARGIN / 50) * 50;  // Round up to nearest 50
 
 // --- BUCKET CYLINDER GEOMETRY CALCULATION ---
 // The bucket cylinder connects:
@@ -461,18 +582,39 @@ echo("DEBUG: Stroke from params:", BUCKET_CYLINDER_STROKE);
 echo("DEBUG: LEN_MIN from params:", BUCKET_CYL_LEN_MIN);
 echo("DEBUG: LEN_MAX from params:", BUCKET_CYL_LEN_MAX);
 
-// --- FINAL CYLINDER SPECIFICATIONS ---
-// Lift cylinder specs - use values from params
-LIFT_CYLINDER_BORE = 63.5;        // 2.5" bore (force capacity)
-LIFT_CYLINDER_ROD = 38.1;         // 1.5" rod
-LIFT_CYLINDER_STROKE = is_undef(LIFT_CYLINDER_STROKE_CALC) ? 300 : LIFT_CYLINDER_STROKE_CALC;
+echo("=== CYLINDER GEOMETRY DEBUG ===");
+echo("LIFT_CYL_BASE_Y:", LIFT_CYL_BASE_Y);
+echo("LIFT_CYL_BASE_Z:", LIFT_CYL_BASE_Z);
+echo("HYD_BRACKET_ARM_POS (arm_local_y):", HYD_BRACKET_ARM_POS);
+echo("arm_local_z (calculated):", -(TUBE_2X6_1_4[1]/2 + HYD_BRACKET_CIRCLE_DIA/2));
+echo("LIFT_CYL_LEN_MIN (from params):", LIFT_CYL_LEN_MIN);
+echo("LIFT_CYL_LEN_MAX (from params):", LIFT_CYL_LEN_MAX);
+echo("_LIFT_STROKE_REQUIRED (calculated):", _LIFT_STROKE_REQUIRED);
+echo("_LIFT_STROKE_RECOMMENDED:", _LIFT_STROKE_RECOMMENDED);
+echo("LIFT_CYLINDER_STROKE (from params):", LIFT_CYLINDER_STROKE);
 
-// Bucket cylinder specs are defined in params:
-// BUCKET_CYLINDER_BORE, BUCKET_CYLINDER_ROD, BUCKET_CYLINDER_STROKE
-
-// Debug output
-echo("=== LIFT CYLINDER SIZING ===");
+// Debug output for verification
+echo("=== LIFT CYLINDER SIZING ANALYSIS ===");
 echo("Arm angle range:", ARM_MIN_ANGLE, "to", ARM_MAX_ANGLE, "degrees");
+echo("Calculated pin-to-pin at ARM_MIN:", _LIFT_PIN_TO_PIN_AT_MIN, "mm");
+echo("Calculated pin-to-pin at ARM_MAX:", _LIFT_PIN_TO_PIN_AT_MAX, "mm");
+echo("Required stroke (max - min):", _LIFT_STROKE_REQUIRED, "mm");
+echo("Selected stroke (from params):", LIFT_CYLINDER_STROKE, "mm");
+echo("Cylinder closed length (from params):", LIFT_CYL_LEN_MIN, "mm");
+echo("Cylinder extended length (from params):", LIFT_CYL_LEN_MAX, "mm");
+echo("SHORTFALL at max (+ = too short):", _LIFT_PIN_TO_PIN_AT_MAX - LIFT_CYL_LEN_MAX, "mm");
+echo("CLOSED FIT at min (+ = too long when closed):", LIFT_CYL_LEN_MIN - _LIFT_PIN_TO_PIN_AT_MIN, "mm");
+
+// WARNING checks
+_shortfall = _LIFT_PIN_TO_PIN_AT_MAX - LIFT_CYL_LEN_MAX;
+_closed_excess = LIFT_CYL_LEN_MIN - _LIFT_PIN_TO_PIN_AT_MIN;
+echo(_shortfall > 0 ? "WARNING: Cylinder too short at max extension!" : "OK: Cylinder reaches max position");
+echo(_closed_excess > 0 ? "WARNING: Cylinder too long when closed!" : "OK: Cylinder fits at min position");
+
+echo("=== FINAL LIFT CYLINDER SPECIFICATIONS ===");
+echo("Arm angle range:", ARM_MIN_ANGLE, "to", ARM_MAX_ANGLE, "degrees");
+echo("SELECTED LIFT CYLINDER BORE:", LIFT_CYLINDER_BORE, "mm (", LIFT_CYLINDER_BORE/25.4, "inches)");
+echo("SELECTED LIFT CYLINDER ROD:", LIFT_CYLINDER_ROD, "mm");
 echo("SELECTED LIFT CYLINDER STROKE:", LIFT_CYLINDER_STROKE, "mm");
 
 echo("=== BUCKET CYLINDER SIZING (from params) ===");
@@ -507,7 +649,7 @@ echo("BUCKET BOTTOM WORLD Z (should be 0) =", _bucket_bottom_world_z, "mm");
 // and lever arm geometry at various arm positions
 
 // --- HYDRAULIC SYSTEM PARAMETERS ---
-HYDRAULIC_PRESSURE_PSI = 3000;         // Operating pressure (PSI)
+// HYDRAULIC_PRESSURE_PSI defined earlier in file (3000 PSI)
 HYDRAULIC_PRESSURE_MPA = HYDRAULIC_PRESSURE_PSI * 0.00689476;  // Convert to MPa
 
 // Lift cylinder force calculation
@@ -536,17 +678,15 @@ echo("Total lift cylinder force (2 cyls):", TOTAL_LIFT_FORCE_LBF, "lbf (", TOTAL
 
 // Function to calculate cylinder moment arm about pivot for given arm angle
 // Returns perpendicular distance from pivot to cylinder force line
-function lift_cyl_moment_arm(arm_angle) = 
+// Uses params values directly to avoid undefined variable issues
+function lift_cyl_moment_arm(arm_angle, arm_local_y, arm_local_z, pivot_y, pivot_z, base_y, base_z) = 
     let(
         // Arm attachment in world coordinates (pivot at origin)
-        arm_y = LIFT_CYL_ARM_LOCAL_Y * cos(arm_angle) - LIFT_CYL_ARM_LOCAL_Z * sin(arm_angle),
-        arm_z = LIFT_CYL_ARM_LOCAL_Y * sin(arm_angle) + LIFT_CYL_ARM_LOCAL_Z * cos(arm_angle),
+        arm_y = arm_local_y * cos(arm_angle) - arm_local_z * sin(arm_angle),
+        arm_z = arm_local_y * sin(arm_angle) + arm_local_z * cos(arm_angle),
         // Add pivot offset to get world position
-        arm_world_y = ARM_PIVOT_Y + arm_y,
-        arm_world_z = ARM_PIVOT_Z + arm_z,
-        // Base point
-        base_y = LIFT_CYL_BASE_Y,
-        base_z = LIFT_CYL_BASE_Z,
+        arm_world_y = pivot_y + arm_y,
+        arm_world_z = pivot_z + arm_z,
         // Vector from base to arm attachment
         dy = arm_world_y - base_y,
         dz = arm_world_z - base_z,
@@ -570,10 +710,15 @@ function lift_cyl_moment_arm(arm_angle) =
 // Load moment arm = horizontal distance from pivot to bucket CG
 function load_moment_arm(arm_angle) = ARM_LENGTH * cos(arm_angle);
 
+// Helper values for cylinder geometry - calculate once for use in capacity functions
+_lift_arm_local_y = HYD_BRACKET_ARM_POS;
+_lift_arm_local_z = -(TUBE_2X6_1_4[1]/2 + HYD_BRACKET_CIRCLE_DIA/2);
+
 // Calculate lift capacity in kg at given arm angle
 function lift_capacity_kg(arm_angle) = 
     let(
-        cyl_moment = lift_cyl_moment_arm(arm_angle),
+        cyl_moment = lift_cyl_moment_arm(arm_angle, _lift_arm_local_y, _lift_arm_local_z,
+                                          ARM_PIVOT_Y, ARM_PIVOT_Z, LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z),
         load_moment = load_moment_arm(arm_angle),
         // Total moment from two cylinders
         total_cyl_moment_Nm = TOTAL_LIFT_FORCE_N * cyl_moment / 1000,
@@ -591,12 +736,13 @@ CAPACITY_AT_45DEG = lift_capacity_kg(45);                     // Arms at 45°
 CAPACITY_AT_MAX = lift_capacity_kg(ARM_MAX_ANGLE);            // Arms fully up
 
 // Moment arms at ground position (for reference)
-CYL_MOMENT_ARM_GROUND = lift_cyl_moment_arm(ARM_MIN_ANGLE);
+CYL_MOMENT_ARM_GROUND = lift_cyl_moment_arm(ARM_MIN_ANGLE, _lift_arm_local_y, _lift_arm_local_z,
+                                             ARM_PIVOT_Y, ARM_PIVOT_Z, LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z);
 LOAD_MOMENT_ARM_GROUND = load_moment_arm(ARM_MIN_ANGLE);
 
 echo("=== LIFTING CAPACITY ANALYSIS ===");
 echo("Arm length:", ARM_LENGTH, "mm");
-echo("Cylinder attachment distance from pivot:", LIFT_CYL_ARM_OFFSET, "mm");
+echo("Cylinder attachment distance from pivot:", HYD_BRACKET_ARM_POS, "mm");
 echo("--- At Ground Position (angle =", ARM_MIN_ANGLE, "°) ---");
 echo("  Cylinder moment arm:", CYL_MOMENT_ARM_GROUND, "mm");
 echo("  Load moment arm:", LOAD_MOMENT_ARM_GROUND, "mm");
@@ -985,6 +1131,7 @@ function rot_x(v, ang) = [
 ];
 
 // Calculate cylinder orientation from base to target point
+// The cylinder will be sized to fit between the two points
 module oriented_cylinder(base_pt, target_pt, bore, rod, stroke, extension) {
     dir = target_pt - base_pt;
     len = vec_len(dir);
@@ -1003,9 +1150,9 @@ module oriented_cylinder(base_pt, target_pt, bore, rod, stroke, extension) {
     
     translate(base_pt)
     rotate(a = angle, v = axis) {
-        // Use explicit extension mode (pass 0 for pin_to_pin_length)
-        // This renders the cylinder at the specified extension regardless of actual mount distance
-        hydraulic_cylinder(bore, rod, stroke, false, extension, "clevis", 0);
+        // Pass the actual pin-to-pin distance so the cylinder fits correctly
+        // The hydraulic_cylinder module will calculate the proper extension
+        hydraulic_cylinder(bore, rod, stroke, false, 0, "clevis", len);
         
         // Base clevis pin with nuts (pin axis along X to match lug holes)
         translate([0, 0, 0])
@@ -1339,11 +1486,10 @@ module side_panel_with_holes(is_inner = false) {
         translate([ARM_PIVOT_Y, MACHINE_HEIGHT - 50, PANEL_THICKNESS/2])
         cylinder(d=PIVOT_PIN_DIA + 2, h=PANEL_THICKNESS+4, center=true, $fn=48);
         
-        // Lift cylinder base mount hole (only on inner panels)
-        if (is_inner) {
-            translate([WHEEL_BASE - LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z, PANEL_THICKNESS/2])
-            cylinder(d=BOLT_DIA_1 + 2, h=PANEL_THICKNESS+4, center=true, $fn=32);
-        }
+        // Lift cylinder base mount hole - through-bolt between ALL panels
+        // A long bolt spans between the wall plates to hold the cylinder clevis
+        translate([WHEEL_BASE - LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z, PANEL_THICKNESS/2])
+        cylinder(d=BOLT_DIA_1 + 2, h=PANEL_THICKNESS+4, center=true, $fn=32);
         
         // Wheel axle holes
         translate([0, WHEEL_DIAMETER/2 - 50, PANEL_THICKNESS/2])
@@ -1425,25 +1571,29 @@ module side_panel_right_outer() {
 // =============================================================================
 
 // Lift cylinder base mount - uses 4"x4" tube cut to U-channel
+// REMOVED: U-channel lug is replaced by a through-bolt between wall plates
+// The cylinder clevis pins directly to a 1" bolt spanning between the inner plates
 module cylinder_mounting_lug() {
-    lug_length = 100;  // Length along Y axis
+    // This module is deprecated - mount is now a through-bolt
+    // Keeping module for compatibility but rendering only the pin
     
-    // Rotate to orient correctly - U opens toward center of machine
-    rotate([0, 0, 90])
-    rotate([90, 0, 0])
-    u_channel_lug_with_pin(TUBE_4X4_1_4, lug_length, BOLT_DIA_1 + 2);
+    // Render just the clevis pin that goes between the wall plates
+    pin_length = SANDWICH_SPACING + 40;  // Span between inner plates + extra for nuts
+    
+    rotate([0, 90, 0])
+    clevis_pin(BOLT_DIA_1, pin_length);
 }
 
 module cylinder_mounting_lugs() {
-    // Position lugs between the sandwich plates on each side wall
-    // X position is centered in the sandwich gap on each side
+    // Position through-bolt mounts between the sandwich plates on each side wall
+    // The bolt passes through holes in BOTH inner panels (not just inner)
     lug_x = TRACK_WIDTH/2;  // At each side wall
     
-    // Left side lug - between left inner and outer panels
+    // Left side - through-bolt with clevis pin
     translate([-lug_x, LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z])
     cylinder_mounting_lug();
     
-    // Right side lug - between right inner and outer panels  
+    // Right side - through-bolt with clevis pin  
     translate([lug_x, LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z])
     cylinder_mounting_lug();
 }
@@ -2380,12 +2530,27 @@ module lift_cylinders() {
         // Base attachment point (on each side wall, between sandwich plates)
         base_x_offset = TRACK_WIDTH/2;  // At each side wall
         
-        // Arm attachment point (in arm local coordinates)
-        arm_local_attach = [0, LIFT_CYL_ARM_OFFSET, -ARM_TUBE_SIZE[0]/2 - 30];
+        // Arm attachment point in arm local coordinates
+        // Calculate from params directly to avoid variable ordering issues
+        arm_local_y = HYD_BRACKET_ARM_POS;
+        arm_local_z = -(TUBE_2X6_1_4[1]/2 + HYD_BRACKET_CIRCLE_DIA/2);
+        
+        echo("=== LIFT CYLINDER POSITIONING ===");
+        echo("HYD_BRACKET_ARM_POS:", HYD_BRACKET_ARM_POS);
+        echo("arm_local_y:", arm_local_y);
+        echo("arm_local_z:", arm_local_z);
+        echo("ARM_LIFT_ANGLE:", ARM_LIFT_ANGLE);
+        
+        arm_local_attach = [0, arm_local_y, arm_local_z];
         
         // Calculate actual extension based on current arm angle
-        current_cyl_length = lift_cyl_length(ARM_LIFT_ANGLE);
+        current_cyl_length = lift_cyl_length(ARM_LIFT_ANGLE, arm_local_y, arm_local_z,
+                                              ARM_PIVOT_Y, ARM_PIVOT_Z, LIFT_CYL_BASE_Y, LIFT_CYL_BASE_Z);
         lift_extension = current_cyl_length - LIFT_CYL_LEN_MIN;
+        
+        echo("current_cyl_length:", current_cyl_length);
+        echo("LIFT_CYL_LEN_MIN:", LIFT_CYL_LEN_MIN);
+        echo("lift_extension:", lift_extension);
         
         for (side = [-1, 1]) {
             // Base point on frame - mounted between sandwich plates on side wall
@@ -2401,6 +2566,13 @@ module lift_cylinders() {
             arm_world = [arm_rotated[0], 
                         ARM_PIVOT_Y + arm_rotated[1], 
                         ARM_PIVOT_Z + arm_rotated[2]];
+            
+            if (side == 1) {
+                echo("base_pt:", base_pt);
+                echo("arm_local:", arm_local);
+                echo("arm_rotated:", arm_rotated);
+                echo("arm_world:", arm_world);
+            }
             
             // Orient and place cylinder with calculated extension
             oriented_cylinder(base_pt, arm_world, 

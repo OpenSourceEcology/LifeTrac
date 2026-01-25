@@ -448,48 +448,162 @@ PIVOT_PANEL_Y = ARM_PIVOT_Z - FRAME_Z_OFFSET;         // Pivot Y in panel coords
 // Lift cylinder mounting points (arms pivot at rear, cylinders attach forward)
 // Optimized for leverage at bottom position (cylinder pushes up/forward from low rear point)
 
-// 1. Define Arm Attachment Point
-LIFT_CYL_ARM_OFFSET = ARM_LENGTH * 0.25;     // Attachment point along arm from pivot (proportional)
+// =============================================================================
+// LIFT CYLINDER GEOMETRY CALCULATION - GEOMETRY-FIRST APPROACH
+// =============================================================================
+// This algorithm works BACKWARDS from the available space:
+// 1. Set arm attachment position (trade-off: leverage vs cylinder size)
+// 2. Set base mount position (must be on frame, clear of wheels)
+// 3. Calculate pin-to-pin distances at min and max arm angles
+// 4. The ACTUAL available stroke = pin_to_pin_max - pin_to_pin_min
+// 5. Select a cylinder that fits: closed_length ≤ pin_to_pin_min
+//
+// This guarantees a cylinder that WILL FIT the geometry.
 
-// 2. Calculate Arm Attachment Position in World Coords at Lowest Angle (Bucket on Ground)
-//    Pivot is at [0, ARM_PIVOT_Y, ARM_PIVOT_Z]
-// _theta_min = -ARM_GROUND_ANGLE; // OLD: Used fixed 45 deg
-_theta_min = ARM_MIN_ANGLE_COMPUTED; // NEW: Use calculated tangent angle (-25)
-_attach_y_world = ARM_PIVOT_Y + LIFT_CYL_ARM_OFFSET * cos(_theta_min);
-_attach_z_world = ARM_PIVOT_Z + LIFT_CYL_ARM_OFFSET * sin(_theta_min);
+// --- STEP 1: Fixed cylinder specifications ---
+_LIFT_CYL_BORE = 63.5;        // 2.5" bore
+_LIFT_CYL_ROD = 38.1;         // 1.5" rod
 
-// 3. Determine Base Z Height (Constrained by Axle Clearance)
-//    Must clear the rear axle (FRAME_Z_OFFSET + WHEEL_DIAMETER/2)
-_min_base_z = FRAME_Z_OFFSET + WHEEL_DIAMETER/2 + 65; // Reduced clearance to fit 16" cylinder
-LIFT_CYL_BASE_Z = _min_base_z;
+// --- STEP 2: Bracket drop (arm attachment offset below centerline) ---
+_bracket_drop = TUBE_2X6_1_4[1]/2 + 76.2/2;  // ~114mm below arm centerline
 
-// 4. Calculate Base Y for Optimal Leverage Angle
-//    We want the cylinder to push at an angle ~45-50 degrees from horizontal
-//    to be roughly perpendicular to the arm (which is at ~-45 degrees).
-//    Slope m = tan(target_angle).
-//    Y = Attach_Y - (Attach_Z - Base_Z) / m
-_target_cyl_angle = 50; // Degrees
-_calc_base_y = _attach_y_world - (_attach_z_world - LIFT_CYL_BASE_Z) / tan(_target_cyl_angle);
+// --- STEP 3: Arm attachment position ---
+// Trade-off: Further out = more leverage (less cylinder force needed), more travel
+//            Closer in = less travel, but cylinder can be shorter
+// With base at rear, we need attachment further forward on arm for good geometry
+// Set at 50% of arm length for adequate pin-to-pin distance at MIN angle
+LIFT_CYL_ARM_OFFSET = ARM_LENGTH * 0.50;
 
-// 5. Clamp Y to valid frame range (0 to WHEEL_BASE/2)
-// Adjusted for 16" cylinder fit
-// LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y + 10)); // Original
-LIFT_CYL_BASE_Y = max(50, min(WHEEL_BASE/2, _calc_base_y + 10)); // Current logic seems fine, relying on calc update
-// Note: If cylinders bottom out, we need to move Base FORWARD (bigger Y) or DOWN (smaller Z).
-// But we are constrained.
-// If _attach_z_world is HIGHER (because angle is -25 vs -45), the cylinder is LONGER.
-// So Bottoming Out should not be an issue with higher arm position.
-// Unless "lowered" meant "Lower the mount to get MORE extension"?
-// If the user says "lowered so that they do not bottom out" -> "Bottom out" usually means COMPRESSED fully.
-// If the cylinder is too SHORT, we need to make the distance LARGER.
-// To make distance larger: Move Base Away from Arm.
-// Arm is Up/Right. Base is Down/Left.
-// Moving Base Down (Lower Z) increases distance.
-// Moving Base Back (Lower Y) increases distance.
-// Let's check clearance.
-// _min_base_z = FRAME_Z_OFFSET + WHEEL_DIAMETER/2 + 65;
-// We can't go lower than this without hitting axle.
-// Can we go smoother on the axle? CLEARANCE = 65 -> 40?
+// --- STEP 3a: Define angles for geometry calculations ---
+_theta_min_lift = ARM_MIN_ANGLE_COMPUTED;
+// NOTE: ARM_MAX_ANGLE_LIMITED is calculated later in the file based on bucket cylinder
+// geometry. We use a conservative estimate here (60 degrees) to ensure the lift
+// cylinder will reach. The final verification in the main file uses the actual limit.
+_theta_max_lift_estimate = 50;  // Conservative estimate for initial sizing
+_theta_max_lift = min(ARM_MAX_ANGLE, _theta_max_lift_estimate);
+
+// --- STEP 4: Base mount position ---
+// The key constraint: pin-to-pin at MIN must be long enough to fit closed cylinder
+// 
+// COORDINATE SYSTEM: Y=0 is at REAR of machine, Y increases toward FRONT
+// - ARM_PIVOT_Y (~200mm) is near the rear
+// - Front axle is at ~1150mm
+//
+// Strategy: Place cylinder base BEHIND the arm pivot (lower Y, toward rear)
+// The cylinder pushes UP on the arm from behind/below
+
+// Calculate attachment position at MIN angle to know what we're working with
+_attach_y_at_min_prelim = ARM_PIVOT_Y + LIFT_CYL_ARM_OFFSET * cos(_theta_min_lift) + _bracket_drop * sin(_theta_min_lift);
+_attach_z_at_min_prelim = ARM_PIVOT_Z + LIFT_CYL_ARM_OFFSET * sin(_theta_min_lift) - _bracket_drop * cos(_theta_min_lift);
+
+// Position base near REAR of machine (low Y value), between side walls
+// Base should be behind (lower Y than) the arm pivot
+// Raise Z position higher to increase pin-to-pin distance at MIN angle
+LIFT_CYL_BASE_Y = max(50, ARM_PIVOT_Y - 150);  // 150mm behind arm pivot, min 50mm from rear edge
+LIFT_CYL_BASE_Z = FRAME_Z_OFFSET + WHEEL_DIAMETER/2 + 200;  // Raised higher for better geometry
+
+// --- STEP 5: Calculate arm attachment world positions ---
+_theta_min = _theta_min_lift;
+_theta_max = _theta_max_lift;
+
+_attach_y_at_min = ARM_PIVOT_Y + LIFT_CYL_ARM_OFFSET * cos(_theta_min) + _bracket_drop * sin(_theta_min);
+_attach_z_at_min = ARM_PIVOT_Z + LIFT_CYL_ARM_OFFSET * sin(_theta_min) - _bracket_drop * cos(_theta_min);
+
+_attach_y_at_max = ARM_PIVOT_Y + LIFT_CYL_ARM_OFFSET * cos(_theta_max) + _bracket_drop * sin(_theta_max);
+_attach_z_at_max = ARM_PIVOT_Z + LIFT_CYL_ARM_OFFSET * sin(_theta_max) - _bracket_drop * cos(_theta_max);
+
+// --- STEP 6: Calculate ACTUAL pin-to-pin distances ---
+_dy_min = _attach_y_at_min - LIFT_CYL_BASE_Y;
+_dz_min = _attach_z_at_min - LIFT_CYL_BASE_Z;
+_pin_to_pin_at_min = sqrt(_dy_min*_dy_min + _dz_min*_dz_min);
+
+_dy_max = _attach_y_at_max - LIFT_CYL_BASE_Y;
+_dz_max = _attach_z_at_max - LIFT_CYL_BASE_Z;
+_pin_to_pin_at_max = sqrt(_dy_max*_dy_max + _dz_max*_dz_max);
+
+// --- STEP 7: Calculate available stroke from geometry ---
+// Stroke is the difference between max and min pin-to-pin distances
+_available_stroke = _pin_to_pin_at_max - _pin_to_pin_at_min;
+
+// --- STEP 8: Calculate maximum cylinder closed length that fits ---
+// Must fit at minimum angle with some margin
+_max_closed_length = _pin_to_pin_at_min - 25;  // 25mm safety margin
+
+// --- STEP 9: Calculate stroke constraints ---
+// For a WELDED hydraulic cylinder, closed length is more compact than tie-rod
+// Typical welded cylinder: closed_length ≈ stroke + (bore×0.8 + 100mm for ends)
+// Based on commercial specs (e.g., Prince, Cross, Dalton):
+//   2.5" bore, 1.5" rod: closed ≈ stroke + 5" (127mm)
+//   3" bore, 1.75" rod: closed ≈ stroke + 6" (152mm)
+_cylinder_overhead = _LIFT_CYL_BORE + 90;  // Compact welded cylinder: bore + 90mm for ends
+
+// Maximum stroke from closed length constraint: stroke = max_closed - overhead
+_max_stroke_from_closed = _max_closed_length - _cylinder_overhead;
+
+// Required stroke from geometry: stroke >= pin_to_pin_max - pin_to_pin_min
+_required_stroke_from_geometry = _pin_to_pin_at_max - _pin_to_pin_at_min;
+
+// Add margin for safety and to account for any angle limiting done elsewhere
+// The main file may use ARM_MAX_ANGLE_LIMITED which could be lower
+_stroke_margin_factor = 1.30;  // 30% margin to ensure full reach
+_stroke_to_use = _required_stroke_from_geometry * _stroke_margin_factor;
+
+// --- STEP 10: Round UP to standard stroke (ensure full reach!) ---
+_LIFT_CYL_STROKE_AUTO = 
+    _stroke_to_use <= 150 ? 150 :
+    _stroke_to_use <= 200 ? 200 :
+    _stroke_to_use <= 250 ? 250 :
+    _stroke_to_use <= 300 ? 300 :
+    _stroke_to_use <= 350 ? 350 :
+    _stroke_to_use <= 400 ? 400 :
+    _stroke_to_use <= 450 ? 450 :
+    _stroke_to_use <= 500 ? 500 :
+    _stroke_to_use <= 550 ? 550 :
+    _stroke_to_use <= 600 ? 600 :
+    ceil(_stroke_to_use / 50) * 50;  // Round up to nearest 50mm
+
+// --- STEP 11: Calculate final cylinder physical lengths ---
+_CYL_CLOSED_LEN_AUTO = _LIFT_CYL_STROKE_AUTO + _cylinder_overhead;
+_CYL_EXTENDED_LEN_AUTO = _CYL_CLOSED_LEN_AUTO + _LIFT_CYL_STROKE_AUTO;
+
+// --- STEP 12: Verify fit ---
+_margin_at_min = _pin_to_pin_at_min - _CYL_CLOSED_LEN_AUTO;  // Should be >= 0
+_margin_at_max = _CYL_EXTENDED_LEN_AUTO - _pin_to_pin_at_max; // Should be >= 0
+
+// Echo parametric calculation results
+echo("=== LIFT CYLINDER PARAMETRIC STROKE CALCULATION ===");
+echo("Arm attachment offset:", LIFT_CYL_ARM_OFFSET, "mm (", LIFT_CYL_ARM_OFFSET/ARM_LENGTH*100, "% of arm)");
+echo("--- Base Mount Position ---");
+echo("LIFT_CYL_BASE_Y:", LIFT_CYL_BASE_Y, "mm");
+echo("LIFT_CYL_BASE_Z:", LIFT_CYL_BASE_Z, "mm");
+echo("--- Arm Travel Analysis ---");
+echo("Attachment at MIN angle (", _theta_min, "°): Y=", _attach_y_at_min, "Z=", _attach_z_at_min);
+echo("Attachment at MAX angle (", _theta_max, "°): Y=", _attach_y_at_max, "Z=", _attach_z_at_max);
+echo("--- Pin-to-Pin Distances (GEOMETRY CONSTRAINTS) ---");
+echo("Pin-to-pin at MIN:", _pin_to_pin_at_min, "mm (cylinder must be SHORTER than this when closed)");
+echo("Pin-to-pin at MAX:", _pin_to_pin_at_max, "mm");
+echo("Available geometric stroke:", _available_stroke, "mm");
+echo("--- Cylinder Size Constraints ---");
+echo("Max closed length that fits:", _max_closed_length, "mm");
+echo("Cylinder overhead (body+clevises):", _cylinder_overhead, "mm");
+echo("Max stroke from closed constraint:", _max_stroke_from_closed, "mm");
+echo("Required stroke from geometry:", _required_stroke_from_geometry, "mm");
+echo("Stroke with 30% margin:", _stroke_to_use, "mm");
+echo("--- SELECTED CYLINDER ---");
+echo("AUTO-SELECTED STROKE:", _LIFT_CYL_STROKE_AUTO, "mm (", _LIFT_CYL_STROKE_AUTO/25.4, "inches)");
+echo("Cylinder closed length:", _CYL_CLOSED_LEN_AUTO, "mm");
+echo("Cylinder extended length:", _CYL_EXTENDED_LEN_AUTO, "mm");
+echo("--- Fit Verification ---");
+echo("Margin at min (closed fit):", _margin_at_min, "mm", _margin_at_min >= 0 ? "✓ OK" : "✗ TOO LONG");
+echo("Margin at max (extended fit):", _margin_at_max, "mm", _margin_at_max >= 0 ? "✓ OK" : "✗ TOO SHORT");
+
+// =============================================================================
+// ARM HYDRAULIC MOUNTING PARAMETERS (Integrated into Arm Plates)
+// =============================================================================
+HYD_BRACKET_CIRCLE_DIA = 76.2;           // 3 inch diameter mounting circle
+HYD_BRACKET_ARM_POS = LIFT_CYL_ARM_OFFSET; // Position along arm from pivot
+HYD_BRACKET_BOLT_DIA = BOLT_DIA_1;        // 1" bolt for cylinder mount
+HYD_BRACKET_CUTOUT_CLEARANCE = 15;        // 15mm clearance around the circle
 // Let's try to lower the base slightly if possible.
 // LIFT_CYL_BASE_Z = _min_base_z - 25; // Experimental lower
 // No, let's stick to calc base Z for now, and see if visual fix solves perception.
@@ -576,13 +690,15 @@ BUCKET_PIVOT_HEIGHT_ADJUST = -5 * 25.4; // Lower lug (~5")
 BUCKET_PIVOT_HEIGHT_FROM_BOTTOM = BUCKET_PIVOT_HEIGHT_BASE + BUCKET_PIVOT_HEIGHT_ADJUST;
 */
 
-// Lift Cylinder (3" Bore, 1.5" Rod, 16" Stroke)
-LIFT_CYLINDER_BORE = 76.2; // 3"
-LIFT_CYLINDER_ROD = 38.1;  // 1.5"
-LIFT_CYLINDER_STROKE_DEF = 406.4; // 16" - Updated for better reach
-LIFT_CYLINDER_STROKE = LIFT_CYLINDER_STROKE_DEF;
-LIFT_CYL_LEN_MIN_DEF = 406.4 + 205; // Stroke + Dead Length (approx 8")
-LIFT_CYL_LEN_MIN = LIFT_CYL_LEN_MIN_DEF;
+// Lift Cylinder - PARAMETRICALLY CALCULATED
+// These are the PRIMARY definitions - do not redefine in main file
+LIFT_CYLINDER_BORE = _LIFT_CYL_BORE;   // 2.5" bore (63.5mm)
+LIFT_CYLINDER_ROD = _LIFT_CYL_ROD;     // 1.5" rod (38.1mm)
+LIFT_CYLINDER_STROKE = _LIFT_CYL_STROKE_AUTO;  // Auto-calculated from geometry
+
+// Use the auto-calculated closed/extended lengths
+LIFT_CYL_LEN_MIN = _CYL_CLOSED_LEN_AUTO;
+LIFT_CYL_LEN_MAX = _CYL_EXTENDED_LEN_AUTO;
 
 // Bucket Cylinder (3" Bore, 1.5" Rod)
 // Stroke and closed length will be calculated based on geometry

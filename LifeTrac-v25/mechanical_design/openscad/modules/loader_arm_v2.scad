@@ -183,5 +183,9 @@ module loader_arm_v2(angle=0, side="left") {
                 cylinder(d=DOM_PIPE_OD, h=SANDWICH_SPACING, center=true, $fn=64);
                 cylinder(d=DOM_PIPE_ID, h=SANDWICH_SPACING + 2, center=true, $fn=64);
             }
+        
+        // NOTE: Hydraulic mounting is now integrated into the arm_plate profile
+        // The plates extend downward with the 3" circle mounting point
+        // No separate bracket needed - see arm_plate.scad
     }
 }

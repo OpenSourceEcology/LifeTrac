@@ -56,12 +56,53 @@ module arm_plate(is_inner_plate=false) {
     // cz should be PIVOT_HOLE_Z_FROM_BOTTOM.
     
     cz = PIVOT_HOLE_Z_FROM_BOTTOM;
+    
+    // Hydraulic mounting bracket parameters (integrated into plate)
+    hyd_bracket_pos = is_undef(HYD_BRACKET_ARM_POS) ? LIFT_CYL_ARM_OFFSET : HYD_BRACKET_ARM_POS;
+    hyd_circle_dia = is_undef(HYD_BRACKET_CIRCLE_DIA) ? 76.2 : HYD_BRACKET_CIRCLE_DIA;
+    hyd_circle_r = hyd_circle_dia / 2;
+    hyd_bolt_dia = is_undef(HYD_BRACKET_BOLT_DIA) ? BOLT_DIA_1 : HYD_BRACKET_BOLT_DIA;
+    
+    // Circle center is below the tube bottom (Z=0) by circle radius
+    hyd_circle_center_z = -hyd_circle_r;
+
+    echo("=== ARM PLATE HYD BRACKET DEBUG ===");
+    echo("HYD_BRACKET_ARM_POS:", HYD_BRACKET_ARM_POS);
+    echo("LIFT_CYL_ARM_OFFSET:", LIFT_CYL_ARM_OFFSET);
+    echo("hyd_bracket_pos (used):", hyd_bracket_pos);
+    echo("hyd_circle_center_z:", hyd_circle_center_z);
 
     difference() {
         union() {
              // Main Horizontal Strip (Pivot to Elbow)
             translate([-tube_h/2, 0, 0])
             cube([overlap + main_tube_len + tube_h/2, plate_thick, tube_h]);
+            
+            // =============================================================
+            // HYDRAULIC MOUNTING EXTENSION (below main tube)
+            // =============================================================
+            // This extends the plate downward at hyd_bracket_pos to create
+            // a 3" circle mounting point for the hydraulic cylinder.
+            // Right triangular gussets connect the tube bottom to the circle.
+            
+            // Gusset attachment length along arm (3x tube width for strength)
+            gusset_attach_len = tube_w * 3;  // ~6" attachment length
+            
+            // Triangle + Circle geometry extending below tube
+            translate([hyd_bracket_pos, 0, 0]) {
+                // Right triangle gussets tangent to circle
+                // Hull from tube bottom corners to circle
+                hull() {
+                    // Top edge at tube bottom (Z=0), spanning 3x tube width along arm
+                    translate([-gusset_attach_len/2, 0, 0])
+                    cube([gusset_attach_len, plate_thick, 1]);
+                    
+                    // Bottom: 3" circle centered below
+                    translate([0, 0, hyd_circle_center_z])
+                    rotate([-90, 0, 0])
+                    cylinder(r=hyd_circle_r, h=plate_thick, $fn=48);
+                }
+            }
             
             // Drop Leg (Elbow) - 6" Width Maintained until Cut
             translate([overlap + main_tube_len, 0, tube_h]) 
@@ -101,12 +142,15 @@ module arm_plate(is_inner_plate=false) {
         // 1. Pivot DOM Pipe Hole
         translate([0, plate_thick/2, tube_h/2]) rotate([90,0,0]) cylinder(d=DOM_PIPE_OD, h=plate_thick+2, center=true, $fn=64);
         
-        // 2. Cylinder Mount Hole
-        translate([LIFT_CYL_ARM_OFFSET, plate_thick/2, tube_h/2]) rotate([90,0,0]) cylinder(d=BOLT_DIA_1 + 2, h=plate_thick+2, center=true, $fn=32);
+        // 2. Hydraulic Cylinder Mount Hole (in the circle below tube)
+        // This is the primary mounting point for the lift cylinder
+        translate([hyd_bracket_pos, plate_thick/2, hyd_circle_center_z]) 
+        rotate([90,0,0]) 
+        cylinder(d=hyd_bolt_dia + 2, h=plate_thick+2, center=true, $fn=32);
         
-        // 3. Extra Cylinder Bolt Holes (2x)
+        // 3. Extra Alignment Bolt Holes along tube (2x)
         for (i = [1, 2]) {
-            translate([LIFT_CYL_ARM_OFFSET + i * 50.8, plate_thick/2, tube_h/2]) 
+            translate([hyd_bracket_pos + i * 50.8, plate_thick/2, tube_h/2]) 
             rotate([90,0,0]) 
             cylinder(d=BOLT_DIA_1_2, h=plate_thick+2, center=true, $fn=32);
         }
@@ -146,3 +190,15 @@ module arm_plate(is_inner_plate=false) {
         }
     }
 }
+
+// =============================================================================
+// HYDRAULIC MOUNTING GEOMETRY NOTES
+// =============================================================================
+// The hydraulic cylinder mounting is now integrated into the arm_plate profile.
+// The plate extends downward below the 2x6 tube with:
+// - A 3" diameter circle at the bottom (mounting point for cylinder pin)
+// - Right triangular sections connecting the tube bottom to the circle (via hull)
+// - Position adjustable via HYD_BRACKET_ARM_POS parameter
+//
+// The side panels need matching arc cutouts to clear this extension during rotation.
+// See hydraulic_bracket_arc_slot() in side_panel.scad

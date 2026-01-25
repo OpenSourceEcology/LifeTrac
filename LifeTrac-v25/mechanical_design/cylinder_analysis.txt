@@ -1,0 +1,136 @@
+=============================================================================
+LIFT CYLINDER SIZING ANALYSIS
+=============================================================================
+
+GEOMETRY INPUT PARAMETERS (from lifetrac_v25_params.scad):
+-----------------------------------------------------------
+ARM_PIVOT_Y = 200 mm (near rear of machine)
+ARM_PIVOT_Z = 1100 mm (frame offset 150 + machine height 1000 - 50)
+TUBE_2X6_1_4 = [50.8, 152.4, 6.35] mm (2"x6" arm tube)
+HYD_BRACKET_CIRCLE_DIA = 76.2 mm (3" mounting circle)
+
+ARM_LENGTH ≈ 1600 mm (calculated from geometry solver)
+ARM_MIN_ANGLE ≈ -25° (bucket on ground)
+ARM_MAX_ANGLE ≈ 50° (arm fully raised, may be limited)
+
+CYLINDER MOUNTING:
+-----------------------------------------------------------
+Arm Attachment:
+  LIFT_CYL_ARM_LOCAL_Y = 0.25 * ARM_LENGTH ≈ 400 mm along arm
+  LIFT_CYL_ARM_LOCAL_Z = -(152.4/2 + 76.2/2) = -114.3 mm (below arm centerline)
+
+Base Attachment:
+  LIFT_CYL_BASE_Z ≈ 150 + 250 + 65 = 465 mm (above rear axle)
+  LIFT_CYL_BASE_Y ≈ calculated for ~50° cylinder angle at rest
+
+CYLINDER LENGTH CALCULATION:
+-----------------------------------------------------------
+At ARM_MIN_ANGLE (-25°):
+  arm_y = 400*cos(-25) - (-114.3)*sin(-25) 
+        = 400*0.906 + 114.3*(-0.423)
+        = 362.4 - 48.3 = 314.1
+  arm_z = 400*sin(-25) + (-114.3)*cos(-25)
+        = 400*(-0.423) + (-114.3)*0.906
+        = -169.2 - 103.6 = -272.8
+  arm_world_y = 200 + 314.1 = 514.1 mm
+  arm_world_z = 1100 - 272.8 = 827.2 mm
+
+At ARM_MAX_ANGLE (+50°):
+  arm_y = 400*cos(50) - (-114.3)*sin(50)
+        = 400*0.643 + 114.3*0.766
+        = 257.1 + 87.5 = 344.6
+  arm_z = 400*sin(50) + (-114.3)*cos(50)
+        = 400*0.766 + (-114.3)*0.643
+        = 306.4 - 73.5 = 232.9
+  arm_world_y = 200 + 344.6 = 544.6 mm
+  arm_world_z = 1100 + 232.9 = 1332.9 mm
+
+Base estimate (LIFT_CYL_BASE_Y ≈ 200, LIFT_CYL_BASE_Z ≈ 465):
+  At MIN: dy = 514-200 = 314, dz = 827-465 = 362
+          length = sqrt(314² + 362²) = sqrt(98596 + 131044) = sqrt(229640) ≈ 479 mm
+  
+  At MAX: dy = 545-200 = 345, dz = 1333-465 = 868
+          length = sqrt(345² + 868²) = sqrt(119025 + 753424) = sqrt(872449) ≈ 934 mm
+
+REQUIRED STROKE ≈ 934 - 479 = 455 mm
+
+CURRENT CYLINDER (300mm stroke, 63.5mm bore):
+-----------------------------------------------------------
+From hydraulics.scad formula:
+  base_clevis_len = 63.5 * 0.8 = 50.8 mm
+  piston_len = 63.5 * 0.4 = 25.4 mm
+  head_internal = 63.5 * 0.4 = 25.4 mm
+  head_external = 63.5 * 0.2 = 12.7 mm
+  rod_clevis_len = 38.1 * 1.5 = 57.2 mm
+  clearance = 5 mm
+  
+  tube_len = 300 + 25.4 + 25.4 + 5 = 355.8 mm
+  closed_len = 50.8 + 355.8 + 12.7 + 5 + 57.2 = 481.5 mm
+  max_len = 481.5 + 300 = 781.5 mm
+
+ANALYSIS:
+-----------------------------------------------------------
+Required at ARM_MIN (closed position): ~479 mm
+Cylinder closed length: 481.5 mm ✓ (just fits)
+
+Required at ARM_MAX (extended position): ~934 mm
+Cylinder max extended: 781.5 mm ✗ SHORTFALL = 152.5 mm!
+
+RECOMMENDATIONS:
+=============================================================================
+
+OPTION 1: LONGER STROKE CYLINDER
+-----------------------------------------------------------
+To reach 934mm extended, we need:
+  closed_len + stroke ≥ 934
+  
+Since closed_len ≈ 481 + (stroke - 300)*0.4 (tube grows with stroke):
+  closed_len_450 = 50.8 + (450+25.4+25.4+5) + 12.7 + 5 + 57.2 = 631.5 mm
+  max_len_450 = 631.5 + 450 = 1081.5 mm ✓ (covers 934 with margin)
+  
+  But check closed position: 631 > 479 → CYLINDER TOO LONG WHEN CLOSED!
+
+This is the core problem: A 450mm stroke cylinder has a closed length that
+exceeds the minimum pin-to-pin distance.
+
+OPTION 2: MOVE BASE MOUNT POSITION
+-----------------------------------------------------------
+If we move the base mount FORWARD (increase LIFT_CYL_BASE_Y):
+- Reduces overall stroke requirement
+- Reduces closed length requirement
+- Changes cylinder angle (may reduce lifting force)
+
+If we move the base mount DOWN (decrease LIFT_CYL_BASE_Z):
+- Limited by axle clearance
+- May help slightly
+
+OPTION 3: HYBRID APPROACH (RECOMMENDED)
+-----------------------------------------------------------
+1. Move base forward to reduce stroke requirement to ~350-400mm
+2. Use 350mm or 400mm stroke cylinder
+3. Verify closed length fits at ARM_MIN
+
+CALCULATION FOR REPOSITIONED BASE:
+If LIFT_CYL_BASE_Y increases by 150mm (from ~200 to ~350):
+  At MIN: dy = 514-350 = 164, dz = 827-465 = 362
+          length = sqrt(164² + 362²) = sqrt(26896 + 131044) = sqrt(157940) ≈ 397 mm
+  
+  At MAX: dy = 545-350 = 195, dz = 1333-465 = 868
+          length = sqrt(195² + 868²) = sqrt(38025 + 753424) = sqrt(791449) ≈ 890 mm
+
+New required stroke = 890 - 397 = 493 mm (still too much!)
+
+BETTER: Increase both LIFT_CYL_BASE_Y and reduce LIFT_CYL_ARM_LOCAL_Y:
+Move cylinder attachment closer to pivot on arm (e.g., 0.20 instead of 0.25)
+This reduces the geometric multiplier.
+
+CONCLUSION:
+=============================================================================
+The current geometry requires too much stroke (~455mm) for a standard cylinder
+to work, because cylinder closed length grows with stroke.
+
+BEST SOLUTION: Reduce HYD_BRACKET_ARM_POS from 0.25 to ~0.18-0.20 
+AND move base mount forward slightly.
+
+This trades off some mechanical advantage (lifting force) for achievable 
+cylinder geometry. A 350mm or 400mm stroke cylinder should then fit.
