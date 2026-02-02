@@ -30,12 +30,13 @@ module loader_arm_v2(angle=0, side="left") {
     is_left = (side == "left");
 
     module angle_iron_mount() {
-        len = 152.4;
+        angle_trim = 3.175;  // 1/8" trimmed from each end
+        len = 152.4 - 2*angle_trim;  // 6" minus 1/4" total = 5.75" (146.05mm)
         leg = 50.8;
         thick = 6.35;
         
         // Bolt spacing from center
-        plate_bolt_offset = 63.5; // 2.5 inches from center (5 inch spacing) - Wider
+        plate_bolt_offset = 50.8; // 2.0 inches from center (4 inch spacing) - Wider
         beam_bolt_offset = 25.4;  // 1.0 inch from center (2 inch spacing) - Narrower
         
         difference() {
@@ -93,6 +94,10 @@ module loader_arm_v2(angle=0, side="left") {
         
         // Instantiate Plates
         
+        // Angle iron positioning - trimmed length centered on crossbeam
+        angle_trim = 3.175;  // 1/8" trimmed from each end
+        angle_len = 152.4 - 2*angle_trim;  // Trimmed length
+        
         // Plate 1: Y = -plate_thick
         translate([0, -plate_thick, 0]) {
             arm_plate(is_left); // is_left means it's inner for left arm
@@ -100,10 +105,10 @@ module loader_arm_v2(angle=0, side="left") {
             if (is_left) { // Add angles for Left Arm Inner
                 hole_x = CROSS_BEAM_1_POS;
                 // Top Angle
-                translate([hole_x - 152.4/2, 0, tube_h/2 + cross_beam_h/2])
+                translate([hole_x - angle_len/2, 0, tube_h/2 + cross_beam_h/2])
                     scale([1, -1, 1]) angle_iron_mount();
                 // Bottom Angle
-                translate([hole_x - 152.4/2, 0, tube_h/2 - cross_beam_h/2])
+                translate([hole_x - angle_len/2, 0, tube_h/2 - cross_beam_h/2])
                     scale([1, -1, -1]) angle_iron_mount();
             }
         }
@@ -115,10 +120,10 @@ module loader_arm_v2(angle=0, side="left") {
             if (!is_left) { // Add angles for Right Arm Inner
                 hole_x = CROSS_BEAM_1_POS;
                 // Top Angle
-                translate([hole_x - 152.4/2, plate_thick, tube_h/2 + cross_beam_h/2])
+                translate([hole_x - angle_len/2, plate_thick, tube_h/2 + cross_beam_h/2])
                     scale([1, 1, 1]) angle_iron_mount();
                 // Bottom Angle
-                translate([hole_x - 152.4/2, plate_thick, tube_h/2 - cross_beam_h/2])
+                translate([hole_x - angle_len/2, plate_thick, tube_h/2 - cross_beam_h/2])
                     scale([1, 1, -1]) angle_iron_mount();
             }
         }

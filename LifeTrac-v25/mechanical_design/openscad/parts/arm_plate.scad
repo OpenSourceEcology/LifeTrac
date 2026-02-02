@@ -240,7 +240,7 @@ module arm_plate(is_inner_plate=false) {
                 cube([cross_beam_w, cross_beam_h, plate_thick+2], center=true);
                 
             // Angle Iron Mounting Bolts
-            plate_bolt_offset = 63.5;
+            plate_bolt_offset = 50.8;  // 2.0 inches from center (4 inch spacing)
             
             // Top Angle Bolts
             translate([CROSS_BEAM_1_POS - plate_bolt_offset, plate_thick/2, tube_h/2 + cross_beam_h/2 + 25.4])

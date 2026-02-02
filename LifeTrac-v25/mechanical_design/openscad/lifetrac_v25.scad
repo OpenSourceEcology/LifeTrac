@@ -1682,9 +1682,23 @@ module arm_pivot_assembly() {
 function get_stiffener_holes_a(h) = [for(i=[0:3]) h * (0.2 + i*0.2)];
 function get_stiffener_holes_b(h) = [for(i=[0:3]) h * (0.1 + i*0.2)];
 
-// Helper function for bolt positions along horizontal angle irons (length)
-function get_horizontal_stiffener_holes_a(length) = [for(i=[0:3]) length * (0.2 + i*0.2)];
-function get_horizontal_stiffener_holes_b(length) = [for(i=[0:3]) length * (0.1 + i*0.2)];
+// Minimum bolt spacing for horizontal angle irons (4 inches = 101.6mm)
+MIN_BOLT_SPACING = 101.6;
+
+// Smart helper function for bolt positions along horizontal angle irons
+// Calculates appropriate number of holes based on length:
+// - Very short segments (< 200mm): 2 holes at 25% and 75%
+// - Medium segments (200-400mm): 3 holes at 20%, 50%, 80%
+// - Long segments (> 400mm): 4 holes at 20%, 40%, 60%, 80%
+function get_horizontal_stiffener_holes_a(length) = 
+    length < 200 ? [length * 0.25, length * 0.75] :
+    length < 400 ? [length * 0.2, length * 0.5, length * 0.8] :
+    [for(i=[0:3]) length * (0.2 + i*0.2)];
+
+function get_horizontal_stiffener_holes_b(length) = 
+    length < 200 ? [length * 0.25, length * 0.75] :
+    length < 400 ? [length * 0.2, length * 0.5, length * 0.8] :
+    [for(i=[0:3]) length * (0.1 + i*0.2)];
 
 // Bottom plate parameters (for offset calculations)
 // 2 inches from front of wall side plates, 6 inches from back
@@ -1723,18 +1737,18 @@ _MIN_WHEELBASE = WHEEL_DIAMETER + 50;
 _MAX_REAR_Y = _FRONT_WHEEL_AXIS_Y - _MIN_WHEELBASE;
 _REAR_WHEEL_AXIS_Y = min(_REAR_WHEEL_TARGET_Y, _MAX_REAR_Y);
 
-// Cross tube Y positions - 6 inches from wheel axis to tube center
+// Cross tube Y positions - 6 inches from wheel axis to tube face
 FRAME_TUBE_OFFSET_FROM_WHEEL = 152.4;  // 6 inches
 
 // Front tube: behind front wheel (between the wheels)
-// Center of tube is 6" behind the front wheel axis
-// y_pos is rear face of tube, so subtract half tube width
-FRONT_FRAME_TUBE_Y = _FRONT_WHEEL_AXIS_Y - FRAME_TUBE_OFFSET_FROM_WHEEL - FRAME_TUBE_WIDTH/2;
+// Front face of tube is 6" behind the front wheel axis
+// y_pos is rear face of tube, so subtract full tube width
+FRONT_FRAME_TUBE_Y = _FRONT_WHEEL_AXIS_Y - FRAME_TUBE_OFFSET_FROM_WHEEL - FRAME_TUBE_WIDTH;
 
 // Rear tube: in front of rear wheel (between the wheels)
-// Center of tube is 6" in front of the rear wheel axis
-// y_pos is rear face of tube, so add offset and subtract half tube width
-REAR_FRAME_TUBE_Y = _REAR_WHEEL_AXIS_Y + FRAME_TUBE_OFFSET_FROM_WHEEL - FRAME_TUBE_WIDTH/2;
+// Rear face of tube is 6" in front of the rear wheel axis
+// y_pos is rear face of tube
+REAR_FRAME_TUBE_Y = _REAR_WHEEL_AXIS_Y + FRAME_TUBE_OFFSET_FROM_WHEEL;
 
 // Debug output
 echo("=== CROSS FRAME TUBE POSITIONING ===");
@@ -1742,6 +1756,41 @@ echo("Front wheel axis Y:", _FRONT_WHEEL_AXIS_Y, "mm");
 echo("Rear wheel axis Y:", _REAR_WHEEL_AXIS_Y, "mm");
 echo("Front tube rear face Y:", FRONT_FRAME_TUBE_Y, "mm");
 echo("Rear tube rear face Y:", REAR_FRAME_TUBE_Y, "mm");
+
+// =============================================================================
+// SPLIT ANGLE IRON PARAMETERS (for bottom stiffener plate)
+// =============================================================================
+// 8 inch gap centered on each wheel axis
+ANGLE_IRON_GAP = 203.2;  // 8 inches
+
+// Calculate segment positions relative to BOTTOM_PLATE_Y_START
+// Rear gap center (relative to bottom plate start)
+_REAR_GAP_CENTER_REL = _REAR_WHEEL_AXIS_Y - BOTTOM_PLATE_Y_START;
+// Front gap center (relative to bottom plate start)
+_FRONT_GAP_CENTER_REL = _FRONT_WHEEL_AXIS_Y - BOTTOM_PLATE_Y_START;
+
+// Segment lengths:
+// Segment 1 (rear): from start to rear gap start
+ANGLE_SEGMENT_1_START = 0;
+ANGLE_SEGMENT_1_END = _REAR_GAP_CENTER_REL - ANGLE_IRON_GAP/2;
+ANGLE_SEGMENT_1_LENGTH = ANGLE_SEGMENT_1_END - ANGLE_SEGMENT_1_START;
+
+// Segment 2 (middle): from rear gap end to front gap start
+ANGLE_SEGMENT_2_START = _REAR_GAP_CENTER_REL + ANGLE_IRON_GAP/2;
+ANGLE_SEGMENT_2_END = _FRONT_GAP_CENTER_REL - ANGLE_IRON_GAP/2;
+ANGLE_SEGMENT_2_LENGTH = ANGLE_SEGMENT_2_END - ANGLE_SEGMENT_2_START;
+
+// Segment 3 (front): from front gap end to plate end
+ANGLE_SEGMENT_3_START = _FRONT_GAP_CENTER_REL + ANGLE_IRON_GAP/2;
+ANGLE_SEGMENT_3_END = BOTTOM_PLATE_LENGTH;
+ANGLE_SEGMENT_3_LENGTH = ANGLE_SEGMENT_3_END - ANGLE_SEGMENT_3_START;
+
+echo("=== SPLIT ANGLE IRON POSITIONING ===");
+echo("Rear wheel axis (rel to plate):", _REAR_GAP_CENTER_REL, "mm");
+echo("Front wheel axis (rel to plate):", _FRONT_GAP_CENTER_REL, "mm");
+echo("Segment 1 length:", ANGLE_SEGMENT_1_LENGTH, "mm");
+echo("Segment 2 length:", ANGLE_SEGMENT_2_LENGTH, "mm");
+echo("Segment 3 length:", ANGLE_SEGMENT_3_LENGTH, "mm");
 
 // Tube length - extends 1/2" past outer panels on each side
 FRAME_TUBE_EXTENSION = 12.7;  // 1/2 inch
@@ -1817,6 +1866,136 @@ module horizontal_angle_iron_smart(length, size=[50.8, 6.35]) {
             translate([thick/2, y, hole_offset])
             rotate([0, 90, 0])
             cylinder(d=bolt_dia, h=thick+2, center=true, $fn=16);
+        }
+    }
+}
+
+// Split horizontal angle iron - creates 3 segments with 8" gaps at wheel axes
+// y_offset is the Y position of the angle iron origin relative to bottom plate start
+module split_horizontal_angle_iron(size=[50.8, 6.35]) {
+    leg = size[0];
+    thick = size[1];
+    bolt_dia = 9.525; // 3/8" bolts
+    hole_offset = leg * 0.6;
+    
+    // Helper module to create a single angle iron segment with holes
+    module angle_segment(seg_length) {
+        if (seg_length > 0) {
+            color("DarkGray")
+            difference() {
+                union() {
+                    // Horizontal leg - flat on plate, extends in +X direction
+                    cube([leg, seg_length, thick]);
+                    // Vertical leg - extends upward in +Z direction
+                    cube([thick, seg_length, leg]);
+                }
+                
+                // Holes on horizontal leg (X-leg), bolts go through in Z direction
+                for (y = get_horizontal_stiffener_holes_a(seg_length)) {
+                    translate([hole_offset, y, thick/2])
+                    cylinder(d=bolt_dia, h=thick+2, center=true, $fn=16);
+                }
+                
+                // Holes on vertical leg (Z-leg), bolts go through in X direction
+                for (y = get_horizontal_stiffener_holes_b(seg_length)) {
+                    translate([thick/2, y, hole_offset])
+                    rotate([0, 90, 0])
+                    cylinder(d=bolt_dia, h=thick+2, center=true, $fn=16);
+                }
+            }
+        }
+    }
+    
+    // Segment 1 (rear section)
+    if (ANGLE_SEGMENT_1_LENGTH > 0) {
+        translate([0, ANGLE_SEGMENT_1_START, 0])
+        angle_segment(ANGLE_SEGMENT_1_LENGTH);
+    }
+    
+    // Segment 2 (middle section - between wheel axes)
+    if (ANGLE_SEGMENT_2_LENGTH > 0) {
+        translate([0, ANGLE_SEGMENT_2_START, 0])
+        angle_segment(ANGLE_SEGMENT_2_LENGTH);
+    }
+    
+    // Segment 3 (front section)
+    if (ANGLE_SEGMENT_3_LENGTH > 0) {
+        translate([0, ANGLE_SEGMENT_3_START, 0])
+        angle_segment(ANGLE_SEGMENT_3_LENGTH);
+    }
+}
+
+// Split horizontal angle iron rotated 180 degrees (for opposite side mounting)
+// When rotated 180, the segments need to be placed differently
+module split_horizontal_angle_iron_rotated(size=[50.8, 6.35]) {
+    leg = size[0];
+    thick = size[1];
+    bolt_dia = 9.525; // 3/8" bolts
+    hole_offset = leg * 0.6;
+    
+    // Helper module to create a single angle iron segment with holes
+    module angle_segment(seg_length) {
+        if (seg_length > 0) {
+            color("DarkGray")
+            difference() {
+                union() {
+                    // Horizontal leg - flat on plate, extends in +X direction
+                    cube([leg, seg_length, thick]);
+                    // Vertical leg - extends upward in +Z direction
+                    cube([thick, seg_length, leg]);
+                }
+                
+                // Holes on horizontal leg (X-leg), bolts go through in Z direction
+                for (y = get_horizontal_stiffener_holes_a(seg_length)) {
+                    translate([hole_offset, y, thick/2])
+                    cylinder(d=bolt_dia, h=thick+2, center=true, $fn=16);
+                }
+                
+                // Holes on vertical leg (Z-leg), bolts go through in X direction
+                for (y = get_horizontal_stiffener_holes_b(seg_length)) {
+                    translate([thick/2, y, hole_offset])
+                    rotate([0, 90, 0])
+                    cylinder(d=bolt_dia, h=thick+2, center=true, $fn=16);
+                }
+            }
+        }
+    }
+    
+    // When rotated 180, we're at y_start + plate_length and going backward
+    // So segment 3 (front) is closest to origin after rotation, segment 1 (rear) is farthest
+    
+    // Segment 3 (front section) - starts at 0 after rotation
+    if (ANGLE_SEGMENT_3_LENGTH > 0) {
+        translate([0, 0, 0])
+        rotate([0, 0, 180])
+        translate([-leg, -ANGLE_SEGMENT_3_LENGTH, 0])
+        angle_segment(ANGLE_SEGMENT_3_LENGTH);
+    }
+    
+    // Segment 2 (middle section)
+    if (ANGLE_SEGMENT_2_LENGTH > 0) {
+        translate([0, -(ANGLE_SEGMENT_3_LENGTH + ANGLE_IRON_GAP), 0])
+        rotate([0, 0, 180])
+        translate([-leg, -ANGLE_SEGMENT_2_LENGTH, 0])
+        angle_segment(ANGLE_SEGMENT_2_LENGTH);
+    }
+    
+    // Segment 1 (rear section)
+    if (ANGLE_SEGMENT_1_LENGTH > 0) {
+        translate([0, -(ANGLE_SEGMENT_3_LENGTH + ANGLE_IRON_GAP + ANGLE_SEGMENT_2_LENGTH + ANGLE_IRON_GAP), 0])
+        rotate([0, 0, 180])
+        translate([-leg, -ANGLE_SEGMENT_1_LENGTH, 0])
+        angle_segment(ANGLE_SEGMENT_1_LENGTH);
+    }
+}
+
+// Helper module to generate holes for a single segment (for stiffener_side_panel_cutters)
+module _segment_holes(seg_start, seg_length, x_pos, bottom_plate_top_z, bottom_hole_offset, bolt_dia) {
+    if (seg_length > 0) {
+        for (y = get_horizontal_stiffener_holes_b(seg_length)) {
+            translate([x_pos, BOTTOM_PLATE_Y_START + seg_start + y, bottom_plate_top_z + bottom_hole_offset])
+            rotate([0, 90, 0])
+            cylinder(d=bolt_dia, h=40, center=true, $fn=16);
         }
     }
 }
@@ -1917,57 +2096,49 @@ module stiffener_side_panel_cutters(is_inner, is_left) {
     // Bottom Plate Angle Holes (for all panels - both inner and outer)
     // Bottom plate top surface is at FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM
     // Angles sit on top of plate with vertical legs against panels
+    // SPLIT INTO 3 SEGMENTS with 8" gaps centered on wheel axes
     bottom_angle_size = [50.8, 6.35];
     bottom_leg = bottom_angle_size[0];
     bottom_hole_offset = bottom_leg * 0.6;
     bottom_plate_top_z = FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM;  // Z position of bottom plate top surface
     
-    // Calculate Y positions for holes along the angle iron length
-    // Bottom plate runs from BOTTOM_PLATE_Y_START to BOTTOM_PLATE_Y_END
-    
-    // Inner panels get holes for inner angles
+    // Inner panels get holes for inner angles (3 segments each)
     if (is_inner) {
-        // Holes go through panel in X direction (horizontal, into the wall)
-        // Vertical leg has holes at offset from bottom of leg
-        for (y = get_horizontal_stiffener_holes_b(BOTTOM_PLATE_LENGTH)) {
-            // Left inner panel
-            if (is_left) {
-                translate([-(TRACK_WIDTH/2 - SANDWICH_SPACING/2), BOTTOM_PLATE_Y_START + y, bottom_plate_top_z + bottom_hole_offset])
-                rotate([0, 90, 0])
-                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
-            }
-            // Right inner panel
-            if (!is_left) {
-                translate([(TRACK_WIDTH/2 - SANDWICH_SPACING/2), BOTTOM_PLATE_Y_START + y, bottom_plate_top_z + bottom_hole_offset])
-                rotate([0, 90, 0])
-                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
-            }
+        // Left inner panel
+        if (is_left) {
+            _segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, -(TRACK_WIDTH/2 - SANDWICH_SPACING/2), bottom_plate_top_z, bottom_hole_offset, bolt_dia);
+            _segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, -(TRACK_WIDTH/2 - SANDWICH_SPACING/2), bottom_plate_top_z, bottom_hole_offset, bolt_dia);
+            _segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, -(TRACK_WIDTH/2 - SANDWICH_SPACING/2), bottom_plate_top_z, bottom_hole_offset, bolt_dia);
+        }
+        // Right inner panel
+        if (!is_left) {
+            _segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, (TRACK_WIDTH/2 - SANDWICH_SPACING/2), bottom_plate_top_z, bottom_hole_offset, bolt_dia);
+            _segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, (TRACK_WIDTH/2 - SANDWICH_SPACING/2), bottom_plate_top_z, bottom_hole_offset, bolt_dia);
+            _segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, (TRACK_WIDTH/2 - SANDWICH_SPACING/2), bottom_plate_top_z, bottom_hole_offset, bolt_dia);
         }
     }
     
-    // Outer panels get holes for outer angles
+    // Outer panels get holes for outer angles (3 segments each)
     if (!is_inner) {
-        for (y = get_horizontal_stiffener_holes_b(BOTTOM_PLATE_LENGTH)) {
-            // Left outer panel
-            if (is_left) {
-                translate([-(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), BOTTOM_PLATE_Y_START + y, bottom_plate_top_z + bottom_hole_offset])
-                rotate([0, 90, 0])
-                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
-            }
-            // Right outer panel
-            if (!is_left) {
-                translate([(TRACK_WIDTH/2 + SANDWICH_SPACING/2), BOTTOM_PLATE_Y_START + y, bottom_plate_top_z + bottom_hole_offset])
-                rotate([0, 90, 0])
-                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
-            }
+        // Left outer panel
+        if (is_left) {
+            _segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, -(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), bottom_plate_top_z, bottom_hole_offset, bolt_dia);
+            _segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, -(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), bottom_plate_top_z, bottom_hole_offset, bolt_dia);
+            _segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, -(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), bottom_plate_top_z, bottom_hole_offset, bolt_dia);
+        }
+        // Right outer panel
+        if (!is_left) {
+            _segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, (TRACK_WIDTH/2 + SANDWICH_SPACING/2), bottom_plate_top_z, bottom_hole_offset, bolt_dia);
+            _segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, (TRACK_WIDTH/2 + SANDWICH_SPACING/2), bottom_plate_top_z, bottom_hole_offset, bolt_dia);
+            _segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, (TRACK_WIDTH/2 + SANDWICH_SPACING/2), bottom_plate_top_z, bottom_hole_offset, bolt_dia);
         }
     }
     
     // Frame tube angle iron holes (all panels)
     // Angle irons are 6" tall (same as tube), vertical leg against panel
-    // Holes spaced 5" apart vertically (2.5" from center)
+    // Holes spaced 4" apart vertically (2.0" from center)
     frame_angle_bolt_dia = 12.7;  // 1/2" bolt holes
-    frame_angle_z_spacing = 63.5;  // 2.5" from center (5" total Z spacing)
+    frame_angle_z_spacing = 50.8;  // 2.0" from center (4" total Z spacing)
     frame_angle_center_z = FRAME_TUBE_Z + FRAME_TUBE_HEIGHT/2;  // Mid-height of tube/angle
     
     // Y position is centered on tube
@@ -2212,6 +2383,16 @@ module back_stiffener_plate() {
 // Positioned 2" from front of wall plates, 6" from back
 // Mounted with angle iron and bolt holes to all 4 wall panels
 
+// Helper module for segment holes at a given X position (must be outside difference block)
+module _plate_segment_holes(seg_start, seg_length, x_pos, y_start, z_pos, plate_thickness, bolt_dia) {
+    if (seg_length > 0) {
+        for (y = get_horizontal_stiffener_holes_a(seg_length)) {
+            translate([x_pos, y_start + seg_start + y, z_pos + plate_thickness])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+    }
+}
+
 module bottom_stiffener_plate() {
     // Plate spans full width like back_stiffener_plate
     plate_width = TRACK_WIDTH + SANDWICH_SPACING;
@@ -2236,73 +2417,155 @@ module bottom_stiffener_plate() {
         cube([plate_width, plate_length, plate_thickness]);
         
         // Subtract holes for angle irons along both sides
-        // Left Outer angle: X-leg has holes for bolts going down through plate (Z direction)
-        for (y = get_horizontal_stiffener_holes_a(plate_length)) {
-            translate([-plate_width/2 + hole_offset, y_start + y, z_pos + plate_thickness])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        // SPLIT INTO 3 SEGMENTS with 8" gaps centered on wheel axes
         
-        // Right Outer angle: mirrored
-        for (y = get_horizontal_stiffener_holes_a(plate_length)) {
-            translate([plate_width/2 - hole_offset, y_start + y, z_pos + plate_thickness])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        // Left Outer angle holes (3 segments)
+        _plate_segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, -plate_width/2 + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, -plate_width/2 + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, -plate_width/2 + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
         
-        // Left Inner Panel angles (both sides of the panel thickness)
-        // Left side of left inner panel
-        for (y = get_horizontal_stiffener_holes_a(plate_length)) {
-            translate([-inner_offset - hole_offset, y_start + y, z_pos + plate_thickness])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
-        // Right side of left inner panel
-        for (y = get_horizontal_stiffener_holes_a(plate_length)) {
-            translate([-inner_offset + PANEL_THICKNESS + hole_offset, y_start + y, z_pos + plate_thickness])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        // Right Outer angle holes (3 segments)
+        _plate_segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, plate_width/2 - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, plate_width/2 - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, plate_width/2 - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
         
-        // Right Inner Panel angles
-        // Left side of right inner panel
-        for (y = get_horizontal_stiffener_holes_a(plate_length)) {
-            translate([inner_offset - PANEL_THICKNESS - hole_offset, y_start + y, z_pos + plate_thickness])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
-        // Right side of right inner panel
-        for (y = get_horizontal_stiffener_holes_a(plate_length)) {
-            translate([inner_offset + hole_offset, y_start + y, z_pos + plate_thickness])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        // Left Inner Panel angles - left side (3 segments)
+        _plate_segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, -inner_offset - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, -inner_offset - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, -inner_offset - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        
+        // Left Inner Panel angles - right side (3 segments)
+        _plate_segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, -inner_offset + PANEL_THICKNESS + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, -inner_offset + PANEL_THICKNESS + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, -inner_offset + PANEL_THICKNESS + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        
+        // Right Inner Panel angles - left side (3 segments)
+        _plate_segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, inner_offset - PANEL_THICKNESS - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, inner_offset - PANEL_THICKNESS - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, inner_offset - PANEL_THICKNESS - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        
+        // Right Inner Panel angles - right side (3 segments)
+        _plate_segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, inner_offset + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, inner_offset + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, inner_offset + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        
+        // Motor mounting plate angle holes (both sides of each motor plate)
+        // Left motor plate - left side
+        _plate_segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, -MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, -MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, -MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        // Left motor plate - right side
+        _plate_segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, -MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, -MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, -MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        
+        // Right motor plate - left side
+        _plate_segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        // Right motor plate - right side
+        _plate_segment_holes(ANGLE_SEGMENT_1_START, ANGLE_SEGMENT_1_LENGTH, MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_2_START, ANGLE_SEGMENT_2_LENGTH, MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
+        _plate_segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
     }
     
     // Angle Irons - horizontal along Y axis, X-leg flat on plate, Z-leg vertical against wall
+    // Split into 3 segments with 8" gaps centered on wheel axes
+    
     // Left Outer (X-leg extends in +X toward center, Z-leg goes up)
     translate([-plate_width/2, y_start, z_pos + plate_thickness])
-    horizontal_angle_iron_smart(plate_length, angle_size);
+    split_horizontal_angle_iron(angle_size);
     
-    // Right Outer (X-leg extends in -X toward center, Z-leg goes up) -> rotate 180 around Z
-    // After 180° rotation, angle extends in -Y, so offset by plate_length to align
-    translate([plate_width/2, y_start + plate_length, z_pos + plate_thickness])
-    rotate([0, 0, 180])
-    horizontal_angle_iron_smart(plate_length, angle_size);
+    // Right Outer (X-leg extends in -X toward center, Z-leg goes up) -> mirror in X
+    translate([plate_width/2, y_start, z_pos + plate_thickness])
+    mirror([1, 0, 0])
+    split_horizontal_angle_iron(angle_size);
     
     // Inner Angles - Left Inner Panel
-    // Left side (X-leg extends -X outward, Z-leg goes up) -> rotate 180 around Z
-    translate([-inner_offset, y_start + plate_length, z_pos + plate_thickness])
-    rotate([0, 0, 180])
-    horizontal_angle_iron_smart(plate_length, angle_size);
+    // Left side (OUTSIDE - X-leg extends -X into sandwich gap, Z-leg goes up) -> mirror in X
+    translate([-inner_offset, y_start, z_pos + plate_thickness])
+    mirror([1, 0, 0])
+    split_horizontal_angle_iron(angle_size);
     
-    // Right side (X-leg extends +X outward, Z-leg goes up)
+    // Right side (INSIDE - X-leg extends +X toward center, Z-leg goes up) -> NO mirror needed
     translate([-inner_offset + PANEL_THICKNESS, y_start, z_pos + plate_thickness])
-    horizontal_angle_iron_smart(plate_length, angle_size);
+    split_horizontal_angle_iron(angle_size);
     
     // Inner Angles - Right Inner Panel
-    // Left side (X-leg extends -X outward, Z-leg goes up) -> rotate 180 around Z
-    translate([inner_offset - PANEL_THICKNESS, y_start + plate_length, z_pos + plate_thickness])
-    rotate([0, 0, 180])
-    horizontal_angle_iron_smart(plate_length, angle_size);
+    // Left side (INSIDE - X-leg extends -X toward center, Z-leg goes up) -> mirror in X
+    translate([inner_offset - PANEL_THICKNESS, y_start, z_pos + plate_thickness])
+    mirror([1, 0, 0])
+    split_horizontal_angle_iron(angle_size);
     
-    // Right side (X-leg extends +X outward, Z-leg goes up)
+    // Right side (OUTSIDE - X-leg extends +X into sandwich gap, Z-leg goes up) -> NO mirror
     translate([inner_offset, y_start, z_pos + plate_thickness])
-    horizontal_angle_iron_smart(plate_length, angle_size);
+    split_horizontal_angle_iron(angle_size);
+}
+
+// =============================================================================
+// MOTOR MOUNTING PLATE
+// =============================================================================
+// Vertical plate parallel to wall plates, for mounting the motor/engine
+// - 10 inches tall
+// - Same length as bottom stiffener plate
+// - Bottom edge flush with top of bottom stiffener plate
+// - 6 inches inboard from inner wall plate
+
+MOTOR_PLATE_HEIGHT = 254.0;      // 10 inches tall
+MOTOR_PLATE_INBOARD = 152.4;     // 6 inches inboard from inner wall plate
+MOTOR_PLATE_THICKNESS = PLATE_1_4_INCH;
+
+// X position of motor plates (measured from center)
+// Inner wall plate is at TRACK_WIDTH/2 - SANDWICH_SPACING/2
+// Motor plate is 6" inboard (toward center)
+MOTOR_PLATE_X = (TRACK_WIDTH/2 - SANDWICH_SPACING/2) - MOTOR_PLATE_INBOARD;
+
+module motor_mounting_plate() {
+    plate_height = MOTOR_PLATE_HEIGHT;
+    plate_length = BOTTOM_PLATE_LENGTH;  // Same as bottom stiffener plate
+    plate_thickness = MOTOR_PLATE_THICKNESS;
+    
+    y_start = BOTTOM_PLATE_Y_START;  // Same Y position as bottom stiffener plate
+    z_bottom = FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM;  // Bottom flush with top of bottom stiffener
+    
+    angle_size = [50.8, 6.35];  // 2"x1/4" angle
+    leg = angle_size[0];
+    thick = angle_size[1];
+    
+    // Left motor plate (negative X side)
+    // Plate is in YZ plane
+    color("Silver")
+    translate([-MOTOR_PLATE_X - plate_thickness/2, y_start, z_bottom])
+    cube([plate_thickness, plate_length, plate_height]);
+    
+    // Right motor plate (positive X side)
+    color("Silver")
+    translate([MOTOR_PLATE_X - plate_thickness/2, y_start, z_bottom])
+    cube([plate_thickness, plate_length, plate_height]);
+    
+    // Angle irons connecting motor plates to bottom stiffener plate
+    // These run along the bottom edge of the motor plates
+    // Horizontal leg on bottom stiffener plate, vertical leg against motor plate
+    
+    // Left motor plate angles (2 angles - one on each side of plate)
+    // Left side of left motor plate (X-leg extends -X, away from center)
+    translate([-MOTOR_PLATE_X - plate_thickness/2, y_start, z_bottom])
+    mirror([1, 0, 0])
+    split_horizontal_angle_iron(angle_size);
+    
+    // Right side of left motor plate (X-leg extends +X, toward center)
+    translate([-MOTOR_PLATE_X + plate_thickness/2, y_start, z_bottom])
+    split_horizontal_angle_iron(angle_size);
+    
+    // Right motor plate angles (2 angles - one on each side of plate)
+    // Left side of right motor plate (X-leg extends -X, toward center)
+    translate([MOTOR_PLATE_X - plate_thickness/2, y_start, z_bottom])
+    mirror([1, 0, 0])
+    split_horizontal_angle_iron(angle_size);
+    
+    // Right side of right motor plate (X-leg extends +X, away from center)
+    translate([MOTOR_PLATE_X + plate_thickness/2, y_start, z_bottom])
+    split_horizontal_angle_iron(angle_size);
 }
 
 // =============================================================================
@@ -2354,13 +2617,14 @@ module cross_frame_tubes() {
 // Oriented with length running vertically (Z direction)
 // Vertical leg against wall panel, horizontal leg extends toward tube
 module frame_tube_angle_iron() {
-    len = FRAME_TUBE_HEIGHT;  // 6" (152.4mm) - matches tube height, runs along Z
+    angle_trim = 3.175;  // 1/8" trimmed from each end
+    len = FRAME_TUBE_HEIGHT - 2*angle_trim;  // 6" minus 1/4" total = 5.75" (146.05mm)
     leg = 50.8;               // 2" leg
     thick = 6.35;             // 1/4" thick
     bolt_dia = BOLT_DIA_1_2;  // 1/2" bolts
     
     // Bolt spacing - closer together on tube side, further apart on wall side
-    plate_bolt_offset = 63.5;  // 2.5 inches from center (5 inch spacing) for plate/wall
+    plate_bolt_offset = 50.8;  // 2.0 inches from center (4 inch spacing) for plate/wall
     tube_bolt_offset = 25.4;   // 1.0 inch from center (2 inch spacing) for tube
     hole_inset = 25.4;         // 1 inch from corner for hole placement
     
@@ -2408,8 +2672,9 @@ module frame_tube_angle_irons() {
     right_inner_panel_face = (TRACK_WIDTH/2 - SANDWICH_SPACING/2) - PANEL_THICKNESS;
     right_outer_panel_face = (TRACK_WIDTH/2 + SANDWICH_SPACING/2);
     
-    // Z position - angle bottom aligns with tube bottom
-    angle_z = FRAME_TUBE_Z;
+    // Z position - angle centered with tube (offset by 1/8" trim)
+    angle_trim = 3.175;  // 1/8" trimmed from each end
+    angle_z = FRAME_TUBE_Z + angle_trim;
     
     // Y positions - flush with tube faces
     front_tube_rear_y = FRONT_FRAME_TUBE_Y;
@@ -2571,6 +2836,9 @@ module base_frame() {
     // Bottom plate (horizontal stiffener at bottom of frame)
     // 2" from front, 6" from back of wall side plates
     bottom_stiffener_plate();
+    
+    // Motor mounting plates (vertical plates for engine mounting)
+    motor_mounting_plate();
     
     // Cross frame tubes (2x6 square tubes through side walls)
     cross_frame_tubes();
