@@ -1508,6 +1508,10 @@ module side_panel_left_outer() {
     difference() {
         side_panel(is_inner=false);
         
+        // Cross tube cutouts
+        cross_tube_panel_cutout(FRONT_FRAME_TUBE_Y);
+        cross_tube_panel_cutout(REAR_FRAME_TUBE_Y);
+        
         // Subtract stiffener holes
         rotate([-90, 0, 0]) rotate([0, 0, -90])
         translate([(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), 0, -FRAME_Z_OFFSET])
@@ -1525,6 +1529,15 @@ module side_panel_left_inner() {
         // Trim back for stiffener plate (Y < 31.75 in world coords -> X < 31.75 in part coords)
         translate([-10, -50, -10]) // Start before 0 to be safe, Z range covers panel thickness
         cube([31.75 + 10, MACHINE_HEIGHT + 100, 50]); // Cutout
+        
+        // Trim entire bottom edge flat at plate height
+        // In panel coords: Y < BOTTOM_PLATE_INNER_TRIM for full length of panel
+        translate([-10, -50, -10])
+        cube([WHEEL_BASE + 100, BOTTOM_PLATE_INNER_TRIM + 50, 50]); // Full bottom cutout
+        
+        // Cross tube cutouts
+        cross_tube_panel_cutout(FRONT_FRAME_TUBE_Y);
+        cross_tube_panel_cutout(REAR_FRAME_TUBE_Y);
         
         // Subtract stiffener holes
         rotate([-90, 0, 0]) rotate([0, 0, -90])
@@ -1544,6 +1557,15 @@ module side_panel_right_inner() {
         translate([-10, -50, -10]) // Start before 0 to be safe, Z range covers panel thickness
         cube([31.75 + 10, MACHINE_HEIGHT + 100, 50]); // Cutout
         
+        // Trim entire bottom edge flat at plate height
+        // In panel coords: Y < BOTTOM_PLATE_INNER_TRIM for full length of panel
+        translate([-10, -50, -10])
+        cube([WHEEL_BASE + 100, BOTTOM_PLATE_INNER_TRIM + 50, 50]); // Full bottom cutout
+        
+        // Cross tube cutouts
+        cross_tube_panel_cutout(FRONT_FRAME_TUBE_Y);
+        cross_tube_panel_cutout(REAR_FRAME_TUBE_Y);
+        
         // Subtract stiffener holes
         rotate([-90, 0, 0]) rotate([0, 0, -90])
         translate([-(TRACK_WIDTH/2 - SANDWICH_SPACING/2 - PANEL_THICKNESS), 0, -FRAME_Z_OFFSET])
@@ -1558,6 +1580,10 @@ module side_panel_right_outer() {
     rotate([90, 0, 90])
     difference() {
         side_panel(is_inner=false);
+        
+        // Cross tube cutouts
+        cross_tube_panel_cutout(FRONT_FRAME_TUBE_Y);
+        cross_tube_panel_cutout(REAR_FRAME_TUBE_Y);
         
         // Subtract stiffener holes
         rotate([-90, 0, 0]) rotate([0, 0, -90])
@@ -1649,12 +1675,77 @@ module arm_pivot_assembly() {
 }
 
 // =============================================================================
-// VERTICAL STIFFENER PLATES
+// STIFFENER PLATES (VERTICAL AND HORIZONTAL)
 // =============================================================================
 
-// Helper function for bolt heights
+// Helper function for bolt heights (for vertical angle irons)
 function get_stiffener_holes_a(h) = [for(i=[0:3]) h * (0.2 + i*0.2)];
 function get_stiffener_holes_b(h) = [for(i=[0:3]) h * (0.1 + i*0.2)];
+
+// Helper function for bolt positions along horizontal angle irons (length)
+function get_horizontal_stiffener_holes_a(length) = [for(i=[0:3]) length * (0.2 + i*0.2)];
+function get_horizontal_stiffener_holes_b(length) = [for(i=[0:3]) length * (0.1 + i*0.2)];
+
+// Bottom plate parameters (for offset calculations)
+// 2 inches from front of wall side plates, 6 inches from back
+BOTTOM_PLATE_FRONT_OFFSET = 50.8;   // 2 inches from front
+BOTTOM_PLATE_REAR_OFFSET = 152.4;   // 6 inches from back
+BOTTOM_PLATE_Y_START = BOTTOM_PLATE_REAR_OFFSET;  // Y position of rear edge
+BOTTOM_PLATE_Y_END = WHEEL_BASE - BOTTOM_PLATE_FRONT_OFFSET;  // Y position of front edge
+BOTTOM_PLATE_LENGTH = BOTTOM_PLATE_Y_END - BOTTOM_PLATE_Y_START;
+// Offset amount to trim inner walls (similar to back plate trim of 31.75)
+BOTTOM_PLATE_INNER_TRIM = 31.75;    // Inner walls are trimmed this much at the bottom
+
+// =============================================================================
+// CROSS FRAME TUBES - 2x6 square tubes passing through side walls
+// =============================================================================
+
+// Tube dimensions: 2" x 6" (50.8mm x 152.4mm)
+FRAME_TUBE_WIDTH = 50.8;    // 2" - depth in Y direction
+FRAME_TUBE_HEIGHT = 152.4;  // 6" - height in Z direction
+FRAME_TUBE_WALL = 6.35;     // 1/4" wall thickness
+FRAME_TUBE_RADIUS = 12.7;   // 1/2" actual tube corner radius (matches arm crossbeam)
+FRAME_TUBE_CNC_RADIUS = 3.175;  // 1/8" corner radius for CNC cutouts only
+
+// Gap between bottom plate and cross tubes
+FRAME_TUBE_GAP = 50.8;  // 2 inches
+
+// Cross tube Z position (bottom of tube)
+FRAME_TUBE_Z = FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM + FRAME_TUBE_GAP;
+
+// Calculate ACTUAL wheel axis positions (must match wheel_assemblies logic)
+// Front wheel axis Y position
+_FRONT_WHEEL_AXIS_Y = WHEEL_BASE - WHEEL_RADIUS;
+
+// Rear wheel axis Y position (calculated same as in wheel_assemblies)
+_REAR_WHEEL_TARGET_Y = LIFT_CYL_BASE_Y + WHEEL_RADIUS + 100;
+_MIN_WHEELBASE = WHEEL_DIAMETER + 50;
+_MAX_REAR_Y = _FRONT_WHEEL_AXIS_Y - _MIN_WHEELBASE;
+_REAR_WHEEL_AXIS_Y = min(_REAR_WHEEL_TARGET_Y, _MAX_REAR_Y);
+
+// Cross tube Y positions - 6 inches from wheel axis to tube center
+FRAME_TUBE_OFFSET_FROM_WHEEL = 152.4;  // 6 inches
+
+// Front tube: behind front wheel (between the wheels)
+// Center of tube is 6" behind the front wheel axis
+// y_pos is rear face of tube, so subtract half tube width
+FRONT_FRAME_TUBE_Y = _FRONT_WHEEL_AXIS_Y - FRAME_TUBE_OFFSET_FROM_WHEEL - FRAME_TUBE_WIDTH/2;
+
+// Rear tube: in front of rear wheel (between the wheels)
+// Center of tube is 6" in front of the rear wheel axis
+// y_pos is rear face of tube, so add offset and subtract half tube width
+REAR_FRAME_TUBE_Y = _REAR_WHEEL_AXIS_Y + FRAME_TUBE_OFFSET_FROM_WHEEL - FRAME_TUBE_WIDTH/2;
+
+// Debug output
+echo("=== CROSS FRAME TUBE POSITIONING ===");
+echo("Front wheel axis Y:", _FRONT_WHEEL_AXIS_Y, "mm");
+echo("Rear wheel axis Y:", _REAR_WHEEL_AXIS_Y, "mm");
+echo("Front tube rear face Y:", FRONT_FRAME_TUBE_Y, "mm");
+echo("Rear tube rear face Y:", REAR_FRAME_TUBE_Y, "mm");
+
+// Tube length - extends 1/2" past outer panels on each side
+FRAME_TUBE_EXTENSION = 12.7;  // 1/2 inch
+FRAME_TUBE_LENGTH = TRACK_WIDTH + SANDWICH_SPACING + 2*PANEL_THICKNESS + 2*FRAME_TUBE_EXTENSION;
 
 module vertical_angle_iron_smart(height, size=[50.8, 6.35]) {
     leg = size[0];
@@ -1695,6 +1786,41 @@ module vertical_angle_iron_smart(height, size=[50.8, 6.35]) {
     }
 }
 
+// Horizontal angle iron for bottom plate mounting
+// Runs along Y axis (forward direction)
+// Horizontal leg flat ON the plate surface, extending in +X direction
+// Vertical leg going UP (+Z direction) against the wall panel
+// Origin at inner corner of the L, at the bottom surface
+module horizontal_angle_iron_smart(length, size=[50.8, 6.35]) {
+    leg = size[0];
+    thick = size[1];
+    bolt_dia = 9.525; // 3/8" bolts
+    hole_offset = leg * 0.6; // Shift holes away from corner for tool clearance
+    
+    color("DarkGray")
+    difference() {
+        union() {
+            // Horizontal leg - flat on plate, extends in +X direction
+            cube([leg, length, thick]);
+            // Vertical leg - extends upward in +Z direction
+            cube([thick, length, leg]);
+        }
+        
+        // Holes on horizontal leg (X-leg), bolts go through in Z direction (vertical)
+        for (y = get_horizontal_stiffener_holes_a(length)) {
+            translate([hole_offset, y, thick/2])
+            cylinder(d=bolt_dia, h=thick+2, center=true, $fn=16);
+        }
+        
+        // Holes on vertical leg (Z-leg), bolts go through in X direction (horizontal into wall)
+        for (y = get_horizontal_stiffener_holes_b(length)) {
+            translate([thick/2, y, hole_offset])
+            rotate([0, 90, 0])
+            cylinder(d=bolt_dia, h=thick+2, center=true, $fn=16);
+        }
+    }
+}
+
 // Module to generate hole cutters for the side panels
 module stiffener_side_panel_cutters(is_inner, is_left) {
     // Mid Plate Parameters
@@ -1717,46 +1843,10 @@ module stiffener_side_panel_cutters(is_inner, is_left) {
     
     bolt_dia = 9.525;
     
-    // Mid Plate Holes (Only on Inner Panels)
+    // Mid Plate Holes - REMOVED for simplification
+    // (Mid stiffener plate has been removed from the model)
+    
     if (is_inner) {
-        // Left Inner Panel (is_left=true)
-        if (is_left) {
-            // Left Front: Face B (Y-leg). Rot 0.
-            // Global Hole: [-plate_width/2, mid_y + thick + leg/2, z]
-            for (z = get_stiffener_holes_b(mid_h)) {
-                translate([-(TRACK_WIDTH - SANDWICH_SPACING - 2*PANEL_THICKNESS)/2, mid_y + PLATE_1_4_INCH + mid_hole_offset, mid_z_start + z])
-                rotate([0, 90, 0])
-                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
-            }
-            
-            // Left Rear: Face A (X-leg -> -Y leg). Rot -90.
-            // Global Hole: [-plate_width/2, mid_y - leg/2, z]
-            for (z = get_stiffener_holes_a(mid_h)) {
-                translate([-(TRACK_WIDTH - SANDWICH_SPACING - 2*PANEL_THICKNESS)/2, mid_y - mid_hole_offset, mid_z_start + z])
-                rotate([0, 90, 0])
-                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
-            }
-        }
-        
-        // Right Inner Panel (is_left=false)
-        if (!is_left) {
-             // Right Front: Face A (X-leg -> +Y leg). Rot 90.
-             // Global Hole: [plate_width/2, mid_y + thick + leg/2, z]
-             for (z = get_stiffener_holes_a(mid_h)) {
-                translate([(TRACK_WIDTH - SANDWICH_SPACING - 2*PANEL_THICKNESS)/2, mid_y + PLATE_1_4_INCH + mid_hole_offset, mid_z_start + z])
-                rotate([0, 90, 0])
-                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
-            }
-            
-            // Right Rear: Face B (Y-leg -> -Y leg). Rot 180.
-            // Global Hole: [plate_width/2, mid_y - leg/2, z]
-            for (z = get_stiffener_holes_b(mid_h)) {
-                translate([(TRACK_WIDTH - SANDWICH_SPACING - 2*PANEL_THICKNESS)/2, mid_y - mid_hole_offset, mid_z_start + z])
-                rotate([0, 90, 0])
-                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
-            }
-        }
-        
         // Back Plate Inner Angles (Inner Panels)
         // Left Inner Panel (is_left=true)
         if (is_left) {
@@ -1820,6 +1910,126 @@ module stiffener_side_panel_cutters(is_inner, is_left) {
                 translate([(TRACK_WIDTH/2 + SANDWICH_SPACING/2), back_y + PLATE_1_4_INCH + back_hole_offset, back_z_start + z])
                 rotate([0, 90, 0])
                 cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+        }
+    }
+    
+    // Bottom Plate Angle Holes (for all panels - both inner and outer)
+    // Bottom plate top surface is at FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM
+    // Angles sit on top of plate with vertical legs against panels
+    bottom_angle_size = [50.8, 6.35];
+    bottom_leg = bottom_angle_size[0];
+    bottom_hole_offset = bottom_leg * 0.6;
+    bottom_plate_top_z = FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM;  // Z position of bottom plate top surface
+    
+    // Calculate Y positions for holes along the angle iron length
+    // Bottom plate runs from BOTTOM_PLATE_Y_START to BOTTOM_PLATE_Y_END
+    
+    // Inner panels get holes for inner angles
+    if (is_inner) {
+        // Holes go through panel in X direction (horizontal, into the wall)
+        // Vertical leg has holes at offset from bottom of leg
+        for (y = get_horizontal_stiffener_holes_b(BOTTOM_PLATE_LENGTH)) {
+            // Left inner panel
+            if (is_left) {
+                translate([-(TRACK_WIDTH/2 - SANDWICH_SPACING/2), BOTTOM_PLATE_Y_START + y, bottom_plate_top_z + bottom_hole_offset])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+            // Right inner panel
+            if (!is_left) {
+                translate([(TRACK_WIDTH/2 - SANDWICH_SPACING/2), BOTTOM_PLATE_Y_START + y, bottom_plate_top_z + bottom_hole_offset])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+        }
+    }
+    
+    // Outer panels get holes for outer angles
+    if (!is_inner) {
+        for (y = get_horizontal_stiffener_holes_b(BOTTOM_PLATE_LENGTH)) {
+            // Left outer panel
+            if (is_left) {
+                translate([-(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), BOTTOM_PLATE_Y_START + y, bottom_plate_top_z + bottom_hole_offset])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+            // Right outer panel
+            if (!is_left) {
+                translate([(TRACK_WIDTH/2 + SANDWICH_SPACING/2), BOTTOM_PLATE_Y_START + y, bottom_plate_top_z + bottom_hole_offset])
+                rotate([0, 90, 0])
+                cylinder(d=bolt_dia, h=40, center=true, $fn=16);
+            }
+        }
+    }
+    
+    // Frame tube angle iron holes (all panels)
+    // Angle irons are 6" tall (same as tube), vertical leg against panel
+    // Holes spaced 5" apart vertically (2.5" from center)
+    frame_angle_bolt_dia = 12.7;  // 1/2" bolt holes
+    frame_angle_z_spacing = 63.5;  // 2.5" from center (5" total Z spacing)
+    frame_angle_center_z = FRAME_TUBE_Z + FRAME_TUBE_HEIGHT/2;  // Mid-height of tube/angle
+    
+    // Y position is centered on tube
+    front_tube_y = FRONT_FRAME_TUBE_Y + FRAME_TUBE_WIDTH/2;
+    rear_tube_y = REAR_FRAME_TUBE_Y + FRAME_TUBE_WIDTH/2;
+    
+    // Front tube holes (2 holes at different Z positions, same Y)
+    for (z_offset = [-frame_angle_z_spacing, frame_angle_z_spacing]) {
+        hole_z = frame_angle_center_z + z_offset;
+        
+        if (is_inner) {
+            if (is_left) {
+                translate([-(TRACK_WIDTH/2 - SANDWICH_SPACING/2), front_tube_y, hole_z])
+                rotate([0, 90, 0])
+                cylinder(d=frame_angle_bolt_dia, h=40, center=true, $fn=16);
+            }
+            if (!is_left) {
+                translate([(TRACK_WIDTH/2 - SANDWICH_SPACING/2), front_tube_y, hole_z])
+                rotate([0, 90, 0])
+                cylinder(d=frame_angle_bolt_dia, h=40, center=true, $fn=16);
+            }
+        }
+        if (!is_inner) {
+            if (is_left) {
+                translate([-(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), front_tube_y, hole_z])
+                rotate([0, 90, 0])
+                cylinder(d=frame_angle_bolt_dia, h=40, center=true, $fn=16);
+            }
+            if (!is_left) {
+                translate([(TRACK_WIDTH/2 + SANDWICH_SPACING/2), front_tube_y, hole_z])
+                rotate([0, 90, 0])
+                cylinder(d=frame_angle_bolt_dia, h=40, center=true, $fn=16);
+            }
+        }
+    }
+    
+    // Rear tube holes
+    for (z_offset = [-frame_angle_z_spacing, frame_angle_z_spacing]) {
+        hole_z = frame_angle_center_z + z_offset;
+        
+        if (is_inner) {
+            if (is_left) {
+                translate([-(TRACK_WIDTH/2 - SANDWICH_SPACING/2), rear_tube_y, hole_z])
+                rotate([0, 90, 0])
+                cylinder(d=frame_angle_bolt_dia, h=40, center=true, $fn=16);
+            }
+            if (!is_left) {
+                translate([(TRACK_WIDTH/2 - SANDWICH_SPACING/2), rear_tube_y, hole_z])
+                rotate([0, 90, 0])
+                cylinder(d=frame_angle_bolt_dia, h=40, center=true, $fn=16);
+            }
+        }
+        if (!is_inner) {
+            if (is_left) {
+                translate([-(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), rear_tube_y, hole_z])
+                rotate([0, 90, 0])
+                cylinder(d=frame_angle_bolt_dia, h=40, center=true, $fn=16);
+            }
+            if (!is_left) {
+                translate([(TRACK_WIDTH/2 + SANDWICH_SPACING/2), rear_tube_y, hole_z])
+                rotate([0, 90, 0])
+                cylinder(d=frame_angle_bolt_dia, h=40, center=true, $fn=16);
             }
         }
     }
@@ -1996,6 +2206,328 @@ module back_stiffener_plate() {
 }
 
 // =============================================================================
+// BOTTOM STIFFENER PLATE
+// =============================================================================
+// Horizontal plate at the bottom of the frame, similar mounting to back plate
+// Positioned 2" from front of wall plates, 6" from back
+// Mounted with angle iron and bolt holes to all 4 wall panels
+
+module bottom_stiffener_plate() {
+    // Plate spans full width like back_stiffener_plate
+    plate_width = TRACK_WIDTH + SANDWICH_SPACING;
+    plate_thickness = PLATE_1_4_INCH;
+    plate_length = BOTTOM_PLATE_LENGTH;  // Y dimension
+    
+    y_start = BOTTOM_PLATE_Y_START;  // 6" from rear
+    z_pos = FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM - plate_thickness;  // Top of plate flush with bottom of inner wall plates
+    
+    angle_size = [50.8, 6.35];  // 2"x1/4" angle
+    leg = angle_size[0];
+    thick = angle_size[1];
+    bolt_dia = 9.525;
+    hole_offset = leg * 0.6;
+    
+    inner_offset = TRACK_WIDTH/2 - SANDWICH_SPACING/2;
+    
+    difference() {
+        // Plate (horizontal, in XY plane)
+        color("Silver")
+        translate([-plate_width/2, y_start, z_pos])
+        cube([plate_width, plate_length, plate_thickness]);
+        
+        // Subtract holes for angle irons along both sides
+        // Left Outer angle: X-leg has holes for bolts going down through plate (Z direction)
+        for (y = get_horizontal_stiffener_holes_a(plate_length)) {
+            translate([-plate_width/2 + hole_offset, y_start + y, z_pos + plate_thickness])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Right Outer angle: mirrored
+        for (y = get_horizontal_stiffener_holes_a(plate_length)) {
+            translate([plate_width/2 - hole_offset, y_start + y, z_pos + plate_thickness])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Left Inner Panel angles (both sides of the panel thickness)
+        // Left side of left inner panel
+        for (y = get_horizontal_stiffener_holes_a(plate_length)) {
+            translate([-inner_offset - hole_offset, y_start + y, z_pos + plate_thickness])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        // Right side of left inner panel
+        for (y = get_horizontal_stiffener_holes_a(plate_length)) {
+            translate([-inner_offset + PANEL_THICKNESS + hole_offset, y_start + y, z_pos + plate_thickness])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Right Inner Panel angles
+        // Left side of right inner panel
+        for (y = get_horizontal_stiffener_holes_a(plate_length)) {
+            translate([inner_offset - PANEL_THICKNESS - hole_offset, y_start + y, z_pos + plate_thickness])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        // Right side of right inner panel
+        for (y = get_horizontal_stiffener_holes_a(plate_length)) {
+            translate([inner_offset + hole_offset, y_start + y, z_pos + plate_thickness])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+    }
+    
+    // Angle Irons - horizontal along Y axis, X-leg flat on plate, Z-leg vertical against wall
+    // Left Outer (X-leg extends in +X toward center, Z-leg goes up)
+    translate([-plate_width/2, y_start, z_pos + plate_thickness])
+    horizontal_angle_iron_smart(plate_length, angle_size);
+    
+    // Right Outer (X-leg extends in -X toward center, Z-leg goes up) -> rotate 180 around Z
+    // After 180° rotation, angle extends in -Y, so offset by plate_length to align
+    translate([plate_width/2, y_start + plate_length, z_pos + plate_thickness])
+    rotate([0, 0, 180])
+    horizontal_angle_iron_smart(plate_length, angle_size);
+    
+    // Inner Angles - Left Inner Panel
+    // Left side (X-leg extends -X outward, Z-leg goes up) -> rotate 180 around Z
+    translate([-inner_offset, y_start + plate_length, z_pos + plate_thickness])
+    rotate([0, 0, 180])
+    horizontal_angle_iron_smart(plate_length, angle_size);
+    
+    // Right side (X-leg extends +X outward, Z-leg goes up)
+    translate([-inner_offset + PANEL_THICKNESS, y_start, z_pos + plate_thickness])
+    horizontal_angle_iron_smart(plate_length, angle_size);
+    
+    // Inner Angles - Right Inner Panel
+    // Left side (X-leg extends -X outward, Z-leg goes up) -> rotate 180 around Z
+    translate([inner_offset - PANEL_THICKNESS, y_start + plate_length, z_pos + plate_thickness])
+    rotate([0, 0, 180])
+    horizontal_angle_iron_smart(plate_length, angle_size);
+    
+    // Right side (X-leg extends +X outward, Z-leg goes up)
+    translate([inner_offset, y_start, z_pos + plate_thickness])
+    horizontal_angle_iron_smart(plate_length, angle_size);
+}
+
+// =============================================================================
+// CROSS FRAME TUBES - 2x6 square tubes through side walls
+// =============================================================================
+
+// 2D profile for cross tube cutout with rounded corners (CNC-friendly)
+module cross_tube_cutout_profile() {
+    offset(r=FRAME_TUBE_CNC_RADIUS) 
+    offset(r=-FRAME_TUBE_CNC_RADIUS)
+    square([FRAME_TUBE_WIDTH, FRAME_TUBE_HEIGHT]);
+}
+
+// Single 2x6 square tube
+module cross_tube(y_pos) {
+    color("SteelBlue")
+    translate([-FRAME_TUBE_LENGTH/2, y_pos, FRAME_TUBE_Z])
+    difference() {
+        // Outer profile with actual tube corner radius
+        rotate([0, 90, 0])
+        rotate([0, 0, 90])
+        linear_extrude(height=FRAME_TUBE_LENGTH)
+        offset(r=FRAME_TUBE_RADIUS) 
+        offset(r=-FRAME_TUBE_RADIUS)
+        square([FRAME_TUBE_WIDTH, FRAME_TUBE_HEIGHT]);
+        
+        // Inner cutout (hollow tube)
+        translate([FRAME_TUBE_WALL, FRAME_TUBE_WALL, FRAME_TUBE_WALL])
+        rotate([0, 90, 0])
+        rotate([0, 0, 90])
+        linear_extrude(height=FRAME_TUBE_LENGTH - 2*FRAME_TUBE_WALL)
+        offset(r=FRAME_TUBE_RADIUS - FRAME_TUBE_WALL/2) 
+        offset(r=-(FRAME_TUBE_RADIUS - FRAME_TUBE_WALL/2))
+        square([FRAME_TUBE_WIDTH - 2*FRAME_TUBE_WALL, FRAME_TUBE_HEIGHT - 2*FRAME_TUBE_WALL]);
+    }
+}
+
+// Both cross tubes
+module cross_frame_tubes() {
+    cross_tube(FRONT_FRAME_TUBE_Y);
+    cross_tube(REAR_FRAME_TUBE_Y);
+    
+    // Angle iron mounts (8 total: 2 per tube × 2 sides × 2 tubes)
+    frame_tube_angle_irons();
+}
+
+// Angle iron for mounting frame tubes to side wall plates
+// Same hole pattern as arm crossbeam angle irons
+// Oriented with length running vertically (Z direction)
+// Vertical leg against wall panel, horizontal leg extends toward tube
+module frame_tube_angle_iron() {
+    len = FRAME_TUBE_HEIGHT;  // 6" (152.4mm) - matches tube height, runs along Z
+    leg = 50.8;               // 2" leg
+    thick = 6.35;             // 1/4" thick
+    bolt_dia = BOLT_DIA_1_2;  // 1/2" bolts
+    
+    // Bolt spacing - closer together on tube side, further apart on wall side
+    plate_bolt_offset = 63.5;  // 2.5 inches from center (5 inch spacing) for plate/wall
+    tube_bolt_offset = 25.4;   // 1.0 inch from center (2 inch spacing) for tube
+    hole_inset = 25.4;         // 1 inch from corner for hole placement
+    
+    color("DarkGray")
+    difference() {
+        union() {
+            // Vertical leg (against wall panel) - runs full height in Z, thin in X
+            cube([thick, leg, len]);
+            // Horizontal leg (toward tube) - extends in +X direction, full height
+            cube([leg, thick, len]);
+        }
+        // Holes in vertical leg (bolts through to wall plate in X direction)
+        // 2 holes spaced 5" apart (2.5" from center), 1" up from bottom of leg
+        translate([-1, leg/2, len/2 - plate_bolt_offset]) 
+        rotate([0, 90, 0]) 
+        cylinder(d=bolt_dia, h=thick+2, $fn=32);
+        translate([-1, leg/2, len/2 + plate_bolt_offset]) 
+        rotate([0, 90, 0]) 
+        cylinder(d=bolt_dia, h=thick+2, $fn=32);
+        
+        // Holes in horizontal leg (bolts through in Y direction into tube side)
+        // 2 holes spaced 2" apart (1" from center), 1" from corner
+        translate([hole_inset, -1, len/2 - tube_bolt_offset]) 
+        rotate([-90, 0, 0])
+        cylinder(d=bolt_dia, h=thick+2, $fn=32);
+        translate([hole_inset, -1, len/2 + tube_bolt_offset]) 
+        rotate([-90, 0, 0])
+        cylinder(d=bolt_dia, h=thick+2, $fn=32);
+    }
+}
+
+// Place all 16 angle irons for frame tube mounting (2 per wall plate × 4 wall plates × 2 tubes)
+// Each wall plate gets 2 angles per tube: one at rear face, one at front face
+// Horizontal leg always points toward center of machine (X=0)
+module frame_tube_angle_irons() {
+    // Angle iron dimensions
+    angle_leg = 50.8;
+    angle_thick = 6.35;
+    
+    // X positions for inner faces of panels (where angles mount)
+    // Left panels: inner face is on +X side
+    left_inner_panel_face = -(TRACK_WIDTH/2 - SANDWICH_SPACING/2) + PANEL_THICKNESS;
+    left_outer_panel_face = -(TRACK_WIDTH/2 + SANDWICH_SPACING/2);
+    // Right panels: inner face is on -X side
+    right_inner_panel_face = (TRACK_WIDTH/2 - SANDWICH_SPACING/2) - PANEL_THICKNESS;
+    right_outer_panel_face = (TRACK_WIDTH/2 + SANDWICH_SPACING/2);
+    
+    // Z position - angle bottom aligns with tube bottom
+    angle_z = FRAME_TUBE_Z;
+    
+    // Y positions - flush with tube faces
+    front_tube_rear_y = FRONT_FRAME_TUBE_Y;
+    front_tube_front_y = FRONT_FRAME_TUBE_Y + FRAME_TUBE_WIDTH;
+    rear_tube_rear_y = REAR_FRAME_TUBE_Y;
+    rear_tube_front_y = REAR_FRAME_TUBE_Y + FRAME_TUBE_WIDTH;
+    
+    // =====================
+    // FRONT TUBE ANGLES
+    // =====================
+    
+    // Left inner panel - 2 angles (horizontal leg toward +X = toward center)
+    // Rear face angle - mirrored in Y so vertical leg extends backward
+    translate([left_inner_panel_face, front_tube_rear_y, angle_z])
+    mirror([0, 1, 0])
+    frame_tube_angle_iron();
+    
+    // Front face angle - vertical leg against panel, at front of tube
+    translate([left_inner_panel_face, front_tube_front_y, angle_z])
+    frame_tube_angle_iron();
+    
+    // Left outer panel - 2 angles (horizontal leg toward +X = toward center)
+    // Rear face angle
+    translate([left_outer_panel_face + angle_thick, front_tube_rear_y, angle_z])
+    mirror([0, 1, 0])
+    frame_tube_angle_iron();
+    
+    // Front face angle
+    translate([left_outer_panel_face + angle_thick, front_tube_front_y, angle_z])
+    frame_tube_angle_iron();
+    
+    // Right inner panel - 2 angles (horizontal leg toward -X = toward center, so mirror X)
+    // Rear face angle
+    translate([right_inner_panel_face, front_tube_rear_y, angle_z])
+    mirror([1, 1, 0])
+    frame_tube_angle_iron();
+    
+    // Front face angle
+    translate([right_inner_panel_face, front_tube_front_y, angle_z])
+    mirror([1, 0, 0])
+    frame_tube_angle_iron();
+    
+    // Right outer panel - 2 angles (horizontal leg toward -X = toward center, so mirror X)
+    // Rear face angle
+    translate([right_outer_panel_face - angle_thick, front_tube_rear_y, angle_z])
+    mirror([1, 1, 0])
+    frame_tube_angle_iron();
+    
+    // Front face angle
+    translate([right_outer_panel_face - angle_thick, front_tube_front_y, angle_z])
+    mirror([1, 0, 0])
+    frame_tube_angle_iron();
+    
+    // =====================
+    // REAR TUBE ANGLES
+    // =====================
+    
+    // Left inner panel - 2 angles (horizontal leg toward +X = toward center)
+    // Rear face angle
+    translate([left_inner_panel_face, rear_tube_rear_y, angle_z])
+    mirror([0, 1, 0])
+    frame_tube_angle_iron();
+    
+    // Front face angle
+    translate([left_inner_panel_face, rear_tube_front_y, angle_z])
+    frame_tube_angle_iron();
+    
+    // Left outer panel - 2 angles
+    // Rear face angle
+    translate([left_outer_panel_face + angle_thick, rear_tube_rear_y, angle_z])
+    mirror([0, 1, 0])
+    frame_tube_angle_iron();
+    
+    // Front face angle
+    translate([left_outer_panel_face + angle_thick, rear_tube_front_y, angle_z])
+    frame_tube_angle_iron();
+    
+    // Right inner panel - 2 angles (mirrored for -X direction)
+    // Rear face angle
+    translate([right_inner_panel_face, rear_tube_rear_y, angle_z])
+    mirror([1, 1, 0])
+    frame_tube_angle_iron();
+    
+    // Front face angle
+    translate([right_inner_panel_face, rear_tube_front_y, angle_z])
+    mirror([1, 0, 0])
+    frame_tube_angle_iron();
+    
+    // Right outer panel - 2 angles (mirrored for -X direction)
+    // Rear face angle
+    translate([right_outer_panel_face - angle_thick, rear_tube_rear_y, angle_z])
+    mirror([1, 1, 0])
+    frame_tube_angle_iron();
+    
+    // Front face angle
+    translate([right_outer_panel_face - angle_thick, rear_tube_front_y, angle_z])
+    mirror([1, 0, 0])
+    frame_tube_angle_iron();
+}
+
+// Cutout shape for side panels (in panel local coordinates)
+// Panel local: X = world Y, Y = world Z (relative to FRAME_Z_OFFSET)
+// Uses CNC-friendly corner radius for manufacturability
+module cross_tube_panel_cutout(y_pos) {
+    // In panel coords: 
+    // X position = world Y position of tube
+    // Y position = world Z position - FRAME_Z_OFFSET = FRAME_TUBE_Z - FRAME_Z_OFFSET
+    panel_x = y_pos;
+    panel_y = FRAME_TUBE_Z - FRAME_Z_OFFSET;
+    
+    translate([panel_x, panel_y, -5])
+    linear_extrude(height=PANEL_THICKNESS + 10)
+    offset(r=FRAME_TUBE_CNC_RADIUS) 
+    offset(r=-FRAME_TUBE_CNC_RADIUS)
+    square([FRAME_TUBE_WIDTH, FRAME_TUBE_HEIGHT]);
+}
+
+// =============================================================================
 // BASE FRAME ASSEMBLY
 // =============================================================================
 
@@ -2034,7 +2566,14 @@ module base_frame() {
     // Wall top in world coords = FRAME_Z_OFFSET + wall_height_at_y
     mid_plate_top_z = FRAME_Z_OFFSET + wall_height_at_y - 50.8;
     
-    mid_stiffener_plate(mid_plate_y, FRAME_Z_OFFSET + 100, mid_plate_top_z);
+    // mid_stiffener_plate(mid_plate_y, FRAME_Z_OFFSET + 100, mid_plate_top_z); // Removed for simplification
+    
+    // Bottom plate (horizontal stiffener at bottom of frame)
+    // 2" from front, 6" from back of wall side plates
+    bottom_stiffener_plate();
+    
+    // Cross frame tubes (2x6 square tubes through side walls)
+    cross_frame_tubes();
 }
 
 // =============================================================================
@@ -3182,7 +3721,7 @@ module standing_deck() {
 module lifetrac_v25_assembly() {
     if (show_frame) {
         base_frame();
-        engine();
+        // engine(); // Removed for simplification
     }
     
     wheel_assemblies();
