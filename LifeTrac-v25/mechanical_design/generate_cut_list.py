@@ -387,13 +387,23 @@ def generate_part_renders(part_code, scad_module_name, temp_dir, part=None):
     """
     # Map part codes to their dedicated SCAD files
     scad_file_map = {
-        'A1': '../openscad/parts/platform_angle_arm.scad',
-        'A2': '../openscad/parts/structural/angle_iron_a2_frame_mount.scad',
-        'A3': '../openscad/parts/structural/angle_iron_a3_loader_mount.scad',
-        'A4': '../openscad/parts/structural/angle_iron_a4_side_panel_vertical.scad',
-        'A5': '../openscad/parts/structural/angle_iron_a5_bottom_plate_horizontal.scad',
-        'T1': '../openscad/parts/structural/frame_tube_t1_front.scad',
-        'T2': '../openscad/parts/structural/frame_tube_t2_rear.scad',
+        'A1': '../openscad/parts/structural/angle_iron_a1_back_outer_vertical.scad',
+        'A2': '../openscad/parts/structural/angle_iron_a2_back_inner_vertical.scad',
+        'A3': '../openscad/parts/structural/angle_iron_a3_front_outer_vertical.scad',
+        'A4': '../openscad/parts/structural/angle_iron_a4_frame_tube_mount.scad',
+        'A5': '../openscad/parts/structural/angle_iron_a5_arm_crossbeam_mount.scad',
+        'A6-1': '../openscad/parts/structural/angle_iron_a6_bottom_horizontal.scad',
+        'A6-2': '../openscad/parts/structural/angle_iron_a6_bottom_horizontal.scad',
+        'A6-3': '../openscad/parts/structural/angle_iron_a6_bottom_horizontal.scad',
+        'A7': '../openscad/parts/structural/angle_iron_a7_platform_side.scad',
+        'A8': '../openscad/parts/structural/angle_iron_a8_platform_transverse.scad',
+        'A9': '../openscad/parts/structural/angle_iron_a9_front_center.scad',
+        'A10': '../openscad/parts/structural/angle_iron_a10_front_outer.scad',
+        'T1': '../openscad/parts/structural/tube_t1_front_frame.scad',
+        'T2': '../openscad/parts/structural/tube_t2_rear_frame.scad',
+        'T3': '../openscad/parts/structural/tube_t3_arm_crossbeam.scad',
+        'T4': '../openscad/parts/structural/tube_t4_arm_main.scad',
+        'T5': '../openscad/parts/structural/tube_t5_arm_leg_spacer.scad',
     }
     
     # Get the SCAD file path
@@ -407,25 +417,34 @@ def generate_part_renders(part_code, scad_module_name, temp_dir, part=None):
     
     # Create a wrapper SCAD file that includes the part file
     with open(scad_path, 'w') as f:
-        if part_code == 'A1':
-            f.write('''include <../openscad/lifetrac_v25_params.scad>
-use <../openscad/parts/platform_angle_arm.scad>
-
-platform_angle_arm(show_holes=true);
-''')
-        elif part_code.startswith('A'):
-            # Angle iron parts
-            module_name = scad_file_rel.split('/')[-1].replace('.scad', '')
-            f.write(f'''use <{scad_file_rel}>
+        # Use the structural_parts.scad master file for consistent module names
+        if part_code.startswith('A') or part_code.startswith('T'):
+            # Map part codes to their module names in structural_parts.scad
+            module_map = {
+                'A1': 'part_a1_back_outer_vertical',
+                'A2': 'part_a2_back_inner_vertical',
+                'A3': 'part_a3_front_outer_vertical',
+                'A4': 'part_a4_frame_tube_mount',
+                'A5': 'part_a5_arm_crossbeam_mount',
+                'A6-1': 'part_a6_bottom_segment_1',
+                'A6-2': 'part_a6_bottom_segment_2',
+                'A6-3': 'part_a6_bottom_segment_3',
+                'A7': 'part_a7_platform_side_angle',
+                'A8': 'part_a8_platform_transverse_angle',
+                'A9': 'part_a9_front_center_angle',
+                'A10': 'part_a10_front_outer_angle',
+                'T1': 'part_t1_front_frame_tube',
+                'T2': 'part_t2_rear_frame_tube',
+                'T3': 'part_t3_arm_crossbeam',
+                'T4': 'part_t4_arm_main',
+                'T5': 'part_t5_arm_leg_spacer_raw',
+            }
+            
+            module_name = module_map.get(part_code)
+            if module_name:
+                f.write(f'''use <../openscad/parts/structural/structural_parts.scad>
 
 {module_name}(show_holes=true);
-''')
-        elif part_code.startswith('T'):
-            # Tubing parts
-            module_name = scad_file_rel.split('/')[-1].replace('.scad', '')
-            f.write(f'''use <{scad_file_rel}>
-
-{module_name}(show_holes=false);
 ''')
     
     # Get part dimensions for camera positioning
@@ -612,122 +631,258 @@ def get_structural_parts():
     """Define all structural steel parts for LifeTrac v25"""
     parts = []
     
-    # Platform Angle Arms - based on platform_angle_arm.scad
-    # Length = PLATFORM_ARM_LENGTH - PLATFORM_BRACKET_WIDTH/2 = 425 - 50 = 375mm
-    # Actual arm length in the code uses full PLATFORM_ARM_LENGTH = 425mm
-    # Based on platform_angle_arm.scad: length = PLATFORM_ARM_LENGTH - PLATFORM_BRACKET_WIDTH/2
-    # But looking at the actual module, it uses the full length parameter
-    platform_arm_length = 425.0  # PLATFORM_ARM_LENGTH from params
-    
-    # Hole positions from platform_angle_arm.scad:
-    # Pivot end: PLATFORM_SIDE_BOLT_START and PLATFORM_SIDE_BOLT_START + PLATFORM_SIDE_BOLT_SPACING
-    # Deck end: centered on length with PLATFORM_SIDE_DECK_BOLT_SPACING
-    pivot_hole_1 = 20.0  # PLATFORM_SIDE_BOLT_START
-    pivot_hole_2 = 90.0  # PLATFORM_SIDE_BOLT_START + PLATFORM_SIDE_BOLT_SPACING (20 + 70)
-    
-    center_y = platform_arm_length / 2  # 212.5mm
-    deck_spacing = 150.0  # PLATFORM_SIDE_DECK_BOLT_SPACING
-    deck_hole_1 = center_y - deck_spacing/2  # 137.5mm
-    deck_hole_2 = center_y + deck_spacing/2  # 287.5mm
-    
+    # A1: Back Stiffener - Outer Wall Vertical
+    # Height calculated from FRAME_Z_OFFSET + 350 to FRAME_Z_OFFSET + MACHINE_HEIGHT (~600mm)
     parts.append(StructuralPart(
         part_code="A1",
-        name="Platform Angle Arm",
+        name="Back Stiffener Outer Vertical",
         material='2" × 2" × 1/4" Angle Iron',
-        length_mm=platform_arm_length,
+        length_mm=600.0,
         quantity=2,
         holes=[
-            {"position_mm": pivot_hole_1, "diameter_mm": 12.7, "description": "Pivot bracket bolt 1 (vertical leg)"},
-            {"position_mm": pivot_hole_2, "diameter_mm": 12.7, "description": "Pivot bracket bolt 2 (vertical leg)"},
-            {"position_mm": deck_hole_1, "diameter_mm": 12.7, "description": "Deck bolt 1 (horizontal leg)"},
-            {"position_mm": deck_hole_2, "diameter_mm": 12.7, "description": "Deck bolt 2 (horizontal leg)"},
+            {"position_mm": 50.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
+            {"position_mm": 200.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
+            {"position_mm": 350.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
+            {"position_mm": 500.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
+            {"position_mm": 100.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+            {"position_mm": 250.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+            {"position_mm": 400.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+            {"position_mm": 550.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
         ],
-        notes="Make one left and one right (mirror image). Two pivot holes through vertical leg, two deck holes through horizontal leg."
+        notes="Back stiffener plate outer walls. 3/8\" holes at ~150mm spacing on both legs."
     ))
     
-    # Frame Tube Angle Irons - based on frame_tube_angle_iron module in lifetrac_v25.scad
-    # Length = 152.4mm (6") - 2×3.175mm (trim) = 146.05mm (5.75")
+    # A2: Back Stiffener - Inner Wall Vertical
     parts.append(StructuralPart(
         part_code="A2",
-        name="Frame Tube Mounting Angle",
+        name="Back Stiffener Inner Vertical",
+        material='2" × 2" × 1/4" Angle Iron',
+        length_mm=600.0,
+        quantity=4,
+        holes=[
+            {"position_mm": 50.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
+            {"position_mm": 200.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
+            {"position_mm": 350.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
+            {"position_mm": 500.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
+            {"position_mm": 100.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+            {"position_mm": 250.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+            {"position_mm": 400.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+            {"position_mm": 550.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+        ],
+        notes="Back stiffener inner walls (2 per panel). Same dimensions as A1."
+    ))
+    
+    # A3: Front Stiffener - Outer Section Vertical (4.75")
+    parts.append(StructuralPart(
+        part_code="A3",
+        name="Front Stiffener Outer Vertical",
+        material='2" × 2" × 1/4" Angle Iron',
+        length_mm=120.65,
+        quantity=6,
+        holes=[
+            {"position_mm": 30.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
+            {"position_mm": 90.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
+            {"position_mm": 45.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+            {"position_mm": 75.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+        ],
+        notes="Front stiffener 5\" sections. 3/8\" holes, 3\" spacing."
+    ))
+    
+    # A4: Frame Tube Mount Angles
+    parts.append(StructuralPart(
+        part_code="A4",
+        name="Frame Tube Mount Angle",
         material='2" × 2" × 1/4" Angle Iron',
         length_mm=146.05,
         quantity=16,
         holes=[
-            {"position_mm": 22.86, "diameter_mm": 12.7, "description": "Plate mounting bolt 1"},
-            {"position_mm": 123.19, "diameter_mm": 12.7, "description": "Plate mounting bolt 2"},
-            {"position_mm": 22.86, "diameter_mm": 12.7, "description": "Tube mounting bolt 1 (other leg)"},
-            {"position_mm": 123.19, "diameter_mm": 12.7, "description": "Tube mounting bolt 2 (other leg)"},
+            {"position_mm": 47.625, "diameter_mm": 12.7, "description": "Wall mounting bolt 1 (vertical leg)"},
+            {"position_mm": 98.425, "diameter_mm": 12.7, "description": "Wall mounting bolt 2 (vertical leg)"},
+            {"position_mm": 47.625, "diameter_mm": 12.7, "description": "Tube mounting bolt 1 (horizontal leg)"},
+            {"position_mm": 98.425, "diameter_mm": 12.7, "description": "Tube mounting bolt 2 (horizontal leg)"},
         ],
-        notes="Used to mount frame tubes to side panels. 2 per tube × 2 tubes × 4 panels = 16 total."
+        notes="Mounts 2×6 frame tubes to panels. 1/2\" holes: 4\" spacing on wall leg, 2\" spacing on tube leg."
     ))
     
-    # Loader Arm Angle Irons - based on angle_iron_mount in loader_arm_v2.scad  
-    # Same length as frame tube angles
+    # A5: Arm Crossbeam Mount Angles
     parts.append(StructuralPart(
-        part_code="A3",
-        name="Loader Arm Mounting Angle",
+        part_code="A5",
+        name="Arm Crossbeam Mount Angle",
         material='2" × 2" × 1/4" Angle Iron',
         length_mm=146.05,
         quantity=4,
         holes=[
-            {"position_mm": 22.86, "diameter_mm": 12.7, "description": "Plate mounting bolt 1"},
-            {"position_mm": 123.19, "diameter_mm": 12.7, "description": "Plate mounting bolt 2"},
-            {"position_mm": 48.26, "diameter_mm": 12.7, "description": "Beam mounting bolt 1 (other leg)"},
-            {"position_mm": 97.79, "diameter_mm": 12.7, "description": "Beam mounting bolt 2 (other leg)"},
+            {"position_mm": 47.625, "diameter_mm": 12.7, "description": "Plate mounting bolt 1 (vertical leg)"},
+            {"position_mm": 98.425, "diameter_mm": 12.7, "description": "Plate mounting bolt 2 (vertical leg)"},
+            {"position_mm": 47.625, "diameter_mm": 12.7, "description": "Beam mounting bolt 1 (horizontal leg)"},
+            {"position_mm": 98.425, "diameter_mm": 12.7, "description": "Beam mounting bolt 2 (horizontal leg)"},
         ],
-        notes="Connects loader arm to side panels. 2 per arm × 2 arms = 4 total."
+        notes="Connects loader arm crossbeam to arm plates. 2 per arm × 2 arms = 4 total."
     ))
     
-    # Vertical Angle Irons for side panels - multiple sizes
+    # A6: Bottom Stiffener - Horizontal (3 segments)
+    # Segment 1 (rear)
     parts.append(StructuralPart(
-        part_code="A4",
-        name="Side Panel Vertical Angle (Tall)",
+        part_code="A6-1",
+        name="Bottom Horizontal Segment 1 (Rear)",
         material='2" × 2" × 1/4" Angle Iron',
-        length_mm=550.0,
+        length_mm=200.0,
         quantity=8,
         holes=[
-            {"position_mm": 60.0, "diameter_mm": 9.525, "description": "Panel mounting hole"},
-            {"position_mm": 490.0, "diameter_mm": 9.525, "description": "Panel mounting hole"},
+            {"position_mm": 50.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+            {"position_mm": 150.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+            {"position_mm": 75.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
         ],
-        notes="Vertical stiffeners for side panels. Varies in height per panel section."
+        notes="Bottom plate rear segment. Split pattern with 8\" gaps at wheels."
     ))
     
-    # Horizontal Split Angle Irons for bottom plates
+    # Segment 2 (middle)
     parts.append(StructuralPart(
-        part_code="A5",
-        name="Bottom Plate Horizontal Angle (Front)",
+        part_code="A6-2",
+        name="Bottom Horizontal Segment 2 (Middle)",
+        material='2" × 2" × 1/4" Angle Iron',
+        length_mm=300.0,
+        quantity=8,
+        holes=[
+            {"position_mm": 50.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+            {"position_mm": 200.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+            {"position_mm": 75.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
+            {"position_mm": 225.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
+        ],
+        notes="Bottom plate middle segment (between wheels)."
+    ))
+    
+    # Segment 3 (front)
+    parts.append(StructuralPart(
+        part_code="A6-3",
+        name="Bottom Horizontal Segment 3 (Front)",
+        material='2" × 2" × 1/4" Angle Iron',
+        length_mm=250.0,
+        quantity=8,
+        holes=[
+            {"position_mm": 50.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+            {"position_mm": 200.0, "diameter_mm": 9.525, "description": "Plate mounting (horizontal leg)"},
+            {"position_mm": 75.0, "diameter_mm": 9.525, "description": "Wall mounting (vertical leg)"},
+        ],
+        notes="Bottom plate front segment."
+    ))
+    
+    # A7: Platform Side Angle Iron
+    parts.append(StructuralPart(
+        part_code="A7",
+        name="Platform Side Angle",
         material='2" × 2" × 1/4" Angle Iron',
         length_mm=400.0,
-        quantity=8,
+        quantity=2,
         holes=[
-            {"position_mm": 60.0, "diameter_mm": 9.525, "description": "Plate mounting hole"},
-            {"position_mm": 340.0, "diameter_mm": 9.525, "description": "Plate mounting hole"},
+            {"position_mm": 60.0, "diameter_mm": 9.525, "description": "Pivot bracket bolt 1 (vertical leg)"},
+            {"position_mm": 140.0, "diameter_mm": 9.525, "description": "Pivot bracket bolt 2 (vertical leg)"},
+            {"position_mm": 260.0, "diameter_mm": 9.525, "description": "Deck bolt 1 (horizontal leg)"},
+            {"position_mm": 340.0, "diameter_mm": 9.525, "description": "Deck bolt 2 (horizontal leg)"},
         ],
-        notes="Bottom plate stiffeners. Split pattern to clear wheel axles."
+        notes="Standing platform side arms. Make one left and one right (mirror image)."
     ))
     
-    # Square Tubing Parts - Frame Tubes
-    # Front frame tube - 2" x 6" rectangular tubing
+    # A8: Platform Transverse Angle Iron
+    parts.append(StructuralPart(
+        part_code="A8",
+        name="Platform Transverse Angle",
+        material='2" × 2" × 1/4" Angle Iron',
+        length_mm=300.0,
+        quantity=2,
+        holes=[
+            {"position_mm": 75.0, "diameter_mm": 9.525, "description": "Deck mounting hole"},
+            {"position_mm": 150.0, "diameter_mm": 9.525, "description": "Deck mounting hole"},
+            {"position_mm": 225.0, "diameter_mm": 9.525, "description": "Deck mounting hole"},
+        ],
+        notes="Platform transverse bracing (left-right across deck)."
+    ))
+    
+    # A9: Front Stiffener - Center Section (5.75")
+    parts.append(StructuralPart(
+        part_code="A9",
+        name="Front Center Angle",
+        material='2" × 2" × 1/4" Angle Iron',
+        length_mm=146.05,
+        quantity=2,
+        holes=[
+            {"position_mm": 47.625, "diameter_mm": 12.7, "description": "Mounting bolt 1 (vertical leg)"},
+            {"position_mm": 98.425, "diameter_mm": 12.7, "description": "Mounting bolt 2 (vertical leg)"},
+            {"position_mm": 47.625, "diameter_mm": 12.7, "description": "Mounting bolt 1 (horizontal leg)"},
+            {"position_mm": 98.425, "diameter_mm": 12.7, "description": "Mounting bolt 2 (horizontal leg)"},
+        ],
+        notes="Front stiffener motor plate inner faces. Same as A4."
+    ))
+    
+    # A10: Front Stiffener - Outer Section (Motor Plate Sides)
+    parts.append(StructuralPart(
+        part_code="A10",
+        name="Front Outer Angle (Motor Plate)",
+        material='2" × 2" × 1/4" Angle Iron',
+        length_mm=120.65,
+        quantity=8,
+        holes=[
+            {"position_mm": 30.0, "diameter_mm": 9.525, "description": "Mounting hole 1 (vertical leg)"},
+            {"position_mm": 90.0, "diameter_mm": 9.525, "description": "Mounting hole 2 (vertical leg)"},
+            {"position_mm": 45.0, "diameter_mm": 9.525, "description": "Mounting hole 1 (horizontal leg)"},
+            {"position_mm": 75.0, "diameter_mm": 9.525, "description": "Mounting hole 2 (horizontal leg)"},
+        ],
+        notes="Front stiffener outer sections and motor plate sides."
+    ))
+    
+    # T1: Front Cross Frame Tube
     parts.append(StructuralPart(
         part_code="T1",
         name="Front Frame Tube",
         material='2" × 6" × 1/4" Rectangular Tubing',
-        length_mm=1200.0,  # Approximate - spans track width
+        length_mm=1133.0,
         quantity=1,
         holes=[],
-        notes="Front cross frame tube passing through side panels. Actual length = track width between panels."
+        notes="Front cross frame tube. Length = TRACK_WIDTH + SANDWICH_SPACING + 2×PANEL_THICKNESS + extensions."
     ))
     
-    # Rear frame tube - 2" x 6" rectangular tubing
+    # T2: Rear Cross Frame Tube
     parts.append(StructuralPart(
         part_code="T2",
         name="Rear Frame Tube",
         material='2" × 6" × 1/4" Rectangular Tubing',
-        length_mm=1200.0,  # Approximate - spans track width
+        length_mm=1133.0,
         quantity=1,
         holes=[],
-        notes="Rear cross frame tube passing through side panels. Actual length = track width between panels."
+        notes="Rear cross frame tube. Same length as T1."
+    ))
+    
+    # T3: Arm Crossbeam Tube
+    parts.append(StructuralPart(
+        part_code="T3",
+        name="Arm Crossbeam",
+        material='2" × 6" × 1/4" Rectangular Tubing',
+        length_mm=900.0,
+        quantity=1,
+        holes=[],
+        notes="Loader arm crossbeam connecting left and right arms. Length = ARM_SPACING."
+    ))
+    
+    # T4: Main Arm Tubes
+    parts.append(StructuralPart(
+        part_code="T4",
+        name="Main Arm Tube",
+        material='2" × 6" × 1/4" Rectangular Tubing',
+        length_mm=800.0,
+        quantity=2,
+        holes=[],
+        notes="Loader arm main sections (pivot to elbow). One per arm."
+    ))
+    
+    # T5: Arm Leg Spacer Tubes
+    parts.append(StructuralPart(
+        part_code="T5",
+        name="Arm Leg Spacer Tube",
+        material='2" × 6" × 1/4" Rectangular Tubing',
+        length_mm=150.0,
+        quantity=2,
+        holes=[],
+        notes="Spacer tubes at loader arm elbows. Plasma cut to tapered profile."
     ))
     
     return parts
