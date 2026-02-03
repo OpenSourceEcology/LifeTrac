@@ -377,7 +377,7 @@ def generate_part_renders(part_code, scad_module_name, temp_dir, part=None):
     Generate orthogonal and diagonal views of a part
     
     Args:
-        part_code: Part code (A1, A2, etc.)
+        part_code: Part code (A1, A2, T1, etc.)
         scad_module_name: Name of OpenSCAD module to render
         temp_dir: Temporary directory for outputs
         part: StructuralPart object with dimensions and hole data
@@ -385,91 +385,72 @@ def generate_part_renders(part_code, scad_module_name, temp_dir, part=None):
     Returns:
         Dict with paths to rendered images, or None if rendering failed
     """
-    # Create temporary SCAD file that calls the module
+    # Map part codes to their dedicated SCAD files
+    scad_file_map = {
+        'A1': '../openscad/parts/platform_angle_arm.scad',
+        'A2': '../openscad/parts/structural/angle_iron_a2_frame_mount.scad',
+        'A3': '../openscad/parts/structural/angle_iron_a3_loader_mount.scad',
+        'A4': '../openscad/parts/structural/angle_iron_a4_side_panel_vertical.scad',
+        'A5': '../openscad/parts/structural/angle_iron_a5_bottom_plate_horizontal.scad',
+        'T1': '../openscad/parts/structural/frame_tube_t1_front.scad',
+        'T2': '../openscad/parts/structural/frame_tube_t2_rear.scad',
+    }
+    
+    # Get the SCAD file path
+    scad_file_rel = scad_file_map.get(part_code)
+    if not scad_file_rel:
+        print(f"  ⚠️  No SCAD file defined for part {part_code}")
+        return None
+    
+    # Create absolute path from temp directory
     scad_path = os.path.join(temp_dir, f'{part_code}.scad')
+    
+    # Create a wrapper SCAD file that includes the part file
+    with open(scad_path, 'w') as f:
+        if part_code == 'A1':
+            f.write('''include <../openscad/lifetrac_v25_params.scad>
+use <../openscad/parts/platform_angle_arm.scad>
+
+platform_angle_arm(show_holes=true);
+''')
+        elif part_code.startswith('A'):
+            # Angle iron parts
+            module_name = scad_file_rel.split('/')[-1].replace('.scad', '')
+            f.write(f'''use <{scad_file_rel}>
+
+{module_name}(show_holes=true);
+''')
+        elif part_code.startswith('T'):
+            # Tubing parts
+            module_name = scad_file_rel.split('/')[-1].replace('.scad', '')
+            f.write(f'''use <{scad_file_rel}>
+
+{module_name}(show_holes=false);
+''')
     
     # Get part dimensions for camera positioning
     if part:
-        length = part.length_mm
-        leg = 50.8  # 2" angle iron leg size
-    else:
-        length = 425.0  # default
-        leg = 50.8
-    
-    # For now, create angle iron visualization with holes
-    with open(scad_path, 'w') as f:
-        if part_code == 'A1':
-            # Use the actual platform_angle_arm module which has holes
-            f.write('''
-include <../openscad/lifetrac_v25_params.scad>
-use <../openscad/parts/platform_angle_arm.scad>
-
-// Render with holes visible
-platform_angle_arm(show_holes=true);
-''')
+        if hasattr(part, 'length_mm'):
+            length = part.length_mm
+        elif hasattr(part, 'width_mm'):
+            # For square/rectangular tubing
+            length = max(part.width_mm, part.height_mm) if hasattr(part, 'height_mm') else part.width_mm
         else:
-            # Generic angle iron with holes for other parts
-            if not part:
-                return None
-            
-            # Generate angle iron with holes
-            f.write(f'''
-$fn = 32;
-
-// Angle iron visualization with holes
-module angle_iron_with_holes() {{
-    leg = 50.8;  // 2" angle iron
-    thick = 6.35;  // 1/4" thickness
-    length = {length};
-    
-    difference() {{
-        // Main angle iron shape
-        color("Gray")
-        rotate([90, 0, 0])
-        linear_extrude(height=length)
-        polygon([
-            [0, 0],
-            [leg, 0],
-            [leg, thick],
-            [thick, thick],
-            [thick, leg],
-            [0, leg]
-        ]);
+            length = 425.0
         
-        // Drill holes
-''')
-            
-            # Add holes based on part data
-            if part and part.holes:
-                for hole in part.holes:
-                    hole_pos = hole['position_mm']
-                    hole_dia = hole['diameter_mm']
-                    # Determine which leg the hole goes through
-                    if 'vertical leg' in hole.get('description', '').lower():
-                        # Hole through vertical leg (X direction)
-                        f.write(f'''        // {hole['description']}
-        translate([leg/2, -{hole_pos}, leg/2])
-        rotate([0, 90, 0])
-        cylinder(d={hole_dia}, h=leg+2, center=true, $fn=24);
-''')
-                    else:
-                        # Hole through horizontal leg (Z direction) or default
-                        f.write(f'''        // {hole['description']}
-        translate([leg/2, -{hole_pos}, thick/2])
-        cylinder(d={hole_dia}, h=thick+2, center=true, $fn=24);
-''')
-            
-            f.write('''    }
-}
-
-angle_iron_with_holes();
-''')
+        # Determine typical dimensions
+        if part_code.startswith('T'):
+            # Tubular parts - use tube dimensions
+            max_dim = 1200.0  # Approximate length of frame tubes
+        else:
+            # Angle iron parts
+            leg = 50.8
+            max_dim = max(length, leg * 2)
+    else:
+        length = 425.0
+        max_dim = 425.0
     
     # Calculate camera distances based on part dimensions
-    # Use bounding box to determine good camera distance
-    max_dim = max(length, leg * 2)  # diagonal of L-shape
-    # Camera distance to fit object at ~90% of view
-    # For ortho projection, distance affects the viewing volume
     cam_dist = max_dim * 1.2
     
     # Camera configurations for different views with better positioning
@@ -724,6 +705,29 @@ def get_structural_parts():
             {"position_mm": 340.0, "diameter_mm": 9.525, "description": "Plate mounting hole"},
         ],
         notes="Bottom plate stiffeners. Split pattern to clear wheel axles."
+    ))
+    
+    # Square Tubing Parts - Frame Tubes
+    # Front frame tube - 2" x 6" rectangular tubing
+    parts.append(StructuralPart(
+        part_code="T1",
+        name="Front Frame Tube",
+        material='2" × 6" × 1/4" Rectangular Tubing',
+        length_mm=1200.0,  # Approximate - spans track width
+        quantity=1,
+        holes=[],
+        notes="Front cross frame tube passing through side panels. Actual length = track width between panels."
+    ))
+    
+    # Rear frame tube - 2" x 6" rectangular tubing
+    parts.append(StructuralPart(
+        part_code="T2",
+        name="Rear Frame Tube",
+        material='2" × 6" × 1/4" Rectangular Tubing',
+        length_mm=1200.0,  # Approximate - spans track width
+        quantity=1,
+        holes=[],
+        notes="Rear cross frame tube passing through side panels. Actual length = track width between panels."
     ))
     
     return parts
