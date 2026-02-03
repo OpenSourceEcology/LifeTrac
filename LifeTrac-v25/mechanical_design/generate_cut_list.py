@@ -238,20 +238,36 @@ def get_structural_parts():
     parts = []
     
     # Platform Angle Arms - based on platform_angle_arm.scad
-    # Length = PLATFORM_ARM_LENGTH - PLATFORM_BRACKET_WIDTH/2 ≈ 425mm
+    # Length = PLATFORM_ARM_LENGTH - PLATFORM_BRACKET_WIDTH/2 = 425 - 50 = 375mm
+    # Actual arm length in the code uses full PLATFORM_ARM_LENGTH = 425mm
+    # Based on platform_angle_arm.scad: length = PLATFORM_ARM_LENGTH - PLATFORM_BRACKET_WIDTH/2
+    # But looking at the actual module, it uses the full length parameter
+    platform_arm_length = 425.0  # PLATFORM_ARM_LENGTH from params
+    
+    # Hole positions from platform_angle_arm.scad:
+    # Pivot end: PLATFORM_SIDE_BOLT_START and PLATFORM_SIDE_BOLT_START + PLATFORM_SIDE_BOLT_SPACING
+    # Deck end: centered on length with PLATFORM_SIDE_DECK_BOLT_SPACING
+    pivot_hole_1 = 20.0  # PLATFORM_SIDE_BOLT_START
+    pivot_hole_2 = 90.0  # PLATFORM_SIDE_BOLT_START + PLATFORM_SIDE_BOLT_SPACING (20 + 70)
+    
+    center_y = platform_arm_length / 2  # 212.5mm
+    deck_spacing = 150.0  # PLATFORM_SIDE_DECK_BOLT_SPACING
+    deck_hole_1 = center_y - deck_spacing/2  # 137.5mm
+    deck_hole_2 = center_y + deck_spacing/2  # 287.5mm
+    
     parts.append(StructuralPart(
         part_code="A1",
         name="Platform Angle Arm",
         material='2" × 2" × 1/4" Angle Iron',
-        length_mm=425.0,
+        length_mm=platform_arm_length,
         quantity=2,
         holes=[
-            {"position_mm": 38.1, "diameter_mm": 12.7, "description": "Pivot bracket bolt hole 1"},
-            {"position_mm": 88.9, "diameter_mm": 12.7, "description": "Pivot bracket bolt hole 2"},
-            {"position_mm": 212.5, "diameter_mm": 12.7, "description": "Deck attachment hole 1"},
-            {"position_mm": 262.5, "diameter_mm": 12.7, "description": "Deck attachment hole 2"},
+            {"position_mm": pivot_hole_1, "diameter_mm": 12.7, "description": "Pivot bracket bolt 1 (vertical leg)"},
+            {"position_mm": pivot_hole_2, "diameter_mm": 12.7, "description": "Pivot bracket bolt 2 (vertical leg)"},
+            {"position_mm": deck_hole_1, "diameter_mm": 12.7, "description": "Deck bolt 1 (horizontal leg)"},
+            {"position_mm": deck_hole_2, "diameter_mm": 12.7, "description": "Deck bolt 2 (horizontal leg)"},
         ],
-        notes="Make one left and one right (mirror image). Holes go through different legs."
+        notes="Make one left and one right (mirror image). Two pivot holes through vertical leg, two deck holes through horizontal leg."
     ))
     
     # Frame Tube Angle Irons - based on frame_tube_angle_iron module in lifetrac_v25.scad
