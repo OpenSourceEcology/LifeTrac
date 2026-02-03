@@ -5,14 +5,20 @@ Creates one page per unique angle iron and square tubing part with:
 - Engineering drawing showing dimensions and hole positions
 - List of cutting and drilling operations with checkboxes
 - Part code and quantity needed
+- OpenSCAD rendered views (top, side, end, 45° diagonal)
 """
 
 import sys
+import os
+import subprocess
+import tempfile
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch, mm
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
+from reportlab.lib.utils import ImageReader
+from PIL import Image
 
 
 class StructuralPart:
@@ -245,7 +251,204 @@ def draw_operations_checklist(c, part, x_start, y_start, width, height):
         c.drawString(x_start, y, f"Notes: {part.notes}")
 
 
-def generate_cut_list_page(c, part):
+def generate_openscad_render(part_code, scad_file, camera_config, output_path):
+    """
+    Generate PNG render from OpenSCAD file
+    
+    Args:
+        part_code: Part code (A1, A2, etc.)
+        scad_file: Path to OpenSCAD file
+        camera_config: Dict with camera, rotation, projection settings
+        output_path: Where to save the PNG
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Check if openscad is available
+        if subprocess.run(['which', 'openscad'], capture_output=True).returncode != 0:
+            print(f"  ⚠️  OpenSCAD not found, skipping render for {part_code}")
+            return False
+        
+        # Build OpenSCAD command
+        cmd = [
+            'openscad',
+            '--render',
+            '--imgsize=800,600',
+            '--colorscheme=Tomorrow',
+            f'--camera={camera_config["camera"]}',
+            f'--projection={camera_config.get("projection", "ortho")}',
+            f'--viewall',
+            '-o', output_path,
+            scad_file
+        ]
+        
+        # Run with timeout
+        result = subprocess.run(cmd, capture_output=True, timeout=30, env={'DISPLAY': ':99'})
+        
+        if result.returncode == 0 and os.path.exists(output_path):
+            return True
+        else:
+            print(f"  ⚠️  OpenSCAD render failed for {part_code}: {result.stderr.decode()[:100]}")
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print(f"  ⚠️  OpenSCAD render timeout for {part_code}")
+        return False
+    except Exception as e:
+        print(f"  ⚠️  Error rendering {part_code}: {str(e)}")
+        return False
+
+
+def convert_to_grayscale(image_path):
+    """Convert image to grayscale for easier printing"""
+    try:
+        img = Image.open(image_path)
+        grayscale = img.convert('L')
+        grayscale.save(image_path)
+        return True
+    except Exception as e:
+        print(f"  ⚠️  Error converting to grayscale: {str(e)}")
+        return False
+
+
+def generate_part_renders(part_code, scad_module_name, temp_dir):
+    """
+    Generate orthogonal and diagonal views of a part
+    
+    Args:
+        part_code: Part code (A1, A2, etc.)
+        scad_module_name: Name of OpenSCAD module to render
+        temp_dir: Temporary directory for outputs
+    
+    Returns:
+        Dict with paths to rendered images, or None if rendering failed
+    """
+    # Create temporary SCAD file that calls the module
+    scad_path = os.path.join(temp_dir, f'{part_code}.scad')
+    
+    # Map part codes to their SCAD files
+    scad_files = {
+        'A1': 'openscad/parts/platform_angle_arm.scad',
+        'A2': 'openscad/modules/structural_steel.scad',  # Will need custom wrapper
+        'A3': 'openscad/modules/structural_steel.scad',
+        'A4': 'openscad/modules/structural_steel.scad',
+        'A5': 'openscad/modules/structural_steel.scad',
+    }
+    
+    # For now, create a simple angle iron visualization
+    # This will be expanded based on the actual part
+    with open(scad_path, 'w') as f:
+        if part_code == 'A1':
+            f.write('''
+include <../openscad/lifetrac_v25_params.scad>
+use <../openscad/parts/platform_angle_arm.scad>
+
+platform_angle_arm(show_holes=true);
+''')
+        else:
+            # Generic angle iron for other parts
+            f.write(f'''
+$fn = 32;
+
+// Generic angle iron visualization
+module angle_iron_part() {{
+    leg = 50.8;  // 2" angle iron
+    thick = 6.35;  // 1/4" thickness
+    length = 146.05;  // Default length
+    
+    color("Gray")
+    rotate([90, 0, 0])
+    linear_extrude(height=length)
+    polygon([
+        [0, 0],
+        [leg, 0],
+        [leg, thick],
+        [thick, thick],
+        [thick, leg],
+        [0, leg]
+    ]);
+}}
+
+angle_iron_part();
+''')
+    
+    # Camera configurations for different views
+    views = {
+        'top': {'camera': '0,0,0,0,0,0,500', 'projection': 'ortho'},
+        'side': {'camera': '500,0,0,90,0,0,500', 'projection': 'ortho'},
+        'end': {'camera': '0,500,0,90,0,90,500', 'projection': 'ortho'},
+        'diagonal': {'camera': '300,300,300,55,0,45,800', 'projection': 'ortho'},
+    }
+    
+    renders = {}
+    for view_name, camera_config in views.items():
+        output_path = os.path.join(temp_dir, f'{part_code}_{view_name}.png')
+        if generate_openscad_render(part_code, scad_path, camera_config, output_path):
+            convert_to_grayscale(output_path)
+            renders[view_name] = output_path
+        else:
+            # If OpenSCAD fails, we'll skip rendering for this part
+            return None
+    
+    return renders if renders else None
+
+
+def draw_part_renders(c, renders, x_start, y_start, width, height):
+    """
+    Draw the 4 rendered views in the PDF
+    
+    Args:
+        c: Canvas object
+        renders: Dict with paths to rendered images
+        x_start, y_start: Position to start drawing
+        width, height: Available space
+    """
+    if not renders:
+        return
+    
+    # Layout: 2x2 grid of images
+    img_width = width / 2 - 10
+    img_height = height / 2 - 10
+    
+    # Title
+    c.setFont("Helvetica-Bold", 10)
+    c.setFillColor(colors.black)
+    c.drawString(x_start, y_start + height + 5, "3D Views:")
+    
+    # Draw images in 2x2 grid
+    positions = {
+        'top': (x_start, y_start + height/2 + 5),
+        'side': (x_start + width/2 + 10, y_start + height/2 + 5),
+        'end': (x_start, y_start),
+        'diagonal': (x_start + width/2 + 10, y_start),
+    }
+    
+    labels = {
+        'top': 'Top View',
+        'side': 'Side View',
+        'end': 'End View',
+        'diagonal': '45° Diagonal',
+    }
+    
+    for view_name, (x, y) in positions.items():
+        if view_name in renders:
+            try:
+                # Draw image
+                img = ImageReader(renders[view_name])
+                c.drawImage(img, x, y, width=img_width, height=img_height, 
+                           preserveAspectRatio=True, mask='auto')
+                
+                # Draw label
+                c.setFont("Helvetica", 8)
+                c.setFillColor(colors.black)
+                c.drawString(x + 5, y + img_height - 15, labels[view_name])
+                
+            except Exception as e:
+                print(f"  ⚠️  Error drawing {view_name} render: {str(e)}")
+
+
+def generate_cut_list_page(c, part, temp_dir=None):
     """Generate one page for a structural part"""
     width, height = letter
     margin = 0.75 * inch
@@ -274,9 +477,27 @@ def generate_cut_list_page(c, part):
     
     # Operations checklist section
     checklist_y_start = drawing_y_start - drawing_height - 40
-    checklist_height = 300
+    checklist_height = 200  # Reduced to make room for renders
     draw_operations_checklist(c, part, margin, checklist_y_start - checklist_height,
                               width - 2*margin, checklist_height)
+    
+    # 3D Renders section (below operations)
+    if temp_dir:
+        renders_y_start = checklist_y_start - checklist_height - 20
+        renders_height = 200
+        
+        print(f"  Generating 3D renders for {part.part_code}...")
+        renders = generate_part_renders(part.part_code, part.name.lower().replace(' ', '_'), temp_dir)
+        
+        if renders:
+            draw_part_renders(c, renders, margin, renders_y_start - renders_height,
+                            width - 2*margin, renders_height)
+        else:
+            # If rendering failed, add a note
+            c.setFont("Helvetica-Oblique", 9)
+            c.setFillColor(colors.grey)
+            c.drawString(margin, renders_y_start - 10, 
+                        "(3D renders require OpenSCAD - run with OpenSCAD installed to see views)")
     
     # Footer
     c.setFont("Helvetica-Oblique", 8)
@@ -396,19 +617,21 @@ def main():
     
     print("Generating LifeTrac v25 Structural Steel Cut List...")
     
-    # Create PDF
-    c = canvas.Canvas(output_file, pagesize=letter)
-    
-    # Get all parts
-    parts = get_structural_parts()
-    
-    # Generate one page per part
-    for part in parts:
-        print(f"  Adding page for {part.part_code}: {part.name} (Qty: {part.quantity})")
-        generate_cut_list_page(c, part)
-    
-    # Save PDF
-    c.save()
+    # Create temporary directory for OpenSCAD renders
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create PDF
+        c = canvas.Canvas(output_file, pagesize=letter)
+        
+        # Get all parts
+        parts = get_structural_parts()
+        
+        # Generate one page per part
+        for part in parts:
+            print(f"  Adding page for {part.part_code}: {part.name} (Qty: {part.quantity})")
+            generate_cut_list_page(c, part, temp_dir)
+        
+        # Save PDF
+        c.save()
     
     print(f"\n✓ Generated {output_file}")
     print(f"  Total parts: {len(parts)}")

@@ -32,7 +32,13 @@ jobs:
       with:
         python-version: '3.12'
     
-    - name: Install dependencies
+    - name: Install OpenSCAD for 3D renders
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openscad xvfb
+        openscad --version
+    
+    - name: Install Python dependencies
       run: |
         pip install -r LifeTrac-v25/mechanical_design/requirements.txt
     
@@ -43,6 +49,11 @@ jobs:
         echo "========================================="
         echo "Generating Structural Steel Cut List PDF"
         echo "========================================="
+        
+        # Start Xvfb for OpenSCAD rendering
+        Xvfb :99 -screen 0 1024x768x16 &
+        export DISPLAY=:99
+        sleep 2
         
         python3 generate_cut_list.py
         
