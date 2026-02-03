@@ -219,34 +219,70 @@ def draw_operations_checklist(c, part, x_start, y_start, width, height):
     operations = part.get_operations()
     
     # Title
-    c.setFont("Helvetica-Bold", 12)
+    c.setFont("Helvetica-Bold", 11)
     c.setFillColor(colors.black)
     c.drawString(x_start, y_start + height - 20, "Manufacturing Operations:")
     
     # Draw checkboxes and operations
-    y = y_start + height - 50
-    checkbox_size = 12
+    y = y_start + height - 45
+    checkbox_size = 10
     
-    c.setFont("Helvetica", 10)
+    c.setFont("Helvetica", 9)
     for i, op in enumerate(operations, 1):
         # Draw checkbox
         c.setStrokeColor(colors.black)
         c.setLineWidth(1)
         c.rect(x_start, y - checkbox_size, checkbox_size, checkbox_size, fill=0, stroke=1)
         
-        # Draw operation number and description
-        c.setFillColor(colors.black)
-        c.drawString(x_start + checkbox_size + 5, y - 10, f"{i}. {op['description']}")
+        # Parse operation description to separate main action from position notes
+        description = op['description']
+        # Check if there's a position note (contains " - " or "at ")
+        if ' - ' in description:
+            main_part, detail_part = description.split(' - ', 1)
+            # Draw main operation
+            c.setFillColor(colors.black)
+            c.drawString(x_start + checkbox_size + 5, y - 8, f"{i}. {main_part}")
+            # Draw detail as bullet point
+            y -= 15
+            c.setFont("Helvetica", 8)
+            c.setFillColor(colors.darkgray)
+            c.drawString(x_start + checkbox_size + 15, y - 5, f"• {detail_part}")
+            c.setFont("Helvetica", 9)
+            y -= 5
+        elif 'at ' in description and 'hole' in description.lower():
+            # Split at "at" for hole positions
+            parts = description.split(' at ', 1)
+            if len(parts) == 2:
+                main_part = parts[0]
+                detail_part = f"at {parts[1]}"
+                # Draw main operation
+                c.setFillColor(colors.black)
+                c.drawString(x_start + checkbox_size + 5, y - 8, f"{i}. {main_part}")
+                # Draw detail as bullet point
+                y -= 15
+                c.setFont("Helvetica", 8)
+                c.setFillColor(colors.darkgray)
+                c.drawString(x_start + checkbox_size + 15, y - 5, f"• {detail_part}")
+                c.setFont("Helvetica", 9)
+                y -= 5
+            else:
+                # Draw as single line
+                c.setFillColor(colors.black)
+                c.drawString(x_start + checkbox_size + 5, y - 8, f"{i}. {description}")
+        else:
+            # Draw as single line
+            c.setFillColor(colors.black)
+            c.drawString(x_start + checkbox_size + 5, y - 8, f"{i}. {description}")
         
-        y -= 25
+        y -= 20
         
         if y < y_start + 50:
             break
     
     # Add notes if any
     if part.notes and y > y_start + 60:
-        y -= 20
-        c.setFont("Helvetica-Oblique", 9)
+        y -= 15
+        c.setFont("Helvetica-Oblique", 8)
         c.setFillColor(colors.darkblue)
         c.drawString(x_start, y, f"Notes: {part.notes}")
 
@@ -471,7 +507,7 @@ angle_iron_with_holes();
 
 def draw_part_renders(c, renders, x_start, y_start, width, height):
     """
-    Draw the 4 rendered views in the PDF
+    Draw the 4 rendered views in a single column (vertical stack)
     
     Args:
         c: Canvas object
@@ -482,22 +518,17 @@ def draw_part_renders(c, renders, x_start, y_start, width, height):
     if not renders:
         return
     
-    # Layout: 2x2 grid of images
-    img_width = width / 2 - 10
-    img_height = height / 2 - 10
+    # Layout: Single column, 4 images stacked vertically
+    img_width = width
+    img_height = height / 4 - 5  # Divide height by 4 images with small gaps
     
     # Title
     c.setFont("Helvetica-Bold", 10)
     c.setFillColor(colors.black)
     c.drawString(x_start, y_start + height + 5, "3D Views:")
     
-    # Draw images in 2x2 grid
-    positions = {
-        'top': (x_start, y_start + height/2 + 5),
-        'side': (x_start + width/2 + 10, y_start + height/2 + 5),
-        'end': (x_start, y_start),
-        'diagonal': (x_start + width/2 + 10, y_start),
-    }
+    # Draw images in single column (vertical stack)
+    view_order = ['top', 'side', 'end', 'diagonal']
     
     labels = {
         'top': 'Top View',
@@ -506,18 +537,21 @@ def draw_part_renders(c, renders, x_start, y_start, width, height):
         'diagonal': '45° Diagonal',
     }
     
-    for view_name, (x, y) in positions.items():
+    for i, view_name in enumerate(view_order):
         if view_name in renders:
             try:
+                # Calculate Y position for this image (top to bottom)
+                y = y_start + height - (i + 1) * (img_height + 5)
+                
                 # Draw image
                 img = ImageReader(renders[view_name])
-                c.drawImage(img, x, y, width=img_width, height=img_height, 
+                c.drawImage(img, x_start, y, width=img_width, height=img_height, 
                            preserveAspectRatio=True, mask='auto')
                 
                 # Draw label
-                c.setFont("Helvetica", 8)
+                c.setFont("Helvetica", 7)
                 c.setFillColor(colors.black)
-                c.drawString(x + 5, y + img_height - 15, labels[view_name])
+                c.drawString(x_start + 3, y + img_height - 10, labels[view_name])
                 
             except Exception as e:
                 print(f"  ⚠️  Error drawing {view_name} render: {str(e)}")
@@ -544,35 +578,44 @@ def generate_cut_list_page(c, part, temp_dir=None):
     c.setLineWidth(1)
     c.line(margin, info_y - 10, width - margin, info_y - 10)
     
-    # Engineering drawing section
+    # Engineering drawing section (full width)
     drawing_y_start = info_y - 30
-    drawing_height = 200
+    drawing_height = 180
     draw_angle_iron_drawing(c, part, margin, drawing_y_start - drawing_height, 
                            width - 2*margin, drawing_height)
     
-    # Operations checklist section
-    checklist_y_start = drawing_y_start - drawing_height - 40
-    checklist_height = 200  # Reduced to make room for renders
-    draw_operations_checklist(c, part, margin, checklist_y_start - checklist_height,
-                              width - 2*margin, checklist_height)
+    # Calculate layout for operations and 3D views side by side
+    content_y_start = drawing_y_start - drawing_height - 30
+    content_height = 400  # Height for both operations and 3D views
     
-    # 3D Renders section (below operations)
+    # 2/3 width for operations, 1/3 for 3D views
+    page_width = width - 2*margin
+    operations_width = page_width * 0.65  # 65% for operations (a bit more than 2/3)
+    renders_width = page_width * 0.30     # 30% for renders
+    gap = page_width * 0.05               # 5% gap between sections
+    
+    # Operations checklist section (left side, 2/3)
+    operations_x = margin
+    draw_operations_checklist(c, part, operations_x, content_y_start - content_height,
+                              operations_width, content_height)
+    
+    # 3D Renders section (right side, 1/3)
     if temp_dir:
-        renders_y_start = checklist_y_start - checklist_height - 20
-        renders_height = 200
+        renders_x = margin + operations_width + gap
         
         print(f"  Generating 3D renders for {part.part_code}...")
         renders = generate_part_renders(part.part_code, part.name.lower().replace(' ', '_'), temp_dir, part)
         
         if renders:
-            draw_part_renders(c, renders, margin, renders_y_start - renders_height,
-                            width - 2*margin, renders_height)
+            draw_part_renders(c, renders, renders_x, content_y_start - content_height,
+                            renders_width, content_height)
         else:
-            # If rendering failed, add a note
-            c.setFont("Helvetica-Oblique", 9)
+            # If rendering failed, add a note in the 3D views area
+            c.setFont("Helvetica-Oblique", 8)
             c.setFillColor(colors.grey)
-            c.drawString(margin, renders_y_start - 10, 
-                        "(3D renders require OpenSCAD - run with OpenSCAD installed to see views)")
+            # Wrap the text for narrow column
+            note = "(3D renders require OpenSCAD)"
+            c.drawString(renders_x, content_y_start - 10, note)
     
     # Footer
     c.setFont("Helvetica-Oblique", 8)
