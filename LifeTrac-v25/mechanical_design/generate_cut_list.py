@@ -27,6 +27,21 @@ class StructuralPart:
         self.quantity = quantity
         self.holes = holes or []
         self.notes = notes
+        
+        # Categorize holes by leg
+        self.vertical_leg_holes = []
+        self.horizontal_leg_holes = []
+        for hole in self.holes:
+            if 'vertical leg' in hole.get('description', '').lower():
+                self.vertical_leg_holes.append(hole)
+            elif 'horizontal leg' in hole.get('description', '').lower():
+                self.horizontal_leg_holes.append(hole)
+            elif 'other leg' in hole.get('description', '').lower():
+                # For parts with holes in both legs but not specifically labeled
+                self.horizontal_leg_holes.append(hole)
+            else:
+                # Default to vertical leg if not specified
+                self.vertical_leg_holes.append(hole)
     
     def get_operations(self):
         """Generate list of cutting and drilling operations"""
@@ -106,7 +121,7 @@ def draw_angle_iron_drawing(c, part, x_start, y_start, width, height):
     c.rect(x_offset - 20, y_center - leg_size/2, thick, leg_size, fill=1, stroke=1)
     c.rect(x_offset - 20, y_center - leg_size/2, leg_size, thick, fill=1, stroke=1)
     
-    # Draw dimension line for total length
+    # Draw dimension line for total length (blue)
     dim_y = y_center - 40
     c.setStrokeColor(colors.blue)
     c.setLineWidth(0.5)
@@ -122,30 +137,70 @@ def draw_angle_iron_drawing(c, part, x_start, y_start, width, height):
     text_width = c.stringWidth(dim_text, "Helvetica", 8)
     c.drawString(x_offset + (drawing_width - text_width) / 2, dim_y - 15, dim_text)
     
-    # Draw holes
-    for hole in part.holes:
-        hole_x = x_offset + (hole["position_mm"] * scale)
-        hole_radius = (hole["diameter_mm"] * scale) / 2
-        
-        # Draw hole
-        c.setStrokeColor(colors.red)
-        c.setFillColor(colors.white)
-        c.setLineWidth(1.5)
-        c.circle(hole_x, y_center, hole_radius, fill=1, stroke=1)
-        
-        # Draw dimension to hole
-        dim_y_hole = y_center + 30
+    # Draw holes and dimension lines for vertical leg (red)
+    if part.vertical_leg_holes:
+        dim_y_vertical = y_center + 30
         c.setStrokeColor(colors.red)
         c.setLineWidth(0.5)
-        c.line(x_offset, dim_y_hole, hole_x, dim_y_hole)
-        c.line(x_offset, dim_y_hole - 3, x_offset, dim_y_hole + 3)
-        c.line(hole_x, dim_y_hole - 3, hole_x, dim_y_hole + 3)
         
-        # Dimension text
-        c.setFillColor(colors.red)
-        c.setFont("Helvetica", 7)
-        hole_pos_text = f"{hole['position_mm']:.1f}"
-        c.drawString(hole_x - 10, dim_y_hole + 5, hole_pos_text)
+        for hole in part.vertical_leg_holes:
+            hole_x = x_offset + (hole["position_mm"] * scale)
+            hole_radius = (hole["diameter_mm"] * scale) / 2
+            
+            # Draw hole
+            c.setStrokeColor(colors.red)
+            c.setFillColor(colors.white)
+            c.setLineWidth(1.5)
+            c.circle(hole_x, y_center, hole_radius, fill=1, stroke=1)
+            
+            # Draw dimension line from start to hole
+            c.setStrokeColor(colors.red)
+            c.setLineWidth(0.5)
+            c.line(x_offset, dim_y_vertical, hole_x, dim_y_vertical)
+            c.line(x_offset, dim_y_vertical - 3, x_offset, dim_y_vertical + 3)
+            c.line(hole_x, dim_y_vertical - 3, hole_x, dim_y_vertical + 3)
+            
+            # Dimension text
+            c.setFillColor(colors.red)
+            c.setFont("Helvetica", 7)
+            hole_pos_text = f"{hole['position_mm']:.1f}"
+            c.drawString(hole_x - 10, dim_y_vertical + 5, hole_pos_text)
+        
+        # Add label for vertical leg
+        c.setFont("Helvetica-Oblique", 7)
+        c.drawString(x_offset, dim_y_vertical + 18, "Vertical Leg Holes")
+    
+    # Draw holes and dimension lines for horizontal leg (green)
+    if part.horizontal_leg_holes:
+        dim_y_horizontal = y_center + 55
+        
+        for hole in part.horizontal_leg_holes:
+            hole_x = x_offset + (hole["position_mm"] * scale)
+            hole_radius = (hole["diameter_mm"] * scale) / 2
+            
+            # Draw hole with green circle
+            c.setStrokeColor(colors.green)
+            c.setFillColor(colors.white)
+            c.setLineWidth(1.5)
+            c.circle(hole_x, y_center, hole_radius, fill=1, stroke=1)
+            
+            # Draw dimension line from start to hole
+            c.setStrokeColor(colors.green)
+            c.setLineWidth(0.5)
+            c.line(x_offset, dim_y_horizontal, hole_x, dim_y_horizontal)
+            c.line(x_offset, dim_y_horizontal - 3, x_offset, dim_y_horizontal + 3)
+            c.line(hole_x, dim_y_horizontal - 3, hole_x, dim_y_horizontal + 3)
+            
+            # Dimension text
+            c.setFillColor(colors.green)
+            c.setFont("Helvetica", 7)
+            hole_pos_text = f"{hole['position_mm']:.1f}"
+            c.drawString(hole_x - 10, dim_y_horizontal + 5, hole_pos_text)
+        
+        # Add label for horizontal leg
+        c.setFont("Helvetica-Oblique", 7)
+        c.setFillColor(colors.green)
+        c.drawString(x_offset, dim_y_horizontal + 18, "Horizontal Leg Holes")
     
     # Draw material callout
     c.setFillColor(colors.black)
