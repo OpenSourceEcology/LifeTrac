@@ -323,3 +323,37 @@ The combined CNC layout includes all 23 sheet metal parts with complete manufact
 - [Bucket Side](output/svg/parts/bucket_side.svg) - 2× needed (mirror for opposite)
 
 Total: 23 parts from 8 unique designs
+
+## Structural Steel Cut List
+
+**[Download Cut List PDF](structural_steel_cut_list.pdf)**
+
+Printable cut list for all angle iron and square tubing parts. Each unique part has its own page with:
+- Engineering drawing showing total length and hole positions
+- Dimensions in both inches and millimeters
+- Complete list of cutting and drilling operations with checkboxes
+- Part code (A1, A2, etc.) for use in assembly
+- Quantity needed for complete machine
+
+### Parts Summary
+
+| Part Code | Name | Material | Quantity |
+|-----------|------|----------|----------|
+| A1 | Platform Angle Arm | 2" × 2" × 1/4" Angle Iron | 2 |
+| A2 | Frame Tube Mounting Angle | 2" × 2" × 1/4" Angle Iron | 16 |
+| A3 | Loader Arm Mounting Angle | 2" × 2" × 1/4" Angle Iron | 4 |
+| A4 | Side Panel Vertical Angle | 2" × 2" × 1/4" Angle Iron | 8 |
+| A5 | Bottom Plate Horizontal Angle | 2" × 2" × 1/4" Angle Iron | 8 |
+
+### Using the Cut List
+
+1. **Download the PDF** - Click the link above to get the latest cut list
+2. **Print each page** - One page per unique part type
+3. **Purchase materials** - Buy angle iron stock per the specifications
+4. **Cut to length** - Follow the dimensions on each page
+5. **Drill holes** - Use the engineering drawing to mark and drill holes at specified positions
+6. **Check off operations** - Mark each checkbox as you complete cutting and drilling
+7. **Track quantity** - Make sure you fabricate the correct number of each part
+
+The cut list is automatically updated whenever changes are made to the machine's design files.
+
