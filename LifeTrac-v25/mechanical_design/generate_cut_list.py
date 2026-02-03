@@ -43,7 +43,7 @@ class StructuralPart:
             position_inches = hole["position_mm"] / 25.4
             diameter_inches = hole["diameter_mm"] / 25.4
             # Convert diameter to fraction
-            frac = self._decimal_to_fraction(diameter_inches)
+            frac = self.decimal_to_fraction(diameter_inches)
             operations.append({
                 "description": f"Drill {frac}\" hole at {position_inches:.2f}\" ({hole['position_mm']:.1f} mm) - {hole['description']}",
                 "checked": False
@@ -52,8 +52,8 @@ class StructuralPart:
         return operations
     
     @staticmethod
-    def _decimal_to_fraction(decimal):
-        """Convert decimal inches to common fraction"""
+    def decimal_to_fraction(decimal):
+        """Convert decimal inches to common fraction (public utility method)"""
         # Common drill bit sizes
         fractions = {
             0.125: "1/8",
