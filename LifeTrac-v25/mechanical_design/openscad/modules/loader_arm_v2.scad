@@ -1,5 +1,6 @@
 include <../lifetrac_v25_params.scad>
 use <../parts/arm_plate.scad>
+use <../parts/structural/structural_parts.scad>
 
 module loader_arm_v2(angle=0, side="left") {
     main_tube_len = ARM_MAIN_LEN; 
@@ -29,29 +30,12 @@ module loader_arm_v2(angle=0, side="left") {
     // Determine which plate is the "Inner" plate (facing machine center)
     is_left = (side == "left");
 
+    // Arm crossbeam mount angle iron - uses Part A5
+    // This is a wrapper that orients part_a5 for the arm assembly
     module angle_iron_mount() {
-        angle_trim = 3.175;  // 1/8" trimmed from each end
-        len = 152.4 - 2*angle_trim;  // 6" minus 1/4" total = 5.75" (146.05mm)
-        leg = 50.8;
-        thick = 6.35;
-        
-        // Bolt spacing from center
-        plate_bolt_offset = 50.8; // 2.0 inches from center (4 inch spacing) - Wider
-        beam_bolt_offset = 25.4;  // 1.0 inch from center (2 inch spacing) - Narrower
-        
-        difference() {
-            union() {
-                cube([len, thick, leg]); // Vertical leg (against plate)
-                cube([len, leg, thick]); // Horizontal leg (against beam)
-            }
-            // Holes
-            // Vertical leg (Plate bolts)
-            translate([len/2 - plate_bolt_offset, thick + 1, 25.4]) rotate([90,0,0]) cylinder(d=BOLT_DIA_1_2, h=thick+2, $fn=32);
-            translate([len/2 + plate_bolt_offset, thick + 1, 25.4]) rotate([90,0,0]) cylinder(d=BOLT_DIA_1_2, h=thick+2, $fn=32);
-            // Horizontal leg (Beam bolts)
-            translate([len/2 - beam_bolt_offset, 25.4, -1]) cylinder(d=BOLT_DIA_1_2, h=thick+2, $fn=32);
-            translate([len/2 + beam_bolt_offset, 25.4, -1]) cylinder(d=BOLT_DIA_1_2, h=thick+2, $fn=32);
-        }
+        // Part A5 dimensions (for reference):
+        // len = 146.05mm (5.75"), leg = 50.8mm (2"), thick = 6.35mm (1/4")
+        part_a5_arm_crossbeam_mount(show_holes=true);
     }
 
     rotate([0, -angle, 0]) {
