@@ -326,7 +326,7 @@ Total: 23 parts from 8 unique designs
 
 ## Structural Steel Cut List
 
-**[Download Cut List PDF](structural_steel_cut_list.pdf)**
+**[Download Cut List PDF](structural_steel_cut_list.pdf)** | **[Usage Guide](CUT_LIST_USAGE_GUIDE.md)**
 
 Printable cut list for all angle iron and square tubing parts. Each unique part has its own page with:
 - Engineering drawing showing total length and hole positions
