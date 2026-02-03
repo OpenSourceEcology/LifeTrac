@@ -1169,6 +1169,46 @@ assert(PLATFORM_PIVOT_HEIGHT + PLATFORM_ARM_LENGTH < _crossmember_top_z,
     "Stowed position lock hole must be within rear crossmember height");
 
 // =============================================================================
+// UWU (UNIVERSAL WHEEL UNIT) / UTU (UNIVERSAL TRACK UNIT) PARAMETERS
+// =============================================================================
+// These parameters define the mounting interface for the interchangeable
+// wheel/track units. Both UWU and UTU use the same mounting holes.
+// Components mount directly to existing frame plates:
+//   - Motor mounts to motor mount plate
+//   - Bearing mounts to inner side wall panel
+
+// UWU shaft dimensions
+UWU_SHAFT_DIAM = 31.75;         // 1.25 inches
+UWU_CENTER_HOLE_DIAM = 50.8;    // 2.00 inches (clearance for shaft/bearing housing)
+
+// UWU bolt pattern (standard 4-bolt, 45-degree orientation)
+UWU_BOLT_CIRCLE_DIAM = 157.23;  // 6.19 inches (bearing mount BCD)
+UWU_MOTOR_BCD = 209.55;         // 8.25 inches (motor mount BCD)
+UWU_BOLT_HOLE_DIAM = 12.7;      // 0.5 inch bolt holes
+UWU_BOLT_ANGLES = [45, 135, 225, 315];  // 4 bolts at 45-degree increments
+
+// UWU shaft axis position
+// Shaft axis is centered vertically on motor mount plate (which is 10" tall)
+// Motor plate height = MOTOR_PLATE_HEIGHT = 254mm (10 inches)
+// Shaft axis Z = Bottom of motor plate + half height = z_bottom + 127mm
+UWU_SHAFT_AXIS_HEIGHT_ON_PLATE = 127.0;  // 5 inches = half of 10" motor plate
+
+// Calculate absolute Z position of UWU shaft axis
+// Motor plate bottom is at: FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM
+// UWU_SHAFT_Z = FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM + UWU_SHAFT_AXIS_HEIGHT_ON_PLATE
+// Note: This is calculated in main assembly where BOTTOM_PLATE_INNER_TRIM is available
+
+// The 8-inch angle iron gap is where the shaft passes through
+// This gap is centered on the wheel axis Y position
+// UWU shaft axis Y = wheel axis Y (_FRONT_WHEEL_AXIS_Y or _REAR_WHEEL_AXIS_Y)
+
+echo("=== UWU PARAMETERS ===");
+echo("UWU Shaft Diameter:", UWU_SHAFT_DIAM, "mm");
+echo("UWU Bearing BCD:", UWU_BOLT_CIRCLE_DIAM, "mm");
+echo("UWU Motor BCD:", UWU_MOTOR_BCD, "mm");
+echo("UWU Shaft Axis Height (on motor plate):", UWU_SHAFT_AXIS_HEIGHT_ON_PLATE, "mm");
+
+// =============================================================================
 // JIG PARAMETERS & NEW ARM PARAMETERS
 // =============================================================================
 

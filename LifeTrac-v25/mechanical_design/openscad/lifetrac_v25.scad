@@ -48,6 +48,11 @@ explode_distance = exploded_view ? 200 : 0;
 // Drive configuration
 all_wheel_drive = true;  // true = 4 wheels powered, false = 2 front wheels only
 
+// UWU/UTU configuration
+// Set to true to show UWU (Universal Wheel Unit) assemblies
+// Set to false to show traditional hub-mounted wheel motors
+show_uwu = true;  // Toggle between UWU and traditional wheels
+
 // =============================================================================
 // MATERIAL CONSTANTS
 // =============================================================================
@@ -62,6 +67,7 @@ TUBE_2X4_1_4 = [50.8, 101.6, 6.35]; // 2"x4" rectangular
 
 // Bolt/pin diameters
 PIVOT_PIN_DIA = 38.1;    // 1.5" pivot pin
+BOLT_DIA_3_8 = 9.525;    // 3/8" bolt
 BOLT_DIA_1_2 = 12.7;     // 1/2" bolt
 BOLT_DIA_3_4 = 19.05;    // 3/4" bolt
 BOLT_DIA_1 = 25.4;       // 1" bolt
@@ -1400,6 +1406,36 @@ module clevis_pin(pin_dia, length) {
 // SIDE PANELS - TRIANGULAR SANDWICH STRUCTURE
 // =============================================================================
 
+// UWU bearing mount hole pattern (4-bolt at 45-degree orientation)
+// For cutting through side panels at wheel axis locations
+// In panel local coordinates: X = world Y, Y = world Z - FRAME_Z_OFFSET
+module uwu_bearing_holes_2d(wheel_axis_y) {
+    // Panel local X = world Y
+    local_x = wheel_axis_y;
+    
+    // Panel local Y = shaft Z position - FRAME_Z_OFFSET
+    // UWU_SHAFT_Z = FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM + UWU_SHAFT_AXIS_HEIGHT_ON_PLATE
+    local_y = BOTTOM_PLATE_INNER_TRIM + UWU_SHAFT_AXIS_HEIGHT_ON_PLATE;
+    
+    translate([local_x, local_y]) {
+        // Center clearance hole
+        circle(d=UWU_CENTER_HOLE_DIAM, $fn=32);
+        
+        // 4-bolt pattern at 45-degree orientation (matches UWU bearing plate)
+        for (angle = UWU_BOLT_ANGLES) {
+            rotate([0, 0, angle])
+            translate([UWU_BOLT_CIRCLE_DIAM/2, 0, 0])
+            circle(d=UWU_BOLT_HOLE_DIAM, $fn=16);
+        }
+    }
+}
+
+// 3D cutout for UWU bearing holes (used in difference operations)
+module uwu_bearing_holes_3d(wheel_axis_y, panel_thickness) {
+    linear_extrude(height=panel_thickness + 4, center=true)
+    uwu_bearing_holes_2d(wheel_axis_y);
+}
+
 module side_panel_profile() {
     // Triangular profile for side panels
     // Tall end at rear (Y=0), shorter sloped end at front (Y=WHEEL_BASE)
@@ -1512,6 +1548,11 @@ module side_panel_left_outer() {
         cross_tube_panel_cutout(FRONT_FRAME_TUBE_Y);
         cross_tube_panel_cutout(REAR_FRAME_TUBE_Y);
         
+        // UWU bearing mount holes (front and rear wheel positions)
+        // These holes allow mounting UWU/UTU bearing plates on outer panel
+        uwu_bearing_holes_3d(_FRONT_WHEEL_AXIS_Y, PANEL_THICKNESS);
+        uwu_bearing_holes_3d(_REAR_WHEEL_AXIS_Y, PANEL_THICKNESS);
+        
         // Subtract stiffener holes
         rotate([-90, 0, 0]) rotate([0, 0, -90])
         translate([(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), 0, -FRAME_Z_OFFSET])
@@ -1538,6 +1579,11 @@ module side_panel_left_inner() {
         // Cross tube cutouts
         cross_tube_panel_cutout(FRONT_FRAME_TUBE_Y);
         cross_tube_panel_cutout(REAR_FRAME_TUBE_Y);
+        
+        // UWU bearing mount holes (front and rear wheel positions)
+        // These holes allow mounting UWU/UTU bearing plates
+        uwu_bearing_holes_3d(_FRONT_WHEEL_AXIS_Y, PANEL_THICKNESS);
+        uwu_bearing_holes_3d(_REAR_WHEEL_AXIS_Y, PANEL_THICKNESS);
         
         // Subtract stiffener holes
         rotate([-90, 0, 0]) rotate([0, 0, -90])
@@ -1566,6 +1612,11 @@ module side_panel_right_inner() {
         cross_tube_panel_cutout(FRONT_FRAME_TUBE_Y);
         cross_tube_panel_cutout(REAR_FRAME_TUBE_Y);
         
+        // UWU bearing mount holes (front and rear wheel positions)
+        // These holes allow mounting UWU/UTU bearing plates
+        uwu_bearing_holes_3d(_FRONT_WHEEL_AXIS_Y, PANEL_THICKNESS);
+        uwu_bearing_holes_3d(_REAR_WHEEL_AXIS_Y, PANEL_THICKNESS);
+        
         // Subtract stiffener holes
         rotate([-90, 0, 0]) rotate([0, 0, -90])
         translate([-(TRACK_WIDTH/2 - SANDWICH_SPACING/2 - PANEL_THICKNESS), 0, -FRAME_Z_OFFSET])
@@ -1584,6 +1635,11 @@ module side_panel_right_outer() {
         // Cross tube cutouts
         cross_tube_panel_cutout(FRONT_FRAME_TUBE_Y);
         cross_tube_panel_cutout(REAR_FRAME_TUBE_Y);
+        
+        // UWU bearing mount holes (front and rear wheel positions)
+        // These holes allow mounting UWU/UTU bearing plates on outer panel
+        uwu_bearing_holes_3d(_FRONT_WHEEL_AXIS_Y, PANEL_THICKNESS);
+        uwu_bearing_holes_3d(_REAR_WHEEL_AXIS_Y, PANEL_THICKNESS);
         
         // Subtract stiffener holes
         rotate([-90, 0, 0]) rotate([0, 0, -90])
@@ -1681,6 +1737,15 @@ module arm_pivot_assembly() {
 // Helper function for bolt heights (for vertical angle irons)
 function get_stiffener_holes_a(h) = [for(i=[0:3]) h * (0.2 + i*0.2)];
 function get_stiffener_holes_b(h) = [for(i=[0:3]) h * (0.1 + i*0.2)];
+
+// Smart helper function for bolt heights based on plate height
+// - Short plates (< 200mm): 2 holes at 25% and 75%
+// - Medium plates (200-350mm): 3 holes at 20%, 50%, 80%
+// - Tall plates (> 350mm): 4 holes at 20%, 40%, 60%, 80%
+function get_front_stiffener_holes(h) = 
+    h < 200 ? [h * 0.25, h * 0.75] :
+    h < 350 ? [h * 0.2, h * 0.5, h * 0.8] :
+    [for(i=[0:3]) h * (0.2 + i*0.2)];
 
 // Minimum bolt spacing for horizontal angle irons (4 inches = 101.6mm)
 MIN_BOLT_SPACING = 101.6;
@@ -2393,41 +2458,57 @@ module front_stiffener_plate() {
     center_height = 254.0 + PLATE_1_4_INCH;  // 10" + bottom plate thickness
     outer_height = 127.0;  // 5" for outer sections
     
-    // Angle iron trim to avoid overlap with horizontal angles below
-    angle_trim = 57.15;  // 2.25 inches
-    center_angle_height = center_height - angle_trim;
-    outer_angle_height = outer_height - angle_trim;
-    angle_z_offset = angle_trim;  // Start angles higher to avoid overlap
+    // Angle iron parameters
+    angle_iron_trim = 3.175;  // 1/8" trimmed from each end (same as frame tube angles)
+    frame_angle_height = FRAME_TUBE_HEIGHT - 2*angle_iron_trim;  // 5.75" (146.05mm) - for center section
+    outer_angle_height = outer_height - 2*angle_iron_trim;  // ~4.75" for outer 5" sections
+    
+    // Vertical offset to avoid overlap with horizontal angles below
+    // (2.25 inches = 57.15mm from bottom of plate to bottom of angle iron)
+    angle_z_offset = 57.15;  // For center section (10" tall)
+    outer_angle_z_offset = angle_iron_trim;  // Outer sections start near bottom (just 1/8" trim)
     
     z_start = FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM - PLATE_1_4_INCH;  // Start at bottom stiffener plate top
     
     angle_size = [50.8, 6.35];
     leg = angle_size[0];
-    bolt_dia = 9.525;
-    hole_offset = leg * 0.6;
+    thick = angle_size[1];
+    
+    // Bolt hole parameters - match frame_tube_angle_iron pattern for center, smaller pattern for outer
+    frame_bolt_dia = BOLT_DIA_1_2;  // 1/2" bolts (same as frame tube angles) for center
+    outer_bolt_dia = BOLT_DIA_3_8;  // 3/8" bolts for outer sections
+    plate_bolt_offset = 50.8;  // 2" from center (4" total spacing) for center section
+    outer_bolt_offset = 38.1;  // 1.5" from center (3" total spacing) for outer sections
+    hole_offset = leg / 2;  // Center of leg
     
     inner_offset = TRACK_WIDTH/2 - SANDWICH_SPACING/2;
     
     // Center section plate (between motor plates)
+    // Z position for angle iron center (for bolt hole placement)
+    angle_center_z = angle_z_offset + frame_angle_height/2;  // For center section
+    outer_angle_center_z = outer_angle_z_offset + outer_angle_height/2;  // For outer sections
+    
     difference() {
         color("Silver")
         translate([-MOTOR_PLATE_X, y_pos, z_start])
         cube([2*MOTOR_PLATE_X, plate_thickness, center_height]);
         
-        // Holes for motor plate angles
-        // Left motor plate - right side (Legs +X, -Y)
-        for (z = get_stiffener_holes_b(center_height)) {
-            translate([-MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_pos, z_start + z])
-            rotate([90, 0, 0])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        // Holes for motor plate angles - 2 holes spaced 4" apart (matching frame tube angle pattern)
+        // Left motor plate - right side
+        translate([-MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_pos, z_start + angle_center_z - plate_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=frame_bolt_dia, h=20, center=true, $fn=16);
+        translate([-MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_pos, z_start + angle_center_z + plate_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=frame_bolt_dia, h=20, center=true, $fn=16);
         
-        // Right motor plate - left side (Legs -X, -Y)
-        for (z = get_stiffener_holes_b(center_height)) {
-            translate([MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_pos, z_start + z])
-            rotate([90, 0, 0])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        // Right motor plate - left side
+        translate([MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_pos, z_start + angle_center_z - plate_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=frame_bolt_dia, h=20, center=true, $fn=16);
+        translate([MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_pos, z_start + angle_center_z + plate_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=frame_bolt_dia, h=20, center=true, $fn=16);
     }
     
     // Left outer section plate (outer wall to motor plate)
@@ -2436,33 +2517,37 @@ module front_stiffener_plate() {
         translate([-plate_width/2, y_pos, z_start])
         cube([plate_width/2 - MOTOR_PLATE_X, plate_thickness, outer_height]);
         
-        // Holes for left outer wall angle
-        for (z = get_stiffener_holes_a(outer_height)) {
-            translate([-plate_width/2 + hole_offset, y_pos, z_start + z])
-            rotate([90, 0, 0])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        // Holes for left outer wall angle - 2 holes spaced 3" apart (outer section)
+        translate([-plate_width/2 + hole_offset, y_pos, z_start + outer_angle_center_z - outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
+        translate([-plate_width/2 + hole_offset, y_pos, z_start + outer_angle_center_z + outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
         
         // Holes for left inner wall - left side
-        for (z = get_stiffener_holes_b(outer_height)) {
-            translate([-inner_offset - hole_offset, y_pos, z_start + z])
-            rotate([90, 0, 0])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        translate([-inner_offset - hole_offset, y_pos, z_start + outer_angle_center_z - outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
+        translate([-inner_offset - hole_offset, y_pos, z_start + outer_angle_center_z + outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
         
         // Holes for left inner wall - right side
-        for (z = get_stiffener_holes_a(outer_height)) {
-            translate([-inner_offset + PANEL_THICKNESS + hole_offset, y_pos, z_start + z])
-            rotate([90, 0, 0])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        translate([-inner_offset + PANEL_THICKNESS + hole_offset, y_pos, z_start + outer_angle_center_z - outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
+        translate([-inner_offset + PANEL_THICKNESS + hole_offset, y_pos, z_start + outer_angle_center_z + outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
         
         // Holes for left motor plate - left side
-        for (z = get_stiffener_holes_b(outer_height)) {
-            translate([-MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_pos, z_start + z])
-            rotate([90, 0, 0])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        translate([-MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_pos, z_start + outer_angle_center_z - outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
+        translate([-MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_pos, z_start + outer_angle_center_z + outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
     }
     
     // Right outer section plate (motor plate to outer wall)
@@ -2471,85 +2556,94 @@ module front_stiffener_plate() {
         translate([MOTOR_PLATE_X, y_pos, z_start])
         cube([plate_width/2 - MOTOR_PLATE_X, plate_thickness, outer_height]);
         
-        // Holes for right outer wall angle
-        for (z = get_stiffener_holes_b(outer_height)) {
-            translate([plate_width/2 - hole_offset, y_pos, z_start + z])
-            rotate([90, 0, 0])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        // Holes for right outer wall angle - 2 holes spaced 3" apart (outer section)
+        translate([plate_width/2 - hole_offset, y_pos, z_start + outer_angle_center_z - outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
+        translate([plate_width/2 - hole_offset, y_pos, z_start + outer_angle_center_z + outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
         
         // Holes for right inner wall - left side
-        for (z = get_stiffener_holes_b(outer_height)) {
-            translate([inner_offset - PANEL_THICKNESS - hole_offset, y_pos, z_start + z])
-            rotate([90, 0, 0])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        translate([inner_offset - PANEL_THICKNESS - hole_offset, y_pos, z_start + outer_angle_center_z - outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
+        translate([inner_offset - PANEL_THICKNESS - hole_offset, y_pos, z_start + outer_angle_center_z + outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
         
         // Holes for right inner wall - right side
-        for (z = get_stiffener_holes_a(outer_height)) {
-            translate([inner_offset + hole_offset, y_pos, z_start + z])
-            rotate([90, 0, 0])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        translate([inner_offset + hole_offset, y_pos, z_start + outer_angle_center_z - outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
+        translate([inner_offset + hole_offset, y_pos, z_start + outer_angle_center_z + outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
         
         // Holes for right motor plate - right side
-        for (z = get_stiffener_holes_a(outer_height)) {
-            translate([MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_pos, z_start + z])
-            rotate([90, 0, 0])
-            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
-        }
+        translate([MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_pos, z_start + outer_angle_center_z - outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
+        translate([MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_pos, z_start + outer_angle_center_z + outer_bolt_offset])
+        rotate([90, 0, 0])
+        cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
     }
     
-    // Angle Irons (shortened by 2.25" to avoid overlap with horizontal angles below)
+    // Angle Irons - Outer sections use shorter angles (~4.75"), center uses frame tube angles (5.75")
+    
+    // === OUTER SECTION ANGLES (shorter, ~4.75" for 5" sections) ===
     // Left Outer wall (Legs +X, -Y) -> Rot Z -90
-    translate([-plate_width/2, y_pos, z_start + angle_z_offset])
+    translate([-plate_width/2, y_pos, z_start + outer_angle_z_offset])
     rotate([0, 0, -90])
     vertical_angle_iron_smart(outer_angle_height, angle_size);
     
     // Right Outer wall (Legs -X, -Y) -> Rot Z 180
-    translate([plate_width/2, y_pos, z_start + angle_z_offset])
+    translate([plate_width/2, y_pos, z_start + outer_angle_z_offset])
     rotate([0, 0, 180])
     vertical_angle_iron_smart(outer_angle_height, angle_size);
     
     // Left Inner Panel - left side (Legs -X, -Y) -> Rot Z 180
-    translate([-inner_offset, y_pos, z_start + angle_z_offset])
+    translate([-inner_offset, y_pos, z_start + outer_angle_z_offset])
     rotate([0, 0, 180])
     vertical_angle_iron_smart(outer_angle_height, angle_size);
     
     // Left Inner Panel - right side (Legs +X, -Y) -> Rot Z -90
-    translate([-inner_offset + PANEL_THICKNESS, y_pos, z_start + angle_z_offset])
+    translate([-inner_offset + PANEL_THICKNESS, y_pos, z_start + outer_angle_z_offset])
     rotate([0, 0, -90])
     vertical_angle_iron_smart(outer_angle_height, angle_size);
     
     // Right Inner Panel - left side (Legs -X, -Y) -> Rot Z 180
-    translate([inner_offset - PANEL_THICKNESS, y_pos, z_start + angle_z_offset])
+    translate([inner_offset - PANEL_THICKNESS, y_pos, z_start + outer_angle_z_offset])
     rotate([0, 0, 180])
     vertical_angle_iron_smart(outer_angle_height, angle_size);
     
     // Right Inner Panel - right side (Legs +X, -Y) -> Rot Z -90
-    translate([inner_offset, y_pos, z_start + angle_z_offset])
+    translate([inner_offset, y_pos, z_start + outer_angle_z_offset])
     rotate([0, 0, -90])
     vertical_angle_iron_smart(outer_angle_height, angle_size);
     
-    // Motor plate angles (center section)
-    // Left motor plate - right side (Legs +X, -Y) -> Rot Z -90
+    // === CENTER SECTION ANGLES (5.75" - exact same as frame tube angles) ===
+    // Motor plate angles in 10" center section - use frame_tube_angle_iron module
+    // Left motor plate - right side: vertical leg against plate (+X), horizontal leg toward -Y
+    // Legs +X, -Y -> Rot Z -90 (but origin at corner, so position at plate face)
     translate([-MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2, y_pos, z_start + angle_z_offset])
     rotate([0, 0, -90])
-    vertical_angle_iron_smart(center_angle_height, angle_size);
+    frame_tube_angle_iron();
     
-    // Right motor plate - left side (Legs -X, -Y) -> Rot Z 180
+    // Right motor plate - left side: vertical leg against plate (-X), horizontal leg toward -Y
+    // Legs -X, -Y -> Rot Z 180
     translate([MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2, y_pos, z_start + angle_z_offset])
     rotate([0, 0, 180])
-    vertical_angle_iron_smart(center_angle_height, angle_size);
+    frame_tube_angle_iron();
     
-    // Motor plate angles (outer sections)
+    // === OUTER SECTION ANGLES on motor plates (shorter, ~4.75" for 5" sections) ===
     // Left motor plate - left side (Legs -X, -Y) -> Rot Z 180
-    translate([-MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2, y_pos, z_start + angle_z_offset])
+    translate([-MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2, y_pos, z_start + outer_angle_z_offset])
     rotate([0, 0, 180])
     vertical_angle_iron_smart(outer_angle_height, angle_size);
     
     // Right motor plate - right side (Legs +X, -Y) -> Rot Z -90
-    translate([MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2, y_pos, z_start + angle_z_offset])
+    translate([MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2, y_pos, z_start + outer_angle_z_offset])
     rotate([0, 0, -90])
     vertical_angle_iron_smart(outer_angle_height, angle_size);
 }
@@ -2688,6 +2782,7 @@ module bottom_stiffener_plate() {
 // - Same length as bottom stiffener plate
 // - Bottom edge flush with top of bottom stiffener plate
 // - 6 inches inboard from inner wall plate
+// - NOW INCLUDES: UWU motor mount hole pattern at wheel axis positions
 
 MOTOR_PLATE_HEIGHT = 254.0;      // 10 inches tall
 MOTOR_PLATE_INBOARD = 152.4;     // 6 inches inboard from inner wall plate
@@ -2715,6 +2810,33 @@ module motor_plate_tube_cutout(y_pos, y_start, z_bottom) {
     offset(r=FRAME_TUBE_CNC_RADIUS) 
     offset(r=-FRAME_TUBE_CNC_RADIUS)
     square([FRAME_TUBE_WIDTH, FRAME_TUBE_HEIGHT]);
+}
+
+// UWU Motor mount hole pattern for motor mounting plate
+// Centered at wheel axis Y position and shaft axis Z height
+// Motor plate is in YZ plane, so:
+//   local_y = world Y (wheel axis) - y_start
+//   local_z = shaft height = UWU_SHAFT_AXIS_HEIGHT_ON_PLATE
+module uwu_motor_mount_holes(wheel_axis_y, y_start, plate_thickness) {
+    // Local Y = world Y - plate Y start
+    local_y = wheel_axis_y - y_start;
+    // Local Z = shaft axis height (5" = 127mm from plate bottom)
+    local_z = UWU_SHAFT_AXIS_HEIGHT_ON_PLATE;
+    
+    translate([plate_thickness/2, local_y, local_z]) {
+        // Center clearance hole (rotated to go through X-thickness)
+        rotate([0, 90, 0])
+        cylinder(h=plate_thickness + 4, d=UWU_CENTER_HOLE_DIAM, center=true, $fn=32);
+        
+        // 4-bolt pattern at 45-degree orientation (motor mount uses larger BCD)
+        // Bolts are in YZ plane, holes go through X
+        for (angle = UWU_BOLT_ANGLES) {
+            rotate([0, 0, angle])  // Rotate in YZ plane
+            translate([0, UWU_MOTOR_BCD/2, 0])
+            rotate([0, 90, 0])
+            cylinder(h=plate_thickness + 4, d=UWU_BOLT_HOLE_DIAM, center=true, $fn=16);
+        }
+    }
 }
 
 module motor_mounting_plate() {
@@ -2786,6 +2908,11 @@ module motor_mounting_plate() {
         translate([plate_thickness/2, rear_tube_local_y - leg/2, angle_z_local + angle_len/2 + plate_bolt_offset])
         rotate([0, 90, 0])
         cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        
+        // UWU motor mount holes at front and rear wheel axis positions
+        // These holes allow mounting UWU/UTU motor plates
+        uwu_motor_mount_holes(_FRONT_WHEEL_AXIS_Y, y_start, plate_thickness);
+        uwu_motor_mount_holes(_REAR_WHEEL_AXIS_Y, y_start, plate_thickness);
     }
     
     // Right motor plate (positive X side)
@@ -2830,6 +2957,11 @@ module motor_mounting_plate() {
         translate([plate_thickness/2, rear_tube_local_y - leg/2, angle_z_local + angle_len/2 + plate_bolt_offset])
         rotate([0, 90, 0])
         cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        
+        // UWU motor mount holes at front and rear wheel axis positions
+        // These holes allow mounting UWU/UTU motor plates
+        uwu_motor_mount_holes(_FRONT_WHEEL_AXIS_Y, y_start, plate_thickness);
+        uwu_motor_mount_holes(_REAR_WHEEL_AXIS_Y, y_start, plate_thickness);
     }
     
     // ==========================================================================
@@ -3359,7 +3491,8 @@ module calculate_cog() {
 // =============================================================================
 
 module wheel_assemblies() {
-    if (show_wheels) {
+    // Only show traditional wheels if show_uwu is false
+    if (show_wheels && !show_uwu) {
         // Wheel positions - outside the outer panels with clearance
         // Wheel centers at Z=WHEEL_RADIUS so bottom of wheel touches Z=0 (ground)
         
@@ -3409,6 +3542,241 @@ module wheel_assemblies() {
                 }
             }
         }
+    }
+}
+
+// =============================================================================
+// UWU (UNIVERSAL WHEEL UNIT) ASSEMBLY
+// =============================================================================
+// Modular wheel unit with hydraulic motor, shaft, and bearings
+// Motor mounts directly to motor mount plate
+// Bearings mount directly to inner side wall panels
+// Can be replaced with UTU (Universal Track Unit) using same mounting holes
+
+// Calculate UWU shaft Z position (absolute)
+// Motor plate bottom is at FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM
+// Shaft is centered vertically on motor plate
+UWU_SHAFT_Z = FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM + UWU_SHAFT_AXIS_HEIGHT_ON_PLATE;
+
+// X positions of mounting surfaces
+// Motor plate X (where motor mounts)
+// Inner wall panel X (where bearing mounts)
+INNER_WALL_PANEL_X = TRACK_WIDTH/2 - SANDWICH_SPACING/2;
+
+// Distance from motor plate to inner wall panel
+UWU_MOTOR_TO_WALL_DIST = INNER_WALL_PANEL_X - MOTOR_PLATE_X;
+
+echo("=== UWU POSITIONING ===");
+echo("UWU Shaft Z (absolute):", UWU_SHAFT_Z);
+echo("Motor Plate X:", MOTOR_PLATE_X);
+echo("Inner Wall Panel X:", INNER_WALL_PANEL_X);
+echo("Motor to Wall Distance:", UWU_MOTOR_TO_WALL_DIST);
+
+// UWU Bearing flange module (mounts directly to side wall panel)
+module uwu_bearing() {
+    color("DarkGreen") {
+        difference() {
+            union() {
+                // Flange base
+                hull() {
+                    for (angle = UWU_BOLT_ANGLES) {
+                        rotate([0, 0, angle])
+                        translate([UWU_BOLT_CIRCLE_DIAM/2, 0, 0])
+                        cylinder(h=12.7, d=25.4, $fn=24);  // 1/2" tall, 1" dia at bolt positions
+                    }
+                    cylinder(h=12.7, d=63.5, $fn=32);  // 2.5" housing base
+                }
+                // Housing protrusion
+                translate([0, 0, 6.35])
+                cylinder(h=19.05, d=63.5, $fn=32);  // 2.5" diameter housing
+            }
+            // Shaft bore
+            translate([0, 0, -1])
+            cylinder(h=50, d=UWU_SHAFT_DIAM, $fn=32);
+            
+            // Bolt holes
+            for (angle = UWU_BOLT_ANGLES) {
+                rotate([0, 0, angle])
+                translate([UWU_BOLT_CIRCLE_DIAM/2, 0, -1])
+                cylinder(h=50, d=UWU_BOLT_HOLE_DIAM, $fn=16);
+            }
+        }
+    }
+}
+
+// UWU Hydraulic motor module
+module uwu_hydraulic_motor() {
+    motor_body_diam = 152.4;  // 6 inches
+    motor_body_len = 127.0;   // 5 inches
+    motor_shaft_len = 38.1;   // 1.5 inches
+    
+    color("Orange") {
+        // Motor body (extends away from mounting plate)
+        translate([0, 0, -motor_body_len])
+        cylinder(h=motor_body_len, d=motor_body_diam, $fn=48);
+        
+        // Motor flange
+        difference() {
+            translate([0, 0, -6.35])
+            cube([190.5, 190.5, 12.7], center=true);  // 7.5" x 7.5" x 0.5" flange
+            
+            // Bolt holes on motor BCD
+            for (angle = UWU_BOLT_ANGLES) {
+                rotate([0, 0, angle])
+                translate([UWU_MOTOR_BCD/2, 0, 0])
+                cylinder(h=30, d=UWU_BOLT_HOLE_DIAM, center=true, $fn=16);
+            }
+        }
+        
+        // Motor output shaft (pointing toward plate)
+        cylinder(h=motor_shaft_len, d=25.4, $fn=32);
+    }
+}
+
+// UWU Main shaft module
+module uwu_main_shaft(length) {
+    color("Silver")
+    cylinder(h=length, d=UWU_SHAFT_DIAM, $fn=32);
+}
+
+// UWU Shaft coupling module
+module uwu_shaft_coupling() {
+    color("DimGray")
+    cylinder(h=50.8, d=50.8, $fn=32);  // 2" x 2" coupling
+}
+
+// Module to render all 4 UWU assemblies
+module uwu_assemblies() {
+    if (show_uwu && show_wheels) {
+        // Front wheels
+        front_wheel_y = WHEEL_BASE - WHEEL_RADIUS;
+        
+        // Rear wheels (same calculation as wheel_assemblies)
+        rear_wheel_target_y = LIFT_CYL_BASE_Y + WHEEL_RADIUS + 100;
+        min_wheelbase = WHEEL_DIAMETER + 50;
+        max_rear_y = front_wheel_y - min_wheelbase;
+        final_rear_y = min(rear_wheel_target_y, max_rear_y);
+        
+        // Calculate the wheel center Z based on UWU shaft position
+        // The wheel should be centered on the shaft axis
+        // But we need wheels to touch the ground, so we may need to adjust
+        // Shaft Z is fixed at UWU_SHAFT_Z
+        // Wheel radius is WHEEL_RADIUS (250mm)
+        // For wheel to touch ground (Z=0), wheel center must be at Z=WHEEL_RADIUS
+        // If UWU_SHAFT_Z != WHEEL_RADIUS, we need to note this
+        
+        wheel_z = UWU_SHAFT_Z;  // Wheel center follows shaft
+        
+        // Calculate wheel/ground relationship
+        // For wheels to touch ground (Z=0), wheel center needs to be at WHEEL_RADIUS
+        // UWU shaft is fixed by frame geometry, so wheel size may need to change
+        uwu_wheel_radius = UWU_SHAFT_Z;  // Required wheel radius for ground contact
+        uwu_wheel_diameter = uwu_wheel_radius * 2;
+        
+        echo("=== UWU WHEEL/GROUND GEOMETRY ===");
+        echo("UWU Shaft Z (wheel center):", wheel_z);
+        echo("Current WHEEL_RADIUS:", WHEEL_RADIUS);
+        echo("Required wheel radius for ground contact:", uwu_wheel_radius);
+        echo("Required wheel diameter for ground contact:", uwu_wheel_diameter, "mm (", uwu_wheel_diameter/25.4, "inches)");
+        echo("Wheel bottom clearance from ground:", wheel_z - WHEEL_RADIUS, "mm");
+        if (abs(wheel_z - WHEEL_RADIUS) > 10) {
+            echo("WARNING: Wheels will NOT touch ground with current WHEEL_DIAMETER!");
+            echo("  Either adjust wheel size or modify frame/motor plate height");
+        }
+        
+        // Front left
+        translate([-MOTOR_PLATE_X, front_wheel_y, wheel_z])
+        rotate([0, -90, 0])
+        uwu_assembly_positioned("left");
+        
+        // Front right
+        translate([MOTOR_PLATE_X, front_wheel_y, wheel_z])
+        rotate([0, 90, 0])
+        uwu_assembly_positioned("right");
+        
+        // Rear left
+        translate([-MOTOR_PLATE_X, final_rear_y, wheel_z])
+        rotate([0, -90, 0])
+        uwu_assembly_positioned("left");
+        
+        // Rear right
+        translate([MOTOR_PLATE_X, final_rear_y, wheel_z])
+        rotate([0, 90, 0])
+        uwu_assembly_positioned("right");
+    }
+}
+
+// UWU assembly - mounts directly to existing frame plates
+// Motor mounts to motor mount plate, bearings mount to inner and outer side wall panels
+// Origin is at motor plate face, shaft extends in +Z direction
+module uwu_assembly_positioned(side="left") {
+    side_mult = (side == "left") ? -1 : 1;
+    
+    // Calculate distances
+    // From motor plate to inner wall panel outer face (facing sandwich gap)
+    motor_to_inner_wall = UWU_MOTOR_TO_WALL_DIST;
+    
+    // From inner wall to outer wall (sandwich spacing)
+    inner_to_outer_wall = SANDWICH_SPACING;
+    
+    // Distance from motor plate to outer wall panel outer face (facing outside)
+    // = inner wall outer face + inner wall thickness + sandwich gap + outer wall thickness
+    motor_to_outer_wall_face = motor_to_inner_wall + PANEL_THICKNESS + inner_to_outer_wall + PANEL_THICKNESS;
+    
+    // Clearance between outer face of outer wall panel and inside edge of wheel
+    wheel_to_wall_clearance = 50.8;  // 2" (50.8mm) clearance from outer wall to wheel inside edge
+    
+    // Shaft extends from motor plate, through both wall panels, past clearance, to wheel center
+    shaft_total_length = motor_to_outer_wall_face + wheel_to_wall_clearance + WHEEL_WIDTH/2;
+    
+    // Calculate wheel diameter for ground contact
+    // Wheel center is at UWU_SHAFT_Z, so wheel radius = UWU_SHAFT_Z for ground contact
+    uwu_wheel_radius = UWU_SHAFT_Z;
+    uwu_wheel_diam = uwu_wheel_radius * 2;
+    
+    // Motor mounts to motor plate (at Z=0, extends in -Z direction)
+    translate([0, 0, 0])
+    uwu_hydraulic_motor();
+    
+    // Inner bearing mounts to inner wall panel inner face (facing toward motor)
+    // Flipped 180° so housing extends toward motor (-Z direction)
+    // Flange sits flush against inner face of inner panel
+    // Inner face is at motor_to_inner_wall - PANEL_THICKNESS
+    translate([0, 0, motor_to_inner_wall - PANEL_THICKNESS])
+    rotate([180, 0, 0])
+    uwu_bearing();
+    
+    // Outer bearing mounts to outer wall panel outer face (facing outside)
+    // Distance = inner wall outer face + inner wall thickness + sandwich gap
+    // Bearing flange sits flush against this face, housing extends outward
+    translate([0, 0, motor_to_inner_wall + PANEL_THICKNESS + inner_to_outer_wall])
+    uwu_bearing();
+    
+    // Shaft coupling (between motor shaft and main shaft)
+    translate([0, 0, 12.7])  // Just past motor plate
+    uwu_shaft_coupling();
+    
+    // Main shaft (from coupling through both bearings to wheel)
+    translate([0, 0, 25.4])  // Start after coupling
+    uwu_main_shaft(shaft_total_length);
+    
+    // Wheel at end of shaft
+    // Wheel center is at end of shaft
+    // Using calculated wheel diameter to touch ground
+    translate([0, 0, shaft_total_length + 25.4]) {
+        // Wheel hub
+        color("DarkGray")
+        cylinder(h=WHEEL_WIDTH, d=150, center=true, $fn=48);
+        
+        // Tire (torus shape)
+        color("Black")
+        rotate_extrude($fn=64)
+        translate([uwu_wheel_diam/2 - WHEEL_WIDTH/4, 0, 0])
+        circle(d=WHEEL_WIDTH/2, $fn=32);
+        
+        // Wheel disc
+        color("DarkGray")
+        cylinder(h=WHEEL_WIDTH, d=uwu_wheel_diam - WHEEL_WIDTH/2, center=true, $fn=48);
     }
 }
 
@@ -4332,7 +4700,10 @@ module lifetrac_v25_assembly() {
         // engine(); // Removed for simplification
     }
     
-    wheel_assemblies();
+    // Wheel assemblies - either traditional or UWU
+    wheel_assemblies();      // Traditional hub-mounted motors (when show_uwu=false)
+    uwu_assemblies();        // UWU modular wheel units (when show_uwu=true)
+    
     loader_arms();
     bucket_attachment();
     lift_cylinders();
