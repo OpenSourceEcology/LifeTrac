@@ -251,7 +251,7 @@ def draw_operations_checklist(c, part, x_start, y_start, width, height):
         c.drawString(x_start, y, f"Notes: {part.notes}")
 
 
-def generate_openscad_render(part_code, scad_file, camera_config, output_path):
+def generate_openscad_render(part_code, scad_file, camera_config, output_path, autocenter=True):
     """
     Generate PNG render from OpenSCAD file
     
@@ -260,6 +260,7 @@ def generate_openscad_render(part_code, scad_file, camera_config, output_path):
         scad_file: Path to OpenSCAD file
         camera_config: Dict with camera, rotation, projection settings
         output_path: Where to save the PNG
+        autocenter: If True, use --autocenter and --viewall for better framing
     
     Returns:
         True if successful, False otherwise
@@ -276,12 +277,21 @@ def generate_openscad_render(part_code, scad_file, camera_config, output_path):
             '--render',
             '--imgsize=800,600',
             '--colorscheme=Tomorrow',
-            f'--camera={camera_config["camera"]}',
             f'--projection={camera_config.get("projection", "ortho")}',
-            f'--viewall',
-            '-o', output_path,
-            scad_file
         ]
+        
+        # Add camera or viewall
+        if autocenter:
+            cmd.extend([
+                '--autocenter',
+                '--viewall',
+            ])
+        
+        # Add camera rotation
+        if 'camera' in camera_config:
+            cmd.append(f'--camera={camera_config["camera"]}')
+        
+        cmd.extend(['-o', output_path, scad_file])
         
         # Run with timeout
         result = subprocess.run(cmd, capture_output=True, timeout=30, env={'DISPLAY': ':99'})
@@ -300,11 +310,25 @@ def generate_openscad_render(part_code, scad_file, camera_config, output_path):
         return False
 
 
-def convert_to_grayscale(image_path):
-    """Convert image to grayscale for easier printing"""
+def convert_to_grayscale_with_white_bg(image_path):
+    """Convert image to grayscale with white background for easier printing"""
     try:
         img = Image.open(image_path)
-        grayscale = img.convert('L')
+        
+        # Convert to RGBA to handle transparency
+        if img.mode != 'RGBA':
+            img = img.convert('RGBA')
+        
+        # Create white background
+        white_bg = Image.new('RGBA', img.size, (255, 255, 255, 255))
+        
+        # Composite image onto white background
+        composite = Image.alpha_composite(white_bg, img)
+        
+        # Convert to grayscale
+        grayscale = composite.convert('L')
+        
+        # Save as grayscale
         grayscale.save(image_path)
         return True
     except Exception as e:
@@ -312,7 +336,7 @@ def convert_to_grayscale(image_path):
         return False
 
 
-def generate_part_renders(part_code, scad_module_name, temp_dir):
+def generate_part_renders(part_code, scad_module_name, temp_dir, part=None):
     """
     Generate orthogonal and diagonal views of a part
     
@@ -320,6 +344,7 @@ def generate_part_renders(part_code, scad_module_name, temp_dir):
         part_code: Part code (A1, A2, etc.)
         scad_module_name: Name of OpenSCAD module to render
         temp_dir: Temporary directory for outputs
+        part: StructuralPart object with dimensions and hole data
     
     Returns:
         Dict with paths to rendered images, or None if rendering failed
@@ -327,65 +352,115 @@ def generate_part_renders(part_code, scad_module_name, temp_dir):
     # Create temporary SCAD file that calls the module
     scad_path = os.path.join(temp_dir, f'{part_code}.scad')
     
-    # Map part codes to their SCAD files
-    scad_files = {
-        'A1': 'openscad/parts/platform_angle_arm.scad',
-        'A2': 'openscad/modules/structural_steel.scad',  # Will need custom wrapper
-        'A3': 'openscad/modules/structural_steel.scad',
-        'A4': 'openscad/modules/structural_steel.scad',
-        'A5': 'openscad/modules/structural_steel.scad',
-    }
+    # Get part dimensions for camera positioning
+    if part:
+        length = part.length_mm
+        leg = 50.8  # 2" angle iron leg size
+    else:
+        length = 425.0  # default
+        leg = 50.8
     
-    # For now, create a simple angle iron visualization
-    # This will be expanded based on the actual part
+    # For now, create angle iron visualization with holes
     with open(scad_path, 'w') as f:
         if part_code == 'A1':
+            # Use the actual platform_angle_arm module which has holes
             f.write('''
 include <../openscad/lifetrac_v25_params.scad>
 use <../openscad/parts/platform_angle_arm.scad>
 
+// Render with holes visible
 platform_angle_arm(show_holes=true);
 ''')
         else:
-            # Generic angle iron for other parts
+            # Generic angle iron with holes for other parts
+            if not part:
+                return None
+            
+            # Generate angle iron with holes
             f.write(f'''
 $fn = 32;
 
-// Generic angle iron visualization
-module angle_iron_part() {{
+// Angle iron visualization with holes
+module angle_iron_with_holes() {{
     leg = 50.8;  // 2" angle iron
     thick = 6.35;  // 1/4" thickness
-    length = 146.05;  // Default length
+    length = {length};
     
-    color("Gray")
-    rotate([90, 0, 0])
-    linear_extrude(height=length)
-    polygon([
-        [0, 0],
-        [leg, 0],
-        [leg, thick],
-        [thick, thick],
-        [thick, leg],
-        [0, leg]
-    ]);
-}}
+    difference() {{
+        // Main angle iron shape
+        color("Gray")
+        rotate([90, 0, 0])
+        linear_extrude(height=length)
+        polygon([
+            [0, 0],
+            [leg, 0],
+            [leg, thick],
+            [thick, thick],
+            [thick, leg],
+            [0, leg]
+        ]);
+        
+        // Drill holes
+''')
+            
+            # Add holes based on part data
+            if part and part.holes:
+                for hole in part.holes:
+                    hole_pos = hole['position_mm']
+                    hole_dia = hole['diameter_mm']
+                    # Determine which leg the hole goes through
+                    if 'vertical leg' in hole.get('description', '').lower():
+                        # Hole through vertical leg (X direction)
+                        f.write(f'''        // {hole['description']}
+        translate([leg/2, -{hole_pos}, leg/2])
+        rotate([0, 90, 0])
+        cylinder(d={hole_dia}, h=leg+2, center=true, $fn=24);
+''')
+                    else:
+                        # Hole through horizontal leg (Z direction) or default
+                        f.write(f'''        // {hole['description']}
+        translate([leg/2, -{hole_pos}, thick/2])
+        cylinder(d={hole_dia}, h=thick+2, center=true, $fn=24);
+''')
+            
+            f.write('''    }
+}
 
-angle_iron_part();
+angle_iron_with_holes();
 ''')
     
-    # Camera configurations for different views
+    # Calculate camera distances based on part dimensions
+    # Use bounding box to determine good camera distance
+    max_dim = max(length, leg * 2)  # diagonal of L-shape
+    # Camera distance to fit object at ~90% of view
+    # For ortho projection, distance affects the viewing volume
+    cam_dist = max_dim * 1.2
+    
+    # Camera configurations for different views with better positioning
     views = {
-        'top': {'camera': '0,0,0,0,0,0,500', 'projection': 'ortho'},
-        'side': {'camera': '500,0,0,90,0,0,500', 'projection': 'ortho'},
-        'end': {'camera': '0,500,0,90,0,90,500', 'projection': 'ortho'},
-        'diagonal': {'camera': '300,300,300,55,0,45,800', 'projection': 'ortho'},
+        'top': {
+            'camera': f'0,0,0,0,0,0,{cam_dist}',
+            'projection': 'ortho'
+        },
+        'side': {
+            'camera': f'{cam_dist},0,0,90,0,0,{cam_dist}', 
+            'projection': 'ortho'
+        },
+        'end': {
+            'camera': f'0,{cam_dist},0,90,0,90,{cam_dist}',
+            'projection': 'ortho'
+        },
+        'diagonal': {
+            'camera': f'{cam_dist*0.7},{cam_dist*0.7},{cam_dist*0.5},55,0,45,{cam_dist}',
+            'projection': 'ortho'
+        },
     }
     
     renders = {}
     for view_name, camera_config in views.items():
         output_path = os.path.join(temp_dir, f'{part_code}_{view_name}.png')
-        if generate_openscad_render(part_code, scad_path, camera_config, output_path):
-            convert_to_grayscale(output_path)
+        if generate_openscad_render(part_code, scad_path, camera_config, output_path, autocenter=True):
+            convert_to_grayscale_with_white_bg(output_path)
             renders[view_name] = output_path
         else:
             # If OpenSCAD fails, we'll skip rendering for this part
@@ -487,7 +562,7 @@ def generate_cut_list_page(c, part, temp_dir=None):
         renders_height = 200
         
         print(f"  Generating 3D renders for {part.part_code}...")
-        renders = generate_part_renders(part.part_code, part.name.lower().replace(' ', '_'), temp_dir)
+        renders = generate_part_renders(part.part_code, part.name.lower().replace(' ', '_'), temp_dir, part)
         
         if renders:
             draw_part_renders(c, renders, margin, renders_y_start - renders_height,
