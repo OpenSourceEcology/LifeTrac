@@ -2377,6 +2377,184 @@ module back_stiffener_plate() {
 }
 
 // =============================================================================
+// FRONT STIFFENER PLATE
+// =============================================================================
+// Vertical plate at the front of the frame, similar mounting to back plate
+// Flush with front of motor mount plates
+// Center section (between motor plates): 10" + bottom plate thickness
+// Outer sections (motor plate to outer wall): 5" tall
+
+module front_stiffener_plate() {
+    plate_width = TRACK_WIDTH + SANDWICH_SPACING; 
+    plate_thickness = PLATE_1_4_INCH;
+    y_pos = BOTTOM_PLATE_Y_END;  // Flush with front of motor mount plates
+    
+    // Heights
+    center_height = 254.0 + PLATE_1_4_INCH;  // 10" + bottom plate thickness
+    outer_height = 127.0;  // 5" for outer sections
+    
+    // Angle iron trim to avoid overlap with horizontal angles below
+    angle_trim = 57.15;  // 2.25 inches
+    center_angle_height = center_height - angle_trim;
+    outer_angle_height = outer_height - angle_trim;
+    angle_z_offset = angle_trim;  // Start angles higher to avoid overlap
+    
+    z_start = FRAME_Z_OFFSET + BOTTOM_PLATE_INNER_TRIM - PLATE_1_4_INCH;  // Start at bottom stiffener plate top
+    
+    angle_size = [50.8, 6.35];
+    leg = angle_size[0];
+    bolt_dia = 9.525;
+    hole_offset = leg * 0.6;
+    
+    inner_offset = TRACK_WIDTH/2 - SANDWICH_SPACING/2;
+    
+    // Center section plate (between motor plates)
+    difference() {
+        color("Silver")
+        translate([-MOTOR_PLATE_X, y_pos, z_start])
+        cube([2*MOTOR_PLATE_X, plate_thickness, center_height]);
+        
+        // Holes for motor plate angles
+        // Left motor plate - right side (Legs +X, -Y)
+        for (z = get_stiffener_holes_b(center_height)) {
+            translate([-MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_pos, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Right motor plate - left side (Legs -X, -Y)
+        for (z = get_stiffener_holes_b(center_height)) {
+            translate([MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_pos, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+    }
+    
+    // Left outer section plate (outer wall to motor plate)
+    difference() {
+        color("Silver")
+        translate([-plate_width/2, y_pos, z_start])
+        cube([plate_width/2 - MOTOR_PLATE_X, plate_thickness, outer_height]);
+        
+        // Holes for left outer wall angle
+        for (z = get_stiffener_holes_a(outer_height)) {
+            translate([-plate_width/2 + hole_offset, y_pos, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Holes for left inner wall - left side
+        for (z = get_stiffener_holes_b(outer_height)) {
+            translate([-inner_offset - hole_offset, y_pos, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Holes for left inner wall - right side
+        for (z = get_stiffener_holes_a(outer_height)) {
+            translate([-inner_offset + PANEL_THICKNESS + hole_offset, y_pos, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Holes for left motor plate - left side
+        for (z = get_stiffener_holes_b(outer_height)) {
+            translate([-MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2 - hole_offset, y_pos, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+    }
+    
+    // Right outer section plate (motor plate to outer wall)
+    difference() {
+        color("Silver")
+        translate([MOTOR_PLATE_X, y_pos, z_start])
+        cube([plate_width/2 - MOTOR_PLATE_X, plate_thickness, outer_height]);
+        
+        // Holes for right outer wall angle
+        for (z = get_stiffener_holes_b(outer_height)) {
+            translate([plate_width/2 - hole_offset, y_pos, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Holes for right inner wall - left side
+        for (z = get_stiffener_holes_b(outer_height)) {
+            translate([inner_offset - PANEL_THICKNESS - hole_offset, y_pos, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Holes for right inner wall - right side
+        for (z = get_stiffener_holes_a(outer_height)) {
+            translate([inner_offset + hole_offset, y_pos, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+        
+        // Holes for right motor plate - right side
+        for (z = get_stiffener_holes_a(outer_height)) {
+            translate([MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_pos, z_start + z])
+            rotate([90, 0, 0])
+            cylinder(d=bolt_dia, h=20, center=true, $fn=16);
+        }
+    }
+    
+    // Angle Irons (shortened by 2.25" to avoid overlap with horizontal angles below)
+    // Left Outer wall (Legs +X, -Y) -> Rot Z -90
+    translate([-plate_width/2, y_pos, z_start + angle_z_offset])
+    rotate([0, 0, -90])
+    vertical_angle_iron_smart(outer_angle_height, angle_size);
+    
+    // Right Outer wall (Legs -X, -Y) -> Rot Z 180
+    translate([plate_width/2, y_pos, z_start + angle_z_offset])
+    rotate([0, 0, 180])
+    vertical_angle_iron_smart(outer_angle_height, angle_size);
+    
+    // Left Inner Panel - left side (Legs -X, -Y) -> Rot Z 180
+    translate([-inner_offset, y_pos, z_start + angle_z_offset])
+    rotate([0, 0, 180])
+    vertical_angle_iron_smart(outer_angle_height, angle_size);
+    
+    // Left Inner Panel - right side (Legs +X, -Y) -> Rot Z -90
+    translate([-inner_offset + PANEL_THICKNESS, y_pos, z_start + angle_z_offset])
+    rotate([0, 0, -90])
+    vertical_angle_iron_smart(outer_angle_height, angle_size);
+    
+    // Right Inner Panel - left side (Legs -X, -Y) -> Rot Z 180
+    translate([inner_offset - PANEL_THICKNESS, y_pos, z_start + angle_z_offset])
+    rotate([0, 0, 180])
+    vertical_angle_iron_smart(outer_angle_height, angle_size);
+    
+    // Right Inner Panel - right side (Legs +X, -Y) -> Rot Z -90
+    translate([inner_offset, y_pos, z_start + angle_z_offset])
+    rotate([0, 0, -90])
+    vertical_angle_iron_smart(outer_angle_height, angle_size);
+    
+    // Motor plate angles (center section)
+    // Left motor plate - right side (Legs +X, -Y) -> Rot Z -90
+    translate([-MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2, y_pos, z_start + angle_z_offset])
+    rotate([0, 0, -90])
+    vertical_angle_iron_smart(center_angle_height, angle_size);
+    
+    // Right motor plate - left side (Legs -X, -Y) -> Rot Z 180
+    translate([MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2, y_pos, z_start + angle_z_offset])
+    rotate([0, 0, 180])
+    vertical_angle_iron_smart(center_angle_height, angle_size);
+    
+    // Motor plate angles (outer sections)
+    // Left motor plate - left side (Legs -X, -Y) -> Rot Z 180
+    translate([-MOTOR_PLATE_X - MOTOR_PLATE_THICKNESS/2, y_pos, z_start + angle_z_offset])
+    rotate([0, 0, 180])
+    vertical_angle_iron_smart(outer_angle_height, angle_size);
+    
+    // Right motor plate - right side (Legs +X, -Y) -> Rot Z -90
+    translate([MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2, y_pos, z_start + angle_z_offset])
+    rotate([0, 0, -90])
+    vertical_angle_iron_smart(outer_angle_height, angle_size);
+}
+
+// =============================================================================
 // BOTTOM STIFFENER PLATE
 // =============================================================================
 // Horizontal plate at the bottom of the frame, similar mounting to back plate
@@ -2520,6 +2698,25 @@ MOTOR_PLATE_THICKNESS = PLATE_1_4_INCH;
 // Motor plate is 6" inboard (toward center)
 MOTOR_PLATE_X = (TRACK_WIDTH/2 - SANDWICH_SPACING/2) - MOTOR_PLATE_INBOARD;
 
+// Cutout shape for motor plates (in motor plate local coordinates)
+// Motor plate local: Y = world Y, Z = world Z (relative to z_bottom)
+// Uses CNC-friendly corner radius for manufacturability
+module motor_plate_tube_cutout(y_pos, y_start, z_bottom) {
+    // In motor plate coords: 
+    // Y position = world Y position of tube - y_start
+    // Z position = FRAME_TUBE_Z - z_bottom
+    local_y = y_pos - y_start;
+    local_z = FRAME_TUBE_Z - z_bottom;
+    
+    translate([-5, local_y, local_z])
+    rotate([0, 90, 0])
+    rotate([0, 0, 90])
+    linear_extrude(height=MOTOR_PLATE_THICKNESS + 10)
+    offset(r=FRAME_TUBE_CNC_RADIUS) 
+    offset(r=-FRAME_TUBE_CNC_RADIUS)
+    square([FRAME_TUBE_WIDTH, FRAME_TUBE_HEIGHT]);
+}
+
 module motor_mounting_plate() {
     plate_height = MOTOR_PLATE_HEIGHT;
     plate_length = BOTTOM_PLATE_LENGTH;  // Same as bottom stiffener plate
@@ -2532,20 +2729,112 @@ module motor_mounting_plate() {
     leg = angle_size[0];
     thick = angle_size[1];
     
+    // Frame tube angle iron parameters (same as frame_tube_angle_iron module)
+    angle_trim = 3.175;  // 1/8" trimmed from each end
+    angle_len = FRAME_TUBE_HEIGHT - 2*angle_trim;  // 5.75" (146.05mm)
+    frame_bolt_dia = BOLT_DIA_1_2;  // 1/2" bolts for frame tube angles
+    plate_bolt_offset = 50.8;  // 2" from center (4" total spacing) for plate/wall side
+    
+    // Local Y positions of frame tubes (relative to y_start)
+    front_tube_local_y = FRONT_FRAME_TUBE_Y - y_start;
+    rear_tube_local_y = REAR_FRAME_TUBE_Y - y_start;
+    
+    // Z position of angle irons relative to plate bottom
+    angle_z_local = FRAME_TUBE_Z - z_bottom + angle_trim;
+    
     // Left motor plate (negative X side)
-    // Plate is in YZ plane
+    // Plate is in YZ plane with 2x6 tube cutouts
     color("Silver")
     translate([-MOTOR_PLATE_X - plate_thickness/2, y_start, z_bottom])
-    cube([plate_thickness, plate_length, plate_height]);
+    difference() {
+        cube([plate_thickness, plate_length, plate_height]);
+        
+        // 2x6 cross tube cutouts (front and rear)
+        motor_plate_tube_cutout(FRONT_FRAME_TUBE_Y, y_start, z_bottom);
+        motor_plate_tube_cutout(REAR_FRAME_TUBE_Y, y_start, z_bottom);
+        
+        // Frame tube angle iron bolt holes (same pattern as side wall plates)
+        // 2 holes per angle, spaced 4" apart (2" from center), 1/2" bolts
+        // FRONT TUBE - front face angle
+        translate([plate_thickness/2, front_tube_local_y + FRAME_TUBE_WIDTH + leg/2, angle_z_local + angle_len/2 - plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        translate([plate_thickness/2, front_tube_local_y + FRAME_TUBE_WIDTH + leg/2, angle_z_local + angle_len/2 + plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        
+        // FRONT TUBE - rear face angle
+        translate([plate_thickness/2, front_tube_local_y - leg/2, angle_z_local + angle_len/2 - plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        translate([plate_thickness/2, front_tube_local_y - leg/2, angle_z_local + angle_len/2 + plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        
+        // REAR TUBE - front face angle
+        translate([plate_thickness/2, rear_tube_local_y + FRAME_TUBE_WIDTH + leg/2, angle_z_local + angle_len/2 - plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        translate([plate_thickness/2, rear_tube_local_y + FRAME_TUBE_WIDTH + leg/2, angle_z_local + angle_len/2 + plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        
+        // REAR TUBE - rear face angle
+        translate([plate_thickness/2, rear_tube_local_y - leg/2, angle_z_local + angle_len/2 - plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        translate([plate_thickness/2, rear_tube_local_y - leg/2, angle_z_local + angle_len/2 + plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+    }
     
     // Right motor plate (positive X side)
     color("Silver")
     translate([MOTOR_PLATE_X - plate_thickness/2, y_start, z_bottom])
-    cube([plate_thickness, plate_length, plate_height]);
+    difference() {
+        cube([plate_thickness, plate_length, plate_height]);
+        
+        // 2x6 cross tube cutouts (front and rear)
+        motor_plate_tube_cutout(FRONT_FRAME_TUBE_Y, y_start, z_bottom);
+        motor_plate_tube_cutout(REAR_FRAME_TUBE_Y, y_start, z_bottom);
+        
+        // Frame tube angle iron bolt holes (same pattern as side wall plates)
+        // FRONT TUBE - front face angle
+        translate([plate_thickness/2, front_tube_local_y + FRAME_TUBE_WIDTH + leg/2, angle_z_local + angle_len/2 - plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        translate([plate_thickness/2, front_tube_local_y + FRAME_TUBE_WIDTH + leg/2, angle_z_local + angle_len/2 + plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        
+        // FRONT TUBE - rear face angle
+        translate([plate_thickness/2, front_tube_local_y - leg/2, angle_z_local + angle_len/2 - plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        translate([plate_thickness/2, front_tube_local_y - leg/2, angle_z_local + angle_len/2 + plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        
+        // REAR TUBE - front face angle
+        translate([plate_thickness/2, rear_tube_local_y + FRAME_TUBE_WIDTH + leg/2, angle_z_local + angle_len/2 - plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        translate([plate_thickness/2, rear_tube_local_y + FRAME_TUBE_WIDTH + leg/2, angle_z_local + angle_len/2 + plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        
+        // REAR TUBE - rear face angle
+        translate([plate_thickness/2, rear_tube_local_y - leg/2, angle_z_local + angle_len/2 - plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+        translate([plate_thickness/2, rear_tube_local_y - leg/2, angle_z_local + angle_len/2 + plate_bolt_offset])
+        rotate([0, 90, 0])
+        cylinder(d=frame_bolt_dia, h=plate_thickness+4, center=true, $fn=16);
+    }
     
-    // Angle irons connecting motor plates to bottom stiffener plate
-    // These run along the bottom edge of the motor plates
-    // Horizontal leg on bottom stiffener plate, vertical leg against motor plate
+    // ==========================================================================
+    // HORIZONTAL ANGLE IRONS - Bottom edge (connecting to bottom stiffener plate)
+    // ==========================================================================
     
     // Left motor plate angles (2 angles - one on each side of plate)
     // Left side of left motor plate (X-leg extends -X, away from center)
@@ -2566,6 +2855,54 @@ module motor_mounting_plate() {
     // Right side of right motor plate (X-leg extends +X, away from center)
     translate([MOTOR_PLATE_X + plate_thickness/2, y_start, z_bottom])
     split_horizontal_angle_iron(angle_size);
+    
+    // ==========================================================================
+    // VERTICAL ANGLE IRONS - At 2x6 frame tube locations (same as side wall plates)
+    // Uses frame_tube_angle_iron() module for matching size and bolt pattern
+    // ==========================================================================
+    
+    // Z position - angle centered with tube (offset by 1/8" trim)
+    angle_z = FRAME_TUBE_Z + angle_trim;
+    
+    // Left motor plate - horizontal leg extends toward +X (toward center)
+    // FRONT TUBE - front face angle
+    translate([-MOTOR_PLATE_X + plate_thickness/2, FRONT_FRAME_TUBE_Y + FRAME_TUBE_WIDTH, angle_z])
+    frame_tube_angle_iron();
+    
+    // FRONT TUBE - rear face angle (mirrored in Y so vertical leg extends backward)
+    translate([-MOTOR_PLATE_X + plate_thickness/2, FRONT_FRAME_TUBE_Y, angle_z])
+    mirror([0, 1, 0])
+    frame_tube_angle_iron();
+    
+    // REAR TUBE - front face angle
+    translate([-MOTOR_PLATE_X + plate_thickness/2, REAR_FRAME_TUBE_Y + FRAME_TUBE_WIDTH, angle_z])
+    frame_tube_angle_iron();
+    
+    // REAR TUBE - rear face angle
+    translate([-MOTOR_PLATE_X + plate_thickness/2, REAR_FRAME_TUBE_Y, angle_z])
+    mirror([0, 1, 0])
+    frame_tube_angle_iron();
+    
+    // Right motor plate - horizontal leg extends toward -X (toward center), so mirror X
+    // FRONT TUBE - front face angle
+    translate([MOTOR_PLATE_X - plate_thickness/2, FRONT_FRAME_TUBE_Y + FRAME_TUBE_WIDTH, angle_z])
+    mirror([1, 0, 0])
+    frame_tube_angle_iron();
+    
+    // FRONT TUBE - rear face angle (mirrored in both X and Y)
+    translate([MOTOR_PLATE_X - plate_thickness/2, FRONT_FRAME_TUBE_Y, angle_z])
+    mirror([1, 1, 0])
+    frame_tube_angle_iron();
+    
+    // REAR TUBE - front face angle
+    translate([MOTOR_PLATE_X - plate_thickness/2, REAR_FRAME_TUBE_Y + FRAME_TUBE_WIDTH, angle_z])
+    mirror([1, 0, 0])
+    frame_tube_angle_iron();
+    
+    // REAR TUBE - rear face angle
+    translate([MOTOR_PLATE_X - plate_thickness/2, REAR_FRAME_TUBE_Y, angle_z])
+    mirror([1, 1, 0])
+    frame_tube_angle_iron();
 }
 
 // =============================================================================
@@ -2836,6 +3173,9 @@ module base_frame() {
     // Bottom plate (horizontal stiffener at bottom of frame)
     // 2" from front, 6" from back of wall side plates
     bottom_stiffener_plate();
+    
+    // Front stiffener plate (vertical plate at front of motor mount area)
+    front_stiffener_plate();
     
     // Motor mounting plates (vertical plates for engine mounting)
     motor_mounting_plate();
