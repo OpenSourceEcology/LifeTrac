@@ -1,0 +1,185 @@
+name: Generate Jig Previews
+
+on:
+  push:
+    paths:
+      - 'LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs/**/*.scad'
+      - '.github/workflows/generate-jig-previews.yml'
+  pull_request:
+    paths:
+      - 'LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs/**/*.scad'
+  workflow_dispatch:
+
+jobs:
+  render-jigs:
+    runs-on: ubuntu-latest
+    name: Render Jig Preview Images
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Install OpenSCAD
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openscad xvfb x11-utils
+          openscad --version
+      
+      - name: Start Xvfb
+        run: |
+          Xvfb :99 -screen 0 1024x768x16 &
+          XVFB_PID=$!
+          echo "XVFB_PID=$XVFB_PID" >> $GITHUB_ENV
+          
+          # Wait for Xvfb to be ready
+          for i in {1..10}; do
+            if xdpyinfo -display :99 >/dev/null 2>&1; then
+              echo "Xvfb is ready on display :99"
+              break
+            fi
+            if [ $i -eq 10 ]; then
+              echo "Timeout waiting for Xvfb to start"
+              exit 1
+            fi
+            sleep 1
+          done
+          
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+
+      - name: Create output directory
+        run: |
+          mkdir -p LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs/renders
+
+      - name: Render Tube Drilling Jig
+        run: |
+          cd LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs
+          
+          # Jig is approximately 76mm x 102mm x 178mm (3" x 4" x 7")
+          # Camera distance for good framing
+          CAM_DIST=400
+          
+          echo "Rendering tube_drilling_jig isometric view..."
+          openscad -o renders/tube_drilling_jig_iso.png \
+            --camera=$CAM_DIST,$CAM_DIST,$CAM_DIST,0,0,0 \
+            --imgsize=800,800 \
+            --projection=p \
+            --colorscheme=Tomorrow \
+            tube_drilling_jig.scad
+          
+          echo "Rendering tube_drilling_jig front view..."
+          openscad -o renders/tube_drilling_jig_front.png \
+            --camera=0,$CAM_DIST,0,0,0,0 \
+            --imgsize=800,800 \
+            --projection=p \
+            --colorscheme=Tomorrow \
+            tube_drilling_jig.scad
+
+      - name: Render Pivot Mount Welding Jig
+        run: |
+          cd LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs
+          
+          CAM_DIST=500
+          
+          echo "Rendering pivot_mount_welding_jig isometric view..."
+          openscad -o renders/pivot_mount_welding_jig_iso.png \
+            --camera=$CAM_DIST,$CAM_DIST,$CAM_DIST,0,0,0 \
+            --imgsize=800,800 \
+            --projection=p \
+            --colorscheme=Tomorrow \
+            pivot_mount_welding_jig.scad || echo "Warning: pivot_mount_welding_jig render failed (may have missing dependencies)"
+          
+          echo "Rendering pivot_mount_welding_jig front view..."
+          openscad -o renders/pivot_mount_welding_jig_front.png \
+            --camera=0,$CAM_DIST,0,0,0,0 \
+            --imgsize=800,800 \
+            --projection=p \
+            --colorscheme=Tomorrow \
+            pivot_mount_welding_jig.scad || echo "Warning: pivot_mount_welding_jig render failed"
+
+      - name: Render Pivot Welding Jig
+        run: |
+          cd LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs
+          
+          CAM_DIST=300
+          
+          echo "Rendering pivot_welding_jig isometric view..."
+          openscad -o renders/pivot_welding_jig_iso.png \
+            --camera=$CAM_DIST,$CAM_DIST,$CAM_DIST,0,0,0 \
+            --imgsize=800,800 \
+            --projection=p \
+            --colorscheme=Tomorrow \
+            pivot_welding_jig.scad || echo "Warning: pivot_welding_jig render failed (may have missing dependencies)"
+          
+          echo "Rendering pivot_welding_jig front view..."
+          openscad -o renders/pivot_welding_jig_front.png \
+            --camera=0,$CAM_DIST,0,0,0,0 \
+            --imgsize=800,800 \
+            --projection=p \
+            --colorscheme=Tomorrow \
+            pivot_welding_jig.scad || echo "Warning: pivot_welding_jig render failed"
+
+      - name: Convert PNG to JPG (smaller file size)
+        run: |
+          cd LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs/renders
+          
+          # Install ImageMagick for conversion
+          sudo apt-get install -y imagemagick
+          
+          # Convert all PNG files to JPG with good quality
+          for png in *.png; do
+            if [ -f "$png" ]; then
+              jpg="${png%.png}.jpg"
+              convert "$png" -quality 90 "$jpg"
+              echo "Converted $png to $jpg"
+              # Keep PNG for now, remove if JPG is preferred
+              # rm "$png"
+            fi
+          done
+          
+          # List generated files
+          echo "Generated render files:"
+          ls -la
+
+      - name: Update README with render timestamps
+        run: |
+          cd LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs
+          
+          # Add timestamp comment to README (optional - shows when renders were last updated)
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+          
+          # Check if timestamp line exists, update or add
+          if grep -q "Last rendered:" README.md; then
+            sed -i "s/Last rendered:.*/Last rendered: $TIMESTAMP/" README.md
+          else
+            # Add timestamp after the Note line
+            sed -i "/auto-generated by GitHub Actions/a > Last rendered: $TIMESTAMP" README.md
+          fi
+
+      - name: Commit and push renders
+        if: github.event_name != 'pull_request'
+        run: |
+          cd LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs
+          
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Add render files
+          git add renders/*.png renders/*.jpg README.md
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Auto-generate jig preview renders [skip ci]"
+            git push
+          fi
+
+      - name: Upload renders as artifact (for PRs)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jig-renders
+          path: LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs/renders/
+          retention-days: 30
