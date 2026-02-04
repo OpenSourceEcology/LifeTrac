@@ -1,0 +1,157 @@
+name: Generate Structural Steel Cut List PDF
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'LifeTrac-v25/mechanical_design/openscad/**/*.scad'
+      - 'LifeTrac-v25/mechanical_design/generate_cut_list.py'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'LifeTrac-v25/mechanical_design/openscad/**/*.scad'
+      - 'LifeTrac-v25/mechanical_design/generate_cut_list.py'
+  workflow_dispatch:
+
+jobs:
+  generate-cut-list:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ github.head_ref || github.ref_name }}
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Install OpenSCAD for 3D renders
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openscad xvfb
+        openscad --version
+    
+    - name: Install Python dependencies
+      run: |
+        pip install -r LifeTrac-v25/mechanical_design/requirements.txt
+    
+    - name: Generate Structural Steel Cut List PDF
+      run: |
+        cd LifeTrac-v25/mechanical_design
+        
+        echo "========================================="
+        echo "Generating Structural Steel Cut List PDF"
+        echo "========================================="
+        
+        # Start Xvfb for OpenSCAD rendering
+        Xvfb :99 -screen 0 1024x768x16 &
+        export DISPLAY=:99
+        sleep 2
+        
+        python3 generate_cut_list.py
+        
+        # Verify the PDF was created
+        if [ -f structural_steel_cut_list.pdf ]; then
+          echo "✅ Cut list PDF generated successfully"
+          ls -lh structural_steel_cut_list.pdf
+          du -h structural_steel_cut_list.pdf
+          
+          # Get page count
+          echo "Checking PDF content..."
+          file structural_steel_cut_list.pdf
+        else
+          echo "❌ Failed to generate cut list PDF"
+          exit 1
+        fi
+    
+    - name: Update README with cut list reference
+      run: |
+        cd LifeTrac-v25/mechanical_design
+        
+        # Check if README already has cut list section
+        if ! grep -q "## Structural Steel Cut List" README.md; then
+          echo "Adding cut list section to README..."
+          
+          {
+            echo ""
+            echo "## Structural Steel Cut List"
+            echo ""
+            echo "**[Download Cut List PDF](structural_steel_cut_list.pdf)**"
+            echo ""
+            echo "Printable cut list for all angle iron and square tubing parts. Each unique part has its own page with:"
+            echo "- Engineering drawing showing total length and hole positions"
+            echo "- Dimensions in both inches and millimeters"
+            echo "- Complete list of cutting and drilling operations with checkboxes"
+            echo "- Part code (A1, A2, etc.) for use in assembly"
+            echo "- Quantity needed for complete machine"
+            echo ""
+            echo "### Parts Summary"
+            echo ""
+            echo "| Part Code | Name | Material | Quantity |"
+            echo "|-----------|------|----------|----------|"
+            echo '| A1 | Platform Angle Arm | 2" × 2" × 1/4" Angle Iron | 2 |'
+            echo '| A2 | Frame Tube Mounting Angle | 2" × 2" × 1/4" Angle Iron | 16 |'
+            echo '| A3 | Loader Arm Mounting Angle | 2" × 2" × 1/4" Angle Iron | 4 |'
+            echo '| A4 | Side Panel Vertical Angle | 2" × 2" × 1/4" Angle Iron | 8 |'
+            echo '| A5 | Bottom Plate Horizontal Angle | 2" × 2" × 1/4" Angle Iron | 8 |'
+            echo ""
+          } >> README.md
+          echo "✓ README updated with cut list section"
+        else
+          echo "ℹ️  README already has cut list section"
+        fi
+    
+    - name: Commit and push if changed
+      run: |
+        cd LifeTrac-v25/mechanical_design
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+        git add structural_steel_cut_list.pdf README.md || true
+        
+        if git diff --staged --quiet; then
+          echo "ℹ️  No changes to commit"
+        else
+          echo "📝 Committing changes..."
+          # Note: [skip ci] prevents infinite loops from the workflow re-triggering itself
+          # The paths filter also helps, but [skip ci] is an extra safety measure
+          git commit -m "Update structural steel cut list PDF [skip ci]"
+          
+          # Fetch and rebase to incorporate any remote changes
+          BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
+          echo "🔄 Fetching latest changes from branch: ${BRANCH_NAME}..."
+          if git fetch origin "${BRANCH_NAME}"; then
+            echo "🔄 Rebasing on latest changes..."
+            if ! git rebase "origin/${BRANCH_NAME}"; then
+              echo "❌ Failed to rebase. There may be conflicts."
+              echo "Aborting rebase and exiting..."
+              git rebase --abort
+              exit 1
+            fi
+            
+            echo "📤 Pushing changes with --force-with-lease..."
+            if git push --force-with-lease; then
+              echo "✅ Changes pushed successfully"
+            else
+              echo "⚠️  Push failed. This is expected for PRs from forks or if you do not have write permissions."
+              echo "The files are available as workflow artifacts."
+            fi
+          else
+            echo "⚠️  Could not fetch branch ${BRANCH_NAME} from origin. This may be a PR from a fork."
+            echo "⚠️  Skipping push to avoid pushing potentially stale commits."
+            echo "📦 The files are available as workflow artifacts."
+          fi
+        fi
+    
+    - name: Upload PDF as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: structural-steel-cut-list
+        path: LifeTrac-v25/mechanical_design/structural_steel_cut_list.pdf
+        retention-days: 90
