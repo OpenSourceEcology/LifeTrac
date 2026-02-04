@@ -466,9 +466,11 @@ def generate_part_renders(part_code, scad_module_name, temp_dir, part=None):
         max_dim = 425.0
     
     # Calculate camera distances based on part dimensions
-    cam_dist = max_dim * 1.2
+    # Using a tighter multiplier for better framing (90% of view area)
+    cam_dist = max_dim * 0.75
     
     # Camera configurations for different views with better positioning
+    # For angle iron isometric: horizontal leg flat, vertical leg up, view into corner
     views = {
         'top': {
             'camera': f'0,0,0,0,0,0,{cam_dist}',
@@ -483,7 +485,10 @@ def generate_part_renders(part_code, scad_module_name, temp_dir, part=None):
             'projection': 'ortho'
         },
         'diagonal': {
-            'camera': f'{cam_dist*0.7},{cam_dist*0.7},{cam_dist*0.5},55,0,45,{cam_dist}',
+            # Isometric view: positioned to see both legs and all holes
+            # Rotation: 225° (viewing into the inside corner of the L)
+            # Elevation: 35° (good angle to see both horizontal and vertical surfaces)
+            'camera': f'{cam_dist*0.7},{cam_dist*0.7},{cam_dist*0.4},35,0,225,{cam_dist}',
             'projection': 'ortho'
         },
     }
