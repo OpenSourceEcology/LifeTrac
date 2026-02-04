@@ -5,7 +5,7 @@ Creates one page per unique angle iron and square tubing part with:
 - Engineering drawing showing dimensions and hole positions
 - List of cutting and drilling operations with checkboxes
 - Part code and quantity needed
-- OpenSCAD rendered views (top, side, end, 45° diagonal)
+- OpenSCAD rendered views (top, side, end, isometric)
 """
 
 import sys
@@ -415,6 +415,10 @@ def generate_part_renders(part_code, scad_module_name, temp_dir, part=None):
     # Create absolute path from temp directory
     scad_path = os.path.join(temp_dir, f'{part_code}.scad')
     
+    # Get absolute path to structural_parts.scad
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    structural_parts_path = os.path.join(script_dir, 'openscad/parts/structural/structural_parts.scad')
+    
     # Create a wrapper SCAD file that includes the part file
     with open(scad_path, 'w') as f:
         # Use the structural_parts.scad master file for consistent module names
@@ -442,7 +446,7 @@ def generate_part_renders(part_code, scad_module_name, temp_dir, part=None):
             
             module_name = module_map.get(part_code)
             if module_name:
-                f.write(f'''use <../openscad/parts/structural/structural_parts.scad>
+                f.write(f'''use <{structural_parts_path}>
 
 {module_name}(show_holes=true);
 ''')
@@ -534,7 +538,7 @@ def draw_part_renders(c, renders, x_start, y_start, width, height):
         'top': 'Top View',
         'side': 'Side View',
         'end': 'End View',
-        'diagonal': '45° Diagonal',
+        'diagonal': 'Isometric',
     }
     
     for i, view_name in enumerate(view_order):
