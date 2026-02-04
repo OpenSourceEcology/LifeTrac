@@ -437,7 +437,7 @@ def generate_part_renders(part_code, scad_module_name, temp_dir, part=None):
                 'T2': 'part_t2_rear_frame_tube',
                 'T3': 'part_t3_arm_crossbeam',
                 'T4': 'part_t4_arm_main',
-                'T5': 'part_t5_arm_leg_spacer_raw',
+                'T5': 'part_t5_arm_leg_spacer_cut',  # Use cut version which accepts show_holes
             }
             
             module_name = module_map.get(part_code)
