@@ -135,7 +135,7 @@ def draw_angle_iron_drawing(c, part, x_start, y_start, width, height):
     text_width = c.stringWidth(dim_text, "Helvetica", 8)
     c.drawString(x_offset + (drawing_width - text_width) / 2, dim_y - 15, dim_text)
     
-    # Draw holes and dimension lines for vertical leg (red)
+    # Draw holes and dimension lines for A-side (red)
     if part.vertical_leg_holes:
         dim_y_vertical = y_center + 30
         c.setStrokeColor(colors.red)
@@ -164,11 +164,11 @@ def draw_angle_iron_drawing(c, part, x_start, y_start, width, height):
             hole_pos_text = f"{hole['position_mm']:.1f}"
             c.drawString(hole_x - 10, dim_y_vertical + 5, hole_pos_text)
         
-        # Add label for vertical leg
+        # Add label for A-side
         c.setFont("Helvetica-Oblique", 7)
-        c.drawString(x_offset, dim_y_vertical + 18, "Vertical Leg Holes")
+        c.drawString(x_offset, dim_y_vertical + 18, "A-Side Holes")
     
-    # Draw holes and dimension lines for horizontal leg (green)
+    # Draw holes and dimension lines for B-side (green)
     if part.horizontal_leg_holes:
         dim_y_horizontal = y_center + 55
         
@@ -195,10 +195,10 @@ def draw_angle_iron_drawing(c, part, x_start, y_start, width, height):
             hole_pos_text = f"{hole['position_mm']:.1f}"
             c.drawString(hole_x - 10, dim_y_horizontal + 5, hole_pos_text)
         
-        # Add label for horizontal leg
+        # Add label for B-side
         c.setFont("Helvetica-Oblique", 7)
         c.setFillColor(colors.green)
-        c.drawString(x_offset, dim_y_horizontal + 18, "Horizontal Leg Holes")
+        c.drawString(x_offset, dim_y_horizontal + 18, "B-Side Holes")
     
     # Draw material callout
     c.setFillColor(colors.black)
