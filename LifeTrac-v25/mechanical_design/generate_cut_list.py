@@ -117,15 +117,7 @@ def draw_angle_iron_drawing(c, part, x_start, y_start, width, height):
     c.setLineWidth(2)
     c.line(x_offset, y_center, x_offset + drawing_width, y_center)
     
-    # Draw cross-section at left end
-    profile_scale = 3
-    leg_size = leg_size_mm * scale * profile_scale
-    thick = thick_mm * scale * profile_scale
-    
-    # Draw L-shape profile
-    c.setFillColor(colors.lightgrey)
-    c.rect(x_offset - 20, y_center - leg_size/2, thick, leg_size, fill=1, stroke=1)
-    c.rect(x_offset - 20, y_center - leg_size/2, leg_size, thick, fill=1, stroke=1)
+    # Cross-section profile removed per user request
     
     # Draw dimension line for total length (blue)
     dim_y = y_center - 40
