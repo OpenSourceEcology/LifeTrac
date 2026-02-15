@@ -1,0 +1,192 @@
+name: Generate UTU Animation GIF
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'UTU/UTU-v25/utu_v25.scad'
+      - 'UTU/UTU-v25/gears.scad'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'UTU/UTU-v25/utu_v25.scad'
+      - 'UTU/UTU-v25/gears.scad'
+  workflow_dispatch:
+
+jobs:
+  generate-utu-animation:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ github.head_ref || github.ref_name }}
+        fetch-depth: 0
+
+    - name: Install OpenSCAD and ImageMagick
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openscad xvfb x11-utils imagemagick
+        openscad --version
+
+    - name: Start Xvfb
+      run: |
+        Xvfb :99 -screen 0 1024x768x16 &
+        XVFB_PID=$!
+        echo "XVFB_PID=$XVFB_PID" >> $GITHUB_ENV
+
+        # Wait for Xvfb to be ready (max 10 seconds)
+        for i in {1..10}; do
+          if xdpyinfo -display :99 >/dev/null 2>&1; then
+            echo "Xvfb is ready on display :99"
+            break
+          fi
+          if [ $i -eq 10 ]; then
+            echo "Timeout waiting for Xvfb to start"
+            exit 1
+          fi
+          sleep 1
+        done
+
+        echo "DISPLAY=:99" >> $GITHUB_ENV
+
+    - name: Calculate camera position
+      run: |
+        cd UTU/UTU-v25
+
+        # Extract key parameters from utu_v25.scad
+        INCH=25.4
+
+        IDLER_SPACING=$(grep -E "^idler_spacing" utu_v25.scad | grep -oE "[0-9]+\.?[0-9]*" | head -1 || echo "48")
+        DRIVE_HEIGHT=$(grep -E "^drive_height_above_idlers" utu_v25.scad | grep -oE "[0-9]+\.?[0-9]*" | head -1 || echo "24")
+
+        # Convert to mm
+        IDLER_SPACING_MM=$(awk "BEGIN {print $IDLER_SPACING * $INCH}")
+        DRIVE_HEIGHT_MM=$(awk "BEGIN {print $DRIVE_HEIGHT * $INCH}")
+
+        # Scene dimensions
+        SCENE_WIDTH=$IDLER_SPACING_MM
+        SCENE_HEIGHT=$(awk "BEGIN {print $DRIVE_HEIGHT_MM + 300}")  # extra margin for sprockets
+
+        # Center point: halfway along X, halfway up Z
+        CENTER_X=$(awk "BEGIN {print int($SCENE_WIDTH / 2)}")
+        CENTER_Y=0
+        CENTER_Z=$(awk "BEGIN {print int($SCENE_HEIGHT / 2)}")
+
+        # Camera distance: enough to frame the full track triangle
+        MAX_DIM=$(awk "BEGIN {d=$SCENE_WIDTH; if ($SCENE_HEIGHT > d) d=$SCENE_HEIGHT; print d}")
+        CAMERA_DISTANCE=$(awk "BEGIN {print int($MAX_DIM * 1.8)}")
+
+        echo "=== UTU Camera Calculation ==="
+        echo "Idler spacing: ${IDLER_SPACING_MM}mm"
+        echo "Drive height: ${DRIVE_HEIGHT_MM}mm"
+        echo "Camera: $CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,$CENTER_X,$CENTER_Y,$CENTER_Z"
+        echo "=============================="
+
+        echo "CAMERA_DISTANCE=$CAMERA_DISTANCE" >> $GITHUB_ENV
+        echo "CENTER_X=$CENTER_X" >> $GITHUB_ENV
+        echo "CENTER_Y=$CENTER_Y" >> $GITHUB_ENV
+        echo "CENTER_Z=$CENTER_Z" >> $GITHUB_ENV
+
+    - name: Create output directories
+      run: |
+        mkdir -p UTU/UTU-v25/output/animations/frames
+
+    - name: Generate animation frames
+      run: |
+        cd UTU/UTU-v25
+
+        echo "Generating UTU animation frames..."
+        echo "Camera: $CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,$CENTER_X,$CENTER_Y,$CENTER_Z"
+
+        # Generate 36 frames (one full chain pitch of travel)
+        total_frames=36
+        for i in $(seq 0 $((total_frames-1))); do
+          t=$(awk "BEGIN {print $i/($total_frames-1)}")
+          printf "Frame %d (t=%.4f)\n" "$i" "$t"
+          openscad -o "output/animations/frames/frame_$(printf %03d $i).png" \
+            --camera=$CAMERA_DISTANCE,$CAMERA_DISTANCE,$CAMERA_DISTANCE,$CENTER_X,$CENTER_Y,$CENTER_Z \
+            --imgsize=720,720 \
+            --projection=p \
+            --colorscheme=Nature \
+            -D "animate_track=true" \
+            -D "\$t=$t" \
+            utu_v25.scad
+        done
+
+        echo "Animation frames generated"
+
+    - name: Create animation GIF
+      run: |
+        cd UTU/UTU-v25/output/animations
+
+        echo "Creating UTU animation GIF..."
+        convert -delay 10 -loop 0 frames/frame_*.png utu_v25_animation.gif
+
+        # Copy to UTU-v25 directory for README reference
+        cp utu_v25_animation.gif ../../utu_v25_animation.gif
+
+        echo "✓ UTU Animation GIF created successfully"
+        ls -lh ../../utu_v25_animation.gif
+
+    - name: Upload animation artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: utu-animation
+        path: |
+          UTU/UTU-v25/output/animations/
+          UTU/UTU-v25/utu_v25_animation.gif
+        retention-days: 90
+
+    - name: Commit and push animation GIF
+      run: |
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global user.name "github-actions[bot]"
+        git add UTU/UTU-v25/utu_v25_animation.gif || true
+
+        if git diff --staged --quiet; then
+          echo "ℹ️  No changes to commit"
+        else
+          echo "📝 Committing UTU animation GIF..."
+          git commit -m "Update UTU animation GIF [skip ci]"
+
+          BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
+          echo "🔄 Fetching latest changes from branch: ${BRANCH_NAME}..."
+          if git fetch origin "${BRANCH_NAME}"; then
+            echo "🔄 Rebasing on latest changes..."
+            if ! git rebase "origin/${BRANCH_NAME}"; then
+              echo "❌ Failed to rebase. Aborting..."
+              git rebase --abort
+              exit 1
+            fi
+          else
+            echo "⚠️  Could not fetch branch ${BRANCH_NAME}. Skipping rebase."
+          fi
+
+          echo "📤 Pushing changes..."
+          if git push --force-with-lease; then
+            echo "✅ Changes pushed successfully"
+          else
+            echo "⚠️  Push failed. Files available as workflow artifacts."
+          fi
+        fi
+
+    - name: Cleanup Xvfb
+      if: always()
+      run: |
+        if [ -n "$XVFB_PID" ]; then
+          echo "Stopping Xvfb (PID: $XVFB_PID)"
+          kill -TERM $XVFB_PID 2>/dev/null || true
+          for i in {1..5}; do
+            if ! kill -0 $XVFB_PID 2>/dev/null; then
+              echo "Xvfb stopped"
+              break
+            fi
+            sleep 1
+          done
+          kill -KILL $XVFB_PID 2>/dev/null || true
+        fi

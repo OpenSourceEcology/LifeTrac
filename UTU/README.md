@@ -2,6 +2,8 @@
 
 The Universal Track Unit (UTU) is an interchangeable traction module designed to work interchangeably with the Universal Wheel Unit (UWU).
 
+![UTU v25 Animation](UTU-v25/utu_v25_animation.gif)
+
 ## References
 - [Universal Track Unit Wiki](https://wiki.opensourceecology.org/wiki/Universal_Track_Unit)
 
