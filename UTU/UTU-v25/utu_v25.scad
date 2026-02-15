@@ -29,6 +29,7 @@ eps = 0.1;  // Small epsilon for boolean cut-through margins
 
 num_axes = 3;              // 2 = idlers only, 3+ = idlers + drive
 show_track = true;         // Show track chain links
+animate_track = true;      // Animate track rotation (use View > Animate, FPS=10, Steps=100)
 
 // ============================================================
 // AXIS LAYOUT (positioned in XZ plane, Y = axle direction)
@@ -530,11 +531,19 @@ module connecting_rod() {
 // MODULES - Full Track Chain (wraps all sprockets)
 // ============================================================
 
+// Animation offset: $t goes 0→1, shift chain by one full pitch per cycle
+anim_offset = animate_track ? $t * chain_pitch : 0;
+
+// Sprocket animation: rotate by equivalent angle for chain travel
+anim_sprocket_angle = animate_track ? $t * tooth_angle : 0;
+
 module track_chain_full() {
     for (i = [0 : num_chain_links - 1]) {
         // Rod positions bounding this link (on pitch circle)
-        p0 = chain_point(i * chain_pitch);
-        p1 = chain_point((i + 1) * chain_pitch);
+        s0 = i * chain_pitch + anim_offset;
+        s1 = (i + 1) * chain_pitch + anim_offset;
+        p0 = chain_point(s0);
+        p1 = chain_point(s1);
 
         // Chord midpoint and angle
         mx = (p0[0] + p1[0]) / 2;
@@ -587,7 +596,7 @@ module idler_axis_assembly(phase = 0) {
 
     // Sprocket (centered, in XZ plane)
     rotate([90, 0, 0])
-        sprocket(phase);
+        sprocket(phase + anim_sprocket_angle);
 
     // Shaft collars sandwiching sprocket
     translate([0, sprocket_thickness / 2 + collar_gap, 0])
@@ -645,7 +654,7 @@ module drive_axis_assembly(phase = 0) {
 
     // Sprocket (centered between bearing plates, same as idler)
     rotate([90, 0, 0])
-        sprocket(phase);
+        sprocket(phase + anim_sprocket_angle);
 
     // Shaft collars sandwiching sprocket
     translate([0, sprocket_thickness / 2 + collar_gap, 0])
