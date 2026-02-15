@@ -9,7 +9,7 @@ The Universal Wheel Unit (UWU) is a standardized system of bearings and motors m
 ## Integration
 We want to have the option to use either the UWU or UTU (Universal Track Unit) for the LifeTrac v25.
 
-The design goal is to be able to give a coordinate on any future machine and define the three plates and the UWU size, so that the UWU or UTU can be adopted for use in place.
+The design goal is to be able to give a coordinate on any future machine and define the three plates and the UWU size, so that the UWU or UTU can be adopted for use in place. Both units share the same plate dimensions, bolt patterns, and bearing/motor mounting interfaces.
 
 ## UWU v25 Specifications
 
@@ -36,6 +36,9 @@ The v25 iteration of the UWU is designed with the following parameters (Source: 
 ### Drivetrain
 - **Shaft:** Ø1.25" x 10.0" Length.
 - **Coupling:** Ø2.0" x 2.0" Length connecting Motor Shaft to Main Shaft.
+
+### Compatibility with UTU
+The UWU shares its plate dimensions, bolt patterns, bearing mounts, and motor mount interface with the UTU (Universal Track Unit). See `../UTU/README.md` for the track unit specifications.
 
 ### CAD Files
 - **OpenSCAD:** `UWU-v25/uwu_v25.scad` (Parametric source).
