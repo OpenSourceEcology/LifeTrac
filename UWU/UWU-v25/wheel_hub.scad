@@ -1,15 +1,24 @@
 // wheel_hub.scad
-// UWU Simplified Wheel Hub Assembly
+// UWU Wheel Hub Assembly
 // Open Source Ecology - LifeTrac v25 / UWU-v25
 //
-// Fabricated wheel hub that mounts on the UWU shaft and accepts
+// Wheel hub that mounts on the UWU shaft and accepts
 // standard Bobcat skid-steer wheels (P/N 7232567, 8-lug on 8" BCD).
 //
-// Construction:
+// Two hub styles available (set _hub_style):
+//   "DIY" - Fabricated from DOM tube + triangular gussets + lug plate
+//   "QD"  - QD weld-on hub (SH series) welded to lug plate + QD bushing
+//
+// DIY Construction:
 //   1. DOM (Drawn Over Mandrel) tube - slides over the 1.25" shaft
 //   2. Triangular plate steel gussets - welded to DOM and lug plate
 //   3. Circular lug bolt plate - 8 holes matching Bobcat pattern
 //   4. Cross-drilled hole through DOM + shaft for retention bolt
+//
+// QD Construction:
+//   1. QD weld-on hub (SH series, Martin/McMaster) - welded to lug plate
+//   2. QD tapered bushing - clamps onto shaft via cap screws
+//   3. Circular lug bolt plate - 8 holes matching Bobcat pattern
 //
 // Units: mm (all dimensions converted from inches)
 
@@ -49,6 +58,25 @@ _hub_gusset_thickness = 6.35;    // 1/4" plate
 _hub_gusset_height    = _hub_dom_length * 0.85;
 // Offset 22.5° so gussets sit between the 8 lug bolt holes
 _hub_gusset_angle_offset = 22.5;
+
+// =============================================================================
+// QD WELD-ON HUB PARAMETERS (SH series, 1-1/4" bore)
+// =============================================================================
+// Martin Sprocket / McMaster SH QD bushing + weld-on hub
+_qd_bore            = _hub_shaft_diam;  // 31.75mm (1.250")
+_qd_barrel_od       = 66.04;     // 2.600" (large end of taper)
+_qd_flange_od       = 76.2;      // 3.000"
+_qd_overall_length  = 33.34;     // 1.3125" (1-5/16")
+_qd_flange_thick    = 7.94;      // 0.3125" (5/16")
+_qd_barrel_length   = 25.4;      // 1.000"
+_qd_bolt_circle     = 57.15;     // 2.250" bolt circle
+_qd_num_bolts       = 2;         // 2x 5/16"-18 cap screws
+_qd_bolt_diam       = 7.94;      // 5/16"
+_qd_hub_flange_od   = 76.2;      // 3.000" weld-on hub flange
+_qd_hub_width       = 20.64;     // 0.8125" (13/16") weld-on hub width
+
+// Hub style toggle: "DIY" or "QD"
+_hub_style = "DIY";
 
 // =============================================================================
 // DOM TUBE MODULE
@@ -142,6 +170,107 @@ module hub_gusset(
         [radial_length, 0],            // Outer at plate level
         [0, gusset_height]             // Inner up DOM axis
     ]);
+}
+
+// =============================================================================
+// QD TAPERED BUSHING MODULE (SH series)
+// =============================================================================
+// Standard SH QD bushing: tapered split sleeve that clamps onto the shaft.
+// The bushing sits inside the weld-on hub's tapered bore.
+
+module qd_bushing(
+    bore         = _qd_bore,
+    barrel_od    = _qd_barrel_od,
+    flange_od    = _qd_flange_od,
+    overall_len  = _qd_overall_length,
+    flange_thick = _qd_flange_thick,
+    barrel_len   = _qd_barrel_length,
+    bolt_circle  = _qd_bolt_circle,
+    num_bolts    = _qd_num_bolts,
+    bolt_diam    = _qd_bolt_diam
+) {
+    color("DimGray")
+    difference() {
+        union() {
+            // Tapered barrel
+            cylinder(d1=barrel_od, d2=barrel_od * 0.95, h=barrel_len, $fn=48);
+            // Flange at top
+            translate([0, 0, barrel_len])
+            cylinder(d=flange_od, h=flange_thick, $fn=48);
+        }
+        // Bore
+        translate([0, 0, -1])
+        cylinder(d=bore, h=overall_len + 2, $fn=48);
+        // Cap screw holes in flange
+        for (i = [0 : num_bolts - 1]) {
+            rotate([0, 0, i * (360 / num_bolts)])
+            translate([bolt_circle / 2, 0, barrel_len - 1])
+            cylinder(d=bolt_diam, h=flange_thick + 2, $fn=16);
+        }
+    }
+}
+
+// =============================================================================
+// QD WELD-ON HUB MODULE (SH series)
+// =============================================================================
+// Steel hub with SH tapered bore, flat flange face for welding to lug plate.
+// Bushing inserts from the inboard side.
+
+module qd_weld_on_hub(
+    hub_flange_od = _qd_hub_flange_od,
+    hub_width     = _qd_hub_width,
+    barrel_od     = _qd_barrel_od,
+    bolt_circle   = _qd_bolt_circle,
+    num_bolts     = _qd_num_bolts,
+    bolt_diam     = _qd_bolt_diam
+) {
+    color("SlateGray")
+    difference() {
+        // Main body: cylindrical hub
+        cylinder(d=hub_flange_od, h=hub_width, $fn=48);
+        // Tapered bore (matching SH bushing taper)
+        translate([0, 0, -1])
+        cylinder(d1=barrel_od, d2=barrel_od * 0.95, h=hub_width + 2, $fn=48);
+        // Cap screw holes (tapped, through hub body)
+        for (i = [0 : num_bolts - 1]) {
+            rotate([0, 0, i * (360 / num_bolts)])
+            translate([bolt_circle / 2, 0, -1])
+            cylinder(d=bolt_diam, h=hub_width + 2, $fn=16);
+        }
+    }
+}
+
+// =============================================================================
+// QD WHEEL HUB ASSEMBLY
+// =============================================================================
+// QD hub welded to lug plate, bushing clamped on shaft.
+// Origin: center of shaft bore at the lug plate outboard face
+// Z axis = shaft axis
+// Hub + bushing extend in -Z direction (inboard, over the shaft)
+// Lug plate face is at Z=0, plate body extends in +Z direction (outboard)
+
+module qd_hub_assembly(
+    plate_diam     = _hub_plate_diam,
+    plate_thick    = _hub_plate_thickness,
+    lug_count      = _bobcat_lug_count,
+    bcd            = _bobcat_bcd,
+    lug_hole_diam  = _bobcat_lug_hole,
+    hub_flange_od  = _qd_hub_flange_od,
+    hub_width      = _qd_hub_width
+) {
+    // Lug plate at Z=0, body extends in +Z (outboard toward rim)
+    // Center bore sized for QD hub flange OD + 1/16" clearance
+    hub_lug_plate(plate_diam, plate_thick, lug_count, bcd,
+                  lug_hole_diam, hub_flange_od + 1.5875);
+
+    // QD weld-on hub: welded to inboard face of lug plate
+    // Hub extends inboard (-Z) from the plate face
+    translate([0, 0, -hub_width])
+    qd_weld_on_hub();
+
+    // QD bushing: sits inside the weld-on hub, clamped on shaft
+    translate([0, 0, -hub_width])
+    qd_bushing();
 }
 
 // =============================================================================
@@ -290,10 +419,14 @@ module skid_steer_tire(
 // Origin: center of shaft bore at the hub lug plate face
 // Z axis = shaft/axle axis
 
-module bobcat_wheel_assembly(show_hub=true, show_rim=true, show_tire=true) {
-    // Hub: DOM extends -Z (inboard over shaft), lug plate at Z=0 facing +Z
-    if (show_hub)
-        wheel_hub_assembly();
+module bobcat_wheel_assembly(show_hub=true, show_rim=true, show_tire=true, hub_style=_hub_style) {
+    // Hub: selected style extends -Z (inboard over shaft), lug plate at Z=0 facing +Z
+    if (show_hub) {
+        if (hub_style == "QD")
+            qd_hub_assembly();
+        else
+            wheel_hub_assembly();
+    }
 
     // Rim mounts outboard of lug plate (at Z = plate thickness)
     if (show_rim)
@@ -311,33 +444,19 @@ module bobcat_wheel_assembly(show_hub=true, show_rim=true, show_tire=true) {
 // =============================================================================
 
 if ($preview) {
-    // Full assembly
+    // Full assembly (current style)
     bobcat_wheel_assembly();
 
     // Shaft reference (transparent)
-    %translate([0, 0, -50])
-    cylinder(d=_hub_shaft_diam, h=200, $fn=32);
+    %translate([0, 0, -150])
+    cylinder(d=_hub_shaft_diam, h=350, $fn=32);
 
-    // Exploded view of components
-    translate([400, 0, 0]) {
-        // DOM tube
-        translate([0, 0, 80])
-        hub_dom_tube();
+    // Show the other style offset to the right for comparison
+    translate([500, 0, 0]) {
+        other_style = (_hub_style == "DIY") ? "QD" : "DIY";
+        bobcat_wheel_assembly(hub_style=other_style);
 
-        // Lug plate
-        translate([0, 0, -20])
-        hub_lug_plate();
-
-        // Single gusset
-        translate([0, 0, 30])
-        hub_gusset();
-
-        // Rim
-        translate([0, 0, -120])
-        bobcat_rim();
-
-        // Tire
-        translate([0, 0, -120])
-        skid_steer_tire();
+        %translate([0, 0, -150])
+        cylinder(d=_hub_shaft_diam, h=350, $fn=32);
     }
 }

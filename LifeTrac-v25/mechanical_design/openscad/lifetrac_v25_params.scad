@@ -1231,6 +1231,9 @@ BOBCAT_TIRE_SECTION_HEIGHT = (BOBCAT_TIRE_OD - BOBCAT_RIM_DIAMETER) / 2;  // sid
 // Simplified fabricated wheel hub: DOM tube + triangular gussets + lug plate
 // Transfers torque from UWU shaft to Bobcat wheel via lug bolts
 
+// Hub style: "DIY" = DOM tube + gussets, "QD" = QD weld-on hub + bushing
+HUB_STYLE = "DIY";  // "DIY" or "QD"
+
 // DOM tube (Drawn Over Mandrel) - slides over shaft
 HUB_DOM_OD = 50.8;               // 2.00 inches OD
 HUB_DOM_WALL = 6.35;             // 0.25 inch wall thickness
@@ -1252,6 +1255,26 @@ HUB_GUSSET_THICKNESS = 6.35;     // 1/4 inch plate steel
 // Gussets rotated 22.5° so they sit between the 8 lug bolt holes
 HUB_GUSSET_ANGLE_OFFSET = 22.5;
 HUB_GUSSET_HEIGHT = HUB_DOM_LENGTH * 0.85;  // Gusset height along DOM axis
+
+// =============================================================================
+// QD WELD-ON HUB PARAMETERS (SH series, 1-1/4" bore)
+// =============================================================================
+// Martin Sprocket / McMaster-Carr SH QD bushing + weld-on hub
+// McMaster: 6086K221 (bushing ~$27), 5961K2 (weld-on hub ~$89)
+// The weld-on hub is welded to the lug bolt plate; the tapered bushing
+// clamps onto the shaft via cap screws.
+
+QD_BORE = UWU_SHAFT_DIAM;            // 31.75mm (1.250")
+QD_BARREL_OD = 66.04;                // 2.600" (large end of taper)
+QD_FLANGE_OD = 76.2;                 // 3.000"
+QD_OVERALL_LENGTH = 33.34;           // 1.3125" (1-5/16")
+QD_FLANGE_THICKNESS = 7.94;          // 0.3125" (5/16")
+QD_BARREL_LENGTH = 25.4;             // 1.000"
+QD_BOLT_CIRCLE = 57.15;              // 2.250" bolt circle
+QD_NUM_BOLTS = 2;                     // 2x 5/16"-18 cap screws
+QD_BOLT_DIAM = 7.94;                 // 5/16"
+QD_HUB_FLANGE_OD = 76.2;            // 3.000" weld-on hub flange
+QD_HUB_WIDTH = 20.64;               // 0.8125" (13/16") weld-on hub width
 
 echo("=== UWU PARAMETERS ===");
 echo("UWU Shaft Diameter:", UWU_SHAFT_DIAM, "mm");

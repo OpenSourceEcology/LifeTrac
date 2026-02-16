@@ -3793,57 +3793,107 @@ module uwu_assembly_positioned(side="left") {
     // DOM extends inboard (-Z, over the shaft), lug plate faces outboard (+Z, toward rim)
     // Shifted 2" outboard then 4" inboard = net 2" inboard
     translate([0, 0, shaft_total_length + 25.4 + 50.8 - 127.0]) {
-        // === WHEEL HUB (DOM tube + gussets + lug plate) ===
-        // DOM tube (2" OD x 0.25" wall) - extends inboard over shaft
-        // and 1" past the outer face of the bolt plate
-        _dom_total = HUB_DOM_LENGTH + HUB_PLATE_THICKNESS + 25.4;  // through plate + 1"
-        color("DimGray")
-        translate([0, 0, -HUB_DOM_LENGTH])
-        difference() {
-            cylinder(d=HUB_DOM_OD, h=_dom_total, center=false, $fn=48);
-            translate([0, 0, -1])
-            cylinder(d=HUB_DOM_ID, h=_dom_total + 2, center=false, $fn=48);
-            // Cross-drill hole for retention bolt (centered between gussets)
-            translate([0, 0, HUB_CROSS_BOLT_POS])
+        // === WHEEL HUB ===
+        // Two styles: "DIY" (DOM + gussets) or "QD" (QD weld-on hub + bushing)
+        if (HUB_STYLE == "QD") {
+            // === QD WELD-ON HUB + BUSHING ===
+            // QD weld-on hub welded to inboard face of lug plate
+            translate([0, 0, -QD_HUB_WIDTH])
+            color("SlateGray")
+            difference() {
+                cylinder(d=QD_HUB_FLANGE_OD, h=QD_HUB_WIDTH, $fn=48);
+                translate([0, 0, -1])
+                cylinder(d1=QD_BARREL_OD, d2=QD_BARREL_OD * 0.95, h=QD_HUB_WIDTH + 2, $fn=48);
+                for (i = [0 : QD_NUM_BOLTS - 1]) {
+                    rotate([0, 0, i * (360 / QD_NUM_BOLTS)])
+                    translate([QD_BOLT_CIRCLE / 2, 0, -1])
+                    cylinder(d=QD_BOLT_DIAM, h=QD_HUB_WIDTH + 2, $fn=16);
+                }
+            }
+
+            // QD tapered bushing inside the hub
+            translate([0, 0, -QD_HUB_WIDTH])
+            color("DimGray")
+            difference() {
+                union() {
+                    cylinder(d1=QD_BARREL_OD, d2=QD_BARREL_OD * 0.95, h=QD_BARREL_LENGTH, $fn=48);
+                    translate([0, 0, QD_BARREL_LENGTH])
+                    cylinder(d=QD_FLANGE_OD, h=QD_FLANGE_THICKNESS, $fn=48);
+                }
+                translate([0, 0, -1])
+                cylinder(d=QD_BORE, h=QD_OVERALL_LENGTH + 2, $fn=48);
+                for (i = [0 : QD_NUM_BOLTS - 1]) {
+                    rotate([0, 0, i * (360 / QD_NUM_BOLTS)])
+                    translate([QD_BOLT_CIRCLE / 2, 0, QD_BARREL_LENGTH - 1])
+                    cylinder(d=QD_BOLT_DIAM, h=QD_FLANGE_THICKNESS + 2, $fn=16);
+                }
+            }
+
+            // Lug bolt plate (center bore sized for QD hub)
+            color("Silver")
+            difference() {
+                cylinder(d=HUB_PLATE_DIAM, h=HUB_PLATE_THICKNESS, $fn=64);
+                translate([0, 0, -1])
+                cylinder(d=QD_HUB_FLANGE_OD + 1.5875, h=HUB_PLATE_THICKNESS + 2, $fn=48);
+                for (i = [0 : BOBCAT_LUG_COUNT - 1]) {
+                    rotate([0, 0, i * (360 / BOBCAT_LUG_COUNT)])
+                    translate([BOBCAT_BOLT_CIRCLE_DIAM / 2, 0, -1])
+                    cylinder(d=BOBCAT_LUG_HOLE_DIAM, h=HUB_PLATE_THICKNESS + 2, $fn=24);
+                }
+            }
+        } else {
+            // === DIY HUB (DOM tube + gussets + lug plate) ===
+            // DOM tube (2" OD x 0.25" wall) - extends inboard over shaft
+            // and 1" past the outer face of the bolt plate
+            _dom_total = HUB_DOM_LENGTH + HUB_PLATE_THICKNESS + 25.4;  // through plate + 1"
+            color("DimGray")
+            translate([0, 0, -HUB_DOM_LENGTH])
+            difference() {
+                cylinder(d=HUB_DOM_OD, h=_dom_total, center=false, $fn=48);
+                translate([0, 0, -1])
+                cylinder(d=HUB_DOM_ID, h=_dom_total + 2, center=false, $fn=48);
+                // Cross-drill hole for retention bolt (centered between gussets)
+                translate([0, 0, HUB_CROSS_BOLT_POS])
+                rotate([0, 0, 67.5])
+                rotate([0, 90, 0])
+                cylinder(d=HUB_CROSS_BOLT_DIAM, h=HUB_DOM_OD + 2, center=true, $fn=24);
+            }
+
+            // Cross-bolt visualization
+            color("DarkRed")
+            translate([0, 0, -HUB_DOM_LENGTH + HUB_CROSS_BOLT_POS])
             rotate([0, 0, 67.5])
             rotate([0, 90, 0])
-            cylinder(d=HUB_CROSS_BOLT_DIAM, h=HUB_DOM_OD + 2, center=true, $fn=24);
-        }
+            cylinder(d=HUB_CROSS_BOLT_DIAM * 0.8, h=HUB_DOM_OD * 1.3, center=true, $fn=16);
 
-        // Cross-bolt visualization
-        color("DarkRed")
-        translate([0, 0, -HUB_DOM_LENGTH + HUB_CROSS_BOLT_POS])
-        rotate([0, 0, 67.5])
-        rotate([0, 90, 0])
-        cylinder(d=HUB_CROSS_BOLT_DIAM * 0.8, h=HUB_DOM_OD * 1.3, center=true, $fn=16);
-
-        // Lug bolt plate (circular, at Z=0 facing +Z toward rim/tire)
-        color("Silver")
-        difference() {
-            cylinder(d=HUB_PLATE_DIAM, h=HUB_PLATE_THICKNESS, $fn=64);
-            translate([0, 0, -1])
-            cylinder(d=HUB_PLATE_CENTER_BORE, h=HUB_PLATE_THICKNESS + 2, $fn=48);
-            for (i = [0 : BOBCAT_LUG_COUNT - 1]) {
-                rotate([0, 0, i * (360 / BOBCAT_LUG_COUNT)])
-                translate([BOBCAT_BOLT_CIRCLE_DIAM / 2, 0, -1])
-                cylinder(d=BOBCAT_LUG_HOLE_DIAM, h=HUB_PLATE_THICKNESS + 2, $fn=24);
+            // Lug bolt plate (circular, at Z=0 facing +Z toward rim/tire)
+            color("Silver")
+            difference() {
+                cylinder(d=HUB_PLATE_DIAM, h=HUB_PLATE_THICKNESS, $fn=64);
+                translate([0, 0, -1])
+                cylinder(d=HUB_PLATE_CENTER_BORE, h=HUB_PLATE_THICKNESS + 2, $fn=48);
+                for (i = [0 : BOBCAT_LUG_COUNT - 1]) {
+                    rotate([0, 0, i * (360 / BOBCAT_LUG_COUNT)])
+                    translate([BOBCAT_BOLT_CIRCLE_DIAM / 2, 0, -1])
+                    cylinder(d=BOBCAT_LUG_HOLE_DIAM, h=HUB_PLATE_THICKNESS + 2, $fn=24);
+                }
             }
-        }
 
-        // Triangular gusset plates (welded between DOM and lug plate)
-        // Base flush with lug plate face (Z=0), apex extends inboard along DOM (-Z)
-        // Offset 22.5° to sit between the 8 lug bolt holes
-        for (i = [0 : HUB_GUSSET_COUNT - 1]) {
-            rotate([0, 0, HUB_GUSSET_ANGLE_OFFSET + i * (360 / HUB_GUSSET_COUNT)])
-            color("DarkGray")
-            translate([HUB_DOM_OD / 2, 0, 0])
-            rotate([-90, 0, 0])
-            linear_extrude(height=HUB_GUSSET_THICKNESS, center=true)
-            polygon(points=[
-                [0, 0],                                              // Inner at plate face
-                [HUB_PLATE_DIAM / 2 - HUB_DOM_OD / 2 - 5, 0],      // Outer at plate face
-                [0, HUB_GUSSET_HEIGHT]                               // Inner, inboard along DOM
-            ]);
+            // Triangular gusset plates (welded between DOM and lug plate)
+            // Base flush with lug plate face (Z=0), apex extends inboard along DOM (-Z)
+            // Offset 22.5° to sit between the 8 lug bolt holes
+            for (i = [0 : HUB_GUSSET_COUNT - 1]) {
+                rotate([0, 0, HUB_GUSSET_ANGLE_OFFSET + i * (360 / HUB_GUSSET_COUNT)])
+                color("DarkGray")
+                translate([HUB_DOM_OD / 2, 0, 0])
+                rotate([-90, 0, 0])
+                linear_extrude(height=HUB_GUSSET_THICKNESS, center=true)
+                polygon(points=[
+                    [0, 0],                                              // Inner at plate face
+                    [HUB_PLATE_DIAM / 2 - HUB_DOM_OD / 2 - 5, 0],      // Outer at plate face
+                    [0, HUB_GUSSET_HEIGHT]                               // Inner, inboard along DOM
+                ]);
+            }
         }
 
         // === BOBCAT RIM (P/N 7232567) ===

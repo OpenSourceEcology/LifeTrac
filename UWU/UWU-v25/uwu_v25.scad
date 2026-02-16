@@ -164,4 +164,4 @@ shaft_end_z = shaft_start_z + shaft_length;
 // Wheel hub: lug plate face at shaft end + 3" outboard spacing
 translate([0, 0, shaft_end_z + 3 * inch])
 rotate([0, 0, 0])
-bobcat_wheel_assembly(show_hub=true, show_rim=true, show_tire=true);
+bobcat_wheel_assembly(show_hub=true, show_rim=true, show_tire=true);  // uses _hub_style toggle from wheel_hub.scad
