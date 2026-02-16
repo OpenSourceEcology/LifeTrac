@@ -1,9 +1,13 @@
 // UWU-v25 Universal Wheel Unit Assembly
 // Units: mm (converted from inches)
+// Includes: motor, bearings, shaft, coupling, wheel hub, rim, and tire
 
 $fn = 50;
 
 inch = 25.4;
+
+// Import wheel hub module
+use <wheel_hub.scad>
 
 // --- Parametric Dimensions ---
 plate_w = 8 * inch;
@@ -151,3 +155,13 @@ translate([0,0, plate_t/2 + 0.5*inch]) // Offset from motor plate
 translate([0,0, plate_t/2 + coupling_len/2])
     main_shaft();
 
+// --- Wheel Hub + Rim + Tire ---
+// Hub mounts on the outboard end of the shaft
+// Shaft extends from coupling through bearings; wheel is past Plate 3
+shaft_start_z = plate_t/2 + coupling_len/2;
+shaft_end_z = shaft_start_z + shaft_length;
+
+// Wheel hub: lug plate face at shaft end + 3" outboard spacing
+translate([0, 0, shaft_end_z + 3 * inch])
+rotate([0, 0, 0])
+bobcat_wheel_assembly(show_hub=true, show_rim=true, show_tire=true);

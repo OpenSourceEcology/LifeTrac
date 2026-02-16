@@ -3752,7 +3752,7 @@ module uwu_assembly_positioned(side="left") {
     motor_to_outer_wall_face = motor_to_inner_wall + PANEL_THICKNESS + inner_to_outer_wall + PANEL_THICKNESS;
     
     // Clearance between outer face of outer wall panel and inside edge of wheel
-    wheel_to_wall_clearance = 50.8;  // 2" (50.8mm) clearance from outer wall to wheel inside edge
+    wheel_to_wall_clearance = 76.2;  // 3" (76.2mm) clearance from outer wall to wheel inside edge
     
     // Shaft extends from motor plate, through both wall panels, past clearance, to wheel center
     shaft_total_length = motor_to_outer_wall_face + wheel_to_wall_clearance + WHEEL_WIDTH/2;
@@ -3788,23 +3788,115 @@ module uwu_assembly_positioned(side="left") {
     translate([0, 0, 25.4])  // Start after coupling
     uwu_main_shaft(shaft_total_length);
     
-    // Wheel at end of shaft
-    // Wheel center is at end of shaft
-    // Using calculated wheel diameter to touch ground
-    translate([0, 0, shaft_total_length + 25.4]) {
-        // Wheel hub
-        color("DarkGray")
-        cylinder(h=WHEEL_WIDTH, d=150, center=true, $fn=48);
-        
-        // Tire (torus shape)
-        color("Black")
-        rotate_extrude($fn=64)
-        translate([uwu_wheel_diam/2 - WHEEL_WIDTH/4, 0, 0])
-        circle(d=WHEEL_WIDTH/2, $fn=32);
-        
-        // Wheel disc
-        color("DarkGray")
-        cylinder(h=WHEEL_WIDTH, d=uwu_wheel_diam - WHEEL_WIDTH/2, center=true, $fn=48);
+    // Wheel at end of shaft - Bobcat-style hub + rim + tire
+    // Hub slides over shaft end, cross-bolted for retention
+    // DOM extends inboard (-Z, over the shaft), lug plate faces outboard (+Z, toward rim)
+    // Shifted 2" outboard then 4" inboard = net 2" inboard
+    translate([0, 0, shaft_total_length + 25.4 + 50.8 - 127.0]) {
+        // === WHEEL HUB (DOM tube + gussets + lug plate) ===
+        // DOM tube (2" OD x 0.25" wall) - extends inboard over shaft
+        // and 1" past the outer face of the bolt plate
+        _dom_total = HUB_DOM_LENGTH + HUB_PLATE_THICKNESS + 25.4;  // through plate + 1"
+        color("DimGray")
+        translate([0, 0, -HUB_DOM_LENGTH])
+        difference() {
+            cylinder(d=HUB_DOM_OD, h=_dom_total, center=false, $fn=48);
+            translate([0, 0, -1])
+            cylinder(d=HUB_DOM_ID, h=_dom_total + 2, center=false, $fn=48);
+            // Cross-drill hole for retention bolt (centered between gussets)
+            translate([0, 0, HUB_CROSS_BOLT_POS])
+            rotate([0, 0, 67.5])
+            rotate([0, 90, 0])
+            cylinder(d=HUB_CROSS_BOLT_DIAM, h=HUB_DOM_OD + 2, center=true, $fn=24);
+        }
+
+        // Cross-bolt visualization
+        color("DarkRed")
+        translate([0, 0, -HUB_DOM_LENGTH + HUB_CROSS_BOLT_POS])
+        rotate([0, 0, 67.5])
+        rotate([0, 90, 0])
+        cylinder(d=HUB_CROSS_BOLT_DIAM * 0.8, h=HUB_DOM_OD * 1.3, center=true, $fn=16);
+
+        // Lug bolt plate (circular, at Z=0 facing +Z toward rim/tire)
+        color("Silver")
+        difference() {
+            cylinder(d=HUB_PLATE_DIAM, h=HUB_PLATE_THICKNESS, $fn=64);
+            translate([0, 0, -1])
+            cylinder(d=HUB_PLATE_CENTER_BORE, h=HUB_PLATE_THICKNESS + 2, $fn=48);
+            for (i = [0 : BOBCAT_LUG_COUNT - 1]) {
+                rotate([0, 0, i * (360 / BOBCAT_LUG_COUNT)])
+                translate([BOBCAT_BOLT_CIRCLE_DIAM / 2, 0, -1])
+                cylinder(d=BOBCAT_LUG_HOLE_DIAM, h=HUB_PLATE_THICKNESS + 2, $fn=24);
+            }
+        }
+
+        // Triangular gusset plates (welded between DOM and lug plate)
+        // Base flush with lug plate face (Z=0), apex extends inboard along DOM (-Z)
+        // Offset 22.5° to sit between the 8 lug bolt holes
+        for (i = [0 : HUB_GUSSET_COUNT - 1]) {
+            rotate([0, 0, HUB_GUSSET_ANGLE_OFFSET + i * (360 / HUB_GUSSET_COUNT)])
+            color("DarkGray")
+            translate([HUB_DOM_OD / 2, 0, 0])
+            rotate([-90, 0, 0])
+            linear_extrude(height=HUB_GUSSET_THICKNESS, center=true)
+            polygon(points=[
+                [0, 0],                                              // Inner at plate face
+                [HUB_PLATE_DIAM / 2 - HUB_DOM_OD / 2 - 5, 0],      // Outer at plate face
+                [0, HUB_GUSSET_HEIGHT]                               // Inner, inboard along DOM
+            ]);
+        }
+
+        // === BOBCAT RIM (P/N 7232567) ===
+        // 16.5" x 9.75", offset 3.70", mounted on hub lug plate
+        // Rim mounts outboard of lug plate (at Z = HUB_PLATE_THICKNESS)
+        translate([0, 0, HUB_PLATE_THICKNESS]) {
+            rim_inboard = -BOBCAT_RIM_OFFSET;
+            rim_outboard = BOBCAT_RIM_WIDTH - BOBCAT_RIM_OFFSET;
+
+            // === SIMPLIFIED RIM (cylinder + hub disc) ===
+            color("DarkOrange", 0.2) {
+                // Barrel
+                translate([0, 0, rim_inboard])
+                difference() {
+                    cylinder(d=BOBCAT_RIM_DIAMETER, h=BOBCAT_RIM_WIDTH, $fn=24);
+                    // Hollow interior
+                    translate([0, 0, -1])
+                    cylinder(d=BOBCAT_RIM_DIAMETER - 20, h=BOBCAT_RIM_WIDTH + 2, $fn=24);
+                }
+
+                // Hub disc - inboard face 3.7" from inboard rim edge
+                difference() {
+                    cylinder(d=BOBCAT_RIM_DIAMETER - 20, h=6.35, center=false, $fn=24);
+                    // Center bore
+                    cylinder(d=152.4, h=20, center=true, $fn=48);
+                    // Lug bolt holes
+                    for (i = [0 : BOBCAT_LUG_COUNT - 1]) {
+                        rotate([0, 0, i * (360 / BOBCAT_LUG_COUNT)])
+                        translate([BOBCAT_BOLT_CIRCLE_DIAM / 2, 0, 0])
+                        cylinder(d=BOBCAT_LUG_HOLE_DIAM, h=20, center=true, $fn=24);
+                    }
+                }
+            }
+
+            // === TIRE ===
+            // OD sized so tire is tangent to ground (Z=0)
+            // Wheel center is at UWU_SHAFT_Z, so tire radius = UWU_SHAFT_Z
+            tire_center_z = (rim_inboard + rim_outboard) / 2;
+            color("Black", 0.2)
+            translate([0, 0, tire_center_z])
+            rotate_extrude($fn=24) {
+                hull() {
+                    translate([uwu_wheel_diam/2 - 10, BOBCAT_TIRE_WIDTH/2 - 10])
+                    circle(r=10, $fn=24);
+                    translate([uwu_wheel_diam/2 - 10, -BOBCAT_TIRE_WIDTH/2 + 10])
+                    circle(r=10, $fn=24);
+                    translate([BOBCAT_RIM_DIAMETER/2 + 5, BOBCAT_TIRE_WIDTH/2 - 10])
+                    circle(r=5, $fn=24);
+                    translate([BOBCAT_RIM_DIAMETER/2 + 5, -BOBCAT_TIRE_WIDTH/2 + 10])
+                    circle(r=5, $fn=24);
+                }
+            }
+        }
     }
 }
 

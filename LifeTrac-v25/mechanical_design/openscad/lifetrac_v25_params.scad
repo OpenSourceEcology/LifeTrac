@@ -1202,11 +1202,66 @@ UWU_SHAFT_AXIS_HEIGHT_ON_PLATE = 127.0;  // 5 inches = half of 10" motor plate
 // This gap is centered on the wheel axis Y position
 // UWU shaft axis Y = wheel axis Y (_FRONT_WHEEL_AXIS_Y or _REAR_WHEEL_AXIS_Y)
 
+// =============================================================================
+// BOBCAT WHEEL/RIM PARAMETERS (P/N 7232567)
+// =============================================================================
+// Standard Bobcat skid-steer wheel rim - 16.5 x 9.75
+// Fits 12-16.5 tires (most Bobcat S-series loaders)
+
+// Rim dimensions
+BOBCAT_RIM_DIAMETER = 419.1;      // 16.5 inches - bead seat diameter
+BOBCAT_RIM_WIDTH = 254.0;         // 10.0 inches
+BOBCAT_RIM_OFFSET = 93.98;        // 3.70 inches - backspacing offset
+
+// Bolt pattern
+BOBCAT_LUG_COUNT = 8;             // 8 bolt holes
+BOBCAT_BOLT_CIRCLE_DIAM = 203.2;  // 8.00 inches BCD
+BOBCAT_LUG_HOLE_DIAM = 15.875;    // 5/8" holes (for 1/2"-20 lug bolts with clearance)
+BOBCAT_CENTER_BORE = 76.2;        // 3.00 inches center bore
+BOBCAT_LUG_SPACING = 76.2;        // 3.00 inches between adjacent holes
+
+// Tire dimensions (12-16.5 skid steer tire)
+BOBCAT_TIRE_OD = 851.0;           // ~33.5 inches overall diameter
+BOBCAT_TIRE_WIDTH = 254.0;        // 10.0 inches overall width
+BOBCAT_TIRE_SECTION_HEIGHT = (BOBCAT_TIRE_OD - BOBCAT_RIM_DIAMETER) / 2;  // sidewall height
+
+// =============================================================================
+// UWU WHEEL HUB PARAMETERS
+// =============================================================================
+// Simplified fabricated wheel hub: DOM tube + triangular gussets + lug plate
+// Transfers torque from UWU shaft to Bobcat wheel via lug bolts
+
+// DOM tube (Drawn Over Mandrel) - slides over shaft
+HUB_DOM_OD = 50.8;               // 2.00 inches OD
+HUB_DOM_WALL = 6.35;             // 0.25 inch wall thickness
+HUB_DOM_ID = UWU_SHAFT_DIAM + 0.79375;  // Shaft OD + 1/32" clearance
+HUB_DOM_LENGTH = 101.6;          // 4.00 inches long
+
+// Cross-drill retention bolt (through DOM and shaft)
+HUB_CROSS_BOLT_DIAM = 12.7;      // 1/2 inch cross bolt
+HUB_CROSS_BOLT_POS = HUB_DOM_LENGTH / 2;  // Centered on DOM length
+
+// Lug bolt plate (circular)
+HUB_PLATE_DIAM = 228.6;          // 9.00 inches - slightly larger than BCD
+HUB_PLATE_THICKNESS = 12.7;      // 1/2 inch plate steel
+HUB_PLATE_CENTER_BORE = HUB_DOM_OD + 1.5875;  // DOM OD + 1/16" clearance
+
+// Triangular gusset plates
+HUB_GUSSET_COUNT = 4;            // Number of gusset triangles
+HUB_GUSSET_THICKNESS = 6.35;     // 1/4 inch plate steel
+// Gussets rotated 22.5° so they sit between the 8 lug bolt holes
+HUB_GUSSET_ANGLE_OFFSET = 22.5;
+HUB_GUSSET_HEIGHT = HUB_DOM_LENGTH * 0.85;  // Gusset height along DOM axis
+
 echo("=== UWU PARAMETERS ===");
 echo("UWU Shaft Diameter:", UWU_SHAFT_DIAM, "mm");
 echo("UWU Bearing BCD:", UWU_BOLT_CIRCLE_DIAM, "mm");
 echo("UWU Motor BCD:", UWU_MOTOR_BCD, "mm");
 echo("UWU Shaft Axis Height (on motor plate):", UWU_SHAFT_AXIS_HEIGHT_ON_PLATE, "mm");
+echo("=== BOBCAT WHEEL ===");
+echo("Rim:", BOBCAT_RIM_DIAMETER, "mm dia x", BOBCAT_RIM_WIDTH, "mm wide");
+echo("BCD:", BOBCAT_BOLT_CIRCLE_DIAM, "mm,", BOBCAT_LUG_COUNT, "lugs");
+echo("Tire OD:", BOBCAT_TIRE_OD, "mm");
 
 // =============================================================================
 // JIG PARAMETERS & NEW ARM PARAMETERS

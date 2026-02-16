@@ -1,9 +1,93 @@
 // wheels.scad
 // Standardized wheel and axle assemblies based on OSE designs
 // Part of LifeTrac v25 OpenSCAD design
+// Includes Bobcat-compatible skid steer wheel (P/N 7232567)
 
 // Global parameters
 $fn = 64;
+
+// Bobcat wheel defaults (P/N 7232567, 12-16.5 tire on 16.5x10 rim)
+_bc_rim_diam = 419.1;       // 16.5"
+_bc_rim_width = 254.0;      // 10.0"
+_bc_rim_offset = 93.98;     // 3.70"
+_bc_bcd = 203.2;            // 8.00" bolt circle
+_bc_lug_count = 8;
+_bc_lug_hole = 15.875;      // 5/8"
+_bc_center_bore = 152.4;    // 6.00"
+_bc_tire_od = 851.0;        // ~33.5"
+_bc_tire_width = 254.0;     // 10.0"
+
+/**
+ * Creates a Bobcat-style skid steer wheel assembly
+ * Based on P/N 7232567 rim with 12-16.5 tire
+ * @param rim_diameter Rim bead seat diameter (default 16.5")
+ * @param rim_width Rim width (default 9.75")
+ * @param rim_offset Rim backspacing offset (default 3.70")
+ * @param tire_od Overall tire diameter (default ~33.5")
+ * @param tire_width Overall tire width (default ~12.5")
+ * @param show_tire Show tire if true
+ */
+module bobcat_wheel(
+    rim_diameter = _bc_rim_diam,
+    rim_width    = _bc_rim_width,
+    rim_offset   = _bc_rim_offset,
+    tire_od      = _bc_tire_od,
+    tire_width   = _bc_tire_width,
+    bcd          = _bc_bcd,
+    lug_count    = _bc_lug_count,
+    lug_hole     = _bc_lug_hole,
+    center_bore  = _bc_center_bore,
+    show_tire    = true
+) {
+    section_height = (tire_od - rim_diameter) / 2;
+    rim_inboard = -rim_offset;
+    rim_outboard = rim_width - rim_offset;
+
+    // Rim barrel (simplified cylinder)
+    color("DarkOrange", 0.2)
+    rotate([90, 0, 0]) {
+        // Barrel
+        translate([0, 0, rim_inboard])
+        difference() {
+            cylinder(d=rim_diameter, h=rim_width, $fn=24);
+            translate([0, 0, -1])
+            cylinder(d=rim_diameter - 20, h=rim_width + 2, $fn=24);
+        }
+
+        // Hub disc - inboard face 3.7" from inboard rim edge
+        difference() {
+            cylinder(d=rim_diameter - 20, h=6.35, center=false, $fn=24);
+            // Center bore
+            cylinder(d=center_bore, h=20, center=true, $fn=48);
+            // Lug bolt holes
+            for (i = [0 : lug_count - 1])
+                rotate([0, 0, i * 360 / lug_count])
+                translate([bcd / 2, 0, 0])
+                cylinder(d=lug_hole, h=20, center=true, $fn=24);
+        }
+    }
+
+    // Tire
+    if (show_tire) {
+        tire_center_z = (rim_inboard + rim_outboard) / 2;
+        color("Black", 0.2)
+        rotate([90, 0, 0])
+        translate([0, 0, tire_center_z])
+        rotate_extrude($fn=24) {
+            // Cylindrical tire with slight edge rounding
+            hull() {
+                translate([tire_od/2 - 10, tire_width/2 - 10])
+                circle(r=10, $fn=24);
+                translate([tire_od/2 - 10, -tire_width/2 + 10])
+                circle(r=10, $fn=24);
+                translate([rim_diameter/2 + 5, tire_width/2 - 10])
+                circle(r=5, $fn=24);
+                translate([rim_diameter/2 + 5, -tire_width/2 + 10])
+                circle(r=5, $fn=24);
+            }
+        }
+    }
+}
 
 /**
  * Creates a wheel assembly (simplified representation)
@@ -206,6 +290,10 @@ module complete_wheel_assembly(wheel_diameter=500, axle_length=600,
 if ($preview) {
     // Basic wheel
     wheel(500, 200, 150, true);
+    
+    // Bobcat skid steer wheel (P/N 7232567 with 12-16.5 tire)
+    translate([-600, 0, _bc_tire_od/2])
+    bobcat_wheel();
     
     // Modular wheel unit
     translate([600, 0, 0])
