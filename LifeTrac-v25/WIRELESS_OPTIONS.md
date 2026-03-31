@@ -71,7 +71,7 @@ Chirp Spread Spectrum modulation (Semtech SX127x/SX126x chips).
 
 - **LoS range**: 2–15 km (urban: ~2 km; rural: up to 15+ km)
 - **NLoS range**: 1–5 km through foliage/terrain
-- **Latency**: Highly variable — from ~100 ms (highest spreading factor, narrowest bandwidth) to ~20 ms (lowest SF, widest BW)
+- **Latency**: Highly variable — from ~20 ms (lowest SF, widest bandwidth) to over 2 s (highest spreading factor, narrowest bandwidth)
   - A typical LoRa packet at SF7, BW 500 kHz, CR 4/5 takes about 15–25 ms air time + processing = ~50–100 ms round trip
   - At SF12, BW 125 kHz, a packet can take over 2 seconds — **not suitable for real-time control**
 - **Data rate**: 0.3–50 kbps depending on spreading factor (SF) and bandwidth (BW)
@@ -162,10 +162,18 @@ For longer-range outdoor operation beyond WiFi range, the recommended upgrade is
 
 ExpressLRS receivers output **CRSF** (Crossfire Serial) or **SBUS** protocol:
 
+**CRSF (recommended):**
 ```
-ELRS RX CRSF TX ──► Arduino Opta Serial RX (parse CRSF @ 420000 baud)
-ELRS RX SBUS TX ──► Arduino Opta Serial RX (parse SBUS @ 100000 baud, inverted)
+ELRS RX CRSF TX ──► Arduino Opta Serial RX  (420000 baud, 8N1, non-inverted)
 ```
+
+**SBUS:**
+```
+ELRS RX SBUS TX ──► Hardware Inverter ──► Arduino Opta Serial RX
+                    (100000 baud, 8E2 — even parity, 2 stop bits, inverted signal)
+```
+
+> ⚠️ **SBUS signal is logic-inverted.** Most MCUs (including Arduino Opta) cannot invert UART RX in hardware and require an external single-transistor inverter (e.g., NPN transistor or 74HC04 gate) between the receiver and the MCU RX pin. Some ESP32 variants support software UART inversion (`SERIAL_8E2` + `invert` flag). CRSF does not require inversion and is the simpler choice.
 
 Libraries: `CRSFforArduino`, `SBUS` (bolderflight)
 
@@ -187,6 +195,37 @@ LoRa.setSpreadingFactor(7);   // SF7 = fastest / shortest range
 LoRa.setSignalBandwidth(500E3); // 500 kHz = faster packets
 LoRa.setTxPower(20);           // 20 dBm = ~100 mW
 ```
+
+---
+
+## Hardware Purchase Links
+
+The table below lists example purchasing options for the recommended and commonly discussed hardware. Prices are approximate and may vary by region and retailer. Always verify the frequency band (e.g., 915 MHz for Americas, 868 MHz for Europe) before ordering.
+
+| Technology | Component | Example Product | Store Link | Approx. Price |
+|---|---|---|---|---|
+| **ELRS 900 MHz** | Transmitter module | Radiomaster Ranger Micro 2W (ELRS 900 MHz) | [Radiomaster Store](https://www.radiomasterrc.com/products/ranger-micro-elrs-module) | ~$35 |
+| **ELRS 900 MHz** | Transmitter module | BetaFPV ELRS Micro TX Module 1W 900 MHz | [BetaFPV Store](https://betafpv.com/products/elrs-micro-tx-module-1w) | ~$30 |
+| **ELRS 900 MHz** | Receiver | Radiomaster RP3 Nano ELRS Receiver | [Radiomaster Store](https://www.radiomasterrc.com/products/rp3-expresslrs-nano-receiver) | ~$12 |
+| **ELRS 900 MHz** | Receiver | BetaFPV SuperP 900 MHz Receiver | [BetaFPV Store](https://betafpv.com/products/superp-nano-elrs-receiver) | ~$10 |
+| **ELRS 2.4 GHz** | Transmitter module | Radiomaster Micro TX Module ELRS 2.4 GHz | [Radiomaster Store](https://www.radiomasterrc.com/products/micro-elrs-module-2-4ghz) | ~$25 |
+| **ELRS 2.4 GHz** | Receiver | BetaFPV SuperP 2.4 GHz Nano Receiver | [BetaFPV Store](https://betafpv.com/products/superp-nano-elrs-receiver) | ~$8 |
+| **RC Transmitter** | Full radio (ELRS compatible) | Radiomaster TX16S Mark II (Hall gimbals) | [Radiomaster Store](https://www.radiomasterrc.com/products/tx16s-mark-ii-radio-controller) | ~$120–$190 |
+| **RC Transmitter** | Full radio (ELRS compatible) | Radiomaster Boxer (compact, ELRS 2.4 GHz) | [Radiomaster Store](https://www.radiomasterrc.com/products/boxer-radio-controller) | ~$100–$140 |
+| **RC 900 MHz (traditional)** | Long-range module | FrSky R9M 2019 900 MHz TX Module | [GetFPV](https://www.getfpv.com/frsky-r9m-2019-long-range-900mhz-tx-module.html) | ~$50 |
+| **RC 900 MHz (traditional)** | Receiver | FrSky R9 Mini 900 MHz Receiver | [GetFPV](https://www.getfpv.com/frsky-r9-mini-long-range-receiver.html) | ~$25 |
+| **LoRa Module** | SX1276-based dev board | LilyGO LoRa32 V2.1 (ESP32 + SX1276, 915 MHz) | [Amazon](https://www.amazon.com/s?k=LilyGO+LoRa32+V2.1+915MHz) | ~$15–$25 |
+| **LoRa Module** | Bare SX1276 breakout | HopeRF RFM95W 915 MHz LoRa Transceiver | [Adafruit](https://www.adafruit.com/product/3072) | ~$20 |
+| **LoRa Module** | Bare SX1276 breakout | Ebyte E32-900T20D (UART interface) | [AliExpress](https://www.aliexpress.com/w/wholesale-ebyte-e32-900t20d.html) | ~$8–$12 |
+| **Meshtastic** | T-Beam (GPS + LoRa) | LilyGO T-Beam V1.2 915 MHz | [Amazon](https://www.amazon.com/s?k=LilyGO+T-Beam+V1.2+915MHz) | ~$30–$45 |
+| **Meshtastic** | Heltec LoRa 32 | Heltec WiFi LoRa 32 V3 (915 MHz, OLED) | [Heltec Store](https://heltec.org/project/wifi-lora-32-v3/) | ~$20–$30 |
+| **Meshtastic** | RAK WisBlock | RAK4631 WisBlock Core (nRF52840 + SX1262) | [RAK Store](https://store.rakwireless.com/products/rak4631-lpwan-node) | ~$25–$40 |
+| **WiFi / BLE** | ESP32 module | Espressif ESP32-DevKitC (built-in WiFi + BLE) | [Adafruit](https://www.adafruit.com/product/3269) / [Amazon](https://www.amazon.com/s?k=ESP32+DevKitC) | ~$8–$15 |
+| **WiFi Long-Range (P2P)** | Ubiquiti airMAX | Ubiquiti NanoStation M5 (5.8 GHz) | [Ubiquiti Store](https://store.ui.com) / [Amazon](https://www.amazon.com/s?k=Ubiquiti+NanoStation+M5) | ~$90–$130 each |
+| **Cellular LTE** | LTE modem (IoT) | Waveshare SIM7600G-H 4G HAT (Pi/Arduino) | [Amazon](https://www.amazon.com/s?k=Waveshare+SIM7600G-H+4G) | ~$45–$70 |
+| **Cellular LTE** | LTE modem (ESP32) | SIM7080G-based module for ESP32 | [Adafruit](https://www.adafruit.com/product/5795) | ~$50 |
+
+> **Note:** These are example links to illustrate typical products and price points. Always check availability and regional frequency compliance before purchasing. AliExpress links lead to search results — compare seller ratings before buying.
 
 ---
 
