@@ -220,6 +220,7 @@ The table below lists example purchasing options for the recommended and commonl
 | **Meshtastic** | T-Beam (GPS + LoRa) | LilyGO T-Beam V1.2 915 MHz | [Amazon](https://www.amazon.com/s?k=LilyGO+T-Beam+V1.2+915MHz) | ~$30–$45 |
 | **Meshtastic** | Heltec LoRa 32 | Heltec WiFi LoRa 32 V3 (915 MHz, OLED) | [Heltec Store](https://heltec.org/project/wifi-lora-32-v3/) | ~$20–$30 |
 | **Meshtastic** | RAK WisBlock | RAK4631 WisBlock Core (nRF52840 + SX1262) | [RAK Store](https://store.rakwireless.com/products/rak4631-lpwan-node) | ~$25–$40 |
+| **Digi XBee Pro 900HP** | Serial RF module (pair needed) | Digi XBee Pro 900HP (sub-GHz FHSS, 200 mW) | [Digi Store](https://www.digi.com/products/embedded-systems/digi-xbee/rf-modules/sub-1-ghz-rf-modules/xbee-pro-900hp) | ~$50–$80 each |
 | **WiFi / BLE** | ESP32 module | Espressif ESP32-DevKitC (built-in WiFi + BLE) | [Adafruit](https://www.adafruit.com/product/3269) / [Amazon](https://www.amazon.com/s?k=ESP32+DevKitC) | ~$8–$15 |
 | **WiFi Long-Range (P2P)** | Ubiquiti airMAX | Ubiquiti NanoStation M5 (5.8 GHz) | [Ubiquiti Store](https://store.ui.com) / [Amazon](https://www.amazon.com/s?k=Ubiquiti+NanoStation+M5) | ~$90–$130 each |
 | **Cellular LTE** | LTE modem (IoT) | Waveshare SIM7600G-H 4G HAT (Pi/Arduino) | [Amazon](https://www.amazon.com/s?k=Waveshare+SIM7600G-H+4G) | ~$45–$70 |
