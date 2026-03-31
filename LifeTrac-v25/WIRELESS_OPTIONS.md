@@ -13,26 +13,27 @@ This document compares wireless communication technologies suitable for remote c
 
 ## Comparison Table
 
-| Technology | LoS Range | NLoS Range | Typical Latency | Data Rate | Frequency | Power Consumption | Cost (approx.) | Notes |
-|---|---|---|---|---|---|---|---|---|
-| **Traditional RC (2.4 GHz FHSS)** | 1–2 km | 100–300 m | 10–22 ms | ~1 Mbps | 2.4 GHz | Low | $30–$200 (TX) | FHSS reduces interference; best-in-class latency for RC |
-| **Traditional RC (900 MHz)** | 2–5 km | 500 m–1.5 km | 15–30 ms | ~100 kbps | 900 MHz | Low | $50–$300 (TX) | Better wall/obstacle penetration than 2.4 GHz |
-| **Bluetooth Low Energy (BLE)** | 30–100 m | 10–30 m | 20–50 ms | 1–2 Mbps | 2.4 GHz | Very Low | $5–$20 (module) | Already in LifeTrac v25; short range only |
-| **WiFi 2.4 GHz (802.11n)** | 100–300 m | 30–100 m | 50–200 ms | 150–600 Mbps | 2.4 GHz | Medium | $5–$30 (module) | Already in LifeTrac v25 via MQTT; latency variable |
-| **WiFi 5 GHz (802.11ac)** | 50–150 m | 15–50 m | 10–50 ms | 450 Mbps–1.3 Gbps | 5 GHz | Medium | $10–$40 (module) | Shorter range but lower interference than 2.4 GHz |
-| **LoRa (Long Range)** | 2–15 km | 1–5 km | 100–500 ms | 0.3–50 kbps | 915 MHz / 868 MHz / 433 MHz | Very Low | $5–$20 (module) | Very long range; too slow for real-time joystick control |
-| **Meshtastic (LoRa Mesh)** | 1–10 km | 0.5–3 km | 200 ms–2+ s | 0.3–27 kbps | 915 / 868 / 433 MHz | Very Low | $30–$80 (device) | Mesh adds routing delay; better suited to telemetry than control |
-| **LoRa + KISS Protocol (custom firmware)** | 2–15 km | 1–5 km | 50–150 ms | 5–27 kbps | 915 / 868 MHz | Very Low | $10–$30 (module) | Bypasses LoRaWAN overhead; lowest LoRa latency option |
-| **Cellular (4G LTE)** | Unlimited (network coverage) | Unlimited | 50–150 ms | 1–100 Mbps | 700–2600 MHz | High | $20–$60/month (SIM) | Depends on carrier coverage; variable latency; ongoing cost |
-| **5G Cellular** | Unlimited (network coverage) | Unlimited | 1–20 ms | Up to 10 Gbps | Sub-6 GHz / mmWave | High | $30–$100/month (SIM) | Ultra-low latency; limited rural coverage |
-| **ELRS (ExpressLRS, 2.4 GHz)** | 5–10 km | 500 m–2 km | 1–8 ms | ~200 kbps (control) | 2.4 GHz | Low | $20–$80 (TX+RX) | Open-source RC protocol; extremely low latency |
-| **ELRS (ExpressLRS, 900 MHz)** | 20–40 km | 2–10 km | 4–20 ms | ~100 kbps (control) | 868 / 915 MHz | Low | $25–$100 (TX+RX) | Best combination of range and latency; highly recommended |
-| **FrSky R9 / OpenTX (900 MHz)** | 5–15 km | 1–5 km | 10–30 ms | ~100 kbps | 915 MHz | Low | $50–$150 (TX+RX) | Mature RC ecosystem; solid long-range option |
-| **Digi XBee Pro (900 MHz)** | 3–10 km | 1–3 km | 15–50 ms | 156 kbps | 900 MHz | Low–Medium | $50–$150 (module) | Industrial-grade serial link; configurable RF parameters |
-| **Ubiquiti airMAX (5.8 GHz)** | 5–15 km | Limited | 2–10 ms | 150+ Mbps | 5.8 GHz | Medium–High | $100–$400 (pair) | Directional point-to-point; very high throughput; requires alignment |
+| Technology | LoS Range | NLoS Range | Typical Latency | Data Rate | Frequency | Power Consumption | Cost (approx.) | Open Source | Notes |
+|---|---|---|---|---|---|---|---|---|---|
+| **Traditional RC (2.4 GHz FHSS)** | 1–2 km | 100–300 m | 10–22 ms | ~1 Mbps | 2.4 GHz | Low | $30–$200 (TX) | 🔶 Firmware (OpenTX/EdgeTX); HW closed | FHSS reduces interference; best-in-class latency for RC |
+| **Traditional RC (900 MHz)** | 2–5 km | 500 m–1.5 km | 15–30 ms | ~100 kbps | 900 MHz | Low | $50–$300 (TX) | 🔶 Firmware (OpenTX/EdgeTX); HW closed | Better wall/obstacle penetration than 2.4 GHz |
+| **Bluetooth Low Energy (BLE)** | 30–100 m | 10–30 m | 20–50 ms | 1–2 Mbps | 2.4 GHz | Very Low | $5–$20 (module) | 🔶 Open standard; HW varies | Already in LifeTrac v25; short range only |
+| **WiFi 2.4 GHz (802.11n)** | 100–300 m | 30–100 m | 50–200 ms | 150–600 Mbps | 2.4 GHz | Medium | $5–$30 (module) | 🔶 Open standard; HW varies | Already in LifeTrac v25 via MQTT; latency variable |
+| **WiFi 5 GHz (802.11ac)** | 50–150 m | 15–50 m | 10–50 ms | 450 Mbps–1.3 Gbps | 5 GHz | Medium | $10–$40 (module) | 🔶 Open standard; HW varies | Shorter range but lower interference than 2.4 GHz |
+| **LoRa (Long Range)** | 2–15 km | 1–5 km | 100–500 ms | 0.3–50 kbps | 915 MHz / 868 MHz / 433 MHz | Very Low | $5–$20 (module) | 🔶 Open libraries; HW closed (Semtech) | Very long range; too slow for real-time joystick control |
+| **Meshtastic (LoRa Mesh)** | 1–10 km | 0.5–3 km | 200 ms–2+ s | 0.3–27 kbps | 915 / 868 / 433 MHz | Very Low | $30–$80 (device) | ✅ Firmware (Apache 2.0) + open HW designs | Mesh adds routing delay; better suited to telemetry than control |
+| **LoRa + KISS Protocol (custom firmware)** | 2–15 km | 1–5 km | 50–150 ms | 5–27 kbps | 915 / 868 MHz | Very Low | $10–$30 (module) | 🔶 Firmware open; HW closed (Semtech) | Bypasses LoRaWAN overhead; lowest LoRa latency option |
+| **Cellular (4G LTE)** | Unlimited (network coverage) | Unlimited | 50–150 ms | 1–100 Mbps | 700–2600 MHz | High | $20–$60/month (SIM) | ❌ Proprietary network | Depends on carrier coverage; variable latency; ongoing cost |
+| **5G Cellular** | Unlimited (network coverage) | Unlimited | 1–20 ms | Up to 10 Gbps | Sub-6 GHz / mmWave | High | $30–$100/month (SIM) | ❌ Proprietary network | Ultra-low latency; limited rural coverage |
+| **ELRS (ExpressLRS, 2.4 GHz)** | 5–10 km | 500 m–2 km | 1–8 ms | ~200 kbps (control) | 2.4 GHz | Low | $20–$80 (TX+RX) | ✅ Firmware + HW designs (GPL/CC) | Open-source RC protocol; extremely low latency |
+| **ELRS (ExpressLRS, 900 MHz)** | 20–40 km | 2–10 km | 4–20 ms | ~100 kbps (control) | 868 / 915 MHz | Low | $25–$100 (TX+RX) | ✅ Firmware + HW designs (GPL/CC) | Best combination of range and latency; highly recommended |
+| **FrSky R9 / OpenTX (900 MHz)** | 5–15 km | 1–5 km | 10–30 ms | ~100 kbps | 915 MHz | Low | $50–$150 (TX+RX) | 🔶 Firmware (OpenTX/EdgeTX); HW closed | Mature RC ecosystem; solid long-range option |
+| **Digi XBee Pro (900 MHz)** | 3–10 km | 1–3 km | 15–50 ms | 156 kbps | 900 MHz | Low–Medium | $50–$150 (module) | ❌ Proprietary | Industrial-grade serial link; configurable RF parameters |
+| **Ubiquiti airMAX (5.8 GHz)** | 5–15 km | Limited | 2–10 ms | 150+ Mbps | 5.8 GHz | Medium–High | $100–$400 (pair) | ❌ Proprietary | Directional point-to-point; very high throughput; requires alignment |
 
 > **LoS** = Line of Sight (clear, unobstructed path between antennas)
 > **NLoS** = Non-Line of Sight (obstructions such as vegetation, terrain, buildings)
+> **Open Source column**: ✅ = fully open (firmware + hardware designs) · 🔶 = partially open (open firmware/standard, closed hardware) · ❌ = proprietary/closed
 
 ---
 
@@ -127,19 +128,19 @@ Meshtastic is open-source firmware for LoRa hardware (T-Beam, Heltec, LilyGO T3S
 
 ### Primary Control Link (Best Options)
 
-| Priority | Technology | Rationale |
-|---|---|---|
-| **1st choice** | **ExpressLRS 900 MHz** | Best combination of very long range (5–20+ km LoS), ultra-low latency (4–20 ms), open-source, purpose-built for RC control, mature failsafe |
-| **2nd choice** | **Traditional RC 900 MHz** (FrSky R9 / OpenTX) | Long proven track record, good range (5–15 km LoS), 10–30 ms latency, abundant ecosystem, built-in failsafe |
-| **3rd choice** | **Traditional RC 2.4 GHz** (e.g., Radiomaster + ELRS or standard FHSS) | Shorter range (1–2 km LoS) but very low latency (10–22 ms); good for close-in operation |
+| Priority | Technology | Open Source | Rationale |
+|---|---|---|---|
+| **1st choice** | **ExpressLRS 900 MHz** | ✅ Firmware + HW | Best combination of very long range (5–20+ km LoS), ultra-low latency (4–20 ms), open-source, purpose-built for RC control, mature failsafe |
+| **2nd choice** | **Traditional RC 900 MHz** (FrSky R9 / OpenTX) | 🔶 Firmware only | Long proven track record, good range (5–15 km LoS), 10–30 ms latency, abundant ecosystem, built-in failsafe |
+| **3rd choice** | **Traditional RC 2.4 GHz** (e.g., Radiomaster + ELRS or standard FHSS) | 🔶 Firmware only | Shorter range (1–2 km LoS) but very low latency (10–22 ms); good for close-in operation |
 
 ### Secondary / Telemetry Link (Best Options)
 
-| Priority | Technology | Rationale |
-|---|---|---|
-| **1st choice** | **LoRa 900 MHz (custom firmware)** | Long range, low power, good for GPS + sensor telemetry at low update rates |
-| **2nd choice** | **Meshtastic** | Adds mesh networking to LoRa; ideal for multi-unit farms or monitoring over wide areas |
-| **3rd choice** | **Cellular LTE** | For remote status monitoring when no local infrastructure is available |
+| Priority | Technology | Open Source | Rationale |
+|---|---|---|---|
+| **1st choice** | **LoRa 900 MHz (custom firmware)** | 🔶 Firmware open; HW closed | Long range, low power, good for GPS + sensor telemetry at low update rates |
+| **2nd choice** | **Meshtastic** | ✅ Firmware + HW designs | Adds mesh networking to LoRa; ideal for multi-unit farms or monitoring over wide areas |
+| **3rd choice** | **Cellular LTE** | ❌ Proprietary network | For remote status monitoring when no local infrastructure is available |
 
 ### Current Implementation (LifeTrac v25)
 
