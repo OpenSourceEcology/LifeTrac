@@ -9,6 +9,17 @@ This document compares wireless communication technologies suitable for remote c
 - **Reliability** — consistent signal in outdoor, obstructed environments
 - **Safety** — failsafe behavior on signal loss
 
+## Contents
+
+1. [Comparison Table](#comparison-table)
+2. [Technology Deep-Dives](#technology-deep-dives)
+3. [Summary Recommendation for LifeTrac](#summary-recommendation-for-lifetrac)
+4. [Integration Notes](#integration-notes) — ELRS, LoRa, failsafe, RSSI/LQ, ROS2
+5. [Antenna Selection](#antenna-selection)
+6. [Regulatory & Safety Considerations](#regulatory--safety-considerations)
+7. [Hardware Purchase Links](#hardware-purchase-links)
+8. [References](#references)
+
 ---
 
 ## Comparison Table
@@ -154,6 +165,8 @@ For longer-range outdoor operation beyond WiFi range, the recommended upgrade is
 1. **Add an ELRS 900 MHz receiver** to the Arduino Opta or ESP32 — outputs SBUS/CRSF which can be parsed directly
 2. **Keep WiFi/MQTT** for camera streaming and web dashboard
 3. **Add LoRa module** for long-range telemetry (GPS, status) as a secondary channel
+4. **Configure and bench-test failsafe** ([see below](#failsafe-configuration)) — this is mandatory before any field operation
+5. **Verify regulatory compliance** ([see below](#regulatory--safety-considerations)) for your transmit power and antenna combination
 
 ---
 
@@ -196,6 +209,145 @@ LoRa.setSpreadingFactor(7);   // SF7 = fastest / shortest range
 LoRa.setSignalBandwidth(500E3); // 500 kHz = faster packets
 LoRa.setTxPower(20);           // 20 dBm = ~100 mW
 ```
+
+### Failsafe Configuration
+
+A correctly configured failsafe is the single most important safety feature for any remote-controlled tractor. On signal loss the tractor must come to a controlled stop — never continue with the last commanded motion.
+
+**ELRS / CRSF failsafe (recommended setup):**
+
+1. On the transmitter, open the ELRS Lua script and set **Telemetry Ratio** to `1:32` or higher so the link reports back uplink/downlink quality.
+2. In the model setup, configure failsafe mode to **"No Pulses"** (CRSF stops sending channel frames entirely) rather than "Hold" — this lets the receiver/MCU detect a lost link unambiguously.
+3. On the receiver side, ensure failsafe is bound: bind the receiver, then with the TX on, hold the failsafe button on the RX (or use the Lua script "Set failsafe" option) with the throttle/sticks at the desired safe position (all-stop for LifeTrac).
+
+**Detecting failsafe on the Arduino / ESP32 side:**
+
+```cpp
+// CRSF failsafe detection — frames stop arriving when link is lost
+unsigned long lastCrsfFrameMs = 0;
+const unsigned long CRSF_TIMEOUT_MS = 250;  // 5x the slowest 50 Hz frame
+
+void loop() {
+  if (crsf.update()) {                       // CRSFforArduino update
+    lastCrsfFrameMs = millis();
+  }
+  if (millis() - lastCrsfFrameMs > CRSF_TIMEOUT_MS) {
+    enterSafeStop();                         // open all valves, neutral throttle
+  }
+}
+```
+
+**SBUS failsafe:** SBUS frames include a `failsafe` flag bit and a `frame_lost` bit — check both via the bolderflight SBUS library (`sbus_data.failsafe`, `sbus_data.lost_frame`) and trigger `enterSafeStop()` if either is true or if no frame has arrived for >100 ms.
+
+**XBee / LoRa / generic serial:** No native failsafe — implement a software watchdog that calls `enterSafeStop()` if no valid command packet is received within a timeout (typical: 200–500 ms).
+
+> ⚠️ **Always bench-test failsafe** by powering off the transmitter while the tractor is jacked up off the ground (or with hydraulics depressurized) and confirm the safe-stop behaviour before any field use.
+
+### Link Quality Monitoring (RSSI / LQ)
+
+Knowing the strength and quality of the radio link in real time lets the operator stop driving before the link drops out and is required for any safety-rated deployment.
+
+**ELRS over CRSF** exposes link telemetry on every uplink frame:
+
+| Field | Meaning | Healthy range |
+|---|---|---|
+| `uplink_RSSI_1` / `_2` | Receiver RSSI on each antenna (dBm) | > −95 dBm |
+| `uplink_Link_quality` (LQ) | % of frames received successfully (0–100) | > 70 |
+| `uplink_SNR` | Signal-to-noise ratio (dB) | > 0 dB |
+| `downlink_RSSI` | TX-side RSSI (dBm) | > −95 dBm |
+
+`CRSFforArduino` exposes these via `crsf.getLinkStatistics()`. Publish them to the LifeTrac MQTT/web dashboard so the operator sees a live RSSI/LQ readout.
+
+**LoRa modules** expose RSSI and SNR per packet:
+
+```cpp
+int rssi = LoRa.packetRssi();   // dBm, e.g. -85
+float snr = LoRa.packetSnr();   // dB, e.g. 7.5
+```
+
+A sensible operator warning threshold is **LQ < 70%** or **RSSI < −100 dBm** — log a warning and bring the tractor to a stop on the operator's command before the link is fully lost.
+
+### ROS2 Integration (CRSF Channels → ROS2 Topic)
+
+For builds that already run ROS2 on a companion computer (Raspberry Pi, Jetson), CRSF channel data can be republished as a `sensor_msgs/Joy` message so any ROS2 node can subscribe to operator inputs:
+
+```python
+# crsf_to_joy_node.py — minimal ROS2 (rclpy) bridge
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Joy
+import serial, struct
+
+class CrsfToJoy(Node):
+    def __init__(self):
+        super().__init__('crsf_to_joy')
+        self.pub = self.create_publisher(Joy, 'joy', 10)
+        self.ser = serial.Serial('/dev/ttyUSB0', 420000, timeout=0.01)
+        self.create_timer(0.02, self.tick)  # 50 Hz
+
+    def tick(self):
+        # Parse one CRSF RC_CHANNELS_PACKED frame (use a library such as
+        # `crsf-parser` in production for full framing/CRC handling)
+        channels = read_crsf_channels(self.ser)   # returns 16 ints, 172..1811
+        if channels is None:
+            return
+        msg = Joy()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.axes = [(c - 992) / 820.0 for c in channels[:8]]   # -1.0..+1.0
+        msg.buttons = [1 if c > 1500 else 0 for c in channels[8:16]]
+        self.pub.publish(msg)
+
+def main():
+    rclpy.init(); rclpy.spin(CrsfToJoy()); rclpy.shutdown()
+```
+
+Recommended library: [`crsf-parser`](https://pypi.org/project/crsf-parser/) (Python) or [`crsf_parser`](https://github.com/CapnBry/CRServoF) (C++). A MAVLink bridge follows the same pattern — parse CRSF, publish as `RC_CHANNELS_OVERRIDE` to a MAVLink endpoint.
+
+---
+
+## Antenna Selection
+
+Antenna choice affects range more than transmit power for most installations. A few simple rules of thumb:
+
+| End | Use case | Recommended antenna | Typical gain | Notes |
+|---|---|---|---|---|
+| **Tractor (mobile)** | Omnidirectional coverage in any heading | Vertical whip / dipole | 2–5 dBi | Mount vertically, clear of metal hood/cab; keep at least λ/4 (~8 cm at 900 MHz) from large metal surfaces |
+| **Base station (fixed)** | Wide-area control | Vertical collinear (omni) | 6–9 dBi | Mount as high as practical; line-of-sight to tractor matters more than gain |
+| **Base station (fixed)** | Long-range, known direction | Yagi or patch (directional) | 9–15 dBi | Trades coverage angle for range; aim toward the working area |
+| **2.4 GHz ELRS / WiFi** | Either end | "Moxon" or T-style dipole | 2–4 dBi | Polarization matters — keep TX and RX antennas in the same orientation |
+
+**Cable loss matters.** At 900 MHz, RG-58 loses ~0.6 dB/m and at 2.4 GHz it loses ~1.6 dB/m. A 5 m run of RG-58 at 2.4 GHz throws away most of an 8 dBi antenna's gain — use LMR-240 or LMR-400 for any run longer than ~1 m, or mount the radio at the antenna and run Ethernet/USB instead.
+
+**Polarization:** Most RC and LoRa antennas are vertically polarized — mismatching polarization (one vertical, one horizontal) costs ~20 dB. Keep both ends of the link in the same orientation.
+
+---
+
+## Regulatory & Safety Considerations
+
+> ⚠️ **You are responsible for operating within your local regulations.** This document describes capabilities; legal use depends on your jurisdiction.
+
+**United States (FCC):**
+
+| Band | Rule | Max EIRP (unlicensed) | Notes |
+|---|---|---|---|
+| 902–928 MHz (ISM) | 47 CFR §15.247 (FHSS/DTS) | +36 dBm (4 W) | FHSS systems may run up to 1 W conducted + 6 dBi antenna |
+| 2.400–2.4835 GHz (ISM) | 47 CFR §15.247 | +36 dBm (4 W) | Same FHSS/DTS rules |
+| 5.725–5.850 GHz (UNII-3) | 47 CFR §15.247 / §15.407 | +36 dBm (point-to-multipoint) | Higher EIRP allowed for fixed point-to-point links |
+| 433 MHz | 47 CFR §15.231 | Very limited duty cycle | **Generally not legal for continuous control in the US** — use 902–928 MHz instead |
+
+Some ELRS 900 MHz transmitters can output 1–2 W. Combined with even a modest antenna, EIRP can exceed §15.247 limits. **Use the lowest power that gives reliable link quality** (LQ > 70%) — extra power buys little range and may put you outside the rules.
+
+Operating at higher power is legal under an **FCC Amateur Radio license (Part 97)** on portions of the 902–928 MHz and 2.4 GHz bands, but amateur rules forbid commercial use and require station identification.
+
+**Europe (CE / ETSI):**
+
+| Band | Standard | Max ERP | Notes |
+|---|---|---|---|
+| 868 MHz | EN 300 220 | +14 dBm (25 mW) | Sub-bands have different duty cycle limits (0.1%–10%) |
+| 2.400–2.4835 GHz | EN 300 328 | +20 dBm (100 mW) | Includes BLE, WiFi, ELRS 2.4 |
+| 5 GHz | EN 301 893 | Varies by sub-band | DFS may be required |
+
+**Other jurisdictions:** Check local regulations before purchasing — 915 MHz hardware is illegal to transmit on in most of Europe, and 868 MHz hardware is unusable in the Americas.
 
 ---
 
@@ -241,3 +393,7 @@ The table below lists example purchasing options for the recommended and commonl
 - [Radiomaster TX16S](https://www.radiomasterrc.com)
 - [CRSFforArduino Library](https://github.com/ZZ-Cat/CRSFforArduino)
 - [bolderflight SBUS Library](https://github.com/bolderflight/sbus)
+- [crsf-parser (Python)](https://pypi.org/project/crsf-parser/)
+- [FCC 47 CFR Part 15](https://www.ecfr.gov/current/title-47/chapter-I/subchapter-A/part-15) — Unlicensed RF rules (US)
+- [ETSI EN 300 220](https://www.etsi.org/deliver/etsi_en/300200_300299/30022001/) — Short Range Devices (Europe, sub-1 GHz)
+- [ETSI EN 300 328](https://www.etsi.org/deliver/etsi_en/300300_300399/300328/) — 2.4 GHz wideband devices (Europe)
