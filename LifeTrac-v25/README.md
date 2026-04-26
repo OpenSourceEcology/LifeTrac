@@ -8,10 +8,10 @@ LifeTrac v25 is a remotely-operated compact utility loader designed as an open-s
 
 ### Design Overview
 
-![LifeTrac v25 Assembly](mechanical_design/assembly.png)
+![LifeTrac v25 Assembly](DESIGN-STRUCTURAL/assembly.png)
 *3D render of the complete LifeTrac v25 assembly*
 
-![LifeTrac v25 Animation](mechanical_design/lifetrac_v25_animation.gif)
+![LifeTrac v25 Animation](DESIGN-STRUCTURAL/lifetrac_v25_animation.gif)
 *Animation showing loader arm movement range*
 
 ### Key Design Features
@@ -48,7 +48,7 @@ Machine weight is estimated at **800-1,000 kg (1,760-2,200 lbs)** based on steel
 - 4"×4"×1/4" square tubing for main frame
 - 3"×3"×1/4" square tubing for loader arms
 
-*Note: Weight estimate is a manual calculation based on material specifications. Dimensional specifications in the tables above are automatically extracted from the OpenSCAD design files and updated when the design changes. See [mechanical_design/README.md](mechanical_design/README.md) for complete design documentation.*
+*Note: Weight estimate is a manual calculation based on material specifications. Dimensional specifications in the tables above are automatically extracted from the OpenSCAD design files and updated when the design changes. See [DESIGN-STRUCTURAL/README.md](DESIGN-STRUCTURAL/README.md) for complete design documentation.*
 
 ## Features
 
@@ -138,7 +138,7 @@ Machine weight is estimated at **800-1,000 kg (1,760-2,200 lbs)** based on steel
 | | | **Manual:** [Type 8605 Manual (PDF)](https://www.burkert.com/en/content/download/287474/file/MA8605-Manual-EU-EN.pdf) \| [Product Info](https://www.burkert.com/en/products/316532) | | |
 | | | | **Subtotal:** | **$1,538.98** |
 
-*Note: See FLOW_VALVE_CONFIGURATION.md for single vs dual valve configuration details*
+*Note: See DESIGN-HYDRAULIC/FLOW_VALVE_CONFIGURATION.md for single vs dual valve configuration details*
 
 ### Arduino Controllers
 
@@ -208,8 +208,8 @@ Machine weight is estimated at **800-1,000 kg (1,760-2,200 lbs)** based on steel
 # Software Components
 
 ## Arduino Code
-- **arduino_opta_controller/**: Main controller code for Arduino Opta
-- **esp32_remote_control/**: Remote control code for ESP32
+- **DESIGN-CONTROLLER/arduino_opta_controller/**: Main controller code for Arduino Opta
+- **DESIGN-CONTROLLER/esp32_remote_control/**: Remote control code for ESP32
 
 ## Raspberry Pi Web Controller
 - **raspberry_pi_web_controller/**: Browser-based control with live video feed
@@ -223,28 +223,28 @@ Machine weight is estimated at **800-1,000 kg (1,760-2,200 lbs)** based on steel
 *Browser-based control interface with live camera feed and on-screen joysticks*
 
 ## ROS2 Integration
-- **ros2_bridge/**: ROS2 packages for BeagleBone control via MQTT
+- **DESIGN-CONTROLLER/ros2_bridge/**: ROS2 packages for BeagleBone control via MQTT
   - **lifetrac_msgs/**: Custom ROS2 message definitions
   - **lifetrac_mqtt_bridge/**: Bridge node using mqtt_client package
-  - See [ros2_bridge/README.md](ros2_bridge/README.md) for complete ROS2 setup
+  - See [DESIGN-CONTROLLER/ros2_bridge/README.md](DESIGN-CONTROLLER/ros2_bridge/README.md) for complete ROS2 setup
 
 ## Configuration Files
 - **config/**: MQTT broker and WiFi configuration files
-- **arduino_libraries.txt**: Required Arduino libraries
+- **DESIGN-CONTROLLER/arduino_libraries.txt**: Required Arduino libraries
 
 ## Documentation
 - **INSTALLATION_GUIDE.md**: Complete setup and installation instructions
-- **FLOW_VALVE_CONFIGURATION.md**: Proportional flow valve configuration (single vs dual valve)
+- **DESIGN-HYDRAULIC/FLOW_VALVE_CONFIGURATION.md**: Proportional flow valve configuration (single vs dual valve)
 - **DROIDPAD_INTEGRATION.md**: Guide for DroidPad integration via BLE or MQTT
 - **DROIDPAD_BLE_SETUP.md**: Step-by-step BLE direct control setup for DroidPad
 - **MODE_SWITCH_WIRING.md**: Hardware switch wiring for MQTT/OFF/BLE selection
-- **WIRING_DIAGRAM.md**: Detailed wiring and connection diagrams
-- **HYDRAULIC_DIAGRAM.md**: ASCII hydraulic system diagram showing component layout
-- **ros2_bridge/README.md**: ROS2 integration and BeagleBone setup guide
+- **DESIGN-CONTROLLER/WIRING_DIAGRAM.md**: Detailed wiring and connection diagrams
+- **DESIGN-HYDRAULIC/HYDRAULIC_DIAGRAM.md**: ASCII hydraulic system diagram showing component layout
+- **DESIGN-CONTROLLER/ros2_bridge/README.md**: ROS2 integration and BeagleBone setup guide
 - **raspberry_pi_web_controller/README.md**: Web interface setup and usage guide
 
 ## Testing Tools
-- **test_scripts/**: MQTT testing and debugging utilities
+- **DESIGN-CONTROLLER/test_scripts/**: MQTT testing and debugging utilities
 
 # Quick Start
 
@@ -255,10 +255,10 @@ Machine weight is estimated at **800-1,000 kg (1,760-2,200 lbs)** based on steel
 4. **Configure:** Set up BLE characteristics using provided UUIDs
 5. **Control:** Start controlling immediately - no WiFi/network needed!
 
-For detailed instructions, see [DROIDPAD_BLE_SETUP.md](DROIDPAD_BLE_SETUP.md).
+For detailed instructions, see [DROIDPAD_BLE_SETUP.md](DESIGN-CONTROLLER/DROIDPAD_BLE_SETUP.md).
 
 ## Option 2: Raspberry Pi Web Controller (Best for Fixed Installation)
-1. **Set up MQTT Broker:** Install Mosquitto on Raspberry Pi using config/mosquitto.conf
+1. **Set up MQTT Broker:** Install Mosquitto on Raspberry Pi using DESIGN-CONTROLLER/config/mosquitto.conf
 2. **Program Arduino Opta:** Upload controller code
 3. **Set Mode:** Set mode switch to MQTT position
 4. **Install Web Controller:** Run `sudo ./install.sh` in raspberry_pi_web_controller/
@@ -268,12 +268,12 @@ For detailed instructions, see [DROIDPAD_BLE_SETUP.md](DROIDPAD_BLE_SETUP.md).
 For detailed instructions, see [raspberry_pi_web_controller/README.md](raspberry_pi_web_controller/README.md).
 
 ## Option 3: ESP32 Handheld Remote Control
-1. **Set up MQTT Broker:** Install Mosquitto on Raspberry Pi using config/mosquitto.conf
+1. **Set up MQTT Broker:** Install Mosquitto on Raspberry Pi using DESIGN-CONTROLLER/config/mosquitto.conf
 2. **Program Controllers:** Upload Arduino code to Opta and ESP32 boards
 3. **Set Mode:** Set mode switch to MQTT position
 4. **Configure Network:** Update WiFi credentials and MQTT settings in code
-5. **Wire System:** Follow WIRING_DIAGRAM.md for all connections
-6. **Test System:** Use test_scripts/mqtt_test.py for validation
+5. **Wire System:** Follow DESIGN-CONTROLLER/WIRING_DIAGRAM.md for all connections
+6. **Test System:** Use DESIGN-CONTROLLER/test_scripts/mqtt_test.py for validation
 
 For detailed instructions, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md).
 
@@ -285,7 +285,7 @@ For detailed instructions, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md).
 5. **Build ROS2 packages:** Build lifetrac_msgs and lifetrac_mqtt_bridge
 6. **Launch bridge:** `ros2 launch lifetrac_mqtt_bridge lifetrac_bridge.launch.py`
 
-For detailed ROS2 instructions, see [ros2_bridge/README.md](ros2_bridge/README.md).
+For detailed ROS2 instructions, see [DESIGN-CONTROLLER/ros2_bridge/README.md](DESIGN-CONTROLLER/ros2_bridge/README.md).
 
 # Safety Features
 

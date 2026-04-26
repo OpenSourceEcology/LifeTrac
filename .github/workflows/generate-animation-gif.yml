@@ -4,13 +4,13 @@ on:
   push:
     branches: [ main, master ]
     paths:
-      - 'LifeTrac-v25/mechanical_design/openscad/lifetrac_v25.scad'
-      - 'LifeTrac-v25/mechanical_design/openscad/**/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/**/*.scad'
   pull_request:
     branches: [ main, master ]
     paths:
-      - 'LifeTrac-v25/mechanical_design/openscad/lifetrac_v25.scad'
-      - 'LifeTrac-v25/mechanical_design/openscad/**/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/**/*.scad'
   workflow_dispatch:
 
 jobs:
@@ -56,7 +56,7 @@ jobs:
 
     - name: Calculate camera position
       run: |
-        cd LifeTrac-v25/mechanical_design
+        cd LifeTrac-v25/DESIGN-STRUCTURAL
 
         # Calculate camera position dynamically based on machine dimensions
         # Extract parameters from OpenSCAD file
@@ -110,12 +110,12 @@ jobs:
 
     - name: Create output directories
       run: |
-        cd LifeTrac-v25/mechanical_design
+        cd LifeTrac-v25/DESIGN-STRUCTURAL
         mkdir -p output/animations/frames
 
     - name: Generate animation frames
       run: |
-        cd LifeTrac-v25/mechanical_design
+        cd LifeTrac-v25/DESIGN-STRUCTURAL
 
         # Use camera parameters calculated in previous step (from environment variables)
         echo "Generating animation frames with calculated camera position..."
@@ -142,7 +142,7 @@ jobs:
 
     - name: Create animation GIF
       run: |
-        cd LifeTrac-v25/mechanical_design/output/animations
+        cd LifeTrac-v25/DESIGN-STRUCTURAL/output/animations
 
         echo "Creating animation GIF of arm movement..."
         convert -delay 10 -loop 0 frames/frame_*.png lifetrac_v25_animation.gif
@@ -158,13 +158,13 @@ jobs:
       with:
         name: openscad-animation
         path: |
-          LifeTrac-v25/mechanical_design/output/animations/
-          LifeTrac-v25/mechanical_design/lifetrac_v25_animation.gif
+          LifeTrac-v25/DESIGN-STRUCTURAL/output/animations/
+          LifeTrac-v25/DESIGN-STRUCTURAL/lifetrac_v25_animation.gif
         retention-days: 90
 
     - name: Commit and push animation GIF
       run: |
-        cd LifeTrac-v25/mechanical_design
+        cd LifeTrac-v25/DESIGN-STRUCTURAL
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
         git add lifetrac_v25_animation.gif || true

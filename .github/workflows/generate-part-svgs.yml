@@ -4,13 +4,13 @@ on:
   push:
     branches: [ main, master ]
     paths: 
-      - 'LifeTrac-v25/mechanical_design/parts/*.scad'
-      - 'LifeTrac-v25/mechanical_design/openscad/lifetrac_v25_params.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/parts/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad'
   pull_request:
     branches: [ main, master ]
     paths: 
-      - 'LifeTrac-v25/mechanical_design/parts/*.scad'
-      - 'LifeTrac-v25/mechanical_design/openscad/lifetrac_v25_params.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/parts/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad'
   workflow_dispatch:
 
 jobs:
@@ -33,7 +33,7 @@ jobs:
     
     - name: Generate Individual Part SVGs
       run: |
-        cd LifeTrac-v25/mechanical_design
+        cd LifeTrac-v25/DESIGN-STRUCTURAL
         mkdir -p output/svg/parts
         
         echo "========================================="
@@ -95,7 +95,7 @@ jobs:
     
     - name: Update README with part SVG links
       run: |
-        cd LifeTrac-v25/mechanical_design
+        cd LifeTrac-v25/DESIGN-STRUCTURAL
         
         # Check if README already has part SVG section
         if ! grep -q "Individual Part SVGs" README.md; then
@@ -128,7 +128,7 @@ jobs:
     
     - name: Commit and push if changed
       run: |
-        cd LifeTrac-v25/mechanical_design
+        cd LifeTrac-v25/DESIGN-STRUCTURAL
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add output/svg/parts/*.svg README.md || true

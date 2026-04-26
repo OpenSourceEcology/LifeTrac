@@ -10,7 +10,7 @@ The LifeTrac v25 remote control system consists of three main components:
 2. **ESP32 Remote Control** - Handheld remote with dual joysticks
 3. **MQTT Broker** - Raspberry Pi running Mosquitto for communication
 
-For a detailed view of the hydraulic system layout and component connections, see [HYDRAULIC_DIAGRAM.md](HYDRAULIC_DIAGRAM.md).
+For a detailed view of the hydraulic system layout and component connections, see [DESIGN-HYDRAULIC/HYDRAULIC_DIAGRAM.md](DESIGN-HYDRAULIC/HYDRAULIC_DIAGRAM.md).
 
 ## Hardware Requirements
 
@@ -138,7 +138,7 @@ sudo systemctl status mosquitto
 
 ### 2.2 Software Configuration
 
-1. Open `arduino_opta_controller/lifetrac_v25_controller.ino` in Arduino IDE
+1. Open `DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino` in Arduino IDE
 2. Install required libraries via Library Manager:
    - PubSubClient by Nick O'Leary
    - ArduinoJson by Benoit Blanchon
@@ -198,7 +198,7 @@ Each joystick needs a unique I2C address. Use the SparkFun Qwiic Joystick librar
 
 ### 3.3 Software Configuration
 
-1. Open `esp32_remote_control/lifetrac_v25_remote.ino` in Arduino IDE
+1. Open `DESIGN-CONTROLLER/esp32_remote_control/lifetrac_v25_remote.ino` in Arduino IDE
 2. Update WiFi credentials (same as controller)
 3. Update MQTT broker IP address (same as controller)
 4. Select Board: "ESP32 Dev Module" or "SparkFun ESP32 Thing Plus C"

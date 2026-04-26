@@ -3,11 +3,11 @@ name: Generate Jig Previews
 on:
   push:
     paths:
-      - 'LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs/**/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs/**/*.scad'
       - '.github/workflows/generate-jig-previews.yml'
   pull_request:
     paths:
-      - 'LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs/**/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs/**/*.scad'
   workflow_dispatch:
 
 jobs:
@@ -50,11 +50,11 @@ jobs:
 
       - name: Create output directory
         run: |
-          mkdir -p LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs/renders
+          mkdir -p LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs/renders
 
       - name: Render Tube Drilling Jig
         run: |
-          cd LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs
+          cd LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs
           
           # Jig is approximately 76mm x 102mm x 178mm (3" x 4" x 7")
           # Camera distance for good framing
@@ -78,7 +78,7 @@ jobs:
 
       - name: Render Pivot Mount Welding Jig
         run: |
-          cd LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs
+          cd LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs
           
           CAM_DIST=500
           
@@ -100,7 +100,7 @@ jobs:
 
       - name: Render Pivot Welding Jig
         run: |
-          cd LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs
+          cd LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs
           
           CAM_DIST=300
           
@@ -122,7 +122,7 @@ jobs:
 
       - name: Convert PNG to JPG (smaller file size)
         run: |
-          cd LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs/renders
+          cd LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs/renders
           
           # Install ImageMagick for conversion
           sudo apt-get install -y imagemagick
@@ -144,7 +144,7 @@ jobs:
 
       - name: Update README with render timestamps
         run: |
-          cd LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs
+          cd LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs
           
           # Add timestamp comment to README (optional - shows when renders were last updated)
           TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
@@ -160,7 +160,7 @@ jobs:
       - name: Commit and push renders
         if: github.event_name != 'pull_request'
         run: |
-          cd LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs
+          cd LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs
           
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
@@ -181,5 +181,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: jig-renders
-          path: LifeTrac-v25/mechanical_design/openscad/3d_printed_welding_jigs/renders/
+          path: LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs/renders/
           retention-days: 30

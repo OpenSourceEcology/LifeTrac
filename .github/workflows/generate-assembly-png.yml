@@ -4,13 +4,13 @@ on:
   push:
     branches: [ main, master ]
     paths:
-      - 'LifeTrac-v25/mechanical_design/openscad/lifetrac_v25.scad'
-      - 'LifeTrac-v25/mechanical_design/openscad/**/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/**/*.scad'
   pull_request:
     branches: [ main, master ]
     paths:
-      - 'LifeTrac-v25/mechanical_design/openscad/lifetrac_v25.scad'
-      - 'LifeTrac-v25/mechanical_design/openscad/**/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/**/*.scad'
   workflow_dispatch:
 
 jobs:
@@ -56,7 +56,7 @@ jobs:
 
     - name: Calculate camera position
       run: |
-        cd LifeTrac-v25/mechanical_design
+        cd LifeTrac-v25/DESIGN-STRUCTURAL
 
         # Calculate camera position dynamically based on machine dimensions
         # Extract parameters from OpenSCAD file
@@ -110,7 +110,7 @@ jobs:
 
     - name: Generate assembly.png
       run: |
-        cd LifeTrac-v25/mechanical_design
+        cd LifeTrac-v25/DESIGN-STRUCTURAL
 
         # Generate assembly.png (720x720 square as requested)
         echo "Generating assembly.png..."
@@ -128,12 +128,12 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: assembly-png
-        path: LifeTrac-v25/mechanical_design/assembly.png
+        path: LifeTrac-v25/DESIGN-STRUCTURAL/assembly.png
         retention-days: 90
 
     - name: Commit and push assembly.png
       run: |
-        cd LifeTrac-v25/mechanical_design
+        cd LifeTrac-v25/DESIGN-STRUCTURAL
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
         git add assembly.png || true

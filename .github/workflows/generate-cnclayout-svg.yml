@@ -4,15 +4,15 @@ on:
   push:
     branches: [ main, master ]
     paths:
-      - 'LifeTrac-v25/mechanical_design/openscad/cnclayout.scad'
-      - 'LifeTrac-v25/mechanical_design/openscad/parts/*.scad'
-      - 'LifeTrac-v25/mechanical_design/openscad/lifetrac_v25_params.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/cnclayout.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/parts/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad'
   pull_request:
     branches: [ main, master ]
     paths:
-      - 'LifeTrac-v25/mechanical_design/openscad/cnclayout.scad'
-      - 'LifeTrac-v25/mechanical_design/openscad/parts/*.scad'
-      - 'LifeTrac-v25/mechanical_design/openscad/lifetrac_v25_params.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/cnclayout.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/parts/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad'
   workflow_dispatch:
 
 jobs:
@@ -37,7 +37,7 @@ jobs:
     
     - name: Generate Combined CNC Layout SVG
       run: |
-        cd LifeTrac-v25/mechanical_design
+        cd LifeTrac-v25/DESIGN-STRUCTURAL
         
         echo "========================================="
         echo "Generating Combined CNC Layout SVG"
@@ -76,7 +76,7 @@ jobs:
     
     - name: Update README with CNC layout SVG
       run: |
-        cd LifeTrac-v25/mechanical_design
+        cd LifeTrac-v25/DESIGN-STRUCTURAL
         
         # Check if README already has CNC layout section
         if ! grep -q "## CNC Cutting Layout" README.md; then
@@ -109,7 +109,7 @@ jobs:
     
     - name: Commit and push if changed
       run: |
-        cd LifeTrac-v25/mechanical_design
+        cd LifeTrac-v25/DESIGN-STRUCTURAL
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git config --global user.name "github-actions[bot]"
         git add cnclayout.svg README.md || true

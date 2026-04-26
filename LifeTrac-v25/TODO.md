@@ -19,7 +19,7 @@ and are still unfixed. They are the highest-priority work on the software side.
 
 - [ ] **Opta MQTT proportional control is broken.** Replace
   `doc["..."] | 0` with `doc["..."] | 0.0f` in
-  [arduino_opta_controller/lifetrac_v25_controller.ino](arduino_opta_controller/lifetrac_v25_controller.ino#L329-L332)
+  [DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino](DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino#L329-L332)
   so MQTT joystick values are parsed as floats, not coerced to int. Also
   clamp to `[-1.0, 1.0]` and reject NaN, mirroring the BLE path's
   `validateAndClampJoystickValue()`.
@@ -28,7 +28,7 @@ and are still unfixed. They are the highest-priority work on the software side.
   call `stopAllMovement()` immediately on detected disconnect, and run the
   `SAFETY_TIMEOUT` check on every loop iteration regardless of broker
   state. See
-  [arduino_opta_controller/lifetrac_v25_controller.ino](arduino_opta_controller/lifetrac_v25_controller.ino#L221-L300).
+  [DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino](DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino#L221-L300).
 - [ ] **Browser keyboard control latches motion after key release.** In
   [raspberry_pi_web_controller/static/js/controller.js](raspberry_pi_web_controller/static/js/controller.js#L177-L181)
   the `activeKeys.size === 0` branch must zero `currentControl.{left_x,
@@ -39,19 +39,19 @@ and are still unfixed. They are the highest-priority work on the software side.
 - [ ] **ESP32 remote keeps publishing stale axes when a Qwiic joystick
   drops off the I²C bus.** Zero the corresponding axes when
   `joystick.connected()` is false in
-  [esp32_remote_control/lifetrac_v25_remote.ino](esp32_remote_control/lifetrac_v25_remote.ino#L177-L201).
+  [DESIGN-CONTROLLER/esp32_remote_control/lifetrac_v25_remote.ino](DESIGN-CONTROLLER/esp32_remote_control/lifetrac_v25_remote.ino#L177-L201).
 - [ ] **Mode switch and flow-valve jumper are sampled only at boot.**
   Either poll them in `loop()` (calling `stopAllMovement()` on change) or
   update `MODE_SWITCH_WIRING.md` and the README to make clear that switch
   changes require a reboot. See
-  [arduino_opta_controller/lifetrac_v25_controller.ino](arduino_opta_controller/lifetrac_v25_controller.ino#L207-L217).
+  [DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino](DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino#L207-L217).
 
 ### Boot-time blocking
 
 - [ ] Time-box `setupWiFi()` (e.g. 30 s) in both
-  [arduino_opta_controller/lifetrac_v25_controller.ino](arduino_opta_controller/lifetrac_v25_controller.ino#L268-L276)
+  [DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino](DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino#L268-L276)
   and
-  [esp32_remote_control/lifetrac_v25_remote.ino](esp32_remote_control/lifetrac_v25_remote.ino#L141-L147).
+  [DESIGN-CONTROLLER/esp32_remote_control/lifetrac_v25_remote.ino](DESIGN-CONTROLLER/esp32_remote_control/lifetrac_v25_remote.ino#L141-L147).
   On the Opta, fall back to BLE if MQTT mode WiFi fails to associate so the
   unit does not hang in `setup()`.
 
@@ -63,12 +63,12 @@ and are still unfixed. They are the highest-priority work on the software side.
   See [raspberry_pi_web_controller/app.py](raspberry_pi_web_controller/app.py#L40-L41).
 - [ ] **BLE characteristics accept writes from any unpaired device.**
   Require encryption/pairing on the joystick characteristics in
-  [arduino_opta_controller/lifetrac_v25_controller.ino](arduino_opta_controller/lifetrac_v25_controller.ino#L621-L646),
+  [DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino](DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino#L621-L646),
   and add a disconnect hook that calls `stopAllMovement()` explicitly.
 - [ ] **Hardcoded MQTT credentials and broker IP** in
-  [arduino_opta_controller/lifetrac_v25_controller.ino](arduino_opta_controller/lifetrac_v25_controller.ino#L48-L53)
+  [DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino](DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino#L48-L53)
   and
-  [esp32_remote_control/lifetrac_v25_remote.ino](esp32_remote_control/lifetrac_v25_remote.ino#L26-L30).
+  [DESIGN-CONTROLLER/esp32_remote_control/lifetrac_v25_remote.ino](DESIGN-CONTROLLER/esp32_remote_control/lifetrac_v25_remote.ino#L26-L30).
   Move to a `secrets.h` / NVS-stored config and stop documenting the literal
   password as the default.
 
@@ -90,7 +90,7 @@ and are still unfixed. They are the highest-priority work on the software side.
 ### Robustness / quality
 
 - [ ] Normalize tank-steering output before clamping in `computeTrackSpeeds()`
-  ([arduino_opta_controller/lifetrac_v25_controller.ino](arduino_opta_controller/lifetrac_v25_controller.ino#L342-L355))
+  ([DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino](DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino#L342-L355))
   so high `baseSpeed + turnRate` does not produce a "dead zone" near full
   forward where additional turn input has no effect.
 - [ ] Update `previousInput` only after deceleration completes, so a new
@@ -111,11 +111,11 @@ and are still unfixed. They are the highest-priority work on the software side.
 - [ ] After an `emergency_stop`, server should publish a sticky zero
   `control_command` every ~100 ms for ~1 s to be robust to packet loss
   (mitigates browser `setInterval` throttling on hidden tabs).
-- [ ] `serialEvent()` on ESP32 ([esp32_remote_control/lifetrac_v25_remote.ino](esp32_remote_control/lifetrac_v25_remote.ino#L353-L380))
+- [ ] `serialEvent()` on ESP32 ([DESIGN-CONTROLLER/esp32_remote_control/lifetrac_v25_remote.ino](DESIGN-CONTROLLER/esp32_remote_control/lifetrac_v25_remote.ino#L353-L380))
   is dead code; the documented "type `stop`" e-stop does not work. Poll
   `Serial.available()` from `loop()` instead.
 - [ ] Either remove the placeholder `readBatteryVoltage()` in
-  [esp32_remote_control/lifetrac_v25_remote.ino](esp32_remote_control/lifetrac_v25_remote.ino#L286-L293)
+  [DESIGN-CONTROLLER/esp32_remote_control/lifetrac_v25_remote.ino](DESIGN-CONTROLLER/esp32_remote_control/lifetrac_v25_remote.ino#L286-L293)
   or document and calibrate the divider.
 - [ ] Detect the placeholder literals `"YOUR_WIFI_SSID"` /
   `"YOUR_WIFI_PASSWORD"` at runtime and refuse to enter MQTT mode (fall
@@ -124,14 +124,14 @@ and are still unfixed. They are the highest-priority work on the software side.
   ArduinoJson 7's `JsonDocument`) for the small fixed-size payloads on both
   firmwares.
 - [ ] De-duplicate `controlValve()` and `controlTrack()` in
-  [arduino_opta_controller/lifetrac_v25_controller.ino](arduino_opta_controller/lifetrac_v25_controller.ino#L498-L527).
+  [DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino](DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino#L498-L527).
 - [ ] Factor the joystick wire format into a shared `lifetrac_protocol.h`
   consumed by both firmwares so the Opta and ESP32 cannot drift on
   deadzone / clamp / type expectations.
 
 ### Test coverage
 
-- [ ] Extend [test_scripts/mqtt_test.py](test_scripts/mqtt_test.py) (or add a
+- [ ] Extend [DESIGN-CONTROLLER/test_scripts/mqtt_test.py](DESIGN-CONTROLLER/test_scripts/mqtt_test.py) (or add a
   pytest) that publishes representative float payloads and asserts they
   round-trip through the parsing logic the Opta firmware uses. This would
   catch regressions of the int-coercion class.

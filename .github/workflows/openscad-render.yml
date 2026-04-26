@@ -3,11 +3,11 @@ name: OpenSCAD Render and Export
 on:
   push:
     paths:
-      - 'LifeTrac-v25/mechanical_design/**/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/**/*.scad'
       - '.github/workflows/openscad-render.yml'
   pull_request:
     paths:
-      - 'LifeTrac-v25/mechanical_design/**/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/**/*.scad'
   workflow_dispatch:
 
 jobs:
@@ -51,12 +51,12 @@ jobs:
 
       - name: Create output directories
         run: |
-          cd LifeTrac-v25/mechanical_design
+          cd LifeTrac-v25/DESIGN-STRUCTURAL
           mkdir -p output/{dxf,renders,animations}
       
       - name: Calculate camera position
         run: |
-          cd LifeTrac-v25/mechanical_design
+          cd LifeTrac-v25/DESIGN-STRUCTURAL
           
           # Calculate camera position dynamically based on machine dimensions
           # Extract parameters from OpenSCAD file
@@ -138,7 +138,7 @@ jobs:
 
       - name: Render preview images
         run: |
-          cd LifeTrac-v25/mechanical_design
+          cd LifeTrac-v25/DESIGN-STRUCTURAL
           
           # Use camera parameters calculated in previous step (from environment variables)
           
@@ -182,7 +182,7 @@ jobs:
       
       - name: Render module examples
         run: |
-          cd LifeTrac-v25/mechanical_design
+          cd LifeTrac-v25/DESIGN-STRUCTURAL
           
           # Only render module examples if modules directory exists and contains .scad files
           if [ -d "modules" ] && compgen -G "modules/*.scad" > /dev/null; then
@@ -204,7 +204,7 @@ jobs:
 
       - name: Generate summary report
         run: |
-          cd LifeTrac-v25/mechanical_design
+          cd LifeTrac-v25/DESIGN-STRUCTURAL
           
           cat > output/RENDER_REPORT.md << 'EOF'
           # OpenSCAD Render Report
@@ -242,8 +242,8 @@ jobs:
         with:
           name: openscad-renders
           path: |
-            LifeTrac-v25/mechanical_design/output/renders/
-            LifeTrac-v25/mechanical_design/output/RENDER_REPORT.md
+            LifeTrac-v25/DESIGN-STRUCTURAL/output/renders/
+            LifeTrac-v25/DESIGN-STRUCTURAL/output/RENDER_REPORT.md
           retention-days: 90
       
 
@@ -261,7 +261,7 @@ jobs:
           
           # Read the OpenSCAD file
           try:
-              with open('mechanical_design/openscad/lifetrac_v25.scad', 'r') as f:
+              with open('DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad', 'r') as f:
                   content = f.read()
           except FileNotFoundError:
               print("ERROR: OpenSCAD file not found", file=sys.stderr)

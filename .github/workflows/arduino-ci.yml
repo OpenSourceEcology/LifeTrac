@@ -3,15 +3,15 @@ name: Arduino CI
 on:
   push:
     paths:
-      - 'LifeTrac-v25/arduino_opta_controller/**'
-      - 'LifeTrac-v25/esp32_remote_control/**'
-      - 'LifeTrac-v25/arduino_libraries.txt'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/arduino_opta_controller/**'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/esp32_remote_control/**'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/arduino_libraries.txt'
       - '.github/workflows/arduino-ci.yml'
   pull_request:
     paths:
-      - 'LifeTrac-v25/arduino_opta_controller/**'
-      - 'LifeTrac-v25/esp32_remote_control/**'
-      - 'LifeTrac-v25/arduino_libraries.txt'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/arduino_opta_controller/**'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/esp32_remote_control/**'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/arduino_libraries.txt'
       - '.github/workflows/arduino-ci.yml'
   workflow_dispatch:
 
@@ -41,7 +41,7 @@ jobs:
             - name: ArduinoJson
             - name: ArduinoBLE
           sketch-paths: |
-            - LifeTrac-v25/arduino_opta_controller
+            - LifeTrac-v25/DESIGN-CONTROLLER/arduino_opta_controller
           enable-deltas-report: true
           sketches-report-path: sketches-reports
 
@@ -71,7 +71,7 @@ jobs:
             **Branch:** ${{ github.ref_name }}
             
             ### Details
-            - **Sketch:** \`LifeTrac-v25/arduino_opta_controller\`
+            - **Sketch:** \`LifeTrac-v25/DESIGN-CONTROLLER/arduino_opta_controller\`
             - **Board:** \`arduino:mbed_opta:opta\`
             - **Triggered by:** ${{ github.event_name }}
             
@@ -109,7 +109,7 @@ jobs:
             - name: ArduinoJson
             - name: SparkFun Qwiic Joystick Arduino Library
           sketch-paths: |
-            - LifeTrac-v25/esp32_remote_control
+            - LifeTrac-v25/DESIGN-CONTROLLER/esp32_remote_control
           enable-deltas-report: true
           sketches-report-path: sketches-reports
 
@@ -139,7 +139,7 @@ jobs:
             **Branch:** ${{ github.ref_name }}
             
             ### Details
-            - **Sketch:** \`LifeTrac-v25/esp32_remote_control\`
+            - **Sketch:** \`LifeTrac-v25/DESIGN-CONTROLLER/esp32_remote_control\`
             - **Board:** \`esp32:esp32:esp32thing_plus\`
             - **Triggered by:** ${{ github.event_name }}
             
