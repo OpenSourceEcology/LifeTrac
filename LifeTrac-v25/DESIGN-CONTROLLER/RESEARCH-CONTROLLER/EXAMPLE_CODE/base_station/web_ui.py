@@ -1,0 +1,144 @@
+"""web_ui.py — FastAPI operator console for the LifeTrac v25 base station.
+
+DRAFT FOR REVIEW. Not run yet.
+
+Serves a single HTML page with on-screen virtual joysticks AND USB-gamepad
+support via the browser Gamepad API. Pushes ControlFrames to lora_bridge.py
+through MQTT (`lifetrac/v25/cmd/control`) at 20 Hz, and streams telemetry to
+the page over a WebSocket.
+
+Run:
+    uvicorn web_ui:app --host 0.0.0.0 --port 8080
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import struct
+from pathlib import Path
+from typing import Any
+
+import paho.mqtt.client as mqtt
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+
+WEB_DIR = Path(__file__).parent / "web"
+
+app = FastAPI(title="LifeTrac v25 Base Station")
+app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+
+# ---- MQTT plumbing -----------------------------------------------------
+mqtt_client = mqtt.Client(client_id="web_ui")
+mqtt_client.connect("localhost", 1883)
+mqtt_client.loop_start()
+
+telemetry_subscribers: set[WebSocket] = set()
+
+
+def _on_telemetry(_c, _u, msg):
+    payload = {"topic": msg.topic, "data": msg.payload.hex()}
+    for ws in list(telemetry_subscribers):
+        asyncio.run_coroutine_threadsafe(
+            ws.send_text(json.dumps(payload)), app.state.loop
+        )
+
+
+mqtt_client.message_callback_add("lifetrac/v25/telemetry/+", _on_telemetry)
+mqtt_client.message_callback_add("lifetrac/v25/status/+", _on_telemetry)
+mqtt_client.subscribe("lifetrac/v25/telemetry/#")
+mqtt_client.subscribe("lifetrac/v25/status/#")
+
+
+# ---- ControlFrame packing — MUST match lora_proto.h ControlFrame -------
+PROTO_VERSION = 0x01
+SRC_BASE = 0x02
+FT_CONTROL = 0x10
+
+
+def pack_control(seq: int, lhx: int, lhy: int, rhx: int, rhy: int,
+                 buttons: int, flags: int, hb: int) -> bytes:
+    """Returns 16-byte ControlFrame, CRC included."""
+    # header (5) + 4 axes (4) + buttons(2) + flags(1) + hb(1) = 13 bytes pre-CRC
+    body = struct.pack(
+        "<BBBHbbbbHBB",
+        PROTO_VERSION, SRC_BASE, FT_CONTROL, seq,
+        lhx, lhy, rhx, rhy,
+        buttons, flags, hb,
+    )
+    # CRC-16/CCITT (poly 0x1021, init 0xFFFF) over body.
+    crc = 0xFFFF
+    for b in body:
+        crc ^= b << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021) & 0xFFFF if (crc & 0x8000) else (crc << 1) & 0xFFFF
+    return body + struct.pack("<H", crc)
+
+
+# ---- routes ------------------------------------------------------------
+@app.on_event("startup")
+async def _startup():
+    app.state.loop = asyncio.get_event_loop()
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    return (WEB_DIR / "index.html").read_text(encoding="utf-8")
+
+
+@app.websocket("/ws/telemetry")
+async def ws_telemetry(ws: WebSocket):
+    await ws.accept()
+    telemetry_subscribers.add(ws)
+    try:
+        while True:
+            await ws.receive_text()  # keepalive pings; we don't care about content
+    except WebSocketDisconnect:
+        pass
+    finally:
+        telemetry_subscribers.discard(ws)
+
+
+@app.websocket("/ws/control")
+async def ws_control(ws: WebSocket):
+    """Receives JSON {lhx,lhy,rhx,rhy,buttons,flags} at up to 50 Hz from the
+    browser. Forwards as a packed ControlFrame to the LoRa bridge over MQTT.
+    Server-side rate-limits to 20 Hz to match the air-side cadence."""
+    await ws.accept()
+    seq = 0
+    hb = 0
+    last_tx = 0.0
+    try:
+        while True:
+            raw = await ws.receive_text()
+            now = asyncio.get_event_loop().time()
+            if now - last_tx < 0.05:    # 20 Hz
+                continue
+            last_tx = now
+            try:
+                msg: dict[str, Any] = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            frame = pack_control(
+                seq=seq,
+                lhx=int(msg.get("lhx", 0)),
+                lhy=int(msg.get("lhy", 0)),
+                rhx=int(msg.get("rhx", 0)),
+                rhy=int(msg.get("rhy", 0)),
+                buttons=int(msg.get("buttons", 0)),
+                flags=int(msg.get("flags", 0)),
+                hb=hb,
+            )
+            mqtt_client.publish("lifetrac/v25/cmd/control", frame, qos=0)
+            seq = (seq + 1) & 0xFFFF
+            hb = (hb + 1) & 0xFF
+    except WebSocketDisconnect:
+        pass
+
+
+@app.post("/api/estop")
+async def estop():
+    mqtt_client.publish("lifetrac/v25/cmd/estop", b"", qos=1)
+    return {"ok": True}

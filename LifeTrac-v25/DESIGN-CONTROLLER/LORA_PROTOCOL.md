@@ -12,6 +12,49 @@ This document defines the air-interface protocol used between the Handheld, Trac
 
 LoRaWAN's join procedure (~1 s), duty-cycle enforcement, ADR back-off, and gateway-mediated routing all add latency and indeterminism that are incompatible with sub-second motor control. We use LoRa **physical layer only** (Semtech SX1276 chirp spread spectrum) with our own MAC, framing, security, and application layers — a pattern sometimes called "LoRa raw" or "LoRa P2P."
 
+## Why not full MQTT over LoRa
+
+This question comes up because the **base-station LAN side** uses full MQTT 3.1.1 via Mosquitto (for Grafana, Node-RED, ROS 2, Home Assistant integration). It would be tempting to extend that all the way down to the air-link. We deliberately don't, for these reasons:
+
+| Full MQTT cost | Air-time impact at SF7/BW500 | Air-time impact at SF9/BW250 |
+|---|---|---|
+| `CONNECT` packet (14 B + client ID = 30–60 B) | ~25–40 ms per reconnect | ~120–200 ms |
+| `PUBLISH` topic string (e.g. `lifetrac/v25/telemetry/hydraulics` = 33 B) | ~30 ms per message — *topic dwarfs payload* | ~150 ms |
+| `PINGREQ` keep-alive (every 60 s default) | continuous overhead we can't spare | same |
+| QoS 1 round-trip (`PUBACK`) | doubles air time per message; serializes through half-duplex channel | same |
+| QoS 2 round-trip (`PUBREC` / `PUBREL` / `PUBCOMP`) | quadruples air time | same |
+| TCP transport assumption | LoRa has no TCP — we'd have to tunnel anyway | same |
+
+**What we use instead — "MQTTlite" by composition:**
+
+1. **Control path: no MQTT at all.** The 16-byte `ControlFrame` is a fixed C struct — see [§ ControlFrame](#controlframe-16-bytes-total-5-header--11-payload). No headers, no topic, no broker, no acks. The next frame in 50 ms *is* the retry.
+2. **Telemetry path: MQTT-SN naming convention only.** We borrow the *one* idea from [MQTT-SN v1.2](https://www.oasis-open.org/committees/download.php/66091/MQTT-SN_spec_v1.2.pdf) that matters for constrained radio — **statically pre-registered 1-byte topic IDs** — and skip everything else (REGISTER, SUBSCRIBE, CONNECT, PINGREQ, QoS 1/2). On the wire it is just `[topic_id | payload_len | payload]` — see [§ TelemetryFrame](#telemetryframe-variable-9128-bytes). That's ~3 bytes of overhead per telemetry message.
+3. **No keep-alive over LoRa.** Telemetry cadence already implies liveness. Heartbeats serve the arbitration logic, not protocol-keepalive.
+4. **Bridge republishes onto full MQTT at the X8 boundary.** [`lora_bridge.py`](RESEARCH-CONTROLLER/EXAMPLE_CODE/base_station/lora_bridge.py) maps each `topic_id` to a real MQTT topic string and publishes to Mosquitto over localhost TCP — *gigabit ethernet on the X8 is free.* Anything LAN-side (Grafana, ROS 2, phone apps) sees a normal MQTT broker.
+
+### Bytes-on-the-air comparison for one hydraulics telemetry message
+
+| Approach | Wire bytes | SF7/BW500 air time | Notes |
+|---|---:|---:|---|
+| Full MQTT 3.1.1 PUBLISH QoS 0 over (hypothetical) LoRa-TCP | ~70 B | ~30 ms | + TCP/IP framing not counted |
+| MQTT-SN PUBLISH QoS 0 (proper) | ~14 B | ~17 ms | 7-byte SN header + payload |
+| **Our scheme** (`topic_id | len | payload`) | **~10 B + AES-GCM overhead = 38 B** | **~22 ms** | dominated by 12-byte nonce + 16-byte tag, not by the protocol |
+| Same with no encryption (for reference only) | ~10 B | ~14 ms | not what we ship |
+
+After AES-GCM the protocol-level savings are smaller in absolute terms, but **at our packet rates (sum across all topic cadences ≈ 10–15 messages/sec) the topic-string overhead of full MQTT would push us over the channel's effective duty budget all by itself.** The current scheme leaves headroom for control + heartbeats + the future LoRa video path ([RESEARCH-CONTROLLER/VIDEO_COMPRESSION/](RESEARCH-CONTROLLER/VIDEO_COMPRESSION/)).
+
+### Why not go fully custom (drop MQTT-SN naming too)?
+
+Tempting; declined. Reasons:
+
+- The MQTT-SN-style topic ID costs 1 byte. A bespoke "telemetry frame with a type code" saves zero bytes.
+- Free interop with Mosquitto, Grafana, Node-RED, ROS 2 (`mqtt_client`), Home Assistant, and any phone MQTT app — *without writing translators*. Big multiplier for OSE remixers.
+- Decision is reversible. The base-station bridge is the only file that knows about `TOPIC_BY_ID`; the tractor never imports an MQTT library at all. If we ever drop MQTT-SN naming, only [`lora_bridge.py`](RESEARCH-CONTROLLER/EXAMPLE_CODE/base_station/lora_bridge.py) changes.
+
+### Rule of thumb
+
+> **Full MQTT lives on the LAN. Over the air we use MQTT-SN PUBLISH-only with statically pre-registered topic IDs, wrapped in our own KISS+AES-GCM frame. The control path doesn't use MQTT at all.**
+
 ## Protocol stack
 
 ```
@@ -87,17 +130,21 @@ TX power per source:
 
 After AES-GCM encryption + 12-byte nonce + 16-byte tag → on-air payload ~44 bytes. Plus KISS framing overhead (~5%) → ~46 bytes on the air.
 
-### TelemetryFrame (variable, 32–128 bytes)
+### TelemetryFrame (variable, 9–128 bytes)
 
 | Field | Bytes | Description |
 |---|---:|---|
 | (header) | 5 | as above, `frame_type = 0x20`, `source_id = 0x03` (TRACTOR) |
-| `mqtt_sn_payload` | n | MQTT-SN PUBLISH packet (topic-ID + body) |
+| `topic_id` | 1 | Statically pre-registered topic (see table below) |
+| `payload_len` | 1 | 0..120 |
+| `payload` | n | Raw bytes (CBOR or struct, application-defined per topic_id) |
 | `crc16` | 2 | CRC-16/CCITT |
 
-Topic IDs (statically pre-registered, no MQTT-SN REGISTER round-trip):
+**This is *not* a full MQTT-SN PUBLISH packet.** We use the *naming convention* from MQTT-SN — pre-registered short topic IDs — but skip the MQTT-SN packet headers (msg-type byte, length byte, flags byte, msg-id) because they cost ~3–4 bytes per message and we don't need any of the features they enable (QoS 1/2 round-trips, broker-mediated REGISTER, gateway routing). The base-station bridge ([RESEARCH-CONTROLLER/EXAMPLE_CODE/base_station/lora_bridge.py](RESEARCH-CONTROLLER/EXAMPLE_CODE/base_station/lora_bridge.py)) maps `topic_id` to a real MQTT topic string and republishes onto the LAN-side Mosquitto broker. See [§ Why not full MQTT over LoRa](#why-not-full-mqtt-over-lora) below.
 
-| Topic ID | MQTT topic | Cadence |
+Topic IDs (statically pre-registered — no REGISTER round-trip, no SUBSCRIBE):
+
+| Topic ID | MQTT topic (LAN-side) | Cadence |
 |---|---|---|
 | 0x01 | `lifetrac/v25/telemetry/gps` | 5 Hz |
 | 0x02 | `lifetrac/v25/telemetry/engine` | 1 Hz |

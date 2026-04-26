@@ -1,0 +1,133 @@
+<!doctype html>
+<!--
+  index.html — LifeTrac v25 base-station operator console.
+  DRAFT FOR REVIEW. Not run yet.
+
+  Layout matches BASE_STATION.md § Live operator console.
+  Two on-screen virtual joysticks, button strip, telemetry sidebar,
+  E-STOP button, and a USB-gamepad indicator.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+  <title>LifeTrac v25 — Base Station</title>
+  <style>
+    :root {
+      --bg: #1a1d22;
+      --fg: #e6e8eb;
+      --accent: #4caf50;
+      --warn: #ff7a00;
+      --danger: #d62828;
+      --panel: #232830;
+    }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: var(--bg); color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+      touch-action: none;
+    }
+    header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 16px; background: var(--panel);
+      border-bottom: 1px solid #333;
+    }
+    header .title { font-weight: 600; }
+    header .source-banner { padding: 4px 12px; border-radius: 4px;
+      background: var(--warn); color: #000; font-weight: 600; }
+    header .source-banner.base    { background: var(--accent); }
+    header .source-banner.handheld{ background: var(--warn); }
+    header .source-banner.none    { background: var(--danger); color: #fff; }
+
+    main {
+      display: grid;
+      grid-template-columns: 1fr 1fr 280px;
+      gap: 16px;
+      padding: 16px;
+      height: calc(100% - 90px);
+    }
+    .joystick-pad {
+      background: var(--panel); border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; user-select: none;
+    }
+    .joystick-pad canvas { width: 100%; height: 100%; }
+    .joystick-pad .label {
+      position: absolute; top: 8px; left: 12px; font-size: 12px; opacity: 0.7;
+    }
+    aside {
+      background: var(--panel); border-radius: 12px; padding: 16px;
+      display: flex; flex-direction: column; gap: 8px; font-family: ui-monospace, monospace;
+      font-size: 13px;
+    }
+    aside h3 { margin: 0 0 8px 0; font-size: 13px; opacity: 0.7; text-transform: uppercase; }
+    .row { display: flex; justify-content: space-between; }
+    .buttons { grid-column: 1 / span 2; display: grid;
+      grid-template-columns: repeat(6, 1fr); gap: 8px; }
+    .buttons button {
+      padding: 16px; border-radius: 8px; border: 1px solid #444;
+      background: #2c3239; color: var(--fg); font-size: 14px;
+    }
+    .buttons button.estop { background: var(--danger); color: #fff;
+      grid-column: span 2; font-weight: 700; font-size: 18px; }
+    .buttons button.takectl { background: var(--warn); color: #000; }
+    footer {
+      padding: 4px 16px; background: var(--panel);
+      border-top: 1px solid #333; font-size: 12px; opacity: 0.85;
+    }
+    .gamepad-pill { padding: 2px 8px; border-radius: 12px;
+      background: #444; font-size: 11px; }
+    .gamepad-pill.on { background: var(--accent); color: #000; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">LifeTrac v25 · Base Station</div>
+    <div>
+      <span id="gamepad-pill" class="gamepad-pill">no gamepad</span>
+      <span id="source-banner" class="source-banner none">SOURCE: NONE</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="joystick-pad" id="pad-left">
+      <span class="label">LH · drive</span>
+      <canvas></canvas>
+    </div>
+    <div class="joystick-pad" id="pad-right">
+      <span class="label">RH · boom / aux</span>
+      <canvas></canvas>
+    </div>
+
+    <aside>
+      <h3>Telemetry</h3>
+      <div class="row"><span>Engine RPM</span><span id="t-rpm">—</span></div>
+      <div class="row"><span>Oil temp</span><span id="t-oil">—</span></div>
+      <div class="row"><span>Battery</span><span id="t-bat">—</span></div>
+      <div class="row"><span>GPS fix</span><span id="t-gps">—</span></div>
+      <div class="row"><span>RSSI</span><span id="t-rssi">—</span></div>
+      <div class="row"><span>Pkt loss</span><span id="t-loss">—</span></div>
+      <h3 style="margin-top:16px">Active source</h3>
+      <div class="row"><span>Source</span><span id="t-src">—</span></div>
+    </aside>
+
+    <div class="buttons">
+      <button data-btn="0">CURL</button>
+      <button data-btn="1">DUMP</button>
+      <button data-btn="2">AUX 1</button>
+      <button data-btn="3">AUX 2</button>
+      <button data-btn="7" class="takectl">REQ CTRL</button>
+      <button id="estop" class="estop">E-STOP</button>
+    </div>
+  </main>
+
+  <footer>
+    <span id="link-status">link: connecting…</span> ·
+    <span>WS control 20 Hz</span> ·
+    <span>USB Gamepad: A=curl  B=dump  X=aux1  Y=aux2  RB=hold-takectl  START=E-stop</span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
