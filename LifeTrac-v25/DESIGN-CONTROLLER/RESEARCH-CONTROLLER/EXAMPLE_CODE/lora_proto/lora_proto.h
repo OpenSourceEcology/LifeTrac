@@ -73,7 +73,9 @@ typedef struct {
     uint16_t sequence_num;   // monotonic per source; rollover OK
 } LoraHeader;
 
-// Total: 5 + 8 + 2 + 1 = 16 bytes (cleartext, before AES-GCM + KISS framing)
+// Total: 5 hdr + 4 axes + 2 buttons + 1 flags + 1 hb + 1 reserved + 2 crc = 16 bytes.
+// The reserved byte is part of the on-wire format and MUST be zero on TX and
+// ignored on RX (so we can repurpose it later without bumping protocol version).
 typedef struct {
     LoraHeader hdr;          // frame_type = FT_CONTROL
     int8_t   axis_lh_x;      // -127..+127, drive turn
@@ -83,6 +85,7 @@ typedef struct {
     uint16_t buttons;        // BTN_* bitmap
     uint8_t  flags;          // FLAG_* bitmap
     uint8_t  heartbeat_ctr;  // wraps every 256
+    uint8_t  reserved;       // MUST be 0 on TX; ignored on RX
     uint16_t crc16;          // CRC-16/CCITT over all preceding bytes
 } ControlFrame;
 

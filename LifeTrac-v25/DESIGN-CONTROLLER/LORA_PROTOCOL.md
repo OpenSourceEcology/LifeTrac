@@ -126,7 +126,8 @@ TX power per source:
 | `buttons` | 2 | Bitmap: bucket curl, dump, aux 1-4, mode, take-control |
 | `flags` | 1 | bit0=takecontrol_active, bit1=estop_armed, bit2=cellular_fallback |
 | `heartbeat_ctr` | 1 | Wraps every 256; tractor uses for liveness check |
-| `crc16` | 2 | CRC-16/CCITT over header+payload (post-encryption) |
+| `reserved` | 1 | MUST be 0 on TX; RX must ignore. Keeps the frame at a tidy 16 bytes and reserves a slot for a future field without bumping protocol version. |
+| `crc16` | 2 | CRC-16/CCITT over header+payload (cleartext, before AES-GCM) |
 
 After AES-GCM encryption + 12-byte nonce + 16-byte tag → on-air payload ~44 bytes. Plus KISS framing overhead (~5%) → ~46 bytes on the air.
 

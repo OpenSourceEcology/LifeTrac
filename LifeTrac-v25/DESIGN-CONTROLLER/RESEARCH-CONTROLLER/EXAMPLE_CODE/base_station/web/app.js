@@ -140,6 +140,16 @@
 
   // ----- USB Gamepad -----
   let gamepadActive = false;
+  // Edge-detection memory for momentary actions (E-stop, etc.). Without this
+  // the 50 Hz poll would re-fire fetch('/api/estop') every 20 ms while the
+  // operator holds START — DoSing the server and re-latching the fault.
+  const prevButtons = {};
+  function pressed(gp, idx) {
+    const now = !!gp.buttons[idx]?.pressed;
+    const was = !!prevButtons[idx];
+    prevButtons[idx] = now;
+    return now && !was;   // rising edge only
+  }
   const pill = document.getElementById('gamepad-pill');
   function pollGamepad() {
     const gps = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -149,6 +159,7 @@
         gamepadActive = false;
         pill.textContent = 'no gamepad';
         pill.classList.remove('on');
+        for (const k in prevButtons) prevButtons[k] = false;
       }
       return;
     }
@@ -158,21 +169,25 @@
       pill.classList.add('on');
     }
     const dz = (v) => Math.abs(v) < 0.07 ? 0 : v;
-    state.lhx =  Math.round(dz(gp.axes[0]) * 127);
-    state.lhy = -Math.round(dz(gp.axes[1]) * 127);
-    state.rhx =  Math.round(dz(gp.axes[2] || 0) * 127);
-    state.rhy = -Math.round(dz(gp.axes[3] || 0) * 127);
+    const clip = (v) => Math.max(-127, Math.min(127, v));
+    state.lhx = clip( Math.round(dz(gp.axes[0]) * 127));
+    state.lhy = clip(-Math.round(dz(gp.axes[1]) * 127));
+    state.rhx = clip( Math.round(dz(gp.axes[2] || 0) * 127));
+    state.rhy = clip(-Math.round(dz(gp.axes[3] || 0) * 127));
     let buttons = 0, flags = 0;
     if (gp.buttons[0]?.pressed) buttons |= (1 << 0);   // A → curl
     if (gp.buttons[1]?.pressed) buttons |= (1 << 1);   // B → dump
     if (gp.buttons[2]?.pressed) buttons |= (1 << 2);   // X → aux1
     if (gp.buttons[3]?.pressed) buttons |= (1 << 3);   // Y → aux2
     if (gp.buttons[5]?.pressed) { buttons |= (1 << 7); flags |= 0x01; } // RB → take-control
-    if (gp.buttons[9]?.pressed) {                                       // START → E-stop
+    // E-stop: rising edge only.
+    if (pressed(gp, 9)) {
       fetch('/api/estop', { method: 'POST' });
     }
-    state.buttons = buttons;
-    state.flags   = flags;
+    // Refresh hold-to-track edge memory for the buttons we report by level.
+    [0, 1, 2, 3, 5].forEach(i => { prevButtons[i] = !!gp.buttons[i]?.pressed; });
+    state.buttons = buttons & 0xFFFF;
+    state.flags   = flags   & 0xFF;
   }
   setInterval(pollGamepad, 20);   // 50 Hz
   window.addEventListener('gamepadconnected',    pollGamepad);

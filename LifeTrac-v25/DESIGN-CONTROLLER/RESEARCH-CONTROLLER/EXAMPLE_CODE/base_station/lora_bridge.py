@@ -97,10 +97,38 @@ class LoraHeader:
     sequence_num: int
 
 
+HEADER_LEN = 5
+CTRL_FRAME_LEN = 16
+HB_FRAME_LEN = 10
+TELEM_HEADER_LEN = HEADER_LEN + 2   # + topic_id + payload_len
+TELEM_MAX_PAYLOAD = 128
+CRC_LEN = 2
+
+
 def parse_header(pt: bytes) -> LoraHeader | None:
-    if len(pt) < 5:
+    if len(pt) < HEADER_LEN:
         return None
-    return LoraHeader(*struct.unpack("<BBBH", pt[:5]))
+    return LoraHeader(*struct.unpack("<BBBH", pt[:HEADER_LEN]))
+
+
+def crc16_ccitt(data: bytes) -> int:
+    """CRC-16/CCITT (poly 0x1021, init 0xFFFF) — matches lora_proto.c."""
+    crc = 0xFFFF
+    for b in data:
+        crc ^= b << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021) & 0xFFFF if (crc & 0x8000) else (crc << 1) & 0xFFFF
+    return crc
+
+
+def verify_crc(frame: bytes) -> bool:
+    """Last 2 bytes are little-endian CRC over the preceding bytes."""
+    if len(frame) < CRC_LEN + 1:
+        return False
+    body, tail = frame[:-CRC_LEN], frame[-CRC_LEN:]
+    expected = crc16_ccitt(body)
+    actual = struct.unpack("<H", tail)[0]
+    return expected == actual
 
 
 def decrypt(onair: bytes) -> bytes | None:
@@ -114,7 +142,12 @@ def decrypt(onair: bytes) -> bytes | None:
 
 
 def encrypt(seq: int, source_id: int, pt: bytes) -> bytes:
-    nonce = bytes([source_id]) + struct.pack("<H", seq) + struct.pack("<I", int(time.time())) + os.urandom(5)
+    nonce = (
+        bytes([source_id])
+        + struct.pack("<H", seq & 0xFFFF)
+        + struct.pack("<I", int(time.time()) & 0xFFFFFFFF)
+        + os.urandom(5)
+    )
     ct = AESGCM(FLEET_KEY).encrypt(nonce, pt, None)
     return nonce + ct
 
@@ -163,24 +196,73 @@ class Bridge:
         hdr = parse_header(pt)
         if hdr is None or hdr.version != PROTO_VERSION:
             return
-        if hdr.frame_type == FT_TELEMETRY and len(pt) >= 7:
-            topic_id, payload_len = pt[5], pt[6]
-            payload = pt[7 : 7 + payload_len]
+
+        if hdr.frame_type == FT_TELEMETRY:
+            # Layout: [hdr(5)|topic_id(1)|payload_len(1)|payload(N)|crc16(2)]
+            if len(pt) < TELEM_HEADER_LEN + CRC_LEN:
+                logging.debug("telemetry too short: %d", len(pt))
+                return
+            topic_id = pt[HEADER_LEN]
+            payload_len = pt[HEADER_LEN + 1]
+            if payload_len > TELEM_MAX_PAYLOAD:
+                logging.debug("telemetry payload_len %d > max", payload_len)
+                return
+            expected_total = TELEM_HEADER_LEN + payload_len + CRC_LEN
+            if len(pt) < expected_total:
+                logging.debug("telemetry truncated: have %d need %d",
+                              len(pt), expected_total)
+                return
+            frame = pt[:expected_total]
+            if not verify_crc(frame):
+                logging.warning("telemetry CRC failed (topic=%#x)", topic_id)
+                return
+            payload = frame[TELEM_HEADER_LEN : TELEM_HEADER_LEN + payload_len]
             topic = TOPIC_BY_ID.get(topic_id, f"lifetrac/v25/raw/{topic_id:02x}")
             self.mqtt.publish(topic, payload, qos=0, retain=False)
-        elif hdr.frame_type == FT_HEARTBEAT and len(pt) >= 8:
+
+        elif hdr.frame_type == FT_HEARTBEAT:
+            if len(pt) < HB_FRAME_LEN:
+                return
+            if not verify_crc(pt[:HB_FRAME_LEN]):
+                logging.warning("heartbeat CRC failed (src=%#x)", hdr.source_id)
+                return
             self.mqtt.publish(
                 "lifetrac/v25/status/heartbeat",
                 struct.pack("<BH", hdr.source_id, hdr.sequence_num),
             )
 
+        elif hdr.frame_type == FT_CONTROL:
+            # Bridge does not normally re-publish control frames, but if it
+            # does (debug/forensic), validate first.
+            if len(pt) < CTRL_FRAME_LEN or not verify_crc(pt[:CTRL_FRAME_LEN]):
+                return
+            self.mqtt.publish(
+                f"lifetrac/v25/raw/control/{hdr.source_id:02x}",
+                pt[:CTRL_FRAME_LEN], qos=0, retain=False,
+            )
+
     # ---- outbound: MQTT → serial ----------------------------------
     def _on_mqtt_message(self, _client, _userdata, msg):
         if msg.topic.endswith("/cmd/control"):
-            # Expect a 16-byte ControlFrame from web_ui.py.
+            # Expect a fully-formed 16-byte ControlFrame from web_ui.py.
+            # Validate length + CRC before transmitting — otherwise a malformed
+            # payload from the LAN side becomes a wasted air packet.
+            if len(msg.payload) != CTRL_FRAME_LEN:
+                logging.warning("cmd/control wrong length: %d", len(msg.payload))
+                return
+            if not verify_crc(msg.payload):
+                logging.warning("cmd/control CRC failed")
+                return
             self._tx(SRC_BASE, msg.payload)
         elif msg.topic.endswith("/cmd/estop"):
-            cmd = bytes([PROTO_VERSION, SRC_BASE, FT_COMMAND]) + struct.pack("<H", 0) + bytes([0x01]) + bytes(8) + bytes(2)
+            # FT_COMMAND payload: [hdr(5) | opcode(1) | args(...) | crc16(2)]
+            # opcode 0x01 = CMD_ESTOP. We let the bridge stamp seq=0 here; the
+            # tractor's replay window tolerates seq=0 as the wakeup case, and
+            # the latched-fault is idempotent.
+            body = struct.pack("<BBBHB",
+                               PROTO_VERSION, SRC_BASE, FT_COMMAND, 0, 0x01)
+            crc = crc16_ccitt(body)
+            cmd = body + struct.pack("<H", crc)
             self._tx(SRC_BASE, cmd)
 
     def _tx(self, source_id: int, pt: bytes) -> None:

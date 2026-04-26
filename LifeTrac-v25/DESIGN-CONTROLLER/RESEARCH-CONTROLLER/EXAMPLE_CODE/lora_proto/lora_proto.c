@@ -102,6 +102,7 @@ void lp_make_control(ControlFrame* f,
     f->buttons          = buttons;
     f->flags            = flags;
     f->heartbeat_ctr    = hb_ctr;
+    f->reserved         = 0;
     f->crc16            = lp_crc16((const uint8_t*)f,
                                    sizeof(ControlFrame) - sizeof(uint16_t));
 }

@@ -16,6 +16,17 @@
 #include "lora_proto.h"
 #include <string.h>
 
+// Build guard: opting into the insecure stub must be explicit. The Python
+// bridge uses real AES-128-GCM, so silently building the C side with the stub
+// would produce an *unauthenticated* radio link that *appears* to work in
+// loopback against itself but fails AEAD verification against the real Python
+// peer (and offers zero confidentiality on the air).
+#ifndef LIFETRAC_ALLOW_STUB_CRYPTO
+#  error "crypto_stub.c is a no-op AES placeholder. Either link a real "       \
+         "AES-GCM (MbedTLS / ArduinoBearSSL) or define LIFETRAC_ALLOW_STUB_CRYPTO " \
+         "to acknowledge that this build is for benchtop/sim use only."
+#endif
+
 bool lp_encrypt(const uint8_t* key, const uint8_t* nonce,
                 const uint8_t* pt, size_t pt_len,
                 uint8_t* out) {

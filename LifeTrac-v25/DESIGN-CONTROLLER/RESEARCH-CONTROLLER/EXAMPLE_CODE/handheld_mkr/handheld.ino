@@ -41,21 +41,41 @@ static const uint32_t TAKECTL_LATCH_MS = 30000;
 static const uint32_t TICK_PERIOD_MS   = 50;   // 20 Hz
 
 // ---------- helpers ----------
+// Per-axis deadband (counts on the 0..1023 ADC). Keeps neutral truly neutral.
+static const int AXIS_DEADBAND = 16;
+
 static int8_t read_axis(int pin) {
     int raw = analogRead(pin);            // 0..1023
     int centered = raw - 512;             // -512..+511
-    long scaled = (long)centered * 127 / 512;
+    if (centered > -AXIS_DEADBAND && centered < AXIS_DEADBAND) return 0;
+    // Stretch the live region (deadband..511) back to (0..127) so we don't lose range.
+    int sign = centered < 0 ? -1 : 1;
+    int mag  = (centered < 0 ? -centered : centered) - AXIS_DEADBAND;
+    long scaled = (long)mag * 127 / (512 - AXIS_DEADBAND);
     if (scaled > 127) scaled = 127;
-    if (scaled < -127) scaled = -127;
-    return (int8_t)scaled;
+    return (int8_t)(sign * scaled);
 }
 
+// Per-button debounce — require the same level for >= DEBOUNCE_MS before
+// reporting it. Cheap shift-register style filter so we don't allocate.
+static const uint32_t DEBOUNCE_MS = 15;
+static uint8_t  s_btn_state    = 0;       // currently reported (debounced) state
+static uint8_t  s_btn_candidate = 0;      // last raw read
+static uint32_t s_btn_change_ms = 0;
+
 static uint16_t read_buttons() {
-    uint16_t b = 0;
+    uint8_t raw = 0;
     for (int i = 0; i < 8; i++) {
-        if (digitalRead(PIN_BTN_BASE + i) == LOW) b |= (1u << i);
+        if (digitalRead(PIN_BTN_BASE + i) == LOW) raw |= (1u << i);
     }
-    return b;
+    uint32_t now = millis();
+    if (raw != s_btn_candidate) {
+        s_btn_candidate = raw;
+        s_btn_change_ms = now;
+    } else if ((now - s_btn_change_ms) >= DEBOUNCE_MS) {
+        s_btn_state = raw;
+    }
+    return (uint16_t)s_btn_state;
 }
 
 // Build a 12-byte AES-GCM nonce: [source_id | seq(LE) | t_seconds(LE) | rand(5)]
@@ -70,9 +90,14 @@ static void build_nonce(uint8_t out[12], uint16_t seq) {
 }
 
 // Encrypt + KISS-frame + transmit.
-static void send_frame(const uint8_t* pt, size_t pt_len) {
+//
+// `seq` MUST be the same value that was stamped into the frame header — the
+// nonce binds the ciphertext to that exact sequence number, so passing the
+// post-incremented `g_seq` here would put the nonce one step ahead of the
+// header and the receiver would silently fail AEAD verification.
+static void send_frame(const uint8_t* pt, size_t pt_len, uint16_t seq) {
     uint8_t nonce[12];
-    build_nonce(nonce, g_seq);
+    build_nonce(nonce, seq);
 
     uint8_t enc[160];
     if (!lp_encrypt(kFleetKey, nonce, pt, pt_len, enc)) return;
@@ -134,13 +159,15 @@ void loop() {
 
     // ---- control frame
     ControlFrame cf;
-    lp_make_control(&cf, SRC_HANDHELD, g_seq++, lhx, lhy, rhx, rhy, btns, flags, g_hb);
-    send_frame((const uint8_t*)&cf, sizeof(cf));
+    uint16_t cf_seq = g_seq++;
+    lp_make_control(&cf, SRC_HANDHELD, cf_seq, lhx, lhy, rhx, rhy, btns, flags, g_hb);
+    send_frame((const uint8_t*)&cf, sizeof(cf), cf_seq);
 
     // ---- heartbeat (one per tick — same 20 Hz cadence as control)
     HeartbeatFrame hb;
-    lp_make_heartbeat(&hb, SRC_HANDHELD, g_seq++, /*priority*/1, flags);
-    send_frame((const uint8_t*)&hb, sizeof(hb));
+    uint16_t hb_seq = g_seq++;
+    lp_make_heartbeat(&hb, SRC_HANDHELD, hb_seq, /*priority*/1, flags);
+    send_frame((const uint8_t*)&hb, sizeof(hb), hb_seq);
 
     g_hb++;
 }

@@ -58,15 +58,28 @@ SRC_BASE = 0x02
 FT_CONTROL = 0x10
 
 
+def _clip_i8(v: int) -> int:
+    if v < -127:
+        return -127
+    if v > 127:
+        return 127
+    return v
+
+
 def pack_control(seq: int, lhx: int, lhy: int, rhx: int, rhy: int,
                  buttons: int, flags: int, hb: int) -> bytes:
-    """Returns 16-byte ControlFrame, CRC included."""
-    # header (5) + 4 axes (4) + buttons(2) + flags(1) + hb(1) = 13 bytes pre-CRC
+    """Returns 16-byte ControlFrame, CRC included.
+
+    Layout matches the C ControlFrame in lora_proto.h byte-for-byte:
+      [ver(1)|src(1)|type(1)|seq(2) | lhx|lhy|rhx|rhy(4) | btns(2) | flags(1)
+       | hb(1) | reserved=0(1) | crc16(2) ] = 16 bytes.
+    """
     body = struct.pack(
-        "<BBBHbbbbHBB",
-        PROTO_VERSION, SRC_BASE, FT_CONTROL, seq,
-        lhx, lhy, rhx, rhy,
-        buttons, flags, hb,
+        "<BBBHbbbbHBBB",
+        PROTO_VERSION, SRC_BASE, FT_CONTROL, seq & 0xFFFF,
+        _clip_i8(lhx), _clip_i8(lhy), _clip_i8(rhx), _clip_i8(rhy),
+        buttons & 0xFFFF, flags & 0xFF, hb & 0xFF,
+        0,  # reserved — must be zero on TX
     )
     # CRC-16/CCITT (poly 0x1021, init 0xFFFF) over body.
     crc = 0xFFFF

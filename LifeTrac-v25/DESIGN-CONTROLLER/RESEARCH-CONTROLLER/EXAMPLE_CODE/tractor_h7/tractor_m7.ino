@@ -28,21 +28,64 @@ SX1276 radio = new Module(/*nss*/ PD_4, /*dio0*/ PD_5,
                           /*reset*/ PE_4, /*dio1*/ PE_5);
 
 // ---------- Modbus master over RS-485 (Max Carrier J6) ----------
-// 115200 8N1, RTU framing. Opta is slave id 0x10.
-#define OPTA_SLAVE_ID 0x10
+// 115200 8N1, RTU framing. Opta is slave id 0x01 (per TRACTOR_NODE.md).
+#define OPTA_SLAVE_ID 0x01
 
-// Opta register map (mirror of opta_modbus_slave.ino)
-enum OptaReg : uint16_t {
-    REG_ALIVE_TICK     = 0x0000,
+// Opta register map — SOURCE OF TRUTH is TRACTOR_NODE.md § Modbus RTU register map.
+// Holding registers (master writes):
+//   0x0000 valve_coils      uint16 bitfield, 8 bits used
+//   0x0001 flow_setpoint_1  uint16 (0..10000)
+//   0x0002 flow_setpoint_2  uint16 (0..10000)
+//   0x0003 aux_outputs      uint16 bitfield (R10-R12 + engine-kill arm)
+//   0x0004 watchdog_counter uint16 — must increment >=10 Hz
+//   0x0005 command_source   uint16 enum (logging only)
+//   0x0006 arm_engine_kill  uint16 non-zero = energize engine-kill solenoid
+// Input registers (slave writes, master reads):
+//   0x0100 safety_state     uint16 enum
+//   0x0101 digital_inputs   uint16 bitfield
+//   0x0102..0x0107 analog telemetry block (battery, hyd, coolant, oil, aux)
+//   0x0108 relay_fault_flags
+//   0x0109..0x010A opta_uptime_s (uint32)
+//   0x010B opta_fw_version
+enum OptaHolding : uint16_t {
+    REG_VALVE_COILS    = 0x0000,
     REG_FLOW_SP_1      = 0x0001,
     REG_FLOW_SP_2      = 0x0002,
-    REG_VALVE_BASE     = 0x0010,   // 8 contiguous: 0x0010..0x0017
-    REG_CURRENT_BASE   = 0x0020,   // 8 contiguous read-only
-    REG_MODE_SWITCH    = 0x0030,
-    REG_ESTOP_LOOP     = 0x0031,
-    REG_ANALOG_BASE    = 0x0040,   // 6 contiguous read-only
-    REG_LAST_ERROR     = 0x00FF
+    REG_AUX_OUTPUTS    = 0x0003,
+    REG_WATCHDOG_CTR   = 0x0004,
+    REG_CMD_SOURCE     = 0x0005,
+    REG_ARM_ESTOP      = 0x0006,
+    HOLDING_BLOCK_LEN  = 7,
 };
+enum OptaInput : uint16_t {
+    REG_SAFETY_STATE   = 0x0100,
+    REG_DIGITAL_INPUTS = 0x0101,
+    REG_BATTERY_MV     = 0x0102,
+    REG_HYD_SUPPLY     = 0x0103,
+    REG_HYD_RETURN     = 0x0104,
+    REG_COOLANT_C      = 0x0105,
+    REG_OIL_C          = 0x0106,
+    REG_AUX_ANALOG     = 0x0107,
+    REG_RELAY_FAULTS   = 0x0108,
+    INPUT_BLOCK_LEN    = 12,
+    REG_TELEM_AI_BASE  = REG_BATTERY_MV,   // 6 contiguous analog values
+};
+
+// Bit positions inside REG_VALVE_COILS (per TRACTOR_NODE.md).
+enum ValveBit : uint16_t {
+    VB_DRIVE_LF = 0, VB_DRIVE_LR, VB_DRIVE_RF, VB_DRIVE_RR,
+    VB_BOOM_UP, VB_BOOM_DN, VB_BUCKET_CURL, VB_BUCKET_DUMP,
+};
+
+// ---------- M4 shared SRAM (mirror of tractor_m4.cpp) ----------
+// MUST match the layout in tractor_m4.cpp. The M4 watchdog trips if we don't
+// stamp `alive_tick_ms` with the current millis() every loop.
+struct SharedM7M4 {
+    volatile uint32_t alive_tick_ms;
+    volatile uint32_t reserved[15];
+};
+static volatile SharedM7M4* const SHARED =
+    reinterpret_cast<volatile SharedM7M4*>(0x38000000);
 
 // ---------- pre-shared key (provisioned via USB tool) ----------
 static const uint8_t kFleetKey[16] = {0};
@@ -59,7 +102,19 @@ struct SourceState {
 static SourceState g_src[3];   // index by source_id - 1
 
 static const uint32_t HEARTBEAT_TIMEOUT_MS = 500;
+static const uint32_t CONTROL_TIMEOUT_MS   = 200;   // stale ControlFrame → drop to neutral
 static const uint32_t TAKECTL_LATCH_MS     = 30000;
+
+// E-stop latched fault — set by FT_COMMAND/CMD_ESTOP, cleared only by an
+// explicit non-ESTOP command from the base UI (CMD_CLEAR_ESTOP, future).
+static volatile bool g_estop_latched = false;
+
+// Command opcodes carried in FT_COMMAND payload byte 5.
+enum CmdOp : uint8_t {
+    CMD_ESTOP        = 0x01,
+    CMD_CLEAR_ESTOP  = 0x02,
+    CMD_REKEY        = 0x10,
+};
 
 // ---------- KISS decoder for incoming bytes ----------
 static KissDecoder g_dec;
@@ -75,65 +130,75 @@ static int src_index(uint8_t source_id) {
 }
 
 // pick_active_source — strict priority + take-control latch.
+// A source is only eligible if BOTH its heartbeat AND its most recent
+// ControlFrame are fresh. Heartbeat-only-with-stale-control would mean we
+// keep replaying an old joystick position, which is exactly what the M4 +
+// Opta watchdogs are there to catch — but defense in depth: catch it here too.
 static int pick_active_source() {
     uint32_t now = millis();
-    // 1. Latched take-control wins, if its heartbeat is fresh.
+    auto fresh = [now](int i) {
+        return (now - g_src[i].last_heartbeat_ms) < HEARTBEAT_TIMEOUT_MS &&
+               g_src[i].last_control_ms != 0 &&
+               (now - g_src[i].last_control_ms) < CONTROL_TIMEOUT_MS;
+    };
+    // 1. Latched take-control wins, if its link is fresh.
     for (int i = 0; i < 3; i++) {
-        if (g_src[i].takectl_until_ms > now &&
-            (now - g_src[i].last_heartbeat_ms) < HEARTBEAT_TIMEOUT_MS) {
-            return i;
-        }
+        if (g_src[i].takectl_until_ms > now && fresh(i)) return i;
     }
-    // 2. Strict priority: HANDHELD > BASE > AUTONOMY, must be fresh.
+    // 2. Strict priority: HANDHELD > BASE > AUTONOMY.
     for (int i = 0; i < 3; i++) {
-        if ((now - g_src[i].last_heartbeat_ms) < HEARTBEAT_TIMEOUT_MS) {
-            return i;
-        }
+        if (fresh(i)) return i;
     }
-    return -1;  // failsafe
+    return -1;  // failsafe → neutral
 }
 
 // Drive the Opta to the active source's ControlFrame. -1 = neutral.
-static void apply_control(int active) {
-    if (active < 0) {
-        // Failsafe: all valves off, both flow set-points to zero.
-        ModbusRTUClient.beginTransmission(OPTA_SLAVE_ID, HOLDING_REGISTERS,
-                                          REG_VALVE_BASE, 8);
-        for (int i = 0; i < 8; i++) ModbusRTUClient.write(0);
-        ModbusRTUClient.endTransmission();
-        ModbusRTUClient.holdingRegisterWrite(OPTA_SLAVE_ID, REG_FLOW_SP_1, 0);
-        ModbusRTUClient.holdingRegisterWrite(OPTA_SLAVE_ID, REG_FLOW_SP_2, 0);
-        return;
-    }
-    const ControlFrame& cf = g_src[active].latest;
+//
+// Always writes the full 7-register holding block (0x0000..0x0006) in a single
+// WriteMultipleRegisters transaction so the slave sees a consistent snapshot.
+// E-stop latch and "no fresh source" both collapse to the neutral payload.
+static uint16_t g_watchdog_ctr = 0;
 
-    // Map joystick + buttons → 8 directional valves.
-    // (TODO: deadband, ramp, dual-flow split — port from RESEARCH-CONTROLLER/arduino_opta_controller/.)
-    uint16_t valves[8] = {0};
-    valves[0] = (cf.axis_lh_y > 20);   // drive LH fwd
-    valves[1] = (cf.axis_lh_y < -20);  // drive LH rev
-    valves[2] = (cf.axis_lh_y > 20);   // drive RH fwd (TODO: split for differential turn)
-    valves[3] = (cf.axis_lh_y < -20);  // drive RH rev
-    valves[4] = (cf.axis_rh_y > 20);   // boom up
-    valves[5] = (cf.axis_rh_y < -20);  // boom down
-    valves[6] = (cf.buttons & BTN_BUCKET_CURL) ? 1 : 0;
-    valves[7] = (cf.buttons & BTN_BUCKET_DUMP) ? 1 : 0;
+static void apply_control(int active) {
+    uint16_t regs[HOLDING_BLOCK_LEN] = {0};
+    regs[REG_WATCHDOG_CTR] = ++g_watchdog_ctr;   // tick every call → >=10 Hz
+
+    if (g_estop_latched) {
+        regs[REG_ARM_ESTOP] = 1;
+        regs[REG_CMD_SOURCE] = 0;       // NONE
+    } else if (active >= 0) {
+        const ControlFrame& cf = g_src[active].latest;
+        uint16_t coils = 0;
+        // Map joystick + buttons → 8 directional valve coils.
+        // (TODO: deadband, ramp, dual-flow split — port from
+        //  RESEARCH-CONTROLLER/arduino_opta_controller/.)
+        if (cf.axis_lh_y >  20) { coils |= (1u << VB_DRIVE_LF) | (1u << VB_DRIVE_RF); }
+        if (cf.axis_lh_y < -20) { coils |= (1u << VB_DRIVE_LR) | (1u << VB_DRIVE_RR); }
+        if (cf.axis_rh_y >  20) { coils |= (1u << VB_BOOM_UP);   }
+        if (cf.axis_rh_y < -20) { coils |= (1u << VB_BOOM_DN);   }
+        if (cf.buttons & BTN_BUCKET_CURL) { coils |= (1u << VB_BUCKET_CURL); }
+        if (cf.buttons & BTN_BUCKET_DUMP) { coils |= (1u << VB_BUCKET_DUMP); }
+        regs[REG_VALVE_COILS] = coils;
+
+        uint16_t mag = (uint16_t)abs(cf.axis_lh_y) * 78;   // 127*78 ≈ 10000
+        if (mag > 10000) mag = 10000;
+        regs[REG_FLOW_SP_1] = mag;
+        regs[REG_FLOW_SP_2] = mag;
+        regs[REG_CMD_SOURCE] = (uint16_t)(active + 1);     // 1=HANDHELD, 2=BASE, 3=AUTONOMY
+    }
+    // else: regs already zero → all valves off, both flows 0, cmd_source=NONE.
 
     ModbusRTUClient.beginTransmission(OPTA_SLAVE_ID, HOLDING_REGISTERS,
-                                      REG_VALVE_BASE, 8);
-    for (int i = 0; i < 8; i++) ModbusRTUClient.write(valves[i]);
+                                      0x0000, HOLDING_BLOCK_LEN);
+    for (uint16_t i = 0; i < HOLDING_BLOCK_LEN; i++) {
+        ModbusRTUClient.write(regs[i]);
+    }
     ModbusRTUClient.endTransmission();
-
-    // Flow set-point: scale joystick magnitude to 0..10000 (=> 0..10 V).
-    uint16_t mag = (uint16_t)abs(cf.axis_lh_y) * 78;  // 127 * 78 ≈ 10000
-    ModbusRTUClient.holdingRegisterWrite(OPTA_SLAVE_ID, REG_FLOW_SP_1, mag);
-    ModbusRTUClient.holdingRegisterWrite(OPTA_SLAVE_ID, REG_FLOW_SP_2, mag);
 }
 
-static void tick_opta_watchdog() {
-    static uint16_t alive = 0;
-    ModbusRTUClient.holdingRegisterWrite(OPTA_SLAVE_ID, REG_ALIVE_TICK, ++alive);
-}
+// The Opta-side watchdog is now folded into apply_control() (it advances
+// REG_WATCHDOG_CTR each pass). Keeping this name as a no-op for clarity.
+static void tick_opta_watchdog() { /* see apply_control */ }
 
 // Process one decoded LoRa frame (already past KISS de-framing).
 static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm) {
@@ -159,32 +224,54 @@ static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm) {
 
     uint32_t now = millis();
     switch (hdr->frame_type) {
-        case FT_CONTROL:
-            if (pt_len >= sizeof(ControlFrame)) {
-                memcpy(&g_src[idx].latest, pt, sizeof(ControlFrame));
-                g_src[idx].last_control_ms = now;
-                // CRC over the cleartext frame
-                uint16_t expect = lp_crc16(pt, sizeof(ControlFrame) - 2);
-                if (expect != g_src[idx].latest.crc16) {
-                    // CRC fail — invalidate
-                    g_src[idx].last_control_ms = 0;
-                }
-            }
+        case FT_CONTROL: {
+            if (pt_len < sizeof(ControlFrame)) break;
+            // VALIDATE CRC BEFORE TOUCHING g_src[idx].latest — otherwise a
+            // corrupted frame would overwrite the last good control until the
+            // next valid one arrives.
+            ControlFrame cf;
+            memcpy(&cf, pt, sizeof(ControlFrame));
+            uint16_t expect = lp_crc16((const uint8_t*)&cf,
+                                       sizeof(ControlFrame) - sizeof(uint16_t));
+            if (expect != cf.crc16) break;       // drop silently
+            g_src[idx].latest          = cf;
+            g_src[idx].last_control_ms = now;
             break;
+        }
         case FT_HEARTBEAT:
             if (pt_len >= sizeof(HeartbeatFrame)) {
                 HeartbeatFrame hb;
                 memcpy(&hb, pt, sizeof(HeartbeatFrame));
+                uint16_t expect = lp_crc16((const uint8_t*)&hb,
+                                           sizeof(HeartbeatFrame) - sizeof(uint16_t));
+                if (expect != hb.crc16) break;
                 g_src[idx].last_heartbeat_ms = now;
                 if (hb.flags & FLAG_TAKECTL_HELD) {
                     g_src[idx].takectl_until_ms = now + TAKECTL_LATCH_MS;
                 }
             }
             break;
-        case FT_COMMAND:
-            // E-stop and rekey land here. TODO: wire CMD_ESTOP straight to apply_control(-1)
-            // and latch a fault until cleared from the base UI.
+        case FT_COMMAND: {
+            // Payload layout (cleartext, after the 5-byte header):
+            //   byte 5: opcode (CMD_*)  byte 6..N: opcode-specific args
+            if (pt_len < 6) break;
+            uint8_t op = pt[5];
+            switch (op) {
+                case CMD_ESTOP:
+                    g_estop_latched = true;
+                    // Force immediate neutral apply this tick.
+                    apply_control(-1);
+                    break;
+                case CMD_CLEAR_ESTOP:
+                    // Only the BASE source may clear an E-stop.
+                    if (hdr->source_id == SRC_BASE) g_estop_latched = false;
+                    break;
+                case CMD_REKEY:
+                    // TODO: provisioning over the air — out of scope for v25.
+                    break;
+            }
             break;
+        }
     }
 }
 
@@ -206,18 +293,35 @@ static void poll_radio() {
     radio.startReceive();
 }
 
+// Build a 12-byte AES-GCM nonce identical in shape to the handheld:
+//   [ source_id | seq(LE) | t_seconds(LE) | rand(5) ]
+// Without the time/random bits, two telemetry frames with the same sequence
+// (e.g. across reboot or after a 16-bit rollover) would reuse a nonce, which
+// is catastrophic for AES-GCM confidentiality.
+static void build_nonce(uint8_t out[12], uint8_t source_id, uint16_t seq) {
+    out[0] = source_id;
+    out[1] = (uint8_t)(seq & 0xFF);
+    out[2] = (uint8_t)(seq >> 8);
+    uint32_t t = millis() / 1000;
+    out[3] = (uint8_t)(t      ); out[4] = (uint8_t)(t >>  8);
+    out[5] = (uint8_t)(t >> 16); out[6] = (uint8_t)(t >> 24);
+    for (int i = 0; i < 5; i++) out[7 + i] = (uint8_t)random(0, 256);
+}
+
 // Read Opta telemetry and ship a TelemetryFrame over LoRa.
+static uint16_t g_telem_seq = 0;
 static void emit_telemetry() {
     TelemetryFrame tf;
     tf.hdr.version      = LIFETRAC_PROTO_VERSION;
     tf.hdr.source_id    = SRC_TRACTOR;
     tf.hdr.frame_type   = FT_TELEMETRY;
-    tf.hdr.sequence_num = millis();    // good enough for now
+    tf.hdr.sequence_num = ++g_telem_seq;
     tf.topic_id         = 0x04;        // hydraulics, per LORA_PROTOCOL.md table
     tf.payload_len      = 12;          // 6 analog inputs * 2 bytes
 
-    if (!ModbusRTUClient.requestFrom(OPTA_SLAVE_ID, HOLDING_REGISTERS,
-                                     REG_ANALOG_BASE, 6)) return;
+    // Read INPUT registers (function 0x04), not holding — see TRACTOR_NODE.md.
+    if (!ModbusRTUClient.requestFrom(OPTA_SLAVE_ID, INPUT_REGISTERS,
+                                     REG_TELEM_AI_BASE, 6)) return;
     for (int i = 0; i < 6; i++) {
         uint16_t v = ModbusRTUClient.read();
         tf.payload[i*2  ] = (uint8_t)(v & 0xFF);
@@ -230,10 +334,8 @@ static void emit_telemetry() {
     tf.payload[tf.payload_len + 1] = (uint8_t)(crc >> 8);
 
     // Encrypt + KISS + send
-    uint8_t nonce[12] = { SRC_TRACTOR, 0,0, 0,0,0,0, 0,0,0,0,0 };
-    uint16_t seq = (uint16_t)tf.hdr.sequence_num;
-    nonce[1] = (uint8_t)(seq & 0xFF);
-    nonce[2] = (uint8_t)(seq >> 8);
+    uint8_t nonce[12];
+    build_nonce(nonce, SRC_TRACTOR, g_telem_seq);
     uint8_t enc[200];
     if (!lp_encrypt(kFleetKey, nonce, (const uint8_t*)&tf,
                     prefix + 2, enc)) return;
@@ -264,19 +366,19 @@ void setup() {
 
 void loop() {
     static uint32_t next_arb = 0;
-    static uint32_t next_wd  = 0;
     static uint32_t next_tx  = 0;
     uint32_t now = millis();
+
+    // Stamp the M4 watchdog FIRST every loop iteration. If we crash anywhere
+    // below, the M4 watchdog (200 ms) will pull the PSR-alive GPIO low and
+    // dump the valves. Apply this even if nothing else makes progress.
+    SHARED->alive_tick_ms = now;
 
     poll_radio();
 
     if ((int32_t)(now - next_arb) >= 0) {
-        next_arb = now + 50;        // 20 Hz arbitration
-        apply_control(pick_active_source());
-    }
-    if ((int32_t)(now - next_wd) >= 0) {
-        next_wd = now + 50;         // 20 Hz watchdog tick (well above Opta's 200 ms timeout)
-        tick_opta_watchdog();
+        next_arb = now + 50;        // 20 Hz arbitration AND watchdog tick
+        apply_control(pick_active_source());   // also advances REG_WATCHDOG_CTR
     }
     if ((int32_t)(now - next_tx) >= 0) {
         next_tx = now + 1000;       // 1 Hz telemetry

@@ -2,6 +2,13 @@
 
 **Status:** drafts for **study and review only**. None of this code has been compiled, flashed, or tested. The point of the folder is to make the design concrete enough that we can read it end-to-end and pick which version we actually want to build for the first hardware test.
 
+> **2026-04-26 review pass applied** — the thirteen findings from the
+> [pipeline code review](../../AI%20NOTES/CODE%20REVIEWS/2026-04-26_v25_controller_pipeline_example_code_review.md)
+> were verified and the fixes are documented in
+> [CODE_REVIEW_FIXES.md](CODE_REVIEW_FIXES.md). The Modbus register map now
+> matches [`TRACTOR_NODE.md`](../../TRACTOR_NODE.md) and the
+> ControlFrame size/layout matches [`LORA_PROTOCOL.md`](../../LORA_PROTOCOL.md).
+
 The files here cover the **minimum viable chain** of software that the v25 controller needs:
 
 ```
