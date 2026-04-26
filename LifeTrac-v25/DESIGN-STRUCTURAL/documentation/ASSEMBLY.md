@@ -311,7 +311,7 @@ For each arm (left and right):
    - Protect from wear and weather
    - Label all connections
 
-**Refer to:** `../../INSTALLATION_GUIDE.md` for complete electronics setup
+**Refer to:** `../../DESIGN-CONTROLLER/INSTALLATION_GUIDE.md` for complete electronics setup
 
 ---
 
@@ -489,7 +489,7 @@ For each arm (left and right):
 5. Test motor displacement
 
 ### Control System Issues
-Refer to `../../INSTALLATION_GUIDE.md` for electronics troubleshooting
+Refer to `../../DESIGN-CONTROLLER/INSTALLATION_GUIDE.md` for electronics troubleshooting
 
 ---
 
@@ -514,7 +514,7 @@ Contact Open Source Ecology community for:
 
 - **Mechanical Design:** `../README.md`
 - **Parts List:** `PARTS_LIST.md`
-- **Electronics:** `../../INSTALLATION_GUIDE.md`
+- **Electronics:** `../../DESIGN-CONTROLLER/INSTALLATION_GUIDE.md`
 - **Hydraulics:** `../../DESIGN-HYDRAULIC/HYDRAULIC_DIAGRAM.md`
 - **Wiring:** `../../DESIGN-CONTROLLER/WIRING_DIAGRAM.md`
 - **OpenSCAD Files:** `../openscad/lifetrac_v25.scad`

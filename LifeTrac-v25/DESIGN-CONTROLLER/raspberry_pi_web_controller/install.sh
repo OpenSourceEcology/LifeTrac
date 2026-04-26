@@ -43,8 +43,8 @@ pip3 install -r requirements.txt
 
 # Configure Mosquitto
 echo -e "${YELLOW}[4/8] Configuring MQTT broker...${NC}"
-if [ -f "../DESIGN-CONTROLLER/config/mosquitto.conf" ]; then
-    cp "../DESIGN-CONTROLLER/config/mosquitto.conf" /etc/mosquitto/conf.d/lifetrac.conf
+if [ -f "../config/mosquitto.conf" ]; then
+    cp "../config/mosquitto.conf" /etc/mosquitto/conf.d/lifetrac.conf
     echo -e "${GREEN}Mosquitto configuration installed${NC}"
 fi
 

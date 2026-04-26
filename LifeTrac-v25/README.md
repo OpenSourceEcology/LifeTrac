@@ -212,14 +212,14 @@ Machine weight is estimated at **800-1,000 kg (1,760-2,200 lbs)** based on steel
 - **DESIGN-CONTROLLER/esp32_remote_control/**: Remote control code for ESP32
 
 ## Raspberry Pi Web Controller
-- **raspberry_pi_web_controller/**: Browser-based control with live video feed
+- **DESIGN-CONTROLLER/raspberry_pi_web_controller/**: Browser-based control with live video feed
   - Live camera streaming from Arducam IMX335 using libcamera
   - Touch-enabled on-screen joysticks for phone/tablet control
   - Keyboard shortcuts for desktop control
   - WebSocket for real-time communication
-  - See [raspberry_pi_web_controller/README.md](raspberry_pi_web_controller/README.md) for setup
+  - See [DESIGN-CONTROLLER/raspberry_pi_web_controller/README.md](DESIGN-CONTROLLER/raspberry_pi_web_controller/README.md) for setup
 
-![Web Controller Preview](raspberry_pi_web_controller/preview/web-controller-preview.png)
+![Web Controller Preview](DESIGN-CONTROLLER/raspberry_pi_web_controller/preview/web-controller-preview.png)
 *Browser-based control interface with live camera feed and on-screen joysticks*
 
 ## ROS2 Integration
@@ -233,7 +233,7 @@ Machine weight is estimated at **800-1,000 kg (1,760-2,200 lbs)** based on steel
 - **DESIGN-CONTROLLER/arduino_libraries.txt**: Required Arduino libraries
 
 ## Documentation
-- **INSTALLATION_GUIDE.md**: Complete setup and installation instructions
+- **DESIGN-CONTROLLER/INSTALLATION_GUIDE.md**: Complete setup and installation instructions
 - **DESIGN-HYDRAULIC/FLOW_VALVE_CONFIGURATION.md**: Proportional flow valve configuration (single vs dual valve)
 - **DROIDPAD_INTEGRATION.md**: Guide for DroidPad integration via BLE or MQTT
 - **DROIDPAD_BLE_SETUP.md**: Step-by-step BLE direct control setup for DroidPad
@@ -241,7 +241,7 @@ Machine weight is estimated at **800-1,000 kg (1,760-2,200 lbs)** based on steel
 - **DESIGN-CONTROLLER/WIRING_DIAGRAM.md**: Detailed wiring and connection diagrams
 - **DESIGN-HYDRAULIC/HYDRAULIC_DIAGRAM.md**: ASCII hydraulic system diagram showing component layout
 - **DESIGN-CONTROLLER/ros2_bridge/README.md**: ROS2 integration and BeagleBone setup guide
-- **raspberry_pi_web_controller/README.md**: Web interface setup and usage guide
+- **DESIGN-CONTROLLER/raspberry_pi_web_controller/README.md**: Web interface setup and usage guide
 
 ## Testing Tools
 - **DESIGN-CONTROLLER/test_scripts/**: MQTT testing and debugging utilities
@@ -261,11 +261,11 @@ For detailed instructions, see [DROIDPAD_BLE_SETUP.md](DESIGN-CONTROLLER/DROIDPA
 1. **Set up MQTT Broker:** Install Mosquitto on Raspberry Pi using DESIGN-CONTROLLER/config/mosquitto.conf
 2. **Program Arduino Opta:** Upload controller code
 3. **Set Mode:** Set mode switch to MQTT position
-4. **Install Web Controller:** Run `sudo ./install.sh` in raspberry_pi_web_controller/
+4. **Install Web Controller:** Run `sudo ./install.sh` in DESIGN-CONTROLLER/raspberry_pi_web_controller/
 5. **Connect Camera:** Attach Arducam IMX335 to Raspberry Pi
 6. **Access Interface:** Open `http://<raspberry-pi-ip>:5000` in any browser
 
-For detailed instructions, see [raspberry_pi_web_controller/README.md](raspberry_pi_web_controller/README.md).
+For detailed instructions, see [DESIGN-CONTROLLER/raspberry_pi_web_controller/README.md](DESIGN-CONTROLLER/raspberry_pi_web_controller/README.md).
 
 ## Option 3: ESP32 Handheld Remote Control
 1. **Set up MQTT Broker:** Install Mosquitto on Raspberry Pi using DESIGN-CONTROLLER/config/mosquitto.conf
@@ -275,7 +275,7 @@ For detailed instructions, see [raspberry_pi_web_controller/README.md](raspberry
 5. **Wire System:** Follow DESIGN-CONTROLLER/WIRING_DIAGRAM.md for all connections
 6. **Test System:** Use DESIGN-CONTROLLER/test_scripts/mqtt_test.py for validation
 
-For detailed instructions, see [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md).
+For detailed instructions, see [DESIGN-CONTROLLER/INSTALLATION_GUIDE.md](DESIGN-CONTROLLER/INSTALLATION_GUIDE.md).
 
 ## Option 4: ROS2 Control from BeagleBone
 1. **Set up MQTT Broker:** Same as above

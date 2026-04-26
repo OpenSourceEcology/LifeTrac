@@ -400,7 +400,7 @@ When assembling the complete LifeTrac v25:
 
 ### Electronics Design
 - Main README: `../README.md`
-- Installation: `../INSTALLATION_GUIDE.md`
+- Installation: `../DESIGN-CONTROLLER/INSTALLATION_GUIDE.md`
 - Wiring: `../DESIGN-CONTROLLER/WIRING_DIAGRAM.md`
 - Hydraulics: `../DESIGN-HYDRAULIC/HYDRAULIC_DIAGRAM.md`
 - Arduino code: `../DESIGN-CONTROLLER/arduino_opta_controller/`

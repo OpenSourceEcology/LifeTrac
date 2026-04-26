@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'LifeTrac-v25/raspberry_pi_web_controller/static/**'
-      - 'LifeTrac-v25/raspberry_pi_web_controller/templates/**'
-      - 'LifeTrac-v25/raspberry_pi_web_controller/preview/**'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/raspberry_pi_web_controller/static/**'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/raspberry_pi_web_controller/templates/**'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/raspberry_pi_web_controller/preview/**'
       - '.github/workflows/generate-web-controller-preview.yml'
 
 jobs:
@@ -30,7 +30,7 @@ jobs:
       
       - name: Start HTTP server
         run: |
-          cd LifeTrac-v25/raspberry_pi_web_controller/preview
+          cd LifeTrac-v25/DESIGN-CONTROLLER/raspberry_pi_web_controller/preview
           python3 -m http.server 8080 &
           echo "HTTP_SERVER_PID=$!" >> $GITHUB_ENV
           sleep 2
@@ -82,20 +82,20 @@ jobs:
       
       - name: Move screenshot to preview directory
         run: |
-          mv web-controller-preview.png LifeTrac-v25/raspberry_pi_web_controller/preview/
+          mv web-controller-preview.png LifeTrac-v25/DESIGN-CONTROLLER/raspberry_pi_web_controller/preview/
       
       - name: Upload screenshot as artifact
         uses: actions/upload-artifact@v4
         with:
           name: web-controller-preview
-          path: LifeTrac-v25/raspberry_pi_web_controller/preview/web-controller-preview.png
+          path: LifeTrac-v25/DESIGN-CONTROLLER/raspberry_pi_web_controller/preview/web-controller-preview.png
           retention-days: 90
       
       - name: Commit and push screenshot
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add LifeTrac-v25/raspberry_pi_web_controller/preview/web-controller-preview.png
+          git add LifeTrac-v25/DESIGN-CONTROLLER/raspberry_pi_web_controller/preview/web-controller-preview.png
           if ! git diff --staged --quiet; then
             git commit -m "Update web controller preview screenshot [skip ci]"
             git push --force-with-lease origin HEAD || { echo "ERROR: git push failed. Please check for conflicts or permission issues."; exit 1; }

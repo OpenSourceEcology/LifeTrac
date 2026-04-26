@@ -252,7 +252,7 @@ Replace XXXX with unique values for each unit.
 
 - **Main Documentation**: See ../README.md in LifeTrac-v25 folder
 - **Wiring Diagram**: See WIRING_DIAGRAM.md (sibling) for hardware connections
-- **Installation Guide**: See ../INSTALLATION_GUIDE.md for complete setup
+- **Installation Guide**: See INSTALLATION_GUIDE.md (sibling) for complete setup
 - **DroidPad Integration**: See DROIDPAD_INTEGRATION.md for MQTT mode setup
 - **GitHub Issues**: Report problems at https://github.com/OpenSourceEcology/LifeTrac/issues
 

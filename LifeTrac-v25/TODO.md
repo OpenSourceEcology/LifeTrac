@@ -30,7 +30,7 @@ and are still unfixed. They are the highest-priority work on the software side.
   state. See
   [DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino](DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino#L221-L300).
 - [ ] **Browser keyboard control latches motion after key release.** In
-  [raspberry_pi_web_controller/static/js/controller.js](raspberry_pi_web_controller/static/js/controller.js#L177-L181)
+  [DESIGN-CONTROLLER/raspberry_pi_web_controller/static/js/controller.js](DESIGN-CONTROLLER/raspberry_pi_web_controller/static/js/controller.js#L177-L181)
   the `activeKeys.size === 0` branch must zero `currentControl.{left_x,
   left_y, right_x, right_y}` — currently it only refreshes the display.
   Also fix the wholesale-overwrite of `currentControl` in the active branch
@@ -60,7 +60,7 @@ and are still unfixed. They are the highest-priority work on the software side.
 - [ ] **Web controller has no auth.** Add a login (Flask-Login or HTTP
   basic over TLS), restrict `cors_allowed_origins` from `"*"` to a known
   origin list, and load `SECRET_KEY` from environment / `config.yaml`.
-  See [raspberry_pi_web_controller/app.py](raspberry_pi_web_controller/app.py#L40-L41).
+  See [DESIGN-CONTROLLER/raspberry_pi_web_controller/app.py](DESIGN-CONTROLLER/raspberry_pi_web_controller/app.py#L40-L41).
 - [ ] **BLE characteristics accept writes from any unpaired device.**
   Require encryption/pairing on the joystick characteristics in
   [DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino](DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino#L621-L646),
@@ -75,12 +75,12 @@ and are still unfixed. They are the highest-priority work on the software side.
 ### Configuration / docs vs code
 
 - [ ] **`config/config.yaml` is documented but not consumed** by
-  [raspberry_pi_web_controller/app.py](raspberry_pi_web_controller/app.py#L40-L54).
+  [DESIGN-CONTROLLER/raspberry_pi_web_controller/app.py](DESIGN-CONTROLLER/raspberry_pi_web_controller/app.py#L40-L54).
   Add a YAML loader that overrides the module-level constants (broker, port,
   credentials, camera resolution, secret key), or remove the docs that
   reference it.
 - [ ] Default `MQTT_BROKER` in
-  [raspberry_pi_web_controller/app.py](raspberry_pi_web_controller/app.py#L42)
+  [DESIGN-CONTROLLER/raspberry_pi_web_controller/app.py](DESIGN-CONTROLLER/raspberry_pi_web_controller/app.py#L42)
   should be `127.0.0.1` (broker runs on the Pi itself per the install
   guide), not the literal `192.168.1.100`.
 - [ ] Doc-vs-code audit pass: README, INSTALLATION_GUIDE, and
@@ -97,17 +97,17 @@ and are still unfixed. They are the highest-priority work on the software side.
   input arriving mid-ramp does not cancel the active→zero transition
   detection.
 - [ ] Pin `paho-mqtt < 2.0` in
-  [raspberry_pi_web_controller/requirements.txt](raspberry_pi_web_controller/requirements.txt)
+  [DESIGN-CONTROLLER/raspberry_pi_web_controller/requirements.txt](DESIGN-CONTROLLER/raspberry_pi_web_controller/requirements.txt)
   *or* migrate to `mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, ...)` and
   update callbacks.
 - [ ] Register `cleanup()` with `atexit` and install a `SIGTERM` handler in
-  [raspberry_pi_web_controller/app.py](raspberry_pi_web_controller/app.py#L385-L399)
+  [DESIGN-CONTROLLER/raspberry_pi_web_controller/app.py](DESIGN-CONTROLLER/raspberry_pi_web_controller/app.py#L385-L399)
   so the camera process is terminated under systemd shutdown.
 - [ ] Restart `libcamera-vid` automatically on stream loss in
-  [raspberry_pi_web_controller/app.py](raspberry_pi_web_controller/app.py#L142-L196)
+  [DESIGN-CONTROLLER/raspberry_pi_web_controller/app.py](DESIGN-CONTROLLER/raspberry_pi_web_controller/app.py#L142-L196)
   and notify the browser via SocketIO.
 - [ ] Rate-limit / debounce `control_command` events server-side in
-  [raspberry_pi_web_controller/app.py](raspberry_pi_web_controller/app.py#L243-L271).
+  [DESIGN-CONTROLLER/raspberry_pi_web_controller/app.py](DESIGN-CONTROLLER/raspberry_pi_web_controller/app.py#L243-L271).
 - [ ] After an `emergency_stop`, server should publish a sticky zero
   `control_command` every ~100 ms for ~1 s to be robust to packet loss
   (mitigates browser `setInterval` throttling on hidden tabs).

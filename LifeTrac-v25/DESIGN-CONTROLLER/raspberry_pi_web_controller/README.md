@@ -63,7 +63,7 @@ If not already installed:
 sudo apt install -y mosquitto mosquitto-clients
 
 # Copy configuration
-sudo cp "../DESIGN-CONTROLLER/config/mosquitto.conf" /etc/mosquitto/conf.d/lifetrac.conf
+sudo cp "../config/mosquitto.conf" /etc/mosquitto/conf.d/lifetrac.conf
 
 # Create password file
 sudo mosquitto_passwd -c /etc/mosquitto/passwd lifetrac
@@ -375,7 +375,7 @@ You can test the web interface without camera:
 
 1. Comment out camera-related code in `app.py`
 2. Replace video feed with a placeholder image
-3. Use MQTT test scripts from `../DESIGN-CONTROLLER/test_scripts/` to simulate responses
+3. Use MQTT test scripts from `../test_scripts/` to simulate responses
 
 ### API Endpoints
 
@@ -390,7 +390,7 @@ For issues and support:
 
 1. Check the debug console in the web interface
 2. View application logs: `sudo journalctl -u lifetrac-web-controller.service -f`
-3. Test MQTT separately using `../DESIGN-CONTROLLER/test_scripts/mqtt_test.py`
+3. Test MQTT separately using `../test_scripts/mqtt_test.py`
 4. Refer to [INSTALLATION_GUIDE.md](../INSTALLATION_GUIDE.md) for overall system setup
 
 ## License

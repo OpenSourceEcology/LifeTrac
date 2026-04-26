@@ -235,7 +235,7 @@ if (pinA == HIGH && pinB == LOW) {
 ### Documentation Files (8)
 ```
 ✓ LifeTrac-v25/README.md                           [UPDATED]
-✓ LifeTrac-v25/INSTALLATION_GUIDE.md               [UPDATED]
+✓ LifeTrac-v25/DESIGN-CONTROLLER/INSTALLATION_GUIDE.md               [UPDATED]
 ✓ LifeTrac-v25/DESIGN-CONTROLLER/WIRING_DIAGRAM.md                   [UPDATED]
 ✓ LifeTrac-v25/DROIDPAD_INTEGRATION.md             [UPDATED]
 ✓ LifeTrac-v25/DROIDPAD_BLE_SETUP.md               [NEW]
