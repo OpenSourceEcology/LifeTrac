@@ -61,6 +61,9 @@ EXAMPLE_CODE/
 ├── tractor_h7/                     Portenta H747 (in X8 or H7) sketch
 │   ├── tractor_m7.ino              radio + arbitration + Modbus master
 │   └── tractor_m4.cpp              valve safety on M4 core (sketch only)
+├── tractor_x8/                     Tractor X8 Linux side (Portenta X8 only)
+│   ├── imu_service.py              BNO086 over Qwiic/MCP2221A, 5 Hz → M7 UART
+│   └── requirements.txt
 ├── opta_modbus_slave/              Arduino Opta sketch
 │   └── opta_modbus_slave.ino       Modbus RTU slave + relay/AO drive
 └── base_station/                   X8 Linux side
@@ -109,6 +112,17 @@ Runs on the M7 core of the H747 (whether that H747 lives in an X8 or a standalon
 Tiny M4 sketch that reads a shared-memory "alive" tick from the M7, and pulls a GPIO low if it stops ticking for >200 ms. That GPIO feeds into the PSR safety relay path described in [TRACTOR_NODE.md § Wiring overview](../../TRACTOR_NODE.md#wiring-overview).
 
 **Review question:** is M4 the right place for this, or do we put it entirely on the Opta and let the M4 idle? Currently M4 *and* Opta both have independent watchdogs — belt and suspenders.
+
+### 4b. [`tractor_x8/imu_service.py`](tractor_x8/imu_service.py) — IMU on the X8 Linux side
+
+Reads a SparkFun BNO086 Qwiic IMU through an Adafruit MCP2221A USB→I²C bridge (Adafruit 4471, see [`HARDWARE_BOM.md`](../../HARDWARE_BOM.md) Tier 1). The MCP2221A's `hid-mcp2221` driver has been mainline since Linux 5.10 so the X8 Yocto image enumerates it as `/dev/i2c-N` with no install. The service publishes 18-byte fused samples (Q14 quaternion + linear-accel mg + heading) at 5 Hz over the X8↔H747 UART (`/dev/ttymxc0`); the M7 wraps each one in a `TelemetryFrame` with `topic_id = 0x07` and ships it on the LoRa link. The bridge then re-publishes it as `lifetrac/v25/telemetry/imu` (see `TOPIC_BY_ID` in [`base_station/lora_bridge.py`](base_station/lora_bridge.py)).
+
+**Runs on the tractor X8 only.** Skip this folder if you are flashing a standalone H7 — in that fallback hardware build the IMU has to move to native I²C wired to the Max Carrier breakout, polled by the M7. The tradeoff is documented in [`HARDWARE_BOM.md` § Notes on substitutions — IMU path](../../HARDWARE_BOM.md#notes-on-substitutions).
+
+**Review questions:**
+- Is 5 Hz enough for tip-over warning, or do we want 10–20 Hz? (LoRa budget allows up to ~10 Hz of 18 B frames at SF7/BW500 alongside the existing telemetry.)
+- Quaternion as Q14 fixed-point keeps the packet to 18 B. Do we instead want 4×float32 (28 B) for downstream analysis, at the cost of LoRa airtime?
+- The service runs on Python via `adafruit-circuitpython-bno08x`. For shipping product we may want to rewrite in Rust/C++ to drop the interpreter from the boot path. For first-light, Python is fine.
 
 ### 5. [`opta_modbus_slave/opta_modbus_slave.ino`](opta_modbus_slave/opta_modbus_slave.ino) — the I/O layer
 

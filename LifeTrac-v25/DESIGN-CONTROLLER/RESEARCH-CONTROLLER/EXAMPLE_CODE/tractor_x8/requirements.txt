@@ -1,0 +1,17 @@
+# LifeTrac v25 — tractor X8 Linux-side services (draft)
+#
+# These run on the *tractor* Portenta X8's Linux side. The MCP2221A driver
+# (`hid-mcp2221`) is mainline since Linux 5.10 — no kernel module needed on
+# a stock Yocto image. To use the bridge from CircuitPython libraries we
+# also need Adafruit's Blinka shim with MCP2221A support enabled
+# (`BLINKA_MCP2221=1`, set inside `imu_service.py`).
+#
+# Pin to known-good versions; bump deliberately, not on a whim.
+
+# IMU (BNO086) over MCP2221A:
+adafruit-blinka>=8.40.0
+hidapi>=0.14.0
+adafruit-circuitpython-bno08x>=1.2.5
+
+# Serial link to the H747 M7 (/dev/ttymxc0 on the X8):
+pyserial>=3.5

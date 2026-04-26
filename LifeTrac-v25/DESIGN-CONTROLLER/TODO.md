@@ -14,7 +14,7 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 - [ ] **Order Arduino Portenta X8 (ABX00049)** — primary; same SKU as base station. **Fallback: Portenta H7 (ABX00042)** if X8 unavailable, $85 cheaper, loses Linux/SSH/MIPI camera but keeps full radio + real-time capability (binary-compatible firmware)
 - [ ] Order LoRa SMA whip antenna (915 MHz, 3 dBi) — ANT-8/9-IPW1-SMA or equivalent
 - [ ] Order cellular SMA antenna (700–2700 MHz)
-- [ ] Order GPS active patch antenna (28 dB LNA, SMA)
+- [ ] Order **SparkFun NEO-M9N Qwiic GPS — SMA variant (GPS-15733, ~$75)** + panel-mount SMA bulkhead (~$5) + a second 50 mm Qwiic cable (~$1). Daisy-chains off the BNO086 on the same MCP2221A bus, so no extra USB port or driver work. Onboard SMA jack means the cab-roof antenna feedline runs straight to the enclosure wall — no U.FL pigtail. See [HARDWARE_BOM.md Tier 1](HARDWARE_BOM.md#tier-1--tractor-node-portenta-max-carrier--portenta-x8--arduino-opta).
 - [ ] Order cab-roof antenna mounting bracket + N-bulkhead pass-through
 - [ ] Activate Cat-M1 IoT SIM card (Hologram, Soracom, or equivalent)
 - [ ] Order industrial microSD 32 GB
@@ -43,7 +43,10 @@ See the sensor/cabling discussion in [HARDWARE_BOM.md § Notes on substitutions]
 
 - [ ] Order **USB UVC webcam** for first-light video — Logitech C920 (onboard H.264 hw-encode, ~$70) or ELP-USBFHD06H (M12, IP67, ~$90 if you need a sealed connector). UVC = no driver install on the X8 Yocto image.
 - [ ] Order **panel-mount USB-A bulkhead** + cable gland to bring the webcam cable through the IP65 enclosure wall (consumer USB cables are not field-sealed).
-- [ ] Order **Bosch BNO055 IMU breakout** (Adafruit 2472 or SparkFun equivalent, ~$25) — I²C @ 400 kHz on the Max Carrier breakout, on-chip sensor fusion → quaternion straight out, no Madgwick/Mahony work on the M7. Used for tip-over warning, heading hold, vibration logging.
+- [ ] Order **Adafruit MCP2221A breakout (4471, ~$8)** — USB ↔ I²C bridge with Stemma QT/Qwiic. Mainline `hid-mcp2221` driver, no install on the X8 Yocto image. Hosts the IMU on the **Linux side**, not the M7.
+- [ ] Order **SparkFun Qwiic 9DoF IMU — BNO086 (DEV-22857, ~$30)** with on-chip sensor fusion (quaternion straight out, no Madgwick/Mahony work). Used for tip-over warning, heading hold, vibration logging.
+- [ ] Order **Qwiic / Stemma QT 50 mm cable** for MCP2221A → BNO086 link.
+- [ ] *(Production-build hardening)* Order **USB galvanic isolator** (ADuM3160-based, ~$25) for inline use between the X8 USB port and the MCP2221A in the noisy tractor enclosure. Optional for bench bring-up.
 - [ ] Order **2× hydraulic pressure sensors**, 0–250 bar 4–20 mA output with M12-A 4-pin cordsets (~$40 each). Wires into Opta A0602 analog inputs (`hyd_supply_psi` 0x0103 / `hyd_return_psi` 0x0104 per [TRACTOR_NODE.md Modbus map](TRACTOR_NODE.md#modbus-rtu-register-map-max-carrier--opta)).
 - [ ] *(Phase 2, optional)* Order **MIPI CSI camera** — Arducam IMX219/IMX477 with 22-pin FFC ribbon (~$30–60). Requires building a Yocto image with the camera device-tree overlay enabled; track separately in `RESEARCH-CONTROLLER/VIDEO_COMPRESSION/`.
 - [ ] *(Phase 2, optional)* Order **PoE IP camera** (Reolink RLC-510A or equivalent) if night vision / IR / single-cable PoE is wanted — pulled by FFmpeg/GStreamer from RTSP on the X8.
@@ -189,10 +192,10 @@ Implement [`firmware/common/`](firmware/common/) — the shared protocol layer.
 
 ### Tractor-side telemetry sources
 
-- [ ] Wire u-blox GPS module (UART) + mount active patch antenna on cab roof
+- [ ] Wire **NEO-M9N GPS via Qwiic** (chains off BNO086 on the MCP2221A bus); mount the SMA active patch antenna on cab roof with U.FL→SMA bulkhead pigtail; verify `i2cdetect` sees both 0x42 (GPS) and 0x4A/0x4B (IMU); add a second X8-side service that publishes NMEA at 1 Hz on `lifetrac/v25/telemetry/gps` (`topic_id=0x01`, already in `lora_bridge.py` `TOPIC_BY_ID`)
 - [ ] Wire CAN-FD to engine ECU (if engine ECU available) — Deutsch DT04-5P J1939 harness
 - [ ] Wire hydraulic pressure sensors (4–20 mA → Opta A0602 inputs, M12-A cordsets); confirm `hyd_supply_psi`/`hyd_return_psi` register values track a calibrated reference gauge
-- [ ] Wire **BNO055 IMU** to Max Carrier I²C breakout (SDA/SCL/3V3/GND); poll at 50 Hz from M7 alongside the Modbus master loop; publish `imu` topic (roll/pitch/yaw + accel) at 5 Hz
+- [ ] Wire **BNO086 IMU via MCP2221A USB→Qwiic adapter** to an X8 USB host port; verify Yocto enumerates `/dev/i2c-N` (`i2cdetect -y N` shows BNO086 at 0x4A or 0x4B). Run a Python service on the X8 that reads the IMU at 50 Hz and publishes `lifetrac/v25/telemetry/imu` MQTT (roll/pitch/yaw + accel) at 5 Hz. The bridge ships it as `topic_id=0x07` over LoRa. (Switch to native I²C wired to the Max Carrier breakout only if a future use case needs sub-millisecond determinism.)
 - [ ] Mount **USB UVC webcam** (Logitech C920 or ELP IP67) — route cable through panel-mount USB bulkhead with gland; verify Yocto enumerates as `/dev/video0` (`v4l2-ctl --list-devices`)
 - [ ] Bring up GStreamer pipeline on X8: `v4l2src device=/dev/video0 ! image/jpeg ! jpegdec ! v4l2h264enc ! rtph264pay ! udpsink` for first-light WebRTC test
 - [ ] Verify each source publishes to correct MQTT topic (per [LORA_PROTOCOL.md topic table](LORA_PROTOCOL.md#telemetryframe-variable-9128-bytes))

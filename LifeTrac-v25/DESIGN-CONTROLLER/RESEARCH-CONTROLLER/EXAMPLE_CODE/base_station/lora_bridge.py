@@ -153,6 +153,10 @@ def encrypt(seq: int, source_id: int, pt: bytes) -> bytes:
 
 
 # ---- MQTT topic mapping -----------------------------------------------
+# IDs are statically registered (MQTT-SN style) in LORA_PROTOCOL.md.
+# Anything in 0x01..0x0F is *telemetry from tractor → base*; 0x10..0x1F is
+# control state; 0x20..0x2F is video. New topics MUST be added in both
+# places (LORA_PROTOCOL.md and here) — readers fall back to a raw topic.
 TOPIC_BY_ID = {
     0x01: "lifetrac/v25/telemetry/gps",
     0x02: "lifetrac/v25/telemetry/engine",
@@ -160,6 +164,8 @@ TOPIC_BY_ID = {
     0x04: "lifetrac/v25/telemetry/hydraulics",
     0x05: "lifetrac/v25/telemetry/mode",
     0x06: "lifetrac/v25/telemetry/errors",
+    0x07: "lifetrac/v25/telemetry/imu",          # BNO086 quaternion + accel, see tractor_x8/imu_service.py
+    0x08: "lifetrac/v25/telemetry/sensor_faults", # bitmap of sensor disconnect / CRC errors
     0x10: "lifetrac/v25/control/source_active",
     0x20: "lifetrac/v25/video/thumbnail",
 }

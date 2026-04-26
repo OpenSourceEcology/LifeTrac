@@ -227,3 +227,39 @@ path could in principle emit out-of-range axis values.
   both sides identically from `axis_lh_y`). Carry-over from
   [`RESEARCH-CONTROLLER/arduino_opta_controller/`](../arduino_opta_controller/)
   remains TODO.
+
+---
+
+## Follow-up additions (post-review, same session)
+
+These aren't review findings — they're new code added on top of the reviewed
+pipeline as the hardware design solidified. Listed here so the pipeline doc
+and the code stay in step.
+
+### A. Tractor X8-side IMU service (`tractor_x8/imu_service.py`)
+
+Adds a Linux-side service that reads the **SparkFun BNO086 Qwiic** IMU
+through an **Adafruit MCP2221A USB→I²C bridge** (Adafruit 4471) and forwards
+18-byte fused samples (Q14 quaternion + linear-accel mg + heading×10) to the
+M7 over the X8↔H747 UART at 5 Hz. The M7 will wrap each sample in a
+`TelemetryFrame` with `topic_id = 0x07`. Rationale and the native-I²C
+fallback are documented in
+[`HARDWARE_BOM.md` § Notes on substitutions — IMU path](../../HARDWARE_BOM.md#notes-on-substitutions)
+and in the file's module docstring.
+
+The corresponding receiver in `tractor_m7.ino` (read framed packets from
+`Serial1`, stuff into `TelemetryFrame.payload`, emit at 5 Hz) is **not yet
+implemented** — flagged as TODO in the file. The X8 service is safe to run
+in `--dry-run` for bench bring-up of the IMU itself.
+
+### B. Two new MQTT topic IDs in the bridge
+
+[`base_station/lora_bridge.py`](base_station/lora_bridge.py) `TOPIC_BY_ID`
+gained:
+
+- `0x07 → lifetrac/v25/telemetry/imu` (BNO086 quaternion + accel)
+- `0x08 → lifetrac/v25/telemetry/sensor_faults` (sensor disconnect / CRC bitmap)
+
+Unknown topic IDs continue to fall back to `lifetrac/v25/raw/<id>` so adding
+more is non-breaking.
+
