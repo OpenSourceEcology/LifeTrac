@@ -247,10 +247,26 @@ fallback are documented in
 [`HARDWARE_BOM.md` § Notes on substitutions — IMU path](../../HARDWARE_BOM.md#notes-on-substitutions)
 and in the file's module docstring.
 
-The corresponding receiver in `tractor_m7.ino` (read framed packets from
-`Serial1`, stuff into `TelemetryFrame.payload`, emit at 5 Hz) is **not yet
-implemented** — flagged as TODO in the file. The X8 service is safe to run
-in `--dry-run` for bench bring-up of the IMU itself.
+### A2. Tractor X8-side GPS service (`tractor_x8/gps_service.py`)
+
+Companion service that reads the **SparkFun NEO-M9N SMA Qwiic** receiver on
+the *same* Qwiic bus (chained off the IMU through one MCP2221A) and forwards
+21-byte fixed-point samples (lat/lon/alt e7+cm, speed cm/s, heading×10,
+fix-type, sats, HDOP) to the M7 at **1 Hz active / 0.2 Hz when parked**. The
+M7 emits each one as a `TelemetryFrame` with `topic_id = 0x01`. 1 Hz is the
+sweet spot for a tractor doing ≤5 mph: position uncertainty (~2.2 m
+between fixes) is comparable to the receiver's standalone accuracy.
+
+### A3. Common X8→M7 UART pump (`tractor_h7/tractor_m7.ino`)
+
+The formerly-`emit_telemetry`-only path has been split. `emit_topic(topic_id,
+payload, len)` is now the canonical encryptor + LoRa transmitter for any
+(topic, payload) tuple; `emit_telemetry()` calls it with the Opta hydraulics
+block at 1 Hz. A new `poll_x8_uart()` loop runs every iteration of `loop()`,
+KISS-decodes packets coming in from `gps_service.py` / `imu_service.py` on
+`Serial1` (X8↔H747 UART, 921600 8N1), peels the leading topic byte, and
+hands the rest to `emit_topic`. Standalone-H7 builds simply see no bytes on
+`Serial1` and skip the pump — the rest of the firmware is unchanged.
 
 ### B. Two new MQTT topic IDs in the bridge
 

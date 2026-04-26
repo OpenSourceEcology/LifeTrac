@@ -96,6 +96,12 @@ IMU_PACKET_VERSION = 0x01
 IMU_PACKET_FMT = "<BB hhhh hhh H"   # 1+1+8+6+2 = 18 bytes
 assert struct.calcsize(IMU_PACKET_FMT) == 18
 
+# Topic byte that prefixes every KISS payload on the X8→M7 UART, so the M7's
+# single UART receiver can demux GPS / IMU / future sensors and stuff the
+# rest of the payload into TelemetryFrame.payload after setting the matching
+# topic_id. Matches TOPIC_BY_ID in base_station/lora_bridge.py.
+TOPIC_IMU = 0x07
+
 KISS_FEND = 0xC0
 KISS_FESC = 0xDB
 KISS_TFEND = 0xDC
@@ -247,7 +253,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             # send a zero-payload v1 packet with all flag bits cleared.
             sample = IMUSample(0, 0, 0, 0, 0, 0, 0, 0, False, False, False)
 
-        frame = kiss_encode(sample.pack())
+        frame = kiss_encode(bytes([TOPIC_IMU]) + sample.pack())
         if uart is not None:
             try:
                 uart.write(frame)

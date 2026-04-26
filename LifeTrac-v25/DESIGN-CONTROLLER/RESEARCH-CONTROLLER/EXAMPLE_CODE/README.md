@@ -63,6 +63,7 @@ EXAMPLE_CODE/
 │   └── tractor_m4.cpp              valve safety on M4 core (sketch only)
 ├── tractor_x8/                     Tractor X8 Linux side (Portenta X8 only)
 │   ├── imu_service.py              BNO086 over Qwiic/MCP2221A, 5 Hz → M7 UART
+│   ├── gps_service.py              NEO-M9N over same Qwiic bus, 1 Hz → M7 UART
 │   └── requirements.txt
 ├── opta_modbus_slave/              Arduino Opta sketch
 │   └── opta_modbus_slave.ino       Modbus RTU slave + relay/AO drive
@@ -113,16 +114,23 @@ Tiny M4 sketch that reads a shared-memory "alive" tick from the M7, and pulls a 
 
 **Review question:** is M4 the right place for this, or do we put it entirely on the Opta and let the M4 idle? Currently M4 *and* Opta both have independent watchdogs — belt and suspenders.
 
-### 4b. [`tractor_x8/imu_service.py`](tractor_x8/imu_service.py) — IMU on the X8 Linux side
+### 4b. [`tractor_x8/imu_service.py`](tractor_x8/imu_service.py) + [`tractor_x8/gps_service.py`](tractor_x8/gps_service.py) — sensors on the X8 Linux side
 
-Reads a SparkFun BNO086 Qwiic IMU through an Adafruit MCP2221A USB→I²C bridge (Adafruit 4471, see [`HARDWARE_BOM.md`](../../HARDWARE_BOM.md) Tier 1). The MCP2221A's `hid-mcp2221` driver has been mainline since Linux 5.10 so the X8 Yocto image enumerates it as `/dev/i2c-N` with no install. The service publishes 18-byte fused samples (Q14 quaternion + linear-accel mg + heading) at 5 Hz over the X8↔H747 UART (`/dev/ttymxc0`); the M7 wraps each one in a `TelemetryFrame` with `topic_id = 0x07` and ships it on the LoRa link. The bridge then re-publishes it as `lifetrac/v25/telemetry/imu` (see `TOPIC_BY_ID` in [`base_station/lora_bridge.py`](base_station/lora_bridge.py)).
+Two sibling services that share one Qwiic bus through one Adafruit MCP2221A USB→I²C bridge (Adafruit 4471, see [`HARDWARE_BOM.md`](../../HARDWARE_BOM.md) Tier 1). The bridge driver `hid-mcp2221` has been mainline since Linux 5.10, so the X8 Yocto image enumerates `/dev/i2c-N` with no install. Both services KISS-frame a `<topic_id:1><payload:N>` packet over the X8↔H747 UART (`/dev/ttymxc0`) at 921600 8N1; the M7's `poll_x8_uart()` reads the framed bytes, peels off the topic byte, and re-emits the rest as a standard `TelemetryFrame` on the LoRa link. The bridge then maps it to MQTT via `TOPIC_BY_ID` in [`base_station/lora_bridge.py`](base_station/lora_bridge.py).
 
-**Runs on the tractor X8 only.** Skip this folder if you are flashing a standalone H7 — in that fallback hardware build the IMU has to move to native I²C wired to the Max Carrier breakout, polled by the M7. The tradeoff is documented in [`HARDWARE_BOM.md` § Notes on substitutions — IMU path](../../HARDWARE_BOM.md#notes-on-substitutions).
+| Service | Sensor | Topic | Rate | Payload |
+|---|---|---|---|---|
+| `imu_service.py` | SparkFun BNO086 Qwiic, I²C @ 0x4A/0x4B | `0x07` → `lifetrac/v25/telemetry/imu` | 5 Hz | 18 B (Q14 quaternion + accel mg + heading) |
+| `gps_service.py` | SparkFun NEO-M9N SMA Qwiic, I²C @ 0x42 | `0x01` → `lifetrac/v25/telemetry/gps` | 1 Hz active / 0.2 Hz parked | 21 B (lat/lon/alt e7+cm, speed cm/s, heading×10, fix/sats/HDOP) |
+
+**Why 1 Hz is enough for GPS.** Tractor top speed is ~5 mph (~2.2 m/s), so 1 Hz misses at most ~2.2 m of travel — inside the NEO-M9N's ~1.5 m standalone accuracy. Bumping to 5–10 Hz costs LoRa airtime and doesn't make a tracked tractor visibly smoother on the base map. `gps_service.py` also auto-backs off to 0.2 Hz after 10 s of <0.1 m/s ground speed (parked), freeing the channel for hydraulics / video / IMU.
+
+**Both services run on the tractor X8 only.** Skip this folder if you are flashing a standalone H7 — in that fallback build the IMU and GPS have to move to native I²C wired to the Max Carrier breakout, polled by the M7. The tradeoffs are documented in [`HARDWARE_BOM.md` § Notes on substitutions](../../HARDWARE_BOM.md#notes-on-substitutions).
 
 **Review questions:**
-- Is 5 Hz enough for tip-over warning, or do we want 10–20 Hz? (LoRa budget allows up to ~10 Hz of 18 B frames at SF7/BW500 alongside the existing telemetry.)
-- Quaternion as Q14 fixed-point keeps the packet to 18 B. Do we instead want 4×float32 (28 B) for downstream analysis, at the cost of LoRa airtime?
-- The service runs on Python via `adafruit-circuitpython-bno08x`. For shipping product we may want to rewrite in Rust/C++ to drop the interpreter from the boot path. For first-light, Python is fine.
+- Is 1 Hz GPS enough, or does the autonomy / waypoint follower want ~5 Hz once that lands? (Cheap to bump — just `--rate-hz 5` on the service.)
+- 21 B fixed-point vs raw NMEA: fixed-point keeps each frame inside one LoRa packet at SF7. NMEA strings would need fragmentation. Worth keeping for now.
+- Idle backoff: the 10 s / 0.1 m/s threshold is arbitrary. Should we tie it to the Opta `valve_coils == 0` AND `engine_run == false` instead so it backs off only when *actually* parked, not idling at headlands?
 
 ### 5. [`opta_modbus_slave/opta_modbus_slave.ino`](opta_modbus_slave/opta_modbus_slave.ino) — the I/O layer
 

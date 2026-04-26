@@ -310,23 +310,24 @@ static void build_nonce(uint8_t out[12], uint8_t source_id, uint16_t seq) {
 
 // Read Opta telemetry and ship a TelemetryFrame over LoRa.
 static uint16_t g_telem_seq = 0;
-static void emit_telemetry() {
+
+// emit_topic — encrypt + frame an arbitrary (topic_id, payload) tuple and
+// transmit it as a TelemetryFrame on the radio. Shared by emit_telemetry()
+// (Opta hydraulics @ 1 Hz) and the X8 UART pump (gps @ 1 Hz, imu @ 5 Hz).
+//
+// payload_len must be ≤ TELEM_MAX_PAYLOAD as defined in LORA_PROTOCOL.md.
+static void emit_topic(uint8_t topic_id, const uint8_t* payload, uint8_t payload_len) {
+    if (payload_len > sizeof(((TelemetryFrame*)0)->payload) - 2) return;
+
     TelemetryFrame tf;
     tf.hdr.version      = LIFETRAC_PROTO_VERSION;
     tf.hdr.source_id    = SRC_TRACTOR;
     tf.hdr.frame_type   = FT_TELEMETRY;
     tf.hdr.sequence_num = ++g_telem_seq;
-    tf.topic_id         = 0x04;        // hydraulics, per LORA_PROTOCOL.md table
-    tf.payload_len      = 12;          // 6 analog inputs * 2 bytes
+    tf.topic_id         = topic_id;
+    tf.payload_len      = payload_len;
+    if (payload_len > 0) memcpy(tf.payload, payload, payload_len);
 
-    // Read INPUT registers (function 0x04), not holding — see TRACTOR_NODE.md.
-    if (!ModbusRTUClient.requestFrom(OPTA_SLAVE_ID, INPUT_REGISTERS,
-                                     REG_TELEM_AI_BASE, 6)) return;
-    for (int i = 0; i < 6; i++) {
-        uint16_t v = ModbusRTUClient.read();
-        tf.payload[i*2  ] = (uint8_t)(v & 0xFF);
-        tf.payload[i*2+1] = (uint8_t)(v >> 8);
-    }
     // CRC immediately after payload
     size_t prefix = sizeof(LoraHeader) + 2 + tf.payload_len;
     uint16_t crc = lp_crc16((const uint8_t*)&tf, prefix);
@@ -348,6 +349,54 @@ static void emit_telemetry() {
     radio.startReceive();
 }
 
+static void emit_telemetry() {
+    // Read INPUT registers (function 0x04), not holding — see TRACTOR_NODE.md.
+    if (!ModbusRTUClient.requestFrom(OPTA_SLAVE_ID, INPUT_REGISTERS,
+                                     REG_TELEM_AI_BASE, 6)) return;
+    uint8_t payload[12];               // 6 analog inputs * 2 bytes
+    for (int i = 0; i < 6; i++) {
+        uint16_t v = ModbusRTUClient.read();
+        payload[i*2  ] = (uint8_t)(v & 0xFF);
+        payload[i*2+1] = (uint8_t)(v >> 8);
+    }
+    emit_topic(0x04, payload, sizeof(payload));   // 0x04 = hydraulics
+}
+
+// ---------- X8 UART pump ----------
+//
+// On a Portenta X8, the Linux side runs `tractor_x8/gps_service.py` and
+// `tractor_x8/imu_service.py`, which write KISS-framed packets to the
+// X8↔H747 UART at 921600 8N1. Each packet is:
+//
+//     <topic_id:1> <payload:N>
+//
+// where topic_id matches `TOPIC_BY_ID` in `base_station/lora_bridge.py`
+// (0x01 = gps, 0x07 = imu, etc.). We decode KISS, peel off the topic byte,
+// and re-emit the rest as a TelemetryFrame on the LoRa radio.
+//
+// Standalone-H7 fallback: when the H747 is *not* in an X8 there is nothing
+// driving Serial1 from the Linux side, so this loop sees no bytes — the rest
+// of the firmware behaves identically. (In that build, IMU + GPS would have
+// to be wired natively — see HARDWARE_BOM.md § Notes on substitutions.)
+static KissDecoder g_x8_dec;
+
+static void poll_x8_uart() {
+    while (Serial1.available()) {
+        uint8_t b = (uint8_t)Serial1.read();
+        uint8_t* frame; size_t flen;
+        if (lp_kiss_feed(&g_x8_dec, b, &frame, &flen)) {
+            if (flen < 1) continue;             // empty frame
+            uint8_t topic_id = frame[0];
+            const uint8_t* payload = frame + 1;
+            size_t payload_len = flen - 1;
+            // TelemetryFrame.payload + CRC must fit; cap defensively.
+            if (payload_len > 64) continue;
+            emit_topic(topic_id, payload, (uint8_t)payload_len);
+        }
+    }
+}
+
+
 // ---------- Arduino entry points ----------
 void setup() {
     Serial.begin(115200);
@@ -362,6 +411,10 @@ void setup() {
     if (!ModbusRTUClient.begin(115200)) {
         Serial.println("Modbus begin failed");
     }
+
+    // X8 ↔ H747 UART (Linux side runs gps_service.py + imu_service.py).
+    // Harmless on a standalone H7 — Serial1 just sees no bytes.
+    Serial1.begin(921600);
 }
 
 void loop() {
@@ -375,6 +428,7 @@ void loop() {
     SHARED->alive_tick_ms = now;
 
     poll_radio();
+    poll_x8_uart();    // pump KISS frames from gps_service.py / imu_service.py
 
     if ((int32_t)(now - next_arb) >= 0) {
         next_arb = now + 50;        // 20 Hz arbitration AND watchdog tick
