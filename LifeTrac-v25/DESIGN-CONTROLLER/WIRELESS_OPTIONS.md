@@ -42,6 +42,10 @@ This document compares wireless communication technologies suitable for remote c
 | **ELRS (ExpressLRS, 900 MHz)** | 20–40 km | 2–10 km | 4–20 ms | ~100 kbps (control) | 868 / 915 MHz | Low | $25–$100 (TX+RX) | ✅ Firmware + HW designs (GPL/CC) | Best combination of range and latency; highly recommended |
 | **FrSky R9 / OpenTX (900 MHz)** | 5–15 km | 1–5 km | 10–30 ms | ~100 kbps | 915 MHz | Low | $50–$150 (TX+RX) | 🔶 Firmware (OpenTX/EdgeTX); HW closed | Mature RC ecosystem; solid long-range option |
 | **Digi XBee Pro (900 MHz)** | 3–10 km | 1–3 km | 15–50 ms | 156 kbps | 900 MHz | Low–Medium | $50–$150 (module) | ❌ Proprietary | Industrial-grade serial link; configurable RF parameters |
+| **SparkFun LoRa Thing Plus (expLoRaBLE)** | 2–10 km | 1–3 km | 50–150 ms (KISS) | 0.3–50 kbps | 868 / 915 MHz | Very Low | ~$45 (board) | 🔶 Firmware open (Arduino/Tock); HW open (SparkFun); Semtech/Ambiq silicon closed | SX1262 + Apollo3 MCU + BLE 5 in one Feather board; integrated host MCU eliminates separate Arduino |
+| **SparkFun Pro RF (SAMD21 + RFM95W, 100 mW)** | 2–8 km | 0.5–2 km | 50–150 ms (KISS) | 0.3–37.5 kbps | 915 MHz | Very Low | ~$30 (board) | 🔶 Firmware open (Arduino); HW open (SparkFun); Semtech silicon closed | SAMD21 + SX1276 on one PCB; same RFM95W as LilyGO/Adafruit Feather LoRa |
+| **SparkFun Pro RF 1W (SAMD21 + RFM9xW)** | 5–15 km | 1–4 km | 50–150 ms (KISS) | 0.3–37.5 kbps | 915 MHz | Low | ~$50 (board) | 🔶 Firmware open (Arduino); HW open (SparkFun); Semtech silicon closed | 1 W (30 dBm) PA — comparable EIRP to XBee-PRO 900HP; same SX1276 LoRa core |
+| **SparkFun LoRa Gateway 1-Channel (ESP32 + RFM95W)** | 2–8 km | 0.5–2 km | 50–150 ms (KISS) / 100+ ms (LoRaWAN) | 0.3–37.5 kbps | 915 MHz | Low | ~$45 (board) | 🔶 Firmware open (Arduino/ESP-IDF); HW open (SparkFun) | ESP32 (WiFi+BLE) + SX1276 — natural MQTT-SN ↔ MQTT bridge for the v25 stack |
 | **Ubiquiti airMAX (5.8 GHz)** | 5–15 km | Limited | 2–10 ms | 150+ Mbps | 5.8 GHz | Medium–High | $100–$400 (pair) | ❌ Proprietary | Directional point-to-point; very high throughput; requires alignment |
 
 > **LoS** = Line of Sight (clear, unobstructed path between antennas)
@@ -93,6 +97,59 @@ Chirp Spread Spectrum modulation (Semtech SX127x/SX126x chips).
 - **Strengths**: Extremely long range; very low power; low-cost modules
 - **Weaknesses**: Low data rate; high latency at long-range settings; **not suitable as the sole link for joystick control**
 - **Best use for LifeTrac**: Telemetry data (GPS, sensor readouts, status) as a secondary link alongside a lower-latency primary link
+
+### SparkFun LoRa Hardware (expLoRaBLE, Pro RF, Pro RF 1W, LoRa Gateway)
+
+SparkFun sells four LoRa boards that are all built around Semtech SX127x / SX126x silicon — the same radio family used by Adafruit Feather LoRa, LilyGO LoRa32, RFM95W breakouts, and Meshtastic. Because they expose the raw radio (not a proprietary serial-tunnel firmware), they are a good fit for a custom **LoRa + KISS** control link and for MQTT-SN telemetry. They are *not* a drop-in replacement for an XBee in transparent-serial mode.
+
+| Board | MCU | Radio | TX Power | Frequency | BLE? | Form factor | Approx. Price |
+|---|---|---|---|---|---|---|---|
+| **LoRa Thing Plus — expLoRaBLE** (WRL-17506) | Ambiq Apollo3 Blue (Cortex-M4F, 48/96 MHz) | Semtech SX1262 (in NM180100 SiP) | +22 dBm (~158 mW) | 868 / 915 MHz | ✅ BLE 5 | Thing Plus / Feather | ~$45 |
+| **Pro RF — LoRa 915 MHz** (WRL-14916) | Microchip SAMD21 (Cortex-M0+, 48 MHz) | HopeRF RFM95W (SX1276) | +20 dBm (100 mW) | 915 MHz | ❌ | Pro Mini-ish | ~$30 |
+| **SparkX Pro RF 1W** (SPX-15836) | Microchip SAMD21 | RFM9xW + 1 W PA | +30 dBm (1 W) | 915 MHz | ❌ | Pro Mini-ish | ~$50 |
+| **LoRa Gateway 1-Channel** (WRL-15006) | Espressif ESP32-WROOM (240 MHz, WiFi + BLE) | HopeRF RFM95W (SX1276) | +20 dBm (100 mW) | 915 MHz | ✅ BLE 4.2 | ESP32 dev board | ~$45 |
+
+**What they have in common:** all four boards expose the LoRa modem over SPI to the on-board MCU, are programmable from the Arduino IDE (and PlatformIO), are documented under SparkFun's open hardware license (CC BY-SA / OSHW), and use the same Semtech LoRa libraries (`RadioLib`, `arduino-LoRa`) — so firmware written for one runs on the others with a pin-map change.
+
+#### How they compare to the Digi XBee-PRO 900HP
+
+| Aspect | Digi XBee-PRO 900HP | SparkFun LoRa boards |
+|---|---|---|
+| **Modulation** | Proprietary FHSS (DigiMesh / 802.15.4) | LoRa CSS (Semtech, open spec via app notes) |
+| **Output power** | +24 dBm (~250 mW) | +20 dBm Pro RF / +22 dBm expLoRaBLE / **+30 dBm Pro RF 1W** |
+| **LoS range (rated)** | ~14 km @ 10 kbps | 2–15+ km depending on SF/BW; comparable at +30 dBm |
+| **Host interface** | Transparent or API-mode UART (any MCU works) | SPI to the on-board MCU; the MCU *is* the host |
+| **Out-of-box "just works"** | Yes — pair two, set baud, send bytes | No — you write the firmware (LoRa + KISS, MQTT-SN, etc.) |
+| **Firmware** | Closed Digi firmware, configured via XCTU | Open Arduino / Tock / AmbiqSDK; you own the protocol stack |
+| **Hardware design** | Closed | Open (schematic + Eagle/KiCad on SparkFun GitHub) |
+| **Latency floor** | 30–80 ms RF + UART packetization (`RO`) overhead | 15–25 ms air time at SF7/BW500; ~50–100 ms RT including MCU processing |
+| **Worst-case latency** | 50–200+ ms with default ACK retries | Bounded by your firmware — KISS with no retries can hit ~50 ms |
+| **Mesh** | Built-in DigiMesh | None on these boards (use Meshtastic firmware on the same SX127x silicon if you want mesh) |
+| **Price (per node)** | $50–$80 module + $20 carrier = $70–$100 | $30–$50 (board includes MCU and USB) |
+| **Power draw (TX)** | ~215 mA @ 3.3 V (250 mW) | Pro RF ~120 mA @ 3.3 V; Pro RF 1W ~600 mA @ 3.3 V |
+
+**Bottom line vs XBee:**
+
+- **For a drop-in serial replacement** — XBee wins. SparkFun's LoRa boards do not implement a transparent serial bridge out of the box; you have to write that firmware yourself (or port SparkFun's [`LoRaSerial`](https://github.com/sparkfun/SparkFun_LoRaSerial) firmware, which ships on its dedicated LoRaSerial Kit and is portable to these boards).
+- **For a custom low-latency control link (LoRa + KISS)** — SparkFun wins. You skip XBee's `RO` packetization, ACK-retry, and transparent-mode framing overhead, and the +30 dBm Pro RF 1W matches or exceeds XBee-PRO 900HP's EIRP for the same regulatory class.
+- **For the MQTT/MQTT-SN telemetry plane already discussed in this document** — the **LoRa Gateway 1-Channel (ESP32)** is the most natural fit: ESP32 WiFi joins the existing v25 Mosquitto broker over the local network *and* SX1276 carries MQTT-SN out to the field, all on one board.
+- **For a single-board remote that also speaks BLE** — the **expLoRaBLE** is unique. Apollo3 + SX1262 + BLE 5 in one Feather means a handheld remote can fall back to the v25 BLE link at close range and switch to LoRa when out of BLE range, with no additional radio.
+
+#### Could we use them for the LoRa + KISS system?
+
+Yes — these boards are well suited to the LoRa + KISS pattern listed in the comparison table above. KISS is a thin framing layer (FEND/FESC byte stuffing, no ACKs, no retries) traditionally used for AX.25 packet radio; over LoRa it bypasses LoRaWAN's join/duty-cycle/ADR overhead and gives the lowest-latency LoRa link possible. Concretely:
+
+- **Radio fit.** Both SX1276 (Pro RF, Pro RF 1W, LoRa Gateway) and SX1262 (expLoRaBLE) support the SF/BW/CR ranges needed for KISS-class operation (typically SF7–SF9, BW 250–500 kHz, CR 4/5) — air times of 15–60 ms per 10–20 byte control frame.
+- **Firmware fit.** [`RadioLib`](https://github.com/jgromes/RadioLib) supports both chips with the same API; a KISS framer is ~100 lines of C. The expLoRaBLE is also officially supported by `RadioLib` and the [Tock OS LoRa driver](https://www.alistair23.me/2023/08/09/lora-on-sparkfun-board/).
+- **Power fit for a tractor-side node.** Pro RF 1W at +30 dBm gives the link budget needed for 5–15 km LoS at SF8/BW500, comparable to ELRS 900 MHz at the LoRa data rate (but slower per packet). The expLoRaBLE at +22 dBm is sized more for handheld remote / sensor use (1–5 km).
+- **Caveats.** KISS over LoRa is still **not fast enough to be the primary joystick link** — at SF7/BW500 a 16-byte frame is ~15 ms air time + processing, giving 50–150 ms round-trip and an effective update rate of 10–20 Hz. That is fine for **on/off implement commands and telemetry** but not for proportional joystick control of a heavy machine. Use ELRS 900 MHz for primary control and keep LoRa+KISS as the secondary / failsafe-aware command channel, exactly as recommended in the [Summary Recommendation](#summary-recommendation-for-lifetrac).
+- **Regulatory.** The Pro RF 1W's +30 dBm output is at the FCC §15.247 ceiling and is **only legal with a digital-spread modulation that meets the rule's bandwidth/processing-gain test** — LoRa does qualify, but you must confirm the antenna gain keeps EIRP within the limit (see [Regulatory & Safety Considerations](#regulatory--safety-considerations) below). The expLoRaBLE and 100 mW Pro RF have plenty of EIRP headroom.
+
+**Recommended SparkFun pairing for a v25 LoRa+KISS deployment:**
+
+- **Tractor side:** SparkFun LoRa Gateway 1-Channel (ESP32) — ESP32 bridges the on-board Mosquitto broker and the LoRa+KISS link in one device, eliminating the separate "Pi + UART-attached LoRa modem" gateway from the [MQTT Over Long-Range Radio](#mqtt-over-long-range-radio-xbee--lora-bridges) architecture diagram.
+- **Remote side:** SparkFun LoRa Thing Plus — expLoRaBLE — single board with BLE 5 (close-range fallback) + LoRa SX1262 (long-range KISS), Apollo3 has plenty of CPU for CRSF parsing and a small OLED display, and the Feather form factor drops into existing remote enclosures.
+- **Long-range backup transmitter:** SparkX Pro RF 1W on the operator side, paired with a 3 dBi vertical, when 5+ km range is needed at the cost of higher power draw.
 
 ### Meshtastic
 
@@ -525,6 +582,10 @@ The table below lists example purchasing options for the recommended and commonl
 | **LoRa Module** | SX1276-based dev board | LilyGO LoRa32 V2.1 (ESP32 + SX1276, 915 MHz) | [Amazon](https://www.amazon.com/s?k=LilyGO+LoRa32+V2.1+915MHz) | ~$15–$25 |
 | **LoRa Module** | Bare SX1276 breakout | HopeRF RFM95W 915 MHz LoRa Transceiver | [Adafruit](https://www.adafruit.com/product/3072) | ~$20 |
 | **LoRa Module** | Bare SX1276 breakout | Ebyte E32-900T20D (UART interface) | [AliExpress](https://www.aliexpress.com/w/wholesale-ebyte-e32-900t20d.html) | ~$8–$12 |
+| **SparkFun LoRa** | Apollo3 + SX1262 + BLE 5 (Feather) | SparkFun LoRa Thing Plus — expLoRaBLE (WRL-17506) | [SparkFun Store](https://www.sparkfun.com/sparkfun-lora-thing-plus-explorable.html) | ~$45 |
+| **SparkFun LoRa** | SAMD21 + RFM95W (100 mW) | SparkFun Pro RF — LoRa 915 MHz (WRL-14916) | [SparkFun Store](https://www.sparkfun.com/products/14916) | ~$30 |
+| **SparkFun LoRa** | SAMD21 + 1 W LoRa PA | SparkX SAMD21 Pro RF 1W (SPX-15836) | [SparkFun Store](https://www.sparkfun.com/products/15836) | ~$50 |
+| **SparkFun LoRa** | ESP32 (WiFi+BLE) + RFM95W gateway | SparkFun LoRa Gateway — 1-Channel (ESP32) (WRL-15006) | [SparkFun Store](https://www.sparkfun.com/products/15006) | ~$45 |
 | **Meshtastic** | T-Beam (GPS + LoRa) | LilyGO T-Beam V1.2 915 MHz | [Amazon](https://www.amazon.com/s?k=LilyGO+T-Beam+V1.2+915MHz) | ~$30–$45 |
 | **Meshtastic** | Heltec LoRa 32 | Heltec WiFi LoRa 32 V3 (915 MHz, OLED) | [Heltec Store](https://heltec.org/project/wifi-lora-32-v3/) | ~$20–$30 |
 | **Meshtastic** | RAK WisBlock | RAK4631 WisBlock Core (nRF52840 + SX1262) | [RAK Store](https://store.rakwireless.com/products/rak4631-lpwan-node) | ~$25–$40 |
