@@ -1,5 +1,23 @@
 # LifeTrac v25 — TODO
 
+> **⚡ Controller architecture update (2026):** The primary controller design
+> is now the three-tier Portenta Max Carrier + MKR WAN 1310 system documented
+> in [DESIGN-CONTROLLER/ARCHITECTURE.md](DESIGN-CONTROLLER/ARCHITECTURE.md).
+> All hardware-purchase, firmware, and bring-up tasks for that design live in
+> [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md).
+>
+> The Opta / ESP32 / Raspberry Pi prototype code referenced below has been
+> moved to
+> [DESIGN-CONTROLLER/RESEARCH-CONTROLLER/](DESIGN-CONTROLLER/RESEARCH-CONTROLLER/)
+> (see its [README](DESIGN-CONTROLLER/RESEARCH-CONTROLLER/README.md)).
+> The safety bug-fixes listed in this file are still worth completing on
+> the prototype code if it gets used for any further bench tests, but the
+> equivalent safety logic must be implemented from the start in the new
+> Portenta firmware (tracked in [DESIGN-CONTROLLER/TODO.md § Phase 4](DESIGN-CONTROLLER/TODO.md#phase-4--tractor-firmware)).
+> Path links below refer to the historical locations; prepend
+> `DESIGN-CONTROLLER/RESEARCH-CONTROLLER/` for the current location of any
+> Opta / ESP32 / `raspberry_pi_web_controller` files.
+
 ## Mechanical / UTU integration
 
 - [ ] Verify the loader-arm hydraulic (lift) cylinders do not collide with
