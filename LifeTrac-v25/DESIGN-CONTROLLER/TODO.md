@@ -37,6 +37,26 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 - [ ] Order conformal coating spray (MG Chemicals 419 acrylic or equivalent)
 - [ ] Order cable glands (M16/M20 IP68, ×6)
 
+### Tractor-side sensors and cameras
+
+See the sensor/cabling discussion in [HARDWARE_BOM.md § Notes on substitutions](HARDWARE_BOM.md#notes-on-substitutions) and [TRACTOR_NODE.md § Telemetry sources](TRACTOR_NODE.md). USB UVC is the easy path — the Linux mainline `uvcvideo` driver enumerates any UVC webcam as `/dev/video0` with no custom driver work; MIPI CSI is faster/lower-latency but requires Yocto device-tree overlays so it lands in Phase 2 once the USB pipeline is proven.
+
+- [ ] Order **USB UVC webcam** for first-light video — Logitech C920 (onboard H.264 hw-encode, ~$70) or ELP-USBFHD06H (M12, IP67, ~$90 if you need a sealed connector). UVC = no driver install on the X8 Yocto image.
+- [ ] Order **panel-mount USB-A bulkhead** + cable gland to bring the webcam cable through the IP65 enclosure wall (consumer USB cables are not field-sealed).
+- [ ] Order **Bosch BNO055 IMU breakout** (Adafruit 2472 or SparkFun equivalent, ~$25) — I²C @ 400 kHz on the Max Carrier breakout, on-chip sensor fusion → quaternion straight out, no Madgwick/Mahony work on the M7. Used for tip-over warning, heading hold, vibration logging.
+- [ ] Order **2× hydraulic pressure sensors**, 0–250 bar 4–20 mA output with M12-A 4-pin cordsets (~$40 each). Wires into Opta A0602 analog inputs (`hyd_supply_psi` 0x0103 / `hyd_return_psi` 0x0104 per [TRACTOR_NODE.md Modbus map](TRACTOR_NODE.md#modbus-rtu-register-map-max-carrier--opta)).
+- [ ] *(Phase 2, optional)* Order **MIPI CSI camera** — Arducam IMX219/IMX477 with 22-pin FFC ribbon (~$30–60). Requires building a Yocto image with the camera device-tree overlay enabled; track separately in `RESEARCH-CONTROLLER/VIDEO_COMPRESSION/`.
+- [ ] *(Phase 2, optional)* Order **PoE IP camera** (Reolink RLC-510A or equivalent) if night vision / IR / single-cable PoE is wanted — pulled by FFmpeg/GStreamer from RTSP on the X8.
+
+### Industrial cabling and connectors
+
+- [ ] Order **Deutsch DT04-5P connector kit** + crimp tool for engine CAN harness (already covered above for the generic DT kit; verify 5-pin J1939 variant is in the kit).
+- [ ] Order **M12-A 5-pin cordsets** (TURCK or Phoenix Contact, preassembled, 2 m) for RS-485 master ↔ Opta — preferred over field-terminated cable. Quantity 2.
+- [ ] Order **M12-A 4-pin cordsets** for the 2× hydraulic pressure sensors (matching the sensor side).
+- [ ] Order **M12 X-coded → RJ45 field plug** + Cat6a cable for IP camera or dev laptop Ethernet drop into the enclosure.
+- [ ] Order **Hammond 1554/1555 polycarbonate IP66 enclosure** (or upgrade the existing IP65 spec) sized to fit Max Carrier + Opta + D1608S + A0602 + IMU breakout on a single DIN rail.
+- [ ] Order **inline 5 A automotive blade fuse holder + TVS diode** (e.g. SMBJ33A) for the 12/24 V power feed — load-dump protection.
+
 ### Base station hardware
 
 - [ ] Order second Arduino Portenta Max Carrier (ABX00043)
@@ -169,10 +189,13 @@ Implement [`firmware/common/`](firmware/common/) — the shared protocol layer.
 
 ### Tractor-side telemetry sources
 
-- [ ] Wire u-blox GPS module (UART)
-- [ ] Wire CAN-FD to engine ECU (if engine ECU available)
-- [ ] Wire hydraulic pressure sensors (I²C)
-- [ ] Verify each source publishes to correct MQTT topic
+- [ ] Wire u-blox GPS module (UART) + mount active patch antenna on cab roof
+- [ ] Wire CAN-FD to engine ECU (if engine ECU available) — Deutsch DT04-5P J1939 harness
+- [ ] Wire hydraulic pressure sensors (4–20 mA → Opta A0602 inputs, M12-A cordsets); confirm `hyd_supply_psi`/`hyd_return_psi` register values track a calibrated reference gauge
+- [ ] Wire **BNO055 IMU** to Max Carrier I²C breakout (SDA/SCL/3V3/GND); poll at 50 Hz from M7 alongside the Modbus master loop; publish `imu` topic (roll/pitch/yaw + accel) at 5 Hz
+- [ ] Mount **USB UVC webcam** (Logitech C920 or ELP IP67) — route cable through panel-mount USB bulkhead with gland; verify Yocto enumerates as `/dev/video0` (`v4l2-ctl --list-devices`)
+- [ ] Bring up GStreamer pipeline on X8: `v4l2src device=/dev/video0 ! image/jpeg ! jpegdec ! v4l2h264enc ! rtph264pay ! udpsink` for first-light WebRTC test
+- [ ] Verify each source publishes to correct MQTT topic (per [LORA_PROTOCOL.md topic table](LORA_PROTOCOL.md#telemetryframe-variable-9128-bytes))
 
 ---
 
