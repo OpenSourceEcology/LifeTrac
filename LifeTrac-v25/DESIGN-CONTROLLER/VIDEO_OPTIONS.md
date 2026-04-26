@@ -177,6 +177,78 @@ Operator station                        LifeTrac v25 tractor
 
 ---
 
+## Multi-camera deployment
+
+v25 supports multiple cameras on the tractor X8 (single USB root hub, ~480 Mbit/s shared). The **selected camera at any moment** is what gets thumbnailed for LoRa and (when available) live-streamed over LTE. Other feeds stay local on the tractor for log replay.
+
+Camera positions and their LoRa topic IDs (from [LORA_PROTOCOL.md § Telemetry topic IDs](LORA_PROTOCOL.md#telemetryframe-variable-9128-bytes)):
+
+| Position | Topic | When auto-selected | Hardware suggestion |
+|---|---|---|---|
+| **Front (cab forward)** | `0x20` `lifetrac/v25/video/thumbnail` | tele-op forward, autonomy, default parked | Kurokesu C2-290C boxed + 2.8–12 mm varifocal CS |
+| **Rear (reverse)** | `0x21` `lifetrac/v25/video/thumbnail_rear` | reverse-stick deflection >50% for >1 s | Second Kurokesu C2-290C boxed + fixed 3.6 mm CS lens |
+| **Implement (boom / hitch)** | `0x23` `lifetrac/v25/video/thumbnail_implement` | manually selected | Kurokesu C1 PRO board + 6 mm M12 lens |
+| **Crop-health (down-looking)** | computed → `0x24` summary, no live feed | always-on background analysis | MAPIR Survey3W NDVI/OCN, or NoIR + 850 nm filter — see § Crop-health analysis |
+
+Switching is driven by **`CMD_CAMERA_SELECT`** (see [LORA_PROTOCOL.md § Command frame opcodes](LORA_PROTOCOL.md#command-frame-opcodes)). The default mode is `0x00 auto-by-mode` which gives operators the right camera without thinking; the base-station UI also has a manual override toggle.
+
+The reverse-camera auto-switch deserves to be on the tractor X8 rather than the base, because the round-trip latency of "stick goes back → base sees it → base sends `CMD_CAMERA_SELECT` → tractor switches" is ~150 ms minimum. The X8 watches the local CAN/Modbus drive command and switches in <50 ms with no LoRa hop required.
+
+---
+
+## Crop-health analysis
+
+LifeTrac is fundamentally an agricultural machine. Once we have a down-looking camera on the tractor, we get **NDVI / GNDVI / canopy-cover analysis essentially for free** because the i.MX 8M Mini on the X8 has the headroom for it. This complements (not replaces) drone-based or satellite imagery; tractor-mounted is **continuous, ground-truth, and georeferenced via the same NEO-M9N feeding `topic 0x01`.**
+
+### Why do it onboard the X8 vs. uploading raw frames
+
+The bandwidth case is decisive: a single 1080p NDVI frame is ~2 MB; even over LTE at 1 Mbit/s that's 16 s per frame. Onboard, the X8 reduces it to a **30 B summary per row swept**: mean NDVI, std, percent-canopy-cover, dominant-class flag (healthy / stressed / bare). That fits in one LoRa P2-class TelemetryFrame on `topic 0x24` once per minute. The raw frames stay on the tractor's microSD for later download over WiFi when the tractor is parked next to the shed.
+
+### Camera options
+
+| Option | Cost | Output | OSHW | Notes |
+|---|---|---|---|---|
+| **MAPIR Survey3W OCN (Orange/Cyan/NIR)** | ~$365 | 12 MP, USB | partial (sensor closed, mount/sw open) | Designed for agriculture. Calibration card included. Single sensor, no alignment. |
+| **MAPIR Survey3W NDVI (Red+NIR)** | ~$300 | 12 MP, USB | partial | Cheaper than OCN, narrower spectral coverage |
+| **Raspberry Pi NoIR + 850 nm long-pass filter** | ~$45 | 8 MP, CSI | yes (Pi side) + filter is OSHW-neutral | Cheapest path. Single-band NIR-only — derives NDVI by *adding* a second visible-band camera. |
+| **Dual Pi NoIR (visible + NIR)** | ~$90 | 2× 8 MP | yes | Two synchronized Pi cams with different filters. Spatial alignment is the work. |
+| **Sentera Single (PPK option)** | ~$1,500+ | 12 MP NDVI/NDRE | no | Professional-grade. Out of scope for v25 budget. |
+| **Reuse the C2-290C front cam + diurnal calibration** | $0 (already on tractor) | RGB only | yes | No NIR, so no true NDVI — but **GNDVI proxy + Excess Green Index (ExG) + canopy-cover %** are all computable from RGB and useful as *trend* metrics. Worth doing as Phase-1 even before adding NIR. |
+
+For v25 first light: **start with the RGB-only ExG/canopy-cover analysis on the existing front cam** ($0 hardware adder). It's not as good as NDVI, but it's free, ships now, and the X8 code (Python + OpenCV) is the same shape as the eventual NDVI pipeline. Add the MAPIR or dual NoIR in Phase 3.
+
+### Onboard pipeline (runs on the X8 Linux side)
+
+```
+[USB UVC cam] ──► gstreamer/v4l2 ──► OpenCV ──► classify rows
+                                       │            │
+                                       ▼            ▼
+                                  per-row stats  geotag from
+                                  (mean NDVI,    topic 0x01 GPS
+                                   std, canopy)  + IMU heading
+                                       │
+                                       ▼
+                                 30 B summary ──► topic 0x24 ──► base UI map
+                                       │
+                                       ▼
+                                 raw frame to /var/lib/lifetrac/crop/  (microSD)
+                                 retrievable via WiFi when parked
+```
+
+Compute budget: at 5 fps × 320×240 grayscale NDVI frames, OpenCV `meanStdDev` + thresholding + connected-components is ~10 ms/frame on one A53 core. Less than 5 % of one core. Even a small ML classifier (MobileNet-v3-tiny INT8 → "healthy / stressed / weed" head) runs in ~50 ms/frame on NEON without bothering the GPU we don't have.
+
+### What the operator sees
+
+The base-station map view (see [BASE_STATION.md](BASE_STATION.md)) overlays a per-row NDVI heatmap — green where canopy is healthy, yellow where stressed, red where bare. Updated continuously as the tractor sweeps the field. **No live video required for this** — just the 30 B summaries plus the GPS track. Drag-select a region to download the raw frames over WiFi.
+
+### Open questions
+
+- **Calibration:** NDVI is meaningful only when the sensor is calibrated. MAPIR ships a calibration card; Pi-NoIR DIY needs a reference panel each session. Track in TODO.
+- **Light invariance:** dawn / dusk / overcast change the absolute NDVI numbers. Use the calibration card-based normalization, or accept that we're tracking *relative* trends within a session.
+- **What about disease detection / weed ID?** MobileNet-v3 on the X8 plus a small custom dataset gets you "is this row a weed" at field-relevant accuracy. Out of scope for v25; track in [TODO.md](TODO.md) Phase 4+.
+
+---
+
 ## References
 
 - [WIRELESS_OPTIONS.md](WIRELESS_OPTIONS.md) — main control/telemetry link analysis

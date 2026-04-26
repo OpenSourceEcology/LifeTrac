@@ -76,15 +76,15 @@ Layout:
 │  LifeTrac v25 — Base Station          [HANDHELD HAS CONTROL]    │
 │  ────────────────────────────────────────────────────────────── │
 │  ┌──────────────┐  ┌────────────────────────┐  ┌──────────────┐ │
-│  │              │  │                        │  │ Telemetry    │ │
+│  │              │  │ [FRONT][REAR][IMPL][AUTO*] │ Telemetry    │ │
 │  │  LH joystick │  │   Live video tile      │  │ ────────────│ │
 │  │  (drive)     │  │   (WebRTC from camera) │  │ RPM:  1850  │ │
-│  │              │  │                        │  │ OilT: 78°C  │ │
+│  │              │  │   active: front · t-2s │  │ OilT: 78°C  │ │
 │  └──────────────┘  └────────────────────────┘  │ Bat:  13.2V │ │
 │  ┌──────────────┐  ┌────────────────────────┐  │ GPS:  fix 8 │ │
 │  │              │  │   [BUCKET CURL]        │  │ RSSI: -78dB │ │
 │  │  RH joystick │  │   [BUCKET DUMP]        │  │ Loss: 0.2%  │ │
-│  │  (boom/aux)  │  │   [AUX 1] [AUX 2]      │  │             │ │
+│  │  (boom/aux)  │  │   [AUX 1] [AUX 2]      │  │ NDVI: 0.71  │ │
 │  │              │  │   [E-STOP - LARGE]     │  │ Source:     │ │
 │  └──────────────┘  └────────────────────────┘  │  HANDHELD   │ │
 │                                                  └──────────────┘ │
@@ -97,6 +97,8 @@ Behavior:
 - When source is HANDHELD or AUTONOMY, the on-screen joysticks are disabled and shown greyed out (the base UI cannot send control while a higher-priority source is active).
 - "REQUEST CONTROL" button (visible when not active) — sends a request frame; takes effect when handheld releases TAKE CONTROL or after handheld heartbeat times out.
 - E-STOP button is **always active** regardless of source; sends authoritative E-stop over LoRa AND cellular for redundancy.
+- **Camera switcher** above the video tile picks which camera produces the LoRa thumbnail / WebRTC stream. `[AUTO*]` is the default and means the tractor X8 picks based on operating mode (forward → front, sustained reverse stick → rear, parked → last selected). Manual buttons pin the selection until `[AUTO*]` is re-selected; a small `MANUAL` badge shows when pinned. Active camera is echoed back over LoRa on `topic 0x22` so the badge reflects what the tractor is actually sending, not just what the UI requested. See [LORA_PROTOCOL.md § Command frame opcodes](LORA_PROTOCOL.md#command-frame-opcodes) (`CMD_CAMERA_SELECT`).
+- The **NDVI** mini-readout in the telemetry sidebar comes from `topic 0x24` `lifetrac/v25/telemetry/crop_health` — a 30 B summary computed onboard the X8 (see [VIDEO_OPTIONS.md § Crop-health analysis](VIDEO_OPTIONS.md#crop-health-analysis)). The full per-row heatmap is on the `/map` view.
 
 ### Joystick widget
 
@@ -131,7 +133,10 @@ All topics under `lifetrac/v25/`. Mosquitto runs in a container on the X8 and th
 | Direction | Topic | Producer | Consumer |
 |---|---|---|---|
 | ↓ control | `.../control/base/{lh_x,lh_y,rh_x,rh_y,buttons,estop}` | web_ui | lora_bridge |
-| ↑ telemetry | `.../telemetry/{gps,engine,battery,hydraulics,mode,errors}` | lora_bridge (from tractor) | web_ui, timeseries |
+| ↓ command | `.../cmd/camera_select` | web_ui | lora_bridge → tractor (`CMD_CAMERA_SELECT`) |
+| ↓ command | `.../cmd/estop`, `.../cmd/clear_estop` | web_ui | lora_bridge → tractor |
+| ↑ telemetry | `.../telemetry/{gps,engine,battery,hydraulics,mode,errors,imu,sensor_faults,crop_health}` | lora_bridge (from tractor) | web_ui, timeseries |
+| ↑ video | `.../video/{thumbnail,thumbnail_rear,thumbnail_implement,active_camera}` | lora_bridge (from tractor) | web_ui |
 | ↑ source state | `.../control/source_active` | lora_bridge | web_ui |
 | ↕ link health | `.../link/lora/{rssi,snr,loss}` | lora_bridge | web_ui, diagnostics |
 | ↕ link health | `.../link/cellular/{state,rssi}` | lora_bridge | web_ui, diagnostics |

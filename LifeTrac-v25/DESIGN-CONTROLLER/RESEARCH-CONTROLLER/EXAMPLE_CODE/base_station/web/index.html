@@ -72,6 +72,7 @@
     .buttons button.estop { background: var(--danger); color: #fff;
       grid-column: span 2; font-weight: 700; font-size: 18px; }
     .buttons button.takectl { background: var(--warn); color: #000; }
+    #camera-switch button.active { background: #2a8; color: #fff; }
     footer {
       padding: 4px 16px; background: var(--panel);
       border-top: 1px solid #333; font-size: 12px; opacity: 0.85;
@@ -108,8 +109,10 @@
       <div class="row"><span>GPS fix</span><span id="t-gps">—</span></div>
       <div class="row"><span>RSSI</span><span id="t-rssi">—</span></div>
       <div class="row"><span>Pkt loss</span><span id="t-loss">—</span></div>
+      <div class="row"><span>NDVI</span><span id="t-ndvi">—</span></div>
       <h3 style="margin-top:16px">Active source</h3>
       <div class="row"><span>Source</span><span id="t-src">—</span></div>
+      <div class="row"><span>Camera</span><span id="t-cam">—</span></div>
     </aside>
 
     <div class="buttons">
@@ -119,6 +122,13 @@
       <button data-btn="3">AUX 2</button>
       <button data-btn="7" class="takectl">REQ CTRL</button>
       <button id="estop" class="estop">E-STOP</button>
+    </div>
+
+    <div class="buttons" id="camera-switch" style="grid-column: 1 / span 2;">
+      <button data-cam="front">CAM FRONT</button>
+      <button data-cam="rear">CAM REAR</button>
+      <button data-cam="implement">CAM IMPL</button>
+      <button data-cam="auto" class="active">CAM AUTO*</button>
     </div>
   </main>
 

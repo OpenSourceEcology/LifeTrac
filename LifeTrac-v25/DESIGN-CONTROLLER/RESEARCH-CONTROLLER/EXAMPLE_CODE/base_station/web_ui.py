@@ -155,3 +155,30 @@ async def ws_control(ws: WebSocket):
 async def estop():
     mqtt_client.publish("lifetrac/v25/cmd/estop", b"", qos=1)
     return {"ok": True}
+
+
+# Camera selection: maps human-readable name -> CMD_CAMERA_SELECT payload byte.
+# See LORA_PROTOCOL.md § Command frame opcodes.
+_CAMERA_IDS = {
+    "auto":      0x00,
+    "front":     0x01,
+    "rear":      0x02,
+    "implement": 0x03,
+    "crop":      0x04,
+}
+
+
+@app.post("/api/camera/select")
+async def camera_select(payload: dict):
+    """Switch which camera the tractor uses for LoRa thumbnails / WebRTC.
+
+    Body: {"camera": "auto"|"front"|"rear"|"implement"|"crop"}
+    Publishes a 1-byte payload to lifetrac/v25/cmd/camera_select; lora_bridge
+    wraps it in an FT_COMMAND/CMD_CAMERA_SELECT frame and TXes it over LoRa.
+    """
+    name = str(payload.get("camera", "")).lower()
+    if name not in _CAMERA_IDS:
+        return {"ok": False, "error": f"unknown camera '{name}'"}
+    cam_id = _CAMERA_IDS[name]
+    mqtt_client.publish("lifetrac/v25/cmd/camera_select", bytes([cam_id]), qos=1)
+    return {"ok": True, "camera": name, "id": cam_id}

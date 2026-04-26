@@ -167,7 +167,11 @@ TOPIC_BY_ID = {
     0x07: "lifetrac/v25/telemetry/imu",          # BNO086 quaternion + accel, see tractor_x8/imu_service.py
     0x08: "lifetrac/v25/telemetry/sensor_faults", # bitmap of sensor disconnect / CRC errors
     0x10: "lifetrac/v25/control/source_active",
-    0x20: "lifetrac/v25/video/thumbnail",
+    0x20: "lifetrac/v25/video/thumbnail",          # default / front camera
+    0x21: "lifetrac/v25/video/thumbnail_rear",     # rear-facing reverse camera
+    0x22: "lifetrac/v25/video/active_camera",      # echo of which camera is currently selected
+    0x23: "lifetrac/v25/video/thumbnail_implement",# implement-monitor cam (optional)
+    0x24: "lifetrac/v25/telemetry/crop_health",    # NDVI / GNDVI summary computed onboard the X8
 }
 
 
@@ -181,6 +185,7 @@ class Bridge:
         self.mqtt.connect(mqtt_host, 1883)
         self.mqtt.subscribe("lifetrac/v25/cmd/control")  # from web_ui
         self.mqtt.subscribe("lifetrac/v25/cmd/estop")
+        self.mqtt.subscribe("lifetrac/v25/cmd/camera_select")
         self.mqtt.loop_start()
         self.tx_seq = 0
         self.lock = threading.Lock()
@@ -267,6 +272,24 @@ class Bridge:
             # the latched-fault is idempotent.
             body = struct.pack("<BBBHB",
                                PROTO_VERSION, SRC_BASE, FT_COMMAND, 0, 0x01)
+            crc = crc16_ccitt(body)
+            cmd = body + struct.pack("<H", crc)
+            self._tx(SRC_BASE, cmd)
+        elif msg.topic.endswith("/cmd/camera_select"):
+            # opcode 0x03 = CMD_CAMERA_SELECT, payload = 1B camera_id
+            # (0=auto, 1=front, 2=rear, 3=implement, 4=crop). See LORA_PROTOCOL.md.
+            if len(msg.payload) != 1:
+                logging.warning("cmd/camera_select wrong length: %d", len(msg.payload))
+                return
+            cam_id = msg.payload[0]
+            if cam_id > 0x04:
+                logging.warning("cmd/camera_select unknown id: %#x", cam_id)
+                return
+            with self.lock:
+                seq = self.tx_seq
+            body = struct.pack("<BBBHBB",
+                               PROTO_VERSION, SRC_BASE, FT_COMMAND, seq,
+                               0x03, cam_id)
             crc = crc16_ccitt(body)
             cmd = body + struct.pack("<H", crc)
             self._tx(SRC_BASE, cmd)

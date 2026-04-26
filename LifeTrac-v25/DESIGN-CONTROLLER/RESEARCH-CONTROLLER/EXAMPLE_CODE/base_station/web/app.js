@@ -49,6 +49,26 @@
       if (msg.topic.endsWith('/battery'))    document.getElementById('t-bat').textContent = msg.data;
       if (msg.topic.endsWith('/hydraulics')) document.getElementById('t-oil').textContent = msg.data;
       if (msg.topic.endsWith('/gps'))        document.getElementById('t-gps').textContent = msg.data;
+      if (msg.topic.endsWith('/active_camera')) {
+        // 1B enum on topic 0x22: 0=auto,1=front,2=rear,3=implement,4=crop
+        const map = { 0:'auto', 1:'front', 2:'rear', 3:'implement', 4:'crop' };
+        const id = (typeof msg.data === 'number') ? msg.data : parseInt(msg.data, 10);
+        const name = map[id] || '?';
+        document.getElementById('t-cam').textContent = name;
+        // Highlight the matching button so the UI reflects the *tractor's*
+        // actual selection, not the last button click. Lets the operator
+        // see immediately whether their request landed.
+        document.querySelectorAll('#camera-switch button').forEach(b => {
+          b.classList.toggle('active', b.dataset.cam === name);
+        });
+      }
+      if (msg.topic.endsWith('/crop_health')) {
+        // 30 B summary; here we just show mean NDVI if the bridge has
+        // already JSON-decoded it. Real decoder lives elsewhere.
+        const d = msg.data;
+        const ndvi = (d && typeof d.ndvi_mean === 'number') ? d.ndvi_mean.toFixed(2) : d;
+        document.getElementById('t-ndvi').textContent = ndvi;
+      }
       if (msg.topic.endsWith('/source_active')) {
         const txt = msg.data || 'NONE';
         document.getElementById('t-src').textContent = txt;
@@ -136,6 +156,22 @@
 
   document.getElementById('estop').addEventListener('click', () => {
     fetch('/api/estop', { method: 'POST' });
+  });
+
+  // ----- Camera switcher -----
+  // Sends CMD_CAMERA_SELECT via the web_ui /api/camera/select endpoint, which
+  // hands off to lora_bridge.py for the actual LoRa TX. The active-camera
+  // echo on topic 0x22 updates the .active class above, so we don't optimistically
+  // toggle here — we wait for the tractor to confirm.
+  document.querySelectorAll('#camera-switch button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cam = btn.dataset.cam;
+      fetch('/api/camera/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ camera: cam }),
+      });
+    });
   });
 
   // ----- USB Gamepad -----

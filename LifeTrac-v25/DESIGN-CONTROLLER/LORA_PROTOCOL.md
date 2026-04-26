@@ -153,8 +153,46 @@ Topic IDs (statically pre-registered — no REGISTER round-trip, no SUBSCRIBE):
 | 0x04 | `lifetrac/v25/telemetry/hydraulics` | 2 Hz |
 | 0x05 | `lifetrac/v25/telemetry/mode` | on change |
 | 0x06 | `lifetrac/v25/telemetry/errors` | on event |
+| 0x07 | `lifetrac/v25/telemetry/imu` | 5 Hz |
+| 0x08 | `lifetrac/v25/telemetry/sensor_faults` | on event |
 | 0x10 | `lifetrac/v25/control/source_active` | 1 Hz |
-| 0x20 | `lifetrac/v25/video/thumbnail` | 0.5 Hz |
+| 0x20 | `lifetrac/v25/video/thumbnail` | 0.5 Hz (front camera, default) |
+| 0x21 | `lifetrac/v25/video/thumbnail_rear` | 0.5 Hz (rear-facing reverse camera) |
+| 0x22 | `lifetrac/v25/video/active_camera` | on change (which camera is currently being thumbnailed: `front`, `rear`, `implement`, `crop`) |
+| 0x23 | `lifetrac/v25/video/thumbnail_implement` | 0.2 Hz (implement-monitor cam, optional) |
+| 0x24 | `lifetrac/v25/telemetry/crop_health` | 0.1 Hz (NDVI / GNDVI / canopy-cover summary computed onboard the X8 — see [VIDEO_OPTIONS.md § Crop-health analysis](VIDEO_OPTIONS.md#crop-health-analysis)) |
+
+Camera selection is driven by a Command frame from the active source — see [§ Command frame opcodes](#command-frame-opcodes) below — so that *which* camera's thumbnails get airtime over the priority-queued LoRa video class is operator-controlled, not auto-cycled. The selected camera ID is echoed back on `0x22` so the UI can show which feed it's looking at without guessing.
+
+### Command frame opcodes
+
+Command frames (`frame_type = 0x30`) carry a 1-byte `opcode` followed by an opcode-specific payload of up to 9 bytes. They are P0-class for the priority queue (see [AI NOTES/2026-04-26_LoRa_QoS_Bandwidth_Management.md](../AI%20NOTES/2026-04-26_LoRa_QoS_Bandwidth_Management.md) §4) — they ride alongside `ControlFrame` and never get queued behind telemetry or video.
+
+Layout:
+
+| Field | Bytes | Description |
+|---|---:|---|
+| (header) | 5 | `frame_type = 0x30` |
+| `opcode` | 1 | See table |
+| `payload` | 0..7 | Opcode-specific |
+| `crc16` | 2 | CRC-16/CCITT |
+
+Opcodes:
+
+| Opcode | Name | Payload | Notes |
+|---|---|---|---|
+| `0x01` | `CMD_ESTOP` | (empty) | Tractor latches E-stop until cleared. Must be P0; sent over both LoRa **and** cellular for redundancy. |
+| `0x02` | `CMD_CLEAR_ESTOP` | `confirmation_token (4 B)` | Operator-side cleared after physical ack. Token is `crc32(session_id ‖ epoch_s)` — replay-resistant. |
+| `0x03` | `CMD_CAMERA_SELECT` | `camera_id (1 B)` | Switch which camera produces thumbnails on `0x20`/`0x21`/`0x23`. `0x00=auto-by-mode`, `0x01=front`, `0x02=rear`, `0x03=implement`, `0x04=crop_health`. Tractor echoes back on topic `0x22`. |
+| `0x04` | `CMD_CAMERA_QUALITY` | `quality_id (1 B)` | Manually pin video quality rung from §5.1 of the QoS doc; `0xFF` = auto/RSSI-driven. |
+| `0x10` | `CMD_PLAN_COMMIT` | `plan_id (1 B), plan_crc16 (2 B)` | Activate a previously-uploaded waypoint plan. Parked-only. |
+| `0x20` | `CMD_LINK_HINT` | `flags (1 B)` | Base → tractor: bit0 = "drop video to lowest rung for 30 s". Used when base sees telemetry loss. |
+
+The `CMD_CAMERA_SELECT` semantics:
+
+- **`0x00 auto-by-mode`** (default): tractor picks the camera based on operating mode. Tele-op forward = front; tele-op with reverse stick deflection >50% for >1 s = rear; autonomy = front; parked = whichever was last selected. This is the one most operators want.
+- **`0x01..0x04` manual pin**: operator explicitly chose a camera; tractor stops auto-switching. UI shows a "MANUAL" badge.
+- **Auto-by-mode with rear-priority** is implemented entirely on the tractor X8 \u2014 base only sends `CMD_CAMERA_SELECT 0x00` once and the X8 handles the rest. This avoids round-trip latency on a stick-deflection-driven view switch.
 
 ### Heartbeat (10 bytes)
 
