@@ -1,21 +1,23 @@
-# Tractor Node — Portenta Max Carrier + Portenta H7 + Arduino Opta
+# Tractor Node — Portenta Max Carrier + Portenta X8 + Arduino Opta
 
 The tractor-side controller. Receives commands from the Handheld (proximity) and Base Station (long range), drives the hydraulic valves, and streams telemetry back.
 
 The tractor uses a **two-MCU split**:
 
-- **Max Carrier + Portenta H7** owns the radios (LoRa + cellular), arbitration, telemetry, logging, and engine/CAN integration. It is the *brain*.
+- **Max Carrier + Portenta X8** owns the radios (LoRa + cellular), arbitration, telemetry, logging, and engine/CAN integration. It is the *brain*. The X8 contains a full **STM32H747 co-MCU** (M7 + M4) which runs the same real-time firmware as a standalone Portenta H7; the **Linux side** (Yocto on i.MX 8M Mini) runs SSH for field debug, log rotation, optional containerized telemetry recorder, and the future MIPI camera path.
 - **Arduino Opta + expansions** owns the valve coils, the 0–10 V flow valve drive, the safety-chain interlocks, and per-channel current monitoring. It is the *industrial I/O layer*.
 - The two boards talk to each other over **Modbus RTU on RS-485** (Max Carrier J6 ↔ Opta RS-485 port).
 
-This split exists for safety: a crash, hang, or firmware bug in either MCU fails into a known-safe state independently. The Opta has its own watchdog on the "alive" register that drops all coils if the Max Carrier stops writing for >200 ms; the Max Carrier has its own watchdog on radio liveness that triggers the Opta to neutral via the same path.
+This split exists for safety: a crash, hang, or firmware bug in either MCU fails into a known-safe state independently. The Opta has its own watchdog on the "alive" register that drops all coils if the Max Carrier stops writing for >200 ms; the Max Carrier H747 co-MCU has its own watchdog on radio liveness that triggers the Opta to neutral via the same path. **Linux can crash or be rebooted without affecting valve safety** — the H747 co-MCU continues running independently.
+
+> **Fallback hardware option.** If Portenta X8 is unavailable or budget-constrained, substitute a **Portenta H7 (ABX00042, $115)** for the X8 ($200). The M7+M4 firmware is binary-compatible — it runs on the same STM32H747 silicon either way. You lose: Linux, SSH field debug, MIPI camera path, containerized telemetry recorder, and SKU consistency with the base station. You keep: full radio + arbitration + Modbus master functionality, identical safety behavior, identical pin layout into the Max Carrier. See [HARDWARE_BOM.md § Notes on substitutions](HARDWARE_BOM.md#notes-on-substitutions).
 
 ## Hardware overview
 
 | Component | Role |
 |---|---|
 | Portenta Max Carrier (ABX00043) | Carrier with onboard LoRa (Murata SX1276) + Cat-M1 cellular (SARA-R412M), both SMA |
-| Portenta H7 (ABX00042) | M7 (480 MHz Cortex-M7) + M4 (240 MHz Cortex-M4) dual core; M7 runs LoRa + arbitration + Modbus master, M4 runs deterministic 100 Hz Modbus update loop |
+| **Portenta X8 (ABX00049)** | i.MX 8M Mini quad Cortex-A53 @ 1.8 GHz running Yocto Linux + Docker, **plus STM32H747 co-MCU** (M7 480 MHz + M4 240 MHz). H7 firmware runs on the co-MCU; Linux runs on top for SSH/logs/containers. **Fallback: Portenta H7 (ABX00042) — same H747 silicon, no Linux** |
 | **Arduino Opta WiFi** (AFX00002) | Industrial PLC with 4× 10 A relays, 8 digital/analog inputs, RS-485, Ethernet. Modbus-RTU **slave** to the Max Carrier. Carries 4 of the 8 directional valve coils + watchdog logic |
 | **Opta Ext D1608S** expansion | 8× mechanical relay outputs + 8× digital inputs. Carries the other 4 directional valve coils, with 4 spare relays for engine-kill and aux outputs. 8 inputs for ignition sense / mode switch / external limit switches |
 | **Opta Ext A0602** expansion | 6× analog inputs + **2× 0–10 V analog outputs**. Drives the **Burkert 8605 flow valve controller** — supports the dual-flow-valve config from [DESIGN-HYDRAULIC/FLOW_VALVE_CONFIGURATION.md](../DESIGN-HYDRAULIC/FLOW_VALVE_CONFIGURATION.md) natively. 6 analog inputs cover battery V / oil P / coolant T / hyd P / engine T / spare with built-in conditioning |
@@ -61,7 +63,9 @@ Tractor 12 V battery
         │
         ├──► Max Carrier 6-36 V power jack
         │       │
-        │       ├──► Portenta H7 (via high-density connectors)
+        │       ├──► Portenta X8 (via high-density connectors)
+        │       │     └──► Linux (Yocto): SSH, journald, optional Docker telemetry recorder
+        │       │     └──► H747 co-MCU (M7+M4): radios + arbitration + Modbus master
         │       ├──► LoRa Murata SiP    → SMA J9 → cab-roof whip antenna
         │       ├──► SARA-R412M cellular → SMA J3 → cab-roof cellular antenna
         │       ├──► RS-485 (J6) ◄══ Modbus RTU 115200 8N1 ══► Opta RS-485
@@ -287,7 +291,7 @@ Recovery requires manual reset on the tractor (key-switch cycle or dedicated res
 
 | Load | Average | Peak |
 |---|---:|---:|
-| Portenta H7 + Max Carrier (idle) | 0.5 W | 1 W |
+| Portenta X8 + Max Carrier (idle, Linux running) | 2.5 W | 4 W |
 | LoRa TX (+20 dBm, 50% duty) | 0.4 W | 0.8 W |
 | Cellular Cat-M1 (TX burst) | 0.6 W | 2 W |
 | GPS + sensors | 0.5 W | 0.5 W |

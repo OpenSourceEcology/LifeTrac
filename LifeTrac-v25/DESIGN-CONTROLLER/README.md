@@ -8,7 +8,7 @@ This folder contains the **primary controller design** for the LifeTrac v25 trac
 ┌──────────────────────┐                          ┌──────────────────────────┐
 │  Handheld Remote     │  LoRa 915 MHz            │  Tractor                 │
 │  Arduino MKR         │ ◄────────────────────►   │  Portenta Max Carrier    │
-│  WAN 1310            │     proximity link        │  + Portenta H7           │
+│  WAN 1310            │     proximity link        │  + Portenta X8           │
 └──────────────────────┘                          │  (drives hydraulic       │
                                                    │   valves)                │
                                                    └────────┬─────────────────┘
@@ -31,7 +31,7 @@ This folder contains the **primary controller design** for the LifeTrac v25 trac
 1. **[ARCHITECTURE.md](ARCHITECTURE.md)** — system overview, radios, links, control-source arbitration, failsafes
 2. **[HARDWARE_BOM.md](HARDWARE_BOM.md)** — full bill of materials with part numbers and prices
 3. **[LORA_PROTOCOL.md](LORA_PROTOCOL.md)** — frame format, priority arbitration, MQTT-SN telemetry, security
-4. **[TRACTOR_NODE.md](TRACTOR_NODE.md)** — Portenta Max Carrier + H7 on the tractor: wiring, firmware structure, hydraulic interface
+4. **[TRACTOR_NODE.md](TRACTOR_NODE.md)** — Portenta Max Carrier + X8 (with Opta valve controller) on the tractor: wiring, firmware structure, hydraulic interface
 5. **[BASE_STATION.md](BASE_STATION.md)** — Portenta Max Carrier + X8 base station: web UI, MQTT broker, mast antenna setup
 6. **[HANDHELD_REMOTE.md](HANDHELD_REMOTE.md)** — MKR WAN 1310 handheld: joysticks, E-stop, battery, enclosure
 7. **[TODO.md](TODO.md)** — full development roadmap (hardware purchases, firmware, web UI, field testing)
@@ -56,6 +56,6 @@ The **[RESEARCH-CONTROLLER/](RESEARCH-CONTROLLER/)** subfolder archives the earl
 
 A full justification is in [ARCHITECTURE.md § Hardware rationale](ARCHITECTURE.md#hardware-rationale). The short version:
 
-- **Tractor needs an industrial-grade carrier with multiple radios + Linux-capable host** → Portenta Max Carrier + H7 gives LoRa, Cat-M1 cellular, Gigabit Ethernet, CAN, RS-485, MIPI camera, and rugged power input (6–36 V DC) on one board.
+- **Tractor needs an industrial-grade carrier with multiple radios + Linux-capable host** → Portenta Max Carrier + X8 gives LoRa, Cat-M1 cellular, Gigabit Ethernet, CAN, RS-485, MIPI camera, Linux + Docker, and rugged power input (6–36 V DC) on one board. The X8's onboard STM32H747 co-MCU runs the deterministic real-time loop. *(Fallback: Portenta H7 same-pin substitution if X8 is unavailable — loses Linux but keeps real-time capability.)*
 - **Base station needs a web server, broker, and long-range RF** → second Max Carrier + Portenta X8 (Linux) hosts nginx + Mosquitto natively, drives a high-gain mast antenna over SMA, and connects to the office LAN over Gigabit.
 - **Handheld needs to be cheap, battery-powered, and use the same LoRa silicon as the tractor** → MKR WAN 1310 has the *exact same Murata CMWX1ZZABZ-078 SiP* as the Max Carriers, so RadioLib firmware ports verbatim, at $45 per unit.

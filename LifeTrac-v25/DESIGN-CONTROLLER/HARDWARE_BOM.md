@@ -2,12 +2,12 @@
 
 All prices in USD, approximate, from primary distributor (Arduino Store, SparkFun, DigiKey, Mouser). Verify availability and regional frequency compliance (915 MHz parts shown; substitute 868 MHz for EU).
 
-## Tier 1 — Tractor Node (Portenta Max Carrier + Portenta H7)
+## Tier 1 — Tractor Node (Portenta Max Carrier + Portenta X8 + Arduino Opta)
 
 | Part | Qty | Unit | Subtotal | Source | Notes |
 |---|---:|---:|---:|---|---|
 | Arduino Portenta Max Carrier (ABX00043) | 1 | $335 | $335 | [Arduino Store](https://store-usa.arduino.cc/products/portenta-max-carrier) | Carrier with onboard LoRa + Cat-M1, both SMA |
-| Arduino Portenta H7 (ABX00042) | 1 | $115 | $115 | [Arduino Store](https://store-usa.arduino.cc/products/portenta-h7) | M7 + M4 dual-core; can substitute Portenta X8 ($200) for Linux |
+| **Arduino Portenta X8 (ABX00049)** | 1 | $200 | $200 | [Arduino Store](https://store-usa.arduino.cc/products/portenta-x8) | Linux on i.MX 8M Mini quad Cortex-A53 + **STM32H747 co-MCU**. The H747 co-MCU runs the same M7+M4 firmware as a standalone H7 — we get H7 capability *and* Linux on one board. Also enables MIPI camera and SSH field-debug. **Fallback: substitute Portenta H7 (ABX00042) at $115 — saves $85, loses Linux** (see notes below) |
 | LoRa antenna 915 MHz, SMA, 3 dBi whip | 1 | $8 | $8 | DigiKey / Mouser | Arduino-recommended ANT-8/9-IPW1-SMA |
 | Cellular antenna 700–2700 MHz, SMA | 1 | $12 | $12 | DigiKey / Mouser | For SARA-R412M |
 | Activated Cat-M1 SIM card (e.g. Hologram, Soracom) | 1 | $5 | $5/mo | [Hologram](https://www.hologram.io/) | IoT data plan, ~10 MB/mo sufficient for telemetry |
@@ -34,7 +34,7 @@ All prices in USD, approximate, from primary distributor (Arduino Store, SparkFu
 | Conformal coating spray (acrylic) | 1 | $15 | $15 | MG Chemicals | Humidity protection for all PCBs |
 | Cable glands, M16/M20, IP68 | 6 | $3 | $18 | McMaster | Antenna + power + valve harness + telemetry pass-throughs |
 | Misc connectors, ferrules, heat shrink, wire | — | — | $40 | — | |
-| **Tier 1 Subtotal** | | | **~$1,265** + $5/mo | | Adopts Arduino Opta + expansions in place of discrete relay/DAC/opto/conditioning boards. See [TRACTOR_NODE.md § Why Opta as the valve controller](TRACTOR_NODE.md#why-opta-as-the-valve-controller) |
+| **Tier 1 Subtotal** | | | **~$1,350** + $5/mo | | Standardized on Portenta X8 (matches base station). Adopts Arduino Opta + expansions in place of discrete relay/DAC/opto/conditioning boards. See [TRACTOR_NODE.md § Why Opta as the valve controller](TRACTOR_NODE.md#why-opta-as-the-valve-controller) |
 
 ## Tier 2 — Base Station (Portenta Max Carrier + Portenta X8)
 
@@ -89,7 +89,7 @@ All prices in USD, approximate, from primary distributor (Arduino Store, SparkFu
 
 | Scope | Hardware cost | Recurring |
 |---|---:|---:|
-| **Single deployed system** (1 tractor + 1 base + 1 handheld) | **~$2,320** | **$10/mo** (2× SIM cards) |
+| **Single deployed system** (1 tractor + 1 base + 1 handheld) | **~$2,405** | **$10/mo** (2× SIM cards) |
 | **Plus development gear** (one-time) | $1,914 | |
 | **Plus spare parts** (recommended) | $3,400 | |
 
@@ -101,7 +101,8 @@ All prices in USD, approximate, from primary distributor (Arduino Store, SparkFu
 
 ## Notes on substitutions
 
-- **Portenta H7 vs X8 on the tractor:** H7 is the default (cheaper, real-time M4 core for valve control). Swap to X8 ($85 more) only if you need Linux on the tractor for camera processing or onboard ML. The base station X8 is *not* optional — you need Linux there for the web UI.
+- **Portenta X8 vs H7 on the tractor (primary vs fallback):** X8 is now the **primary** choice on both the tractor and the base station for SKU consistency. The X8 contains a full STM32H747 as a co-MCU, so the M7+M4 valve/radio firmware is binary-compatible with a standalone H7 — no firmware changes needed. The X8 *also* gives you Linux + Docker on the tractor for free, which enables: SSH-in field debug, journaling/log rotation that survives reboots, future MIPI camera integration, container-based telemetry recorder, and one Yocto image to maintain across both Max Carrier nodes. **Fallback to H7 (ABX00042, $115)** is acceptable if (a) X8 is out of stock, (b) cost is critical and you don't need Linux on the tractor, or (c) you want to minimize attack surface (bare-metal only). The fallback path is a pure module swap — same connectors, same firmware. Update [TRACTOR_NODE.md](TRACTOR_NODE.md) hardware table accordingly when running fallback.
+- **Base station X8 is *not* optional** — you need Linux there for the web UI containers.
 - **MKR WAN 1310 vs MKR WAN 1300:** the 1310 adds a battery charger and faster processor; spec is otherwise identical. Always buy the 1310.
 - **Mast height:** for sites where 8 dBi omni isn't enough range, swap to a 12 dBi Yagi pointed at the typical work area. Yagi gives ~15 dB more gain in one direction; total link budget improves by ~7 dB after antenna match losses.
 - **Cellular SIM:** any Cat-M1 IoT SIM works. Hologram, Soracom, Twilio Super SIM all have global coverage.

@@ -11,7 +11,7 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 ### Tractor node hardware
 
 - [ ] Order Arduino Portenta Max Carrier (ABX00043)
-- [ ] Order Arduino Portenta H7 (ABX00042)
+- [ ] **Order Arduino Portenta X8 (ABX00049)** — primary; same SKU as base station. **Fallback: Portenta H7 (ABX00042)** if X8 unavailable, $85 cheaper, loses Linux/SSH/MIPI camera but keeps full radio + real-time capability (binary-compatible firmware)
 - [ ] Order LoRa SMA whip antenna (915 MHz, 3 dBi) — ANT-8/9-IPW1-SMA or equivalent
 - [ ] Order cellular SMA antenna (700–2700 MHz)
 - [ ] Order GPS active patch antenna (28 dB LNA, SMA)
@@ -75,15 +75,15 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 
 ### Spare parts (highly recommended)
 
-- [ ] Order ×2 of each: Max Carrier, MKR WAN 1310, Portenta H7
+- [ ] Order ×2 of each: Max Carrier, MKR WAN 1310, Portenta X8 (+ optional 1× Portenta H7 as documented fallback)
 - [ ] Order ×2 spare LoRa antennas, cellular antennas, joysticks, OLEDs
 
 ---
 
 ## Phase 1 — Bench bring-up
 
-- [ ] Set up shared Git repo with subfolders for `firmware/handheld_mkr`, `firmware/tractor_h7`, `firmware/base_h7`, `firmware/common`, `base_station/` (Docker compose root)
-- [ ] Set up PlatformIO with Portenta H7 + MKR WAN 1310 board support
+- [ ] Set up shared Git repo with subfolders for `firmware/handheld_mkr`, `firmware/tractor_h7` (runs on X8 co-MCU or standalone H7), `firmware/tractor_opta`, `firmware/base_h7` (runs on X8 co-MCU), `firmware/common`, `base_station/` (Docker compose root)
+- [ ] Set up PlatformIO with Portenta H7 + Portenta X8 + MKR WAN 1310 + Opta board support
 - [ ] Set up Arduino-CLI CI (extend existing [ARDUINO_CI.md](ARDUINO_CI.md) setup)
 - [ ] **Tractor:** verify Max Carrier + H7 boots, M7 blink works, M4 blink works
 - [ ] **Tractor:** verify LoRa TX/RX from M7 with RadioLib at 915 MHz, SF7, BW500
@@ -323,6 +323,59 @@ This is the *industrial I/O layer* that the Max Carrier H7 talks to over RS-485.
 
 ---
 
+## Cross-cutting concerns (must address before Phase 7 integration)
+
+These items cut across all three nodes and don't fit neatly into a single phase. Address each before end-to-end integration testing.
+
+### Device pairing & key provisioning
+
+- [ ] Define pairing bootstrap: tractor X8 generates AES-128 key + node ID on first boot, displays as **QR code** on its status OLED (or web UI for headless tractors)
+- [ ] Handheld pairing flow: phone app or laptop scans tractor QR → writes key + node ID to MKR WAN 1310 over USB-C serial (one-time setup tool in `tools/pair_handheld.py`)
+- [ ] Base station pairing: scan same QR from base X8 web UI `/settings/pair` page → key stored in encrypted config file
+- [ ] Re-pair / key-rotation procedure documented in `OPERATIONS_MANUAL.md`
+- [ ] Persistent AES-GCM nonce counter in tractor flash (survives reboot) to prevent replay-attack window after power cycle
+
+### Firmware update strategy
+
+- [ ] Document update path per node in `FIRMWARE_UPDATES.md`:
+  - Tractor X8 / base X8: OTA over cellular (X8 pulls signed image, A/B partition rollback)
+  - Tractor / base H7 co-MCU: flashed from X8 over internal SPI/UART
+  - Opta: flashed from tractor X8 over RS-485 (Modbus file-transfer extension) OR USB in shop
+  - Handheld MKR: USB-C only (too small a RAM for OTA over LoRa)
+- [ ] Code-sign all binaries (Ed25519); X8 verifies before flashing co-MCUs
+
+### Time synchronization
+
+- [ ] Base X8 syncs to NTP over cellular, exposes time as LoRa beacon (1 Hz on a reserved frame type)
+- [ ] Tractor X8 disciplines its RTC from base beacon when available, falls back to GPS PPS, falls back to free-running RTC
+- [ ] All telemetry timestamps in UTC microseconds; document in `LORA_PROTOCOL.md`
+
+### Safety case & cybersecurity
+
+- [ ] Write `SAFETY_CASE.md`: hazard analysis (HAZOP-lite), claim ISO 13849 PL=c on the E-stop chain, document Phoenix PSR wiring as the safety function
+- [ ] Document Modbus RS-485 link as a trust boundary (sealed enclosure, no external access)
+- [ ] Base-station web UI: require WireGuard / Tailscale tunnel for any non-LAN access (no public HTTP exposure); document in `BASE_STATION.md`
+- [ ] HTTPS + basic auth on LAN-only web UI as defence-in-depth
+
+### Missing documentation
+
+- [ ] Write `NON_ARDUINO_BOM.md` — consolidated DigiKey / Mouser / L-com / Phoenix Contact / Burkert / McMaster order list (counterpart to the Arduino-store list)
+- [ ] Write `CALIBRATION.md` — joystick deadband, flow-valve 0–10 V → GPM curve, pressure-sensor zero, GPS antenna offset
+- [ ] Write `FIELD_SERVICE.md` — diagnostic flowcharts, fuse map, common failure modes, spare-parts kit contents
+- [ ] Write `OPERATIONS_MANUAL.md` — operator-facing (not engineer-facing): power-on, pairing, take-control, E-stop, charging the handheld
+
+### Hardware-in-the-loop bench
+
+- [ ] Add HIL bench rig to `HARDWARE_BOM.md` Dev Gear: 8× 12 V LEDs in place of valve coils, 8× 1 kΩ trimpots in place of pressure transducers, 2× DMM on the 0–10 V Burkert outputs, 12 V bench supply with current meter
+- [ ] Document HIL bring-up procedure as part of Phase 1
+
+### Radio vendor lock-in mitigation
+
+- [ ] Abstract the radio HAL in `firmware/common/radio.h` so SX1276 (Murata SiP) and SX1262 (RFM modules) can be swapped firmware-only
+- [ ] Keep an RFM95W + bare STM32 reference design sketch in `RESEARCH-CONTROLLER/` as Murata-EOL insurance
+
+---
+
 ## Stretch goals (Phase 10+)
 
 - [ ] Add MIPI camera on tractor (Portenta X8 only; needs to swap H7 for X8 on tractor side)
@@ -346,6 +399,8 @@ This is the *industrial I/O layer* that the Max Carrier H7 talks to over RS-485.
 | Cellular Cat-M1 not available at tractor work site | Medium | Low | Cellular is backup-only; LoRa is primary; degraded mode is well-tested |
 | Mast lightning strike | Low | High | Lightning arrestor + dedicated ground rod; insurance |
 | Operator confusion over source priority | High | Medium | Clear UI banner; physical TAKE CONTROL button is unambiguous; operator training |
+| Murata CMWX1ZZABZ EOL / single-source | Low | High | Abstract radio HAL; keep RFM95W reference design in RESEARCH-CONTROLLER/ |
+| Replay attack after tractor power cycle | Low | High | Persistent AES-GCM nonce counter in flash; session re-key on pairing |
 
 ---
 

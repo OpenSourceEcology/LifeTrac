@@ -8,7 +8,7 @@ LifeTrac v25 uses a **three-tier wireless control architecture** built on Arduin
 ┌─────────────────────────┐                                  ┌─────────────────────────────┐
 │  HANDHELD REMOTE        │                                  │  TRACTOR                    │
 │  Arduino MKR WAN 1310   │   LoRa 915 MHz, +14 dBm whip     │  Portenta Max Carrier       │
-│  ─────────────────────  │ ◄────────── proximity ──────────►│  + Portenta H7              │
+│  ─────────────────────  │ ◄────────── proximity ──────────►│  + Portenta X8              │
 │  • SAMD21 + Murata LoRa │   500 m – 2 km typical            │  ─────────────────────────  │
 │  • Dual analog joysticks│                                   │  • Murata LoRa, +20 dBm SMA │
 │  • Latching E-stop      │                                   │  • SARA-R412M Cat-M1 (SMA)  │
@@ -84,20 +84,23 @@ This mirrors the manned/unmanned aircraft handover model and is simpler than tok
 
 ## Hardware rationale
 
-### Why Portenta Max Carrier + H7 on the tractor?
+### Why Portenta Max Carrier + X8 on the tractor?
 
-| Requirement | Max Carrier + H7 delivers |
+| Requirement | Max Carrier + X8 delivers |
 |---|---|
 | Multiple radios on one board | LoRa (Murata) + Cat-M1 (SARA-R412M), both SMA |
 | Industrial power input | 6–36 V DC (handles 12 V tractor electrical) |
 | Battery backup | 18650 LiPo socket with onboard charger |
-| Real-time hydraulic control | H7's M4 core does deterministic valve PWM |
-| Linux for advanced features | H7 runs Mbed; can swap to X8 for full Linux if needed later |
-| Camera input | MIPI CSI connector (when paired with X8) |
+| Real-time hydraulic control | X8's onboard **STM32H747 co-MCU** (M7+M4) runs the deterministic Modbus master loop, independent of Linux |
+| Linux for advanced features | i.MX 8M Mini quad-A53 runs Yocto + Docker for SSH, log rotation, future MIPI camera, telemetry recorder |
+| Same SKU as base station | One Portenta X8 to stock, document, flash, and spare across both Max Carrier nodes |
+| Camera input | MIPI CSI-2 (real cameras, native to X8) |
 | Field-bus expansion | CAN-FD (TJA1049), RS-232/422/485 (SP335), mPCIe |
 | Ethernet | Gigabit RJ45 for shop / debug network |
-| Storage | microSD for logging |
-| Already-supported in OSE shop | Arduino Pro family alignment with existing v25 work |
+| Storage | 16 GB eMMC + microSD for logging |
+| Security | NXP SE050 secure element for key storage |
+
+**Fallback: substitute Portenta H7 (ABX00042, $115).** The X8's onboard H747 is the same silicon as a standalone H7, so the M7+M4 firmware is binary-compatible. Drop down to H7 if X8 is out of stock or budget-constrained — you lose Linux/SSH/MIPI camera/SKU consistency, but keep all real-time and radio capability. See [HARDWARE_BOM.md § Notes on substitutions](HARDWARE_BOM.md#notes-on-substitutions) and [TRACTOR_NODE.md](TRACTOR_NODE.md).
 
 ### Why a second Max Carrier + X8 at the base station?
 
@@ -141,8 +144,10 @@ A Max Carrier handheld would be over-engineered and impractical to carry. The MK
 | Tier | Hardware | Stack |
 |---|---|---|
 | Handheld | MKR WAN 1310 | Arduino C++ · RadioLib · MbedTLS (AES-GCM) |
-| Tractor | Portenta H7 (M7+M4) on Max Carrier | Arduino Mbed · RadioLib · MbedTLS · Modbus (for valves) |
-| Base station MCU | Portenta H7 or X8 on Max Carrier | Arduino Mbed (LoRa modem driver) |
+| Tractor real-time | STM32H747 co-MCU on Portenta X8 (or fallback H7) on Max Carrier | Arduino Mbed · RadioLib · MbedTLS · Modbus RTU master |
+| Tractor Linux (X8 only) | i.MX 8M Mini on Portenta X8 | Yocto Linux · SSH · journald · optional Docker telemetry recorder |
+| Tractor I/O | Arduino Opta + D1608S + A0602 expansions | Arduino Mbed · ArduinoModbus slave · industrial relay/DAC/ADC |
+| Base station MCU | STM32H747 co-MCU on Portenta X8 on Max Carrier | Arduino Mbed (LoRa modem driver) |
 | Base station Linux | Portenta X8 | Yocto Linux · Mosquitto · Python (LoRa↔MQTT bridge) · nginx · web UI (HTML/JS + WebSockets) |
 
 ## What this design intentionally does NOT include
@@ -151,7 +156,7 @@ A Max Carrier handheld would be over-engineered and impractical to carry. The MK
 - **Mesh networking.** No Meshtastic; star topology only (tractor is the hub for handheld+base).
 - **Joystick control over cellular.** Latency unacceptable; cellular is for telemetry + non-urgent commands.
 - **Image streaming over LoRa.** LoRa is too narrow; see [VIDEO_OPTIONS.md](VIDEO_OPTIONS.md) for the WiFi/cellular path.
-- **A separate PLC.** The Opta-based design (now in [RESEARCH-CONTROLLER/](RESEARCH-CONTROLLER/)) is superseded; H7 on Max Carrier handles the PLC role.
+- **A monolithic single-MCU design.** Initial drafts had the Max Carrier H7 driving valves directly. We re-adopted the **Arduino Opta** as a Modbus-RTU slave for the I/O layer because (a) the radio MCU and the valve MCU then fail independently — a LoRa-stack bug can't drive a coil, only set a register the Opta validates — and (b) Opta + D1608S + A0602 are pre-certified industrial I/O with built-in flyback / opto / fusing / dual 0–10 V outputs for the dual-flow-valve config. The earlier all-Opta + ESP32 + Pi design (now in [RESEARCH-CONTROLLER/](RESEARCH-CONTROLLER/)) was superseded by the *radio* split, not by removing Opta from the I/O role. See [TRACTOR_NODE.md § Why Opta as the valve controller](TRACTOR_NODE.md#why-opta-as-the-valve-controller).
 
 ## Where to next
 
