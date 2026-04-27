@@ -2,6 +2,14 @@
 //
 // DRAFT FOR REVIEW. Not compiled or tested.
 //
+// SCOPE: Hydraulic-system I/O ONLY, over Modbus-RTU/RS-485.
+//   - The Opta's WiFi and BLE radios are intentionally NOT initialised here.
+//   - No WiFi.begin(), no BLE.begin(), no MQTT client, no HTTP server.
+//   - The legacy Opta firmware that exposed those surfaces is archived in
+//     RESEARCH-CONTROLLER/arduino_opta_controller/ and is NOT this file.
+//   - The only command/telemetry path in/out of the Opta is the RS-485
+//     Modbus link to the Portenta Max Carrier (see MASTER_PLAN.md).
+//
 // Modbus-RTU SLAVE on RS-485 at 115200 8N1, slave id 0x01.
 // Register map matches TRACTOR_NODE.md § Modbus RTU register map.
 //

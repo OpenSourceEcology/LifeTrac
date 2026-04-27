@@ -1,6 +1,6 @@
 # Wireless Video Options for LifeTrac
 
-This document analyzes options for streaming video from a LifeTrac tractor-mounted camera to a remote operator. It complements [WIRELESS_OPTIONS.md](WIRELESS_OPTIONS.md), which covers the control and telemetry links.
+This document analyzes options for streaming video from a LifeTrac tractor-mounted camera to a remote operator. It complements [RESEARCH-CONTROLLER/WIRELESS_OPTIONS.md](RESEARCH-CONTROLLER/WIRELESS_OPTIONS.md) *(archived)*, the historical comparison of wireless control and telemetry technologies. Per [MASTER_PLAN.md](MASTER_PLAN.md), the v25 wireless control link is LoRa-only; WiFi/BLE/cellular discussion in this document is retained as background but is out of scope for the v25 build.
 
 ## Contents
 
@@ -251,7 +251,7 @@ The base-station map view (see [BASE_STATION.md](BASE_STATION.md)) overlays a pe
 
 ## References
 
-- [WIRELESS_OPTIONS.md](WIRELESS_OPTIONS.md) — main control/telemetry link analysis
+- [RESEARCH-CONTROLLER/WIRELESS_OPTIONS.md](RESEARCH-CONTROLLER/WIRELESS_OPTIONS.md) *(archived)* — historical control/telemetry link analysis
 - [LORA_CUSTOM_STACK_TODO.md](LORA_CUSTOM_STACK_TODO.md) — implementation plan for the LoRa stack referenced above
 - [WebRTC for low-latency streaming](https://webrtc.org/)
 - [GStreamer RTSP server](https://gstreamer.freedesktop.org/documentation/rtsp-server/)

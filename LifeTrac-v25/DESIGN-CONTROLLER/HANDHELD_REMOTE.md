@@ -1,5 +1,7 @@
 # Handheld Remote — Arduino MKR WAN 1310
 
+> **Scope (2026-04-26):** LoRa-only per [MASTER_PLAN.md](MASTER_PLAN.md). The handheld is **optional** for the v25 build — a fully usable v25 system is base-station-only (operator drives via the web UI over the base-station LoRa link). Build the handheld after the tractor + base path is bench-proven.
+
 The proximity-control handheld. Used by an operator working alongside the tractor. Holds the highest control priority of the three sources.
 
 ## Why MKR WAN 1310?

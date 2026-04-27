@@ -1,6 +1,18 @@
-# EXAMPLE_CODE — draft prototype sketches for review
+# LifeTrac v25 firmware — draft implementation
 
-**Status:** drafts for **study and review only**. None of this code has been compiled, flashed, or tested. The point of the folder is to make the design concrete enough that we can read it end-to-end and pick which version we actually want to build for the first hardware test.
+**Status:** drafts \u2014 **canonical implementation tree**, but **not yet compiled, flashed, or tested**. Promoted from the former `RESEARCH-CONTROLLER/EXAMPLE_CODE/` on 2026-04-26 to align with the canonical paths referenced in [TODO.md](../TODO.md) and the LoRa-only scope in [MASTER_PLAN.md](../MASTER_PLAN.md).
+
+Do not flash to hardware until the blockers in [`AI NOTES/CODE REVIEWS/2026-04-26_v25_implementation_readiness_review.md`](../../AI%20NOTES/CODE%20REVIEWS/2026-04-26_v25_implementation_readiness_review.md) are resolved.
+
+Layout (see [MASTER_PLAN.md \u00a7 Implementation tree](../MASTER_PLAN.md#implementation-tree)):
+
+- `handheld_mkr/` \u2014 MKR WAN 1310 handheld (LoRa transmit only)
+- `tractor_h7/` \u2014 STM32H747 co-MCU firmware (runs on the Portenta X8's onboard co-MCU; M7 = radio/arbitration, M4 = real-time control). Directory name is historical.
+- `tractor_x8/` \u2014 Portenta X8 Linux services (GPS/IMU MQTT publishers)
+- `tractor_opta/` \u2014 Arduino Opta Modbus-RTU slave (drives valves + flow setpoints)
+- `common/lora_proto/` \u2014 shared C/Python LoRa frame layer (CRC, KISS, AES-GCM)
+
+Base-station code lives at [`../base_station/`](../base_station/).
 
 > **2026-04-26 review pass applied** — the thirteen findings from the
 > [pipeline code review](../../AI%20NOTES/CODE%20REVIEWS/2026-04-26_v25_controller_pipeline_example_code_review.md)
@@ -58,7 +70,7 @@ EXAMPLE_CODE/
 │   └── crypto_stub.c
 ├── handheld_mkr/                   MKR WAN 1310 sketch
 │   └── handheld.ino
-├── tractor_h7/                     Portenta H747 (in X8 or H7) sketch
+├── tractor_h7/                     Portenta H747 co-MCU (inside X8) sketch
 │   ├── tractor_m7.ino              radio + arbitration + Modbus master
 │   └── tractor_m4.cpp              valve safety on M4 core (sketch only)
 ├── tractor_x8/                     Tractor X8 Linux side (Portenta X8 only)
@@ -101,7 +113,7 @@ Simplest of the bunch. Reads two analog joysticks + 8 buttons + a TAKE CONTROL m
 
 ### 3. [`tractor_h7/tractor_m7.ino`](tractor_h7/tractor_m7.ino) — the brain
 
-Runs on the M7 core of the H747 (whether that H747 lives in an X8 or a standalone H7). Receives LoRa frames from both handheld and base, runs the arbitration loop from [LORA_PROTOCOL.md § Multi-source arbitration](../../LORA_PROTOCOL.md#multi-source-arbitration), and writes the chosen control set to the Opta over Modbus RTU. Also sends telemetry frames the other way.
+Runs on the M7 core of the H747 co-MCU inside the Portenta X8. Receives LoRa frames from both handheld and base, runs the arbitration loop from [LORA_PROTOCOL.md § Multi-source arbitration](../../LORA_PROTOCOL.md#multi-source-arbitration), and writes the chosen control set to the Opta over Modbus RTU. Also sends telemetry frames the other way.
 
 **Review questions:**
 - We use `ArduinoModbus` (which only supports MODBUS RTU master mode out of the box) on top of `ArduinoRS485`. Do we want that, or roll a tiny Modbus master in-line so we can fully control timing? Currently using the official library.
@@ -125,7 +137,7 @@ Two sibling services that share one Qwiic bus through one Adafruit MCP2221A USB�
 
 **Why 1 Hz is enough for GPS.** Tractor top speed is ~5 mph (~2.2 m/s), so 1 Hz misses at most ~2.2 m of travel — inside the NEO-M9N's ~1.5 m standalone accuracy. Bumping to 5–10 Hz costs LoRa airtime and doesn't make a tracked tractor visibly smoother on the base map. `gps_service.py` also auto-backs off to 0.2 Hz after 10 s of <0.1 m/s ground speed (parked), freeing the channel for hydraulics / video / IMU.
 
-**Both services run on the tractor X8 only.** Skip this folder if you are flashing a standalone H7 — in that fallback build the IMU and GPS have to move to native I²C wired to the Max Carrier breakout, polled by the M7. The tradeoffs are documented in [`HARDWARE_BOM.md` § Notes on substitutions](../../HARDWARE_BOM.md#notes-on-substitutions).
+**Both services run on the tractor X8 only.** The X8 is canonical per [MASTER_PLAN.md §8.9](../../MASTER_PLAN.md), so this folder is always part of the build.
 
 **Review questions:**
 - Is 1 Hz GPS enough, or does the autonomy / waypoint follower want ~5 Hz once that lands? (Cheap to bump — just `--rate-hz 5` on the service.)
@@ -199,7 +211,7 @@ If you only have an hour, read in this order:
 
 These are the steps we would take *once we decide which version is the first test*. None of this is required to study the code.
 
-- **Arduino side** (handheld, tractor, opta): Arduino IDE 2.x or PlatformIO. Boards: *Arduino MKR WAN 1310*, *Arduino Portenta H7 / Portenta X8 (M7+M4 split)*, *Arduino Opta WiFi*. Libraries listed in [arduino_libraries.txt](../../arduino_libraries.txt).
+- **Arduino side** (handheld, tractor, opta): Arduino IDE 2.x or PlatformIO. Boards: *Arduino MKR WAN 1310*, *Arduino Portenta X8 (M7+M4 split on the onboard H747 co-MCU)*, *Arduino Opta WiFi*. Libraries listed in [arduino_libraries.txt](../../arduino_libraries.txt).
 - **Base station Python** (X8 Linux): `pip install -r base_station/requirements.txt` → `uvicorn web_ui:app --host 0.0.0.0 --port 8080` and `python lora_bridge.py /dev/ttymxc0`.
 - **HIL bench** before any radio: short the LoRa packet path with a UART loopback between handheld and tractor, swap LEDs in for valve coils on the Opta. Same code, no RF.
 

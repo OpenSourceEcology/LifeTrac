@@ -1,8 +1,18 @@
 # RESEARCH-CONTROLLER — archived prototypes and research
 
-This folder contains **superseded** controller designs and research notes that informed the current primary design (Portenta Max Carrier + MKR WAN 1310, see [../ARCHITECTURE.md](../ARCHITECTURE.md)).
+> **Treat everything in this folder as ideas/prior-art only \u2014 not implementation plans.** The canonical v25 build is LoRa-only, defined in [`../MASTER_PLAN.md`](../MASTER_PLAN.md). Code reviews and readiness analyses for the v25 hardware test do **not** apply to files under `RESEARCH-CONTROLLER/`.
+
+This folder contains **superseded** controller designs and research notes that informed the current primary design (Portenta Max Carrier + MKR WAN 1310, see [../MASTER_PLAN.md](../MASTER_PLAN.md) and [../ARCHITECTURE.md](../ARCHITECTURE.md)).
 
 Nothing here is the active design. Files are kept because they contain reusable hardware patterns, control logic, and research that the new firmware will draw on.
+
+Recent additions to this folder (2026-04-26 cleanup):
+
+- [`WIRELESS_OPTIONS.md`](WIRELESS_OPTIONS.md) \u2014 historical comparison of wireless technologies (XBee, ELRS, WiFi, cellular, LoRa, Meshtastic, etc.). LoRa was selected; this is fallback/reference material only.
+- [`config/`](config/) \u2014 Mosquitto broker config and WiFi setup notes from the legacy MQTT-over-WiFi path.
+- [`test_scripts/`](test_scripts/) \u2014 legacy MQTT bench-test scripts.
+- [`AUTOMATION_AND_ROUTE_PLANNING.md`](AUTOMATION_AND_ROUTE_PLANNING.md) \u2014 future-release scope doc for autonomy, waypoint follow, coverage planning, and the wire-protocol slots reserved (but not implemented) in v25 to keep the door open.
+- [`LATENCY_BUDGET.md`](LATENCY_BUDGET.md) \u2014 end-to-end latency analysis (operator stick \u2192 hydraulic actuation) and ranked optimization candidates. Several recommendations from this doc are already pinned in MASTER_PLAN \u00a78.17 / \u00a78.18.
 
 ---
 

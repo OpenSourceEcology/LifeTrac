@@ -1,5 +1,9 @@
 # Base Station — Portenta Max Carrier + Portenta X8
 
+> **Scope (2026-04-26):** LoRa-only per [MASTER_PLAN.md](MASTER_PLAN.md). The "cellular fallback" section and any Cat-M1 references in this document are **archived**. The retained non-LoRa path is the operator's browser reaching the base station X8 over LAN/WiFi/Ethernet — the wireless link to the tractor is LoRa.
+>
+> **MQTT note:** Mosquitto on the base-station X8 is **in scope** as a base-station-internal IPC bus (loopback or LAN-only) between `lora_bridge`, `web_ui`, the logger, and any future autonomy planner. It is *not* used as a wireless transport to the tractor. The legacy MQTT-over-WiFi-to-Opta path is archived in [RESEARCH-CONTROLLER/](RESEARCH-CONTROLLER/).
+
 The base-station controller. Hosts the operator web UI on a local LAN, bridges LoRa ↔ MQTT, and serves as the long-range RF endpoint for the tractor.
 
 ## Hardware overview
@@ -230,7 +234,7 @@ base_station/                   # Runs on X8 in Docker
 │   ├── crypto.py               # AES-GCM (mirrors firmware/common/crypto.cpp)
 │   └── requirements.txt
 ├── mosquitto/
-│   └── mosquitto.conf          # Use existing config from ../config/mosquitto.conf
+│   └── mosquitto.conf          # Use existing config from ../RESEARCH-CONTROLLER/config/mosquitto.conf (archived)
 └── timeseries/
     └── (InfluxDB or SQLite config)
 ```
@@ -241,5 +245,5 @@ base_station/                   # Runs on X8 in Docker
 - [LORA_PROTOCOL.md](LORA_PROTOCOL.md) — what's on the wire over LoRa
 - [TRACTOR_NODE.md](TRACTOR_NODE.md) — what the base station talks to
 - [VIDEO_OPTIONS.md](VIDEO_OPTIONS.md) — how video gets from tractor camera to the web UI
-- [config/mosquitto.conf](config/mosquitto.conf) — broker config (carry over from earlier design)
+- [RESEARCH-CONTROLLER/config/mosquitto.conf](RESEARCH-CONTROLLER/config/mosquitto.conf) — broker config carried over from the archived MQTT-era design; bind to LAN/loopback only
 - [RESEARCH-CONTROLLER/raspberry_pi_web_controller/](RESEARCH-CONTROLLER/raspberry_pi_web_controller/) — earlier Pi-based web UI; many UI patterns can be reused

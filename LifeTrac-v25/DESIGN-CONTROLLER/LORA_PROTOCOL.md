@@ -6,7 +6,7 @@ This document defines the air-interface protocol used between the Handheld, Trac
 - **Multi-source arbitration** — strict-priority handover between handheld, base, autonomy
 - **Loss-tolerant** — no ACK/retry on the control path
 - **Authenticated** — AES-128-GCM payload encryption + replay protection
-- **Portable** — same firmware across MKR WAN 1310, Portenta H7, Portenta X8 (only pin map changes)
+- **Portable** — same firmware across MKR WAN 1310 and Portenta X8 (only pin map changes)
 
 ## Why not LoRaWAN?
 
@@ -84,16 +84,18 @@ Tempting; declined. Reasons:
 
 ## PHY parameters (defaults)
 
-| Parameter | Control link | Telemetry link |
+| Parameter | Control link (default) | Telemetry link |
 |---|---|---|
-| Spreading Factor | SF7 | SF9 |
-| Bandwidth | 500 kHz | 250 kHz |
+| Spreading Factor | **SF7** (adaptive ladder SF7→SF8→SF9, see [§ Adaptive control-link SF](#adaptive-control-link-sf)) | SF9 |
+| Bandwidth | **125 kHz** | 250 kHz |
 | Coding Rate | 4/5 | 4/8 |
 | Sync word | 0x12 (private LoRa) | 0x12 |
 | Preamble length | 8 symbols | 12 symbols |
 | TX power | per-source (see below) | per-source |
-| Air time, 16-byte frame | ~15 ms | ~75 ms |
-| Air time, 64-byte frame | ~25 ms | ~250 ms |
+| Air time, 16-byte ControlFrame (≈44 B on-air after AES-GCM + KISS) | ~30 ms @ SF7, ~55 ms @ SF8, ~100 ms @ SF9 | n/a |
+| Air time, 64-byte TelemetryFrame | n/a | ~250 ms |
+
+The control link is pinned to **SF7 / BW 125 kHz / CR 4/5** by [MASTER_PLAN.md §8.17](MASTER_PLAN.md#817-lora-control-link-phy--sf7--bw-125-khz--cr-4-5-default-no-retries-on-controlframe-adaptive-sf7sf8sf9-fallback-when-snr-margin-degrades). The earlier draft showed BW 500 kHz; we now ship 125 kHz for range margin on the US 915 MHz band with the 8 dBi mast antenna. Adaptive fallback to SF8/SF9 is documented below; telemetry SF is independent and does not change.
 
 TX power per source:
 
@@ -161,6 +163,11 @@ Topic IDs (statically pre-registered — no REGISTER round-trip, no SUBSCRIBE):
 | 0x22 | `lifetrac/v25/video/active_camera` | on change (which camera is currently being thumbnailed: `front`, `rear`, `implement`, `crop`) |
 | 0x23 | `lifetrac/v25/video/thumbnail_implement` | 0.2 Hz (implement-monitor cam, optional) |
 | 0x24 | `lifetrac/v25/telemetry/crop_health` | 0.1 Hz (NDVI / GNDVI / canopy-cover summary computed onboard the X8 — see [VIDEO_OPTIONS.md § Crop-health analysis](VIDEO_OPTIONS.md#crop-health-analysis)) |
+| 0x40 | `lifetrac/v25/auto/plan_status` | *reserved — future release* (active waypoint index, distance-to-goal, ETA). Not implemented in v25; reserved per [`RESEARCH-CONTROLLER/AUTOMATION_AND_ROUTE_PLANNING.md`](RESEARCH-CONTROLLER/AUTOMATION_AND_ROUTE_PLANNING.md) §4.2. |
+| 0x41 | `lifetrac/v25/auto/cross_track_error` | *reserved — future release* (meters off planned path). |
+| 0x42 | `lifetrac/v25/auto/geofence_status` | *reserved — future release* (inside/outside, last violation timestamp). |
+| 0x43 | `lifetrac/v25/auto/odometry` | *reserved — future release* (dead-reckoned pose for plotting). |
+| 0x50 | `lifetrac/v25/safety/obstacle_event` | *reserved — future release* (camera/LiDAR-detected person/animal/vehicle event; mirrors `CMD_OBSTACLE_STOP` opcode `0x50`). |
 
 Camera selection is driven by a Command frame from the active source — see [§ Command frame opcodes](#command-frame-opcodes) below — so that *which* camera's thumbnails get airtime over the priority-queued LoRa video class is operator-controlled, not auto-cycled. The selected camera ID is echoed back on `0x22` so the UI can show which feed it's looking at without guessing.
 
@@ -187,6 +194,13 @@ Opcodes:
 | `0x04` | `CMD_CAMERA_QUALITY` | `quality_id (1 B)` | Manually pin video quality rung from §5.1 of the QoS doc; `0xFF` = auto/RSSI-driven. |
 | `0x10` | `CMD_PLAN_COMMIT` | `plan_id (1 B), plan_crc16 (2 B)` | Activate a previously-uploaded waypoint plan. Parked-only. |
 | `0x20` | `CMD_LINK_HINT` | `flags (1 B)` | Base → tractor: bit0 = "drop video to lowest rung for 30 s". Used when base sees telemetry loss. |
+| `0x21` | `CMD_LINK_TUNE` | `target_sf (1 B), target_bw_code (1 B), reason (1 B)` | **Tractor → base/handheld**: announce a control-link SF/BW change. `target_sf` ∈ {7,8,9}; `target_bw_code` ∈ {0=125 kHz, 1=250 kHz, 2=500 kHz}; `reason` ∈ {0x01=low SNR, 0x02=high loss, 0x03=manual, 0x04=recovery step-down}. The tractor sends this frame **twice back-to-back** — once at the current SF/BW, once at the new SF/BW — then both ends switch. If the tractor receives no Heartbeat at the new SF within 500 ms, both ends revert to the previous SF and increment a fail counter (§ [Adaptive control-link SF](#adaptive-control-link-sf)). P0-class. |
+| `0x40` | `CMD_AUTO_LOAD_PLAN` | *reserved — future release* | `plan_id (1 B), plan_crc16 (2 B)` — base → tractor: arm the named plan that has been staged on the tractor X8 over a side channel (Ethernet in the garage). Tractor responds on telemetry `0x40`. Not implemented in v25. See [`RESEARCH-CONTROLLER/AUTOMATION_AND_ROUTE_PLANNING.md`](RESEARCH-CONTROLLER/AUTOMATION_AND_ROUTE_PLANNING.md). |
+| `0x41` | `CMD_AUTO_START` | *reserved — future release* | `(empty)` — begin executing the armed plan. Requires prior `CMD_AUTO_LOAD_PLAN` ack. Not implemented in v25. |
+| `0x42` | `CMD_AUTO_PAUSE` | *reserved — future release* | `(empty)` — hold position, autonomy stays armed, telemetry continues. Not implemented in v25. |
+| `0x43` | `CMD_AUTO_ABORT` | *reserved — future release* | `reason (1 B)` — drop autonomy, return to operator control, log reason. `CMD_ESTOP` (`0x01`) preempts unconditionally and is preferred for safety stops. Not implemented in v25. |
+| `0x44` | `CMD_GEOFENCE_SET` | *reserved — future release* | `polygon_id (1 B), vertex_count (1 B)` followed by side-channel polygon push. Not implemented in v25. |
+| `0x50` | `CMD_OBSTACLE_STOP` | *reserved — future release* | `source (1 B), confidence_pct (1 B), class (1 B)` — **tractor X8 vision/LiDAR → tractor M4 over IPC**, mirrored on LoRa for base awareness. `class` ∈ {0x01=person, 0x02=animal, 0x03=vehicle, 0x04=unknown}. M4 treats this as `CMD_ESTOP` semantics. The IPC path is the safety-relevant one; the LoRa frame is informational so the operator's UI can show *why* the tractor stopped. Not implemented in v25. |
 
 The `CMD_CAMERA_SELECT` semantics:
 
@@ -301,20 +315,73 @@ void apply_control() {
 LoRa is half-duplex; we need to avoid colliding with concurrent senders.
 
 ```c
-bool transmit(uint8_t* frame, size_t len) {
-    for (int attempt = 0; attempt < 3; attempt++) {
+// Per-frame retry policy (pinned by MASTER_PLAN.md §8.17):
+//   ControlFrame (P0)  : MAX_ATTEMPTS = 1   (no retry; next 50 ms tick is the retry)
+//   HeartbeatFrame (P0): MAX_ATTEMPTS = 1   (same reasoning)
+//   Command (P0)       : MAX_ATTEMPTS = 1   (CMD_LINK_TUNE is sent twice by design at app layer, not MAC)
+//   TelemetryFrame     : MAX_ATTEMPTS = 3   (loss-tolerant, but worth a polite retry)
+bool transmit(uint8_t* frame, size_t len, uint8_t max_attempts) {
+    for (int attempt = 0; attempt < max_attempts; attempt++) {
         int16_t rssi = lora.getRSSI();
         if (rssi < CHANNEL_BUSY_THRESHOLD_DBM) {  // -90 dBm default
             lora.startTransmit(frame, len);
             return true;
         }
-        delay_random(5, 25);  // backoff 5-25 ms
+        if (attempt + 1 < max_attempts) {
+            delay_random(5, 25);  // backoff 5-25 ms (only if we will retry)
+        }
     }
-    return false;  // give up; next 50 ms tick will try again
+    return false;  // give up; for P0 frames, the next 50 ms tick will try again with newer data
 }
 ```
 
-For control frames, give-up is fine — the next frame will arrive in ≤50 ms anyway. For telemetry, prefer queueing.
+For `ControlFrame` and `HeartbeatFrame`, **`MAX_ATTEMPTS = 1`** — we only ever care about the *newest* control snapshot. Retrying a stale stick position consumes channel time the next-newer frame needs and can re-apply a deflection the operator already released. CSMA still applies (one polite channel-busy check), but if the channel is busy we drop and rely on the next 20 Hz tick. For telemetry, prefer queueing with `MAX_ATTEMPTS = 3`.
+
+## Adaptive control-link SF
+
+The control link starts at **SF7 / BW 125 kHz / CR 4/5** and falls back to slower-but-more-sensitive rungs when the link weakens. Pinned by [MASTER_PLAN.md §8.17](MASTER_PLAN.md#817-lora-control-link-phy--sf7--bw-125-khz--cr-4-5-default-no-retries-on-controlframe-adaptive-sf7sf8sf9-fallback-when-snr-margin-degrades).
+
+### Ladder
+
+| Rung | SF | BW | CR | Approx ControlFrame air time | Sensitivity vs SF7 |
+|---|---:|---:|---:|---:|---:|
+| 0 (default) | SF7 | 125 kHz | 4/5 | ~30 ms | baseline |
+| 1 | SF8 | 125 kHz | 4/5 | ~55 ms | +2.5 dB |
+| 2 (deepest) | SF9 | 125 kHz | 4/5 | ~100 ms | +5 dB |
+
+The ladder stops at SF9. Beyond SF9 the air time would not fit the 20 Hz control cadence into the duty-cycle budget; if the link is that bad, failsafe is the correct outcome.
+
+### Decision logic (runs on the tractor, the canonical RX for control)
+
+```c
+// State per remote source (HANDHELD, BASE):
+struct LinkState {
+    uint8_t  current_rung;            // 0..2
+    int8_t   snr_window[10];          // last 10 ControlFrame SNRs (dB)
+    uint8_t  loss_window[10];         // last 10 250-ms slots: missed_in_slot count
+    uint32_t step_up_ok_since_ms;     // how long the link has been clean (for step-down)
+    uint8_t  fail_count_at_new_rung;  // for revert-on-no-heartbeat
+};
+
+// Thresholds (tunable in params_service.py):
+const int8_t  SNR_MARGIN_FALLBACK_DB[3] = {  3,   1,  -2 };  // step UP if avg SNR drops below this for current rung
+const int8_t  SNR_MARGIN_RECOVER_DB[3]  = {  6,   4,   1 };  // step DOWN if avg SNR exceeds this AND link clean 30 s
+const float   LOSS_FRAC_FALLBACK        = 0.02f; // 2% loss over 5 s -> step up
+const uint32_t LINK_TUNE_REVERT_MS      = 500;   // no heartbeat at new rung -> revert
+const uint32_t STEP_DOWN_HOLD_MS        = 30000; // require 30 s clean before step-down
+```
+
+1. **Step UP (slower, more sensitive)** when *either* the rolling average SNR over the last 10 ControlFrames drops below `SNR_MARGIN_FALLBACK_DB[current_rung]` for >2 s, *or* ControlFrame loss over a 5 s window exceeds 2%.
+2. **Step DOWN (faster, less sensitive)** only when the rolling SNR margin exceeds `SNR_MARGIN_RECOVER_DB[current_rung]` continuously for >30 s. Hysteresis prevents hunting.
+3. **Switch protocol:** tractor sends `CMD_LINK_TUNE` (opcode `0x21`) with the new rung's parameters, transmitted **twice back-to-back** — once at the current SF/BW, once at the new SF/BW. The tractor's RX immediately retunes to the new SF/BW. The base/handheld's RX of the second frame triggers their TX to retune.
+4. **Revert on failure:** if no valid Heartbeat arrives at the new SF within `LINK_TUNE_REVERT_MS` (500 ms), the tractor retunes back to the old SF, increments `fail_count_at_new_rung`, and waits a backoff before retrying. After 3 consecutive failed step-up attempts at the same rung, the tractor latches at the deepest rung it can demodulate at all and surfaces a `link_unstable` flag in `TelemetryFrame` topic `0x10`.
+5. **Visibility:** the current rung is reported in TelemetryFrame topic `0x10` (`control/source_active`) so the web UI can surface "LINK: SF7 (clean)" or "LINK: SF9 (degraded — 6 of last 10 frames lost)". Without this, operators cannot tell why their controls feel laggy.
+
+### What does NOT change with the SF
+
+- **Telemetry link** stays on SF9 / BW 250 kHz / CR 4/8 regardless of control-link rung. Telemetry is downlink-only and tractor-initiated; it can hold its own SF without coordination.
+- **Failsafe timeout** stays at `HEARTBEAT_TIMEOUT_MS = 500 ms`. If no valid Heartbeat at *any* SF arrives in that window, `pick_active_source()` returns `SOURCE_NONE` and valves go neutral.
+- **AES-GCM nonce uniqueness** (per-source monotonic sequence + 4-byte timestamp + 5-byte random) is independent of SF.
 
 ## Forward error correction (telemetry only)
 
@@ -363,5 +430,5 @@ X8-side bridge: `bridge.py` (Python, runs in Docker on the X8). Reads serial fro
 - [MQTT-SN v1.2 specification](https://www.oasis-open.org/committees/download.php/66091/MQTT-SN_spec_v1.2.pdf)
 - [NIST SP 800-38D — AES-GCM](https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf)
 - [KISS protocol (TNC framing)](http://www.ax25.net/kiss.aspx)
-- [WIRELESS_OPTIONS.md § Custom LoRa Stack vs XBee Baseline](WIRELESS_OPTIONS.md#custom-lora-stack-vs-xbee-baseline--range-and-throughput)
+- [RESEARCH-CONTROLLER/WIRELESS_OPTIONS.md § Custom LoRa Stack vs XBee Baseline](RESEARCH-CONTROLLER/WIRELESS_OPTIONS.md#custom-lora-stack-vs-xbee-baseline--range-and-throughput) *(archived)*
 - [RESEARCH-CONTROLLER/LORA_CUSTOM_STACK_TODO.md](RESEARCH-CONTROLLER/LORA_CUSTOM_STACK_TODO.md) — earlier SparkFun-based plan; many design decisions carry over

@@ -1,5 +1,7 @@
 # LifeTrac v25 Controller — Development TODO
 
+> **Scope (2026-04-26):** LoRa-only per [MASTER_PLAN.md](MASTER_PLAN.md). Cellular (Cat-M1 / SARA-R412M) line items below are **archived** — do not order, do not implement. Operator-browser ↔ base-station LAN/WiFi is retained. Legacy WiFi/BLE/MQTT-over-WiFi work is in [RESEARCH-CONTROLLER/](RESEARCH-CONTROLLER/).
+
 Comprehensive task list for implementing the three-tier controller architecture (Portenta Max Carrier on tractor + Portenta Max Carrier with X8 base station + MKR WAN 1310 handheld). See [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
 
 Tasks are organized by phase. Hardware purchases come first because lead times dominate the schedule.
@@ -11,7 +13,7 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 ### Tractor node hardware
 
 - [ ] Order Arduino Portenta Max Carrier (ABX00043)
-- [ ] **Order Arduino Portenta X8 (ABX00049)** — primary; same SKU as base station. **Fallback: Portenta H7 (ABX00042)** if X8 unavailable, $85 cheaper, loses Linux/SSH/MIPI camera but keeps full radio + real-time capability (binary-compatible firmware)
+- [ ] **Order Arduino Portenta X8 (ABX00049)** — same SKU as base station. Canonical per [MASTER_PLAN.md §8.9](MASTER_PLAN.md); the X8's onboard STM32H747 co-MCU runs the realtime M7+M4 firmware bare-metal, and the i.MX 8M Mini side gives Linux/SSH/MIPI camera.
 - [ ] Order LoRa SMA whip antenna (915 MHz, 3 dBi) — ANT-8/9-IPW1-SMA or equivalent
 - [ ] Order cellular SMA antenna (700–2700 MHz)
 - [ ] Order **SparkFun NEO-M9N Qwiic GPS — SMA variant (GPS-15733, ~$75)** + panel-mount SMA bulkhead (~$5) + a second 50 mm Qwiic cable (~$1). Daisy-chains off the BNO086 on the same MCP2221A bus, so no extra USB port or driver work. Onboard SMA jack means the cab-roof antenna feedline runs straight to the enclosure wall — no U.FL pigtail. See [HARDWARE_BOM.md Tier 1](HARDWARE_BOM.md#tier-1--tractor-node-portenta-max-carrier--portenta-x8--arduino-opta).
@@ -98,28 +100,28 @@ See the sensor/cabling discussion in [HARDWARE_BOM.md § Notes on substitutions]
 
 ### Spare parts (highly recommended)
 
-- [ ] Order ×2 of each: Max Carrier, MKR WAN 1310, Portenta X8 (+ optional 1× Portenta H7 as documented fallback)
+- [ ] Order ×2 of each: Max Carrier, MKR WAN 1310, Portenta X8
 - [ ] Order ×2 spare LoRa antennas, cellular antennas, joysticks, OLEDs
 
 ---
 
 ## Phase 1 — Bench bring-up
 
-- [ ] Set up shared Git repo with subfolders for `firmware/handheld_mkr`, `firmware/tractor_h7` (runs on X8 co-MCU or standalone H7), `firmware/tractor_opta`, `firmware/base_h7` (runs on X8 co-MCU), `firmware/common`, `base_station/` (Docker compose root)
-- [ ] Set up PlatformIO with Portenta H7 + Portenta X8 + MKR WAN 1310 + Opta board support
+- [ ] Set up shared Git repo with subfolders for `firmware/handheld_mkr`, `firmware/tractor_h7` (runs on the X8's onboard STM32H747 co-MCU), `firmware/tractor_opta`, `firmware/tractor_x8` (Linux services), `firmware/common`, `base_station/` (Docker compose root). Per [MASTER_PLAN.md §8.2](MASTER_PLAN.md), there is **no `firmware/base_*/` target** — Linux on the base X8 drives the SX1276 directly over SPI from `base_station/lora_bridge.py`.
+- [ ] Set up PlatformIO with Portenta X8 + MKR WAN 1310 + Opta board support
 - [ ] Set up Arduino-CLI CI (extend existing [ARDUINO_CI.md](ARDUINO_CI.md) setup)
-- [ ] **Tractor:** verify Max Carrier + H7 boots, M7 blink works, M4 blink works
-- [ ] **Tractor:** verify LoRa TX/RX from M7 with RadioLib at 915 MHz, SF7, BW500
+- [ ] **Tractor:** verify Max Carrier + X8 boots, M7 blink works on the X8's onboard H747 co-MCU, M4 blink works
+- [ ] **Tractor:** verify LoRa TX/RX from M7 with RadioLib at 915 MHz, **SF7 / BW 125 kHz / CR 4-5** per [MASTER_PLAN.md §8.17](MASTER_PLAN.md)
 - [ ] **Tractor:** verify cellular SARA-R412M registers and sends a test MQTT publish
-- [ ] **Tractor:** wire DRV8908, drive 8 LEDs as valve stand-ins from M4 core
+- [ ] **Tractor:** wire D1608S SSR1–SSR4 to four directional valve coils (boom-up, boom-down, bucket-curl, bucket-dump) per [MASTER_PLAN.md §8.18](MASTER_PLAN.md); wire the remaining four directional coils (drive LH/RH fwd/rev) to D1608S SSR5–SSR8. The Opta base's onboard EMRs are reserved for engine-kill / horn / parking-brake / spare. Drive 8 LEDs as coil stand-ins from M4 core.
 - [ ] **Base:** verify Max Carrier + X8 boots, get SSH access
 - [ ] **Base:** install Docker on X8 Yocto image
-- [ ] **Base:** verify M7 LoRa TX/RX (separate from tractor's M7)
+- [ ] **Base:** verify Linux can drive the SX1276 directly over SPI from `base_station/lora_bridge.py` (no Arduino firmware on the base H747 per [MASTER_PLAN.md §8.2](MASTER_PLAN.md))
 - [ ] **Base:** verify Gigabit Ethernet works, get DHCP lease on office LAN
 - [ ] **Handheld:** flash MKR WAN 1310 with `RadioLib` "hello world" sketch, verify LoRa TX/RX
 - [ ] **Handheld:** verify joystick analog reads + button reads on breadboard
 - [ ] **Handheld:** verify OLED display works
-- [ ] **All three nodes:** verify they can hear each other's LoRa frames at bench distance with the same parameters (SF7, BW500, freq 915.0 MHz, sync 0x12)
+- [ ] **All three nodes:** verify they can hear each other's LoRa frames at bench distance with the same parameters (SF7, **BW 125 kHz**, CR 4-5, freq 915.0 MHz, sync 0x12) per [MASTER_PLAN.md §8.17](MASTER_PLAN.md)
 
 ---
 
@@ -254,7 +256,7 @@ This is the *industrial I/O layer* that the Max Carrier H7 talks to over RS-485.
 ### Containers
 
 - [ ] Write `docker-compose.yml` with services: nginx, web_ui, mosquitto, lora_bridge, timeseries
-- [ ] **Mosquitto:** carry over [config/mosquitto.conf](config/mosquitto.conf), bind to LAN-only interface
+- [ ] **Mosquitto:** carry over [RESEARCH-CONTROLLER/config/mosquitto.conf](RESEARCH-CONTROLLER/config/mosquitto.conf), bind to LAN-only interface
 - [ ] **lora_bridge** (Python):
   - [ ] Read serial from M7 over UART
   - [ ] Decode frames using shared protocol (port `lora_proto.cpp` to `lora_proto.py`)
@@ -266,8 +268,8 @@ This is the *industrial I/O layer* that the Max Carrier H7 talks to over RS-485.
   - [ ] HTTP routes: `/`, `/map`, `/telemetry`, `/log`, `/settings`, `/diagnostics`
   - [ ] WebSocket endpoint `/ws` for control + telemetry stream
   - [ ] Static assets: HTML, CSS, JS joystick widget
-  - [ ] Authentication (basic password for now; key-based later)
-- [ ] **nginx:** TLS termination, reverse proxy to web_ui, static asset caching
+  - [ ] Authentication: **single shared PIN** (4–6 digits) configured at first boot, per [MASTER_PLAN.md §8.5](MASTER_PLAN.md)
+- [ ] **nginx:** reverse proxy to web_ui + static asset caching. **Plain HTTP on port 80, LAN-only** per [MASTER_PLAN.md §8.5](MASTER_PLAN.md) (no TLS for v25; threat model is "physical LAN access = trusted operator").
 - [ ] **timeseries:** InfluxDB or SQLite storing all `lifetrac/v25/telemetry/*` topics
 
 ### Web UI front-end (browser-side JavaScript)
@@ -282,11 +284,9 @@ This is the *industrial I/O layer* that the Max Carrier H7 talks to over RS-485.
 - [ ] Telemetry graph page with Plotly or Chart.js
 - [ ] Diagnostics page with link-health graphs
 
-### Base station M7 firmware (`firmware/base_h7/base.ino`)
+### Base station services (Linux only)
 
-- [ ] LoRa modem driver setup
-- [ ] UART bridge to X8 (binary frame stream over high-density connector)
-- [ ] Optional: cellular fallback for control if LoRa down (gated by 2-step UI confirmation)
+Per [MASTER_PLAN.md §8.2](MASTER_PLAN.md), the base station runs **no Arduino firmware** — Linux on the X8 drives the SX1276 directly over SPI from `base_station/lora_bridge.py`. There is no `firmware/base_h7/` target to build, flash, or CI.
 
 ---
 
@@ -340,7 +340,7 @@ This is the *industrial I/O layer* that the Max Carrier H7 talks to over RS-485.
 - [ ] Write hookup guide (consolidated from [TRACTOR_NODE.md](TRACTOR_NODE.md), [BASE_STATION.md](BASE_STATION.md), [HANDHELD_REMOTE.md](HANDHELD_REMOTE.md))
 - [ ] Write operator manual (how to use the handheld + web UI)
 - [ ] Verify FCC §15.247 compliance with spectrum analyzer (handheld at +14 dBm, tractor at +20 dBm, base at +20 dBm + 8 dBi antenna = +26.3 dBm EIRP, all under +36 dBm limit)
-- [ ] Open-source the firmware under GPLv3 (matching ELRS / Meshtastic norms)
+- [ ] Open-source the firmware under GPLv3 (matching Meshtastic / RadioLib community norms)
 - [ ] Open-source the web UI under AGPLv3 (so improvements stay open)
 - [ ] Update top-level [LifeTrac-v25/README.md](../README.md) to reference this controller design
 - [ ] Update [LifeTrac-v25/TODO.md](../TODO.md): mark "wireless control" item as in-progress, link here
@@ -446,7 +446,7 @@ These items cut across all three nodes and don't fit neatly into a single phase.
 - [HARDWARE_BOM.md](HARDWARE_BOM.md) — what to buy
 - [LORA_PROTOCOL.md](LORA_PROTOCOL.md) — air-interface spec
 - [TRACTOR_NODE.md](TRACTOR_NODE.md) · [BASE_STATION.md](BASE_STATION.md) · [HANDHELD_REMOTE.md](HANDHELD_REMOTE.md) — per-tier build guides
-- [WIRELESS_OPTIONS.md](WIRELESS_OPTIONS.md) — comparison of wireless technologies considered
+- [RESEARCH-CONTROLLER/WIRELESS_OPTIONS.md](RESEARCH-CONTROLLER/WIRELESS_OPTIONS.md) *(archived)* — historical comparison of wireless technologies considered before LoRa was selected
 - [VIDEO_OPTIONS.md](VIDEO_OPTIONS.md) — video streaming options
 - [RESEARCH-CONTROLLER/](RESEARCH-CONTROLLER/) — earlier prototypes and research docs
 - [LifeTrac-v25/TODO.md](../TODO.md) — top-level v25 TODO list

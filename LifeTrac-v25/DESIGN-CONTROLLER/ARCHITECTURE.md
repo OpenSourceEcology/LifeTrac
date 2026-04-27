@@ -1,5 +1,7 @@
 # Architecture — LifeTrac v25 Three-Tier Control System
 
+> **Scope (2026-04-26):** LoRa-only per [MASTER_PLAN.md](MASTER_PLAN.md). Cellular (Cat-M1 / SARA-R412M) and "cellular fallback" mentions in this document are **archived** — the v25 build relies solely on the LoRa link for tractor↔base and tractor↔handheld. Cellular sections are retained as background pending a doc cleanup pass.
+
 ## Overview
 
 LifeTrac v25 uses a **three-tier wireless control architecture** built on Arduino Pro hardware. All three tiers share the same Murata CMWX1ZZABZ-078 LoRa SiP (Semtech SX1276 + STM32L0), so a single firmware codebase serves all of them with only pin-map differences.
@@ -100,8 +102,6 @@ This mirrors the manned/unmanned aircraft handover model and is simpler than tok
 | Storage | 16 GB eMMC + microSD for logging |
 | Security | NXP SE050 secure element for key storage |
 
-**Fallback: substitute Portenta H7 (ABX00042, $115).** The X8's onboard H747 is the same silicon as a standalone H7, so the M7+M4 firmware is binary-compatible. Drop down to H7 if X8 is out of stock or budget-constrained — you lose Linux/SSH/MIPI camera/SKU consistency, but keep all real-time and radio capability. See [HARDWARE_BOM.md § Notes on substitutions](HARDWARE_BOM.md#notes-on-substitutions) and [TRACTOR_NODE.md](TRACTOR_NODE.md).
-
 ### Why a second Max Carrier + X8 at the base station?
 
 | Requirement | Max Carrier + X8 delivers |
@@ -144,7 +144,7 @@ A Max Carrier handheld would be over-engineered and impractical to carry. The MK
 | Tier | Hardware | Stack |
 |---|---|---|
 | Handheld | MKR WAN 1310 | Arduino C++ · RadioLib · MbedTLS (AES-GCM) |
-| Tractor real-time | STM32H747 co-MCU on Portenta X8 (or fallback H7) on Max Carrier | Arduino Mbed · RadioLib · MbedTLS · Modbus RTU master |
+| Tractor real-time | STM32H747 co-MCU on Portenta X8 on Max Carrier | Arduino Mbed · RadioLib · MbedTLS · Modbus RTU master |
 | Tractor Linux (X8 only) | i.MX 8M Mini on Portenta X8 | Yocto Linux · SSH · journald · optional Docker telemetry recorder |
 | Tractor I/O | Arduino Opta + D1608S + A0602 expansions | Arduino Mbed · ArduinoModbus slave · industrial relay/DAC/ADC |
 | Base station MCU | STM32H747 co-MCU on Portenta X8 on Max Carrier | Arduino Mbed (LoRa modem driver) |
