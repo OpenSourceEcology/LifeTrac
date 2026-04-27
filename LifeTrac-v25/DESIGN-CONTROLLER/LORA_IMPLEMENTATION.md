@@ -64,13 +64,17 @@ The single SX1276 per node hosts **three coexisting PHY profiles** that the radi
 
 | Profile | SF | BW | CR | Used for | Airtime per typical frame |
 |---|---|---|---|---|---|
-| **Control** | 7 (adaptive 7→8→9) | 125 kHz | 4/5 | `ControlFrame`, `Heartbeat`, P0 commands, `CMD_PERSON_APPEARED` | 16 B → ~30 ms @ SF7, ~55 ms @ SF8, ~100 ms @ SF9 |
+| **Control** | 7 (adaptive 7→8→9) | 125 kHz | 4/5 | `ControlFrame`, `Heartbeat`, P0 commands, `CMD_PERSON_APPEARED` | 44 B encrypted `ControlFrame` → ~92 ms @ SF7, ~164 ms @ SF8, ~288 ms @ SF9. **Blocker:** does not fit 20 Hz cadence. |
 | **Telemetry** | 9 | 250 kHz | 4/8 | `TelemetryFrame` topics `0x01`–`0x10`, `0x26` detections, `0x27` audio events | 64 B → ~250 ms (fragmented to ≤25 ms cap per R-6) |
-| **Image** | 7 (opt-in 8) | 250 kHz | 4/5 | `TileDeltaFrame` (`0x25`), motion vectors (`0x28`), wireframe (`0x29`) | 32 B fragment → ~22 ms @ SF7, ~40 ms @ SF8 |
+| **Image** | 7 (opt-in 8) | 250 kHz | 4/5 | `TileDeltaFrame` (`0x25`), motion vectors (`0x28`), wireframe (`0x29`) | 32 B fragment → ~36 ms @ SF7/BW250. **Blocker:** misses 25 ms fragment cap; ≤15 B is the current estimator limit. |
 
 **Why split.** Telemetry default of SF9/BW250/CR4-8 makes a 32 B image fragment ~120 ms on-air, violating L1. Image therefore gets its own SF7 profile retuned per-frame. SF8 image is opt-in only because it violates L1. See [LORA_PROTOCOL.md § PHY parameters](LORA_PROTOCOL.md#phy-parameters-defaults) and [IMAGE_PIPELINE.md §13.1 Revisit-1](IMAGE_PIPELINE.md).
 
 **Why CR4-5 for image.** Application-layer recovery (canvas + `CMD_REQ_KEYFRAME` + auto-fallback ladder) substitutes for FEC. CR4-8 was a ~37 % airtime tax for redundancy already provided. Image now CR4-5; CR4-8 retained for `0x26` and `0x27` where loss would silently hide a safety alert. See [IMAGE_PIPELINE.md §13.1 Revisit-2](IMAGE_PIPELINE.md).
+
+**Control cadence blocker (2026-04-27 implementation review).** The SF7/BW125 control profile and the 20 Hz no-retry `ControlFrame` cadence are internally inconsistent with AES-GCM overhead. The shared Python estimator reports ~92 ms for the encrypted 44-byte control payload at SF7/BW125, before KISS expansion and CSMA. Week-1 bring-up must decide whether to widen the control profile, reduce cadence, reduce framing/security overhead, or move control to a dedicated radio/channel before any moving-hydraulics test.
+
+**Image fragment cap blocker (2026-04-27 implementation review).** The same estimator reports ~36 ms for a 32 B SF7/BW250 image fragment. The documented 25 ms cap therefore requires smaller fragments (roughly ≤15 B cleartext at the current profile), a wider image profile, or a revised cap. The image pipeline should not be marked ready until this is resolved and bench-measured.
 
 ### 3.1 Adaptive control-link SF ladder
 
@@ -160,26 +164,28 @@ Mandatory in Phase 2; not deferable.
 
 Mirrors the IMAGE_PIPELINE.md week numbering so the two plans interleave correctly. Phase 1 of this plan must complete by the end of week 1 because IMAGE_PIPELINE.md week-1 deliverables depend on it.
 
-| Week | Deliverable | Phase |
-|---|---|:-:|
-| 1 | **Bench bring-up** ([Phase 1](TODO.md#phase-1--bench-bring-up)) — all three nodes hear each other at SF7/BW125/CR4-5/915.0/sync 0x12. Range smoke test at 1 m. | 0 |
-| 1 | **R-7 retune-cost bench measurement.** Measure `setFrequency` + `setSpreadingFactor` + `setBandwidth` + `setCodingRate` cost on SX1276. If > 5 ms, enable burst-batching code path. | 0 |
-| 1–2 | **Common firmware** ([Phase 2](TODO.md#phase-2--common-firmware-shared-by-all-three-nodes)) — KISS framer, CRC-16, frame structs, `lora_proto_encode/decode`, AES-GCM wrapper, nonce generator, replay window, unit tests. | 1 |
-| 2 | **`provision.py`** key provisioning utility. Document key rotation in `KEY_ROTATION.md`. | 1 |
-| 2 | **FHSS hop sequence** in `lora_proto.cpp` — 8 channels, AES-key-ID-seeded sequence, CSMA skip-busy. | 1 |
-| 2–3 | **Priority queue** in `lora_proto.cpp` — P0/P1/P2/P3 classes, preemption rules, 25 ms-per-fragment cap (covers L1 and R-6). | 1 |
-| 3 | **Telemetry fragmentation (R-6)** — extend `TileDeltaFrame` fragment scheme to oversized `TelemetryFrame`; base reassembly in `lora_bridge.py` before MQTT publish. | 1 |
-| 3 | **Handheld firmware** ([Phase 3](TODO.md#phase-3--handheld-firmware)) — 50 Hz `ControlFrame` TX, OLED status, TAKE CONTROL latch, E-STOP, LiPo charging. | 1 |
-| 3–4 | **Tractor M7 firmware** ([Phase 4](TODO.md#phase-4--tractor-firmware)) — `pick_active_source()`, source-state tracking, failsafe at 500 ms, valve neutral handoff. | 1 |
-| 4 | **Bench gate B1** — three-source arbitration test on the bench (see §9). **Image-pipeline week-1 dependencies satisfied.** | 1 |
-| 4–5 | **`CMD_LINK_TUNE` adaptive SF ladder** with R-8 hysteresis (3 windows in either direction; 30 s clean for step-up). | 1 |
-| 5 | **`link_monitor.py`** — rolling airtime ledger, `CMD_ENCODE_MODE` emitter, telemetry `0x10` publisher. **Image-pipeline week-5 dependency satisfied.** | 1 |
-| 5–6 | **Base station LoRa bridge** ([Phase 5](TODO.md#phase-5--base-station-firmware-linux-side-runs-in-docker-on-x8)) — `lora_bridge.py` SPI + decode + decrypt + MQTT republish + telemetry forward. Port `lora_proto.cpp` → `lora_proto.py` and `crypto.cpp` → `crypto.py`. | 1 |
-| 6 | **FHSS spectrum-analyser bench-verification** — confirm per-channel dwell ≤ 12.5 %, all 8 channels active, no out-of-band emissions. | 1 |
-| 6–7 | **Mast antenna installation** ([Phase 6](TODO.md#phase-6--mast-antenna-installation-base-station)). VNA SWR check < 2:1. | 2 |
-| 7–9 | **Integration testing** ([Phase 7](TODO.md#phase-7--integration--end-to-end-testing)) — single-source, two-source, handover, TAKE CONTROL, failsafe, replay, tamper, latency. | 2 |
-| 9–10 | **Field testing** ([Phase 8](TODO.md#phase-8--field-testing)) — 1/5/10/15 km range, foliage attenuation, vibration, IP rating, 24 h soak, 7 d deployment. | 2 |
-| Continuous | **`tools/lora_rtt.py` nightly run.** Audit-log diff per night; flag regressions. | — |
+> **Status note (2026-04-27):** ✅ marks items already shipped in the workspace at the time this plan was written. The build order is retained so a future contributor can see the original sequence; ✅ entries can be skipped during fresh bring-up.
+
+| Week | Deliverable | Status | Phase |
+|---|---|---|:-:|
+| 1 | **Bench bring-up** ([Phase 1](TODO.md#phase-1--bench-bring-up)) — all three nodes hear each other at SF7/BW125/CR4-5/915.0/sync 0x12. Range smoke test at 1 m. | open | 0 |
+| 1 | **R-7 retune-cost bench measurement.** Measure `setFrequency` + `setSpreadingFactor` + `setBandwidth` + `setCodingRate` cost on SX1276. If > 5 ms, enable burst-batching code path. | partial — [`firmware/bench/lora_retune_bench/`](firmware/bench/lora_retune_bench/) sketch exists; not yet bench-run | 0 |
+| 1–2 | **Common firmware** ([Phase 2](TODO.md#phase-2--common-firmware-shared-by-all-three-nodes)) — KISS framer, CRC-16, frame structs, `lora_proto_encode/decode`, AES-GCM wrapper, nonce generator, replay window, unit tests. | ✅ [`firmware/common/lora_proto/`](firmware/common/lora_proto/) (`lora_proto.h`, `lora_proto.c`, `crypto_stub.c`) + Python mirror [`base_station/lora_proto.py`](base_station/lora_proto.py) + tests in [`base_station/tests/`](base_station/tests/) | 1 |
+| 2 | **`provision.py`** key provisioning utility. Document key rotation in `KEY_ROTATION.md`. | ✅ tool at [`tools/provision.py`](tools/provision.py); doc still pending L-O2 | 1 |
+| 2 | **FHSS hop sequence** in `lora_proto.cpp` — 8 channels, AES-key-ID-seeded sequence, CSMA skip-busy. | ✅ hop sequence in `lp_fhss_channel_index` / `lp_fhss_channel_hz` (C) and `fhss_channel_index` / `fhss_channel_hz` (Python). CSMA skip-busy helper ✅ — `lp_csma_pick_hop()` (C) and `pick_csma_hop()` (Python), default –90 dBm / 4 skips, unit-tested. Caller wiring into firmware TX path + audit-log hook still open. | 1 |
+| 2–3 | **Priority queue** in `lora_proto.cpp` — P0/P1/P2/P3 classes, preemption rules, 25 ms-per-fragment cap (covers L1 and R-6). | partial — base-station heap-based priority TX queue ✅ in [`base_station/lora_bridge.py`](base_station/lora_bridge.py) (single `_tx_worker`, classification via `classify_priority()` in [`base_station/lora_proto.py`](base_station/lora_proto.py), unit-tested). Firmware-side queue (handheld + tractor) and the 25 ms cap enforcement still open. | 1 |
+| 3 | **Telemetry fragmentation (R-6)** — extend `TileDeltaFrame` fragment scheme to oversized `TelemetryFrame`; base reassembly in `lora_bridge.py` before MQTT publish. | open | 1 |
+| 3 | **Handheld firmware** ([Phase 3](TODO.md#phase-3--handheld-firmware)) — 50 Hz `ControlFrame` TX, OLED status, TAKE CONTROL latch, E-STOP, LiPo charging. | partial — [`firmware/handheld_mkr/handheld.ino`](firmware/handheld_mkr/handheld.ino) skeleton exists | 1 |
+| 3–4 | **Tractor M7 firmware** ([Phase 4](TODO.md#phase-4--tractor-firmware)) — `pick_active_source()`, source-state tracking, failsafe at 500 ms, valve neutral handoff. | partial — [`firmware/tractor_h7/tractor_m7.ino`](firmware/tractor_h7/tractor_m7.ino) has `pick_active_source()` + `HEARTBEAT_TIMEOUT_MS = 500`; adaptive SF ladder still TODO at line 263 | 1 |
+| 4 | **Bench gate B1** — three-source arbitration test on the bench (see §9). **Image-pipeline week-1 dependencies satisfied.** | open | 1 |
+| 4–5 | **`CMD_LINK_TUNE` adaptive SF ladder** with R-8 hysteresis (3 windows in either direction; 30 s clean for step-up). | ✅ — state machine in [`firmware/tractor_h7/tractor_m7.ino`](firmware/tractor_h7/tractor_m7.ino) `poll_link_ladder()`: 5 s windows on the active source's HB count (bad < 80 %, good ≥ 96 %), 3 bad → SF↑ (`LTR_HIGH_LOSS`), 6 good → SF↓ (`LTR_RECOVERY_DOWN`); twice-back-to-back `CMD_LINK_TUNE` send + 500 ms revert deadline + fail counter. | 1 |
+| 5 | **`link_monitor.py`** — rolling airtime ledger, `CMD_ENCODE_MODE` emitter, telemetry `0x10` publisher. **Image-pipeline week-5 dependency satisfied.** | ✅ — [`base_station/link_monitor.py`](base_station/link_monitor.py) (`RollingAirtimeLedger` + `EncodeModeController`, 3-window hysteresis) is now wired into [`lora_bridge.py`](base_station/lora_bridge.py): every TX/RX records airtime via `attribute_phy()`; a 1 Hz worker emits `CMD_ENCODE_MODE` on rung change and publishes the `(U_image, U_telemetry, U_total)` triple as retained JSON on `lifetrac/v25/control/source_active`; alarm logs fire on `U_telemetry > 30 %` and `U_total > 60 %`. | 1 |
+| 5–6 | **Base station LoRa bridge** ([Phase 5](TODO.md#phase-5--base-station-firmware-linux-side-runs-in-docker-on-x8)) — `lora_bridge.py` SPI + decode + decrypt + MQTT republish + telemetry forward. Port `lora_proto.cpp` → `lora_proto.py` and `crypto.cpp` → `crypto.py`. | partial — [`base_station/lora_bridge.py`](base_station/lora_bridge.py) over serial works; SPI driver pending; airtime ledger not yet integrated | 1 |
+| 6 | **FHSS spectrum-analyser bench-verification** — confirm per-channel dwell ≤ 12.5 %, all 8 channels active, no out-of-band emissions. | open | 1 |
+| 6–7 | **Mast antenna installation** ([Phase 6](TODO.md#phase-6--mast-antenna-installation-base-station)). VNA SWR check < 2:1. | open | 2 |
+| 7–9 | **Integration testing** ([Phase 7](TODO.md#phase-7--integration--end-to-end-testing)) — single-source, two-source, handover, TAKE CONTROL, failsafe, replay, tamper, latency. | open | 2 |
+| 9–10 | **Field testing** ([Phase 8](TODO.md#phase-8--field-testing)) — 1/5/10/15 km range, foliage attenuation, vibration, IP rating, 24 h soak, 7 d deployment. | open | 2 |
+| Continuous | **`tools/lora_rtt.py` nightly run.** Audit-log diff per night; flag regressions. | open | — |
 
 ### 8.1 Cuts if the schedule shrinks (in order)
 
@@ -223,13 +229,13 @@ Mirrors the IMAGE_PIPELINE.md week numbering so the two plans interleave correct
 
 Files this plan touches; updates needed when this plan changes:
 
-- [LORA_PROTOCOL.md](LORA_PROTOCOL.md) — wire bytes only; this plan refers, does not duplicate. **Reservations from IMAGE_PIPELINE.md §3.2 (`0x28`/`0x29`/`0x2A`/`0x63`/badge enum) still need to land in this file as an explicit cascade pass — currently described only in IMAGE_PIPELINE.md.** Tracked in TODO.md Phase 5.0.
+- [LORA_PROTOCOL.md](LORA_PROTOCOL.md) — wire bytes only; this plan refers, does not duplicate. Reservations from IMAGE_PIPELINE.md §3.2 (`0x28`/`0x29`/`0x2A`/`0x63`/badge enum) **✅ already cascaded** — see [LORA_PROTOCOL.md topic table](LORA_PROTOCOL.md#telemetryframe-variable-9128-bytes), [opcode table](LORA_PROTOCOL.md#command-frame-opcodes), and the badge enum table at line 270.
 - [MASTER_PLAN.md §8.17 / §8.17.1](MASTER_PLAN.md) — PHY policy pins, FHSS, R-6/R-7/R-8 bullets, two-radio escape hatch.
 - [TRACTOR_NODE.md](TRACTOR_NODE.md) — M7 `pick_active_source()`, source-state struct, failsafe path.
 - [BASE_STATION.md](BASE_STATION.md) — `lora_bridge.py`, `link_monitor.py`, MQTT topic mapping, audit-log persistence.
 - [HANDHELD_REMOTE.md](HANDHELD_REMOTE.md) — TAKE CONTROL latch, OLED RSSI/SF rung display.
-- [TODO.md](TODO.md) — Phase 1 bench, Phase 2 common firmware, Phase 3 handheld, Phase 4 tractor M7, Phase 5 base bridge — all already enumerated. **NEW Phase 4.LoRa block** (see additions below) consolidates the implementation-plan-level tasks not already covered there.
-- **`KEY_ROTATION.md`** (NEW, week 2) — operator-facing key provisioning + rotation procedure. Companion to `tools/provision.py`.
+- [TODO.md](TODO.md) — Phase 1 bench, Phase 2 common firmware, Phase 3 handheld, Phase 4 tractor M7, Phase 5 base bridge — all already enumerated. Phase 2.LoRa block consolidates the implementation-plan-level tasks.
+- **`KEY_ROTATION.md`** (NEW, week 2) — operator-facing key provisioning + rotation procedure. Companion to existing [`tools/provision.py`](tools/provision.py). Pending L-O2 decision.
 
 ---
 

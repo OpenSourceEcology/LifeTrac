@@ -1,62 +1,72 @@
 # Arduino Library Requirements for LifeTrac v25
 
-## Required Libraries for Arduino Opta Controller
+Active firmware lives under `DESIGN-CONTROLLER/firmware/`. The archived WiFi/BLE/MQTT Opta and ESP32 remote sketches in `RESEARCH-CONTROLLER/` are not part of the v25 hardware-test path.
 
-### Core Libraries (built-in)
-- WiFi - ESP32 WiFi connectivity
-- Wire - I2C communication
-- ArduinoBLE - Bluetooth Low Energy support for direct DroidPad control
+## Active Arduino Targets
 
-### Arduino Opta Specific Libraries
-- OptaController - Arduino Opta controller library for 4-20mA current output and hardware control
+### `firmware/handheld_mkr/handheld.ino`
+- Board: Arduino MKR WAN 1310
+- Libraries:
+    - RadioLib
+    - SPI (board core)
+    - Wire (board core, if OLED/Qwiic controls are added during bench bring-up)
 
-### External Libraries (install via Library Manager)
-- PubSubClient by Nick O'Leary - MQTT client functionality
-- ArduinoJson by Benoit Blanchon - JSON parsing and generation
+### `firmware/tractor_h7/tractor_m7.ino` and `tractor_m4.cpp`
+- Board: Portenta X8 onboard STM32H747 co-MCU / Portenta H7-compatible core
+- Libraries:
+    - RadioLib
+    - ArduinoRS485
+    - ArduinoModbus
+    - SPI (board core)
 
-## Required Libraries for ESP32 Remote Control
+### `firmware/tractor_opta/opta_modbus_slave.ino`
+- Board: Arduino Opta WiFi
+- Libraries:
+    - ArduinoRS485
+    - ArduinoModbus
+    - OptaController (needed when the D1608S/A0602 placeholder shims are replaced with real expansion-bus calls)
 
-### Core Libraries (built-in)
-- WiFi - ESP32 WiFi connectivity  
-- Wire - I2C communication for joysticks
+### `firmware/bench/lora_retune_bench/lora_retune_bench.ino`
+- Board: MKR WAN 1310 or Portenta Max Carrier/H747, selected with `LIFETRAC_BOARD_MKR_WAN1310` or `LIFETRAC_BOARD_PORTENTA_MAX`
+- Libraries:
+    - RadioLib
 
-### External Libraries (install via Library Manager)
-- PubSubClient by Nick O'Leary - MQTT client functionality
-- ArduinoJson by Benoit Blanchon - JSON parsing and generation
-- SparkFun Qwiic Joystick Arduino Library - Joystick control
+## Intentionally Not Required In Active Firmware
 
-## Installation Instructions
+- WiFi
+- ArduinoBLE
+- PubSubClient
+- ArduinoJson
+- SparkFun Qwiic Joystick Arduino Library
 
-1. Open Arduino IDE
-2. Go to Tools → Manage Libraries
-3. Search for each library by name and author:
-   - "OptaController" - Arduino official library for Opta hardware
-   - "PubSubClient" by Nick O'Leary
-   - "ArduinoJson" by Benoit Blanchon
-   - "SparkFun Qwiic Joystick Arduino Library" by SparkFun
-4. Click Install for each required library
-5. Restart Arduino IDE
+Those belonged to the archived Opta WiFi/MQTT/BLE and ESP32 remote designs. MQTT remains in v25 only as base-station-internal Python IPC on the X8, not as an Arduino wireless control transport.
 
-## Library Versions (Tested)
-- OptaController: Latest version (Arduino official library)
-- ArduinoBLE: v1.3.0 or newer (Arduino official library)
-- PubSubClient: v2.8 or newer
-- ArduinoJson: v6.21 or newer
-- SparkFun Qwiic Joystick: v1.0.3 or newer
+## Arduino IDE Installation
 
-## Alternative Installation Methods
+Install these libraries with Tools -> Manage Libraries:
 
-### Manual Installation
-1. Download library ZIP files from GitHub
-2. Go to Sketch → Include Library → Add .ZIP Library
-3. Select downloaded ZIP files
+- `RadioLib`
+- `ArduinoRS485`
+- `ArduinoModbus`
+- `OptaController`
 
-### PlatformIO (if using PlatformIO IDE)
-Add to platformio.ini:
+Then select the target board and run Verify on the sketch folder under `firmware/`.
+
+## Arduino CLI Examples
+
+```bash
+arduino-cli core update-index
+arduino-cli core install arduino:samd
+arduino-cli core install arduino:mbed_opta
+arduino-cli core install arduino:mbed_portenta
+
+arduino-cli lib install RadioLib
+arduino-cli lib install ArduinoRS485
+arduino-cli lib install ArduinoModbus
+arduino-cli lib install OptaController
+
+arduino-cli compile --fqbn arduino:samd:mkrwan1310 LifeTrac-v25/DESIGN-CONTROLLER/firmware/handheld_mkr
+arduino-cli compile --fqbn arduino:mbed_opta:opta LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_opta
 ```
-lib_deps = 
-    arduino/OptaController
-    knolleary/PubSubClient@^2.8
-    bblanchon/ArduinoJson@^6.21
-    sparkfun/SparkFun Qwiic Joystick Arduino Library@^1.0.3
-```
+
+The exact FQBN for the X8 onboard H747 compile should be verified against the installed Arduino core before enabling it as a required CI gate.

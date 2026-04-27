@@ -66,16 +66,16 @@ This mirrors the manned/unmanned aircraft handover model and is simpler than tok
 
 ### Primary: LoRa 915 MHz (custom KISS-style framing)
 
-- **Modulation:** LoRa CSS, SF7–SF9, BW 250–500 kHz, CR 4/5
+- **Modulation:** LoRa CSS, control SF7/BW125/CR4-5, telemetry SF9/BW250/CR4-8, image SF7/BW250/CR4-5
 - **Frame:** 16-byte control frame, 32–128 byte telemetry frame, KISS-stuffed with CRC-16 + AES-128-GCM session encryption
-- **Air time per control frame:** ~15–25 ms at SF7/BW500
-- **Round-trip latency budget:** ~50–150 ms (handheld), ~100–250 ms (base station, longer range / lower SF)
+- **Air time per encrypted control frame:** ~92 ms at SF7/BW125 before KISS expansion. This does **not** fit the current 20 Hz target; see [MASTER_PLAN.md §8.17](MASTER_PLAN.md#817-lora-control-link-phy--sf7--bw-125-khz--cr-4-5-default-no-retries-on-controlframe-adaptive-sf7sf8sf9-fallback-when-snr-margin-degrades).
+- **Round-trip latency budget:** blocked pending the control cadence / PHY decision in [TODO.md](TODO.md).
 - **Why custom, not LoRaWAN:** LoRaWAN's join + duty-cycle + ADR overhead is incompatible with sub-second control loops. See [LORA_PROTOCOL.md](LORA_PROTOCOL.md).
 
-### Backup: Cellular Cat-M1 (tractor ↔ base station only)
+### Archived: Cellular Cat-M1 (tractor ↔ base station only)
 
 - **Modem:** SARA-R412M-02B on both Max Carriers
-- **Use case:** when LoRa link is marginal or blocked (deep foliage, terrain, > 25 km), telemetry and non-time-critical commands fall over to cellular MQTT
+- **Use case:** historical only. v25 does not populate SIMs or route telemetry/control over cellular.
 - **Latency:** 100–500 ms typical for Cat-M1; **not used for live joystick control**
 - **Cost:** SIM data plan, ~$5–10/month for IoT-class data
 

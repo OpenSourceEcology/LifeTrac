@@ -1,112 +1,49 @@
 # Arduino CI for LifeTrac v25
 
-This directory contains Arduino sketches for the LifeTrac v25 control system, which are automatically tested using GitHub Actions continuous integration (CI).
+The active v25 Arduino firmware is the LoRa/Modbus controller tree under `DESIGN-CONTROLLER/firmware/`:
 
-## CI Workflow
+- `firmware/handheld_mkr/handheld.ino` — MKR WAN 1310 handheld LoRa controller
+- `firmware/tractor_h7/tractor_m7.ino` and `tractor_m4.cpp` — Portenta X8 onboard H747 co-MCU tractor firmware
+- `firmware/tractor_opta/opta_modbus_slave.ino` — Opta Modbus-RTU hydraulic I/O slave
+- `firmware/bench/lora_retune_bench/lora_retune_bench.ino` — LoRa retune timing bench sketch
 
-The Arduino CI workflow automatically compiles both Arduino sketches whenever changes are made to:
-- Arduino Opta Controller code (`DESIGN-CONTROLLER/arduino_opta_controller/`)
-- ESP32 Remote Control code (`DESIGN-CONTROLLER/esp32_remote_control/`)
-- Library requirements (`arduino_libraries.txt`)
-- CI workflow configuration (`.github/workflows/arduino-ci.yml`)
+The old `arduino_opta_controller` and `esp32_remote_control` sketches are archived under `RESEARCH-CONTROLLER/` and are intentionally excluded from the active CI gate.
 
-## What Gets Tested
+## What The Workflow Should Compile
 
-### Arduino Opta Controller
-- **Board**: Arduino Opta WiFi (arduino:mbed_opta:opta)
-- **Sketch**: `DESIGN-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino`
-- **Libraries**: OptaController, PubSubClient, ArduinoJson, ArduinoBLE
+| Target | FQBN | Status |
+|---|---|---|
+| Handheld MKR WAN 1310 | `arduino:samd:mkrwan1310` | Ready for CI once shared C compilation is wired into the sketch/build step. |
+| Opta Modbus slave | `arduino:mbed_opta:opta` | Ready for CI; expansion-bus functions are placeholders until hardware bring-up. |
+| Tractor H747 M7/M4 | Portenta/X8 H747 core FQBN | Needs local FQBN verification before making CI blocking. |
+| LoRa retune bench | same board as radio under test | Manual bench tool; not required on every PR. |
 
-### ESP32 Remote Control
-- **Board**: SparkFun Thing Plus ESP32 WROOM (esp32:esp32:esp32thing_plus)
-- **Sketch**: `DESIGN-CONTROLLER/esp32_remote_control/lifetrac_v25_remote.ino`
-- **Libraries**: PubSubClient, ArduinoJson, SparkFun Qwiic Joystick Arduino Library
+## Local Smoke Test
 
-## Workflow Status
-
-You can view the status of CI runs at:
-https://github.com/OpenSourceEcology/LifeTrac/actions/workflows/arduino-ci.yml
-
-## Compilation Reports
-
-The workflow generates compilation reports showing:
-- Whether the sketches compile successfully
-- Binary size (flash and RAM usage)
-- Size deltas compared to previous builds
-
-These reports are uploaded as artifacts and retained for 30 days.
-
-## Automatic Issue Creation
-
-When a compilation error occurs, the workflow automatically creates a GitHub issue with:
-- A descriptive title indicating which sketch failed (Opta Controller or ESP32 Remote)
-- Link to the failed workflow run
-- Commit and branch information
-- Details about the sketch and board configuration
-- The issue is automatically labeled with `bug`, `arduino`, and `ci`
-- The issue is automatically assigned to @copilot for investigation
-
-This ensures compilation failures are tracked and addressed promptly.
-
-## Running CI Manually
-
-The workflow can be triggered manually:
-1. Go to the [Actions tab](https://github.com/OpenSourceEcology/LifeTrac/actions/workflows/arduino-ci.yml)
-2. Click "Run workflow"
-3. Select the branch and click "Run workflow"
-
-## Local Testing
-
-To test Arduino sketches locally before pushing:
-
-### Using Arduino IDE
-1. Install required libraries (see `arduino_libraries.txt`)
-2. Select the appropriate board:
-   - For Opta: Tools → Board → Arduino Mbed OS Opta Boards → Arduino Opta
-   - For ESP32: Tools → Board → ESP32 Arduino → SparkFun ESP32 Thing Plus
-3. Open the sketch and click "Verify" (checkmark icon)
-
-### Using Arduino CLI
 ```bash
-# Install Arduino CLI
-curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
-
-# Install board support
+arduino-cli core update-index
+arduino-cli core install arduino:samd
 arduino-cli core install arduino:mbed_opta
-arduino-cli core install esp32:esp32 --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+arduino-cli core install arduino:mbed_portenta
 
-# Install libraries
+arduino-cli lib install RadioLib
+arduino-cli lib install ArduinoRS485
+arduino-cli lib install ArduinoModbus
 arduino-cli lib install OptaController
-arduino-cli lib install PubSubClient
-arduino-cli lib install ArduinoJson
-arduino-cli lib install ArduinoBLE
-arduino-cli lib install "SparkFun Qwiic Joystick Arduino Library"
 
-# Compile sketches
-arduino-cli compile --fqbn arduino:mbed_opta:opta LifeTrac-v25/DESIGN-CONTROLLER/arduino_opta_controller
-arduino-cli compile --fqbn esp32:esp32:esp32thing_plus LifeTrac-v25/esp32_remote_control
+arduino-cli compile --fqbn arduino:samd:mkrwan1310 LifeTrac-v25/DESIGN-CONTROLLER/firmware/handheld_mkr
+arduino-cli compile --fqbn arduino:mbed_opta:opta LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_opta
 ```
 
-## Troubleshooting
+The first hardware compile pass may still need sketch-folder build glue for `firmware/common/lora_proto/*.c`. Keep that fix in the active tree; do not copy code back out to `RESEARCH-CONTROLLER/`.
 
-### Workflow Not Running
-- New workflows require approval from a repository maintainer
-- Check the Actions tab for pending approval requests
+## Python Protocol Gate
 
-### Compilation Failures
-- Check the workflow logs for specific error messages
-- Verify all required libraries are listed in `arduino_libraries.txt`
-- Ensure sketch code is compatible with the target board
+The base-station protocol tests are standard-library `unittest` tests and can run before hardware is available:
 
-### Adding New Libraries
-If you add a new library dependency:
-1. Update `arduino_libraries.txt` with the library name and version
-2. Add the library to the workflow configuration in `.github/workflows/arduino-ci.yml`
+```bash
+cd LifeTrac-v25/DESIGN-CONTROLLER/base_station
+python -m unittest discover -s tests
+```
 
-## Contributing
-
-When making changes to Arduino code:
-1. Test compilation locally first
-2. Create a pull request
-3. Wait for CI to pass before merging
-4. Fix any compilation errors reported by CI
+These tests verify CRC/KISS packing, ControlFrame layout, FHSS channel generation, and the `CMD_ENCODE_MODE` hysteresis controller.

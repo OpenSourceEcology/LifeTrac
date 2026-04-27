@@ -9,11 +9,11 @@
 // Expected boards/libs:
 //   - Arduino MKR WAN 1310
 //   - RadioLib >= 6.x
-//   - lora_proto.h / .c included from ../lora_proto/
+//   - lora_proto.h / .c included from ../common/lora_proto/
 
 #include <Arduino.h>
 #include <RadioLib.h>
-#include "../lora_proto/lora_proto.h"
+#include "../common/lora_proto/lora_proto.h"
 
 // ---------- pins ----------
 #define PIN_LH_X        A0
@@ -124,7 +124,7 @@ void setup() {
     for (int i = 0; i < 8; i++) pinMode(PIN_BTN_BASE + i, INPUT_PULLUP);
 
     int st = radio.begin(915.0,    // MHz
-                         500.0,    // bandwidth kHz
+                         125.0,    // bandwidth kHz
                          7,        // SF
                          5,        // CR (4/5)
                          0x12,     // sync word — private LoRa

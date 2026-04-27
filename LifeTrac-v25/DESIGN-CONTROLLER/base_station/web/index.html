@@ -56,6 +56,10 @@
     .joystick-pad .label {
       position: absolute; top: 8px; left: 12px; font-size: 12px; opacity: 0.7;
     }
+    body.controls-locked .joystick-pad,
+    body.controls-locked .buttons button:not(.estop) {
+      opacity: 0.45;
+    }
     aside {
       background: var(--panel); border-radius: 12px; padding: 16px;
       display: flex; flex-direction: column; gap: 8px; font-family: ui-monospace, monospace;
@@ -109,6 +113,9 @@
       <div class="row"><span>GPS fix</span><span id="t-gps">—</span></div>
       <div class="row"><span>RSSI</span><span id="t-rssi">—</span></div>
       <div class="row"><span>Pkt loss</span><span id="t-loss">—</span></div>
+      <div class="row"><span>Link use</span><span id="t-link-use">—</span></div>
+      <div class="row"><span>Image use</span><span id="t-img-use">—</span></div>
+      <div class="row"><span>Encode</span><span id="t-encode">—</span></div>
       <div class="row"><span>NDVI</span><span id="t-ndvi">—</span></div>
       <h3 style="margin-top:16px">Active source</h3>
       <div class="row"><span>Source</span><span id="t-src">—</span></div>

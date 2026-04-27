@@ -1,153 +1,47 @@
-name: Arduino CI
+name: LifeTrac v25 Controller CI
 
 on:
   push:
     paths:
-      - 'LifeTrac-v25/DESIGN-CONTROLLER/arduino_opta_controller/**'
-      - 'LifeTrac-v25/DESIGN-CONTROLLER/esp32_remote_control/**'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/firmware/**'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/base_station/**'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/tools/**'
       - 'LifeTrac-v25/DESIGN-CONTROLLER/arduino_libraries.txt'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/ARDUINO_CI.md'
       - '.github/workflows/arduino-ci.yml'
   pull_request:
     paths:
-      - 'LifeTrac-v25/DESIGN-CONTROLLER/arduino_opta_controller/**'
-      - 'LifeTrac-v25/DESIGN-CONTROLLER/esp32_remote_control/**'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/firmware/**'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/base_station/**'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/tools/**'
       - 'LifeTrac-v25/DESIGN-CONTROLLER/arduino_libraries.txt'
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/ARDUINO_CI.md'
       - '.github/workflows/arduino-ci.yml'
   workflow_dispatch:
 
 jobs:
-  compile-opta-controller:
+  python-protocol-tests:
     runs-on: ubuntu-latest
-    name: Compile Arduino Opta Controller
-    permissions:
-      contents: read
-      issues: write
-    
+    name: Base station protocol tests
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: Compile Arduino Opta sketch
-        id: compile-opta
-        continue-on-error: true
-        uses: arduino/compile-sketches@v1
-        with:
-          fqbn: 'arduino:mbed_opta:opta'
-          platforms: |
-            - name: arduino:mbed_opta
-          libraries: |
-            - name: OptaController
-            - name: PubSubClient
-            - name: ArduinoJson
-            - name: ArduinoBLE
-          sketch-paths: |
-            - LifeTrac-v25/DESIGN-CONTROLLER/arduino_opta_controller
-          enable-deltas-report: true
-          sketches-report-path: sketches-reports
 
-      - name: Upload compilation report
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          name: opta-controller-report
-          path: sketches-reports
-          retention-days: 30
-      
-      - name: Create issue on compilation failure
-        if: failure() && steps.compile-opta.outcome == 'failure'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const issue = await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: '🔴 Arduino Opta Controller compilation failed',
-              body: `## Compilation Error
-            
-            The Arduino Opta Controller sketch failed to compile.
-            
-            **Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            **Commit:** ${{ github.sha }}
-            **Branch:** ${{ github.ref_name }}
-            
-            ### Details
-            - **Sketch:** \`LifeTrac-v25/DESIGN-CONTROLLER/arduino_opta_controller\`
-            - **Board:** \`arduino:mbed_opta:opta\`
-            - **Triggered by:** ${{ github.event_name }}
-            
-            Please review the workflow logs to identify and fix the compilation errors.
-            
-            ---
-            *This issue was automatically created by the Arduino CI workflow.*`,
-              labels: ['bug', 'arduino', 'ci'],
-              assignees: ['copilot']
-            });
-            console.log(`Created issue #${issue.data.number}`)
+          python-version: '3.11'
 
-  compile-esp32-remote:
+      - name: Run unittest protocol gate
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/base_station
+        run: python -m unittest discover -s tests
+
+  firmware-compile-plan:
     runs-on: ubuntu-latest
-    name: Compile ESP32 Remote Control
-    permissions:
-      contents: read
-      issues: write
-    
+    name: Firmware compile gate status
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Compile ESP32 sketch
-        id: compile-esp32
-        continue-on-error: true
-        uses: arduino/compile-sketches@v1
-        with:
-          fqbn: 'esp32:esp32:esp32thing_plus'
-          platforms: |
-            - name: esp32:esp32
-              source-url: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-          libraries: |
-            - name: PubSubClient
-            - name: ArduinoJson
-            - name: SparkFun Qwiic Joystick Arduino Library
-          sketch-paths: |
-            - LifeTrac-v25/DESIGN-CONTROLLER/esp32_remote_control
-          enable-deltas-report: true
-          sketches-report-path: sketches-reports
-
-      - name: Upload compilation report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: esp32-remote-report
-          path: sketches-reports
-          retention-days: 30
-      
-      - name: Create issue on compilation failure
-        if: failure() && steps.compile-esp32.outcome == 'failure'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const issue = await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: '🔴 ESP32 Remote Control compilation failed',
-              body: `## Compilation Error
-            
-            The ESP32 Remote Control sketch failed to compile.
-            
-            **Workflow Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            **Commit:** ${{ github.sha }}
-            **Branch:** ${{ github.ref_name }}
-            
-            ### Details
-            - **Sketch:** \`LifeTrac-v25/DESIGN-CONTROLLER/esp32_remote_control\`
-            - **Board:** \`esp32:esp32:esp32thing_plus\`
-            - **Triggered by:** ${{ github.event_name }}
-            
-            Please review the workflow logs to identify and fix the compilation errors.
-            
-            ---
-            *This issue was automatically created by the Arduino CI workflow.*`,
-              labels: ['bug', 'arduino', 'ci'],
-              assignees: ['copilot']
-            });
-            console.log(`Created issue #${issue.data.number}`)
+      - name: Print active Arduino targets
+        run: |
+          echo "Active targets are documented in LifeTrac-v25/DESIGN-CONTROLLER/ARDUINO_CI.md"
+          echo "Archived arduino_opta_controller and esp32_remote_control are intentionally not compiled."
+          echo "Enable blocking Arduino compile jobs after local FQBN/build-glue verification."

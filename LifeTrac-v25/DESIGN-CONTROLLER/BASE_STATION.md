@@ -10,12 +10,11 @@ The base-station controller. Hosts the operator web UI on a local LAN, bridges L
 
 | Component | Role |
 |---|---|
-| Portenta Max Carrier (ABX00043) | Carrier with onboard LoRa (Murata SX1276) + Cat-M1 (SARA-R412M), Gigabit Ethernet |
+| Portenta Max Carrier (ABX00043) | Carrier with onboard LoRa (Murata SX1276), Gigabit Ethernet, and the disabled/not-used Cat-M1 hardware present on the board |
 | Portenta X8 (ABX00049) | i.MX 8M Mini quad-core Cortex-A53 + M4 + M0; runs Yocto Linux with Docker |
 | 8 dBi 915 MHz omni antenna | Mast-mounted for long-range LoRa to tractor |
 | LMR-400 coax + lightning arrestor | Mast-to-carrier RF feed |
 | ~3 m galvanized mast + ground rod | Outdoor mount |
-| Cellular antenna (SMA) | Backup uplink to tractor |
 | 12 V / 5 A indoor power supply + UPS | Survives brief power drops |
 | Indoor enclosure (ventilated) | Wall-mount or shelf |
 
@@ -36,24 +35,23 @@ Full BOM in [HARDWARE_BOM.md § Tier 2](HARDWARE_BOM.md#tier-2--base-station-por
 │  Portenta X8 (Yocto Linux)                                   │
 │  ────────────────────────────────────────────────────────────│
 │  Docker containers:                                          │
-│    • nginx          (reverse proxy, static UI, TLS)           │
+│    • nginx          (reverse proxy, static UI, no TLS in v25) │
 │    • web_ui         (Python FastAPI + Jinja2 + WebSockets)    │
 │    • mosquitto      (MQTT broker, port 1883)                  │
-│    • lora_bridge    (Python: serial ↔ MQTT, runs on X8 OR    │
-│                      direct from H7 over UART)                │
+│    • lora_bridge    (Python: SX1276 SPI ↔ MQTT; serial bench  │
+│                      fallback until the SPI driver lands)      │
 │    • timeseries     (InfluxDB or SQLite for telemetry log)    │
 │    • grafana        (optional: telemetry dashboards)          │
 └──────────────────────────┬───────────────────────────────────┘
-                           │ UART (over high-density connector)
+                           │ SPI + GPIO IRQ on Max Carrier
                            ▼
 ┌──────────────────────────────────────────────────────────────┐
-│  M7 core (firmware/base_h7/base.ino)                         │
+│  Murata LoRa SiP (SX1276)                                    │
 │  ────────────────────────────────────────────────────────────│
-│  • LoRa modem driver (RadioLib SX1276)                       │
-│  • Cellular modem driver (SARA-R412M, optional)              │
-│  • Frames bridged byte-stream to/from X8 over UART           │
+│  • Raw LoRa P2P modem driven directly by Linux               │
+│  • No active base-station H747 firmware target               │
 └──────────────────────────┬───────────────────────────────────┘
-                           │ SPI
+                           │ RF
                            ▼
                   Murata LoRa SiP → SMA → mast antenna
 ```
@@ -93,7 +91,7 @@ Layout:
 │  └──────────────┘  └────────────────────────┘  │  HANDHELD   │ │
 │                                                  └──────────────┘ │
 │  ────────────────────────────────────────────────────────────── │
-│  Status bar: LoRa link OK · Cellular standby · 0.2% pkt loss   │
+│  Status bar: LoRa link OK · SF7 · 0.2% pkt loss                │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -108,17 +106,19 @@ Behavior:
 
 - Touch-friendly virtual stick (works on tablets too)
 - Outputs values 50 Hz as joystick-X, joystick-Y in [-127, +127]
-- Sent via WebSocket → web_ui container → MQTT publish to `lifetrac/v25/control/base/lh_axis` etc.
-- `lora_bridge` subscribes, packs into ControlFrame, hands to H7 via UART at 20 Hz
+- Sent via WebSocket -> `web_ui.py`, which packs a 16-byte `ControlFrame` and publishes it to `lifetrac/v25/cmd/control` at 20 Hz.
+- `lora_bridge.py` validates the frame, encrypts it, and transmits it over the base X8 LoRa transport.
 
 ### WebSocket message format (browser ↔ web_ui)
 
 ```json
 {
-  "type": "control",
-  "ts_ms": 1714000000123,
-  "axes": { "lh_x": 0, "lh_y": 0, "rh_x": 32, "rh_y": -45 },
-  "buttons": { "bucket_curl": false, "bucket_dump": false, "estop": false }
+  "lhx": 0,
+  "lhy": 0,
+  "rhx": 32,
+  "rhy": -45,
+  "buttons": 0,
+  "flags": 0
 }
 ```
 
@@ -189,12 +189,9 @@ All topics under `lifetrac/v25/`. Mosquitto runs in a container on the X8 and th
 - Firewall: allow inbound 80/443 from LAN only; Mosquitto 1883 LAN-only; never expose to public internet
 - TLS: self-signed cert acceptable for LAN; use Let's Encrypt only if the base station is behind a publicly-routable hostname
 
-## Cellular fallback behavior
+## Link-loss behavior
 
-When LoRa link to tractor is lost (no telemetry for 30 s), the base UI shows a banner and:
-- Telemetry continues to flow via cellular (tractor MQTT publishes over Cat-M1)
-- Control input is *not* automatically routed over cellular (latency too high; operator must explicitly enable "cellular control mode" with a 2-step confirmation)
-- When LoRa heartbeat returns, system auto-reverts to LoRa control
+When the LoRa link to the tractor is lost (no telemetry for 30 s), the base UI shows a banner, stops sending joystick `ControlFrame`s, and leaves E-stop available. There is no Cat-M1 or MQTT-over-cellular fallback in v25; recovery is LoRa link restoration or a local hardware/service intervention.
 
 ## Bring-up checklist
 
@@ -209,31 +206,19 @@ When LoRa link to tractor is lost (no telemetry for 30 s), the base UI shows a b
 9. [ ] End-to-end test: laptop joystick → base UI → LoRa → tractor → valves
 10. [ ] 24-hour soak with telemetry continuously logged
 
-## Source code layout (when implemented)
+## Source code layout
 
 ```
-firmware/base_h7/
-├── base.ino                    # M7: LoRa modem, UART bridge to X8
-├── pinmap_max_carrier_h7.h     # Pin definitions
-└── platformio.ini
-
-base_station/                   # Runs on X8 in Docker
-├── docker-compose.yml          # All services
-├── nginx/
-│   ├── nginx.conf
-│   └── certs/                  # TLS certs (self-signed by default)
-├── web_ui/
-│   ├── main.py                 # FastAPI app
-│   ├── ws.py                   # WebSocket handlers
-│   ├── templates/              # Jinja2 HTML
-│   ├── static/                 # JS, CSS, joystick widget
-│   └── requirements.txt
-├── lora_bridge/
-│   ├── bridge.py               # Serial ↔ MQTT translation
-│   ├── proto.py                # Frame pack/unpack (mirrors firmware/common/lora_proto.cpp)
-│   ├── crypto.py               # AES-GCM (mirrors firmware/common/crypto.cpp)
-│   └── requirements.txt
-├── image_pipeline/             # See § Image pipeline below
+base_station/
+├── lora_bridge.py              # LoRa transport ↔ MQTT bridge; serial bench fallback today, SPI target per MASTER_PLAN.md §8.2
+├── lora_proto.py               # Python mirror of firmware/common/lora_proto
+├── link_monitor.py             # Airtime ledger + CMD_ENCODE_MODE hysteresis
+├── web_ui.py                   # FastAPI app + WebSocket handlers
+├── requirements.txt
+├── web/
+│   ├── index.html              # Operator console
+│   └── app.js                  # Gamepad/touch controls + telemetry UI
+├── image_pipeline/             # Planned; see § Image pipeline below
 │   ├── canvas.py               # Persistent tile canvas, I/P-frame reassembly
 │   ├── reassemble.py           # Fragment → TileDeltaFrame
 │   ├── superres_cpu.py         # Real-ESRGAN-General-x4v3 (CPU fallback, ncnn)
@@ -243,7 +228,7 @@ base_station/                   # Runs on X8 in Docker
 │   ├── inpaint_lama.py         # Optional LaMa-Fourier (Coral only)
 │   ├── accel_select.py         # Auto-detect Coral; pick CPU vs Coral path per stage
 │   └── models/                 # Bundled INT8 models (CPU and Edge-TPU variants)
-├── mosquitto/
+├── mosquitto/                  # Planned deployment config
 │   └── mosquitto.conf          # Use existing config from ../RESEARCH-CONTROLLER/config/mosquitto.conf (archived)
 └── timeseries/
     └── (InfluxDB or SQLite config)
@@ -255,7 +240,7 @@ Per [MASTER_PLAN.md §8.19](MASTER_PLAN.md) and [`../AI NOTES/2026-04-27_Image_T
 
 **Stages**:
 
-1. **Reassemble** — `lora_bridge/bridge.py` collects `TileDeltaFrame` fragments, hands the assembled frame to `image_pipeline/reassemble.py`. Missing fragments after a configurable timeout → tile is marked stale (yellow tint, age in seconds visible in UI).
+1. **Reassemble** — `base_station/lora_bridge.py` collects `TileDeltaFrame` fragments, hands the assembled frame to `image_pipeline/reassemble.py`. Missing fragments after a configurable timeout → tile is marked stale (yellow tint, age in seconds visible in UI).
 2. **Canvas update** — `canvas.py` overwrites the changed tiles in the persistent canvas. If `base_seq` does not match the current I, send `CMD_REQ_KEYFRAME` (opcode `0x62`).
 3. **Per-tile fade** — when a new tile arrives the GLSL fragment shader on the browser side cross-fades from the prior value over ~3 display frames. Zero CPU cost.
 4. **Super-resolution** — Real-ESRGAN-General-x4v3 (BSD) on the canvas. CPU path: ncnn at ~250 ms/frame; Coral path: ~15–30 ms via the Edge-TPU port. `accel_select.py` picks at startup.

@@ -154,46 +154,48 @@ Major implementation-plan-level tasks not already enumerated in Phases 2–5 abo
 
 **Phase 2.LoRa.0 — Week-1 bench measurements (block Phase 1–5 work that depends on the numbers):**
 
-- [ ] **R-7 retune-cost bench** (per [LORA_IMPLEMENTATION.md §8 week 1](LORA_IMPLEMENTATION.md)): measure `setFrequency` + `setSpreadingFactor` + `setBandwidth` + `setCodingRate` cost on SX1276 via RadioLib. Record baseline. **If > 5 ms,** burst-batching code path becomes mandatory in `lora_proto.cpp`.
+- [ ] **R-7 retune-cost bench** (per [LORA_IMPLEMENTATION.md §8 week 1](LORA_IMPLEMENTATION.md)): measure `setFrequency` + `setSpreadingFactor` + `setBandwidth` + `setCodingRate` cost on SX1276 via RadioLib. Record baseline. **If > 5 ms,** burst-batching code path becomes mandatory in `lora_proto.cpp`. *Sketch in place at [`firmware/bench/lora_retune_bench/`](firmware/bench/lora_retune_bench/); needs an actual run.*
 - [ ] **TX→RX turnaround + CSMA backoff bench** (per [LORA_IMPLEMENTATION.md L8](LORA_IMPLEMENTATION.md)): record so the airtime ledger is accurate, not assumed.
-- [ ] **Cross-doc cascade pass** (per [LORA_IMPLEMENTATION.md §11](LORA_IMPLEMENTATION.md)): land the IMAGE_PIPELINE.md §3.2 reservations (`0x28`/`0x29`/`0x2A`/`0x63`/badge enum) into [LORA_PROTOCOL.md](LORA_PROTOCOL.md) proper. Currently described only in IMAGE_PIPELINE.md.
+- [ ] **Control cadence / PHY blocker** — resolve the 2026-04-27 airtime mismatch before field motion: encrypted `ControlFrame` is ~92 ms at SF7/BW125 while the current control cadence is 20 Hz (50 ms). Decide between BW250/BW500, lower cadence, reduced overhead, or a dedicated control radio/channel; bench-verify before hydraulic testing.
+- [ ] **Image fragment cap blocker** — resolve the 2026-04-27 airtime mismatch before image-pipeline bring-up: 32 B at SF7/BW250 estimates at ~36 ms, so the 25 ms cap currently allows only ~15 B cleartext fragments unless PHY/cap changes.
+- [x] ~~**Cross-doc cascade pass** — land the IMAGE_PIPELINE.md §3.2 reservations (`0x28`/`0x29`/`0x2A`/`0x63`/badge enum) into [LORA_PROTOCOL.md](LORA_PROTOCOL.md) proper.~~ **✅ Done** — see [LORA_PROTOCOL.md topic table](LORA_PROTOCOL.md#telemetryframe-variable-9128-bytes) (`0x28`/`0x29`/`0x2A`), [opcode table](LORA_PROTOCOL.md#command-frame-opcodes) (`0x63`), and the badge enum table at line 270.
 
 **Phase 2.LoRa.1 — PHY policy implementation (per [LORA_IMPLEMENTATION.md §3](LORA_IMPLEMENTATION.md)):**
 
-- [ ] **Three-profile PHY in `lora_proto.cpp`** — Control SF7/BW125/CR4-5, Telemetry SF9/BW250/CR4-8, Image SF7/BW250/CR4-5; per-frame retune via existing `CMD_LINK_TUNE` mechanism.
-- [ ] **Adaptive control-link SF ladder** with R-8 hysteresis (N=3 consecutive bad 5 s windows for any transition; 30 s clean for SF↑→SF↓). `CMD_LINK_TUNE` sent twice back-to-back at old-then-new SF; revert + fail-counter increment if no Heartbeat at new SF within 500 ms.
-- [ ] **Image-link auto-fallback ladder** in `link_monitor.py` per [IMAGE_PIPELINE.md §3.4](IMAGE_PIPELINE.md): airtime-% `U` thresholds with 3-window hysteresis, `CMD_ENCODE_MODE` emission, surface `U` + ladder rung on telemetry topic `0x10`.
+- [x] ~~**Three-profile PHY in `lora_proto.cpp`**~~ **✅ Done** — `LP_PHY_CONTROL_SF7/SF8/SF9`, `LP_PHY_TELEMETRY`, `LP_PHY_IMAGE` defined in [`firmware/common/lora_proto/lora_proto.c`](firmware/common/lora_proto/lora_proto.c) and mirrored in [`base_station/lora_proto.py`](base_station/lora_proto.py). Per-frame retune via `CMD_LINK_TUNE` mechanism still needs runtime wiring on the M7.
+- [x] **Adaptive control-link SF ladder** with R-8 hysteresis (N=3 consecutive bad 5 s windows for any transition; 30 s clean for SF↑→SF↓). `CMD_LINK_TUNE` sent twice back-to-back at old-then-new SF; revert + fail-counter increment if no Heartbeat at new SF within 500 ms. *Implemented in [`firmware/tractor_h7/tractor_m7.ino`](firmware/tractor_h7/tractor_m7.ino) `poll_link_ladder()` + `try_step_ladder()` + `send_link_tune()`. Reciprocal handheld/base receiver still needs the matching retune handler (handheld.ino + lora_bridge.py both currently no-op on inbound `CMD_LINK_TUNE`).*
+- [x] **Image-link auto-fallback ladder** wiring (per [IMAGE_PIPELINE.md §3.4](IMAGE_PIPELINE.md)): `RollingAirtimeLedger` + `EncodeModeController` from [`base_station/link_monitor.py`](base_station/link_monitor.py) are now wired into [`lora_bridge.py`](base_station/lora_bridge.py) — every TX and RX records airtime via `attribute_phy()`, a 1 Hz worker emits `CMD_ENCODE_MODE` on rung change, and the `(U_image, U_telemetry, U_total)` triple is published as retained JSON on `lifetrac/v25/control/source_active`. Alarms fire on `U_telemetry > 30 %` and `U_total > 60 %`.
 
 **Phase 2.LoRa.2 — MAC: FHSS + CSMA (per [LORA_IMPLEMENTATION.md §3.2](LORA_IMPLEMENTATION.md), [MASTER_PLAN.md §8.17 FHSS bullet](MASTER_PLAN.md)):**
 
-- [ ] **8-channel hop sequence** in `lora_proto.cpp` — 902–928 MHz at 3.25 MHz spacing, deterministic pseudo-random sequence seeded by AES key ID, ~1.5 s dwell per channel per ~12 s cycle.
-- [ ] **CSMA skip-busy** — RSSI > –90 dBm threshold on next-hop channel = skip to channel after, log skip event to audit ledger.
+- [x] ~~**8-channel hop sequence** in `lora_proto.cpp`~~ **✅ Done** — `lp_fhss_channel_index` / `lp_fhss_channel_hz` in [`firmware/common/lora_proto/lora_proto.c`](firmware/common/lora_proto/lora_proto.c); Python mirror `fhss_channel_index` / `fhss_channel_hz` in [`base_station/lora_proto.py`](base_station/lora_proto.py). Deterministic Fisher-Yates seeded by `key_id`, 8 channels @ 3.25 MHz starting 902 MHz.
+- [x] **CSMA skip-busy** — helper landed: `lp_csma_pick_hop()` in [`firmware/common/lora_proto/lora_proto.c`](firmware/common/lora_proto/lora_proto.c) and `pick_csma_hop()` in [`base_station/lora_proto.py`](base_station/lora_proto.py); default threshold –90 dBm, max 4 skips, falls through to last candidate so a control frame still goes out. Unit tests cover clean-channel, single-skip, all-busy, and threshold-boundary cases. *Caller wiring (RadioLib `scanChannel` on tractor/handheld TX path, base-SPI driver on bridge) and the audit-log skip-event hook still open.*
 - [ ] **Spectrum-analyser FHSS verification** (week 6, per [LORA_IMPLEMENTATION.md §8](LORA_IMPLEMENTATION.md)) — confirm 8 channels active, ≤ 12.5 % per-channel dwell over 60 s, no out-of-band emissions, EIRP ≤ +36 dBm. Pre-Phase-9 FCC verification.
 
 **Phase 2.LoRa.3 — Priority queue + airtime cap (per [LORA_IMPLEMENTATION.md §4](LORA_IMPLEMENTATION.md)):**
 
-- [ ] **P0/P1/P2/P3 priority queue** in `lora_proto.cpp` with strict preemption. P0 = ControlFrame/Heartbeat/CMD_ESTOP/CMD_LINK_TUNE/CMD_PERSON_APPEARED. P1 = key commands (CMD_CLEAR_ESTOP, CMD_ROI_HINT, CMD_REQ_KEYFRAME, CMD_CAMERA_SELECT). P2 = telemetry. P3 = image fragments.
+- [x] **P0/P1/P2/P3 priority queue** in the base-station bridge — [`base_station/lora_bridge.py`](base_station/lora_bridge.py) routes every TX through `_tx_queue` (heap by priority + FIFO tiebreaker) drained by a single `_tx_worker` thread; classification via `classify_priority()` in [`base_station/lora_proto.py`](base_station/lora_proto.py) covered by `test_classify_priority_buckets`. P0 = ControlFrame/Heartbeat/CMD_ESTOP/CMD_LINK_TUNE/CMD_PERSON_APPEARED; P1 = CMD_CLEAR_ESTOP/CMD_ROI_HINT/CMD_REQ_KEYFRAME/CMD_CAMERA_SELECT/CMD_ENCODE_MODE; P2 = telemetry; P3 = image fragments. *Firmware-side queue (handheld + tractor in `lora_proto.c`) still open — those nodes only TX a handful of frame types so an explicit queue is lower-priority there.*
 - [ ] **L1/R-6 25 ms-per-fragment airtime cap** — enforced uniformly on P2 telemetry and P3 image fragments. No P2/P3 frame can begin TX if remaining airtime in current opportunity > 25 ms.
 - [ ] **R-6 telemetry fragmentation** — oversized `TelemetryFrame` payloads fragment using the `TileDeltaFrame` scheme; base-station bridge reassembles before MQTT publish.
 - [ ] **Burst-batching code path** (gated by R-7 measurement) — if retune > 5 ms, batch image fragments so radio retunes at most twice per refresh window (once into image PHY, once back).
 
 **Phase 2.LoRa.4 — Security (per [LORA_IMPLEMENTATION.md §6](LORA_IMPLEMENTATION.md)):**
 
-- [ ] **Replay-defence sliding window** — per-source 64-frame `sequence_num` window in `lora_proto.cpp`. Reject below window-low or above window-high + 256.
-- [ ] **Nonce generator** — `source_id (1 B) ‖ sequence_num (2 B) ‖ epoch_s_low24 (3 B) ‖ random (6 B)` = 12 B. Document the construction in `crypto.cpp`.
-- [ ] **`tools/provision.py`** — USB-CDC writer for pre-shared 16 B key + 4 B key ID at first boot. Same tool used by all three nodes.
+- [x] **Replay-defence sliding window** — 64-frame per-source `LpReplayWindow` lives in [`firmware/common/lora_proto/lora_proto.c`](firmware/common/lora_proto/lora_proto.c) (`lp_replay_init` / `lp_replay_check_and_update`); used per source in [`firmware/tractor_h7/tractor_m7.ino`](firmware/tractor_h7/tractor_m7.ino) `process_air_frame`. Bit-compatible Python mirror `ReplayWindow` in [`base_station/lora_proto.py`](base_station/lora_proto.py) covered by 5 unit tests in [`base_station/tests/test_lora_proto.py`](base_station/tests/test_lora_proto.py) (duplicate, in-order advance, out-of-order, too-old, 16-bit wrap).
+- [x] ~~**Nonce generator**~~ **✅ Done** — `build_nonce` in [`base_station/lora_proto.py`](base_station/lora_proto.py); 12 B = `source_id (1) ‖ seq (2) ‖ epoch_s (4) ‖ random (5)`. C-side mirror still needs to land in [`firmware/common/lora_proto/crypto_stub.c`](firmware/common/lora_proto/crypto_stub.c).
+- [x] ~~**`tools/provision.py`**~~ **✅ Done** — [`tools/provision.py`](tools/provision.py) writes pre-shared 16 B key + 4 B key ID via USB-CDC.
 - [ ] **`KEY_ROTATION.md`** (NEW, week 2 per [LORA_IMPLEMENTATION.md §11](LORA_IMPLEMENTATION.md)) — operator-facing key rotation procedure. Companion to `provision.py`. **Decision L-O2 (rotation cadence) deadline: before week 2.**
 
 **Phase 2.LoRa.5 — Multi-source arbitration (per [LORA_IMPLEMENTATION.md §5](LORA_IMPLEMENTATION.md)):**
 
-- [ ] **`pick_active_source()`** runs every M7 loop iteration (50 Hz). Highest-priority source with `last_heartbeat_ms < 500 ms` wins; else `SOURCE_NONE` → valves neutral within next M7 tick (≤ 20 ms).
+- [x] ~~**`pick_active_source()`** runs every M7 loop iteration~~ **✅ Done** — [`firmware/tractor_h7/tractor_m7.ino`](firmware/tractor_h7/tractor_m7.ino) line 130, `HEARTBEAT_TIMEOUT_MS = 500` enforced. Failsafe to neutral on `SOURCE_NONE`.
 - [ ] **TAKE CONTROL latch** — 30 s P0 priority after button release; persists across heartbeat misses but not across `SOURCE_NONE`.
-- [ ] **Source-active publisher** — topic `0x10` carries `active_source` + per-source RSSI/SNR + current SF rung + airtime-% triple `(U_image, U_telemetry, U_total)` at 1 Hz + on every change.
+- [ ] **Source-active publisher** — topic `0x10` carries `active_source` + per-source RSSI/SNR + current SF rung + airtime-% triple `(U_image, U_telemetry, U_total)` at 1 Hz + on every change. *Wire in [`base_station/lora_bridge.py`](base_station/lora_bridge.py) once airtime ledger is integrated.*
 - [ ] **Audit log** — every source transition, SF transition, encode-mode transition, FHSS skip event, replay rejection, GCM-tag rejection, CSMA backoff event appended to the [§8.10 black-box logger](MASTER_PLAN.md).
 
 **Phase 2.LoRa.6 — Observability (per [LORA_IMPLEMENTATION.md §7](LORA_IMPLEMENTATION.md)):**
 
-- [ ] **`link_monitor.py`** — rolling 10 s airtime ledger per profile; computes `U_image`, `U_telemetry`, `U_total`; alarms if `U_telemetry > 30 %` or `U_total > 60 %`; emits `CMD_ENCODE_MODE` per the image auto-fallback ladder.
+- [x] **`link_monitor.py`** — rolling 10 s airtime ledger per profile; computes `U_image`, `U_telemetry`, `U_total`; alarms if `U_telemetry > 30 %` or `U_total > 60 %`; emits `CMD_ENCODE_MODE` per the image auto-fallback ladder. *Module at [`base_station/link_monitor.py`](base_station/link_monitor.py) is now wired into [`lora_bridge.py`](base_station/lora_bridge.py); alarm thresholds live as `U_TELEMETRY_ALARM` / `U_TOTAL_ALARM` in the bridge worker.*
 - [ ] **`tools/lora_rtt.py`** — handheld→tractor→base RTT measurement harness via timestamp echo. Run nightly during build weeks 1–10; audit-log diff per night; flag regressions.
 - [ ] **Operator UI surface** — airtime-% bar (green < 40 %, yellow 40–60 %, red > 60 %); current SF rung pill; FHSS hop indicator (channel 1–8); two-source-active banner if both handheld and base are within heartbeat timeout.
 
@@ -370,11 +372,11 @@ Per [MASTER_PLAN.md §8.2](MASTER_PLAN.md), the base station runs **no Arduino f
 
 **Phase 5.0 — Protocol-level reservations (do FIRST, before any image-pipeline code lands):**
 
-- [ ] **Reserve topic ID `0x28`** `video/motion_vectors` in [LORA_PROTOCOL.md](LORA_PROTOCOL.md) (optical-flow microframes, degraded mode Q)
-- [ ] **Reserve topic ID `0x29`** `video/wireframe` in [LORA_PROTOCOL.md](LORA_PROTOCOL.md) (PiDiNet edges, extreme degraded mode P)
-- [ ] **Reserve topic ID `0x2A`** `video/semantic_map` as **v26-only** placeholder in [LORA_PROTOCOL.md](LORA_PROTOCOL.md) (do NOT implement in v25)
-- [ ] **Reserve opcode `0x63`** `CMD_ENCODE_MODE` (base → tractor, P2): `{full | y_only | motion_only | wireframe}` for the §3.4 auto-fallback ladder
-- [ ] **Add Badge enum table** to [LORA_PROTOCOL.md](LORA_PROTOCOL.md) per [IMAGE_PIPELINE.md §3.3](IMAGE_PIPELINE.md): `Raw`, `Cached`, `Enhanced`, `Recolourised`, `Predicted`, `Synthetic`, `Wireframe` — base attaches, browser must fail-closed if missing/malformed
+- [x] **Reserve topic ID `0x28`** `video/motion_vectors` in [LORA_PROTOCOL.md](LORA_PROTOCOL.md) (optical-flow microframes, degraded mode Q)
+- [x] **Reserve topic ID `0x29`** `video/wireframe` in [LORA_PROTOCOL.md](LORA_PROTOCOL.md) (PiDiNet edges, extreme degraded mode P)
+- [x] **Reserve topic ID `0x2A`** `video/semantic_map` as **v26-only** placeholder in [LORA_PROTOCOL.md](LORA_PROTOCOL.md) (do NOT implement in v25)
+- [x] **Reserve opcode `0x63`** `CMD_ENCODE_MODE` (base → tractor, P2): `{full | y_only | motion_only | wireframe}` for the §3.4 auto-fallback ladder
+- [x] **Add Badge enum table** to [LORA_PROTOCOL.md](LORA_PROTOCOL.md) per [IMAGE_PIPELINE.md §3.3](IMAGE_PIPELINE.md): `Raw`, `Cached`, `Enhanced`, `Recolourised`, `Predicted`, `Synthetic`, `Wireframe` — base attaches, browser must fail-closed if missing/malformed
 - [ ] **LoRa PHY revisit — Revisit-3** (per [IMAGE_PIPELINE.md §13.1](IMAGE_PIPELINE.md)): **✅ Spec shipped** in [IMAGE_PIPELINE.md §3.4](IMAGE_PIPELINE.md). `link_monitor.py` implementation (week 5): use `RadioLib::getTimeOnAir`, apply 3-window hysteresis, surface `U` + ladder rung on telemetry topic `0x10`
 - [ ] **LoRa PHY revisit — Revisit-4** (per [IMAGE_PIPELINE.md §13.2](IMAGE_PIPELINE.md)): **✅ Documented** in [MASTER_PLAN.md §8.17.1](MASTER_PLAN.md) as the v26 escape hatch. **Not adopted for v25.** No build action; revisit only if the C1 gate fails in field testing.
 - [ ] **LoRa PHY revisit — Revisit-5** (per [IMAGE_PIPELINE.md §13.1](IMAGE_PIPELINE.md)): **✅ Policy shipped** in [MASTER_PLAN.md §8.17](MASTER_PLAN.md) — 8-channel FHSS across 902–928 MHz, 3.25 MHz spacing, ~12.5 % per-channel dwell. Implementation: deterministic hop sequence in `lora_proto.cpp` seeded by AES key ID; CSMA skip-busy-channel rule. Bench-verify duty calc with spectrum analyser before [Phase 9 FCC verification](#phase-9--documentation-regulatory-release).

@@ -62,39 +62,37 @@ Those are tracked as enhancements at the bottom of this README.
 ## Folder layout
 
 ```
-EXAMPLE_CODE/
-├── README.md                       (this file)
-├── lora_proto/                     shared C header + framing (study target #1)
+firmware/
+├── README.md
+├── common/lora_proto/              shared C header + framing
 │   ├── lora_proto.h
 │   ├── lora_proto.c
-│   └── crypto_stub.c
+│   ├── crypto_stub.c
+│   └── key.h.example               copy to key.h locally; key.h is gitignored
 ├── handheld_mkr/                   MKR WAN 1310 sketch
 │   └── handheld.ino
-├── tractor_h7/                     Portenta H747 co-MCU (inside X8) sketch
+├── tractor_h7/                     Portenta H747 co-MCU inside the tractor X8
 │   ├── tractor_m7.ino              radio + arbitration + Modbus master
-│   └── tractor_m4.cpp              valve safety on M4 core (sketch only)
-├── tractor_x8/                     Tractor X8 Linux side (Portenta X8 only)
-│   ├── imu_service.py              BNO086 over Qwiic/MCP2221A, 5 Hz → M7 UART
-│   ├── gps_service.py              NEO-M9N over same Qwiic bus, 1 Hz → M7 UART
+│   └── tractor_m4.cpp              independent safety watchdog
+├── tractor_x8/                     Tractor X8 Linux side
+│   ├── imu_service.py              BNO086 over Qwiic/MCP2221A, 5 Hz -> M7 UART
+│   ├── gps_service.py              NEO-M9N over Qwiic/MCP2221A, 1 Hz -> M7 UART
 │   └── requirements.txt
-├── opta_modbus_slave/              Arduino Opta sketch
+├── tractor_opta/                   Arduino Opta sketch
 │   └── opta_modbus_slave.ino       Modbus RTU slave + relay/AO drive
-└── base_station/                   X8 Linux side
-    ├── lora_bridge.py              serial (UART → H747 → SX1276) ↔ MQTT/WebSocket
-    ├── web_ui.py                   FastAPI app with /ws control channel
-    ├── requirements.txt
-    └── web/
-        ├── index.html              touch joysticks + USB gamepad
-        └── app.js                  Gamepad API + WebSocket client
+└── bench/lora_retune_bench/        RadioLib retune timing sketch
+    └── lora_retune_bench.ino
 ```
 
-Every file is **commented heavily** so it reads as documentation. They are intentionally short, share types via [lora_proto/lora_proto.h](lora_proto/lora_proto.h), and avoid features we haven't decided on yet.
+Base-station Python code lives in [`../base_station/`](../base_station/). Per [MASTER_PLAN.md §8.2](../MASTER_PLAN.md#82-base-station-radio-path), Linux on the base X8 owns the SX1276 path; there is no active base Arduino firmware target.
+
+Every file is **commented heavily** so it reads as documentation. The firmware shares types via [common/lora_proto/lora_proto.h](common/lora_proto/lora_proto.h), and avoids features we have not decided on yet.
 
 ---
 
 ## What each file is for, and what to look at when reviewing
 
-### 1. [`lora_proto/`](lora_proto/) — the wire format, in code
+### 1. [`common/lora_proto/`](common/lora_proto/) — the wire format, in code
 
 Mirrors the ControlFrame / Heartbeat / TelemetryFrame definitions in [LORA_PROTOCOL.md § Frame format](../../LORA_PROTOCOL.md#frame-format). This is the *one* file that handheld, tractor, and base station all include — if it changes, everyone changes together.
 
@@ -108,7 +106,7 @@ Mirrors the ControlFrame / Heartbeat / TelemetryFrame definitions in [LORA_PROTO
 Simplest of the bunch. Reads two analog joysticks + 8 buttons + a TAKE CONTROL momentary, packs a ControlFrame, hands it to `lora_proto_send()`, and emits a Heartbeat at the same cadence.
 
 **Review questions:**
-- Are 20 Hz control frames the right cadence? (Air time for 16 B at SF7/BW500 ≈ 15 ms, so 20 Hz uses ~30% of the channel — leaves headroom for base + telemetry.)
+- Are 20 Hz control frames the right cadence? The active control PHY is SF7/BW125/CR4-5 per [MASTER_PLAN.md](../MASTER_PLAN.md); bench airtime must be measured with the retune sketch and RadioLib before field tests.
 - Take-control latch state: we have it on the *handheld* side per [LORA_PROTOCOL.md § Take-control sequence](../../LORA_PROTOCOL.md#take-control-sequence-handheld). Is that the right place? (Trade-off: simpler tractor logic vs. operator's intent stored on a single device they could lose.)
 
 ### 3. [`tractor_h7/tractor_m7.ino`](tractor_h7/tractor_m7.ino) — the brain
@@ -144,7 +142,7 @@ Two sibling services that share one Qwiic bus through one Adafruit MCP2221A USB�
 - 21 B fixed-point vs raw NMEA: fixed-point keeps each frame inside one LoRa packet at SF7. NMEA strings would need fragmentation. Worth keeping for now.
 - Idle backoff: the 10 s / 0.1 m/s threshold is arbitrary. Should we tie it to the Opta `valve_coils == 0` AND `engine_run == false` instead so it backs off only when *actually* parked, not idling at headlands?
 
-### 5. [`opta_modbus_slave/opta_modbus_slave.ino`](opta_modbus_slave/opta_modbus_slave.ino) — the I/O layer
+### 5. [`tractor_opta/opta_modbus_slave.ino`](tractor_opta/opta_modbus_slave.ino) — the I/O layer
 
 Modbus-RTU slave on RS-485, holds a register map exposing:
 
@@ -167,9 +165,9 @@ Map and behaviour deliberately match [TODO.md § Phase 1](../../TODO.md#phase-1-
 - Should `flow_setpoint` be a single register or two (target + slew rate)? Currently single.
 - `mode_switch` here is a *physical* 3-position switch read from a digital input — this is not the same as the LoRa source-arbitration; the physical switch is a hard lockout. Is that the model we want?
 
-### 6. [`base_station/lora_bridge.py`](base_station/lora_bridge.py) — UART ↔ MQTT/WebSocket
+### 6. [`../base_station/lora_bridge.py`](../base_station/lora_bridge.py) — LoRa ↔ MQTT/WebSocket
 
-Runs as a Docker container on the X8 Linux side. Talks to the H747 co-MCU over UART (which in turn talks to the SX1276 SiP), unpacks frames, publishes to Mosquitto on `lifetrac/v25/…` topics, and forwards control frames the other direction.
+Runs on the base-station X8 Linux side. It unpacks authenticated frames, publishes to Mosquitto on `lifetrac/v25/...` topics, and forwards control/command frames the other direction. The active hardware plan is direct SX1276-over-SPI from Linux; the current serial path is retained as a bench fallback until the SPI transport is filled in.
 
 **Review questions:**
 - Do we need MQTT for the local case at all, or is FastAPI's in-process pub/sub enough? MQTT helps when external clients (Grafana, ROS 2) want to subscribe; otherwise it is overhead. Currently included.
@@ -198,12 +196,12 @@ The USB gamepad is a *huge* quality-of-life win and adds essentially zero hardwa
 
 If you only have an hour, read in this order:
 
-1. [`lora_proto/lora_proto.h`](lora_proto/lora_proto.h) — 5 minutes. This is the single source of truth for the wire format.
+1. [`common/lora_proto/lora_proto.h`](common/lora_proto/lora_proto.h) — 5 minutes. This is the single source of truth for the wire format.
 2. [`handheld_mkr/handheld.ino`](handheld_mkr/handheld.ino) — 5 minutes. The simplest LoRa producer.
 3. [`tractor_h7/tractor_m7.ino`](tractor_h7/tractor_m7.ino) — 15 minutes. The interesting one — arbitration + bridge from radio to Modbus.
-4. [`opta_modbus_slave/opta_modbus_slave.ino`](opta_modbus_slave/opta_modbus_slave.ino) — 10 minutes. What actually moves the metal.
-5. [`base_station/lora_bridge.py`](base_station/lora_bridge.py) and [`base_station/web/app.js`](base_station/web/app.js) — 15 minutes. Server side and gamepad input.
-6. [`base_station/web_ui.py`](base_station/web_ui.py) and [`base_station/web/index.html`](base_station/web/index.html) — 10 minutes. The operator console.
+4. [`tractor_opta/opta_modbus_slave.ino`](tractor_opta/opta_modbus_slave.ino) — 10 minutes. What actually moves the metal.
+5. [`../base_station/lora_bridge.py`](../base_station/lora_bridge.py) and [`../base_station/web/app.js`](../base_station/web/app.js) — 15 minutes. Server side and gamepad input.
+6. [`../base_station/web_ui.py`](../base_station/web_ui.py) and [`../base_station/web/index.html`](../base_station/web/index.html) — 10 minutes. The operator console.
 
 ---
 
@@ -211,8 +209,8 @@ If you only have an hour, read in this order:
 
 These are the steps we would take *once we decide which version is the first test*. None of this is required to study the code.
 
-- **Arduino side** (handheld, tractor, opta): Arduino IDE 2.x or PlatformIO. Boards: *Arduino MKR WAN 1310*, *Arduino Portenta X8 (M7+M4 split on the onboard H747 co-MCU)*, *Arduino Opta WiFi*. Libraries listed in [arduino_libraries.txt](../../arduino_libraries.txt).
-- **Base station Python** (X8 Linux): `pip install -r base_station/requirements.txt` → `uvicorn web_ui:app --host 0.0.0.0 --port 8080` and `python lora_bridge.py /dev/ttymxc0`.
+- **Arduino side** (handheld, tractor, opta): Arduino IDE 2.x or Arduino CLI. Boards: *Arduino MKR WAN 1310*, *Arduino Portenta X8 (M7+M4 split on the onboard H747 co-MCU)*, *Arduino Opta WiFi*. Libraries listed in [arduino_libraries.txt](../arduino_libraries.txt).
+- **Base station Python** (X8 Linux): `pip install -r base_station/requirements.txt` -> `uvicorn web_ui:app --host 0.0.0.0 --port 8080` and `python lora_bridge.py /dev/ttymxc0` for the serial bench fallback.
 - **HIL bench** before any radio: short the LoRa packet path with a UART loopback between handheld and tractor, swap LEDs in for valve coils on the Opta. Same code, no RF.
 
 ---

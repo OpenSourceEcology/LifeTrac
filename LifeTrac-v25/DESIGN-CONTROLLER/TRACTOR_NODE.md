@@ -6,7 +6,7 @@ The tractor-side controller. Receives commands from the Handheld (proximity) and
 
 The tractor uses a **two-MCU split**:
 
-- **Max Carrier + Portenta X8** owns the radios (LoRa + cellular), arbitration, telemetry, logging, and engine/CAN integration. It is the *brain*. The X8 contains a full **STM32H747 co-MCU** (M7 + M4) running the real-time firmware bare-metal; the **Linux side** (Yocto on i.MX 8M Mini) runs SSH for field debug, log rotation, optional containerized telemetry recorder, and the future MIPI camera path.
+- **Max Carrier + Portenta X8** owns LoRa, arbitration, telemetry, logging, and engine/CAN integration. It is the *brain*. The X8 contains a full **STM32H747 co-MCU** (M7 + M4) running the real-time firmware bare-metal; the **Linux side** (Yocto on i.MX 8M Mini) runs SSH for field debug, log rotation, optional containerized telemetry recorder, sensors, and video services.
 - **Arduino Opta + expansions** owns the valve coils, the 0–10 V flow valve drive, the safety-chain interlocks, and per-channel current monitoring. It is the *industrial I/O layer*.
 - The two boards talk to each other over **Modbus RTU on RS-485** (Max Carrier J6 ↔ Opta RS-485 port).
 
@@ -16,7 +16,7 @@ This split exists for safety: a crash, hang, or firmware bug in either MCU fails
 
 | Component | Role |
 |---|---|
-| Portenta Max Carrier (ABX00043) | Carrier with onboard LoRa (Murata SX1276) + Cat-M1 cellular (SARA-R412M), both SMA |
+| Portenta Max Carrier (ABX00043) | Carrier with onboard LoRa (Murata SX1276), SMA RF, RS-485, CAN, and disabled/not-used Cat-M1 hardware present on the board |
 | **Portenta X8 (ABX00049)** | i.MX 8M Mini quad Cortex-A53 @ 1.8 GHz running Yocto Linux + Docker, **plus STM32H747 co-MCU** (M7 480 MHz + M4 240 MHz). The H747 co-MCU runs the real-time M7+M4 firmware bare-metal; Linux runs on top for SSH/logs/containers. Canonical per [MASTER_PLAN.md §8.9](MASTER_PLAN.md). |
 | **Arduino Opta WiFi** (AFX00002) | Industrial PLC with 4× 10 A relays, 8 digital/analog inputs, RS-485, Ethernet. Modbus-RTU **slave** to the Max Carrier. Carries 4 of the 8 directional valve coils + watchdog logic. **WiFi and BLE radios are disabled in firmware** — the Opta is used solely for hydraulic-system I/O over Modbus-RTU/RS-485; no wireless paths to or from the Opta are in scope (see [MASTER_PLAN.md](MASTER_PLAN.md)) |
 | **Opta Ext D1608S** expansion (AFX00006) | **8× solid-state relays (SSR), 24 VDC / 2 A each** + 16× programmable voltage inputs (digital 0–24 VDC or analog 0–10 V). Carries the other 4 directional valve coils on SSR channels for low-latency switching (sub-millisecond, no contact bounce). 4 spare SSR channels for aux outputs. The slower onboard EMRs on the Opta base remain available for the engine-kill chain (which is gated by the PSR safety relay anyway, not latency-critical). 16 inputs cover ignition sense / mode switch / external limit switches |
@@ -27,7 +27,7 @@ This split exists for safety: a crash, hang, or firmware bug in either MCU fails
 | Master battery cutoff switch | Shop-maintenance disconnect |
 | 18650 LiPo + TP4056 charger | Survives engine-crank brown-outs; supports graceful shutdown |
 | microSD 32 GB | Local data logging on Max Carrier |
-| LoRa whip + cellular antenna | Both SMA; cab-roof bracket with N-bulkhead pass-through |
+| LoRa whip antenna | Cab-roof bracket with N-bulkhead pass-through |
 | GPS active patch antenna (28 dB LNA) | For onboard u-blox GPS on Max Carrier |
 | Status LEDs (POWER / LINK / FAULT) + piezo buzzer | Exterior indicators / audible alerts |
 | Deutsch DT connector harness | Weatherproof harness terminations |
@@ -65,9 +65,8 @@ Tractor 12 V battery
         │       │
         │       ├──► Portenta X8 (via high-density connectors)
         │       │     └──► Linux (Yocto): SSH, journald, optional Docker telemetry recorder
-        │       │     └──► H747 co-MCU (M7+M4): radios + arbitration + Modbus master
+        │       │     └──► H747 co-MCU (M7+M4): LoRa + arbitration + Modbus master
         │       ├──► LoRa Murata SiP    → SMA J9 → cab-roof whip antenna
-        │       ├──► SARA-R412M cellular → SMA J3 → cab-roof cellular antenna
         │       ├──► RS-485 (J6) ◄══ Modbus RTU 115200 8N1 ══► Opta RS-485
         │       ├──► CAN-FD (J7) → engine ECU (read-only telemetry)
         │       ├──► UART → u-blox GPS (with active antenna)
@@ -184,14 +183,13 @@ This is independent of any LoRa-side timeout — the LoRa watchdog and the Modbu
 
 ## Firmware structure
 
-### M7 core (`tractor.ino`)
+### M7 core (`firmware/tractor_h7/tractor_m7.ino`)
 
 Responsibilities:
 - LoRa TX/RX via RadioLib (SX1276)
-- Cellular fallback (SARA-R412M via MKRNB library)
 - Multi-source arbitration (see [LORA_PROTOCOL.md § Multi-source arbitration](LORA_PROTOCOL.md#multi-source-arbitration))
 - Telemetry packing → MQTT-SN over LoRa to base station
-- Modbus RTU master → DRV8908 valve driver
+- Modbus RTU master → Opta Modbus-RTU slave
 - microSD logging
 - M4 IPC: pushes the active ControlFrame to M4 every 50 ms via shared memory
 
@@ -200,12 +198,10 @@ Main loop pseudocode:
 ```c
 void setup() {
     Serial.begin(115200);
-    LoRa.begin(915E6);
-    LoRa.setSpreadingFactor(7);
-    LoRa.setSignalBandwidth(500E3);
+    radio.begin(915.0, 125.0, 7, 5, 0x12, 20);  // SF7/BW125/CR4-5
     crypto_init(PRESHARED_KEY);
     
-    Modbus.begin(115200);  // RS-485 to valve driver
+    Modbus.begin(115200);  // RS-485 to Opta slave
     sd.begin(BUILTIN_SDCARD);
     
     // Boot M4 core for valve control
@@ -231,8 +227,8 @@ void loop() {
     // 3. Telemetry tick (variable, per topic)
     telemetry_tick();
     
-    // 4. Cellular MQTT keep-alive
-    cellular_tick();
+    // 4. Service watchdogs and non-blocking X8 sidecar IPC
+    service_sidecar_ipc();
 }
 ```
 
@@ -243,7 +239,7 @@ Responsibilities:
 - Read latest ControlFrame from shared memory
 - Apply axis values → valve PWM (or on/off)
 - Watchdog: if no fresh ControlFrame in 200 ms → all valves neutral
-- Write valve commands to DRV8908 over local SPI/I²C
+- Keep the hardware watchdog independent of Linux and mirror the safe control state
 
 ```c
 void m4_loop_100hz() {
@@ -285,7 +281,7 @@ The hardware E-stop chain MUST function even if the H7 freezes:
 ```
 Handheld E-stop signal (LoRa heartbeat with estop_armed=0)
    OR
-Base station E-stop button (web UI → cellular → tractor)
+Base station E-stop button (web UI → LoRa → tractor)
    OR
 H7 watchdog timeout
    OR
@@ -306,9 +302,8 @@ Recovery requires manual reset on the tractor (key-switch cycle or dedicated res
 |---|---:|---:|
 | Portenta X8 + Max Carrier (idle, Linux running) | 2.5 W | 4 W |
 | LoRa TX (+20 dBm, 50% duty) | 0.4 W | 0.8 W |
-| Cellular Cat-M1 (TX burst) | 0.6 W | 2 W |
 | GPS + sensors | 0.5 W | 0.5 W |
-| **Total electronics** | **~2 W** | **~4 W** |
+| **Total electronics** | **~3.4 W** | **~5.3 W** |
 | Solenoid valves (when energized) | 60–120 W | 240 W (all 8 on, transient) |
 
 The Max Carrier accepts 6–36 V; tractor 12 V system is fine. The 18650 backup gives ~30 min of MCU operation through engine-crank brown-outs.
@@ -317,7 +312,6 @@ The Max Carrier accepts 6–36 V; tractor 12 V system is fine. The 18650 backup 
 
 - Mount the IP65 enclosure inside the cab on a vibration-isolated bracket (rubber grommets)
 - LoRa whip antenna outside the cab, vertical, ground-plane on the cab roof
-- Cellular antenna mounted on the cab roof or rear ROPS
 - Cable runs through cable glands; avoid running RF coax parallel to ignition wiring
 - Operating temperature: -20 °C to +60 °C (Portenta industrial spec)
 - Vibration: secure with Loctite on screw threads; service inspection every 250 hours
@@ -326,27 +320,29 @@ The Max Carrier accepts 6–36 V; tractor 12 V system is fine. The 18650 backup 
 
 1. [ ] Bench-test Max Carrier + H7 with USB-C power, blink LED on M7 and M4
 2. [ ] Verify LoRa TX/RX with a second Max Carrier (or any RadioLib-compatible board)
-3. [ ] Verify cellular registers with the IoT SIM, sends test MQTT publish
-4. [ ] Wire up DRV8908 valve driver, test each channel with bench LEDs as valve stand-ins
+3. [ ] Verify Opta Modbus slave over RS-485 with bench LEDs as valve stand-ins
+4. [ ] Verify all 8 D1608S SSR channels and both A0602 analog outputs drop safe on watchdog timeout
 5. [ ] Wire up E-stop relay chain, test that loss of M7 watchdog drops valve power within 200 ms
 6. [ ] Install in tractor, verify GPS lock, CAN read from engine ECU
 7. [ ] Field-test hydraulic actuation with all valves wet (engine off, hydraulic pump motor on)
-8. [ ] Field-test with handheld at close range, verify no missed packets at SF7/BW500
+8. [ ] Field-test with handheld at close range, verify no missed packets at SF7/BW125
 9. [ ] Field-test with base station at 1 km, 5 km, 10 km LoS — record RSSI and packet loss
 10. [ ] 24-hour soak test in shop with simulated joystick input
 
-## Source code layout (when implemented)
+## Source code layout
 
 ```
 firmware/tractor_h7/
-├── tractor.ino                 # M7 main; setup() and loop()
-├── tractor_m4.cpp              # M4 100 Hz valve loop
-├── modbus_valves.cpp           # RS-485 master to DRV8908
-├── cellular_mqtt.cpp           # SARA-R412M + MQTT publish over Cat-M1
-├── telemetry.cpp               # Topic builders (GPS, engine, battery, etc.)
-├── ipc.cpp                     # M7 ↔ M4 shared memory
-├── pinmap_max_carrier_h7.h     # Pin definitions for this hardware combo
-└── platformio.ini              # PlatformIO build for both cores
+├── tractor_m7.ino              # M7 main: LoRa, source arbitration, Modbus master
+└── tractor_m4.cpp              # M4 independent safety watchdog
+
+firmware/tractor_opta/
+└── opta_modbus_slave.ino       # Opta + D1608S + A0602 Modbus-RTU slave
+
+firmware/tractor_x8/
+├── gps_service.py              # GPS sidecar service
+├── imu_service.py              # IMU sidecar service
+└── requirements.txt
 ```
 
 ## Image pipeline (Portenta X8 Linux side)

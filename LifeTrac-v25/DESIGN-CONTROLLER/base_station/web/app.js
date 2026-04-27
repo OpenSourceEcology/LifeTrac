@@ -30,6 +30,48 @@
   const wsCtrl = new WebSocket(`ws://${location.host}/ws/control`);
   const wsTele = new WebSocket(`ws://${location.host}/ws/telemetry`);
   const linkEl = document.getElementById('link-status');
+  let controlsLocked = false;
+
+  function normalizeSource(value) {
+    if (typeof value === 'string') return value.toLowerCase();
+    if (typeof value === 'number') {
+      return ({ 0:'none', 1:'handheld', 2:'base', 3:'autonomy', 4:'autonomy', 255:'none' })[value] || 'unknown';
+    }
+    if (value && typeof value === 'object') {
+      return normalizeSource(value.active_source ?? value.source);
+    }
+    return 'unknown';
+  }
+
+  function setSource(value) {
+    const source = normalizeSource(value);
+    document.getElementById('t-src').textContent = source;
+    const banner = document.getElementById('source-banner');
+    controlsLocked = source === 'handheld' || source === 'autonomy';
+    banner.textContent = controlsLocked
+      ? `${source.toUpperCase()} ACTIVE — CONTROLS DISABLED`
+      : `SOURCE: ${source.toUpperCase()}`;
+    banner.className = 'source-banner ' + source;
+    document.body.classList.toggle('controls-locked', controlsLocked);
+    if (controlsLocked) {
+      state.lhx = state.lhy = state.rhx = state.rhy = 0;
+      state.buttons = 0;
+      state.flags = 0;
+    }
+  }
+
+  function pct(value) {
+    return (Number(value || 0) * 100).toFixed(1) + '%';
+  }
+
+  function setLinkStatus(data) {
+    if (!data || typeof data !== 'object') return;
+    if ('u_total' in data) document.getElementById('t-link-use').textContent = pct(data.u_total);
+    if ('u_image' in data) document.getElementById('t-img-use').textContent = pct(data.u_image);
+    if ('u_telemetry' in data) document.getElementById('t-loss').textContent = `telem ${pct(data.u_telemetry)}`;
+    if ('encode_mode' in data) document.getElementById('t-encode').textContent = String(data.encode_mode).toLowerCase();
+  }
+
   wsCtrl.addEventListener('open',  () => linkEl.textContent = 'link: connected');
   wsCtrl.addEventListener('close', () => linkEl.textContent = 'link: DISCONNECTED');
   wsCtrl.addEventListener('error', () => linkEl.textContent = 'link: error');
@@ -37,6 +79,7 @@
   // 20 Hz tx (server also rate-limits)
   setInterval(() => {
     if (wsCtrl.readyState !== WebSocket.OPEN) return;
+    if (controlsLocked) return;
     wsCtrl.send(JSON.stringify(state));
   }, 50);
 
@@ -52,7 +95,7 @@
       if (msg.topic.endsWith('/active_camera')) {
         // 1B enum on topic 0x22: 0=auto,1=front,2=rear,3=implement,4=crop
         const map = { 0:'auto', 1:'front', 2:'rear', 3:'implement', 4:'crop' };
-        const id = (typeof msg.data === 'number') ? msg.data : parseInt(msg.data, 10);
+        const id = (typeof msg.data === 'number') ? msg.data : parseInt(msg.data, 16);
         const name = map[id] || '?';
         document.getElementById('t-cam').textContent = name;
         // Highlight the matching button so the UI reflects the *tractor's*
@@ -69,12 +112,13 @@
         const ndvi = (d && typeof d.ndvi_mean === 'number') ? d.ndvi_mean.toFixed(2) : d;
         document.getElementById('t-ndvi').textContent = ndvi;
       }
+      if (msg.topic.endsWith('/status/link') || (msg.topic.endsWith('/source_active') && msg.data && typeof msg.data === 'object')) {
+        setLinkStatus(msg.data);
+      }
       if (msg.topic.endsWith('/source_active')) {
-        const txt = msg.data || 'NONE';
-        document.getElementById('t-src').textContent = txt;
-        const banner = document.getElementById('source-banner');
-        banner.textContent = `SOURCE: ${txt.toUpperCase()}`;
-        banner.className = 'source-banner ' + txt.toLowerCase();
+        const hasSourceField = msg.data && typeof msg.data === 'object'
+          && ('active_source' in msg.data || 'source' in msg.data);
+        if (typeof msg.data !== 'object' || hasSourceField) setSource(msg.data);
       }
     } catch (e) { /* shrug */ }
   });
@@ -115,7 +159,7 @@
       hx = Math.cos(a) * m;
       hy = Math.sin(a) * m;
       // Only emit from on-screen joystick when no gamepad is driving.
-      if (!gamepadActive) {
+      if (!gamepadActive && !controlsLocked) {
         state[axisX] =  Math.round((hx / radius) * 127);
         state[axisY] = -Math.round((hy / radius) * 127);  // y-axis: up = positive
       }
@@ -143,6 +187,7 @@
   document.querySelectorAll('.buttons button[data-btn]').forEach(btn => {
     const bit = 1 << parseInt(btn.dataset.btn, 10);
     const set = (down) => {
+      if (controlsLocked) return;
       if (down) state.buttons |= bit; else state.buttons &= ~bit;
       // Take-control button → also set flags bit0 while held.
       if (parseInt(btn.dataset.btn, 10) === 7) {
@@ -165,6 +210,7 @@
   // toggle here — we wait for the tractor to confirm.
   document.querySelectorAll('#camera-switch button').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (controlsLocked) return;
       const cam = btn.dataset.cam;
       fetch('/api/camera/select', {
         method: 'POST',
@@ -196,6 +242,9 @@
         pill.textContent = 'no gamepad';
         pill.classList.remove('on');
         for (const k in prevButtons) prevButtons[k] = false;
+        state.lhx = state.lhy = state.rhx = state.rhy = 0;
+        state.buttons = 0;
+        state.flags = 0;
       }
       return;
     }
@@ -219,6 +268,12 @@
     // E-stop: rising edge only.
     if (pressed(gp, 9)) {
       fetch('/api/estop', { method: 'POST' });
+    }
+    if (controlsLocked) {
+      state.lhx = state.lhy = state.rhx = state.rhy = 0;
+      state.buttons = 0;
+      state.flags = 0;
+      return;
     }
     // Refresh hold-to-track edge memory for the buttons we report by level.
     [0, 1, 2, 3, 5].forEach(i => { prevButtons[i] = !!gp.buttons[i]?.pressed; });

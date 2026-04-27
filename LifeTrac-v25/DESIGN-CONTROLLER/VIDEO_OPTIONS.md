@@ -50,7 +50,7 @@ For comparison, here's what each link can carry:
 | Cellular 4G LTE | 2–10 Mbps up | unlimited (coverage) |
 | Cellular 5G | 50–500 Mbps up | unlimited (coverage) |
 | WiFi long-range mesh | 5–20 Mbps | 500 m–1 km |
-| **LoRa (custom stack, SF7/BW500, US)** | **~12 kbps** | 5–15 km LoS |
+| **LoRa (v25 custom stack, image SF7/BW250, US)** | **~3–7 kbps before app overhead; 32 B fragments estimate at ~36 ms and miss the current 25 ms cap** | 5–15 km LoS |
 | LoRa (LoRaWAN, 1% duty cycle) | ~0.1 kbps avg | 5–15 km LoS |
 | XBee-PRO 900HP @ 200 kbps | ~50–80 kbps | ~3 km LoS |
 | XBee-PRO 900HP @ 10 kbps | ~3–5 kbps | ~14 km LoS |
@@ -83,12 +83,12 @@ LoRa cannot stream video in any conventional sense, but it *can* carry low-rate 
 
 | Region | Rule | LoRa max effective rate |
 |---|---|---|
-| US (FCC §15.247) | No duty-cycle limit on DTS modulation | **~12 kbps** (SF7/BW500, custom stack) |
+| US (FCC §15.247) | FHSS/dwell compliance required by the v25 sub-500 kHz profiles | **~3–7 kbps practical image budget pending fragment-cap redesign** (SF7/BW250 image profile) |
 | EU (ETSI EN 300 220, sub-band g3) | 10% duty cycle, 14 dBm ERP | **~1.2 kbps** |
 | EU (sub-band g1) | 1% duty cycle | ~0.12 kbps |
 | LoRaWAN (any region) | 1% duty cycle (effectively) | ~0.1 kbps |
 
-So in the US with a custom stack you can sustain ~12 kbps; everywhere else you're 10–100× lower.
+So in the US with the active v25 sub-500 kHz custom stack, LoRa remains a proof-of-life / tile-delta medium, not a video link. The current implementation review found that a 32 B SF7/BW250 image fragment is ~36 ms on air; the 25 ms cap needs smaller fragments, a wider image profile, or a revised cap before it can be treated as implemented.
 
 ### What 12 kbps buys you
 

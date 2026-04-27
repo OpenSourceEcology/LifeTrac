@@ -10,21 +10,22 @@ the BNO086 IMU** through a single Adafruit MCP2221A USB→I²C bridge
 (Adafruit 4471, see [`HARDWARE_BOM.md`](../../../HARDWARE_BOM.md) Tier 1).
 
 Why a periodic 1 Hz message is enough:
-  * **Tractor top speed ~5 mph (8 km/h ≈ 2.2 m/s).** At 1 Hz we miss at most
-    ~2.2 m of travel between fixes — well inside the NEO-M9N's ~1.5 m typical
-    standalone accuracy. Bumping to 5 Hz costs LoRa airtime and doesn't make
-    a tracked tractor visibly smoother on the base-station map.
-  * **Hydraulic loop is unrelated.** Tip-over warning + heading hold come from
-    the IMU at 5 Hz (see [`imu_service.py`](imu_service.py)) — the GPS only
-    feeds the operator-console map and the autonomy waypoint follower.
-  * **Battery / cellular budget.** A 1 Hz NMEA update at SF7/BW500 is ~30 ms
-    of airtime — negligible. We can also drop to 0.2 Hz when the tractor is
-    parked (speed < 0.1 m/s for 10 s) to free the channel for telemetry.
+    * **Tractor top speed ~5 mph (8 km/h ≈ 2.2 m/s).** At 1 Hz we miss at most
+        ~2.2 m of travel between fixes — well inside the NEO-M9N's ~1.5 m typical
+        standalone accuracy. Bumping to 5 Hz costs LoRa airtime and does not make
+        a tracked tractor visibly smoother on the base-station map.
+    * **Hydraulic loop is unrelated.** Tip-over warning + heading hold come from
+        the IMU at 5 Hz (see [`imu_service.py`](imu_service.py)) — the GPS only
+        feeds the operator-console map and the autonomy waypoint follower.
+    * **Airtime budget.** A 1 Hz fixed-point update fits one LoRa telemetry
+        frame; final airtime accounting belongs to `base_station/link_monitor.py`.
+        We can also drop to 0.2 Hz when the tractor is parked (speed < 0.1 m/s for
+        10 s) to free the channel for telemetry.
 
 The service publishes 20-byte fixed-point GPS samples to the M7 over the
 X8↔H747 UART (`/dev/ttymxc0`); the M7 wraps each one in a `TelemetryFrame`
 with `topic_id = 0x01` (already mapped to `lifetrac/v25/telemetry/gps` in
-[`base_station/lora_bridge.py`](../base_station/lora_bridge.py) `TOPIC_BY_ID`).
+[`base_station/lora_bridge.py`](../../base_station/lora_bridge.py) `TOPIC_BY_ID`).
 
 Architecture (same Qwiic bus as IMU — chained, not parallel):
 
@@ -71,10 +72,10 @@ def _import_hardware():
 # ---------------------------------------------------------------------------
 # Wire format from X8 → M7 for `topic_id = 0x01` (GPS).
 # ---------------------------------------------------------------------------
-# Designed to (a) fit comfortably inside the 51-byte SF7/BW500 telemetry
-# budget from LORA_PROTOCOL.md § Frame format, (b) keep a fixed schema so
-# the bridge can deserialise without per-version code paths, (c) cover the
-# common UI needs (map marker, heading rose, fix quality bar).
+# Designed to (a) fit comfortably inside one compact LoRa telemetry frame,
+# (b) keep a fixed schema so the bridge can deserialise without per-version
+# code paths, and (c) cover the common UI needs (map marker, heading rose,
+# fix quality bar).
 #
 #     uint8_t   version       (= 0x01)
 #     uint8_t   flags         (bit 0: pos_valid, bit 1: vel_valid,

@@ -4,11 +4,18 @@
 
 #include "lora_proto.h"
 #include <string.h>
+#include <math.h>
 
 #define KISS_FEND  0xC0
 #define KISS_FESC  0xDB
 #define KISS_TFEND 0xDC
 #define KISS_TFESC 0xDD
+
+const LoraPhyProfile LP_PHY_CONTROL_SF7 = { 7, 125, 5, 8 };
+const LoraPhyProfile LP_PHY_CONTROL_SF8 = { 8, 125, 5, 8 };
+const LoraPhyProfile LP_PHY_CONTROL_SF9 = { 9, 125, 5, 8 };
+const LoraPhyProfile LP_PHY_TELEMETRY   = { 9, 250, 8, 12 };
+const LoraPhyProfile LP_PHY_IMAGE       = { 7, 250, 5, 8 };
 
 // CRC-16/CCITT (false): poly 0x1021, init 0xFFFF, no reflection, no xor-out.
 uint16_t lp_crc16(const uint8_t* buf, size_t len) {
@@ -119,4 +126,138 @@ void lp_make_heartbeat(HeartbeatFrame* f,
     f->reserved             = 0;
     f->crc16                = lp_crc16((const uint8_t*)f,
                                        sizeof(HeartbeatFrame) - sizeof(uint16_t));
+}
+
+size_t lp_make_command(CommandFrame* f,
+                       uint8_t source_id, uint16_t seq,
+                       uint8_t opcode, const uint8_t* arg, uint8_t arg_len) {
+    if (arg_len > sizeof(f->arg)) arg_len = sizeof(f->arg);
+    f->hdr.version      = LIFETRAC_PROTO_VERSION;
+    f->hdr.source_id    = source_id;
+    f->hdr.frame_type   = FT_COMMAND;
+    f->hdr.sequence_num = seq;
+    f->opcode           = opcode;
+    memset(f->arg, 0, sizeof(f->arg));
+    if (arg_len > 0 && arg != 0) memcpy(f->arg, arg, arg_len);
+    size_t prefix = sizeof(LoraHeader) + 1 + arg_len;
+    uint16_t crc = lp_crc16((const uint8_t*)f, prefix);
+    uint8_t* raw = (uint8_t*)f;
+    raw[prefix] = (uint8_t)(crc & 0xFF);
+    raw[prefix + 1] = (uint8_t)(crc >> 8);
+    return prefix + 2;
+}
+
+uint32_t lp_lora_airtime_ms(uint8_t payload_len,
+                            uint8_t sf,
+                            uint16_t bw_khz,
+                            uint8_t cr_den,
+                            uint8_t preamble_len) {
+    if (sf < 6 || sf > 12 || bw_khz == 0 || cr_den < 5 || cr_den > 8) return 0;
+    double bw_hz = (double)bw_khz * 1000.0;
+    double tsym_ms = ((double)(1UL << sf) / bw_hz) * 1000.0;
+    uint8_t low_data_rate_opt = (sf >= 11 && bw_khz <= 125) ? 1 : 0;
+    uint8_t cr = (uint8_t)(cr_den - 4);  // RadioLib denominator 5..8 -> formula 1..4
+    int32_t numerator = (int32_t)(8u * payload_len) - (int32_t)(4u * sf) + 28 + 16;
+    int32_t denominator = 4 * ((int32_t)sf - (2 * low_data_rate_opt));
+    int32_t payload_sym = 8;
+    if (numerator > 0 && denominator > 0) {
+        payload_sym += (int32_t)ceil((double)numerator / (double)denominator) * (cr + 4);
+    }
+    double total_ms = ((double)preamble_len + 4.25 + (double)payload_sym) * tsym_ms;
+    return (uint32_t)ceil(total_ms);
+}
+
+static uint32_t xorshift32(uint32_t x) {
+    if (x == 0) x = 0x6D2B79F5UL;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    return x;
+}
+
+uint8_t lp_fhss_channel_index(uint32_t key_id, uint32_t hop_counter) {
+    uint8_t perm[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+    uint32_t cycle = hop_counter / 8u;
+    uint32_t rnd = xorshift32(key_id ^ (cycle * 0x9E3779B9UL));
+    for (int i = 7; i > 0; i--) {
+        rnd = xorshift32(rnd);
+        uint8_t j = (uint8_t)(rnd % (uint32_t)(i + 1));
+        uint8_t tmp = perm[i];
+        perm[i] = perm[j];
+        perm[j] = tmp;
+    }
+    return perm[hop_counter & 0x07u];
+}
+
+uint32_t lp_fhss_channel_hz(uint32_t key_id, uint32_t hop_counter) {
+    return 902000000UL + ((uint32_t)lp_fhss_channel_index(key_id, hop_counter) * 3250000UL);
+}
+
+// -------------------------------------------------------------------------
+// CSMA skip-busy wrapper. See lora_proto.h for the protocol contract.
+// -------------------------------------------------------------------------
+uint32_t lp_csma_pick_hop(uint32_t key_id,
+                          uint32_t start_hop,
+                          lp_rssi_sampler_fn sample,
+                          void* ctx,
+                          int16_t busy_threshold_dbm,
+                          uint8_t max_skips,
+                          uint8_t* skips_out) {
+    uint32_t hop = start_hop;
+    for (uint8_t skips = 0; skips <= max_skips; skips++) {
+        int16_t rssi = sample(lp_fhss_channel_hz(key_id, hop), ctx);
+        if (rssi <= busy_threshold_dbm) {
+            if (skips_out) *skips_out = skips;
+            return hop;
+        }
+        hop++;
+    }
+    // Every candidate within budget was busy. Caller must audit-log.
+    if (skips_out) *skips_out = max_skips;
+    return hop - 1u;
+}
+
+// -------------------------------------------------------------------------
+// Replay-defence sliding window. See lora_proto.h for the protocol contract.
+// -------------------------------------------------------------------------
+void lp_replay_init(LpReplayWindow* w) {
+    w->high_water  = 0;
+    w->bitmap      = 0;
+    w->primed      = false;
+}
+
+bool lp_replay_check_and_update(LpReplayWindow* w, uint16_t seq) {
+    if (!w->primed) {
+        w->high_water = seq;
+        w->bitmap     = 1u;     // bit 0 = seq itself, marked seen
+        w->primed     = true;
+        return true;
+    }
+
+    // Signed 16-bit delta handles wrap correctly: delta > 0 means "newer",
+    // delta <= 0 means "same or older".
+    int16_t delta = (int16_t)(seq - w->high_water);
+
+    if (delta > 0) {
+        // Newer than anything we've seen: shift bitmap, mark new top.
+        if ((uint32_t)delta >= LP_REPLAY_WINDOW_BITS) {
+            w->bitmap = 1u;     // gap exceeds window; reset, accept new top
+        } else {
+            w->bitmap = (w->bitmap << (uint32_t)delta) | 1u;
+        }
+        w->high_water = seq;
+        return true;
+    }
+
+    // delta <= 0: candidate is at or behind high_water.
+    uint32_t age = (uint32_t)(-delta);
+    if (age >= LP_REPLAY_WINDOW_BITS) {
+        return false;          // too old to track; reject as replay
+    }
+    uint64_t mask = (uint64_t)1u << age;
+    if (w->bitmap & mask) {
+        return false;          // already seen
+    }
+    w->bitmap |= mask;
+    return true;
 }

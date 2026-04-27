@@ -87,11 +87,12 @@ def _import_hardware():
 #     int16_t   ax, ay, az       (mg, signed; ±32 g range)
 #     uint16_t  yaw_deg10        (heading × 10, 0..3599)  — convenience for UI
 #
-# Total: 1 + 1 + 8 + 6 + 2 = 18 bytes; fits the 51-byte SF7/BW500 telemetry budget
+# Total: 1 + 1 + 8 + 6 + 2 = 18 bytes; fits one telemetry frame; final
+# airtime budgeting is handled by base_station/link_monitor.py.
 # from LORA_PROTOCOL.md § Frame format with room for the 2-byte CRC and topic
 # header. Layout matches what the bridge will publish under
 # `lifetrac/v25/telemetry/imu` (see TOPIC_BY_ID 0x07 in
-# [`base_station/lora_bridge.py`](../base_station/lora_bridge.py)).
+# [`base_station/lora_bridge.py`](../../base_station/lora_bridge.py)).
 IMU_PACKET_VERSION = 0x01
 IMU_PACKET_FMT = "<BB hhhh hhh H"   # 1+1+8+6+2 = 18 bytes
 assert struct.calcsize(IMU_PACKET_FMT) == 18
@@ -110,7 +111,7 @@ KISS_TFESC = 0xDD
 
 def kiss_encode(data: bytes) -> bytes:
     """Standard KISS (RFC 1055-style) framing — same as `lp_kiss_encode` in
-    [`lora_proto/lora_proto.c`](../lora_proto/lora_proto.c). One framer in the
+    [`common/lora_proto/lora_proto.c`](../common/lora_proto/lora_proto.c). One framer in the
     codebase, used here, on the air, *and* on the X8↔H747 UART."""
     out = bytearray([KISS_FEND])
     for b in data:

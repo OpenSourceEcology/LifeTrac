@@ -2,8 +2,9 @@
 
 DRAFT FOR REVIEW. Not run yet.
 
-The X8's H747 co-MCU runs base.ino (a thin RadioLib wrapper) and pipes
-KISS-framed bytes to/from this script over UART. We:
+The v25 master plan pins the base station to Linux-on-X8 control of the SX1276
+over SPI. This bridge currently keeps the serial transport path as a bench
+fallback while the in-tree SPI driver is filled in. We:
 
   - Decode KISS frames, decrypt with AES-128-GCM, parse the LoraHeader.
   - Republish telemetry + control-source state on Mosquitto under
@@ -17,163 +18,54 @@ Run:
 from __future__ import annotations
 
 import argparse
+import heapq
+import itertools
+import json
 import logging
-import os
 import struct
-import sys
 import threading
 import time
-from dataclasses import dataclass
 
 import paho.mqtt.client as mqtt
 import serial
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-# ---- shared with lora_proto.h ------------------------------------------
-PROTO_VERSION = 0x01
-SRC_HANDHELD, SRC_BASE, SRC_TRACTOR, SRC_AUTONOMY = 0x01, 0x02, 0x03, 0x04
-FT_CONTROL, FT_TELEMETRY, FT_COMMAND, FT_HEARTBEAT = 0x10, 0x20, 0x30, 0x40
+from link_monitor import EncodeModeController, RollingAirtimeLedger
+from lora_proto import (
+    CMD_CAMERA_SELECT,
+    CMD_ESTOP,
+    CMD_LINK_TUNE,
+    CTRL_FRAME_LEN,
+    CRC_LEN,
+    FT_COMMAND,
+    FT_CONTROL,
+    FT_HEARTBEAT,
+    FT_TELEMETRY,
+    HB_FRAME_LEN,
+    HEADER_LEN,
+    KissDecoder,
+    PROTO_VERSION,
+    SRC_BASE,
+    TELEM_HEADER_LEN,
+    TELEM_MAX_PAYLOAD,
+    attribute_phy,
+    classify_priority,
+    decrypt_frame,
+    encrypt_frame,
+    kiss_encode,
+    pack_command,
+    parse_header,
+    topic_name,
+    verify_crc,
+)
 
-KISS_FEND, KISS_FESC, KISS_TFEND, KISS_TFESC = 0xC0, 0xDB, 0xDC, 0xDD
+# Airtime alarm thresholds per LORA_IMPLEMENTATION.md \u00a77.
+U_TELEMETRY_ALARM = 0.30
+U_TOTAL_ALARM = 0.60
+# How often to poll the ledger + emit CMD_ENCODE_MODE if needed.
+AIRTIME_POLL_INTERVAL_S = 1.0
 
 # 16-byte pre-shared fleet key. PROVISIONED ELSEWHERE.
 FLEET_KEY = bytes(16)
-
-
-# ---- KISS framing ------------------------------------------------------
-def kiss_encode(data: bytes) -> bytes:
-    out = bytearray([KISS_FEND])
-    for b in data:
-        if b == KISS_FEND:
-            out += bytes([KISS_FESC, KISS_TFEND])
-        elif b == KISS_FESC:
-            out += bytes([KISS_FESC, KISS_TFESC])
-        else:
-            out.append(b)
-    out.append(KISS_FEND)
-    return bytes(out)
-
-
-class KissDecoder:
-    def __init__(self) -> None:
-        self.buf = bytearray()
-        self.in_frame = False
-        self.escape = False
-
-    def feed(self, b: int):
-        """Yield complete frames as bytes."""
-        if b == KISS_FEND:
-            if self.in_frame and self.buf:
-                frame = bytes(self.buf)
-                self.buf.clear()
-                self.in_frame = False
-                self.escape = False
-                yield frame
-            else:
-                self.in_frame = True
-                self.buf.clear()
-                self.escape = False
-            return
-        if not self.in_frame:
-            return
-        if self.escape:
-            if b == KISS_TFEND:
-                b = KISS_FEND
-            elif b == KISS_TFESC:
-                b = KISS_FESC
-            self.escape = False
-        elif b == KISS_FESC:
-            self.escape = True
-            return
-        self.buf.append(b)
-
-
-# ---- frame parsing -----------------------------------------------------
-@dataclass
-class LoraHeader:
-    version: int
-    source_id: int
-    frame_type: int
-    sequence_num: int
-
-
-HEADER_LEN = 5
-CTRL_FRAME_LEN = 16
-HB_FRAME_LEN = 10
-TELEM_HEADER_LEN = HEADER_LEN + 2   # + topic_id + payload_len
-TELEM_MAX_PAYLOAD = 128
-CRC_LEN = 2
-
-
-def parse_header(pt: bytes) -> LoraHeader | None:
-    if len(pt) < HEADER_LEN:
-        return None
-    return LoraHeader(*struct.unpack("<BBBH", pt[:HEADER_LEN]))
-
-
-def crc16_ccitt(data: bytes) -> int:
-    """CRC-16/CCITT (poly 0x1021, init 0xFFFF) — matches lora_proto.c."""
-    crc = 0xFFFF
-    for b in data:
-        crc ^= b << 8
-        for _ in range(8):
-            crc = ((crc << 1) ^ 0x1021) & 0xFFFF if (crc & 0x8000) else (crc << 1) & 0xFFFF
-    return crc
-
-
-def verify_crc(frame: bytes) -> bool:
-    """Last 2 bytes are little-endian CRC over the preceding bytes."""
-    if len(frame) < CRC_LEN + 1:
-        return False
-    body, tail = frame[:-CRC_LEN], frame[-CRC_LEN:]
-    expected = crc16_ccitt(body)
-    actual = struct.unpack("<H", tail)[0]
-    return expected == actual
-
-
-def decrypt(onair: bytes) -> bytes | None:
-    if len(onair) < 12 + 16:
-        return None
-    nonce, ct = onair[:12], onair[12:]
-    try:
-        return AESGCM(FLEET_KEY).decrypt(nonce, ct, None)
-    except Exception:
-        return None
-
-
-def encrypt(seq: int, source_id: int, pt: bytes) -> bytes:
-    nonce = (
-        bytes([source_id])
-        + struct.pack("<H", seq & 0xFFFF)
-        + struct.pack("<I", int(time.time()) & 0xFFFFFFFF)
-        + os.urandom(5)
-    )
-    ct = AESGCM(FLEET_KEY).encrypt(nonce, pt, None)
-    return nonce + ct
-
-
-# ---- MQTT topic mapping -----------------------------------------------
-# IDs are statically registered (MQTT-SN style) in LORA_PROTOCOL.md.
-# Anything in 0x01..0x0F is *telemetry from tractor → base*; 0x10..0x1F is
-# control state; 0x20..0x2F is video. New topics MUST be added in both
-# places (LORA_PROTOCOL.md and here) — readers fall back to a raw topic.
-TOPIC_BY_ID = {
-    0x01: "lifetrac/v25/telemetry/gps",
-    0x02: "lifetrac/v25/telemetry/engine",
-    0x03: "lifetrac/v25/telemetry/battery",
-    0x04: "lifetrac/v25/telemetry/hydraulics",
-    0x05: "lifetrac/v25/telemetry/mode",
-    0x06: "lifetrac/v25/telemetry/errors",
-    0x07: "lifetrac/v25/telemetry/imu",          # BNO086 quaternion + accel, see tractor_x8/imu_service.py
-    0x08: "lifetrac/v25/telemetry/sensor_faults", # bitmap of sensor disconnect / CRC errors
-    0x10: "lifetrac/v25/control/source_active",
-    0x20: "lifetrac/v25/video/thumbnail",          # default / front camera
-    0x21: "lifetrac/v25/video/thumbnail_rear",     # rear-facing reverse camera
-    0x22: "lifetrac/v25/video/active_camera",      # echo of which camera is currently selected
-    0x23: "lifetrac/v25/video/thumbnail_implement",# implement-monitor cam (optional)
-    0x24: "lifetrac/v25/telemetry/crop_health",    # NDVI / GNDVI summary computed onboard the X8
-}
-
 
 # ---- bridge -----------------------------------------------------------
 class Bridge:
@@ -189,6 +81,24 @@ class Bridge:
         self.mqtt.loop_start()
         self.tx_seq = 0
         self.lock = threading.Lock()
+        # Airtime ledger + encode-mode controller (LORA_IMPLEMENTATION.md \u00a74, \u00a77).
+        self.ledger = RollingAirtimeLedger(window_ms=10_000)
+        self.encode_ctrl = EncodeModeController(required_windows=3)
+        # Priority TX queue (LORA_IMPLEMENTATION.md §4). All TX goes through a
+        # single dedicated worker so the serial write is never racy and so
+        # P0 frames preempt anything queued behind them.
+        self._tx_queue: list[tuple[int, int, bytes]] = []
+        self._tx_cv = threading.Condition()
+        self._tx_counter = itertools.count()
+        self._stop_evt = threading.Event()
+        self._tx_thread = threading.Thread(
+            target=self._tx_worker, daemon=True, name="tx"
+        )
+        self._tx_thread.start()
+        self._airtime_thread = threading.Thread(
+            target=self._airtime_worker, daemon=True, name="airtime"
+        )
+        self._airtime_thread.start()
 
     # ---- inbound: serial → MQTT -----------------------------------
     def run(self) -> None:
@@ -200,13 +110,19 @@ class Bridge:
                     self._handle_air(frame)
 
     def _handle_air(self, onair: bytes) -> None:
-        pt = decrypt(onair)
+        pt = decrypt_frame(FLEET_KEY, onair)
         if pt is None:
             logging.debug("decrypt failed (%d bytes)", len(onair))
             return
         hdr = parse_header(pt)
         if hdr is None or hdr.version != PROTO_VERSION:
             return
+
+        # Attribute received airtime to the appropriate PHY profile so the
+        # ledger reflects the full channel utilization, not just our own TX.
+        topic_id = pt[HEADER_LEN] if hdr.frame_type == FT_TELEMETRY and len(pt) > HEADER_LEN else None
+        self.ledger.record(_now_ms(), attribute_phy(hdr.frame_type, topic_id),
+                           cleartext_len=len(pt), encrypted=True)
 
         if hdr.frame_type == FT_TELEMETRY:
             # Layout: [hdr(5)|topic_id(1)|payload_len(1)|payload(N)|crc16(2)]
@@ -228,8 +144,7 @@ class Bridge:
                 logging.warning("telemetry CRC failed (topic=%#x)", topic_id)
                 return
             payload = frame[TELEM_HEADER_LEN : TELEM_HEADER_LEN + payload_len]
-            topic = TOPIC_BY_ID.get(topic_id, f"lifetrac/v25/raw/{topic_id:02x}")
-            self.mqtt.publish(topic, payload, qos=0, retain=False)
+            self.mqtt.publish(topic_name(topic_id), payload, qos=0, retain=False)
 
         elif hdr.frame_type == FT_HEARTBEAT:
             if len(pt) < HB_FRAME_LEN:
@@ -252,6 +167,32 @@ class Bridge:
                 pt[:CTRL_FRAME_LEN], qos=0, retain=False,
             )
 
+        elif hdr.frame_type == FT_COMMAND:
+            # Inbound commands from the tractor. The only one we currently
+            # care about is CMD_LINK_TUNE — surface it on MQTT so the radio
+            # supervisor (today: the serial firmware on the X8 carrier;
+            # tomorrow: the in-tree SPI driver per MASTER_PLAN.md §8.17) can
+            # retune the base-side radio. We do NOT retune here because the
+            # current bridge talks to the radio over an opaque KISS serial link.
+            if len(pt) < HEADER_LEN + 4:
+                return
+            opcode = pt[HEADER_LEN]
+            if opcode == CMD_LINK_TUNE:
+                target_sf = pt[HEADER_LEN + 1]
+                target_bw_code = pt[HEADER_LEN + 2]
+                reason = pt[HEADER_LEN + 3]
+                logging.info("CMD_LINK_TUNE rx: SF=%d bw_code=%d reason=%#x",
+                             target_sf, target_bw_code, reason)
+                self.mqtt.publish(
+                    "lifetrac/v25/control/link_tune",
+                    json.dumps({
+                        "target_sf": target_sf,
+                        "target_bw_code": target_bw_code,
+                        "reason": reason,
+                    }).encode(),
+                    qos=0, retain=True,
+                )
+
     # ---- outbound: MQTT → serial ----------------------------------
     def _on_mqtt_message(self, _client, _userdata, msg):
         if msg.topic.endswith("/cmd/control"):
@@ -266,15 +207,12 @@ class Bridge:
                 return
             self._tx(SRC_BASE, msg.payload)
         elif msg.topic.endswith("/cmd/estop"):
-            # FT_COMMAND payload: [hdr(5) | opcode(1) | args(...) | crc16(2)]
-            # opcode 0x01 = CMD_ESTOP. We let the bridge stamp seq=0 here; the
-            # tractor's replay window tolerates seq=0 as the wakeup case, and
-            # the latched-fault is idempotent.
-            body = struct.pack("<BBBHB",
-                               PROTO_VERSION, SRC_BASE, FT_COMMAND, 0, 0x01)
-            crc = crc16_ccitt(body)
-            cmd = body + struct.pack("<H", crc)
-            self._tx(SRC_BASE, cmd)
+            # FT_COMMAND payload: [hdr(5) | opcode(1) | args(...) | crc16(2)].
+            # E-stop is latched and idempotent, but it still gets a fresh
+            # sequence number so the tractor replay window does not discard it.
+            seq = self._reserve_tx_seq()
+            cmd = pack_command(seq, CMD_ESTOP)
+            self._tx(SRC_BASE, cmd, nonce_seq=seq)
         elif msg.topic.endswith("/cmd/camera_select"):
             # opcode 0x03 = CMD_CAMERA_SELECT, payload = 1B camera_id
             # (0=auto, 1=front, 2=rear, 3=implement, 4=crop). See LORA_PROTOCOL.md.
@@ -285,21 +223,106 @@ class Bridge:
             if cam_id > 0x04:
                 logging.warning("cmd/camera_select unknown id: %#x", cam_id)
                 return
-            with self.lock:
-                seq = self.tx_seq
-            body = struct.pack("<BBBHBB",
-                               PROTO_VERSION, SRC_BASE, FT_COMMAND, seq,
-                               0x03, cam_id)
-            crc = crc16_ccitt(body)
-            cmd = body + struct.pack("<H", crc)
-            self._tx(SRC_BASE, cmd)
+            seq = self._reserve_tx_seq()
+            cmd = pack_command(seq, CMD_CAMERA_SELECT, bytes([cam_id]))
+            self._tx(SRC_BASE, cmd, nonce_seq=seq)
 
-    def _tx(self, source_id: int, pt: bytes) -> None:
+    def _reserve_tx_seq(self) -> int:
         with self.lock:
             seq = self.tx_seq
             self.tx_seq = (self.tx_seq + 1) & 0xFFFF
-        wire = encrypt(seq, source_id, pt)
-        self.ser.write(kiss_encode(wire))
+            return seq
+
+    def _tx(self, source_id: int, pt: bytes, nonce_seq: int | None = None) -> None:
+        """Enqueue a cleartext frame for transmission.
+
+        The encrypt + write happens on the dedicated TX worker so the serial
+        port has exactly one writer (no interleaved bytes) and so P0 traffic
+        always wins against any queued P2/P3.
+        """
+        seq = self._reserve_tx_seq() if nonce_seq is None else nonce_seq
+        # Classify priority from the cleartext frame header.
+        frame_type = pt[2] if len(pt) > 2 else FT_COMMAND
+        opcode = pt[HEADER_LEN] if frame_type == FT_COMMAND and len(pt) > HEADER_LEN else None
+        topic_id = pt[HEADER_LEN] if frame_type == FT_TELEMETRY and len(pt) > HEADER_LEN else None
+        prio = classify_priority(frame_type, opcode, topic_id)
+        item = (source_id, seq, pt)
+        with self._tx_cv:
+            heapq.heappush(self._tx_queue,
+                           (prio, next(self._tx_counter), item))
+            self._tx_cv.notify()
+
+    def _tx_worker(self) -> None:
+        """Single TX writer: pops highest-priority frame, encrypts, writes serial,
+        records airtime. Per LORA_IMPLEMENTATION.md §4 priority queue.
+        """
+        while not self._stop_evt.is_set():
+            with self._tx_cv:
+                while not self._tx_queue and not self._stop_evt.is_set():
+                    self._tx_cv.wait(timeout=0.5)
+                if self._stop_evt.is_set():
+                    return
+                _prio, _ord, (source_id, seq, pt) = heapq.heappop(self._tx_queue)
+            try:
+                wire = encrypt_frame(FLEET_KEY, source_id, seq, pt)
+                # Attribute TX airtime by frame type (and topic for FT_TELEMETRY).
+                frame_type = pt[2] if len(pt) > 2 else FT_COMMAND
+                topic_id = pt[HEADER_LEN] if frame_type == FT_TELEMETRY and len(pt) > HEADER_LEN else None
+                self.ledger.record(_now_ms(), attribute_phy(frame_type, topic_id),
+                                   cleartext_len=len(pt), encrypted=True)
+                self.ser.write(kiss_encode(wire))
+            except Exception:
+                logging.exception("tx worker write failed")
+
+    # ---- airtime worker: poll ledger, emit CMD_ENCODE_MODE, publish 0x10 ----
+    def _airtime_worker(self) -> None:
+        """Periodically observe utilization, emit CMD_ENCODE_MODE on rung change,
+        publish the airtime triple for the operator UI, and log alarm thresholds.
+
+        Per LORA_IMPLEMENTATION.md \u00a74 + \u00a77.
+        """
+        last_alarm_state = (False, False)
+        while not self._stop_evt.wait(AIRTIME_POLL_INTERVAL_S):
+            try:
+                util = self.ledger.utilization(_now_ms())
+                # 1. Mode-change detection (3-window hysteresis lives in EncodeModeController).
+                new_mode = self.encode_ctrl.observe(util)
+                if new_mode is not None:
+                    seq = self._reserve_tx_seq()
+                    cmd = self.encode_ctrl.command_frame(seq, new_mode)
+                    logging.info("CMD_ENCODE_MODE \u2192 %s (U_image=%.1f%%)",
+                                 new_mode.name, util.image * 100)
+                    self._tx(SRC_BASE, cmd, nonce_seq=seq)
+                # 2. Publish airtime triple alongside the source-active topic
+                #    so the UI has one place to read everything link-related.
+                #    NOTE: topic 0x10 (`control/source_active`) is owned by the
+                #    tractor's 1 Hz active-source byte, so airtime lands on a
+                #    sibling retained topic to avoid clobbering it.
+                payload = json.dumps({
+                    "u_image": round(util.image, 4),
+                    "u_telemetry": round(util.telemetry, 4),
+                    "u_total": round(util.total, 4),
+                    "encode_mode": self.encode_ctrl.mode.name,
+                }).encode()
+                self.mqtt.publish("lifetrac/v25/control/link_airtime",
+                                  payload, qos=0, retain=True)
+                # 3. Alarm logging \u2014 squelch repeat lines so the journal stays useful.
+                tel_alarm = util.telemetry > U_TELEMETRY_ALARM
+                tot_alarm = util.total > U_TOTAL_ALARM
+                if (tel_alarm, tot_alarm) != last_alarm_state:
+                    if tel_alarm:
+                        logging.warning("U_telemetry %.1f%% exceeds %.0f%% alarm",
+                                        util.telemetry * 100, U_TELEMETRY_ALARM * 100)
+                    if tot_alarm:
+                        logging.warning("U_total %.1f%% exceeds %.0f%% alarm \u2014 P0 headroom at risk",
+                                        util.total * 100, U_TOTAL_ALARM * 100)
+                    last_alarm_state = (tel_alarm, tot_alarm)
+            except Exception:
+                logging.exception("airtime worker iteration failed")
+
+
+def _now_ms() -> int:
+    return int(time.monotonic() * 1000)
 
 
 def main() -> None:

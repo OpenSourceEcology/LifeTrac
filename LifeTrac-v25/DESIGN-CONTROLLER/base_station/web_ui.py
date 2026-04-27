@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import struct
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +24,8 @@ import paho.mqtt.client as mqtt
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+
+from lora_proto import SRC_AUTONOMY, SRC_BASE, SRC_HANDHELD, SRC_NONE, pack_control
 
 WEB_DIR = Path(__file__).parent / "web"
 
@@ -36,58 +38,82 @@ mqtt_client.connect("localhost", 1883)
 mqtt_client.loop_start()
 
 telemetry_subscribers: set[WebSocket] = set()
+active_source = "none"
+active_source_lock = threading.Lock()
 
 
-def _on_telemetry(_c, _u, msg):
-    payload = {"topic": msg.topic, "data": msg.payload.hex()}
+SOURCE_BY_ID = {
+    0x00: "none",
+    SRC_HANDHELD: "handheld",
+    SRC_BASE: "base",
+    0x03: "autonomy",  # priority enum value used by heartbeat/source telemetry
+    SRC_AUTONOMY: "autonomy",
+    SRC_NONE: "none",
+}
+
+
+def _source_name(value: Any) -> str | None:
+    if isinstance(value, str):
+        name = value.strip().lower()
+        if name in {"none", "handheld", "base", "autonomy"}:
+            return name
+        return None
+    if isinstance(value, int):
+        return SOURCE_BY_ID.get(value)
+    return None
+
+
+def _set_active_source(name: str) -> None:
+    global active_source
+    with active_source_lock:
+        active_source = name
+
+
+def _base_controls_allowed() -> bool:
+    with active_source_lock:
+        return active_source not in {"handheld", "autonomy"}
+
+
+def _decode_payload(topic: str, payload: bytes) -> Any:
+    if topic.endswith("/active_camera") and len(payload) == 1:
+        return payload[0]
+    if topic.endswith("/source_active") and len(payload) == 1:
+        return _source_name(payload[0]) or payload[0]
+    stripped = payload.lstrip()
+    if stripped.startswith((b"{", b"[")):
+        try:
+            return json.loads(payload.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            pass
+    return payload.hex()
+
+
+def _on_mqtt_message(_c, _u, msg):
+    data = _decode_payload(msg.topic, msg.payload)
+    if msg.topic.endswith("/source_active"):
+        candidate = None
+        if isinstance(data, dict):
+            candidate = _source_name(data.get("active_source"))
+        else:
+            candidate = _source_name(data)
+        if candidate is not None:
+            _set_active_source(candidate)
+
+    payload = {"topic": msg.topic, "data": data}
+    loop = getattr(app.state, "loop", None)
+    if loop is None:
+        return
     for ws in list(telemetry_subscribers):
         asyncio.run_coroutine_threadsafe(
-            ws.send_text(json.dumps(payload)), app.state.loop
+            ws.send_text(json.dumps(payload)), loop
         )
 
 
-mqtt_client.message_callback_add("lifetrac/v25/telemetry/+", _on_telemetry)
-mqtt_client.message_callback_add("lifetrac/v25/status/+", _on_telemetry)
+mqtt_client.on_message = _on_mqtt_message
 mqtt_client.subscribe("lifetrac/v25/telemetry/#")
 mqtt_client.subscribe("lifetrac/v25/status/#")
-
-
-# ---- ControlFrame packing — MUST match lora_proto.h ControlFrame -------
-PROTO_VERSION = 0x01
-SRC_BASE = 0x02
-FT_CONTROL = 0x10
-
-
-def _clip_i8(v: int) -> int:
-    if v < -127:
-        return -127
-    if v > 127:
-        return 127
-    return v
-
-
-def pack_control(seq: int, lhx: int, lhy: int, rhx: int, rhy: int,
-                 buttons: int, flags: int, hb: int) -> bytes:
-    """Returns 16-byte ControlFrame, CRC included.
-
-    Layout matches the C ControlFrame in lora_proto.h byte-for-byte:
-      [ver(1)|src(1)|type(1)|seq(2) | lhx|lhy|rhx|rhy(4) | btns(2) | flags(1)
-       | hb(1) | reserved=0(1) | crc16(2) ] = 16 bytes.
-    """
-    body = struct.pack(
-        "<BBBHbbbbHBBB",
-        PROTO_VERSION, SRC_BASE, FT_CONTROL, seq & 0xFFFF,
-        _clip_i8(lhx), _clip_i8(lhy), _clip_i8(rhx), _clip_i8(rhy),
-        buttons & 0xFFFF, flags & 0xFF, hb & 0xFF,
-        0,  # reserved — must be zero on TX
-    )
-    # CRC-16/CCITT (poly 0x1021, init 0xFFFF) over body.
-    crc = 0xFFFF
-    for b in body:
-        crc ^= b << 8
-        for _ in range(8):
-            crc = ((crc << 1) ^ 0x1021) & 0xFFFF if (crc & 0x8000) else (crc << 1) & 0xFFFF
-    return body + struct.pack("<H", crc)
+mqtt_client.subscribe("lifetrac/v25/video/#")
+mqtt_client.subscribe("lifetrac/v25/control/#")
 
 
 # ---- routes ------------------------------------------------------------
@@ -130,6 +156,8 @@ async def ws_control(ws: WebSocket):
             if now - last_tx < 0.05:    # 20 Hz
                 continue
             last_tx = now
+            if not _base_controls_allowed():
+                continue
             try:
                 msg: dict[str, Any] = json.loads(raw)
             except json.JSONDecodeError:

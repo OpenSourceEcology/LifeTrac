@@ -16,7 +16,7 @@ LoRaWAN's join procedure (~1 s), duty-cycle enforcement, ADR back-off, and gatew
 
 This question comes up because the **base-station LAN side** uses full MQTT 3.1.1 via Mosquitto (for Grafana, Node-RED, ROS 2, Home Assistant integration). It would be tempting to extend that all the way down to the air-link. We deliberately don't, for these reasons:
 
-| Full MQTT cost | Air-time impact at SF7/BW500 | Air-time impact at SF9/BW250 |
+| Full MQTT cost | Air-time impact at SF7/BW125 | Air-time impact at SF9/BW250 |
 |---|---|---|
 | `CONNECT` packet (14 B + client ID = 30–60 B) | ~25–40 ms per reconnect | ~120–200 ms |
 | `PUBLISH` topic string (e.g. `lifetrac/v25/telemetry/hydraulics` = 33 B) | ~30 ms per message — *topic dwarfs payload* | ~150 ms |
@@ -30,16 +30,16 @@ This question comes up because the **base-station LAN side** uses full MQTT 3.1.
 1. **Control path: no MQTT at all.** The 16-byte `ControlFrame` is a fixed C struct — see [§ ControlFrame](#controlframe-16-bytes-total-5-header--11-payload). No headers, no topic, no broker, no acks. The next frame in 50 ms *is* the retry.
 2. **Telemetry path: MQTT-SN naming convention only.** We borrow the *one* idea from [MQTT-SN v1.2](https://www.oasis-open.org/committees/download.php/66091/MQTT-SN_spec_v1.2.pdf) that matters for constrained radio — **statically pre-registered 1-byte topic IDs** — and skip everything else (REGISTER, SUBSCRIBE, CONNECT, PINGREQ, QoS 1/2). On the wire it is just `[topic_id | payload_len | payload]` — see [§ TelemetryFrame](#telemetryframe-variable-9128-bytes). That's ~3 bytes of overhead per telemetry message.
 3. **No keep-alive over LoRa.** Telemetry cadence already implies liveness. Heartbeats serve the arbitration logic, not protocol-keepalive.
-4. **Bridge republishes onto full MQTT at the X8 boundary.** [`lora_bridge.py`](RESEARCH-CONTROLLER/EXAMPLE_CODE/base_station/lora_bridge.py) maps each `topic_id` to a real MQTT topic string and publishes to Mosquitto over localhost TCP — *gigabit ethernet on the X8 is free.* Anything LAN-side (Grafana, ROS 2, phone apps) sees a normal MQTT broker.
+4. **Bridge republishes onto full MQTT at the X8 boundary.** [`base_station/lora_bridge.py`](base_station/lora_bridge.py) maps each `topic_id` to a real MQTT topic string and publishes to Mosquitto over localhost TCP — *gigabit ethernet on the X8 is free.* Anything LAN-side (Grafana, ROS 2, phone apps) sees a normal MQTT broker.
 
 ### Bytes-on-the-air comparison for one hydraulics telemetry message
 
-| Approach | Wire bytes | SF7/BW500 air time | Notes |
+| Approach | Wire bytes | SF7/BW125 air time | Notes |
 |---|---:|---:|---|
-| Full MQTT 3.1.1 PUBLISH QoS 0 over (hypothetical) LoRa-TCP | ~70 B | ~30 ms | + TCP/IP framing not counted |
-| MQTT-SN PUBLISH QoS 0 (proper) | ~14 B | ~17 ms | 7-byte SN header + payload |
-| **Our scheme** (`topic_id | len | payload`) | **~10 B + AES-GCM overhead = 38 B** | **~22 ms** | dominated by 12-byte nonce + 16-byte tag, not by the protocol |
-| Same with no encryption (for reference only) | ~10 B | ~14 ms | not what we ship |
+| Full MQTT 3.1.1 PUBLISH QoS 0 over (hypothetical) LoRa-TCP | ~70 B | ~128 ms | + TCP/IP framing not counted |
+| MQTT-SN PUBLISH QoS 0 (proper) | ~14 B | ~46 ms | 7-byte SN header + payload |
+| **Our scheme** (`topic_id | len | payload`) | **~10 B + AES-GCM overhead = 38 B** | **~82 ms** | dominated by 12-byte nonce + 16-byte tag, not by the protocol |
+| Same with no encryption (for reference only) | ~10 B | ~41 ms | not what we ship |
 
 After AES-GCM the protocol-level savings are smaller in absolute terms, but **at our packet rates (sum across all topic cadences ≈ 10–15 messages/sec) the topic-string overhead of full MQTT would push us over the channel's effective duty budget all by itself.** The current scheme leaves headroom for control + heartbeats + the future LoRa video path ([RESEARCH-CONTROLLER/VIDEO_COMPRESSION/](RESEARCH-CONTROLLER/VIDEO_COMPRESSION/)).
 
@@ -49,7 +49,7 @@ Tempting; declined. Reasons:
 
 - The MQTT-SN-style topic ID costs 1 byte. A bespoke "telemetry frame with a type code" saves zero bytes.
 - Free interop with Mosquitto, Grafana, Node-RED, ROS 2 (`mqtt_client`), Home Assistant, and any phone MQTT app — *without writing translators*. Big multiplier for OSE remixers.
-- Decision is reversible. The base-station bridge is the only file that knows about `TOPIC_BY_ID`; the tractor never imports an MQTT library at all. If we ever drop MQTT-SN naming, only [`lora_bridge.py`](RESEARCH-CONTROLLER/EXAMPLE_CODE/base_station/lora_bridge.py) changes.
+- Decision is reversible. The base-station bridge is the only file that knows about `TOPIC_BY_ID`; the tractor never imports an MQTT library at all. If we ever drop MQTT-SN naming, only [`base_station/lora_bridge.py`](base_station/lora_bridge.py) changes.
 
 ### Rule of thumb
 
@@ -63,7 +63,7 @@ Tempting; declined. Reasons:
 │  - 16-byte ControlFrame                      │
 │  - 32-128 byte TelemetryFrame (MQTT-SN)      │
 ├─────────────────────────────────────────────┤
-│  Session                                    │  AES-128-GCM, 4-byte nonce
+│  Session                                    │  AES-128-GCM, 12-byte nonce
 │  - SourceID (1 byte: HANDHELD/BASE/AUTO)     │
 │  - SequenceNum (2 bytes)                     │
 ├─────────────────────────────────────────────┤
@@ -77,7 +77,7 @@ Tempting; declined. Reasons:
 │  - Random backoff if busy                    │
 ├─────────────────────────────────────────────┤
 │  PHY (RadioLib)                             │  Semtech SX1276
-│  - SF7-SF9, BW 250-500 kHz, CR 4/5           │
+│  - Control SF7/BW125/CR4-5, adaptive SF7-SF9 │
 │  - 915 MHz (US) or 868 MHz (EU)              │
 └─────────────────────────────────────────────┘
 ```
@@ -92,9 +92,9 @@ Tempting; declined. Reasons:
 | Sync word | 0x12 (private LoRa) | 0x12 | 0x12 |
 | Preamble length | 8 symbols | 12 symbols | 8 symbols |
 | TX power | per-source (see below) | per-source | per-source |
-| Air time, 16-byte ControlFrame (≈44 B on-air after AES-GCM + KISS) | ~30 ms @ SF7, ~55 ms @ SF8, ~100 ms @ SF9 | n/a | n/a |
+| Air time, 16-byte ControlFrame (≈44 B encrypted before KISS expansion) | ~92 ms @ SF7, ~164 ms @ SF8, ~288 ms @ SF9 — **does not fit the current 20 Hz cadence; see MASTER_PLAN.md §8.17 blocker** | n/a | n/a |
 | Air time, 64-byte TelemetryFrame | n/a | ~250 ms | n/a |
-| Air time, 32-byte image fragment (TileDelta) | n/a | n/a | **~22 ms @ SF7, ~40 ms @ SF8** — SF7 fits under the C1 25 ms-per-fragment cap; SF8 violates it and is reserved for an emergency "image limps along" mode behind operator opt-in |
+| Air time, 32-byte image fragment (TileDelta) | n/a | n/a | **~36 ms @ SF7/BW250** by the shared estimator — does **not** fit the C1 25 ms-per-fragment cap. Current cap requires roughly ≤15 B cleartext fragments at SF7/BW250 or a profile/cap redesign. |
 
 The control link is pinned to **SF7 / BW 125 kHz / CR 4/5** by [MASTER_PLAN.md §8.17](MASTER_PLAN.md#817-lora-control-link-phy--sf7--bw-125-khz--cr-4-5-default-no-retries-on-controlframe-adaptive-sf7sf8sf9-fallback-when-snr-margin-degrades). The earlier draft showed BW 500 kHz; we now ship 125 kHz for range margin on the US 915 MHz band with the 8 dBi mast antenna. Adaptive fallback to SF8/SF9 is documented below; telemetry SF is independent and does not change.
 
@@ -146,7 +146,7 @@ After AES-GCM encryption + 12-byte nonce + 16-byte tag → on-air payload ~44 by
 | `payload` | n | Raw bytes (CBOR or struct, application-defined per topic_id) |
 | `crc16` | 2 | CRC-16/CCITT |
 
-**This is *not* a full MQTT-SN PUBLISH packet.** We use the *naming convention* from MQTT-SN — pre-registered short topic IDs — but skip the MQTT-SN packet headers (msg-type byte, length byte, flags byte, msg-id) because they cost ~3–4 bytes per message and we don't need any of the features they enable (QoS 1/2 round-trips, broker-mediated REGISTER, gateway routing). The base-station bridge ([RESEARCH-CONTROLLER/EXAMPLE_CODE/base_station/lora_bridge.py](RESEARCH-CONTROLLER/EXAMPLE_CODE/base_station/lora_bridge.py)) maps `topic_id` to a real MQTT topic string and republishes onto the LAN-side Mosquitto broker. See [§ Why not full MQTT over LoRa](#why-not-full-mqtt-over-lora) below.
+**This is *not* a full MQTT-SN PUBLISH packet.** We use the *naming convention* from MQTT-SN — pre-registered short topic IDs — but skip the MQTT-SN packet headers (msg-type byte, length byte, flags byte, msg-id) because they cost ~3–4 bytes per message and we don't need any of the features they enable (QoS 1/2 round-trips, broker-mediated REGISTER, gateway routing). The base-station bridge ([base_station/lora_bridge.py](base_station/lora_bridge.py)) maps `topic_id` to a real MQTT topic string and republishes onto the LAN-side Mosquitto broker. See [§ Why not full MQTT over LoRa](#why-not-full-mqtt-over-lora) below.
 
 Topic IDs (statically pre-registered — no REGISTER round-trip, no SUBSCRIBE):
 
@@ -169,6 +169,9 @@ Topic IDs (statically pre-registered — no REGISTER round-trip, no SUBSCRIBE):
 | 0x25 | `lifetrac/v25/video/tile_delta` | I/P frame mode — see [§ TileDeltaFrame](#tiledeltaframe-image-pipeline-i--p-frames). Replaces topics `0x20`/`0x21`/`0x23` when image pipeline phase 1 ships per [MASTER_PLAN.md §8.19](MASTER_PLAN.md). Camera selection still uses `CMD_CAMERA_SELECT`; `0x22` still echoes the active camera. |
 | 0x26 | `lifetrac/v25/video/detections` | P2-class detection sidecar (~6 B per detection, max 8 → ≤50 B). Bounding boxes + class IDs from the tractor's on-X8 NanoDet-Plus per [`../AI NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md`](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md) §4.3. Drawn as vector overlays on the base canvas. |
 | 0x27 | `lifetrac/v25/video/audio_event` | 4 B classifier output from on-tractor [YAMNet](https://github.com/tensorflow/models/tree/master/research/audioset/yamnet)-class model when a microphone is fitted. `class_id (1 B), confidence_pct (1 B), epoch_offset_s (2 B)`. Optional. |
+| 0x28 | `lifetrac/v25/video/motion_vectors` | Optical-flow microframes for degraded image mode Q. Base replays motion vectors over the last trusted canvas and marks tiles with the `Predicted` badge. |
+| 0x29 | `lifetrac/v25/video/wireframe` | PiDiNet/edge wireframe overlay for extreme degraded image mode P. Base renders as non-photographic guidance and marks tiles with the `Wireframe` badge. |
+| 0x2A | `lifetrac/v25/video/semantic_map` | Reserved for v26 only. Do not emit in v25; browser/base must fail closed if this appears without a negotiated protocol bump. |
 | 0x40 | `lifetrac/v25/auto/plan_status` | *reserved — future release* (active waypoint index, distance-to-goal, ETA). Not implemented in v25; reserved per [`RESEARCH-CONTROLLER/AUTOMATION_AND_ROUTE_PLANNING.md`](RESEARCH-CONTROLLER/AUTOMATION_AND_ROUTE_PLANNING.md) §4.2. |
 | 0x41 | `lifetrac/v25/auto/cross_track_error` | *reserved — future release* (meters off planned path). |
 | 0x42 | `lifetrac/v25/auto/geofence_status` | *reserved — future release* (inside/outside, last violation timestamp). |
@@ -210,6 +213,7 @@ Opcodes:
 | `0x60` | `CMD_PERSON_APPEARED` | `class (1 B), confidence_pct (1 B), bbox_cx (1 B), bbox_cy (1 B)` | **Tractor → base**: tractor's on-X8 detector saw a *new* high-confidence person/animal/vehicle in the frame that wasn't there last refresh. P0-class so it preempts image fragments. `bbox_cx`/`bbox_cy` are 0–255 normalised across the frame so the base UI can highlight the region without waiting for the next image. Confidence threshold is high (≥0.7) by default to avoid alarm fatigue per [`../AI NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md`](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md) §4.4. Informational only — does *not* trigger a stop in v25 (operator-in-the-loop). Future revisions may chain to `CMD_OBSTACLE_STOP`. |
 | `0x61` | `CMD_ROI_HINT` | `roi_x (1 B), roi_y (1 B), ttl_refreshes (1 B)` | **Base → tractor**: operator tapped a region in the displayed image; bias the next `ttl_refreshes` image frames to spend most of the byte budget on tiles overlapping `(roi_x, roi_y)`. Coordinates are 0–255 normalised. P1-class. |
 | `0x62` | `CMD_REQ_KEYFRAME` | `(empty)` | **Base → tractor**: the persistent canvas is too stale or the base lost an I-frame; please send a full I-frame on the next image transmission instead of a P-frame. P1-class. |
+| `0x63` | `CMD_ENCODE_MODE` | `mode (1 B)` | **Base → tractor**: image-link auto-fallback ladder output from `base_station/link_monitor.py`. `0=full`, `1=y_only`, `2=motion_only`, `3=wireframe`. Requires 3 consecutive bad 5 s windows before changing modes. P2-class; never blocks ControlFrame. |
 
 The `CMD_CAMERA_SELECT` semantics:
 
@@ -251,16 +255,27 @@ Layout (after framing/AES-GCM unwrap, before fragmentation):
 | ↳ `tile_size_minus1` | 1 | Bytes-1 of the WebP blob for this tile (max 256 B) |
 | ↳ `tile_data` | n | WebP-compressed 32×32 sub-image |
 
-**On-air targets** at SF7/BW250/CR4-5 with ≤25 ms fragment cap:
-- I-frame (~900 B): 16 fragments × ~32 B → ~1.6 s wall-clock to deliver, never blocks P0.
-- P-frame, slow driving (~1620 B): 28 fragments → ~2.8 s.
-- P-frame, stationary (~260 B): 4 fragments → ~0.4 s.
+**On-air targets** at SF7/BW250/CR4-5 with ≤25 ms fragment cap are pending redesign. The shared estimator reports a 32 B fragment at ~36 ms; staying below 25 ms currently means roughly ≤15 B cleartext fragments, a wider image profile, or a changed cap. Do not treat the earlier 32 B fragment budget as implemented.
 
 **Loss handling.** Each P-frame carries `base_seq` so the base knows whether it has the matching I. If `base_seq` does not match the base's current canvas I, base sends `CMD_REQ_KEYFRAME` (opcode `0x62`); tractor sends a fresh I on the next image transmission. Stale tiles in the canvas are tinted yellow with their age in seconds visible — never silently extrapolated — per the v1.1 LoRa analysis §5.4 mandatory operator-UX rules.
 
 **Drift control.** Tractor sends an unconditional I-frame every ~30 s (≈20 P-frames at 1.5 s cadence) to flush the canvas regardless of measured delta size.
 
 **Encoding-mode selection.** Each refresh, the tractor estimates `p_bytes ≈ HEADER + BITMAP + Σ webp_size_estimate(tile)`; if `p_bytes > 0.7 · keyframe_bytes`, send an I-frame instead. Choice is local; the base reconstructs from whatever arrives.
+
+### Image badge enum
+
+Every tile or derived visual update that reaches the browser carries one badge byte. The base station attaches this badge; the browser must refuse to display image data if the badge is missing or malformed.
+
+| Value | Name | Meaning |
+|---:|---|---|
+| 0 | `Raw` | Direct camera pixels, not modified beyond normal compression/decompression. |
+| 1 | `Cached` | A previously received tile reused because the current refresh did not replace it. |
+| 2 | `Enhanced` | Deterministic enhancement such as super-resolution or denoising. |
+| 3 | `Recolourised` | Luma-only tile recoloured from a recent colour reference. |
+| 4 | `Predicted` | Motion-vector extrapolation from topic `0x28`; not fresh pixels. |
+| 5 | `Synthetic` | AI-filled or hallucinated content. Disabled by default in v25. |
+| 6 | `Wireframe` | Edge/wireframe representation from topic `0x29`; not photographic. |
 
 ## Multi-source arbitration
 
@@ -437,7 +452,7 @@ Implementation: [`thirdparty/reed-solomon-c`](https://github.com/Vourhey/c-reed-
 
 | Test | Pass criterion |
 |---|---|
-| Handheld → tractor RT latency at SF7/BW500 | ≤ 150 ms median, ≤ 250 ms 99th percentile |
+| Handheld → tractor RT latency at SF7/BW125 | ≤ 150 ms median, ≤ 250 ms 99th percentile |
 | Base → tractor RT latency at SF9/BW250, 10 km LoS | ≤ 250 ms median, ≤ 500 ms 99th percentile |
 | Failsafe activation after handheld power-off | ≤ 500 ms valve-drop |
 | Take-control latch after handheld button release | 30 s ± 1 s |
@@ -445,26 +460,38 @@ Implementation: [`thirdparty/reed-solomon-c`](https://github.com/Vourhey/c-reed-
 | Auth-tag tamper | 100% rejection |
 | 24-hour soak (handheld + base running, tractor in failsafe) | < 0.1% valid frame loss; zero spurious failsafes |
 
-## Implementation files (planned layout)
+## Implementation files
 
 ```
 firmware/
 ├── common/
-│   ├── lora_proto.h          # Frame structs, source IDs, frame types
-│   ├── lora_proto.cpp        # Pack/unpack, KISS framing, CRC
-│   ├── crypto.cpp            # AES-128-GCM wrapper around MbedTLS
-│   ├── arbitration.cpp       # pick_active_source() — TRACTOR only
-│   └── mqtt_sn.cpp           # MQTT-SN packet building — TRACTOR + BASE only
+│   └── lora_proto/
+│       ├── lora_proto.h      # Frame structs, constants, helper APIs
+│       ├── lora_proto.c      # KISS framing, CRC, FHSS, airtime estimates
+│       ├── crypto_stub.c     # bench/sim only, guarded by LIFETRAC_ALLOW_STUB_CRYPTO
+│       └── key.h.example     # copy to ignored key.h for local fleet key material
 ├── handheld_mkr/
 │   └── handheld.ino          # MKR WAN 1310 main sketch
 ├── tractor_h7/
-│   ├── tractor.ino           # M7 core: LoRa, arbitration, telemetry
-│   └── tractor_m4.cpp        # M4 core: valve PWM at 100 Hz
-└── base_h7/
-    └── base.ino              # M7: LoRa modem, serializes to UART → X8
+│   ├── tractor_m7.ino        # M7 core: LoRa, arbitration, Modbus master
+│   └── tractor_m4.cpp        # M4 core: independent safety watchdog
+├── tractor_opta/
+│   └── opta_modbus_slave.ino # Opta Modbus-RTU hydraulic I/O slave
+├── tractor_x8/
+│   ├── gps_service.py
+│   └── imu_service.py
+└── bench/lora_retune_bench/
+    └── lora_retune_bench.ino
+
+base_station/
+├── lora_proto.py             # Python mirror for bridge/UI/tests
+├── lora_bridge.py            # X8 LoRa bridge; serial bench fallback, SPI path pending
+├── link_monitor.py           # airtime ledger + CMD_ENCODE_MODE hysteresis
+├── web_ui.py
+└── web/
 ```
 
-X8-side bridge: `bridge.py` (Python, runs in Docker on the X8). Reads serial from H7, publishes to Mosquitto.
+Per [MASTER_PLAN.md §8.2](MASTER_PLAN.md#82-base-station-radio-path), the base station has no active `firmware/base_*` Arduino target. Linux on the base X8 owns the SX1276 path from `base_station/lora_bridge.py`; the serial transport in that file is a bench fallback while direct SPI is implemented.
 
 ## References
 

@@ -21,7 +21,7 @@
 #include <RadioLib.h>
 #include <ArduinoRS485.h>
 #include <ArduinoModbus.h>
-#include "../lora_proto/lora_proto.h"
+#include "../common/lora_proto/lora_proto.h"
 
 // ---------- LoRa pins (Portenta Max Carrier wires Murata SiP via SPI) ----------
 SX1276 radio = new Module(/*nss*/ PD_4, /*dio0*/ PD_5,
@@ -97,6 +97,7 @@ struct SourceState {
     uint16_t last_sequence;
     uint32_t takectl_until_ms;
     int16_t  rssi_dbm;
+    LpReplayWindow replay;
     ControlFrame latest;
 };
 static SourceState g_src[3];   // index by source_id - 1
@@ -106,15 +107,55 @@ static const uint32_t CONTROL_TIMEOUT_MS   = 200;   // stale ControlFrame → dr
 static const uint32_t TAKECTL_LATCH_MS     = 30000;
 
 // E-stop latched fault — set by FT_COMMAND/CMD_ESTOP, cleared only by an
-// explicit non-ESTOP command from the base UI (CMD_CLEAR_ESTOP, future).
+// explicit command from the base UI (CMD_CLEAR_ESTOP).
 static volatile bool g_estop_latched = false;
 
-// Command opcodes carried in FT_COMMAND payload byte 5.
-enum CmdOp : uint8_t {
-    CMD_ESTOP        = 0x01,
-    CMD_CLEAR_ESTOP  = 0x02,
-    CMD_REKEY        = 0x10,
+// ---------- adaptive SF ladder (R-8 hysteresis) ----------
+//
+// Per LORA_IMPLEMENTATION.md §3.1 + MASTER_PLAN.md §8.17:
+//   - 3 ladder rungs SF7/SF8/SF9, all on BW125 / CR4-5 (control profile).
+//   - Step-down (SF↑): require N=3 consecutive bad 5 s windows.
+//   - Step-up   (SF↓): require >=30 s clean (6 consecutive good windows).
+//   - On transition: send CMD_LINK_TUNE twice back-to-back — once at the old
+//     PHY, once at the new PHY — then both ends switch. If no Heartbeat at
+//     the new SF within 500 ms, revert and increment the fail counter.
+//
+// "Bad window" = the *active* source's heartbeat count over the 5 s window
+// dropped below 80 % of the expected 50 frames (handheld emits HB @ 10 Hz).
+// We track the active source rather than the worst eligible source so that a
+// stale autonomy link can't drag the human-driven control link down.
+struct LadderRung { uint8_t sf; uint16_t bw_khz; uint8_t cr_den; uint8_t bw_code; };
+static const LadderRung LADDER[3] = {
+    { 7, 125, 5, 0 },   // bw_code 0 = 125 kHz (per LORA_PROTOCOL.md §CMD_LINK_TUNE)
+    { 8, 125, 5, 0 },
+    { 9, 125, 5, 0 },
 };
+static const uint32_t LADDER_WINDOW_MS          = 5000;
+static const uint8_t  LADDER_BAD_TO_STEPDOWN    = 3;     // 15 s of bad to widen SF
+static const uint8_t  LADDER_GOOD_TO_STEPUP     = 6;     // 30 s of clean to narrow SF
+static const uint32_t LADDER_HB_EXPECTED_5S     = 50;    // 10 Hz × 5 s
+static const uint32_t LADDER_HB_BAD_THRESHOLD   = 40;    // <80 %  -> bad
+static const uint32_t LADDER_HB_GOOD_THRESHOLD  = 48;    // >=96 % -> good
+static const uint32_t LADDER_TUNE_REVERT_MS     = 500;
+
+// Reason codes for CMD_LINK_TUNE (LORA_PROTOCOL.md §CMD_LINK_TUNE row).
+enum LinkTuneReason : uint8_t {
+    LTR_LOW_SNR        = 0x01,
+    LTR_HIGH_LOSS      = 0x02,
+    LTR_MANUAL         = 0x03,
+    LTR_RECOVERY_DOWN  = 0x04,
+};
+
+static uint8_t  g_ladder_rung           = 0;     // committed rung
+static uint8_t  g_ladder_pending_rung   = 0;     // rung being verified
+static uint32_t g_ladder_tune_deadline  = 0;     // 0 = no tune in flight
+static uint32_t g_ladder_window_start   = 0;
+static uint32_t g_ladder_hb_count[3]    = { 0, 0, 0 };
+static uint32_t g_ladder_ctrl_count[3]  = { 0, 0, 0 };
+static uint8_t  g_ladder_consec_bad     = 0;
+static uint8_t  g_ladder_consec_good    = 0;
+static uint32_t g_ladder_hb_at_pending  = 0;     // last HB ts while tune pending
+static uint32_t g_ladder_tune_failures  = 0;     // surfaced via topic 0x10 later
 
 // ---------- KISS decoder for incoming bytes ----------
 static KissDecoder g_dec;
@@ -215,10 +256,11 @@ static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm) {
     int idx = src_index(hdr->source_id);
     if (idx < 0) return;
 
-    // Replay protection: sequence must advance (with rollover tolerance).
-    uint16_t prev = g_src[idx].last_sequence;
-    int16_t  delta = (int16_t)(hdr->sequence_num - prev);
-    if (prev != 0 && delta <= 0 && delta > -1024) return;   // stale/replay
+    // Replay protection: 64-frame sliding window per source. Rejects any
+    // sequence we have already accepted as well as anything more than 64
+    // frames behind the high-water mark (handles legitimate out-of-order
+    // delivery while killing replay attacks against captured ciphertext).
+    if (!lp_replay_check_and_update(&g_src[idx].replay, hdr->sequence_num)) return;
     g_src[idx].last_sequence = hdr->sequence_num;
     g_src[idx].rssi_dbm      = rssi_dbm;
 
@@ -236,6 +278,7 @@ static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm) {
             if (expect != cf.crc16) break;       // drop silently
             g_src[idx].latest          = cf;
             g_src[idx].last_control_ms = now;
+            g_ladder_ctrl_count[idx]++;
             break;
         }
         case FT_HEARTBEAT:
@@ -246,6 +289,12 @@ static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm) {
                                            sizeof(HeartbeatFrame) - sizeof(uint16_t));
                 if (expect != hb.crc16) break;
                 g_src[idx].last_heartbeat_ms = now;
+                g_ladder_hb_count[idx]++;
+                if (g_ladder_tune_deadline != 0) {
+                    // We are inside the post-tune verification window; record
+                    // the HB so poll_link_ladder() commits the new rung.
+                    g_ladder_hb_at_pending = now;
+                }
                 if (hb.flags & FLAG_TAKECTL_HELD) {
                     g_src[idx].takectl_until_ms = now + TAKECTL_LATCH_MS;
                 }
@@ -266,8 +315,15 @@ static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm) {
                     // Only the BASE source may clear an E-stop.
                     if (hdr->source_id == SRC_BASE) g_estop_latched = false;
                     break;
-                case CMD_REKEY:
-                    // TODO: provisioning over the air — out of scope for v25.
+                case CMD_LINK_TUNE:
+                    // Tractor is the canonical issuer of CMD_LINK_TUNE; an
+                    // inbound copy on this side means somebody else announced
+                    // a retune (e.g. a future two-radio peer per
+                    // MASTER_PLAN.md §8.17.1). For the current single-radio
+                    // build we ignore it — our own tx path already retunes.
+                    break;
+                case CMD_ENCODE_MODE:
+                    // Base -> tractor X8 path is plumbed later; M7 only logs/forwards.
                     break;
             }
             break;
@@ -359,7 +415,30 @@ static void emit_telemetry() {
         payload[i*2  ] = (uint8_t)(v & 0xFF);
         payload[i*2+1] = (uint8_t)(v >> 8);
     }
-    emit_topic(0x04, payload, sizeof(payload));   // 0x04 = hydraulics
+    emit_topic(TOPIC_HYDRAULICS, payload, sizeof(payload));   // 0x04
+}
+
+// emit_source_active() — 1 Hz publish of topic 0x10 (TOPIC_SOURCE_ACTIVE) per
+// LORA_PROTOCOL.md. Payload is the operator-visible link state so the base
+// UI can render "LINK: SF7 (clean)" and "CTRL: HANDHELD" without inferring.
+//
+//   byte 0: active_source (0 = none, 1 = HANDHELD, 2 = BASE, 3 = AUTONOMY)
+//   byte 1: committed ladder rung (0 = SF7, 1 = SF8, 2 = SF9)
+//   byte 2: estop_latched (0 / 1)
+//   byte 3: pending tune in flight (0 / 1)
+//   byte 4..7: little-endian uint32 lifetime tune-revert failures
+static void emit_source_active() {
+    int active = pick_active_source();
+    uint8_t payload[8];
+    payload[0] = (active < 0) ? 0 : (uint8_t)(active + 1);
+    payload[1] = g_ladder_rung;
+    payload[2] = g_estop_latched ? 1 : 0;
+    payload[3] = (g_ladder_tune_deadline != 0) ? 1 : 0;
+    payload[4] = (uint8_t)(g_ladder_tune_failures      );
+    payload[5] = (uint8_t)(g_ladder_tune_failures >>  8);
+    payload[6] = (uint8_t)(g_ladder_tune_failures >> 16);
+    payload[7] = (uint8_t)(g_ladder_tune_failures >> 24);
+    emit_topic(TOPIC_SOURCE_ACTIVE, payload, sizeof(payload));
 }
 
 // ---------- X8 UART pump ----------
@@ -397,13 +476,143 @@ static void poll_x8_uart() {
 }
 
 
+// ---------- adaptive SF ladder helpers ----------
+//
+// apply_phy_rung() retunes the local radio. RX must be re-armed because
+// changing SF / BW kicks the modem out of receive on the SX1276.
+static void apply_phy_rung(uint8_t rung) {
+    if (rung > 2) return;
+    radio.setSpreadingFactor(LADDER[rung].sf);
+    radio.setBandwidth((float)LADDER[rung].bw_khz);
+    radio.setCodingRate(LADDER[rung].cr_den);
+    radio.startReceive();
+}
+
+// send_link_tune() builds, encrypts, and transmits one CMD_LINK_TUNE frame.
+// Per LORA_PROTOCOL.md §CMD_LINK_TUNE the payload is exactly
+//   arg[0] = target SF, arg[1] = target_bw_code, arg[2] = reason.
+static void send_link_tune(uint8_t target_rung, uint8_t reason) {
+    if (target_rung > 2) return;
+    CommandFrame cf;
+    memset(&cf, 0, sizeof(cf));
+    cf.hdr.version      = LIFETRAC_PROTO_VERSION;
+    cf.hdr.source_id    = SRC_TRACTOR;
+    cf.hdr.frame_type   = FT_COMMAND;
+    cf.hdr.sequence_num = ++g_telem_seq;
+    cf.opcode  = CMD_LINK_TUNE;
+    cf.arg[0]  = LADDER[target_rung].sf;
+    cf.arg[1]  = LADDER[target_rung].bw_code;
+    cf.arg[2]  = reason;
+    cf.crc16   = lp_crc16((const uint8_t*)&cf,
+                          sizeof(CommandFrame) - sizeof(uint16_t));
+
+    uint8_t nonce[12];
+    build_nonce(nonce, SRC_TRACTOR, cf.hdr.sequence_num);
+    uint8_t enc[sizeof(CommandFrame) + 16];
+    if (!lp_encrypt(kFleetKey, nonce, (const uint8_t*)&cf,
+                    sizeof(CommandFrame), enc)) return;
+    uint8_t onair[12 + sizeof(CommandFrame) + 16];
+    memcpy(onair, nonce, 12);
+    memcpy(onair + 12, enc, sizeof(CommandFrame) + 16);
+    uint8_t kiss[2 * sizeof(onair) + 4];
+    size_t kl = lp_kiss_encode(onair, sizeof(onair), kiss, sizeof(kiss));
+    if (kl) radio.transmit(kiss, kl);
+}
+
+// try_step_ladder() executes the twice-back-to-back handshake and arms the
+// 500 ms revert deadline. The committed rung (g_ladder_rung) does NOT change
+// until poll_link_ladder() observes a Heartbeat at the new PHY.
+static void try_step_ladder(uint8_t target_rung, uint8_t reason) {
+    if (target_rung > 2 || target_rung == g_ladder_rung) return;
+    // 1. Announce at current PHY so old-PHY peers retune.
+    send_link_tune(target_rung, reason);
+    // 2. Switch our radio (apply_phy_rung re-arms RX so the announce-at-new
+    //    PHY immediately below transmits from a known state).
+    apply_phy_rung(target_rung);
+    // 3. Re-announce at new PHY so new-PHY peers (or peers that missed #1
+    //    but somehow already retuned) latch the change.
+    send_link_tune(target_rung, reason);
+    // 4. Re-arm RX after the second TX — radio.transmit() leaves the SX1276
+    //    in standby, so without this the verification HB would never arrive.
+    radio.startReceive();
+
+    g_ladder_pending_rung  = target_rung;
+    g_ladder_tune_deadline = millis() + LADDER_TUNE_REVERT_MS;
+    g_ladder_hb_at_pending = 0;
+
+    // Reset window stats: the post-tune 5 s window starts fresh.
+    g_ladder_consec_bad  = 0;
+    g_ladder_consec_good = 0;
+    for (int i = 0; i < 3; i++) {
+        g_ladder_hb_count[i]   = 0;
+        g_ladder_ctrl_count[i] = 0;
+    }
+    g_ladder_window_start = millis();
+}
+
+// poll_link_ladder() — called once per loop. Two responsibilities:
+//   1. Verify any pending tune (commit on HB at new PHY, revert on timeout).
+//   2. When the 5 s window closes, classify it bad/good and step the ladder
+//      after R-8 hysteresis is satisfied (3 bad → step-down, 6 good → step-up).
+static void poll_link_ladder() {
+    uint32_t now = millis();
+    if (g_ladder_window_start == 0) g_ladder_window_start = now;
+
+    // (1) Pending tune verification.
+    if (g_ladder_tune_deadline != 0 && (int32_t)(now - g_ladder_tune_deadline) >= 0) {
+        bool got_hb = (g_ladder_hb_at_pending != 0) &&
+                      (g_ladder_hb_at_pending + LADDER_TUNE_REVERT_MS >= g_ladder_tune_deadline);
+        if (got_hb) {
+            g_ladder_rung = g_ladder_pending_rung;          // commit
+        } else {
+            apply_phy_rung(g_ladder_rung);                  // revert
+            g_ladder_tune_failures++;
+        }
+        g_ladder_tune_deadline = 0;
+        g_ladder_hb_at_pending = 0;
+    }
+
+    // (2) Window evaluation. Hold off while a tune is still in flight so the
+    //     verification window doesn't double-count as a "bad" window.
+    if (g_ladder_tune_deadline != 0) return;
+    if ((now - g_ladder_window_start) < LADDER_WINDOW_MS) return;
+
+    int active = pick_active_source();
+    bool bad  = false;
+    bool good = false;
+    if (active >= 0) {
+        uint32_t hb = g_ladder_hb_count[active];
+        bad  = (hb <  LADDER_HB_BAD_THRESHOLD);
+        good = (hb >= LADDER_HB_GOOD_THRESHOLD);
+    } else {
+        // No fresh source at all: count as a bad window so the ladder
+        // pessimistically widens SF (gives marginal links a chance to recover).
+        bad = true;
+    }
+    if (bad)  { g_ladder_consec_bad++;  g_ladder_consec_good = 0; }
+    if (good) { g_ladder_consec_good++; g_ladder_consec_bad  = 0; }
+
+    if (g_ladder_consec_bad >= LADDER_BAD_TO_STEPDOWN && g_ladder_rung < 2) {
+        try_step_ladder((uint8_t)(g_ladder_rung + 1), LTR_HIGH_LOSS);
+    } else if (g_ladder_consec_good >= LADDER_GOOD_TO_STEPUP && g_ladder_rung > 0) {
+        try_step_ladder((uint8_t)(g_ladder_rung - 1), LTR_RECOVERY_DOWN);
+    }
+
+    // Reset window counters.
+    for (int i = 0; i < 3; i++) {
+        g_ladder_hb_count[i]   = 0;
+        g_ladder_ctrl_count[i] = 0;
+    }
+    g_ladder_window_start = now;
+}
+
+
 // ---------- Arduino entry points ----------
 void setup() {
     Serial.begin(115200);
 
-    // LoRa: SF7 BW500 for control link to handheld; we'll switch SF/BW
-    // dynamically once we add the base station's SF9 BW250 mode.
-    radio.begin(915.0, 500.0, 7, 5, 0x12, 20);
+    // LoRa control profile: SF7 / BW125 / CR4-5 per MASTER_PLAN.md §8.17.
+    radio.begin(915.0, 125.0, 7, 5, 0x12, 20);
     radio.startReceive();
 
     // RS-485 / Modbus
@@ -429,6 +638,7 @@ void loop() {
 
     poll_radio();
     poll_x8_uart();    // pump KISS frames from gps_service.py / imu_service.py
+    poll_link_ladder();  // R-8 hysteresis SF7→SF8→SF9 ladder
 
     if ((int32_t)(now - next_arb) >= 0) {
         next_arb = now + 50;        // 20 Hz arbitration AND watchdog tick
@@ -437,5 +647,6 @@ void loop() {
     if ((int32_t)(now - next_tx) >= 0) {
         next_tx = now + 1000;       // 1 Hz telemetry
         emit_telemetry();
+        emit_source_active();       // topic 0x10: link state for the operator UI
     }
 }
