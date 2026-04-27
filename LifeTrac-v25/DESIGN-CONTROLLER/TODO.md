@@ -1,6 +1,10 @@
 # LifeTrac v25 Controller — Development TODO
 
 > **Scope (2026-04-26):** LoRa-only per [MASTER_PLAN.md](MASTER_PLAN.md). Cellular (Cat-M1 / SARA-R412M) line items below are **archived** — do not order, do not implement. Operator-browser ↔ base-station LAN/WiFi is retained. Legacy WiFi/BLE/MQTT-over-WiFi work is in [RESEARCH-CONTROLLER/](RESEARCH-CONTROLLER/).
+>
+> **Image-pipeline scope (2026-04-27):** see the canonical [IMAGE_PIPELINE.md](IMAGE_PIPELINE.md) implementation plan. The image-pipeline tasks in Phases 4–5 below are pulled from that plan; if they ever drift, IMAGE_PIPELINE.md is the source of truth.
+>
+> **LoRa system scope (2026-04-27):** see the canonical [LORA_IMPLEMENTATION.md](LORA_IMPLEMENTATION.md) implementation plan. The LoRa-stack tasks scattered across Phases 1–5 below are pulled from that plan; if they ever drift, LORA_IMPLEMENTATION.md is the source of truth for *what to build*, [LORA_PROTOCOL.md](LORA_PROTOCOL.md) for the wire bytes, and [MASTER_PLAN.md §8.17](MASTER_PLAN.md) for PHY policy pins.
 
 Comprehensive task list for implementing the three-tier controller architecture (Portenta Max Carrier on tractor + Portenta Max Carrier with X8 base station + MKR WAN 1310 handheld). See [ARCHITECTURE.md](ARCHITECTURE.md) for the design.
 
@@ -75,6 +79,10 @@ See the sensor/cabling discussion in [HARDWARE_BOM.md § Notes on substitutions]
 - [ ] Order mini UPS (12 V, 30 min runtime)
 - [ ] Order indoor ventilated enclosure
 - [ ] Order Cat6 Ethernet cable (5 m)
+- [ ] **Order [Coral Mini PCIe Accelerator](https://coral.ai/products/pcie-accelerator/) (~$25)** — *strongly recommended optional* per [MASTER_PLAN.md §8.19](MASTER_PLAN.md). Unproven on the Max Carrier — the Phase 1 validation spike below decides whether this stays in the BOM, gets swapped for the Coral USB Accelerator, or is dropped entirely.
+- [ ] *(Spike-conditional)* Order [Coral USB Accelerator](https://www.digikey.com/en/products/detail/coral/G950-01456-01/10256669) (~$60) **only if** the Mini PCIe spike fails
+- [ ] *(If Coral fitted)* Order ~15×15×8 mm stick-on aluminium heatsink for the Edge TPU package
+- [ ] **2-day validation spike (gate before BOM lock):** install Coral Mini PCIe in the Max Carrier; confirm PCIe enumeration in `lspci`, `gasket`/`apex` driver loads against the X8 Yocto kernel, sustained 30-min inference without thermal throttle, slot power budget adequate. Document outcome in [HARDWARE_BOM.md](HARDWARE_BOM.md). On failure, repeat with the USB Accelerator; on second failure, ship CPU-only and degrade the image pipeline per [MASTER_PLAN.md §8.19](MASTER_PLAN.md).
 
 ### Handheld hardware
 
@@ -139,6 +147,76 @@ Implement [`firmware/common/`](firmware/common/) — the shared protocol layer.
 - [ ] Unit tests for crypto (round-trip encrypt/decrypt, replay rejection, tamper rejection)
 - [ ] Implement key provisioning utility `provision.py` (writes pre-shared key to flash via USB-CDC)
 - [ ] Document key rotation procedure
+
+### Phase 2.LoRa — LoRa-stack tasks consolidated from [LORA_IMPLEMENTATION.md](LORA_IMPLEMENTATION.md)
+
+Major implementation-plan-level tasks not already enumerated in Phases 2–5 above. Cross-link each to the LORA_IMPLEMENTATION.md § that owns the spec.
+
+**Phase 2.LoRa.0 — Week-1 bench measurements (block Phase 1–5 work that depends on the numbers):**
+
+- [ ] **R-7 retune-cost bench** (per [LORA_IMPLEMENTATION.md §8 week 1](LORA_IMPLEMENTATION.md)): measure `setFrequency` + `setSpreadingFactor` + `setBandwidth` + `setCodingRate` cost on SX1276 via RadioLib. Record baseline. **If > 5 ms,** burst-batching code path becomes mandatory in `lora_proto.cpp`.
+- [ ] **TX→RX turnaround + CSMA backoff bench** (per [LORA_IMPLEMENTATION.md L8](LORA_IMPLEMENTATION.md)): record so the airtime ledger is accurate, not assumed.
+- [ ] **Cross-doc cascade pass** (per [LORA_IMPLEMENTATION.md §11](LORA_IMPLEMENTATION.md)): land the IMAGE_PIPELINE.md §3.2 reservations (`0x28`/`0x29`/`0x2A`/`0x63`/badge enum) into [LORA_PROTOCOL.md](LORA_PROTOCOL.md) proper. Currently described only in IMAGE_PIPELINE.md.
+
+**Phase 2.LoRa.1 — PHY policy implementation (per [LORA_IMPLEMENTATION.md §3](LORA_IMPLEMENTATION.md)):**
+
+- [ ] **Three-profile PHY in `lora_proto.cpp`** — Control SF7/BW125/CR4-5, Telemetry SF9/BW250/CR4-8, Image SF7/BW250/CR4-5; per-frame retune via existing `CMD_LINK_TUNE` mechanism.
+- [ ] **Adaptive control-link SF ladder** with R-8 hysteresis (N=3 consecutive bad 5 s windows for any transition; 30 s clean for SF↑→SF↓). `CMD_LINK_TUNE` sent twice back-to-back at old-then-new SF; revert + fail-counter increment if no Heartbeat at new SF within 500 ms.
+- [ ] **Image-link auto-fallback ladder** in `link_monitor.py` per [IMAGE_PIPELINE.md §3.4](IMAGE_PIPELINE.md): airtime-% `U` thresholds with 3-window hysteresis, `CMD_ENCODE_MODE` emission, surface `U` + ladder rung on telemetry topic `0x10`.
+
+**Phase 2.LoRa.2 — MAC: FHSS + CSMA (per [LORA_IMPLEMENTATION.md §3.2](LORA_IMPLEMENTATION.md), [MASTER_PLAN.md §8.17 FHSS bullet](MASTER_PLAN.md)):**
+
+- [ ] **8-channel hop sequence** in `lora_proto.cpp` — 902–928 MHz at 3.25 MHz spacing, deterministic pseudo-random sequence seeded by AES key ID, ~1.5 s dwell per channel per ~12 s cycle.
+- [ ] **CSMA skip-busy** — RSSI > –90 dBm threshold on next-hop channel = skip to channel after, log skip event to audit ledger.
+- [ ] **Spectrum-analyser FHSS verification** (week 6, per [LORA_IMPLEMENTATION.md §8](LORA_IMPLEMENTATION.md)) — confirm 8 channels active, ≤ 12.5 % per-channel dwell over 60 s, no out-of-band emissions, EIRP ≤ +36 dBm. Pre-Phase-9 FCC verification.
+
+**Phase 2.LoRa.3 — Priority queue + airtime cap (per [LORA_IMPLEMENTATION.md §4](LORA_IMPLEMENTATION.md)):**
+
+- [ ] **P0/P1/P2/P3 priority queue** in `lora_proto.cpp` with strict preemption. P0 = ControlFrame/Heartbeat/CMD_ESTOP/CMD_LINK_TUNE/CMD_PERSON_APPEARED. P1 = key commands (CMD_CLEAR_ESTOP, CMD_ROI_HINT, CMD_REQ_KEYFRAME, CMD_CAMERA_SELECT). P2 = telemetry. P3 = image fragments.
+- [ ] **L1/R-6 25 ms-per-fragment airtime cap** — enforced uniformly on P2 telemetry and P3 image fragments. No P2/P3 frame can begin TX if remaining airtime in current opportunity > 25 ms.
+- [ ] **R-6 telemetry fragmentation** — oversized `TelemetryFrame` payloads fragment using the `TileDeltaFrame` scheme; base-station bridge reassembles before MQTT publish.
+- [ ] **Burst-batching code path** (gated by R-7 measurement) — if retune > 5 ms, batch image fragments so radio retunes at most twice per refresh window (once into image PHY, once back).
+
+**Phase 2.LoRa.4 — Security (per [LORA_IMPLEMENTATION.md §6](LORA_IMPLEMENTATION.md)):**
+
+- [ ] **Replay-defence sliding window** — per-source 64-frame `sequence_num` window in `lora_proto.cpp`. Reject below window-low or above window-high + 256.
+- [ ] **Nonce generator** — `source_id (1 B) ‖ sequence_num (2 B) ‖ epoch_s_low24 (3 B) ‖ random (6 B)` = 12 B. Document the construction in `crypto.cpp`.
+- [ ] **`tools/provision.py`** — USB-CDC writer for pre-shared 16 B key + 4 B key ID at first boot. Same tool used by all three nodes.
+- [ ] **`KEY_ROTATION.md`** (NEW, week 2 per [LORA_IMPLEMENTATION.md §11](LORA_IMPLEMENTATION.md)) — operator-facing key rotation procedure. Companion to `provision.py`. **Decision L-O2 (rotation cadence) deadline: before week 2.**
+
+**Phase 2.LoRa.5 — Multi-source arbitration (per [LORA_IMPLEMENTATION.md §5](LORA_IMPLEMENTATION.md)):**
+
+- [ ] **`pick_active_source()`** runs every M7 loop iteration (50 Hz). Highest-priority source with `last_heartbeat_ms < 500 ms` wins; else `SOURCE_NONE` → valves neutral within next M7 tick (≤ 20 ms).
+- [ ] **TAKE CONTROL latch** — 30 s P0 priority after button release; persists across heartbeat misses but not across `SOURCE_NONE`.
+- [ ] **Source-active publisher** — topic `0x10` carries `active_source` + per-source RSSI/SNR + current SF rung + airtime-% triple `(U_image, U_telemetry, U_total)` at 1 Hz + on every change.
+- [ ] **Audit log** — every source transition, SF transition, encode-mode transition, FHSS skip event, replay rejection, GCM-tag rejection, CSMA backoff event appended to the [§8.10 black-box logger](MASTER_PLAN.md).
+
+**Phase 2.LoRa.6 — Observability (per [LORA_IMPLEMENTATION.md §7](LORA_IMPLEMENTATION.md)):**
+
+- [ ] **`link_monitor.py`** — rolling 10 s airtime ledger per profile; computes `U_image`, `U_telemetry`, `U_total`; alarms if `U_telemetry > 30 %` or `U_total > 60 %`; emits `CMD_ENCODE_MODE` per the image auto-fallback ladder.
+- [ ] **`tools/lora_rtt.py`** — handheld→tractor→base RTT measurement harness via timestamp echo. Run nightly during build weeks 1–10; audit-log diff per night; flag regressions.
+- [ ] **Operator UI surface** — airtime-% bar (green < 40 %, yellow 40–60 %, red > 60 %); current SF rung pill; FHSS hop indicator (channel 1–8); two-source-active banner if both handheld and base are within heartbeat timeout.
+
+**Phase 2.LoRa.7 — Validation gates (per [LORA_IMPLEMENTATION.md §9](LORA_IMPLEMENTATION.md), all must pass before field test):**
+
+- [ ] **L-V1.** L1 P0 starvation — 30-min mixed-mode stress, zero P0 TX-start delays > 25 ms (joint pass with image V1).
+- [ ] **L-V2.** L3 failsafe — power-off active source, valve neutral within 500 ms p99 (repeat for HANDHELD, BASE, AUTONOMY).
+- [ ] **L-V3.** Three-source arbitration — 30 s latch + 500 ms timeout handover.
+- [ ] **L-V4.** TAKE CONTROL preemption — within next M7 tick (≤ 20 ms).
+- [ ] **L-V5.** Replay rejection — captured-frame retransmit rejected + logged.
+- [ ] **L-V6.** Tamper rejection — bit-flipped frame rejected via GCM tag + logged.
+- [ ] **L-V7.** Adaptive SF ladder — step-attenuator sweep, no hunting, 30 s clean before step-up.
+- [ ] **L-V8.** R-6 telemetry fragmentation round-trip — 120 B payload survives bit-identical via fragment+reassemble.
+- [ ] **L-V9.** R-7 retune cost recorded; burst-batching code path validated under image load if > 5 ms.
+- [ ] **L-V10.** L5 FHSS spectrum-analyser compliance — 8 channels, ≤ 12.5 % dwell, no OOB, EIRP ≤ +36 dBm.
+- [ ] **L-V11.** Latency — handheld→valve ≤ 150 ms p99; base→valve ≤ 250 ms p99.
+- [ ] **L-V12.** Field range — base mast→tractor ≥ 1 km LoS minimum; handheld→tractor ≥ 500 m minimum.
+
+**Phase 2.LoRa.8 — Open scope decisions (need a human stakeholder):**
+
+- [ ] **L-O1 — Region.** US 915 MHz only for v25, or also EU 868 MHz? Affects FHSS channel plan + per-region key-ID prefix. **Deadline: before week 1 (Phase 0 procurement).** Default if undecided: US 915 MHz only.
+- [ ] **L-O2 — Key rotation cadence.** Annual / on-incident-only / never. Affects whether `provision.py` ships with operator-runnable docs or stays a workshop tool. **Deadline: before week 2.** Default if undecided: on-incident-only.
+- [ ] **L-O3 — Two-radio split (Revisit-4) field-test escape hatch.** Adopt in v25 if L-V1 / image-V1 joint gate fails in field test, or hold the line and downshift the encoder more aggressively? **Deadline: only on documented gate failure.** Default if undecided: hold the line; revisit only on field failure.
 
 ---
 
@@ -287,6 +365,97 @@ This is the *industrial I/O layer* that the Max Carrier H7 talks to over RS-485.
 ### Base station services (Linux only)
 
 Per [MASTER_PLAN.md §8.2](MASTER_PLAN.md), the base station runs **no Arduino firmware** — Linux on the X8 drives the SX1276 directly over SPI from `base_station/lora_bridge.py`. There is no `firmware/base_h7/` target to build, flash, or CI.
+
+### Image pipeline (per [IMAGE_PIPELINE.md](IMAGE_PIPELINE.md), [MASTER_PLAN.md §8.19](MASTER_PLAN.md), [BASE_STATION.md § Image pipeline](BASE_STATION.md#image-pipeline-portenta-x8-linux-side), [LORA_PROTOCOL.md § TileDeltaFrame](LORA_PROTOCOL.md#tiledeltaframe-image-pipeline-i--p-frames))
+
+**Phase 5.0 — Protocol-level reservations (do FIRST, before any image-pipeline code lands):**
+
+- [ ] **Reserve topic ID `0x28`** `video/motion_vectors` in [LORA_PROTOCOL.md](LORA_PROTOCOL.md) (optical-flow microframes, degraded mode Q)
+- [ ] **Reserve topic ID `0x29`** `video/wireframe` in [LORA_PROTOCOL.md](LORA_PROTOCOL.md) (PiDiNet edges, extreme degraded mode P)
+- [ ] **Reserve topic ID `0x2A`** `video/semantic_map` as **v26-only** placeholder in [LORA_PROTOCOL.md](LORA_PROTOCOL.md) (do NOT implement in v25)
+- [ ] **Reserve opcode `0x63`** `CMD_ENCODE_MODE` (base → tractor, P2): `{full | y_only | motion_only | wireframe}` for the §3.4 auto-fallback ladder
+- [ ] **Add Badge enum table** to [LORA_PROTOCOL.md](LORA_PROTOCOL.md) per [IMAGE_PIPELINE.md §3.3](IMAGE_PIPELINE.md): `Raw`, `Cached`, `Enhanced`, `Recolourised`, `Predicted`, `Synthetic`, `Wireframe` — base attaches, browser must fail-closed if missing/malformed
+- [ ] **LoRa PHY revisit — Revisit-3** (per [IMAGE_PIPELINE.md §13.1](IMAGE_PIPELINE.md)): **✅ Spec shipped** in [IMAGE_PIPELINE.md §3.4](IMAGE_PIPELINE.md). `link_monitor.py` implementation (week 5): use `RadioLib::getTimeOnAir`, apply 3-window hysteresis, surface `U` + ladder rung on telemetry topic `0x10`
+- [ ] **LoRa PHY revisit — Revisit-4** (per [IMAGE_PIPELINE.md §13.2](IMAGE_PIPELINE.md)): **✅ Documented** in [MASTER_PLAN.md §8.17.1](MASTER_PLAN.md) as the v26 escape hatch. **Not adopted for v25.** No build action; revisit only if the C1 gate fails in field testing.
+- [ ] **LoRa PHY revisit — Revisit-5** (per [IMAGE_PIPELINE.md §13.1](IMAGE_PIPELINE.md)): **✅ Policy shipped** in [MASTER_PLAN.md §8.17](MASTER_PLAN.md) — 8-channel FHSS across 902–928 MHz, 3.25 MHz spacing, ~12.5 % per-channel dwell. Implementation: deterministic hop sequence in `lora_proto.cpp` seeded by AES key ID; CSMA skip-busy-channel rule. Bench-verify duty calc with spectrum analyser before [Phase 9 FCC verification](#phase-9--documentation-regulatory-release).
+- [ ] **LoRa PHY revisit — R-6** (per [IMAGE_PIPELINE.md §13.1](IMAGE_PIPELINE.md)): **✅ Policy shipped** in [MASTER_PLAN.md §8.17](MASTER_PLAN.md) — P2 telemetry frames inherit the 25 ms airtime cap; oversized topic payloads fragment using the `TileDeltaFrame` scheme. Implementation: extend the fragment scheme to `TelemetryFrame` in `lora_proto.cpp`; base-station bridge reassembles before MQTT publish.
+- [ ] **LoRa PHY revisit — R-7** (per [IMAGE_PIPELINE.md §13.3](IMAGE_PIPELINE.md)): **Week 1 bench task** — measure actual `CMD_LINK_TUNE` retune cost (`setFrequency` + `setSpreadingFactor` + `setBandwidth` + `setCodingRate`) on the SX1276 via RadioLib. **If > 5 ms,** implement burst-batching of image fragments so the radio retunes at most twice per refresh window. Until measured, plan the burst-batching code path conservatively.
+- [ ] **LoRa PHY revisit — R-8** (per [IMAGE_PIPELINE.md §13.1](IMAGE_PIPELINE.md)): **✅ Policy shipped** in [MASTER_PLAN.md §8.17](MASTER_PLAN.md) and [IMAGE_PIPELINE.md §3.4](IMAGE_PIPELINE.md) — require N=3 consecutive bad 5 s windows for any SF or `CMD_ENCODE_MODE` ladder transition. Implementation: hysteresis state machine in the SF-ladder logic in `lora_proto.cpp` and in `link_monitor.py`.
+
+**Phase 5A — Foundation (CPU-only, no AI accelerator required, ships value alone):**
+
+- [ ] `image_pipeline/reassemble.py` — collect `TileDeltaFrame` (topic `0x25`) fragments, time out missing fragments, mark stale tiles
+- [ ] `image_pipeline/canvas.py` — persistent tile canvas; replace changed tiles in place; on `base_seq` mismatch send `CMD_REQ_KEYFRAME` (opcode `0x62`); **attaches the badge enum to every published tile**
+- [ ] `image_pipeline/accel_select.py` — auto-detect Coral at startup; export `HAS_CORAL` for downstream stages; expose status to the UI
+- [ ] **`firmware/tractor_x8/image_pipeline/register.py`** — phase-correlation pre-diff image registration (NEON-accelerated, ~5 % CPU). **Non-negotiable** per [IMAGE_PIPELINE.md week 2](IMAGE_PIPELINE.md): without this, byte-savings collapse the moment the tractor moves
+- [ ] **`encode_tile_delta.py --y-only` + base-side `image_pipeline/recolourise.py`** — scheme Z (Y-only luma + 30 s colour reference + base recolouriser, `Recolourised` badge). Inserted at week 2.5 per [IMAGE_PIPELINE.md §8](IMAGE_PIPELINE.md)
+- [ ] **`image_pipeline/link_monitor.py`** — rolling 10 s `bytes/refresh`; emits `CMD_ENCODE_MODE` per the auto-fallback ladder (`full ≥400 B`, `y_only 150–400 B`, `motion_only 50–150 B`, `wireframe <50 B`)
+- [ ] **`image_pipeline/bg_cache.py`** — rolling per-tile median keyed on segmenter class output; fills missed tiles with `Cached` badge + age (the only hole-filler available without an AI inpainter)
+- [ ] **`image_pipeline/state_publisher.py`** — WebSocket publisher: canvas tiles + per-tile age + per-tile badge enum + detection vectors + safety verdicts + accelerator status. **All authoritative state lives here, not in the browser**
+- [ ] **`image_pipeline/fallback_render.py`** — server-side 1 fps render of the canvas, for HDMI console + headless QA (kept alive even when browser is the primary surface)
+
+**Phase 5A.B — Browser-tier offload (mandatory in Phase 1, not deferred — per [IMAGE_PIPELINE.md §6](IMAGE_PIPELINE.md)):**
+
+Lives in `base_station/web_ui/static/img/`. Capability floor = WebGL 2 + Canvas 2D; opportunistic WebGPU with WebGL fallback; defer WebNN to v26.
+
+- [ ] `canvas_renderer.js` — WebSocket subscriber; per-tile blits to Canvas 2D in an OffscreenCanvas Worker
+- [ ] `fade_shader.js` — WebGL 2 fragment shader for per-tile cross-fade (~3 display frames, target 60 fps local)
+- [ ] `staleness_overlay.js` — yellow tint + age-in-seconds rendering (consumes `age_ms` from base, never computes locally)
+- [ ] `badge_renderer.js` — reads badge enum per tile; **fail-closed if missing/malformed** (refusal-to-display logged to base health endpoint)
+- [ ] `detection_overlay.js` — bounding-box rendering from `state_publisher` detection vectors
+- [ ] `accel_status.js` — "AI accelerator: online / offline / degraded" pill, always visible
+- [ ] `raw_mode_toggle.js` — one-click toggle to most-recent-bytes-only view; choice logged to base audit endpoint
+- [ ] **Trust-boundary documentation in [BASE_STATION.md](BASE_STATION.md)** per [IMAGE_PIPELINE.md §6.1](IMAGE_PIPELINE.md): table of what stays browser-only (display polish) vs what never goes to the browser (safety detector, ROI generation, badge decisions, anything autopilot might consume)
+- [ ] **Browser test matrix gate** (Phase-1 completion gate): Latest Chrome on a $200 Android tablet, latest Safari on a 2020 iPhone SE, latest Firefox on a Linux laptop, latest Chrome on a Windows laptop — all four must render canvas + per-tile fade + staleness + badges + raw-mode toggle correctly
+
+**Phase 5B — Base-side AI (CPU first, Coral if available):**
+
+- [ ] `image_pipeline/superres_cpu.py` — Real-ESRGAN-General-x4v3 via [ncnn](https://github.com/Tencent/ncnn) on the A53 cores at **0.5–1 fps** (not 30 fps); benchmark gate ≤300 ms/frame; sets `Enhanced` badge
+- [ ] `image_pipeline/superres_coral.py` — Edge-TPU port of Real-ESRGAN; only used iff `HAS_CORAL` and the spike (Phase 0) passed; benchmark gate ≤30 ms/frame
+- [ ] `image_pipeline/detect_yolo.py` — **independent base-side safety detector (R6, two-detector pattern)**; CPU path = YOLOv8-nano OR NanoDet-Plus per AGPL decision, Coral path = YOLOv8-medium. **Two-detector disagreement banner in UI** when tractor `0x26` and base detectors disagree on a high-confidence object; log to §8.10 logger for v26 retraining
+  - [ ] **OPEN SCOPE DECISION O1 — AGPL stance** on Ultralytics YOLOv8 (AGPL-3.0) vs. NanoDet-Plus (Apache-2.0). **Deadline: before week 6.** Default if undecided: NanoDet-Plus, accept ~5 % accuracy reduction. See [IMAGE_PIPELINE.md §10](IMAGE_PIPELINE.md)
+- [ ] **`image_pipeline/motion_replay.py`** — apply `0x28` motion vectors to existing canvas; sets `Predicted` badge (Q degraded mode)
+- [ ] **`image_pipeline/wireframe_render.py`** — render `0x29` wireframe over canvas; sets `Wireframe` overlay (P extreme degraded mode)
+- [ ] **Tractor-side `encode_motion.py`** — optical-flow microframe encoder for topic `0x28`
+- [ ] **Tractor-side `encode_wireframe.py`** — PiDiNet edge encoder for topic `0x29`
+- [ ] **OPEN SCOPE DECISION O2 — Coral on the v25 BOM** — order it for the spike, or skip entirely? **Deadline: before week 5** (Phase-0 spike must complete by then). Default if undecided: ship CPU-only Stack-NoCoral as primary; Coral added in v25.5 if a later spike succeeds. See [IMAGE_PIPELINE.md §10](IMAGE_PIPELINE.md)
+- [ ] `image_pipeline/interp_rife.py` *(optional, Coral-only)* — RIFE frame interpolation between thumbnail arrivals; under `Enhanced` badge
+- [ ] `image_pipeline/inpaint_lama.py` *(optional, Coral-only)* — LaMa-Fourier fill of stale tiles; under `Synthetic` badge; opt-in only
+
+**Phase 5C — Operator UX safety rules (mandatory before live hydraulic test):**
+
+- [ ] Staleness clock visible on every displayed canvas, always
+- [ ] "Enhanced" / "Synthetic" badge on any non-1:1 pixel (super-resolved, RIFE-interpolated, LaMa-inpainted, AI-colorized)
+- [ ] Never hide loss — partial / corrupt canvas shown with gaps visible, never extrapolated and hidden
+- [ ] One-click "raw mode" toggle — most-recent received bytes only, no enhancement
+- [ ] Audit log: which view-mode (raw / enhanced) the operator was using when each command was issued; persisted to the §8.10 black-box logger
+- [ ] **"AI accelerator: online / offline / degraded"** indicator visible on the operator console at all times
+
+### Tractor image pipeline (per [TRACTOR_NODE.md § Image pipeline](TRACTOR_NODE.md#image-pipeline-portenta-x8-linux-side)) — *no Coral on tractor*
+
+- [ ] `firmware/tractor_x8/image_pipeline/capture.py` — V4L2 → 384×256 YCbCr buffer per camera
+- [ ] `tile_diff.py` — pHash-based 32×32 tile-change detector, NEON-accelerated, ≤30 ms for 96 tiles
+- [ ] `roi.py` — read valve activity from H747 over IPC, classify mode (loading / driving / idle), produce ROI mask; honour `CMD_ROI_HINT` (opcode `0x61`)
+- [ ] `detect_nanodet.py` — [NanoDet-Plus](https://github.com/RangiLyu/nanodet) (Apache-2.0) at 320×320 INT8, six classes; benchmark gate ≤50 ms p99 on the X8 A53s
+- [ ] `encode_tile_delta.py` — per-tile WebP at q15/q40/q60 by ROI/detection; assemble `TileDeltaFrame` body
+- [ ] `fragment.py` — split into ≤25 ms airtime fragments
+- [ ] `ipc_to_h747.py` — hand fragments to the M7 firmware ring buffer at P3
+- [ ] **`CMD_PERSON_APPEARED` (opcode `0x60`)** — on first new high-confidence person/animal/vehicle in frame, emit P0 alert with normalised bbox centroid; promote next image transmission to P1 for one frame
+- [ ] **Multi-camera attention multiplexing** — front=70 / bucket=25 / rear=5 default; reverse-stick-driven flip; person-detection-driven 90 % promotion
+- [ ] **Logger requirement** — every captured canvas + detection set + operator command + active-view-mode appended to the §8.10 black-box logger (builds the v26 fine-tuning dataset)
+
+**Phase 5D — Validation gates (must all pass before field test, per [IMAGE_PIPELINE.md §9](IMAGE_PIPELINE.md)):**
+
+- [ ] **V1.** Image-pipeline P0 starvation gate: 30-min mixed-mode stress run, **zero P0 ControlFrame TX-start delays >25 ms attributable to image fragments**
+- [ ] **V2.** End-to-end image latency: capture → base UI repaint, ≤500 ms p99 CPU-only, ≤300 ms p99 with Coral
+- [ ] **V3.** `CMD_PERSON_APPEARED` end-to-end: walk a person across the FOV, alert reaches base UI in ≤250 ms p99
+- [ ] **V4.** `CMD_REQ_KEYFRAME` recovery: induce I-frame loss, confirm base detects mismatch and tractor returns a fresh I within 1 refresh
+- [ ] **V5.** Coral fallback: yank Coral mid-operation, confirm UI flips to "AI accelerator: offline" within 10 s and pipeline continues degraded
+- [ ] **V6.** **Auto-fallback ladder validation** — attenuate the LoRa link in 50 B/s steps; verify the encoder downshifts cleanly through `full → y_only → motion_only → wireframe` without operator intervention and without losing the canvas
+- [ ] **V7.** **Browser test matrix** — all four target browsers (Chrome/Android, Safari/iOS, Firefox/Linux, Chrome/Windows) render canvas + fade + badges + raw-mode toggle correctly
+- [ ] **V8.** **Two-detector cross-check** — tractor `0x26` vs. base `detect_yolo.py` disagreements surface in UI within one refresh; logged to §8.10 black-box logger
+- [ ] **V9.** Operator-UX safety rules (Phase 5C) all visible and functional — pre-condition for any live hydraulic test
+- [ ] **V10.** **Trust-boundary fail-closed** — patch a tile in transit to remove its badge enum; browser **must refuse to display** the tile and log the refusal to the base health endpoint
 
 ---
 

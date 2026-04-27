@@ -349,6 +349,50 @@ firmware/tractor_h7/
 └── platformio.ini              # PlatformIO build for both cores
 ```
 
+## Image pipeline (Portenta X8 Linux side)
+
+Per [MASTER_PLAN.md §8.19](MASTER_PLAN.md) and [`../AI NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md`](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md). All inference on the tractor runs on the i.MX 8M Mini's 4× Cortex-A53 with NEON via TFLite-XNNPACK or ncnn — **no Coral on the tractor in v25** (power, thermal, enclosure constraints).
+
+**Pipeline stages** (per camera, runs at the §8.19 budget on the X8 Linux side):
+
+1. **Capture** — `/dev/videoN` (UVC) → 384×256 YCbCr 4:2:0 buffer.
+2. **Lens-occlusion / over-exposure pre-check** — tiny (~50 KB) classifier on the H747 M7 co-MCU, reads a downsampled luma thumbnail over IPC. If occluded, the X8 emits a UI hint and skips the heavy pipeline for this refresh.
+3. **Detection** — [NanoDet-Plus](https://github.com/RangiLyu/nanodet) (Apache-2.0, ~2.3 MB INT8) at 320×320, ~30 ms on A53. Six classes for v25: `person`, `animal`, `vehicle`, `large_obstacle`, `implement_attached`, `implement_detached`. Output → `0x26 video/detections` sidecar (P2). High-confidence new `person` → `CMD_PERSON_APPEARED` (opcode `0x60`, P0) — see [LORA_PROTOCOL.md § Command frame opcodes](LORA_PROTOCOL.md#command-frame-opcodes).
+4. **Tile-diff** — pHash over 32×32 tiles vs the last sent canvas (~30 ms total for 96 tiles, NEON SIMD). Produces the `changed_bitmap` field of the `TileDeltaFrame`.
+5. **ROI budget allocation** — read current valve-activity flags from the H747 M7 over IPC; classify operating mode (loading / driving / idle); per-tile WebP quality picks q60 (ROI), q40 (changed-non-ROI), or q15 (low). Bucket-tip area is *always* high quality regardless of mode. Operator-cued ROI from `CMD_ROI_HINT` (opcode `0x61`) overrides for `ttl_refreshes` frames.
+6. **WebP encode** — libwebp on A53. Per-tile blobs assembled into the `TileDeltaFrame` body.
+7. **Fragment & enqueue** — split into ≤25 ms airtime chunks, hand off to the H747 M7 firmware over the IPC ring buffer for transmission at P3 (image data) — *never* delays a P0 ControlFrame's TX-start.
+
+**Mode selection.** Tractor decides I vs P locally each refresh per [LORA_PROTOCOL.md § TileDeltaFrame](LORA_PROTOCOL.md#tiledeltaframe-image-pipeline-i--p-frames). On receipt of `CMD_REQ_KEYFRAME` (opcode `0x62`) the next image is forced to I.
+
+**Multi-camera attention multiplexing.** When 2+ UVC cameras are attached, default budget split is front=70 % / bucket=25 % / rear=5 %; reverse-stick deflection >50 % for >1 s flips to rear=70 %. A `person`-class detection in any camera promotes that camera to 90 % for the next 5 refreshes. Logic lives entirely on the X8 — base only sends `CMD_CAMERA_SELECT 0x00` for auto-by-mode.
+
+**Audio (optional, future).** If a USB microphone is fitted, [YAMNet](https://github.com/tensorflow/models/tree/master/research/audioset/yamnet) (Apache-2.0, ~3.8 MB, ~50 ms on A53) classifies engine-knock / hydraulic-squeal / impact / voice; class IDs → topic `0x27 video/audio_event` (4 B per detection). Not required for v25 first build.
+
+**Logger requirement.** Every captured canvas, every detection, every operator action and current view-mode is appended to the §8.10 black-box logger so a v26 fine-tuned NanoDet can train on real LifeTrac footage.
+
+**Source layout (X8-side, when implemented):**
+
+```
+firmware/tractor_x8/image_pipeline/
+├── capture.py            # V4L2 → numpy
+├── tile_diff.py          # pHash + bitmap, NEON via numpy
+├── roi.py                # valve-state → ROI mask
+├── detect_nanodet.py     # NanoDet-Plus inference (TFLite-XNNPACK)
+├── encode_tile_delta.py  # WebP per tile, assemble TileDeltaFrame
+├── fragment.py           # ≤25 ms airtime fragmentation
+├── ipc_to_h747.py        # Hand fragments to the M7 firmware over the IPC ring
+└── models/               # NanoDet-Plus INT8, lens-occlusion, (optional) YAMNet
+```
+
+## Bring-up checklist (additions for image pipeline)
+
+11. [ ] Capture from each Kurokesu / UVC camera at 384×256 ≥10 fps, no dropped frames over 5 minutes
+12. [ ] NanoDet-Plus inference benchmark on the X8: confirm ≤50 ms p99 at 320×320 INT8
+13. [ ] End-to-end image-pipeline benchmark: confirm a P-frame from capture to H747 IPC handoff in ≤200 ms p99
+14. [ ] Validate the P0 starvation gate: 30-min mixed-mode stress test, confirm zero P0 ControlFrame TX-start delays >25 ms attributable to image fragments
+15. [ ] `CMD_PERSON_APPEARED` end-to-end: walk a person across the camera FOV, confirm the alert reaches the base UI in ≤250 ms p99
+
 ## See also
 
 - [HARDWARE_BOM.md § Tier 1](HARDWARE_BOM.md#tier-1--tractor-node-portenta-max-carrier--portenta-h7)

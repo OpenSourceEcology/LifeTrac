@@ -233,11 +233,54 @@ base_station/                   # Runs on X8 in Docker
 │   ├── proto.py                # Frame pack/unpack (mirrors firmware/common/lora_proto.cpp)
 │   ├── crypto.py               # AES-GCM (mirrors firmware/common/crypto.cpp)
 │   └── requirements.txt
+├── image_pipeline/             # See § Image pipeline below
+│   ├── canvas.py               # Persistent tile canvas, I/P-frame reassembly
+│   ├── reassemble.py           # Fragment → TileDeltaFrame
+│   ├── superres_cpu.py         # Real-ESRGAN-General-x4v3 (CPU fallback, ncnn)
+│   ├── superres_coral.py       # Real-ESRGAN Edge-TPU port (optional, used iff Coral online)
+│   ├── detect_yolo.py          # YOLOv8-nano CPU / YOLOv8-medium Coral cross-check
+│   ├── interp_rife.py          # Optional RIFE frame interpolation
+│   ├── inpaint_lama.py         # Optional LaMa-Fourier (Coral only)
+│   ├── accel_select.py         # Auto-detect Coral; pick CPU vs Coral path per stage
+│   └── models/                 # Bundled INT8 models (CPU and Edge-TPU variants)
 ├── mosquitto/
 │   └── mosquitto.conf          # Use existing config from ../RESEARCH-CONTROLLER/config/mosquitto.conf (archived)
 └── timeseries/
     └── (InfluxDB or SQLite config)
 ```
+
+## Image pipeline (Portenta X8 Linux side)
+
+Per [MASTER_PLAN.md §8.19](MASTER_PLAN.md) and [`../AI NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md`](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md). The base receives [`TileDeltaFrame`](LORA_PROTOCOL.md#tiledeltaframe-image-pipeline-i--p-frames) on topic `0x25`, reassembles the persistent canvas, runs post-processing, and publishes the result to the web UI over WebSocket.
+
+**Stages**:
+
+1. **Reassemble** — `lora_bridge/bridge.py` collects `TileDeltaFrame` fragments, hands the assembled frame to `image_pipeline/reassemble.py`. Missing fragments after a configurable timeout → tile is marked stale (yellow tint, age in seconds visible in UI).
+2. **Canvas update** — `canvas.py` overwrites the changed tiles in the persistent canvas. If `base_seq` does not match the current I, send `CMD_REQ_KEYFRAME` (opcode `0x62`).
+3. **Per-tile fade** — when a new tile arrives the GLSL fragment shader on the browser side cross-fades from the prior value over ~3 display frames. Zero CPU cost.
+4. **Super-resolution** — Real-ESRGAN-General-x4v3 (BSD) on the canvas. CPU path: ncnn at ~250 ms/frame; Coral path: ~15–30 ms via the Edge-TPU port. `accel_select.py` picks at startup.
+5. **Independent safety detector cross-check** — second-pass [YOLOv8-nano](https://github.com/ultralytics/ultralytics) (CPU, ~150 ms) or YOLOv8-medium (Coral, ~25–40 ms) on the reconstructed canvas. Compare class set against the tractor's `0x26 video/detections` sidecar. **Disagreements (especially "base saw a person tractor missed") are highlighted in the UI and logged for v26 model retraining.** Note: Ultralytics models are AGPL-3.0 — see `../AI NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md` §4.1; substitute NanoDet-Plus if AGPL is unacceptable for the OSE codebase.
+6. **(Optional) RIFE frame interpolation** — fills in display frames between thumbnail arrivals so a 1.5 s cadence presents as ~15 fps. Coral-only.
+7. **(Optional) LaMa-Fourier inpainting** — fills stale tiles when the operator opts in. *Mandatory* "Enhanced" badge on any inpainted tile per the v1.1 LoRa analysis §5.4 safety rules. Coral-only.
+8. **Publish to UI** — final canvas + detection metadata + bounding-box vectors + staleness clock per tile go to the WebSocket consumers as a single message.
+
+**Accelerator policy** (per [MASTER_PLAN.md §8.19](MASTER_PLAN.md)):
+
+- The base ships in **CPU-only mode by default**. Stages 4 and 5 fall back to single-frame Real-ESRGAN at lower fps and YOLOv8-nano on CPU; stages 6 and 7 are *unavailable* without an accelerator.
+- If a Coral Mini PCIe (or USB) Accelerator is present, `accel_select.py` enables the Coral paths automatically and the UI shows **"AI accelerator: online"**. If Coral fails to enumerate or load drivers, UI shows **"AI accelerator: offline"** and the pipeline transparently degrades to CPU.
+- **Coral on the Max Carrier is unproven as of 2026-04-27** — see [MASTER_PLAN.md §8.19](MASTER_PLAN.md). A 2-day validation spike must pass before BOM lock. Until then, all Coral-dependent stages are best-effort and the safety story does not depend on them.
+- Even with Coral the base must continue to function if Coral fails mid-operation (thermal, driver crash). `accel_select.py` re-evaluates every 10 s and degrades on the fly.
+
+**Outside-the-box ideas deferred** (documented in image-transmission analysis §6, not in v25 first build): procedural texture synthesis for static background, satellite-imagery far-field rendering, MiDaS depth + 2.5D rendering, learned autoencoder codec (v26).
+
+## Bring-up checklist (additions for image pipeline)
+
+11. [ ] Reassemble + canvas: feed synthetic `TileDeltaFrame` fragments at the bench, confirm I/P logic and `CMD_REQ_KEYFRAME` recovery
+12. [ ] CPU-only super-res benchmark: confirm Real-ESRGAN-x4v3 ncnn ≤300 ms/frame on the X8 A53s
+13. [ ] CPU-only safety cross-check: YOLOv8-nano ≤200 ms/frame on the X8 A53s (or NanoDet-Plus if AGPL avoidance is required)
+14. [ ] **Coral spike (gate before BOM lock)** — install Coral Mini PCIe in the Max Carrier, confirm: PCIe enumeration in `lspci`, `gasket`/`apex` driver loads against the X8 Yocto kernel, sustained inference for 30 min without thermal throttle, slot power budget adequate. Document outcome in [HARDWARE_BOM.md](HARDWARE_BOM.md). If fail, repeat with Coral USB Accelerator.
+15. [ ] End-to-end image-pipeline latency: tractor capture → base UI repaint, ≤500 ms p99 in CPU-only mode, ≤300 ms p99 with Coral
+16. [ ] UI safety badges: confirm staleness clock, "Enhanced/Synthetic" badge on any non-1:1 pixel, one-click raw-mode toggle, audit-log of "view-mode at command time" in the §8.10 black-box logger
 
 ## See also
 

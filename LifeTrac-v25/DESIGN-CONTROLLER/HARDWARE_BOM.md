@@ -65,7 +65,10 @@ All prices in USD, approximate, from primary distributor (Arduino Store, SparkFu
 | Mini UPS for base station (12 V, 30 min runtime) | 1 | $60 | $60 | Amazon | Survives brief power drops |
 | Indoor enclosure, ventilated | 1 | $25 | $25 | Polycase | Wall-mount or shelf |
 | Ethernet cable, Cat6, 5 m | 1 | $10 | $10 | DigiKey | To office switch/router |
-| **Tier 2 Subtotal** | | | **$872** + $5/mo | | |
+| **[Coral Mini PCIe Accelerator](https://coral.ai/products/pcie-accelerator/)** *(strongly recommended optional)* | 1 | $25 | $25 | [Coral](https://coral.ai/products/pcie-accelerator/) / DigiKey | Single Edge TPU, 4 TOPS INT8. Drops into the Max Carrier mini-PCIe slot. **Unproven on this hardware** — see [MASTER_PLAN.md §8.19](MASTER_PLAN.md). Requires a 2-day validation spike before BOM lock (PCIe enumeration, `gasket`/`apex` driver on the X8 Yocto image, thermal sustain, slot power budget). If validation fails, substitute the Coral USB Accelerator below. If both fail, ship CPU-only — pipeline degrades per the image-transmission analysis. |
+| **[Coral USB Accelerator](https://www.digikey.com/en/products/detail/coral/G950-01456-01/10256669)** *(documented Coral fallback)* | 0–1 | $60 | — | [Coral](https://coral.ai/products/accelerator/) / DigiKey | USB 3.0 Type-C, single Edge TPU, 4 TOPS. Use **only** if the Mini PCIe path fails the validation spike. Adds an internal USB cable to the base enclosure; needs strain relief. Quantity is 0 by default; bump to 1 if Mini PCIe is dropped. |
+| **Stick-on aluminium heatsink, ~15×15×8 mm** *(if Coral is fitted)* | 0–1 | $3 | — | DigiKey | Mounts on the Coral Edge TPU package. Sustained inference can hit 60–70 °C in a sealed enclosure; cheap insurance. |
+| **Tier 2 Subtotal** | | | **$897** + $5/mo *(with Coral Mini PCIe; $872 base + $25)* | | Coral lines are optional but priced into the recommended build. CPU-only build subtracts $25–$28. |
 
 ## Tier 3 — Handheld Remote (MKR WAN 1310)
 

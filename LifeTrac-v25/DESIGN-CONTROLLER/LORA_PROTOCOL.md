@@ -84,18 +84,21 @@ Tempting; declined. Reasons:
 
 ## PHY parameters (defaults)
 
-| Parameter | Control link (default) | Telemetry link |
-|---|---|---|
-| Spreading Factor | **SF7** (adaptive ladder SF7→SF8→SF9, see [§ Adaptive control-link SF](#adaptive-control-link-sf)) | SF9 |
-| Bandwidth | **125 kHz** | 250 kHz |
-| Coding Rate | 4/5 | 4/8 |
-| Sync word | 0x12 (private LoRa) | 0x12 |
-| Preamble length | 8 symbols | 12 symbols |
-| TX power | per-source (see below) | per-source |
-| Air time, 16-byte ControlFrame (≈44 B on-air after AES-GCM + KISS) | ~30 ms @ SF7, ~55 ms @ SF8, ~100 ms @ SF9 | n/a |
-| Air time, 64-byte TelemetryFrame | n/a | ~250 ms |
+| Parameter | Control link (default) | Telemetry link | Image link (P3 only) |
+|---|---|---|---|
+| Spreading Factor | **SF7** (adaptive ladder SF7→SF8→SF9, see [§ Adaptive control-link SF](#adaptive-control-link-sf)) | SF9 | **SF7** (drops to SF8 if image-link SNR margin < 6 dB; see [IMAGE_PIPELINE.md §3.4](IMAGE_PIPELINE.md)) |
+| Bandwidth | **125 kHz** | 250 kHz | **250 kHz** |
+| Coding Rate | 4/5 | 4/8 | **4/5** (canvas + `CMD_REQ_KEYFRAME` recover loss; CR4/8 is wasteful overhead per [IMAGE_PIPELINE.md §revisit-2](IMAGE_PIPELINE.md)) |
+| Sync word | 0x12 (private LoRa) | 0x12 | 0x12 |
+| Preamble length | 8 symbols | 12 symbols | 8 symbols |
+| TX power | per-source (see below) | per-source | per-source |
+| Air time, 16-byte ControlFrame (≈44 B on-air after AES-GCM + KISS) | ~30 ms @ SF7, ~55 ms @ SF8, ~100 ms @ SF9 | n/a | n/a |
+| Air time, 64-byte TelemetryFrame | n/a | ~250 ms | n/a |
+| Air time, 32-byte image fragment (TileDelta) | n/a | n/a | **~22 ms @ SF7, ~40 ms @ SF8** — SF7 fits under the C1 25 ms-per-fragment cap; SF8 violates it and is reserved for an emergency "image limps along" mode behind operator opt-in |
 
 The control link is pinned to **SF7 / BW 125 kHz / CR 4/5** by [MASTER_PLAN.md §8.17](MASTER_PLAN.md#817-lora-control-link-phy--sf7--bw-125-khz--cr-4-5-default-no-retries-on-controlframe-adaptive-sf7sf8sf9-fallback-when-snr-margin-degrades). The earlier draft showed BW 500 kHz; we now ship 125 kHz for range margin on the US 915 MHz band with the 8 dBi mast antenna. Adaptive fallback to SF8/SF9 is documented below; telemetry SF is independent and does not change.
+
+**Image link split (2026-04-27 reanalysis):** the image link is a **separate PHY profile** from the telemetry link, even though both ride the same physical SX1276 radio and channel. Reason: the telemetry default of SF9/BW250/CR4-8 makes a 32 B image fragment ~120 ms on-air, which violates the [IMAGE_PIPELINE.md C1 hard constraint](IMAGE_PIPELINE.md) (25 ms-per-fragment cap protecting P0 ControlFrame TX-start). Image fragments transmit at the SF7/BW250/CR4-5 profile shown above; everything else on the telemetry link (topics `0x01`–`0x10`, `0x26`, `0x27`) stays at SF9/BW250/CR4-8. The radio retunes between SF7 and SF9 on a per-frame basis using the same `CMD_LINK_TUNE` mechanism documented in the adaptive-control-link section; the retune cost is ~1 ms and is folded into the airtime budget.
 
 TX power per source:
 
@@ -163,6 +166,9 @@ Topic IDs (statically pre-registered — no REGISTER round-trip, no SUBSCRIBE):
 | 0x22 | `lifetrac/v25/video/active_camera` | on change (which camera is currently being thumbnailed: `front`, `rear`, `implement`, `crop`) |
 | 0x23 | `lifetrac/v25/video/thumbnail_implement` | 0.2 Hz (implement-monitor cam, optional) |
 | 0x24 | `lifetrac/v25/telemetry/crop_health` | 0.1 Hz (NDVI / GNDVI / canopy-cover summary computed onboard the X8 — see [VIDEO_OPTIONS.md § Crop-health analysis](VIDEO_OPTIONS.md#crop-health-analysis)) |
+| 0x25 | `lifetrac/v25/video/tile_delta` | I/P frame mode — see [§ TileDeltaFrame](#tiledeltaframe-image-pipeline-i--p-frames). Replaces topics `0x20`/`0x21`/`0x23` when image pipeline phase 1 ships per [MASTER_PLAN.md §8.19](MASTER_PLAN.md). Camera selection still uses `CMD_CAMERA_SELECT`; `0x22` still echoes the active camera. |
+| 0x26 | `lifetrac/v25/video/detections` | P2-class detection sidecar (~6 B per detection, max 8 → ≤50 B). Bounding boxes + class IDs from the tractor's on-X8 NanoDet-Plus per [`../AI NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md`](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md) §4.3. Drawn as vector overlays on the base canvas. |
+| 0x27 | `lifetrac/v25/video/audio_event` | 4 B classifier output from on-tractor [YAMNet](https://github.com/tensorflow/models/tree/master/research/audioset/yamnet)-class model when a microphone is fitted. `class_id (1 B), confidence_pct (1 B), epoch_offset_s (2 B)`. Optional. |
 | 0x40 | `lifetrac/v25/auto/plan_status` | *reserved — future release* (active waypoint index, distance-to-goal, ETA). Not implemented in v25; reserved per [`RESEARCH-CONTROLLER/AUTOMATION_AND_ROUTE_PLANNING.md`](RESEARCH-CONTROLLER/AUTOMATION_AND_ROUTE_PLANNING.md) §4.2. |
 | 0x41 | `lifetrac/v25/auto/cross_track_error` | *reserved — future release* (meters off planned path). |
 | 0x42 | `lifetrac/v25/auto/geofence_status` | *reserved — future release* (inside/outside, last violation timestamp). |
@@ -201,6 +207,9 @@ Opcodes:
 | `0x43` | `CMD_AUTO_ABORT` | *reserved — future release* | `reason (1 B)` — drop autonomy, return to operator control, log reason. `CMD_ESTOP` (`0x01`) preempts unconditionally and is preferred for safety stops. Not implemented in v25. |
 | `0x44` | `CMD_GEOFENCE_SET` | *reserved — future release* | `polygon_id (1 B), vertex_count (1 B)` followed by side-channel polygon push. Not implemented in v25. |
 | `0x50` | `CMD_OBSTACLE_STOP` | *reserved — future release* | `source (1 B), confidence_pct (1 B), class (1 B)` — **tractor X8 vision/LiDAR → tractor M4 over IPC**, mirrored on LoRa for base awareness. `class` ∈ {0x01=person, 0x02=animal, 0x03=vehicle, 0x04=unknown}. M4 treats this as `CMD_ESTOP` semantics. The IPC path is the safety-relevant one; the LoRa frame is informational so the operator's UI can show *why* the tractor stopped. Not implemented in v25. |
+| `0x60` | `CMD_PERSON_APPEARED` | `class (1 B), confidence_pct (1 B), bbox_cx (1 B), bbox_cy (1 B)` | **Tractor → base**: tractor's on-X8 detector saw a *new* high-confidence person/animal/vehicle in the frame that wasn't there last refresh. P0-class so it preempts image fragments. `bbox_cx`/`bbox_cy` are 0–255 normalised across the frame so the base UI can highlight the region without waiting for the next image. Confidence threshold is high (≥0.7) by default to avoid alarm fatigue per [`../AI NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md`](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md) §4.4. Informational only — does *not* trigger a stop in v25 (operator-in-the-loop). Future revisions may chain to `CMD_OBSTACLE_STOP`. |
+| `0x61` | `CMD_ROI_HINT` | `roi_x (1 B), roi_y (1 B), ttl_refreshes (1 B)` | **Base → tractor**: operator tapped a region in the displayed image; bias the next `ttl_refreshes` image frames to spend most of the byte budget on tiles overlapping `(roi_x, roi_y)`. Coordinates are 0–255 normalised. P1-class. |
+| `0x62` | `CMD_REQ_KEYFRAME` | `(empty)` | **Base → tractor**: the persistent canvas is too stale or the base lost an I-frame; please send a full I-frame on the next image transmission instead of a P-frame. P1-class. |
 
 The `CMD_CAMERA_SELECT` semantics:
 
@@ -219,6 +228,39 @@ Sent at **20 Hz** by the active control source. Used by the tractor's source-arb
 | `flags` | 1 | bit0=takecontrol_held |
 | `padding` | 1 | reserved |
 | `crc16` | 2 | |
+
+### TileDeltaFrame (image pipeline I & P frames)
+
+The image pipeline replaces the simple "send a whole WebP every N seconds" model from earlier drafts with hybrid I/P-frame tile-delta transmission, per [MASTER_PLAN.md §8.19](MASTER_PLAN.md) and [`../AI NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md`](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md) §2. Carried on TelemetryFrame topic `0x25` and fragmented across LoRa frames using the existing fragment scheme, with a per-fragment **25 ms airtime cap** so an in-flight image chunk cannot delay a P0 ControlFrame's TX-start (per the v1.1 LoRa analysis §3 / [v25 image analysis §2.6](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md)).
+
+Layout (after framing/AES-GCM unwrap, before fragmentation):
+
+| Field | Bytes | Description |
+|---|---:|---|
+| `frame_type` | 1 | `0x00` = I (full keyframe), `0x01` = P (delta) |
+| `seq` | 2 | Monotonic image sequence |
+| `base_seq` | 2 | For P: which I this deltas from. For I: 0. |
+| `wall_seconds` | 4 | Capture wall-clock (epoch seconds) so the base can render an honest staleness clock per [`../AI NOTES/2026-04-27_LoRa_InDepth_Analysis_ClaudeOpus4_7_v1_1.md`](../AI%20NOTES/2026-04-27_LoRa_InDepth_Analysis_ClaudeOpus4_7_v1_1.md) §5.4 |
+| `camera_id` | 1 | Which camera produced the frame (matches `CMD_CAMERA_SELECT` codes) |
+| `grid_w` | 1 | Tile-grid width in tiles (default 12) |
+| `grid_h` | 1 | Tile-grid height in tiles (default 8) |
+| `tile_px` | 1 | Tile edge in pixels (default 32) |
+| `flags` | 1 | bit0 = ROI-mode-loading, bit1 = ROI-mode-driving, bit2 = grayscale (chroma dropped, base may colorize), bit3 = optical-flow degraded mode (no pixels, vector field only — see image analysis §5.3) |
+| `changed_bitmap` | ⌈grid_w·grid_h/8⌉ | Default 12 B for 12×8 grid. One bit per tile (row-major). For I-frames every bit is 1. |
+| (per changed tile, in row-major order) | | |
+| ↳ `tile_size_minus1` | 1 | Bytes-1 of the WebP blob for this tile (max 256 B) |
+| ↳ `tile_data` | n | WebP-compressed 32×32 sub-image |
+
+**On-air targets** at SF7/BW250/CR4-5 with ≤25 ms fragment cap:
+- I-frame (~900 B): 16 fragments × ~32 B → ~1.6 s wall-clock to deliver, never blocks P0.
+- P-frame, slow driving (~1620 B): 28 fragments → ~2.8 s.
+- P-frame, stationary (~260 B): 4 fragments → ~0.4 s.
+
+**Loss handling.** Each P-frame carries `base_seq` so the base knows whether it has the matching I. If `base_seq` does not match the base's current canvas I, base sends `CMD_REQ_KEYFRAME` (opcode `0x62`); tractor sends a fresh I on the next image transmission. Stale tiles in the canvas are tinted yellow with their age in seconds visible — never silently extrapolated — per the v1.1 LoRa analysis §5.4 mandatory operator-UX rules.
+
+**Drift control.** Tractor sends an unconditional I-frame every ~30 s (≈20 P-frames at 1.5 s cadence) to flush the canvas regardless of measured delta size.
+
+**Encoding-mode selection.** Each refresh, the tractor estimates `p_bytes ≈ HEADER + BITMAP + Σ webp_size_estimate(tile)`; if `p_bytes > 0.7 · keyframe_bytes`, send an I-frame instead. Choice is local; the base reconstructs from whatever arrives.
 
 ## Multi-source arbitration
 
@@ -380,6 +422,7 @@ const uint32_t STEP_DOWN_HOLD_MS        = 30000; // require 30 s clean before st
 ### What does NOT change with the SF
 
 - **Telemetry link** stays on SF9 / BW 250 kHz / CR 4/8 regardless of control-link rung. Telemetry is downlink-only and tractor-initiated; it can hold its own SF without coordination.
+- **Image link** runs at SF7 / BW 250 kHz / CR 4/5 by default and is independent of the control-link rung. Per the [IMAGE_PIPELINE.md §3.4 auto-fallback ladder](IMAGE_PIPELINE.md), if the image link's own SNR margin degrades the encoder downshifts (`full → y_only → motion_only → wireframe`) *before* dropping to SF8 — because SF8 violates the C1 25 ms-per-fragment cap. SF8 image is opt-in only.
 - **Failsafe timeout** stays at `HEARTBEAT_TIMEOUT_MS = 500 ms`. If no valid Heartbeat at *any* SF arrives in that window, `pick_active_source()` returns `SOURCE_NONE` and valves go neutral.
 - **AES-GCM nonce uniqueness** (per-source monotonic sequence + 4-byte timestamp + 5-byte random) is independent of SF.
 

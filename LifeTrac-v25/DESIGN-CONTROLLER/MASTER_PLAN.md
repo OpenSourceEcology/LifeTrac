@@ -373,8 +373,51 @@ The `ControlFrame` and active-source `HeartbeatFrame` are P0-class and latency-c
 - **Air-time impact at each rung** (for the 44-byte on-air ControlFrame including AES-GCM + KISS overhead, approximate): SF7 ~30 ms → SF8 ~55 ms → SF9 ~100 ms. At SF9 we are at the edge of fitting 20 Hz cadence into the duty budget; this is acceptable as a degraded-link mode, not steady state.
 - **Failsafe behavior is unchanged.** If the tractor sees no valid control frame at any SF for `HEARTBEAT_TIMEOUT_MS` (500 ms), `pick_active_source()` drops to `SOURCE_NONE` and valves go neutral per § ControlFrame in `LORA_PROTOCOL.md`.
 - **Interaction with telemetry SF.** Telemetry stays on its own SF (currently SF9 / BW 250 kHz / CR 4/8 per `LORA_PROTOCOL.md`); the adaptive-SF logic above is for the control + heartbeat slot only.
+- **FCC §15.247 compliance — frequency hopping (per [`IMAGE_PIPELINE.md` §13.3 Revisit-5](IMAGE_PIPELINE.md)).** All v25 PHY profiles use BW < 500 kHz (control 125 kHz, telemetry/image 250 kHz), which under §15.247 hybrid-system rules requires either digital-modulation (≥500 kHz somewhere in the system) or frequency hopping. We choose frequency hopping rather than widening, because widening would cost ~3 dB sensitivity on the SF7/BW250 image profile that is already on the edge of usable range with the 8 dBi mast antenna. **Implementation:** 8 channels evenly spaced across 902–928 MHz (3.25 MHz spacing, satisfying the ≥6 × 20 dB-bandwidth requirement of §15.247(a)(1)(iii) for our 250 kHz widest profile), rotated per P3 refresh window (~1.5 s) on a deterministic shared pseudo-random sequence seeded by the AES key ID. Per-channel dwell time is therefore ~1.5 s per ~12 s sequence cycle = ~12.5 % per channel, which is well under the 400 ms-per-channel-per-20 s §15.247(a)(1)(i) limit (the rule maps to ≤2 % per 20 s for our 8-channel rotation). CSMA still applies: if the next-hop channel is busy, skip to the channel after it and log the skip. The hop sequence is implemented in `lora_proto.cpp` and shared by all three nodes (handheld, base, tractor). **Action:** bench-verify the duty calc with a spectrum analyser before the [TODO Phase 9 FCC verification](TODO.md).
+- **R-6 telemetry frames also obey the 25 ms airtime cap (per [`IMAGE_PIPELINE.md` §13.3 R-6](IMAGE_PIPELINE.md)).** A 64 B SF9/BW250 TelemetryFrame is ~250 ms on-air — the same airtime mechanism that protects P0 control from image fragments must also protect it from oversized telemetry. Telemetry frames at P2 are subject to the same ≤25 ms-per-fragment cap as image fragments; oversized topic payloads fragment using the same scheme as `TileDeltaFrame`. The base-station bridge reassembles fragments before MQTT publish.
+- **R-7 `CMD_LINK_TUNE` retune cost is bench-measured, not assumed (per [`IMAGE_PIPELINE.md` §13.3 R-7](IMAGE_PIPELINE.md)).** The earlier "~1 ms per retune" estimate is unverified. During week 1 protocol bring-up, measure the actual `setFrequency` + `setSpreadingFactor` + `setBandwidth` + `setCodingRate` sequence cost on the SX1276 via RadioLib. If > 5 ms, the per-fragment retune between SF7 image and SF9 telemetry becomes a real airtime tax; the mitigation is to **batch image fragments into bursts** so the radio retunes at most twice per refresh window (once into image PHY, once back to telemetry PHY) instead of per fragment. Until measured, plan the burst-batching code path conservatively.
+- **R-8 hysteresis on the SF ladder (per [`IMAGE_PIPELINE.md` §13.3 R-8](IMAGE_PIPELINE.md)).** The current 30 s clean-link requirement protects SF↑ → SF↓ from hunting, but the SF↓ → SF↑ entry path is unprotected: a 2 s burst of interference can yank the link to SF9. Require **N=3 consecutive bad windows** (each window = 5 s of rolling SNR margin, matching the existing `>2 s` threshold) before any SF transition in either direction. Same rule applies to the image-link SF ladder and to the `CMD_ENCODE_MODE` auto-fallback ladder in [`IMAGE_PIPELINE.md` §3.4](IMAGE_PIPELINE.md).
 
 Authoritative wire-format and `CMD_LINK_TUNE` opcode definition live in [`LORA_PROTOCOL.md`](LORA_PROTOCOL.md). This pin establishes the policy; that file establishes the bytes.
+
+### 8.17.1 Two-radio split — **documented, not adopted for v25**
+
+During the 2026-04-27 LoRa post-image-pipeline reanalysis (see [`IMAGE_PIPELINE.md` §13](IMAGE_PIPELINE.md)), the option of giving each node a **second SX1276 on a separate 915 MHz sub-channel** was considered as the v26 escape hatch. This subsection documents the idea so a future revision can pick it up without re-deriving the analysis. **It is explicitly NOT in the v25 plan, BOM, or schedule.**
+
+**Concept.** Each tractor and base node carries two independent SX1276 radios on adjacent (or widely-separated) 915 MHz channels:
+
+- **Radio A (control link):** `ControlFrame`, `HeartbeatFrame`, P0/P1 command opcodes only. SF7/BW125/CR4-5 today; never carries image or bulk telemetry. Adaptive SF ladder per §8.17.
+- **Radio B (image + telemetry link):** `TelemetryFrame` (topics `0x01`–`0x10`, `0x26`, `0x27`), `TileDeltaFrame` (`0x25`), motion vectors (`0x28`), wireframe (`0x29`). SF7/BW250/CR4-5 image profile + SF9/BW250/CR4-8 telemetry profile, retuned per-frame on radio B only.
+
+**What it buys.**
+
+- **Eliminates the C1 P0-starvation risk entirely.** Image fragments cannot delay a P0 ControlFrame TX-start because they are on a physically separate radio, so the 25 ms fragment cap can be dropped. Larger fragments → ~15 % less per-fragment header overhead → more useful image bytes per refresh.
+- **Independent failure domains.** A jammed or noisy image channel cannot block control. A failed image radio degrades to "no video" without affecting tele-op.
+- **Per-link PHY tuning is independent.** Radio A can sit at SF7/BW125 indefinitely for range margin; radio B can use SF7/BW500 (digital-modulation per FCC §15.247(a)(2), avoiding FHSS rules entirely) without compromising control range.
+- **Simpler MAC.** No per-frame retune cost on the image path because the control radio doesn't share it.
+
+**What it costs.**
+
+- **~$25 BOM per node** for the second SX1276 module + matching network + SMA bulkhead + coax pigtail. Tractor and base each need it; handheld stays single-radio (no image RX). Net add ~$50 to the system BOM.
+- **One additional SPI chip-select + 2 GPIO** (DIO0, DIO1) on each Max Carrier. Carrier I/O has the headroom; pin-mapping work in `firmware/tractor_h7/` is real but small.
+- **Adjacent-channel coexistence testing.** Two SX1276s on the same enclosure within ~10 MHz of each other will de-sense each other unless the channels are widely separated (recommend ≥5 MHz spacing) and both antennas are at least λ/2 apart with the right polarisation. Real RF bench work, not a paper exercise.
+- **Doubled antenna count** on the base mast (or a diplexer); single-antenna with diplexer is preferred but adds insertion loss.
+- **Doubled FCC §15.247 exposure** — two transmitters each subject to the +36 dBm EIRP and either FHSS or digital-modulation rules.
+- **Software complexity:** dual-radio scheduling, per-radio link-health surfaces, two adaptive-SF state machines, two `CMD_LINK_TUNE` paths.
+
+**When to revisit.**
+
+Adopt the split if any of the following becomes true in v25.5 / v26:
+
+1. The C1 P0-starvation gate (zero P0 TX-start delays > 25 ms attributable to image traffic) starts failing under load — most likely once super-res + two-detector + browser-tier compositing push base CPU past ~70 % steady state, or once `CMD_PERSON_APPEARED` p99 starts climbing past 250 ms in field testing.
+2. The image-link auto-fallback ladder (§3.4) is permanently stuck at `motion_only` or `wireframe` because real-world refresh windows don't fit a useful tile-delta payload at SF7/BW250 alongside telemetry traffic.
+3. A v26 autonomy planner needs continuous high-rate camera data to the base for off-tractor inference — the single-radio link cannot sustain that without preempting control.
+
+**Why not now.**
+
+- Stack-NoCoral with the SF7 image profile (Revisit-1) and the airtime-% fallback ladder (Revisit-3) is projected to meet C1 with margin. Building a second-radio capability we don't need adds BOM, RF risk, and software complexity for no operational win.
+- The 2026-04-27 four-way LLM design consensus (see [`../AI NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md` §16](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md)) reached a stable single-radio architecture; adding a second radio is a strict additive upgrade, not a re-architecture. v25 ships single-radio; v25.5/v26 may add the second without breaking on-air or wire compatibility.
+- The two open scope decisions for v25 (AGPL stance §10 O1, Coral spike §10 O2 in [IMAGE_PIPELINE.md](IMAGE_PIPELINE.md)) are higher-leverage uses of remaining v25 design bandwidth than a second-radio investigation.
 
 ### 8.18 Valve coil drive routing — **directional-valve coils ride the D1608S SSR channels for low-latency switching**
 
@@ -385,6 +428,18 @@ The Opta Ext **D1608S** (AFX00006) carries **8× solid-state relays rated 24 VDC
 - **Implication for the wiring diagram in [`TRACTOR_NODE.md`](TRACTOR_NODE.md):** the boom-up / boom-down / bucket-curl / bucket-dump / drive-LH-fwd / drive-LH-rev / drive-RH-fwd / drive-RH-rev coils all land on D1608S SSR outputs. The four onboard Opta EMRs are reserved for engine-kill, beacon/horn relay, parking-brake release, and one spare. (Earlier drafts had four directional coils on the onboard EMRs; that was based on the mistaken assumption that the D1608S was electromechanical. Update the harness diagram before bench bring-up.)
 - **Coil flyback / surge:** SSRs handle inductive DC switching gracefully when paired with a flyback diode across the coil. Continue to spec a 1N4007-class diode across each solenoid coil per industrial practice; not optional.
 - **What we did NOT do:** we did not specify external SSR modules in the harness. The D1608S provides what an external module would have provided, with one less line item and one less terminal block. If a future revision needs faster pickup than the D1608S can deliver (e.g. PWM coil drive at >100 Hz for proportional valves), revisit.
+
+### 8.19 Image-pipeline compute — **Portenta X8 CPU first; Coral Edge TPU listed as optional / unproven**
+
+The image-transmission analysis ([`../AI NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md`](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md)) explores running detection, super-resolution, frame interpolation, and inpainting on both X8s. v25 policy:
+
+- **Primary path: pure Portenta X8 CPU on both ends.** All image-pipeline features (tile-delta encoding, ROI budget allocation, persistent base canvas, per-tile fade, single-frame Real-ESRGAN, NanoDet-Plus on the tractor, YOLOv8-nano on the base) must run acceptably on the bare 4× Cortex-A53 cores with NEON via TFLite/XNNPACK or ncnn. The H747 co-MCU's M7 core is fair game for tiny preprocessing models (lens-occlusion / over-exposure detectors) per [`../AI NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md`](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md) §1.2. No part of the safety story may depend on an accelerator.
+- **Optional accelerator: [Coral Mini PCIe Accelerator](https://coral.ai/products/pcie-accelerator/) (~$25, single Edge TPU, 4 TOPS) on the base only.** The Portenta Max Carrier exposes a mini-PCIe slot (per the carrier's user manual / pinout); the Coral Mini PCIe is the matching form factor. The Coral USB Accelerator (~$60) is the documented fallback if the mini-PCIe path is unworkable in a given build.
+- **Caveat — unproven on this hardware.** As of 2026-04-27 there is **no documented prior art** for Coral on the Portenta Max Carrier. The Mini variant of the i.MX 8M is not on Google Coral's tested-host list, and Arduino Project Hub / forums show no working examples. Adopting Coral for v25 requires a **2-day validation spike before BOM lock** confirming: (a) PCIe enumeration, (b) `gasket`/`apex` driver loads on the X8 Yocto image, (c) sustained inference under enclosure thermal conditions, (d) mini-PCIe slot power budget is adequate. If the spike fails, fall back to Coral USB Accelerator with a strain-relieved internal cable. If both fail, ship pure-CPU; AI features degrade as documented in the analysis (no YOLOv8-medium safety cross-check, single-frame SR only at <1 fps, no temporal SR, no LaMa inpainting).
+- **BOM treatment.** Coral Mini PCIe is listed in [`HARDWARE_BOM.md`](HARDWARE_BOM.md) as **strongly recommended optional** for the base station, with the Coral USB Accelerator as a substitution. It is not optional on the tractor — there is no Coral on the tractor in v25 (power, thermal, enclosure constraints; tractor inference must remain CPU-only).
+- **Architectural rule.** Every Coral-accelerated feature on the base must have a documented, automatically-selected pure-CPU fallback path. The base UI must surface "AI accelerator: online / offline / degraded" so the operator and builder always know which path is active.
+- **What this preserves:** the canonical hardware list in §3 stays unchanged; Coral is an addition, not a substitution. The §8.10 tractor X8 role and §8.9 compute platform are unchanged. The image-transmission protocol changes (tile-delta I/P frames, ROI bytes, detection sidecar, `PersonAppearedFrame` P0 alert) are independent of Coral and ship regardless.
+- **Re-open in v26 once:** the spike outcome is known, the operator-facing safety cross-check has logged 30 days of comparison data between tractor NanoDet and base YOLOv8, and a decision can be made about either promoting Coral to canonical, switching base to a Hailo-class accelerator on a different carrier, or staying CPU-only.
 
 ---
 
