@@ -40,7 +40,15 @@
 SX1276 radio = new Module(LORA_IRQ_DUMB, LORA_IRQ, LORA_RESET, LORA_BOOT0);
 
 // ---------- pre-shared key (PROVISIONED ELSEWHERE — placeholder all-zero) ----------
+// IP-008: production builds MUST replace this with the provisioned 16 bytes.
+// `setup()` halts at boot if the key is still all zero AND real crypto is on,
+// so accidentally flashing the example image cannot ship an unauthenticated link.
 static const uint8_t kFleetKey[16] = {0};
+
+static bool fleet_key_is_zero() {
+    for (int i = 0; i < 16; i++) if (kFleetKey[i] != 0) return false;
+    return true;
+}
 
 // ---------- state ----------
 static uint16_t g_seq = 0;
@@ -58,6 +66,13 @@ uint32_t g_fhss_key_id      = 0;
 // Last RSSI we observed on any inbound frame — surfaced on the OLED so the
 // operator can sanity-check link health before reaching for the cab.
 static int16_t  g_last_rx_rssi_dbm = -128;
+// IP-307: timestamp of the last successfully decoded inbound frame. Used
+// to drive the OLED "NO LINK" boundary indicator so the operator can
+// tell the difference between a healthy quiet link and a dead one
+// (where ``g_last_rx_rssi_dbm`` would otherwise still display its last
+// known value forever).
+static uint32_t g_last_rx_ms       = 0;
+static const uint32_t LINK_STALE_MS = 3000;   // ~3× the slowest HB period
 // Per-source replay window. We only ever receive from tractor + base on the
 // handheld, but sizing for 3 sources keeps the index calculus identical to
 // tractor_m7.ino so the same lp_replay_check_and_update() call works.
@@ -245,6 +260,7 @@ static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm) {
     if (idx < 0) return;
     if (!lp_replay_check_and_update(&g_replay[idx], hdr->sequence_num)) return;
     g_last_rx_rssi_dbm = rssi_dbm;
+    g_last_rx_ms       = millis();   // IP-307
 
     // We only act on commands. The handheld is a controller, not a logger;
     // telemetry/heartbeat from the tractor are surfaced on the OLED via the
@@ -323,7 +339,16 @@ static void update_oled(int8_t lhx, int8_t lhy, int8_t rhx, int8_t rhy,
     g_oled.setCursor(0, 12);
     g_oled.print(F("SF"));   g_oled.print(LADDER[g_ladder_rung].sf);
     g_oled.print(F(" BW")); g_oled.print(LADDER[g_ladder_rung].bw_khz);
-    g_oled.print(F(" "));   g_oled.print(g_last_rx_rssi_dbm); g_oled.print(F("dBm"));
+    // IP-307: only show the cached RSSI when the link is fresh; otherwise
+    // print "--" so a stale value can't masquerade as a live link.
+    bool link_fresh = (g_last_rx_ms != 0) &&
+                      ((millis() - g_last_rx_ms) < LINK_STALE_MS);
+    g_oled.print(F(" "));
+    if (link_fresh) {
+        g_oled.print(g_last_rx_rssi_dbm); g_oled.print(F("dBm"));
+    } else {
+        g_oled.print(F("--dBm"));
+    }
 
     g_oled.setCursor(0, 24);
     g_oled.print(F("LH "));  g_oled.print(lhx); g_oled.print(F(",")); g_oled.print(lhy);
@@ -343,6 +368,10 @@ static void update_oled(int8_t lhx, int8_t lhy, int8_t rhx, int8_t rhy,
         } else {
             g_oled.print(F("HELD"));
         }
+    } else if (!link_fresh) {
+        // IP-307: surface the no-source-active boundary explicitly so
+        // "OK" never displays while the tractor is unreachable.
+        g_oled.print(F("NO LINK"));
     } else {
         g_oled.print(F("OK"));
     }
@@ -359,18 +388,32 @@ void setup() {
     pinMode(PIN_BTN_ESTOP,   INPUT_PULLUP);
     for (int i = 0; i < 8; i++) pinMode(PIN_BTN_BASE + i, INPUT_PULLUP);
 
-    int st = radio.begin(915.0,    // MHz
-                         125.0,    // bandwidth kHz
-                         7,        // SF
-                         5,        // CR (4/5)
-                         0x12,     // sync word — private LoRa
-                         14);      // tx power dBm (Murata SiP max for MKR)
+    int st = radio.begin(915.0,
+                         (float)LADDER[0].bw_khz,   // IP-006: match LADDER[0] (BW250)
+                         LADDER[0].sf,
+                         LADDER[0].cr_den,
+                         0x12,                       // sync word — private LoRa
+                         14);                        // tx power dBm (Murata SiP max for MKR)
     if (st != RADIOLIB_ERR_NONE) {
         Serial.print("LoRa begin failed: "); Serial.println(st);
         while (1) { delay(1000); }
     }
     radio.startReceive();
     g_ladder_rung = 0;
+
+#ifdef LIFETRAC_USE_REAL_CRYPTO
+    // IP-008: refuse to operate with an unprovisioned fleet key.
+    if (fleet_key_is_zero()) {
+        if (g_oled_ok) {
+            g_oled.clearDisplay();
+            g_oled.setTextSize(1); g_oled.setCursor(0, 0);
+            g_oled.print(F("FLEET KEY NOT\nPROVISIONED\nHALT (IP-008)"));
+            g_oled.display();
+        }
+        Serial.println("FATAL: fleet key all-zero — refusing to TX (IP-008)");
+        while (1) { delay(1000); }
+    }
+#endif
 
     for (int i = 0; i < 3; i++) lp_replay_init(&g_replay[i]);
 

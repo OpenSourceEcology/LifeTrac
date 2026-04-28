@@ -79,6 +79,22 @@ enum SafetyState : uint16_t {
 #define VB_BUCKET_CURL  6
 #define VB_BUCKET_DUMP  7
 
+// ---- Bit positions inside REG_AUX_OUTPUTS (matches TRACTOR_NODE.md §4) ----
+// IP-303: bits 0-2 drive the spare D1608S SSR channels reserved for R10-R12.
+// Bit 3 ("engine-kill arm") is intentionally NOT honoured here — the live
+// engine-kill chain is gated by REG_ARM_ESTOP (0x0006) and the PSR. Mapping
+// it twice would let a stale aux-outputs write re-arm the kill solenoid.
+#define AUX_R10_BIT     0
+#define AUX_R11_BIT     1
+#define AUX_R12_BIT     2
+#define AUX_OUTPUTS_VALID_MASK 0x0007u   // anything outside this is rejected
+// D1608S SSR channels carrying the aux relays. Channels 0-3 are taken by
+// the boom/bucket valve coils above (see ``apply_valve_coils``); 4-6 are
+// the spare bank documented in TRACTOR_NODE.md.
+#define D1608S_CH_R10   4
+#define D1608S_CH_R11   5
+#define D1608S_CH_R12   6
+
 // Pin map (placeholder — verify against actual Opta + expansion pinout).
 // Onboard relays R1..R4 → drive LF/LR/RF/RR (valve bits 0..3).
 #define PIN_R1 D0
@@ -143,6 +159,10 @@ static void all_coils_off() {
     digitalWrite(PIN_R4, LOW);
     // D1608S relays R5..R8 → bits 4..7
     for (uint8_t ch = 0; ch < 4; ch++) d1608s_set(ch, false);
+    // IP-303: aux relays R10..R12 also drop on safe-state.
+    d1608s_set(D1608S_CH_R10, false);
+    d1608s_set(D1608S_CH_R11, false);
+    d1608s_set(D1608S_CH_R12, false);
     // Both flow set-points to 0 V.
     a0602_write_mv(0, 0);
     a0602_write_mv(1, 0);
@@ -208,7 +228,16 @@ static void on_holding_change(uint16_t address, uint16_t value) {
             a0602_write_mv(1, value > 10000 ? 10000 : value);
             break;
         case REG_AUX_OUTPUTS:
-            // TODO: drive aux relays R10-R12 + engine-kill arm bit.
+            // IP-303: drive only the documented bits (R10..R12). Anything
+            // outside ``AUX_OUTPUTS_VALID_MASK`` is silently dropped so a
+            // future expansion with a typo'd bitfield can't unexpectedly
+            // energize R5..R8 (those are owned by the valve manifold above).
+            {
+                uint16_t aux = value & AUX_OUTPUTS_VALID_MASK;
+                d1608s_set(D1608S_CH_R10, (aux >> AUX_R10_BIT) & 1);
+                d1608s_set(D1608S_CH_R11, (aux >> AUX_R11_BIT) & 1);
+                d1608s_set(D1608S_CH_R12, (aux >> AUX_R12_BIT) & 1);
+            }
             break;
         case REG_WATCHDOG_CTR:
             g_last_alive_value     = value;
@@ -266,8 +295,13 @@ void setup() {
     ModbusRTUServer.inputRegisterWrite(REG_FW_VERSION, FW_VERSION);
 
     // Boot self-test stub: blink each onboard relay 50 ms.
+    // IP-308: iterate over an explicit pin table rather than ``PIN_R1 + i``.
+    // The Rev-A board happens to have D0..D3 contiguous, but a future board
+    // revision may break that assumption silently and this loop would then
+    // pulse the wrong GPIOs.
+    static const uint8_t kRelayPins[4] = { PIN_R1, PIN_R2, PIN_R3, PIN_R4 };
     for (uint8_t i = 0; i < 4; i++) {
-        digitalWrite(PIN_R1 + i, HIGH); delay(50); digitalWrite(PIN_R1 + i, LOW);
+        digitalWrite(kRelayPins[i], HIGH); delay(50); digitalWrite(kRelayPins[i], LOW);
     }
 }
 

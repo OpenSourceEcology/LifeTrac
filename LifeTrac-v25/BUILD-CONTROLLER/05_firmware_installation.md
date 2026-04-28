@@ -61,7 +61,7 @@ This prints something like `9f3a8c4e2b1d7506a8e3f4c5b9d2e1f0`. Copy it into a fi
 
 This is the radio + arbitration + Modbus master firmware that runs on the X8's onboard STM32H747.
 
-1. Open `firmware/tractor_h7/tractor_m7.ino` in Arduino IDE 2.
+1. Open `firmware/tractor_h7/tractor_h7.ino` in Arduino IDE 2.
 2. Select **Tools → Board → Arduino Mbed OS Portenta Boards → Portenta H7 (M7 core)**. (The X8's onboard H747 enumerates the same way as a standalone H7 for the toolchain — same M7 binary.)
 3. Select **Tools → Port** → the X8's USB-C serial port.
 4. Click **Verify** (✓). Confirm it compiles cleanly.
@@ -179,7 +179,7 @@ Telemetry should start streaming over the X8↔H747 UART; the M7 picks it up, fr
 ## Step 6 — Flash the Handheld *(Optional)*
 
 1. Connect the MKR WAN 1310 over USB-C.
-2. Open `firmware/handheld_mkr/handheld.ino`.
+2. Open `firmware/handheld_mkr/handheld_mkr.ino`.
 3. Select **Tools → Board → Arduino SAMD Boards → MKR WAN 1310**.
 4. Select the serial port. Upload.
 

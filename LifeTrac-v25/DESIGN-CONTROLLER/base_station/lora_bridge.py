@@ -22,6 +22,7 @@ import heapq
 import itertools
 import json
 import logging
+import os
 import struct
 import threading
 import time
@@ -35,6 +36,7 @@ from lora_proto import (
     CMD_CAMERA_SELECT,
     CMD_ESTOP,
     CMD_LINK_TUNE,
+    CMD_REQ_KEYFRAME,
     CTRL_FRAME_LEN,
     CRC_LEN,
     FT_COMMAND,
@@ -49,6 +51,7 @@ from lora_proto import (
     SRC_BASE,
     TELEM_HEADER_LEN,
     TELEM_MAX_PAYLOAD,
+    TelemetryReassembler,
     attribute_phy,
     classify_priority,
     decrypt_frame,
@@ -59,6 +62,7 @@ from lora_proto import (
     topic_name,
     verify_crc,
 )
+from nonce_store import NonceStore
 
 # Airtime alarm thresholds per LORA_IMPLEMENTATION.md \u00a77.
 U_TELEMETRY_ALARM = 0.30
@@ -66,13 +70,80 @@ U_TOTAL_ALARM = 0.60
 # How often to poll the ledger + emit CMD_ENCODE_MODE if needed.
 AIRTIME_POLL_INTERVAL_S = 1.0
 
-# 16-byte pre-shared fleet key. PROVISIONED ELSEWHERE.
-FLEET_KEY = bytes(16)
+
+def _load_fleet_key() -> bytes:
+    """Load the AES-128 fleet key from disk (IP-008).
+
+    Source order:
+      1. ``LIFETRAC_FLEET_KEY_FILE`` (Docker-secret path; raw 16 B or 32-char hex).
+      2. ``LIFETRAC_FLEET_KEY_HEX`` (32-char hex string in env, dev only).
+
+    Refuses to start (raises ``RuntimeError``) when the key is missing, the
+    wrong length, or all-zero. A working broadcast on an unauthenticated link
+    is worse than a service that won't start.
+    """
+    import os
+    path = os.environ.get("LIFETRAC_FLEET_KEY_FILE")
+    raw: bytes | None = None
+    if path:
+        try:
+            with open(path, "rb") as fp:
+                raw = fp.read().strip()
+        except OSError as exc:
+            raise RuntimeError(
+                f"LIFETRAC_FLEET_KEY_FILE={path!r} unreadable: {exc}"
+            ) from exc
+        if len(raw) == 32:
+            try:
+                raw = bytes.fromhex(raw.decode("ascii"))
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"fleet key file {path!r} is 32 chars but not valid hex"
+                ) from exc
+    else:
+        hex_str = os.environ.get("LIFETRAC_FLEET_KEY_HEX", "").strip()
+        if hex_str:
+            try:
+                raw = bytes.fromhex(hex_str)
+            except ValueError as exc:
+                raise RuntimeError(
+                    "LIFETRAC_FLEET_KEY_HEX is not valid hex"
+                ) from exc
+    if raw is None:
+        raise RuntimeError(
+            "fleet key not configured: set LIFETRAC_FLEET_KEY_FILE "
+            "(Docker secret) or LIFETRAC_FLEET_KEY_HEX (dev only). See "
+            "DESIGN-CONTROLLER/KEY_ROTATION.md."
+        )
+    if len(raw) != 16:
+        raise RuntimeError(
+            f"fleet key must be 16 bytes; got {len(raw)} bytes"
+        )
+    if raw == bytes(16):
+        raise RuntimeError(
+            "fleet key is all zero \u2014 refusing to start (IP-008). "
+            "Provision a real key per KEY_ROTATION.md."
+        )
+    return raw
+
+
+# Loaded at import time so a misconfigured deployment fails immediately rather
+# than at first packet. Tests that don't need radio TX may monkeypatch this.
+try:
+    FLEET_KEY = _load_fleet_key()
+except RuntimeError:
+    # Allow imports during unit tests / static analysis; the bridge itself
+    # re-validates on instantiation so production code paths still fail-closed.
+    if os.environ.get("LIFETRAC_ALLOW_UNCONFIGURED_KEY") == "1":
+        FLEET_KEY = bytes(16)
+    else:
+        raise
 
 # ---- bridge -----------------------------------------------------------
 class Bridge:
     def __init__(self, port: str, mqtt_host: str = "localhost",
-                 audit_path: str = AUDIT_LOG_DEFAULT_PATH) -> None:
+                 audit_path: str = AUDIT_LOG_DEFAULT_PATH,
+                 nonce_store_path: str | None = None) -> None:
         # Audit log first — every other constructor step may want to record.
         self.audit = AuditLog(audit_path)
         self.audit.record("bridge_start", port=port, mqtt_host=mqtt_host)
@@ -84,12 +155,28 @@ class Bridge:
         self.mqtt.subscribe("lifetrac/v25/cmd/control")  # from web_ui
         self.mqtt.subscribe("lifetrac/v25/cmd/estop")
         self.mqtt.subscribe("lifetrac/v25/cmd/camera_select")
+        # IP-103: image pipeline / X8 vision can request an MJPEG keyframe
+        # over the LoRa command channel. Payload = empty (opcode-only).
+        self.mqtt.subscribe("lifetrac/v25/cmd/req_keyframe")
         self.mqtt.loop_start()
+        # IP-101: persist the SRC_BASE TX nonce-seq across restarts so a
+        # crash inside the same wall-clock second cannot reuse a (key, nonce).
+        store_path = nonce_store_path or os.environ.get(
+            "LIFETRAC_NONCE_STORE", "/var/lib/lifetrac/nonce_store.json")
+        try:
+            self.nonce_store: NonceStore | None = NonceStore(path=store_path)
+        except Exception as exc:  # pragma: no cover — file-system edge cases
+            logging.warning("nonce_store: disabled (%s); using in-memory seq", exc)
+            self.nonce_store = None
         self.tx_seq = 0
         self.lock = threading.Lock()
         # Per-source replay defence (mirrors LpReplayWindow on the tractor).
         # Keyed by header.source_id so a noisy peer can't poison another peer.
         self._replay: dict[int, ReplayWindow] = {}
+        # IP-204: reassemble fragmented telemetry payloads (TELEMETRY_FRAGMENT_MAGIC
+        # prefix). Per-(source,topic,frag_seq) keying so two topics in flight
+        # can't collide. Unfragmented payloads pass through unchanged.
+        self.telem_reasm = TelemetryReassembler(timeout_ms=1500)
         # Airtime ledger + encode-mode controller (LORA_IMPLEMENTATION.md \u00a74, \u00a77).
         self.ledger = RollingAirtimeLedger(window_ms=10_000)
         self.encode_ctrl = EncodeModeController(required_windows=3)
@@ -169,7 +256,16 @@ class Bridge:
                 logging.warning("telemetry CRC failed (topic=%#x)", topic_id)
                 return
             payload = frame[TELEM_HEADER_LEN : TELEM_HEADER_LEN + payload_len]
-            self.mqtt.publish(topic_name(topic_id), payload, qos=0, retain=False)
+            # IP-204: feed through reassembler. Returns the original payload
+            # for unfragmented frames; returns the joined payload once the
+            # final fragment of a multi-part topic arrives; returns None
+            # while waiting for more fragments.
+            joined = self.telem_reasm.feed(
+                hdr.source_id, topic_id, payload, _now_ms()
+            )
+            if joined is None:
+                return
+            self.mqtt.publish(topic_name(topic_id), joined, qos=0, retain=False)
 
         elif hdr.frame_type == FT_HEARTBEAT:
             if len(pt) < HB_FRAME_LEN:
@@ -223,6 +319,24 @@ class Bridge:
                 )
 
     # ---- outbound: MQTT → serial ----------------------------------
+    def _restamp_control(self, payload: bytes, seq: int) -> bytes | None:
+        """Rewrite a ControlFrame's hdr.sequence_num + CRC with our `seq`.
+
+        IP-102: web_ui restarts reset its local seq to 0, which would replay-
+        reject every frame on the tractor's per-source ControlFrame window
+        until 32+ packets pass. The bridge owns the persistent SRC_BASE seq
+        space (via NonceStore) and re-stamps the header so both the GCM nonce
+        and the protocol-level replay window draw from one monotonic counter.
+        Returns the restamped frame, or None if the input is malformed.
+        """
+        if len(payload) != CTRL_FRAME_LEN:
+            return None
+        from lora_proto import crc16_ccitt
+        body = bytearray(payload[:-CRC_LEN])
+        body[3] = seq & 0xFF
+        body[4] = (seq >> 8) & 0xFF
+        return bytes(body) + struct.pack("<H", crc16_ccitt(bytes(body)))
+
     def _on_mqtt_message(self, _client, _userdata, msg):
         if msg.topic.endswith("/cmd/control"):
             # Expect a fully-formed 16-byte ControlFrame from web_ui.py.
@@ -234,7 +348,15 @@ class Bridge:
             if not verify_crc(msg.payload):
                 logging.warning("cmd/control CRC failed")
                 return
-            self._tx(SRC_BASE, msg.payload)
+            # IP-102: stamp the bridge's persistent nonce-seq into the header
+            # so both the GCM nonce and the tractor's ControlFrame replay
+            # window draw from the same monotonic counter (survives web_ui
+            # process restarts).
+            seq = self._reserve_tx_seq()
+            restamped = self._restamp_control(msg.payload, seq)
+            if restamped is None:
+                return
+            self._tx(SRC_BASE, restamped, nonce_seq=seq)
         elif msg.topic.endswith("/cmd/estop"):
             # FT_COMMAND payload: [hdr(5) | opcode(1) | args(...) | crc16(2)].
             # E-stop is latched and idempotent, but it still gets a fresh
@@ -255,8 +377,22 @@ class Bridge:
             seq = self._reserve_tx_seq()
             cmd = pack_command(seq, CMD_CAMERA_SELECT, bytes([cam_id]))
             self._tx(SRC_BASE, cmd, nonce_seq=seq)
+        elif msg.topic.endswith("/cmd/req_keyframe"):
+            # IP-103: opcode-only command (no args). Payload from publishers
+            # is ignored; future revs may add a quality / camera_id arg.
+            seq = self._reserve_tx_seq()
+            cmd = pack_command(seq, CMD_REQ_KEYFRAME)
+            self._tx(SRC_BASE, cmd, nonce_seq=seq)
 
     def _reserve_tx_seq(self) -> int:
+        # IP-101: prefer the persistent store so a crash + restart cannot
+        # reuse a (key, nonce). Fall back to the in-memory counter only when
+        # the store could not be opened (logged at startup).
+        if self.nonce_store is not None:
+            seq = self.nonce_store.reserve(SRC_BASE)
+            with self.lock:
+                self.tx_seq = (seq + 1) & 0xFFFF
+            return seq
         with self.lock:
             seq = self.tx_seq
             self.tx_seq = (self.tx_seq + 1) & 0xFFFF
@@ -389,8 +525,43 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("port", help="serial device for the H747 link, e.g. /dev/ttymxc0")
     p.add_argument("--mqtt", default="localhost")
+    p.add_argument("--lockfile",
+                   default=os.environ.get("LIFETRAC_BRIDGE_LOCKFILE",
+                                          "/var/lib/lifetrac/lora_bridge.lock"),
+                   help="Pidfile to prevent two bridges from talking to the radio at once (IP-209)")
     args = p.parse_args()
-    Bridge(args.port, args.mqtt).run()
+
+    # IP-209: a second instance would race the radio serial port and cause
+    # interleaved KISS frames + duplicate nonce reservations. Take an
+    # exclusive advisory lock on a file in shared state; abort cleanly if it
+    # is already held. ``flock`` is POSIX-only; on Windows we no-op since
+    # the bridge is not deployed there.
+    lock_fp = None
+    try:
+        import fcntl  # type: ignore[import-not-found]
+        try:
+            os.makedirs(os.path.dirname(args.lockfile) or ".", exist_ok=True)
+            lock_fp = open(args.lockfile, "w", encoding="utf-8")
+            fcntl.flock(lock_fp.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock_fp.write(str(os.getpid()))
+            lock_fp.flush()
+        except BlockingIOError:
+            logging.error("lora_bridge: another instance holds %s; aborting (IP-209)",
+                          args.lockfile)
+            raise SystemExit(2)
+    except ImportError:
+        # Windows / sandboxed test runs — skip locking but log so the operator
+        # is not surprised when two processes step on each other.
+        logging.warning("lora_bridge: fcntl unavailable; skipping lockfile (IP-209)")
+
+    try:
+        Bridge(args.port, args.mqtt).run()
+    finally:
+        if lock_fp is not None:
+            try:
+                lock_fp.close()
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":

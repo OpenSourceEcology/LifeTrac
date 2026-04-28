@@ -45,3 +45,98 @@ jobs:
           echo "Active targets are documented in LifeTrac-v25/DESIGN-CONTROLLER/ARDUINO_CI.md"
           echo "Archived arduino_opta_controller and esp32_remote_control are intentionally not compiled."
           echo "Enable blocking Arduino compile jobs after local FQBN/build-glue verification."
+
+  # IP-007 follow-up: best-effort firmware compile. Marked
+  # ``continue-on-error`` because the sketches include shared sources
+  # via ``#include "../common/lora_proto/..."`` paths that arduino-cli
+  # cannot resolve without staging. We stage them into a ``src/``
+  # subfolder of each sketch (Arduino IDE auto-compiles ``src/**``)
+  # so the job catches the regressions it can; remaining failures
+  # are visible in the action log without blocking PRs until the
+  # build-glue follow-up lands.
+  firmware-compile-handheld:
+    runs-on: ubuntu-latest
+    name: Compile firmware/handheld_mkr (best-effort)
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install arduino-cli
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s -- -b /usr/local/bin
+          arduino-cli version
+      - name: Install cores
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:samd
+      - name: Install libraries
+        run: |
+          arduino-cli lib install RadioLib
+          arduino-cli lib install "Adafruit SSD1306"
+          arduino-cli lib install "Adafruit GFX Library"
+          arduino-cli lib install Crypto
+      - name: Stage shared lora_proto sources into sketch
+        run: |
+          mkdir -p LifeTrac-v25/DESIGN-CONTROLLER/firmware/handheld_mkr/src
+          cp -r LifeTrac-v25/DESIGN-CONTROLLER/firmware/common/lora_proto \
+                LifeTrac-v25/DESIGN-CONTROLLER/firmware/handheld_mkr/src/
+      - name: Compile (stub crypto)
+        run: |
+          arduino-cli compile --fqbn arduino:samd:mkrwan1310 \
+            LifeTrac-v25/DESIGN-CONTROLLER/firmware/handheld_mkr
+      - name: Compile (real crypto)
+        run: |
+          arduino-cli compile --fqbn arduino:samd:mkrwan1310 \
+            --build-property "build.extra_flags=-DLIFETRAC_USE_REAL_CRYPTO" \
+            LifeTrac-v25/DESIGN-CONTROLLER/firmware/handheld_mkr
+
+  firmware-compile-opta:
+    runs-on: ubuntu-latest
+    name: Compile firmware/tractor_opta (best-effort)
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install arduino-cli
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s -- -b /usr/local/bin
+      - name: Install cores
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:mbed_opta
+      - name: Install libraries
+        run: |
+          arduino-cli lib install ArduinoRS485
+          arduino-cli lib install ArduinoModbus
+      - name: Compile
+        run: |
+          arduino-cli compile --fqbn arduino:mbed_opta:opta \
+            LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_opta
+
+  firmware-compile-tractor-h7:
+    runs-on: ubuntu-latest
+    name: Compile firmware/tractor_h7 (best-effort)
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install arduino-cli
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s -- -b /usr/local/bin
+      - name: Install cores
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:mbed_portenta
+      - name: Install libraries
+        run: |
+          arduino-cli lib install RadioLib
+          arduino-cli lib install ArduinoRS485
+          arduino-cli lib install ArduinoModbus
+      - name: Stage shared sources into sketch
+        run: |
+          mkdir -p LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/src
+          cp -r LifeTrac-v25/DESIGN-CONTROLLER/firmware/common/lora_proto \
+                LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/src/
+          cp LifeTrac-v25/DESIGN-CONTROLLER/firmware/common/shared_mem.h \
+             LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/src/
+      - name: Compile (stub crypto)
+        run: |
+          arduino-cli compile --fqbn arduino:mbed_portenta:envie_m7 \
+            LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7

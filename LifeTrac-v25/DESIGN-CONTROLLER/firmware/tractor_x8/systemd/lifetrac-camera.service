@@ -8,6 +8,10 @@ Type=simple
 ExecStart=/usr/bin/python3 /opt/lifetrac/firmware/tractor_x8/camera_service.py
 Restart=on-failure
 RestartSec=5
+# IP-304: make ``lora_proto`` / ``audit_log`` / ``settings_store`` resolvable
+# without per-script sys.path hacks. The install layout puts the base-station
+# Python modules at /opt/lifetrac/base_station/.
+Environment=PYTHONPATH=/opt/lifetrac/base_station
 # libcamera/picamera2 needs access to /dev/video* and /dev/media*; on the
 # X8 these are owned by the `video` group.
 SupplementaryGroups=video

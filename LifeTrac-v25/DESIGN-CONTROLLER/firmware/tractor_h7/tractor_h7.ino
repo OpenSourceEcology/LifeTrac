@@ -85,7 +85,15 @@ static volatile SharedM7M4* const SHARED =
     reinterpret_cast<volatile SharedM7M4*>(LIFETRAC_SHARED_ADDR);
 
 // ---------- pre-shared key (provisioned via USB tool) ----------
+// IP-008: setup() halts boot when this is still the all-zero placeholder AND
+// LIFETRAC_USE_REAL_CRYPTO is defined, so a stock image cannot accidentally
+// run an unauthenticated radio link.
 static const uint8_t kFleetKey[16] = {0};
+
+static bool fleet_key_is_zero() {
+    for (int i = 0; i < 16; i++) if (kFleetKey[i] != 0) return false;
+    return true;
+}
 
 // ---------- per-source state ----------
 struct SourceState {
@@ -113,6 +121,9 @@ uint32_t g_fhss_key_id      = 0;
 // Forward declaration so emit_topic() / send_link_tune() (which appear above
 // the definition) can call the CSMA hop helper.
 static inline void csma_pick_hop_before_tx();
+// IP-104 follow-on: forward-declare so process_air_frame() can hand
+// CMD_REQ_KEYFRAME / CMD_CAMERA_SELECT off to the X8 over Serial1.
+static void send_cmd_to_x8(uint8_t opcode, const uint8_t* args, uint8_t args_len);
 
 static const uint32_t HEARTBEAT_TIMEOUT_MS = 500;
 static const uint32_t CONTROL_TIMEOUT_MS   = 200;   // stale ControlFrame → drop to neutral
@@ -212,32 +223,175 @@ static int pick_active_source() {
 // E-stop latch and "no fresh source" both collapse to the neutral payload.
 static uint16_t g_watchdog_ctr = 0;
 
+// IP-303 (Round-4 follow-on): port deadband + on-release ramp from
+// `RESEARCH-CONTROLLER/arduino_opta_controller/lifetrac_v25_controller.ino`.
+// The research code worked in floats [-1, 1] with DEADZONE=0.1 and a per-axis
+// linear ramp to zero whose duration depended on the magnitude at release
+// (full-speed wheel = 2 s, arm = 1 s; faster ramp at lower magnitudes).
+//
+// Re-derived for the M7's int8 axes (-127..127) and the 20 Hz arbitration tick:
+//   - AXIS_DEADBAND = 13 (~10% of full scale, matches research DEADZONE).
+//   - Track axes (lh_x, lh_y) get the slower 2 s / 1 s / 0.5 s ladder.
+//   - Arm axes (rh_x, rh_y) get the faster 1 s / 0.5 s / 0.25 s ladder.
+//   - "Mixed mode" skip from the research code is preserved: if any other
+//     axis is still active when one drops, that axis stops immediately so a
+//     coordinated dig→drive transition isn't gummed up by ramp-out.
+//   - REG_FLOW_SP_* gets the *max* active magnitude across all four axes
+//     (single-valve assumption), scaled to the Opta's 0..10000 mV range.
+//
+// All ramp state lives in static locals here; reset on E-stop or no-source.
+
+static const int8_t AXIS_DEADBAND  = 13;     // ~10% of int8 full scale
+static const uint32_t RAMP_TICK_MS = 50;     // matches the 20 Hz arbiter
+
+struct AxisRamp {
+    int16_t  effective;   // current ramped value (axis units, -127..127)
+    int16_t  start;       // value at the moment release started
+    uint32_t start_ms;    // millis() when ramp began
+    uint32_t duration_ms; // total ramp length
+    bool     ramping;     // true while interpolating to zero
+};
+
+static AxisRamp g_ramp_lhx{}, g_ramp_lhy{};
+static AxisRamp g_ramp_rhx{}, g_ramp_rhy{};
+
+static inline bool axis_active(int16_t v) {
+    return (v > AXIS_DEADBAND) || (v < -AXIS_DEADBAND);
+}
+
+// Mirror calculateDecelerationDuration() from the research code, but in
+// magnitude units (0..127) and ms.
+static uint32_t ramp_duration_ms(int16_t magnitude_axis_units, bool is_arm) {
+    int mag = magnitude_axis_units < 0 ? -magnitude_axis_units : magnitude_axis_units;
+    if (is_arm) {
+        if (mag >= 96) return 1000;   // ~75% → 1.0 s
+        if (mag >= 48) return  500;   //  ~37% → 0.5 s
+        return 250;                   //   <37% → 0.25 s
+    }
+    if (mag >= 96) return 2000;       // ~75% → 2.0 s
+    if (mag >= 48) return 1000;       //  ~37% → 1.0 s
+    return 500;                       //   <37% → 0.5 s
+}
+
+// Update one axis's ramp state. Returns the effective axis value to use this
+// tick. ``other_active`` is "is any other axis still active right now" — used
+// to implement the research code's mixed-mode skip.
+static int16_t step_axis_ramp(AxisRamp& r, int8_t raw, bool is_arm,
+                              bool other_active) {
+    bool was_active = axis_active(r.effective);
+    bool is_now     = axis_active(raw);
+    uint32_t now    = millis();
+
+    if (is_now) {
+        // Operator commanding — cancel any ramp and pass through immediately.
+        r.ramping   = false;
+        r.effective = raw;
+        return r.effective;
+    }
+    // Operator released the axis.
+    if (was_active && !r.ramping) {
+        if (other_active) {
+            // Mixed-mode: stop now so coordinated transitions stay snappy.
+            r.effective = 0;
+            return 0;
+        }
+        // Start a ramp from the last effective value down to zero.
+        r.ramping     = true;
+        r.start       = r.effective;
+        r.start_ms    = now;
+        r.duration_ms = ramp_duration_ms(r.start, is_arm);
+    }
+    if (r.ramping) {
+        uint32_t elapsed = now - r.start_ms;
+        if (elapsed >= r.duration_ms) {
+            r.ramping   = false;
+            r.effective = 0;
+        } else {
+            // Linear interpolation start → 0.
+            int32_t v = (int32_t)r.start *
+                        (int32_t)(r.duration_ms - elapsed) /
+                        (int32_t)r.duration_ms;
+            r.effective = (int16_t)v;
+        }
+    } else {
+        r.effective = 0;
+    }
+    return r.effective;
+}
+
+// Reset every ramp's state — used on E-stop and no-source paths so a future
+// fresh frame doesn't see stale ``effective`` values.
+static void reset_axis_ramps() {
+    g_ramp_lhx = AxisRamp{};
+    g_ramp_lhy = AxisRamp{};
+    g_ramp_rhx = AxisRamp{};
+    g_ramp_rhy = AxisRamp{};
+}
+
 static void apply_control(int active) {
     uint16_t regs[HOLDING_BLOCK_LEN] = {0};
     regs[REG_WATCHDOG_CTR] = ++g_watchdog_ctr;   // tick every call → >=10 Hz
 
     if (g_estop_latched) {
+        reset_axis_ramps();
         regs[REG_ARM_ESTOP] = 1;
         regs[REG_CMD_SOURCE] = 0;       // NONE
     } else if (active >= 0) {
         const ControlFrame& cf = g_src[active].latest;
+
+        // IP-303: deadband + per-axis ramp on release. ``other_active`` is
+        // computed against the *raw* values so a stale ramping axis doesn't
+        // block a sibling axis's mixed-mode skip.
+        bool any_lhx = axis_active(cf.axis_lh_x);
+        bool any_lhy = axis_active(cf.axis_lh_y);
+        bool any_rhx = axis_active(cf.axis_rh_x);
+        bool any_rhy = axis_active(cf.axis_rh_y);
+        int16_t lhx = step_axis_ramp(g_ramp_lhx, cf.axis_lh_x, /*arm*/false,
+                                     any_lhy || any_rhx || any_rhy);
+        int16_t lhy = step_axis_ramp(g_ramp_lhy, cf.axis_lh_y, /*arm*/false,
+                                     any_lhx || any_rhx || any_rhy);
+        int16_t rhx = step_axis_ramp(g_ramp_rhx, cf.axis_rh_x, /*arm*/true,
+                                     any_lhx || any_lhy || any_rhy);
+        int16_t rhy = step_axis_ramp(g_ramp_rhy, cf.axis_rh_y, /*arm*/true,
+                                     any_lhx || any_lhy || any_rhx);
+
+        // Map (post-ramp) joystick + buttons → 8 directional valve coils.
+        // Coils stay engaged while we ramp the proportional flow down so the
+        // hydraulic path doesn't slam closed (research code §"Leave hydraulic
+        // solenoid engaged while proportional valve(s) reduce flow").
         uint16_t coils = 0;
-        // Map joystick + buttons → 8 directional valve coils.
-        // (TODO: deadband, ramp, dual-flow split — port from
-        //  RESEARCH-CONTROLLER/arduino_opta_controller/.)
-        if (cf.axis_lh_y >  20) { coils |= (1u << VB_DRIVE_LF) | (1u << VB_DRIVE_RF); }
-        if (cf.axis_lh_y < -20) { coils |= (1u << VB_DRIVE_LR) | (1u << VB_DRIVE_RR); }
-        if (cf.axis_rh_y >  20) { coils |= (1u << VB_BOOM_UP);   }
-        if (cf.axis_rh_y < -20) { coils |= (1u << VB_BOOM_DN);   }
+        if (lhy >  AXIS_DEADBAND) { coils |= (1u << VB_DRIVE_LF) | (1u << VB_DRIVE_RF); }
+        if (lhy < -AXIS_DEADBAND) { coils |= (1u << VB_DRIVE_LR) | (1u << VB_DRIVE_RR); }
+        if (rhy >  AXIS_DEADBAND) { coils |= (1u << VB_BOOM_UP);   }
+        if (rhy < -AXIS_DEADBAND) { coils |= (1u << VB_BOOM_DN);   }
         if (cf.buttons & BTN_BUCKET_CURL) { coils |= (1u << VB_BUCKET_CURL); }
         if (cf.buttons & BTN_BUCKET_DUMP) { coils |= (1u << VB_BUCKET_DUMP); }
         regs[REG_VALVE_COILS] = coils;
 
-        uint16_t mag = (uint16_t)abs(cf.axis_lh_y) * 78;   // 127*78 ≈ 10000
-        if (mag > 10000) mag = 10000;
-        regs[REG_FLOW_SP_1] = mag;
-        regs[REG_FLOW_SP_2] = mag;
+        // Proportional flow set-point: largest active magnitude across all
+        // four axes scales linearly to 0..10000 mV (the A0602 0-10 V range
+        // documented in opta_modbus_slave.ino::a0602_write_mv()).
+        int16_t mag = 0;
+        int16_t am;
+        am = lhx < 0 ? -lhx : lhx; if (am > mag) mag = am;
+        am = lhy < 0 ? -lhy : lhy; if (am > mag) mag = am;
+        am = rhx < 0 ? -rhx : rhx; if (am > mag) mag = am;
+        am = rhy < 0 ? -rhy : rhy; if (am > mag) mag = am;
+        // Subtract deadband so the live region maps to 0..10000 (matches the
+        // handheld's deadband-stretched output convention from IP-302).
+        int32_t flow = 0;
+        if (mag > AXIS_DEADBAND) {
+            flow = (int32_t)(mag - AXIS_DEADBAND) * 10000 /
+                   (127 - AXIS_DEADBAND);
+            if (flow > 10000) flow = 10000;
+        }
+        regs[REG_FLOW_SP_1] = (uint16_t)flow;
+        regs[REG_FLOW_SP_2] = (uint16_t)flow;
         regs[REG_CMD_SOURCE] = (uint16_t)(active + 1);     // 1=HANDHELD, 2=BASE, 3=AUTONOMY
+    } else {
+        // No fresh source. Reset ramps so a recovering link doesn't replay
+        // a stale ramp on the first new frame.
+        reset_axis_ramps();
     }
     // else: regs already zero → all valves off, both flows 0, cmd_source=NONE.
 
@@ -246,7 +400,26 @@ static void apply_control(int active) {
     for (uint16_t i = 0; i < HOLDING_BLOCK_LEN; i++) {
         ModbusRTUClient.write(regs[i]);
     }
-    ModbusRTUClient.endTransmission();
+    // IP-205: surface Modbus write failures so a wedged RS-485 link doesn't
+    // silently keep accepting joystick frames. We rate-limit logs so a long
+    // outage doesn't fill the serial console.
+    if (!ModbusRTUClient.endTransmission()) {
+        static uint32_t s_modbus_fail_count = 0;
+        static uint32_t s_modbus_last_log_ms = 0;
+        s_modbus_fail_count++;
+        uint32_t now_ms = millis();
+        if ((now_ms - s_modbus_last_log_ms) >= 1000) {
+            Serial.print("modbus tx fail (");
+            Serial.print(s_modbus_fail_count);
+            Serial.println(" since boot)");
+            s_modbus_last_log_ms = now_ms;
+        }
+        // Treat persistent failure as an E-stop trigger \u2014 valves are stuck
+        // at whatever the Opta last got, which violates the fail-closed promise.
+        if (s_modbus_fail_count >= 10) {
+            g_estop_latched = true;
+        }
+    }
 }
 
 // The Opta-side watchdog is now folded into apply_control() (it advances
@@ -336,7 +509,25 @@ static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm, int1
                     // build we ignore it — our own tx path already retunes.
                     break;
                 case CMD_ENCODE_MODE:
-                    // Base -> tractor X8 path is plumbed later; M7 only logs/forwards.
+                    // IP-104 follow-on: forward to the X8 camera_service
+                    // over Serial1 instead of dropping silently. Args are
+                    // pass-through; the X8 reader matches on opcode.
+                    if (pt_len >= 6) {
+                        uint8_t arg_len = (uint8_t)(pt_len - 6);
+                        if (arg_len > 32) arg_len = 32;
+                        send_cmd_to_x8(op, pt + 6, arg_len);
+                    }
+                    break;
+                case CMD_REQ_KEYFRAME:
+                case CMD_CAMERA_SELECT:
+                case CMD_CAMERA_QUALITY:
+                    // IP-104 follow-on: same back-channel — camera_service
+                    // listens for these and re-encodes on the next tick.
+                    if (pt_len >= 6) {
+                        uint8_t arg_len = (uint8_t)(pt_len - 6);
+                        if (arg_len > 32) arg_len = 32;
+                        send_cmd_to_x8(op, pt + 6, arg_len);
+                    }
                     break;
             }
             break;
@@ -382,6 +573,146 @@ static void build_nonce(uint8_t out[12], uint8_t source_id, uint16_t seq) {
 // Read Opta telemetry and ship a TelemetryFrame over LoRa.
 static uint16_t g_telem_seq = 0;
 
+// ---------- IP-107: async TX queue (C port of M7TxQueue SIL model) ----
+//
+// Replaces the blocking ``radio.transmit()`` path with a single-slot
+// pending-TX register fronted by a 4-deep priority queue. Mirrors the
+// design proven out in [tests/test_m7_tx_queue_sil.py](
+// ../base_station/tests/test_m7_tx_queue_sil.py).
+//
+//   * P0_SAFETY  = LINK_TUNE             (jumps the queue, evicts P1s)
+//   * P1_NORMAL  = telemetry / source    (FIFO within class)
+//
+// In-flight TXes are timed out via an estimated time-on-air ceiling
+// rather than a true IRQ callback, because RadioLib's IRQ wiring on
+// the H747's SX1276 needs bench validation. The estimate is generous
+// (×1.5 + 50 ms slack) so we never call ``finishTransmit()`` early on
+// a worst-case PHY rung. ``radio.startTransmit()`` returns immediately,
+// so the M7 loop never blocks against the M4 watchdog regardless of
+// PHY choice — the headline IP-107 invariant.
+//
+// The Round-3 ``refresh_m4_alive_before_tx()`` belt is removed: the
+// queue itself guarantees the loop returns to ``loop()``'s top-of-frame
+// watchdog stamp every iteration.
+
+#define TX_QUEUE_CAP        4
+#define TX_PRIO_SAFETY      0    // CMD_LINK_TUNE
+#define TX_PRIO_NORMAL      1    // telemetry / source / x8 forwards
+#define TX_PAYLOAD_MAX      256  // ~118 B encrypted + KISS expansion + slack
+
+struct TxRequest {
+    uint8_t  prio;
+    uint16_t kiss_len;
+    uint8_t  kiss[TX_PAYLOAD_MAX];
+    uint8_t  rung_at_submit;     // PHY rung used to estimate TOA
+};
+
+static TxRequest g_tx_queue[TX_QUEUE_CAP];
+static uint8_t   g_tx_queue_depth = 0;
+static bool      g_tx_in_flight   = false;
+static uint32_t  g_tx_done_after_ms = 0;
+static uint32_t  g_tx_dropped     = 0;
+static uint32_t  g_tx_pre_empted  = 0;
+
+// Approximate Semtech LoRa TOA (ms) for the *committed* PHY rung.
+// Matches base_station/lora_proto.py::lora_time_on_air_ms() at the
+// active rung, padded ×1.5 + 50 ms so we never reclaim the radio early.
+static uint32_t estimate_toa_ms(uint16_t payload_len, uint8_t rung) {
+    if (rung > 2) rung = 2;
+    const uint8_t  sf  = LADDER[rung].sf;
+    const uint16_t bw  = LADDER[rung].bw_khz;
+    const uint8_t  cr  = LADDER[rung].cr_den;
+    // Symbol time in microseconds (avoid float on M7 hot path).
+    // tsym_us = (1 << sf) * 1000 / bw_khz
+    const uint32_t tsym_us = ((uint32_t)1 << sf) * 1000UL / bw;
+    const uint8_t  ldro = (sf >= 11 && bw <= 125) ? 1 : 0;
+    int32_t numer = 8 * (int32_t)payload_len - 4 * (int32_t)sf + 28 + 16;
+    int32_t denom = 4 * ((int32_t)sf - 2 * ldro);
+    int32_t blocks = (numer + denom - 1) / denom;       // ceil
+    if (blocks < 0) blocks = 0;
+    const int32_t payload_sym = 8 + blocks * (cr - 4 + 4);
+    const uint32_t total_sym = 8 /*preamble*/ + 4 /*hdr*/ + payload_sym;
+    const uint32_t toa_us = total_sym * tsym_us;
+    // ×1.5 + 50 ms slack so finishTransmit() can never run early.
+    return (toa_us * 3UL) / 2000UL + 50UL;
+}
+
+// Insert keeping P0 ahead of P1, FIFO within priority. Returns true on
+// success, false if dropped. ``label_for_log`` is debug-only.
+static bool tx_enqueue(const uint8_t* kiss, uint16_t kiss_len, uint8_t prio) {
+    if (kiss_len == 0 || kiss_len > TX_PAYLOAD_MAX) return false;
+    if (g_tx_queue_depth >= TX_QUEUE_CAP) {
+        if (prio == TX_PRIO_SAFETY) {
+            // Evict the *last* P1 to make room for a P0 (mirror of
+            // M7TxQueue.submit() in the SIL model).
+            for (int i = (int)g_tx_queue_depth - 1; i >= 0; --i) {
+                if (g_tx_queue[i].prio == TX_PRIO_NORMAL) {
+                    for (int j = i; j < (int)g_tx_queue_depth - 1; ++j) {
+                        g_tx_queue[j] = g_tx_queue[j + 1];
+                    }
+                    g_tx_queue_depth--;
+                    g_tx_dropped++;
+                    break;
+                }
+            }
+            if (g_tx_queue_depth >= TX_QUEUE_CAP) {
+                g_tx_dropped++;
+                return false;          // queue full of P0s, drop self
+            }
+        } else {
+            g_tx_dropped++;
+            return false;
+        }
+    }
+    // Find insertion point: first slot whose prio is *higher number*
+    // (lower priority) than ours.
+    int at = (int)g_tx_queue_depth;
+    for (int i = 0; i < (int)g_tx_queue_depth; ++i) {
+        if (g_tx_queue[i].prio > prio) { at = i; break; }
+    }
+    for (int j = (int)g_tx_queue_depth; j > at; --j) {
+        g_tx_queue[j] = g_tx_queue[j - 1];
+    }
+    TxRequest& slot = g_tx_queue[at];
+    slot.prio     = prio;
+    slot.kiss_len = kiss_len;
+    slot.rung_at_submit = g_ladder_rung;
+    memcpy(slot.kiss, kiss, kiss_len);
+    g_tx_queue_depth++;
+    return true;
+}
+
+// Drive the radio forward. Called from loop() every iteration. Never
+// blocks: each invocation either advances the SX1276 state machine or
+// returns immediately.
+static void tx_pump(uint32_t now_ms) {
+    if (g_tx_in_flight) {
+        if ((int32_t)(now_ms - g_tx_done_after_ms) < 0) {
+            return;                // still on air per our TOA estimate
+        }
+        radio.finishTransmit();
+        g_tx_in_flight = false;
+        radio.startReceive();      // re-arm RX after every TX (IP-307)
+    }
+    if (g_tx_queue_depth == 0) return;
+    // Pop front.
+    TxRequest req = g_tx_queue[0];
+    for (int i = 0; i < (int)g_tx_queue_depth - 1; ++i) {
+        g_tx_queue[i] = g_tx_queue[i + 1];
+    }
+    g_tx_queue_depth--;
+    csma_pick_hop_before_tx();
+    int16_t state = radio.startTransmit(req.kiss, req.kiss_len);
+    if (state != RADIOLIB_ERR_NONE) {
+        // Radio rejected the start — re-arm RX and let the next loop
+        // iteration retry the next queued frame.
+        radio.startReceive();
+        return;
+    }
+    g_tx_in_flight    = true;
+    g_tx_done_after_ms = now_ms + estimate_toa_ms(req.kiss_len, req.rung_at_submit);
+}
+
 // emit_topic — encrypt + frame an arbitrary (topic_id, payload) tuple and
 // transmit it as a TelemetryFrame on the radio. Shared by emit_telemetry()
 // (Opta hydraulics @ 1 Hz) and the X8 UART pump (gps @ 1 Hz, imu @ 5 Hz).
@@ -417,10 +748,11 @@ static void emit_topic(uint8_t topic_id, const uint8_t* payload, uint8_t payload
     uint8_t kiss[512];
     size_t kl = lp_kiss_encode(onair, 12 + prefix + 2 + 16, kiss, sizeof(kiss));
     if (kl) {
-        csma_pick_hop_before_tx();
-        radio.transmit(kiss, kl);
+        // IP-107: enqueue instead of blocking radio.transmit(). The next
+        // tx_pump() call from loop() will start the SX1276 transmit and
+        // return immediately; loop() keeps stamping the M4 watchdog.
+        tx_enqueue(kiss, (uint16_t)kl, TX_PRIO_NORMAL);
     }
-    radio.startReceive();
 }
 
 static void emit_telemetry() {
@@ -491,11 +823,21 @@ static inline void csma_pick_hop_before_tx() {
                                     LP_CSMA_DEFAULT_BUSY_DBM,
                                     LP_CSMA_DEFAULT_MAX_SKIPS,
                                     &skips);
-    radio.setFrequency(hop / 1.0e6f);
-    g_fhss_hop_counter++;
+    // IP-004: hop is a hop counter (channel index source), NOT a frequency.
+    // Convert to Hz via the FHSS sequence before retuning the radio.
+    radio.setFrequency(lp_fhss_channel_hz(g_fhss_key_id, hop) / 1.0e6f);
+    g_fhss_hop_counter = hop + 1;
     (void)skips;   // TODO: surface to audit log once X8↔H747 IPC lands
 #endif
 }
+
+// IP-107 (round-7): the M7 TX path is now non-blocking via the
+// `tx_enqueue()` + `tx_pump()` queue. The Round-3
+// `refresh_m4_alive_before_tx()` shim is no longer needed because the
+// loop() top-of-frame watchdog stamp executes every iteration regardless
+// of radio state. Helper retained as a no-op stub for any callers that
+// still reference it from a stale review checklist.
+static inline void refresh_m4_alive_before_tx() { /* no-op since IP-107 round-7 */ }
 
 // ---------- X8 UART pump ----------
 //
@@ -509,11 +851,34 @@ static inline void csma_pick_hop_before_tx() {
 // (0x01 = gps, 0x07 = imu, etc.). We decode KISS, peel off the topic byte,
 // and re-emit the rest as a TelemetryFrame on the LoRa radio.
 //
+// IP-104 follow-on: the *back-channel* (M7 → X8) uses the same KISS framing
+// but a reserved ``X8_CMD_TOPIC = 0xC0`` topic byte. Payload is
+// ``<opcode:1> <args:N>``, mirroring the LoRa ``CommandFrame`` post-header
+// shape. Today only `camera_service.py` listens for it (CMD_REQ_KEYFRAME +
+// CMD_CAMERA_SELECT + CMD_ENCODE_MODE); future X8 services can subscribe by
+// switching on the opcode.
+//
 // Standalone-H7 fallback: when the H747 is *not* in an X8 there is nothing
 // driving Serial1 from the Linux side, so this loop sees no bytes — the rest
 // of the firmware behaves identically. (In that build, IMU + GPS would have
 // to be wired natively — see HARDWARE_BOM.md § Notes on substitutions.)
 static KissDecoder g_x8_dec;
+
+#define X8_CMD_TOPIC 0xC0
+
+// Frame ``<X8_CMD_TOPIC><opcode><args...>`` with KISS escaping and push it
+// out Serial1. Cheap (one-shot, no queueing) — commands fired from CMD_*
+// handlers are P0/P1 single-frame events at human-scale rates.
+static void send_cmd_to_x8(uint8_t opcode, const uint8_t* args, uint8_t args_len) {
+    if (args_len > 32) return;   // defensive: arg payload from LoRa is ≤8 bytes
+    uint8_t body[2 + 32];
+    body[0] = X8_CMD_TOPIC;
+    body[1] = opcode;
+    if (args_len) memcpy(body + 2, args, args_len);
+    uint8_t kiss[2 * sizeof(body) + 4];
+    size_t kl = lp_kiss_encode(body, 2 + args_len, kiss, sizeof(kiss));
+    if (kl) Serial1.write(kiss, kl);
+}
 
 static void poll_x8_uart() {
     while (Serial1.available()) {
@@ -573,9 +938,13 @@ static void send_link_tune(uint8_t target_rung, uint8_t reason) {
     uint8_t kiss[2 * sizeof(onair) + 4];
     size_t kl = lp_kiss_encode(onair, sizeof(onair), kiss, sizeof(kiss));
     if (kl) {
-        csma_pick_hop_before_tx();
-        radio.transmit(kiss, kl);
+        // IP-107: P0 (safety) priority — LINK_TUNE jumps the queue ahead
+        // of pending telemetry / source frames so the link recovery path
+        // is not stuck behind a 1 Hz hydraulics burst.
+        tx_enqueue(kiss, (uint16_t)kl, TX_PRIO_SAFETY);
     }
+    // RX is re-armed inside tx_pump() once the TX completes — no need to
+    // toggle it here.
 }
 
 // try_step_ladder() executes the twice-back-to-back handshake and arms the
@@ -670,9 +1039,26 @@ static void poll_link_ladder() {
 void setup() {
     Serial.begin(115200);
 
-    // LoRa control profile: SF7 / BW125 / CR4-5 per MASTER_PLAN.md §8.17.
-    radio.begin(915.0, 125.0, 7, 5, 0x12, 20);
+    // LoRa control profile per LADDER[0] (DECISIONS.md D-A2: SF7/BW250/CR4-5).
+    // IP-006: must match LADDER[0] exactly so the first TX after boot decodes
+    // on a peer that has not yet received CMD_LINK_TUNE.
+    radio.begin(915.0,
+                (float)LADDER[0].bw_khz,
+                LADDER[0].sf,
+                LADDER[0].cr_den,
+                0x12,
+                20);
     radio.startReceive();
+    g_ladder_rung = 0;
+
+#ifdef LIFETRAC_USE_REAL_CRYPTO
+    // IP-008: refuse to operate with an unprovisioned fleet key.
+    if (fleet_key_is_zero()) {
+        Serial.println("FATAL: fleet key all-zero — refusing to operate (IP-008)");
+        SHARED->estop_request = LIFETRAC_ESTOP_MAGIC;
+        while (1) { delay(1000); }
+    }
+#endif
 
     // RS-485 / Modbus
     RS485.setPins(/*tx*/ PA_9, /*de*/ PA_10, /*re*/ PB_3);
@@ -695,14 +1081,25 @@ void loop() {
     // dump the valves. Apply this even if nothing else makes progress.
     // Bump version + counter too so the M4 can validate layout and detect
     // a stuck-but-fresh-looking timestamp.
+    //
+    // IP-105: write under the seqlock convention from shared_mem.h \u2014 raise
+    // `seq` to ODD before touching payload, lower to EVEN after. The M4
+    // reader retries until it sees a matching pre/post even snapshot.
     SHARED->version       = LIFETRAC_SHARED_VERSION;
+    uint32_t s = SHARED->seq;
+    SHARED->seq           = s | 1u;          // mark in-progress (odd)
+    __DMB();
     SHARED->alive_tick_ms = now;
     SHARED->loop_counter += 1;
-    SHARED->estop_request = g_estop_latched ? 1u : 0u;
+    // IP-106: publish the magic constant only when actually latched.
+    SHARED->estop_request = g_estop_latched ? LIFETRAC_ESTOP_MAGIC : 0u;
+    __DMB();
+    SHARED->seq           = (s | 1u) + 1u;   // back to even = "stable"
 
     poll_radio();
     poll_x8_uart();    // pump KISS frames from gps_service.py / imu_service.py
     poll_link_ladder();  // R-8 hysteresis SF7→SF8→SF9 ladder
+    tx_pump(now);      // IP-107: drain the async TX queue, never blocks
 
     if ((int32_t)(now - next_arb) >= 0) {
         next_arb = now + 50;        // 20 Hz arbitration AND watchdog tick

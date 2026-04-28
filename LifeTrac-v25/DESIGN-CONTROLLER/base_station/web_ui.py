@@ -29,8 +29,73 @@ import paho.mqtt.client as mqtt
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from lora_proto import SRC_AUTONOMY, SRC_BASE, SRC_HANDHELD, SRC_NONE, pack_control
+
+
+# ---- IP-203: input validation models -----------------------------------
+# Every LAN-side surface (WebSocket payloads + JSON bodies) goes through one
+# of these models. Range-checks here are tighter than the on-air protocol so
+# malformed inputs never reach the LoRa transmitter.
+
+# Allow-list of params the operator may set via /api/params. Anything else
+# is rejected with HTTP 400 \u2014 prevents a compromised browser from poking
+# at internal MQTT topics that happen to start with "params.".
+_ALLOWED_PARAM_KEYS = frozenset({
+    "image.coral_enabled",
+    "image.encode_quality",
+    "image.tile_quality",
+    "ui.theme",
+    "ui.language",
+})
+
+MAX_PARAM_VALUE_LEN = 256        # any string value over this is dropped
+MAX_PARAMS_BODY_BYTES = 4096     # whole /api/params POST cap
+
+
+class ControlMsg(BaseModel):
+    """WebSocket payload from /ws/control."""
+    model_config = ConfigDict(extra="forbid")
+    lhx: int = Field(0, ge=-127, le=127)
+    lhy: int = Field(0, ge=-127, le=127)
+    rhx: int = Field(0, ge=-127, le=127)
+    rhy: int = Field(0, ge=-127, le=127)
+    buttons: int = Field(0, ge=0, le=0xFFFF)
+    flags: int = Field(0, ge=0, le=0xFF)
+
+
+class CameraSelectBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    camera: str = Field(..., min_length=1, max_length=16)
+
+
+class LoginBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    pin: str = Field(..., min_length=1, max_length=16)
+
+
+class AccelToggleBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool
+
+
+class ParamsBody(BaseModel):
+    """POST /api/params body — only allow-listed keys, scalar values only."""
+    model_config = ConfigDict(extra="forbid")
+    params: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("params")
+    @classmethod
+    def _check_keys(cls, v: dict[str, Any]) -> dict[str, Any]:
+        for k, val in v.items():
+            if k not in _ALLOWED_PARAM_KEYS:
+                raise ValueError(f"unknown parameter {k!r}")
+            if isinstance(val, str) and len(val) > MAX_PARAM_VALUE_LEN:
+                raise ValueError(f"value for {k!r} too long")
+            if isinstance(val, (list, dict, set, tuple)):
+                raise ValueError(f"value for {k!r} must be a scalar")
+        return v
 
 WEB_DIR = Path(__file__).parent / "web"
 
@@ -38,7 +103,25 @@ WEB_DIR = Path(__file__).parent / "web"
 # Single shared PIN, LAN-only, plain HTTP for v25. Telemetry views are public;
 # control/E-stop/camera-select require the PIN. The hardware E-stop on the
 # base is auth-independent.
-LIFETRAC_PIN = os.environ.get("LIFETRAC_PIN", "").strip()  # 4-6 digits, set at first boot
+def _load_operator_pin() -> str:
+    """Load the operator PIN from a Docker secret file or env var.
+
+    Source order (matches IP-002 / IP-008 secret-file pattern):
+      1. ``LIFETRAC_PIN_FILE``  — preferred, file is mounted by Docker.
+      2. ``LIFETRAC_PIN``       — fallback, mostly for dev / unit tests.
+    Empty / unreadable values fall through to "" so the runtime check in
+    ``api_login`` returns 503 (refuse-to-grant) rather than fail-open.
+    """
+    path = os.environ.get("LIFETRAC_PIN_FILE", "").strip()
+    if path:
+        try:
+            return open(path, "r", encoding="utf-8").read().strip()
+        except OSError as exc:
+            logging.warning("LIFETRAC_PIN_FILE=%r unreadable: %s", path, exc)
+    return os.environ.get("LIFETRAC_PIN", "").strip()
+
+
+LIFETRAC_PIN = _load_operator_pin()    # 4-6 digits, set at first boot
 SESSION_TTL_S = 30 * 60          # 30 min idle timeout
 LOCKOUT_FAILS = 5                # wrong PINs before lockout
 LOCKOUT_S     = 60               # seconds of cool-off
@@ -69,7 +152,25 @@ def _session_valid(token: str | None) -> bool:
 
 
 def _client_ip(request: Request) -> str:
-    return (request.client.host if request.client else "unknown")
+    """Return the best-effort client IP for audit + lockout (IP-206).
+
+    Trusts ``X-Forwarded-For`` only when the immediate peer is in
+    ``LIFETRAC_TRUSTED_PROXIES`` (comma-separated CIDRs / exact IPs). When
+    not trusted, falls back to the TCP peer address. Trims to the leftmost
+    entry of XFF (the original client) per RFC 7239 §5.2 guidance.
+    """
+    peer = request.client.host if request.client else "unknown"
+    trusted = os.environ.get("LIFETRAC_TRUSTED_PROXIES", "").strip()
+    if not trusted:
+        return peer
+    allowed = {t.strip() for t in trusted.split(",") if t.strip()}
+    if peer not in allowed:
+        return peer
+    xff = request.headers.get("x-forwarded-for")
+    if not xff:
+        return peer
+    first = xff.split(",", 1)[0].strip()
+    return first or peer
 
 
 def _check_lockout(ip: str) -> float:
@@ -90,8 +191,23 @@ def _record_failure(ip: str) -> None:
         if n_fails >= LOCKOUT_FAILS:
             _fail_counts[ip] = (0, now + LOCKOUT_S)
             logging.warning("web_ui: PIN lockout for %s (%d fails)", ip, n_fails)
+            # IP-207: also persist to the audit log so SOC tooling can alert.
+            try:
+                from audit_log import AuditLog, DEFAULT_PATH as _AUDIT_PATH
+                AuditLog(_AUDIT_PATH).record("pin_lockout", ip=ip, fails=n_fails)
+            except Exception:                          # pragma: no cover
+                pass
         else:
             _fail_counts[ip] = (n_fails, 0.0)
+            logging.info("web_ui: PIN failure for %s (%d/%d)",
+                         ip, n_fails, LOCKOUT_FAILS)
+            # IP-207: also audit individual failures so brute-force attempts
+            # show up in the same stream as crypto rejects.
+            try:
+                from audit_log import AuditLog, DEFAULT_PATH as _AUDIT_PATH
+                AuditLog(_AUDIT_PATH).record("pin_failure", ip=ip, fails=n_fails)
+            except Exception:                          # pragma: no cover
+                pass
 
 
 def _record_success(ip: str) -> None:
@@ -111,7 +227,32 @@ app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 
 # ---- MQTT plumbing -----------------------------------------------------
 mqtt_client = mqtt.Client(client_id="web_ui")
-mqtt_client.connect("localhost", 1883)
+
+
+def _connect_mqtt_with_retry() -> None:
+    """IP-201: connect to the broker with bounded retries instead of letting
+    a transient DNS failure crash the entire web UI at module import time.
+    The broker is named ``mosquitto`` inside docker-compose; the container
+    may finish coming up after we do.
+    """
+    host = os.environ.get("LIFETRAC_MQTT_HOST", "localhost")
+    deadline = time.monotonic() + 30.0
+    backoff = 0.5
+    while True:
+        try:
+            mqtt_client.connect(host, 1883)
+            return
+        except (OSError, ConnectionError) as exc:
+            if time.monotonic() >= deadline:
+                logging.error("mqtt: giving up on %s after 30s (%s)", host, exc)
+                raise
+            logging.warning("mqtt: %s not ready (%s); retry in %.1fs",
+                            host, exc, backoff)
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 5.0)
+
+
+_connect_mqtt_with_retry()
 mqtt_client.loop_start()
 
 telemetry_subscribers: set[WebSocket] = set()
@@ -119,6 +260,45 @@ image_subscribers: set[WebSocket] = set()
 state_subscribers: set[WebSocket] = set()
 active_source = "none"
 active_source_lock = threading.Lock()
+
+
+# ---- IP-202 / IP-208: bounded WS fan-out -------------------------------
+# Caps on concurrent subscribers per topic so a misbehaving (or malicious)
+# client can't OOM the base-station by opening thousands of WSes. A new
+# connection over the cap is closed with WS code 4429 ("too many
+# connections"), modelled after HTTP 429.
+MAX_TELEMETRY_SUBSCRIBERS = 8
+MAX_IMAGE_SUBSCRIBERS     = 4
+MAX_STATE_SUBSCRIBERS     = 4
+WS_OVER_CAPACITY_CODE     = 4429
+
+
+async def _admit_ws(ws: WebSocket, pool: set[WebSocket], cap: int,
+                    label: str) -> bool:
+    """Accept *ws* into *pool* if there's room, else close with 4429.
+
+    Returns True iff the caller should proceed with its receive loop.
+    """
+    if len(pool) >= cap:
+        try:
+            await ws.close(code=WS_OVER_CAPACITY_CODE)
+        except Exception:
+            pass
+        logging.warning("ws/%s: rejecting connection, cap=%d reached", label, cap)
+        return False
+    await ws.accept()
+    pool.add(ws)
+    return True
+
+
+def _ws_send_done(label: str):
+    """asyncio future callback that surfaces dropped sends in the log
+    instead of silently swallowing exceptions (IP-208)."""
+    def _cb(fut):
+        exc = fut.exception()
+        if exc is not None:
+            logging.debug("ws/%s send failed: %r", label, exc)
+    return _cb
 
 
 SOURCE_BY_ID = {
@@ -177,9 +357,10 @@ def _on_mqtt_message(_c, _u, msg):
         loop_img = getattr(app.state, "loop", None)
         if loop_img is not None:
             for ws in list(image_subscribers):
-                asyncio.run_coroutine_threadsafe(
+                fut = asyncio.run_coroutine_threadsafe(
                     ws.send_bytes(msg.payload), loop_img
                 )
+                fut.add_done_callback(_ws_send_done("image"))
         return
 
     if msg.topic.endswith("/video/tile_delta") or msg.topic.endswith("/cmd/image_frame"):
@@ -202,9 +383,10 @@ def _on_mqtt_message(_c, _u, msg):
     if loop is None:
         return
     for ws in list(telemetry_subscribers):
-        asyncio.run_coroutine_threadsafe(
+        fut = asyncio.run_coroutine_threadsafe(
             ws.send_text(json.dumps(payload)), loop
         )
+        fut.add_done_callback(_ws_send_done("telemetry"))
 
 
 mqtt_client.on_message = _on_mqtt_message
@@ -235,7 +417,8 @@ def _publish_state_snapshot() -> None:
         return
     snap = json.dumps(_image_publisher.snapshot())
     for ws in list(state_subscribers):
-        asyncio.run_coroutine_threadsafe(ws.send_text(snap), loop)
+        fut = asyncio.run_coroutine_threadsafe(ws.send_text(snap), loop)
+        fut.add_done_callback(_ws_send_done("state"))
 
 
 def _ingest_tile_delta(payload: bytes) -> None:
@@ -376,8 +559,9 @@ async def api_audit(limit: int = 200,
 
 @app.websocket("/ws/telemetry")
 async def ws_telemetry(ws: WebSocket):
-    await ws.accept()
-    telemetry_subscribers.add(ws)
+    if not await _admit_ws(ws, telemetry_subscribers,
+                           MAX_TELEMETRY_SUBSCRIBERS, "telemetry"):
+        return
     try:
         while True:
             await ws.receive_text()  # keepalive pings; we don't care about content
@@ -397,8 +581,9 @@ async def ws_image(ws: WebSocket):
     same surface as the dashboard telemetry and FastAPI's cookie Depends
     doesn't run for WebSockets anyway.
     """
-    await ws.accept()
-    image_subscribers.add(ws)
+    if not await _admit_ws(ws, image_subscribers,
+                           MAX_IMAGE_SUBSCRIBERS, "image"):
+        return
     try:
         while True:
             await ws.receive_text()
@@ -416,8 +601,9 @@ async def ws_state(ws: WebSocket):
     computing display state locally. JSON snapshots are pushed on every
     canvas update plus a 2 Hz keepalive.
     """
-    await ws.accept()
-    state_subscribers.add(ws)
+    if not await _admit_ws(ws, state_subscribers,
+                           MAX_STATE_SUBSCRIBERS, "state"):
+        return
     try:
         # Send an initial snapshot immediately so a freshly-connected
         # client can render before the next tile arrives.
@@ -491,6 +677,10 @@ async def ws_control(ws: WebSocket):
     try:
         while True:
             raw = await ws.receive_text()
+            # IP-203: cap payload size before parsing. ControlMsg fully
+            # populated with extreme integers fits in well under 256 bytes.
+            if len(raw) > 512:
+                continue
             now = asyncio.get_event_loop().time()
             if now - last_tx < 0.05:    # 20 Hz
                 continue
@@ -498,17 +688,19 @@ async def ws_control(ws: WebSocket):
             if not _base_controls_allowed():
                 continue
             try:
-                msg: dict[str, Any] = json.loads(raw)
-            except json.JSONDecodeError:
+                msg_obj = ControlMsg.model_validate_json(raw)
+            except ValidationError:
+                # Malformed payload — drop the frame but keep the socket
+                # so a flaky browser tab doesn't have to re-auth.
                 continue
             frame = pack_control(
                 seq=seq,
-                lhx=int(msg.get("lhx", 0)),
-                lhy=int(msg.get("lhy", 0)),
-                rhx=int(msg.get("rhx", 0)),
-                rhy=int(msg.get("rhy", 0)),
-                buttons=int(msg.get("buttons", 0)),
-                flags=int(msg.get("flags", 0)),
+                lhx=msg_obj.lhx,
+                lhy=msg_obj.lhy,
+                rhx=msg_obj.rhx,
+                rhy=msg_obj.rhy,
+                buttons=msg_obj.buttons,
+                flags=msg_obj.flags,
                 hb=hb,
             )
             mqtt_client.publish("lifetrac/v25/cmd/control", frame, qos=0)
@@ -536,16 +728,18 @@ _CAMERA_IDS = {
 
 
 @app.post("/api/camera/select")
-async def camera_select(payload: dict, _session: str = Depends(_require_session)):
+async def camera_select(body: CameraSelectBody,
+                        _session: str = Depends(_require_session)):
     """Switch which camera the tractor uses for LoRa thumbnails / WebRTC.
 
     Body: {"camera": "auto"|"front"|"rear"|"implement"|"crop"}
     Publishes a 1-byte payload to lifetrac/v25/cmd/camera_select; lora_bridge
     wraps it in an FT_COMMAND/CMD_CAMERA_SELECT frame and TXes it over LoRa.
     """
-    name = str(payload.get("camera", "")).lower()
+    name = body.camera.lower()
     if name not in _CAMERA_IDS:
-        return {"ok": False, "error": f"unknown camera '{name}'"}
+        raise HTTPException(status_code=400,
+                            detail=f"unknown camera {name!r}")
     cam_id = _CAMERA_IDS[name]
     mqtt_client.publish("lifetrac/v25/cmd/camera_select", bytes([cam_id]), qos=1)
     return {"ok": True, "camera": name, "id": cam_id}
@@ -553,7 +747,7 @@ async def camera_select(payload: dict, _session: str = Depends(_require_session)
 
 # ---- PIN login routes (MASTER_PLAN.md §8.5) ----------------------------
 @app.post("/api/login")
-async def api_login(payload: dict, request: Request):
+async def api_login(body: LoginBody, request: Request):
     if not LIFETRAC_PIN:
         # No PIN configured — refuse to grant access rather than fail-open.
         raise HTTPException(status_code=503,
@@ -563,7 +757,7 @@ async def api_login(payload: dict, request: Request):
     if locked > 0:
         raise HTTPException(status_code=429,
                             detail=f"locked out, retry in {int(locked)}s")
-    submitted = str(payload.get("pin", ""))
+    submitted = body.pin
     if not hmac.compare_digest(submitted, LIFETRAC_PIN):
         _record_failure(ip)
         raise HTTPException(status_code=401, detail="invalid PIN")
@@ -619,7 +813,7 @@ async def api_accel_get(_session: str = Depends(_require_session)):
 
 
 @app.post("/api/settings/accel")
-async def api_accel_set(payload: dict,
+async def api_accel_set(body: AccelToggleBody,
                         _session: str = Depends(_require_session)):
     """Operator master toggle for the optional Coral Edge TPU.
 
@@ -627,9 +821,7 @@ async def api_accel_set(payload: dict,
     survives reboot. Takes effect within one inference call (per-call
     `is_active()` check in superres.py / detect.py).
     """
-    if "enabled" not in payload:
-        raise HTTPException(status_code=400, detail="missing 'enabled' bool")
-    enabled = bool(payload["enabled"])
+    enabled = body.enabled
     _settings_get().set("image.coral_enabled", enabled)
     state = _accel_get().state()
     return {"ok": True, "enabled": enabled, "active": state.is_active()}
@@ -657,18 +849,33 @@ async def api_params_get(_session: str = Depends(_require_session)):
 
 
 @app.post("/api/params")
-async def api_params_set(payload: dict,
+async def api_params_set(request: Request,
                          _session: str = Depends(_require_session)):
     """Forward a JSON patch to the tractor X8 params_service.
 
-    Body is a partial dict shaped like the snapshot from GET /api/params.
-    The tractor side validates and rejects unknown keys, so we send the
-    patch as-is and rely on the next retained `params/changed` message to
-    confirm the apply.
+    Body is a partial dict of allow-listed parameter keys. We size-cap the
+    raw body (IP-203) and run it through ``ParamsBody`` so neither a huge
+    payload nor an unknown key reaches the tractor.
     """
-    if not isinstance(payload, dict):
+    raw = await request.body()
+    if len(raw) > MAX_PARAMS_BODY_BYTES:
+        raise HTTPException(status_code=413,
+                            detail=f"body exceeds {MAX_PARAMS_BODY_BYTES} bytes")
+    try:
+        as_dict = json.loads(raw or b"{}")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"invalid JSON: {exc}")
+    # Accept either the raw {key: value} dict or a {"params": {...}} wrapper.
+    inner = as_dict.get("params", as_dict) if isinstance(as_dict, dict) else None
+    if not isinstance(inner, dict):
         raise HTTPException(status_code=400,
                             detail="body must be a JSON object")
+    try:
+        body = ParamsBody(params=inner)
+    except ValidationError as exc:
+        # Pydantic's ``errors()`` may include ValueError instances under
+        # ``ctx`` which aren't JSON-serialisable; stringify them.
+        raise HTTPException(status_code=400, detail=str(exc))
     mqtt_client.publish("lifetrac/v25/params/set",
-                        json.dumps(payload), qos=1)
-    return {"ok": True, "submitted": payload}
+                        json.dumps(body.params), qos=1)
+    return {"ok": True, "submitted": body.params}

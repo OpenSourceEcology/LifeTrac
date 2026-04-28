@@ -9,6 +9,8 @@ ExecStart=/usr/bin/python3 /opt/lifetrac/firmware/tractor_x8/params_service.py
 Restart=on-failure
 RestartSec=5
 Environment=LIFETRAC_PARAMS_PATH=/var/lib/lifetrac/params.json
+# IP-304: see lifetrac-camera.service.
+Environment=PYTHONPATH=/opt/lifetrac/base_station
 
 [Install]
 WantedBy=multi-user.target

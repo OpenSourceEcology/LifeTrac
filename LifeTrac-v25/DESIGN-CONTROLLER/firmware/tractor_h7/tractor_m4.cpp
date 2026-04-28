@@ -76,24 +76,47 @@ void setup() {
 void loop() {
     uint32_t now = millis();
 
+    // IP-105: take a coherent snapshot of the M7-side fields using the
+    // shared_mem.h seqlock. Retry up to a few times if the writer is
+    // mid-update; bail out and trip if we can't get a consistent read.
+    uint32_t snap_alive   = 0;
+    uint32_t snap_loop_ct = 0;
+    uint32_t snap_estop   = 0;
+    bool     snap_ok      = false;
+    for (int attempt = 0; attempt < 4; attempt++) {
+        uint32_t s0 = SHARED->seq;
+        if (s0 & 1u) { continue; }                 // writer in progress
+        snap_alive   = SHARED->alive_tick_ms;
+        snap_loop_ct = SHARED->loop_counter;
+        snap_estop   = SHARED->estop_request;
+        __DMB();                                    // observe writes-in-order
+        uint32_t s1 = SHARED->seq;
+        if (s0 == s1) { snap_ok = true; break; }
+    }
+    if (!snap_ok) {
+        // Writer is hammering the struct (or RAM is corrupt); treat as
+        // unsafe and trip rather than acting on a torn read.
+        trip("seqlock_torn");
+        return;
+    }
+
     // 1. Liveness tick check.
-    uint32_t last_tick = SHARED->alive_tick_ms;
-    if (now >= last_tick && (now - last_tick) > LIFETRAC_M4_WATCHDOG_MS) {
+    if (now >= snap_alive && (now - snap_alive) > LIFETRAC_M4_WATCHDOG_MS) {
         trip("alive_tick_stale");
     }
 
     // 2. Loop-counter advance check (separate witness; catches "millis()
     //    is stuck so alive_tick keeps reading fresh by accident").
-    uint32_t lc = SHARED->loop_counter;
-    if (lc != s_last_loop_counter) {
-        s_last_loop_counter   = lc;
+    if (snap_loop_ct != s_last_loop_counter) {
+        s_last_loop_counter   = snap_loop_ct;
         s_last_loop_change_ms = now;
     } else if ((now - s_last_loop_change_ms) > LIFETRAC_M4_WATCHDOG_MS) {
         trip("loop_counter_stuck");
     }
 
-    // 3. M7 explicitly requested E-stop mirror.
-    if (SHARED->estop_request != 0) {
+    // 3. M7 explicitly requested E-stop mirror. IP-106: gate on the magic
+    //    constant so SRAM noise / stale boot bytes cannot trip the chain.
+    if (snap_estop == LIFETRAC_ESTOP_MAGIC) {
         trip("estop_request");
     }
 

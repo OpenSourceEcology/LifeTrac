@@ -42,10 +42,16 @@ services:
     environment:
       LIFETRAC_MQTT_HOST: mosquitto
       LIFETRAC_LORA_DEVICE: /dev/ttyACM0
+      LIFETRAC_FLEET_KEY_FILE: /run/secrets/lifetrac_fleet_key
+      LIFETRAC_NONCE_STORE: /var/lib/lifetrac/nonce_store.json
     volumes:
       - lifetrac_state:/var/lib/lifetrac
       - lifetrac_logs:/var/log/lifetrac
-    command: ["python", "/app/base_station/lora_bridge.py"]
+    secrets:
+      - lifetrac_fleet_key
+    # Bridge takes the LoRa device as its single positional arg; the env var
+    # is the only source of truth so .env / compose stay in sync (IP-002).
+    command: ["sh", "-c", "exec python /app/base_station/lora_bridge.py \"$LIFETRAC_LORA_DEVICE\" --mqtt \"$LIFETRAC_MQTT_HOST\""]
 
   web_ui:
     build: .
@@ -55,14 +61,18 @@ services:
       - mosquitto
     environment:
       LIFETRAC_MQTT_HOST: mosquitto
-      LIFETRAC_PIN: "${LIFETRAC_PIN:?LIFETRAC_PIN must be set in .env}"
+      LIFETRAC_PIN_FILE: /run/secrets/lifetrac_pin
+      LIFETRAC_PIN: "${LIFETRAC_PIN:-}"
       LIFETRAC_SETTINGS_PATH: /var/lib/lifetrac/settings.json
+      LIFETRAC_TRUSTED_PROXIES: "${LIFETRAC_TRUSTED_PROXIES:-}"
     volumes:
       - lifetrac_state:/var/lib/lifetrac
       - lifetrac_logs:/var/log/lifetrac
     ports:
       - "8080:8080"
-    command: ["uvicorn", "web_ui:app", "--host", "0.0.0.0", "--port", "8080"]
+    secrets:
+      - lifetrac_pin
+    command: ["uvicorn", "web_ui:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers"]
 
   audit_tail:
     build: .
@@ -82,3 +92,12 @@ volumes:
   mosquitto_logs:
   lifetrac_state:
   lifetrac_logs:
+
+# Docker secrets — populate ./secrets/{lifetrac_pin,lifetrac_fleet_key} on the
+# base station before `docker compose up`. Files are mounted read-only at
+# /run/secrets/* and consumed via the *_FILE env vars above (IP-002, IP-008).
+secrets:
+  lifetrac_pin:
+    file: ./secrets/lifetrac_pin
+  lifetrac_fleet_key:
+    file: ./secrets/lifetrac_fleet_key

@@ -8,6 +8,8 @@ Type=simple
 ExecStart=/usr/bin/python3 /opt/lifetrac/firmware/tractor_x8/logger_service.py
 Restart=on-failure
 RestartSec=5
+# IP-304: see lifetrac-camera.service.
+Environment=PYTHONPATH=/opt/lifetrac/base_station
 
 [Install]
 WantedBy=multi-user.target

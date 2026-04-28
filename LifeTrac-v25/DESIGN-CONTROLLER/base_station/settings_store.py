@@ -20,9 +20,30 @@ from typing import Any
 
 LOG = logging.getLogger("settings_store")
 
-DEFAULT_PATH = Path(os.environ.get(
-    "LIFETRAC_BASE_SETTINGS",
-    "/var/lib/lifetrac/base_settings.json"))
+# IP-005: docker-compose passes LIFETRAC_SETTINGS_PATH; older code/docs read
+# LIFETRAC_BASE_SETTINGS. Honor the new name preferentially and warn if the
+# legacy name is set instead so deployments converge on one variable.
+def _resolve_settings_path() -> Path:
+    new = os.environ.get("LIFETRAC_SETTINGS_PATH")
+    legacy = os.environ.get("LIFETRAC_BASE_SETTINGS")
+    if new:
+        if legacy and legacy != new:
+            LOG.warning(
+                "settings: both LIFETRAC_SETTINGS_PATH (%s) and legacy "
+                "LIFETRAC_BASE_SETTINGS (%s) set; using LIFETRAC_SETTINGS_PATH.",
+                new, legacy,
+            )
+        return Path(new)
+    if legacy:
+        LOG.warning(
+            "settings: LIFETRAC_BASE_SETTINGS is deprecated; "
+            "rename to LIFETRAC_SETTINGS_PATH (IP-005)."
+        )
+        return Path(legacy)
+    return Path("/var/lib/lifetrac/settings.json")
+
+
+DEFAULT_PATH = _resolve_settings_path()
 
 DEFAULTS: dict[str, Any] = {
     "image": {

@@ -27,6 +27,20 @@ tags. **All work tracked there:**
 
 ➡️ **[AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md)**
 
+**Implementation status (2026-04-28, through Round 7):**
+[`AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md`](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md)
+— every plan item achievable without bench hardware is now landed
+(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). 131 base_station
+tests pass. **Round 7** ported the IP-107 SIL queue into M7 firmware:
+`emit_topic()` / `send_link_tune()` now enqueue into a 4-deep priority
+queue; `tx_pump()` runs every `loop()` iteration via
+`startTransmit()` + estimated-TOA polling. The headline IP-107 invariant
+— M7 never blocks against the M4 watchdog — is now structural in
+`tractor_h7.ino` instead of a timing-dependent mitigation. CI also runs
+best-effort `arduino-cli compile` for handheld_mkr / tractor_opta /
+tractor_h7. Remaining work is the HIL gate set below — bench validation
+of W4-01…W4-10 and the CI compile-gate flip from best-effort to blocking.
+
 Source reviews:
 
 - [Claude Opus 4.7 (primary, with cross-review addendum)](AI%20NOTES/2026-04-28_Controller_Code_Pipeline_Review_ClaudeOpus4_7_v1_0.md)
@@ -46,7 +60,7 @@ Tracked in detail in [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) and
 ### Done
 - [x] Handheld firmware: full RX, KISS, per-source replay, `CMD_LINK_TUNE` /
   `CMD_ESTOP` / `CMD_CLEAR_ESTOP` ingest, OLED status, latching mushroom E-stop
-  ([firmware/handheld_mkr/handheld.ino](DESIGN-CONTROLLER/firmware/handheld_mkr/handheld.ino)).
+  ([firmware/handheld_mkr/handheld_mkr.ino](DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino)).
 - [x] Base-station audit log
   ([base_station/audit_log.py](DESIGN-CONTROLLER/base_station/audit_log.py))
   + bridge wiring (rx/tx/tx_error/gcm_tag_reject/bad_header/replay_reject/
@@ -79,7 +93,7 @@ Tracked in detail in [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) and
 - [x] **Mirror handheld CSMA #ifdef into the tractor M7 TX path** —
   shared `csma_pick_hop_before_tx()` helper called from both
   `emit_topic()` and `send_link_tune()` under `LIFETRAC_FHSS_ENABLED`
-  ([tractor_m7.ino](DESIGN-CONTROLLER/firmware/tractor_h7/tractor_m7.ino)).
+  ([tractor_h7.ino](DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino)).
 - [x] **`g_fhss_hop_counter` / `g_fhss_key_id` globals** defined on M7 and
   handheld (file-scope, not static, so a future shared header can re-extern
   them). Initialised to 0; epoch-rotated by `time_service.py` once the
@@ -323,6 +337,80 @@ emitter, and `lora_rtt._percentile`).
   KISS-over-serial; on-tractor needs the real radio path).
 - [ ] **Bench-validate E-stop end-to-end** per the procedure in
   [KEY_ROTATION.md](DESIGN-CONTROLLER/KEY_ROTATION.md) §7.
+
+---
+
+## Hardware-in-the-loop (HIL) gate — required before any wet hydraulic test
+
+These are the items the Round 1–4 implementation plan explicitly deferred
+because they cannot be validated without the actual bench setup (handheld
++ tractor H747 + Opta + expansions + SX1276 modems on both ends). Each
+must pass before the system is allowed to drive real hydraulics. Tracked
+against the Wave-4 gates in
+[`AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md` § Wave 4](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md).
+
+**HIL bench setup prerequisites:**
+
+- [ ] Two SX1276 LoRa modems wired (handheld MKR WAN 1310 + tractor H747).
+- [ ] Tractor H747 + Opta connected over RS-485 with both expansions
+  (D1608S + A0602) chained.
+- [ ] Solenoid-valve bank powered through the PSR safety relay with the
+  hydraulic supply valved off (dry test only, no fluid pressure).
+- [ ] Logic analyzer or scope on the X8↔H747 UART, the M7↔M4 GPIO, and
+  the PSR-alive line. CRC-protected `.csv` capture for each test.
+- [ ] Battery emulator on the 12 V rail so a brownout can be simulated
+  without yanking the keyswitch.
+
+**HIL tests (Wave 4 gates):**
+
+- [ ] **W4-01 Handheld E-stop latch latency.** Mushroom-button press →
+  PSR-alive drops → all 8 valve coils de-energize within **< 100 ms**
+  measured at the relay terminals. Repeat 100× across the SF7/SF8/SF9
+  PHY rungs. Capture worst-case + histogram.
+- [ ] **W4-02 Link-tune walk-down.** Force RSSI degradation
+  (RF attenuator) and verify the M7 walks SF7 → SF8 → SF9 and back via
+  `CMD_LINK_TUNE` with **< 1% packet loss** during each transition.
+  Verify `try_step_ladder()` revert deadline (500 ms) fires correctly
+  on a synthetic missing-HB.
+- [ ] **W4-03 M7↔M4 watchdog trip.** Halt the M7 with a debugger
+  breakpoint or a deliberate `while(1)` injected via a debug build;
+  verify the M4 trips the PSR within **200 ms** of the last
+  `alive_tick_ms` and that `estop_request = 0xA5A5A5A5` is observed
+  on the SRAM4 capture (IP-105/106 seqlock holds).
+- [ ] **W4-04 Modbus failure → E-stop.** Pull the RS-485 cable mid-run;
+  verify IP-205 counter ticks, `apply_control(-1)` fires after 10
+  consecutive failures, valves go neutral, and the audit log shows
+  the disconnect within 1 s.
+- [ ] **W4-05 Proportional valve ramp-out (IP-303 Round-4 follow-on).**
+  Hold full-speed track for 3 s, release joystick; verify
+  `REG_FLOW_SP_*` ramps from 10000 mV to 0 over **2 s** (track ladder)
+  on the A0602 output, valve coil stays energized through the ramp,
+  drops at t=2 s. Repeat for arm axes (1 s ramp).
+- [ ] **W4-06 Mixed-mode skip.** Drive both axes; release one; verify
+  released axis stops *immediately* (no ramp) because sibling is
+  active. Critical for coordinated dig→drive transitions.
+- [ ] **W4-07 Boot-PHY first-frame decode (IP-006 verification).**
+  Cold-boot both ends; first encrypted frame decodes on the receiver
+  with no `bad_header` events in the audit log.
+- [ ] **W4-08 Camera back-channel round-trip (IP-104 Round-4 follow-on).**
+  Operator presses "Force keyframe" on web UI → `CMD_REQ_KEYFRAME`
+  over LoRa → M7 forwards on Serial1 → `camera_service.py` emits
+  I-frame within **< 200 ms** end-to-end. Verify with frame-flag
+  capture from the X8↔H747 UART.
+- [ ] **W4-09 Async M7 TX state machine (IP-107 follow-on).** Bench-
+  validate `radio.startTransmit()` + `isTransmitDone()` IRQ timing
+  on real H747 + SX1276 wiring. Once green, replace the
+  `refresh_m4_alive_before_tx()` watchdog-refresh hack with the
+  proper non-blocking queue. Removes the worst-case time-on-air
+  margin assumption.
+- [ ] **W4-10 Fleet-key provisioning sanity (IP-008 verification).**
+  Flash a fresh image with `lp_keys_secret.h` deleted; confirm the
+  M7 halts in `setup()` with the OLED "FLEET KEY NOT PROVISIONED"
+  message and the bridge container exits non-zero.
+
+**Status memo for ongoing HIL work:**
+[`AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md`](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md)
+— Round 4 deferred items + Round 5 candidate queue.
 
 ---
 

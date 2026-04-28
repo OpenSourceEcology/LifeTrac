@@ -92,7 +92,12 @@ HEADER_LEN = 5
 CTRL_FRAME_LEN = 16
 HB_FRAME_LEN = 10
 TELEM_HEADER_LEN = HEADER_LEN + 2
-TELEM_MAX_PAYLOAD = 120
+# IP-306: reconciled with C side. The on-wire ``payload[120]`` array in
+# ``firmware/common/lora_proto/lora_proto.h`` stores the trailing 2-byte
+# CRC inside the same buffer, so the maximum *usable* payload is 118.
+# Keeping the Python side at 120 silently allowed frames the tractor would
+# truncate. See LORA_PROTOCOL.md telemetry frame layout.
+TELEM_MAX_PAYLOAD = 118
 CRC_LEN = 2
 GCM_NONCE_LEN = 12
 GCM_TAG_LEN = 16

@@ -39,12 +39,18 @@ uint16_t lp_crc16(const uint8_t* buf, size_t len) {
 
 size_t lp_kiss_encode(const uint8_t* in, size_t in_len,
                       uint8_t* out, size_t out_max) {
+    // IP-305: bound exactly how many bytes each iteration writes (2 for an
+    // escape, 1 for a regular byte) instead of assuming the worst case for
+    // every byte; the old check refused buffers that were 1 byte short of
+    // fitting an escape-free payload.
     size_t o = 0;
     if (out_max < 2) return 0;
     out[o++] = KISS_FEND;
     for (size_t i = 0; i < in_len; i++) {
-        if (o + 2 >= out_max) return 0;
         uint8_t b = in[i];
+        size_t need = (b == KISS_FEND || b == KISS_FESC) ? 2 : 1;
+        // Reserve one trailing byte for the closing FEND.
+        if (o + need + 1 > out_max) return 0;
         if (b == KISS_FEND) {
             out[o++] = KISS_FESC;
             out[o++] = KISS_TFEND;
@@ -55,7 +61,6 @@ size_t lp_kiss_encode(const uint8_t* in, size_t in_len,
             out[o++] = b;
         }
     }
-    if (o >= out_max) return 0;
     out[o++] = KISS_FEND;
     return o;
 }
@@ -138,18 +143,24 @@ void lp_make_heartbeat(HeartbeatFrame* f,
 size_t lp_make_command(CommandFrame* f,
                        uint8_t source_id, uint16_t seq,
                        uint8_t opcode, const uint8_t* arg, uint8_t arg_len) {
+    // IP-108: see CommandFrame docblock in lora_proto.h. The on-wire
+    // layout packs CRC immediately after the actual arg bytes, which for
+    // short commands lands inside the struct's ``arg[]`` storage and
+    // leaves the trailing struct ``crc16`` field undefined. We zero the
+    // whole struct first so any debugger / serializer that inspects
+    // unused tail bytes sees deterministic 0x00 instead of stack garbage.
     if (arg_len > sizeof(f->arg)) arg_len = sizeof(f->arg);
+    memset(f, 0, sizeof(*f));
     f->hdr.version      = LIFETRAC_PROTO_VERSION;
     f->hdr.source_id    = source_id;
     f->hdr.frame_type   = FT_COMMAND;
     f->hdr.sequence_num = seq;
     f->opcode           = opcode;
-    memset(f->arg, 0, sizeof(f->arg));
     if (arg_len > 0 && arg != 0) memcpy(f->arg, arg, arg_len);
     size_t prefix = sizeof(LoraHeader) + 1 + arg_len;
     uint16_t crc = lp_crc16((const uint8_t*)f, prefix);
     uint8_t* raw = (uint8_t*)f;
-    raw[prefix] = (uint8_t)(crc & 0xFF);
+    raw[prefix]     = (uint8_t)(crc & 0xFF);
     raw[prefix + 1] = (uint8_t)(crc >> 8);
     return prefix + 2;
 }

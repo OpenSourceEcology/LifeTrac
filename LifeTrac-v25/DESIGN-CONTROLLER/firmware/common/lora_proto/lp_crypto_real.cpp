@@ -48,17 +48,20 @@
 
   bool lp_encrypt(const uint8_t* key, const uint8_t* nonce,
                   const uint8_t* pt, size_t pt_len, uint8_t* out) {
-      // Layout written by us: ciphertext[pt_len] | tag[16].
+      // Layout written by us: ciphertext[pt_len] | tag[LP_TAG_LEN].
       uint8_t* tag = out + pt_len;
       return lp__gcm_run(MBEDTLS_GCM_ENCRYPT, key, nonce, pt, pt_len, out, tag) == 0;
   }
 
   bool lp_decrypt(const uint8_t* key, const uint8_t* nonce,
                   const uint8_t* ct, size_t ct_len, uint8_t* pt) {
-      // ct buffer carries ct_len + 16-byte tag at the end.
-      uint8_t tag_copy[16];
-      memcpy(tag_copy, ct + ct_len, 16);
-      return lp__gcm_run(MBEDTLS_GCM_DECRYPT, key, nonce, ct, ct_len, pt, tag_copy) == 0;
+      // IP-003 contract: ct_len = ciphertext + tag total length. Tag is the
+      // last LP_TAG_LEN bytes; the leading bytes are the ciphertext.
+      if (ct_len < LP_TAG_LEN) return false;
+      size_t cipher_len = ct_len - LP_TAG_LEN;
+      uint8_t tag_copy[LP_TAG_LEN];
+      memcpy(tag_copy, ct + cipher_len, LP_TAG_LEN);
+      return lp__gcm_run(MBEDTLS_GCM_DECRYPT, key, nonce, ct, cipher_len, pt, tag_copy) == 0;
   }
 
 // ===== MKR WAN 1310 path (rweather/Crypto) ===================================
@@ -71,19 +74,22 @@
                   const uint8_t* pt, size_t pt_len, uint8_t* out) {
       GCM<AES128> gcm;
       if (!gcm.setKey(key, 16)) return false;
-      if (!gcm.setIV(nonce, 12)) return false;
+      if (!gcm.setIV(nonce, LP_NONCE_LEN)) return false;
       gcm.encrypt(out, pt, pt_len);
-      gcm.computeTag(out + pt_len, 16);
+      gcm.computeTag(out + pt_len, LP_TAG_LEN);
       return true;
   }
 
   bool lp_decrypt(const uint8_t* key, const uint8_t* nonce,
                   const uint8_t* ct, size_t ct_len, uint8_t* pt) {
+      // IP-003 contract: ct_len = ciphertext + tag. See lora_proto.h.
+      if (ct_len < LP_TAG_LEN) return false;
+      size_t cipher_len = ct_len - LP_TAG_LEN;
       GCM<AES128> gcm;
       if (!gcm.setKey(key, 16)) return false;
-      if (!gcm.setIV(nonce, 12)) return false;
-      gcm.decrypt(pt, ct, ct_len);
-      return gcm.checkTag(ct + ct_len, 16);
+      if (!gcm.setIV(nonce, LP_NONCE_LEN)) return false;
+      gcm.decrypt(pt, ct, cipher_len);
+      return gcm.checkTag(ct + cipher_len, LP_TAG_LEN);
   }
 
 #else

@@ -150,18 +150,31 @@ typedef struct {
 typedef struct {
     LoraHeader hdr;          // frame_type = FT_TELEMETRY
     uint8_t    topic_id;     // statically registered MQTT-SN topic ID
-    uint8_t    payload_len;  // 0..120
+    uint8_t    payload_len;  // 0..118 (IP-306: usable max; the trailing
+                             //         CRC-16 is stored inside ``payload[]``,
+                             //         consuming 2 bytes of the 120-byte
+                             //         buffer.)
     // payload bytes follow inline; CRC-16 follows payload
     uint8_t    payload[120];
 } TelemetryFrame;
 
-// 8 bytes minimum (more if opcode-specific data present)
+// Variable-length on the wire (8 bytes minimum, 16 bytes maximum).
+//
+// IMPORTANT (IP-108): the on-wire layout is
+//     [ hdr(5) | opcode(1) | arg[arg_len] | crc16(2) ]
+// where ``arg_len`` may be 0..8 inclusive. ``arg[]`` and ``crc16`` here are
+// only the maximum-size storage; ``lp_make_command()`` writes the CRC
+// IMMEDIATELY after the actual arg bytes (i.e. into ``arg[arg_len]`` for
+// short commands) and leaves the trailing ``arg[]``/``crc16`` storage
+// undefined. Callers MUST use the size returned by ``lp_make_command()``
+// rather than ``sizeof(CommandFrame)`` and MUST NOT read ``f->crc16``
+// directly — use the last two bytes of the returned slice instead.
 typedef struct {
     LoraHeader hdr;          // frame_type = FT_COMMAND
     uint8_t  opcode;         // CMD_*
     // up to 8 bytes of opcode-specific payload
     uint8_t  arg[8];
-    uint16_t crc16;
+    uint16_t crc16;          // see note above — do NOT read directly
 } CommandFrame;
 
 typedef struct {
@@ -204,17 +217,27 @@ typedef struct {
 bool lp_kiss_feed(KissDecoder* dec, uint8_t b,
                   uint8_t** frame_out, size_t* frame_len);
 
-// AES-128-GCM wrappers — implementations live in crypto_stub.c (TODO: real
-// MbedTLS / ArduinoBearSSL bindings). Returns true on success.
+// AES-128-GCM wrappers. Real backends live in lp_crypto_real.cpp; the no-op
+// stub in crypto_stub.c is gated behind LIFETRAC_ALLOW_STUB_CRYPTO.
 //
-// `key` is the pre-shared 16-byte fleet key.
-// `nonce` is 12 bytes: [source_id(1) | sequence(2) | timestamp_s(4) | random(5)].
-// `out` must be pt_len + 16 (auth tag) bytes.
+// `key`   : pre-shared 16-byte fleet key.
+// `nonce` : 12 bytes [source_id(1) | sequence(2) | timestamp_s(4) | random(5)].
+//
+// CONTRACT (IP-003 — must match Python AESGCM, the stub, and real backends):
+//   * lp_encrypt: writes `pt_len` ciphertext bytes followed by `LP_TAG_LEN`
+//     auth tag bytes into `out`. Caller must size `out` to pt_len + LP_TAG_LEN.
+//   * lp_decrypt: `ct_len` is the TOTAL length of ciphertext + auth tag
+//     (i.e. `pt_len + LP_TAG_LEN`). Recovered plaintext is `ct_len - LP_TAG_LEN`
+//     bytes long; caller must size `pt` accordingly.
+//
+// Returns true on success; lp_decrypt returns false on tag mismatch / tamper.
+#define LP_NONCE_LEN  12
+#define LP_TAG_LEN    16
+
 bool lp_encrypt(const uint8_t* key, const uint8_t* nonce,
                 const uint8_t* pt, size_t pt_len,
                 uint8_t* out);
 
-// Returns true and fills `pt` if the auth tag verifies; false on tamper/replay.
 bool lp_decrypt(const uint8_t* key, const uint8_t* nonce,
                 const uint8_t* ct, size_t ct_len,
                 uint8_t* pt);
