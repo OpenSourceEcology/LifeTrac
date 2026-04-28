@@ -18,6 +18,26 @@
 > `DESIGN-CONTROLLER/RESEARCH-CONTROLLER/` for the current location of any
 > Opta / ESP32 / `raspberry_pi_web_controller` files.
 
+## 2026-04-28 controller code-review implementation plan
+
+Four code reviews of the DESIGN-CONTROLLER stack (Claude Opus 4.7, GitHub
+Copilot v1.0, GPT-5.3-Codex v1.0, Gemini 3.1 Pro) have been merged into a
+single actionable plan with stable IDs (`IP-001` … `IP-309`) and severity
+tags. **All work tracked there:**
+
+➡️ **[AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md)**
+
+Source reviews:
+
+- [Claude Opus 4.7 (primary, with cross-review addendum)](AI%20NOTES/2026-04-28_Controller_Code_Pipeline_Review_ClaudeOpus4_7_v1_0.md)
+- [GitHub Copilot v1.0](AI%20NOTES/2026-04-28_Controller_Code_Pipeline_Review_GitHub_Copilot_v1_0.md)
+- [GPT-5.3-Codex v1.0](AI%20NOTES/2026-04-28_Controller_Code_Pipeline_Review_GPT-5.3-Codex_v1_0.md)
+- [Gemini 3.1 Pro v1.0](AI%20NOTES/2026-04-28_Controller_Code_Review_Gemini_3.1_Pro_v1.0.md)
+
+Wave 0 (IP-001 … IP-008) is the BLOCKER set — nothing else is testable
+until those land. Wave 4 lists the gates that must pass before any wet
+hydraulic test.
+
 ## Current sprint status — DESIGN-CONTROLLER LoRa stack (2026-04-27)
 
 Tracked in detail in [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) and
