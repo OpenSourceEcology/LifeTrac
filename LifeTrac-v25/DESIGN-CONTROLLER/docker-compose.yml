@@ -1,0 +1,84 @@
+# LifeTrac v25 base-station compose stack.
+#
+# Brings up: mosquitto broker, lora_bridge (talks to the SX1276 over USB-CDC),
+# web_ui (operator console + REST), audit-tail (rotating JSONL writer).
+#
+# All four services share the same image (built from ./Dockerfile) and the
+# same /var/lib/lifetrac volume so audit logs and settings survive restarts.
+# Mosquitto is on the default 1883 inside the compose network so containers
+# can talk to it as `mqtt://mosquitto:1883` without exposing it to the LAN.
+#
+# Run with:
+#     docker compose up -d
+# Tail a service:
+#     docker compose logs -f web_ui
+# Bring down (preserving volumes):
+#     docker compose down
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    volumes:
+      - ./base_station/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+    # Bound to localhost only; reverse-proxy TLS or a firewall handles LAN
+    # exposure. Compose-internal traffic uses the service-name DNS alias.
+    ports:
+      - "127.0.0.1:1883:1883"
+
+  lora_bridge:
+    build: .
+    image: lifetrac-v25:latest
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    # Bridge needs the SX1276 USB-CDC; map the host device through. The
+    # path is overridable via .env so dev boxes can swap in a virtual
+    # serial port for tests.
+    devices:
+      - "${LIFETRAC_LORA_DEVICE:-/dev/ttyACM0}:/dev/ttyACM0"
+    environment:
+      LIFETRAC_MQTT_HOST: mosquitto
+      LIFETRAC_LORA_DEVICE: /dev/ttyACM0
+    volumes:
+      - lifetrac_state:/var/lib/lifetrac
+      - lifetrac_logs:/var/log/lifetrac
+    command: ["python", "/app/base_station/lora_bridge.py"]
+
+  web_ui:
+    build: .
+    image: lifetrac-v25:latest
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      LIFETRAC_MQTT_HOST: mosquitto
+      LIFETRAC_PIN: "${LIFETRAC_PIN:?LIFETRAC_PIN must be set in .env}"
+      LIFETRAC_SETTINGS_PATH: /var/lib/lifetrac/settings.json
+    volumes:
+      - lifetrac_state:/var/lib/lifetrac
+      - lifetrac_logs:/var/log/lifetrac
+    ports:
+      - "8080:8080"
+    command: ["uvicorn", "web_ui:app", "--host", "0.0.0.0", "--port", "8080"]
+
+  audit_tail:
+    build: .
+    image: lifetrac-v25:latest
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      LIFETRAC_MQTT_HOST: mosquitto
+      LIFETRAC_AUDIT_PATH: /var/log/lifetrac/audit.jsonl
+    volumes:
+      - lifetrac_logs:/var/log/lifetrac
+    command: ["python", "-m", "audit_log", "--tail-mqtt"]
+
+volumes:
+  mosquitto_data:
+  mosquitto_logs:
+  lifetrac_state:
+  lifetrac_logs:

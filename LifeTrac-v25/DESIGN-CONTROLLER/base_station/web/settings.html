@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>LifeTrac v25 — Settings</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2em auto; padding: 0 1em; }
+    h1, h2 { font-weight: 600; }
+    .pill { display: inline-block; padding: 0.25em 0.7em; border-radius: 999px;
+            font-size: 0.9em; font-weight: 600; color: #fff; }
+    .pill.green  { background: #2a8a3e; }
+    .pill.yellow { background: #b88a00; }
+    .pill.orange { background: #c0651a; }
+    .pill.grey   { background: #6c757d; }
+    .row { display: flex; align-items: center; gap: 1em; margin: 1em 0; }
+    button { padding: 0.5em 1em; font-size: 1em; cursor: pointer; }
+    code { background: #f3f3f3; padding: 0.1em 0.3em; border-radius: 3px; }
+    .meta { color: #555; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <h1>LifeTrac v25 — Base-Station Settings</h1>
+  <p><a href="/">&larr; back to operator console</a></p>
+
+  <h2>AI accelerator (optional Coral Edge TPU)</h2>
+
+  <div class="row">
+    <span>Status:</span>
+    <span id="accel-pill" class="pill grey">unknown</span>
+    <button id="accel-refresh">Re-scan hardware</button>
+  </div>
+
+  <div class="row">
+    <label>
+      <input type="checkbox" id="accel-toggle">
+      Use Coral when available
+    </label>
+  </div>
+
+  <p class="meta">
+    The pipeline ships and validates CPU-only per
+    <code>MASTER_PLAN.md §8.19</code>; Coral is a strict additive upgrade.
+    See <code>DESIGN-CONTROLLER/CORAL.md</code> for troubleshooting.
+  </p>
+
+  <div class="meta">
+    <div>Hardware kind: <span id="accel-kind">—</span></div>
+    <div>Last error: <span id="accel-error">—</span></div>
+  </div>
+
+  <script>
+    const pill   = document.getElementById('accel-pill');
+    const toggle = document.getElementById('accel-toggle');
+    const kindEl = document.getElementById('accel-kind');
+    const errEl  = document.getElementById('accel-error');
+    const btn    = document.getElementById('accel-refresh');
+
+    function paint(state) {
+      toggle.checked = !!state.enabled;
+      kindEl.textContent = state.kind || '—';
+      errEl.textContent  = state.last_error || '—';
+      let cls = 'grey', label = 'no accelerator';
+      if (state.active) { cls = 'green';  label = 'Coral active'; }
+      else if (state.present && !state.enabled) { cls = 'yellow'; label = 'present, disabled'; }
+      else if (state.present && !state.usable)  { cls = 'orange'; label = 'present, driver missing'; }
+      pill.className = 'pill ' + cls;
+      pill.textContent = label;
+    }
+
+    async function load() {
+      const r = await fetch('/api/settings/accel', {credentials:'include'});
+      if (r.status === 401) { location = '/'; return; }
+      paint(await r.json());
+    }
+
+    toggle.addEventListener('change', async () => {
+      await fetch('/api/settings/accel', {
+        method:'POST', credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({enabled: toggle.checked}),
+      });
+      load();
+    });
+
+    btn.addEventListener('click', async () => {
+      const r = await fetch('/api/settings/accel/refresh', {
+        method:'POST', credentials:'include',
+      });
+      if (r.ok) paint(await r.json());
+    });
+
+    load();
+  </script>
+
+  <h2>Tractor parameters</h2>
+  <p class="meta">
+    Live snapshot from the tractor X8 <code>params_service</code> via the
+    retained MQTT topic <code>lifetrac/v25/params/changed</code>. Edits are
+    sent as a JSON patch on <code>lifetrac/v25/params/set</code>; the tractor
+    validates and re-publishes the new snapshot. Empty until the broker
+    delivers the first retained payload.
+  </p>
+  <textarea id="params-editor" rows="14"
+            style="width:100%; font-family:ui-monospace, monospace;
+                   font-size: 0.95em; box-sizing: border-box;"></textarea>
+  <div class="row">
+    <button id="params-reload">Reload from tractor</button>
+    <button id="params-save">Send patch</button>
+    <span id="params-status" class="meta"></span>
+  </div>
+
+  <script>
+    const editor = document.getElementById('params-editor');
+    const status = document.getElementById('params-status');
+    const reload = document.getElementById('params-reload');
+    const save   = document.getElementById('params-save');
+
+    async function loadParams() {
+      const r = await fetch('/api/params', {credentials:'include'});
+      if (r.status === 401) { location = '/'; return; }
+      const data = await r.json();
+      editor.value = JSON.stringify(data, null, 2);
+      status.textContent = Object.keys(data).length === 0
+        ? 'no snapshot yet (broker has not delivered retained params)'
+        : 'loaded';
+    }
+
+    reload.addEventListener('click', loadParams);
+
+    save.addEventListener('click', async () => {
+      let patch;
+      try { patch = JSON.parse(editor.value); }
+      catch (e) { status.textContent = 'invalid JSON: ' + e.message; return; }
+      const r = await fetch('/api/params', {
+        method:'POST', credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) { status.textContent = 'send failed: HTTP ' + r.status; return; }
+      status.textContent = 'patch sent — waiting for confirm…';
+      // Give the tractor a beat to apply + re-publish, then refresh.
+      setTimeout(loadParams, 750);
+    });
+
+    loadParams();
+  </script>
+</body>
+</html>

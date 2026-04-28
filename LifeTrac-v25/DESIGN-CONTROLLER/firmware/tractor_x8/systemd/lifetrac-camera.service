@@ -1,0 +1,16 @@
+[Unit]
+Description=LifeTrac v25 tractor X8 camera service (tile-delta encoder)
+After=network-online.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/lifetrac/firmware/tractor_x8/camera_service.py
+Restart=on-failure
+RestartSec=5
+# libcamera/picamera2 needs access to /dev/video* and /dev/media*; on the
+# X8 these are owned by the `video` group.
+SupplementaryGroups=video
+
+[Install]
+WantedBy=multi-user.target

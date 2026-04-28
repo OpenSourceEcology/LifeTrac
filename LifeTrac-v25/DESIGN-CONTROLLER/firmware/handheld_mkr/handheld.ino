@@ -2,17 +2,25 @@
 //
 // DRAFT FOR REVIEW. Not compiled or tested.
 //
-// Reads two analog joysticks + 8 buttons + a momentary TAKE CONTROL button,
-// packs a ControlFrame at 20 Hz, and emits a Heartbeat at the same cadence.
-// LoRa PHY: SF7 / BW 500 kHz / CR 4/5 / 915 MHz (US).
+// Reads two analog joysticks + 8 buttons + a momentary TAKE CONTROL button +
+// a latching E-STOP button, packs a ControlFrame at 20 Hz, and emits a
+// Heartbeat at the same cadence. Also receives CMD_LINK_TUNE from the
+// tractor (so we follow its adaptive SF ladder) and CMD_ESTOP from any
+// peer (so the OLED + LED indicate latched state).
+//
+// LoRa PHY at boot: SF7 / BW 125 kHz / CR 4/5 / 915 MHz (US) — control
+// profile per MASTER_PLAN.md §8.17. The ladder may step us to SF8/SF9.
 //
 // Expected boards/libs:
 //   - Arduino MKR WAN 1310
 //   - RadioLib >= 6.x
+//   - Adafruit_SSD1306 + Adafruit_GFX (for the optional 128x64 OLED)
 //   - lora_proto.h / .c included from ../common/lora_proto/
 
 #include <Arduino.h>
 #include <RadioLib.h>
+#include <Wire.h>
+#include <Adafruit_SSD1306.h>
 #include "../common/lora_proto/lora_proto.h"
 
 // ---------- pins ----------
@@ -22,7 +30,9 @@
 #define PIN_RH_Y        A3
 #define PIN_BTN_BASE    2     // first of 8 contiguous button pins
 #define PIN_BTN_TAKECTL 10    // momentary, latched in software for 30 s after release
+#define PIN_BTN_ESTOP   11    // latching mushroom — LOW = pressed (latched)
 #define PIN_LED_LINK    LED_BUILTIN
+#define PIN_LED_ESTOP   12    // panel LED: solid red when E-stop latched
 
 // ---------- LoRa modem ----------
 // MKR WAN 1310 wires the Murata SiP to: NSS=LORA_IRQ_DUMB, IRQ=LORA_IRQ, RST=-1, GPIO=LORA_BOOT0.
@@ -36,9 +46,47 @@ static const uint8_t kFleetKey[16] = {0};
 static uint16_t g_seq = 0;
 static uint8_t  g_hb  = 0;
 static uint32_t g_takectl_release_ms = 0;  // 0 = not latched
+// Set true on inbound CMD_ESTOP from any peer; cleared only by an explicit
+// CMD_CLEAR_ESTOP from BASE.
+static bool     g_estop_remote_latched = false;
+
+// FHSS counters — definitions for the externs referenced inside `send_frame()`'s
+// LIFETRAC_FHSS_ENABLED block. File-scope (not static) so a future shared
+// header could re-extern them without breaking the link.
+uint32_t g_fhss_hop_counter = 0;
+uint32_t g_fhss_key_id      = 0;
+// Last RSSI we observed on any inbound frame — surfaced on the OLED so the
+// operator can sanity-check link health before reaching for the cab.
+static int16_t  g_last_rx_rssi_dbm = -128;
+// Per-source replay window. We only ever receive from tractor + base on the
+// handheld, but sizing for 3 sources keeps the index calculus identical to
+// tractor_m7.ino so the same lp_replay_check_and_update() call works.
+static LpReplayWindow g_replay[3];
 
 static const uint32_t TAKECTL_LATCH_MS = 30000;
 static const uint32_t TICK_PERIOD_MS   = 50;   // 20 Hz
+
+// ---------- adaptive SF ladder rung tracking ----------
+// Mirrors the LADDER[] table in tractor_m7.ino so an inbound CMD_LINK_TUNE
+// can map (sf, bw_code) back to a rung index for state + UI purposes.
+struct LadderRung { uint8_t sf; uint16_t bw_khz; uint8_t cr_den; uint8_t bw_code; };
+static const LadderRung LADDER[3] = {
+    { 7, 250, 5, 1 },   // DECISIONS.md D-A2
+    { 8, 125, 5, 0 },
+    { 9, 125, 5, 0 },
+};
+static uint8_t g_ladder_rung = 0;
+
+// ---------- KISS decoder for incoming bytes ----------
+static KissDecoder g_dec;
+
+// ---------- OLED (optional; init failure is non-fatal) ----------
+#define OLED_W 128
+#define OLED_H 64
+#define OLED_ADDR 0x3C
+static Adafruit_SSD1306 g_oled(OLED_W, OLED_H, &Wire, /*reset*/ -1);
+static bool g_oled_ok = false;
+static uint32_t g_next_oled_ms = 0;
 
 // ---------- helpers ----------
 // Per-axis deadband (counts on the 0..1023 ADC). Keeps neutral truly neutral.
@@ -79,6 +127,7 @@ static uint16_t read_buttons() {
 }
 
 // Build a 12-byte AES-GCM nonce: [source_id | seq(LE) | t_seconds(LE) | rand(5)]
+// Identical layout to base_station/lora_proto.py build_nonce().
 static void build_nonce(uint8_t out[12], uint16_t seq) {
     out[0] = SRC_HANDHELD;
     out[1] = (uint8_t)(seq & 0xFF);
@@ -112,15 +161,202 @@ static void send_frame(const uint8_t* pt, size_t pt_len, uint16_t seq) {
     size_t kiss_len = lp_kiss_encode(onair, 12 + enc_len, kiss, sizeof(kiss));
     if (kiss_len == 0) return;
 
+#ifdef LIFETRAC_FHSS_ENABLED
+    // CSMA skip-busy hop selection (DECISIONS.md D-C6). Only enabled when the
+    // FHSS path is compiled in, because the per-hop scanChannel call adds a
+    // few ms to every TX and we don't pay that on the single-channel default.
+    extern uint32_t g_fhss_hop_counter;     // owned by the loop()
+    extern uint32_t g_fhss_key_id;
+    auto sampler = [](uint32_t hz, void* /*ctx*/) -> int16_t {
+        radio.setFrequency(hz / 1.0e6f);
+        // RadioLib::scanChannel returns RADIOLIB_LORA_DETECTED if a preamble
+        // is heard, else RADIOLIB_CHANNEL_FREE. We translate that into a
+        // sentinel dBm so lp_csma_pick_hop's threshold compare works.
+        int state = radio.scanChannel();
+        return (state == RADIOLIB_LORA_DETECTED) ? (int16_t)-40 : (int16_t)-110;
+    };
+    uint8_t skips = 0;
+    uint32_t hop = lp_csma_pick_hop(g_fhss_key_id, g_fhss_hop_counter,
+                                    sampler, nullptr,
+                                    LP_CSMA_DEFAULT_BUSY_DBM,
+                                    LP_CSMA_DEFAULT_MAX_SKIPS, &skips);
+    radio.setFrequency(lp_fhss_channel_hz(g_fhss_key_id, hop) / 1.0e6f);
+    g_fhss_hop_counter = hop + 1;
+    if (skips > 0) {
+        // Audit-log hook — surface skip count via the next heartbeat flags
+        // byte once the telemetry pipeline carries link health.
+        (void)skips;
+    }
+#endif
+
     radio.transmit(kiss, kiss_len);
     digitalWrite(PIN_LED_LINK, !digitalRead(PIN_LED_LINK));
+    // RadioLib leaves the SX1276 in standby after transmit(); re-arm RX or
+    // we'll never see another inbound frame.
+    radio.startReceive();
+}
+
+// Apply a (sf, bw_khz, cr_den) PHY profile to the local radio. Returns the
+// rung index 0..2 if the request matches a known LADDER row, else 0xFF.
+static uint8_t apply_phy_rung(uint8_t sf, uint16_t bw_khz, uint8_t cr_den) {
+    uint8_t rung = 0xFF;
+    for (uint8_t r = 0; r < 3; r++) {
+        if (LADDER[r].sf == sf && LADDER[r].bw_khz == bw_khz && LADDER[r].cr_den == cr_den) {
+            rung = r;
+            break;
+        }
+    }
+    if (rung == 0xFF) return 0xFF;     // unknown profile — ignore
+    radio.setSpreadingFactor(sf);
+    radio.setBandwidth((float)bw_khz);
+    radio.setCodingRate(cr_den);
+    radio.startReceive();
+    g_ladder_rung = rung;
+    return rung;
+}
+
+static int src_index(uint8_t source_id) {
+    switch (source_id) {
+        case SRC_HANDHELD: return 0;
+        case SRC_BASE:     return 1;
+        case SRC_AUTONOMY: return 2;
+        // Tractor TX shares slot 0 with our own SRC_HANDHELD slot. We never
+        // receive our own frames over the air, so the only thing landing in
+        // slot 0 is tractor → handheld traffic, and the per-slot replay
+        // window remains correct against that single peer.
+        case SRC_TRACTOR:  return 0;
+        default:           return -1;
+    }
+}
+
+// Process one decoded LoRa frame (already past KISS de-framing).
+static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm) {
+    if (len < 12 + 16) return;             // nonce + tag minimum
+    uint8_t nonce[12];
+    memcpy(nonce, onair, 12);
+    uint8_t pt[160];
+    if (!lp_decrypt(kFleetKey, nonce, onair + 12, len - 12, pt)) return;
+    size_t pt_len = len - 12 - 16;
+    if (pt_len < sizeof(LoraHeader)) return;
+
+    LoraHeader* hdr = (LoraHeader*)pt;
+    if (hdr->version != LIFETRAC_PROTO_VERSION) return;
+    int idx = src_index(hdr->source_id);
+    if (idx < 0) return;
+    if (!lp_replay_check_and_update(&g_replay[idx], hdr->sequence_num)) return;
+    g_last_rx_rssi_dbm = rssi_dbm;
+
+    // We only act on commands. The handheld is a controller, not a logger;
+    // telemetry/heartbeat from the tractor are surfaced on the OLED via the
+    // RSSI side effect above, but we don't decode them further yet.
+    if (hdr->frame_type != FT_COMMAND) return;
+    if (pt_len < sizeof(LoraHeader) + 1 + 2) return;     // hdr + opcode + crc
+    uint8_t op = pt[sizeof(LoraHeader)];
+    const uint8_t* arg = pt + sizeof(LoraHeader) + 1;
+
+    switch (op) {
+        case CMD_LINK_TUNE: {
+            // arg[0]=target SF, arg[1]=bw_code (0=125, 1=250, 2=500), arg[2]=reason.
+            uint8_t target_sf = arg[0];
+            uint8_t bw_code   = arg[1];
+            uint16_t bw_khz = (bw_code == 0) ? 125 : (bw_code == 1) ? 250 : 500;
+            apply_phy_rung(target_sf, bw_khz, /*cr_den*/ 5);
+            break;
+        }
+        case CMD_ESTOP:
+            g_estop_remote_latched = true;
+            digitalWrite(PIN_LED_ESTOP, HIGH);
+            break;
+        case CMD_CLEAR_ESTOP:
+            // Honour clears only from BASE per MASTER_PLAN.md §8.5 (operator at console).
+            if (hdr->source_id == SRC_BASE) {
+                g_estop_remote_latched = false;
+                digitalWrite(PIN_LED_ESTOP, LOW);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+// Pull bytes off the LoRa modem and feed the KISS decoder.
+static void poll_radio() {
+    int packet_len = radio.getPacketLength();
+    if (packet_len <= 0) return;
+    uint8_t buf[256];
+    int st = radio.readData(buf, packet_len);
+    if (st != RADIOLIB_ERR_NONE) {
+        radio.startReceive();
+        return;
+    }
+    int16_t rssi = radio.getRSSI();
+    for (int i = 0; i < packet_len; i++) {
+        uint8_t* frame; size_t flen;
+        if (lp_kiss_feed(&g_dec, buf[i], &frame, &flen)) {
+            process_air_frame(frame, flen, rssi);
+        }
+    }
+    radio.startReceive();
+}
+
+// Build + send a CMD_ESTOP frame at P0 priority. This is invoked when the
+// local mushroom button latches LOW. The tractor M7 will set its own
+// g_estop_latched on receipt and force valves neutral on the next 50 Hz tick.
+static void send_estop() {
+    CommandFrame cf;
+    uint16_t seq = g_seq++;
+    size_t cmd_len = lp_make_command(&cf, SRC_HANDHELD, seq, CMD_ESTOP, NULL, 0);
+    send_frame((const uint8_t*)&cf, cmd_len, seq);
+}
+
+// Render a one-screen status page on the SSD1306. Cheap to call ~5 Hz.
+static void update_oled(int8_t lhx, int8_t lhy, int8_t rhx, int8_t rhy,
+                        bool takectl_held, bool takectl_latched, bool estop_local) {
+    if (!g_oled_ok) return;
+    g_oled.clearDisplay();
+    g_oled.setTextColor(SSD1306_WHITE);
+    g_oled.setTextSize(1);
+
+    g_oled.setCursor(0, 0);
+    g_oled.print(F("LifeTrac v25 HANDHELD"));
+
+    g_oled.setCursor(0, 12);
+    g_oled.print(F("SF"));   g_oled.print(LADDER[g_ladder_rung].sf);
+    g_oled.print(F(" BW")); g_oled.print(LADDER[g_ladder_rung].bw_khz);
+    g_oled.print(F(" "));   g_oled.print(g_last_rx_rssi_dbm); g_oled.print(F("dBm"));
+
+    g_oled.setCursor(0, 24);
+    g_oled.print(F("LH "));  g_oled.print(lhx); g_oled.print(F(",")); g_oled.print(lhy);
+    g_oled.print(F("  RH ")); g_oled.print(rhx); g_oled.print(F(",")); g_oled.print(rhy);
+
+    g_oled.setCursor(0, 36);
+    if (estop_local || g_estop_remote_latched) {
+        g_oled.setTextSize(2);
+        g_oled.print(F("ESTOP"));
+        g_oled.setTextSize(1);
+    } else if (takectl_held || takectl_latched) {
+        g_oled.print(F("TAKECTL "));
+        if (takectl_latched && !takectl_held) {
+            uint32_t left = (g_takectl_release_ms > millis())
+                          ? (g_takectl_release_ms - millis()) / 1000 : 0;
+            g_oled.print(left); g_oled.print(F("s"));
+        } else {
+            g_oled.print(F("HELD"));
+        }
+    } else {
+        g_oled.print(F("OK"));
+    }
+
+    g_oled.display();
 }
 
 // ---------- Arduino entry points ----------
 void setup() {
     Serial.begin(115200);
-    pinMode(PIN_LED_LINK, OUTPUT);
+    pinMode(PIN_LED_LINK,  OUTPUT);
+    pinMode(PIN_LED_ESTOP, OUTPUT);
     pinMode(PIN_BTN_TAKECTL, INPUT_PULLUP);
+    pinMode(PIN_BTN_ESTOP,   INPUT_PULLUP);
     for (int i = 0; i < 8; i++) pinMode(PIN_BTN_BASE + i, INPUT_PULLUP);
 
     int st = radio.begin(915.0,    // MHz
@@ -133,9 +369,33 @@ void setup() {
         Serial.print("LoRa begin failed: "); Serial.println(st);
         while (1) { delay(1000); }
     }
+    radio.startReceive();
+    g_ladder_rung = 0;
+
+    for (int i = 0; i < 3; i++) lp_replay_init(&g_replay[i]);
+
+    // OLED is optional — if init fails we just skip rendering. The handheld
+    // remains fully functional without it.
+    Wire.begin();
+    if (g_oled.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
+        g_oled_ok = true;
+        g_oled.clearDisplay();
+        g_oled.setTextColor(SSD1306_WHITE);
+        g_oled.setTextSize(1);
+        g_oled.setCursor(0, 0);
+        g_oled.print(F("LifeTrac v25 HANDHELD"));
+        g_oled.setCursor(0, 12);
+        g_oled.print(F("boot OK"));
+        g_oled.display();
+    }
 }
 
 void loop() {
+    // Drain RX every loop iteration so an inbound CMD_LINK_TUNE applies
+    // before our next TX (otherwise we transmit on the old PHY and the
+    // tractor doesn't hear us).
+    poll_radio();
+
     static uint32_t next_tick = 0;
     uint32_t now = millis();
     if ((int32_t)(now - next_tick) < 0) return;
@@ -148,6 +408,22 @@ void loop() {
     int8_t   rhy = read_axis(PIN_RH_Y);
     uint16_t btns = read_buttons();
 
+    // E-STOP button (latching mushroom; LOW = pressed). Edge-trigger on
+    // press so we send exactly one CMD_ESTOP per latch event — the tractor's
+    // sliding replay window de-dupes anyway, but this keeps the airwaves clean.
+    static bool s_estop_prev = false;
+    bool estop_local = (digitalRead(PIN_BTN_ESTOP) == LOW);
+    if (estop_local && !s_estop_prev) {
+        send_estop();
+        digitalWrite(PIN_LED_ESTOP, HIGH);
+    } else if (!estop_local) {
+        // Local button physically released. We do NOT auto-clear the latched
+        // remote state — that requires an explicit operator action at the base
+        // console (CMD_CLEAR_ESTOP from BASE).
+        if (!g_estop_remote_latched) digitalWrite(PIN_LED_ESTOP, LOW);
+    }
+    s_estop_prev = estop_local;
+
     // TAKE CONTROL latch — held while button is down; latches 30 s after release.
     bool takectl_held = (digitalRead(PIN_BTN_TAKECTL) == LOW);
     if (takectl_held) {
@@ -156,6 +432,7 @@ void loop() {
     bool takectl_latched = (now < g_takectl_release_ms);
     uint8_t flags = 0;
     if (takectl_held || takectl_latched) flags |= FLAG_TAKECTL_HELD;
+    if (estop_local || g_estop_remote_latched) flags |= FLAG_ESTOP_ARMED;
 
     // ---- control frame
     ControlFrame cf;
@@ -170,4 +447,10 @@ void loop() {
     send_frame((const uint8_t*)&hb, sizeof(hb), hb_seq);
 
     g_hb++;
+
+    // OLED update at ~5 Hz (cheap but I²C still costs ~10 ms per frame).
+    if ((int32_t)(now - g_next_oled_ms) >= 0) {
+        g_next_oled_ms = now + 200;
+        update_oled(lhx, lhy, rhx, rhy, takectl_held, takectl_latched, estop_local);
+    }
 }

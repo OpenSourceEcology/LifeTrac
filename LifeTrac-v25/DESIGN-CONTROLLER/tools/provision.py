@@ -1,20 +1,45 @@
-"""Generate the local LifeTrac v25 LoRa fleet-key header.
+"""Generate the local LifeTrac v25 LoRa fleet-key header and (optionally)
+push the key to a node over USB-CDC.
 
 This implements the MASTER_PLAN.md v25 key workflow: a single shared AES-128
-key lives in firmware/common/lora_proto/key.h on each build machine and is not
-committed. Device flashing over USB can be layered on this once the bootloader
-handshake is defined.
+key lives in firmware/common/lora_proto/key.h on each build machine and is
+not committed.
+
+Two operating modes:
+  * Default ("header" mode): generate or accept a key and write key.h.
+  * --write-port MODE: send the key to a flashed node that has booted into
+    USB-CDC provisioning mode. Wire protocol per KEY_ROTATION.md:
+
+        host: b"LIFETRAC-V25-PROV\\n"   node: b"READY\\n"
+        host: b"KEY:" + key_bytes(16)   node: b"OK\\n"
+        host: b"COMMIT\\n"               node: b"COMMITTED\\n"  → node resets
+
+    The magic prologue exists so a stray serial monitor cannot accidentally
+    trigger a key write — the node ignores anything else.
 """
 
 from __future__ import annotations
 
 import argparse
 import secrets
+import sys
+import time
 from pathlib import Path
+
+try:
+    import serial          # pyserial; only required for --write-port
+except ImportError:
+    serial = None          # type: ignore[assignment]
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HEADER = ROOT / "firmware" / "common" / "lora_proto" / "key.h"
+
+# USB-CDC provisioning protocol constants.
+PROLOGUE   = b"LIFETRAC-V25-PROV\n"
+KEY_PREFIX = b"KEY:"
+COMMIT     = b"COMMIT\n"
+KEY_LEN    = 16
 
 
 def parse_key(text: str | None) -> bytes:
@@ -71,16 +96,86 @@ def main() -> None:
     parser.add_argument("--key-id", type=lambda value: int(value, 0), help="override 32-bit key id")
     parser.add_argument("--out", type=Path, default=DEFAULT_HEADER, help="output key.h path")
     parser.add_argument("--print-key", action="store_true", help="print generated key hex once")
+    parser.add_argument("--no-header", action="store_true",
+                        help="skip writing key.h (use with --write-port to provision only)")
+    parser.add_argument("--write-port",
+                        help="USB-CDC port (e.g. COM5, /dev/ttyACM0); push key to a node "
+                             "in provisioning mode")
+    parser.add_argument("--baud", type=int, default=115200,
+                        help="serial baud for --write-port (default 115200)")
+    parser.add_argument("--i-am-the-key-officer", action="store_true",
+                        help="confirm authority to provision; required with --write-port")
     args = parser.parse_args()
 
     key = parse_key(args.key)
     key_id = args.key_id if args.key_id is not None else default_key_id(key)
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(render_header(key, key_id), encoding="ascii")
-    print(f"wrote {args.out}")
-    print(f"key_id=0x{key_id:08X}")
+
+    if not args.no_header:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(render_header(key, key_id), encoding="ascii")
+        print(f"wrote {args.out}")
+        print(f"key_id=0x{key_id:08X}")
     if args.print_key:
         print(f"key={key.hex()}")
+
+    if args.write_port:
+        if not args.i_am_the_key_officer:
+            print("--write-port refuses to run without --i-am-the-key-officer "
+                  "(see KEY_ROTATION.md)", file=sys.stderr)
+            sys.exit(2)
+        try:
+            write_key_to_node(args.write_port, key, baud=args.baud)
+        except (RuntimeError, TimeoutError, OSError) as exc:
+            print(f"provision failed: {exc}", file=sys.stderr)
+            sys.exit(1)
+        print("provision ok")
+
+
+# ---- USB-CDC provisioning helpers -----------------------------------------
+
+def _read_line(ser, timeout_s: float = 3.0) -> bytes:
+    """Read one newline-terminated line within timeout. Raises TimeoutError."""
+    deadline = time.monotonic() + timeout_s
+    buf = bytearray()
+    while time.monotonic() < deadline:
+        b = ser.read(1)
+        if not b:
+            continue
+        buf.extend(b)
+        if buf.endswith(b"\n"):
+            return bytes(buf)
+    raise TimeoutError(f"no response within {timeout_s:.1f}s; got {bytes(buf)!r}")
+
+
+def write_key_to_node(port: str, key: bytes, baud: int = 115200) -> None:
+    """Send `key` (16 bytes) to a node listening on USB-CDC at `port`."""
+    if len(key) != KEY_LEN:
+        raise ValueError(f"key must be exactly {KEY_LEN} bytes (got {len(key)})")
+    if serial is None:
+        raise SystemExit("pyserial not installed; pip install pyserial")
+
+    ser = serial.Serial(port, baudrate=baud, timeout=0.2)
+    try:
+        # Some boards reset on DTR open; give the bootloader a moment to settle.
+        time.sleep(1.5)
+        ser.reset_input_buffer()
+
+        ser.write(PROLOGUE)
+        resp = _read_line(ser).strip()
+        if resp != b"READY":
+            raise RuntimeError(f"node did not enter provisioning mode: {resp!r}")
+
+        ser.write(KEY_PREFIX + key)
+        resp = _read_line(ser).strip()
+        if resp != b"OK":
+            raise RuntimeError(f"node rejected key: {resp!r}")
+
+        ser.write(COMMIT)
+        resp = _read_line(ser, timeout_s=5.0).strip()
+        if resp != b"COMMITTED":
+            raise RuntimeError(f"node did not commit: {resp!r}")
+    finally:
+        ser.close()
 
 
 if __name__ == "__main__":

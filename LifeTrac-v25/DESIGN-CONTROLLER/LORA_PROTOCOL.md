@@ -96,7 +96,7 @@ Tempting; declined. Reasons:
 | Air time, 64-byte TelemetryFrame | n/a | ~250 ms | n/a |
 | Air time, 32-byte image fragment (TileDelta) | n/a | n/a | **~36 ms @ SF7/BW250** by the shared estimator — does **not** fit the C1 25 ms-per-fragment cap. Current cap requires roughly ≤15 B cleartext fragments at SF7/BW250 or a profile/cap redesign. |
 
-The control link is pinned to **SF7 / BW 125 kHz / CR 4/5** by [MASTER_PLAN.md §8.17](MASTER_PLAN.md#817-lora-control-link-phy--sf7--bw-125-khz--cr-4-5-default-no-retries-on-controlframe-adaptive-sf7sf8sf9-fallback-when-snr-margin-degrades). The earlier draft showed BW 500 kHz; we now ship 125 kHz for range margin on the US 915 MHz band with the 8 dBi mast antenna. Adaptive fallback to SF8/SF9 is documented below; telemetry SF is independent and does not change.
+The control link is pinned to **SF7 / BW 250 kHz / CR 4/5** by [DECISIONS.md D-A2](DECISIONS.md) (supersedes the original BW 125 kHz pin in [MASTER_PLAN.md §8.17](MASTER_PLAN.md)). The wider 250 kHz channel is required so the encrypted 44 B `ControlFrame` (~46 ms airtime) fits the 50 ms (20 Hz) cadence; the link-budget cost is ~3 dB vs. BW 125 kHz, recovered by SF8/SF9 fallback rungs that stay at BW 125 kHz. Adaptive fallback to SF8/SF9 is documented below; telemetry SF is independent and does not change.
 
 **Image link split (2026-04-27 reanalysis):** the image link is a **separate PHY profile** from the telemetry link, even though both ride the same physical SX1276 radio and channel. Reason: the telemetry default of SF9/BW250/CR4-8 makes a 32 B image fragment ~120 ms on-air, which violates the [IMAGE_PIPELINE.md C1 hard constraint](IMAGE_PIPELINE.md) (25 ms-per-fragment cap protecting P0 ControlFrame TX-start). Image fragments transmit at the SF7/BW250/CR4-5 profile shown above; everything else on the telemetry link (topics `0x01`–`0x10`, `0x26`, `0x27`) stays at SF9/BW250/CR4-8. The radio retunes between SF7 and SF9 on a per-frame basis using the same `CMD_LINK_TUNE` mechanism documented in the adaptive-control-link section; the retune cost is ~1 ms and is folded into the airtime budget.
 
@@ -396,7 +396,7 @@ For `ControlFrame` and `HeartbeatFrame`, **`MAX_ATTEMPTS = 1`** — we only ever
 
 ## Adaptive control-link SF
 
-The control link starts at **SF7 / BW 125 kHz / CR 4/5** and falls back to slower-but-more-sensitive rungs when the link weakens. Pinned by [MASTER_PLAN.md §8.17](MASTER_PLAN.md#817-lora-control-link-phy--sf7--bw-125-khz--cr-4-5-default-no-retries-on-controlframe-adaptive-sf7sf8sf9-fallback-when-snr-margin-degrades).
+The control link starts at **SF7 / BW 250 kHz / CR 4/5** (per [DECISIONS.md D-A2](DECISIONS.md)) and falls back to slower-but-more-sensitive rungs at **BW 125 kHz** when the link weakens. Originally pinned in [MASTER_PLAN.md §8.17](MASTER_PLAN.md); the BW 250 kHz revision discharges the `CONTROL_CADENCE_BLOCKER`.
 
 ### Ladder
 

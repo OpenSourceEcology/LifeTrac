@@ -42,10 +42,13 @@ For each line item we link to **DigiKey or Mouser first** (most reliable stock +
 | 2 | Qwiic / Stemma QT 50 mm cable | [DigiKey: Qwiic cable 50mm](https://www.digikey.com/en/products/result?keywords=qwiic+cable+50mm) | $4 total |
 | 1 | Active SMA GPS patch antenna, magnetic mount, 3 m | [DigiKey: GPS patch SMA 3m](https://www.digikey.com/en/products/result?keywords=GPS+antenna+SMA+magnetic) | $20 |
 | 1 | SMA bulkhead pass-through, panel-mount | [DigiKey: SMA bulkhead](https://www.digikey.com/en/products/result?keywords=SMA+bulkhead+panel) | $5 |
-| 1 | **Kurokesu C2-290C** USB camera (or Logitech C920 substitute) | [Kurokesu shop](https://www.kurokesu.com/shop/cameras/CAMUSB1) · [DigiKey: Logitech C920](https://www.digikey.com/en/products/result?keywords=C920) | $70–$240 |
-| 1 | Panel-mount USB-A bulkhead + IP-rated cable gland | [DigiKey: USB-A bulkhead](https://www.digikey.com/en/products/result?keywords=USB-A+bulkhead+panel) | $12 |
+| 1 | **Kurokesu C2-290C** USB camera (Sony IMX290, 1080p, low-light, IR-cut, CS-mount, boxed) — order with **USB-C** interface option | [Kurokesu C2-290C](https://www.kurokesu.com/item/C2-290C) | $240 |
+| 1 | **Kurokesu L169-FZA-2.8Z12-CS** varifocal CS-mount lens (2.8–12 mm, 130°→39° field-tunable) — sized for the 1/2.8" IMX290 | [Kurokesu L169-FZA-2.8Z12-CS](https://www.kurokesu.com/item/L169-FZA-2.8Z12-CS) | $45 |
+| 1 | **Kurokesu 595.0218.15A** locking USB-A↔USB-C cable, 1.5 m, USB 2.0 — *required* for the X8 cable run because consumer USB-C unseats under tractor vibration | [Kurokesu 595.0218.15A](https://www.kurokesu.com/item/595.0218.15A) | $25 |
+| 1 | Panel-mount USB-A bulkhead + IP-rated cable gland (camera cable exit) | [DigiKey: USB-A bulkhead](https://www.digikey.com/en/products/result?keywords=USB-A+bulkhead+panel) | $12 |
+| 1 *(opt)* | **Kurokesu RA-PLATE** right-angle camera bracket — only if the cab mount needs side-orientation rather than rear | [Kurokesu RA-PLATE](https://www.kurokesu.com/item/RA-PLATE) | $25 |
 
-**Tier 1 subtotal: ~$1,750**
+**Tier 1 subtotal: ~$1,840**
 
 ## Tier 2 — Base Station
 
@@ -61,8 +64,9 @@ For each line item we link to **DigiKey or Mouser first** (most reliable stock +
 | 1 | Mini UPS, 12 V, 30 min runtime | [DigiKey: 12V mini UPS](https://www.digikey.com/en/products/result?keywords=12V+mini+UPS) | $80 |
 | 1 | Indoor ventilated enclosure (rack box or wall-mount) | local | $50 |
 | 1 | Cat6 Ethernet, 5 m | local | $10 |
+| 1 | **Google Coral USB Accelerator** (Edge-TPU; enables base-side YOLO-medium cross-check + Real-ESRGAN super-res — see [`../DESIGN-CONTROLLER/BASE_STATION.md`](../DESIGN-CONTROLLER/BASE_STATION.md) §image-pipeline). Pipeline auto-falls-back to CPU if absent. | [Mouser: Coral USB Accelerator](https://www.mouser.com/c/?q=coral+usb+accelerator) · [DigiKey: 1778-1099-ND](https://www.digikey.com/en/products/result?keywords=coral+usb+accelerator) · [Coral.ai](https://coral.ai/products/accelerator/) | $60 |
 
-**Tier 2 subtotal: ~$910**
+**Tier 2 subtotal: ~$970**
 
 ## Tier 3 — Handheld (Optional)
 
@@ -104,17 +108,20 @@ Spare-parts subtotal: **~$1,400**.
 
 | Scope | Hardware cost | Recurring |
 |---|---:|---:|
-| **One deployed system** (1 tractor + 1 base + 1 handheld) | **~$2,850** | $0/mo (no SIM cards in v25) |
+| **One deployed system** (1 tractor + 1 base + 1 handheld) | **~$3,000** | $0/mo (no SIM cards in v25) |
 | Plus development gear | $300–600 | |
 | Plus recommended spares | $1,400 | |
 
-> **Pro tip:** If you're sourcing for a single first build and on a budget, you can **skip the handheld** and the second cellular SIM (cellular is out of scope for v25 anyway — see [`../DESIGN-CONTROLLER/MASTER_PLAN.md`](../DESIGN-CONTROLLER/MASTER_PLAN.md) §1). That brings the minimum viable build down to about **$2,650**.
+> **Pro tip:** If you're sourcing for a single first build and on a budget, you can **skip the handheld**, **skip the Coral** (the AI pipeline degrades cleanly to CPU), and skip the optional right-angle camera bracket. That brings the minimum viable build down to about **~$2,750**.
 
 ## Substitutions and Regional Notes
 
 - **EU (868 MHz)** instead of US (915 MHz): swap to **MKR WAN 1300** for the handheld, confirm the Max Carrier's Murata module is the 868 MHz variant at order time, and pick an 868 MHz omni mast antenna in Tier 2.
-- **Any UVC USB camera** works for first-light video. Logitech C920, ELP IP67, Kurokesu C1 PRO are all fine — they all enumerate as `/dev/video0` on the X8 Yocto image.
+- **Any UVC USB camera** works for first-light video. Logitech C920, ELP IP67, Kurokesu C1 PRO are all fine — they all enumerate as `/dev/video0` on the X8 Yocto image. We pick the **C2-290C** for production because the IMX290 has roughly **6× the low-light sensitivity** of the C920 (matters at dawn/dusk when most chores happen) and because the boxed CS-mount + locking-screw USB-C cable survives engine vibration. *Do not skip the locking USB-C cable* — consumer USB-C connectors back out within hours on a vibrating chassis.
+- **Night-vision upgrade path:** swap the C2-290C + IR-cut lens for a [**Kurokesu C3-415C-NF**](https://www.kurokesu.com/item/C3-415C-NF) (Sony IMX415, 4K, **no filter**) plus an 850 nm IR illuminator. Only worth it if you actually run after dark; for daytime ag work the IMX290 wins on dynamic range. The same locking USB-C cable (595.0218.15A) fits both.
+- **Lens framing math** is in the [Kurokesu lens calculator](https://www.kurokesu.com/Knowledge-Base/?categories=019bcb0abce37a11819d92a15a454f5d). For a typical X8 perimeter view (~30 m work radius, IMX290 1/2.8" sensor) the L169 varifocal at ~6 mm gives roughly a 60° HFOV — adjust on-bench during install.
 - **Camera enclosure** — see [`../DESIGN-CONTROLLER/HARDWARE_BOM.md` § "Camera enclosure path"](../DESIGN-CONTROLLER/HARDWARE_BOM.md#notes-on-substitutions) for cab-mounted vs NEMA 4X external trade-off.
+- **Coral availability** — Mouser and DigiKey both stock the USB Accelerator intermittently; if both are out, the Mini PCIe / M.2 variants work too (check that the X8 carrier's M.2 slot is keyed correctly). The base station works *without* a Coral — `accel_select.py` autodetects and degrades to CPU paths.
 - **Do not substitute the D1608S with the D1608E.** The "S" is solid-state relays (sub-millisecond, what we want for valves); the "E" is electromechanical (8–20 ms pickup latency, too slow for the control hot path). See [`../DESIGN-CONTROLLER/MASTER_PLAN.md`](../DESIGN-CONTROLLER/MASTER_PLAN.md) §8.18.
 
 ## Next Step

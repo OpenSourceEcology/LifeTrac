@@ -29,6 +29,7 @@ import time
 import paho.mqtt.client as mqtt
 import serial
 
+from audit_log import DEFAULT_PATH as AUDIT_LOG_DEFAULT_PATH, AuditLog
 from link_monitor import EncodeModeController, RollingAirtimeLedger
 from lora_proto import (
     CMD_CAMERA_SELECT,
@@ -44,6 +45,7 @@ from lora_proto import (
     HEADER_LEN,
     KissDecoder,
     PROTO_VERSION,
+    ReplayWindow,
     SRC_BASE,
     TELEM_HEADER_LEN,
     TELEM_MAX_PAYLOAD,
@@ -69,7 +71,11 @@ FLEET_KEY = bytes(16)
 
 # ---- bridge -----------------------------------------------------------
 class Bridge:
-    def __init__(self, port: str, mqtt_host: str = "localhost") -> None:
+    def __init__(self, port: str, mqtt_host: str = "localhost",
+                 audit_path: str = AUDIT_LOG_DEFAULT_PATH) -> None:
+        # Audit log first — every other constructor step may want to record.
+        self.audit = AuditLog(audit_path)
+        self.audit.record("bridge_start", port=port, mqtt_host=mqtt_host)
         self.ser = serial.Serial(port, 115200, timeout=0.1)
         self.dec = KissDecoder()
         self.mqtt = mqtt.Client(client_id="lora_bridge")
@@ -81,6 +87,9 @@ class Bridge:
         self.mqtt.loop_start()
         self.tx_seq = 0
         self.lock = threading.Lock()
+        # Per-source replay defence (mirrors LpReplayWindow on the tractor).
+        # Keyed by header.source_id so a noisy peer can't poison another peer.
+        self._replay: dict[int, ReplayWindow] = {}
         # Airtime ledger + encode-mode controller (LORA_IMPLEMENTATION.md \u00a74, \u00a77).
         self.ledger = RollingAirtimeLedger(window_ms=10_000)
         self.encode_ctrl = EncodeModeController(required_windows=3)
@@ -113,10 +122,26 @@ class Bridge:
         pt = decrypt_frame(FLEET_KEY, onair)
         if pt is None:
             logging.debug("decrypt failed (%d bytes)", len(onair))
+            self.audit.log_gcm_reject(onair_len=len(onair))
             return
         hdr = parse_header(pt)
         if hdr is None or hdr.version != PROTO_VERSION:
+            self.audit.record("bad_header",
+                              version=(hdr.version if hdr else None),
+                              pt_len=len(pt))
             return
+        # Per-source replay window check. The C side does this on the tractor
+        # with an LpReplayWindow; we mirror it here so a base-side replay
+        # doesn't clobber telemetry derived from the cleartext.
+        if not self._replay_check(hdr.source_id, hdr.sequence_num):
+            self.audit.log_replay_reject(
+                source_id=hdr.source_id, seq=hdr.sequence_num)
+            return
+        self.audit.record("rx",
+                          source_id=hdr.source_id,
+                          frame_type=hdr.frame_type,
+                          seq=hdr.sequence_num,
+                          pt_len=len(pt))
 
         # Attribute received airtime to the appropriate PHY profile so the
         # ledger reflects the full channel utilization, not just our own TX.
@@ -183,6 +208,10 @@ class Bridge:
                 reason = pt[HEADER_LEN + 3]
                 logging.info("CMD_LINK_TUNE rx: SF=%d bw_code=%d reason=%#x",
                              target_sf, target_bw_code, reason)
+                self.audit.record("link_tune",
+                                  target_sf=target_sf,
+                                  target_bw_code=target_bw_code,
+                                  reason=reason)
                 self.mqtt.publish(
                     "lifetrac/v25/control/link_tune",
                     json.dumps({
@@ -233,6 +262,19 @@ class Bridge:
             self.tx_seq = (self.tx_seq + 1) & 0xFFFF
             return seq
 
+    def _replay_check(self, source_id: int, seq: int) -> bool:
+        """Per-source 64-frame replay window check. Returns True if fresh.
+
+        Lazily allocates a ReplayWindow on first sight of a source so unknown
+        peers (e.g. a future SRC_AUTONOMY) don't need pre-registration.
+        """
+        with self.lock:
+            window = self._replay.get(source_id)
+            if window is None:
+                window = ReplayWindow()
+                self._replay[source_id] = window
+            return window.check_and_update(seq)
+
     def _tx(self, source_id: int, pt: bytes, nonce_seq: int | None = None) -> None:
         """Enqueue a cleartext frame for transmission.
 
@@ -271,8 +313,14 @@ class Bridge:
                 self.ledger.record(_now_ms(), attribute_phy(frame_type, topic_id),
                                    cleartext_len=len(pt), encrypted=True)
                 self.ser.write(kiss_encode(wire))
+                self.audit.record("tx",
+                                  source_id=source_id,
+                                  frame_type=frame_type,
+                                  seq=seq,
+                                  pt_len=len(pt))
             except Exception:
                 logging.exception("tx worker write failed")
+                self.audit.record("tx_error", source_id=source_id, seq=seq)
 
     # ---- airtime worker: poll ledger, emit CMD_ENCODE_MODE, publish 0x10 ----
     def _airtime_worker(self) -> None:
@@ -292,6 +340,11 @@ class Bridge:
                     cmd = self.encode_ctrl.command_frame(seq, new_mode)
                     logging.info("CMD_ENCODE_MODE \u2192 %s (U_image=%.1f%%)",
                                  new_mode.name, util.image * 100)
+                    self.audit.record("encode_mode_change",
+                                      mode=new_mode.name,
+                                      u_image=round(util.image, 4),
+                                      u_telemetry=round(util.telemetry, 4),
+                                      u_total=round(util.total, 4))
                     self._tx(SRC_BASE, cmd, nonce_seq=seq)
                 # 2. Publish airtime triple alongside the source-active topic
                 #    so the UI has one place to read everything link-related.
@@ -316,6 +369,11 @@ class Bridge:
                     if tot_alarm:
                         logging.warning("U_total %.1f%% exceeds %.0f%% alarm \u2014 P0 headroom at risk",
                                         util.total * 100, U_TOTAL_ALARM * 100)
+                    self.audit.record("airtime_alarm",
+                                      u_telemetry=round(util.telemetry, 4),
+                                      u_total=round(util.total, 4),
+                                      telemetry_alarm=tel_alarm,
+                                      total_alarm=tot_alarm)
                     last_alarm_state = (tel_alarm, tot_alarm)
             except Exception:
                 logging.exception("airtime worker iteration failed")

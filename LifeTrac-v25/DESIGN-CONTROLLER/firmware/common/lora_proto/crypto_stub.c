@@ -21,10 +21,18 @@
 // would produce an *unauthenticated* radio link that *appears* to work in
 // loopback against itself but fails AEAD verification against the real Python
 // peer (and offers zero confidentiality on the air).
+//
+// Real backends live in lp_crypto_real.cpp (DECISIONS.md D-C1/C2). When that
+// file is compiled in (LIFETRAC_USE_REAL_CRYPTO defined), this whole file
+// must be skipped to avoid duplicate symbols.
+#ifdef LIFETRAC_USE_REAL_CRYPTO
+// real crypto wins; nothing to compile here.
+#else
 #ifndef LIFETRAC_ALLOW_STUB_CRYPTO
 #  error "crypto_stub.c is a no-op AES placeholder. Either link a real "       \
-         "AES-GCM (MbedTLS / ArduinoBearSSL) or define LIFETRAC_ALLOW_STUB_CRYPTO " \
-         "to acknowledge that this build is for benchtop/sim use only."
+         "AES-GCM (define LIFETRAC_USE_REAL_CRYPTO and link lp_crypto_real.cpp)" \
+         " or define LIFETRAC_ALLOW_STUB_CRYPTO to acknowledge that this build" \
+         " is for benchtop/sim use only."
 #endif
 
 bool lp_encrypt(const uint8_t* key, const uint8_t* nonce,
@@ -46,3 +54,5 @@ bool lp_decrypt(const uint8_t* key, const uint8_t* nonce,
     memcpy(pt, ct, ct_len - 16);
     return true;
 }
+
+#endif  // !LIFETRAC_USE_REAL_CRYPTO

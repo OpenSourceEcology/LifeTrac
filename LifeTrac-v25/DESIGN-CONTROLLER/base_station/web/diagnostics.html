@@ -1,0 +1,101 @@
+<!doctype html>
+<!--
+  diagnostics.html — LifeTrac v25 base-station link diagnostics.
+
+  Subscribes to /ws/state for the rolling LinkSnapshot
+  (airtime %, encode_mode, SF rung when wired) and renders:
+
+    1. Airtime utilization graph (image / telemetry / total) over the
+       last 60 seconds, with 30 % WARN and 60 % ALARM threshold lines.
+    2. SF rung history bar (last 32 transitions, 3-window hysteresis
+       marker per LORA_PROTOCOL.md §6.4).
+    3. FHSS channel-activity heatmap (8 channels × 60 s).
+    4. Link-loss duration timeline (longest gap, last gap, current).
+
+  All rendering is plain Canvas — no 3rd-party charting deps. Server is
+  authoritative; this page only displays what /ws/state already vouches
+  for. Refusal-on-bad-payload follows the same fail-closed contract as
+  the operator console (IMAGE_PIPELINE.md §6.1).
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LifeTrac v25 — Diagnostics</title>
+  <style>
+    :root {
+      --bg: #1a1d22; --fg: #e6e8eb; --panel: #232830;
+      --warn: #ff7a00; --danger: #d62828; --ok: #4caf50; --grid: #333;
+    }
+    html, body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    header { display:flex; justify-content:space-between; align-items:center;
+      padding: 8px 16px; background: var(--panel); border-bottom: 1px solid #333; }
+    header .title { font-weight:600; }
+    header .nav a { color: var(--fg); text-decoration:none; margin-left:12px; opacity:.8; }
+    header .nav a:hover { opacity:1; }
+    main { display:grid; grid-template-columns: 1fr 1fr; grid-template-rows:auto auto;
+      gap:12px; padding:12px; height: calc(100% - 50px); box-sizing:border-box; }
+    section { background: var(--panel); border-radius: 8px; padding: 12px;
+      display:flex; flex-direction:column; min-height:240px; }
+    section h2 { margin: 0 0 8px 0; font-size:14px; opacity:.8; text-transform:uppercase; }
+    section canvas { flex:1; width:100%; height:100%; display:block; }
+    .legend { font-size:11px; opacity:.7; display:flex; gap:12px; margin-top:6px; }
+    .legend i { display:inline-block; width:10px; height:10px; margin-right:4px;
+      border-radius:2px; vertical-align: middle; }
+    .num { font-family: ui-monospace, monospace; font-size: 12px; opacity:.85; }
+    .stat-row { display:flex; justify-content:space-between; font-family:ui-monospace,monospace;
+      font-size:12px; padding:2px 0; }
+    .stat-row .v { opacity: .9; }
+    .stale { color: var(--warn); }
+    .ok { color: var(--ok); }
+    .alarm { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">LifeTrac v25 — Diagnostics</div>
+    <div class="nav">
+      <a href="/">Console</a>
+      <a href="/map">Map</a>
+      <a href="/audit">Audit</a>
+      <a href="/settings">Settings</a>
+    </div>
+  </header>
+  <main>
+    <section id="sec-airtime">
+      <h2>Airtime utilization (last 60 s)</h2>
+      <canvas id="cv-airtime"></canvas>
+      <div class="legend">
+        <span><i style="background:#4ea1ff"></i>image</span>
+        <span><i style="background:#ffc857"></i>telemetry</span>
+        <span><i style="background:#ff7a00"></i>WARN 30 %</span>
+        <span><i style="background:#d62828"></i>ALARM 60 %</span>
+      </div>
+      <div class="stat-row"><span>image %</span><span class="v" id="now-image">—</span></div>
+      <div class="stat-row"><span>telem %</span><span class="v" id="now-telem">—</span></div>
+      <div class="stat-row"><span>total %</span><span class="v" id="now-total">—</span></div>
+    </section>
+    <section id="sec-sf">
+      <h2>SF rung history (3-window hysteresis)</h2>
+      <canvas id="cv-sf"></canvas>
+      <div class="stat-row"><span>current rung</span><span class="v" id="now-rung">—</span></div>
+      <div class="stat-row"><span>candidate</span><span class="v" id="now-cand">—</span></div>
+      <div class="stat-row"><span>encode mode</span><span class="v" id="now-mode">—</span></div>
+    </section>
+    <section id="sec-fhss">
+      <h2>FHSS channel activity (8 ch × 60 s)</h2>
+      <canvas id="cv-fhss"></canvas>
+    </section>
+    <section id="sec-link">
+      <h2>Link-loss timeline</h2>
+      <canvas id="cv-link"></canvas>
+      <div class="stat-row"><span>longest gap</span><span class="v" id="link-longest">—</span></div>
+      <div class="stat-row"><span>last gap</span><span class="v" id="link-last">—</span></div>
+      <div class="stat-row"><span>current</span><span class="v" id="link-now">—</span></div>
+    </section>
+  </main>
+
+  <script src="/static/diagnostics.js"></script>
+</body>
+</html>

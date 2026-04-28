@@ -66,17 +66,20 @@ class LoraProtoTests(unittest.TestCase):
         self.assertTrue(verify_crc(frame))
 
     def test_airtime_estimator_is_reasonable(self):
-        self.assertGreater(lora_time_on_air_ms(16, PHY_CONTROL_SF7), 30.0)
-        self.assertLess(lora_time_on_air_ms(16, PHY_CONTROL_SF7), 60.0)
+        self.assertGreater(lora_time_on_air_ms(16, PHY_CONTROL_SF7), 15.0)
+        self.assertLess(lora_time_on_air_ms(16, PHY_CONTROL_SF7), 35.0)
 
-    def test_encrypted_control_airtime_exposes_bw125_budget_blocker(self):
+    def test_encrypted_control_airtime_fits_20hz_cadence(self):
+        # DECISIONS.md D-A2: control PHY is SF7/BW250 so the encrypted 44 B
+        # ControlFrame fits a 50 ms (20 Hz) cadence with margin.
         airtime_ms = lora_time_on_air_ms(encrypted_payload_len(CTRL_FRAME_LEN), PHY_CONTROL_SF7)
-        self.assertGreater(airtime_ms, 90.0)
-        self.assertLess(airtime_ms, 100.0)
+        self.assertLessEqual(airtime_ms, 50.0)
+        self.assertGreater(airtime_ms, 30.0)   # sanity: not absurdly small
 
-    def test_image_fragment_cap_requires_smaller_payload_at_sf7_bw250(self):
-        self.assertGreater(lora_time_on_air_ms(32, PHY_IMAGE), 25.0)
-        self.assertLessEqual(lora_time_on_air_ms(15, PHY_IMAGE), 25.0)
+    def test_image_fragment_fits_25ms_cap_at_bw500(self):
+        # DECISIONS.md D-A3: image PHY is SF7/BW500 so a 32 B fragment
+        # stays under the 25 ms per-fragment cap (LORA_IMPLEMENTATION.md §4).
+        self.assertLessEqual(lora_time_on_air_ms(32, PHY_IMAGE), 25.0)
 
     def test_fhss_sequence_stays_in_us_915_band(self):
         channels = [fhss_channel_hz(0x12345678, hop) for hop in range(8)]

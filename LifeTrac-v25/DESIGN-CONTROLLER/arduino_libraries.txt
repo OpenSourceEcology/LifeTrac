@@ -9,7 +9,9 @@ Active firmware lives under `DESIGN-CONTROLLER/firmware/`. The archived WiFi/BLE
 - Libraries:
     - RadioLib
     - SPI (board core)
-    - Wire (board core, if OLED/Qwiic controls are added during bench bring-up)
+    - Wire (board core, drives the SSD1306 OLED + future Qwiic peripherals)
+    - Adafruit_SSD1306 (panel status display; init failure is non-fatal)
+    - Adafruit_GFX (transitive dep of Adafruit_SSD1306)
 
 ### `firmware/tractor_h7/tractor_m7.ino` and `tractor_m4.cpp`
 - Board: Portenta X8 onboard STM32H747 co-MCU / Portenta H7-compatible core
@@ -48,6 +50,9 @@ Install these libraries with Tools -> Manage Libraries:
 - `RadioLib`
 - `ArduinoRS485`
 - `ArduinoModbus`
+- `Adafruit SSD1306` (handheld OLED)
+- `Adafruit GFX Library` (handheld OLED)
+- `Crypto` by `rweather` (handheld AES-128-GCM via `GCM<AES128>`; production builds with `-DLIFETRAC_USE_REAL_CRYPTO`. Portenta H7 uses MbedTLS already shipped in the mbed-os core, no extra library.)
 - `OptaController`
 
 Then select the target board and run Verify on the sketch folder under `firmware/`.

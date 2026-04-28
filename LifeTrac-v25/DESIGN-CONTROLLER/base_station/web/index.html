@@ -137,14 +137,60 @@
       <button data-cam="implement">CAM IMPL</button>
       <button data-cam="auto" class="active">CAM AUTO*</button>
     </div>
+
+    <!--
+      Tile-delta image canvas. Renders the persistent canvas reassembled
+      from TileDeltaFrame (LORA_PROTOCOL.md § TileDeltaFrame, topic 0x25).
+      Tiles older than IMAGE_STALE_S get a yellow tint via overlay; missing
+      ones stay as the last received pixel data per the I/P scheme.
+      Spans both joystick columns; sidebar untouched.
+    -->
+    <div id="image-panel" style="grid-column: 1 / span 2;
+                                  background: var(--panel); border-radius: 12px;
+                                  padding: 8px; position: relative;">
+      <canvas id="image-canvas" width="384" height="256"
+              style="width: 100%; height: auto; image-rendering: pixelated;
+                     background: #000; border-radius: 8px;"></canvas>
+      <div id="image-meta" style="position: absolute; top: 12px; right: 16px;
+                                   font-family: ui-monospace, monospace;
+                                   font-size: 11px; opacity: 0.8;">
+        no image
+      </div>
+    </div>
   </main>
 
   <footer>
     <span id="link-status">link: connecting…</span> ·
     <span>WS control 20 Hz</span> ·
-    <span>USB Gamepad: A=curl  B=dump  X=aux1  Y=aux2  RB=hold-takectl  START=E-stop</span>
+    <span>USB Gamepad: A=curl  B=dump  X=aux1  Y=aux2  RB=hold-takectl  START=E-stop</span> ·
+    <a href="/audit" style="color:var(--fg); opacity:0.8;">audit log</a> ·
+    <a href="/settings" style="color:var(--fg); opacity:0.8;">settings</a>
   </footer>
 
+  <!-- Detector cross-check disagreement banner; toggled by detection_overlay.js -->
+  <div id="detector-disagree" style="display:none; position:fixed; top:50px; left:50%;
+       transform:translateX(-50%); background:#c00; color:#fff; padding:6px 14px;
+       border-radius:6px; font-family:monospace; z-index:998;"></div>
+
+  <!--
+    Bucket-B browser image-tier modules. Order matters:
+    canvas_renderer.js opens /ws/state; everything below subscribes to its
+    `lifetrac-state` and `lifetrac-tile-painted` events.
+    raw-mode CSS hides every overlay class so the operator sees raw bytes only.
+  -->
+  <style>
+    body.raw-mode #image-fade,
+    body.raw-mode #image-staleness,
+    body.raw-mode #image-badges,
+    body.raw-mode #image-detections { display: none !important; }
+  </style>
+  <script src="/static/img/canvas_renderer.js"></script>
+  <script src="/static/img/fade_shader.js"></script>
+  <script src="/static/img/staleness_overlay.js"></script>
+  <script src="/static/img/badge_renderer.js"></script>
+  <script src="/static/img/detection_overlay.js"></script>
+  <script src="/static/img/accel_status.js"></script>
+  <script src="/static/img/raw_mode_toggle.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

@@ -371,3 +371,10 @@ Once the image-pipeline byte budget was settled, eight inconsistencies and weakn
 
 - **R-7 — Bench-measure `CMD_LINK_TUNE` retune cost in week 1.** The earlier ~1 ms estimate is unverified. Measure the actual `setFrequency` + `setSpreadingFactor` + `setBandwidth` + `setCodingRate` sequence on the SX1276 via RadioLib. **If > 5 ms**, implement burst-batching of image fragments so the radio retunes at most twice per refresh window (once into image PHY, once back to telemetry PHY) instead of per fragment. Until measured, plan the burst-batching code path conservatively in `lora_proto.cpp`.
 
+
+---
+
+## 14. Operator toggle (Coral on/off)
+
+The optional Coral Edge TPU is gated by a single operator master switch in the base-station web UI (Settings panel) and persisted to `/var/lib/lifetrac/base_settings.json` via [`base_station/settings_store.py`](base_station/settings_store.py). The dispatchers in [`base_station/image_pipeline/superres.py`](base_station/image_pipeline/superres.py) and [`base_station/image_pipeline/detect.py`](base_station/image_pipeline/detect.py) call `accel.is_active()` per inference, so the toggle and hot-unplug both take effect within one frame. Three-level state (`present` / `usable` / `enabled`) is exposed via `GET /api/settings/accel`; see [`CORAL.md`](CORAL.md) for the operator workflow and the four pill states.
+

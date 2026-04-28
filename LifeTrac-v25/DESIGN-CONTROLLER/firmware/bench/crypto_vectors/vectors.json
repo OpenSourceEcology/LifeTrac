@@ -1,0 +1,34 @@
+[
+  {
+    "_comment": "LifeTrac v25 AES-128-GCM golden vectors. Generated with cryptography.hazmat.primitives.ciphers.aead.AESGCM and committed verbatim so the firmware-side host build (firmware/bench/crypto_vectors/host_check.c) can byte-compare its mbedtls/rweather output against the same Python reference. All values are lowercase hex; tag is the 16-byte GCM tag concatenated to the ciphertext per lp_encrypt's output layout.",
+    "_columns": "key(16) | nonce(12) | aad(0) | plaintext | ciphertext | tag",
+    "_aad_note": "LifeTrac frames pass NULL/0-len AAD to mbedtls_gcm_crypt_and_tag (see lp_crypto_real.cpp). All vectors here mirror that: AAD is the empty string."
+  },
+  {
+    "name": "empty_pt",
+    "key":   "00000000000000000000000000000000",
+    "nonce": "000000000000000000000000",
+    "aad":   "",
+    "pt":    "",
+    "ct":    "",
+    "tag":   "58e2fccefa7e3061367f1d57a4e7455a"
+  },
+  {
+    "name": "block_zero",
+    "key":   "00000000000000000000000000000000",
+    "nonce": "000000000000000000000000",
+    "aad":   "",
+    "pt":    "00000000000000000000000000000000",
+    "ct":    "0388dace60b6a392f328c2b971b2fe78",
+    "tag":   "ab6e47d42cec13bdf53a67b21257bddf"
+  },
+  {
+    "name": "control_frame_typical",
+    "key":   "0123456789abcdef0123456789abcdef",
+    "nonce": "010000000000000000000001",
+    "aad":   "",
+    "pt":    "0102000a64fffe40ff80000000",
+    "ct_tag_combined_check": true,
+    "_note": "ct/tag for this synthetic LifeTrac frame are filled in by the test on first run via lp_encrypt and compared with the Python AESGCM reference; see test_crypto_vectors.py."
+  }
+]

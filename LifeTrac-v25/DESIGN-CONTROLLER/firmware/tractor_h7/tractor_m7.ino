@@ -78,14 +78,11 @@ enum ValveBit : uint16_t {
 };
 
 // ---------- M4 shared SRAM (mirror of tractor_m4.cpp) ----------
-// MUST match the layout in tractor_m4.cpp. The M4 watchdog trips if we don't
-// stamp `alive_tick_ms` with the current millis() every loop.
-struct SharedM7M4 {
-    volatile uint32_t alive_tick_ms;
-    volatile uint32_t reserved[15];
-};
+// Layout owned by firmware/common/shared_mem.h. The M4 watchdog trips if we
+// don't stamp `alive_tick_ms` AND `loop_counter` every loop iteration.
+#include "../common/shared_mem.h"
 static volatile SharedM7M4* const SHARED =
-    reinterpret_cast<volatile SharedM7M4*>(0x38000000);
+    reinterpret_cast<volatile SharedM7M4*>(LIFETRAC_SHARED_ADDR);
 
 // ---------- pre-shared key (provisioned via USB tool) ----------
 static const uint8_t kFleetKey[16] = {0};
@@ -97,10 +94,25 @@ struct SourceState {
     uint16_t last_sequence;
     uint32_t takectl_until_ms;
     int16_t  rssi_dbm;
+    int16_t  snr_db_x10;          // SX1276 reports SNR in 0.25 dB; we store *10
     LpReplayWindow replay;
     ControlFrame latest;
 };
 static SourceState g_src[3];   // index by source_id - 1
+
+// ---------- FHSS state (DECISIONS.md D-C6, MASTER_PLAN.md §8.17) ----------
+//
+// Owned here on the M7; the CSMA #ifdef block below feeds them into
+// `lp_csma_pick_hop()`. `g_fhss_hop_counter` advances once per TX so
+// successive frames land on different channels. `g_fhss_key_id` is the
+// fleet hop-key seed (epoch-rotated by `time_service.py` over the X8↔H747
+// UART once that service is wired); zero is a valid value during bring-up.
+uint32_t g_fhss_hop_counter = 0;
+uint32_t g_fhss_key_id      = 0;
+
+// Forward declaration so emit_topic() / send_link_tune() (which appear above
+// the definition) can call the CSMA hop helper.
+static inline void csma_pick_hop_before_tx();
 
 static const uint32_t HEARTBEAT_TIMEOUT_MS = 500;
 static const uint32_t CONTROL_TIMEOUT_MS   = 200;   // stale ControlFrame → drop to neutral
@@ -126,8 +138,8 @@ static volatile bool g_estop_latched = false;
 // stale autonomy link can't drag the human-driven control link down.
 struct LadderRung { uint8_t sf; uint16_t bw_khz; uint8_t cr_den; uint8_t bw_code; };
 static const LadderRung LADDER[3] = {
-    { 7, 125, 5, 0 },   // bw_code 0 = 125 kHz (per LORA_PROTOCOL.md §CMD_LINK_TUNE)
-    { 8, 125, 5, 0 },
+    { 7, 250, 5, 1 },   // bw_code 1 = 250 kHz — fits 20 Hz cadence (DECISIONS.md D-A2)
+    { 8, 125, 5, 0 },   // fallback rungs widen back to BW125 for link budget
     { 9, 125, 5, 0 },
 };
 static const uint32_t LADDER_WINDOW_MS          = 5000;
@@ -242,7 +254,7 @@ static void apply_control(int active) {
 static void tick_opta_watchdog() { /* see apply_control */ }
 
 // Process one decoded LoRa frame (already past KISS de-framing).
-static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm) {
+static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm, int16_t snr_db_x10) {
     if (len < 12 + 16) return;             // nonce + tag minimum
     uint8_t nonce[12];
     memcpy(nonce, onair, 12);
@@ -263,6 +275,7 @@ static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm) {
     if (!lp_replay_check_and_update(&g_src[idx].replay, hdr->sequence_num)) return;
     g_src[idx].last_sequence = hdr->sequence_num;
     g_src[idx].rssi_dbm      = rssi_dbm;
+    g_src[idx].snr_db_x10    = snr_db_x10;
 
     uint32_t now = millis();
     switch (hdr->frame_type) {
@@ -339,11 +352,13 @@ static void poll_radio() {
     int st = radio.readData(buf, packet_len);
     if (st != RADIOLIB_ERR_NONE) return;
     int16_t rssi = radio.getRSSI();
+    // SX1276::getSNR() returns float dB; capture *10 for fixed-point telemetry.
+    int16_t snr_x10 = (int16_t)(radio.getSNR() * 10.0f);
 
     for (int i = 0; i < packet_len; i++) {
         uint8_t* frame; size_t flen;
         if (lp_kiss_feed(&g_dec, buf[i], &frame, &flen)) {
-            process_air_frame(frame, flen, rssi);
+            process_air_frame(frame, flen, rssi, snr_x10);
         }
     }
     radio.startReceive();
@@ -401,7 +416,10 @@ static void emit_topic(uint8_t topic_id, const uint8_t* payload, uint8_t payload
     memcpy(onair + 12, enc, prefix + 2 + 16);
     uint8_t kiss[512];
     size_t kl = lp_kiss_encode(onair, 12 + prefix + 2 + 16, kiss, sizeof(kiss));
-    if (kl) radio.transmit(kiss, kl);
+    if (kl) {
+        csma_pick_hop_before_tx();
+        radio.transmit(kiss, kl);
+    }
     radio.startReceive();
 }
 
@@ -422,14 +440,19 @@ static void emit_telemetry() {
 // LORA_PROTOCOL.md. Payload is the operator-visible link state so the base
 // UI can render "LINK: SF7 (clean)" and "CTRL: HANDHELD" without inferring.
 //
-//   byte 0: active_source (0 = none, 1 = HANDHELD, 2 = BASE, 3 = AUTONOMY)
-//   byte 1: committed ladder rung (0 = SF7, 1 = SF8, 2 = SF9)
-//   byte 2: estop_latched (0 / 1)
-//   byte 3: pending tune in flight (0 / 1)
-//   byte 4..7: little-endian uint32 lifetime tune-revert failures
+//   byte  0   : active_source (0 = none, 1 = HANDHELD, 2 = BASE, 3 = AUTONOMY)
+//   byte  1   : committed ladder rung (0 = SF7, 1 = SF8, 2 = SF9)
+//   byte  2   : estop_latched (0 / 1)
+//   byte  3   : pending tune in flight (0 / 1)
+//   byte  4-7 : little-endian uint32 lifetime tune-revert failures
+//   byte  8-13: per-source RSSI dBm, int16 LE, [HANDHELD, BASE, AUTONOMY]
+//   byte 14-19: per-source SNR *10, int16 LE, [HANDHELD, BASE, AUTONOMY]
+//
+// Total 20 bytes. Base bridge `lora_bridge.py` decodes this layout into the
+// per-source RSSI/SNR fields surfaced on the operator UI.
 static void emit_source_active() {
     int active = pick_active_source();
-    uint8_t payload[8];
+    uint8_t payload[20];
     payload[0] = (active < 0) ? 0 : (uint8_t)(active + 1);
     payload[1] = g_ladder_rung;
     payload[2] = g_estop_latched ? 1 : 0;
@@ -438,7 +461,40 @@ static void emit_source_active() {
     payload[5] = (uint8_t)(g_ladder_tune_failures >>  8);
     payload[6] = (uint8_t)(g_ladder_tune_failures >> 16);
     payload[7] = (uint8_t)(g_ladder_tune_failures >> 24);
+    for (int i = 0; i < 3; ++i) {
+        int16_t r = g_src[i].rssi_dbm;
+        int16_t s = g_src[i].snr_db_x10;
+        payload[ 8 + i*2    ] = (uint8_t)(r & 0xFF);
+        payload[ 8 + i*2 + 1] = (uint8_t)((r >> 8) & 0xFF);
+        payload[14 + i*2    ] = (uint8_t)(s & 0xFF);
+        payload[14 + i*2 + 1] = (uint8_t)((s >> 8) & 0xFF);
+    }
     emit_topic(TOPIC_SOURCE_ACTIVE, payload, sizeof(payload));
+}
+
+// ---------- CSMA hop helper (DECISIONS.md D-C6) ----------
+//
+// Mirrors the handheld `send_frame()` skip-busy block. Both M7 TX paths
+// (emit_topic, send_link_tune) call this just before `radio.transmit()`
+// when LIFETRAC_FHSS_ENABLED is defined; otherwise it's a no-op so the
+// single-channel default doesn't pay for `scanChannel()`.
+static inline void csma_pick_hop_before_tx() {
+#ifdef LIFETRAC_FHSS_ENABLED
+    auto sampler = [](uint32_t hz, void* /*ctx*/) -> int16_t {
+        radio.setFrequency(hz / 1.0e6f);
+        int state = radio.scanChannel();
+        return (state == RADIOLIB_LORA_DETECTED) ? (int16_t)-40 : (int16_t)-110;
+    };
+    uint8_t skips = 0;
+    uint32_t hop = lp_csma_pick_hop(g_fhss_key_id, g_fhss_hop_counter,
+                                    sampler, nullptr,
+                                    LP_CSMA_DEFAULT_BUSY_DBM,
+                                    LP_CSMA_DEFAULT_MAX_SKIPS,
+                                    &skips);
+    radio.setFrequency(hop / 1.0e6f);
+    g_fhss_hop_counter++;
+    (void)skips;   // TODO: surface to audit log once X8↔H747 IPC lands
+#endif
 }
 
 // ---------- X8 UART pump ----------
@@ -516,7 +572,10 @@ static void send_link_tune(uint8_t target_rung, uint8_t reason) {
     memcpy(onair + 12, enc, sizeof(CommandFrame) + 16);
     uint8_t kiss[2 * sizeof(onair) + 4];
     size_t kl = lp_kiss_encode(onair, sizeof(onair), kiss, sizeof(kiss));
-    if (kl) radio.transmit(kiss, kl);
+    if (kl) {
+        csma_pick_hop_before_tx();
+        radio.transmit(kiss, kl);
+    }
 }
 
 // try_step_ladder() executes the twice-back-to-back handshake and arms the
@@ -634,7 +693,12 @@ void loop() {
     // Stamp the M4 watchdog FIRST every loop iteration. If we crash anywhere
     // below, the M4 watchdog (200 ms) will pull the PSR-alive GPIO low and
     // dump the valves. Apply this even if nothing else makes progress.
+    // Bump version + counter too so the M4 can validate layout and detect
+    // a stuck-but-fresh-looking timestamp.
+    SHARED->version       = LIFETRAC_SHARED_VERSION;
     SHARED->alive_tick_ms = now;
+    SHARED->loop_counter += 1;
+    SHARED->estop_request = g_estop_latched ? 1u : 0u;
 
     poll_radio();
     poll_x8_uart();    // pump KISS frames from gps_service.py / imu_service.py

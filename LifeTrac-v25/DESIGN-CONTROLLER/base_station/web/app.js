@@ -126,6 +126,42 @@
     if (wsTele.readyState === WebSocket.OPEN) wsTele.send('ping');
   }, 5000);
 
+  // ----- Image canvas (tile-delta reassembled frames from /ws/image) -----
+  // The base reassembles TileDeltaFrame fragments into a single WebP/PNG
+  // blob and pushes it as a binary WebSocket message. We draw via
+  // createImageBitmap so the browser handles WebP natively.
+  (() => {
+    const cvs  = document.getElementById('image-canvas');
+    const meta = document.getElementById('image-meta');
+    if (!cvs) return;
+    const ctx  = cvs.getContext('2d');
+    const wsImg = new WebSocket(`ws://${location.host}/ws/image`);
+    wsImg.binaryType = 'arraybuffer';
+    let frames = 0;
+    let lastTs = performance.now();
+    wsImg.addEventListener('message', async (ev) => {
+      try {
+        const blob = new Blob([ev.data]);
+        const bmp  = await createImageBitmap(blob);
+        ctx.drawImage(bmp, 0, 0, cvs.width, cvs.height);
+        bmp.close && bmp.close();
+        frames++;
+        const now = performance.now();
+        if (now - lastTs > 1000) {
+          meta.textContent = `${frames} fps · ${ev.data.byteLength} B`;
+          frames = 0;
+          lastTs = now;
+        }
+      } catch (e) {
+        meta.textContent = 'decode err: ' + e.message;
+      }
+    });
+    wsImg.addEventListener('close', () => { meta.textContent = 'image link closed'; });
+    setInterval(() => {
+      if (wsImg.readyState === WebSocket.OPEN) wsImg.send('ping');
+    }, 5000);
+  })();
+
   // ----- Virtual joystick pads (touch + mouse) -----
   function createPad(id, axisX, axisY) {
     const pad = document.getElementById(id);

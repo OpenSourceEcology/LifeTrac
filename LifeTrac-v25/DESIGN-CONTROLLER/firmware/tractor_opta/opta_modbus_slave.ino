@@ -28,6 +28,11 @@
 #include <Arduino.h>
 #include <ArduinoRS485.h>
 #include <ArduinoModbus.h>
+// Real expansion-bus driver from the Arduino_Opta_Blueprints repository.
+// On a workstation without the library installed, arduino-cli pulls it via:
+//   arduino-cli lib install "Arduino_Opta_Blueprints"
+#include <OptaBlue.h>
+using namespace Opta;
 
 #define SLAVE_ID 0x01
 
@@ -81,9 +86,9 @@ enum SafetyState : uint16_t {
 #define PIN_R3 D2
 #define PIN_R4 D3
 // D1608S relays R5..R8 → boom up/down + bucket curl/dump (valve bits 4..7).
-// Addressed via the Opta expansion API:
-//   OptaController.setRelay(D1608S_INDEX, channel, state);
-// (Pseudocode here; replace with real library calls when bringing up hardware.)
+// A0602 owns AO1/AO2 (flow set-points) and AI1..AI6 (analog telemetry).
+// Both expansions are addressed by their position in the chain (0 = closest
+// to the Opta). Adjust if the wiring order changes.
 #define D1608S_INDEX 0
 #define A0602_INDEX  1
 
@@ -101,20 +106,33 @@ static bool     g_alive_seen           = false;   // first write seen yet?
 static uint16_t g_safety_state         = SAFETY_NORMAL;
 static uint16_t g_relay_fault_flags    = 0;
 
-// ---- expansion-bus shims (placeholders) ----
-// Replace these with real OptaController calls during hardware bring-up.
+// ---- expansion-bus driver wrappers ----
+// Thin wrappers over Arduino_Opta_Blueprints. Each call asserts the device
+// type defensively: a swapped expansion order on the chain would otherwise
+// silently send relay commands to the analog board.
 static void d1608s_set(uint8_t ch, bool on) {
-    (void)ch; (void)on;
-    // OptaController.setRelay(D1608S_INDEX, ch, on ? HIGH : LOW);
+    Expansion& exp = OptaController.getExpansion(D1608S_INDEX);
+    if (exp.getType() != EXPANSION_OPTA_DIGITAL_MEC &&
+        exp.getType() != EXPANSION_OPTA_DIGITAL_STS) {
+        return;   // wrong board at this index — fail safe (relay stays off)
+    }
+    DigitalExpansion de = (DigitalExpansion&)exp;
+    de.digitalWrite(ch, on ? HIGH : LOW, true /* update now */);
 }
 static void a0602_write_mv(uint8_t ch, uint16_t value_0_10000) {
-    (void)ch; (void)value_0_10000;
-    // OptaController.writeAnalog(A0602_INDEX, ch, value_0_10000); // already 0..10000 = 0..10 V
+    Expansion& exp = OptaController.getExpansion(A0602_INDEX);
+    if (exp.getType() != EXPANSION_OPTA_ANALOG) return;
+    AnalogExpansion ae = (AnalogExpansion&)exp;
+    // The A0602 analog-out range is 0..10000 mV. Library takes mV directly.
+    ae.pinVoltage(ch, value_0_10000, true /* update now */);
 }
 static uint16_t a0602_read(uint8_t ch) {
-    (void)ch;
-    // return OptaController.readAnalog(A0602_INDEX, ch);
-    return 0;
+    Expansion& exp = OptaController.getExpansion(A0602_INDEX);
+    if (exp.getType() != EXPANSION_OPTA_ANALOG) return 0;
+    AnalogExpansion ae = (AnalogExpansion&)exp;
+    // Return raw 16-bit ADC code; downstream scales per channel role
+    // (battery / supply / coolant / etc).
+    return (uint16_t)ae.pinCurrent(ch);
 }
 
 static void all_coils_off() {
@@ -216,6 +234,12 @@ static void on_holding_change(uint16_t address, uint16_t value) {
 // ---------- Arduino entry points ----------
 void setup() {
     Serial.begin(115200);
+
+    // Expansion bus must come up BEFORE we touch any d1608s_* / a0602_*
+    // helper, otherwise getExpansion() returns an UNKNOWN stub.
+    OptaController.begin();
+    OptaController.update();
+
     pinMode(PIN_R1, OUTPUT);
     pinMode(PIN_R2, OUTPUT);
     pinMode(PIN_R3, OUTPUT);
@@ -255,6 +279,10 @@ static uint16_t s_last_seen[HOLDING_BLOCK_LEN];
 static bool     s_seen_init = false;
 
 void loop() {
+    // Pump expansion-bus traffic every loop iteration — the library queues
+    // analog reads / digital writes here.
+    OptaController.update();
+
     int n = ModbusRTUServer.poll();
     (void)n;   // we don't need the count; we walk the writable block ourselves.
 

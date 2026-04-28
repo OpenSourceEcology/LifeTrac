@@ -1,0 +1,14 @@
+[Unit]
+Description=LifeTrac v25 tractor X8 params service (JSON store + MQTT)
+After=network-online.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/lifetrac/firmware/tractor_x8/params_service.py
+Restart=on-failure
+RestartSec=5
+Environment=LIFETRAC_PARAMS_PATH=/var/lib/lifetrac/params.json
+
+[Install]
+WantedBy=multi-user.target

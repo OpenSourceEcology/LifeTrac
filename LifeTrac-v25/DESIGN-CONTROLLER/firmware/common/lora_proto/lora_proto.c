@@ -11,11 +11,18 @@
 #define KISS_TFEND 0xDC
 #define KISS_TFESC 0xDD
 
-const LoraPhyProfile LP_PHY_CONTROL_SF7 = { 7, 125, 5, 8 };
+// PHY profiles per DECISIONS.md D-A2 + D-A3 (2026-04-27):
+//   * Control SF7 runs at BW250 so the encrypted 44 B ControlFrame fits a
+//     50 ms (20 Hz) cadence with margin (~46 ms airtime). SF8/SF9 fallback
+//     rungs stay BW125 for link-budget headroom — the ladder accepts the
+//     slower effective cadence as graceful degradation.
+//   * Image PHY runs at BW500 so a 32 B fragment stays under the 25 ms
+//     per-fragment cap that protects P0 preemption.
+const LoraPhyProfile LP_PHY_CONTROL_SF7 = { 7, 250, 5, 8 };
 const LoraPhyProfile LP_PHY_CONTROL_SF8 = { 8, 125, 5, 8 };
 const LoraPhyProfile LP_PHY_CONTROL_SF9 = { 9, 125, 5, 8 };
 const LoraPhyProfile LP_PHY_TELEMETRY   = { 9, 250, 8, 12 };
-const LoraPhyProfile LP_PHY_IMAGE       = { 7, 250, 5, 8 };
+const LoraPhyProfile LP_PHY_IMAGE       = { 7, 500, 5, 8 };
 
 // CRC-16/CCITT (false): poly 0x1021, init 0xFFFF, no reflection, no xor-out.
 uint16_t lp_crc16(const uint8_t* buf, size_t len) {

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>LifeTrac v25 — Audit Log</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 1100px; margin: 1.5em auto;
+           padding: 0 1em; background: #1a1d22; color: #e6e8eb; }
+    h1 { font-weight: 600; }
+    a { color: #6cb1ff; }
+    .controls { display: flex; gap: 1em; align-items: center; margin: 1em 0; }
+    button, input { padding: 0.4em 0.8em; font-size: 0.95em; }
+    table { width: 100%; border-collapse: collapse; font-family: ui-monospace, monospace;
+            font-size: 0.85em; }
+    th, td { padding: 4px 6px; border-bottom: 1px solid #333; vertical-align: top; }
+    th { text-align: left; opacity: 0.7; }
+    tr:hover { background: #232830; }
+    .ev-mqtt   { color: #9cd; }
+    .ev-rx     { color: #cf9; }
+    .ev-tx     { color: #fc9; }
+    .ev-reject { color: #f88; }
+    .meta { color: #888; font-size: 0.85em; }
+    pre { white-space: pre-wrap; word-break: break-all; margin: 0;
+          color: #ddd; font-size: 0.8em; }
+  </style>
+</head>
+<body>
+  <h1>Audit log</h1>
+  <p><a href="/">&larr; back to operator console</a></p>
+  <div class="meta" id="path">—</div>
+
+  <div class="controls">
+    <label>Last
+      <input id="limit" type="number" value="200" min="1" max="5000" style="width:6em;">
+      lines
+    </label>
+    <label>Filter
+      <input id="filter" type="text" placeholder="event or topic substring" style="width:20em;">
+    </label>
+    <button id="refresh">Refresh</button>
+    <label><input id="autorefresh" type="checkbox"> auto (5 s)</label>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th style="width:11em;">time</th><th style="width:7em;">event</th><th>fields</th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <script>
+    const rows     = document.getElementById('rows');
+    const pathEl   = document.getElementById('path');
+    const limitEl  = document.getElementById('limit');
+    const filterEl = document.getElementById('filter');
+    const refresh  = document.getElementById('refresh');
+    const autoEl   = document.getElementById('autorefresh');
+    let timer = null;
+
+    function fmtTs(ts) {
+      if (typeof ts !== 'number') return String(ts ?? '—');
+      const d = new Date(ts * 1000);
+      return d.toISOString().replace('T',' ').replace('Z','');
+    }
+
+    function render(lines) {
+      const needle = filterEl.value.trim().toLowerCase();
+      rows.innerHTML = '';
+      // Newest first.
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const r = lines[i];
+        if (needle) {
+          const blob = JSON.stringify(r).toLowerCase();
+          if (!blob.includes(needle)) continue;
+        }
+        const tr = document.createElement('tr');
+        const ev = r.event || (r.raw ? 'raw' : '?');
+        tr.innerHTML = `
+          <td>${fmtTs(r.ts)}</td>
+          <td class="ev-${ev.replace(/[^a-z]/g,'')}">${ev}</td>
+          <td><pre>${escapeHtml(JSON.stringify(
+              Object.fromEntries(Object.entries(r).filter(
+                ([k]) => k !== 'ts' && k !== 'event'))))}</pre></td>`;
+        rows.appendChild(tr);
+      }
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    }
+
+    async function load() {
+      const r = await fetch('/api/audit?limit=' + limitEl.value,
+                            {credentials:'include'});
+      if (r.status === 401) { location = '/login'; return; }
+      const data = await r.json();
+      pathEl.textContent = data.path + (data.error ? ' — ' + data.error : '');
+      render(data.lines || []);
+    }
+
+    refresh.addEventListener('click', load);
+    filterEl.addEventListener('input', () => load());
+    autoEl.addEventListener('change', () => {
+      clearInterval(timer);
+      if (autoEl.checked) timer = setInterval(load, 5000);
+    });
+
+    load();
+  </script>
+</body>
+</html>

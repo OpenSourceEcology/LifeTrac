@@ -267,6 +267,49 @@ Per [MASTER_PLAN.md §8.19](MASTER_PLAN.md) and [`../AI NOTES/2026-04-27_Image_T
 15. [ ] End-to-end image-pipeline latency: tractor capture → base UI repaint, ≤500 ms p99 in CPU-only mode, ≤300 ms p99 with Coral
 16. [ ] UI safety badges: confirm staleness clock, "Enhanced/Synthetic" badge on any non-1:1 pixel, one-click raw-mode toggle, audit-log of "view-mode at command time" in the §8.10 black-box logger
 
+## Trust boundary — server vs. browser
+
+Per [IMAGE_PIPELINE.md §6.1](IMAGE_PIPELINE.md), the browser is **untrusted**
+for any decision that affects machine motion. Anything that controls valves,
+trips an E-stop, blocks autopilot moves, or sets ROI hints is computed
+server-side (in `web_ui.py` + `image_pipeline/*` on the X8) and only the
+*result* of that decision is shipped to the browser for display. The browser
+is allowed to render polish that doesn't change what the operator commands —
+fades, badge labels, status pills, raw-mode toggle.
+
+| Concern                                       | Server-only (`base_station/image_pipeline/*` + `web_ui.py`) | Browser (`web/img/*.js`) |
+|-----------------------------------------------|-------------------------------------------------------------|---------------------------|
+| Reassembly of `TileDeltaFrame` fragments      | ✅ `image_pipeline/reassemble.py`                            | ❌                        |
+| Per-tile badge assignment + trust enum        | ✅ `image_pipeline/canvas.py` + `lora_proto.Badge`           | ❌                        |
+| Background-cache fill (Badge.CACHED)          | ✅ `image_pipeline/bg_cache.py`                              | ❌                        |
+| Y-only re-colourisation (Badge.RECOLOURISED)  | ✅ `image_pipeline/recolourise.py`                           | ❌                        |
+| Motion-vector replay (Badge.PREDICTED)        | ✅ `image_pipeline/motion_replay.py`                         | ❌                        |
+| Wireframe replay (Badge.WIREFRAME)            | ✅ `image_pipeline/wireframe_render.py`                      | ❌                        |
+| CPU super-res (Badge.ENHANCED)                | ✅ `image_pipeline/superres_cpu.py`                          | ❌                        |
+| Independent safety detector (R6)              | ✅ `image_pipeline/detect_yolo.py`                           | ❌                        |
+| Detector cross-check + verdict                | ✅ `image_pipeline/detect_yolo.cross_check`                  | ❌                        |
+| ROI hint generation (`CMD_ROI_HINT` 0x61)     | ✅ `firmware/tractor_x8/image_pipeline/roi.py`               | ❌                        |
+| Keyframe-request decision (`CMD_REQ_KEYFRAME`)| ✅ `image_pipeline/canvas.py` → `web_ui.py` MQTT publish     | ❌                        |
+| Encode-mode demotion (`CMD_ENCODE_MODE`)      | ✅ `link_monitor.py` orchestrator                            | ❌                        |
+| Audit-log "view-mode at command time"         | ✅ `audit_log.py`                                            | ❌ (sends notifications)  |
+| Per-tile OffscreenCanvas painting             | —                                                            | ✅ `canvas_renderer.js`   |
+| 3-frame alpha fade animation                  | —                                                            | ✅ `fade_shader.js`       |
+| Yellow staleness tint (server-supplied age)   | —                                                            | ✅ `staleness_overlay.js` |
+| Badge label text + colour ring                | —                                                            | ✅ `badge_renderer.js`    |
+| Badge enforcement (refuse missing/invalid)    | ✅ accepts refusal via `POST /api/health/refusal`            | ✅ `badge_renderer.js`    |
+| Bounding-box overlay drawing                  | —                                                            | ✅ `detection_overlay.js` |
+| Detector-disagree banner toggle               | ✅ source of truth in state snapshot                         | ✅ `detection_overlay.js` |
+| Accel-status pill                             | —                                                            | ✅ `accel_status.js`      |
+| Raw-mode local toggle + post-back             | ✅ accepts via `POST /api/audit/view_mode`                   | ✅ `raw_mode_toggle.js`   |
+
+**Fail-closed contract.** A tile that arrives at the browser without a
+recognised badge enum is **not painted** (`badge_renderer.js` blacks the
+slot, labels it `BADGE?`, and POSTs the refusal back to the server so the
+audit_log captures the rejection). The same fail-closed rule applies if the
+browser ever fails to receive an `age_ms` field — the staleness overlay
+treats missing age as "infinitely stale" rather than "fresh".
+
+
 ## See also
 
 - [HARDWARE_BOM.md § Tier 2](HARDWARE_BOM.md#tier-2--base-station-portenta-max-carrier--portenta-x8)

@@ -18,6 +18,294 @@
 > `DESIGN-CONTROLLER/RESEARCH-CONTROLLER/` for the current location of any
 > Opta / ESP32 / `raspberry_pi_web_controller` files.
 
+## Current sprint status — DESIGN-CONTROLLER LoRa stack (2026-04-27)
+
+Tracked in detail in [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) and
+[DESIGN-CONTROLLER/DECISIONS.md](DESIGN-CONTROLLER/DECISIONS.md). Snapshot:
+
+### Done
+- [x] Handheld firmware: full RX, KISS, per-source replay, `CMD_LINK_TUNE` /
+  `CMD_ESTOP` / `CMD_CLEAR_ESTOP` ingest, OLED status, latching mushroom E-stop
+  ([firmware/handheld_mkr/handheld.ino](DESIGN-CONTROLLER/firmware/handheld_mkr/handheld.ino)).
+- [x] Base-station audit log
+  ([base_station/audit_log.py](DESIGN-CONTROLLER/base_station/audit_log.py))
+  + bridge wiring (rx/tx/tx_error/gcm_tag_reject/bad_header/replay_reject/
+  link_tune/encode_mode_change/airtime_alarm) + per-source ReplayWindow.
+- [x] DECISIONS.md option tables for D-A2 / D-A3 / D-C1 / D-C2 / D-C6 / D-E1.
+- [x] **D-A2 control PHY → SF7/BW250** (~46 ms encrypted ControlFrame, fits
+  20 Hz cadence). Updated in C, Python, both LADDER tables, LORA_PROTOCOL.md.
+- [x] **D-A3 image PHY → SF7/BW500** (~18 ms 32 B fragment, fits 25 ms cap).
+- [x] **D-C1/C2 real-crypto scaffold**:
+  [lp_crypto_real.cpp](DESIGN-CONTROLLER/firmware/common/lora_proto/lp_crypto_real.cpp)
+  with MbedTLS (Portenta H7) + rweather/Crypto (MKR) backends, gated on
+  `-DLIFETRAC_USE_REAL_CRYPTO`; `crypto_stub.c` re-guarded so it skips when
+  real crypto wins.
+- [x] **D-C6 CSMA scanChannel** wired into handheld TX under
+  `#ifdef LIFETRAC_FHSS_ENABLED`.
+- [x] **D-E1 web UI PIN auth**: `LIFETRAC_PIN`, HttpOnly+SameSite=strict
+  cookie, 30 min idle TTL, 5-fail/60 s IP lockout, WS cookie-check, new
+  `/api/login` `/api/logout` `/api/session` routes
+  ([base_station/web_ui.py](DESIGN-CONTROLLER/base_station/web_ui.py),
+  [tests/test_web_ui_auth.py](DESIGN-CONTROLLER/base_station/tests/test_web_ui_auth.py)).
+- [x] Tractor X8 service scaffolds:
+  [time_service.py](DESIGN-CONTROLLER/firmware/tractor_x8/time_service.py),
+  [params_service.py](DESIGN-CONTROLLER/firmware/tractor_x8/params_service.py),
+  [logger_service.py](DESIGN-CONTROLLER/firmware/tractor_x8/logger_service.py).
+- [x] [DESIGN-CONTROLLER/KEY_ROTATION.md](DESIGN-CONTROLLER/KEY_ROTATION.md)
+  operator procedure.
+- [x] arduino_libraries.txt: + Adafruit SSD1306/GFX + rweather Crypto.
+- [x] All 26 base_station unit tests pass (1 env-skip when fastapi/paho
+  missing).
+- [x] **Mirror handheld CSMA #ifdef into the tractor M7 TX path** —
+  shared `csma_pick_hop_before_tx()` helper called from both
+  `emit_topic()` and `send_link_tune()` under `LIFETRAC_FHSS_ENABLED`
+  ([tractor_m7.ino](DESIGN-CONTROLLER/firmware/tractor_h7/tractor_m7.ino)).
+- [x] **`g_fhss_hop_counter` / `g_fhss_key_id` globals** defined on M7 and
+  handheld (file-scope, not static, so a future shared header can re-extern
+  them). Initialised to 0; epoch-rotated by `time_service.py` once the
+  X8↔H747 UART tick lands.
+- [x] **D6 source-active telemetry enrichment**: `emit_source_active()`
+  payload extended from 8 → 20 bytes, now carries per-source RSSI (int16)
+  + SNR×10 (int16) for `[HANDHELD, BASE, AUTONOMY]` alongside the
+  existing source/rung/estop/pending/tune-failures fields. SourceState
+  gained `snr_db_x10`; `process_air_frame` captures `radio.getSNR()` per RX.
+- [x] **Web operator HTML/JS** PIN-entry page +
+  [`/login`](DESIGN-CONTROLLER/base_station/web/login.html) route on
+  `web_ui.py`; `/` now redirects to `/login` when no valid session.
+  The operator console (joysticks, telemetry sidebar, camera selector,
+  E-stop, gamepad support) was already in place.
+- [x] **Real-crypto golden vectors**:
+  [vectors.json](DESIGN-CONTROLLER/firmware/bench/crypto_vectors/vectors.json)
+  + Python regression
+  [test_crypto_vectors.py](DESIGN-CONTROLLER/base_station/tests/test_crypto_vectors.py)
+  + host-build cross-check
+  [host_check.c + Makefile](DESIGN-CONTROLLER/firmware/bench/crypto_vectors/)
+  (`make crypto-check`, needs `libmbedtls-dev`).
+- [x] **Tractor X8 service follow-through**: real
+  [time_service.py](DESIGN-CONTROLLER/firmware/tractor_x8/time_service.py)
+  (PPS_FETCH ioctl + UART tick + wall-clock fallback),
+  [params_service.py](DESIGN-CONTROLLER/firmware/tractor_x8/params_service.py)
+  (atomic JSON store + FastAPI sub-app + MQTT publish-on-change), and
+  [logger_service.py](DESIGN-CONTROLLER/firmware/tractor_x8/logger_service.py)
+  (paho subscriber + queued SQLite writer + JSONL audit).
+- [x] **`tools/provision.py`** gained a `--write-port` USB-CDC mode
+  implementing the wire protocol from KEY_ROTATION.md (prologue → KEY:
+  → COMMIT). Header-generation mode unchanged.
+- [x] All 39 base_station unit tests pass (2 env-skips: fastapi + paho
+  optional; cryptography optional for the golden-vector test).
+- [x] **Phase 5 Docker / compose stack**:
+  [Dockerfile](DESIGN-CONTROLLER/Dockerfile),
+  [docker-compose.yml](DESIGN-CONTROLLER/docker-compose.yml),
+  [base_station/mosquitto.conf](DESIGN-CONTROLLER/base_station/mosquitto.conf),
+  [.env.example](DESIGN-CONTROLLER/.env.example), and
+  [systemd units](DESIGN-CONTROLLER/base_station/systemd/) for the
+  base + tractor X8 services. `audit_log.py` gained a `--tail-mqtt`
+  CLI mode used by the `audit_tail` compose service.
+- [x] **Tractor M4 core hardened**:
+  [firmware/common/shared_mem.h](DESIGN-CONTROLLER/firmware/common/shared_mem.h)
+  formalises the M7↔M4 SRAM4 layout (version + alive_tick + loop_counter
+  + estop_request); rewrote
+  [tractor_m4.cpp](DESIGN-CONTROLLER/firmware/tractor_h7/tractor_m4.cpp)
+  with three independent trip conditions (stale tick, stuck loop counter,
+  M7 e-stop request) + heartbeat LED. M7 stamps version/loop_counter/
+  estop_request every iteration.
+- [x] **Opta expansion shims replaced with real `OptaBlue` library
+  calls** (digitalWrite via `DigitalExpansion`, analog out/in via
+  `AnalogExpansion`); `OptaController.begin()`/`update()` wired into
+  `setup()`/`loop()`.
+- [x] **Web UI tractor-params proxy** —
+  `web_ui` subscribes to `lifetrac/v25/params/changed`, exposes
+  GET/POST `/api/params`, publishes patches on `lifetrac/v25/params/set`;
+  `params_service` listens on the same topic and applies. Settings page
+  gained a JSON params editor.
+- [x] **Tractor X8 image pipeline encoder** —
+  [camera_service.py](DESIGN-CONTROLLER/firmware/tractor_x8/camera_service.py)
+  with libcamera + synthetic backends, 12×8 tile diff, WebP per tile
+  with quality back-off, I/P frames + CMD_REQ_KEYFRAME subscription;
+  publishes ready-to-fragment payloads on `lifetrac/v25/cmd/image_frame`.
+- [x] **Web UI image canvas + audit viewer** — `<canvas id="image-canvas">`
+  in `index.html`; `/ws/image` binary WS in `web_ui.py` forwarding the
+  `lifetrac/v25/video/canvas` topic; new
+  [`web/audit.html`](DESIGN-CONTROLLER/base_station/web/audit.html) page
+  + `/api/audit` route reading the rotating JSONL tail with filter and
+  auto-refresh.
+- [x] **Cross-cutting docs**:
+  [SAFETY_CASE.md](DESIGN-CONTROLLER/SAFETY_CASE.md) (ISO 25119 hazard
+  table + AgPL targets), [CYBERSECURITY_CASE.md](DESIGN-CONTROLLER/CYBERSECURITY_CASE.md)
+  (IEC 62443 SL-1 sketch + STRIDE per zone),
+  [OTA_STRATEGY.md](DESIGN-CONTROLLER/OTA_STRATEGY.md) (signed image
+  flow + A/B + 60 s health-check rollback),
+  [PAIRING_PROCEDURE.md](DESIGN-CONTROLLER/PAIRING_PROCEDURE.md)
+  (initial provision, field re-pair, decommission).
+- [x] **Tooling**: [tools/keygen.py](DESIGN-CONTROLLER/tools/keygen.py)
+  (offline 16/32 B fleet-key generator) and
+  [tools/replay_pcap.py](DESIGN-CONTROLLER/tools/replay_pcap.py)
+  (offline GCM + replay-window validator over a hex capture file).
+
+### Remaining — code (no hardware needed)
+
+The 2026-04-27 backlog sweep against
+[DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) Phase 5A/5A.B/5B/5C +
+Cross-cutting + Tractor image pipeline identified six pure-code buckets
+(A-F). **All six are now code-complete; G remains intentionally skipped.**
+71/71 base_station unit tests pass (`python -m unittest discover tests`).
+
+**A — Base-station image pipeline (Python, `base_station/image_pipeline/`):** ✅ Done
+
+- [x] `reassemble.py` — collect TileDeltaFrame (topic `0x25`) fragments,
+  time out missing fragments, surface stale-tile bitmap.
+- [x] `canvas.py` — persistent tile canvas; on `base_seq` mismatch publish
+  `CMD_REQ_KEYFRAME` (opcode `0x62`); attach badge enum to every published
+  tile.
+- [x] `bg_cache.py` — rolling per-tile median; fills missed tiles with
+  `Cached` badge + age.
+- [x] `state_publisher.py` — authoritative WS publisher (canvas tiles +
+  per-tile age + badge + detections + safety verdicts + accel status).
+- [x] `fallback_render.py` — server-side 1 fps composite for HDMI console
+  + headless QA.
+- [x] `recolourise.py` — Y-only luma + 30 s colour reference (scheme Z),
+  sets `Recolourised` badge.
+- [x] `motion_replay.py` — applies `0x28` motion vectors to canvas, sets
+  `Predicted` badge (Q degraded mode).
+- [x] `wireframe_render.py` — renders `0x29` PiDiNet wireframe overlay,
+  sets `Wireframe` badge (P extreme degraded mode).
+- [x] `link_monitor.py` `LinkMonitor` orchestrator with on_air()/tick(),
+  publish_command/publish_status callbacks, and 3-window hysteresis ladder.
+
+**B — Browser image-tier modules (`base_station/web/img/`):** ✅ Done
+
+- [x] `canvas_renderer.js` — WS subscriber; per-tile blits via OffscreenCanvas
+  worker pattern; dispatches `lifetrac-state` + `lifetrac-tile-painted` events.
+- [x] `fade_shader.js` — 3-frame alpha pulse on `#image-fade` overlay.
+- [x] `staleness_overlay.js` — yellow tint scaling with server-supplied
+  `age_ms` (1 s threshold, max at 5 s).
+- [x] `badge_renderer.js` — fail-closed badge enforcement; refusals POST
+  to `/api/health/refusal`.
+- [x] `detection_overlay.js` — bbox rendering by class colour; toggles
+  `#detector-disagree` banner.
+- [x] `accel_status.js` — fixed-position pill with 4 status colours.
+- [x] `raw_mode_toggle.js` — body.raw-mode CSS class toggle, persisted in
+  localStorage; choice POSTs to `/api/audit/view_mode`.
+- [x] `web_ui.py` wired with `/ws/state` + `/api/health/refusal` +
+  `/api/audit/view_mode`; tile_delta MQTT topics dispatched into
+  Canvas + StatePublisher singletons.
+
+**C — Tractor X8 image pipeline (split out of monolithic `camera_service.py`):** ✅ Done
+
+- [x] `firmware/tractor_x8/image_pipeline/register.py` — phase-correlation
+  pre-diff (NumPy + optional OpenCV NEON path).
+- [x] `firmware/tractor_x8/image_pipeline/roi.py` — ROI mask from valve
+  activity + `CMD_ROI_HINT` (opcode `0x61`) honour.
+- [x] `firmware/tractor_x8/image_pipeline/encode_motion.py` — block-match
+  optical-flow microframe encoder for topic `0x28`.
+- [x] `firmware/tractor_x8/image_pipeline/encode_wireframe.py` — packed-bitmap
+  edge encoder for topic `0x29`.
+- [x] `firmware/tractor_x8/image_pipeline/ipc_to_h747.py` — UART ring-buffer
+  hand-off with CRC-8/SMBUS-framed envelope.
+
+**D — AI detector CPU scaffolds (model weights out of band, scaffolding pure
+code):** ✅ Done
+
+- [x] `base_station/image_pipeline/detect_yolo.py` — base-side independent
+  safety detector with NanoDet-Plus default (Apache-2.0) and YOLOv8 path
+  guarded by `LIFETRAC_DETECTOR=yolov8`; `cross_check()` IoU verdict +
+  `DetectorWorker` thread.
+- [x] `base_station/image_pipeline/superres_cpu.py` — ncnn Real-ESRGAN-x4v3
+  façade with passthrough fallback.
+- [x] `firmware/tractor_x8/image_pipeline/detect_nanodet.py` — NanoDet-Plus
+  scaffold + topic-`0x26` `pack_detection_frame` wire format.
+
+**E — Tooling + cross-cutting code:** ✅ Done
+
+- [x] `tools/pair_handheld.py` — handheld provisioning over USB-CDC with
+  signed-handshake + audit-log append.
+- [x] LoRa R-6 fragment scheme extended to `TelemetryFrame` —
+  `pack_telemetry_fragments()` / `parse_telemetry_fragment()` /
+  `TelemetryReassembler` in `lora_proto.py`; obeys 25 ms-per-fragment cap.
+- [x] Persistent AES-GCM nonce counter — `base_station/nonce_store.py`
+  (file-backed, fsync'd, gap-bumped on every reserve, restore on boot).
+- [x] Tests: `tests/test_telemetry_fragmentation.py` covers R-6 single +
+  multi-fragment round-trips, dedup, timeouts, and per-source `NonceStore`
+  persistence across instances.
+
+**F — Documentation:** ✅ Done
+
+- [x] [DESIGN-CONTROLLER/NON_ARDUINO_BOM.md](DESIGN-CONTROLLER/NON_ARDUINO_BOM.md)
+  — DigiKey/Mouser/L-com/Phoenix/Bürkert/McMaster consolidated order list.
+- [x] [DESIGN-CONTROLLER/CALIBRATION.md](DESIGN-CONTROLLER/CALIBRATION.md)
+  — joystick deadband, flow-valve curve, pressure zero, GPS offset, IMU bias.
+- [x] [DESIGN-CONTROLLER/FIELD_SERVICE.md](DESIGN-CONTROLLER/FIELD_SERVICE.md)
+  — spare-parts kit, fuse map, diagnostic flowcharts, escalation.
+- [x] [DESIGN-CONTROLLER/OPERATIONS_MANUAL.md](DESIGN-CONTROLLER/OPERATIONS_MANUAL.md)
+  — operator-facing power-on, pairing, take-control, E-stop, charging.
+- [x] [DESIGN-CONTROLLER/FIRMWARE_UPDATES.md](DESIGN-CONTROLLER/FIRMWARE_UPDATES.md)
+  — per-node update path (X8 OCI vs H747 USB-CDC vs handheld USB-CDC),
+  signing, fleet sequencing.
+- [x] [DESIGN-CONTROLLER/BASE_STATION.md](DESIGN-CONTROLLER/BASE_STATION.md)
+  trust-boundary table per IMAGE_PIPELINE §6.1 (server-only vs browser surface).
+
+**H — 2026-04-27 follow-up sweep (residual no-hardware items):** ✅ Done
+
+- [x] [firmware/tractor_x8/image_pipeline/tile_diff.py](DESIGN-CONTROLLER/firmware/tractor_x8/image_pipeline/tile_diff.py)
+  — 64-bit pHash per 32 px tile + Hamming-distance differ.
+- [x] [firmware/tractor_x8/image_pipeline/fragment.py](DESIGN-CONTROLLER/firmware/tractor_x8/image_pipeline/fragment.py)
+  — image-PHY fragmenter that reuses the R-6 magic so base-station
+  reassembly stays identical for telemetry + image.
+- [x] [firmware/tractor_x8/image_pipeline/capture.py](DESIGN-CONTROLLER/firmware/tractor_x8/image_pipeline/capture.py)
+  — `CaptureRing` newest-wins ring buffer with `MockCaptureBackend`
+  (unit-testable on Windows / CI) and a `V4l2CaptureBackend` shim
+  whose embedded body is filled in by the vendor patch.
+- [x] [tools/lora_rtt.py](DESIGN-CONTROLLER/tools/lora_rtt.py)
+  — RTT harness with JSONL logging, percentile summary, and an
+  `--echo-loopback` CI mode that needs no real radios.
+- [x] [base_station/person_alert.py](DESIGN-CONTROLLER/base_station/person_alert.py)
+  — `CMD_PERSON_APPEARED` (opcode `0x60`) packer + `PersonAlertEmitter`
+  with confidence filter, debounce, and audit-log hook; ready to be
+  passed as `DetectorWorker(on_result=emitter.feed)`.
+- [x] Named `audit_log.py` event helpers (`log_sf_step`, `log_encode_mode_change`,
+  `log_fhss_skip`, `log_replay_reject`, `log_gcm_reject`, `log_source_transition`,
+  `log_person_appeared`); `lora_bridge.py` and `link_monitor.py` switched
+  to the named helpers so the JSONL stays queryable.
+- [x] [base_station/web/diagnostics.html](DESIGN-CONTROLLER/base_station/web/diagnostics.html)
+  + [diagnostics.js](DESIGN-CONTROLLER/base_station/web/diagnostics.js)
+  — airtime utilization graph (30 % WARN / 60 % ALARM bands), SF rung
+  history with hysteresis marker, FHSS 8×60 s heatmap, link-loss
+  timeline; subscribes to `/ws/state` only.
+- [x] [base_station/web/map.html](DESIGN-CONTROLLER/base_station/web/map.html)
+  + [map.js](DESIGN-CONTROLLER/base_station/web/map.js)
+  — Leaflet with offline-first tile pyramid (`/tiles/{z}/{x}/{y}.png`),
+  OSM fallback when online, live tractor marker + breadcrumb track,
+  range-estimate sidebar from the FSPL model in IMAGE_PIPELINE Appendix B.
+
+88/88 base_station unit tests pass (was 71; +17 new tests for the helpers,
+emitter, and `lora_rtt._percentile`).
+
+**G — Skip (explicitly out of scope this pass):**
+
+- [ ] Legacy-prototype safety bugs (rest of this file) — only worth fixing
+  if the prototype gets used for any further bench tests.
+- Anything Coral-only (`superres_coral.py`, `interp_rife.py`, `inpaint_lama.py`).
+- Anything in Phase 6+ (mast install, integration, field test, FCC verification).
+- Phase 10+ stretch goals (SVT-AV1, neural-inflate, NDVI, ROS 2 bridge, etc.).
+
+### Remaining — needs hardware
+
+- [ ] **Phase A1 R-7 retune bench** —
+  [firmware/bench/lora_retune_bench/](DESIGN-CONTROLLER/firmware/bench/lora_retune_bench/)
+  is ready; needs two LoRa boards on a desk to measure actual retune cost.
+- [ ] **Phase B Opta Modbus slave** — replace the `OptaController` /
+  D1608S / A0602 placeholder shims in
+  [firmware/tractor_opta/opta_modbus_slave.ino](DESIGN-CONTROLLER/firmware/tractor_opta/opta_modbus_slave.ino)
+  with real library calls; needs an Opta + expansions on the bench.
+- [ ] **Compile `lp_crypto_real.cpp` on-target** (Portenta H7 + MKR WAN
+  1310) and verify with the golden-vector test from above.
+- [ ] **Tractor M7 ↔ SX1276 SPI driver** (bridge currently talks
+  KISS-over-serial; on-tractor needs the real radio path).
+- [ ] **Bench-validate E-stop end-to-end** per the procedure in
+  [KEY_ROTATION.md](DESIGN-CONTROLLER/KEY_ROTATION.md) §7.
+
+---
+
 ## Mechanical / UTU integration
 
 - [ ] Verify the loader-arm hydraulic (lift) cylinders do not collide with

@@ -1,0 +1,17 @@
+[Unit]
+Description=LifeTrac v25 tractor X8 time service (PPS + UART tick)
+After=network-online.target dev-pps0.device
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/lifetrac/firmware/tractor_x8/time_service.py
+Restart=on-failure
+RestartSec=5
+# PPS_FETCH ioctl + raw UART writes need CAP_SYS_TIME (for any future
+# adjtimex slewing) and direct device access. Run as root for v25; future
+# hardening can drop to a dedicated user with udev rules.
+User=root
+
+[Install]
+WantedBy=multi-user.target

@@ -115,11 +115,11 @@ class PhyProfile:
     preamble_len: int = 8
 
 
-PHY_CONTROL_SF7 = PhyProfile("control_sf7", 7, 125, 5, 8)
+PHY_CONTROL_SF7 = PhyProfile("control_sf7", 7, 250, 5, 8)
 PHY_CONTROL_SF8 = PhyProfile("control_sf8", 8, 125, 5, 8)
 PHY_CONTROL_SF9 = PhyProfile("control_sf9", 9, 125, 5, 8)
 PHY_TELEMETRY = PhyProfile("telemetry", 9, 250, 8, 12)
-PHY_IMAGE = PhyProfile("image", 7, 250, 5, 8)
+PHY_IMAGE = PhyProfile("image", 7, 500, 5, 8)
 
 PHY_BY_NAME = {
     profile.name: profile
@@ -468,3 +468,166 @@ def _xorshift32(value: int) -> int:
     value ^= value >> 17
     value ^= (value << 5) & 0xFFFFFFFF
     return value & 0xFFFFFFFF
+
+
+# -------------------------------------------------------------------------
+# R-6 — Telemetry fragmentation.
+#
+# Per IMAGE_PIPELINE.md §13.3 R-6 / MASTER_PLAN.md §8.17, P2 telemetry obeys
+# the same ≤25 ms-per-fragment airtime cap as image fragments. When a
+# topic payload exceeds the per-PHY fragment budget we chop it into
+# `TileDeltaFrame`-style fragments using the 4-byte 0xFE-magic header that
+# `base_station.image_pipeline.reassemble.FragmentReassembler` already
+# understands.
+#
+# Wire format (matches reassemble.py):
+#     u8 magic = 0xFE
+#     u8 frag_seq        ; same value across all fragments of one logical
+#                        ; payload, increments per logical payload mod 256
+#     u8 frag_idx        ; 0..total-1
+#     u8 total_minus_one ; total fragments - 1 (so single-fragment payloads
+#                        ; would still use 0)
+#     payload bytes
+#
+# Each TelemetryFrame body (header + topic_id + length + fragment bytes +
+# CRC) must satisfy `lora_time_on_air_ms(...) <= max_air_ms`. We size the
+# fragments by binary search up front — measured once per (profile,
+# topic_id) and cached, since the PHY profile is per-topic_id stable.
+# -------------------------------------------------------------------------
+TELEMETRY_FRAGMENT_MAGIC = 0xFE
+TELEMETRY_FRAGMENT_HEADER_LEN = 4
+TELEMETRY_FRAGMENT_MAX_AIRTIME_MS = 25.0
+
+
+def max_telemetry_fragment_payload(profile: PhyProfile,
+                                   max_air_ms: float = TELEMETRY_FRAGMENT_MAX_AIRTIME_MS) -> int:
+    """Largest fragment-body byte count whose on-air time ≤ ``max_air_ms``.
+
+    The returned value is the count of *fragment header + fragment data*
+    bytes that go inside the TelemetryFrame body; the caller still pays
+    the TelemetryFrame envelope (5-byte header + 2-byte topic/length tag +
+    2-byte CRC), which we account for by adding a constant 9 here.
+    """
+    envelope = TELEM_HEADER_LEN + CRC_LEN  # 5-byte header + 2-byte CRC
+    # Binary search.
+    lo, hi = 1, TELEM_MAX_PAYLOAD
+    best = 0
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        air = lora_time_on_air_ms(envelope + mid, profile)
+        if air <= max_air_ms:
+            best = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return max(0, best - TELEMETRY_FRAGMENT_HEADER_LEN)
+
+
+def pack_telemetry_fragments(payload: bytes, frag_seq: int,
+                             profile: PhyProfile,
+                             max_air_ms: float = TELEMETRY_FRAGMENT_MAX_AIRTIME_MS) -> list[bytes]:
+    """Split a logical telemetry payload into ≤25 ms-air fragment bodies.
+
+    Returns the list of fragment bodies (header + data) that the caller
+    wraps into TelemetryFrames. If the payload already fits in a single
+    fragment under ``max_air_ms`` the returned list has length 1; the
+    fragment is still tagged so the receiver's reassembler treats it
+    uniformly.
+    """
+    chunk = max_telemetry_fragment_payload(profile, max_air_ms)
+    if chunk <= 0:
+        raise ValueError(f"profile {profile.name} cannot fit any fragment in {max_air_ms} ms")
+    total = max(1, (len(payload) + chunk - 1) // chunk)
+    if total > 256:
+        raise ValueError(f"payload requires {total} fragments; max 256")
+    out: list[bytes] = []
+    for idx in range(total):
+        body = payload[idx * chunk:(idx + 1) * chunk]
+        header = bytes([TELEMETRY_FRAGMENT_MAGIC,
+                        frag_seq & 0xFF,
+                        idx & 0xFF,
+                        (total - 1) & 0xFF])
+        out.append(header + body)
+    return out
+
+
+def parse_telemetry_fragment(body: bytes) -> tuple[int, int, int, bytes] | None:
+    """Inverse of pack_telemetry_fragments(); returns (seq, idx, total, data).
+
+    Returns None when the magic byte doesn't match (caller should treat
+    the body as a complete unfragmented payload — keeps backward compat
+    with telemetry topics whose payloads always fit under 25 ms).
+    """
+    if len(body) < TELEMETRY_FRAGMENT_HEADER_LEN:
+        return None
+    if body[0] != TELEMETRY_FRAGMENT_MAGIC:
+        return None
+    frag_seq = body[1]
+    frag_idx = body[2]
+    total = body[3] + 1
+    if frag_idx >= total:
+        return None
+    return frag_seq, frag_idx, total, bytes(body[TELEMETRY_FRAGMENT_HEADER_LEN:])
+
+
+@dataclass
+class _TelemPartial:
+    total: int
+    received_ms: int
+    parts: dict[int, bytes]
+
+
+class TelemetryReassembler:
+    """Reassemble fragments produced by ``pack_telemetry_fragments``.
+
+    Mirrors :class:`base_station.image_pipeline.reassemble.FragmentReassembler`
+    but is keyed on (source_id, topic_id, frag_seq) so two topics sharing a
+    seq window can't be confused. Time-based GC drops partial assemblies
+    older than ``timeout_ms``.
+    """
+
+    def __init__(self, timeout_ms: int = 1500) -> None:
+        self.timeout_ms = timeout_ms
+        self._partials: dict[tuple[int, int, int], _TelemPartial] = {}
+        self.completed = 0
+        self.timeouts = 0
+        self.duplicates = 0
+        self.bad_magic_passthroughs = 0
+
+    def feed(self, source_id: int, topic_id: int, body: bytes,
+             now_ms: int) -> bytes | None:
+        self._gc(now_ms)
+        parsed = parse_telemetry_fragment(body)
+        if parsed is None:
+            self.bad_magic_passthroughs += 1
+            return body  # passthrough — body is itself a complete payload
+        frag_seq, frag_idx, total, data = parsed
+        key = (source_id & 0xFF, topic_id & 0xFF, frag_seq)
+        slot = self._partials.get(key)
+        if slot is None:
+            slot = _TelemPartial(total=total, received_ms=now_ms, parts={})
+            self._partials[key] = slot
+        elif slot.total != total:
+            # Total changed mid-stream — start over.
+            slot = _TelemPartial(total=total, received_ms=now_ms, parts={})
+            self._partials[key] = slot
+        if frag_idx in slot.parts:
+            self.duplicates += 1
+        else:
+            slot.parts[frag_idx] = data
+            slot.received_ms = now_ms
+        if len(slot.parts) == slot.total:
+            del self._partials[key]
+            self.completed += 1
+            return b"".join(slot.parts[i] for i in range(slot.total))
+        return None
+
+    def _gc(self, now_ms: int) -> None:
+        expired = [k for k, p in self._partials.items()
+                   if now_ms - p.received_ms > self.timeout_ms]
+        for k in expired:
+            del self._partials[k]
+            self.timeouts += 1
+
+    def pending_keys(self) -> list[tuple[int, int, int]]:
+        return list(self._partials.keys())
