@@ -3,7 +3,7 @@
 The active v25 Arduino firmware is the LoRa/Modbus controller tree under `DESIGN-CONTROLLER/firmware/`:
 
 - `firmware/handheld_mkr/handheld_mkr.ino` — MKR WAN 1310 handheld LoRa controller
-- `firmware/tractor_h7/tractor_h7.ino` and `tractor_m4.cpp` — Portenta X8 onboard H747 co-MCU tractor firmware
+- `firmware/tractor_h7/tractor_h7.ino` (M7) and `firmware/tractor_h7_m4/tractor_h7_m4.ino` (M4) — Portenta X8 onboard H747 co-MCU tractor firmware (split across two sketch folders for arduino-cli; see Round 17 in the Implementation Status memo)
 - `firmware/tractor_opta/opta_modbus_slave.ino` — Opta Modbus-RTU hydraulic I/O slave
 - `firmware/bench/lora_retune_bench/lora_retune_bench.ino` — LoRa retune timing bench sketch
 

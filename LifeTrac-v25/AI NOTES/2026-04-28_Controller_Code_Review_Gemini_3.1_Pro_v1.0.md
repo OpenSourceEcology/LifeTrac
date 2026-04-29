@@ -77,3 +77,32 @@ When `lp_make_command` structures variable-length commands, it explicitly overwr
 ### 3.3 `asyncio` WebSocket Handling 
 **Location:** `ws_control` inside `web_ui.py`.
 * **Improvement:** Inside the `ws_control` WebSocket handler, you poll time `now = asyncio.get_event_loop().time()` on each packet ingress, checking `now - last_tx < 0.05` to constrain inputs to a conservative 20Hz. If a rogue/stuck client begins blasting inputs to the socket faster than the event loop yields context, FastAPI might suffer thread-starvation on `receive_text`. It is advisable to use `asyncio.sleep` to cleanly drain buffer boundaries or properly backpressure inputs via asynchronous queues.
+
+---
+
+## 4. Second Pass Review Findings
+
+### 4.1 Verification of Previous Fixes
+- **Sequence Number Mismatch**: **Fixed correctly.** Python uses strict `<H` struct packing (little-endian alignment), which natively aligns to structural expectations. State rollover is appropriately handled across both the Python and C side replay windows.
+- **Multi-Device Lockout**: **Fixed correctly.** `_fail_counts` handles PIN lockout correctly using `X-Forwarded-For` from `LIFETRAC_TRUSTED_PROXIES`, mitigating collateral lockouts from unrelated devices.
+- **`lp_kiss_encode` Bounds Check**: **Fixed correctly.** The `(o + need + 1 > out_max)` instruction appropriately accounts for escaped bytes, preventing stack overruns.
+- **`CommandFrame` Overwrite**: **Fixed correctly.** The C firmware preemptively zeroes the struct and dynamically handles overlap.
+
+### 4.2 New Issues Discovered
+#### 4.2.1 Concurrency Bug in `web_ui.py` WebSockets (Major Risk)
+* **Location:** `_on_mqtt_message` & `ws_telemetry`/`ws_image`
+* **Issue:** The MQTT background thread iterates over `telemetry_subscribers` and `image_subscribers` while the FastAPI `uvloop` thread modifies them (`set.add`/`set.discard`).
+* **Consequence:** `RuntimeError: Set changed size during iteration` will sporadically fire when connections flap, potentially dropping critical telemetry.
+* **Fix:** Apply a `threading.Lock()` or an asyncio-safe event loop sync primitive to guard access to subscriber sets.
+
+#### 4.2.2 Missing WS Connection Ceiling in `/ws/control` (Security Risk)
+* **Location:** `base_station/web_ui.py`
+* **Issue:** Unlike the telemetry sockets gated by `_admit_ws()`, the operator control socket accepts clients boundlessly. 
+* **Consequence:** An infinite timeout or connection leak can exhaust memory bounds on the base station's local network.
+* **Fix:** Enforce a strict concurrent `MAX_CONTROL_SUBSCRIBERS` limit similarly to telemetry routing.
+
+#### 4.2.3 API Decoupling Limitation in `ReplayWindow` (Improvement)
+* **Location:** `ReplayWindow` (`lora_proto.c`) / `_restamp_control` (`lora_bridge.py`)
+* **Issue:** Out-of-bounds history checks rely heavily on explicit unsigned masking implementations (`age <= 63`).
+* **Consequence:** Modifications to the window span `bitmap` width in the C code could induce integer overflow faults if Python tracking definitions aren't matched flawlessly.
+* **Fix:** Clip boundaries deterministically ahead of assignment.

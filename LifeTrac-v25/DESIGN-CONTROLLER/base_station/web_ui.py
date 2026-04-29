@@ -183,6 +183,28 @@ def _check_lockout(ip: str) -> float:
         return 0.0
 
 
+# §E (Round 9): module-level singleton AuditLog so PIN failures don't open a
+# new file handle per event (which would leak a `ResourceWarning` on every
+# rejected login). Lazily constructed so unit-test environments without a
+# writable audit dir don't pay for setup until the first event.
+_AUDIT_LOG: "object | None" = None
+_AUDIT_LOG_LOCK = threading.Lock()
+
+
+def _get_audit_log():
+    global _AUDIT_LOG
+    if _AUDIT_LOG is not None:
+        return _AUDIT_LOG
+    with _AUDIT_LOG_LOCK:
+        if _AUDIT_LOG is None:
+            try:
+                from audit_log import AuditLog, DEFAULT_PATH as _AUDIT_PATH
+                _AUDIT_LOG = AuditLog(_AUDIT_PATH)
+            except Exception:                          # pragma: no cover
+                _AUDIT_LOG = False  # sentinel: tried and failed
+    return _AUDIT_LOG if _AUDIT_LOG is not False else None
+
+
 def _record_failure(ip: str) -> None:
     now = time.monotonic()
     with _fail_lock:
@@ -193,8 +215,9 @@ def _record_failure(ip: str) -> None:
             logging.warning("web_ui: PIN lockout for %s (%d fails)", ip, n_fails)
             # IP-207: also persist to the audit log so SOC tooling can alert.
             try:
-                from audit_log import AuditLog, DEFAULT_PATH as _AUDIT_PATH
-                AuditLog(_AUDIT_PATH).record("pin_lockout", ip=ip, fails=n_fails)
+                al = _get_audit_log()
+                if al is not None:
+                    al.record("pin_lockout", ip=ip, fails=n_fails)
             except Exception:                          # pragma: no cover
                 pass
         else:
@@ -204,8 +227,9 @@ def _record_failure(ip: str) -> None:
             # IP-207: also audit individual failures so brute-force attempts
             # show up in the same stream as crypto rejects.
             try:
-                from audit_log import AuditLog, DEFAULT_PATH as _AUDIT_PATH
-                AuditLog(_AUDIT_PATH).record("pin_failure", ip=ip, fails=n_fails)
+                al = _get_audit_log()
+                if al is not None:
+                    al.record("pin_failure", ip=ip, fails=n_fails)
             except Exception:                          # pragma: no cover
                 pass
 
@@ -258,8 +282,22 @@ mqtt_client.loop_start()
 telemetry_subscribers: set[WebSocket] = set()
 image_subscribers: set[WebSocket] = set()
 state_subscribers: set[WebSocket] = set()
+control_subscribers: set[WebSocket] = set()
+# §C (Round 9): single lock guarding all WS subscriber-set mutations.
+# The MQTT background thread iterates these sets while the FastAPI event
+# loop adds/removes on connect/disconnect; without the lock that race
+# fires "Set changed size during iteration" intermittently. We snapshot
+# under the lock and iterate the snapshot lock-free.
+_subscribers_lock = threading.Lock()
 active_source = "none"
 active_source_lock = threading.Lock()
+
+
+def _snapshot_subscribers(pool: set[WebSocket]) -> list[WebSocket]:
+    """Return a stable snapshot of *pool* under ``_subscribers_lock`` so the
+    caller can iterate without racing against connect/disconnect."""
+    with _subscribers_lock:
+        return list(pool)
 
 
 # ---- IP-202 / IP-208: bounded WS fan-out -------------------------------
@@ -270,6 +308,13 @@ active_source_lock = threading.Lock()
 MAX_TELEMETRY_SUBSCRIBERS = 8
 MAX_IMAGE_SUBSCRIBERS     = 4
 MAX_STATE_SUBSCRIBERS     = 4
+# §B (Round 9): /ws/control was previously unbounded — flagged independently
+# by the second-pass GPT-5.3-Codex and Gemini reviews. Tractor-side replay
+# windows already gate by source_id, but at the WS layer an attacker that
+# bypassed PIN auth could still open thousands of sockets and starve the
+# event loop. Cap matches the realistic operator + observer scenario
+# (one driver + a couple of mirrored sessions).
+MAX_CONTROL_SUBSCRIBERS   = 4
 WS_OVER_CAPACITY_CODE     = 4429
 
 
@@ -278,17 +323,38 @@ async def _admit_ws(ws: WebSocket, pool: set[WebSocket], cap: int,
     """Accept *ws* into *pool* if there's room, else close with 4429.
 
     Returns True iff the caller should proceed with its receive loop.
+    Mutation of *pool* is serialised through ``_subscribers_lock`` so the
+    MQTT-thread snapshot in ``_snapshot_subscribers`` is race-free.
     """
-    if len(pool) >= cap:
+    with _subscribers_lock:
+        if len(pool) >= cap:
+            over_cap = True
+        else:
+            over_cap = False
+    if over_cap:
         try:
             await ws.close(code=WS_OVER_CAPACITY_CODE)
         except Exception:
             pass
         logging.warning("ws/%s: rejecting connection, cap=%d reached", label, cap)
+        # Audit so a brute-force WS spammer shows up alongside PIN failures.
+        try:
+            al = _get_audit_log()
+            if al is not None:
+                al.record("ws_over_cap", label=label, cap=cap)
+        except Exception:                                  # pragma: no cover
+            pass
         return False
     await ws.accept()
-    pool.add(ws)
+    with _subscribers_lock:
+        pool.add(ws)
     return True
+
+
+def _discard_subscriber(pool: set[WebSocket], ws: WebSocket) -> None:
+    """Remove *ws* from *pool* under the shared lock."""
+    with _subscribers_lock:
+        pool.discard(ws)
 
 
 def _ws_send_done(label: str):
@@ -356,7 +422,7 @@ def _on_mqtt_message(_c, _u, msg):
     if msg.topic.endswith("/video/canvas"):
         loop_img = getattr(app.state, "loop", None)
         if loop_img is not None:
-            for ws in list(image_subscribers):
+            for ws in _snapshot_subscribers(image_subscribers):
                 fut = asyncio.run_coroutine_threadsafe(
                     ws.send_bytes(msg.payload), loop_img
                 )
@@ -382,7 +448,7 @@ def _on_mqtt_message(_c, _u, msg):
     loop = getattr(app.state, "loop", None)
     if loop is None:
         return
-    for ws in list(telemetry_subscribers):
+    for ws in _snapshot_subscribers(telemetry_subscribers):
         fut = asyncio.run_coroutine_threadsafe(
             ws.send_text(json.dumps(payload)), loop
         )
@@ -413,10 +479,13 @@ _image_lock = threading.Lock()
 
 def _publish_state_snapshot() -> None:
     loop = getattr(app.state, "loop", None)
-    if loop is None or not state_subscribers:
+    if loop is None:
+        return
+    snap_subs = _snapshot_subscribers(state_subscribers)
+    if not snap_subs:
         return
     snap = json.dumps(_image_publisher.snapshot())
-    for ws in list(state_subscribers):
+    for ws in snap_subs:
         fut = asyncio.run_coroutine_threadsafe(ws.send_text(snap), loop)
         fut.add_done_callback(_ws_send_done("state"))
 
@@ -568,7 +637,7 @@ async def ws_telemetry(ws: WebSocket):
     except WebSocketDisconnect:
         pass
     finally:
-        telemetry_subscribers.discard(ws)
+        _discard_subscriber(telemetry_subscribers, ws)
 
 
 @app.websocket("/ws/image")
@@ -590,7 +659,7 @@ async def ws_image(ws: WebSocket):
     except WebSocketDisconnect:
         pass
     finally:
-        image_subscribers.discard(ws)
+        _discard_subscriber(image_subscribers, ws)
 
 
 @app.websocket("/ws/state")
@@ -617,7 +686,7 @@ async def ws_state(ws: WebSocket):
     except WebSocketDisconnect:
         pass
     finally:
-        state_subscribers.discard(ws)
+        _discard_subscriber(state_subscribers, ws)
 
 
 @app.post("/api/health/refusal")
@@ -670,7 +739,12 @@ async def ws_control(ws: WebSocket):
     if not _session_valid(token):
         await ws.close(code=4401)
         return
-    await ws.accept()
+    # §B (Round 9): bound the operator-control socket the same way as
+    # telemetry/image/state so a credentialled-but-misbehaving client
+    # cannot open thousands of sockets and starve the event loop.
+    if not await _admit_ws(ws, control_subscribers,
+                           MAX_CONTROL_SUBSCRIBERS, "control"):
+        return
     seq = 0
     hb = 0
     last_tx = 0.0
@@ -708,6 +782,8 @@ async def ws_control(ws: WebSocket):
             hb = (hb + 1) & 0xFF
     except WebSocketDisconnect:
         pass
+    finally:
+        _discard_subscriber(control_subscribers, ws)
 
 
 @app.post("/api/estop")

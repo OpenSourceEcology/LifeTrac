@@ -27,23 +27,146 @@ tags. **All work tracked there:**
 
 ➡️ **[AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md)**
 
-**Implementation status (2026-04-28, through Round 8):**
+**Implementation status (2026-04-28, through Round 17):**
 [`AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md`](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md)
 — every plan item achievable without bench hardware is now landed
-(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). 147 base_station
-tests pass. **Round 8** added (a) a property/fuzz suite for
-`pack_control` (the symmetric counterpart to the IP-108 command-frame
-fuzz, locking down length, header invariants, CRC offset, signed-int8
-stick clipping with no sign-aliasing, byte-mask containment for
-buttons/flags/hb, seq mod-16 wrap, and single-bit-flip CRC catch), and
-(b) a pure-Python SIL model of the M4 safety supervisor that mirrors
-`tractor_m4.cpp` 1:1 (seqlock retry, `LIFETRAC_M4_WATCHDOG_MS`,
-`LIFETRAC_ESTOP_MAGIC` gating, latched trip). The SIL turns the W4-01
-E-stop-latency and W4-03 watchdog-trip HIL gates into verification
-passes against a documented model rather than greenfield design passes
-on the bench. Remaining work is the HIL gate set below — bench
-validation of W4-01…W4-10 and the CI compile-gate flip from
-best-effort to blocking.
+(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). 200 base_station
+tests pass. **Round 17** flips the last best-effort Arduino compile
+gate (`firmware-compile-tractor-h7`) to blocking and adds a parallel
+`firmware-compile-tractor-m4` job. The M4 watchdog firmware was
+moved out of the M7 sketch folder into its own
+[`firmware/tractor_h7_m4/tractor_h7_m4.ino`](DESIGN-CONTROLLER/firmware/tractor_h7_m4/tractor_h7_m4.ino).
+A `#if defined(CORE_CM4)` guard inside the original `tractor_m4.cpp`
+fixed the M7 `multiple definition of 'setup'` link error, but the M4
+build still failed because arduino-cli's library auto-discovery
+scans the .ino's `#include` directives regardless of `target_core`,
+pulling RadioLib + Modbus into the M4 build where they don't
+compile against the M4 variant headers. Two separate sketch folders
+is the canonical Portenta-dual-core layout (matches Arduino IDE's
+stock `PortentaDualCore` example). M7 builds at 207888 B / 9% flash;
+M4 at 87032 B. The Portenta core does not expose a separate
+`envie_m4` FQBN — the M4 build uses the `target_core=cm4` board
+menu option (`arduino:mbed_portenta:envie_m7:target_core=cm4`).
+**Round 16** flips the second of three Arduino compile
+gates (`firmware-compile-opta`) from `continue-on-error: true` to
+blocking after a local arduino-cli replay exposed two issues: the
+.ino base name didn't match its parent folder (renamed
+`opta_modbus_slave.ino` → `tractor_opta.ino`) and the
+`Arduino_Opta_Blueprint` library (provider of `OptaBlue.h`) was
+missing from the workflow's install step. tractor_opta now compiles
+clean (171520 B / 8% flash). **Round 15** turned the Arduino compile
+gate from `continue-on-error: true` into a real blocking job for
+`firmware/handheld_mkr` after a local arduino-cli replay exposed
+three independent bugs that had been hiding behind that flag since
+IP-007: stale `#include "../common/..."` paths that don't resolve
+in arduino-cli's temp build dir; `--build-property build.extra_flags=...`
+clobbering the MKR WAN 1310's `-DUSE_BQ24195L_PMIC` (which gates
+`LORA_IRQ`); and `crypto_stub.c` requiring an explicit
+`-DLIFETRAC_ALLOW_STUB_CRYPTO` opt-in. Both stub (55932 B) and real-crypto
+(59940 B) handheld builds are now green locally and in
+[`.github/workflows/arduino-ci.yml`](../.github/workflows/arduino-ci.yml).
+A reproducible local staging script
+[`DESIGN-CONTROLLER/tools/stage_firmware_sketches.ps1`](DESIGN-CONTROLLER/tools/stage_firmware_sketches.ps1)
+mirrors the CI staging steps (extended in Round 17 to also stage
+shared_mem.h into the new tractor_h7_m4 sketch).
+**Round 14** resolves the TR-I cumulative-vs-consecutive
+divergence pinned in Round 10: the M7's
+`s_modbus_fail_count` in
+[`firmware/tractor_h7/tractor_h7.ino`](DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino)
+now resets to 0 on every successful Modbus poll, so the 10-strike
+E-stop latch counts *consecutive* failures and matches the W4-04
+runbook prose. The SIL test suite was flipped accordingly: the old
+`test_fail_count_is_cumulative_not_consecutive` (which pinned the
+firmware bug) is replaced by `test_fail_count_is_consecutive` plus
+two new pathological-pattern tests
+(`test_intermittent_failures_never_latch`,
+`test_nine_then_one_then_nine_does_not_latch`) — 1000-cycle
+alternating fail/success and 9-1-9 patterns that *would* have tripped
+under cumulative semantics but must not under consecutive. This
+prevents the "noisy bus is a slow-burn nuisance trip" failure mode
+where a single bad poll every few hours would eventually latch the
+tractor down. Test count: 198 → 200 (+1 cumulative test removed,
++3 consecutive tests added).
+[`AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md`](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md)
+— every plan item achievable without bench hardware is now landed
+(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). 198 base_station
+tests pass. **Round 13** completes the third and final fragmenter
+fuzz: the on-air TileDeltaFrame chunker in
+[`base_station/image_pipeline/reassemble.py`](DESIGN-CONTROLLER/base_station/image_pipeline/reassemble.py),
+exercised via
+[`base_station/tests/test_image_reassembly_fuzz.py`](DESIGN-CONTROLLER/base_station/tests/test_image_reassembly_fuzz.py).
+13 tests cover IF-A through IF-L: round-trip identity for arbitrary
+frame sizes split N ways, fragment-header invariants (magic /
+constant `frag_seq` / monotonic idx / shared `total_minus1`),
+bad-magic passthrough that must not disturb an in-flight assembly,
+truncated-header-with-magic decode-error path, `frag_idx >= total`
+rejection, reordered delivery (20 PRNG trials), duplicate handling
+with `2*(N-1)` duplicate-counter check, missing-middle timeout +
+GC, two-stream interleave by `frag_seq`, seq-wrap 255 → 0 across an
+intervening GC, mid-stream `total` change recovery, and a 200-trial
+PRNG-seeded randomised stress with optional shuffle + duplicate.
+The system now has property-fuzz coverage on **all three** binary
+parsers — IP-108 command frame (operator → tractor),
+`telemetry_fragmentation_fuzz` (M7 → base, Round 11), and the
+TileDeltaFrame chunker (camera → base, Round 13).
+[`AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md`](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md)
+— every plan item achievable without bench hardware is now landed
+(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). 185 base_station
+tests pass. **Round 12** added a WS subscriber-concurrency stress
+suite
+([`base_station/tests/test_ws_subscriber_concurrency.py`](DESIGN-CONTROLLER/base_station/tests/test_ws_subscriber_concurrency.py))
+that drives `_admit_ws`, `_discard_subscriber`, `_snapshot_subscribers`,
+and `_on_mqtt_message` together against a real asyncio loop running on
+a background thread — the same topology the production gateway
+executes. 6 tests cover: cap honoured under N=4×cap concurrent admits
+(WC-A), 200 admit/discard cycles with no leak (WC-B), 20 000 snapshot
+iterations under 4-thread churn with zero `RuntimeError: Set changed
+size during iteration` (WC-C), 500 `_on_mqtt_message` fan-outs while
+3 churners mutate the pool (WC-D), per-pool cap independence (WC-E),
+drain-and-refill counter integrity (WC-F), and 4429-on-overflow
+close-code verification piggybacked on WC-A (WC-G). This converts
+Round 9 §B/§C from "code looks right by inspection" to a CI-enforced
+property.
+[`AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md`](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md)
+— every plan item achievable without bench hardware is now landed
+(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). 179 base_station
+tests pass. **Round 11** added the property/fuzz suite for the
+telemetry fragmentation path
+([`base_station/tests/test_telemetry_fragmentation_fuzz.py`](DESIGN-CONTROLLER/base_station/tests/test_telemetry_fragmentation_fuzz.py)),
+symmetric to the IP-108 command-frame fuzz: 15 tests cover round-trip
+identity across every length × packable profile, header invariants
+(magic, monotonic idx, shared seq/total), 25 ms airtime cap per
+fragment, the > 256-fragment oversize rejection, reordered and
+duplicated delivery, missing-middle timeout & GC, multi-source/topic
+isolation, seq-wrap across GC boundaries, non-magic passthrough,
+mid-stream `total` change recovery, and a 200-trial PRNG-seeded
+randomised stress. **Round 10** added a SIL model of the Opta Modbus
+slave + M7 `apply_control()` writer
+([`base_station/tests/test_modbus_slave_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_modbus_slave_sil.py)),
+which converts W4-04 (Modbus failure → E-stop) from a HIL-only gate
+into a CI verification — 13 tests cover the 200 ms Opta watchdog,
+the 10-strike fail-count latch, the fail-closed block shape, the
+REG_ARM_ESTOP/external-loop trip paths, the AUX-mask guard, and the
+W4-04 < 1 s budget. The suite also pins a documented divergence: the
+current firmware fail-count is *cumulative* not *consecutive*, so the
+W4-04 runbook prose and the firmware disagree (firmware wins until a
+deliberate fix lands). **Round 9** addressed five operational-hardening
+findings that surfaced in the parallel GPT-5.3-Codex and Gemini
+second-pass reviews: **§B** `/ws/control` admission cap
+(`MAX_CONTROL_SUBSCRIBERS=4` + `_admit_ws()` parity with
+telemetry/image/state); **§C** `_subscribers_lock` guarding all WS-pool
+mutations + `_snapshot_subscribers()` for the MQTT fan-out thread;
+**§D** unconditional all-zero fleet-key refusal in both firmware
+sketches (was previously gated only on `LIFETRAC_USE_REAL_CRYPTO`,
+now requires explicit `LIFETRAC_ALLOW_UNCONFIGURED_KEY` opt-in);
+**§E** `AuditLog` promoted to a module-level singleton via
+`_get_audit_log()` so PIN failures stop opening a new file handle per
+event; **§F** cross-language
+`LP_REPLAY_WINDOW_BITS == REPLAY_WINDOW_BITS == 64` invariant test
+parsing the C header. Remaining work is the HIL gate set
+below — bench validation of W4-01…W4-10 and the **§A** CI compile-gate
+flip from best-effort to blocking once the three `arduino-cli compile`
+jobs go green on a real Actions runner.
 
 Source reviews:
 
@@ -143,7 +266,7 @@ Tracked in detail in [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) and
   [firmware/common/shared_mem.h](DESIGN-CONTROLLER/firmware/common/shared_mem.h)
   formalises the M7↔M4 SRAM4 layout (version + alive_tick + loop_counter
   + estop_request); rewrote
-  [tractor_m4.cpp](DESIGN-CONTROLLER/firmware/tractor_h7/tractor_m4.cpp)
+  [tractor_h7_m4.ino](DESIGN-CONTROLLER/firmware/tractor_h7_m4/tractor_h7_m4.ino)
   with three independent trip conditions (stale tick, stuck loop counter,
   M7 e-stop request) + heartbeat LED. M7 stamps version/loop_counter/
   estop_request every iteration.
@@ -365,7 +488,11 @@ against the Wave-4 gates in
 - [ ] Battery emulator on the 12 V rail so a brownout can be simulated
   without yanking the keyswitch.
 
-**HIL tests (Wave 4 gates):**
+**HIL tests (Wave 4 gates):** Step-by-step bench procedures, capture
+conventions, pass criteria, and sign-off rules for every gate below are
+documented in
+[`DESIGN-CONTROLLER/HIL_RUNBOOK.md`](DESIGN-CONTROLLER/HIL_RUNBOOK.md).
+Execute from the runbook; the bullets below are the index.
 
 - [ ] **W4-01 Handheld E-stop latch latency.** Mushroom-button press →
   PSR-alive drops → all 8 valve coils de-energize within **< 100 ms**
@@ -385,6 +512,13 @@ against the Wave-4 gates in
   verify IP-205 counter ticks, `apply_control(-1)` fires after 10
   consecutive failures, valves go neutral, and the audit log shows
   the disconnect within 1 s.
+  *SIL coverage:* [`base_station/tests/test_modbus_slave_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_modbus_slave_sil.py)
+  (Round 10) models both the M7 `apply_control` writer and the
+  Opta-side `on_holding_change`/`check_safety` surface; 13 tests cover
+  TR-A through TR-J including the < 1 s W4-04 budget. Note TR-I:
+  current firmware uses *cumulative* not *consecutive* fail count —
+  pinned by `test_fail_count_is_cumulative_not_consecutive` so a
+  future firmware fix will be a loud test failure.
 - [ ] **W4-05 Proportional valve ramp-out (IP-303 Round-4 follow-on).**
   Hold full-speed track for 3 s, release joystick; verify
   `REG_FLOW_SP_*` ramps from 10000 mV to 0 over **2 s** (track ladder)
@@ -554,3 +688,110 @@ and are still unfixed. They are the highest-priority work on the software side.
   round-trip through the parsing logic the Opta firmware uses. This would
   catch regressions of the int-coercion class.
 - [ ] Wire the MQTT contract test into `ARDUINO_CI` so it runs on PRs.
+
+---
+
+## Future ideas � autonomous routines & mission library
+
+Beyond tele-op, the v25 controller stack reserves source-id `AUTONOMY`
+and the MASTER_PLAN already carves out autonomy opcodes. Once GPS/RTK,
+IMU dead-reckoning, vision-based obstacle stop, and the autonomy mode
+arbitration land, the tractor becomes a programmable mobile hydraulic
+robot. This list is the running brainstorm of mission-level routines we
+want the autonomy layer to be able to express. None of these are
+in-scope for v25 itself � they are the target use cases the autonomy
+APIs need to be expressive enough to support.
+
+Each routine should compose from a small set of primitives � *go-to
+pose*, *follow path*, *bucket dig*, *bucket dump*, *engage implement*,
+*hold posture*, *wait-for-condition* � and run under the same hard
+safety envelope as tele-op (PSR E-stop chain, person-alert vision stop,
+geofence, link-loss timeout).
+
+### Operator-requested routines
+
+- [ ] **Material movement loop (dig ? haul ? dump).** Operator marks a
+  source pile or dig area on the map and a destination (another pile,
+  the hopper of a Compressed Earth Block press, a trailer, a spoil
+  heap). Tractor drives to the source, executes a bucket-fill cycle
+  (curl + crowd until pressure plateau or load cell threshold),
+  reverses out, follows the planned path to the destination, and dumps.
+  Loops until the source is exhausted, the destination is full (CEB
+  hopper level sensor, trailer load cell), the operator pauses it, or
+  fuel/battery falls below a return-to-base threshold. Records each
+  cycle for cycle-time and yield analytics.
+- [ ] **Field pass routine (plow / disc / water / fertilize / seed).**
+  Operator selects a field polygon and an implement profile (plow,
+  disc, sprayer, spreader, seed drill). Tractor generates a coverage
+  pattern (boustrophedon / spiral / contour-following) honouring
+  implement width, headland turn radius, no-go zones, and slope limits,
+  then executes the pattern with implement engaged. Variable-rate
+  application uses a prescription map (e.g. heavier fertilizer on
+  low-N zones from a soil map) when one is supplied; otherwise uniform.
+- [ ] **Land levelling to target grade.** Operator defines a target
+  surface � flat at elevation Z, a planar slope (azimuth + grade %),
+  or an arbitrary heightmap. Tractor surveys current grade with the
+  bucket-mounted GNSS/laser, computes a cut/fill map, then iteratively
+  scrapes high spots into low spots until residual elevation error is
+  within tolerance everywhere in the polygon. Pairs naturally with the
+  material-movement loop when net cut ? net fill.
+
+### Additional routines worth adding to the same backlog
+
+- [ ] **Trenching along a marked line at constant depth.** For
+  irrigation drip lines, electrical conduit, water service, or french
+  drains. Operator draws a polyline; tractor follows it with a
+  trenching attachment held at depth via bucket-tip GNSS feedback.
+- [ ] **Stockpile reshaping / push-up.** Loose material from a dump pile
+  pushed up onto an existing stockpile to a target geometry (cone,
+  windrow, bermed rectangle). Useful before tarping or for compost
+  windrow turning when paired with a turner attachment.
+- [ ] **CEB-press tending loop.** A specialisation of the
+  material-movement loop with the press as the destination: monitor
+  press hopper level over MQTT, refill on demand, fall idle when the
+  press is full or paused. Closes the open-source-housing-system loop
+  with no human in the bucket cycle.
+- [ ] **Hole-grid drilling for tree planting / fence posts / pier
+  footings.** Operator defines a grid (rows � columns, spacing,
+  azimuth) or imports a planting plan. Tractor drives to each point
+  with an auger attachment, drills to a specified depth, withdraws,
+  advances. Records actual location of every hole for the as-built map.
+- [ ] **Perimeter / contour swale digging.** Follows a survey contour
+  line at a specified cross-section to build keyline-style water
+  retention features. Reuses the trenching primitive with a wider,
+  shallower bucket pose.
+- [ ] **Brush / mowing pattern over a polygon.** Same coverage planner
+  as the field pass, but with a flail mower or brush hog and a more
+  conservative obstacle-stop policy (vision detector tuned for fence
+  posts, irrigation risers, animals).
+- [ ] **Snow / debris clearing along a route.** Plough or bucket follows
+  a defined polyline (driveway, footpath, lane) repeatedly, pushing
+  material to a designated spoil zone. Triggered by weather alert or
+  manual start.
+- [ ] **Rock / debris pickup over a polygon.** Vision detector picks out
+  rocks above a size threshold; tractor drives to each, scoops with
+  forks or bucket, deposits in a bin or spoil pile. Random-sweep
+  pattern with revisit on detector confidence.
+- [ ] **Trailer / truck loading to a target weight.** Repeats the
+  material-movement loop with the trailer as destination and stops
+  when an on-trailer load cell (or estimated bucket cycle count) hits
+  the target weight, leaving the operator to drive away.
+- [ ] **Geofence patrol / perimeter inspection.** Tractor follows a
+  perimeter polyline at low speed with the camera streaming, flagging
+  fence breaks, downed trees, washouts, or strange objects to the
+  operator for review. Pairs with the existing person-alert pipeline.
+- [ ] **Return-to-base on fuel / battery / weather.** Background
+  routine, not a job: any active mission yields and the tractor
+  drives itself to a configured shelter or charge dock when fuel
+  drops below reserve, battery SOC drops below threshold, lightning is
+  forecast within N km, or wind exceeds a safety cap. Mission state is
+  checkpointed so the operator can resume after refuel/recharge.
+- [ ] **Multi-tractor cooperative jobs.** Two LifeTracs sharing the
+  same site: one parks at the dig face on the material-movement loop
+  while the other shuttles between the loader and the destination.
+  Requires the autonomy layer to negotiate non-overlapping path
+  reservations and shared safety zones.
+- [ ] **Implement auto-engage / auto-disengage at the implement rack.**
+  Drive to the rack, align with the target attachment, hydraulically
+  couple, drive away. Eliminates the manual swap that gates most of
+  the routines above when a job needs more than one implement.

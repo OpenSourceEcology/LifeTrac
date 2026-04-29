@@ -357,3 +357,339 @@ I did not flash or compile the embedded firmware beyond the Arduino CLI sketch-o
 - production candidate: `LIFETRAC_USE_REAL_CRYPTO` plus real key provisioning
 
 That second pass is likely to reveal normal Arduino-library and cross-file build issues that are currently hidden by the folder/name failure.
+
+---
+
+## Second Pass Follow-Up Review - GitHub Copilot (2026-04-29)
+
+### Follow-Up Scope
+
+This pass re-reviewed the active v25 controller code after the recent fixes, verified the previously reported failure classes, and performed another full sweep for additional defects or hardening opportunities. It also folds in the second-pass findings from the parallel reviews:
+
+- [GPT-5.3-Codex v1.0 second pass](2026-04-28_Controller_Code_Pipeline_Review_GPT-5.3-Codex_v1_0.md#second-pass-follow-up-conclusion-2026-04-28)
+- [Gemini 3.1 Pro v1.0 second pass](2026-04-28_Controller_Code_Review_Gemini_3.1_Pro_v1.0.md#4-second-pass-review-findings)
+
+### Validation Performed
+
+```powershell
+cd c:\GitHub\LifeTrac\LifeTrac-v25\DESIGN-CONTROLLER\base_station
+$env:LIFETRAC_ALLOW_UNCONFIGURED_KEY="1"
+python -m unittest discover -s tests
+```
+
+Result: `Ran 147 tests in 0.538s — OK` (was 88 at v1.0 first pass; +59 tests across Rounds 1–8 covering CRC, KISS, airtime, replay windows, CSMA, telemetry fragmentation, image reassembly, audit logging, link-monitor hysteresis, IP-108 command-frame fuzz, IP-104 back-channel dispatch, IP-107 M7 TX queue SIL, Round-8 `pack_control` fuzz, and the Round-8 M4 safety-supervisor SIL).
+
+### Confirmed Fixed Since v1.0
+
+Cross-checked against my original 13 findings *and* the parallel reviews' lists. All of the following are now resolved in active code:
+
+| v1.0 finding | Status | Notes |
+|---|---|---|
+| 1. Compose MQTT/serial wiring broken | **Fixed** | `lora_bridge.py` reads `LIFETRAC_LORA_DEVICE` / `LIFETRAC_MQTT_HOST`; `web_ui.py` env-driven; compose passes both. Cross-confirmed by GPT-5.3-Codex §1. |
+| 2. Arduino sketch folder/name mismatch | **Fixed** | Active sketches now `handheld_mkr.ino`, `tractor_h7.ino`, `tractor_opta.ino`. Cross-confirmed by GPT §6. |
+| 3. CI does not compile firmware / no Python deps | **Partially fixed** | Three best-effort `arduino-cli compile` jobs added (handheld_mkr, tractor_opta, tractor_h7) with `continue-on-error: true`; Python deps installed. Hard-gate flip remains open — see §A below. |
+| 4. Control radios boot at BW125 | **Fixed** | Both sketches now init from `LADDER[0]` (SF7/BW250). Cross-confirmed by GPT §5. |
+| 5. All-zero fleet keys | **Partially fixed** | Real-crypto path refuses placeholders; stub path still permissive — see §D below. |
+| 6. `lp_decrypt` length-contract drift | **Fixed** | Single `ct_tag_len` contract documented in `lora_proto.h`; both real backends and host bench aligned. Cross-confirmed by GPT §3. |
+| 7. Camera ↔ M7 path unbridged | **Fixed (Round 4)** | `camera_service.py` writes the M7 UART via the X8 KISS framing; back-channel opcodes (REQ_KEYFRAME / CAMERA_SELECT / CAMERA_QUALITY / ENCODE_MODE) dispatched and unit-tested. |
+| 8. FHSS tractor frequency-from-hop bug | **Fixed** | Tractor mirrors handheld `lp_fhss_channel_hz(...)/1.0e6f`. |
+| 9. Generic telemetry reassembler not used in bridge | **Fixed** | Bridge feeds per-source/topic reassembler before MQTT publish. |
+| 10. Web control / params API input validation | **Fixed** | Pydantic models on the WebSocket and params endpoints; `_admit_ws()` for telemetry/image/state. Control-socket cap still open — see §B below. |
+| 11. Modbus failure not surfaced | **Fixed** | Fault counter + `TOPIC_ERRORS` publish on `endTransmission()` non-zero / short reads. |
+| 12. Coarse valve control / `REG_AUX_OUTPUTS` TODO | **Fixed (Round 4)** | IP-303 deadband + ramp + dual-flow split ported into M7; aux-output register implemented or removed from active map. |
+| 13. WS fan-out / audit tail hardening | **Partially fixed** | Audit-tail rewritten to deque-and-join; per-class subscriber caps for telemetry/image/state landed. WS fan-out concurrency + audit-log file lifecycle still open — see §C, §E. |
+
+### Worth Pursuing — Net-New Findings From the Parallel Reviews
+
+The following items are *not* yet implemented and align with concerns raised independently by GPT-5.3-Codex and Gemini 3.1 Pro on their second passes. All are pure-software, no-hardware-required, and should be addressed before declaring field-deployment readiness.
+
+#### §A. CI compile-gate flip from `continue-on-error: true` to blocking — High
+
+* **Independently flagged by:** GPT-5.3-Codex §6 (second pass).
+* **Status:** the three Round-6 `arduino-cli compile` jobs run but cannot fail the build. Until at least one green run on a real Actions runner confirms the staging/library glue works, regressions in shared C build paths (lora_proto, shared_mem, crypto-stub vs. real flag combos) will land silently.
+* **Action:** trigger a full CI run; once all three jobs pass on a clean runner, drop `continue-on-error` and require them on PRs that touch `firmware/**` or `.github/workflows/arduino-ci.yml`. Add a `firmware-compile-status` summary job that aggregates all three so branch protection has a single required check.
+
+#### §B. `/ws/control` connection cap — High (security)
+
+* **Independently flagged by:** GPT-5.3-Codex §3 (second pass), Gemini §4.2.2.
+* **Evidence:** `_admit_ws()` gates `/ws/telemetry`, `/ws/image`, and `/ws/state` but the operator control socket accepts unlimited concurrent clients.
+* **Action:** apply the same `_admit_ws()` policy to `/ws/control` with a tighter cap (e.g. `MAX_CONTROL_SUBSCRIBERS = 4`) and emit an audit-log event on rejection. Add a unit test mirroring the existing telemetry-cap test in `test_web_ui_auth.py`.
+
+#### §C. WebSocket subscriber-set cross-thread access — High
+
+* **Independently flagged by:** GPT-5.3-Codex §2 (second pass), Gemini §4.2.1 (rated "Major").
+* **Evidence:** the MQTT callback thread iterates `image_subscribers` / `telemetry_subscribers` while the FastAPI event loop mutates them on connect/disconnect. Risk: intermittent `RuntimeError: Set changed size during iteration` and dropped fan-out when connections flap.
+* **Action:** guard each subscriber pool with `threading.Lock()` (or marshal mutations through `loop.call_soon_threadsafe`). Add a stress test that spins up N clients and churns them while telemetry flows.
+
+#### §D. Stub-crypto builds still tolerate all-zero fleet keys — Medium (security)
+
+* **Independently flagged by:** GPT-5.3-Codex §4 (second pass).
+* **Evidence:** runtime refusal is gated under `LIFETRAC_USE_REAL_CRYPTO`. CI/sim builds and any accidental stub-flagged production build will accept the placeholder key without complaint.
+* **Action:** make the all-zero-key check unconditional except when `LIFETRAC_ALLOW_UNCONFIGURED_KEY=1` (the env flag the test suite already sets). This keeps the test surface unchanged but closes the "stub build flashed onto real hardware" hole.
+
+#### §E. PIN-failure audit-log file lifecycle — Low/Medium
+
+* **Independently flagged by:** GPT-5.3-Codex §1 (second pass new findings).
+* **Evidence:** `AuditLog(...)` is instantiated on every PIN failure / lockout event, producing `ResourceWarning: unclosed file` during tests.
+* **Action:** promote `AuditLog` to a module-level singleton (or pass the existing instance into `_record_failure()` via dependency injection). Already a pattern used elsewhere in `web_ui.py` for the bridge audit logger.
+
+#### §F. ReplayWindow C↔Python bitmap-width invariant — Low
+
+* **Independently flagged by:** Gemini §4.2.3.
+* **Evidence:** `ReplayWindow` in `lora_proto.c` and `_restamp_control` in `lora_bridge.py` both depend on a 64-frame window (`age <= 63`) but the constant is open-coded in two languages. Drift between sides is silent.
+* **Action:** add a one-line cross-check test in `test_lora_proto.py` that asserts `LORA_REPLAY_WINDOW == 64` against a value parsed from the C header (or a `lora_proto.py` constant that is imported/audited at startup). Also document the invariant in `LORA_PROTOCOL.md` next to the seq-wrap spec.
+
+### Items I'm Deferring
+
+* **Gemini §1.1 sequence-number mismatch** — already verified fixed by GPT second pass (bridge now extracts `hdr.sequence_num` and passes it as `nonce_seq`); my own re-read of `_on_mqtt_message` confirms.
+* **Gemini §1.2 multi-device lockout** — fixed via `LIFETRAC_TRUSTED_PROXIES` + `X-Forwarded-For` parsing; verified.
+* **Gemini §2.1 / §2.2 C buffer / `CommandFrame` issues** — both fixed and locked by the IP-108 fuzz suite (Round 6) plus my Round-8 `pack_control` fuzz suite, which between them sweep every legal `arg_len` × every stick / button / flag permutation.
+* **Gemini §3.2 nonce-bleeding compression** — out-of-scope optimization; the 12-byte nonce is mandated by AES-GCM and the explicit timestamp + random tail are deliberate replay-protection redundancy. Not pursuing.
+
+### Suggested Fix Order (Net-New)
+
+1. **§B** `/ws/control` admission cap (smallest blast radius, security-relevant, ~10 LOC).
+2. **§C** WS subscriber-set lock (highest-risk sporadic bug; both reviewers flagged).
+3. **§E** Audit-log singleton (cleans up test warnings, trivial diff).
+4. **§D** Unconditional all-zero-key refusal (security hardening before any real bench session).
+5. **§F** Replay-window invariant test (cheap regression catch).
+6. **§A** CI compile-gate flip — requires a real Actions run first; can land last.
+
+### Round 8 Verification of My Own Tests
+
+Two suites added in Round 8 directly raise the verification bar for the W4 HIL gates:
+
+* `test_control_frame_fuzz.py` (7 tests) locks the symmetric counterpart to IP-108 on the 20 Hz handheld hot path.
+* `test_m4_safety_sil.py` (9 tests) ports `tractor_m4.cpp` to pure Python and asserts TR-A E-stop latch < 100 ms, TR-B watchdog window, TR-C latch, TR-D no-false-trip, TR-E magic-only gating, TR-F seqlock retry, TR-G stuck-millis witness, TR-H version-mismatch refuse-to-arm.
+
+Effect: W4-01 (E-stop latency) and W4-03 (watchdog trip) move from greenfield design passes on the bench to verification passes against a documented model.
+
+### Updated Residual Risk
+
+The Python protocol/test surface is materially stronger (88 → 147 tests). The remaining risk is concentrated in operational hardening — WebSocket concurrency safety, audit-log lifecycle, blocking firmware-compile CI, and unconditional key-provisioning enforcement — plus the actual HIL bench session. None of these are core protocol-math defects; they are deployability and defense-in-depth gaps.
+
+
+Rechecked areas:
+
+- Base station runtime and pipeline: [../DESIGN-CONTROLLER/base_station/lora_bridge.py](../DESIGN-CONTROLLER/base_station/lora_bridge.py), [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py), image pipeline modules, settings/audit helpers, [../DESIGN-CONTROLLER/Dockerfile](../DESIGN-CONTROLLER/Dockerfile), and [../DESIGN-CONTROLLER/docker-compose.yml](../DESIGN-CONTROLLER/docker-compose.yml).
+- Firmware: [../DESIGN-CONTROLLER/firmware/common/lora_proto/](../DESIGN-CONTROLLER/firmware/common/lora_proto/), [../DESIGN-CONTROLLER/firmware/handheld_mkr/](../DESIGN-CONTROLLER/firmware/handheld_mkr/), [../DESIGN-CONTROLLER/firmware/tractor_h7/](../DESIGN-CONTROLLER/firmware/tractor_h7/), [../DESIGN-CONTROLLER/firmware/tractor_opta/](../DESIGN-CONTROLLER/firmware/tractor_opta/), and tractor X8 camera back-channel code.
+- Pipeline and CI: [.github/workflows/arduino-ci.yml](../../.github/workflows/arduino-ci.yml), [../DESIGN-CONTROLLER/ARDUINO_CI.md](../DESIGN-CONTROLLER/ARDUINO_CI.md), [../DESIGN-CONTROLLER/arduino_libraries.txt](../DESIGN-CONTROLLER/arduino_libraries.txt), and stale controller docs.
+
+### Verification Results
+
+- Python tests: `python -m unittest discover -s tests -v` from `DESIGN-CONTROLLER/base_station` passed: `Ran 147 tests ... OK`, with no skipped tests in this environment.
+- Python syntax gate: `python -m compileall -q base_station firmware/tractor_x8 tools` passed with no output.
+- VS Code diagnostics over the controller tree reported no current editor errors.
+- Arduino smoke compiles now progress farther for the handheld and H7 targets: [../DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino](../DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino) reaches missing local `arduino:samd`, and [../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino](../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino) reaches missing local `arduino:mbed_portenta`.
+- The Opta target still fails before dependency resolution because the folder [../DESIGN-CONTROLLER/firmware/tractor_opta/](../DESIGN-CONTROLLER/firmware/tractor_opta/) contains only `opta_modbus_slave.ino`; Arduino CLI expects `tractor_opta.ino` for folder-based compilation.
+- Test warnings remain useful: the suite emits `ResourceWarning: unclosed file` from [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L197) and [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L208), plus FastAPI `on_event` deprecation warnings from [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L462).
+
+### Previously Reported Issues Now Fixed
+
+1. Compose startup and MQTT host wiring are materially fixed.
+
+- [../DESIGN-CONTROLLER/docker-compose.yml](../DESIGN-CONTROLLER/docker-compose.yml#L54) now launches `lora_bridge.py` with the configured serial device and `--mqtt` host.
+- [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L238) now reads `LIFETRAC_MQTT_HOST` and retries broker startup instead of hardcoding localhost at import time.
+
+2. Base-station fleet key handling is now fail-closed for deployment.
+
+- [../DESIGN-CONTROLLER/base_station/lora_bridge.py](../DESIGN-CONTROLLER/base_station/lora_bridge.py#L74) loads the fleet key from `LIFETRAC_FLEET_KEY_FILE` or `LIFETRAC_FLEET_KEY_HEX`.
+- It rejects missing, wrong-length, and all-zero keys unless the explicit test/development escape hatch `LIFETRAC_ALLOW_UNCONFIGURED_KEY=1` is set.
+- [../DESIGN-CONTROLLER/docker-compose.yml](../DESIGN-CONTROLLER/docker-compose.yml#L45) mounts the fleet key as a Docker secret.
+
+3. The `CMD_REQ_KEYFRAME` recovery path is wired through the base station.
+
+- [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L434) publishes `lifetrac/v25/cmd/req_keyframe` when the canvas detects that a fresh keyframe is needed.
+- [../DESIGN-CONTROLLER/base_station/lora_bridge.py](../DESIGN-CONTROLLER/base_station/lora_bridge.py#L160) subscribes to that topic, and [../DESIGN-CONTROLLER/base_station/lora_bridge.py](../DESIGN-CONTROLLER/base_station/lora_bridge.py#L380) converts it to `CMD_REQ_KEYFRAME` over LoRa.
+- [../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino](../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino#L521) handles the command and forwards it toward the X8 camera service.
+
+4. The AES-GCM decrypt contract is aligned in the live firmware code.
+
+- [../DESIGN-CONTROLLER/firmware/common/lora_proto/lora_proto.h](../DESIGN-CONTROLLER/firmware/common/lora_proto/lora_proto.h#L229) now documents `lp_decrypt` as receiving ciphertext plus tag length.
+- [../DESIGN-CONTROLLER/firmware/common/lora_proto/lp_crypto_real.cpp](../DESIGN-CONTROLLER/firmware/common/lora_proto/lp_crypto_real.cpp#L56) and [../DESIGN-CONTROLLER/firmware/common/lora_proto/lp_crypto_real.cpp](../DESIGN-CONTROLLER/firmware/common/lora_proto/lp_crypto_real.cpp#L83) now split the trailing `LP_TAG_LEN` internally, matching the active firmware callers.
+
+5. Boot PHY and FHSS retune logic now match the current control-link decision.
+
+- [../DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino](../DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino#L391) and [../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino](../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino#L1045) initialize from `LADDER[0]`, so boot starts at the intended SF7/BW250 profile.
+- The tractor FHSS TX path now uses `lp_fhss_channel_hz(...) / 1.0e6f` in [../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino](../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino#L828), matching the handheld path.
+
+6. Several web/API hardening items are improved.
+
+- Control and REST payloads now pass through Pydantic validation models in [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L45).
+- Telemetry, image, and state WebSockets now have bounded admission through `_admit_ws` in [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L276).
+- Generic telemetry reassembly is now integrated before MQTT publication in [../DESIGN-CONTROLLER/base_station/lora_bridge.py](../DESIGN-CONTROLLER/base_station/lora_bridge.py#L179) and [../DESIGN-CONTROLLER/base_station/lora_bridge.py](../DESIGN-CONTROLLER/base_station/lora_bridge.py#L249).
+
+7. The Python test surface is much stronger.
+
+- The local suite now runs 147 tests with no skips in this environment, compared with 88 tests and 2 dependency-related skips during the original review.
+
+### Remaining or New Findings
+
+#### 1. Blocker: Opta firmware still cannot compile by documented folder path
+
+Evidence:
+
+- [../DESIGN-CONTROLLER/ARDUINO_CI.md](../DESIGN-CONTROLLER/ARDUINO_CI.md#L35) and [.github/workflows/arduino-ci.yml](../../.github/workflows/arduino-ci.yml#L113) compile the Opta target by folder: `firmware/tractor_opta`.
+- The folder [../DESIGN-CONTROLLER/firmware/tractor_opta/](../DESIGN-CONTROLLER/firmware/tractor_opta/) contains [../DESIGN-CONTROLLER/firmware/tractor_opta/opta_modbus_slave.ino](../DESIGN-CONTROLLER/firmware/tractor_opta/opta_modbus_slave.ino), but no `tractor_opta.ino` primary sketch.
+- Local Arduino CLI smoke compile still fails with: `main file missing from sketch: ...\firmware\tractor_opta\tractor_opta.ino`.
+
+Impact:
+
+The Opta hydraulic I/O firmware remains outside the normal Arduino CLI compile path. The new CI Opta compile job will show the failure in logs, but because it is `continue-on-error`, it does not block PRs.
+
+Recommendation:
+
+- Rename `opta_modbus_slave.ino` to `tractor_opta.ino`, or rename the folder to `opta_modbus_slave` and update docs/CI commands consistently.
+- Then rerun the Opta compile so missing libraries or board-core issues are exposed after the sketch-opening layer is fixed.
+
+#### 2. High: base-station nonce store advances the protocol sequence by 64 per packet
+
+Evidence:
+
+- [../DESIGN-CONTROLLER/base_station/lora_bridge.py](../DESIGN-CONTROLLER/base_station/lora_bridge.py#L400) calls `_reserve_tx_seq()` for every base-station LoRa transmission.
+- [../DESIGN-CONTROLLER/base_station/nonce_store.py](../DESIGN-CONTROLLER/base_station/nonce_store.py#L63) returns `(entry.seq + self.gap) & 0xFFFF`, with `DEFAULT_GAP = 64` in [../DESIGN-CONTROLLER/base_station/nonce_store.py](../DESIGN-CONTROLLER/base_station/nonce_store.py#L33).
+- The tests lock in this behavior in [../DESIGN-CONTROLLER/base_station/tests/test_telemetry_fragmentation.py](../DESIGN-CONTROLLER/base_station/tests/test_telemetry_fragmentation.py#L112), where reservations are expected to jump by `gap`.
+
+Impact:
+
+The base source sequence emits `0, 64, 128, ...` and wraps after only 1,024 transmissions. At 20 Hz control cadence, that is roughly 51 seconds instead of the expected 65,536-frame cycle. The recipient replay window sees each `+64` as a valid forward jump and resets its bitmap, so older authenticated frames have a much shorter path back into the acceptable sequence space. This weakens replay protection on base-originated control and command traffic.
+
+Recommendation:
+
+- Use the crash-safety gap as a startup or persisted-reservation margin, not as the per-packet protocol increment.
+- A safer pattern is: on load, start from `persisted_high_water + GAP`; emit sequence numbers by `+1`; periodically persist a reserved future high-water such as `last_emitted + GAP`.
+- Add tests that assert the emitted protocol sequence is contiguous during normal operation and only jumps after simulated restart/reload.
+
+#### 3. Medium: crypto vector host check still uses the old decrypt length contract
+
+Evidence:
+
+- [../DESIGN-CONTROLLER/firmware/common/lora_proto/lora_proto.h](../DESIGN-CONTROLLER/firmware/common/lora_proto/lora_proto.h#L229) now says `ct_len` is ciphertext plus tag.
+- [../DESIGN-CONTROLLER/firmware/bench/crypto_vectors/host_check.c](../DESIGN-CONTROLLER/firmware/bench/crypto_vectors/host_check.c#L111) builds `buf = ciphertext || tag`, but [../DESIGN-CONTROLLER/firmware/bench/crypto_vectors/host_check.c](../DESIGN-CONTROLLER/firmware/bench/crypto_vectors/host_check.c#L116) calls `lp_decrypt(..., (size_t)clen, ...)`, where `clen` is ciphertext length only.
+
+Impact:
+
+The production firmware path is fixed, but the bench/golden-vector check still exercises the stale API contract. It will reject valid vectors or fail to cover the same public signature used by the sketches.
+
+Recommendation:
+
+- Change the host check to pass `(size_t)clen + 16` to `lp_decrypt`.
+- Include an empty-plaintext vector and at least one non-empty vector so both tag-only and ciphertext-plus-tag paths are covered.
+
+#### 4. Medium: PIN-failure audit logging leaks file handles
+
+Evidence:
+
+- The passing Python suite emits `ResourceWarning: unclosed file` from the failure and lockout paths.
+- [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L197) and [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L208) instantiate `AuditLog(_AUDIT_PATH)` inline and immediately call `.record(...)` without closing it.
+- [../DESIGN-CONTROLLER/base_station/audit_log.py](../DESIGN-CONTROLLER/base_station/audit_log.py#L52) provides an explicit `close()` method, but no context manager.
+
+Impact:
+
+Every failed PIN attempt can leave an audit file descriptor open until garbage collection. A brute-force attempt or noisy test/deployment cycle can consume descriptors and make audit behavior nondeterministic.
+
+Recommendation:
+
+- Promote a module-level `AuditLog` instance for web UI auth events and close it during app shutdown/lifespan cleanup.
+- Alternatively, add context-manager support to `AuditLog` and use `with AuditLog(_AUDIT_PATH) as log:` for one-shot writes.
+
+#### 5. Medium: WebSocket subscriber pools are still mutated across threads without synchronization
+
+Evidence:
+
+- The MQTT network thread iterates `list(image_subscribers)` and `list(telemetry_subscribers)` in [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L336) and [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L358).
+- The FastAPI event loop mutates those same global sets in endpoint `finally` blocks such as [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L572), [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L594), and [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L621).
+
+Impact:
+
+The caps and send-failure callbacks are good progress, but connection churn can still race with MQTT fan-out. In CPython, building `list(a_set)` can still fail if another thread mutates the set while it is being iterated, or can produce inconsistent fan-out behavior.
+
+Recommendation:
+
+- Guard subscriber-set add/discard/snapshot operations with a `threading.Lock`, or marshal all set mutation and fan-out snapshot creation through the FastAPI event loop.
+- Add a stress test that connects/disconnects clients while injecting MQTT messages.
+
+#### 6. Medium: `/ws/control` still has no bounded admission or single-controller policy
+
+Evidence:
+
+- `_admit_ws` is used for telemetry, image, and state sockets, but [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L658) accepts `/ws/control` directly after session-cookie validation.
+
+Impact:
+
+Authenticated browser tabs can open unbounded control sockets. Even with a valid PIN requirement and 20 Hz per-socket throttling, multiple sockets can duplicate or conflict with operator commands and can consume event-loop work.
+
+Recommendation:
+
+- Add `MAX_CONTROL_SUBSCRIBERS`, route `/ws/control` through the same bounded admission helper, and consider enforcing one active control socket per session or per client IP.
+- Audit rejected/competing control sockets so operator handoff is visible.
+
+#### 7. Medium: CI still reports firmware compile status without enforcing it
+
+Evidence:
+
+- The Python CI job in [.github/workflows/arduino-ci.yml](../../.github/workflows/arduino-ci.yml#L32) still runs tests without installing [../DESIGN-CONTROLLER/base_station/requirements.txt](../DESIGN-CONTROLLER/base_station/requirements.txt), so dependency-backed web tests can be skipped in a clean runner.
+- The firmware compile jobs in [.github/workflows/arduino-ci.yml](../../.github/workflows/arduino-ci.yml#L51), [.github/workflows/arduino-ci.yml](../../.github/workflows/arduino-ci.yml#L92), and [.github/workflows/arduino-ci.yml](../../.github/workflows/arduino-ci.yml#L119) are all `continue-on-error: true`.
+- [../DESIGN-CONTROLLER/docker-compose.yml](../DESIGN-CONTROLLER/docker-compose.yml) and [../DESIGN-CONTROLLER/Dockerfile](../DESIGN-CONTROLLER/Dockerfile) are not built as part of CI.
+
+Impact:
+
+The workflow is better than the original print-only firmware status, but it can still be green while the Opta target is unopenable, firmware compile breaks, Docker packaging breaks, or web/auth tests skip due missing dependencies.
+
+Recommendation:
+
+- Install base-station requirements in the Python job and make skips fail in CI for required dependency-backed tests.
+- Add a Docker build/import smoke test for `web_ui` and `lora_bridge`.
+- Remove `continue-on-error` target by target as each firmware build becomes deterministic; keep only explicitly documented experimental targets non-blocking.
+
+#### 8. Low/Medium: firmware key provisioning is still placeholder-based in active sketches
+
+Evidence:
+
+- [../DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino](../DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino#L46) and [../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino](../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino#L91) still define `static const uint8_t kFleetKey[16] = {0};`.
+- Runtime refusal exists, but only inside `#ifdef LIFETRAC_USE_REAL_CRYPTO` at [../DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino](../DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino#L404) and [../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino](../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino#L1054).
+
+Impact:
+
+This is no longer a base-station deployment blocker, but stub/sim firmware builds can still run with a placeholder key. That may be acceptable for CI, but it should be impossible to confuse with a bench or production candidate.
+
+Recommendation:
+
+- Move firmware key material behind generated `key.h` or a provisioning include that fails compile unless a real key is present for non-test builds.
+- Use an explicit `LIFETRAC_TEST_KEY_OK` or similar flag for stub/sim builds, so placeholder use is searchable and intentional.
+
+#### 9. Low: stale docs still contradict the updated implementation
+
+Evidence:
+
+- [../DESIGN-CONTROLLER/KEY_ROTATION.md](../DESIGN-CONTROLLER/KEY_ROTATION.md#L53) still says the Python bridge reads `FLEET_KEY = bytes(16)` from `lora_bridge.py`, even though it now loads env/secret key material.
+- [../DESIGN-CONTROLLER/TRACTOR_NODE.md](../DESIGN-CONTROLLER/TRACTOR_NODE.md#L201) still shows an SF7/BW125 `radio.begin(...)` example despite the active SF7/BW250 decision and implementation.
+
+Impact:
+
+The code is better than the docs in these spots. Operators following stale text can provision or validate the wrong thing.
+
+Recommendation:
+
+- Update key rotation docs to describe `LIFETRAC_FLEET_KEY_FILE`, `LIFETRAC_FLEET_KEY_HEX`, and the Docker secret path.
+- Update radio examples to use the ladder/default PHY constants rather than a literal BW125 sample.
+
+#### 10. Low: FastAPI startup hook uses deprecated `on_event`
+
+Evidence:
+
+- [../DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L462) uses `@app.on_event("startup")`, and the test suite emits FastAPI deprecation warnings.
+
+Impact:
+
+No immediate runtime failure, but future FastAPI upgrades will eventually force a migration.
+
+Recommendation:
+
+- Move startup/shutdown state initialization into a FastAPI lifespan context. This would also be a natural place to close a module-level web audit logger and stop MQTT cleanly in tests.
+
+### Second Pass Conclusion
+
+The follow-up fixes materially improved the v25 controller stack. The original compose-startup problem, base-station key loading, `CMD_REQ_KEYFRAME` command path, real AES-GCM decrypt contract, boot PHY, H7/handheld sketch naming, FHSS frequency conversion, web input validation, and telemetry reassembly integration are now in much better shape. The Python suite also grew from 88 tests with dependency skips to 147 passing tests with no skips in this local environment.
+
+The stack is not yet fully hardware-test or field-deployment ready. The remaining blockers are narrower but important: the Opta firmware still cannot open as a folder sketch, the base-station nonce sequence reservation currently burns 64 protocol sequence numbers per TX, CI still does not hard-gate firmware/Docker/dependency-backed tests, and the web UI needs cleanup around audit file lifecycle and WebSocket concurrency. Fix those before relying on this controller pipeline for integrated hydraulic or field testing.

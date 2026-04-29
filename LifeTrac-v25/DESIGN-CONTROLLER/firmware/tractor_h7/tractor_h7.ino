@@ -21,7 +21,19 @@
 #include <RadioLib.h>
 #include <ArduinoRS485.h>
 #include <ArduinoModbus.h>
-#include "../common/lora_proto/lora_proto.h"
+// lora_proto and shared_mem are vendored into ./src/ at build time. CI:
+//   .github/workflows/arduino-ci.yml; local: stage_firmware_sketches.ps1.
+// The canonical sources still live in firmware/common/. The src/ tree is
+// .gitignored.
+#include "src/lora_proto/lora_proto.h"
+
+// Forward declarations for types used in helper-function signatures, so the
+// Arduino preprocessor's auto-generated prototypes (inserted near the top of
+// the translation unit) can resolve `AxisRamp&` etc. before the full struct
+// definitions appear further down. Without these, arduino-cli emits
+// "redeclared as different kind of symbol" because the auto-prototype is
+// parsed in a scope where the struct name is unknown.
+struct AxisRamp;
 
 // ---------- LoRa pins (Portenta Max Carrier wires Murata SiP via SPI) ----------
 SX1276 radio = new Module(/*nss*/ PD_4, /*dio0*/ PD_5,
@@ -80,7 +92,7 @@ enum ValveBit : uint16_t {
 // ---------- M4 shared SRAM (mirror of tractor_m4.cpp) ----------
 // Layout owned by firmware/common/shared_mem.h. The M4 watchdog trips if we
 // don't stamp `alive_tick_ms` AND `loop_counter` every loop iteration.
-#include "../common/shared_mem.h"
+#include "src/shared_mem.h"
 static volatile SharedM7M4* const SHARED =
     reinterpret_cast<volatile SharedM7M4*>(LIFETRAC_SHARED_ADDR);
 
@@ -403,15 +415,21 @@ static void apply_control(int active) {
     // IP-205: surface Modbus write failures so a wedged RS-485 link doesn't
     // silently keep accepting joystick frames. We rate-limit logs so a long
     // outage doesn't fill the serial console.
+    //
+    // Round 14 / TR-I follow-up: count *consecutive* failures, not
+    // cumulative. A single bad poll on a noisy bus must not eventually
+    // (over hours) latch the E-stop; only a sustained loss of the Opta
+    // link should. The counter resets to 0 on every successful poll.
+    // Matches HIL_RUNBOOK.md W4-04 prose ("10 consecutive failures").
+    static uint32_t s_modbus_fail_count = 0;
+    static uint32_t s_modbus_last_log_ms = 0;
     if (!ModbusRTUClient.endTransmission()) {
-        static uint32_t s_modbus_fail_count = 0;
-        static uint32_t s_modbus_last_log_ms = 0;
         s_modbus_fail_count++;
         uint32_t now_ms = millis();
         if ((now_ms - s_modbus_last_log_ms) >= 1000) {
             Serial.print("modbus tx fail (");
             Serial.print(s_modbus_fail_count);
-            Serial.println(" since boot)");
+            Serial.println(" consecutive)");
             s_modbus_last_log_ms = now_ms;
         }
         // Treat persistent failure as an E-stop trigger \u2014 valves are stuck
@@ -419,6 +437,9 @@ static void apply_control(int active) {
         if (s_modbus_fail_count >= 10) {
             g_estop_latched = true;
         }
+    } else {
+        // Successful poll clears the strike counter.
+        s_modbus_fail_count = 0;
     }
 }
 
@@ -1051,8 +1072,10 @@ void setup() {
     radio.startReceive();
     g_ladder_rung = 0;
 
-#ifdef LIFETRAC_USE_REAL_CRYPTO
-    // IP-008: refuse to operate with an unprovisioned fleet key.
+#ifndef LIFETRAC_ALLOW_UNCONFIGURED_KEY
+    // §D (Round 9): IP-008 enforced unconditionally; see handheld_mkr.ino
+    // for rationale. Stub-crypto builds previously skipped this check and
+    // could TX cleartext-equivalent traffic on a stock image.
     if (fleet_key_is_zero()) {
         Serial.println("FATAL: fleet key all-zero — refusing to operate (IP-008)");
         SHARED->estop_request = LIFETRAC_ESTOP_MAGIC;

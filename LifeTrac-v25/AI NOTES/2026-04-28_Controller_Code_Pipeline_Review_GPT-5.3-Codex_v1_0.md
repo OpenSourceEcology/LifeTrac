@@ -216,3 +216,78 @@ Recommendation:
 ## Residual Risk Statement
 
 Even with current passing protocol tests, deployment risk remains high because the largest defects are cross-service integration and runtime wiring issues rather than isolated unit logic.
+
+---
+
+## Second Pass Follow-Up Conclusion (2026-04-28)
+
+### Follow-Up Scope
+
+This second pass re-reviewed the active controller/pipeline code after fixes, then ran another broad validation sweep.
+
+- Runtime/pipeline files rechecked: [DESIGN-CONTROLLER/docker-compose.yml](../DESIGN-CONTROLLER/docker-compose.yml), [DESIGN-CONTROLLER/base_station/lora_bridge.py](../DESIGN-CONTROLLER/base_station/lora_bridge.py), [DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py), [DESIGN-CONTROLLER/base_station/settings_store.py](../DESIGN-CONTROLLER/base_station/settings_store.py), [.github/workflows/arduino-ci.yml](../../.github/workflows/arduino-ci.yml), and active firmware sketches.
+- Validation run: `python -m unittest discover -s tests -p "test_*.py" -v` from `base_station`.
+- Result: 147 tests passed.
+
+### Previously Reported Issues That Are Now Fixed
+
+1. Compose command wiring for bridge startup appears corrected.
+
+- [DESIGN-CONTROLLER/docker-compose.yml](../DESIGN-CONTROLLER/docker-compose.yml#L56) now passes both the serial device arg and MQTT host to lora_bridge.
+
+2. Keyframe-request command path is now wired.
+
+- [DESIGN-CONTROLLER/base_station/lora_bridge.py](../DESIGN-CONTROLLER/base_station/lora_bridge.py#L160) subscribes to `lifetrac/v25/cmd/req_keyframe`.
+- [DESIGN-CONTROLLER/base_station/lora_bridge.py](../DESIGN-CONTROLLER/base_station/lora_bridge.py#L380) sends `CMD_REQ_KEYFRAME` on receipt.
+
+3. Crypto decrypt contract alignment is fixed in real backends.
+
+- [DESIGN-CONTROLLER/firmware/common/lora_proto/lora_proto.h](../DESIGN-CONTROLLER/firmware/common/lora_proto/lora_proto.h#L224) now documents one explicit contract.
+- [DESIGN-CONTROLLER/firmware/common/lora_proto/lp_crypto_real.cpp](../DESIGN-CONTROLLER/firmware/common/lora_proto/lp_crypto_real.cpp#L61) and [DESIGN-CONTROLLER/firmware/common/lora_proto/lp_crypto_real.cpp](../DESIGN-CONTROLLER/firmware/common/lora_proto/lp_crypto_real.cpp#L84) implement `ct_len = ciphertext + tag` handling.
+
+4. Settings env-variable mismatch is fixed compatibly.
+
+- [DESIGN-CONTROLLER/base_station/settings_store.py](../DESIGN-CONTROLLER/base_station/settings_store.py#L27) prefers `LIFETRAC_SETTINGS_PATH` and handles legacy fallback.
+
+5. Boot PHY now matches the ladder default profile.
+
+- [DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino](../DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino#L392) initializes from `LADDER[0]`.
+- [DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino](../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino#L1048) initializes from `LADDER[0]`.
+
+6. Sketch naming is now Arduino-CLI compatible.
+
+- Active files are now [DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino](../DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino) and [DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino](../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino).
+
+### Remaining / New Findings From Second Pass
+
+1. Medium: Resource leak in PIN-failure audit path in `web_ui.py`.
+
+- Test run emitted `ResourceWarning: unclosed file` from [DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L197) and [DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L208).
+- Root cause: `AuditLog(...)` is instantiated on each failure/lockout event without close lifecycle.
+- Recommendation: promote a module-level audit logger instance (or explicit close context) for these paths.
+
+2. Medium: WebSocket subscriber-set access remains cross-thread unsafe.
+
+- MQTT callback thread iterates `list(image_subscribers)` / `list(telemetry_subscribers)` in [DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L336) and [DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L358), while event-loop handlers mutate those sets in [DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L541), [DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L561), and [DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L584).
+- Risk: intermittent `RuntimeError` or dropped fan-out when connections flap.
+- Recommendation: guard subscriber pools with a lock or marshal pool changes onto one thread.
+
+3. Medium: Control WebSocket path still lacks explicit connection cap.
+
+- Caps were added for telemetry/image/state via `_admit_ws`, but `/ws/control` in [DESIGN-CONTROLLER/base_station/web_ui.py](../DESIGN-CONTROLLER/base_station/web_ui.py#L624) still accepts unlimited concurrent clients.
+- Recommendation: apply the same bounded-admission policy to control sockets.
+
+4. Medium: Fleet-key source handling in firmware remains compile-time placeholder based.
+
+- Both active sketches still declare all-zero key arrays by default in [DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino](../DESIGN-CONTROLLER/firmware/handheld_mkr/handheld_mkr.ino#L46) and [DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino](../DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino#L91).
+- Runtime refusal is currently gated under `LIFETRAC_USE_REAL_CRYPTO`; stub builds can still operate with placeholder keys.
+- Recommendation: enforce non-placeholder key checks for all non-test builds, not only real-crypto builds.
+
+5. Medium: CI still does not enforce full dependency-backed Python suite as a hard gate.
+
+- [.github/workflows/arduino-ci.yml](../../.github/workflows/arduino-ci.yml#L37) still runs tests without an explicit requirements install step.
+- Additional compile jobs exist but remain `continue-on-error`, so firmware compile regressions are still non-blocking.
+
+### Second Pass Bottom Line
+
+The follow-up fixes materially improved correctness and readiness, and the Python test surface is significantly stronger now (147/147 passing in this local run). The highest remaining risks are operational hardening issues rather than core protocol math: websocket concurrency safety, audit-log file lifecycle, and stricter key/CI enforcement. These should be addressed before declaring field-deployment readiness.

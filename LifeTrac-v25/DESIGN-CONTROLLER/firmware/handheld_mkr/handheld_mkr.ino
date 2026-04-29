@@ -15,13 +15,17 @@
 //   - Arduino MKR WAN 1310
 //   - RadioLib >= 6.x
 //   - Adafruit_SSD1306 + Adafruit_GFX (for the optional 128x64 OLED)
-//   - lora_proto.h / .c included from ../common/lora_proto/
+//   - lora_proto.h / .c are vendored into ./src/lora_proto/ at build time
+//     (CI: see .github/workflows/arduino-ci.yml; local: see
+//     LifeTrac-v25/DESIGN-CONTROLLER/tools/stage_firmware_sketches.ps1).
+//     The canonical sources still live in firmware/common/lora_proto/.
+//     The src/ tree is .gitignored.
 
 #include <Arduino.h>
 #include <RadioLib.h>
 #include <Wire.h>
 #include <Adafruit_SSD1306.h>
-#include "../common/lora_proto/lora_proto.h"
+#include "src/lora_proto/lora_proto.h"
 
 // ---------- pins ----------
 #define PIN_LH_X        A0
@@ -401,8 +405,12 @@ void setup() {
     radio.startReceive();
     g_ladder_rung = 0;
 
-#ifdef LIFETRAC_USE_REAL_CRYPTO
-    // IP-008: refuse to operate with an unprovisioned fleet key.
+#ifndef LIFETRAC_ALLOW_UNCONFIGURED_KEY
+    // §D (Round 9): IP-008 enforced unconditionally. Previously this was
+    // gated behind LIFETRAC_USE_REAL_CRYPTO, which meant a stub-crypto
+    // build accidentally flashed onto real hardware would happily TX with
+    // an all-zero key. Define LIFETRAC_ALLOW_UNCONFIGURED_KEY only for
+    // bench builds where you understand the consequences.
     if (fleet_key_is_zero()) {
         if (g_oled_ok) {
             g_oled.clearDisplay();

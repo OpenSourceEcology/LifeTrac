@@ -66,7 +66,7 @@ This is the radio + arbitration + Modbus master firmware that runs on the X8's o
 3. Select **Tools → Port** → the X8's USB-C serial port.
 4. Click **Verify** (✓). Confirm it compiles cleanly.
 5. Click **Upload** (→). The X8 reboots and enters DFU; a successful flash takes ~30 s.
-6. Repeat for the M4 sketch: open `firmware/tractor_h7/tractor_m4.cpp`, switch board to **Portenta H7 (M4 core)**, upload.
+6. Repeat for the M4 sketch: open `firmware/tractor_h7_m4/tractor_h7_m4.ino`, switch board to **Portenta H7 (M4 core)** (or set **Tools → Target core → M4 Co-processor**), upload. The M4 sketch lives in its own folder because arduino-cli's library auto-discovery would otherwise try to compile RadioLib/Modbus against the M4 variant headers and fail.
 
 Open the Serial Monitor at 115200. You should see:
 

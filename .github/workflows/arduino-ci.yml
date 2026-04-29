@@ -46,18 +46,22 @@ jobs:
           echo "Archived arduino_opta_controller and esp32_remote_control are intentionally not compiled."
           echo "Enable blocking Arduino compile jobs after local FQBN/build-glue verification."
 
-  # IP-007 follow-up: best-effort firmware compile. Marked
-  # ``continue-on-error`` because the sketches include shared sources
-  # via ``#include "../common/lora_proto/..."`` paths that arduino-cli
-  # cannot resolve without staging. We stage them into a ``src/``
-  # subfolder of each sketch (Arduino IDE auto-compiles ``src/**``)
-  # so the job catches the regressions it can; remaining failures
-  # are visible in the action log without blocking PRs until the
-  # build-glue follow-up lands.
+  # Round 15 (2026-04-28): handheld_mkr is now a blocking compile gate.
+  # The earlier ``continue-on-error: true`` masked three independent bugs that
+  # all had to be fixed before this job could go green:
+  #   1. The .ino used ``#include "../common/lora_proto/lora_proto.h"`` which
+  #      doesn't resolve in arduino-cli's temp build dir. Now staged to
+  #      ``src/lora_proto/`` and the include is ``"src/lora_proto/lora_proto.h"``.
+  #   2. ``--build-property build.extra_flags=...`` *replaces* the board's own
+  #      ``build.extra_flags`` (which include ``-DUSE_BQ24195L_PMIC`` — that
+  #      gate guards the ``LORA_IRQ`` pin define for MKR WAN 1310). We now use
+  #      ``compiler.cpp.extra_flags`` / ``compiler.c.extra_flags`` which *add*
+  #      to the existing flags instead of clobbering them.
+  #   3. ``crypto_stub.c`` requires an opt-in ``LIFETRAC_ALLOW_STUB_CRYPTO``
+  #      define for the stub build to acknowledge it isn't field-safe.
   firmware-compile-handheld:
     runs-on: ubuntu-latest
-    name: Compile firmware/handheld_mkr (best-effort)
-    continue-on-error: true
+    name: Compile firmware/handheld_mkr
     steps:
       - uses: actions/checkout@v4
       - name: Install arduino-cli
@@ -82,17 +86,26 @@ jobs:
       - name: Compile (stub crypto)
         run: |
           arduino-cli compile --fqbn arduino:samd:mkrwan1310 \
+            --build-property "compiler.cpp.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO" \
+            --build-property "compiler.c.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO" \
             LifeTrac-v25/DESIGN-CONTROLLER/firmware/handheld_mkr
       - name: Compile (real crypto)
         run: |
           arduino-cli compile --fqbn arduino:samd:mkrwan1310 \
-            --build-property "build.extra_flags=-DLIFETRAC_USE_REAL_CRYPTO" \
+            --build-property "compiler.cpp.extra_flags=-DLIFETRAC_USE_REAL_CRYPTO -DLIFETRAC_ALLOW_UNCONFIGURED_KEY" \
+            --build-property "compiler.c.extra_flags=-DLIFETRAC_USE_REAL_CRYPTO -DLIFETRAC_ALLOW_UNCONFIGURED_KEY" \
             LifeTrac-v25/DESIGN-CONTROLLER/firmware/handheld_mkr
 
+  # Round 16 (2026-04-28): now a blocking compile gate. The two issues
+  # exposed by the local arduino-cli replay were:
+  #   1. .ino filename did not match the folder name (was
+  #      ``opta_modbus_slave.ino`` in folder ``tractor_opta/``); arduino-cli
+  #      requires them to match. Renamed to ``tractor_opta.ino``.
+  #   2. ``#include <OptaBlue.h>`` requires the ``Arduino_Opta_Blueprint``
+  #      library, which was missing from the install step.
   firmware-compile-opta:
     runs-on: ubuntu-latest
-    name: Compile firmware/tractor_opta (best-effort)
-    continue-on-error: true
+    name: Compile firmware/tractor_opta
     steps:
       - uses: actions/checkout@v4
       - name: Install arduino-cli
@@ -106,15 +119,31 @@ jobs:
         run: |
           arduino-cli lib install ArduinoRS485
           arduino-cli lib install ArduinoModbus
+          arduino-cli lib install Arduino_Opta_Blueprint
       - name: Compile
         run: |
           arduino-cli compile --fqbn arduino:mbed_opta:opta \
             LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_opta
 
+  # Round 17 (2026-04-28): tractor_h7 is now a blocking compile gate, and
+  # the M4 watchdog firmware was split out into its own sketch folder
+  # (``firmware/tractor_h7_m4/``) built by the parallel
+  # ``firmware-compile-tractor-m4`` job below. Why the split:
+  #   * arduino-cli compiles every .cpp in a sketch folder into the
+  #     selected core's binary, so leaving ``tractor_m4.cpp`` next to
+  #     ``tractor_h7.ino`` produced ``multiple definition of 'setup'`` at
+  #     link time when targeting M7.
+  #   * A ``#if defined(CORE_CM4)`` guard inside the .cpp would have fixed
+  #     the link error but did NOT fix the M4 build: arduino-cli's library
+  #     auto-discovery scans the .ino's #include directives regardless of
+  #     ``target_core``, so RadioLib + ArduinoModbus + ArduinoRS485 get
+  #     pulled into the M4 build and fail to compile against the M4
+  #     variant headers. Two separate sketch folders is the canonical
+  #     Portenta-dual-core layout (matches Arduino IDE's stock
+  #     ``PortentaDualCore`` example).
   firmware-compile-tractor-h7:
     runs-on: ubuntu-latest
-    name: Compile firmware/tractor_h7 (best-effort)
-    continue-on-error: true
+    name: Compile firmware/tractor_h7 (M7 core)
     steps:
       - uses: actions/checkout@v4
       - name: Install arduino-cli
@@ -139,4 +168,35 @@ jobs:
       - name: Compile (stub crypto)
         run: |
           arduino-cli compile --fqbn arduino:mbed_portenta:envie_m7 \
+            --build-property "compiler.cpp.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO" \
+            --build-property "compiler.c.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO" \
             LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7
+
+  # Round 17 (2026-04-28): M4 watchdog co-processor build. FQBN uses the
+  # ``target_core=cm4`` board menu option (the Portenta core does not
+  # expose a separate ``envie_m4`` FQBN — it switches variants via this
+  # menu). The M4 binary is uploaded with the IDE's "M4 Co-processor"
+  # board target; on hardware the M7 image's bootloader copies it into
+  # SRAM at the ``CM4_BINARY_START`` address chosen by the partition
+  # menu. See ``firmware/tractor_h7_m4/tractor_h7_m4.ino`` header comment.
+  firmware-compile-tractor-m4:
+    runs-on: ubuntu-latest
+    name: Compile firmware/tractor_h7_m4 (M4 core)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install arduino-cli
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s -- -b /usr/local/bin
+      - name: Install cores
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:mbed_portenta
+      - name: Stage shared sources into sketch
+        run: |
+          mkdir -p LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7_m4/src
+          cp LifeTrac-v25/DESIGN-CONTROLLER/firmware/common/shared_mem.h \
+             LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7_m4/src/
+      - name: Compile
+        run: |
+          arduino-cli compile --fqbn "arduino:mbed_portenta:envie_m7:target_core=cm4" \
+            LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7_m4

@@ -1,4 +1,4 @@
-// tractor_m4.cpp — Portenta H747 M4 core: independent valve safety watchdog.
+// tractor_h7_m4.ino — Portenta H747 M4 core: independent valve safety watchdog.
 //
 // The M4 runs alongside the M7 on the same H747 silicon. It does ONE thing:
 // observe the "alive tick" the M7 publishes via shared SRAM4, and pull a
@@ -19,17 +19,24 @@
 // re-arms. That is intentional — automatic re-arming after a missed tick
 // would mask intermittent firmware faults that the operator must see.
 //
-// BUILD GATING (Round 17): the entire body of this file is wrapped in
-// ``#if defined(CORE_CM4)``. arduino-cli's mbed_portenta core compiles
-// every .cpp in the sketch folder into whichever core's binary is being
-// built (envie_m7 or envie_m4). Without this guard, the M7 build would
-// pick up our ``setup()``/``loop()`` and hit ``multiple definition`` at
-// link time. ``CORE_CM4`` is set automatically by the Portenta core when
-// targeting ``arduino:mbed_portenta:envie_m4`` (see
-// packages/arduino/hardware/mbed_portenta/<ver>/boards.txt — the M4 entry
-// adds ``-DCORE_CM4`` to ``build.extra_flags``). The CI workflow has a
-// dedicated ``firmware-compile-tractor-m4`` job that builds for that FQBN.
-#if defined(CORE_CM4)
+// SKETCH LAYOUT (Round 17): the M4 firmware lives in this dedicated sketch
+// folder, separate from ../tractor_h7/. Reason: arduino-cli scans the .ino
+// for #include directives during library auto-discovery REGARDLESS of the
+// selected target_core, so building the M7 sketch (which pulls in RadioLib
+// + ArduinoModbus + ArduinoRS485) for the M4 core fails in those library
+// sources. Splitting into two sketch folders gives each core its own
+// minimal include set. The Arduino IDE's stock "PortentaDualCore" example
+// uses the same two-folder layout.
+//
+// Build: open this folder in the IDE, select board "Portenta H7" with
+// menu "Target core: M4 Co-processor" (FQBN
+// ``arduino:mbed_portenta:envie_m7:target_core=cm4``), upload. CI builds
+// it via the ``firmware-compile-tractor-m4`` job in arduino-ci.yml.
+//
+// Shared sources (``shared_mem.h``) are staged into ``src/`` by
+// ``tools/stage_firmware_sketches.ps1`` (local) and by the workflow
+// (CI). The canonical copy lives at
+// ``DESIGN-CONTROLLER/firmware/common/shared_mem.h``.
 
 #include "Arduino.h"
 #include "mbed.h"
@@ -142,5 +149,3 @@ void loop() {
 
     delay(20);
 }
-
-#endif  // CORE_CM4

@@ -146,6 +146,13 @@ class SubscriberBoundTests(unittest.TestCase):
         self.web_ui.telemetry_subscribers.clear()
         self.web_ui.image_subscribers.clear()
         self.web_ui.state_subscribers.clear()
+        self.web_ui.control_subscribers.clear()
+        # PIN auth required for /ws/control. Establish a session cookie
+        # on the test client so the cap test reaches the admit gate
+        # rather than bouncing on 4401.
+        import os
+        os.environ["LIFETRAC_PIN"] = "424242"
+        self.client.post("/api/login", json={"pin": "424242"})
 
     def test_telemetry_subscriber_cap(self):
         cap = self.web_ui.MAX_TELEMETRY_SUBSCRIBERS
@@ -168,6 +175,37 @@ class SubscriberBoundTests(unittest.TestCase):
                     ws.__exit__(None, None, None)
                 except Exception:
                     pass
+
+    def test_control_subscriber_cap(self):
+        # §B (Round 9): /ws/control was previously unbounded.
+        cap = self.web_ui.MAX_CONTROL_SUBSCRIBERS
+        clients = []
+        try:
+            for _ in range(cap):
+                ws = self.client.websocket_connect("/ws/control")
+                ws.__enter__()
+                clients.append(ws)
+            from starlette.websockets import WebSocketDisconnect as SWD
+            with self.assertRaises(SWD) as ctx:
+                with self.client.websocket_connect("/ws/control"):
+                    pass
+            self.assertEqual(ctx.exception.code,
+                             self.web_ui.WS_OVER_CAPACITY_CODE)
+        finally:
+            for ws in clients:
+                try:
+                    ws.__exit__(None, None, None)
+                except Exception:
+                    pass
+
+    def test_control_rejected_without_session(self):
+        # Drop the auth cookie established in setUp, then expect 4401.
+        self.client.cookies.clear()
+        from starlette.websockets import WebSocketDisconnect as SWD
+        with self.assertRaises(SWD) as ctx:
+            with self.client.websocket_connect("/ws/control"):
+                pass
+        self.assertEqual(ctx.exception.code, 4401)
 
 
 if __name__ == "__main__":
