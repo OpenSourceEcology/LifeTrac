@@ -34,13 +34,517 @@ IP each one verifies lives in
 update it in the same PR as any test/code change (see §7 of that file
 for the protocol).
 
-**Implementation status (2026-04-29, through Round 26):**
+**Implementation status (2026-04-29, through Round 41):**
 [`AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md`](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md)
 — every plan item achievable without bench hardware is now landed
-(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). 329 base_station
+(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). 571 base_station
 tests pass, and **every "—" cell with a natural SIL surface in the
 [MASTER_TEST_PROGRAM.md](MASTER_TEST_PROGRAM.md) §5 IP-traceability
-table is now closed.** **Round 26** lands the Wave-4 HIL harness
+table is now closed.** **Round 41** lands BC-12C — the bench-side
+CLI half of BC-12 — by composing Round 39's ``boot_self_test``
+comparator with Round 37's ``lifetrac-config`` CLI. The new
+``self-test`` subcommand takes a TOML config and a JSON-encoded
+``HardwareInventory`` (whatever the operator captured from the M4 on
+the bench), runs ``run_self_test`` in-process, and prints a structured
+pass/fail report as text (default) or JSON. Exit code is non-zero on
+any ``error`` finding (matches the boot-time gate); ``warning``-only
+findings keep exit code 0. The new
+[base_station/tests/test_config_self_test_cli_sil.py](DESIGN-CONTROLLER/base_station/tests/test_config_self_test_cli_sil.py)
+adds 10 tests across BC12C_A..BC12C_E pinning the contract: BC12C_A
+matching inventory passes (text + JSON formats); BC12C_B
+error-mismatches exit non-zero with stable codes (AXIS_COUNT_TRACK,
+AXIS_COUNT_ARM); BC12C_C warning-only mismatches (camera count) keep
+exit 0; BC12C_D bad inputs are rejected with diagnostic stderr
+(missing file, non-object JSON, missing fields, unparseable JSON);
+BC12C_E source-grep tripwire pins the subparser registration.
+BUILD_CONFIG.md synopsis bumped eight→nine subcommands; the BC-08
+doc-coverage gate auto-validates. **Suite at 571 tests / 1 skipped
+/ 48 files** (561 → 571 from Round 41). **Round 40** lands BC-14B — a follow-up
+to Round 37/BC-14 that closes the gap noted in the Round 37 memo:
+the ``config_loaded`` audit emitters in
+[base_station/web_ui.py](DESIGN-CONTROLLER/base_station/web_ui.py)
+and
+[base_station/lora_bridge.py](DESIGN-CONTROLLER/base_station/lora_bridge.py)
+now include ``schema_version`` (was: missing, leaving the BC-14
+inventory column always empty). The new
+[base_station/tests/test_config_loaded_schema_version_sil.py](DESIGN-CONTROLLER/base_station/tests/test_config_loaded_schema_version_sil.py)
+adds 5 tests across BC14B_A..BC14B_D pinning the contract: BC14B_A
+web_ui's ``_audit_config_loaded`` writes ``schema_version`` as an
+``int`` from ``BUILD.schema_version``; BC14B_B the lora_bridge inline
+block writes the same field (exercised against the same paho-mocked
+pattern as BC4_A); BC14B_C end-to-end — fixture audit lines
+that carry ``schema_version`` flow through the BC-14 aggregator and
+populate the CSV column, and back-compat is preserved (legacy lines
+without the field still aggregate cleanly with empty cells); BC14B_D
+source greps both emitter call-sites for ``schema_version=`` so a
+future refactor that drops the field fails the gate even if a test
+happens to mock around it. Suite at **561 tests / 1 skipped / 47
+files** (556 → 561 from Round 40). **Round 39** lands the SIL half of BC-12 —
+new
+[base_station/boot_self_test.py](DESIGN-CONTROLLER/base_station/boot_self_test.py)
+module that compares a loaded ``BuildConfig`` against an injected
+``HardwareInventory`` (the M4-side Modbus probe will live in the HIL
+half, deferred until bench rig) and produces a structured
+``SelfTestReport`` with a stable finding-code catalogue (12 codes:
+AXIS_COUNT_TRACK / AXIS_COUNT_ARM / PROPORTIONAL_FLOW_UNAVAILABLE /
+PRESSURE_SENSOR_COUNT / IMU_PRESENCE / GPS_PRESENCE /
+CAMERA_COUNT_SHORT / CAMERA_COUNT_EXTRA / LORA_REGION_MISMATCH /
+AUX_PORT_COUNT / AUX_COUPLER_TYPE / AUX_CASE_DRAIN). Severity model:
+safety-significant mismatches (axis counts, proportional flow when
+commanded, pressure-sensor count, IMU/GPS presence, LoRa region, aux
+plumbing) are ``error`` and set ``ok=False``; cosmetic camera-count
+mismatches degrade to ``warning`` and ``ok`` stays True. The
+``emit_audit()`` helper writes one ``boot_self_test`` JSONL event per
+boot with the canonical ``{component, unit_id, config_sha256, ok,
+error_count, warning_count, findings[], started_ts, finished_ts}``
+shape so jq / Pandas can pivot on ``code`` without nested-object
+handling. The new
+[base_station/tests/test_boot_self_test_sil.py](DESIGN-CONTROLLER/base_station/tests/test_boot_self_test_sil.py)
+adds 15 tests across 8 classes BC12_A..BC12_H pinning every branch
+plus the audit-event shape and the finding-code catalogue (catalogue
+renames are caught here so dashboards / runbooks don't break
+silently). The HIL half (real M4 Modbus probe + tractor-side
+integration) remains deferred. Suite at **556 tests / 1 skipped /
+46 files** (541 → 556 from Round 39). **Round 38** lands BC-13 — a new
+``$9 Build-config attack surface`` section in
+[CYBERSECURITY_CASE.md](DESIGN-CONTROLLER/CYBERSECURITY_CASE.md)
+that treats the build-config subsystem (TOML files, installer
+bundles, ``lifetrac-config`` CLI, push daemon, ``config_loaded``
+audit events, generated firmware header) as an explicit asset class
+with safety significance, with four sub-sections: 9.1 Z-CONFIG zone
+enumeration, 9.2 STRIDE-per-asset table (9 rows), 9.3
+capability-altering leaves are safety-significant (the defence-in-depth
+stack that ties together BC-09 BOM cross-reference, ``codegen --check``
+drift gate, BC-14 inventory visibility, and the three-watchdog
+safe-state), and 9.4 self-reference to the enforcing SIL drift gate.
+The new
+[base_station/tests/test_cybersecurity_buildconfig_xref_sil.py](DESIGN-CONTROLLER/base_station/tests/test_cybersecurity_buildconfig_xref_sil.py)
+adds 5 tests across BC13_A..BC13_E pinning the prose against the rest
+of the codebase: BC13_A four-subheading structure; BC13_B every
+named ``lifetrac-config <subcommand>`` resolves through the live
+_build_parser() (catches typos and stale subcommand names); BC13_C
+every relative Markdown link target exists on disk; BC13_D the
+STRIDE table covers each Z-CONFIG asset row from $9.1; BC13_E $9
+self-references its enforcing test file (so renaming the test fails
+the gate). Suite at **541 tests / 1 skipped / 45 files** (536 → 541
+from Round 38). **Round 37** lands BC-14 — a new
+``lifetrac-config inventory`` subcommand that aggregates
+``config_loaded`` audit-log events across one or more ``audit.jsonl``
+files into a CSV / Markdown fleet inventory, deduplicated by
+``(unit_id, config_sha256)`` so a unit that has been reflashed
+shows one row per distinct build it has booted (with first-seen,
+last-seen, boot-count, and which components emitted the record).
+Directory arguments expand to every ``audit*.jsonl*`` sibling so
+log-rotation files (``audit.jsonl.1`` etc.) are picked up
+automatically. The new
+[base_station/tests/test_config_inventory_sil.py](DESIGN-CONTROLLER/base_station/tests/test_config_inventory_sil.py)
+adds 14 tests across 5 classes BC14_A..BC14_E pinning the parser
+(BC14_A — only ``config_loaded`` records pass; malformed lines /
+non-dict records / missing-field records / missing files all
+skipped silently), aggregator (BC14_B — unit/SHA dedup;
+reflash produces two rows; sort order), renderers (BC14_C — CSV
+header matches ``INVENTORY_FIELDS``; CSV byte-identical across two
+runs; Markdown header + separator shape), command integration
+(BC14_D — directory glob picks up rotated siblings + skips stray
+non-audit files; ``--format markdown`` switches the renderer), and
+timestamp formatting (BC14_E — known-epoch ISO-8601 UTC; zero /
+negative renders empty). The BC-08 doc gate then auto-validates the
+new subcommand row in BUILD_CONFIG.md (synopsis bumped from seven
+to eight subcommands). Suite at **536 tests / 1 skipped / 44 files**
+(522 → 536 from Round 37). **Round 36** lands BC-09 — a new
+`## Capability cross-reference` appendix in
+[DESIGN-CONTROLLER/HARDWARE_BOM.md](DESIGN-CONTROLLER/HARDWARE_BOM.md)
+that maps every **physical-shape** build-config leaf (the 15 leaves
+whose value materially changes which parts you order) to the BOM
+section + part(s) that physically realise it. Pure-software / tunable
+leaves (`unit_id`, `schema_version`, `*_ramp_seconds`, every
+`safety.*` threshold, every `ui.*`, every `net.*`) are deliberately
+omitted because they do not change the BOM. The new
+[base_station/tests/test_hardware_bom_xref_sil.py](DESIGN-CONTROLLER/base_station/tests/test_hardware_bom_xref_sil.py)
+adds 6 tests across 5 classes BC09_A..BC09_E pinning the table to
+reality: every appendix capability ID exists in the schema (BC09_A
+— no orphan IDs); every entry in the curated
+``_PHYSICAL_CAPABILITIES`` set appears in the appendix AND every
+curated entry is itself a real schema property (BC09_B —
+bidirectional); every row's evidence cell carries a ``Tier 1`` /
+``Tier 2`` / ``Tier 3`` token OR a ``planned`` marker so unrealised
+capabilities (e.g. the three Round-33 ``aux.*`` leaves) stay self-
+documenting (BC09_C); every relative link in the appendix resolves
+on disk (BC09_D); the appendix self-references its enforcing test
+file so the next reader can find the contract that pins it (BC09_E).
+Adding a new physical-shape capability is now a five-place edit
+(schema, default TOML, loader dataclass, codegen ``_SECTIONS``, AND
+the BOM xref row) instead of four; the gate fails loudly if step
+five is forgotten. Suite at **522 tests / 1 skipped / 43 files**
+(516 → 522 from Round 36). **Round 35** lands BC-08 — a single
+operator-facing onboarding doc
+[DESIGN-CONTROLLER/BUILD_CONFIG.md](DESIGN-CONTROLLER/BUILD_CONFIG.md)
+that ties every piece of the per-unit build-config system together
+for the next person who is handed a LifeTrac v25 to bring up. Nine
+short sections cover what a build-config is, where the files live
+(schema / default / per-unit / loader / codegen / CLI), the eight
+required sections (with a one-line rationale + common-override-
+reason for each), the three reload classes (``live`` /
+``restart_required`` / ``firmware_required`` with the operator
+action each demands), the seven CLI subcommands (``validate`` /
+``bundle`` / ``verify`` / ``diff`` / ``push`` / ``codegen`` /
+``dump-json``), the deterministic ``config_sha256`` identity, the
+``config_loaded`` audit trail, the four common pitfalls (UTF-8
+BOMs trip ``tomllib``, section ordering matters for tests, a new
+schema leaf needs four edits, ``firmware_required`` changes need a
+reflash), and a where-to-read-next pointer table. The new
+[base_station/tests/test_build_config_doc_sil.py](DESIGN-CONTROLLER/base_station/tests/test_build_config_doc_sil.py)
+adds 5 tests across 5 classes BC08_A..BC08_E pinning the doc to
+reality: every required schema section is named (BC08_A); every
+``sub.add_parser`` registered subcommand is named AND no orphan
+subcommands appear in the synopsis table (BC08_B); every
+``reload_class`` value the schema declares is named, and the
+schema's vocabulary is exactly the documented three (BC08_C);
+every relative-path link target resolves on disk (BC08_D); every
+``estop_topology`` enum value appears verbatim (BC08_E —
+representative drift gate so a new topology can't be added without
+updating the doc). Suite at **516 tests / 1 skipped / 42 files**
+(511 → 516 from Round 35). **Round 34** lands BC-06 — the Wave-4
+HIL dispatcher is now build-config aware. Per-gate applicability
+rules live in the new
+[DESIGN-CONTROLLER/hil/gate_applicability.json](DESIGN-CONTROLLER/hil/gate_applicability.json)
+file (one source of truth shared between PowerShell and Python
+consumers); ``hil/dispatch.ps1`` gains ``-ConfigPath`` and
+``-NoApplicability`` parameters and shells out to a new
+``lifetrac-config dump-json`` subcommand to load the validated
+config as canonical JSON, then evaluates the rules table to flag
+gates the active fleet shape can't exercise as ``N/A`` instead of
+``NOT-STARTED``. The recommended-next-gate line skips ``N/A`` rows.
+The rules cover every Wave-4 gate (BC06_A enforces parity between
+the rules file and ``$Script:GateTargets``): radio gates W4-01 /
+W4-02 are N/A when ``comm.handheld_present == false``; W4-05 is
+N/A when ``hydraulic.proportional_flow == false``; W4-06 is N/A
+when ``hydraulic.arm_axis_count == 0``; W4-08 is N/A when
+``cameras.count == 0``; the rest always apply. The new
+[base_station/tests/test_hil_dispatch_applicability_sil.py](DESIGN-CONTROLLER/base_station/tests/test_hil_dispatch_applicability_sil.py)
+adds 13 tests across 7 classes covering rules-file shape +
+dispatcher-vs-rules parity (BC06_A), canonical default fully
+applicable (BC06_B), four representative N/A scenarios (BC06_C
+through BC06_F), and ``dump-json`` determinism + payload contract
+(BC06_G). The applicability evaluator is a pure-Python translation
+of the four ops the rules file declares (``eq`` / ``gt`` / ``gte`` /
+``truthy``) so the SIL gate exercises the rules without ever
+subprocessing ``powershell.exe`` from CI; the PowerShell evaluator
+in ``dispatch.ps1`` is the trivial mechanical mirror of the same
+vocabulary. Suite at **511 tests / 1 skipped / 41 files**
+(498 → 511 from Round 34). **Round 33** lands BC-11 — first-class auxiliary
+attachment ports. The schema gains an ``[aux]`` top-level section
+(``port_count`` 0..2, ``coupler_type`` ``iso_5675``/``flat_face``/``none``,
+``case_drain_present``); every leaf carries
+``reload_class = restart_required`` because aux ports are a hardware
+capability that requires re-init of the M4 PWM channels and the
+attachment-permit gate. The canonical default is the conservative
+shape (``port_count = 0``, ``coupler_type = "none"``,
+``case_drain_present = false``) so existing v25 builds without aux
+plumbing keep getting the safe answer; per-unit ``build.<unit_id>.toml``
+files can opt in. The Round 31 codegen walks ``aux`` automatically
+(now in ``_SECTIONS``) and emits ``LIFETRAC_AUX_PORT_COUNT``,
+``LIFETRAC_AUX_COUPLER_TYPE`` (with enum side-macros
+``LIFETRAC_AUX_COUPLER_TYPE_NONE`` etc.), and
+``LIFETRAC_AUX_CASE_DRAIN_PRESENT`` macros so M4 firmware can
+``#if LIFETRAC_AUX_PORT_COUNT > 0`` to gate aux-PWM init. The on-disk
+[firmware/common/lifetrac_build_config.h](DESIGN-CONTROLLER/firmware/common/lifetrac_build_config.h)
+is regenerated; new SHA ``f961d9fd924b52ec46074c6cd26e6d1efcac035f8993e676f6003beb84b1c280``
+replaces the Round 31 ``63a15fcb...``. The new
+[base_station/tests/test_build_config_aux_section_sil.py](DESIGN-CONTROLLER/base_station/tests/test_build_config_aux_section_sil.py)
+adds 13 tests across BC11_A (schema declares aux + every leaf
+``restart_required`` + coupler_type enum includes ``none``), BC11_B
+(``AuxConfig`` dataclass + canonical default conservative + loader
+rejects missing section), BC11_C (codegen emits every leaf macro +
+enum side-macros), BC11_D (``iter_reload_classes`` covers every aux
+leaf + ``diff_reload_classes`` classifies aux changes as
+``restart_required``), and BC11_E (committed on-disk header contains
+the aux block — the drift gate that fails when an aux schema edit
+forgets the regen). [CAPABILITY_INVENTORY.md](DESIGN-CONTROLLER/CAPABILITY_INVENTORY.md)
+gains an "Auxiliary attachment ports" section so the schema-vs-doc
+parity gate stays green. Suite at **498 tests / 1 skipped /
+40 files** (485 → 498 from Round 33). **Round 32** lands BC-07 — the variant-matrix
+SIL. Four representative fleet shapes (canonical / no-camera / no-IMU+GPS /
+single-axis) are synthesised inline from the canonical default TOML
+and round-tripped through the loader, ``web_ui`` module-import
+(``_CAMERA_IDS`` filter + ``MAX_CONTROL_SUBSCRIBERS`` substitution),
+the Round 31 codegen (header values reflect the variant), and the
+BC-10 reload-class diff helper (camera-only diffs classify as
+``live``, axis-count diffs bubble to ``restart_required``). The four
+variants produce pairwise-distinct ``config_sha256`` values so a
+single ``config_loaded`` audit-log line disambiguates the fleet shape
+that booted. The new
+[base_station/tests/test_build_config_variant_matrix_sil.py](DESIGN-CONTROLLER/base_station/tests/test_build_config_variant_matrix_sil.py)
+adds 14 tests across BC07_A (loader accepts every variant; canonical
+fixture byte-identical to the default), BC07_B (web_ui consumes the
+variant: empty camera table when ``cameras.count == 0``, default
+camera table when canonical, ``MAX_CONTROL_SUBSCRIBERS`` reads from
+``BUILD.ui`` even on single-axis), BC07_C (codegen for every variant:
+present flags zero on no-camera and no-IMU+GPS, model strings persist
+so re-enable just flips a bool, single-axis emits the smaller numbers
+verbatim with the ``f`` suffix on the float), BC07_D (canonical
+self-diff empty; no-camera diff stays inside the cameras section and
+bubbles to ``live``; single-axis diff bubbles to ``restart_required``
+because ``track_axis_count`` and ``arm_axis_count`` carry that
+reload class), and BC07_E (pairwise-distinct SHAs across the four
+variants + canonical SHA equals a fresh load of
+``build.default.toml``). Suite at **485 tests / 1 skipped /
+39 files** (471 → 485 from Round 32). **Round 31** lands BC-03 — firmware codegen.
+New [base_station/build_config_codegen.py](DESIGN-CONTROLLER/base_station/build_config_codegen.py)
+walks the validated `BuildConfig` and emits a deterministic C header
+([firmware/common/lifetrac_build_config.h](DESIGN-CONTROLLER/firmware/common/lifetrac_build_config.h))
+that the M4/M7 sketches `#include` in place of the hand-edited
+`#define` blocks they carry today (existing
+`LIFETRAC_M4_WATCHDOG_MS` is preserved as a legacy alias of the
+generated `LIFETRAC_SAFETY_M4_WATCHDOG_MS` so the firmware can
+migrate without a flag-day rename). Every scalar leaf the JSON Schema
+declares becomes a `#define` (~30 macros across hydraulic / safety /
+cameras / sensors / comm / ui / net), with type-safe formatting
+(`int` → bare literal, `bool` → `1`/`0`, `float` → `2.0f`-suffixed,
+`str` → double-quoted) and enum side-macros
+(`LIFETRAC_SAFETY_ESTOP_TOPOLOGY_PSR_MONITORED_DUAL` etc.) so
+sketches can `#if` against the canonical truth. The header is
+ASCII-only, LF-terminated, deterministic (no timestamps in the body),
+and carries `LIFETRAC_UNIT_ID` + `LIFETRAC_SCHEMA_VERSION` +
+`LIFETRAC_CONFIG_SHA256_HEX` for runtime cross-checks against the
+`config_loaded` audit entry. The `tools/lifetrac-config` CLI grows
+a `codegen` subcommand with `--check` mode (zero-exit when the
+on-disk header matches the canonical emission, non-zero on drift) so
+CI catches a schema or default-TOML edit that didn't also regenerate
+the firmware header. The new
+[base_station/tests/test_build_config_codegen_sil.py](DESIGN-CONTROLLER/base_station/tests/test_build_config_codegen_sil.py)
+adds 22 tests across BC03_A (header-shape: guard, identity macros,
+ASCII / LF / no trailing whitespace), BC03_B (leaf-parity: every
+schema leaf appears as a `#define`), BC03_C (type formatting: int /
+bool / float / string / enum side-macros), BC03_D (determinism + the
+CI gate that fails when the on-disk firmware header drifts from the
+default TOML), BC03_E (legacy aliases resolvable + ordered correctly),
+BC03_F (CLI write byte-identical to direct `emit_header`, `--check`
+clean / drift / canonical), and BC03_G (source tripwires for the
+module + CLI + on-disk header). Suite at **471 tests / 1 skipped /
+38 files** (449 → 471 from Round 31). **Round 30** lands BC-05 — the operator-facing
+build-config admin form on the base UI. New page at `/config`
+([web/config.html](DESIGN-CONTROLLER/base_station/web/config.html))
+is a thin client over four PIN-gated sibling routes:
+`GET /api/build_config/source` seeds the editor with the verbatim
+active TOML body, `POST /api/build_config/preview-diff` schema-
+validates a candidate body and returns the would-be reload-class
+classification (`live` / `restart_required` / `firmware_required`)
+without writing, `POST /api/build_config/upload` schema-validates,
+refuses `firmware_required` diffs (re-flash via bench), atomically
+rewrites `BUILD.source_path` via `installer_daemon._atomic_write`,
+and emits a `config_upload` audit entry; the existing watcher then
+picks up the change on its next poll and routes it through the same
+BC-10 contract the X8 installer uses (`live` → swap immediately;
+`restart_required` → set sticky `restart_pending` flag, surface in
+the watcher state). The page itself shows running unit_id, schema
+version, SHA, source path, and watcher pill, plus a Preview-Diff
+button that lists every changed leaf with its reload class before
+the operator commits. New SIL gate
+[base_station/tests/test_build_config_admin_sil.py](DESIGN-CONTROLLER/base_station/tests/test_build_config_admin_sil.py)
+adds 16 tests across BC05_A (page routing + widget IDs), BC05_B
+(source endpoint verbatim + auth gate), BC05_C (preview-diff:
+identical / live / restart-required / schema-violation + no-write
+tripwire), BC05_D (upload: identical / live atomic-write / schema-
+rejected / unit_id-mismatch / firmware-required-rejected + auth
+gate), and BC05_E (source + HTML tripwires). Suite at
+**449 tests / 1 skipped / 37 files** (433 → 449 from Round 30).
+**Round 29b-beta** lands the tractor-side half
+of the BC-10 delivery surface and closes the loop opened by 29b-alpha.
+New [base_station/installer_daemon.py](DESIGN-CONTROLLER/base_station/installer_daemon.py)
+verifies a USB-stick bundle against this X8's identity at three layers
+(filename `unit_id`, header `unit_id`, body `unit_id`), schema-validates
+the body, classifies the diff against the in-memory current config
+(rejecting `firmware_required` outright since a re-flash isn't a
+USB-stick operation), and atomically replaces the active TOML via
+`os.replace` so a partial write can't leave a half-applied config
+behind. Every outcome — `applied` / `rejected` / `noop` /
+`deferred` — produces an `InstallResult` that gets serialised to
+`lifetrac-config-result.json` next to the bundle on the stick, so an
+operator unplugging the stick has a record of what happened.
+[base_station/feedback.py](DESIGN-CONTROLLER/base_station/feedback.py)
+pins the operator-facing contract: a 21-character OLED line and a
+blink pattern keyed off the install status (3 long green = applied,
+3 short red = rejected, amber slow = deferred, single short green =
+no-op). The pattern table is locked verbatim in the SIL gate so
+changing it is a deliberate contract bump.
+[base_station/config_watcher.py](DESIGN-CONTROLLER/base_station/config_watcher.py)
+is the watch-and-reload helper consumed by both the base `web_ui`
+(via the new `/api/build_config/state` endpoint) and the tractor-side
+`lora_bridge`: it polls the source-path `mtime`+`size`, reloads on
+change, runs `diff_reload_classes` + `evaluate_quiescence` (Round 29
+helpers), and emits one of six `WatchEvent` kinds (`noop` /
+`applied` / `deferred` / `restart_pending` / `firmware_required` /
+`rejected`) so the caller does no decision-making of its own. The
+`tools/lifetrac-config` CLI grows a `push` subcommand (path 1: local
+copy into a USB-stick mount or LAN drop directory with optional
+`--apply` that invokes the daemon directly; path 5: scp+ssh-trigger
+plan, dry-run by default, `--execute` to actually run). The
+base web UI gains `/api/build_config/state` (PIN-gated, returns
+`{unit_id, sha256, schema_version, restart_pending, last_event,
+last_event_reason, changed_leaves, worst_reload_class}`) and emits a
+`config_watch_event` audit entry on every non-noop poll. The new
+[base_station/tests/test_build_config_installer_daemon_sil.py](DESIGN-CONTROLLER/base_station/tests/test_build_config_installer_daemon_sil.py)
+adds 30 tests across BC10c_A (daemon: apply / discover / result-file),
+BC10c_B (feedback: pinned LED + OLED for every status), BC10c_C
+(watcher: noop / applied-when-quiet / deferred-when-busy /
+restart-pending / rejected-on-schema-violation + `/api/build_config/state`
+integration), and BC10c_D (push: local copy / local --apply / ssh
+dry-run + module-export tripwires for `installer_daemon`, `feedback`,
+`config_watcher`, the web route, the audit verb, and the CLI
+subcommand). The X8 systemd unit + udev rule that wraps
+`installer_daemon.process_mount` in a polling loop on USB-stick mount
+is a bench operation queued for the next on-tractor checkout. BC-03,
+BC-05, BC-06, BC-07, BC-08, BC-09 remain queued. **Round 29b-alpha**
+lands the base-side half of
+the BC-10 delivery surface: the installer-bundle envelope, a four-
+subcommand laptop CLI (`tools/lifetrac-config validate / bundle /
+verify / diff`), and a PIN-gated `/config/download` route on the base
+web UI that emits a named, SHA-stamped installer file an operator can
+drop on a USB stick. Bundle format is plain UTF-8 text with a header
+block (`# bundle_version`, `# unit_id`, `# sha256`, `# generator`,
+`# created`) terminated by a `# --- body ---` sentinel and the
+validated TOML verbatim, so an operator can `cat` the file in the
+field and see exactly what's about to be applied; the SHA covers body
+bytes only (no chicken-and-egg with the header that carries it) and
+the filename `lifetrac-config-<unit_id>-<sha8>.toml` carries the same
+`unit_id` + first-8-of-SHA so a USB stick with multiple bundles is
+self-disambiguating. The new
+[base_station/config_bundle.py](DESIGN-CONTROLLER/base_station/config_bundle.py)
+is the single source of truth for the format; both the CLI and the
+web route use `make_bundle` / `serialise` / `parse` /
+`verify_filename_matches` so byte-for-byte agreement between
+"download from base UI" and "build with the CLI" is enforced by
+construction. The CLI exits 0 on success and 2 on validation /
+verification failure (reserves 1 for unexpected exceptions so CI can
+distinguish "config bad" from "tool bad"); `validate` and `verify`
+schema-validate the body too, so a malformed TOML can never reach
+the X8-side installer (deferred to 29b-beta). The bundle is gated by
+[`base_station/tests/test_build_config_installer_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_build_config_installer_sil.py)
+(24 tests across 4 classes BC10b_A/B/C/D) which pins the envelope
+(round-trip, filename pattern, body-tamper breaks SHA, unsupported
+bundle_version refused, bad unit_id pattern refused, filename/header
+mismatch refused, missing sentinel refused), the CLI (`validate`
+passes canonical / fails out-of-range; `bundle` writes a file whose
+on-disk SHA matches the embedded SHA; `verify` accepts bundler output
+/ rejects tampered body; `diff` reports identical / classifies live /
+classifies restart_required), the download route (401 without
+session, 200 with session, returns a parseable bundle with the
+documented Content-Disposition filename, emits a `config_download`
+audit entry carrying the SHA), and source tripwires (CLI script
+exists with the four subcommand handlers; web_ui carries the route
+and the `config_download` audit verb; `config_bundle.py` exports the
+documented surface). The X8-side installer daemon (USB-stick watch,
+filename + unit-id + SHA verify, atomic-rename apply, OLED + LED
+feedback, `lifetrac-config-result.json` write-back) and the daemon
+watch-and-reload loop in `web_ui` + `lora_bridge` are deferred to
+**Round 29b-beta** so this PR stays a clean base-side round; the CLI
+and the download route are immediately useful for fleet-onboarding
+even without the X8 installer in place. BC-03, BC-05, BC-06, BC-07,
+BC-08, BC-09 remain queued. **Round 29** lands the schema + library
+half of
+BC-10 — the hot-reload contract that future config delivery (USB-cable
+CLI, base-UI installer bundle) is built on. Every leaf in
+[build_config.schema.json](DESIGN-CONTROLLER/base_station/config/build_config.schema.json)
+now carries a `reload_class` annotation (`live`, `restart_required`, or
+`firmware_required`); a missing or out-of-enum annotation is an error,
+not a default. The loader gains three pure helpers in
+[build_config.py](DESIGN-CONTROLLER/base_station/build_config.py):
+`iter_reload_classes(schema)` returns the dotted-path → class map;
+`diff_reload_classes(old, new)` returns a `ReloadDiff` with `changed`
+paths, per-path classes, and the strictest `worst` class so the
+installer can decide apply vs defer vs reject in one call;
+`evaluate_quiescence(state)` checks the four preconditions any live
+reload depends on (parked ≥ 30 s, no `/ws/control` subscribers, M7 TX
+queue empty, engine off or idle-low) and returns an operator-facing
+reason string when any fails. `firmware_required` is currently
+restricted to `schema_version` and `safety.m4_watchdog_ms`; the SIL
+gate pins this set so any future demotion or expansion is a deliberate
+edit. The bundle is gated by
+[`base_station/tests/test_build_config_delivery_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_build_config_delivery_sil.py)
+(19 tests across 5 classes BC10_A/B/C/D/E) which pins reload-class
+annotations (every leaf, in-enum, firmware set exact, missing/unknown
+raises), diff classification (identical → empty; live-only; restart-
+required; firmware-required wins over both; undeclared leaf raises),
+quiescence (all four preconditions block independently with their own
+operator-facing reason; threshold configurable; OK only when all hold),
+leaf coverage (no schema/loader drift in either direction), and source
+tripwires (loader contains the BC-10 helper names; schema uses the
+`reload_class` keyword and every class token). The actual delivery
+landing (laptop USB-cable `lifetrac-config push` CLI, base-UI installer
+bundle download route, X8-side installer daemon with OLED + LED
+feedback, atomic-rename + result-file write-back) is deferred to
+**Round 29b** so this PR stays a clean schema/library round; the
+contract pinned here is what 29b builds against. BC-03, BC-05, BC-06,
+BC-07, BC-08, BC-09 remain queued. **Round 28** lands BC-04 — the first round in
+which the BC-XX BuildConfig actually changes runtime behaviour rather
+than just sitting on disk. Both
+[`web_ui.py`](DESIGN-CONTROLLER/base_station/web_ui.py) and
+[`lora_bridge.py`](DESIGN-CONTROLLER/base_station/lora_bridge.py) now
+load the active config at boot (env
+`LIFETRAC_UNIT_ID` selects the per-unit override) and write a
+`config_loaded` audit-log line carrying `unit_id` / `source_path` /
+`config_sha256` so post-mortems can cross-reference behaviour against
+the exact file that was running. The web UI's `_CAMERA_IDS` table is
+filtered against `BUILD.cameras.{front,rear,implement,crop_health}_present`
+— a build with `cameras.count == 0` advertises an empty table (UI tile
+and `/api/camera/select` API both refuse the absent positions); the
+default canonical build (front camera only) advertises just `auto` +
+`front`; a fully-loaded variant build advertises all five. The
+`MAX_CONTROL_SUBSCRIBERS` constant is now read from
+`BUILD.ui.max_control_subscribers` instead of being hard-coded; the
+historical default of 4 is the dev-checkout fallback when the loader
+fails. Loader failures are non-fatal — the daemons log a warning and
+continue with built-in defaults so a dev checkout without a config
+file still boots a degraded-but-running console rather than crash-
+looping (BC-XX rationale: observe-the-failure first, then BC-05/BC-10
+tighten enforcement). The bundle is gated by
+[`base_station/tests/test_build_config_consumption_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_build_config_consumption_sil.py)
+(11 tests across 5 classes BC4_A/B/C/D/E) which pins the boot audit
+contract (both daemons emit `config_loaded` with the `unit_id` /
+`source_path` / `config_sha256` field set, and the helper is a no-op
+when `BUILD is None`), camera gating (canonical = `auto + front`,
+full-loadout = all five, `count == 0` collapses), parameter
+substitution (`MAX_CONTROL_SUBSCRIBERS` reads from BuildConfig at
+import time, falls back to 4 when missing), graceful degradation
+(missing TOML does not break module import; full hard-coded camera
+table falls through), and source tripwires (both files greppably
+reference the BC-04 audit call). BC-03, BC-05, BC-06, BC-07, BC-08,
+BC-09, BC-10 remain queued. **Round 27** opens the BC-XX build-configuration
+initiative with BC-01 + BC-02: a markdown
+[`CAPABILITY_INVENTORY.md`](DESIGN-CONTROLLER/CAPABILITY_INVENTORY.md)
+enumerating every optional / parameterised capability in the v25
+BOM (axis count, E-stop topology, camera count, IMU/GPS presence,
+LoRa region, etc.); a draft-07 JSON Schema at
+[`base_station/config/build_config.schema.json`](DESIGN-CONTROLLER/base_station/config/build_config.schema.json)
+that encodes the inventory machine-readably with strict
+`additionalProperties: false` on every section; a canonical
+[`build.default.toml`](DESIGN-CONTROLLER/base_station/config/build.default.toml)
+for the canonical-BOM build; and a stdlib-only loader
+[`base_station/build_config.py`](DESIGN-CONTROLLER/base_station/build_config.py)
+(`load(unit_id) -> BuildConfig`) with frozen-dataclass nested
+sections, fallback chain `LIFETRAC_BUILD_CONFIG_PATH` env →
+`build.<unit_id>.toml` → `build.default.toml`, hand-rolled JSON
+Schema validator (no third-party deps), and a deterministic
+`config_sha256` derived from canonical-JSON of the validated
+dict — what every boot will record into the audit log per BC-04.
+The whole bundle is gated by
+[`base_station/tests/test_build_config_loader_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_build_config_loader_sil.py)
+(20 tests across 5 classes BC_A/BC_B/BC_C/BC_D/BC_E) which pins
+schema well-formedness (every section is a strict object), loader
+fallback-chain precedence (env wins over per-unit wins over default,
+missing env path raises), strict validation (unknown top-level /
+nested keys, out-of-range integers, wrong types, bad enum tokens,
+pattern-violating `unit_id`, missing required section all raise
+`BuildConfigError`), deterministic SHA-256 (matches the explicit
+canonical-JSON formula, invariant under TOML whitespace + section
+re-ordering, changes when any leaf changes), and **inventory
+parity** (every schema property has a backticked `id` row in
+`CAPABILITY_INVENTORY.md` and vice-versa — no third-place drift
+between loader, schema, and doc). BC-03..BC-10 (firmware codegen +
+`#if LIFETRAC_HAS_*` guards, web_ui consumption, admin `/config`
+route, HIL `N/A` skipping, variant-matrix SIL, onboarding doc, BOM
+cross-reference) remain queued. **Round 26** lands the Wave-4 HIL harness
 toolchain under
 [`DESIGN-CONTROLLER/hil/`](DESIGN-CONTROLLER/hil/): one PowerShell
 harness skeleton per W4-XX gate (10 files) that wraps each
@@ -396,7 +900,16 @@ fleet. Specific failure modes already lurking in the codebase:
    tests must continue passing under the *default* (canonical-BOM)
    config; new SIL tests gate the variant matrix.
 
-### Proposed work breakdown (BC-01 … BC-09)
+### Proposed work breakdown (BC-01 … BC-10)
+
+> **Round ordering (post-Round-27):** BC-01 + BC-02 are landed. The
+> recommended order from here is **Round 28 = BC-04** (consumers
+> first, so the loader actually changes behaviour); **Round 29 =
+> BC-10** (delivery + hot-reload contract, ahead of BC-05 because
+> BC-05 is essentially a thin web UI on top of BC-10's atomic-write +
+> reload machinery); **Round 30 = BC-05**; **Round 31 = BC-03**
+> (firmware codegen + reduced-BOM compile gates is the largest piece
+> and benefits from CI work landing on its own).
 
 * **BC-01 — Capability inventory.** Walk the BOM, the firmware
   sketches, [`web_ui.py`](DESIGN-CONTROLLER/base_station/web_ui.py),
@@ -458,10 +971,100 @@ fleet. Specific failure modes already lurking in the codebase:
   optional row lists its BC capability id, and a SIL test asserts
   every `optional` BOM row is referenced by exactly one capability
   in the schema (no orphans either way).
+* **BC-10 — Config delivery & hot-reload contract.** Defines *how*
+  a new `build.<unit_id>.toml` lands on a tractor / base station
+  and *when* the running daemons reload it. Explicitly **non-OTA
+  over LoRa** — LoRa airtime is reserved for control + telemetry
+  + thumbnails, and the LoRa write surface is intentionally narrow
+  (control / E-stop / camera-select opcodes only); rewriting the
+  config over LoRa would be a category jump in trust boundary.
+  Supported delivery paths, ranked by preference:
+  1. **USB-cable from a laptop** (preferred for technical operators).
+     The X8 enumerates as `g_ether` USB-Ethernet gadget; the laptop
+     sees a `usb0` interface and runs `lifetrac-config push --target
+     usb0 ./build.<unit_id>.toml`. CLI streams installer stdout
+     (validation errors, applied SHA, deferral reason) to the laptop
+     terminal in real time. Narrowest attack surface, best UX for
+     anyone comfortable with a terminal.
+  2. **USB-stick installer bundle generated by the base-station web
+     UI** (preferred for non-technical operators — default field
+     workflow). Operator opens the PIN-gated `/config` page on the
+     base, edits fields via the schema-driven form, clicks
+     **Download installer bundle** — base emits a single file named
+     `lifetrac-config-<unit_id>-<sha8>.toml` with the validated TOML
+     plus an embedded `# sha256:<full>` header comment. Operator
+     copies the file to any USB stick, walks it to the tractor,
+     plugs in. The tractor X8 installer auto-discovers the file
+     (`lifetrac-config-*.toml` glob), refuses if `unit_id` in the
+     filename or payload doesn't match this tractor, refuses if the
+     embedded SHA doesn't match the file body (anti-corruption),
+     then applies via the atomic-rename + quiescence-gate path.
+     Result file `lifetrac-config-result.json` is written back to
+     the stick: `{unit_id, source_sha256, applied_sha256, accepted,
+     reason, applied_fields[], reload_class, timestamp}`. Operator
+     pulls the stick, plugs it back into the base, the `/config`
+     page surfaces the receipt and any deferral status. **All
+     validation happens on the base UI before the file ever leaves
+     the building**, so no syntax/range errors reach the tractor.
+     Plus tractor-side OLED status line (`CFG: validated, applied
+     <sha8>` / `CFG: REJECTED <reason>` / `CFG: deferred (in use)`)
+     and X8 status-LED flash convention (3 long = applied, 3 short
+     = rejected, alternating = deferred).
+  3. **Hand-authored USB-stick TOML** (fallback for ops without the
+     base online). Same on-tractor installer logic as path 2, but
+     no UI-side validation — the installer is the only line of
+     defence. Same OLED + LED feedback. Same result-file write-back.
+     Documented as "power-user" in BUILD_CONFIG.md.
+  4. **Web admin form on the base station** (BC-05, base-side
+     config only — the base's *own* `BuildConfig` reload, not the
+     tractor's).
+  5. **SSH from any networked laptop** (advanced operators only).
+     Same `lifetrac-config push` CLI, just over the LAN/WiFi link
+     to the X8 instead of `usb0`. Documented in BUILD_CONFIG.md
+     as the path for fleet-wide scripted updates; not the
+     primary field workflow because not every operator is
+     comfortable with SSH key management.
+
+  **Quiescence gate** (precondition for live reload): tractor in
+  `STATE_PARKED` for ≥ N seconds (default 30, configurable), no
+  active `/ws/control` subscriber, engine off OR idle-low,
+  M7 TX queue empty. If any condition fails, installer writes
+  `.toml.next` and the daemons pick it up at the next quiescent
+  window; operator sees a "reload pending" banner.
+
+  **Reload taxonomy** (encoded as a `reload_class` annotation on
+  every JSON Schema property):
+  * `live` — reloadable without daemon restart (UI strings, camera
+    presence flags, MQTT host with reconnect, `max_control_subscribers`,
+    IMU/GPS presence flags, `hyd_pressure_sensor_count`).
+  * `restart_required` — needs graceful daemon restart
+    (`lora_region`, `estop_topology`, `m4_watchdog_ms`, axis counts).
+    Detected by diffing old vs new `BuildConfig`; logged as
+    "restart required" and operator confirms via OLED button or
+    web UI before reboot.
+
+  Deliverables: `tools/lifetrac-config` Python CLI (laptop-side,
+  for paths 1 + 5); X8-side `lifetrac-config-installer` daemon
+  (handles USB-stick discovery for paths 2 + 3, atomic rename,
+  result-file write-back, OLED + LED feedback); base-side
+  `/config/download` route emitting the named installer bundle
+  for path 2; quiescence detector module in
+  `base_station/build_config.py`; new `test_build_config_delivery_sil.py`
+  (~15 tests covering USB-stick filename + unit-id-match
+  enforcement, embedded-SHA verification, base-side bundle
+  generation, quiescence-gate logic, reload-class annotations,
+  result-file schema, atomic-rename invariant, deferred-reload
+  pickup).
 
 ### Out of scope (for now)
 
-* OTA delivery of build configs across the fleet (would need
+* **OTA delivery of build configs over LoRa.** Wrong trust
+  boundary (LoRa write surface is intentionally narrow), wrong
+  airtime budget (would steal from control/telemetry/thumbnails),
+  and would require reinventing transactional delivery + rollback
+  on a half-duplex radio. Deliver via USB-cable / SSH / web admin
+  per BC-10 instead.
+* OTA delivery of build configs over cellular backup (would need
   signing + rollback; defer).
 * Per-axis hydraulic flow auto-calibration from manifold response
   (separate initiative; the config only carries operator-supplied

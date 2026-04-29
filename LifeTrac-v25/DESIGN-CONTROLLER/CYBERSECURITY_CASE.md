@@ -111,3 +111,68 @@ These are explicitly out of scope for v25 and are tracked in TODO.md.
 | Replay window | `base_station/tests/test_replay_window.py` | base_station/tests/ |
 | PIN lockout | `base_station/tests/test_web_ui_auth.py` | base_station/tests/ |
 | Audit append | `base_station/tests/test_audit_log.py` | base_station/tests/ |
+
+## 9. Build-config attack surface (BC-13)
+
+The build-config subsystem (TOML files, installer bundles, `lifetrac-config`
+CLI, push daemon, `audit.jsonl` `config_loaded` events, generated firmware
+header) is itself an asset class with safety significance: a maliciously crafted
+config can change physical-shape capability flags (e.g. enable `has_lift_arms`
+on a unit with no lift cylinders, or raise a hydraulic limit beyond what the
+plumbing tolerates) without ever touching firmware code. This section pins the
+SL-1 threat model for that surface; each row references concrete artefacts that
+the SIL gate ([test_cybersecurity_buildconfig_xref_sil.py](base_station/tests/test_cybersecurity_buildconfig_xref_sil.py))
+verifies still exist.
+
+### 9.1 Build-config zone (Z-CONFIG)
+
+| Asset | Lives on | Crosses into |
+|-------|----------|--------------|
+| `build.<unit_id>.toml` source | install-bench laptop (Z-LAN-bench) | Z-CONFIG when bundled |
+| `lifetrac-config-<unit>-<sha8>.toml` bundle | USB stick / LAN | Z-CONFIG on the tractor X8 |
+| Active config under `/etc/lifetrac/` | tractor X8 (Z-LAN-tractor) | Z-CONFIG (read by web_ui, lora_bridge) |
+| `config_loaded` audit events | `audit.jsonl` on tractor X8 | Z-AUDIT (operator inspection) |
+| Generated firmware header | repo + flashed M7 | Z-FIRMWARE (codegen `--check` is the drift gate) |
+
+### 9.2 STRIDE per build-config asset
+
+| Asset / action | STRIDE | Threat | Mitigation |
+|---|---|---|---|
+| `build.toml` on bench | T | Edit a TOML to enable a capability the hardware lacks | `lifetrac-config validate` schema gate; BC-09 capability cross-reference forces a BOM row to exist for every physical-shape leaf |
+| Bundle on USB stick | T | Swap bundle contents in transit | `lifetrac-config verify` re-hashes; filename embeds `sha8` and `unit_id` so a swap to another unit's bundle is visible |
+| Bundle on USB stick | S | Hand-craft a bundle whose embedded `unit_id` does not match the target tractor | `verify` rejects `unit_id` mismatch; activation refuses if filename `unit_id` ≠ embedded `unit_id` |
+| `lifetrac-config push` over LAN | S | RF-attacker-as-installer pushes a bundle | Z-LAN PIN-cookie auth on the install daemon endpoint (same control as web_ui) |
+| `lifetrac-config push` over LAN | E | Operator on the LAN escalates to bypass schema validation | Daemon re-runs `validate` server-side; `--force` is rejected at SL-1 |
+| Active config on tractor | T | Edit `/etc/lifetrac/build.toml` in place after install | Atomic-replace install path means an in-place edit changes the on-disk `config_sha256`; next `config_loaded` event records the drift; BC-14 inventory surfaces it as a new row |
+| `config_loaded` audit event | R | Operator denies which build was active during an incident | Every web_ui and lora_bridge process start emits one `config_loaded` JSONL line with `unit_id` + full `config_sha256`; BC-14 `lifetrac-config inventory` aggregates across the fleet |
+| `config_loaded` audit event | T | Tamper with `audit.jsonl` to hide a swap | Audit log is append-only at SL-1; signed/sealed log is the SL-2 gap (see —7 item 5) |
+| Generated firmware header | T | Ship a header that diverges from the active TOML | `lifetrac-config codegen --check` is a CI drift gate; BC-09 binds every physical leaf to a BOM row so silent capability inflation fails the bidirectional schema parity check |
+
+### 9.3 Capability-altering leaves are safety-significant
+
+Physical-shape leaves enumerated in [HARDWARE_BOM.md](HARDWARE_BOM.md) —
+`Capability cross-reference` (Round 36 / BC-09) are the subset of build-config
+leaves whose tampering can drive an actuator the unit cannot safely command.
+For SL-1 the mitigation is **defence in depth**, not signed configs:
+
+1. Schema validation rejects out-of-range values (`lifetrac-config validate`).
+2. BOM cross-reference forces a hardware row to exist for every physical leaf
+   (BC-09 bidirectional gate).
+3. `codegen --check` rejects any divergence between the active TOML and the
+   compiled firmware header.
+4. `config_loaded` audit + BC-14 inventory mean a swap is *visible* to the
+   operator within one boot.
+5. The three-watchdog de-energise (SAFETY_CASE.md —4) is the last-resort
+   safe-state regardless of what the config claims is plumbed.
+
+The SL-2 gap that closes the residual risk (signed bundles + per-device PKI)
+is tracked in —7 item 1.
+
+### 9.4 Drift gate
+
+The SIL gate
+[test_cybersecurity_buildconfig_xref_sil.py](base_station/tests/test_cybersecurity_buildconfig_xref_sil.py)
+pins this section against the rest of the codebase: every `lifetrac-config`
+subcommand named here exists in the CLI; every relative link resolves on disk;
+the STRIDE table covers each Z-CONFIG asset exactly once; and this section
+self-references its enforcing test file (so renaming the test fails the gate).

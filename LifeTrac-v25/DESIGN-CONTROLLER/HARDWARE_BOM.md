@@ -153,3 +153,43 @@ All prices in USD, approximate, from primary distributor (Arduino Store, SparkFu
 - Mast antenna + LMR-400 cable: 1 week (L-com US stock)
 - Custom PCB (handheld joystick board): 2 weeks via OSHPark / JLCPCB
 - IP65 enclosures: 1 week
+
+## Capability cross-reference (Round 36 / BC-09)
+
+> Every **physical-shape** build-config leaf — the ones whose value
+> directly determines whether a particular part appears in the BOM
+> for a given build — is mapped here to the BOM section + part(s)
+> that physically realise it. Parity is pinned by the SIL gate
+> [test_hardware_bom_xref_sil.py](base_station/tests/test_hardware_bom_xref_sil.py)
+> (Round 36 / BC-09).
+>
+> Non-physical leaves (`unit_id`, `schema_version`, the various
+> `*_ramp_seconds`, `safety.*` thresholds, every `ui.*`, every
+> `net.*`) are deliberately omitted: they are pure software /
+> tunable parameters and do not change which parts you order.
+
+| Capability ID | BOM evidence (section / part) | Notes |
+|---|---|---|
+| ``hydraulic.proportional_flow`` | Tier 1 / **Opta Ext A0602** + Burkert 8605 flow valve | When ``false``, the A0602 module is still present (other analog inputs use it) but the Burkert is omitted; bang-bang directional valves alone. |
+| ``safety.estop_topology`` | Tier 1 / **Phoenix Contact PSR safety relay** + Tier 1 / **Engine-kill relay** + Tier 3 / **Latching mushroom E-stop button** | ``hardwired_only`` omits the PSR; ``psr_monitored_dual`` is canonical; mushroom + engine-kill relay are present in every topology. |
+| ``cameras.count`` | Tier 1 / **USB UVC webcam** (Kurokesu C1 PRO / C2-290C) + ``Panel-mount USB-A bulkhead`` | ``0`` omits both. ``2..4`` adds rear / implement / crop-health cams (see *Multi-camera deployment* note). |
+| ``cameras.coral_tpu`` | Tier 2 / **Coral Mini PCIe Accelerator** OR **Coral USB Accelerator** (+ heatsink) | ``mini_pcie`` is canonical; ``usb`` swaps to USB Accelerator; ``none`` omits both. |
+| ``sensors.imu_present`` | Tier 1 / **Adafruit MCP2221A breakout** + **SparkFun Qwiic 9DoF IMU — BNO086** | When ``false``, omit both (or keep MCP2221A if GPS is also Qwiic). |
+| ``sensors.imu_model`` | Tier 1 / **SparkFun Qwiic 9DoF IMU — BNO086** (canonical) | Substitutes BNO055 / ICM-20948 are documented in CAPABILITY_INVENTORY but not currently stocked in the BOM. |
+| ``sensors.gps_present`` | Tier 1 / **SparkFun GPS Breakout — NEO-M9N, SMA Qwiic** + **GPS active patch antenna** + ``SMA female-female bulkhead`` | When ``false``, omit all three. |
+| ``sensors.gps_model`` | Tier 1 / **SparkFun GPS Breakout — NEO-M9N, SMA Qwiic** (canonical) | ``neo_m9n_rtk_f9p`` substitutes the SparkFun ZED-F9P RTK board — see the *GPS path* note. |
+| ``sensors.hyd_pressure_sensor_count`` | Tier 1 / **Hydraulic pressure sensor** + ``M12-A 4-pin cordset`` | ``0`` omits both line items entirely. |
+| ``comm.lora_region`` | Tier 1 / **LoRa antenna 915 MHz** + Tier 2 / **LoRa mast antenna, 915 MHz, 8 dBi omni** + Tier 3 / **LoRa antenna, 915 MHz, 1/4-wave whip** | ``eu868`` substitutes 868 MHz parts (see the *915 MHz vs 868 MHz* note); ``au915`` keeps 915 MHz silicon with regional EIRP table. |
+| ``comm.cellular_backup_present`` | Tier 1 / **Cellular antenna 700-2700 MHz** + Tier 1 / **Activated Cat-M1 SIM card** | When ``false``, omit both (and the recurring SIM-card monthly cost). Listed as archived per the *Scope* banner — handled by the schema flag for future re-enable. |
+| ``comm.handheld_present`` | Tier 3 (entire tier) | When ``false``, omit Tier 3 entirely. |
+| ``aux.port_count`` | (no current BOM line; planned: Tier 1 / aux PWM coil drivers + ISO-5675 / flat-face couplers) | Round 33 capability; physical realisation tracked in [DESIGN-HYDRAULIC](../DESIGN-HYDRAULIC) until BOM lines land. |
+| ``aux.coupler_type`` | (planned — see ``aux.port_count`` row) | |
+| ``aux.case_drain_present`` | (planned — see ``aux.port_count`` row) | |
+
+**How to keep this in sync.** Adding a new physical-shape capability
+to the schema is a four-place edit: schema — default TOML — loader
+dataclass — codegen ``_SECTIONS``. Adding a new physical-shape
+capability that *also* needs hardware is now a **five**-place edit:
+the four above plus one new row in this table. The
+``BC09_B_EveryPhysicalCapabilityHasBOMRow`` test fails loudly if step
+five is forgotten.

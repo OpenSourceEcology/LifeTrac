@@ -147,6 +147,24 @@ class Bridge:
         # Audit log first — every other constructor step may want to record.
         self.audit = AuditLog(audit_path)
         self.audit.record("bridge_start", port=port, mqtt_host=mqtt_host)
+        # BC-04: record the active build-config SHA at boot so post-mortems
+        # can correlate behaviour with the *exact* config the bridge ran
+        # against. Best-effort: a corrupt or missing config does not block
+        # bring-up (BC-XX rationale: the bridge has to come up so we can
+        # observe the failure; firmer enforcement lands in BC-05/BC-10).
+        try:
+            import build_config as _bc
+            cfg = _bc.load(os.environ.get("LIFETRAC_UNIT_ID"))
+            self.audit.record(
+                "config_loaded",
+                component="lora_bridge",
+                unit_id=cfg.unit_id,
+                source_path=str(cfg.source_path),
+                config_sha256=cfg.config_sha256,
+                schema_version=cfg.schema_version,
+            )
+        except Exception as _bc_exc:  # pragma: no cover — dev-checkout fallback
+            logging.warning("build_config: load failed (%s); bridge continues", _bc_exc)
         self.ser = serial.Serial(port, 115200, timeout=0.1)
         self.dec = KissDecoder()
         self.mqtt = mqtt.Client(client_id="lora_bridge")

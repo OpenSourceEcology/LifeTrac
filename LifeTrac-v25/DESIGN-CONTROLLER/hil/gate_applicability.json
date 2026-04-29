@@ -1,0 +1,66 @@
+{
+  "_doc": "Round 34 / BC-06: per-gate applicability predicates. Each gate lists conjunctive predicates over the validated build_config; if every predicate evaluates true the gate applies to this fleet shape, otherwise it is reported as N/A by hil/dispatch.ps1 and the SIL gate. Op set: 'eq' (path == value), 'gt' (path > value), 'gte' (path >= value), 'truthy' (path is truthy). Empty 'applies_when' means the gate always applies. Source of truth: this file. Both dispatch.ps1 and tests/test_hil_dispatch_applicability_sil.py read it.",
+  "schema_version": 1,
+  "gates": {
+    "W4-01": {
+      "title": "Handheld E-stop latch",
+      "applies_when": [
+        {"path": "comm.handheld_present", "op": "eq", "value": true}
+      ],
+      "rationale": "Handheld E-stop gate is meaningless when no handheld is wired."
+    },
+    "W4-02": {
+      "title": "Link-tune walk-down",
+      "applies_when": [
+        {"path": "comm.handheld_present", "op": "eq", "value": true}
+      ],
+      "rationale": "LoRa link-tune walk-down needs the handheld in the operator's hand."
+    },
+    "W4-03": {
+      "title": "M7<->M4 watchdog trip",
+      "applies_when": [],
+      "rationale": "M7+M4 are always present on the Portenta H7."
+    },
+    "W4-04": {
+      "title": "Modbus disconnect -> E-stop",
+      "applies_when": [],
+      "rationale": "Opta Modbus E-stop is core to every v25 build."
+    },
+    "W4-05": {
+      "title": "Proportional ramp-out",
+      "applies_when": [
+        {"path": "hydraulic.proportional_flow", "op": "eq", "value": true}
+      ],
+      "rationale": "A bang-bang hydraulic build has no ramp curve to verify."
+    },
+    "W4-06": {
+      "title": "Mixed-mode skip",
+      "applies_when": [
+        {"path": "hydraulic.arm_axis_count", "op": "gt", "value": 0}
+      ],
+      "rationale": "Mixed-mode requires at least one arm axis to mix with the tracks."
+    },
+    "W4-07": {
+      "title": "Boot-PHY first-frame",
+      "applies_when": [],
+      "rationale": "Boot-PHY ordering is a property of the radio stack; always applies."
+    },
+    "W4-08": {
+      "title": "Camera keyframe round-trip",
+      "applies_when": [
+        {"path": "cameras.count", "op": "gt", "value": 0}
+      ],
+      "rationale": "No cameras -> no keyframe pipeline to verify."
+    },
+    "W4-09": {
+      "title": "Async M7 TX IRQ",
+      "applies_when": [],
+      "rationale": "M7 LoRa TX path is core; always applies."
+    },
+    "W4-10": {
+      "title": "Fleet-key provisioning",
+      "applies_when": [],
+      "rationale": "Fleet key provisioning is required regardless of optional features."
+    }
+  }
+}

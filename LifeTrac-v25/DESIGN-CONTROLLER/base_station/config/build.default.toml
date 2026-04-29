@@ -1,0 +1,57 @@
+# LifeTrac v25 — canonical build configuration.
+#
+# This file is the fallback when no per-unit override is found.
+# Per-unit overrides live in build.<unit_id>.toml in this directory.
+# Schema: ./build_config.schema.json
+# Human docs: ../../CAPABILITY_INVENTORY.md
+# Loader: ../build_config.py (Round 27 / BC-02).
+
+unit_id        = "lifetrac-001"
+schema_version = 1
+
+[hydraulic]
+track_axis_count    = 2
+arm_axis_count      = 2
+proportional_flow   = true
+track_ramp_seconds  = 2.0
+arm_ramp_seconds    = 1.0
+
+[aux]
+port_count          = 0
+coupler_type        = "none"
+case_drain_present  = false
+
+[safety]
+estop_topology          = "psr_monitored_dual"
+estop_latency_ms_max    = 100
+modbus_fail_latch_count = 10
+m4_watchdog_ms          = 200
+
+[cameras]
+count                = 1
+front_present        = true
+rear_present         = false
+implement_present    = false
+crop_health_present  = false
+coral_tpu            = "mini_pcie"
+
+[sensors]
+imu_present                = true
+imu_model                  = "bno086"
+gps_present                = true
+gps_model                  = "neo_m9n"
+hyd_pressure_sensor_count  = 2
+
+[comm]
+lora_region              = "us915"
+cellular_backup_present  = false
+handheld_present         = true
+
+[ui]
+web_ui_enabled            = true
+max_control_subscribers   = 4
+pin_required_for_control  = true
+
+[net]
+mqtt_host = "localhost"
+mqtt_port = 1883

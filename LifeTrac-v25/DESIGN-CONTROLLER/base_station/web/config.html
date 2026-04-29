@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>LifeTrac v25 &mdash; Build Configuration</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2em auto; padding: 0 1em; }
+    h1, h2 { font-weight: 600; }
+    .pill { display: inline-block; padding: 0.25em 0.7em; border-radius: 999px;
+            font-size: 0.9em; font-weight: 600; color: #fff; }
+    .pill.green   { background: #2a8a3e; }
+    .pill.yellow  { background: #b88a00; }
+    .pill.orange  { background: #c0651a; }
+    .pill.red     { background: #b03020; }
+    .pill.grey    { background: #6c757d; }
+    .row { display: flex; align-items: center; gap: 1em; margin: 1em 0; }
+    .meta { color: #555; font-size: 0.9em; }
+    code, pre { background: #f3f3f3; padding: 0.1em 0.3em; border-radius: 3px; font-family: ui-monospace, monospace; }
+    pre { padding: 0.7em; overflow: auto; }
+    textarea { width: 100%; min-height: 30em; font-family: ui-monospace, monospace;
+               font-size: 0.95em; padding: 0.7em; box-sizing: border-box; }
+    button { padding: 0.5em 1em; font-size: 1em; cursor: pointer; }
+    .banner { padding: 0.7em 1em; border-radius: 6px; margin: 1em 0; }
+    .banner.info    { background: #e7f0fb; color: #244c7a; }
+    .banner.warn    { background: #fdf2d6; color: #6b4d00; }
+    .banner.error   { background: #fbe6e2; color: #82231a; }
+    .banner.success { background: #e3f4e8; color: #1d5b2a; }
+    .diff-row { display: flex; gap: 1em; padding: 0.2em 0; border-bottom: 1px solid #eee; }
+    .diff-leaf { flex: 2; font-family: ui-monospace, monospace; }
+    .diff-class { flex: 1; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>LifeTrac v25 &mdash; Build Configuration</h1>
+  <p><a href="/">&larr; back to operator console</a> &middot;
+     <a href="/config/download">download installer bundle</a> &middot;
+     <a href="/audit">audit log</a></p>
+
+  <div id="status-banner" class="banner info">Loading current configuration&hellip;</div>
+
+  <h2>Active configuration</h2>
+  <div class="row meta">
+    <span>Unit ID: <code id="meta-unit-id">&mdash;</code></span>
+    <span>Schema version: <code id="meta-schema">&mdash;</code></span>
+    <span>SHA-256: <code id="meta-sha">&mdash;</code></span>
+  </div>
+  <div class="row meta">
+    <span>Source path: <code id="meta-source">&mdash;</code></span>
+  </div>
+  <div class="row">
+    <span>Watcher state:</span>
+    <span id="watcher-pill" class="pill grey">unknown</span>
+    <span id="watcher-reason" class="meta"></span>
+  </div>
+
+  <h2>Edit TOML</h2>
+  <p class="meta">
+    Schema-validated on submit. The would-be reload class is previewed
+    below before you commit. <strong>Restart-required</strong> changes
+    save to disk but the running daemon keeps the previous config until
+    you bounce it; <strong>firmware-required</strong> changes are
+    refused (re-flash via bench).
+  </p>
+  <textarea id="editor" spellcheck="false" autocomplete="off"></textarea>
+
+  <div class="row">
+    <button id="preview-btn">Preview diff</button>
+    <button id="upload-btn">Save</button>
+    <button id="reset-btn">Reload from disk</button>
+  </div>
+
+  <div id="diff-banner" class="banner info hidden"></div>
+  <div id="diff-list"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function setBanner(el, kind, html) {
+      el.className = "banner " + kind;
+      el.innerHTML = html;
+      el.classList.remove("hidden");
+    }
+
+    function pillFor(event) {
+      switch (event) {
+        case "applied":           return ["green",  "applied"];
+        case "noop":              return ["grey",   "no change"];
+        case "deferred":          return ["yellow", "deferred"];
+        case "restart_pending":   return ["orange", "restart pending"];
+        case "firmware_required": return ["red",    "firmware required"];
+        case "rejected":          return ["red",    "rejected"];
+        default:                  return ["grey",   event || "unknown"];
+      }
+    }
+
+    async function refreshState() {
+      const r = await fetch("/api/build_config/state", { credentials: "same-origin" });
+      if (r.status === 401) { window.location = "/login"; return; }
+      const d = await r.json();
+      $("meta-unit-id").textContent = d.unit_id;
+      $("meta-schema").textContent  = "v" + d.schema_version;
+      $("meta-sha").textContent     = d.sha256.slice(0, 16) + "&hellip;";
+      $("meta-source").textContent  = d.source_path;
+      const [colour, label] = pillFor(d.last_event);
+      const pill = $("watcher-pill");
+      pill.className = "pill " + colour;
+      pill.textContent = label;
+      $("watcher-reason").textContent = d.last_event_reason || "";
+      if (d.restart_pending) {
+        setBanner($("status-banner"), "warn",
+          "<strong>Restart pending.</strong> A restart-required change is on disk; " +
+          "the running daemon will keep the previous config until you bounce it.");
+      } else {
+        setBanner($("status-banner"), "info",
+          "Running configuration matches disk.");
+      }
+    }
+
+    async function loadEditor() {
+      const r = await fetch("/api/build_config/source", { credentials: "same-origin" });
+      if (r.status === 401) { window.location = "/login"; return; }
+      const text = await r.text();
+      $("editor").value = text;
+    }
+
+    async function previewDiff() {
+      const r = await fetch("/api/build_config/preview-diff", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "text/plain" },
+        body: $("editor").value,
+      });
+      const d = await r.json();
+      const list = $("diff-list");
+      list.innerHTML = "";
+      if (!d.ok) {
+        setBanner($("diff-banner"), "error", "Schema error: " + (d.error || "unknown"));
+        return;
+      }
+      if (!d.changed_leaves || d.changed_leaves.length === 0) {
+        setBanner($("diff-banner"), "info", "No diff against running config.");
+        return;
+      }
+      const [colour, label] = pillFor(
+        d.worst_reload_class === "live" ? "applied"
+        : d.worst_reload_class === "restart_required" ? "restart_pending"
+        : "firmware_required"
+      );
+      setBanner($("diff-banner"), colour === "green" ? "success" :
+                                  colour === "orange" ? "warn" : "error",
+        "<strong>" + d.changed_leaves.length + " leaves changed; " +
+        "worst reload class: " + d.worst_reload_class + "</strong>"
+      );
+      for (const leaf of d.changed_leaves) {
+        const row = document.createElement("div");
+        row.className = "diff-row";
+        row.innerHTML =
+          '<div class="diff-leaf">' + leaf + "</div>" +
+          '<div class="diff-class">' + (d.classes[leaf] || "?") + "</div>";
+        list.appendChild(row);
+      }
+    }
+
+    async function upload() {
+      const r = await fetch("/api/build_config/upload", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "text/plain" },
+        body: $("editor").value,
+      });
+      const d = await r.json();
+      if (!d.ok) {
+        setBanner($("status-banner"), "error", "Upload rejected: " + (d.error || "unknown"));
+        return;
+      }
+      setBanner($("status-banner"), "success",
+        "Saved. SHA " + d.sha256.slice(0, 8) + "&hellip; &mdash; reload class: " + d.worst_reload_class);
+      await refreshState();
+    }
+
+    $("preview-btn").addEventListener("click", previewDiff);
+    $("upload-btn").addEventListener("click", upload);
+    $("reset-btn").addEventListener("click", () => { loadEditor(); refreshState(); });
+
+    (async () => { await loadEditor(); await refreshState(); })();
+  </script>
+</body>
+</html>

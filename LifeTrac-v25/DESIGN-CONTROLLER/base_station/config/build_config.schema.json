@@ -1,0 +1,170 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://lifetrac.local/v25/build_config.schema.json",
+  "title": "LifeTrac v25 build configuration",
+  "description": "Per-unit build configuration. See DESIGN-CONTROLLER/CAPABILITY_INVENTORY.md for human-readable documentation. Round 27 / BC-02. reload_class annotations added Round 29 / BC-10.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "unit_id",
+    "schema_version",
+    "hydraulic",
+    "safety",
+    "cameras",
+    "sensors",
+    "comm",
+    "ui",
+    "net",
+    "aux"
+  ],
+  "properties": {
+    "unit_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]{3,32}$",
+      "description": "Per-fleet identifier; selects build.<unit_id>.toml.",
+      "reload_class": "restart_required"
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bumped when the schema breaks backward-compat.",
+      "reload_class": "firmware_required"
+    },
+    "hydraulic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "track_axis_count",
+        "arm_axis_count",
+        "proportional_flow",
+        "track_ramp_seconds",
+        "arm_ramp_seconds"
+      ],
+      "properties": {
+        "track_axis_count":   {"type": "integer", "minimum": 1, "maximum": 2, "reload_class": "restart_required"},
+        "arm_axis_count":     {"type": "integer", "minimum": 0, "maximum": 2, "reload_class": "restart_required"},
+        "proportional_flow":  {"type": "boolean", "reload_class": "restart_required"},
+        "track_ramp_seconds": {"type": "number",  "minimum": 0.5,  "maximum": 5.0, "reload_class": "live"},
+        "arm_ramp_seconds":   {"type": "number",  "minimum": 0.25, "maximum": 3.0, "reload_class": "live"}
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estop_topology",
+        "estop_latency_ms_max",
+        "modbus_fail_latch_count",
+        "m4_watchdog_ms"
+      ],
+      "properties": {
+        "estop_topology": {
+          "type": "string",
+          "enum": ["psr_monitored_dual", "psr_monitored_single", "hardwired_only"],
+          "reload_class": "restart_required"
+        },
+        "estop_latency_ms_max":    {"type": "integer", "minimum": 50,  "maximum": 200, "reload_class": "restart_required"},
+        "modbus_fail_latch_count": {"type": "integer", "minimum": 3,   "maximum": 50,  "reload_class": "live"},
+        "m4_watchdog_ms":          {"type": "integer", "minimum": 100, "maximum": 500, "reload_class": "firmware_required"}
+      }
+    },
+    "cameras": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "count",
+        "front_present",
+        "rear_present",
+        "implement_present",
+        "crop_health_present",
+        "coral_tpu"
+      ],
+      "properties": {
+        "count":               {"type": "integer", "minimum": 0, "maximum": 4, "reload_class": "live"},
+        "front_present":       {"type": "boolean", "reload_class": "live"},
+        "rear_present":        {"type": "boolean", "reload_class": "live"},
+        "implement_present":   {"type": "boolean", "reload_class": "live"},
+        "crop_health_present": {"type": "boolean", "reload_class": "live"},
+        "coral_tpu": {
+          "type": "string",
+          "enum": ["mini_pcie", "usb", "none"],
+          "reload_class": "restart_required"
+        }
+      }
+    },
+    "sensors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "imu_present",
+        "imu_model",
+        "gps_present",
+        "gps_model",
+        "hyd_pressure_sensor_count"
+      ],
+      "properties": {
+        "imu_present": {"type": "boolean", "reload_class": "live"},
+        "imu_model": {
+          "type": "string",
+          "enum": ["bno086", "bno055", "icm20948"],
+          "reload_class": "restart_required"
+        },
+        "gps_present": {"type": "boolean", "reload_class": "live"},
+        "gps_model": {
+          "type": "string",
+          "enum": ["neo_m9n", "neo_m9n_rtk_f9p"],
+          "reload_class": "restart_required"
+        },
+        "hyd_pressure_sensor_count": {"type": "integer", "minimum": 0, "maximum": 2, "reload_class": "live"}
+      }
+    },
+    "comm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lora_region", "cellular_backup_present", "handheld_present"],
+      "properties": {
+        "lora_region": {
+          "type": "string",
+          "enum": ["us915", "eu868", "au915"],
+          "reload_class": "restart_required"
+        },
+        "cellular_backup_present": {"type": "boolean", "reload_class": "restart_required"},
+        "handheld_present":        {"type": "boolean", "reload_class": "live"}
+      }
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["web_ui_enabled", "max_control_subscribers", "pin_required_for_control"],
+      "properties": {
+        "web_ui_enabled":             {"type": "boolean", "reload_class": "restart_required"},
+        "max_control_subscribers":    {"type": "integer", "minimum": 1, "maximum": 32, "reload_class": "live"},
+        "pin_required_for_control":   {"type": "boolean", "reload_class": "live"}
+      }
+    },
+    "net": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mqtt_host", "mqtt_port"],
+      "properties": {
+        "mqtt_host": {"type": "string", "minLength": 1, "maxLength": 253, "reload_class": "live"},
+        "mqtt_port": {"type": "integer", "minimum": 1, "maximum": 65535, "reload_class": "live"}
+      }
+    },
+    "aux": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Round 33 / BC-11: auxiliary attachment hydraulic ports. Declares the fleet's aux-port hardware so the firmware knows how many PWM channels to drive and the web UI knows whether to surface aux controls.",
+      "required": ["port_count", "coupler_type", "case_drain_present"],
+      "properties": {
+        "port_count":         {"type": "integer", "minimum": 0, "maximum": 2, "reload_class": "restart_required"},
+        "coupler_type": {
+          "type": "string",
+          "enum": ["iso_5675", "flat_face", "none"],
+          "reload_class": "restart_required"
+        },
+        "case_drain_present": {"type": "boolean", "reload_class": "restart_required"}
+      }
+    }
+  }
+}

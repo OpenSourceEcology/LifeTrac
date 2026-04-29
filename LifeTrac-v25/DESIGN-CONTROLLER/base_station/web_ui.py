@@ -27,7 +27,7 @@ from typing import Any
 
 import paho.mqtt.client as mqtt
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
@@ -279,6 +279,48 @@ def _connect_mqtt_with_retry() -> None:
 _connect_mqtt_with_retry()
 mqtt_client.loop_start()
 
+# ---- BC-04: load build configuration -----------------------------------
+# Module-level singleton consumed below for MAX_CONTROL_SUBSCRIBERS,
+# _CAMERA_IDS filtering, and the boot-time audit-log entry. Best-effort:
+# if the loader fails (corrupt TOML, missing file in a dev checkout) we
+# fall back to canonical defaults so the web UI still boots and the
+# operator sees a degraded-but-running console rather than a crash loop.
+# Per BC-XX the env var LIFETRAC_UNIT_ID selects the per-unit override.
+try:
+    import build_config as _bc
+    BUILD: "_bc.BuildConfig | None" = _bc.load(os.environ.get("LIFETRAC_UNIT_ID"))
+except Exception as _bc_exc:  # pragma: no cover — dev-checkout fallback
+    logging.warning("build_config: load failed (%s); using built-in defaults", _bc_exc)
+    BUILD = None
+
+
+def _audit_config_loaded() -> None:
+    """Record the active BuildConfig SHA on every web_ui boot (BC-04).
+
+    The SHA is what later rounds (BC-05 admin form, BC-10 delivery) will
+    cross-reference against the file on disk to confirm the running
+    process matches the file the operator believes is active.
+    """
+    if BUILD is None:
+        return
+    al = _get_audit_log()
+    if al is None:
+        return
+    try:
+        al.record(
+            "config_loaded",
+            component="web_ui",
+            unit_id=BUILD.unit_id,
+            source_path=str(BUILD.source_path),
+            config_sha256=BUILD.config_sha256,
+            schema_version=BUILD.schema_version,
+        )
+    except Exception as exc:  # pragma: no cover
+        logging.warning("audit: config_loaded record failed: %s", exc)
+
+
+_audit_config_loaded()
+
 telemetry_subscribers: set[WebSocket] = set()
 image_subscribers: set[WebSocket] = set()
 state_subscribers: set[WebSocket] = set()
@@ -313,8 +355,10 @@ MAX_STATE_SUBSCRIBERS     = 4
 # windows already gate by source_id, but at the WS layer an attacker that
 # bypassed PIN auth could still open thousands of sockets and starve the
 # event loop. Cap matches the realistic operator + observer scenario
-# (one driver + a couple of mirrored sessions).
-MAX_CONTROL_SUBSCRIBERS   = 4
+# (one driver + a couple of mirrored sessions). Per BC-04 this is now
+# driven from the loaded BuildConfig (`ui.max_control_subscribers`) when
+# available, with the historical default of 4 as the dev-checkout fallback.
+MAX_CONTROL_SUBSCRIBERS   = BUILD.ui.max_control_subscribers if BUILD is not None else 4
 WS_OVER_CAPACITY_CODE     = 4429
 
 
@@ -585,6 +629,21 @@ async def map_page(session: str | None = Cookie(default=None)):
     return (WEB_DIR / "map.html").read_text(encoding="utf-8")
 
 
+# ---- BC-05 (Round 30): build-config admin page -------------------------
+@app.get("/config", response_class=HTMLResponse)
+async def config_page(session: str | None = Cookie(default=None)):
+    """Operator-facing TOML editor + reload-class diff preview.
+
+    Thin client over the BC-05 endpoints below + the BC-10 watcher
+    state route. Keeps PIN-gated so only authenticated operators can
+    even read the active config (it carries unit_id, MQTT host, etc.).
+    """
+    if not _session_valid(session):
+        return HTMLResponse(status_code=status.HTTP_303_SEE_OTHER,
+                            content="", headers={"Location": "/login"})
+    return (WEB_DIR / "config.html").read_text(encoding="utf-8")
+
+
 @app.get("/api/audit")
 async def api_audit(limit: int = 200,
                     _session: str = Depends(_require_session)):
@@ -794,13 +853,337 @@ async def estop(_session: str = Depends(_require_session)):
 
 # Camera selection: maps human-readable name -> CMD_CAMERA_SELECT payload byte.
 # See LORA_PROTOCOL.md § Command frame opcodes.
-_CAMERA_IDS = {
+# Per BC-04 the table is filtered against the loaded BuildConfig so a build
+# without (e.g.) a rear or implement camera does not advertise that name on
+# the API — attempts to select an absent camera return HTTP 400 with
+# "unknown camera" rather than silently sending a CMD_CAMERA_SELECT for a
+# camera the tractor doesn't have.
+_CAMERA_IDS_FULL = {
     "auto":      0x00,
     "front":     0x01,
     "rear":      0x02,
     "implement": 0x03,
     "crop":      0x04,
 }
+
+
+def _filter_cameras(table: dict[str, int]) -> dict[str, int]:
+    if BUILD is None or BUILD.cameras.count == 0:
+        # No build config or no cameras at all — keep "auto" only when at
+        # least one camera might exist; with count == 0 even auto is
+        # meaningless, so drop the table entirely.
+        return dict(table) if BUILD is None else {}
+    out = {"auto": table["auto"]}
+    if BUILD.cameras.front_present:
+        out["front"] = table["front"]
+    if BUILD.cameras.rear_present:
+        out["rear"] = table["rear"]
+    if BUILD.cameras.implement_present:
+        out["implement"] = table["implement"]
+    if BUILD.cameras.crop_health_present:
+        out["crop"] = table["crop"]
+    return out
+
+
+_CAMERA_IDS = _filter_cameras(_CAMERA_IDS_FULL)
+
+
+# ---- BC-10 (Round 29b-alpha): installer bundle download ----------------
+# PIN-gated. Returns a plain-text installer bundle of the active BUILD as a
+# file download. Operator copies the file to a USB stick, walks it to the
+# tractor; the X8-side installer (Round 29b-beta) verifies the embedded SHA
+# and applies via atomic-rename + quiescence-gate. The route is GET so it's
+# linkable from the (future) /config admin page; no body, no side effects
+# other than an audit-log entry recording who downloaded what SHA.
+@app.get("/config/download")
+async def config_download(_session: str = Depends(_require_session)):
+    if BUILD is None:
+        raise HTTPException(status_code=503, detail="build_config not loaded")
+    try:
+        import config_bundle as _cb  # local import keeps base_station optional
+        body = BUILD.source_path.read_text(encoding="utf-8")
+        bundle = _cb.make_bundle(
+            body, BUILD.unit_id, generator="lifetrac-base-ui 1.0"
+        )
+        text = _cb.serialise(bundle)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"bundle build failed: {exc}") from exc
+    al = _get_audit_log()
+    if al is not None:
+        try:
+            al.record(
+                "config_download",
+                component="web_ui",
+                unit_id=bundle.unit_id,
+                config_sha256=bundle.sha256,
+            )
+        except Exception:  # pragma: no cover
+            pass
+    return PlainTextResponse(
+        content=text,
+        headers={
+            "Content-Disposition": f'attachment; filename="{bundle.filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+# ---- BC-10 (Round 29b-beta): config watch-and-reload state -------------
+# Module-level ConfigWatcher, lazily constructed on first /api/build_config
+# poll. Base side has no hydraulics, so quiescence is trivially-true
+# (parked >> threshold, no subs, queue empty, engine off). The watcher's
+# job here is to surface a "restart pending" banner when the X8 installer
+# atomically replaces the on-disk TOML under us; the same module is also
+# imported by lora_bridge with a real quiescence callback for tractor-side
+# live-reload of UI strings + camera-presence flags.
+_WATCHER: "_cw.ConfigWatcher | None" = None  # type: ignore[name-defined]
+
+
+def _base_quiescence():
+    import build_config as _bc
+    # Base UI = always quiet. Live changes apply on the next poll.
+    return _bc.QuiescenceState(
+        parked_seconds=999.0,
+        active_control_subscribers=0,
+        m7_tx_queue_depth=0,
+        engine_idle_or_off=True,
+    )
+
+
+def _get_watcher():
+    global _WATCHER
+    if _WATCHER is not None:
+        return _WATCHER
+    if BUILD is None:
+        return None
+    try:
+        import config_watcher as _cw
+        _WATCHER = _cw.ConfigWatcher(BUILD, get_quiescence=_base_quiescence)
+    except Exception as exc:  # pragma: no cover
+        logging.warning("config_watcher: init failed: %s", exc)
+        return None
+    return _WATCHER
+
+
+@app.get("/api/build_config/state")
+async def build_config_state(_session: str = Depends(_require_session)):
+    """Surface the running BuildConfig + any pending-reload state.
+
+    Polls the watcher (cheap: one ``stat()`` + a possible reload) so a
+    UI banner can refresh without the operator restarting the daemon.
+    Returns a small JSON envelope ``{unit_id, sha256, schema_version,
+    restart_pending, last_event, last_event_reason, changed_leaves,
+    worst_reload_class}``.
+    """
+    if BUILD is None:
+        raise HTTPException(status_code=503, detail="build_config not loaded")
+    watcher = _get_watcher()
+    if watcher is None:
+        raise HTTPException(status_code=503, detail="config_watcher unavailable")
+    event = watcher.poll()
+    cfg = watcher.current
+    payload = {
+        "unit_id": cfg.unit_id,
+        "schema_version": cfg.schema_version,
+        "sha256": cfg.config_sha256,
+        "source_path": str(cfg.source_path),
+        "restart_pending": watcher.restart_pending,
+        "last_event": event.kind,
+        "last_event_reason": event.reason,
+    }
+    diff = event.diff or watcher.restart_pending_diff
+    if diff is not None:
+        payload["changed_leaves"] = list(diff.changed)
+        payload["worst_reload_class"] = diff.worst
+    else:
+        payload["changed_leaves"] = []
+        payload["worst_reload_class"] = None
+    al = _get_audit_log()
+    if al is not None and event.kind != "noop":
+        try:
+            al.record(
+                "config_watch_event",
+                component="web_ui",
+                unit_id=cfg.unit_id,
+                event=event.kind,
+                reason=event.reason,
+                worst_reload_class=payload["worst_reload_class"],
+            )
+        except Exception:  # pragma: no cover
+            pass
+    return JSONResponse(payload)
+
+
+# ---- BC-05 (Round 30): build-config admin API --------------------------
+# Three sibling routes the /config admin page drives:
+#
+#   GET  /api/build_config/source       -> raw TOML body (text/plain)
+#   POST /api/build_config/preview-diff -> {ok, changed_leaves, classes,
+#                                            worst_reload_class} or {ok:false, error}
+#   POST /api/build_config/upload       -> writes atomically + audits;
+#                                          returns {ok, sha256, worst_reload_class}
+#                                          or {ok:false, error}
+#
+# Upload bytes are validated by the same ``build_config.load`` path the X8
+# installer (BC-10 / Round 29b-beta) uses, so a TOML the editor accepts is
+# byte-identical to a TOML the installer would accept. Atomic write goes
+# via ``installer_daemon._atomic_write`` so a partial write can never leave
+# the running daemon's source file half-rewritten -- the watcher then
+# picks up the change on its next poll and either applies live, defers
+# on quiescence, or sets restart_pending. Firmware-required diffs are
+# rejected at upload time (same policy as the X8 installer).
+
+
+def _load_body_for_validation(body: str):
+    """Schema-validate a TOML body string by writing it to a temp file
+    and invoking the canonical loader. Returns the BuildConfig.
+
+    Mirrors :func:`installer_daemon._load_body_via_temp` exactly; kept
+    inline so web_ui can degrade gracefully when installer_daemon is
+    unimportable in dev checkouts (it's stdlib-only, but the import is
+    inside a function so a missing module surfaces as 503 not import-time
+    crash).
+    """
+    import build_config as _bc
+    import os as _os
+    import tempfile as _tf
+    with _tf.NamedTemporaryFile("w", suffix=".toml", delete=False, encoding="utf-8") as tf:
+        tf.write(body)
+        tmp = tf.name
+    prev = _os.environ.get("LIFETRAC_BUILD_CONFIG_PATH")
+    _os.environ["LIFETRAC_BUILD_CONFIG_PATH"] = tmp
+    try:
+        return _bc.load()
+    finally:
+        if prev is None:
+            _os.environ.pop("LIFETRAC_BUILD_CONFIG_PATH", None)
+        else:
+            _os.environ["LIFETRAC_BUILD_CONFIG_PATH"] = prev
+        try:
+            _os.unlink(tmp)
+        except OSError:
+            pass
+
+
+@app.get("/api/build_config/source", response_class=PlainTextResponse)
+async def build_config_source(_session: str = Depends(_require_session)):
+    """Return the raw TOML body of the active build config.
+
+    The editor seeds itself from this. PIN-gated -- the body carries
+    unit_id, MQTT host, and other identifying info.
+    """
+    if BUILD is None:
+        raise HTTPException(status_code=503, detail="build_config not loaded")
+    try:
+        return PlainTextResponse(
+            BUILD.source_path.read_text(encoding="utf-8"),
+            headers={"Cache-Control": "no-store"},
+        )
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"read failed: {exc}") from exc
+
+
+@app.post("/api/build_config/preview-diff")
+async def build_config_preview_diff(request: Request,
+                                    _session: str = Depends(_require_session)):
+    """Schema-validate a candidate body and report the would-be reload class.
+
+    Body is the raw TOML text (Content-Type: text/plain). No side effects
+    -- the editor calls this on "Preview diff" so the operator can see
+    what's about to land before they hit Save.
+    """
+    if BUILD is None:
+        raise HTTPException(status_code=503, detail="build_config not loaded")
+    body_bytes = await request.body()
+    body = body_bytes.decode("utf-8", errors="replace")
+    try:
+        import build_config as _bc
+        candidate = _load_body_for_validation(body)
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)})
+    try:
+        diff = _bc.diff_reload_classes(BUILD, candidate)
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": f"diff: {exc}"})
+    return JSONResponse({
+        "ok": True,
+        "unit_id": candidate.unit_id,
+        "schema_version": candidate.schema_version,
+        "candidate_sha256": candidate.config_sha256,
+        "running_sha256": BUILD.config_sha256,
+        "changed_leaves": list(diff.changed),
+        "classes": dict(diff.classes),
+        "worst_reload_class": diff.worst,
+    })
+
+
+@app.post("/api/build_config/upload")
+async def build_config_upload(request: Request,
+                              _session: str = Depends(_require_session)):
+    """Schema-validate, refuse firmware-required diffs, atomically write.
+
+    On success the running daemon does NOT immediately swap -- the
+    :class:`config_watcher.ConfigWatcher` picks up the change on its
+    next poll and decides per the BC-10 contract (live -> apply,
+    restart_required -> set restart_pending, deferred if not quiet).
+    This endpoint just lands the bytes on disk and audits the upload.
+    """
+    if BUILD is None:
+        raise HTTPException(status_code=503, detail="build_config not loaded")
+    body_bytes = await request.body()
+    body = body_bytes.decode("utf-8", errors="replace")
+    try:
+        import build_config as _bc
+        candidate = _load_body_for_validation(body)
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)})
+    if candidate.unit_id != BUILD.unit_id:
+        return JSONResponse({
+            "ok": False,
+            "error": (
+                f"unit_id mismatch: candidate={candidate.unit_id!r} "
+                f"running={BUILD.unit_id!r}"
+            ),
+        })
+    diff = _bc.diff_reload_classes(BUILD, candidate)
+    if diff.firmware_required:
+        return JSONResponse({
+            "ok": False,
+            "error": (
+                "firmware_required change refused via web admin "
+                f"(leaves: {', '.join(diff.changed)}); re-flash via bench"
+            ),
+            "worst_reload_class": "firmware_required",
+            "changed_leaves": list(diff.changed),
+        })
+    # Atomic write -- delegate to installer_daemon for byte-identity
+    # with the X8-side path.
+    try:
+        import installer_daemon as _id
+        _id._atomic_write(BUILD.source_path, body)
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": f"write failed: {exc}"})
+    al = _get_audit_log()
+    if al is not None:
+        try:
+            al.record(
+                "config_upload",
+                component="web_ui",
+                unit_id=candidate.unit_id,
+                config_sha256=candidate.config_sha256,
+                worst_reload_class=diff.worst,
+                changed_leaves=list(diff.changed),
+            )
+        except Exception:  # pragma: no cover
+            pass
+    return JSONResponse({
+        "ok": True,
+        "sha256": candidate.config_sha256,
+        "unit_id": candidate.unit_id,
+        "schema_version": candidate.schema_version,
+        "worst_reload_class": diff.worst,
+        "changed_leaves": list(diff.changed),
+    })
 
 
 @app.post("/api/camera/select")
