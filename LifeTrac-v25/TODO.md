@@ -27,11 +27,175 @@ tags. **All work tracked there:**
 
 ➡️ **[AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md)**
 
-**Implementation status (2026-04-28, through Round 17):**
+**Test inventory & per-IP traceability:** the canonical index of every
+SIL test, every Arduino compile gate, every HIL bench item, and which
+IP each one verifies lives in
+➡️ **[MASTER_TEST_PROGRAM.md](MASTER_TEST_PROGRAM.md)** —
+update it in the same PR as any test/code change (see §7 of that file
+for the protocol).
+
+**Implementation status (2026-04-29, through Round 26):**
 [`AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md`](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md)
 — every plan item achievable without bench hardware is now landed
-(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). 200 base_station
-tests pass. **Round 17** flips the last best-effort Arduino compile
+(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). 329 base_station
+tests pass, and **every "—" cell with a natural SIL surface in the
+[MASTER_TEST_PROGRAM.md](MASTER_TEST_PROGRAM.md) §5 IP-traceability
+table is now closed.** **Round 26** lands the Wave-4 HIL harness
+toolchain under
+[`DESIGN-CONTROLLER/hil/`](DESIGN-CONTROLLER/hil/): one PowerShell
+harness skeleton per W4-XX gate (10 files) that wraps each
+[HIL_RUNBOOK.md](DESIGN-CONTROLLER/HIL_RUNBOOK.md) procedure with
+the §0 setup checklist, the per-gate prompts, the auto pass/fail
+flip on threshold violation, and a uniform JSONL result-line
+writer; a shared
+[`_common.ps1`](DESIGN-CONTROLLER/hil/_common.ps1) helper exposing
+`Write-GateHeader` / `Assert-Section0-Ready` / `Write-HilResult`
+/ `New-RunId`; a [`results_schema.json`](DESIGN-CONTROLLER/hil/results_schema.json)
+JSON Schema that locks the JSONL contract; and a
+[`dispatch.ps1`](DESIGN-CONTROLLER/hil/dispatch.ps1) that reads
+every `bench-evidence/W4-XX/results.jsonl`, prints a
+status-table (`PASS/Target` per gate), and recommends the next
+gate to run. The whole bundle is gated by the new
+[`base_station/tests/test_hil_harness_completeness_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_hil_harness_completeness_sil.py)
+(13 tests, 4 classes HC_A/HC_B/HC_C/HC_D) which pins file
+existence, harness contract (dot-source `_common`, mandatory
+`-Operator`, `Write-GateHeader` + `Assert-Section0-Ready` +
+`Write-HilResult` + HIL_RUNBOOK back-reference), schema invariants
+(W4-01..W4-10 gate-id pattern, PASS/FAIL/SKIP/ABORT enum, 5-key
+firmware-SHA bundle), and dispatcher coverage (every gate has a
+positive `Target`, no orphans either way). Day-1 with hardware is
+now "edit three COM ports in `_common.ps1`, run `pwsh
+./dispatch.ps1`, run the recommended harness" rather than "write
+the harness from scratch." **Round 25** lands the IP-201 MQTT
+retry/backoff fake-clock SIL
+[`base_station/tests/test_mqtt_retry_backoff_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_mqtt_retry_backoff_sil.py)
+(13 tests across 4 classes). The test reloads `web_ui` per-test with
+`paho.mqtt.client.Client` stubbed so the module-import-time
+`_connect_mqtt_with_retry()` call succeeds, then patches
+`web_ui.mqtt_client.connect` with a scripted side-effect sequence
+and replaces `web_ui.time.monotonic` / `web_ui.time.sleep` with a
+`_FakeClock` that advances only on `sleep()`. This makes the
+entire retry contract deterministic: env-var (`LIFETRAC_MQTT_HOST`)
+honoured with `localhost` default; first-try success path observes
+zero sleeps; one-retry-then-success observes exactly `[0.5]`; full
+six-failure schedule observes `[0.5, 1.0, 2.0, 4.0, 5.0, 5.0]`
+(geometric doubling, cap at 5.0); deadline path raises the
+underlying exception verbatim once monotonic time crosses
+`+30.0` s; late-success-near-deadline does NOT raise spuriously;
+the deadline uses `time.monotonic` (NOT wall-clock `time.time`,
+which can jump backwards under boot-time NTP slew). A source-grep
+tripwire pins the 30 s deadline literal, the 0.5 s initial
+backoff, the `min(backoff * 2, 5.0)` cap, the env-var lookup, and
+the `(OSError, ConnectionError)` exception filter against future
+refactors. **Round 24** lands the IP-102 nonce-seq thread-through SIL
+[`base_station/tests/test_nonce_seq_threadthrough_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_nonce_seq_threadthrough_sil.py)
+(13 tests across 4 classes). The test pins the bridge invariant that
+every `_on_mqtt_message` arm reserves exactly one seq via
+`_reserve_tx_seq()`, stamps it into the cleartext header (via
+`_restamp_control` for the `cmd/control` arm or `pack_command(seq, ...)`
+for `cmd/estop` / `cmd/camera_select` / `cmd/req_keyframe`), and
+threads that *same* seq into `_tx(..., nonce_seq=seq)` so the GCM
+nonce bytes (`build_nonce` offsets 1..3) match the cleartext header
+seq bytes (`pt[3:5]`) byte-for-byte. The acceptance criterion from
+the IP-102 spec ("100 control messages — AEAD nonce seq == cleartext
+header seq for every frame; no replay-window false-rejects") is
+driven verbatim. Negative tests confirm malformed payloads and
+invalid camera-id values are rejected BEFORE `_reserve_tx_seq` so
+garbage on the LAN side cannot accelerate `NonceStore` wear or
+advance the persistent counter. A cross-arm interleave test pins
+that all four arms share ONE counter (so two arms cannot reserve
+the same value), and a 16-bit wrap test pins `tx_seq` masking so
+the GCM nonce's 2-byte seq slot never desynchronises from the
+cleartext header at wrap-around. A source-grep tripwire asserts
+every `self._tx(` call inside `_on_mqtt_message` carries a
+`nonce_seq=` keyword — the original IP-102 bug surface.
+**Round 23** lands the Wave-3 polish constants SIL
+[`base_station/tests/test_protocol_constants_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_protocol_constants_sil.py)
+(12 tests across three IPs): IP-306 pins
+`lora_proto.TELEM_MAX_PAYLOAD == 118` against the C-side
+`TelemetryFrame.payload[120]` storage and the `payload_len = 0..118`
+header comment so future buffer drift trips loudly; IP-303 pins
+`REG_AUX_OUTPUTS = 0x0003` on both the Opta slave (`#define`,
+`AUX_OUTPUTS_VALID_MASK = 0x0007`, and a `case REG_AUX_OUTPUTS:`
+write-handler arm that masks reserved bits so a typo'd bitfield
+cannot energise the valve-manifold SSR channels) and on the M7
+Modbus master enum so the slot can never become orphaned;
+IP-301 lands the one-line `s_btn_change_ms = millis();` anchor
+at the end of `handheld_mkr.ino` `setup()` (after `Serial.begin` /
+`pinMode` / `radio.begin` / OLED init) so the very first
+`read_buttons()` call after boot can never satisfy
+`(now - s_btn_change_ms) >= DEBOUNCE_MS` against the
+uninitialised-zero default and commit a spurious debounced state.
+**Round 22** lands the last two HIL-companion SILs:
+W4-08 (camera back-channel keyframe round-trip / IP-103, IP-104)
+via
+[`base_station/tests/test_keyframe_round_trip_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_keyframe_round_trip_sil.py)
+(17 tests) and W4-10 (fleet-key provisioning sanity / IP-008) via
+[`base_station/tests/test_fleet_key_provisioning_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_fleet_key_provisioning_sil.py)
+(24 tests). The keyframe SIL exercises the `/cmd/req_keyframe` →
+`pack_command(seq, CMD_REQ_KEYFRAME)` translation, the on-air
+encrypt + KISS encode + KISS decode + decrypt + parse round-trip
+(including 0xC0 escape-path coverage), the M7 `send_cmd_to_x8()`
+`[X8_CMD_TOPIC, opcode]` framing → KISS UART → `dispatch_back_channel`
+keyframe-event firing, and a pure-Python time-on-air model that
+proves the LADDER[0] (SF7/BW250) airtime fits the < 100 ms LoRa
+leg with margin and the modeled end-to-end (REQ TOA + worst-case
+in-flight CTRL TOA + UART KISS @ 115200 + encode-loop wake-up)
+fits the < 200 ms HIL acceptance budget. The fleet-key SIL parses
+both `handheld_mkr.ino` and `tractor_h7.ino` to assert the
+`#ifndef LIFETRAC_ALLOW_UNCONFIGURED_KEY` guard exists in `setup()`,
+calls `fleet_key_is_zero()`, halts in a forever-loop with
+`delay()` inside, renders the canonical handheld OLED text
+`"FLEET KEY NOT\nPROVISIONED\nHALT (IP-008)"` byte-for-byte, and
+writes `LIFETRAC_ESTOP_MAGIC` (= 0xA5A5A5A5) to
+`SHARED->estop_request` on the tractor side so the M4 watchdog
+covered by `test_m4_safety_sil.py` drops the safety relay; the
+Python half drives `lora_bridge._load_fleet_key()` through every
+failure mode (missing env, all-zero hex, all-zero file, wrong
+length, invalid hex, unreadable file) and verifies the
+`LIFETRAC_ALLOW_UNCONFIGURED_KEY=1` bypass lives ONLY in the
+module-level try/except, not inside the loader, so explicit
+production calls always fail-closed. **Round 21** added
+[`MASTER_TEST_PROGRAM.md`](MASTER_TEST_PROGRAM.md), the
+canonical index of all SIL tests, compile gates, and HIL items
+with per-IP traceability. **Round 20** lands the W4-07 (boot-PHY first-frame
+decode / IP-006) SIL via
+[`base_station/tests/test_boot_phy_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_boot_phy_sil.py)
+(11 tests). The test parses the three relevant firmware sources
+(`handheld_mkr.ino`, `tractor_h7.ino`, `tractor_x8/params_service.py`)
+and asserts the `LADDER[3]` tables on the two LoRa nodes are
+byte-identical, every `radio.begin(...)` references `LADDER[0]`
+symbolically (regression-trapping numeric-literal drift), `LADDER[0]`
+matches DECISIONS.md D-A2 (SF7/BW250/CR4-5/bw_code=1), the sync word
+is `0x12`, and the Pi-side `control_phy` string agrees. **Round 19** ports the M7 adaptive-SF ladder state
+machine (`try_step_ladder()`, `poll_link_ladder()`, the HB ingress
+hook, and `apply_phy_rung()`) from
+[`firmware/tractor_h7/tractor_h7.ino`](DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino)
+to pure-Python in
+[`base_station/tests/test_link_tune_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_link_tune_sil.py)
+(16 tests). W4-02 (link-tune walk-down) moves from greenfield bench
+pass to verification pass against a documented model: the SF7→SF8→SF9
+bad-window walk-down (R-8 hysteresis: 3 bad of 5 s windows), the
+SF9→SF8→SF7 good-window walk-back (6 good of 5 s windows), SF9 +
+SF7 saturation gates, twice-back-to-back announce invariant
+(one TX at OLD PHY, one TX at NEW PHY, same target & reason byte),
+500 ms revert deadline with commit / revert / edge-case coverage,
+stale-active-source pessimism rule, and the verification-window
+gate that prevents the in-flight tune window from being
+double-counted as bad. Only the < 1% packet-loss metric still
+needs an HIL bench RF attenuator. **Round 18** ports `step_axis_ramp()` and the four-axis
+`apply_control` arbitration shape from
+[`firmware/tractor_h7/tractor_h7.ino`](DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino)
+to pure-Python in
+[`base_station/tests/test_axis_ramp_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_axis_ramp_sil.py)
+(10 tests). W4-05 (proportional valve ramp-out) and W4-06 (mixed-mode
+skip) move from greenfield bench passes to verification passes
+against a documented model: the track 2/1/0.5 s ladder, arm 1/0.5/0.25 s
+ladder, linear-interpolation midpoint, coil-stays-engaged-through-ramp
+invariant, flow-setpoint monotonicity, and the four mixed-mode skip
+variants (including the subtle one where `other_active` is computed
+from *raw* inputs so a stale ramping sibling can't block a fresh
+release's ramp/skip decision) are all now CI-gated. **Round 17** flips the last best-effort Arduino compile
 gate (`firmware-compile-tractor-h7`) to blocking and adds a parallel
 `firmware-compile-tractor-m4` job. The M4 watchdog firmware was
 moved out of the M7 sketch folder into its own
@@ -178,6 +342,144 @@ Source reviews:
 Wave 0 (IP-001 … IP-008) is the BLOCKER set — nothing else is testable
 until those land. Wave 4 lists the gates that must pass before any wet
 hydraulic test.
+
+## Open initiative — Build-configuration / hardware-variant editor (BC-XX)
+
+> **Status:** planning only — not yet scheduled. Captured 2026-04-29
+> after the user observed that not every builder will procure every
+> BOM line item and the software must not break when an optional
+> sensor / camera / IMU / GPS / second-camera is absent or differently
+> spec'd. Owner: TBD. Target start: after Wave-4 HIL gates are CLOSED.
+
+### The problem
+
+LifeTrac v25 firmware + base-station + web UI today assume the
+canonical [`HARDWARE_BOM.md`](DESIGN-CONTROLLER/HARDWARE_BOM.md) build:
+one Coral X8 camera, one IMU on the M7 I²C bus, one GPS on the X8,
+the documented mushroom-button E-stop wiring, the four-track / four-arm
+hydraulic axis count from
+[`MASTER_TEST_PROGRAM.md`](MASTER_TEST_PROGRAM.md) §3. A builder who
+cannot source — or chooses to omit — any of those parts today has
+three bad options: ship anyway and let the code log errors / crash;
+fork the firmware; or hand-edit constants. None of those scale to a
+fleet. Specific failure modes already lurking in the codebase:
+
+* `web_ui` rendering a "second camera" tile that always says
+  `no signal` because the second X8 is absent.
+* M7 logging Modbus failures forever for a non-existent Opta input
+  (different E-stop topology that doesn't use the AUX bank).
+* IMU-derived telemetry fields (`pitch_deg`, `roll_deg`) emitted as
+  `null` and crashing chart code that assumed numbers.
+* GPS-stamped audit log lines emitting `lat=0.000, lon=0.000` and
+  poisoning any post-run analysis.
+* W4-XX HIL gates failing because a builder omitted the sensor under
+  test even though their build doesn't need that gate.
+
+### Goals
+
+1. **Fail-soft on absent parts.** Every optional capability must
+   declare itself optional in code; UI and logging must tolerate
+   `feature_disabled` without raising or rendering broken widgets.
+2. **Per-build configuration as data, not code.** Each fleet unit
+   has one canonical config file (`config/build.<unit_id>.toml`)
+   that selects which BOM-optional features are present and pins
+   their parameters (axis count, valve flow ratings, IMU/GPS port,
+   camera count, E-stop topology id, …).
+3. **Web UI editor.** Operator can view + edit the active config
+   from the base-station web UI, with form-level validation against
+   a JSON Schema, audit-logged save + reboot, and a one-click
+   "export this config" for fleet onboarding.
+4. **Compile-time + run-time gating.** Firmware respects the same
+   config for `#define`-style feature flags via a generated
+   `lifetrac_build_config.h`; bridge / UI honour it at run time.
+5. **No regression in existing SIL coverage.** Existing 329 SIL
+   tests must continue passing under the *default* (canonical-BOM)
+   config; new SIL tests gate the variant matrix.
+
+### Proposed work breakdown (BC-01 … BC-09)
+
+* **BC-01 — Capability inventory.** Walk the BOM, the firmware
+  sketches, [`web_ui.py`](DESIGN-CONTROLLER/base_station/web_ui.py),
+  the [`lora_bridge`](DESIGN-CONTROLLER/base_station/), and
+  [`MASTER_TEST_PROGRAM.md`](MASTER_TEST_PROGRAM.md) §3 to enumerate
+  every feature that is *physically optional* or *parameterised*.
+  Output: a markdown table of capability id → default → spec range
+  → consumer modules. This is the source of truth for the schema.
+* **BC-02 — Config schema (JSON Schema + TOML loader).** Define
+  `config/schema/build_config.schema.json` with one property per
+  capability and per-capability `enum` / `min` / `max` / `default`.
+  Land a Python loader
+  (`base_station/build_config.py::load(unit_id) -> BuildConfig`)
+  with strict-mode validation and a documented fallback chain
+  (env override → `config/build.<unit_id>.toml` → `config/build.default.toml`).
+* **BC-03 — Firmware codegen.** A pre-build script consumes the
+  active TOML and emits
+  `firmware/common/lifetrac_build_config.h` with the
+  `#define LIFETRAC_HAS_IMU 1` style flags + the parameter literals
+  (`LIFETRAC_AXIS_COUNT`, `LIFETRAC_CAMERA_COUNT`, …). Sketch code
+  switches from hard-coded to `#if LIFETRAC_HAS_*` guards. Adds a
+  CI job that builds the canonical-BOM config and three
+  representative reduced-BOM configs to the existing five compile
+  gates.
+* **BC-04 — Base-station + web_ui plumbing.** Replace the
+  hard-coded `CAMERA_COUNT = 1` / `HAS_IMU = True` constants with
+  attribute reads off the loaded `BuildConfig`. UI templates render
+  optional tiles only when the corresponding capability is enabled;
+  MQTT topics that depend on absent hardware are not subscribed.
+  Audit-log records the active `config_sha256` on every boot.
+* **BC-05 — Web UI editor page.** New `/config` admin route
+  (PIN-gated, same as the existing admin surface): form generated
+  from the JSON Schema, client-side validation, save → write
+  `config/build.<unit_id>.toml.next` → atomic rename → audit-log →
+  prompt operator for restart. Read-only "diff against canonical"
+  view to make fleet-onboarding obvious.
+* **BC-06 — Per-build HIL harness gating.** Extend the Round-26
+  [`hil/dispatch.ps1`](DESIGN-CONTROLLER/hil/dispatch.ps1) to read
+  the active build config and report gates that don't apply as
+  `N/A` rather than `NOT-STARTED`. Each `w4-XX_*.ps1` harness
+  consults the config in `Assert-Section0-Ready` and `SKIP`s if
+  the capability under test is disabled (e.g. W4-08 SKIPs when
+  `camera_count == 0`).
+* **BC-07 — SIL variant matrix.** New
+  `base_station/tests/test_build_config_variants_sil.py` that
+  loads the schema, instantiates ≥ 4 representative configs
+  (canonical, no-camera, no-IMU/GPS, single-axis), and asserts
+  the bridge + UI startup paths run clean (no exceptions, no
+  subscription to disabled topics, no broken template renders).
+  Plus a source-grep tripwire that `web_ui.py` references no
+  optional capability without a `BuildConfig.has_*` guard.
+* **BC-08 — Migration + onboarding doc.** New
+  `DESIGN-CONTROLLER/BUILD_CONFIG.md` that explains the schema,
+  the editor, the codegen, and the supported variants; existing
+  builders create a `build.<unit_id>.toml` once and never edit
+  firmware again.
+* **BC-09 — BOM cross-reference.** Update
+  [`HARDWARE_BOM.md`](DESIGN-CONTROLLER/HARDWARE_BOM.md) so each
+  optional row lists its BC capability id, and a SIL test asserts
+  every `optional` BOM row is referenced by exactly one capability
+  in the schema (no orphans either way).
+
+### Out of scope (for now)
+
+* OTA delivery of build configs across the fleet (would need
+  signing + rollback; defer).
+* Per-axis hydraulic flow auto-calibration from manifold response
+  (separate initiative; the config only carries operator-supplied
+  rated flows).
+* Fundamentally different control topologies (e.g. CAN bus vs
+  RS-485). The schema is for *presence/absence and parameters*,
+  not for swapping the control fabric.
+
+### Acceptance criteria
+
+* `pwsh ./dispatch.ps1` shows correct PASS / N/A / NOT-STARTED for
+  three distinct test fleets (canonical, no-camera, single-axis).
+* All 329 + new BC SIL tests pass under the canonical config.
+* Web UI `/config` editor round-trips a config edit → reboot →
+  audit-logged `config_sha256` change with no firmware re-flash
+  needed for run-time-only flags.
+* No firmware sketch contains a hard-coded "is this hardware
+  present" check that the schema doesn't also gate.
 
 ## Current sprint status — DESIGN-CONTROLLER LoRa stack (2026-04-27)
 
@@ -503,6 +805,16 @@ Execute from the runbook; the bullets below are the index.
   `CMD_LINK_TUNE` with **< 1% packet loss** during each transition.
   Verify `try_step_ladder()` revert deadline (500 ms) fires correctly
   on a synthetic missing-HB.
+  *SIL coverage:* [`base_station/tests/test_link_tune_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_link_tune_sil.py)
+  (Round 19) ports `try_step_ladder()`, `poll_link_ladder()`, the HB
+  ingress hook, and `apply_phy_rung()` from
+  [`firmware/tractor_h7/tractor_h7.ino`](DESIGN-CONTROLLER/firmware/tractor_h7/tractor_h7.ino)
+  to pure-Python; 16 tests cover TL-A through TL-I including the
+  3-bad-window walk-down ladder, 6-good-window walk-back ladder, SF9
+  saturation gate, SF7 saturation gate, twice-back-to-back announce
+  invariant, 500 ms revert deadline (commit/revert/edge cases), and
+  the stale-active-source pessimism rule. The < 1% packet-loss
+  measurement is the only piece that still needs HIL bench time.
 - [ ] **W4-03 M7↔M4 watchdog trip.** Halt the M7 with a debugger
   breakpoint or a deliberate `while(1)` injected via a debug build;
   verify the M4 trips the PSR within **200 ms** of the last
@@ -524,12 +836,40 @@ Execute from the runbook; the bullets below are the index.
   `REG_FLOW_SP_*` ramps from 10000 mV to 0 over **2 s** (track ladder)
   on the A0602 output, valve coil stays energized through the ramp,
   drops at t=2 s. Repeat for arm axes (1 s ramp).
+  *SIL coverage:* [`base_station/tests/test_axis_ramp_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_axis_ramp_sil.py)
+  (Round 18) ports `step_axis_ramp()` + the `apply_control()`
+  arbitration to pure Python. TR-A pins the 2 s deadline at full speed,
+  TR-B the linear-interpolation midpoint, TR-C/D both ladders
+  (track 2/1/0.5 s, arm 1/0.5/0.25 s), TR-E the coil-stays-engaged
+  invariant during ramp, TR-F flow-setpoint monotonicity. Bench job is
+  now confirm-only.
 - [ ] **W4-06 Mixed-mode skip.** Drive both axes; release one; verify
   released axis stops *immediately* (no ramp) because sibling is
   active. Critical for coordinated dig→drive transitions.
+  *SIL coverage:* same suite as W4-05. TR-G two-axis skip; TR-H
+  orientation-agnostic across all four sibling combinations; TR-I
+  last-axis release falls back to ramp; TR-J pins the
+  `apply_control` comment that `other_active` is computed from *raw*
+  inputs so a stale ramping sibling can't block a fresh release's
+  skip-vs-ramp decision.
 - [ ] **W4-07 Boot-PHY first-frame decode (IP-006 verification).**
   Cold-boot both ends; first encrypted frame decodes on the receiver
   with no `bad_header` events in the audit log.
+  *SIL coverage:* [`base_station/tests/test_boot_phy_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_boot_phy_sil.py)
+  (Round 20) parses `firmware/handheld_mkr/handheld_mkr.ino`,
+  `firmware/tractor_h7/tractor_h7.ino`, and
+  `firmware/tractor_x8/params_service.py` and asserts: BP-A both
+  `LADDER[3]` tables are byte-identical (rung mapping for
+  `CMD_LINK_TUNE`); BP-A2 `LADDER[0]` matches DECISIONS.md D-A2
+  (SF7/BW250/CR4-5/bw_code=1); BP-A3 SF strictly increases down the
+  ladder; BP-A4 each rung is uniquely identifiable; BP-B/B2 every
+  `radio.begin(...)` references `LADDER[0].sf` / `.bw_khz` / `.cr_den`
+  symbolically + sync word `0x12`; BP-B3 nobody slipped a numeric SF /
+  BW / CR literal back in; BP-C the Pi-side
+  `DEFAULT_PARAMS['link']['control_phy']` agrees with the canonical
+  `SF7_BW250` string; BP-D parser self-tests so the regex extractor
+  catches mis-formats. The on-air no-`bad_header` confirmation is the
+  only piece that still needs HIL bench time.
 - [ ] **W4-08 Camera back-channel round-trip (IP-104 Round-4 follow-on).**
   Operator presses "Force keyframe" on web UI → `CMD_REQ_KEYFRAME`
   over LoRa → M7 forwards on Serial1 → `camera_service.py` emits

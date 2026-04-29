@@ -439,6 +439,14 @@ void setup() {
         g_oled.print(F("boot OK"));
         g_oled.display();
     }
+
+    // IP-301: anchor the button-debounce reference to a real timestamp so
+    // the very first read_buttons() call after boot can never satisfy
+    // ``(now - s_btn_change_ms) >= DEBOUNCE_MS`` against the
+    // uninitialised-zero default. Without this, a noisy raw==0 read on
+    // the first iteration would commit ``s_btn_state = 0`` immediately
+    // (harmless today but a footgun for any future non-zero idle state).
+    s_btn_change_ms = millis();
 }
 
 void loop() {
