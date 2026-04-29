@@ -237,3 +237,42 @@ Marked the stale `IP-202 / IP-203 / IP-204` Round-1 deferred entries as supersed
 Round 7 closes the last firmware-side plan item that has a clear specification.
 Remaining open items: bench-only Wave-4 gates (W4-01ï¿½W4-10 in [`TODO.md`](../TODO.md)) and the `arduino-cli` CI gate flip from best-effort to blocking, both of which require real CI / hardware feedback.
 
+
+## Round 8 — 2026-04-28 — Pure-software extensions: pack_control fuzz + M4 safety SIL
+
+Two no-hardware additions; both expand verification coverage so HIL bench time can focus on physical interactions.
+
+### IP-108 symmetric: `pack_control` property/fuzz
+[`base_station/tests/test_control_frame_fuzz.py`](../DESIGN-CONTROLLER/base_station/tests/test_control_frame_fuzz.py) — 7 tests, stdlib only. Mirrors the IP-108 command-frame fuzz on the *control* hot path (20 Hz from handheld). Sweeps source × seq × stick × button/flag/hb permutations and asserts:
+
+- Frame is always exactly `CTRL_FRAME_LEN` (16) bytes.
+- `parse_header` recovers `version=PROTO_VERSION`, `frame_type=FT_CONTROL`, `source_id`, and `seq & 0xFFFF`.
+- CRC-16/CCITT lives at the trailing 2 bytes (offset 14); regression catch if anyone reorders the body struct.
+- Stick channels clip to signed-int8 `[-127, 127]` rather than wrapping mod 256 — the safety invariant: a rail-to-rail joystick must never alias to the opposite direction.
+- Wide `buttons` / `flags` / `hb` values get masked, not allowed to spill into neighbouring fields.
+- Single-bit flips anywhere in the body are caught by CRC.
+- Default `source_id` is `SRC_BASE` (regression: bridge ? M7 routing depends on this).
+
+### M4 safety supervisor SIL
+[`base_station/tests/test_m4_safety_sil.py`](../DESIGN-CONTROLLER/base_station/tests/test_m4_safety_sil.py) — 9 tests, stdlib only. Pure-Python `M4Supervisor` class mirrors `firmware/tractor_h7/tractor_m4.cpp` 1:1: `SharedState` with seqlock counter, `boot()` that refuses to arm on version mismatch or zero `alive_tick_ms`, `tick(now_ms)` that runs the same three liveness checks (alive_tick stale > 200 ms, loop_counter stuck > 200 ms, `estop_request == LIFETRAC_ESTOP_MAGIC`) under the same 4-retry seqlock pattern. Trip is latched.
+
+Properties asserted:
+
+- **TR-A** E-stop latency from M7 setting MAGIC to safety_alive low is < 100 ms (one M4 tick = 20 ms; budget = 100 ms per W4-01).
+- **TR-B** Silent M7 trips between WATCHDOG_MS and WATCHDOG_MS + 1 tick.
+- **TR-C** Trip is sticky — M7 recovery does NOT re-arm (matches design comment in tractor_m4.cpp).
+- **TR-D** Healthy M7 over a 9-second simulated run produces zero trips.
+- **TR-E** Non-magic `estop_request` values (0, 0x12345678, MAGIC ± 1, ~MAGIC) do NOT trip — protects against SRAM noise per IP-106.
+- **TR-F** Persistent odd-locked seq trips with `seqlock_torn`; momentarily-odd writer is recovered without trip.
+- **TR-G** Loop-counter witness catches "alive_tick_ms keeps reading fresh because the M7 keeps stamping the same value but never advanced loop_counter."
+- **TR-H** Refuses to arm on `version != LIFETRAC_SHARED_VERSION`; remains unarmed forever even if MAGIC is later written.
+
+### Effect on HIL gate set
+
+- **W4-01** (E-stop latch < 100 ms) is now a verification pass against TR-A, not a greenfield design pass. Bench captures only need to confirm the model holds on real silicon timing.
+- **W4-03** (M7?M4 watchdog trip) is verified by TR-B / TR-G in software. Bench focus shifts to "did the PSR relay actually de-energise" rather than timing math.
+
+### Tests after Round 8
+`Ran 147 tests in 0.538s` `OK` (was 131; +7 control fuzz, +9 M4 SIL).
+
+No firmware changes this round — both additions are pure-Python, zero new dependencies.

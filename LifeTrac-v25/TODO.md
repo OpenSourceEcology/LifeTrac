@@ -27,19 +27,23 @@ tags. **All work tracked there:**
 
 ➡️ **[AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md)**
 
-**Implementation status (2026-04-28, through Round 7):**
+**Implementation status (2026-04-28, through Round 8):**
 [`AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md`](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md)
 — every plan item achievable without bench hardware is now landed
-(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). 131 base_station
-tests pass. **Round 7** ported the IP-107 SIL queue into M7 firmware:
-`emit_topic()` / `send_link_tune()` now enqueue into a 4-deep priority
-queue; `tx_pump()` runs every `loop()` iteration via
-`startTransmit()` + estimated-TOA polling. The headline IP-107 invariant
-— M7 never blocks against the M4 watchdog — is now structural in
-`tractor_h7.ino` instead of a timing-dependent mitigation. CI also runs
-best-effort `arduino-cli compile` for handheld_mkr / tractor_opta /
-tractor_h7. Remaining work is the HIL gate set below — bench validation
-of W4-01…W4-10 and the CI compile-gate flip from best-effort to blocking.
+(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). 147 base_station
+tests pass. **Round 8** added (a) a property/fuzz suite for
+`pack_control` (the symmetric counterpart to the IP-108 command-frame
+fuzz, locking down length, header invariants, CRC offset, signed-int8
+stick clipping with no sign-aliasing, byte-mask containment for
+buttons/flags/hb, seq mod-16 wrap, and single-bit-flip CRC catch), and
+(b) a pure-Python SIL model of the M4 safety supervisor that mirrors
+`tractor_m4.cpp` 1:1 (seqlock retry, `LIFETRAC_M4_WATCHDOG_MS`,
+`LIFETRAC_ESTOP_MAGIC` gating, latched trip). The SIL turns the W4-01
+E-stop-latency and W4-03 watchdog-trip HIL gates into verification
+passes against a documented model rather than greenfield design passes
+on the bench. Remaining work is the HIL gate set below — bench
+validation of W4-01…W4-10 and the CI compile-gate flip from
+best-effort to blocking.
 
 Source reviews:
 
