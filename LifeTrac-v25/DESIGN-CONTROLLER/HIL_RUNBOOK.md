@@ -1,7 +1,12 @@
-# HIL Runbook — Wave 4 Gates W4-01 … W4-10
+# HIL Runbook — Wave 4 Gates W4-pre, W4-00 … W4-10
 
-**Scope.** Step-by-step bench procedures for the ten Wave-4 hardware-in-the-loop
-gates currently open in [`TODO.md`](TODO.md). Each section is structured the
+**Scope.** Step-by-step bench procedures for the twelve Wave-4 hardware-in-the-loop
+gates currently open in [`TODO.md`](TODO.md). **W4-pre (board bring-up
+sanity, no RF) and W4-00 (LoRa stack dual-Portenta bench) are the new
+front gates** added in Round 53 — they isolate first board health and
+then the radio stack on real silicon, *before* any of the
+safety-critical W4-01..W4-10 gates that assume both. Each section is
+structured the
 same way so the operator can execute without re-deriving the plan and so the
 artifacts collected become the test-evidence package for the §A CI compile-gate
 flip and the SAFETY_CASE update.
@@ -67,6 +72,268 @@ Stop immediately and document if any of the following occur:
   this is itself a finding — capture audit log, do not retry until root-caused).
 - The audit log contains an `unexpected_panic` or `crc_mismatch_burst` event
   unrelated to the test stimulus.
+
+---
+
+## W4-pre — Board bring-up sanity (no RF)
+
+**Gate.** Prove each Portenta + Max Carrier is electrically and
+firmware-bootable healthy *before* the SX1276 PA is keyed. This is a
+pure board-level smoke test — USB enumeration, rails, blink-equivalent,
+dual-core handshake, firmware-boots-without-radio. Catches dead
+boards, bad solder, brick states, USB-CDC driver issues, and
+dual-core SRAM4 wiring problems while they are still cheap to debug
+(no RF in the picture, no antennas attached, no PA risk).
+
+**Antennas are NOT installed for this gate.** SX1276 PA stays cold.
+
+### Hardware required
+
+- [ ] **2× Portenta H7 (or X8)**.
+- [ ] **2× Portenta Max Carrier (ABX00043)**.
+- [ ] **2× USB-C cable** to the workstation.
+- [ ] **Multimeter** (DMM) capable of reading 3.3 V and 5 V to ±1 %.
+- [ ] *(Optional)* logic analyzer or scope to confirm the dual-core
+      M4↔M7 SRAM4 link if sub-gate (d) is flaky.
+
+**Explicitly NOT needed:** SMA antennas, dummy loads, Opta, valve
+coils, MKR handheld, 12 V supply, oscilloscope (DMM is enough),
+MQTT broker, audit log capture.
+
+### Procedure (sub-gate (a) — USB-CDC enumeration)
+
+1. Plug both Portenta+Carrier stacks into the workstation.
+2. Confirm Windows Device Manager (or `ls /dev/ttyACM*` / `pmset -g
+   batt` on macOS / Linux) shows **two distinct** USB-CDC serial ports.
+3. Re-plug each stack 10×. Port name should remain stable per board
+   (Windows: same `COMn` if same physical USB port; Linux: same
+   `by-id` symlink).
+
+**Pass:** both boards enumerate every cycle, no "unknown device"
+entries, no driver-install prompts after the first plug.
+
+### Procedure (sub-gate (b) — blink + USB-Serial echo)
+
+1. Flash the stock Arduino `Blink.ino` to one Portenta. Confirm the
+   on-board user LED toggles at 1 Hz.
+2. Flash the stock `SerialEcho` (or any 115200 8N1 echo sketch).
+3. Open the Arduino IDE Serial Monitor (or VS Code Serial Monitor)
+   at 115200 8N1. Type 100 random bytes; confirm exact echo within
+   50 ms round-trip.
+4. Repeat both for the second board.
+
+**Pass:** blink visible on both boards; echo round-trip < 50 ms with
+zero corrupted bytes.
+
+### Procedure (sub-gate (c) — rails under no-RF load)
+
+1. With one Portenta+Carrier stack idle (blink sketch running,
+   antenna *not* attached), measure on the Max Carrier:
+   - 3V3 test point → GND: should read 3.30 V ± 5 %.
+   - 5V0 test point → GND: should read 5.00 V ± 5 %.
+2. Repeat for the second stack.
+3. Record both readings in `bench-evidence/W4-pre/NOTES.md`.
+
+**Pass:** both rails on both stacks within ±5 %. Anything outside
+this range is a hardware fault — stop and investigate before
+powering the SiP.
+
+### Procedure (sub-gate (d) — M7↔M4 dual-core handshake)
+
+1. Flash the stock Arduino `PortentaDualCore` example to one
+   Portenta (this builds both the M7 and M4 sketches per the Round 17
+   two-folder convention).
+2. Open the M7 USB-CDC console at 115200.
+3. Confirm a counter from the M4 increments (visible in M7 print
+   output) for 60 s without gaps.
+4. Repeat for the second Portenta.
+
+**Pass:** both boards print a continuous M4 counter for 60 s, zero
+stalls. Any stall indicates SRAM4 / inter-core wiring is broken on
+that board — W4-03 (M7↔M4 watchdog) cannot pass until this does.
+
+### Procedure (sub-gate (e) — firmware boots without radio)
+
+1. Build [`firmware/tractor_h7/`](firmware/tractor_h7/) with the
+   radio disabled — either:
+   - compile flag `-DLIFETRAC_RADIO_DISABLE` if the firmware exposes
+     one, OR
+   - temporarily comment out the `radio.begin()` call and rebuild,
+     OR
+   - build the firmware as-is but **leave the antenna disconnected**
+     and accept that `radio.begin()` may fail-loud on the first cycle
+     — the test is whether the rest of the firmware reaches
+     `loop()` and emits its heartbeat log.
+2. Flash to one Portenta. Open USB-CDC console at 115200.
+3. Press reset. Confirm the boot banner appears within 5 s and the
+   firmware reaches its periodic heartbeat / status log line.
+4. Let it run for 60 s. Confirm zero panics, no `unexpected_panic`
+   audit events, no watchdog reboots.
+5. Repeat for the second Portenta.
+
+**Pass:** both boards reach steady-state heartbeat within 5 s of
+reset and stay there for 60 s with no panics. This is the
+"firmware fundamentally works on this hardware" check before any
+LoRa air time is requested.
+
+### Capture & sign-off
+
+- Save Device Manager / `dmesg` enumeration output, scope/DMM rail
+  photos, and serial-console captures under `bench-evidence/W4-pre/`.
+- Per the §0.3 capture conventions: one paragraph in
+  `bench-evidence/W4-pre/NOTES.md` with operator, fw SHAs, ambient,
+  and rail readings.
+- Sign-off by initialing the table row in [§ Sign-off](#sign-off)
+  before W4-00 is attempted.
+
+### Why this gate exists
+
+Before Round 53 the HIL plan jumped straight to W4-00 (LoRa stack
+on real silicon), which assumes the boards themselves are healthy.
+A first-power *board* failure during W4-00 (a) would be ambiguous
+(bad SiP? bad antenna? bad firmware? bad USB? bad rail?). W4-pre
+isolates board health as a known-good before any RF is generated
+and before any safety-critical gate is exercised. It also ensures
+antennas are deliberately *not* attached during board first-power,
+which is the safest order of operations for the SX1276 PA.
+
+---
+
+## W4-00 — LoRa stack dual-Portenta bench
+
+**Gate.** Prove the full radio + framing + AES-GCM + replay-window
+stack on real SX1276 silicon at short range, with **both Max Carriers
+plugged into the same workstation** so the operator (or VS Code +
+GitHub Copilot) can read both sides of every exchange over USB-CDC.
+
+This gate runs *before* the §0.1 valve-coil bench is wired. It is
+intentionally **standalone** so first power-on of the LoRa stack can
+happen on the desk, not at the tractor crate. Every later W4-XX gate
+that exercises the radio assumes W4-00 (a)–(d) have already passed.
+
+### Hardware required (minimal — does NOT need the full §0.1 setup)
+
+- [ ] **2× Arduino Portenta H7 (or X8)**. Both should run the same
+      git SHA of [`firmware/tractor_h7/`](firmware/tractor_h7/) for
+      the radio-stack tests. (Phase (d) image-delivery sub-gate
+      additionally requires one X8 on the "tractor" side for the
+      Linux-side image pipeline; an H7-only pair can still complete
+      sub-gates (a)/(b)/(c).)
+- [ ] **2× Portenta Max Carrier (ABX00043)**. Hosts the Murata
+      CMWX1ZZABZ SiP (SX1276 inside) and the SMA jack.
+- [ ] **2× 915 MHz SMA whip antenna** — 1/4-wave or 3 dBi rubber-duck
+      (e.g. ANT-916-CW-RH or equivalent). **Keep the two antennas
+      separated by ≥ 30 cm to avoid front-end overload at +20 dBm
+      conducted, and do NOT TX into the air without an antenna or
+      50 Ω dummy load attached** (un-terminated PA into open SMA can
+      damage the Murata SiP).
+- [ ] **2× USB-C cable**, both plugged into the same workstation.
+      USB-C 5 V is sufficient to power both Max Carriers for this
+      gate; **no external 12 V supply is required**.
+- [ ] *(Optional, recommended for sub-gate (b) latency-vs-distance
+      sweeps)* 2× 50 Ω SMA dummy loads + a 30 dB SMA attenuator +
+      short SMA cable for *conducted* range testing. Removes antenna
+      orientation as a variable, gives repeatable RSSI numbers.
+
+**Explicitly NOT needed for W4-00:** Opta WiFi, valve coils / dummy
+bulbs, PSR safety relay, RS-485 cabling, oscilloscope, logic
+analyzer, MQTT broker, audit-log capture, the 12 V battery emulator,
+or the handheld MKR. Those all enter at W4-01 and beyond.
+
+### Software setup
+
+- [ ] Both carriers flashed with the firmware-compile-tractor-h7 build
+      from [`ARDUINO_CI.md`](ARDUINO_CI.md). One image acts as
+      "tractor" (full M7 + bridge stub), the other as "base"
+      (compile-time `LIFETRAC_ROLE=base` if the build supports it,
+      otherwise just runs the same M7 image with a different
+      `source_id` provisioned via [`tools/provision.py`](tools/provision.py)).
+- [ ] `lp_keys_secret.h` provisioned identically on both carriers
+      (same fleet key + key ID; different source IDs).
+- [ ] Two USB-CDC consoles open simultaneously in VS Code (`Ctrl+Shift+P`
+      → `Serial Monitor: Open`). Pin each to a side of the editor so
+      Copilot can read TX log on one and RX log on the other.
+- [ ] *(Sub-gate (d) only)* Tractor-side X8 has a USB UVC webcam
+      attached and the [`base_station/image_pipeline/`](base_station/image_pipeline/)
+      service running, configured for SSDV chunking per
+      [IMAGE_PIPELINE.md § Phase A](IMAGE_PIPELINE.md).
+
+### Procedure (sub-gate (a) — basic TX/RX at 1 m)
+
+1. Place both Max Carriers on the bench, antennas 30 cm apart,
+   pointing the same direction.
+2. From the "base" console, send a 1000-frame burst: each frame is a
+   ControlFrame at SF7 with a counter in the seq field. Capture the
+   "tractor" console's RX log to a file.
+3. Repeat at SF8 and SF9.
+4. Diff TX seq list against RX seq list; count missing.
+
+**Pass:** 1000-frame burst at each of SF7 / SF8 / SF9 with **0 lost
+frames** at 1 m. Any loss at this distance indicates a hardware
+fault, not link budget.
+
+### Procedure (sub-gate (b) — round-trip latency)
+
+1. From the base console, send a single ControlFrame, timestamp the
+   TX moment from `micros()` returned in the audit log.
+2. Tractor M7 echoes a Heartbeat reply within the firmware's
+   schedule slot.
+3. Base captures the RX timestamp; compute round-trip.
+4. 100 round-trips per SF (SF7 / SF8 / SF9). Compute p50 and p99.
+
+**Pass:** p50 within ±5 % of `lora_time_on_air_ms() * 2 + 30 ms`
+scheduler slop (model lives in [`base_station/lora_proto.py`](base_station/lora_proto.py)).
+p99 < p50 + 50 ms. Any wider tail flags an IRQ / scheduler bug.
+
+### Procedure (sub-gate (c) — payload size on air)
+
+1. Send one frame of every public type (ControlFrame, Heartbeat,
+   each TelemetryFrame topic, each command opcode listed in
+   [LORA_PROTOCOL.md](LORA_PROTOCOL.md)).
+2. From the radio's TX done callback, log the actual on-air length
+   (post-encryption + nonce + tag).
+3. Diff against the predicted length from
+   `encrypted_payload_len(cleartext_len)` in
+   [`base_station/lora_proto.py`](base_station/lora_proto.py).
+
+**Pass:** measured air-bytes within **±1 byte** of prediction across
+all four PHY profiles (control SF7/SF8/SF9, telemetry, image). Any
+larger gap means the C `pack_*` and Python mirror have drifted.
+
+### Procedure (sub-gate (d) — keyframe / SSDV image delivery)
+
+1. Tractor X8: capture one 256×192 JPEG keyframe from the UVC webcam
+   (~3–5 kB) via the image pipeline.
+2. SSDV-chunk it into ~250 B LoRa fragments per
+   [IMAGE_PIPELINE.md § Phase A](IMAGE_PIPELINE.md).
+3. Send the full chunk train over the image PHY profile.
+4. Base: reassemble via the SSDV reassembler; verify the resulting
+   JPEG decodes; verify the badge enum is intact.
+
+**Pass:** at least one full keyframe reassembled with valid CRC and
+intact badge. Document the wallclock from first chunk to last and
+the achieved kbps; carry the number into
+[IMAGE_PIPELINE.md § Phase A budget](IMAGE_PIPELINE.md).
+
+### Capture & sign-off
+
+- All four sub-gate logs saved as `W4-00_(a|b|c|d)_run-NN_YYYY-MM-DD.log`.
+- One paragraph in `bench-evidence/W4-00/NOTES.md` per the §0.3
+  capture conventions (operator, fw SHAs, antenna orientation,
+  bench-RF environment notes — e.g. WiFi APs nearby, microwave
+  running).
+- Sign-off by initialing the table row in [§ Sign-off](#sign-off)
+  before any later W4-XX gate is attempted.
+
+### Why this gate exists
+
+Before Round 53 the HIL plan jumped straight to W4-01 (handheld
+E-stop latch latency), which assumes a working radio. A first-power
+LoRa-stack failure at W4-01 would be ambiguous (handheld? tractor?
+PSR? radio?). W4-00 isolates the radio as a known-good before any
+safety-critical gate is exercised, and the dual-USB layout lets the
+operator (or an AI assistant in VS Code) introspect both sides
+simultaneously, which collapses the bring-up loop dramatically.
 
 ---
 
@@ -524,7 +791,7 @@ A Wave-4 gate is **closed** when:
 4. The corresponding checkbox in [`TODO.md`](TODO.md) is flipped to `[x]`
    and the commit message references the evidence directory.
 
-Once W4-01 … W4-10 are all closed:
+Once W4-pre, W4-00 … W4-10 are all closed:
 
 - §A (CI compile-gate flip from `continue-on-error: true` to blocking) can
   land in [`.github/workflows/arduino-ci.yml`](../../.github/workflows/arduino-ci.yml)

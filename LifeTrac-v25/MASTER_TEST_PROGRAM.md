@@ -39,7 +39,7 @@ own.
 |---|---|---|---|
 | **SIL** (software-in-the-loop) | CI on every push, pure Python stdlib + project deps | Logic, protocol, state-machine regressions; cross-language byte-identity (C ↔ Python). **No hardware required.** | **581 tests** across [49 files](#2-sil-test-catalog) |
 | **Compile gates** | CI on every push, `arduino-cli compile` against pinned cores | Toolchain drift, missing libraries, link errors, flash/RAM regressions, FQBN / sketch-folder convention breaks. | **5 jobs** (4 sketches × 1, plus stub/real-crypto on handheld) — [§3](#3-compile-gate-catalog) |
-| **HIL** (hardware-in-the-loop) | Bench, manually, per [HIL_RUNBOOK.md](DESIGN-CONTROLLER/HIL_RUNBOOK.md) | Real-radio timing, valve-coil energise/release latency, RF link budget, IRQ jitter, on-air decode after cold-boot. | **10 procedures** — [§4](#4-hil-bench-matrix) |
+| **HIL** (hardware-in-the-loop) | Bench, manually, per [HIL_RUNBOOK.md](DESIGN-CONTROLLER/HIL_RUNBOOK.md) | Real-radio timing, valve-coil energise/release latency, RF link budget, IRQ jitter, on-air decode after cold-boot. | **12 procedures** — [§4](#4-hil-bench-matrix). The matrix opens with **W4-pre** (board bring-up sanity, no RF) and **W4-00** (dual-Portenta LoRa-stack bench) so board health is confirmed and the radio link is proven on real silicon before any valve-coil work is attempted. |
 
 **Coverage rule:** every HIL bench item should have a SIL companion that
 verifies the *logic* it depends on (state machine, threshold, ramp
@@ -157,6 +157,8 @@ latency, …).
 
 | W4-XX | Goal | Pass criterion | SIL coverage | Bench-only residual |
 |---|---|---|---|---|
+| **W4-pre** | **Board bring-up sanity** — prove each Portenta + Max Carrier is healthy *before* the SX1276 PA is keyed. Sub-gates: (a) USB-CDC enumeration on the host (both boards as distinct serial ports, stable across re-plug); (b) Arduino blink + USB-Serial echo at 115200 8N1 (rules out brick / bad solder on the carrier); (c) carrier 3.3 V + 5 V rails within ±5 % under no-RF load (multimeter on Max Carrier test points); (d) M7↔M4 dual-core handshake — stock PortentaDualCore example flashes both cores and exchanges a counter via SRAM4; (e) flash + run the [`firmware/tractor_h7/`](DESIGN-CONTROLLER/firmware/tractor_h7/) image with `LIFETRAC_RADIO_DISABLE` (or equivalent stub) and verify boot-banner + heartbeat log on USB-CDC — the firmware reaches `loop()` without RF. | (a) Both boards enumerate; ports survive 10 re-plug cycles each; (b) blink visible + echo round-trip < 50 ms; (c) 3.3 V ± 5 %, 5 V ± 5 %; (d) M4 counter increments visible from M7 console for 60 s with zero gaps; (e) boot banner reaches steady-state `heartbeat` log line within 5 s of reset, no panics in 60 s. | None — these are pre-firmware checks that the SIL suite cannot model (real USB enumeration, real rail voltages, real dual-core SRAM4 link). | All of it. **Hardware required:** 2× Portenta + 2× Max Carrier + 2× USB-C cable + multimeter. **No antennas attached for this gate.** |
+| **W4-00** | **LoRa stack dual-Portenta bench** — prove the full radio + framing + AES-GCM + replay-window stack on real silicon at short range, with both Max Carriers plugged into the same workstation so the operator (or VS Code + Copilot) can read both sides of every exchange over USB-CDC. Sub-gates: (a) carrier-class TX/RX at 1 m, (b) round-trip latency by SF, (c) on-air payload size matches `lp_frame_len` predictions, (d) keyframe / SSDV image-fragment delivery end-to-end. | (a) 1000-frame burst at SF7/SF8/SF9 with 0 lost frames at 1 m; (b) ControlFrame round-trip p50 within 5 % of `lora_time_on_air_ms` * 2 + 30 ms scheduler slop, p99 < p50 + 50 ms; (c) measured air-bytes within ±1 byte of `pack_command()` / `pack_telemetry()` predictions across all four PHY profiles; (d) one full keyframe (256×192 JPEG, ~3–5 kB) reassembled at the RX side via the SSDV reassembler with valid CRC and badge intact. | [test_lora_proto_sil.py](DESIGN-CONTROLLER/base_station/tests/test_lora_proto_sil.py) (frame pack/unpack, replay window, nonce builder) + [test_keyframe_round_trip_sil.py](DESIGN-CONTROLLER/base_station/tests/test_keyframe_round_trip_sil.py) (bridge → air → M7 wrap) + [test_link_tune_sil.py](DESIGN-CONTROLLER/base_station/tests/test_link_tune_sil.py) (PHY profiles + ladder timing) | Real SX1276 TX/RX timing, IRQ wiring, antenna front-end behaviour at 1 m, on-silicon AES-GCM throughput. **Hardware required:** 2× Portenta + 2× Max Carrier + 2× SMA whip antenna (separated ≥ 30 cm) + 2× USB-C cable. No 12 V supply, no valve coils, no Opta needed for this gate. **W4-pre must be green first.** |
 | **W4-01** | Handheld E-stop latch < 100 ms across SF7/8/9 | 100/100 captures `latency_ms < 100`; p99 < 80 ms | [test_m4_safety_sil.py](DESIGN-CONTROLLER/base_station/tests/test_m4_safety_sil.py) | Real PSR-alive falling edge → relay terminal de-energise time |
 | **W4-02** | Link-tune walk-down SF7→8→9 with < 1 % packet loss; revert deadline 500 ms | full ladder walk both directions; histogram monotonic; zero missed E-stop | [test_link_tune_sil.py](DESIGN-CONTROLLER/base_station/tests/test_link_tune_sil.py) | RF attenuator + < 1 % loss measurement |
 | **W4-03** | M7↔M4 watchdog trip < 200 ms; `estop_request = 0xA5A5A5A5` magic on SRAM4 | 10/10 runs `t_trip - t_halt < 200 ms`; magic confirmed | [test_m4_safety_sil.py](DESIGN-CONTROLLER/base_station/tests/test_m4_safety_sil.py) | SRAM4 capture probe + JTAG halt of M7 |
@@ -168,13 +170,22 @@ latency, …).
 | **W4-09** | Async M7 TX state machine: `startTransmit()` + `isTransmitDone()` IRQ timing | Phase 1 time-on-air within 5 % of theory + IRQ→flag p99 < 2 ms; Phase 2 W4-03 + alive_tick jitter p99 < 5 ms | [test_m7_tx_queue_sil.py](DESIGN-CONTROLLER/base_station/tests/test_m7_tx_queue_sil.py) (queue logic only) | Real SX1276 IRQ wiring on real H747 silicon — **hard-blocked, no SIL substitute possible** |
 | **W4-10** | Fleet-key provisioning sanity: missing key halts M7 + bridge at startup | compile fail (missing header); OLED `FLEET KEY NOT PROVISIONED`; container exit ≠ 0 | [test_fleet_key_provisioning_sil.py](DESIGN-CONTROLLER/base_station/tests/test_fleet_key_provisioning_sil.py) (bridge loader failure modes; source-parse of handheld + tractor `#ifndef` guard, OLED string, ESTOP magic write) + handheld stub/real compile gates | OLED visual confirmation on real bench; systemd-unit restart behavior on real X8 |
 
-**Tier status (Round 22):**
-- 9 of 10 (W4-01, W4-02, W4-03, W4-04, W4-05, W4-06, W4-07, W4-08,
-  W4-10) have SIL coverage of the *logic surface* and need only a
-  bench-confirmation pass.
-- 1 of 10 (W4-09) has *partial* SIL — the M7 TX queue logic is
-  covered, but the IRQ-driven async startTransmit / isTransmitDone
-  on real SX1276 silicon is hard-blocked from SIL substitution.
+**Tier status (Round 53):**
+- **W4-pre** is the new earliest gate — board health (USB enumeration,
+  rails, dual-core handshake, blink-equivalent firmware boot) confirmed
+  with no RF activity. No antennas attached. Cannot be SIL-substituted.
+- **W4-00** is the LoRa-stack gating phase — every later W4-XX gate
+  that exercises the radio assumes W4-00 (a)–(d) have already passed.
+  W4-00 has full SIL coverage of the logic surface (lora_proto,
+  keyframe round-trip, link-tune); the bench run is a real-silicon
+  confirmation only.
+- 9 of 10 prior gates (W4-01, W4-02, W4-03, W4-04, W4-05, W4-06,
+  W4-07, W4-08, W4-10) have SIL coverage of the *logic surface* and
+  need only a bench-confirmation pass.
+- 1 of 10 prior gates (W4-09) has *partial* SIL — the M7 TX queue
+  logic is covered, but the IRQ-driven async startTransmit /
+  isTransmitDone on real SX1276 silicon is hard-blocked from SIL
+  substitution.
 
 ---
 
