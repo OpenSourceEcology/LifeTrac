@@ -2498,3 +2498,30 @@ et.*\` into a literal newline plus `net.*\`). Workaround: write the appendix via
 **Remaining BC backlog:**
 - **BC-12 HIL half** (deferred, unchanged): real M4 Modbus probe + integration into `web_ui` / `lora_bridge` boot path so `boot_self_test` event fires per process start. Now strictly waits for bench rig — the laptop-side dry-run path is closed.
 - The original BC-* delivery list, BC-13, BC-14, BC-14B, BC-12 SIL half, and BC-12C are all closed.
+
+---
+
+## Round 42 — BC-15 (— 2026-04-29)
+
+**Scope.** Add a machine-readable JSON form to the BC-10 `lifetrac-config diff` subcommand so non-Python consumers (notably `hil/dispatch.ps1` and ad-hoc bench-laptop shell pipelines) can decide whether a candidate config requires a service restart or a firmware reflash without re-implementing the schema-aware comparator.
+
+**What landed.**
+
+- `tools/lifetrac_config.py` — `cmd_diff` gains a `--format text|json` branch. `text` (default) is **byte-identical** to the pre-BC-15 output so existing operator muscle-memory and any shell pipelines that scrape the `--> reload required: ...` line keep working. `json` emits the canonical sorted-keys compact form (consistent with `dump-json`) carrying `changed` / `classes` / `worst` / `is_empty` / `restart_required` / `firmware_required`. Subparser registration adds the `--format` choice with default `text`.
+- `DESIGN-CONTROLLER/BUILD_CONFIG.md` §4 subcommand table: `diff` row updated to mention the new JSON form and the `hil/dispatch.ps1` consumer; doc-coverage gate (BC-08) auto-validates.
+- `DESIGN-CONTROLLER/base_station/tests/test_config_diff_cli_sil.py` — new SIL gate, 10 tests across 3 classes:
+  - **BC15_A** text output unchanged (no-diff, live-class change, explicit `--format text` matches default byte-for-byte).
+  - **BC15_B** JSON shape (no-diff empty payload; live-only / restart_required / firmware_required classification each assert `worst` + the boolean flags; `worst` promotes to `firmware_required` across multiple changes; output is canonical sorted-keys compact — no extra whitespace).
+  - **BC15_C** argparse rejects unknown `--format` values with `SystemExit(2)` and stderr containing `invalid choice`.
+- `TODO.md` status block bumped through Round 42, suite count 581.
+- `MASTER_TEST_PROGRAM.md` Last-updated → Round 42, §1 totals 571—>—581 / 48—>—49, §2 + §5 rows added.
+
+**Suite.** 581 tests / 1 skipped / 49 files, all green (was 571 / 1 / 48 — +10 from BC-15).
+
+**Backward compat.** `--format text` is the default and produces output byte-identical to the pre-BC-15 form. Exit code remains `EXIT_OK` regardless of reload class so existing CI pipelines that just look at exit code see no change. Callers wanting to gate on reload class should switch to `--format json` and parse the `restart_required` / `firmware_required` booleans.
+
+**Lessons.**
+- BC-08 doc gate was happy this round — the `diff` row uses `text` / `JSON` as descriptive prose (not backticked) so they are not parsed as orphan subcommand tokens. The Round 41 lesson held.
+- `argparse`'s choice-violation path raises `SystemExit` directly and bypasses `lc.main`'s try/except wrapper, so the BC15_C test brackets the call with `assertRaises(SystemExit)` + `redirect_stderr` instead of going through the `_run_cli` helper.
+
+**Deferred.** Same as Round 41: BC-12 HIL half (real M4 Modbus probe + integration into the `web_ui` / `lora_bridge` boot path) waits for the bench rig.

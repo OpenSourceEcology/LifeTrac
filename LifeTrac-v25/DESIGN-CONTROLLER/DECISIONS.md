@@ -190,3 +190,47 @@ Deferred until D-A3 lands and the image-link ladder is bench-verified end-to-end
 **PICK: A.** Per-feature is a v26 setting; tracked in CORAL.md §6.
 
 ---
+
+## D-HYD1 - Actuator soft-stop strategy (EFC ramp + valve settling)
+
+**Context:** [DESIGN-HYDRAULIC/SOFT_STOP_STRATEGY.md](../DESIGN-HYDRAULIC/SOFT_STOP_STRATEGY.md), [DESIGN-HYDRAULIC/HYDRAULIC_BOM.md](../DESIGN-HYDRAULIC/HYDRAULIC_BOM.md) Sec. 3, [firmware/tractor_h7/tractor_h7.ino](firmware/tractor_h7/tractor_h7.ino) IP-303 block, [firmware/common/lifetrac_build_config.h](firmware/common/lifetrac_build_config.h).
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Float-centre spool (D1VW00**4**CNKW) + 2x PO check valves on cylinders | Track motors free-coast on release; OSE-legacy pattern | Pump full-flow bypass at idle through EFC EX port (heat); cylinders need extra hardware; no hill-hold on tracks |
+| **B. Tandem-centre spool (D1VW00*8*CNKW) + EFC ramp + valve settling delay** | Natural cylinder load-hold (drop 2 PO checks); near-zero idle pressure (cool); track hill-hold; uses existing EFC + Burkert + IP-303 ramp infrastructure | Requires firmware sequencer (BC-18); no free track coast on release (decel follows ramp ladder) |
+| C. Closed-centre spool + accumulator | True hold everywhere | Adds accumulator hardware; no benefit over B |
+
+**PICK: B.** Adopted 2026-04-29. Detailed timing, safety properties, and tuning parameters in [DESIGN-HYDRAULIC/SOFT_STOP_STRATEGY.md](../DESIGN-HYDRAULIC/SOFT_STOP_STRATEGY.md). Firmware work tagged **BC-18** (settling-timer addition to `tractor_opta.ino` valve-drive loop + new `hydraulic.valve_settling_ms` BuildConfig leaf + SIL gate `test_valve_settling_sil.py`). Until BC-18 ships, populate field hardware with the float-centre interim bill (Option A) and migrate at next service interval.
+
+## D-HYD2 - Hydraulic build-variant configurability
+
+**Context:** Other LifeTrac builders won't all use the canonical v25 hydraulic stack. The firmware sequencer must be data-driven, not hard-coded. Same pattern as `safety.estop_topology` already established in [base_station/config/build_config.schema.json](base_station/config/build_config.schema.json).
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Hard-code v25 canonical (tandem + 100ms settling) in firmware | Smallest code; matches v25 BOM exactly | Other builders must fork firmware; OSE-legacy float+PO-check builds break with current behaviour after BC-18 |
+| **B. Three new BuildConfig leaves under `[hydraulic]`: `spool_type` (enum tandem/float/closed/open), `load_holding` (enum spool_inherent/po_check/counterbalance/none), `valve_settling_ms` (uint 0..250)** | Mirrors existing `estop_topology` pattern; ~30 lines of firmware branch + 3 schema leaves cover all four spool types; validator catches incompatible combinations | One more SIL matrix dimension; `lifetrac-config self-test` gains two new compatibility rules |
+| C. Compile-time only via lifetrac_build_config.h (no schema/TOML/codegen) | Slightly less code | Loses the per-unit override + bundle/verify flow that all other config goes through; off-pattern |
+
+**PICK: B.** Adopted 2026-04-29 alongside D-HYD1. Schema work tagged **BC-19** (separate from BC-18 firmware sequencer); BC-18 ships hard-coded with the canonical v25 defaults, BC-19 makes them configurable. Three reference builds (OSE-legacy, v25-canonical, high-performance) documented in [DESIGN-HYDRAULIC/SOFT_STOP_STRATEGY.md → Hydraulic variants & per-build configuration](../DESIGN-HYDRAULIC/SOFT_STOP_STRATEGY.md#hydraulic-variants--per-build-configuration). The two firmware branch points are listed there: `tractor_opta.ino` valve-drive loop + `lifetrac-config self-test` compatibility rules.
+
+## D-HYD3 - IMU-adaptive ramp tuning (jerk feedback)
+
+**Context:** The canonical ramp constants are starting points; optimal values vary with payload, slope, temperature, pump wear. The BNO086 IMU on [HARDWARE_BOM.md](HARDWARE_BOM.md) Tier-1 publishes 100 Hz linear acceleration; computing jerk (`d(accel)/dt`) gives an objective measure of ramp quality. Question: should we use it to auto-tune the soft-start code?
+
+| Option | Pros | Cons |
+|---|---|---|
+| A. Ignore IMU; ramp values stay static (only manual operator tuning via `lifetrac-config push`) | Simplest; no new code | Operators have no objective signal; "feels rough" stays subjective; suboptimal ramps unnoticed |
+| B. Passive jerk telemetry only (BC-20A) | Pure observability; safe to ship anytime; large diagnostic value with small implementation cost | Operator still has to interpret + manually edit the config |
+| C. Passive telemetry + advisory recommendation engine (BC-20A + BC-20B), human-in-the-loop via existing `lifetrac-config validate/bundle/verify/push` flow | All the safety gates of static config delivery already exist (schema validate, audit log, reload-class, operator approval); recommendations refuse out-of-range writes pre-validation | Slightly more SIL surface |
+| **D. Three-stage rollout: BC-20A passive telemetry, then BC-20B advisory, then BC-20C closed-loop online tuning gated by new `hydraulic.adaptive_ramp_tuning` bool (default false, opt-in, panic revert button, BC-12 HIL prerequisite)** | Captures the value of each stage independently; ships safely incrementally; closed-loop disabled by default matches IEC-62443 + ISO-25119 reviewer expectations for adaptive control on a safety parameter | Three rounds of work instead of one |
+| E. Skip straight to closed-loop online tuning (no advisory stage) | One round; full automation | SIL cannot validate stability under all payload/slope/temperature combinations; needs HIL data we don't have yet; high blast radius on regression |
+
+**PICK: D.** Adopted 2026-04-29. Three sub-rounds:
+
+* **BC-20A passive jerk telemetry** - M7 publishes per-transition peak jerk over existing telemetry channel; web UI diagnostics surfaces; no control change. Safe to ship anytime.
+* **BC-20B advisory recommendation engine** - base-station accumulates per-build histograms, recommends ramp-leaf edits via existing config-delivery flow; human approves; no autonomous writes.
+* **BC-20C closed-loop online tuning** - new `hydraulic.adaptive_ramp_tuning` schema leaf (bool, default false, `restart_required`); +-5%% step adjustments per accepted clean transition, schema-bounded, audit-logged, panic revert. Disabled by default; requires BC-12 HIL bench validation before enabling.
+
+Detailed rationale and SIL surface breakdown in [DESIGN-HYDRAULIC/SOFT_STOP_STRATEGY.md](../DESIGN-HYDRAULIC/SOFT_STOP_STRATEGY.md) section "IMU-adaptive ramp tuning".

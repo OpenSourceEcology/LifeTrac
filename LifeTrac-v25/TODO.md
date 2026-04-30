@@ -34,13 +34,593 @@ IP each one verifies lives in
 update it in the same PR as any test/code change (see §7 of that file
 for the protocol).
 
-**Implementation status (2026-04-29, through Round 41):**
+---
+
+## Pre-field-deployment checklist (open items as of 2026-04-29)
+
+> **Purpose.** A single consolidated view of what still has to happen
+> before a real LifeTrac v25 can be powered on at a real work site.
+> Every line links to the authoritative phase plan in
+> [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) (or the
+> structural / hydraulic equivalents). **All software work that does
+> not need bench hardware is landed** (810 SIL tests / 60 files); what
+> remains is **hardware, integration, and field-validation work that
+> requires physical parts**.
+>
+> Status legend: 🟥 = blocker (must finish before Phase 8 field tests)
+> · 🟨 = required for Phase 9 release · 🟩 = stretch / nice-to-have.
+
+### A. Hardware procurement (lead-time blocker — start first)
+
+🟥 Nothing has been ordered yet. Until parts arrive, every other
+hardware-touching item below is blocked.
+
+- [ ] 🟥 **Tractor node** — Portenta Max Carrier, Portenta X8, LoRa +
+  cellular antennas, NEO-M9N GPS, IP65 enclosure, Opta WiFi + D1608S
+  + A0602 expansions, hydraulic pressure sensors, engine-kill relay,
+  Phoenix PSR safety relay, USB UVC webcam + MCP2221A + BNO086 IMU.
+  Full BOM in
+  [DESIGN-CONTROLLER/TODO.md § Phase 0 / Tractor node hardware](DESIGN-CONTROLLER/TODO.md#phase-0--hardware-procurement--shop-setup).
+- [ ] 🟥 **Base station** — second Max Carrier + X8, 8 dBi mast
+  antenna, LMR-400 coax, lightning arrestor, mast + ground rod,
+  indoor PSU + UPS. Coral Mini PCIe pending the Phase 1 validation
+  spike. See [DESIGN-CONTROLLER/TODO.md § Base station hardware](DESIGN-CONTROLLER/TODO.md#base-station-hardware).
+- [ ] 🟥 **Handheld** — MKR WAN 1310, dual joysticks, latching E-stop,
+  SSD1306 OLED, IP54 enclosure, custom joystick PCB (KiCad design +
+  fab). [DESIGN-CONTROLLER/TODO.md § Handheld hardware](DESIGN-CONTROLLER/TODO.md#handheld-hardware).
+- [ ] 🟨 **Spares** — 2× of each major board + antennas + joysticks +
+  OLEDs. Cuts the bring-up loop in half if anything DOAs.
+- [ ] 🟨 **Dev gear** — RTL-SDR, Saleae Logic 8 (or clone), bench
+  PSU, 50 Ω SMA dummy loads, spectrum-analyzer rental for FCC EIRP.
+- [ ] 🟥 **Mechanical / hydraulic BOM** — frame tube stock, pivot
+  pins, lift cylinders, valves, hoses, fittings. Tracked in
+  [DESIGN-STRUCTURAL/](DESIGN-STRUCTURAL/) and
+  [DESIGN-HYDRAULIC/](DESIGN-HYDRAULIC/). The chassis has to exist
+  before the controller can move anything.
+
+### B. Bench bring-up (Phase 1)
+
+🟥 All blocked on Section A.
+
+- [ ] 🟥 First-power-on smoke tests for each of the three nodes
+  (tractor X8 + Max Carrier H7, base X8 + Max Carrier H7, handheld
+  MKR WAN 1310). Verify USB enumeration, serial console, LED blink.
+  [DESIGN-CONTROLLER/TODO.md § Phase 1](DESIGN-CONTROLLER/TODO.md#phase-1--bench-bring-up).
+- [ ] 🟥 RadioLib + SX1276 (or Murata SiP) hello-world: send a packet
+  base ↔ tractor at 1 m, decode RSSI/SNR.
+- [ ] 🟥 Coral Mini PCIe **2-day validation spike** — `lspci`
+  enumeration, `gasket`/`apex` driver against the X8 Yocto kernel,
+  30-min sustained inference without thermal throttle. On failure,
+  swap to Coral USB Accelerator; on second failure, ship CPU-only
+  per [MASTER_PLAN.md §8.19](DESIGN-CONTROLLER/MASTER_PLAN.md).
+- [ ] 🟥 HIL bench rig: 8× LED dummy coils, 8× 1 kΩ trimpot dummy
+  pressure transducers, 2× DMM on the Burkert 0–10 V outputs, bench
+  PSU with current meter. Documented bring-up procedure in
+  [HIL_RUNBOOK.md](DESIGN-CONTROLLER/HIL_RUNBOOK.md).
+
+### C. Firmware that needs hardware to validate (Phases 2–4.5)
+
+🟥 SIL coverage is in place; on-target compile + bench-run is not.
+
+- [ ] 🟥 Compile-gate **all three Arduino sketches** under the
+  Arduino CI matrix on real boards (currently CI-only, no hardware
+  pinned): tractor M7 + M4, handheld MKR WAN 1310, Opta valve
+  controller. See
+  [ARDUINO_CI.md](DESIGN-CONTROLLER/ARDUINO_CI.md) and the
+  IP-traceability rows still marked as compile-gate-only in
+  [MASTER_TEST_PROGRAM.md](MASTER_TEST_PROGRAM.md).
+- [ ] 🟥 Wire the **`CMD_LINK_TUNE` reciprocal handler** on the
+  handheld and base receivers — currently only the tractor M7 sends.
+  See note in
+  [DESIGN-CONTROLLER/TODO.md § Phase 2 line 166](DESIGN-CONTROLLER/TODO.md#phase-2--common-firmware-shared-by-all-three-nodes).
+- [ ] 🟥 Wire the **`pick_csma_hop()` caller** into the RadioLib
+  `scanChannel` TX path on tractor and handheld and the base SPI TX
+  path. Helper landed; integration pending.
+- [ ] 🟥 Land the **C-side nonce generator mirror** in
+  [`firmware/common/lora_proto/crypto_stub.c`](DESIGN-CONTROLLER/firmware/common/lora_proto/crypto_stub.c)
+  to match `build_nonce()` in the Python mirror.
+- [ ] 🟥 Phase 4.5 **Opta Modbus slave firmware** — bring-up against
+  D1608S + A0602 + Burkert 8605, verify register map matches
+  [TRACTOR_NODE.md Modbus map](DESIGN-CONTROLLER/TRACTOR_NODE.md#modbus-rtu-register-map-max-carrier--opta).
+- [ ] 🟥 Phase 5 **base-station Linux services** — Docker compose
+  bring-up on real X8 hardware (Yocto image), end-to-end web UI
+  reachable on LAN, audit log writing to disk.
+
+### D. Cross-cutting firmware/security work (still required for Phase 7)
+
+- [ ] 🟥 **Pairing flow + persistent AES-GCM nonce counter in flash**
+  — survives reboot to close the post-power-cycle replay window. QR
+  bootstrap on tractor X8 OLED / web UI. See
+  [DESIGN-CONTROLLER/TODO.md § Cross-cutting / Device pairing](DESIGN-CONTROLLER/TODO.md#device-pairing--key-provisioning).
+- [ ] 🟥 **Code-signing pipeline (Ed25519)** for OTA images; X8
+  verifies before flashing the H7 / MKR / Opta. See
+  [FIRMWARE_UPDATES.md](DESIGN-CONTROLLER/FIRMWARE_UPDATES.md).
+- [ ] 🟨 **Time sync chain** — base X8 NTP-over-cellular, LoRa beacon
+  every 1 s, tractor X8 disciplines RTC from beacon → GPS PPS →
+  free-run fallback.
+- [ ] 🟨 **WireGuard / Tailscale tunnel** for remote base-station web
+  UI access (no public HTTP surface). Defence-in-depth: HTTPS +
+  basic auth on the LAN-only listener.
+- [ ] 🟥 **Web-UI ramp-state heatmap painter** (consumes the
+  Round-53 K-E2 JSON from
+  [base_station/ramp_heatmap.py](DESIGN-CONTROLLER/base_station/ramp_heatmap.py)).
+  Data model + 29 SIL tests already shipped; only the JS render
+  + a `/diagnostics/heatmap` route remain.
+
+### E. Phase 6 mast install (base station site work)
+
+- [ ] 🟥 Site survey for clear LoS to typical work area.
+- [ ] 🟥 Drive ≥ 2.5 m ground rod; erect mast (concrete or guyed);
+  mount 8 dBi omni; route LMR-400 in conduit; install lightning
+  arrestor at base.
+- [ ] 🟥 VNA / NanoVNA: confirm SWR < 2:1 across 902–928 MHz.
+
+### F. Phase 7 integration testing (bench, all-three-nodes)
+
+🟥 All blocked on B + C. Each item below is a discrete pass/fail.
+
+- [ ] 🟥 Bench: all three nodes powered, exchange frames at 1 m.
+- [ ] 🟥 Single-source: handheld-only → tractor follows; base-only
+  → tractor follows; both active → handheld wins (priority).
+- [ ] 🟥 Handover: handheld release → 30 s latch + 500 ms timeout
+  → base takes over.
+- [ ] 🟥 TAKE CONTROL: physical button on handheld pre-empts an
+  active base session immediately.
+- [ ] 🟥 Failsafe: power-off the active source mid-frame → tractor
+  reaches neutral within 500 ms (M4 watchdog gate).
+- [ ] 🟥 Replay attack: capture frame, retransmit later → rejected.
+- [ ] 🟥 Tamper: flip a bit in a captured frame, retransmit →
+  rejected by AES-GCM tag check.
+- [ ] 🟥 Latency: handheld stick → tractor valve, target ≤ 150 ms
+  median; base UI stick → valve, ≤ 250 ms median. Saleae trace.
+
+### G. Phase 8 field testing (gates Phase 9 release)
+
+- [ ] 🟥 LoS range from base mast: 1 km / 5 km / 10 km / 15 km.
+- [ ] 🟥 Light-foliage range: 1 km / 3 km.
+- [ ] 🟥 Handheld range: 100 m / 500 m / 1 km / 2 km.
+- [ ] 🟥 Vibration soak: drive over rough ground; no spurious
+  failsafes; enclosure intact.
+- [ ] 🟥 Cellular fallback: pull LoRa antenna at tractor →
+  telemetry continues over cellular.
+- [ ] 🟥 Engine-crank brown-out: cold-start engine while controller
+  is up; LiPo backup carries through; no MCU reset.
+- [ ] 🟥 IP rating: garden-hose spray test of all three enclosures.
+- [ ] 🟥 24 h shop soak; then 7-day on-site soak with full event log.
+
+### H. Documentation gaps still to close before Phase 9 release
+
+- [ ] 🟨 [`NON_ARDUINO_BOM.md`](DESIGN-CONTROLLER/NON_ARDUINO_BOM.md)
+  — DigiKey / Mouser / L-com / Phoenix / Burkert / McMaster
+  consolidated order list. (Stub exists; needs filling.)
+- [ ] 🟨 [`CALIBRATION.md`](DESIGN-CONTROLLER/CALIBRATION.md) —
+  joystick deadband, flow-valve 0–10 V → GPM curve, pressure-sensor
+  zero, GPS antenna offset.
+- [ ] 🟨 [`FIELD_SERVICE.md`](DESIGN-CONTROLLER/FIELD_SERVICE.md) —
+  diagnostic flowcharts, fuse map, common failure modes,
+  spare-parts kit contents.
+- [ ] 🟨 [`OPERATIONS_MANUAL.md`](DESIGN-CONTROLLER/OPERATIONS_MANUAL.md)
+  — operator-facing power-on, pairing, take-control, E-stop,
+  charging the handheld.
+- [ ] 🟨 Hookup guide consolidating
+  [TRACTOR_NODE.md](DESIGN-CONTROLLER/TRACTOR_NODE.md),
+  [BASE_STATION.md](DESIGN-CONTROLLER/BASE_STATION.md),
+  [HANDHELD_REMOTE.md](DESIGN-CONTROLLER/HANDHELD_REMOTE.md).
+
+### I. Regulatory + release (Phase 9 — before any public deployment)
+
+- [ ] 🟥 **FCC §15.247 EIRP verification** with spectrum analyzer.
+  Targets: handheld +14 dBm, tractor +20 dBm, base +20 dBm + 8 dBi
+  = +26.3 dBm EIRP, all under +36 dBm limit.
+- [ ] 🟥 **Safety case sign-off** —
+  [SAFETY_CASE.md](DESIGN-CONTROLLER/SAFETY_CASE.md) HAZOP-lite,
+  ISO 13849 PL=c claim on the E-stop chain, Phoenix PSR wiring as
+  the safety function.
+- [ ] 🟨 Open-source licence pass: firmware GPLv3, web UI AGPLv3,
+  public release tag `controller-v1.0.0`.
+- [ ] 🟨 Add controller hardware to the v25 main BOM and update
+  [LifeTrac-v25/README.md](README.md).
+
+### J. Mechanical / hydraulic / structural (parallel track)
+
+🟥 The controller is useless without a chassis. These are tracked
+outside DESIGN-CONTROLLER but block field deployment equally.
+
+- [ ] 🟥 Frame fabrication —
+  [DESIGN-STRUCTURAL/](DESIGN-STRUCTURAL/) and
+  [BUILD-STRUCTURE/](BUILD-STRUCTURE/).
+- [ ] 🟥 Hydraulic plumbing + valve manifold —
+  [DESIGN-HYDRAULIC/](DESIGN-HYDRAULIC/) and
+  [BUILD-HYDRAULIC/](BUILD-HYDRAULIC/).
+- [ ] 🟥 Tracks / drive sprockets / final drive (UTU-v25 chain
+  reuse) — see
+  [AI NOTES/2026-02-15_UTU_v25_Track_Chain_Implementation.md](AI%20NOTES/2026-02-15_UTU_v25_Track_Chain_Implementation.md).
+- [ ] 🟥 Lift cylinder mount + pivot geometry —
+  [AI NOTES/2026-01-25_Pivot_Mount_Assembly.md](AI%20NOTES/2026-01-25_Pivot_Mount_Assembly.md)
+  +
+  [AI NOTES/2026-01-25_Lift_Cylinder_Parametric_Formula.md](AI%20NOTES/2026-01-25_Lift_Cylinder_Parametric_Formula.md).
+
+---
+
+## Recently completed (running log — newest first)
+
+**Implementation status (2026-04-29, through Round 53):**
 [`AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md`](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md)
 — every plan item achievable without bench hardware is now landed
-(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). 571 base_station
-tests pass, and **every "—" cell with a natural SIL surface in the
+(Wave 0 8/8, Wave 1 8/8, Wave 2 9/9, Wave 3 9/9). **810 base_station
+tests pass / 2 skipped / 2364 subtests / 60 files**, and **every "—"
+cell with a natural SIL surface in the
 [MASTER_TEST_PROGRAM.md](MASTER_TEST_PROGRAM.md) §5 IP-traceability
-table is now closed.** **Round 41** lands BC-12C — the bench-side
+table is now closed.** **Round 53** lands K-E2 — web UI ramp-state
+heatmap data model. New module
+[base_station/ramp_heatmap.py](DESIGN-CONTROLLER/base_station/ramp_heatmap.py)
+exposes a 5-state per-tick classifier (``idle`` / ``matched`` /
+``reversal`` / ``decay`` / ``mushy``) over (raw, effective) axis
+pairs so the operator-visible "why did my stop feel mushy" overlay
+can paint cells without recomputing ramp state. Precedence ladder:
+``idle`` (both within deadband) > ``reversal`` (opposite-sign while
+both active — wins over ``mushy`` because BC-22 brake lag is
+*expected*) > ``decay`` (raw idle, effective still asserting) >
+``mushy`` (same-sign ``|lag| > mushy_threshold``) > ``matched``
+(otherwise). ``DEFAULT_DEADBAND`` mirrors the BC-29 ``ui.axis_deadband``
+config default; ``DEFAULT_MUSHY_THRESHOLD = 40`` (~31% of int8 full
+scale) is the documented starting point. Public API:
+``HeatmapSample``, ``classify_state()``, ``lag()``,
+``build_heatmap_row()``, ``build_heatmap()`` — all JSON-serializable
+output for the painter. The new
+[base_station/tests/test_ramp_heatmap_sil.py](DESIGN-CONTROLLER/base_station/tests/test_ramp_heatmap_sil.py)
+adds 29 tests across RH-A..RH-F: state-vocabulary pin, signed lag
+math, full classification ladder including precedence + boundary +
+threshold validation, row shape, top-level heatmap shape with
+stream-order preservation and threshold propagation, and a firmware-
+identity gate that pins ``DEFAULT_DEADBAND`` to ``cfg.ui.axis_deadband``.
+[ROADMAP.md](DESIGN-KINEMATICS/ROADMAP.md) flips the K-E2 row to
+``✓ LANDED Round 53`` and adds the Round 53 sequencing line. Painter
+wiring (writing the JSON into a web view) deferred. **Suite at 810
+tests / 2 skipped / 60 files** (781 → 810 from Round 53).
+**Round 52** lands BC-29 — configurable axis deadband
+deadband (cheap-win K-D3). New schema int leaf
+``[ui].axis_deadband`` ∈ ``[0, 32]``, default ``13`` (≈10% of int8
+full scale = byte-for-byte identity vs the pre-Round-52 hard-coded
+firmware constant). Firmware sources the constant from the codegen-
+emitted header: ``static const int8_t AXIS_DEADBAND =
+(int8_t)LIFETRAC_UI_AXIS_DEADBAND;``. All four use sites
+(``axis_active()``, the per-coil activation block, BC-24 spin-turn
+detection, the flow-set-point computation) continue to read the same
+compile-time constant so the four call sites stay in sync. The new
+[base_station/tests/test_axis_deadband_sil.py](DESIGN-CONTROLLER/base_station/tests/test_axis_deadband_sil.py)
+adds 23 tests across DB-A..DB-E: DB-A schema validation (required-
+list, in-range 0/1/13/20/32 accepted, out-of-range low/high + wrong
+type + float-where-int rejected); DB-B default-value identity
+(default toml authors 13, loader yields int 13, codegen emits
+``LIFETRAC_UI_AXIS_DEADBAND 13``, ``reload_class = restart_required``);
+DB-C override round-trip for 5 / 0 / 32; DB-D firmware tripwires
+(BC-29 marker, exact macro init line, no legacy hard-coded literal,
+constant still consumed in all four use sites with the precise
+patterns); DB-E docs tripwires (schema bounds, default-toml leaf +
+doc comment, CAPABILITY_INVENTORY row).
+[ROADMAP.md](DESIGN-KINEMATICS/ROADMAP.md) gains a new BC-29 entry,
+adds a K-D3 row to the cheap-wins table marked ``✓ LANDED Round 52``,
+and adds the Round 52 sequencing line. **Suite at 781 tests / 2
+skipped / 59 files** (758 → 781 from Round 52).
+**Round 51** lands BC-28 — operator profile
+preset (cheap-win K-D1, minimal version). New schema enum leaf
+``[ui].operator_profile`` ∈ ``{normal, gentle, sport}``, default
+``"normal"`` (byte-for-byte identity — individual operator-feel
+leaves stand as authored). ``"gentle"`` overrides
+``ui.confined_space_mode_enabled = true`` AND
+``hydraulic.ramp_shape = "scurve"`` for tight-quarters work.
+``"sport"`` overrides ``ui.confined_space_mode_enabled = false``,
+``hydraulic.ramp_shape = "linear"`` AND ``ui.stick_curve_exponent
+= 1.0`` for crisp control. Overrides are applied at config-load time
+inside ``build_config.load()`` via a new
+``_apply_operator_profile_overrides()`` helper that mutates the
+parsed TOML dict in place after schema validation but before the
+hydraulic-compatibility cross-check. Both Python consumers and the
+codegen-emitted firmware header automatically pick up the post-
+override state because both flow through the same loader. Bundles
+intentionally only touch operator-feel leaves with ``reload_class
+= restart_required``; safety / hydraulic-topology / network leaves
+are NEVER overridden by a profile. The new
+[base_station/tests/test_operator_profile_sil.py](DESIGN-CONTROLLER/base_station/tests/test_operator_profile_sil.py)
+adds 21 tests across OP-A..OP-E: OP-A pure helper math (normal no-op
+even with bundle-shaped authored values, gentle / sport flip exactly
+their bundle leaves and leave sentinels untouched, unknown profile
+defensive no-op, public ``OPERATOR_PROFILE_OVERRIDES`` table pinned);
+OP-B loader integration via temp-TOML + ``LIFETRAC_BUILD_CONFIG_PATH``
+(default toml yields normal + identity, gentle/sport tomls override
+authored values, ``cfg.raw`` reflects post-override state so
+``config_sha256`` is consumer-consistent); OP-C codegen integration
+(gentle emits ``..._CONFINED_SPACE_MODE_ENABLED 1`` +
+``..._RAMP_SHAPE_SCURVE 1`` + profile macro/side-macro; sport emits
+``..._CONFINED_SPACE_MODE_ENABLED 0`` + ``..._RAMP_SHAPE_LINEAR 1`` +
+``..._STICK_CURVE_EXPONENT 1.0f``; normal default toml is byte-
+identity to authored); OP-D schema rejection of unknown enum value;
+OP-E source/config tripwires (``BC-28`` marker,
+``_apply_operator_profile_overrides`` symbol +
+``OPERATOR_PROFILE_OVERRIDES`` table, schema enum,
+``operator_profile = "normal"`` line in ``build.default.toml``,
+CAPABILITY_INVENTORY row).
+[ROADMAP.md](DESIGN-KINEMATICS/ROADMAP.md) gains a new BC-28 entry,
+marks K-D1 cheap-win as ``✓ LANDED Round 51 (minimal)``, and adds
+the Round 51 sequencing line. **Suite at 758 tests / 2 skipped /
+58 files** (737 → 758 from Round 51).
+**Round 50** lands BC-27 — confined-space
+mode (cheap-win K-D2, minimal version). New schema leaf
+``[ui].confined_space_mode_enabled`` (bool, default ``false`` =
+byte-for-byte identity — zero behaviour change unless a build opts
+in). When ``true``, ``ramp_duration_ms()`` multiplies its base
+ladder result by ``3 / 2`` (integer-exact for every ladder value:
+250→375, 500→750, 1000→1500, 2000→3000) so release ramps,
+BC-22 reversal-decay ramps, and the K-A4 forced-coordinated track
+duration all stretch by 1.5× — the tractor stops more gently in
+tight quarters at the cost of a slightly softer feel. Composes
+orthogonally with BC-25 stick curve and BC-26 scurve ramp shape
+(operators who already opted in keep their preferences). Minimal
+version: 1.5× ramp duration only — no curve / flow-cap change
+(deferred until real-world testing motivates them). The new
+[base_station/tests/test_confined_space_sil.py](DESIGN-CONTROLLER/base_station/tests/test_confined_space_sil.py)
+adds 18 tests across CS-A..CS-G: CS-A pure ladder math at
+``confined=False/True`` for both track and arm magnitudes plus
+sign-absolute handling; CS-B default-identity at ``FourAxisArbiter``;
+CS-C end-to-end release ramp from ``lhy=127`` (baseline last-non-zero
+~tick 38–40, confined ~tick 58–60, ≥18-tick stretch); CS-D K-A4
+asymmetric-magnitude coordination preserved at the deadline tick
+(left=127 / right=25 → both 0 at deadline 40 baseline / 60 confined);
+CS-E composition with BC-25 ``stick_curve_exponent=2.0`` (curve
+compresses 64→32 AND ramp stretches); CS-F composition with BC-26
+``ramp_shape="scurve"`` (smoothstep over the longer 3 s ramp); CS-G
+firmware/source tripwires (``BC-27`` marker,
+``LIFETRAC_UI_CONFINED_SPACE_MODE_ENABLED`` macro consumption,
+``base * 3u`` / ``) / 2u`` multiplier expression, schema leaf,
+CAPABILITY_INVENTORY row). The ``test_axis_ramp_sil.py`` Python
+mirror gained a ``confined_space`` parameter on ``ramp_duration_ms()``
+and ``step_axis_ramp()``, plumbed through ``FourAxisArbiter`` to
+both per-axis ramps and the K-A4 forced-track-duration computation;
+the default ``confined_space=False`` keeps every pre-Round-50 ramp
+test byte-identical. [ROADMAP.md](DESIGN-KINEMATICS/ROADMAP.md)
+gains a new BC-27 entry, marks K-D2 cheap-win as ``✓ LANDED
+Round 50 (minimal)``, and adds the Round 50 sequencing line.
+**Suite at 737 tests / 2 skipped / 57 files** (719 → 737 from
+Round 50).
+**Round 49** lands BC-26 — S-curve ramp shape
+selector (cheap-win K-A3). New schema leaf
+``[hydraulic].ramp_shape`` ∈ ``{linear, scurve}``, default ``linear``
+(byte-for-byte identity — zero behaviour change unless a build opts
+in). Firmware factors the prior inline interpolation in
+``step_axis_ramp()`` into a ``ramp_interpolate(start, elapsed,
+duration_ms)`` helper. When the build defines
+``LIFETRAC_HYDRAULIC_RAMP_SHAPE_SCURVE`` the helper substitutes a
+half-cosine smoothstep ``shape(t) = 0.5 × (1 + cos(π × t))`` whose
+derivative is zero at both endpoints, cutting P95 jerk roughly in
+half for the same total stop distance. Pinned closed-form quarter
+points: smoothstep at ``t=0.25 → ~0.854 × start`` (vs linear ``0.75``),
+``t=0.5 → ~0.5 × start`` (matches linear), ``t=0.75 → ~0.146 × start``
+(vs linear ``0.25``).
+The new
+[base_station/tests/test_ramp_shape_sil.py](DESIGN-CONTROLLER/base_station/tests/test_ramp_shape_sil.py)
+adds 21 tests across RS-A..RS-G: RS-A linear-default byte-identity to
+the legacy truncation formula across positive / negative starts and
+quarter / half / three-quarter / endpoint elapsed, plus implicit
+default-arg identity; RS-B scurve endpoints (`elapsed=0 → start`,
+``elapsed≥duration → 0``, ``duration=0 → 0``, monotonic non-increasing);
+RS-C scurve quarter-point closed-form pinning that distinguishes from
+linear; RS-D sign preservation + magnitude symmetry within 1 LSB;
+RS-E end-to-end through ``FourAxisArbiter(ramp_shape="scurve")``
+(release ramp from full forward, scurve strictly higher at the
+quarter-point sample, both shapes reach 0 at the K-A4-coordinated
+2 s deadline); RS-F default-identity contract for ``FourAxisArbiter()``
+release trajectory; RS-G firmware/source tripwires (BC-26 marker,
+``ramp_interpolate`` symbol, ``LIFETRAC_HYDRAULIC_RAMP_SHAPE_SCURVE``
+macro consumption, helper call site, schema enum, CAPABILITY_INVENTORY
+row).
+The ``test_axis_ramp_sil.py`` Python mirror gained an
+``_ramp_interpolate(start, elapsed, duration_ms, shape)`` helper and
+``step_axis_ramp()`` / ``FourAxisArbiter`` now route through it; the
+default ``shape="linear"`` keeps every pre-Round-49 ramp test
+byte-identical. [ROADMAP.md](DESIGN-KINEMATICS/ROADMAP.md) gains a
+new BC-26 entry, marks K-A3 cheap-win as ``✓ LANDED Round 49``, and
+adds the Round 49 sequencing line. **Suite at 719 tests / 2 skipped
+/ 56 files** (698 → 719 from Round 49).
+**Round 48** lands BC-25 — per-stick response
+curve exponent (cheap-win K-A2). New schema leaf
+``[ui].stick_curve_exponent`` ∈ ``{1.0, 1.5, 2.0}``, default ``1.0``
+(byte-for-byte identity — zero behaviour change unless a build opts in).
+Firmware precomputes a 128-entry uint8_t LUT in ``setup()`` from
+``LIFETRAC_UI_STICK_CURVE_EXPONENT`` and applies
+``effective = sign(x) × LUT[|x|]`` to every raw stick axis (``lhx``,
+``lhy``, ``rhx``, ``rhy``) **post-deadband, pre-mixing**. At ``n = 2.0``
+a 50%-stick input compresses to ~32 (vs 64 linear) for finer creep
+precision; pegged sticks still reach ±127 at every supported exponent.
+The new
+[base_station/tests/test_stick_curve_sil.py](DESIGN-CONTROLLER/base_station/tests/test_stick_curve_sil.py)
+adds 20 tests across SC-A..SC-F: SC-A pure curve math (identity, zero
+fixed point, full-stick preserved, square-law at n=2.0, monotonic, sign
+preservation, OOB clamping); SC-B default-identity contract for
+``FourAxisArbiter()``; SC-C K-A2 motivating low-stick compression; SC-D
+top-end authority across exponents; SC-E pre-mixing application
+(``lhx=64`` at n=2.0 → tracks ``(32, -32)`` not ``(16, -16)``); SC-F
+firmware source / config tripwires (BC-25 marker, ``apply_stick_curve``
+symbol, ``init_stick_curve_lut`` setup-time call, four call sites
+wrapping ``cf.axis_*``, schema enum, CAPABILITY_INVENTORY row).
+The ``test_axis_ramp_sil.py`` Python mirror grew an
+``_apply_stick_curve(v, exponent)`` helper and ``FourAxisArbiter``
+gained a ``stick_curve_exponent`` ctor parameter (default 1.0 → legacy
+fixtures unaffected). [INPUT_MAPPING.md](DESIGN-KINEMATICS/INPUT_MAPPING.md)
+§ "Stick curve" rewritten to past tense; pending-list item ticked off.
+[ROADMAP.md](DESIGN-KINEMATICS/ROADMAP.md) gains a new BC-25 entry,
+marks K-A2 cheap-win as ``✓ LANDED Round 48``, and adds the Round 48
+sequencing line. **Suite at 698 tests / 2 skipped / 55 files** (678 →
+698 from Round 48).
+**Round 47** is a doc-debt cleanup + SIL traceability round: closes the two ``STUB`` kinematics docs that were
+originally scheduled for Round 44.
+[INPUT_MAPPING.md](DESIGN-KINEMATICS/INPUT_MAPPING.md) and
+[MOTION_PRIMITIVES.md](DESIGN-KINEMATICS/MOTION_PRIMITIVES.md) are now
+marked landed, with their pending sections pointing at the deferred
+schema leaves (``[ui].stick_curve_exponent``, BUILD_VARIANT_MOTION_MATRIX
+promotion). Stale BC-22 "New design" entry in
+[ROADMAP.md](DESIGN-KINEMATICS/ROADMAP.md) corrected to ``✓ LANDED Round
+45``. The new
+[base_station/tests/test_motion_primitives_sil.py](DESIGN-CONTROLLER/base_station/tests/test_motion_primitives_sil.py)
+adds 15 tests (1 skipped — MP-12 float, build-gated by ``hydraulic.spool_type``)
+that pin the post-mix logical-axis signature of every primitive
+MP-01..MP-12 through ``FourAxisArbiter``: drive forward / reverse,
+skid turn, pivot turn (one track exactly 0), spin in place
+(opposite-sign tracks + BC-24 full-flow boost), arms raise / lower,
+bucket curl / dump, drive + arms (max-flow over arms), turn + bucket
+(both pivot+bucket and spin+bucket combinations), and a cross-cutting
+sub-deadband test (all four sticks at v=5 → every logical axis 0,
+flow_sp 0). The doc-anchored test file means any future regression to
+operator-visible motion vocabulary fails loudly with the primitive
+number. **Suite at 678 tests / 2 skipped / 54 files** (663 → 678 from
+Round 47).
+**Round 46** lands BC-23 — preserve-steering proportional scale-down on saturation — plus BC-24 — spin-turn flow
+boost. The naive ``clip_to_int8(lhy + lhx)`` per-side clip is replaced
+in ``apply_control()`` by ``mix_tracks_preserve_steering(left_intent,
+right_intent)``: when either intent magnitude exceeds ±127, BOTH are
+scaled by ``127 / max_mag`` so the differential (steering) ratio is
+preserved at the cost of throttle authority. Concrete example: ``lhy=120,
+lhx=80`` previously clipped to ``(127, 40)`` — differential 43, vs
+operator-commanded 80 — now scales to ``(127, 25)`` — differential 51.
+BC-24 augments the flow set-point: when both tracks are active in opposite
+directions (a pure or near-pure spin-turn), the track contribution becomes
+``min(127, |left_track| + |right_track|)`` instead of
+``max(|left_track|, |right_track|)``, so the proportional valve doesn't
+under-budget flow and stall the spin. Same-sign motion (forward, reverse,
+smooth-curve turn) continues to use max. Arms / bucket continue to use
+max in both cases since they're independent valve banks. The new
+[base_station/tests/test_steering_priority_sil.py](DESIGN-CONTROLLER/base_station/tests/test_steering_priority_sil.py)
+adds 24 tests across SP-A..SP-E: SP-A helper math (8 cases incl. boundary
+and mixed-sign saturation), SP-B end-to-end steering-ratio invariant
+(post-BC-23 diff is no further from operator intent than pre-BC-23
+baseline), SP-C spin-turn boost (pure spin reaches 10000 mV; partial spin
+uses sum; large spin clamps), SP-D non-spin cases (forward / reverse /
+smooth-curve / arms-only must use max), SP-E firmware source tripwires.
+The ``test_axis_ramp_sil.py`` Python mirror grew the new
+``_mix_tracks_preserve_steering`` helper and ``FourAxisArbiter`` now
+applies it. ``test_track_mix_ramp_sil.py`` RT-A / RT-C / RT-D expectations
+updated for BC-23 scaling; behavioural invariants (mixed-mode skip, K-A4
+coordinated stop, smooth-curve no-step) preserved. Schema-driven
+policy selectors (``[hydraulic].steering_priority`` enum,
+``[hydraulic].spin_turn_boost_enabled`` bool) deferred to a future round.
+[DIFFERENTIAL_MIXING.md](DESIGN-KINEMATICS/DIFFERENTIAL_MIXING.md) and
+[FLOW_BUDGETING.md](DESIGN-KINEMATICS/FLOW_BUDGETING.md) promoted from
+stub to landed; [ROADMAP.md](DESIGN-KINEMATICS/ROADMAP.md) marks BC-23
+and BC-24 as ``✓ LANDED Round 46``.
+**Suite at 663 tests / 1 skipped / 53 files** (639 → 663 from Round 46).
+**Round 45** lands BC-22 — reversal brake.
+``step_axis_ramp()`` now detects a same-tick sign-flip on a still-
+energised axis (``was_active && is_now && opposite signs``), converts
+the operator's reversal command into a decay-to-zero ramp using the
+standard release ladder, and on completion holds the axis at zero for
+``REVERSAL_BRAKE_MS = 100`` ms (= 2 × ``RAMP_TICK_MS``) before allowing
+the new direction to pass through. Two new fields on ``struct AxisRamp``
+(``reversal_pending`` and ``brake_until_ms``); a decay-shield invariant
+ensures the operator's still-held opposite-sign input cannot cancel the
+in-flight reversal ramp via the snap-on-activation path — the decay+
+settle sequence runs to completion deterministically, which is the
+central hydraulic-safety reason for BC-22 (prevents spool slam and the
+cavitation/pressure-spike pair documented in
+[DESIGN-KINEMATICS/REVERSAL_HANDLING.md](DESIGN-KINEMATICS/REVERSAL_HANDLING.md)).
+The new
+[base_station/tests/test_reversal_brake_sil.py](DESIGN-CONTROLLER/base_station/tests/test_reversal_brake_sil.py)
+adds 21 tests across BR-A..BR-F: BR-A decay phase (no-snap, release-ladder
+duration, monotonic non-increasing magnitude, brake-arm at deadline),
+BR-B settle window (holds zero through the full window, ignores input
+changes, 2-tick width invariant), BR-C post-brake resumption (active
+resumes immediately, zero stays zero), BR-D non-reversal cases (same-sign
+jump, plain release, sub-deadband flicker, mixed-mode-skip), BR-E arm
+reversals share settle window, BR-F firmware source tripwires. The
+``test_axis_ramp_sil.py`` Python mirror grew the same two fields and the
+shield logic; the W4-05 / W4-06 invariants stay green. K-A1 / K-A2 /
+K-A3 ramping refinements deferred (semantics ambiguous against the
+current snap-on-activation contract; need an operator-feel design pass).
+[REVERSAL_HANDLING.md](DESIGN-KINEMATICS/REVERSAL_HANDLING.md) promoted
+from stub to landed; [ROADMAP.md](DESIGN-KINEMATICS/ROADMAP.md) marks
+BC-22 as ``✓ LANDED Round 45``.
+**Suite at 639 tests / 1 skipped / 52 files** (618 → 639 from Round 45).
+**Round 44** lands BC-21 — mix-then-ramp +
+K-A4 coordinated bilateral track stop. The four ramps in
+`apply_control()` now operate on **logical** motion axes
+(`g_ramp_left_track`, `g_ramp_right_track`, `g_ramp_arms`,
+`g_ramp_bucket`) AFTER differential mixing of raw stick channels
+(`leftTrack = clip(lhy + lhx, ±127)`, mirror for right). Pre-BC-21,
+ramping on raw stick axes meant a smooth-curve turn (forward-pinned
+`lhy`, ramping `lhx` in) stepped the right track because the ramp
+short-circuit fired on a stick channel that no track ramp watched.
+Three independent code reviews flagged this. As an incidental fix the
+coil mapping moved from `lhy`-only OR'd pairs (`if lhy>db: coils |=
+LF | RF`) to per-side independent (`if leftTrack>db: coils |= LF`),
+which also fixes a second pre-BC-21 bug: pure spin-turns
+(`lhy=0, lhx=full`) produced ZERO drive coil activation. K-A4 ships
+alongside via a new optional `forced_duration_ms` parameter on
+`step_axis_ramp`: when both tracks transition active→released in the
+same tick, both ramps share a duration computed from the larger
+starting magnitude so the tractor doesn't pivot during release. The
+new
+[base_station/tests/test_track_mix_ramp_sil.py](DESIGN-CONTROLLER/base_station/tests/test_track_mix_ramp_sil.py)
+adds 25 tests across RT-A..RT-G: RT-A mixing math (8 cases incl.
+saturation), RT-B spin-turn coil activation (3 cases), RT-C
+smooth-curve no-step (the central correctness claim), RT-D K-A4
+(symmetric, asymmetric same-tick zero-crossing), RT-F single-track
+release, RT-G firmware source tripwire (BC-21 / K-A4 markers,
+old-globals-removed, per-side coil mapping). Existing
+[test_axis_ramp_sil.py](DESIGN-CONTROLLER/base_station/tests/test_axis_ramp_sil.py)
+W4-05 / W4-06 tests refactored to logical-axis semantics
+(behavioural invariants preserved). New top-level folder
+[`DESIGN-KINEMATICS/`](DESIGN-KINEMATICS/README.md) created in the
+same round as the canonical home for motion-command semantics
+(input mapping, mixing, ramp profiles, reversal handling, flow
+budgeting, build-variant motion matrix); [ROADMAP.md](DESIGN-KINEMATICS/ROADMAP.md)
+captures BC-22 / BC-23 / BC-24 and 13 follow-on K-* ideas.
+**Suite at 618 tests / 1 skipped / 51 files** (593 → 618 from Round
+44). **Round 43** lands BC-19 — hydraulic build-
+variant configurability. Three new `[hydraulic]` schema leaves
+(`spool_type` enum tandem/float/closed/open, `load_holding` enum
+spool_inherent/po_check/counterbalance/none, `valve_settling_ms`
+uint 0..250) extend the canonical TOML, the `HydraulicConfig`
+dataclass, the schema-driven C-header codegen (which auto-emits 11
+new `LIFETRAC_HYDRAULIC_*` macros incl. enum side-flags), and
+`CAPABILITY_INVENTORY.md`. A new in-loader cross-leaf validator
+`_validate_hydraulic_compatibility` rejects three contradictory
+combinations (tandem/closed + load_holding=none; float/open +
+load_holding=spool_inherent; float/open + non-zero
+valve_settling_ms) at `build_config.load()` time, before any
+consumer touches the config. The new
+[base_station/tests/test_hydraulic_compatibility_sil.py](DESIGN-CONTROLLER/base_station/tests/test_hydraulic_compatibility_sil.py)
+adds 13 tests across BC19_A..BC19_D: BC19_A canonical default
+passes the validator; BC19_B four documented reference builds load
+(OSE-legacy float+po_check, v25-canonical tandem+inherent, high-
+performance open+counterbalance, closed+counterbalance redundant);
+BC19_C six invalid pairings rejected (each with diagnostic naming
+the offending leaves); BC19_D source tripwire pins the validator
+call site so a refactor cannot silently disable the gate. The
+existing variant-matrix / loader / codegen SIL gates (BC-07 / BC-01
+/ BC-03) exercise the three new leaves at canonical values via
+their schema-driven sweeps without per-leaf edits. BUILD_CONFIG.md
+gets a new "Common pitfalls" entry pointing to the validator hook
+for future cross-leaf rules. **Suite at 593 tests / 1 skipped / 50
+files** (581 → 593 from Round 43). **Round 42** lands BC-15 — a machine-readable
+JSON form for the BC-10 ``lifetrac-config diff`` subcommand so non-
+Python consumers (notably ``hil/dispatch.ps1`` and ad-hoc bench-laptop
+shell pipelines) can decide whether a candidate config requires a
+service restart or a firmware reflash without re-implementing the
+schema-aware comparator. ``--format text`` (default) is byte-identical
+to the pre-BC-15 output; ``--format json`` emits the canonical sorted-
+keys compact form (consistent with ``dump-json``) carrying
+``changed`` / ``classes`` / ``worst`` / ``is_empty`` /
+``restart_required`` / ``firmware_required``. The new
+[base_station/tests/test_config_diff_cli_sil.py](DESIGN-CONTROLLER/base_station/tests/test_config_diff_cli_sil.py)
+adds 10 tests across BC15_A..BC15_C pinning the contract: BC15_A text
+output unchanged (no-diff, live-class change, explicit ``--format
+text`` matches default byte-for-byte); BC15_B JSON shape (no-diff
+empty payload, live-only / restart_required / firmware_required
+classification, ``worst`` promotion across multiple changes,
+canonical sorted-keys compact output); BC15_C argparse rejects
+unknown ``--format`` values with exit 2. BUILD_CONFIG.md ``diff`` row
+updated; doc-coverage gate auto-validates. **Suite at 581 tests / 1
+skipped / 49 files** (571 → 581 from Round 42). **Round 41** lands
+BC-12C — the bench-side
 CLI half of BC-12 — by composing Round 39's ``boot_self_test``
 comparator with Round 37's ``lifetrac-config`` CLI. The new
 ``self-test`` subcommand takes a TOML config and a JSON-encoded
@@ -58,8 +638,7 @@ exit 0; BC12C_D bad inputs are rejected with diagnostic stderr
 (missing file, non-object JSON, missing fields, unparseable JSON);
 BC12C_E source-grep tripwire pins the subparser registration.
 BUILD_CONFIG.md synopsis bumped eight→nine subcommands; the BC-08
-doc-coverage gate auto-validates. **Suite at 571 tests / 1 skipped
-/ 48 files** (561 → 571 from Round 41). **Round 40** lands BC-14B — a follow-up
+doc-coverage gate auto-validates. **Round 40** lands BC-14B — a follow-up
 to Round 37/BC-14 that closes the gap noted in the Round 37 memo:
 the ``config_loaded`` audit emitters in
 [base_station/web_ui.py](DESIGN-CONTROLLER/base_station/web_ui.py)
@@ -1084,6 +1663,108 @@ fleet. Specific failure modes already lurking in the codebase:
 * No firmware sketch contains a hard-coded "is this hardware
   present" check that the schema doesn't also gate.
 
+## Open initiative — Hydraulic soft-stop sequencer & build variants (BC-18 / BC-19 / BC-20)
+
+Tracked in detail in
+[DESIGN-HYDRAULIC/SOFT_STOP_STRATEGY.md](DESIGN-HYDRAULIC/SOFT_STOP_STRATEGY.md)
+and the canonical decisions in
+[DESIGN-CONTROLLER/DECISIONS.md](DESIGN-CONTROLLER/DECISIONS.md) §D-HYD1 and
+§D-HYD2. **Status:** designed, not yet implemented. Three sequential rounds:
+
+* **BC-18 — Valve-centre settling timer (firmware sequencer).** Add the
+  100 ms (default) settling delay between EFC reaching zero and the
+  directional-valve solenoid de-energising, gating the tandem-centre spool
+  (`D1VW00*8*CNKW`) becoming usable in field hardware. Concrete work:
+  add `LIFETRAC_HYDRAULIC_VALVE_SETTLING_MS` macro to
+  [`firmware/common/lifetrac_build_config.h`](DESIGN-CONTROLLER/firmware/common/lifetrac_build_config.h);
+  gate solenoid de-energise in
+  [`firmware/tractor_opta/tractor_opta.ino`](DESIGN-CONTROLLER/firmware/tractor_opta/tractor_opta.ino)
+  valve-drive loop behind a settling timer that starts when each
+  `REG_FLOW_SP_*` register reaches zero; new SIL gate
+  `base_station/tests/test_valve_settling_sil.py` (4 cases:
+  axis-active→zero starts timer; EFC reaches zero before timer; valve
+  de-energises only after timer; E-stop cancels timer immediately);
+  MASTER_TEST_PROGRAM.md row.
+
+* **BC-19 — Hydraulic build-variant schema. ✓ LANDED Round 43.**
+  Make the soft-stop parameters configurable per unit so non-canonical
+  hydraulic builds (OSE-legacy float + PO check, high-performance
+  open + counterbalance, etc.) work without forking firmware. Three
+  new leaves added under `[hydraulic]` in
+  [`base_station/config/build_config.schema.json`](DESIGN-CONTROLLER/base_station/config/build_config.schema.json) —
+  `spool_type` (enum: `tandem` / `float` / `closed` / `open`,
+  `restart_required`), `load_holding` (enum: `spool_inherent` /
+  `po_check` / `counterbalance` / `none`, `restart_required`),
+  `valve_settling_ms` (uint 0..250, `live`).
+  [`build.default.toml`](DESIGN-CONTROLLER/base_station/config/build.default.toml),
+  `HydraulicConfig` dataclass in
+  [`build_config.py`](DESIGN-CONTROLLER/base_station/build_config.py),
+  schema-driven codegen in
+  [`build_config_codegen.py`](DESIGN-CONTROLLER/base_station/build_config_codegen.py)
+  (auto-emits 11 new `LIFETRAC_HYDRAULIC_*` macros incl. enum side-
+  flags), and `CAPABILITY_INVENTORY.md` rows all updated.
+  Cross-leaf compatibility validator
+  `_validate_hydraulic_compatibility` lives in
+  [`build_config.py`](DESIGN-CONTROLLER/base_station/build_config.py)
+  and runs after JSON-Schema validation in `load()`; rejects three
+  contradictory combinations (tandem/closed + load_holding=none;
+  float/open + load_holding=spool_inherent; float/open + non-zero
+  valve_settling_ms). New SIL gate
+  [`test_hydraulic_compatibility_sil.py`](DESIGN-CONTROLLER/base_station/tests/test_hydraulic_compatibility_sil.py)
+  pins 13 cases (BC19_A canonical, BC19_B four reference builds load,
+  BC19_C six invalid pairings rejected, BC19_D rejection-at-load
+  tripwire). MASTER_TEST_PROGRAM.md §5 row promoted from "(planned)"
+  to landed. BUILD_CONFIG.md gets a new "Common pitfalls" entry on
+  the cross-leaf validator hook. Firmware consumer (BC-18) will read
+  the new `LIFETRAC_HYDRAULIC_SPOOL_TYPE` and `_VALVE_SETTLING_MS`
+  macros in the next round instead of hard-coding tandem.
+
+* **BC-20 — IMU-adaptive ramp tuning (jerk-based auto-tune).** Use
+  the BNO086 IMU already on the canonical BOM
+  ([HARDWARE_BOM.md](DESIGN-CONTROLLER/HARDWARE_BOM.md)) to detect jerk
+  spikes during start/stop transitions and slowly nudge
+  `LIFETRAC_HYDRAULIC_TRACK_RAMP_SECONDS` /
+  `_ARM_RAMP_SECONDS` / `_VALVE_SETTLING_MS` toward a smoother
+  trajectory. **Read-only telemetry first; closed-loop tuning gated.**
+  Detail in [DESIGN-HYDRAULIC/SOFT_STOP_STRATEGY.md](DESIGN-HYDRAULIC/SOFT_STOP_STRATEGY.md)
+  §"IMU-adaptive ramp tuning". Three sub-rounds:
+
+  * **BC-20A — passive jerk telemetry.** Compute `d(accel)/dt` from
+    BNO086 linear-acceleration samples on the Portenta H7 M7 core,
+    publish per-transition jerk peak (g/s, signed per axis) over the
+    existing telemetry channel, surface as a chart in the web UI
+    diagnostics page. **No control-loop change.** SIL: synthetic
+    accel time series → expected jerk peak.
+
+  * **BC-20B — recommendation engine (offline / advisory).** Base
+    station accumulates per-build jerk-vs-ramp histograms over
+    operator-confirmed clean transitions and recommends ramp-leaf
+    edits (e.g. "track_ramp_seconds 2.0 → 2.4 reduces P95 jerk from
+    1.8 g/s to 0.9 g/s"). Operator approves via the existing
+    `lifetrac-config` flow (validate / bundle / verify / push) — no
+    autonomous writes. SIL: mock telemetry stream → expected
+    recommendation; reject recommendations that would push values
+    outside the schema range.
+
+  * **BC-20C — closed-loop online tuning (gated, opt-in).** New
+    schema leaf `hydraulic.adaptive_ramp_tuning` (bool, default
+    `false`, `restart_required`). When enabled, M7 firmware adjusts
+    ramp seconds in ±5 % steps per accepted clean transition,
+    bounded by the schema range, audit-logged, with operator panic
+    button to revert to defaults. Disabled by default for v25
+    canonical because closed-loop control on a safety-relevant
+    parameter requires real bench validation (BC-12 HIL hardware
+    dependency). SIL: simulated jerk feedback drives ramp
+    adjustments; out-of-range writes refused; revert-on-panic
+    restores baseline.
+
+  **Why three sub-rounds:** BC-20A is pure observability and is safe
+  to ship anytime. BC-20B closes the loop through the human via the
+  existing config-delivery flow, which already has all the safety
+  gates we need. BC-20C is the only sub-round that adds autonomous
+  writes to a safety parameter, so it is opt-in, gated by HIL bench
+  validation, and exposes a panic revert.
+
 ## Current sprint status — DESIGN-CONTROLLER LoRa stack (2026-04-27)
 
 Tracked in detail in [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) and
@@ -1507,8 +2188,57 @@ Execute from the runbook; the bullets below are the index.
 [2026-04-25 code review](AI%20NOTES/CODE%20REVIEWS/2026-04-25_Review_ClaudeOpus4_7.md))
 
 The first four items also appear in the
-[2026-04-16 review](AI%20NOTES/CODE%20REVIEWS/2026-04-16_Review_GPT5_4.md)
-and are still unfixed. They are the highest-priority work on the software side.
+[2026-04-16 review](AI%20NOTES/CODE%20REVIEWS/2026-04-16_Review_GPT5_4.md).
+~~They are still unfixed. They are the highest-priority work on the software side.~~
+*Superseded \u2014 see WONTFIX banner immediately below.*
+
+> **2026-04-29 status update — entire section below is WONTFIX against archived
+> prototype code.** All file paths in this section
+> (`DESIGN-CONTROLLER/arduino_opta_controller/`,
+> `DESIGN-CONTROLLER/esp32_remote_control/`,
+> `DESIGN-CONTROLLER/raspberry_pi_web_controller/`) point at code that was
+> moved to
+> [`DESIGN-CONTROLLER/RESEARCH-CONTROLLER/`](DESIGN-CONTROLLER/RESEARCH-CONTROLLER/README.md)
+> in the 2026-04-26 cleanup. The RESEARCH-CONTROLLER README is explicit:
+> *"Treat everything in this folder as ideas/prior-art only — not
+> implementation plans. The canonical v25 build is LoRa-only, defined in
+> `MASTER_PLAN.md`. Code reviews and readiness analyses for the v25
+> hardware test do **not** apply to files under `RESEARCH-CONTROLLER/`."*
+> The bug surfaces below (Opta MQTT-over-WiFi proportional control,
+> blocking reconnect, BLE-without-pairing, hardcoded broker IP, ESP32
+> Qwiic-disconnect stale axes, Pi web-UI auth, mode-switch boot-only
+> sampling, etc.) all live on the **superseded MQTT-over-WiFi path** that
+> the canonical Portenta H7 + MKR WAN 1310 LoRa stack replaced.
+>
+> **The canonical v25 stack does not use WiFi or BLE for control.** The
+> active Opta firmware
+> ([firmware/tractor_opta/tractor_opta.ino](DESIGN-CONTROLLER/firmware/tractor_opta/tractor_opta.ino))
+> explicitly states *"The Opta's WiFi and BLE radios are intentionally NOT
+> initialised here. No WiFi.begin(), no BLE.begin(), no MQTT client, no
+> HTTP server."* and `base_station/` contains zero references to WiFi /
+> BLE / bluetooth (verified 2026-04-29 via repo-wide grep). The
+> equivalent functionality of every legacy bug below has been
+> re-implemented from scratch in the active LoRa-only stack with full
+> SIL coverage:
+>
+> | Legacy bug surface | Replaced by canonical-stack equivalent |
+> | --- | --- |
+> | Opta MQTT joystick float-parse, clamp, NaN-reject | `lora_proto.unpack_control` + Round 18 axis-ramp SIL ([test_axis_ramp_sil.py](DESIGN-CONTROLLER/base_station/tests/test_axis_ramp_sil.py)) |
+> | Opta blocking MQTT reconnect / safety timeout starvation | Round 25 MQTT retry/backoff fake-clock SIL ([test_mqtt_retry_backoff_sil.py](DESIGN-CONTROLLER/base_station/tests/test_mqtt_retry_backoff_sil.py)) + M4 watchdog (Round 39 boot_self_test) |
+> | Opta MQTT mode-switch / flow-valve jumper boot-only sampling | BC-XX BuildConfig (Rounds 27\u201341): per-unit TOML reloaded via `config_watcher.py`, classified `live`/`restart_required`/`firmware_required` |
+> | Opta hardcoded MQTT broker IP / credentials | `LIFETRAC_MQTT_HOST` env + PIN-gated web auth (D-E1, Round 9 \u00a7E) |
+> | Opta BLE characteristics accept unpaired writes | LoRa control path: AES-GCM + per-source `ReplayWindow` + `LIFETRAC_ALLOW_UNCONFIGURED_KEY` opt-in (Round 22 fleet-key SIL) |
+> | ESP32 stale axes on Qwiic disconnect | Handheld MKR replaces ESP32 entirely; LoRa control loop has 200 ms M4 watchdog (`tractor_h7_m4.ino`) that drops PSR on stale `alive_tick_ms` |
+> | Pi web controller no-auth, hardcoded broker | Round 9 \u00a7B/\u00a7C/\u00a7D + D-E1 PIN auth on `base_station/web_ui.py` |
+> | `setupWiFi()` boot-time blocking | Canonical stack does not use WiFi for control; LoRa is link-up-from-cold |
+> | `paho-mqtt < 2.0` pin / atexit cleanup on `app.py` | Active code uses `paho.mqtt.client.Client` via `web_ui._connect_mqtt_with_retry()` (Round 25) and lives under systemd unit lifecycle |
+>
+> Every item below is therefore WONTFIX in the canonical-stack sense \u2014
+> kept here as historical record. The `[ ]` checkboxes are left unticked
+> deliberately so a future operator who chooses to revive the prototype
+> for a one-off bench test can see what they would need to fix first.
+> See [`RESEARCH-CONTROLLER/README.md`](DESIGN-CONTROLLER/RESEARCH-CONTROLLER/README.md)
+> for the harvest-from-this list per legacy module.
 
 ### Stale-command / fail-safe (must fix before further deployment)
 

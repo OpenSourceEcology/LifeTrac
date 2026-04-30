@@ -68,6 +68,17 @@ class HydraulicConfig:
     proportional_flow: bool
     track_ramp_seconds: float
     arm_ramp_seconds: float
+    # BC-26 / K-A3 (Round 49) — ramp interpolation shape selector.
+    # ``linear`` (default) preserves the pre-Round-49 ladder shape
+    # byte-for-byte; ``scurve`` substitutes a half-cosine smoothstep
+    # (zero derivative at both endpoints) that cuts P95 jerk roughly
+    # in half for the same stop distance. Consumed by
+    # ``ramp_interpolate()`` in ``firmware/tractor_h7/tractor_h7.ino``.
+    ramp_shape: str
+    # BC-19 (Round 43) — hydraulic build-variant configurability.
+    spool_type: str
+    load_holding: str
+    valve_settling_ms: int
 
 
 @dataclass(frozen=True)
@@ -109,6 +120,32 @@ class UiConfig:
     web_ui_enabled: bool
     max_control_subscribers: int
     pin_required_for_control: bool
+    # BC-25 / K-A2 (Round 48): per-stick response curve exponent.
+    # ``effective = sign(x) * |x|^n`` applied post-deadband, pre-mixing.
+    # 1.0 = linear (canonical default), 1.5 / 2.0 = progressive curves.
+    stick_curve_exponent: float
+    # BC-27 / K-D2 (Round 50): confined-space mode. When ``true``, the
+    # release-ramp / reversal-decay duration is multiplied by 3/2 so the
+    # tractor stops more gently in tight quarters. ``false`` (default) is
+    # byte-for-byte identity vs the pre-Round-50 behaviour. Composes
+    # cleanly with BC-25 stick curve and BC-26 scurve ramp shape.
+    confined_space_mode_enabled: bool
+    # BC-28 / K-D1 (Round 51): operator profile preset. ``"normal"``
+    # (default) leaves the individual operator-feel leaves above as
+    # authored = byte-for-byte identity. ``"gentle"`` overrides
+    # ``confined_space_mode_enabled = true`` AND
+    # ``hydraulic.ramp_shape = "scurve"``. ``"sport"`` overrides
+    # ``confined_space_mode_enabled = false``,
+    # ``hydraulic.ramp_shape = "linear"`` AND ``stick_curve_exponent = 1.0``.
+    # Overrides apply at config-load time so codegen + audit-log + firmware
+    # all see the post-override state.
+    operator_profile: str
+    # BC-29 / K-D3 (Round 52): axis deadband threshold applied to the
+    # already-int8-clipped logical-axis values inside the tractor M7
+    # firmware (`axis_active()`, per-coil activation, spin-turn detect,
+    # flow-set-point computation). 13 = ~10% of int8 full scale =
+    # byte-for-byte identity vs the pre-Round-52 behaviour. Range 0..32.
+    axis_deadband: int
 
 
 @dataclass(frozen=True)
@@ -212,10 +249,106 @@ def _validate(value: Any, schema: Mapping[str, Any], path: str) -> None:
         )
 
 
+# BC-19 (Round 43) — hydraulic build-variant compatibility rules.
+#
+# The JSON Schema can validate each leaf in isolation but cannot express
+# cross-leaf constraints. The combination of ``hydraulic.spool_type`` and
+# ``hydraulic.load_holding`` has invalid pairings that the firmware
+# sequencer cannot honour safely; reject those at load time so the
+# installer / web-ui / CLI / boot path all surface the same diagnostic.
+#
+# Rules:
+#   * ``spool_type in {tandem, closed}`` requires ``load_holding != none``
+#     (tandem/closed centres block A & B, but ``load_holding=none`` would
+#     mean the BOM has no PO check / no counterbalance / no inherent hold
+#     either, which is contradictory — the spool itself is the inherent
+#     hold, so the right value is ``spool_inherent``, not ``none``).
+#   * ``spool_type in {float, open}`` rejects ``load_holding=spool_inherent``
+#     (those centres vent the cylinder lines on de-energise, so there is
+#     no inherent hold; the BOM must declare PO check, counterbalance,
+#     or none).
+#   * ``spool_type in {float, open}`` requires ``valve_settling_ms == 0``
+#     (no settling delay needed because the centre vents the cylinder
+#     lines; a non-zero value would silently introduce an EFC ramp-down
+#     pause before the directional valve releases, which is the wrong
+#     model for free-coast / float behaviour).
+
+_INHERENT_HOLD_SPOOLS = frozenset({"tandem", "closed"})
+_VENTING_SPOOLS = frozenset({"float", "open"})
+
+
+def _validate_hydraulic_compatibility(data: Mapping[str, Any]) -> None:
+    h = data.get("hydraulic", {})
+    spool = h.get("spool_type")
+    hold = h.get("load_holding")
+    settle = h.get("valve_settling_ms")
+    if spool in _INHERENT_HOLD_SPOOLS and hold == "none":
+        raise BuildConfigError(
+            f"hydraulic: spool_type={spool!r} requires load_holding != 'none' "
+            f"(use 'spool_inherent' for tandem/closed centres)"
+        )
+    if spool in _VENTING_SPOOLS and hold == "spool_inherent":
+        raise BuildConfigError(
+            f"hydraulic: spool_type={spool!r} cannot use load_holding='spool_inherent' "
+            f"(float/open centres vent cylinder lines; choose po_check, "
+            f"counterbalance, or none)"
+        )
+    if spool in _VENTING_SPOOLS and settle not in (None, 0):
+        raise BuildConfigError(
+            f"hydraulic: spool_type={spool!r} requires valve_settling_ms=0 "
+            f"(float/open centres vent on de-energise; got {settle!r})"
+        )
+
+
 def load_schema(path: Path = SCHEMA_PATH) -> Mapping[str, Any]:
     """Load and parse the JSON Schema document. Cached only by callers."""
     with path.open("rb") as f:
         return json.loads(f.read().decode("utf-8"))
+
+
+# ---------------------------------------------------------------- BC-28 / K-D1
+#
+# Round 51 (BC-28 / K-D1): operator profile preset overrides. ``"normal"``
+# is the no-op identity case. ``"gentle"`` and ``"sport"`` are bundles
+# that mutate a small set of operator-feel leaves at config-load time so
+# every downstream consumer (codegen header, audit log, hot-reload
+# diff) sees the same post-override state. Overrides are intentionally
+# silent: the operator picked a profile because they want its bundle.
+#
+# Bundles are intentionally minimal -- only operator-feel leaves with
+# ``reload_class = restart_required`` are touched. Safety / hydraulic-
+# topology / network leaves are NEVER overridden by a profile.
+
+OPERATOR_PROFILE_OVERRIDES: Mapping[str, Mapping[str, Mapping[str, Any]]] = {
+    "normal": {},
+    "gentle": {
+        "ui": {"confined_space_mode_enabled": True},
+        "hydraulic": {"ramp_shape": "scurve"},
+    },
+    "sport": {
+        "ui": {"confined_space_mode_enabled": False,
+               "stick_curve_exponent": 1.0},
+        "hydraulic": {"ramp_shape": "linear"},
+    },
+}
+
+
+def _apply_operator_profile_overrides(data: dict) -> None:
+    """Mutate ``data`` in place with the ``ui.operator_profile`` overrides.
+
+    Called from :func:`load` after schema validation but before the
+    hydraulic-compatibility cross-check, so the consistency check sees
+    the final post-override state. ``"normal"`` is a no-op.
+    """
+    profile = data.get("ui", {}).get("operator_profile", "normal")
+    bundle = OPERATOR_PROFILE_OVERRIDES.get(profile)
+    if bundle is None:
+        # Schema validation already caught unknown enums; defensive.
+        return
+    for section, leaves in bundle.items():
+        if section in data:
+            for leaf, value in leaves.items():
+                data[section][leaf] = value
 
 
 # ---------------------------------------------------------------- public API
@@ -258,6 +391,8 @@ def load(unit_id: str | None = None) -> BuildConfig:
 
     schema = load_schema()
     _validate(data, schema, path="")
+    _apply_operator_profile_overrides(data)
+    _validate_hydraulic_compatibility(data)
 
     return BuildConfig(
         unit_id=data["unit_id"],

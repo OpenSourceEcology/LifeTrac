@@ -1,5 +1,14 @@
 # LifeTrac v25 Controller — Development TODO
 
+> **📋 Pre-deployment summary:** for a single consolidated view of
+> what still has to happen across all subsystems before field
+> deployment (controller + structural + hydraulic + integration +
+> field tests + regulatory), see the
+> **[Pre-field-deployment checklist](../TODO.md#pre-field-deployment-checklist-open-items-as-of-2026-04-29)**
+> section in the top-level [LifeTrac-v25/TODO.md](../TODO.md). This
+> file remains the authoritative source for the controller-side phase
+> plan; the top-level checklist links back to specific items here.
+
 > **Scope (2026-04-26):** LoRa-only per [MASTER_PLAN.md](MASTER_PLAN.md). Cellular (Cat-M1 / SARA-R412M) line items below are **archived** — do not order, do not implement. Operator-browser ↔ base-station LAN/WiFi is retained. Legacy WiFi/BLE/MQTT-over-WiFi work is in [RESEARCH-CONTROLLER/](RESEARCH-CONTROLLER/).
 >
 > **Image-pipeline scope (2026-04-27):** see the canonical [IMAGE_PIPELINE.md](IMAGE_PIPELINE.md) implementation plan. The image-pipeline tasks in Phases 4–5 below are pulled from that plan; if they ever drift, IMAGE_PIPELINE.md is the source of truth.

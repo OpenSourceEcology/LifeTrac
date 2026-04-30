@@ -235,6 +235,7 @@ Machine weight is estimated at **800-1,000 kg (1,760-2,200 lbs)** based on steel
 ## Documentation
 - **DESIGN-CONTROLLER/INSTALLATION_GUIDE.md**: Complete setup and installation instructions
 - **DESIGN-HYDRAULIC/FLOW_VALVE_CONFIGURATION.md**: Proportional flow valve configuration (single vs dual valve)
+- **DESIGN-KINEMATICS/README.md**: Motion command semantics — input mapping, differential mixing, ramp profiles, reversal handling, flow budgeting, and the build-variant × motion-primitive matrix
 - **DROIDPAD_INTEGRATION.md**: Guide for DroidPad integration via BLE or MQTT
 - **DROIDPAD_BLE_SETUP.md**: Step-by-step BLE direct control setup for DroidPad
 - **MODE_SWITCH_WIRING.md**: Hardware switch wiring for MQTT/OFF/BLE selection

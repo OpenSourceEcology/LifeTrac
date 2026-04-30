@@ -15,6 +15,20 @@ arm_axis_count      = 2
 proportional_flow   = true
 track_ramp_seconds  = 2.0
 arm_ramp_seconds    = 1.0
+# BC-26 / K-A3 (Round 49) — ramp interpolation shape.
+# ``linear`` (default) preserves the pre-Round-49 release-ramp shape
+# byte-for-byte. ``scurve`` substitutes a half-cosine smoothstep (zero
+# derivative at both endpoints) that cuts P95 jerk roughly in half for
+# the same stop distance.
+ramp_shape          = "linear"
+# BC-19 (Round 43) — hydraulic build-variant configurability.
+# spool_type: tandem (canonical v25, requires BC-18 firmware) | float | closed | open
+# load_holding: spool_inherent (matches tandem/closed) | po_check | counterbalance | none
+# valve_settling_ms: settling delay between EFC reaching zero and valve solenoid de-energising
+#   (BC-18 firmware), 0 for float/open spools (no delay needed). Default 100 ms.
+spool_type          = "tandem"
+load_holding        = "spool_inherent"
+valve_settling_ms   = 100
 
 [aux]
 port_count          = 0
@@ -51,6 +65,30 @@ handheld_present         = true
 web_ui_enabled            = true
 max_control_subscribers   = 4
 pin_required_for_control  = true
+# BC-25 / K-A2: per-stick response curve `effective = sign(x) * |x|^n`
+# applied post-deadband, pre-mixing. 1.0 = linear (canonical default), 1.5
+# / 2.0 give better low-speed precision at the cost of top-end fidelity.
+stick_curve_exponent      = 1.0
+# BC-27 / K-D2 (Round 50): confined-space mode. When ``true`` the
+# release-ramp / reversal-decay duration is multiplied by 3/2 so the
+# tractor stops more gently in tight quarters. ``false`` (default) is
+# byte-for-byte identity vs the pre-Round-50 behaviour.
+confined_space_mode_enabled = false
+# BC-28 / K-D1 (Round 51): operator profile preset. ``"normal"`` (default)
+# leaves the individual operator-feel leaves above as authored = byte-for-
+# byte identity. ``"gentle"`` overrides ``confined_space_mode_enabled = true``
+# AND ``hydraulic.ramp_shape = "scurve"`` for tight-quarters work.
+# ``"sport"`` overrides ``confined_space_mode_enabled = false``,
+# ``hydraulic.ramp_shape = "linear"`` AND ``stick_curve_exponent = 1.0``
+# for crisp control. Overrides apply at config-load time so codegen +
+# audit-log + firmware all see the post-override state.
+operator_profile          = "normal"
+# BC-29 / K-D3 (Round 52): axis deadband threshold applied to the
+# already-int8-clipped logical-axis values. ``13`` (default ≈ 10% of
+# int8 full scale) is byte-for-byte identity vs the pre-Round-52
+# behaviour. Widen for jittery operators / cold-day stiff sticks;
+# shrink for fine-precision arms work. Range 0..32.
+axis_deadband             = 13
 
 [net]
 mqtt_host = "localhost"

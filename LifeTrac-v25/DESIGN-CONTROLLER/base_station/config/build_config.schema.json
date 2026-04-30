@@ -38,14 +38,34 @@
         "arm_axis_count",
         "proportional_flow",
         "track_ramp_seconds",
-        "arm_ramp_seconds"
+        "arm_ramp_seconds",
+        "ramp_shape",
+        "spool_type",
+        "load_holding",
+        "valve_settling_ms"
       ],
       "properties": {
         "track_axis_count":   {"type": "integer", "minimum": 1, "maximum": 2, "reload_class": "restart_required"},
         "arm_axis_count":     {"type": "integer", "minimum": 0, "maximum": 2, "reload_class": "restart_required"},
         "proportional_flow":  {"type": "boolean", "reload_class": "restart_required"},
         "track_ramp_seconds": {"type": "number",  "minimum": 0.5,  "maximum": 5.0, "reload_class": "live"},
-        "arm_ramp_seconds":   {"type": "number",  "minimum": 0.25, "maximum": 3.0, "reload_class": "live"}
+        "arm_ramp_seconds":   {"type": "number",  "minimum": 0.25, "maximum": 3.0, "reload_class": "live"},
+        "ramp_shape": {
+          "type": "string",
+          "enum": ["linear", "scurve"],
+          "reload_class": "restart_required"
+        },
+        "spool_type": {
+          "type": "string",
+          "enum": ["tandem", "float", "closed", "open"],
+          "reload_class": "restart_required"
+        },
+        "load_holding": {
+          "type": "string",
+          "enum": ["spool_inherent", "po_check", "counterbalance", "none"],
+          "reload_class": "restart_required"
+        },
+        "valve_settling_ms":  {"type": "integer", "minimum": 0, "maximum": 250, "reload_class": "live"}
       }
     },
     "safety": {
@@ -135,11 +155,15 @@
     "ui": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["web_ui_enabled", "max_control_subscribers", "pin_required_for_control"],
+      "required": ["web_ui_enabled", "max_control_subscribers", "pin_required_for_control", "stick_curve_exponent", "confined_space_mode_enabled", "operator_profile", "axis_deadband"],
       "properties": {
-        "web_ui_enabled":             {"type": "boolean", "reload_class": "restart_required"},
-        "max_control_subscribers":    {"type": "integer", "minimum": 1, "maximum": 32, "reload_class": "live"},
-        "pin_required_for_control":   {"type": "boolean", "reload_class": "live"}
+        "web_ui_enabled":               {"type": "boolean", "reload_class": "restart_required"},
+        "max_control_subscribers":      {"type": "integer", "minimum": 1, "maximum": 32, "reload_class": "live"},
+        "pin_required_for_control":     {"type": "boolean", "reload_class": "live"},
+        "stick_curve_exponent":         {"type": "number", "enum": [1.0, 1.5, 2.0], "reload_class": "restart_required"},
+        "confined_space_mode_enabled":  {"type": "boolean", "reload_class": "restart_required"},
+        "operator_profile":             {"type": "string", "enum": ["normal", "gentle", "sport"], "reload_class": "restart_required"},
+        "axis_deadband":                {"type": "integer", "minimum": 0, "maximum": 32, "reload_class": "restart_required"}
       }
     },
     "net": {

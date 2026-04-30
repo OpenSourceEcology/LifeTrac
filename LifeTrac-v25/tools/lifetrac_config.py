@@ -268,9 +268,32 @@ def cmd_push(args: argparse.Namespace) -> int:
 
 
 def cmd_diff(args: argparse.Namespace) -> int:
+    """Round 42 / BC-15: ``--format text|json`` machine-readable diff.
+
+    Text output is byte-identical to the pre-BC-15 default so existing
+    operator muscle-memory and any shell pipelines that scrape the
+    ``--> reload required: ...`` line keep working. JSON output is the
+    canonical sorted-keys form (compatible with ``dump-json``) so
+    non-Python consumers (notably ``hil/dispatch.ps1`` and ad-hoc
+    bench-laptop scripts) can decide whether a candidate config
+    requires a service restart or a firmware reflash without
+    re-implementing the schema-aware comparator.
+    """
+    import json
     old_cfg, _ = _load_validated(Path(args.old_path))
     new_cfg, _ = _load_validated(Path(args.against))
     diff = build_config.diff_reload_classes(old_cfg, new_cfg)
+    if args.format == "json":
+        payload = {
+            "changed": list(diff.changed),
+            "classes": dict(diff.classes),
+            "worst": diff.worst,
+            "is_empty": diff.is_empty,
+            "restart_required": diff.restart_required,
+            "firmware_required": diff.firmware_required,
+        }
+        print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+        return EXIT_OK
     if diff.is_empty:
         print("OK  configs identical (no diff)")
         return EXIT_OK
@@ -633,6 +656,12 @@ def _build_parser() -> argparse.ArgumentParser:
     pd = sub.add_parser("diff", help="show reload-class diff between two configs")
     pd.add_argument("old_path", help="baseline TOML or bundle")
     pd.add_argument("--against", required=True, help="candidate TOML or bundle")
+    pd.add_argument(
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help="output format (default: text; BC-15)",
+    )
     pd.set_defaults(func=cmd_diff)
 
     pp = sub.add_parser(

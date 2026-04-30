@@ -243,87 +243,219 @@ static uint16_t g_watchdog_ctr = 0;
 //
 // Re-derived for the M7's int8 axes (-127..127) and the 20 Hz arbitration tick:
 //   - AXIS_DEADBAND = 13 (~10% of full scale, matches research DEADZONE).
-//   - Track axes (lh_x, lh_y) get the slower 2 s / 1 s / 0.5 s ladder.
-//   - Arm axes (rh_x, rh_y) get the faster 1 s / 0.5 s / 0.25 s ladder.
-//   - "Mixed mode" skip from the research code is preserved: if any other
-//     axis is still active when one drops, that axis stops immediately so a
-//     coordinated dig→drive transition isn't gummed up by ramp-out.
-//   - REG_FLOW_SP_* gets the *max* active magnitude across all four axes
-//     (single-valve assumption), scaled to the Opta's 0..10000 mV range.
+//   - **BC-21 (Round 44):** ramping happens on **logical** motion axes
+//     (left_track, right_track, arms, bucket) AFTER differential mixing,
+//     not on the raw stick channels. Pre-BC-21, ramping on `lhx`/`lhy`
+//     directly meant a smooth stick movement that activated a previously-
+//     idle stick axis stepped the corresponding track because the ramp
+//     short-circuit (`is_now = true`) bypassed shaping. Mixing first puts
+//     the ramp on the signal the operator actually feels.
+//   - Track logical axes get the slower 2 s / 1 s / 0.5 s ladder.
+//   - Arm and bucket logical axes get the faster 1 s / 0.5 s / 0.25 s ladder.
+//   - "Mixed mode" skip from the research code is preserved on logical axes:
+//     if any other logical axis is still active when one drops, that axis
+//     stops immediately so a coordinated dig→drive transition isn't gummed
+//     up by ramp-out.
+//   - **K-A4 (Round 44):** coordinated bilateral track stop. When BOTH
+//     track logical axes transition to inactive in the same tick, both
+//     ramps share a single duration computed from the larger starting
+//     magnitude. Without this, the higher-magnitude track ramps longer
+//     and the tractor pivots as one side stops first.
+//   - REG_FLOW_SP_* gets the *max* active magnitude across all four
+//     logical axes (single-valve assumption), scaled to the Opta's
+//     0..10000 mV range.
 //
 // All ramp state lives in static locals here; reset on E-stop or no-source.
 
-static const int8_t AXIS_DEADBAND  = 13;     // ~10% of int8 full scale
+// BC-29 / K-D3 (Round 52): axis deadband threshold sourced from the
+// codegen-emitted firmware header so a build can widen it for jittery
+// sticks or shrink it for fine arms work. Default 13 = ~10% of int8
+// full scale = byte-for-byte identity vs the pre-Round-52 behaviour.
+static const int8_t AXIS_DEADBAND  = (int8_t)LIFETRAC_UI_AXIS_DEADBAND;
 static const uint32_t RAMP_TICK_MS = 50;     // matches the 20 Hz arbiter
+// BC-22 (Round 45) reversal brake: hold each axis at zero for this many
+// milliseconds after a decay-to-zero triggered by a same-tick sign-flip on
+// the raw input. Lets pump pressure equalise across the spool centre before
+// the new direction is energised. 100 ms = 2 arbiter ticks.
+static const uint32_t REVERSAL_BRAKE_MS = 100;
 
 struct AxisRamp {
-    int16_t  effective;   // current ramped value (axis units, -127..127)
-    int16_t  start;       // value at the moment release started
-    uint32_t start_ms;    // millis() when ramp began
-    uint32_t duration_ms; // total ramp length
-    bool     ramping;     // true while interpolating to zero
+    int16_t  effective;      // current ramped value (axis units, -127..127)
+    int16_t  start;          // value at the moment release started
+    uint32_t start_ms;       // millis() when ramp began
+    uint32_t duration_ms;    // total ramp length
+    bool     ramping;        // true while interpolating to zero
+    // BC-22 reversal-brake state. ``reversal_pending`` is set when a
+    // decay-to-zero ramp was triggered by a same-tick sign-flip on the raw
+    // input (vs a plain release). When such a ramp completes, ``brake_until_ms``
+    // is set to ``millis() + REVERSAL_BRAKE_MS`` and the axis is held at 0
+    // until ``millis()`` reaches that threshold.
+    bool     reversal_pending;
+    uint32_t brake_until_ms;
 };
 
-static AxisRamp g_ramp_lhx{}, g_ramp_lhy{};
-static AxisRamp g_ramp_rhx{}, g_ramp_rhy{};
+static AxisRamp g_ramp_left_track{},  g_ramp_right_track{};
+static AxisRamp g_ramp_arms{},        g_ramp_bucket{};
 
 static inline bool axis_active(int16_t v) {
     return (v > AXIS_DEADBAND) || (v < -AXIS_DEADBAND);
+}
+
+// Saturate an int16 to int8 range. Used post-mixing where the additive
+// formula `lhy ± lhx` can produce values up to ±254 before clipping.
+static inline int8_t clip_to_int8(int16_t v) {
+    if (v >  127) return  127;
+    if (v < -127) return -127;
+    return (int8_t)v;
 }
 
 // Mirror calculateDecelerationDuration() from the research code, but in
 // magnitude units (0..127) and ms.
 static uint32_t ramp_duration_ms(int16_t magnitude_axis_units, bool is_arm) {
     int mag = magnitude_axis_units < 0 ? -magnitude_axis_units : magnitude_axis_units;
+    uint32_t base;
     if (is_arm) {
-        if (mag >= 96) return 1000;   // ~75% → 1.0 s
-        if (mag >= 48) return  500;   //  ~37% → 0.5 s
-        return 250;                   //   <37% → 0.25 s
+        if (mag >= 96)      base = 1000;   // ~75% → 1.0 s
+        else if (mag >= 48) base =  500;   //  ~37% → 0.5 s
+        else                base =  250;   //   <37% → 0.25 s
+    } else {
+        if (mag >= 96)      base = 2000;   // ~75% → 2.0 s
+        else if (mag >= 48) base = 1000;   //  ~37% → 1.0 s
+        else                base =  500;   //   <37% → 0.5 s
     }
-    if (mag >= 96) return 2000;       // ~75% → 2.0 s
-    if (mag >= 48) return 1000;       //  ~37% → 1.0 s
-    return 500;                       //   <37% → 0.5 s
+    // BC-27 / K-D2 (Round 50): confined-space mode multiplies the
+    // release-ramp / reversal-decay duration by 3/2 so the tractor stops
+    // more gently in tight quarters. ``false`` (default) is byte-for-byte
+    // identity; the multiply-then-divide order keeps the result exact in
+    // integer math for every base value in the ladder above.
+#if LIFETRAC_UI_CONFINED_SPACE_MODE_ENABLED
+    base = (base * 3u) / 2u;
+#endif
+    return base;
+}
+
+// BC-26 / K-A3 (Round 49) ramp interpolation shape.
+// Selects the curve used to walk ``start → 0`` over ``duration_ms``
+// during a release ramp or BC-22 reversal decay. ``linear`` (default)
+// preserves the pre-Round-49 shape byte-for-byte; ``scurve`` substitutes
+// a half-cosine smoothstep ``shape(t) = 0.5 * (1 + cos(pi * t))`` whose
+// derivative is zero at both t=0 and t=1, cutting P95 jerk roughly in
+// half for the same stop distance. ``elapsed`` is clamped into
+// ``[0, duration_ms]`` defensively so a callsite that passes an over
+// run can't produce a sign-flipped result.
+static int16_t ramp_interpolate(int16_t start, uint32_t elapsed,
+                                uint32_t duration_ms) {
+    if (duration_ms == 0) return 0;
+    if (elapsed >= duration_ms) return 0;
+#if LIFETRAC_HYDRAULIC_RAMP_SHAPE_SCURVE
+    // Half-cosine smoothstep: shape(t) = 0.5 * (1 + cos(pi * t)).
+    float t = (float)elapsed / (float)duration_ms;
+    float shape = 0.5f * (1.0f + cosf((float)M_PI * t));
+    float v = (float)start * shape;
+    if (v >  127.0f) v =  127.0f;
+    if (v < -127.0f) v = -127.0f;
+    return (int16_t)(v >= 0 ? v + 0.5f : v - 0.5f);
+#else
+    // Canonical linear interpolation (pre-Round-49 default).
+    int32_t v = (int32_t)start *
+                (int32_t)(duration_ms - elapsed) /
+                (int32_t)duration_ms;
+    return (int16_t)v;
+#endif
 }
 
 // Update one axis's ramp state. Returns the effective axis value to use this
 // tick. ``other_active`` is "is any other axis still active right now" — used
-// to implement the research code's mixed-mode skip.
+// to implement the research code's mixed-mode skip. ``forced_duration_ms``
+// (BC-21 / K-A4): when non-zero AND a fresh ramp is being started this tick,
+// override the magnitude-derived ladder duration with the supplied value.
+// Used by the coordinated-bilateral-stop logic in apply_control to pin both
+// track ramps to the same wallclock duration so the tractor doesn't pivot
+// during release.
 static int16_t step_axis_ramp(AxisRamp& r, int8_t raw, bool is_arm,
-                              bool other_active) {
+                              bool other_active,
+                              uint32_t forced_duration_ms = 0) {
     bool was_active = axis_active(r.effective);
     bool is_now     = axis_active(raw);
     uint32_t now    = millis();
 
-    if (is_now) {
-        // Operator commanding — cancel any ramp and pass through immediately.
-        r.ramping   = false;
-        r.effective = raw;
-        return r.effective;
-    }
-    // Operator released the axis.
-    if (was_active && !r.ramping) {
-        if (other_active) {
-            // Mixed-mode: stop now so coordinated transitions stay snappy.
+    // BC-22 (Round 45) reversal brake — settle phase. While we're holding
+    // the axis at zero post-decay, ignore raw input entirely. Operator
+    // intent is captured naturally on the next tick after the brake expires.
+    if (r.brake_until_ms != 0) {
+        if ((int32_t)(now - r.brake_until_ms) < 0) {
             r.effective = 0;
+            r.ramping = false;
             return 0;
         }
-        // Start a ramp from the last effective value down to zero.
-        r.ramping     = true;
-        r.start       = r.effective;
-        r.start_ms    = now;
-        r.duration_ms = ramp_duration_ms(r.start, is_arm);
+        // Brake window elapsed — clear and fall through to normal handling.
+        r.brake_until_ms = 0;
+        was_active = false;  // we're at zero post-brake
+    }
+
+    // BC-22 reversal decay shield: if a reversal-decay ramp is in flight,
+    // the operator's still-held opposite-sign input must NOT cancel it via
+    // the snap-on-activation path. Skip straight to the interpolation block
+    // so the decay completes deterministically (the hydraulic-safety reason
+    // for BC-22 is exactly that the decay+settle must run to completion).
+    if (!(r.ramping && r.reversal_pending)) {
+        // Detect a fresh reversal: same-tick sign-flip on a still-energised
+        // axis. Convert the operator's reversal command into a decay-to-zero
+        // ramp followed (on completion) by a settle window. Prevents spool
+        // slam and the cavitation/pressure-spike pair documented in
+        // DESIGN-KINEMATICS/REVERSAL_HANDLING.md.
+        bool reversal = was_active && is_now &&
+                        ((r.effective > 0 && raw < 0) ||
+                         (r.effective < 0 && raw > 0));
+        if (reversal && !r.ramping) {
+            r.ramping           = true;
+            r.start             = r.effective;
+            r.start_ms          = now;
+            r.duration_ms       = (forced_duration_ms != 0)
+                                      ? forced_duration_ms
+                                      : ramp_duration_ms(r.start, is_arm);
+            r.reversal_pending  = true;
+            // Fall through to interpolation block.
+        } else if (is_now) {
+            // Operator commanding (and not a reversal) — cancel any release
+            // ramp and pass through immediately.
+            r.ramping           = false;
+            r.reversal_pending  = false;
+            r.effective         = raw;
+            return r.effective;
+        } else if (was_active && !r.ramping) {
+            // Operator released the axis (raw inactive).
+            if (other_active) {
+                // Mixed-mode: stop now so coordinated transitions stay snappy.
+                r.effective         = 0;
+                r.reversal_pending  = false;
+                return 0;
+            }
+            // Start a release ramp from the last effective value down to zero.
+            r.ramping           = true;
+            r.start             = r.effective;
+            r.start_ms          = now;
+            r.duration_ms       = (forced_duration_ms != 0)
+                                      ? forced_duration_ms
+                                      : ramp_duration_ms(r.start, is_arm);
+            // Plain release, not a reversal.
+            r.reversal_pending  = false;
+        }
     }
     if (r.ramping) {
         uint32_t elapsed = now - r.start_ms;
         if (elapsed >= r.duration_ms) {
             r.ramping   = false;
             r.effective = 0;
+            if (r.reversal_pending) {
+                // Decay done — enter settle window. Next call returns 0
+                // (and any subsequent calls until the brake window elapses).
+                r.brake_until_ms   = now + REVERSAL_BRAKE_MS;
+                r.reversal_pending = false;
+            }
         } else {
-            // Linear interpolation start → 0.
-            int32_t v = (int32_t)r.start *
-                        (int32_t)(r.duration_ms - elapsed) /
-                        (int32_t)r.duration_ms;
-            r.effective = (int16_t)v;
+            // BC-26 / K-A3: shape selector (linear default; scurve opt-in).
+            r.effective = ramp_interpolate(r.start, elapsed, r.duration_ms);
         }
     } else {
         r.effective = 0;
@@ -334,10 +466,77 @@ static int16_t step_axis_ramp(AxisRamp& r, int8_t raw, bool is_arm,
 // Reset every ramp's state — used on E-stop and no-source paths so a future
 // fresh frame doesn't see stale ``effective`` values.
 static void reset_axis_ramps() {
-    g_ramp_lhx = AxisRamp{};
-    g_ramp_lhy = AxisRamp{};
-    g_ramp_rhx = AxisRamp{};
-    g_ramp_rhy = AxisRamp{};
+    g_ramp_left_track  = AxisRamp{};
+    g_ramp_right_track = AxisRamp{};
+    g_ramp_arms        = AxisRamp{};
+    g_ramp_bucket      = AxisRamp{};
+}
+
+// BC-25 / K-A2 (Round 48) per-stick response curve.
+// effective = sign(x) * 127 * (|x|/127)^n, applied post-deadband and
+// pre-mixing. n is sourced from the build config
+// (``ui.stick_curve_exponent``); the canonical default is 1.0 (linear,
+// identity) so existing operator-feel is unchanged unless a build opts
+// in. The LUT is computed once at boot from
+// LIFETRAC_UI_STICK_CURVE_EXPONENT and indexed by |v| ∈ [0, 127]; sign
+// is reapplied to the result. Outputs stay in [-127, +127] by construction.
+static uint8_t g_stick_curve_lut[128];
+static bool    g_stick_curve_lut_ready = false;
+
+static void init_stick_curve_lut() {
+    const float n = (float)LIFETRAC_UI_STICK_CURVE_EXPONENT;
+    if (n == 1.0f) {
+        for (int i = 0; i < 128; ++i) g_stick_curve_lut[i] = (uint8_t)i;
+    } else {
+        for (int i = 0; i < 128; ++i) {
+            float u = (float)i / 127.0f;
+            float curved = 127.0f * powf(u, n);
+            int q = (int)(curved + 0.5f);
+            if (q < 0) q = 0;
+            if (q > 127) q = 127;
+            g_stick_curve_lut[i] = (uint8_t)q;
+        }
+    }
+    g_stick_curve_lut_ready = true;
+}
+
+static inline int8_t apply_stick_curve(int8_t v) {
+    // Defensive: if setup() hasn't run yet (unit-test harness etc.), fall
+    // back to identity rather than indexing an uninitialised LUT.
+    if (!g_stick_curve_lut_ready) return v;
+    if (v >= 0) {
+        int idx = v > 127 ? 127 : v;
+        return (int8_t)g_stick_curve_lut[idx];
+    } else {
+        int idx = v < -127 ? 127 : -v;
+        return (int8_t)(-(int)g_stick_curve_lut[idx]);
+    }
+}
+
+// BC-23 (Round 46) preserve-steering mix. The naive `clip_to_int8(lhy + lhx)`
+// saturates each track independently, which destroys the differential
+// (steering) component when the throttle+steering sum exceeds full scale.
+// Example: lhy=120, lhx=80 yields raw (200, 40); independent clip yields
+// (127, 40) so steering authority drops from 80 to (127-40)/2 = 43 — nearly
+// half. Preserve-steering policy proportionally scales BOTH track intents by
+// the same factor when either side exceeds ±127, so the ratio (and hence
+// turn tightness) is preserved at the cost of throttle authority. Caller
+// receives the post-scale int8 values via out-params.
+static inline void mix_tracks_preserve_steering(int16_t left_intent,
+                                                 int16_t right_intent,
+                                                 int8_t& left_out,
+                                                 int8_t& right_out) {
+    int16_t lm = left_intent  < 0 ? -left_intent  : left_intent;
+    int16_t rm = right_intent < 0 ? -right_intent : right_intent;
+    int16_t mx = lm > rm ? lm : rm;
+    if (mx <= 127) {
+        left_out  = (int8_t)left_intent;
+        right_out = (int8_t)right_intent;
+        return;
+    }
+    // Scale both sides by 127/mx using int32 to avoid overflow.
+    left_out  = (int8_t)((int32_t)left_intent  * 127 / mx);
+    right_out = (int8_t)((int32_t)right_intent * 127 / mx);
 }
 
 static void apply_control(int active) {
@@ -351,44 +550,127 @@ static void apply_control(int active) {
     } else if (active >= 0) {
         const ControlFrame& cf = g_src[active].latest;
 
-        // IP-303: deadband + per-axis ramp on release. ``other_active`` is
-        // computed against the *raw* values so a stale ramping axis doesn't
-        // block a sibling axis's mixed-mode skip.
-        bool any_lhx = axis_active(cf.axis_lh_x);
-        bool any_lhy = axis_active(cf.axis_lh_y);
-        bool any_rhx = axis_active(cf.axis_rh_x);
-        bool any_rhy = axis_active(cf.axis_rh_y);
-        int16_t lhx = step_axis_ramp(g_ramp_lhx, cf.axis_lh_x, /*arm*/false,
-                                     any_lhy || any_rhx || any_rhy);
-        int16_t lhy = step_axis_ramp(g_ramp_lhy, cf.axis_lh_y, /*arm*/false,
-                                     any_lhx || any_rhx || any_rhy);
-        int16_t rhx = step_axis_ramp(g_ramp_rhx, cf.axis_rh_x, /*arm*/true,
-                                     any_lhx || any_lhy || any_rhy);
-        int16_t rhy = step_axis_ramp(g_ramp_rhy, cf.axis_rh_y, /*arm*/true,
-                                     any_lhx || any_lhy || any_rhx);
+        // BC-25 / K-A2: per-stick response curve, applied to the four raw
+        // stick axes before mixing or ramping. With the canonical default
+        // of n = 1.0 this is a byte-for-byte identity; for n = 1.5 / 2.0 it
+        // squeezes low-stick values toward zero for finer creep precision.
+        int8_t lhx_in = apply_stick_curve(cf.axis_lh_x);
+        int8_t lhy_in = apply_stick_curve(cf.axis_lh_y);
+        int8_t rhx_in = apply_stick_curve(cf.axis_rh_x);
+        int8_t rhy_in = apply_stick_curve(cf.axis_rh_y);
 
-        // Map (post-ramp) joystick + buttons → 8 directional valve coils.
-        // Coils stay engaged while we ramp the proportional flow down so the
-        // hydraulic path doesn't slam closed (research code §"Leave hydraulic
-        // solenoid engaged while proportional valve(s) reduce flow").
+        // BC-21: mix raw stick axes → logical motion axes BEFORE ramping.
+        // Track logical axes use differential mixing (Y±X). Arm and bucket
+        // are pass-through today (bucket coils are still button-driven; the
+        // bucket logical-axis ramp is reserved for future bucket-on-stick
+        // builds and contributes to the flow setpoint magnitude).
+        int16_t left_track_raw  = (int16_t)lhy_in + (int16_t)lhx_in;
+        int16_t right_track_raw = (int16_t)lhy_in - (int16_t)lhx_in;
+        // BC-23: preserve-steering proportional scale-down on saturation.
+        // Replaces the previous independent `clip_to_int8` per side.
+        int8_t left_track_in;
+        int8_t right_track_in;
+        mix_tracks_preserve_steering(left_track_raw, right_track_raw,
+                                     left_track_in, right_track_in);
+        int8_t arms_in          = rhy_in;
+        int8_t bucket_in        = rhx_in;
+
+        // ``other_active`` is computed against the post-mix (logical) inputs
+        // so the mixed-mode-skip rule operates on the same signal the ramps
+        // do. This is BC-21's central correctness point: pre-BC-21 the skip
+        // checked stick-axis activity, which made smooth-curve turns step
+        // the right track because ``lhx`` activating mid-turn flipped the
+        // ramp's `is_now` short-circuit on a stick channel that no track
+        // ramp was watching.
+        bool any_left   = axis_active(left_track_in);
+        bool any_right  = axis_active(right_track_in);
+        bool any_arms   = axis_active(arms_in);
+        bool any_bucket = axis_active(bucket_in);
+
+        // K-A4: coordinated bilateral track stop. When BOTH tracks
+        // transition from active → released in the same tick (and neither
+        // is already ramping), pin both ramps to a shared duration computed
+        // from the larger starting magnitude. Without this the tractor
+        // pivots during release because the higher-magnitude track ramps
+        // longer than its sibling.
+        uint32_t forced_track_dur = 0;
+        bool left_was_active  = axis_active(g_ramp_left_track.effective);
+        bool right_was_active = axis_active(g_ramp_right_track.effective);
+        if (!any_left && !any_right
+            && !g_ramp_left_track.ramping && !g_ramp_right_track.ramping
+            && (left_was_active || right_was_active)) {
+            int16_t lm = g_ramp_left_track.effective;
+            if (lm < 0) lm = -lm;
+            int16_t rm = g_ramp_right_track.effective;
+            if (rm < 0) rm = -rm;
+            forced_track_dur = ramp_duration_ms(lm > rm ? lm : rm,
+                                                /*is_arm*/ false);
+        }
+
+        int16_t left_track  = step_axis_ramp(g_ramp_left_track,  left_track_in,
+                                             /*is_arm*/false,
+                                             any_right || any_arms || any_bucket,
+                                             forced_track_dur);
+        int16_t right_track = step_axis_ramp(g_ramp_right_track, right_track_in,
+                                             /*is_arm*/false,
+                                             any_left  || any_arms || any_bucket,
+                                             forced_track_dur);
+        int16_t arms        = step_axis_ramp(g_ramp_arms,        arms_in,
+                                             /*is_arm*/true,
+                                             any_left || any_right || any_bucket);
+        int16_t bucket      = step_axis_ramp(g_ramp_bucket,      bucket_in,
+                                             /*is_arm*/true,
+                                             any_left || any_right || any_arms);
+
+        // Map (post-ramp) logical axes → 8 directional valve coils.
+        // BC-21 fix: pre-BC-21 only `lhy` drove the drive coils, which meant
+        // a pure spin-turn (lhy=0, lhx=full) produced ZERO drive coil
+        // activation despite the tractor wanting to spin. With logical-axis
+        // mixing each track side is independently energised in the correct
+        // direction. Coils stay engaged while we ramp the proportional flow
+        // down so the hydraulic path doesn't slam closed (research code
+        // §"Leave hydraulic solenoid engaged while proportional valve(s)
+        // reduce flow").
         uint16_t coils = 0;
-        if (lhy >  AXIS_DEADBAND) { coils |= (1u << VB_DRIVE_LF) | (1u << VB_DRIVE_RF); }
-        if (lhy < -AXIS_DEADBAND) { coils |= (1u << VB_DRIVE_LR) | (1u << VB_DRIVE_RR); }
-        if (rhy >  AXIS_DEADBAND) { coils |= (1u << VB_BOOM_UP);   }
-        if (rhy < -AXIS_DEADBAND) { coils |= (1u << VB_BOOM_DN);   }
+        if (left_track  >  AXIS_DEADBAND) { coils |= (1u << VB_DRIVE_LF); }
+        if (left_track  < -AXIS_DEADBAND) { coils |= (1u << VB_DRIVE_LR); }
+        if (right_track >  AXIS_DEADBAND) { coils |= (1u << VB_DRIVE_RF); }
+        if (right_track < -AXIS_DEADBAND) { coils |= (1u << VB_DRIVE_RR); }
+        if (arms        >  AXIS_DEADBAND) { coils |= (1u << VB_BOOM_UP); }
+        if (arms        < -AXIS_DEADBAND) { coils |= (1u << VB_BOOM_DN); }
         if (cf.buttons & BTN_BUCKET_CURL) { coils |= (1u << VB_BUCKET_CURL); }
         if (cf.buttons & BTN_BUCKET_DUMP) { coils |= (1u << VB_BUCKET_DUMP); }
         regs[REG_VALVE_COILS] = coils;
 
         // Proportional flow set-point: largest active magnitude across all
-        // four axes scales linearly to 0..10000 mV (the A0602 0-10 V range
-        // documented in opta_modbus_slave.ino::a0602_write_mv()).
-        int16_t mag = 0;
+        // four logical axes scales linearly to 0..10000 mV (the A0602
+        // 0-10 V range documented in opta_modbus_slave.ino::a0602_write_mv()).
+        //
+        // BC-24 (Round 46) spin-turn flow boost: when both tracks are active
+        // with opposite signs (a pure or near-pure spin-turn), the hydraulic
+        // demand is the SUM of the two track magnitudes (each track motor
+        // draws its own flow), not the max. Use sum-of-magnitudes for the
+        // track contribution in that case so the proportional valve doesn't
+        // under-budget flow and stall the spin. Same-sign or single-track
+        // cases continue to use the max-magnitude rule (the two motors share
+        // a common flow path). Arms/bucket continue to use max-magnitude
+        // since they're independent valve banks.
+        int16_t lt_mag = left_track  < 0 ? -left_track  : left_track;
+        int16_t rt_mag = right_track < 0 ? -right_track : right_track;
+        int16_t track_mag;
+        bool spin_turn = (left_track  >  AXIS_DEADBAND && right_track < -AXIS_DEADBAND)
+                      || (left_track  < -AXIS_DEADBAND && right_track >  AXIS_DEADBAND);
+        if (spin_turn) {
+            int32_t s = (int32_t)lt_mag + (int32_t)rt_mag;
+            if (s > 127) s = 127;  // clamp to int8 magnitude space
+            track_mag = (int16_t)s;
+        } else {
+            track_mag = lt_mag > rt_mag ? lt_mag : rt_mag;
+        }
+        int16_t mag = track_mag;
         int16_t am;
-        am = lhx < 0 ? -lhx : lhx; if (am > mag) mag = am;
-        am = lhy < 0 ? -lhy : lhy; if (am > mag) mag = am;
-        am = rhx < 0 ? -rhx : rhx; if (am > mag) mag = am;
-        am = rhy < 0 ? -rhy : rhy; if (am > mag) mag = am;
+        am = arms        < 0 ? -arms        : arms;        if (am > mag) mag = am;
+        am = bucket      < 0 ? -bucket      : bucket;      if (am > mag) mag = am;
         // Subtract deadband so the live region maps to 0..10000 (matches the
         // handheld's deadband-stretched output convention from IP-302).
         int32_t flow = 0;
@@ -1059,6 +1341,10 @@ static void poll_link_ladder() {
 // ---------- Arduino entry points ----------
 void setup() {
     Serial.begin(115200);
+
+    // BC-25 / K-A2: precompute the per-stick response curve LUT from the
+    // build-time exponent. Must run before apply_control() can be called.
+    init_stick_curve_lut();
 
     // LoRa control profile per LADDER[0] (DECISIONS.md D-A2: SF7/BW250/CR4-5).
     // IP-006: must match LADDER[0] exactly so the first TX after boot decodes

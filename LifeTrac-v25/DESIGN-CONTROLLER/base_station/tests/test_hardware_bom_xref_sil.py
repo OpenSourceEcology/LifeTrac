@@ -46,6 +46,13 @@ _SCHEMA = _BS / "config" / "build_config.schema.json"
 _PHYSICAL_CAPABILITIES: frozenset[str] = frozenset(
     {
         "hydraulic.proportional_flow",
+        # Round 43 / BC-19. spool_type maps to a Parker D1VW SKU suffix
+        # (tandem=008, float=004, closed=001, open=002); load_holding
+        # maps to PO-check / counterbalance / inherent (no extra parts) /
+        # none. valve_settling_ms is pure software (firmware timer) so
+        # it stays out of this curated set per the existing rule.
+        "hydraulic.spool_type",
+        "hydraulic.load_holding",
         "safety.estop_topology",
         "cameras.count",
         "cameras.coral_tpu",

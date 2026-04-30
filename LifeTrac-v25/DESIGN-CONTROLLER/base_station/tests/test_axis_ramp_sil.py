@@ -1,5 +1,15 @@
 """Round 18: SIL model of the M7 per-axis ramp + mixed-mode skip.
 
+**Round 44 (BC-21 / K-A4) update.** Ramping now happens on **logical**
+motion axes (``left_track``, ``right_track``, ``arms``, ``bucket``)
+*after* differential mixing of the raw stick channels, not on the raw
+``lhx``/``lhy``/``rhx``/``rhy`` channels. The ramp engine
+(``step_axis_ramp``) and ladder are unchanged; only what we feed into
+them changes. The W4-05 / W4-06 tests below have been re-expressed in
+terms of the new logical axes — the *behavioural* invariants (ramp
+shape, mixed-mode skip, coil-engagement during ramp) are identical;
+only the axis names and coil-mapping shift.
+
 Mirrors ``step_axis_ramp()`` and the surrounding ``apply_control()``
 arbitration in ``firmware/tractor_h7/tractor_h7.ino`` so the W4-05 and
 W4-06 HIL gates become *verification* passes against a documented model
@@ -15,17 +25,24 @@ What the C side does, captured here:
   raw value and ``ramping`` is false.
 * On the *first* tick where the axis transitions from active to
   released (``was_active && !is_now && !r.ramping``):
-    - If any *other* axis is currently active, jump straight to 0
-      (mixed-mode skip — coordinated dig→drive transitions stay snappy).
+    - If any *other* logical axis is currently active, jump straight
+      to 0 (mixed-mode skip — coordinated dig→drive transitions stay
+      snappy).
     - Otherwise, latch ``r.start = r.effective`` and
       ``r.duration_ms = ramp_duration_ms(start, is_arm)`` and start
       a linear interpolation from ``start`` down to 0.
+* **K-A4 coordinated bilateral track stop:** if BOTH track logical
+  axes transition active → released in the same tick (and neither is
+  already ramping), both ramps share a single ``forced_duration_ms``
+  computed from the larger starting magnitude. The ``forced`` value is
+  passed through ``step_axis_ramp``'s optional ``forced_duration_ms``
+  parameter and overrides the magnitude-derived ladder.
 * Per-axis ramp ladder, in magnitude units 0..127:
-    Track (lh_x / lh_y, ``is_arm = false``):
+    Track (left_track / right_track, ``is_arm = false``):
       mag >= 96 → 2000 ms
       mag >= 48 → 1000 ms
       mag <  48 →  500 ms
-    Arm   (rh_x / rh_y, ``is_arm = true``):
+    Arm   (arms / bucket, ``is_arm = true``):
       mag >= 96 → 1000 ms
       mag >= 48 →  500 ms
       mag <  48 →  250 ms
@@ -35,12 +52,14 @@ What the C side does, captured here:
   and ``ramping = false``.
 * The valve-coil bitmap and ``REG_FLOW_SP_*`` are re-derived from
   ``effective`` (not raw) every tick:
-    - Coil bits are set iff ``|effective| > AXIS_DEADBAND`` for the
-      axis that owns them. Concretely, a ramp-out keeps the coil
-      energised until the ramped magnitude crosses the deadband.
-    - ``REG_FLOW_SP_*`` = max(|effective|) across all four axes,
-      mapped from (deadband..127] linearly onto (0..10000] mV. Below
-      the deadband the flow set-point is 0.
+    - **BC-21 coil mapping (logical-axis driven):** ``left_track > db``
+      → ``VB_DRIVE_LF``; ``left_track < -db`` → ``VB_DRIVE_LR``;
+      ``right_track > db`` → ``VB_DRIVE_RF``; ``right_track < -db``
+      → ``VB_DRIVE_RR``. Pre-BC-21 only ``lhy`` drove drive coils, so a
+      pure spin-turn (lhy=0, lhx=full) produced ZERO drive coil
+      activation. Per-side coils fix that.
+    - ``REG_FLOW_SP_*`` = max(|effective|) across all four logical
+      axes, mapped from (deadband..127] linearly onto (0..10000] mV.
 
 W4-05 (proportional valve ramp-out) verification surface:
 
@@ -54,31 +73,30 @@ W4-05 (proportional valve ramp-out) verification surface:
   (deadband..48) → 500 ms.
 * **TR-D** Arm  ladder: (96..127] → 1000 ms; (48..96) →  500 ms;
   (deadband..48) →  250 ms.
-* **TR-E** Coil-stays-engaged invariant: from release to one tick
-  before the ramp ends, the coil bit owned by the ramping axis stays
-  set. The coil drops in the same tick that ``REG_FLOW_SP_*`` first
-  reads 0 (or the immediately following tick — see TR-E note below).
+* **TR-E** Coil-stays-engaged invariant on the LEFT-TRACK logical axis:
+  from release to one tick before the ramp ends, the ``VB_DRIVE_LF``
+  coil bit owned by the ramping axis stays set. The coil drops in the
+  same tick that the ramped magnitude crosses the deadband.
 * **TR-F** Flow set-point during ramp is monotonically non-increasing
   and reaches 0 by the deadline.
 
-W4-06 (mixed-mode skip) verification surface:
+W4-06 (mixed-mode skip) verification surface, expressed on logical
+axes:
 
-* **TR-G** Two-axis: drive lhy + lhx active; release lhy with lhx
-  still active → lhy.effective drops to 0 in the *same tick*; lhy is
-  not marked ``ramping``.
-* **TR-H** Sibling release order doesn't matter: same outcome whether
-  the still-held axis is the same hand or opposite hand (lhy held vs
-  rhy held).
+* **TR-G** Two logical axes active (e.g. left_track + arms via stick
+  inputs lhy=120, rhy=120). Releasing arms while left_track is still
+  active → arms.effective drops to 0 in the *same tick*; arms is not
+  marked ``ramping``.
+* **TR-H** Sibling release order doesn't matter: same outcome
+  regardless of which other logical axis is the holder.
 * **TR-I** Last-axis release falls back to ramp: in a sequence
   release-A-while-B-active (skip), then release-B alone, B *does*
   ramp from its current value — the skip path must not poison the
   arbiter.
-* **TR-J** Skip is checked against *raw* sibling state, not the
-  ramping ``effective`` of an already-released sibling. A previously-
+* **TR-J** Skip is checked against *current-tick logical inputs*, not
+  the ``effective`` of an already-ramping sibling. A previously-
   released axis that's still mid-ramp must NOT block a fresh release
-  from taking the ramp path. This pins the comment in apply_control:
-  "``other_active`` is computed against the *raw* values so a stale
-  ramping axis doesn't block a sibling axis's mixed-mode skip."
+  from taking the ramp path.
 
 Pure stdlib.
 """
@@ -94,6 +112,8 @@ import unittest
 
 AXIS_DEADBAND = 13
 RAMP_TICK_MS = 50
+# BC-22 (Round 45) reversal-brake settle-window length, in milliseconds.
+REVERSAL_BRAKE_MS = 100
 
 # Valve-coil bit positions (REG_VALVE_COILS layout per TRACTOR_NODE.md).
 VB_DRIVE_LF = 0
@@ -111,31 +131,47 @@ def axis_active(v: int) -> bool:
     return v > AXIS_DEADBAND or v < -AXIS_DEADBAND
 
 
-def ramp_duration_ms(magnitude: int, is_arm: bool) -> int:
-    """Mirror ``ramp_duration_ms()`` from tractor_h7.ino."""
+def ramp_duration_ms(magnitude: int, is_arm: bool,
+                     confined_space: bool = False) -> int:
+    """Mirror ``ramp_duration_ms()`` from tractor_h7.ino.
+
+    BC-27 / K-D2 (Round 50): when ``confined_space`` is true the base
+    duration is multiplied by 3/2 so the tractor stops more gently in
+    tight quarters. Default ``False`` is byte-for-byte identity vs
+    pre-Round-50.
+    """
     mag = -magnitude if magnitude < 0 else magnitude
     if is_arm:
         if mag >= 96:
-            return 1000
-        if mag >= 48:
-            return 500
-        return 250
-    if mag >= 96:
-        return 2000
-    if mag >= 48:
-        return 1000
-    return 500
+            base = 1000
+        elif mag >= 48:
+            base = 500
+        else:
+            base = 250
+    else:
+        if mag >= 96:
+            base = 2000
+        elif mag >= 48:
+            base = 1000
+        else:
+            base = 500
+    if confined_space:
+        base = (base * 3) // 2
+    return base
 
 
 class AxisRamp:
     """Mirror ``struct AxisRamp``.
 
-    All five fields are kept verbatim; ``effective`` and ``start`` are
+    All seven fields are kept verbatim; ``effective`` and ``start`` are
     int16 in C but Python ints are wide enough to model them losslessly
-    so long as we keep arithmetic to the same shape.
+    so long as we keep arithmetic to the same shape. ``brake_until_ms``
+    and ``reversal_pending`` are BC-22 reversal-brake state; both default
+    to inert (0 / False).
     """
 
-    __slots__ = ("effective", "start", "start_ms", "duration_ms", "ramping")
+    __slots__ = ("effective", "start", "start_ms", "duration_ms",
+                 "ramping", "reversal_pending", "brake_until_ms")
 
     def __init__(self) -> None:
         self.effective = 0
@@ -143,105 +179,306 @@ class AxisRamp:
         self.start_ms = 0
         self.duration_ms = 0
         self.ramping = False
+        self.reversal_pending = False
+        self.brake_until_ms = 0
 
 
 def step_axis_ramp(r: AxisRamp, raw: int, is_arm: bool, other_active: bool,
-                   now_ms: int) -> int:
+                   now_ms: int, forced_duration_ms: int = 0,
+                   ramp_shape: str = "linear",
+                   confined_space: bool = False) -> int:
     """Mirror ``step_axis_ramp()`` from tractor_h7.ino.
 
     Returns the new ``r.effective`` after one tick. ``now_ms`` is the
-    SIL stand-in for ``millis()``.
+    SIL stand-in for ``millis()``. ``forced_duration_ms`` (BC-21 / K-A4):
+    when non-zero AND a fresh ramp is starting this tick, override the
+    magnitude-derived ladder duration with the supplied value.
+
+    BC-22 reversal brake: a same-tick sign-flip on the raw input while the
+    axis is still energised triggers a decay-to-zero ramp; on completion the
+    axis is held at zero for ``REVERSAL_BRAKE_MS`` before the new direction
+    is allowed to pass through.
+
+    BC-26 / K-A3: ``ramp_shape`` selects the interpolation curve used
+    during release / reversal-decay. ``"linear"`` (default) preserves the
+    pre-Round-49 shape; ``"scurve"`` substitutes a half-cosine smoothstep.
     """
     was_active = axis_active(r.effective)
     is_now = axis_active(raw)
 
-    if is_now:
-        # Operator commanding — cancel any ramp and pass through.
-        r.ramping = False
-        r.effective = raw
-        return r.effective
-
-    # Operator released the axis.
-    if was_active and not r.ramping:
-        if other_active:
-            # Mixed-mode skip — drop instantly so coordinated transitions
-            # stay snappy.
+    # BC-22 settle phase — hold zero, ignore raw, until brake expires.
+    if r.brake_until_ms != 0:
+        if now_ms < r.brake_until_ms:
             r.effective = 0
+            r.ramping = False
             return 0
-        # Start a ramp from the last effective value down to zero.
-        r.ramping = True
-        r.start = r.effective
-        r.start_ms = now_ms
-        r.duration_ms = ramp_duration_ms(r.start, is_arm)
+        # Brake elapsed — clear and proceed normally.
+        r.brake_until_ms = 0
+        was_active = False
+
+    # BC-22 reversal-decay shield: if a reversal ramp is mid-flight, the
+    # operator's held opposite-sign input must not cancel it via the
+    # snap-on-activation path — the decay+settle sequence must run to
+    # completion for hydraulic safety.
+    if not (r.ramping and r.reversal_pending):
+        reversal = (was_active and is_now and (
+            (r.effective > 0 and raw < 0) or (r.effective < 0 and raw > 0)))
+        if reversal and not r.ramping:
+            r.ramping = True
+            r.start = r.effective
+            r.start_ms = now_ms
+            r.duration_ms = (forced_duration_ms
+                             if forced_duration_ms != 0
+                             else ramp_duration_ms(r.start, is_arm,
+                                                   confined_space))
+            r.reversal_pending = True
+            # Fall through to interpolation.
+        elif is_now:
+            # Normal pass-through (no reversal).
+            r.ramping = False
+            r.reversal_pending = False
+            r.effective = raw
+            return r.effective
+        elif was_active and not r.ramping:
+            # Operator released the axis.
+            if other_active:
+                # Mixed-mode skip.
+                r.effective = 0
+                r.reversal_pending = False
+                return 0
+            # Start a release ramp.
+            r.ramping = True
+            r.start = r.effective
+            r.start_ms = now_ms
+            r.duration_ms = (forced_duration_ms
+                             if forced_duration_ms != 0
+                             else ramp_duration_ms(r.start, is_arm,
+                                                   confined_space))
+            r.reversal_pending = False
 
     if r.ramping:
         elapsed = now_ms - r.start_ms
         if elapsed >= r.duration_ms:
             r.ramping = False
             r.effective = 0
+            if r.reversal_pending:
+                # Decay complete — enter the settle window.
+                r.brake_until_ms = now_ms + REVERSAL_BRAKE_MS
+                r.reversal_pending = False
         else:
-            # Linear interpolation start → 0 with C-style integer
-            # truncation toward zero (Python ``int(a*b/c)`` after
-            # arithmetic on ints differs from ``//`` for negatives, so
-            # we replicate the C ``int32_t`` truncation explicitly).
-            num = r.start * (r.duration_ms - elapsed)
-            v = int(num / r.duration_ms)  # truncates toward 0
-            r.effective = v
+            r.effective = _ramp_interpolate(r.start, elapsed,
+                                            r.duration_ms, ramp_shape)
     else:
         r.effective = 0
     return r.effective
 
 
 # ---------------------------------------------------------------------------
-# A small four-axis driver mirroring the apply_control() arbitration shape
-# so the W4-06 mixed-mode-skip tests can exercise the *combination* of all
-# four axes' ramps simultaneously, not just one in isolation.
+# A four-axis arbiter mirroring apply_control() post-BC-21: stick inputs
+# (lhx/lhy/rhx/rhy) are mixed into logical axes (left_track, right_track,
+# arms, bucket) BEFORE ramping. ``other_active`` and the K-A4 coordinated
+# bilateral track stop are applied to the logical axes.
 # ---------------------------------------------------------------------------
 
 
+def _clip_to_int8(v: int) -> int:
+    """Mirror the C ``clip_to_int8(int16_t)`` saturating cast."""
+    if v > 127:
+        return 127
+    if v < -127:
+        return -127
+    return v
+
+
+def _ramp_interpolate(start: int, elapsed: int, duration_ms: int,
+                      shape: str = "linear") -> int:
+    """BC-26 / K-A3 mirror of ``ramp_interpolate()`` in
+    ``firmware/tractor_h7/tractor_h7.ino``.
+
+    Returns the int16 axis value at ``elapsed`` ms into a
+    ``start → 0`` ramp of length ``duration_ms``. ``"linear"`` preserves
+    the pre-Round-49 truncation-toward-zero math byte-for-byte;
+    ``"scurve"`` uses ``shape(t) = 0.5 * (1 + cos(πt))`` rounded to
+    nearest int with sign-aware half-up.
+    """
+    if duration_ms <= 0:
+        return 0
+    if elapsed >= duration_ms:
+        return 0
+    if elapsed < 0:
+        elapsed = 0
+    if shape == "scurve":
+        import math
+        t = elapsed / duration_ms
+        s = 0.5 * (1.0 + math.cos(math.pi * t))
+        v = start * s
+        if v >  127.0:
+            v =  127.0
+        if v < -127.0:
+            v = -127.0
+        return int(v + 0.5) if v >= 0 else int(v - 0.5)
+    # linear (canonical, pre-Round-49)
+    num = start * (duration_ms - elapsed)
+    return int(num / duration_ms)  # truncates toward 0
+
+
+def _apply_stick_curve(v: int, exponent: float = 1.0) -> int:
+    """BC-25 / K-A2 mirror of ``apply_stick_curve()`` in
+    ``firmware/tractor_h7/tractor_h7.ino``.
+
+    ``effective = sign(v) * 127 * (|v|/127) ** exponent`` rounded to
+    nearest int8. Default exponent of 1.0 is the canonical (linear)
+    pass-through so existing tests are unaffected unless they opt in.
+    """
+    if exponent == 1.0 or v == 0:
+        return v
+    sign = 1 if v > 0 else -1
+    mag = -v if v < 0 else v
+    if mag > 127:
+        mag = 127
+    u = mag / 127.0
+    curved = 127.0 * (u ** exponent)
+    q = int(curved + 0.5)
+    if q < 0:
+        q = 0
+    if q > 127:
+        q = 127
+    return sign * q
+
+
+def _mix_tracks_preserve_steering(left_intent: int,
+                                  right_intent: int) -> tuple[int, int]:
+    """BC-23 mirror of ``mix_tracks_preserve_steering()`` from
+    ``firmware/tractor_h7/tractor_h7.ino``.
+
+    Replaces the previous independent ``clip_to_int8`` per side. When
+    either intent magnitude exceeds 127, both are scaled by ``127/max_mag``
+    so the differential (steering) ratio is preserved at the cost of
+    throttle authority.
+    """
+    lm = -left_intent if left_intent < 0 else left_intent
+    rm = -right_intent if right_intent < 0 else right_intent
+    mx = lm if lm > rm else rm
+    if mx <= 127:
+        return left_intent, right_intent
+    # C-style int truncation toward zero.
+    left = int(left_intent * 127 / mx)
+    right = int(right_intent * 127 / mx)
+    return left, right
+
+
 class FourAxisArbiter:
-    """Drive lhx/lhy/rhx/rhy through ``step_axis_ramp`` like apply_control.
+    """Drive lhx/lhy/rhx/rhy through the BC-21 mix-then-ramp pipeline.
 
     Field naming and ``other_active`` wiring are byte-for-byte identical
-    to the C in ``apply_control()`` lines that compute ``any_lhx`` …
-    ``any_rhy`` and pass them as siblings to ``step_axis_ramp``.
+    to the post-BC-21 C in ``apply_control()``: the four logical-axis
+    ramps (``left_track``, ``right_track``, ``arms``, ``bucket``) are
+    fed clipped post-mix values and the mixed-mode-skip rule operates
+    on the logical-axis activity.
     """
 
-    def __init__(self) -> None:
-        self.lhx = AxisRamp()
-        self.lhy = AxisRamp()
-        self.rhx = AxisRamp()
-        self.rhy = AxisRamp()
+    def __init__(self, stick_curve_exponent: float = 1.0,
+                 ramp_shape: str = "linear",
+                 confined_space_mode_enabled: bool = False) -> None:
+        self.left_track = AxisRamp()
+        self.right_track = AxisRamp()
+        self.arms = AxisRamp()
+        self.bucket = AxisRamp()
+        # BC-25 / K-A2: per-stick response curve exponent. Mirrors
+        # ``BUILD.ui.stick_curve_exponent``. Default 1.0 = linear identity.
+        self.stick_curve_exponent = stick_curve_exponent
+        # BC-26 / K-A3: ramp interpolation shape. Mirrors
+        # ``BUILD.hydraulic.ramp_shape``. Default ``"linear"`` = identity.
+        self.ramp_shape = ramp_shape
+        # BC-27 / K-D2: confined-space mode. Mirrors
+        # ``BUILD.ui.confined_space_mode_enabled``. Default False = identity.
+        self.confined_space_mode_enabled = confined_space_mode_enabled
 
     def tick(self, raw_lhx: int, raw_lhy: int, raw_rhx: int, raw_rhy: int,
              now_ms: int) -> dict:
-        any_lhx = axis_active(raw_lhx)
-        any_lhy = axis_active(raw_lhy)
-        any_rhx = axis_active(raw_rhx)
-        any_rhy = axis_active(raw_rhy)
-        lhx = step_axis_ramp(self.lhx, raw_lhx, False,
-                             any_lhy or any_rhx or any_rhy, now_ms)
-        lhy = step_axis_ramp(self.lhy, raw_lhy, False,
-                             any_lhx or any_rhx or any_rhy, now_ms)
-        rhx = step_axis_ramp(self.rhx, raw_rhx, True,
-                             any_lhx or any_lhy or any_rhy, now_ms)
-        rhy = step_axis_ramp(self.rhy, raw_rhy, True,
-                             any_lhx or any_lhy or any_rhx, now_ms)
+        # BC-25 / K-A2: apply per-stick response curve before mixing.
+        n = self.stick_curve_exponent
+        lhx = _apply_stick_curve(raw_lhx, n)
+        lhy = _apply_stick_curve(raw_lhy, n)
+        rhx = _apply_stick_curve(raw_rhx, n)
+        rhy = _apply_stick_curve(raw_rhy, n)
+        # BC-21 mixing: tracks use Y±X, arms/bucket pass-through.
+        # BC-23: preserve-steering proportional scale-down on saturation.
+        left_intent = lhy + lhx
+        right_intent = lhy - lhx
+        left_in, right_in = _mix_tracks_preserve_steering(left_intent,
+                                                          right_intent)
+        arms_in = rhy
+        bucket_in = rhx
 
-        # Coil bitmap from post-ramp values (mirrors apply_control).
+        any_left = axis_active(left_in)
+        any_right = axis_active(right_in)
+        any_arms = axis_active(arms_in)
+        any_bucket = axis_active(bucket_in)
+
+        # K-A4 coordinated bilateral track stop.
+        forced_track_dur = 0
+        left_was_active = axis_active(self.left_track.effective)
+        right_was_active = axis_active(self.right_track.effective)
+        if (not any_left and not any_right
+                and not self.left_track.ramping
+                and not self.right_track.ramping
+                and (left_was_active or right_was_active)):
+            lm = abs(self.left_track.effective)
+            rm = abs(self.right_track.effective)
+            forced_track_dur = ramp_duration_ms(
+                max(lm, rm), is_arm=False,
+                confined_space=self.confined_space_mode_enabled)
+
+        left = step_axis_ramp(self.left_track, left_in, False,
+                              any_right or any_arms or any_bucket,
+                              now_ms, forced_track_dur,
+                              ramp_shape=self.ramp_shape,
+                              confined_space=self.confined_space_mode_enabled)
+        right = step_axis_ramp(self.right_track, right_in, False,
+                               any_left or any_arms or any_bucket,
+                               now_ms, forced_track_dur,
+                               ramp_shape=self.ramp_shape,
+                               confined_space=self.confined_space_mode_enabled)
+        arms = step_axis_ramp(self.arms, arms_in, True,
+                              any_left or any_right or any_bucket, now_ms,
+                              ramp_shape=self.ramp_shape,
+                              confined_space=self.confined_space_mode_enabled)
+        bucket = step_axis_ramp(self.bucket, bucket_in, True,
+                                any_left or any_right or any_arms, now_ms,
+                                ramp_shape=self.ramp_shape,
+                                confined_space=self.confined_space_mode_enabled)
+
+        # Coil bitmap from post-ramp logical axes (BC-21 per-side mapping).
         coils = 0
-        if lhy > AXIS_DEADBAND:
-            coils |= (1 << VB_DRIVE_LF) | (1 << VB_DRIVE_RF)
-        if lhy < -AXIS_DEADBAND:
-            coils |= (1 << VB_DRIVE_LR) | (1 << VB_DRIVE_RR)
-        if rhy > AXIS_DEADBAND:
+        if left > AXIS_DEADBAND:
+            coils |= 1 << VB_DRIVE_LF
+        if left < -AXIS_DEADBAND:
+            coils |= 1 << VB_DRIVE_LR
+        if right > AXIS_DEADBAND:
+            coils |= 1 << VB_DRIVE_RF
+        if right < -AXIS_DEADBAND:
+            coils |= 1 << VB_DRIVE_RR
+        if arms > AXIS_DEADBAND:
             coils |= 1 << VB_BOOM_UP
-        if rhy < -AXIS_DEADBAND:
+        if arms < -AXIS_DEADBAND:
             coils |= 1 << VB_BOOM_DN
 
-        # Flow set-point: max |effective| across all four, mapped to
-        # 0..10000 mV through the deadband-stretched live region.
-        mag = max(abs(lhx), abs(lhy), abs(rhx), abs(rhy))
+        # Flow set-point: largest active magnitude across the four logical
+        # axes mapped to 0..10000 mV through the deadband-stretched live
+        # region.
+        # BC-24 spin-turn flow boost: opposite-sign tracks contribute the
+        # SUM of magnitudes (clamped to 127), not the max, since each track
+        # motor draws its own flow during a spin.
+        lt_mag = abs(left)
+        rt_mag = abs(right)
+        spin_turn = ((left > AXIS_DEADBAND and right < -AXIS_DEADBAND) or
+                     (left < -AXIS_DEADBAND and right > AXIS_DEADBAND))
+        if spin_turn:
+            track_mag = min(127, lt_mag + rt_mag)
+        else:
+            track_mag = max(lt_mag, rt_mag)
+        mag = max(track_mag, abs(arms), abs(bucket))
         if mag > AXIS_DEADBAND:
             flow = (mag - AXIS_DEADBAND) * 10000 // (127 - AXIS_DEADBAND)
             if flow > 10000:
@@ -250,7 +487,8 @@ class FourAxisArbiter:
             flow = 0
 
         return {
-            "lhx": lhx, "lhy": lhy, "rhx": rhx, "rhy": rhy,
+            "left_track": left, "right_track": right,
+            "arms": arms, "bucket": bucket,
             "coils": coils, "flow_sp": flow,
         }
 
@@ -350,8 +588,9 @@ class W4_05_RampOutTests(unittest.TestCase):
                                  expected)
 
     # TR-E — coil stays engaged through the ramp until the ramped
-    # magnitude crosses below the deadband. Drive lhy forward at 127,
-    # release alone, watch the VB_DRIVE_LF / VB_DRIVE_RF bits.
+    # magnitude crosses below the deadband. Drive forward at lhy=127
+    # (which mixes to left_track=127, right_track=127), release alone,
+    # watch the VB_DRIVE_LF bit (BC-21 per-side mapping).
     def test_tr_e_coil_stays_engaged_during_ramp(self):
         arb = FourAxisArbiter()
         t = 0
@@ -360,24 +599,24 @@ class W4_05_RampOutTests(unittest.TestCase):
             arb.tick(0, 127, 0, 0, t)
             t += RAMP_TICK_MS
 
-        # Release. Track sample-by-sample: while |lhy.effective| > deadband
-        # the drive coils MUST be set; once it drops to/below deadband the
-        # coils MUST clear (not lag behind).
+        # Release. Track sample-by-sample: while |left_track.effective|
+        # > deadband the VB_DRIVE_LF coil MUST be set; once it drops
+        # to/below deadband the coil MUST clear (not lag behind).
         coils_engaged_after_subdeadband = False
         while t <= 200 + 2200:
             out = arb.tick(0, 0, 0, 0, t)
-            mag_above_db = abs(out["lhy"]) > AXIS_DEADBAND
-            drive_bits = (1 << VB_DRIVE_LF) | (1 << VB_DRIVE_RF)
-            coils_set = bool(out["coils"] & drive_bits)
+            mag_above_db = abs(out["left_track"]) > AXIS_DEADBAND
+            drive_bit = 1 << VB_DRIVE_LF
+            coil_set = bool(out["coils"] & drive_bit)
             if mag_above_db:
-                self.assertTrue(coils_set,
-                                f"coils dropped while ramping ({out}, t={t})")
+                self.assertTrue(coil_set,
+                                f"VB_DRIVE_LF dropped while ramping ({out}, t={t})")
             else:
-                if coils_set:
+                if coil_set:
                     coils_engaged_after_subdeadband = True
             t += RAMP_TICK_MS
         self.assertFalse(coils_engaged_after_subdeadband,
-                         "coils must drop once ramped magnitude is "
+                         "coil must drop once ramped magnitude is "
                          "<= deadband (otherwise the valve stays open "
                          "with no flow command, defeating ramp-out)")
 
@@ -411,118 +650,123 @@ class W4_05_RampOutTests(unittest.TestCase):
 
 
 class W4_06_MixedModeSkipTests(unittest.TestCase):
-    """W4-06 SIL: releasing one axis with a sibling still active skips
-    the ramp entirely on that axis."""
+    """W4-06 SIL: releasing one logical axis with a sibling still
+    active skips the ramp entirely on that axis."""
 
-    # TR-G — two-axis: lhy released while lhx still active → lhy goes
+    # TR-G — two logical axes active (left_track + arms via lhy=120,
+    # rhy=120). Release arms while left_track still active → arms goes
     # straight to 0 in the same tick, no ``ramping`` flag set.
     def test_tr_g_release_with_sibling_active_skips_ramp(self):
         arb = FourAxisArbiter()
         t = 0
-        # Warm up with both lhx and lhy active.
+        # Warm up with both left_track (via lhy) and arms (via rhy) active.
         while t < 200:
-            arb.tick(120, 120, 0, 0, t)
+            arb.tick(0, 120, 0, 120, t)
             t += RAMP_TICK_MS
-        self.assertGreater(arb.lhy.effective, AXIS_DEADBAND)
+        self.assertGreater(arb.arms.effective, AXIS_DEADBAND)
 
-        # Release lhy; lhx still active.
-        out = arb.tick(120, 0, 0, 0, t)
-        self.assertEqual(out["lhy"], 0, "lhy must skip to 0 immediately")
-        self.assertFalse(arb.lhy.ramping,
-                         "lhy must not enter ramp state on mixed release")
-        # And lhx untouched.
-        self.assertEqual(out["lhx"], 120)
+        # Release arms (rhy=0); left_track still active.
+        out = arb.tick(0, 120, 0, 0, t)
+        self.assertEqual(out["arms"], 0, "arms must skip to 0 immediately")
+        self.assertFalse(arb.arms.ramping,
+                         "arms must not enter ramp state on mixed release")
+        # And left_track untouched.
+        self.assertEqual(out["left_track"], 120)
 
-    # TR-H — same outcome with sibling on the *other* hand.
+    # TR-H — same outcome regardless of which logical axis is the holder.
     def test_tr_h_skip_is_orientation_agnostic(self):
-        for held_axis in ("lhx", "lhy", "rhx", "rhy"):
-            with self.subTest(held=held_axis):
+        # Each entry maps a "holder" logical axis to the stick input that
+        # activates it (and only it). We then drive arms (rhy) plus the
+        # holder, release arms, and assert arms skips while the holder
+        # remains active.
+        holders = {
+            "left_track":  (0,    120, 0, 0),   # lhy=120 → both tracks fwd; we only need left
+            "right_track": (0,    120, 0, 0),   # mirror of left (mixing makes both = 120)
+            "bucket":      (0,      0, 100, 0), # rhx=100 → bucket only
+        }
+        for name, (lhx, lhy, rhx, _rhy) in holders.items():
+            with self.subTest(holder=name):
                 arb = FourAxisArbiter()
-                # Warm up: drive lhy AND the held axis.
                 t = 0
+                # Warm up with the holder + arms (rhy=120) active.
                 while t < 200:
-                    raw = {"lhx": 0, "lhy": 120, "rhx": 0, "rhy": 0}
-                    if held_axis != "lhy":
-                        raw[held_axis] = 100
-                    arb.tick(raw["lhx"], raw["lhy"], raw["rhx"], raw["rhy"], t)
+                    arb.tick(lhx, lhy, rhx, 120, t)
                     t += RAMP_TICK_MS
-                if held_axis == "lhy":
-                    # Degenerate: only one axis ever active, so releasing
-                    # *it* alone must take the ramp path, not skip.
-                    out = arb.tick(0, 0, 0, 0, t)
-                    self.assertTrue(arb.lhy.ramping,
-                                    "single-axis release must ramp, not skip")
-                else:
-                    raw = {"lhx": 0, "lhy": 0, "rhx": 0, "rhy": 0}
-                    raw[held_axis] = 100
-                    out = arb.tick(raw["lhx"], raw["lhy"],
-                                   raw["rhx"], raw["rhy"], t)
-                    self.assertEqual(out["lhy"], 0,
-                                     f"lhy must skip with {held_axis} held")
-                    self.assertFalse(arb.lhy.ramping)
+                self.assertGreater(arb.arms.effective, AXIS_DEADBAND)
+                # Release arms only.
+                out = arb.tick(lhx, lhy, rhx, 0, t)
+                self.assertEqual(out["arms"], 0,
+                                 f"arms must skip with {name} held")
+                self.assertFalse(arb.arms.ramping)
 
     # TR-I — last-axis release falls back to the ramp path. Sequence:
-    # release lhy with lhx held (skip), then release lhx alone (ramp).
+    # release arms with left_track held (skip), then release left_track
+    # alone (ramp).
     def test_tr_i_last_release_takes_ramp_path(self):
         arb = FourAxisArbiter()
         t = 0
+        # Warm up: lhy=120 (→ left_track=120, right_track=120) + rhy=120 (arms).
+        # K-A4 will couple the two track ramps later; for this test we want
+        # to release ARMS first so only the tracks remain active and they
+        # release together (still a single fall-through).
         while t < 200:
-            arb.tick(120, 120, 0, 0, t)
+            arb.tick(0, 120, 0, 120, t)
             t += RAMP_TICK_MS
 
-        # Release lhy first — skip path.
-        arb.tick(120, 0, 0, 0, t)
-        self.assertEqual(arb.lhy.effective, 0)
-        self.assertFalse(arb.lhy.ramping)
+        # Release arms first — arms skips (left_track + right_track held).
+        arb.tick(0, 120, 0, 0, t)
+        self.assertEqual(arb.arms.effective, 0)
+        self.assertFalse(arb.arms.ramping)
         t += RAMP_TICK_MS
 
-        # Hold lhx steady for a beat, then release. lhx must ramp.
-        arb.tick(120, 0, 0, 0, t)
+        # Hold tracks steady for a beat, then release. Both tracks must
+        # ramp (and K-A4 will give them a shared duration).
+        arb.tick(0, 120, 0, 0, t)
         t += RAMP_TICK_MS
-        out = arb.tick(0, 0, 0, 0, t)
-        self.assertTrue(arb.lhx.ramping,
+        arb.tick(0, 0, 0, 0, t)
+        self.assertTrue(arb.left_track.ramping,
                         "last-axis release must take the ramp path")
-        self.assertEqual(arb.lhx.start, 120)
-        self.assertEqual(arb.lhx.duration_ms, 2000)  # track @ 120 → 2 s
+        self.assertEqual(arb.left_track.start, 120)
+        self.assertEqual(arb.left_track.duration_ms, 2000)  # track @ 120 → 2 s
 
     # TR-J — pin the apply_control comment: ``other_active`` is computed
-    # against *raw* values, not the ``effective`` of an already-ramping
-    # sibling. So a previously-released-and-now-ramping lhx must NOT
-    # block lhy from taking its own ramp path when lhy is released
-    # second with no other raw-active sibling.
+    # against *current-tick logical-axis inputs*, not the ``effective``
+    # of an already-ramping sibling. So a previously-released-and-now-
+    # ramping logical axis must NOT block another logical axis from
+    # taking its own ramp path when released second with no other
+    # currently-active sibling.
     def test_tr_j_stale_ramping_sibling_does_not_block_skip_decision(self):
         arb = FourAxisArbiter()
         t = 0
-        # Warm up: lhx + lhy + rhy all active. (rhy is the "anchor" so
-        # the lhx release below is forced to take the skip path.)
+        # Warm up: bucket (rhx=100) + arms (rhy=120) + left_track via
+        # lhy=120 — three logical axes simultaneously active.
         while t < 200:
-            arb.tick(120, 120, 0, 100, t)
+            arb.tick(0, 120, 100, 120, t)
             t += RAMP_TICK_MS
 
-        # Release lhx with lhy + rhy still active — skip.
-        arb.tick(0, 120, 0, 100, t)
-        self.assertEqual(arb.lhx.effective, 0)
-        self.assertFalse(arb.lhx.ramping)
+        # Release bucket (rhx=0) with arms + left_track still active — skip.
+        arb.tick(0, 120, 0, 120, t)
+        self.assertEqual(arb.bucket.effective, 0)
+        self.assertFalse(arb.bucket.ramping)
         t += RAMP_TICK_MS
 
-        # Now release rhy (boom) with only lhy still raw-active. lhy is
-        # still raw-active at 120 so rhy must skip to 0.
+        # Now release arms (rhy=0) with only left_track still active — skip.
         out = arb.tick(0, 120, 0, 0, t)
-        self.assertEqual(out["rhy"], 0)
-        self.assertFalse(arb.rhy.ramping)
+        self.assertEqual(out["arms"], 0)
+        self.assertFalse(arb.arms.ramping)
         t += RAMP_TICK_MS
 
-        # Finally release lhy. Only lhy is raw-active at this point;
-        # lhx and rhy are both already at effective=0 (skipped earlier).
-        # The arbiter computes ``other_active`` from raw inputs, which
-        # are now all zero → lhy MUST take the ramp path, not skip.
-        out = arb.tick(0, 0, 0, 0, t)
-        self.assertTrue(arb.lhy.ramping,
-                        "lhy release with no raw-active sibling must "
+        # Finally release tracks. All other logical axes are at
+        # effective=0 (skipped earlier). The arbiter computes
+        # ``other_active`` from current-tick logical inputs which are
+        # all zero → tracks MUST take the ramp path, not skip.
+        arb.tick(0, 0, 0, 0, t)
+        self.assertTrue(arb.left_track.ramping,
+                        "track release with no active sibling must "
                         "ramp; the previously-skipped axes' effective=0 "
                         "must not be observable to the skip check")
-        self.assertEqual(arb.lhy.start, 120)
-        self.assertEqual(arb.lhy.duration_ms, 2000)
+        self.assertEqual(arb.left_track.start, 120)
+        self.assertEqual(arb.left_track.duration_ms, 2000)
 
 
 if __name__ == "__main__":

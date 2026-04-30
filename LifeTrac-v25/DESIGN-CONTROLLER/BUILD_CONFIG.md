@@ -16,6 +16,13 @@
 > * [`HARDWARE_BOM.md`](HARDWARE_BOM.md) — what each capability
 >   physically is on a real tractor.
 >
+> **See also:** the [`DESIGN-KINEMATICS/`](../DESIGN-KINEMATICS/README.md)
+> folder owns the **motion semantics** of build variants — i.e. how each
+> configured `hydraulic.spool_type` / `flow_valve_count` / etc. translates
+> into operator-felt motion primitives. The
+> [BUILD_VARIANT_MOTION_MATRIX](../DESIGN-KINEMATICS/BUILD_VARIANT_MOTION_MATRIX.md)
+> cross-tabulates reference builds × motion primitives.
+>
 > Everything below is normative for operators; the tests in
 > [`base_station/tests/test_build_config_doc_sil.py`](base_station/tests/test_build_config_doc_sil.py)
 > pin that this page stays in sync with the schema, the CLI, and the
@@ -73,7 +80,7 @@ time so a typo in a section header cannot silently inherit a default):
 
 | Section | What it pins | Common reasons to override |
 |---|---|---|
-| **`hydraulic`** | Axis counts, proportional vs bang-bang, ramp seconds. | Drive-only chassis (no arm); cost-down build with bang-bang valves. |
+| **`hydraulic`** | Axis counts, proportional vs bang-bang, ramp seconds, **spool centre type, load-holding strategy, valve-settling delay** (Round 43 / BC-19). | Drive-only chassis (no arm); cost-down build with bang-bang valves; OSE-legacy float-spool + PO-check builds; high-performance open-spool + counterbalance builds. |
 | **`safety`** | E-stop topology, latency budget, watchdog window, Modbus fail-latch. Topology enum: `psr_monitored_dual` (canonical) / `psr_monitored_single` (cost-down) / `hardwired_only` (legacy, refuses to boot together with proportional flow). | Single-channel PSR for cost-down; tighter watchdog after relay upgrade. |
 | **`cameras`** | Total count, per-position presence flags, Coral TPU type. | Unit shipped without a rear cam; CPU-only inference build. |
 | **`sensors`** | IMU + GPS presence and model; hydraulic pressure-sensor count. | RTK GPS upgrade; no-IMU minimal build. |
@@ -122,7 +129,7 @@ the nine subcommands are:
 | `validate` | Schema-validate a TOML or installer bundle. Exits 0 / 2. | Pre-commit hook; CI gate before bundling. |
 | `bundle` | Validate + emit `lifetrac-config-<unit_id>-<sha8>.toml` installer bundle. | Operator builds a bundle on the laptop, walks a USB stick to the tractor. |
 | `verify` | Re-parse + re-hash a bundle on disk; check filename matches embedded `unit_id` + sha. | Post-USB-copy sanity check on flaky media. |
-| `diff` | Show which leaves differ between two configs and what reload class each change requires. | Decide whether a change needs a service restart or a firmware reflash. |
+| `diff` | Show which leaves differ between two configs and what reload class each change requires. Output as text (default) or JSON. | Decide whether a change needs a service restart or a firmware reflash. JSON form for `hil/dispatch.ps1` and shell pipelines. |
 | `push` | Hand a bundle to the X8-side installer daemon for atomic activation. | Deploy from the bench laptop over WiFi when the tractor is online. |
 | `codegen` | Emit (or `--check`) the firmware C header from the active config. | CI drift gate; reflash workflow before a `firmware_required` change. |
 | `dump-json` | Print the validated config as canonical JSON to stdout. | Non-Python consumers (notably `hil/dispatch.ps1`); shell pipelines. |
@@ -183,6 +190,13 @@ dispatch transcript always names the fleet shape it was scoped to.
   loader dataclass, codegen `_SECTIONS` tuple. The
   `test_build_config_loader_sil.py` inventory-parity gate fails
   loudly if any of the four is forgotten.
+* **Cross-leaf constraints live in
+  `_validate_hydraulic_compatibility`, not the schema.** JSON Schema
+  cannot express "if `spool_type=tandem` then `load_holding!=none`".
+  Round 43 / BC-19 added a small post-validate hook in
+  `build_config.load()` for the three hydraulic spool ↔ load-holding
+  ↔ settling-delay rules. Other cross-leaf rules added in future
+  rounds belong next to it.
 * **`firmware_required` changes need a reflash.** A `restart` is
   not enough. The `lifetrac-config diff` output is authoritative.
 
