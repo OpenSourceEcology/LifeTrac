@@ -23,6 +23,8 @@ param(
 
 # Per-gate PASS-row targets. Source of truth: HIL_RUNBOOK.md.
 $Script:GateTargets = [ordered]@{
+    'W4-pre' = @{ Target = 5;   Title = 'Board bring-up sanity (no RF)' }
+    'W4-00' = @{ Target = 4;   Title = 'LoRa stack dual-Portenta bench' }
     'W4-01' = @{ Target = 300; Title = 'Handheld E-stop latch (100 per SF rung)' }
     'W4-02' = @{ Target = 1;   Title = 'Link-tune walk-down + revert' }
     'W4-03' = @{ Target = 10;  Title = 'M7<->M4 watchdog trip' }

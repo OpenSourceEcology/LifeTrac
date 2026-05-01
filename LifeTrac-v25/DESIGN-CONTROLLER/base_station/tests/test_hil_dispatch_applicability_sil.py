@@ -66,11 +66,11 @@ def _load_rules() -> dict:
 
 
 def _dispatch_gate_ids() -> set[str]:
-    """Scrape the W4-XX gate IDs declared in dispatch.ps1's GateTargets table."""
+    """Scrape the Wave-4 gate IDs declared in dispatch.ps1's GateTargets table."""
     text = _DISPATCH_PS1.read_text(encoding="utf-8")
     import re
-    # Match lines like:    'W4-01' = @{ Target = ...
-    return set(re.findall(r"'(W4-\d{2})'\s*=\s*@\{", text))
+    # Match lines like:    'W4-pre' = @{ Target = ... or 'W4-01' = @{ Target = ...
+    return set(re.findall(r"'(W4-(?:pre|\d{2}))'\s*=\s*@\{", text))
 
 
 def _resolve_dotted(payload: dict, path: str):
@@ -219,7 +219,7 @@ class BC06_C_NoHandheldMarksRadioGatesNA(unittest.TestCase):
         self.assertFalse(_gate_applies(self.rules, "W4-02", self.raw))
 
     def test_remaining_gates_still_apply(self) -> None:
-        for gate_id in ("W4-03", "W4-04", "W4-05", "W4-06", "W4-07", "W4-08", "W4-09", "W4-10"):
+        for gate_id in ("W4-pre", "W4-00", "W4-03", "W4-04", "W4-05", "W4-06", "W4-07", "W4-08", "W4-09", "W4-10"):
             with self.subTest(gate=gate_id):
                 self.assertTrue(_gate_applies(self.rules, gate_id, self.raw))
 

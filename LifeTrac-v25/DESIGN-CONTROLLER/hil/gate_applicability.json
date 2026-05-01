@@ -2,6 +2,16 @@
   "_doc": "Round 34 / BC-06: per-gate applicability predicates. Each gate lists conjunctive predicates over the validated build_config; if every predicate evaluates true the gate applies to this fleet shape, otherwise it is reported as N/A by hil/dispatch.ps1 and the SIL gate. Op set: 'eq' (path == value), 'gt' (path > value), 'gte' (path >= value), 'truthy' (path is truthy). Empty 'applies_when' means the gate always applies. Source of truth: this file. Both dispatch.ps1 and tests/test_hil_dispatch_applicability_sil.py read it.",
   "schema_version": 1,
   "gates": {
+    "W4-pre": {
+      "title": "Board bring-up sanity",
+      "applies_when": [],
+      "rationale": "Board enumeration, rail, dual-core, and no-RF firmware boot checks are required before any v25 Portenta Max Carrier build keys the radio."
+    },
+    "W4-00": {
+      "title": "LoRa stack dual-Portenta bench",
+      "applies_when": [],
+      "rationale": "The LoRa radio link is core to every v25 controller build; later Wave-4 gates assume this front gate has passed."
+    },
     "W4-01": {
       "title": "Handheld E-stop latch",
       "applies_when": [

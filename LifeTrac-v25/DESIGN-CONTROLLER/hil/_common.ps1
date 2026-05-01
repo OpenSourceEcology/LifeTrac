@@ -13,6 +13,7 @@
 $Script:HIL_HANDHELD_PORT = 'COM7'    # MKR WAN 1310
 $Script:HIL_TRACTOR_PORT  = 'COM8'    # Portenta H7
 $Script:HIL_OPTA_PORT     = 'COM9'    # Opta
+$Script:HIL_BASE_PORT     = 'COM10'   # second Portenta Max Carrier for W4-00
 $Script:HIL_MQTT_HOST     = 'localhost'
 $Script:HIL_MQTT_PORT     = 1883
 $Script:HIL_AUDIT_LOG     = '/var/log/lifetrac/audit.jsonl'
@@ -101,6 +102,31 @@ function Assert-Section0-Ready {
         "tail -f $Script:HIL_AUDIT_LOG open in a third terminal",
         'Web UI open at http://localhost:8000 with PIN session active',
         'Firmware built without LIFETRAC_ALLOW_UNCONFIGURED_KEY (production gate exercised)'
+    )
+}
+
+function Assert-FrontGateReady {
+    param([Parameter(Mandatory)][ValidateSet('W4-pre','W4-00')][string]$GateId)
+
+    if ($GateId -eq 'W4-pre') {
+        Confirm-OperatorChecklist @(
+            'Both Portenta + Max Carrier stacks connected by USB-C to this workstation',
+            'Windows shows two distinct USB-CDC serial ports for the carriers',
+            'SMA antennas and dummy loads removed; no LoRa TX will be commanded',
+            'Multimeter available for Max Carrier 3V3 and 5V0 rail checks',
+            'Arduino IDE or VS Code Serial Monitor can open both carrier consoles at 115200 8N1'
+        )
+        return
+    }
+
+    Confirm-OperatorChecklist @(
+        'W4-pre is signed off green for both Portenta + Max Carrier stacks',
+        'Both Max Carriers are connected to this workstation by USB-C',
+        "Tractor-side console is open on $Script:HIL_TRACTOR_PORT at 115200 8N1",
+        "Base-side console is open on $Script:HIL_BASE_PORT at 115200 8N1",
+        'Each Max Carrier has a 915 MHz SMA antenna or 50 ohm dummy load attached before TX',
+        'Antennas are separated by at least 30 cm, or conducted attenuator/dummy-load setup is installed',
+        'Both nodes are provisioned with the same fleet key/key ID and distinct source IDs'
     )
 }
 

@@ -2,19 +2,19 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://lifetrac.org/schemas/hil-result.json",
   "title": "LifeTrac HIL gate run result",
-  "description": "One JSON object per Wave-4 bench run, appended to bench-evidence/W4-XX/results.jsonl by the harness scripts under DESIGN-CONTROLLER/hil/.",
+  "description": "One JSON object per Wave-4 bench run, appended to bench-evidence/<gate>/results.jsonl by the harness scripts under DESIGN-CONTROLLER/hil/.",
   "type": "object",
   "required": ["gate_id", "run_id", "timestamp", "operator", "firmware_sha", "result"],
   "additionalProperties": false,
   "properties": {
     "gate_id": {
       "type": "string",
-      "pattern": "^W4-(0[1-9]|10)$",
+      "pattern": "^(W4-pre|W4-00|W4-(0[1-9]|10))$",
       "description": "Wave-4 gate identifier from MASTER_TEST_PROGRAM.md section 4."
     },
     "run_id": {
       "type": "string",
-      "pattern": "^W4-(0[1-9]|10)_run-\\d{3}_\\d{4}-\\d{2}-\\d{2}(_[A-Za-z0-9_-]+)?$",
+      "pattern": "^(W4-pre|W4-00|W4-(0[1-9]|10))_run-\\d{3}_\\d{4}-\\d{2}-\\d{2}(_[A-Za-z0-9_-]+)?$",
       "description": "Unique run id: <gate>_run-<NNN>_<YYYY-MM-DD>[_<rung>]. The optional rung suffix is used for gates that sweep parameters (e.g. W4-01 across SF7/SF8/SF9)."
     },
     "timestamp": {

@@ -10,22 +10,23 @@ This is a pure source-parse SIL test -- it does not invoke PowerShell.
 Defended invariants
 -------------------
 
-HC-A (file existence): every W4-XX row in MASTER_TEST_PROGRAM.md section 4
-    has a matching ``DESIGN-CONTROLLER/hil/w4-NN_*.ps1`` harness file, and
+HC-A (file existence): every Wave-4 row in MASTER_TEST_PROGRAM.md section 4
+    has a matching ``DESIGN-CONTROLLER/hil/w4-*_*.ps1`` harness file, and
     the supporting files (README.md, results_schema.json, _common.ps1,
     dispatch.ps1) are all present.
 
 HC-B (harness contract): every harness script
     * dot-sources ``_common.ps1``
     * declares ``[CmdletBinding()]`` + a mandatory ``-Operator`` parameter
-    * calls ``Write-GateHeader`` and ``Assert-Section0-Ready``
+    * calls ``Write-GateHeader`` and the appropriate setup assertion helper
     * calls ``Write-HilResult`` to log a JSONL line
     * mentions its own gate id (W4-NN) in the source
     * carries a reference back to ``HIL_RUNBOOK.md``
 
 HC-C (schema invariants): ``results_schema.json`` is well-formed JSON
-    Schema, restricts ``gate_id`` to ``W4-01..W4-10``, and ``result`` to the
-    four-value enum the harnesses + dispatcher rely on.
+    Schema, restricts ``gate_id`` to ``W4-pre``, ``W4-00``, and
+    ``W4-01..W4-10``, and ``result`` to the four-value enum the harnesses +
+    dispatcher rely on.
 
 HC-D (dispatcher coverage): ``dispatch.ps1`` enumerates exactly the same
     set of W4-XX gate ids as the harness directory (no orphans either way)
@@ -45,11 +46,11 @@ HIL_DIR = REPO_ROOT / "DESIGN-CONTROLLER" / "hil"
 RUNBOOK = REPO_ROOT / "DESIGN-CONTROLLER" / "HIL_RUNBOOK.md"
 MASTER = REPO_ROOT / "MASTER_TEST_PROGRAM.md"
 
-EXPECTED_GATES = [f"W4-{n:02d}" for n in range(1, 11)]
+EXPECTED_GATES = ["W4-pre", "W4-00", *[f"W4-{n:02d}" for n in range(1, 11)]]
 
 
 def _gate_to_filename_prefix(gate_id: str) -> str:
-    # 'W4-01' -> 'w4-01_'
+    # 'W4-01' -> 'w4-01_', 'W4-pre' -> 'w4-pre_'
     return gate_id.lower() + "_"
 
 
@@ -77,12 +78,13 @@ class HC_A_FileExistence(unittest.TestCase):
                 self.assertIsNotNone(path, f"no harness file matching {gid.lower()}_*.ps1")
 
     def test_no_orphan_harnesses(self) -> None:
-        # Every w4-NN_*.ps1 in the directory must map back to an EXPECTED_GATE.
+        # Every w4-*_*.ps1 in the directory must map back to an EXPECTED_GATE.
         actual = set()
         for p in HIL_DIR.glob("w4-*_*.ps1"):
-            m = re.match(r"^(w4-\d{2})_", p.name)
+            m = re.match(r"^(w4-(?:pre|\d{2}))_", p.name)
             self.assertIsNotNone(m, f"bad harness filename: {p.name}")
-            actual.add(m.group(1).upper())
+            raw = m.group(1)
+            actual.add("W4-pre" if raw == "w4-pre" else raw.upper())
         expected = set(EXPECTED_GATES)
         self.assertEqual(
             actual, expected,
@@ -107,7 +109,6 @@ class HC_B_HarnessContract(unittest.TestCase):
         ("[CmdletBinding()]",            "must declare [CmdletBinding()]"),
         ("[Parameter(Mandatory)][string]$Operator", "must take a mandatory -Operator string"),
         ("Write-GateHeader",             "must call Write-GateHeader"),
-        ("Assert-Section0-Ready",        "must call Assert-Section0-Ready"),
         ("Write-HilResult",              "must call Write-HilResult"),
         ("HIL_RUNBOOK.md",               "must reference HIL_RUNBOOK.md"),
     )
@@ -122,6 +123,11 @@ class HC_B_HarnessContract(unittest.TestCase):
                     self.assertIn(fragment, src, f"{path.name}: {why}")
             with self.subTest(gate=gid, check="self-id"):
                 self.assertIn(gid, src, f"{path.name}: must mention own gate id {gid}")
+            with self.subTest(gate=gid, check="setup-helper"):
+                self.assertTrue(
+                    ("Assert-Section0-Ready" in src) or ("Assert-FrontGateReady" in src),
+                    f"{path.name}: must call a HIL setup assertion helper",
+                )
 
 
 class HC_C_SchemaInvariants(unittest.TestCase):
@@ -139,13 +145,13 @@ class HC_C_SchemaInvariants(unittest.TestCase):
             f"missing required fields: {required}",
         )
 
-    def test_gate_id_pattern_matches_only_W4_01_through_W4_10(self) -> None:
+    def test_gate_id_pattern_matches_expected_wave4_gates(self) -> None:
         pat = self.schema["properties"]["gate_id"]["pattern"]
         regex = re.compile(pat)
         for gid in EXPECTED_GATES:
             with self.subTest(gate=gid):
                 self.assertIsNotNone(regex.match(gid))
-        for bad in ("W4-00", "W4-11", "W3-01", "w4-01", ""):
+        for bad in ("W4-preflight", "W4-11", "W3-01", "w4-01", ""):
             with self.subTest(bad=bad):
                 self.assertIsNone(regex.match(bad))
 
@@ -184,7 +190,7 @@ class HC_D_DispatcherCoverage(unittest.TestCase):
                 self.assertGreater(target, 0, f"{gid} target must be positive")
 
     def test_no_orphan_dispatcher_entries(self) -> None:
-        found = set(re.findall(r"'(W4-\d{2})'\s*=\s*@\{\s*Target", self.src))
+        found = set(re.findall(r"'(W4-(?:pre|\d{2}))'\s*=\s*@\{\s*Target", self.src))
         self.assertEqual(found, set(EXPECTED_GATES),
                          f"dispatcher gate set does not match harness set: {found ^ set(EXPECTED_GATES)}")
 
