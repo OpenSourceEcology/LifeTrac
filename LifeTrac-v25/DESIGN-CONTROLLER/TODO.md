@@ -4,7 +4,7 @@
 > what still has to happen across all subsystems before field
 > deployment (controller + structural + hydraulic + integration +
 > field tests + regulatory), see the
-> **[Pre-field-deployment checklist](../TODO.md#pre-field-deployment-checklist-open-items-as-of-2026-04-29)**
+> **[Pre-field-deployment checklist](../TODO.md#pre-field-deployment-checklist-open-items-as-of-2026-05-04)**
 > section in the top-level [LifeTrac-v25/TODO.md](../TODO.md). This
 > file remains the authoritative source for the controller-side phase
 > plan; the top-level checklist links back to specific items here.
@@ -124,21 +124,33 @@ See the sensor/cabling discussion in [HARDWARE_BOM.md § Notes on substitutions]
 
 ## Phase 1 — Bench bring-up
 
-- [ ] Set up shared Git repo with subfolders for `firmware/handheld_mkr`, `firmware/tractor_h7` (runs on the X8's onboard STM32H747 co-MCU), `firmware/tractor_opta`, `firmware/tractor_x8` (Linux services), `firmware/common`, `base_station/` (Docker compose root). Per [MASTER_PLAN.md §8.2](MASTER_PLAN.md), there is **no `firmware/base_*/` target** — Linux on the base X8 drives the SX1276 directly over SPI from `base_station/lora_bridge.py`.
+**2026-05-04 bench status:** two Portenta X8 + Max Carrier stacks have
+been flashed with the `tractor_h7` M7 image at `0x08040000`. Both M7
+cores reached `loop()` and advanced SRAM4 liveness with CFSR/HFSR = 0
+using the X8 no-USB, bit-banged-SPI, nonce-PRNG bring-up image. This is
+partial W4-pre evidence only; USB-CDC, rail, blink/echo, stock M7<->M4
+handshake, and W4-00 TX/RX burst evidence are still open. Newer radio
+diagnostics enqueue frames but fail before TX start (`stageMode(TX)`
+returns `-16`; direct SX127x register snapshots are zero), so the Max
+Carrier LoRa interface must be revalidated before W4-00. Details:
+[`../AI NOTES/2026-05-04_Portenta_X8_M7_W4_Pre_Bringup_Status.md`](../AI%20NOTES/2026-05-04_Portenta_X8_M7_W4_Pre_Bringup_Status.md).
+
+- [ ] Set up shared Git repo with subfolders for `firmware/handheld_mkr`, `firmware/tractor_h7` (runs on the X8's onboard STM32H747 co-MCU), `firmware/tractor_opta`, `firmware/tractor_x8` (Linux services), `firmware/common`, `base_station/` (Docker compose root). Per [MASTER_PLAN.md §8.2](MASTER_PLAN.md), there is **no `firmware/base_*/` target**. 2026-05-04 interface update: revalidate the original "Linux drives SX1276 directly over SPI" assumption for the Max Carrier; Arduino's X8 gateway example drives the onboard Murata LPWAN module as an AT modem on `/dev/ttymxc3` with reset on `/dev/gpiochip5` line 3.
 - [ ] Set up PlatformIO with Portenta X8 + MKR WAN 1310 + Opta board support
 - [ ] Set up Arduino-CLI CI (extend existing [ARDUINO_CI.md](ARDUINO_CI.md) setup)
 - [ ] **Tractor:** verify Max Carrier + X8 boots, M7 blink works on the X8's onboard H747 co-MCU, M4 blink works
-- [ ] **Tractor:** verify LoRa TX/RX from M7 with RadioLib at 915 MHz, **SF7 / BW 125 kHz / CR 4-5** per [MASTER_PLAN.md §8.17](MASTER_PLAN.md)
+- [ ] **Tractor:** verify LoRa TX/RX from M7 with RadioLib at 915 MHz, **SF7 / BW 250 kHz / CR 4-5** per [LORA_PROTOCOL.md](LORA_PROTOCOL.md) / [DECISIONS.md](DECISIONS.md) D-A2. 
+  **2026-05-04 update:** Definitive confirmation received: The Max Carrier physically does not route the Murata module's SPI pins. It acts purely as a UART AT modem (19200 or 115200 baud). Raw `RadioLib` SPI control is impossible. The tractor M7 firmware must be refactored to use `Serial3` (or the equivalent Linux X8 serial endpoint) and AT commands (e.g. `AT`, `AT+VER?`, `AT+APPEUI`, etc).
 - [ ] **Tractor:** verify cellular SARA-R412M registers and sends a test MQTT publish
 - [ ] **Tractor:** wire D1608S SSR1–SSR4 to four directional valve coils (boom-up, boom-down, bucket-curl, bucket-dump) per [MASTER_PLAN.md §8.18](MASTER_PLAN.md); wire the remaining four directional coils (drive LH/RH fwd/rev) to D1608S SSR5–SSR8. The Opta base's onboard EMRs are reserved for engine-kill / horn / parking-brake / spare. Drive 8 LEDs as coil stand-ins from M4 core.
 - [ ] **Base:** verify Max Carrier + X8 boots, get SSH access
 - [ ] **Base:** install Docker on X8 Yocto image
-- [ ] **Base:** verify Linux can drive the SX1276 directly over SPI from `base_station/lora_bridge.py` (no Arduino firmware on the base H747 per [MASTER_PLAN.md §8.2](MASTER_PLAN.md))
+- [ ] **Base:** verify Linux can drive the Max Carrier LoRa module from `base_station/lora_bridge.py` (no Arduino firmware on the base H747 per [MASTER_PLAN.md §8.2](MASTER_PLAN.md)). 2026-05-04 update: first prove whether this is `/dev/ttymxc3` AT commands to the Murata `CMWX1ZZABZ-078` module rather than raw SPI to an exposed SX1276.
 - [ ] **Base:** verify Gigabit Ethernet works, get DHCP lease on office LAN
 - [ ] **Handheld:** flash MKR WAN 1310 with `RadioLib` "hello world" sketch, verify LoRa TX/RX
 - [ ] **Handheld:** verify joystick analog reads + button reads on breadboard
 - [ ] **Handheld:** verify OLED display works
-- [ ] **All three nodes:** verify they can hear each other's LoRa frames at bench distance with the same parameters (SF7, **BW 125 kHz**, CR 4-5, freq 915.0 MHz, sync 0x12) per [MASTER_PLAN.md §8.17](MASTER_PLAN.md)
+- [ ] **All three nodes:** verify they can hear each other's LoRa frames at bench distance with the same parameters (SF7, **BW 250 kHz**, CR 4-5, freq 915.0 MHz, sync 0x12) per [LORA_PROTOCOL.md](LORA_PROTOCOL.md) / [DECISIONS.md](DECISIONS.md) D-A2
 
 ---
 
@@ -375,7 +387,7 @@ This is the *industrial I/O layer* that the Max Carrier H7 talks to over RS-485.
 
 ### Base station services (Linux only)
 
-Per [MASTER_PLAN.md §8.2](MASTER_PLAN.md), the base station runs **no Arduino firmware** — Linux on the X8 drives the SX1276 directly over SPI from `base_station/lora_bridge.py`. There is no `firmware/base_h7/` target to build, flash, or CI.
+Per [MASTER_PLAN.md §8.2](MASTER_PLAN.md), the base station runs **no Arduino firmware**. There is no `firmware/base_h7/` target to build, flash, or CI. 2026-05-04 interface update: revalidate the original raw-SPI assumption for `base_station/lora_bridge.py`; Arduino's X8 Max Carrier example drives the onboard Murata LPWAN module through `/dev/ttymxc3` AT commands, not a `/dev/spidev*` SX1276 node.
 
 ### Image pipeline (per [IMAGE_PIPELINE.md](IMAGE_PIPELINE.md), [MASTER_PLAN.md §8.19](MASTER_PLAN.md), [BASE_STATION.md § Image pipeline](BASE_STATION.md#image-pipeline-portenta-x8-linux-side), [LORA_PROTOCOL.md § TileDeltaFrame](LORA_PROTOCOL.md#tiledeltaframe-image-pipeline-i--p-frames))
 

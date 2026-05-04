@@ -1,7 +1,7 @@
 # LifeTrac v25 — Master Test Program
 
 **Status:** living document, updated every implementation round.
-**Last updated:** 2026-04-29 (Round 42).
+**Last updated:** 2026-05-04 (X8 M7 bring-up / W4-pre partial evidence).
 **Owner:** every PR that adds, removes, or re-scopes a test MUST update
 the relevant section of this file in the same commit. See
 [§7 Update Protocol](#7-update-protocol).
@@ -170,15 +170,28 @@ latency, …).
 | **W4-09** | Async M7 TX state machine: `startTransmit()` + `isTransmitDone()` IRQ timing | Phase 1 time-on-air within 5 % of theory + IRQ→flag p99 < 2 ms; Phase 2 W4-03 + alive_tick jitter p99 < 5 ms | [test_m7_tx_queue_sil.py](DESIGN-CONTROLLER/base_station/tests/test_m7_tx_queue_sil.py) (queue logic only) | Real SX1276 IRQ wiring on real H747 silicon — **hard-blocked, no SIL substitute possible** |
 | **W4-10** | Fleet-key provisioning sanity: missing key halts M7 + bridge at startup | compile fail (missing header); OLED `FLEET KEY NOT PROVISIONED`; container exit ≠ 0 | [test_fleet_key_provisioning_sil.py](DESIGN-CONTROLLER/base_station/tests/test_fleet_key_provisioning_sil.py) (bridge loader failure modes; source-parse of handheld + tractor `#ifndef` guard, OLED string, ESTOP magic write) + handheld stub/real compile gates | OLED visual confirmation on real bench; systemd-unit restart behavior on real X8 |
 
-**Tier status (Round 53):**
-- **W4-pre** is the new earliest gate — board health (USB enumeration,
-  rails, dual-core handshake, blink-equivalent firmware boot) confirmed
-  with no RF activity. No antennas attached. Cannot be SIL-substituted.
-- **W4-00** is the LoRa-stack gating phase — every later W4-XX gate
-  that exercises the radio assumes W4-00 (a)–(d) have already passed.
-  W4-00 has full SIL coverage of the logic surface (lora_proto,
-  keyframe round-trip, link-tune); the bench run is a real-silicon
-  confirmation only.
+**Tier status (updated 2026-05-04):**
+- **X8 M7 bring-up evidence exists, but no gate is closed by it.** Two
+  Portenta X8 + Max Carrier stacks were flashed at `0x08040000` with
+  the `tractor_h7` M7 image. Both reached `loop()`, advanced SRAM4
+  liveness for roughly 60 s, and showed CFSR/HFSR = 0. Evidence note:
+  [AI NOTES/2026-05-04_Portenta_X8_M7_W4_Pre_Bringup_Status.md](AI%20NOTES/2026-05-04_Portenta_X8_M7_W4_Pre_Bringup_Status.md).
+- **W4-pre remains open.** The new evidence covers only the M7
+  firmware-liveness slice of sub-gate (e) via ADB/OpenOCD SRAM4
+  snapshots. USB enumeration, rail measurements, blink/echo, and the
+  stock M7<->M4 dual-core handshake still need their normal evidence
+  captures. No antennas attached for this gate.
+- **W4-00 remains blocked.** The repo has a result-recording harness,
+  but not the X8-accessible 1000-frame burst sender/control plane or
+   receiver counter export that the runbook procedure requires. Newer
+   bench diagnostics also show the current M7 raw-SPI RadioLib path is
+   not a valid W4-00 path yet: telemetry frames enqueue, but
+   `stageMode(TX)` returns `-16`, TX never starts, and direct SX127x
+   register snapshots are zero on both boards. Revalidate the Max
+   Carrier Murata `CMWX1ZZABZ-078` interface; Arduino's X8 gateway
+   example uses `/dev/ttymxc3` AT commands plus `/dev/gpiochip5` reset,
+   not a raw `/dev/spidev*` SX1276 device. Every later W4-XX gate that
+   exercises the radio still assumes W4-00 (a)-(d) have passed.
 - 9 of 10 prior gates (W4-01, W4-02, W4-03, W4-04, W4-05, W4-06,
   W4-07, W4-08, W4-10) have SIL coverage of the *logic surface* and
   need only a bench-confirmation pass.

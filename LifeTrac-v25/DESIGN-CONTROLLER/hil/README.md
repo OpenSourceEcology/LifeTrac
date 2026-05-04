@@ -52,6 +52,16 @@ hil/
    `bench-evidence/W4-XX/results.jsonl`.
 6. Re-run `dispatch.ps1` to see updated counts and the next recommended gate.
 
+## Current W4-00 Limitation
+
+As of 2026-05-04, `w4-00_lora_dual_portenta.ps1` is an evidence wrapper,
+not a traffic generator. It prompts for and records operator-observed
+burst, latency, payload-size, and keyframe metrics, but it does not yet
+drive the 1000-frame encrypted ControlFrame burst required by the W4-00
+runbook. The X8 no-USB M7 bring-up path also needs an ADB/Serial1/SRAM4
+control plane and receiver-side counter export before W4-00 can be run
+without interactive USB-CDC consoles.
+
 ## Result-line schema
 
 Every harness writes one JSON object per bench run to

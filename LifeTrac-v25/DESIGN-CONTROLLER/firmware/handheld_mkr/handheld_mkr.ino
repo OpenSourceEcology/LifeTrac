@@ -392,12 +392,18 @@ void setup() {
     pinMode(PIN_BTN_ESTOP,   INPUT_PULLUP);
     for (int i = 0; i < 8; i++) pinMode(PIN_BTN_BASE + i, INPUT_PULLUP);
 
+    // TX power: LIFETRAC_BENCH_TX_DBM defaults to 2 dBm (SX1276 minimum,
+    // ~1.6 mW) for close-range bench / HIL testing.  Remove the define or
+    // set it to 14 for field use (MKR WAN 1310 PA limit).
+#ifndef LIFETRAC_BENCH_TX_DBM
+#  define LIFETRAC_BENCH_TX_DBM 2
+#endif
     int st = radio.begin(915.0,
                          (float)LADDER[0].bw_khz,   // IP-006: match LADDER[0] (BW250)
                          LADDER[0].sf,
                          LADDER[0].cr_den,
                          0x12,                       // sync word — private LoRa
-                         14);                        // tx power dBm (Murata SiP max for MKR)
+                         LIFETRAC_BENCH_TX_DBM);     // 2 dBm bench / 14 dBm field
     if (st != RADIOLIB_ERR_NONE) {
         Serial.print("LoRa begin failed: "); Serial.println(st);
         while (1) { delay(1000); }

@@ -164,7 +164,11 @@ that board — W4-03 (M7↔M4 watchdog) cannot pass until this does.
      and accept that `radio.begin()` may fail-loud on the first cycle
      — the test is whether the rest of the firmware reaches
      `loop()` and emits its heartbeat log.
-2. Flash to one Portenta. Open USB-CDC console at 115200.
+2. Flash to one Portenta. Open USB-CDC console at 115200. For an
+  X8 diagnostic image built with `LIFETRAC_X8_NO_USB_SERIAL`, use
+  the ADB/OpenOCD SRAM4 liveness snapshot instead of the serial
+  console: confirm `SharedM7M4.version == 2`, `alive_tick_ms` is
+  advancing, `loop_counter` is advancing, and CFSR/HFSR are both 0.
 3. Press reset. Confirm the boot banner appears within 5 s and the
    firmware reaches its periodic heartbeat / status log line.
 4. Let it run for 60 s. Confirm zero panics, no `unexpected_panic`
@@ -175,6 +179,23 @@ that board — W4-03 (M7↔M4 watchdog) cannot pass until this does.
 reset and stay there for 60 s with no panics. This is the
 "firmware fundamentally works on this hardware" check before any
 LoRa air time is requested.
+
+### 2026-05-04 X8 M7 status
+
+Two Portenta X8 + Max Carrier stacks were flashed with the `tractor_h7`
+M7 image at `0x08040000` using the X8 no-USB bring-up path. Both boards
+hit `loop()`, updated the SRAM4 liveness fields for roughly 60 s, and
+reported CFSR/HFSR as 0. This is evidence for the M7 firmware-liveness
+slice of sub-gate (e), not a full W4-pre pass: USB-CDC enumeration,
+rail measurements, blink/echo, and the stock M7<->M4 dual-core
+handshake still need their normal evidence captures.
+
+The longer two-carrier-only runs latched `estop_request = 0xA5A5A5A5`
+because the Opta/RS-485 target was not attached and the production
+Modbus safety policy latched after consecutive failures. Treat that as
+expected for this bench shape, not as a CPU fault. Full evidence and
+working commands are recorded in
+[`../AI NOTES/2026-05-04_Portenta_X8_M7_W4_Pre_Bringup_Status.md`](../AI%20NOTES/2026-05-04_Portenta_X8_M7_W4_Pre_Bringup_Status.md).
 
 ### Capture & sign-off
 
@@ -257,6 +278,31 @@ or the handheld MKR. Those all enter at W4-01 and beyond.
       attached and the [`base_station/image_pipeline/`](base_station/image_pipeline/)
       service running, configured for SSDV chunking per
       [IMAGE_PIPELINE.md § Phase A](IMAGE_PIPELINE.md).
+
+### Current tooling blocker (2026-05-04)
+
+Do not mark W4-00 as run yet. The current X8 no-USB `tractor_h7`
+bring-up image reaches `loop()` and enqueues radio frames, but the
+assumed direct M7 raw-SPI SX1276 path fails before TX start:
+`stageMode(TX)` returns `RADIOLIB_ERR_SPI_WRITE_FAILED` (`-16`) and
+direct register snapshots are zero on both boards. This procedure also
+still assumes two interactive USB-CDC consoles and a base-side command
+that can generate the 1000-frame encrypted ControlFrame bursts. The
+existing PowerShell harness
+[`hil/w4-00_lora_dual_portenta.ps1`](hil/w4-00_lora_dual_portenta.ps1)
+records operator-entered metrics; it does not drive the burst itself.
+
+Revalidate the Max Carrier LoRa interface before any W4-00 run.
+Arduino's Portenta X8 + Max Carrier gateway example uses the onboard
+Murata `CMWX1ZZABZ-078` as an AT-command modem on `/dev/ttymxc3` at
+19200 baud, with reset on `/dev/gpiochip5` line 3, rather than a raw
+`/dev/spidev*` SX1276 interface.
+
+Before W4-00 can produce gate evidence, add one X8-accessible M7 bench
+control plane (USB-CDC restored, Serial1/RPC, ADB mailbox, or SRAM4
+command mailbox), a real base-role 1000-frame burst sender for
+SF7/SF8/SF9, receiver-side counters/export that can be captured without
+halting the CPU, and a proven Max Carrier LoRa control path.
 
 ### Procedure (sub-gate (a) — basic TX/RX at 1 m)
 

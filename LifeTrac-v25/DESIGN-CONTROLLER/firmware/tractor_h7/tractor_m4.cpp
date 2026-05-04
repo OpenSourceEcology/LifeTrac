@@ -43,7 +43,12 @@ static volatile SharedM7M4* const SHARED =
 #define PIN_SAFETY_ALIVE  PG_3
 
 // Heartbeat LED so a tech with no scope can see the M4 is running.
-#define PIN_M4_HEARTBEAT  LEDB
+// LEDB is not defined on the portenta_x8 SDK; fall back to LED_BUILTIN.
+#if defined(LEDB)
+#  define PIN_M4_HEARTBEAT  LEDB
+#else
+#  define PIN_M4_HEARTBEAT  LED_BUILTIN
+#endif
 
 static uint32_t s_last_loop_counter = 0;
 static uint32_t s_last_loop_change_ms = 0;

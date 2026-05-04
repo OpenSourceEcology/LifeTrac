@@ -36,7 +36,7 @@ for the protocol).
 
 ---
 
-## Pre-field-deployment checklist (open items as of 2026-04-29)
+## Pre-field-deployment checklist (open items as of 2026-05-04)
 
 > **Purpose.** A single consolidated view of what still has to happen
 > before a real LifeTrac v25 can be powered on at a real work site.
@@ -52,8 +52,10 @@ for the protocol).
 
 ### A. Hardware procurement (lead-time blocker — start first)
 
-🟥 Nothing has been ordered yet. Until parts arrive, every other
-hardware-touching item below is blocked.
+🟥 Production procurement remains open. Two bench Portenta X8 + Max
+Carrier stacks are on hand for bring-up, but the rest of the tractor,
+base, handheld, hydraulic, and dev-gear BOM still blocks full HIL and
+field testing.
 
 - [ ] 🟥 **Tractor node** — Portenta Max Carrier, Portenta X8, LoRa +
   cellular antennas, NEO-M9N GPS, IP65 enclosure, Opta WiFi + D1608S
@@ -80,14 +82,28 @@ hardware-touching item below is blocked.
 
 ### B. Bench bring-up (Phase 1)
 
-🟥 All blocked on Section A.
+🟥 Mostly blocked on Section A. Current bench exception: two Portenta X8
+and Max Carrier stacks are available and have produced partial W4-pre
+M7 firmware-liveness evidence; the full production procurement list
+remains open.
 
 - [ ] 🟥 First-power-on smoke tests for each of the three nodes
   (tractor X8 + Max Carrier H7, base X8 + Max Carrier H7, handheld
   MKR WAN 1310). Verify USB enumeration, serial console, LED blink.
   [DESIGN-CONTROLLER/TODO.md § Phase 1](DESIGN-CONTROLLER/TODO.md#phase-1--bench-bring-up).
+  **2026-05-04 partial:** Board 1 (`2D0A1209DABC240B`) and Board 2
+  (`2E2C1209DABC240B`) both flashed `tractor_h7` M7 at `0x08040000`,
+  reached `loop()`, advanced SRAM4 liveness for roughly 60 s, and had
+  CFSR/HFSR = 0. Formal USB-CDC, rail, blink/echo, and stock
+  dual-core handshake captures are still open.
 - [ ] 🟥 RadioLib + SX1276 (or Murata SiP) hello-world: send a packet
   base ↔ tractor at 1 m, decode RSSI/SNR.
+  **2026-05-04 update:** The physical architecture has been definitively confirmed. The Murata `CMWX1ZZABZ-078` on the Max Carrier acts as a standalone AT modem and its raw SPI pins are **not** routed to the Portenta high-density connectors. Raw SPI communication (i.e. `RadioLib` P2P) is physically impossible. All LoRa control MUST be rewritten to use AT commands over a serial port (`Serial3` on H7, or `/dev/ttymxc3` on X8 Linux).
+  **2026-05-04 bench probe update:** Live UART probe on both X8 boards (see [AI NOTES/2026-05-04_Murata_UART_Firmware_Probe_Bench_Results_Copilot_v1_0.md](AI%20NOTES/2026-05-04_Murata_UART_Firmware_Probe_Bench_Results_Copilot_v1_0.md)) confirmed the modem UART is alive at **19200 8N1**, reset via `gpio163` works, and host→modem TX is acknowledged. **However**, the firmware currently flashed on the Murata does *not* respond to any known AT command set (Hayes / MKRWAN / RAK / Semtech AT_Slave / RUI3 all rejected with `Error when receiving / +ERR_RX`), and a board1↔board2 over-air smoke test produced zero received bytes. Method comparison in [AI NOTES/2026-05-04_LoRa_AT_vs_SPI_Method_Comparison_Copilot_v1_0.md](AI%20NOTES/2026-05-04_LoRa_AT_vs_SPI_Method_Comparison_Copilot_v1_0.md).
+  **2026-05-04 Arduino-doc reading update:** Per [Arduino's Max Carrier TTN tutorial §2.1](https://docs.arduino.cc/tutorials/portenta-max-carrier/connecting-to-ttn) and the [official LoRa modem firmware update guide](https://support.arduino.cc/hc/en-us/articles/4405107258130-How-to-update-the-LoRa-modem-firmware), the Max Carrier ships with a **stale stock Murata firmware that must be updated before first use** via the `MKRWANFWUpdate_standalone` example sketch from the `MKRWAN` library, with `#define PORTENTA_CARRIER` added before `#include <MKRWAN.h>`. The sketch reflashes the modem **over UART from the host H7** using the STM32L072 system bootloader — **no SWD required**. The `+ERR_RX` URC observed on our boards matches the documented "stale firmware" failure mode.
+  **2026-05-04 Method G analysis update:** Per user question "could we implement [SPI-era features] with custom firmware?" — yes, fully. The Murata SiP's SX1276 SPI bus is internal to the package and directly wired to the on-die STM32L072 (192 KB Flash / 20 KB RAM, Cortex-M0+ @ 32 MHz). Custom firmware on the L072 recovers per-frame FHSS, adaptive SF, three-profile per-frame PHY swap, P0 preempt, AES-GCM, custom 16 B ControlFrame, no-ACK semantics, with sub-millisecond host↔radio latency over a binary COBS UART. Cost: 4–6 weeks of focused L072 firmware work using [`hardwario/lora-modem`](https://github.com/hardwario/lora-modem) (MIT) as the fork point. Brick risk near-zero if BOOT0/NRST control + a UART safe-mode command are designed in. Full analysis in [AI NOTES/2026-05-04_Murata_L072_Custom_Firmware_Method_G_Copilot_v1_0.md](AI%20NOTES/2026-05-04_Murata_L072_Custom_Firmware_Method_G_Copilot_v1_0.md); summary appended as §11 of the comparison note.
+  **2026-05-04 Method G commitment update:** Per project lead direction "we are not in a hurry, we want to get the most performance out of LoRa as possible. Lets skip external modems or boards in method E/F, and focus exclusively on method G" — Methods A, B, C, D, E, F are now superseded. Method G (custom firmware on the L072) is committed as the only LoRa path forward. New design folder [DESIGN-CONTROLLER/DESIGN-LORAFIRMWARE/](DESIGN-CONTROLLER/DESIGN-LORAFIRMWARE/) created to hold the plans and analysis: [README](DESIGN-CONTROLLER/DESIGN-LORAFIRMWARE/README.md), [00 Method-G commitment & decision record](DESIGN-CONTROLLER/DESIGN-LORAFIRMWARE/00_DECISION_Method_G_Commitment.md), [01 capabilities analysis](DESIGN-CONTROLLER/DESIGN-LORAFIRMWARE/01_Capabilities_Analysis_Custom_Firmware.md) (12 R-XX recovered features + 34 N-XX new capabilities including LBT, channel-quality-aware FHSS, deep-sleep handheld, autonomous emergency beacon, signed firmware, A/B field updates), [02 firmware architecture](DESIGN-CONTROLLER/DESIGN-LORAFIRMWARE/02_Firmware_Architecture_Plan.md) (source layout, bare-metal cooperative scheduler, ~92 KB / ~14 KB resource budget, Make + PlatformIO), [03 bring-up roadmap](DESIGN-CONTROLLER/DESIGN-LORAFIRMWARE/03_Bringup_Roadmap.md) (8 phases, gated on capability not calendar), [04 hardware interface & recovery](DESIGN-CONTROLLER/DESIGN-LORAFIRMWARE/04_Hardware_Interface_and_Recovery.md) (host UART spec + 5-layer brick recovery).
+  Status: Blocked on Phase 0 of the bring-up roadmap — running `MKRWANFWUpdate_standalone` (with `#define PORTENTA_CARRIER`) on Board2 first, then Board1, to qualify the H7→L072 bootloader pipeline that all custom-firmware development will rely on. Bench utilities to verify the post-flash result are checked in under [LifeTrac-v25/tools/](tools/) (`at_probe.sh`, `at_probe2.sh`, `rx_listen.sh`, `tx_burst.sh`). After Phase 0 green, Phase 1 (hello-world + brick-resistance + prove SiP-internal SPI works from our binary) is the next gate. Per [DECISION 00](DESIGN-CONTROLLER/DESIGN-LORAFIRMWARE/00_DECISION_Method_G_Commitment.md), Methods E/F are dropped — no external SX1276 module to order, no second antenna to plan.
 - [ ] 🟥 Coral Mini PCIe **2-day validation spike** — `lspci`
   enumeration, `gasket`/`apex` driver against the X8 Yocto kernel,
   30-min sustained inference without thermal throttle. On failure,
@@ -2046,8 +2062,11 @@ emitter, and `lora_rtt._percentile`).
   with real library calls; needs an Opta + expansions on the bench.
 - [ ] **Compile `lp_crypto_real.cpp` on-target** (Portenta H7 + MKR WAN
   1310) and verify with the golden-vector test from above.
-- [ ] **Tractor M7 ↔ SX1276 SPI driver** (bridge currently talks
-  KISS-over-serial; on-tractor needs the real radio path).
+- [ ] **Tractor radio driver/control path** (bridge currently talks
+  KISS-over-serial; on-tractor needs the real radio path). 2026-05-04
+  update: Max Carrier evidence points away from a bare M7↔SX1276 SPI
+  path and toward the Murata LPWAN AT modem interface on X8 Linux
+  `/dev/ttymxc3`; revalidate before writing more raw-SPI RadioLib code.
 - [ ] **Bench-validate E-stop end-to-end** per the procedure in
   [KEY_ROTATION.md](DESIGN-CONTROLLER/KEY_ROTATION.md) §7.
 
@@ -2056,13 +2075,18 @@ emitter, and `lora_rtt._percentile`).
 ## Hardware-in-the-loop (HIL) gate — required before any wet hydraulic test
 
 These are the items the Round 1–4 implementation plan explicitly deferred
-because they cannot be validated without the actual bench setup (handheld
-+ tractor H747 + Opta + expansions + SX1276 modems on both ends). Each
-must pass before the system is allowed to drive real hydraulics. Tracked
+because they cannot be fully validated without hardware. W4-pre and W4-00
+use the minimal two-carrier desk setup from the runbook; W4-01 and later
+need the full bench setup (handheld + tractor H747 + Opta + expansions +
+SX1276 modems on both ends). Each gate must pass before the system is
+allowed to drive real hydraulics. Tracked
 against the Wave-4 gates in
 [`AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md` § Wave 4](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Plan_v1_0.md).
 
 **HIL bench setup prerequisites:**
+
+W4-pre and W4-00 use their own minimal hardware lists in the runbook. The
+full setup below applies before W4-01 and later.
 
 - [ ] Two SX1276 LoRa modems wired (handheld MKR WAN 1310 + tractor H747).
 - [ ] Tractor H747 + Opta connected over RS-485 with both expansions
@@ -2080,6 +2104,20 @@ documented in
 [`DESIGN-CONTROLLER/HIL_RUNBOOK.md`](DESIGN-CONTROLLER/HIL_RUNBOOK.md).
 Execute from the runbook; the bullets below are the index.
 
+- [ ] **W4-pre Board bring-up sanity.** Partial 2026-05-04 evidence:
+  both Portenta X8 M7 cores flash, boot, reach `loop()`, and update
+  SRAM4 liveness with CFSR/HFSR = 0. Still open: USB enumeration,
+  3.3 V/5 V rail measurements, blink/echo, stock M7<->M4 handshake,
+  and formal capture/sign-off package.
+- [ ] **W4-00 LoRa stack dual-Portenta bench.** Blocked until the X8
+  no-USB bench image has a control plane plus a real base-role
+  1000-frame encrypted ControlFrame burst sender and receiver-side
+  counters/export. Also blocked on Max Carrier radio-interface
+  revalidation: the onboard Murata `CMWX1ZZABZ-078` appears to be
+  exposed through the X8 Linux AT-modem path (`/dev/ttymxc3`), while
+  the current M7 raw-SPI RadioLib diagnostic fails before TX start.
+  The current PowerShell harness records metrics but does not generate
+  the burst.
 - [ ] **W4-01 Handheld E-stop latch latency.** Mushroom-button press →
   PSR-alive drops → all 8 valve coils de-energize within **< 100 ms**
   measured at the relay terminals. Repeat 100× across the SF7/SF8/SF9

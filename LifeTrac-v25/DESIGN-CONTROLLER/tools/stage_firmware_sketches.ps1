@@ -40,8 +40,8 @@ function Stage-Sketch {
     Write-Host "Staged $SketchDir/src ($($ExtraFiles.Count + ($LoraProto.Count -gt 0)) source group(s))"
 }
 
-Stage-Sketch -SketchDir (Join-Path $fw 'handheld_mkr')   -LoraProto @('lora_proto')
-Stage-Sketch -SketchDir (Join-Path $fw 'tractor_h7')     -LoraProto @('lora_proto') -ExtraFiles @('shared_mem.h')
+Stage-Sketch -SketchDir (Join-Path $fw 'handheld_mkr')   -LoraProto @('lora_proto') -ExtraFiles @('lifetrac_build_config.h')
+Stage-Sketch -SketchDir (Join-Path $fw 'tractor_h7')     -LoraProto @('lora_proto') -ExtraFiles @('shared_mem.h', 'lifetrac_build_config.h')
 # Round 17 (2026-04-28): tractor_h7_m4 is its own sketch folder for the
 # Portenta H7 M4 co-processor. Only shared_mem.h is shared with the M7.
 Stage-Sketch -SketchDir (Join-Path $fw 'tractor_h7_m4')  -LoraProto @() -ExtraFiles @('shared_mem.h')

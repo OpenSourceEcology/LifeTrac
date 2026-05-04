@@ -25,7 +25,21 @@
 //   .github/workflows/arduino-ci.yml; local: stage_firmware_sketches.ps1.
 // The canonical sources still live in firmware/common/. The src/ tree is
 // .gitignored.
+#include "src/lifetrac_build_config.h"
 #include "src/lora_proto/lora_proto.h"
+
+// X8 compatibility: the portenta_x8 SDK replaces `Serial` with an ErrorSerialClass
+// that requires the SerialRPC library. Redirect all debug output to a no-op sink
+// so the same source compiles for both portenta_x8 and envie_m7/portenta_h7_m7.
+#if defined(ARDUINO_PORTENTA_X8) || defined(LIFETRAC_X8_NO_USB_SERIAL)
+namespace { struct _NullSerial {
+    void begin(unsigned long) {}
+    template<typename T> size_t print(T)   { return 0; }
+    template<typename T> size_t println(T) { return 0; }
+    size_t println() { return 0; }
+} _nullSerial; }
+#define Serial _nullSerial
+#endif
 
 // Forward declarations for types used in helper-function signatures, so the
 // Arduino preprocessor's auto-generated prototypes (inserted near the top of
@@ -34,10 +48,6 @@
 // "redeclared as different kind of symbol" because the auto-prototype is
 // parsed in a scope where the struct name is unknown.
 struct AxisRamp;
-
-// ---------- LoRa pins (Portenta Max Carrier wires Murata SiP via SPI) ----------
-SX1276 radio = new Module(/*nss*/ PD_4, /*dio0*/ PD_5,
-                          /*reset*/ PE_4, /*dio1*/ PE_5);
 
 // ---------- Modbus master over RS-485 (Max Carrier J6) ----------
 // 115200 8N1, RTU framing. Opta is slave id 0x01 (per TRACTOR_NODE.md).
@@ -96,11 +106,276 @@ enum ValveBit : uint16_t {
 static volatile SharedM7M4* const SHARED =
     reinterpret_cast<volatile SharedM7M4*>(LIFETRAC_SHARED_ADDR);
 
-// ---------- pre-shared key (provisioned via USB tool) ----------
-// IP-008: setup() halts boot when this is still the all-zero placeholder AND
-// LIFETRAC_USE_REAL_CRYPTO is defined, so a stock image cannot accidentally
-// run an unauthenticated radio link.
+#if defined(LIFETRAC_BENCH_RADIO_COUNTERS) || defined(LIFETRAC_X8_BOOT_TRACE)
+static inline void bench_radio_set(uint32_t index, uint32_t value) {
+    if (index < 11u) {
+        SHARED->reserved[index] = value;
+        __DMB();
+    }
+}
+
+static inline void bench_radio_add(uint32_t index, uint32_t delta = 1u) {
+    if (index < 11u) {
+        SHARED->reserved[index] += delta;
+        __DMB();
+    }
+}
+
+static inline void bench_radio_reset() {
+    for (uint32_t index = 0; index < 11u; ++index) {
+        SHARED->reserved[index] = 0u;
+    }
+    bench_radio_set(LIFETRAC_SHARED_RADIO_MAGIC_IDX, LIFETRAC_SHARED_RADIO_MAGIC);
+}
+
+static inline uint32_t bench_radio_meta(uint8_t source_id, uint8_t frame_type,
+                                        int16_t rssi_dbm, int16_t snr_db_x10) {
+    return ((uint32_t)source_id) |
+           ((uint32_t)frame_type << 8) |
+           (((uint32_t)((uint8_t)rssi_dbm)) << 16) |
+           (((uint32_t)((uint8_t)snr_db_x10)) << 24);
+}
+
+static inline uint32_t bench_radio_status_meta(uint8_t stage, int16_t state) {
+    return 0xBA000000u | ((uint32_t)stage << 16) | ((uint16_t)state);
+}
+
+static inline uint32_t bench_radio_reg_pack(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
+    return ((uint32_t)a) | ((uint32_t)b << 8) | ((uint32_t)c << 16) | ((uint32_t)d << 24);
+}
+
+static inline uint32_t bench_radio_initial_tx_offset_ms() {
+    volatile const uint32_t* uid = (volatile const uint32_t*)0x1FF1E800u;
+    uint32_t mix = uid[0] ^ (uid[1] << 7) ^ (uid[2] << 13);
+    return 100u + (mix % 700u);
+}
+#else
+static inline void bench_radio_set(uint32_t, uint32_t) {}
+static inline void bench_radio_add(uint32_t, uint32_t = 1u) {}
+static inline void bench_radio_reset() {}
+static inline uint32_t bench_radio_meta(uint8_t, uint8_t, int16_t, int16_t) { return 0u; }
+static inline uint32_t bench_radio_reg_pack(uint8_t, uint8_t, uint8_t, uint8_t) { return 0u; }
+static inline uint32_t bench_radio_initial_tx_offset_ms() { return 0u; }
+#endif
+
+static inline void boot_trace_mark_raw(uint32_t stage) {
+    volatile uint32_t* const shared = reinterpret_cast<volatile uint32_t*>(LIFETRAC_SHARED_ADDR);
+    shared[0] = LIFETRAC_SHARED_VERSION;
+    shared[1] = stage << 1;
+    shared[2] = 0xB0070000u | (stage & 0xFFFFu);
+    shared[3] = 0u;
+    shared[4] = stage;
+}
+
+extern "C" void lifetrac_preinit_marker(void) {
+#if defined(LIFETRAC_X8_BOOT_TRACE)
+    boot_trace_mark_raw(0xE0u);
+#endif
+}
+
+__attribute__((section(".preinit_array"), used))
+void (*lifetrac_preinit_marker_ptr)(void) = lifetrac_preinit_marker;
+
+extern "C" uint32_t __StackLimit;
+extern "C" uint32_t __StackTop;
+extern "C" uint32_t __end__;
+extern "C" uint32_t mbed_stack_isr_start;
+extern "C" uint32_t mbed_stack_isr_size;
+extern "C" uint32_t mbed_heap_start;
+extern "C" uint32_t mbed_heap_size;
+extern "C" void mbed_init(void);
+extern "C" void mbed_rtos_start(void);
+
+extern "C" void software_init_hook(void) {
+#if defined(LIFETRAC_X8_BOOT_TRACE)
+    boot_trace_mark_raw(0xD0u);
+#endif
+    mbed_stack_isr_start = reinterpret_cast<uint32_t>(&__StackLimit);
+    mbed_stack_isr_size  = reinterpret_cast<uint32_t>(&__StackTop) -
+                           reinterpret_cast<uint32_t>(&__StackLimit);
+    mbed_heap_start      = reinterpret_cast<uint32_t>(&__end__);
+    mbed_heap_size       = reinterpret_cast<uint32_t>(&__StackLimit) -
+                           reinterpret_cast<uint32_t>(&__end__);
+    mbed_init();
+#if defined(LIFETRAC_X8_BOOT_TRACE)
+    boot_trace_mark_raw(0xD1u);
+#endif
+    mbed_rtos_start();
+}
+
+static inline void boot_trace_mark(uint32_t stage) {
+#if defined(LIFETRAC_X8_BOOT_TRACE)
+    boot_trace_mark_raw(stage);
+#else
+    (void)stage;
+#endif
+}
+
+#if defined(ARDUINO_PORTENTA_X8) || defined(LIFETRAC_X8_NO_USB_SERIAL)
+static inline void lifetrac_x8_spi_kernel_clock_init() {
+    volatile uint32_t* const rcc_cr = reinterpret_cast<volatile uint32_t*>(0x58024400UL);
+    volatile uint32_t* const rcc_pllckselr = reinterpret_cast<volatile uint32_t*>(0x58024428UL);
+    volatile uint32_t* const rcc_pllcfgr = reinterpret_cast<volatile uint32_t*>(0x5802442CUL);
+    volatile uint32_t* const rcc_pll1divr = reinterpret_cast<volatile uint32_t*>(0x58024430UL);
+    volatile uint32_t* const rcc_pll1fracr = reinterpret_cast<volatile uint32_t*>(0x58024434UL);
+    volatile uint32_t* const rcc_d1ccipr = reinterpret_cast<volatile uint32_t*>(0x5802444CUL);
+    volatile uint32_t* const rcc_d2ccip1r = reinterpret_cast<volatile uint32_t*>(0x58024450UL);
+
+    constexpr uint32_t hsion = 1UL << 0;
+    constexpr uint32_t hsirdy = 1UL << 2;
+    constexpr uint32_t pll1on = 1UL << 24;
+    constexpr uint32_t pll1rdy = 1UL << 25;
+
+    if ((*rcc_cr & pll1rdy) == 0) {
+        *rcc_cr |= hsion;
+        while ((*rcc_cr & hsirdy) == 0) {}
+
+        *rcc_pllckselr = (*rcc_pllckselr & ~((0x3UL << 0) | (0x3FUL << 4))) | (4UL << 4);
+        *rcc_pllcfgr = (*rcc_pllcfgr & ~((0x3UL << 2) | (1UL << 1) | (0x7UL << 16))) |
+                       (0x2UL << 2) | (0x7UL << 16);
+        *rcc_pll1divr = ((24UL - 1UL) << 0) |
+                        ((2UL - 1UL) << 9) |
+                        ((6UL - 1UL) << 16) |
+                        ((2UL - 1UL) << 24);
+        *rcc_pll1fracr = 0;
+        *rcc_cr |= pll1on;
+        while ((*rcc_cr & pll1rdy) == 0) {}
+    }
+
+    *rcc_d1ccipr = (*rcc_d1ccipr & ~(0x3UL << 28));
+    *rcc_d2ccip1r = (*rcc_d2ccip1r & ~(0x7UL << 12)) | (0x4UL << 12);
+}
+#else
+static inline void lifetrac_x8_spi_kernel_clock_init() {}
+#endif
+
+// ---------- LoRa pins (Portenta Max Carrier wires Murata SiP via SPI) ----------
+#if defined(ARDUINO_PORTENTA_X8) || defined(LIFETRAC_X8_NO_USB_SERIAL)
+class LifeTracX8RadioHal : public ArduinoHal {
+  public:
+    LifeTracX8RadioHal() : ArduinoHal(SPI, SPISettings(2000000, MSBFIRST, SPI_MODE0)) {}
+
+    void init() override {
+        ensureSpiPins();
+    }
+
+    void pinMode(uint32_t pin, uint32_t mode) override {
+        if (pin == RADIOLIB_NC) {
+            return;
+        }
+        ::pinMode(static_cast<PinName>(pin), static_cast<PinMode>(mode));
+    }
+
+    void digitalWrite(uint32_t pin, uint32_t value) override {
+        if (pin == RADIOLIB_NC) {
+            return;
+        }
+        ::digitalWrite(static_cast<PinName>(pin), static_cast<PinStatus>(value));
+    }
+
+    uint32_t digitalRead(uint32_t pin) override {
+        if (pin == RADIOLIB_NC) {
+            return 0;
+        }
+        return (uint32_t)::digitalRead(static_cast<PinName>(pin));
+    }
+
+    void spiBeginTransaction() override {
+        ensureSpiPins();
+    }
+
+    void spiTransfer(uint8_t* out, size_t len, uint8_t* in) override {
+        ensureSpiPins();
+        for (size_t index = 0; index < len; ++index) {
+            uint8_t tx = out ? out[index] : 0xFFu;
+            uint8_t rx = 0;
+            for (int bit = 7; bit >= 0; --bit) {
+                *spiMosi = (tx >> bit) & 0x01u;
+                bitDelay();
+                *spiSck = 1;
+                bitDelay();
+                rx = static_cast<uint8_t>((rx << 1) | (spiMiso->read() ? 1u : 0u));
+                *spiSck = 0;
+                bitDelay();
+            }
+            if (in) {
+                in[index] = rx;
+            }
+        }
+    }
+
+    void spiEndTransaction() override {}
+
+    void term() override {}
+
+
+    void delay(RadioLibTime_t ms) override {
+        busyWaitUs(ms * 1000u);
+    }
+
+    void delayMicroseconds(RadioLibTime_t us) override {
+        busyWaitUs(us);
+    }
+
+    RadioLibTime_t millis() override {
+        return (RadioLibTime_t)(tim5Count() / 1000u);
+    }
+
+    RadioLibTime_t micros() override {
+        return (RadioLibTime_t)tim5Count();
+    }
+  private:
+    void ensureSpiPins() {
+        if (!spiSck) {
+            spiSck = new mbed::DigitalOut(SPI_SCK, 0);
+            spiMosi = new mbed::DigitalOut(SPI_MOSI, 0);
+            spiMiso = new mbed::DigitalIn(SPI_MISO);
+            spiMiso->mode(PullUp);
+        }
+    }
+
+    mbed::DigitalOut* spiSck = nullptr;
+    mbed::DigitalOut* spiMosi = nullptr;
+    mbed::DigitalIn* spiMiso = nullptr;
+
+    static uint32_t tim5Count() {
+        return *(volatile uint32_t*)0x40000C24u;
+    }
+
+    static void busyWaitUs(RadioLibTime_t us) {
+        uint32_t start = tim5Count();
+        while ((uint32_t)(tim5Count() - start) < (uint32_t)us) {}
+    }
+
+    static void bitDelay() {
+        busyWaitUs(1u);
+    }
+};
+
+static LifeTracX8RadioHal radio_hal;
+static Module radio_module(&radio_hal, /*nss*/ PD_4, /*dio0*/ PD_5,
+                           /*reset*/ PE_4, /*dio1*/ PE_5);
+#else
+static Module radio_module(/*nss*/ PD_4, /*dio0*/ PD_5,
+                           /*reset*/ PE_4, /*dio1*/ PE_5);
+#endif
+SX1276 radio(&radio_module);
+
+__attribute__((constructor(101)))
+static void boot_trace_constructor_mark() {
+    boot_trace_mark(0xE1u);
+}
+
+// ---------- pre-shared key ----------
+// The fleet key is baked in at compile time from src/lora_proto/key.h, which
+// is generated by tools/provision.py. IP-008 halts boot when the key is still
+// the all-zero placeholder AND LIFETRAC_USE_REAL_CRYPTO is defined.
+#include "src/lora_proto/key.h"
+#ifdef LIFETRAC_USE_REAL_CRYPTO
+static const uint8_t kFleetKey[16] = LIFETRAC_FLEET_KEY_BYTES;
+#else
 static const uint8_t kFleetKey[16] = {0};
+#endif
 
 static bool fleet_key_is_zero() {
     for (int i = 0; i < 16; i++) if (kFleetKey[i] != 0) return false;
@@ -736,13 +1011,20 @@ static void process_air_frame(uint8_t* onair, size_t len, int16_t rssi_dbm, int1
     memcpy(nonce, onair, 12);
     uint8_t pt[160];
     if (!lp_decrypt(kFleetKey, nonce, onair + 12, len - 12, pt)) return;
+    bench_radio_add(LIFETRAC_SHARED_RADIO_RX_DECRYPT_IDX);
     size_t pt_len = len - 12 - 16;
     if (pt_len < sizeof(LoraHeader)) return;
 
     LoraHeader* hdr = (LoraHeader*)pt;
     if (hdr->version != LIFETRAC_PROTO_VERSION) return;
+    bench_radio_set(LIFETRAC_SHARED_RADIO_RX_META_IDX,
+                    bench_radio_meta(hdr->source_id, hdr->frame_type,
+                                     rssi_dbm, snr_db_x10));
     int idx = src_index(hdr->source_id);
-    if (idx < 0) return;
+    if (idx < 0) {
+        bench_radio_add(LIFETRAC_SHARED_RADIO_RX_REJECT_IDX);
+        return;
+    }
 
     // Replay protection: 64-frame sliding window per source. Rejects any
     // sequence we have already accepted as well as anything more than 64
@@ -845,6 +1127,8 @@ static void poll_radio() {
     uint8_t buf[256];
     int st = radio.readData(buf, packet_len);
     if (st != RADIOLIB_ERR_NONE) return;
+    bench_radio_add(LIFETRAC_SHARED_RADIO_RX_PACKET_IDX);
+    bench_radio_add(LIFETRAC_SHARED_RADIO_RX_BYTE_IDX, (uint32_t)packet_len);
     int16_t rssi = radio.getRSSI();
     // SX1276::getSNR() returns float dB; capture *10 for fixed-point telemetry.
     int16_t snr_x10 = (int16_t)(radio.getSNR() * 10.0f);
@@ -852,11 +1136,39 @@ static void poll_radio() {
     for (int i = 0; i < packet_len; i++) {
         uint8_t* frame; size_t flen;
         if (lp_kiss_feed(&g_dec, buf[i], &frame, &flen)) {
+            bench_radio_add(LIFETRAC_SHARED_RADIO_RX_KISS_IDX);
             process_air_frame(frame, flen, rssi, snr_x10);
         }
     }
     radio.startReceive();
 }
+
+#if defined(ARDUINO_PORTENTA_X8) || defined(LIFETRAC_X8_NO_USB_SERIAL)
+static uint32_t g_nonce_prng_state = 0;
+
+static uint32_t nonce_prng_next() {
+    if (g_nonce_prng_state == 0) {
+        volatile const uint32_t* uid = (volatile const uint32_t*)0x1FF1E800u;
+        uint32_t seed = 0x9E3779B9u ^ millis() ^ micros();
+        seed ^= uid[0] ^ (uid[1] << 11) ^ (uid[1] >> 21) ^ (uid[2] << 22) ^ (uid[2] >> 10);
+        g_nonce_prng_state = seed ? seed : 0xA5A5C3C3u;
+    }
+    uint32_t x = g_nonce_prng_state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    g_nonce_prng_state = x ? x : 0xA5A5C3C3u;
+    return g_nonce_prng_state;
+}
+
+static uint8_t nonce_random_byte() {
+    return (uint8_t)nonce_prng_next();
+}
+#else
+static uint8_t nonce_random_byte() {
+    return (uint8_t)random(0, 256);
+}
+#endif
 
 // Build a 12-byte AES-GCM nonce identical in shape to the handheld:
 //   [ source_id | seq(LE) | t_seconds(LE) | rand(5) ]
@@ -870,7 +1182,7 @@ static void build_nonce(uint8_t out[12], uint8_t source_id, uint16_t seq) {
     uint32_t t = millis() / 1000;
     out[3] = (uint8_t)(t      ); out[4] = (uint8_t)(t >>  8);
     out[5] = (uint8_t)(t >> 16); out[6] = (uint8_t)(t >> 24);
-    for (int i = 0; i < 5; i++) out[7 + i] = (uint8_t)random(0, 256);
+    for (int i = 0; i < 5; i++) out[7 + i] = nonce_random_byte();
 }
 
 // Read Opta telemetry and ship a TelemetryFrame over LoRa.
@@ -982,6 +1294,7 @@ static bool tx_enqueue(const uint8_t* kiss, uint16_t kiss_len, uint8_t prio) {
     slot.rung_at_submit = g_ladder_rung;
     memcpy(slot.kiss, kiss, kiss_len);
     g_tx_queue_depth++;
+    bench_radio_add(LIFETRAC_SHARED_RADIO_TX_ENQ_IDX);
     return true;
 }
 
@@ -994,6 +1307,7 @@ static void tx_pump(uint32_t now_ms) {
             return;                // still on air per our TOA estimate
         }
         radio.finishTransmit();
+        bench_radio_add(LIFETRAC_SHARED_RADIO_TX_DONE_IDX);
         g_tx_in_flight = false;
         radio.startReceive();      // re-arm RX after every TX (IP-307)
     }
@@ -1005,13 +1319,64 @@ static void tx_pump(uint32_t now_ms) {
     }
     g_tx_queue_depth--;
     csma_pick_hop_before_tx();
-    int16_t state = radio.startTransmit(req.kiss, req.kiss_len);
+#if defined(LIFETRAC_BENCH_RADIO_COUNTERS)
+    auto capture_tx_regs = []() {
+        bench_radio_set(LIFETRAC_SHARED_RADIO_RX_BYTE_IDX,
+                        bench_radio_reg_pack(
+                            radio_module.SPIreadRegister(RADIOLIB_SX127X_REG_VERSION),
+                            radio_module.SPIreadRegister(RADIOLIB_SX127X_REG_OP_MODE),
+                            radio_module.SPIreadRegister(RADIOLIB_SX127X_REG_IRQ_FLAGS),
+                            radio_module.SPIreadRegister(RADIOLIB_SX127X_REG_DIO_MAPPING_1)));
+        bench_radio_set(LIFETRAC_SHARED_RADIO_RX_KISS_IDX,
+                        bench_radio_reg_pack(
+                            radio_module.SPIreadRegister(RADIOLIB_SX127X_REG_PAYLOAD_LENGTH),
+                            radio_module.SPIreadRegister(RADIOLIB_SX127X_REG_FIFO_ADDR_PTR),
+                            radio_module.SPIreadRegister(RADIOLIB_SX127X_REG_FIFO_TX_BASE_ADDR),
+                            radio_module.SPIreadRegister(RADIOLIB_SX127X_REG_FIFO_RX_BASE_ADDR)));
+    };
+    capture_tx_regs();
+    RadioModeConfig_t tx_config = {};
+    tx_config.transmit.data = req.kiss;
+    tx_config.transmit.len = req.kiss_len;
+    tx_config.transmit.addr = 0;
+    int16_t state = radio.stageMode(RADIOLIB_RADIO_MODE_TX, &tx_config);
     if (state != RADIOLIB_ERR_NONE) {
+        bench_radio_add(LIFETRAC_SHARED_RADIO_TX_FAIL_IDX);
+        bench_radio_set(LIFETRAC_SHARED_RADIO_RX_DECRYPT_IDX,
+                        bench_radio_status_meta(4u, state));
+        bench_radio_set(LIFETRAC_SHARED_RADIO_RX_META_IDX,
+                        bench_radio_status_meta(3u, state));
+        capture_tx_regs();
+        radio.startReceive();
+        return;
+    }
+    bench_radio_set(LIFETRAC_SHARED_RADIO_RX_DECRYPT_IDX,
+                    bench_radio_status_meta(4u, state));
+    capture_tx_regs();
+    state = radio.launchMode();
+#else
+    int16_t state = radio.startTransmit(req.kiss, req.kiss_len);
+#endif
+    if (state != RADIOLIB_ERR_NONE) {
+        bench_radio_add(LIFETRAC_SHARED_RADIO_TX_FAIL_IDX);
+        bench_radio_set(LIFETRAC_SHARED_RADIO_RX_META_IDX,
+                        bench_radio_status_meta(3u, state));
+#if defined(LIFETRAC_BENCH_RADIO_COUNTERS)
+        bench_radio_set(LIFETRAC_SHARED_RADIO_RX_REJECT_IDX,
+                        bench_radio_status_meta(5u, state));
+        capture_tx_regs();
+#endif
         // Radio rejected the start — re-arm RX and let the next loop
         // iteration retry the next queued frame.
         radio.startReceive();
         return;
     }
+#if defined(LIFETRAC_BENCH_RADIO_COUNTERS)
+    bench_radio_set(LIFETRAC_SHARED_RADIO_RX_REJECT_IDX,
+                    bench_radio_status_meta(5u, state));
+    capture_tx_regs();
+#endif
+    bench_radio_add(LIFETRAC_SHARED_RADIO_TX_START_IDX);
     g_tx_in_flight    = true;
     g_tx_done_after_ms = now_ms + estimate_toa_ms(req.kiss_len, req.rung_at_submit);
 }
@@ -1340,23 +1705,42 @@ static void poll_link_ladder() {
 
 // ---------- Arduino entry points ----------
 void setup() {
+    boot_trace_mark(1);
     Serial.begin(115200);
+    bench_radio_reset();
+    boot_trace_mark(2);
 
     // BC-25 / K-A2: precompute the per-stick response curve LUT from the
     // build-time exponent. Must run before apply_control() can be called.
     init_stick_curve_lut();
+    boot_trace_mark(3);
 
     // LoRa control profile per LADDER[0] (DECISIONS.md D-A2: SF7/BW250/CR4-5).
     // IP-006: must match LADDER[0] exactly so the first TX after boot decodes
     // on a peer that has not yet received CMD_LINK_TUNE.
-    radio.begin(915.0,
-                (float)LADDER[0].bw_khz,
-                LADDER[0].sf,
-                LADDER[0].cr_den,
-                0x12,
-                20);
-    radio.startReceive();
+    //
+    // TX power: LIFETRAC_BENCH_TX_DBM defaults to 2 dBm (SX1276 minimum,
+    // ~1.6 mW) for close-range bench / HIL testing.  Remove the define or
+    // set it to 20 for field use (Portenta Max Carrier PA limit).
+#ifndef LIFETRAC_BENCH_TX_DBM
+#  define LIFETRAC_BENCH_TX_DBM 2
+#endif
+    int16_t radio_state = radio.begin(915.0,
+                                      (float)LADDER[0].bw_khz,
+                                      LADDER[0].sf,
+                                      LADDER[0].cr_den,
+                                      0x12,
+                                      LIFETRAC_BENCH_TX_DBM);
+    bench_radio_set(LIFETRAC_SHARED_RADIO_RX_META_IDX,
+                    bench_radio_status_meta(1u, radio_state));
+    boot_trace_mark(4);
+    radio_state = radio.startReceive();
+    if (radio_state != RADIOLIB_ERR_NONE) {
+        bench_radio_set(LIFETRAC_SHARED_RADIO_RX_META_IDX,
+                        bench_radio_status_meta(2u, radio_state));
+    }
     g_ladder_rung = 0;
+    boot_trace_mark(5);
 
 #ifndef LIFETRAC_ALLOW_UNCONFIGURED_KEY
     // §D (Round 9): IP-008 enforced unconditionally; see handheld_mkr.ino
@@ -1368,22 +1752,30 @@ void setup() {
         while (1) { delay(1000); }
     }
 #endif
+    boot_trace_mark(6);
 
     // RS-485 / Modbus
     RS485.setPins(/*tx*/ PA_9, /*de*/ PA_10, /*re*/ PB_3);
+    boot_trace_mark(7);
     if (!ModbusRTUClient.begin(115200)) {
         Serial.println("Modbus begin failed");
     }
+    boot_trace_mark(8);
 
     // X8 ↔ H747 UART (Linux side runs gps_service.py + imu_service.py).
     // Harmless on a standalone H7 — Serial1 just sees no bytes.
     Serial1.begin(921600);
+    boot_trace_mark(9);
 }
 
 void loop() {
     static uint32_t next_arb = 0;
     static uint32_t next_tx  = 0;
     uint32_t now = millis();
+
+    if (next_tx == 0) {
+        next_tx = now + bench_radio_initial_tx_offset_ms();
+    }
 
     // Stamp the M4 watchdog FIRST every loop iteration. If we crash anywhere
     // below, the M4 watchdog (200 ms) will pull the PSR-alive GPIO low and

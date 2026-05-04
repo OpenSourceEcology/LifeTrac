@@ -51,6 +51,22 @@ struct SharedM7M4 {
     volatile uint32_t reserved[11];
 };
 
+// Optional bench radio counters published in SharedM7M4::reserved by
+// diagnostic M7 images. These do not change the safety-critical layout above;
+// the M4 watchdog ignores reserved words.
+#define LIFETRAC_SHARED_RADIO_MAGIC          0x52414430u  // "RAD0"
+#define LIFETRAC_SHARED_RADIO_MAGIC_IDX      0u
+#define LIFETRAC_SHARED_RADIO_TX_ENQ_IDX     1u
+#define LIFETRAC_SHARED_RADIO_TX_START_IDX   2u
+#define LIFETRAC_SHARED_RADIO_TX_FAIL_IDX    3u
+#define LIFETRAC_SHARED_RADIO_TX_DONE_IDX    4u
+#define LIFETRAC_SHARED_RADIO_RX_PACKET_IDX  5u
+#define LIFETRAC_SHARED_RADIO_RX_BYTE_IDX    6u
+#define LIFETRAC_SHARED_RADIO_RX_KISS_IDX    7u
+#define LIFETRAC_SHARED_RADIO_RX_DECRYPT_IDX 8u
+#define LIFETRAC_SHARED_RADIO_RX_REJECT_IDX  9u
+#define LIFETRAC_SHARED_RADIO_RX_META_IDX    10u
+
 // IP-106: any value other than this constant is treated as "no E-stop".
 // Chosen as 0xA5A5A5A5 (alternating bit pattern) so neither all-zero RAM
 // nor all-ones flash erase pattern can match.
