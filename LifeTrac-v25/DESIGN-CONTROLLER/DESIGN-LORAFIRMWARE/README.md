@@ -1,7 +1,9 @@
-# DESIGN-LORAFIRMWARE — Custom firmware for the Murata `CMWX1ZZABZ-078`
+# DESIGN-LORAFIRMWARE — `OSE-LifeTracLORA-MurataFW`
 
 **Owner:** LifeTrac v25 controller team
 **Status:** Active design — Method G committed (2026-05-04). Methods A, B, C, D, E, F superseded.
+**Firmware product name:** `OSE-LifeTracLORA-MurataFW`
+**Firmware version convention:** `vMAJOR.MINOR.PATCH`, starting at `v0.0.0` for initial bring-up builds.
 **Target hardware:** STM32L072CZ inside the Murata SiP on the Portenta Max Carrier (LoRa SX1276 die wired to the L072 over an internal SPI bus that is not externally routed).
 
 ---
@@ -12,7 +14,7 @@ The Portenta Max Carrier exposes the Murata LoRa module only via UART, not via t
 
 The decision (see [00_DECISION_Method_G_Commitment.md](00_DECISION_Method_G_Commitment.md)) is to **write custom firmware that runs on the STM32L072 inside the Murata package** and reaches the SX1276 over the SiP's internal SPI bus — recovering all of the SPI-era features and gaining several more that were never possible from the host.
 
-This folder holds the **design, analysis, and bring-up plans** for that firmware. The firmware source code itself, when it lands, will live in [`../firmware/murata_l072/`](../firmware/) (not yet created).
+This folder holds the **design, analysis, and bring-up plans** for that firmware. The firmware source code itself, when it lands, will live in [`../firmware/murata_l072/`](../firmware/) (not yet created). Release artifacts and `VER_URC` identity strings should use the product name `OSE-LifeTracLORA-MurataFW` and the `v0.0.0`-style version convention above.
 
 ---
 

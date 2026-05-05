@@ -70,8 +70,8 @@ Properties:
 | `type` | Direction | Name | Purpose |
 |---|---|---|---|
 | `0x00` | both | `PING` | liveness probe; URC echoes the seq |
-| `0x01` | H→L | `VER_REQ` | request firmware version |
-| `0x81` | L→H | `VER_URC` | reply with version + git SHA + capability bitmap |
+| `0x01` | H→L | `VER_REQ` | request firmware identity and version |
+| `0x81` | L→H | `VER_URC` | reply with product name + firmware version + git SHA + capability bitmap |
 | `0x02` | H→L | `UID_REQ` | request L072 96-bit unique device ID |
 | `0x82` | L→H | `UID_URC` | reply with UID |
 | `0x03` | H→L | `RESET` | soft reset request (firmware does an orderly NVIC_SystemReset) |
@@ -213,6 +213,8 @@ A future `cfg get` command lets the H7 read back the active config to detect dri
 
 ## 8. Versioning & compatibility
 
+- The firmware product name is `OSE-LifeTracLORA-MurataFW`.
+- The firmware build version uses `vMAJOR.MINOR.PATCH`, starting at `v0.0.0` for initial bring-up builds.
 - The protocol version is `ver = 0x01` for v25 launch.
 - Adding a new command type increments the firmware build version but **not** the protocol version.
 - Changing the meaning of an existing command type or removing one is a protocol-version change. The H7 detects this from the `VER_URC` capability bitmap and refuses to operate against an incompatible L072 firmware.

@@ -42,7 +42,7 @@ Capability IDs (R-XX, N-XX) reference [01 Capabilities Analysis](01_Capabilities
 **Entry:** Phase 0 green. Toolchain (`arm-none-eabi-gcc` 13.2 + Make + optionally PlatformIO) installed. Repository folder [`../firmware/murata_l072/`](../firmware/) created with the layout from [02 §2](02_Firmware_Architecture_Plan.md) (skeleton files only).
 
 **Work items:**
-- W1-1: Minimal `main.c` that toggles a debug GPIO at 1 Hz and emits `"L072 hello v0.0.1\r\n"` on USART2 at 921600 baud once per second. No HAL beyond clock + GPIO + USART.
+- W1-1: Minimal `main.c` that toggles a debug GPIO at 1 Hz and emits `"OSE-LifeTracLORA-MurataFW v0.0.0 hello\r\n"` on USART2 at 921600 baud once per second. No HAL beyond clock + GPIO + USART.
 - W1-2: Linker script `stm32l072cz_flash.ld` matching [02 §4.3](02_Firmware_Architecture_Plan.md) (single slot for now; A/B comes in Phase 6).
 - W1-3: Makefile producing a stripped `firmware.bin` ready for the STM32 ROM bootloader UART protocol.
 - W1-4: Helper script (PowerShell-friendly) that drives the H7 to: (a) hold BOOT0 high, (b) pulse NRST, (c) speak STM32 ROM-bootloader protocol over `Serial3`, (d) flash `firmware.bin`. Reuse the open-source `stm32flash` source as reference; we want this working *without* needing the Arduino sketch.

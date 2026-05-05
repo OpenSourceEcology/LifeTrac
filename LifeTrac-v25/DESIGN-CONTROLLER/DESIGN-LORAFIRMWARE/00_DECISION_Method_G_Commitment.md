@@ -12,6 +12,8 @@
 
 LifeTrac v25 will run **custom firmware on the STM32L072CZ inside the Murata `CMWX1ZZABZ-078` SiP** on the Portenta Max Carrier. The firmware will speak directly to the in-package SX1276 over the SiP's internal SPI bus and expose a thin binary protocol to the Portenta H7 over UART.
 
+The end firmware product name is `OSE-LifeTracLORA-MurataFW`. Firmware releases use `vMAJOR.MINOR.PATCH` version tags, beginning with `v0.0.0` for the first bring-up/skeleton builds.
+
 No external LoRa hardware will be added. No vendor AT firmware (LoRaWAN, P2P, or otherwise) will be used in production. No LoRaWAN MAC stack will be carried.
 
 ## 2. Methods superseded

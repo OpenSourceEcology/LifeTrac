@@ -8,6 +8,7 @@
 
 ## 1. Target
 
+- **Firmware product:** `OSE-LifeTracLORA-MurataFW`, versioned as `vMAJOR.MINOR.PATCH` starting at `v0.0.0`.
 - **MCU:** STMicro STM32L072CZ (Cortex-M0+ @ 32 MHz, 192 KB Flash, 20 KB RAM, true RNG, hardware AES-128 on rev Y+ silicon, USART, SPI, I²C, USB-FS, RTC, IWDG, TIM2/3/21/22, DMA1).
 - **Radio die:** Semtech SX1276 in same package, on internal SPI (`SPI1`), with DIO0/DIO1/DIO2/DIO3 wired to L072 GPIOs and a dedicated TCXO/PA/LNA/switch.
 - **Host link:** L072 USART2 ↔ Portenta H7 `Serial3` (and X8 `/dev/ttymxc3` when the H7 isn't booted).
@@ -19,7 +20,7 @@ The firmware lives in [`../firmware/murata_l072/`](../firmware/) (folder will be
 
 ```
 firmware/murata_l072/
-├── README.md                    # build & flash instructions, links back to DESIGN-LORAFIRMWARE
+├── README.md                    # build & flash instructions, product identity, links back to DESIGN-LORAFIRMWARE
 ├── Makefile                     # top-level (or CMakeLists.txt — see §5)
 ├── platformio.ini               # optional alternate build entry point
 ├── ld/
@@ -65,7 +66,7 @@ firmware/murata_l072/
 │   └── mfgtest.c / .h          # factory self-test (N-27)
 ├── main.c                      # init sequence, task dispatcher (no RTOS for launch — see §3)
 ├── config.h                    # build-time options (FEATURE_* defines)
-├── version.h                   # generated at build time from git SHA + tag
+├── version.h                   # generated at build time from product name + version tag + git SHA
 └── tests/
     ├── host_loopback/          # PC-side Python test harness, talks to the host UART
     └── unit/                   # native (host-PC) unit tests for proto/, host/cobs/, replay/
@@ -77,6 +78,7 @@ Notes on layout choices:
 - **`hal/` only contains what we use.** Cube HAL pulls in dozens of peripherals by default; we hand-pick.
 - **`radio/` and `proto/` are deliberately separate.** A future swap to a different radio die (the Method E fallback in [00 §9](00_DECISION_Method_G_Commitment.md)) only touches `radio/` and `hal/spi.c`.
 - **`host/` is the public ABI.** Document it in [04_Hardware_Interface_and_Recovery.md](04_Hardware_Interface_and_Recovery.md). Anything else can be refactored without coordinating with the H7 team.
+- **`version.h` is the firmware identity source.** It should expose `OSE-LifeTracLORA-MurataFW`, the `vMAJOR.MINOR.PATCH` firmware version string, the git SHA, and the host-protocol version consumed by `VER_URC`.
 
 ## 3. Concurrency model
 
