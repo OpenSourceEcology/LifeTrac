@@ -1,0 +1,435 @@
+#include "sx1276.h"
+#include "platform.h"
+#include "stm32l072_regs.h"
+
+#include <stddef.h>
+
+/* Default Murata CMWX1ZZABZ pin map used in this first increment. */
+#define SX1276_NSS_PORT               GPIOA_BASE
+#define SX1276_NSS_PIN                15U
+
+#define SX1276_RESET_PORT             GPIOC_BASE
+#define SX1276_RESET_PIN              0U
+
+#define SX1276_DIO0_PORT              GPIOB_BASE
+#define SX1276_DIO0_PIN               4U
+#define SX1276_DIO1_PORT              GPIOB_BASE
+#define SX1276_DIO1_PIN               1U
+#define SX1276_DIO2_PORT              GPIOB_BASE
+#define SX1276_DIO2_PIN               0U
+#define SX1276_DIO3_PORT              GPIOC_BASE
+#define SX1276_DIO3_PIN               13U
+
+#define SX1276_RF_SW_TXRX_PORT        GPIOA_BASE
+#define SX1276_RF_SW_TXRX_PIN         1U
+#define SX1276_RF_SW_RX_PORT          GPIOC_BASE
+#define SX1276_RF_SW_RX_PIN           1U
+#define SX1276_RF_SW_TX_BOOST_PORT    GPIOC_BASE
+#define SX1276_RF_SW_TX_BOOST_PIN     2U
+
+#define SX1276_REG_OP_MODE            0x01U
+#define SX1276_REG_FRF_MSB            0x06U
+#define SX1276_REG_FRF_MID            0x07U
+#define SX1276_REG_FRF_LSB            0x08U
+#define SX1276_REG_PA_CONFIG          0x09U
+#define SX1276_REG_MODEM_CONFIG1      0x1DU
+#define SX1276_REG_MODEM_CONFIG2      0x1EU
+#define SX1276_REG_MODEM_CONFIG3      0x26U
+#define SX1276_REG_DETECT_OPTIMIZE    0x31U
+#define SX1276_REG_DETECTION_THRESH   0x37U
+#define SX1276_REG_VERSION            0x42U
+
+#define SX1276_OPMODE_LORA_SLEEP      0x80U
+#define SX1276_OPMODE_LORA_STDBY      0x81U
+
+static volatile uint32_t s_irq_events;
+
+static uint32_t exti_port_code(uint32_t port) {
+    if (port == GPIOB_BASE) {
+        return 1U;
+    }
+    if (port == GPIOC_BASE) {
+        return 2U;
+    }
+    return 0U;
+}
+
+static void gpio_mode_output(uint32_t port, uint8_t pin) {
+    uint32_t moder = GPIO_MODER(port);
+    moder &= ~(3UL << (pin * 2U));
+    moder |= (1UL << (pin * 2U));
+    GPIO_MODER(port) = moder;
+
+    GPIO_OTYPER(port) &= ~(1UL << pin);
+
+    uint32_t speed = GPIO_OSPEEDR(port);
+    speed &= ~(3UL << (pin * 2U));
+    speed |= (2UL << (pin * 2U));
+    GPIO_OSPEEDR(port) = speed;
+
+    uint32_t pupd = GPIO_PUPDR(port);
+    pupd &= ~(3UL << (pin * 2U));
+    GPIO_PUPDR(port) = pupd;
+}
+
+static void gpio_mode_input(uint32_t port, uint8_t pin) {
+    uint32_t moder = GPIO_MODER(port);
+    moder &= ~(3UL << (pin * 2U));
+    GPIO_MODER(port) = moder;
+
+    uint32_t pupd = GPIO_PUPDR(port);
+    pupd &= ~(3UL << (pin * 2U));
+    GPIO_PUPDR(port) = pupd;
+}
+
+static void gpio_mode_alt(uint32_t port, uint8_t pin, uint8_t af) {
+    uint32_t moder = GPIO_MODER(port);
+    moder &= ~(3UL << (pin * 2U));
+    moder |= (2UL << (pin * 2U));
+    GPIO_MODER(port) = moder;
+
+    GPIO_OTYPER(port) &= ~(1UL << pin);
+
+    uint32_t speed = GPIO_OSPEEDR(port);
+    speed &= ~(3UL << (pin * 2U));
+    speed |= (2UL << (pin * 2U));
+    GPIO_OSPEEDR(port) = speed;
+
+    uint32_t pupd = GPIO_PUPDR(port);
+    pupd &= ~(3UL << (pin * 2U));
+    GPIO_PUPDR(port) = pupd;
+
+    if (pin < 8U) {
+        uint32_t afrl = GPIO_AFRL(port);
+        afrl &= ~(0xFUL << (pin * 4U));
+        afrl |= ((uint32_t)af << (pin * 4U));
+        GPIO_AFRL(port) = afrl;
+    } else {
+        const uint8_t pin_hi = (uint8_t)(pin - 8U);
+        uint32_t afrh = GPIO_AFRH(port);
+        afrh &= ~(0xFUL << (pin_hi * 4U));
+        afrh |= ((uint32_t)af << (pin_hi * 4U));
+        GPIO_AFRH(port) = afrh;
+    }
+}
+
+static void gpio_write(uint32_t port, uint8_t pin, uint8_t value) {
+    if (value != 0U) {
+        GPIO_BSRR(port) = (1UL << pin);
+    } else {
+        GPIO_BSRR(port) = (1UL << (pin + 16U));
+    }
+}
+
+static void sx1276_select(uint8_t selected) {
+    gpio_write(SX1276_NSS_PORT, SX1276_NSS_PIN, (uint8_t)(selected == 0U));
+}
+
+static uint8_t spi1_transfer(uint8_t value) {
+    while ((SPI1_SR & SPI_SR_TXE) == 0U) {
+    }
+
+    SPI1_DR8 = value;
+
+    while ((SPI1_SR & SPI_SR_RXNE) == 0U) {
+    }
+
+    while ((SPI1_SR & SPI_SR_BSY) != 0U) {
+    }
+
+    return SPI1_DR8;
+}
+
+static void exti_route_line(uint8_t line, uint32_t port) {
+    const uint32_t group = (line / 4U) + 1U;
+    const uint32_t shift = (uint32_t)(line % 4U) * 4U;
+    uint32_t exticr = SYSCFG_EXTICR(group);
+    exticr &= ~(0xFUL << shift);
+    exticr |= (exti_port_code(port) << shift);
+    SYSCFG_EXTICR(group) = exticr;
+}
+
+static uint8_t bw_to_reg_bits(uint16_t bw_khz) {
+    if (bw_khz >= 500U) {
+        return 9U;
+    }
+    if (bw_khz >= 250U) {
+        return 8U;
+    }
+    return 7U;
+}
+
+static void sx1276_set_rf_switch_tx(uint8_t tx_mode) {
+    if (tx_mode != 0U) {
+        gpio_write(SX1276_RF_SW_TXRX_PORT, SX1276_RF_SW_TXRX_PIN, 1U);
+        gpio_write(SX1276_RF_SW_RX_PORT, SX1276_RF_SW_RX_PIN, 0U);
+        gpio_write(SX1276_RF_SW_TX_BOOST_PORT, SX1276_RF_SW_TX_BOOST_PIN, 1U);
+    } else {
+        gpio_write(SX1276_RF_SW_TXRX_PORT, SX1276_RF_SW_TXRX_PIN, 0U);
+        gpio_write(SX1276_RF_SW_RX_PORT, SX1276_RF_SW_RX_PIN, 1U);
+        gpio_write(SX1276_RF_SW_TX_BOOST_PORT, SX1276_RF_SW_TX_BOOST_PIN, 0U);
+    }
+}
+
+static void sx1276_gpio_init(void) {
+    RCC_IOPENR |= RCC_IOPENR_GPIOAEN |
+                  RCC_IOPENR_GPIOBEN |
+                  RCC_IOPENR_GPIOCEN;
+
+    gpio_mode_alt(GPIOA_BASE, 5U, 0U);
+    gpio_mode_alt(GPIOA_BASE, 6U, 0U);
+    gpio_mode_alt(GPIOA_BASE, 7U, 0U);
+
+    gpio_mode_output(SX1276_NSS_PORT, SX1276_NSS_PIN);
+    sx1276_select(0U);
+
+    gpio_mode_output(SX1276_RESET_PORT, SX1276_RESET_PIN);
+    gpio_write(SX1276_RESET_PORT, SX1276_RESET_PIN, 1U);
+
+    gpio_mode_output(SX1276_RF_SW_TXRX_PORT, SX1276_RF_SW_TXRX_PIN);
+    gpio_mode_output(SX1276_RF_SW_RX_PORT, SX1276_RF_SW_RX_PIN);
+    gpio_mode_output(SX1276_RF_SW_TX_BOOST_PORT, SX1276_RF_SW_TX_BOOST_PIN);
+    sx1276_set_rf_switch_tx(0U);
+
+    gpio_mode_input(SX1276_DIO0_PORT, SX1276_DIO0_PIN);
+    gpio_mode_input(SX1276_DIO1_PORT, SX1276_DIO1_PIN);
+    gpio_mode_input(SX1276_DIO2_PORT, SX1276_DIO2_PIN);
+    gpio_mode_input(SX1276_DIO3_PORT, SX1276_DIO3_PIN);
+}
+
+static void sx1276_spi_init(void) {
+    RCC_APB2ENR |= RCC_APB2ENR_SPI1EN;
+
+    SPI1_CR1 = 0U;
+    SPI1_CR2 = 0U;
+
+    SPI1_CR1 = SPI_CR1_MSTR |
+               SPI_CR1_SSM |
+               SPI_CR1_SSI |
+               SPI_CR1_BR_DIV8;
+    SPI1_CR2 = SPI_CR2_DS_8BIT | SPI_CR2_FRXTH;
+    SPI1_CR1 |= SPI_CR1_SPE;
+}
+
+static void sx1276_exti_init(void) {
+    const uint32_t dio_mask = (1UL << SX1276_DIO0_PIN) |
+                              (1UL << SX1276_DIO1_PIN) |
+                              (1UL << SX1276_DIO2_PIN) |
+                              (1UL << SX1276_DIO3_PIN);
+
+    RCC_APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+
+    exti_route_line(SX1276_DIO0_PIN, SX1276_DIO0_PORT);
+    exti_route_line(SX1276_DIO1_PIN, SX1276_DIO1_PORT);
+    exti_route_line(SX1276_DIO2_PIN, SX1276_DIO2_PORT);
+    exti_route_line(SX1276_DIO3_PIN, SX1276_DIO3_PORT);
+
+    EXTI_IMR |= dio_mask;
+    EXTI_RTSR |= dio_mask;
+    EXTI_FTSR &= ~dio_mask;
+    EXTI_PR = dio_mask;
+
+    platform_irq_enable(EXTI0_1_IRQn, 3U);
+    platform_irq_enable(EXTI4_15_IRQn, 3U);
+}
+
+bool sx1276_init(void) {
+    sx1276_gpio_init();
+    sx1276_spi_init();
+    sx1276_exti_init();
+    sx1276_radio_reset();
+
+    sx1276_write_reg(SX1276_REG_OP_MODE, SX1276_OPMODE_LORA_SLEEP);
+    platform_delay_ms(1U);
+    sx1276_write_reg(SX1276_REG_OP_MODE, SX1276_OPMODE_LORA_STDBY);
+
+    const uint8_t version = sx1276_read_version();
+    if (version == 0x00U || version == 0xFFU) {
+        return false;
+    }
+
+    sx1276_set_frequency_hz(915000000UL);
+    sx1276_set_sf_bw_cr(7U, 250U, 5U);
+    sx1276_set_tx_power_dbm(14U);
+
+    return true;
+}
+
+void sx1276_radio_reset(void) {
+    gpio_write(SX1276_RESET_PORT, SX1276_RESET_PIN, 0U);
+    platform_delay_ms(2U);
+    gpio_write(SX1276_RESET_PORT, SX1276_RESET_PIN, 1U);
+    platform_delay_ms(8U);
+}
+
+uint8_t sx1276_read_reg(uint8_t reg_addr) {
+    uint8_t value;
+
+    sx1276_select(1U);
+    (void)spi1_transfer((uint8_t)(reg_addr & 0x7FU));
+    value = spi1_transfer(0x00U);
+    sx1276_select(0U);
+
+    return value;
+}
+
+void sx1276_write_reg(uint8_t reg_addr, uint8_t value) {
+    sx1276_select(1U);
+    (void)spi1_transfer((uint8_t)(reg_addr | 0x80U));
+    (void)spi1_transfer(value);
+    sx1276_select(0U);
+}
+
+void sx1276_read_burst(uint8_t start_reg, uint8_t *dst, size_t len) {
+    sx1276_select(1U);
+    (void)spi1_transfer((uint8_t)(start_reg & 0x7FU));
+    for (size_t i = 0U; i < len; ++i) {
+        dst[i] = spi1_transfer(0x00U);
+    }
+    sx1276_select(0U);
+}
+
+void sx1276_write_burst(uint8_t start_reg, const uint8_t *src, size_t len) {
+    sx1276_select(1U);
+    (void)spi1_transfer((uint8_t)(start_reg | 0x80U));
+    for (size_t i = 0U; i < len; ++i) {
+        (void)spi1_transfer(src[i]);
+    }
+    sx1276_select(0U);
+}
+
+uint8_t sx1276_read_version(void) {
+    return sx1276_read_reg(SX1276_REG_VERSION);
+}
+
+void sx1276_set_frequency_hz(uint32_t freq_hz) {
+    const uint64_t frf = (((uint64_t)freq_hz) << 19) / 32000000ULL;
+
+    sx1276_write_reg(SX1276_REG_FRF_MSB, (uint8_t)((frf >> 16) & 0xFFU));
+    sx1276_write_reg(SX1276_REG_FRF_MID, (uint8_t)((frf >> 8) & 0xFFU));
+    sx1276_write_reg(SX1276_REG_FRF_LSB, (uint8_t)(frf & 0xFFU));
+}
+
+void sx1276_set_tx_power_dbm(uint8_t dbm) {
+    uint8_t clipped = dbm;
+    if (clipped < 2U) {
+        clipped = 2U;
+    }
+    if (clipped > 17U) {
+        clipped = 17U;
+    }
+
+    sx1276_write_reg(SX1276_REG_PA_CONFIG, (uint8_t)(0x80U | (clipped - 2U)));
+}
+
+void sx1276_set_sf_bw_cr(uint8_t sf, uint16_t bw_khz, uint8_t cr_den) {
+    uint8_t sf_use = sf;
+    uint8_t cr_use = cr_den;
+    const uint8_t bw_bits = bw_to_reg_bits(bw_khz);
+    uint8_t cfg3;
+
+    if (sf_use < 6U) {
+        sf_use = 6U;
+    }
+    if (sf_use > 12U) {
+        sf_use = 12U;
+    }
+
+    if (cr_use < 5U) {
+        cr_use = 5U;
+    }
+    if (cr_use > 8U) {
+        cr_use = 8U;
+    }
+
+    sx1276_write_reg(SX1276_REG_MODEM_CONFIG1,
+                     (uint8_t)((bw_bits << 4) | ((cr_use - 4U) << 1) | 0U));
+    sx1276_write_reg(SX1276_REG_MODEM_CONFIG2,
+                     (uint8_t)((sf_use << 4) | (1U << 2)));
+
+    cfg3 = sx1276_read_reg(SX1276_REG_MODEM_CONFIG3);
+    cfg3 |= (1U << 2);
+    if (sf_use >= 11U && bw_khz <= 125U) {
+        cfg3 |= (1U << 3);
+    } else {
+        cfg3 &= ~(1U << 3);
+    }
+    sx1276_write_reg(SX1276_REG_MODEM_CONFIG3, cfg3);
+
+    if (sf_use == 6U) {
+        sx1276_write_reg(SX1276_REG_DETECT_OPTIMIZE,
+                         (uint8_t)((sx1276_read_reg(SX1276_REG_DETECT_OPTIMIZE) & 0xF8U) | 0x05U));
+        sx1276_write_reg(SX1276_REG_DETECTION_THRESH, 0x0CU);
+    } else {
+        sx1276_write_reg(SX1276_REG_DETECT_OPTIMIZE,
+                         (uint8_t)((sx1276_read_reg(SX1276_REG_DETECT_OPTIMIZE) & 0xF8U) | 0x03U));
+        sx1276_write_reg(SX1276_REG_DETECTION_THRESH, 0x0AU);
+    }
+}
+
+void sx1276_apply_profile_full(const sx1276_profile_t *profile) {
+    if (profile == NULL) {
+        return;
+    }
+
+    sx1276_write_reg(SX1276_REG_OP_MODE, SX1276_OPMODE_LORA_STDBY);
+    sx1276_set_frequency_hz(profile->freq_hz);
+    sx1276_set_sf_bw_cr(profile->sf, profile->bw_khz, profile->cr_den);
+    sx1276_set_tx_power_dbm(profile->tx_power_dbm);
+}
+
+uint32_t sx1276_take_irq_events(void) {
+    uint32_t irq_state = cpu_irq_save();
+    uint32_t events = s_irq_events;
+    s_irq_events = 0U;
+    cpu_irq_restore(irq_state);
+    return events;
+}
+
+bool sx1276_reg_dump(uint8_t *out_regs, size_t out_len) {
+    if (out_regs == NULL || out_len < 0x43U) {
+        return false;
+    }
+
+    for (uint8_t reg = 0U; reg <= SX1276_REG_VERSION; ++reg) {
+        out_regs[reg] = sx1276_read_reg(reg);
+    }
+
+    return true;
+}
+
+void EXTI0_1_IRQHandler(void) {
+    const uint32_t line_mask = (1UL << SX1276_DIO1_PIN) | (1UL << SX1276_DIO2_PIN);
+    const uint32_t pending = EXTI_PR & line_mask;
+
+    if (pending == 0U) {
+        return;
+    }
+
+    EXTI_PR = pending;
+
+    if ((pending & (1UL << SX1276_DIO1_PIN)) != 0U) {
+        s_irq_events |= SX1276_EVT_DIO1;
+    }
+    if ((pending & (1UL << SX1276_DIO2_PIN)) != 0U) {
+        s_irq_events |= SX1276_EVT_DIO2;
+    }
+}
+
+void EXTI4_15_IRQHandler(void) {
+    const uint32_t line_mask = (1UL << SX1276_DIO0_PIN) | (1UL << SX1276_DIO3_PIN);
+    const uint32_t pending = EXTI_PR & line_mask;
+
+    if (pending == 0U) {
+        return;
+    }
+
+    EXTI_PR = pending;
+
+    if ((pending & (1UL << SX1276_DIO0_PIN)) != 0U) {
+        s_irq_events |= SX1276_EVT_DIO0;
+    }
+    if ((pending & (1UL << SX1276_DIO3_PIN)) != 0U) {
+        s_irq_events |= SX1276_EVT_DIO3;
+    }
+}
