@@ -46,6 +46,29 @@ jobs:
           echo "Archived arduino_opta_controller and esp32_remote_control are intentionally not compiled."
           echo "Enable blocking Arduino compile jobs after local FQBN/build-glue verification."
 
+  firmware-l072-static-checks:
+    runs-on: ubuntu-latest
+    name: L072 firmware static checks
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install host toolchain
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+      - name: make check (memory map invariants)
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
+        run: make check
+      - name: make check-opmode-owner
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
+        run: make check-opmode-owner
+      - name: make check-cfg-wire-owner
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
+        run: make check-cfg-wire-owner
+      - name: make check-rx-counter-owner
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
+        run: make check-rx-counter-owner
+      - name: make check-cfg-contract
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
+        run: make check-cfg-contract
+
   # Round 15 (2026-04-28): handheld_mkr is now a blocking compile gate.
   # The earlier ``continue-on-error: true`` masked three independent bugs that
   # all had to be fixed before this job could go green:

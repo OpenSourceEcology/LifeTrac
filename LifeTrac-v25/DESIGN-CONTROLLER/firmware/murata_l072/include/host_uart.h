@@ -2,6 +2,7 @@
 #define LIFETRAC_MURATA_L072_HOST_UART_H
 
 #include "config.h"
+#include "host_types.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -36,9 +37,20 @@ void host_uart_send_urc(uint8_t type,
                         uint8_t flags,
                         const uint8_t *payload,
                         uint16_t payload_len);
-void host_uart_send_err_proto(uint16_t seq, uint8_t offending_type, uint8_t offending_ver);
+void host_uart_send_err_proto(uint16_t seq,
+                              uint8_t offending_type,
+                              uint8_t offending_ver,
+                              uint8_t err_code,
+                              uint16_t detail);
+
+void host_uart_stats_reset(void);
 
 uint32_t host_uart_stats_dropped(void);
 uint32_t host_uart_stats_errors(void);
+uint32_t host_uart_stats_queue_full(void);
+uint32_t host_uart_stats_irq_idle(void);
+uint32_t host_uart_stats_irq_ht(void);
+uint32_t host_uart_stats_irq_tc(void);
+uint32_t host_uart_stats_irq_te(void);
 
 #endif /* LIFETRAC_MURATA_L072_HOST_UART_H */

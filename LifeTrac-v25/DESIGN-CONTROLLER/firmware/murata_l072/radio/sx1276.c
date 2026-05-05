@@ -1,4 +1,5 @@
 #include "sx1276.h"
+#include "sx1276_modes.h"
 #include "platform.h"
 #include "stm32l072_regs.h"
 
@@ -27,7 +28,6 @@
 #define SX1276_RF_SW_TX_BOOST_PORT    GPIOC_BASE
 #define SX1276_RF_SW_TX_BOOST_PIN     2U
 
-#define SX1276_REG_OP_MODE            0x01U
 #define SX1276_REG_FRF_MSB            0x06U
 #define SX1276_REG_FRF_MID            0x07U
 #define SX1276_REG_FRF_LSB            0x08U
@@ -38,9 +38,6 @@
 #define SX1276_REG_DETECT_OPTIMIZE    0x31U
 #define SX1276_REG_DETECTION_THRESH   0x37U
 #define SX1276_REG_VERSION            0x42U
-
-#define SX1276_OPMODE_LORA_SLEEP      0x80U
-#define SX1276_OPMODE_LORA_STDBY      0x81U
 
 static volatile uint32_t s_irq_events;
 
@@ -239,9 +236,9 @@ bool sx1276_init(void) {
     sx1276_exti_init();
     sx1276_radio_reset();
 
-    sx1276_write_reg(SX1276_REG_OP_MODE, SX1276_OPMODE_LORA_SLEEP);
-    platform_delay_ms(1U);
-    sx1276_write_reg(SX1276_REG_OP_MODE, SX1276_OPMODE_LORA_STDBY);
+    if (!sx1276_modes_init()) {
+        return false;
+    }
 
     const uint8_t version = sx1276_read_version();
     if (version == 0x00U || version == 0xFFU) {
@@ -372,7 +369,9 @@ void sx1276_apply_profile_full(const sx1276_profile_t *profile) {
         return;
     }
 
-    sx1276_write_reg(SX1276_REG_OP_MODE, SX1276_OPMODE_LORA_STDBY);
+    if (!sx1276_modes_to_standby()) {
+        return;
+    }
     sx1276_set_frequency_hz(profile->freq_hz);
     sx1276_set_sf_bw_cr(profile->sf, profile->bw_khz, profile->cr_den);
     sx1276_set_tx_power_dbm(profile->tx_power_dbm);

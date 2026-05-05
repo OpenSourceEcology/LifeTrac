@@ -5,13 +5,13 @@
 #include <stddef.h>
 #include <string.h>
 
-#define HOST_PROTOCOL_VER            1U
-#define HOST_TYPE_ERR_PROTO          0xFEU
-
 #define HOST_DMA_RX_CH               6U
 #define HOST_DMA_RX_BUF_SIZE         512U
 #define HOST_FRAME_QUEUE_DEPTH       4U
 #define HOST_COBS_ENCODED_MAX        (HOST_COBS_MAX_LEN - 2U)
+
+_Static_assert((HOST_DMA_RX_BUF_SIZE % 2U) == 0U,
+               "HOST_DMA_RX_BUF_SIZE must be even for HT/TC servicing");
 
 static volatile uint8_t s_dma_rx_buf[HOST_DMA_RX_BUF_SIZE];
 static uint16_t s_dma_last_idx;
@@ -28,6 +28,11 @@ static volatile uint8_t s_q_count;
 
 static uint32_t s_stats_dropped;
 static uint32_t s_stats_errors;
+static uint32_t s_stats_queue_full;
+static uint32_t s_stats_irq_idle;
+static uint32_t s_stats_irq_ht;
+static uint32_t s_stats_irq_tc;
+static uint32_t s_stats_irq_te;
 
 static uint16_t crc16_ccitt(const uint8_t *data, uint16_t len) {
     uint16_t crc = 0xFFFFU;
@@ -107,6 +112,8 @@ static void dma_rx_start(void) {
 
     DMA1_CCR(HOST_DMA_RX_CH) = DMA_CCR_MINC |
                                DMA_CCR_CIRC |
+                               DMA_CCR_HTIE |
+                               DMA_CCR_TCIE |
                                DMA_CCR_TEIE |
                                DMA_CCR_PL_HIGH;
     DMA1_CCR(HOST_DMA_RX_CH) |= DMA_CCR_EN;
@@ -115,14 +122,20 @@ static void dma_rx_start(void) {
 }
 
 static uint8_t queue_push(const host_frame_t *frame) {
+    uint32_t irq_state = cpu_irq_save();
+
     if (s_q_count >= HOST_FRAME_QUEUE_DEPTH) {
+        s_stats_queue_full++;
         s_stats_dropped++;
+        cpu_irq_restore(irq_state);
         return 0U;
     }
 
     s_frame_queue[s_q_head] = *frame;
     s_q_head = (uint8_t)((s_q_head + 1U) % HOST_FRAME_QUEUE_DEPTH);
     s_q_count++;
+
+    cpu_irq_restore(irq_state);
 
     return 1U;
 }
@@ -294,14 +307,21 @@ static void ingest_rx_byte(uint8_t byte) {
     s_cobs_encoded[s_cobs_encoded_len++] = byte;
 }
 
-static void service_dma_rx(void) {
+static uint16_t dma_rx_write_idx_now(void) {
+    return (uint16_t)(HOST_DMA_RX_BUF_SIZE - DMA1_CNDTR(HOST_DMA_RX_CH));
+}
+
+static void service_dma_rx_to(uint16_t write_idx) {
+    uint32_t irq_state = cpu_irq_save();
+
     if (s_service_in_progress != 0U) {
+        cpu_irq_restore(irq_state);
         return;
     }
 
     s_service_in_progress = 1U;
+    cpu_irq_restore(irq_state);
 
-    uint16_t write_idx = (uint16_t)(HOST_DMA_RX_BUF_SIZE - DMA1_CNDTR(HOST_DMA_RX_CH));
     while (s_dma_last_idx != write_idx) {
         ingest_rx_byte(s_dma_rx_buf[s_dma_last_idx]);
         s_dma_last_idx++;
@@ -310,7 +330,13 @@ static void service_dma_rx(void) {
         }
     }
 
+    irq_state = cpu_irq_save();
     s_service_in_progress = 0U;
+    cpu_irq_restore(irq_state);
+}
+
+static void service_dma_rx_now(void) {
+    service_dma_rx_to(dma_rx_write_idx_now());
 }
 
 static void usart2_write_byte(uint8_t byte) {
@@ -365,8 +391,7 @@ void host_uart_init(uint32_t baud) {
     s_cobs_encoded_len = 0U;
     s_cobs_overflow = 0U;
     s_service_in_progress = 0U;
-    s_stats_dropped = 0U;
-    s_stats_errors = 0U;
+    host_uart_stats_reset();
 
     dma_rx_start();
 
@@ -381,7 +406,7 @@ void host_uart_init(uint32_t baud) {
 }
 
 void host_uart_poll_dma(void) {
-    service_dma_rx();
+    service_dma_rx_now();
 }
 
 bool host_uart_pop_frame(host_frame_t *out_frame) {
@@ -440,11 +465,33 @@ void host_uart_send_urc(uint8_t type,
     send_inner_frame(inner, idx);
 }
 
-void host_uart_send_err_proto(uint16_t seq, uint8_t offending_type, uint8_t offending_ver) {
-    uint8_t payload[2];
+void host_uart_send_err_proto(uint16_t seq,
+                              uint8_t offending_type,
+                              uint8_t offending_ver,
+                              uint8_t err_code,
+                              uint16_t detail) {
+    uint8_t payload[5];
     payload[0] = offending_type;
     payload[1] = offending_ver;
-    host_uart_send_urc(HOST_TYPE_ERR_PROTO, seq, 0U, payload, (uint16_t)sizeof(payload));
+    payload[2] = err_code;
+    payload[3] = (uint8_t)(detail & 0xFFU);
+    payload[4] = (uint8_t)((detail >> 8) & 0xFFU);
+
+    host_uart_send_urc(HOST_TYPE_ERR_PROTO_URC, seq, 0U, payload, (uint16_t)sizeof(payload));
+}
+
+void host_uart_stats_reset(void) {
+    uint32_t irq_state = cpu_irq_save();
+
+    s_stats_dropped = 0U;
+    s_stats_errors = 0U;
+    s_stats_queue_full = 0U;
+    s_stats_irq_idle = 0U;
+    s_stats_irq_ht = 0U;
+    s_stats_irq_tc = 0U;
+    s_stats_irq_te = 0U;
+
+    cpu_irq_restore(irq_state);
 }
 
 uint32_t host_uart_stats_dropped(void) {
@@ -455,12 +502,33 @@ uint32_t host_uart_stats_errors(void) {
     return s_stats_errors;
 }
 
+uint32_t host_uart_stats_queue_full(void) {
+    return s_stats_queue_full;
+}
+
+uint32_t host_uart_stats_irq_idle(void) {
+    return s_stats_irq_idle;
+}
+
+uint32_t host_uart_stats_irq_ht(void) {
+    return s_stats_irq_ht;
+}
+
+uint32_t host_uart_stats_irq_tc(void) {
+    return s_stats_irq_tc;
+}
+
+uint32_t host_uart_stats_irq_te(void) {
+    return s_stats_irq_te;
+}
+
 void USART2_IRQHandler(void) {
     const uint32_t isr = USART2_ISR;
 
     if ((isr & USART_ISR_IDLE) != 0U) {
         USART2_ICR = USART_ICR_IDLECF;
-        service_dma_rx();
+        s_stats_irq_idle++;
+        service_dma_rx_now();
     }
 
     if ((isr & (USART_ISR_PE | USART_ISR_FE | USART_ISR_NE | USART_ISR_ORE)) != 0U) {
@@ -476,8 +544,21 @@ void USART2_IRQHandler(void) {
 void DMA1_Channel4_5_6_7_IRQHandler(void) {
     const uint32_t isr = DMA1_ISR;
 
+    if ((isr & DMA_ISR_HTIF(HOST_DMA_RX_CH)) != 0U) {
+        DMA1_IFCR = DMA_IFCR_CHTIF(HOST_DMA_RX_CH);
+        s_stats_irq_ht++;
+        service_dma_rx_now();
+    }
+
+    if ((isr & DMA_ISR_TCIF(HOST_DMA_RX_CH)) != 0U) {
+        DMA1_IFCR = DMA_IFCR_CTCIF(HOST_DMA_RX_CH);
+        s_stats_irq_tc++;
+        service_dma_rx_now();
+    }
+
     if ((isr & DMA_ISR_TEIF(HOST_DMA_RX_CH)) != 0U) {
         DMA1_IFCR = DMA_IFCR_CTEIF(HOST_DMA_RX_CH) | DMA_IFCR_CGIF(HOST_DMA_RX_CH);
+        s_stats_irq_te++;
         dma_rx_start();
         s_stats_errors++;
     }

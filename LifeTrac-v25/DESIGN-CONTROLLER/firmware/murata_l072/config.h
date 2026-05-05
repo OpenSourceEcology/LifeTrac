@@ -50,6 +50,11 @@
 #define HOST_TXQ_DEPTH                8U
 #define HOST_TXQ_P0_RESERVED          1U        /* per Claude §H5: keep one P0 */
 
+/* Diagnostic/prototyping controls. Keep these conservative in production. */
+#define HOST_ALLOW_REG_WRITE_DIAG     1
+#define HOST_EMIT_RADIO_IRQ_DEBUG_URC 1
+#define HOST_DEBUG_OPMODE_GUARD       0
+
 /* ------------------------------------------------------------------------ */
 /* Watchdog (N-20). Initial window per Claude review §5.5: 500 ms during    */
 /* boot/init, tightened to 100 ms after radio init succeeds.                */

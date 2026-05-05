@@ -32,6 +32,22 @@ uint32_t platform_now_ms(void) {
     return s_tick_ms;
 }
 
+uint32_t platform_now_us(void) {
+    uint32_t ms_before;
+    uint32_t ms_after;
+    uint32_t systick_val;
+    uint32_t elapsed_ticks;
+
+    do {
+        ms_before = s_tick_ms;
+        systick_val = SYST_CVR;
+        ms_after = s_tick_ms;
+    } while (ms_before != ms_after);
+
+    elapsed_ticks = (SYST_RVR + 1U) - systick_val;
+    return (ms_before * 1000U) + (elapsed_ticks / (s_core_hz / 1000000U));
+}
+
 void platform_delay_ms(uint32_t delay_ms) {
     const uint32_t start = platform_now_ms();
     while ((uint32_t)(platform_now_ms() - start) < delay_ms) {

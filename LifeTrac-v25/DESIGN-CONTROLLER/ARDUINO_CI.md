@@ -18,6 +18,19 @@ The old `arduino_opta_controller` and `esp32_remote_control` sketches are archiv
 | Tractor H747 M7/M4 | Portenta/X8 H747 core FQBN | Needs local FQBN verification before making CI blocking. |
 | LoRa retune bench | same board as radio under test | Manual bench tool; not required on every PR. |
 
+## L072 Static Gates
+
+The `firmware-l072-static-checks` workflow job validates host-buildable invariants for
+`firmware/murata_l072` without requiring the cross toolchain:
+
+- `make check` (memory map preprocess + static asserts)
+- `make check-opmode-owner` (only `radio/sx1276_modes.c` may own `RegOpMode`)
+- `make check-cfg-wire-owner` (CFG URC payload layout owned by `host_cfg_wire`)
+- `make check-rx-counter-owner` (RX stats increment ownership in `radio/sx1276_rx.c`)
+- `make check-cfg-contract` (CFG policy/unit + wire-vector host tests)
+
+Repository maintainers should mark `L072 firmware static checks` as a required branch-protection check on `main`.
+
 ## Local Smoke Test
 
 ```bash

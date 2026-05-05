@@ -33,7 +33,13 @@ SRCS := \
     main.c \
     boot/safe_mode.c \
 	hal/platform.c \
+	host/host_cfg.c \
+	host/host_cfg_wire.c \
+	host/host_cmd.c \
+	host/host_stats.c \
 	host/host_uart.c \
+	radio/sx1276_modes.c \
+	radio/sx1276_rx.c \
 	radio/sx1276.c \
     include/static_asserts.c
 
@@ -86,7 +92,7 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all clean size check check-cpp check-asserts help
+.PHONY: all clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner help
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
 
@@ -135,7 +141,13 @@ size: $(BUILD)/$(TARGET).elf
 #      the cross compile).
 # This is what CI runs today, before Phase 1 lands the real toolchain.
 # --------------------------------------------------------------------------
+ifeq ($(OS),Windows_NT)
+HOST_CC ?= gcc
+else
 HOST_CC ?= cc
+endif
+CFG_CONTRACT_BIN := $(BUILD)/cfg_contract
+CFG_WIRE_BIN     := $(BUILD)/cfg_wire_vectors
 
 check: check-cpp check-asserts
 	@echo "[OK] memory map invariants hold"
@@ -149,6 +161,74 @@ check-asserts: $(BUILD)
 	@echo "[2/2] Compiling include/static_asserts.c (host) ..."
 	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude \
 	    -c include/static_asserts.c -o $(BUILD)/static_asserts.host.o
+
+# Optional CI guard: ensure RegOpMode ownership stays in radio/sx1276_modes.c.
+ifeq ($(OS),Windows_NT)
+check-opmode-owner:
+	@echo "[CI] Checking OpMode ownership ..."
+	@powershell -NoProfile -Command "$$hits = Select-String -Path 'radio/*.c' -Pattern 'SX1276_REG_OP_MODE' | Where-Object { ($$_.Path -replace '\\','/') -notlike '*/radio/sx1276_modes.c' }; if ($$hits) { Write-Output '[FAIL] Unexpected RegOpMode access outside radio/sx1276_modes.c'; $$hits | ForEach-Object { Write-Output $$_.ToString() }; exit 1 }; Write-Output '[OK] OpMode ownership check passed'"
+
+check-cfg-wire-owner:
+	@echo "[CI] Checking CFG URC payload ownership ..."
+	@powershell -NoProfile -Command "$$hits = Select-String -Path 'host/*.c' -Pattern 'HOST_TYPE_CFG_OK_URC|HOST_TYPE_CFG_DATA_URC' | Where-Object { ($$_.Path -replace '\\','/') -notlike '*/host/host_cfg_wire.c' -and ($$_.Path -replace '\\','/') -notlike '*/host/host_cmd.c' }; if ($$hits) { Write-Output '[FAIL] Unexpected CFG URC emitters outside host_cfg_wire/host_cmd'; $$hits | ForEach-Object { Write-Output $$_.ToString() }; exit 1 }; Write-Output '[OK] CFG URC ownership check passed'"
+
+check-rx-counter-owner:
+	@echo "[CI] Checking RX counter ownership ..."
+	@powershell -NoProfile -Command "$$hits = Select-String -Path 'radio/*.c','host/*.c','main.c' -Pattern 'host_stats_radio_rx_ok|host_stats_radio_crc_err' | Where-Object { ($$_.Path -replace '\\','/') -notlike '*/radio/sx1276_rx.c' -and ($$_.Path -replace '\\','/') -notlike '*/host/host_stats.c' }; if ($$hits) { Write-Output '[FAIL] RX counters must only be incremented in radio/sx1276_rx.c'; $$hits | ForEach-Object { Write-Output $$_.ToString() }; exit 1 }; Write-Output '[OK] RX counter ownership check passed'"
+else
+check-opmode-owner:
+	@echo "[CI] Checking OpMode ownership ..."
+	@hits=$$(grep -RIn "SX1276_REG_OP_MODE" radio/*.c | grep -v "radio/sx1276_modes.c" || true); \
+	if [ -n "$$hits" ]; then \
+		echo "[FAIL] Unexpected RegOpMode access outside radio/sx1276_modes.c"; \
+		echo "$$hits"; \
+		exit 1; \
+	fi; \
+	echo "[OK] OpMode ownership check passed"
+
+check-cfg-wire-owner:
+	@echo "[CI] Checking CFG URC payload ownership ..."
+	@hits=$$(grep -RIn "HOST_TYPE_CFG_OK_URC\|HOST_TYPE_CFG_DATA_URC" host/*.c | grep -v "host/host_cfg_wire.c\|host/host_cmd.c" || true); \
+	if [ -n "$$hits" ]; then \
+		echo "[FAIL] Unexpected CFG URC emitters outside host_cfg_wire/host_cmd"; \
+		echo "$$hits"; \
+		exit 1; \
+	fi; \
+	echo "[OK] CFG URC ownership check passed"
+
+check-rx-counter-owner:
+	@echo "[CI] Checking RX counter ownership ..."
+	@hits=$$(grep -RIn "host_stats_radio_rx_ok\|host_stats_radio_crc_err" radio/ host/ main.c | grep -v "radio/sx1276_rx.c\|host/host_stats.c" || true); \
+	if [ -n "$$hits" ]; then \
+		echo "[FAIL] RX counters must only be incremented in radio/sx1276_rx.c"; \
+		echo "$$hits"; \
+		exit 1; \
+	fi; \
+	echo "[OK] RX counter ownership check passed"
+endif
+
+check-cfg-contract: check-cfg-contract-unit check-cfg-contract-wire
+
+check-cfg-contract-unit: $(BUILD)
+	@echo "[CFG] Building host contract test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/cfg_contract.c \
+	    bench/host_proto/sx1276_stub.c \
+	    host/host_cfg.c \
+	    -o $(CFG_CONTRACT_BIN)
+	@echo "[CFG] Running host contract test ..."
+	@$(CFG_CONTRACT_BIN)
+
+check-cfg-contract-wire: $(BUILD)
+	@echo "[CFG] Building wire-vector test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/cfg_wire_vectors.c \
+	    bench/host_proto/sx1276_stub.c \
+	    host/host_cfg.c \
+	    host/host_cfg_wire.c \
+	    -o $(CFG_WIRE_BIN)
+	@echo "[CFG] Running wire-vector test ..."
+	@$(CFG_WIRE_BIN)
 
 $(BUILD):
 	@mkdir -p $(BUILD)
