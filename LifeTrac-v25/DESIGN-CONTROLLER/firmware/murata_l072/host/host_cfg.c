@@ -22,7 +22,10 @@
 
 #define DEFAULT_TX_POWER_DBM                14U
 #define DEFAULT_LBT_THRESHOLD_DBM           ((uint8_t)0xA6U) /* -90 dBm */
+#define DEFAULT_LBT_MAX_BACKOFF_MS          500U
+#define DEFAULT_CAD_SYMBOLS                 4U
 #define DEFAULT_FHSS_CHANNEL_MASK           0x00000000000000FFULL
+#define DEFAULT_FHSS_DWELL_MS               400U
 #define DEFAULT_BEACON_CHANNEL_IDX          0U
 #define DEFAULT_REPLAY_WINDOW               16U
 
@@ -108,6 +111,12 @@ static const cfg_key_desc_t k_cfg_desc[CFG_KEY_COUNT] = {
       { LE16_0(IWDG_RUN_WINDOW_MS), LE16_1(IWDG_RUN_WINDOW_MS), 0U, 0U, 0U, 0U, 0U, 0U } },
     { CFG_KEY_CRYPTO_IN_L072,        1U, CFG_KIND_BOOL, 0U,                cfg_apply_unsupported,
       { LORA_FW_CRYPTO_IN_L072, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
+        { CFG_KEY_LBT_MAX_BACKOFF_MS,    2U, CFG_KIND_U16,  0U,                NULL,
+            { LE16_0(DEFAULT_LBT_MAX_BACKOFF_MS), LE16_1(DEFAULT_LBT_MAX_BACKOFF_MS), 0U, 0U, 0U, 0U, 0U, 0U } },
+        { CFG_KEY_CAD_SYMBOLS,           1U, CFG_KIND_U8,   0U,                NULL,
+            { DEFAULT_CAD_SYMBOLS, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
+        { CFG_KEY_FHSS_DWELL_MS,         2U, CFG_KIND_U16,  0U,                NULL,
+            { LE16_0(DEFAULT_FHSS_DWELL_MS), LE16_1(DEFAULT_FHSS_DWELL_MS), 0U, 0U, 0U, 0U, 0U, 0U } },
     { CFG_KEY_PROTOCOL_VERSION,      1U, CFG_KIND_U8,   CFG_FLAG_READ_ONLY, NULL,
       { HOST_PROTOCOL_VER, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
     { CFG_KEY_WIRE_SCHEMA_VERSION,   1U, CFG_KIND_U8,   CFG_FLAG_READ_ONLY, NULL,
@@ -203,6 +212,25 @@ static cfg_status_t cfg_validate_and_normalize(uint8_t key, uint8_t *value, uint
         case CFG_KEY_IWDG_WINDOW_MS: {
             const uint16_t ms = read_u16_le(value);
             if (ms < 50U || ms > 5000U) {
+                return CFG_STATUS_OUT_OF_RANGE;
+            }
+            return CFG_STATUS_OK;
+        }
+
+        case CFG_KEY_LBT_MAX_BACKOFF_MS: {
+            const uint16_t max_backoff_ms = read_u16_le(value);
+            if (max_backoff_ms < 10U || max_backoff_ms > 5000U) {
+                return CFG_STATUS_OUT_OF_RANGE;
+            }
+            return CFG_STATUS_OK;
+        }
+
+        case CFG_KEY_CAD_SYMBOLS:
+            return (value[0] >= 1U && value[0] <= 10U) ? CFG_STATUS_OK : CFG_STATUS_OUT_OF_RANGE;
+
+        case CFG_KEY_FHSS_DWELL_MS: {
+            const uint16_t dwell_ms = read_u16_le(value);
+            if (dwell_ms < 50U || dwell_ms > 2000U) {
                 return CFG_STATUS_OUT_OF_RANGE;
             }
             return CFG_STATUS_OK;

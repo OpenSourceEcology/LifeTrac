@@ -30,15 +30,38 @@ static void put_u32_le(uint8_t *dst, uint32_t value) {
     dst[3] = (uint8_t)((value >> 24) & 0xFFU);
 }
 
+static void host_send_fault_urc(const platform_fault_record_t *record) {
+    uint8_t payload[HOST_FAULT_URC_PAYLOAD_LEN];
+
+    if (record == NULL) {
+        return;
+    }
+
+    memset(payload, 0, sizeof(payload));
+    payload[0] = record->code;
+    payload[1] = record->sub;
+    put_u32_le(&payload[4], record->pc);
+    put_u32_le(&payload[8], record->lr);
+    put_u32_le(&payload[12], record->psr);
+    put_u32_le(&payload[16], record->bfar);
+    put_u32_le(&payload[20], platform_now_ms());
+
+    host_uart_send_urc(HOST_TYPE_FAULT_URC,
+                       0U,
+                       0U,
+                       payload,
+                       (uint16_t)sizeof(payload));
+}
+
 static void host_send_boot_urc(void) {
     uint8_t payload[6];
 
-    payload[0] = 0U; /* reset_cause: TODO in next increment */
+    payload[0] = (uint8_t)platform_reset_cause_take();
     payload[1] = s_radio_ok ? 1U : 0U;
     payload[2] = s_radio_version;
     payload[3] = HOST_PROTOCOL_VER;
     payload[4] = HOST_WIRE_SCHEMA_VER;
-    payload[5] = 0U;
+    payload[5] = platform_clock_source_id();
 
     host_uart_send_urc(HOST_TYPE_BOOT_URC,
                        0U,
@@ -130,6 +153,52 @@ static void handle_stats_dump(const host_frame_t *frame) {
                        0U,
                        payload,
                        payload_len);
+}
+
+static void handle_tx_frame(const host_frame_t *frame) {
+    sx1276_tx_request_t req;
+
+    if (frame->payload_len < 2U) {
+        host_uart_send_err_proto(frame->seq,
+                                 frame->type,
+                                 frame->ver,
+                                 HOST_ERR_PROTO_BAD_LENGTH,
+                                 2U);
+        return;
+    }
+
+    req.tx_id = frame->payload[0];
+    req.length = frame->payload[1];
+
+    if (frame->payload_len != (uint16_t)(2U + req.length)) {
+        host_uart_send_err_proto(frame->seq,
+                                 frame->type,
+                                 frame->ver,
+                                 HOST_ERR_PROTO_BAD_LENGTH,
+                                 (uint16_t)(2U + req.length));
+        return;
+    }
+
+    if (sx1276_tx_busy()) {
+        host_uart_send_err_proto(frame->seq,
+                                 frame->type,
+                                 frame->ver,
+                                 HOST_ERR_PROTO_QUEUE_FULL,
+                                 0U);
+        return;
+    }
+
+    if (req.length > 0U) {
+        memcpy(req.payload, &frame->payload[2], req.length);
+    }
+
+    if (!sx1276_tx_begin(&req)) {
+        host_uart_send_err_proto(frame->seq,
+                                 frame->type,
+                                 frame->ver,
+                                 HOST_ERR_PROTO_FORBIDDEN,
+                                 0U);
+    }
 }
 
 static bool reg_write_allowed(uint8_t reg_addr) {
@@ -331,6 +400,8 @@ static void handle_cfg_get(const host_frame_t *frame) {
 }
 
 void host_cmd_init(bool radio_ok, uint8_t radio_version) {
+    platform_fault_record_t replay;
+
     host_type_compile_time_uniqueness_check();
 
     s_radio_ok = radio_ok;
@@ -339,6 +410,10 @@ void host_cmd_init(bool radio_ok, uint8_t radio_version) {
     cfg_init();
     host_stats_reset();
     host_send_boot_urc();
+
+    if (platform_fault_take_replay(&replay)) {
+        host_send_fault_urc(&replay);
+    }
 }
 
 void host_cmd_dispatch(const host_frame_t *frame) {
@@ -370,6 +445,10 @@ void host_cmd_dispatch(const host_frame_t *frame) {
 
         case HOST_TYPE_RESET_REQ:
             platform_system_reset();
+            break;
+
+        case HOST_TYPE_TX_FRAME_REQ:
+            handle_tx_frame(frame);
             break;
 
         case HOST_TYPE_STATS_RESET_REQ:
@@ -422,6 +501,38 @@ void host_cmd_on_radio_events(uint32_t radio_events) {
 #else
     (void)radio_events;
 #endif
+}
+
+void host_cmd_emit_tx_done(const sx1276_tx_result_t *result) {
+    uint8_t payload[7];
+
+    if (result == NULL) {
+        return;
+    }
+
+    payload[0] = result->tx_id;
+    payload[1] = result->status;
+    put_u32_le(&payload[2], result->time_on_air_us);
+    payload[6] = result->tx_power_dbm;
+
+    host_uart_send_urc(HOST_TYPE_TX_DONE_URC,
+                       0U,
+                       0U,
+                       payload,
+                       (uint16_t)sizeof(payload));
+}
+
+void host_cmd_emit_fault(uint8_t code, uint8_t sub) {
+    platform_fault_record_t fault;
+
+    fault.code = code;
+    fault.sub = sub;
+    fault.pc = 0U;
+    fault.lr = 0U;
+    fault.psr = 0U;
+    fault.bfar = 0U;
+
+    host_send_fault_urc(&fault);
 }
 
 void host_cmd_emit_rx_frame(const sx1276_rx_frame_t *frame) {

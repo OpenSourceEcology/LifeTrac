@@ -52,5 +52,6 @@ uint32_t host_uart_stats_irq_idle(void);
 uint32_t host_uart_stats_irq_ht(void);
 uint32_t host_uart_stats_irq_tc(void);
 uint32_t host_uart_stats_irq_te(void);
+uint32_t host_uart_take_dma_te_events(void);
 
 #endif /* LIFETRAC_MURATA_L072_HOST_UART_H */

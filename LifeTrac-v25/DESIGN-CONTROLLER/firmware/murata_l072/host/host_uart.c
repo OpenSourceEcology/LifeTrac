@@ -33,6 +33,7 @@ static uint32_t s_stats_irq_idle;
 static uint32_t s_stats_irq_ht;
 static uint32_t s_stats_irq_tc;
 static uint32_t s_stats_irq_te;
+static volatile uint32_t s_dma_te_events;
 
 static uint16_t crc16_ccitt(const uint8_t *data, uint16_t len) {
     uint16_t crc = 0xFFFFU;
@@ -490,6 +491,7 @@ void host_uart_stats_reset(void) {
     s_stats_irq_ht = 0U;
     s_stats_irq_tc = 0U;
     s_stats_irq_te = 0U;
+    s_dma_te_events = 0U;
 
     cpu_irq_restore(irq_state);
 }
@@ -520,6 +522,14 @@ uint32_t host_uart_stats_irq_tc(void) {
 
 uint32_t host_uart_stats_irq_te(void) {
     return s_stats_irq_te;
+}
+
+uint32_t host_uart_take_dma_te_events(void) {
+    uint32_t irq_state = cpu_irq_save();
+    uint32_t events = s_dma_te_events;
+    s_dma_te_events = 0U;
+    cpu_irq_restore(irq_state);
+    return events;
 }
 
 void USART2_IRQHandler(void) {
@@ -559,6 +569,7 @@ void DMA1_Channel4_5_6_7_IRQHandler(void) {
     if ((isr & DMA_ISR_TEIF(HOST_DMA_RX_CH)) != 0U) {
         DMA1_IFCR = DMA_IFCR_CTEIF(HOST_DMA_RX_CH) | DMA_IFCR_CGIF(HOST_DMA_RX_CH);
         s_stats_irq_te++;
+        s_dma_te_events++;
         dma_rx_start();
         s_stats_errors++;
     }

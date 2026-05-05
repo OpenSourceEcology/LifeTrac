@@ -150,6 +150,18 @@ A Max Carrier handheld would be over-engineered and impractical to carry. The MK
 | Base station MCU | STM32H747 co-MCU on Portenta X8 on Max Carrier | Arduino Mbed (LoRa modem driver) |
 | Base station Linux | Portenta X8 | Yocto Linux · Mosquitto · Python (LoRa↔MQTT bridge) · nginx · web UI (HTML/JS + WebSockets) |
 
+## Tractor M7 Radio Integration Modes
+
+`firmware/tractor_h7/tractor_h7.ino` supports two compile-time-exclusive radio
+integration modes:
+
+- Default (legacy): onboard SX1276 path via RadioLib.
+- Method G host path: enable `LIFETRAC_USE_METHOD_G_HOST=1` and set
+    `LIFETRAC_MH_SERIAL` to the selected host UART object (for CI: `Serial1`).
+
+Method G routes `setup()` and `loop()` into `murata_host/mh_runtime`; the
+default build keeps those runtime symbols out of the linked image.
+
 ## What this design intentionally does NOT include
 
 - **LoRaWAN.** Too much overhead for control loops; we own the air interface end-to-end.

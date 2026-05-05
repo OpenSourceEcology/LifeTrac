@@ -47,7 +47,7 @@ jobs:
           echo "Enable blocking Arduino compile jobs after local FQBN/build-glue verification."
 
   firmware-l072-static-checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: L072 firmware static checks
     steps:
       - uses: actions/checkout@v4
@@ -65,9 +65,106 @@ jobs:
       - name: make check-rx-counter-owner
         working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
         run: make check-rx-counter-owner
+      - name: make check-tx-counter-owner
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
+        run: make check-tx-counter-owner
+      - name: make check-lbt-owner
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
+        run: make check-lbt-owner
+      - name: make check-airtime-counter-owner
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
+        run: make check-airtime-counter-owner
       - name: make check-cfg-contract
         working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
         run: make check-cfg-contract
+
+  firmware-l072-cross-compile:
+    runs-on: ubuntu-24.04
+    name: L072 cross-compile (arm-none-eabi-gcc)
+    needs: firmware-l072-static-checks
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi python3
+          arm-none-eabi-gcc --version
+      - name: make all
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
+        run: make all
+      - name: Verify region budgets
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
+        run: |
+          arm-none-eabi-size -A -d build/firmware.elf | tee build/size.txt
+          python3 tools/check_size_budget.py build/firmware.elf
+      - name: Upload L072 firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: l072-firmware-${{ github.sha }}
+          path: |
+            LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build/firmware.elf
+            LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build/firmware.bin
+            LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build/firmware.hex
+            LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build/firmware.map
+            LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build/size.txt
+          retention-days: 30
+
+  h7-host-driver-tests:
+    runs-on: ubuntu-24.04
+    name: H7 host driver wire tests
+    needs: firmware-l072-cross-compile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify murata_host wire constant sync
+        run: python3 LifeTrac-v25/DESIGN-CONTROLLER/tools/check_mh_wire_sync.py
+      - name: Build and run COBS/CRC unit test
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7
+        run: |
+          mkdir -p build
+          cc -std=gnu11 -Wall -Wextra -Werror -Imurata_host \
+            bench/h7_host_proto/mh_cobs_crc_unit.c \
+            murata_host/mh_cobs.c \
+            murata_host/mh_crc16.c \
+            -o build/mh_cobs_crc_unit
+          ./build/mh_cobs_crc_unit
+      - name: Build and run STATS compatibility vectors
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7
+        run: |
+          mkdir -p build
+          cc -std=gnu11 -Wall -Wextra -Werror -Imurata_host \
+            bench/h7_host_proto/mh_stats_vectors.c \
+            murata_host/mh_crc16.c \
+            murata_host/murata_host.c \
+            murata_host/mh_stats.c \
+            -o build/mh_stats_vectors
+          ./build/mh_stats_vectors
+
+  h7-host-driver-loopback:
+    runs-on: ubuntu-24.04
+    name: H7 host driver PTY loopback
+    needs: h7-host-driver-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build loopback driver
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7
+        run: |
+          mkdir -p build
+          cc -std=gnu11 -D_DEFAULT_SOURCE -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror -Wpedantic -Imurata_host \
+            bench/h7_host_proto/loopback_driver.c \
+            murata_host/mh_cobs.c \
+            murata_host/mh_crc16.c \
+            murata_host/murata_host.c \
+            murata_host/mh_stats.c \
+            murata_host/mh_uart.c \
+            murata_host/mh_uart_posix.c \
+            murata_host/mh_uart_tcp.c \
+            murata_host/mh_stream.c \
+            -o build/loopback_driver
+      - name: Run PTY loopback harness
+        run: |
+          python3 LifeTrac-v25/DESIGN-CONTROLLER/tools/murata_host_loopback.py \
+            --driver LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/build/loopback_driver \
+            --iterations 150
 
   # Round 15 (2026-04-28): handheld_mkr is now a blocking compile gate.
   # The earlier ``continue-on-error: true`` masked three independent bugs that
@@ -194,6 +291,60 @@ jobs:
             --build-property "compiler.cpp.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO" \
             --build-property "compiler.c.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO" \
             LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7
+
+  tractor-h7-method-g-guards:
+    runs-on: ubuntu-latest
+    name: tractor_h7 Method G runtime guards
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install arduino-cli
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s -- -b /usr/local/bin
+      - name: Install cores
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:mbed_portenta
+      - name: Install libraries
+        run: |
+          arduino-cli lib install RadioLib
+          arduino-cli lib install ArduinoRS485
+          arduino-cli lib install ArduinoModbus
+      - name: Stage shared sources into sketch
+        run: |
+          mkdir -p LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/src
+          cp -r LifeTrac-v25/DESIGN-CONTROLLER/firmware/common/lora_proto \
+                LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/src/
+          cp LifeTrac-v25/DESIGN-CONTROLLER/firmware/common/shared_mem.h \
+             LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/src/
+      - name: Compile default path (Method G disabled)
+        run: |
+          arduino-cli compile --fqbn arduino:mbed_portenta:envie_m7 \
+            --build-path /tmp/tractor_h7_off \
+            --build-property "compiler.cpp.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO" \
+            --build-property "compiler.c.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO" \
+            LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7
+      - name: check-mh-runtime-off-symbols
+        run: |
+          ELF_OFF=/tmp/tractor_h7_off/tractor_h7.ino.elf
+          nm --defined-only "$ELF_OFF" > /tmp/tractor_h7_off/nm_off.txt
+          if grep -E "mh_runtime_|mh_uart_arduino_" /tmp/tractor_h7_off/nm_off.txt; then
+            echo "Method G runtime symbols leaked into default build"
+            exit 1
+          fi
+      - name: Compile Method G host path
+        run: |
+          arduino-cli compile --fqbn arduino:mbed_portenta:envie_m7 \
+            --build-path /tmp/tractor_h7_methodg \
+            --build-property "compiler.cpp.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO -DLIFETRAC_USE_METHOD_G_HOST=1 -DLIFETRAC_MH_SERIAL=Serial1" \
+            --build-property "compiler.c.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO -DLIFETRAC_USE_METHOD_G_HOST=1 -DLIFETRAC_MH_SERIAL=Serial1" \
+            LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7
+      - name: Verify Method G runtime symbols exist
+        run: |
+          ELF_ON=/tmp/tractor_h7_methodg/tractor_h7.ino.elf
+          if ! nm --defined-only "$ELF_ON" | grep -E "mh_runtime_begin|mh_uart_arduino_init"; then
+            echo "Method G runtime symbols missing from enabled build"
+            exit 1
+          fi
 
   # Round 17 (2026-04-28): M4 watchdog co-processor build. FQBN uses the
   # ``target_core=cm4`` board menu option (the Portenta core does not

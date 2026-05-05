@@ -151,6 +151,10 @@ int main(void) {
         0x00U, 0xC2U, 0x01U, 0x00U
     };
     static const uint8_t k_set_baud_urc[] = { CFG_KEY_HOST_BAUD, HOST_CFG_STATUS_DEFERRED, 0x04U, 0x00U };
+    static const uint8_t k_get_lbt_backoff_req[] = { CFG_KEY_LBT_MAX_BACKOFF_MS };
+    static const uint8_t k_get_lbt_backoff_urc[] = { CFG_KEY_LBT_MAX_BACKOFF_MS, 0x02U, 0xF4U, 0x01U };
+    static const uint8_t k_set_cad_symbols_req[] = { CFG_KEY_CAD_SYMBOLS, 0x01U, 0x03U };
+    static const uint8_t k_set_cad_symbols_urc[] = { CFG_KEY_CAD_SYMBOLS, HOST_CFG_STATUS_OK, 0x01U, 0x00U };
 
     cfg_init();
     ok = build_cfg_get_urc(k_get_tx_power_req,
@@ -212,11 +216,41 @@ int main(void) {
                   k_set_baud_urc,
                   (uint8_t)sizeof(k_set_baud_urc));
 
+    cfg_init();
+    ok = build_cfg_get_urc(k_get_lbt_backoff_req,
+                           (uint8_t)sizeof(k_get_lbt_backoff_req),
+                           &out_type,
+                           out_payload,
+                           &out_len);
+    assert_vector("get_lbt_backoff_default",
+                  ok,
+                  out_type,
+                  out_payload,
+                  out_len,
+                  HOST_TYPE_CFG_DATA_URC,
+                  k_get_lbt_backoff_urc,
+                  (uint8_t)sizeof(k_get_lbt_backoff_urc));
+
+    cfg_init();
+    ok = build_cfg_set_urc(k_set_cad_symbols_req,
+                           (uint8_t)sizeof(k_set_cad_symbols_req),
+                           &out_type,
+                           out_payload,
+                           &out_len);
+    assert_vector("set_cad_symbols",
+                  ok,
+                  out_type,
+                  out_payload,
+                  out_len,
+                  HOST_TYPE_CFG_OK_URC,
+                  k_set_cad_symbols_urc,
+                  (uint8_t)sizeof(k_set_cad_symbols_urc));
+
     if (g_failures != 0U) {
         printf("[FAIL] cfg_wire_vectors: %lu failures\n", (unsigned long)g_failures);
         return 1;
     }
 
-    printf("[PASS] cfg_wire_vectors: 4 vectors\n");
+    printf("[PASS] cfg_wire_vectors: 6 vectors\n");
     return 0;
 }

@@ -1,4 +1,6 @@
 #include "stm32l072_regs.h"
+#include "host_types.h"
+#include "platform.h"
 
 #include <stdint.h>
 
@@ -15,14 +17,56 @@ extern int main(void);
 
 void Reset_Handler(void);
 void Default_Handler(void);
+void NMI_Handler(void);
+void HardFault_Handler(void);
+void HardFault_Handler_C(uint32_t *stack_ptr);
+
+static void __attribute__((section(".boot_text"), noreturn))
+fault_reset_and_reboot(uint8_t code, uint8_t sub, uint32_t pc, uint32_t lr, uint32_t psr) {
+    platform_fault_record(code, sub, pc, lr, psr, 0U);
+    platform_system_reset();
+    for (;;) {
+        cpu_wfi();
+    }
+}
+
+void __attribute__((section(".boot_text"), noreturn)) NMI_Handler(void) {
+    fault_reset_and_reboot(HOST_FAULT_CODE_NMI, 0U, 0U, 0U, 0U);
+}
+
+void __attribute__((section(".boot_text"), naked)) HardFault_Handler(void) {
+    __asm__ volatile (
+        "tst lr, #4\n"
+        "ite eq\n"
+        "mrseq r0, msp\n"
+        "mrsne r0, psp\n"
+        "b HardFault_Handler_C\n"
+    );
+}
+
+void __attribute__((section(".boot_text"), noreturn)) HardFault_Handler_C(uint32_t *stack_ptr) {
+    uint32_t stacked_pc = 0U;
+    uint32_t stacked_lr = 0U;
+    uint32_t stacked_psr = 0U;
+
+    if (stack_ptr != (uint32_t *)0U) {
+        stacked_lr = stack_ptr[5];
+        stacked_pc = stack_ptr[6];
+        stacked_psr = stack_ptr[7];
+    }
+
+    fault_reset_and_reboot(HOST_FAULT_CODE_HARDFAULT,
+                           0U,
+                           stacked_pc,
+                           stacked_lr,
+                           stacked_psr);
+}
 
 void __attribute__((weak)) SystemInit(void) {
 }
 
 #define WEAK_ALIAS(handler_name) __attribute__((weak, alias(#handler_name)))
 
-void NMI_Handler(void) WEAK_ALIAS(Default_Handler);
-void HardFault_Handler(void) WEAK_ALIAS(Default_Handler);
 void SVC_Handler(void) WEAK_ALIAS(Default_Handler);
 void PendSV_Handler(void) WEAK_ALIAS(Default_Handler);
 void SysTick_Handler(void) WEAK_ALIAS(Default_Handler);

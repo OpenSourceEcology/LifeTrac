@@ -113,6 +113,14 @@ SECTIONS
         _edata = .;
     } > RAM AT> APP
 
+    .noinit (NOLOAD) :
+    {
+        . = ALIGN(4);
+        *(.noinit)
+        *(.noinit.*)
+        . = ALIGN(4);
+    } > RAM
+
     /* Zero-initialised data. */
     .bss :
     {

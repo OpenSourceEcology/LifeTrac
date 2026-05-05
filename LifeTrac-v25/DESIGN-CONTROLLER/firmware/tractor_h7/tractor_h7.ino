@@ -28,6 +28,13 @@
 #include "src/lifetrac_build_config.h"
 #include "src/lora_proto/lora_proto.h"
 
+#if defined(LIFETRAC_USE_METHOD_G_HOST) && (LIFETRAC_USE_METHOD_G_HOST)
+#ifndef LIFETRAC_MH_SERIAL
+#error "LIFETRAC_MH_SERIAL must name a HardwareSerial instance when LIFETRAC_USE_METHOD_G_HOST=1"
+#endif
+#include "murata_host/mh_runtime.h"
+#endif
+
 // X8 compatibility: the portenta_x8 SDK replaces `Serial` with an ErrorSerialClass
 // that requires the SerialRPC library. Redirect all debug output to a no-op sink
 // so the same source compiles for both portenta_x8 and envie_m7/portenta_h7_m7.
@@ -1705,6 +1712,14 @@ static void poll_link_ladder() {
 
 // ---------- Arduino entry points ----------
 void setup() {
+#if defined(LIFETRAC_USE_METHOD_G_HOST) && (LIFETRAC_USE_METHOD_G_HOST)
+    if (!mh_runtime_begin((void *)&LIFETRAC_MH_SERIAL, 921600U)) {
+        while (1) {
+            delay(1000);
+        }
+    }
+    return;
+#else
     boot_trace_mark(1);
     Serial.begin(115200);
     bench_radio_reset();
@@ -1766,9 +1781,14 @@ void setup() {
     // Harmless on a standalone H7 — Serial1 just sees no bytes.
     Serial1.begin(921600);
     boot_trace_mark(9);
+#endif
 }
 
 void loop() {
+#if defined(LIFETRAC_USE_METHOD_G_HOST) && (LIFETRAC_USE_METHOD_G_HOST)
+    mh_runtime_loop(millis());
+    return;
+#else
     static uint32_t next_arb = 0;
     static uint32_t next_tx  = 0;
     uint32_t now = millis();
@@ -1811,4 +1831,5 @@ void loop() {
         emit_telemetry();
         emit_source_active();       // topic 0x10: link state for the operator UI
     }
+#endif
 }

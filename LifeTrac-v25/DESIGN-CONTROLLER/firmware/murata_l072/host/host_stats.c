@@ -22,6 +22,7 @@ typedef struct host_stats_wire_s {
     uint32_t radio_rx_ok;
     uint32_t radio_tx_ok;
     uint32_t radio_tx_abort_lbt;
+    uint32_t radio_tx_abort_airtime;
     uint32_t radio_state;
 } host_stats_wire_t;
 
@@ -36,6 +37,7 @@ static uint32_t s_radio_crc_err;
 static uint32_t s_radio_rx_ok;
 static uint32_t s_radio_tx_ok;
 static uint32_t s_radio_tx_abort_lbt;
+static uint32_t s_radio_tx_abort_airtime;
 
 static void put_u32_le(uint8_t *dst, uint32_t value) {
     dst[0] = (uint8_t)(value & 0xFFU);
@@ -53,6 +55,7 @@ void host_stats_reset(void) {
     s_radio_rx_ok = 0U;
     s_radio_tx_ok = 0U;
     s_radio_tx_abort_lbt = 0U;
+    s_radio_tx_abort_airtime = 0U;
 
     host_uart_stats_reset();
 }
@@ -71,6 +74,10 @@ void host_stats_radio_tx_ok(void) {
 
 void host_stats_radio_tx_abort_lbt(void) {
     s_radio_tx_abort_lbt++;
+}
+
+void host_stats_radio_tx_abort_airtime(void) {
+    s_radio_tx_abort_airtime++;
 }
 
 void host_stats_note_radio_events(uint32_t events) {
@@ -113,6 +120,7 @@ uint16_t host_stats_serialize(uint8_t *out, uint16_t out_cap) {
     put_u32_le(&out[idx], s_radio_rx_ok); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], s_radio_tx_ok); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], s_radio_tx_abort_lbt); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], s_radio_tx_abort_airtime); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], (uint32_t)sx1276_modes_get_state());
 
     return HOST_STATS_PAYLOAD_LEN;

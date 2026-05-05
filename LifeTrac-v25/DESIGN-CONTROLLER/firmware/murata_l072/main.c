@@ -14,6 +14,7 @@
 #include "platform.h"
 #include "sx1276.h"
 #include "sx1276_rx.h"
+#include "sx1276_tx.h"
 #include "stm32l072_regs.h"
 
 #include <stdbool.h>
@@ -27,8 +28,11 @@ const unsigned long * const _mm_anchor_ref = &_mm_static_asserts_anchor;
 int main(void) {
     host_frame_t frame;
     sx1276_rx_frame_t rx_frame;
+    sx1276_tx_result_t tx_result;
     bool radio_ok;
     uint8_t radio_version;
+
+    platform_reset_cause_capture_early();
 
     /* Brick-recovery Layer 2 must run before any normal init. */
     safe_mode_listen();
@@ -38,14 +42,26 @@ int main(void) {
     host_uart_init(HOST_BAUD_DEFAULT);
 
     radio_ok = sx1276_init();
+    if (!radio_ok) {
+        host_cmd_emit_fault(HOST_FAULT_CODE_RADIO_INIT_FAIL, 0U);
+    }
     if (radio_ok) {
         radio_ok = sx1276_rx_arm();
     }
     radio_version = sx1276_read_version();
     host_cmd_init(radio_ok, radio_version);
 
+    if (platform_clock_source_id() != PLATFORM_CLOCK_SOURCE_HSE_OK) {
+        host_cmd_emit_fault(HOST_FAULT_CODE_CLOCK_HSE_FAILED,
+                            platform_clock_source_id());
+    }
+
     for (;;) {
         host_uart_poll_dma();
+
+        if (host_uart_take_dma_te_events() != 0U) {
+            host_cmd_emit_fault(HOST_FAULT_CODE_HOST_DMA_OVERRUN, 0U);
+        }
 
         while (host_uart_pop_frame(&frame)) {
             host_cmd_dispatch(&frame);
@@ -55,7 +71,11 @@ int main(void) {
             const uint32_t radio_events = sx1276_take_irq_events();
             host_cmd_on_radio_events(radio_events);
 
-            if (sx1276_rx_service(radio_events, &rx_frame)) {
+            if (sx1276_tx_poll(radio_events, &tx_result)) {
+                host_cmd_emit_tx_done(&tx_result);
+            }
+
+            if (!sx1276_tx_busy() && sx1276_rx_service(radio_events, &rx_frame)) {
                 host_cmd_emit_rx_frame(&rx_frame);
             }
         }

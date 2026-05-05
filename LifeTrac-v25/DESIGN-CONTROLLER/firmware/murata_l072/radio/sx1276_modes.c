@@ -1,6 +1,7 @@
 #include "sx1276_modes.h"
 
 #include "config.h"
+#include "host_cmd.h"
 #include "platform.h"
 #include "sx1276.h"
 #include "stm32l072_regs.h"
@@ -93,6 +94,7 @@ static bool sx1276_modes_apply(const sx1276_mode_desc_t *desc) {
     {
         const uint8_t opmode_rb = sx1276_read_reg(SX1276_REG_OP_MODE);
         if ((opmode_rb & 0x87U) != (desc->opmode & 0x87U)) {
+            host_cmd_emit_fault(HOST_FAULT_CODE_RADIO_OPMODE_DRIFT, opmode_rb);
             s_state = SX1276_STATE_FAULT;
             return false;
         }

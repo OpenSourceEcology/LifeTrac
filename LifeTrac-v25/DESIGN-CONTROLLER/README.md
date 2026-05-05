@@ -45,6 +45,7 @@ This folder contains the **primary controller design** for the LifeTrac v25 trac
 
 - **[VIDEO_OPTIONS.md](VIDEO_OPTIONS.md)** — wireless video streaming analysis (LoRa thumbnails on the air; WiFi/cellular alternatives are archived)
 - **[ARDUINO_CI.md](ARDUINO_CI.md)** — Arduino-CLI continuous integration setup
+- **[firmware/murata_l072/BRINGUP_MAX_CARRIER.md](firmware/murata_l072/BRINGUP_MAX_CARRIER.md)** — Murata L072 flash + bench bring-up runbook (SWD/OpenOCD/J-Link/DFU)
 - **[arduino_libraries.txt](arduino_libraries.txt)** — pinned library versions
 - **[RESEARCH-CONTROLLER/WIRELESS_OPTIONS.md](RESEARCH-CONTROLLER/WIRELESS_OPTIONS.md)** *(archived)* — historical comparison of wireless technologies considered before LoRa was selected
 

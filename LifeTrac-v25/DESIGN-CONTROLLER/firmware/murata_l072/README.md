@@ -68,10 +68,11 @@ Stack is reserved at the top (size set in [include/memory_map.h](include/memory_
 ```
 make            # build firmware.elf, firmware.bin, firmware.hex
 make size       # show region usage against the budget
+python3 tools/check_size_budget.py build/firmware.elf
 make clean
 ```
 
-A real toolchain (`arm-none-eabi-gcc`) is required to actually link; the skeleton commits without invoking the toolchain in CI. See [Makefile](Makefile) `# CI:` comments for what should run in CI today (preprocessor + static-assert compile only) versus what will run once Phase 1 starts (full link + size report).
+A real toolchain (`arm-none-eabi-gcc`) is required to link. CI now runs a full cross-compile gate on pinned `ubuntu-24.04` with Ubuntu's `gcc-arm-none-eabi` package, publishes the ELF/BIN/HEX/MAP artifacts, and enforces APP/RAM budgets via [tools/check_size_budget.py](tools/check_size_budget.py) using constants from [include/memory_map.h](include/memory_map.h).
 
 ## Not yet present
 
@@ -84,3 +85,8 @@ Per the bring-up roadmap [DESIGN-LORAFIRMWARE/03](../../DESIGN-LORAFIRMWARE/03_B
 - Golden-jump helper (`boot/golden_jump.c`) — Phase 6.
 
 The current code establishes the bare-metal transport and radio control substrate so protocol and policy layers can be added incrementally.
+
+## Bench bring-up
+
+- Runbook: [BRINGUP_MAX_CARRIER.md](BRINGUP_MAX_CARRIER.md)
+- OpenOCD configs: [openocd/stlink.cfg](openocd/stlink.cfg), [openocd/stm32l0_swd.cfg](openocd/stm32l0_swd.cfg)

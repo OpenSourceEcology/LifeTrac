@@ -204,6 +204,25 @@ dispatch transcript always names the fleet shape it was scoped to.
 
 ## 9. Where to read next
 
+## 10. Tractor M7 radio host mode switch
+
+The tractor M7 sketch supports two mutually exclusive radio-integration paths:
+
+* **Legacy onboard RadioLib path (default):** no extra defines.
+* **Method G host path:** define both compile-time flags:
+
+  * `LIFETRAC_USE_METHOD_G_HOST=1`
+  * `LIFETRAC_MH_SERIAL=<HardwareSerial instance>` (for CI this is `Serial1`)
+
+When Method G is enabled, `tractor_h7.ino` routes `setup()` + `loop()` through
+`murata_host/mh_runtime` and compiles out the legacy execution path from those
+entry points. Do not set `LIFETRAC_USE_METHOD_G_HOST` without also defining
+`LIFETRAC_MH_SERIAL`.
+
+---
+
+## 11. Where to read next
+
 * [`CAPABILITY_INVENTORY.md`](CAPABILITY_INVENTORY.md) — every leaf,
   its consumers, and its rationale.
 * [`HARDWARE_BOM.md`](HARDWARE_BOM.md) — physical part for each

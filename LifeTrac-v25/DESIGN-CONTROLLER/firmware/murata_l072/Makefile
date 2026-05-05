@@ -38,8 +38,12 @@ SRCS := \
 	host/host_cmd.c \
 	host/host_stats.c \
 	host/host_uart.c \
+	radio/sx1276_airtime.c \
+	radio/sx1276_cad.c \
+	radio/sx1276_lbt.c \
 	radio/sx1276_modes.c \
 	radio/sx1276_rx.c \
+	radio/sx1276_tx.c \
 	radio/sx1276.c \
     include/static_asserts.c
 
@@ -92,7 +96,7 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner help
+.PHONY: all clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner help
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
 
@@ -175,6 +179,18 @@ check-cfg-wire-owner:
 check-rx-counter-owner:
 	@echo "[CI] Checking RX counter ownership ..."
 	@powershell -NoProfile -Command "$$hits = Select-String -Path 'radio/*.c','host/*.c','main.c' -Pattern 'host_stats_radio_rx_ok|host_stats_radio_crc_err' | Where-Object { ($$_.Path -replace '\\','/') -notlike '*/radio/sx1276_rx.c' -and ($$_.Path -replace '\\','/') -notlike '*/host/host_stats.c' }; if ($$hits) { Write-Output '[FAIL] RX counters must only be incremented in radio/sx1276_rx.c'; $$hits | ForEach-Object { Write-Output $$_.ToString() }; exit 1 }; Write-Output '[OK] RX counter ownership check passed'"
+
+check-tx-counter-owner:
+	@echo "[CI] Checking TX counter ownership ..."
+	@powershell -NoProfile -Command "$$hits = Select-String -Path 'radio/*.c','host/*.c','main.c' -Pattern 'host_stats_radio_tx_ok' | Where-Object { ($$_.Path -replace '\\','/') -notlike '*/radio/sx1276_tx.c' -and ($$_.Path -replace '\\','/') -notlike '*/host/host_stats.c' }; if ($$hits) { Write-Output '[FAIL] TX counters must only be incremented in radio/sx1276_tx.c'; $$hits | ForEach-Object { Write-Output $$_.ToString() }; exit 1 }; Write-Output '[OK] TX counter ownership check passed'"
+
+check-lbt-owner:
+	@echo "[CI] Checking LBT abort counter ownership ..."
+	@powershell -NoProfile -Command "$$hits = Select-String -Path 'radio/*.c','host/*.c','main.c' -Pattern 'host_stats_radio_tx_abort_lbt' | Where-Object { ($$_.Path -replace '\\','/') -notlike '*/radio/sx1276_lbt.c' -and ($$_.Path -replace '\\','/') -notlike '*/host/host_stats.c' }; if ($$hits) { Write-Output '[FAIL] LBT abort counter must only be incremented in radio/sx1276_lbt.c'; $$hits | ForEach-Object { Write-Output $$_.ToString() }; exit 1 }; Write-Output '[OK] LBT abort ownership check passed'"
+
+check-airtime-counter-owner:
+	@echo "[CI] Checking airtime abort counter ownership ..."
+	@powershell -NoProfile -Command "$$hits = Select-String -Path 'radio/*.c','host/*.c','main.c' -Pattern 'host_stats_radio_tx_abort_airtime' | Where-Object { ($$_.Path -replace '\\','/') -notlike '*/radio/sx1276_tx.c' -and ($$_.Path -replace '\\','/') -notlike '*/host/host_stats.c' }; if ($$hits) { Write-Output '[FAIL] Airtime abort counter must only be incremented in radio/sx1276_tx.c'; $$hits | ForEach-Object { Write-Output $$_.ToString() }; exit 1 }; Write-Output '[OK] Airtime abort ownership check passed'"
 else
 check-opmode-owner:
 	@echo "[CI] Checking OpMode ownership ..."
@@ -205,6 +221,36 @@ check-rx-counter-owner:
 		exit 1; \
 	fi; \
 	echo "[OK] RX counter ownership check passed"
+
+check-tx-counter-owner:
+	@echo "[CI] Checking TX counter ownership ..."
+	@hits=$$(grep -RIn "host_stats_radio_tx_ok" radio/ host/ main.c | grep -v "radio/sx1276_tx.c\|host/host_stats.c" || true); \
+	if [ -n "$$hits" ]; then \
+		echo "[FAIL] TX counters must only be incremented in radio/sx1276_tx.c"; \
+		echo "$$hits"; \
+		exit 1; \
+	fi; \
+	echo "[OK] TX counter ownership check passed"
+
+check-lbt-owner:
+	@echo "[CI] Checking LBT abort counter ownership ..."
+	@hits=$$(grep -RIn "host_stats_radio_tx_abort_lbt" radio/ host/ main.c | grep -v "radio/sx1276_lbt.c\|host/host_stats.c" || true); \
+	if [ -n "$$hits" ]; then \
+		echo "[FAIL] LBT abort counter must only be incremented in radio/sx1276_lbt.c"; \
+		echo "$$hits"; \
+		exit 1; \
+	fi; \
+	echo "[OK] LBT abort ownership check passed"
+
+check-airtime-counter-owner:
+	@echo "[CI] Checking airtime abort counter ownership ..."
+	@hits=$$(grep -RIn "host_stats_radio_tx_abort_airtime" radio/ host/ main.c | grep -v "radio/sx1276_tx.c\|host/host_stats.c" || true); \
+	if [ -n "$$hits" ]; then \
+		echo "[FAIL] Airtime abort counter must only be incremented in radio/sx1276_tx.c"; \
+		echo "$$hits"; \
+		exit 1; \
+	fi; \
+	echo "[OK] Airtime abort ownership check passed"
 endif
 
 check-cfg-contract: check-cfg-contract-unit check-cfg-contract-wire

@@ -1,5 +1,6 @@
 #include "sx1276_rx.h"
 
+#include "host_cmd.h"
 #include "host_stats.h"
 #include "platform.h"
 #include "sx1276.h"
@@ -27,6 +28,7 @@ bool sx1276_rx_arm(void) {
     }
 
     if ((sx1276_read_reg(SX1276_REG_MODEM_CONFIG2) & (1U << 2)) == 0U) {
+        host_cmd_emit_fault(HOST_FAULT_CODE_RX_CRC_DISABLED, 0U);
         (void)sx1276_modes_to_standby();
         return false;
     }

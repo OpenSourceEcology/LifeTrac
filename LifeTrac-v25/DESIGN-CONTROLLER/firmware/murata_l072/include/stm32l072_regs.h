@@ -15,14 +15,20 @@
 #define RCC_AHBENR                 MMIO32(RCC_BASE + 0x30UL)
 #define RCC_APB2ENR                MMIO32(RCC_BASE + 0x34UL)
 #define RCC_APB1ENR                MMIO32(RCC_BASE + 0x38UL)
+#define RCC_CSR                    MMIO32(RCC_BASE + 0x74UL)
 
 #define RCC_CR_HSION               (1UL << 8)
 #define RCC_CR_HSIRDY              (1UL << 10)
+#define RCC_CR_HSEON               (1UL << 16)
+#define RCC_CR_HSERDY              (1UL << 17)
+#define RCC_CR_HSEBYP              (1UL << 18)
 
 #define RCC_CFGR_SW_MASK           (3UL << 0)
 #define RCC_CFGR_SW_HSI16          (1UL << 0)
+#define RCC_CFGR_SW_HSE            (2UL << 0)
 #define RCC_CFGR_SWS_MASK          (3UL << 2)
 #define RCC_CFGR_SWS_HSI16         (1UL << 2)
+#define RCC_CFGR_SWS_HSE           (2UL << 2)
 
 #define RCC_IOPENR_GPIOAEN         (1UL << 0)
 #define RCC_IOPENR_GPIOBEN         (1UL << 1)
@@ -34,6 +40,16 @@
 #define RCC_APB2ENR_SPI1EN         (1UL << 12)
 
 #define RCC_APB1ENR_USART2EN       (1UL << 17)
+
+#define RCC_CSR_RMVF               (1UL << 23)
+#define RCC_CSR_FWRSTF             (1UL << 24)
+#define RCC_CSR_OBLRSTF            (1UL << 25)
+#define RCC_CSR_PINRSTF            (1UL << 26)
+#define RCC_CSR_PORRSTF            (1UL << 27)
+#define RCC_CSR_SFTRSTF            (1UL << 28)
+#define RCC_CSR_IWDGRSTF           (1UL << 29)
+#define RCC_CSR_WWDGRSTF           (1UL << 30)
+#define RCC_CSR_LPWRRSTF           (1UL << 31)
 
 /* GPIO */
 #define GPIOA_BASE                 0x50000000UL

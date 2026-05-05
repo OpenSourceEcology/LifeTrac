@@ -17,12 +17,16 @@
 #define CFG_KEY_REPLAY_WINDOW                0x0CU
 #define CFG_KEY_IWDG_WINDOW_MS               0x0DU
 #define CFG_KEY_CRYPTO_IN_L072               0x0EU
+/* 0x0F intentionally unused to preserve stable key numbering. */
+#define CFG_KEY_LBT_MAX_BACKOFF_MS           0x10U
+#define CFG_KEY_CAD_SYMBOLS                  0x11U
+#define CFG_KEY_FHSS_DWELL_MS                0x13U
 
 #define CFG_KEY_PROTOCOL_VERSION             0x80U
 #define CFG_KEY_WIRE_SCHEMA_VERSION          0x81U
 #define CFG_KEY_CFG_DIRTY                    0x82U
 
 #define CFG_KEY_MAX_VALUE_LEN                8U
-#define CFG_KEY_COUNT                        17U
+#define CFG_KEY_COUNT                        20U
 
 #endif /* LIFETRAC_MURATA_L072_HOST_CFG_KEYS_H */
