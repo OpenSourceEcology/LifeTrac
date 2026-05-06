@@ -18,6 +18,216 @@
 static bool s_radio_ok;
 static uint8_t s_radio_version;
 
+#if HOST_AT_SHELL_ENABLE
+static char at_upper(char ch) {
+    if (ch >= 'a' && ch <= 'z') {
+        return (char)(ch - ('a' - 'A'));
+    }
+
+    return ch;
+}
+
+static bool at_line_equals(const char *line, uint16_t len, const char *cmd) {
+    uint16_t start = 0U;
+    uint16_t end = len;
+    uint16_t idx = 0U;
+
+    while (start < end && (line[start] == ' ' || line[start] == '\t')) {
+        start++;
+    }
+
+    while (end > start && (line[end - 1U] == ' ' || line[end - 1U] == '\t')) {
+        end--;
+    }
+
+    while (cmd[idx] != '\0') {
+        if ((uint16_t)(start + idx) >= end) {
+            return false;
+        }
+
+        if (at_upper(line[start + idx]) != at_upper(cmd[idx])) {
+            return false;
+        }
+
+        idx++;
+    }
+
+    return (uint16_t)(start + idx) == end;
+}
+
+static void at_send_u32(uint32_t value) {
+    char buf[10];
+    uint8_t idx = 0U;
+
+    if (value == 0UL) {
+        host_uart_send_ascii("0");
+        return;
+    }
+
+    while (value != 0UL && idx < (uint8_t)sizeof(buf)) {
+        buf[idx++] = (char)('0' + (value % 10UL));
+        value /= 10UL;
+    }
+
+    while (idx > 0U) {
+        char out[2];
+        out[0] = buf[--idx];
+        out[1] = '\0';
+        host_uart_send_ascii(out);
+    }
+}
+
+static void at_send_hex_nibble(uint8_t value) {
+    char out[2];
+    value &= 0x0FU;
+    if (value < 10U) {
+        out[0] = (char)((uint8_t)'0' + value);
+    } else {
+        out[0] = (char)((uint8_t)'A' + (value - 10U));
+    }
+    out[1] = '\0';
+    host_uart_send_ascii(out);
+}
+
+static void at_send_hex_u8(uint8_t value) {
+    at_send_hex_nibble((uint8_t)(value >> 4));
+    at_send_hex_nibble(value);
+}
+
+static void at_send_hex_u32(uint32_t value) {
+    for (int8_t shift = 28; shift >= 0; shift = (int8_t)(shift - 4)) {
+        at_send_hex_nibble((uint8_t)(value >> (uint8_t)shift));
+    }
+}
+
+static uint32_t at_get_u32_le(const uint8_t *src, uint16_t offset) {
+    return (uint32_t)src[offset] |
+           ((uint32_t)src[offset + 1U] << 8) |
+           ((uint32_t)src[offset + 2U] << 16) |
+           ((uint32_t)src[offset + 3U] << 24);
+}
+
+static void at_send_key_u32(const char *key, uint32_t value) {
+    host_uart_send_ascii(key);
+    host_uart_send_ascii("=");
+    at_send_u32(value);
+}
+
+static void at_send_ok(void) {
+    host_uart_send_ascii("OK\r\n");
+}
+
+static void at_send_error(void) {
+    host_uart_send_ascii("ERROR\r\n");
+}
+
+static void at_send_version_triplet(void) {
+    at_send_u32(FW_VERSION_MAJOR);
+    host_uart_send_ascii(".");
+    at_send_u32(FW_VERSION_MINOR);
+    host_uart_send_ascii(".");
+    at_send_u32(FW_VERSION_PATCH);
+}
+
+static void at_handle_identity(void) {
+    host_uart_send_ascii(OSE_LIFETRACLORA_FW_NAME);
+    host_uart_send_ascii(" ");
+    at_send_version_triplet();
+    host_uart_send_ascii(" ");
+    host_uart_send_ascii(FW_GIT_SHA);
+    host_uart_send_ascii("\r\n");
+    at_send_ok();
+}
+
+static void at_handle_version(void) {
+    host_uart_send_ascii("FW=");
+    host_uart_send_ascii(OSE_LIFETRACLORA_FW_NAME);
+    host_uart_send_ascii(" VERSION=");
+    at_send_version_triplet();
+    host_uart_send_ascii(" GIT=");
+    host_uart_send_ascii(FW_GIT_SHA);
+    host_uart_send_ascii(" PROTO=");
+    at_send_u32(HOST_PROTOCOL_VER);
+    host_uart_send_ascii(" SCHEMA=");
+    at_send_u32(HOST_WIRE_SCHEMA_VER);
+    host_uart_send_ascii(" CAP=0x");
+    at_send_hex_u32(HOST_CAPABILITY_BITMAP);
+    host_uart_send_ascii("\r\n");
+    at_send_ok();
+}
+
+static bool at_take_stats(uint8_t *stats) {
+    return host_stats_serialize(stats, HOST_STATS_PAYLOAD_LEN) == HOST_STATS_PAYLOAD_LEN;
+}
+
+static void at_handle_radio(void) {
+    uint8_t stats[HOST_STATS_PAYLOAD_LEN];
+
+    if (!at_take_stats(stats)) {
+        at_send_error();
+        return;
+    }
+
+    host_uart_send_ascii("RADIO=");
+    host_uart_send_ascii(s_radio_ok ? "OK" : "FAIL");
+    host_uart_send_ascii(" VERSION=0x");
+    at_send_hex_u8(s_radio_version);
+    host_uart_send_ascii(" STATE=");
+    at_send_u32(at_get_u32_le(stats, HOST_STATS_OFFSET_RADIO_STATE));
+    host_uart_send_ascii("\r\n");
+    at_send_ok();
+}
+
+static void at_handle_stats(void) {
+    uint8_t stats[HOST_STATS_PAYLOAD_LEN];
+
+    if (!at_take_stats(stats)) {
+        at_send_error();
+        return;
+    }
+
+    at_send_key_u32("HOST_DROPPED", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_DROPPED));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("HOST_ERRORS", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_ERRORS));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("HOST_QUEUE_FULL", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_QUEUE_FULL));
+    host_uart_send_ascii("\r\n");
+
+    at_send_key_u32("HOST_IRQ_IDLE", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_IRQ_IDLE));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("HOST_IRQ_HT", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_IRQ_HT));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("HOST_IRQ_TC", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_IRQ_TC));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("HOST_IRQ_TE", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_IRQ_TE));
+    host_uart_send_ascii("\r\n");
+
+    at_send_key_u32("RADIO_DIO0", at_get_u32_le(stats, HOST_STATS_OFFSET_RADIO_DIO0));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("RADIO_DIO1", at_get_u32_le(stats, HOST_STATS_OFFSET_RADIO_DIO1));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("RADIO_DIO2", at_get_u32_le(stats, HOST_STATS_OFFSET_RADIO_DIO2));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("RADIO_DIO3", at_get_u32_le(stats, HOST_STATS_OFFSET_RADIO_DIO3));
+    host_uart_send_ascii("\r\n");
+
+    at_send_key_u32("RADIO_RX_OK", at_get_u32_le(stats, HOST_STATS_OFFSET_RADIO_RX_OK));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("RADIO_TX_OK", at_get_u32_le(stats, HOST_STATS_OFFSET_RADIO_TX_OK));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("RADIO_CRC_ERR", at_get_u32_le(stats, HOST_STATS_OFFSET_RADIO_CRC_ERR));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("STATE", at_get_u32_le(stats, HOST_STATS_OFFSET_RADIO_STATE));
+    host_uart_send_ascii("\r\n");
+    at_send_ok();
+}
+
+static void at_handle_help(void) {
+    host_uart_send_ascii("AT ATI AT+VER? AT+RADIO? AT+STAT? AT+HELP AT+BIN\r\n");
+    at_send_ok();
+}
+#endif
+
 static void put_u16_le(uint8_t *dst, uint16_t value) {
     dst[0] = (uint8_t)(value & 0xFFU);
     dst[1] = (uint8_t)((value >> 8) & 0xFFU);
@@ -483,6 +693,36 @@ void host_cmd_dispatch(const host_frame_t *frame) {
                                      frame->type);
             break;
     }
+}
+
+void host_cmd_dispatch_at_line(const char *line, uint16_t len) {
+#if HOST_AT_SHELL_ENABLE
+    if (line == NULL) {
+        return;
+    }
+
+    if (at_line_equals(line, len, "AT")) {
+        at_send_ok();
+    } else if (at_line_equals(line, len, "ATI")) {
+        at_handle_identity();
+    } else if (at_line_equals(line, len, "AT+VER?")) {
+        at_handle_version();
+    } else if (at_line_equals(line, len, "AT+RADIO?")) {
+        at_handle_radio();
+    } else if (at_line_equals(line, len, "AT+STAT?")) {
+        at_handle_stats();
+    } else if (at_line_equals(line, len, "AT+HELP") ||
+               at_line_equals(line, len, "AT+HELP?")) {
+        at_handle_help();
+    } else if (at_line_equals(line, len, "AT+BIN")) {
+        host_uart_send_ascii("OK BIN\r\n");
+    } else {
+        at_send_error();
+    }
+#else
+    (void)line;
+    (void)len;
+#endif
 }
 
 void host_cmd_on_radio_events(uint32_t radio_events) {

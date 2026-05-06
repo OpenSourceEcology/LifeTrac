@@ -1,4 +1,6 @@
 #include "host_uart.h"
+
+#include "host_cmd.h"
 #include "platform.h"
 #include "stm32l072_regs.h"
 
@@ -20,6 +22,16 @@ static uint8_t s_cobs_encoded[HOST_COBS_ENCODED_MAX];
 static uint16_t s_cobs_encoded_len;
 static uint8_t s_cobs_overflow;
 static volatile uint8_t s_service_in_progress;
+
+#if HOST_AT_SHELL_ENABLE
+_Static_assert(HOST_AT_LINE_MAX_LEN >= 8U,
+               "HOST_AT_LINE_MAX_LEN must fit the smallest AT command");
+
+static char s_at_line[HOST_AT_LINE_MAX_LEN];
+static uint16_t s_at_line_len;
+static uint8_t s_at_candidate;
+static uint8_t s_at_ignore_lf;
+#endif
 
 static host_frame_t s_frame_queue[HOST_FRAME_QUEUE_DEPTH];
 static volatile uint8_t s_q_head;
@@ -281,7 +293,7 @@ static void process_encoded_frame(void) {
     (void)queue_push(&frame);
 }
 
-static void ingest_rx_byte(uint8_t byte) {
+static void ingest_binary_byte(uint8_t byte) {
     if (s_cobs_overflow != 0U) {
         if (byte == 0U) {
             s_cobs_overflow = 0U;
@@ -306,6 +318,82 @@ static void ingest_rx_byte(uint8_t byte) {
     }
 
     s_cobs_encoded[s_cobs_encoded_len++] = byte;
+}
+
+#if HOST_AT_SHELL_ENABLE
+static bool at_is_printable(uint8_t byte) {
+    return byte >= 0x20U && byte <= 0x7EU;
+}
+
+static bool at_is_t(uint8_t byte) {
+    return byte == (uint8_t)'T' || byte == (uint8_t)'t';
+}
+
+static void at_reset_candidate(void) {
+    s_at_line_len = 0U;
+    s_at_candidate = 0U;
+}
+
+static void at_replay_candidate_to_binary(void) {
+    for (uint16_t i = 0U; i < s_at_line_len; ++i) {
+        ingest_binary_byte((uint8_t)s_at_line[i]);
+    }
+
+    at_reset_candidate();
+}
+
+static void at_finish_line(uint8_t terminator) {
+    s_at_line[s_at_line_len] = '\0';
+    host_cmd_dispatch_at_line(s_at_line, s_at_line_len);
+    at_reset_candidate();
+    s_at_ignore_lf = (terminator == (uint8_t)'\r') ? 1U : 0U;
+}
+#endif
+
+static void ingest_rx_byte(uint8_t byte) {
+#if HOST_AT_SHELL_ENABLE
+    if (s_at_ignore_lf != 0U) {
+        s_at_ignore_lf = 0U;
+        if (byte == (uint8_t)'\n') {
+            return;
+        }
+    }
+
+    if (s_at_candidate != 0U) {
+        if (byte == (uint8_t)'\r' || byte == (uint8_t)'\n') {
+            at_finish_line(byte);
+            return;
+        }
+
+        if (byte == 0U) {
+            at_replay_candidate_to_binary();
+            ingest_binary_byte(byte);
+            return;
+        }
+
+        if ((s_at_line_len == 1U && !at_is_t(byte)) ||
+            !at_is_printable(byte) ||
+            s_at_line_len >= (HOST_AT_LINE_MAX_LEN - 1U)) {
+            at_replay_candidate_to_binary();
+            ingest_binary_byte(byte);
+            return;
+        }
+
+        s_at_line[s_at_line_len++] = (char)byte;
+        return;
+    }
+
+    if (s_cobs_encoded_len == 0U &&
+        s_cobs_overflow == 0U &&
+        (byte == (uint8_t)'A' || byte == (uint8_t)'a')) {
+        s_at_line[0] = (char)byte;
+        s_at_line_len = 1U;
+        s_at_candidate = 1U;
+        return;
+    }
+#endif
+
+    ingest_binary_byte(byte);
 }
 
 static uint16_t dma_rx_write_idx_now(void) {
@@ -392,6 +480,11 @@ void host_uart_init(uint32_t baud) {
     s_cobs_encoded_len = 0U;
     s_cobs_overflow = 0U;
     s_service_in_progress = 0U;
+#if HOST_AT_SHELL_ENABLE
+    s_at_line_len = 0U;
+    s_at_candidate = 0U;
+    s_at_ignore_lf = 0U;
+#endif
     host_uart_stats_reset();
 
     dma_rx_start();
@@ -464,6 +557,15 @@ void host_uart_send_urc(uint8_t type,
     inner[idx++] = (uint8_t)((crc >> 8) & 0xFFU);
 
     send_inner_frame(inner, idx);
+}
+
+void host_uart_send_ascii(const char *text) {
+    if (text == NULL) {
+        s_stats_errors++;
+        return;
+    }
+
+    usart2_write_bytes((const uint8_t *)text, (uint16_t)strlen(text));
 }
 
 void host_uart_send_err_proto(uint16_t seq,

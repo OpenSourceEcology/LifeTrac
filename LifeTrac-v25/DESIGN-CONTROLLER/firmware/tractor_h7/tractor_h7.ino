@@ -29,6 +29,10 @@
 #define LIFETRAC_MH_SOFT_BRIDGE 0
 #endif
 
+#ifndef LIFETRAC_MH_SOFT_BRIDGE_HEARTBEAT_MS
+#define LIFETRAC_MH_SOFT_BRIDGE_HEARTBEAT_MS 0
+#endif
+
 #if !LIFETRAC_METHOD_G_HOST_BUILD
 #include <RadioLib.h>
 #include <ArduinoRS485.h>
@@ -1888,6 +1892,14 @@ void setup() {
 void loop() {
 #if LIFETRAC_METHOD_G_HOST_BUILD
 #if (LIFETRAC_MH_SOFT_BRIDGE)
+#if (LIFETRAC_MH_SOFT_BRIDGE_HEARTBEAT_MS > 0)
+    static uint32_t next_hb_ms = 0;
+    const uint32_t now_ms = millis();
+    if ((int32_t)(now_ms - next_hb_ms) >= 0) {
+        next_hb_ms = now_ms + (uint32_t)LIFETRAC_MH_SOFT_BRIDGE_HEARTBEAT_MS;
+        LIFETRAC_MH_BRIDGE_DEBUG_SERIAL.println("MH_SOFT_BRIDGE_HB");
+    }
+#endif
     mh_soft_bridge_pump();
 #else
     mh_runtime_loop(millis());

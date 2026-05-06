@@ -1,8 +1,8 @@
 # `murata_l072/` — Custom firmware for the Murata `CMWX1ZZABZ-078` SiP
 
-**Status:** Increment 1 complete. Startup, BOOT safe-mode listener, UART2 DMA-on-IDLE host transport, and a minimal SX1276 SPI register driver are now implemented.
+**Status:** Increment 1 complete. Startup, BOOT safe-mode listener, UART2 DMA-on-IDLE host transport, a compile-gated AT service shell, and a minimal SX1276 SPI register driver are now implemented.
 
-**Design docs:** [../../DESIGN-CONTROLLER/DESIGN-LORAFIRMWARE/](../../DESIGN-LORAFIRMWARE/) (00–05)
+**Design docs:** [../../DESIGN-CONTROLLER/DESIGN-LORAFIRMWARE/](../../DESIGN-LORAFIRMWARE/) (00–06)
 
 **Target:** STM32L072CZ inside the Murata SiP — 192 KB Flash, 20 KB RAM, Cortex-M0+ @ 32 MHz.
 
@@ -19,7 +19,7 @@
 | [startup.c](startup.c) | Vector table, reset handler, `.data` copy, `.bss` clear, and default IRQ handlers in the BOOT region. |
 | [boot/safe_mode.c](boot/safe_mode.c) | Implemented N-22 listener with compile-time magic sequence over baud sweep and ROM bootloader jump. |
 | [hal/platform.c](hal/platform.c) | HSI16 clock switch, SysTick millisecond timebase, delay helper, IRQ enable helper, and software reset primitive. |
-| [host/host_uart.c](host/host_uart.c) | UART2 DMA circular RX + IDLE ISR servicing, COBS decode/encode, CRC16 checks, and parsed frame queue. |
+| [host/host_uart.c](host/host_uart.c) | UART2 DMA circular RX + IDLE ISR servicing, AT line recognition, COBS decode/encode, CRC16 checks, and parsed frame queue. |
 | [radio/sx1276.c](radio/sx1276.c) | SPI1 register access, basic LoRa modem setup, DIO EXTI wiring, and IRQ event collection. |
 | [main.c](main.c) | Bring-up sequence plus minimal host command handling (ping, version, SX1276 reg read/write). |
 | [config.h](config.h) | Build-time feature flags. |

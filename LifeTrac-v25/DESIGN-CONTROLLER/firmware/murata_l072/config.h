@@ -54,6 +54,12 @@
 #define HOST_ALLOW_REG_WRITE_DIAG     1
 #define HOST_EMIT_RADIO_IRQ_DEBUG_URC 1
 #define HOST_DEBUG_OPMODE_GUARD       0
+#ifndef HOST_AT_SHELL_ENABLE
+#define HOST_AT_SHELL_ENABLE          1
+#endif
+#ifndef HOST_AT_LINE_MAX_LEN
+#define HOST_AT_LINE_MAX_LEN          96U
+#endif
 
 /* ------------------------------------------------------------------------ */
 /* Watchdog (N-20). Initial window per Claude review §5.5: 500 ms during    */

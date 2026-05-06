@@ -27,6 +27,8 @@ This folder holds the **design, analysis, and bring-up plans** for that firmware
 | 02 | [Firmware Architecture Plan](02_Firmware_Architecture_Plan.md) | Project structure, fork point, module breakdown, RAM/Flash budget, build & toolchain. |
 | 03 | [Bring-up Roadmap](03_Bringup_Roadmap.md) | Phased, no-deadline plan from "today" to "v25 LoRa fully on custom firmware." |
 | 04 | [Hardware Interface & Recovery](04_Hardware_Interface_and_Recovery.md) | UART transport spec (H7 ↔ L072), BOOT0/NRST control, brick-recovery design, golden-binary policy. |
+| 05 | [Method G Review Findings and Code Suggestions](05_Method_G_Review_Findings_and_Code_Suggestions_GPT-5.3-Codex_v1_0.md) | External review findings and follow-up code suggestions. |
+| 06 | [AT Service Shell Debug Control Plane](06_AT_Service_Shell_Debug_Control_Plane.md) | Compile-gated AT-style bench/debug command surface alongside the binary host protocol. |
 
 ---
 

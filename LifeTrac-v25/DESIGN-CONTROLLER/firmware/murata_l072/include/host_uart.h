@@ -37,6 +37,7 @@ void host_uart_send_urc(uint8_t type,
                         uint8_t flags,
                         const uint8_t *payload,
                         uint16_t payload_len);
+void host_uart_send_ascii(const char *text);
 void host_uart_send_err_proto(uint16_t seq,
                               uint8_t offending_type,
                               uint8_t offending_ver,
