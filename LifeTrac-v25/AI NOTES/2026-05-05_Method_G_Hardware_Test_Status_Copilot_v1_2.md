@@ -90,3 +90,19 @@ What remains open:
 1. Perform targeted active probe on the selected route (known payload marker + endpoint monitor) with command forms compatible with target userspace tools.
 2. If Linux endpoint visibility remains zero, switch to external `UART_SNIFF`/logic analyzer route-proof capture.
 3. Once route bytes are visible, archive BOOT/VER evidence for both boards under `bench-evidence` and issue updated readiness verdict.
+
+## 8. Diagnosis & Architectural Assessment (Gemini 3.1 Pro)
+
+**Diagnosis Date:** 2026-05-05
+
+The reason the Linux endpoints (`/dev/ttymxcX`) are returning 0 bytes while `Serial2` successfully compiles and links on the M7 is due to the fundamental architecture of the Portenta X8 and the Max Carrier.
+
+### Physical MUX and Routing Separation
+1.  **The M7 "Shim" Isolation:** The shim added (`arduino::HardwareSerial Serial2(PD_4, PD_3);` or `PA_15`/`PF_6`) successfully instantiates the UART peripheral inside the **STM32H747 (M7/M4)**. The STM32 begins pumping bytes out of those physical pins onto the high-density connector.
+2.  **The Linux Endpoint Disconnect:** `/dev/ttymxc1`, `ttymxc2`, and `ttymxc3` are the Linux device tree endpoints mapping to the UART peripherals inside the **i.MX8M Mini**.
+3.  **The Carrier Route:** The Max Carrier schematic dictates that the Murata LoRa module's UART lines are routed via physical trace to specific pins. When the STM32H747 drives `Serial2`, it is talking *directly* over those traces on the carrier board to the Murata module. The i.MX8M Mini (Linux) is structurally bypassed on this physical bus. Therefore, listening to `/dev/ttymxcX` on Linux will result in absolute silence because the Linux SoC is not electrically tapped into the STM32 ↔ Murata bus.
+
+### The Correct Way to Prove Route Observability
+Because the M7 handles this traffic directly in hardware, Linux cannot sniff it natively. You must proceed with Action 7.2:
+
+*   **Use the Logic Analyzer / Serial Bridge:** Hook up a physical logic analyzer, an FTDI USB-to-Serial debug cable, or rely on the Max Carrier's onboard `UART_SNIFF1..5` (via the STM32F405 debugger IC) to actually read the bytes traversing the physical PCB traces between the Portenta HD connector and the Murata SiP.

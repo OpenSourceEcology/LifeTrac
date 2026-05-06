@@ -25,6 +25,10 @@
 #define LIFETRAC_METHOD_G_HOST_BUILD 0
 #endif
 
+#ifndef LIFETRAC_MH_SOFT_BRIDGE
+#define LIFETRAC_MH_SOFT_BRIDGE 0
+#endif
+
 #if !LIFETRAC_METHOD_G_HOST_BUILD
 #include <RadioLib.h>
 #include <ArduinoRS485.h>
@@ -42,9 +46,26 @@
 #error "LIFETRAC_MH_SERIAL must name a HardwareSerial instance when LIFETRAC_USE_METHOD_G_HOST=1"
 #endif
 #ifndef LIFETRAC_MH_BENCH_LOG
+#if LIFETRAC_MH_SOFT_BRIDGE
+#define LIFETRAC_MH_BENCH_LOG 0
+#else
 #define LIFETRAC_MH_BENCH_LOG 1
 #endif
+#endif
 #include "murata_host/mh_runtime.h"
+#endif
+
+#if LIFETRAC_METHOD_G_HOST_BUILD && (LIFETRAC_MH_SOFT_BRIDGE)
+#if defined(ARDUINO_PORTENTA_X8)
+#include <SerialRPC.h>
+#ifndef LIFETRAC_MH_BRIDGE_DEBUG_SERIAL
+#define LIFETRAC_MH_BRIDGE_DEBUG_SERIAL SerialRPC
+#endif
+#else
+#ifndef LIFETRAC_MH_BRIDGE_DEBUG_SERIAL
+#define LIFETRAC_MH_BRIDGE_DEBUG_SERIAL Serial
+#endif
+#endif
 #endif
 
 // Stock PORTENTA_X8 core exposes only Serial1 (SERIAL_HOWMANY=1), but Method G
@@ -69,7 +90,7 @@ arduino::UART _UART2_(SERIAL2_TX, SERIAL2_RX, SERIAL2_RTS, SERIAL2_CTS);
 // X8 compatibility: the portenta_x8 SDK replaces `Serial` with an ErrorSerialClass
 // that requires the SerialRPC library. Redirect all debug output to a no-op sink
 // so the same source compiles for both portenta_x8 and envie_m7/portenta_h7_m7.
-#if defined(ARDUINO_PORTENTA_X8) || defined(LIFETRAC_X8_NO_USB_SERIAL)
+#if (defined(ARDUINO_PORTENTA_X8) || defined(LIFETRAC_X8_NO_USB_SERIAL)) && !(LIFETRAC_METHOD_G_HOST_BUILD && (LIFETRAC_MH_SOFT_BRIDGE))
 namespace { struct _NullSerial {
     void begin(unsigned long) {}
     template<typename T> size_t print(T)   { return 0; }
@@ -77,6 +98,26 @@ namespace { struct _NullSerial {
     size_t println() { return 0; }
 } _nullSerial; }
 #define Serial _nullSerial
+#endif
+
+#if LIFETRAC_METHOD_G_HOST_BUILD && (LIFETRAC_MH_SOFT_BRIDGE)
+static void mh_soft_bridge_pump() {
+    while (LIFETRAC_MH_SERIAL.available() > 0) {
+        int value = LIFETRAC_MH_SERIAL.read();
+        if (value < 0) {
+            break;
+        }
+        LIFETRAC_MH_BRIDGE_DEBUG_SERIAL.write((uint8_t)value);
+    }
+
+    while (LIFETRAC_MH_BRIDGE_DEBUG_SERIAL.available() > 0) {
+        int value = LIFETRAC_MH_BRIDGE_DEBUG_SERIAL.read();
+        if (value < 0) {
+            break;
+        }
+        LIFETRAC_MH_SERIAL.write((uint8_t)value);
+    }
+}
 #endif
 
 #if LIFETRAC_METHOD_G_HOST_BUILD && defined(LIFETRAC_MH_BENCH_LOG) && (LIFETRAC_MH_BENCH_LOG)
@@ -1760,6 +1801,12 @@ static void poll_link_ladder() {
 // ---------- Arduino entry points ----------
 void setup() {
 #if LIFETRAC_METHOD_G_HOST_BUILD
+#if (LIFETRAC_MH_SOFT_BRIDGE)
+    LIFETRAC_MH_BRIDGE_DEBUG_SERIAL.begin(115200);
+    LIFETRAC_MH_SERIAL.begin(921600U);
+    LIFETRAC_MH_BRIDGE_DEBUG_SERIAL.println("MH_SOFT_BRIDGE ready; forwarding Serial<->LIFETRAC_MH_SERIAL");
+    return;
+#else
 #if defined(LIFETRAC_MH_BENCH_LOG) && (LIFETRAC_MH_BENCH_LOG)
     Serial.begin(115200);
 #endif
@@ -1772,6 +1819,7 @@ void setup() {
     mh_runtime_set_log_sink(mh_bench_log_sink, nullptr);
 #endif
     return;
+#endif
 #else
     boot_trace_mark(1);
     Serial.begin(115200);
@@ -1839,7 +1887,11 @@ void setup() {
 
 void loop() {
 #if LIFETRAC_METHOD_G_HOST_BUILD
+#if (LIFETRAC_MH_SOFT_BRIDGE)
+    mh_soft_bridge_pump();
+#else
     mh_runtime_loop(millis());
+#endif
     return;
 #else
     static uint32_t next_arb = 0;
