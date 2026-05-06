@@ -26,6 +26,18 @@ TARGET   := firmware
 BUILD    := build
 
 # --------------------------------------------------------------------------
+# Host shell portability helpers
+# --------------------------------------------------------------------------
+ifeq ($(OS),Windows_NT)
+path_native = $(subst /,\,$1)
+MKDIR_P = if not exist "$(call path_native,$1)" mkdir "$(call path_native,$1)"
+RM_RF = if exist "$(call path_native,$1)" rmdir /S /Q "$(call path_native,$1)"
+else
+MKDIR_P = mkdir -p "$1"
+RM_RF = rm -rf "$1"
+endif
+
+# --------------------------------------------------------------------------
 # Sources (skeleton stage — extended in Phase 1)
 # --------------------------------------------------------------------------
 SRCS := \
@@ -83,15 +95,23 @@ CFLAGS := \
 LD_SRC      := ld/stm32l072cz_flash.ld
 LD_GEN      := $(BUILD)/$(TARGET).ld
 
+# Older arm-none-eabi ld (such as Arduino's 7-2017q4 toolchain) does not
+# support --no-warn-rwx-segments. Enable this explicitly only on toolchains
+# that support it.
+LD_NO_WARN_RWX ?= 0
+ifeq ($(LD_NO_WARN_RWX),1)
+LDFLAG_NO_WARN_RWX := -Wl,--no-warn-rwx-segments
+endif
+
 LDFLAGS := \
-    $(MCU_FLAGS) \
-    -T$(LD_GEN) \
-    -nostartfiles \
-    -Wl,--gc-sections \
-    -Wl,--no-warn-rwx-segments \
-    -Wl,-Map=$(BUILD)/$(TARGET).map \
-    -specs=nano.specs \
-    -specs=nosys.specs
+	$(MCU_FLAGS) \
+	-T$(LD_GEN) \
+	-nostartfiles \
+	-Wl,--gc-sections \
+	$(LDFLAG_NO_WARN_RWX) \
+	-Wl,-Map=$(BUILD)/$(TARGET).map \
+	-specs=nano.specs \
+	-specs=nosys.specs
 
 # --------------------------------------------------------------------------
 # Targets
@@ -110,12 +130,12 @@ help:
 # Generated linker script — runs the C preprocessor on the .ld template
 # so MM_* constants from include/memory_map.h expand inline.
 $(LD_GEN): $(LD_SRC) include/memory_map.h | $(BUILD)
-	@mkdir -p $(dir $@)
+	@$(call MKDIR_P,$(dir $@))
 	$(CPP) -P -nostdinc -undef -Iinclude -x c $< -o $@
 
 # Object compilation
 $(BUILD)/%.o: %.c | $(BUILD)
-	@mkdir -p $(dir $@)
+	@$(call MKDIR_P,$(dir $@))
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Link
@@ -277,9 +297,9 @@ check-cfg-contract-wire: $(BUILD)
 	@$(CFG_WIRE_BIN)
 
 $(BUILD):
-	@mkdir -p $(BUILD)
+	@$(call MKDIR_P,$(BUILD))
 
 clean:
-	rm -rf $(BUILD)
+	@$(call RM_RF,$(BUILD))
 
 -include $(DEPS)

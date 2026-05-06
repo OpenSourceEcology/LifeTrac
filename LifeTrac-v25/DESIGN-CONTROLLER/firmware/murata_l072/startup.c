@@ -36,10 +36,15 @@ void __attribute__((section(".boot_text"), noreturn)) NMI_Handler(void) {
 
 void __attribute__((section(".boot_text"), naked)) HardFault_Handler(void) {
     __asm__ volatile (
-        "tst lr, #4\n"
-        "ite eq\n"
-        "mrseq r0, msp\n"
-        "mrsne r0, psp\n"
+        "movs r1, #4\n"
+        "mov r2, lr\n"
+        "tst r2, r1\n"
+        "bne 1f\n"
+        "mrs r0, msp\n"
+        "b 2f\n"
+        "1:\n"
+        "mrs r0, psp\n"
+        "2:\n"
         "b HardFault_Handler_C\n"
     );
 }

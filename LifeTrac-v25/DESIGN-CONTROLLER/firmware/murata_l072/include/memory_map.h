@@ -26,12 +26,12 @@
 /* Chip totals — STM32L072CZ                                                */
 /* ------------------------------------------------------------------------ */
 
-#define MM_FLASH_BASE          0x08000000UL
-#define MM_FLASH_SIZE          (192UL * 1024UL)     /* 0x30000 */
+#define MM_FLASH_BASE          0x08000000
+#define MM_FLASH_SIZE          (192 * 1024)     /* 0x30000 */
 #define MM_FLASH_END           (MM_FLASH_BASE + MM_FLASH_SIZE)
 
-#define MM_RAM_BASE            0x20000000UL
-#define MM_RAM_SIZE            (20UL * 1024UL)      /* 0x5000  */
+#define MM_RAM_BASE            0x20000000
+#define MM_RAM_SIZE            (20 * 1024)      /* 0x5000  */
 #define MM_RAM_END             (MM_RAM_BASE + MM_RAM_SIZE)
 
 /*
@@ -44,8 +44,8 @@
  *   (c) ST documents 4 KB as a safe granularity for option-byte and
  *       calibration storage.
  */
-#define MM_FLASH_PAGE_SIZE     128UL
-#define MM_REGION_ALIGN        (4UL * 1024UL)       /* 0x1000 */
+#define MM_FLASH_PAGE_SIZE     128
+#define MM_REGION_ALIGN        (4 * 1024)       /* 0x1000 */
 
 /* ------------------------------------------------------------------------ */
 /* Launch (single-slot) Flash layout                                        */
@@ -57,13 +57,13 @@
 /* ------------------------------------------------------------------------ */
 
 #define MM_BOOT_BASE           MM_FLASH_BASE
-#define MM_BOOT_SIZE           (4UL * 1024UL)       /* 0x01000 */
+#define MM_BOOT_SIZE           (4 * 1024)       /* 0x01000 */
 
 #define MM_APP_BASE            (MM_BOOT_BASE + MM_BOOT_SIZE)
-#define MM_APP_SIZE            (180UL * 1024UL)     /* 0x2D000 */
+#define MM_APP_SIZE            (180 * 1024)     /* 0x2D000 */
 
 #define MM_CFG_BASE            (MM_APP_BASE + MM_APP_SIZE)
-#define MM_CFG_SIZE            (8UL * 1024UL)       /* 0x02000 */
+#define MM_CFG_SIZE            (8 * 1024)       /* 0x02000 */
 
 /* ------------------------------------------------------------------------ */
 /* Future A/B slot layout (Phase 6 / N-26) — DO NOT consume in Phase 1.     */
@@ -73,10 +73,10 @@
 /* ------------------------------------------------------------------------ */
 
 #define MM_FUTURE_SLOT_A_BASE  MM_APP_BASE
-#define MM_FUTURE_SLOT_A_SIZE  (88UL * 1024UL)      /* 0x16000 */
+#define MM_FUTURE_SLOT_A_SIZE  (88 * 1024)      /* 0x16000 */
 
 #define MM_FUTURE_SLOT_B_BASE  (MM_FUTURE_SLOT_A_BASE + MM_FUTURE_SLOT_A_SIZE)
-#define MM_FUTURE_SLOT_B_SIZE  (88UL * 1024UL)      /* 0x16000 */
+#define MM_FUTURE_SLOT_B_SIZE  (88 * 1024)      /* 0x16000 */
 
 /* MM_APP_SIZE - (2 * MM_FUTURE_SLOT_*_SIZE) = 4 KB unused gap.  When N-26  */
 /* lands, that gap moves into either slot or into an enlarged CFG region —  */
@@ -94,20 +94,20 @@
 /* via a static_assert that the runtime free area still leaves margin.      */
 /* ------------------------------------------------------------------------ */
 
-#define MM_STACK_SIZE          (2560UL)             /* 2.5 KB; Claude rev §2.3 */
+#define MM_STACK_SIZE          (2560)             /* 2.5 KB; Claude rev §2.3 */
 #define MM_STACK_TOP           MM_RAM_END
 #define MM_STACK_BASE          (MM_RAM_END - MM_STACK_SIZE)
 
 /* Minimum free heap/.bss headroom we want left after stack reservation.    */
 /* Tripping this is a "the firmware grew too much" early-warning signal     */
 /* rather than a chip-capacity error.                                       */
-#define MM_RAM_HEADROOM_MIN    (4UL * 1024UL)
+#define MM_RAM_HEADROOM_MIN    (4 * 1024)
 
 /* ------------------------------------------------------------------------ */
 /* STM32 system memory (ROM bootloader entry point) — used by safe_mode.c   */
 /* See AN2606. The L0-series bootloader lives at 0x1FF00000.                */
 /* ------------------------------------------------------------------------ */
 
-#define MM_SYSMEM_BASE         0x1FF00000UL
+#define MM_SYSMEM_BASE         0x1FF00000
 
 #endif /* LIFETRAC_MURATA_L072_MEMORY_MAP_H */

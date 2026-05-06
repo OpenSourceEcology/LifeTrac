@@ -72,6 +72,14 @@ SECTIONS
         . = ALIGN(4);
     } > BOOT
 
+    .boot_rodata :
+    {
+        . = ALIGN(4);
+        KEEP(*(.boot_rodata))
+        KEEP(*(.boot_rodata.*))
+        . = ALIGN(4);
+    } > BOOT
+
     /* Application code, read-only data, and exception unwind tables go in
      * the APP region. Phase 6 splits this into Slot A + Slot B; until then
      * the whole APP region is one slot. */

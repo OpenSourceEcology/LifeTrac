@@ -18,13 +18,13 @@
 #define SAFE_MODE_BAUD_COUNT         3U
 #define SAFE_MODE_SLOT_MS            (MM_SAFE_MODE_WINDOW_MS / SAFE_MODE_BAUD_COUNT)
 
-static const uint32_t kSafeModeBauds[SAFE_MODE_BAUD_COUNT] __attribute__((section(".boot_text"))) = {
+static const uint32_t kSafeModeBauds[SAFE_MODE_BAUD_COUNT] __attribute__((section(".boot_rodata"))) = {
     921600UL,
     115200UL,
     9600UL
 };
 
-static const uint8_t kSafeModeMagic[8] __attribute__((section(".boot_text"))) = {
+static const uint8_t kSafeModeMagic[8] __attribute__((section(".boot_rodata"))) = {
     0xA5, 0x5A, 0xA5, 0x5A, 0x5A, 0xA5, 0x5A, 0xA5
 };
 

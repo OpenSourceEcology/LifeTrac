@@ -1,6 +1,8 @@
 #include "platform.h"
 #include "stm32l072_regs.h"
 
+#include <stddef.h>
+
 #define PLATFORM_FAULT_MAGIC        0xFA075DECUL
 #define PLATFORM_HSE_READY_TIMEOUT   800000UL
 
