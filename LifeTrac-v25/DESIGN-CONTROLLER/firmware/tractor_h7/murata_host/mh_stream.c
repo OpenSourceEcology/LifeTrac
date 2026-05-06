@@ -222,6 +222,30 @@ bool mh_stream_send_ping_req(mh_stream_t *stream,
     return true;
 }
 
+bool mh_stream_send_ver_req(mh_stream_t *stream,
+                            uint16_t *out_seq) {
+    uint16_t seq;
+
+    if (stream == NULL) {
+        return false;
+    }
+
+    seq = alloc_seq(stream);
+    if (!stream_send_inner(stream,
+                           HOST_TYPE_VER_REQ,
+                           0U,
+                           seq,
+                           NULL,
+                           0U)) {
+        return false;
+    }
+
+    if (out_seq != NULL) {
+        *out_seq = seq;
+    }
+    return true;
+}
+
 bool mh_stream_send_cfg_get_req(mh_stream_t *stream,
                                 uint8_t key,
                                 uint16_t *out_seq) {

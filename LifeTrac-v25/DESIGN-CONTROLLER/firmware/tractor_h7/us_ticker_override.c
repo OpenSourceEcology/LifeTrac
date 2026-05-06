@@ -5,7 +5,13 @@
  * The archive us_ticker.o spins in init_32bit_timer() because it waits for a
  * CM4 HSEM core-id value (0x80000100) while the M7 hardware returns 0x80000300.
  * This implementation drives TIM2 directly as a 1 MHz 32-bit ticker.
+ *
+ * GATE: this override is for legacy X8/libmbed combinations only. Current
+ * stock mbed_portenta X8 cores already export us_ticker_* symbols, so this
+ * file must be opt-in to avoid duplicate-symbol link failures.
  */
+
+#if defined(LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES) && (LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES)
 
 #include <stdint.h>
 
@@ -155,3 +161,5 @@ const ticker_info_t *us_ticker_get_info(void)
 {
     return &us_ticker_info_tim2;
 }
+
+#endif /* LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES */

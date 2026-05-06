@@ -1,5 +1,7 @@
 #include "mh_uart.h"
 
+#if !defined(ARDUINO)
+
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -264,3 +266,5 @@ bool mh_uart_tcp_init(mh_uart_if_t *out_iface,
 
     return true;
 }
+
+#endif /* !ARDUINO */

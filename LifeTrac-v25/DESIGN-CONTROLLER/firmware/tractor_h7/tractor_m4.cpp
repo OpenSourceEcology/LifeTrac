@@ -29,7 +29,7 @@
 // packages/arduino/hardware/mbed_portenta/<ver>/boards.txt — the M4 entry
 // adds ``-DCORE_CM4`` to ``build.extra_flags``). The CI workflow has a
 // dedicated ``firmware-compile-tractor-m4`` job that builds for that FQBN.
-#if defined(CORE_CM4)
+#if defined(CORE_CM4) && !defined(ARDUINO_PORTENTA_X8)
 
 #include "Arduino.h"
 #include "mbed.h"
@@ -148,4 +148,4 @@ void loop() {
     delay(20);
 }
 
-#endif  // CORE_CM4
+#endif  // CORE_CM4 && !ARDUINO_PORTENTA_X8

@@ -209,14 +209,50 @@ dispatch transcript always names the fleet shape it was scoped to.
 The tractor M7 sketch supports two mutually exclusive radio-integration paths:
 
 * **Legacy onboard RadioLib path (default):** no extra defines.
-* **Method G host path:** define both compile-time flags:
+* **Method G host path:** define both compile-time flags. This path does **not**
+  use H7-side RadioLib; the H7 talks only to the custom Murata L072 firmware over
+  the Method G UART host protocol, and the L072 firmware owns SX1276 control.
 
   * `LIFETRAC_USE_METHOD_G_HOST=1`
-  * `LIFETRAC_MH_SERIAL=<HardwareSerial instance>` (for CI this is `Serial1`)
+  * `LIFETRAC_MH_SERIAL=<HardwareSerial instance>` (CI uses `Serial1` as a token because there is no real hardware to contend with; on Max Carrier hardware see `firmware/murata_l072/BRINGUP_MAX_CARRIER.md` §1.1 — the bench candidates are `Serial2`/`Serial4`/`Serial5`, and `Serial1` MUST NOT be used because it is consumed by the X8↔H747 link in `tractor_h7.ino`).
+
+### 10.1 X8 low-level override gates
+
+The production tractor-node target is **Portenta X8 (ABX00049) + Max Carrier**
+per [`BUILD-CONTROLLER/01_bill_of_materials.md`](../BUILD-CONTROLLER/01_bill_of_materials.md).
+The `tractor_h7/` sketch name refers to the X8's onboard STM32H747 co-MCU, not
+a standalone Portenta H7 board.
+
+The sketch still carries low-level X8 override translation units that were used
+for older or locally patched Portenta X8 core experiments:
+
+* `lp_ticker_override.c` — `lp_ticker_*`, `HAL_GetREVID`, `HAL_GetDEVID`
+* `us_ticker_override.c` — `us_ticker_*`
+* `sysclock_x8.c` — `SetSysClock`, `SystemCoreClockUpdate`
+* `software_init_hook` (in `tractor_h7.ino`)
+
+These overrides are now **opt-in only**. Current stock `arduino:mbed_portenta`
+X8 cores already provide these symbols, so enabling the overrides against that
+core causes duplicate-symbol link failures.
+
+* `LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES=1` enables `lp_ticker_override.c`,
+  `us_ticker_override.c`, `sysclock_x8.c`, and `software_init_hook`.
+* `LIFETRAC_X8_NO_USB_SERIAL=1` enables the optional `get_usb_phy()` override
+  in `x8_no_usb_main.cpp`.
+* `ARDUINO_PORTENTA_X8` identifies the X8 FQBN, but it does **not** enable the
+  legacy overrides by itself.
+
+Do not enable the legacy overrides unless the exact core package under test is
+known to need them. The standard Gate 1 preflight for
+`arduino:mbed_portenta:portenta_x8` runs with these overrides off.
+
+Method G bench diagnostics are compiled in by default and emit decoded URC
+summaries when the sketch installs its USB `Serial` log sink. Define
+`LIFETRAC_MH_BENCH_LOG=0` only for a size-constrained production build.
 
 When Method G is enabled, `tractor_h7.ino` routes `setup()` + `loop()` through
-`murata_host/mh_runtime` and compiles out the legacy execution path from those
-entry points. Do not set `LIFETRAC_USE_METHOD_G_HOST` without also defining
+`murata_host/mh_runtime` and compiles out the legacy RadioLib/RS-485/Modbus
+sketch body. Do not set `LIFETRAC_USE_METHOD_G_HOST` without also defining
 `LIFETRAC_MH_SERIAL`.
 
 ---

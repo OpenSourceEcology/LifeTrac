@@ -1,0 +1,38 @@
+﻿=== Gate 1 Compile Preflight (X8 FQBN) ===
+Date: 2026-05-05 19:30:57 -05:00
+CLI: c:/Users/dorkm/AppData/Local/Programs/ArduinoCLI/arduino-cli.exe
+Sketch: c:/Users/dorkm/Documents/GitHub/LifeTrac/LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7
+
+CLI Version:
+arduino-cli  Version: 1.4.1 Commit: e39419312 Date: 2026-01-19T16:12:56Z
+
+Installed cores:
+ID                    Installed Latest Name
+arduino:avr           1.8.7     1.8.7  Arduino AVR Boards
+arduino:mbed_opta     4.5.0     4.5.0  Arduino Mbed OS Opta Boards
+arduino:mbed_portenta 4.5.0     4.5.0  Arduino Mbed OS Portenta Boards
+
+
+Relevant boards:
+Arduino Portenta H7              arduino:mbed_portenta:envie_m7
+Arduino Portenta X8              arduino:mbed_portenta:portenta_x8
+
+=== Case: x8-default ===
+Args: compile --clean --jobs 1 --build-path "C:\Users\dorkm\AppData\Local\Temp\lifetrac_gate1_preflight\x8-default" --fqbn arduino:mbed_portenta:portenta_x8 --build-property "compiler.cpp.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO" --build-property "compiler.c.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO" "c:/Users/dorkm/Documents/GitHub/LifeTrac/LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7"
+ExitCode: 0
+--- stdout ---
+--- stderr ---
+
+=== Case: x8-methodg-serial1 ===
+Args: compile --clean --jobs 1 --build-path "C:\Users\dorkm\AppData\Local\Temp\lifetrac_gate1_preflight\x8-methodg-serial1" --fqbn arduino:mbed_portenta:portenta_x8 --build-property "compiler.cpp.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO -DLIFETRAC_USE_METHOD_G_HOST=1 -DLIFETRAC_MH_SERIAL=Serial1" --build-property "compiler.c.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO -DLIFETRAC_USE_METHOD_G_HOST=1 -DLIFETRAC_MH_SERIAL=Serial1" "c:/Users/dorkm/Documents/GitHub/LifeTrac/LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7"
+ExitCode: 0
+--- stdout ---
+--- stderr ---
+
+=== Case: x8-methodg-serial1-benchlog-built-in ===
+Args: compile --clean --jobs 1 --build-path "C:\Users\dorkm\AppData\Local\Temp\lifetrac_gate1_preflight\x8-methodg-serial1-benchlog-built-in" --fqbn arduino:mbed_portenta:portenta_x8 --build-property "compiler.cpp.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO -DLIFETRAC_USE_METHOD_G_HOST=1 -DLIFETRAC_MH_SERIAL=Serial1" --build-property "compiler.c.extra_flags=-DLIFETRAC_ALLOW_UNCONFIGURED_KEY -DLIFETRAC_ALLOW_STUB_CRYPTO -DLIFETRAC_USE_METHOD_G_HOST=1 -DLIFETRAC_MH_SERIAL=Serial1" "c:/Users/dorkm/Documents/GitHub/LifeTrac/LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7"
+ExitCode: 0
+--- stdout ---
+--- stderr ---
+
+Summary: gate1-summary default=0 methodg=0 benchlog=0

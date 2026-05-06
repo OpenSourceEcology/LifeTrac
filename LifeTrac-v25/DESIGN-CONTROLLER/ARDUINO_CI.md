@@ -39,6 +39,7 @@ The `h7-host-driver-tests` job validates the tracked `firmware/tractor_h7/murata
 - verifies mirrored host-wire constants via `tools/check_mh_wire_sync.py`
 - runs COBS + CRC16 unit tests (`mh_cobs_crc_unit`)
 - runs STATS parser vectors for both legacy 64-byte and additive 68-byte payloads (`mh_stats_vectors`)
+- runs runtime-health vectors for BOOT field mapping and `TX_DONE_URC`/`RX_FRAME_URC` handling (`mh_runtime_health_vectors`)
 
 The `h7-host-driver-loopback` job adds an integration harness for the same layer:
 

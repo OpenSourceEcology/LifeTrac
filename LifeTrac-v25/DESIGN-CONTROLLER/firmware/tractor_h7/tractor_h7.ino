@@ -18,6 +18,14 @@
 //   - Per-coil current monitoring, CAN-bus engine telemetry.
 
 #include <Arduino.h>
+
+#if defined(LIFETRAC_USE_METHOD_G_HOST) && (LIFETRAC_USE_METHOD_G_HOST)
+#define LIFETRAC_METHOD_G_HOST_BUILD 1
+#else
+#define LIFETRAC_METHOD_G_HOST_BUILD 0
+#endif
+
+#if !LIFETRAC_METHOD_G_HOST_BUILD
 #include <RadioLib.h>
 #include <ArduinoRS485.h>
 #include <ArduinoModbus.h>
@@ -27,12 +35,35 @@
 // .gitignored.
 #include "src/lifetrac_build_config.h"
 #include "src/lora_proto/lora_proto.h"
+#endif
 
-#if defined(LIFETRAC_USE_METHOD_G_HOST) && (LIFETRAC_USE_METHOD_G_HOST)
+#if LIFETRAC_METHOD_G_HOST_BUILD
 #ifndef LIFETRAC_MH_SERIAL
 #error "LIFETRAC_MH_SERIAL must name a HardwareSerial instance when LIFETRAC_USE_METHOD_G_HOST=1"
 #endif
+#ifndef LIFETRAC_MH_BENCH_LOG
+#define LIFETRAC_MH_BENCH_LOG 1
+#endif
 #include "murata_host/mh_runtime.h"
+#endif
+
+// Stock PORTENTA_X8 core exposes only Serial1 (SERIAL_HOWMANY=1), but Method G
+// bench routing for Max Carrier targets the H7 Serial2 mapping. Provide an
+// X8-only Serial2 object so -DLIFETRAC_MH_SERIAL=Serial2 links in this mode.
+#if defined(ARDUINO_PORTENTA_X8) && (SERIAL_HOWMANY < 2)
+#ifndef SERIAL2_TX
+#define SERIAL2_TX PA_15
+#endif
+#ifndef SERIAL2_RX
+#define SERIAL2_RX PF_6
+#endif
+#ifndef SERIAL2_RTS
+#define SERIAL2_RTS PF_8
+#endif
+#ifndef SERIAL2_CTS
+#define SERIAL2_CTS PF_9
+#endif
+arduino::UART _UART2_(SERIAL2_TX, SERIAL2_RX, SERIAL2_RTS, SERIAL2_CTS);
 #endif
 
 // X8 compatibility: the portenta_x8 SDK replaces `Serial` with an ErrorSerialClass
@@ -47,6 +78,17 @@ namespace { struct _NullSerial {
 } _nullSerial; }
 #define Serial _nullSerial
 #endif
+
+#if LIFETRAC_METHOD_G_HOST_BUILD && defined(LIFETRAC_MH_BENCH_LOG) && (LIFETRAC_MH_BENCH_LOG)
+static void mh_bench_log_sink(const char *line, void *ctx) {
+    (void)ctx;
+    if (line != nullptr) {
+        Serial.println(line);
+    }
+}
+#endif
+
+#if !LIFETRAC_METHOD_G_HOST_BUILD
 
 // Forward declarations for types used in helper-function signatures, so the
 // Arduino preprocessor's auto-generated prototypes (inserted near the top of
@@ -161,6 +203,7 @@ static inline void bench_radio_set(uint32_t, uint32_t) {}
 static inline void bench_radio_add(uint32_t, uint32_t = 1u) {}
 static inline void bench_radio_reset() {}
 static inline uint32_t bench_radio_meta(uint8_t, uint8_t, int16_t, int16_t) { return 0u; }
+static inline uint32_t bench_radio_status_meta(uint8_t, int16_t) { return 0u; }
 static inline uint32_t bench_radio_reg_pack(uint8_t, uint8_t, uint8_t, uint8_t) { return 0u; }
 static inline uint32_t bench_radio_initial_tx_offset_ms() { return 0u; }
 #endif
@@ -193,6 +236,7 @@ extern "C" uint32_t mbed_heap_size;
 extern "C" void mbed_init(void);
 extern "C" void mbed_rtos_start(void);
 
+#if defined(LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES) && (LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES)
 extern "C" void software_init_hook(void) {
 #if defined(LIFETRAC_X8_BOOT_TRACE)
     boot_trace_mark_raw(0xD0u);
@@ -209,6 +253,7 @@ extern "C" void software_init_hook(void) {
 #endif
     mbed_rtos_start();
 }
+#endif /* LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES */
 
 static inline void boot_trace_mark(uint32_t stage) {
 #if defined(LIFETRAC_X8_BOOT_TRACE)
@@ -1709,15 +1754,23 @@ static void poll_link_ladder() {
     g_ladder_window_start = now;
 }
 
+#endif /* !LIFETRAC_METHOD_G_HOST_BUILD */
+
 
 // ---------- Arduino entry points ----------
 void setup() {
-#if defined(LIFETRAC_USE_METHOD_G_HOST) && (LIFETRAC_USE_METHOD_G_HOST)
+#if LIFETRAC_METHOD_G_HOST_BUILD
+#if defined(LIFETRAC_MH_BENCH_LOG) && (LIFETRAC_MH_BENCH_LOG)
+    Serial.begin(115200);
+#endif
     if (!mh_runtime_begin((void *)&LIFETRAC_MH_SERIAL, 921600U)) {
         while (1) {
             delay(1000);
         }
     }
+#if defined(LIFETRAC_MH_BENCH_LOG) && (LIFETRAC_MH_BENCH_LOG)
+    mh_runtime_set_log_sink(mh_bench_log_sink, nullptr);
+#endif
     return;
 #else
     boot_trace_mark(1);
@@ -1785,7 +1838,7 @@ void setup() {
 }
 
 void loop() {
-#if defined(LIFETRAC_USE_METHOD_G_HOST) && (LIFETRAC_USE_METHOD_G_HOST)
+#if LIFETRAC_METHOD_G_HOST_BUILD
     mh_runtime_loop(millis());
     return;
 #else

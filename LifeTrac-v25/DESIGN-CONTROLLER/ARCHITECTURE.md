@@ -144,7 +144,7 @@ A Max Carrier handheld would be over-engineered and impractical to carry. The MK
 | Tier | Hardware | Stack |
 |---|---|---|
 | Handheld | MKR WAN 1310 | Arduino C++ · RadioLib · MbedTLS (AES-GCM) |
-| Tractor real-time | STM32H747 co-MCU on Portenta X8 on Max Carrier | Arduino Mbed · RadioLib · MbedTLS · Modbus RTU master |
+| Tractor real-time | STM32H747 co-MCU on Portenta X8 on Max Carrier | Arduino Mbed · Method G UART host runtime · MbedTLS · Modbus RTU master in legacy build |
 | Tractor Linux (X8 only) | i.MX 8M Mini on Portenta X8 | Yocto Linux · SSH · journald · optional Docker telemetry recorder |
 | Tractor I/O | Arduino Opta + D1608S + A0602 expansions | Arduino Mbed · ArduinoModbus slave · industrial relay/DAC/ADC |
 | Base station MCU | STM32H747 co-MCU on Portenta X8 on Max Carrier | Arduino Mbed (LoRa modem driver) |
@@ -159,8 +159,11 @@ integration modes:
 - Method G host path: enable `LIFETRAC_USE_METHOD_G_HOST=1` and set
     `LIFETRAC_MH_SERIAL` to the selected host UART object (for CI: `Serial1`).
 
-Method G routes `setup()` and `loop()` into `murata_host/mh_runtime`; the
-default build keeps those runtime symbols out of the linked image.
+Method G routes `setup()` and `loop()` into `murata_host/mh_runtime` and does
+not link H7-side RadioLib, RS-485, or Modbus code. In this mode the custom L072
+firmware owns direct SX1276 control; the H7 exchanges COBS/CRC-framed host
+messages over UART. The default build keeps Method G runtime symbols out of the
+linked image.
 
 ## What this design intentionally does NOT include
 

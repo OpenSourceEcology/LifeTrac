@@ -11,7 +11,14 @@
  * Clock plan: HSI(64 MHz) / DIVM1=4 = 16 MHz → PLL1 DIVN1=60 → VCO=960 MHz
  *             DIVP1=2 → SYSCLK=480 MHz, DIVQ1=4 → 240 MHz, DIVR1=2 → 480 MHz
  *             AHB = SYSCLK/2 = 240 MHz, APB1/2/3/4 = AHB/2 = 120 MHz
+ *
+ * GATE: these overrides are for legacy X8/libmbed combinations only.
+ * Current stock mbed_portenta X8 cores already export clock symbols, so
+ * auto-linking this file causes duplicate-symbol link failures.
+ * Enable only when explicitly requested.
  */
+
+#if defined(LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES) && (LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES)
 
 #include <stdint.h>
 
@@ -251,3 +258,5 @@ void SystemCoreClockUpdate(void)
 {
     SystemCoreClock = 400000000UL;
 }
+
+#endif /* LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES */

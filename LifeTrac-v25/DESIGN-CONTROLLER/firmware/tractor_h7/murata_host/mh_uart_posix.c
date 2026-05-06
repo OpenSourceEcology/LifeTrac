@@ -1,5 +1,7 @@
 #include "mh_uart.h"
 
+#if !defined(ARDUINO)
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stddef.h>
@@ -185,3 +187,5 @@ bool mh_uart_posix_init(mh_uart_if_t *out_iface,
 
     return true;
 }
+
+#endif /* !ARDUINO */

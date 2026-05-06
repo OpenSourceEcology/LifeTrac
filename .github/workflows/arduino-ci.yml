@@ -138,6 +138,16 @@ jobs:
             murata_host/mh_stats.c \
             -o build/mh_stats_vectors
           ./build/mh_stats_vectors
+      - name: Build and run runtime health vectors
+        working-directory: LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7
+        run: |
+          mkdir -p build
+          cc -std=gnu11 -DLIFETRAC_USE_METHOD_G_HOST=1 -Wall -Wextra -Werror -Imurata_host \
+            bench/h7_host_proto/mh_runtime_health_vectors.c \
+            murata_host/mh_runtime_health.c \
+            murata_host/mh_stats.c \
+            -o build/mh_runtime_health_vectors
+          ./build/mh_runtime_health_vectors
 
   h7-host-driver-loopback:
     runs-on: ubuntu-24.04

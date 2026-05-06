@@ -12,7 +12,14 @@
  *
  * Because sketch .o files are linked before libmbed.a, these definitions
  * shadow the archive's lp_ticker.o entirely — no archive symbols are pulled.
+ *
+ * GATE: these strong symbols are for legacy X8/libmbed combinations only.
+ * Current stock mbed_portenta X8 cores already export lp_ticker_* and
+ * HAL_GetREVID/HAL_GetDEVID, so auto-linking this file causes duplicate
+ * symbol failures. Enable only when explicitly requested.
  */
+
+#if defined(LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES) && (LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES)
 
 #include <stdint.h>
 
@@ -239,3 +246,5 @@ uint32_t HAL_GetDEVID(void)
 {
     return 0x450UL;    /* STM32H747/57 device ID */
 }
+
+#endif /* LIFETRAC_X8_ENABLE_LEGACY_OVERRIDES */

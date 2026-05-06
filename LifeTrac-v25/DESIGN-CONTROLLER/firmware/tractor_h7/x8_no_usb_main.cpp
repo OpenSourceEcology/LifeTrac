@@ -1,5 +1,6 @@
 #include <Arduino.h>
 
+/* Opt-in only: current stock X8 cores provide get_usb_phy() already. */
 #if defined(LIFETRAC_X8_NO_USB_SERIAL)
 
 class USBPhy;

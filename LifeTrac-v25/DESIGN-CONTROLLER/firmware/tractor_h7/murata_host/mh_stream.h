@@ -52,6 +52,9 @@ bool mh_stream_send_ping_req(mh_stream_t *stream,
                              uint16_t payload_len,
                              uint16_t *out_seq);
 
+bool mh_stream_send_ver_req(mh_stream_t *stream,
+                            uint16_t *out_seq);
+
 bool mh_stream_send_cfg_get_req(mh_stream_t *stream,
                                 uint8_t key,
                                 uint16_t *out_seq);
