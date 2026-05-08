@@ -11,6 +11,7 @@
 #define RCC_BASE                   0x40021000UL
 #define RCC_CR                     MMIO32(RCC_BASE + 0x00UL)
 #define RCC_CFGR                   MMIO32(RCC_BASE + 0x0CUL)
+#define RCC_CCIPR                  MMIO32(RCC_BASE + 0x4CUL)
 #define RCC_IOPENR                 MMIO32(RCC_BASE + 0x2CUL)
 #define RCC_AHBENR                 MMIO32(RCC_BASE + 0x30UL)
 #define RCC_APB2ENR                MMIO32(RCC_BASE + 0x34UL)
@@ -38,8 +39,10 @@
 
 #define RCC_APB2ENR_SYSCFGEN       (1UL << 0)
 #define RCC_APB2ENR_SPI1EN         (1UL << 12)
+#define RCC_APB2ENR_USART1EN       (1UL << 14)
 
 #define RCC_APB1ENR_USART2EN       (1UL << 17)
+#define RCC_APB1ENR_LPUART1EN      (1UL << 18)
 
 #define RCC_CSR_RMVF               (1UL << 23)
 #define RCC_CSR_FWRSTF             (1UL << 24)
@@ -96,6 +99,18 @@
 #define DMA_CCR_MINC               (1UL << 7)
 #define DMA_CCR_PL_HIGH            (2UL << 12)
 
+/* USART1 */
+#define USART1_BASE                0x40013800UL
+#define USART1_CR1                 MMIO32(USART1_BASE + 0x00UL)
+#define USART1_CR2                 MMIO32(USART1_BASE + 0x04UL)
+#define USART1_CR3                 MMIO32(USART1_BASE + 0x08UL)
+#define USART1_BRR                 MMIO32(USART1_BASE + 0x0CUL)
+#define USART1_RQR                 MMIO32(USART1_BASE + 0x18UL)
+#define USART1_ISR                 MMIO32(USART1_BASE + 0x1CUL)
+#define USART1_ICR                 MMIO32(USART1_BASE + 0x20UL)
+#define USART1_RDR                 MMIO32(USART1_BASE + 0x24UL)
+#define USART1_TDR                 MMIO32(USART1_BASE + 0x28UL)
+
 /* USART2 */
 #define USART2_BASE                0x40004400UL
 #define USART2_CR1                 MMIO32(USART2_BASE + 0x00UL)
@@ -107,6 +122,17 @@
 #define USART2_ICR                 MMIO32(USART2_BASE + 0x20UL)
 #define USART2_RDR                 MMIO32(USART2_BASE + 0x24UL)
 #define USART2_TDR                 MMIO32(USART2_BASE + 0x28UL)
+
+/* LPUART1 */
+#define LPUART1_BASE               0x40004800UL
+#define LPUART1_CR1                MMIO32(LPUART1_BASE + 0x00UL)
+#define LPUART1_CR2                MMIO32(LPUART1_BASE + 0x04UL)
+#define LPUART1_CR3                MMIO32(LPUART1_BASE + 0x08UL)
+#define LPUART1_BRR                MMIO32(LPUART1_BASE + 0x0CUL)
+#define LPUART1_ISR                MMIO32(LPUART1_BASE + 0x1CUL)
+#define LPUART1_ICR                MMIO32(LPUART1_BASE + 0x20UL)
+#define LPUART1_RDR                MMIO32(LPUART1_BASE + 0x24UL)
+#define LPUART1_TDR                MMIO32(LPUART1_BASE + 0x28UL)
 
 #define USART_CR1_UE               (1UL << 0)
 #define USART_CR1_RE               (1UL << 2)

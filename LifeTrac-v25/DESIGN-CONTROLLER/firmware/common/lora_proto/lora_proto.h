@@ -220,10 +220,18 @@ bool lp_kiss_feed(KissDecoder* dec, uint8_t b,
 // AES-128-GCM wrappers. Real backends live in lp_crypto_real.cpp; the no-op
 // stub in crypto_stub.c is gated behind LIFETRAC_ALLOW_STUB_CRYPTO.
 //
+// Crypto Ownership Contract (Profile A):
+// --------------------------------------
+// The Host CPU (H747/SAMD21) ENCRYPTS data natively and is the sole owner of AES-GCM
+// processing, maintaining the nonces, keys, and replay tracking state logic.
+// The L072 AT_Slave/Custom Firmware acts only as a dumb transport for ciphertext.
+//
 // `key`   : pre-shared 16-byte fleet key.
 // `nonce` : 12 bytes [source_id(1) | sequence(2) | timestamp_s(4) | random(5)].
+//           Per N-13, the L072 *only* contributes the 5 random bytes ONCE upon
+//           booting and ships it to the H7 over the BOOT_URC binary command.
 //
-// CONTRACT (IP-003 — must match Python AESGCM, the stub, and real backends):
+// CONTRACT (IP-003):
 //   * lp_encrypt: writes `pt_len` ciphertext bytes followed by `LP_TAG_LEN`
 //     auth tag bytes into `out`. Caller must size `out` to pt_len + LP_TAG_LEN.
 //   * lp_decrypt: `ct_len` is the TOTAL length of ciphertext + auth tag

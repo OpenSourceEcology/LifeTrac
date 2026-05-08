@@ -25,6 +25,15 @@ SIZE     := $(CROSS)size
 TARGET   := firmware
 BUILD    := build
 
+HELLO_TARGET := hello_world
+HELLO_BUILD  := build_hello
+HELLO_SRCS   := startup.c hal/platform.c hello_world.c include/static_asserts.c
+
+PING_SRCS    := startup.c hal/platform.c lora_ping.c include/static_asserts.c
+
+# EXTRA_CFLAGS: injected by recursive lora_ping_tx / lora_ping_rx targets
+EXTRA_CFLAGS ?=
+
 # --------------------------------------------------------------------------
 # Host shell portability helpers
 # --------------------------------------------------------------------------
@@ -116,16 +125,36 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner help
+.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner help
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
 
+hello:
+	$(MAKE) CROSS="$(CROSS)" TARGET=$(HELLO_TARGET) BUILD=$(HELLO_BUILD) SRCS="$(HELLO_SRCS)" all
+
+lora_ping_tx:
+	$(MAKE) CROSS="$(CROSS)" TARGET=lora_ping_tx BUILD=build_ping_tx SRCS="$(PING_SRCS)" EXTRA_CFLAGS="-DPING_ROLE=0" all
+
+lora_ping_rx:
+	$(MAKE) CROSS="$(CROSS)" TARGET=lora_ping_rx BUILD=build_ping_rx SRCS="$(PING_SRCS)" EXTRA_CFLAGS="-DPING_ROLE=1" all
+
+lora_ping_tx_active:
+	$(MAKE) CROSS="$(CROSS)" TARGET=lora_ping_tx_active BUILD=build_ping_tx_active SRCS="$(PING_SRCS)" EXTRA_CFLAGS="-DPING_ROLE=0 -DRADIO_ACTIVE_TEST_DEFAULT=1" all
+
+lora_ping_rx_active:
+	$(MAKE) CROSS="$(CROSS)" TARGET=lora_ping_rx_active BUILD=build_ping_rx_active SRCS="$(PING_SRCS)" EXTRA_CFLAGS="-DPING_ROLE=1 -DRADIO_ACTIVE_TEST_DEFAULT=1" all
+
 help:
 	@echo "Targets:"
-	@echo "  all     — full build (requires arm-none-eabi-gcc)"
-	@echo "  size    — show region usage against the memory budget"
-	@echo "  check   — preprocessor + memory-map static asserts only (no cross toolchain)"
-	@echo "  clean   — remove build artifacts"
+	@echo "  all          — full build (requires arm-none-eabi-gcc)"
+	@echo "  hello        — build minimal hello-world image for L072 bring-up"
+	@echo "  lora_ping_tx — build LoRa TX pinger with minimized-on-boot RF default"
+	@echo "  lora_ping_rx — build LoRa RX ponger with minimized-on-boot RF default"
+	@echo "  lora_ping_tx_active — build opt-in active RF TX pinger for bench OTA tests"
+	@echo "  lora_ping_rx_active — build opt-in active RF RX ponger for bench OTA tests"
+	@echo "  size         — show region usage against the memory budget"
+	@echo "  check        — preprocessor + memory-map static asserts only (no cross toolchain)"
+	@echo "  clean        — remove build artifacts"
 
 # Generated linker script — runs the C preprocessor on the .ld template
 # so MM_* constants from include/memory_map.h expand inline.
@@ -136,7 +165,7 @@ $(LD_GEN): $(LD_SRC) include/memory_map.h | $(BUILD)
 # Object compilation
 $(BUILD)/%.o: %.c | $(BUILD)
 	@$(call MKDIR_P,$(dir $@))
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -c $< -o $@
 
 # Link
 $(BUILD)/$(TARGET).elf: $(OBJS) $(LD_GEN)

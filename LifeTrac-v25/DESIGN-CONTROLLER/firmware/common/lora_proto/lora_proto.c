@@ -221,10 +221,15 @@ uint32_t lp_csma_pick_hop(uint32_t key_id,
                           int16_t busy_threshold_dbm,
                           uint8_t max_skips,
                           uint8_t* skips_out) {
+    if (sample == NULL) {
+        if (skips_out) *skips_out = 0;
+        return start_hop;
+    }
+
     uint32_t hop = start_hop;
     for (uint8_t skips = 0; skips <= max_skips; skips++) {
         int16_t rssi = sample(lp_fhss_channel_hz(key_id, hop), ctx);
-        if (rssi <= busy_threshold_dbm) {
+        if (rssi <= busy_threshold_dbm || rssi == INT16_MIN) {
             if (skips_out) *skips_out = skips;
             return hop;
         }

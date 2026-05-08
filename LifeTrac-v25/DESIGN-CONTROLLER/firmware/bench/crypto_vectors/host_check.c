@@ -31,16 +31,7 @@
 
 /* lp_encrypt / lp_decrypt are exported from lp_crypto_real.cpp.
  * The Makefile compiles that file alongside this one. */
-#ifdef __cplusplus
-extern "C" {
-#endif
-int  lp_encrypt(const uint8_t* key, const uint8_t* nonce,
-                const uint8_t* pt, size_t pt_len, uint8_t* out);
-int  lp_decrypt(const uint8_t* key, const uint8_t* nonce,
-                const uint8_t* ct, size_t ct_len, uint8_t* pt);
-#ifdef __cplusplus
-}
-#endif
+#include "lora_proto.h"
 
 /* Tiny hex helper — keeps the runner free of cJSON for the v25 ship. */
 static int hex2bin(const char* hex, uint8_t* out, size_t out_max) {
@@ -113,7 +104,7 @@ int main(void) {
         uint8_t buf[64 + 16];
         memcpy(buf,             ct_want,  (size_t)clen);
         memcpy(buf + clen,      tag_want, 16);
-        if (!lp_decrypt(key, nonce, buf, (size_t)clen, rec)) {
+        if (!lp_decrypt(key, nonce, buf, (size_t)clen + 16u, rec)) {
             fprintf(stderr, "vector[%s]: lp_decrypt rejected valid frame\n", v->name);
             fails++;
             continue;

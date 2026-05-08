@@ -3,6 +3,8 @@
 > **Status (2026-04-27):** Canonical implementation plan for the v25 LoRa stack across handheld, tractor, and base. Mirrors the structure of [IMAGE_PIPELINE.md](IMAGE_PIPELINE.md). **This document is the source of truth for *what to build* and in what order; [LORA_PROTOCOL.md](LORA_PROTOCOL.md) is the source of truth for the wire bytes; [MASTER_PLAN.md §8.17](MASTER_PLAN.md) is the source of truth for the PHY policy pins.**
 >
 > **Headline:** Three-source priority-arbitrated point-to-point LoRa with adaptive SF, three concurrent PHY profiles (control / telemetry / image) on one SX1276 per node, AES-128-GCM authenticated payloads, FCC §15.247 compliance via 8-channel FHSS, and a strict 25 ms-per-fragment airtime cap protecting P0 ControlFrame TX-start. **Total airtime budget on the shared 915 MHz channel sequence: ≤ 60 % steady-state across all three sources combined; P0/P1 always preempt.**
+>
+> **Development default policy (2026-05-08):** Until final release, all controller software and firmware sent to hardware should keep the LoRa radiation minimizer enabled by default and keep the Method G power-cycle-avoidance workflow enabled by default. See [2026-05-08_Development_Defaults_Radio_Minimizer_and_Power_Cycle_Avoidance_Copilot_v1_0.md](../AI%20NOTES/2026-05-08_Development_Defaults_Radio_Minimizer_and_Power_Cycle_Avoidance_Copilot_v1_0.md).
 
 ---
 
