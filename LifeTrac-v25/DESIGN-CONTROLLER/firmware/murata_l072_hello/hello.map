@@ -1,0 +1,88 @@
+
+Discarded input sections
+
+ .text          0x00000000        0x0 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+ .data          0x00000000        0x0 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+ .bss           0x00000000        0x0 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+FLASH            0x08000000         0x00030000         xr
+RAM              0x20000000         0x00005000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+                0x20005000                _estack = (ORIGIN (RAM) + LENGTH (RAM))
+
+.isr_vector     0x08000000       0x10
+ *(.isr_vector)
+ .isr_vector    0x08000000       0x10 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+                0x08000000                vector_table
+
+.text           0x08000010      0x295
+ *(.text*)
+ .text.uart_putc_both
+                0x08000010       0x30 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+ .text.uart_puts
+                0x08000040       0x14 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+ .text.Default_Handler
+                0x08000054        0x2 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+                0x08000054                Default_Handler
+ *fill*         0x08000056        0x2 
+ .text.startup.main
+                0x08000058      0x184 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+                0x08000058                main
+ .text.Reset_Handler
+                0x080001dc       0x40 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+                0x080001dc                Reset_Handler
+ *(.rodata*)
+ .rodata.main.str1.1
+                0x0800021c       0x89 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+                0x080002a8                _sidata = LOADADDR (.data)
+
+.glue_7         0x080002a8        0x0
+ .glue_7        0x080002a8        0x0 linker stubs
+
+.glue_7t        0x080002a8        0x0
+ .glue_7t       0x080002a8        0x0 linker stubs
+
+.vfp11_veneer   0x080002a8        0x0
+ .vfp11_veneer  0x080002a8        0x0 linker stubs
+
+.v4_bx          0x080002a8        0x0
+ .v4_bx         0x080002a8        0x0 linker stubs
+
+.iplt           0x080002a8        0x0
+ .iplt          0x080002a8        0x0 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+
+.rel.dyn        0x080002a8        0x0
+ .rel.iplt      0x080002a8        0x0 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+
+.data           0x20000000        0x0 load address 0x080002a8
+                0x20000000                _sdata = .
+ *(.data*)
+                0x20000000                . = ALIGN (0x4)
+                0x20000000                _edata = .
+
+.igot.plt       0x20000000        0x0 load address 0x080002a5
+ .igot.plt      0x20000000        0x0 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+
+.bss            0x20000000        0x0 load address 0x080002a8
+                0x20000000                _sbss = .
+ *(.bss*)
+ *(COMMON)
+                0x20000000                . = ALIGN (0x4)
+                0x20000000                _ebss = .
+OUTPUT(C:\Users\dorkm\Documents\GitHub\LifeTrac\LifeTrac-v25\DESIGN-CONTROLLER\firmware\murata_l072_hello\hello.elf elf32-littlearm)
+
+.comment        0x00000000       0x7e
+ .comment       0x00000000       0x7e C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
+                                 0x7f (size before relaxing)
+
+.ARM.attributes
+                0x00000000       0x32
+ .ARM.attributes
+                0x00000000       0x32 C:\Users\dorkm\AppData\Local\Temp\ccQZZzev.o
