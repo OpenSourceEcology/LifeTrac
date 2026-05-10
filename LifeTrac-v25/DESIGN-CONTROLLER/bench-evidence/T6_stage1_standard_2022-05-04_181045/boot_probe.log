@@ -1,0 +1,170 @@
+=== killing any lingering openocd ===
+
+=== running 08_boot_user_app.cfg (release BOOT0 + pulse NRST) ===
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: ensure GPIOA + GPIOF clocks enabled
+  RCC_AHB4ENR before = 0
+  RCC_AHB4ENR after  = 33
+Phase B: ensure PA_11 + PF_4 are outputs (preserve other bits)
+Phase C: drop BOOT0 (PA_11 -> LOW) so L072 boots from flash
+  GPIOA_IDR.PA_11 = 0   (expect 0)
+Phase D: pulse NRST (PF_4 LOW 250 ms then HIGH)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+
+DONE: BOOT0 LOW, NRST released. L072 should now run user firmware.
+Allow ~500 ms then probe UART (e.g. AT command at 19200 8N1).
+shutdown command invoked
+
+=== AT probe sweep (8N1) ===
+Device sweep: /dev/ttymxc3 /dev/ttymxc2 /dev/ttymxc1 /dev/ttymxc0
+
+=== UART configure /dev/ttymxc3 19200 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc3 baud=19200 attempt=1 size=0 bytes
+AT probe result: dev=/dev/ttymxc3 baud=19200 attempt=1 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc3 19200 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc3 baud=19200 attempt=2 size=0 bytes
+AT probe result: dev=/dev/ttymxc3 baud=19200 attempt=2 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc3 19200 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc3 baud=19200 attempt=3 size=0 bytes
+AT probe result: dev=/dev/ttymxc3 baud=19200 attempt=3 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc3 9600 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc3 baud=9600 attempt=1 size=0 bytes
+AT probe result: dev=/dev/ttymxc3 baud=9600 attempt=1 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc3 9600 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc3 baud=9600 attempt=2 size=0 bytes
+AT probe result: dev=/dev/ttymxc3 baud=9600 attempt=2 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc3 9600 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc3 baud=9600 attempt=3 size=0 bytes
+AT probe result: dev=/dev/ttymxc3 baud=9600 attempt=3 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc3 38400 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc3 baud=38400 attempt=1 size=0 bytes
+AT probe result: dev=/dev/ttymxc3 baud=38400 attempt=1 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc3 38400 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc3 baud=38400 attempt=2 size=0 bytes
+AT probe result: dev=/dev/ttymxc3 baud=38400 attempt=2 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc3 38400 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc3 baud=38400 attempt=3 size=0 bytes
+AT probe result: dev=/dev/ttymxc3 baud=38400 attempt=3 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc2 19200 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc2 baud=19200 attempt=1 size=0 bytes
+AT probe result: dev=/dev/ttymxc2 baud=19200 attempt=1 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc2 19200 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc2 baud=19200 attempt=2 size=0 bytes
+AT probe result: dev=/dev/ttymxc2 baud=19200 attempt=2 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc2 19200 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc2 baud=19200 attempt=3 size=0 bytes
+AT probe result: dev=/dev/ttymxc2 baud=19200 attempt=3 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc2 9600 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc2 baud=9600 attempt=1 size=0 bytes
+AT probe result: dev=/dev/ttymxc2 baud=9600 attempt=1 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc2 9600 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc2 baud=9600 attempt=2 size=0 bytes
+AT probe result: dev=/dev/ttymxc2 baud=9600 attempt=2 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc2 9600 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc2 baud=9600 attempt=3 size=0 bytes
+AT probe result: dev=/dev/ttymxc2 baud=9600 attempt=3 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc2 38400 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc2 baud=38400 attempt=1 size=0 bytes
+AT probe result: dev=/dev/ttymxc2 baud=38400 attempt=1 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc2 38400 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc2 baud=38400 attempt=2 size=0 bytes
+AT probe result: dev=/dev/ttymxc2 baud=38400 attempt=2 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc2 38400 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc2 baud=38400 attempt=3 size=0 bytes
+AT probe result: dev=/dev/ttymxc2 baud=38400 attempt=3 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc1 19200 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc1 baud=19200 attempt=1 size=0 bytes
+AT probe result: dev=/dev/ttymxc1 baud=19200 attempt=1 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc1 19200 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc1 baud=19200 attempt=2 size=0 bytes
+AT probe result: dev=/dev/ttymxc1 baud=19200 attempt=2 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc1 19200 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc1 baud=19200 attempt=3 size=0 bytes
+AT probe result: dev=/dev/ttymxc1 baud=19200 attempt=3 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc1 9600 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc1 baud=9600 attempt=1 size=0 bytes
+AT probe result: dev=/dev/ttymxc1 baud=9600 attempt=1 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc1 9600 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc1 baud=9600 attempt=2 size=0 bytes
+AT probe result: dev=/dev/ttymxc1 baud=9600 attempt=2 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc1 9600 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc1 baud=9600 attempt=3 size=0 bytes
+AT probe result: dev=/dev/ttymxc1 baud=9600 attempt=3 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc1 38400 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc1 baud=38400 attempt=1 size=0 bytes
+AT probe result: dev=/dev/ttymxc1 baud=38400 attempt=1 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc1 38400 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc1 baud=38400 attempt=2 size=0 bytes
+AT probe result: dev=/dev/ttymxc1 baud=38400 attempt=2 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc1 38400 8N1 raw ===
+Passive probe result: dev=/dev/ttymxc1 baud=38400 attempt=3 size=0 bytes
+AT probe result: dev=/dev/ttymxc1 baud=38400 attempt=3 size=0 bytes (passive=0)
+
+=== UART configure /dev/ttymxc0 19200 8N1 raw ===
+WARN: skipping dev=/dev/ttymxc0 baud=19200 attempt=1 (device unavailable)
+
+=== UART configure /dev/ttymxc0 19200 8N1 raw ===
+WARN: skipping dev=/dev/ttymxc0 baud=19200 attempt=2 (device unavailable)
+
+=== UART configure /dev/ttymxc0 19200 8N1 raw ===
+WARN: skipping dev=/dev/ttymxc0 baud=19200 attempt=3 (device unavailable)
+
+=== UART configure /dev/ttymxc0 9600 8N1 raw ===
+WARN: skipping dev=/dev/ttymxc0 baud=9600 attempt=1 (device unavailable)
+
+=== UART configure /dev/ttymxc0 9600 8N1 raw ===
+WARN: skipping dev=/dev/ttymxc0 baud=9600 attempt=2 (device unavailable)
+
+=== UART configure /dev/ttymxc0 9600 8N1 raw ===
+WARN: skipping dev=/dev/ttymxc0 baud=9600 attempt=3 (device unavailable)
+
+=== UART configure /dev/ttymxc0 38400 8N1 raw ===
+WARN: skipping dev=/dev/ttymxc0 baud=38400 attempt=1 (device unavailable)
+
+=== UART configure /dev/ttymxc0 38400 8N1 raw ===
+WARN: skipping dev=/dev/ttymxc0 baud=38400 attempt=2 (device unavailable)
+
+=== UART configure /dev/ttymxc0 38400 8N1 raw ===
+WARN: skipping dev=/dev/ttymxc0 baud=38400 attempt=3 (device unavailable)
+AT response size = 0 bytes
+
+=== done ===

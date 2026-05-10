@@ -138,6 +138,7 @@
 #define USART_CR1_RE               (1UL << 2)
 #define USART_CR1_TE               (1UL << 3)
 #define USART_CR1_IDLEIE           (1UL << 4)
+#define USART_CR1_RXNEIE           (1UL << 5)
 
 #define USART_CR3_DMAR             (1UL << 6)
 
@@ -226,7 +227,9 @@
 #define EXTI0_1_IRQn               5U
 #define EXTI4_15_IRQn              7U
 #define DMA1_Channel4_5_6_7_IRQn   11U
+#define USART1_IRQn                26U
 #define USART2_IRQn                27U
+#define RNG_LPUART1_IRQn           28U
 
 static inline void nvic_enable_irq(uint32_t irqn, uint8_t priority) {
     NVIC_IPR(irqn) = (uint8_t)(priority << 4);

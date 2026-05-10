@@ -2,7 +2,9 @@ param(
     [string]$AdbSerial = "",
     [string]$RepoRoot = "",
     [string]$LocalImage = "",
-    [int]$Cycles = 20
+    [int]$Cycles = 20,
+    [int]$CycleTimeoutSec = 180,
+    [bool]$RunGate = $true
 )
 
 Set-StrictMode -Version Latest
@@ -101,8 +103,79 @@ function Invoke-Adb {
     return $LASTEXITCODE
 }
 
+function Invoke-AdbExecOutWithTimeout {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Command,
+        [string]$Serial,
+        [int]$TimeoutSec = 180
+    )
+
+    $stdoutPath = [System.IO.Path]::GetTempFileName()
+    $stderrPath = [System.IO.Path]::GetTempFileName()
+
+    try {
+        $escapedCommand = $Command.Replace('"', '\"')
+        $adbArgString = ""
+        if ($Serial) {
+            $adbArgString += "-s `"$Serial`" "
+        }
+        $adbArgString += "exec-out `"$escapedCommand`""
+
+        $proc = Start-Process -FilePath "adb" `
+                              -ArgumentList $adbArgString `
+                              -PassThru `
+                              -NoNewWindow `
+                              -RedirectStandardOutput $stdoutPath `
+                              -RedirectStandardError $stderrPath
+
+        $finished = $proc.WaitForExit($TimeoutSec * 1000)
+        if (-not $finished) {
+            try { $proc.Kill() } catch {}
+            try { $proc.WaitForExit() } catch {}
+
+            $stdoutText = ""
+            $stderrText = ""
+            if (Test-Path -LiteralPath $stdoutPath) {
+                $stdoutText = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue
+            }
+            if (Test-Path -LiteralPath $stderrPath) {
+                $stderrText = Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue
+            }
+
+            return @{
+                TimedOut = $true
+                LauncherRc = 124
+                OutputText = ($stdoutText + $stderrText)
+            }
+        }
+
+        $stdoutText = ""
+        $stderrText = ""
+        if (Test-Path -LiteralPath $stdoutPath) {
+            $stdoutText = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue
+        }
+        if (Test-Path -LiteralPath $stderrPath) {
+            $stderrText = Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue
+        }
+
+        return @{
+            TimedOut = $false
+            LauncherRc = $proc.ExitCode
+            OutputText = ($stdoutText + $stderrText)
+        }
+    } finally {
+        Remove-Item -LiteralPath $stdoutPath -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $stderrPath -ErrorAction SilentlyContinue
+    }
+}
+
 if ($Cycles -lt 1) {
     throw "Cycles must be >= 1"
+}
+
+if ($CycleTimeoutSec -lt 10) {
+    throw "CycleTimeoutSec must be >= 10"
 }
 
 $scriptRoot = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
@@ -151,15 +224,25 @@ $stamp = "$stamp-$PID"
 $quantDir = Join-Path $benchEvidenceRoot "T6_stage1_standard_quant_$stamp"
 $null = New-Item -ItemType Directory -Force -Path $quantDir
 
-$resultsCsv = Join-Path $quantDir "results.csv"
-$summaryTxt = Join-Path $quantDir "summary.txt"
+$resultsCsv  = Join-Path $quantDir "results.csv"
+$summaryTxt  = Join-Path $quantDir "summary.txt"
 $launcherLog = Join-Path $quantDir "launcher.log"
+$statusTxt   = Join-Path $quantDir "status.txt"
 
 "cycle,launcher_rc,evidence_dir,final_result,elapsed_s,sync_ok,getid_ok,erase_ok,write_ok,verify_ok,boot_ok" | Set-Content -LiteralPath $resultsCsv
 
 $resultCounts = @{}
 $launcherFailCount = 0
+$timeoutCount = 0
 $cycleStart = (Get-Date).ToUniversalTime().ToString("o")
+
+# Write initial status so incomplete/interrupted runs are identifiable
+@(
+    "STATUS=RUNNING",
+    "CYCLES_PLANNED=$Cycles",
+    "CYCLES_COMPLETED=0",
+    "START_UTC=$cycleStart"
+) | Set-Content -LiteralPath $statusTxt
 
 for ($cycle = 1; $cycle -le $Cycles; $cycle++) {
     $cycleHeader = "=== cycle $cycle/$Cycles $(Get-Date -Format o) ==="
@@ -170,16 +253,15 @@ for ($cycle = 1; $cycle -le $Cycles; $cycle++) {
     $runnerCmd = "echo fio | sudo -S -p '' bash /tmp/lifetrac_p0c/run_stage1_standard_contract.sh $remoteImage '$serialForRemote'"
     $remoteWrappedCmd = "sh -lc '$runnerCmd; rc=`$?; printf ""__STD_RC__=%s\n"" ""`$rc""'"
 
-    $prevErr = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    $prefix = @()
-    if ($AdbSerial) {
-        $prefix = @("-s", $AdbSerial)
+    $invokeResult = Invoke-AdbExecOutWithTimeout -Command $remoteWrappedCmd -Serial $AdbSerial -TimeoutSec $CycleTimeoutSec
+    $launcherRc = [int]$invokeResult.LauncherRc
+    $outputText = [string]$invokeResult.OutputText
+    if ($invokeResult.TimedOut) {
+        $timeoutCount++
+        $timeoutMsg = "WARN: cycle $cycle timed out after ${CycleTimeoutSec}s (adb exec-out killed)"
+        Append-TextWithRetry -Path $launcherLog -Value $timeoutMsg
+        Write-Host $timeoutMsg
     }
-    $output = & adb @prefix exec-out $remoteWrappedCmd 2>&1
-    $ErrorActionPreference = $prevErr
-    $launcherRc = $LASTEXITCODE
-    $outputText = ($output | Out-String)
     Append-TextWithRetry -Path $launcherLog -Value $outputText
 
     $evidenceDir = ""
@@ -195,7 +277,7 @@ for ($cycle = 1; $cycle -le $Cycles; $cycle++) {
         }
     }
 
-    $finalResult = "RUNNER_FAIL"
+    $finalResult = if ($invokeResult.TimedOut) { "RUNNER_TIMEOUT" } else { "RUNNER_FAIL" }
     $elapsed = ""
     $syncOk = ""
     $getIdOk = ""
@@ -234,9 +316,28 @@ for ($cycle = 1; $cycle -le $Cycles; $cycle++) {
     $safeEvidence = $evidenceDir -replace ',', ';'
     Append-TextWithRetry -Path $resultsCsv -Value "$cycle,$stdRc,$safeEvidence,$finalResult,$elapsed,$syncOk,$getIdOk,$eraseOk,$writeOk,$verifyOk,$bootOk"
     Write-Host "cycle=$cycle launcher_rc=$launcherRc std_rc=$stdRc final_result=$finalResult"
+
+    # Update live status after each cycle
+    @(
+        "STATUS=RUNNING",
+        "CYCLES_PLANNED=$Cycles",
+        "CYCLES_COMPLETED=$cycle",
+        "LAST_CYCLE_UTC=$(Get-Date -Format o)",
+        "LAST_CYCLE_RESULT=$finalResult",
+        "START_UTC=$cycleStart"
+    ) | Set-Content -LiteralPath $statusTxt
 }
 
 $cycleEnd = (Get-Date).ToUniversalTime().ToString("o")
+
+# Mark run complete before writing summary
+@(
+    "STATUS=COMPLETE",
+    "CYCLES_PLANNED=$Cycles",
+    "CYCLES_COMPLETED=$Cycles",
+    "START_UTC=$cycleStart",
+    "END_UTC=$cycleEnd"
+) | Set-Content -LiteralPath $statusTxt
 
 $orderedResults = $resultCounts.GetEnumerator() | Sort-Object Name
 $resultLines = @()
@@ -247,13 +348,29 @@ foreach ($entry in $orderedResults) {
 $summary = @(
     "RUN_ID=T6_stage1_standard_quant_$stamp",
     "CYCLES=$Cycles",
+    "CYCLE_TIMEOUT_SEC=$CycleTimeoutSec",
     "BOARD_SERIAL=$AdbSerial",
     "CYCLE_START_UTC=$cycleStart",
     "CYCLE_END_UTC=$cycleEnd",
     "LAUNCHER_FAIL_COUNT=$launcherFailCount",
+    "TIMEOUT_COUNT=$timeoutCount",
     "RESULTS_CSV=$resultsCsv",
     "LAUNCHER_LOG=$launcherLog"
 ) + $resultLines
 
 $summary | Set-Content -LiteralPath $summaryTxt
 Get-Content -LiteralPath $summaryTxt | Write-Host
+
+if ($RunGate) {
+    $gateScript = Join-Path $helperDir "run_stage1_quant_gate.ps1"
+    if (-not (Test-Path -LiteralPath $gateScript)) {
+        throw "Quant gate script not found: $gateScript"
+    }
+
+    Write-Host "Running quant gate check..."
+    & $gateScript -SummaryPath $summaryTxt -ExpectedCycles $Cycles
+    $gateRc = $LASTEXITCODE
+    if ($gateRc -ne 0) {
+        throw "Quant gate failed with exit code $gateRc"
+    }
+}

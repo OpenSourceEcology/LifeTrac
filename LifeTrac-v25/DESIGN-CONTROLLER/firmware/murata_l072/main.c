@@ -40,6 +40,9 @@ int main(void) {
     platform_clock_init_hsi16();
     platform_systick_init_1ms();
     host_uart_init(HOST_BAUD_DEFAULT);
+#if LIFETRAC_BENCH_BOOT_HEARTBEAT_ENABLE
+    host_uart_send_ascii("LT_BOOT_HEARTBEAT stage=post_uart_init\\r\\n");
+#endif
 
     radio_ok = sx1276_init();
     if (!radio_ok) {
@@ -48,6 +51,13 @@ int main(void) {
     if (radio_ok) {
         radio_ok = sx1276_rx_arm();
     }
+#if LIFETRAC_BENCH_BOOT_HEARTBEAT_ENABLE
+    if (radio_ok) {
+        host_uart_send_ascii("LT_BOOT_HEARTBEAT stage=radio_ready\\r\\n");
+    } else {
+        host_uart_send_ascii("LT_BOOT_HEARTBEAT stage=radio_fault\\r\\n");
+    }
+#endif
     radio_version = sx1276_read_version();
     host_cmd_init(radio_ok, radio_version);
 

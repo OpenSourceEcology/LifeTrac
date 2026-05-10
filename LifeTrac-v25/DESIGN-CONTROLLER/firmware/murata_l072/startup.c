@@ -44,6 +44,18 @@ static void boot_diag_uart_init_19200(void) {
     LPUART1_CR1 = USART_CR1_TE | USART_CR1_UE;
 }
 
+static void boot_diag_uart_putc(char c) {
+    while ((LPUART1_ISR & USART_ISR_TXE) == 0U) {
+    }
+    LPUART1_TDR = (uint8_t)c;
+}
+
+static void boot_diag_uart_puts(const char *s) {
+    while (*s != '\0') {
+        boot_diag_uart_putc(*s++);
+    }
+}
+
 static void boot_diag_switch_hsi16(void) {
     RCC_CR |= RCC_CR_HSION;
     while ((RCC_CR & RCC_CR_HSIRDY) == 0U) {
@@ -204,6 +216,7 @@ void Reset_Handler(void) {
 
     boot_diag_switch_hsi16();
     boot_diag_uart_init_19200();
+    boot_diag_uart_puts("EARLY:RESET\\r\\n");
     platform_diag_trace("RST:START\r\n");
 
     while (dst < &_edata) {
@@ -216,6 +229,7 @@ void Reset_Handler(void) {
     }
 
     platform_diag_trace("RST:MAIN\r\n");
+    boot_diag_uart_puts("EARLY:MAIN\\r\\n");
 
     SystemInit();
     (void)main();

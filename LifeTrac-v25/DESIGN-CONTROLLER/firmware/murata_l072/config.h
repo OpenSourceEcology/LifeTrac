@@ -61,6 +61,11 @@
 #define HOST_AT_LINE_MAX_LEN          96U
 #endif
 
+/* Bench-only boot heartbeat markers on host UART during early init. */
+#ifndef LIFETRAC_BENCH_BOOT_HEARTBEAT_ENABLE
+#define LIFETRAC_BENCH_BOOT_HEARTBEAT_ENABLE 0
+#endif
+
 /* ------------------------------------------------------------------------ */
 /* Watchdog (N-20). Initial window per Claude review §5.5: 500 ms during    */
 /* boot/init, tightened to 100 ms after radio init succeeds.                */
