@@ -142,6 +142,25 @@ void platform_delay_ms(uint32_t delay_ms) {
     }
 }
 
+void platform_diag_trace(const char *text) {
+    if (text == NULL) {
+        return;
+    }
+
+    if ((LPUART1_CR1 & (USART_CR1_UE | USART_CR1_TE)) != (USART_CR1_UE | USART_CR1_TE)) {
+        return;
+    }
+
+    while (*text != '\0') {
+        while ((LPUART1_ISR & USART_ISR_TXE) == 0U) {
+        }
+        LPUART1_TDR = (uint8_t)(*text++);
+    }
+
+    while ((LPUART1_ISR & USART_ISR_TC) == 0U) {
+    }
+}
+
 void platform_irq_enable(uint32_t irqn, uint8_t priority) {
     nvic_enable_irq(irqn, priority);
 }

@@ -1,0 +1,10 @@
+Password: --- AT probe at 19200 8N1 (ROM bootloader will be silent) ---
+AT_RESP_SIZE=0
+
+--- ROM bootloader sync at 19200 8E1 (expect 0x79 ACK) ---
+ROM_RESP_SIZE=4
+00000000: 0000 0000                                ....
+
+--- verdict ---
+First byte after 0x7F: 0x00
+RESULT: Unexpected response - review hex above.

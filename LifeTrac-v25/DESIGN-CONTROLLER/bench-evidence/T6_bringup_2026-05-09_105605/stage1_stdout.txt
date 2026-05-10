@@ -1,0 +1,117 @@
+bash=== Tue May  3 21:59:37 UTC 2022 Method G Stage 1 flash ===
+=== sanity ===
+-rw-rw-rw- 1 fio fio  2334 May  8  2026 /tmp/lifetrac_p0c/07_assert_pa11_pf4_long.cfg
+-rw-rw-rw- 1 fio fio 15852 May  9  2026 /tmp/lifetrac_p0c/firmware.bin
+-rw-rw-rw- 1 fio fio  9818 May  9  2026 /tmp/lifetrac_p0c/stm32_an3155_flasher.py
+fuser /dev/ttymxc3: 
+
+=== launching openocd (600s hold) ===
+OCD_PID=8756
+
+=== openocd output so far ===
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+  RCC_AHB4ENR before = 0x00000000
+  RCC_AHB4ENR after  = 0x00000021
+Phase B: drive PA_11 HIGH (LoRa BOOT0)
+  GPIOA_IDR.PA_11 = 1   (expect 1)
+Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+Phase D: re-assert PA_11 HIGH
+  GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+
+READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+Run flasher in a parallel shell.
+
+=== configure UART 19200 8E1 raw ===
+speed 19200 baud; rows 0; columns 0; line = 0;
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+
+=== running flasher (with --verify) ===
+Opening /dev/ttymxc3 (stty-preconfigured)...
+Connecting to Bootloader...
+Sending sync byte 0x7F...
+Sending GET command (0x00 0xFF)...
+Bootloader version: 31
+Reading payload /tmp/lifetrac_p0c/firmware.bin...
+Firmware size: 15852 bytes
+Erasing memory... (This may take up to 20 seconds)
+Firmware span covers flash pages 0..123 (124 pages @ 128 bytes/page)
+Received NACK!
+Extended Erase payload was NACKed. Trying Extended Erase page fallback...
+Trying Extended Erase page batch 0..63...
+Trying Extended Erase page batch 64..123...
+Extended Erase page batches complete!
+Starting flash process...
+
+[----------------------------------------] 1.6% (0x100 / 0x3DEC)
+[=---------------------------------------] 3.2% (0x200 / 0x3DEC)
+[=---------------------------------------] 4.8% (0x300 / 0x3DEC)
+[==--------------------------------------] 6.5% (0x400 / 0x3DEC)
+[===-------------------------------------] 8.1% (0x500 / 0x3DEC)
+[===-------------------------------------] 9.7% (0x600 / 0x3DEC)
+[====------------------------------------] 11.3% (0x700 / 0x3DEC)
+[=====-----------------------------------] 12.9% (0x800 / 0x3DEC)
+[=====-----------------------------------] 14.5% (0x900 / 0x3DEC)
+[======----------------------------------] 16.1% (0xA00 / 0x3DEC)
+[=======---------------------------------] 17.8% (0xB00 / 0x3DEC)
+[=======---------------------------------] 19.4% (0xC00 / 0x3DEC)
+[========--------------------------------] 21.0% (0xD00 / 0x3DEC)
+[=========-------------------------------] 22.6% (0xE00 / 0x3DEC)
+[=========-------------------------------] 24.2% (0xF00 / 0x3DEC)
+[==========------------------------------] 25.8% (0x1000 / 0x3DEC)
+[==========------------------------------] 27.5% (0x1100 / 0x3DEC)
+[===========-----------------------------] 29.1% (0x1200 / 0x3DEC)
+[============----------------------------] 30.7% (0x1300 / 0x3DEC)
+[============----------------------------] 32.3% (0x1400 / 0x3DEC)
+[=============---------------------------] 33.9% (0x1500 / 0x3DEC)
+[==============--------------------------] 35.5% (0x1600 / 0x3DEC)
+[==============--------------------------] 37.1% (0x1700 / 0x3DEC)
+[===============-------------------------] 38.8% (0x1800 / 0x3DEC)
+[================------------------------] 40.4% (0x1900 / 0x3DEC)
+[================------------------------] 42.0% (0x1A00 / 0x3DEC)
+[=================-----------------------] 43.6% (0x1B00 / 0x3DEC)
+[==================----------------------] 45.2% (0x1C00 / 0x3DEC)
+[==================----------------------] 46.8% (0x1D00 / 0x3DEC)
+[===================---------------------] 48.4% (0x1E00 / 0x3DEC)
+[====================--------------------] 50.1% (0x1F00 / 0x3DEC)
+[====================--------------------] 51.7% (0x2000 / 0x3DEC)
+[=====================-------------------] 53.3% (0x2100 / 0x3DEC)
+[=====================-------------------] 54.9% (0x2200 / 0x3DEC)
+[======================------------------] 56.5% (0x2300 / 0x3DEC)
+[=======================-----------------] 58.1% (0x2400 / 0x3DEC)
+[=======================-----------------] 59.8% (0x2500 / 0x3DEC)
+[========================----------------] 61.4% (0x2600 / 0x3DEC)
+[=========================---------------] 63.0% (0x2700 / 0x3DEC)
+[=========================---------------] 64.6% (0x2800 / 0x3DEC)
+[==========================--------------] 66.2% (0x2900 / 0x3DEC)
+[===========================-------------] 67.8% (0x2A00 / 0x3DEC)
+[===========================-------------] 69.4% (0x2B00 / 0x3DEC)
+[============================------------] 71.1% (0x2C00 / 0x3DEC)
+[=============================-----------] 72.7% (0x2D00 / 0x3DEC)
+[=============================-----------] 74.3% (0x2E00 / 0x3DEC)
+[==============================----------] 75.9% (0x2F00 / 0x3DEC)
+[===============================---------] 77.5% (0x3000 / 0x3DEC)
+[===============================---------] 79.1% (0x3100 / 0x3DEC)
+[================================--------] 80.7% (0x3200 / 0x3DEC)
+[================================--------] 82.4% (0x3300 / 0x3DEC)
+[=================================-------] 84.0% (0x3400 / 0x3DEC)
+[==================================------] 85.6% (0x3500 / 0x3DEC)
+[==================================------] 87.2% (0x3600 / 0x3DEC)
+[===================================-----] 88.8% (0x3700 / 0x3DEC)
+

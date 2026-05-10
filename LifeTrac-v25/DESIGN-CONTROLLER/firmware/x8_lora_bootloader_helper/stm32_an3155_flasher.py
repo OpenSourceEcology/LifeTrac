@@ -2,33 +2,23 @@
 import os
 import sys
 import time
-import termios
 import struct
 
 PORT = "/dev/ttymxc3"
-BAUD = termios.B19200
 ACK = b'\x79'
 NACK = b'\x1f'
+FLASH_BASE = 0x08000000
+FLASH_PAGE_SIZE = 128
+ERASE_CHUNK_PAGES = 64
 
 def open_port():
-    print(f"Opening {PORT} at 19200 8E1...")
+    """
+    Open /dev/ttymxc3 for raw I/O. UART is pre-configured by stty.
+    Note: This script assumes stty has already configured the port to 19200 8E1 raw.
+    """
+    print(f"Opening {PORT} (stty-preconfigured)...")
+    # Open with O_NOCTTY to prevent TTY control, O_NONBLOCK for async reads
     fd = os.open(PORT, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-    
-    # Configure termios
-    # 8E1: CS8, PARENB (parity enable), INPCK (input parity checking). CLEAR PARODD for Even.
-    iflag, oflag, cflag, lflag, ispeed, ospeed, cc = termios.tcgetattr(fd)
-    
-    cflag &= ~(termios.PARENB | termios.PARODD | termios.CSIZE | termios.CSTOPB | termios.CRTSCTS)
-    cflag |= (termios.CS8 | termios.PARENB | termios.CREAD | termios.CLOCAL)
-    
-    iflag &= ~(termios.IXON | termios.IXOFF | termios.IXANY | termios.INLRCR | termios.IGNCR | termios.ICRNL)
-    oflag &= ~termios.OPOST
-    lflag &= ~(termios.ICANON | termios.ECHO | termios.ECHOE | termios.ISIG)
-    
-    termios.tcsetattr(fd, termios.TCSANOW, [iflag, oflag, cflag, lflag, BAUD, BAUD, cc])
-    
-    # Clear NOCTTY/NONBLOCK for blocking IO with timeout
-    os.set_blocking(fd, False)
     return fd
 
 def read_exact(fd, length, timeout=5.0): # Default extended slightly for erase wait
@@ -86,9 +76,71 @@ def xor_checksum(data):
         c ^= b
     return c
 
-def erase_memory(fd):
+def page_numbers_for_span(start_address, length):
+    if length <= 0:
+        return []
+
+    first_page = (start_address - FLASH_BASE) // FLASH_PAGE_SIZE
+    last_address = start_address + length - 1
+    last_page = (last_address - FLASH_BASE) // FLASH_PAGE_SIZE
+    return list(range(first_page, last_page + 1))
+
+def erase_pages_extended(fd, pages):
+    for index in range(0, len(pages), ERASE_CHUNK_PAGES):
+        batch = pages[index:index + ERASE_CHUNK_PAGES]
+        print(f"Trying Extended Erase page batch {batch[0]}..{batch[-1]}...")
+        write_cmd(fd, b'\x44\xBB')
+        if not wait_ack(fd, timeout=2.0):
+            print("Extended Erase command was NACKed during page fallback.")
+            return False
+
+        count_minus_1 = len(batch) - 1
+        payload = bytearray(struct.pack('>H', count_minus_1))
+        for page in batch:
+            payload.extend(struct.pack('>H', page))
+        payload.append(xor_checksum(payload))
+
+        write_cmd(fd, bytes(payload))
+        if not wait_ack(fd, timeout=25.0):
+            print("Extended Erase page payload was NACKed.")
+            return False
+
+    print("Extended Erase page batches complete!")
+    return True
+
+def erase_pages_standard(fd, pages):
+    if not pages:
+        return True
+    if max(pages) > 0xFF:
+        print("Standard Erase page fallback unavailable: page index exceeds 255.")
+        return False
+
+    for index in range(0, len(pages), ERASE_CHUNK_PAGES):
+        batch = pages[index:index + ERASE_CHUNK_PAGES]
+        print(f"Trying Standard Erase page batch {batch[0]}..{batch[-1]}...")
+        write_cmd(fd, b'\x43\xBC')
+        if not wait_ack(fd, timeout=2.0):
+            print("Standard Erase command was NACKed during page fallback.")
+            return False
+
+        payload = bytearray([len(batch) - 1])
+        payload.extend(batch)
+        payload.append(xor_checksum(payload))
+
+        write_cmd(fd, bytes(payload))
+        if not wait_ack(fd, timeout=25.0):
+            print("Standard Erase page payload was NACKed.")
+            return False
+
+    print("Standard Erase page batches complete!")
+    return True
+
+def erase_memory(fd, start_address, firmware_len):
     print("Erasing memory... (This may take up to 20 seconds)")
-    
+    pages = page_numbers_for_span(start_address, firmware_len)
+    if pages:
+        print(f"Firmware span covers flash pages {pages[0]}..{pages[-1]} ({len(pages)} pages @ {FLASH_PAGE_SIZE} bytes/page)")
+
     # We will try Extended Erase (0x44) first. STM32L0 often uses standard Erase (0x43)
     # but the bootloader may support both.
     write_cmd(fd, b'\x44\xBB')
@@ -98,21 +150,29 @@ def erase_memory(fd):
         if wait_ack(fd, timeout=25.0):
             print("Extended Erase complete!")
             return True
+        print("Extended Erase payload was NACKed. Trying Extended Erase page fallback...")
+        if erase_pages_extended(fd, pages):
+            return True
+        print("Extended Erase page fallback failed. Falling back to standard Erase (0x43)...")
     else:
         print("Extended Erase not supported or failed. Attempting standard Erase (0x43)...")
-        # Clear buffer
-        try:
-            os.read(fd, 1024)
-        except:
-            pass
-        
-        write_cmd(fd, b'\x43\xBC')
-        if wait_ack(fd, timeout=2.0):
-            # Global Erase command: 0xFF 0x00
-            write_cmd(fd, b'\xFF\x00')
-            if wait_ack(fd, timeout=25.0):
-                print("Standard Erase complete!")
-                return True
+
+    # Clear any leftover buffered bytes before retrying with standard erase.
+    try:
+        os.read(fd, 1024)
+    except Exception:
+        pass
+
+    write_cmd(fd, b'\x43\xBC')
+    if wait_ack(fd, timeout=2.0):
+        # Global Erase command: 0xFF 0x00
+        write_cmd(fd, b'\xFF\x00')
+        if wait_ack(fd, timeout=25.0):
+            print("Standard Erase complete!")
+            return True
+        print("Standard Erase payload was NACKed. Trying Standard Erase page fallback...")
+        if erase_pages_standard(fd, pages):
+            return True
 
     print("Erase failed!")
     return False
@@ -156,7 +216,7 @@ def flash_file(fd, filepath, start_address=0x08000000):
     print(f"Firmware size: {firmware_len} bytes")
     
     # 1. Erase
-    if not erase_memory(fd):
+    if not erase_memory(fd, start_address, firmware_len):
         return False
         
     # 2. Flash
@@ -222,18 +282,22 @@ if __name__ == "__main__":
             os.read(fd, 1024)
         except:
             pass
-            
+
         print("Connecting to Bootloader...")
         synced = sync(fd)
-        
+
         if not synced:
             print("Sync failed (got NACK or Timeout). The autobaud might already be locked.")
             print("Attempting to proceed anyway...")
-            
+
+        rc = 1
         if get_command(fd) is not None:
-            flash_file(fd, filepath, 0x08000000)
+            rc = 0 if flash_file(fd, filepath, 0x08000000) else 1
         else:
             print("Failed to communicate with the STM32 Bootloader. Reset the Murata chip and try again.")
-            
+            rc = 1
+
     finally:
         os.close(fd)
+
+    sys.exit(rc)

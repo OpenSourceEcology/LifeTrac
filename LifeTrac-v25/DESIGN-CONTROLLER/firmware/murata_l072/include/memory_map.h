@@ -48,35 +48,29 @@
 #define MM_REGION_ALIGN        (4 * 1024)       /* 0x1000 */
 
 /* ------------------------------------------------------------------------ */
-/* Launch (single-slot) Flash layout                                        */
+/* Launch (single-slot) Flash layout — UNIFIED                              */
 /*                                                                          */
-/*  0x08000000  BOOT     4 KB    resident: vectors + safe-mode + slot stub  */
-/*  0x08001000  APP    180 KB    single launch slot                         */
-/*  0x0802E000  CFG      8 KB    calibration + persisted config + flags     */
-/*  0x08030000  --- end of Flash (192 KB) ---                               */
+/* 0x08000000 to 0x08030000: Single unified 192 KB FLASH region            */
+/*   - Vector table at 0x08000000                                           */
+/*   - Reset_Handler and code immediately after                             */
+/*   - All .text, .rodata, .data (init) in this region                      */
+/*   - Runtime-written config/calibration in application-reserved space     */
+/* 0x08030000  --- end of Flash (192 KB) ---                                */
+/*                                                                          */
+/* NOTE: This unified layout matches STM32L0 ROM bootloader expectations    */
+/* and the proven Arduino MKR WAN 1300/1310 approach. Phase 6 A/B slot      */
+/* split will require re-architecting (see hardwario/lora-modem reference). */
 /* ------------------------------------------------------------------------ */
 
-#define MM_BOOT_BASE           MM_FLASH_BASE
-#define MM_BOOT_SIZE           (4 * 1024)       /* 0x01000 */
+/* Unified flash region (no BOOT/APP/CFG split) — bootloader expects        */
+/* standard ARM/STM32 layout with Reset_Handler immediately after vector    */
+/* table, all code continuous from 0x08000000 onward.                       */
+#define MM_APP_BASE            MM_FLASH_BASE
+#define MM_APP_SIZE            MM_FLASH_SIZE
 
-#define MM_APP_BASE            (MM_BOOT_BASE + MM_BOOT_SIZE)
-#define MM_APP_SIZE            (180 * 1024)     /* 0x2D000 */
-
-#define MM_CFG_BASE            (MM_APP_BASE + MM_APP_SIZE)
+/* Calibration/config storage — runtime-managed within APP region           */
+#define MM_CFG_BASE            (MM_FLASH_BASE + 0x2E000)
 #define MM_CFG_SIZE            (8 * 1024)       /* 0x02000 */
-
-/* ------------------------------------------------------------------------ */
-/* Future A/B slot layout (Phase 6 / N-26) — DO NOT consume in Phase 1.     */
-/* Provided here so the Phase 6 patch is a single #define swap, not a       */
-/* re-derivation of every address. APP region splits into Slot A + Slot B,  */
-/* boot and cfg regions are unchanged.                                      */
-/* ------------------------------------------------------------------------ */
-
-#define MM_FUTURE_SLOT_A_BASE  MM_APP_BASE
-#define MM_FUTURE_SLOT_A_SIZE  (88 * 1024)      /* 0x16000 */
-
-#define MM_FUTURE_SLOT_B_BASE  (MM_FUTURE_SLOT_A_BASE + MM_FUTURE_SLOT_A_SIZE)
-#define MM_FUTURE_SLOT_B_SIZE  (88 * 1024)      /* 0x16000 */
 
 /* MM_APP_SIZE - (2 * MM_FUTURE_SLOT_*_SIZE) = 4 KB unused gap.  When N-26  */
 /* lands, that gap moves into either slot or into an enlarged CFG region —  */

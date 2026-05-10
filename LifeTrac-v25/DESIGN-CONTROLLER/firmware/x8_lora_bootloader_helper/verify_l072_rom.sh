@@ -7,30 +7,34 @@
 set -e
 DEV=/dev/ttymxc3
 
-echo "--- AT probe at 19200 8N1 (ROM bootloader will be silent) ---"
-stty -F $DEV 19200 cs8 -parenb -cstopb raw -echo -echoe -echok -ixon -ixoff -icrnl -onlcr time 5 min 0
-( cat $DEV > /tmp/at_resp.bin & ) ; CATPID=$!
-sleep 0.2
-printf 'AT\r\n' > $DEV
-sleep 1
-kill $CATPID 2>/dev/null || true
-wait 2>/dev/null || true
-SZ=$(stat -c %s /tmp/at_resp.bin 2>/dev/null || echo 0)
-echo "AT_RESP_SIZE=$SZ"
-[ "$SZ" -gt 0 ] && xxd /tmp/at_resp.bin | head -5
-
-echo
 echo "--- ROM bootloader sync at 19200 8E1 (expect 0x79 ACK) ---"
-stty -F $DEV 19200 cs8 parenb -parodd -cstopb raw -echo -echoe -echok -ixon -ixoff -icrnl -onlcr time 5 min 0
-( cat $DEV > /tmp/rom_resp.bin & ) ; CATPID=$!
+stty -F "$DEV" 19200 cs8 parenb -parodd -cstopb raw -echo -echoe -echok -ixon -ixoff -icrnl -onlcr time 5 min 0
+rm -f /tmp/rom_resp.bin
+cat "$DEV" > /tmp/rom_resp.bin &
+CATPID=$!
 sleep 0.2
-printf '\x7f' > $DEV
+printf '\x7f' > "$DEV"
 sleep 1
-kill $CATPID 2>/dev/null || true
-wait 2>/dev/null || true
+kill "$CATPID" 2>/dev/null || true
+wait "$CATPID" 2>/dev/null || true
 SZ=$(stat -c %s /tmp/rom_resp.bin 2>/dev/null || echo 0)
 echo "ROM_RESP_SIZE=$SZ"
 [ "$SZ" -gt 0 ] && xxd /tmp/rom_resp.bin | head -5
+
+echo
+echo "--- AT probe at 19200 8N1 (ROM bootloader will be silent) ---"
+stty -F "$DEV" 19200 cs8 -parenb -cstopb raw -echo -echoe -echok -ixon -ixoff -icrnl -onlcr time 5 min 0
+rm -f /tmp/at_resp.bin
+cat "$DEV" > /tmp/at_resp.bin &
+CATPID=$!
+sleep 0.2
+printf 'AT\r\n' > "$DEV"
+sleep 1
+kill "$CATPID" 2>/dev/null || true
+wait "$CATPID" 2>/dev/null || true
+AT_SZ=$(stat -c %s /tmp/at_resp.bin 2>/dev/null || echo 0)
+echo "AT_RESP_SIZE=$AT_SZ"
+[ "$AT_SZ" -gt 0 ] && xxd /tmp/at_resp.bin | head -5
 
 echo
 echo "--- verdict ---"

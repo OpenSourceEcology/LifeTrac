@@ -11,6 +11,13 @@
 #define HOST_DMA_RX_BUF_SIZE         512U
 #define HOST_FRAME_QUEUE_DEPTH       4U
 #define HOST_COBS_ENCODED_MAX        (HOST_COBS_MAX_LEN - 2U)
+#define LPUART1_CLOCK_HZ             16000000UL
+#define USART_CR1_OVER8              (1UL << 15U)
+
+/* Stage-1 ingress diagnostic: echo raw RX bytes back out on both host TX lanes. */
+#ifndef HOST_UART_RX_ECHO_DIAG
+#define HOST_UART_RX_ECHO_DIAG       1U
+#endif
 
 _Static_assert((HOST_DMA_RX_BUF_SIZE % 2U) == 0U,
                "HOST_DMA_RX_BUF_SIZE must be even for HT/TC servicing");
@@ -45,7 +52,38 @@ static uint32_t s_stats_irq_idle;
 static uint32_t s_stats_irq_ht;
 static uint32_t s_stats_irq_tc;
 static uint32_t s_stats_irq_te;
+static uint32_t s_stats_rx_bytes;
+static uint32_t s_stats_rx_lpuart_bytes;
+static uint32_t s_stats_rx_usart1_bytes;
+static uint32_t s_stats_parse_ok;
+static uint32_t s_stats_parse_err;
+static uint32_t s_stats_uart_err_lpuart;
+static uint32_t s_stats_uart_err_usart1;
 static volatile uint32_t s_dma_te_events;
+static volatile uint8_t s_rx_seen_flags;
+static volatile uint8_t s_diag_marks;
+static uint8_t s_trace_first_rx_lpuart;
+static uint8_t s_trace_first_rx_usart1;
+static uint8_t s_trace_first_err_lpuart;
+static uint8_t s_trace_first_err_usart1;
+
+#define HOST_RX_SEEN_FLAG_LPUART             0x01U
+#define HOST_RX_SEEN_FLAG_USART1             0x02U
+
+static void host_diag_echo_rx_byte(uint8_t byte) {
+#if HOST_UART_RX_ECHO_DIAG
+    /* Non-blocking echo to avoid stalling RX IRQ service. */
+    if ((LPUART1_ISR & USART_ISR_TXE) != 0U) {
+        LPUART1_TDR = byte;
+    }
+
+    if ((USART1_ISR & USART_ISR_TXE) != 0U) {
+        USART1_TDR = byte;
+    }
+#else
+    (void)byte;
+#endif
+}
 
 static uint16_t crc16_ccitt(const uint8_t *data, uint16_t len) {
     uint16_t crc = 0xFFFFU;
@@ -69,7 +107,17 @@ static uint32_t usart_brr_from_baud(uint32_t baud) {
         return 1UL;
     }
 
-    return (platform_core_hz() + (baud / 2UL)) / baud;
+    return ((256UL * LPUART1_CLOCK_HZ) + (baud / 2UL)) / baud;
+}
+
+static uint32_t usart1_brr_from_baud(uint32_t baud) {
+    if (baud == 0UL) {
+        return 1UL;
+    }
+
+    /* USART1 uses OVER8 for tighter 921600 baud error at 16 MHz. */
+    const uint32_t div = ((2UL * LPUART1_CLOCK_HZ) + (baud / 2UL)) / baud;
+    return (div & 0xFFF0UL) | ((div & 0x000FUL) >> 1U);
 }
 
 static void gpio_set_alt(uint32_t port, uint8_t pin, uint8_t af) {
@@ -102,36 +150,23 @@ static void gpio_set_alt(uint32_t port, uint8_t pin, uint8_t af) {
 static void usart2_gpio_init(void) {
     RCC_IOPENR |= RCC_IOPENR_GPIOAEN;
 
-    gpio_set_alt(GPIOA_BASE, 2U, 4U);
-    gpio_set_alt(GPIOA_BASE, 3U, 4U);
+    gpio_set_alt(GPIOA_BASE, 2U, 6U);
+    gpio_set_alt(GPIOA_BASE, 3U, 6U);
 
     /* Keep RX high when host is disconnected. */
     uint32_t pupd = GPIO_PUPDR(GPIOA_BASE);
     pupd &= ~(3UL << (3U * 2U));
     pupd |= (1UL << (3U * 2U));
     GPIO_PUPDR(GPIOA_BASE) = pupd;
-}
 
-static void dma_rx_start(void) {
-    DMA1_CCR(HOST_DMA_RX_CH) &= ~DMA_CCR_EN;
-    DMA1_IFCR = DMA_IFCR_CGIF(HOST_DMA_RX_CH) |
-                DMA_IFCR_CTCIF(HOST_DMA_RX_CH) |
-                DMA_IFCR_CHTIF(HOST_DMA_RX_CH) |
-                DMA_IFCR_CTEIF(HOST_DMA_RX_CH);
+    /* Mirror host transport on USART1 as a routing fallback. */
+    gpio_set_alt(GPIOA_BASE, 9U, 4U);
+    gpio_set_alt(GPIOA_BASE, 10U, 4U);
 
-    DMA1_CPAR(HOST_DMA_RX_CH) = (uint32_t)(uintptr_t)&USART2_RDR;
-    DMA1_CMAR(HOST_DMA_RX_CH) = (uint32_t)(uintptr_t)s_dma_rx_buf;
-    DMA1_CNDTR(HOST_DMA_RX_CH) = HOST_DMA_RX_BUF_SIZE;
-
-    DMA1_CCR(HOST_DMA_RX_CH) = DMA_CCR_MINC |
-                               DMA_CCR_CIRC |
-                               DMA_CCR_HTIE |
-                               DMA_CCR_TCIE |
-                               DMA_CCR_TEIE |
-                               DMA_CCR_PL_HIGH;
-    DMA1_CCR(HOST_DMA_RX_CH) |= DMA_CCR_EN;
-
-    s_dma_last_idx = 0U;
+    pupd = GPIO_PUPDR(GPIOA_BASE);
+    pupd &= ~(3UL << (10U * 2U));
+    pupd |= (1UL << (10U * 2U));
+    GPIO_PUPDR(GPIOA_BASE) = pupd;
 }
 
 static uint8_t queue_push(const host_frame_t *frame) {
@@ -281,16 +316,32 @@ static void process_encoded_frame(void) {
 
     host_frame_t frame;
     if (!cobs_decode(s_cobs_encoded, s_cobs_encoded_len, decoded, (uint16_t)sizeof(decoded), &decoded_len)) {
+        platform_diag_trace("H:COBS_ERR\r\n");
         s_stats_errors++;
+        s_stats_parse_err++;
+        s_diag_marks |= HOST_DIAG_MARK_FRAME_PARSE_ERR;
         return;
     }
 
     if (parse_inner_frame(decoded, decoded_len, &frame) != HOST_STATUS_OK) {
+        platform_diag_trace("H:PARSE_ERR\r\n");
         s_stats_errors++;
+        s_stats_parse_err++;
+        s_diag_marks |= HOST_DIAG_MARK_FRAME_PARSE_ERR;
         return;
     }
 
-    (void)queue_push(&frame);
+    if (frame.type == HOST_TYPE_VER_REQ) {
+        platform_diag_trace("H:VER_REQ_RX\r\n");
+        s_diag_marks |= HOST_DIAG_MARK_VER_REQ_PARSED;
+    }
+
+    platform_diag_trace("H:FRAME_OK\r\n");
+    s_stats_parse_ok++;
+
+    if (!queue_push(&frame)) {
+        platform_diag_trace("H:Q_FULL\r\n");
+    }
 }
 
 static void ingest_binary_byte(uint8_t byte) {
@@ -304,6 +355,7 @@ static void ingest_binary_byte(uint8_t byte) {
 
     if (byte == 0U) {
         if (s_cobs_encoded_len > 0U) {
+            platform_diag_trace("H:PROC_FRAME\r\n");
             process_encoded_frame();
         }
         s_cobs_encoded_len = 0U;
@@ -311,6 +363,7 @@ static void ingest_binary_byte(uint8_t byte) {
     }
 
     if (s_cobs_encoded_len >= HOST_COBS_ENCODED_MAX) {
+        platform_diag_trace("H:COBS_OVF\r\n");
         s_cobs_overflow = 1U;
         s_cobs_encoded_len = 0U;
         s_stats_errors++;
@@ -344,6 +397,7 @@ static void at_replay_candidate_to_binary(void) {
 
 static void at_finish_line(uint8_t terminator) {
     s_at_line[s_at_line_len] = '\0';
+    platform_diag_trace("H:AT_DISPATCH\r\n");
     host_cmd_dispatch_at_line(s_at_line, s_at_line_len);
     at_reset_candidate();
     s_at_ignore_lf = (terminator == (uint8_t)'\r') ? 1U : 0U;
@@ -413,6 +467,7 @@ static void service_dma_rx_to(uint16_t write_idx) {
 
     while (s_dma_last_idx != write_idx) {
         ingest_rx_byte(s_dma_rx_buf[s_dma_last_idx]);
+            s_stats_rx_bytes++;
         s_dma_last_idx++;
         if (s_dma_last_idx >= HOST_DMA_RX_BUF_SIZE) {
             s_dma_last_idx = 0U;
@@ -429,10 +484,15 @@ static void service_dma_rx_now(void) {
 }
 
 static void usart2_write_byte(uint8_t byte) {
-    while ((USART2_ISR & USART_ISR_TXE) == 0U) {
+    while ((LPUART1_ISR & USART_ISR_TXE) == 0U) {
     }
 
-    USART2_TDR = byte;
+    LPUART1_TDR = byte;
+
+    while ((USART1_ISR & USART_ISR_TXE) == 0U) {
+    }
+
+    USART1_TDR = byte;
 }
 
 static void usart2_write_bytes(const uint8_t *buf, uint16_t len) {
@@ -440,7 +500,10 @@ static void usart2_write_bytes(const uint8_t *buf, uint16_t len) {
         usart2_write_byte(buf[i]);
     }
 
-    while ((USART2_ISR & USART_ISR_TC) == 0U) {
+    while ((LPUART1_ISR & USART_ISR_TC) == 0U) {
+    }
+
+    while ((USART1_ISR & USART_ISR_TC) == 0U) {
     }
 }
 
@@ -459,16 +522,27 @@ static void send_inner_frame(const uint8_t *inner, uint16_t inner_len) {
 }
 
 void host_uart_init(uint32_t baud) {
-    RCC_AHBENR |= RCC_AHBENR_DMA1EN;
-    RCC_APB1ENR |= RCC_APB1ENR_USART2EN;
+    RCC_APB2ENR |= RCC_APB2ENR_USART1EN;
+    RCC_APB1ENR |= RCC_APB1ENR_LPUART1EN;
+    RCC_CCIPR = (RCC_CCIPR & ~(3UL << 10U)) | (2UL << 10U);
 
     usart2_gpio_init();
 
-    USART2_CR1 = 0U;
-    USART2_CR2 = 0U;
-    USART2_CR3 = 0U;
-    USART2_BRR = usart_brr_from_baud(baud);
-    USART2_ICR = USART_ICR_PECF |
+    LPUART1_CR1 = 0U;
+    LPUART1_CR2 = 0U;
+    LPUART1_CR3 = 0U;
+    LPUART1_BRR = usart_brr_from_baud(baud);
+    LPUART1_ICR = USART_ICR_PECF |
+                  USART_ICR_FECF |
+                  USART_ICR_NCF |
+                  USART_ICR_ORECF |
+                  USART_ICR_IDLECF;
+
+    USART1_CR1 = 0U;
+    USART1_CR2 = 0U;
+    USART1_CR3 = 0U;
+    USART1_BRR = usart1_brr_from_baud(baud);
+    USART1_ICR = USART_ICR_PECF |
                  USART_ICR_FECF |
                  USART_ICR_NCF |
                  USART_ICR_ORECF |
@@ -487,20 +561,24 @@ void host_uart_init(uint32_t baud) {
 #endif
     host_uart_stats_reset();
 
-    dma_rx_start();
+    LPUART1_CR1 = USART_CR1_UE |
+                  USART_CR1_RE |
+                  USART_CR1_TE |
+                  USART_CR1_RXNEIE |
+                  USART_CR1_IDLEIE;
 
-    USART2_CR3 = USART_CR3_DMAR;
-    USART2_CR1 = USART_CR1_UE |
+    USART1_CR1 = USART_CR1_UE |
+                 USART_CR1_OVER8 |
                  USART_CR1_RE |
                  USART_CR1_TE |
+                 USART_CR1_RXNEIE |
                  USART_CR1_IDLEIE;
-
-    platform_irq_enable(DMA1_Channel4_5_6_7_IRQn, 2U);
-    platform_irq_enable(USART2_IRQn, 1U);
+    platform_irq_enable(RNG_LPUART1_IRQn, 1U);
+    platform_irq_enable(USART1_IRQn, 1U);
 }
 
 void host_uart_poll_dma(void) {
-    service_dma_rx_now();
+    /* RX is interrupt-driven on the UART lane that is physically routed. */
 }
 
 bool host_uart_pop_frame(host_frame_t *out_frame) {
@@ -593,7 +671,20 @@ void host_uart_stats_reset(void) {
     s_stats_irq_ht = 0U;
     s_stats_irq_tc = 0U;
     s_stats_irq_te = 0U;
+    s_stats_rx_bytes = 0U;
+    s_stats_rx_lpuart_bytes = 0U;
+    s_stats_rx_usart1_bytes = 0U;
+    s_stats_parse_ok = 0U;
+    s_stats_parse_err = 0U;
+    s_stats_uart_err_lpuart = 0U;
+    s_stats_uart_err_usart1 = 0U;
     s_dma_te_events = 0U;
+    s_rx_seen_flags = 0U;
+    s_diag_marks = 0U;
+    s_trace_first_rx_lpuart = 0U;
+    s_trace_first_rx_usart1 = 0U;
+    s_trace_first_err_lpuart = 0U;
+    s_trace_first_err_usart1 = 0U;
 
     cpu_irq_restore(irq_state);
 }
@@ -626,6 +717,34 @@ uint32_t host_uart_stats_irq_te(void) {
     return s_stats_irq_te;
 }
 
+uint32_t host_uart_stats_rx_bytes(void) {
+    return s_stats_rx_bytes;
+}
+
+uint32_t host_uart_stats_rx_lpuart_bytes(void) {
+    return s_stats_rx_lpuart_bytes;
+}
+
+uint32_t host_uart_stats_rx_usart1_bytes(void) {
+    return s_stats_rx_usart1_bytes;
+}
+
+uint32_t host_uart_stats_parse_ok(void) {
+    return s_stats_parse_ok;
+}
+
+uint32_t host_uart_stats_parse_err(void) {
+    return s_stats_parse_err;
+}
+
+uint32_t host_uart_stats_uart_err_lpuart(void) {
+    return s_stats_uart_err_lpuart;
+}
+
+uint32_t host_uart_stats_uart_err_usart1(void) {
+    return s_stats_uart_err_usart1;
+}
+
 uint32_t host_uart_take_dma_te_events(void) {
     uint32_t irq_state = cpu_irq_save();
     uint32_t events = s_dma_te_events;
@@ -634,45 +753,100 @@ uint32_t host_uart_take_dma_te_events(void) {
     return events;
 }
 
-void USART2_IRQHandler(void) {
-    const uint32_t isr = USART2_ISR;
+uint8_t host_uart_take_rx_seen_flags(void) {
+    uint32_t irq_state = cpu_irq_save();
+    uint8_t flags = s_rx_seen_flags;
+    s_rx_seen_flags = 0U;
+    cpu_irq_restore(irq_state);
+    return flags;
+}
+
+void host_uart_note_diag_mark(uint8_t mark) {
+    if (mark == 0U) {
+        return;
+    }
+
+    uint32_t irq_state = cpu_irq_save();
+    s_diag_marks = (uint8_t)(s_diag_marks | mark);
+    cpu_irq_restore(irq_state);
+}
+
+uint8_t host_uart_take_diag_marks(void) {
+    uint32_t irq_state = cpu_irq_save();
+    uint8_t marks = s_diag_marks;
+    s_diag_marks = 0U;
+    cpu_irq_restore(irq_state);
+    return marks;
+}
+
+void RNG_LPUART1_IRQHandler(void) {
+    const uint32_t isr = LPUART1_ISR;
 
     if ((isr & USART_ISR_IDLE) != 0U) {
-        USART2_ICR = USART_ICR_IDLECF;
+        LPUART1_ICR = USART_ICR_IDLECF;
         s_stats_irq_idle++;
-        service_dma_rx_now();
+    }
+
+    while ((LPUART1_ISR & USART_ISR_RXNE) != 0U) {
+        const uint8_t rx = (uint8_t)LPUART1_RDR;
+        if (s_trace_first_rx_lpuart == 0U) {
+            s_trace_first_rx_lpuart = 1U;
+            platform_diag_trace("H:RX_LPUART1\r\n");
+        }
+        s_stats_rx_bytes++;
+        s_stats_rx_lpuart_bytes++;
+        s_rx_seen_flags |= HOST_RX_SEEN_FLAG_LPUART;
+        host_diag_echo_rx_byte(rx);
+        ingest_rx_byte(rx);
     }
 
     if ((isr & (USART_ISR_PE | USART_ISR_FE | USART_ISR_NE | USART_ISR_ORE)) != 0U) {
-        USART2_ICR = USART_ICR_PECF |
-                     USART_ICR_FECF |
-                     USART_ICR_NCF |
-                     USART_ICR_ORECF;
-        (void)USART2_RDR;
+        if (s_trace_first_err_lpuart == 0U) {
+            s_trace_first_err_lpuart = 1U;
+            platform_diag_trace("H:ERR_LPUART1\r\n");
+        }
+        LPUART1_ICR = USART_ICR_PECF |
+                      USART_ICR_FECF |
+                      USART_ICR_NCF |
+                      USART_ICR_ORECF;
+        (void)LPUART1_RDR;
         s_stats_errors++;
+        s_stats_uart_err_lpuart++;
     }
 }
 
-void DMA1_Channel4_5_6_7_IRQHandler(void) {
-    const uint32_t isr = DMA1_ISR;
+void USART1_IRQHandler(void) {
+    const uint32_t isr = USART1_ISR;
 
-    if ((isr & DMA_ISR_HTIF(HOST_DMA_RX_CH)) != 0U) {
-        DMA1_IFCR = DMA_IFCR_CHTIF(HOST_DMA_RX_CH);
-        s_stats_irq_ht++;
-        service_dma_rx_now();
+    if ((isr & USART_ISR_IDLE) != 0U) {
+        USART1_ICR = USART_ICR_IDLECF;
+        s_stats_irq_idle++;
     }
 
-    if ((isr & DMA_ISR_TCIF(HOST_DMA_RX_CH)) != 0U) {
-        DMA1_IFCR = DMA_IFCR_CTCIF(HOST_DMA_RX_CH);
-        s_stats_irq_tc++;
-        service_dma_rx_now();
+    while ((USART1_ISR & USART_ISR_RXNE) != 0U) {
+        const uint8_t rx = (uint8_t)USART1_RDR;
+        if (s_trace_first_rx_usart1 == 0U) {
+            s_trace_first_rx_usart1 = 1U;
+            platform_diag_trace("H:RX_USART1\r\n");
+        }
+        s_stats_rx_bytes++;
+        s_stats_rx_usart1_bytes++;
+        s_rx_seen_flags |= HOST_RX_SEEN_FLAG_USART1;
+        host_diag_echo_rx_byte(rx);
+        ingest_rx_byte(rx);
     }
 
-    if ((isr & DMA_ISR_TEIF(HOST_DMA_RX_CH)) != 0U) {
-        DMA1_IFCR = DMA_IFCR_CTEIF(HOST_DMA_RX_CH) | DMA_IFCR_CGIF(HOST_DMA_RX_CH);
-        s_stats_irq_te++;
-        s_dma_te_events++;
-        dma_rx_start();
+    if ((isr & (USART_ISR_PE | USART_ISR_FE | USART_ISR_NE | USART_ISR_ORE)) != 0U) {
+        if (s_trace_first_err_usart1 == 0U) {
+            s_trace_first_err_usart1 = 1U;
+            platform_diag_trace("H:ERR_USART1\r\n");
+        }
+        USART1_ICR = USART_ICR_PECF |
+                     USART_ICR_FECF |
+                     USART_ICR_NCF |
+                     USART_ICR_ORECF;
+        (void)USART1_RDR;
         s_stats_errors++;
+        s_stats_uart_err_usart1++;
     }
 }

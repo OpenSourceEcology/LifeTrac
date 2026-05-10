@@ -1,0 +1,11 @@
+--- ROM bootloader sync at 19200 8E1 (expect 0x79 ACK) ---
+ROM_RESP_SIZE=1
+00000000: 79                                       y
+
+--- AT probe at 19200 8N1 (ROM bootloader will be silent) ---
+AT_RESP_SIZE=1
+00000000: 1f                                       .
+
+--- verdict ---
+First byte after 0x7F: 0x79
+RESULT: ROM bootloader ACK (0x79) - L072 IS in System Memory bootloader.

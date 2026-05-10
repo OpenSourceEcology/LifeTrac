@@ -1,0 +1,22 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "run-stage1-standard-quant-20",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_stage1_standard_quant_end_to_end.ps1",
+				"-AdbSerial",
+				"2E2C1209DABC240B",
+				"-Cycles",
+				"20"
+			],
+			"isBackground": false
+		}
+	]
+}

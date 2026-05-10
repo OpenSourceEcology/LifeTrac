@@ -75,11 +75,19 @@
 #define HOST_STATS_OFFSET_RADIO_TX_ABORT_LBT 56U
 #define HOST_STATS_OFFSET_RADIO_TX_ABORT_AIRTIME 60U
 #define HOST_STATS_OFFSET_RADIO_STATE        64U
-#define HOST_STATS_PAYLOAD_LEN               68U
+#define HOST_STATS_OFFSET_HOST_RX_BYTES      68U
+#define HOST_STATS_OFFSET_HOST_RX_LPUART_BYTES 72U
+#define HOST_STATS_OFFSET_HOST_RX_USART1_BYTES 76U
+#define HOST_STATS_OFFSET_HOST_PARSE_OK      80U
+#define HOST_STATS_OFFSET_HOST_PARSE_ERR     84U
+#define HOST_STATS_OFFSET_HOST_UART_ERR_LPUART 88U
+#define HOST_STATS_OFFSET_HOST_UART_ERR_USART1 92U
+#define HOST_STATS_PAYLOAD_LEN               96U
 
 #define HOST_TYPE_BOOT_URC                   0xF0U
 /* FAULT_URC payload: {u8 code, u8 sub, u16 reserved, u32 pc, u32 lr, u32 psr, u32 bfar, u32 uptime_ms} */
 #define HOST_TYPE_FAULT_URC                  0xF1U
+#define HOST_TYPE_READY_URC                  0xF2U
 #define HOST_TYPE_ERR_PROTO_URC              0xFEU
 
 #define HOST_FAULT_URC_PAYLOAD_LEN           24U
@@ -92,6 +100,10 @@
 #define HOST_FAULT_CODE_HOST_DMA_OVERRUN     0x06U
 #define HOST_FAULT_CODE_STACK_GUARD          0x07U
 #define HOST_FAULT_CODE_CLOCK_HSE_FAILED     0x08U
+#define HOST_FAULT_CODE_HOST_RX_SEEN         0x09U
+#define HOST_FAULT_CODE_HOST_RX_INACTIVE     0x0AU
+#define HOST_FAULT_CODE_HOST_PARSE_ERROR     0x0BU
+#define HOST_FAULT_CODE_HOST_DIAG_MARK       0x0CU
 
 /* CFG status codes used in CFG_OK_URC payload. */
 #define HOST_CFG_STATUS_OK                   0U
@@ -138,6 +150,7 @@ static inline void host_type_compile_time_uniqueness_check(void) {
         case HOST_TYPE_STATS_URC:
         case HOST_TYPE_BOOT_URC:
         case HOST_TYPE_FAULT_URC:
+        case HOST_TYPE_READY_URC:
         case HOST_TYPE_ERR_PROTO_URC:
             break;
         default:

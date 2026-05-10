@@ -52,7 +52,7 @@ stty -F $DEV -a 2>&1 | head -3 | tee -a $LOG
 
 echo "" | tee -a $LOG
 echo "=== running flasher (with --verify) ===" | tee -a $LOG
-python3 -u $FLASHER $DEV $IMAGE --verify 2>&1 | tee -a $LOG
+python3 -u $FLASHER $IMAGE --verify 2>&1 | tee -a $LOG
 RC=${PIPESTATUS[0]}
 echo "flasher exit code = $RC" | tee -a $LOG
 

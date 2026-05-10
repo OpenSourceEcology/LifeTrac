@@ -202,6 +202,22 @@ static void at_handle_stats(void) {
     at_send_key_u32("HOST_IRQ_TE", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_IRQ_TE));
     host_uart_send_ascii("\r\n");
 
+    at_send_key_u32("HOST_RX_BYTES", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_RX_BYTES));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("HOST_RX_LPUART", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_RX_LPUART_BYTES));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("HOST_RX_USART1", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_RX_USART1_BYTES));
+    host_uart_send_ascii("\r\n");
+
+    at_send_key_u32("HOST_PARSE_OK", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_PARSE_OK));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("HOST_PARSE_ERR", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_PARSE_ERR));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("HOST_UART_ERR_LPUART", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_UART_ERR_LPUART));
+    host_uart_send_ascii(" ");
+    at_send_key_u32("HOST_UART_ERR_USART1", at_get_u32_le(stats, HOST_STATS_OFFSET_HOST_UART_ERR_USART1));
+    host_uart_send_ascii("\r\n");
+
     at_send_key_u32("RADIO_DIO0", at_get_u32_le(stats, HOST_STATS_OFFSET_RADIO_DIO0));
     host_uart_send_ascii(" ");
     at_send_key_u32("RADIO_DIO1", at_get_u32_le(stats, HOST_STATS_OFFSET_RADIO_DIO1));
@@ -280,6 +296,26 @@ static void host_send_boot_urc(void) {
                        (uint16_t)sizeof(payload));
 }
 
+static void host_send_ready_urc(void) {
+    uint8_t payload[8];
+
+    payload[0] = 0x01U; /* host parser/dispatcher ready */
+    payload[1] = HOST_PROTOCOL_VER;
+    payload[2] = HOST_WIRE_SCHEMA_VER;
+#if HOST_AT_SHELL_ENABLE
+    payload[3] = 1U;
+#else
+    payload[3] = 0U;
+#endif
+    put_u32_le(&payload[4], HOST_CAPABILITY_BITMAP);
+
+    host_uart_send_urc(HOST_TYPE_READY_URC,
+                       0U,
+                       0U,
+                       payload,
+                       (uint16_t)sizeof(payload));
+}
+
 static void handle_ping(const host_frame_t *frame) {
     host_uart_send_urc(HOST_TYPE_PING_REQ,
                        frame->seq,
@@ -326,6 +362,7 @@ static void handle_version(const host_frame_t *frame) {
                        0U,
                        payload,
                        idx);
+    host_uart_note_diag_mark(HOST_DIAG_MARK_VER_URC_SENT);
 }
 
 static void handle_uid(const host_frame_t *frame) {
@@ -343,6 +380,21 @@ static void handle_uid(const host_frame_t *frame) {
                        0U,
                        payload,
                        (uint16_t)sizeof(payload));
+}
+
+static void emit_stats_urc(uint16_t seq) {
+    uint8_t payload[HOST_STATS_PAYLOAD_LEN];
+    const uint16_t payload_len = host_stats_serialize(payload, (uint16_t)sizeof(payload));
+
+    if (payload_len == 0U) {
+        return;
+    }
+
+    host_uart_send_urc(HOST_TYPE_STATS_URC,
+                       seq,
+                       0U,
+                       payload,
+                       payload_len);
 }
 
 static void handle_stats_dump(const host_frame_t *frame) {
@@ -363,6 +415,10 @@ static void handle_stats_dump(const host_frame_t *frame) {
                        0U,
                        payload,
                        payload_len);
+}
+
+void host_cmd_emit_stats_snapshot(void) {
+    emit_stats_urc(0U);
 }
 
 static void handle_tx_frame(const host_frame_t *frame) {
@@ -624,6 +680,8 @@ void host_cmd_init(bool radio_ok, uint8_t radio_version) {
     if (platform_fault_take_replay(&replay)) {
         host_send_fault_urc(&replay);
     }
+
+    host_send_ready_urc();
 }
 
 void host_cmd_dispatch(const host_frame_t *frame) {
@@ -646,6 +704,8 @@ void host_cmd_dispatch(const host_frame_t *frame) {
             break;
 
         case HOST_TYPE_VER_REQ:
+            platform_diag_trace("C:VER_DISP\r\n");
+            host_uart_note_diag_mark(HOST_DIAG_MARK_VER_REQ_DISPATCHED);
             handle_version(frame);
             break;
 
@@ -706,6 +766,8 @@ void host_cmd_dispatch_at_line(const char *line, uint16_t len) {
     } else if (at_line_equals(line, len, "ATI")) {
         at_handle_identity();
     } else if (at_line_equals(line, len, "AT+VER?")) {
+        platform_diag_trace("C:AT_VER_DISP\r\n");
+        host_uart_note_diag_mark(HOST_DIAG_MARK_AT_VER_DISPATCHED);
         at_handle_version();
     } else if (at_line_equals(line, len, "AT+RADIO?")) {
         at_handle_radio();

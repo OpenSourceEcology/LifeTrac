@@ -21,8 +21,43 @@ void NMI_Handler(void);
 void HardFault_Handler(void);
 void HardFault_Handler_C(uint32_t *stack_ptr);
 
-static void __attribute__((section(".boot_text"), noreturn))
+static void boot_diag_uart_init_19200(void) {
+    RCC_IOPENR |= RCC_IOPENR_GPIOAEN;
+    RCC_APB1ENR |= RCC_APB1ENR_LPUART1EN;
+
+    /* Route LPUART1 clock from HSI16 for deterministic 19200 baud. */
+    RCC_CCIPR = (RCC_CCIPR & ~(0x3UL << 10U)) | (0x2UL << 10U);
+
+    GPIO_MODER(GPIOA_BASE) =
+        (GPIO_MODER(GPIOA_BASE) & ~((3UL << (2U * 2U)) | (3UL << (3U * 2U)))) |
+        (2UL << (2U * 2U)) |
+        (2UL << (3U * 2U));
+    GPIO_AFRL(GPIOA_BASE) =
+        (GPIO_AFRL(GPIOA_BASE) & ~((0xFUL << (2U * 4U)) | (0xFUL << (3U * 4U)))) |
+        (6UL << (2U * 4U)) |
+        (6UL << (3U * 4U));
+
+    LPUART1_CR1 = 0U;
+    LPUART1_CR2 = 0U;
+    LPUART1_CR3 = 0U;
+    LPUART1_BRR = 213333UL;
+    LPUART1_CR1 = USART_CR1_TE | USART_CR1_UE;
+}
+
+static void boot_diag_switch_hsi16(void) {
+    RCC_CR |= RCC_CR_HSION;
+    while ((RCC_CR & RCC_CR_HSIRDY) == 0U) {
+    }
+
+    RCC_CFGR = (RCC_CFGR & ~RCC_CFGR_SW_MASK) | RCC_CFGR_SW_HSI16;
+    while ((RCC_CFGR & RCC_CFGR_SWS_MASK) != RCC_CFGR_SWS_HSI16) {
+    }
+}
+
+static void __attribute__((noreturn))
 fault_reset_and_reboot(uint8_t code, uint8_t sub, uint32_t pc, uint32_t lr, uint32_t psr) {
+    boot_diag_uart_init_19200();
+    platform_diag_trace("FAULT:RESET\r\n");
     platform_fault_record(code, sub, pc, lr, psr, 0U);
     platform_system_reset();
     for (;;) {
@@ -30,11 +65,11 @@ fault_reset_and_reboot(uint8_t code, uint8_t sub, uint32_t pc, uint32_t lr, uint
     }
 }
 
-void __attribute__((section(".boot_text"), noreturn)) NMI_Handler(void) {
+void __attribute__((noreturn)) NMI_Handler(void) {
     fault_reset_and_reboot(HOST_FAULT_CODE_NMI, 0U, 0U, 0U, 0U);
 }
 
-void __attribute__((section(".boot_text"), naked)) HardFault_Handler(void) {
+void __attribute__((naked)) HardFault_Handler(void) {
     __asm__ volatile (
         "movs r1, #4\n"
         "mov r2, lr\n"
@@ -49,7 +84,7 @@ void __attribute__((section(".boot_text"), naked)) HardFault_Handler(void) {
     );
 }
 
-void __attribute__((section(".boot_text"), noreturn)) HardFault_Handler_C(uint32_t *stack_ptr) {
+void __attribute__((noreturn)) HardFault_Handler_C(uint32_t *stack_ptr) {
     uint32_t stacked_pc = 0U;
     uint32_t stacked_lr = 0U;
     uint32_t stacked_psr = 0U;
@@ -162,10 +197,14 @@ const isr_handler_t g_pfnVectors[] = {
     CRS_IRQHandler
 };
 
-__attribute__((section(".boot_text"), noreturn))
+__attribute__((noreturn))
 void Reset_Handler(void) {
     uint32_t *src = &_sidata;
     uint32_t *dst = &_sdata;
+
+    boot_diag_switch_hsi16();
+    boot_diag_uart_init_19200();
+    platform_diag_trace("RST:START\r\n");
 
     while (dst < &_edata) {
         *dst++ = *src++;
@@ -176,6 +215,8 @@ void Reset_Handler(void) {
         *dst++ = 0U;
     }
 
+    platform_diag_trace("RST:MAIN\r\n");
+
     SystemInit();
     (void)main();
 
@@ -184,7 +225,7 @@ void Reset_Handler(void) {
     }
 }
 
-void __attribute__((section(".boot_text"), noreturn)) Default_Handler(void) {
+void __attribute__((noreturn)) Default_Handler(void) {
     for (;;) {
         cpu_wfi();
     }

@@ -1,0 +1,20 @@
+Password: ============================================================
+Method G Stage 1 Probe
+Device: /dev/ttymxc3 @ 921600 8N1
+Expected target: custom murata_l072 firmware host link
+============================================================
+STATS_URC(init): host_rx_bytes=0 host_rx_lpuart=0 host_rx_usart1=0 host_parse_ok=0 host_parse_err=0 uart_err_lpuart=0 uart_err_usart1=0
+BOOT_URC: not observed during initial window (continuing with active queries)
+ASCII fallback diagnostics:
+  pre-drain: no bytes observed
+  reply to ATI: 108 byte(s)
+  hex: 000301c1010102600101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010102020101010101010101010101010101010101010101010101010101010101010371ea00
+  txt: .......`.................................................................................................q..
+  reply to ATI: decoded 1 host frame(s)
+  type=0xC1(STATS_URC) seq=0 host_rx_bytes=0 host_parse_err=0 host_errors=0
+  reply to AT+VER?: 108 byte(s)
+  hex: 000301c1010102600101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010102020101010101010101010101010101010101010101010101010101010101010371ea00
+  txt: .......`.................................................................................................q..
+  reply to AT+VER?: decoded 1 host frame(s)
+  type=0xC1(STATS_URC) seq=0 host_rx_bytes=0 host_parse_err=0 host_errors=0
+FATAL: probe failed: timeout waiting for response type 0x81 to req 0x01

@@ -1,0 +1,25 @@
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 0 breakpoints, 0 watchpoints
+Info : gdb port disabled
+Info : SWD DPIDR 0x6ba02477
+Error: Failed to read memory at 0x00000055
+Error: mem2array: Read @ 0xe00e1004, w=4, cnt=1, failed
+Error executing event examine-end on target stm32h7x.cpu0:
+/usr/bin/../share/openocd/scripts/target/stm32h7x.cfg:227: Error: 
+in procedure 'ocd_process_reset' 
+in procedure 'ocd_process_reset_inner' called at file "embedded:startup.tcl", line 288
+in procedure 'stm32h7x_dbgmcu_mmw' called at file "/usr/bin/../share/openocd/scripts/target/stm32h7x.cfg", line 166
+in procedure 'stm32h7x_mmw' called at file "/usr/bin/../share/openocd/scripts/target/stm32h7x.cfg", line 251
+in procedure 'stm32h7x_mrw' called at file "/usr/bin/../share/openocd/scripts/target/stm32h7x.cfg", line 233
+at file "/usr/bin/../share/openocd/scripts/target/stm32h7x.cfg", line 227
+Info : SWD DPIDR 0x6ba02477
+Error: Failed to read memory and, additionally, failed to find out where
+Error: Failed to enable the FPB
+TARGET: stm32h7x.cpu0 - Not halted

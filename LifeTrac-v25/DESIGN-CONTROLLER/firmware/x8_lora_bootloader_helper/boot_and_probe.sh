@@ -41,7 +41,7 @@ sleep 0.6
 printf 'AT+VER?\r\n' > $DEV
 sleep 1.2
 kill -9 $CATPID 2>/dev/null
-wait $CATPID 2>/dev/null
+wait $CATPID 2>/dev/null || true
 SZ=$(stat -c %s /tmp/at_resp.bin)
 echo "AT response size = $SZ bytes" | tee -a $LOG
 xxd /tmp/at_resp.bin | head -20 | tee -a $LOG

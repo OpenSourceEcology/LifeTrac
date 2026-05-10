@@ -1,0 +1,96 @@
+=== sanity ===
+-rw-rw-rw- 1 fio fio  2334 May  8  2026 /tmp/lifetrac_p0c/07_assert_pa11_pf4_long.cfg
+-rw-rw-rw- 1 fio fio 14820 May  9  2026 /tmp/lifetrac_p0c/firmware.bin
+-rw-rw-rw- 1 fio fio  9818 May  9  2026 /tmp/lifetrac_p0c/stm32_an3155_flasher.py
+fuser /dev/ttymxc3: 
+
+=== launching openocd (600s hold) ===
+OCD_PID=6019
+
+=== openocd output so far ===
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+  RCC_AHB4ENR before = 0x00000000
+  RCC_AHB4ENR after  = 0x00000021
+Phase B: drive PA_11 HIGH (LoRa BOOT0)
+  GPIOA_IDR.PA_11 = 1   (expect 1)
+Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+Phase D: re-assert PA_11 HIGH
+  GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+
+READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+Run flasher in a parallel shell.
+
+=== configure UART 19200 8E1 raw ===
+speed 19200 baud; rows 0; columns 0; line = 0;
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+
+=== running flasher (with --verify) ===
+Opening /dev/ttymxc3 (stty-preconfigured)...
+Connecting to Bootloader...
+Sending sync byte 0x7F...
+Sending GET command (0x00 0xFF)...
+Bootloader version: 31
+Reading payload /tmp/lifetrac_p0c/firmware.bin...
+Firmware size: 14820 bytes
+Erasing memory... (This may take up to 20 seconds)
+Firmware span covers flash pages 0..115 (116 pages @ 128 bytes/page)
+Received NACK!
+Extended Erase payload was NACKed. Trying Extended Erase page fallback...
+Trying Extended Erase page batch 0..63...
+Trying Extended Erase page batch 64..115...
+Extended Erase page batches complete!
+Starting flash process...
+[----------------------------------------] 1.7% (0x100 / 0x39E4)[=---------------------------------------] 3.5% (0x200 / 0x39E4)[==--------------------------------------] 5.2% (0x300 / 0x39E4)[==--------------------------------------] 6.9% (0x400 / 0x39E4)[===-------------------------------------] 8.6% (0x500 / 0x39E4)[====------------------------------------] 10.4% (0x600 / 0x39E4)[====------------------------------------] 12.1% (0x700 / 0x39E4)[=====-----------------------------------] 13.8% (0x800 / 0x39E4)[======----------------------------------] 15.5% (0x900 / 0x39E4)[======----------------------------------] 17.3% (0xA00 / 0x39E4)[=======---------------------------------] 19.0% (0xB00 / 0x39E4)[========--------------------------------] 20.7% (0xC00 / 0x39E4)[========--------------------------------] 22.5% (0xD00 / 0x39E4)[=========-------------------------------] 24.2% (0xE00 / 0x39E4)[==========------------------------------] 25.9% (0xF00 / 0x39E4)[===========-----------------------------] 27.6% (0x1000 / 0x39E4)[===========-----------------------------] 29.4% (0x1100 / 0x39E4)[============----------------------------] 31.1% (0x1200 / 0x39E4)[=============---------------------------] 32.8% (0x1300 / 0x39E4)[=============---------------------------] 34.5% (0x1400 / 0x39E4)[==============--------------------------] 36.3% (0x1500 / 0x39E4)[===============-------------------------] 38.0% (0x1600 / 0x39E4)[===============-------------------------] 39.7% (0x1700 / 0x39E4)[================------------------------] 41.5% (0x1800 / 0x39E4)[=================-----------------------] 43.2% (0x1900 / 0x39E4)[=================-----------------------] 44.9% (0x1A00 / 0x39E4)[==================----------------------] 46.6% (0x1B00 / 0x39E4)[===================---------------------] 48.4% (0x1C00 / 0x39E4)[====================--------------------] 50.1% (0x1D00 / 0x39E4)[====================--------------------] 51.8% (0x1E00 / 0x39E4)[=====================-------------------] 53.5% (0x1F00 / 0x39E4)[======================------------------] 55.3% (0x2000 / 0x39E4)[======================------------------] 57.0% (0x2100 / 0x39E4)[=======================-----------------] 58.7% (0x2200 / 0x39E4)[========================----------------] 60.5% (0x2300 / 0x39E4)[========================----------------] 62.2% (0x2400 / 0x39E4)[=========================---------------] 63.9% (0x2500 / 0x39E4)[==========================--------------] 65.6% (0x2600 / 0x39E4)[==========================--------------] 67.4% (0x2700 / 0x39E4)[===========================-------------] 69.1% (0x2800 / 0x39E4)[============================------------] 70.8% (0x2900 / 0x39E4)[=============================-----------] 72.6% (0x2A00 / 0x39E4)[=============================-----------] 74.3% (0x2B00 / 0x39E4)[==============================----------] 76.0% (0x2C00 / 0x39E4)[===============================---------] 77.7% (0x2D00 / 0x39E4)[===============================---------] 79.5% (0x2E00 / 0x39E4)[================================--------] 81.2% (0x2F00 / 0x39E4)[=================================-------] 82.9% (0x3000 / 0x39E4)[=================================-------] 84.6% (0x3100 / 0x39E4)[==================================------] 86.4% (0x3200 / 0x39E4)[===================================-----] 88.1% (0x3300 / 0x39E4)[===================================-----] 89.8% (0x3400 / 0x39E4)[====================================----] 91.6% (0x3500 / 0x39E4)[=====================================---] 93.3% (0x3600 / 0x39E4)[======================================--] 95.0% (0x3700 / 0x39E4)[======================================--] 96.7% (0x3800 / 0x39E4)[=======================================-] 98.5% (0x3900 / 0x39E4)[========================================] 100.0% (0x39E4 / 0x39E4)
+
+Flash complete in 11.2 seconds! (1.3 KB/s)
+flasher exit code = 0
+
+=== killing openocd (6019) ===
+
+=== final openocd log ===
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+  RCC_AHB4ENR before = 0x00000000
+  RCC_AHB4ENR after  = 0x00000021
+Phase B: drive PA_11 HIGH (LoRa BOOT0)
+  GPIOA_IDR.PA_11 = 1   (expect 1)
+Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+Phase D: re-assert PA_11 HIGH
+  GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+
+READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+Run flasher in a parallel shell.
+
+=== overall result: flasher RC=0 ===

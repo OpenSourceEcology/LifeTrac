@@ -28,6 +28,12 @@ typedef struct host_frame_s {
     uint8_t payload[HOST_PAYLOAD_MAX_LEN];
 } host_frame_t;
 
+#define HOST_DIAG_MARK_VER_REQ_PARSED        0x01U
+#define HOST_DIAG_MARK_FRAME_PARSE_ERR       0x02U
+#define HOST_DIAG_MARK_VER_REQ_DISPATCHED    0x04U
+#define HOST_DIAG_MARK_VER_URC_SENT          0x08U
+#define HOST_DIAG_MARK_AT_VER_DISPATCHED     0x10U
+
 void host_uart_init(uint32_t baud);
 void host_uart_poll_dma(void);
 bool host_uart_pop_frame(host_frame_t *out_frame);
@@ -53,6 +59,16 @@ uint32_t host_uart_stats_irq_idle(void);
 uint32_t host_uart_stats_irq_ht(void);
 uint32_t host_uart_stats_irq_tc(void);
 uint32_t host_uart_stats_irq_te(void);
+uint32_t host_uart_stats_rx_bytes(void);
+uint32_t host_uart_stats_rx_lpuart_bytes(void);
+uint32_t host_uart_stats_rx_usart1_bytes(void);
+uint32_t host_uart_stats_parse_ok(void);
+uint32_t host_uart_stats_parse_err(void);
+uint32_t host_uart_stats_uart_err_lpuart(void);
+uint32_t host_uart_stats_uart_err_usart1(void);
 uint32_t host_uart_take_dma_te_events(void);
+uint8_t host_uart_take_rx_seen_flags(void);
+void host_uart_note_diag_mark(uint8_t mark);
+uint8_t host_uart_take_diag_marks(void);
 
 #endif /* LIFETRAC_MURATA_L072_HOST_UART_H */

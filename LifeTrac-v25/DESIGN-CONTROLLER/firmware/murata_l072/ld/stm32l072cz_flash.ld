@@ -20,22 +20,22 @@ OUTPUT_ARCH(arm)
 ENTRY(Reset_Handler)
 
 /* ------------------------------------------------------------------------ */
-/* MEMORY regions — driven entirely by memory_map.h.                        */
+/* MEMORY regions — unified flash layout (no BOOT/APP/CFG split).           */
 /*                                                                          */
-/* BOOT and APP are presented to the linker as separate regions so the      */
-/* boot code (vector table + safe-mode + slot-select stub) physically lives */
-/* in the resident BOOT region and the rest of the app in APP. CFG is       */
-/* declared so the linker reserves it (and refuses to spill into it) but    */
-/* nothing is placed there at link time — it is written/read by the         */
+/* Single FLASH region from 0x08000000 to 0x08030000 (192 KB) with vector   */
+/* table, Reset_Handler, and all code continuous. This matches STM32L0 ROM  */
+/* bootloader expectations and the Arduino/hardwario proven approach.       */
+/*                                                                          */
+/* CFG region is declared as read-only to reserve space at the end of       */
+/* flash; nothing is placed there at link time — it is written/read by the  */
 /* application at runtime.                                                  */
 /* ------------------------------------------------------------------------ */
 
 MEMORY
 {
-    BOOT (rx)  : ORIGIN = MM_BOOT_BASE, LENGTH = MM_BOOT_SIZE
-    APP  (rx)  : ORIGIN = MM_APP_BASE,  LENGTH = MM_APP_SIZE
-    CFG  (r)   : ORIGIN = MM_CFG_BASE,  LENGTH = MM_CFG_SIZE
-    RAM  (rwx) : ORIGIN = MM_RAM_BASE,  LENGTH = MM_RAM_SIZE
+    FLASH (rx) : ORIGIN = MM_FLASH_BASE, LENGTH = MM_FLASH_SIZE
+    CFG   (r)  : ORIGIN = MM_CFG_BASE,   LENGTH = MM_CFG_SIZE
+    RAM  (rwx) : ORIGIN = MM_RAM_BASE,   LENGTH = MM_RAM_SIZE
 }
 
 /* Stack symbols consumed by the Reset_Handler / startup code. */
@@ -44,7 +44,6 @@ _stack_size   = MM_STACK_SIZE;
 _stack_bottom = MM_STACK_BASE;
 
 /* Region symbols exposed for runtime sanity checks (e.g. a CRC over CFG).  */
-_boot_start = MM_BOOT_BASE;  _boot_end = MM_BOOT_BASE + MM_BOOT_SIZE;
 _app_start  = MM_APP_BASE;   _app_end  = MM_APP_BASE  + MM_APP_SIZE;
 _cfg_start  = MM_CFG_BASE;   _cfg_end  = MM_CFG_BASE  + MM_CFG_SIZE;
 
@@ -54,35 +53,18 @@ _cfg_start  = MM_CFG_BASE;   _cfg_end  = MM_CFG_BASE  + MM_CFG_SIZE;
 
 SECTIONS
 {
-    /* Vector table sits at the very base of Flash inside BOOT. The boot
-     * code (safe-mode listener, slot-select stub once Phase 6 lands) lives
-     * here too because it must run before any APP-region code. */
+    /* Vector table and code sit at the very base of Flash. Reset_Handler
+     * entry immediately follows, with all application code continuous.
+     * This standard layout is expected by the STM32L0 ROM bootloader. */
     .isr_vector :
     {
         . = ALIGN(4);
         KEEP(*(.isr_vector))
         . = ALIGN(4);
-    } > BOOT
+    } > FLASH
 
-    .boot_text :
-    {
-        . = ALIGN(4);
-        KEEP(*(.boot_text))
-        KEEP(*(.boot_text.*))
-        . = ALIGN(4);
-    } > BOOT
-
-    .boot_rodata :
-    {
-        . = ALIGN(4);
-        KEEP(*(.boot_rodata))
-        KEEP(*(.boot_rodata.*))
-        . = ALIGN(4);
-    } > BOOT
-
-    /* Application code, read-only data, and exception unwind tables go in
-     * the APP region. Phase 6 splits this into Slot A + Slot B; until then
-     * the whole APP region is one slot. */
+    /* Application code, read-only data, and exception unwind tables go
+     * in the main text section following the vector table. */
     .text :
     {
         . = ALIGN(4);
@@ -95,21 +77,21 @@ SECTIONS
         *(.eh_frame)
         . = ALIGN(4);
         _etext = .;
-    } > APP
+    } > FLASH
 
     .ARM.extab :
     {
         *(.ARM.extab* .gnu.linkonce.armextab.*)
-    } > APP
+    } > FLASH
 
     .ARM :
     {
         __exidx_start = .;
         *(.ARM.exidx*)
         __exidx_end = .;
-    } > APP
+    } > FLASH
 
-    /* Initialised data — load address in APP, runtime address in RAM. */
+    /* Initialised data — load address in FLASH, runtime address in RAM. */
     _sidata = LOADADDR(.data);
     .data :
     {
@@ -119,7 +101,7 @@ SECTIONS
         *(.data.*)
         . = ALIGN(4);
         _edata = .;
-    } > RAM AT> APP
+    } > RAM AT> FLASH
 
     .noinit (NOLOAD) :
     {
@@ -179,12 +161,8 @@ SECTIONS
     }
 }
 
-/* Belt-and-braces ASSERTs — duplicate of the C static_asserts so that even
- * a misconfigured build (e.g. someone running ld without preprocessing
- * static_asserts.c) cannot produce a binary with a broken layout. */
-ASSERT(MM_BOOT_SIZE + MM_APP_SIZE + MM_CFG_SIZE == MM_FLASH_SIZE,
-       "Linker: Flash regions must sum to 192 KB");
-ASSERT(MM_BOOT_BASE == MM_FLASH_BASE,
-       "Linker: BOOT must start at Flash base");
-ASSERT(MM_CFG_BASE + MM_CFG_SIZE == MM_FLASH_END,
-       "Linker: CFG must end exactly at Flash end");
+/* Belt-and-braces ASSERTs — verify the unified layout is sound. */
+ASSERT(MM_FLASH_BASE + MM_FLASH_SIZE == (MM_CFG_BASE + MM_CFG_SIZE),
+       "Linker: FLASH + CFG must cover full 192 KB");
+ASSERT(MM_CFG_BASE >= MM_FLASH_BASE,
+       "Linker: CFG region must fall within overall memory");
