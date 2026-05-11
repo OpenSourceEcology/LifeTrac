@@ -1,0 +1,254 @@
+bash=== Thu May  5 15:52:48 UTC 2022 Method G Stage 1 flash ===
+=== sanity ===
+-rw-rw-rw- 1 fio fio  2334 May  8  2026 /tmp/lifetrac_p0c/07_assert_pa11_pf4_long.cfg
+-rw-rw-rw- 1 fio fio 16332 May 11  2026 /tmp/lifetrac_p0c/firmware.bin
+-rw-rw-rw- 1 fio fio  9818 May  9  2026 /tmp/lifetrac_p0c/stm32_an3155_flasher.py
+fuser /dev/ttymxc3: 
+
+=== launching openocd (600s hold) ===
+OCD_PID=186552
+
+=== openocd output so far ===
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+  RCC_AHB4ENR before = 0x00000000
+  RCC_AHB4ENR after  = 0x00000021
+Phase B: drive PA_11 HIGH (LoRa BOOT0)
+  GPIOA_IDR.PA_11 = 1   (expect 1)
+Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+Phase D: re-assert PA_11 HIGH
+  GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+
+READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+Run flasher in a parallel shell.
+
+=== configure UART 19200 8E1 raw ===
+speed 19200 baud; rows 0; columns 0; line = 0;
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+
+=== running flasher (with --verify) ===
+Opening /dev/ttymxc3 (stty-preconfigured)...
+Connecting to Bootloader...
+Sending sync byte 0x7F...
+Sending GET command (0x00 0xFF)...
+Bootloader version: 31
+Reading payload /tmp/lifetrac_p0c/firmware.bin...
+Firmware size: 16332 bytes
+Erasing memory... (This may take up to 20 seconds)
+Firmware span covers flash pages 0..127 (128 pages @ 128 bytes/page)
+Received NACK!
+Extended Erase payload was NACKed. Trying Extended Erase page fallback...
+Trying Extended Erase page batch 0..63...
+Trying Extended Erase page batch 64..127...
+Extended Erase page batches complete!
+Starting flash process...
+
+[----------------------------------------] 1.6% (0x100 / 0x3FCC)
+[=---------------------------------------] 3.1% (0x200 / 0x3FCC)
+[=---------------------------------------] 4.7% (0x300 / 0x3FCC)
+[==--------------------------------------] 6.3% (0x400 / 0x3FCC)
+[===-------------------------------------] 7.8% (0x500 / 0x3FCC)
+[===-------------------------------------] 9.4% (0x600 / 0x3FCC)
+[====------------------------------------] 11.0% (0x700 / 0x3FCC)
+[=====-----------------------------------] 12.5% (0x800 / 0x3FCC)
+[=====-----------------------------------] 14.1% (0x900 / 0x3FCC)
+[======----------------------------------] 15.7% (0xA00 / 0x3FCC)
+[======----------------------------------] 17.2% (0xB00 / 0x3FCC)
+[=======---------------------------------] 18.8% (0xC00 / 0x3FCC)
+[========--------------------------------] 20.4% (0xD00 / 0x3FCC)
+[========--------------------------------] 21.9% (0xE00 / 0x3FCC)
+[=========-------------------------------] 23.5% (0xF00 / 0x3FCC)
+[==========------------------------------] 25.1% (0x1000 / 0x3FCC)
+[==========------------------------------] 26.6% (0x1100 / 0x3FCC)
+[===========-----------------------------] 28.2% (0x1200 / 0x3FCC)
+[===========-----------------------------] 29.8% (0x1300 / 0x3FCC)
+[============----------------------------] 31.3% (0x1400 / 0x3FCC)
+[=============---------------------------] 32.9% (0x1500 / 0x3FCC)
+[=============---------------------------] 34.5% (0x1600 / 0x3FCC)
+[==============--------------------------] 36.1% (0x1700 / 0x3FCC)
+[===============-------------------------] 37.6% (0x1800 / 0x3FCC)
+[===============-------------------------] 39.2% (0x1900 / 0x3FCC)
+[================------------------------] 40.8% (0x1A00 / 0x3FCC)
+[================------------------------] 42.3% (0x1B00 / 0x3FCC)
+[=================-----------------------] 43.9% (0x1C00 / 0x3FCC)
+[==================----------------------] 45.5% (0x1D00 / 0x3FCC)
+[==================----------------------] 47.0% (0x1E00 / 0x3FCC)
+[===================---------------------] 48.6% (0x1F00 / 0x3FCC)
+[====================--------------------] 50.2% (0x2000 / 0x3FCC)
+[====================--------------------] 51.7% (0x2100 / 0x3FCC)
+[=====================-------------------] 53.3% (0x2200 / 0x3FCC)
+[=====================-------------------] 54.9% (0x2300 / 0x3FCC)
+[======================------------------] 56.4% (0x2400 / 0x3FCC)
+[=======================-----------------] 58.0% (0x2500 / 0x3FCC)
+[=======================-----------------] 59.6% (0x2600 / 0x3FCC)
+[========================----------------] 61.1% (0x2700 / 0x3FCC)
+[=========================---------------] 62.7% (0x2800 / 0x3FCC)
+[=========================---------------] 64.3% (0x2900 / 0x3FCC)
+[==========================--------------] 65.8% (0x2A00 / 0x3FCC)
+[==========================--------------] 67.4% (0x2B00 / 0x3FCC)
+[===========================-------------] 69.0% (0x2C00 / 0x3FCC)
+[============================------------] 70.5% (0x2D00 / 0x3FCC)
+[============================------------] 72.1% (0x2E00 / 0x3FCC)
+[=============================-----------] 73.7% (0x2F00 / 0x3FCC)
+[==============================----------] 75.2% (0x3000 / 0x3FCC)
+[==============================----------] 76.8% (0x3100 / 0x3FCC)
+[===============================---------] 78.4% (0x3200 / 0x3FCC)
+[===============================---------] 79.9% (0x3300 / 0x3FCC)
+[================================--------] 81.5% (0x3400 / 0x3FCC)
+[=================================-------] 83.1% (0x3500 / 0x3FCC)
+[=================================-------] 84.6% (0x3600 / 0x3FCC)
+[==================================------] 86.2% (0x3700 / 0x3FCC)
+[===================================-----] 87.8% (0x3800 / 0x3FCC)
+[===================================-----] 89.3% (0x3900 / 0x3FCC)
+[====================================----] 90.9% (0x3A00 / 0x3FCC)
+[====================================----] 92.5% (0x3B00 / 0x3FCC)
+[=====================================---] 94.0% (0x3C00 / 0x3FCC)
+[======================================--] 95.6% (0x3D00 / 0x3FCC)
+[======================================--] 97.2% (0x3E00 / 0x3FCC)
+[=======================================-] 98.8% (0x3F00 / 0x3FCC)
+[========================================] 100.0% (0x3FCC / 0x3FCC)
+
+Flash complete in 12.3 seconds! (1.3 KB/s)
+flasher exit code = 0
+
+=== killing openocd (186552) ===
+/tmp/lifetrac_p0c/run_flash_l072.sh: line 62: 186552 Killed                  nohup openocd -f /usr/arduino/extra/openocd_script-imx_gpio.cfg -f $CFG > $OCD_LOG 2>&1 < /dev/null
+
+=== final openocd log ===
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+  RCC_AHB4ENR before = 0x00000000
+  RCC_AHB4ENR after  = 0x00000021
+Phase B: drive PA_11 HIGH (LoRa BOOT0)
+  GPIOA_IDR.PA_11 = 1   (expect 1)
+Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+Phase D: re-assert PA_11 HIGH
+  GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+
+READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+Run flasher in a parallel shell.
+
+=== overall result: flasher RC=0 ===
+flash_rc=0
+
+=== Thu May  5 15:53:08 UTC 2022 boot custom user app ===
+boot_ocd_rc=0
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: ensure GPIOA + GPIOF clocks enabled
+  RCC_AHB4ENR before = 0
+  RCC_AHB4ENR after  = 33
+Phase B: ensure PA_11 + PF_4 are outputs (preserve other bits)
+Phase C: drop BOOT0 (PA_11 -> LOW) so L072 boots from flash
+  GPIOA_IDR.PA_11 = 0   (expect 0)
+Phase D: pulse NRST (PF_4 LOW 250 ms then HIGH)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+
+DONE: BOOT0 LOW, NRST released. L072 should now run user firmware.
+Allow ~500 ms then probe UART (e.g. AT command at 19200 8N1).
+shutdown command invoked
+
+=== Thu May  5 15:53:14 UTC 2022 early UART capture @921600 (hex) ===
+00000000: 433a 5345 4e44 5f42 4f4f 540d 0a00 0301  C:SEND_BOOT.....
+00000010: f001 0102 0601 0801 1201 0101 0b8b 0043  ...............C
+00000020: 3a53 454e 445f 5245 4144 590d 0a00 0301  :SEND_READY.....
+00000030: f201 0102 0806 0101 0101 7f01 0103 97fd  ................
+00000040: 0043 3a43 4c4b 5f48 5349 5f31 364d 0d0a  .C:CLK_HSI_16M..
+00000050: 433a 494e 4954 5f44 4f4e 450d 0a00 0301  C:INIT_DONE.....
+00000060: f101 0102 1803 0801 0101 0101 0101 0101  ................
+00000070: 0101 0101 0101 0101 0102 1f01 0103 251b  ..............%.
+00000080: 0000 0301 f101 0102 1802 0a01 0101 0101  ................
+00000090: 0101 0101 0101 0101 0101 0101 0103 d70b  ................
+000000a0: 0103 bed6 0000 0301 c101 0102 8401 0101  ................
+000000b0: 0101 0101 0101 0101 0101 0101 0101 0101  ................
+000000c0: 0101 0101 0101 0101 0101 0101 0101 0101  ................
+000000d0: 0101 0101 0101 0101 0101 0101 0101 0101  ................
+000000e0: 0101 0101 0101 0101 0101 0101 0102 0401  ................
+000000f0: 0101 0101 0101 0101 0101 0101 0101 0101  ................
+00000100: 0101 0101 0101 0101 0101 0101 0101 0101  ................
+00000110: 0101 0101 0101 0101 0101 0101 0101 0101  ................
+00000120: 0101 0101 0101 0101 0101 0101 0101 0101  ................
+00000130: 0103 8a42 00                             ...B.
+
+early_921600_bytes=309
+
+=== Thu May  5 15:53:14 UTC 2022 Stage 1 probe ===
+Probe device sweep: /dev/ttymxc3 /dev/ttymxc2 /dev/ttymxc1 /dev/ttymxc0 /dev/ttyX0
+-- probe dev=/dev/ttymxc3 --
+============================================================
+Method G Stage 1 Probe
+Device: /dev/ttymxc3 @ 921600 8N1
+Expected target: custom murata_l072 firmware host link
+============================================================
+BOOT_URC: not observed during initial window (continuing with active queries)
+VER_URC: name=OSE-LifeTracLORA-MurataFW version=0.0.0 git=dev cap=0x0000007F
+STATS_URC: radio_state=4 radio_rx_ok=0 radio_tx_ok=0 host_errors=0 host_rx_bytes=24 host_rx_lpuart=24 host_rx_usart1=0 host_parse_err=0 uart_err_lpuart=0 uart_err_usart1=0
+STATS_URC per-flag LPUART1: PE=0 FE=0 NE=0 ORE=0
+STATS_URC per-flag USART1:  PE=0 FE=0 NE=0 ORE=0
+STATS_URC ring overflow:  rx_ring_ovf=0
+REG 0x42 VERSION = 0x12
+SX1276 register dump:
+  0x00: 4C 80 1A 0B 00 52 E4 C0 00 8C 09 2B 20 01 80 00
+  0x10: 00 00 00 00 00 00 00 00 10 00 00 00 00 82 74 64
+  0x20: 00 08 01 FF 00 00 04 00 00 00 00 00 00 50 14 45
+  0x30: 55 C3 05 27 1C 0A 03 0A 42 12 52 1D 00 AF 00 00
+  0x40: 00 00 12 24 2D 00 03 00 04 23 00 10 05 84 32 2B
+  0x50: 14 00 00 00 00 00 00 0F E0 00 0C 00 01 00 5C 78
+  0x60: 00 1C 0E 5B CC 00 01 50 00 00 00 00 00 00 00 0B
+  0x70: D0
+
+Critical checks:
+  [PASS] ver name present
+  [PASS] sx1276 version reg valid
+
+VERDICT: PASS (Stage 1 protocol and register-access checks passed)
+probe_rc[/dev/ttymxc3]=0
+probe_selected_dev=/dev/ttymxc3
+
+=== DONE: flash=0 probe=0 ===
+log=/tmp/lifetrac_p0c/method_g_stage1.log
+__METHOD_G_RC__=0
+

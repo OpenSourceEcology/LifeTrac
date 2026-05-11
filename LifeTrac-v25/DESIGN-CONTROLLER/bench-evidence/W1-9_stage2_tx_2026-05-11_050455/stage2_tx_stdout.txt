@@ -1,0 +1,51 @@
+bash=== Thu May  5 15:51:28 UTC 2022 Method H Stage 2 boot user app ===
+boot_ocd_rc=0
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: ensure GPIOA + GPIOF clocks enabled
+  RCC_AHB4ENR before = 0
+  RCC_AHB4ENR after  = 33
+Phase B: ensure PA_11 + PF_4 are outputs (preserve other bits)
+Phase C: drop BOOT0 (PA_11 -> LOW) so L072 boots from flash
+  GPIOA_IDR.PA_11 = 0   (expect 0)
+Phase D: pulse NRST (PF_4 LOW 250 ms then HIGH)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+
+DONE: BOOT0 LOW, NRST released. L072 should now run user firmware.
+Allow ~500 ms then probe UART (e.g. AT command at 19200 8N1).
+shutdown command invoked
+
+=== Thu May  5 15:51:29 UTC 2022 Stage 2 TX probe on /dev/ttymxc3 ===
+=== Stage 2 TX bring-up probe (W1-9) ===
+dev=/dev/ttymxc3 baud=921600
+tx_id=0x42 payload_len=8 payload_hex=4c49464554524143
+timeout=5.0s
+BOOT_URC observed during settle (payload=000112010101)
+STATS(before): radio_tx_ok=0 radio_dio0=0 radio_state=4 host_parse_err=0 radio_tx_abort_lbt=0 radio_tx_abort_airtime=0
+CFG_OK_URC(LBT_ENABLE=0): payload=03000100
+DIAG(pre): RegOpMode(0x01)=0x80
+DIAG: REG_WRITE_ACK(opmode=0x81): ack=0181
+DIAG(post-write 0x81): RegOpMode(0x01)=0x80 (IGNORED)
+DIAG(post-write 0x83): RegOpMode(0x01)=0x80 (IGNORED)
+sent TX_FRAME_REQ seq=9 bytes=10
+DIAG(tGכך5ms): RegOpMode(0x01)=0x80 (expected 0x83 = LoRa+TX)
+DIAG(tGכך25ms): RegIrqFlags(0x12)=0x00 (TxDone bit3 = CLR) RegOpMode(0x01)=0x80 PayloadLen(0x22)=0x08 PaConfig(0x09)=0x8C DioMap1(0x40)=0x00
+FAIL: timeout waiting for TX_DONE_URC tx_id=0x42
+STATS(late): radio_tx_ok=0 radio_state=4
+probe_rc[/dev/ttymxc3]=1
+
+=== DONE: boot=0 probe=1 ===
+__METHOD_H_RC__=1
+

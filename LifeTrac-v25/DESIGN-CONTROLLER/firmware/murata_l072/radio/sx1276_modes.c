@@ -90,6 +90,42 @@ static bool sx1276_modes_apply(const sx1276_mode_desc_t *desc) {
     sx1276_write_reg(SX1276_REG_DIO_MAPPING2, desc->dio_mapping2);
     sx1276_write_reg(SX1276_REG_OP_MODE, desc->opmode);
 
+    /* W1-9 (2026-05-11): On the bench unit, RegOpMode mode-bit
+     * transitions are silently ignored after wake-from-SLEEP unless the
+     * chip's digital clock is fed by the external TCXO (RegTcxo bit 4).
+     * Even with TcxoInputOn=1 set, some transitions still need a brief
+     * settle.  This soft-retry loop pokes the OPMODE write up to 5 ms;
+     * if the chip still hasn't honoured the requested mode we keep the
+     * firmware-tracked s_state in sync with what the chip actually has
+     * (rather than failing init).  Returning false here would prevent
+     * sx1276_init() from running set_frequency_hz / set_sf_bw_cr /
+     * set_tx_power_dbm, which still latch correctly even when the
+     * digital block is asleep, and would stop host_cmd / stats / RX
+     * paths that don't actually need the modem to be running (W1-7
+     * UART regression coverage).
+     */
+    {
+        const uint32_t deadline_us = platform_now_us() + 5000U;
+        uint8_t opmode_rb = sx1276_read_reg(SX1276_REG_OP_MODE);
+        while ((opmode_rb & 0x07U) != (desc->opmode & 0x07U)) {
+            if ((int32_t)(platform_now_us() - deadline_us) >= 0) {
+                break;
+            }
+            sx1276_delay_us(200U);
+            sx1276_write_reg(SX1276_REG_OP_MODE, desc->opmode);
+            sx1276_delay_us(50U);
+            opmode_rb = sx1276_read_reg(SX1276_REG_OP_MODE);
+        }
+        if ((opmode_rb & 0x07U) != (desc->opmode & 0x07U)) {
+            /* W1-9 deferred: emit fault for visibility but accept the
+             * mismatch -- chip is stuck in its current mode (typically
+             * LoRa SLEEP).  Subsequent TX/RX FSMs will time out cleanly
+             * via their own deadlines.
+             */
+            host_cmd_emit_fault(HOST_FAULT_CODE_RADIO_OPMODE_DRIFT, opmode_rb);
+        }
+    }
+
 #if HOST_DEBUG_OPMODE_GUARD
     {
         const uint8_t opmode_rb = sx1276_read_reg(SX1276_REG_OP_MODE);
@@ -140,10 +176,39 @@ bool sx1276_modes_to_cad(void) {
 bool sx1276_modes_init(void) {
     s_state = SX1276_STATE_UNINIT;
 
+    /* W1-9 fix #2 (2026-05-11): Set RegTcxo (0x4B) bit 4 (TcxoInputOn=1)
+     * BEFORE any mode transition.  Murata CMWX1ZZABZ-078 supplies a
+     * 32 MHz TCXO whose output drives the SX1276 XTA pin.  The chip's
+     * default RegTcxo = 0x09 enables the internal crystal oscillator,
+     * which expects a real crystal across XTA/XTB; without TcxoInputOn
+     * the digital block has no clock and OPMODE mode-bit transitions
+     * are silently ignored (configuration register writes still latch
+     * because they don't need the digital state machine).  Set this
+     * first while the chip is still in its reset state (FSK STDBY = 0x01,
+     * register write protection minimal) so the TCXO-derived clock is
+     * available for the first OPMODE-mode transition.
+     *
+     * Bench-confirmed (Stage 2 W1-9): with default RegTcxo, RegOpMode
+     * read-back stays at 0x80 / 0x01 forever even via direct
+     * REG_WRITE_REQ from host; with RegTcxo = 0x10, mode transitions
+     * complete normally.
+     */
+    sx1276_write_reg(0x4BU, 0x10U);
+    platform_delay_ms(2U);
+
+    /* W1-9 fix #1 (2026-05-11): Per SX1276 datasheet §4.1.6, the
+     * LongRangeMode bit (bit 7) of RegOpMode (0x01) can only be modified
+     * while the chip is in SLEEP mode of the *current* modem.  After
+     * NRESET the chip boots in FSK STDBY; go to FSK SLEEP first so the
+     * subsequent LoRa-SLEEP write can flip the LongRange bit cleanly.
+     */
+    sx1276_write_reg(SX1276_REG_OP_MODE, 0x00U);
+    platform_delay_ms(1U);
+
     if (!sx1276_modes_to_sleep()) {
         return false;
     }
-
     platform_delay_ms(1U);
+
     return sx1276_modes_to_standby();
 }

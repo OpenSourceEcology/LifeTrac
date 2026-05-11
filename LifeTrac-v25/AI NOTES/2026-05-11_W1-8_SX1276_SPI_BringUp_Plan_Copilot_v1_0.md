@@ -259,3 +259,73 @@ If the bench shows `boot_info.radio_ok == 1` while the version still reads `0x00
 The plan above is a single-shot fix with a strong root-cause confidence. Suggested action: **apply edits Â§5.1 + Â§5.2 + Â§5.3, build, flash, run probe, run 20-cycle quant.** Total bench cost â‰ˆ 1 build + 1 flash + 1 probe + 1 quant â€” well under the 1-hour budget that closed W1-7.
 
 Awaiting user go-ahead to proceed with implementation.
+
+---
+
+## 9. Bench result — 2026-05-11 late-night execution (W1-8 PASSED)
+
+Ran the plan exactly as written in §5. All three edits applied to adio/sx1276.c:
+
+1. SCK retargeted from PA5 to PB3 (AF0).
+2. PA6 (MISO) PUPDR = 01 (pull-up) added.
+3. `while ((SPI1_SR & SPI_SR_BSY) != 0U) { }` BSY-wait added before CR1 disable in `sx1276_spi_init()`.
+
+Build: `firmware.bin` = **16 292 bytes** (+52 from W1-7 baseline of 16 240 — within the +20…+60 estimate in §5.5 step 3).
+
+### 9.1 Method G probe — first try
+
+`REG 0x42 VERSION = 0x12` (was `0x00`). Full register dump showed real, varied silicon contents:
+
+```
+SX1276 register dump:
+  0x00: 69 80 1A 0B 00 52 E4 C0 00 8C 09 2B 20 01 80 00
+  0x10: 00 00 00 00 00 00 00 00 10 00 00 00 00 82 74 64
+  0x20: 00 08 01 FF 00 00 04 00 00 00 00 00 00 50 14 45
+  0x30: 55 C3 05 27 1C 0A 03 0A 42 12 52 1D 00 AF 00 00
+  0x40: 00 00 12 24 2D 00 03 00 04 23 00 09 05 84 32 2B
+  0x50: 14 00 00 00 00 00 00 0F E0 00 0C 00 01 00 5C 78
+  0x60: 00 1C 0E 5B CC 00 01 50 00 00 00 00 00 00 00 0B
+  0x70: D0
+```
+
+Critical checks:
+
+```
+[PASS] ver name present
+[PASS] sx1276 version reg valid
+
+VERDICT: PASS (Stage 1 protocol and register-access checks passed)
+probe_rc[/dev/ttymxc3]=0
+probe_selected_dev=/dev/ttymxc3
+```
+
+W1-7 telemetry remained pristine: `host_parse_err=0`, all per-flag PE/FE/NE/ORE = 0, `rx_ring_ovf=0`, `host_rx_lpuart=24`, `host_rx_usart1=0`.
+
+### 9.2 Regression — W1-7 20-cycle quant
+
+`run_stage1_standard_quant_end_to_end.ps1 -Cycles 20` on the same flashed image:
+
+`cycle=1..20 launcher_rc=0 std_rc=0 final_result=PASS  (x20)`  
+`FINAL_RESULT_PASS=20`
+
+**20/20 PASS** — identical to the W1-7 baseline. No UART regression introduced by the SPI fix.
+
+### 9.3 Acceptance criteria summary
+
+| # | Criterion | Result |
+|---|---|---|
+| W1-8.A | `REG 0x42` reads valid SX127x rev | **PASS** (`0x12`) |
+| W1-8.B | Probe `rc == 0` (all critical checks pass) | **PASS** |
+| W1-8.C | Register dump non-uniform / real silicon | **PASS** |
+| W1-8.D | W1-7 quant = 18/20 (target 20/20) | **PASS** (20/20) |
+| W1-8.E | `host_parse_err` and PE/FE/NE/ORE remain 0 | **PASS** |
+
+### 9.4 Lesson learned
+
+When a working bring-up sketch (`lora_ping.c`) exists for the same hardware unit, **diff its peripheral init against the production driver before touching the production driver**. The SCK pin discrepancy (PA5 vs PB3) was visible in a single grep of both files. Net cost from idea to PASS once that diff was made: 3 small edits, one build, one flash, one probe, one quant. No oscilloscope required. (The §5.6 contingency tree was prepared but not needed — root-cause confidence held.)
+
+### 9.5 Carry-forward to W1-9
+
+The SX1276 is now reachable on SPI1. Next milestone (out of scope here, deferred to a separate plan):
+- W1-9: TX bring-up (set frequency, set mode TX, send a single LoRa packet on 915 MHz, verify TxDone via DIO0).
+- W1-10: RX bring-up under load (continuous RX, FIFO pointer reads, RSSI/SNR sampling, DIO0 RxDone interrupt).

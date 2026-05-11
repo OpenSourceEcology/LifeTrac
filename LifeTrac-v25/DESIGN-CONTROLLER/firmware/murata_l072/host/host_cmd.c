@@ -471,6 +471,7 @@ static void handle_tx_frame(const host_frame_t *frame) {
 static bool reg_write_allowed(uint8_t reg_addr) {
 #if HOST_ALLOW_REG_WRITE_DIAG
     switch (reg_addr) {
+        case 0x01U:  /* W1-9 diag: allow OPMODE for SPI-write isolation */
         case 0x06U:
         case 0x07U:
         case 0x08U:
@@ -480,6 +481,7 @@ static bool reg_write_allowed(uint8_t reg_addr) {
         case 0x26U:
         case 0x31U:
         case 0x37U:
+        case 0x40U:  /* W1-9 diag: allow DIO_MAPPING1 */
             return true;
         default:
             return false;
