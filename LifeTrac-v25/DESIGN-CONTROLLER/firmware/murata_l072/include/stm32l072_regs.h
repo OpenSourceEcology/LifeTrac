@@ -18,8 +18,8 @@
 #define RCC_APB1ENR                MMIO32(RCC_BASE + 0x38UL)
 #define RCC_CSR                    MMIO32(RCC_BASE + 0x74UL)
 
-#define RCC_CR_HSION               (1UL << 8)
-#define RCC_CR_HSIRDY              (1UL << 10)
+#define RCC_CR_HSION               (1UL << 0)
+#define RCC_CR_HSIRDY              (1UL << 2)
 #define RCC_CR_HSEON               (1UL << 16)
 #define RCC_CR_HSERDY              (1UL << 17)
 #define RCC_CR_HSEBYP              (1UL << 18)
@@ -169,6 +169,9 @@
 #define SPI_CR1_MSTR               (1UL << 2)
 #define SPI_CR1_BR_DIV4            (1UL << 3)
 #define SPI_CR1_BR_DIV8            (2UL << 3)
+#define SPI_CR1_BR_DIV16           (3UL << 3)
+#define SPI_CR1_BR_DIV32           (4UL << 3)
+#define SPI_CR1_BR_DIV64           (5UL << 3)
 #define SPI_CR1_SPE                (1UL << 6)
 #define SPI_CR1_LSBFIRST           (1UL << 7)
 #define SPI_CR1_SSI                (1UL << 8)
@@ -223,13 +226,15 @@
 #define NVIC_IPR_BASE              0xE000E400UL
 #define NVIC_IPR(irqn)             MMIO8(NVIC_IPR_BASE + (irqn))
 
-/* IRQ numbers for STM32L072 family. */
+/* IRQ numbers for STM32L072 family (RM0367 Table 58).
+ * IRQ19 is reserved in the STM32L072 vector table; UART IRQs:
+ * USART1=27, USART2=28, AES_RNG_LPUART1=29. */
 #define EXTI0_1_IRQn               5U
 #define EXTI4_15_IRQn              7U
 #define DMA1_Channel4_5_6_7_IRQn   11U
-#define USART1_IRQn                26U
-#define USART2_IRQn                27U
-#define RNG_LPUART1_IRQn           28U
+#define USART1_IRQn                27U
+#define USART2_IRQn                28U
+#define RNG_LPUART1_IRQn           29U
 
 static inline void nvic_enable_irq(uint32_t irqn, uint8_t priority) {
     NVIC_IPR(irqn) = (uint8_t)(priority << 4);

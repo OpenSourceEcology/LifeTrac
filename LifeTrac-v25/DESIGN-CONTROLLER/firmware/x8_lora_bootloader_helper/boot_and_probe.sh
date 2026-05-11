@@ -4,10 +4,17 @@
 # Run AFTER successful flash. Sources 08_boot_user_app.cfg via openocd to
 # drive PA_11=LOW + pulse PF_4, then issues AT+VER? at 19200 8N1 and prints
 # the response. Expect a real version string instead of '+ERR_RX'.
+#
+# 2026-05-11: Restricted DEV_LIST to /dev/ttymxc3 only. Including ttymxc0
+# (the X8 console UART, no termios) caused the writes to loop back via the
+# kernel tty discipline, yielding a non-zero "AT response size" without the
+# L072 actually replying — a false-positive PASS in the standard contract.
+# Override with LIFETRAC_UART_DEV_LIST only when intentionally probing
+# alternate carrier wirings; never re-add /dev/ttymxc0.
 
 set -e
 LOG=/tmp/lifetrac_p0c/boot_probe.log
-DEV_LIST_DEFAULT="/dev/ttymxc3 /dev/ttymxc2 /dev/ttymxc1 /dev/ttymxc0"
+DEV_LIST_DEFAULT="/dev/ttymxc3"
 DEV_LIST="${LIFETRAC_UART_DEV_LIST:-$DEV_LIST_DEFAULT}"
 HELPER_DIR=/tmp/lifetrac_p0c
 mkdir -p $HELPER_DIR
@@ -133,7 +140,22 @@ probe_at_once() {
     sz=$(stat -c %s "$resp_file" 2>/dev/null || echo 0)
   fi
 
-  echo "AT probe result: dev=${dev} baud=${baud} attempt=${attempt} size=${sz} bytes (passive=${passive_sz})" | tee -a "$LOG"
+  # Reject pure-echo: if every byte in the response also appears in the
+  # request bytes ("AT\r\nAT+VER?\r\n"), classify as loopback (size=0).
+  # This is a defence-in-depth check on top of the DEV_LIST restriction.
+  local nonecho_sz=0
+  if [ "$sz" -gt 0 ]; then
+    nonecho_sz=$(python3 -c 'import sys
+req=set(b"AT\r\nAT+VER?\r\n")
+data=open(sys.argv[1],"rb").read()
+print(sum(1 for b in data if b not in req))' "$resp_file" 2>/dev/null || echo 0)
+    if [ "$nonecho_sz" -eq 0 ]; then
+      echo "NOTE: dev=${dev} baud=${baud} attempt=${attempt} response is pure echo of request bytes — treating as loopback (sz=0)" | tee -a "$LOG"
+      sz=0
+    fi
+  fi
+
+  echo "AT probe result: dev=${dev} baud=${baud} attempt=${attempt} size=${sz} bytes (passive=${passive_sz}, nonecho=${nonecho_sz})" | tee -a "$LOG"
 
   if [ "$sz" -gt "$BEST_SZ" ]; then
     BEST_SZ="$sz"

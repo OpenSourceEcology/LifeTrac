@@ -76,6 +76,38 @@ reset_cause_t platform_reset_cause_take(void) {
 void platform_clock_init_hsi16(void) {
     uint32_t timeout = 0U;
 
+    /*
+     * 2026-05-11 W1-7 RX-fix: assert TCXO_VCC enable before probing HSE.
+     * The Murata CMWX1ZZABZ-078 module's 32 MHz TCXO is powered via the
+     * MCU GPIO PA12 on the B-L072Z-LRWAN1 reference design (X-CUBE-LRWAN
+     * BSP `HW_TCXO_ON`).  Without this assert, HSEBYP probe times out
+     * silently and the firmware falls back to HSI16 16 MHz (clock_source
+     * id == 1), which is too imprecise (±1 %) to support 921 600 baud
+     * COBS-framed RX without framing errors.  Cost: ~5 ms TCXO settle
+     * one-shot at boot + ~600 uA when running.
+     *
+     * Sequence:
+     *   1. Enable GPIOA bus clock (idempotent if already on).
+     *   2. Set PA12 MODER = 01 (general purpose output).
+     *   3. Set PA12 OTYPER = 0 (push-pull, default).
+     *   4. Drive PA12 HIGH via BSRR.
+     *   5. Spin ~5 ms (well above the 2 ms TCXO startup spec).
+     *   6. Then proceed to HSE BYPASS probe below.
+     *
+     * If HSE still fails after this assert, the carrier wiring routes
+     * TCXO_VCC differently (R12 / VDD_TCXO rail per BRINGUP_MAX_CARRIER.md);
+     * fall back is unchanged (HSI16 16 MHz with reduced host baud).
+     */
+    RCC_IOPENR |= RCC_IOPENR_GPIOAEN;
+    GPIO_MODER(GPIOA_BASE) = (GPIO_MODER(GPIOA_BASE) & ~(3UL << (12U * 2U)))
+                             | (1UL << (12U * 2U));        /* PA12 = output */
+    GPIO_OTYPER(GPIOA_BASE) &= ~(1UL << 12U);              /* push-pull */
+    GPIO_BSRR(GPIOA_BASE) = (1UL << 12U);                  /* PA12 = HIGH */
+    /* Settle delay: ~5 ms at the MSI default ~2.1 MHz boot clock.
+     * 2.1e6 cycles/s × 5e-3 s ≈ 10 500 cycles; multiply by ~3 for the
+     * cycles-per-iteration of this empty loop = ~3 500 iterations. */
+    for (volatile uint32_t i = 0; i < 4000U; ++i) { __asm__ volatile(""); }
+
     RCC_CR |= RCC_CR_HSEBYP | RCC_CR_HSEON;
     while (((RCC_CR & RCC_CR_HSERDY) == 0U) && timeout < PLATFORM_HSE_READY_TIMEOUT) {
         timeout++;
@@ -86,7 +118,15 @@ void platform_clock_init_hsi16(void) {
         while ((RCC_CFGR & RCC_CFGR_SWS_MASK) != RCC_CFGR_SWS_HSE) {
         }
 
-        RCC_CR &= ~RCC_CR_HSION;
+        /*
+         * 2026-05-10: do NOT disable HSI16 here.  LPUART1 in host_uart_init()
+         * explicitly selects HSI16 as its kernel clock via RCC_CCIPR[11:10]=10.
+         * Disabling HSION while LPUART1 still depends on it stops the host
+         * transport before the first byte is emitted (root cause of W1-7
+         * silence on /dev/ttymxc3).  Leaving HSION asserted alongside HSE is
+         * harmless (cost: ~100uA extra HSI16 idle current).
+         */
+        /* RCC_CR &= ~RCC_CR_HSION;  -- intentionally NOT cleared, see note above */
         s_core_hz = 32000000UL;
         s_clock_source_id = PLATFORM_CLOCK_SOURCE_HSE_OK;
         return;

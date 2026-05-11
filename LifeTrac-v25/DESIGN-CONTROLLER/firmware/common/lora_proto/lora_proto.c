@@ -37,6 +37,26 @@ uint16_t lp_crc16(const uint8_t* buf, size_t len) {
     return crc;
 }
 
+bool lp_build_nonce(uint8_t source_id,
+                    uint16_t seq,
+                    uint32_t epoch_s,
+                    const uint8_t random_tail[5],
+                    uint8_t out_nonce[LP_NONCE_LEN]) {
+    if (random_tail == NULL || out_nonce == NULL) {
+        return false;
+    }
+
+    out_nonce[0] = source_id;
+    out_nonce[1] = (uint8_t)(seq & 0xFFU);
+    out_nonce[2] = (uint8_t)((seq >> 8U) & 0xFFU);
+    out_nonce[3] = (uint8_t)(epoch_s & 0xFFU);
+    out_nonce[4] = (uint8_t)((epoch_s >> 8U) & 0xFFU);
+    out_nonce[5] = (uint8_t)((epoch_s >> 16U) & 0xFFU);
+    out_nonce[6] = (uint8_t)((epoch_s >> 24U) & 0xFFU);
+    memcpy(&out_nonce[7], random_tail, 5U);
+    return true;
+}
+
 size_t lp_kiss_encode(const uint8_t* in, size_t in_len,
                       uint8_t* out, size_t out_max) {
     // IP-305: bound exactly how many bytes each iteration writes (2 for an

@@ -31,6 +31,13 @@ int main(void) {
     sx1276_tx_result_t tx_result;
     bool radio_ok;
     uint8_t radio_version;
+    uint32_t boot_ms;
+    uint8_t rx_seen_latch = 0U;
+    uint8_t diag_marks_latch = 0U;
+    bool emitted_rx_seen = false;
+    bool emitted_rx_inactive = false;
+    bool emitted_parse_error = false;
+    bool emitted_diag_mark = false;
 
     platform_reset_cause_capture_early();
 
@@ -47,10 +54,13 @@ int main(void) {
     radio_ok = sx1276_init();
     if (!radio_ok) {
         host_cmd_emit_fault(HOST_FAULT_CODE_RADIO_INIT_FAIL, 0U);
+        /* TEMPORARY FOR DEBUGGING: Continue even if radio fails to test binary protocol path */
+        platform_diag_trace("M:RADIO_BYPASS\r\n");
     }
     if (radio_ok) {
         radio_ok = sx1276_rx_arm();
     }
+    /* TEMPORARY: Continue even if RX arm fails to test binary protocol path */
 #if LIFETRAC_BENCH_BOOT_HEARTBEAT_ENABLE
     if (radio_ok) {
         host_uart_send_ascii("LT_BOOT_HEARTBEAT stage=radio_ready\\r\\n");
@@ -60,6 +70,7 @@ int main(void) {
 #endif
     radio_version = sx1276_read_version();
     host_cmd_init(radio_ok, radio_version);
+    boot_ms = platform_now_ms();
 
     if (platform_clock_source_id() != PLATFORM_CLOCK_SOURCE_HSE_OK) {
         host_cmd_emit_fault(HOST_FAULT_CODE_CLOCK_HSE_FAILED,
@@ -67,7 +78,42 @@ int main(void) {
     }
 
     for (;;) {
+        const uint32_t now_ms = platform_now_ms();
+
         host_uart_poll_dma();
+        host_uart_service_rx();
+        host_uart_flush_diag_traces();
+
+        rx_seen_latch = (uint8_t)(rx_seen_latch | host_uart_take_rx_seen_flags());
+        diag_marks_latch = (uint8_t)(diag_marks_latch | host_uart_take_diag_marks());
+
+        if (!emitted_rx_seen && rx_seen_latch != 0U) {
+            host_cmd_emit_fault(HOST_FAULT_CODE_HOST_RX_SEEN, rx_seen_latch);
+            host_cmd_emit_stats_snapshot();
+            emitted_rx_seen = true;
+        }
+
+        if (!emitted_diag_mark && diag_marks_latch != 0U) {
+            host_cmd_emit_fault(HOST_FAULT_CODE_HOST_DIAG_MARK, diag_marks_latch);
+            host_cmd_emit_stats_snapshot();
+            emitted_diag_mark = true;
+        }
+
+        if (!emitted_parse_error && host_uart_stats_parse_err() != 0U) {
+            uint32_t parse_err = host_uart_stats_parse_err();
+            uint8_t parse_sub = (parse_err > 0xFFU) ? 0xFFU : (uint8_t)parse_err;
+            host_cmd_emit_fault(HOST_FAULT_CODE_HOST_PARSE_ERROR, parse_sub);
+            host_cmd_emit_stats_snapshot();
+            emitted_parse_error = true;
+        }
+
+        if (!emitted_rx_inactive && !emitted_rx_seen &&
+            ((now_ms - boot_ms) >= 3000U) &&
+            host_uart_stats_rx_bytes() == 0U) {
+            host_cmd_emit_fault(HOST_FAULT_CODE_HOST_RX_INACTIVE, 0U);
+            host_cmd_emit_stats_snapshot();
+            emitted_rx_inactive = true;
+        }
 
         if (host_uart_take_dma_te_events() != 0U) {
             host_cmd_emit_fault(HOST_FAULT_CODE_HOST_DMA_OVERRUN, 0U);

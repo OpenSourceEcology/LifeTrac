@@ -242,6 +242,14 @@ bool lp_kiss_feed(KissDecoder* dec, uint8_t b,
 #define LP_NONCE_LEN  12
 #define LP_TAG_LEN    16
 
+// Build a 12-byte nonce as [source_id|seq_le16|epoch_s_le32|random_tail(5)].
+// Caller owns monotonic sequence and timestamp policy.
+bool lp_build_nonce(uint8_t source_id,
+                    uint16_t seq,
+                    uint32_t epoch_s,
+                    const uint8_t random_tail[5],
+                    uint8_t out_nonce[LP_NONCE_LEN]);
+
 bool lp_encrypt(const uint8_t* key, const uint8_t* nonce,
                 const uint8_t* pt, size_t pt_len,
                 uint8_t* out);

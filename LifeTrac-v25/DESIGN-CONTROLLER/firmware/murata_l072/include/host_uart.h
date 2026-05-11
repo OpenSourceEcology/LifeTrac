@@ -34,8 +34,29 @@ typedef struct host_frame_s {
 #define HOST_DIAG_MARK_VER_URC_SENT          0x08U
 #define HOST_DIAG_MARK_AT_VER_DISPATCHED     0x10U
 
+/*
+ * Deferred RX-path diagnostic trace bitmask. Set from any context (IRQ-safe);
+ * flushed only from foreground via host_uart_flush_diag_traces().  See
+ * AI NOTES/2026-05-11_W1-7_RX_Implementation_Plan_Copilot_v1_2.md §3.
+ */
+#define HOST_TRACE_RX_LPUART1     (1UL << 0)
+#define HOST_TRACE_RX_USART1      (1UL << 1)
+#define HOST_TRACE_ERR_LPUART1    (1UL << 2)
+#define HOST_TRACE_ERR_USART1     (1UL << 3)
+#define HOST_TRACE_PROC_FRAME     (1UL << 4)
+#define HOST_TRACE_COBS_ERR       (1UL << 5)
+#define HOST_TRACE_COBS_OVF       (1UL << 6)
+#define HOST_TRACE_PARSE_ERR      (1UL << 7)
+#define HOST_TRACE_VER_REQ_RX     (1UL << 8)
+#define HOST_TRACE_FRAME_OK       (1UL << 9)
+#define HOST_TRACE_Q_FULL         (1UL << 10)
+#define HOST_TRACE_AT_DISPATCH    (1UL << 11)
+#define HOST_TRACE_RX_RING_OVF    (1UL << 12)
+
 void host_uart_init(uint32_t baud);
 void host_uart_poll_dma(void);
+void host_uart_service_rx(void);
+void host_uart_flush_diag_traces(void);
 bool host_uart_pop_frame(host_frame_t *out_frame);
 
 void host_uart_send_urc(uint8_t type,
@@ -66,6 +87,15 @@ uint32_t host_uart_stats_parse_ok(void);
 uint32_t host_uart_stats_parse_err(void);
 uint32_t host_uart_stats_uart_err_lpuart(void);
 uint32_t host_uart_stats_uart_err_usart1(void);
+uint32_t host_uart_stats_uart_pe_lpuart(void);
+uint32_t host_uart_stats_uart_fe_lpuart(void);
+uint32_t host_uart_stats_uart_ne_lpuart(void);
+uint32_t host_uart_stats_uart_ore_lpuart(void);
+uint32_t host_uart_stats_uart_pe_usart1(void);
+uint32_t host_uart_stats_uart_fe_usart1(void);
+uint32_t host_uart_stats_uart_ne_usart1(void);
+uint32_t host_uart_stats_uart_ore_usart1(void);
+uint32_t host_uart_stats_rx_ring_ovf(void);
 uint32_t host_uart_take_dma_te_events(void);
 uint8_t host_uart_take_rx_seen_flags(void);
 void host_uart_note_diag_mark(uint8_t mark);

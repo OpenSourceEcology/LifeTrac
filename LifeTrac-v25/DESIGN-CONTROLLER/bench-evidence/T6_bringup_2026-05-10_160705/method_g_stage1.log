@@ -1,0 +1,26 @@
+=== Thu May  5 02:54:10 UTC 2022 Method G Stage 1 flash ===
+=== sanity ===
+-rw-rw-rw- 1 fio fio  2334 May  8  2026 /tmp/lifetrac_p0c/07_assert_pa11_pf4_long.cfg
+-rw-rw-rw- 1 fio fio 15276 May 10  2026 /tmp/lifetrac_p0c/firmware.bin
+-rw-rw-rw- 1 fio fio  9818 May  9  2026 /tmp/lifetrac_p0c/stm32_an3155_flasher.py
+fuser /dev/ttymxc3: 
+
+=== launching openocd (600s hold) ===
+OCD_PID=160439
+ASCII fallback diagnostics:
+  pre-drain: no bytes observed
+  reply to ATI: no bytes observed
+  reply to AT+VER?: no bytes observed
+FATAL: probe failed: timeout waiting for response type 0x81 to req 0x01
+probe_rc[/dev/ttymxc1]=2
+-- probe dev=/dev/ttymxc0 --
+============================================================
+Method G Stage 1 Probe
+Device: /dev/ttymxc0 @ 921600 8N1
+Expected target: custom murata_l072 firmware host link
+============================================================
+FATAL: cannot open/configure /dev/ttymxc0: stty: /dev/ttymxc0: Inappropriate ioctl for device
+probe_rc[/dev/ttymxc0]=2
+probe_selected_dev=none
+
+=== DONE: flash=0 probe=2 ===

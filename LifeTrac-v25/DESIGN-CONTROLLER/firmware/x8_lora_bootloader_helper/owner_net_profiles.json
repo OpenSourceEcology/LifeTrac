@@ -1,0 +1,266 @@
+{
+  "profiles": [
+    {
+      "name": "pa11_discriminator_recheck",
+      "description": "Replay known PA11-paired discriminator tuples to re-validate class stability under a common runner.",
+      "evidencePrefix": "T6_profile_pa11_discriminator_recheck",
+      "probeDevice": "/dev/ttymxc3",
+      "baud": 921600,
+      "bootTimeout": 2.0,
+      "cases": [
+        {
+          "cfg": "82a_mixed_tuple_pa11_low_c11_e11_high_halted",
+          "tag": "82a"
+        },
+        {
+          "cfg": "82b_mixed_tuple_pa11_high_c11_e11_high_halted",
+          "tag": "82b"
+        },
+        {
+          "cfg": "83a_mixed_tuple_pa11_low_c12_e12_high_halted",
+          "tag": "83a"
+        },
+        {
+          "cfg": "83b_mixed_tuple_pa11_high_c12_e12_high_halted",
+          "tag": "83b"
+        }
+      ]
+    },
+    {
+      "name": "pa11_inreset_toggle_recheck",
+      "description": "Replay in-reset PA11 toggle branch (85a/85b) with immediate repeats.",
+      "evidencePrefix": "T6_profile_pa11_inreset_toggle",
+      "probeDevice": "/dev/ttymxc3",
+      "baud": 921600,
+      "bootTimeout": 2.0,
+      "cases": [
+        {
+          "cfg": "85a_pa11_toggle_during_reset_postlow_halted",
+          "tag": "85a"
+        },
+        {
+          "cfg": "85a_pa11_toggle_during_reset_postlow_halted",
+          "tag": "85a_r2"
+        },
+        {
+          "cfg": "85b_pa11_toggle_during_reset_posthigh_halted",
+          "tag": "85b"
+        },
+        {
+          "cfg": "85b_pa11_toggle_during_reset_posthigh_halted",
+          "tag": "85b_r2"
+        }
+      ]
+    },
+    {
+      "name": "ownerexp_onehot_replay",
+      "description": "Replay one-hot owner-net expansion branch for PA12/PB12/PC11/PC12/PE11/PE12 under halted baseline.",
+      "evidencePrefix": "T6_profile_ownerexp_onehot",
+      "probeDevice": "/dev/ttymxc3",
+      "baud": 921600,
+      "bootTimeout": 2.0,
+      "cases": [
+        {
+          "cfg": "72a_targeted_pa9_analog_pa11_low_pa12_high_halted",
+          "tag": "72a"
+        },
+        {
+          "cfg": "73a_targeted_pa9_analog_pa11_low_pb12_high_halted",
+          "tag": "73a"
+        },
+        {
+          "cfg": "74a_targeted_pa9_analog_pa11_low_pc11_high_halted",
+          "tag": "74a"
+        },
+        {
+          "cfg": "75a_targeted_pa9_analog_pa11_low_pc12_high_halted",
+          "tag": "75a"
+        },
+        {
+          "cfg": "76a_targeted_pa9_analog_pa11_low_pe11_high_halted",
+          "tag": "76a"
+        },
+        {
+          "cfg": "77a_targeted_pa9_analog_pa11_low_pe12_high_halted",
+          "tag": "77a"
+        }
+      ]
+    },
+    {
+      "name": "ownerexp_derived_uart4_mux_2026-05-10",
+      "description": "Owner-derived UART4 path expansion: target suspected mux SEL and level-shifter OE/DIR control nets. If successful, should recover VER_URC or produce new ATI signature class beyond seeded baselines.",
+      "evidencePrefix": "T6_profile_ownerexp_derived_uart4_mux",
+      "probeDevice": "/dev/ttymxc3",
+      "baud": 921600,
+      "bootTimeout": 2.0,
+      "cases": [
+        {
+          "cfg": "d1rev_uart4_pa12_high_halted",
+          "tag": "d1"
+        },
+        {
+          "cfg": "d2rev_uart4_pb12_high_halted",
+          "tag": "d2"
+        },
+        {
+          "cfg": "d3rev_uart4_pc11_high_halted",
+          "tag": "d3"
+        },
+        {
+          "cfg": "d4rev_uart4_pc12_high_halted",
+          "tag": "d4"
+        },
+        {
+          "cfg": "d5rev_uart4_pe11_high_halted",
+          "tag": "d5"
+        },
+        {
+          "cfg": "d6rev_uart4_pe12_high_halted",
+          "tag": "d6"
+        }
+      ]
+    },
+    {
+      "name": "ownerexp_phase_d1_gpiob_sweep_2026-05-11",
+      "description": "Phase D-1: GPIOB onehot sweep targeting untested H747 control-net pins (PB0–PB11, excepting PB12 already tested in Phase C). Expected outcome: identify at least one pin that enables UART4 TX/RX paths or produces new signature class beyond ATI silence baseline.",
+      "evidencePrefix": "T6_profile_phase_d1_gpiob_sweep",
+      "probeDevice": "/dev/ttymxc3",
+      "baud": 921600,
+      "bootTimeout": 2.0,
+      "cases": [
+        {
+          "cfg": "d7_uart4_pb0_high_halted",
+          "tag": "d7"
+        },
+        {
+          "cfg": "d8_uart4_pb1_high_halted",
+          "tag": "d8"
+        },
+        {
+          "cfg": "d9_uart4_pb2_high_halted",
+          "tag": "d9"
+        },
+        {
+          "cfg": "d10_uart4_pb3_high_halted",
+          "tag": "d10"
+        },
+        {
+          "cfg": "d11_uart4_pb4_high_halted",
+          "tag": "d11"
+        },
+        {
+          "cfg": "d12_uart4_pb5_high_halted",
+          "tag": "d12"
+        },
+        {
+          "cfg": "d13_uart4_pb6_high_halted",
+          "tag": "d13"
+        },
+        {
+          "cfg": "d14_uart4_pb7_high_halted",
+          "tag": "d14"
+        },
+        {
+          "cfg": "d15_uart4_pb8_high_halted",
+          "tag": "d15"
+        },
+        {
+          "cfg": "d16_uart4_pb9_high_halted",
+          "tag": "d16"
+        },
+        {
+          "cfg": "d17_uart4_pb10_high_halted",
+          "tag": "d17"
+        },
+        {
+          "cfg": "d18_uart4_pb11_high_halted",
+          "tag": "d18"
+        }
+      ]
+    },
+    {
+      "name": "ownerexp_phase_d2_gpiof_sweep_2026-05-11",
+      "description": "Phase D-2: GPIOF selective sweep targeting F0–F3, F5–F10 (skipping F4=NRST, already in use). Expected outcome: identify at least one pin that enables UART4 TX/RX paths or produces new signature class. GPIOF is high-priority candidate because F4 is already proven active (NRST), indicating F-bank involvement in boot logic.",
+      "evidencePrefix": "T6_profile_phase_d2_gpiof_sweep",
+      "probeDevice": "/dev/ttymxc3",
+      "baud": 921600,
+      "bootTimeout": 2.0,
+      "cases": [
+        {
+          "cfg": "d19_uart4_pf0_high_halted",
+          "tag": "d19"
+        },
+        {
+          "cfg": "d20_uart4_pf1_high_halted",
+          "tag": "d20"
+        },
+        {
+          "cfg": "d21_uart4_pf2_high_halted",
+          "tag": "d21"
+        },
+        {
+          "cfg": "d22_uart4_pf3_high_halted",
+          "tag": "d22"
+        },
+        {
+          "cfg": "d23_uart4_pf5_high_halted",
+          "tag": "d23"
+        },
+        {
+          "cfg": "d24_uart4_pf6_high_halted",
+          "tag": "d24"
+        },
+        {
+          "cfg": "d25_uart4_pf7_high_halted",
+          "tag": "d25"
+        },
+        {
+          "cfg": "d26_uart4_pf8_high_halted",
+          "tag": "d26"
+        },
+        {
+          "cfg": "d27_uart4_pf9_high_halted",
+          "tag": "d27"
+        },
+        {
+          "cfg": "d28_uart4_pf10_high_halted",
+          "tag": "d28"
+        }
+      ]
+    },
+    {
+      "name": "ownerexp_phase_d3_gpiod_sweep_2026-05-11",
+      "description": "Phase D-3: GPIOD selective sweep targeting D0, D1, D6, D7, D14, D15 (6-pin subset to avoid exhaustive 16-pin sweep). GPIOD is final H747 untested GPIO bank. Expected outcome: identify control-net ownership pins or produce new signature class, else escalate to Phase E (multi-pin/polarity/timing hypotheses).",
+      "evidencePrefix": "T6_profile_phase_d3_gpiod_sweep",
+      "probeDevice": "/dev/ttymxc3",
+      "baud": 921600,
+      "bootTimeout": 2.0,
+      "cases": [
+        {
+          "cfg": "d29_uart4_pd0_high_halted",
+          "tag": "d29"
+        },
+        {
+          "cfg": "d30_uart4_pd1_high_halted",
+          "tag": "d30"
+        },
+        {
+          "cfg": "d31_uart4_pd6_high_halted",
+          "tag": "d31"
+        },
+        {
+          "cfg": "d32_uart4_pd7_high_halted",
+          "tag": "d32"
+        },
+        {
+          "cfg": "d33_uart4_pd14_high_halted",
+          "tag": "d33"
+        },
+        {
+          "cfg": "d34_uart4_pd15_high_halted",
+          "tag": "d34"
+        }
+      ]
+    }
+  ]
+}

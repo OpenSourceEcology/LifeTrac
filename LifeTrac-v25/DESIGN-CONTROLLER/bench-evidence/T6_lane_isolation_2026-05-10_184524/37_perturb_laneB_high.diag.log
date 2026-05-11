@@ -1,0 +1,21 @@
+=== UART RX/TX diagnostic on /dev/ttymxc3 ===
+mode: baud=921600 hwflow=off
+
+Opened fd=3
+  stty -a: speed 921600 baud; rows 0; columns 0; line = 0;
+
+--- Passive listen 1.0s (should be empty since BOOT_URC long gone) ---
+  (no bytes)
+
+--- Sending ATI<CR><LF> ---
+  (no bytes GÇö LPUART1 RX may not be reaching Murata)
+
+--- Sending binary VER_REQ (type=0x01) ---
+  Sending 12 bytes: 000301010201010103bb7a00
+  (no bytes GÇö VER_URC not received)
+
+--- Sending PING_REQ (type=0x00) ---
+  Sending 12 bytes: 000201010202010103c7a400
+  (no bytes)
+
+Done.

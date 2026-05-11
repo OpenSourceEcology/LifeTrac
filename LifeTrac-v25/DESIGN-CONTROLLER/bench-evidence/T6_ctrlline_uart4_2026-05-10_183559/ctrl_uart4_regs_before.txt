@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/tmp/lifetrac_p0c/uart4_regs2.py", line 15, in <module>
+    ucr1 = rd(fd, 0x80)
+  File "/tmp/lifetrac_p0c/uart4_regs2.py", line 8, in rd
+    return struct.unpack("<I", os.read(fd, 4))[0]
+OSError: [Errno 14] Bad address

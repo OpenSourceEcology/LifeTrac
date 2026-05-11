@@ -173,9 +173,24 @@ static void sx1276_gpio_init(void) {
                   RCC_IOPENR_GPIOBEN |
                   RCC_IOPENR_GPIOCEN;
 
-    gpio_mode_alt(GPIOA_BASE, 5U, 0U);
-    gpio_mode_alt(GPIOA_BASE, 6U, 0U);
-    gpio_mode_alt(GPIOA_BASE, 7U, 0U);
+    /* W1-8 fix (2026-05-11): SX1276 SCK is wired to PB3 inside the Murata
+     * CMWX1ZZABZ-078 SiP.  PA5 is wired to SX1276 DIO4.  Driving PA5 as
+     * SPI1_SCK clocks DIO4 instead of SCK and the SX1276 SPI engine never
+     * shifts -- RegVersion (0x42) reads 0x00.  Reference: B-L072Z-LRWAN1
+     * schematic; lora_ping.c gpio_spi_init() also uses PB3=SCK and proves
+     * SPI works on this hardware unit. */
+    gpio_mode_alt(GPIOB_BASE, 3U, 0U);   /* SCK  = PB3 (AF0 = SPI1_SCK)  */
+    gpio_mode_alt(GPIOA_BASE, 6U, 0U);   /* MISO = PA6 (AF0 = SPI1_MISO) */
+    gpio_mode_alt(GPIOA_BASE, 7U, 0U);   /* MOSI = PA7 (AF0 = SPI1_MOSI) */
+
+    /* Pull-up on PA6 (MISO) -- prevents floating reads if SX1276 ever
+     * tristates MISO mid-frame.  lora_ping.c uses the same pull-up. */
+    {
+        uint32_t pupd = GPIO_PUPDR(GPIOA_BASE);
+        pupd &= ~(3UL << (6U * 2U));
+        pupd |= (1UL << (6U * 2U));      /* PUPDR = 01 = pull-up */
+        GPIO_PUPDR(GPIOA_BASE) = pupd;
+    }
 
     gpio_mode_output(SX1276_NSS_PORT, SX1276_NSS_PIN);
     sx1276_select(0U);
@@ -196,15 +211,21 @@ static void sx1276_gpio_init(void) {
 
 static void sx1276_spi_init(void) {
     RCC_APB2ENR |= RCC_APB2ENR_SPI1EN;
+    (void)RCC_APB2ENR;   /* ensure APB2 clock has propagated to SPI1 */
+
+    /* W1-8 (2026-05-11): if the boot ROM or a previous init left SPI1
+     * active, wait for idle before clearing CR1 -- same precaution as
+     * lora_ping.c gpio_spi_init(). */
+    while ((SPI1_SR & SPI_SR_BSY) != 0U) {
+    }
 
     SPI1_CR1 = 0U;
-    SPI1_CR2 = 0U;
+    SPI1_CR2 = SPI_CR2_DS_8BIT | SPI_CR2_FRXTH;
 
     SPI1_CR1 = SPI_CR1_MSTR |
                SPI_CR1_SSM |
                SPI_CR1_SSI |
-               SPI_CR1_BR_DIV8;
-    SPI1_CR2 = SPI_CR2_DS_8BIT | SPI_CR2_FRXTH;
+               SPI_CR1_BR_DIV64;
     SPI1_CR1 |= SPI_CR1_SPE;
 }
 
@@ -254,9 +275,9 @@ bool sx1276_init(void) {
 
 void sx1276_radio_reset(void) {
     gpio_write(SX1276_RESET_PORT, SX1276_RESET_PIN, 0U);
-    platform_delay_ms(2U);
+    platform_delay_ms(5U);
     gpio_write(SX1276_RESET_PORT, SX1276_RESET_PIN, 1U);
-    platform_delay_ms(8U);
+    platform_delay_ms(20U);
 }
 
 uint8_t sx1276_read_reg(uint8_t reg_addr) {

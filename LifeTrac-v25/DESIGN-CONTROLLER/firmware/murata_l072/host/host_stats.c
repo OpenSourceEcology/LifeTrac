@@ -31,6 +31,15 @@ typedef struct host_stats_wire_s {
     uint32_t host_parse_err;
     uint32_t host_uart_err_lpuart;
     uint32_t host_uart_err_usart1;
+    uint32_t host_uart_pe_lpuart;
+    uint32_t host_uart_fe_lpuart;
+    uint32_t host_uart_ne_lpuart;
+    uint32_t host_uart_ore_lpuart;
+    uint32_t host_uart_pe_usart1;
+    uint32_t host_uart_fe_usart1;
+    uint32_t host_uart_ne_usart1;
+    uint32_t host_uart_ore_usart1;
+    uint32_t host_rx_ring_ovf;
 } host_stats_wire_t;
 
 _Static_assert(sizeof(host_stats_wire_t) == HOST_STATS_PAYLOAD_LEN,
@@ -137,7 +146,16 @@ uint16_t host_stats_serialize(uint8_t *out, uint16_t out_cap) {
     put_u32_le(&out[idx], host_uart_stats_parse_ok()); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], host_uart_stats_parse_err()); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], host_uart_stats_uart_err_lpuart()); idx = (uint16_t)(idx + 4U);
-    put_u32_le(&out[idx], host_uart_stats_uart_err_usart1());
+    put_u32_le(&out[idx], host_uart_stats_uart_err_usart1()); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], host_uart_stats_uart_pe_lpuart());  idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], host_uart_stats_uart_fe_lpuart());  idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], host_uart_stats_uart_ne_lpuart());  idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], host_uart_stats_uart_ore_lpuart()); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], host_uart_stats_uart_pe_usart1());  idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], host_uart_stats_uart_fe_usart1());  idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], host_uart_stats_uart_ne_usart1());  idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], host_uart_stats_uart_ore_usart1()); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], host_uart_stats_rx_ring_ovf());
 
     return HOST_STATS_PAYLOAD_LEN;
 }

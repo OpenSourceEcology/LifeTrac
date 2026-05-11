@@ -5,6 +5,7 @@
 #include "host_cfg_wire.h"
 #include "host_stats.h"
 #include "host_types.h"
+#include "host_uart.h"
 #include "platform.h"
 #include "sx1276.h"
 #include "stm32l072_regs.h"
@@ -675,13 +676,25 @@ void host_cmd_init(bool radio_ok, uint8_t radio_version) {
 
     cfg_init();
     host_stats_reset();
+    platform_diag_trace("C:SEND_BOOT\r\n");
     host_send_boot_urc();
 
     if (platform_fault_take_replay(&replay)) {
+        platform_diag_trace("C:SEND_FAULT\r\n");
         host_send_fault_urc(&replay);
     }
 
+    platform_diag_trace("C:SEND_READY\r\n");
     host_send_ready_urc();
+    /* W1-7 RX-debug 2026-05-11: announce active SYSCLK source so we can tell
+     * whether HSE 32 MHz TCXO actually locked or we silently fell back to
+     * HSI16 16 MHz (which kills 921600 baud RX framing tolerance). */
+    if (platform_clock_source_id() == PLATFORM_CLOCK_SOURCE_HSE_OK) {
+        platform_diag_trace("C:CLK_HSE_32M\r\n");
+    } else {
+        platform_diag_trace("C:CLK_HSI_16M\r\n");
+    }
+    platform_diag_trace("C:INIT_DONE\r\n");
 }
 
 void host_cmd_dispatch(const host_frame_t *frame) {
@@ -689,7 +702,10 @@ void host_cmd_dispatch(const host_frame_t *frame) {
         return;
     }
 
+    platform_diag_trace("C:DISPATCH\r\n");
+
     if (frame->ver != HOST_PROTOCOL_VER) {
+        platform_diag_trace("C:BAD_VER\r\n");
         host_uart_send_err_proto(frame->seq,
                                  frame->type,
                                  frame->ver,
@@ -700,6 +716,7 @@ void host_cmd_dispatch(const host_frame_t *frame) {
 
     switch (frame->type) {
         case HOST_TYPE_PING_REQ:
+            platform_diag_trace("C:PING\r\n");
             handle_ping(frame);
             break;
 

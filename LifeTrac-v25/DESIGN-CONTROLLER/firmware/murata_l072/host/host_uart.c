@@ -16,7 +16,7 @@
 
 /* Stage-1 ingress diagnostic: echo raw RX bytes back out on both host TX lanes. */
 #ifndef HOST_UART_RX_ECHO_DIAG
-#define HOST_UART_RX_ECHO_DIAG       1U
+#define HOST_UART_RX_ECHO_DIAG       0U
 #endif
 
 _Static_assert((HOST_DMA_RX_BUF_SIZE % 2U) == 0U,
@@ -59,13 +59,46 @@ static uint32_t s_stats_parse_ok;
 static uint32_t s_stats_parse_err;
 static uint32_t s_stats_uart_err_lpuart;
 static uint32_t s_stats_uart_err_usart1;
+static volatile uint32_t s_stats_uart_pe_lpuart;
+static volatile uint32_t s_stats_uart_fe_lpuart;
+static volatile uint32_t s_stats_uart_ne_lpuart;
+static volatile uint32_t s_stats_uart_ore_lpuart;
+static volatile uint32_t s_stats_uart_pe_usart1;
+static volatile uint32_t s_stats_uart_fe_usart1;
+static volatile uint32_t s_stats_uart_ne_usart1;
+static volatile uint32_t s_stats_uart_ore_usart1;
 static volatile uint32_t s_dma_te_events;
 static volatile uint8_t s_rx_seen_flags;
 static volatile uint8_t s_diag_marks;
-static uint8_t s_trace_first_rx_lpuart;
-static uint8_t s_trace_first_rx_usart1;
-static uint8_t s_trace_first_err_lpuart;
-static uint8_t s_trace_first_err_usart1;
+
+/*
+ * Software RX ring shared between IRQ/poll producers and the foreground
+ * host_uart_service_rx() consumer.  Drain-only IRQs push raw bytes here so
+ * COBS/CRC parsing happens outside any interrupt or PRIMASK=1 context.  See
+ * AI NOTES/2026-05-11_W1-7_RX_Implementation_Plan_Copilot_v1_2.md §3.2.
+ */
+#define HOST_RX_RING_LEN  512U
+_Static_assert((HOST_RX_RING_LEN & (HOST_RX_RING_LEN - 1U)) == 0U,
+               "HOST_RX_RING_LEN must be a power of two");
+
+static volatile uint8_t  s_rx_ring[HOST_RX_RING_LEN];
+static volatile uint16_t s_rx_ring_head;
+static volatile uint16_t s_rx_ring_tail;
+static volatile uint32_t s_rx_ring_ovf;
+
+/* Deferred trace bitmask; OR-set from any context, drained by foreground. */
+static volatile uint32_t s_diag_trace_flags;
+
+/*
+ * UART idle pending flag.  Set from the LPUART1/USART1 ISRs when
+ * USART_ISR_IDLE fires; consumed by host_uart_service_rx() to discard a
+ * stale partial COBS frame that never got its terminating 0x00 (e.g. line
+ * noise during the Method G -> firmware handoff).  Without this reset the
+ * AT shell entry guard (s_cobs_encoded_len == 0 && s_cobs_overflow == 0)
+ * stays false forever and ASCII commands silently feed ingest_binary_byte().
+ * See AI NOTES/2026-05-11_W1-7_RX_Implementation_Plan_Copilot_v1_3.md §9.2.
+ */
+static volatile uint8_t s_rx_idle_pending;
 
 #define HOST_RX_SEEN_FLAG_LPUART             0x01U
 #define HOST_RX_SEEN_FLAG_USART1             0x02U
@@ -83,6 +116,39 @@ static void host_diag_echo_rx_byte(uint8_t byte) {
 #else
     (void)byte;
 #endif
+}
+
+/*
+ * IRQ-safe deferred trace flag setter.  Aligned 32-bit OR is atomic enough
+ * for our use: lost races only delay a redundant trace by one main-loop
+ * tick; we never miss a *category* because every producer ORs into the
+ * same word.
+ */
+static inline void host_uart_note_trace(uint32_t flag) {
+    s_diag_trace_flags |= flag;
+}
+
+static inline bool rx_ring_push(uint8_t b) {
+    const uint16_t head = s_rx_ring_head;
+    const uint16_t next = (uint16_t)((head + 1U) & (HOST_RX_RING_LEN - 1U));
+    if (next == s_rx_ring_tail) {
+        s_rx_ring_ovf++;
+        host_uart_note_trace(HOST_TRACE_RX_RING_OVF);
+        return false;
+    }
+    s_rx_ring[head] = b;
+    s_rx_ring_head = next;
+    return true;
+}
+
+static inline bool rx_ring_pop(uint8_t *out) {
+    const uint16_t tail = s_rx_ring_tail;
+    if (tail == s_rx_ring_head) {
+        return false;
+    }
+    *out = s_rx_ring[tail];
+    s_rx_ring_tail = (uint16_t)((tail + 1U) & (HOST_RX_RING_LEN - 1U));
+    return true;
 }
 
 static uint16_t crc16_ccitt(const uint8_t *data, uint16_t len) {
@@ -107,7 +173,17 @@ static uint32_t usart_brr_from_baud(uint32_t baud) {
         return 1UL;
     }
 
-    return ((256UL * LPUART1_CLOCK_HZ) + (baud / 2UL)) / baud;
+    /*
+     * 2026-05-11: LPUART1 kernel clock is now SYSCLK (set in host_uart_init
+     * via CCIPR[11:10]=01).  When the platform brought up HSE successfully
+     * SYSCLK = 32 MHz from the SX1276 TCXO (±2 ppm); on HSE failure SYSCLK
+     * falls back to HSI16 = 16 MHz (±1 % — RX path will be unreliable in
+     * that degraded mode, which is acceptable since LoRa needs HSE anyway).
+     * Compute BRR from the live core clock so the same code is correct in
+     * both paths.
+     */
+    const uint32_t fck = platform_core_hz();
+    return ((256UL * fck) + (baud / 2UL)) / baud;
 }
 
 static uint32_t usart1_brr_from_baud(uint32_t baud) {
@@ -115,8 +191,10 @@ static uint32_t usart1_brr_from_baud(uint32_t baud) {
         return 1UL;
     }
 
-    /* USART1 uses OVER8 for tighter 921600 baud error at 16 MHz. */
-    const uint32_t div = ((2UL * LPUART1_CLOCK_HZ) + (baud / 2UL)) / baud;
+    /* USART1 (mirror) uses OVER8 for tighter baud error.  USART1SEL defaults
+     * to PCLK2 = SYSCLK with HPRE/PPRE2 = /1, so use the same fck source. */
+    const uint32_t fck = platform_core_hz();
+    const uint32_t div = ((2UL * fck) + (baud / 2UL)) / baud;
     return (div & 0xFFF0UL) | ((div & 0x000FUL) >> 1U);
 }
 
@@ -316,7 +394,7 @@ static void process_encoded_frame(void) {
 
     host_frame_t frame;
     if (!cobs_decode(s_cobs_encoded, s_cobs_encoded_len, decoded, (uint16_t)sizeof(decoded), &decoded_len)) {
-        platform_diag_trace("H:COBS_ERR\r\n");
+        host_uart_note_trace(HOST_TRACE_COBS_ERR);
         s_stats_errors++;
         s_stats_parse_err++;
         s_diag_marks |= HOST_DIAG_MARK_FRAME_PARSE_ERR;
@@ -324,7 +402,7 @@ static void process_encoded_frame(void) {
     }
 
     if (parse_inner_frame(decoded, decoded_len, &frame) != HOST_STATUS_OK) {
-        platform_diag_trace("H:PARSE_ERR\r\n");
+        host_uart_note_trace(HOST_TRACE_PARSE_ERR);
         s_stats_errors++;
         s_stats_parse_err++;
         s_diag_marks |= HOST_DIAG_MARK_FRAME_PARSE_ERR;
@@ -332,15 +410,15 @@ static void process_encoded_frame(void) {
     }
 
     if (frame.type == HOST_TYPE_VER_REQ) {
-        platform_diag_trace("H:VER_REQ_RX\r\n");
+        host_uart_note_trace(HOST_TRACE_VER_REQ_RX);
         s_diag_marks |= HOST_DIAG_MARK_VER_REQ_PARSED;
     }
 
-    platform_diag_trace("H:FRAME_OK\r\n");
+    host_uart_note_trace(HOST_TRACE_FRAME_OK);
     s_stats_parse_ok++;
 
     if (!queue_push(&frame)) {
-        platform_diag_trace("H:Q_FULL\r\n");
+        host_uart_note_trace(HOST_TRACE_Q_FULL);
     }
 }
 
@@ -355,7 +433,7 @@ static void ingest_binary_byte(uint8_t byte) {
 
     if (byte == 0U) {
         if (s_cobs_encoded_len > 0U) {
-            platform_diag_trace("H:PROC_FRAME\r\n");
+            host_uart_note_trace(HOST_TRACE_PROC_FRAME);
             process_encoded_frame();
         }
         s_cobs_encoded_len = 0U;
@@ -363,7 +441,7 @@ static void ingest_binary_byte(uint8_t byte) {
     }
 
     if (s_cobs_encoded_len >= HOST_COBS_ENCODED_MAX) {
-        platform_diag_trace("H:COBS_OVF\r\n");
+        host_uart_note_trace(HOST_TRACE_COBS_OVF);
         s_cobs_overflow = 1U;
         s_cobs_encoded_len = 0U;
         s_stats_errors++;
@@ -397,7 +475,7 @@ static void at_replay_candidate_to_binary(void) {
 
 static void at_finish_line(uint8_t terminator) {
     s_at_line[s_at_line_len] = '\0';
-    platform_diag_trace("H:AT_DISPATCH\r\n");
+    host_uart_note_trace(HOST_TRACE_AT_DISPATCH);
     host_cmd_dispatch_at_line(s_at_line, s_at_line_len);
     at_reset_candidate();
     s_at_ignore_lf = (terminator == (uint8_t)'\r') ? 1U : 0U;
@@ -522,9 +600,25 @@ static void send_inner_frame(const uint8_t *inner, uint16_t inner_len) {
 }
 
 void host_uart_init(uint32_t baud) {
+    /*
+     * 2026-05-11: LPUART1 kernel clock = SYSCLK (CCIPR[11:10] = 01).
+     * platform_clock_init_hsi16() brings SYSCLK up from HSE = 32 MHz via
+     * the SX1276 TCXO (±2 ppm).  This replaces the previous HSI16 source
+     * (±1 % drift) which caused LPUART1 RX to log H:ERR_LPUART1 framing
+     * errors and reject every COBS frame from the i.MX (Step 6 in the
+     * controller TODO; see AI NOTES/2026-05-11_W1-7_HSI16_Root_Cause_And_Fix
+     * Copilot v1.0 §3.4–3.5).  TX worked under HSI16 because the i.MX side
+     * had a calibrated PLL the L072 receiver could lock to; RX failed
+     * because the L072's own sampling clock was the drifting one.
+     *
+     * Defensive: if HSE failed during platform init, SYSCLK = HSI16 and
+     * platform_core_hz() returns 16 MHz; usart_brr_from_baud() handles both
+     * cases.  HSI16 is left enabled in that fallback path so LPUART1 still
+     * has a clock; it will just be the unreliable ±1 % source again.
+     */
     RCC_APB2ENR |= RCC_APB2ENR_USART1EN;
     RCC_APB1ENR |= RCC_APB1ENR_LPUART1EN;
-    RCC_CCIPR = (RCC_CCIPR & ~(3UL << 10U)) | (2UL << 10U);
+    RCC_CCIPR = (RCC_CCIPR & ~(3UL << 10U)) | (1UL << 10U);
 
     usart2_gpio_init();
 
@@ -578,7 +672,149 @@ void host_uart_init(uint32_t baud) {
 }
 
 void host_uart_poll_dma(void) {
-    /* RX is interrupt-driven on the UART lane that is physically routed. */
+    /*
+     * Drain-only fallback: read available RX bytes / error flags from both
+     * host RX lanes and push raw bytes into the software ring.  No
+     * platform_diag_trace, no parser, no cpu_irq_save across the loop body
+     * (was the v1.1 hang root cause — see plan v1.2 §3.4).  Heavy work
+     * happens in host_uart_service_rx() and host_uart_flush_diag_traces().
+     */
+    for (;;) {
+        /*
+         * 2026-05-11 v1.3 §10.6 Residual A fix: poll_dma races with the
+         * RX IRQ on the same RDR.  Both paths read ISR then RDR and push
+         * to the ring; without coordination, foreground can sample
+         * RXNE=1, get preempted by the IRQ which drains RDR, then resume
+         * and re-read RDR (stale or next byte) and push a duplicate.
+         * Wrap each ISR-snapshot + RDR-drain step in a brief critical
+         * section so the foreground operation is atomic w.r.t. the IRQ.
+         */
+        uint32_t poll_irq_state = cpu_irq_save();
+        const uint32_t lpuart_isr = LPUART1_ISR;
+        const uint32_t usart1_isr = USART1_ISR;
+
+        if ((lpuart_isr & (USART_ISR_PE | USART_ISR_FE | USART_ISR_NE | USART_ISR_ORE)) != 0U) {
+            if ((lpuart_isr & USART_ISR_PE) != 0U)  { s_stats_uart_pe_lpuart++; }
+            if ((lpuart_isr & USART_ISR_FE) != 0U)  { s_stats_uart_fe_lpuart++; }
+            if ((lpuart_isr & USART_ISR_NE) != 0U)  { s_stats_uart_ne_lpuart++; }
+            if ((lpuart_isr & USART_ISR_ORE) != 0U) { s_stats_uart_ore_lpuart++; }
+            host_uart_note_trace(HOST_TRACE_ERR_LPUART1);
+            LPUART1_ICR = USART_ICR_PECF |
+                          USART_ICR_FECF |
+                          USART_ICR_NCF |
+                          USART_ICR_ORECF;
+            (void)LPUART1_RDR;
+            s_stats_errors++;
+            s_stats_uart_err_lpuart++;
+            cpu_irq_restore(poll_irq_state);
+            continue;
+        }
+
+        if ((usart1_isr & (USART_ISR_PE | USART_ISR_FE | USART_ISR_NE | USART_ISR_ORE)) != 0U) {
+            if ((usart1_isr & USART_ISR_PE) != 0U)  { s_stats_uart_pe_usart1++; }
+            if ((usart1_isr & USART_ISR_FE) != 0U)  { s_stats_uart_fe_usart1++; }
+            if ((usart1_isr & USART_ISR_NE) != 0U)  { s_stats_uart_ne_usart1++; }
+            if ((usart1_isr & USART_ISR_ORE) != 0U) { s_stats_uart_ore_usart1++; }
+            host_uart_note_trace(HOST_TRACE_ERR_USART1);
+            USART1_ICR = USART_ICR_PECF |
+                         USART_ICR_FECF |
+                         USART_ICR_NCF |
+                         USART_ICR_ORECF;
+            (void)USART1_RDR;
+            s_stats_errors++;
+            s_stats_uart_err_usart1++;
+            cpu_irq_restore(poll_irq_state);
+            continue;
+        }
+
+        if ((lpuart_isr & USART_ISR_RXNE) != 0U) {
+            const uint8_t rx = (uint8_t)LPUART1_RDR;
+            s_stats_rx_bytes++;
+            s_stats_rx_lpuart_bytes++;
+            s_rx_seen_flags |= HOST_RX_SEEN_FLAG_LPUART;
+            host_uart_note_trace(HOST_TRACE_RX_LPUART1);
+            host_diag_echo_rx_byte(rx);
+            (void)rx_ring_push(rx);
+            cpu_irq_restore(poll_irq_state);
+            continue;
+        }
+
+        if ((usart1_isr & USART_ISR_RXNE) != 0U) {
+            const uint8_t rx = (uint8_t)USART1_RDR;
+            s_stats_rx_bytes++;
+            s_stats_rx_usart1_bytes++;
+            s_rx_seen_flags |= HOST_RX_SEEN_FLAG_USART1;
+            host_uart_note_trace(HOST_TRACE_RX_USART1);
+            host_diag_echo_rx_byte(rx);
+            (void)rx_ring_push(rx);
+            cpu_irq_restore(poll_irq_state);
+            continue;
+        }
+
+        cpu_irq_restore(poll_irq_state);
+        break;
+    }
+}
+
+void host_uart_service_rx(void) {
+    /* Foreground COBS/CRC parsing — drain the software RX ring fully. */
+    uint8_t b;
+    while (rx_ring_pop(&b)) {
+        ingest_rx_byte(b);
+    }
+
+    /*
+     * UART-idle recovery: if the line has been idle (gap between frames or
+     * since boot-time noise) and we still hold a partial COBS frame that
+     * never terminated with 0x00, discard it.  Only safe to reset when no
+     * AT candidate is in progress (otherwise the AT line in flight would be
+     * lost) and the ring drained above is empty (no fresh bytes pending).
+     * Fixes W1-7 root cause where boot noise leaves s_cobs_encoded_len > 0
+     * and gates the AT shell entry guard off forever (v1.3 plan §9.2).
+     */
+    if (s_rx_idle_pending != 0U) {
+        uint32_t irq_state = cpu_irq_save();
+        s_rx_idle_pending = 0U;
+        cpu_irq_restore(irq_state);
+#if HOST_AT_SHELL_ENABLE
+        if (s_at_candidate == 0U && (s_cobs_encoded_len != 0U || s_cobs_overflow != 0U)) {
+#else
+        if (s_cobs_encoded_len != 0U || s_cobs_overflow != 0U) {
+#endif
+            s_cobs_encoded_len = 0U;
+            s_cobs_overflow = 0U;
+        }
+    }
+}
+
+void host_uart_flush_diag_traces(void) {
+    /* Drain the deferred trace bitmask under foreground context where
+     * platform_diag_trace() is allowed to block on TX.  Atomically swap
+     * the pending mask to zero so concurrent producers don't race us. */
+    uint32_t flags;
+    {
+        const uint32_t irq_state = cpu_irq_save();
+        flags = s_diag_trace_flags;
+        s_diag_trace_flags = 0U;
+        cpu_irq_restore(irq_state);
+    }
+    if (flags == 0U) {
+        return;
+    }
+
+    if ((flags & HOST_TRACE_RX_LPUART1)  != 0U) { platform_diag_trace("H:RX_LPUART1\r\n"); }
+    if ((flags & HOST_TRACE_RX_USART1)   != 0U) { platform_diag_trace("H:RX_USART1\r\n"); }
+    if ((flags & HOST_TRACE_ERR_LPUART1) != 0U) { platform_diag_trace("H:ERR_LPUART1\r\n"); }
+    if ((flags & HOST_TRACE_ERR_USART1)  != 0U) { platform_diag_trace("H:ERR_USART1\r\n"); }
+    if ((flags & HOST_TRACE_PROC_FRAME)  != 0U) { platform_diag_trace("H:PROC_FRAME\r\n"); }
+    if ((flags & HOST_TRACE_COBS_ERR)    != 0U) { platform_diag_trace("H:COBS_ERR\r\n"); }
+    if ((flags & HOST_TRACE_COBS_OVF)    != 0U) { platform_diag_trace("H:COBS_OVF\r\n"); }
+    if ((flags & HOST_TRACE_PARSE_ERR)   != 0U) { platform_diag_trace("H:PARSE_ERR\r\n"); }
+    if ((flags & HOST_TRACE_VER_REQ_RX)  != 0U) { platform_diag_trace("H:VER_REQ_RX\r\n"); }
+    if ((flags & HOST_TRACE_FRAME_OK)    != 0U) { platform_diag_trace("H:FRAME_OK\r\n"); }
+    if ((flags & HOST_TRACE_Q_FULL)      != 0U) { platform_diag_trace("H:Q_FULL\r\n"); }
+    if ((flags & HOST_TRACE_AT_DISPATCH) != 0U) { platform_diag_trace("H:AT_DISPATCH\r\n"); }
+    if ((flags & HOST_TRACE_RX_RING_OVF) != 0U) { platform_diag_trace("H:RX_RING_OVF\r\n"); }
 }
 
 bool host_uart_pop_frame(host_frame_t *out_frame) {
@@ -678,13 +914,22 @@ void host_uart_stats_reset(void) {
     s_stats_parse_err = 0U;
     s_stats_uart_err_lpuart = 0U;
     s_stats_uart_err_usart1 = 0U;
+    s_stats_uart_pe_lpuart = 0U;
+    s_stats_uart_fe_lpuart = 0U;
+    s_stats_uart_ne_lpuart = 0U;
+    s_stats_uart_ore_lpuart = 0U;
+    s_stats_uart_pe_usart1 = 0U;
+    s_stats_uart_fe_usart1 = 0U;
+    s_stats_uart_ne_usart1 = 0U;
+    s_stats_uart_ore_usart1 = 0U;
     s_dma_te_events = 0U;
     s_rx_seen_flags = 0U;
     s_diag_marks = 0U;
-    s_trace_first_rx_lpuart = 0U;
-    s_trace_first_rx_usart1 = 0U;
-    s_trace_first_err_lpuart = 0U;
-    s_trace_first_err_usart1 = 0U;
+    s_rx_ring_head = 0U;
+    s_rx_ring_tail = 0U;
+    s_rx_ring_ovf = 0U;
+    s_rx_idle_pending = 0U;
+    s_diag_trace_flags = 0U;
 
     cpu_irq_restore(irq_state);
 }
@@ -745,6 +990,16 @@ uint32_t host_uart_stats_uart_err_usart1(void) {
     return s_stats_uart_err_usart1;
 }
 
+uint32_t host_uart_stats_uart_pe_lpuart(void)  { return s_stats_uart_pe_lpuart; }
+uint32_t host_uart_stats_uart_fe_lpuart(void)  { return s_stats_uart_fe_lpuart; }
+uint32_t host_uart_stats_uart_ne_lpuart(void)  { return s_stats_uart_ne_lpuart; }
+uint32_t host_uart_stats_uart_ore_lpuart(void) { return s_stats_uart_ore_lpuart; }
+uint32_t host_uart_stats_uart_pe_usart1(void)  { return s_stats_uart_pe_usart1; }
+uint32_t host_uart_stats_uart_fe_usart1(void)  { return s_stats_uart_fe_usart1; }
+uint32_t host_uart_stats_uart_ne_usart1(void)  { return s_stats_uart_ne_usart1; }
+uint32_t host_uart_stats_uart_ore_usart1(void) { return s_stats_uart_ore_usart1; }
+uint32_t host_uart_stats_rx_ring_ovf(void)     { return s_rx_ring_ovf; }
+
 uint32_t host_uart_take_dma_te_events(void) {
     uint32_t irq_state = cpu_irq_save();
     uint32_t events = s_dma_te_events;
@@ -785,33 +1040,35 @@ void RNG_LPUART1_IRQHandler(void) {
     if ((isr & USART_ISR_IDLE) != 0U) {
         LPUART1_ICR = USART_ICR_IDLECF;
         s_stats_irq_idle++;
+        s_rx_idle_pending = 1U;
     }
 
-    while ((LPUART1_ISR & USART_ISR_RXNE) != 0U) {
-        const uint8_t rx = (uint8_t)LPUART1_RDR;
-        if (s_trace_first_rx_lpuart == 0U) {
-            s_trace_first_rx_lpuart = 1U;
-            platform_diag_trace("H:RX_LPUART1\r\n");
-        }
-        s_stats_rx_bytes++;
-        s_stats_rx_lpuart_bytes++;
-        s_rx_seen_flags |= HOST_RX_SEEN_FLAG_LPUART;
-        host_diag_echo_rx_byte(rx);
-        ingest_rx_byte(rx);
-    }
-
+    /* Drain-only: errors first, then bytes into the software ring.  Heavy
+     * COBS/CRC parsing happens in foreground host_uart_service_rx(). */
     if ((isr & (USART_ISR_PE | USART_ISR_FE | USART_ISR_NE | USART_ISR_ORE)) != 0U) {
-        if (s_trace_first_err_lpuart == 0U) {
-            s_trace_first_err_lpuart = 1U;
-            platform_diag_trace("H:ERR_LPUART1\r\n");
-        }
+        if ((isr & USART_ISR_PE) != 0U)  { s_stats_uart_pe_lpuart++; }
+        if ((isr & USART_ISR_FE) != 0U)  { s_stats_uart_fe_lpuart++; }
+        if ((isr & USART_ISR_NE) != 0U)  { s_stats_uart_ne_lpuart++; }
+        if ((isr & USART_ISR_ORE) != 0U) { s_stats_uart_ore_lpuart++; }
+        host_uart_note_trace(HOST_TRACE_ERR_LPUART1);
         LPUART1_ICR = USART_ICR_PECF |
                       USART_ICR_FECF |
                       USART_ICR_NCF |
                       USART_ICR_ORECF;
-        (void)LPUART1_RDR;
+        (void)LPUART1_RDR;  /* discard erroneous byte, clears RXNE */
         s_stats_errors++;
         s_stats_uart_err_lpuart++;
+        return;
+    }
+
+    while ((LPUART1_ISR & USART_ISR_RXNE) != 0U) {
+        const uint8_t rx = (uint8_t)LPUART1_RDR;
+        s_stats_rx_bytes++;
+        s_stats_rx_lpuart_bytes++;
+        s_rx_seen_flags |= HOST_RX_SEEN_FLAG_LPUART;
+        host_uart_note_trace(HOST_TRACE_RX_LPUART1);
+        host_diag_echo_rx_byte(rx);
+        (void)rx_ring_push(rx);
     }
 }
 
@@ -821,32 +1078,32 @@ void USART1_IRQHandler(void) {
     if ((isr & USART_ISR_IDLE) != 0U) {
         USART1_ICR = USART_ICR_IDLECF;
         s_stats_irq_idle++;
-    }
-
-    while ((USART1_ISR & USART_ISR_RXNE) != 0U) {
-        const uint8_t rx = (uint8_t)USART1_RDR;
-        if (s_trace_first_rx_usart1 == 0U) {
-            s_trace_first_rx_usart1 = 1U;
-            platform_diag_trace("H:RX_USART1\r\n");
-        }
-        s_stats_rx_bytes++;
-        s_stats_rx_usart1_bytes++;
-        s_rx_seen_flags |= HOST_RX_SEEN_FLAG_USART1;
-        host_diag_echo_rx_byte(rx);
-        ingest_rx_byte(rx);
+        s_rx_idle_pending = 1U;
     }
 
     if ((isr & (USART_ISR_PE | USART_ISR_FE | USART_ISR_NE | USART_ISR_ORE)) != 0U) {
-        if (s_trace_first_err_usart1 == 0U) {
-            s_trace_first_err_usart1 = 1U;
-            platform_diag_trace("H:ERR_USART1\r\n");
-        }
+        if ((isr & USART_ISR_PE) != 0U)  { s_stats_uart_pe_usart1++; }
+        if ((isr & USART_ISR_FE) != 0U)  { s_stats_uart_fe_usart1++; }
+        if ((isr & USART_ISR_NE) != 0U)  { s_stats_uart_ne_usart1++; }
+        if ((isr & USART_ISR_ORE) != 0U) { s_stats_uart_ore_usart1++; }
+        host_uart_note_trace(HOST_TRACE_ERR_USART1);
         USART1_ICR = USART_ICR_PECF |
                      USART_ICR_FECF |
                      USART_ICR_NCF |
                      USART_ICR_ORECF;
-        (void)USART1_RDR;
+        (void)USART1_RDR;  /* discard erroneous byte, clears RXNE */
         s_stats_errors++;
         s_stats_uart_err_usart1++;
+        return;
+    }
+
+    while ((USART1_ISR & USART_ISR_RXNE) != 0U) {
+        const uint8_t rx = (uint8_t)USART1_RDR;
+        s_stats_rx_bytes++;
+        s_stats_rx_usart1_bytes++;
+        s_rx_seen_flags |= HOST_RX_SEEN_FLAG_USART1;
+        host_uart_note_trace(HOST_TRACE_RX_USART1);
+        host_diag_echo_rx_byte(rx);
+        (void)rx_ring_push(rx);
     }
 }

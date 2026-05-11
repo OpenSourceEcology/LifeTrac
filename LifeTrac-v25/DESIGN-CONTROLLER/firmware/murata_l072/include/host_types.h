@@ -82,7 +82,18 @@
 #define HOST_STATS_OFFSET_HOST_PARSE_ERR     84U
 #define HOST_STATS_OFFSET_HOST_UART_ERR_LPUART 88U
 #define HOST_STATS_OFFSET_HOST_UART_ERR_USART1 92U
-#define HOST_STATS_PAYLOAD_LEN               96U
+/* v1.2 (W1-7 RX): per-flag UART error counters + RX ring overflow.
+ * Additive only — older parsers tolerate this growth (see plan v1.2 §3.8). */
+#define HOST_STATS_OFFSET_HOST_UART_PE_LPUART  96U
+#define HOST_STATS_OFFSET_HOST_UART_FE_LPUART  100U
+#define HOST_STATS_OFFSET_HOST_UART_NE_LPUART  104U
+#define HOST_STATS_OFFSET_HOST_UART_ORE_LPUART 108U
+#define HOST_STATS_OFFSET_HOST_UART_PE_USART1  112U
+#define HOST_STATS_OFFSET_HOST_UART_FE_USART1  116U
+#define HOST_STATS_OFFSET_HOST_UART_NE_USART1  120U
+#define HOST_STATS_OFFSET_HOST_UART_ORE_USART1 124U
+#define HOST_STATS_OFFSET_HOST_RX_RING_OVF     128U
+#define HOST_STATS_PAYLOAD_LEN               132U
 
 #define HOST_TYPE_BOOT_URC                   0xF0U
 /* FAULT_URC payload: {u8 code, u8 sub, u16 reserved, u32 pc, u32 lr, u32 psr, u32 bfar, u32 uptime_ms} */

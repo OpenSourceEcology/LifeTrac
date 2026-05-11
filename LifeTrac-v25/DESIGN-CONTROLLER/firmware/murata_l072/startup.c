@@ -194,7 +194,8 @@ const isr_handler_t g_pfnVectors[] = {
     TIM3_IRQHandler,
     TIM6_DAC_IRQHandler,
     TIM7_IRQHandler,
-    TIM21_IRQHandler,
+        0,                         /* IRQ19 reserved (RM0367 Table 58) */
+        TIM21_IRQHandler,
     I2C3_IRQHandler,
     TIM22_IRQHandler,
     I2C1_IRQHandler,

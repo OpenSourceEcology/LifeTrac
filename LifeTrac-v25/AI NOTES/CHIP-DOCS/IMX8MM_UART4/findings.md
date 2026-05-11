@@ -11,3 +11,9 @@
 - Controlled A/B behavior is confirmed:
 	- STM32 ROM mode is reachable and responds at 19200 8E1.
 	- User firmware mode emits outbound URCs but does not receive host ingress on the same path.
+- From the official Portenta Max Carrier user-manual topology table, the following active devices are present and should be treated as first-class route-control candidates on UART-adjacent paths:
+	- `U16-U19`: `74LVC1G157` (single 2-input multiplexers)
+	- `U8/U20/U21/U22`: `SN74LVC1T45` (bi-directional level converters)
+	- `U10`: `SN74LVC1G125` (single bus buffer gate)
+	- `U23`: `CMWX1ZZABZ-078` Murata LPWAN module
+- This component inventory supports the current blocker classification that ingress may be gated by control ownership (OE/SEL/EN/DIR) rather than by baud/framing only.

@@ -15,7 +15,10 @@ IMAGE=${1:-$TOOLDIR/firmware.bin}
 FLASH=$TOOLDIR/run_flash_l072.sh
 PROBE=$TOOLDIR/method_g_stage1_probe.py
 CFG_BOOT=$TOOLDIR/08_boot_user_app.cfg
-DEV=/dev/ttymxc3
+DEV_LIST_DEFAULT="/dev/ttymxc3 /dev/ttymxc2 /dev/ttymxc1 /dev/ttymxc0"
+DEV_LIST=${LIFETRAC_UART_DEV_LIST:-$DEV_LIST_DEFAULT}
+DEV_LIST_EFFECTIVE="$DEV_LIST"
+DEV=""
 LOG=$TOOLDIR/method_g_stage1.log
 OCD_LOG=$TOOLDIR/method_g_stage1_ocd.log
 EARLY_UART_19200_LOG=$TOOLDIR/method_g_stage1_early_uart_19200.log
@@ -25,6 +28,53 @@ EARLY_UART_921600_LOG=$TOOLDIR/method_g_stage1_early_uart_921600.log
 : > "$OCD_LOG"
 : > "$EARLY_UART_19200_LOG"
 : > "$EARLY_UART_921600_LOG"
+
+serial_dev_usable() {
+  local dev="$1"
+  local stty_log="/tmp/stage1_stty_$(basename "$dev").log"
+
+  if [ ! -e "$dev" ]; then
+    return 1
+  fi
+
+  if [ ! -c "$dev" ]; then
+    return 1
+  fi
+
+  stty -F "$dev" 921600 cs8 -parenb -cstopb raw -echo > "$stty_log" 2>&1
+  local stty_rc=$?
+  if [ "$stty_rc" -ne 0 ]; then
+    return 1
+  fi
+
+  return 0
+}
+
+# Add any currently visible UART endpoints to the sweep list.
+for auto_dev in /dev/ttymxc* /dev/ttyX* /dev/ttyUSB* /dev/ttyACM*; do
+  if [ ! -e "$auto_dev" ]; then
+    continue
+  fi
+
+  case " $DEV_LIST_EFFECTIVE " in
+    *" $auto_dev "*)
+      ;;
+    *)
+      DEV_LIST_EFFECTIVE="$DEV_LIST_EFFECTIVE $auto_dev"
+      ;;
+  esac
+done
+
+for candidate_dev in $DEV_LIST_EFFECTIVE; do
+  if serial_dev_usable "$candidate_dev"; then
+    DEV="$candidate_dev"
+    break
+  fi
+done
+
+if [ -z "$DEV" ]; then
+  DEV=/dev/ttymxc3
+fi
 
 if [ ! -f "$FLASH" ]; then
   echo "ERROR: missing $FLASH" | tee -a "$LOG"
@@ -79,7 +129,9 @@ fuser -k "$DEV" 2>/dev/null || true
 # while safe_mode_listen holds (500ms window). Starting the capture here
 # ensures we see the URC rather than it racing against a sequential 19200
 # window that would only show the same bytes as garbage.
-stty -F "$DEV" 921600 cs8 -parenb -cstopb raw -echo
+if ! stty -F "$DEV" 921600 cs8 -parenb -cstopb raw -echo; then
+  echo "WARN: early capture setup failed for $DEV" | tee -a "$LOG"
+fi
 # No byte-count limit — rely purely on timeout so the capture stays open
 # long enough for BOOT_URC which arrives ~500ms after NRST (after
 # safe_mode_listen completes). A count=4096 cap was filling in ~44ms from
@@ -106,8 +158,42 @@ fi
 
 echo "" | tee -a "$LOG"
 echo "=== $(date) Stage 1 probe ===" | tee -a "$LOG"
-python3 -u "$PROBE" --dev "$DEV" --baud 921600 2>&1 | tee -a "$LOG"
-PROBE_RC=${PIPESTATUS[0]}
+echo "Probe device sweep: $DEV_LIST_EFFECTIVE" | tee -a "$LOG"
+
+PROBE_RC=2
+PROBE_DEV=""
+for candidate_dev in $DEV_LIST_EFFECTIVE; do
+  if [ ! -e "$candidate_dev" ]; then
+    echo "skip probe dev=$candidate_dev (not present)" | tee -a "$LOG"
+    continue
+  fi
+
+  if ! serial_dev_usable "$candidate_dev"; then
+    echo "skip probe dev=$candidate_dev (not usable serial tty)" | tee -a "$LOG"
+    continue
+  fi
+
+  fuser -k "$candidate_dev" 2>/dev/null || true
+  sleep 0.1
+
+  echo "-- probe dev=$candidate_dev --" | tee -a "$LOG"
+  python3 -u "$PROBE" --dev "$candidate_dev" --baud 921600 2>&1 | tee -a "$LOG"
+  CANDIDATE_RC=${PIPESTATUS[0]}
+  echo "probe_rc[$candidate_dev]=$CANDIDATE_RC" | tee -a "$LOG"
+
+  if [ "$CANDIDATE_RC" -eq 0 ]; then
+    PROBE_RC=0
+    PROBE_DEV="$candidate_dev"
+    break
+  fi
+
+  if [ "$PROBE_RC" -eq 2 ] && [ "$CANDIDATE_RC" -eq 1 ]; then
+    PROBE_RC=1
+    PROBE_DEV="$candidate_dev"
+  fi
+done
+
+echo "probe_selected_dev=${PROBE_DEV:-none}" | tee -a "$LOG"
 
 echo "" | tee -a "$LOG"
 echo "=== DONE: flash=$FLASH_RC probe=$PROBE_RC ===" | tee -a "$LOG"

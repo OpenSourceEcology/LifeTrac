@@ -356,6 +356,18 @@ def parse_stats(payload: bytes) -> dict:
         "host_parse_err",
         "host_uart_err_lpuart",
         "host_uart_err_usart1",
+        # v1.2 (W1-7 RX) additive: per-flag UART error counters + RX ring overflow.
+        # Older firmware (96-byte payload) simply omits these — handled by the
+        # `offset + 4 <= len(payload)` guard below.
+        "host_uart_pe_lpuart",
+        "host_uart_fe_lpuart",
+        "host_uart_ne_lpuart",
+        "host_uart_ore_lpuart",
+        "host_uart_pe_usart1",
+        "host_uart_fe_usart1",
+        "host_uart_ne_usart1",
+        "host_uart_ore_usart1",
+        "host_rx_ring_ovf",
     ]
     stats = {}
     for index, label in enumerate(labels):
@@ -578,6 +590,77 @@ def run_ascii_diagnostics(link: HostLink) -> None:
         print_decoded_frames(f"  reply to {cmd.strip()}", reply)
 
 
+def print_uart_flag_counters(label: str, stats: dict) -> None:
+    """v1.3 Phase D2: emit per-flag UART error counters from the 132-byte STATS payload.
+
+    Older firmware (96-byte payload) simply omits these keys, in which case
+    parse_stats() leaves them out of the dict and we print a note.
+    """
+    new_keys = (
+        "host_uart_pe_lpuart",
+        "host_uart_fe_lpuart",
+        "host_uart_ne_lpuart",
+        "host_uart_ore_lpuart",
+        "host_uart_pe_usart1",
+        "host_uart_fe_usart1",
+        "host_uart_ne_usart1",
+        "host_uart_ore_usart1",
+        "host_rx_ring_ovf",
+    )
+    if not any(k in stats for k in new_keys):
+        print(f"{label} per-flag: <not present in payload (legacy 96B firmware)>")
+        return
+    print(
+        f"{label} per-flag LPUART1: "
+        f"PE={stats.get('host_uart_pe_lpuart', 0)} "
+        f"FE={stats.get('host_uart_fe_lpuart', 0)} "
+        f"NE={stats.get('host_uart_ne_lpuart', 0)} "
+        f"ORE={stats.get('host_uart_ore_lpuart', 0)}"
+    )
+    print(
+        f"{label} per-flag USART1:  "
+        f"PE={stats.get('host_uart_pe_usart1', 0)} "
+        f"FE={stats.get('host_uart_fe_usart1', 0)} "
+        f"NE={stats.get('host_uart_ne_usart1', 0)} "
+        f"ORE={stats.get('host_uart_ore_usart1', 0)}"
+    )
+    print(f"{label} ring overflow:  rx_ring_ovf={stats.get('host_rx_ring_ovf', 0)}")
+
+
+def attempt_stats_dump_on_failure(link: HostLink) -> None:
+    """v1.3 Phase D2: best-effort STATS capture after VER_REQ timeout.
+
+    Drains any pending frames first, then issues STATS_DUMP_REQ with a
+    generous timeout so the per-flag UART error counters reach stdout.
+    """
+    print("Phase D2: attempting STATS_DUMP_REQ after failure")
+    pending = link.read_frames(0.2)
+    for frame in pending:
+        if frame["type"] == HOST_TYPE_STATS_URC:
+            stats = parse_stats(frame["payload"])
+            print(f"  drained late STATS_URC seq={frame['seq']} payload_len={len(frame['payload'])}")
+            print_uart_flag_counters("  drained STATS_URC", stats)
+        elif frame["type"] == HOST_TYPE_FAULT_URC:
+            print(f"  drained FAULT_URC: {format_fault_payload(frame['payload'])}")
+        elif frame["type"] == HOST_TYPE_ERR_PROTO_URC:
+            print(f"  drained ERR_PROTO_URC: {format_err_proto_payload(frame['payload'])}")
+    frame = link.request(HOST_TYPE_STATS_DUMP_REQ, HOST_TYPE_STATS_URC, timeout=2.0)
+    payload = frame["payload"]
+    stats = parse_stats(payload)
+    print(f"  STATS_URC(D2) payload_len={len(payload)} seq={frame['seq']}")
+    print(
+        "  STATS_URC(D2): "
+        f"host_rx_bytes={stats.get('host_rx_bytes', 0)} "
+        f"host_rx_lpuart={stats.get('host_rx_lpuart_bytes', 0)} "
+        f"host_rx_usart1={stats.get('host_rx_usart1_bytes', 0)} "
+        f"host_parse_ok={stats.get('host_parse_ok', 0)} "
+        f"host_parse_err={stats.get('host_parse_err', 0)} "
+        f"uart_err_lpuart={stats.get('host_uart_err_lpuart', 0)} "
+        f"uart_err_usart1={stats.get('host_uart_err_usart1', 0)}"
+    )
+    print_uart_flag_counters("  STATS_URC(D2)", stats)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Method G Stage 1 custom-firmware probe")
     parser.add_argument("--dev", default=DEV_DEFAULT, help=f"UART device (default: {DEV_DEFAULT})")
@@ -614,6 +697,7 @@ def main() -> int:
                     f"uart_err_lpuart={stats.get('host_uart_err_lpuart', 0)} "
                     f"uart_err_usart1={stats.get('host_uart_err_usart1', 0)}"
                 )
+                print_uart_flag_counters("STATS_URC(init)", stats)
             elif frame["type"] == HOST_TYPE_FAULT_URC:
                 print(f"FAULT_URC: {format_fault_payload(frame['payload'])}")
             elif frame["type"] == HOST_TYPE_READY_URC:
@@ -657,6 +741,7 @@ def main() -> int:
             f"uart_err_lpuart={stats.get('host_uart_err_lpuart', 0)} "
             f"uart_err_usart1={stats.get('host_uart_err_usart1', 0)}"
         )
+        print_uart_flag_counters("STATS_URC", stats)
 
         regs = dump_registers(link)
         version_reg = regs[SX1276_REG_VERSION]
@@ -687,6 +772,13 @@ def main() -> int:
         print("VERDICT: PASS (Stage 1 protocol and register-access checks passed)")
         return 0
     except Exception as exc:
+        # v1.3 Phase D2: on any failure (most importantly VER_REQ timeout)
+        # try to drain a STATS_URC so the per-flag UART error counters in
+        # the 132-byte payload land in stdout. Best-effort; never raises.
+        try:
+            attempt_stats_dump_on_failure(link)
+        except Exception as stats_exc:
+            print(f"Phase D2 stats-on-failure capture failed: {stats_exc}")
         try:
             run_ascii_diagnostics(link)
         except Exception as diag_exc:
