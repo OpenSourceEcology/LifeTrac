@@ -274,10 +274,27 @@ bool sx1276_init(void) {
 }
 
 void sx1276_radio_reset(void) {
+    /* W1-9c (2026-05-12): match Semtech LoRaMac-node SX1276Reset() pattern.
+     * Reference: Lora-net/LoRaMac-node src/boards/B-L072Z-LRWAN1/sx1276-board.c
+     *
+     *   GpioInit(Reset, OUTPUT, PUSH_PULL, NO_PULL, 0); // drive LOW
+     *   DelayMs(1);
+     *   GpioInit(Reset, INPUT, PUSH_PULL, NO_PULL, 1);  // Hi-Z release
+     *   DelayMs(6);
+     *
+     * Releasing NRESET as Hi-Z (and letting the SX1276's internal pull-up
+     * raise the line) avoids the MCU's push-pull HIGH driver fighting the
+     * chip's internal pull-up during the brief window when the SX1276
+     * digital block is sampling NRESET.  Active push-pull HIGH release is
+     * a known cause of the chip latching into a state where SPI register
+     * writes succeed but RegOpMode mode-bit transitions are silently
+     * ignored -- exactly the W1-9 OPMODE-stuck symptom.
+     */
+    gpio_mode_output(SX1276_RESET_PORT, SX1276_RESET_PIN);
     gpio_write(SX1276_RESET_PORT, SX1276_RESET_PIN, 0U);
-    platform_delay_ms(5U);
-    gpio_write(SX1276_RESET_PORT, SX1276_RESET_PIN, 1U);
-    platform_delay_ms(20U);
+    platform_delay_ms(1U);
+    gpio_mode_input(SX1276_RESET_PORT, SX1276_RESET_PIN);
+    platform_delay_ms(6U);
 }
 
 uint8_t sx1276_read_reg(uint8_t reg_addr) {

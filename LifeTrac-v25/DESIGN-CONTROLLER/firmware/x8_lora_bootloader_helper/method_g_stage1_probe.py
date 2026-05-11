@@ -179,6 +179,14 @@ class HostLink:
         self.fd = os.open(dev, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
         self.rx_buf = bytearray()
         self.seq = 1
+        # Frames received but not consumed by the matching request() call.
+        # Drained first by subsequent read_frames()/request()/wait_*() so URCs
+        # that arrive in the middle of a request/response cannot be lost.
+        # 2026-05-12 W1-9e fix: previously these frames were kept only in a
+        # local 'pending' list inside request() and silently discarded on
+        # return, which dropped TX_DONE_URC arriving during post-TX_FRAME_REQ
+        # diagnostic REG_READ_REQs.
+        self.urc_queue = []
 
     def close(self) -> None:
         os.close(self.fd)
@@ -245,6 +253,16 @@ class HostLink:
     def read_frames(self, timeout: float):
         deadline = time.time() + timeout
         frames = []
+        # 2026-05-12 W1-9e fix: drain any frames stashed by previous request()
+        # calls before reading new bytes from the wire.
+        # 2026-05-12 W1-9b refinement: if the queue has frames, return them
+        # immediately (caller may want them). If the caller wants more, they
+        # call read_frames again — which will then proceed to the wire-read
+        # path below since the queue is now empty.
+        if self.urc_queue:
+            frames.extend(self.urc_queue)
+            self.urc_queue.clear()
+            return frames
         while time.time() < deadline:
             try:
                 chunk = os.read(self.fd, 1024)
@@ -281,19 +299,50 @@ class HostLink:
     def request(self, req_type: int, rsp_type: int, payload: bytes = b"", timeout: float = 1.0) -> dict:
         seq = self.send(req_type, payload)
         deadline = time.time() + timeout
-        pending = []
-        while time.time() < deadline:
-            pending.extend(self.read_frames(0.1))
-            kept = []
-            for frame in pending:
+        # 2026-05-12 W1-9b fix: drain urc_queue ONCE up front. Subsequent
+        # iterations must read from the wire — otherwise read_frames() keeps
+        # returning the same queued (non-matching) frames every iteration
+        # without ever pulling new bytes, and request() spins until timeout.
+        pending = list(self.urc_queue)
+        self.urc_queue.clear()
+        while True:
+            if not pending:
+                if time.time() >= deadline:
+                    raise TimeoutError(
+                        f"timeout waiting for response type 0x{rsp_type:02X} "
+                        f"to req 0x{req_type:02X}"
+                    )
+                pending = self.read_frames(0.1)
+            keep = []
+            matched = None
+            for idx, frame in enumerate(pending):
                 if frame["type"] == rsp_type and frame["seq"] == seq:
-                    return frame
+                    matched = (idx, frame)
+                    break
                 if frame["type"] == HOST_TYPE_ERR_PROTO_URC and frame["seq"] == seq:
+                    self.urc_queue.extend(keep + pending[idx + 1:])
                     details = format_err_proto_payload(frame["payload"])
                     raise RuntimeError(f"ERR_PROTO for req 0x{req_type:02X}: {details}")
-                kept.append(frame)
-            pending = kept
-        raise TimeoutError(f"timeout waiting for response type 0x{rsp_type:02X} to req 0x{req_type:02X}")
+                # Stale type-match (response from prior request that was
+                # given up on) — discard so it doesn't cycle in urc_queue.
+                if frame["type"] == rsp_type:
+                    print(
+                        f"INFO: discarding stale type=0x{frame['type']:02X} "
+                        f"seq={frame['seq']} (waiting for seq={seq})"
+                    )
+                    continue
+                keep.append(frame)
+            if matched is not None:
+                idx, frame = matched
+                leftovers = keep + pending[idx + 1:]
+                if leftovers:
+                    self.urc_queue.extend(leftovers)
+                return frame
+            # No match in this batch — keep unrelated frames for later
+            # consumers, then drop back to the wire-read path.
+            if keep:
+                self.urc_queue.extend(keep)
+            pending = []
 
 
 def parse_boot(payload: bytes) -> dict:

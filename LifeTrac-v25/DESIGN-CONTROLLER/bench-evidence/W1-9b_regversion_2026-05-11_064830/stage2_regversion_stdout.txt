@@ -1,0 +1,48 @@
+env=== Thu May  5 17:35:03 UTC 2022 Method H Stage 2 boot user app ===
+boot_ocd_rc=0
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: ensure GPIOA + GPIOF clocks enabled
+  RCC_AHB4ENR before = 0
+  RCC_AHB4ENR after  = 33
+Phase B: ensure PA_11 + PF_4 are outputs (preserve other bits)
+Phase C: drop BOOT0 (PA_11 -> LOW) so L072 boots from flash
+  GPIOA_IDR.PA_11 = 0   (expect 0)
+Phase D: pulse NRST (PF_4 LOW 250 ms then HIGH)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+
+DONE: BOOT0 LOW, NRST released. L072 should now run user firmware.
+Allow ~500 ms then probe UART (e.g. AT command at 19200 8N1).
+shutdown command invoked
+
+=== Thu May  5 17:35:04 UTC 2022 Stage 2 probe (mode=regversion) on /dev/ttymxc3 ===
+MODE: regversion
+dev=/dev/ttymxc3 baud=921600
+=== W1-9b probe T1: RegVersion burst (count=1024) ===
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x04 sub=0x80 raw=048000000000000000000000000000000000000022000000
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x04 sub=0x80 raw=048000000000000000000000000000000000000029000000
+BOOT_URC observed during settle (payload=000112010101)
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x08 sub=0x01 raw=08010000000000000000000000000000000000002b000000
+T0: STATS(before) host_parse_err=0
+T1 burst: correct=1024 zero=0 other=0 errors=0 elapsed=10.94s rate=93.6/s
+__T1_TRANSPORT__=PASS
+__T1_NON_VERSION_READS__=0
+__T1_REQUEST_ERRORS__=0
+__W1_9B_VERDICT__=T1_PASS
+probe_rc[/dev/ttymxc3][regversion]=0
+
+=== DONE: boot=0 probe=0 ===
+__METHOD_H_RC__=0
+

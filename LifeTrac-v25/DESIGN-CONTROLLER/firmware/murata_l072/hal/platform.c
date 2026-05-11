@@ -103,6 +103,23 @@ void platform_clock_init_hsi16(void) {
                              | (1UL << (12U * 2U));        /* PA12 = output */
     GPIO_OTYPER(GPIOA_BASE) &= ~(1UL << 12U);              /* push-pull */
     GPIO_BSRR(GPIOA_BASE) = (1UL << 12U);                  /* PA12 = HIGH */
+
+    /*
+     * 2026-05-12 W1-9d: also drive PB6 HIGH for TCXO_VCC enable.
+     * ABX00043 carrier straps R12 0R (PB6 -> VDD_TCX0) with R86 DNP, so
+     * PA12 above does nothing on this board.  hardwario/lora-modem's
+     * TCXO_PIN==2 build variant documents PB6 as a Murata-SiP-supported
+     * TCXO control pin.  Risk: zero -- PB6 currently floats; HIGH cannot
+     * disturb a pin already 0R-strapped to a +3V3-tied rail.
+     * Acceptance: BOOT_URC.clock_source_id should report 0 (HSE_OK)
+     * after this edit; previously always 1 (HSI_FALLBACK).
+     */
+    RCC_IOPENR |= RCC_IOPENR_GPIOBEN;
+    GPIO_MODER(GPIOB_BASE) = (GPIO_MODER(GPIOB_BASE) & ~(3UL << (6U * 2U)))
+                             | (1UL << (6U * 2U));         /* PB6 = output */
+    GPIO_OTYPER(GPIOB_BASE) &= ~(1UL << 6U);               /* push-pull */
+    GPIO_BSRR(GPIOB_BASE) = (1UL << 6U);                   /* PB6 = HIGH */
+
     /* Settle delay: ~5 ms at the MSI default ~2.1 MHz boot clock.
      * 2.1e6 cycles/s × 5e-3 s ≈ 10 500 cycles; multiply by ~3 for the
      * cycles-per-iteration of this empty loop = ~3 500 iterations. */
@@ -113,25 +130,21 @@ void platform_clock_init_hsi16(void) {
         timeout++;
     }
 
-    if ((RCC_CR & RCC_CR_HSERDY) != 0U) {
-        RCC_CFGR = (RCC_CFGR & ~RCC_CFGR_SW_MASK) | RCC_CFGR_SW_HSE;
-        while ((RCC_CFGR & RCC_CFGR_SWS_MASK) != RCC_CFGR_SWS_HSE) {
-        }
-
-        /*
-         * 2026-05-10: do NOT disable HSI16 here.  LPUART1 in host_uart_init()
-         * explicitly selects HSI16 as its kernel clock via RCC_CCIPR[11:10]=10.
-         * Disabling HSION while LPUART1 still depends on it stops the host
-         * transport before the first byte is emitted (root cause of W1-7
-         * silence on /dev/ttymxc3).  Leaving HSION asserted alongside HSE is
-         * harmless (cost: ~100uA extra HSI16 idle current).
-         */
-        /* RCC_CR &= ~RCC_CR_HSION;  -- intentionally NOT cleared, see note above */
-        s_core_hz = 32000000UL;
-        s_clock_source_id = PLATFORM_CLOCK_SOURCE_HSE_OK;
-        return;
-    }
-
+    /*
+     * 2026-05-12 W1-9d follow-up: this function's contract is "init HSI16"
+     * (per its name + the lora_ping.c "Force HSI16 (proven path)" comment).
+     * Switching SYSCLK to HSE 32 MHz on success silently doubled the USART1
+     * kernel clock (USART1 uses SYSCLK by default per RCC_CCIPR[1:0]=00),
+     * halving the effective baud and breaking the 921 600 host transport.
+     * Pre-W1-9d this never tripped because HSE never locked (TCXO unpowered);
+     * once PB6 powered the TCXO and HSERDY started asserting, the long-dormant
+     * SYSCLK switch surfaced as TRANSPORT_FAIL on the W1-9b T2 probe.
+     *
+     * New behavior: probe HSE for diagnostic only; report HSE_OK in BOOT_URC.
+     * clock_source_id when HSERDY asserts, but always keep SYSCLK on HSI16.
+     * SX1276 still benefits from PB6 powering TCXO_VCC -- that is independent
+     * of which clock the L072 SYSCLK runs on.
+     */
     RCC_CR |= RCC_CR_HSION;
     while ((RCC_CR & RCC_CR_HSIRDY) == 0U) {
     }
@@ -141,7 +154,9 @@ void platform_clock_init_hsi16(void) {
     }
 
     s_core_hz = 16000000UL;
-    s_clock_source_id = PLATFORM_CLOCK_SOURCE_HSI_FALLBACK;
+    s_clock_source_id = ((RCC_CR & RCC_CR_HSERDY) != 0U)
+                        ? PLATFORM_CLOCK_SOURCE_HSE_OK
+                        : PLATFORM_CLOCK_SOURCE_HSI_FALLBACK;
 }
 
 uint8_t platform_clock_source_id(void) {

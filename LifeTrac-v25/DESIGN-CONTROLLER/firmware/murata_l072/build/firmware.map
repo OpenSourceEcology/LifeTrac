@@ -240,7 +240,7 @@ END GROUP
 .boot_rodata    0x080000c4       0x14
  .boot_rodata   0x080000c4       0x14 build/boot/safe_mode.o
 
-.text           0x080000d8     0x3d34
+.text           0x080000d8     0x3d3c
                 0x080000d8                . = ALIGN (0x4)
  *(.text)
  .text          0x080000d8       0x14 c:/users/dorkm/appdata/local/arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/bin/../lib/gcc/arm-none-eabi/7.2.1/thumb/v6-m\libgcc.a(_thumb1_case_shi.o)
@@ -333,459 +333,462 @@ END GROUP
                 0x08000808       0x1c build/hal/platform.o
                 0x08000808                platform_reset_cause_take
  .text.platform_clock_init_hsi16
-                0x08000824       0xfc build/hal/platform.o
+                0x08000824      0x104 build/hal/platform.o
                 0x08000824                platform_clock_init_hsi16
  .text.platform_clock_source_id
-                0x08000920        0xc build/hal/platform.o
-                0x08000920                platform_clock_source_id
+                0x08000928        0xc build/hal/platform.o
+                0x08000928                platform_clock_source_id
  .text.platform_systick_init_1ms
-                0x0800092c       0x34 build/hal/platform.o
-                0x0800092c                platform_systick_init_1ms
+                0x08000934       0x34 build/hal/platform.o
+                0x08000934                platform_systick_init_1ms
  .text.platform_now_ms
-                0x08000960        0xc build/hal/platform.o
-                0x08000960                platform_now_ms
+                0x08000968        0xc build/hal/platform.o
+                0x08000968                platform_now_ms
  .text.platform_now_us
-                0x0800096c       0x48 build/hal/platform.o
-                0x0800096c                platform_now_us
+                0x08000974       0x48 build/hal/platform.o
+                0x08000974                platform_now_us
  .text.platform_delay_ms
-                0x080009b4       0x14 build/hal/platform.o
-                0x080009b4                platform_delay_ms
+                0x080009bc       0x14 build/hal/platform.o
+                0x080009bc                platform_delay_ms
  .text.platform_diag_trace
-                0x080009c8       0x40 build/hal/platform.o
-                0x080009c8                platform_diag_trace
+                0x080009d0       0x40 build/hal/platform.o
+                0x080009d0                platform_diag_trace
  .text.platform_irq_enable
-                0x08000a08       0x1c build/hal/platform.o
-                0x08000a08                platform_irq_enable
+                0x08000a10       0x1c build/hal/platform.o
+                0x08000a10                platform_irq_enable
  .text.platform_system_reset
-                0x08000a24       0x10 build/hal/platform.o
-                0x08000a24                platform_system_reset
+                0x08000a2c       0x10 build/hal/platform.o
+                0x08000a2c                platform_system_reset
  .text.platform_fault_record
-                0x08000a34       0x28 build/hal/platform.o
-                0x08000a34                platform_fault_record
+                0x08000a3c       0x28 build/hal/platform.o
+                0x08000a3c                platform_fault_record
  .text.platform_fault_take_replay
-                0x08000a5c       0x38 build/hal/platform.o
-                0x08000a5c                platform_fault_take_replay
+                0x08000a64       0x38 build/hal/platform.o
+                0x08000a64                platform_fault_take_replay
  .text.SysTick_Handler
-                0x08000a94       0x10 build/hal/platform.o
-                0x08000a94                SysTick_Handler
+                0x08000a9c       0x10 build/hal/platform.o
+                0x08000a9c                SysTick_Handler
  .text.cfg_apply_unsupported
-                0x08000aa4        0x4 build/host/host_cfg.o
+                0x08000aac        0x4 build/host/host_cfg.o
  .text.cfg_apply_tx_power_dbm
-                0x08000aa8       0x14 build/host/host_cfg.o
+                0x08000ab0       0x14 build/host/host_cfg.o
  .text.cfg_init
-                0x08000abc       0x60 build/host/host_cfg.o
-                0x08000abc                cfg_init
- .text.cfg_set  0x08000b1c      0x1d4 build/host/host_cfg.o
-                0x08000b1c                cfg_set
- .text.cfg_get  0x08000cf0       0x68 build/host/host_cfg.o
-                0x08000cf0                cfg_get
+                0x08000ac4       0x60 build/host/host_cfg.o
+                0x08000ac4                cfg_init
+ .text.cfg_set  0x08000b24      0x1d4 build/host/host_cfg.o
+                0x08000b24                cfg_set
+ .text.cfg_get  0x08000cf8       0x68 build/host/host_cfg.o
+                0x08000cf8                cfg_get
  .text.host_cfg_wire_encode_ok
-                0x08000d58       0x28 build/host/host_cfg_wire.o
-                0x08000d58                host_cfg_wire_encode_ok
+                0x08000d60       0x28 build/host/host_cfg_wire.o
+                0x08000d60                host_cfg_wire_encode_ok
  .text.host_cfg_wire_encode_data
-                0x08000d80       0x3e build/host/host_cfg_wire.o
-                0x08000d80                host_cfg_wire_encode_data
+                0x08000d88       0x3e build/host/host_cfg_wire.o
+                0x08000d88                host_cfg_wire_encode_data
  .text.at_get_u32_le
-                0x08000dbe       0x1c build/host/host_cmd.o
+                0x08000dc6       0x1c build/host/host_cmd.o
  .text.put_u32_le
-                0x08000dda       0x10 build/host/host_cmd.o
+                0x08000de2       0x10 build/host/host_cmd.o
  .text.handle_tx_frame
-                0x08000dea       0x80 build/host/host_cmd.o
- *fill*         0x08000e6a        0x2 
+                0x08000df2       0x80 build/host/host_cmd.o
+ *fill*         0x08000e72        0x2 
  .text.at_send_ok
-                0x08000e6c       0x10 build/host/host_cmd.o
+                0x08000e74       0x10 build/host/host_cmd.o
  .text.at_send_version_triplet
-                0x08000e7c       0x30 build/host/host_cmd.o
+                0x08000e84       0x30 build/host/host_cmd.o
  .text.at_send_hex_nibble
-                0x08000eac       0x1e build/host/host_cmd.o
+                0x08000eb4       0x1e build/host/host_cmd.o
  .text.host_send_fault_urc.part.1
-                0x08000eca       0x5a build/host/host_cmd.o
+                0x08000ed2       0x5a build/host/host_cmd.o
  .text.at_send_u32.part.3
-                0x08000f24       0x54 build/host/host_cmd.o
+                0x08000f2c       0x54 build/host/host_cmd.o
  .text.at_line_equals
-                0x08000f78       0x72 build/host/host_cmd.o
- *fill*         0x08000fea        0x2 
+                0x08000f80       0x72 build/host/host_cmd.o
+ *fill*         0x08000ff2        0x2 
  .text.at_send_key_u32
-                0x08000fec       0x2c build/host/host_cmd.o
+                0x08000ff4       0x2c build/host/host_cmd.o
  .text.host_cmd_emit_stats_snapshot
-                0x08001018       0x22 build/host/host_cmd.o
-                0x08001018                host_cmd_emit_stats_snapshot
- *fill*         0x0800103a        0x2 
+                0x08001020       0x22 build/host/host_cmd.o
+                0x08001020                host_cmd_emit_stats_snapshot
+ *fill*         0x08001042        0x2 
  .text.host_cmd_init
-                0x0800103c       0xbc build/host/host_cmd.o
-                0x0800103c                host_cmd_init
+                0x08001044       0xbc build/host/host_cmd.o
+                0x08001044                host_cmd_init
  .text.host_cmd_dispatch
-                0x080010f8      0x33c build/host/host_cmd.o
-                0x080010f8                host_cmd_dispatch
+                0x08001100      0x33c build/host/host_cmd.o
+                0x08001100                host_cmd_dispatch
  .text.host_cmd_dispatch_at_line
-                0x08001434      0x434 build/host/host_cmd.o
-                0x08001434                host_cmd_dispatch_at_line
+                0x0800143c      0x434 build/host/host_cmd.o
+                0x0800143c                host_cmd_dispatch_at_line
  .text.host_cmd_on_radio_events
-                0x08001868       0x26 build/host/host_cmd.o
-                0x08001868                host_cmd_on_radio_events
+                0x08001870       0x26 build/host/host_cmd.o
+                0x08001870                host_cmd_on_radio_events
  .text.host_cmd_emit_tx_done
-                0x0800188e       0x36 build/host/host_cmd.o
-                0x0800188e                host_cmd_emit_tx_done
+                0x08001896       0x36 build/host/host_cmd.o
+                0x08001896                host_cmd_emit_tx_done
  .text.host_cmd_emit_fault
-                0x080018c4       0x1c build/host/host_cmd.o
-                0x080018c4                host_cmd_emit_fault
+                0x080018cc       0x1c build/host/host_cmd.o
+                0x080018cc                host_cmd_emit_fault
  .text.host_cmd_emit_rx_frame
-                0x080018e0       0x58 build/host/host_cmd.o
-                0x080018e0                host_cmd_emit_rx_frame
+                0x080018e8       0x58 build/host/host_cmd.o
+                0x080018e8                host_cmd_emit_rx_frame
  .text.put_u32_le
-                0x08001938       0x10 build/host/host_stats.o
+                0x08001940       0x10 build/host/host_stats.o
  .text.host_stats_reset
-                0x08001948       0x54 build/host/host_stats.o
-                0x08001948                host_stats_reset
+                0x08001950       0x54 build/host/host_stats.o
+                0x08001950                host_stats_reset
  .text.host_stats_radio_rx_ok
-                0x0800199c       0x10 build/host/host_stats.o
-                0x0800199c                host_stats_radio_rx_ok
+                0x080019a4       0x10 build/host/host_stats.o
+                0x080019a4                host_stats_radio_rx_ok
  .text.host_stats_radio_crc_err
-                0x080019ac       0x10 build/host/host_stats.o
-                0x080019ac                host_stats_radio_crc_err
+                0x080019b4       0x10 build/host/host_stats.o
+                0x080019b4                host_stats_radio_crc_err
  .text.host_stats_radio_tx_ok
-                0x080019bc       0x10 build/host/host_stats.o
-                0x080019bc                host_stats_radio_tx_ok
+                0x080019c4       0x10 build/host/host_stats.o
+                0x080019c4                host_stats_radio_tx_ok
  .text.host_stats_radio_tx_abort_lbt
-                0x080019cc       0x10 build/host/host_stats.o
-                0x080019cc                host_stats_radio_tx_abort_lbt
+                0x080019d4       0x10 build/host/host_stats.o
+                0x080019d4                host_stats_radio_tx_abort_lbt
  .text.host_stats_radio_tx_abort_airtime
-                0x080019dc       0x10 build/host/host_stats.o
-                0x080019dc                host_stats_radio_tx_abort_airtime
+                0x080019e4       0x10 build/host/host_stats.o
+                0x080019e4                host_stats_radio_tx_abort_airtime
  .text.host_stats_note_radio_events
-                0x080019ec       0x44 build/host/host_stats.o
-                0x080019ec                host_stats_note_radio_events
+                0x080019f4       0x44 build/host/host_stats.o
+                0x080019f4                host_stats_note_radio_events
  .text.host_stats_serialize
-                0x08001a30      0x1fc build/host/host_stats.o
-                0x08001a30                host_stats_serialize
+                0x08001a38      0x1fc build/host/host_stats.o
+                0x08001a38                host_stats_serialize
  .text.host_uart_note_trace
-                0x08001c2c       0x10 build/host/host_uart.o
+                0x08001c34       0x10 build/host/host_uart.o
  .text.crc16_ccitt
-                0x08001c3c       0x3c build/host/host_uart.o
+                0x08001c44       0x3c build/host/host_uart.o
  .text.usart2_write_byte
-                0x08001c78       0x30 build/host/host_uart.o
+                0x08001c80       0x30 build/host/host_uart.o
  .text.usart2_write_bytes
-                0x08001ca8       0x34 build/host/host_uart.o
+                0x08001cb0       0x34 build/host/host_uart.o
  .text.rx_ring_push
-                0x08001cdc       0x44 build/host/host_uart.o
+                0x08001ce4       0x44 build/host/host_uart.o
  .text.host_uart_send_urc.part.4
-                0x08001d20      0x104 build/host/host_uart.o
+                0x08001d28      0x104 build/host/host_uart.o
  .text.process_encoded_frame
-                0x08001e24      0x1e4 build/host/host_uart.o
+                0x08001e2c      0x1e4 build/host/host_uart.o
  .text.ingest_binary_byte
-                0x08002008       0x6c build/host/host_uart.o
+                0x08002010       0x6c build/host/host_uart.o
  .text.gpio_set_alt.constprop.7
-                0x08002074       0x70 build/host/host_uart.o
+                0x0800207c       0x70 build/host/host_uart.o
  .text.at_replay_candidate_to_binary
-                0x080020e4       0x30 build/host/host_uart.o
+                0x080020ec       0x30 build/host/host_uart.o
  .text.host_uart_poll_dma
-                0x08002114      0x164 build/host/host_uart.o
-                0x08002114                host_uart_poll_dma
+                0x0800211c      0x164 build/host/host_uart.o
+                0x0800211c                host_uart_poll_dma
  .text.host_uart_service_rx
-                0x08002278      0x130 build/host/host_uart.o
-                0x08002278                host_uart_service_rx
+                0x08002280      0x130 build/host/host_uart.o
+                0x08002280                host_uart_service_rx
  .text.host_uart_flush_diag_traces
-                0x080023a8       0xd4 build/host/host_uart.o
-                0x080023a8                host_uart_flush_diag_traces
+                0x080023b0       0xd4 build/host/host_uart.o
+                0x080023b0                host_uart_flush_diag_traces
  .text.host_uart_pop_frame
-                0x0800247c       0x54 build/host/host_uart.o
-                0x0800247c                host_uart_pop_frame
+                0x08002484       0x54 build/host/host_uart.o
+                0x08002484                host_uart_pop_frame
  .text.host_uart_send_urc
-                0x080024d0       0x2c build/host/host_uart.o
-                0x080024d0                host_uart_send_urc
+                0x080024d8       0x2c build/host/host_uart.o
+                0x080024d8                host_uart_send_urc
  .text.host_uart_send_ascii
-                0x080024fc       0x24 build/host/host_uart.o
-                0x080024fc                host_uart_send_ascii
+                0x08002504       0x24 build/host/host_uart.o
+                0x08002504                host_uart_send_ascii
  .text.host_uart_send_err_proto
-                0x08002520       0x2a build/host/host_uart.o
-                0x08002520                host_uart_send_err_proto
- *fill*         0x0800254a        0x2 
+                0x08002528       0x2a build/host/host_uart.o
+                0x08002528                host_uart_send_err_proto
+ *fill*         0x08002552        0x2 
  .text.host_uart_stats_reset
-                0x0800254c      0x100 build/host/host_uart.o
-                0x0800254c                host_uart_stats_reset
+                0x08002554      0x100 build/host/host_uart.o
+                0x08002554                host_uart_stats_reset
  .text.host_uart_init
-                0x0800264c      0x190 build/host/host_uart.o
-                0x0800264c                host_uart_init
+                0x08002654      0x190 build/host/host_uart.o
+                0x08002654                host_uart_init
  .text.host_uart_stats_dropped
-                0x080027dc        0xc build/host/host_uart.o
-                0x080027dc                host_uart_stats_dropped
+                0x080027e4        0xc build/host/host_uart.o
+                0x080027e4                host_uart_stats_dropped
  .text.host_uart_stats_errors
-                0x080027e8        0xc build/host/host_uart.o
-                0x080027e8                host_uart_stats_errors
+                0x080027f0        0xc build/host/host_uart.o
+                0x080027f0                host_uart_stats_errors
  .text.host_uart_stats_queue_full
-                0x080027f4        0xc build/host/host_uart.o
-                0x080027f4                host_uart_stats_queue_full
+                0x080027fc        0xc build/host/host_uart.o
+                0x080027fc                host_uart_stats_queue_full
  .text.host_uart_stats_irq_idle
-                0x08002800        0xc build/host/host_uart.o
-                0x08002800                host_uart_stats_irq_idle
+                0x08002808        0xc build/host/host_uart.o
+                0x08002808                host_uart_stats_irq_idle
  .text.host_uart_stats_irq_ht
-                0x0800280c        0xc build/host/host_uart.o
-                0x0800280c                host_uart_stats_irq_ht
+                0x08002814        0xc build/host/host_uart.o
+                0x08002814                host_uart_stats_irq_ht
  .text.host_uart_stats_irq_tc
-                0x08002818        0xc build/host/host_uart.o
-                0x08002818                host_uart_stats_irq_tc
+                0x08002820        0xc build/host/host_uart.o
+                0x08002820                host_uart_stats_irq_tc
  .text.host_uart_stats_irq_te
-                0x08002824        0xc build/host/host_uart.o
-                0x08002824                host_uart_stats_irq_te
+                0x0800282c        0xc build/host/host_uart.o
+                0x0800282c                host_uart_stats_irq_te
  .text.host_uart_stats_rx_bytes
-                0x08002830        0xc build/host/host_uart.o
-                0x08002830                host_uart_stats_rx_bytes
+                0x08002838        0xc build/host/host_uart.o
+                0x08002838                host_uart_stats_rx_bytes
  .text.host_uart_stats_rx_lpuart_bytes
-                0x0800283c        0xc build/host/host_uart.o
-                0x0800283c                host_uart_stats_rx_lpuart_bytes
+                0x08002844        0xc build/host/host_uart.o
+                0x08002844                host_uart_stats_rx_lpuart_bytes
  .text.host_uart_stats_rx_usart1_bytes
-                0x08002848        0xc build/host/host_uart.o
-                0x08002848                host_uart_stats_rx_usart1_bytes
+                0x08002850        0xc build/host/host_uart.o
+                0x08002850                host_uart_stats_rx_usart1_bytes
  .text.host_uart_stats_parse_ok
-                0x08002854        0xc build/host/host_uart.o
-                0x08002854                host_uart_stats_parse_ok
+                0x0800285c        0xc build/host/host_uart.o
+                0x0800285c                host_uart_stats_parse_ok
  .text.host_uart_stats_parse_err
-                0x08002860        0xc build/host/host_uart.o
-                0x08002860                host_uart_stats_parse_err
+                0x08002868        0xc build/host/host_uart.o
+                0x08002868                host_uart_stats_parse_err
  .text.host_uart_stats_uart_err_lpuart
-                0x0800286c        0xc build/host/host_uart.o
-                0x0800286c                host_uart_stats_uart_err_lpuart
+                0x08002874        0xc build/host/host_uart.o
+                0x08002874                host_uart_stats_uart_err_lpuart
  .text.host_uart_stats_uart_err_usart1
-                0x08002878        0xc build/host/host_uart.o
-                0x08002878                host_uart_stats_uart_err_usart1
+                0x08002880        0xc build/host/host_uart.o
+                0x08002880                host_uart_stats_uart_err_usart1
  .text.host_uart_stats_uart_pe_lpuart
-                0x08002884        0xc build/host/host_uart.o
-                0x08002884                host_uart_stats_uart_pe_lpuart
+                0x0800288c        0xc build/host/host_uart.o
+                0x0800288c                host_uart_stats_uart_pe_lpuart
  .text.host_uart_stats_uart_fe_lpuart
-                0x08002890        0xc build/host/host_uart.o
-                0x08002890                host_uart_stats_uart_fe_lpuart
+                0x08002898        0xc build/host/host_uart.o
+                0x08002898                host_uart_stats_uart_fe_lpuart
  .text.host_uart_stats_uart_ne_lpuart
-                0x0800289c        0xc build/host/host_uart.o
-                0x0800289c                host_uart_stats_uart_ne_lpuart
+                0x080028a4        0xc build/host/host_uart.o
+                0x080028a4                host_uart_stats_uart_ne_lpuart
  .text.host_uart_stats_uart_ore_lpuart
-                0x080028a8        0xc build/host/host_uart.o
-                0x080028a8                host_uart_stats_uart_ore_lpuart
+                0x080028b0        0xc build/host/host_uart.o
+                0x080028b0                host_uart_stats_uart_ore_lpuart
  .text.host_uart_stats_uart_pe_usart1
-                0x080028b4        0xc build/host/host_uart.o
-                0x080028b4                host_uart_stats_uart_pe_usart1
+                0x080028bc        0xc build/host/host_uart.o
+                0x080028bc                host_uart_stats_uart_pe_usart1
  .text.host_uart_stats_uart_fe_usart1
-                0x080028c0        0xc build/host/host_uart.o
-                0x080028c0                host_uart_stats_uart_fe_usart1
+                0x080028c8        0xc build/host/host_uart.o
+                0x080028c8                host_uart_stats_uart_fe_usart1
  .text.host_uart_stats_uart_ne_usart1
-                0x080028cc        0xc build/host/host_uart.o
-                0x080028cc                host_uart_stats_uart_ne_usart1
+                0x080028d4        0xc build/host/host_uart.o
+                0x080028d4                host_uart_stats_uart_ne_usart1
  .text.host_uart_stats_uart_ore_usart1
-                0x080028d8        0xc build/host/host_uart.o
-                0x080028d8                host_uart_stats_uart_ore_usart1
+                0x080028e0        0xc build/host/host_uart.o
+                0x080028e0                host_uart_stats_uart_ore_usart1
  .text.host_uart_stats_rx_ring_ovf
-                0x080028e4        0xc build/host/host_uart.o
-                0x080028e4                host_uart_stats_rx_ring_ovf
+                0x080028ec        0xc build/host/host_uart.o
+                0x080028ec                host_uart_stats_rx_ring_ovf
  .text.host_uart_take_dma_te_events
-                0x080028f0       0x18 build/host/host_uart.o
-                0x080028f0                host_uart_take_dma_te_events
+                0x080028f8       0x18 build/host/host_uart.o
+                0x080028f8                host_uart_take_dma_te_events
  .text.host_uart_take_rx_seen_flags
-                0x08002908       0x1c build/host/host_uart.o
-                0x08002908                host_uart_take_rx_seen_flags
+                0x08002910       0x1c build/host/host_uart.o
+                0x08002910                host_uart_take_rx_seen_flags
  .text.host_uart_note_diag_mark
-                0x08002924       0x1c build/host/host_uart.o
-                0x08002924                host_uart_note_diag_mark
+                0x0800292c       0x1c build/host/host_uart.o
+                0x0800292c                host_uart_note_diag_mark
  .text.host_uart_take_diag_marks
-                0x08002940       0x1c build/host/host_uart.o
-                0x08002940                host_uart_take_diag_marks
+                0x08002948       0x1c build/host/host_uart.o
+                0x08002948                host_uart_take_diag_marks
  .text.RNG_LPUART1_IRQHandler
-                0x0800295c       0xe0 build/host/host_uart.o
-                0x0800295c                RNG_LPUART1_IRQHandler
+                0x08002964       0xe0 build/host/host_uart.o
+                0x08002964                RNG_LPUART1_IRQHandler
  .text.USART1_IRQHandler
-                0x08002a3c       0xe0 build/host/host_uart.o
-                0x08002a3c                USART1_IRQHandler
+                0x08002a44       0xe0 build/host/host_uart.o
+                0x08002a44                USART1_IRQHandler
  .text.sx1276_airtime_estimate_toa_us
-                0x08002b1c      0x104 build/radio/sx1276_airtime.o
-                0x08002b1c                sx1276_airtime_estimate_toa_us
+                0x08002b24      0x104 build/radio/sx1276_airtime.o
+                0x08002b24                sx1276_airtime_estimate_toa_us
  .text.sx1276_airtime_reserve
-                0x08002c20       0x54 build/radio/sx1276_airtime.o
-                0x08002c20                sx1276_airtime_reserve
+                0x08002c28       0x54 build/radio/sx1276_airtime.o
+                0x08002c28                sx1276_airtime_reserve
  .text.sx1276_airtime_release
-                0x08002c74       0x20 build/radio/sx1276_airtime.o
-                0x08002c74                sx1276_airtime_release
+                0x08002c7c       0x20 build/radio/sx1276_airtime.o
+                0x08002c7c                sx1276_airtime_release
  .text.sx1276_airtime_commit
-                0x08002c94       0x44 build/radio/sx1276_airtime.o
-                0x08002c94                sx1276_airtime_commit
+                0x08002c9c       0x44 build/radio/sx1276_airtime.o
+                0x08002c9c                sx1276_airtime_commit
  .text.sx1276_cad_begin
-                0x08002cd8       0x28 build/radio/sx1276_cad.o
-                0x08002cd8                sx1276_cad_begin
+                0x08002ce0       0x28 build/radio/sx1276_cad.o
+                0x08002ce0                sx1276_cad_begin
  .text.sx1276_cad_poll
-                0x08002d00       0x3c build/radio/sx1276_cad.o
-                0x08002d00                sx1276_cad_poll
+                0x08002d08       0x3c build/radio/sx1276_cad.o
+                0x08002d08                sx1276_cad_poll
  .text.lbt_arm_backoff
-                0x08002d3c       0x3c build/radio/sx1276_lbt.o
+                0x08002d44       0x3c build/radio/sx1276_lbt.o
  .text.cfg_read_u8
-                0x08002d78       0x2a build/radio/sx1276_lbt.o
- *fill*         0x08002da2        0x2 
+                0x08002d80       0x2a build/radio/sx1276_lbt.o
+ *fill*         0x08002daa        0x2 
  .text.sx1276_lbt_check_and_backoff
-                0x08002da4      0x110 build/radio/sx1276_lbt.o
-                0x08002da4                sx1276_lbt_check_and_backoff
+                0x08002dac      0x110 build/radio/sx1276_lbt.o
+                0x08002dac                sx1276_lbt_check_and_backoff
  .text.mode_desc_for_state
-                0x08002eb4       0x30 build/radio/sx1276_modes.o
+                0x08002ebc       0x30 build/radio/sx1276_modes.o
  .text.sx1276_delay_us
-                0x08002ee4       0x16 build/radio/sx1276_modes.o
- *fill*         0x08002efa        0x2 
+                0x08002eec       0x16 build/radio/sx1276_modes.o
+ *fill*         0x08002f02        0x2 
  .text.sx1276_modes_apply
-                0x08002efc       0xbc build/radio/sx1276_modes.o
+                0x08002f04       0xbc build/radio/sx1276_modes.o
  .text.sx1276_modes_get_state
-                0x08002fb8        0xc build/radio/sx1276_modes.o
-                0x08002fb8                sx1276_modes_get_state
+                0x08002fc0        0xc build/radio/sx1276_modes.o
+                0x08002fc0                sx1276_modes_get_state
  .text.sx1276_modes_to_sleep
-                0x08002fc4        0xe build/radio/sx1276_modes.o
-                0x08002fc4                sx1276_modes_to_sleep
+                0x08002fcc        0xe build/radio/sx1276_modes.o
+                0x08002fcc                sx1276_modes_to_sleep
  .text.sx1276_modes_to_standby
-                0x08002fd2        0xe build/radio/sx1276_modes.o
-                0x08002fd2                sx1276_modes_to_standby
+                0x08002fda        0xe build/radio/sx1276_modes.o
+                0x08002fda                sx1276_modes_to_standby
  .text.sx1276_modes_to_tx
-                0x08002fe0        0xe build/radio/sx1276_modes.o
-                0x08002fe0                sx1276_modes_to_tx
+                0x08002fe8        0xe build/radio/sx1276_modes.o
+                0x08002fe8                sx1276_modes_to_tx
  .text.sx1276_modes_to_rx_cont
-                0x08002fee        0xe build/radio/sx1276_modes.o
-                0x08002fee                sx1276_modes_to_rx_cont
+                0x08002ff6        0xe build/radio/sx1276_modes.o
+                0x08002ff6                sx1276_modes_to_rx_cont
  .text.sx1276_modes_to_cad
-                0x08002ffc       0x16 build/radio/sx1276_modes.o
-                0x08002ffc                sx1276_modes_to_cad
- *fill*         0x08003012        0x2 
+                0x08003004       0x16 build/radio/sx1276_modes.o
+                0x08003004                sx1276_modes_to_cad
+ *fill*         0x0800301a        0x2 
  .text.sx1276_modes_init
-                0x08003014       0x3c build/radio/sx1276_modes.o
-                0x08003014                sx1276_modes_init
+                0x0800301c       0x48 build/radio/sx1276_modes.o
+                0x0800301c                sx1276_modes_init
  .text.sx1276_rx_arm
-                0x08003050       0x28 build/radio/sx1276_rx.o
-                0x08003050                sx1276_rx_arm
+                0x08003064       0x28 build/radio/sx1276_rx.o
+                0x08003064                sx1276_rx_arm
  .text.sx1276_rx_disarm
-                0x08003078        0x8 build/radio/sx1276_rx.o
-                0x08003078                sx1276_rx_disarm
+                0x0800308c        0x8 build/radio/sx1276_rx.o
+                0x0800308c                sx1276_rx_disarm
  .text.sx1276_rx_service
-                0x08003080       0xa6 build/radio/sx1276_rx.o
-                0x08003080                sx1276_rx_service
- *fill*         0x08003126        0x2 
+                0x08003094       0xa6 build/radio/sx1276_rx.o
+                0x08003094                sx1276_rx_service
+ *fill*         0x0800313a        0x2 
  .text.sx1276_tx_cleanup
-                0x08003128       0x2c build/radio/sx1276_tx.o
+                0x0800313c       0x2c build/radio/sx1276_tx.o
  .text.sx1276_tx_begin
-                0x08003154      0x124 build/radio/sx1276_tx.o
-                0x08003154                sx1276_tx_begin
+                0x08003168      0x124 build/radio/sx1276_tx.o
+                0x08003168                sx1276_tx_begin
  .text.sx1276_tx_poll
-                0x08003278       0xb4 build/radio/sx1276_tx.o
-                0x08003278                sx1276_tx_poll
+                0x0800328c       0xb4 build/radio/sx1276_tx.o
+                0x0800328c                sx1276_tx_poll
  .text.sx1276_tx_busy
-                0x0800332c       0x10 build/radio/sx1276_tx.o
-                0x0800332c                sx1276_tx_busy
+                0x08003340       0x10 build/radio/sx1276_tx.o
+                0x08003340                sx1276_tx_busy
  .text.gpio_mode_output
-                0x0800333c       0x34 build/radio/sx1276.o
+                0x08003350       0x34 build/radio/sx1276.o
+ .text.gpio_mode_input
+                0x08003384       0x16 build/radio/sx1276.o
+ *fill*         0x0800339a        0x2 
  .text.spi1_transfer
-                0x08003370       0x30 build/radio/sx1276.o
+                0x0800339c       0x30 build/radio/sx1276.o
  .text.sx1276_radio_reset
-                0x080033a0       0x20 build/radio/sx1276.o
-                0x080033a0                sx1276_radio_reset
+                0x080033cc       0x34 build/radio/sx1276.o
+                0x080033cc                sx1276_radio_reset
  .text.sx1276_read_reg
-                0x080033c0       0x24 build/radio/sx1276.o
-                0x080033c0                sx1276_read_reg
+                0x08003400       0x24 build/radio/sx1276.o
+                0x08003400                sx1276_read_reg
  .text.sx1276_write_reg
-                0x080033e4       0x28 build/radio/sx1276.o
-                0x080033e4                sx1276_write_reg
+                0x08003424       0x28 build/radio/sx1276.o
+                0x08003424                sx1276_write_reg
  .text.sx1276_read_burst
-                0x0800340c       0x34 build/radio/sx1276.o
-                0x0800340c                sx1276_read_burst
+                0x0800344c       0x34 build/radio/sx1276.o
+                0x0800344c                sx1276_read_burst
  .text.sx1276_write_burst
-                0x08003440       0x34 build/radio/sx1276.o
-                0x08003440                sx1276_write_burst
- .text.sx1276_read_version
-                0x08003474        0xa build/radio/sx1276.o
-                0x08003474                sx1276_read_version
- *fill*         0x0800347e        0x2 
- .text.sx1276_set_frequency_hz
                 0x08003480       0x34 build/radio/sx1276.o
-                0x08003480                sx1276_set_frequency_hz
+                0x08003480                sx1276_write_burst
+ .text.sx1276_read_version
+                0x080034b4        0xa build/radio/sx1276.o
+                0x080034b4                sx1276_read_version
+ *fill*         0x080034be        0x2 
+ .text.sx1276_set_frequency_hz
+                0x080034c0       0x34 build/radio/sx1276.o
+                0x080034c0                sx1276_set_frequency_hz
  .text.sx1276_set_tx_power_dbm
-                0x080034b4       0x26 build/radio/sx1276.o
-                0x080034b4                sx1276_set_tx_power_dbm
+                0x080034f4       0x26 build/radio/sx1276.o
+                0x080034f4                sx1276_set_tx_power_dbm
  .text.sx1276_set_sf_bw_cr
-                0x080034da       0xba build/radio/sx1276.o
-                0x080034da                sx1276_set_sf_bw_cr
+                0x0800351a       0xba build/radio/sx1276.o
+                0x0800351a                sx1276_set_sf_bw_cr
  .text.sx1276_init
-                0x08003594      0x298 build/radio/sx1276.o
-                0x08003594                sx1276_init
+                0x080035d4      0x260 build/radio/sx1276.o
+                0x080035d4                sx1276_init
  .text.sx1276_take_irq_events
-                0x0800382c       0x18 build/radio/sx1276.o
-                0x0800382c                sx1276_take_irq_events
+                0x08003834       0x18 build/radio/sx1276.o
+                0x08003834                sx1276_take_irq_events
  .text.EXTI0_1_IRQHandler
-                0x08003844       0x34 build/radio/sx1276.o
-                0x08003844                EXTI0_1_IRQHandler
+                0x0800384c       0x34 build/radio/sx1276.o
+                0x0800384c                EXTI0_1_IRQHandler
  .text.EXTI4_15_IRQHandler
-                0x08003878       0x38 build/radio/sx1276.o
-                0x08003878                EXTI4_15_IRQHandler
- .text.memcmp   0x080038b0       0x1e c:/users/dorkm/appdata/local/arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libc_nano.a(lib_a-memcmp.o)
-                0x080038b0                memcmp
- .text.memcpy   0x080038ce       0x12 c:/users/dorkm/appdata/local/arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libc_nano.a(lib_a-memcpy-stub.o)
-                0x080038ce                memcpy
- .text.memset   0x080038e0       0x10 c:/users/dorkm/appdata/local/arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libc_nano.a(lib_a-memset.o)
-                0x080038e0                memset
+                0x08003880       0x38 build/radio/sx1276.o
+                0x08003880                EXTI4_15_IRQHandler
+ .text.memcmp   0x080038b8       0x1e c:/users/dorkm/appdata/local/arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libc_nano.a(lib_a-memcmp.o)
+                0x080038b8                memcmp
+ .text.memcpy   0x080038d6       0x12 c:/users/dorkm/appdata/local/arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libc_nano.a(lib_a-memcpy-stub.o)
+                0x080038d6                memcpy
+ .text.memset   0x080038e8       0x10 c:/users/dorkm/appdata/local/arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/bin/../lib/gcc/arm-none-eabi/7.2.1/../../../../arm-none-eabi/lib/thumb/v6-m\libc_nano.a(lib_a-memset.o)
+                0x080038e8                memset
  *(.rodata)
  *(.rodata.*)
  .rodata.NMI_Handler.str1.1
-                0x080038f0        0xe build/startup.o
+                0x080038f8        0xe build/startup.o
  .rodata.Reset_Handler.str1.1
-                0x080038fe       0x36 build/startup.o
+                0x08003906       0x36 build/startup.o
  .rodata.main.str1.1
-                0x08003934       0x11 build/main.o
- *fill*         0x08003945        0x3 
+                0x0800393c       0x11 build/main.o
+ *fill*         0x0800394d        0x3 
  .rodata.k_cfg_desc
-                0x08003948      0x140 build/host/host_cfg.o
+                0x08003950      0x140 build/host/host_cfg.o
  .rodata.at_send_key_u32.str1.1
-                0x08003a88       0x11 build/host/host_cmd.o
+                0x08003a90       0x11 build/host/host_cmd.o
                                   0x2 (size before relaxing)
  .rodata.at_send_ok.str1.1
-                0x08003a88       0x11 build/host/host_cmd.o
+                0x08003a90       0x11 build/host/host_cmd.o
                                   0x5 (size before relaxing)
  .rodata.at_send_version_triplet.str1.1
-                0x08003a88        0x2 build/host/host_cmd.o
+                0x08003a90        0x2 build/host/host_cmd.o
                                   0x4 (size before relaxing)
  .rodata.host_cmd_dispatch.str1.1
-                0x08003a8a       0x4d build/host/host_cmd.o
+                0x08003a92       0x4d build/host/host_cmd.o
  .rodata.host_cmd_dispatch_at_line.str1.1
-                0x08003ad7      0x203 build/host/host_cmd.o
+                0x08003adf      0x203 build/host/host_cmd.o
                                 0x209 (size before relaxing)
  .rodata.host_cmd_init.str1.1
-                0x08003cda       0x5a build/host/host_cmd.o
+                0x08003ce2       0x5a build/host/host_cmd.o
  .rodata.host_uart_flush_diag_traces.str1.1
-                0x08003d34       0xba build/host/host_uart.o
+                0x08003d3c       0xba build/host/host_uart.o
  .rodata.k_mode_descs
-                0x08003dee       0x1e build/radio/sx1276_modes.o
+                0x08003df6       0x1e build/radio/sx1276_modes.o
  *(.glue_7)
- .glue_7        0x08003e0c        0x0 linker stubs
+ .glue_7        0x08003e14        0x0 linker stubs
  *(.glue_7t)
- .glue_7t       0x08003e0c        0x0 linker stubs
+ .glue_7t       0x08003e14        0x0 linker stubs
  *(.eh_frame)
-                0x08003e0c                . = ALIGN (0x4)
-                0x08003e0c                _etext = .
+                0x08003e14                . = ALIGN (0x4)
+                0x08003e14                _etext = .
 
-.vfp11_veneer   0x08003e0c        0x0
- .vfp11_veneer  0x08003e0c        0x0 linker stubs
+.vfp11_veneer   0x08003e14        0x0
+ .vfp11_veneer  0x08003e14        0x0 linker stubs
 
-.v4_bx          0x08003e0c        0x0
- .v4_bx         0x08003e0c        0x0 linker stubs
+.v4_bx          0x08003e14        0x0
+ .v4_bx         0x08003e14        0x0 linker stubs
 
-.iplt           0x08003e0c        0x0
- .iplt          0x08003e0c        0x0 build/startup.o
+.iplt           0x08003e14        0x0
+ .iplt          0x08003e14        0x0 build/startup.o
 
-.boot_text      0x08003e0c      0x214
- .boot_text     0x08003e0c      0x214 build/boot/safe_mode.o
-                0x08003e0c                jump_to_bootloader
-                0x08003e84                safe_mode_listen
+.boot_text      0x08003e14      0x214
+ .boot_text     0x08003e14      0x214 build/boot/safe_mode.o
+                0x08003e14                jump_to_bootloader
+                0x08003e8c                safe_mode_listen
 
 .ARM.extab
  *(.ARM.extab* .gnu.linkonce.armextab.*)
 
-.ARM            0x08004020        0x8
-                0x08004020                __exidx_start = .
+.ARM            0x08004028        0x8
+                0x08004028                __exidx_start = .
  *(.ARM.exidx*)
- .ARM.exidx     0x08004020        0x8 c:/users/dorkm/appdata/local/arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/bin/../lib/gcc/arm-none-eabi/7.2.1/thumb/v6-m\libgcc.a(_udivmoddi4.o)
-                0x08004028                __exidx_end = .
-                0x08004028                _sidata = LOADADDR (.data)
+ .ARM.exidx     0x08004028        0x8 c:/users/dorkm/appdata/local/arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/bin/../lib/gcc/arm-none-eabi/7.2.1/thumb/v6-m\libgcc.a(_udivmoddi4.o)
+                0x08004030                __exidx_end = .
+                0x08004030                _sidata = LOADADDR (.data)
 
-.rel.dyn        0x08004028        0x0
- .rel.iplt      0x08004028        0x0 build/startup.o
+.rel.dyn        0x08004030        0x0
+ .rel.iplt      0x08004030        0x0 build/startup.o
 
-.data           0x20000000        0x8 load address 0x08004028
+.data           0x20000000        0x8 load address 0x08004030
                 0x20000000                . = ALIGN (0x4)
                 0x20000000                _sdata = .
  *(.data)
@@ -798,17 +801,17 @@ END GROUP
                 0x20000008                . = ALIGN (0x4)
                 0x20000008                _edata = .
 
-.igot.plt       0x20000008        0x0 load address 0x08004030
+.igot.plt       0x20000008        0x0 load address 0x08004038
  .igot.plt      0x20000008        0x0 build/startup.o
 
-.noinit         0x20000008       0x18 load address 0x08004030
+.noinit         0x20000008       0x18 load address 0x08004038
                 0x20000008                . = ALIGN (0x4)
  *(.noinit)
  .noinit        0x20000008       0x18 build/hal/platform.o
  *(.noinit.*)
                 0x20000020                . = ALIGN (0x4)
 
-.bss            0x20000020      0xab8 load address 0x08004030
+.bss            0x20000020      0xab8 load address 0x08004038
                 0x20000020                . = ALIGN (0x4)
                 0x20000020                _sbss = .
                 0x20000020                __bss_start__ = _sbss
@@ -968,7 +971,7 @@ END GROUP
                 0x20000ad8                _ebss = .
                 0x20000ad8                __bss_end__ = _ebss
 
-._user_heap     0x20000ad8        0x0 load address 0x08004030
+._user_heap     0x20000ad8        0x0 load address 0x08004038
                 0x20000ad8                . = ALIGN (0x8)
                 0x20000ad8                _end = .
                 0x20000ad8                _heap_start = .
@@ -976,7 +979,7 @@ END GROUP
                 0x20000ad8                . = ALIGN (0x8)
                 0x20000ad8                _heap_end = .
 
-.stack_check    0x20000ad8        0x0 load address 0x08004030
+.stack_check    0x20000ad8        0x0 load address 0x08004038
                 0x20000ad8                . = ALIGN (0x8)
                 0x20000ad8                . = (. + 0x0)
                 0x00000001                ASSERT (((_heap_end + _stack_size) <= _estack), Linker error: not enough RAM left for the reserved stack)

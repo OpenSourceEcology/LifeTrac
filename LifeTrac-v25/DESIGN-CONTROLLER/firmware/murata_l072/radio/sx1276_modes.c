@@ -192,8 +192,15 @@ bool sx1276_modes_init(void) {
      * read-back stays at 0x80 / 0x01 forever even via direct
      * REG_WRITE_REQ from host; with RegTcxo = 0x10, mode transitions
      * complete normally.
+     *
+     * W1-9c (2026-05-12): use read-modify-write so the reserved bits 3:0
+     * (POR default 0x09) are preserved.  Writing 0x10 alone clears those
+     * reserved bits, which Semtech datasheet rev 7 \"4.1.7 RegTcxo\" warns
+     * against (\"Reserved -- 1001 -- Reserved.  Retain default value.\").
+     * Murata CMWX1ZZABZ-078 ref drivers (mlm32l07x01) and LoRaMac-node
+     * preserve these bits via RMW.  Final value: 0x09 | 0x10 = 0x19.
      */
-    sx1276_write_reg(0x4BU, 0x10U);
+    sx1276_write_reg(0x4BU, sx1276_read_reg(0x4BU) | 0x10U);
     platform_delay_ms(2U);
 
     /* W1-9 fix #1 (2026-05-11): Per SX1276 datasheet §4.1.6, the

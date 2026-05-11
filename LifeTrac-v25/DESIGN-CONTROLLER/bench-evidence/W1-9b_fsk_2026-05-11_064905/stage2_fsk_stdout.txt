@@ -1,0 +1,57 @@
+env=== Thu May  5 17:35:39 UTC 2022 Method H Stage 2 boot user app ===
+boot_ocd_rc=0
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: ensure GPIOA + GPIOF clocks enabled
+  RCC_AHB4ENR before = 0
+  RCC_AHB4ENR after  = 33
+Phase B: ensure PA_11 + PF_4 are outputs (preserve other bits)
+Phase C: drop BOOT0 (PA_11 -> LOW) so L072 boots from flash
+  GPIOA_IDR.PA_11 = 0   (expect 0)
+Phase D: pulse NRST (PF_4 LOW 250 ms then HIGH)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+
+DONE: BOOT0 LOW, NRST released. L072 should now run user firmware.
+Allow ~500 ms then probe UART (e.g. AT command at 19200 8N1).
+shutdown command invoked
+
+=== Thu May  5 17:35:40 UTC 2022 Stage 2 probe (mode=fsk) on /dev/ttymxc3 ===
+MODE: fsk
+dev=/dev/ttymxc3 baud=921600
+=== W1-9b probe T2: FSK STDBY datapath ===
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x04 sub=0x80 raw=048000000000000000000000000000000000000022000000
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x04 sub=0x80 raw=048000000000000000000000000000000000000029000000
+BOOT_URC observed during settle (payload=000112010101)
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x08 sub=0x01 raw=08010000000000000000000000000000000000002b000000
+T0: STATS(before) host_parse_err=0
+T2 step2: pre RegOpMode=0x80 (raw=0180)
+T2 step3: REG_WRITE OPMODE=0x00 ack=0100
+T2 step5: post-FSK-SLEEP RegOpMode=0x00 (raw=0100) elapsed=24.04ms
+T2 step6: REG_WRITE OPMODE=0x01 ack=0101
+T2 step8: post-FSK-STDBY RegOpMode=0x00 (raw=0100) elapsed=23.73ms
+T2 restore: REG_WRITE OPMODE=0x80 ack=0180
+T2 restore: RegOpMode=0x80 (raw=0180)
+__T2_STEP5_READBACK__=0x00
+__T2_STEP8_READBACK__=0x00
+__T2_RESTORE_VERDICT__=OK
+__T2_RESTORE_READBACK__=0x80
+__T2_RADIO_VERDICT__=FSK_SLEEP_ONLY
+__HOST_INVARIANTS__=PASS
+__W1_9B_VERDICT__=T2_FSK_SLEEP_ONLY
+probe_rc[/dev/ttymxc3][fsk]=0
+
+=== DONE: boot=0 probe=0 ===
+__METHOD_H_RC__=0
+

@@ -1,0 +1,69 @@
+=== Fri May  6 00:21:34 UTC 2022 Method H Stage 2 boot user app ===
+boot_ocd_rc=0
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: ensure GPIOA + GPIOF clocks enabled
+  RCC_AHB4ENR before = 0
+  RCC_AHB4ENR after  = 33
+Phase B: ensure PA_11 + PF_4 are outputs (preserve other bits)
+Phase C: drop BOOT0 (PA_11 -> LOW) so L072 boots from flash
+  GPIOA_IDR.PA_11 = 0   (expect 0)
+Phase D: pulse NRST (PF_4 LOW 250 ms then HIGH)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+
+DONE: BOOT0 LOW, NRST released. L072 should now run user firmware.
+Allow ~500 ms then probe UART (e.g. AT command at 19200 8N1).
+shutdown command invoked
+
+=== Fri May  6 00:21:35 UTC 2022 Stage 2 probe (mode=rx) on /dev/ttymxc3 ===
+MODE: rx
+dev=/dev/ttymxc3 baud=921600
+=== W1-10 probe RX: single-board RX-liveness (window=10.0s) ===
+BOOT_URC not observed during 1.0s settle (firmware likely already past boot — continuing).
+T0a: VER warm-up OK fw=v0.0.0 build=00000000
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+T0b: post-VER drain consumed 4 frames
+T0c STATS(before): radio_state=4 (4=RX_CONT) radio_rx_ok=0 radio_crc_err=0 host_parse_err=0
+T1: RegOpMode(pre) = 0x85 (expected 0x85 = LoRa+RXCONTINUOUS)
+T2: RegRssiValue A=0x25 (-120 dBm) B=0x26 (-119 dBm) in_band=True varies=True
+T3: RegModemStat(0x18) = 0x04 (bit0=SigDetect bit1=SigSync bit2=RxOngoing bit3=HdrInfoValid bit4=ModemClear)
+T4: observation window 10.0s (quiet bench, no peer expected)
+T5: RegOpMode(post) = 0x85 (stuck-in-RXCONT = True)
+T5 STATS(after): radio_rx_ok=0 (delta=0) radio_crc_err=0 (delta=0) radio_state=4 host_parse_err=0
+
+Critical checks:
+  [PASS] A1 RegOpMode(pre)  == 0x85 (LoRa+RXCONTINUOUS)
+  [PASS] A2 RegOpMode(post) == 0x85 (LoRa+RXCONTINUOUS)
+  [PASS] B1 RegRssiValue in plausible band [10..200]
+  [PASS] B2 RegRssiValue varies between samples (AGC alive)
+  [PASS] C  radio_state == 4 (RX_CONT)
+  [PASS] D  host invariants stable
+  [PASS] E  no real FAULT_URC during window
+
+Bonus evidence: rx_frames_received=0 (0 expected on single-board quiet bench)
+__W1_10_RX_FRAMES__=0
+__W1_10_RSSI_PRE__=-120
+__W1_10_RSSI_POST__=-119
+__W1_10_OPMODE_PRE__=0x85
+__W1_10_OPMODE_POST__=0x85
+__W1_10_REAL_FAULTS__=0
+__W1_10_VERDICT__=RX_LIVENESS_PASS
+VERDICT: PASS (single-board RX-liveness — receive chain alive, OPMODE stuck in RXCONTINUOUS, AGC twitching, no fault/invariant violations). Two-board end-to-end (W1-10b) requires Board 1 on bench.
+probe_rc[/dev/ttymxc3][rx]=0
+
+=== DONE: boot=0 probe=0 ===

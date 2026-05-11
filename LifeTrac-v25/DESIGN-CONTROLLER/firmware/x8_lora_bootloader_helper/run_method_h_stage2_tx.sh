@@ -1,15 +1,29 @@
 #!/bin/bash
 # run_method_h_stage2_tx.sh — boot the murata_l072 user app (no flash)
-# and run the W1-9 Stage 2 TX bring-up probe over /dev/ttymxc3.
+# and run the W1-9 Stage 2 TX bring-up probe (or a W1-9b sub-probe)
+# over /dev/ttymxc3.
 #
 # Usage on the X8:
 #   echo fio | sudo -S -p '' bash /tmp/lifetrac_p0c/run_method_h_stage2_tx.sh
+#   LIFETRAC_PROBE_MODE=regversion echo fio | sudo -S -p '' bash ...   (T1)
+#   LIFETRAC_PROBE_MODE=fsk         echo fio | sudo -S -p '' bash ...   (T2)
+#   LIFETRAC_PROBE_MODE=opmode_walk echo fio | sudo -S -p '' bash ...   (T3)
 #
-# This script intentionally does NOT reflash — the W1-8 firmware is
-# expected to already be on the L072. To reflash, run the Stage 1 helper
-# first, then this script.
+# This script intentionally does NOT reflash — the W1-8/W1-9 firmware
+# is expected to already be on the L072. To reflash, run the Stage 1
+# helper first, then this script.
 
 set -u
+
+PROBE_MODE="${LIFETRAC_PROBE_MODE:-tx}"
+RX_WINDOW="${LIFETRAC_RX_WINDOW:-}"
+TX_COUNT="${LIFETRAC_TX_COUNT:-}"
+INTER_CYCLE_S="${LIFETRAC_INTER_CYCLE_S:-}"
+
+EXTRA_ARGS=""
+if [ -n "$RX_WINDOW" ]; then EXTRA_ARGS="$EXTRA_ARGS --rx-window $RX_WINDOW"; fi
+if [ -n "$TX_COUNT" ]; then EXTRA_ARGS="$EXTRA_ARGS --tx-count $TX_COUNT"; fi
+if [ -n "$INTER_CYCLE_S" ]; then EXTRA_ARGS="$EXTRA_ARGS --inter-cycle-s $INTER_CYCLE_S"; fi
 
 TOOLDIR=/tmp/lifetrac_p0c
 PROBE=$TOOLDIR/method_h_stage2_tx_probe.py
@@ -17,8 +31,8 @@ STAGE1_PROBE=$TOOLDIR/method_g_stage1_probe.py
 CFG_BOOT=$TOOLDIR/08_boot_user_app.cfg
 DEV_LIST_DEFAULT="/dev/ttymxc3 /dev/ttymxc2 /dev/ttymxc1 /dev/ttymxc0"
 DEV_LIST=${LIFETRAC_UART_DEV_LIST:-$DEV_LIST_DEFAULT}
-LOG=$TOOLDIR/method_h_stage2_tx.log
-OCD_LOG=$TOOLDIR/method_h_stage2_tx_ocd.log
+LOG=$TOOLDIR/method_h_stage2_${PROBE_MODE}.log
+OCD_LOG=$TOOLDIR/method_h_stage2_${PROBE_MODE}_ocd.log
 
 : > "$LOG"
 : > "$OCD_LOG"
@@ -78,10 +92,10 @@ fuser -k "$DEV" 2>/dev/null || true
 sleep 0.1
 
 echo "" | tee -a "$LOG"
-echo "=== $(date) Stage 2 TX probe on $DEV ===" | tee -a "$LOG"
-PYTHONPATH="$TOOLDIR" python3 -u "$PROBE" --dev "$DEV" --baud 921600 2>&1 | tee -a "$LOG"
+echo "=== $(date) Stage 2 probe (mode=$PROBE_MODE) on $DEV ===" | tee -a "$LOG"
+PYTHONPATH="$TOOLDIR" python3 -u "$PROBE" --dev "$DEV" --baud 921600 --probe "$PROBE_MODE" $EXTRA_ARGS 2>&1 | tee -a "$LOG"
 PROBE_RC=${PIPESTATUS[0]}
-echo "probe_rc[$DEV]=$PROBE_RC" | tee -a "$LOG"
+echo "probe_rc[$DEV][$PROBE_MODE]=$PROBE_RC" | tee -a "$LOG"
 
 echo "" | tee -a "$LOG"
 echo "=== DONE: boot=$BOOT_RC probe=$PROBE_RC ===" | tee -a "$LOG"
