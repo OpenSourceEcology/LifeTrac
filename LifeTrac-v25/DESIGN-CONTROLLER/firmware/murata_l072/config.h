@@ -66,6 +66,20 @@
 #define LIFETRAC_BENCH_BOOT_HEARTBEAT_ENABLE 0
 #endif
 
+/* Bench-only: park SX1276 in LoRa SLEEP (RegOpMode=0x80) at boot instead of
+ * arming RXCONTINUOUS. Cuts radiated EM and SX1276 idle current to ~µA when
+ * the controller is sitting on the bench between active probe runs.
+ *
+ * Production builds MUST leave this 0 (default) so the radio boots into
+ * RXCONTINUOUS and is ready to receive immediately. Set to 1 only via
+ *   make CFLAGS="-DLIFETRAC_BENCH_RADIO_IDLE_SLEEP=1"
+ * for bench/EMC-conscious test sessions. Probes that need active RX/TX
+ * during a session will wake the radio explicitly through the host link
+ * (the probe-side sleep-on-exit cleanup mirrors this in software). */
+#ifndef LIFETRAC_BENCH_RADIO_IDLE_SLEEP
+#define LIFETRAC_BENCH_RADIO_IDLE_SLEEP 0
+#endif
+
 /* ------------------------------------------------------------------------ */
 /* Watchdog (N-20). Initial window per Claude review §5.5: 500 ms during    */
 /* boot/init, tightened to 100 ms after radio init succeeds.                */

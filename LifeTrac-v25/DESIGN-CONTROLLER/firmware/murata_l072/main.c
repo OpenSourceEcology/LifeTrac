@@ -13,6 +13,7 @@
 #include "host_uart.h"
 #include "platform.h"
 #include "sx1276.h"
+#include "sx1276_modes.h"
 #include "sx1276_rx.h"
 #include "sx1276_tx.h"
 #include "stm32l072_regs.h"
@@ -58,7 +59,18 @@ int main(void) {
         platform_diag_trace("M:RADIO_BYPASS\r\n");
     }
     if (radio_ok) {
+#if LIFETRAC_BENCH_RADIO_IDLE_SLEEP
+        /* Bench EMC mode: keep radio in LoRa SLEEP at boot to minimise
+         * radiated emissions while the controller idles between probe runs.
+         * Probes that need RX/TX wake the radio explicitly via the host link.
+         */
+        radio_ok = sx1276_modes_to_sleep();
+        if (radio_ok) {
+            platform_diag_trace("M:RADIO_BENCH_SLEEP\r\n");
+        }
+#else
         radio_ok = sx1276_rx_arm();
+#endif
     }
     /* TEMPORARY: Continue even if RX arm fails to test binary protocol path */
 #if LIFETRAC_BENCH_BOOT_HEARTBEAT_ENABLE

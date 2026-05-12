@@ -213,6 +213,37 @@ def write_reg(link: HostLink, addr: int, value: int, timeout: float = 0.5) -> by
     return f["payload"]
 
 
+# SX1276 RegOpMode value parked at end of every bench probe run so the radio
+# stops radiating between tests. 0x80 = LongRangeMode=1 (LoRa) | Mode=000
+# (SLEEP). Per the 2026-05-10 "Radio Shutdown for EM Reduction (Bench-Only)"
+# rule, bench builds should keep the radio idle whenever it is not actively
+# under test. The firmware-side equivalent is the LIFETRAC_BENCH_RADIO_IDLE_SLEEP
+# config flag in murata_l072/config.h; this probe-side cleanup covers the gap
+# during/after a probe run where firmware would otherwise auto-resume RXCONT.
+SX1276_OPMODE_LORA_SLEEP_VAL = 0x80
+
+
+def sleep_radio_safely(link: HostLink, label: str = "") -> None:
+    """Best-effort write of RegOpMode=0x80 (LoRa SLEEP). Never raises; logs
+    success/failure to stdout so post-run summaries can confirm the radio was
+    parked. Safe to call from a finally: block even if the link is degraded.
+    """
+    tag = f" ({label})" if label else ""
+    try:
+        ack = write_reg(link, SX1276_REG_OP_MODE,
+                        SX1276_OPMODE_LORA_SLEEP_VAL, timeout=0.5)
+        try:
+            opm, _ = read_reg(link, SX1276_REG_OP_MODE, timeout=0.5)
+            print(f"__RADIO_SLEEP_ON_EXIT__{tag} ack={ack.hex()} "
+                  f"RegOpMode(post)=0x{opm:02X} "
+                  f"(target=0x{SX1276_OPMODE_LORA_SLEEP_VAL:02X})")
+        except Exception:
+            print(f"__RADIO_SLEEP_ON_EXIT__{tag} ack={ack.hex()} "
+                  f"(readback skipped)")
+    except Exception as exc:
+        print(f"__RADIO_SLEEP_ON_EXIT_WARN__{tag} write_reg failed: {exc}")
+
+
 def host_invariants_violated(stats_before: dict, stats_after: dict) -> list:
     """Return list of (label, before, after) tuples for any invariant counters
     that changed. Empty list = invariants intact."""
@@ -1369,6 +1400,16 @@ def main(argv=None) -> int:
         default=0.2,
         help="seconds to sleep between TX cycles during --probe tx_burst (default 0.2)",
     )
+    parser.add_argument(
+        "--no-sleep-on-exit",
+        dest="sleep_on_exit",
+        action="store_false",
+        default=True,
+        help="Disable the post-run RegOpMode=0x80 (LoRa SLEEP) cleanup. Default "
+             "is to park the SX1276 in SLEEP after every probe run (bench EMC "
+             "hygiene rule, 2026-05-10). Override only if a follow-on probe "
+             "needs the radio left in its working state.",
+    )
     args = parser.parse_args(argv)
 
     print(f"MODE: {args.probe}")
@@ -1400,6 +1441,8 @@ def main(argv=None) -> int:
         print(f"FATAL: unknown probe mode: {args.probe}")
         return 2
     finally:
+        if getattr(args, "sleep_on_exit", True):
+            sleep_radio_safely(link, label=args.probe)
         link.close()
 
 

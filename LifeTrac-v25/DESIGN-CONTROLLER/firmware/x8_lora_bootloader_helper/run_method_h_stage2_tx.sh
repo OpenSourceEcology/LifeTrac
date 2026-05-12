@@ -99,4 +99,21 @@ echo "probe_rc[$DEV][$PROBE_MODE]=$PROBE_RC" | tee -a "$LOG"
 
 echo "" | tee -a "$LOG"
 echo "=== DONE: boot=$BOOT_RC probe=$PROBE_RC ===" | tee -a "$LOG"
+
+# Bench EMC hygiene audit (per AI NOTES/2026-05-10 Bench-Only plan): every
+# probe run MUST end with the SX1276 parked in LoRa SLEEP (RegOpMode=0x80).
+# The probe's main() finally: emits __RADIO_SLEEP_ON_EXIT__ on success and
+# __RADIO_SLEEP_ON_EXIT_WARN__ on best-effort failure. If neither token
+# appears, something bypassed the cleanup (new probe mode without finally,
+# crash before main(), --no-sleep-on-exit, link open failure, etc.) and the
+# radio may still be radiating between bench tests. Surface this loudly so
+# every orchestrator (W1-10b, stage1 quant, ad-hoc) sees it in evidence.
+if grep -q '__RADIO_SLEEP_ON_EXIT__' "$LOG"; then
+  echo "__BENCH_RADIO_SLEEP_AUDIT__=PASS" | tee -a "$LOG"
+elif grep -q '__RADIO_SLEEP_ON_EXIT_WARN__' "$LOG"; then
+  echo "__BENCH_RADIO_SLEEP_AUDIT__=DEGRADED (best-effort sleep failed; radio state unknown)" | tee -a "$LOG" >&2
+else
+  echo "__BENCH_RADIO_SLEEP_AUDIT__=MISSING (probe exited without parking SX1276 in SLEEP — bench EMC rule violated; investigate before next test)" | tee -a "$LOG" >&2
+fi
+
 exit "$PROBE_RC"

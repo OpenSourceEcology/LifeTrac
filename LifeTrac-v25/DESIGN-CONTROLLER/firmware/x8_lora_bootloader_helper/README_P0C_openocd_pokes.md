@@ -219,4 +219,56 @@ PS5.1 throws `Parameters "-NoNewWindow" and "-WindowStyle" cannot be
 specified at the same time.` Pick one. For a hidden background `adb`
 helper, use **`-NoNewWindow`** (no `-WindowStyle`).
 
+### TT-8: Bench EMC hygiene — always park SX1276 in SLEEP after a probe run
+
+Per the 2026-05-10 "Radio Shutdown for EM Reduction (Bench-Only)" rule, the
+SX1276 must be in LoRa SLEEP (`RegOpMode=0x80`) whenever the controller is
+not actively transmitting or receiving on the bench. RXCONTINUOUS
+(`0x85`) draws ~10 mA continuously and radiates. SLEEP drops to <1 µA
+with effectively zero RF emission.
+
+**Layer 1 — probe-side cleanup (active by default, no reflash needed).**
+[`method_h_stage2_tx_probe.py`](method_h_stage2_tx_probe.py) `main()` finally:
+calls `sleep_radio_safely(link, label=args.probe)` for **every** probe
+mode (`tx`, `rx`, `rx_listen`, `tx_burst`, `regversion`, `fsk`,
+`opmode_walk`). Opt-out: `--no-sleep-on-exit` (only use this if a
+follow-on probe needs the radio left awake). On success the probe emits:
+
+```
+__RADIO_SLEEP_ON_EXIT__ (rx_listen) ack=0180 RegOpMode(post)=0x80 (target=0x80)
+```
+
+**Layer 2 — wrapper-level audit (enforces Layer 1 across all orchestrators).**
+[`run_method_h_stage2_tx.sh`](run_method_h_stage2_tx.sh) tail-greps the
+probe log for the SLEEP marker after every run and emits one of three
+audit verdicts:
+
+| Marker present | Audit verdict | Meaning |
+|---|---|---|
+| `__RADIO_SLEEP_ON_EXIT__` | `__BENCH_RADIO_SLEEP_AUDIT__=PASS` | Radio parked at 0x80, OK to leave bench |
+| `__RADIO_SLEEP_ON_EXIT_WARN__` | `__BENCH_RADIO_SLEEP_AUDIT__=DEGRADED` | Best-effort sleep write failed (link/firmware fault); investigate radio state manually |
+| neither | `__BENCH_RADIO_SLEEP_AUDIT__=MISSING` | Probe bypassed cleanup (new mode without finally, crash, link open failure, or `--no-sleep-on-exit`); **bench EMC rule violated**, do not start next test until resolved |
+
+Because every higher-level orchestrator
+([`run_w1_10b_rx_pair_end_to_end.ps1`](run_w1_10b_rx_pair_end_to_end.ps1),
+[`run_method_h_stage2_tx_end_to_end.ps1`](run_method_h_stage2_tx_end_to_end.ps1),
+[`run_stage1_standard_quant_end_to_end.ps1`](run_stage1_standard_quant_end_to_end.ps1),
+ad-hoc `LIFETRAC_PROBE_MODE=...` invocations) routes through
+`run_method_h_stage2_tx.sh`, the audit line lands in every evidence log
+automatically — no per-orchestrator change needed when adding new bench tests.
+
+**Layer 3 — firmware idle (opt-in, requires reflash).** Build with
+`make CFLAGS=-DLIFETRAC_BENCH_RADIO_IDLE_SLEEP=1` to make the firmware
+boot into LoRa SLEEP instead of RXCONTINUOUS. Default is `0` so
+production binaries are unchanged. Do **not** enable this for RX-side
+probes (rx_listen, rx_liveness) without first wiring an explicit wake
+step — they assume `0x85` at entry.
+
+**Adding a new bench probe?** As long as the new mode dispatches through
+`main()` in `method_h_stage2_tx_probe.py`, the `finally:` covers it for
+free. If you write a new entry-point script that talks to the radio
+outside `method_h_stage2_tx_probe.py`, end it with the same
+`write_reg(SX1276_REG_OP_MODE, 0x80)` call and emit
+`__RADIO_SLEEP_ON_EXIT__` so the wrapper audit can verify it.
+
 
