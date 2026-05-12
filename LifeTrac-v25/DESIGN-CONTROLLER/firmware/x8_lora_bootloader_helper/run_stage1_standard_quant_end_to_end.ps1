@@ -213,11 +213,23 @@ if ($pushImageRc -ne 0) {
     throw "adb push image failed with exit code $pushImageRc"
 }
 
-$chmodCmd = "echo fio | sudo -S -p '' bash -lc 'chmod +x /tmp/lifetrac_p0c/*.sh'"
-$chmodRc = Invoke-Adb -Args @("exec-out", $chmodCmd) -Serial $AdbSerial
+$chmodCmd = "chmod +x /tmp/lifetrac_p0c/*.sh"
+$chmodPrefix = @()
+if ($AdbSerial) { $chmodPrefix = @("-s", $AdbSerial) }
+& adb @chmodPrefix exec-out $chmodCmd | Out-Null
+$chmodRc = $LASTEXITCODE
 if ($chmodRc -ne 0) {
     throw "chmod on remote helper scripts failed with exit code $chmodRc"
 }
+
+# Pre-flight: ensure H7 SWD pins (gpio8/10/15) are exported and NRST (gpio10) is held
+# high so OpenOCD imx_gpio bitbang can read SWD DPIDR. On freshly-flashed X8 images
+# (kernel 6.1.x LMP), gpio10 boots low, holding the H7 in reset and causing
+# "Error connecting DP: cannot read IDR". See AI NOTES 2026-05-12 recovery plan.
+$gpioPreflight = "for n in 8 10 15; do [ -d /sys/class/gpio/gpio`$n ] || echo `$n > /sys/class/gpio/export 2>/dev/null; done; echo out > /sys/class/gpio/gpio10/direction 2>/dev/null; echo 1 > /sys/class/gpio/gpio10/value 2>/dev/null; cat /sys/class/gpio/gpio10/value"
+$gpioPreflightRemote = "echo fio | sudo -S -p '' bash -c `"$gpioPreflight`""
+& adb @chmodPrefix exec-out $gpioPreflightRemote | Out-Null
+Write-Host "GPIO preflight complete (gpio10 driven high to release H7 NRST)."
 
 $stamp = Get-Date -Format "yyyy-MM-dd_HHmmss_fff"
 $stamp = "$stamp-$PID"

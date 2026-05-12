@@ -1,0 +1,27 @@
+============================================================
+Method G Stage 1 Probe
+Device: /dev/ttymxc3 @ 921600 8N1
+Expected target: custom murata_l072 firmware host link
+============================================================
+BOOT_URC: not observed during initial window (continuing with active queries)
+VER_URC: name=OSE-LifeTracLORA-MurataFW version=0.0.0 git=dev cap=0x0000007F
+INFO: discarding stale type=0xC1 seq=0 (waiting for seq=2)
+INFO: discarding stale type=0xC1 seq=0 (waiting for seq=2)
+Phase D2: attempting STATS_DUMP_REQ after failure
+  drained FAULT_URC: code=0x09 sub=0x01 lanes=LPUART1 raw=0901000000000000000000000000000000000000a00a0000
+  drained FAULT_URC: code=0x0C sub=0x01 marks=VER_REQ_PARSED raw=0c01000000000000000000000000000000000000a30a0000
+INFO: discarding stale type=0xC1 seq=2 (waiting for seq=3)
+  STATS_URC(D2) payload_len=132 seq=3
+  STATS_URC(D2): host_rx_bytes=36 host_rx_lpuart=36 host_rx_usart1=0 host_parse_ok=3 host_parse_err=0 uart_err_lpuart=0 uart_err_usart1=0
+  STATS_URC(D2) per-flag LPUART1: PE=0 FE=0 NE=0 ORE=0
+  STATS_URC(D2) per-flag USART1:  PE=0 FE=0 NE=0 ORE=0
+  STATS_URC(D2) ring overflow:  rx_ring_ovf=0
+ASCII fallback diagnostics:
+  pre-drain: no bytes observed
+  reply to ATI: 70 byte(s)
+  hex: 4f53452d4c696665547261634c4f52412d4d7572617461465720302e302e30206465760d0a4f4b0d0a483a52585f4c5055415254310d0a483a41545f44495350415443480d0a
+  txt: OSE-LifeTracLORA-MurataFW 0.0.0 dev..OK..H:RX_LPUART1..H:AT_DISPATCH..
+  reply to AT+VER?: 132 byte(s)
+  hex: 433a41545f5645525f444953500d0a46573d4f53452d4c696665547261634c4f52412d4d757261746146572056455253494f4e3d302e302e30204749543d6465762050524f544f3d3120534348454d413d31204341503d307830303030303037460d0a4f4b0d0a483a52585f4c5055415254310d0a483a41545f44495350415443480d0a
+  txt: C:AT_VER_DISP..FW=OSE-LifeTracLORA-MurataFW VERSION=0.0.0 GIT=dev PROTO=1 SCHEMA=1 CAP=0x0000007F..OK..H:RX_LPUART1..H:AT_DISPATCH..
+FATAL: probe failed: timeout waiting for response type 0xC1 to req 0x41

@@ -59,3 +59,122 @@ do not call `init` themselves.
 5. **x8h7 bridge will stall** once openocd halts the H7. `gpio167`, `gpio163`,
    etc. will return `Connection timed out`. This is expected. Plan a power
    cycle as the final cleanup step.
+
+## Bench tips & tricks (post-recovery gotchas, 2026-05-12)
+
+These are bench failures that have bitten us repeatedly. Each entry documents
+the symptom, the root cause, and the fix already wired into the launcher
+scripts in this directory. **If you hit one of these again, do not re-debug
+from scratch — apply the listed fix and move on.**
+
+### TT-1: `OpenOCD: Error connecting DP: cannot read IDR` after a fresh `uuu` reflash
+
+**Symptom.** First `imx_gpio` OpenOCD attach on a freshly reflashed X8 fails
+with `Error connecting DP: cannot read IDR`. `run_stage1_standard_quant_end_to_end.ps1`
+reports `final_result=FAIL_SYNC` on every cycle. A side-by-side `cat
+/sys/class/gpio/gpio10/value` shows `0` on the freshly flashed board and `1`
+on a known-good reference board.
+
+**Root cause.** A freshly flashed LMP image leaves H7 NRST asserted: kernel
+GPIO line `gpio10` (which is wired to H7 NRST via the `imx_gpio`
+`reset_config srst_only srst_push_pull` pin map at `srst_num 10`) boots LOW.
+With NRST held low, the H7 SWD DP cannot respond, so OpenOCD reads 0 from
+DPIDR. Reference boards have `gpio8/10/15` pre-exported with `gpio10=1` as a
+side effect of prior workflows — that state does **not** persist across
+reflash.
+
+**Fix (already in `run_stage1_standard_quant_end_to_end.ps1`).** Run a GPIO
+preflight before the cycle loop:
+
+```bash
+echo fio | sudo -S -p '' bash -c '
+  if [ ! -d /sys/class/gpio/gpio10 ]; then echo 10 > /sys/class/gpio/export; fi
+  echo out > /sys/class/gpio/gpio10/direction
+  echo 1 > /sys/class/gpio/gpio10/value
+  for n in 8 15; do
+    if [ ! -d /sys/class/gpio/gpio$n ]; then echo $n > /sys/class/gpio/export; fi
+  done
+'
+```
+
+After this, `cat /sys/class/gpio/gpio10/value` returns `1`, NRST releases,
+and OpenOCD reads `Info : SWD DPIDR 0x6ba02477`. **Mirror this preflight in
+any other launcher you write that runs OpenOCD against a freshly reflashed
+X8** (e.g. future stage-2/stage-3 quants).
+
+### TT-2: PowerShell `Invoke-Adb` wrapper gives false-fail on chmod / fire-and-forget calls
+
+**Symptom.** `run_stage1_standard_quant_end_to_end.ps1` aborts with `chmod
+failed` even though the script ran fine on the X8. Re-running by hand works.
+The "rc" printed by the wrapper looks like an array, not an int.
+
+**Root cause.** The local `Invoke-Adb` helper returns
+`(stdout-array, $LASTEXITCODE)`. When the wrapped command emits ANSI / sudo
+TTY escape sequences to stdout (e.g. `adb exec-out 'echo fio | sudo -S
+chmod ...'`), the captured "rc" becomes a `[string[]]` containing the
+escapes, not an `[int]`. `$rc -ne 0` is then always true.
+
+**Fix.** Bypass the wrapper for fire-and-forget calls — discard stdout and
+read `$LASTEXITCODE` directly:
+
+```powershell
+& adb @prefix exec-out $cmd | Out-Null
+$rc = $LASTEXITCODE
+if ($rc -ne 0) { throw "command failed: rc=$rc" }
+```
+
+The chmod call in `run_stage1_standard_quant_end_to_end.ps1` already does
+this. **If you copy/paste a new `Invoke-Adb` call for a no-output command,
+prefer this pattern.** A long-term fix would be to make `Invoke-Adb` always
+return only `[int]` and route stdout through `Out-String` separately.
+
+### TT-3: `uuu` recovery — version + warm-reset traps
+
+**Symptom A.** Bundled `uuu 1.5.109` (from older NXP `MfgTool` releases)
+fails partway through the recovery flow on Win11 against the current X8 LMP
+image.
+
+**Fix A.** Use **`uuu 1.5.243`** (or newer). Verified end-to-end (12/12
+stages `Okay`) on Board 1 2026-05-12.
+
+**Symptom B.** After `FB: ucmd reset` from a temp `.uuu` script, host returns
+`LIBUSB_ERROR_PIPE` (expected) but the board never re-enumerates as fastboot
+*or* adb. Polling for ≥55 minutes does nothing.
+
+**Fix B.** Don't poll forever. If the board hasn't re-enumerated within
+~2 minutes of the warm reset, escalate to a **physical USB-C + 12 V
+power-cycle** (unplug both, wait 10 s, replug). The post-cold-boot adb
+attach is reliable.
+
+### TT-4: i.MX 8M Mini SDP PID is not always `012B`
+
+**Symptom.** `diagnose_x8_recovery.ps1` reports "no SDP device present" or
+the recovery plan's "is the mask ROM alive?" check returns empty even though
+the BOOT DIPs are set correctly and `uuu` itself can see the device.
+
+**Root cause.** The SDP PID varies by mask-ROM revision: older boards
+enumerate as `VID_1FC9&PID_012B`, newer boards (observed on Board 1
+2026-05-12) as `VID_1FC9&PID_0134`. The original regex only matched `012B`.
+
+**Fix.** Already patched: `diagnose_x8_recovery.ps1` and the recovery plan
+both now match `VID_1FC9&PID_(012B|0134)`. **If you write a new SDP-presence
+check, use the same widened regex.**
+
+### TT-5: Always reach for the reference-board diff before debugging OpenOCD config
+
+If the L072 flash pipeline regresses on one board but works on another,
+compare these *before* touching `imx_gpio` config, OpenOCD versions, or Tcl
+scripts:
+
+```bash
+# On both boards:
+cat /sys/class/gpio/gpio8/value /sys/class/gpio/gpio10/value /sys/class/gpio/gpio15/value
+ls /sys/class/gpio/
+uname -r              # kernel version
+openocd --version     # OpenOCD version + build date
+```
+
+A `gpio10` mismatch (1 on good, 0 on bad) is the canonical TT-1 signature
+and saves an hour of OpenOCD verbose-log archaeology.
+
+
