@@ -1,0 +1,149 @@
+7[r[999;999H[6n7[r[999;999H[6n=== Thu Apr 28 20:03:13 UTC 2022 Method H Stage 2 boot user app ===
+boot_ocd_rc=0
+Open On-Chip Debugger 0.11.0-dirty (2025-07-14-18:35)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x0800db4c msp: 0x24080000
+Phase A: ensure GPIOA + GPIOF clocks enabled
+  RCC_AHB4ENR before = 0
+  RCC_AHB4ENR after  = 33
+Phase B: ensure PA_11 + PF_4 are outputs (preserve other bits)
+Phase C: drop BOOT0 (PA_11 -> LOW) so L072 boots from flash
+  GPIOA_IDR.PA_11 = 0   (expect 0)
+Phase D: pulse NRST (PF_4 LOW 250 ms then HIGH)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+
+DONE: BOOT0 LOW, NRST released. L072 should now run user firmware.
+Allow ~500 ms then probe UART (e.g. AT command at 19200 8N1).
+shutdown command invoked
+
+=== Thu Apr 28 20:03:14 UTC 2022 Stage 2 probe (mode=tx_burst) on /dev/ttymxc3 ===
+MODE: tx_burst
+dev=/dev/ttymxc3 baud=921600
+=== W1-10b probe TX_BURST: count=50 inter=0.20s timeout=5.0s ===
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+CFG_OK_URC: LBT_ENABLE=0
+TX_BURST: STATS(before) radio_tx_ok=0 radio_tx_abort_lbt=0 radio_tx_abort_airtime=0
+__W1_10B_BURST_READY__
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=0 tx_id=0x00 status=0(OK) toa_us=30848 elapsed_ms=48.5 payload_hex=57312d313062207365713d30303030206239333065313931
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=1 tx_id=0x01 status=0(OK) toa_us=30848 elapsed_ms=51.5 payload_hex=57312d313062207365713d30303031206166383535626265
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=2 tx_id=0x02 status=0(OK) toa_us=30848 elapsed_ms=49.5 payload_hex=57312d313062207365713d30303032206437333763663862
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=3 tx_id=0x03 status=0(OK) toa_us=30848 elapsed_ms=56.1 payload_hex=57312d313062207365713d30303033203337316338356430
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=4 tx_id=0x04 status=0(OK) toa_us=30848 elapsed_ms=57.8 payload_hex=57312d313062207365713d30303034203739373166633738
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=5 tx_id=0x05 status=0(OK) toa_us=30848 elapsed_ms=56.4 payload_hex=57312d313062207365713d30303035203461376562616232
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=6 tx_id=0x06 status=0(OK) toa_us=30848 elapsed_ms=52.0 payload_hex=57312d313062207365713d30303036203435363430613661
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=7 tx_id=0x07 status=0(OK) toa_us=30848 elapsed_ms=51.2 payload_hex=57312d313062207365713d30303037203937303930643336
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=8 tx_id=0x08 status=0(OK) toa_us=30848 elapsed_ms=51.6 payload_hex=57312d313062207365713d30303038206539346131643737
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=9 tx_id=0x09 status=0(OK) toa_us=30848 elapsed_ms=50.3 payload_hex=57312d313062207365713d30303039203238303466346131
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=10 tx_id=0x0A status=0(OK) toa_us=30848 elapsed_ms=56.0 payload_hex=57312d313062207365713d30303130206166656463376636
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=11 tx_id=0x0B status=0(OK) toa_us=30848 elapsed_ms=55.8 payload_hex=57312d313062207365713d30303131203334386533306339
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=12 tx_id=0x0C status=0(OK) toa_us=30848 elapsed_ms=56.0 payload_hex=57312d313062207365713d30303132206665626563626231
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=13 tx_id=0x0D status=0(OK) toa_us=30848 elapsed_ms=55.5 payload_hex=57312d313062207365713d30303133203861633064306362
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=14 tx_id=0x0E status=0(OK) toa_us=30848 elapsed_ms=56.7 payload_hex=57312d313062207365713d30303134203062613839353161
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=15 tx_id=0x0F status=0(OK) toa_us=30848 elapsed_ms=56.0 payload_hex=57312d313062207365713d30303135203430326430383962
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=16 tx_id=0x10 status=0(OK) toa_us=30848 elapsed_ms=50.3 payload_hex=57312d313062207365713d30303136203432306430633865
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=17 tx_id=0x11 status=0(OK) toa_us=30848 elapsed_ms=56.1 payload_hex=57312d313062207365713d30303137203264316562653066
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=18 tx_id=0x12 status=0(OK) toa_us=30848 elapsed_ms=50.5 payload_hex=57312d313062207365713d30303138206332353863343064
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=19 tx_id=0x13 status=0(OK) toa_us=30848 elapsed_ms=52.0 payload_hex=57312d313062207365713d30303139203734616166663233
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=20 tx_id=0x14 status=0(OK) toa_us=30848 elapsed_ms=55.9 payload_hex=57312d313062207365713d30303230206231633733393637
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=21 tx_id=0x15 status=0(OK) toa_us=30848 elapsed_ms=56.0 payload_hex=57312d313062207365713d30303231203339303563363132
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=22 tx_id=0x16 status=0(OK) toa_us=30848 elapsed_ms=56.7 payload_hex=57312d313062207365713d30303232206662303863313133
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=23 tx_id=0x17 status=0(OK) toa_us=30848 elapsed_ms=51.9 payload_hex=57312d313062207365713d30303233203161623635386337
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=24 tx_id=0x18 status=0(OK) toa_us=30848 elapsed_ms=55.6 payload_hex=57312d313062207365713d30303234203537653933653465
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=25 tx_id=0x19 status=0(OK) toa_us=30848 elapsed_ms=56.2 payload_hex=57312d313062207365713d30303235206165306661323961
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=26 tx_id=0x1A status=0(OK) toa_us=30848 elapsed_ms=49.7 payload_hex=57312d313062207365713d30303236206139666232636561
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=27 tx_id=0x1B status=0(OK) toa_us=30848 elapsed_ms=52.0 payload_hex=57312d313062207365713d30303237206531386264373461
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=28 tx_id=0x1C status=0(OK) toa_us=30848 elapsed_ms=51.5 payload_hex=57312d313062207365713d30303238206639653432666235
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=29 tx_id=0x1D status=0(OK) toa_us=30848 elapsed_ms=56.1 payload_hex=57312d313062207365713d30303239203266343433333666
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=30 tx_id=0x1E status=0(OK) toa_us=30848 elapsed_ms=61.3 payload_hex=57312d313062207365713d30303330206437303763383966
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=31 tx_id=0x1F status=0(OK) toa_us=30848 elapsed_ms=52.1 payload_hex=57312d313062207365713d30303331203937343363633530
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=32 tx_id=0x20 status=0(OK) toa_us=30848 elapsed_ms=52.2 payload_hex=57312d313062207365713d30303332203165313030303463
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=33 tx_id=0x21 status=0(OK) toa_us=30848 elapsed_ms=51.7 payload_hex=57312d313062207365713d30303333203732333162303566
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=34 tx_id=0x22 status=0(OK) toa_us=30848 elapsed_ms=51.5 payload_hex=57312d313062207365713d30303334206332323535393864
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=35 tx_id=0x23 status=0(OK) toa_us=30848 elapsed_ms=56.6 payload_hex=57312d313062207365713d30303335206663393232303763
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=36 tx_id=0x24 status=0(OK) toa_us=30848 elapsed_ms=55.6 payload_hex=57312d313062207365713d30303336203265313039643666
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=37 tx_id=0x25 status=0(OK) toa_us=30848 elapsed_ms=55.8 payload_hex=57312d313062207365713d30303337206434326337666465
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=38 tx_id=0x26 status=0(OK) toa_us=30848 elapsed_ms=56.3 payload_hex=57312d313062207365713d30303338206432653062376463
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=39 tx_id=0x27 status=0(OK) toa_us=30848 elapsed_ms=56.6 payload_hex=57312d313062207365713d30303339203332643232343861
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=40 tx_id=0x28 status=0(OK) toa_us=30848 elapsed_ms=51.4 payload_hex=57312d313062207365713d30303430206665393433613436
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=41 tx_id=0x29 status=0(OK) toa_us=30848 elapsed_ms=51.5 payload_hex=57312d313062207365713d30303431206163666362336266
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=42 tx_id=0x2A status=0(OK) toa_us=30848 elapsed_ms=56.0 payload_hex=57312d313062207365713d30303432203339343438653265
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=43 tx_id=0x2B status=0(OK) toa_us=30848 elapsed_ms=56.2 payload_hex=57312d313062207365713d30303433203438653834343264
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=44 tx_id=0x2C status=0(OK) toa_us=30848 elapsed_ms=51.2 payload_hex=57312d313062207365713d30303434203939306532623162
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=45 tx_id=0x2D status=0(OK) toa_us=30848 elapsed_ms=52.0 payload_hex=57312d313062207365713d30303435203236383261626266
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=46 tx_id=0x2E status=0(OK) toa_us=30848 elapsed_ms=56.1 payload_hex=57312d313062207365713d30303436203634386334626637
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=47 tx_id=0x2F status=0(OK) toa_us=30848 elapsed_ms=56.5 payload_hex=57312d313062207365713d30303437203063653362376164
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=48 tx_id=0x30 status=0(OK) toa_us=30848 elapsed_ms=50.5 payload_hex=57312d313062207365713d30303438203761626666623163
+INFO: unrelated frame during TX wait type=0xC0
+__TX_DONE__ idx=49 tx_id=0x31 status=0(OK) toa_us=30848 elapsed_ms=55.9 payload_hex=57312d313062207365713d30303439203061616139323830
+TX_BURST: STATS(after) radio_tx_ok=50 (delta=50) radio_tx_abort_lbt=0 (delta=0) radio_tx_abort_airtime=0 (delta=0)
+__W1_10B_BURST_DONE__ tx_count=50 tx_done_ok=50 tx_done_fail=0 tx_timeout=0 radio_tx_ok_delta=50 radio_tx_abort_lbt_delta=0 radio_tx_abort_airtime_delta=0 real_faults=0 invariants_violated=0
+__RADIO_SLEEP_ON_EXIT__ (tx_burst) ack=0180 RegOpMode(post)=0x80 (target=0x80)
+probe_rc[/dev/ttymxc3][tx_burst]=0
+
+=== DONE: boot=0 probe=0 ===
+__BENCH_RADIO_SLEEP_AUDIT__=PASS
+__METHOD_H_RC__=0n
+

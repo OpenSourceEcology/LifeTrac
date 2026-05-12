@@ -344,14 +344,64 @@ $summary | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $eviden
 
 # ---------------------------------------------------------------------------
 # 13. Pull per-board logs (best-effort).
+# 14. Optional: post-process latency stats (LATENCY_BUDGET.md §1 confirmation).
+# Both steps are post-gate / informational — they must NEVER fail the run.
+# Scope $ErrorActionPreference=Continue across both: under EAP=Stop, native
+# tools (adb, python) emitting stderr text raise NativeCommandError records
+# that are converted to terminating errors and would abort the orchestrator
+# after all gate evaluation is complete.
 # ---------------------------------------------------------------------------
-foreach ($pair in @(@($RxAdbSerial, "rx_listen"), @($TxAdbSerial, "tx_burst"))) {
-    $serial = $pair[0]; $mode = $pair[1]
-    foreach ($leaf in @("method_h_stage2_${mode}.log", "method_h_stage2_${mode}_ocd.log")) {
-        $rPath = "/tmp/lifetrac_p0c/$leaf"
-        $lPath = Join-Path $evidenceDir "${serial}_${leaf}"
-        & adb -s $serial pull $rPath $lPath 2>&1 | Out-Null
+$savedEAP = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    foreach ($pair in @(@($RxAdbSerial, "rx_listen"), @($TxAdbSerial, "tx_burst"))) {
+        $serial = $pair[0]; $mode = $pair[1]
+        foreach ($leaf in @("method_h_stage2_${mode}.log", "method_h_stage2_${mode}_ocd.log")) {
+            $rPath = "/tmp/lifetrac_p0c/$leaf"
+            $lPath = Join-Path $evidenceDir "${serial}_${leaf}"
+            & adb -s $serial pull $rPath $lPath 2>&1 | Out-Null
+        }
     }
+
+    $analyzer = Join-Path $helperDir "analyze_rtt.py"
+    if (Test-Path -LiteralPath $analyzer) {
+        Write-Host ""
+        Write-Host "Running latency analyzer..."
+        $pyCandidates = @("python", "python3", "py")
+        $analyzerRan = $false
+        foreach ($pyName in $pyCandidates) {
+            $argList = @($analyzer, $evidenceDir, "--no-stdout")
+            if ($pyName -eq "py") { $argList = @("-3") + $argList }
+            $output = $null
+            try {
+                $output = & $pyName @argList 2>&1
+                $rc = $LASTEXITCODE
+            } catch {
+                Write-Host ("  [$pyName] not invokable: {0}" -f $_.Exception.Message)
+                continue
+            }
+            if ($null -ne $output) {
+                $output | ForEach-Object { Write-Host "  [$pyName] $_" }
+            }
+            if ($rc -eq 0) {
+                $analyzerRan = $true
+                break
+            }
+            Write-Host ("  [$pyName] exited rc={0}, trying next interpreter" -f $rc)
+        }
+        if ($analyzerRan) {
+            $rttMd = Join-Path $evidenceDir "rtt_report.md"
+            if (Test-Path -LiteralPath $rttMd) {
+                Write-Host "--- rtt_report.md ---"
+                Get-Content -LiteralPath $rttMd | Write-Host
+                Write-Host "---"
+            }
+        } else {
+            Write-Warning "Latency analyzer did not run; invoke manually: python `"$analyzer`" `"$evidenceDir`""
+        }
+    }
+} finally {
+    $ErrorActionPreference = $savedEAP
 }
 
 Write-Host ""

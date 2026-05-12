@@ -1,0 +1,55 @@
+{
+    "stamp":  "2026-05-11_223226",
+    "rx_serial":  "2E2C1209DABC240B",
+    "tx_serial":  "2D0A1209DABC240B",
+    "cycles":  2000,
+    "inter_cycle_s":  0.05,
+    "rx_window_s":  366,
+    "tx_done_ok":  1126,
+    "tx_done_rate":  0.563,
+    "tx_timeouts":  0,
+    "rx_frames_received":  1024,
+    "rx_match":  1024,
+    "rx_orphan":  0,
+    "rx_match_rate":  0.512,
+    "rssi_median_dbm":  -97,
+    "snr_median_db":  9,
+    "radio_tx_abort_airtime_delta":  999,
+    "tx_real_faults":  999,
+    "rx_real_faults":  999,
+    "tx_invariants_violated":  999,
+    "rx_invariants_violated":  999,
+    "gates":  [
+                  {
+                      "id":  "B1",
+                      "label":  "tx_done_rate \u003e= 0.99 (got 0.563)",
+                      "ok":  false
+                  },
+                  {
+                      "id":  "B2",
+                      "label":  "rx_match_rate \u003e= 0.99 (got 0.512)",
+                      "ok":  false
+                  },
+                  {
+                      "id":  "B3",
+                      "label":  "radio_tx_abort_airtime_delta == 0 (got 999)",
+                      "ok":  false
+                  },
+                  {
+                      "id":  "B4",
+                      "label":  "no real FAULT_URC (tx=999 rx=999)",
+                      "ok":  false
+                  },
+                  {
+                      "id":  "B5",
+                      "label":  "host invariants stable (tx_violated=999 rx_violated=999)",
+                      "ok":  false
+                  },
+                  {
+                      "id":  "B6",
+                      "label":  "median RSSI in [-120,-30] dBm (got -97)",
+                      "ok":  true
+                  }
+              ],
+    "verdict":  "RX_PAIR_FAIL_5_GATES"
+}

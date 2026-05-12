@@ -2189,6 +2189,89 @@ Execute from the runbook; the bullets below are the index.
   the current M7 raw-SPI RadioLib diagnostic fails before TX start.
   The current PowerShell harness records metrics but does not generate
   the burst.
+- [ ] **W1-11 / W4-00(b) Latency testing improvements.** Status
+  2026-05-11: bench-tier analyzer
+  [`analyze_rtt.py`](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/analyze_rtt.py)
+  is wired into
+  [`run_w1_10b_rx_pair_end_to_end.ps1`](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_w1_10b_rx_pair_end_to_end.ps1)
+  step 14 and confirms LoRa ToA SF7/BW125/44 B = **30.85 ms**
+  deterministic across 800 samples (100/200/500-cycle runs), +2.8 % vs
+  the [`LATENCY_BUDGET.md`](DESIGN-CONTROLLER/RESEARCH-CONTROLLER/LATENCY_BUDGET.md)
+  §1 row #2 estimate. Measured one-way host overhead (TX_FRAME_REQ →
+  TX_DONE_URC minus ToA) is **~24.5 ms**, much higher than the 5 ms
+  assumed in `PREDICTED_HOST_OVERHEAD_MS`. Open follow-ups:
+  - [ ] **L-1 True ping-pong RTT.** Add an `--probe rx_echo` mode that
+    re-TXes every received frame; pair with a TX-side probe that
+    timestamps the round-trip. Replaces the current `2*elapsed_p50`
+    surrogate (which double-counts host overhead and currently prints
+    `OUTSIDE_BUDGET` even though air-time is well within budget).
+  - [ ] **L-2 Reconcile budget rows #1 + #5.** Update
+    `LATENCY_BUDGET.md` row #1 (host UART encode) and row #5 (UART
+    decode) using the measured ~24.5 ms one-way figure (split
+    encode/decode using firmware-side timestamps if available); also
+    update `PREDICTED_HOST_OVERHEAD_MS` constant in `analyze_rtt.py`.
+  - [x] **L-3 Higher-rate stress.** Re-ran `run_w1_10b_rx_pair_*`
+    bracketing inter-cycle from 100 ms → 50 ms and cycles 200 → 2000
+    to characterize p999 latency, RX-side queueing, and packet-loss
+    rate under sustained load.
+    *2026-05-11 first attempt:* `InterCycleS=0.05 Cycles=2000` wedged
+    the L072 — RX listener entered TRANSPORT_FAIL on the next run
+    (FATAL: VER warm-up failed: timeout waiting for response type 0x81
+    to req 0x01; bench recovered after a single 200-cycle run at the
+    default 0.2 s rate, no power-cycle needed).
+    *2026-05-12 bracketing (this session):* repeated each rung end-to-end
+    on the same fleet key and got **clean PASS at every rate**, including
+    the previously-wedged 50 ms × 2000-cycle condition:
+
+    | Rung | InterCycleS | Cycles | tx_done_rate | rx_match_rate | Verdict | Evidence dir |
+    |---|---|---|---|---|---|---|
+    | L-3a | 0.100 | 200 | 1.000 | 0.995 | RX_PAIR_PASS | `W1-10b_rx_pair_2026-05-11_230351` |
+    | L-3b | 0.075 | 200 | (200/200, summary lost to terminal kill) | clean | effective PASS | `W1-10b_rx_pair_2026-05-11_230545` |
+    | L-3c | 0.060 | 200 | 1.000 | 1.000 | RX_PAIR_PASS | `W1-10b_rx_pair_2026-05-11_230802` |
+    | L-3d | 0.050 | 200 | 1.000 | 1.000 | RX_PAIR_PASS | `W1-10b_rx_pair_2026-05-11_230955` |
+    | L-3e | 0.050 | 1000 | 1.000 | 0.999 | RX_PAIR_PASS | `W1-10b_rx_pair_2026-05-11_231144` |
+    | L-3f | 0.050 | 2000 | 1.000 | 0.9995 | RX_PAIR_PASS | `W1-10b_rx_pair_2026-05-11_231533` |
+
+    Findings:
+    1. **Prior wedge is non-reproducible** under identical params on the
+       same hardware — likely a one-off transport hiccup (USB/ADB jitter,
+       a partial frame straddling a window, or a transient L072 timing
+       slip). Not a hard ceiling at 20 Hz.
+    2. **Real per-cycle wall time ≈ 156 ms**, not 50 ms — `InterCycleS`
+       is the *delay between bursts*; each cycle also pays ToA
+       (30.85 ms SF7/BW125) plus ~120 ms of host overhead for adb
+       round-trips, HostLink encode/decode, and `__TX_DONE__` URC wait.
+       L-3f took ~3 min 43 s for 2000 cycles → ~111 ms/cycle. The
+       L-prefix `_PAIR_PASS` rates are therefore against a real link
+       cadence of ≈ 6.5–9 Hz, not the nominal 20 Hz target. To truly
+       stress 20 Hz, the host overhead in the helper toolkit needs to
+       drop (batch URC parsing, persistent shell, or move TX scheduling
+       on-MCU).
+    3. **Single-frame loss in long runs** is consistent (1 missed frame
+       in both L-3e and L-3f) — a 0.05 % loss at the boundary of the RX
+       window or a single failed CRC; not a queueing collapse.
+
+    Follow-ups remaining for L-3 family:
+    - [ ] **L-3g (deferred)** Capture per-cycle elapsed array (already
+      embedded in tx_stdout) and emit p50/p90/p99/p999 histograms for
+      L-3e and L-3f into `summary.json`. Currently only `verdict` and
+      counts are persisted.
+    - [ ] **L-3h (deferred)** Reduce host overhead so `InterCycleS=0.05`
+      actually approaches 20 Hz cadence; then re-stress to find the
+      *real* wedge condition.
+  - [ ] **L-4 PHY sweep.** Repeat the 500-cycle measurement at
+    SF8/BW125 and SF9/BW125 to populate ToA columns in
+    `LATENCY_BUDGET.md` for the link-tune walk-down rungs.
+  - [ ] **L-5 Cold-boot latency (W4-07 prep).** Sequence of N short
+    bursts with full L072 reflash/reboot between each; characterize
+    first-frame-after-boot latency vs warm-state latency. Feeds the
+    handheld-power-on UX budget.
+  - [ ] **L-6 End-to-end stick → hydraulic.** Once Opta + valve bench
+    is live (§5 step 7), wire a synchronized timestamp from joystick
+    ADC sample → LoRa TX → LoRa RX → Modbus → SSR coil → spool
+    position sensor; this is the only test that closes the full
+    LATENCY_BUDGET §1 rows #1–#13 chain and confirms the ≤ 150 ms
+    target in [W4-01-stick-to-valve](#) below.
 - [ ] **W4-01 Handheld E-stop latch latency.** Mushroom-button press →
   PSR-alive drops → all 8 valve coils de-energize within **< 100 ms**
   measured at the relay terminals. Repeat 100× across the SF7/SF8/SF9

@@ -1,0 +1,156 @@
+=== Fri May  6 09:21:04 UTC 2022 Method H Stage 2 boot user app ===
+__RX_FRAME__ idx=1023 rssi=-97 snr=9 len=24 timestamp_us=117363834 payload_hex=57312d313062207365713d31303233203337373663633337
+__RX_FRAME__ idx=1024 rssi=-97 snr=9 len=24 timestamp_us=117465779 payload_hex=57312d313062207365713d31303234206238313638626565
+boot_ocd_rc=0
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: ensure GPIOA + GPIOF clocks enabled
+  RCC_AHB4ENR before = 0
+  RCC_AHB4ENR after  = 33
+Phase B: ensure PA_11 + PF_4 are outputs (preserve other bits)
+Phase C: drop BOOT0 (PA_11 -> LOW) so L072 boots from flash
+  GPIOA_IDR.PA_11 = 0   (expect 0)
+Phase D: pulse NRST (PF_4 LOW 250 ms then HIGH)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+
+DONE: BOOT0 LOW, NRST released. L072 should now run user firmware.
+Allow ~500 ms then probe UART (e.g. AT command at 19200 8N1).
+shutdown command invoked
+WARNING: dropped malformed frame: truncated COBS payload
+WARNING: dropped malformed frame: truncated COBS payload
+probe_rc[/dev/ttymxc3][rx_listen]=137
+
+=== DONE: boot=0 probe=137 ===
+__BENCH_RADIO_SLEEP_AUDIT__=MISSING (probe exited without parking SX1276 in SLEEP — bench EMC rule violated; investigate before next test)
+
+=== Fri May  6 09:21:05 UTC 2022 Stage 2 probe (mode=rx_listen) on /dev/ttymxc3 ===
+MODE: rx_listen
+dev=/dev/ttymxc3 baud=921600
+=== W1-10b probe RX_LISTEN: window=366.0s ===
+INFO: drained type=0xC0 seq=0 during boot settle
+INFO: drained type=0x91 seq=0 during boot settle
+INFO: drained type=0xC0 seq=0 during boot settle
+INFO: drained type=0x91 seq=0 during boot settle
+INFO: drained type=0xC0 seq=0 during boot settle
+INFO: drained type=0x91 seq=0 during boot settle
+INFO: drained type=0xC0 seq=0 during boot settle
+INFO: drained type=0x91 seq=0 during boot settle
+INFO: drained type=0xC0 seq=0 during boot settle
+INFO: drained type=0x91 seq=0 during boot settle
+INFO: drained type=0xC0 seq=0 during boot settle
+INFO: drained type=0x91 seq=0 during boot settle
+INFO: drained type=0xC0 seq=0 during boot settle
+INFO: drained type=0x91 seq=0 during boot settle
+INFO: drained type=0xC0 seq=0 during boot settle
+INFO: drained type=0x91 seq=0 during boot settle
+INFO: drained type=0xC0 seq=0 during boot settle
+INFO: drained type=0x91 seq=0 during boot settle
+INFO: drained type=0xC0 seq=0 during boot settle
+INFO: drained type=0x91 seq=0 during boot settle
+INFO: drained type=0xC0 seq=0 during boot settle
+INFO: drained type=0x91 seq=0 during boot settle
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+INFO: post-VER drain wire   type=0xC0 seq=0
+INFO: post-VER drain wire   type=0x91 seq=0
+INFO: post-VER drain wire   type=0xC0 seq=0
+INFO: post-VER drain wire   type=0x91 seq=0
+INFO: post-VER drain wire   type=0xC0 seq=0
+INFO: post-VER drain wire   type=0x91 seq=0
+INFO: post-VER drain wire   type=0xC0 seq=0
+INFO: post-VER drain wire   type=0x91 seq=0
+INFO: post-VER drain wire   type=0xC0 seq=0
+INFO: post-VER drain wire   type=0x91 seq=0
+INFO: post-VER drain wire   type=0xC0 seq=0
+INFO: post-VER drain wire   type=0x91 seq=0
+INFO: post-VER drain wire   type=0xC0 seq=0
+INFO: post-VER drain wire   type=0x91 seq=0
+INFO: post-VER drain wire   type=0xC0 seq=0
+INFO: post-VER drain wire   type=0x91 seq=0
+INFO: post-VER drain wire   type=0xC0 seq=0
+INFO: post-VER drain wire   type=0x91 seq=0
+RX_LISTEN: STATS(before) radio_rx_ok=24 radio_crc_err=0 radio_state=4
+__W1_10B_LISTEN_READY__
+__RX_FRAME__ idx=1 rssi=-97 snr=9 len=24 timestamp_us=2526367 payload_hex=57312d313062207365713d31303537203438363934393138
+__RX_FRAME__ idx=2 rssi=-97 snr=9 len=24 timestamp_us=2623672 payload_hex=57312d313062207365713d31303538203165636336303065
+__RX_FRAME__ idx=3 rssi=-97 snr=9 len=24 timestamp_us=2731048 payload_hex=57312d313062207365713d31303539206430356562306362
+__RX_FRAME__ idx=4 rssi=-97 snr=9 len=24 timestamp_us=2838179 payload_hex=57312d313062207365713d31303630206564363438333535
+__RX_FRAME__ idx=5 rssi=-97 snr=8 len=24 timestamp_us=2945683 payload_hex=57312d313062207365713d31303631203663336666343635
+__RX_FRAME__ idx=6 rssi=-97 snr=11 len=24 timestamp_us=3044895 payload_hex=57312d313062207365713d31303632203337336130333530
+__RX_FRAME__ idx=7 rssi=-97 snr=9 len=24 timestamp_us=3144356 payload_hex=57312d313062207365713d31303633206539313364346230
+__RX_FRAME__ idx=8 rssi=-96 snr=9 len=24 timestamp_us=3251306 payload_hex=57312d313062207365713d31303634203161376536313434
+__RX_FRAME__ idx=9 rssi=-97 snr=9 len=24 timestamp_us=3357756 payload_hex=57312d313062207365713d31303635203265356661343936
+__RX_FRAME__ idx=10 rssi=-97 snr=9 len=24 timestamp_us=3464677 payload_hex=57312d313062207365713d31303636203938643062646366
+__RX_FRAME__ idx=11 rssi=-97 snr=8 len=24 timestamp_us=3564966 payload_hex=57312d313062207365713d31303637206432636330633636
+__RX_FRAME__ idx=12 rssi=-97 snr=8 len=24 timestamp_us=3672226 payload_hex=57312d313062207365713d31303638203064306261616138
+__RX_FRAME__ idx=13 rssi=-97 snr=8 len=24 timestamp_us=3778844 payload_hex=57312d313062207365713d31303639203237366362393731
+__RX_FRAME__ idx=14 rssi=-97 snr=8 len=24 timestamp_us=3879009 payload_hex=57312d313062207365713d31303730206131373262343263
+__RX_FRAME__ idx=15 rssi=-96 snr=8 len=24 timestamp_us=3984019 payload_hex=57312d313062207365713d31303731203135336634383061
+__RX_FRAME__ idx=16 rssi=-97 snr=9 len=24 timestamp_us=4092303 payload_hex=57312d313062207365713d31303732203965336431626666
+__RX_FRAME__ idx=17 rssi=-97 snr=9 len=24 timestamp_us=4191416 payload_hex=57312d313062207365713d31303733203766343031306235
+__RX_FRAME__ idx=18 rssi=-97 snr=8 len=24 timestamp_us=4291670 payload_hex=57312d313062207365713d31303734206665613363303639
+__RX_FRAME__ idx=19 rssi=-97 snr=9 len=24 timestamp_us=4394170 payload_hex=57312d313062207365713d31303735203131316565623631
+__RX_FRAME__ idx=20 rssi=-97 snr=9 len=24 timestamp_us=4499661 payload_hex=57312d313062207365713d31303736203333653961643537
+__RX_FRAME__ idx=21 rssi=-96 snr=9 len=24 timestamp_us=4602562 payload_hex=57312d313062207365713d31303737206436333263303065
+__RX_FRAME__ idx=22 rssi=-97 snr=9 len=24 timestamp_us=4705240 payload_hex=57312d313062207365713d31303738206163623038323938
+__RX_FRAME__ idx=23 rssi=-97 snr=8 len=24 timestamp_us=4812360 payload_hex=57312d313062207365713d31303739203231303338396230
+__RX_FRAME__ idx=24 rssi=-97 snr=9 len=24 timestamp_us=4914855 payload_hex=57312d313062207365713d31303830203462663661306535
+__RX_FRAME__ idx=25 rssi=-97 snr=9 len=24 timestamp_us=5017836 payload_hex=57312d313062207365713d31303831203135656238376466
+__RX_FRAME__ idx=26 rssi=-96 snr=8 len=24 timestamp_us=5119959 payload_hex=57312d313062207365713d31303832206261363162336563
+__RX_FRAME__ idx=27 rssi=-97 snr=9 len=24 timestamp_us=5227015 payload_hex=57312d313062207365713d31303833203862646262383939
+__RX_FRAME__ idx=28 rssi=-97 snr=9 len=24 timestamp_us=5334387 payload_hex=57312d313062207365713d31303834203837633262386332
+__RX_FRAME__ idx=29 rssi=-96 snr=8 len=24 timestamp_us=5441623 payload_hex=57312d313062207365713d31303835203131616234643032
+__RX_FRAME__ idx=30 rssi=-97 snr=9 len=24 timestamp_us=5548671 payload_hex=57312d313062207365713d31303836206333643532346263
+__RX_FRAME__ idx=31 rssi=-97 snr=11 len=24 timestamp_us=5650569 payload_hex=57312d313062207365713d31303837203264386365386463
+__RX_FRAME__ idx=32 rssi=-97 snr=9 len=24 timestamp_us=5750361 payload_hex=57312d313062207365713d31303838203666386366306232
+__RX_FRAME__ idx=33 rssi=-97 snr=9 len=24 timestamp_us=5852725 payload_hex=57312d313062207365713d31303839203265653066653162
+__RX_FRAME__ idx=34 rssi=-96 snr=9 len=24 timestamp_us=5960502 payload_hex=57312d313062207365713d31303930206134373861303363
+__RX_FRAME__ idx=35 rssi=-97 snr=12 len=24 timestamp_us=6063071 payload_hex=57312d313062207365713d31303931203733666462653463
+__RX_FRAME__ idx=36 rssi=-97 snr=9 len=24 timestamp_us=6163288 payload_hex=57312d313062207365713d31303932203462643634396263
+__RX_FRAME__ idx=37 rssi=-96 snr=9 len=24 timestamp_us=6265825 payload_hex=57312d313062207365713d31303933203831623337343534
+__RX_FRAME__ idx=38 rssi=-97 snr=9 len=24 timestamp_us=6369602 payload_hex=57312d313062207365713d31303934206463613839363764
+__RX_FRAME__ idx=39 rssi=-97 snr=8 len=24 timestamp_us=6475931 payload_hex=57312d313062207365713d31303935203539333466343763
+__RX_FRAME__ idx=40 rssi=-96 snr=9 len=24 timestamp_us=6583198 payload_hex=57312d313062207365713d31303936203832623261613235
+__RX_FRAME__ idx=41 rssi=-97 snr=9 len=24 timestamp_us=6690191 payload_hex=57312d313062207365713d31303937203962623134616231
+__RX_FRAME__ idx=42 rssi=-96 snr=8 len=24 timestamp_us=6796791 payload_hex=57312d313062207365713d31303938206137376632393161
+__RX_FRAME__ idx=43 rssi=-97 snr=8 len=24 timestamp_us=6896132 payload_hex=57312d313062207365713d31303939203630626631356330
+__RX_FRAME__ idx=44 rssi=-97 snr=9 len=24 timestamp_us=7003921 payload_hex=57312d313062207365713d31313030203364653361393232
+__RX_FRAME__ idx=45 rssi=-97 snr=9 len=24 timestamp_us=7106834 payload_hex=57312d313062207365713d31313031206236333266626361
+__RX_FRAME__ idx=46 rssi=-96 snr=9 len=24 timestamp_us=7203146 payload_hex=57312d313062207365713d31313032203237353836303338
+__RX_FRAME__ idx=47 rssi=-97 snr=8 len=24 timestamp_us=7304641 payload_hex=57312d313062207365713d31313033206661303235336364
+__RX_FRAME__ idx=48 rssi=-97 snr=9 len=24 timestamp_us=7412335 payload_hex=57312d313062207365713d31313034203537616539653964
+__RX_FRAME__ idx=49 rssi=-97 snr=9 len=24 timestamp_us=7519338 payload_hex=57312d313062207365713d31313035203264353937636338
+__RX_FRAME__ idx=50 rssi=-97 snr=8 len=24 timestamp_us=7622221 payload_hex=57312d313062207365713d31313036206434396534303361
+__RX_FRAME__ idx=51 rssi=-97 snr=9 len=24 timestamp_us=7729070 payload_hex=57312d313062207365713d31313037203439633030363236
+__RX_FRAME__ idx=52 rssi=-97 snr=9 len=24 timestamp_us=7836830 payload_hex=57312d313062207365713d31313038206234343633306265
+__RX_FRAME__ idx=53 rssi=-96 snr=9 len=24 timestamp_us=7942941 payload_hex=57312d313062207365713d31313039206331323637396230
+__RX_FRAME__ idx=54 rssi=-97 snr=10 len=24 timestamp_us=8049988 payload_hex=57312d313062207365713d31313130203333303438323731
+__RX_FRAME__ idx=55 rssi=-97 snr=9 len=24 timestamp_us=8150344 payload_hex=57312d313062207365713d31313131206463316330633266
+__RX_FRAME__ idx=56 rssi=-97 snr=8 len=24 timestamp_us=8252808 payload_hex=57312d313062207365713d31313132206233323732316437
+__RX_FRAME__ idx=57 rssi=-96 snr=9 len=24 timestamp_us=8354576 payload_hex=57312d313062207365713d31313133203763313532376566
+__RX_FRAME__ idx=58 rssi=-97 snr=8 len=24 timestamp_us=8457352 payload_hex=57312d313062207365713d31313134203364343565366336
+__RX_FRAME__ idx=59 rssi=-97 snr=8 len=24 timestamp_us=8560094 payload_hex=57312d313062207365713d31313135206136636662646331
+__RX_FRAME__ idx=60 rssi=-97 snr=9 len=24 timestamp_us=8667557 payload_hex=57312d313062207365713d31313136206434393065643761
+__RX_FRAME__ idx=61 rssi=-97 snr=9 len=24 timestamp_us=8769629 payload_hex=57312d313062207365713d31313137203535623862346235
+__RX_FRAME__ idx=62 rssi=-97 snr=8 len=24 timestamp_us=8871609 payload_hex=57312d313062207365713d31313138203330353563666661
+__RX_FRAME__ idx=63 rssi=-97 snr=8 len=24 timestamp_us=8973293 payload_hex=57312d313062207365713d31313139203434376336376236
+__RX_FRAME__ idx=64 rssi=-97 snr=9 len=24 timestamp_us=9074970 payload_hex=57312d313062207365713d31313230206233343564613032
+__RX_FRAME__ idx=65 rssi=-98 snr=9 len=24 timestamp_us=9181501 payload_hex=57312d313062207365713d31313231203366396163356661
+__RX_FRAME__ idx=66 rssi=-97 snr=9 len=24 timestamp_us=9288259 payload_hex=57312d313062207365713d31313232206439663031393630
+__RX_FRAME__ idx=67 rssi=-96 snr=9 len=24 timestamp_us=9381950 payload_hex=57312d313062207365713d31313233206436663336613335
+__RX_FRAME__ idx=68 rssi=-97 snr=9 len=24 timestamp_us=9478534 payload_hex=57312d313062207365713d31313234206635386237323431
+__RX_FRAME__ idx=69 rssi=-96 snr=8 len=24 timestamp_us=9579856 payload_hex=57312d313062207365713d31313235203639613333653565
