@@ -177,4 +177,46 @@ openocd --version     # OpenOCD version + build date
 A `gpio10` mismatch (1 on good, 0 on bad) is the canonical TT-1 signature
 and saves an hour of OpenOCD verbose-log archaeology.
 
+### TT-6: PowerShell `Start-Process -ArgumentList` mangles nested-quoted shell strings
+
+**Symptom.** A two-board orchestrator (e.g.
+`run_w1_10b_rx_pair_end_to_end.ps1`) launches an `adb exec-out` background
+process via `Start-Process`. Stdout file shows
+`fio: -c: line 1: unexpected EOF while looking for matching ''` and the
+remote command never starts. The *same* `sh -lc '...'` string works fine
+when invoked via the PowerShell call operator (`& adb ... exec-out
+$wrapped`) elsewhere in the codebase.
+
+**Root cause.** `Start-Process -ArgumentList @(...)` re-quotes args
+containing single quotes/spaces using Windows arg-quoting rules, which
+silently breaks any nested `sh -lc 'echo ... | sudo -S -p '\'\'' ...'`
+embedded escape sequence. The PowerShell call operator `&` uses a
+different (native-style) quoting path that preserves the inner quotes.
+
+**Fix (already applied to W1-10b).** Don't pass a multi-quoted shell
+string through `Start-Process -ArgumentList`. Instead, write the command
+to a tiny `.sh` wrapper file (with **LF line endings** — `[System.IO.File]::WriteAllText`
+plus `-replace "`r`n", "`n"`), `adb push` it to `/tmp/lifetrac_p0c/_xxx_wrap.sh`,
+and let `Start-Process` invoke a single, quote-free arg:
+
+```powershell
+$wrapBody = "#!/bin/sh`necho fio | sudo -S -p '' env FOO=bar bash /tmp/.../runner.sh`n"
+[System.IO.File]::WriteAllText($wrapLocal, ($wrapBody -replace "`r`n", "`n"))
+& adb -s $serial push $wrapLocal /tmp/lifetrac_p0c/_wrap.sh | Out-Null
+& adb -s $serial exec-out "chmod +x /tmp/lifetrac_p0c/_wrap.sh" | Out-Null
+$proc = Start-Process -FilePath "adb" `
+    -ArgumentList @("-s", $serial, "exec-out", "bash /tmp/lifetrac_p0c/_wrap.sh") `
+    -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile `
+    -PassThru -NoNewWindow
+```
+
+Foreground sync calls can keep using `& adb @prefix exec-out $wrapped` —
+that path is fine.
+
+### TT-7: `Start-Process -NoNewWindow` and `-WindowStyle Hidden` are mutually exclusive
+
+PS5.1 throws `Parameters "-NoNewWindow" and "-WindowStyle" cannot be
+specified at the same time.` Pick one. For a hidden background `adb`
+helper, use **`-NoNewWindow`** (no `-WindowStyle`).
+
 

@@ -1,0 +1,145 @@
+=== Fri May  6 07:35:19 UTC 2022 Method H Stage 2 boot user app ===
+boot_ocd_rc=0
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: ensure GPIOA + GPIOF clocks enabled
+  RCC_AHB4ENR before = 0
+  RCC_AHB4ENR after  = 33
+Phase B: ensure PA_11 + PF_4 are outputs (preserve other bits)
+Phase C: drop BOOT0 (PA_11 -> LOW) so L072 boots from flash
+  GPIOA_IDR.PA_11 = 0   (expect 0)
+Phase D: pulse NRST (PF_4 LOW 250 ms then HIGH)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+
+DONE: BOOT0 LOW, NRST released. L072 should now run user firmware.
+Allow ~500 ms then probe UART (e.g. AT command at 19200 8N1).
+shutdown command invoked
+
+=== Fri May  6 07:35:20 UTC 2022 Stage 2 probe (mode=rx_listen) on /dev/ttymxc3 ===
+MODE: rx_listen
+dev=/dev/ttymxc3 baud=921600
+=== W1-10b probe RX_LISTEN: window=66.0s ===
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+RX_LISTEN: STATS(before) radio_rx_ok=0 radio_crc_err=0 radio_state=4
+RX_LISTEN: RegOpMode(pre)=0x85 (expected 0x85)
+__W1_10B_LISTEN_READY__
+__RX_FRAME__ idx=1 rssi=-97 snr=8 len=24 timestamp_us=11235482 payload_hex=57312d313062207365713d30303030206432336539376136
+__RX_FRAME__ idx=2 rssi=-97 snr=9 len=24 timestamp_us=11493749 payload_hex=57312d313062207365713d30303031203665636438623436
+__RX_FRAME__ idx=3 rssi=-97 snr=8 len=24 timestamp_us=11752642 payload_hex=57312d313062207365713d30303032206338636364663737
+__RX_FRAME__ idx=4 rssi=-96 snr=8 len=24 timestamp_us=12009110 payload_hex=57312d313062207365713d30303033206363663866343263
+__RX_FRAME__ idx=5 rssi=-96 snr=8 len=24 timestamp_us=12262018 payload_hex=57312d313062207365713d30303034203231313564633632
+__RX_FRAME__ idx=6 rssi=-96 snr=9 len=24 timestamp_us=12520061 payload_hex=57312d313062207365713d30303035203963636666393265
+__RX_FRAME__ idx=7 rssi=-97 snr=9 len=24 timestamp_us=12779660 payload_hex=57312d313062207365713d30303036206563623733663766
+__RX_FRAME__ idx=8 rssi=-97 snr=9 len=24 timestamp_us=13037851 payload_hex=57312d313062207365713d30303037203931633536663335
+__RX_FRAME__ idx=9 rssi=-97 snr=9 len=24 timestamp_us=13291564 payload_hex=57312d313062207365713d30303038203034336338373563
+__RX_FRAME__ idx=10 rssi=-97 snr=9 len=24 timestamp_us=13545076 payload_hex=57312d313062207365713d30303039203766393636626365
+__RX_FRAME__ idx=11 rssi=-97 snr=9 len=24 timestamp_us=13802456 payload_hex=57312d313062207365713d30303130203937616461303735
+__RX_FRAME__ idx=12 rssi=-97 snr=8 len=24 timestamp_us=14057400 payload_hex=57312d313062207365713d30303131206538346364613437
+__RX_FRAME__ idx=13 rssi=-97 snr=9 len=24 timestamp_us=14314919 payload_hex=57312d313062207365713d30303132206530643432383537
+__RX_FRAME__ idx=14 rssi=-97 snr=8 len=24 timestamp_us=14572114 payload_hex=57312d313062207365713d30303133203832633263316364
+__RX_FRAME__ idx=15 rssi=-97 snr=8 len=24 timestamp_us=14830692 payload_hex=57312d313062207365713d30303134203262656437336134
+__RX_FRAME__ idx=16 rssi=-97 snr=9 len=24 timestamp_us=15083219 payload_hex=57312d313062207365713d30303135203737356130336432
+__RX_FRAME__ idx=17 rssi=-97 snr=9 len=24 timestamp_us=15340566 payload_hex=57312d313062207365713d30303136203064373637643134
+__RX_FRAME__ idx=18 rssi=-97 snr=8 len=24 timestamp_us=15596347 payload_hex=57312d313062207365713d30303137203332353466646630
+__RX_FRAME__ idx=19 rssi=-97 snr=9 len=24 timestamp_us=15853779 payload_hex=57312d313062207365713d30303138206331373864623431
+__RX_FRAME__ idx=20 rssi=-97 snr=8 len=24 timestamp_us=16106746 payload_hex=57312d313062207365713d30303139206266343166653835
+__RX_FRAME__ idx=21 rssi=-96 snr=8 len=24 timestamp_us=16362709 payload_hex=57312d313062207365713d30303230203832383166643532
+__RX_FRAME__ idx=22 rssi=-97 snr=6 len=24 timestamp_us=16615201 payload_hex=57312d313062207365713d30303231206439616532376438
+__RX_FRAME__ idx=23 rssi=-97 snr=9 len=24 timestamp_us=16873477 payload_hex=57312d313062207365713d30303232203261363364346137
+__RX_FRAME__ idx=24 rssi=-97 snr=9 len=24 timestamp_us=17124574 payload_hex=57312d313062207365713d30303233206565613237333139
+__RX_FRAME__ idx=25 rssi=-97 snr=8 len=24 timestamp_us=17382585 payload_hex=57312d313062207365713d30303234203966643664616433
+__RX_FRAME__ idx=26 rssi=-97 snr=8 len=24 timestamp_us=17636153 payload_hex=57312d313062207365713d30303235203135356436393462
+__RX_FRAME__ idx=27 rssi=-96 snr=9 len=24 timestamp_us=17889301 payload_hex=57312d313062207365713d30303236203366633134663334
+__RX_FRAME__ idx=28 rssi=-97 snr=9 len=24 timestamp_us=18146781 payload_hex=57312d313062207365713d30303237203764346336303764
+__RX_FRAME__ idx=29 rssi=-97 snr=9 len=24 timestamp_us=18404524 payload_hex=57312d313062207365713d30303238203635396563623934
+__RX_FRAME__ idx=30 rssi=-97 snr=9 len=24 timestamp_us=18655414 payload_hex=57312d313062207365713d30303239203434336435363437
+__RX_FRAME__ idx=31 rssi=-96 snr=9 len=24 timestamp_us=18905732 payload_hex=57312d313062207365713d30303330203738373763343466
+__RX_FRAME__ idx=32 rssi=-97 snr=9 len=24 timestamp_us=19159445 payload_hex=57312d313062207365713d30303331203732373634333564
+__RX_FRAME__ idx=33 rssi=-97 snr=9 len=24 timestamp_us=19412162 payload_hex=57312d313062207365713d30303332206231613333303162
+__RX_FRAME__ idx=34 rssi=-97 snr=9 len=24 timestamp_us=19669598 payload_hex=57312d313062207365713d30303333206332633330306137
+__RX_FRAME__ idx=35 rssi=-98 snr=9 len=24 timestamp_us=19920630 payload_hex=57312d313062207365713d30303334206238393935363433
+__RX_FRAME__ idx=36 rssi=-97 snr=8 len=24 timestamp_us=20178636 payload_hex=57312d313062207365713d30303335203732633436653766
+__RX_FRAME__ idx=37 rssi=-96 snr=9 len=24 timestamp_us=20436541 payload_hex=57312d313062207365713d30303336206366393234343064
+__RX_FRAME__ idx=38 rssi=-98 snr=9 len=24 timestamp_us=20689544 payload_hex=57312d313062207365713d30303337203638383161613537
+__RX_FRAME__ idx=39 rssi=-97 snr=9 len=24 timestamp_us=20943303 payload_hex=57312d313062207365713d30303338206531666631303731
+__RX_FRAME__ idx=40 rssi=-96 snr=9 len=24 timestamp_us=21195992 payload_hex=57312d313062207365713d30303339206632363865373163
+__RX_FRAME__ idx=41 rssi=-97 snr=8 len=24 timestamp_us=21459175 payload_hex=57312d313062207365713d30303430203763343434353462
+__RX_FRAME__ idx=42 rssi=-97 snr=8 len=24 timestamp_us=21717800 payload_hex=57312d313062207365713d30303431203535343632386136
+__RX_FRAME__ idx=43 rssi=-97 snr=9 len=24 timestamp_us=21969906 payload_hex=57312d313062207365713d30303432206239653633643038
+__RX_FRAME__ idx=44 rssi=-97 snr=9 len=24 timestamp_us=22219600 payload_hex=57312d313062207365713d30303433206532626165323361
+__RX_FRAME__ idx=45 rssi=-97 snr=8 len=24 timestamp_us=22468408 payload_hex=57312d313062207365713d30303434203836306662666433
+__RX_FRAME__ idx=46 rssi=-97 snr=9 len=24 timestamp_us=22725801 payload_hex=57312d313062207365713d30303435203039663830393664
+__RX_FRAME__ idx=47 rssi=-97 snr=9 len=24 timestamp_us=22985436 payload_hex=57312d313062207365713d30303436203237653239316561
+__RX_FRAME__ idx=48 rssi=-97 snr=9 len=24 timestamp_us=23238754 payload_hex=57312d313062207365713d30303437206435393930333761
+__RX_FRAME__ idx=49 rssi=-97 snr=8 len=24 timestamp_us=23491613 payload_hex=57312d313062207365713d30303438206461643737356534
+__RX_FRAME__ idx=50 rssi=-97 snr=8 len=24 timestamp_us=23750222 payload_hex=57312d313062207365713d30303439203361663234383263
+__RX_FRAME__ idx=51 rssi=-97 snr=8 len=24 timestamp_us=24012918 payload_hex=57312d313062207365713d30303530206662326532373663
+__RX_FRAME__ idx=52 rssi=-97 snr=9 len=24 timestamp_us=24266739 payload_hex=57312d313062207365713d30303531203536656666323338
+__RX_FRAME__ idx=53 rssi=-97 snr=9 len=24 timestamp_us=24517915 payload_hex=57312d313062207365713d30303532203038343864633130
+__RX_FRAME__ idx=54 rssi=-97 snr=9 len=24 timestamp_us=24771189 payload_hex=57312d313062207365713d30303533206636343965663433
+__RX_FRAME__ idx=55 rssi=-97 snr=9 len=24 timestamp_us=25029581 payload_hex=57312d313062207365713d30303534203463366637633235
+__RX_FRAME__ idx=56 rssi=-96 snr=9 len=24 timestamp_us=25282879 payload_hex=57312d313062207365713d30303535203163303734383031
+__RX_FRAME__ idx=57 rssi=-97 snr=9 len=24 timestamp_us=25541433 payload_hex=57312d313062207365713d30303536203136383565663265
+__RX_FRAME__ idx=58 rssi=-97 snr=9 len=24 timestamp_us=25799407 payload_hex=57312d313062207365713d30303537206631626535636539
+__RX_FRAME__ idx=59 rssi=-97 snr=8 len=24 timestamp_us=26057658 payload_hex=57312d313062207365713d30303538203466366263633534
+__RX_FRAME__ idx=60 rssi=-97 snr=8 len=24 timestamp_us=26308566 payload_hex=57312d313062207365713d30303539206166643038306464
+__RX_FRAME__ idx=61 rssi=-96 snr=9 len=24 timestamp_us=26561934 payload_hex=57312d313062207365713d30303630206661343137336164
+__RX_FRAME__ idx=62 rssi=-97 snr=9 len=24 timestamp_us=26820473 payload_hex=57312d313062207365713d30303631203333356636623663
+__RX_FRAME__ idx=63 rssi=-97 snr=9 len=24 timestamp_us=27077938 payload_hex=57312d313062207365713d30303632203635316131336230
+__RX_FRAME__ idx=64 rssi=-96 snr=9 len=24 timestamp_us=27328189 payload_hex=57312d313062207365713d30303633206662626236623933
+__RX_FRAME__ idx=65 rssi=-96 snr=9 len=24 timestamp_us=27582026 payload_hex=57312d313062207365713d30303634206338623063396565
+__RX_FRAME__ idx=66 rssi=-97 snr=9 len=24 timestamp_us=27840006 payload_hex=57312d313062207365713d30303635206236613264613730
+__RX_FRAME__ idx=67 rssi=-96 snr=9 len=24 timestamp_us=28098207 payload_hex=57312d313062207365713d30303636203161373838666161
+__RX_FRAME__ idx=68 rssi=-97 snr=9 len=24 timestamp_us=28348289 payload_hex=57312d313062207365713d30303637203330343962373166
+__RX_FRAME__ idx=69 rssi=-97 snr=8 len=24 timestamp_us=28606098 payload_hex=57312d313062207365713d30303638203364333765306138
+__RX_FRAME__ idx=70 rssi=-97 snr=9 len=24 timestamp_us=28864644 payload_hex=57312d313062207365713d30303639203132396536626338
+__RX_FRAME__ idx=71 rssi=-97 snr=9 len=24 timestamp_us=29123461 payload_hex=57312d313062207365713d30303730203337343361336334
+__RX_FRAME__ idx=72 rssi=-97 snr=9 len=24 timestamp_us=29375012 payload_hex=57312d313062207365713d30303731203630326132336332
+__RX_FRAME__ idx=73 rssi=-97 snr=9 len=24 timestamp_us=29624346 payload_hex=57312d313062207365713d30303732203265373034323266
+__RX_FRAME__ idx=74 rssi=-97 snr=10 len=24 timestamp_us=29870755 payload_hex=57312d313062207365713d30303733206662306135613763
+__RX_FRAME__ idx=75 rssi=-97 snr=9 len=24 timestamp_us=30118282 payload_hex=57312d313062207365713d30303734203439633038666561
+__RX_FRAME__ idx=76 rssi=-97 snr=9 len=24 timestamp_us=30366752 payload_hex=57312d313062207365713d30303735206363373863643439
+__RX_FRAME__ idx=77 rssi=-94 snr=1 len=24 timestamp_us=30611207 payload_hex=57312d313062207365713d30303736203136656639656663
+__RX_FRAME__ idx=78 rssi=-96 snr=9 len=24 timestamp_us=30868176 payload_hex=57312d313062207365713d30303737203032393364363138
+__RX_FRAME__ idx=79 rssi=-97 snr=9 len=24 timestamp_us=31118391 payload_hex=57312d313062207365713d30303738203539396132353665
+__RX_FRAME__ idx=80 rssi=-96 snr=9 len=24 timestamp_us=31361880 payload_hex=57312d313062207365713d30303739206436663263653338
+__RX_FRAME__ idx=81 rssi=-96 snr=9 len=24 timestamp_us=31606096 payload_hex=57312d313062207365713d30303830203533353639636235
+__RX_FRAME__ idx=82 rssi=-96 snr=9 len=24 timestamp_us=31850011 payload_hex=57312d313062207365713d30303831203438366230643336
+__RX_FRAME__ idx=83 rssi=-97 snr=9 len=24 timestamp_us=32094745 payload_hex=57312d313062207365713d30303832206138613766613866
+__RX_FRAME__ idx=84 rssi=-96 snr=9 len=24 timestamp_us=32347444 payload_hex=57312d313062207365713d30303833203064306132366164
+__RX_FRAME__ idx=85 rssi=-97 snr=8 len=24 timestamp_us=32606214 payload_hex=57312d313062207365713d30303834203432343164356263
+__RX_FRAME__ idx=86 rssi=-97 snr=8 len=24 timestamp_us=32864645 payload_hex=57312d313062207365713d30303835203636383464366163
+__RX_FRAME__ idx=87 rssi=-97 snr=8 len=24 timestamp_us=33119052 payload_hex=57312d313062207365713d30303836203466363239336639
+__RX_FRAME__ idx=88 rssi=-97 snr=8 len=24 timestamp_us=33372251 payload_hex=57312d313062207365713d30303837203039393639316463
+__RX_FRAME__ idx=89 rssi=-96 snr=8 len=24 timestamp_us=33630256 payload_hex=57312d313062207365713d30303838203935636431383134
+__RX_FRAME__ idx=90 rssi=-97 snr=9 len=24 timestamp_us=33888213 payload_hex=57312d313062207365713d30303839203333653835366535
+__RX_FRAME__ idx=91 rssi=-97 snr=9 len=24 timestamp_us=34142566 payload_hex=57312d313062207365713d30303930206239643536646534
+__RX_FRAME__ idx=92 rssi=-96 snr=8 len=24 timestamp_us=34396935 payload_hex=57312d313062207365713d30303931206636306431393934
+__RX_FRAME__ idx=93 rssi=-97 snr=8 len=24 timestamp_us=34649973 payload_hex=57312d313062207365713d30303932206463633963623539
+__RX_FRAME__ idx=94 rssi=-97 snr=9 len=24 timestamp_us=34908618 payload_hex=57312d313062207365713d30303933206666653335306533
+__RX_FRAME__ idx=95 rssi=-97 snr=8 len=24 timestamp_us=35166437 payload_hex=57312d313062207365713d30303934203763323432643537
+__RX_FRAME__ idx=96 rssi=-96 snr=9 len=24 timestamp_us=35423874 payload_hex=57312d313062207365713d30303935206230666432383561
+__RX_FRAME__ idx=97 rssi=-98 snr=9 len=24 timestamp_us=35677423 payload_hex=57312d313062207365713d30303936203066633331663934
+__RX_FRAME__ idx=98 rssi=-97 snr=9 len=24 timestamp_us=35935833 payload_hex=57312d313062207365713d30303937203837633364663064
+__RX_FRAME__ idx=99 rssi=-97 snr=9 len=24 timestamp_us=36189095 payload_hex=57312d313062207365713d30303938203334386534353034
+__RX_FRAME__ idx=100 rssi=-96 snr=9 len=24 timestamp_us=36442773 payload_hex=57312d313062207365713d30303939206561393262383737
+RX_LISTEN: STATS(after) radio_rx_ok=100 (delta=100) radio_crc_err=0 (delta=0)
+__W1_10B_LISTEN_DONE__ rx_frames=100 radio_rx_ok_delta=100 radio_crc_err_delta=0 real_faults=0 invariants_violated=0
+probe_rc[/dev/ttymxc3][rx_listen]=0
+
+=== DONE: boot=0 probe=0 ===

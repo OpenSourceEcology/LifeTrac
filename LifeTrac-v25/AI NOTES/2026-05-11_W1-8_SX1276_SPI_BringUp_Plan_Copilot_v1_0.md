@@ -262,17 +262,18 @@ Awaiting user go-ahead to proceed with implementation.
 
 ---
 
-## 9. Bench result — 2026-05-11 late-night execution (W1-8 PASSED)
+## 9. Bench result ï¿½ 2026-05-11 late-night execution (W1-8 PASSED)
 
-Ran the plan exactly as written in §5. All three edits applied to adio/sx1276.c:
+Ran the plan exactly as written in ï¿½5. All three edits applied to 
+adio/sx1276.c:
 
 1. SCK retargeted from PA5 to PB3 (AF0).
 2. PA6 (MISO) PUPDR = 01 (pull-up) added.
 3. `while ((SPI1_SR & SPI_SR_BSY) != 0U) { }` BSY-wait added before CR1 disable in `sx1276_spi_init()`.
 
-Build: `firmware.bin` = **16 292 bytes** (+52 from W1-7 baseline of 16 240 — within the +20…+60 estimate in §5.5 step 3).
+Build: `firmware.bin` = **16 292 bytes** (+52 from W1-7 baseline of 16 240 ï¿½ within the +20ï¿½+60 estimate in ï¿½5.5 step 3).
 
-### 9.1 Method G probe — first try
+### 9.1 Method G probe ï¿½ first try
 
 `REG 0x42 VERSION = 0x12` (was `0x00`). Full register dump showed real, varied silicon contents:
 
@@ -301,14 +302,14 @@ probe_selected_dev=/dev/ttymxc3
 
 W1-7 telemetry remained pristine: `host_parse_err=0`, all per-flag PE/FE/NE/ORE = 0, `rx_ring_ovf=0`, `host_rx_lpuart=24`, `host_rx_usart1=0`.
 
-### 9.2 Regression — W1-7 20-cycle quant
+### 9.2 Regression ï¿½ W1-7 20-cycle quant
 
 `run_stage1_standard_quant_end_to_end.ps1 -Cycles 20` on the same flashed image:
 
 `cycle=1..20 launcher_rc=0 std_rc=0 final_result=PASS  (x20)`  
 `FINAL_RESULT_PASS=20`
 
-**20/20 PASS** — identical to the W1-7 baseline. No UART regression introduced by the SPI fix.
+**20/20 PASS** ï¿½ identical to the W1-7 baseline. No UART regression introduced by the SPI fix.
 
 ### 9.3 Acceptance criteria summary
 
@@ -322,7 +323,7 @@ W1-7 telemetry remained pristine: `host_parse_err=0`, all per-flag PE/FE/NE/ORE 
 
 ### 9.4 Lesson learned
 
-When a working bring-up sketch (`lora_ping.c`) exists for the same hardware unit, **diff its peripheral init against the production driver before touching the production driver**. The SCK pin discrepancy (PA5 vs PB3) was visible in a single grep of both files. Net cost from idea to PASS once that diff was made: 3 small edits, one build, one flash, one probe, one quant. No oscilloscope required. (The §5.6 contingency tree was prepared but not needed — root-cause confidence held.)
+When a working bring-up sketch (`lora_ping.c`) exists for the same hardware unit, **diff its peripheral init against the production driver before touching the production driver**. The SCK pin discrepancy (PA5 vs PB3) was visible in a single grep of both files. Net cost from idea to PASS once that diff was made: 3 small edits, one build, one flash, one probe, one quant. No oscilloscope required. (The ï¿½5.6 contingency tree was prepared but not needed ï¿½ root-cause confidence held.)
 
 ### 9.5 Carry-forward to W1-9
 

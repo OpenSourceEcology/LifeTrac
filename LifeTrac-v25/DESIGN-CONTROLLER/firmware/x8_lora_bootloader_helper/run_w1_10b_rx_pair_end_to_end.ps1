@@ -137,15 +137,24 @@ $rxStderr = Join-Path $evidenceDir "rx_stderr.txt"
 "" | Set-Content -LiteralPath $rxStdout
 "" | Set-Content -LiteralPath $rxStderr
 
+# Stage the RX wrapper as a real .sh file on the X8 instead of inlining it
+# through Start-Process -ArgumentList, which re-quotes single-quoted args and
+# breaks the nested `sh -lc '...'` quoting (the inline form works only with
+# the PowerShell call operator, as in the TX path below).
 $rxRemoteCmd = "echo fio | sudo -S -p '' env LIFETRAC_PROBE_MODE=rx_listen LIFETRAC_RX_WINDOW=$rxWindowS bash /tmp/lifetrac_p0c/run_method_h_stage2_tx.sh"
-$rxWrapped = "sh -lc '$rxRemoteCmd; rc=`$?; printf ""__METHOD_H_RC__=%s\n"" ""`$rc""'"
+$rxWrapBody = "#!/bin/sh`n$rxRemoteCmd`nrc=`$?`nprintf '__METHOD_H_RC__=%s\n' `"`$rc`"`n"
+$rxWrapLocal = Join-Path $evidenceDir "_rx_wrap.sh"
+# Force LF line endings so /bin/sh on the X8 doesn't choke on CRLF.
+[System.IO.File]::WriteAllText($rxWrapLocal, ($rxWrapBody -replace "`r`n", "`n"))
+& adb -s $RxAdbSerial push $rxWrapLocal /tmp/lifetrac_p0c/_rx_wrap.sh | Out-Null
+& adb -s $RxAdbSerial exec-out "chmod +x /tmp/lifetrac_p0c/_rx_wrap.sh" | Out-Null
 
 Write-Host "Starting RX listener on $RxAdbSerial (window=${rxWindowS}s)..."
 $rxProc = Start-Process -FilePath "adb" `
-    -ArgumentList @("-s", $RxAdbSerial, "exec-out", $rxWrapped) `
+    -ArgumentList @("-s", $RxAdbSerial, "exec-out", "bash /tmp/lifetrac_p0c/_rx_wrap.sh") `
     -RedirectStandardOutput $rxStdout `
     -RedirectStandardError $rxStderr `
-    -PassThru -NoNewWindow -WindowStyle Hidden
+    -PassThru -NoNewWindow
 
 # ---------------------------------------------------------------------------
 # 6. Poll RX stdout for the __W1_10B_LISTEN_READY__ token (max 60 s).

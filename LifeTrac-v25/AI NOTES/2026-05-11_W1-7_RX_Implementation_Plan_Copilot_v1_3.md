@@ -478,7 +478,7 @@ via STATS to confirm.
 
 ### 11.1 Diagnostic outcome
 
-Implemented the §10.6 step 1 patch (emit `C:NOMATCH:<n>:<hex>` from
+Implemented the ï¿½10.6 step 1 patch (emit `C:NOMATCH:<n>:<hex>` from
 `host_cmd_dispatch_at_line` when no command matches), then extended
 it to also dump `host_uart_stats_rx_lpuart_bytes()`. Captured via
 `d3_bash_ingress.sh`:
@@ -501,7 +501,7 @@ it to also dump `host_uart_stats_rx_lpuart_bytes()`. Captured via
 
 `host_uart_poll_dma()` (foreground) and `RNG_LPUART1_IRQHandler`
 (IRQ) both read `LPUART1_ISR` then `LPUART1_RDR`, increment
-`s_stats_rx_lpuart_bytes`, and push to `s_rx_ring` — without any
+`s_stats_rx_lpuart_bytes`, and push to `s_rx_ring` ï¿½ without any
 mutual-exclusion guard. The race window:
 
 1. Foreground enters the `poll_dma` loop body, caches
@@ -510,7 +510,7 @@ mutual-exclusion guard. The race window:
    `LPUART1_RDR` (clears `RXNE`), pushes the byte, and increments
    the counter.
 3. Foreground resumes, still holding the cached `lpuart_isr` with
-   `RXNE=1`. It reads `LPUART1_RDR` again — but on STM32L0 this
+   `RXNE=1`. It reads `LPUART1_RDR` again ï¿½ but on STM32L0 this
    returns either the stale last-received byte *or* whichever new byte
    has just arrived in the meantime. Either way the foreground pushes
    that value to the ring and increments the counter again.
@@ -518,7 +518,7 @@ mutual-exclusion guard. The race window:
 Because the duplicated value is whatever happened to sit in `RDR` at
 the moment of the foreground re-read, the duplicate appears as a
 positionally-inserted byte that is *not* an exact echo of the last
-real character — explaining the ghost `T` between `V` and `E` in
+real character ï¿½ explaining the ghost `T` between `V` and `E` in
 `AT+VER?` and between `T` and `A` in `AT+STAT?`.
 
 This is why `ATI` (3 ASCII chars + `\r\n`, all consumed inside one
@@ -572,9 +572,9 @@ from reaching `probe=0`.
 
 ---
 
-## 12. Residual B disposition: closed by §11 fix (2026-05-11 evening)
+## 12. Residual B disposition: closed by ï¿½11 fix (2026-05-11 evening)
 
-After landing the §11 `host_uart_poll_dma` race fix and re-flashing 16344 B,
+After landing the ï¿½11 `host_uart_poll_dma` race fix and re-flashing 16344 B,
 the next end-to-end Method G probe on `/dev/ttymxc3` produced:
 
 ```
@@ -596,7 +596,7 @@ roundtrips succeed. `host_parse_err=0`. The probe RC dropped from
 `2` (transport timeout) to `1` (one critical-check failure on the
 SX1276 register-readback path).
 
-### 12.1 Why §11 also fixed Residual B
+### 12.1 Why ï¿½11 also fixed Residual B
 
 The `host_uart_poll_dma` race injected an extra duplicate byte at a
 non-deterministic position inside whatever sequence was being received.
@@ -604,13 +604,13 @@ For ASCII the duplicate broke the AT shell match (`AT+VER?` ?
 `AT+VTER?`); for binary frames the duplicate broke the COBS-decoded
 length / CRC, so `process_encoded_frame()` either silently dropped the
 frame (CRC mismatch increments `host_parse_err` but produces no URC)
-or — more often — pushed the byte mid-COBS-run, producing an inner
+or ï¿½ more often ï¿½ pushed the byte mid-COBS-run, producing an inner
 length mismatch and silent drop.
 
 When the Python probe sent its 12-byte `VER_REQ` and the foreground
 `poll_dma` won the race even once, the frame was corrupted and
 `link.request()` timed out at 1.0 s waiting for `0x81`. From the
-host side this looked identical to "request never arrived" — there was
+host side this looked identical to "request never arrived" ï¿½ there was
 no `H:PROC_FRAME` trace because the corrupted frame had a CRC error
 that bumped `host_parse_err` silently.
 
@@ -623,8 +623,8 @@ and replies. Confirmed by the bench probe above.
 | Item | Status | Notes |
 |---|---|---|
 | W1-7 Stage 1 RX bring-up | **PASSED** | ASCII + binary both clean; all UART error counters = 0 |
-| Residual A (poll_dma race) | **CLOSED §11** | 16344 B firmware, fix in `host_uart.c` |
-| Residual B (binary timeout) | **CLOSED §12** | Was a downstream symptom of A; §11 fix removed it transitively |
+| Residual A (poll_dma race) | **CLOSED ï¿½11** | 16344 B firmware, fix in `host_uart.c` |
+| Residual B (binary timeout) | **CLOSED ï¿½12** | Was a downstream symptom of A; ï¿½11 fix removed it transitively |
 | C:NOMATCH diagnostic | **REMOVED** | Build returned to 16240 B |
 | SX1276 register read = 0x00 | **NEW (separate)** | Tracked under W1-8 / radio-SPI bring-up; not a UART issue |
 
@@ -640,7 +640,7 @@ and replies. Confirmed by the bench probe above.
    via AT shell early (we did) and read it before/after a binary
    attempt.
 3. **The `poll_dma` foreground path is now redundant** for the
-   single-byte RX path on this MCU — the IRQ already drains every
+   single-byte RX path on this MCU ï¿½ the IRQ already drains every
    byte. Future cleanup: delete `host_uart_poll_dma()` entirely once
    we are sure no other code depends on its side effects, and rely on
    `HOST_IRQ_IDLE` + `service_rx` only.
