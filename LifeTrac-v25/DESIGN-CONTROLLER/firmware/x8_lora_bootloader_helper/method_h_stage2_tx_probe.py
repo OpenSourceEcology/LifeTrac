@@ -1038,6 +1038,323 @@ def run_tx_burst(link: HostLink, count: int = 100, inter_s: float = 0.2,
     return 1
 
 
+def run_rx_echo(link: "HostLink", window_s: float = 60.0,
+                echo_timeout_s: float = 5.0) -> int:
+    """W1-11 L-1 RX-side echo. Same as `rx_listen` but on every
+    RX_FRAME_URC immediately issues TX_FRAME_REQ with the same payload
+    (host-driven echo; no firmware change required).
+
+    NOTE: the resulting round-trip latency observed by the TX-side
+    `--probe ping_pong` includes **two** host-overhead round-trips
+    (one on each board), not one. A production-equivalent RTT
+    requires firmware-side echo (deferred follow-up; would need a
+    new HOST_TYPE_CFG_RX_ECHO_ENABLE config key + L072 dispatch).
+
+    Emits one `__RX_ECHO__ idx=N rx_payload_hex=H tx_id=0xX
+    echo_lat_ms=M tx_done_status=S` line per echoed frame and the
+    same `__W1_10B_LISTEN_DONE__` summary as `rx_listen`.
+    """
+    print(f"=== W1-11 probe RX_ECHO: window={window_s:.1f}s "
+          f"echo_timeout={echo_timeout_s:.1f}s ===")
+    drain_boot(link, 1.0)
+    try:
+        link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=1.0)
+    except Exception as exc:
+        print(f"FATAL: VER warm-up failed: {exc}")
+        print("__W1_10B_LISTEN_VERDICT__=TRANSPORT_FAIL")
+        return 2
+    drain_pending(link, quiet_s=0.25, max_s=1.0)
+
+    # Disable LBT on RX board too so echo TX is not suppressed by an
+    # uncalibrated antenna sensing the air busy mid-window.
+    try:
+        link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
+                     bytes([CFG_KEY_LBT_ENABLE, 0x01, 0x00]), timeout=1.0)
+        print("CFG_OK_URC: LBT_ENABLE=0")
+    except Exception as exc:
+        print(f"WARN: CFG_SET_REQ(LBT_ENABLE=0) failed: {exc} (continuing)")
+
+    try:
+        stats_before = fetch_stats(link)
+    except Exception as exc:
+        print(f"FATAL: STATS_URC(before) failed: {exc}")
+        print("__W1_10B_LISTEN_VERDICT__=TRANSPORT_FAIL")
+        return 2
+    rx_ok_b = stats_before.get("radio_rx_ok", 0)
+    crc_b = stats_before.get("radio_crc_err", 0)
+    print(f"RX_ECHO: STATS(before) radio_rx_ok={rx_ok_b} radio_crc_err={crc_b} "
+          f"radio_state={stats_before.get('radio_state', 0)}")
+
+    sys.stdout.write("__W1_10B_LISTEN_READY__\n")
+    sys.stdout.flush()
+
+    deadline = time.time() + window_s
+    rx_count = 0
+    echo_count = 0
+    real_faults = 0
+    echo_idx = 0
+    while time.time() < deadline:
+        for frame in link.read_frames(0.2):
+            ftype = frame["type"]
+            if ftype == HOST_TYPE_RX_FRAME_URC:
+                try:
+                    p = parse_rx_frame(frame["payload"])
+                    rx_count += 1
+                    print(f"__RX_FRAME__ idx={rx_count} rssi={p['rssi_dbm']} "
+                          f"snr={p['snr_db']} len={p['len']} "
+                          f"timestamp_us={p['timestamp_us']} "
+                          f"payload_hex={p['payload'].hex()}")
+                    sys.stdout.flush()
+
+                    # Echo: re-TX the same payload with our own tx_id.
+                    payload = p["payload"]
+                    if len(payload) > 64:
+                        payload = payload[:64]
+                    tx_id = echo_idx & 0xFF
+                    echo_idx += 1
+                    tx_frame = bytes([tx_id, len(payload)]) + payload
+                    t_send = time.time()
+                    try:
+                        link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
+                    except Exception as exc:
+                        print(f"__RX_ECHO_SEND_ERR__ idx={rx_count} {exc}")
+                        continue
+                    try:
+                        done, faults = wait_for_tx_done(
+                            link, tx_id, timeout=echo_timeout_s)
+                    except TimeoutError as exc:
+                        print(f"__RX_ECHO_TIMEOUT__ idx={rx_count} {exc}")
+                        continue
+                    except Exception as exc:
+                        print(f"__RX_ECHO_ERR__ idx={rx_count} {exc}")
+                        continue
+                    elapsed_ms = (time.time() - t_send) * 1000.0
+                    if done["status"] == SX1276_TX_STATUS_OK:
+                        echo_count += 1
+                    print(f"__RX_ECHO__ idx={rx_count} "
+                          f"rx_payload_hex={payload.hex()} "
+                          f"tx_id=0x{tx_id:02X} "
+                          f"echo_lat_ms={elapsed_ms:.1f} "
+                          f"tx_done_status={done['status']}({done['status_name']}) "
+                          f"toa_us={done['time_on_air_us']}")
+                    sys.stdout.flush()
+                    for f in faults:
+                        real_faults += 1
+                        print(f"__RX_ECHO_FAULT__ idx={rx_count} {f}")
+                except Exception as exc:
+                    print(f"__RX_FRAME_ERR__ {exc} raw={frame['payload'].hex()}")
+            elif ftype == HOST_TYPE_FAULT_URC:
+                code = frame["payload"][0] if frame["payload"] else None
+                desc = format_fault_payload(frame["payload"])
+                if code in BENIGN_FAULT_CODES:
+                    print(f"INFO: benign FAULT_URC: {desc}")
+                else:
+                    real_faults += 1
+                    print(f"__RX_FAULT__ {desc}")
+            elif ftype == HOST_TYPE_ERR_PROTO_URC:
+                desc = format_err_proto_payload(frame["payload"])
+                real_faults += 1
+                print(f"__RX_ERR_PROTO__ {desc}")
+
+    try:
+        stats_after = fetch_stats(link)
+    except Exception:
+        stats_after = stats_before
+    rx_ok_a = stats_after.get("radio_rx_ok", 0)
+    crc_a = stats_after.get("radio_crc_err", 0)
+    invariants_violated = host_invariants_violated(stats_before, stats_after)
+    for label, b, a in invariants_violated:
+        print(f"  INVARIANT VIOLATED: {label} {b} -> {a}")
+    print(f"RX_ECHO: STATS(after) radio_rx_ok={rx_ok_a} (delta={rx_ok_a - rx_ok_b}) "
+          f"radio_crc_err={crc_a} (delta={crc_a - crc_b})")
+    # Reuse the LISTEN_DONE summary tag so the existing orchestrator parser
+    # picks this up unchanged.
+    print(f"__W1_10B_LISTEN_DONE__ rx_frames={rx_count} "
+          f"radio_rx_ok_delta={rx_ok_a - rx_ok_b} "
+          f"radio_crc_err_delta={crc_a - crc_b} "
+          f"real_faults={real_faults} "
+          f"invariants_violated={len(invariants_violated)}")
+    print(f"__W1_11_ECHO_DONE__ rx_frames={rx_count} echoes_ok={echo_count}")
+    return 0
+
+
+def run_ping_pong(link: "HostLink", count: int = 100, inter_s: float = 0.2,
+                  timeout: float = 5.0, rtt_timeout: float = 5.0) -> int:
+    """W1-11 L-1 TX-side ping-pong. Sends `count` TX_FRAME_REQs with payload
+    `W1-11 ping seq=NNNN <random-hex>` and for each one waits BOTH for the
+    local TX_DONE_URC AND for a matching RX_FRAME_URC echo (correlated by
+    full payload). Emits `__PINGPONG__ idx=N tx_id=0xX status=S
+    toa_us=T tx_elapsed_ms=M rtt_ms=R rx_rssi=X rx_snr=Y payload_hex=H`
+    per cycle and the same `__W1_10B_BURST_DONE__` summary as `tx_burst`.
+
+    rtt_ms is the host-perceived round-trip from TX_FRAME_REQ submission
+    on this board to RX_FRAME_URC arrival of the echo on this board. It
+    includes 2x ToA + TX-side host overhead + RX-side host overhead +
+    L072 dispatch on both boards. Useful as a real round-trip lower
+    bound; production-equivalent RTT requires firmware-side echo
+    (deferred).
+    """
+    import os as _os
+    print(f"=== W1-11 probe PING_PONG: count={count} inter={inter_s:.2f}s "
+          f"tx_timeout={timeout:.1f}s rtt_timeout={rtt_timeout:.1f}s ===")
+    drain_boot(link, 1.0)
+    try:
+        link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=1.0)
+    except Exception as exc:
+        print(f"FATAL: VER warm-up failed: {exc}")
+        print("__W1_10B_BURST_VERDICT__=TRANSPORT_FAIL")
+        return 2
+    drain_pending(link, quiet_s=0.25, max_s=1.0)
+
+    try:
+        link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
+                     bytes([CFG_KEY_LBT_ENABLE, 0x01, 0x00]), timeout=1.0)
+        print("CFG_OK_URC: LBT_ENABLE=0")
+    except Exception as exc:
+        print(f"WARN: CFG_SET_REQ(LBT_ENABLE=0) failed: {exc} (continuing)")
+
+    try:
+        stats_before = fetch_stats(link)
+    except Exception as exc:
+        print(f"FATAL: STATS_URC(before) failed: {exc}")
+        print("__W1_10B_BURST_VERDICT__=TRANSPORT_FAIL")
+        return 2
+    tx_ok_b = stats_before.get("radio_tx_ok", 0)
+    abort_lbt_b = stats_before.get("radio_tx_abort_lbt", 0)
+    abort_air_b = stats_before.get("radio_tx_abort_airtime", 0)
+    print(f"PING_PONG: STATS(before) radio_tx_ok={tx_ok_b} "
+          f"radio_tx_abort_lbt={abort_lbt_b} radio_tx_abort_airtime={abort_air_b}")
+
+    sys.stdout.write("__W1_10B_BURST_READY__\n")
+    sys.stdout.flush()
+
+    real_faults = 0
+    tx_done_ok = 0
+    tx_done_fail = 0
+    tx_timeout_count = 0
+    pong_received = 0
+    pong_timeout = 0
+    for i in range(count):
+        tx_id = i & 0xFF
+        rand = _os.urandom(4).hex()
+        payload = f"W1-11 ping seq={i:04d} {rand}".encode("ascii")
+        if len(payload) > 64:
+            payload = payload[:64]
+        tx_frame = bytes([tx_id, len(payload)]) + payload
+        t_send = time.time()
+        try:
+            link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
+        except Exception as exc:
+            print(f"__TX_SEND_ERR__ idx={i} {exc}")
+            tx_timeout_count += 1
+            continue
+        # Phase 1: wait for our own TX_DONE_URC.
+        try:
+            done, faults = wait_for_tx_done(link, tx_id, timeout=timeout)
+        except TimeoutError as exc:
+            print(f"__TX_TIMEOUT__ idx={i} tx_id=0x{tx_id:02X} {exc}")
+            tx_timeout_count += 1
+            if inter_s > 0:
+                time.sleep(inter_s)
+            continue
+        except Exception as exc:
+            print(f"__TX_ERR__ idx={i} {exc}")
+            tx_timeout_count += 1
+            if inter_s > 0:
+                time.sleep(inter_s)
+            continue
+        tx_elapsed_ms = (time.time() - t_send) * 1000.0
+        if done["status"] == SX1276_TX_STATUS_OK:
+            tx_done_ok += 1
+        else:
+            tx_done_fail += 1
+        for f in faults:
+            real_faults += 1
+            print(f"__TX_FAULT__ idx={i} {f}")
+
+        # Phase 2: wait for the RX_FRAME_URC echo matching our payload.
+        rtt_ms = -1.0
+        rx_rssi = None
+        rx_snr = None
+        deadline = t_send + rtt_timeout
+        while time.time() < deadline:
+            frames = link.read_frames(0.2)
+            for frame in frames:
+                ftype = frame["type"]
+                if ftype == HOST_TYPE_RX_FRAME_URC:
+                    try:
+                        p = parse_rx_frame(frame["payload"])
+                    except Exception:
+                        continue
+                    if p["payload"] == payload:
+                        rtt_ms = (time.time() - t_send) * 1000.0
+                        rx_rssi = p["rssi_dbm"]
+                        rx_snr = p["snr_db"]
+                        pong_received += 1
+                        break
+                    # else: stale or unrelated echo, ignore
+                elif ftype == HOST_TYPE_FAULT_URC:
+                    code = frame["payload"][0] if frame["payload"] else None
+                    desc = format_fault_payload(frame["payload"])
+                    if code not in BENIGN_FAULT_CODES:
+                        real_faults += 1
+                        print(f"__PINGPONG_FAULT__ idx={i} {desc}")
+            if rtt_ms >= 0:
+                break
+        if rtt_ms < 0:
+            pong_timeout += 1
+            print(f"__PINGPONG_TIMEOUT__ idx={i} payload_hex={payload.hex()}")
+
+        print(f"__PINGPONG__ idx={i} tx_id=0x{tx_id:02X} "
+              f"status={done['status']}({done['status_name']}) "
+              f"toa_us={done['time_on_air_us']} "
+              f"tx_elapsed_ms={tx_elapsed_ms:.1f} "
+              f"rtt_ms={rtt_ms:.1f} "
+              f"rx_rssi={rx_rssi if rx_rssi is not None else 'NA'} "
+              f"rx_snr={rx_snr if rx_snr is not None else 'NA'} "
+              f"payload_hex={payload.hex()}")
+        # Also emit __TX_DONE__ in the same format as run_tx_burst so
+        # analyze_rtt.py picks up toa/elapsed without modification.
+        print(f"__TX_DONE__ idx={i} tx_id=0x{tx_id:02X} "
+              f"status={done['status']}({done['status_name']}) "
+              f"toa_us={done['time_on_air_us']} "
+              f"elapsed_ms={tx_elapsed_ms:.1f} "
+              f"payload_hex={payload.hex()}")
+        sys.stdout.flush()
+        if inter_s > 0:
+            time.sleep(inter_s)
+
+    try:
+        stats_after = fetch_stats(link)
+    except Exception:
+        stats_after = stats_before
+    tx_ok_a = stats_after.get("radio_tx_ok", 0)
+    abort_lbt_a = stats_after.get("radio_tx_abort_lbt", 0)
+    abort_air_a = stats_after.get("radio_tx_abort_airtime", 0)
+    invariants_violated = host_invariants_violated(stats_before, stats_after)
+    for label, b, a in invariants_violated:
+        print(f"  INVARIANT VIOLATED: {label} {b} -> {a}")
+    print(f"PING_PONG: STATS(after) radio_tx_ok={tx_ok_a} (delta={tx_ok_a - tx_ok_b}) "
+          f"radio_tx_abort_lbt={abort_lbt_a} (delta={abort_lbt_a - abort_lbt_b}) "
+          f"radio_tx_abort_airtime={abort_air_a} (delta={abort_air_a - abort_air_b})")
+    # Reuse the BURST_DONE summary tag so the orchestrator parses it.
+    print(f"__W1_10B_BURST_DONE__ tx_count={count} "
+          f"tx_done_ok={tx_done_ok} tx_done_fail={tx_done_fail} "
+          f"tx_timeout={tx_timeout_count} "
+          f"radio_tx_ok_delta={tx_ok_a - tx_ok_b} "
+          f"radio_tx_abort_lbt_delta={abort_lbt_a - abort_lbt_b} "
+          f"radio_tx_abort_airtime_delta={abort_air_a - abort_air_b} "
+          f"real_faults={real_faults} "
+          f"invariants_violated={len(invariants_violated)}")
+    print(f"__W1_11_PINGPONG_DONE__ tx_count={count} "
+          f"tx_done_ok={tx_done_ok} pong_received={pong_received} "
+          f"pong_timeout={pong_timeout}")
+    if (tx_done_ok == count and pong_received == count
+            and real_faults == 0 and not invariants_violated):
+        return 0
+    return 1
+
+
 def parse_tx_done(payload: bytes) -> dict:
     if len(payload) < 7:
         raise ValueError(f"TX_DONE_URC payload too short: {payload.hex()}")
@@ -1371,9 +1688,17 @@ def main(argv=None) -> int:
         "--probe",
         default="tx",
         choices=["tx", "regversion", "fsk", "opmode_walk", "rx",
-                 "rx_listen", "tx_burst"],
+                 "rx_listen", "tx_burst", "rx_echo", "ping_pong"],
         help="probe mode (W1-9 default 'tx'; W1-9b 'regversion'/'fsk'/'opmode_walk'; "
-             "W1-10 single-board 'rx'; W1-10b two-board 'rx_listen'/'tx_burst')",
+             "W1-10 single-board 'rx'; W1-10b two-board 'rx_listen'/'tx_burst'; "
+             "W1-11 L-1 two-board 'rx_echo'/'ping_pong')",
+    )
+    parser.add_argument(
+        "--rtt-timeout",
+        type=float,
+        default=5.0,
+        help="seconds to wait for the RX_FRAME_URC echo per cycle during "
+             "--probe ping_pong (default 5.0)",
     )
     parser.add_argument(
         "--burst-count",
@@ -1438,6 +1763,14 @@ def main(argv=None) -> int:
             return run_tx_burst(link, count=args.tx_count,
                                 inter_s=args.inter_cycle_s,
                                 timeout=args.timeout)
+        if args.probe == "rx_echo":
+            return run_rx_echo(link, window_s=args.rx_window,
+                               echo_timeout_s=args.timeout)
+        if args.probe == "ping_pong":
+            return run_ping_pong(link, count=args.tx_count,
+                                 inter_s=args.inter_cycle_s,
+                                 timeout=args.timeout,
+                                 rtt_timeout=args.rtt_timeout)
         print(f"FATAL: unknown probe mode: {args.probe}")
         return 2
     finally:

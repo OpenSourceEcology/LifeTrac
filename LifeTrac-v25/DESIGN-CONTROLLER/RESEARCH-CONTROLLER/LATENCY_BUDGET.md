@@ -31,6 +31,43 @@ Per-stage latency for a single operator stick deflection at the **default** rung
 | 13 | Cylinder pressure rise + load break-away | 20–100 ms | 300 ms | Function of mass, friction, accumulator state |
 | | **End-to-end (sum)** | **~100–190 ms** | **~610 ms** | Typical median ~120–150 ms with §8.17/§8.18 in place |
 
+> **Bench-measured caveat for rows #1–#5 (W1-11 L-3, 2026-05-12).** The
+> values above are the **production M7-direct path** budget. The Method G
+> bench harness uses an X8 → LPUART → L072 HostLink instead of the
+> production M7-direct path; on that bench tier `elapsed_ms` (host
+> `TX_FRAME_REQ` → `TX_DONE_URC`) measures **p50 ≈ 52 ms / p99 ≈ 58 ms /
+> p999 ≤ 60.6 ms** across 2000 cycles at SF7/BW125 (`bench-evidence/W1-10b_rx_pair_2026-05-11_231533/summary.json`).
+> Subtracting the firmware-reported ToA = 30.85 ms gives a one-way
+> bench HostLink overhead of **~21 ms p50 / ~30 ms p999** — much higher
+> than the ~5 ms originally pinned for rows #1+#3+#4 because every TX
+> cycle pays an X8 ADB pipe + LPUART encode/decode + L072 dispatch
+> round-trip that does not exist in the production M7 path. The
+> production-path budget for rows #1+#3+#4+#5 (~5 ms total) is
+> **unchanged**; the bench number is captured here only so latency
+> analyzer output (`rtt_report.json` `verdicts.w4_00b_within_5pct`)
+> can be interpreted correctly when the bench surrogate prints
+> `OUTSIDE_BUDGET`. A true production RTT measurement requires a
+> firmware echo handler (planned as L-1 / `--probe rx_echo`) running
+> on the M7-direct path.
+>
+> **Update 2026-05-12 (W1-11 L-1 ping-pong).** The host-driven echo
+> form of L-1 is now wired (`--probe rx_echo` on RX,
+> `--probe ping_pong` on TX, accessible via
+> `run_w1_10b_rx_pair_end_to_end.ps1 -Probe ping_pong`). First-light
+> 100-cycle run (`bench-evidence/W1-11_pingpong_2026-05-12_115122/`)
+> measured a true round-trip `pingpong_rtt_ms` p50=**107.0 ms**
+> (p90=115, p99=118, p999=121.8, max=121.8) — close to the analytical
+> prediction `2×ToA + 2×host_overhead = 2×33.4 + 2×21 = 108.8 ms`,
+> independently confirming both the `+2.8%`/`+11.4%` ToA measurement
+> and the new `PREDICTED_HOST_OVERHEAD_MS = 21.0` constant. This
+> bench RTT still includes **two** host overheads (one per board) and
+> therefore continues to print `OUTSIDE_BUDGET` against W4-00(b)'s
+> `2*ToA + 30 ms = 96.8 ms ± 4.8` window. The
+> production-equivalent value (RX-side echo done on-MCU, no host
+> round-trip) is predicted to drop the RTT by ~21 ms to **~86 ms
+> p50**, which lands inside the W4-00(b) window. Confirming that
+> requires firmware-side echo on the W2-01 H747 transport bring-up.
+
 ### Observations
 
 - **The radio is no longer the dominant single term** at SF7 (~30 ms) once §8.17 caps retries at 1.

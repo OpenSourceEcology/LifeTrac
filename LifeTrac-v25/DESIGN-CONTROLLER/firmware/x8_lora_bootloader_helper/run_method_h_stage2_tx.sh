@@ -19,11 +19,13 @@ PROBE_MODE="${LIFETRAC_PROBE_MODE:-tx}"
 RX_WINDOW="${LIFETRAC_RX_WINDOW:-}"
 TX_COUNT="${LIFETRAC_TX_COUNT:-}"
 INTER_CYCLE_S="${LIFETRAC_INTER_CYCLE_S:-}"
+RTT_TIMEOUT="${LIFETRAC_RTT_TIMEOUT:-}"
 
 EXTRA_ARGS=""
 if [ -n "$RX_WINDOW" ]; then EXTRA_ARGS="$EXTRA_ARGS --rx-window $RX_WINDOW"; fi
 if [ -n "$TX_COUNT" ]; then EXTRA_ARGS="$EXTRA_ARGS --tx-count $TX_COUNT"; fi
 if [ -n "$INTER_CYCLE_S" ]; then EXTRA_ARGS="$EXTRA_ARGS --inter-cycle-s $INTER_CYCLE_S"; fi
+if [ -n "$RTT_TIMEOUT" ]; then EXTRA_ARGS="$EXTRA_ARGS --rtt-timeout $RTT_TIMEOUT"; fi
 
 TOOLDIR=/tmp/lifetrac_p0c
 PROBE=$TOOLDIR/method_h_stage2_tx_probe.py

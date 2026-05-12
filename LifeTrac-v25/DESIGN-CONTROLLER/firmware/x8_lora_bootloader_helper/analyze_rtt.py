@@ -66,9 +66,15 @@ PREDICTED_TOA_SF7_BW125_MS = 30.0
 # Predicted host control-plane overhead per LATENCY_BUDGET.md §1
 # rows #1 + #3 + #4 (encode + demod + AES). The bench L072 probe path
 # adds two LPUART hops (TX_FRAME_REQ down + TX_DONE_URC back) at
-# 921600 8N1 (~0.04 ms / byte * ~16 B = ~0.6 ms each direction). Use
-# 5 ms as the published-budget surrogate.
-PREDICTED_HOST_OVERHEAD_MS = 5.0
+# 921600 8N1 (~0.04 ms / byte * ~16 B = ~0.6 ms each direction).
+#
+# **Bench-measured (W1-11 L-3 / 2026-05-12):** elapsed_ms - ToA across
+# 2000 cycles at SF7/BW125 was p50 = 21 ms, p99 = 27 ms, p999 = 30 ms.
+# That figure is the *bench-tier* HostLink round-trip (X8 ADB pipe +
+# LPUART encode/decode + L072-side TX-cycle dispatch), NOT the
+# production M7-direct path. The constant below is the bench p50; the
+# production-path equivalent is still the ~5 ms originally pinned.
+PREDICTED_HOST_OVERHEAD_MS = 21.0
 
 # Phase-B observation window default; the budget gate is W4-00(b)
 # "round-trip p50 within 5% of `lora_time_on_air_ms * 2 + 30 ms`".
@@ -89,6 +95,12 @@ _RX_FRAME_RE = re.compile(
     r"__RX_FRAME__\s+idx=(?P<idx>\d+)\s+rssi=(?P<rssi>-?\d+)\s+"
     r"snr=(?P<snr>-?\d+)\s+len=(?P<len>\d+)\s+"
     r"timestamp_us=(?P<timestamp_us>\d+)\s+payload_hex=(?P<payload_hex>[0-9A-Fa-f]+)"
+)
+
+# W1-11 L-1 ping-pong RTT (host-driven echo). One per cycle on the TX board.
+_PINGPONG_RE = re.compile(
+    r"__PINGPONG__\s+idx=(?P<idx>\d+)\s+tx_id=0x(?P<tx_id>[0-9A-Fa-f]+)\s+"
+    r"status=(?P<status>\d+)[^\n]*?rtt_ms=(?P<rtt_ms>-?\d+(?:\.\d+)?)"
 )
 
 
@@ -117,8 +129,10 @@ class Stats:
     n: int = 0
     min: float = 0.0
     p50: float = 0.0
+    p90: float = 0.0
     p95: float = 0.0
     p99: float = 0.0
+    p999: float = 0.0
     max: float = 0.0
     mean: float = 0.0
     stdev: float = 0.0
@@ -129,8 +143,10 @@ class Stats:
             "n": self.n,
             "min": round(self.min, 3),
             "p50": round(self.p50, 3),
+            "p90": round(self.p90, 3),
             "p95": round(self.p95, 3),
             "p99": round(self.p99, 3),
+            "p999": round(self.p999, 3),
             "max": round(self.max, 3),
             "mean": round(self.mean, 3),
             "stdev": round(self.stdev, 3),
@@ -156,8 +172,10 @@ def summarize(values: Iterable[float]) -> Stats:
         n=len(xs),
         min=xs[0],
         p50=_percentile(xs, 50),
+        p90=_percentile(xs, 90),
         p95=_percentile(xs, 95),
         p99=_percentile(xs, 99),
+        p999=_percentile(xs, 99.9),
         max=xs[-1],
         mean=statistics.fmean(xs),
         stdev=statistics.pstdev(xs) if len(xs) > 1 else 0.0,
@@ -193,6 +211,19 @@ def parse_rx_frames(text: str) -> list[RxRow]:
     return rows
 
 
+def parse_pingpong_rtts(text: str) -> list[float]:
+    """W1-11 L-1: extract per-cycle RTT (ms) from `__PINGPONG__` lines on
+    the TX board's stdout. Cycles where the echo timed out emit
+    `rtt_ms=-1` and are filtered out here.
+    """
+    rtts: list[float] = []
+    for m in _PINGPONG_RE.finditer(text):
+        v = float(m["rtt_ms"])
+        if v >= 0:
+            rtts.append(v)
+    return rtts
+
+
 def rx_inter_arrival_ms(rxs: list[RxRow]) -> list[float]:
     if len(rxs) < 2:
         return []
@@ -211,8 +242,9 @@ def fmt_stats_row(label: str, s: Stats, unit: str = "ms") -> str:
     if s.n == 0:
         return f"  {label:<32s} (no samples)"
     return (f"  {label:<32s} n={s.n:<4d} "
-            f"min={s.min:>7.2f} p50={s.p50:>7.2f} p95={s.p95:>7.2f} "
-            f"p99={s.p99:>7.2f} max={s.max:>7.2f} {unit}")
+            f"min={s.min:>7.2f} p50={s.p50:>7.2f} p90={s.p90:>7.2f} "
+            f"p95={s.p95:>7.2f} p99={s.p99:>7.2f} p999={s.p999:>7.2f} "
+            f"max={s.max:>7.2f} {unit}")
 
 
 def build_report(evidence_dir: Path) -> tuple[str, dict]:
@@ -223,6 +255,8 @@ def build_report(evidence_dir: Path) -> tuple[str, dict]:
 
     txs = parse_tx_dones(tx_text)
     rxs = parse_rx_frames(rx_text)
+    pingpong_rtts = parse_pingpong_rtts(tx_text)
+    pingpong_ms = summarize(pingpong_rtts)
 
     toa_ms = summarize(t.toa_us / 1000.0 for t in txs if t.status == 0)
     elapsed_ms = summarize(t.elapsed_ms for t in txs if t.status == 0)
@@ -293,6 +327,18 @@ def build_report(evidence_dir: Path) -> tuple[str, dict]:
     else:
         lines.append(f"  W4-00(b) verdict  : {'WITHIN_BUDGET' if w4_00b_within else 'OUTSIDE_BUDGET'}")
     lines.append("")
+    if pingpong_ms.n:
+        # W1-11 L-1: true (host-driven) ping-pong RTT, includes 2x ToA +
+        # TX-side host overhead + RX-side host overhead. Production
+        # firmware-echo RTT will be ~21 ms lower (one host overhead).
+        lines.append("--- True ping-pong RTT (W1-11 L-1, host-driven echo) ---")
+        lines.append(fmt_stats_row("pingpong_rtt_ms", pingpong_ms, "ms"))
+        pp_target = w4_00b_target_ms
+        pp_window = w4_00b_window_ms
+        pp_within = abs(pingpong_ms.p50 - pp_target) <= pp_window
+        lines.append(f"  W4-00(b) (true RTT) target = {pp_target:.2f} ms (+/- {pp_window:.2f} ms)")
+        lines.append(f"  W4-00(b) (true RTT) verdict: {'WITHIN_BUDGET' if pp_within else 'OUTSIDE_BUDGET'}")
+        lines.append("")
     lines.append("--- Reconciliation vs LATENCY_BUDGET.md §1 ---")
     lines.append("  This bench tier covers ONLY rows #1-#5 of the budget (encode +")
     lines.append("  air + demod + AES + IPC). Rows #6-#13 (M4 100 Hz quant, Modbus,")
@@ -324,7 +370,12 @@ def build_report(evidence_dir: Path) -> tuple[str, dict]:
         "verdicts": {
             "toa_match_pct": (round(toa_match_pct, 2) if toa_match_pct is not None else None),
             "w4_00b_within_5pct": w4_00b_within,
+            "w4_00b_within_5pct_pingpong": (
+                bool(abs(pingpong_ms.p50 - w4_00b_target_ms) <= w4_00b_window_ms)
+                if pingpong_ms.n else None
+            ),
         },
+        "pingpong_rtt_ms": pingpong_ms.to_dict() if pingpong_ms.n else None,
     }
 
     return "\n".join(lines), payload
@@ -345,6 +396,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="JSON report path (default: <evidence_dir>/rtt_report.json)")
     parser.add_argument("--no-stdout", action="store_true",
                         help="Suppress the human-readable report on stdout.")
+    parser.add_argument("--merge-summary", action="store_true",
+                        help="Merge the latency payload into <evidence_dir>/summary.json "
+                             "under a `latency` key (orchestrator-friendly; non-fatal "
+                             "if summary.json is absent or unreadable).")
     args = parser.parse_args(argv)
 
     if not args.evidence_dir.is_dir():
@@ -359,10 +414,29 @@ def main(argv: list[str] | None = None) -> int:
     out_md.write_text(text + "\n", encoding="utf-8")
     out_json.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
+    merged_path = None
+    if args.merge_summary:
+        summary_path = args.evidence_dir / "summary.json"
+        if summary_path.exists():
+            try:
+                summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as e:
+                print(f"WARN: cannot read {summary_path}: {e}", file=sys.stderr)
+                summary = None
+            if isinstance(summary, dict):
+                summary["latency"] = payload
+                summary_path.write_text(
+                    json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+                merged_path = summary_path
+        else:
+            print(f"WARN: --merge-summary set but {summary_path} not found", file=sys.stderr)
+
     if not args.no_stdout:
         print(text)
         print(f"Report written: {out_md}")
         print(f"JSON written:   {out_json}")
+        if merged_path is not None:
+            print(f"Merged into:    {merged_path}")
     return 0
 
 

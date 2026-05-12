@@ -1,55 +1,112 @@
 {
-    "stamp":  "2026-05-11_231533",
-    "rx_serial":  "2E2C1209DABC240B",
-    "tx_serial":  "2D0A1209DABC240B",
-    "cycles":  2000,
-    "inter_cycle_s":  0.05,
-    "rx_window_s":  336,
-    "tx_done_ok":  2000,
-    "tx_done_rate":  1,
-    "tx_timeouts":  0,
-    "rx_frames_received":  1999,
-    "rx_match":  1999,
-    "rx_orphan":  0,
-    "rx_match_rate":  0.9995,
-    "rssi_median_dbm":  -97,
-    "snr_median_db":  9,
-    "radio_tx_abort_airtime_delta":  0,
-    "tx_real_faults":  0,
-    "rx_real_faults":  0,
-    "tx_invariants_violated":  0,
-    "rx_invariants_violated":  0,
-    "gates":  [
-                  {
-                      "id":  "B1",
-                      "label":  "tx_done_rate \u003e= 0.99 (got 1)",
-                      "ok":  true
-                  },
-                  {
-                      "id":  "B2",
-                      "label":  "rx_match_rate \u003e= 0.99 (got 0.9995)",
-                      "ok":  true
-                  },
-                  {
-                      "id":  "B3",
-                      "label":  "radio_tx_abort_airtime_delta == 0 (got 0)",
-                      "ok":  true
-                  },
-                  {
-                      "id":  "B4",
-                      "label":  "no real FAULT_URC (tx=0 rx=0)",
-                      "ok":  true
-                  },
-                  {
-                      "id":  "B5",
-                      "label":  "host invariants stable (tx_violated=0 rx_violated=0)",
-                      "ok":  true
-                  },
-                  {
-                      "id":  "B6",
-                      "label":  "median RSSI in [-120,-30] dBm (got -97)",
-                      "ok":  true
-                  }
-              ],
-    "verdict":  "RX_PAIR_PASS"
+  "stamp": "2026-05-11_231533",
+  "rx_serial": "2E2C1209DABC240B",
+  "tx_serial": "2D0A1209DABC240B",
+  "cycles": 2000,
+  "inter_cycle_s": 0.05,
+  "rx_window_s": 336,
+  "tx_done_ok": 2000,
+  "tx_done_rate": 1,
+  "tx_timeouts": 0,
+  "rx_frames_received": 1999,
+  "rx_match": 1999,
+  "rx_orphan": 0,
+  "rx_match_rate": 0.9995,
+  "rssi_median_dbm": -97,
+  "snr_median_db": 9,
+  "radio_tx_abort_airtime_delta": 0,
+  "tx_real_faults": 0,
+  "rx_real_faults": 0,
+  "tx_invariants_violated": 0,
+  "rx_invariants_violated": 0,
+  "gates": [
+    {
+      "id": "B1",
+      "label": "tx_done_rate >= 0.99 (got 1)",
+      "ok": true
+    },
+    {
+      "id": "B2",
+      "label": "rx_match_rate >= 0.99 (got 0.9995)",
+      "ok": true
+    },
+    {
+      "id": "B3",
+      "label": "radio_tx_abort_airtime_delta == 0 (got 0)",
+      "ok": true
+    },
+    {
+      "id": "B4",
+      "label": "no real FAULT_URC (tx=0 rx=0)",
+      "ok": true
+    },
+    {
+      "id": "B5",
+      "label": "host invariants stable (tx_violated=0 rx_violated=0)",
+      "ok": true
+    },
+    {
+      "id": "B6",
+      "label": "median RSSI in [-120,-30] dBm (got -97)",
+      "ok": true
+    }
+  ],
+  "verdict": "RX_PAIR_PASS",
+  "latency": {
+    "evidence_dir": "LifeTrac-v25\\DESIGN-CONTROLLER\\bench-evidence\\W1-10b_rx_pair_2026-05-11_231533",
+    "tx_done_count": 2000,
+    "tx_done_ok_count": 2000,
+    "rx_frame_count": 1999,
+    "matched_pair_count": 1999,
+    "toa_ms": {
+      "n": 2000,
+      "min": 30.848,
+      "p50": 30.848,
+      "p90": 30.848,
+      "p95": 30.848,
+      "p99": 30.848,
+      "p999": 30.848,
+      "max": 30.848,
+      "mean": 30.848,
+      "stdev": 0.0
+    },
+    "elapsed_ms": {
+      "n": 2000,
+      "min": 42.4,
+      "p50": 51.8,
+      "p90": 55.9,
+      "p95": 56.1,
+      "p99": 57.8,
+      "p999": 60.4,
+      "max": 61.3,
+      "mean": 52.46,
+      "stdev": 3.367
+    },
+    "rx_inter_arrival_ms": {
+      "n": 1998,
+      "min": 93.031,
+      "p50": 103.053,
+      "p90": 107.653,
+      "p95": 107.87,
+      "p99": 108.702,
+      "p999": 112.303,
+      "max": 209.983,
+      "mean": 103.863,
+      "stdev": 4.315
+    },
+    "rtt_estimate_ms": {
+      "p50": 103.6,
+      "p99": 115.6
+    },
+    "budget_predictions": {
+      "toa_sf7_bw125_ms": 30.0,
+      "host_overhead_ms": 21.0,
+      "w4_00b_target_ms": 91.696,
+      "w4_00b_window_ms": 4.585
+    },
+    "verdicts": {
+      "toa_match_pct": 2.83,
+      "w4_00b_within_5pct": false
+    }
+  }
 }

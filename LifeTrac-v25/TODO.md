@@ -2200,16 +2200,51 @@ Execute from the runbook; the bullets below are the index.
   §1 row #2 estimate. Measured one-way host overhead (TX_FRAME_REQ →
   TX_DONE_URC minus ToA) is **~24.5 ms**, much higher than the 5 ms
   assumed in `PREDICTED_HOST_OVERHEAD_MS`. Open follow-ups:
-  - [ ] **L-1 True ping-pong RTT.** Add an `--probe rx_echo` mode that
-    re-TXes every received frame; pair with a TX-side probe that
-    timestamps the round-trip. Replaces the current `2*elapsed_p50`
-    surrogate (which double-counts host overhead and currently prints
-    `OUTSIDE_BUDGET` even though air-time is well within budget).
-  - [ ] **L-2 Reconcile budget rows #1 + #5.** Update
-    `LATENCY_BUDGET.md` row #1 (host UART encode) and row #5 (UART
-    decode) using the measured ~24.5 ms one-way figure (split
-    encode/decode using firmware-side timestamps if available); also
-    update `PREDICTED_HOST_OVERHEAD_MS` constant in `analyze_rtt.py`.
+  - [x] **L-1 True ping-pong RTT.** Added `--probe rx_echo` (RX board
+    re-TXes every received frame using its own `tx_id` counter) and
+    `--probe ping_pong` (TX board sends payload, waits for both
+    `TX_DONE_URC` and an `RX_FRAME_URC` echo matching the original
+    payload, computes per-cycle `rtt_ms`) to
+    [`method_h_stage2_tx_probe.py`](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_h_stage2_tx_probe.py).
+    Wired through
+    [`run_w1_10b_rx_pair_end_to_end.ps1`](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_w1_10b_rx_pair_end_to_end.ps1)
+    via new `-Probe`/`-RttTimeout` params (`-Probe ping_pong` selects
+    the new pair) plus a B7 gate `rtt_match_rate ≥ 0.99`, and through
+    [`analyze_rtt.py`](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/analyze_rtt.py)
+    (parses `__PINGPONG__` lines, emits `pingpong_rtt_ms` percentiles +
+    `verdicts.w4_00b_within_5pct_pingpong`).
+    *2026-05-12 first-light run* (`bench-evidence/W1-11_pingpong_2026-05-12_115122/`,
+    100 cycles, InterCycleS=0.2, RttTimeout=3.0): all 7 gates **PASS**,
+    `pingpong_rtt_ms` p50=**107.0** ms, p90=115.0, p99=118.0, p999=121.8,
+    max=121.8 (rtt_match_rate=1.000). The bench ping-pong measures
+    `2×ToA + 2×host_overhead`; predicted = 2×33.4 + 2×21 = **108.8 ms**,
+    actual p50=107.0 ms (within 2 ms — independently confirms both ToA
+    and the new `PREDICTED_HOST_OVERHEAD_MS=21.0`). Both
+    `2*elapsed_p50` surrogate and the new true RTT print
+    `OUTSIDE_BUDGET` against W4-00(b)'s `2*ToA + 30 ms = 96.8 ms ± 4.8`,
+    because the bench HostLink path pays host overhead **twice** (once
+    per board) while production M7-direct will pay it only once. The
+    true production-equivalent RTT requires firmware-side echo (a
+    `HOST_TYPE_CFG_RX_ECHO_ENABLE` config key + L072 dispatch that
+    skips the host round-trip on the RX side); deferred until W2-01
+    H747 transport bring-up makes the equivalent path live.
+  - [x] **L-2 Reconcile budget rows #1 + #5.** Bumped
+    `PREDICTED_HOST_OVERHEAD_MS` from 5.0 → **21.0 ms** in
+    [`analyze_rtt.py`](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/analyze_rtt.py)
+    (bench-measured p50 across 5 evidence dirs / 3,400 samples;
+    p999 ~30 ms; max 30.9 ms). Added bench-vs-production caveat
+    blockquote to
+    [`LATENCY_BUDGET.md`](DESIGN-CONTROLLER/RESEARCH-CONTROLLER/LATENCY_BUDGET.md)
+    §1 explaining that the 21 ms overhead is the X8 HostLink
+    (Python+ADB+UART) path, not the production M7-direct path.
+    Refreshed all 5 prior W1-10b dirs (L-3a/c/d/e/f) so
+    `rtt_report.json` and
+    `summary.json.latency.budget_predictions.host_overhead_ms` reflect
+    the new constant. (L-3b dir lacks `summary.json` from earlier
+    terminal kill; analyzer warns and skips merge — non-fatal.) The
+    finer encode-vs-decode split via firmware-side timestamps is
+    deferred; current data confirms the *combined* overhead is
+    well-modeled.
   - [x] **L-3 Higher-rate stress.** Re-ran `run_w1_10b_rx_pair_*`
     bracketing inter-cycle from 100 ms → 50 ms and cycles 200 → 2000
     to characterize p999 latency, RX-side queueing, and packet-loss
@@ -2252,10 +2287,18 @@ Execute from the runbook; the bullets below are the index.
        window or a single failed CRC; not a queueing collapse.
 
     Follow-ups remaining for L-3 family:
-    - [ ] **L-3g (deferred)** Capture per-cycle elapsed array (already
-      embedded in tx_stdout) and emit p50/p90/p99/p999 histograms for
-      L-3e and L-3f into `summary.json`. Currently only `verdict` and
-      counts are persisted.
+    - [x] **L-3g** Capture per-cycle elapsed array (already embedded in
+      tx_stdout) and emit p50/p90/p99/p999 histograms. *Done
+      2026-05-12:*
+      [`analyze_rtt.py`](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/analyze_rtt.py)
+      `Stats` now carries p90 and p999 (in addition to p50/p95/p99); a
+      new `--merge-summary` flag splices the analyzer payload into
+      `summary.json` under a `latency` key, and step 14 of the
+      orchestrator passes `--merge-summary` so every fresh evidence dir
+      gets it for free. All 5 of L-3a/c/d/e/f were re-analyzed and now
+      carry full histograms in `summary.json.latency.elapsed_ms`
+      (p50≈51.8–55.4, p90≈55.9–56.2, p99=56.6–60.2, p999=59.8–60.6,
+      max=59.8–61.3 ms across the 200..2000-cycle runs).
     - [ ] **L-3h (deferred)** Reduce host overhead so `InterCycleS=0.05`
       actually approaches 20 Hz cadence; then re-stress to find the
       *real* wedge condition.

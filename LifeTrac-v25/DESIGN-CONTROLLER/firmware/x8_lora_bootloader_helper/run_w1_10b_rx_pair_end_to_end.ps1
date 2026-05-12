@@ -55,6 +55,9 @@ param(
     [double]$InterCycleS = 0.2,
     [double]$Timeout = 5.0,
     [int]$ExtraRxWindowS = 30,
+    [ValidateSet("tx_burst", "ping_pong")]
+    [string]$Probe = "tx_burst",
+    [double]$RttTimeout = 5.0,
     [string]$RepoRoot = ""
 )
 
@@ -106,9 +109,15 @@ $benchEvidenceRoot = Join-Path $repo "DESIGN-CONTROLLER/bench-evidence"
 $null = New-Item -ItemType Directory -Force -Path $benchEvidenceRoot
 
 $stamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
-$evidenceDir = Join-Path $benchEvidenceRoot "W1-10b_rx_pair_${stamp}"
+$dirSuffix = if ($Probe -eq "ping_pong") { "W1-11_pingpong_${stamp}" } else { "W1-10b_rx_pair_${stamp}" }
+$evidenceDir = Join-Path $benchEvidenceRoot $dirSuffix
 $null = New-Item -ItemType Directory -Force -Path $evidenceDir
 Write-Host "Evidence dir: $evidenceDir"
+
+# Map orchestrator -Probe to (rx_mode, tx_mode) pairs.
+$rxMode = if ($Probe -eq "ping_pong") { "rx_echo" } else { "rx_listen" }
+$txMode = $Probe
+Write-Host "Probe pair: rx=$rxMode tx=$txMode"
 
 # ---------------------------------------------------------------------------
 # 3. Push helper toolkit to both boards.
@@ -141,7 +150,7 @@ $rxStderr = Join-Path $evidenceDir "rx_stderr.txt"
 # through Start-Process -ArgumentList, which re-quotes single-quoted args and
 # breaks the nested `sh -lc '...'` quoting (the inline form works only with
 # the PowerShell call operator, as in the TX path below).
-$rxRemoteCmd = "echo fio | sudo -S -p '' env LIFETRAC_PROBE_MODE=rx_listen LIFETRAC_RX_WINDOW=$rxWindowS bash /tmp/lifetrac_p0c/run_method_h_stage2_tx.sh"
+$rxRemoteCmd = "echo fio | sudo -S -p '' env LIFETRAC_PROBE_MODE=$rxMode LIFETRAC_RX_WINDOW=$rxWindowS bash /tmp/lifetrac_p0c/run_method_h_stage2_tx.sh"
 $rxWrapBody = "#!/bin/sh`n$rxRemoteCmd`nrc=`$?`nprintf '__METHOD_H_RC__=%s\n' `"`$rc`"`n"
 $rxWrapLocal = Join-Path $evidenceDir "_rx_wrap.sh"
 # Force LF line endings so /bin/sh on the X8 doesn't choke on CRLF.
@@ -182,7 +191,12 @@ Write-Host "RX listener READY."
 $txStdout = Join-Path $evidenceDir "tx_stdout.txt"
 $txCountStr = $Cycles.ToString([System.Globalization.CultureInfo]::InvariantCulture)
 $interStr = Format-Invariant $InterCycleS
-$txRemoteCmd = "echo fio | sudo -S -p '' env LIFETRAC_PROBE_MODE=tx_burst LIFETRAC_TX_COUNT=$txCountStr LIFETRAC_INTER_CYCLE_S=$interStr bash /tmp/lifetrac_p0c/run_method_h_stage2_tx.sh"
+$txRemoteCmd = "echo fio | sudo -S -p '' env LIFETRAC_PROBE_MODE=$txMode LIFETRAC_TX_COUNT=$txCountStr LIFETRAC_INTER_CYCLE_S=$interStr"
+if ($Probe -eq "ping_pong") {
+    $rttStr = Format-Invariant $RttTimeout
+    $txRemoteCmd += " LIFETRAC_RTT_TIMEOUT=$rttStr"
+}
+$txRemoteCmd += " bash /tmp/lifetrac_p0c/run_method_h_stage2_tx.sh"
 $txWrapped = "sh -lc '$txRemoteCmd; rc=`$?; printf ""__METHOD_H_RC__=%s\n"" ""`$rc""'"
 
 Write-Host "Starting TX burst on $TxAdbSerial (cycles=$Cycles)..."
@@ -245,6 +259,38 @@ function Parse-RxFrames([string]$text) {
 $txDones = Parse-TxDones $txText
 $rxFrames = Parse-RxFrames $rxText
 
+# W1-11 L-1: parse __PINGPONG__ rtt_ms lines (ping_pong mode only).
+function Parse-PingPongs([string]$text) {
+    $rows = New-Object System.Collections.ArrayList
+    foreach ($line in ($text -split "`n")) {
+        if ($line -match '__PINGPONG__\s+idx=(\d+)\s+tx_id=0x([0-9A-Fa-f]+)\s+status=(\d+).*?rtt_ms=(-?\d+(?:\.\d+)?)') {
+            [void]$rows.Add([pscustomobject]@{
+                idx    = [int]$matches[1]
+                tx_id  = [Convert]::ToInt32($matches[2], 16)
+                status = [int]$matches[3]
+                rtt_ms = [double]$matches[4]
+            })
+        }
+    }
+    return ,$rows
+}
+$pingPongs = if ($Probe -eq "ping_pong") { Parse-PingPongs $txText } else { @() }
+$rttSamples = @($pingPongs | Where-Object { $_.rtt_ms -ge 0 } | ForEach-Object { $_.rtt_ms } | Sort-Object)
+$rttCount = $rttSamples.Count
+$rttMatchRate = if ($Probe -eq "ping_pong" -and $Cycles -gt 0) {
+    [Math]::Round($rttCount / $Cycles, 4)
+} else { $null }
+function Get-Pct([double[]]$xs, [double]$pct) {
+    if ($xs.Count -eq 0) { return $null }
+    $i = [int][Math]::Floor(($pct / 100.0) * ($xs.Count - 1))
+    if ($i -lt 0) { $i = 0 }
+    if ($i -ge $xs.Count) { $i = $xs.Count - 1 }
+    return $xs[$i]
+}
+$rttP50 = Get-Pct $rttSamples 50
+$rttP99 = Get-Pct $rttSamples 99
+$rttMax = if ($rttCount -gt 0) { $rttSamples[$rttCount - 1] } else { $null }
+
 $txTimeoutCount = ([regex]::Matches($txText, '__TX_TIMEOUT__|__TX_ERR__|__TX_SEND_ERR__')).Count
 $txBurstDone = [regex]::Match($txText, '__W1_10B_BURST_DONE__\s+tx_count=(\d+)\s+tx_done_ok=(\d+)\s+tx_done_fail=(\d+)\s+tx_timeout=(\d+).*?radio_tx_abort_airtime_delta=(-?\d+).*?real_faults=(\d+)\s+invariants_violated=(\d+)')
 $rxListenDone = [regex]::Match($rxText, '__W1_10B_LISTEN_DONE__\s+rx_frames=(\d+)\s+radio_rx_ok_delta=(-?\d+)\s+radio_crc_err_delta=(-?\d+)\s+real_faults=(\d+)\s+invariants_violated=(\d+)')
@@ -295,6 +341,15 @@ $gates = @(
     [pscustomobject]@{ id = "B5"; label = "host invariants stable (tx_violated=$txInvariantsBad rx_violated=$rxInvariantsBad)"; ok = $gateB5 }
     [pscustomobject]@{ id = "B6"; label = "median RSSI in [-120,-30] dBm (got $rssiMedian)"; ok = $gateB6 }
 )
+if ($Probe -eq "ping_pong") {
+    $gateB7 = [bool]($null -ne $rttMatchRate -and $rttMatchRate -ge 0.99)
+    $gates += [pscustomobject]@{
+        id = "B7"
+        label = ("rtt_match_rate >= 0.99 (got {0}); rtt_ms p50={1} p99={2} max={3}" `
+            -f $rttMatchRate, $rttP50, $rttP99, $rttMax)
+        ok = $gateB7
+    }
+}
 
 Write-Host ""
 Write-Host "=== W1-10b Phase B gate evaluation ==="
@@ -318,6 +373,7 @@ Write-Host "  tx_invariants_violated=$txInvariantsBad rx_invariants_violated=$rx
 $verdict = if ($failed -eq 0) { "RX_PAIR_PASS" } else { "RX_PAIR_FAIL_${failed}_GATES" }
 $summary = [ordered]@{
     stamp                          = $stamp
+    probe                          = $Probe
     rx_serial                      = $RxAdbSerial
     tx_serial                      = $TxAdbSerial
     cycles                         = $Cycles
@@ -337,6 +393,11 @@ $summary = [ordered]@{
     rx_real_faults                 = $rxRealFaults
     tx_invariants_violated         = $txInvariantsBad
     rx_invariants_violated         = $rxInvariantsBad
+    rtt_match_rate                 = $rttMatchRate
+    rtt_count                      = $rttCount
+    rtt_ms_p50                     = $rttP50
+    rtt_ms_p99                     = $rttP99
+    rtt_ms_max                     = $rttMax
     gates                          = $gates
     verdict                        = $verdict
 }
@@ -354,7 +415,7 @@ $summary | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $eviden
 $savedEAP = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-    foreach ($pair in @(@($RxAdbSerial, "rx_listen"), @($TxAdbSerial, "tx_burst"))) {
+    foreach ($pair in @(@($RxAdbSerial, $rxMode), @($TxAdbSerial, $txMode))) {
         $serial = $pair[0]; $mode = $pair[1]
         foreach ($leaf in @("method_h_stage2_${mode}.log", "method_h_stage2_${mode}_ocd.log")) {
             $rPath = "/tmp/lifetrac_p0c/$leaf"
@@ -370,7 +431,7 @@ try {
         $pyCandidates = @("python", "python3", "py")
         $analyzerRan = $false
         foreach ($pyName in $pyCandidates) {
-            $argList = @($analyzer, $evidenceDir, "--no-stdout")
+            $argList = @($analyzer, $evidenceDir, "--no-stdout", "--merge-summary")
             if ($pyName -eq "py") { $argList = @("-3") + $argList }
             $output = $null
             try {

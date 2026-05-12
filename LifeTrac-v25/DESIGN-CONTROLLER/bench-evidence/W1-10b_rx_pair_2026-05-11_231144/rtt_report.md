@@ -1,18 +1,18 @@
 === W1-10b / W1-11 radio-link latency report ===
-Evidence dir: C:\Users\dorkm\Documents\GitHub\LifeTrac\LifeTrac-v25\DESIGN-CONTROLLER\bench-evidence\W1-10b_rx_pair_2026-05-11_231144
+Evidence dir: LifeTrac-v25\DESIGN-CONTROLLER\bench-evidence\W1-10b_rx_pair_2026-05-11_231144
 TX_DONE rows parsed: 1000  (status==OK: 1000)
 RX_FRAME rows parsed: 999  matched-to-TX-by-payload: 999
 
 --- Time-on-air (LATENCY_BUDGET §1 row #2) ---
-  toa (firmware-reported)          n=1000 min=  30.85 p50=  30.85 p95=  30.85 p99=  30.85 max=  30.85 ms
+  toa (firmware-reported)          n=1000 min=  30.85 p50=  30.85 p90=  30.85 p95=  30.85 p99=  30.85 p999=  30.85 max=  30.85 ms
   predicted SF7/BW125 ~30.0 ms   measured-vs-predicted: +2.8%
 
 --- Host-to-host TX-confirm (rows #1 + #2 + #3 + LPUART) ---
-  elapsed_ms (TX_FRAME_REQ -> TX_DONE_URC) n=1000 min=  42.40 p50=  51.80 p95=  56.20 p99=  57.80 max=  60.80 ms
-  budget for this segment: ToA + ~5.0 ms host overhead = ~35.0 ms
+  elapsed_ms (TX_FRAME_REQ -> TX_DONE_URC) n=1000 min=  42.40 p50=  51.80 p90=  56.00 p95=  56.20 p99=  57.80 p999=  60.60 max=  60.80 ms
+  budget for this segment: ToA + ~21.0 ms host overhead = ~51.0 ms
 
 --- RX inter-arrival jitter (cross-check) ---
-  rx_iat (L072 hw timestamp_us)    n=998  min=  93.06 p50= 102.83 p95= 107.86 p99= 108.42 max= 206.24 ms
+  rx_iat (L072 hw timestamp_us)    n=998  min=  93.06 p50= 102.83 p90= 107.67 p95= 107.86 p99= 108.42 p999= 112.76 max= 206.24 ms
   expected ~= TX inter_cycle_s + 1x ToA jitter
 
 --- Estimated radio-link RTT (bench-tier surrogate) ---
