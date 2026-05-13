@@ -1,0 +1,27 @@
+# W2-01 Kurokesu C2 USB autosuspend disable.
+#
+# Belt-and-braces companion to Option A (`usbcore.autosuspend=-1` on the
+# kernel cmdline). Forces power/control=on at enumeration time for the C2
+# specifically, so even if Option A is missing or misapplied the C2 itself
+# stays out of runtime PM.
+#
+# Correctness notes (see AI NOTES/2026-05-12_W2-01_USB_Wedge_Avoidance_Research_Copilot_v1_0.md
+# section 6a.3 - NVIDIA Xavier NX thread):
+#   - Must match ENV{DEVTYPE}=="usb_device" (NOT usb_interface). power/control
+#     lives on the parent device, not on per-interface nodes.
+#   - TEST=="power/control" gates the write so udev won't error on bus probes
+#     that arrive before the power/ directory exists.
+#   - Run on ACTION=="add" only; we don't want to fight the kernel on remove.
+#
+# Install on the target:
+#   sudo cp 99-w2-01-c2.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload
+#   sudo udevadm trigger --action=add --subsystem-match=usb
+#
+# Verify:
+#   udevadm test $(udevadm info -q path -n /dev/video2 | sed 's|/video4linux/.*||')
+#   cat /sys/bus/usb/devices/1-1.2/power/control   # expect 'on'
+
+ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", \
+    ATTR{idVendor}=="16d0", ATTR{idProduct}=="0ed4", \
+    TEST=="power/control", ATTR{power/control}="on"

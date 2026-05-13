@@ -1,0 +1,23 @@
+﻿=== adb devices ===
+List of devices attached
+2D0A1209DABC240B	device
+2E2C1209DABC240B	device
+
+=== restore ===
+adb : error: closed
+At line:1 char:264
++ ... f8 -Append; adb -s $s shell "echo fio | sudo -S -p '' bash -c 'cp -f  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (error: closed:String) [], RemoteE 
+   xception
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+=== verify ===
+adb : adb.exe: device '2D0A1209DABC240B' not found
+At line:1 char:534
++ ... f8 -Append; adb -s $s shell "grep ^options /boot/loader/entries/ostre ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (adb.exe: device...240B' not found 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

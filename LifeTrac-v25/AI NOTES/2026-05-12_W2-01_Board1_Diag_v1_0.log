@@ -1,0 +1,91 @@
+﻿7[r[999;999H[6n__W2_01_DIAG_BEGIN__
+schema=w2_01_diag/1
+utc_start=2022-04-29T10:50:38Z
+hostname=portenta-x8-2d0a1209dabc240b
+uname=Linux portenta-x8-2d0a1209dabc240b 6.1.24-lmp-standard #1 SMP PREEMPT Tue May 23 16:16:05 UTC 2023 aarch64 aarch64 aarch64 GNU/Linux
+--- LmP version ---
+NAME="Linux-microPlatform XWayland"
+VERSION="4.0.11-934-91"
+PRETTY_NAME="Linux-microPlatform XWayland 4.0.11-934-91"
+--- /proc/cmdline ---
+console=tty1 console=ttymxc2,115200 earlycon=ec_imx6q,0x30880000,115200 root=/dev/mmcblk2p2 rootfstype=ext4 ostree=/ostree/boot.1/lmp/eba52b6ee2c40696aa4394e5c0676ac82fc2da876283d13784cb897b0cc5ecac/0 root=/dev/mmcblk2p2
+--- /etc/fw_env.config (eMMC vs MTD) ---
+/mnt/boot/uboot.env     0x0000          0x4000
+--- fw_setenv presence ---
+-rwxr-xr-x 3 root root 10176 Jan  1  1970 /usr/bin/fw_setenv
+no_fw_setenv
+--- /boot layout ---
+total 16
+drwxr-xr-x  4 root root 4096 Aug 11  2025 .
+drwxr-xr-x 12 root root 4096 Aug 11  2025 ..
+lrwxrwxrwx  1 root root    1 Aug 11  2025 boot -> .
+lrwxrwxrwx  1 root root    8 Aug 11  2025 loader -> loader.1
+drwxr-xr-x  3 root root 4096 Aug 11  2025 loader.1
+drwxr-xr-x  3 root root 4096 Aug 11  2025 ostree
+--- /boot/uEnv.txt (if any) ---
+no_uenv_txt
+--- /boot/extlinux/extlinux.conf (if any) ---
+no_extlinux_conf
+--- mount | grep boot ---
+/dev/mmcblk2p2 on /boot type ext4 (rw,relatime)
+/dev/mmcblk2p1 on /var/rootdirs/mnt/boot type vfat (rw,noatime,sync,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro)
+--- ci_hdrc / chipidea modular vs builtin ---
+lsmod_chipidea:
+  (none loaded)
+modules_builtin_chipidea:
+kernel/drivers/usb/chipidea/ci_hdrc.ko
+kernel/drivers/usb/chipidea/ci_hdrc_usb2.ko
+kernel/drivers/usb/chipidea/ci_hdrc_msm.ko
+kernel/drivers/usb/chipidea/ci_hdrc_pci.ko
+kernel/drivers/usb/chipidea/ci_hdrc_imx.ko
+kernel/drivers/usb/chipidea/usbmisc_imx.ko
+kernel/drivers/usb/chipidea/ci_hdrc_tegra.ko
+kernel_config_chipidea:
+CONFIG_USB_CHIPIDEA=y
+CONFIG_USB_CHIPIDEA_UDC=y
+CONFIG_USB_CHIPIDEA_HOST=y
+CONFIG_USB_CHIPIDEA_PCI=y
+CONFIG_USB_CHIPIDEA_MSM=y
+CONFIG_USB_CHIPIDEA_IMX=y
+CONFIG_USB_CHIPIDEA_GENERIC=y
+CONFIG_USB_CHIPIDEA_TEGRA=y
+--- usbcore autosuspend default (Option A status) ---
+usbcore.autosuspend=2
+--- USB controller dr_mode (hypothesis 6a.4) ---
+/sys/firmware/devicetree/base/soc@0/bus@32c00000/usb@32e40000/dr_mode = otg
+/sys/firmware/devicetree/base/soc@0/bus@32c00000/usb@32e50000/dr_mode = host
+--- USB device tree (lsusb -t) ---
+/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=ci_hdrc/1p, 480M
+    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
+--- lsusb (flat) ---
+Bus 001 Device 002: ID 0424:2514 Microchip Technology, Inc. (formerly SMSC) USB 2.0 Hub
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+--- per-device USB PM snapshot (read-only) ---
+--- udev rules referencing 16d0:0ed4 (C2) or autosuspend ---
+/lib/udev/rules.d/60-autosuspend.rules:3:ACTION!="add", GOTO="autosuspend_end"
+/lib/udev/rules.d/60-autosuspend.rules:7:  ATTR{power/control}="on", GOTO="autosuspend_end"
+/lib/udev/rules.d/60-autosuspend.rules:9:# Enable autosuspend if hwdb says so. Here we are relying on
+/lib/udev/rules.d/60-autosuspend.rules:11:ENV{ID_AUTOSUSPEND}=="1", TEST=="power/control", \
+/lib/udev/rules.d/60-autosuspend.rules:12:  ATTR{power/control}="auto"
+/lib/udev/rules.d/60-autosuspend.rules:18:LABEL="autosuspend_end"
+--- last 60 dmesg lines mentioning ci_hdrc / usb / uvc ---
+[    1.669223] usbserial: USB Serial support registered for generic
+[    1.829787] usbhid: USB HID core driver
+[    2.452212] imx_usb 32e50000.usb: No over current polarity defined
+[    2.461539] ci_hdrc ci_hdrc.1: EHCI Host Controller
+[    2.466466] ci_hdrc ci_hdrc.1: new USB bus registered, assigned bus number 1
+[    2.489488] ci_hdrc ci_hdrc.1: USB 2.0 started, EHCI 1.00
+[    2.495131] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002, bcdDevice= 6.01
+[    2.503423] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    2.510670] usb usb1: Product: EHCI Host Controller
+[    2.515565] usb usb1: Manufacturer: Linux 6.1.24-lmp-standard ehci_hcd
+[    2.522114] usb usb1: SerialNumber: ci_hdrc.1
+[    2.527643] hub 1-0:1.0: USB hub found
+[    2.793203] usb 1-1: new high-speed USB device number 2 using ci_hdrc
+[    2.953655] usb 1-1: New USB device found, idVendor=0424, idProduct=2514, bcdDevice= 0.00
+[    2.962052] usb 1-1: New USB device strings: Mfr=0, Product=0, SerialNumber=0
+[    2.969934] hub 1-1:1.0: USB hub found
+[    5.614682] anx7625 1-0058: Type C USB connected
+[    5.728616] anx7625 1-0058: Type C USB device role selected
+utc_end=2022-04-29T10:50:38Z
+__W2_01_DIAG_END__

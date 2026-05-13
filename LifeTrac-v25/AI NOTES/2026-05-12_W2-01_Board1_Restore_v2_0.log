@@ -1,0 +1,21 @@
+﻿List of devices attached
+2E2C1209DABC240B	device
+
+---restore---
+adb : error: device '2D0A1209DABC240B' not found
+At line:1 char:200
++ ... f8 -Append; adb -s $s exec-out "echo fio | sudo -S -p '' bash -c 'cp  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (error: device '...240B' not found 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+---verify---
+adb : error: device '2D0A1209DABC240B' not found
+At line:1 char:471
++ ... f8 -Append; adb -s $s exec-out "grep ^options /boot/loader/entries/os ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (error: device '...240B' not found 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

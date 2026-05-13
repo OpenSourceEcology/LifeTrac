@@ -1,0 +1,43 @@
+__W2_01_PROBE_BEGIN__
+schema=w2_01_probe/1
+utc_start=2022-05-06T23:07:55Z
+hostname=portenta-x8-2e2c1209dabc240b
+uname=Linux portenta-x8-2e2c1209dabc240b 5.10.93-lmp-standard #1 SMP PREEMPT Thu Jan 20 20:01:30 UTC 2022 aarch64 aarch64 aarch64 GNU/Linux
+id=uid=1000(fio) gid=1000(fio) groups=1000(fio),1003,1004,1007,1011,1015,1028,3001,3002,3003,3006
+capture_py=/tmp/w2_01_camera_capture.py
+out_path=/tmp/w2_01_snap.jpg
+--- lsusb ---
+Bus 001 Device 002: ID 0424:2514 Microchip Technology, Inc. (formerly SMSC) USB 2.0 Hub
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+--- /dev/video* listing ---
+crw-rw----+ 1 root video 81, 0 Apr 28 17:42 /dev/video0
+--- /dev/media* listing ---
+ls: cannot access '/dev/media*': No such file or directory
+--- /dev/v4l/by-id (if present) ---
+ls: cannot access '/dev/v4l/by-id/': No such file or directory
+no_by_id
+--- modules with uvc/v4l in name ---
+videobuf2_dma_contig    20480  1 mx6s_capture
+videobuf2_memops       16384  1 videobuf2_dma_contig
+videobuf2_v4l2         24576  1 mx6s_capture
+videobuf2_common       53248  2 videobuf2_v4l2,mx6s_capture
+videodev              258048  4 videobuf2_v4l2,mx6s_capture,mxc_mipi_csi,videobuf2_common
+--- last 30 kmsgs mentioning uvc/usb/video ---
+[    3.228315] usb 1-1: new high-speed USB device number 2 using ci_hdrc
+[    3.390662] usb 1-1: New USB device found, idVendor=0424, idProduct=2514, bcdDevice= 0.00
+[    3.398878] usb 1-1: New USB device strings: Mfr=0, Product=0, SerialNumber=0
+[    7.675118] videodev: Linux video capture interface: v2.00
+[   33.820596] camera_dvdd: disabling
+[   33.824040] camera_avdd: disabling
+[   33.827449] camera_dovdd: disabling
+node_count=1
+needs_sudo=1
+use_sudo_flag=0
+per_attempt_timeout_s=8
+ABORTING: fio user lacks /dev/video* access. Run on the X8 ONCE:
+  echo fio | sudo -S usermod -aG video fio && exit
+then reconnect and re-run. Or pass --use-sudo to this orchestrator.
+winning_node=
+overall_verdict=FAIL_NEEDS_VIDEO_GROUP
+utc_end=2022-05-06T23:07:55Z
+__W2_01_PROBE_END__

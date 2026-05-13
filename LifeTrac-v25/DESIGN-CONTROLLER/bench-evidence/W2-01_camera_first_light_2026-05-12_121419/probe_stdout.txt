@@ -1,0 +1,89 @@
+7[r[999;999H[6n__W2_01_PROBE_BEGIN__
+schema=w2_01_probe/1
+utc_start=2022-04-29T10:42:25Z
+hostname=portenta-x8-2d0a1209dabc240b
+uname=Linux portenta-x8-2d0a1209dabc240b 6.1.24-lmp-standard #1 SMP PREEMPT Tue May 23 16:16:05 UTC 2023 aarch64 aarch64 aarch64 GNU/Linux
+id=uid=1000(fio) gid=1000(fio) groups=1000(fio),1003,1004,1007,1011,1015,1028,3001,3002,3003,3006
+capture_py=/tmp/w2_01_camera_capture.py
+out_path=/tmp/w2_01_snap.jpg
+--- lsusb ---
+Bus 001 Device 003: ID 16d0:0ed4 MCS C2
+Bus 001 Device 002: ID 0424:2514 Microchip Technology, Inc. (formerly SMSC) USB 2.0 Hub
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+--- /dev/video* listing ---
+crw-rw----+ 1 root video 81, 0 Apr 28 17:42 /dev/video0
+crw-rw----+ 1 root video 81, 1 Apr 28 17:42 /dev/video1
+crw-rw----+ 1 root video 81, 2 Apr 28 17:42 /dev/video2
+crw-rw----+ 1 root video 81, 3 Apr 28 17:42 /dev/video3
+crw-rw----+ 1 root video 81, 4 Apr 28 17:42 /dev/video4
+--- /dev/media* listing ---
+crw-rw----+ 1 root video 251, 0 Apr 28 17:42 /dev/media0
+--- /dev/v4l/by-id (if present) ---
+total 0
+drwxr-xr-x 2 root root 120 Apr 28 17:42 .
+drwxr-xr-x 4 root root  80 Apr 28 17:42 ..
+lrwxrwxrwx 1 root root  12 Apr 28 17:42 usb-Kurokesu_C2_KTM-QGFST-video-index0 -> ../../video1
+lrwxrwxrwx 1 root root  12 Apr 28 17:42 usb-Kurokesu_C2_KTM-QGFST-video-index1 -> ../../video2
+lrwxrwxrwx 1 root root  12 Apr 28 17:42 usb-Kurokesu_C2_KTM-QGFST-video-index2 -> ../../video3
+lrwxrwxrwx 1 root root  12 Apr 28 17:42 usb-Kurokesu_C2_KTM-QGFST-video-index3 -> ../../video4
+--- modules with uvc/v4l in name ---
+uvcvideo              106496  0
+videobuf2_vmalloc      16384  1 uvcvideo
+videobuf2_dma_contig    20480  2 mx6s_capture,imx7_media_csi
+videobuf2_memops       16384  2 videobuf2_vmalloc,videobuf2_dma_contig
+videobuf2_v4l2         24576  3 mx6s_capture,uvcvideo,imx7_media_csi
+v4l2_async             20480  3 mx6s_capture,mxc_mipi_csi,imx7_media_csi
+videobuf2_common       53248  7 videobuf2_vmalloc,videobuf2_dma_contig,videobuf2_v4l2,mx6s_capture,uvcvideo,imx7_media_csi,videobuf2_memops
+videodev              221184  7 v4l2_async,videobuf2_v4l2,mx6s_capture,uvcvideo,mxc_mipi_csi,videobuf2_common,imx7_media_csi
+--- last 30 kmsgs mentioning uvc/usb/video ---
+[    2.785131] usb 1-1: new high-speed USB device number 2 using ci_hdrc
+[    2.945773] usb 1-1: New USB device found, idVendor=0424, idProduct=2514, bcdDevice= 0.00
+[    2.954160] usb 1-1: New USB device strings: Mfr=0, Product=0, SerialNumber=0
+[    3.257108] usb 1-1.2: new high-speed USB device number 3 using ci_hdrc
+[    3.413150] usb 1-1.2: New USB device found, idVendor=16d0, idProduct=0ed4, bcdDevice= 1.00
+[    3.421943] usb 1-1.2: New USB device strings: Mfr=2, Product=1, SerialNumber=3
+[    3.429444] usb 1-1.2: Product: C2
+[    3.432892] usb 1-1.2: Manufacturer: Kurokesu
+[    3.437368] usb 1-1.2: SerialNumber: KTM-QGFST
+[    7.466242] videodev: Linux video capture interface: v2.00
+[    8.230599] usb 1-1.2: Found UVC 1.00 device C2 (16d0:0ed4)
+[    8.391454] usbcore: registered new interface driver uvcvideo
+[    8.402961] usb 1-1.2: 4:1: cannot get freq at ep 0x84
+node_count=5
+--- attempt capture on /dev/video0 ---
+Traceback (most recent call last):
+  File "/tmp/w2_01_camera_capture.py", line 246, in <module>
+    assert V4L2_BUFFER_SIZE == 88, f"v4l2_buffer size {V4L2_BUFFER_SIZE}"
+AssertionError: v4l2_buffer size 84
+node=/dev/video0 rc=1
+--- attempt capture on /dev/video1 ---
+Traceback (most recent call last):
+  File "/tmp/w2_01_camera_capture.py", line 246, in <module>
+    assert V4L2_BUFFER_SIZE == 88, f"v4l2_buffer size {V4L2_BUFFER_SIZE}"
+AssertionError: v4l2_buffer size 84
+node=/dev/video1 rc=1
+--- attempt capture on /dev/video2 ---
+Traceback (most recent call last):
+  File "/tmp/w2_01_camera_capture.py", line 246, in <module>
+    assert V4L2_BUFFER_SIZE == 88, f"v4l2_buffer size {V4L2_BUFFER_SIZE}"
+AssertionError: v4l2_buffer size 84
+node=/dev/video2 rc=1
+--- attempt capture on /dev/video3 ---
+Traceback (most recent call last):
+  File "/tmp/w2_01_camera_capture.py", line 246, in <module>
+    assert V4L2_BUFFER_SIZE == 88, f"v4l2_buffer size {V4L2_BUFFER_SIZE}"
+AssertionError: v4l2_buffer size 84
+node=/dev/video3 rc=1
+--- attempt capture on /dev/video4 ---
+Traceback (most recent call last):
+  File "/tmp/w2_01_camera_capture.py", line 246, in <module>
+    assert V4L2_BUFFER_SIZE == 88, f"v4l2_buffer size {V4L2_BUFFER_SIZE}"
+AssertionError: v4l2_buffer size 84
+node=/dev/video4 rc=1
+--- output file stat ---
+ls: cannot access '/tmp/w2_01_snap.jpg': No such file or directory
+no_output_file
+winning_node=
+overall_verdict=FAIL_NO_PASS
+utc_end=2022-04-29T10:42:26Z
+__W2_01_PROBE_END__

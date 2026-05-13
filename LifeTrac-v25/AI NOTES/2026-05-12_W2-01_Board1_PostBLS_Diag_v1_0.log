@@ -1,0 +1,98 @@
+﻿7[r[999;999H[6n 10:57:42 up 0 min,  1 user,  load average: 0.29, 0.06, 0.02
+---CMDLINE---
+console=tty1 console=ttymxc2,115200 earlycon=ec_imx6q,0x30880000,115200 root=/dev/mmcblk2p2 rootfstype=ext4 ostree=/ostree/boot.1/lmp/eba52b6ee2c40696aa4394e5c0676ac82fc2da876283d13784cb897b0cc5ecac/0 root=/dev/mmcblk2p2
+---AUTOSUSPEND---
+2
+---BLS---
+title Linux-microPlatform XWayland 4.0.11-934-91 (ostree:0)
+version 1
+options console=tty1 console=ttymxc2,115200 earlycon=ec_imx6q,0x30880000,115200 root=/dev/mmcblk2p2 rootfstype=ext4 ostree=/ostree/boot.1/lmp/eba52b6ee2c40696aa4394e5c0676ac82fc2da876283d13784cb897b0cc5ecac/0 usbcore.autosuspend=-1
+linux /ostree/lmp-eba52b6ee2c40696aa4394e5c0676ac82fc2da876283d13784cb897b0cc5ecac/vmlinuz-6.1.24-lmp-standard
+initrd /ostree/lmp-eba52b6ee2c40696aa4394e5c0676ac82fc2da876283d13784cb897b0cc5ecac/initramfs-6.1.24-lmp-standard.img
+---BLS_BAK---
+total 16
+drwxr-xr-x 2 root root 4096 Apr 29 10:57 .
+drwxr-xr-x 3 root root 4096 Aug 11  2025 ..
+-rw-r--r-- 1 root root  531 Apr 29 10:57 ostree-1-lmp.conf
+-rw-r--r-- 1 root root  508 Aug 11  2025 ostree-1-lmp.conf.bak.w2_01
+---DMESG_TAIL---
+[    5.616232] anx7625 1-0058: attach dsi succeeded.
+[    5.619732] anx7625 1-0058: anx: - Reserved
+[    5.619736] anx7625 1-0058: anx: - VCONN status OFF
+[    5.619740] anx7625 1-0058: anx: - VBUS power consumer
+[    5.619743] anx7625 1-0058: anx: - Data role: UFP
+[    5.621772] systemd[1]: Starting Remount Root and Kernel File Systems...
+[    5.628578] imx-drm 32c00000.bus:display-subsystem: bound 32e10000.mipi_dsi (ops 0xffffffc008feea70)
+[    5.633218] anx7625 1-0058: anx: - DP HPD low
+[    5.633606] anx7625 1-0058: anx7625_apply_pending_early_init_config: CC status (0x46) c1 = 0x4, c2 = 0x0:
+[    5.637871] [drm] Initialized imx-drm 1.0.0 20120507 for 32c00000.bus:display-subsystem on minor 1
+[    5.642370] anx7625 1-0058: anx: CC1: SNK.default
+[    5.642383] anx7625 1-0058: anx: CC2: SRC.Open
+[    5.642387] anx7625 1-0058: Type C USB device role selected
+[    5.647758] anx7625 1-0058: anx7625_apply_pending_early_init_config: End
+[    5.650699] EXT4-fs (mmcblk2p2): re-mounted. Quota mode: disabled.
+[    5.652385] anx7625 1-0058: drm detect
+[    5.659121] anx7625 1-0058: anx probed
+[    5.668331] imx-drm 32c00000.bus:display-subsystem: [drm] Cannot find any crtc or sizes
+[    5.691463] i2c_dev: i2c /dev entries driver
+[    5.781305] systemd[1]: Starting Coldplug All udev Devices...
+[    5.806197] systemd[1]: Starting Create compressed swap in memory using zram...
+[    5.838549] systemd[1]: Started Journal Service.
+[    5.873198] zram: Added device: zram0
+[    5.912727] zram0: detected capacity change from 0 to 3903144
+[    6.511506] systemd-journald[483]: Received client request to flush runtime journal.
+[    6.635559] Adding 1951568k swap on /dev/zram0.  Priority:-2 extents:1 across:1951568k SS
+[    7.138735] imx-sdma 302c0000.dma-controller: firmware found.
+[    7.144995] imx-sdma 302c0000.dma-controller: loaded firmware 4.6
+[    7.152707] input: bd718xx-pwrkey as /devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-004b/gpio-keys.1.auto/input/input1
+[    7.168091] Bluetooth: HCI UART driver ver 2.3
+[    7.172680] Bluetooth: HCI UART protocol H4 registered
+[    7.177936] Bluetooth: HCI UART protocol BCSP registered
+[    7.184848] Bluetooth: HCI UART protocol LL registered
+[    7.190126] Bluetooth: HCI UART protocol ATH3K registered
+[    7.195713] Bluetooth: HCI UART protocol Three-wire (H5) registered
+[    7.210268] Bluetooth: HCI UART protocol Intel registered
+[    7.223348] Bluetooth: HCI UART protocol Broadcom registered
+[    7.223441] hci_uart_bcm serial0-0: supply vbat not found, using dummy regulator
+[    7.225282] videodev: Linux video capture interface: v2.00
+[    7.238940] Bluetooth: HCI UART protocol QCA registered
+[    7.249496] hci_uart_bcm serial0-0: supply vddio not found, using dummy regulator
+[    7.257224] hci_uart_bcm serial0-0: No reset resource, using default baud rate
+[    7.273723] imx-sdma 302b0000.dma-controller: firmware found.
+[    7.279052] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+[    7.290401] cfg80211: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+[    7.437322] FAT-fs (mmcblk2p1): Volume was not properly unmounted. Some data may be corrupt. Please run fsck.
+[    7.525241] imx-sdma 30bd0000.dma-controller: firmware found.
+[    7.602714] OF: graph: no port node found in /soc@0/bus@32c00000/mipi_csi@32e30000
+[    7.613127] mxc_mipi-csi 32e30000.mipi_csi: No port node at mipi_csi@32e30000
+[    7.621499] mxc_mipi-csi: probe of 32e30000.mipi_csi failed with error -22
+[    7.664419] brcmfmac: brcmf_fw_alloc_request: using brcm/brcmfmac43430-sdio for chip BCM43430/1
+[    7.678135] brcmfmac mmc0:0001:1: Direct firmware load for brcm/brcmfmac43430-sdio.fsl,imx8mm-evk.bin failed with error -2
+[    7.689316] brcmfmac mmc0:0001:1: Falling back to sysfs fallback for: brcm/brcmfmac43430-sdio.fsl,imx8mm-evk.bin
+[    7.705212] Bluetooth: hci0: BCM: chip id 94
+[    7.714975] Bluetooth: hci0: BCM: features 0x2e
+[    7.724450] mx6s-csi 32e20000.csi1_bridge: initialising
+[    7.742190] imx7_media_csi: module is from the staging directory, the quality is unknown, you have been warned.
+[    7.752454] Bluetooth: hci0: BCM43430A1
+[    7.756370] Bluetooth: hci0: BCM43430A1 (001.002.009) build 0000
+[    8.702696] Bluetooth: hci0: BCM43430A1 'brcm/BCM43430A1.hcd' Patch
+[    8.857151] Bluetooth: BNEP (Ethernet Emulation) ver 1.3
+[    8.862544] Bluetooth: BNEP filters: protocol multicast
+[    8.862568] Bluetooth: BNEP socket layer initialized
+[    8.878739] brcmfmac: brcmf_c_preinit_dcmds: Firmware: BCM43430/1 wl0: Aug 16 2022 03:05:14 version 7.45.98.125 (5b7978c CY) FWID 01-f420b81d
+[    9.207171] file system registered
+[    9.274645] read descriptors
+[    9.277647] read strings
+[    9.894410] Microchip KSZ9131 Gigabit PHY 30be0000.ethernet-1:01: attached PHY driver (mii_bus:phy_addr=30be0000.ethernet-1:01, irq=110)
+[   10.663923] x8h7_can can@2 can0: X8H7 CAN successfully initialized.
+[   10.680869] x8h7_can can@1 can1: X8H7 CAN successfully initialized.
+[   10.756382] cs42l52 2-004a: Failed to apply regmap patch: -6
+[   10.765049] cs42l52 2-004a: Failed to read chip ID: -6
+[   10.873607] x8h7_rtc x8h7rtc: registered as rtc1
+[   10.910003] Serial: X8H7 UART driver
+[   10.913869] x8h7uart: ttyX0 at I/O 0x0 (irq = 0, base_baud = 1500000) is a unknown
+[   10.991754] anx7625 1-0058: drm detect
+[   13.621699] Bluetooth: hci0: BCM: features 0x2e
+[   13.652707] Bluetooth: hci0: BCM4343WA1 37.4MHz Murata Type-1DX BT4.2-0093
+[   13.659725] Bluetooth: hci0: BCM43430A1 (001.002.009) build 0000
+[   13.839594] Bluetooth: MGMT ver 1.22
