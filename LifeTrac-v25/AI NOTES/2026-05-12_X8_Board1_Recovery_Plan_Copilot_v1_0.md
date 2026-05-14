@@ -263,3 +263,85 @@ triaged in one command rather than reconstructing the diagnosis by hand.
   through 2026-05-12 covering bridge stall recovery and openocd/H7 architectural
   block.
 - NXP application note AN12805 — *i.MX 8M Mini Serial Download Protocol*.
+
+---
+
+## 6. 2026-05-13 update — L072 ROM auto-baud trap (Stack C recovery path)
+
+### 6.1 The discovery
+
+While debugging the **swd_bypass_pa11_pf4_launcher.sh** flow on Board 2, I confirmed
+the launcher *does* enter ROM bootloader mode but every probe returned `0x1F` NACK
+(or no response at 8N1). Root cause: the STM32 ROM bootloader auto-bauds on the FIRST
+byte after NRST release. A glitch byte during the NRST rising edge — most likely from
+the `cs42l52` audio codec's repeated `cannot obtain reset-gpio` i2c retries (see
+[2026-05-08_Method_G_Avoiding_Power_Cycles_Copilot_v2_0.md §1](2026-05-08_Method_G_Avoiding_Power_Cycles_Copilot_v2_0.md)) —
+consumes the auto-baud slot. After that, the ROM is locked at 19200 8E1 and treats
+the standard `0x7F` sync byte as an invalid command, returning `0x1F` NACK.
+
+**Fix:** never re-send `0x7F`. Configure UART to 19200 8E1 and send commands directly.
+Validated on Board 2:
+
+| Command | TX | RX | Decoded |
+|---|---|---|---|
+| GET    | `00 FF` | `79 0b 31 00 01 02 11 21 31 44 63 73 82 92 79` | bootloader **v3.1**, 11 commands |
+| GET_ID | `02 FD` | `79 01 04 47 79`                                | PID **0x0447** (L072) |
+| READ_MEMORY @ 0x08000000 | `11 EE / addr+csum / FF 00` | 256 valid bytes | vector table SP=0x20005000, Reset=0x08000579 (Thumb-aligned ✓) |
+
+### 6.2 New tooling
+
+Added to `LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/`:
+
+- **flash_l072_via_uart.py** — minimal AN3155 client for LmP. Avoids `0x7F` entirely.
+  Supports `probe`, `read [addr] [n]`, `erase`, `write <bin>`, `go [addr]`. Uses
+  shell `stty` for UART config (LmP Python lacks termios/fcntl/ctypes/pyserial).
+- **rom_clean_sync.sh** — re-asserts PWM4 HIGH (BOOT0), pulses PF4 (NRST), proves
+  liveness without expecting an ACK from the autobaud byte.
+- **rom_get_cmd.sh** / **rom_get_id.sh** — minimal shell-only confirmations.
+
+### 6.3 New Tier 0.5 in the recovery hierarchy
+
+Insert between Tier 0 (host-side already attempted) and Tier 1 (USB cable swaps):
+
+> **Tier 0.5 — L072-only recovery via UART4 (no SWD, no DFU).**
+> If the H7 / X8 stack is healthy but the L072 user firmware is broken (no AT
+> response, stuck in OPMODE, etc.), the entire L072 can be re-flashed *over the
+> existing UART4 link* via the bridge. Steps:
+>
+> 1. Drive PA11 HIGH and pulse PF4 NRST low/high using
+>    `swd_bypass_pa11_pf4_launcher.sh` (writes via `pwmchip0/pwm4` and
+>    `gpio-163`). PA11 must already be high *before* NRST releases.
+> 2. Run `python3 flash_l072_via_uart.py probe`. Expect `bootloader v3.1` and
+>    `PID=0x0447`. **Do not panic if the very first 0x7F probe NACKs** — that
+>    is now expected; the Python flasher never sends 0x7F.
+> 3. `read 0x08000000 256` to dump the vector table — confirms READ_MEMORY
+>    works and shows what is currently flashed.
+> 4. `write <fw>.bin` to ERASE + WRITE_MEMORY + verify the new image.
+> 5. `go 0x08000000` to start it (or just pulse NRST again with PA11 LOW).
+
+### 6.4 Healthcheck addition
+
+`board1_healthcheck.sh` now ends with an **L072 GET probe** section that:
+
+- Sends `GET (00 FF)` at 19200 8E1 to `/dev/ttymxc3` (read-only, never `0x7F`).
+- Reports `silent` (chip running user firmware — the normal state),
+  `ACK` (chip in ROM mode), or `NACK 0x1F` (in ROM but auto-baud consumed,
+  use `flash_l072_via_uart.py`).
+
+This is non-destructive in all cases — `GET` is a query command and does not
+alter chip state.
+
+### 6.5 What the discovery does NOT explain
+
+The L072 user firmware itself is still uncooperative — it does not respond on
+`/dev/ttymxc3` at 921600 8N1 (expected Stack C host-protocol baud). That means:
+
+- The chip is healthy (ROM proves it).
+- The wiring is healthy (READ_MEMORY full pages succeed).
+- **The user firmware on flash is not initializing the host UART correctly**, OR
+  **the W1-9 fallback path leaves the chip in a non-host-protocol state**.
+
+Next step (separate work item): use the new `read 0x08000000 16440` capability
+to dump the *currently flashed* image off Board 2 and bindiff it against
+`build/firmware.bin` to find out what is actually on the chip vs. what we last
+intentionally flashed.
