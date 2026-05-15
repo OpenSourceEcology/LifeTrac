@@ -56,6 +56,11 @@ param(
     [switch]$FullCapture,           # default OFF -> safe enumerate-only mode
     [switch]$NoQuirks,              # default OFF -> reload uvcvideo with FIX_BANDWIDTH
     [int]$PerAttemptTimeoutS = 8,
+    [switch]$RunGuard,              # default OFF -> skip the root USB guard step
+    [switch]$NoGuard,               # explicit opt-out (overrides RunGuard)
+    [int]$GuardHotplugWaitS = 0,    # if >0, guard waits N s for C2 hot-plug
+    [switch]$GuardAuthorizedGate,   # use authorized_default=0 + explicit authorize
+    [int]$GuardSettleMs = 800,
     [string]$RepoRoot = ''
 )
 
@@ -92,21 +97,60 @@ Write-Host "Evidence dir: $evidenceDir"
 
 $pyLocal  = Join-Path $helperDir 'w2_01_camera_capture.py'
 $shLocal  = Join-Path $helperDir 'w2_01_camera_first_light.sh'
-foreach ($p in @($pyLocal, $shLocal)) {
+$guardLocal = Join-Path $helperDir 'w2_01_camera_usb_guard.sh'
+foreach ($p in @($pyLocal, $shLocal, $guardLocal)) {
     if (-not (Test-Path -LiteralPath $p)) {
         throw "Missing local file: $p"
     }
 }
 
-$pyRemote   = '/tmp/w2_01_camera_capture.py'
-$shRemote   = '/tmp/w2_01_camera_first_light.sh'
-$snapRemote = '/tmp/w2_01_snap.jpg'
+$pyRemote      = '/tmp/w2_01_camera_capture.py'
+$shRemote      = '/tmp/w2_01_camera_first_light.sh'
+$guardRemote   = '/tmp/w2_01_camera_usb_guard.sh'
+$snapRemote    = '/tmp/w2_01_snap.jpg'
+$guardLogRemote = '/tmp/w2_01_guard_dmesg.log'
 
 # 1. Push helper files
 Write-Host "Pushing helper files to $AdbSerial ..."
 & adb -s $AdbSerial push $pyLocal $pyRemote | Out-Null
 & adb -s $AdbSerial push $shLocal $shRemote | Out-Null
-& adb -s $AdbSerial shell "chmod +x $pyRemote $shRemote; rm -f $snapRemote" | Out-Null
+& adb -s $AdbSerial push $guardLocal $guardRemote | Out-Null
+& adb -s $AdbSerial shell "chmod +x $pyRemote $shRemote $guardRemote; rm -f $snapRemote $guardLogRemote" | Out-Null
+
+# 1b. Optionally run the root USB guard FIRST. This is the privileged step
+#     that applies usbcore.autosuspend=-1, snd-usb-audio unbind, and the
+#     C2-specific power/control + autosuspend_delay_ms=-1. The capture step
+#     below runs read-only verification and ideally unprivileged.
+$guardStdoutPath = Join-Path $evidenceDir 'guard_stdout.txt'
+$guardKV = $null
+$runGuardEffective = $RunGuard.IsPresent -and -not $NoGuard.IsPresent
+if ($runGuardEffective) {
+    Write-Host "Running USB guard (sudo) ..."
+    $guardEnv = @(
+        "GUARD_HOTPLUG_WAIT_S=$GuardHotplugWaitS",
+        "GUARD_AUTHORIZED_GATE=$([int][bool]$GuardAuthorizedGate)",
+        "GUARD_SETTLE_MS=$GuardSettleMs"
+    ) -join ' '
+    $gpsi = New-Object System.Diagnostics.ProcessStartInfo
+    $gpsi.FileName = (Get-Command adb).Source
+    $gpsi.Arguments = "-s $AdbSerial exec-out `"bash --noprofile --norc -c '$guardEnv $guardRemote'`""
+    $gpsi.RedirectStandardOutput = $true
+    $gpsi.RedirectStandardError = $true
+    $gpsi.UseShellExecute = $false
+    $gpsi.StandardOutputEncoding = [System.Text.Encoding]::UTF8
+    $gpsi.StandardErrorEncoding = [System.Text.Encoding]::UTF8
+    $gproc = [System.Diagnostics.Process]::Start($gpsi)
+    $guardStdout = $gproc.StandardOutput.ReadToEnd()
+    $guardStderr = $gproc.StandardError.ReadToEnd()
+    $gproc.WaitForExit()
+    [System.IO.File]::WriteAllText($guardStdoutPath, $guardStdout, [System.Text.UTF8Encoding]::new($false))
+    if ($guardStderr) {
+        [System.IO.File]::WriteAllText((Join-Path $evidenceDir 'guard_stderr.txt'), $guardStderr, [System.Text.UTF8Encoding]::new($false))
+    }
+    Write-Host "Guard exit: $($gproc.ExitCode)  ->  $guardStdoutPath"
+} else {
+    Write-Host "Skipping USB guard (pass -RunGuard to enable)"
+}
 
 # 2. Run the probe and capture stdout as raw UTF-8 (avoid PowerShell's
 #    default UTF-16 redirect that corrupts byte-oriented adb output).
@@ -171,6 +215,21 @@ function Parse-KV([string]$block) {
 $probeBlock  = Get-MarkerBlock $probeText '__W2_01_PROBE_BEGIN__' '__W2_01_PROBE_END__'
 $probeKV     = Parse-KV $probeBlock
 
+# Parse guard block (if guard ran).
+if ($runGuardEffective -and (Test-Path -LiteralPath $guardStdoutPath)) {
+    $guardText = Get-Content -LiteralPath $guardStdoutPath -Raw -Encoding UTF8
+    $guardText = [regex]::Replace($guardText, "\x1b\[[0-9;?]*[a-zA-Z]", "")
+    $guardBlock = Get-MarkerBlock $guardText '__W2_01_GUARD_BEGIN__' '__W2_01_GUARD_END__'
+    $guardKV = Parse-KV $guardBlock
+    # Pull the guard's dmesg tail (best effort).
+    $guardDmesgLocal = Join-Path $evidenceDir 'guard_dmesg.log'
+    try {
+        & adb -s $AdbSerial pull $guardLogRemote $guardDmesgLocal 2>&1 | Out-Null
+    } catch {
+        Write-Host "guard dmesg pull non-fatal: $_"
+    }
+}
+
 # Find the LAST camera marker block (the winning attempt) - there can be one
 # per /dev/videoN that was tried.
 $cameraBlocks = @()
@@ -208,6 +267,15 @@ function Get-KV([hashtable]$h, [string]$k, $default = $null) {
 $nodeCount = [int](Get-KV $probeKV 'node_count' 0)
 $g1 = $nodeCount -gt 0
 
+# G0 gate: did the USB guard apply successfully? When guard was not run we
+# treat G0 as N/A (true) so legacy invocations without -RunGuard still pass.
+if ($runGuardEffective) {
+    $guardVerdict = Get-KV $guardKV 'verdict' ''
+    $g0 = ($guardVerdict -eq 'PASS')
+} else {
+    $g0 = $true
+}
+
 $driver = Get-KV $winningKV 'driver' ''
 $g2 = ($driver -match 'uvcvideo')
 
@@ -228,6 +296,7 @@ if ($negFourcc -eq 'MJPG') {
 $g7 = $snapExists -and ($snapSize -gt 0)
 
 $gates = [ordered]@{
+    G0_guard_applied       = $g0
     G1_device_present      = $g1
     G2_driver_uvc          = $g2
     G3_capture_capable     = $g3
@@ -253,6 +322,17 @@ $summary = [ordered]@{
         node_count  = $nodeCount
         winning_node = (Get-KV $probeKV 'winning_node' '')
         overall_verdict_remote = (Get-KV $probeKV 'overall_verdict' '')
+    }
+    guard = [ordered]@{
+        ran     = $runGuardEffective
+        verdict = (Get-KV $guardKV 'verdict' '')
+        autosuspend_initial = (Get-KV $guardKV 'autosuspend_initial' '')
+        autosuspend_final   = (Get-KV $guardKV 'autosuspend_final' '')
+        c2_present_at_start = (Get-KV $guardKV 'c2_present_at_start' '')
+        c2_power_writes     = (Get-KV $guardKV 'c2_power_writes' '')
+        snd_unbound_count   = (Get-KV $guardKV 'snd_usb_audio_unbound_count' '')
+        hotplug_wait_s      = $GuardHotplugWaitS
+        authorized_gate     = [bool]$GuardAuthorizedGate
     }
     capture = $winningKV
     pulled = [ordered]@{

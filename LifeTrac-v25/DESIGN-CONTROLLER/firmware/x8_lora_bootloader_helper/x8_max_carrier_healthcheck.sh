@@ -1,55 +1,54 @@
 #!/bin/sh
-# Comprehensive X8 + Max Carrier health check (read-only).
+# Comprehensive X8 + Max Carrier health check (read-only) focusing on all relevant chips.
+
+echo "========================================================"
+echo "==== CHIP 1: i.MX 8M Mini (Linux Host MPU)          ===="
+echo "========================================================"
 echo "==== UPTIME ===="
 uptime
 echo "==== KERNEL ===="
 uname -a
 echo "==== OS-RELEASE ===="
 grep -E '^(NAME|VERSION|PRETTY_NAME)=' /etc/os-release 2>/dev/null
-echo "==== UPTIME-PROC ===="
-cat /proc/uptime
 echo "==== DMESG (errors/warnings, last boot) ===="
-dmesg -T -l err,warn 2>/dev/null | tail -40
-echo "==== X8H7 MODULES ===="
-lsmod | grep -E '^x8h7|^Module' | sort
-echo "==== X8H7 FW VERSION (5s timeout) ===="
-timeout 5 cat /sys/kernel/x8h7_firmware/version 2>&1 || echo "<read failed/timeout>"
-echo "==== M4_PROXY ===="
-systemctl is-active m4-proxy.service 2>/dev/null
-systemctl is-active stm32h7-program.service 2>/dev/null
-echo "==== GPIO CHIPS ===="
-ls /sys/class/gpio/ | grep -E '^gpiochip' | sort
-echo "==== EXPORTED GPIOS ===="
-ls /sys/class/gpio/ | grep -E '^gpio[0-9]+$' | sort
-echo "==== SWD-RELEVANT GPIOS (8/10/15) STATE ===="
-for g in 8 10 15; do
-  if [ -d /sys/class/gpio/gpio$g ]; then
-    d=$(cat /sys/class/gpio/gpio$g/direction 2>/dev/null)
-    v=$(cat /sys/class/gpio/gpio$g/value 2>/dev/null)
-    echo "gpio$g dir=$d val=$v"
-  else
-    echo "gpio$g not exported"
-  fi
-done
-echo "==== /dev/ttymxc3 PRESENT ===="
-ls -la /dev/ttymxc3 2>&1
+dmesg -T -l err,warn 2>/dev/null | tail -20
 echo "==== USB DEVICES ===="
-ls /sys/bus/usb/devices/ 2>/dev/null | sort
-echo "==== USB IDs ===="
 for d in /sys/bus/usb/devices/*/idVendor; do
   vid=$(cat "$d" 2>/dev/null)
   pid=$(cat "$(dirname $d)/idProduct" 2>/dev/null)
   prod=$(cat "$(dirname $d)/product" 2>/dev/null)
   echo "$(basename $(dirname $d)) ${vid}:${pid} $prod"
 done
-echo "==== WATCHDOG ===="
-ls /dev/watchdog* 2>&1
-echo "==== DISK ===="
-df -h / /var 2>/dev/null
-echo "==== MEMORY ===="
+echo "==== MEMORY & LOAD ===="
 free -m
-echo "==== LOAD ===="
 cat /proc/loadavg
+
+echo ""
+echo "========================================================"
+echo "==== CHIP 2: STM32H747 (Portenta X8 Companion MCU)  ===="
+echo "========================================================"
+echo "==== X8H7 MODULES ===="
+lsmod | grep -E '^x8h7|^Module' | sort
+echo "==== X8H7 FW VERSION ===="
+timeout 5 cat /sys/kernel/x8h7_firmware/version 2>&1 || echo "<read failed/timeout>"
+echo "==== M4_PROXY & PROGRAM SERVICES ===="
+systemctl is-active m4-proxy.service 2>/dev/null || echo "m4-proxy inactive"
+systemctl is-active stm32h7-program.service 2>/dev/null || echo "stm32h7-program inactive"
+echo "==== SWD/GPIO PINS ===="
+for g in 8 10 15; do
+  if [ -d /sys/class/gpio/gpio$g ]; then
+    d=$(cat /sys/class/gpio/gpio$g/direction 2>/dev/null)
+    v=$(cat /sys/class/gpio/gpio$g/value 2>/dev/null)
+    echo "gpio$g dir=$d val=$v"
+  fi
+done
+
+echo ""
+echo "========================================================"
+echo "==== CHIP 3: STM32L072 (Max Carrier LoRa Module)    ===="
+echo "========================================================"
+echo "==== /dev/ttymxc3 UART ===="
+ls -la /dev/ttymxc3 2>&1
 echo "==== L072 ROM-MODE PROBE (non-destructive) ===="
 # 2026-05-13 discovery: ROM auto-bauds on the FIRST byte after NRST release.
 # A glitch byte (most likely from cs42l52 i2c retry traffic) consumes the
@@ -101,4 +100,20 @@ if [ -c /dev/ttymxc3 ] && [ -f /tmp/flash_l072_via_uart.py ]; then
 else
   echo "SKIP: /tmp/flash_l072_via_uart.py not present"
 fi
+
+echo ""
+echo "========================================================"
+echo "==== CHIP 4: CS42L52 & I2C Peripherals (Max Carrier)===="
+echo "========================================================"
+# The Max Carrier has I2C audio and other peripherals on the main I2C bus.
+echo "==== I2C BUS STATUS ===="
+if command -v i2cdetect >/dev/null 2>&1; then
+  # Usually i2c-0 or i2c-1 on portenta x8
+  i2cdetect -y 0 2>/dev/null | grep -E '^40:' 2>/dev/null && echo "CS42L52 Audio Codec (0x4A) likely detected" || echo "Note: i2cdetect command skipped or audio not at 0x4A"
+else
+  echo "i2cdetect not installed. Checking dmesg for I2C devices..."
+  dmesg | grep -iE 'cs42l52|i2c|se050'
+fi
+
+echo ""
 echo "==== END ===="

@@ -327,6 +327,97 @@ Carrier LoRa interface must be revalidated before W4-00. Details:
 - [ ] **Handheld:** verify OLED display works
 - [ ] **All three nodes:** verify they can hear each other's LoRa frames at bench distance with the same parameters (SF7, **BW 250 kHz**, CR 4-5, freq 915.0 MHz, sync 0x12) per [LORA_PROTOCOL.md](LORA_PROTOCOL.md) / [DECISIONS.md](DECISIONS.md) D-A2
 
+### Tractor X8 USB peripherals — W2-01 wedge mitigation follow-ups
+
+Implementation done in this round (camera bring-up, root-only USB guard,
+unprivileged capture decoupling, orchestrator integration, udev rule + audio
+blacklist files) is captured in [`firmware/x8_lora_bootloader_helper/w2_01_camera_usb_guard.sh`](firmware/x8_lora_bootloader_helper/w2_01_camera_usb_guard.sh),
+[`firmware/x8_lora_bootloader_helper/w2_01_camera_first_light.sh`](firmware/x8_lora_bootloader_helper/w2_01_camera_first_light.sh),
+[`firmware/x8_lora_bootloader_helper/run_w2_01_camera_first_light_end_to_end.ps1`](firmware/x8_lora_bootloader_helper/run_w2_01_camera_first_light_end_to_end.ps1),
+[`firmware/x8_lora_bootloader_helper/99-w2-01-c2.rules`](firmware/x8_lora_bootloader_helper/99-w2-01-c2.rules), and
+[`firmware/x8_lora_bootloader_helper/lifetrac-no-usb-audio.conf`](firmware/x8_lora_bootloader_helper/lifetrac-no-usb-audio.conf).
+Full pros/cons + voltage-drop quantification is in [`../AI NOTES/2026-05-14_USB_Wedge_Software_Mitigations.md`](../AI%20NOTES/2026-05-14_USB_Wedge_Software_Mitigations.md) §7–§8.
+
+The remaining items below are the deferred suggestions from that note's §8.
+Each is independently shippable; none block the next bench run.
+
+- [ ] **W2-01.D1 Bench-only `provision_x8.sh` install step** — one-shot
+  helper that copies `99-w2-01-c2.rules` to `/etc/udev/rules.d/`, copies
+  `lifetrac-no-usb-audio.conf` to `/etc/modprobe.d/`, runs `udevadm control
+  --reload && udevadm trigger`, and `rmmod snd_usb_audio` (best-effort).
+  Documented reversal: `rm` both files + `udevadm reload` + `modprobe
+  snd_usb_audio`. Buys ~10–30 mV avoided VBUS sag at C2 attach plus
+  protection against mid-session unplug/replug events the guard misses
+  (per §8.3 / §8.4 of the mitigation note).
+- [ ] **W2-01.D2 Stopgap systemd oneshot for runtime autosuspend** —
+  install a unit that writes `-1` to `/sys/module/usbcore/parameters/autosuspend`
+  early in boot, before USB hot-plug. Local-only; no Foundries change.
+  Useful when the operator forgets to run the guard, or when the C2 is
+  plugged at boot. Race-prone (may lose to fast camera enumeration);
+  ship only if §8.1 is more than a sprint away. See §8.2 of the
+  mitigation note.
+- [ ] **W2-01.D3 Production `OSTREE_KERNEL_ARGS=usbcore.autosuspend=-1`** —
+  bake the autosuspend disable into the next LmP factory image so it is
+  active before any USB device enumerates. Bundle with the next planned
+  image cycle, not a one-off rebuild. Closes the cold-plug-at-boot hole
+  the runtime guard cannot. Coordinate with Foundries pipeline owner.
+  See §8.1 of the mitigation note.
+- [ ] **W2-01.D4 Bench measurement of voltage-drop estimates** — the
+  ~110–310 mV software-only headroom number in §8.4 is order-of-magnitude
+  only (assumes ~150–300 mΩ rail+trace+cable). Capture a USB VBUS scope
+  trace at the C2 input during attach with and without the guard, and
+  with and without a powered hub, to tighten the numbers. Adds bench
+  evidence to [`../AI NOTES/2026-05-14_USB_Wedge_Software_Mitigations.md`](../AI%20NOTES/2026-05-14_USB_Wedge_Software_Mitigations.md) §8.4.
+- [ ] **W2-01.D5 Powered USB hub on bench** — still the largest single
+  voltage-drop fix (~300–800 mV vs ~110–310 mV from the entire software
+  stack combined). Source one before W2-01 declares "wedge-free" status.
+  Existing TODO on this is implicit; this entry makes it explicit.
+
+### Tractor X8 USB peripherals — W2-02/W2-03 GPS + IMU coverage
+
+Per [`../AI NOTES/2026-05-14_USB_Wedge_Software_Mitigations.md`](../AI%20NOTES/2026-05-14_USB_Wedge_Software_Mitigations.md) §7,
+the MCP2221A bridge plus its Qwiic-attached NEO-M9N GPS and BNO086 IMU
+appear to the X8 as **one HID device drawing ~50–80 mA total** — no
+isochronous bandwidth, no audio interface, no UVC quirks. They do **not**
+need the W2-01 camera guard.
+
+- [ ] **W2-02/W2-03.U1 Inherit autosuspend disable for free** — once
+  W2-01.D3 (production kernel arg) ships, the MCP2221A automatically
+  benefits at no extra config cost. No per-device work required.
+- [ ] **W2-02/W2-03.U2 Optional belt-and-braces udev rule** — drop a
+  one-liner keyed on `04d8:00dd` that sets `power/control=on` and
+  `power/autosuspend_delay_ms=-1` for the MCP2221A specifically. Cost
+  is essentially zero; protects against the HID re-bind path that opens
+  the device on demand from `gps_service.py` / `imu_service.py`. See
+  the suggested rule body in §7 of the mitigation note.
+- [ ] **W2-02/W2-03.U3 Confirm `hid-mcp2221` is mainline in the X8 LmP
+  kernel** — driver has been in mainline since Linux 5.10, so this
+  should be a no-op on the current image, but verify before W2-02
+  bring-up so we do not chase a missing-module symptom on bench.
+- [ ] **W2-02/W2-03.U4 ADuM3160 USB galvanic isolator integration** —
+  already tracked under [Phase 0 → Tractor-side sensors](#tractor-side-sensors-and-cameras)
+  ("USB galvanic isolator (ADuM3160-based, ~$25)"). When inserted
+  inline between the X8 and the MCP2221A, the isolator presents as its
+  own USB hub node in `lsusb -t` and the bus addresses for the C2 and
+  MCP2221A will shift — re-verify the W2-01 udev VID:PID rule matches
+  unchanged (it should; rules key on VID:PID, not bus path).
+
+### Tractor X8 USB peripherals — Coral USB Accelerator (base-station only)
+
+Per [`../AI NOTES/2026-05-14_USB_Wedge_Software_Mitigations.md`](../AI%20NOTES/2026-05-14_USB_Wedge_Software_Mitigations.md) §7,
+the Coral USB Accelerator is the **only other peripheral in the BOM**
+that shares the C2's wedge risk profile (multi-amp inrush at first
+inference, isochronous-like bursty load). It currently lives only on the
+base-station X8.
+
+- [ ] **W?-Coral.U1 If Coral is co-located with the C2 on a single X8**
+  (currently not planned, but possible if the Phase 1 Mini-PCIe spike
+  fails and the USB variant is adopted), apply the W2-01 guard pattern
+  to it as well: add `1a6e:089a` (unbound dev board) and `18d1:9302`
+  (post-firmware) to the udev rule, and to the guard's authorization-gate
+  list. No new script; reuse `w2_01_camera_usb_guard.sh` with an extra
+  VID:PID.
+
 ---
 
 ## Phase 2 — Common firmware (shared by all three nodes)

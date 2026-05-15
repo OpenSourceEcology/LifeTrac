@@ -127,109 +127,99 @@ fi
 # actually originates from snd-usb-audio (kernel.org bug #212771) and is
 # benign. FIX_BANDWIDTH only affects uncompressed YUV streams (the C2's
 # preferred format is MJPEG = compressed) so the quirk is a no-op for us.
+#
+# 2026-05-15 REFACTOR: The privileged USB policy work (autosuspend,
+# power/control, snd-usb-audio unbind, dmesg tail) is now owned by the
+# separate guard script `w2_01_camera_usb_guard.sh`. The orchestrator runs
+# the guard FIRST as root, then this script runs in capture mode (ideally
+# unprivileged via the `video` group). This block is now a read-only
+# VERIFICATION step only - it never writes to sysfs or invokes sudo. That
+# keeps capture decoupled from `--use-sudo` and removes the silent-skip
+# failure mode where unprivileged capture lost all USB defenses.
 PRE_FLIGHT_LOG="/tmp/w2_01_dmesg_during_probe.log"
 C2_VID="16d0"
 C2_PID="0ed4"
-if [ "$APPLY_QUIRKS" = "1" ] && [ "$USE_SUDO" = "1" ]; then
+if [ "$APPLY_QUIRKS" = "1" ]; then
   echo "--- pre-flight (a) start backgrounded dmesg tail -> $PRE_FLIGHT_LOG ---"
   : > "$PRE_FLIGHT_LOG" 2>/dev/null || true
   ( dmesg -wH 2>/dev/null > "$PRE_FLIGHT_LOG" 2>&1 & echo $! > /tmp/w2_01_dmesg_pid )
   DMESG_PID="$(cat /tmp/w2_01_dmesg_pid 2>/dev/null || echo '')"
   echo "  dmesg_tail_pid=$DMESG_PID  (log=$PRE_FLIGHT_LOG)"
 
-  echo "--- pre-flight (b) /proc/cmdline + usbcore.autosuspend ---"
+  echo "--- pre-flight (b) /proc/cmdline + usbcore.autosuspend (read-only) ---"
   cat /proc/cmdline 2>&1 || true
   GLOBAL_AUTOSUSPEND="$(cat /sys/module/usbcore/parameters/autosuspend 2>/dev/null || echo '?')"
   echo "  usbcore.autosuspend=${GLOBAL_AUTOSUSPEND}"
 
-  # (c) Safety gate. Option A (boot-time usbcore.autosuspend=-1) must be in
-  # effect before we touch any power/control file. If not, skip the rest and
-  # let the capture proceed with the kernel's default policy. The capture
-  # call itself is wrapped in `timeout` so an unsafe baseline cannot hang us
-  # indefinitely.
-  if [ "$GLOBAL_AUTOSUSPEND" != "-1" ]; then
-    echo "--- pre-flight (c) GATE FAILED: autosuspend=${GLOBAL_AUTOSUSPEND} (need -1) ---"
-    echo "  SKIPPING per-device power/control writes and snd-usb-audio unbind."
-    echo "  Apply Option A first (see avoidance doc sec 6b/6d.2): persist"
-    echo "  usbcore.autosuspend=-1 in the boot cmdline, reboot, then re-run."
-    sleep 1
-    if command -v udevadm >/dev/null 2>&1; then
-      udevadm settle --timeout=3 2>&1 || true
-    fi
+  # Read-only guard verification. We do NOT write to sysfs from here -
+  # that's the guard script's job. We only report what's already in place
+  # so summary.json can show whether the orchestrator forgot to run guard.
+  echo "--- pre-flight (c) read-only guard verification ---"
+  if [ "$GLOBAL_AUTOSUSPEND" = "-1" ]; then
+    echo "  guard_autosuspend_ok=1"
   else
-    echo "--- pre-flight (c) GATE PASSED: autosuspend=-1 in effect ---"
+    echo "  guard_autosuspend_ok=0"
+    echo "  guard_autosuspend_note=run_w2_01_camera_usb_guard.sh_first"
+  fi
 
-    # (d) Find the sysfs path of the C2. Cached descriptor reads only.
-    C2_SYSPATH=""
-    for d in /sys/bus/usb/devices/*/; do
-      [ -e "${d}idVendor" ] || continue
-      v=$(cat "${d}idVendor" 2>/dev/null)
-      p=$(cat "${d}idProduct" 2>/dev/null)
-      if [ "$v" = "$C2_VID" ] && [ "$p" = "$C2_PID" ]; then
-        C2_SYSPATH="$d"
-        break
-      fi
+  C2_SYSPATH=""
+  for d in /sys/bus/usb/devices/*/; do
+    [ -e "${d}idVendor" ] || continue
+    v=$(cat "${d}idVendor" 2>/dev/null)
+    p=$(cat "${d}idProduct" 2>/dev/null)
+    if [ "$v" = "$C2_VID" ] && [ "$p" = "$C2_PID" ]; then
+      C2_SYSPATH="$d"
+      break
+    fi
+  done
+  echo "c2_syspath=${C2_SYSPATH:-NOT_FOUND}"
+
+  if [ -n "$C2_SYSPATH" ]; then
+    C2_BUSDEV="$(basename "$C2_SYSPATH")"
+    HUB_BUSDEV="$(echo "$C2_BUSDEV" | sed -E 's/\.[0-9]+$//')"
+    HUB_SYSPATH="/sys/bus/usb/devices/${HUB_BUSDEV}/"
+
+    echo "--- pre-flight (e) snapshot C2 + hub power state (read-only) ---"
+    for path in "$C2_SYSPATH" "$HUB_SYSPATH"; do
+      for f in power/control power/runtime_status power/autosuspend_delay_ms power/runtime_active_time power/runtime_suspended_time; do
+        if [ -r "${path}${f}" ]; then
+          echo "  ${path}${f}=$(cat "${path}${f}" 2>/dev/null)"
+        fi
+      done
     done
-    echo "c2_syspath=${C2_SYSPATH:-NOT_FOUND}"
 
-    if [ -n "$C2_SYSPATH" ]; then
-      C2_BUSDEV="$(basename "$C2_SYSPATH")"
-      HUB_BUSDEV="$(echo "$C2_BUSDEV" | sed -E 's/\.[0-9]+$//')"
-      HUB_SYSPATH="/sys/bus/usb/devices/${HUB_BUSDEV}/"
-
-      echo "--- pre-flight (e) snapshot C2 + hub power state ---"
-      for path in "$C2_SYSPATH" "$HUB_SYSPATH"; do
-        for f in power/control power/runtime_status power/runtime_active_time power/runtime_suspended_time; do
-          if [ -r "${path}${f}" ]; then
-            echo "  ${path}${f}=$(cat "${path}${f}" 2>/dev/null)"
-          fi
-        done
-      done
-
-      echo "--- pre-flight (f) write power/control=on (skip if suspended) ---"
-      for path in "$C2_SYSPATH" "$HUB_SYSPATH"; do
-        rs="$(cat "${path}power/runtime_status" 2>/dev/null || echo '?')"
-        if [ "$rs" = "suspended" ]; then
-          echo "  SKIP ${path} (runtime_status=suspended; would trigger autoresume)"
-          continue
-        fi
-        if [ -e "${path}power/control" ]; then
-          echo fio | sudo -S -p '' sh -c "echo on > '${path}power/control'" 2>&1 || true
-          echo "  ${path}power/control=$(cat "${path}power/control" 2>/dev/null) (was rs=${rs})"
-        fi
-      done
-
-      echo "--- pre-flight (g) unbind snd-usb-audio from C2 audio interfaces ---"
-      SND_DRV="/sys/bus/usb/drivers/snd-usb-audio"
-      if [ -d "$SND_DRV" ]; then
-        UNBOUND=0
-        for ifpath in "$SND_DRV"/${C2_BUSDEV}:*; do
-          [ -e "$ifpath" ] || continue
-          ifname="$(basename "$ifpath")"
-          echo "  unbinding $ifname from snd-usb-audio"
-          echo fio | sudo -S -p '' sh -c "echo '$ifname' > '$SND_DRV/unbind'" 2>&1 || true
-          UNBOUND=$((UNBOUND + 1))
-        done
-        echo "  snd_usb_audio_interfaces_unbound=$UNBOUND"
-      else
-        echo "  snd-usb-audio driver not present (good - nothing to unbind)"
-      fi
-      echo "  remaining_drivers_bound_to_c2:"
-      for ifpath in "$C2_SYSPATH"*:*; do
+    # Read-only: report whether snd-usb-audio is still bound to any C2
+    # interface. We do NOT unbind here - the guard or the modprobe
+    # blacklist owns that.
+    echo "--- pre-flight (g) snd-usb-audio bind state (read-only) ---"
+    SND_DRV="/sys/bus/usb/drivers/snd-usb-audio"
+    SND_BOUND=0
+    if [ -d "$SND_DRV" ]; then
+      for ifpath in "$SND_DRV"/${C2_BUSDEV}:*; do
         [ -e "$ifpath" ] || continue
-        ifname="$(basename "$ifpath")"
-        drv=""
-        if [ -L "${ifpath}driver" ]; then
-          drv="$(basename "$(readlink "${ifpath}driver")")"
-        fi
-        echo "    $ifname -> ${drv:-<unbound>}"
+        SND_BOUND=$((SND_BOUND + 1))
+        echo "  bound=$(basename "$ifpath")"
       done
     fi
-
-    sleep 1
-    if command -v udevadm >/dev/null 2>&1; then
-      udevadm settle --timeout=3 2>&1 || true
+    echo "  snd_usb_audio_bound_to_c2=$SND_BOUND"
+    if [ "$SND_BOUND" -gt 0 ]; then
+      echo "  snd_usb_audio_note=run_guard_or_install_lifetrac-no-usb-audio.conf"
     fi
+    echo "  remaining_drivers_bound_to_c2:"
+    for ifpath in "$C2_SYSPATH"*:*; do
+      [ -e "$ifpath" ] || continue
+      ifname="$(basename "$ifpath")"
+      drv=""
+      if [ -L "${ifpath}driver" ]; then
+        drv="$(basename "$(readlink "${ifpath}driver")")"
+      fi
+      echo "    $ifname -> ${drv:-<unbound>}"
+    done
+  fi
+
+  sleep 1
+  if command -v udevadm >/dev/null 2>&1; then
+    udevadm settle --timeout=3 2>&1 || true
   fi
 fi
 
