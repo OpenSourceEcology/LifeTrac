@@ -1,0 +1,117 @@
+﻿__W2_01_GUARD_BEGIN__
+
+schema=w2_01_guard/1
+
+utc_start=2022-05-09T22:00:34Z
+
+id=uid=1000(fio) gid=1000(fio) groups=1000(fio),1003,1004,1007,1011,1015,1028,3001,3002,3003,3006
+
+uname=Linux portenta-x8-2e2c1209dabc240b 5.10.93-lmp-standard #1 SMP PREEMPT Thu Jan 20 20:01:30 UTC 2022 aarch64 aarch64 aarch64 GNU/Linux
+
+guard_hotplug_wait_s=0
+
+guard_authorized_gate=0
+
+guard_settle_ms=800
+
+--- (a) start dmesg tail -> /tmp/w2_01_guard_dmesg.log ---
+
+dmesg_pid=4008
+
+--- (b) /proc/cmdline + usbcore.autosuspend snapshot ---
+
+cmdline=console=tty1 console=ttymxc2,115200 earlycon=ec_imx6q,0x30880000,115200 root=/dev/mmcblk2p2 rootfstype=ext4 ostree=/ostree/boot.1/lmp/edd88b28fad148b3096157052e4434582f63b7bbe09489086203ddb56fddd279/0
+
+autosuspend_initial=2
+
+--- (c) write usbcore.autosuspend=-1 (effective for future enumerations) ---
+
+autosuspend_after_write=-1
+
+c2_present_at_start=1
+
+c2_syspath_initial=/sys/bus/usb/devices/1-1.2.3/
+
+--- (e) C2 power state snapshot ---
+
+  /sys/bus/usb/devices/1-1.2.3/power/control=on
+
+  /sys/bus/usb/devices/1-1.2.3/power/runtime_status=active
+
+  /sys/bus/usb/devices/1-1.2.3/power/autosuspend_delay_ms=-1
+
+  /sys/bus/usb/devices/1-1.2.3/power/runtime_active_time=1626325
+
+  /sys/bus/usb/devices/1-1.2.3/power/runtime_suspended_time=1291071
+
+--- (e) writing power/control=on + autosuspend_delay_ms=-1 (rs=active) ---
+
+  c2_power_control_after=on
+
+  c2_autosuspend_delay_ms_after=-1
+
+c2_power_writes=applied
+
+  hub_power_control_after=on
+
+--- (f) snd-usb-audio policy ---
+
+snd_usb_audio_present=0
+
+snd_usb_audio_note=driver_absent_likely_blacklisted
+
+--- (f) drivers bound to C2 interfaces after guard ---
+
+  1-1.2.3:1.0 -> <unbound>
+
+  1-1.2.3:1.1 -> <unbound>
+
+  1-1.2.3:1.2 -> <unbound>
+
+  1-1.2.3:1.3 -> <unbound>
+
+  1-1.2.3:1.4 -> <unbound>
+
+dmesg_log_path=/tmp/w2_01_guard_dmesg.log
+
+dmesg_log_size=36123
+
+autosuspend_final=-1
+
+verdict=PASS
+
+utc_end=2022-05-09T22:00:35Z
+
+__W2_01_GUARD_END__
+
+__W2_01_GATE_BEGIN__
+
+schema=w2_01_gate/1
+
+guard_verdict=PASS
+
+c2_present_at_start=1
+
+lifetrac_c2_target=/dev/video1
+
+lifetrac_c2_index0_target=/dev/video1
+
+lifetrac_c2_index0_ok=1
+
+snd_usb_audio_bound_count=0
+
+autosuspend_final=-1
+
+c2_power_control=on
+
+c2_power_autosuspend_delay_ms=-1
+
+pm_effective=1
+
+gate=PASS
+
+__W2_01_GATE_END__
+
+__RC__=0
+
+

@@ -39,6 +39,7 @@ CMD_PERSON_APPEARED = 0x60
 CMD_ROI_HINT = 0x61
 CMD_REQ_KEYFRAME = 0x62
 CMD_ENCODE_MODE = 0x63
+CMD_LINK_PROFILE = 0x64
 
 TOPIC_BY_ID = {
     0x01: "lifetrac/v25/telemetry/gps",
@@ -130,6 +131,14 @@ PHY_BY_NAME = {
     profile.name: profile
     for profile in (PHY_CONTROL_SF7, PHY_CONTROL_SF8, PHY_CONTROL_SF9, PHY_TELEMETRY, PHY_IMAGE)
 }
+
+# IP-W2-04: shared ordered tuple used as the wire-side index space for
+# CMD_LINK_PROFILE (opcode 0x64). The base-station emitter and the X8
+# decoder MUST agree on this order; the X8 mirrors it as
+# ``camera_service.LINK_PHY_NAMES``.
+LINK_PHY_NAMES: tuple[str, ...] = (
+    "image", "telemetry", "control_sf9", "control_sf8", "control_sf7",
+)
 
 
 def crc16_ccitt(data: bytes) -> int:
@@ -390,7 +399,7 @@ PRIO_P3 = 3   # image fragments (topics 0x25/0x28/0x29)
 
 _P0_OPCODES = frozenset({CMD_ESTOP, CMD_LINK_TUNE, CMD_PERSON_APPEARED})
 _P1_OPCODES = frozenset({CMD_CLEAR_ESTOP, CMD_ROI_HINT, CMD_REQ_KEYFRAME,
-                         CMD_CAMERA_SELECT, CMD_ENCODE_MODE})
+                         CMD_CAMERA_SELECT, CMD_ENCODE_MODE, CMD_LINK_PROFILE})
 
 
 def classify_priority(frame_type: int, opcode: int | None = None,

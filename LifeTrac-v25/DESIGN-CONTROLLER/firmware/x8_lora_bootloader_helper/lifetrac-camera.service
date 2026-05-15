@@ -1,0 +1,18 @@
+[Unit]
+Description=LifeTrac C2 camera service
+Wants=dev-lifetrac\x2dc2.device
+Requires=dev-lifetrac\x2dc2.device
+BindsTo=dev-lifetrac\x2dc2.device
+After=dev-lifetrac\x2dc2.device
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+Environment=LIFETRAC_CAMERA_COMPOSE=/opt/lifetrac/compose-apps/lifetrac-camera/docker-compose.yml
+ExecStart=/bin/sh -lc 'if [ -f "$LIFETRAC_CAMERA_COMPOSE" ] && command -v docker >/dev/null 2>&1; then exec docker compose -f "$LIFETRAC_CAMERA_COMPOSE" up --remove-orphans; fi; echo "lifetrac-camera: compose app not installed; holding C2 device sentinel"; while [ -e /dev/lifetrac-c2 ]; do sleep 5; done; exit 1'
+Restart=on-failure
+RestartSec=2s
+
+[Install]
+WantedBy=multi-user.target

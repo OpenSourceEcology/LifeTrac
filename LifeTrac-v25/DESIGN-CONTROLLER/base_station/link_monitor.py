@@ -12,7 +12,9 @@ from dataclasses import dataclass
 
 from lora_proto import (
     CMD_ENCODE_MODE,
+    CMD_LINK_PROFILE,
     EncodeMode,
+    LINK_PHY_NAMES,
     PHY_BY_NAME,
     PHY_IMAGE,
     PHY_TELEMETRY,
@@ -218,3 +220,135 @@ class LinkMonitor:
                                                   "candidate_mode": snap.candidate_mode.name})
             self._last_status_ms = now_ms
         return snap
+
+
+# ---------------------------------------------------------------------------
+# IP-W2-04: link-adaptive byte-budget emitter
+#
+# Watches the rolling SNR (and optionally RSSI) the bridge harvests off the
+# LoRa modem and translates a degraded link into a ``CMD_LINK_PROFILE``
+# (opcode ``0x64``) command that the X8 ``camera_service.LinkBudget`` reads
+# to shrink/grow its airtime byte cap. Three-window hysteresis matches the
+# encode-mode controller above so a single bad SNR sample never flaps the
+# encoder.
+#
+# Independently of ``EncodeModeController`` because it consumes a different
+# signal (own-station receive SNR vs. own-airtime utilization) — both can
+# fire in the same window without conflicting because the X8 force-keys on
+# both opcodes.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class LinkProfileTarget:
+    """Wire-side ``(n_fragments, phy_index)`` pair the X8 will apply.
+
+    ``phy_index`` is the position inside :data:`lora_proto.LINK_PHY_NAMES`.
+    """
+    n_fragments: int
+    phy_index: int
+
+    @property
+    def phy_name(self) -> str:
+        return LINK_PHY_NAMES[self.phy_index]
+
+
+# Default SNR ladder. Highest-SNR rung first; the first rung whose threshold
+# is satisfied wins. Tuned against the Semtech demod floors:
+#   SF7  (image PHY)     ~ -7.5 dB
+#   SF9  (telemetry PHY) ~ -12.5 dB
+# We retreat from image-PHY to telemetry-PHY *before* the SF7 floor so the
+# encoder has margin when the link finally walks off the cliff.
+DEFAULT_SNR_LADDER: tuple[tuple[float, LinkProfileTarget], ...] = (
+    (  -3.0, LinkProfileTarget(n_fragments=8, phy_index=0)),  # image, full
+    (  -7.0, LinkProfileTarget(n_fragments=4, phy_index=0)),  # image, half
+    ( -10.0, LinkProfileTarget(n_fragments=2, phy_index=0)),  # image, quarter
+    ( -13.0, LinkProfileTarget(n_fragments=4, phy_index=1)),  # telemetry, retreat
+    (-999.0, LinkProfileTarget(n_fragments=2, phy_index=1)),  # telemetry, floor
+)
+
+
+class LinkProfileEmitter:
+    """Map rolling SNR to a ``CMD_LINK_PROFILE`` command with hysteresis.
+
+    ``observe(now_ms, snr_db)`` is called for every received frame. The
+    emitter keeps a rolling window of SNR samples, picks a target rung
+    from :data:`DEFAULT_SNR_LADDER`, and only commits a transition after
+    ``required_windows`` consecutive ticks agree. On transition it emits
+    a ``pack_command(seq, CMD_LINK_PROFILE, ...)`` frame via
+    ``publish_command``.
+    """
+
+    def __init__(
+        self,
+        publish_command=None,
+        ladder: tuple[tuple[float, LinkProfileTarget], ...] = DEFAULT_SNR_LADDER,
+        required_windows: int = 3,
+        seq_start: int = 0,
+        audit=None,
+    ) -> None:
+        # Validate ladder is sorted high→low so the first-match scan works.
+        for prev, nxt in zip(ladder, ladder[1:]):
+            if prev[0] <= nxt[0]:
+                raise ValueError(
+                    f"ladder must be strictly descending by SNR; got {prev[0]} -> {nxt[0]}")
+        self._ladder = ladder
+        self._publish_command = publish_command
+        self._required_windows = max(1, int(required_windows))
+        self._seq = seq_start & 0xFFFF
+        self._audit = audit
+        self.current: LinkProfileTarget | None = None
+        self._candidate: LinkProfileTarget | None = None
+        self._candidate_count = 0
+
+    @staticmethod
+    def _target_for(snr_db: float,
+                    ladder: tuple[tuple[float, LinkProfileTarget], ...]) -> LinkProfileTarget:
+        for threshold, target in ladder:
+            if snr_db >= threshold:
+                return target
+        # Ladder always ends with a floor sentinel so this is unreachable.
+        return ladder[-1][1]                                # pragma: no cover
+
+    def observe(self, now_ms: int, snr_db: float) -> bytes | None:
+        """Return the wire-format command frame iff a transition was committed."""
+        target = self._target_for(snr_db, self._ladder)
+        if target == self.current:
+            self._candidate = target
+            self._candidate_count = 0
+            return None
+        if target != self._candidate:
+            self._candidate = target
+            self._candidate_count = 1
+        else:
+            self._candidate_count += 1
+        if self._candidate_count < self._required_windows:
+            return None
+        prev = self.current
+        self.current = target
+        self._candidate_count = 0
+        self._seq = (self._seq + 1) & 0xFFFF
+        frame = pack_command(self._seq, CMD_LINK_PROFILE,
+                             bytes([target.n_fragments & 0xFF,
+                                    target.phy_index & 0xFF]))
+        if self._publish_command is not None:
+            self._publish_command(frame)
+        if self._audit is not None:
+            try:
+                self._audit.log_link_profile_change(
+                    prev=None if prev is None else {
+                        "n_fragments": prev.n_fragments,
+                        "phy": prev.phy_name,
+                    },
+                    new={"n_fragments": target.n_fragments, "phy": target.phy_name},
+                    snr_db=snr_db,
+                )
+            except (AttributeError, Exception):              # pragma: no cover
+                pass
+        return frame
+
+    def reset(self) -> None:
+        """Drop committed state — used by tests and by the bridge on restart."""
+        self.current = None
+        self._candidate = None
+        self._candidate_count = 0

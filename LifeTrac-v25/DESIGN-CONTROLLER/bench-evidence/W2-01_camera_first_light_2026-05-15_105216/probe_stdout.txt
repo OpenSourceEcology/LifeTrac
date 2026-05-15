@@ -1,0 +1,78 @@
+__W2_01_PROBE_BEGIN__
+schema=w2_01_probe/1
+utc_start=2022-05-09T21:12:53Z
+hostname=portenta-x8-2e2c1209dabc240b
+uname=Linux portenta-x8-2e2c1209dabc240b 5.10.93-lmp-standard #1 SMP PREEMPT Thu Jan 20 20:01:30 UTC 2022 aarch64 aarch64 aarch64 GNU/Linux
+id=uid=1000(fio) gid=1000(fio) groups=1000(fio),1003,1004,1007,1011,1015,1028,3001,3002,3003,3006
+capture_py=/tmp/w2_01_camera_capture.py
+out_path=/tmp/w2_01_snap.jpg
+--- lsusb ---
+Bus 001 Device 005: ID 2109:2817 VIA Labs, Inc. USB2.0 Hub             
+Bus 001 Device 004: ID 16d0:0ed4 MCS C2
+Bus 001 Device 003: ID 2109:2817 VIA Labs, Inc. USB2.0 Hub             
+Bus 001 Device 002: ID 0424:2514 Microchip Technology, Inc. (formerly SMSC) USB 2.0 Hub
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+--- /dev/video* listing ---
+crw-rw----+ 1 root video 81, 0 Apr 28 17:42 /dev/video0
+crw-rw----+ 1 root video 81, 1 Apr 28 17:42 /dev/video1
+crw-rw----+ 1 root video 81, 2 Apr 28 17:42 /dev/video2
+crw-rw----+ 1 root video 81, 3 Apr 28 17:42 /dev/video3
+crw-rw----+ 1 root video 81, 4 Apr 28 17:42 /dev/video4
+--- /dev/media* listing ---
+crw-rw----+ 1 root video 251, 0 Apr 28 17:42 /dev/media0
+--- /dev/v4l/by-id (if present) ---
+total 0
+drwxr-xr-x 2 root root 120 Apr 28 17:42 .
+drwxr-xr-x 4 root root  80 Apr 28 17:42 ..
+lrwxrwxrwx 1 root root  12 Apr 28 17:42 usb-Kurokesu_C2_KTM-QGFST-video-index0 -> ../../video1
+lrwxrwxrwx 1 root root  12 Apr 28 17:42 usb-Kurokesu_C2_KTM-QGFST-video-index1 -> ../../video2
+lrwxrwxrwx 1 root root  12 Apr 28 17:42 usb-Kurokesu_C2_KTM-QGFST-video-index2 -> ../../video3
+lrwxrwxrwx 1 root root  12 Apr 28 17:42 usb-Kurokesu_C2_KTM-QGFST-video-index3 -> ../../video4
+--- modules with uvc/v4l in name ---
+uvcvideo               98304  0
+videobuf2_vmalloc      16384  1 uvcvideo
+videobuf2_dma_contig    20480  1 mx6s_capture
+videobuf2_memops       16384  2 videobuf2_vmalloc,videobuf2_dma_contig
+videobuf2_v4l2         24576  2 mx6s_capture,uvcvideo
+videobuf2_common       53248  3 videobuf2_v4l2,mx6s_capture,uvcvideo
+videodev              258048  5 videobuf2_v4l2,mx6s_capture,uvcvideo,mxc_mipi_csi,videobuf2_common
+--- last 30 kmsgs mentioning uvc/usb/video ---
+[    3.168369] usb 1-1: new high-speed USB device number 2 using ci_hdrc
+[    3.329969] usb 1-1: New USB device found, idVendor=0424, idProduct=2514, bcdDevice= 0.00
+[    3.338192] usb 1-1: New USB device strings: Mfr=0, Product=0, SerialNumber=0
+[    3.640777] usb 1-1.2: new high-speed USB device number 3 using ci_hdrc
+[    3.759839] usb 1-1.2: New USB device found, idVendor=2109, idProduct=2817, bcdDevice= 7.64
+[    3.768229] usb 1-1.2: New USB device strings: Mfr=1, Product=2, SerialNumber=0
+[    3.781238] usb 1-1.2: Product: USB2.0 Hub             
+[    3.792389] usb 1-1.2: Manufacturer: VIA Labs, Inc.         
+[    4.876430] usb 1-1.2.3: new high-speed USB device number 4 using ci_hdrc
+[    5.092595] usb 1-1.2.3: New USB device found, idVendor=16d0, idProduct=0ed4, bcdDevice= 1.00
+[    5.101238] usb 1-1.2.3: New USB device strings: Mfr=2, Product=1, SerialNumber=3
+[    5.108822] usb 1-1.2.3: Product: C2
+[    5.112472] usb 1-1.2.3: Manufacturer: Kurokesu
+[    5.117076] usb 1-1.2.3: SerialNumber: KTM-QGFST
+[    5.256390] usb 1-1.2.4: new high-speed USB device number 5 using ci_hdrc
+[    5.434088] usb 1-1.2.4: New USB device found, idVendor=2109, idProduct=2817, bcdDevice= 7.63
+[    5.442672] usb 1-1.2.4: New USB device strings: Mfr=1, Product=2, SerialNumber=0
+[    5.450201] usb 1-1.2.4: Product: USB2.0 Hub             
+[    5.455624] usb 1-1.2.4: Manufacturer: VIA Labs, Inc.         
+[    7.605871] videodev: Linux video capture interface: v2.00
+[    7.795835] usb 1-1.2.3: 4:1: cannot get freq at ep 0x84
+[    7.891230] uvcvideo: Found UVC 1.00 device C2 (16d0:0ed4)
+[    7.999880] usbcore: registered new interface driver uvcvideo
+[    8.009747] USB Video Class driver (1.1.1)
+[   33.820722] camera_dvdd: disabling
+[   33.824142] camera_avdd: disabling
+[   33.827573] camera_dovdd: disabling
+node_count=5
+enumerate_only=1
+needs_sudo=1
+use_sudo_flag=0
+per_attempt_timeout_s=8
+ABORTING: fio user lacks /dev/video* access. Run on the X8 ONCE:
+  echo fio | sudo -S usermod -aG video fio && exit
+then reconnect and re-run. Or pass --use-sudo to this orchestrator.
+winning_node=
+overall_verdict=FAIL_NEEDS_VIDEO_GROUP
+utc_end=2022-05-09T21:12:53Z
+__W2_01_PROBE_END__

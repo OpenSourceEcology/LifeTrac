@@ -26,3 +26,12 @@ ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", \
     ATTR{idVendor}=="16d0", ATTR{idProduct}=="0ed4", \
     TEST=="power/control", ATTR{power/control}="on", \
     TEST=="power/autosuspend_delay_ms", ATTR{power/autosuspend_delay_ms}="-1"
+
+# W2-01 C2 V4L capture node symlinking and systemd unit trigger.
+# The C2 exposes four video nodes. Match index 0 so /dev/lifetrac-c2
+# does not drift to metadata/secondary nodes as udev processes the device.
+# Added for Production Deploy (Section 9.2)
+ACTION=="add", SUBSYSTEM=="video4linux", ATTRS{idVendor}=="16d0", ATTRS{idProduct}=="0ed4", ATTR{index}=="0", ENV{ID_V4L_CAPABILITIES}=="*:capture:*", SYMLINK+="lifetrac-c2", TAG+="systemd"
+
+# Re-start the camera service when the C2 capture node re-enumerates.
+ACTION=="add", SUBSYSTEM=="video4linux", ATTRS{idVendor}=="16d0", ATTRS{idProduct}=="0ed4", ATTR{index}=="0", ENV{ID_V4L_CAPABILITIES}=="*:capture:*", ENV{SYSTEMD_WANTS}+="lifetrac-camera.service"

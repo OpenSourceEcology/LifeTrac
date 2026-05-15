@@ -25,7 +25,8 @@ from __future__ import annotations
 import logging
 import os
 import struct
-from typing import BinaryIO
+from dataclasses import dataclass
+from typing import BinaryIO, Iterator
 
 LOG = logging.getLogger("ipc_to_h747")
 
@@ -91,3 +92,97 @@ class IpcWriter:
                                   is_wireframe=is_wireframe)
         assert self._fh is not None
         return self._fh.write(frame)
+
+
+# ---- decoder side (used by tests + the offline replay tools) ---------
+#
+# The M7 firmware does this decode in C++ on the UART RX path. The Python
+# implementation here is byte-for-byte equivalent so the host-side tests
+# can verify that what camera_service emits will actually round-trip
+# through the framing the M7 expects. Tolerant of leading garbage and of
+# being handed a partial buffer mid-frame: the decoder resyncs on the
+# next 0xA5 marker, drops any frame whose CRC doesn't match, and reports
+# how many input bytes it consumed so a streaming caller can advance its
+# read cursor.
+
+
+class IpcFrameError(ValueError):
+    """Raised by :func:`decode_one_ipc_frame` when the buffer holds a
+    malformed-but-fully-bounded frame (bad CRC or impossible length).
+    Truncation returns ``(None, 0)`` instead so the caller can wait for
+    more bytes."""
+
+
+@dataclass
+class DecodedIpcFrame:
+    flags: int
+    payload: bytes
+
+    @property
+    def is_keyframe(self) -> bool:
+        return bool(self.flags & FLAG_KEYFRAME)
+
+    @property
+    def is_motion(self) -> bool:
+        return bool(self.flags & FLAG_MOTION)
+
+    @property
+    def is_wireframe(self) -> bool:
+        return bool(self.flags & FLAG_WIREFRAME)
+
+
+def decode_one_ipc_frame(buf: bytes) -> tuple[DecodedIpcFrame | None, int]:
+    """Try to decode one frame from the head of ``buf``.
+
+    Returns ``(frame, consumed)``:
+      * ``frame=None, consumed=0`` — not enough bytes yet (caller should
+        accumulate more and retry).
+      * ``frame=DecodedIpcFrame, consumed=N`` — successfully parsed, drop
+        the first ``N`` bytes from the buffer.
+      * Raises :class:`IpcFrameError` when a fully-bounded frame fails
+        CRC. The caller should advance one byte past the bad marker and
+        retry; :func:`iter_ipc_frames` does that for you.
+    """
+    # Skip junk until we find a marker.
+    i = 0
+    while i < len(buf) and buf[i] != FRAME_MARKER:
+        i += 1
+    if i >= len(buf):
+        # All junk; consume nothing — wait for more.
+        return None, 0
+    # Need at least marker + flags + length(2) + crc = 5 bytes before payload.
+    if len(buf) - i < 5:
+        return None, 0
+    flags = buf[i + 1]
+    length = struct.unpack_from("<H", buf, i + 2)[0]
+    end = i + 4 + length + 1  # +1 for trailing CRC
+    if len(buf) < end:
+        return None, 0
+    payload = bytes(buf[i + 4:i + 4 + length])
+    body = bytes(buf[i + 1:i + 4 + length])  # flags|length|payload
+    expected = buf[i + 4 + length]
+    actual = crc8_smbus(body)
+    if expected != actual:
+        raise IpcFrameError(
+            f"crc mismatch at offset {i}: expected 0x{expected:02x}, got 0x{actual:02x}")
+    return DecodedIpcFrame(flags=flags, payload=payload), end
+
+
+def iter_ipc_frames(buf: bytes) -> Iterator[DecodedIpcFrame]:
+    """Yield every well-formed frame in ``buf``. Bad-CRC frames are
+    silently skipped (logged at debug level) and the scan resumes one
+    byte past the failed marker — same behaviour the M7 has on a
+    physical-layer glitch."""
+    cursor = 0
+    while cursor < len(buf):
+        try:
+            frame, consumed = decode_one_ipc_frame(buf[cursor:])
+        except IpcFrameError as exc:
+            LOG.debug("ipc_to_h747: dropping bad frame at %d: %s", cursor, exc)
+            # Skip this marker byte and keep looking.
+            cursor += 1
+            continue
+        if frame is None:
+            return
+        yield frame
+        cursor += consumed

@@ -1,0 +1,26 @@
+﻿/bin/bash: line 1: systemd-analyze: command not found
+
+__ACTIVE__
+
+active
+
+__STATUS__
+
+* lifetrac-camera.service - LifeTrac C2 camera service
+
+     Loaded: loaded (/etc/systemd/system/lifetrac-camera.service; enabled; vendor preset: disabled)
+
+     Active: active (running) since Mon 2022-05-09 21:38:49 UTC; 2min 31s ago
+
+   Main PID: 2902 (sh)
+
+      Tasks: 2 (limit: 1564)
+
+     Memory: 508.0K
+
+     CGroup: /system.slice/lifetrac-camera.service
+
+             |- 2902 /bin/sh -lc "if [ -f \"\$LIFETRAC_CAMERA_COMPOSE\" ] && command -v docker >/dev/null 2>&1; then exec docker compose -f \"\$LIFETRAC_CAMERA_COMPOSE\" up --remove-orphans; fi; echo \"lifetrac-camera: compose app not installed; holding C2 device sentinel\"; while [ -e /dev/lifetrac-c2 ]; do sleep 5; done; exit 1"
+
+             `- 3550 sleep 5
+

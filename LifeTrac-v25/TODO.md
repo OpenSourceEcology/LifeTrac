@@ -36,6 +36,47 @@ for the protocol).
 
 ---
 
+## Control source priority (project-wide policy, 2026-05-15)
+
+Three control sources can drive the tractor. Whenever more than one is
+active, the **highest-priority active source wins** and the others are
+locked out at the M7 ControlFrame arbiter (not just at the UI). This
+ordering is the single source of truth for every arbitration decision
+in firmware, the bridge, the web UI, and the autonomy stack:
+
+1. **🥇 Handheld MKR WAN 1310 — direct LoRa control.** Primary control
+   path. Owns the 50 Hz P0 ControlFrame budget, the latching mushroom
+   E-stop, and the physical TAKE-CONTROL button which pre-empts any
+   lower-priority source within one frame. Handheld must work fully
+   stand-alone with the base station and X8 powered off.
+2. **🥈 Browser operator console — base station.** Secondary. Active
+   only when (a) no handheld frame has arrived in the last 500 ms
+   *and* (b) the operator has held TAKE CONTROL on the browser side
+   to claim the source slot. Releases instantly when a handheld frame
+   reappears (handheld pre-empts; no negotiation). Wired today via
+   [base_station/web_ui.py](DESIGN-CONTROLLER/base_station/web_ui.py)
+   + [base_station/web/app.js](DESIGN-CONTROLLER/base_station/web/app.js)
+   (USB Gamepad API + on-screen joysticks → 20 Hz WebSocket → MQTT →
+   `lora_bridge.py` → tractor).
+3. **🥉 Autonomy — on-tractor X8 / base autonomy stack.** Lowest
+   priority. Pre-empted by both handheld and browser at any moment
+   without warning, must come to a clean controlled stop within the
+   500 ms M4 failsafe window when pre-empted. Future scope; not
+   implemented yet beyond the `AUTONOMY` source-id reservation in the
+   source-active telemetry.
+
+Implementation/test obligations rolling forward:
+- The §F single-source bench gate (below) tests all three pairwise
+  pre-emptions, not just handheld-vs-base.
+- The browser must surface the active source as a status pill
+  ("HANDHELD · YOU · AUTONOMY · NONE") so the operator never wonders
+  why their stick input was dropped.
+- The arbitration logic lives at the M7 ControlFrame mux on the
+  tractor; the bridge and web UI are advisory mirrors only — they
+  must not be the only safety check.
+
+---
+
 ## Pre-field-deployment checklist (open items as of 2026-05-04)
 
 > **Purpose.** A single consolidated view of what still has to happen
@@ -247,12 +288,20 @@ remains open.
 🟥 All blocked on B + C. Each item below is a discrete pass/fail.
 
 - [ ] 🟥 Bench: all three nodes powered, exchange frames at 1 m.
-- [ ] 🟥 Single-source: handheld-only → tractor follows; base-only
-  → tractor follows; both active → handheld wins (priority).
+- [ ] 🟥 Single-source per the project priority policy
+  (handheld > browser > autonomy — see top of file): handheld-only →
+  tractor follows; browser-only → tractor follows; autonomy-only →
+  tractor follows; **handheld+browser → handheld wins**;
+  **handheld+autonomy → handheld wins**;
+  **browser+autonomy → browser wins**;
+  **all three active → handheld wins**.
 - [ ] 🟥 Handover: handheld release → 30 s latch + 500 ms timeout
-  → base takes over.
+  → browser (if armed) takes over, else autonomy (if enabled).
 - [ ] 🟥 TAKE CONTROL: physical button on handheld pre-empts an
-  active base session immediately.
+  active browser **or autonomy** session immediately (≤1 frame).
+- [ ] 🟥 Browser pre-empts autonomy: clicking/holding TAKE CONTROL
+  in the operator console claims the source slot from the autonomy
+  stack within 500 ms; autonomy decelerates to neutral cleanly.
 - [ ] 🟥 Failsafe: power-off the active source mid-frame → tractor
   reaches neutral within 500 ms (M4 watchdog gate).
 - [ ] 🟥 Replay attack: capture frame, retransmit later → rejected.
@@ -327,9 +376,430 @@ outside DESIGN-CONTROLLER but block field deployment equally.
   +
   [AI NOTES/2026-01-25_Lift_Cylinder_Parametric_Formula.md](AI%20NOTES/2026-01-25_Lift_Cylinder_Parametric_Formula.md).
 
+### K. Image transmit/receive code path (active since 2026-05-15)
+
+🟥 Bench-validated on **2026-05-15**: the Kurokesu C2 USB camera now
+captures clean MJPEG `1920×1080` frames on the tractor X8
+(`/dev/video1`) using a static `aarch64` FFmpeg helper pushed over
+ADB, with the W2-01 USB host-controller mitigations in place. With
+pixel acquisition proven, the next active firmware/software workstream
+is the **W2-02 capture → encode → transmit → reassemble → decode →
+render** code path. Promoted to a top-level pre-field-deployment
+section per [DESIGN-CONTROLLER/MASTER_PLAN.md §8.20](DESIGN-CONTROLLER/MASTER_PLAN.md#820-image-transmitreceive-code-path--active-firmware-priority-2026-05-15).
+
+The full task list is **not duplicated here** — it lives in
+[DESIGN-CONTROLLER/TODO.md Phases 5A / 5B / 5C / 5D](DESIGN-CONTROLLER/TODO.md#phase-5--image-pipeline)
+and the [tractor image-pipeline checklist](DESIGN-CONTROLLER/TODO.md#tractor-image-pipeline-per-tractor_nodemd--image-pipeline--no-coral-on-tractor).
+This section only elevates and groups what runs **on the hardware**
+(tractor X8 + H747 M7) versus what runs **at the base station** so
+the next round of code lands against a clear contract.
+
+**On the tractor (`firmware/tractor_x8/image_pipeline/` + `tractor_h7/`):**
+
+- [ ] 🟥 `capture.py` — V4L2 → 384×256 YCbCr buffer per camera,
+  fed by the bench-validated `/dev/video1` MJPEG path.
+- [ ] 🟥 `register.py` — phase-correlation pre-diff registration
+  (NEON, ~5 % CPU). Non-negotiable per [IMAGE_PIPELINE.md week 2](DESIGN-CONTROLLER/IMAGE_PIPELINE.md).
+- [ ] 🟥 `tile_diff.py` — pHash-based 32×32 change detector
+  (≤30 ms for 96 tiles).
+- [ ] 🟥 `roi.py` — read valve activity from H747 over IPC,
+  classify mode, honour `CMD_ROI_HINT` (opcode `0x61`).
+- [ ] 🟥 `detect_nanodet.py` — NanoDet-Plus 320×320 INT8, six
+  classes (≤50 ms p99 on the X8 A53s).
+- [ ] 🟥 `encode_tile_delta.py` — per-tile WebP at q15/q40/q60 by
+  ROI/detection; assemble `TileDeltaFrame` body. Includes
+  `--y-only` luma-only mode for the §8 recolourise scheme.
+- [ ] 🟥 `encode_motion.py` / `encode_wireframe.py` — degraded-mode
+  encoders for topics `0x28` / `0x29`.
+- [ ] 🟥 `fragment.py` — split into ≤25 ms airtime fragments.
+- [ ] 🟥 `ipc_to_h747.py` — hand fragments to the M7 firmware ring
+  buffer at P3.
+- [ ] 🟥 `tractor_h7` (M7) — `TileDeltaFrame` TX scheduler that
+  never preempts a P0 ControlFrame (the V1 starvation gate in
+  Phase 5D is the proof obligation).
+- [ ] 🟥 Tractor `CMD_PERSON_APPEARED` (opcode `0x60`) — P0 alert
+  + bbox centroid on first new high-confidence detection.
+- [ ] 🟥 Multi-camera attention multiplexer (front 70 / bucket 25 /
+  rear 5; reverse-stick + person-detection promotions).
+- [ ] 🟥 §8.10 black-box logger hook — append captured canvas +
+  detections + active-view-mode for every frame.
+
+**On the base station (`base_station/image_pipeline/` + `web_ui` + `lora_bridge`):**
+
+- [ ] 🟥 `lora_bridge.py` — collect `TileDeltaFrame` (topic `0x25`)
+  fragments off the LoRa link and hand them to `reassemble.py`.
+- [ ] 🟥 `reassemble.py` — fragment → `TileDeltaFrame`; mark stale
+  tiles on timeout (yellow tint + age-in-seconds in UI).
+- [ ] 🟥 `canvas.py` — persistent tile canvas with badge enum;
+  emit `CMD_REQ_KEYFRAME` (opcode `0x62`) on `base_seq` mismatch.
+- [ ] 🟥 `bg_cache.py` — rolling per-tile median for `Cached` badge
+  fill (only hole-filler available without an AI inpainter).
+- [ ] 🟥 `recolourise.py` — base-side recoloriser for the Y-only
+  `Recolourised` badge path.
+- [ ] 🟥 `motion_replay.py` / `wireframe_render.py` — apply `0x28` /
+  `0x29` payloads to canvas (`Predicted` / `Wireframe` badges).
+- [ ] 🟥 `superres_cpu.py` (and `superres_coral.py` if §8.19 spike
+  passes) — `Enhanced` badge path.
+- [ ] 🟥 `detect_yolo.py` — independent base-side safety detector;
+  two-detector disagreement banner in UI; logs to §8.10 logger.
+- [ ] 🟥 `accel_select.py` — auto-detect Coral, expose
+  `HAS_CORAL`; surface "AI accelerator: online / offline /
+  degraded" pill to the operator UI.
+- [ ] 🟥 `link_monitor.py` — rolling 10 s `bytes/refresh`; emit
+  `CMD_ENCODE_MODE` (opcode `0x63`) per the §3.4 auto-fallback
+  ladder with 3-window hysteresis.
+- [ ] 🟥 `state_publisher.py` — WebSocket fan-out: canvas tiles +
+  per-tile age + badge enum + detection vectors + safety verdicts
+  + accelerator status. **All authoritative state lives here, not
+  in the browser.**
+- [ ] 🟥 `fallback_render.py` — server-side 1 fps render of the
+  canvas for the HDMI console + headless QA.
+- [ ] 🟥 Browser-tier overlays in `base_station/web/static/img/`
+  (`canvas_renderer.js`, `fade_shader.js`, `staleness_overlay.js`,
+  `badge_renderer.js`, `detection_overlay.js`, `accel_status.js`,
+  `raw_mode_toggle.js`) — see [Phase 5A.B](DESIGN-CONTROLLER/TODO.md#phase-5ab--browser-tier-offload-mandatory-in-phase-1-not-deferred--per-image_pipelinemd-6).
+
+**Validation gates (must all pass before the live hydraulic test):**
+
+- [ ] 🟥 V1 — P0 ControlFrame starvation gate (zero >25 ms TX-start
+  delays attributable to image fragments over 30 min).
+- [ ] 🟥 V2 — capture → base-UI repaint ≤500 ms p99 CPU-only
+  (≤300 ms p99 with Coral).
+- [ ] 🟥 V3 — `CMD_PERSON_APPEARED` end-to-end ≤250 ms p99.
+- [ ] 🟥 V4 — `CMD_REQ_KEYFRAME` recovery within 1 refresh.
+- [ ] 🟨 V5 — Coral hot-yank → "AI accelerator: offline" within
+  10 s, pipeline degrades cleanly.
+- [ ] 🟥 V6 — auto-fallback ladder (`full → y_only → motion_only →
+  wireframe`) downshifts cleanly under attenuation.
+- [ ] 🟨 V7 — browser test matrix (Chrome/Android, Safari/iOS,
+  Firefox/Linux, Chrome/Windows).
+- [ ] 🟥 V8 — two-detector cross-check disagreements surface in UI
+  within one refresh; logged to §8.10.
+- [ ] 🟥 V9 — Phase 5C operator-UX safety rules visible and
+  functional (badges, staleness clock, raw-mode toggle, audit log).
+- [ ] 🟥 V10 — trust-boundary fail-closed: a tile with a stripped
+  badge enum **must** be refused by the browser and logged.
+
+**Cross-references:**
+[MASTER_PLAN.md §8.20](DESIGN-CONTROLLER/MASTER_PLAN.md#820-image-transmitreceive-code-path--active-firmware-priority-2026-05-15)
+· [TRACTOR_NODE.md § Image pipeline](DESIGN-CONTROLLER/TRACTOR_NODE.md#image-pipeline-portenta-x8-linux-side)
+· [BASE_STATION.md § Image pipeline](DESIGN-CONTROLLER/BASE_STATION.md#image-pipeline-portenta-x8-linux-side)
+· [LORA_PROTOCOL.md § TileDeltaFrame](DESIGN-CONTROLLER/LORA_PROTOCOL.md#tiledeltaframe-image-pipeline-i--p-frames)
+· [W2-01 mitigations note](AI%20NOTES/2026-05-14_USB_Wedge_Software_Mitigations.md).
+
 ---
 
 ## Recently completed (running log — newest first)
+
+**2026-05-18 — IP-W2-09b base_station test runner with process isolation
+([`run_tests.ps1`](DESIGN-CONTROLLER/base_station/run_tests.ps1)).**
+Closes the IP-W2-09 cluster-collision footnote without doing the full
+W2-10 package rename. Each `tests/test_*.py` now runs in its own
+`py -3 -m unittest tests.<mod>` subprocess so `sys.modules` is fresh
+per file — the X8-side and base-side `image_pipeline/` packages can
+no longer collide on package name. Also prepends `tests/` to
+`PYTHONPATH` so the *_sil files that do sibling imports (e.g.
+`from test_axis_ramp_sil import ...`) resolve the same way they do
+under `unittest discover`. Sets `LIFETRAC_ALLOW_UNCONFIGURED_KEY=1`
+once for the whole run instead of every CLI invocation.
+
+Result: full base_station suite 69/69 green from a single command
+(previously 62/69 due to the documented collisions and 9/9 green for
+the previously-colliding image cluster). Usage:
+
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\run_tests.ps1
+    powershell ... -File .\run_tests.ps1 -Filter "x8_|e2e_image"
+    powershell ... -File .\run_tests.ps1 -StopOnFail
+
+Filter is a regex against the file name. -StopOnFail short-circuits
+the loop. -VerboseTests forwards `-v` to each unittest call.
+
+W2-10 (renaming `firmware/tractor_x8/image_pipeline/` to a unique
+package name so a single Python process can also see both halves) is
+no longer on the critical path; remains as a tidy-up.
+
+**2026-05-18 — IP-W2-09 end-to-end image-pipeline contract + V2 latency gate.**
+Closes the last open Phase-5 base-station gap: an automated test that
+pins the producer (`camera_service.py` on the tractor X8) against the
+renderer ([`base_station/web/img/canvas_renderer.js`](DESIGN-CONTROLLER/base_station/web/img/canvas_renderer.js))
+without bringing up MQTT, the serial bridge, or a real radio. New file
+[`base_station/tests/test_e2e_image_pipeline.py`](DESIGN-CONTROLLER/base_station/tests/test_e2e_image_pipeline.py)
+(7 tests, 3 classes, all green in 0.23 s) drives the full pipe:
+
+  TileDeltaFrame (real PIL-encoded WebP tiles)
+    → encode_tile_delta_frame   (frame_format.py, producer side)
+    → pack_telemetry_fragments  (lora_proto.py R-6 chunker)
+    → TelemetryReassembler      (lora_bridge.py join layer)
+    → FragmentReassembler       (image_pipeline/reassemble.py)
+    → Canvas.apply              (image_pipeline/canvas.py)
+    → StatePublisher.snapshot   (image_pipeline/state_publisher.py)
+
+`BrowserSnapshotContractTests` (5 tests) pin the JSON shape against
+every key `canvas_renderer.js` and the overlay JS modules read —
+`grid.{w,h,tile_px}`, `tiles[].{i,tx,ty,age_ms,badge,blob_b64}`,
+`accel_status`, `encode_mode`, `detections`, `safety_verdict`,
+`needs_keyframe`, `last_keyframe_reason`. Also exercises the
+keyframe-then-delta persistence (delta tiles overwrite their slots,
+everything else keeps its last blob) and the orphan-delta path
+(`needs_keyframe=True` + non-empty reason surfaces all the way to
+the browser).
+
+`V2LatencyGateTests` measures 60 trials of (bridge-join + image-join +
+canvas-apply + snapshot) and asserts p99 ≤ 80 ms — leaves >420 ms
+headroom under the IMAGE_PIPELINE.md V2 ≤500 ms p99 capture-to-repaint
+budget for the camera + LoRa airtime that this test deliberately
+excludes (gated separately on the bench). Measured p99 on this
+laptop: well under the budget.
+
+`BridgeJoinSanityTests` (1 test) catches drift between the lora_proto
+telemetry chunker and image_pipeline.reassemble — both use 0xFE-magic
+4-byte headers but are *separate* implementations operating on
+different wire formats; a payload that survives one must remain
+bit-identical after the round trip.
+
+Cluster sweep (this slice + W2-07 + W2-08 + back-channel + telemetry
+fragmentation + replay + tile cache): 47/47 standalone, 7/7 for the
+new file in 0.23 s. The previously-documented `image_pipeline`
+package-name collision (X8-side `firmware/tractor_x8/image_pipeline`
+ships `tile_cache.py`, base-side `base_station/image_pipeline` does
+not) still surfaces 2 import errors when X8 + base tests run in the
+same Python process; standalone counts confirm no regression. Cleanest
+fix is the spec_from_file_location migration that replay_ipc_capture
+already uses; deferred to W2-10.
+
+Producer wiring (camera_service → IPC → tractor M7 LoRa → bridge →
+MQTT) and the browser canvas painter were both already shipped in
+prior slices; this gate wires the *contract* between them so future
+edits to either side break a test instead of breaking the operator
+console silently. The remaining helpers in the Phase 5 image-pipeline
+block (`bg_cache`, `recolourise`, `motion_replay`, `wireframe_render`,
+`superres_cpu`, `detect_yolo`, `fallback_render`) all exist on disk
+already with their own unit tests; they fill in non-blocking overlay
+features (badges, fallback rendering) — none gate the operator
+console getting first pixels.
+
+**2026-05-17 — IP-W2-07 X8 honours `CMD_ENCODE_MODE` (0x63) + IP-W2-08 offline IPC capture replay bench.**
+Closes the encoder side of the auto-fallback ladder and adds an
+offline forensic tool so a 30 s `cat /dev/ttymxc1 > capture.bin` can
+be turned into a per-frame PNG strip without a live tractor.
+
+W2-07 (encode mode wiring): until this slice the X8 dispatcher logged
+`CMD_ENCODE_MODE` and force-keyframed but did *not* change the encoder,
+so the base-station's `EncodeModeController` had no measurable wire
+effect. New module-level globals in
+[`firmware/tractor_x8/camera_service.py`](DESIGN-CONTROLLER/firmware/tractor_x8/camera_service.py) —
+`ENCODE_MODE_FULL=0`, `ENCODE_MODE_Y_ONLY=1`,
+`ENCODE_MODE_MOTION_ONLY=2`, `ENCODE_MODE_WIREFRAME=3`,
+`ENCODE_MODE_NAMES`, `ENCODE_MODE` (runtime knob, env-overridable via
+`LIFETRAC_ENCODE_MODE`), plus quality ceilings
+`MOTION_ONLY_QUALITY=30` (env: `LIFETRAC_MOTION_ONLY_QUALITY`) and
+`WIREFRAME_QUALITY=20` (env: `LIFETRAC_WIREFRAME_QUALITY`).
+`_encode_tile` gained an optional `encode_mode=None` kwarg; for any
+mode ≠ `FULL` it does a PIL `L→RGB` round-trip (chroma drop, WebP
+container stays RGB so wire decoders are unchanged) and applies
+`_apply_encode_mode_quality(quality, mode)` as a `min()` ceiling so
+the ROI-inside boost still wins when its quality is below the cap.
+Dispatcher now validates `0 ≤ mode ≤ 3` and silently rejects
+out-of-range modes (with a warning log) while still force-keyframing
+per the IP-104 contract — gives the operator visible "ack" feedback
+even on malformed packets. Cache-key fix: the W2-05 `TileEncodeCache`
+key in `_build_frame` now appends `bytes([q & 0xFF, ENCODE_MODE & 0xFF])`
+to the raw RGB slice, so a `CMD_ENCODE_MODE` flip auto-invalidates all
+per-tile entries (otherwise the next keyframe would replay stale
+colour blobs at the new mode). New
+[`base_station/tests/test_x8_encode_mode.py`](DESIGN-CONTROLLER/base_station/tests/test_x8_encode_mode.py)
+adds **11 tests**: `EncodeModeDispatchTests` (every valid mode commits
+the global + force-keyframes; out-of-range modes are rejected but
+still ack via keyframe; truncated frame doesn't crash and leaves
+mode untouched), `EncodeModeQualityCeilingTests` (full/y_only pass
+through, motion_only/wireframe clamp, wireframe ceiling ≤
+motion_only ceiling), `EncodeModeWebPSizeTests` (wire WebP byte count
+strictly drops when y_only replaces full and when wireframe replaces
+motion_only on the same `SyntheticCamera` canvas; explicit
+`encode_mode=` kwarg overrides the global without mutating it), and
+`EncodeCacheInvalidatesOnModeChangeTests` (96 misses → 0 misses on
+identical-mode replay → 96 misses again after a `CMD_ENCODE_MODE`
+flip, proving the cache key fix). Cluster: **77/77** across
+`test_x8_encode_mode + test_x8_tile_encode_cache + test_back_channel_dispatch +
+test_data_saving_measures + test_link_adaptive_budget +
+test_link_profile_emitter`.
+
+W2-08 (replay bench): new
+[`base_station/replay_ipc_capture.py`](DESIGN-CONTROLLER/base_station/replay_ipc_capture.py)
+takes a captured byte stream from `/dev/ttymxc1`, walks
+`iter_ipc_frames()` (X8-side framer, sync `0xA5` + flags + length +
+CRC-8/SMBus), feeds each payload to `parse_tile_delta_frame()` (base
+side), maintains a persistent canvas (so dropped tiles in delta
+frames keep their last value), blits each tile via PIL, and writes
+`frame_NNNN_seqXXX_{key,delta}.png` per frame. CLI:
+`py -3 -m base_station.replay_ipc_capture capture.bin --out-dir out/`
+with `--limit N` and `--no-pngs` knobs. Module-loading uses
+`importlib.spec_from_file_location` so it doesn't pollute
+`sys.modules['image_pipeline']` (the X8 and base sides ship same-named
+packages with different contents). `ReplayStats` exposes
+`(ipc_frames, decoded_frames, keyframes, deltas, decode_errors,
+pngs_written)` for downstream piping. New
+[`base_station/tests/test_replay_ipc_capture.py`](DESIGN-CONTROLLER/base_station/tests/test_replay_ipc_capture.py)
+adds **8 tests**: synthesizes a real capture (1 keyframe of 96 WebP
+tiles + 2 deltas, with a junk byte sprinkled between IPC frames to
+exercise framer resync); asserts decode counts split correctly,
+documented PNG naming
+(`frame_0001_seq000_key.png` etc.), expected canvas size
+(384×256), `--limit` honoured, `--no-pngs` skips both writes and
+mkdir, corrupt TileDeltaFrame payloads bump `decode_errors` without
+crashing, CLI returns 0 on success and 2 on missing capture.
+
+Pre-existing sys.path collision note: `test_image_pipeline` and
+`test_image_reassembly_fuzz` fail when run *in the same process* as
+any test that puts `firmware/tractor_x8/` on `sys.path`
+(`test_back_channel_dispatch`, `test_x8_*`, `test_replay_ipc_capture`,
+…) because the X8-side `image_pipeline` package (no `bg_cache.py`)
+shadows the base-side one. Standalone they're 33/33 green. Not a
+regression introduced by W2-07/08; pre-dates this session. Cleanest
+fix is to migrate the legacy tests onto the same
+`spec_from_file_location` loader pattern; deferred.
+
+**2026-05-16 — IP-W2-05 X8 per-tile WebP encode cache + IP-W2-06 on-device dry-run harness.**
+Closes the loop on the encode-side CPU saver and adds an end-to-end
+hardware smoke harness for the data-saving stack. New
+[`firmware/tractor_x8/image_pipeline/tile_cache.py`](DESIGN-CONTROLLER/firmware/tractor_x8/image_pipeline/tile_cache.py)
+implements `TileEncodeCache(n_tiles, history=4)` — a per-tile
+`OrderedDict` LRU bucket keyed by
+`hashlib.blake2b(raw_pixels + bytes([quality]), digest_size=16)` so
+the cache is invalidated automatically on quality (mode) changes.
+`TileCacheStats(hits, misses, evictions)` exposes per-instance
+counters for downstream telemetry. `camera_service._build_frame` now
+takes an optional `encode_cache=None` parameter and short-circuits the
+WebP encode call on a hit; the wire payload is byte-identical with or
+without the cache. `_encode_tile` was refactored to extract a pure
+`_slice_tile_rgb(rgb_canvas, tx, ty)` helper so the cache key matches
+exactly what the encoder hashes. The cache is opt-in via
+`LIFETRAC_TILE_CACHE_ENABLE=1` (with `LIFETRAC_TILE_CACHE_HISTORY`
+overriding the per-tile depth, default 4) so the existing zero-cache
+boot path is unchanged. New
+[`base_station/tests/test_x8_tile_encode_cache.py`](DESIGN-CONTROLLER/base_station/tests/test_x8_tile_encode_cache.py)
+adds **13 tests**: `TileEncodeCacheUnitTests` cover lookup-miss-then-hit,
+per-tile bucket isolation, LRU eviction beyond `history`, LRU refresh
+on hit, store-update-in-place, constructor validation, the
+`DEFAULT_HISTORY=4` constant, and `reset()`. `BuildFrameWithCacheTests`
+exercise the integration: first keyframe misses every tile (96 encode
+calls), second identical canvas hits every tile (0 encode calls), the
+emitted wire bytes are byte-identical with vs. without the cache, and
+a quality-byte change forces a cache miss. Importlib loader pattern
+mirrors `test_data_saving_measures.py` so the X8-side `camera_service`
+loads cleanly from base-station tests without polluting `sys.modules`.
+Full cluster green: **86/86** across `test_x8_tile_encode_cache +
+test_data_saving_measures + test_link_adaptive_budget +
+test_link_profile_emitter + test_back_channel_dispatch +
+test_ipc_to_h747_roundtrip + test_v4l2_ffmpeg_camera`.
+
+W2-06 hardware smoke: new
+[`firmware/tractor_x8/dry_run_w2_05.py`](DESIGN-CONTROLLER/firmware/tractor_x8/dry_run_w2_05.py)
+is a stdlib-only self-contained validator that monkey-patches
+`camera_service._encode_tile` with a sized stub (so PIL is not needed
+on the device) and walks 4 sequential gates: (1) default keyframe
+encodes `GRID_W*GRID_H` tiles and produces a non-empty payload;
+(2) dispatching `CMD_LINK_PROFILE(n=2, phy_idx=image)` shrinks
+`LinkBudget.bytes` strictly below the seed `(n=8, phy_idx=image)`
+budget and forces a keyframe via the shared `force_evt`; (3) the next
+encoded frame respects the new tighter budget and is correspondingly
+smaller; (4) `TileEncodeCache` records `n_tiles` encodes on first
+pass and 0 on the second pass over the same canvas. Each gate prints
+a `PASS:` line; first failure prints `FAIL: …` to stderr and exits 1.
+Companion
+[`firmware/x8_lora_bootloader_helper/run_w2_05_dry_run.ps1`](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_w2_05_dry_run.ps1)
+adb-pushes `camera_service.py`, the `image_pipeline/` tree, and
+`base_station/lora_proto.py` into
+`/var/rootdirs/home/fio/lifetrac_w2_05/`, runs
+`python3 dry_run_w2_05.py` over `adb shell`, and propagates the
+device-side exit code via a `__DRYRUN_RC=$?` sentinel (adb shell does
+not propagate remote rc on its own). **Host smoke: 4/4 gates green**
+(`PASS: default keyframe payload=5873 B (96 tile encodes) /
+PASS: CMD_LINK_PROFILE applied; budget=74 B (< seed 296 B) /
+PASS: capped payload=78 B (< 5873 B default) /
+PASS: tile cache 1st pass=96 encodes, 2nd pass=0 encodes`).
+**On-device run blocked**: the bare LmP rootfs Python 3.10 ships
+without `logging`, `dataclasses`, `json`, `hashlib`, `select`,
+`socket`, etc. — production Python is meant to run inside the X8's
+Docker container. Wrapper script header now documents this; the
+runtime gate will turn green once the dry-run is invoked from inside
+the production container (or after `python3-dataclasses`/-`json`/
+-`logging`/-`hashlib` packages are layered on the rootfs).
+
+**2026-05-15 — W2-04 base-station emitter for `CMD_LINK_PROFILE` (0x64).**
+Closes the loop opened earlier the same day so the X8's `LinkBudget`
+slot is now driven from the base-station's rolling SNR window without
+operator intervention. New class `LinkProfileEmitter` in
+[`base_station/link_monitor.py`](DESIGN-CONTROLLER/base_station/link_monitor.py)
+wraps a strictly-descending SNR ladder (`DEFAULT_SNR_LADDER`, 5 rungs:
+image PHY at 8/4/2 fragments, then telemetry-PHY retreat at 4 / floor 2)
+with the same 3-window hysteresis pattern as `EncodeModeController` so
+a single noisy receive sample can't flap the encoder. `observe(now_ms,
+snr_db)` returns the wire-format `pack_command(seq, CMD_LINK_PROFILE,
+bytes([n_frag, phy_idx]))` frame on commit and forwards it to an
+optional `publish_command` sink + audit-log hook
+(`AuditLog.log_link_profile_change`). The retreat threshold is intentionally
+above the SF7 demod floor (≈-7.5 dB) so the encoder downshifts before
+the modem walks off the cliff. New
+[base_station/tests/test_link_profile_emitter.py](DESIGN-CONTROLLER/base_station/tests/test_link_profile_emitter.py)
+adds **20 tests** across `LadderTargetTests` (default-ladder
+descending-and-unique invariant, top-of-ladder picks image-full,
+mid-rung picks image-quarter, sub-floor retreat to telemetry, hard
+floor clamps, constructor rejects unsorted ladders),
+`HysteresisTests` (first observation never emits, required-windows
+gate, single-bad-window resets candidate counter, steady-state silence
+after commit, `required_windows=0` clamps to 1), `WireFormatTests`
+(emitted frame validates CRC, opcode = 0x64 + args = `[n_frag, phy_idx]`,
+seq monotonically increments across commits), `PublisherWiringTests`
+(callback only on commit, `reset()` clears state and unsticks
+re-emission), `AuditWiringTests` (audit hook called with prev/new/snr,
+records previous target after second commit), and
+`CrossSideContractTests` (`LINK_PHY_NAMES[0]/[1]` pinned to
+`"image"`/`"telemetry"`, X8-side tuple round-trips byte-identical so
+a unilateral rename on either side fails CI). Wire side:
+[`base_station/lora_proto.py`](DESIGN-CONTROLLER/base_station/lora_proto.py)
+adds `CMD_LINK_PROFILE = 0x64`, the shared `LINK_PHY_NAMES` tuple, and
+classifies the new opcode as a P1 frame so existing fuzz/parser tests
+gate it. Combined sweep across `test_link_profile_emitter` (20),
+`test_link_adaptive_budget` (11), `test_data_saving_measures` (15),
+`test_back_channel_dispatch` (10), `test_ipc_to_h747_roundtrip` (12),
+`test_v4l2_ffmpeg_camera` (8) is **73 tests / 0 failures**, and the
+adjacent lora_proto/link_monitor sweep
+(`test_lora_proto + test_command_frame_fuzz + test_link_monitor +
+test_link_monitor_orchestrator + test_link_profile_emitter +
+test_link_adaptive_budget`) is **60 tests / 0 failures**, confirming
+that adding `CMD_LINK_PROFILE` to `_P1_OPCODES` doesn't regress the
+existing parser/fuzz suites.
+
+**2026-05-15 — W2-04 link-adaptive byte budget (`CMD_LINK_PROFILE` 0x64).**
+Closes the loop on the §K image-pipeline data-saving stack: the X8's
+encoder now accepts a runtime byte cap from the base station instead
+of being pinned at boot via `LIFETRAC_FRAGMENT_BUDGET`. New constants
+in [`firmware/tractor_x8/camera_service.py`](DESIGN-CONTROLLER/firmware/tractor_x8/camera_service.py):
+`CMD_LINK_PROFILE = 0x64`, `LINK_PHY_NAMES = ("image", "telemetry",
+"control_sf9", "control_sf8", "control_sf7")`, shared
+`_compute_link_bytes(n_fragments, profile_name)` helper, and a slot-based
+`LinkBudget` mutable holder shared between the back-channel reader and
+the encode loop. `dispatch_back_channel(..., link_budget=...)` handles
+opcode `0x64` with args `<n_fragments u8> <phy_index u8>` — invalid
+indices and zero fragments are rejected without corrupting prior state,
+but a keyframe is forced unconditionally so the new budget is observable
+on the next decoded frame at the base. `_resolve_byte_budget()` now
+honours `LIFETRAC_FRAGMENT_PROFILE` (default `"image"`). New
+[base_station/tests/test_link_adaptive_budget.py](DESIGN-CONTROLLER/base_station/tests/test_link_adaptive_budget.py)
+adds **11 tests** across `LinkBudgetUpdateTests` (image/telemetry
+recompute, telemetry-cap < image-cap at same fragment count, OOR phy
+rejected, zero-frag rejected, fresh-state nulls), `CmdLinkProfileDispatchTests`
+(opcode mutates budget + forces keyframe; truncated args don't corrupt;
+`link_budget=None` silent; bad index keeps prior cap but still keys),
+and `ResolveByteBudgetUsesProfileTests` (env-var profile selection,
+unknown profile → `None`). Suite total now **52 tests / 0 failures**
+across `test_link_adaptive_budget`, `test_data_saving_measures` (15),
+`test_back_channel_dispatch` (10), `test_ipc_to_h747_roundtrip` (12),
+`test_v4l2_ffmpeg_camera` (8). Stacks on the W2-03 ROI + budget wiring
+landed earlier the same day. Next slice (in flight): base-station-side
+emitter that publishes `CMD_LINK_PROFILE` from the `link_monitor.py`
+RSSI/SNR watcher so the loop runs without operator intervention.
 
 **Implementation status (2026-04-29, through Round 53):**
 [`AI NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md`](AI%20NOTES/2026-04-28_Controller_Code_Review_Implementation_Status_v1_0.md)

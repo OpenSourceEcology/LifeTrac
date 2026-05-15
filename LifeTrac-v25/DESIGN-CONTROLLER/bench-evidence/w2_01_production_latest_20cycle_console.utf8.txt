@@ -1,0 +1,106 @@
+﻿Evidence dir: C:\Users\dorkm\Documents\GitHub\LifeTrac\LifeTrac-v25\DESIGN-CONTROLLER\bench-evidence\w2_01_production_2026-05-15_111326
+
+=== 0. Pre-flight ===
+  C2 (16d0:0ed4) present : True
+  usbcore.autosuspend=-1 in cmdline : False
+  current usbcore.autosuspend       : 2
+  snd_usb_audio bound               : NONE
+
+=== 1. Staging artifacts to /tmp/w2_01_production ===
+  pushed provision_x8.sh
+  pushed 99-w2-01-c2.rules
+  pushed lifetrac-no-usb-audio.conf
+  pushed lifetrac-camera.service
+
+=== 2. Installing artifacts via provision_x8.sh ===
+  install log written
+
+=== 3. V1 cold-boot enumeration (20 cycles) ===
+--- Cycle 1 / 20 ---
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 2 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 3 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 4 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 5 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 6 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 7 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 8 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 9 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 10 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 11 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 12 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 13 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 14 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 15 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 16 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 17 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 18 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 19 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+--- Cycle 20 / 20 ---
+  reboot issued, waiting for ADB to come back...
+  C2 enum: True, svc active: True, snd_usb_audio absent: True
+
+=== Summary ===
+{
+    "timestamp":  "2026-05-15_111326",
+    "adb_serial":  "2E2C1209DABC240B",
+    "install_applied":  true,
+    "sysfs_only":  true,
+    "cycles":  20,
+    "pre_state":  {
+                      "autosuspend_runtime":  "2",
+                      "snd_usb_audio_pre":  "NONE",
+                      "c2_present":  true,
+                      "autosuspend_in_cmdline":  false
+                  },
+    "v1_cold_boot_enum":  {
+                              "fail":  0,
+                              "pass":  20
+                          },
+    "v2_snd_usb_audio_blocked":  {
+                                     "fail":  0,
+                                     "pass":  20
+                                 },
+    "v3_wedge_reproducibility":  "DEFERRED (needs Section 10.3 V3 stress harness)",
+    "v4_hotplug_recovery":  "DEFERRED",
+    "v5_vbus_scope":  "DEFERRED (needs USB power meter + scope)",
+    "v6_idle_power_delta":  "DEFERRED (needs DC current clamp)"
+}
+
+Evidence: C:\Users\dorkm\Documents\GitHub\LifeTrac\LifeTrac-v25\DESIGN-CONTROLLER\bench-evidence\w2_01_production_2026-05-15_111326

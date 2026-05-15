@@ -17,6 +17,121 @@
 				"20"
 			],
 			"isBackground": false
+		},
+		{
+			"label": "Check Video Devices",
+			"type": "shell",
+			"command": "adb shell ls /dev/video*"
+		},
+		{
+			"label": "Check Native Python",
+			"type": "shell",
+			"command": "adb shell python3 -V"
+		},
+		{
+			"label": "Check v4l2 module",
+			"type": "shell",
+			"command": "adb shell python3 -c 'import v4l2'"
+		},
+		{
+			"label": "Run Dep Check",
+			"type": "shell",
+			"command": "adb push LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/check_deps.py /tmp/check_deps.py && adb shell python3 /tmp/check_deps.py"
+		},
+		{
+			"label": "Run Dep Check PS",
+			"type": "shell",
+			"command": "adb push LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/check_deps.py /tmp/check_deps.py ; adb shell python3 /tmp/check_deps.py"
+		},
+		{
+			"label": "Check GStreamer",
+			"type": "shell",
+			"command": "adb shell \"which gst-launch-1.0 || echo none\""
+		},
+		{
+			"label": "Check GStreamer 2",
+			"type": "shell",
+			"command": "adb shell which gst-launch-1.0"
+		},
+		{
+			"label": "Check Ping",
+			"type": "shell",
+			"command": "adb shell ping -c 1 8.8.8.8"
+		},
+		{
+			"label": "Check compiler",
+			"type": "shell",
+			"command": "adb shell which gcc clang make"
+		},
+		{
+			"label": "Download ffmpeg task",
+			"type": "shell",
+			"command": "powershell -c \"Invoke-WebRequest -Uri 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz' -OutFile 'ffmpeg.tar.xz'\""
+		},
+		{
+			"label": "Check downloaded file",
+			"type": "shell",
+			"command": "dir ffmpeg.tar.xz"
+		},
+		{
+			"label": "Extract FFmpeg",
+			"type": "shell",
+			"command": "tar -xf ffmpeg.tar.xz"
+		},
+		{
+			"label": "Check Extracted Dir",
+			"type": "shell",
+			"command": "dir ffmpeg-*"
+		},
+		{
+			"label": "Push FFmpeg",
+			"type": "shell",
+			"command": "adb push ffmpeg-7.0.2-arm64-static/ffmpeg /tmp/ffmpeg"
+		},
+		{
+			"label": "Capture Frame",
+			"type": "shell",
+			"command": "adb shell \"chmod +x /tmp/ffmpeg && /tmp/ffmpeg -y -f v4l2 -input_format mjpeg -i /dev/video0 -vframes 1 /tmp/test_frame.jpg\""
+		},
+		{
+			"label": "Capture Frame 2",
+			"type": "shell",
+			"command": "adb shell chmod +x /tmp/ffmpeg ; adb shell /tmp/ffmpeg -y -f v4l2 -input_format mjpeg -i /dev/video0 -vframes 1 /tmp/test_frame.jpg"
+		},
+		{
+			"label": "Capture Frame Sudo",
+			"type": "shell",
+			"command": "adb shell \"echo fio | sudo -S /tmp/ffmpeg -y -f v4l2 -input_format mjpeg -i /dev/video0 -vframes 1 /tmp/test_frame.jpg\""
+		},
+		{
+			"label": "Capture Frame Sudo 2",
+			"type": "shell",
+			"command": "adb shell 'echo fio | sudo -S /tmp/ffmpeg -y -f v4l2 -input_format mjpeg -i /dev/video0 -vframes 1 /tmp/test_frame.jpg'"
+		},
+		{
+			"label": "List FFmpeg Devices",
+			"type": "shell",
+			"command": "adb shell 'echo fio | sudo -S /tmp/ffmpeg -list_devices true -f v4l2 -i dummy'"
+		},
+		{
+			"label": "Get Camera Names",
+			"type": "shell",
+			"command": "adb shell 'grep -H \"\" /sys/class/video4linux/video*/name'"
+		},
+		{
+			"label": "Cat Camera Names",
+			"type": "shell",
+			"command": "adb shell 'for i in /sys/class/video4linux/video*/name; do echo -n \"$i: \" ; cat $i; done'"
+		},
+		{
+			"label": "Capture Video 1",
+			"type": "shell",
+			"command": "adb shell 'echo fio | sudo -S /tmp/ffmpeg -y -f v4l2 -input_format mjpeg -i /dev/video1 -vframes 1 /tmp/test_frame.jpg'"
+		},
+		{
+			"label": "Pull Frame",
+			"type": "shell",
+			"command": "adb pull /tmp/test_frame.jpg .\\test_frame.jpg"
 		}
 	]
 }

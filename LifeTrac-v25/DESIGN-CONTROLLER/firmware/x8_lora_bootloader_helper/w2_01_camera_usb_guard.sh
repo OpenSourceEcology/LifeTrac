@@ -256,8 +256,8 @@ if [ -n "$C2_SYSPATH" ]; then
         [ -e "$ifpath" ] || continue
         ifname="$(basename "$ifpath")"
         drv=""
-        if [ -L "${ifpath}driver" ]; then
-            drv="$(basename "$(readlink "${ifpath}driver")")"
+        if [ -L "${ifpath}/driver" ]; then
+            drv="$(basename "$(readlink "${ifpath}/driver")")"
         fi
         echo "  $ifname -> ${drv:-<unbound>}"
     done

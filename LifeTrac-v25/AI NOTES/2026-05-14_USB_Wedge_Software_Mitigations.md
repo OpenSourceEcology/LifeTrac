@@ -435,3 +435,551 @@ window, mostly via sequencing rather than current reduction. A powered
 hub removes 2–3× more sag than the entire software stack combined and is
 therefore still the right structural answer. The software work is what
 keeps the X8 Linux side from mishandling whatever transient remains.
+
+## 9. Production Operating Model: C2 Permanently Attached Across Power Cycles
+
+§3 through §8 are framed around the bench scenario where an operator hot-
+plugs the C2 into a running X8. In production the camera is permanently
+cabled to the tractor X8 and is energised every time the X8 powers on.
+That changes which mitigations matter and introduces a different set of
+failure modes that are not addressed elsewhere in this document.
+
+### 9.1. What changes vs. the bench scenario
+
+The dominant enumeration path is now **cold boot**, not hot-plug. The
+specific race that wedged us at the bench — `usbcore.autosuspend=2`
+firing while `snd-usb-audio` was still probing a freshly hot-plugged
+composite device — is much less likely during cold boot, but should not
+be treated as impossible. USB hub enumeration, driver binding, runtime
+PM setup, and udev/module-load can still overlap during early boot. The
+production conclusion is the same, but the reason is sharper: **the
+runtime sysfs write the W2-01 guard performs is too late**. By the time
+any userspace runs, the C2 may already have enumerated under the kernel
+default. Every guarantee has to be in place *before* the kernel sees the
+C2.
+
+| Concern                          | Bench (today)                          | Production (C2 always attached)                         |
+| -------------------------------- | -------------------------------------- | ------------------------------------------------------- |
+| Wedge trigger to defend against  | hot-plug into running kernel           | lower probability at boot; still validate power cycles  |
+| `usbcore.autosuspend=-1`         | runtime sysfs write (volatile)         | **must be in `OSTREE_KERNEL_ARGS`** (§8.1)              |
+| `snd-usb-audio` block            | unloaded once per session              | **must be persistent `install … /bin/false`**           |
+| Capture service start            | manual / orchestrator                  | **systemd unit ordered After= the `.device` unit**      |
+| Recovery from brownout / unplug  | operator replug                        | **udev-triggered restart + watchdog**                   |
+| Mechanical interface             | bench USB-A friction fit               | **strain-relieved or screw-locking USB**                |
+| Authorization gate               | guard step                             | **not used** — defeats boot ordering, see §9.4          |
+
+### 9.2. Persistent software state required for production
+
+These are the W2-01.D-series TODO items, promoted from "nice to have"
+to **required for production deployment**:
+
+1. **`OSTREE_KERNEL_ARGS += "usbcore.autosuspend=-1"`** in the LmP build
+   recipe (§8.1, TODO W2-01.D3). This is the only one of the §3 knobs
+   that takes effect *before* the C2 is enumerated at boot, which is
+   exactly when production needs it. Reviewer note: Setting this
+   globally disables runtime PM for the entire USB host controller and
+   all downstream ports. This will impose a permanent ~1-2W power
+   penalty; confirm the vehicle's 12V/5V power budget can absorb this
+   idle load.
+2. **`/etc/modprobe.d/lifetrac-no-usb-audio.conf`** with
+   `install snd_usb_audio /bin/false`. This is stronger than `blacklist`
+   because it also blocks auto-load triggered by a UAC descriptor
+   appearing on the bus. Lives in mutable `/etc`, survives OSTree
+   deploys. Reviewer note: the checked-in file currently uses only
+   `blacklist snd_usb_audio`; production should upgrade it to the
+   stronger `install snd_usb_audio /bin/false` form or explicitly record
+   why `blacklist` is enough on the target LmP image.
+3. **`/etc/udev/rules.d/99-w2-01-c2.rules`** with three jobs:
+   - Stable symlink: `SUBSYSTEM=="video4linux", ATTRS{idVendor}=="16d0",
+     ATTRS{idProduct}=="0ed4", SYMLINK+="lifetrac-c2"`. Capture binds
+     `/dev/lifetrac-c2`, never `/dev/video0` (which can renumber if any
+     other V4L device ever appears, e.g. a debug HDMI capture dongle).
+     Reviewer note: UVC devices can expose more than one `/dev/video*`
+     node, so the final rule should also match only the real capture
+     node. Rather than just relying on `ATTR{index}=="0"` (which can be
+     fragile if the driver discovers nodes out of order), using
+     `ENV{ID_V4L_CAPABILITIES}==":capture:"` is the safest primary
+     symlink match.
+   - `TAG+="systemd"` to enable the synthesised `dev-lifetrac\x2dc2.device`
+     unit for service ordering (§9.3).
+   - Use `ENV{SYSTEMD_WANTS}+="lifetrac-camera.service"` or `.device`
+     `BindsTo=` wiring for hotplug recovery. Avoid
+     `RUN+="/bin/systemctl restart ..."` in udev: udev `RUN` jobs are
+     meant to be short-lived, can be killed by the udev worker timeout,
+     and can deadlock or race systemd during boot.
+   Reviewer note: the checked-in `99-w2-01-c2.rules` currently only sets
+   `power/control` and `power/autosuspend_delay_ms`; it does not yet
+   create `/dev/lifetrac-c2`, tag the device for systemd, or request the
+   camera service.
+4. **`provision_x8.sh`** (TODO W2-01.D1): an idempotent installer that
+   lays down items 2 and 3, runs `udevadm control --reload-rules`, and
+   adds `fio` to the `video` group. Run once per fresh image; safe to
+   re-run as a self-heal step.
+
+### 9.3. systemd service topology
+
+```
+[multi-user.target]
+        │
+        └── lifetrac-camera.service
+                 Wants=    dev-lifetrac\x2dc2.device
+                 Requires= dev-lifetrac\x2dc2.device   # fail fast if camera missing at boot
+                 BindsTo=  dev-lifetrac\x2dc2.device   # stop if the device disappears
+                 After=    dev-lifetrac\x2dc2.device
+                 Restart=  on-failure
+                 RestartSec= 2s
+                 StartLimitIntervalSec= 60
+                 StartLimitBurst= 5
+```
+
+The `Requires=` plus `After=` on the synthesised `.device` unit is what
+makes systemd *wait for the kernel to enumerate the C2* before starting
+capture, instead of racing it. `BindsTo=` is the missing production
+piece: it stops `lifetrac-camera.service` when `/dev/lifetrac-c2`
+disappears, instead of assuming the capture process notices the USB
+remove event by itself. If the device never appears (cable yanked
+pre-boot, brownout during enumeration), the service fails cleanly,
+journald records why, and the autonomy stack can read service state to
+decide whether to continue without vision or block.
+
+For mid-run disconnect / brownout, the udev `ACTION=="add"` rule from
+§9.2.3 plus `BindsTo=` and `Restart=on-failure` give automatic recovery
+the next time the kernel sees the device. `StartLimitBurst=5` prevents
+thrash if the cable is genuinely flapping; once exhausted, the service
+parks and the LoRa health beacon ships `cam=wedged`. Reviewer note: When
+`BindsTo=` cleanly stops the service during a disconnect,
+`Restart=on-failure` will **not** bring it back. Ensure the udev rule
+explicitly includes `ENV{SYSTEMD_WANTS}+="lifetrac-camera.service"` so
+the auto-recovery is correctly triggered by udev when the camera
+re-enumerates.
+
+### 9.4. Why the §3 authorization gate is *not* used in production
+
+The bench guard holds the C2 unauthorized until the system is quiet, then
+authorizes it. In production this is actively counterproductive:
+
+- `usbcore.authorized_default=0` would block *every* USB device at boot,
+  including the MCP2221A, which the autonomy stack wants up immediately.
+- The "system is quiet" trigger that justifies authorization at the
+  bench (operator decides) does not exist on a tractor that boots
+  unattended. Any chosen trigger (timer, CPU idle threshold, etc.) is
+  worse than just letting the kernel enumerate normally.
+- Once `usbcore.autosuspend=-1` is in the cmdline, the C2 enumerates
+  with autosuspend already disabled. The §3 authorization gate's only
+  job — preventing autosuspend from firing during the attach window —
+  is already done.
+
+The systemd `Requires=` ordering replaces the authorization gate as the
+"don't touch the camera until it's ready" mechanism, and does it without
+needing root or per-device sysfs writes.
+
+### 9.5. Boot-time canary: keep the W2-01 guard as a oneshot
+
+Wire the existing `w2_01_camera_usb_guard.sh` into the production image
+as a `Before=lifetrac-camera.service` oneshot. Three reasons:
+
+- **Regression detector.** Records `autosuspend`, `snd-usb-audio` state,
+  and C2 descriptors *every boot*. If a future kernel or OSTree update
+  silently drops one of the knobs, the guard's `verdict=` field flips
+  and the LoRa beacon ships the change next packet.
+- **Single-byte telemetry.** The `__W2_01_GUARD_BEGIN__` / `__W2_01_GUARD_END__`
+  block is already machine-parseable; the health beacon only needs to
+  ship one bit (PASS/FAIL).
+- **Policy hook.** If `verdict=FAIL` because the camera is missing at
+  boot, the service can decide whether to start the autonomy stack
+  without vision or refuse to start. That is a product decision, not a
+  firmware one, but the canary is what makes it *expressible*.
+
+The guard's runtime sysfs writes become idempotent in this configuration
+(autosuspend is already `-1` from the cmdline, snd-usb-audio is already
+blocked by modprobe.d). It still records state, which is the entire
+point in production. Reviewer note: the current guard exits `0` by
+design and its `PASS` condition is intentionally minimal (C2 present +
+autosuspend disabled). A production oneshot that gates startup should
+wrap the guard, parse the framed status block, and fail the unit if the
+policy-relevant fields are wrong (for example C2 missing,
+`autosuspend_final` not `-1`, `snd-usb-audio` bound, or no
+`/dev/lifetrac-c2` capture node).
+
+### 9.6. Cold-boot power & enumeration concerns (new in production)
+
+This is the failure surface that does *not* exist at the bench, because
+at the bench the X8 boots first and the C2 is plugged afterward.
+
+- The C2 draws ~250 mA steady, with a ~400 mA peak during sensor PLL
+  lock (~50 ms window).
+- At cold boot the i.MX8 SoM, eMMC init, LoRa radio init, and C2
+  enumeration all hit the 5 V rail in the same ~500 ms window.
+- The voltage-drop budget in §8.4 pegs avoidable software-side losses at
+  ~110–310 mV. Cumulative drop with a long bulkhead cable + carrier
+  trace + SMSC hub can put VBUS at the camera below the ~4.75 V the
+  OV9281 / IMX-class sensors need during PLL lock. The visible symptom
+  is enumeration succeeding but first-frame ISP init flaking
+  intermittently, which the bench scenario never sees because the X8 is
+  already past its boot peak when the operator plugs the C2.
+- **Mitigation hierarchy, cheapest first:**
+  1. Short USB cable (<300 mm), 22 AWG VBUS pair.
+  2. Powered USB hub between carrier and C2 (§5 Bottom Line + §8.4),
+     even if the C2 is the only downstream device. Isolates inrush and
+     gives the C2 its own clean 5 V; the hub's upstream cable then
+     carries only data + ~100 mA enumeration current.
+    3. If camera ground isolation is required, choose a **high-speed USB
+      isolator** or isolate the camera power/chassis path separately.
+      Do not put the ADuM3160 on the C2 UVC data path: the ADuM3160 is a
+      low/full-speed isolator and is appropriate for the MCP2221A HID
+      branch, not a high-speed UVC camera.
+
+### 9.7. Mechanical interface (single biggest production risk)
+
+USB-A friction fit on a vibrating tractor will fail. Pick one:
+
+- **Screw-lock USB-A** — Kurokesu sells C2 variants with this; the X8's
+  Max Carrier USB-A bulkhead does not, so this still leaves the carrier
+  end exposed.
+- **Strain-relief boot + cable clamp** within 50 mm of both ends. The
+  failure point shifts from the connector to the clamp, which is what we
+  want.
+- **Potted joint** at the camera enclosure penetration if IP-rated.
+
+The Max Carrier USB-A bulkhead is friction-only. Without strain relief
+on the carrier end, the bulkhead solder joints become the failure point,
+which is much more expensive to repair than a cable.
+
+### 9.8. Production failure modes and responses
+
+| Failure mode                              | Detection                                       | Auto-action                                              | Operator action          |
+| ----------------------------------------- | ----------------------------------------------- | -------------------------------------------------------- | ------------------------ |
+| C2 missing at boot                        | guard `verdict=FAIL`, `.device` unit times out  | service stays inactive; beacon flags `cam=down`          | inspect cable            |
+| Brownout disconnect mid-run               | udev `remove` event; `.device` becomes inactive | `BindsTo=` stops service; udev/systemd starts on re-add   | none if recovered <2 s   |
+| USB host wedge (hub `EILSEQ` storm)       | dmesg burst; `Restart=on-failure` exhausts burst| systemd parks service; beacon flags `cam=wedged`         | reboot X8                |
+| OSTree update regresses cmdline           | guard reads `autosuspend_initial≠-1`            | beacon flags `cam=policy_drift`                          | rebuild image            |
+| Sensor thermal throttle                   | frame timing variance                           | (out of scope for this layer)                            | enclosure ventilation    |
+
+### 9.9. Suggested deliverable order for production hardening
+
+In priority order — none required for *first* bench light, all required
+before field deploy:
+
+1. **`provision_x8.sh`** (TODO W2-01.D1) — installs §9.2 items 2 and 3
+   plus `usermod -aG video fio`. Idempotent. Lands cleanly on existing
+   X8s without an image rebuild.
+2. **`lifetrac-camera.service` skeleton** + `dev-lifetrac\x2dc2.device`
+   wiring — even if the actual capture binary is a placeholder
+   (`cat /dev/lifetrac-c2 > /dev/null`), prove the unit topology and
+   `systemd-analyze verify` it before the real capture exists.
+3. **`OSTREE_KERNEL_ARGS` patch** to the LmP layer (§8.1, TODO W2-01.D3) —
+   the only item that requires a Foundries image rebuild, so it has the
+   longest lead time. Start the recipe change in parallel with item 1.
+4. **Boot-time guard oneshot** — repackage the existing
+   `w2_01_camera_usb_guard.sh` as a systemd unit per §9.5.
+5. **Powered-hub spec & cable BOM update** (TODO W2-01.D5) — closes the
+   §9.6 hardware gap.
+6. **Mechanical strain relief / locking-USB BOM update** — addresses
+   §9.7.
+
+Items 1 and 2 are doable on the X8 we already have on the bench
+(`2E2C1209DABC240B`) without touching the LmP image, and `systemd-analyze
+verify` exercises the unit ordering offline. Item 3 is the only
+production-hardening step that blocks on a Foundries build cycle.
+
+### 9.10. Review comments before implementation
+
+These are the review findings to carry into the first production draft:
+
+| Finding | Why it matters | Action |
+| ------- | -------------- | ------ |
+| Cold boot is lower risk, not zero risk | USB enumeration and driver binding can still overlap early boot; the original text overstated this as impossible | Validate with repeated power cycles with the C2 permanently attached, capturing `dmesg`, `/proc/cmdline`, `lsusb -t`, and service state each time |
+| Checked-in audio policy is weaker than §9.2 | `blacklist snd_usb_audio` may not block every module auto-load path; §9.2 calls for `install snd_usb_audio /bin/false` | Update `lifetrac-no-usb-audio.conf` or explicitly document why `blacklist` is sufficient on this LmP image |
+| Checked-in udev rule is incomplete for production | It sets USB PM only; it does not create `/dev/lifetrac-c2`, tag the device for systemd, or request the service | Extend or split the rule into a USB-device PM rule and a video4linux symlink/systemd rule |
+| UVC may expose multiple video nodes | A plain VID/PID symlink can bind the metadata node instead of the capture node | Match the final rule against `ATTR{index}=="0"`, `ENV{ID_V4L_CAPABILITIES}`, or the observed C2 udev properties |
+| Avoid `systemctl restart` directly from udev `RUN` | udev workers are not a reliable place to run long-lived service control | Use `TAG+="systemd"`, `ENV{SYSTEMD_WANTS}`, and service `BindsTo=`/`After=` relationships |
+| Unit sketch omits section placement | `Restart=` belongs in `[Service]`, while `StartLimitIntervalSec=`/`StartLimitBurst=` belong in `[Unit]` on systemd versions that support the `Sec` form | Draft the real `.service` file explicitly and run `systemd-analyze verify` on the target image |
+| Guard oneshot is a canary, not a hard gate yet | The current script always exits 0 and does not validate every production invariant | Add a small wrapper or guard mode that exits nonzero on policy drift before wiring it as a blocking `Before=` unit |
+| ADuM3160 is not suitable for the C2 data path | It is low/full-speed, while the UVC camera needs high-speed USB | Keep ADuM3160 on the MCP2221A branch only; spec a high-speed isolator if the camera itself needs isolation |
+| Power numbers are estimates | The 250 mA / 400 mA and 100–300 mV figures are planning values, not measured on the tractor harness | Add a bench task to measure VBUS at the C2 during cold boot and first `STREAMON` with the final cable/hub assembly |
+| `BindsTo=` requires `SYSTEMD_WANTS` to recover | When `BindsTo=` cleanly stops the service during a disconnect, `Restart=on-failure` will **not** bring it back | Ensure the udev rule includes `ENV{SYSTEMD_WANTS}+="lifetrac-camera.service"` so udev starts it on re-attach |
+| Global autosuspend has a system power penalty | Setting `usbcore.autosuspend=-1` keeps the USB host controller and **all** hub ports active permanently | Verify the tractor 12V/5V power budget can absorb an extra ~1-2W of idle draw from the un-suspended host |
+| V4L2 capability matching is safer than index | `ATTR{index}=="0"` can be fragile if the driver discovers nodes out of order | Use `ENV{ID_V4L_CAPABILITIES}==":capture:"` (provided by `60-persistent-v4l.rules`) as the primary symlink match |
+
+The first implementation pass should therefore be: update the two policy
+files to match the stronger production notes, draft the `.service` unit
+with `BindsTo=`, then run a cold-boot validation loop before promoting
+the `OSTREE_KERNEL_ARGS` change into the image recipe.
+
+## 10. Consolidated Implementation Plan
+
+This section folds every reviewer note from §9.2, §9.3, §9.5, and §9.10
+together with the self-review of those notes into a single, ordered,
+actionable plan. Where §9.10 and §9.2/§9.3 overlap, **this section is
+authoritative**; §9.10 is retained as the audit trail of how we got
+here.
+
+### 10.0. Corrections that supersede earlier sections
+
+These fix mistakes introduced into the earlier reviewer notes
+themselves and should be considered the final form:
+
+1. **`ID_V4L_CAPABILITIES` match must be a glob and not the only
+  discriminator.**
+   `v4l_id` emits a colon-delimited list (`:capture:`,
+   `:capture:video_output:`, etc.). Use
+   `ENV{ID_V4L_CAPABILITIES}=="*:capture:*"`, **not** `==":capture:"`.
+    Bench evidence on 2026-05-15 also showed that all four C2 video nodes
+    can satisfy the broad capability match, so combine the glob with
+    `ATTR{index}=="0"` for `/dev/lifetrac-c2` and the systemd trigger.
+2. **Drop the "~1-2 W" idle-power figure.** That number is itself an
+   estimate. Replace with: "non-zero idle power penalty on the USB
+   host; measure on the bench before committing to the global cmdline
+   form." The actual delta on this i.MX8 carrier with one C2 +
+   MCP2221A is expected to be a few hundred mW, but is unverified.
+3. **Treat `usbcore.autosuspend=-1` as conditional, not mandatory.**
+   The original wedge required `snd_usb_audio` probing *and*
+   autosuspend firing in the same window. If §10.1.B (`install
+   snd_usb_audio /bin/false`) holds across every code path, the
+   cmdline arg becomes belt-and-suspenders. Decision gate is
+   §10.3.V3.
+4. **`StartLimitIntervalSec=` / `StartLimitBurst=` placement.** On
+   the systemd version shipped with LmP/Foundries (≥230), both
+   directives belong in `[Unit]`. `Restart=` and `RestartSec=` belong
+   in `[Service]`. There is no version-dependent ambiguity on this
+   target.
+5. **§9.8 "Brownout disconnect mid-run" row is conditional on
+   §10.1.C.3.** Auto-recovery only happens if the udev rule includes
+   `ENV{SYSTEMD_WANTS}+="lifetrac-camera.service"`; without it,
+   `BindsTo=` cleanly stops the unit and nothing brings it back.
+6. **Bare-host Python is not a production capture dependency.** The
+  bench X8 image has a deliberately small Python runtime; missing
+  modules such as `_ctypes`/`ctypes`, `fcntl`, `mmap`, `pip`, and common
+  media packages are normal on Foundries LmP host images. The Python
+  first-light helper remains bench scaffolding only. Production camera
+  capture must run in the application container stack, and low-level
+  bench frame capture should use a static aarch64 helper rather than
+  host Python.
+7. **`adb shell` does not honour `/etc/group` for the `fio` user.**
+   adbd on the LmP image hands the `fio` shell an Android-style
+   supplementary group set (`1003,1004,3001…`) that excludes
+   `video`/`plugdev`/`docker` even after `usermod -aG video fio`
+   succeeds. Bench probes that need to open `/dev/lifetrac-c2` from
+   adb must elevate via `sudo -S` (the V3 stress harness does this);
+   the production capture path runs via systemd + docker compose and
+   does see `/etc/group`, so this quirk does not affect deployment.
+
+### 10.1. Deliverables
+
+Each deliverable is a single artifact with an owner-visible name, the
+file or location it lives in, and the acceptance test that proves it
+works.
+
+**A. `provision_x8.sh` (TODO W2-01.D1)**
+
+- *Location:* `LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/provision_x8.sh`
+- *Does:* lays down B, C, D; runs `udevadm control --reload-rules &&
+  udevadm trigger`; runs `usermod -aG video fio`; idempotent.
+- *Acceptance:* second invocation is a no-op (`diff` of `/etc` before
+  and after returns empty); `getent group video` shows `fio`.
+
+**B. `/etc/modprobe.d/lifetrac-no-usb-audio.conf`**
+
+- *Content:* `install snd_usb_audio /bin/false`
+  (plus a one-line comment pointing back to this section). The checked-in
+  helper now uses this stronger `install` form; the older `blacklist
+  snd_usb_audio` form is retained only as historical context in earlier
+  sections of this note.
+- *Acceptance:* after a cold boot with the C2 attached,
+  `lsmod | grep snd_usb_audio` is empty and
+  `find /sys/bus/usb/drivers/snd-usb-audio -maxdepth 1 -type l` shows
+  no bound interface.
+
+**C. `/etc/udev/rules.d/99-w2-01-c2.rules`**
+
+Split into three rule lines so each concern is independently auditable:
+
+1. **USB-device PM (existing concern):**
+   `SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="16d0", ATTR{idProduct}=="0ed4",
+    TEST=="power/control", ATTR{power/control}="on",
+    TEST=="power/autosuspend_delay_ms", ATTR{power/autosuspend_delay_ms}="-1"`
+2. **V4L capture symlink + systemd tag:**
+   `SUBSYSTEM=="video4linux", ATTRS{idVendor}=="16d0",
+  ATTRS{idProduct}=="0ed4", ATTR{index}=="0",
+  ENV{ID_V4L_CAPABILITIES}=="*:capture:*", SYMLINK+="lifetrac-c2",
+  TAG+="systemd"`
+3. **Hotplug recovery:**
+   `SUBSYSTEM=="video4linux", ACTION=="add", ATTRS{idVendor}=="16d0",
+  ATTRS{idProduct}=="0ed4", ATTR{index}=="0",
+  ENV{ID_V4L_CAPABILITIES}=="*:capture:*", ENV{SYSTEMD_WANTS}+="lifetrac-camera.service"`
+- *Acceptance:* after cold boot, `readlink /dev/lifetrac-c2` resolves;
+  `systemctl status dev-lifetrac\\x2dc2.device` is `active (plugged)`;
+  unplug + replug restarts `lifetrac-camera.service` within 2 s.
+
+**D. `lifetrac-camera.service`**
+
+```
+[Unit]
+Description=LifeTrac C2 camera service
+Wants=dev-lifetrac\x2dc2.device
+Requires=dev-lifetrac\x2dc2.device
+BindsTo=dev-lifetrac\x2dc2.device
+After=dev-lifetrac\x2dc2.device
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+Environment=LIFETRAC_CAMERA_COMPOSE=/opt/lifetrac/compose-apps/lifetrac-camera/docker-compose.yml
+ExecStart=/bin/sh -lc 'if [ -f "$LIFETRAC_CAMERA_COMPOSE" ] && command -v docker >/dev/null 2>&1; then exec docker compose -f "$LIFETRAC_CAMERA_COMPOSE" up --remove-orphans; fi; echo "lifetrac-camera: compose app not installed; holding C2 device sentinel"; while [ -e /dev/lifetrac-c2 ]; do sleep 5; done; exit 1'
+Restart=on-failure
+RestartSec=2s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+- *Acceptance:* before the compose app exists, the unit stays active as
+  a device-presence sentinel and does not open `/dev/lifetrac-c2`. After
+  TODO W2-01.D5 lands, `systemd-analyze verify lifetrac-camera.service`
+  is silent on the target image and `journalctl -u lifetrac-camera`
+  shows the foreground compose process running with `/dev/lifetrac-c2`
+  mapped into the camera container.
+
+**E. `w2_01_camera_usb_guard_gate.sh` (hard-gate wrapper)** — *shipped 2026-05-15*
+
+- *Wraps* the existing `w2_01_camera_usb_guard.sh`, parses its
+  `__W2_01_GUARD_BEGIN__`/`__W2_01_GUARD_END__` block, and exits
+  non-zero if any of: C2 missing, `autosuspend_final` not effectively
+  disabled (per §10.3.V3 outcome), `snd_usb_audio` bound,
+  `/dev/lifetrac-c2` symlink missing or not pointing at
+  video-index0. The gate also accepts per-device PM equivalence
+  (`power/control=on` + `power/autosuspend_delay_ms=-1`) so it does not
+  hard-require deliverable F.
+- *Wired in as* a `Before=lifetrac-camera.service` oneshot.
+- *Acceptance:* deliberately removing the modprobe.d file and
+  rebooting causes the gate unit to fail and `lifetrac-camera.service`
+  to refuse to start.
+- *Bench result 2026-05-15:* `gate=PASS` on the bench X8 across two
+  consecutive V3 stress runs (50 + 200 iterations); evidence under
+  `DESIGN-CONTROLLER/bench-evidence/w2_01_v3_stress_2026-05-15_114302/`
+  and `…_114350/`.
+- *Side-finding:* the original `w2_01_camera_usb_guard.sh` had a
+  cosmetic glob bug (`${ifpath}driver` missing a slash) that mis-
+  reported all C2 interfaces as `<unbound>`. Fixed in the same change
+  that shipped E.
+
+**F. `OSTREE_KERNEL_ARGS += "usbcore.autosuspend=-1"` (TODO W2-01.D3)** — *shelved 2026-05-15 pending colder reproduction attempt*
+
+- *Conditional on §10.3.V3.* Only promote into the LmP recipe if the
+  bench validation in V3 shows the wedge can still be triggered with
+  B+C+D+E in place. If V3 cannot reproduce the wedge, this deliverable
+  is downgraded to "documented but not shipped".
+- *Bench result 2026-05-15:* 0/250 wedge reproductions across V3
+  stress (50 + 200 iters of sysfs descriptor reads + V4L2 device
+  open). With B+C+D+E in place the trigger pattern no longer wedges
+  the host, so F stays shelved. Re-evaluate after the next cold-boot
+  campaign or if V5 surfaces a VBUS sag.
+- *Acceptance (if revived):* `cat /proc/cmdline` on a freshly imaged
+  X8 contains `usbcore.autosuspend=-1`.
+
+**G. Hardware BOM updates**
+
+- Powered USB hub between Max Carrier and C2 (closes §9.6).
+- Strain-relief boot + cable clamp within 50 mm of both connector ends
+  (closes §9.7). Screw-lock USB-A on the C2 end if available.
+- Decision still open: high-speed USB isolator on the camera path
+  *only if* a galvanic-isolation requirement materialises. The
+  ADuM3160 is **not** a candidate here; it stays on the MCP2221A
+  branch.
+- *Acceptance:* BOM PR merged; mechanical drawing references the
+  clamp locations.
+
+**H. Static aarch64 bench capture helper (TODO W2-01.D4a)**
+
+- *Why:* the host LmP Python runtime is intentionally stripped and is
+  not a reliable substrate for V4L2 ioctl capture tests.
+- *Content:* either a static `v4l2-ctl` build or a tiny dedicated C
+  helper that enumerates C2 formats and grabs one MJPEG/YUYV frame from
+  `/dev/lifetrac-c2` without Python, OpenCV, GStreamer, or FFmpeg.
+- *Acceptance:* `adb push` to `/tmp`, run as `fio` after `usermod -aG
+  video fio`, produces a non-empty frame file and exits non-zero on
+  open/ioctl/STREAMON errors without wedging the X8.
+
+**I. Containerized camera runtime (TODO W2-01.D5)**
+
+- *Location:* `/opt/lifetrac/compose-apps/lifetrac-camera/` on the X8
+  image, with source in the tractor controller tree.
+- *Does:* owns the production capture/encoding process inside a
+  container, with `/dev/lifetrac-c2` passed through as a device and the
+  host service in D supervising the foreground `docker compose up`.
+- *Acceptance:* service startup launches the compose app, the container
+  can open `/dev/lifetrac-c2`, and the health path reports frame timing
+  without depending on any host Python module.
+
+### 10.2. Dependencies and ordering
+
+```
+A (provision_x8.sh) ──┬── B (modprobe.d)
+                      ├── C (udev rules)
+                      └── usermod -aG video fio
+                                │
+                                ▼
+                          D (.service unit) ── systemd-analyze verify
+                                │
+                                ▼
+                            V1..V4 USB-policy validation (§10.3)
+                                │
+                                ▼
+                          E (guard gate)  ── ties D start to canary PASS
+                                │
+                                ▼ (conditional, §10.3.V3 outcome)
+                          F (OSTREE_KERNEL_ARGS) ── needs LmP rebuild
+
+                  H (static capture helper) and I (containerized runtime) run in parallel
+                  after V1/V2 prove the USB policy. H is the bench frame-grab unblocker;
+                  I is the field deployment path.
+
+G (hardware BOM) runs in parallel with A..F; gates field deploy, not
+bench validation.
+```
+
+A through E land on the existing X8 (`2E2C1209DABC240B`) without an
+image rebuild. F is the only item that costs a Foundries build cycle,
+and §10.0.3 / §10.3.V3 are explicitly designed to decide whether F is
+worth that cost.
+
+### 10.3. Bench validation matrix
+
+Every validation runs on the existing X8 with the C2 permanently
+attached unless noted. Each row produces a recorded artifact under
+`DESIGN-CONTROLLER/bench-evidence/w2_01_production_<YYYY-MM-DD>/`.
+
+| ID | Validation                              | Apparatus                                                    | Pass criterion                                                       |
+| -- | --------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------- |
+| V1 | Cold-boot enumeration, 20 cycles        | Reboot/power cycle loop + `run_w2_01_bench_validation.ps1 -SysfsOnly` | C2 enumerates, `/dev/lifetrac-c2` resolves, and no USB wedge every cycle |
+| V2 | `snd_usb_audio` blocked across boots    | `lsmod`, `dmesg \| grep snd_usb_audio` after each V1 cycle    | zero matches                                                         |
+| V3 | Wedge reproducibility *with B+C+D+E*    | `run_w2_01_v3_stress.ps1` — sysfs descriptor reads + V4L2 open loop, no kernel cmdline change | if reproduces → ship F; if 0/50 reproductions → keep F shelved. **2026-05-15: 0/250 reproductions across two runs (50 + 200 iters), F shelved.** |
+| V4 | Hotplug recovery                        | unplug C2 mid-run, wait 5 s, replug                          | `systemctl status` returns to `active (running)` within 2 s of replug |
+| V5 | VBUS at the camera under cold boot      | USB power meter inline, scope on 5V                          | VBUS ≥ 4.75 V through PLL-lock window                                |
+| V6 | Idle-power delta from `autosuspend=-1`  | DC current clamp on 5 V rail; measure with and without F     | recorded delta in mW, replaces the placeholder figure in §10.0.2     |
+
+V1, V2, V4 must pass before E is merged. V3 is the gate for F. V5 and
+V6 inform G and §10.0.2 respectively but do not block A..E.
+
+### 10.4. Decisions that need a human before merging
+
+These cannot be auto-resolved from the data already in this document:
+
+1. **Should the autonomy stack start without vision** if E reports
+   `verdict=FAIL` at boot? Product decision; informs whether D uses
+   `Requires=` (current draft, hard-fails) or `Wants=` (degrades).
+2. **Powered-hub vendor and cable spec** — needs a part number, not
+   just "powered USB hub". Drives G.
+3. **Whether to ship F in the next image** — answered by V3 outcome.
+4. **Whether `blacklist` is acceptable instead of `install`** for
+   §10.1.B on the target LmP image — answered by inspecting which
+   subsystems on this image can trigger module auto-load (e.g. via
+   `kmod` aliases vs. udev `MODALIAS=`).
+
+### 10.5. What §9.10 is now for
+
+§9.10 stays as the unedited list of review findings that produced this
+plan. It is no longer an action list. New findings discovered during
+V1–V6 should be appended to §9.10 with a date, then either folded into
+§10.1/§10.3 or explicitly deferred.
