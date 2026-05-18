@@ -42,7 +42,7 @@ docs in this folder reference them by path rather than duplicating.
 | 2.5 | Carrier-power sanity check | [recovery/T2_5_carrier_power_sanity.md](recovery/T2_5_carrier_power_sanity.md) | Pre-flight before Tier 3 (J-Link BMP `1366:0105` must enumerate). |
 | 3a | SDP / `uuu` full image reflash | [recovery/T3a_sdp_uuu_reflash.md](recovery/T3a_sdp_uuu_reflash.md) | Definitive fix; mask-ROM independent of eMMC. |
 | 3b | SDP RAM-only initramfs rescue | [recovery/T3b_sdp_ram_rescue.md](recovery/T3b_sdp_ram_rescue.md) | Diagnostic: capture journals from broken eMMC. |
-| 4 | LoRa Hardware J-Link Unbrick | [recovery/T4_lora_jlink_hardware_unbrick.md](recovery/T4_lora_jlink_hardware_unbrick.md) | Recovers Murata L072 from bad Option Bytes / flashed states. |
+| 4 | LoRa Hardware J-Link Unbrick | [recovery/T4_lora_jlink_hardware_unbrick.md](recovery/T4_lora_jlink_hardware_unbrick.md) | **Last-resort** (2026-05-18). Only needed for RDP-Level-1 lockouts or a dead X8↔L072 UART path. The 2026-05-18 page-by-page Ext-Erase fallback in `stm32_an3155_flasher.py` lets [HC-04](routines/HC-04_stage1_standard_quant.md) recover the previously-J-Link-only "mass-erase NACK" case from a clean UART path. Try HC-04 first. |
 
 ## Soft-reset menu (no physical contact)
 

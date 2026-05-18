@@ -6,9 +6,12 @@ An unbrick procedure using a physical Segger J-Link connected directly to the Po
 Because the Max Carrier routes the L072 `SWDIO` and `SWCLK` to this 10-pin header, we can bypass the Portenta X8 entirely and re-flash the module using an external J-Link needle adapter or ribbon cable.
 
 ## When to use
-* Option bytes have been erased or corrupted, locking out the ROM bootloader mechanism.
-* Module is hard-faulting instantly out of reset preventing connection to the serial AT interface.
-* Soft-reset methods (toggling GPIO163) combined with deafen/unbind scripts (`deafen_unbrick.sh`) fail.
+* Option bytes have been erased or corrupted such that the ROM is in **RDP Level 1 or Level 2** (read-protected) — the soft UART path cannot lift Level 1 → Level 0 without a power cycle plus the RDP-1→0 mass-erase trigger, and Level 2 is permanent.
+* The X8 ↔ L072 UART path is itself dead (USART2/UART4 hardware or pad failure) — confirmed by [routines/HC-04_stage1_standard_quant.md](../routines/HC-04_stage1_standard_quant.md) failing with `FAIL_SYNC` AND HC-02 also failing.
+* Module is hard-faulting instantly out of reset preventing connection to the serial AT interface AND the page-by-page Ext-Erase fallback in the post-2026-05-18 `stm32_an3155_flasher.py` did not clear it.
+
+## When NOT to use (try first instead)
+* **2026-05-18 update — Tier 4 is now last-resort.** The X8-resident UART flasher handles the formerly-J-Link-only "mass-erase NACK" case via page-by-page Extended Erase. Run [HC-04](../routines/HC-04_stage1_standard_quant.md) first; if it PASSes, no J-Link work is needed.
 
 ## Prerequisites
 

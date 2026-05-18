@@ -40,6 +40,7 @@ The launcher's preflight (line ~229) exports `gpio8/10/15` and asserts
 | First cycle PASS, later cycles FAIL | Bridge degradation or watchdog reboot mid-run | Check `dmesg`; HC-02 between cycles |
 | `READY` reached but L072 verify fails | Murata side issue (rare) | Re-run with `-Cycles 1`; check `/dev/ttymxc3` from HC-02 |
 | `BENCH_RADIO_SLEEP_AUDIT=MISSING` | Helper bypass or `--no-sleep-on-exit` slipped in | Inspect probe stdout; not a board fault |
+| `FAIL_ERASE` while `write_ok=1 verify_ok=1 boot_ok=1` | L0 ROM v3.1 NACK'd `0x44 0xFFFF` mass-erase param; page-by-page Ext-Erase fallback succeeded but the launcher's success-string parser missed it | Confirm `stm32_an3155_flasher.py` is at the post-2026-05-18 revision (success line contains literal "Extended Erase complete"). See `/memories/repo/lifetrac-x8-l072-bootloader.md` ROOT-CAUSE 2026-05-18. |
 
 ## Verdict matrix
 
@@ -50,3 +51,4 @@ The launcher's preflight (line ~229) exports `gpio8/10/15` and asserts
 | 2026-05-12 | Board 1 (`2D0A`) | 5 | 0 | FAIL_SYNC ×5 | After NRST pulse. No change. |
 | 2026-05-12 | Board 1 (`2D0A`) | 1 | 0 | FAIL_SYNC | After `prep_bridge.sh` + watchdog auto-reboot. No change. |
 | 2026-05-12 | Board 1 (`2D0A`) | 2 | 0 | FAIL_SYNC ×2 | Same. |
+| 2026-05-18 | Board 1 (`2D0A`) | 5 | 5 | PASS | After page-by-page Ext-Erase fallback + parser-string fix in `stm32_an3155_flasher.py`. All six flags (sync/getid/erase/write/verify/boot) = 1 per cycle. Run dir `T6_stage1_standard_quant_2026-05-18_000947_959-35212`. **Closes the FAIL_ERASE branch — J-Link no longer required for routine Stage 1.** |
