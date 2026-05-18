@@ -42,6 +42,7 @@ docs in this folder reference them by path rather than duplicating.
 | 2.5 | Carrier-power sanity check | [recovery/T2_5_carrier_power_sanity.md](recovery/T2_5_carrier_power_sanity.md) | Pre-flight before Tier 3 (J-Link BMP `1366:0105` must enumerate). |
 | 3a | SDP / `uuu` full image reflash | [recovery/T3a_sdp_uuu_reflash.md](recovery/T3a_sdp_uuu_reflash.md) | Definitive fix; mask-ROM independent of eMMC. |
 | 3b | SDP RAM-only initramfs rescue | [recovery/T3b_sdp_ram_rescue.md](recovery/T3b_sdp_ram_rescue.md) | Diagnostic: capture journals from broken eMMC. |
+| 4 | LoRa Hardware J-Link Unbrick | [recovery/T4_lora_jlink_hardware_unbrick.md](recovery/T4_lora_jlink_hardware_unbrick.md) | Recovers Murata L072 from bad Option Bytes / flashed states. |
 
 ## Soft-reset menu (no physical contact)
 

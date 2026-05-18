@@ -1,0 +1,27 @@
+Open On-Chip Debugger 0.11.0-dirty (2025-07-14-18:35)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x0800db4c msp: 0x24080000
+Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+  RCC_AHB4ENR before = 0x00000000
+  RCC_AHB4ENR after  = 0x00000021
+Phase B: drive PA_11 HIGH (LoRa BOOT0)
+  GPIOA_IDR.PA_11 = 1   (expect 1)
+Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+Phase D: re-assert PA_11 HIGH
+  GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+
+READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+Run flasher in a parallel shell.

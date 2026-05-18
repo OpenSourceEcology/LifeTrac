@@ -1,0 +1,86 @@
+=== sanity ===
+-rw-rw-rw- 1 fio fio  2334 May  8  2026 /tmp/lifetrac_p0c/07_assert_pa11_pf4_long.cfg
+-rw-rw-rw- 1 fio fio 16592 May 14  2026 /tmp/lifetrac_p0c/firmware.bin
+-rw-rw-rw- 1 fio fio  7426 May 15  2026 /tmp/lifetrac_p0c/stm32_an3155_flasher.py
+fuser /dev/ttymxc3: 
+
+=== launching openocd (600s hold) ===
+OCD_PID=2389
+
+=== openocd output so far ===
+Open On-Chip Debugger 0.11.0-dirty (2025-07-14-18:35)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x0800db4c msp: 0x24080000
+Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+  RCC_AHB4ENR before = 0x00000000
+  RCC_AHB4ENR after  = 0x00000021
+Phase B: drive PA_11 HIGH (LoRa BOOT0)
+  GPIOA_IDR.PA_11 = 1   (expect 1)
+Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+Phase D: re-assert PA_11 HIGH
+  GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+
+READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+Run flasher in a parallel shell.
+
+=== configure UART 19200 8E1 raw ===
+speed 19200 baud; rows 0; columns 0; line = 0;
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+
+=== running flasher (with --verify) ===
+Opening /dev/ttymxc3 at 19200 8E1...
+Traceback (most recent call last):
+  File "/tmp/lifetrac_p0c/stm32_an3155_flasher.py", line 217, in <module>
+    fd = open_port()
+  File "/tmp/lifetrac_p0c/stm32_an3155_flasher.py", line 24, in open_port
+    iflag &= ~(termios.IXON | termios.IXOFF | termios.IXANY | termios.INLRCR | termios.IGNCR | termios.ICRNL)
+AttributeError: module 'termios' has no attribute 'INLRCR'. Did you mean: 'INLCR'?
+flasher exit code = 1
+
+=== killing openocd (2389) ===
+/tmp/lifetrac_p0c/run_flash_l072.sh: line 62:  2389 Killed                  nohup openocd -f /usr/arduino/extra/openocd_script-imx_gpio.cfg -f $CFG > $OCD_LOG 2>&1 < /dev/null
+
+=== final openocd log ===
+Open On-Chip Debugger 0.11.0-dirty (2025-07-14-18:35)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x0800db4c msp: 0x24080000
+Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+  RCC_AHB4ENR before = 0x00000000
+  RCC_AHB4ENR after  = 0x00000021
+Phase B: drive PA_11 HIGH (LoRa BOOT0)
+  GPIOA_IDR.PA_11 = 1   (expect 1)
+Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+Phase D: re-assert PA_11 HIGH
+  GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+
+READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+Run flasher in a parallel shell.
+
+=== overall result: flasher RC=1 ===

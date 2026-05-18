@@ -21,7 +21,7 @@ def open_port():
     cflag &= ~(termios.PARENB | termios.PARODD | termios.CSIZE | termios.CSTOPB | termios.CRTSCTS)
     cflag |= (termios.CS8 | termios.PARENB | termios.CREAD | termios.CLOCAL)
     
-    iflag &= ~(termios.IXON | termios.IXOFF | termios.IXANY | termios.INLRCR | termios.IGNCR | termios.ICRNL)
+    iflag &= ~(termios.IXON | termios.IXOFF | termios.IXANY | termios.INLCR | termios.IGNCR | termios.ICRNL)
     oflag &= ~termios.OPOST
     lflag &= ~(termios.ICANON | termios.ECHO | termios.ECHOE | termios.ISIG)
     
@@ -86,29 +86,66 @@ def xor_checksum(data):
         c ^= b
     return c
 
-def erase_memory(fd):
-    print("Erasing memory... (This may take up to 20 seconds)")
-    
-    # We will try Extended Erase (0x44) first. STM32L0 often uses standard Erase (0x43)
-    # but the bootloader may support both.
+def erase_extended_pages(fd, num_pages):
+    """Page-by-page Extended Erase. Required on STM32L0 ROM where mass erase
+    (0xFFFF) is unreliable on a clean/RDP=0 chip."""
+    if num_pages < 1 or num_pages > 0xFFFB:
+        print(f"  page count out of range: {num_pages}")
+        return False
+    # N is (number_of_pages - 1) as a big-endian halfword
+    n_minus_1 = num_pages - 1
+    payload = bytes([(n_minus_1 >> 8) & 0xFF, n_minus_1 & 0xFF])
+    for p in range(num_pages):
+        payload += bytes([(p >> 8) & 0xFF, p & 0xFF])
+    chk = xor_checksum(payload)
+    payload += bytes([chk])
+    write_cmd(fd, b'\x44\xBB')
+    if not wait_ack(fd, timeout=2.0):
+        print("  Extended Erase command NACK on cmd byte")
+        return False
+    write_cmd(fd, payload)
+    # L0 erases ~3-4 ms per 128B page; budget generously.
+    return wait_ack(fd, timeout=max(30.0, num_pages * 0.05))
+
+def erase_memory(fd, firmware_len=None):
+    print("Erasing memory... (This may take up to 60 seconds)")
+    # Try Extended Erase mass-erase (0xFFFF) first — works when RDP just
+    # transitioned 1->0, fast path for some devices.
     write_cmd(fd, b'\x44\xBB')
     if wait_ack(fd, timeout=2.0):
-        # Global Ext Erase command: 0xFF 0xFF 0x00
         write_cmd(fd, b'\xFF\xFF\x00')
-        if wait_ack(fd, timeout=25.0):
-            print("Extended Erase complete!")
+        if wait_ack(fd, timeout=30.0):
+            print("Extended Erase complete! (mass-erase via 0xFFFF)")
+            return True
+        # Mass erase NACK'd — fall through to page-by-page.
+        print("  mass-erase parameter NACK; falling back to page-by-page erase")
+        # Drain any stray bytes before next command.
+        try:
+            while os.read(fd, 64):
+                pass
+        except BlockingIOError:
+            pass
+        # STM32L072 page size is 128 bytes; erase enough pages to cover
+        # the firmware (rounded up). Default to 256 pages (32KB) if size
+        # is unknown — comfortably covers our 16592B builds.
+        L072_PAGE_SIZE = 128
+        if firmware_len is not None:
+            num_pages = (firmware_len + L072_PAGE_SIZE - 1) // L072_PAGE_SIZE
+        else:
+            num_pages = 256
+        print(f"  page-by-page Extended Erase: {num_pages} pages "
+              f"({num_pages * L072_PAGE_SIZE} bytes)")
+        if erase_extended_pages(fd, num_pages):
+            print(f"Extended Erase complete! ({num_pages} page batches complete via page-by-page fallback)")
             return True
     else:
         print("Extended Erase not supported or failed. Attempting standard Erase (0x43)...")
-        # Clear buffer
         try:
             os.read(fd, 1024)
-        except:
+        except Exception:
             pass
-        
         write_cmd(fd, b'\x43\xBC')
         if wait_ack(fd, timeout=2.0):
-            # Global Erase command: 0xFF 0x00
             write_cmd(fd, b'\xFF\x00')
             if wait_ack(fd, timeout=25.0):
                 print("Standard Erase complete!")
@@ -156,7 +193,7 @@ def flash_file(fd, filepath, start_address=0x08000000):
     print(f"Firmware size: {firmware_len} bytes")
     
     # 1. Erase
-    if not erase_memory(fd):
+    if not erase_memory(fd, firmware_len=firmware_len):
         return False
         
     # 2. Flash
