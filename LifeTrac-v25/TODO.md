@@ -384,7 +384,42 @@ captures clean MJPEG `1920×1080` frames on the tractor X8
 ADB, with the W2-01 USB host-controller mitigations in place. With
 pixel acquisition proven, the next active firmware/software workstream
 is the **W2-02 capture → encode → transmit → reassemble → decode →
-render** code path. Promoted to a top-level pre-field-deployment
+render** code path.
+
+🟩 **W2-02 single-frame proof-of-life PASS on 2026-05-18**
+(evidence: `DESIGN-CONTROLLER/bench-evidence/W2-02_image_over_lora_2026-05-18_175638/`).
+End-to-end orchestrator `run_w2_02_image_over_lora_end_to_end.ps1`
+captured one Kurokesu C2 frame on the TX X8 (`2E2C1209DABC240B`),
+encoded a `TileDeltaFrame` KEY (96 tiles, 190 fragments of ≤60 B
+data each), transmitted them over LoRa SF7/BW125 via the
+W1-10b-proven HostLink TX path, listened on the RX X8
+(`2D0A1209DABC240B`), and reassembled + rendered the canvas on
+the host. All four gates green:
+
+| Gate | Threshold | Got |
+|---|---|---|
+| V1 tx_ok_rate | ≥ 0.99 | **1.00** (190/190 OK, 0 timeouts, 0 ERR_PROTO) |
+| V2 rx_match_rate | ≥ 0.95 | **1.00** (190/190 matched by payload) |
+| V3 frame_complete | True | **True** |
+| V4 tiles_decoded | == 96 | **96/96** (0 decode errors) |
+
+Link quality: RSSI median −113 dBm, SNR median +3 dB on bench dipoles.
+Two real-bench bugs were fixed to reach PASS: (a) the RX SX1276 was
+parked in `LORA_SLEEP` (RegOpMode=0x80) by every prior probe's
+`__RADIO_SLEEP_ON_EXIT__` cleanup — solved by `w2_02_radio_wake_rxcont.py`,
+a HostLink-only helper that writes `REG_OP_MODE=0x85` (LORA_RXCONT)
+before `rx_listen` (replaces unreliable openocd SWD warm-boot on
+Board 1); (b) `--inter-s 0.05` overflowed the L072 TX queue
+(elapsed_ms≈73 ms ≫ inter_s) producing `HOST_ERR_PROTO_FORBIDDEN`
+(0x08) bursts of 5 after every ~6 OK frags — solved by raising the
+orchestrator default to `--inter-s 0.2`. Full write-up:
+[AI NOTES/2026-05-18_W2-02_Image_Over_LoRa_Bench_Plan_Copilot_v1_0.md](AI%20NOTES/2026-05-18_W2-02_Image_Over_LoRa_Bench_Plan_Copilot_v1_0.md).
+
+This is the **proof of life only** — the tractor-side production
+code path (`capture.py`, `register.py`, `tile_diff.py`, `roi.py`,
+`fragment.py`, `ipc_to_h747.py`, etc., below) is still all 🟥.
+The bench scaffold uses a Python host encoder + bypass HostLink TX,
+not the M7 P3 scheduler. Promoted to a top-level pre-field-deployment
 section per [DESIGN-CONTROLLER/MASTER_PLAN.md §8.20](DESIGN-CONTROLLER/MASTER_PLAN.md#820-image-transmitreceive-code-path--active-firmware-priority-2026-05-15).
 
 The full task list is **not duplicated here** — it lives in

@@ -1,0 +1,19 @@
+=== W2-02 TX: 188 fragments, uart=/dev/ttymxc3 ===
+Traceback (most recent call last):
+  File "/tmp/lifetrac_p0c/w2_02_tx_fragments.py", line 157, in <module>
+    sys.exit(main())
+  File "/tmp/lifetrac_p0c/w2_02_tx_fragments.py", line 81, in main
+    link = HostLink(args.uart, args.baud)
+  File "/tmp/lifetrac_p0c/method_g_stage1_probe.py", line 178, in __init__
+    configure_uart(dev, baud)
+  File "/tmp/lifetrac_p0c/method_g_stage1_probe.py", line 72, in configure_uart
+    result = subprocess.run(
+  File "/usr/lib/python3.10/subprocess.py", line 501, in run
+    with Popen(*popenargs, **kwargs) as process:
+  File "/usr/lib/python3.10/subprocess.py", line 966, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.10/subprocess.py", line 1775, in _execute_child
+    self.pid = _posixsubprocess.fork_exec(
+TypeError: expected str, bytes or os.PathLike object, not int
+__METHOD_H_RC__=1
+
