@@ -184,6 +184,39 @@ class StatePublisherTests(unittest.TestCase):
         self.assertEqual(snap["accel_status"], "online")
         self.assertEqual(snap["detections"][0]["cls"], "person")
 
+    def test_snapshot_includes_link_power_default_null(self):
+        # S7.1: LINK-pill telemetry field must always be present in
+        # snapshot output so browser map.js doesn't crash on KeyError
+        # before the bridge emits its first sample.
+        canvas = Canvas()
+        canvas.apply(_make_keyframe(0, [0]))
+        pub = StatePublisher(canvas=canvas)
+        snap = pub.snapshot()
+        self.assertIn("link_power", snap)
+        self.assertEqual(snap["link_power"], {"uplink": None, "downlink": None})
+
+    def test_snapshot_link_power_per_direction(self):
+        # S7.1: each direction is forwarded independently and the
+        # snapshot preserves the S7.2 field schema verbatim.
+        canvas = Canvas()
+        canvas.apply(_make_keyframe(0, [0]))
+        pub = StatePublisher(canvas=canvas)
+        sample = {
+            "state": "MARGIN_LIMITED",
+            "action": "RAISE_POWER",
+            "value": 15,
+            "reason": "snr_below_floor",
+            "power_dbm": 15,
+            "sf_rung": 0,
+            "snr_ewma": -6.2,
+            "per": 0.04,
+            "per_sample_count": 100,
+        }
+        pub.link_power["uplink"] = sample
+        snap = pub.snapshot()
+        self.assertEqual(snap["link_power"]["uplink"], sample)
+        self.assertIsNone(snap["link_power"]["downlink"])
+
 
 class FallbackRendererTests(unittest.TestCase):
     def test_text_digest_when_pil_missing(self):

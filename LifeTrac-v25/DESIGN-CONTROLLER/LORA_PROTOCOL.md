@@ -108,6 +108,42 @@ TX power per source:
 | Tractor (Max Carrier) | +20 dBm | Murata SiP max |
 | Base station (Max Carrier) | +20 dBm | Murata SiP max; gain comes from 8 dBi mast antenna |
 
+## Priority class policy (canonical)
+
+This table is the **normative** traffic-class taxonomy for the LoRa
+link. It supersedes the older `STREAM_CONTROL` / `STREAM_TELEMETRY` /
+`STREAM_VIDEO_FRAGMENT` / `EVENT_STATE` / `SAFETY` naming used in early
+bring-up notes (per [AI NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md](../AI%20NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md)
+decision **D11**, with rationale in §15.3 of the same doc). All
+implementation code, CI tests, and design notes from 2026-05-18 onward
+use the `P0`/`P1`/`P2`/`P3` names below.
+
+| Class | Member traffic | Mailbox / queue discipline | Burst | Crypto | Loss policy |
+|---|---|---|---|---|---|
+| **P0 — control + safety** | `ControlFrame`, `HeartbeatFrame` (active source), Command opcodes `CMD_ESTOP` (0x01), `CMD_LINK_TUNE` (0x21), `CMD_PERSON_APPEARED` (0x60); ESTOP bypasses mailbox via dedicated path | **depth-1 latest-wins per source** (newest joystick frame preempts in-mailbox stale one) | 1 (5 with ≥50 ms spacing for `CMD_ESTOP` per D4) | AES-GCM-64 implicit nonce (+12 B) per D13 | <1 % PER target in field, <2 % triggers adapter recovery (§23.2). Freshness wins — no retransmit. |
+| **P1 — event / sticky state** | Command opcodes `CMD_CLEAR_ESTOP` (0x02), `CMD_CAMERA_SELECT` (0x03), `CMD_ROI_HINT` (0x61), `CMD_REQ_KEYFRAME` (0x62), `CMD_ENCODE_MODE` (0x63), `CMD_LINK_PROFILE` (0x64); any unknown Command opcode (defensive default — see `classify_priority()`) | EVENT FIFO, drained ahead of P2/P3 | 3 copies (pull-recovery for RELEASE edges per D3) | AES-GCM-64 implicit (+12 B) | <0.1 % effective loss after sticky-state echo in heartbeat. |
+| **P2 — telemetry** | Topics `0x01`–`0x10`, `0x26` (`detections`), `0x27` (`audio_event`), `link_power`, `link_airtime` | Bounded FIFO, fragment-accounted, PER-feedback piggybacked per D9 | 1 | AES-GCM-64 implicit (+12 B) | ≤10 % PER OK; sender backs off cadence before queue overruns. |
+| **P3 — image fragment** | `TileDeltaFrame` (topic `0x25`), I-frame and P-frame fragments | Refresh-cancelable per-tile mailbox, fragment-accounted; new keyframe **cancels** in-flight stale fragments per D11 | 1 | **Plaintext + 4 B seq + 2 B CRC32 (+6 B, no MAC)** per D14 — split-trust: image is not safety-critical | ≤1 % per fragment OK; missing fragments produce a stale tile / trigger `CMD_REQ_KEYFRAME` (opcode `0x62`), **never** a false-complete frame (§23.2). |
+
+**Strict-priority drain.** The base-station bridge
+([`base_station/lora_bridge.py`](base_station/lora_bridge.py)) and the
+tractor M7 firmware queue both implement a strict-priority heap with
+FIFO tiebreak: a P0 frame queued at time *t* is always dequeued before
+any P1/P2/P3 frame queued at *t* − ε. P3 image fragments are subject
+to the **25 ms-per-fragment cap** in [IMAGE_PIPELINE.md C1](IMAGE_PIPELINE.md)
+so a single image fragment cannot delay a P0 ControlFrame TX-start by
+more than 25 ms. Classification on the base side is performed by
+`classify_priority()` in [`base_station/lora_proto.py`](base_station/lora_proto.py),
+pinned by `test_classify_priority_buckets`.
+
+**Reverse mapping (deprecated → canonical).** If you encounter old
+names in archived AI NOTES, treat them as aliases for the rows above:
+`STREAM_CONTROL` → P0; `EVENT_STATE` → P1; `STREAM_TELEMETRY` → P2;
+`STREAM_VIDEO_FRAGMENT` → P3; standalone `SAFETY` → P0 (ESTOP-bypass
+row). The `SAFETY` row's older "+17 dBm forced" power note is
+superseded by **regional EIRP cap per §21.3-6** of the 2026-05-18 TX
+adaptation doc.
+
 ## Frame format
 
 ### Common header (5 bytes)
@@ -182,7 +218,7 @@ Camera selection is driven by a Command frame from the active source — see [§
 
 ### Command frame opcodes
 
-Command frames (`frame_type = 0x30`) carry a 1-byte `opcode` followed by an opcode-specific payload of up to 9 bytes. They are P0-class for the priority queue (see [AI NOTES/2026-04-26_LoRa_QoS_Bandwidth_Management.md](../AI%20NOTES/2026-04-26_LoRa_QoS_Bandwidth_Management.md) §4) — they ride alongside `ControlFrame` and never get queued behind telemetry or video.
+Command frames (`frame_type = 0x30`) carry a 1-byte `opcode` followed by an opcode-specific payload of up to 9 bytes. Their priority class is **per opcode** — see the [Priority class policy (canonical)](#priority-class-policy-canonical) table above and [`base_station/lora_proto.py::classify_priority()`](base_station/lora_proto.py). The safety-critical opcodes `CMD_ESTOP` (0x01), `CMD_LINK_TUNE` (0x21), and `CMD_PERSON_APPEARED` (0x60) are P0 and ride alongside `ControlFrame`; the remaining opcodes (`CMD_CLEAR_ESTOP`, `CMD_CAMERA_SELECT`, `CMD_ROI_HINT`, `CMD_REQ_KEYFRAME`, `CMD_ENCODE_MODE`, `CMD_LINK_PROFILE`) are P1 — they drain ahead of telemetry/video but do not preempt an in-flight `ControlFrame` (see [AI NOTES/2026-04-26_LoRa_QoS_Bandwidth_Management.md](../AI%20NOTES/2026-04-26_LoRa_QoS_Bandwidth_Management.md) §4).
 
 Layout:
 

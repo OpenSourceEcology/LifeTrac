@@ -488,6 +488,22 @@ def _on_mqtt_message(_c, _u, msg):
             _set_active_source(candidate)
     _maybe_capture_params(msg.topic, data)
 
+    # S7.1 LINK-pill cross-process glue: forward the per-direction
+    # adapter snapshot published by lora_bridge._airtime_worker on
+    # `lifetrac/v25/control/link_power/{direction}` into the
+    # StatePublisher so /ws/state carries it to map.js. Bridge and
+    # web_ui are separate processes (they share only the broker), so
+    # this MQTT subscription is the seam — there is no in-process
+    # object handoff. Refusal-on-bad-payload: silently drop anything
+    # that isn't a dict on a known direction, per §6.1.
+    if msg.topic.startswith("lifetrac/v25/control/link_power/"):
+        direction = msg.topic.rsplit("/", 1)[-1]
+        if direction in ("uplink", "downlink") and isinstance(data, dict):
+            try:
+                _image_publisher.link_power[direction] = data
+            except Exception:
+                pass
+
     payload = {"topic": msg.topic, "data": data}
     loop = getattr(app.state, "loop", None)
     if loop is None:

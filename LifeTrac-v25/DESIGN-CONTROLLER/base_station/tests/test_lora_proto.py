@@ -6,6 +6,11 @@ from lora_proto import (
     CMD_LINK_TUNE,
     CMD_PERSON_APPEARED,
     CMD_REQ_KEYFRAME,
+    CRYPTO_GCM128_EXPLICIT,
+    CRYPTO_GCM64_IMPLICIT,
+    CRYPTO_IMAGE_PLAIN_CRC32,
+    CRYPTO_PROFILE_DEFAULT,
+    CRYPTO_PROFILES,
     CTRL_FRAME_LEN,
     FT_COMMAND,
     FT_CONTROL,
@@ -80,6 +85,124 @@ class LoraProtoTests(unittest.TestCase):
         # DECISIONS.md D-A3: image PHY is SF7/BW500 so a 32 B fragment
         # stays under the 25 ms per-fragment cap (LORA_IMPLEMENTATION.md §4).
         self.assertLessEqual(lora_time_on_air_ms(32, PHY_IMAGE), 25.0)
+
+    # --- 2026-05-18 design-doc D13 / D14 / §17 worked-example pins ---------
+    #
+    # Reference numbers come from running the project's actual
+    # `lora_time_on_air_ms` + `encrypted_payload_len` against the project's
+    # actual PHY profile constants. Where the design doc §17/§19 claims a
+    # specific ToA, these tests pin the computed value and note any small
+    # delta from the doc (the doc rounded preamble assumptions in places).
+    # Future changes to the predictor, the PHY profiles, or the crypto
+    # profiles will trip these tests and force a coordinated update.
+
+    def test_crypto_profile_overheads_match_design_doc(self):
+        # D13: GCM-64 implicit saves exactly 16 B vs the shipped GCM-128
+        # explicit profile (§19.10). D14: split-trust image saves exactly
+        # 22 B vs shipped (§20.4).
+        self.assertEqual(CRYPTO_GCM128_EXPLICIT.overhead_bytes, 28)
+        self.assertEqual(CRYPTO_GCM64_IMPLICIT.overhead_bytes, 12)
+        self.assertEqual(CRYPTO_IMAGE_PLAIN_CRC32.overhead_bytes, 6)
+        self.assertEqual(
+            CRYPTO_GCM128_EXPLICIT.overhead_bytes
+            - CRYPTO_GCM64_IMPLICIT.overhead_bytes,
+            16,
+            "D13 reclaim must be exactly 16 B/frame",
+        )
+        # Class-downgrade-only invariant (§21.3-3) hinges on this MAC flag.
+        self.assertTrue(CRYPTO_GCM128_EXPLICIT.has_mac)
+        self.assertTrue(CRYPTO_GCM64_IMPLICIT.has_mac)
+        self.assertFalse(CRYPTO_IMAGE_PLAIN_CRC32.has_mac)
+
+    def test_encrypted_payload_len_backward_compatible(self):
+        # Single-arg callers must still get the SHIPPED GCM-128 profile.
+        self.assertEqual(encrypted_payload_len(16), 16 + 28)
+        self.assertIs(CRYPTO_PROFILE_DEFAULT, CRYPTO_GCM128_EXPLICIT)
+        # All three profiles are registered by name.
+        self.assertEqual(set(CRYPTO_PROFILES), {
+            "gcm128_explicit", "gcm64_implicit", "image_plain_crc32",
+        })
+
+    def test_control_frame_airtime_matches_doc_section_17(self):
+        # §17 / §19.4 worked example: 16 B ControlFrame on SF7/BW250/CR4-5.
+        # GCM-128 explicit (shipped) → 46.21 ms; GCM-64 implicit (D13) → 33.41 ms.
+        toa_shipped = lora_time_on_air_ms(
+            encrypted_payload_len(16, CRYPTO_GCM128_EXPLICIT),
+            PHY_CONTROL_SF7,
+        )
+        toa_d13 = lora_time_on_air_ms(
+            encrypted_payload_len(16, CRYPTO_GCM64_IMPLICIT),
+            PHY_CONTROL_SF7,
+        )
+        self.assertAlmostEqual(toa_shipped, 46.208, places=3)
+        self.assertAlmostEqual(toa_d13, 33.408, places=3)
+        # D13 must produce a strict reduction.
+        self.assertLess(toa_d13, toa_shipped)
+        # Both must still fit the 50 ms / 20 Hz cadence with margin.
+        self.assertLess(toa_shipped, 50.0)
+        self.assertLess(toa_d13, 50.0)
+
+    def test_image_fragment_airtime_matches_doc_section_17(self):
+        # §17 / §19.4: 32 B image fragment on PHY_IMAGE (SF7/BW500/CR4-5).
+        # Shipped GCM-128 = 28.22 ms (VIOLATES 25 ms cap).
+        # D13 GCM-64 = 23.10 ms (fits with ~2 ms margin).
+        # D14 plain+CRC32 = 20.54 ms (fits with ~4.5 ms margin).
+        toa_shipped = lora_time_on_air_ms(
+            encrypted_payload_len(32, CRYPTO_GCM128_EXPLICIT), PHY_IMAGE,
+        )
+        toa_d13 = lora_time_on_air_ms(
+            encrypted_payload_len(32, CRYPTO_GCM64_IMPLICIT), PHY_IMAGE,
+        )
+        toa_d14 = lora_time_on_air_ms(
+            encrypted_payload_len(32, CRYPTO_IMAGE_PLAIN_CRC32), PHY_IMAGE,
+        )
+        self.assertAlmostEqual(toa_shipped, 28.224, places=3)
+        self.assertAlmostEqual(toa_d13, 23.104, places=3)
+        self.assertAlmostEqual(toa_d14, 20.544, places=3)
+        # The 25 ms per-fragment cap (LORA_IMPLEMENTATION.md §4) is the
+        # binding constraint that motivated D13/D14 in the first place.
+        self.assertGreater(toa_shipped, 25.0,
+                           "Shipped profile MUST violate the 25 ms cap — "
+                           "if this assertion ever flips, recompute D13/D14 "
+                           "savings before merging.")
+        self.assertLess(toa_d13, 25.0)
+        self.assertLess(toa_d14, 25.0)
+
+    def test_telemetry_100b_airtime_uses_project_phy_constants(self):
+        # §17 quoted ~557.57 ms for a 100 B telemetry frame under
+        # GCM-128. That worked example used a different preamble length
+        # than the project's actual PHY_TELEMETRY (preamble=12). The
+        # CODEBASE is the source of truth; recompute against project
+        # constants here so future PHY-profile tweaks are caught.
+        toa = lora_time_on_air_ms(
+            encrypted_payload_len(100, CRYPTO_GCM128_EXPLICIT), PHY_TELEMETRY,
+        )
+        # Project value: 524.8 ms (preamble=12). Doc value: 557.57 ms.
+        # Pin the project value; if it changes, also update the §17 footnote.
+        self.assertAlmostEqual(toa, 524.800, places=3)
+        # D13 reduction is still 16 B saved → measurable ToA delta.
+        toa_d13 = lora_time_on_air_ms(
+            encrypted_payload_len(100, CRYPTO_GCM64_IMPLICIT), PHY_TELEMETRY,
+        )
+        self.assertLess(toa_d13, toa)
+        # Sanity: reduction is at least 30 ms at SF9 (16 B × 2.048 ms/sym
+        # ÷ symbols-per-byte ≈ many ms of saved airtime).
+        self.assertGreater(toa - toa_d13, 30.0)
+
+    def test_d13_reclaim_estimate_at_20hz_control_cadence(self):
+        # §18 claim: dropping control to GCM-64 implicit reclaims hundreds
+        # of milliseconds per second at 20 Hz cadence. Test the lower
+        # bound: at 20 Hz, 16 B ControlFrames, the reclaim must be
+        # at least 200 ms/s (the actual computed value is ~256 ms/s).
+        rate_hz = 20.0
+        toa_shipped = lora_time_on_air_ms(
+            encrypted_payload_len(16, CRYPTO_GCM128_EXPLICIT), PHY_CONTROL_SF7,
+        )
+        toa_d13 = lora_time_on_air_ms(
+            encrypted_payload_len(16, CRYPTO_GCM64_IMPLICIT), PHY_CONTROL_SF7,
+        )
+        reclaim_ms_per_s = (toa_shipped - toa_d13) * rate_hz
+        self.assertGreater(reclaim_ms_per_s, 200.0)
 
     def test_fhss_sequence_stays_in_us_915_band(self):
         channels = [fhss_channel_hz(0x12345678, hop) for hop in range(8)]

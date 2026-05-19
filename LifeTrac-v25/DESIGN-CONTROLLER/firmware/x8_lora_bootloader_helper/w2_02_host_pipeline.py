@@ -59,6 +59,10 @@ from image_pipeline.frame_format import (  # noqa: E402
     encode_tile_delta_frame,
 )
 from image_pipeline.reassemble import FragmentReassembler  # noqa: E402
+# S1.3: newest-frame-wins counter. Observability primitive that surfaces
+# stale / duplicate completed frames so the W2-02 stability gate can assert
+# `stale_dropped == 0` once the S3 firmware coalescing fix lands.
+from newest_frame_wins import NewestFrameWinsCounter  # noqa: E402
 from lora_proto import (  # noqa: E402
     PHY_IMAGE,
     pack_telemetry_fragments,
@@ -196,6 +200,13 @@ def cmd_decode(args) -> int:
     hex_payloads = _RX_FRAME_RE.findall(text)
     print(f"DECODE: parsed {len(hex_payloads)} __RX_FRAME__ lines")
     reasm = FragmentReassembler()
+    # S1.3: track every completed-frame base_seq in arrival order. The
+    # counter is pure observability — it does not change which frame the
+    # harness paints (that stays `completed[0]` for backward-compat). The
+    # counter surfaces what the S3-gated behavioural change must produce:
+    # `stale_dropped == 0` and `duplicate_dropped == 0` across a 10-minute
+    # mixed-load run.
+    newest = NewestFrameWinsCounter()
     completed: list[TileDeltaFrame] = []
     for h in hex_payloads:
         try:
@@ -206,8 +217,10 @@ def cmd_decode(args) -> int:
         frame = reasm.feed(body)
         if frame is not None:
             completed.append(frame)
+            newest.observe(frame.base_seq)
     print(f"DECODE: reassembler stats={reasm.stats} pending={reasm.pending_frag_seqs()}")
     print(f"DECODE: completed frames={len(completed)}")
+    print(f"DECODE: newest_frame_wins={newest.stats_dict()}")
     if not completed:
         print("FATAL: no frame completed")
         if args.summary:
@@ -216,6 +229,7 @@ def cmd_decode(args) -> int:
                 "completed_frames": 0,
                 "decode_errors": reasm.stats.decode_errors,
                 "pending_seqs": reasm.pending_frag_seqs(),
+                "newest_frame_wins": newest.stats_dict(),
             }, indent=2))
         return 3
 
@@ -259,6 +273,7 @@ def cmd_decode(args) -> int:
                 "bad_magic_passthroughs": reasm.stats.bad_magic_passthroughs,
                 "timeouts": reasm.stats.timeouts,
             },
+            "newest_frame_wins": newest.stats_dict(),
             "pending_seqs": reasm.pending_frag_seqs(),
         }, indent=2))
     return 0

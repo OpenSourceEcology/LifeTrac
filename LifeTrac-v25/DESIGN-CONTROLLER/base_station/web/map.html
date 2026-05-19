@@ -79,6 +79,19 @@
       <div class="row"><span>SNR</span><span id="link-snr">—</span></div>
       <div class="row"><span>est. range</span><span id="link-range">—</span></div>
       <div class="row"><span>encode</span><span id="link-mode" class="pill">—</span></div>
+      <!--
+        S7.1 LINK pill — per-direction adapter state from
+        `state.link_power.{uplink,downlink}` (server-side, populated by
+        lora_bridge._airtime_worker on the link_power MQTT topic and
+        forwarded to /ws/state by StatePublisher). Symmetric with the
+        IMG/AI pills on the operator console. Format per spec:
+        `LINK: SF7 / +14 dBm / 99.2% / SNR +8 dB`, color-coded by state.
+        Renders `—` when the bench flag LIFETRAC_TX_POWER_ADAPTER_V3 is
+        OFF or before the adapter has emitted a first decision.
+      -->
+      <div class="row"><span>LINK ↑</span><span id="link-pill-up" class="pill">—</span></div>
+      <div class="row"><span>LINK ↓</span><span id="link-pill-dn" class="pill">—</span></div>
+      <div class="row" id="link-reason-row" style="opacity:.7"><span>reason</span><span id="link-reason">—</span></div>
     </aside>
   </main>
 

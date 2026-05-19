@@ -453,6 +453,12 @@ The Kurokesu C2 USB camera was bench-validated end-to-end on the tractor X8 on *
 
 This subsection does **not** alter any §8.19 compute decisions, the canonical hardware list (§3), the bench-validated capture stack (§8.8), or any LoRa wire-protocol slot — those are settled. It only elevates the implementation order: **W2-02 capture/encode/transmit on the tractor and reassemble/decode/render on the base are now the next blocks of code to land**, ahead of the V4/V5/V6 physical USB tests from the [W2-01 mitigations note](../AI%20NOTES/2026-05-14_USB_Wedge_Software_Mitigations.md), so the rest of the §3.4 fallback ladder, the §8.10 black-box logger, and the Phase 5D V1–V10 validation gates (in [DESIGN-CONTROLLER/TODO.md](TODO.md)) have something concrete to verify against. The full task breakdown is **not duplicated here** — it lives in [DESIGN-CONTROLLER/TODO.md Phases 5A / 5B / 5C / 5D](TODO.md#phase-5a--foundation-cpu-only-no-ai-accelerator-required-ships-value-alone) and is mirrored at the program level in [LifeTrac-v25/TODO.md § K](../TODO.md#k-image-transmitreceive-code-path-active-since-2026-05-15).
 
+### 8.21 LoRa priority-class taxonomy — **P0 / P1 / P2 / P3 (D11)**
+
+The canonical traffic-class names for the LoRa link are **P0** (control + safety), **P1** (event / sticky state), **P2** (telemetry), and **P3** (image fragment). The normative table — class membership, mailbox discipline, burst counts, crypto envelope, and per-class loss policy — lives in [`LORA_PROTOCOL.md § Priority class policy (canonical)`](LORA_PROTOCOL.md#priority-class-policy-canonical) and is the single source of truth for both `base_station/lora_proto.py::classify_priority()` and the tractor M7 firmware queue.
+
+This pins decision **D11** from [AI NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md § 15.3](../AI%20NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md) — the older `STREAM_CONTROL` / `STREAM_TELEMETRY` / `STREAM_VIDEO_FRAGMENT` / `EVENT_STATE` / `SAFETY` taxonomy used in early bring-up notes is **deprecated**, retained only as a reverse-mapping aid for archived material. All normative documents (this file, `LORA_PROTOCOL.md`, `LORA_IMPLEMENTATION.md`, `DESIGN-CONTROLLER/TODO.md`, top-level `TODO.md`) use the P0/P1/P2/P3 names exclusively; CI grep against `STREAM_*` in normative paths returns zero hits (S7.3 gate).
+
 ---
 
 If none of the §7 reversals happen and the §8 confirmations land, this plan is the build.

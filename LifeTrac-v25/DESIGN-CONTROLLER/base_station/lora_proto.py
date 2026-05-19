@@ -288,6 +288,194 @@ def decrypt_frame(key: bytes, onair: bytes) -> bytes | None:
         return None
 
 
+# --- D13 AES-GCM-64 implicit-nonce codec (proposed) ------------------------
+#
+# Wire layout (replaces explicit 12-B nonce + 16-B tag = +28 B):
+#
+#   on_air = seq_be32 (4 B) ‖ ciphertext (len = cleartext) ‖ tag (8 B)
+#
+# RX reconstructs the AES-GCM 12-B nonce from receiver-side state:
+#
+#   nonce = src (1 B) ‖ boot_ctr (4 B, big-endian) ‖ seq (4 B, big-endian)
+#                       ‖ zero_pad (3 B)
+#
+# Both sides must agree on (src, boot_ctr) out-of-band. `boot_ctr` is
+# persisted to flash and incremented on every TX-side boot to guarantee
+# nonce uniqueness across reboots even if the seq counter resets. The
+# RX learns the new boot_ctr from an explicit handshake frame (out of
+# scope of this codec — see DECISIONS.md D13 §3 boot_ctr roll protocol).
+#
+# Tag is the first 8 bytes of the full 16-B AES-GCM tag (NIST SP 800-38D
+# §5.2.1.2 allows truncation to ≥ 32 bits; we use 64 bits). The §19.6
+# rate-limited MAC-failure floor budgets the residual forgery risk.
+
+GCM64_SEQ_LEN = 4
+GCM64_TAG_LEN = 8
+GCM64_BOOT_CTR_LEN = 4
+GCM64_OVERHEAD = GCM64_SEQ_LEN + GCM64_TAG_LEN  # 12 B (matches CRYPTO_GCM64_IMPLICIT.overhead_bytes)
+
+
+def build_implicit_nonce(source_id: int, boot_ctr: int, seq: int) -> bytes:
+    """Reconstruct the 12-B AES-GCM nonce for the D13 implicit-nonce profile.
+
+    Layout: src(1) ‖ boot_ctr_be32(4) ‖ seq_be32(4) ‖ zero_pad(3) = 12 B.
+    All three integer fields are masked to their wire width so callers
+    cannot accidentally inject upper bits that would silently desync
+    sender and receiver."""
+    return (
+        bytes([source_id & 0xFF])
+        + struct.pack(">I", boot_ctr & 0xFFFFFFFF)
+        + struct.pack(">I", seq & 0xFFFFFFFF)
+        + b"\x00\x00\x00"
+    )
+
+
+def encrypt_frame_gcm64_implicit(key: bytes, source_id: int, boot_ctr: int,
+                                 seq: int, plaintext: bytes) -> bytes:
+    """D13 codec: seq_be32 ‖ ciphertext ‖ tag8. Overhead = +12 B."""
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
+    nonce = build_implicit_nonce(source_id, boot_ctr, seq)
+    encryptor = Cipher(algorithms.AES(key), modes.GCM(nonce)).encryptor()
+    ciphertext = encryptor.update(plaintext) + encryptor.finalize()
+    tag8 = encryptor.tag[:GCM64_TAG_LEN]
+    return struct.pack(">I", seq & 0xFFFFFFFF) + ciphertext + tag8
+
+
+def decrypt_frame_gcm64_implicit(key: bytes, source_id: int, boot_ctr: int,
+                                 onair: bytes) -> tuple[int, bytes] | None:
+    """D13 RX: parse seq, reconstruct nonce, decrypt + verify 8-B tag.
+
+    Returns (seq, plaintext) on success, None on any failure
+    (length too short, MAC mismatch). Caller is responsible for
+    feeding `seq` into the per-source replay window AFTER this returns
+    a non-None value (per §19.6 the replay check runs after MAC verify
+    to avoid a side-channel on the replay state itself)."""
+    if len(onair) < GCM64_SEQ_LEN + GCM64_TAG_LEN:
+        return None
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
+    seq = struct.unpack(">I", onair[:GCM64_SEQ_LEN])[0]
+    tag8 = onair[-GCM64_TAG_LEN:]
+    ciphertext = onair[GCM64_SEQ_LEN:-GCM64_TAG_LEN]
+    nonce = build_implicit_nonce(source_id, boot_ctr, seq)
+    try:
+        decryptor = Cipher(
+            algorithms.AES(key),
+            modes.GCM(nonce, tag8, min_tag_length=GCM64_TAG_LEN),
+        ).decryptor()
+        plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+    except Exception:
+        return None
+    return seq, plaintext
+
+
+# --- D14 split-trust image fragment framer (plaintext + CRC32) -------------
+#
+# Wire layout (replaces +28 B GCM-128 envelope for P3 image fragments):
+#
+#   on_air = seq_be32 (4 B) ‖ cleartext (variable) ‖ crc16_be (2 B)
+#
+# Where crc16 = (zlib.crc32(seq_be32 ‖ cleartext) & 0xFFFF). We use
+# the lower 16 bits of CRC32 (not CRC16-CCITT) deliberately: it gives
+# a different polynomial domain than the PHY-layer CRC16-CCITT, so a
+# burst error that defeats the PHY CRC is unlikely to also satisfy
+# this app-layer CRC. There is intentionally NO MAC (D14 split-trust
+# rationale §20.4): a forged image fragment has zero kinetic-control
+# authority, and the host-boundary class-tag enforcer (below) prevents
+# reclassification into a P0/P1/P2 path.
+
+IMAGE_PLAIN_SEQ_LEN = 4
+IMAGE_PLAIN_CRC_LEN = 2
+IMAGE_PLAIN_OVERHEAD = IMAGE_PLAIN_SEQ_LEN + IMAGE_PLAIN_CRC_LEN  # 6 B
+
+
+def _image_plain_crc(seq_bytes: bytes, payload: bytes) -> int:
+    import zlib
+    return zlib.crc32(seq_bytes + payload) & 0xFFFF
+
+
+def pack_image_fragment_plain(seq: int, payload: bytes) -> bytes:
+    """D14 TX: seq_be32 ‖ payload ‖ crc16_be. Overhead = +6 B, NO MAC."""
+    seq_bytes = struct.pack(">I", seq & 0xFFFFFFFF)
+    crc = _image_plain_crc(seq_bytes, payload)
+    return seq_bytes + payload + struct.pack(">H", crc)
+
+
+def unpack_image_fragment_plain(onair: bytes) -> tuple[int, bytes] | None:
+    """D14 RX: parse seq, verify CRC, return (seq, payload). None on failure.
+
+    Caller MUST treat the returned payload as UNAUTHENTICATED and route
+    it ONLY into the image pipeline. See `enforce_class_tag_boundary`
+    below for the host-side guard that makes this safe."""
+    if len(onair) < IMAGE_PLAIN_OVERHEAD:
+        return None
+    seq_bytes = onair[:IMAGE_PLAIN_SEQ_LEN]
+    payload = onair[IMAGE_PLAIN_SEQ_LEN:-IMAGE_PLAIN_CRC_LEN]
+    crc_recv = struct.unpack(">H", onair[-IMAGE_PLAIN_CRC_LEN:])[0]
+    if _image_plain_crc(seq_bytes, payload) != crc_recv:
+        return None
+    seq = struct.unpack(">I", seq_bytes)[0]
+    return seq, payload
+
+
+# --- S5.3 Host-boundary class-tag enforcer (X8 ↔ L072) ---------------------
+#
+# §20 / §21.3-3 class-downgrade-only invariant: a frame arriving at the
+# X8 ↔ L072 host boundary carries a declared traffic class (P0/P1/P2/P3)
+# AND a crypto profile (which may or may not have a MAC). The enforcer
+# rejects any path that would let an unauthenticated frame (no MAC)
+# drive a kinetic effector, and rejects any reclassification that would
+# raise the privilege level of the frame mid-pipeline.
+#
+# This module-level guard is the single point that makes the D14
+# split-trust image profile safe: even if an attacker forges a
+# CRYPTO_IMAGE_PLAIN_CRC32 fragment that decodes cleanly, it cannot be
+# laundered into a P0/P1/P2 path because (a) it has no MAC and (b) any
+# attempt to relabel its class to a higher-privilege bucket raises.
+
+class ClassTagViolation(Exception):
+    """Raised when a frame's (class, profile) tuple violates §21.3-3."""
+
+
+# P0/P1/P2 require an authenticated profile (has_mac == True). P3 does not.
+# Constants inlined here (not `PRIO_P0` etc.) because those names are
+# defined later in this module; the integer wire values are stable per
+# LORA_PROTOCOL.md so the inline literals are safe.
+_CLASSES_REQUIRING_MAC = frozenset({0, 1, 2})  # P0, P1, P2
+
+
+def enforce_class_tag_boundary(declared_class: int, profile: CryptoProfile) -> None:
+    """Reject frames whose (class, crypto profile) tuple violates §21.3-3.
+
+    Specifically: any class in {P0, P1, P2} that carries an unauthenticated
+    profile (has_mac=False) is rejected — this is the guard that prevents
+    a forged D14 image fragment from being laundered into a kinetic-control
+    path at the X8 ↔ L072 host boundary. P3 is allowed without a MAC
+    (that is the whole point of the D14 split-trust profile)."""
+    if declared_class in _CLASSES_REQUIRING_MAC and not profile.has_mac:
+        raise ClassTagViolation(
+            f"class {declared_class} (P0/P1/P2) requires an authenticated "
+            f"crypto profile; got profile={profile.name!r} (has_mac=False). "
+            f"See §21.3-3 class-downgrade-only invariant."
+        )
+
+
+def enforce_class_downgrade_only(src_class: int, dst_class: int) -> None:
+    """Reject reclassification that raises the privilege level of a frame.
+
+    Class numbers are inverted-priority (P0 = 0 = highest privilege,
+    P3 = 3 = lowest). A frame may be downgraded (dst_class >= src_class)
+    but never upgraded. This blocks the "image fragment laundered into
+    a control frame" attack at the host boundary."""
+    if dst_class < src_class:
+        raise ClassTagViolation(
+            f"class-downgrade-only invariant violated: cannot reclassify "
+            f"P{src_class} frame as P{dst_class} (would raise privilege). "
+            f"See §21.3-3."
+        )
+
+
 def lora_time_on_air_ms(payload_len: int, profile: PhyProfile | None = None,
                         *, sf: int | None = None, bw_khz: int | None = None,
                         cr_den: int | None = None, preamble_len: int | None = None) -> float:
@@ -310,8 +498,102 @@ def lora_time_on_air_ms(payload_len: int, profile: PhyProfile | None = None,
     return (preamble_len + 4.25 + payload_symbols) * tsym_ms
 
 
-def encrypted_payload_len(cleartext_len: int) -> int:
-    return GCM_NONCE_LEN + cleartext_len + GCM_TAG_LEN
+# --- Crypto-profile-aware on-air overhead ----------------------------------
+#
+# Per the 2026-05-18 TX-Power Adaptation design doc (§19 / §20 / D13 / D14),
+# we need to predict on-air bytes under three different crypto profiles:
+#
+#   * The SHIPPED profile (today's code): explicit 12 B nonce + AES-GCM-128
+#     16 B tag = +28 B overhead. Used by all classes right now.
+#   * The PROPOSED control/telemetry profile (D13): implicit nonce derived
+#     from `(src ‖ boot_ctr ‖ seq)` so it does not ride on the air + a
+#     truncated 8 B AES-GCM tag + a 4 B explicit `seq` field that the RX
+#     uses to reconstruct the nonce = +12 B overhead. Cuts ~16 B per frame
+#     versus the shipped profile and is the source of the ~1 s/s airtime
+#     reclaim claimed in §17 / §18.
+#   * The PROPOSED image fragment profile (D14, "split-trust"): plaintext
+#     payload + 4 B monotonic `seq` + 2 B CRC32 truncated to 16 bits at the
+#     application layer = +6 B overhead with no cryptographic MAC. Safe
+#     because image fragments have zero kinetic-effector authority and
+#     because the host-boundary class tag (§20) prevents an unauth frame
+#     from being reclassified into a control path.
+#
+# `encrypted_payload_len(cleartext_len)` keeps its old single-arg signature
+# (= SHIPPED profile, +28 B) so every existing caller keeps working. New
+# callers pass an explicit `CryptoProfile` to predict the proposed profiles.
+
+@dataclass(frozen=True)
+class CryptoProfile:
+    """Per-class on-air overhead model. `overhead_bytes` is the constant
+    delta between the application-layer cleartext payload and the on-air
+    LoRa payload that gets fed to `lora_time_on_air_ms`. `has_mac` records
+    whether the profile carries a cryptographic authentication tag, which
+    matters for the "may this class drive a kinetic effector?" check at
+    the host boundary (§20 D14)."""
+    name: str
+    overhead_bytes: int
+    has_mac: bool
+    description: str = ""
+
+
+# Shipped profile: 12 B nonce + 16 B GCM-128 tag.
+CRYPTO_GCM128_EXPLICIT = CryptoProfile(
+    name="gcm128_explicit",
+    overhead_bytes=GCM_NONCE_LEN + GCM_TAG_LEN,  # 28
+    has_mac=True,
+    description="Shipped 2026 profile: 12 B explicit nonce + AES-GCM-128 16 B tag.",
+)
+
+# Proposed D13: implicit nonce (reconstructed from src/boot_ctr/seq on RX) +
+# 4 B explicit seq + 8 B truncated GCM tag. 12 B on the wire.
+CRYPTO_GCM64_IMPLICIT = CryptoProfile(
+    name="gcm64_implicit",
+    overhead_bytes=4 + 8,  # 12
+    has_mac=True,
+    description=(
+        "D13 proposal: 4 B explicit seq + 8 B truncated AES-GCM tag; nonce "
+        "is reconstructed from (src ‖ boot_ctr ‖ seq) on RX. Saves 16 B "
+        "vs CRYPTO_GCM128_EXPLICIT. Use only for classes whose §19.6 "
+        "rate-limited MAC-failure floor is acceptable."
+    ),
+)
+
+# Proposed D14: split-trust image fragment. No crypto, just integrity tag.
+CRYPTO_IMAGE_PLAIN_CRC32 = CryptoProfile(
+    name="image_plain_crc32",
+    overhead_bytes=4 + 2,  # 4 B seq + 2 B CRC32-truncated-to-16
+    has_mac=False,
+    description=(
+        "D14 split-trust profile for P3 image fragments only: 4 B seq + "
+        "2 B integrity tag, no MAC. The host boundary MUST enforce that "
+        "this profile can never be reclassified into a kinetic-control "
+        "path (§20 §21.3-3 class-downgrade-only invariant)."
+    ),
+)
+
+# Default to the shipped profile so existing single-arg callers are unchanged.
+CRYPTO_PROFILE_DEFAULT = CRYPTO_GCM128_EXPLICIT
+
+CRYPTO_PROFILES = {
+    p.name: p for p in (
+        CRYPTO_GCM128_EXPLICIT,
+        CRYPTO_GCM64_IMPLICIT,
+        CRYPTO_IMAGE_PLAIN_CRC32,
+    )
+}
+
+
+def encrypted_payload_len(cleartext_len: int,
+                          profile: CryptoProfile = CRYPTO_PROFILE_DEFAULT) -> int:
+    """Predict on-air payload bytes for a cleartext frame under `profile`.
+
+    Backward compatible: single-arg calls use the SHIPPED GCM-128 explicit
+    profile (+28 B). Pass `profile=CRYPTO_GCM64_IMPLICIT` to predict the
+    D13 reclaim, or `profile=CRYPTO_IMAGE_PLAIN_CRC32` for D14 image
+    fragments."""
+    if cleartext_len < 0:
+        raise ValueError("cleartext_len must be >= 0")
+    return cleartext_len + profile.overhead_bytes
 
 
 def fhss_channel_index(key_id: int, hop_counter: int) -> int:

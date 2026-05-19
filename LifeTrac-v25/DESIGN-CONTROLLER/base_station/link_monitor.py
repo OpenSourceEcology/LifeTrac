@@ -3,6 +3,21 @@
 The bridge and image pipeline can use this module to keep telemetry/image
 traffic under the LoRa budget and to emit CMD_ENCODE_MODE only after sustained
 pressure, avoiding one bad window flapping the encoder.
+
+Per-direction symmetry (§21.3-5, S5.5)
+--------------------------------------
+The power, SF, and encode-mode adapters in this module are designed to run
+with INDEPENDENT STATE on each link direction (base→tractor and
+tractor→base). The two directions can be margin-limited or
+airtime-limited at different times — e.g. a downlink ACK starvation is not
+evidence that uplink telemetry needs to drop a rung. Each end therefore
+instantiates its own `RollingAirtimeLedger` + `EncodeModeController` pair
+and never reads the peer's counters across the link. Cross-link feedback
+(e.g. PER reports piggybacked on topic 0x10) is consumed by the local
+adapter as ONE input among several, not as authoritative control. The
+S6 stage formalises this with an explicit state machine; here we pin the
+invariant in prose so it can't be quietly violated by a future shared
+singleton.
 """
 
 from __future__ import annotations

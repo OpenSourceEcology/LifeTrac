@@ -1,0 +1,28 @@
+W2-02 STABILITY LOOP REPORT
+Runs       : 10
+PASS       : 8/10 (80.0%)
+FAIL       : 2/10
+inter-s    : 0.2
+
+Per-gate aggregates (n, min, mean, median, max, std):
+  tx_ok_rate         n=10 min=   1.000 mean=   1.000 median=   1.000 max=   1.000 std=  0.000
+  rx_match_rate      n=10 min=   0.995 mean=   0.999 median=   1.000 max=   1.000 std=  0.002
+  tiles_decoded      n=10 min=   0.000 mean=  76.800 median=  96.000 max=  96.000 std= 40.477
+  rssi_median_dbm    n=10 min=-113.000 mean=-113.000 median=-113.000 max=-113.000 std=  0.000
+  snr_median_db      n=10 min=   3.000 mean=   3.000 median=   3.000 max=   3.000 std=  0.000
+  n_tx_err           n=10 min=   0.000 mean=   0.000 median=   0.000 max=   0.000 std=  0.000
+  n_tx_timeout       n=10 min=   0.000 mean=   0.000 median=   0.000 max=   0.000 std=  0.000
+
+Per-run table:
+  run verdict    tx_ok   rx_mat tile  rssi   snr   err
+    1 PASS          1        1   96  -113     3     0
+    2 PASS          1        1   96  -113     3     0
+    3 FAIL          1   0.9948    0  -113     3     0
+    4 PASS          1        1   96  -113     3     0
+    5 FAIL          1   0.9948    0  -113     3     0
+    6 PASS          1        1   96  -113     3     0
+    7 PASS          1        1   96  -113     3     0
+    8 PASS          1        1   96  -113     3     0
+    9 PASS          1        1   96  -113     3     0
+   10 PASS          1        1   96  -113     3     0
+

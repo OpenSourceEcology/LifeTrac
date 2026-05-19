@@ -36,6 +36,524 @@ for the protocol).
 
 ---
 
+## 2026-05-18 TX-power adaptation + SAFETY-burst implementation plan
+
+Design doc + six review passes (Gemini 3.1 Pro, GPT-5.3-Codex, three Claude
+Opus 4.7 passes, GitHub Copilot) converged on 16 decisions (D1–D16) and 5
+internal contradictions (C1–C5). Full source-of-truth:
+
+➡️ **[AI NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md](AI%20NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md)**
+(see §21.1 decision table, §21.2 contradictions, §21.3 gaps, §23.6 order)
+
+Work is sequenced as **stages S0–S7**. Each stage has one deliverable + one
+falsification gate; the next stage does not start until its predecessor's
+gate passes on bench and evidence is committed under
+`DESIGN-CONTROLLER/bench-evidence/`.
+
+**Sequencing rule:** S2 is a hard blocker for S4 (the E-STOP replay-rejection
+bug makes the 5-copy SAFETY burst actively dangerous — every burst copy
+after the first is rejected as a replay, so the burst *reduces* assert
+probability instead of raising it). S0+S1 are independent of firmware and
+can run in parallel with S2.
+
+**Bench hardware reality (2026-05-18):** the only LoRa-stack hardware
+currently on the bench is **two Portenta X8 + Max Carrier boards and one
+camera**. There are **no L072 boards, no handheld MKR WAN 1310, no
+mushroom E-STOP, no step attenuator, and no spectrum analyzer** physically
+connected right now. Every stage below is therefore tagged:
+
+- 🟢 **HW-READY** — can complete on current bench (software-only or X8-only).
+- 🟡 **HW-PARTIAL** — software foundations can be built now; final gate needs LoRa rig.
+- 🔴 **HW-BLOCKED** — cannot start until L072 + handheld are reattached.
+
+Strategy: drive every 🟢 and the software half of every 🟡 to done now, so
+that when the LoRa rig is reattached the only remaining work is gate
+validation, not implementation. See "S-HW" and "Software-only work that
+can run NOW" sections at the bottom of this plan for ordered next steps.
+
+**Cross-doc precedence (add to design-doc top in S0, per §23.3):** when
+docs disagree, implementation follows (1) current code constants + measured
+bench evidence, (2) `DESIGN-CONTROLLER/DECISIONS.md`, (3) `LORA_PROTOCOL.md`,
+(4) `IMAGE_PIPELINE.md`, (5) the 2026-05-18 design doc.
+
+### Stage S0 — Document consolidation (editorial, no code) 🟢 HW-READY
+- [x] **S0.1** Fix C1: §3.8 silence default 250 ms → 500 ms ship; 250 ms
+      behind bench flag. — **DONE 2026-05-18** (strikethrough preserves
+      original for review-trail integrity).
+- [x] **S0.2** Fix C2: §3.9 recommendation Option U → **Option T** for
+      product; Option U as migration shim. — **DONE 2026-05-18.**
+- [x] **S0.3** Fix C3: §3.5 — all "H7 host (operator side)" language
+      removed; adapter is X8 Python on both ends. Section title updated.
+      — **DONE 2026-05-18** (§4 ASCII diagram label "Operator H7" not yet
+      redrawn; tracked under S0.6 deferred follow-up).
+- [x] **S0.4** Fix C4: §4 image-traffic row → "plaintext + 4 B seq + 2 B
+      CRC32 (+6 B, no MAC)". SAFETY power "+17 dBm forced" → "regional
+      EIRP cap per §21.3-6". — **DONE 2026-05-18.**
+- [ ] **S0.5** *(deferred from surgical pass)* Renumber duplicate `## 13`,
+      `## 14`, `## 15`, `## 18` headings. Requires audit of every
+      `§13.x`-style cross-reference in §12–§23 first; defer until full
+      consolidation pass.
+- [ ] **S0.6** *(deferred from surgical pass)* Promote §15.3 P0/P1/P2/P3
+      policy table into §4 as the canonical traffic-class table (replacing
+      `STREAM_*`). §4 row labels were tagged inline with their P0–P3
+      equivalents in S0.4 as a transitional step; full promotion + ASCII
+      diagram redraw is the larger follow-up.
+- [x] **S0.7** Add §23.3 precedence rule at top of design doc. — **DONE
+      2026-05-18.**
+- [x] **S0.8** Replace "20% P0 PER target" → "field gate <1% PER, recovery
+      trigger before 2%". — **DONE 2026-05-18** (folded into §4 row edit).
+- **Gate:** document reads top-to-bottom without contradicting itself.
+  **Status (2026-05-18):** C1–C5 surgical fixes ✅ complete. Structural
+  cleanup (S0.5, S0.6) still pending; doc line count is 2743 (up slightly
+  from 2687 because the change-log footer was appended). Trim toward
+  ~1200 lines after S0.5/S0.6 land.
+
+### Stage S1 — Bench instrumentation (read-only firmware) 🟡 HW-PARTIAL
+*(Software half can be built now on the two X8 boards; RF half requires
+L072 + handheld reattached.)*
+- [x] **S1.0** *(software-only)* ~~Implement
+      `DESIGN-CONTROLLER/base_station/lora_airtime.py` — pure-Python ToA
+      predictor `lora_time_on_air_ms(sf, bw, cr, payload_len, ...)`
+      matching Semtech SX1276/SX1262 datasheet formulas, plus
+      `encrypted_payload_len(class, raw_len, crypto_profile)` helper.~~
+      **DONE 2026-05-18.** Discovery showed `lora_time_on_air_ms` and
+      `encrypted_payload_len` already existed in `lora_proto.py`, so
+      instead of creating a duplicate `lora_airtime.py` module we
+      **extended `lora_proto.py`** with a `CryptoProfile` registry
+      (`CRYPTO_GCM128_EXPLICIT` +28 B / `CRYPTO_GCM64_IMPLICIT` +12 B /
+      `CRYPTO_IMAGE_PLAIN_CRC32` +6 B) and a backward-compatible
+      `profile=` arg on `encrypted_payload_len`. Six new tests in
+      `tests/test_lora_proto.py` pin the §17/§19 worked-example numbers
+      (46.208/33.408 ms control, 28.224/23.104/20.544 ms image,
+      524.800 ms telemetry) and assert that the shipped GCM-128 image
+      profile MUST violate the 25 ms cap (sentinel test — guards D13/D14
+      motivation). 24/24 lora_proto tests pass; 846/846 base_station
+      tests pass (the 12 unrelated pre-existing failures in
+      `test_fleet_key_provisioning_sil.py` and one `test_x8_encode_mode`
+      case are infrastructure, not from this change). NOTE: §17 quoted
+      557.57 ms for 100 B telemetry but the project's PHY_TELEMETRY
+      (preamble=12) actually gives 524.800 ms — codebase is source of
+      truth; doc footnote needs updating in a follow-up S0 doc-cleanup
+      pass.
+- [x] **S1.1** Add `walk_power` mode to
+      `method_h_stage2_tx_probe_v2.py`: sweep 2 → 17 dBm in 1 dB steps,
+      log RSSI/SNR/PER/CRC to CSV under `bench-evidence/walk_power_<date>/`.
+      *(Code lands now; sweep run blocked until L072 reattached.)*
+      *(DONE 2026-05-18 — new `run_walk_power()` + `--probe walk_power`
+      mode in `method_h_stage2_tx_probe_v2.py`. CLI flags `--power-min`
+      (default 2) / `--power-max` (default 17) / `--power-step` (default 1) /
+      `--per-step-count` (default 100) / `--walk-payload-len` (default 16) /
+      `--csv-out`. Per step issues `CFG_SET_REQ(CFG_KEY_TX_POWER_DBM=0x01,
+      dbm)`, snapshots `radio_tx_ok/_abort_lbt/_abort_airtime`, sends N
+      `TX_FRAME_REQ`s, captures `TX_DONE_URC` `status / time_on_air_us /
+      tx_power_dbm` per frame, then writes one CSV row
+      `(timestamp, step_idx, power_dbm_requested, power_dbm_echoed_first,
+      count_sent, tx_done_ok, tx_done_fail, tx_timeout, radio_tx_ok_delta,
+      radio_tx_abort_lbt_delta, radio_tx_abort_airtime_delta,
+      mean_toa_us, tx_per_pct, rx_per_pct, rx_rssi_dbm_mean,
+      rx_snr_db_mean, rx_crc_err_count)`. RX-side columns are emitted
+      empty — a paired `--probe rx_listen` orchestrator running on the
+      second board fills them post-sweep (see S1.4). Default output dir
+      `bench-evidence/walk_power_<YYYY-MM-DD_HHMMSS>/walk_power_tx_side.csv`.
+      Smoke-tested: `py method_h_stage2_tx_probe_v2.py --help` shows the
+      new mode + flags; module imports clean. **First paired sweep landed
+      2026-05-19** — see [bench-evidence/walk_power_pilot_2026-05-19/](DESIGN-CONTROLLER/bench-evidence/walk_power_pilot_2026-05-19/README.md);
+      both L072s alive, 16-step 2..17 dBm sweep on 915.000 MHz with mean
+      PER 0.59 %, RSSI monotonic, `__PAIRED_SWEEP_VERDICT__=OK`.)*
+- [x] **S1.2** Instrument host orchestrator to record per-class p50/p99
+      `TX_DONE` latency, P0 TX-start delay, queue age, measured-vs-predicted
+      encrypted ToA. *(Hooks land now; data collection blocked until L072
+      reattached.)*
+      *(Host hooks DONE 2026-05-18 — new `tx_latency_meter.py` module
+      defines `TxLatencyMeter` with `mark_enqueue / mark_dequeue /
+      mark_done(predicted_toa_ms=…)` and per-class rolling p50/p99
+      windows for queue_age, tx_done, and toa_delta. Wired into
+      `Bridge._tx` (enqueue token) and `Bridge._tx_worker`
+      (dequeue + done timestamps); all calls wrapped in try/except so
+      instrumentation never breaks TX. Pinned by 14 tests in
+      `test_tx_latency_meter.py` covering empty/lifecycle/per-class
+      isolation/P0 p99 tail/missing-done/unknown-token/leak-guard/
+      reset/rolling-window. **Real-airtime data still blocked on
+      L072 reattach** — `predicted_toa_ms` is passed as `None` from
+      the bridge for now; once `TX_DONE_URC (0x90)` is plumbed back
+      from the L072 we substitute the real on-air timestamp and the
+      ledger's PHY airtime prediction.)*
+- [x] **S1.3** Extend topic `0x10` decoder + add `newest_frame_wins` counter
+      to W2-02 stability harness (preparation for S3 validation).
+      *(Decoder/counter land now; validation run blocked.)*
+      *(DONE 2026-05-18 — two new pure-Python modules: (1)
+      `topic_0x10_decoder.py` defines `decode_topic_0x10()` →
+      `SourceActiveSnapshot` normalising legacy 1-byte enum, JSON
+      dict, and forward-rev payloads; preserves unknown keys in
+      `extras`; fail-closed on garbage. (2) `newest_frame_wins.py`
+      defines `NewestFrameWinsCounter` with RFC-1982 16-bit
+      serial-arithmetic accept/stale/duplicate counters per
+      AI NOTES 2026-05-18 §"newest-frame-wins gate". Counter wired
+      into `w2_02_host_pipeline.py::cmd_decode` (observability only —
+      paint logic unchanged for backward-compat) so the harness
+      summary JSON now carries `newest_frame_wins.{accepted,
+      stale_dropped, duplicate_dropped, last_accepted_seq}`. The S3
+      gate target is `stale_dropped == 0` over a 10-minute mixed-load
+      run — pre-validation today, validation blocked on the L072
+      reattach + W2-02 stability rig.)*
+- [ ] **S1.4** � *(PILOT LANDED — full sweep pending)* Commit one full
+      `walk_power` sweep and one 10-minute mixed-load run to `bench-evidence/`.
+      *(Pilot 2026-05-19: 16-step 50-packet-per-step paired sweep landed at
+      `DESIGN-CONTROLLER/bench-evidence/walk_power_pilot_2026-05-19/`
+      (verdict OK, mean PER 0.59 %, RSSI/SNR monotonic). Full evidence
+      still wants `--per-step-count 200` after the EU-heritage 1 %
+      airtime gate is either characterised or made `--no-duty-cycle`
+      configurable; ~15 % of attempts in the pilot were rejected by
+      `radio_tx_abort_airtime_delta`. 10-minute mixed-load run not yet
+      started.)*
+- **Gate:** measured vs. predicted encrypted ToA delta < 10 ms on at least
+  one P0 and one P3 packet class. (S1.0 unit tests against historical CSVs
+  give a software-only proxy that can pre-pass before LoRa rig returns.)
+
+### Stage S2 — D15 E-STOP replay-rejection fix (BLOCKER for S4) 🔴 HW-BLOCKED
+*(L072 firmware change; safety-critical bench regression fundamentally
+requires L072 + handheld + mushroom E-STOP. Code can be written and
+unit-tested against a host-side packet emulator now, but the gate cannot
+close without the rig. Decision deferred until rig is available — do not
+ship safety code on synthetic-only evidence.)*
+- [ ] **S2.1** Per §19.7 / D15: change burst-emit path so each copy carries
+      a fresh monotonic `seq`, not all `seq=0`.
+- [ ] **S2.2** RX accepts `CMD_ESTOP` idempotently across the replay window
+      (assert state-set is idempotent; do not consume window slots that
+      block subsequent legitimate ESTOP).
+- [ ] **S2.3** Grow RX replay window to ≥ 32 entries.
+- [ ] **S2.4** Add §19.6 RX MAC-failure rate-limit: ≥100 bad MACs in 10 s
+      → enter safe state + log STATS counter.
+- [ ] **S2.5** Bench regression: replicate the 2026-04-27 Controller Master
+      Plan Review §4 failure (E-STOP after ~30 s of normal base traffic);
+      passes only if a real ESTOP is accepted while a replay-attack frame
+      is still rejected.
+- **Gate:** real ESTOP accepted after arbitrary normal-traffic prefix; replay
+  attack still rejected; MAC-fail rate-limit observed in STATS log.
+- **Optional standalone hotfix path:** S2 is independently shippable as a
+  safety patch to current field firmware regardless of the rest of this
+  plan. Recommended.
+
+### Stage S3 — D1 depth-1 P0 mailbox (biggest single lag win) 🔴 HW-BLOCKED
+*(L072 firmware change; validation needs the W2-02 stability harness with
+L072 + handheld attached. The multi-source merge-policy paper decision
+(S3.3) and the abandoned-writer-timeout API (S3.2) can be drafted now.)*
+- [ ] **S3.1** Replace depth-6 FIFO for P0/STREAM class with depth-1
+      latest-wins slot in L072 TX submit path; SAFETY + EVENT classes keep
+      small ordered FIFO.
+- [ ] **S3.2** Add abandoned-writer timeout (§21.3-4): half-written mailbox
+      slot is invalidated after configurable timeout so a host crash
+      mid-write cannot freeze the slot.
+- [ ] **S3.3** Define multi-source P0 merge policy (§21.3-1): per-source
+      slot or explicit precedence (handheld preempts autonomy → mailbox
+      drops autonomy slot on handheld arrival). Document chosen rule in
+      §3.3 of design doc.
+- [ ] **S3.4** Emit new STATS counter `tx_stream_overwrites` per class.
+- [ ] **S3.5** Validation on bench rig W2-02 stability harness.
+- **Gate:** joystick → valve p99 under bursty submit drops from ~367 ms
+  toward ~136 ms (per §17.2 prediction); stick-release produces **zero**
+  stale-motion P0 frames after next sample interval.
+
+### Stage S4 — D2 + D4 SAFETY 5-copy burst with decorrelation 🔴 HW-BLOCKED
+*(Requires S2 passing. Additionally requires step attenuator + interferer
++ EIRP measurement path — see S-HW prereqs at end of plan.)*
+- [ ] **S4.1** SAFETY-class burst handler in firmware: 5 copies, ≥ 50 ms
+      inter-copy spacing (rationale §21.3-2: exceed worst-case other-class
+      ToA on channel so half-duplex doesn't drop a copy), FHSS-diverse when
+      LBT allows.
+- [ ] **S4.2** Power cap is **regional EIRP ceiling** (§21.3-6: EU 868
+      → +14 dBm ERP including antenna gain; FCC 915 → higher), NOT a blanket
+      +17 dBm. Add `(region, sub-band, antenna_gain)` table.
+- [ ] **S4.3** SAFETY-class **may** bypass LBT per §7 carve-out but **may not**
+      exceed EIRP ceiling.
+- [ ] **S4.4** Non-bursted RELEASE — operator-confirmed state convergence
+      via pull-recovery (D3), not push burst.
+- [ ] **S4.5** RX failsafe-on-silence = **500 ms ship default** (D5/C1);
+      sticky `state_bits` in heartbeat per §3.6.
+- [ ] **S4.6** Class-downgrade-only invariant (§21.3-3): L072 may treat
+      unknown class as control (strict crypto) but never as image
+      (no crypto).
+- **Gate:** step-attenuator at 20% per-copy PER → first-arrival p99 < 125 ms,
+  latch-intent miss rate < 10⁻⁶ over 10k trials; correlated-fade test shows
+  hop-spaced burst beats back-to-back copies; failsafe latches within
+  500 ms ± 50 ms of last heartbeat.
+
+### Stage S5 — D13 + D14 crypto downgrade + split-trust image 🟡 HW-PARTIAL
+*(AES-GCM-64 codec, plaintext+CRC32 image framer, and host-boundary
+class-tag enforcer are all pure Python and unit-testable now on the two
+X8 boards. Bench airtime-reclaim gate requires L072 reattached.)*
+- [x] **S5.1** *(software half DONE 2026-05-18)* AES-GCM-64 implicit-nonce
+      codec landed in `lora_proto.py` as `encrypt_frame_gcm64_implicit` /
+      `decrypt_frame_gcm64_implicit` / `build_implicit_nonce`. Wire layout:
+      `seq_be32(4) ‖ ciphertext ‖ tag8` = +12 B. Nonce derived from
+      `src(1) ‖ boot_ctr_be32(4) ‖ seq_be32(4) ‖ zero_pad(3)`. 8 tests +
+      9 subtests in `tests/test_d13_d14_codec.py` cover round-trip,
+      tampered tag/ciphertext, wrong src, wrong boot_ctr, short-frame
+      rejection (no exception), and per-(src,boot_ctr,seq) nonce
+      uniqueness (NIST SP 800-38D §8). STILL TODO (gated on integration
+      work, not pure crypto): persist `boot_ctr` to flash on X8; wire
+      the codec into `lora_bridge.py` and the L072 path; cut over the
+      live control/heartbeat/telemetry callers from `encrypt_frame` to
+      the new codec (separate stage S5.1b, kept open).
+- [ ] **S5.1b** *(integration — software-only, do next)* Persist `boot_ctr`
+      to X8 flash; emit a boot-handshake frame on link-up so the RX learns
+      the new value; switch the live `lora_bridge.py` control/heartbeat
+      /telemetry TX path from `encrypt_frame` (shipped GCM-128) to
+      `encrypt_frame_gcm64_implicit` behind a feature flag. Default off
+      until S-HW.1 (L072 reattach) lets us measure the airtime reclaim.
+- [x] **S5.2** *(DONE 2026-05-18)* Image fragment plaintext+CRC framer
+      landed as `pack_image_fragment_plain` / `unpack_image_fragment_plain`.
+      Wire layout: `seq_be32(4) ‖ payload ‖ crc16_be(2)` where the CRC
+      is the low 16 bits of `zlib.crc32(seq ‖ payload)` (deliberately a
+      different polynomial domain than the PHY-layer CRC16-CCITT). 7
+      tests cover round-trip, tampered payload, tampered CRC, short
+      frame, big-endian seq field pin, and overhead-constant agreement
+      with `CRYPTO_IMAGE_PLAIN_CRC32.overhead_bytes`.
+- [x] **S5.3** *(DONE 2026-05-18)* Host-boundary class-tag enforcer
+      landed as `enforce_class_tag_boundary` and
+      `enforce_class_downgrade_only` plus a `ClassTagViolation` exception.
+      The first guard rejects any P0/P1/P2 frame carried by an
+      unauthenticated profile (has_mac=False); the second enforces the
+      §21.3-3 class-downgrade-only invariant. 6 tests + 11 subtests
+      cover all P0/P1/P2/P3 × {GCM-128, GCM-64, PLAIN_CRC32} matrix
+      slots plus a dedicated sentinel
+      `test_forged_d14_fragment_cannot_be_laundered_into_p0` that
+      pins the core split-trust safety property. STILL TODO: wire the
+      enforcer into the actual X8→L072 dispatch site in `lora_bridge.py`
+      (one-line call at the boundary; kept open as S5.3b).
+- [x] **S5.3b** *(DONE 2026-05-18)* Enforcer wired into
+      `lora_bridge._tx_worker` immediately before the `encrypt_frame`
+      call, inside the existing try block. On `ClassTagViolation` the
+      worker logs to `audit_log` with event `class_tag_violation` and
+      `continue`s — the frame never reaches the radio. With today's
+      `CRYPTO_PROFILE_DEFAULT` (GCM-128 explicit, `has_mac=True`) no
+      legitimate class trips the guard; the call is a defense-in-depth
+      pin that fails LOUD if a future S5.1b cutover accidentally pairs
+      a P0/P1/P2 frame with an unauthenticated profile. Coverage:
+      `tests/test_tx_worker_class_tag_enforcer_wired.py` (5 tests, 15
+      subtests: source-presence guard, ordering guard
+      (enforce-before-encrypt), full classify→enforce pairing matrix
+      across every dispatchable (frame_type, opcode, topic_id), and a
+      sentinel that pins "P0 + plaintext profile → raise".
+- [ ] **S5.4** RX rate-limit cleartext image at design refresh rate + margin
+      so a flood of forged image fragments cannot starve P0 RX duty.
+      *(Deferred 2026-05-18: no D14 cleartext-image RX path is wired
+      into `lora_bridge._handle_air` yet. Re-open after S5.1b lands a
+      D14 ingest site so the rate-limiter has a real call site to
+      attach to instead of becoming dead code.)*
+- [x] **S5.5** *(DONE 2026-05-18 — doc-only)* Per-direction adapter
+      symmetry (§21.3-5): power/SF/encode adapters run with independent
+      state on each link direction. Documented at the head of
+      `link_monitor.py` and pinned by the per-direction state separation
+      already present in `EncodeModeController`. No code change needed
+      beyond the docstring note; behavioural enforcement comes with S6.5.
+- **Gate:** image fragments fit 25 ms cap with ≥ 4 ms margin under encrypted
+  framing predictor; spoofed class-tag injection at host boundary rejected;
+  class-spoof DoS test (forged image flood) fails to starve P0; measured
+  reclaim ≥ 1.0 s/s of airtime over a 10-minute mixed run.
+
+### Stage S6 — D6 + D7 + D8 + D9 TX-power adapter (X8 Python) 🟡 HW-PARTIAL
+*(The `{NORMAL, MARGIN_LIMITED, AIRTIME_LIMITED, RECOVERY}` state machine,
+dwell timers, and PER/SNR aggregators are pure Python and SIL-testable
+against synthetic input traces on the two X8 boards. Final gate needs
+step attenuator + airtime-load generator + L072 link.)*
+- [x] **S6.1** *(DONE 2026-05-18)* New module
+      `DESIGN-CONTROLLER/base_station/tx_power_adapter_v3.py`: `SnrEwma`
+      inner loop with 5-packet hysteresis + 10 Hz minimum interval cap
+      (`INNER_MIN_INTERVAL_MS=100`), `PerWindow` 100-pkt outer loop,
+      `_AirtimeSnapshot` consumes the existing `RollingAirtimeLedger`
+      output. Pure Python, no I/O — caller applies the returned
+      `AdapterDecision`. Verified by 12 SIL tests in
+      `tests/test_tx_power_adapter_v3.py` covering 10 Hz rate cap (I6),
+      single-sample-flap rejection (I7), and cap-saturation handoff.
+- [ ] **S6.2** PER feedback piggybacked in topic `0x10` at 0.2–0.5 Hz (not
+      9 B per frame).
+      *(Partially DONE 2026-05-18: host-side publisher landed —
+      `_airtime_worker` emits PER + state + power on the sibling topic
+      `lifetrac/v25/control/link_power/{direction}` at the existing
+      airtime-poll cadence behind `LIFETRAC_TX_POWER_ADAPTER_V3=1`.
+      Reverse direction — firmware-side piggyback of per-RX SNR/PER on
+      tractor topic `0x10` so the base adapter has a real input — still
+      open, blocked on L072 reattach.)*
+- [x] **S6.3** *(DONE 2026-05-18)* Explicit controller state machine
+      `AdapterState{NORMAL, MARGIN_LIMITED, AIRTIME_LIMITED, RECOVERY}`
+      in `tx_power_adapter_v3.py` with dwell timers
+      (`DWELL_NORMAL_TO_LIMITED_MS=1000`,
+      `DWELL_LIMITED_TO_RECOVERY_MS=5000`,
+      `DWELL_RECOVERY_TO_NORMAL_MS=10000`) and asymmetric hysteresis
+      gaps (SNR -5/0 dB, PER 2.0%/0.5%, airtime 0.60/0.45). RECOVERY
+      walks power back one notch per tick. Pinned by I8 (dwell) and
+      I9 (re-degradation re-entry) tests.
+- [x] **S6.4** *(DONE 2026-05-18)* Priority cascade **branched on root
+      cause** (§14.1 + D6): MARGIN_LIMITED emits RAISE_POWER first and
+      only `SF_STEP_UP` once power saturates at `P_MAX_DBM`;
+      AIRTIME_LIMITED emits `CANCEL_P3` → `CANCEL_P2` → `ENCODE_DEGRADE`
+      in cheapest-first order. **Mutual exclusivity invariant (I3) pinned
+      by test**: no direct MARGIN→AIRTIME (or reverse) transition is
+      possible — RECOVERY always sits between, so the event log preserves
+      root-cause attribution. Tie-break on simultaneous trigger prefers
+      MARGIN_LIMITED (rationale: encode-degrade can't fix a margin hole;
+      raise-power can drain PER even under airtime pressure).
+- [x] **S6.5** *(DONE 2026-05-18)* Adapter runs per-link-direction with
+      separate state on each end (§21.3-5). `lora_bridge.Bridge.__init__`
+      instantiates two independent `TxPowerAdapterV3` instances
+      (`tx_adapter_uplink`, `tx_adapter_downlink`); `_airtime_worker`
+      drives both with the same airtime triple but isolated SNR/PER
+      streams; new hook `Bridge.observe_radio_metadata(snr_db, ok,
+      direction=...)` routes radio metadata to the matching adapter.
+      Per-direction divergence pinned by
+      `test_per_direction_state_diverges_on_asymmetric_snr` (uplink →
+      MARGIN_LIMITED, downlink → NORMAL under asymmetric trace).
+- [x] **S6.6** *(DONE 2026-05-18)* Behind a bench flag until all gates
+      pass — do NOT enable in field firmware default. Gate: env var
+      `LIFETRAC_TX_POWER_ADAPTER_V3=1` at bridge boot. Default OFF.
+      When OFF, both `tx_adapter_*` attrs are `None` and zero work runs
+      in the airtime worker — pinned by `test_default_off_no_adapter`.
+      When ON, the adapter runs in **OBSERVATION-ONLY** mode: it
+      publishes decisions but does NOT yet write `RegPaConfig` or emit
+      `CMD_LINK_TUNE`, so an adapter regression cannot brick a live
+      link. Real radio action is held until the SPI driver from
+      `MASTER_PLAN.md §8.17` lands.
+- **Gate:** standing 30-min bench run shows median TX power ≥ 3 dB below
+  the +14 dBm baseline while per-fragment PER < 1%; step-attenuator
+  induced margin-limited vs airtime-limited failures trigger
+  **different** responses (verified in logs); zero P0 TX-start regression
+  vs S3 baseline.
+
+### Stage S7 — D11 + D16 operator UX + canonicalize policy 🟢 HW-READY
+*(LINK pill UI is pure browser/JS — can be developed against simulated
+telemetry on the existing two X8 boards. Doc edits are editorial.)*
+- [x] **S7.1** *(DONE 2026-05-18, UI half)* Add **LINK pill** to operator
+      UI (browser console + handheld OLED if practical) symmetric with
+      `IMG:` / `AI:` pills: `LINK: SF7 / +14 dBm / 99.2% / SNR +8 dB`,
+      color-coded by state. Implemented on the existing `map.html`
+      sidebar (two rows: `LINK ↑` and `LINK ↓`) — per-direction
+      adapter snapshots come from `state.link_power.{uplink,downlink}`
+      published by `image_pipeline.state_publisher.StatePublisher.snapshot()`
+      and consumed by `web/map.js::renderLinkPill()`. Color map:
+      NORMAL→ok(green), RECOVERY→warn(orange), MARGIN_LIMITED /
+      AIRTIME_LIMITED→bad(red), unknown→grey. Worst-side `reason`
+      string surfaces in a third row. Field schema pinned by
+      `StatePublisherTests::test_snapshot_includes_link_power_default_null`
+      and `…_link_power_per_direction`. Cross-process MQTT glue
+      DONE 2026-05-18 — bridge and web_ui are separate processes
+      sharing only the broker, so `web_ui._on_mqtt_message` now
+      forwards every retained
+      `lifetrac/v25/control/link_power/{direction}` payload into
+      `_image_publisher.link_power[direction]`. Pinned by 5 tests
+      in `test_web_ui_link_power_glue.py` (uplink,
+      downlink-independence, unknown-direction drop, non-dict
+      drop, end-to-end snapshot carry). Remaining: handheld OLED
+      mirror (blocked on D14 RX path, see S5.4). When bench flag
+      `LIFETRAC_TX_POWER_ADAPTER_V3` is OFF the pills stay at
+      `—` — fail-closed UX per §6.1.
+- [ ] **S7.2** Publish power / cap-reason / SF / encode-mode / SNR-margin
+      / PER fields in topic `0x10`.
+      *(Host-side serializer DONE 2026-05-18 — `_airtime_worker`
+      publishes `{state, action, value, reason, power_dbm, sf_rung,
+      snr_ewma, per, per_sample_count, direction}` on
+      `lifetrac/v25/control/link_power/{direction}` behind
+      `LIFETRAC_TX_POWER_ADAPTER_V3=1`. Field schema pinned by
+      `test_link_power_topic_payload_contains_s72_fields`. The
+      `encode_mode` field is already on the existing sibling topic
+      `link_airtime`. Remaining: the topic `0x10` reverse-direction
+      LoRa wire encoding for handheld OLED — blocked on L072 reattach
+      same as S6.2 reverse.)*
+- [x] **S7.3** Propagate D11 P0/P1/P2/P3 policy table into
+      `MASTER_PLAN.md` and `LORA_PROTOCOL.md`.
+      *(DONE 2026-05-18 — added new normative section
+      `LORA_PROTOCOL.md § Priority class policy (canonical)` with the
+      full P0/P1/P2/P3 table (membership, mailbox discipline, burst
+      counts, crypto envelope, loss policy) plus a reverse-mapping
+      block aliasing the deprecated `STREAM_*` / `EVENT_STATE` /
+      `SAFETY` names; added cross-reference `MASTER_PLAN.md § 8.21`
+      pinning D11 and pointing at the LORA_PROTOCOL table as single
+      source of truth for `classify_priority()` and the tractor M7
+      firmware queue. Grep audit: the only remaining `STREAM_*` hits
+      in normative paths are inside the two explicit deprecation
+      blocks themselves — exactly the documented reverse-mapping
+      aid, no live usage. The `link_monitor.py` adaptation-narrative
+      half of this gate is already covered by the LINK pill +
+      `link_power` topic shipped under S7.1/S7.2.)*
+- **Gate:** operator can explain every adaptation transition from logs +
+  pill state alone; cross-doc grep for `STREAM_*` returns 0 hits in
+  normative text **except** the two explicit deprecation/aliasing
+  blocks in `LORA_PROTOCOL.md § Priority class policy (canonical)`
+  and `MASTER_PLAN.md § 8.21`, which exist precisely to pin the
+  rename.
+
+### Open decisions before kick-off
+1. **Start point.** Recommend S0 + S1 in parallel (both independent of
+   firmware, both unblock everything). S2 ships as standalone hotfix.
+2. **S0 scope.** Minimal (just C1–C5, ~1 hr) vs. full §21.5 / §23.4
+   rewrite (~3–4 hr, cuts doc to ~1200 lines).
+3. **S2 hotfix.** Treat as standalone PR mergeable this week independent
+   of the rest of this plan? (Recommended yes.)
+
+### S-HW — Hardware prerequisites (current bench: 2× X8 + Max Carrier + 1 camera)
+*(Added 2026-05-18 after user confirmed actual bench state. None of these
+block S0 / S1.0 / S5 software half / S6 software half / S7. They DO block
+S1.4, S2, S3, S4, S5 validation, and S6 validation.)*
+- [x] **S-HW.0** *(host-side, no RF)* DONE 2026-05-18. Cross-validated D13
+      AES-GCM-64 codec, D14 image plaintext+CRC32 framer, and
+      `enforce_class_tag_boundary` on a real Portenta X8 (ARM64,
+      `cryptography` 36.0.2) via UDP-localhost loopback. All 12 integration
+      assertions pass (round-trip, MAC-tamper rejection, boot_ctr binding,
+      ReplayWindow dedup, P0/D14 split-trust attack rejection, sustained
+      20 Hz control with zero loss). Microbench: aggregate D13 cost at full
+      design cadence is **~3.03 % of one A53 core** — no risk to A/V.
+      Bench scripts: `bench_crypto_perf.py`, `bench_loopback_d13_d14.py`.
+      Evidence: `AI NOTES/2026-05-18_S-HW0_Host_Side_Validation_Evidence.md`.
+      Notes: (a) D13 is ~50 % slower per op than shipped GCM-128 due to
+      low-level `Cipher(...)` API overhead vs `AESGCM` class — absolute
+      cost still negligible, but D13's motivation is airtime not CPU.
+      (b) X8-B (camera, serial `2E2C1209...`) has stripped Python stdlib
+      (no `socket`/`dataclasses`/`json`); host-side bench ran on X8-A only.
+      Production code on X8-B runs inside Docker, out of scope for S-HW.0.
+- [ ] **S-HW.1** Reattach at least one **L072 base + L072 handheld** pair
+      to the X8 stack. Without this, every RF gate is blocked.
+- [ ] **S-HW.2** Inventory the **step attenuator** (range, accuracy,
+      condition). Required for S1.1 walk_power sweep, S4 PER induction,
+      S6 margin-limited induction. If unavailable, source one
+      (≥ 0–60 dB range, ≥ 1 dB step, rated for 868/915 MHz).
+- [ ] **S-HW.3** Confirm or build a **second LoRa TX as interferer** on
+      an adjacent channel — needed only for S4 correlated-fade test. A
+      spare MKR WAN 1310 running a pre-canned hammer script suffices.
+- [ ] **S-HW.4** Decide the **EIRP measurement path** for S4.2 (regional
+      ceiling enforcement):
+      - (a) spectrum analyzer + calibrated antenna or directional coupler
+        (preferred);
+      - (b) conducted measurement at antenna port + datasheet antenna-gain
+        math (sufficient for declaration, weaker evidence);
+      - (c) defer — S4 ships bench-flag-only until measurement path exists.
+      **S-HW.4 cannot be solved by software alone.** This is the most
+      likely blocker for shipping S4 to field.
+- [ ] **S-HW.5** Confirm a **real mushroom E-STOP** is wired to the
+      handheld used on the W2-02 rig (so S2 is a real regression test,
+      not a synthetic injector test).
+
+### Software-only work that can run NOW on the current 2× X8 bench
+*(Ordered by leverage. Each is HW-independent and produces code that
+plugs into a HW gate when the LoRa rig returns.)*
+1. **S0.1–S0.4, S0.7, S0.8** — design-doc surgical C1–C5 fixes. ✅
+   **DONE 2026-05-18.**
+2. **S1.0** — `lora_airtime.py` pure-Python ToA predictor + unit tests,
+   cross-checked against existing bench-evidence CSVs.
+3. **S5 software half** — AES-GCM-64 implicit-nonce codec + image
+   plaintext+CRC32 framer + host-boundary class-tag enforcer, all
+   unit-tested. (Crypto Profile A keeps crypto in host, so this is the
+   right layer for it anyway.)
+4. **S6 software half** — controller state machine + dwell timers + PER
+   / SNR aggregators, SIL-tested against synthetic input traces.
+5. **S7.1** — LINK pill UI in browser console, fed by simulated telemetry.
+6. **S0.5 + S0.6** — deferred structural doc cleanup (renumber duplicate
+   `## 13/14/15/18`, promote P0/P1/P2/P3 policy table into §4, redraw
+   ASCII diagram).
+7. **S1.1 + S1.2 + S1.3** — instrumentation code (sweep mode, host
+   metric collectors, decoder extensions) — lands without running.
+
+---
+
 ## Control source priority (project-wide policy, 2026-05-15)
 
 Three control sources can drive the tractor. Whenever more than one is

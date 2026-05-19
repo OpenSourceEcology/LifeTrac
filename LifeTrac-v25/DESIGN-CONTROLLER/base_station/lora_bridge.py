@@ -32,6 +32,20 @@ import serial
 
 from audit_log import DEFAULT_PATH as AUDIT_LOG_DEFAULT_PATH, AuditLog
 from link_monitor import EncodeModeController, RollingAirtimeLedger
+# S6.6: opt-in TX-power adapter (default OFF). When the env var
+# `LIFETRAC_TX_POWER_ADAPTER_V3=1` is set at bridge boot, we instantiate
+# the v3 state-machine controller and publish its decisions on the
+# `lifetrac/v25/control/link_power` sibling topic (S7.2). All radio I/O
+# remains in observation-only mode until firmware-side wiring lands —
+# see ``observe_radio_metadata`` below.
+from tx_power_adapter_v3 import (
+    AdapterAction,
+    TxPowerAdapterV3,
+)
+# S1.2: per-class p50/p99 TX latency instrumentation. Always on (overhead
+# is one dict lookup + one deque append per frame); snapshot() is read by
+# the airtime worker and surfaced via the audit log.
+from tx_latency_meter import TxLatencyMeter
 from lora_proto import (
     CMD_CAMERA_SELECT,
     CMD_ESTOP,
@@ -49,6 +63,9 @@ from lora_proto import (
     PROTO_VERSION,
     ReplayWindow,
     SRC_BASE,
+    CRYPTO_PROFILE_DEFAULT,
+    ClassTagViolation,
+    enforce_class_tag_boundary,
     TELEM_HEADER_LEN,
     TELEM_MAX_PAYLOAD,
     TelemetryReassembler,
@@ -198,6 +215,24 @@ class Bridge:
         # Airtime ledger + encode-mode controller (LORA_IMPLEMENTATION.md \u00a74, \u00a77).
         self.ledger = RollingAirtimeLedger(window_ms=10_000)
         self.encode_ctrl = EncodeModeController(required_windows=3)
+        # S6.5 + S6.6: per-link-direction TX-power adapters, gated by
+        # `LIFETRAC_TX_POWER_ADAPTER_V3=1`. Two independent instances so
+        # each direction tracks its own SNR/PER/airtime (§21.3-5). When
+        # the flag is OFF both are ``None`` and zero work runs.
+        if os.environ.get("LIFETRAC_TX_POWER_ADAPTER_V3") == "1":
+            self.tx_adapter_uplink = TxPowerAdapterV3(audit=self.audit)
+            self.tx_adapter_downlink = TxPowerAdapterV3(audit=self.audit)
+            logging.info("tx_power_adapter_v3: ENABLED (observation-only)")
+            self.audit.record("tx_power_adapter_v3_enabled")
+        else:
+            self.tx_adapter_uplink = None
+            self.tx_adapter_downlink = None
+        # S1.2: host-side per-class TX latency meter. Records queue age,
+        # enqueue→write-done latency, and (when available) actual−predicted
+        # encrypted ToA delta per priority class. Pure-Python, no HW dep —
+        # the data collected here pre-pays the S1 gate audit until the L072
+        # reattaches and we can swap in the real on-air TX_DONE timestamp.
+        self.tx_latency = TxLatencyMeter()
         # Priority TX queue (LORA_IMPLEMENTATION.md §4). All TX goes through a
         # single dedicated worker so the serial write is never racy and so
         # P0 frames preempt anything queued behind them.
@@ -355,6 +390,34 @@ class Bridge:
         body[4] = (seq >> 8) & 0xFF
         return bytes(body) + struct.pack("<H", crc16_ccitt(bytes(body)))
 
+    # ---- S6.5 radio-metadata hook --------------------------------------
+    # Called by the radio supervisor once per RX/TX-done event with the
+    # SX1276 SNR estimate and pass/fail bit. Until firmware-side piggyback
+    # lands (see TODO S6.2) the bridge has no such source on the KISS
+    # serial transport — but the hook exists so downstream code (the
+    # adapter, tests, future SPI driver) can feed it. When the adapter is
+    # disabled this is a cheap no-op.
+    def observe_radio_metadata(self, snr_db: float, ok: bool,
+                                direction: str = "uplink") -> None:
+        """Feed an SNR/ok sample to the corresponding direction's adapter.
+
+        Parameters
+        ----------
+        snr_db: instantaneous SX1276 SNR estimate (dB).
+        ok: ``True`` if frame decoded and passed CRC/MAC.
+        direction: ``"uplink"`` (handheld/tractor → base) or
+                   ``"downlink"`` (base → tractor).
+        """
+        if direction == "uplink":
+            adapter = self.tx_adapter_uplink
+        elif direction == "downlink":
+            adapter = self.tx_adapter_downlink
+        else:
+            raise ValueError(f"unknown direction: {direction!r}")
+        if adapter is None:
+            return                                    # flag disabled
+        adapter.observe_packet(_now_ms(), snr_db, ok)
+
     def _on_mqtt_message(self, _client, _userdata, msg):
         if msg.topic.endswith("/cmd/control"):
             # Expect a fully-formed 16-byte ControlFrame from web_ui.py.
@@ -442,7 +505,16 @@ class Bridge:
         opcode = pt[HEADER_LEN] if frame_type == FT_COMMAND and len(pt) > HEADER_LEN else None
         topic_id = pt[HEADER_LEN] if frame_type == FT_TELEMETRY and len(pt) > HEADER_LEN else None
         prio = classify_priority(frame_type, opcode, topic_id)
-        item = (source_id, seq, pt)
+        # S1.2: open a latency-meter token on enqueue. The token is carried
+        # alongside the frame through the heap so the TX worker can close
+        # the loop with mark_dequeue + mark_done without a lookup.
+        latency_token: int | None
+        try:
+            latency_token = self.tx_latency.mark_enqueue(prio, _now_ms())
+        except Exception:
+            # Instrumentation must never break TX. Drop the token and carry on.
+            latency_token = None
+        item = (source_id, seq, pt, latency_token)
         with self._tx_cv:
             heapq.heappush(self._tx_queue,
                            (prio, next(self._tx_counter), item))
@@ -458,15 +530,53 @@ class Bridge:
                     self._tx_cv.wait(timeout=0.5)
                 if self._stop_evt.is_set():
                     return
-                _prio, _ord, (source_id, seq, pt) = heapq.heappop(self._tx_queue)
+                _prio, _ord, (source_id, seq, pt, latency_token) = heapq.heappop(self._tx_queue)
+            # S1.2: stamp the dequeue moment as soon as we have the frame out
+            # of the heap, *before* any encrypt/serial work, so queue_age_ms
+            # measures only the priority-queue wait (not the writer's own work).
+            if latency_token is not None:
+                try:
+                    self.tx_latency.mark_dequeue(latency_token, _now_ms())
+                except Exception:
+                    latency_token = None
             try:
-                wire = encrypt_frame(FLEET_KEY, source_id, seq, pt)
                 # Attribute TX airtime by frame type (and topic for FT_TELEMETRY).
                 frame_type = pt[2] if len(pt) > 2 else FT_COMMAND
                 topic_id = pt[HEADER_LEN] if frame_type == FT_TELEMETRY and len(pt) > HEADER_LEN else None
+                opcode = pt[HEADER_LEN] if frame_type == FT_COMMAND and len(pt) > HEADER_LEN else None
+                # S5.3b: host-boundary class-tag enforcer. Fail-closed if a
+                # frame's traffic-class declaration is incompatible with the
+                # crypto profile we'd ship it under. With today's default
+                # profile (GCM-128 explicit, has_mac=True), nothing trips
+                # this; once S5.1b cuts over to mixed profiles (D13 GCM-64
+                # for P0/P1/P2, D14 plaintext+CRC32 for P3-only), an
+                # accidental misroute (e.g. a P0 frame sent on the D14 path)
+                # is dropped here instead of going on-air unauthenticated.
+                prio = classify_priority(frame_type, opcode, topic_id)
+                try:
+                    enforce_class_tag_boundary(prio, CRYPTO_PROFILE_DEFAULT)
+                except ClassTagViolation as exc:
+                    logging.error("class-tag enforcer dropped tx frame: %s", exc)
+                    self.audit.record("class_tag_violation",
+                                      source_id=source_id, seq=seq,
+                                      frame_type=frame_type, prio=prio,
+                                      profile=CRYPTO_PROFILE_DEFAULT.name,
+                                      reason=str(exc))
+                    continue
+                wire = encrypt_frame(FLEET_KEY, source_id, seq, pt)
                 self.ledger.record(_now_ms(), attribute_phy(frame_type, topic_id),
                                    cleartext_len=len(pt), encrypted=True)
                 self.ser.write(kiss_encode(wire))
+                # S1.2: close the latency loop with the post-write timestamp.
+                # predicted_toa_ms left as None until the PHY airtime predictor
+                # is wired in here (the ledger already has the data; pulling
+                # it through is a follow-up once the L072 returns and we can
+                # validate the prediction against real on-air TX_DONE).
+                if latency_token is not None:
+                    try:
+                        self.tx_latency.mark_done(latency_token, _now_ms())
+                    except Exception:
+                        pass
                 self.audit.record("tx",
                                   source_id=source_id,
                                   frame_type=frame_type,
@@ -513,6 +623,48 @@ class Bridge:
                 }).encode()
                 self.mqtt.publish("lifetrac/v25/control/link_airtime",
                                   payload, qos=0, retain=True)
+                # 2b. S6.2 + S7.2: feed the airtime triple to each enabled
+                #     TX-power adapter, advance the state machine, and
+                #     publish the resulting decision on the sibling topic
+                #     `link_power`. The actual radio command (write
+                #     RegPaConfig / emit CMD_LINK_TUNE) is deferred to the
+                #     SPI driver landing in MASTER_PLAN.md §8.17; today
+                #     the bridge runs in OBSERVATION-ONLY mode so an
+                #     unwanted regression in the adapter cannot brick a
+                #     live link.
+                for direction, adapter in (("uplink", self.tx_adapter_uplink),
+                                            ("downlink", self.tx_adapter_downlink)):
+                    if adapter is None:
+                        continue
+                    adapter.observe_airtime(total=util.total,
+                                             image=util.image,
+                                             telemetry=util.telemetry)
+                    decision = adapter.tick(_now_ms())
+                    if decision.action is not AdapterAction.NONE:
+                        self.audit.record("tx_power_adapter_decision",
+                                          direction=direction,
+                                          state=decision.state.value,
+                                          action=decision.action.value,
+                                          value=decision.value,
+                                          reason=decision.reason)
+                    snapshot = json.dumps({
+                        "direction": direction,
+                        "state": decision.state.value,
+                        "action": decision.action.value,
+                        "value": decision.value,
+                        "reason": decision.reason,
+                        # S7.2 LINK-pill fields:
+                        "power_dbm": adapter.power_dbm,
+                        "sf_rung": adapter.sf_rung,
+                        "snr_ewma": (round(adapter._snr.value, 2)
+                                     if adapter._snr.value is not None
+                                     else None),
+                        "per": round(adapter._per.per, 4),
+                        "per_sample_count": adapter._per.count,
+                    }).encode()
+                    self.mqtt.publish(
+                        f"lifetrac/v25/control/link_power/{direction}",
+                        snapshot, qos=0, retain=True)
                 # 3. Alarm logging \u2014 squelch repeat lines so the journal stays useful.
                 tel_alarm = util.telemetry > U_TELEMETRY_ALARM
                 tot_alarm = util.total > U_TOTAL_ALARM

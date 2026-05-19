@@ -1,0 +1,12 @@
+Password: MODE: rx_listen
+dev=/dev/ttymxc3 baud=921600
+=== W1-10b probe RX_LISTEN: window=120.0s ===
+RX_LISTEN: STATS(before) radio_rx_ok=12 radio_crc_err=12 radio_state=4
+RX_LISTEN: RegOpMode(pre)=0x80 (expected 0x85)
+__V2_AUTOWAKE__ opmode_pre=0x80 opmode_post=0x85 action=write
+__W1_10B_LISTEN_READY__
+$adb = "C:\Users\dorkm\AppData\Local\Microsoft\WinGet\Packages\Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe\platform-tools\adb.exe"
+$xLog = "$PWD\walk_power_board_a.log"
+& $adb -s 2D0A1209DABC240B shell "cd /tmp/lifetrac_p0c && echo fio | sudo -S python3 method_h_stage2_tx_probe_v2.py --probe walk_power --dev /dev/ttymxc3 --baud 921600 --power-min 2 --power-max 17 --power-step 1 --per-step-count 50 --walk-payload-len 24 --timeout 3 --inter-cycle-s 0.02 --csv-out /tmp/walk_power_paired.csv 2>&1" | Tee-Object -FilePath $txLog | Select-String -Pattern "__WALK_POWER_STEP__|__WALK_POWER_DONE__|VERDICT|FAIL|FATAL"
+Get-Content "$PWD\walk_power_board_a.log" -Tail 40$env:ADB = "C:\Users\dorkm\AppData\Local\Microsoft\WinGet\Packages\Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe\platform-tools\adb.exe"& $env:ADB -s 2E2C1209DABC240B shell "pgrep -af 'method_h_stage2.*rx_listen' | head -1; echo ---rxlog tail---; tail -3 /tmp/rx_listen.log 2>/dev/null"
+$nv:ADB

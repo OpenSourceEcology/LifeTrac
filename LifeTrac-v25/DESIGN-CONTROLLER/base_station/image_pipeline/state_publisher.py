@@ -47,6 +47,15 @@ class StatePublisher:
     safety_verdict: SafetyVerdict | None = None
     needs_keyframe: bool = False
     last_keyframe_reason: str = ""
+    # S7.1 LINK-pill telemetry. Mirrors the per-direction adapter
+    # decisions published on `lifetrac/v25/control/link_power/{direction}`
+    # by `lora_bridge._airtime_worker` (S6.2 host half / S7.2 schema).
+    # Schema per direction: ``{state, action, value, reason, power_dbm,
+    # sf_rung, snr_ewma, per, per_sample_count}``. ``None`` when the
+    # bench flag ``LIFETRAC_TX_POWER_ADAPTER_V3`` is OFF or the bridge
+    # has not yet emitted a sample (cold-start before first tick).
+    link_power: dict[str, dict[str, Any] | None] = field(
+        default_factory=lambda: {"uplink": None, "downlink": None})
     clock_ms: Callable[[], int] = field(default=lambda: int(time.monotonic() * 1000))
 
     def snapshot(self) -> dict[str, Any]:
@@ -78,4 +87,8 @@ class StatePublisher:
             ),
             "needs_keyframe": self.needs_keyframe,
             "last_keyframe_reason": self.last_keyframe_reason,
+            "link_power": {
+                "uplink": self.link_power.get("uplink"),
+                "downlink": self.link_power.get("downlink"),
+            },
         }

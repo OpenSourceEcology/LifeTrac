@@ -76,6 +76,9 @@ HOST_TYPE_REG_DATA_URC = 0xB0
 HOST_TYPE_REG_WRITE_ACK_URC = 0xB1
 
 CFG_KEY_LBT_ENABLE = 0x03
+# 2026-05-18 S1.1: TX-power adapter sweep (`--probe walk_power`). Mirrors
+# `CFG_KEY_TX_POWER_DBM` from `firmware/murata_l072/include/host_cfg_keys.h`.
+CFG_KEY_TX_POWER_DBM = 0x01
 
 SX1276_REG_IRQ_FLAGS = 0x12
 SX1276_REG_OP_MODE = 0x01
@@ -1057,6 +1060,270 @@ def run_tx_burst(link: HostLink, count: int = 100, inter_s: float = 0.2,
     return 1
 
 
+# -------------------------------------------------------------------------
+# 2026-05-18 S1.1: TX-power sweep (`walk_power`) — software half.
+#
+# Walks the SX1276 TX power in 1 dB steps from --power-min to --power-max
+# inclusive, sending --per-step-count TX_FRAME_REQs per step. Each step
+# records its own CSV row with TX-side counters (count_sent, tx_done_ok,
+# tx_done_fail, tx_timeout, radio_tx_ok delta, radio_tx_abort_lbt /
+# radio_tx_abort_airtime deltas, mean time_on_air_us, requested vs echoed
+# tx_power_dbm). Per-fragment RX-side measurements (rx_rssi_dbm, rx_snr_db,
+# rx_per_pct, rx_crc_err_count) are NOT captured here — they live on the
+# paired RX board. They are emitted as empty CSV cells so an outer
+# orchestrator that runs `--probe rx_listen` in parallel can JOIN the two
+# CSVs after the sweep on (timestamp, power_dbm_requested).
+#
+# The L072 firmware is NOT physically connected on this bench today; the
+# sweep run itself is HW-BLOCKED per LifeTrac-v25/TODO.md S1.4. This code
+# lands so that the moment the L072 + handheld are reattached the only
+# remaining work is "execute the sweep + commit the CSV", not "write the
+# harness". See AI NOTES 2026-05-18 §"Phase 0" + design-doc walk_power
+# bullet.
+# -------------------------------------------------------------------------
+WALK_POWER_CSV_FIELDS = (
+    "timestamp_iso",
+    "step_idx",
+    "power_dbm_requested",
+    "power_dbm_echoed_first",
+    "count_sent",
+    "tx_done_ok",
+    "tx_done_fail",
+    "tx_timeout",
+    "radio_tx_ok_delta",
+    "radio_tx_abort_lbt_delta",
+    "radio_tx_abort_airtime_delta",
+    "mean_toa_us",
+    "tx_per_pct",
+    # RX-side columns filled by a paired `--probe rx_listen` orchestrator.
+    "rx_per_pct",
+    "rx_rssi_dbm_mean",
+    "rx_snr_db_mean",
+    "rx_crc_err_count",
+)
+
+
+def _format_walk_power_row(row: dict) -> str:
+    """Serialise one walk_power row as a CSV line (RFC4180-ish: no quoting
+    needed because every value is numeric / ISO-8601 / empty). Order is
+    locked to WALK_POWER_CSV_FIELDS."""
+    out = []
+    for key in WALK_POWER_CSV_FIELDS:
+        v = row.get(key, "")
+        if v is None:
+            out.append("")
+        elif isinstance(v, float):
+            # 3 decimal places is enough for ToA-us and PER-pct.
+            out.append(f"{v:.3f}")
+        else:
+            out.append(str(v))
+    return ",".join(out)
+
+
+def run_walk_power(link: HostLink,
+                   power_min: int,
+                   power_max: int,
+                   power_step: int,
+                   per_step_count: int,
+                   timeout: float,
+                   inter_s: float,
+                   csv_out: str | None,
+                   payload_len: int = 16) -> int:
+    """S1.1 walk_power sweep. Returns 0 if every step's CFG_OK_URC took and
+    every step issued ≥1 TX_DONE_URC (sweep produced data); returns 1 if
+    any step's CFG_SET timed out; returns 2 on transport-fatal."""
+    import os as _os
+    import datetime as _dt
+
+    if power_step <= 0:
+        print(f"FATAL: --power-step must be > 0 (got {power_step})")
+        print("__WALK_POWER_VERDICT__=BAD_ARGS")
+        return 2
+    if power_min < 2 or power_max > 20 or power_min > power_max:
+        print(f"FATAL: --power-min/--power-max out of range or inverted "
+              f"(got {power_min}..{power_max}, SX1276 PA_BOOST range is 2..20)")
+        print("__WALK_POWER_VERDICT__=BAD_ARGS")
+        return 2
+    if per_step_count <= 0:
+        print(f"FATAL: --per-step-count must be > 0 (got {per_step_count})")
+        print("__WALK_POWER_VERDICT__=BAD_ARGS")
+        return 2
+    if payload_len < 1 or payload_len > 64:
+        print(f"FATAL: --walk-payload-len out of [1, 64] (got {payload_len})")
+        print("__WALK_POWER_VERDICT__=BAD_ARGS")
+        return 2
+
+    # Default CSV path: bench-evidence/walk_power_<date>/board_<hash>.csv
+    if csv_out is None:
+        date_tag = _dt.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        # The script runs on the X8 under /tmp/lifetrac_p0c, but it's also
+        # importable on a dev box. Try to land the CSV beside the script's
+        # original repo location when present; otherwise fall back to /tmp.
+        repo_evidence = _os.path.normpath(_os.path.join(
+            _os.path.dirname(_os.path.abspath(__file__)),
+            "..", "..", "bench-evidence", f"walk_power_{date_tag}"))
+        out_dir = repo_evidence if _os.path.isdir(_os.path.dirname(repo_evidence)) \
+            else f"/tmp/walk_power_{date_tag}"
+        try:
+            _os.makedirs(out_dir, exist_ok=True)
+        except OSError as exc:
+            print(f"WARN: cannot create {out_dir}: {exc}; falling back to /tmp")
+            out_dir = "/tmp"
+        csv_out = _os.path.join(out_dir, "walk_power_tx_side.csv")
+    print(f"=== walk_power: {power_min}..{power_max} dBm step={power_step} "
+          f"count/step={per_step_count} csv={csv_out} ===")
+
+    drain_boot(link, 1.0)
+    try:
+        link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=1.0)
+    except Exception as exc:
+        print(f"FATAL: VER warm-up failed: {exc}")
+        print("__WALK_POWER_VERDICT__=TRANSPORT_FAIL")
+        return 2
+    drain_pending(link, quiet_s=0.25, max_s=1.0)
+
+    # Disable LBT for the sweep — same rationale as run_tx_burst.
+    try:
+        link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
+                     bytes([CFG_KEY_LBT_ENABLE, 0x01, 0x00]), timeout=1.0)
+        print("CFG_OK_URC: LBT_ENABLE=0")
+    except Exception as exc:
+        print(f"WARN: CFG_SET_REQ(LBT_ENABLE=0) failed: {exc} (continuing)")
+
+    # Open the CSV with header.
+    try:
+        csv_fh = open(csv_out, "w", encoding="utf-8")
+    except OSError as exc:
+        print(f"FATAL: cannot open CSV {csv_out}: {exc}")
+        print("__WALK_POWER_VERDICT__=CSV_OPEN_FAIL")
+        return 2
+    csv_fh.write(",".join(WALK_POWER_CSV_FIELDS) + "\n")
+    csv_fh.flush()
+
+    sys.stdout.write(f"__WALK_POWER_READY__ csv={csv_out}\n")
+    sys.stdout.flush()
+
+    any_step_failed = False
+    steps_with_data = 0
+    powers = list(range(power_min, power_max + 1, power_step))
+    for step_idx, dbm in enumerate(powers):
+        # 1. Apply the new TX power.
+        try:
+            link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
+                         bytes([CFG_KEY_TX_POWER_DBM, 0x01, dbm & 0xFF]),
+                         timeout=1.0)
+            print(f"step {step_idx}: CFG_OK_URC TX_POWER_DBM={dbm}")
+        except Exception as exc:
+            print(f"step {step_idx}: CFG_SET TX_POWER_DBM={dbm} FAILED: {exc}")
+            any_step_failed = True
+            # Still write a row so the CSV exposes the gap.
+            row = {
+                "timestamp_iso": _dt.datetime.now().isoformat(timespec="seconds"),
+                "step_idx": step_idx,
+                "power_dbm_requested": dbm,
+                "count_sent": 0,
+            }
+            csv_fh.write(_format_walk_power_row(row) + "\n")
+            csv_fh.flush()
+            continue
+
+        # 2. Snapshot stats.
+        try:
+            stats_b = fetch_stats(link)
+        except Exception as exc:
+            print(f"step {step_idx}: STATS(before) failed: {exc}; skipping step")
+            any_step_failed = True
+            continue
+        tx_ok_b = stats_b.get("radio_tx_ok", 0)
+        abort_lbt_b = stats_b.get("radio_tx_abort_lbt", 0)
+        abort_air_b = stats_b.get("radio_tx_abort_airtime", 0)
+
+        # 3. Send per_step_count frames.
+        tx_done_ok = 0
+        tx_done_fail = 0
+        tx_timeout_n = 0
+        toa_samples = []
+        first_echoed = None
+        for i in range(per_step_count):
+            tx_id = (step_idx * 256 + i) & 0xFF
+            payload = (f"WP s{step_idx:02d} p{dbm:02d} i{i:04d} ".encode("ascii")
+                       + _os.urandom(max(0, payload_len - 24)))
+            payload = payload[:payload_len]
+            tx_frame = bytes([tx_id, len(payload)]) + payload
+            try:
+                link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
+            except Exception as exc:
+                print(f"  WP s{step_idx} i{i}: send err: {exc}")
+                tx_timeout_n += 1
+                continue
+            try:
+                done, _ = wait_for_tx_done(link, tx_id, timeout=timeout)
+            except TimeoutError:
+                tx_timeout_n += 1
+                if inter_s > 0:
+                    time.sleep(inter_s)
+                continue
+            except Exception as exc:
+                print(f"  WP s{step_idx} i{i}: wait err: {exc}")
+                tx_timeout_n += 1
+                if inter_s > 0:
+                    time.sleep(inter_s)
+                continue
+            if done["status"] == SX1276_TX_STATUS_OK:
+                tx_done_ok += 1
+            else:
+                tx_done_fail += 1
+            toa_samples.append(done.get("time_on_air_us", 0))
+            if first_echoed is None:
+                first_echoed = done.get("tx_power_dbm")
+            if inter_s > 0:
+                time.sleep(inter_s)
+
+        # 4. Snapshot stats after.
+        try:
+            stats_a = fetch_stats(link)
+        except Exception:
+            stats_a = stats_b
+        tx_ok_a = stats_a.get("radio_tx_ok", 0)
+        abort_lbt_a = stats_a.get("radio_tx_abort_lbt", 0)
+        abort_air_a = stats_a.get("radio_tx_abort_airtime", 0)
+
+        mean_toa = (sum(toa_samples) / len(toa_samples)) if toa_samples else 0.0
+        tx_per_pct = (100.0 * (per_step_count - tx_done_ok) / per_step_count
+                      if per_step_count > 0 else 0.0)
+
+        row = {
+            "timestamp_iso": _dt.datetime.now().isoformat(timespec="seconds"),
+            "step_idx": step_idx,
+            "power_dbm_requested": dbm,
+            "power_dbm_echoed_first": first_echoed if first_echoed is not None else "",
+            "count_sent": per_step_count,
+            "tx_done_ok": tx_done_ok,
+            "tx_done_fail": tx_done_fail,
+            "tx_timeout": tx_timeout_n,
+            "radio_tx_ok_delta": tx_ok_a - tx_ok_b,
+            "radio_tx_abort_lbt_delta": abort_lbt_a - abort_lbt_b,
+            "radio_tx_abort_airtime_delta": abort_air_a - abort_air_b,
+            "mean_toa_us": float(mean_toa),
+            "tx_per_pct": float(tx_per_pct),
+        }
+        csv_fh.write(_format_walk_power_row(row) + "\n")
+        csv_fh.flush()
+        steps_with_data += 1
+        print(f"__WALK_POWER_STEP__ step={step_idx} dbm={dbm} "
+              f"ok={tx_done_ok} fail={tx_done_fail} "
+              f"timeout={tx_timeout_n} per_pct={tx_per_pct:.2f} "
+              f"mean_toa_us={mean_toa:.0f} echoed_dbm={first_echoed}")
+        sys.stdout.flush()
+
+    csv_fh.close()
+    print(f"__WALK_POWER_DONE__ steps={len(powers)} steps_with_data={steps_with_data} "
+          f"csv={csv_out} verdict={'FAIL' if any_step_failed else 'OK'}")
+    if any_step_failed:
+        return 1
+    return 0
+
+
 def run_rx_echo(link: "HostLink", window_s: float = 60.0,
                 echo_timeout_s: float = 5.0) -> int:
     """W1-11 L-1 RX-side echo. Same as `rx_listen` but on every
@@ -1707,10 +1974,12 @@ def main(argv=None) -> int:
         "--probe",
         default="tx",
         choices=["tx", "regversion", "fsk", "opmode_walk", "rx",
-                 "rx_listen", "tx_burst", "rx_echo", "ping_pong"],
+                 "rx_listen", "tx_burst", "rx_echo", "ping_pong",
+                 "walk_power"],
         help="probe mode (W1-9 default 'tx'; W1-9b 'regversion'/'fsk'/'opmode_walk'; "
              "W1-10 single-board 'rx'; W1-10b two-board 'rx_listen'/'tx_burst'; "
-             "W1-11 L-1 two-board 'rx_echo'/'ping_pong')",
+             "W1-11 L-1 two-board 'rx_echo'/'ping_pong'; "
+             "S1.1 'walk_power' (TX-power sweep 2..17 dBm in 1 dB steps)",
     )
     parser.add_argument(
         "--rtt-timeout",
@@ -1754,6 +2023,20 @@ def main(argv=None) -> int:
              "hygiene rule, 2026-05-10). Override only if a follow-on probe "
              "needs the radio left in its working state.",
     )
+    # 2026-05-18 S1.1 walk_power options.
+    parser.add_argument("--power-min", type=int, default=2,
+                        help="walk_power: minimum TX power dBm (default 2)")
+    parser.add_argument("--power-max", type=int, default=17,
+                        help="walk_power: maximum TX power dBm (default 17, SX1276 PA_BOOST ceiling)")
+    parser.add_argument("--power-step", type=int, default=1,
+                        help="walk_power: dBm step size (default 1)")
+    parser.add_argument("--per-step-count", type=int, default=100,
+                        help="walk_power: TX frames per power step (default 100)")
+    parser.add_argument("--walk-payload-len", type=int, default=16,
+                        help="walk_power: per-frame payload length (default 16, max 64)")
+    parser.add_argument("--csv-out", default=None,
+                        help="walk_power: explicit CSV output path. If omitted, "
+                             "writes to bench-evidence/walk_power_<date>/walk_power_tx_side.csv")
     args = parser.parse_args(argv)
 
     print(f"MODE: {args.probe}")
@@ -1790,6 +2073,16 @@ def main(argv=None) -> int:
                                  inter_s=args.inter_cycle_s,
                                  timeout=args.timeout,
                                  rtt_timeout=args.rtt_timeout)
+        if args.probe == "walk_power":
+            return run_walk_power(link,
+                                  power_min=args.power_min,
+                                  power_max=args.power_max,
+                                  power_step=args.power_step,
+                                  per_step_count=args.per_step_count,
+                                  timeout=args.timeout,
+                                  inter_s=args.inter_cycle_s,
+                                  csv_out=args.csv_out,
+                                  payload_len=args.walk_payload_len)
         print(f"FATAL: unknown probe mode: {args.probe}")
         return 2
     finally:
