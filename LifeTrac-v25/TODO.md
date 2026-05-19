@@ -196,19 +196,151 @@ L072 + handheld reattached.)*
       gate target is `stale_dropped == 0` over a 10-minute mixed-load
       run — pre-validation today, validation blocked on the L072
       reattach + W2-02 stability rig.)*
-- [ ] **S1.4** � *(PILOT LANDED — full sweep pending)* Commit one full
-      `walk_power` sweep and one 10-minute mixed-load run to `bench-evidence/`.
-      *(Pilot 2026-05-19: 16-step 50-packet-per-step paired sweep landed at
-      `DESIGN-CONTROLLER/bench-evidence/walk_power_pilot_2026-05-19/`
-      (verdict OK, mean PER 0.59 %, RSSI/SNR monotonic). Full evidence
-      still wants `--per-step-count 200` after the EU-heritage 1 %
-      airtime gate is either characterised or made `--no-duty-cycle`
-      configurable; ~15 % of attempts in the pilot were rejected by
-      `radio_tx_abort_airtime_delta`. 10-minute mixed-load run not yet
-      started.)*
+- [x] **S1.4** ✅ *(CLOSED 2026-05-19 — full sweep + soak both landed)*
+      Commit one full `walk_power` sweep and one 10-minute mixed-load run
+      to `bench-evidence/`.
+      *(Pilot 2026-05-19: 16-step × 50-packet paired sweep at
+      `DESIGN-CONTROLLER/bench-evidence/walk_power_pilot_2026-05-19/` —
+      verdict OK, mean PER 0.59 %, RSSI/SNR monotonic.
+      Full 2026-05-19: 16-step × 200-packet paired sweep at
+      `DESIGN-CONTROLLER/bench-evidence/walk_power_full_2026-05-19/` —
+      verdict OK, mean PER 1.22 %, 3 200/3 200 `tx_done_ok`,
+      0 `tx_aborted_airtime` at `--inter-cycle-s 0.07`, RSSI -118.9 →
+      -111.2 dBm monotonic.
+      Soak 2026-05-19: 6 500-packet × ~13 min paired soak at
+      `DESIGN-CONTROLLER/bench-evidence/mixed_load_2026-05-19/` —
+      6 500/6 500 `tx_done_ok`, 0 timeout, **0 faults, 0 invariants
+      violated**, 6 463/6 500 RX (PER 0.57 %).
+      Airtime-gate falsification done: the pilot's 12-16 % attempt loss was
+      NOT EU 1 % regulatory but the 40 % internal per-channel fairness cap
+      in `sx1276_airtime.c`; see
+      `AI NOTES/2026-05-19_FCC_Part15_902-928_Compliance_Notes_Copilot_v1_0.md`
+      for the actual FCC envelope and the resulting FHSS work item.
+      Multi-channel / multi-payload-class "mixed-load" is gated on FHSS
+      scheduler landing — captured as a follow-up in the mixed_load README.)*
 - **Gate:** measured vs. predicted encrypted ToA delta < 10 ms on at least
   one P0 and one P3 packet class. (S1.0 unit tests against historical CSVs
   give a software-only proxy that can pre-pass before LoRa rig returns.)
+
+### Stage S1.5 — FCC §15.247 50-channel FHSS (PRE-LAUNCH BLOCKER) 🔴 NEW
+*(Per [AI NOTES/2026-05-19_FCC_Part15_902-928_Compliance_Notes_Copilot_v1_0.md](AI%20NOTES/2026-05-19_FCC_Part15_902-928_Compliance_Notes_Copilot_v1_0.md)
+§19-§20 and the v3.0 consolidated execution order in
+[AI NOTES/2026-05-19_LoRa_FCC_50CH_FHSS_Implementation_Plan_Copilot_v1_0.md §14](AI%20NOTES/2026-05-19_LoRa_FCC_50CH_FHSS_Implementation_Plan_Copilot_v1_0.md#14-consolidated-v30-plan-deltas-authoritative).
+Production radio profile is `FCC_15_247_FHSS_50CH_BW250` at the existing
++17 dBm clamp. All current S1.x bench evidence is stamped
+`BENCH_ONLY_FIXED_915` and is **not** FCC field evidence. The L072 today
+hardcodes `s_channel_idx = 0U` in `sx1276_tx.c:64` — single fixed
+channel — which is the single largest compliance gap.)*
+
+**Implementation (firmware, executed in v3.0 order):**
+- [ ] **FCC-FHSS-CHANTAB** Channel-table generator + static asserts:
+      `_Static_assert(FHSS_CHANNEL_COUNT == 50)`,
+      `_Static_assert(FHSS_CHANNEL_SPACING_HZ >= 25000)`. Interim formula
+      `center_hz = 902_750_000 + 500_000*i, i=0..49`. Same generator
+      imported by X8-side Python tooling.
+- [ ] **FCC-PROFILE-ENUM** Add `CFG_KEY_REG_PROFILE` with
+      `{BENCH_ONLY_FIXED_915, FCC_15_247_FHSS_50CH_BW250, FCC_15_247_DTS_BW500}`.
+      Compile-time gate: A5 only accepts production profile when
+      `LIFETRAC_FHSS_TX_ROUTED` is defined (defined only by FCC-A4).
+- [ ] **FCC-A1a** Config-time airtime invariant in modem-config setter:
+      reject `(SF, BW, CR)` whose worst-case ToA > `dwell_cap_ms - guard_ms`
+      (400 - 20 ms default). New URC `__AIRTIME_INVARIANT_REJECT__`.
+- [ ] **FCC-A1b** Pre-TX airtime invariant in `sx1276_tx_begin()` keyed on
+      actual payload + header + CRC + preamble + safety-burst framing.
+      Host-side mirror calc keyed on `profile_id` so oversized payloads
+      never reach the L072.
+- [ ] **FCC-A3** New `radio/sx1276_fhss.{c,h}`: 50-channel table, pseudo-
+      random permutation `permute(H(farm_id||node_id||epoch))`, blacklist
+      with legal floor (refuse if active set would drop below 50),
+      cold-start warm-up, `record_lbt_block()` separate from blacklist.
+      **Fails closed** on invalid epoch / hop / timebase. Golden vectors
+      checked in under `bench/host_proto/`.
+- [ ] **FCC-A2** Split `sx1276_airtime.c`: keep 1 s/400 ms QoS gate
+      (`qos_used_us_1s`), add 10 s legal-dwell accountant
+      (`legal_dwell_used_us_10s`) widened to 64 channel slots, and a 20 s
+      variant gated by profile. Window semantics: `[t-WINDOW_MS, t)`
+      half-open. Reserve pessimistically before TX-start; reconcile on
+      TX-done; **never roll back** legal dwell on NACK.
+- [ ] **FCC-B1-PERTX** Per-TX `RFCO` URC:
+      `{profile_id, epoch, hop_idx, freq_hz, pkt_toa_us, legal_dwell_used_us_for_ch}`.
+- [ ] **FCC-A5** cfg validation + two-phase commit
+      (`cfg_profile_stage` → validate → `cfg_profile_activate`). Profile-
+      aware power clamp `Pmax = tier_ceiling - max(0, antenna_gain - 6)`.
+      Production profile still gated on `LIFETRAC_FHSS_TX_ROUTED`.
+- [ ] **FCC-A4** Replace `s_channel_idx = 0U` in
+      [`sx1276_tx.c` L64](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_tx.c)
+      with `sx1276_fhss_next_channel()` + `sx1276_set_frequency_hz()` +
+      PLL settle (document measured settle budget) **before** LBT/CAD/TX-
+      start. Defines `LIFETRAC_FHSS_TX_ROUTED`.
+- [ ] **FCC-A6** RX hop sync: same `permute(seed, epoch)`; packet header
+      carries authenticated `{profile_id, epoch, hop_idx, schema_ver}`.
+      Explicit **Scanning** state for cold start — wideband scan across
+      active set, **no fixed rendezvous channel**.
+- [ ] **FCC-B1-SUMMARY** Per-minute `RFCO_SUMMARY` URC: 50-bucket
+      histogram, per-channel `legal_dwell_max_us`, `blocked_attempts`
+      histogram, `active_count`, `blacklist_size`, last clamp reason,
+      RFCO schema version.
+- [ ] **FCC-B2** Artifact stamping: required header fields (firmware git
+      SHA, build timestamp UTC, profile enum + string, RFCO schema
+      version). **Naming linter** refuses any artifact containing
+      `airtime_us` or `dwell_us` without one of `qos_used_us_1s`,
+      `legal_dwell_used_us_10s`, `legal_dwell_used_us_20s`.
+- [ ] **FCC-B3** Update orchestrator scripts in
+      [`tools/`](tools/) (incl. `mixed_load_soak.ps1`) to require
+      `profile=FCC_15_247_FHSS_50CH_BW250` in run header and abort if
+      the RFCO snapshot disagrees.
+- [ ] **FCC-TXPOWER-LAYER** Close the
+      [AI NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md](AI%20NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md)
+      gap: TX-power adapter and safety-burst path must layer **inside**
+      the hop scheduler (FCC notes §11.1.5 — every power step must still
+      meet OOB mask). Add bench-only-single-channel callout to that doc.
+
+**Bench evidence gates (Phase D — promote to field-candidate):**
+*All D1/D9 captures must be conducted into 50 Ω with a directional coupler
+or inside an RF-quiet enclosure. Ambient open-lab traffic is not
+acceptable evidence.*
+- [ ] **FCC-EVID-D1** Hop proof: ≥50 distinct centers, equal-use within
+      ±10 % per epoch over 60 s continuous TX (spectrum analyzer + RFCO
+      histogram).
+- [ ] **FCC-EVID-D2** Occupied BW at SF7/SF8 × BW250 × +17 dBm: ≥250 kHz
+      and ≤500 kHz → 10 s window; <250 kHz → fallback profile
+      `..._NARROW` with 20 s window.
+- [ ] **FCC-EVID-D3** OOB mask: emissions ≥20 dB below in-band in any
+      100 kHz outside 902-928 MHz at every channel, especially band edges.
+- [ ] **FCC-EVID-D4** Per-channel dwell ≤400 ms / channel / 10 s during
+      continuous TX soak (RFCO `legal_dwell_max_us`).
+- [ ] **FCC-EVID-D5** Largest TX `pkt_toa_ms` over the run < 400 - 20 ms
+      guard (RFCO).
+- [ ] **FCC-EVID-D6** Profile lock: host attempts to set arbitrary
+      `RegFrf` / wrong BW / mask < 50 ch on production build are rejected
+      with explicit error code (cfg fuzz script).
+- [ ] **FCC-EVID-D7** RF exposure: MPE evaluation per §1.1307 / §2.1093 or
+      categorical exclusion documented for the committed antenna SKU.
+- [ ] **FCC-EVID-D8** Two-node sync torture: RX boots late, reboots
+      mid-run, misses several epochs, sees burst packet loss — reacquires
+      without fixed rendezvous and without host intervention. Doubles as
+      §14.3 Q6 measurement (target ≤5 s reacquire; >30 s ⇒ A6 redesign).
+- [ ] **FCC-EVID-D9** LBT bias stress with calibrated interferer on a
+      channel subset: legal dwell stays below cap, RFCO cleanly separates
+      blocked attempts from TX counts, active set never silently shrinks.
+- [ ] **FCC-EVID-D10** Power/antenna clamp fuzz: every illegal
+      (profile, antenna_gain, tx_power) combination through host cfg is
+      rejected with structured reason; legal combos clamp correctly.
+- [ ] **FCC-EVID-DGATE** Scripted go/no-go summary report that fails the
+      run if any D1-D10 artifact or any required B2 header field
+      (git SHA, timestamp, profile enum, schema version) is missing.
+
+**Open questions (must answer before FCC-A3 lands — see §14.3 of plan doc):**
+Q1 final 50-ch list (gated on D2), Q2 epoch model time-slice vs counter,
+Q3 L072 monotonic-tick wrap behavior, Q4 hopset-update auth path
+(Track C), Q5 antenna SKU + gain commitment, Q6 RX cold-start scan budget
+(measured at D8).
+
+- **Gate (S1.5 closes when):** all FCC-A* + FCC-B1/B2/B3 firmware items
+  land AND all FCC-EVID-D1..D10 + FCC-EVID-DGATE pass with margin and are
+  archived under
+  `LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/fcc_fhss_50ch_<date>/`.
+  Until S1.5 closes, no over-the-air production deployment.
 
 ### Stage S2 — D15 E-STOP replay-rejection fix (BLOCKER for S4) 🔴 HW-BLOCKED
 *(L072 firmware change; safety-critical bench regression fundamentally

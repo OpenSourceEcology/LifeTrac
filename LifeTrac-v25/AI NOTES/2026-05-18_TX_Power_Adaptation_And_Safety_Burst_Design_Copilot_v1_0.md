@@ -62,7 +62,19 @@ reliability guarantees inside that model.
 ## 1. Motivating Evidence (W2-02 Stability Run, 2026-05-18 18:11–18:33)
 
 10 back-to-back end-to-end image-over-LoRa runs, +14 dBm fixed,
-SF7/BW125, 868.1 MHz, ~190 fragments per KEY frame:
+SF7/BW125, ~~868.1 MHz~~ **915.0 MHz** [^freq-correction], ~190 fragments per KEY frame:
+
+[^freq-correction]: Corrected 2026-05-19 (Copilot): the original draft said
+    "868.1 MHz" but firmware initialises the SX1276 at 915.000 MHz
+    ([sx1276.c#L269](../DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276.c#L269),
+    [lora_ping.c#L312](../DESIGN-CONTROLLER/firmware/murata_l072/lora_ping.c#L312))
+    and live `regfrf_check.py` readback on both X8+L072 bench boards on
+    2026-05-19 returned `RegFrf=0xE4C000 → 915.000 MHz` (US FCC Part 15.247
+    band). Per §0 precedence (code > evidence > doc), the firmware is
+    authoritative; the original 868.1 MHz figure was a stale copy-paste
+    from earlier EU-spec notes. The W2-02 run on this firmware therefore
+    was also on 915.0 MHz. See
+    [bench-evidence/walk_power_pilot_2026-05-19/README.md](../DESIGN-CONTROLLER/bench-evidence/walk_power_pilot_2026-05-19/README.md).
 
 | Run | TX OK | RX | tiles | verdict |
 |---:|---:|---:|---:|:---:|
