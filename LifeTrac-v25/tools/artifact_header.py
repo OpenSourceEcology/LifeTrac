@@ -614,6 +614,144 @@ def run_self_test() -> int:
             f"rc={rc4} raised={raised}",
         )
 
+        # ---- Case 26-31: --profile-from-map CLI mode (b-b-3-2-2-3-1) --
+        # Build a tiny in-tempdir bench-evidence-style root and a
+        # tiny profile map, then exercise: mutex enforcement, missing
+        # --map-root, end-to-end stamp resolving the enum from the
+        # map, KeyError on unmapped prefix, and --if-unstamped short-
+        # circuiting BEFORE the map lookup (so a pre-stamped file
+        # under an unmapped prefix is a clean no-op).
+        import json as _json
+        fake_root = tdp / "fake_bench_evidence"
+        (fake_root / "T6_bringup_2026-05-09_132110").mkdir(parents=True)
+        target = (fake_root / "T6_bringup_2026-05-09_132110"
+                  / "console.log")
+        target.write_text("body line\n", encoding="utf-8")
+        unmapped_dir = fake_root / "never_seen_workload_2026-06-01"
+        unmapped_dir.mkdir()
+        unmapped_target = unmapped_dir / "console.log"
+        unmapped_target.write_text("body\n", encoding="utf-8")
+        tiny_map = tdp / "tiny_map.json"
+        tiny_map.write_text(_json.dumps({
+            "schema_version": 1,
+            "prefixes": {"T6_bringup": 2},
+        }), encoding="utf-8")
+
+        # Case 26: mutex enforcement (both flags -> exit 2).
+        rc_mutex = main([
+            "stamp",
+            "--profile-enum", "0",
+            "--profile-from-map", str(tiny_map),
+            "--map-root", str(fake_root),
+            "--input", str(target),
+            "--output", str(target),
+        ])
+        check(
+            "stamp rejects --profile-enum + --profile-from-map together",
+            rc_mutex == 2, f"rc={rc_mutex}",
+        )
+
+        # Case 27: --profile-from-map requires --map-root (exit 2).
+        rc_no_root = main([
+            "stamp",
+            "--profile-from-map", str(tiny_map),
+            "--input", str(target),
+            "--output", str(target),
+        ])
+        check(
+            "stamp --profile-from-map without --map-root -> exit 2",
+            rc_no_root == 2, f"rc={rc_no_root}",
+        )
+
+        # Case 28: end-to-end stamp resolves enum from map.
+        # tiny_map maps T6_bringup -> 2, so the stamped file should
+        # carry profile_enum: 2.
+        rc_map = main([
+            "stamp",
+            "--profile-from-map", str(tiny_map),
+            "--map-root", str(fake_root),
+            "--input", str(target),
+            "--output", str(target),
+        ])
+        stamped_fields = parse_header_block(
+            target.read_text(encoding="utf-8"), comment_prefix="# ")
+        check(
+            "stamp --profile-from-map resolves enum via map lookup",
+            rc_map == 0 and stamped_fields.get("profile_enum") == "2",
+            f"rc={rc_map} fields={stamped_fields}",
+        )
+
+        # Case 29: --if-unstamped short-circuits BEFORE map lookup.
+        # The same file is now stamped; running again with
+        # --if-unstamped + a map that doesn't even contain the prefix
+        # must be a clean no-op (no KeyError).
+        empty_map = tdp / "empty_map.json"
+        empty_map.write_text(_json.dumps({
+            "schema_version": 1, "prefixes": {}}),
+            encoding="utf-8")
+        rc_skip = main([
+            "stamp", "--if-unstamped",
+            "--profile-from-map", str(empty_map),
+            "--map-root", str(fake_root),
+            "--input", str(target),
+            "--output", str(target),
+        ])
+        check(
+            "--if-unstamped short-circuits before map lookup",
+            rc_skip == 0,
+            f"rc={rc_skip}",
+        )
+
+        # Case 30: unmapped prefix -> KeyError -> exit 1.
+        rc_miss = main([
+            "stamp",
+            "--profile-from-map", str(tiny_map),
+            "--map-root", str(fake_root),
+            "--input", str(unmapped_target),
+            "--output", str(unmapped_target),
+        ])
+        check(
+            "stamp --profile-from-map on unmapped prefix -> exit 1 "
+            "(forcing-function gate, no silent default)",
+            rc_miss == 1, f"rc={rc_miss}",
+        )
+
+        # Case 31: neither flag -> exit 2.
+        rc_neither = main([
+            "stamp", "--input", str(target), "--output", str(target),
+        ])
+        check(
+            "stamp with neither --profile-enum nor --profile-from-map "
+            "-> exit 2",
+            rc_neither == 2, f"rc={rc_neither}",
+        )
+
+        # Case 32-33: non-UTF-8 input must NOT crash (smoke-test
+        # finding 2026-05-20: real bench artifacts like
+        # mixed_load_2026-05-19/tx_burst_board_a.log carry raw UART
+        # bytes that were aborting the stamper with
+        # UnicodeDecodeError). surrogateescape encoding must
+        # round-trip the bytes untouched.
+        noisy = tdp / "noisy.log"
+        original_tail = (b"\xff\xfe garbage prefix bytes\n"
+                         b"normal ascii body line\n")
+        noisy.write_bytes(original_tail)
+        rc_noisy = main([
+            "stamp", "--profile-enum", "0",
+            "--input", str(noisy), "--output", str(noisy),
+        ])
+        check(
+            "stamp accepts non-UTF-8 input (surrogateescape)",
+            rc_noisy == 0, f"rc={rc_noisy}",
+        )
+        after = noisy.read_bytes()
+        check(
+            "non-UTF-8 tail bytes preserved bit-identical "
+            "post-stamp",
+            original_tail in after,
+            f"missing tail; got first 80 bytes: {after[:80]!r}",
+        )
+
     print(f"[self-test] {cases - fails}/{cases} cases passed")
     return 1 if fails else 0
 
@@ -634,7 +772,61 @@ def _cmd_harvest(args: argparse.Namespace) -> int:
 
 
 def _cmd_stamp(args: argparse.Namespace) -> int:
-    text = args.input.read_text(encoding="utf-8") if args.input else ""
+    # ---- enum source: --profile-enum N XOR --profile-from-map FILE ----
+    # b-b-3-2-2-3-1: --profile-from-map is the forcing-function path
+    # for the tree-wide sweep. It defers profile_enum selection to the
+    # artifact_profile_map loader (which collapses the file's group
+    # via inventory_artifact_headers.collapse_to_prefix and then
+    # strict-looks-up the map). Mutually exclusive with --profile-enum;
+    # one of the two MUST be set (enforced post-parse to keep the
+    # subparser tidy). Lazy-imported so this module stays cycle-free
+    # for callers that only need stamp_text / parse_header_block.
+    if args.profile_from_map is not None:
+        if args.profile_enum is not None:
+            print("error: --profile-enum and --profile-from-map are "
+                  "mutually exclusive", file=sys.stderr)
+            return 2
+        if args.input is None:
+            print("error: --profile-from-map requires --input "
+                  "(group is derived from the file's path under "
+                  "--map-root)", file=sys.stderr)
+            return 2
+        if args.map_root is None:
+            print("error: --profile-from-map requires --map-root "
+                  "DIR (the bench-evidence-style root the input "
+                  "file lives under)", file=sys.stderr)
+            return 2
+    elif args.profile_enum is None:
+        print("error: one of --profile-enum N or "
+              "--profile-from-map FILE is required", file=sys.stderr)
+        return 2
+
+    # b-b-3-2-2-3-1 smoke-test discovered some real-world artifacts
+    # (e.g. mixed_load_2026-05-19/tx_burst_board_a.log) carry non-
+    # UTF-8 bytes at the start from UART / terminal control noise.
+    # The original `encoding="utf-8"` read aborted with a traceback,
+    # which would have halted the b-b-3-2-2-3-2 tree-wide sweep on
+    # the first contaminated file. `errors="surrogateescape"` is
+    # lossless: it round-trips the non-UTF-8 bytes through Python
+    # str unchanged when written back with the same codec. The
+    # prepended header block is pure ASCII so the resulting file
+    # stays bit-identical in its tail.
+    #
+    # `newline=""` (both read and write) disables Python's universal-
+    # newlines translation. Without it, on Windows the default text
+    # mode silently rewrites every `\n` to `\r\n` on write, which
+    # would mangle every Unix-EOL bench artifact in the corpus.
+    if args.input is not None:
+        try:
+            text = args.input.read_text(
+                encoding="utf-8", errors="surrogateescape",
+                newline="")
+        except OSError as exc:
+            print(f"error: cannot read {args.input}: {exc}",
+                  file=sys.stderr)
+            return 2
+    else:
+        text = ""
     prefix = (args.comment_prefix
               if args.comment_prefix is not None
               else (comment_prefix_for_path(args.input) if args.input
@@ -645,26 +837,55 @@ def _cmd_stamp(args: argparse.Namespace) -> int:
     # call is cheap to re-run over a large tree, AND preserves the
     # original `build_timestamp_utc` (which the strict stamp_text
     # idempotency contract from b-b-1 would otherwise reject as a
-    # field diff). Output file (if any) is left untouched.
+    # field diff). Also runs BEFORE the --profile-from-map lookup so
+    # a pre-stamped file under an unmapped prefix is a clean no-op,
+    # not a KeyError.
     if args.if_unstamped:
         existing = parse_header_block(text, comment_prefix=prefix)
         if existing:
             return 0
+
+    profile_enum = args.profile_enum
+    if args.profile_from_map is not None:
+        # Lazy import to break the artifact_header <- inventory <-
+        # profile_map import cycle.
+        from artifact_profile_map import (  # noqa: E402
+            load_profile_map, lookup_profile_for_group,
+        )
+        from inventory_artifact_headers import group_for  # noqa: E402
+        try:
+            prefix_map = load_profile_map(args.profile_from_map)
+        except (OSError, ValueError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        group = group_for(args.input.resolve(),
+                          args.map_root.resolve())
+        try:
+            profile_enum = lookup_profile_for_group(group, prefix_map)
+        except KeyError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+
     fields = build_header_fields(
         firmware_root=args.firmware_root,
         repo_root=args.repo_root,
-        profile_enum=args.profile_enum,
+        profile_enum=profile_enum,
     )
     stamped = stamp_text(text, fields, comment_prefix=prefix)
     if args.output is None:
         sys.stdout.write(stamped)
     else:
-        args.output.write_text(stamped, encoding="utf-8")
+        args.output.write_text(stamped, encoding="utf-8",
+                               errors="surrogateescape",
+                               newline="")
     return 0
 
 
 def _cmd_parse(args: argparse.Namespace) -> int:
-    text = args.input.read_text(encoding="utf-8")
+    # Same surrogateescape/newline="" rationale as _cmd_stamp.
+    text = args.input.read_text(encoding="utf-8",
+                                errors="surrogateescape",
+                                newline="")
     prefix = (args.comment_prefix
               if args.comment_prefix is not None
               else comment_prefix_for_path(args.input))
@@ -699,7 +920,19 @@ def main(argv: list) -> int:
                         help="prepend a header block to a text artifact")
     sp.add_argument("--firmware-root", type=Path, default=default_firmware)
     sp.add_argument("--repo-root", type=Path, default=default_repo)
-    sp.add_argument("--profile-enum", type=int, required=True)
+    sp.add_argument("--profile-enum", type=int, default=None,
+                    help="explicit numeric REG_PROFILE_* id; mutually "
+                         "exclusive with --profile-from-map")
+    sp.add_argument("--profile-from-map", type=Path, default=None,
+                    help="resolve profile_enum from a workload-prefix "
+                         "map (see tools/artifact_profile_map.json); "
+                         "requires --input and --map-root; mutually "
+                         "exclusive with --profile-enum")
+    sp.add_argument("--map-root", type=Path, default=None,
+                    help="root directory the input file lives under "
+                         "(group is computed as the top-level subdir "
+                         "of the file's path relative to this root); "
+                         "required iff --profile-from-map is used")
     sp.add_argument("--input", type=Path,
                     help="input file (default: stdin / empty)")
     sp.add_argument("--output", type=Path,

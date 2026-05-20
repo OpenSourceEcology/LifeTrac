@@ -1,3 +1,14 @@
+# === FCC-B2-b ARTIFACT HEADER BEGIN (v1) ===
+# firmware_git_sha: d4dfcb86cfd99bbcbd227844940a1f905336b356
+# firmware_git_sha_short: d4dfcb86cfd9
+# build_timestamp_utc: 2026-05-20T07:50:34Z
+# profile_enum: 0
+# profile_string: REG_PROFILE_BENCH_ONLY_FIXED_915
+# rfco_summary_schema_ver: 1
+# rfco_pertx_schema_ver: 1
+# header_schema_ver: 1
+# === FCC-B2-b ARTIFACT HEADER END ===
+
 # Walk-Power Paired Sweep — Full S1.4 Evidence — 2026-05-19
 
 Full TX-power sweep across **+2 to +17 dBm in 1 dB steps × 200 packets per step**

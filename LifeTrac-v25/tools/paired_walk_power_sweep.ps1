@@ -59,6 +59,35 @@ $tail | ForEach-Object { Write-Host $_ }
 Write-Host "`n=== TX CSV head ==="
 Get-Content $csvLocal -TotalCount 5
 
+# FCC-B2-b-b-3-3-3: stamp + lint gate (matches mixed_load_soak.ps1 pattern
+# introduced in b-b-3-3-2). Profile enum 0 (REG_PROFILE_BENCH_ONLY_FIXED_915)
+# per artifact_profile_map.json entry for walk_power_pilot — this sweep runs
+# on a single fixed channel per the 2026-05-19 FCC plan §5 #3 BENCH_ONLY
+# callout. Stamp every artifact this run produced; soft-fail per file so a
+# stamper error can't erase already-captured bench evidence. The lint gate
+# below then converts any unstamped/corrupt/missing-fields/wrong-schema-ver
+# artifact in $outDir into a hard exit so an unstamped run can never ship.
+$stamper     = Join-Path $PSScriptRoot 'artifact_header.py'
+$profileEnum = 0
+foreach ($p in @($txLog, $rxLog, $csvLocal)) {
+  if (Test-Path $p) {
+    & py -3 $stamper stamp --profile-enum $profileEnum --input $p --output $p
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "[stamp] WARN: artifact_header.py exit=$LASTEXITCODE on $p"
+    } else {
+      Write-Host "[stamp] header prepended to $(Split-Path -Leaf $p)"
+    }
+  }
+}
+$linter = Join-Path $PSScriptRoot 'lint_artifact_headers.py'
+& py -3 $linter $outDir
+$lintRc = $LASTEXITCODE
+if ($lintRc -ne 0) {
+  Write-Host "[lint] FAIL: lint_artifact_headers.py exit=$lintRc on $outDir"
+  exit 3
+}
+Write-Host "[lint] OK: every text artifact in $outDir carries a v1 FCC-B2-b header"
+
 Write-Host "`n=== Files ==="
 Write-Host "  rx log:  $rxLog"
 Write-Host "  tx log:  $txLog"

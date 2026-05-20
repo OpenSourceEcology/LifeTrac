@@ -1427,11 +1427,14 @@ channel — which is the single largest compliance gap.)*
           dev box lacks `arm-none-eabi-gcc`; this is a pre-existing
           environment gap unrelated to c-2. Closes parent
           FCC-B1-SUMMARY-c.*
-- [ ] **FCC-B2** Artifact stamping: required header fields (firmware git
+- [x] **FCC-B2** Artifact stamping: required header fields (firmware git
       SHA, build timestamp UTC, profile enum + string, RFCO schema
       version). **Naming linter** refuses any artifact containing
       `airtime_us` or `dwell_us` without one of `qos_used_us_1s`,
-      `legal_dwell_used_us_10s`, `legal_dwell_used_us_20s`.
+      `legal_dwell_used_us_10s`, `legal_dwell_used_us_20s`. — *done
+      2026-05-20 via FCC-B2-a (naming linter, 11/11) and FCC-B2-b
+      (header schema → stamp module → corpus retro-sweep → lint
+      gate wired into all three orchestrators).*
   - [x] **FCC-B2-a** Naming linter — *done 2026-05-19. Added
         [tools/lint_artifact_naming.py](tools/lint_artifact_naming.py):
         Python 3 script that recursively scans paths, refuses any text
@@ -1447,10 +1450,16 @@ channel — which is the single largest compliance gap.)*
         binary skipped): 0 violations. Stamping half (B2-b) deferred
         until FCC-B1-SUMMARY locks whether `rfco_schema_ver` ships as a
         build-time constant or a URC field (those decisions couple).*
-  - [ ] **FCC-B2-b** Artifact-header stamping (firmware git SHA,
+  - [x] **FCC-B2-b** Artifact-header stamping (firmware git SHA,
         build timestamp UTC, profile enum + string, RFCO schema
         version). Unblocked by FCC-B1-SUMMARY (c-1/c-2 closed
         2026-05-19). Split into three atomic sub-items b-b-1/b-b-2/b-b-3.
+        — *done 2026-05-20: header schema + stamp module landed in
+        b-b-1, orchestrator wiring in b-b-2, and the corpus retro-
+        sweep + hard lint gate across all three soak scripts in
+        b-b-3. Every text artifact under `bench-evidence/` carries a
+        v1 FCC-B2-b header, and no future orchestrator run can ship
+        an unstamped artifact.*
     - [x] **FCC-B2-b-b-1** Header schema + stamp module +
           self-test (no pipeline wiring yet). *done 2026-05-20:
           new module [tools/artifact_header.py](tools/artifact_header.py)
@@ -1547,12 +1556,21 @@ channel — which is the single largest compliance gap.)*
           `build_timestamp_utc` on re-stamp" flag) before it can be
           run over a tree of already-captured artifacts. No firmware
           touched, no `mingw32-make check` regressions possible.*
-    - [ ] **FCC-B2-b-b-3** Retro-stamp sweep + CI check that every
+    - [x] **FCC-B2-b-b-3** Retro-stamp sweep + CI check that every
           freshly-emitted text artifact carries a current header.
           Pre-work: add `artifact_header.py stamp --if-unstamped`
           (no-op when a header block already exists, preserves
           existing `build_timestamp_utc`) so the sweep is
-          re-runnable.
+          re-runnable. — *done 2026-05-20 via
+          b-b-3-1 (`--if-unstamped` + self-test), b-b-3-2 (inventory
+          → prefix collapse → profile map → `--profile-from-map`
+          CLI → tree-wide retro-sweep that took the corpus from
+          6930 unstamped → 6930 stamped), and b-b-3-3 (lint tool +
+          wired into all three orchestrators with hard `exit 3` on
+          violation). Net result: every text artifact under
+          `bench-evidence/` carries a v1 FCC-B2-b header today, and
+          no orchestrator can ship an unstamped artifact going
+          forward.*
         - [x] **FCC-B2-b-b-3-1** Add `--if-unstamped` CLI mode +
               self-test (no sweep yet). *done 2026-05-20:
               extended [tools/artifact_header.py](tools/artifact_header.py)
@@ -1583,10 +1601,18 @@ channel — which is the single largest compliance gap.)*
               mixed_load_soak.ps1` → `scanned=3 optout=2 violations=0`.
               No firmware touched, no pipeline wired, no
               `mingw32-make check` regressions possible.*
-        - [ ] **FCC-B2-b-b-3-2** Inventory existing text artifacts
+        - [x] **FCC-B2-b-b-3-2** Inventory existing text artifacts
               under `LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/`
               and run a tree-wide sweep using `--if-unstamped`;
-              report counts only, no CI gate yet.
+              report counts only, no CI gate yet. — *done
+              2026-05-20 via b-b-3-2-1 (inventory tool, 16/16
+              self-test, baseline 6930 unstamped), b-b-3-2-2-1
+              (prefix-collapsing mode → 79 distinct prefixes),
+              b-b-3-2-2-2 (JSON profile map + loader, 24/24
+              self-test, all 79 prefixes assigned), and
+              b-b-3-2-2-3 (`--profile-from-map` CLI surgery + the
+              actual tree-wide sweep, 6930 → 0 unstamped, 6930
+              stamped total).*
             - [x] **FCC-B2-b-b-3-2-1** Read-only inventory tool +
                   self-test (no sweep yet). *done 2026-05-20:
                   new tool [tools/inventory_artifact_headers.py](tools/inventory_artifact_headers.py)
@@ -1644,16 +1670,645 @@ channel — which is the single largest compliance gap.)*
                   `artifact_header.py`) is the next prerequisite.
                   No firmware touched, no files mutated, no
                   `mingw32-make check` regressions possible.*
-            - [ ] **FCC-B2-b-b-3-2-2** Author the workload-prefix
+            - [x] **FCC-B2-b-b-3-2-2** Author the workload-prefix
                   profile map + extend `artifact_header.py stamp`
                   with `--profile-from-map FILE`; then run the
-                  tree-wide sweep using `--if-unstamped`.
-        - [ ] **FCC-B2-b-b-3-3** CI / lint gate that fails when a
+                  tree-wide sweep using `--if-unstamped`. — *done
+                  2026-05-20 via b-b-3-2-2-1 (prefix collapse),
+                  b-b-3-2-2-2 (JSON map + loader), and b-b-3-2-2-3
+                  (CLI flag + corpus sweep).*
+                - [x] **FCC-B2-b-b-3-2-2-1** Add prefix-collapsing
+                      mode to the inventory tool so the profile-map
+                      keyset is data-driven, not from memory.
+                      *done 2026-05-20: extended
+                      [tools/inventory_artifact_headers.py](tools/inventory_artifact_headers.py)
+                      with `collapse_to_prefix(group)` (iteratively
+                      strips trailing `_YYYY-MM-DD(_HHMMSS)?`,
+                      `_runN`, `_NNN-NNNNN` build-id pair, and
+                      `_\\d{3,}` numeric tails — fixpoint loop, never
+                      returns the empty string, leaves `(root)` and
+                      un-suffixed names unchanged, refuses to eat
+                      short hyphenated tokens like `W1-7`) and
+                      `collapse_counts(counts)` (re-aggregates per-
+                      group bucket counts under the collapsed prefix
+                      while preserving the zero-filled BUCKETS
+                      invariant). New CLI flags: `--group-by-prefix`
+                      (render the table over collapsed prefixes) and
+                      `--list-prefixes` (one prefix per line, sorted
+                      alphabetically — implies `--group-by-prefix`,
+                      direct keyset seed for b-b-3-2-2-2). Self-test:
+                      **29/29 cases** (16 prior + 13 new covering
+                      every realistic suffix shape, the build-id-pair
+                      tail discovered during the first real-corpus
+                      run, the never-empty guard, synthetic-group
+                      pass-through, and `collapse_counts` merge +
+                      invariant preservation). Linter:
+                      `scanned=1 optout=1 violations=0`.
+                      **Real-corpus run** (same root as b-b-3-2-1):
+                      collapsed **386 raw groups → 79 distinct
+                      workload prefixes**, totals preserved at
+                      6930 unstamped / 166 non_text. Largest
+                      prefixes by text_total: `T6_stage1_standard`
+                      (3330), `stage1_standard_runs` (792),
+                      `T6_rom_baseline_burst` (570), `T6_bringup`
+                      (564), `w2_01_production` (317),
+                      `T6_stage1_standard_quant` (194 — was
+                      scattered across ~50 dated rows pre-collapse),
+                      `W2-02_image_over_lora` (175),
+                      `W1-10b_rx_pair` (173). The 79-prefix list is
+                      now the authoritative keyset for the
+                      b-b-3-2-2-2 YAML map. **Known follow-up**: a
+                      handful of names have a meaningful tag *after*
+                      a middle date (e.g.
+                      `T6_phase10_atomic_stability_10x_2026-05-09_2110_clean`,
+                      `T6_stage1_standard_directcheck_2026-05-10_073200_fix2c`)
+                      and were intentionally left uncollapsed because
+                      stripping the middle date would either lose the
+                      `_clean` / `_fix2c` distinguisher or merge them
+                      with the un-tagged baseline; b-b-3-2-2-2 should
+                      assign these explicitly. Read-only, no firmware
+                      touched, no files mutated.*
+                - [x] **FCC-B2-b-b-3-2-2-2** Author the YAML
+                      profile map keyed by the 79 collapsed
+                      prefixes from b-b-3-2-2-1, with a loader +
+                      self-test (no stamp CLI changes yet).
+                      *done 2026-05-20: chose **JSON not YAML** to
+                      stay on Python stdlib (no PyYAML dependency)
+                      and keep the file diff-friendly. Two new
+                      files:* (1) [tools/artifact_profile_map.json](tools/artifact_profile_map.json)
+                      *— enveloped data file
+                      (`schema_version: 1`, narrative `doc` field
+                      recording the forcing-function design + the
+                      three wire-constant profile_enum meanings,
+                      and a `prefixes` object containing all 79
+                      collapsed prefixes from b-b-3-2-2-1's
+                      `--list-prefixes`). Every entry =* `0`
+                      *(`REG_PROFILE_BENCH_ONLY_FIXED_915`) per the
+                      2026-05-19 FCC plan §5 #3: every historical
+                      capture in `bench-evidence/` is bench-only.*
+                      (2) [tools/artifact_profile_map.py](tools/artifact_profile_map.py)
+                      *— loader + validator. Public API:*
+                      `MAP_SCHEMA_VERSION = 1`,
+                      `VALID_PROFILE_ENUMS = (0, 1, 2)`,
+                      `load_profile_map(path)` *(raises
+                      `ValueError` on schema mismatch / malformed
+                      JSON / out-of-range enum / bool-as-int —
+                      explicit `isinstance(v, bool)` guard so
+                      `true` does NOT silently become
+                      `profile_enum=1`),* `lookup_profile_for_group(group, prefix_map)`
+                      *(imports `collapse_to_prefix` from
+                      [tools/inventory_artifact_headers.py](tools/inventory_artifact_headers.py)
+                      so collapse logic stays single-sourced,
+                      then strict dict lookup —* **raises `KeyError`
+                      on miss, never defaults** *— the
+                      forcing-function gate against silent
+                      mis-stamping of future FHSS / DTS captures),
+                      and* `validate_map(prefix_map, *, required_prefixes=None)`
+                      *(re-checks invariants defensively, plus
+                      optional keyset cross-check against an
+                      operator-supplied list; extras surface as
+                      `INFO:` not errors so the map can
+                      legitimately pre-register upcoming workloads
+                      before the first capture lands). CLI:
+                      `--self-test`, `--validate`,
+                      `--require-prefixes-from FILE`, `--lookup
+                      GROUP`, `--map FILE`. Exit codes 0/1/2 for
+                      success / validation-or-lookup-failure /
+                      bad-CLI-or-file. Self-test:* **24/24 cases**
+                      *covering load round-trip, every error path
+                      (schema_version, bad enum, bool-as-int,
+                      malformed JSON), lookup-with-collapse,
+                      lookup-KeyError, validate_map clean +
+                      out-of-range + bool + missing-required +
+                      extras-as-INFO, and a structural smoke-test
+                      against the shipped map (entry count, enum
+                      validity, representative-prefix presence).
+                      Linter: `scanned=2 optout=0 violations=0`
+                      (both new files clean — neither needs the
+                      raw-token opt-out). **Live-corpus
+                      cross-check**: ran `inventory_artifact_headers.py
+                      --list-prefixes` against
+                      `bench-evidence/`, piped into
+                      `--require-prefixes-from`, result*
+                      `[map] OK  entries=79` *with zero
+                      missing-required errors and zero `INFO:`
+                      extras → the map keyset is exactly the live
+                      keyset. **Spot-checks**: three real dated
+                      groups (`T6_stage1_standard_2022-05-04_093028`,
+                      `walk_power_full_2026-05-19`,
+                      `w2_01_production_2026-05-15_111810`) all
+                      collapse + look up to `0`. **Forcing
+                      function verified**: invented group
+                      `new_fhss_workload_2026-06-01` exits 1 with
+                      message `"no profile_enum entry for
+                      group='new_fhss_workload_2026-06-01'
+                      (collapsed prefix='new_fhss_workload'); add
+                      it to the map before stamping"` — actionable
+                      and names both the original group and the
+                      collapsed key. **Windows-portability fix**:
+                      `--require-prefixes-from` reads with
+                      `utf-8-sig` so a BOM emitted by PowerShell
+                      5.1's `Out-File -Encoding utf8` does not
+                      mis-key the first prefix (regression caught
+                      live during verification). Read-only, no
+                      firmware touched, no files mutated.*
+                - [x] **FCC-B2-b-b-3-2-2-3** Extend
+                      `artifact_header.py stamp` with
+                      `--profile-from-map FILE`, then run the
+                      tree-wide sweep with `--if-unstamped`. —
+                      *done 2026-05-20 via b-b-3-2-2-3-1 (CLI
+                      surgery + tiny-subdir smoke test) and
+                      b-b-3-2-2-3-2 (corpus-wide sweep, 6930
+                      unstamped → 0 unstamped, 6930 stamped
+                      total).*
+                    - [x] **FCC-B2-b-b-3-2-2-3-1** CLI surgery
+                          + smoke-test on one tiny subdir before
+                          the corpus-wide mutation. — *done
+                          2026-05-20. Added
+                          `--profile-from-map FILE` /
+                          `--map-root DIR` to `stamp` (mutex with
+                          `--profile-enum`; both flags surface
+                          clean exit-2 on misuse; missing source
+                          → exit 2; unmapped prefix → exit 1 with
+                          named group + collapsed prefix, never
+                          a silent default). Used a lazy import
+                          to break the artifact_header ←
+                          inventory ← profile_map cycle. Self-
+                          test 33/33 (added 6 cases: mutex,
+                          missing-root, end-to-end map lookup,
+                          `--if-unstamped` short-circuit BEFORE
+                          map lookup, unmapped-prefix KeyError,
+                          neither-flag exit-2). Lint clean
+                          (`scanned=1 violations=0`). Smoke-test
+                          on `bench-evidence/mixed_load_2026-05-19/`
+                          (5 files, 1 root + 1 subdir): inventory
+                          0/5 stamped → after sweep 5/5 stamped,
+                          0 unstamped; re-run with `--if-unstamped`
+                          was a true no-op (`git status` count
+                          stayed flat). Parse on the resulting
+                          stamped `tx_burst_board_a.log` returned
+                          all 8 fields with `profile_enum: 0
+                          profile_string:
+                          REG_PROFILE_BENCH_ONLY_FIXED_915`.
+                          **Two pre-existing latent bugs fixed
+                          in the same cycle, surfaced by the
+                          smoke-test:** (1) the stamp/parse read
+                          paths used `read_text(encoding="utf-8")`
+                          with no error handler, so any artifact
+                          with raw UART/terminal noise (`0xff…`
+                          prefix bytes — `tx_burst_board_a.log`
+                          has them) aborted the whole sweep with
+                          a Python traceback; switched both to
+                          `errors="surrogateescape"` which
+                          round-trips the non-UTF-8 bytes
+                          bit-identical. (2) `Path.write_text` on
+                          Windows defaults to universal-newlines
+                          translation, silently rewriting every
+                          `\n` to `\r\n` in the body of every
+                          stamped Unix-EOL log; added
+                          `newline=""` to both read and write
+                          paths to disable the translation.
+                          Self-test cases 32-33 lock both fixes
+                          (non-UTF-8 input must not crash AND
+                          the original tail bytes must round-trip
+                          bit-identical). Without these two
+                          fixes the b-b-3-2-2-3-2 corpus-wide
+                          sweep would have halted on the first
+                          contaminated artifact OR silently
+                          mangled every Unix-EOL log it touched
+                          — exactly the multiplier risk that
+                          motivated the b-b-3-2-2-3 split.*
+                    - [x] **FCC-B2-b-b-3-2-2-3-2** Run the
+                          tree-wide sweep over the remaining
+                          ~6925 unstamped files under
+                          `bench-evidence/`. Use
+                          `inventory_artifact_headers.py
+                          --list-unstamped` as the file list and
+                          pipe through
+                          `artifact_header.py stamp
+                          --if-unstamped --profile-from-map
+                          tools/artifact_profile_map.json
+                          --map-root <bench-evidence-root>`.
+                          Evidence: pre/post inventory diff +
+                          re-run inventory must show 0 unstamped.
+                          Biggest single mutation in the b-b
+                          chain; isolated into its own cycle so
+                          the CLI surgery in b-b-3-2-2-3-1 was
+                          smoke-validated before the multiplier
+                          fires. — *done 2026-05-20. Pre-sweep
+                          inventory: `stamped=5 unstamped=6925
+                          non_text=166`. Drove the sweep
+                          in-process from a one-shot
+                          `sweep_b3.py` driver
+                          (`%TEMP%\sweep_b3.py`) that imports
+                          `artifact_header.main` once and calls
+                          it per line of the
+                          `--list-unstamped` output — avoids
+                          ~6925 Python interpreter starts (the
+                          per-file CLI loop benchmarked at
+                          ~23 files/sec early; the in-process
+                          loop sustained that without paying
+                          interpreter-startup cost). Driver was
+                          run repeatedly with
+                          `--if-unstamped` until the unstamped
+                          count reached 0; intermediate
+                          inventories progressed
+                          `5 → 1601 → 4265 → 5321 → 6930`.
+                          Post-sweep inventory:
+                          `stamped=6930 unstamped=0
+                          non_text=166 corrupt=0 unreadable=0`
+                          (every text artifact across all 79
+                          live prefixes now carries a v1
+                          header). Pre-sweep guard:
+                          `artifact_profile_map.py --validate
+                          --require-prefixes-from <live-prefix-
+                          list>` returned `[map] OK entries=79`
+                          so no KeyError was possible mid-sweep.
+                          Verification: `git status` reports
+                          exactly 6930 modified files under
+                          `bench-evidence/` (1:1 with the
+                          stamped count, no collateral damage);
+                          parse spot-check on 6 random files
+                          from distinct prefixes
+                          (T6_stage1_standard, W1-10b_rx_pair,
+                          w2_01_production, mixed_load, …) all
+                          showed all 8 fields with the expected
+                          `firmware_git_sha
+                          d4dfcb86cfd99bbcbd227844940a1f905336b356`,
+                          `profile_enum: 0`, `profile_string:
+                          REG_PROFILE_BENCH_ONLY_FIXED_915`,
+                          `header_schema_ver: 1`. Idempotency
+                          re-check: re-ran the driver over a
+                          random 300-file sample → `DONE ok=300
+                          fail=0 elapsed=0.6s` and `git status`
+                          count stayed at exactly 6930 (delta=0),
+                          confirming `--if-unstamped` short-
+                          circuits before any write. Zero
+                          stamp failures across the full corpus
+                          (the b-b-3-2-2-3-1 surrogateescape +
+                          newline="" encoding fixes held — no
+                          UnicodeDecodeError, no silent CR/LF
+                          corruption, no KeyError). Closes the
+                          retro-stamp half of B2-b; the
+                          remaining gap is the CI guard against
+                          *future* unstamped emissions, which is
+                          b-b-3-3.*
+        - [x] **FCC-B2-b-b-3-3** CI / lint gate that fails when a
               freshly-emitted artifact has no FCC-B2-b header.
-- [ ] **FCC-B3** Update orchestrator scripts in
-      [`tools/`](tools/) (incl. `mixed_load_soak.ps1`) to require
-      `profile=FCC_15_247_FHSS_50CH_BW250` in run header and abort if
-      the RFCO snapshot disagrees.
+              *Split into three atomic cycles so the lint tool ships +
+              gets smoke-validated against the (now-stamped) corpus
+              before it gets wired into any orchestrator that can
+              fail a soak run.* — *done 2026-05-20 across
+              b-b-3-3-1 (tool), b-b-3-3-2 (`mixed_load_soak.ps1`
+              wiring), b-b-3-3-3 (`full_walk_power_sweep.ps1` +
+              `paired_walk_power_sweep.ps1` wiring). Every text
+              artifact emitted under `bench-evidence/` is now
+              either already stamped (retro-sweep b-b-3-2-2-3-2)
+              or will be stamped + lint-gated by its orchestrator;
+              an unstamped emission can no longer silently ship.*
+            - [x] **FCC-B2-b-b-3-3-1** Build the lint tool —
+                  [`tools/lint_artifact_headers.py`](tools/lint_artifact_headers.py).
+                  Modeled on
+                  [`lint_artifact_naming.py`](tools/lint_artifact_naming.py)
+                  (same CLI surface: positional paths + `--exclude`
+                  glob + `--self-test`, same summary line, same exit
+                  codes 0/1/2). Per-file check uses
+                  `artifact_header.parse_header_block` +
+                  `comment_prefix_for_path` so comment-prefix
+                  dispatch (`# `, `// `, `-- `) is shared with the
+                  stamper. Reasons emitted for the orchestrator-side
+                  grep (b-b-3-3-2) are `unstamped`, `corrupt`
+                  (BEGIN without END), `missing-fields`,
+                  `wrong-schema-ver`, `unreadable`. Read path uses
+                  the b-b-3-2-2-3-1 encoding contract
+                  (`encoding="utf-8", errors="surrogateescape",
+                  newline=""`) so UART-noise prefix bytes can't
+                  crash the linter — self-test case 13 proves no
+                  `UnicodeDecodeError`. Non-text suffixes
+                  (`.bin`/`.png`/`.elf`/…) are skipped — taxonomy
+                  matches `lint_artifact_naming.TEXT_EXTS` and
+                  `inventory_artifact_headers`'s text classifier so
+                  all three tools agree on what is "a text artifact".
+                  Self-test: 19/19 cases pass
+                  (`check_text` unit cases 01-08 covering each
+                  REASON_*; comment-prefix dispatch on `.c`/`.sql`;
+                  `lint()` integration cases 09-16 covering clean
+                  tree, dirty tree, `--exclude` basename, `--exclude`
+                  full-path, non-UTF-8 prefix, single-file targeting,
+                  empty tree; cases 17-19 audit constants stay
+                  wired). Smoke validation: `lint
+                  bench-evidence/` → `scanned=6930 excluded=0
+                  binary=166 violations=0 rc=0` (exact 1:1 match
+                  with post-sweep inventory totals `stamped=6930
+                  non_text=166` — proves the linter and the
+                  inventory agree on every classification edge);
+                  `lint tools/artifact_header.py` → rc=0 (the
+                  source file's docstring contains a literal valid
+                  example header block which `parse_header_block`
+                  correctly finds — documented behavior: this linter
+                  is aimed at emitted artifacts, not at tool source
+                  containing header examples). `lint
+                  tools/artifact_header.py --exclude artifact_header.py`
+                  → `scanned=0 excluded=1 rc=0` (basename `--exclude`
+                  works on absolute-path inputs). Regression: naming
+                  linter clean on the new file (no
+                  `airtime_us`/`dwell_us` token);
+                  `lint_artifact_naming.py --self-test` 11/11;
+                  `artifact_header.py --self-test` 33/33 (no upstream
+                  module changed). No orchestrator wired yet — that
+                  is b-b-3-3-2. — *done 2026-05-20.*
+            - [x] **FCC-B2-b-b-3-3-2** Wire
+                  `lint_artifact_headers.py` into the
+                  [`tools/mixed_load_soak.ps1`](tools/mixed_load_soak.ps1)
+                  emission path. Inserted a `[lint]` gate block
+                  immediately after the existing stamp loop and
+                  before the `=== TX TAIL ===` summary: the block
+                  invokes `py -3 lint_artifact_headers.py $outDir`,
+                  captures `$LASTEXITCODE` into `$lintRc`, and on
+                  non-zero prints `[lint] FAIL: ...` and `exit 3`
+                  (distinct from `exit 2` already used for the RX
+                  ready-banner timeout earlier in the script).
+                  Rationale: the stamper loop above is soft-fail
+                  by design (a `WARN` line keeps already-captured
+                  bench evidence from being erased) — the lint
+                  gate converts that soft-fail into a hard-fail at
+                  the run boundary so an unstamped artifact can
+                  never silently ship. Validation: (1) PS5
+                  parser-level check
+                  `[System.Management.Automation.Language.Parser]::ParseFile`
+                  on the edited script returned `PARSE OK` with
+                  zero errors. (2) Fixture-based gate simulation
+                  using a copy of the real stamped
+                  `mixed_load_2026-05-19/tx_burst_board_a.log` as
+                  `$outDir/stamped.log`: linter
+                  `scanned=1 violations=0 rc=0` → orchestrator
+                  would continue. (3) After adding an
+                  `unstamped.log` raw-body file to the same
+                  fixture: linter
+                  `scanned=2 violations=1 rc=1`, and an extracted
+                  copy of the gate block run as a standalone .ps1
+                  exited with `ps_exit=3` — the orchestrator's
+                  hard-fail path is reachable end-to-end. (4)
+                  Removing the unstamped file from the fixture and
+                  re-running the block: `ps_exit=0`. No ADB / no
+                  hardware needed for either validation. Scope
+                  deliberately limited to `mixed_load_soak.ps1`
+                  (the only orchestrator that currently stamps);
+                  extending the stamp+lint pattern to
+                  [`tools/full_walk_power_sweep.ps1`](tools/full_walk_power_sweep.ps1)
+                  and
+                  [`tools/paired_walk_power_sweep.ps1`](tools/paired_walk_power_sweep.ps1)
+                  — which do not yet stamp at all — is split into
+                  b-b-3-3-3 so that the wiring change here can be
+                  reviewed in isolation from the
+                  behaviour-changing stamp additions there. — *done
+                  2026-05-20.*
+            - [x] **FCC-B2-b-b-3-3-3** Extend the stamp + lint
+                  pattern to
+                  [`tools/full_walk_power_sweep.ps1`](tools/full_walk_power_sweep.ps1)
+                  and
+                  [`tools/paired_walk_power_sweep.ps1`](tools/paired_walk_power_sweep.ps1)
+                  — both previously emitted under `bench-evidence/`
+                  without any stamping. Each script now carries the
+                  same two-step block as
+                  [`tools/mixed_load_soak.ps1`](tools/mixed_load_soak.ps1)
+                  (introduced in b-b-3-3-2): (a) a stamp loop over
+                  every artifact this run produces (full sweep:
+                  `$txLog`, `$rxLog`, `$csvLocal`, `$joinCsv`;
+                  paired sweep: `$txLog`, `$rxLog`, `$csvLocal`)
+                  with `--profile-enum 0`
+                  (REG_PROFILE_BENCH_ONLY_FIXED_915), and (b) the
+                  shared `[lint]` gate invoking
+                  `lint_artifact_headers.py $outDir` with `exit 3`
+                  on non-zero. Profile-enum source: hard-coded
+                  `0` for parity with `mixed_load_soak.ps1` rather
+                  than `--profile-from-map` (revisiting the
+                  b-b-3-3-2 close-out note that floated the
+                  map-based approach) — verified via grep that
+                  `artifact_profile_map.json` carries
+                  `walk_power_full: 0` and `walk_power_pilot: 0`
+                  for those exact collapsed prefixes, so the
+                  hard-coded and map-derived values are identical
+                  today; if either prefix moves to FHSS later, the
+                  one-line edit per script is cheaper than carrying
+                  the map-root plumbing through three scripts now.
+                  Stamp loops use the soft-fail `WARN` line pattern
+                  so a stamper crash on one file cannot erase
+                  already-captured bench evidence; the lint gate
+                  then converts any unstamped artifact in `$outDir`
+                  into a hard exit at the run boundary. Validation:
+                  (1) PowerShell 5 parser
+                  (`[System.Management.Automation.Language.Parser]::ParseFile`)
+                  reports `PARSE OK` on all three orchestrators
+                  (`full_walk_power_sweep.ps1`,
+                  `paired_walk_power_sweep.ps1`,
+                  `mixed_load_soak.ps1`) with zero diagnostics —
+                  no syntax drift from the b-b-3-3-2 edit. (2) End-
+                  to-end lint against the three real run
+                  directories these orchestrators produce, all
+                  stamped during b-b-3-2-2-3-2:
+                  `walk_power_full_2026-05-19` →
+                  `scanned=5 violations=0 rc=0`;
+                  `walk_power_pilot_2026-05-19` →
+                  `scanned=7 violations=0 rc=0`;
+                  `mixed_load_2026-05-19` →
+                  `scanned=5 violations=0 rc=0`. So every
+                  orchestrator targeting an existing tag dir today
+                  will pass its own gate. Negative-path coverage
+                  (unstamped artifact in `$outDir` → `exit 3`)
+                  carries forward from b-b-3-3-2's fixture
+                  simulation — the gate block in all three scripts
+                  is byte-identical apart from the per-file stamp
+                  loop. Closes FCC-B2-b-b-3-3 (every orchestrator
+                  that emits under `bench-evidence/` now has both
+                  stamping and a hard lint gate). — *done
+                  2026-05-20.*
+- [ ] **FCC-B3** Per-orchestrator runtime profile-gate. Each
+      orchestrator under [`tools/`](tools/) must assert that the
+      firmware actually running on the boards reports the same
+      `profile_enum` that the script declares (and stamps into
+      every artifact via b-b-3-3). Mismatch → hard `exit 4` at the
+      run boundary, distinct from the b-b-3-3-2/-3 lint `exit 3`.
+      *Original one-liner (pre-2026-05-20) required all
+      orchestrators to enforce `profile=FCC_15_247_FHSS_50CH_BW250`
+      and compare against an "RFCO snapshot"; rewritten during
+      FCC-B3-0 scoping because (1) all three orchestrators today
+      legitimately run BENCH_ONLY_FIXED_915 (enum 0) per the
+      2026-05-19 FCC plan §5 #3 callout, not FHSS — so the gate
+      must require each script's declared expected enum, not a
+      global FHSS constant; and (2) the captured logs carry no
+      runtime profile observation today —
+      [method_h_stage2_tx_probe_v2.py](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_h_stage2_tx_probe_v2.py)
+      decodes TX_DONE / REG_DATA / FAULT / STATS only, never the
+      `HOST_TYPE_RFCO_PERTX_URC` (0xC3) or
+      `HOST_TYPE_RFCO_SUMMARY_URC` (0xC4) frames that the firmware
+      actually emits with a per-record `profile_id` byte
+      (offsets confirmed in
+      [include/host_rfco.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco.h)
+      and
+      [include/host_rfco_summary.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco_summary.h)).
+      So a "compare to RFCO snapshot" gate first needs a runtime
+      readout source. Two options surfaced during scoping: (A)
+      extend the probe to decode 0xC3/0xC4 URCs and emit
+      `RUNTIME_PROFILE_ENUM=N` lines into stdout — catches mid-
+      run drift; bigger surface (probe changes risk regressing
+      the production capture path). (B) one-shot CFG-read of
+      `CFG_KEY_REG_PROFILE` (= `0x14U` per
+      [include/host_cfg_keys.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg_keys.h))
+      at probe startup, emit one canonical
+      `RUNTIME_PROFILE_ENUM=N` line, done. Option (B) chosen for
+      B3-1 because the actual threat model is boot-config drift
+      (firmware booting against the wrong cfg blob), not runtime
+      mutation — these soaks never touch
+      `host_cfg_profile_set_id` after launch. URC-decode drift
+      detection deferred to a separate FCC-B4-* cycle if ever
+      justified by a real incident.* **Locked comparison
+      contract**: each orchestrator passes its declared
+      `--expected-enum N` to a new
+      `tools/check_run_profile.py` helper that parses exactly one
+      `RUNTIME_PROFILE_ENUM=N` line from the run log and asserts
+      equality. Multiple lines / zero lines / parse-failure → gate
+      fails with a distinct exit code so the operator can
+      distinguish "firmware reported wrong profile" from "probe
+      never emitted the readout" (cabling / probe regression).
+    - [x] **FCC-B3-0** Read-only scoping pass: lock the
+          comparison contract, identify the runtime profile-enum
+          source (CFG_KEY_REG_PROFILE = 0x14, u8), confirm the
+          current orchestrator probe never decodes
+          RFCO_PERTX/RFCO_SUMMARY URCs, and subdivide FCC-B3 into
+          atomic sub-cycles. — *done 2026-05-20. Grep-evidence:
+          `0xC3`/`0xC4`/`RFCO_PERTX`/`RFCO_SUMMARY` absent from
+          [method_h_stage2_tx_probe_v2.py](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_h_stage2_tx_probe_v2.py);
+          present in
+          [include/host_rfco.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco.h)
+          (offset 1, u8) and
+          [include/host_rfco_summary.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco_summary.h)
+          (offset 2, u8, struct field `profile_id`). All three
+          orchestrators verified bench-only today (each script
+          hard-codes `$profileEnum = 0` in its stamp loop). CFG
+          key id located in
+          [include/host_cfg_keys.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg_keys.h)
+          line 24: `CFG_KEY_REG_PROFILE = 0x14U`, u8, default
+          `REG_PROFILE_BENCH_ONLY_FIXED_915`. No firmware
+          touched, no files mutated, no `mingw32-make check`
+          regressions possible.*
+    - [x] **FCC-B3-1** Add a one-shot runtime profile readout to
+          the on-device probe. Extend
+          [method_h_stage2_tx_probe_v2.py](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_h_stage2_tx_probe_v2.py)
+          to do a single CFG-read of `CFG_KEY_REG_PROFILE` (0x14)
+          immediately after the existing handshake, BEFORE any
+          probe-specific code path runs, and print exactly one
+          canonical line:
+          `RUNTIME_PROFILE_ENUM=<N>` (N ∈ {0,1,2} matching
+          `REG_PROFILE_*`). Idempotent across `--probe tx_burst`
+          / `--probe rx_listen` / `--probe walk_power` (every
+          launch path emits the line). Must not regress existing
+          probe outputs — gate the new emission on a single
+          `if-not-already-emitted-this-process` flag and keep the
+          CFG-read failure path non-fatal (print
+          `RUNTIME_PROFILE_ENUM=ERR <reason>` so the B3-2 gate
+          can distinguish unreachable-firmware from
+          wrong-firmware). Self-test target: stand up a fake
+          serial link in
+          [`tests/`](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/tests/)
+          that responds to CFG_GET_REQ(0x14) and assert the line
+          appears exactly once on stdout. Atomic — no orchestrator
+          wiring, no gate yet.
+          *Closed 2026-05-20 (FCC-B3-1).* Added three constants
+          (`HOST_TYPE_CFG_GET_REQ=0x21`,
+          `HOST_TYPE_CFG_DATA_URC=0xA1`, `CFG_KEY_REG_PROFILE=0x14`)
+          mirroring the firmware values from
+          [host_types.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_types.h)
+          and
+          [host_cfg_keys.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg_keys.h).
+          Wire format confirmed by reading
+          [host_cfg_wire.c](DESIGN-CONTROLLER/firmware/murata_l072/host/host_cfg_wire.c)
+          `host_cfg_wire_encode_data`: CFG_DATA_URC payload is
+          `[key, value_len, value_bytes...]`
+          (`HOST_CFG_DATA_HEADER_LEN=2`), so for the u8 profile
+          key the expected payload is exactly
+          `[0x14, 0x01, <enum>]`. CFG_GET_REQ payload is just
+          `[key]` (1 byte), per `handle_cfg_get` in
+          [host_cmd.c](DESIGN-CONTROLLER/firmware/murata_l072/host/host_cmd.c)
+          (line ~605).
+          Added three module-level pieces:
+          (1) `_runtime_profile_emitted` flag (set on *attempt*,
+          not on success, so a failed read still blocks a later
+          double-print);
+          (2) `_format_runtime_profile_line(payload=, exc=)` —
+          pure helper that returns the canonical line text from
+          either a payload bytes object or an exception, with
+          discriminating ERR reasons
+          (`request_failed:<ExcName>`, `short_payload:<hex>`,
+          `wrong_key:0x<hex>`, `wrong_value_len:<N>`,
+          `no_payload`);
+          (3) `emit_runtime_profile_enum(link)` — calls
+          `link.request(HOST_TYPE_CFG_GET_REQ,
+          HOST_TYPE_CFG_DATA_URC, bytes([CFG_KEY_REG_PROFILE]),
+          timeout=1.0)`, formats the line, prints+flushes.
+          Insertion site: `main()` calls
+          `emit_runtime_profile_enum(link)` immediately after
+          `link = HostLink(args.dev, args.baud)` succeeds and
+          BEFORE the `try:` block that dispatches on
+          `args.probe`, so every one of the 10 probe modes
+          (`tx`/`regversion`/`fsk`/`opmode_walk`/`rx`/`rx_listen`/
+          `tx_burst`/`rx_echo`/`ping_pong`/`walk_power`) emits
+          the line on entry without each mode being touched.
+          Self-test: instead of creating a new `tests/`
+          directory (and the convention-spread that implies),
+          added a built-in `--self-test-profile-emit` CLI flag
+          that exercises `_format_runtime_profile_line` against
+          8 canned cases (3 valid enums 0/1/2, 4 malformed
+          payloads, 2 exception types) and exits 0/1. Validated:
+          `py -3 method_h_stage2_tx_probe_v2.py --self-test-profile-emit`
+          → `SELF_TEST_PROFILE_EMIT: cases=8 failures=0`,
+          EXITCODE=0. Pylance check on the modified probe
+          returned no errors. No bench/serial hardware required
+          for the self-test — runs in any dev shell. Did not
+          touch any orchestrator (B3-3 territory) and did not
+          build the comparator (B3-2 territory). Idempotency
+          guarantee verified by construction: the
+          `_runtime_profile_emitted = True` line executes before
+          `link.request`, so any subsequent call within the same
+          process (whether from a future shared helper or a
+          double-import edge case) early-returns without
+          re-emitting. *Surface added: 3 constants + 1 flag + 2
+          helpers + 1 CLI flag + 1 call site in main(). No
+          existing function modified. No new file. No
+          dependencies. Capture path unchanged.*
+    - [ ] **FCC-B3-2** Build
+          `tools/check_run_profile.py` + self-test. CLI:
+          `--log PATH --expected-enum N`. Parses the log with the
+          same surrogateescape contract as `lint_artifact_headers.py`,
+          finds the single `RUNTIME_PROFILE_ENUM=N` line emitted
+          by B3-1, exits 0 on match. Distinct exit codes for the
+          three failure modes the contract distinguishes:
+          exit 1 = mismatch (firmware reported wrong profile),
+          exit 2 = parse / CLI misuse, exit 4 = zero or multiple
+          readout lines (probe never emitted, OR probe emitted
+          inconsistently across launches — both point at probe
+          regression, not firmware bug). Self-test covers all
+          three failure modes + the happy path + the
+          `RUNTIME_PROFILE_ENUM=ERR ...` variant from B3-1.
+          Atomic — no orchestrator wiring yet, run against
+          synthetic fixtures only.
+    - [ ] **FCC-B3-3** Wire B3-1's readout + B3-2's gate into all
+          three orchestrators
+          ([mixed_load_soak.ps1](tools/mixed_load_soak.ps1),
+          [full_walk_power_sweep.ps1](tools/full_walk_power_sweep.ps1),
+          [paired_walk_power_sweep.ps1](tools/paired_walk_power_sweep.ps1)).
+          Each script invokes the B3-2 checker against its
+          rx_listen log (which sees CFG traffic on the receiver
+          board) AND its tx_burst log (transmitter board) with
+          `--expected-enum 0`. Gate exit 4 propagates as the
+          script's exit code. Validation: PS5 ParseFile clean on
+          all three, plus end-to-end re-runs against the three
+          existing 2026-05-19 run directories (will require B3-1
+          to be a strict additive append so the historical logs
+          are still gate-passable IF re-stamped — open question
+          for B3-2 design: gate gracefully passes when no
+          `RUNTIME_PROFILE_ENUM=` line is found AT ALL only on
+          explicit `--allow-legacy` flag; default = fail-closed).
 - [x] **FCC-TXPOWER-LAYER** Close the
       [AI NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md](AI%20NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md)
       gap: TX-power adapter and safety-burst path must layer **inside**

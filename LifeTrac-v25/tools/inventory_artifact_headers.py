@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -100,6 +101,76 @@ def group_for(path: Path, root: Path) -> str:
     if len(parts) <= 1:
         return "(root)"
     return parts[0]
+
+
+# Trailing date / time / run-number / build-id suffixes appended to
+# per-run dir names. Applied iteratively so a dir like
+# ``T6_stage1_standard_quant_2026-05-11_102825_292-27400`` collapses
+# cleanly.
+#   _YYYY-MM-DD                 e.g. _2026-05-19
+#   _YYYY-MM-DD_HHMMSS          e.g. _2026-05-15_111810
+#   _runN                       e.g. _run3
+#   _\d{3,}-\d+                 e.g. _292-27400  (build-id pair)
+#   _\d{3,}                     pure numeric tail of >=3 digits
+#                               (matches HHMMSS / run-id style; avoids
+#                                eating short tokens like ``W1-7``)
+# Order matters: the build-id-pair pattern must precede the bare
+# numeric pattern so the longer match wins.
+_PREFIX_SUFFIX_RE = re.compile(
+    r"(?:_\d{4}-\d{2}-\d{2}(?:_\d{6})?"
+    r"|_run\d+"
+    r"|_\d{3,}-\d+"
+    r"|_\d{3,})$"
+)
+_SYNTHETIC_GROUPS = {"(root)", "(outside-root)"}
+
+
+def collapse_to_prefix(group: str) -> str:
+    """Collapse a raw per-run group name to its workload prefix.
+
+    Iteratively strips trailing ``_YYYY-MM-DD(_HHMMSS)?``, ``_runN``,
+    and ``_\\d{3,}`` suffixes so dated sibling runs cluster under the
+    same key. Synthetic groups (``(root)``, ``(outside-root)``) and
+    groups with no recognised suffix are returned unchanged.
+
+    Examples:
+        T6_stage1_standard_2022-05-04_093028  -> T6_stage1_standard
+        T6_bringup_2026-05-09_132110          -> T6_bringup
+        walk_power_full_2026-05-19            -> walk_power_full
+        w2_01_production_2026-05-15_111810    -> w2_01_production
+        partial_run_rx_window_700s            -> partial_run_rx_window_700s
+        stage1_standard_runs                  -> stage1_standard_runs
+        (root)                                -> (root)
+    """
+    if group in _SYNTHETIC_GROUPS:
+        return group
+    prev = None
+    cur = group
+    while cur != prev:
+        prev = cur
+        cur = _PREFIX_SUFFIX_RE.sub("", cur)
+        if not cur:
+            # Defensive: never collapse to the empty string. If a name
+            # is *entirely* a suffix (shouldn't happen on real data),
+            # fall back to the original.
+            return group
+    return cur
+
+
+def collapse_counts(counts: Dict[str, Dict[str, int]]
+                    ) -> Dict[str, Dict[str, int]]:
+    """Re-aggregate per-group counts under collapsed workload prefixes.
+
+    Preserves the zero-filled BUCKETS invariant.
+    """
+    out: Dict[str, Dict[str, int]] = {}
+    for group, bucket_counts in counts.items():
+        prefix = collapse_to_prefix(group)
+        if prefix not in out:
+            out[prefix] = {b: 0 for b in BUCKETS}
+        for b in BUCKETS:
+            out[prefix][b] += bucket_counts[b]
+    return out
 
 
 def walk_root(root: Path) -> Tuple[Dict[str, Dict[str, int]],
@@ -327,6 +398,93 @@ def run_self_test() -> int:
             ec == {} and all(v == [] for v in ef.values()),
         )
 
+        # ---- collapse_to_prefix: realistic suffix patterns ----
+        check(
+            "collapse dated_HHMMSS suffix",
+            collapse_to_prefix("T6_stage1_standard_2022-05-04_093028")
+            == "T6_stage1_standard",
+            collapse_to_prefix("T6_stage1_standard_2022-05-04_093028"),
+        )
+        check(
+            "collapse dated-only suffix",
+            collapse_to_prefix("walk_power_full_2026-05-19")
+            == "walk_power_full",
+            collapse_to_prefix("walk_power_full_2026-05-19"),
+        )
+        check(
+            "collapse _runN suffix",
+            collapse_to_prefix("T6_bringup_run3") == "T6_bringup",
+            collapse_to_prefix("T6_bringup_run3"),
+        )
+        check(
+            "collapse stacked suffixes (date + runN)",
+            collapse_to_prefix("T6_phase_2026-05-09_run7") == "T6_phase",
+            collapse_to_prefix("T6_phase_2026-05-09_run7"),
+        )
+        check(
+            "collapse build-id pair tail (_NNN-NNNNN) atop date+time",
+            collapse_to_prefix(
+                "T6_stage1_standard_quant_2026-05-11_102825_292-27400")
+            == "T6_stage1_standard_quant",
+            collapse_to_prefix(
+                "T6_stage1_standard_quant_2026-05-11_102825_292-27400"),
+        )
+        check(
+            "leave un-suffixed name unchanged",
+            collapse_to_prefix("stage1_standard_runs")
+            == "stage1_standard_runs",
+            collapse_to_prefix("stage1_standard_runs"),
+        )
+        check(
+            "leave (root) synthetic group unchanged",
+            collapse_to_prefix("(root)") == "(root)",
+        )
+        check(
+            "do not eat short hyphenated tokens like W1-7",
+            collapse_to_prefix("W1-7") == "W1-7",
+        )
+        check(
+            "never collapse to empty string",
+            collapse_to_prefix("_2026-05-19") == "_2026-05-19",
+        )
+
+        # ---- collapse_counts: re-aggregation preserves invariants ----
+        raw = {
+            "T6_stage1_standard_2022-05-04_093028":
+                {"stamped": 0, "unstamped": 5, "corrupt": 0,
+                 "non_text": 0, "unreadable": 0},
+            "T6_stage1_standard_2022-05-04_094837":
+                {"stamped": 1, "unstamped": 2, "corrupt": 0,
+                 "non_text": 0, "unreadable": 0},
+            "walk_power_full_2026-05-19":
+                {"stamped": 0, "unstamped": 3, "corrupt": 0,
+                 "non_text": 1, "unreadable": 0},
+            "(root)":
+                {"stamped": 0, "unstamped": 1, "corrupt": 0,
+                 "non_text": 0, "unreadable": 0},
+        }
+        col = collapse_counts(raw)
+        check(
+            "collapse_counts merges T6_stage1_standard siblings",
+            col["T6_stage1_standard"]["stamped"] == 1
+            and col["T6_stage1_standard"]["unstamped"] == 7,
+            f"got={col.get('T6_stage1_standard')}",
+        )
+        check(
+            "collapse_counts keeps (root) separate",
+            col["(root)"]["unstamped"] == 1,
+        )
+        check(
+            "collapse_counts result preserves zero-filled BUCKETS",
+            all(set(c) == set(BUCKETS) for c in col.values()),
+        )
+        check(
+            "collapse_counts keyset is the distinct prefix set",
+            set(col) == {"T6_stage1_standard",
+                         "walk_power_full", "(root)"},
+            f"got={sorted(col)}",
+        )
+
     print(f"[self-test] {cases - fails}/{cases} cases passed")
     return 1 if fails else 0
 
@@ -344,12 +502,28 @@ def main(argv: list) -> int:
     p.add_argument("--list-unstamped", action="store_true",
                    help="print only the unstamped file paths, one per line "
                         "(useful for piping into b-b-3-2-2's sweep)")
+    p.add_argument("--group-by-prefix", action="store_true",
+                   help="collapse dated/run-numbered per-run dirs to "
+                        "their workload prefix before rendering counts "
+                        "(see collapse_to_prefix); the prerequisite for "
+                        "authoring the b-b-3-2-2 profile map")
+    p.add_argument("--list-prefixes", action="store_true",
+                   help="print only the distinct collapsed workload "
+                        "prefixes, one per line, sorted alphabetically "
+                        "(useful for seeding the profile YAML keyset); "
+                        "implies --group-by-prefix")
     p.add_argument("--self-test", action="store_true",
                    help="run built-in unit cases and exit")
     args = p.parse_args(argv)
     if args.self_test:
         return run_self_test()
     counts, files = walk_root(args.root)
+    if args.group_by_prefix or args.list_prefixes:
+        counts = collapse_counts(counts)
+    if args.list_prefixes:
+        for prefix in sorted(counts):
+            print(prefix)
+        return 0
     if args.list_unstamped:
         for f in files["unstamped"]:
             print(f)

@@ -69,7 +69,9 @@ BENIGN_FAULT_CODES = (
 HOST_TYPE_TX_FRAME_REQ = 0x10
 HOST_TYPE_TX_DONE_URC = 0x90
 HOST_TYPE_CFG_SET_REQ = 0x20
+HOST_TYPE_CFG_GET_REQ = 0x21
 HOST_TYPE_CFG_OK_URC = 0xA0
+HOST_TYPE_CFG_DATA_URC = 0xA1
 HOST_TYPE_REG_READ_REQ = 0x30
 HOST_TYPE_REG_WRITE_REQ = 0x31
 HOST_TYPE_REG_DATA_URC = 0xB0
@@ -79,6 +81,13 @@ CFG_KEY_LBT_ENABLE = 0x03
 # 2026-05-18 S1.1: TX-power adapter sweep (`--probe walk_power`). Mirrors
 # `CFG_KEY_TX_POWER_DBM` from `firmware/murata_l072/include/host_cfg_keys.h`.
 CFG_KEY_TX_POWER_DBM = 0x01
+# 2026-05-20 FCC-B3-1: runtime profile readout (CFG_KEY_REG_PROFILE = 0x14U
+# u8 in `firmware/murata_l072/include/host_cfg_keys.h`). Used by
+# emit_runtime_profile_enum() below to publish one canonical
+# `RUNTIME_PROFILE_ENUM=<N>` line at process startup so the FCC-B3-2 gate
+# (`tools/check_run_profile.py`) can verify the firmware actually running
+# on the board matches the orchestrator's declared expected enum.
+CFG_KEY_REG_PROFILE = 0x14
 
 SX1276_REG_IRQ_FLAGS = 0x12
 SX1276_REG_OP_MODE = 0x01
@@ -214,6 +223,101 @@ def write_reg(link: HostLink, addr: int, value: int, timeout: float = 0.5) -> by
     f = link.request(HOST_TYPE_REG_WRITE_REQ, HOST_TYPE_REG_WRITE_ACK_URC,
                      bytes([addr, value & 0xFF]), timeout=timeout)
     return f["payload"]
+
+
+# 2026-05-20 FCC-B3-1: runtime profile readout (CFG_KEY_REG_PROFILE = 0x14).
+# One-shot emission flag — guarantees the canonical line is printed exactly
+# once per probe process, regardless of how many code paths call the emitter
+# or how many --probe modes the orchestrator wires through main(). The flag
+# is set the moment we *attempt* the read (not when it succeeds) so a failed
+# read still prevents a later success from double-printing.
+_runtime_profile_emitted = False
+
+
+def _format_runtime_profile_line(payload: bytes = None, exc: BaseException = None) -> str:
+    """Pure helper that produces exactly one `RUNTIME_PROFILE_ENUM=...` line
+    (no trailing newline) from either a CFG_DATA_URC payload or an exception
+    raised by `link.request()`. Factored out for the --self-test-profile-emit
+    harness so the parsing/formatting logic is exercised without needing a
+    real serial port.
+
+    Wire format (per firmware/murata_l072/host/host_cfg_wire.c
+    `host_cfg_wire_encode_data`): payload = [key, value_len, value_bytes...].
+    For CFG_KEY_REG_PROFILE the value is a single u8 enum byte, so the
+    expected payload is exactly [0x14, 0x01, <enum>].
+    """
+    if exc is not None:
+        return f"RUNTIME_PROFILE_ENUM=ERR request_failed:{type(exc).__name__}"
+    if payload is None:
+        return "RUNTIME_PROFILE_ENUM=ERR no_payload"
+    if len(payload) < 3:
+        return f"RUNTIME_PROFILE_ENUM=ERR short_payload:{payload.hex()}"
+    if payload[0] != CFG_KEY_REG_PROFILE:
+        return f"RUNTIME_PROFILE_ENUM=ERR wrong_key:0x{payload[0]:02x}"
+    if payload[1] != 1:
+        return f"RUNTIME_PROFILE_ENUM=ERR wrong_value_len:{payload[1]}"
+    return f"RUNTIME_PROFILE_ENUM={payload[2]}"
+
+
+def emit_runtime_profile_enum(link: HostLink) -> None:
+    """FCC-B3-1: issue one CFG_GET_REQ(CFG_KEY_REG_PROFILE) and print exactly
+    one canonical `RUNTIME_PROFILE_ENUM=<N>` line to stdout. Idempotent: a
+    second call within the same process is a no-op. Non-fatal: any
+    request/parse failure prints `RUNTIME_PROFILE_ENUM=ERR <reason>` so the
+    FCC-B3-2 gate can distinguish wrong-firmware (enum mismatch) from
+    probe regression (line missing entirely).
+    """
+    global _runtime_profile_emitted
+    if _runtime_profile_emitted:
+        return
+    _runtime_profile_emitted = True
+    try:
+        frame = link.request(HOST_TYPE_CFG_GET_REQ, HOST_TYPE_CFG_DATA_URC,
+                             bytes([CFG_KEY_REG_PROFILE]), timeout=1.0)
+        line = _format_runtime_profile_line(payload=frame.get("payload"))
+    except Exception as exc:
+        line = _format_runtime_profile_line(exc=exc)
+    print(line)
+    sys.stdout.flush()
+
+
+def _self_test_profile_emit() -> int:
+    """Built-in self-test for the FCC-B3-1 emitter. Exercises
+    `_format_runtime_profile_line` over the documented payload shapes so a
+    regression in the parser is caught without needing a serial port or
+    bench hardware. Returns 0 on success, 1 on any case mismatch (with
+    per-case diagnostic printed to stdout).
+    """
+    cases = [
+        ("enum=0 (BENCH_ONLY_FIXED_915)", {"payload": bytes([0x14, 0x01, 0x00])},
+         "RUNTIME_PROFILE_ENUM=0"),
+        ("enum=1 (FCC_FHSS)", {"payload": bytes([0x14, 0x01, 0x01])},
+         "RUNTIME_PROFILE_ENUM=1"),
+        ("enum=2 (FCC_DTS)", {"payload": bytes([0x14, 0x01, 0x02])},
+         "RUNTIME_PROFILE_ENUM=2"),
+        ("wrong key", {"payload": bytes([0x15, 0x01, 0x00])},
+         "RUNTIME_PROFILE_ENUM=ERR wrong_key:0x15"),
+        ("wrong value_len", {"payload": bytes([0x14, 0x02, 0x00, 0x00])},
+         "RUNTIME_PROFILE_ENUM=ERR wrong_value_len:2"),
+        ("short payload", {"payload": bytes([0x14])},
+         "RUNTIME_PROFILE_ENUM=ERR short_payload:14"),
+        ("request raised TimeoutError", {"exc": TimeoutError("no urc")},
+         "RUNTIME_PROFILE_ENUM=ERR request_failed:TimeoutError"),
+        ("request raised ValueError", {"exc": ValueError("bad cobs")},
+         "RUNTIME_PROFILE_ENUM=ERR request_failed:ValueError"),
+    ]
+    failures = 0
+    for name, kwargs, expected in cases:
+        got = _format_runtime_profile_line(**kwargs)
+        if got == expected:
+            print(f"SELF_TEST_PROFILE_EMIT: PASS  {name}")
+        else:
+            failures += 1
+            print(f"SELF_TEST_PROFILE_EMIT: FAIL  {name}")
+            print(f"  expected: {expected!r}")
+            print(f"  got:      {got!r}")
+    print(f"SELF_TEST_PROFILE_EMIT: cases={len(cases)} failures={failures}")
+    return 0 if failures == 0 else 1
 
 
 # SX1276 RegOpMode value parked at end of every bench probe run so the radio
@@ -2037,7 +2141,18 @@ def main(argv=None) -> int:
     parser.add_argument("--csv-out", default=None,
                         help="walk_power: explicit CSV output path. If omitted, "
                              "writes to bench-evidence/walk_power_<date>/walk_power_tx_side.csv")
+    # 2026-05-20 FCC-B3-1: built-in self-test for the RUNTIME_PROFILE_ENUM
+    # emitter. Skips serial/link setup entirely so it can run in CI/dev shells
+    # without bench hardware attached.
+    parser.add_argument("--self-test-profile-emit", action="store_true",
+                        help="FCC-B3-1: exercise _format_runtime_profile_line "
+                             "over canned CFG_DATA_URC payloads and exception "
+                             "cases. Exits 0 on pass, 1 on any mismatch. Does "
+                             "not open the serial link or touch the radio.")
     args = parser.parse_args(argv)
+
+    if args.self_test_profile_emit:
+        return _self_test_profile_emit()
 
     print(f"MODE: {args.probe}")
     print(f"dev={args.dev} baud={args.baud}")
@@ -2047,6 +2162,14 @@ def main(argv=None) -> int:
     except Exception as exc:
         print(f"FATAL: link open failed: {exc}")
         return 2
+
+    # 2026-05-20 FCC-B3-1: publish RUNTIME_PROFILE_ENUM=<N> exactly once per
+    # probe process so the FCC-B3-2 gate (`tools/check_run_profile.py`) can
+    # confirm the firmware actually running matches the orchestrator's
+    # `--expected-enum`. Non-fatal: any failure here prints
+    # `RUNTIME_PROFILE_ENUM=ERR <reason>` and probe execution continues so
+    # we don't regress the existing capture surface.
+    emit_runtime_profile_enum(link)
 
     try:
         if args.probe == "tx":

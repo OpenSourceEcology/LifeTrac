@@ -99,6 +99,22 @@ foreach ($logPath in @($txLog, $rxLog)) {
   }
 }
 
+# FCC-B2-b-b-3-3-2: lint gate. Every text artifact under $outDir must
+# carry a valid v1 FCC-B2-b header by the time this script returns.
+# The stamp loop above is the only producer of headers in this script,
+# so if it soft-failed on any path the linter will surface that file
+# here and abort the run with a non-zero exit. This converts the
+# stamper's soft-fail (line ~95) into a hard-fail at the run boundary
+# so an unstamped artifact can never silently ship.
+$linter = Join-Path $PSScriptRoot 'lint_artifact_headers.py'
+& py -3 $linter $outDir
+$lintRc = $LASTEXITCODE
+if ($lintRc -ne 0) {
+  Write-Host "[lint] FAIL: lint_artifact_headers.py exit=$lintRc on $outDir"
+  exit 3
+}
+Write-Host "[lint] OK: every text artifact in $outDir carries a v1 FCC-B2-b header"
+
 # Summarise both logs
 Write-Host ""
 Write-Host "=== TX TAIL ==="
