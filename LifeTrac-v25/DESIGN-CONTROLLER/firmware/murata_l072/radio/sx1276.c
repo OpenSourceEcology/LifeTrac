@@ -1,5 +1,8 @@
 #include "sx1276.h"
 #include "sx1276_modes.h"
+#include "sx1276_airtime.h"
+#include "host_uart.h"
+#include "host_types.h"
 #include "platform.h"
 #include "stm32l072_regs.h"
 
@@ -358,10 +361,15 @@ void sx1276_set_tx_power_dbm(uint8_t dbm) {
 }
 
 void sx1276_set_sf_bw_cr(uint8_t sf, uint16_t bw_khz, uint8_t cr_den) {
+    (void)sx1276_set_sf_bw_cr_checked(sf, bw_khz, cr_den);
+}
+
+bool sx1276_set_sf_bw_cr_checked(uint8_t sf, uint16_t bw_khz, uint8_t cr_den) {
     uint8_t sf_use = sf;
     uint8_t cr_use = cr_den;
     const uint8_t bw_bits = bw_to_reg_bits(bw_khz);
     uint8_t cfg3;
+    uint32_t computed_toa_us = 0U;
 
     if (sf_use < 6U) {
         sf_use = 6U;
@@ -375,6 +383,52 @@ void sx1276_set_sf_bw_cr(uint8_t sf, uint16_t bw_khz, uint8_t cr_den) {
     }
     if (cr_use > 8U) {
         cr_use = 8U;
+    }
+
+    /*
+     * FCC-A1a (plan §14.2 step 3): refuse a (SF, BW, CR) tuple whose
+     * worst-case ToA at the maximum PHY payload (255 B) exceeds the
+     * dwell cap (400 ms window minus a 20 ms guard band). If we accept
+     * such a tuple here, the per-channel dwell budget in
+     * sx1276_airtime_reserve() can never legally admit a frame of any
+     * size, and any TX of moderate length will silently overrun the
+     * 400 ms FCC dwell limit on the hop channel.
+     *
+     * Emit __AIRTIME_INVARIANT_REJECT__ URC and skip the register writes
+     * so the modem retains its prior (presumed-legal) configuration.
+     */
+    if (!sx1276_airtime_config_invariant_ok(sf_use,
+                                            bw_khz,
+                                            cr_use,
+                                            255U,
+                                            SX1276_AIRTIME_DWELL_CAP_US,
+                                            &computed_toa_us)) {
+        uint8_t urc_payload[HOST_AIRTIME_REJECT_PAYLOAD_LEN];
+        const uint32_t bw_hz = (uint32_t)bw_khz * 1000UL;
+        const uint32_t cap_us = SX1276_AIRTIME_DWELL_CAP_US;
+
+        urc_payload[0]  = sf_use;
+        urc_payload[1]  = cr_use;
+        urc_payload[2]  = (uint8_t)(bw_hz & 0xFFU);
+        urc_payload[3]  = (uint8_t)((bw_hz >> 8)  & 0xFFU);
+        urc_payload[4]  = (uint8_t)((bw_hz >> 16) & 0xFFU);
+        urc_payload[5]  = (uint8_t)((bw_hz >> 24) & 0xFFU);
+        urc_payload[6]  = 255U;
+        urc_payload[7]  = (uint8_t)(computed_toa_us & 0xFFU);
+        urc_payload[8]  = (uint8_t)((computed_toa_us >> 8)  & 0xFFU);
+        urc_payload[9]  = (uint8_t)((computed_toa_us >> 16) & 0xFFU);
+        urc_payload[10] = (uint8_t)((computed_toa_us >> 24) & 0xFFU);
+        urc_payload[11] = (uint8_t)(cap_us & 0xFFU);
+        urc_payload[12] = (uint8_t)((cap_us >> 8)  & 0xFFU);
+        urc_payload[13] = (uint8_t)((cap_us >> 16) & 0xFFU);
+        urc_payload[14] = (uint8_t)((cap_us >> 24) & 0xFFU);
+
+        host_uart_send_urc(HOST_TYPE_AIRTIME_INVARIANT_REJECT_URC,
+                           0U,
+                           0U,
+                           urc_payload,
+                           (uint16_t)sizeof(urc_payload));
+        return false;
     }
 
     sx1276_write_reg(SX1276_REG_MODEM_CONFIG1,
@@ -400,6 +454,7 @@ void sx1276_set_sf_bw_cr(uint8_t sf, uint16_t bw_khz, uint8_t cr_den) {
                          (uint8_t)((sx1276_read_reg(SX1276_REG_DETECT_OPTIMIZE) & 0xF8U) | 0x03U));
         sx1276_write_reg(SX1276_REG_DETECTION_THRESH, 0x0AU);
     }
+    return true;
 }
 
 void sx1276_apply_profile_full(const sx1276_profile_t *profile) {

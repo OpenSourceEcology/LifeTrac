@@ -751,3 +751,138 @@ Field-candidate when:
 *Signed:* **GitHub Copilot, Consolidated Plan v3.0 (2026-05-19)
 — folds v2.0/v2.1/v2.2/v2.3 review chain into a single authoritative delta**
 
+
+
+---
+
+## 15. v3.1 Bench-hardware-reality + lab-equipment-waiver addendum (2026-05-19)
+
+This addendum folds in four scope clarifications the user delivered after
+v3.0 landed. Where §15 conflicts with §1-§14, **§15 wins** for the bench
+hardware topology, the lab-equipment waivers, and the E-STOP signal
+path. §10-§14 remain unedited as the review trail.
+
+### 15.1 Bench hardware truth (replaces "no L072 hardware available" assumption)
+
+The production radio module is **already on the bench, twice over.**
+
+- 2× Portenta X8 + Max Carrier. Each Max Carrier integrates the Murata
+  CMWX1ZZABZ-078 (STM32L072 + SX1276) as its onboard LoRa radio.
+- Board 1 serial `2D0A1209DABC240B` = **tractor-side** radio.
+- Board 2 serial `2E2C1209DABC240B` = **base-station-side** radio.
+- 1× MKR WAN 1310 (Murata CMWX1ZZABZ-091) = optional bring-up spare /
+  hammer-firmware host for the S-HW.3 interferer substitute.
+
+**Implication for the plan:** there is no "L072 reattach" step
+anywhere in Tracks A/B/C. The same firmware ships to both Max Carrier
+units; profile selection at boot picks base-vs-tractor role. The
+existing W1-10b 100/100 RX match (2026-05-12) is end-to-end production
+hardware evidence, not a development-board proxy.
+
+### 15.2 Permanent lab-equipment waivers (cascades to §3 gates)
+
+The user has confirmed that the following equipment will **not** be
+available for this product line — ever, not "later":
+
+| Equipment | Waiver scope | Software substitute that ships in its place |
+|---|---|---|
+| Step attenuator | S-HW.2 PERMANENTLY SKIPPED | Range-walk + natural path loss. Bench artifact axis flips from "PER vs commanded attenuation step" to **"PER vs measured-RSSI bin"** — the existing PERTX URC's RSSI field is the discriminator. |
+| Spectrum analyzer | S-HW.4 PERMANENTLY SKIPPED | FCC §15.247 conducted-emission evidence ships under (a) firmware-side `RegPaConfig` cap declared in the artifact header and (b) datasheet conducted-path table for the SX1276. |
+| Calibrated antenna + anechoic enclosure | S-HW.4 PERMANENTLY SKIPPED | Antenna gain read from datasheet. EIRP computed at report-time as `EIRP_dBm = conducted_dBm + antenna_dBi − cable_loss_dB`; the three operands are stamped in every artifact header. |
+| TCB / part-15 lab | S-HW.4 PERMANENTLY SKIPPED | Categorical exclusion under §1.1307(b) / §2.1093 documented in the artifact header (D7 substitute). |
+
+**Cascade to §3 Phase-D evidence gates** — five of the seven gates
+listed in §3 (and the three added by delta #15 in §14.1) lose their
+direct measurement path. Each ships a software substitute and is
+flagged **⚫ WAIVED** in TODO.md Phase-D block:
+
+| §3 gate | New status | Substitute evidence (lands in firmware/orchestrator, not on a lab bench) |
+|---|---|---|
+| **D1** Hop proof | ⚫ WAIVED | `RFCO_SUMMARY.per_channel_hop_count[50]` (B1-SUMMARY-b). Equal-use within ±10 % per epoch is computed from the histogram, not from spectrum-analyzer integration. |
+| **D2** Occupied BW | ⚫ WAIVED | SX1276 datasheet table for `BW250` (≥250 kHz inherent). Profile name stays `FCC_15_247_FHSS_50CH_BW250`. No `_NARROW` fallback path lands until a real SA run exists. |
+| **D3** OOB mask | ⚫ WAIVED | SX1276 datasheet OOB mask declaration in artifact header. PA cap (`RegPaConfig` ≤ +17 dBm) enforced at runtime by S0.9 TX-power layer. |
+| **D4** Per-channel dwell | ✅ IN SCOPE | `RFCO_SUMMARY.per_channel_dwell_max_ms[50]` already does this. No equipment needed. |
+| **D5** Packet airtime cap | ✅ IN SCOPE | `RFCO_PERTX.pkt_toa_us_le` already does this. No equipment needed. |
+| **D6** Profile lock | ✅ IN SCOPE | cfg-fuzz Python script; no equipment needed. |
+| **D7** RF exposure | ⚫ WAIVED | Categorical exclusion §1.1307(b) / §2.1093 declared in artifact header. Antenna gain + separation distance numbers from datasheet + mechanical assembly. |
+| **D8** Two-node sync torture | ✅ IN SCOPE | Two Max Carriers + W1-10b harness pattern. No equipment needed. |
+| **D9** LBT bias stress | ⚫ WAIVED | Second Max Carrier flashed with hammer firmware = substitute interferer. `RFCO_SUMMARY.blocked_attempts_by_reason[8]` is the discriminator instead of "ambient cannot substitute for calibrated jammer." |
+| **D10** Power/antenna clamp fuzz | ✅ IN SCOPE | cfg-fuzz Python script; no equipment needed. |
+| **D-Gate** scripted summary | ✅ IN SCOPE | Aggregates the surviving D4/D5/D6/D8/D10 + waiver-declaration headers. |
+
+**§13.7 bench-environment caveat is hereby superseded** for D1 + D9
+specifically: since neither gate runs on a spectrum analyzer, the
+"shielded enclosure / directional coupler / calibrated interferer"
+constraint no longer applies. It still applies in principle to any
+future SA-based re-measurement, but that re-measurement is not on the
+critical path. §13.8's "do not change the §4 retirement list" still
+holds — none of the retired profiles are reopened by this waiver.
+
+### 15.3 E-STOP signal path (definitive)
+
+S-HW.5 was previously written as if it required a physical mushroom
+button. The user has redefined the path:
+
+- **Tractor-side E-STOP:** Arduino Opta digital-input pin flip. Routed
+  to the base-station Max Carrier as a host frame; on the L072 side
+  this is an existing `host_uart` command, not a new URC.
+- **Operator-side E-STOP:** keyboard / joystick button on the web
+  remote-control UI. Generates an `ESTOP_REQ` host frame on the
+  browser → backend → L072 path. Rate-limited ≤5 Hz. Global keydown
+  handler (must fire even when the joystick widget does not have
+  focus).
+- **Bench substitute:** a tactile switch shorting Opta input I1 to GND.
+  No mushroom hardware, no separate E-STOP cert path.
+
+**Implication for the plan:** there is no new safety-burst PHY work
+beyond what
+[2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md](2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md)
+already specifies. The "safety burst layered inside the hop scheduler"
+note from §14.4 item 4 stands unchanged.
+
+### 15.4 FCC-B1-SUMMARY landing trail (concretizes §14.2 step 11)
+
+§14.2 step 11 lumps `RFCO_SUMMARY` + B2 + B3 into one bullet. The
+implementation has decomposed it further (see TODO.md FCC track):
+
+- **Wire-layout design doc:**
+  [2026-05-19_FCC_B1_SUMMARY_Wire_Layout_Design_Copilot_v1_0.md](2026-05-19_FCC_B1_SUMMARY_Wire_Layout_Design_Copilot_v1_0.md)
+  — 191 B single-frame payload, snapshot-and-reset deltas, main-loop
+  polling cadence at 60 000 ms, `HOST_TYPE_RFCO_SUMMARY_URC = 0xC4U`.
+- **FCC-B1-SUMMARY-a (landed 2026-05-19):** declaration-only header
+  [include/host_rfco_summary.h](../DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco_summary.h)
+  + 0xC4 type-code in
+  [include/host_types.h](../DESIGN-CONTROLLER/firmware/murata_l072/include/host_types.h).
+  Four `_Static_assert`s pin the wire layout. No emitter, no pack
+  helper, no main-loop integration. Reversible.
+- **FCC-B1-SUMMARY-b (next):** pure `host_rfco_summary_pack()` + three
+  sidecar counter TUs (per-channel hop count, per-channel dwell-max
+  ms, blocked-attempts-by-reason) + ≥10 byte-by-byte wire-vector
+  cases in `bench/host_proto/rfco_summary.c`.
+- **FCC-B1-SUMMARY-c:** emit wrapper + main-loop 60 000 ms cadence +
+  emit-timing bench test.
+- **FCC-B2-b (unblocked by Q7 resolution):** the first SUMMARY URC's
+  `schema_ver` byte at run start is stamped into the artifact header
+  alongside firmware_git_sha, build_timestamp_utc, profile_id,
+  profile_str.
+- **FCC-B3:** orchestrator profile gate + RFCO snapshot-mismatch
+  abort.
+
+### 15.5 Sign-off conditions (incremental delta on §14.5)
+
+The "Done enough to start coding" gate in §14.5 is unchanged — coding
+has already started. Field-candidate gate is **amended** as follows:
+
+- Strike "D1-D10 all archived" and replace with **"D4 + D5 + D6 + D8 +
+  D10 + D-Gate all archived; D1 + D2 + D3 + D7 + D9 each have the
+  software-substitute artifact and the §15.2 waiver declaration in
+  the artifact header."**
+- Add: "First `RFCO_SUMMARY` URC of every run is captured in the
+  artifact and its `schema_ver` byte matches the stamped header
+  field" (B2-b cross-check).
+- Add: "E-STOP path tested end-to-end (Opta pin-flip → base-station
+  Max Carrier → ESTOP host frame on host UART) under nominal LBT
+  load. Web-UI keydown-handler path tested with browser-only stub
+  (no Opta) under the same load."
+
+*Signed:* **GitHub Copilot, Bench-Hardware-Reality + Lab-Equipment-Waiver Addendum v3.1 (2026-05-19) — incremental addendum to v3.0**

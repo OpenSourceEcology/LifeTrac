@@ -8,6 +8,15 @@
 #include "sx1276_modes.h"
 #include "sx1276_rx.h"
 
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+#include "host_cfg_keys.h"
+#include "host_cfg_profile.h"
+#include "host_rfco.h"
+#include "lora_pkt_hdr.h"
+#include "sx1276_fhss.h"
+#include "sx1276_legal_dwell.h"
+#endif
+
 #define SX1276_REG_FIFO                    0x00U
 #define SX1276_REG_FIFO_ADDR_PTR           0x0DU
 #define SX1276_REG_FIFO_TX_BASE_ADDR       0x0EU
@@ -18,6 +27,22 @@
 #define SX1276_IRQ_TX_DONE                 0x08U
 
 #define SX1276_TX_TIMEOUT_GUARD_US         50000UL
+
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+/*
+ * FCC-A4 (plan §14.2 step 9): PLL settle budget after a frequency
+ * change before LBT/CAD/TX-start may sample the channel. The SX1276
+ * datasheet (rev 7, §4.1.4 Frequency Synthesis) characterises the
+ * PLL lock time at the "PllBandwidth" default (75 kHz) as ~50 µs
+ * worst-case across temperature; the 200 µs budget here is a 4x
+ * conservative envelope pending bench characterisation under the
+ * actual Murata CMWX1ZZABZ TCXO. This delay is intentionally
+ * separate from the 1 ms modes_to_standby() settle in sx1276.c so
+ * that operators bisecting RFCO logs can distinguish "PLL not
+ * locked yet" from "modem still in sleep/standby transition".
+ */
+#define SX1276_TX_PLL_SETTLE_US            200UL
+#endif
 
 typedef enum sx1276_tx_state_e {
     SX1276_TX_STATE_IDLE = 0,
@@ -32,6 +57,39 @@ static uint32_t s_expected_toa_us;
 static uint32_t s_deadline_us;
 static uint32_t s_reserved_airtime_us;
 static uint8_t s_channel_idx;
+
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+static uint32_t s_hop_freq_hz;
+static uint8_t  s_hop_idx;
+static uint32_t s_hop_epoch;
+static uint16_t s_legal_dwell_handle = SX1276_DWELL_HANDLE_INVALID;
+static uint32_t s_predicted_toa_us;
+static uint16_t s_rfco_pertx_seq;
+
+static void pll_settle_busy_wait(uint32_t delay_us) {
+    const uint32_t start = platform_now_us();
+    while ((uint32_t)(platform_now_us() - start) < delay_us) {
+        /* spin — SX1276 has no settle IRQ on the L072 wiring */
+    }
+}
+
+static void tx_emit_rfco_pertx(uint8_t tx_status, uint32_t pkt_toa_us) {
+    host_rfco_pertx_t snap;
+    const host_cfg_profile_req_t *active = host_cfg_profile_active();
+    snap.profile_id = (active != NULL) ? active->profile_id
+                                       : (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915;
+    snap.tx_status               = tx_status;
+    snap.hop_idx                 = s_hop_idx;
+    snap.channel_idx             = s_channel_idx;
+    snap.epoch                   = s_hop_epoch;
+    snap.freq_hz                 = s_hop_freq_hz;
+    snap.pkt_toa_us              = pkt_toa_us;
+    snap.legal_dwell_used_us_10s = sx1276_legal_dwell_used_us(
+        s_channel_idx, SX1276_DWELL_WINDOW_10S_MS, platform_now_ms());
+    (void)host_rfco_pertx_emit(s_rfco_pertx_seq, 0U, &snap);
+    ++s_rfco_pertx_seq;
+}
+#endif /* LIFETRAC_FHSS_TX_ROUTED */
 
 static uint8_t tx_power_dbm_now(void) {
     return (uint8_t)((sx1276_read_reg(SX1276_REG_PA_CONFIG) & 0x0FU) + 2U);
@@ -61,7 +119,71 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
         return false;
     }
 
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+    /*
+     * FCC-A6b (plan §14.2 step 10, delta #13): the 8-byte hop-sync
+     * header is prepended at FIFO-write time, so every length-bearing
+     * calculation downstream (airtime invariant, airtime reserve,
+     * legal-dwell reserve, FIFO PAYLOAD_LENGTH) must use the on-air
+     * length INCLUDING the header. Refuse requests that would overflow
+     * the SX1276's 256-byte FIFO with the header included; do it
+     * before consuming an FHSS hop slot so a doomed TX does not burn
+     * scheduler progress. Emit an INTERNAL RFCO snapshot with zeroed
+     * hop fields for bench traceability.
+     */
+    if ((uint32_t)req->length + (uint32_t)LORA_PKT_HDR_LEN > 255UL) {
+        s_hop_idx     = 0U;
+        s_hop_epoch   = 0U;
+        s_hop_freq_hz = 0U;
+        s_channel_idx = 0U;
+        tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_INTERNAL, 0U);
+        return false;
+    }
+    const uint8_t effective_len = (uint8_t)(req->length + LORA_PKT_HDR_LEN);
+#else
+    const uint8_t effective_len = req->length;
+#endif
+
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+    /*
+     * FCC-A4 (plan §14.2 step 9): route TX through the FHSS hop
+     * scheduler BEFORE LBT/CAD/TX-start. Capturing (hop_idx, epoch)
+     * here makes every RFCO_PERTX emit below truthful even on
+     * fail-closed paths.
+     */
+    {
+        uint8_t  hop_channel_idx = 0U;
+        uint32_t hop_center_hz   = 0U;
+        const sx1276_fhss_status_t hop_st =
+            sx1276_fhss_next_channel(&hop_channel_idx, &hop_center_hz);
+        if (hop_st != SX1276_FHSS_OK) {
+            /* Scheduler not initialised / corrupted: emit an INTERNAL
+             * snapshot with zeroed hop fields so bench post-processing
+             * can detect the fault, then refuse the TX. */
+            s_hop_idx     = 0U;
+            s_hop_epoch   = 0U;
+            s_hop_freq_hz = 0U;
+            s_channel_idx = 0U;
+            tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_INTERNAL, 0U);
+            return false;
+        }
+        s_channel_idx = hop_channel_idx;
+        s_hop_freq_hz = hop_center_hz;
+        /* sx1276_fhss_current_slot() is the NEXT slot the scheduler
+         * will hand out; the one we just consumed is therefore
+         * (slot - 1) within the current epoch. Slot wrap is folded
+         * back to the last index of the previous epoch. */
+        {
+            const uint8_t slot_after = sx1276_fhss_current_slot();
+            s_hop_idx = (slot_after == 0U)
+                ? (uint8_t)(SX1276_FHSS_CHANNEL_COUNT - 1U)
+                : (uint8_t)(slot_after - 1U);
+        }
+        s_hop_epoch = sx1276_fhss_current_epoch();
+    }
+#else
     s_channel_idx = 0U;
+#endif
 
     s_rearm_rx = (state_before == SX1276_STATE_RX_CONT || state_before == SX1276_STATE_RX_SINGLE) ? 1U : 0U;
     if (s_rearm_rx != 0U) {
@@ -70,27 +192,125 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
         return false;
     }
 
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+    /*
+     * Retune the synthesiser now that the modem is in standby, then
+     * wait the documented PLL settle budget so LBT/CAD samples the
+     * correct channel rather than the previous one.
+     */
+    sx1276_set_frequency_hz(s_hop_freq_hz);
+    pll_settle_busy_wait(SX1276_TX_PLL_SETTLE_US);
+#endif
+
     lbt_result = sx1276_lbt_check_and_backoff();
     if (lbt_result != SX1276_LBT_RESULT_CLEAR && lbt_result != SX1276_LBT_RESULT_DISABLED) {
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+        sx1276_fhss_record_lbt_block(s_channel_idx);
+        tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_ABORT_LBT, 0U);
+#endif
         sx1276_tx_cleanup();
         return false;
     }
 
+    /*
+     * FCC-A1b (plan §14.2 step 4): pre-TX per-frame airtime invariant.
+     *
+     * The config-time invariant (FCC-A1a) already proves that
+     * `(SF, BW, CR)` at MAX payload fits the 380 ms dwell cap, but the
+     * modem-config setter only writes registers when accepted, so this
+     * check fires if either (a) the running config was changed by an
+     * out-of-band path (debug, host REG_WRITE), or (b) caller framing
+     * assumptions (preamble length, implicit-header mode, CRC bit)
+     * differ from the helper's defaults. Failing closed here keeps the
+     * 400 ms FCC §15.247(a)(1)(iii) per-channel dwell legally satisfied
+     * even when the modem state is unexpected.
+     *
+     * `sx1276_airtime_estimate_toa_us()` reads the live modem-config
+     * registers + preamble length, so this check is faithful to whatever
+     * is actually programmed at TX time.
+     */
+    {
+        const uint32_t predicted_toa_us = sx1276_airtime_estimate_toa_us(effective_len);
+        if (predicted_toa_us > SX1276_AIRTIME_DWELL_CAP_US) {
+            host_stats_radio_tx_abort_airtime();
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+            tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_ABORT_AIRTIME_INVARIANT,
+                               predicted_toa_us);
+#endif
+            sx1276_tx_cleanup();
+            return false;
+        }
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+        s_predicted_toa_us = predicted_toa_us;
+#endif
+    }
+
     airtime_result = sx1276_airtime_reserve(s_channel_idx,
-                                            req->length,
+                                            effective_len,
                                             platform_now_ms(),
                                             &s_reserved_airtime_us);
     if (airtime_result != SX1276_AIRTIME_OK) {
         if (airtime_result == SX1276_AIRTIME_OVER_BUDGET) {
             host_stats_radio_tx_abort_airtime();
         }
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+        tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_ABORT_QOS,
+                           s_predicted_toa_us);
+#endif
         sx1276_tx_cleanup();
         return false;
     }
 
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+    /*
+     * FCC-A2 (plan §14.2 step 6): pessimistic legal-dwell reservation
+     * against the 400 ms / 10 s per-channel cap. The QoS reserve above
+     * is the 1 s fairness window; this is the regulatory 10 s window.
+     * Both are kept separate per plan delta #11.
+     */
+    {
+        s_legal_dwell_handle = SX1276_DWELL_HANDLE_INVALID;
+        const sx1276_dwell_status_t dst = sx1276_legal_dwell_reserve(
+            s_channel_idx,
+            s_predicted_toa_us,
+            platform_now_ms(),
+            SX1276_DWELL_WINDOW_10S_MS,
+            SX1276_DWELL_DEFAULT_CAP_US,
+            &s_legal_dwell_handle);
+        if (dst != SX1276_DWELL_OK) {
+            sx1276_airtime_release(s_channel_idx, s_reserved_airtime_us);
+            tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_ABORT_LEGAL_DWELL,
+                               s_predicted_toa_us);
+            sx1276_tx_cleanup();
+            return false;
+        }
+    }
+#endif
+
     sx1276_write_reg(SX1276_REG_FIFO_TX_BASE_ADDR, 0x00U);
     sx1276_write_reg(SX1276_REG_FIFO_ADDR_PTR, 0x00U);
-    sx1276_write_reg(SX1276_REG_PAYLOAD_LENGTH, req->length);
+    sx1276_write_reg(SX1276_REG_PAYLOAD_LENGTH, effective_len);
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+    /*
+     * FCC-A6b (plan §14.2 step 10): write the 8-byte hop-sync header
+     * FIRST so it occupies bytes [0..7] of the on-air frame; the RX
+     * side relies on this byte ordering to strip it before delivering
+     * the upper-layer payload (sx1276_rx.c). schema_ver is hard-coded
+     * inside lora_pkt_hdr_pack() — no field-driven path can demote it.
+     */
+    {
+        uint8_t hdr_bytes[LORA_PKT_HDR_LEN];
+        const host_cfg_profile_req_t *active = host_cfg_profile_active();
+        lora_pkt_hdr_t hdr;
+        hdr.profile_id = (active != NULL)
+            ? active->profile_id
+            : (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915;
+        hdr.hop_idx    = s_hop_idx;
+        hdr.epoch      = s_hop_epoch;
+        (void)lora_pkt_hdr_pack(&hdr, hdr_bytes);
+        sx1276_write_burst(SX1276_REG_FIFO, hdr_bytes, LORA_PKT_HDR_LEN);
+    }
+#endif
     if (req->length > 0U) {
         sx1276_write_burst(SX1276_REG_FIFO, req->payload, req->length);
     }
@@ -98,6 +318,14 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
 
     if (!sx1276_modes_to_tx()) {
         sx1276_airtime_release(s_channel_idx, s_reserved_airtime_us);
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+        /* No reconcile of legal_dwell — FCC-A2 contract is no-rollback
+         * once reserved. Energy was not emitted but we keep the worst-
+         * case booking; the per-minute SUMMARY URC will surface the
+         * over-accounting if it ever becomes operationally relevant. */
+        tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_TX_FAIL,
+                           s_predicted_toa_us);
+#endif
         sx1276_tx_cleanup();
         return false;
     }
@@ -106,7 +334,7 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
     s_tx_power_dbm = tx_power_dbm_now();
     s_expected_toa_us = s_reserved_airtime_us;
     if (s_expected_toa_us == 0U) {
-        s_expected_toa_us = sx1276_airtime_estimate_toa_us(req->length);
+        s_expected_toa_us = sx1276_airtime_estimate_toa_us(effective_len);
     }
     s_deadline_us = platform_now_us() + s_expected_toa_us + SX1276_TX_TIMEOUT_GUARD_US;
     s_tx_state = SX1276_TX_STATE_WAIT_DONE;
@@ -131,6 +359,15 @@ bool sx1276_tx_poll(uint32_t events, sx1276_tx_result_t *out_result) {
             out_result->time_on_air_us = s_expected_toa_us;
             sx1276_airtime_commit(s_channel_idx, 0U, platform_now_ms());
             host_stats_radio_tx_ok();
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+            /* Reconcile dwell down to the predicted ToA. We don't have
+             * a hardware-measured actual airtime on the L072 wiring;
+             * the predicted ToA from FCC-A1b is the post-rearm best
+             * estimate and matches what the FCC accountant must book. */
+            sx1276_legal_dwell_reconcile(s_legal_dwell_handle,
+                                         s_expected_toa_us);
+            tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_OK, s_expected_toa_us);
+#endif
             sx1276_tx_cleanup();
             return true;
         }
@@ -143,6 +380,12 @@ bool sx1276_tx_poll(uint32_t events, sx1276_tx_result_t *out_result) {
         out_result->tx_power_dbm = s_tx_power_dbm;
         out_result->time_on_air_us = s_expected_toa_us;
         sx1276_airtime_commit(s_channel_idx, 0U, platform_now_ms());
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+        /* No legal_dwell reconcile — RF energy was emitted but we don't
+         * know for how long, so the pessimistic reserve stands per
+         * FCC-A2's no-rollback contract. */
+        tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_TX_TIMEOUT, s_expected_toa_us);
+#endif
         sx1276_tx_cleanup();
         return true;
     }

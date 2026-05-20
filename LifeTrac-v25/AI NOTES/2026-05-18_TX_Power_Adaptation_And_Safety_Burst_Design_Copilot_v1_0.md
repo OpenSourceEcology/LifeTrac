@@ -2792,3 +2792,101 @@ text.**
 
 Signed: GitHub Copilot
 Date: 2026-05-18
+
+---
+
+## Change-log — S0.9 FCC-FHSS layering callout (2026-05-19)
+
+Closes the **FCC-TXPOWER-LAYER** TODO item against the 2026-05-19
+50-channel FHSS plan
+([2026-05-19_LoRa_FCC_50CH_FHSS_Implementation_Plan_Copilot_v1_0.md](2026-05-19_LoRa_FCC_50CH_FHSS_Implementation_Plan_Copilot_v1_0.md))
+§5 #4 and §14.4 #4. This is an additive callout — no main-body
+restructuring (still deferred per S0.5 / S0.6 above). Two surgical
+edits, both applied below.
+
+### S0.9.a — Layering rule (TX-power adapter and SAFETY-burst layer *inside* the hop scheduler)
+
+The TX-power adapter (§3, §5, §15) and the SAFETY-burst path (§3.3,
+§5.4, §15.7) are both **inner** to the FHSS hop schedule defined in the
+2026-05-19 plan §2 (Track A) and §3 (`sx1276_fhss` module, A3/A4). The
+hop schedule is the outer loop:
+
+1. The hop scheduler owns *which channel* every individual TX leaves
+   on, including each individual copy of a SAFETY burst.
+2. Inside one hop's dwell window, the TX-power adapter chooses *what
+   dBm* the next message-class instance transmits at.
+3. Every dBm step the adapter selects must still satisfy the §15.247
+   out-of-band (OOB) mask at the chosen channel center; the adapter has
+   no authority to relax the OOB mask because the mask is a function of
+   the channel center, channel BW, and PA configuration, not of message
+   class.
+4. SAFETY-burst's N=5 copies (§3.3) do **not** override the hop
+   scheduler. They MUST be scheduled on N distinct hops (preferred,
+   improves narrowband-interference robustness — see §279 strawman S
+   in the main body) or N consecutive hops with channel diversity, but
+   they never re-use the same channel center for all 5 copies and they
+   never bypass the legal per-channel dwell budget tracked by
+   `legal_dwell_used_us_10s` (FCC `RFCO_SUMMARY` URC fields, plan
+   §3.2). If the per-channel dwell budget on the next-due hop would be
+   exceeded by the burst copy, the burst copy must skip to the
+   following hop, not steal dwell from the current channel.
+5. The TX-power adapter MUST NOT raise dBm above the per-channel EIRP
+   cap derived from antenna gain + the 2026-05-19 plan §3 profile
+   `FCC_15_247_FHSS_50CH_BW250` clamps, even when the message class is
+   SAFETY. The SAFETY class buys redundancy via copy-count and channel
+   diversity, **not** via power-cap escape (consistent with the §4
+   S0.4 edit that already retired the "+17 dBm forced" wording).
+
+Implementation consequence for the inner-loop boundary:
+
+* The TX-power adapter and SAFETY burst sit in the **same per-message
+  pre-TX hook** that the hop scheduler exposes; they never call
+  `sx1276_tx_*` directly. The hop scheduler is the only caller of the
+  PHY TX primitive after A4 lands (2026-05-19 plan §6 step 6).
+* Any `cfg_tx_power_dbm` write that races a hop boundary is resolved
+  against the *next* hop's per-channel EIRP cap, not the current hop's,
+  to keep §23.5 "Power-write race gate" satisfied.
+
+### S0.9.b — Bench-only single-channel callout
+
+§1 (W2-02 stability run) and several strawmans in §3 (Alternatives
+considered — e.g. §279 row S "single-channel today", §559 "Single-
+channel today", §2465 "single-channel") describe the bench's posture as
+of 2026-05-18, which was **fixed 915.000 MHz, no hop**. That posture is
+stamped `BENCH_ONLY_FIXED_915` (2026-05-19 plan §5 #3 and §14.4 #3) and
+is **not** FCC field evidence. Field operation under
+`FCC_15_247_FHSS_50CH_BW250` will exercise all 50 channels per the hop
+schedule, and the §1 0.5 % per-fragment PER number is therefore a
+fixed-channel-only baseline; it does not characterise field PER under
+hop-induced channel-quality variation.
+
+Concrete reader contract:
+
+* Every numerical PER / RSSI / SNR figure in §1 is `BENCH_ONLY_FIXED_915`.
+* The "single-channel today" language in §3 / §15 / §17 alternatives
+  is a **bench-only snapshot**, **not** a design assertion. The
+  field-target architecture is FHSS-50CH; any future revision of the
+  alternatives table must re-evaluate the single-channel strawmans
+  under FHSS, where channel diversity replaces some of the value those
+  strawmans previously could not provide.
+* Bench scripts in `LifeTrac-v25/tools/` and bench-evidence directories
+  in `LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/` written prior to
+  2026-05-19 are stamped `BENCH_ONLY_FIXED_915` by virtue of running
+  against a fixed-915 firmware. Any post-FCC-FHSS-50CH artifact that
+  reuses the same scripts must carry the new `profile=` header
+  required by FCC-B3 (TODO.md) so artifact downstream consumers do not
+  silently treat fixed-915 PER as field-eligible.
+
+Cross-link: see also [LifeTrac-v25/TODO.md](../TODO.md) item
+`FCC-TXPOWER-LAYER` and the 2026-05-19 plan §11 (Copilot Final Addendum)
+which expects this layering rule to be locked before A4 (route TX
+through hop scheduler) ships.
+
+**Status of S0.9 pass: complete. No main-body section was renumbered or
+deleted; §3 / §15 alternatives still resolve correctly against original
+text. The two callouts above are referenced from `FCC-TXPOWER-LAYER`
+in TODO.md.**
+
+Signed: GitHub Copilot
+Date: 2026-05-19
+

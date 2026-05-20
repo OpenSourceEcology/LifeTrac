@@ -30,6 +30,13 @@ uint8_t sx1276_read_version(void);
 void sx1276_set_frequency_hz(uint32_t freq_hz);
 void sx1276_set_tx_power_dbm(uint8_t dbm);
 void sx1276_set_sf_bw_cr(uint8_t sf, uint16_t bw_khz, uint8_t cr_den);
+/*
+ * FCC-A1a config-time invariant variant. Returns false (and emits an
+ * AIRTIME_INVARIANT_REJECT_URC) without writing modem registers when
+ * the supplied tuple would exceed the 380 ms dwell cap at the maximum
+ * PHY payload (255 B). On success returns true after writing.
+ */
+bool sx1276_set_sf_bw_cr_checked(uint8_t sf, uint16_t bw_khz, uint8_t cr_den);
 void sx1276_apply_profile_full(const sx1276_profile_t *profile);
 
 uint32_t sx1276_take_irq_events(void);

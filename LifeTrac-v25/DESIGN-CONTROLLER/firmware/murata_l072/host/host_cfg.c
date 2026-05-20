@@ -117,6 +117,8 @@ static const cfg_key_desc_t k_cfg_desc[CFG_KEY_COUNT] = {
             { DEFAULT_CAD_SYMBOLS, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
         { CFG_KEY_FHSS_DWELL_MS,         2U, CFG_KIND_U16,  0U,                NULL,
             { LE16_0(DEFAULT_FHSS_DWELL_MS), LE16_1(DEFAULT_FHSS_DWELL_MS), 0U, 0U, 0U, 0U, 0U, 0U } },
+    { CFG_KEY_REG_PROFILE,           1U, CFG_KIND_U8,   0U,                NULL,
+      { REG_PROFILE_BENCH_ONLY_FIXED_915, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
     { CFG_KEY_PROTOCOL_VERSION,      1U, CFG_KIND_U8,   CFG_FLAG_READ_ONLY, NULL,
       { HOST_PROTOCOL_VER, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
     { CFG_KEY_WIRE_SCHEMA_VERSION,   1U, CFG_KIND_U8,   CFG_FLAG_READ_ONLY, NULL,
@@ -238,6 +240,29 @@ static cfg_status_t cfg_validate_and_normalize(uint8_t key, uint8_t *value, uint
 
         case CFG_KEY_FHSS_CHANNEL_MASK:
             return (read_u64_le(value) != 0ULL) ? CFG_STATUS_OK : CFG_STATUS_OUT_OF_RANGE;
+
+        case CFG_KEY_REG_PROFILE:
+            /*
+             * FCC-PROFILE-ENUM gate (plan §14 delta #1, TODO Stage S1.5):
+             *   - BENCH_ONLY_FIXED_915 is always accepted.
+             *   - Production profiles require the TX path to be routed
+             *     through the FHSS hop scheduler, which is gated by the
+             *     build symbol LIFETRAC_FHSS_TX_ROUTED (defined only when
+             *     FCC-A4 lands). Until then they return
+             *     CFG_STATUS_PROFILE_UNROUTED so an operator cannot
+             *     select a profile the firmware cannot actually honour.
+             */
+            if (value[0] > REG_PROFILE_MAX) {
+                return CFG_STATUS_OUT_OF_RANGE;
+            }
+            if (value[0] == REG_PROFILE_BENCH_ONLY_FIXED_915) {
+                return CFG_STATUS_OK;
+            }
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+            return CFG_STATUS_OK;
+#else
+            return CFG_STATUS_PROFILE_UNROUTED;
+#endif
 
         default:
             return CFG_STATUS_OK;

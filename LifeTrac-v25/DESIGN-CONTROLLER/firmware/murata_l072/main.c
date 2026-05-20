@@ -9,7 +9,9 @@
  */
 
 #include "config.h"
+#include "host_cfg_profile.h"
 #include "host_cmd.h"
+#include "host_rfco_summary.h"
 #include "host_uart.h"
 #include "platform.h"
 #include "sx1276.h"
@@ -146,7 +148,40 @@ int main(void) {
             if (!sx1276_tx_busy() && sx1276_rx_service(radio_events, &rx_frame)) {
                 host_cmd_emit_rx_frame(&rx_frame);
             }
+
+            /* FCC-A6c-2-b: drive the Scanning state machine. Must
+             * run BEFORE sx1276_rx_tick() so the (state, action)
+             * counters reflect the SM that γ-1 retune will (in
+             * A6c-2-c) be gated against. Observe-only today —
+             * BEGIN_SCAN / ADVANCE_CHANNEL / LOCK / FAIL update
+             * file-static state + anchors only; HW is unchanged.
+             * No-op in unrouted builds. */
+            sx1276_rx_scan_tick(now_ms);
+
+            /* FCC-A6b-2-ii-γ-2: drive the RX retune scheduler. No-op
+             * in unrouted builds; in routed builds, advances the
+             * FHSS channel and retunes the synth so the receiver
+             * follows the same hopset as TX. The function consults
+             * sx1276_tx_busy() internally — safe to call regardless
+             * of TX state. */
+            sx1276_rx_tick(now_ms);
         }
+
+        /* FCC-B1-SUMMARY-c-2: cadence-driven RFCO_SUMMARY URC emit.
+         * tick() polls should_emit() internally; first emit fires
+         * 60 s after boot (carries FIRST_SINCE_BOOT flag) then
+         * repeats every HOST_RFCO_SUMMARY_PERIOD_MS. Drains every
+         * per-window sidecar (hop_count, dwell_peak,
+         * blocked_attempts, pertx_count_in_window,
+         * last_clamp_reason). profile_id is sourced from the active
+         * cfg profile so the SUMMARY payload reflects whatever
+         * regulatory regime the radio is currently programmed to.
+         * host_cfg_profile_active() always returns a valid pointer
+         * to file-static state (zero-initialised at boot to
+         * REG_PROFILE_BENCH_ONLY_FIXED_915 == 0). */
+        (void)host_rfco_summary_tick(
+            now_ms,
+            host_cfg_profile_active()->profile_id);
 
         cpu_wfi();
     }

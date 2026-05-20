@@ -77,6 +77,28 @@ Start-Sleep -Seconds 6
 & $adb -s $boardB shell "echo fio | sudo -S pkill -f method_h_stage2_tx_probe_v2.py" 2>$null | Out-Null
 Start-Sleep -Seconds 2
 
+# FCC-B2-b-b-2: stamp the FCC-B2 artifact-header block onto both captured
+# logs so downstream consumers (analysis scripts, retro-stamp sweeps in
+# b-b-3, FCC-B3 orchestrator gate) can verify firmware_git_sha,
+# build_timestamp_utc, profile_enum/profile_string, and the RFCO schema
+# versions without having to cross-reference run-time metadata. Soft-fail
+# on stamper non-zero exit: a stamp failure on an already-captured log
+# must not erase the bench evidence. Profile is BENCH_ONLY_FIXED_915 (=0)
+# because this W1-10b / W2 mixed-load soak runs on a single fixed channel
+# per the 2026-05-19 FCC plan §5 #3 BENCH_ONLY callout.
+$stamper     = Join-Path $PSScriptRoot 'artifact_header.py'
+$profileEnum = 0
+foreach ($logPath in @($txLog, $rxLog)) {
+  if (Test-Path $logPath) {
+    & py -3 $stamper stamp --profile-enum $profileEnum --input $logPath --output $logPath
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "[stamp] WARN: artifact_header.py exit=$LASTEXITCODE on $logPath"
+    } else {
+      Write-Host "[stamp] header prepended to $(Split-Path -Leaf $logPath)"
+    }
+  }
+}
+
 # Summarise both logs
 Write-Host ""
 Write-Host "=== TX TAIL ==="

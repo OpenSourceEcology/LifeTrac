@@ -56,20 +56,42 @@ after the first is rejected as a replay, so the burst *reduces* assert
 probability instead of raising it). S0+S1 are independent of firmware and
 can run in parallel with S2.
 
-**Bench hardware reality (2026-05-18):** the only LoRa-stack hardware
-currently on the bench is **two Portenta X8 + Max Carrier boards and one
-camera**. There are **no L072 boards, no handheld MKR WAN 1310, no
-mushroom E-STOP, no step attenuator, and no spectrum analyzer** physically
-connected right now. Every stage below is therefore tagged:
+**Bench hardware reality (updated 2026-05-19):** the LoRa-stack hardware
+on the bench is **two Portenta X8 + Max Carrier boards and one camera**.
+Each Max Carrier carries an onboard **Murata CMWX1ZZABZ-078**
+(= STM32L072 + SX1276 SiP), so the two boards together ARE the production
+radio set: **one Max Carrier is the base-station radio, the other is the
+tractor-side radio.** The MKR WAN 1310 handheld referenced in earlier
+revisions of this plan is **optional and not on the critical path**.
 
-- 🟢 **HW-READY** — can complete on current bench (software-only or X8-only).
-- 🟡 **HW-PARTIAL** — software foundations can be built now; final gate needs LoRa rig.
-- 🔴 **HW-BLOCKED** — cannot start until L072 + handheld are reattached.
+**Test-equipment scope (project decision 2026-05-19):**
+- **No spectrum analyzer, no calibrated antenna, no TCB lab access.**
+  FCC §15.247 EIRP compliance ships under **conducted-path datasheet
+  declaration + firmware-side TX-power cap** (no lab-measured EIRP
+  evidence). See S-HW.4 (permanently skipped) and S4.2 below.
+- **No step attenuator.** S1.1 walk-power, S4 PER induction, S6
+  margin-limited induction will substitute **range-walk + natural path
+  loss** for controlled attenuation. See S-HW.2 (permanently skipped).
+- **E-STOP model (revised 2026-05-19):** tractor-side E-STOP signal =
+  **Arduino Opta digital input flip** routed to the base-station Max
+  Carrier; operator-side E-STOP = **keyboard / joystick button on web
+  remote controller UI**. No physical mushroom button required at the
+  handheld; the Opta itself can carry a mushroom-button in a later
+  hardening pass without re-architecting the signal path. See S-HW.5.
 
-Strategy: drive every 🟢 and the software half of every 🟡 to done now, so
-that when the LoRa rig is reattached the only remaining work is gate
-validation, not implementation. See "S-HW" and "Software-only work that
-can run NOW" sections at the bottom of this plan for ordered next steps.
+Every stage below is therefore tagged:
+
+- 🟢 **HW-READY** — can complete on current bench (software-only or X8-only or 2× Max Carrier).
+- 🟡 **HW-PARTIAL** — software foundations can be built now; final gate needs the Opta + web-UI button wiring (S-HW.5).
+- ⚫ **HW-WAIVED** — originally required lab test-equipment we have
+  permanently decided not to acquire (spectrum analyzer, step
+  attenuator); ships under software-only enforcement + datasheet
+  declaration. NOT a blocker.
+
+Strategy: drive every 🟢 and the software half of every 🟡 to done now;
+the full radio link (W1-10b) is already proven end-to-end on the 2× Max
+Carrier pair. See "S-HW" and "Software-only work that can run NOW"
+sections at the bottom of this plan for ordered next steps.
 
 **Cross-doc precedence (add to design-doc top in S0, per §23.3):** when
 docs disagree, implementation follows (1) current code constants + measured
@@ -233,102 +255,1477 @@ hardcodes `s_channel_idx = 0U` in `sx1276_tx.c:64` — single fixed
 channel — which is the single largest compliance gap.)*
 
 **Implementation (firmware, executed in v3.0 order):**
-- [ ] **FCC-FHSS-CHANTAB** Channel-table generator + static asserts:
+- [x] **FCC-FHSS-CHANTAB** ✅ *(2026-05-19 — landed)* Channel-table
+      generator + static asserts:
       `_Static_assert(FHSS_CHANNEL_COUNT == 50)`,
-      `_Static_assert(FHSS_CHANNEL_SPACING_HZ >= 25000)`. Interim formula
-      `center_hz = 902_750_000 + 500_000*i, i=0..49`. Same generator
-      imported by X8-side Python tooling.
-- [ ] **FCC-PROFILE-ENUM** Add `CFG_KEY_REG_PROFILE` with
-      `{BENCH_ONLY_FIXED_915, FCC_15_247_FHSS_50CH_BW250, FCC_15_247_DTS_BW500}`.
-      Compile-time gate: A5 only accepts production profile when
-      `LIFETRAC_FHSS_TX_ROUTED` is defined (defined only by FCC-A4).
-- [ ] **FCC-A1a** Config-time airtime invariant in modem-config setter:
+      `_Static_assert(FHSS_CHANNEL_SPACING_HZ >= 25000)`,
+      first/last centers asserted inside 902-928 MHz. Formula
+      `center_hz = 902_750_000 + 500_000*i, i=0..49` (span 902.750-927.250
+      MHz, 750 kHz edge guard). Files:
+      [`include/sx1276_fhss_chantab.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/sx1276_fhss_chantab.h),
+      [`radio/sx1276_fhss_chantab.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_fhss_chantab.c),
+      golden-vector C test
+      [`bench/host_proto/fhss_chantab_vectors.c`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/fhss_chantab_vectors.c),
+      Python mirror (X8-side parity, byte-identical golden vectors)
+      [`bench/host_proto/fhss_chantab.py`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/fhss_chantab.py).
+      Wired into Makefile via new `check-fhss-chantab` target hooked
+      into the aggregate `check`. Verified: `mingw32-make check` passes
+      with `[OK] sx1276_fhss_chantab: all checks passed (count=50,
+      span=902750000..927250000 Hz)`.
+      Final spacing tighten is gated on FCC-EVID-D2 (measured 20 dB
+      OBW); placeholder comment in the .c file marks the future assert.
+- [x] **FCC-PROFILE-ENUM** ✅ *(2026-05-19 — landed)* Added
+      `CFG_KEY_REG_PROFILE` (key `0x14U`, u8) with enum
+      `{REG_PROFILE_BENCH_ONLY_FIXED_915=0,
+      REG_PROFILE_FCC_15_247_FHSS_50CH_BW250=1,
+      REG_PROFILE_FCC_15_247_DTS_BW500=2}` in
+      [`include/host_cfg_keys.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg_keys.h).
+      New status code `CFG_STATUS_PROFILE_UNROUTED=7` in
+      [`include/host_cfg.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg.h).
+      Validator in
+      [`host/host_cfg.c`](DESIGN-CONTROLLER/firmware/murata_l072/host/host_cfg.c)
+      always accepts bench profile, rejects unknown values with
+      `OUT_OF_RANGE`, gates both production profiles behind
+      `#ifdef LIFETRAC_FHSS_TX_ROUTED` (undefined until FCC-A4) →
+      returns `CFG_STATUS_PROFILE_UNROUTED` today. Default value =
+      bench profile. `CFG_KEY_COUNT` bumped 20→21;
+      `HOST_WIRE_SCHEMA_VER` bumped 1→2. Tests in
+      [`bench/host_proto/cfg_contract.c`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/cfg_contract.c)
+      extended with 4 cases (`reg_profile_bench_default_ok`,
+      `reg_profile_fcc_fhss_unrouted`, `reg_profile_fcc_dts_unrouted`,
+      `reg_profile_unknown_oor`). `mingw32-make check-cfg-contract`
+      passes 34 cases + 6 wire vectors.
+- [x] **FCC-A1a** Config-time airtime invariant in modem-config setter:
       reject `(SF, BW, CR)` whose worst-case ToA > `dwell_cap_ms - guard_ms`
       (400 - 20 ms default). New URC `__AIRTIME_INVARIANT_REJECT__`.
-- [ ] **FCC-A1b** Pre-TX airtime invariant in `sx1276_tx_begin()` keyed on
+      ✅ 2026-05-19. New pure helper `sx1276_airtime_compute_toa_us()`
+      and config-time predicate `sx1276_airtime_config_invariant_ok()`
+      added in
+      [`include/sx1276_airtime.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/sx1276_airtime.h)
+      /
+      [`radio/sx1276_airtime.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_airtime.c);
+      cap constants `SX1276_AIRTIME_DWELL_WINDOW_MS=400`,
+      `SX1276_AIRTIME_DWELL_GUARD_US=20000`,
+      `SX1276_AIRTIME_DWELL_CAP_US=380000`. New URC byte
+      `HOST_TYPE_AIRTIME_INVARIANT_REJECT_URC=0xC2` with 15-byte payload
+      `{u8 sf, u8 cr_den, u32 bw_hz_le, u8 payload_len, u32 toa_us_le, u32 cap_us_le}`
+      registered in
+      [`include/host_types.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/host_types.h)
+      (added to compile-time uniqueness switch). New bool-returning
+      variant `sx1276_set_sf_bw_cr_checked()` in
+      [`radio/sx1276.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276.c)
+      runs the invariant at max payload (255 B); on reject it emits the
+      URC and skips all modem-register writes so the prior legal config
+      is retained. The existing `void sx1276_set_sf_bw_cr()` is kept as
+      a thin wrapper that discards the bool to preserve all existing
+      call sites (init path: SF7/BW250/CR45 → 199.808 ms, accepted).
+      Host golden vectors in
+      [`bench/host_proto/airtime_invariant.c`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/airtime_invariant.c)
+      (7 cases incl. SF12/BW125/255B reject, SF11/BW125/255B reject,
+      SF10/BW500/255B reject, SF7/BW250/255B accept, SF7/BW250/24B
+      accept). `mingw32-make check-airtime-invariant` →
+      `[PASS] airtime_invariant: 7 cases`; aggregate
+      `mingw32-make check` still green
+      (`[OK] sx1276_fhss_chantab` + `[PASS] airtime_invariant` +
+      `[OK] memory map invariants hold`).
+- [x] **FCC-A1b** Pre-TX airtime invariant in `sx1276_tx_begin()` keyed on
       actual payload + header + CRC + preamble + safety-burst framing.
       Host-side mirror calc keyed on `profile_id` so oversized payloads
       never reach the L072.
-- [ ] **FCC-A3** New `radio/sx1276_fhss.{c,h}`: 50-channel table, pseudo-
+      ✅ 2026-05-19. Per-frame dwell-cap check added in
+      [`radio/sx1276_tx.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_tx.c)
+      between LBT and `sx1276_airtime_reserve()`: calls
+      `sx1276_airtime_estimate_toa_us(req->length)` (which reads live
+      modem-config + preamble registers), and on `predicted > 380 ms`
+      increments `host_stats_radio_tx_abort_airtime()`, runs
+      `sx1276_tx_cleanup()` (re-arms RX if needed), and returns false.
+      Counter-ownership check (`[OK] Airtime abort ownership check passed`)
+      confirms the increment site is still uniquely owned by
+      `radio/sx1276_tx.c`. Host-side mirror table + lookup added in
+      [`bench/host_proto/airtime_invariant.c`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/airtime_invariant.c)
+      mapping `REG_PROFILE_BENCH_ONLY_FIXED_915`,
+      `REG_PROFILE_FCC_15_247_FHSS_50CH_BW250`,
+      `REG_PROFILE_FCC_15_247_DTS_BW500` to their `(sf, bw_khz, cr_den)`
+      tuples (table is FCC-A4's production-routing precursor). Five new
+      test cases prove: (a) every payload 0..255 is accepted under the
+      FHSS profile, (b) ToA is monotonic non-decreasing in payload_len,
+      (c) host mirror agrees byte-for-byte with the on-target helper at
+      payloads {0,1,16,24,64,128,200,255}, (d) bench profile @255B fits
+      under cap, (e) unknown `profile_id` fails closed without mutating
+      the out param. `mingw32-make check-airtime-invariant` →
+      `[PASS] airtime_invariant: 12 cases`; aggregate `mingw32-make check`
+      still green; `mingw32-make check-airtime-counter-owner` still
+      `[OK]`.
+- [x] **FCC-A3** New `radio/sx1276_fhss.{c,h}`: 50-channel table, pseudo-
       random permutation `permute(H(farm_id||node_id||epoch))`, blacklist
       with legal floor (refuse if active set would drop below 50),
       cold-start warm-up, `record_lbt_block()` separate from blacklist.
       **Fails closed** on invalid epoch / hop / timebase. Golden vectors
       checked in under `bench/host_proto/`.
-- [ ] **FCC-A2** Split `sx1276_airtime.c`: keep 1 s/400 ms QoS gate
-      (`qos_used_us_1s`), add 10 s legal-dwell accountant
-      (`legal_dwell_used_us_10s`) widened to 64 channel slots, and a 20 s
-      variant gated by profile. Window semantics: `[t-WINDOW_MS, t)`
-      half-open. Reserve pessimistically before TX-start; reconcile on
-      TX-done; **never roll back** legal dwell on NACK.
-- [ ] **FCC-B1-PERTX** Per-TX `RFCO` URC:
-      `{profile_id, epoch, hop_idx, freq_hz, pkt_toa_us, legal_dwell_used_us_for_ch}`.
-- [ ] **FCC-A5** cfg validation + two-phase commit
-      (`cfg_profile_stage` → validate → `cfg_profile_activate`). Profile-
-      aware power clamp `Pmax = tier_ceiling - max(0, antenna_gain - 6)`.
-      Production profile still gated on `LIFETRAC_FHSS_TX_ROUTED`.
-- [ ] **FCC-A4** Replace `s_channel_idx = 0U` in
+      ✅ 2026-05-19. New module landed:
+      [`include/sx1276_fhss.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/sx1276_fhss.h)
+      defines the `sx1276_fhss_status_t` fail-closed enum
+      (`NOT_INIT`/`NULL_ARG`/`BAD_IDX`/`BLACKLIST_FLOOR`/`BLACKLIST_WARMUP`/`ALREADY_BLACKED`/`INTERNAL`)
+      plus pure helpers `sx1276_fhss_compute_seed()` (FNV-1a 32-bit over
+      LE `farm_id||node_id||epoch`) and `sx1276_fhss_compute_permutation()`
+      (Fisher-Yates seeded by xorshift32; zero-seed fallback prevents
+      the xorshift32 zero-state trap).
+      [`radio/sx1276_fhss.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_fhss.c)
+      implements the stateful scheduler with `init/reset/next_channel/
+      epoch_advance/blacklist/active_count/record_lbt_block/lbt_block_count`
+      plus `current_epoch/slot/seed/is_initialized` telemetry getters.
+      Cold-start warm-up = 50 hops (`SX1276_FHSS_WARMUP_HOPS`);
+      `_Static_assert` enforces legal floor ≤ channel count and channel
+      count ≤ 64 (blacklist bitmap fits `uint64_t`). Time source NOT read
+      inside the module — caller drives `epoch_advance()` from the
+      monotonic tick so golden vectors stay deterministic. New
+      `mingw32-make check-fhss-scheduler` target →
+      `[PASS] fhss_scheduler_vectors: 11 cases` covering: 3 hard-coded
+      golden seed+permutation vectors (zero / nominal /
+      `0xFFFF…F`-saturated), determinism vs distinctness, zero-seed
+      fallback, NOT_INIT / NULL_ARG / BAD_IDX fail-closed paths,
+      single-epoch coverage bijection, slot-wrap auto-advance, warm-up
+      blacklist refusal then post-warm-up floor refusal, LBT-block
+      decoupling, and epoch-advance regeneration. Aggregate
+      `mingw32-make check` still green
+      (`[OK] sx1276_fhss_chantab` + `[PASS] fhss_scheduler_vectors: 11 cases`
+      + `[PASS] airtime_invariant: 12 cases` + `[OK] memory map invariants
+      hold`). Host mirror at `bench/host_proto/fhss_scheduler.py` is
+      deferred to FCC-A4 (when X8-side hop prediction lands).
+- [x] **FCC-A2** ✅ 2026-05-19 — split addressed by **adding** a new
+      module rather than carving the existing one: the 1 s / 400 ms QoS
+      gate stays untouched in
+      [`radio/sx1276_airtime.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_airtime.c)
+      (still emitting `qos_used_us_1s`); the FCC §15.247(a)(1)(i)
+      legal-dwell accountant lives in
+      [`include/sx1276_legal_dwell.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/sx1276_legal_dwell.h)
+      + [`radio/sx1276_legal_dwell.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_legal_dwell.c).
+      Widened to 64 channel slots (`SX1276_DWELL_CHANNEL_COUNT=64`);
+      both 10 s (`legal_dwell_used_us_10s`) and 20 s
+      (`legal_dwell_used_us_20s`) windows supported via a `window_ms`
+      parameter (the 20 s variant is gated on by FCC-A5 cfg validation,
+      not by this module). Window semantics are half-open `[t-W, t)`
+      (event at `start_ms == now - W` is OUT; tested at
+      [`bench/host_proto/legal_dwell.c` L116-L131](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/legal_dwell.c#L116-L131)).
+      Storage model: single shared 128-event ring carrying per-event
+      channel index (~1.5 KiB RAM) — chosen over per-channel mini-rings
+      to fit L072's 20 KiB SRAM. Pessimistic reserve immediately books
+      the worst-case ToA; reconcile is **monotonically downward only**
+      (cannot grow legal dwell beyond the reservation, verified by
+      [`test_reconcile_up_is_noop`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/legal_dwell.c#L91-L102)).
+      No-rollback-on-NACK contract is enforced **structurally** by not
+      exposing any release API; verified by
+      [`test_no_rollback_on_nack`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/legal_dwell.c#L104-L121)
+      which proves the booking persists for the entire window after a
+      simulated NACK. Property tests also cover per-channel isolation,
+      64-ch widening + `BAD_CH`, 10 s vs 20 s window split, over-budget
+      rejection (does not book), ring-full fail-closed, stale-handle
+      generation safety, and bad-input rejection. Wired into
+      [`Makefile`](DESIGN-CONTROLLER/firmware/murata_l072/Makefile) as
+      `check-legal-dwell` and the aggregate `check` target. Last run
+      green: `mingw32-make check` →
+      `[OK] sx1276_fhss_chantab` + `[PASS] fhss_scheduler_vectors: 11 cases`
+      + `[PASS] airtime_invariant: 12 cases` +
+      `[PASS] legal_dwell: 15 cases` + `[OK] memory map invariants hold`.
+      Integration into `sx1276_tx.c` (calling `reserve()` before
+      LBT/TX-start and `reconcile()` from TX-done) is part of FCC-A4
+      (active-set wiring) so the module stays unused but verified
+      until then.
+- [x] **FCC-B1-PERTX** ✅ 2026-05-19 — Per-TX `RFCO` URC scaffolded.
+      URC type `HOST_TYPE_RFCO_PERTX_URC = 0xC3U` registered in
+      [`include/host_types.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/host_types.h)
+      with cross-ref to the full spec in
+      [`include/host_rfco.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco.h).
+      Payload is 21 bytes, little-endian, schema_ver=1, additive-only:
+      `{schema_ver, profile_id, tx_status, hop_idx, channel_idx, epoch,
+      freq_hz, pkt_toa_us, legal_dwell_used_us_10s}`. Naming discipline
+      per plan delta #11 — the dwell field is explicitly suffixed
+      `_us_10s` so bench post-processing can never conflate it with
+      `qos_used_us_1s`. Status enum covers OK / ABORT_* (one per fail-
+      closed gate: airtime invariant, LBT, legal-dwell, QoS) / TX_TIMEOUT
+      / TX_FAIL / INTERNAL. Pack + emit live in
+      [`host/host_rfco.c`](DESIGN-CONTROLLER/firmware/murata_l072/host/host_rfco.c)
+      — pack() is pure (host-testable, no HAL deps) and emit() is the
+      ONLY public wrapper around `host_uart_send_urc()` for this URC so
+      the schema_ver byte stays in one place. Host test
+      [`bench/host_proto/rfco_pertx.c`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/rfco_pertx.c)
+      pins the wire layout with a byte-for-byte golden vector
+      (`freq_hz=915500000=0x36916BE0`, `pkt_toa_us=12345`,
+      `legal_dwell_used_us_10s=200000`), edge-value coverage
+      (UINT32_MAX in all u32 fields, status=0xFF round-trip), NULL-input
+      rejection, and a forwarding test that verifies emit() calls
+      `host_uart_send_urc` with `(type=0xC3, payload_len=21, payload ==
+      pack(snapshot))`. Wired into
+      [`Makefile`](DESIGN-CONTROLLER/firmware/murata_l072/Makefile) as
+      `check-rfco-pertx` and the aggregate `check` target. Last run
+      green: `mingw32-make check` →
+      `[OK] sx1276_fhss_chantab` + `[PASS] fhss_scheduler_vectors: 11 cases`
+      + `[PASS] airtime_invariant: 12 cases` +
+      `[PASS] legal_dwell: 15 cases` +
+      `[PASS] rfco_pertx: 6 cases` + `[OK] memory map invariants hold`.
+      `host/host_rfco.c` is in the firmware SRCS list so it will link
+      into the next cross-build; the call site in `sx1276_tx.c`
+      (emitting OK / ABORT_* / TX_FAIL) is deferred to FCC-A4 when TX
+      is routed through the FHSS scheduler — until then there is no
+      `channel_idx` / `epoch` to report, so emitting now would supply
+      stub zeros and pollute bench evidence. The 50-bucket per-channel
+      histogram + per-channel `legal_dwell_max_us` snapshot is the
+      separate per-minute `RFCO_SUMMARY` URC (FCC-B1-SUMMARY).
+- [x] **FCC-A5** ✅ 2026-05-19 — Regulatory-profile validator + two-phase
+      commit landed as pure, host-testable module
+      [`include/host_cfg_profile.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg_profile.h)
+      / [`host/host_cfg_profile.c`](DESIGN-CONTROLLER/firmware/murata_l072/host/host_cfg_profile.c).
+      State machine is `host_cfg_profile_reset(initial)` →
+      `host_cfg_profile_stage(&req, tx_routed)` →
+      `host_cfg_profile_activate()` with `host_cfg_profile_cancel_stage()`
+      and `host_cfg_profile_has_stage()` introspection. Active profile
+      is NEVER mutated on a failed stage or a failed activate
+      (NOT_STAGED). A failed stage clears any prior in-flight stage so a
+      stale candidate cannot accidentally commit on the next activate.
+      Validator enforces (per plan §A5):
+        - `popcount(channel_mask) >= 50` for `FCC_15_247_FHSS_50CH_BW250`
+          (since the certified table is exactly 50 bits this collapses
+          to `channel_mask == HOST_CFG_PROFILE_FHSS_50CH_REQUIRED_MASK
+          = (1ULL<<50)-1`),
+        - no mask bits set above bit 49 (table-membership),
+        - modem BW == 250 kHz for FHSS / 500 kHz for DTS,
+        - antenna gain ∈ [0, 30] dBi,
+        - production profiles are rejected with `REJECT_UNROUTED` when
+          the explicit `tx_routed` boolean (mirroring compile-time
+          `LIFETRAC_FHSS_TX_ROUTED`) is false. Until FCC-A4 lands the
+          firmware passes `tx_routed = false` so only
+          `BENCH_ONLY_FIXED_915` activates.
+      Profile-aware power clamp is the pure helper
+      `host_cfg_profile_power_clamp(tier_ceiling, hw_ceiling, gain)`
+      implementing `Pmax = min(tier_ceiling - max(0, gain_dBi - 6),
+      hw_ceiling)` floored at `HOST_CFG_PROFILE_TX_POWER_MIN_DBM = 2`;
+      returns 0 when no headroom remains and the validator maps that to
+      `REJECT_NO_POWER_HEADROOM`. Tier ceilings: bench = +17 dBm (hw
+      ceiling), FHSS = +30 dBm tier, DTS = +30 dBm tier; production
+      tiers are then further clamped by the caller-supplied
+      `hw_ceiling_dBm` (typically +17/+20 dBm on this Murata module).
+      Structured reject reasons (`HOST_CFG_PROFILE_REJECT_*`,
+      BAD_PROFILE / MASK_POPCOUNT / MASK_OUT_OF_TABLE / BW_MISMATCH /
+      ANTENNA_OUT_OF_RANGE / NO_POWER_HEADROOM / UNROUTED / NOT_STAGED
+      / NULL_ARG) are surfaced byte-for-byte to the wire layer so bench
+      post-processing can attribute every rejection. Host test
+      [`bench/host_proto/cfg_profile.c`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/cfg_profile.c)
+      runs 25 cases covering the validator (every reject reason),
+      power-clamp arithmetic (gain≤6 no-op, gain>6 ERP reduction,
+      hw-ceiling clamp, negative gain, no-headroom floor), tier-ceiling
+      lookup, and the full state machine (happy path, activate-without-
+      stage, failed-stage-clears-in-flight, cancel, double-activate,
+      unrouted-leaves-active-alone). Wired into
+      [`Makefile`](DESIGN-CONTROLLER/firmware/murata_l072/Makefile) as
+      `check-cfg-profile` and the aggregate `check` target; module is
+      also in firmware SRCS so the next cross-build will link it.
+      `cfg_set(CFG_KEY_REG_PROFILE)` integration (routing wire-level
+      profile writes through stage/activate) is deferred to FCC-A4 when
+      `LIFETRAC_FHSS_TX_ROUTED` is defined and there is a routed TX
+      path to honour the new profile. Last run green: `mingw32-make
+      check` → `[OK] chantab` + `[PASS] fhss_scheduler_vectors: 11
+      cases` + `[PASS] airtime_invariant: 12 cases` +
+      `[PASS] legal_dwell: 15 cases` + `[PASS] rfco_pertx: 6 cases` +
+      `[PASS] cfg_profile: 25 cases` + `[OK] memory map invariants
+      hold`.
+- [x] **FCC-A4** Replace `s_channel_idx = 0U` in
       [`sx1276_tx.c` L64](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_tx.c)
       with `sx1276_fhss_next_channel()` + `sx1276_set_frequency_hz()` +
       PLL settle (document measured settle budget) **before** LBT/CAD/TX-
       start. Defines `LIFETRAC_FHSS_TX_ROUTED`.
+      Landed 2026-05-19 (assistant): the FHSS-routed TX path is gated
+      by `#ifdef LIFETRAC_FHSS_TX_ROUTED` in
+      [`radio/sx1276_tx.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_tx.c).
+      On `sx1276_tx_begin()` the new flow is: capture `(hop_idx,
+      epoch, channel_idx, freq_hz)` from
+      `sx1276_fhss_next_channel()` → modes_to_standby → retune via
+      `sx1276_set_frequency_hz(freq_hz)` → busy-wait
+      `SX1276_TX_PLL_SETTLE_US=200 µs` (4× the SX1276 datasheet rev 7
+      §4.1.4 ~50 µs worst-case PLL lock budget; pending bench
+      characterisation under the actual Murata CMWX1ZZABZ TCXO) → LBT
+      → FCC-A1b airtime invariant → FCC-A2
+      `sx1276_legal_dwell_reserve(channel_idx, predicted_toa_us,
+      now_ms, 10_000 ms, 400_000 µs)` → QoS reserve → FIFO →
+      `modes_to_tx()`. Every fail-closed gate (INTERNAL, ABORT_LBT,
+      ABORT_AIRTIME_INVARIANT, ABORT_QOS, ABORT_LEGAL_DWELL, TX_FAIL)
+      emits an `RFCO_PERTX` URC via `tx_emit_rfco_pertx()` so bench
+      post-processing sees the captured hop state regardless of
+      outcome. `sx1276_tx_poll()` reconciles the legal-dwell reserve
+      down to the post-rearm predicted ToA on TX_DONE and emits
+      `HOST_RFCO_TX_STATUS_OK`; on timeout it emits
+      `HOST_RFCO_TX_STATUS_TX_TIMEOUT` and leaves the pessimistic
+      reserve booked (FCC-A2 no-rollback contract). The pre-A4
+      fixed-channel behaviour is preserved when
+      `LIFETRAC_FHSS_TX_ROUTED` is undefined (host test builds), so
+      the existing `cfg_contract` tests that lock in
+      `CFG_STATUS_PROFILE_UNROUTED` continue to pass. The build
+      symbol is now added to firmware-only `CFLAGS` in
+      [`Makefile`](DESIGN-CONTROLLER/firmware/murata_l072/Makefile),
+      which automatically unlocks the production profile in
+      `host_cfg.c` (`cfg_set(CFG_KEY_REG_PROFILE,
+      FCC_15_247_FHSS_50CH_BW250)` now returns `CFG_STATUS_OK` on
+      firmware builds). Evidence: `mingw32-make check` →
+      `[OK] sx1276_fhss_chantab: count=50, span=902750000..927250000
+      Hz` + `[PASS] fhss_scheduler_vectors: 11 cases` +
+      `[PASS] airtime_invariant: 12 cases` +
+      `[PASS] legal_dwell: 15 cases` + `[PASS] rfco_pertx: 6 cases` +
+      `[PASS] cfg_profile: 25 cases` + `[OK] memory map invariants
+      hold`. `gcc -fsyntax-only -DLIFETRAC_FHSS_TX_ROUTED=1` and
+      without the flag both produce zero diagnostics on
+      `radio/sx1276_tx.c`. Follow-on `cfg_set(REG_PROFILE)` →
+      `host_cfg_profile_stage/activate` integration and full
+      cross-toolchain link verification deferred to Phase D bench
+      bring-up (no `arm-none-eabi-gcc` on this host).
 - [ ] **FCC-A6** RX hop sync: same `permute(seed, epoch)`; packet header
       carries authenticated `{profile_id, epoch, hop_idx, schema_ver}`.
       Explicit **Scanning** state for cold start — wideband scan across
       active set, **no fixed rendezvous channel**.
+    - [x] **FCC-A6a** LoRa link-layer packet header pack/unpack
+          contract — `include/lora_pkt_hdr.h` + `radio/lora_pkt_hdr.c`.
+          8-byte v1 layout: `{schema_ver:u8, profile_id:u8, hop_idx:u8,
+          _reserved:u8, epoch_le:u32}`. MIC trailer is reserved for a
+          future additive `schema_ver=2` (FCC notes §17.3 #4); no MIC
+          today because Track-C1 LoRa-link MIC/AEAD is unblocked but
+          not yet implemented (plan §7 Q4, deferred). Parser refuses
+          unknown schema_ver and leaves `*out` untouched on every
+          failure path. Reserved byte is intentionally ignored on
+          parse to keep the schema additive-evolution friendly.
+          Evidence: `mingw32-make check` →
+          `[PASS] lora_pkt_hdr: 10 cases` (constants, nominal golden,
+          all-zero golden, edge values, NULL/short/bad-schema
+          rejection, round-trip, reserved-byte ignore) plus all 6
+          prior tests still green and
+          `[OK] memory map invariants hold`. Not yet wired into
+          `sx1276_tx.c` (prepend) or `sx1276_rx.c` (strip) — that
+          wiring belongs to A6b/A6c so the header schema can be
+          frozen and consumed unchanged once RX retune lands.
+    - [ ] **FCC-A6b** RX tune-to-hop integration in `radio/sx1276_rx.c`
+          + `sx1276_fhss`: derive the same `permute(seed, epoch)` as
+          TX, retune between RX windows from `host_fhss_next_channel`,
+          align epoch from `platform_now_ms()` monotonic tick, prepend
+          A6a header to every TX in `sx1276_tx.c` (gated on
+          `LIFETRAC_FHSS_TX_ROUTED`), and consume it in the RX
+          service path to confirm or correct the local hop pointer.
+        - [x] **FCC-A6b-1** Header prepend/strip cutover —
+              `radio/sx1276_tx.c` prepends the 8-byte A6a header to
+              every FIFO write under `LIFETRAC_FHSS_TX_ROUTED`, with a
+              pre-FHSS overflow guard (`req->length + LORA_PKT_HDR_LEN
+              > 255` ⇒ emit `RFCO TX_STATUS_INTERNAL` and bail before
+              consuming a hop slot). All length-bearing downstream
+              calls (`sx1276_airtime_estimate_toa_us`,
+              `sx1276_airtime_reserve`, fallback ToA estimate, FIFO
+              `PAYLOAD_LENGTH`) now use the on-air `effective_len`
+              including header; the `req->payload` FIFO burst stays at
+              `req->length`. `radio/sx1276_rx.c` strips the leading 8
+              bytes after RX_DONE, parses via `lora_pkt_hdr_unpack`,
+              populates `out_frame->hdr` + `hdr_valid`, slides
+              remaining bytes forward, and drops frames with
+              short/bad-schema headers (IRQ still acked; visibility
+              deferred to FCC-B1-SUMMARY rather than a host_stats
+              wire-layout bump). `sx1276_rx_frame_t` extended with
+              `lora_pkt_hdr_t hdr` + `bool hdr_valid` (struct always
+              carries the fields; `hdr_valid==false` when unrouted).
+              Behavior with `LIFETRAC_FHSS_TX_ROUTED` undefined is
+              byte-for-byte identical to before. Evidence:
+              `mingw32-make check` → all 7 host tests still green +
+              `[OK] memory map invariants hold`; `gcc -fsyntax-only`
+              clean on `radio/sx1276_tx.c` + `radio/sx1276_rx.c` both
+              with and without the flag.
+        - [ ] **FCC-A6b-2** RX retune loop — between RX windows,
+              consume `sx1276_fhss_next_channel` and call
+              `sx1276_set_frequency_hz` + PLL settle so the receiver
+              follows the same hopset as TX. On a `hdr_valid` frame
+              whose `(epoch, hop_idx)` disagrees with the local
+              scheduler, snap the local pointer (define the snap
+              policy — e.g., only when |Δepoch| ≤ 1 and within a guard
+              slot, to refuse spoofed jumps once a MIC ships).
+              Resync slot policy: reserve one slot per epoch where RX
+              parks for a known seed-slot dwell as a fallback if N
+              consecutive epochs decode-fail.
+            - [x] **FCC-A6b-2-i** Scheduler snap primitive —
+                  `sx1276_fhss_snap_to(target_epoch, snap_to_slot)` in
+                  `include/sx1276_fhss.h` + `radio/sx1276_fhss.c`.
+                  Atomically sets `(epoch, slot)`, rebuilds the
+                  permutation from `H(farm_id, node_id, target_epoch)`,
+                  clears `warmup_hops_remaining` (snapping implies the
+                  remote is past warm-up), preserves `blacklist_bits`
+                  and `lbt_block_count[]` (per-channel quality history
+                  survives). `snap_to_slot == CHANNEL_COUNT` is legal
+                  and lets the next `next_channel()` trip the wrap
+                  path. Fails closed on `NOT_INIT` and
+                  `snap_to_slot > CHANNEL_COUNT` (`BAD_IDX`) without
+                  mutating state. The policy layer
+                  (`consider_remote(epoch, hop_idx)` deciding when to
+                  call snap_to vs. ignore the remote hint) and the
+                  RX-side wire-up will land with A6b-2-ii where they
+                  have a caller. Evidence: `mingw32-make check` →
+                  `[PASS] fhss_scheduler_vectors: 16 cases` (was 11;
+                  5 new: fails-closed, lands-on-expected-slot,
+                  slot==CHANNEL_COUNT wrap, clears-warmup,
+                  preserves-quality-history) plus all other host tests
+                  still green + `[OK] memory map invariants hold`.
+            - [ ] **FCC-A6b-2-ii** RX retune loop + snap-policy layer —
+                  introduce `sx1276_fhss_consider_remote(epoch,
+                  hop_idx)` deciding ALIGNED / SNAPPED / REJECTED based
+                  on `|Δepoch| ≤ 1` (until MIC ships), call it from
+                  `sx1276_rx_service` on `hdr_valid` frames, add an
+                  `sx1276_rx_tick(now_ms)` API that the main loop
+                  drives so RX retunes between windows via
+                  `sx1276_fhss_next_channel` + `sx1276_set_frequency_hz`
+                  + PLL settle. Window duration is gated on the
+                  epoch-model decision in plan §7 open Q2.
+                - [x] **FCC-A6b-2-ii-α** Snap-policy primitive —
+                      `sx1276_fhss_consider_remote(remote_epoch,
+                      remote_hop_idx) →
+                      sx1276_fhss_snap_decision_t { ALIGNED, SNAPPED,
+                      REJECTED_NOT_INIT, REJECTED_BAD_HOP,
+                      REJECTED_EPOCH_DRIFT }` in
+                      `include/sx1276_fhss.h` + `radio/sx1276_fhss.c`.
+                      ALIGNED uses the same local_hop_idx convention
+                      as sx1276_tx.c stamping (slot==0 ? N-1 :
+                      slot-1) — symmetric with TX so genuine
+                      lock-step peers no-op. SNAPPED gate is
+                      `|Δepoch| ≤ SX1276_FHSS_SNAP_MAX_EPOCH_DRIFT
+                      (=1)` computed via `(int32_t)(remote-local)`
+                      (uint32 wrap-safe across the 0xFFFFFFFF→0
+                      boundary). On SNAPPED, `snap_to(remote_epoch,
+                      remote_hop_idx + 1)` is called internally (the
+                      slot the remote will emit next; +1 ==
+                      CHANNEL_COUNT wrap handled by snap_to's spec).
+                      All REJECTED_* paths are no-ops. Has no caller
+                      yet — the RX wire-up lands with -β and -γ where
+                      the call site exists. Evidence: `mingw32-make
+                      check` → `[PASS] fhss_scheduler_vectors: 23
+                      cases` (was 16; 7 new: fails-closed,
+                      aligned-no-op, snapped-same-epoch,
+                      snapped-±1-epoch-drift, rejected-drift-incl-far-
+                      replay, uint32-wrap-boundary, snapped-wrap-slot)
+                      plus all other host tests green +
+                      `[OK] memory map invariants hold`.
+                - [x] **FCC-A6b-2-ii-β** RX call-site wire-up — call
+                      `sx1276_fhss_consider_remote(parsed.epoch,
+                      parsed.hop_idx)` from `sx1276_rx_service`
+                      immediately after a successful
+                      `lora_pkt_hdr_unpack` (i.e., when `hdr_valid` is
+                      set). The returned decision is fed to
+                      `sx1276_rx_counter_record(dec)` which lives in a
+                      HW-free TU (`radio/sx1276_rx_counters.c`,
+                      extracted so the saturating-increment +
+                      snapshot/reset semantics are host-testable
+                      without dragging in modem deps). Counters are
+                      indexed by `sx1276_fhss_snap_decision_t`
+                      (ALIGNED / SNAPPED / REJECTED_NOT_INIT /
+                      REJECTED_BAD_HOP / REJECTED_EPOCH_DRIFT, dim=5),
+                      saturate at `UINT32_MAX`, and are exposed via
+                      `sx1276_rx_consider_remote_counts(out[5])` +
+                      `_reset()`. **REJECTED_* outcomes do NOT drop
+                      the frame** — the payload is still useful even
+                      if the snap was refused (drift-flag is purely
+                      diagnostic until A6 MIC ships). No `host_stats`
+                      field added (no host↔X8 wire layout bump);
+                      FCC-B1-SUMMARY will surface these via an
+                      additive URC. Evidence: `mingw32-make check` →
+                      `[PASS] rx_counters: 10 cases` (initial-zero,
+                      per-slot-isolation, out-of-range no-op,
+                      snapshot-idempotency, reset-round-trip,
+                      NULL-arg safety, no-narrow-type-wrap @ 4096
+                      records, interleaved-accumulation, DIM-matches-
+                      enum invariant, post-reset-usable) + all 7
+                      previous host tests still green + `[OK] memory
+                      map invariants hold` + `gcc -fsyntax-only` clean
+                      on `sx1276_rx.c` + `sx1276_rx_counters.c` +
+                      `sx1276_tx.c` both with and without
+                      `-DLIFETRAC_FHSS_TX_ROUTED=1`.
+                - [ ] **FCC-A6b-2-ii-γ** RX retune loop + `rx_tick` —
+                      add `sx1276_rx_tick(now_ms)` API the main loop
+                      drives; between RX windows, advance the scheduler
+                      via `sx1276_fhss_next_channel` and apply
+                      `sx1276_set_frequency_hz` + PLL settle so the
+                      receiver follows the same hopset as TX. Window
+                      duration gated on plan §7 open Q2 epoch-model
+                      decision. **Split** (same playbook as A6b-2-ii-α/β
+                      — pure-function policy first, HW mechanism second,
+                      Q2-dependent final policy third):
+                    - [x] **FCC-A6b-2-ii-γ-1** Retune-decision pure
+                          function — HW-free TU
+                          `radio/sx1276_rx_retune_policy.c` exposing
+                          `sx1276_rx_retune_eval(now_ms,
+                          last_retune_ms, modem_busy, fhss_ready)
+                          → enum { DO=0, SKIP_NOT_INIT=1,
+                          SKIP_BUSY=2, SKIP_TOO_SOON=3, DO_WRAP=4 }`.
+                          Window-duration constant
+                          `SX1276_RX_RETUNE_PERIOD_MS = 380U` (≤ FCC
+                          dwell cap so it is never illegal regardless
+                          of which Q2 model wins) — γ-3 swaps in the
+                          epoch-driven boundary as a point edit. Uses
+                          `(int32_t)(now_ms - last_retune_ms)` for
+                          wrap-safe elapsed math (mirrors
+                          `consider_remote`'s `int32_t` drift idiom);
+                          negative reinterpret → `DO_WRAP` so γ-2 can
+                          re-anchor `last_retune_ms = now_ms` and the
+                          next tick evaluates cleanly. Priority order:
+                          NOT_INIT > BUSY > timing (NOT_INIT first so
+                          an un-init'd scheduler surfaces as the most
+                          actionable diagnostic even on the legacy
+                          single-channel path). `DIM = 5` constant
+                          pinned to `max-enum + 1`. Enum numeric
+                          values pinned (FCC-B1-SUMMARY's additive URC
+                          will index counters by these values —
+                          reordering would silently mis-route
+                          histograms). Evidence:
+                          `mingw32-make check` → `[PASS]
+                          rx_retune_policy: 14 cases` (NOT_INIT-vs-busy
+                          and NOT_INIT-vs-time priority, BUSY-defers-
+                          past-period, same-tick / period-1 / =period
+                          / period+1 / max-int32-positive forward
+                          deltas, small + large backwards-delta wrap,
+                          real-uint32-tick-wrap both
+                          insufficient-elapsed and sufficient-elapsed
+                          branches, DIM-matches-max-enum, enum-
+                          numeric-stable) + all 8 previous host tests
+                          still green + `[OK] memory map invariants
+                          hold`.
+                    - [x] **FCC-A6b-2-ii-γ-2** Retune mechanism +
+                          `sx1276_rx_tick(now_ms)` API in
+                          `sx1276_rx.c`: consults the γ-1 policy and
+                          on `DO` performs standby →
+                          `sx1276_fhss_next_channel` →
+                          `sx1276_set_frequency_hz` →
+                          `pll_settle_busy_wait(SX1276_TX_PLL_SETTLE_US)`
+                          → re-arm RX. Per-outcome counter TU
+                          (HW-free) mirroring the A6b-2-ii-β snap
+                          counters. Main-loop wire-up via
+                          `sx1276_rx_tick(millis())`. Gated by
+                          `LIFETRAC_FHSS_TX_ROUTED`.
+                          - Done 2026-05-20. API surface added to
+                            [include/sx1276_rx.h](DESIGN-CONTROLLER/firmware/murata_l072/include/sx1276_rx.h):
+                            `sx1276_rx_tick(uint32_t now_ms)`,
+                            `sx1276_rx_retune_counts(out[DIM])`,
+                            `sx1276_rx_retune_counts_reset()`,
+                            `sx1276_rx_retune_counter_record(dec)`.
+                            HW-free counter TU at
+                            [radio/sx1276_rx_retune_counters.c](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_rx_retune_counters.c)
+                            (NULL-safe getter, out-of-range no-op,
+                            saturating @ UINT32_MAX, DIM = 5).
+                            HW mechanism appended to
+                            [radio/sx1276_rx.c](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_rx.c):
+                            first-tick anchors `s_rx_last_retune_ms`
+                            without consulting policy; subsequent
+                            ticks call `sx1276_rx_retune_eval(...)`
+                            with `sx1276_tx_busy()` as `modem_busy`
+                            and `sx1276_fhss_is_initialized() != 0U`
+                            as `fhss_ready`; every decision is
+                            recorded into the counter TU; `DO_WRAP`
+                            re-anchors with no HW touch; `DO` does
+                            `sx1276_fhss_next_channel` →
+                            `sx1276_modes_to_standby` →
+                            `sx1276_set_frequency_hz` → PLL settle
+                            busy-wait (`SX1276_RX_PLL_SETTLE_US =
+                            200 µs`, mirrors the static value in
+                            `sx1276_tx.c` with a tracking comment) →
+                            `sx1276_rx_arm`; all `SKIP_*` branches
+                            are HW no-ops. Unrouted build defines
+                            `sx1276_rx_tick` as `(void)now_ms;` so
+                            main.c needs no ifdef. Main-loop wire-up
+                            in [main.c](DESIGN-CONTROLLER/firmware/murata_l072/main.c)
+                            calls `sx1276_rx_tick(now_ms)` inside the
+                            existing `{ const uint32_t radio_events
+                            = ... }` block (reuses the `now_ms` tick
+                            already taken at the top of the loop).
+                            Host_stats UNCHANGED (FROZEN per plan);
+                            retune counters reach the host via the
+                            additive FCC-B1-SUMMARY URC, not via
+                            host_stats. γ-2 known limitation: the
+                            γ-1 placeholder period (380 ms = dwell
+                            cap) means a worst-case in-flight long
+                            frame could be interrupted at the
+                            boundary; γ-3 closes this by tying the
+                            period to the Q2 epoch model so TX and
+                            RX retune at the same instant.
+                            `modem_busy` here only tracks
+                            `sx1276_tx_busy()` — RX-mid-frame is not
+                            tracked at this layer (γ-3 / Q2-gated).
+                            Evidence: `mingw32-make check` →
+                            `[PASS] rx_retune_counters: 10 cases`
+                            (initial-state-all-zero, each-slot-
+                            isolation, out-of-range-noop, snapshot-
+                            readonly, reset-zeroes-then-usable,
+                            null-getter-noop, saturating-increment-
+                            4096, interleaved-accumulate, DIM-
+                            matches-enum, round-trip-after-reset-
+                            fresh) + all 9 previous host tests still
+                            green + `[OK] memory map invariants
+                            hold`.
+                    - [ ] **FCC-A6b-2-ii-γ-3** (deferred until Q2
+                          closes) Replace the γ-1 placeholder period
+                          with the real epoch-driven boundary from the
+                          chosen epoch model.
+    - [ ] **FCC-A6c** Explicit **Scanning** cold-start state: wideband
+          scan-with-preamble-timeout across the 50-channel active set,
+          re-sync slot per epoch fallback if decode fails for N
+          consecutive epochs. No fixed-channel rendezvous (FCC notes
+          §15.1.1 retraction). Acceptance target per plan §7 Q6:
+          measured worst-case cold-start hop-sync reacquire ≤ 5 s;
+          >30 s ⇒ A6 redesign (adaptive scan dwell or super-frame
+          beacon slot within the hopset).
+        - [x] **FCC-A6c-1** Scanning state-machine pure-function
+              policy in
+              [`radio/sx1276_rx_scan_policy.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_rx_scan_policy.c)
+              + header
+              [`include/sx1276_rx_scan_policy.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/sx1276_rx_scan_policy.h).
+              State enum (BOOT, SCANNING, LOCKED, FAILED; DIM=4),
+              event enum (TICK, FRAME_VALID, FRAME_INVALID; DIM=3),
+              action enum (HOLD, BEGIN_SCAN, ADVANCE_CHANNEL, LOCK,
+              FAIL, REANCHOR; DIM=6). All numeric values pinned —
+              FCC-B1-SUMMARY URC will index per-state / per-action
+              histograms by these values. Regulatory constants:
+              `SX1276_RX_SCAN_DWELL_MS=100`, `SX1276_RX_SCAN_GOAL_MS=5000`
+              (§7 Q6 acceptance target — A6c-3 reports overruns to
+              D-Gate, NOT enforced),
+              `SX1276_RX_SCAN_REDESIGN_MS=30000` (§7 Q6 redesign
+              threshold — enforced as SCANNING→FAILED transition).
+              Authenticated-header trust boundary: FRAME_VALID
+              requires caller to pre-verify A6a MIC + profile_id +
+              schema_ver; policy defensively demotes
+              FRAME_VALID+header_ok=false to FRAME_INVALID so it
+              never locks onto an unauthenticated frame. Order of
+              checks in SCANNING+TICK: cold-anchor wrap → regulatory
+              FAIL (cold_elapsed ≥ REDESIGN_MS) → channel-anchor
+              wrap → ADVANCE_CHANNEL (channel_elapsed ≥ DWELL_MS) →
+              HOLD. Modular arithmetic absorbs the normal 49.7d tick
+              wrap; REANCHOR is only emitted when apparent elapsed
+              ≥ 2^31 ms (clock glitch / backwards jump). BOOT
+              collapses any event to BEGIN_SCAN. LOCKED + FAILED are
+              absorbing (LOSS-OF-SYNC re-scan path is deferred until
+              the LOCKED-state stale-decode policy lands post-γ-3).
+              Wired into [Makefile](DESIGN-CONTROLLER/firmware/murata_l072/Makefile)
+              (SRCS, `RX_SCAN_POLICY_BIN`, `.PHONY`, aggregate
+              `check`, `check-rx-scan-policy` target with
+              `[RXSCN]` label). Evidence: `mingw32-make check` →
+              `[PASS] rx_scan_policy: 20 cases` (NULL-safe default,
+              BOOT-collapses-all-events, dwell-boundary precedence,
+              redesign-boundary FAIL-wins-over-ADVANCE, FRAME_VALID-
+              with-bad-header demotion, LOCKED+FAILED absorbing,
+              per-anchor REANCHOR detection, DIM-matches-max-enum
+              for all three enums, enum-numeric-stability) + all 9
+              prior host tests still green + `[OK] memory map
+              invariants hold`.
+        - [x] **FCC-A6c-2** HW mechanism: wire A6c-1 policy into the
+              RX loop. Caller maintains `state`, `channel_entry_ms`,
+              `cold_start_entry_ms`; converts modem IRQ + A6a
+              header verification result into the input event;
+              executes the returned action (BEGIN_SCAN starts
+              SCANNING and arms preamble timeout on first scan
+              channel; ADVANCE_CHANNEL jumps to next channel in the
+              active set and rearms; LOCK extracts epoch/hop_idx
+              from header and seeds the FHSS scheduler then
+              transitions to γ-1 retune loop; FAIL emits alert URC
+              and halts modem; REANCHOR re-anchors both timers).
+              HW-free per-state + per-action counter TU mirroring
+              γ-2 (host-testable). No host_stats bump (FROZEN).
+            - [x] **FCC-A6c-2-a** Counters TU
+                  ([`radio/sx1276_rx_scan_counters.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_rx_scan_counters.c)
+                  + prototypes in
+                  [`include/sx1276_rx_scan_policy.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/sx1276_rx_scan_policy.h)).
+                  Two parallel saturating-uint32 histograms — one
+                  indexed by `sx1276_rx_scan_state_t` (DIM=4), one
+                  by `sx1276_rx_scan_action_t` (DIM=6). Mirrors
+                  γ-2 (`sx1276_rx_retune_counters.c`) pattern but
+                  spans both axes. Per-axis OOR guards are
+                  independent (one bad cast cannot blank the
+                  other). Single `record(state, action)` API the
+                  RX loop (A6c-2-b) calls once per
+                  `sx1276_rx_scan_eval()`. Getters
+                  (`sx1276_rx_scan_state_counts`,
+                  `sx1276_rx_scan_action_counts`) unconditionally
+                  available so FCC-B1-SUMMARY reads without an
+                  ifdef wrapper. Single `_counts_reset()` zeros
+                  both arrays. No host_stats field, no host↔X8
+                  SerialRPC wire bump. Wired into
+                  [Makefile](DESIGN-CONTROLLER/firmware/murata_l072/Makefile)
+                  (SRCS, `RX_SCAN_COUNTERS_BIN`, `.PHONY`,
+                  aggregate `check`, `check-rx-scan-counters`
+                  target with `[RXSCC]` label). Evidence:
+                  `mingw32-make check` →
+                  `[PASS] rx_scan_counters: 14 cases` (zeroed
+                  initial state, per-axis slot isolation
+                  in-lockstep, OOR-state-keeps-action, OOR-action-
+                  keeps-state, both-OOR no-op, idempotent
+                  snapshots, reset zeros BOTH, NULL-safe getters,
+                  no narrow-type wrap @ 4096 records,
+                  interleaved accumulation, STATE_DIM/ACTION_DIM
+                  match max-enum + 1, round-trip after reset) +
+                  all 10 prior host tests still green +
+                  `[OK] memory map invariants hold`.
+            - [x] **FCC-A6c-2-b** RX-loop wire-up in
+                  `radio/sx1276_rx.c`: maintain SM state +
+                  anchors, map modem IRQ + A6a header verification
+                  onto event, dispatch action (BEGIN_SCAN /
+                  ADVANCE_CHANNEL / LOCK→γ-1 / FAIL / REANCHOR),
+                  call `sx1276_rx_scan_counter_record()` once per
+                  eval.
+                - [x] **FCC-A6c-2-b-i** Scanning tick API +
+                      observe-only bookkeeping. New
+                      `sx1276_rx_scan_tick(now_ms)` in
+                      [`radio/sx1276_rx.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_rx.c)
+                      (prototype in
+                      [`include/sx1276_rx.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/sx1276_rx.h))
+                      maintains file-static `s_scan_state` +
+                      `s_scan_channel_entry_ms` +
+                      `s_scan_cold_start_entry_ms`; per tick
+                      builds an A6c-1 input with `event=TICK`,
+                      calls `sx1276_rx_scan_eval()`, records the
+                      observed (state, action) pair via the
+                      A6c-2-a counters TU, updates anchors per
+                      action (BEGIN_SCAN/REANCHOR ⇒ both,
+                      ADVANCE_CHANNEL ⇒ channel only, others ⇒
+                      unchanged), and stores `next_state` back.
+                      Routed-build only — no-op when
+                      `LIFETRAC_FHSS_TX_ROUTED` undefined. Called
+                      from
+                      [`main.c`](DESIGN-CONTROLLER/firmware/murata_l072/main.c)
+                      BEFORE `sx1276_rx_tick()` so the γ-1
+                      retune gating (A6c-2-c) will see the
+                      freshly-updated SM state. **Observe-only**:
+                      no modem standby / set_freq / arm / disarm
+                      is driven by any scan-SM action this
+                      increment — the existing γ-1 retune loop
+                      and main.c `sx1276_rx_arm()` continue
+                      unchanged. Counter histograms pre-A6c-2-c
+                      will show BOOT→BEGIN_SCAN exactly once at
+                      first tick, then SCANNING+TICK
+                      accumulating with ADVANCE_CHANNEL ticking
+                      every 100 ms and FAIL firing at
+                      cold_elapsed ≥ 30 s — no FRAME_VALID /
+                      FRAME_INVALID histograms (those land in
+                      A6c-2-b-ii). Evidence: `mingw32-make
+                      check` → all 11 host tests green +
+                      `[OK] memory map invariants hold` (the
+                      cross-target firmware compile validates
+                      the new TU once an arm-none-eabi
+                      toolchain is available; the host check
+                      preprocesses `sx1276_rx_scan_policy.h`
+                      cleanly via the existing scan_policy /
+                      scan_counters TU host tests).
+                - [x] **FCC-A6c-2-b-ii** Frame-event wire-up in
+                      `sx1276_rx_service()`: after A6a header
+                      parse, drive `sx1276_rx_scan_eval()` with
+                      `event=FRAME_VALID, frame_header_valid=
+                      true` on parse OK and `event=FRAME_INVALID`
+                      on parse fail / CRC error / wrong schema,
+                      then `sx1276_rx_scan_counter_record()`.
+                    - [x] **FCC-A6c-2-b-ii-α** Shared SM driver +
+                          frame-event feed plumbing. Refactored
+                          [`radio/sx1276_rx.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_rx.c)
+                          to extract a static `scan_drive(event,
+                          header_valid, now_ms)` helper shared by
+                          `sx1276_rx_scan_tick()` and a new static
+                          `scan_feed_frame(header_valid)` that
+                          samples `platform_now_ms()` and drives
+                          the SM with `FRAME_VALID` /
+                          `FRAME_INVALID`. Wired three call sites
+                          in `sx1276_rx_service()`: (1) payload
+                          CRC error → `scan_feed_frame(false)`
+                          before IRQ ack; (2) post-RX_DONE A6a
+                          `lora_pkt_hdr_unpack()` failure (bad
+                          schema / short frame) → `scan_feed_frame
+                          (false)`; (3) post-RX_DONE header OK +
+                          `sx1276_fhss_consider_remote()` →
+                          `scan_feed_frame(true)`. All three are
+                          inside `#ifdef LIFETRAC_FHSS_TX_ROUTED`
+                          so the unrouted build is unchanged.
+                          **Still observe-only**: SM transitions
+                          to LOCKED on FRAME_VALID(header_ok=true)
+                          and the (state, action) counter records
+                          it, but no HW dispatch — γ-1 retune
+                          continues unconditionally and main.c
+                          arm/disarm is unchanged. A6c-2-c gates
+                          γ-1 on LOCKED and adds modem standby /
+                          set_freq / arm dispatch off scan
+                          actions. Evidence: `mingw32-make check`
+                          → all 11 host tests green +
+                          `[OK] memory map invariants hold`; the
+                          three call sites compile inside the
+                          existing routed ifdef without
+                          duplicating frame-parse logic.
+                - [x] **FCC-A6c-2-c** HW dispatch: gate the γ-1
+                      retune tick on `s_scan_state == LOCKED`;
+                      wire BEGIN_SCAN (anchor + initial channel
+                      arm), ADVANCE_CHANNEL (standby → next
+                      channel from FHSS → set_freq → settle →
+                      RX-arm), LOCK (seed FHSS from header
+                      epoch/hop_idx then transition to γ-1
+                      loop), FAIL (alert URC + standby).
+                    - [x] **FCC-A6c-2-c-i** γ-1 LOCKED gate +
+                          BEGIN_SCAN / ADVANCE_CHANNEL HW
+                          dispatch. New static
+                          `scan_dispatch_action(action)` in
+                          [`radio/sx1276_rx.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_rx.c)
+                          executes the standby → `sx1276_fhss_next
+                          _channel()` → `sx1276_set_frequency_hz()`
+                          → PLL-settle (`SX1276_RX_PLL_SETTLE_US`
+                          = 200 µs, mirrors γ-2) →
+                          `sx1276_rx_arm()` sequence for both
+                          BEGIN_SCAN and ADVANCE_CHANNEL; called
+                          from `scan_drive()` AFTER state +
+                          anchors are committed so a re-entrant
+                          IRQ during the standby window observes
+                          the new state. HOLD / LOCK / FAIL /
+                          REANCHOR remain HW-no-op pending
+                          A6c-2-c-ii. `sx1276_rx_tick()` (γ-1)
+                          now early-returns unless `s_scan_state
+                          == LOCKED` and resets
+                          `s_rx_last_retune_ms_valid = 0` while
+                          gated out, so the first tick post-LOCK
+                          re-anchors cleanly instead of firing a
+                          spurious DO_WRAP off stale pre-LOCK
+                          timing. File-statics `s_scan_state` /
+                          `s_scan_channel_entry_ms` /
+                          `s_scan_cold_start_entry_ms` were moved
+                          to the top of the routed block (default
+                          zero-init = `SX1276_RX_SCAN_STATE_BOOT`)
+                          so γ-1 can read `s_scan_state`. Scan
+                          dispatcher and γ-1 are now mutually
+                          exclusive owners of the synth: scan SM
+                          owns it in BOOT / SCANNING / FAILED;
+                          γ-1 owns it in LOCKED. Evidence:
+                          `mingw32-make check` → all 11 host
+                          tests green + `[OK] memory map
+                          invariants hold`.
+                    - [x] **FCC-A6c-2-c-ii** LOCK + FAIL HW
+                          dispatch. LOCK case in
+                          `scan_dispatch_action()` is
+                          intentionally HW-no-op (frame that
+                          triggered LOCK was just received in
+                          RX-cont so the modem is already armed
+                          on the snapped channel;
+                          `sx1276_fhss_consider_remote()` already
+                          aligned the FHSS pointer; the next
+                          `sx1276_rx_tick()` opens the LOCKED
+                          gate and γ-1 takes the synth — driving
+                          an extra standby + arm here would only
+                          add a needless RX gap right after first
+                          contact). FAIL case calls
+                          `sx1276_modes_to_standby()` so the
+                          modem stops listening on a dead
+                          hopset; FAILED is the A6c-1 absorbing
+                          state so this single standby is
+                          sufficient until external recovery.
+                          HOLD / REANCHOR remain HW-no-op (no
+                          transition / clock-glitch anchor reset
+                          only). Alert URC deliberately deferred
+                          to FCC-A6c-3 / FCC-B1-SUMMARY to keep
+                          this increment within the frozen
+                          host↔X8 wire layout (no new SerialRPC
+                          URC codes in the A6c-2 sub-track).
+                          Evidence: `mingw32-make check` → all
+                          11 host tests green + `[OK] memory map
+                          invariants hold`.
+        - [x] **FCC-A6c-3** Reporting: 5 s acceptance-target overrun
+              counter + FAIL-cause URC (additive to B1-SUMMARY).
+              D-Gate analyzes the overrun rate.
+              Scope locked by
+              [AI NOTES/2026-05-19_RX_Scan_FAILED_State_Analysis_Copilot_v1_0.md](AI%20NOTES/2026-05-19_RX_Scan_FAILED_State_Analysis_Copilot_v1_0.md)
+              §13 (v5.0): Phase P1 only (bounded retries + four-class
+              `sub`-byte disambiguation); P2 (Opta-routed indicator)
+              and P3 (RTC-BKP LKG / backoff) explicitly deferred.
+            - [x] **FCC-A6c-3-a** Add
+                  `HOST_FAULT_CODE_RX_SCAN_FAILED = 0x0DU` to
+                  [`include/host_types.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/host_types.h)
+                  with the §13.1 #2 `sub`-byte encoding documented in
+                  a comment block above the define. Declaration-only;
+                  no emitter yet. Evidence: `mingw32-make check` →
+                  all 11 host tests green + `[OK] memory map
+                  invariants hold`.
+            - [x] **FCC-A6c-3-b** Add the four file-statics
+                  (`s_scan_fail_retries`, `s_scan_got_any_irq`,
+                  `s_scan_crc_seen`, `s_scan_ever_locked_this_boot`)
+                  to `radio/sx1276_rx.c`; hook
+                  `s_scan_got_any_irq` / `s_scan_crc_seen` in
+                  `sx1276_rx_service()`; clear on
+                  `BEGIN_SCAN`/`ADVANCE_CHANNEL`; reset on `LOCK`;
+                  set `s_scan_ever_locked_this_boot` on `LOCK`. **Do
+                  not** emit the fault URC yet. Evidence:
+                  `mingw32-make check` → all 11 host tests green +
+                  `[OK] memory map invariants hold`.
+            - [x] **FCC-A6c-3-c** Wire B-prime retry supervisor +
+                  `host_cmd_emit_fault(HOST_FAULT_CODE_RX_SCAN_FAILED,
+                  sub)` into `scan_dispatch_action(FAIL)` per
+                  §13.1 #6; land HW-free retry/`sub`-byte wrapper
+                  test (≥8 cases) under
+                  [`bench/host_proto/`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/).
+                  Evidence: pure helper landed at
+                  [`radio/sx1276_rx_scan_fail.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_rx_scan_fail.c)
+                  + [`include/sx1276_rx_scan_fail.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/sx1276_rx_scan_fail.h)
+                  (defines `SX1276_RX_SCAN_MAX_RETRIES = 3U` per
+                  v5.0 §13.1). Dispatcher emits the URC and either
+                  absorbs in `FAILED` (final) or re-enters `SCANNING`
+                  with anchor reset + recursive `BEGIN_SCAN` HW
+                  sequence (non-final). Host test
+                  [`bench/host_proto/rx_scan_fail.c`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/rx_scan_fail.c)
+                  pins the §13.1 #2 bit layout, retry boundary,
+                  attempt-nibble saturation, warm/hw_suspect/
+                  crc_seen derivation, NULL-input defensive
+                  contract, and `MAX_RETRIES==3U` constant —
+                  12 cases. `mingw32-make check` → all 12 host
+                  tests green + `[OK] memory map invariants hold`.
 - [ ] **FCC-B1-SUMMARY** Per-minute `RFCO_SUMMARY` URC: 50-bucket
       histogram, per-channel `legal_dwell_max_us`, `blocked_attempts`
       histogram, `active_count`, `blacklist_size`, last clamp reason,
-      RFCO schema version.
+      RFCO schema version. **Wire layout + cadence design**:
+      [AI NOTES/2026-05-19_FCC_B1_SUMMARY_Wire_Layout_Design_Copilot_v1_0.md](AI%20NOTES/2026-05-19_FCC_B1_SUMMARY_Wire_Layout_Design_Copilot_v1_0.md)
+      — 191 B payload, single frame, snapshot-and-reset deltas, main-loop
+      polling cadence at 60 000 ms, `HOST_TYPE_RFCO_SUMMARY_URC = 0xC4U`.
+      Awaiting user ratification of §7 checklist before B1-SUMMARY-a
+      lands.
+  - [x] **FCC-B1-SUMMARY-a** Declaration-only — *done 2026-05-19.
+        Added [include/host_rfco_summary.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco_summary.h)
+        with `HOST_RFCO_SUMMARY_SCHEMA_VER=1`,
+        `HOST_RFCO_SUMMARY_PAYLOAD_LEN=191`,
+        `HOST_RFCO_SUMMARY_PERIOD_MS=60000`,
+        `HOST_RFCO_SUMMARY_CHANNEL_COUNT=50`,
+        `HOST_RFCO_SUMMARY_REASON_SLOTS=8`, full byte-offset macro set,
+        `host_rfco_summary_t` snapshot struct mirroring §3 of the design
+        doc, and 4 `_Static_assert`s (payload_len==191, channel count
+        matches `SX1276_FHSS_CHANNEL_COUNT`, payload ≤ `HOST_PAYLOAD_MAX_LEN`,
+        reason slots ≥ 7). Added
+        `HOST_TYPE_RFCO_SUMMARY_URC = 0xC4U` to
+        [include/host_types.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_types.h)
+        with cross-ref comment block. No emitter, no pack helper, no
+        main-loop integration — those land in B1-SUMMARY-b and -c.
+        Verified: standalone `gcc -fsyntax-only` on the header parses
+        clean (all 4 static_asserts hold); `mingw32-make check` green
+        (12 host suites pass, memory map invariants hold).*
+  - [x] **FCC-B1-SUMMARY-b** Pure pack helper
+        `host_rfco_summary_pack()` + 3 sidecar counter TUs (per-channel
+        hop-count, per-channel dwell-max-ms, blocked-attempts-by-reason)
+        + ≥10 byte-by-byte wire-vector cases in
+        `bench/host_proto/rfco_summary.c`. — *done 2026-05-19 across
+        three sub-bullets b-1, b-2, b-3 below.*
+    - [x] **b-1** Three sidecar counter TUs in isolation — *done
+          2026-05-19. Added saturating-record + snapshot-and-clear APIs
+          to three modules:
+          (1) [radio/sx1276_fhss.c](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_fhss.c)
+          + [include/sx1276_fhss.h](DESIGN-CONTROLLER/firmware/murata_l072/include/sx1276_fhss.h)
+          — `sx1276_fhss_record_hop(idx)` + `sx1276_fhss_hop_count_snapshot_and_clear(out[50])`
+          (u16 in-memory, saturates to 0xFFU on wire);
+          (2) [radio/sx1276_legal_dwell.c](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_legal_dwell.c)
+          + [include/sx1276_legal_dwell.h](DESIGN-CONTROLLER/firmware/murata_l072/include/sx1276_legal_dwell.h)
+          — `peak_used_us[64]` tracked on every successful `reserve()` as
+          `used_before + pessimistic_us`, plus
+          `sx1276_legal_dwell_peak_us_snapshot_and_clear(out[64])`;
+          failed reservations (BAD_CH/BAD_RESERVE/OVER_BUDGET) do NOT
+          update peak;
+          (3) [host/host_rfco.c](DESIGN-CONTROLLER/firmware/murata_l072/host/host_rfco.c)
+          + [include/host_rfco.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco.h)
+          — `host_rfco_blocked_attempts_record(reason)` /
+          `_snapshot_and_clear(out[8])` / `_reset()` with documented
+          slot map (OK never recorded; reasons 1..6 → slots 1..6;
+          INTERNAL 0xFF → slot 7; unallocated values dropped; u16
+          saturating). All three counter pairs are NULL-safe (out=NULL
+          preserves) and OOR-safe (bad idx is a no-op). New bench TU
+          [bench/host_proto/rfco_summary_counters.c](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/rfco_summary_counters.c)
+          with 17 cases (record→snapshot→re-snapshot zero; wire-byte
+          saturation; in-memory u16 saturation past UINT16_MAX;
+          per-channel/per-slot independence; monotonic high-water
+          mark; failed-reserve no-update; NULL preserves; OK never
+          recorded; INTERNAL→slot 7; unallocated reason dropped).
+          New Makefile target `check-rfco-summary-counters` added to
+          `check:` chain. NO call-site wiring (TX-success → record_hop,
+          legal-dwell → already integrated in reserve(), TX-abort →
+          record_blocked) — that lands in B1-SUMMARY-b-3. Verified:
+          `mingw32-make check` green (14 host suites pass including
+          `rfco_summary_counters: 17 cases`, memory map invariants
+          hold).*
+    - [x] **b-2** Pure pack helper + byte-by-byte wire vectors — *done
+          2026-05-19. Added
+          [host/host_rfco_summary.c](DESIGN-CONTROLLER/firmware/murata_l072/host/host_rfco_summary.c)
+          with `host_rfco_summary_pack(const host_rfco_summary_t *in,
+          uint8_t out[191])` (no HAL deps; pure serialize) and
+          declared in
+          [include/host_rfco_summary.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco_summary.h).
+          Layout invariants enforced by the helper itself:
+          (a) byte 0 hard-pinned to `HOST_RFCO_SUMMARY_SCHEMA_VER`
+          (struct `schema_ver` field ignored, documentation-only);
+          (b) bytes 6..7 (`_reserved_align`) hard-zeroed regardless of
+          struct field (suppresses uninit-struct leaks; any future use
+          MUST bump SCHEMA_VER);
+          (c) CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF, no reflect,
+          xorout 0x0000) over bytes [0..188] written LE at [189..190].
+          Added `host_rfco_summary.c` to firmware `SRCS` so the target
+          toolchain also compile-checks it. New bench TU
+          [bench/host_proto/rfco_summary.c](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/rfco_summary.c)
+          with 17 cases: CRC-16/CCITT-FALSE KAT (crc("123456789") ==
+          0x29B1); NULL `in` rejected without touching out; NULL `out`
+          rejected; payload_len pin; schema byte hard-pin under struct
+          lie (0xAA → still 0x01 on wire); pertx_schema_ver_at_emit
+          stamp; `_reserved_align` hard-zero under struct poison
+          (0xDEAD → 00 00); all-zero snapshot golden (only byte 0 +
+          CRC non-zero); u32 LE encoding for uptime/seq/window_elapsed
+          (spot-checked byte order 0x12345678 → 78 56 34 12);
+          per-channel hop-count[50] byte-for-byte round-trip with 0xFF
+          saturation; per-channel dwell_max_ms[50] u16 LE round-trip
+          with 0xFFFF saturation; blocked_attempts_by_reason[8] u16 LE
+          round-trip (spot-checked 0xABCD → CD AB); tail bytes
+          (pertx_count_in_window / summary_emit_count / flags); flags
+          FIRST_SINCE_BOOT bit; CRC byte order (LE); CRC sensitivity
+          (flipping any of 15 representative bytes in [0..188] changes
+          the CRC); repack overwrites pre-poisoned CRC bytes. New
+          Makefile target `check-rfco-summary` added to `check:` chain.
+          NO call-site wiring (snapshot consumer + emit() land in b-3
+          and -c). Verified: `mingw32-make check` green (15 host
+          suites pass including `rfco_summary: 17 cases`, memory map
+          invariants hold).*
+    - [x] **b-3** Call-site wiring at the per-TX emit boundary — *done
+          2026-05-19. Wired the two TX-driven sidecar counters into
+          [host/host_rfco.c](DESIGN-CONTROLLER/firmware/murata_l072/host/host_rfco.c)
+          `host_rfco_pertx_emit()` so every accepted per-TX URC also
+          updates the per-minute SUMMARY URC inputs:
+          (1) `host_rfco_blocked_attempts_record(snapshot->tx_status)`
+          called on every accepted emit (record() handles the OK skip
+          internally, so slot 0 stays reserved);
+          (2) `sx1276_fhss_record_hop(snapshot->hop_idx)` called iff
+          `snapshot->tx_status == HOST_RFCO_TX_STATUS_OK` (a blocked
+          TX never went on air, so it must NOT inflate the per-channel
+          hop histogram). NULL snapshot short-circuits before either
+          counter is touched. Legal-dwell counter was already wired in
+          b-1 (inside `sx1276_legal_dwell_reserve()`), so all three
+          SUMMARY sidecars now self-populate from the live TX path
+          without sx1276_tx.c needing any changes. Extended
+          [bench/host_proto/rfco_pertx.c](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/rfco_pertx.c)
+          with 5 new cases (now 11 total): hop_count bumps on OK and
+          ONLY on OK; blocked_attempts[slot=2] on ABORT_LBT;
+          blocked_attempts[slot=7] on INTERNAL (0xFF remap); 5x
+          repeated emit accumulates hop_count[N]==5; emit(NULL) does
+          NOT touch either counter. Updated `check-rfco-pertx`
+          Makefile target to link `radio/sx1276_fhss.c` +
+          `radio/sx1276_fhss_chantab.c` (host_rfco.c now references
+          `sx1276_fhss_record_hop`). Verified: `mingw32-make check`
+          green (15 host suites pass including
+          `rfco_pertx: 11 cases`, memory map invariants hold).
+          Closes FCC-B1-SUMMARY-b parent; B1-SUMMARY-c (emit wrapper +
+          60 000 ms main-loop cadence) is now unblocked.*
+  - [x] **FCC-B1-SUMMARY-c** Emit wrapper
+        `host_rfco_summary_emit()` + main-loop 60 000 ms cadence
+        integration + emit-timing bench test. *done 2026-05-19 via
+        c-1 (emit wrapper + per-window sidecars) + c-2 (main-loop
+        wiring + integration bench). Closes FCC-B1-SUMMARY entirely
+        — unblocks FCC-B2-b (artifact-header stamping can now source
+        `rfco_schema_ver` from the SUMMARY URC wire byte 0).*
+    - [x] **c-1** Emit wrapper + cadence helper + per-window sidecars
+          — *done 2026-05-19. Added 4-function per-window sidecar API
+          in [include/host_rfco.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco.h)
+          (`host_rfco_pertx_window_record`,
+          `_count_in_window_snapshot_and_clear`,
+          `host_rfco_last_clamp_reason_snapshot_and_clear`,
+          `_pertx_window_reset`) with internal u16 saturating counter +
+          u8 wire clamp + 0xFF sentinel for "no clamp this window".
+          Implemented sidecars in
+          [host/host_rfco.c](DESIGN-CONTROLLER/firmware/murata_l072/host/host_rfco.c)
+          (literal `0xFFU` used to avoid summary.h ↔ host_rfco.h
+          include cycle) and wired the recorder into
+          `host_rfco_pertx_emit()` AFTER the b-3 blocked_attempts +
+          conditional hop_count block so every accepted per-TX URC also
+          bumps the per-window counters. Added emit wrapper +
+          cadence helper to
+          [include/host_rfco_summary.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco_summary.h):
+          `host_rfco_summary_emit(seq, now_ms, window_elapsed_ms,
+          profile_id)`, `host_rfco_summary_should_emit(now, last)`
+          (u32-wraparound-safe), `host_rfco_summary_reset_wrapper_state()`
+          (test-only). Implementation lives in a new TU
+          [host/host_rfco_summary_emit.c](DESIGN-CONTROLLER/firmware/murata_l072/host/host_rfco_summary_emit.c)
+          (split from `host_rfco_summary.c` so the b-2 pack-only bench
+          stays HAL-free): builds `host_rfco_summary_t` from live
+          sidecars (`sx1276_fhss_active_count`,
+          `hop_count_snapshot_and_clear`,
+          `sx1276_legal_dwell_peak_us_snapshot_and_clear` with µs→ms
+          ceiling-div u16 saturation, `blocked_attempts_snapshot_and_clear`,
+          new `pertx_count_in_window` + `last_clamp_reason` sidecars),
+          packs to 191 B, forwards to `host_uart_send_urc(0xC4,
+          (uint16_t)(seq&0xFFFF), flags, payload, 191)`. State advance
+          (FIRST_SINCE_BOOT latch, `summary_emit_count` saturating u8)
+          happens AFTER the send so a pack failure preserves the
+          FIRST bit for retry. No main-loop wiring — that lands as
+          c-2. Added new Makefile target `check-rfco-summary-emit`
+          (links the new TU + `host_rfco.c` + `sx1276_fhss.c` +
+          `_fhss_chantab.c` + `_legal_dwell.c`) in
+          [DESIGN-CONTROLLER/firmware/murata_l072/Makefile](DESIGN-CONTROLLER/firmware/murata_l072/Makefile)
+          and added `host/host_rfco_summary_emit.c` to firmware SRCS.
+          New bench
+          [bench/host_proto/rfco_summary_emit.c](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/rfco_summary_emit.c)
+          covers 9 cases: (1) emit forwards (type=0xC4, seq low 16,
+          flags, payload, len=191) to stubbed send_urc; (2) payload
+          matches independent re-pack with hand-built snapshot
+          mirroring populated sidecars; (3) FIRST_SINCE_BOOT latch
+          set then cleared; (4) summary_emit_count 0→1→2; (5) every
+          sidecar drained by emit (hop_count, dwell_peak,
+          blocked_attempts, pertx_count_in_window, last_clamp_reason);
+          (6) pertx_count_in_window counts 5x then saturates at 0xFF
+          after 300+ emits; (7) last_clamp_reason captures most-recent
+          non-OK (ABORT_LEGAL_DWELL after LBT, then OK does not
+          overwrite); (8) µs→ms ceiling conversion via emit payload
+          (0→0, 1µs→1ms, 1000µs→1ms, 1500µs→2ms) using
+          `sx1276_legal_dwell_reserve`; (9) `should_emit` returns true
+          at exactly 60000 ms, false at 59999, tolerant across u32
+          wraparound. Verified: `mingw32-make check` green (16 host
+          suites pass including `rfco_summary_emit: 9 cases`, memory
+          map invariants hold). Parent stays `[ ]` pending c-2
+          (main-loop wiring).*
+    - [x] **c-2** Main-loop wiring — *done 2026-05-19. Moved
+          last_emit_ms + summary_seq tracking out of main.c and into
+          the emit TU via a new `host_rfco_summary_tick(now_ms,
+          profile_id)` helper added in
+          [include/host_rfco_summary.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco_summary.h)
+          and implemented in
+          [host/host_rfco_summary_emit.c](DESIGN-CONTROLLER/firmware/murata_l072/host/host_rfco_summary_emit.c)
+          (file-static `s_tick_last_emit_ms` + `s_tick_seq`, both
+          zeroed by `host_rfco_summary_reset_wrapper_state()` for
+          test re-arm). tick() polls `should_emit` internally and on
+          a successful emit advances `last_emit_ms` to `now_ms` and
+          increments `seq`; on pack failure (unreachable in
+          practice) it preserves both so the next tick retries with
+          the accumulated window. Wired into the main loop in
+          [DESIGN-CONTROLLER/firmware/murata_l072/main.c](DESIGN-CONTROLLER/firmware/murata_l072/main.c)
+          after the `sx1276_rx_tick(now_ms)` call: a single
+          `host_rfco_summary_tick(now_ms,
+          host_cfg_profile_active()->profile_id)` invocation per
+          loop iteration. `host_cfg_profile_active()` always returns
+          a valid pointer to file-static state (zero-initialised at
+          boot to `REG_PROFILE_BENCH_ONLY_FIXED_915 == 0`), so no
+          NULL guard is needed. Added new Makefile target
+          `check-rfco-summary-integration` (links the same TUs as
+          the c-1 emit bench) in
+          [DESIGN-CONTROLLER/firmware/murata_l072/Makefile](DESIGN-CONTROLLER/firmware/murata_l072/Makefile)
+          and registered it in the .PHONY list + `check` aggregator.
+          New bench
+          [bench/host_proto/rfco_summary_integration.c](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/rfco_summary_integration.c)
+          drives a simulated clock past several 60 000 ms boundaries
+          and covers 8 cases: (1) no emit before first boundary
+          (ticks at 0, 1, 1000, 30000, 59999 must NOT call send_urc);
+          (2) first emit fires at exactly `now_ms == 60000` with
+          type=0xC4, FIRST_SINCE_BOOT flag set, summary_seq=0,
+          window_elapsed_ms=60000, uptime_ms=60000; (3) tick() is
+          idempotent — 10 back-to-back invocations at 60000 +
+          mid-window ticks at 60001/90000/119999 produce no extra
+          emits; (4) second on-time emit at 120000 carries seq=1,
+          FIRST cleared, window=60000; (5) LATE tick at 181500 (1500
+          ms jitter) reports `window_elapsed_ms == 61500` and
+          seq=2, proving window reflects actual wall-clock delta;
+          (6) `reset_wrapper_state()` re-arms FIRST and zeros seq +
+          last_emit_ms so the post-reset emit at 120001 carries
+          FIRST again with seq=0 and window=120001; (7) `profile_id`
+          arg propagates to `payload[HOST_RFCO_SUMMARY_OFF_PROFILE_ID]`
+          unchanged (verified with 0x05 and 0xA7); (8) cadence
+          survives u32 platform_now_ms() wraparound — boot_jump
+          near 0xFFFFFFFF emits first (huge window vs last=0), then
+          mid-window tick at boot_jump+30000 (wrapped) NO emit,
+          boundary tick at boot_jump+60000 (wrapped to ~0xEA5F)
+          emits with `window_elapsed_ms == 60000`. Verified:
+          `mingw32-make check` green (17 host suites pass including
+          `rfco_summary_integration: 8 cases`, memory map invariants
+          hold). Cross-build (`mingw32-make all`) skipped — host
+          dev box lacks `arm-none-eabi-gcc`; this is a pre-existing
+          environment gap unrelated to c-2. Closes parent
+          FCC-B1-SUMMARY-c.*
 - [ ] **FCC-B2** Artifact stamping: required header fields (firmware git
       SHA, build timestamp UTC, profile enum + string, RFCO schema
       version). **Naming linter** refuses any artifact containing
       `airtime_us` or `dwell_us` without one of `qos_used_us_1s`,
       `legal_dwell_used_us_10s`, `legal_dwell_used_us_20s`.
+  - [x] **FCC-B2-a** Naming linter — *done 2026-05-19. Added
+        [tools/lint_artifact_naming.py](tools/lint_artifact_naming.py):
+        Python 3 script that recursively scans paths, refuses any text
+        artifact containing `airtime_us` or `dwell_us` without at least
+        one of `qos_used_us_1s`, `legal_dwell_used_us_10s`,
+        `legal_dwell_used_us_20s`. Per-file opt-out marker
+        `LINTER_ALLOW_RAW_AIRTIME_DWELL_US` for legitimate sources-of-truth.
+        `--self-test` runs 11 built-in cases (empty, only-canonical,
+        only-old-airtime, only-old-dwell, old+canonical pairings,
+        opt-out marker, both-old-tokens, substring-only-not-canonical)
+        — all 11 pass. Run against
+        `DESIGN-CONTROLLER/bench-evidence/` (6930 text files scanned, 166
+        binary skipped): 0 violations. Stamping half (B2-b) deferred
+        until FCC-B1-SUMMARY locks whether `rfco_schema_ver` ships as a
+        build-time constant or a URC field (those decisions couple).*
+  - [ ] **FCC-B2-b** Artifact-header stamping (firmware git SHA,
+        build timestamp UTC, profile enum + string, RFCO schema
+        version). Unblocked by FCC-B1-SUMMARY (c-1/c-2 closed
+        2026-05-19). Split into three atomic sub-items b-b-1/b-b-2/b-b-3.
+    - [x] **FCC-B2-b-b-1** Header schema + stamp module +
+          self-test (no pipeline wiring yet). *done 2026-05-20:
+          new module [tools/artifact_header.py](tools/artifact_header.py)
+          (~520 LOC, mirrors `lint_artifact_naming.py` style). Single
+          source of truth for the fenced header block. Required fields:
+          `firmware_git_sha` (40-char full + 12-char short via
+          `git rev-parse HEAD`, falls back to `unknown/unknown` outside
+          a repo), `build_timestamp_utc` (ISO-8601 'Z', second
+          precision), `profile_enum` (numeric), `profile_string`
+          (harvested from `REG_PROFILE_*` macros in
+          [include/host_cfg_keys.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg_keys.h),
+          `REG_PROFILE_MAX` excluded so it doesn't collide with the
+          aliased enum), `rfco_summary_schema_ver` +
+          `rfco_pertx_schema_ver` (harvested from
+          `HOST_RFCO_SUMMARY_SCHEMA_VER` /
+          `HOST_RFCO_PERTX_SCHEMA_VER` in
+          [include/host_rfco_summary.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco_summary.h)
+          + [include/host_rfco.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco.h)
+          — drift gate raises `RuntimeError` if either macro is
+          missing, refusing to fabricate a schema version), and
+          `header_schema_ver` (this module's own format version, =1).
+          Block format: fenced `# === FCC-B2-b ARTIFACT HEADER BEGIN
+          (v1) ===` / `# === FCC-B2-b ARTIFACT HEADER END ===` with
+          one `# key: value` line per field; comment prefix
+          configurable (default `# ` for shell/Py/Make/log/md;
+          auto-picks `// ` for `.c`/`.h`/`.cpp`/`.hpp`; `-- ` for
+          `.sql`). Idempotency rule: `stamp_text` returns input
+          unchanged when an existing header is byte-equal, and raises
+          `ValueError` (with diff dict) when it disagrees — re-stamp
+          MUST be explicit unstamp + restamp by the caller, never
+          silent. CLI surface: `--self-test`, `harvest` (prints
+          schema + profile table), `stamp --profile-enum N
+          [--input ...] [--output ...] [--comment-prefix ...]`,
+          `parse --input ...`. Self-test: **21/21 cases green**
+          including format/parse round-trip under both `# ` and
+          `// ` prefixes, idempotent stamping, schema/profile
+          harvester correctness, unknown-profile rejection,
+          BEGIN-without-END corruption detection, embedded-newline
+          rejection, unknown-key rejection, comment-prefix table,
+          and an explicit check that the emitted block contains
+          neither `airtime_us` nor `dwell_us` (so it does not trip
+          [tools/lint_artifact_naming.py](tools/lint_artifact_naming.py)).
+          Linter cross-check: `py -3 tools/lint_artifact_naming.py
+          tools/artifact_header.py tools/lint_artifact_naming.py`
+          → `scanned=2 optout=2 violations=0` (the new module
+          carries the `LINTER_ALLOW_RAW_AIRTIME_DWELL_US` opt-out
+          marker because its docstring legitimately names the rule).
+          CLI smoke: `harvest` prints SUMMARY=1, PERTX=1, profiles
+          0/1/2 → BENCH_ONLY_FIXED_915 / FCC_15_247_FHSS_50CH_BW250
+          / FCC_15_247_DTS_BW500; `stamp --profile-enum 1` prints a
+          well-formed v1 block with real git SHA
+          `b322f8950a5659351434b9b642d3e41720c597ac`. No firmware
+          touched, no pipeline wired, no `mingw32-make check`
+          regressions possible.*
+    - [x] **FCC-B2-b-b-2** Wire `artifact_header.stamp_text` into
+          one or two real bench-evidence emission sites (smallest
+          orchestrator script or Makefile rule that already writes
+          a text artifact without a header). *done 2026-05-20:
+          [tools/mixed_load_soak.ps1](tools/mixed_load_soak.ps1) now
+          stamps both captured logs (`tx_burst_board_a.log` written
+          by `Tee-Object` on board A, `rx_listen_board_b.log` written
+          by `Start-Process -RedirectStandardOutput` on board B)
+          immediately after the post-soak pkill+sleep and before the
+          `=== TX TAIL ===` summary. Stamp call:
+          `py -3 tools/artifact_header.py stamp --profile-enum 0
+          --input <log> --output <log>` per log; profile=0 =
+          `REG_PROFILE_BENCH_ONLY_FIXED_915` because this W1-10b / W2
+          mixed-load soak runs on a single fixed channel per the
+          2026-05-19 FCC plan §5 #3 BENCH_ONLY callout. Soft-fail:
+          non-zero stamper exit prints `[stamp] WARN: ... exit=N`
+          and continues — a stamp failure on an already-captured log
+          must not erase the bench evidence. Offline verification
+          (hardware-free): synthetic log containing
+          `__W1_10B_LISTEN_READY__`, two `__RX_FRAME__`, `__TX_DONE__`,
+          `__W1_10B_BURST_DONE__` markers — after the same stamp
+          invocation: (1) `Select-String __TX_DONE__` still returns 1
+          and `__RX_FRAME__` still returns 2 (counter logic
+          unaffected by prepended header); (2) `artifact_header.py
+          parse` round-trips every field with `profile_enum: 0`,
+          `profile_string: REG_PROFILE_BENCH_ONLY_FIXED_915`,
+          `rfco_summary_schema_ver: 1`, `rfco_pertx_schema_ver: 1`,
+          `header_schema_ver: 1`, real git SHA
+          `b322f8950a5659351434b9b642d3e41720c597ac`; (3)
+          [lint_artifact_naming.py](tools/lint_artifact_naming.py)
+          reports `scanned=1 violations=0` on the stamped log.
+          **b-b-3 hardening flagged**: the b-b-1 strict idempotency
+          contract (`stamp_text` raises `ValueError` on any field
+          diff) makes a back-to-back CLI re-stamp fail by 1 s on
+          `build_timestamp_utc`. Safe here because `Tee-Object` /
+          `Start-Process -RedirectStandardOutput` always overwrite
+          the log file before the stamp call runs (fresh run =
+          fresh unstamped log), but b-b-3's retro-stamp sweep will
+          need a `--if-unstamped` CLI mode (or a "preserve existing
+          `build_timestamp_utc` on re-stamp" flag) before it can be
+          run over a tree of already-captured artifacts. No firmware
+          touched, no `mingw32-make check` regressions possible.*
+    - [ ] **FCC-B2-b-b-3** Retro-stamp sweep + CI check that every
+          freshly-emitted text artifact carries a current header.
+          Pre-work: add `artifact_header.py stamp --if-unstamped`
+          (no-op when a header block already exists, preserves
+          existing `build_timestamp_utc`) so the sweep is
+          re-runnable.
+        - [x] **FCC-B2-b-b-3-1** Add `--if-unstamped` CLI mode +
+              self-test (no sweep yet). *done 2026-05-20:
+              extended [tools/artifact_header.py](tools/artifact_header.py)
+              `_cmd_stamp` to short-circuit BEFORE harvesters /
+              git-sha collection when `parse_header_block` finds an
+              existing v1 block on the input — returns 0 + leaves
+              the output file untouched, regardless of field values
+              (the flag means "skip if a header exists", not "skip
+              if fields match"). Skipping the harvesters keeps the
+              call cheap for tree-wide sweeps; leaving the file
+              untouched preserves the original `build_timestamp_utc`
+              that the strict b-b-1 `stamp_text` field-diff guard
+              would otherwise reject. Self-test extended from 21
+              to **25/25 cases green**: (18) `--if-unstamped` on an
+              unstamped file stamps and exits 0; (19) `--if-unstamped`
+              on a pre-stamped file is a no-op + exit 0 with
+              byte-equal file contents; (20) `--if-unstamped`
+              tolerates a stale `--profile-enum` without raising
+              the strict-mode field-diff `ValueError`; (21)
+              regression guard — stamp WITHOUT `--if-unstamped`
+              still raises on field diff (confirms strict mode is
+              preserved as the default). Real-tree smoke: stamped
+              a temp log with `--profile-enum 0`, slept 2 s,
+              re-ran with `--profile-enum 2 --if-unstamped` →
+              `build_timestamp_utc` byte-equal across both calls
+              (preserved=True). Linter cross-check: `lint_artifact_naming.py`
+              on `artifact_header.py + lint_artifact_naming.py +
+              mixed_load_soak.ps1` → `scanned=3 optout=2 violations=0`.
+              No firmware touched, no pipeline wired, no
+              `mingw32-make check` regressions possible.*
+        - [ ] **FCC-B2-b-b-3-2** Inventory existing text artifacts
+              under `LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/`
+              and run a tree-wide sweep using `--if-unstamped`;
+              report counts only, no CI gate yet.
+            - [x] **FCC-B2-b-b-3-2-1** Read-only inventory tool +
+                  self-test (no sweep yet). *done 2026-05-20:
+                  new tool [tools/inventory_artifact_headers.py](tools/inventory_artifact_headers.py)
+                  walks a root dir (default
+                  `LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence`)
+                  and classifies every file into 5 buckets —
+                  `stamped` (v1 header parses), `unstamped` (no
+                  header), `corrupt` (BEGIN fence without END, or
+                  BEGIN literal present but default-prefix parse
+                  finds nothing — belt-and-suspenders flag for
+                  cross-prefix mistakes), `non_text` (suffix not in
+                  the shared `TEXT_EXTS` from
+                  [tools/lint_artifact_naming.py](tools/lint_artifact_naming.py)),
+                  `unreadable` (OS refused to open). Reuses
+                  `parse_header_block` + `comment_prefix_for_path` +
+                  `BEGIN_FENCE` from
+                  [tools/artifact_header.py](tools/artifact_header.py)
+                  via direct import so there is exactly one source
+                  of truth for the header schema. Per-group counts
+                  keyed by top-level subdirectory name (workload
+                  prefix); files directly under root bucketed as
+                  `(root)`. Output modes: human-readable fixed-width
+                  table sorted by text_total desc (default), `--json`,
+                  `--list-unstamped` (pipes paths into the future
+                  b-b-3-2-2 sweep). Read-only: exit 0 always on
+                  successful walk, exit 2 on bad CLI. Self-test:
+                  **16/16 cases green** — synthetic tree exercises
+                  every bucket, asserts `walk_root` grouping,
+                  zero-filled bucket keys, sort order, JSON
+                  round-trip, and graceful empty-root behaviour.
+                  Linter: `scanned=1 optout=1 violations=0` (the
+                  module carries `LINTER_ALLOW_RAW_AIRTIME_DWELL_US`
+                  because its self-test docstring names the rule).
+                  **Real-corpus run** against
+                  `LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/`
+                  (772-line table, 386 groups): **6930 unstamped /
+                  0 stamped / 0 corrupt / 166 non_text / 0
+                  unreadable** text artifacts. Biggest single group
+                  is `stage1_standard_runs` (792 files); the
+                  ~80 `T6_stage1_standard_2022-*` and ~50
+                  `T6_stage1_standard_quant_2026-*` per-run dirs
+                  cluster into a small number of workload prefixes
+                  (`T6_bringup_*`, `T6_rom_baseline_burst_*`,
+                  `T6_phase*_*`, `T6_profile_*`, `T6_stage1_standard_*`,
+                  `W1-9b_*`, `W1-10b_*`, `W1-9_stage2_tx_*`,
+                  `W2-01_*`, `w2_01_*`, `W2-02_*`, `W4-pre`,
+                  `walk_power_*`, `adb_hardened_logs`,
+                  `mixed_load_*`, plus the `(root)` singletons).
+                  **Design implication for b-b-3-2-2**: confirmed
+                  that a tree-wide `--profile-enum N` would
+                  mis-stamp the corpus — a workload-prefix →
+                  profile_enum map (likely
+                  `tools/artifact_profile_map.yaml` consumed by a
+                  new `--profile-from-map FILE` CLI flag on
+                  `artifact_header.py`) is the next prerequisite.
+                  No firmware touched, no files mutated, no
+                  `mingw32-make check` regressions possible.*
+            - [ ] **FCC-B2-b-b-3-2-2** Author the workload-prefix
+                  profile map + extend `artifact_header.py stamp`
+                  with `--profile-from-map FILE`; then run the
+                  tree-wide sweep using `--if-unstamped`.
+        - [ ] **FCC-B2-b-b-3-3** CI / lint gate that fails when a
+              freshly-emitted artifact has no FCC-B2-b header.
 - [ ] **FCC-B3** Update orchestrator scripts in
       [`tools/`](tools/) (incl. `mixed_load_soak.ps1`) to require
       `profile=FCC_15_247_FHSS_50CH_BW250` in run header and abort if
       the RFCO snapshot disagrees.
-- [ ] **FCC-TXPOWER-LAYER** Close the
+- [x] **FCC-TXPOWER-LAYER** Close the
       [AI NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md](AI%20NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md)
       gap: TX-power adapter and safety-burst path must layer **inside**
       the hop scheduler (FCC notes §11.1.5 — every power step must still
       meet OOB mask). Add bench-only-single-channel callout to that doc.
+      — *done 2026-05-19 (S0.9 surgical pass appended to the 2026-05-18
+      doc): S0.9.a layers the TX-power adapter and the SAFETY-burst N=5
+      copies inside the hop scheduler (hop scheduler is the outer loop;
+      adapter chooses dBm within one hop's dwell; SAFETY copies go on
+      N distinct hops and never bypass `legal_dwell_used_us_10s`; SAFETY
+      class buys redundancy via copy-count + channel diversity, not via
+      power-cap escape — consistent with §4 S0.4 retirement of the
+      "+17 dBm forced" language). S0.9.b stamps §1 W2-02 PER/RSSI/SNR
+      figures and the §3/§15/§17 "single-channel today" strawmans as
+      `BENCH_ONLY_FIXED_915` (per 2026-05-19 FCC plan §5 #3 + §14.4 #3)
+      and binds future single-channel reasoning to be re-evaluated
+      under FHSS. No main-body restructuring (still deferred per
+      S0.5/S0.6). Doc-only change — no firmware touched, no
+      `mingw32-make check` regressions possible.*
 
 **Bench evidence gates (Phase D — promote to field-candidate):**
-*All D1/D9 captures must be conducted into 50 Ω with a directional coupler
-or inside an RF-quiet enclosure. Ambient open-lab traffic is not
-acceptable evidence.*
-- [ ] **FCC-EVID-D1** Hop proof: ≥50 distinct centers, equal-use within
-      ±10 % per epoch over 60 s continuous TX (spectrum analyzer + RFCO
-      histogram).
-- [ ] **FCC-EVID-D2** Occupied BW at SF7/SF8 × BW250 × +17 dBm: ≥250 kHz
-      and ≤500 kHz → 10 s window; <250 kHz → fallback profile
-      `..._NARROW` with 20 s window.
-- [ ] **FCC-EVID-D3** OOB mask: emissions ≥20 dB below in-band in any
-      100 kHz outside 902-928 MHz at every channel, especially band edges.
+*Test-equipment scope per 2026-05-19 project decision: **no spectrum
+analyzer, no calibrated antenna, no TCB lab access** (S-HW.4 waived).
+D1/D2/D3/D7/D9 gates that originally required lab equipment are marked
+⚫ WAIVED and the project ships under firmware-side enforcement +
+datasheet declaration in lieu of measured RF evidence — see per-item
+notes below. D4/D5/D6/D8/D10/DGATE remain in scope and run on the 2×
+Max Carrier bench.*
+- ⚫ **FCC-EVID-D1** Hop proof — **WAIVED** (no spectrum analyzer).
+      Substitute: firmware-side RFCO `per_channel_hop_count` histogram
+      from B1-SUMMARY URC; equal-use within ±10% verified from URC
+      telemetry over 60 s soak. Not a lab measurement but proves the
+      hop scheduler is exercising all 50 channels.
+- ⚫ **FCC-EVID-D2** Occupied BW — **WAIVED** (no spectrum analyzer).
+      Substitute: datasheet BW (SX1276 RegModemConfig1 `BW=0b0111`
+      → 250 kHz nominal) declared in artifact header.
+- ⚫ **FCC-EVID-D3** OOB mask — **WAIVED** (no spectrum analyzer).
+      Substitute: SX1276 datasheet OOB mask compliance claim under
+      conducted output ≤ declared cap; antenna gain entered from
+      datasheet.
 - [ ] **FCC-EVID-D4** Per-channel dwell ≤400 ms / channel / 10 s during
-      continuous TX soak (RFCO `legal_dwell_max_us`).
+      continuous TX soak (RFCO `legal_dwell_max_us`). **IN SCOPE** —
+      pure firmware telemetry, runs on 2× Max Carrier bench.
 - [ ] **FCC-EVID-D5** Largest TX `pkt_toa_ms` over the run < 400 - 20 ms
-      guard (RFCO).
+      guard (RFCO). **IN SCOPE.**
 - [ ] **FCC-EVID-D6** Profile lock: host attempts to set arbitrary
       `RegFrf` / wrong BW / mask < 50 ch on production build are rejected
-      with explicit error code (cfg fuzz script).
-- [ ] **FCC-EVID-D7** RF exposure: MPE evaluation per §1.1307 / §2.1093 or
-      categorical exclusion documented for the committed antenna SKU.
+      with explicit error code (cfg fuzz script). **IN SCOPE.**
+- ⚫ **FCC-EVID-D7** RF exposure / MPE — **WAIVED as lab measurement**
+      (no calibrated antenna). Substitute: categorical exclusion claim
+      per §1.1307(b) / §2.1093 documented in user-facing README for the
+      committed antenna SKU + declared conducted power.
 - [ ] **FCC-EVID-D8** Two-node sync torture: RX boots late, reboots
       mid-run, misses several epochs, sees burst packet loss — reacquires
       without fixed rendezvous and without host intervention. Doubles as
       §14.3 Q6 measurement (target ≤5 s reacquire; >30 s ⇒ A6 redesign).
-- [ ] **FCC-EVID-D9** LBT bias stress with calibrated interferer on a
-      channel subset: legal dwell stays below cap, RFCO cleanly separates
-      blocked attempts from TX counts, active set never silently shrinks.
+      **IN SCOPE** — runs on 2× Max Carrier bench.
+- ⚫ **FCC-EVID-D9** LBT bias stress with calibrated interferer —
+      **WAIVED as calibrated-interferer test** (no calibrated source).
+      Substitute: hammer firmware on second Max Carrier as uncalibrated
+      interferer + RFCO `blocked_attempts_by_reason` histogram; verifies
+      LBT separates blocked attempts from TX counts and active set never
+      silently shrinks. Not power-calibrated but proves the policy.
 - [ ] **FCC-EVID-D10** Power/antenna clamp fuzz: every illegal
       (profile, antenna_gain, tx_power) combination through host cfg is
       rejected with structured reason; legal combos clamp correctly.
+      **IN SCOPE** — pure firmware validation, no RF equipment needed.
 - [ ] **FCC-EVID-DGATE** Scripted go/no-go summary report that fails the
-      run if any D1-D10 artifact or any required B2 header field
-      (git SHA, timestamp, profile enum, schema version) is missing.
+      run if any **in-scope** D4/D5/D6/D8/D10 artifact or any required B2
+      header field (git SHA, timestamp, profile enum, schema version) is
+      missing. Waived gates (D1/D2/D3/D7/D9) are recorded as `WAIVED`
+      with a citation to S-HW.4 rather than failing the run.
 
 **Open questions (must answer before FCC-A3 lands — see §14.3 of plan doc):**
 Q1 final 50-ch list (gated on D2), Q2 epoch model time-slice vs counter,
@@ -342,9 +1739,14 @@ Q3 L072 monotonic-tick wrap behavior, Q4 hopset-update auth path
   `LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/fcc_fhss_50ch_<date>/`.
   Until S1.5 closes, no over-the-air production deployment.
 
-### Stage S2 — D15 E-STOP replay-rejection fix (BLOCKER for S4) 🔴 HW-BLOCKED
-*(L072 firmware change; safety-critical bench regression fundamentally
-requires L072 + handheld + mushroom E-STOP. Code can be written and
+### Stage S2 — D15 E-STOP replay-rejection fix (BLOCKER for S4) � HW-PARTIAL
+*(L072 firmware change; safety-critical bench regression runs on the
+2× Max Carrier pair. E-STOP signal path per 2026-05-19 decision
+(S-HW.5): tractor-side = **Arduino Opta digital-input pin flip** routed
+to the base-station Max Carrier; operator-side = **keyboard / joystick
+button on the web remote-control UI** → `ESTOP_REQ` host frame. No
+physical mushroom button required for S2; bench substitute = tactile
+switch shorting Opta I1 to GND. Code can be written and
 unit-tested against a host-side packet emulator now, but the gate cannot
 close without the rig. Decision deferred until rig is available — do not
 ship safety code on synthetic-only evidence.)*
@@ -387,8 +1789,10 @@ L072 + handheld attached. The multi-source merge-policy paper decision
   stale-motion P0 frames after next sample interval.
 
 ### Stage S4 — D2 + D4 SAFETY 5-copy burst with decorrelation 🔴 HW-BLOCKED
-*(Requires S2 passing. Additionally requires step attenuator + interferer
-+ EIRP measurement path — see S-HW prereqs at end of plan.)*
+*(Requires S2 passing. Step attenuator and EIRP measurement path are
+**permanently waived** per 2026-05-19 decision — see S-HW.2 / S-HW.4.
+S4 ships under firmware-side TX-power cap + range-walk PER substitution
++ datasheet-declared EIRP, not lab-measured evidence.)*
 - [ ] **S4.1** SAFETY-class burst handler in firmware: 5 copies, ≥ 50 ms
       inter-copy spacing (rationale §21.3-2: exceed worst-case other-class
       ToA on channel so half-duplex doesn't drop a copy), FHSS-diverse when
@@ -487,8 +1891,12 @@ X8 boards. Bench airtime-reclaim gate requires L072 reattached.)*
 ### Stage S6 — D6 + D7 + D8 + D9 TX-power adapter (X8 Python) 🟡 HW-PARTIAL
 *(The `{NORMAL, MARGIN_LIMITED, AIRTIME_LIMITED, RECOVERY}` state machine,
 dwell timers, and PER/SNR aggregators are pure Python and SIL-testable
-against synthetic input traces on the two X8 boards. Final gate needs
-step attenuator + airtime-load generator + L072 link.)*
+against synthetic input traces on the two X8 boards. Final gate uses
+**range-walk + natural path loss** instead of a step attenuator (S-HW.2
+permanently waived) — bench evidence is "PER vs measured-RSSI bin"
+rather than "PER vs commanded attenuation step." Airtime-load generator
+runs on the second Max Carrier; full L072 link already proven via
+W1-10b.)*
 - [x] **S6.1** *(DONE 2026-05-18)* New module
       `DESIGN-CONTROLLER/base_station/tx_power_adapter_v3.py`: `SnrEwma`
       inner loop with 5-packet hysteresis + 10 Hz minimum interval cap
@@ -642,27 +2050,59 @@ S1.4, S2, S3, S4, S5 validation, and S6 validation.)*
       (b) X8-B (camera, serial `2E2C1209...`) has stripped Python stdlib
       (no `socket`/`dataclasses`/`json`); host-side bench ran on X8-A only.
       Production code on X8-B runs inside Docker, out of scope for S-HW.0.
-- [ ] **S-HW.1** Reattach at least one **L072 base + L072 handheld** pair
-      to the X8 stack. Without this, every RF gate is blocked.
-- [ ] **S-HW.2** Inventory the **step attenuator** (range, accuracy,
-      condition). Required for S1.1 walk_power sweep, S4 PER induction,
-      S6 margin-limited induction. If unavailable, source one
-      (≥ 0–60 dB range, ≥ 1 dB step, rated for 868/915 MHz).
+- [x] **S-HW.1** ✅ 2026-05-19 — RESOLVED BY TOPOLOGY CLARIFICATION.
+      Earlier wording assumed a separate "L072 base + L072 handheld"
+      pair was needed. Project decision: **one Max Carrier = base
+      station, the other Max Carrier = tractor-side radio**, both
+      already on the bench with onboard Murata CMWX1ZZABZ-078 (L072 +
+      SX1276). MKR WAN 1310 handheld is **optional**. The 2× Max
+      Carrier pair already passed end-to-end LoRa link test
+      (W1-10b 100/100 RX match, 2026-05-12). No RF-side gate is blocked
+      on radio hardware; remaining HW gates depend on test-equipment
+      (S-HW.2 attenuator, S-HW.4 EIRP path, S-HW.5 E-STOP), not radios.
+- ⚫ **S-HW.2** ~~Inventory the step attenuator~~ — **PERMANENTLY
+      SKIPPED 2026-05-19** (project decision: no lab test-equipment
+      will be acquired). Downstream consumers (S1.1 walk-power, S4 PER
+      induction, S6 margin-limited induction) substitute **range-walk
+      + natural path loss** for controlled attenuation; bench evidence
+      becomes "PER vs measured RSSI bin" instead of "PER vs commanded
+      attenuation step." Lower precision but acceptable for an
+      open-source agricultural-equipment context.
 - [ ] **S-HW.3** Confirm or build a **second LoRa TX as interferer** on
-      an adjacent channel — needed only for S4 correlated-fade test. A
-      spare MKR WAN 1310 running a pre-canned hammer script suffices.
-- [ ] **S-HW.4** Decide the **EIRP measurement path** for S4.2 (regional
-      ceiling enforcement):
-      - (a) spectrum analyzer + calibrated antenna or directional coupler
-        (preferred);
-      - (b) conducted measurement at antenna port + datasheet antenna-gain
-        math (sufficient for declaration, weaker evidence);
-      - (c) defer — S4 ships bench-flag-only until measurement path exists.
-      **S-HW.4 cannot be solved by software alone.** This is the most
-      likely blocker for shipping S4 to field.
-- [ ] **S-HW.5** Confirm a **real mushroom E-STOP** is wired to the
-      handheld used on the W2-02 rig (so S2 is a real regression test,
-      not a synthetic injector test).
+      an adjacent channel — needed only for S4 correlated-fade test.
+      Can be satisfied by **temporarily repurposing one of the two Max
+      Carrier radios** with a hammer firmware build (no extra hardware
+      required); MKR WAN 1310 path retained as fallback.
+- ⚫ **S-HW.4** ~~Decide the EIRP measurement path~~ — **PERMANENTLY
+      SKIPPED 2026-05-19** (project decision: no spectrum analyzer, no
+      calibrated antenna, no TCB lab access). FCC §15.247 EIRP
+      compliance ships under **firmware-side TX-power cap +
+      conducted-path datasheet declaration**:
+      - Firmware enforces SX1276 `RegPaConfig` MaxPower / OutputPower
+        bits so chip-side conducted output cannot exceed a declared
+        ceiling (FCC-TXPOWER-LAYER S0.9 hook lives here).
+      - Antenna gain entered from datasheet; total EIRP computed in
+        artifact header (orchestrator stamp via FCC-B2-b) as
+        `conducted_dBm + antenna_dBi - cable_loss_dB`.
+      - S4.2 ships **declaration-only**, not lab-measured. Production
+        deployment carries the standard amateur / experimental
+        unintentional-radiator caveat in the user-facing README.
+- [ ] **S-HW.5** Wire the revised E-STOP signal path (project decision
+      2026-05-19, supersedes the mushroom-button assumption):
+      - **Tractor side:** an **Arduino Opta digital input pin flip**
+        (e.g. dry-contact relay or hardwired switch into Opta I1…I8)
+        is the E-STOP trigger consumed by the base-station Max Carrier
+        radio. Opta-to-Max-Carrier link is per the existing
+        BUILD-CONTROLLER wiring plan (Modbus RTU or digital pass-through
+        — to be confirmed in S2).
+      - **Operator side:** a **keyboard key OR joystick button on the
+        web remote-control UI** sends an `ESTOP_REQ` host frame to the
+        tractor-side radio; UI must rate-limit at ≤ 5 Hz and **must
+        not require focus** (global keydown handler) so the operator
+        cannot lose E-STOP by tabbing away.
+      - **Test posture:** S2 regression treats both paths as real (no
+        synthetic injector). Opta pin flip can be simulated on the
+        bench by shorting Opta I1 to GND through a tactile switch.
 
 ### Software-only work that can run NOW on the current 2× X8 bench
 *(Ordered by leverage. Each is HW-independent and produces code that

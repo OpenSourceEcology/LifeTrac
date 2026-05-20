@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #define HOST_PROTOCOL_VER                    1U
-#define HOST_WIRE_SCHEMA_VER                 1U
+#define HOST_WIRE_SCHEMA_VER                 2U
 
 #define HOST_CAP_PING                        (1UL << 0)
 #define HOST_CAP_VERSION                     (1UL << 1)
@@ -56,6 +56,65 @@
 
 #define HOST_TYPE_RADIO_IRQ_URC              0xC0U
 #define HOST_TYPE_STATS_URC                  0xC1U
+#define HOST_TYPE_AIRTIME_INVARIANT_REJECT_URC 0xC2U
+/*
+ * AIRTIME_INVARIANT_REJECT_URC (a.k.a. "__AIRTIME_INVARIANT_REJECT__" in
+ * plan §14.2 step 3) signals that a modem-config setter refused a
+ * (SF, BW, CR) tuple whose worst-case ToA at max payload exceeds the
+ * per-channel dwell cap (currently 380 ms = 400 ms dwell - 20 ms guard).
+ *
+ * Payload layout (15 bytes, additive-only):
+ *   u8  sf                     spreading factor 6..12
+ *   u8  cr_den                  coding-rate denominator 5..8 (CR = 4/cr_den)
+ *   u32 bw_hz_le                bandwidth in Hz (e.g. 125000 / 250000 / 500000)
+ *   u8  payload_len             payload byte count used in the worst-case calc
+ *   u32 computed_toa_us_le      ToA the helper computed for this tuple
+ *   u32 cap_us_le               dwell cap that was exceeded (e.g. 380000)
+ *
+ * Cross-refs: AI NOTES/2026-05-19_LoRa_FCC_50CH_FHSS_Implementation_Plan_Copilot_v1_0.md
+ *             §14 / §14.2 step 3, TODO.md Stage S1.5 FCC-A1a.
+ */
+#define HOST_AIRTIME_REJECT_PAYLOAD_LEN      15U
+
+/*
+ * RFCO_PERTX_URC (plan §14.2 step 7, FCC-B1-PERTX) — per-TX Radio
+ * Frequency Compliance Observability snapshot. Emitted on EVERY TX
+ * result (OK, abort-at-gate, or downstream failure). Full payload
+ * documentation and helper API live in include/host_rfco.h; do NOT
+ * pack this URC inline — call host_rfco_pertx_emit() so the
+ * schema_ver byte and payload length stay in one place.
+ *
+ * Payload length is fixed at HOST_RFCO_PERTX_PAYLOAD_LEN (= 21).
+ * Schema version is HOST_RFCO_PERTX_SCHEMA_VER (= 1); future field
+ * additions MUST bump this. The 50-bucket per-channel histogram + per-
+ * channel `legal_dwell_max_us` snapshot is the SEPARATE per-minute
+ * RFCO_SUMMARY URC (FCC-B1-SUMMARY), not this one.
+ */
+#define HOST_TYPE_RFCO_PERTX_URC             0xC3U
+
+/*
+ * RFCO_SUMMARY_URC (plan §14.2, FCC-B1-SUMMARY) — per-minute Radio
+ * Frequency Compliance Observability snapshot. Carries the
+ * 50-bucket per-channel hop histogram, per-channel legal-dwell peak,
+ * blocked-attempts-by-reason histogram, active_count / blacklist_size,
+ * and last_clamp_reason. Complements the LIGHT per-TX RFCO_PERTX URC
+ * (one per TX result, 0xC3 above).
+ *
+ * Wire layout, schema_ver, constants, and snapshot struct live in
+ * include/host_rfco_summary.h. Payload length is fixed at
+ * HOST_RFCO_SUMMARY_PAYLOAD_LEN (= 191). Schema version is
+ * HOST_RFCO_SUMMARY_SCHEMA_VER (= 1); future additions MUST bump it.
+ * Cadence: HOST_RFCO_SUMMARY_PERIOD_MS (60 000 ms), polled from the
+ * main loop against platform_now_ms() — no new HAL timer.
+ *
+ * Design doc:
+ *   AI NOTES/2026-05-19_FCC_B1_SUMMARY_Wire_Layout_Design_Copilot_v1_0.md
+ *
+ * This is a DECLARATION-ONLY type-code allocation (FCC-B1-SUMMARY-a);
+ * pack helper, emit wrapper, and main-loop cadence land in
+ * FCC-B1-SUMMARY-b and FCC-B1-SUMMARY-c.
+ */
+#define HOST_TYPE_RFCO_SUMMARY_URC           0xC4U
 
 /* STATS_URC payload layout is additive-only; parsers must tolerate trailing bytes. */
 #define HOST_STATS_OFFSET_HOST_DROPPED       0U
@@ -116,6 +175,28 @@
 #define HOST_FAULT_CODE_HOST_PARSE_ERROR     0x0BU
 #define HOST_FAULT_CODE_HOST_DIAG_MARK       0x0CU
 
+/*
+ * RX_SCAN_FAILED — emitted by the SCANNING-state failure handler in
+ * radio/sx1276_rx.c when the FHSS rendezvous scan has failed to lock
+ * within REDESIGN_MS (per FCC-A6c-1 policy, sx1276_rx_scan_policy.c).
+ *
+ * The `sub` byte carries a four-class disambiguation encoding so the
+ * host can distinguish root cause at the fault edge without a wider
+ * URC payload (per AI NOTES/2026-05-19_RX_Scan_FAILED_State_Analysis
+ * §13.1 #2, A6c-3-a):
+ *
+ *   bit 7 : final       — 1 == retries exhausted, FAILED entered
+ *   bit 6 : warm        — 1 == this boot has previously LOCKED
+ *   bit 5 : hw_suspect  — 1 == no DIO0 IRQ observed during scan
+ *   bit 4 : crc_seen    — 1 == >=1 CRC-error IRQ observed during scan
+ *   bits 3..0 : attempt — 0..15 saturating, this attempt's index
+ *
+ * Emission semantics (B-prime, per §13.1 #6) and the file-statics that
+ * back the `sub` bits land in FCC-A6c-3-b / A6c-3-c. This define is
+ * declaration-only (FCC-A6c-3-a); no code emits it yet.
+ */
+#define HOST_FAULT_CODE_RX_SCAN_FAILED       0x0DU
+
 /* CFG status codes used in CFG_OK_URC payload. */
 #define HOST_CFG_STATUS_OK                   0U
 #define HOST_CFG_STATUS_UNKNOWN_KEY          1U
@@ -159,6 +240,7 @@ static inline void host_type_compile_time_uniqueness_check(void) {
         case HOST_TYPE_REG_WRITE_ACK_URC:
         case HOST_TYPE_RADIO_IRQ_URC:
         case HOST_TYPE_STATS_URC:
+        case HOST_TYPE_AIRTIME_INVARIANT_REJECT_URC:
         case HOST_TYPE_BOOT_URC:
         case HOST_TYPE_FAULT_URC:
         case HOST_TYPE_READY_URC:

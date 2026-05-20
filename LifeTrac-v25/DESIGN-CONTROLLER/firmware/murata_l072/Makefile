@@ -55,15 +55,29 @@ SRCS := \
     boot/safe_mode.c \
 	hal/platform.c \
 	host/host_cfg.c \
+	host/host_cfg_profile.c \
 	host/host_cfg_wire.c \
 	host/host_cmd.c \
+	host/host_rfco.c \
+	host/host_rfco_summary.c \
+	host/host_rfco_summary_emit.c \
 	host/host_stats.c \
 	host/host_uart.c \
 	radio/sx1276_airtime.c \
 	radio/sx1276_cad.c \
+	radio/lora_pkt_hdr.c \
+	radio/sx1276_fhss_chantab.c \
+	radio/sx1276_fhss.c \
 	radio/sx1276_lbt.c \
+	radio/sx1276_legal_dwell.c \
 	radio/sx1276_modes.c \
 	radio/sx1276_rx.c \
+	radio/sx1276_rx_counters.c \
+	radio/sx1276_rx_retune_policy.c \
+	radio/sx1276_rx_retune_counters.c \
+	radio/sx1276_rx_scan_policy.c \
+	radio/sx1276_rx_scan_counters.c \
+	radio/sx1276_rx_scan_fail.c \
 	radio/sx1276_tx.c \
 	radio/sx1276.c \
     include/static_asserts.c
@@ -92,6 +106,7 @@ CFLAGS := \
     $(OPT_FLAGS) \
     -std=gnu11 \
     -Iinclude -I. \
+    -DLIFETRAC_FHSS_TX_ROUTED=1 \
     -fno-common \
     -fno-builtin \
     -MMD -MP
@@ -125,7 +140,7 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner help
+.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters help
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
 
@@ -199,10 +214,27 @@ HOST_CC ?= gcc
 else
 HOST_CC ?= cc
 endif
-CFG_CONTRACT_BIN := $(BUILD)/cfg_contract
-CFG_WIRE_BIN     := $(BUILD)/cfg_wire_vectors
+CFG_CONTRACT_BIN  := $(BUILD)/cfg_contract
+CFG_WIRE_BIN      := $(BUILD)/cfg_wire_vectors
+FHSS_CHANTAB_BIN   := $(BUILD)/fhss_chantab_vectors
+FHSS_SCHEDULER_BIN := $(BUILD)/fhss_scheduler_vectors
+LEGAL_DWELL_BIN    := $(BUILD)/legal_dwell
+RFCO_PERTX_BIN     := $(BUILD)/rfco_pertx
+RFCO_SUMMARY_COUNTERS_BIN := $(BUILD)/rfco_summary_counters
+RFCO_SUMMARY_BIN   := $(BUILD)/rfco_summary
+RFCO_SUMMARY_EMIT_BIN := $(BUILD)/rfco_summary_emit
+RFCO_SUMMARY_INTEGRATION_BIN := $(BUILD)/rfco_summary_integration
+CFG_PROFILE_BIN    := $(BUILD)/cfg_profile
+LORA_PKT_HDR_BIN   := $(BUILD)/lora_pkt_hdr
+RX_COUNTERS_BIN    := $(BUILD)/rx_counters
+RX_RETUNE_POLICY_BIN := $(BUILD)/rx_retune_policy
+RX_RETUNE_COUNTERS_BIN := $(BUILD)/rx_retune_counters
+RX_SCAN_POLICY_BIN := $(BUILD)/rx_scan_policy
+RX_SCAN_COUNTERS_BIN := $(BUILD)/rx_scan_counters
+RX_SCAN_FAIL_BIN := $(BUILD)/rx_scan_fail
+AIRTIME_INVARIANT_BIN := $(BUILD)/airtime_invariant
 
-check: check-cpp check-asserts
+check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-airtime-invariant check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail
 	@echo "[OK] memory map invariants hold"
 
 check-cpp: $(BUILD)
@@ -324,6 +356,343 @@ check-cfg-contract-wire: $(BUILD)
 	    -o $(CFG_WIRE_BIN)
 	@echo "[CFG] Running wire-vector test ..."
 	@$(CFG_WIRE_BIN)
+
+# FCC-FHSS-CHANTAB (implementation plan §14 delta #6).
+# Compiles the firmware table source against a host toolchain so the
+# _Static_asserts in radio/sx1276_fhss_chantab.c fire on bad edits, then
+# runs golden vectors that are mirrored byte-for-byte in
+# bench/host_proto/fhss_chantab.py.
+check-fhss-chantab: $(BUILD)
+	@echo "[FHSS] Building chantab golden-vector test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/fhss_chantab_vectors.c \
+	    radio/sx1276_fhss_chantab.c \
+	    -o $(FHSS_CHANTAB_BIN)
+	@echo "[FHSS] Running chantab golden-vector test ..."
+	@$(FHSS_CHANTAB_BIN)
+
+# FCC-A1a (plan §14.2 step 3): config-time airtime invariant.
+# Builds the pure ToA helper + invariant check from radio/sx1276_airtime.c
+# against the host toolchain and runs golden vectors that prove
+#   (a) SF12/BW125/255B is rejected (ToA > 380 ms),
+#   (b) SF7/BW250/255B is accepted (ToA = 199.808 ms),
+#   (c) the pure ToA helper matches the Semtech datasheet formula.
+check-airtime-invariant: $(BUILD)
+	@echo "[AIRTIME] Building airtime-invariant test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/airtime_invariant.c \
+	    radio/sx1276_airtime.c \
+	    -o $(AIRTIME_INVARIANT_BIN)
+	@echo "[AIRTIME] Running airtime-invariant test ..."
+	@$(AIRTIME_INVARIANT_BIN)
+
+# FCC-A3 (plan §14.2 step 5): FHSS hop scheduler.
+# Compiles radio/sx1276_fhss.c + radio/sx1276_fhss_chantab.c against the
+# host toolchain and runs golden vectors that prove:
+#   - FNV-1a 32-bit seed matches off-tree reference values,
+#   - Fisher-Yates / xorshift32 permutation matches reference vectors,
+#   - permutation is a bijection of 0..49,
+#   - one full epoch via next_channel() visits every channel exactly once,
+#   - blacklist is refused during cold-start warm-up (50 hops) and after
+#     warm-up the 50-channel legal floor still refuses it,
+#   - LBT block accounting is decoupled from the active set,
+#   - APIs fail closed (NOT_INIT / NULL_ARG / BAD_IDX) without mutating state.
+check-fhss-scheduler: $(BUILD)
+	@echo "[FHSS] Building scheduler golden-vector test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/fhss_scheduler_vectors.c \
+	    radio/sx1276_fhss.c \
+	    radio/sx1276_fhss_chantab.c \
+	    -o $(FHSS_SCHEDULER_BIN)
+	@echo "[FHSS] Running scheduler golden-vector test ..."
+	@$(FHSS_SCHEDULER_BIN)
+
+# FCC-A2 (plan §14.2 step 6): legal-dwell accountant.
+# Compiles radio/sx1276_legal_dwell.c against the host toolchain and
+# runs property tests covering: half-open window inclusion, pessimistic
+# reserve + monotonic-downward reconcile, no-rollback-on-NACK contract,
+# per-channel isolation across 64 channels, 10 s vs 20 s window split,
+# over-budget refusal, ring-full eviction path, stale-handle safety,
+# and fail-closed bad-input rejection.
+check-legal-dwell: $(BUILD)
+	@echo "[DWELL] Building legal-dwell test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/legal_dwell.c \
+	    radio/sx1276_legal_dwell.c \
+	    -o $(LEGAL_DWELL_BIN)
+	@echo "[DWELL] Running legal-dwell test ..."
+	@$(LEGAL_DWELL_BIN)
+
+# FCC-B1-PERTX (plan §14.2 step 7): per-TX RFCO URC packer + emit().
+# Compiles host/host_rfco.c against the host toolchain with a stub for
+# host_uart_send_urc(), and runs golden-vector + property tests that
+# pin the on-wire payload layout (21 bytes, little-endian), the
+# schema_ver byte (= 1), the URC type (= 0xC3), the status enum
+# sentinels, and that emit() forwards the correct (type, payload, len)
+# triple. Bench post-processing depends on these constants.
+check-rfco-pertx: $(BUILD)
+	@echo "[RFCO ] Building per-TX RFCO test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rfco_pertx.c \
+	    host/host_rfco.c \
+	    radio/sx1276_fhss.c \
+	    radio/sx1276_fhss_chantab.c \
+	    -o $(RFCO_PERTX_BIN)
+	@echo "[RFCO ] Running per-TX RFCO test ..."
+	@$(RFCO_PERTX_BIN)
+
+# FCC-B1-SUMMARY-b-1 (plan §14.2 step 11, sub-step 1 of 3): sidecar
+# counter TUs that feed the per-minute RFCO_SUMMARY URC payload.
+# Compiles three counter-bearing modules (host_rfco, sx1276_fhss,
+# sx1276_legal_dwell) against the host toolchain and runs property
+# tests covering: saturating increment, snapshot-and-clear semantics,
+# NULL-safe out, out-of-range guards, per-channel/per-slot independence,
+# OK-not-recorded, INTERNAL->slot 7 mapping. Pins behavior that the
+# SUMMARY pack helper (b-2) and call-site wiring (b-3) will rely on.
+check-rfco-summary-counters: $(BUILD)
+	@echo "[SUMC ] Building RFCO summary counters test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rfco_summary_counters.c \
+	    host/host_rfco.c \
+	    radio/sx1276_fhss.c \
+	    radio/sx1276_fhss_chantab.c \
+	    radio/sx1276_legal_dwell.c \
+	    -o $(RFCO_SUMMARY_COUNTERS_BIN)
+	@echo "[SUMC ] Running RFCO summary counters test ..."
+	@$(RFCO_SUMMARY_COUNTERS_BIN)
+
+# FCC-B1-SUMMARY-b-2 (plan §14.2 step 11, sub-step 2 of 3): pure pack
+# helper for the per-minute RFCO_SUMMARY URC (191-byte LE payload +
+# trailing CRC-16/CCITT-FALSE). Compiles host/host_rfco_summary.c
+# against the host toolchain and runs byte-by-byte golden vectors that
+# pin: (a) the 191-byte payload length, (b) the schema byte hard-pin
+# at offset 0, (c) the _reserved_align hard-zero at offsets 6..7, (d)
+# LE encoding of every u16/u32 field, (e) per-channel/per-slot array
+# layout (50 hop + 50 dwell + 8 blocked), (f) CRC-16/CCITT-FALSE
+# correctness (KAT + sensitivity + LE byte order). NO call-site wiring
+# — that lands as B1-SUMMARY-b-3.
+check-rfco-summary: $(BUILD)
+	@echo "[SUMP ] Building RFCO summary pack test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rfco_summary.c \
+	    host/host_rfco_summary.c \
+	    -o $(RFCO_SUMMARY_BIN)
+	@echo "[SUMP ] Running RFCO summary pack test ..."
+	@$(RFCO_SUMMARY_BIN)
+
+# FCC-B1-SUMMARY-c-1 (plan §14.2 step 11, sub-step c-1 of c-1/c-2):
+# emit wrapper + cadence helper + per-window sidecars (no main-loop
+# wiring — that lands as c-2). Compiles host/host_rfco_summary.c
+# alongside the sidecar sources (host_rfco, sx1276_fhss,
+# sx1276_legal_dwell) against the host toolchain with a stub for
+# host_uart_send_urc(), and runs property tests covering:
+# (a) emit() forwards (type=0xC4, seq lower 16, flags, payload, len=191)
+# to send_urc; (b) payload matches an independent re-pack via
+# host_rfco_summary_pack(); (c) FIRST_SINCE_BOOT bit set on first call,
+# cleared on the second; (d) summary_emit_count increments 0→1→2;
+# (e) all sidecars (hop_count, dwell_peak, blocked_attempts,
+# pertx_count_in_window, last_clamp_reason) are drained by emit();
+# (f) pertx_count_in_window reflects intervening host_rfco_pertx_emit()
+# calls and saturates at 0xFF; (g) last_clamp_reason captures the
+# most-recent non-OK status, stays 0xFF when only OKs; (h) µs→ms
+# ceiling-div conversion (0→0, 1µs→1ms, 1500µs→2ms, UINT32_MAX→0xFFFF);
+# (i) should_emit cadence at exactly 60000 ms boundary + u32 wraparound.
+check-rfco-summary-emit: $(BUILD)
+	@echo "[SUME ] Building RFCO summary emit test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rfco_summary_emit.c \
+	    host/host_rfco_summary.c \
+	    host/host_rfco_summary_emit.c \
+	    host/host_rfco.c \
+	    radio/sx1276_fhss.c \
+	    radio/sx1276_fhss_chantab.c \
+	    radio/sx1276_legal_dwell.c \
+	    -o $(RFCO_SUMMARY_EMIT_BIN)
+	@echo "[SUME ] Running RFCO summary emit test ..."
+	@$(RFCO_SUMMARY_EMIT_BIN)
+
+# FCC-B1-SUMMARY-c-2 (plan §14.2 step 11, sub-step c-2 of c-1/c-2):
+# main-loop integration of the summary emit. Compiles
+# bench/host_proto/rfco_summary_integration.c against the same emit
+# wrapper + sidecar TUs as c-1 (now exercising the new
+# host_rfco_summary_tick() helper that owns last_emit_ms + seq) and
+# drives a simulated clock to verify:
+# (a) tick() emits nothing before now_ms reaches the first 60 000 ms
+# boundary; (b) at exactly 60 000 ms the first emit fires, carries
+# FIRST_SINCE_BOOT, summary_seq == 0, window_elapsed_ms == 60000;
+# (c) tick() is idempotent within a window (no double-emit at the
+# boundary); (d) successive windows emit at 120 000, 180 000, ... with
+# monotonically advancing summary_seq and window_elapsed_ms reflecting
+# the actual delta (e.g. late tick at 121 500 reports window=61 500);
+# (e) FIRST_SINCE_BOOT flag is cleared on the second emit;
+# (f) reset_wrapper_state() restores the 60 s startup delay and zeros
+# both seq and last_emit_ms; (g) profile_id arg threads through to the
+# SUMMARY payload byte 2 unchanged; (h) cadence survives a u32
+# platform_now_ms() wraparound near 0xFFFFFFFF.
+check-rfco-summary-integration: $(BUILD)
+	@echo "[SUMI ] Building RFCO summary integration test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rfco_summary_integration.c \
+	    host/host_rfco_summary.c \
+	    host/host_rfco_summary_emit.c \
+	    host/host_rfco.c \
+	    radio/sx1276_fhss.c \
+	    radio/sx1276_fhss_chantab.c \
+	    radio/sx1276_legal_dwell.c \
+	    -o $(RFCO_SUMMARY_INTEGRATION_BIN)
+	@echo "[SUMI ] Running RFCO summary integration test ..."
+	@$(RFCO_SUMMARY_INTEGRATION_BIN)
+
+# FCC-A5 (plan §14.2 step 8): regulatory-profile validation + two-phase
+# commit. Compiles host/host_cfg_profile.c against the host toolchain
+# and runs 25 property tests covering: validator (profile id, FHSS mask
+# popcount + table-membership, BW match, DTS, antenna range, unrouted
+# gate, NULL arg), power-clamp arithmetic (gain<=6 no-op, gain>6 ERP
+# reduction, hw-ceiling clamp, negative gain, no-headroom floor), tier
+# ceiling lookup, and the stage/activate state machine (happy path,
+# activate-without-stage, failed-stage clears in-flight, cancel, double
+# activate, unrouted-leaves-active-alone).
+check-cfg-profile: $(BUILD)
+	@echo "[CFGP ] Building cfg-profile test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/cfg_profile.c \
+	    host/host_cfg_profile.c \
+	    -o $(CFG_PROFILE_BIN)
+	@echo "[CFGP ] Running cfg-profile test ..."
+	@$(CFG_PROFILE_BIN)
+
+# FCC-A6a (plan §14.2 step 10, delta #13): LoRa link-layer packet header
+# pack/unpack contract. Compiles radio/lora_pkt_hdr.c against the host
+# toolchain and runs golden-vector + property tests pinning the on-wire
+# layout (8 bytes, little-endian epoch), the schema_ver byte (= 1), the
+# header length constant, NULL/short/bad-schema rejection paths, the
+# reserved-byte ignore rule (additive-evolution friendly per FCC notes
+# §17.3 #4), and pack/unpack round-trip integrity. Required so both
+# TX (sx1276_tx.c) and RX (sx1276_rx.c) agree on hop-sync header
+# layout before A6b (RX retune) and A6c (Scanning state) land.
+check-lora-pkt-hdr: $(BUILD)
+	@echo "[HDR  ] Building lora-pkt-hdr test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/lora_pkt_hdr.c \
+	    radio/lora_pkt_hdr.c \
+	    -o $(LORA_PKT_HDR_BIN)
+	@echo "[HDR  ] Running lora-pkt-hdr test ..."
+	@$(LORA_PKT_HDR_BIN)
+
+# FCC-A6b-2-ii-β (plan §14.2 step 10): per-decision counters that
+# sx1276_rx_service() updates via sx1276_rx_counter_record() after each
+# successful A6a header parse. Compiles radio/sx1276_rx_counters.c
+# (HW-free TU) against the host toolchain and verifies initial-zero,
+# per-slot increment isolation, out-of-range no-op, snapshot
+# idempotency, reset round-trip, NULL-arg safety, no-narrow-type-wrap,
+# interleaved-accumulation, and the DIM-matches-enum invariant. Drop
+# visibility for FCC-B1-SUMMARY rides on these counters — no
+# host_stats field added (would bump the host↔X8 wire layout).
+check-rx-counters: $(BUILD)
+	@echo "[RXCT ] Building rx-counters test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rx_counters.c \
+	    radio/sx1276_rx_counters.c \
+	    -o $(RX_COUNTERS_BIN)
+	@echo "[RXCT ] Running rx-counters test ..."
+	@$(RX_COUNTERS_BIN)
+
+# FCC-A6b-2-ii-γ-1 (plan §14.2 step 10): pure-function RX retune
+# decision. Verifies priority ordering (NOT_INIT > BUSY > timing),
+# strict-< period boundary, wrap-safe int32 elapsed math (incl. real
+# uint32 tick wrap), DO_WRAP self-heal branch, DIM = max-enum + 1, and
+# enum numeric stability (FCC-B1-SUMMARY's additive URC will index
+# per-outcome counters by these values — reordering would silently
+# mis-route histograms). γ-2 wires this policy + a HW-free counter TU
+# into sx1276_rx_tick(); γ-3 replaces the placeholder period with the
+# Q2 epoch-driven boundary.
+check-rx-retune-policy: $(BUILD)
+	@echo "[RXRT ] Building rx-retune-policy test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rx_retune_policy.c \
+	    radio/sx1276_rx_retune_policy.c \
+	    -o $(RX_RETUNE_POLICY_BIN)
+	@echo "[RXRT ] Running rx-retune-policy test ..."
+	@$(RX_RETUNE_POLICY_BIN)
+
+# FCC-A6b-2-ii-γ-2: per-outcome counters for the γ-1 retune policy.
+# HW-free TU (radio/sx1276_rx_retune_counters.c) — host links and runs
+# without modem/platform deps. The 10-case test verifies: zeroed
+# initial state, per-slot isolation, out-of-range no-op, idempotent
+# snapshot, reset + reuse, NULL-safe getter, no narrow-type wrap @
+# 4096 records, interleaved accumulation, DIM = max-enum + 1, and
+# round-trip after reset. FCC-B1-SUMMARY will read these counters
+# additively into the per-minute URC.
+check-rx-retune-counters: $(BUILD)
+	@echo "[RXRTC] Building rx-retune-counters test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rx_retune_counters.c \
+	    radio/sx1276_rx_retune_counters.c \
+	    -o $(RX_RETUNE_COUNTERS_BIN)
+	@echo "[RXRTC] Running rx-retune-counters test ..."
+	@$(RX_RETUNE_COUNTERS_BIN)
+
+# FCC-A6c-1: RX cold-start Scanning state-machine pure-function
+# policy (radio/sx1276_rx_scan_policy.c). 20-case host golden vector
+# verifies: NULL-safe default, BOOT-collapses-all-events to
+# BEGIN_SCAN, SCANNING dwell-boundary + redesign-boundary precedence
+# (FAIL wins over ADVANCE), FRAME_VALID-locks-only-with-header-ok
+# defensive demotion, LOCKED+FAILED absorbing, uint32 ms tick wrap
+# on either anchor -> REANCHOR, DIM = max-enum + 1 for
+# state/event/action, and enum numeric stability (FCC-B1-SUMMARY
+# URC will index per-state / per-action counters by these values --
+# reordering would silently mis-route histograms). A6c-2 wires this
+# policy + a HW-free counter TU into the RX loop; A6c-3 surfaces
+# 5 s acceptance-target overruns to D-Gate.
+check-rx-scan-policy: $(BUILD)
+	@echo "[RXSCN] Building rx-scan-policy test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rx_scan_policy.c \
+	    radio/sx1276_rx_scan_policy.c \
+	    -o $(RX_SCAN_POLICY_BIN)
+	@echo "[RXSCN] Running rx-scan-policy test ..."
+	@$(RX_SCAN_POLICY_BIN)
+
+# FCC-A6c-2 (counters TU): per-state + per-action histograms for
+# the A6c-1 Scanning SM. HW-free TU (radio/sx1276_rx_scan_counters.c)
+# mirrors the γ-2 retune-counters pattern but spans two axes
+# (state DIM=4 + action DIM=6). The 14-case test verifies: zeroed
+# initial state, per-axis slot isolation in lockstep with the
+# orthogonal axis, OOR-state drops state but keeps action, OOR-
+# action drops action but keeps state, both-OOR total no-op,
+# idempotent snapshots, reset zeros BOTH arrays, NULL-safe getters
+# on either axis, no narrow-type wrap @ 4096 records, interleaved
+# accumulation, STATE_DIM/ACTION_DIM = max-enum + 1, and round-
+# trip after reset. FCC-B1-SUMMARY will read both histograms
+# additively into the per-minute URC.
+check-rx-scan-counters: $(BUILD)
+	@echo "[RXSCC] Building rx-scan-counters test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rx_scan_counters.c \
+	    radio/sx1276_rx_scan_counters.c \
+	    -o $(RX_SCAN_COUNTERS_BIN)
+	@echo "[RXSCC] Running rx-scan-counters test ..."
+	@$(RX_SCAN_COUNTERS_BIN)
+
+# FCC-A6c-3-c: pure helper that builds the HOST_FAULT_CODE_RX_SCAN_
+# FAILED sub-byte + the retry-vs-final gate from the A6c-3-b file-
+# static snapshot. HW-free TU (radio/sx1276_rx_scan_fail.c) — host
+# links and runs without modem/platform/host_cmd deps. Test pins
+# the §13.1 #2 bit layout (final=bit7, warm=bit6, hw_suspect=bit5,
+# crc_seen=bit4, attempt=bits3..0), the retry boundary
+# (retries==max ⇒ final), the attempt-nibble saturation, the
+# hw_suspect derivation (NOT got_irq AND NOT crc_seen), the
+# warm-bit passthrough, the NULL-input defensive contract
+# (sub=0x80, final=1), and the constant SX1276_RX_SCAN_MAX_RETRIES
+# = 3U from v5.0 §13.1.
+check-rx-scan-fail: $(BUILD)
+	@echo "[RXSCF] Building rx-scan-fail test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rx_scan_fail.c \
+	    radio/sx1276_rx_scan_fail.c \
+	    -o $(RX_SCAN_FAIL_BIN)
+	@echo "[RXSCF] Running rx-scan-fail test ..."
+	@$(RX_SCAN_FAIL_BIN)
 
 $(BUILD):
 	@$(call MKDIR_P,$(BUILD))

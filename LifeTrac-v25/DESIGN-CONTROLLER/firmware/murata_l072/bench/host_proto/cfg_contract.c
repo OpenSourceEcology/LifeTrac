@@ -496,6 +496,67 @@ int main(void) {
             false,
             false,
             0U
+        },
+        /*
+         * FCC-PROFILE-ENUM (plan §14 / TODO Stage S1.5). These cases run
+         * under the bench host build, which does NOT define
+         * LIFETRAC_FHSS_TX_ROUTED. They therefore lock in the pre-A4
+         * behaviour: bench profile is the only accepted value; both
+         * production profiles return CFG_STATUS_PROFILE_UNROUTED; an
+         * unknown profile byte is rejected as OUT_OF_RANGE before the
+         * routing gate is even consulted.
+         */
+        {
+            "reg_profile_bench_default_ok",
+            CFG_KEY_REG_PROFILE,
+            { REG_PROFILE_BENCH_ONLY_FIXED_915 },
+            1U,
+            CFG_STATUS_OK,
+            true,
+            { REG_PROFILE_BENCH_ONLY_FIXED_915 },
+            1U,
+            false, /* setting default value does not flip dirty */
+            false,
+            0U
+        },
+        {
+            "reg_profile_fcc_fhss_unrouted",
+            CFG_KEY_REG_PROFILE,
+            { REG_PROFILE_FCC_15_247_FHSS_50CH_BW250 },
+            1U,
+            CFG_STATUS_PROFILE_UNROUTED,
+            true,
+            { REG_PROFILE_BENCH_ONLY_FIXED_915 },
+            1U,
+            false,
+            false,
+            0U
+        },
+        {
+            "reg_profile_fcc_dts_unrouted",
+            CFG_KEY_REG_PROFILE,
+            { REG_PROFILE_FCC_15_247_DTS_BW500 },
+            1U,
+            CFG_STATUS_PROFILE_UNROUTED,
+            true,
+            { REG_PROFILE_BENCH_ONLY_FIXED_915 },
+            1U,
+            false,
+            false,
+            0U
+        },
+        {
+            "reg_profile_unknown_oor",
+            CFG_KEY_REG_PROFILE,
+            { (uint8_t)(REG_PROFILE_MAX + 1U) },
+            1U,
+            CFG_STATUS_OUT_OF_RANGE,
+            true,
+            { REG_PROFILE_BENCH_ONLY_FIXED_915 },
+            1U,
+            false,
+            false,
+            0U
         }
     };
 
