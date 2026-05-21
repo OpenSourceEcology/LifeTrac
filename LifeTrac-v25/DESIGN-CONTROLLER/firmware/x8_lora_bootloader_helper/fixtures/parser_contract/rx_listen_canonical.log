@@ -1,0 +1,15 @@
+MODE: rx_listen
+dev=/dev/ttymxc3 baud=921600
+RUNTIME_PROFILE_ENUM=0
+RUNTIME_PROFILE_ENUM=ERR request_failed:TimeoutError
+__W1_10B_LISTEN_READY__
+__RX_FRAME__ idx=1 rssi=-114 snr=2 len=64 timestamp_us=100 payload_hex=fe0000ba
+RX_FRAME_URC: idx=2 rssi=-113 snr=3 len=64 timestamp_us=200 payload_hex=fe0001ba
+__RX_FRAME__ idx=3 rssi=-114 snr=2 len=64 timestamp_us=300 payload_hex=fe0002ba
+RX_FRAME_URC: idx=4 rssi=-113 snr=2 len=64 timestamp_us=400 payload_hex=fe0003ba
+__RX_FRAME__ idx=5 rssi=-114 snr=3 len=64 timestamp_us=500 payload_hex=fe0004ba
+__TX_DONE__ idx=1 tx_id=0xdead status=0(OK) toa_us=30000 elapsed_ms=30.1 payload_hex=00
+__TX_DONE__ idx=2 tx_id=0xbeef status=0(OK) toa_us=30000 elapsed_ms=30.2 payload_hex=00
+KeyboardInterrupt
+__RX_LISTEN_STOPPED__ reason=SIGINT rx_frames_so_far=5
+__W1_10B_LISTEN_DONE__ rx_frames=5 radio_rx_ok_delta=5 radio_crc_err_delta=0 real_faults=0 invariants_violated=0 stopped_by_signal=1

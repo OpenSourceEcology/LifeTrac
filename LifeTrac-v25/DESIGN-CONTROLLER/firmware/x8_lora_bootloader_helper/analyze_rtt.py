@@ -103,6 +103,29 @@ _PINGPONG_RE = re.compile(
     r"status=(?P<status>\d+)[^\n]*?rtt_ms=(?P<rtt_ms>-?\d+(?:\.\d+)?)"
 )
 
+# 2026-05-20 P1-5: explicit timeout token (probe emits this alongside the
+# legacy __PINGPONG_TIMEOUT__). Used for timeout accounting only; the actual
+# RTT samples come from _PINGPONG_RE.
+_RTT_TIMEOUT_RE = re.compile(
+    r"__RTT_TIMEOUT__\s+idx=(?P<idx>\d+)\s+"
+    r"rtt_timeout_s=(?P<rtt_timeout_s>\d+(?:\.\d+)?)"
+)
+_PINGPONG_TIMEOUT_RE = re.compile(r"__PINGPONG_TIMEOUT__\s+idx=(?P<idx>\d+)")
+
+# 2026-05-20 P1-5: probe announcement line carrying the configured
+# `rtt_timeout` so the analyzer can auto-detect the censoring boundary
+# without a separate CLI flag. Format:
+#     === W1-11 probe PING_PONG: count=N tx_timeout=Xs rtt_timeout=Ys ===
+_PINGPONG_BANNER_RE = re.compile(
+    r"=== W1-11 probe PING_PONG:.*?rtt_timeout=(?P<rtt_timeout>\d+(?:\.\d+)?)s"
+)
+
+# Default censoring margin (ms). Samples within this distance of the
+# rtt_timeout boundary are treated as quasi-timeouts and dropped from the
+# percentile pool because their absolute value is bounded by the timeout
+# rather than by the link.
+DEFAULT_RTT_CENSOR_MARGIN_MS = 20.0
+
 
 @dataclass
 class TxRow:
@@ -215,6 +238,10 @@ def parse_pingpong_rtts(text: str) -> list[float]:
     """W1-11 L-1: extract per-cycle RTT (ms) from `__PINGPONG__` lines on
     the TX board's stdout. Cycles where the echo timed out emit
     `rtt_ms=-1` and are filtered out here.
+
+    Returns the *raw* (uncensored) successful-echo samples. P1-5 censoring
+    is applied later in `censor_rtts_near_timeout` so the caller can report
+    both raw and censored stats.
     """
     rtts: list[float] = []
     for m in _PINGPONG_RE.finditer(text):
@@ -222,6 +249,48 @@ def parse_pingpong_rtts(text: str) -> list[float]:
         if v >= 0:
             rtts.append(v)
     return rtts
+
+
+def detect_rtt_timeout_s(text: str) -> float | None:
+    """P1-5: parse the configured `rtt_timeout` (seconds) from the probe's
+    `=== W1-11 probe PING_PONG: ... rtt_timeout=Ys ===` banner. Returns
+    None if the banner is absent (caller should default).
+    """
+    m = _PINGPONG_BANNER_RE.search(text)
+    if m is None:
+        return None
+    try:
+        return float(m["rtt_timeout"])
+    except (TypeError, ValueError):
+        return None
+
+
+def count_rtt_timeouts(text: str) -> int:
+    """P1-5: count explicit timeout markers. Prefers the new
+    `__RTT_TIMEOUT__` token; falls back to legacy `__PINGPONG_TIMEOUT__`.
+    Never double-counts: the probe emits both for the same cycle so we take
+    the max of the two regex match counts.
+    """
+    new_n = sum(1 for _ in _RTT_TIMEOUT_RE.finditer(text))
+    legacy_n = sum(1 for _ in _PINGPONG_TIMEOUT_RE.finditer(text))
+    return max(new_n, legacy_n)
+
+
+def censor_rtts_near_timeout(
+    rtts: list[float],
+    rtt_timeout_s: float | None,
+    margin_ms: float = DEFAULT_RTT_CENSOR_MARGIN_MS,
+) -> tuple[list[float], int]:
+    """P1-5: drop samples within `margin_ms` of the rtt_timeout boundary.
+    Returns (censored_samples, n_dropped). If `rtt_timeout_s` is None, no
+    censoring is applied (the analyzer falls back to raw stats and prints
+    a warning).
+    """
+    if rtt_timeout_s is None:
+        return list(rtts), 0
+    boundary_ms = rtt_timeout_s * 1000.0
+    kept = [v for v in rtts if v < (boundary_ms - margin_ms)]
+    return kept, len(rtts) - len(kept)
 
 
 def rx_inter_arrival_ms(rxs: list[RxRow]) -> list[float]:
@@ -247,7 +316,10 @@ def fmt_stats_row(label: str, s: Stats, unit: str = "ms") -> str:
             f"max={s.max:>7.2f} {unit}")
 
 
-def build_report(evidence_dir: Path) -> tuple[str, dict]:
+def build_report(evidence_dir: Path,
+                 rtt_timeout_s_override: float | None = None,
+                 rtt_censor_margin_ms: float = DEFAULT_RTT_CENSOR_MARGIN_MS
+                 ) -> tuple[str, dict]:
     tx_path = evidence_dir / "tx_stdout.txt"
     rx_path = evidence_dir / "rx_stdout.txt"
     tx_text = tx_path.read_text(encoding="utf-8", errors="replace") if tx_path.exists() else ""
@@ -255,8 +327,16 @@ def build_report(evidence_dir: Path) -> tuple[str, dict]:
 
     txs = parse_tx_dones(tx_text)
     rxs = parse_rx_frames(rx_text)
-    pingpong_rtts = parse_pingpong_rtts(tx_text)
-    pingpong_ms = summarize(pingpong_rtts)
+    pingpong_rtts_raw = parse_pingpong_rtts(tx_text)
+    rtt_timeout_s_detected = detect_rtt_timeout_s(tx_text)
+    rtt_timeout_s = (rtt_timeout_s_override
+                     if rtt_timeout_s_override is not None
+                     else rtt_timeout_s_detected)
+    pingpong_rtts_censored, censored_count = censor_rtts_near_timeout(
+        pingpong_rtts_raw, rtt_timeout_s, rtt_censor_margin_ms)
+    pingpong_timeout_count = count_rtt_timeouts(tx_text)
+    pingpong_ms = summarize(pingpong_rtts_censored)
+    pingpong_ms_raw = summarize(pingpong_rtts_raw)
 
     toa_ms = summarize(t.toa_us / 1000.0 for t in txs if t.status == 0)
     elapsed_ms = summarize(t.elapsed_ms for t in txs if t.status == 0)
@@ -333,6 +413,25 @@ def build_report(evidence_dir: Path) -> tuple[str, dict]:
         # firmware-echo RTT will be ~21 ms lower (one host overhead).
         lines.append("--- True ping-pong RTT (W1-11 L-1, host-driven echo) ---")
         lines.append(fmt_stats_row("pingpong_rtt_ms", pingpong_ms, "ms"))
+        # 2026-05-20 P1-5: surface raw vs censored sample counts so a
+        # reader can see when a percentile bucket is bounded by the
+        # rtt_timeout rather than by the link.
+        if rtt_timeout_s is not None:
+            lines.append(
+                f"  rtt_timeout_boundary             = {rtt_timeout_s*1000.0:.1f} ms "
+                f"(censor margin = {rtt_censor_margin_ms:.1f} ms)"
+            )
+            lines.append(
+                f"  raw_samples                       n={pingpong_ms_raw.n} "
+                f"censored_near_timeout={censored_count} "
+                f"explicit_timeouts={pingpong_timeout_count}"
+            )
+        else:
+            lines.append(
+                "  WARN: rtt_timeout banner not found in tx_stdout.txt; "
+                "P1-5 timeout-censoring is DISABLED for this report. "
+                "Pass --rtt-timeout <seconds> to override."
+            )
         pp_target = w4_00b_target_ms
         pp_window = w4_00b_window_ms
         pp_within = abs(pingpong_ms.p50 - pp_target) <= pp_window
@@ -376,6 +475,15 @@ def build_report(evidence_dir: Path) -> tuple[str, dict]:
             ),
         },
         "pingpong_rtt_ms": pingpong_ms.to_dict() if pingpong_ms.n else None,
+        "pingpong_rtt_raw_ms": pingpong_ms_raw.to_dict() if pingpong_ms_raw.n else None,
+        "pingpong_rtt_censoring": {
+            "rtt_timeout_s_detected": rtt_timeout_s_detected,
+            "rtt_timeout_s_effective": rtt_timeout_s,
+            "rtt_censor_margin_ms": rtt_censor_margin_ms,
+            "raw_sample_count": pingpong_ms_raw.n,
+            "censored_near_timeout_count": censored_count,
+            "explicit_timeout_count": pingpong_timeout_count,
+        },
     }
 
     return "\n".join(lines), payload
@@ -400,6 +508,17 @@ def main(argv: list[str] | None = None) -> int:
                         help="Merge the latency payload into <evidence_dir>/summary.json "
                              "under a `latency` key (orchestrator-friendly; non-fatal "
                              "if summary.json is absent or unreadable).")
+    # 2026-05-20 P1-5: RTT timeout censoring overrides. By default the
+    # analyzer auto-detects rtt_timeout from the probe banner; pass these
+    # to override.
+    parser.add_argument("--rtt-timeout", type=float, default=None,
+                        help="Override rtt_timeout (seconds) for percentile "
+                             "censoring. Default: auto-detect from probe banner.")
+    parser.add_argument("--rtt-censor-margin-ms", type=float,
+                        default=DEFAULT_RTT_CENSOR_MARGIN_MS,
+                        help=f"Margin (ms) within which samples are treated as "
+                             f"near-timeout and dropped (default "
+                             f"{DEFAULT_RTT_CENSOR_MARGIN_MS}).")
     args = parser.parse_args(argv)
 
     if not args.evidence_dir.is_dir():
@@ -409,7 +528,11 @@ def main(argv: list[str] | None = None) -> int:
     out_md = args.out_md or (args.evidence_dir / "rtt_report.md")
     out_json = args.out_json or (args.evidence_dir / "rtt_report.json")
 
-    text, payload = build_report(args.evidence_dir)
+    text, payload = build_report(
+        args.evidence_dir,
+        rtt_timeout_s_override=args.rtt_timeout,
+        rtt_censor_margin_ms=args.rtt_censor_margin_ms,
+    )
 
     out_md.write_text(text + "\n", encoding="utf-8")
     out_json.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

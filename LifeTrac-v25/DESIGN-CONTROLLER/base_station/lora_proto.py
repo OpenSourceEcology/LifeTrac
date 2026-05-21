@@ -792,6 +792,16 @@ def _xorshift32(value: int) -> int:
 # -------------------------------------------------------------------------
 TELEMETRY_FRAGMENT_MAGIC = 0xFE
 TELEMETRY_FRAGMENT_HEADER_LEN = 4
+# W2-02 P0c (2026-05-20): v2 wire format with explicit redundancy. The
+# 5-byte header is identical to v1 except for the magic and one extra
+# trailing byte encoding (total_copies<<4)|copy_idx (nibbles). v2 is
+# emitted only by image-pipeline payloads with redundancy >= 2; telemetry
+# topics continue to use v1 (no airtime budget for redundancy under
+# TELEMETRY_FRAGMENT_MAX_AIRTIME_MS). The reassembler in
+# image_pipeline/reassemble.py recognises both magics and treats v2
+# copies as dedup-by-(seq, idx) with first-copy-wins semantics.
+TELEMETRY_FRAGMENT_MAGIC_V2 = 0xFD
+TELEMETRY_FRAGMENT_HEADER_LEN_V2 = 5
 TELEMETRY_FRAGMENT_MAX_AIRTIME_MS = 25.0
 
 
@@ -850,20 +860,36 @@ def pack_telemetry_fragments(payload: bytes, frag_seq: int,
 def parse_telemetry_fragment(body: bytes) -> tuple[int, int, int, bytes] | None:
     """Inverse of pack_telemetry_fragments(); returns (seq, idx, total, data).
 
-    Returns None when the magic byte doesn't match (caller should treat
-    the body as a complete unfragmented payload — keeps backward compat
-    with telemetry topics whose payloads always fit under 25 ms).
+    Accepts both v1 (0xFE, 4-byte header) and v2 (0xFD, 5-byte header
+    with extra redundancy nibble byte). For v2 the redundancy byte is
+    silently dropped here -- callers that care about copy_idx use the
+    image_pipeline FragmentReassembler directly. Returns None when no
+    known magic matches (caller should treat the body as a complete
+    unfragmented payload -- keeps backward compat with telemetry topics
+    whose payloads always fit under 25 ms).
     """
     if len(body) < TELEMETRY_FRAGMENT_HEADER_LEN:
         return None
-    if body[0] != TELEMETRY_FRAGMENT_MAGIC:
+    magic = body[0]
+    if magic == TELEMETRY_FRAGMENT_MAGIC:
+        header_len = TELEMETRY_FRAGMENT_HEADER_LEN
+    elif magic == TELEMETRY_FRAGMENT_MAGIC_V2:
+        if len(body) < TELEMETRY_FRAGMENT_HEADER_LEN_V2:
+            return None
+        red_byte = body[4]
+        total_copies = (red_byte >> 4) & 0x0F
+        copy_idx = red_byte & 0x0F
+        if total_copies == 0 or copy_idx >= total_copies:
+            return None
+        header_len = TELEMETRY_FRAGMENT_HEADER_LEN_V2
+    else:
         return None
     frag_seq = body[1]
     frag_idx = body[2]
     total = body[3] + 1
     if frag_idx >= total:
         return None
-    return frag_seq, frag_idx, total, bytes(body[TELEMETRY_FRAGMENT_HEADER_LEN:])
+    return frag_seq, frag_idx, total, bytes(body[header_len:])
 
 
 @dataclass

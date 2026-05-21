@@ -75,9 +75,14 @@ CANVAS_W = GRID_W * TILE_PX   # 384
 CANVAS_H = GRID_H * TILE_PX   # 256
 
 # L072 firmware caps HostLink TX_FRAME_REQ payload at 64 B.
-# Fragment body = 4-byte 0xFE header + data, so usable data per fragment = 60 B.
+# Fragment body = 4-byte 0xFE header + data (v1), so usable data per fragment
+# = 60 B. The W2-02 P0c redundancy header (0xFD) prepends one extra byte
+# encoding `(total_copies<<4)|copy_idx`, so v2 fragments lose 1 B of payload.
 L072_TX_MAX = 64
-FRAG_DATA_MAX = L072_TX_MAX - 4   # 60 B
+FRAG_DATA_MAX = L072_TX_MAX - 4        # 60 B (v1)
+FRAG_DATA_MAX_V2 = L072_TX_MAX - 5     # 59 B (v2)
+FRAGMENT_MAGIC_V2 = 0xFD
+MAX_REDUNDANCY_V2 = 15                 # one nibble
 
 
 def _encode_tile_webp(rgb: bytes, quality: int = 55) -> bytes:
@@ -127,27 +132,52 @@ def _build_keyframe(frame_rgb: bytes, base_seq: int, quality: int) -> TileDeltaF
     )
 
 
-def _frag_capped(payload: bytes, frag_seq: int) -> list[bytes]:
-    """Like pack_telemetry_fragments but force chunk size <= FRAG_DATA_MAX.
+def _frag_capped(payload: bytes, frag_seq: int, redundancy: int = 1) -> list[bytes]:
+    """Hand-chunk ``payload`` into L072-cappable fragment bodies.
 
-    The library function sizes by airtime via PHY_IMAGE (SF7/BW500), which
-    would produce fragments much larger than the L072 HostLink 64 B cap.
-    For the bench we hand-chunk to FRAG_DATA_MAX bytes of data per
-    fragment, keeping the 4-byte 0xFE header that FragmentReassembler
-    needs.
+    When ``redundancy == 1`` (default), emits the legacy v1 wire format
+    (4-byte 0xFE header, body <= 60 B). When ``redundancy > 1``, emits
+    the W2-02 P0c v2 wire format: 5-byte 0xFD header carrying an extra
+    ``redundancy = (total_copies<<4)|copy_idx`` byte, body <= 59 B. Each
+    unique fragment idx is emitted ``redundancy`` times back-to-back
+    (copy_idx-major), so the receiver can dedup via the copy_idx
+    bitmask in :class:`FragmentReassembler`.
+
+    We deliberately do not interleave fragments across the redundancy
+    dimension (Step 0 lock 2026-05-20: burstiness verdict found no
+    benefit from interleaving on the bench link and the simpler
+    "copy 0 then copy 1" ordering minimises reassembly window).
+
+    Backwards-compat note: ``pack_telemetry_fragments`` in lora_proto.py
+    sizes by airtime (PHY_IMAGE = SF7/BW500) and would produce fragments
+    much larger than the L072 HostLink 64 B cap, so we don't reuse it.
     """
     from lora_proto import TELEMETRY_FRAGMENT_MAGIC
-    chunk = FRAG_DATA_MAX
+    if redundancy < 1:
+        raise ValueError(f"redundancy must be >= 1, got {redundancy}")
+    if redundancy > MAX_REDUNDANCY_V2:
+        raise ValueError(f"redundancy {redundancy} > MAX_REDUNDANCY_V2 ({MAX_REDUNDANCY_V2})")
+    chunk = FRAG_DATA_MAX if redundancy == 1 else FRAG_DATA_MAX_V2
     total = max(1, (len(payload) + chunk - 1) // chunk)
     if total > 256:
         raise RuntimeError(f"payload requires {total} fragments; max 256")
     out: list[bytes] = []
     for idx in range(total):
         data = payload[idx * chunk:(idx + 1) * chunk]
-        header = bytes([TELEMETRY_FRAGMENT_MAGIC,
-                        frag_seq & 0xFF, idx & 0xFF,
-                        (total - 1) & 0xFF])
-        out.append(header + data)
+        if redundancy == 1:
+            header = bytes([TELEMETRY_FRAGMENT_MAGIC,
+                            frag_seq & 0xFF, idx & 0xFF,
+                            (total - 1) & 0xFF])
+            out.append(header + data)
+        else:
+            total_copies_nibble = (redundancy & 0x0F) << 4
+            for copy_idx in range(redundancy):
+                red_byte = total_copies_nibble | (copy_idx & 0x0F)
+                header = bytes([FRAGMENT_MAGIC_V2,
+                                frag_seq & 0xFF, idx & 0xFF,
+                                (total - 1) & 0xFF,
+                                red_byte])
+                out.append(header + data)
     return out
 
 
@@ -171,7 +201,7 @@ def cmd_encode(args) -> int:
 
     frame = _build_keyframe(raw, base_seq=args.base_seq, quality=args.quality)
     body = encode_tile_delta_frame(frame)
-    fragments = _frag_capped(body, frag_seq=args.frag_seq)
+    fragments = _frag_capped(body, frag_seq=args.frag_seq, redundancy=args.redundancy)
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="ascii", newline="\n") as fh:
@@ -290,6 +320,11 @@ def main(argv=None) -> int:
     enc.add_argument("--quality", type=int, default=55, help="WebP quality")
     enc.add_argument("--base-seq", type=int, default=0)
     enc.add_argument("--frag-seq", type=int, default=0)
+    enc.add_argument("--redundancy", type=int, default=1,
+                     help="W2-02 P0c redundancy factor N (1=v1 0xFE wire format "
+                          "no redundancy; >=2 emits v2 0xFD header with "
+                          "(total_copies<<4)|copy_idx). 2026-05-20 plan default "
+                          "for stability runs: 2. Max 15 (one nibble).")
     enc.set_defaults(func=cmd_encode)
 
     dec = sub.add_parser("decode")

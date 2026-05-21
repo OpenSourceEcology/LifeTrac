@@ -266,17 +266,40 @@ def emit_runtime_profile_enum(link: HostLink) -> None:
     request/parse failure prints `RUNTIME_PROFILE_ENUM=ERR <reason>` so the
     FCC-B3-2 gate can distinguish wrong-firmware (enum mismatch) from
     probe regression (line missing entirely).
+
+    2026-05-20 P2-1 fix: drain BOOT_URC + any pending traffic first, then
+    retry once with a longer timeout if the initial CFG_GET races the boot
+    storm (cold-start TimeoutError seen in walk_power_pilot/T4 evidence).
     """
     global _runtime_profile_emitted
     if _runtime_profile_emitted:
         return
     _runtime_profile_emitted = True
+    # Quiet the link before the CFG_GET so the response isn't buried under
+    # BOOT_URC / STATS_URC traffic. Both helpers are no-ops if nothing is
+    # pending; failure here is non-fatal.
     try:
-        frame = link.request(HOST_TYPE_CFG_GET_REQ, HOST_TYPE_CFG_DATA_URC,
-                             bytes([CFG_KEY_REG_PROFILE]), timeout=1.0)
-        line = _format_runtime_profile_line(payload=frame.get("payload"))
-    except Exception as exc:
-        line = _format_runtime_profile_line(exc=exc)
+        drain_boot(link, 0.5)
+    except Exception:
+        pass
+    try:
+        drain_pending(link, quiet_s=0.10, max_s=0.5)
+    except Exception:
+        pass
+    last_exc = None
+    line = None
+    for attempt_timeout in (1.5, 2.5):
+        try:
+            frame = link.request(HOST_TYPE_CFG_GET_REQ, HOST_TYPE_CFG_DATA_URC,
+                                 bytes([CFG_KEY_REG_PROFILE]),
+                                 timeout=attempt_timeout)
+            line = _format_runtime_profile_line(payload=frame.get("payload"))
+            break
+        except Exception as exc:
+            last_exc = exc
+            continue
+    if line is None:
+        line = _format_runtime_profile_line(exc=last_exc)
     print(line)
     sys.stdout.flush()
 
@@ -999,33 +1022,46 @@ def run_rx_listen(link: HostLink, window_s: float = 30.0) -> int:
     deadline = time.time() + window_s
     rx_count = 0
     real_faults = 0
-    while time.time() < deadline:
-        for frame in link.read_frames(0.2):
-            ftype = frame["type"]
-            if ftype == HOST_TYPE_RX_FRAME_URC:
-                try:
-                    p = parse_rx_frame(frame["payload"])
-                    rx_count += 1
-                    print(f"__RX_FRAME__ idx={rx_count} rssi={p['rssi_dbm']} "
-                          f"snr={p['snr_db']} len={p['len']} "
-                          f"timestamp_us={p['timestamp_us']} "
-                          f"payload_hex={p['payload'].hex()}")
-                    sys.stdout.flush()
-                except Exception as exc:
-                    print(f"__RX_FRAME_ERR__ {exc} raw={frame['payload'].hex()}")
-            elif ftype == HOST_TYPE_FAULT_URC:
-                code = frame["payload"][0] if frame["payload"] else None
-                desc = format_fault_payload(frame["payload"])
-                if code in BENIGN_FAULT_CODES:
-                    print(f"INFO: benign FAULT_URC: {desc}")
-                else:
+    # 2026-05-20 P1-3 fix: graceful SIGINT shutdown. Without this, the
+    # orchestrator's `pkill -INT` (paired_walk_power_sweep.ps1) lands inside
+    # link.read_frames() and Python emits a full KeyboardInterrupt traceback
+    # into the RX log, which downstream parsers misread as a probe crash.
+    # Catching KeyboardInterrupt here emits a stable machine-parseable
+    # `__RX_LISTEN_STOPPED__` token, then falls through to the normal
+    # __W1_10B_LISTEN_DONE__ summary path so stats are still captured.
+    stopped_by_signal = False
+    try:
+        while time.time() < deadline:
+            for frame in link.read_frames(0.2):
+                ftype = frame["type"]
+                if ftype == HOST_TYPE_RX_FRAME_URC:
+                    try:
+                        p = parse_rx_frame(frame["payload"])
+                        rx_count += 1
+                        print(f"__RX_FRAME__ idx={rx_count} rssi={p['rssi_dbm']} "
+                              f"snr={p['snr_db']} len={p['len']} "
+                              f"timestamp_us={p['timestamp_us']} "
+                              f"payload_hex={p['payload'].hex()}")
+                        sys.stdout.flush()
+                    except Exception as exc:
+                        print(f"__RX_FRAME_ERR__ {exc} raw={frame['payload'].hex()}")
+                elif ftype == HOST_TYPE_FAULT_URC:
+                    code = frame["payload"][0] if frame["payload"] else None
+                    desc = format_fault_payload(frame["payload"])
+                    if code in BENIGN_FAULT_CODES:
+                        print(f"INFO: benign FAULT_URC: {desc}")
+                    else:
+                        real_faults += 1
+                        print(f"__RX_FAULT__ {desc}")
+                elif ftype == HOST_TYPE_ERR_PROTO_URC:
+                    desc = format_err_proto_payload(frame["payload"])
                     real_faults += 1
-                    print(f"__RX_FAULT__ {desc}")
-            elif ftype == HOST_TYPE_ERR_PROTO_URC:
-                desc = format_err_proto_payload(frame["payload"])
-                real_faults += 1
-                print(f"__RX_ERR_PROTO__ {desc}")
-            # Other URCs (STATS_URC etc.) are ignored during the listen window.
+                    print(f"__RX_ERR_PROTO__ {desc}")
+                # Other URCs (STATS_URC etc.) are ignored during the listen window.
+    except KeyboardInterrupt:
+        stopped_by_signal = True
+        print(f"__RX_LISTEN_STOPPED__ reason=SIGINT rx_frames_so_far={rx_count}")
+        sys.stdout.flush()
 
     try:
         stats_after = fetch_stats(link)
@@ -1042,7 +1078,8 @@ def run_rx_listen(link: HostLink, window_s: float = 30.0) -> int:
           f"radio_rx_ok_delta={rx_ok_a - rx_ok_b} "
           f"radio_crc_err_delta={crc_a - crc_b} "
           f"real_faults={real_faults} "
-          f"invariants_violated={len(invariants_violated)}")
+          f"invariants_violated={len(invariants_violated)} "
+          f"stopped_by_signal={int(stopped_by_signal)}")
     return 0
 
 
@@ -1206,6 +1243,28 @@ WALK_POWER_CSV_FIELDS = (
     "rx_crc_err_count",
 )
 
+# 2026-05-20 P1-4 falsification matrix: per-packet CSV columns. Sibling file
+# alongside the per-step CSV. One row per TX attempt; lets us discriminate
+# between (a) Python loop stutter under high duty cycle, (b) LBT defer hits,
+# and (c) cold-start CFG_SET race ordering at the 14-15 dBm cliff.
+WALK_POWER_PERPACKET_FIELDS = (
+    "step_idx",
+    "power_dbm_requested",
+    "packet_idx_in_step",
+    "tx_id",
+    "send_ts_ns",
+    "done_ts_ns",
+    "elapsed_us",
+    "outcome",            # ok|fail|timeout|send_err
+    "status_code",
+    "toa_us",
+    "lbt_enabled",
+    "inter_cycle_s",
+    "cfg_set_age_ms",     # ms between CFG_OK_URC for this step and send_ts
+    "host_loop_iter_us",  # send_ts - prior_send_ts (gap-since-last-send)
+    "python_rss_kb",      # best-effort getrusage().ru_maxrss; 0 on Windows
+)
+
 
 def _format_walk_power_row(row: dict) -> str:
     """Serialise one walk_power row as a CSV line (RFC4180-ish: no quoting
@@ -1232,7 +1291,8 @@ def run_walk_power(link: HostLink,
                    timeout: float,
                    inter_s: float,
                    csv_out: str | None,
-                   payload_len: int = 16) -> int:
+                   payload_len: int = 16,
+                   lbt_enable: int = 0) -> int:
     """S1.1 walk_power sweep. Returns 0 if every step's CFG_OK_URC took and
     every step issued ≥1 TX_DONE_URC (sweep produced data); returns 1 if
     any step's CFG_SET timed out; returns 2 on transport-fatal."""
@@ -1287,12 +1347,15 @@ def run_walk_power(link: HostLink,
     drain_pending(link, quiet_s=0.25, max_s=1.0)
 
     # Disable LBT for the sweep — same rationale as run_tx_burst.
+    # 2026-05-20 P1-4 fix: actually honour --lbt-enable so the falsification
+    # matrix can run Pass B (LBT on) against the same probe binary.
     try:
         link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
-                     bytes([CFG_KEY_LBT_ENABLE, 0x01, 0x00]), timeout=1.0)
-        print("CFG_OK_URC: LBT_ENABLE=0")
+                     bytes([CFG_KEY_LBT_ENABLE, 0x01, lbt_enable & 0xFF]),
+                     timeout=1.0)
+        print(f"CFG_OK_URC: LBT_ENABLE={lbt_enable}")
     except Exception as exc:
-        print(f"WARN: CFG_SET_REQ(LBT_ENABLE=0) failed: {exc} (continuing)")
+        print(f"WARN: CFG_SET_REQ(LBT_ENABLE={lbt_enable}) failed: {exc} (continuing)")
 
     # Open the CSV with header.
     try:
@@ -1304,18 +1367,40 @@ def run_walk_power(link: HostLink,
     csv_fh.write(",".join(WALK_POWER_CSV_FIELDS) + "\n")
     csv_fh.flush()
 
-    sys.stdout.write(f"__WALK_POWER_READY__ csv={csv_out}\n")
+    # 2026-05-20 P1-4: per-packet CSV sibling. Naming: `<stem>_perpacket.csv`.
+    pp_csv_path = _os.path.splitext(csv_out)[0] + "_perpacket.csv"
+    try:
+        pp_fh = open(pp_csv_path, "w", encoding="utf-8")
+        pp_fh.write(",".join(WALK_POWER_PERPACKET_FIELDS) + "\n")
+        pp_fh.flush()
+    except OSError as exc:
+        print(f"WARN: cannot open per-packet CSV {pp_csv_path}: {exc} (continuing without it)")
+        pp_fh = None
+
+    # Cheap RSS sampler. getrusage is POSIX-only; on the X8 Linux target
+    # ru_maxrss is in kB. Wrap so Windows dev runs don't crash.
+    try:
+        import resource as _resource  # type: ignore
+        def _rss_kb() -> int:
+            return int(_resource.getrusage(_resource.RUSAGE_SELF).ru_maxrss)
+    except Exception:
+        def _rss_kb() -> int:
+            return 0
+
+    sys.stdout.write(f"__WALK_POWER_READY__ csv={csv_out} perpacket_csv={pp_csv_path}\n")
     sys.stdout.flush()
 
     any_step_failed = False
     steps_with_data = 0
     powers = list(range(power_min, power_max + 1, power_step))
+    prior_send_ns = 0
     for step_idx, dbm in enumerate(powers):
         # 1. Apply the new TX power.
         try:
             link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
                          bytes([CFG_KEY_TX_POWER_DBM, 0x01, dbm & 0xFF]),
                          timeout=1.0)
+            cfg_ok_ns = time.perf_counter_ns()
             print(f"step {step_idx}: CFG_OK_URC TX_POWER_DBM={dbm}")
         except Exception as exc:
             print(f"step {step_idx}: CFG_SET TX_POWER_DBM={dbm} FAILED: {exc}")
@@ -1354,32 +1439,63 @@ def run_walk_power(link: HostLink,
                        + _os.urandom(max(0, payload_len - 24)))
             payload = payload[:payload_len]
             tx_frame = bytes([tx_id, len(payload)]) + payload
+            send_ns = time.perf_counter_ns()
+            host_loop_iter_us = ((send_ns - prior_send_ns) // 1000) if prior_send_ns else 0
+            cfg_set_age_ms = (send_ns - cfg_ok_ns) // 1_000_000
+            prior_send_ns = send_ns
+            pp_outcome = None
+            pp_status = ""
+            pp_toa = ""
+            done_ns = 0
             try:
                 link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
             except Exception as exc:
                 print(f"  WP s{step_idx} i{i}: send err: {exc}")
                 tx_timeout_n += 1
-                continue
-            try:
-                done, _ = wait_for_tx_done(link, tx_id, timeout=timeout)
-            except TimeoutError:
-                tx_timeout_n += 1
-                if inter_s > 0:
-                    time.sleep(inter_s)
-                continue
-            except Exception as exc:
-                print(f"  WP s{step_idx} i{i}: wait err: {exc}")
-                tx_timeout_n += 1
-                if inter_s > 0:
-                    time.sleep(inter_s)
-                continue
-            if done["status"] == SX1276_TX_STATUS_OK:
-                tx_done_ok += 1
-            else:
-                tx_done_fail += 1
-            toa_samples.append(done.get("time_on_air_us", 0))
-            if first_echoed is None:
-                first_echoed = done.get("tx_power_dbm")
+                pp_outcome = "send_err"
+            if pp_outcome is None:
+                try:
+                    done, _ = wait_for_tx_done(link, tx_id, timeout=timeout)
+                    done_ns = time.perf_counter_ns()
+                except TimeoutError:
+                    tx_timeout_n += 1
+                    pp_outcome = "timeout"
+                except Exception as exc:
+                    print(f"  WP s{step_idx} i{i}: wait err: {exc}")
+                    tx_timeout_n += 1
+                    pp_outcome = "timeout"
+                else:
+                    if done["status"] == SX1276_TX_STATUS_OK:
+                        tx_done_ok += 1
+                        pp_outcome = "ok"
+                    else:
+                        tx_done_fail += 1
+                        pp_outcome = "fail"
+                    pp_status = str(done["status"])
+                    pp_toa = str(done.get("time_on_air_us", 0))
+                    toa_samples.append(done.get("time_on_air_us", 0))
+                    if first_echoed is None:
+                        first_echoed = done.get("tx_power_dbm")
+            if pp_fh is not None:
+                pp_row = [
+                    str(step_idx),
+                    str(dbm),
+                    str(i),
+                    f"0x{tx_id:02x}",
+                    str(send_ns),
+                    str(done_ns) if done_ns else "",
+                    str((done_ns - send_ns) // 1000) if done_ns else "",
+                    pp_outcome or "",
+                    pp_status,
+                    pp_toa,
+                    str(lbt_enable),
+                    f"{inter_s:.4f}",
+                    str(cfg_set_age_ms),
+                    str(host_loop_iter_us),
+                    str(_rss_kb()),
+                ]
+                pp_fh.write(",".join(pp_row) + "\n")
+                pp_fh.flush()
             if inter_s > 0:
                 time.sleep(inter_s)
 
@@ -1421,6 +1537,8 @@ def run_walk_power(link: HostLink,
         sys.stdout.flush()
 
     csv_fh.close()
+    if pp_fh is not None:
+        pp_fh.close()
     print(f"__WALK_POWER_DONE__ steps={len(powers)} steps_with_data={steps_with_data} "
           f"csv={csv_out} verdict={'FAIL' if any_step_failed else 'OK'}")
     if any_step_failed:
@@ -1694,6 +1812,12 @@ def run_ping_pong(link: "HostLink", count: int = 100, inter_s: float = 0.2,
         if rtt_ms < 0:
             pong_timeout += 1
             print(f"__PINGPONG_TIMEOUT__ idx={i} payload_hex={payload.hex()}")
+            # 2026-05-20 P1-5: stable token consumed by analyze_rtt.py for
+            # explicit timeout accounting. Keeps __PINGPONG_TIMEOUT__ for
+            # backwards-compat with legacy parsers; the new analyzer prefers
+            # __RTT_TIMEOUT__ because it's symmetric with __RTT_SAMPLE__.
+            print(f"__RTT_TIMEOUT__ idx={i} rtt_timeout_s={rtt_timeout:.3f} "
+                  f"payload_hex={payload.hex()}")
 
         print(f"__PINGPONG__ idx={i} tx_id=0x{tx_id:02X} "
               f"status={done['status']}({done['status_name']}) "
@@ -2141,6 +2265,14 @@ def main(argv=None) -> int:
     parser.add_argument("--csv-out", default=None,
                         help="walk_power: explicit CSV output path. If omitted, "
                              "writes to bench-evidence/walk_power_<date>/walk_power_tx_side.csv")
+    # 2026-05-20 P1-4 falsification matrix: per-packet CSV + LBT toggle.
+    # The per-packet CSV is written as a sibling of --csv-out (same dir,
+    # `_perpacket.csv` suffix) so existing post-processors that consume the
+    # per-step CSV are unaffected.
+    parser.add_argument("--lbt-enable", type=int, choices=[0, 1], default=0,
+                        help="walk_power: 0 = force LBT off (legacy default, used "
+                             "by Pass A/C of the falsification matrix); 1 = leave "
+                             "LBT on (Pass B). Always logged into the per-packet CSV.")
     # 2026-05-20 FCC-B3-1: built-in self-test for the RUNTIME_PROFILE_ENUM
     # emitter. Skips serial/link setup entirely so it can run in CI/dev shells
     # without bench hardware attached.
@@ -2205,7 +2337,8 @@ def main(argv=None) -> int:
                                   timeout=args.timeout,
                                   inter_s=args.inter_cycle_s,
                                   csv_out=args.csv_out,
-                                  payload_len=args.walk_payload_len)
+                                  payload_len=args.walk_payload_len,
+                                  lbt_enable=args.lbt_enable)
         print(f"FATAL: unknown probe mode: {args.probe}")
         return 2
     finally:

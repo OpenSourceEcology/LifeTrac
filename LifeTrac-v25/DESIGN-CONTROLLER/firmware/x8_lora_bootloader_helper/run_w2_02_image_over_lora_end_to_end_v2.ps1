@@ -57,7 +57,7 @@ param(
     [double]$InterFragS = 0.2,
     [int]$Quality        = 55,
     [int]$ExtraRxWindowS = 30,
-    [int]$Redundancy     = 1,
+    [int]$Redundancy     = 2,
     [string]$RepoRoot    = ""
 )
 
@@ -164,14 +164,15 @@ if ($rawSize -ne 294912) { throw "Raw frame size $rawSize != 294912 (RGB24 384x2
 $fragLocal = Join-Path $evidence "fragments.hex"
 $origPng   = Join-Path $evidence "original.png"
 $encLog    = Join-Path $evidence "encode.log"
-Write-Host "Encoding TileDeltaFrame + fragments on host..."
+Write-Host "Encoding TileDeltaFrame + fragments on host (redundancy=$Redundancy)..."
 $encArgs = @(
     (Join-Path $helperDir "w2_02_host_pipeline.py"),
     "encode",
     "--raw", $rawLocal,
     "--out", $fragLocal,
     "--orig-png", $origPng,
-    "--quality", $Quality.ToString()
+    "--quality", $Quality.ToString(),
+    "--redundancy", $Redundancy.ToString()
 )
 $encOut = & py -3 @encArgs 2>&1
 $encRc = $LASTEXITCODE
@@ -179,21 +180,13 @@ $encText = ($encOut | Out-String)
 Set-Content -LiteralPath $encLog -Value $encText
 Write-Host $encText
 if ($encRc -ne 0) { throw "Encode failed (rc=$encRc)" }
-$uniqueFragments = (Get-Content -LiteralPath $fragLocal | Where-Object { $_.Trim() -ne "" }).Count
-Write-Host "Encoded $uniqueFragments unique fragments."
-
-# Apply per-fragment redundancy (each unique fragment is sent $Redundancy times back-to-back).
-# RX-side FragmentReassembler dedupes by (frag_seq, frag_idx), so dupes are harmless
-# beyond extra airtime. With per-frag p_loss~=0.007 and N=2, frame catastrophic loss
-# drops from ~73% to <1% (187 frags).
-if ($Redundancy -gt 1) {
-    $fragLines = Get-Content -LiteralPath $fragLocal | Where-Object { $_.Trim() -ne "" }
-    $dup = New-Object System.Collections.Generic.List[string]
-    foreach ($line in $fragLines) { for ($i=0; $i -lt $Redundancy; $i++) { $dup.Add($line) } }
-    Set-Content -LiteralPath $fragLocal -Value $dup
-    Write-Host "Applied redundancy=$Redundancy : will transmit $($dup.Count) fragment lines ($uniqueFragments unique x $Redundancy)."
-}
 $nFragments = (Get-Content -LiteralPath $fragLocal | Where-Object { $_.Trim() -ne "" }).Count
+# 2026-05-20 W2-02 P0c: the encoder now emits v2 0xFD-headed fragments
+# (one per (idx, copy_idx)) directly, so we no longer post-duplicate hex
+# lines in PowerShell. With Redundancy=2 the encoder writes 2 * unique
+# fragment count lines; the RX-side FragmentReassembler dedups via the
+# copy_idx bitmask, recording v2_redundant_copies_seen in stats.
+Write-Host "Encoded $nFragments fragments (includes redundancy copies)."
 
 # ---------------------------------------------------------------------------
 # 6. Push fragments to TX board.

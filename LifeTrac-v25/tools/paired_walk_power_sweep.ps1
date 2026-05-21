@@ -3,8 +3,24 @@ $ErrorActionPreference = "Stop"
 $adb = "C:\Users\dorkm\AppData\Local\Microsoft\WinGet\Packages\Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe\platform-tools\adb.exe"
 $boardA = "2D0A1209DABC240B"  # TX
 $boardB = "2E2C1209DABC240B"  # RX
-$outDir = "$PSScriptRoot\..\DESIGN-CONTROLLER\bench-evidence\walk_power_pilot_2026-05-19"
+# 2026-05-20 v4.0 §5 fix: timestamp the evidence dir at TX-start, not at
+# script-module load. Also capture git SHA + a UUID for traceability so a
+# renamed/moved dir can still be matched back to its source revision.
+$runStartTs = Get-Date -Format 'yyyy-MM-dd_HHmmss'
+$runUuid    = [guid]::NewGuid().ToString()
+try { $gitSha = (& git rev-parse --short HEAD 2>$null).Trim() } catch { $gitSha = 'unknown' }
+if (-not $gitSha) { $gitSha = 'unknown' }
+$outDir = "$PSScriptRoot\..\DESIGN-CONTROLLER\bench-evidence\walk_power_paired_$runStartTs"
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+# Stamp a run-meta file so the date drift bug (v4.0 §5) never recurs.
+@{
+  run_start_ts_local = $runStartTs
+  run_uuid           = $runUuid
+  git_sha_short      = $gitSha
+  orchestrator       = 'paired_walk_power_sweep.ps1'
+  boardA_tx          = $boardA
+  boardB_rx          = $boardB
+} | ConvertTo-Json | Set-Content -Encoding utf8 "$outDir\run_meta.json"
 $rxLog = "$outDir\rx_listen_board_b.log"
 $txLog = "$outDir\walk_power_board_a.log"
 $csvLocal = "$outDir\walk_power_paired.csv"
@@ -30,7 +46,12 @@ Get-Content $rxLog -Tail 8
 
 Write-Host "`n=== Running walk_power on board A: 2..17 dBm step 1, 50 packets/step, payload 24B ==="
 $swStart = Get-Date
-& $adb -s $boardA shell "cd /tmp/lifetrac_p0c && echo fio | sudo -S python3 method_h_stage2_tx_probe_v2.py --probe walk_power --dev /dev/ttymxc3 --baud 921600 --power-min 2 --power-max 17 --power-step 1 --per-step-count 50 --walk-payload-len 24 --timeout 3 --inter-cycle-s 0.02 --csv-out /tmp/walk_power_paired.csv 2>&1" *> $txLog
+# 2026-05-20 P2-3 fix: replace `*> $txLog` (which writes a UTF-16-LE-with-BOM
+# file and surfaces stderr as a NativeCommandError cosmetic noise) with an
+# explicit merge-stderr-into-stdout + UTF-8 file write. This preserves the
+# full log content but stops PowerShell from injecting a 0xFFFE BOM that
+# downstream parsers see as garbage in the first line.
+& $adb -s $boardA shell "cd /tmp/lifetrac_p0c && echo fio | sudo -S python3 method_h_stage2_tx_probe_v2.py --probe walk_power --dev /dev/ttymxc3 --baud 921600 --power-min 2 --power-max 17 --power-step 1 --per-step-count 50 --walk-payload-len 24 --timeout 3 --inter-cycle-s 0.02 --csv-out /tmp/walk_power_paired.csv 2>&1" 2>&1 | Out-File -Encoding utf8 -FilePath $txLog
 $swEnd = Get-Date
 Write-Host "walk_power finished in $([math]::Round(($swEnd-$swStart).TotalSeconds,1))s"
 
@@ -41,9 +62,20 @@ Write-Host "`n=== Waiting 5s for any in-flight RX packets to land ==="
 Start-Sleep -Seconds 5
 
 Write-Host "`n=== Stopping rx_listen on board B ==="
-& $adb -s $boardB shell "echo fio | sudo -S pkill -INT -f 'method_h_stage2.*rx_listen' 2>/dev/null; sleep 1; pgrep -af method_h_stage2 || echo no-residual"
+# 2026-05-20 P1-3 fix: after sending SIGINT, wait for the graceful
+# __RX_LISTEN_STOPPED__ token (probe v2 emits it on KeyboardInterrupt) before
+# SIGKILL. Cap the wait so a non-upgraded probe still exits in bounded time.
+& $adb -s $boardB shell "echo fio | sudo -S pkill -INT -f 'method_h_stage2.*rx_listen' 2>/dev/null; sleep 0.2; pgrep -af method_h_stage2 || echo no-residual"
+$sigintWaitDeadline = (Get-Date).AddSeconds(8)
+while ((Get-Date) -lt $sigintWaitDeadline) {
+  if (Select-String -Path $rxLog -Pattern "__RX_LISTEN_STOPPED__|__W1_10B_LISTEN_DONE__" -Quiet) {
+    Write-Host "RX listener acknowledged shutdown."
+    break
+  }
+  Start-Sleep -Milliseconds 250
+}
 if (-not $rxProc.HasExited) {
-  Start-Sleep -Seconds 3
+  Start-Sleep -Seconds 1
   if (-not $rxProc.HasExited) { Stop-Process -Id $rxProc.Id -Force -ErrorAction SilentlyContinue }
 }
 
@@ -51,8 +83,11 @@ Write-Host "`n=== Pulling walk_power CSV from board A ==="
 & $adb -s $boardA pull /tmp/walk_power_paired.csv $csvLocal
 
 Write-Host "`n=== RX summary (board B) ==="
-$rxFrames = Select-String -Path $rxLog -Pattern "RX_FRAME_URC:" | Measure-Object | Select-Object -ExpandProperty Count
-Write-Host "RX_FRAME_URC count = $rxFrames"
+# 2026-05-20 P1-2 fix: probe v2 emits `__RX_FRAME__` (double-underscore
+# machine token); the legacy human label `RX_FRAME_URC:` was retired. Match
+# both so the orchestrator works on both old and new logs.
+$rxFrames = Select-String -Path $rxLog -Pattern "__RX_FRAME__|RX_FRAME_URC:" | Measure-Object | Select-Object -ExpandProperty Count
+Write-Host "__RX_FRAME__ + RX_FRAME_URC: count = $rxFrames"
 $tail = Get-Content $rxLog -Tail 15
 $tail | ForEach-Object { Write-Host $_ }
 
