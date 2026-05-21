@@ -22,13 +22,22 @@
 #define CFG_KEY_CAD_SYMBOLS                  0x11U
 #define CFG_KEY_FHSS_DWELL_MS                0x13U
 #define CFG_KEY_REG_PROFILE                  0x14U
+/*
+ * FCC-EVID-D6-2-a-ii: validator inputs for the regulatory-profile
+ * two-phase commit synthesised at cfg_set(CFG_KEY_REG_PROFILE).
+ * Both accept full type range at the wire (no validator clamp);
+ * the host_cfg_profile validator is the authoritative gate and
+ * is the only path that can produce CFG_STATUS_PROFILE_REJECT_*.
+ */
+#define CFG_KEY_ANTENNA_GAIN_DBI             0x15U
+#define CFG_KEY_HW_CEILING_DBM               0x16U
 
 #define CFG_KEY_PROTOCOL_VERSION             0x80U
 #define CFG_KEY_WIRE_SCHEMA_VERSION          0x81U
 #define CFG_KEY_CFG_DIRTY                    0x82U
 
 #define CFG_KEY_MAX_VALUE_LEN                8U
-#define CFG_KEY_COUNT                        21U
+#define CFG_KEY_COUNT                        23U
 
 /*
  * Regulatory operating-mode enum for CFG_KEY_REG_PROFILE (u8).

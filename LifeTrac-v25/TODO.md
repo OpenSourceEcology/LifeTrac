@@ -860,7 +860,7 @@ channel — which is the single largest compliance gap.)*
                           closes) Replace the γ-1 placeholder period
                           with the real epoch-driven boundary from the
                           chosen epoch model.
-    - [ ] **FCC-A6c** Explicit **Scanning** cold-start state: wideband
+    - [x] **FCC-A6c** Explicit **Scanning** cold-start state: wideband
           scan-with-preamble-timeout across the 50-channel active set,
           re-sync slot per epoch fallback if decode fails for N
           consecutive epochs. No fixed-channel rendezvous (FCC notes
@@ -868,6 +868,35 @@ channel — which is the single largest compliance gap.)*
           measured worst-case cold-start hop-sync reacquire ≤ 5 s;
           >30 s ⇒ A6 redesign (adaptive scan dwell or super-frame
           beacon slot within the hopset).
+          *Closed 2026-05-20 via three sub-tracks all [x]:
+          FCC-A6c-1 (pure-function Scanning SM in
+          [`radio/sx1276_rx_scan_policy.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_rx_scan_policy.c)
+          — BOOT/SCANNING/LOCKED/FAILED, TICK/FRAME_VALID/
+          FRAME_INVALID events, six actions, defensive
+          FRAME_VALID+header_ok=false demotion, modular-tick wrap
+          handling, 20 host cases),
+          FCC-A6c-2 (HW dispatch: -2-a parallel per-state +
+          per-action saturating counter TU [14 cases]; -2-b
+          scan-tick API + frame-event feed wired into three
+          `sx1276_rx_service()` call sites; -2-c gates γ-1 retune
+          on LOCKED, dispatches BEGIN_SCAN / ADVANCE_CHANNEL via
+          standby → next_channel → set_freq → PLL-settle → arm,
+          LOCK = HW-no-op since frame was just received on the
+          snapped channel, FAIL → standby, HOLD/REANCHOR HW-no-op),
+          FCC-A6c-3 (P1 reporting per
+          [AI NOTES/2026-05-19_RX_Scan_FAILED_State_Analysis_Copilot_v1_0.md](AI%20NOTES/2026-05-19_RX_Scan_FAILED_State_Analysis_Copilot_v1_0.md)
+          §13 v5.0: -3-a `HOST_FAULT_CODE_RX_SCAN_FAILED=0x0D` +
+          §13.1 #2 `sub`-byte encoding; -3-b four file-statics
+          tracking retries / IRQ-seen / CRC-seen / ever-locked;
+          -3-c B-prime retry supervisor with `MAX_RETRIES=3U` +
+          12-case host TU pinning bit layout, retry boundary,
+          attempt-nibble saturation, defensive NULL contract).
+          P2 (Opta-routed indicator) and P3 (RTC-BKP LKG /
+          backoff) explicitly deferred per the §13 v5.0
+          scope-lock. `mingw32-make check` green throughout
+          (12 host suites; memory map invariants hold). Acceptance
+          target (≤5 s reacquire) measurement deferred to
+          FCC-EVID-D8 bench run.*
         - [x] **FCC-A6c-1** Scanning state-machine pure-function
               policy in
               [`radio/sx1276_rx_scan_policy.c`](DESIGN-CONTROLLER/firmware/murata_l072/radio/sx1276_rx_scan_policy.c)
@@ -1169,15 +1198,35 @@ channel — which is the single largest compliance gap.)*
                   contract, and `MAX_RETRIES==3U` constant —
                   12 cases. `mingw32-make check` → all 12 host
                   tests green + `[OK] memory map invariants hold`.
-- [ ] **FCC-B1-SUMMARY** Per-minute `RFCO_SUMMARY` URC: 50-bucket
+- [x] **FCC-B1-SUMMARY** Per-minute `RFCO_SUMMARY` URC: 50-bucket
       histogram, per-channel `legal_dwell_max_us`, `blocked_attempts`
       histogram, `active_count`, `blacklist_size`, last clamp reason,
       RFCO schema version. **Wire layout + cadence design**:
       [AI NOTES/2026-05-19_FCC_B1_SUMMARY_Wire_Layout_Design_Copilot_v1_0.md](AI%20NOTES/2026-05-19_FCC_B1_SUMMARY_Wire_Layout_Design_Copilot_v1_0.md)
       — 191 B payload, single frame, snapshot-and-reset deltas, main-loop
       polling cadence at 60 000 ms, `HOST_TYPE_RFCO_SUMMARY_URC = 0xC4U`.
-      Awaiting user ratification of §7 checklist before B1-SUMMARY-a
-      lands.
+      *Closed 2026-05-20 via FCC-B1-SUMMARY-a (declaration-only header
+      with `HOST_RFCO_SUMMARY_SCHEMA_VER=1`, payload-length /
+      channel-count / reason-slots static_asserts, and the
+      `HOST_TYPE_RFCO_SUMMARY_URC=0xC4U` host-type allocation),
+      FCC-B1-SUMMARY-b (pure `host_rfco_summary_pack()` plus three
+      sidecar saturating counter modules — `sx1276_fhss` per-channel
+      hop counts, `sx1276_legal_dwell` per-channel peak-used-µs,
+      `host_rfco` `blocked_attempts_by_reason` slot map — with full
+      byte-by-byte wire-vector coverage in
+      [bench/host_proto/rfco_summary.c](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/rfco_summary.c)
+      and `rfco_summary_counters.c`), and FCC-B1-SUMMARY-c (emit
+      wrapper with `HOST_RFCO_SUMMARY_PERIOD_MS=60000` cadence,
+      monotonic `platform_now_ms()` wraparound safety, `FIRST` flag
+      arming, `seq` counter, and `window_elapsed_ms` jitter
+      reporting — verified by `rfco_summary_integration: 8 cases`).
+      `mingw32-make check` green throughout (17 host suites). All
+      seven required telemetry fields covered: per-channel hop
+      histogram (50 u8), per-channel legal-dwell peak (50 u16),
+      blocked-attempts histogram (8 u16 slots), active_count,
+      blacklist_size, last clamp reason, schema version — matching
+      the parent's bullet list one-for-one. No outstanding sub-work;
+      gate is field-ready.*
   - [x] **FCC-B1-SUMMARY-a** Declaration-only — *done 2026-05-19.
         Added [include/host_rfco_summary.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_rfco_summary.h)
         with `HOST_RFCO_SUMMARY_SCHEMA_VER=1`,
@@ -2123,7 +2172,7 @@ channel — which is the single largest compliance gap.)*
                   that emits under `bench-evidence/` now has both
                   stamping and a hard lint gate). — *done
                   2026-05-20.*
-- [ ] **FCC-B3** Per-orchestrator runtime profile-gate. Each
+- [x] **FCC-B3** Per-orchestrator runtime profile-gate. Each
       orchestrator under [`tools/`](tools/) must assert that the
       firmware actually running on the boards reports the same
       `profile_enum` that the script declares (and stamps into
@@ -2276,7 +2325,7 @@ channel — which is the single largest compliance gap.)*
           helpers + 1 CLI flag + 1 call site in main(). No
           existing function modified. No new file. No
           dependencies. Capture path unchanged.*
-    - [ ] **FCC-B3-2** Build
+    - [x] **FCC-B3-2** Build
           `tools/check_run_profile.py` + self-test. CLI:
           `--log PATH --expected-enum N`. Parses the log with the
           same surrogateescape contract as `lint_artifact_headers.py`,
@@ -2292,7 +2341,37 @@ channel — which is the single largest compliance gap.)*
           `RUNTIME_PROFILE_ENUM=ERR ...` variant from B3-1.
           Atomic — no orchestrator wiring yet, run against
           synthetic fixtures only.
-    - [ ] **FCC-B3-3** Wire B3-1's readout + B3-2's gate into all
+          *Closed 2026-05-20 (FCC-B3-2).* Added
+          [tools/check_run_profile.py](tools/check_run_profile.py)
+          (~270 LOC). Public API: `find_readouts(text) -> List[str]`
+          (line-anchored `(?m)^RUNTIME_PROFILE_ENUM=(\S+)` regex
+          — narrative substrings like "the RUNTIME_PROFILE_ENUM=
+          line" in TODO entries are correctly NOT counted),
+          `classify(readouts, expected_enum, allow_legacy)
+          -> (exit_code, message)`, `check(log_path, expected_enum,
+          allow_legacy)` end-to-end. Exit codes match the B3-0
+          contract exactly (0/1/2/4) and don't collide with the
+          FCC-B2-b header-lint exit 3. Encoding chosen as
+          `utf-8-sig` (not the lint tool's bare `utf-8`) so the
+          BOM that PowerShell `Out-File -Encoding utf8` prepends
+          to captured logs is transparently stripped — verified
+          by self-test case 35. Resolved B3-0 open question on
+          legacy behavior: `--allow-legacy` opt-in turns
+          "zero readouts" into a pass (so pre-B3-1 captures
+          re-run through the gate don't break), but
+          `--allow-legacy` does NOT cover `RUNTIME_PROFILE_ENUM=ERR`
+          (case 19) — an ERR readout proves the probe IS B3-1-aware
+          but couldn't reach the firmware, which is a regression
+          worth flagging even on legacy runs. Self-test: 24 cases
+          (7 unit `find_readouts`, 11 branch `classify`, 6
+          end-to-end `check` with temp files including BOM and
+          missing-file). `py -3 check_run_profile.py --self-test`
+          → `cases=24 passed=24 failed=0`, EXITCODE=0. Pylance
+          clean. Stdlib-only (re, argparse, sys, tempfile, pathlib,
+          typing) — no new deps. *Surface added: 1 new file
+          (~270 LOC). No existing file modified. Zero
+          orchestrator wiring (that's B3-3).*
+    - [x] **FCC-B3-3** Wire B3-1's readout + B3-2's gate into all
           three orchestrators
           ([mixed_load_soak.ps1](tools/mixed_load_soak.ps1),
           [full_walk_power_sweep.ps1](tools/full_walk_power_sweep.ps1),
@@ -2309,6 +2388,40 @@ channel — which is the single largest compliance gap.)*
           for B3-2 design: gate gracefully passes when no
           `RUNTIME_PROFILE_ENUM=` line is found AT ALL only on
           explicit `--allow-legacy` flag; default = fail-closed).
+          *Closed 2026-05-20 (FCC-B3-3).* Same block inserted in
+          all three scripts right after the FCC-B2-b header lint
+          OK message (so the runtime gate runs only on a run that
+          already passed the structural lint, giving a clear
+          per-stage failure boundary). Block contents: locate
+          `check_run_profile.py` via `$PSScriptRoot`, loop over
+          `@($txLog, $rxLog)` (the two probe-produced log paths;
+          CSVs are firmware/analysis dumps without the readout
+          line and are intentionally skipped), `Test-Path` guard
+          so a missing log doesn't crash the loop, invoke
+          `py -3 $profileChecker --log $logPath --expected-enum
+          $profileEnum`, `exit 4` on any non-zero (preserves
+          B3-0's exit-code contract: 4 reserved for this gate,
+          distinct from lint exit 3 and the various exit 1/2
+          failure modes earlier in each script). Reused the
+          existing `$profileEnum = 0` variable (already declared
+          for the stamp loop), so the gate and stamper can never
+          drift on which profile this run is claiming — single
+          source of truth per script. Validation: PS5 ParseFile
+          on all three returned `OK`. End-to-end smoke against
+          synthetic logs written with `Out-File -Encoding utf8`
+          (the real PS BOM path): good log → exit 0, wrong-enum
+          log → exit 1, missing-line log → exit 4 (all three
+          codes propagated correctly through the gate). No
+          changes to the probe (B3-1 surface unchanged), no
+          changes to the checker (B3-2 surface unchanged), no
+          changes to the existing stamp/lint blocks. *Surface
+          added per script: 1 comment block + 1 foreach loop
+          (~12 lines). Three files modified. Zero new files.
+          Capture path unchanged — the gate runs strictly after
+          captures + stamps + lint, so a B3-3 false-positive
+          cannot erase already-captured bench evidence (the run
+          directory survives, only the orchestrator's exit code
+          flips).*
 - [x] **FCC-TXPOWER-LAYER** Close the
       [AI NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md](AI%20NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md)
       gap: TX-power adapter and safety-burst path must layer **inside**
@@ -2357,6 +2470,432 @@ Max Carrier bench.*
 - [ ] **FCC-EVID-D6** Profile lock: host attempts to set arbitrary
       `RegFrf` / wrong BW / mask < 50 ch on production build are rejected
       with explicit error code (cfg fuzz script). **IN SCOPE.**
+    - [x] **FCC-EVID-D6-0** Scoping pass — *done 2026-05-20.* Mapped
+          the existing rejection surface so the remaining work is just
+          coverage + a wire-level driver, not a new validator:
+          [`host_cfg_profile.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg_profile.h)
+          declares 9 `HOST_CFG_PROFILE_REJECT_*` codes (NONE=0,
+          BAD_PROFILE=1, MASK_POPCOUNT=2, MASK_OUT_OF_TABLE=3,
+          BW_MISMATCH=4, ANTENNA_OUT_OF_RANGE=5, NO_POWER_HEADROOM=6,
+          UNROUTED=7, NOT_STAGED=8, NULL_ARG=9) and the header
+          comment explicitly says non-zero values are reported
+          verbatim on the wire status byte — so the firmware-side
+          enforcement is already in place (FCC-A5). Existing host TU
+          [`bench/host_proto/cfg_profile.c`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/cfg_profile.c)
+          covers ~5 of the 9 codes (BAD_PROFILE, NULL_ARG, UNROUTED,
+          MASK_POPCOUNT, MASK_OUT_OF_TABLE, BW_MISMATCH) plus
+          REJECT_NONE positive cases — gap audit lives in D6-1. The
+          D6 wording "cfg fuzz script" points at the missing
+          **wire-level** driver (host-side TU is HW-free; D6 wants
+          on-bench evidence that the production firmware actually
+          enforces the rejection on the UART surface). Decomposition:
+          D6-1 host-side coverage audit (close any gap in the 9-code
+          table; pure `mingw32-make check`), D6-2 wire-level fuzz
+          orchestrator (`tools/cfg_fuzz_profile_lock.py`, Python 3
+          stdlib only, drives `cfg_set` transactions through the
+          existing SerialRPC framing used by
+          [method_h_stage2_tx_probe_v2.py](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_h_stage2_tx_probe_v2.py),
+          one illegal transaction per REJECT class, asserts the
+          returned status byte matches the expected REJECT enum
+          verbatim, `--self-test` for the per-class crafted-frame
+          golden vectors), D6-3 bench capture + evidence (run D6-2 on
+          the 2× Max Carrier bench, save log under
+          `DESIGN-CONTROLLER/bench-evidence/`, lint via FCC-B2-b
+          header schema + B3-3 runtime-profile gate so the artifact
+          is DGATE-ingestible). Reuses every existing primitive —
+          no new wire codes, no firmware change, no SerialRPC schema
+          bump. Open question for D6-2: does the production
+          `host_cmd` dispatcher already propagate the
+          `host_cfg_profile_reject_t` value into the `CFG_STATUS`
+          response byte, or does it currently collapse non-zero to a
+          generic `CFG_STATUS_ERROR`? If the latter, D6-2 splits into
+          D6-2-a (additive `host_cmd.c` enrichment: thread the
+          REJECT value into the status byte; pure refactor with
+          regression test) and D6-2-b (the fuzz orchestrator). D6-1
+          will answer this by inspection of the `host_cmd.c` cfg-set
+          handler.
+    - [x] **FCC-EVID-D6-1** Host-side coverage audit. Inspect
+          [`bench/host_proto/cfg_profile.c`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/cfg_profile.c)
+          against the 9 REJECT codes from D6-0; add ≥1 positive case
+          per missing code (ANTENNA_OUT_OF_RANGE, NO_POWER_HEADROOM,
+          NOT_STAGED at minimum). Simultaneously read the `host_cmd.c`
+          cfg-set dispatcher to confirm whether the REJECT value
+          reaches the wire as a distinct status byte or is collapsed
+          to a generic error — record the answer inline so D6-2 can
+          decide whether to split into a -2-a/-2-b refactor pair.
+          `mingw32-make check` green. No new files unless a coverage
+          case demands one.
+          *Done 2026-05-20.* Two findings, second one structural:
+          **(1) Host-side coverage is already complete.** Re-counted
+          the existing 25 cases in `cfg_profile.c` against the 9
+          `HOST_CFG_PROFILE_REJECT_*` codes — **every** code has ≥1
+          positive case: NONE (3× across bench/FHSS/DTS happy paths),
+          BAD_PROFILE (`test_validate_bad_profile_id`), MASK_POPCOUNT
+          (2× — FHSS short + DTS zero), MASK_OUT_OF_TABLE
+          (`test_validate_fhss_mask_out_of_table`), BW_MISMATCH (2×
+          — FHSS + DTS), ANTENNA_OUT_OF_RANGE (2× — negative + >max),
+          NO_POWER_HEADROOM (`test_validate_power_no_headroom` via
+          `hw_ceiling_dBm < TX_POWER_MIN_DBM`), UNROUTED (3× —
+          validator FHSS, validator DTS, two-phase
+          `test_stage_unrouted_leaves_active_alone`), NOT_STAGED (4×
+          — `test_activate_without_stage`,
+          `test_failed_stage_clears_prior_stage`,
+          `test_cancel_stage`, `test_double_activate`), NULL_ARG
+          (`test_validate_null_arg`). D6-0's earlier "~5 of 9"
+          estimate was wrong — no new host cases needed.
+          **(2) Wire-level dispatcher bypasses 7 of 9 REJECT codes
+          today.** Read the `cfg_set(CFG_KEY_REG_PROFILE, ...)`
+          handler in
+          [`host/host_cfg.c`](DESIGN-CONTROLLER/firmware/murata_l072/host/host_cfg.c)
+          lines ~244-265: the wire path performs only a shallow
+          one-byte check — `value[0] > REG_PROFILE_MAX` →
+          `CFG_STATUS_OUT_OF_RANGE`; BENCH → `OK`; FHSS/DTS → `OK`
+          when `LIFETRAC_FHSS_TX_ROUTED` defined, else
+          `CFG_STATUS_PROFILE_UNROUTED`. The two-phase commit
+          (`host_cfg_profile_stage()` / `_activate()`) and the full
+          validator are **never called from the wire-level
+          dispatcher**, which means 7 of the 9 REJECT codes
+          (MASK_POPCOUNT, MASK_OUT_OF_TABLE, BW_MISMATCH,
+          ANTENNA_OUT_OF_RANGE, NO_POWER_HEADROOM, NOT_STAGED,
+          NULL_ARG) are wire-unreachable today. The
+          [`host_cfg_profile.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg_profile.h)
+          header comment anticipates this: "cfg_set(REG_PROFILE)
+          remains the wire-level entry point but FCC-A4 will route
+          it through stage()/activate() so partial reconfiguration
+          cannot leave the radio in a half-converted state. Until
+          FCC-A4 lands the state machine is exercised only by the
+          host test." The current FCC-A4 [x] entry (line 531)
+          delivered the runtime `s_channel_idx` rewire, **not** the
+          cfg_set→stage/activate plumbing the comment forecasts.
+          The wire keys also do not exist for the validator's full
+          input space — `CFG_KEY_FHSS_CHANNEL_MASK` (0x07) exists
+          but only checks `mask != 0` (popcount unchecked at the
+          wire); there is no wire cfg key for modem BW (set
+          internally per profile), antenna_gain_dBi, or
+          hw_ceiling_dBm. So even if `cfg_set(REG_PROFILE)` synth
+          esised a `host_cfg_profile_req_t`, several inputs would
+          have to come from defaults rather than the caller.
+          **Implication for D6-2** (recorded; D6-2 entry below now
+          reflects this): the original "one illegal cfg_set per
+          REJECT class" plan only reaches 2 of 9 classes
+          (OUT_OF_RANGE on bad profile_id, PROFILE_UNROUTED on
+          FHSS/DTS in unrouted build). D6-2 must therefore EITHER
+          (a) add the missing wire plumbing first (sub-split into
+          D6-2-a wire-plumbing + D6-2-b orchestrator), OR (b)
+          scope D6 down to the 2 wire-reachable classes for the
+          first delivery and explicitly track the other 7 as
+          host-TU-only with a deferred wire-coverage TODO. **No
+          code changes in this audit increment.** `mingw32-make
+          check` not re-run (no source edits).
+    - [ ] **FCC-EVID-D6-2-a** Wire plumbing — route
+          `cfg_set(CFG_KEY_REG_PROFILE)` through
+          `host_cfg_profile_stage()` + `_activate()` so all 9
+          REJECT classes are reachable from the wire. **Option (a)
+          chosen 2026-05-20** per D6-1 finding (2). Decomposed
+          into three atomic increments to keep each change
+          reviewable; each must land green on `mingw32-make check`
+          before the next starts.
+        - [x] **FCC-EVID-D6-2-a-i** Pure-additive plumbing.
+              Add a new `CFG_STATUS_PROFILE_REJECT_*` family to
+              [`include/host_cfg.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg.h)
+              `cfg_status_t` covering the 7 REJECT codes not
+              already mapped (MASK_POPCOUNT, MASK_OUT_OF_TABLE,
+              BW_MISMATCH, ANTENNA_OUT_OF_RANGE,
+              NO_POWER_HEADROOM, NOT_STAGED, NULL_ARG) starting at
+              value 8 to preserve the existing 0..7 numbering.
+              Keep BAD_PROFILE→`OUT_OF_RANGE`(=3) and
+              UNROUTED→`PROFILE_UNROUTED`(=7) as wire aliases.
+              Add helpers in
+              [`include/host_cfg_profile.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg_profile.h)
+              + [`host/host_cfg_profile.c`](DESIGN-CONTROLLER/firmware/murata_l072/host/host_cfg_profile.c):
+              `uint32_t host_cfg_profile_default_bw_hz(uint8_t profile_id)`
+              (BENCH=125k, FHSS=250k, DTS=500k, unknown=0) and
+              `cfg_status_t host_cfg_profile_reject_to_cfg_status(host_cfg_profile_reject_t r)`.
+              Extend [`bench/host_proto/cfg_profile.c`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/cfg_profile.c)
+              with golden-vector tests pinning both mappings for
+              all 10 enum values (NONE→OK plus 9 REJECT codes).
+              No other callers touched; `cfg_set(REG_PROFILE)`
+              behavior unchanged. `mingw32-make check-cfg-profile`
+              + `mingw32-make check` green.
+              *Done 2026-05-20.* Extended `cfg_status_t` with 7
+              new values 8..14 in
+              [host_cfg.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg.h)
+              (BAD_PROFILE/UNROUTED kept as wire aliases for
+              backward compat); added
+              `host_cfg_profile_default_bw_hz()` and
+              `host_cfg_profile_reject_to_cfg_status()` in
+              [host_cfg_profile.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg_profile.h)
+              + [host_cfg_profile.c](DESIGN-CONTROLLER/firmware/murata_l072/host/host_cfg_profile.c)
+              with `HOST_CFG_PROFILE_BENCH_BW_HZ=125000`; added 2
+              new test functions (`test_default_bw_hz`,
+              `test_reject_to_cfg_status`) to
+              [cfg_profile.c](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/cfg_profile.c)
+              with golden vectors pinning each of the 7 new wire
+              values + the 2 legacy aliases + NONE→OK. Test count
+              25 → 27. `mingw32-make check-cfg-profile` green;
+              full `mingw32-make check` green (no other suite
+              regressed by the enum extension).
+        - [x] **FCC-EVID-D6-2-a-ii** Add wire cfg keys for the
+              two validator inputs that have no current wire
+              surface: `CFG_KEY_ANTENNA_GAIN_DBI` (i8, default 2,
+              range -128..+30 with `ANTENNA_OUT_OF_RANGE` only
+              detectable through the profile validator — wire
+              validator clamps to representable range) and
+              `CFG_KEY_HW_CEILING_DBM` (u8, default 17, range
+              0..30). Allocate keys at the next free indices in
+              [`include/host_cfg_keys.h`](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg_keys.h),
+              bump `CFG_KEY_COUNT`, add descriptors to the
+              `k_cfg_desc[]` table in
+              [`host/host_cfg.c`](DESIGN-CONTROLLER/firmware/murata_l072/host/host_cfg.c)
+              with validators in `cfg_validate_and_normalize`.
+              Add round-trip cfg-contract tests in
+              [`bench/host_proto/cfg_contract.c`](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/cfg_contract.c)
+              for set/get/default/range of both keys. No change
+              to `cfg_set(REG_PROFILE)` yet. `mingw32-make check`
+              green.
+              *Done 2026-05-20.* Added `CFG_KEY_ANTENNA_GAIN_DBI=0x15`
+              and `CFG_KEY_HW_CEILING_DBM=0x16` in
+              [host_cfg_keys.h](DESIGN-CONTROLLER/firmware/murata_l072/include/host_cfg_keys.h)
+              with `CFG_KEY_COUNT` 21→23; added defaults
+              `DEFAULT_ANTENNA_GAIN_DBI=2`, `DEFAULT_HW_CEILING_DBM=17`
+              + 2 descriptors to `k_cfg_desc[]` in
+              [host_cfg.c](DESIGN-CONTROLLER/firmware/murata_l072/host/host_cfg.c)
+              with kind I8/U8 and no validator (wire accepts full
+              type range; the profile validator is the authoritative
+              gate — documented inline in the key block). Added 6
+              new test cases to
+              [cfg_contract.c](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/cfg_contract.c)
+              covering default+roundtrip+out-of-FCC-range for each
+              key, asserting all are accepted at the wire (dirty
+              flag flips appropriately). `mingw32-make
+              check-cfg-contract`: 40 cases (was 34); full
+              `mingw32-make check` still green.
+        - [x] **FCC-EVID-D6-2-a-iii** Rewrite the
+              `cfg_set(CFG_KEY_REG_PROFILE)` handler in
+              [`host/host_cfg.c`](DESIGN-CONTROLLER/firmware/murata_l072/host/host_cfg.c)
+              to synthesise a `host_cfg_profile_req_t` from
+              current cfg state (FHSS_CHANNEL_MASK,
+              ANTENNA_GAIN_DBI, HW_CEILING_DBM, BW from
+              `host_cfg_profile_default_bw_hz`), call
+              `host_cfg_profile_stage(&req, LIFETRAC_FHSS_TX_ROUTED)`,
+              and on REJECT_NONE call `host_cfg_profile_activate()`.
+              Map any non-NONE return through
+              `host_cfg_profile_reject_to_cfg_status()` so the wire
+              receives the distinct status byte. Preserve the
+              `>REG_PROFILE_MAX → OUT_OF_RANGE` early-return for
+              backward compat. Add new TU
+              `bench/host_proto/cfg_profile_wire.c` (separate from
+              `cfg_profile.c` so the existing 25 cases stay focused
+              on the C API) that drives `cfg_set` directly with
+              ≥1 case per status code, plus a happy-path
+              activate+verify-via-cfg_get(REG_PROFILE). Add new
+              `check-cfg-profile-wire` rule to the Makefile.
+              `mingw32-make check` green.
+              *Done 2026-05-20.* Replaced the legacy
+              [host_cfg.c](DESIGN-CONTROLLER/firmware/murata_l072/host/host_cfg.c)
+              `case CFG_KEY_REG_PROFILE:` body with the
+              stage()+activate() dispatcher (synthesises req from
+              the live `s_cfg_values[]` for FHSS_CHANNEL_MASK /
+              ANTENNA_GAIN_DBI / HW_CEILING_DBM, BW from
+              `host_cfg_profile_default_bw_hz`, tx_routed from
+              compile-time `LIFETRAC_FHSS_TX_ROUTED`). Mapped
+              non-NONE rejects through
+              `host_cfg_profile_reject_to_cfg_status`. Kept the
+              `>REG_PROFILE_MAX → OUT_OF_RANGE` early-return so
+              `cfg_contract.c reg_profile_unknown_oor` still
+              asserts the legacy status. Added
+              `host_cfg_profile_reset(&bench_default)` to
+              `cfg_init()` so the profile state machine is seeded
+              at boot and reset between TU cases. New TU
+              [cfg_profile_wire.c](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/cfg_profile_wire.c)
+              (9 cases) covers: bench happy, FHSS happy (routed +
+              50ch mask), DTS happy (routed), unknown-id
+              OUT_OF_RANGE, FHSS MASK_POPCOUNT, FHSS
+              MASK_OUT_OF_TABLE, ANTENNA_OUT_OF_RANGE,
+              NO_POWER_HEADROOM, re-apply same profile is
+              idempotent. Documented wire-unreachable rejects
+              (BW_MISMATCH / NOT_STAGED / NULL_ARG / non-FHSS
+              MASK_POPCOUNT) inline. New Makefile rule
+              `check-cfg-profile-wire` builds with
+              `-DLIFETRAC_FHSS_TX_ROUTED` and links host_cfg.c +
+              host_cfg_profile.c + sx1276_stub.c; wired into the
+              default `check` target and `.PHONY`. Also added
+              `host_cfg_profile.c` to the existing
+              `check-cfg-contract-unit` and
+              `check-cfg-contract-wire` link lines (now required
+              because host_cfg.c depends on it). `mingw32-make
+              check` end-to-end green: cfg_profile 27 +
+              cfg_profile_wire 9 + cfg_contract 40 +
+              cfg_wire_vectors 6 + all prior suites unchanged.
+    - [x] **FCC-EVID-D6-2-b** Wire-level fuzz orchestrator
+          `tools/cfg_fuzz_profile_lock.py` (Python 3 stdlib only,
+          `py -3` launcher). Reuses the SerialRPC framing from
+          [method_h_stage2_tx_probe_v2.py](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_h_stage2_tx_probe_v2.py)
+          (HostLink + cfg-key constants from FCC-B3-1). One
+          illegal cfg_set transaction per REJECT class; asserts
+          the wire status byte matches the value from
+          `host_cfg_profile_reject_to_cfg_status()` (table mirrored
+          in Python). Exits 0 on full pass, non-zero with a
+          per-class diff on any mismatch. CLI: `--dev`, `--baud`,
+          `--out-log`, `--self-test`. Self-test exercises the
+          crafted-frame golden vectors (HW-free byte builders)
+          so the orchestrator validates without a board. Output
+          log stamped with the FCC-B2-b artifact header + the
+          B3-1 `RUNTIME_PROFILE_ENUM=<N>` line so FCC-B3-3 gate
+          accepts it. PS5 ParseFile + `py -3 --self-test` clean
+          before declaring done.
+        - **2026-05-21 evidence**: created
+          [tools/cfg_fuzz_profile_lock.py](tools/cfg_fuzz_profile_lock.py)
+          (≈540 lines, stdlib only — `argparse`, `dataclasses`,
+          `subprocess`, `sys`, `time`, `pathlib`).
+          - **Wire constants mirrored**: `HOST_TYPE_CFG_SET_REQ=0x20`,
+            `HOST_TYPE_CFG_OK_URC=0xA0`, `HOST_TYPE_CFG_GET_REQ=0x21`,
+            `HOST_TYPE_CFG_DATA_URC=0xA1`; `CFG_KEY_FHSS_CHANNEL_MASK=0x07`,
+            `CFG_KEY_REG_PROFILE=0x14`, `CFG_KEY_ANTENNA_GAIN_DBI=0x15`,
+            `CFG_KEY_HW_CEILING_DBM=0x16`; full `cfg_status_t` 0..14.
+          - **`REJECT_TO_STATUS` table** mirrors
+            `host_cfg_profile_reject_to_cfg_status()` byte-for-byte
+            (NONE→0, BAD_PROFILE→3, UNROUTED→7, MASK_POPCOUNT→8,
+            MASK_OUT_OF_TABLE→9, BW_MISMATCH→10,
+            ANTENNA_OUT_OF_RANGE→11, NO_POWER_HEADROOM→12,
+            NOT_STAGED→13, NULL_ARG→14). Self-test pins this dict
+            against the canonical expected table so any firmware-side
+            renumber will fail both the C TU
+            ([cfg_profile.c](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/cfg_profile.c))
+            and this Python mirror in lock-step.
+          - **Case table (9 cases)** in `build_cases()` 1:1 mirrors
+            [cfg_profile_wire.c](DESIGN-CONTROLLER/firmware/murata_l072/bench/host_proto/cfg_profile_wire.c):
+            bench_happy_default, profile_unknown_oor,
+            antenna_out_of_range (gain=31), no_power_headroom
+            (gain=30), fhss_unrouted_when_unrouted_build,
+            dts_unrouted_when_unrouted_build, fhss_happy_when_routed,
+            fhss_mask_popcount (mask=0x1), fhss_mask_out_of_table
+            (mask=(1<<50)|0x1). `requires_routed` flag + runtime
+            inference (via `_read_runtime_profile_enum`) auto-skips
+            unrouted-only cases on routed firmware and vice versa.
+          - **Pure helpers** (HW-free, fully golden-tested):
+            `u64_to_le_bytes`, `i8_to_byte`, `u8_to_byte`,
+            `build_cfg_set_payload` (asserts `CFG_KEY_VALUE_LEN`
+            agreement so a host-side off-by-one is rejected before
+            the byte hits the UART), `parse_cfg_ok_payload`
+            (validates the 4-byte `[key,status,actual_len,0]`
+            schema from `host_cfg_wire_encode_ok`),
+            `parse_cfg_data_payload`.
+          - **`--self-test`**: 26 golden-vector cases — 6 packer
+            checks (u64 LE round-trips for 0xFF /
+            `FHSS_50CH_REQUIRED_MASK=(1<<50)-1` / `(1<<50)|1`; i8
+            two's complement for -5 and 30; u8 for 17), 3
+            `build_cfg_set_payload` byte vectors (REG_PROFILE=0
+            → `14 01 00`, ANTENNA_GAIN_DBI=31 → `15 01 1F`,
+            FHSS_CHANNEL_MASK=REQUIRED → `07 08 FF FF FF FF FF FF
+            03 00`), 2 length-mismatch rejection assertions, 3
+            `parse_cfg_ok_payload` cases (OK, reject MASK_POPCOUNT
+            status=0x08, truncated → ValueError), 1
+            `parse_cfg_data_payload` happy case, 1 `REJECT_TO_STATUS`
+            table-pinning assertion (full 10-entry dict equality),
+            and 1+9 case-table sanity checks (unique names + every
+            case's `expected_status` matches the table). All 26
+            PASS on first run.
+          - **Live run** (`--dev` + `--baud`): opens `HostLink` via
+            sys.path-injected reuse of
+            [method_g_stage1_probe.py](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_g_stage1_probe.py),
+            emits canonical `RUNTIME_PROFILE_ENUM=<N>` line first
+            (FCC-B3-1 contract), executes every case with try/finally
+            `_restore_defaults` cleanup of FHSS_CHANNEL_MASK +
+            ANTENNA_GAIN_DBI + HW_CEILING_DBM so a per-case setup
+            write can't poison the next case, asserts both the
+            CFG_OK_URC status byte AND the cfg_get(REG_PROFILE)
+            stored byte, prints PASS/FAIL/SKIP per case and a
+            `# SUMMARY passes=N fails=N skipped=N` tail. Exit 0 on
+            full pass, 1 on any FAIL, 2 on transport setup
+            failure.
+          - **`--stamp`**: shells out to `artifact_header.py stamp
+            --input <log> --output <log> --profile-enum <N>` using
+            the runtime-read enum so the log is FCC-B2-b conformant
+            for direct
+            `DESIGN-CONTROLLER/bench-evidence/<date>_D6_profile_lock_fuzz/`
+            submission. Subprocess-not-import keeps this
+            orchestrator decoupled from the stamper's harvest-on-import
+            side-effects.
+          - **Validation**: `py -3 -c "import ast;
+            ast.parse(open('cfg_fuzz_profile_lock.py').read())"` →
+            `ast OK`; `py -3 cfg_fuzz_profile_lock.py --self-test`
+            → `SELF_TEST: all golden vectors passed` (26 PASS / 0
+            FAIL). D6-3 bench capture is the only remaining D6
+            child.
+    - [ ] **FCC-EVID-D6-3** Bench capture + DGATE-ready evidence.
+          Run D6-2 on the 2× Max Carrier bench against the
+          BENCH_ONLY_FIXED_915 firmware build (enum 0), save log to
+          `DESIGN-CONTROLLER/bench-evidence/<date>_D6_profile_lock_fuzz/`,
+          verify FCC-B2-b lint + FCC-B3-3 runtime-profile gate both
+          pass on the artifact directory (proves the captured
+          evidence will survive the same gates DGATE will run).
+          Flip D6 parent `[x]` with the per-class REJECT-code
+          observation table embedded in the evidence summary.
+        - **2026-05-20 update (Windows-shim + bench-bridge probe)**:
+          While attempting the bench step the assistant discovered
+          that `method_g_stage1_probe.HostLink` is POSIX-only
+          (`os.open`/`O_NONBLOCK`/`stty`) and cannot run from the
+          Windows bench host the user is on. Fix landed: added
+          `_PySerialHostLink` to
+          [tools/cfg_fuzz_profile_lock.py](tools/cfg_fuzz_profile_lock.py)
+          — a pyserial-backed shim implementing the `request()` +
+          `close()` subset that the orchestrator needs, while
+          re-using `build_frame`/`parse_frame` from the original
+          module so wire framing stays single-sourced. Self-test
+          re-validated post-shim (26/26 PASS). Probe attempt against
+          enumerated USB-CDC ports (COM11, COM12 — both Arduino VID
+          0x2341 PID 0x0061, composite/MI_ → Portenta H7 in Multi
+          mode) showed: passive 2 s read returns 0 bytes on both
+          ports; orchestrator write attempts raise
+          `SerialTimeoutException: Write timeout` (CDC IN endpoint
+          backpressure — H7 isn't draining). Diagnosis: the Murata
+          L072 host_link UART is **internal to the Max Carrier**
+          and only reaches the PC via a USB-CDC ⇄ L072-UART bridge
+          sketch running on the Portenta H7; no such bridge is
+          currently flashed on either H7. User action required
+          before bench fuzz can run: flash a host_link bridge
+          sketch on the H7 (or use a different physical access
+          path to the L072 UART, e.g. an external FTDI on the
+          Max Carrier debug header). See repo memory
+          `lifetrac-l072-bench-bridge.md` for the diagnostic
+          one-liner and the symptom matrix.
+        - **2026-05-21 status (orchestrator ready, awaiting bench
+          hands-on)**: D6-2-a and D6-2-b are landed and self-validated;
+          the orchestrator's HW-free 26-case `--self-test` is green
+          and its `REJECT_TO_STATUS` table is pinned against the
+          firmware enum, so any drift between the wire dispatcher
+          and the Python mirror will be caught before the bench
+          step runs. The remaining work is purely a physical
+          procedure that the assistant cannot perform autonomously
+          (requires the user to flash BENCH_ONLY_FIXED_915 to the
+          Murata L072, **flash a USB-CDC⇄host_link bridge sketch on
+          the Portenta H7** (see 2026-05-20 update above), attach the
+          2× Max Carrier bench, identify the COM port, and run the
+          live mode). NOT performing this via a synthesized stub: per
+          the [DGATE](TODO.md#fcc-evid-dgate) contract, FCC-B2-b lint +
+          FCC-B3-3 check headers + the `RUNTIME_PROFILE_ENUM=` line
+          but do NOT validate content correctness, so a stamped
+          orchestrator log without real bench data would silently
+          pass the gates while misrepresenting evidence — a
+          falsification-test antipattern. Bench procedure for the
+          user (when hardware is available):
+          ```powershell
+          $stamp = Get-Date -Format 'yyyy-MM-dd'
+          $dir   = "LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/${stamp}_D6_profile_lock_fuzz"
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          py -3 LifeTrac-v25/tools/cfg_fuzz_profile_lock.py `
+              --dev COM7 --baud 115200 `
+              --out-log "$dir/cfg_fuzz_profile_lock.log" --stamp
+          py -3 LifeTrac-v25/tools/lint_artifact_headers.py "$dir/cfg_fuzz_profile_lock.log"
+          ```
+          Expected: orchestrator exit 0, all 6 bench-build cases PASS
+          (bench_happy_default, profile_unknown_oor, antenna_out_of_range,
+          no_power_headroom, fhss_unrouted_when_unrouted_build,
+          dts_unrouted_when_unrouted_build), 3 routed-only cases
+          SKIP, lint exit 0. Embed the resulting PASS/SKIP table in
+          this entry's evidence block and flip both D6-3 and D6
+          parent `[x]`.
 - ⚫ **FCC-EVID-D7** RF exposure / MPE — **WAIVED as lab measurement**
       (no calibrated antenna). Substitute: categorical exclusion claim
       per §1.1307(b) / §2.1093 documented in user-facing README for the
@@ -2372,10 +2911,56 @@ Max Carrier bench.*
       interferer + RFCO `blocked_attempts_by_reason` histogram; verifies
       LBT separates blocked attempts from TX counts and active set never
       silently shrinks. Not power-calibrated but proves the policy.
-- [ ] **FCC-EVID-D10** Power/antenna clamp fuzz: every illegal
+- [x] **FCC-EVID-D10** Power/antenna clamp fuzz: every illegal
       (profile, antenna_gain, tx_power) combination through host cfg is
       rejected with structured reason; legal combos clamp correctly.
       **IN SCOPE** — pure firmware validation, no RF equipment needed.
+    - 2026-05-21 landing — exhaustive Cartesian-product fuzz delivered
+      as `bench/host_proto/cfg_clamp_fuzz.c` with a new
+      `check-cfg-clamp-fuzz` Makefile target wired into the aggregator
+      `check` recipe and the .PHONY list. Axes: profile_id
+      ∈ {0, 1, 2, 3, 0x10, 0xFF}, antenna_gain ∈ {-128, -10, -1, 0, 1,
+      6, 7, 10, 17, 20, 30, 31, 100, 127}, hw_ceiling ∈ {0, 1, 2, 3, 6,
+      17, 20, 25, 30, 50, 100, 255}, channel_mask ∈ {0, bit0,
+      FHSS-required, FHSS-required minus bit0, FHSS-required plus
+      bit50, bit63}, tx_routed ∈ {false, true}. modem_bw_hz is always
+      the per-profile default so the fuzz isolates the
+      (profile, antenna, hw, mask, routed) interactions — BW_MISMATCH
+      and NOT_STAGED stay in their existing hand-picked coverage
+      (`cfg_profile.c`, 27 cases). For every tuple the test
+      independently re-derives the expected reject reason from a copy
+      of the validator's decision tree (predicate ordering
+      NULL > BAD_PROFILE > ANTENNA > NO_POWER_HEADROOM > per-profile)
+      and independently re-derives the expected `power_clamp` byte
+      from the §A5 ERP formula; a mismatch prints the offending tuple
+      coordinates + got/expected reject names and aborts. Also asserts
+      the global invariants `clamp <= min(tier, hw)` (skipping the
+      OOR-profile case where `tier == 0`), `NO_POWER_HEADROOM ⇔
+      clamp==0 ∧ pre-power checks pass`, and that the wire-status
+      mapping never falls through to the `APPLY_FAILED` catch-all for
+      any reject reason in `[NONE, NULL_ARG]`. Final histogram bucket
+      coverage asserted non-zero for NONE, BAD_PROFILE, ANTENNA,
+      NO_POWER_HEADROOM, UNROUTED, MASK_POPCOUNT, MASK_OUT_OF_TABLE so
+      a future axis-table prune that silences a branch fails loudly.
+      Run output: `[PASS] cfg_clamp_fuzz: cases=12096 legal=1180
+      reject=10916 NONE=1180 BAD_PROFILE=6048 ANTENNA=2592
+      NO_HEADROOM=696 UNROUTED=960 MASK_POP=460 MASK_OOT=160`.
+      Existing `check-cfg-profile` (27 cases) and `check-cfg-profile-
+      wire` (9 cases) re-run clean after the Makefile edits → no
+      neighboring-target regression. Note: the fuzz intentionally
+      does NOT cover the `CFG_KEY_TX_POWER_DBM` apply path in
+      `host/host_cfg.c` — that key has its own
+      `cfg_validate_and_normalize` branch that silently clamps `[2,17]`
+      with `CFG_STATUS_OK` and routes directly to
+      `sx1276_set_tx_power_dbm` without consulting the active profile
+      or current `power_clamp`. That is a design choice (tx power is
+      independently bounded by hardware tier in any subsequent
+      `host_cfg_profile_validate` call when REG_PROFILE is re-applied,
+      and the radio driver caps to PA register limits at the lowest
+      level), so D10 doesn't flag it as a finding; if a future bench-
+      evidence run reveals a path where TX_POWER can be staged above
+      the active tier's clamp and reach the air, that becomes an
+      FCC-EVID-D10-followup ticket.
 - [ ] **FCC-EVID-DGATE** Scripted go/no-go summary report that fails the
       run if any **in-scope** D4/D5/D6/D8/D10 artifact or any required B2
       header field (git SHA, timestamp, profile enum, schema version) is

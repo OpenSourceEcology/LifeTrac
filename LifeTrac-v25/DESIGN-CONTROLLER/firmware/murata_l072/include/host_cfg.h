@@ -21,7 +21,35 @@ typedef enum cfg_status_e {
      * AI NOTES/2026-05-19_LoRa_FCC_50CH_FHSS_Implementation_Plan_Copilot_v1_0.md
      * §14 and TODO.md FCC-PROFILE-ENUM / FCC-A4 / FCC-A5.
      */
-    CFG_STATUS_PROFILE_UNROUTED = 7
+    CFG_STATUS_PROFILE_UNROUTED = 7,
+    /*
+     * FCC-EVID-D6-2-a-i: distinct wire status bytes for the
+     * host_cfg_profile_reject_t codes that are not already mapped
+     * to legacy cfg_status_t values. Mapping table (see
+     * host_cfg_profile_reject_to_cfg_status):
+     *   HOST_CFG_PROFILE_REJECT_NONE                 -> CFG_STATUS_OK (0)
+     *   HOST_CFG_PROFILE_REJECT_BAD_PROFILE          -> CFG_STATUS_OUT_OF_RANGE (3)  [alias]
+     *   HOST_CFG_PROFILE_REJECT_UNROUTED             -> CFG_STATUS_PROFILE_UNROUTED (7) [alias]
+     *   HOST_CFG_PROFILE_REJECT_MASK_POPCOUNT        -> 8
+     *   HOST_CFG_PROFILE_REJECT_MASK_OUT_OF_TABLE    -> 9
+     *   HOST_CFG_PROFILE_REJECT_BW_MISMATCH          -> 10
+     *   HOST_CFG_PROFILE_REJECT_ANTENNA_OUT_OF_RANGE -> 11
+     *   HOST_CFG_PROFILE_REJECT_NO_POWER_HEADROOM    -> 12
+     *   HOST_CFG_PROFILE_REJECT_NOT_STAGED           -> 13
+     *   HOST_CFG_PROFILE_REJECT_NULL_ARG             -> 14
+     *
+     * Values 8..14 are pure-additive — no existing callers branch
+     * on cfg_status_t > CFG_STATUS_PROFILE_UNROUTED today, so the
+     * extension is wire-backward-compatible (a legacy host parser
+     * still sees these as non-zero error codes).
+     */
+    CFG_STATUS_PROFILE_REJECT_MASK_POPCOUNT       = 8,
+    CFG_STATUS_PROFILE_REJECT_MASK_OUT_OF_TABLE   = 9,
+    CFG_STATUS_PROFILE_REJECT_BW_MISMATCH         = 10,
+    CFG_STATUS_PROFILE_REJECT_ANTENNA_OUT_OF_RANGE = 11,
+    CFG_STATUS_PROFILE_REJECT_NO_POWER_HEADROOM   = 12,
+    CFG_STATUS_PROFILE_REJECT_NOT_STAGED          = 13,
+    CFG_STATUS_PROFILE_REJECT_NULL_ARG            = 14
 } cfg_status_t;
 
 void cfg_init(void);

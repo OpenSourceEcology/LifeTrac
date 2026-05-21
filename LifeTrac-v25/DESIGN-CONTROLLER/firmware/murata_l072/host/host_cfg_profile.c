@@ -31,6 +31,31 @@ uint8_t host_cfg_profile_tier_ceiling_dBm(uint8_t profile_id) {
     }
 }
 
+uint32_t host_cfg_profile_default_bw_hz(uint8_t profile_id) {
+    switch (profile_id) {
+        case REG_PROFILE_BENCH_ONLY_FIXED_915:       return HOST_CFG_PROFILE_BENCH_BW_HZ;
+        case REG_PROFILE_FCC_15_247_FHSS_50CH_BW250: return HOST_CFG_PROFILE_FHSS_BW_HZ;
+        case REG_PROFILE_FCC_15_247_DTS_BW500:       return HOST_CFG_PROFILE_DTS_BW_HZ;
+        default:                                     return 0UL;
+    }
+}
+
+cfg_status_t host_cfg_profile_reject_to_cfg_status(host_cfg_profile_reject_t r) {
+    switch (r) {
+        case HOST_CFG_PROFILE_REJECT_NONE:                 return CFG_STATUS_OK;
+        case HOST_CFG_PROFILE_REJECT_BAD_PROFILE:          return CFG_STATUS_OUT_OF_RANGE;
+        case HOST_CFG_PROFILE_REJECT_UNROUTED:             return CFG_STATUS_PROFILE_UNROUTED;
+        case HOST_CFG_PROFILE_REJECT_MASK_POPCOUNT:        return CFG_STATUS_PROFILE_REJECT_MASK_POPCOUNT;
+        case HOST_CFG_PROFILE_REJECT_MASK_OUT_OF_TABLE:    return CFG_STATUS_PROFILE_REJECT_MASK_OUT_OF_TABLE;
+        case HOST_CFG_PROFILE_REJECT_BW_MISMATCH:          return CFG_STATUS_PROFILE_REJECT_BW_MISMATCH;
+        case HOST_CFG_PROFILE_REJECT_ANTENNA_OUT_OF_RANGE: return CFG_STATUS_PROFILE_REJECT_ANTENNA_OUT_OF_RANGE;
+        case HOST_CFG_PROFILE_REJECT_NO_POWER_HEADROOM:    return CFG_STATUS_PROFILE_REJECT_NO_POWER_HEADROOM;
+        case HOST_CFG_PROFILE_REJECT_NOT_STAGED:           return CFG_STATUS_PROFILE_REJECT_NOT_STAGED;
+        case HOST_CFG_PROFILE_REJECT_NULL_ARG:             return CFG_STATUS_PROFILE_REJECT_NULL_ARG;
+        default:                                           return CFG_STATUS_APPLY_FAILED;
+    }
+}
+
 uint8_t host_cfg_profile_power_clamp(uint8_t tier_ceiling_dBm,
                                      uint8_t hw_ceiling_dBm,
                                      int8_t  antenna_gain_dBi) {

@@ -56,6 +56,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "host_cfg.h"  /* cfg_status_t for reject->status mapper */
+
 /*
  * The certified FCC 50-channel table covers indices 0..49 of
  * sx1276_fhss_chantab. A valid FCC_15_247_FHSS_50CH_BW250 mask must
@@ -143,6 +145,28 @@ uint8_t host_cfg_profile_power_clamp(
 
 /* Tier ceiling for a profile id, or 0 for unknown profiles. */
 uint8_t host_cfg_profile_tier_ceiling_dBm(uint8_t profile_id);
+
+/*
+ * FCC-EVID-D6-2-a-i: per-profile default modem BW used when
+ * synthesising a host_cfg_profile_req_t at the wire-level
+ * cfg_set(CFG_KEY_REG_PROFILE) handler. Returns 0 for unknown
+ * profile ids (caller MUST treat 0 as a BAD_PROFILE rejection
+ * and not pass it through to the validator).
+ *
+ *   BENCH_ONLY_FIXED_915      -> 125000 (LoRa bench BW)
+ *   FCC_15_247_FHSS_50CH_BW250 -> HOST_CFG_PROFILE_FHSS_BW_HZ (250000)
+ *   FCC_15_247_DTS_BW500       -> HOST_CFG_PROFILE_DTS_BW_HZ (500000)
+ */
+#define HOST_CFG_PROFILE_BENCH_BW_HZ                125000UL
+uint32_t host_cfg_profile_default_bw_hz(uint8_t profile_id);
+
+/*
+ * FCC-EVID-D6-2-a-i: map a profile reject code to the wire-level
+ * cfg_status_t emitted by cfg_set(CFG_KEY_REG_PROFILE). The mapping
+ * is golden-vector-pinned in bench/host_proto/cfg_profile.c so any
+ * accidental renumbering is caught at host-test time.
+ */
+cfg_status_t host_cfg_profile_reject_to_cfg_status(host_cfg_profile_reject_t r);
 
 /* Two-phase commit. */
 void host_cfg_profile_reset(const host_cfg_profile_req_t *initial_active);

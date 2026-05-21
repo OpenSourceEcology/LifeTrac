@@ -115,6 +115,28 @@ if ($lintRc -ne 0) {
 }
 Write-Host "[lint] OK: every text artifact in $outDir carries a v1 FCC-B2-b header"
 
+# FCC-B3-3: runtime-profile gate. After header lint passes, verify the
+# firmware actually running on each board matches $profileEnum. The
+# probe (FCC-B3-1) emits exactly one RUNTIME_PROFILE_ENUM=<N> line per
+# log; the checker (FCC-B3-2) exits 0=match, 1=mismatch, 4=probe
+# regression (zero/multi/ERR readout). Any non-zero is a hard failure;
+# we propagate exit 4 so the orchestrator's exit carries the gate's
+# verdict (B3-0 contract: 4 reserved for this gate, distinct from 3
+# used by the header lint). Only $txLog/$rxLog are probe-produced and
+# carry the readout line; CSVs are firmware dumps and are intentionally
+# not checked here.
+$profileChecker = Join-Path $PSScriptRoot 'check_run_profile.py'
+foreach ($logPath in @($txLog, $rxLog)) {
+  if (-not (Test-Path $logPath)) { continue }
+  & py -3 $profileChecker --log $logPath --expected-enum $profileEnum
+  $profRc = $LASTEXITCODE
+  if ($profRc -ne 0) {
+    Write-Host "[profile-gate] FAIL: check_run_profile.py exit=$profRc on $logPath (expected enum $profileEnum)"
+    exit 4
+  }
+}
+Write-Host "[profile-gate] OK: every probe log reports RUNTIME_PROFILE_ENUM=$profileEnum"
+
 # Summarise both logs
 Write-Host ""
 Write-Host "=== TX TAIL ==="

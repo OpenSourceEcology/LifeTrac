@@ -1,0 +1,120 @@
+{
+  "stamp": "2026-05-20_185116",
+  "probe": "tx_burst",
+  "rx_serial": "2E2C1209DABC240B",
+  "tx_serial": "2D0A1209DABC240B",
+  "cycles": 1000,
+  "inter_cycle_s": 0.05,
+  "rx_window_s": 186,
+  "tx_done_ok": 1000,
+  "tx_done_rate": 1,
+  "tx_timeouts": 0,
+  "rx_frames_received": 993,
+  "rx_match": 993,
+  "rx_orphan": 0,
+  "rx_match_rate": 0.993,
+  "rssi_median_dbm": -114,
+  "snr_median_db": 2,
+  "radio_tx_abort_airtime_delta": 0,
+  "tx_real_faults": 0,
+  "rx_real_faults": 0,
+  "tx_invariants_violated": 0,
+  "rx_invariants_violated": 0,
+  "rtt_match_rate": null,
+  "rtt_count": 0,
+  "rtt_ms_p50": null,
+  "rtt_ms_p99": null,
+  "rtt_ms_max": null,
+  "gates": [
+    {
+      "id": "B1",
+      "label": "tx_done_rate >= 0.99 (got 1)",
+      "ok": true
+    },
+    {
+      "id": "B2",
+      "label": "rx_match_rate >= 0.99 (got 0.993)",
+      "ok": true
+    },
+    {
+      "id": "B3",
+      "label": "radio_tx_abort_airtime_delta == 0 (got 0)",
+      "ok": true
+    },
+    {
+      "id": "B4",
+      "label": "no real FAULT_URC (tx=0 rx=0)",
+      "ok": true
+    },
+    {
+      "id": "B5",
+      "label": "host invariants stable (tx_violated=0 rx_violated=0)",
+      "ok": true
+    },
+    {
+      "id": "B6",
+      "label": "median RSSI in [-120,-30] dBm (got -114)",
+      "ok": true
+    }
+  ],
+  "verdict": "RX_PAIR_PASS",
+  "latency": {
+    "evidence_dir": "C:\\Users\\dorkm\\Documents\\GitHub\\LifeTrac\\LifeTrac-v25\\DESIGN-CONTROLLER\\bench-evidence\\W1-10b_rx_pair_2026-05-20_185116",
+    "tx_done_count": 1000,
+    "tx_done_ok_count": 1000,
+    "rx_frame_count": 993,
+    "matched_pair_count": 993,
+    "toa_ms": {
+      "n": 1000,
+      "min": 30.848,
+      "p50": 30.848,
+      "p90": 30.848,
+      "p95": 30.848,
+      "p99": 30.848,
+      "p999": 30.848,
+      "max": 30.848,
+      "mean": 30.848,
+      "stdev": 0.0
+    },
+    "elapsed_ms": {
+      "n": 1000,
+      "min": 42.5,
+      "p50": 52.0,
+      "p90": 56.1,
+      "p95": 56.4,
+      "p99": 59.9,
+      "p999": 60.6,
+      "max": 60.7,
+      "mean": 52.874,
+      "stdev": 2.964
+    },
+    "rx_inter_arrival_ms": {
+      "n": 992,
+      "min": 95.0,
+      "p50": 103.116,
+      "p90": 107.726,
+      "p95": 107.95,
+      "p99": 110.761,
+      "p999": 211.115,
+      "max": 211.612,
+      "mean": 104.898,
+      "stdev": 9.278
+    },
+    "rtt_estimate_ms": {
+      "p50": 104.0,
+      "p99": 119.8
+    },
+    "budget_predictions": {
+      "toa_sf7_bw125_ms": 30.0,
+      "host_overhead_ms": 21.0,
+      "w4_00b_target_ms": 91.696,
+      "w4_00b_window_ms": 4.585
+    },
+    "verdicts": {
+      "toa_match_pct": 2.83,
+      "w4_00b_within_5pct": false,
+      "w4_00b_within_5pct_pingpong": null
+    },
+    "pingpong_rtt_ms": null
+  }
+}

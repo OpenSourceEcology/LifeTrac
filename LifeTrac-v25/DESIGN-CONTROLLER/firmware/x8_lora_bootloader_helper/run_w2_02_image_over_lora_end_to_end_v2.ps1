@@ -57,8 +57,11 @@ param(
     [double]$InterFragS = 0.2,
     [int]$Quality        = 55,
     [int]$ExtraRxWindowS = 30,
+    [int]$Redundancy     = 1,
     [string]$RepoRoot    = ""
 )
+
+if ($Redundancy -lt 1) { throw "-Redundancy must be >= 1 (got $Redundancy)" }
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -176,8 +179,21 @@ $encText = ($encOut | Out-String)
 Set-Content -LiteralPath $encLog -Value $encText
 Write-Host $encText
 if ($encRc -ne 0) { throw "Encode failed (rc=$encRc)" }
+$uniqueFragments = (Get-Content -LiteralPath $fragLocal | Where-Object { $_.Trim() -ne "" }).Count
+Write-Host "Encoded $uniqueFragments unique fragments."
+
+# Apply per-fragment redundancy (each unique fragment is sent $Redundancy times back-to-back).
+# RX-side FragmentReassembler dedupes by (frag_seq, frag_idx), so dupes are harmless
+# beyond extra airtime. With per-frag p_loss~=0.007 and N=2, frame catastrophic loss
+# drops from ~73% to <1% (187 frags).
+if ($Redundancy -gt 1) {
+    $fragLines = Get-Content -LiteralPath $fragLocal | Where-Object { $_.Trim() -ne "" }
+    $dup = New-Object System.Collections.Generic.List[string]
+    foreach ($line in $fragLines) { for ($i=0; $i -lt $Redundancy; $i++) { $dup.Add($line) } }
+    Set-Content -LiteralPath $fragLocal -Value $dup
+    Write-Host "Applied redundancy=$Redundancy : will transmit $($dup.Count) fragment lines ($uniqueFragments unique x $Redundancy)."
+}
 $nFragments = (Get-Content -LiteralPath $fragLocal | Where-Object { $_.Trim() -ne "" }).Count
-Write-Host "Encoded $nFragments fragments."
 
 # ---------------------------------------------------------------------------
 # 6. Push fragments to TX board.

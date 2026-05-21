@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "host_cfg_keys.h"
+#include "host_cfg_profile.h"
 #include "host_types.h"
 #include "sx1276.h"
 
@@ -28,6 +29,15 @@
 #define DEFAULT_FHSS_DWELL_MS               400U
 #define DEFAULT_BEACON_CHANNEL_IDX          0U
 #define DEFAULT_REPLAY_WINDOW               16U
+/*
+ * FCC-EVID-D6-2-a-ii defaults. Antenna gain 2 dBi matches the
+ * existing host TU make_*_req() helpers (cfg_profile.c). HW
+ * ceiling 17 dBm matches the bench tier and the existing
+ * sx1276 PA clamp; production hardware can re-program it via
+ * cfg_set up to 30 dBm.
+ */
+#define DEFAULT_ANTENNA_GAIN_DBI            ((uint8_t)(int8_t)2)
+#define DEFAULT_HW_CEILING_DBM              17U
 
 #define LE16_0(v)                           ((uint8_t)((v) & 0xFFU))
 #define LE16_1(v)                           ((uint8_t)(((v) >> 8) & 0xFFU))
@@ -119,6 +129,10 @@ static const cfg_key_desc_t k_cfg_desc[CFG_KEY_COUNT] = {
             { LE16_0(DEFAULT_FHSS_DWELL_MS), LE16_1(DEFAULT_FHSS_DWELL_MS), 0U, 0U, 0U, 0U, 0U, 0U } },
     { CFG_KEY_REG_PROFILE,           1U, CFG_KIND_U8,   0U,                NULL,
       { REG_PROFILE_BENCH_ONLY_FIXED_915, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
+    { CFG_KEY_ANTENNA_GAIN_DBI,      1U, CFG_KIND_I8,   0U,                NULL,
+      { DEFAULT_ANTENNA_GAIN_DBI, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
+    { CFG_KEY_HW_CEILING_DBM,        1U, CFG_KIND_U8,   0U,                NULL,
+      { DEFAULT_HW_CEILING_DBM, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
     { CFG_KEY_PROTOCOL_VERSION,      1U, CFG_KIND_U8,   CFG_FLAG_READ_ONLY, NULL,
       { HOST_PROTOCOL_VER, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
     { CFG_KEY_WIRE_SCHEMA_VERSION,   1U, CFG_KIND_U8,   CFG_FLAG_READ_ONLY, NULL,
@@ -241,28 +255,70 @@ static cfg_status_t cfg_validate_and_normalize(uint8_t key, uint8_t *value, uint
         case CFG_KEY_FHSS_CHANNEL_MASK:
             return (read_u64_le(value) != 0ULL) ? CFG_STATUS_OK : CFG_STATUS_OUT_OF_RANGE;
 
-        case CFG_KEY_REG_PROFILE:
+        case CFG_KEY_REG_PROFILE: {
             /*
-             * FCC-PROFILE-ENUM gate (plan §14 delta #1, TODO Stage S1.5):
-             *   - BENCH_ONLY_FIXED_915 is always accepted.
-             *   - Production profiles require the TX path to be routed
-             *     through the FHSS hop scheduler, which is gated by the
-             *     build symbol LIFETRAC_FHSS_TX_ROUTED (defined only when
-             *     FCC-A4 lands). Until then they return
-             *     CFG_STATUS_PROFILE_UNROUTED so an operator cannot
-             *     select a profile the firmware cannot actually honour.
+             * FCC-EVID-D6-2-a-iii: route cfg_set(REG_PROFILE) through
+             * the host_cfg_profile two-phase commit. Wire layer
+             * synthesises a host_cfg_profile_req_t from the candidate
+             * profile_id plus the current cfg state (FHSS channel
+             * mask, antenna gain, HW ceiling); modem BW is fixed per
+             * profile via host_cfg_profile_default_bw_hz so the wire
+             * path never produces BW_MISMATCH. tx_routed mirrors the
+             * LIFETRAC_FHSS_TX_ROUTED build symbol exactly as
+             * documented in host_cfg_profile.h.
+             *
+             * The legacy >REG_PROFILE_MAX early-return is preserved
+             * for backward compat with the cfg_contract.c
+             * reg_profile_unknown_oor case; it short-circuits before
+             * we touch the profile state machine, matching the prior
+             * wire contract that an unknown profile id is OUT_OF_RANGE
+             * (not the BAD_PROFILE alias).
              */
             if (value[0] > REG_PROFILE_MAX) {
                 return CFG_STATUS_OUT_OF_RANGE;
             }
-            if (value[0] == REG_PROFILE_BENCH_ONLY_FIXED_915) {
-                return CFG_STATUS_OK;
+
+            host_cfg_profile_req_t req;
+            memset(&req, 0, sizeof(req));
+            req.profile_id   = value[0];
+            req.modem_bw_hz  = host_cfg_profile_default_bw_hz(value[0]);
+
+            {
+                int idx = cfg_find_index(CFG_KEY_FHSS_CHANNEL_MASK);
+                if (idx < 0) {
+                    return CFG_STATUS_APPLY_FAILED;
+                }
+                req.channel_mask = read_u64_le(s_cfg_values[idx].bytes);
             }
+            {
+                int idx = cfg_find_index(CFG_KEY_ANTENNA_GAIN_DBI);
+                if (idx < 0) {
+                    return CFG_STATUS_APPLY_FAILED;
+                }
+                req.antenna_gain_dBi = (int8_t)s_cfg_values[idx].bytes[0];
+            }
+            {
+                int idx = cfg_find_index(CFG_KEY_HW_CEILING_DBM);
+                if (idx < 0) {
+                    return CFG_STATUS_APPLY_FAILED;
+                }
+                req.hw_ceiling_dBm = s_cfg_values[idx].bytes[0];
+            }
+
 #ifdef LIFETRAC_FHSS_TX_ROUTED
-            return CFG_STATUS_OK;
+            const bool tx_routed = true;
 #else
-            return CFG_STATUS_PROFILE_UNROUTED;
+            const bool tx_routed = false;
 #endif
+
+            host_cfg_profile_reject_t r =
+                host_cfg_profile_stage(&req, tx_routed);
+            if (r != HOST_CFG_PROFILE_REJECT_NONE) {
+                return host_cfg_profile_reject_to_cfg_status(r);
+            }
+            r = host_cfg_profile_activate();
+            return host_cfg_profile_reject_to_cfg_status(r);
+        }
 
         default:
             return CFG_STATUS_OK;
@@ -281,6 +337,25 @@ void cfg_init(void) {
         memcpy(s_cfg_values[i].bytes,
                k_cfg_desc[i].default_value,
                k_cfg_desc[i].len);
+    }
+
+    /*
+     * FCC-EVID-D6-2-a-iii: seed the profile two-phase-commit state
+     * machine with the bench-default req so cfg_set(REG_PROFILE)
+     * after boot sees a consistent active profile and so the host
+     * TU run_case()->cfg_init() cycle resets the state machine
+     * between cases.
+     */
+    {
+        host_cfg_profile_req_t initial;
+        memset(&initial, 0, sizeof(initial));
+        initial.profile_id      = REG_PROFILE_BENCH_ONLY_FIXED_915;
+        initial.channel_mask    = DEFAULT_FHSS_CHANNEL_MASK;
+        initial.modem_bw_hz     = host_cfg_profile_default_bw_hz(
+                                      REG_PROFILE_BENCH_ONLY_FIXED_915);
+        initial.antenna_gain_dBi = (int8_t)DEFAULT_ANTENNA_GAIN_DBI;
+        initial.hw_ceiling_dBm  = DEFAULT_HW_CEILING_DBM;
+        host_cfg_profile_reset(&initial);
     }
 
     s_cfg_dirty = false;

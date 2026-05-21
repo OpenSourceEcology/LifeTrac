@@ -1,0 +1,56 @@
+{
+    "timestamp":  "2026-05-20_184021",
+    "tx_board":  "2E2C1209DABC240B",
+    "rx_board":  "2D0A1209DABC240B",
+    "video_dev":  "/dev/video1",
+    "n_fragments_planned":  187,
+    "n_tx_done":  187,
+    "n_tx_ok":  187,
+    "n_tx_timeout":  0,
+    "n_rx_frames":  185,
+    "n_rx_matched":  185,
+    "tx_ok_rate":  1,
+    "rx_match_rate":  0.9893,
+    "rssi_median_dbm":  -114,
+    "snr_median_db":  2,
+    "tx_duration_s":  52.9,
+    "frame_complete":  false,
+    "tiles_decoded":  0,
+    "decode":  {
+                   "n_rx_frames":  185,
+                   "completed_frames":  0,
+                   "decode_errors":  0,
+                   "pending_seqs":  [
+                                        0
+                                    ],
+                   "newest_frame_wins":  {
+                                             "accepted":  0,
+                                             "stale_dropped":  0,
+                                             "duplicate_dropped":  0,
+                                             "first_frame_accepted":  false,
+                                             "last_accepted_seq":  null
+                                         }
+               },
+    "gates":  [
+                  {
+                      "id":  "V1",
+                      "label":  "tx_ok_rate \u003e= 0.99 (got 1)",
+                      "ok":  true
+                  },
+                  {
+                      "id":  "V2",
+                      "label":  "rx_match_rate \u003e= 0.95 (got 0.9893)",
+                      "ok":  true
+                  },
+                  {
+                      "id":  "V3",
+                      "label":  "frame_complete (got False)",
+                      "ok":  false
+                  },
+                  {
+                      "id":  "V4",
+                      "label":  "tiles_decoded == 96 (got 0)",
+                      "ok":  false
+                  }
+              ]
+}

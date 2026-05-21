@@ -12,6 +12,7 @@
 
 #include "host_cfg_keys.h"
 #include "host_cfg_profile.h"
+#include "host_cfg.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -324,6 +325,70 @@ static void test_stage_unrouted_leaves_active_alone(void) {
            "active untouched after UNROUTED");
 }
 
+/* -------- FCC-EVID-D6-2-a-i: default BW + reject->status mappers -------- */
+
+static void test_default_bw_hz(void) {
+    EXPECT(host_cfg_profile_default_bw_hz(REG_PROFILE_BENCH_ONLY_FIXED_915) ==
+               HOST_CFG_PROFILE_BENCH_BW_HZ,
+           "default bw bench = 125000");
+    EXPECT(host_cfg_profile_default_bw_hz(REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) ==
+               HOST_CFG_PROFILE_FHSS_BW_HZ,
+           "default bw FHSS = 250000");
+    EXPECT(host_cfg_profile_default_bw_hz(REG_PROFILE_FCC_15_247_DTS_BW500) ==
+               HOST_CFG_PROFILE_DTS_BW_HZ,
+           "default bw DTS = 500000");
+    EXPECT(host_cfg_profile_default_bw_hz(0xFFU) == 0UL,
+           "default bw unknown profile = 0");
+}
+
+static void test_reject_to_cfg_status(void) {
+    /* Golden vector: pins the wire-status byte for every REJECT enum. */
+    EXPECT(host_cfg_profile_reject_to_cfg_status(HOST_CFG_PROFILE_REJECT_NONE) ==
+               CFG_STATUS_OK,
+           "REJECT_NONE -> CFG_STATUS_OK (0)");
+    EXPECT(host_cfg_profile_reject_to_cfg_status(HOST_CFG_PROFILE_REJECT_BAD_PROFILE) ==
+               CFG_STATUS_OUT_OF_RANGE,
+           "REJECT_BAD_PROFILE -> CFG_STATUS_OUT_OF_RANGE (3) [alias]");
+    EXPECT(host_cfg_profile_reject_to_cfg_status(HOST_CFG_PROFILE_REJECT_UNROUTED) ==
+               CFG_STATUS_PROFILE_UNROUTED,
+           "REJECT_UNROUTED -> CFG_STATUS_PROFILE_UNROUTED (7) [alias]");
+    EXPECT(host_cfg_profile_reject_to_cfg_status(HOST_CFG_PROFILE_REJECT_MASK_POPCOUNT) ==
+               CFG_STATUS_PROFILE_REJECT_MASK_POPCOUNT,
+           "REJECT_MASK_POPCOUNT -> 8");
+    EXPECT((uint8_t)CFG_STATUS_PROFILE_REJECT_MASK_POPCOUNT == 8U,
+           "wire value MASK_POPCOUNT pinned at 8");
+    EXPECT(host_cfg_profile_reject_to_cfg_status(HOST_CFG_PROFILE_REJECT_MASK_OUT_OF_TABLE) ==
+               CFG_STATUS_PROFILE_REJECT_MASK_OUT_OF_TABLE,
+           "REJECT_MASK_OUT_OF_TABLE -> 9");
+    EXPECT((uint8_t)CFG_STATUS_PROFILE_REJECT_MASK_OUT_OF_TABLE == 9U,
+           "wire value MASK_OUT_OF_TABLE pinned at 9");
+    EXPECT(host_cfg_profile_reject_to_cfg_status(HOST_CFG_PROFILE_REJECT_BW_MISMATCH) ==
+               CFG_STATUS_PROFILE_REJECT_BW_MISMATCH,
+           "REJECT_BW_MISMATCH -> 10");
+    EXPECT((uint8_t)CFG_STATUS_PROFILE_REJECT_BW_MISMATCH == 10U,
+           "wire value BW_MISMATCH pinned at 10");
+    EXPECT(host_cfg_profile_reject_to_cfg_status(HOST_CFG_PROFILE_REJECT_ANTENNA_OUT_OF_RANGE) ==
+               CFG_STATUS_PROFILE_REJECT_ANTENNA_OUT_OF_RANGE,
+           "REJECT_ANTENNA_OUT_OF_RANGE -> 11");
+    EXPECT((uint8_t)CFG_STATUS_PROFILE_REJECT_ANTENNA_OUT_OF_RANGE == 11U,
+           "wire value ANTENNA_OUT_OF_RANGE pinned at 11");
+    EXPECT(host_cfg_profile_reject_to_cfg_status(HOST_CFG_PROFILE_REJECT_NO_POWER_HEADROOM) ==
+               CFG_STATUS_PROFILE_REJECT_NO_POWER_HEADROOM,
+           "REJECT_NO_POWER_HEADROOM -> 12");
+    EXPECT((uint8_t)CFG_STATUS_PROFILE_REJECT_NO_POWER_HEADROOM == 12U,
+           "wire value NO_POWER_HEADROOM pinned at 12");
+    EXPECT(host_cfg_profile_reject_to_cfg_status(HOST_CFG_PROFILE_REJECT_NOT_STAGED) ==
+               CFG_STATUS_PROFILE_REJECT_NOT_STAGED,
+           "REJECT_NOT_STAGED -> 13");
+    EXPECT((uint8_t)CFG_STATUS_PROFILE_REJECT_NOT_STAGED == 13U,
+           "wire value NOT_STAGED pinned at 13");
+    EXPECT(host_cfg_profile_reject_to_cfg_status(HOST_CFG_PROFILE_REJECT_NULL_ARG) ==
+               CFG_STATUS_PROFILE_REJECT_NULL_ARG,
+           "REJECT_NULL_ARG -> 14");
+    EXPECT((uint8_t)CFG_STATUS_PROFILE_REJECT_NULL_ARG == 14U,
+           "wire value NULL_ARG pinned at 14");
+}
+
 int main(void) {
     /* validator */
     test_validate_bench_ok();
@@ -359,6 +424,10 @@ int main(void) {
     test_double_activate();
     test_stage_unrouted_leaves_active_alone();
 
-    printf("[PASS] cfg_profile: 25 cases\n");
+    /* FCC-EVID-D6-2-a-i: default BW + reject->status mappers */
+    test_default_bw_hz();
+    test_reject_to_cfg_status();
+
+    printf("[PASS] cfg_profile: 27 cases\n");
     return 0;
 }

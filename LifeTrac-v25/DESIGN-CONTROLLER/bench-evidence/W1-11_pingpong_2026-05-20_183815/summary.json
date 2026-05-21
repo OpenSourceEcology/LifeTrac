@@ -1,0 +1,136 @@
+{
+  "stamp": "2026-05-20_183815",
+  "probe": "ping_pong",
+  "rx_serial": "2E2C1209DABC240B",
+  "tx_serial": "2D0A1209DABC240B",
+  "cycles": 100,
+  "inter_cycle_s": 0.2,
+  "rx_window_s": 66,
+  "tx_done_ok": 100,
+  "tx_done_rate": 1,
+  "tx_timeouts": 0,
+  "rx_frames_received": 98,
+  "rx_match": 98,
+  "rx_orphan": 0,
+  "rx_match_rate": 0.98,
+  "rssi_median_dbm": -114,
+  "snr_median_db": 2,
+  "radio_tx_abort_airtime_delta": 0,
+  "tx_real_faults": 0,
+  "rx_real_faults": 0,
+  "tx_invariants_violated": 0,
+  "rx_invariants_violated": 0,
+  "rtt_match_rate": 0.97,
+  "rtt_count": 97,
+  "rtt_ms_p50": 106.7,
+  "rtt_ms_p99": 118,
+  "rtt_ms_max": 118,
+  "gates": [
+    {
+      "id": "B1",
+      "label": "tx_done_rate >= 0.99 (got 1)",
+      "ok": true
+    },
+    {
+      "id": "B2",
+      "label": "rx_match_rate >= 0.99 (got 0.98)",
+      "ok": false
+    },
+    {
+      "id": "B3",
+      "label": "radio_tx_abort_airtime_delta == 0 (got 0)",
+      "ok": true
+    },
+    {
+      "id": "B4",
+      "label": "no real FAULT_URC (tx=0 rx=0)",
+      "ok": true
+    },
+    {
+      "id": "B5",
+      "label": "host invariants stable (tx_violated=0 rx_violated=0)",
+      "ok": true
+    },
+    {
+      "id": "B6",
+      "label": "median RSSI in [-120,-30] dBm (got -114)",
+      "ok": true
+    },
+    {
+      "id": "B7",
+      "label": "rtt_match_rate >= 0.99 (got 0.97); rtt_ms p50=106.7 p99=118 max=118",
+      "ok": false
+    }
+  ],
+  "verdict": "RX_PAIR_FAIL_2_GATES",
+  "latency": {
+    "evidence_dir": "C:\\Users\\dorkm\\Documents\\GitHub\\LifeTrac\\LifeTrac-v25\\DESIGN-CONTROLLER\\bench-evidence\\W1-11_pingpong_2026-05-20_183815",
+    "tx_done_count": 100,
+    "tx_done_ok_count": 100,
+    "rx_frame_count": 98,
+    "matched_pair_count": 98,
+    "toa_ms": {
+      "n": 100,
+      "min": 33.408,
+      "p50": 33.408,
+      "p90": 33.408,
+      "p95": 33.408,
+      "p99": 33.408,
+      "p999": 33.408,
+      "max": 33.408,
+      "mean": 33.408,
+      "stdev": 0.0
+    },
+    "elapsed_ms": {
+      "n": 100,
+      "min": 43.4,
+      "p50": 55.9,
+      "p90": 57.3,
+      "p95": 57.9,
+      "p99": 60.8,
+      "p999": 61.0,
+      "max": 61.0,
+      "mean": 54.275,
+      "stdev": 3.232
+    },
+    "rx_inter_arrival_ms": {
+      "n": 97,
+      "min": 300.05,
+      "p50": 309.409,
+      "p90": 318.668,
+      "p95": 320.0,
+      "p99": 3694.175,
+      "p999": 3710.993,
+      "max": 3710.993,
+      "mean": 410.928,
+      "stdev": 570.59
+    },
+    "rtt_estimate_ms": {
+      "p50": 111.8,
+      "p99": 121.6
+    },
+    "budget_predictions": {
+      "toa_sf7_bw125_ms": 30.0,
+      "host_overhead_ms": 21.0,
+      "w4_00b_target_ms": 96.816,
+      "w4_00b_window_ms": 4.841
+    },
+    "verdicts": {
+      "toa_match_pct": 11.36,
+      "w4_00b_within_5pct": false,
+      "w4_00b_within_5pct_pingpong": false
+    },
+    "pingpong_rtt_ms": {
+      "n": 97,
+      "min": 94.2,
+      "p50": 106.7,
+      "p90": 113.0,
+      "p95": 116.9,
+      "p99": 118.0,
+      "p999": 118.0,
+      "max": 118.0,
+      "mean": 106.516,
+      "stdev": 4.989
+    }
+  }
+}

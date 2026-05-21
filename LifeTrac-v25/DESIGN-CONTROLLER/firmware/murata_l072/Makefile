@@ -140,7 +140,7 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters help
+.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters help
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
 
@@ -225,6 +225,8 @@ RFCO_SUMMARY_BIN   := $(BUILD)/rfco_summary
 RFCO_SUMMARY_EMIT_BIN := $(BUILD)/rfco_summary_emit
 RFCO_SUMMARY_INTEGRATION_BIN := $(BUILD)/rfco_summary_integration
 CFG_PROFILE_BIN    := $(BUILD)/cfg_profile
+CFG_PROFILE_WIRE_BIN := $(BUILD)/cfg_profile_wire
+CFG_CLAMP_FUZZ_BIN := $(BUILD)/cfg_clamp_fuzz
 LORA_PKT_HDR_BIN   := $(BUILD)/lora_pkt_hdr
 RX_COUNTERS_BIN    := $(BUILD)/rx_counters
 RX_RETUNE_POLICY_BIN := $(BUILD)/rx_retune_policy
@@ -234,7 +236,7 @@ RX_SCAN_COUNTERS_BIN := $(BUILD)/rx_scan_counters
 RX_SCAN_FAIL_BIN := $(BUILD)/rx_scan_fail
 AIRTIME_INVARIANT_BIN := $(BUILD)/airtime_invariant
 
-check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-airtime-invariant check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail
+check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-airtime-invariant check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail
 	@echo "[OK] memory map invariants hold"
 
 check-cpp: $(BUILD)
@@ -342,6 +344,7 @@ check-cfg-contract-unit: $(BUILD)
 	    bench/host_proto/cfg_contract.c \
 	    bench/host_proto/sx1276_stub.c \
 	    host/host_cfg.c \
+	    host/host_cfg_profile.c \
 	    -o $(CFG_CONTRACT_BIN)
 	@echo "[CFG] Running host contract test ..."
 	@$(CFG_CONTRACT_BIN)
@@ -352,6 +355,7 @@ check-cfg-contract-wire: $(BUILD)
 	    bench/host_proto/cfg_wire_vectors.c \
 	    bench/host_proto/sx1276_stub.c \
 	    host/host_cfg.c \
+	    host/host_cfg_profile.c \
 	    host/host_cfg_wire.c \
 	    -o $(CFG_WIRE_BIN)
 	@echo "[CFG] Running wire-vector test ..."
@@ -560,6 +564,44 @@ check-cfg-profile: $(BUILD)
 	    -o $(CFG_PROFILE_BIN)
 	@echo "[CFGP ] Running cfg-profile test ..."
 	@$(CFG_PROFILE_BIN)
+
+# FCC-EVID-D6-2-a-iii: wire-level dispatcher coverage. Builds with
+# -DLIFETRAC_FHSS_TX_ROUTED so the cfg_set(REG_PROFILE) path exercises
+# the production routed branches (FHSS happy + MASK_POPCOUNT /
+# MASK_OUT_OF_TABLE; DTS happy; ANTENNA_OUT_OF_RANGE; NO_POWER_HEADROOM).
+# The unrouted-gate path is covered separately by
+# bench/host_proto/cfg_contract.c (built without the define).
+check-cfg-profile-wire: $(BUILD)
+	@echo "[CFGPW] Building cfg-profile-wire test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    -DLIFETRAC_FHSS_TX_ROUTED \
+	    bench/host_proto/cfg_profile_wire.c \
+	    bench/host_proto/sx1276_stub.c \
+	    host/host_cfg.c \
+	    host/host_cfg_profile.c \
+	    -o $(CFG_PROFILE_WIRE_BIN)
+	@echo "[CFGPW] Running cfg-profile-wire test ..."
+	@$(CFG_PROFILE_WIRE_BIN)
+
+# FCC-EVID-D10 — exhaustive (profile, antenna_gain, hw_ceiling,
+# mask_class, tx_routed) Cartesian-product fuzz of the
+# host_cfg_profile validator + power_clamp. HW-free; pure C against
+# host gcc. Complements the hand-picked unit cases in
+# bench/host_proto/cfg_profile.c (legal-shape coverage) and the wire
+# dispatcher tests in bench/host_proto/cfg_profile_wire.c (full
+# CFG_KEY_REG_PROFILE wire path). The fuzz independently re-derives
+# the expected reject reason and the expected power_clamp byte for
+# every tuple so a refactor that reorders the validator's decision
+# tree or sign-flips the ERP arithmetic surfaces as concrete tuple-
+# level diff output rather than a single sample miss.
+check-cfg-clamp-fuzz: $(BUILD)
+	@echo "[CFGF ] Building cfg-clamp-fuzz test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/cfg_clamp_fuzz.c \
+	    host/host_cfg_profile.c \
+	    -o $(CFG_CLAMP_FUZZ_BIN)
+	@echo "[CFGF ] Running cfg-clamp-fuzz test ..."
+	@$(CFG_CLAMP_FUZZ_BIN)
 
 # FCC-A6a (plan §14.2 step 10, delta #13): LoRa link-layer packet header
 # pack/unpack contract. Compiles radio/lora_pkt_hdr.c against the host

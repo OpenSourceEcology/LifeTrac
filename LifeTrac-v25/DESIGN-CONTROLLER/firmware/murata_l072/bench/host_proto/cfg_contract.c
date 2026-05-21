@@ -557,6 +557,92 @@ int main(void) {
             false,
             false,
             0U
+        },
+        /*
+         * FCC-EVID-D6-2-a-ii: round-trip the two new validator-input
+         * keys. Wire layer accepts the full type range; the
+         * host_cfg_profile validator (invoked from cfg_set(REG_PROFILE)
+         * in D6-2-a-iii) is the only gate that produces a profile-
+         * specific REJECT. Tests pin set/get/default behaviour so the
+         * key indices and defaults cannot drift silently.
+         */
+        {
+            "antenna_gain_default_roundtrip",
+            CFG_KEY_ANTENNA_GAIN_DBI,
+            { (uint8_t)(int8_t)2 },
+            1U,
+            CFG_STATUS_OK,
+            true,
+            { (uint8_t)(int8_t)2 },
+            1U,
+            false, /* setting default value does not flip dirty */
+            false,
+            0U
+        },
+        {
+            "antenna_gain_negative_accepted_at_wire",
+            CFG_KEY_ANTENNA_GAIN_DBI,
+            { (uint8_t)(int8_t)-5 },
+            1U,
+            CFG_STATUS_OK,
+            true,
+            { (uint8_t)(int8_t)-5 },
+            1U,
+            true,
+            false,
+            0U
+        },
+        {
+            "antenna_gain_above_fcc_max_accepted_at_wire",
+            CFG_KEY_ANTENNA_GAIN_DBI,
+            { 31U }, /* exceeds HOST_CFG_PROFILE_ANTENNA_GAIN_MAX_DBI=30 */
+            1U,
+            CFG_STATUS_OK,
+            true,
+            { 31U },
+            1U,
+            true,
+            false,
+            0U
+        },
+        {
+            "hw_ceiling_default_roundtrip",
+            CFG_KEY_HW_CEILING_DBM,
+            { 17U },
+            1U,
+            CFG_STATUS_OK,
+            true,
+            { 17U },
+            1U,
+            false, /* default value */
+            false,
+            0U
+        },
+        {
+            "hw_ceiling_zero_accepted_at_wire",
+            CFG_KEY_HW_CEILING_DBM,
+            { 0U },
+            1U,
+            CFG_STATUS_OK,
+            true,
+            { 0U },
+            1U,
+            true,
+            false,
+            0U
+        },
+        {
+            "hw_ceiling_30_accepted_at_wire",
+            CFG_KEY_HW_CEILING_DBM,
+            { 30U },
+            1U,
+            CFG_STATUS_OK,
+            true,
+            { 30U },
+            1U,
+            true,
+            false,
+            0U
         }
     };
 
