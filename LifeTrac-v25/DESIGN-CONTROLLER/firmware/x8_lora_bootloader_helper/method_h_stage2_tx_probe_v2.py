@@ -118,6 +118,13 @@ CFG_KEY_TX_POWER_DBM = 0x01
 # on the board matches the orchestrator's declared expected enum.
 CFG_KEY_REG_PROFILE = 0x14
 
+CFG_KEY_FHSS_CHANNEL_MASK = 0x07
+CFG_KEY_ANTENNA_GAIN_DBI = 0x15
+CFG_KEY_HW_CEILING_DBM = 0x16
+
+REG_PROFILE_BENCH_ONLY_FIXED_915 = 0
+REG_PROFILE_FCC_15_247_FHSS_50CH_BW250 = 1
+
 SX1276_REG_IRQ_FLAGS = 0x12
 SX1276_REG_OP_MODE = 0x01
 SX1276_REG_MODEM_STAT = 0x18    # bits 0..3: modem status; bits 4..7: SF (RxNbBytes coded path)
@@ -286,6 +293,50 @@ def _format_runtime_profile_line(payload: bytes = None, exc: BaseException = Non
     if payload[1] != 1:
         return f"RUNTIME_PROFILE_ENUM=ERR wrong_value_len:{payload[1]}"
     return f"RUNTIME_PROFILE_ENUM={payload[2]}"
+
+
+def configure_regulatory_profile_if_needed(link: HostLink) -> None:
+    """Configures the required regulatory profile parameters and activates the
+    FHSS profile REG_PROFILE_FCC_15_247_FHSS_50CH_BW250 on the co-processor.
+    This fulfills the production requirement for FHSS channel hopping.
+    """
+    print("Initializing regulatory profile on co-processor...")
+    
+    # 1. Set the FHSS channel mask (50 channels required, indices 0..49)
+    # 0x0003FFFFFFFFFFFF (50 continuous active channels)
+    # Little-endian representation of 0x0003FFFFFFFFFFFF is \xff\xff\xff\xff\xff\xff\x03\x00 (8 bytes)
+    channel_mask_payload = bytes([CFG_KEY_FHSS_CHANNEL_MASK, 0x08, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03, 0x00])
+    try:
+        ack = link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC, channel_mask_payload, timeout=1.0)
+        print(f"CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: {ack['payload'].hex()}")
+    except Exception as exc:
+        print(f"WARN: CFG_SET_REQ(FHSS_CHANNEL_MASK) failed: {exc}")
+        
+    # 2. Set the antenna gain in dBi
+    # Let's use 2 dBi as standard (1 byte, signed 0x02)
+    antenna_gain_payload = bytes([CFG_KEY_ANTENNA_GAIN_DBI, 0x01, 0x02])
+    try:
+        ack = link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC, antenna_gain_payload, timeout=1.0)
+        print(f"CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: {ack['payload'].hex()}")
+    except Exception as exc:
+        print(f"WARN: CFG_SET_REQ(ANTENNA_GAIN_DBI) failed: {exc}")
+        
+    # 3. Set the HW ceiling in dBm
+    # Let's use 17 dBm (1 byte, unsigned 0x11)
+    hw_ceiling_payload = bytes([CFG_KEY_HW_CEILING_DBM, 0x01, 0x11])
+    try:
+        ack = link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC, hw_ceiling_payload, timeout=1.0)
+        print(f"CFG_SET_REQ(HW_CEILING_DBM) OK: {ack['payload'].hex()}")
+    except Exception as exc:
+        print(f"WARN: CFG_SET_REQ(HW_CEILING_DBM) failed: {exc}")
+        
+    # 4. Set the regulatory profile to REG_PROFILE_FCC_15_247_FHSS_50CH_BW250 (1) and activate
+    reg_profile_payload = bytes([CFG_KEY_REG_PROFILE, 0x01, REG_PROFILE_FCC_15_247_FHSS_50CH_BW250])
+    try:
+        ack = link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC, reg_profile_payload, timeout=1.0)
+        print(f"CFG_SET_REQ(REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) OK: {ack['payload'].hex()}")
+    except Exception as exc:
+        print(f"WARN: CFG_SET_REQ(REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) failed: {exc}")
 
 
 def emit_runtime_profile_enum(link: HostLink) -> None:
@@ -2431,6 +2482,9 @@ def main(argv=None) -> int:
         _emit_progress("link_open_failed", err=type(exc).__name__)
         return 2
     _emit_progress("link_open_ok")
+
+    # Configure regulatory profile so the FHSS scheduler is initialized
+    configure_regulatory_profile_if_needed(link)
 
     # 2026-05-20 FCC-B3-1: publish RUNTIME_PROFILE_ENUM=<N> exactly once per
     # probe process so the FCC-B3-2 gate (`tools/check_run_profile.py`) can

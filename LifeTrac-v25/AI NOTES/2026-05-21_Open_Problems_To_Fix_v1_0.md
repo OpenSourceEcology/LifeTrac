@@ -1327,3 +1327,68 @@ Expected: `RUNTIME_PROFILE_ENUM=<0|1|2>` on all cycles, no
 - Repo memory: `/memories/repo/lifetrac-p1-cold-boot-verdict.md`
 
 *Signed:* **GitHub Copilot, Phase 2.3 root-cause verdict 2026-05-22 16:15**
+
+---
+
+## P8 (NEW 2026-05-22 17:15) — Post-FHSS firmware FORBIDs every TX; bench probes block RF testing
+
+- **Symptom.** Today's first ping_pong run **after** the HC-04 reflash of both
+  L072 boards failed 5/7 gates with adio_tx_ok=0/100, every cycle emitting
+  `INFO: unrelated frame during TX wait type=0xC3` followed immediately by
+  `__TX_ERR__ idx=N ERR_PROTO during TX wait: 1001080000`. RX raised one-shot
+  `__RX_FAULT__ code=0x0D sub=0x20` and `sub=0x21` at listener start.
+  Evidence: DESIGN-CONTROLLER/bench-evidence/W1-11_pingpong_2026-05-22_165144/.
+- **Decoded payloads.**
+  - ERR_PROTO 10 01 08 00 00 = offending_type=0x10 (TX_FRAME_REQ),
+    err_code=0x08 = `HOST_ERR_PROTO_FORBIDDEN`.
+  - Fault 0x0D = `HOST_FAULT_CODE_RX_SCAN_FAILED`
+    (murata_l072/include/host_types.h:198).
+- **Root cause.** Commit `d4dfcb8` (2026-05-20 02:24, "Add FHSS, RFCO summary,
+  RX-scan docs & radio") added `-DLIFETRAC_FHSS_TX_ROUTED=1` to
+  `murata_l072/Makefile`. `sx1276_tx_begin()` now calls
+  `sx1276_fhss_next_channel()` before LBT/CAD; if no profile has been armed
+  via `cfg_set(CFG_KEY_REG_PROFILE=0x14, ...)` the scheduler returns non-OK,
+  `sx1276_tx_begin()` returns false, host gets FORBIDDEN. RX has the
+  symmetric refusal that raises RX_SCAN_FAILED. The 2026-05-20 18:38 PASS was
+  on **pre-d4dfcb8 firmware that was still loaded** on the L072s — today's
+  HC-04 reflash uploaded the new `firmware.bin` for the first time.
+- **Why P1 closure does NOT cover this.** The 2026-05-22 P1 discriminator only
+  exercises `CFG_GET CFG_KEY_REG_PROFILE` (a read). It never asks the radio
+  to transmit. P1 CLOSED is still valid for what it tested (cold-boot
+  stale-firmware regression on the CFG_GET path), but it is **not** an
+  end-to-end RF green-light. The previous "P1 closure also means radios work"
+  framing was an overreach.
+- **DONE WHEN.** A post-reflash `run_w1_10b_rx_pair_end_to_end.ps1 -Cycles 100
+  -Probe ping_pong` returns verdict `RX_PAIR_PASS` (≥95/100 PONG, RSSI
+  measured) **on current `firmware.bin`** (i.e. with `LIFETRAC_FHSS_TX_ROUTED`
+  enabled), without requiring any manual `cfg_set` outside the probe.
+- **Next action — requires user direction (3 options).** Detailed in
+  `AI NOTES/2026-05-22_W1-11_RF_Blocked_FHSS_Gate_v1_0.md`:
+  - **Option A (host-side):** add `cfg_set(CFG_KEY_REG_PROFILE)` arming at
+    the top of every probe entrypoint
+    (`method_h_stage2_tx_probe[_v2].py`, `method_g_stage1_probe.py`).
+    Lowest blast radius; needs the correct `host_cfg_profile_req_t` payload
+    encoded by the probe.
+  - **Option B (firmware-side):** make `BENCH_ONLY_FIXED_915` auto-init the
+    FHSS scheduler at boot so legacy probes work unchanged. Cleanest semantics
+    but touches FCC-adjacent code paths.
+  - **Option C (build variant):** `-DLIFETRAC_FHSS_TX_ROUTED_BENCH_BYPASS=1`
+    for a bench firmware variant that skips the gate when profile is fixed-915.
+- **DO NOT** attempt the fix autonomously: the cross-layer change has FCC
+  implications and needs the FHSS author's input on what
+  `BENCH_ONLY_FIXED_915` is contractually allowed to do.
+
+### Closure status against the DONE WHEN table (updated 2026-05-22 17:15)
+
+| Item | Status | Note |
+|---|---|---|
+| P1 | CLOSED (CFG_GET path only) | Discriminator passes on current firmware; does NOT cover RF I/O — see P8. |
+| P2 | CLOSED | — |
+| P3 | PARTIAL | Firmware mirror pending (Phase 3.2). |
+| P4/T1, T2, T3 | OPEN | Blocked behind P8 — needs RF working. |
+| P5 | OPEN | — |
+| P6 | LIVE | — |
+| P7 | CLOSED | — |
+| **P8** | **OPEN — BLOCKING ALL RF TESTING** | Needs user direction on Option A/B/C. |
+
+*Signed:* **GitHub Copilot, P8 opened 2026-05-22 17:15 (autonomous — user unavailable)**

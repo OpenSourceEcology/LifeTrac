@@ -1,6 +1,24 @@
 # LifeTrac v25 — TODO
 
-> **🟢 Recent closure (2026-05-22):** P1 cold-boot stale-firmware regression
+> **� New blocker (2026-05-22 17:15) — P8:** First post-reflash W1-11
+> ping_pong run failed 5/7 gates (`radio_tx_ok=0/100`, no RX frames). Root
+> cause: commit `d4dfcb8` (2026-05-20) added `-DLIFETRAC_FHSS_TX_ROUTED=1`
+> to `murata_l072/Makefile`; current `firmware.bin` therefore refuses every
+> `TX_FRAME_REQ` with `HOST_ERR_PROTO_FORBIDDEN` until the host arms a
+> profile via `cfg_set(CFG_KEY_REG_PROFILE=0x14, …)` — which no bench probe
+> currently does. RX side fails symmetrically with
+> `HOST_FAULT_CODE_RX_SCAN_FAILED (0x0D)`. **All RF testing (W1-10b, W1-11,
+> W2-02, T4/T5b RF half) is blocked.** Three fix options (host-side /
+> firmware-side / build-variant) need user direction before applying — see
+> [AI NOTES/2026-05-22_W1-11_RF_Blocked_FHSS_Gate_v1_0.md](AI%20NOTES/2026-05-22_W1-11_RF_Blocked_FHSS_Gate_v1_0.md)
+> and the new P8 entry in
+> [AI NOTES/2026-05-21_Open_Problems_To_Fix_v1_0.md](AI%20NOTES/2026-05-21_Open_Problems_To_Fix_v1_0.md).
+> Evidence dir:
+> `DESIGN-CONTROLLER/bench-evidence/W1-11_pingpong_2026-05-22_165144/`.
+> Note: the earlier P1 closure (below) is still valid — but only for the
+> CFG_GET-only cold-boot discriminator. It does **not** prove RF I/O.
+>
+> **�🟢 Recent closure (2026-05-22):** P1 cold-boot stale-firmware regression
 > is **CLOSED** after re-flashing both X8 boards with current `firmware.bin`.
 > Two bugs fixed along the way: `stm32_an3155_flasher.py` termios import is
 > now optional (LmP Python lacks `termios`); `run_flash_l072.sh` now

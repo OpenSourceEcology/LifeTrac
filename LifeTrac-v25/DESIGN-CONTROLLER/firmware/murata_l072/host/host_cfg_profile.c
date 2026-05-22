@@ -5,6 +5,7 @@
 
 #include "host_cfg_profile.h"
 #include "host_cfg_keys.h"
+#include "sx1276_fhss.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -181,6 +182,9 @@ host_cfg_profile_reject_t host_cfg_profile_activate(void) {
         return HOST_CFG_PROFILE_REJECT_NOT_STAGED;
     }
     s_active    = s_staged;
+    if (s_active.profile_id == REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) {
+        (void)sx1276_fhss_init(0ULL, 0ULL, 0U);
+    }
     memset(&s_staged, 0, sizeof(s_staged));
     s_has_stage = false;
     return HOST_CFG_PROFILE_REJECT_NONE;

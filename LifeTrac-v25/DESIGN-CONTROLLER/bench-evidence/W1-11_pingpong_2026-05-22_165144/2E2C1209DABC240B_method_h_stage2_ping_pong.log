@@ -1,0 +1,248 @@
+=== Fri May 22 21:50:27 UTC 2026 Method H Stage 2 boot user app ===
+boot_ocd_rc=0
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: ensure GPIOA + GPIOF clocks enabled
+  RCC_AHB4ENR before = 0
+  RCC_AHB4ENR after  = 33
+Phase B: ensure PA_11 + PF_4 are outputs (preserve other bits)
+Phase C: drop BOOT0 (PA_11 -> LOW) so L072 boots from flash
+  GPIOA_IDR.PA_11 = 0   (expect 0)
+Phase D: pulse NRST (PF_4 LOW 250 ms then HIGH)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+
+DONE: BOOT0 LOW, NRST released. L072 should now run user firmware.
+Allow ~500 ms then probe UART (e.g. AT command at 19200 8N1).
+shutdown command invoked
+
+=== Fri May 22 21:50:28 UTC 2026 Stage 2 probe (mode=ping_pong) on /dev/ttymxc3 ===
+MODE: ping_pong
+dev=/dev/ttymxc3 baud=921600
+=== W1-11 probe PING_PONG: count=100 inter=0.20s tx_timeout=5.0s rtt_timeout=5.0s ===
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+CFG_OK_URC: LBT_ENABLE=0
+PING_PONG: STATS(before) radio_tx_ok=0 radio_tx_abort_lbt=0 radio_tx_abort_airtime=0
+__W1_10B_BURST_READY__
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=0 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=1 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=2 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=3 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=4 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=5 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=6 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=7 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=8 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=9 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=10 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=11 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=12 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=13 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=14 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=15 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=16 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=17 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=18 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=19 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=20 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=21 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=22 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=23 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=24 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=25 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=26 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=27 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=28 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=29 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=30 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=31 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=32 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=33 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=34 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=35 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=36 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=37 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=38 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=39 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=40 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=41 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=42 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=43 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=44 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=45 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=46 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=47 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=48 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=49 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=50 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=51 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=52 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=53 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=54 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=55 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=56 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=57 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=58 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=59 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=60 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=61 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=62 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=63 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=64 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=65 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=66 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=67 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=68 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=69 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=70 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=71 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=72 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=73 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=74 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=75 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=76 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=77 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=78 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=79 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=80 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=81 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=82 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=83 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=84 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=85 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=86 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=87 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=88 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=89 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=90 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=91 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=92 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=93 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=94 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=95 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=96 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=97 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=98 ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+__TX_ERR__ idx=99 ERR_PROTO during TX wait: 1001080000
+PING_PONG: STATS(after) radio_tx_ok=0 (delta=0) radio_tx_abort_lbt=0 (delta=0) radio_tx_abort_airtime=0 (delta=0)
+__W1_10B_BURST_DONE__ tx_count=100 tx_done_ok=0 tx_done_fail=0 tx_timeout=100 radio_tx_ok_delta=0 radio_tx_abort_lbt_delta=0 radio_tx_abort_airtime_delta=0 real_faults=0 invariants_violated=0
+__W1_11_PINGPONG_DONE__ tx_count=100 tx_done_ok=0 pong_received=0 pong_timeout=0
+__RADIO_SLEEP_ON_EXIT__ (ping_pong) ack=0180 RegOpMode(post)=0x80 (target=0x80)
+probe_rc[/dev/ttymxc3][ping_pong]=1
+
+=== DONE: boot=0 probe=1 ===
+__BENCH_RADIO_SLEEP_AUDIT__=PASS
