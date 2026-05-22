@@ -7,6 +7,7 @@
 #include "sx1276_rx_scan_policy.h"
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 /* Default-safe decision for NULL / out-of-range inputs. */

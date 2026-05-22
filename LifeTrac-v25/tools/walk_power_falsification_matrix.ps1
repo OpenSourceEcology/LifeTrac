@@ -59,6 +59,17 @@ $ErrorActionPreference = "Stop"
 $adbEAP = 'Continue'
 $adb = "C:\Users\dorkm\AppData\Local\Microsoft\WinGet\Packages\Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe\platform-tools\adb.exe"
 
+# 2026-05-22 P5 (Phase 4): dot-source the sidecar progress tailer so the
+# long-running TX walk_power probe's per-step progress is visible in the
+# orchestrator console (otherwise the foreground `& adb shell python3 ...`
+# blocks silently for several minutes per pass). Helper is best-effort:
+# if it can't be loaded the orchestrator still works, just without the
+# live progress lines.
+$_rptHelper = Join-Path $PSScriptRoot "RemoteProgressTail.ps1"
+if (Test-Path -LiteralPath $_rptHelper) { . $_rptHelper } else {
+    Write-Warning "RemoteProgressTail.ps1 not found at $_rptHelper; sidecar tailing disabled."
+}
+
 $runStartTs = Get-Date -Format 'yyyy-MM-dd_HHmmss'
 $runUuid    = [guid]::NewGuid().ToString()
 try { $gitSha = (& git rev-parse --short HEAD 2>$null).Trim() } catch { $gitSha = 'unknown' }
@@ -131,8 +142,20 @@ function Invoke-WalkPowerPass {
   # Run walk_power on TX with the matrix arguments.
   $remoteCsv = "/tmp/walk_power_matrix_${PassName}.csv"
   $remoteCsvPerPkt = "/tmp/walk_power_matrix_${PassName}_perpacket.csv"
-  $txCmd = "cd /tmp/lifetrac_p0c && echo fio | sudo -S python3 method_h_stage2_tx_probe_v2.py --probe walk_power --dev /dev/ttymxc3 --baud 921600 --power-min $PowerMin --power-max $PowerMax --power-step $PowerStep --per-step-count $PerStepCount --walk-payload-len 24 --timeout 3 --inter-cycle-s $InterCycleS --lbt-enable $LbtEnable --csv-out $remoteCsv 2>&1"
+  $remoteProgress = "/tmp/lifetrac_p0c/progress_walk_${PassName}.txt"
+  $txCmd = "cd /tmp/lifetrac_p0c && echo fio | sudo -S python3 method_h_stage2_tx_probe_v2.py --probe walk_power --dev /dev/ttymxc3 --baud 921600 --power-min $PowerMin --power-max $PowerMax --power-step $PowerStep --per-step-count $PerStepCount --walk-payload-len 24 --timeout 3 --inter-cycle-s $InterCycleS --lbt-enable $LbtEnable --csv-out $remoteCsv --progress-file $remoteProgress 2>&1"
+  # P5 sidecar tail: start poller, run TX foreground (blocks), stop poller.
+  $walkProgressMirror = Join-Path $passDir "walk_progress.log"
+  $walkProgressJob = $null
+  if (Get-Command Start-RemoteProgressTail -ErrorAction SilentlyContinue) {
+      $walkProgressJob = Start-RemoteProgressTail `
+          -AdbSerial $BoardA `
+          -RemotePath $remoteProgress `
+          -LocalMirrorPath $walkProgressMirror `
+          -Tag "walk-$PassName"
+  }
   & $adb -s $BoardA shell $txCmd 2>&1 | Out-File -Encoding utf8 -FilePath $txLog
+  if ($walkProgressJob) { Stop-RemoteProgressTail -Job $walkProgressJob }
 
   # Stop RX listener.
   & $adb -s $BoardB shell "echo fio | sudo -S pkill -INT -f 'method_h_stage2.*rx_listen' 2>/dev/null; sleep 0.2; pgrep -af method_h_stage2 || echo no-residual"

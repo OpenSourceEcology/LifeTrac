@@ -96,4 +96,31 @@ Describe 'Invoke-AdbScoped (P2 wrapper)' {
             Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
         }
     }
+
+    It 'always merges stderr into the Output stream so callers using `*>&1 | Tee-Object` see no NativeCommandError block' -Skip:(-not $env:LIFETRAC_TX_SERIAL) {
+        # 2026-05-22 P2 follow-up: the original wrapper only merged stderr
+        # when -MergeStderr was passed. Even with EAP=Continue, a native
+        # command writing to stderr still emits an ErrorRecord that
+        # `*>&1 | Tee-Object` renders as a red "NativeCommandError" block
+        # in the bench log — the very artifact P2 set out to eliminate.
+        # The fix is to ALWAYS merge stderr: `& adb @cmd 2>&1`. This test
+        # asserts the wrapper never leaks an ErrorRecord on a successful
+        # push by capturing the error stream redirected to output and
+        # confirming no [System.Management.Automation.ErrorRecord] objects
+        # were produced.
+        $tmp = New-TemporaryFile
+        try {
+            'p2-merge-stderr-smoke' | Set-Content -LiteralPath $tmp
+            $captured = & {
+                Invoke-AdbScoped -Serial $env:LIFETRAC_TX_SERIAL `
+                    -AdbArgs @('push', $tmp.FullName, '/tmp/p2_merge_stderr_smoke.txt')
+            } 2>&1
+            $errs = $captured | Where-Object {
+                $_ -is [System.Management.Automation.ErrorRecord]
+            }
+            $errs.Count | Should -Be 0
+        } finally {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        }
+    }
 }

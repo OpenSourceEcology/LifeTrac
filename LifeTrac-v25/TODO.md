@@ -1,5 +1,18 @@
 # LifeTrac v25 — TODO
 
+> **🟢 Recent closure (2026-05-22):** P1 cold-boot stale-firmware regression
+> is **CLOSED** after re-flashing both X8 boards with current `firmware.bin`.
+> Two bugs fixed along the way: `stm32_an3155_flasher.py` termios import is
+> now optional (LmP Python lacks `termios`); `run_flash_l072.sh` now
+> **unexports** gpio8/10/15 immediately before launching `openocd` to avoid
+> a sysfs/mmap race in the newer (`2025-07-14`) OpenOCD build on RX X8 that
+> manifested as `SWD DPIDR 0xdeadbeef`. Post-reflash discriminator on RX
+> shows clean `RUNTIME_PROFILE_ENUM=0` on 5/5 cycles. See
+> [AI NOTES/2026-05-22_RX_Reflash_And_P1_Resolution_v1_0.md](AI%20NOTES/2026-05-22_RX_Reflash_And_P1_Resolution_v1_0.md)
+> and the updated
+> [AI NOTES/2026-05-21_Open_Problems_To_Fix_v1_0.md](AI%20NOTES/2026-05-21_Open_Problems_To_Fix_v1_0.md)
+> closure table.
+>
 > **⚡ Controller architecture update (2026):** The primary controller design
 > is now the three-tier Portenta Max Carrier + MKR WAN 1310 system documented
 > in [DESIGN-CONTROLLER/ARCHITECTURE.md](DESIGN-CONTROLLER/ARCHITECTURE.md).

@@ -79,6 +79,18 @@ function Resolve-RepoRoot {
 
 $null = Get-Command adb -ErrorAction Stop
 
+# 2026-05-22 P5 (Phase 4): dot-source the sidecar progress tailer so we can
+# emit `[progress rx-listen ...] mode=rx_listen rx=N faults=...` lines from
+# the X8 probe's /tmp/lifetrac_p0c/progress_rx.txt without parsing the
+# already-tee'd rx_stdout.txt stream. See tools/RemoteProgressTail.ps1 +
+# Open Problems doc v4.1 §4.
+$_rptHelper = Join-Path $ScriptRoot "..\..\..\tools\RemoteProgressTail.ps1"
+if (Test-Path -LiteralPath $_rptHelper) {
+    . $_rptHelper
+} else {
+    Write-Warning "RemoteProgressTail.ps1 not found at $_rptHelper; sidecar tailing disabled."
+}
+
 # ---------------------------------------------------------------------------
 # P2 fix (2026-05-21): scoped-EAP adb wrapper.
 #
@@ -110,11 +122,14 @@ function Invoke-AdbScoped {
         $cmd = @()
         if ($Serial) { $cmd += @('-s', $Serial) }
         $cmd += $AdbArgs
-        if ($MergeStderr) {
-            $out = & adb @cmd 2>&1
-        } else {
-            $out = & adb @cmd
-        }
+        # Always merge stderr into stdout: adb writes legitimate status
+        # messages ("N files pushed") to stderr, and any ErrorRecord that
+        # escapes here is rendered as a "NativeCommandError" red block when
+        # the caller uses `*>&1 | Tee-Object`, even though rc=0. Merging
+        # converts those into plain strings on the success stream. The
+        # `-MergeStderr` switch is retained for API back-compat (no-op).
+        $null = $MergeStderr
+        $out = & adb @cmd 2>&1
         $rc = $LASTEXITCODE
         if ($rc -ne 0 -and -not $NoThrow) {
             throw "adb $($cmd -join ' ') failed rc=$rc on serial='$Serial'"
@@ -276,7 +291,7 @@ $rxStderr = Join-Path $evidence "rx_stderr.txt"
 Set-Content -LiteralPath (Join-Path $evidence "rx_wake.log") -Value "v2: wake folded into probe v2 (see rx_stdout.txt __V2_AUTOWAKE__)"
 Write-Host "v2: skipping external wake helper; auto-wake folded into probe v2."
 
-$rxRemoteCmd = "cd /tmp/lifetrac_p0c && echo fio | sudo -S -p '' python3 -u method_h_stage2_tx_probe_v2.py --dev /dev/ttymxc3 --baud 921600 --probe rx_listen --rx-window $rxWindowS"
+$rxRemoteCmd = "cd /tmp/lifetrac_p0c && echo fio | sudo -S -p '' python3 -u method_h_stage2_tx_probe_v2.py --dev /dev/ttymxc3 --baud 921600 --probe rx_listen --rx-window $rxWindowS --progress-file /tmp/lifetrac_p0c/progress_rx.txt"
 $rxWrapBody = "#!/bin/sh`n$rxRemoteCmd`nrc=`$?`nprintf '__METHOD_H_RC__=%s\n' `"`$rc`"`n"
 $rxWrapLocal = Join-Path $evidence "_rx_wrap.sh"
 [System.IO.File]::WriteAllText($rxWrapLocal, ($rxWrapBody -replace "`r`n", "`n"))
@@ -289,6 +304,20 @@ $rxProc = Start-Process -FilePath "adb" `
     -RedirectStandardOutput $rxStdout `
     -RedirectStandardError $rxStderr `
     -PassThru -NoNewWindow
+
+# P5 sidecar tail (Phase 4): start the poller AFTER the probe has been
+# launched so the first poll has something to read; the poller is silent
+# until the remote file appears + changes. Stopped just before we decide
+# whether to kill the RX process.
+$rxProgressMirror = Join-Path $evidence "rx_progress.log"
+$rxProgressJob = $null
+if (Get-Command Start-RemoteProgressTail -ErrorAction SilentlyContinue) {
+    $rxProgressJob = Start-RemoteProgressTail `
+        -AdbSerial $RxAdbSerial `
+        -RemotePath "/tmp/lifetrac_p0c/progress_rx.txt" `
+        -LocalMirrorPath $rxProgressMirror `
+        -Tag "rx-listen"
+}
 
 # Wait for __W1_10B_LISTEN_READY__ token.
 $readyDeadline = (Get-Date).AddSeconds(60)
@@ -345,8 +374,16 @@ Write-Host "TX done in $([int]$txDurationActualS)s (adb rc=$txAdbRc)."
 # ---------------------------------------------------------------------------
 $rxFinishDeadline = (Get-Date).AddSeconds($rxWindowS + 30)
 while (-not $rxProc.HasExited -and (Get-Date) -lt $rxFinishDeadline) {
+    # P5: emit any queued progress lines from the tailer job while we wait.
+    if ($rxProgressJob) {
+        try {
+            $queued = Receive-Job -Job $rxProgressJob -Keep:$false -ErrorAction SilentlyContinue
+            if ($queued) { $queued | ForEach-Object { Write-Host $_ } }
+        } catch { }
+    }
     Start-Sleep -Milliseconds 500
 }
+if ($rxProgressJob) { Stop-RemoteProgressTail -Job $rxProgressJob }
 if (-not $rxProc.HasExited) {
     Write-Warning "RX listener still running past deadline; killing."
     try { $rxProc.Kill() | Out-Null } catch { }

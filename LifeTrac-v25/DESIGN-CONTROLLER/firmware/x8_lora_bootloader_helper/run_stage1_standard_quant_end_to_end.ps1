@@ -226,10 +226,15 @@ if ($chmodRc -ne 0) {
 # high so OpenOCD imx_gpio bitbang can read SWD DPIDR. On freshly-flashed X8 images
 # (kernel 6.1.x LMP), gpio10 boots low, holding the H7 in reset and causing
 # "Error connecting DP: cannot read IDR". See AI NOTES 2026-05-12 recovery plan.
-$gpioPreflight = "for n in 8 10 15; do [ -d /sys/class/gpio/gpio`$n ] || echo `$n > /sys/class/gpio/export 2>/dev/null; done; echo out > /sys/class/gpio/gpio10/direction 2>/dev/null; echo 1 > /sys/class/gpio/gpio10/value 2>/dev/null; cat /sys/class/gpio/gpio10/value"
+$gpioPreflight = "for n in 8 10 15; do [ -d /sys/class/gpio/gpio`$n ] || echo `$n > /sys/class/gpio/export 2>/dev/null; done; echo out > /sys/class/gpio/gpio10/direction 2>/dev/null; echo 1 > /sys/class/gpio/gpio10/value 2>/dev/null; sleep 1; cat /sys/class/gpio/gpio10/value"
 $gpioPreflightRemote = "echo fio | sudo -S -p '' bash -c `"$gpioPreflight`""
 & adb @chmodPrefix exec-out $gpioPreflightRemote | Out-Null
-Write-Host "GPIO preflight complete (gpio10 driven high to release H7 NRST)."
+# On some X8 boards (e.g. RX 2D0A1209DABC240B with OpenOCD 0.11.0-dirty 2025-07-14)
+# the H7 SWD DP needs ~1s of NRST-high settle before SWD DPIDR is readable, otherwise
+# `Error connecting DP: cannot read IDR`. The `sleep 1` above + this extra 0.5s here
+# give the H7 time to fully release reset before openocd attaches.
+Start-Sleep -Milliseconds 500
+Write-Host "GPIO preflight complete (gpio10 driven high to release H7 NRST; 1.5s settle)."
 
 $stamp = Get-Date -Format "yyyy-MM-dd_HHmmss_fff"
 $stamp = "$stamp-$PID"

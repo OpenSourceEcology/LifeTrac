@@ -20,8 +20,8 @@ docs in this folder reference them by path rather than duplicating.
 
 | Tag | ADB serial | Role | Notes |
 |---|---|---|---|
-| Board 1 | `2D0A1209DABC240B` | Primary / TX in pair tests | Currently soft-hung post-W2-01 camera session (2026-05-12). |
-| Board 2 | `2E2C1209DABC240B` | Control / RX in pair tests | Healthy, 3+ day uptime as of 2026-05-13. |
+| Board 1 | `2D0A1209DABC240B` | RX in pair tests (was TX pre-2026-05-19) | Healthy as of 2026-05-22. Successfully re-flashed via HC-04 after `run_flash_l072.sh` was hardened against the newer-openocd sysfs/mmap race (see HC-04 verdict 2026-05-22). |
+| Board 2 | `2E2C1209DABC240B` | TX in pair tests (was RX pre-2026-05-19) | Healthy as of 2026-05-22. Successfully re-flashed via HC-04 after `stm32_an3155_flasher.py` termios import was made optional. |
 
 ## Routine index
 

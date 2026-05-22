@@ -27,12 +27,41 @@ echo "fuser $DEV: $HOLDERS" | tee -a $LOG
 
 echo "" | tee -a $LOG
 echo "=== launching openocd (600s hold) ===" | tee -a $LOG
+# Per-cycle gpio preflight: ensure gpio8/10/15 are exported and gpio10 (H7 NRST)
+# is driven high and given time to settle BEFORE openocd attaches. Then UNEXPORT
+# them so openocd's imx_gpio mmap driver has uncontested access (sysfs-owned gpio
+# pins can collide with openocd's direct register writes via /dev/mem mmap).
+# Symptom of the collision on the RX X8 (OpenOCD 0.11.0-dirty 2025-07-14):
+# SWD DPIDR returns 0xdeadbeef and OCD never reaches `init` / Phase A.
+for n in 8 10 15; do
+    [ -d /sys/class/gpio/gpio$n ] || echo $n > /sys/class/gpio/export 2>/dev/null
+done
+echo out > /sys/class/gpio/gpio10/direction 2>/dev/null
+echo 1   > /sys/class/gpio/gpio10/value     2>/dev/null
+sleep 1
+echo "gpio10_value_before_unexport=$(cat /sys/class/gpio/gpio10/value 2>/dev/null)" | tee -a $LOG
+for n in 8 10 15; do
+    [ -d /sys/class/gpio/gpio$n ] && echo $n > /sys/class/gpio/unexport 2>/dev/null
+done
+
 nohup openocd -f /usr/arduino/extra/openocd_script-imx_gpio.cfg \
               -f $CFG \
               > $OCD_LOG 2>&1 < /dev/null &
 OCD_PID=$!
 echo "OCD_PID=$OCD_PID" | tee -a $LOG
-sleep 5
+
+# Poll for READY banner up to 25s. The newer X8 OpenOCD build
+# (0.11.0-dirty 2025-07-14) on the RX X8 (e.g. 2D0A1209DABC240B) can take
+# 8-12s between gpio10-high settle and SWD-attach completion, vs <5s on
+# the older bundled OpenOCD on the TX X8. The previous fixed `sleep 5`
+# raced this and falsely reported "openocd did not reach READY phase".
+READY_DEADLINE=$(( $(date +%s) + 25 ))
+while [ "$(date +%s)" -lt "$READY_DEADLINE" ]; do
+    if grep -q "READY: L072 in STM32 ROM bootloader" "$OCD_LOG"; then
+        break
+    fi
+    sleep 1
+done
 
 echo "" | tee -a $LOG
 echo "=== openocd output so far ===" | tee -a $LOG

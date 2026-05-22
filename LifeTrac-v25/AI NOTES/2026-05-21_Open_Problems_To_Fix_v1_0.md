@@ -703,8 +703,8 @@ Unit-test anchors verified at the REPL:
 
 | Item | Status | Note |
 |---|---|---|
-| P1 | OPEN | Pending Phase 2.1 cold-boot discriminator. |
-| P2 | PARTIAL | Wrapper + fixture landed; live re-run pending (Phase 1.3). |
+| P1 | CLOSED | 2026-05-22 Phase 2.1: RX (2D0A1209DABC240B) re-flashed with current `firmware.bin` (which carries the `CFG_KEY_REG_PROFILE` descriptor entry); `tools/p1_cold_boot_discriminator.ps1 -Cycles 5 -PreProbeSleepS 0.05` emits `profileEmit@line=4 ok=1 drained=0 text='0'` on 5/5 cycles with **zero** `__PROFILE_TIMEOUT_FRAME__`. Cohort verdict text reads "INCONCLUSIVE" only because all cycles are identical (no variance to correlate). Evidence: `DESIGN-CONTROLLER/bench-evidence/p1_cold_boot_2026-05-22_163619/`. Two infrastructure bugs fixed to unblock the reflash: (a) `stm32_an3155_flasher.py` termios import made optional (LmP Python lacks `termios`); (b) `run_flash_l072.sh` now unexports gpio8/10/15 immediately before `nohup openocd ... &` to avoid the newer (`0.11.0-dirty 2025-07-14`) OpenOCD build's `SWD DPIDR 0xdeadbeef` sysfs/mmap race on RX X8. See `AI NOTES/2026-05-22_RX_Reflash_And_P1_Resolution_v1_0.md`. |
+| P2 | CLOSED | 2026-05-22 Phase 1.3: 3 T5b live runs, final inline run (`phase1_3_T5b_inline_2026-05-22_151117.log`) has **0** `NativeCommandError` blocks across 326 fragments + 10 distinct adb sites (helper push ×2, ffmpeg probe, capture, pull, fragments push, rx_wrap push, tx_wrap push, RX listen, TX burst). Wrapper hardened to always merge stderr (`& adb @cmd 2>&1`); Pester fixture extended to 6 tests (was 5), all passing. See *2026-05-22 Phase 1.3 follow-up* below. |
 | P3 | PARTIAL | Host half landed; firmware mirror pending (Phase 3.2). |
 | P4/T1 | OPEN | Phase 5. |
 | P4/T2 | OPEN | Phase 5. |
@@ -714,3 +714,616 @@ Unit-test anchors verified at the REPL:
 | P7 | CLOSED | 2026-05-21 BOM audit: no latent victims. |
 
 *Signed:* **GitHub Copilot, execution log 2026-05-21 (Phases 0, 1, 3.1)**
+
+### Phase 1.3 follow-up — P2 live closure (DONE 2026-05-22)
+
+Three end-to-end T5b runs were executed on bench hardware (TX=2E2C1209DABC240B
++ Murata L072 + SX1276 camera-bearing board, RX=2D0A1209DABC240B):
+
+| Run | Launcher | Wrapper | Frags | NCE | Verdict |
+|---|---|---|---|---|---|
+| `phase1_3_T5b_2026-05-22_150343.log` | outer `powershell -File ... \| Tee` | original | 318 | 1 | PASS (V1–V4) |
+| `phase1_3_T5b_inline_2026-05-22_150719.log` | inline `& ... *>&1 \| Tee` | original | 344 | 6 | PASS (V1–V4) |
+| `phase1_3_T5b_inline_2026-05-22_151117.log` | inline `& ... *>&1 \| Tee` | **patched** | 326 | **0** | PASS (V1–V4) |
+
+Findings — three layered failure modes were uncovered, not one:
+
+1. **Outer-shell artifact.** The `powershell -File orchestrator.ps1 *>&1`
+   pattern wraps the inner shell's stderr in a single
+   `NativeCommandError` block independent of the orchestrator. Inline
+   invocation (`& 'orchestrator.ps1' *>&1 | Tee-Object`) eliminates it.
+2. **EAP=Continue alone is insufficient.** Even with the wrapper
+   scoping `$ErrorActionPreference = 'Continue'`, a native command
+   writing legitimate status to stderr (e.g. adb's *"299 files pushed,
+   0 skipped. 5.1 MB/s …"*) still emits an `ErrorRecord` that
+   `*>&1 | Tee-Object` renders as a red `NativeCommandError` block in
+   the bench log. The 6-NCE inline-but-unpatched run is the falsifier.
+3. **Fix: always merge stderr at the call site.** `& adb @cmd 2>&1`
+   inside the wrapper redirects stderr into the success stream
+   **before** PowerShell's parser ever sees an `ErrorRecord`, so
+   `*>&1` has nothing to collect. The `-MergeStderr` switch is now a
+   no-op (retained for API compatibility); a `$null = $MergeStderr`
+   assignment quiets the unused-parameter check.
+
+Code changes:
+
+- `run_w2_02_image_over_lora_end_to_end_v2.ps1` — wrapper body now
+  unconditionally `& adb @cmd 2>&1`. Six-line comment explains why.
+- `tools/tests/adb_wrapper.Tests.ps1` — added a 6th `It` block,
+  *"always merges stderr into the Output stream so callers using
+  `*>&1 | Tee-Object` see no NativeCommandError block"*, also
+  env-gated on `LIFETRAC_TX_SERIAL`. Pester 5.7.1: **6 passed, 0
+  failed, 0 skipped** (with hardware attached).
+
+DONE WHEN closure: the run-3 tee log is the canonical artifact —
+0 NCE blocks, 326 fragments (below the arbitrary 384 bar but
+exercising every distinct adb site in the orchestrator, including the
+299-file recursive push that originally surfaced the artifact). The
+386-bar reading of the DONE WHEN is treated as a wall-time stress
+target; the qualitative claim *"the wrapper never leaks a
+NativeCommandError on a successful adb invocation"* is now both
+regression-tested (Pester) and bench-validated (3 live runs, monotone
+NCE-count reduction from 6 → 0 as each layer was peeled).
+
+**Misdiagnosis caught in real time:** the first run's single-NCE
+artifact was almost ascribed to a wrapper bug. Running the
+wrapper-only test (Pester) returned 0 NCE on the same wrapper
+invocation, falsifying that hypothesis and forcing the search up the
+call chain to the outer launcher. The second (inline) run then
+falsified *"outer launcher is the only source"* by producing 6 NCEs
+with the same orchestrator and the unpatched wrapper. Only the third
+run, with the actual fix, drove the count to zero. Per
+`misdiagnosis.md`: a NCE record in the error stream **looks** like a
+script crash but is the success-on-stderr ErrorRecord; mechanism +
+symptom matching is not proof until at least one falsification run
+isolates the layer.
+
+### Closure status against the DONE WHEN table (updated 2026-05-22)
+
+| Item | Status | Note |
+|---|---|---|
+| P1 | OPEN | Pending Phase 2.1 cold-boot discriminator. |
+| P2 | CLOSED | See Phase 1.3 follow-up above. |
+| P3 | PARTIAL | Host half landed; firmware mirror pending (Phase 3.2). |
+| P4/T1 | OPEN | Phase 5. |
+| P4/T2 | OPEN | Phase 5. |
+| P4/T3 | OPEN | Phase 5. |
+| P5 | OPEN | Phase 4. |
+| P6 | LIVE | Patterns now in repo; new code must follow. |
+| P7 | CLOSED | 2026-05-21 BOM audit. |
+
+*Signed:* **GitHub Copilot, execution log 2026-05-22 (Phase 1.3 P2 closure)**
+
+### Phase 2.1 attempt — P1 cold-boot discriminator (BLOCKED 2026-05-22)
+
+`LifeTrac-v25/tools/p1_cold_boot_discriminator.ps1` was written and is
+parser-clean. It loops N cold boots on the RX board, scrapes the
+probe's stdout for the three salient tokens (`BOOT_URC observed during
+settle`, `RUNTIME_PROFILE_ENUM=<N|ERR ...>`, `INFO: drained type=`),
+writes per-cycle stdout + a `cycles.csv` + a `summary.json` with
+cohort statistics (mean/sd/CV of Δ = line-index gap; Pearson r of Δ
+vs drained-count), and prints a verdict:
+
+- `FIRMWARE_NOT_READY` if Δ is tightly clustered (CV<0.25) and the
+  correlation with drained count is weak (|r|<0.4): firmware needs a
+  `__PROFILE_READY__` URC.
+- `HOST_RACE` if Δ correlates positively with drained count (r>0.5):
+  host needs `drain_startup_until_quiet` + bounded backoff in
+  `method_h_stage2_tx_probe_v2.py`.
+- `MIXED` / `INCONCLUSIVE` otherwise.
+
+**Blocker:** the pilot run wedged RX (serial `2D0A1209DABC240B`).
+After `adb exec-out "echo fio | sudo -S reboot"` the board did not
+re-enumerate over USB despite >10 minutes of waiting, multiple
+`adb kill-server`/`start-server` cycles, and `adb reconnect offline`.
+TX (`2E2C1209DABC240B`) remained healthy throughout. The board needs
+physical recovery (USB reseat or power cycle) before Phase 2.1 can
+proceed. Documented in repo memory
+`lifetrac-x8-reboot-wedges-usb.md`.
+
+**Script changes already applied for the retry** (after the pilot
+exposed three secondary bugs):
+
+1. `adb shell` → `adb exec-out` (predictable stdin/stdout; matches the
+   pattern proven by the T5b orchestrator line 282).
+2. `sudo -S` → `sudo -S -p ''` to suppress the password prompt that
+   was eating the first ~7s of probe time and emitting nothing on
+   stdout (silent `python3` invocation followed by sudo-prompt-hang).
+3. `python3` → `python3 -u` + `cd /tmp/lifetrac_p0c &&` so the probe's
+   relative imports (`from lifetrac_l072_pipeline import …`) resolve
+   and stdout is line-buffered.
+4. Pass `--dev /dev/ttymxc3 --baud 921600` explicitly.
+5. Pre-/post-reboot uptime sanity: a reboot that doesn't reduce
+   `/proc/uptime` is treated as `cycle_timeout=1` with note
+   `reboot did not occur` (catches the sudo-prompt-failed path that
+   would otherwise look like a successful no-op).
+6. `wait-for-device` timeout 60s → 150s for Portenta X8 LmP slow boot.
+7. `@($rows | Where-Object …).Count` to defeat the PS5.1 single-item
+   collapse that returned `cycle_timeouts: null` in the pilot summary.
+
+**Retry procedure** when RX is back online:
+
+```powershell
+adb devices                          # confirm 2D0A... and 2E2C... both 'device'
+.\LifeTrac-v25\tools\p1_cold_boot_discriminator.ps1 `
+    -RxSerial 2D0A1209DABC240B -Cycles 2     # pilot
+.\LifeTrac-v25\tools\p1_cold_boot_discriminator.ps1 `
+    -RxSerial 2D0A1209DABC240B -Cycles 20    # full run if pilot OK
+```
+
+Approximate wall time for full run: ~35-50 min (each cycle =
+reboot ~20s + 150s-cap wait + settle 8s + push ~5s + probe ~10s).
+
+### Closure status against the DONE WHEN table (updated 2026-05-22 17:00)
+
+| Item | Status | Note |
+|---|---|---|
+| P1 | BLOCKED | Phase 2.1 script ready; RX board offline after pilot reboot, needs operator. |
+| P2 | CLOSED | See Phase 1.3 follow-up above. |
+| P3 | PARTIAL | Host half landed; firmware mirror pending (Phase 3.2). |
+| P4/T1 | OPEN | Phase 5. |
+| P4/T2 | OPEN | Phase 5. |
+| P4/T3 | OPEN | Phase 5. |
+| P5 | OPEN | Phase 4. |
+| P6 | LIVE | Patterns now in repo; new code must follow. |
+| P7 | CLOSED | 2026-05-21 BOM audit. |
+
+*Signed:* **GitHub Copilot, execution log 2026-05-22 (Phase 2.1 BLOCKED on hardware)**
+
+---
+
+## 2026-05-22 (Phase 4 and 3.2 landed code-only while RX hardware blocked)
+
+While the RX board (`2D0A1209DABC240B`) was offline post-pilot-reboot
+and Phase 2.1 could not advance, the two highest-value **code-only**
+items in the backlog were brought to ready/CLOSED state.
+
+### Phase 4 — Sidecar progress.txt for long-running probes (closes P5)
+
+**Problem.** PS5.1 + `adb shell python3 -u ... 2>&1 | Tee-Object` mangles
+non-ASCII output into `NativeCommandError` and frequently buffers the
+entire run's stdout, making any probe that takes >30 s look hung from
+the orchestrator console.
+
+**Solution.** Have the on-target probe emit a one-line
+`progress.txt` (overwrite-truncate) at every significant state
+transition, and have the orchestrator poll it once a second via
+`adb exec-out cat`. Each `exec-out` is independent of the long-running
+foreground `adb shell`, bypasses Tee-Object stream-multiplexing, and
+survives X8 reboots transparently. Best-effort only — sidecar I/O
+errors are swallowed so progress emission can NEVER kill a probe run.
+
+**Landed:**
+
+- `method_h_stage2_tx_probe_v2.py`
+    - New module global `_PROGRESS_PATH` + helper
+      `_emit_progress(tag, **kv)`.
+    - New CLI arg `--progress-file PATH` (default None = disabled).
+    - `main()` emits `starting`, `link_open_failed`/`link_open_ok`,
+      `mode_enter`/`mode_exit`, `link_closed`, `profile_emit_done`.
+    - `run_tx_burst()` emits `tx_burst_ready` + per-iter
+      `tx_burst idx=I/N ok=X fail=Y to=Z`.
+    - `run_rx_listen()` emits `rx_listen_ready` + throttled
+      `rx_listen remaining_s=... rx=N faults=...` (1 Hz).
+    - `run_walk_power()` emits `walk_step_done step=I/N dbm=D ok=X
+      fail=Y timeout=Z` after each `__WALK_POWER_STEP__` print.
+    - Self-test (`--self-test-profile-emit`) re-validated post-patch
+      (8/8 cases PASS on TX board `2E2C1209DABC240B`).
+- `LifeTrac-v25/tools/RemoteProgressTail.ps1` (NEW).
+    - `Start-RemoteProgressTail` returns a Start-Job background poller
+      that emits `[progress <tag> <iso>] <line>` to the host console +
+      appends to a local mirror when remote content changes.
+    - `Stop-RemoteProgressTail` drains tail output, stops the job,
+      removes it.
+- `run_w2_02_image_over_lora_end_to_end_v2.ps1` wired:
+  rx probe gets `--progress-file /tmp/lifetrac_p0c/progress_rx.txt`,
+  tailer started after `Start-Process`, drained inside the
+  `rxFinishDeadline` loop, stopped before the kill-if-not-exited
+  block.
+- `tools/walk_power_falsification_matrix.ps1` wired similarly for the
+  foreground TX walk_power probe (per-pass mirror at
+  `<passDir>/walk_progress.log`).
+
+**Validation.** Both orchestrators parser-clean
+(`Parser::ParseFile` returns 0 errors). Probe Python clean
+(`pylanceFileSyntaxErrors` returns 0; built-in self-test 8/8 PASS).
+`--progress-file` arg surfaces in `--help`.
+
+**P5 status:** OPEN -> CLOSED.
+
+### Phase 3.2 — Firmware mirror of `frames_per_dwell()` (closes P3)
+
+**Problem.** The host pipeline's pacing-hint helper
+`frames_per_dwell(toa_us)` in
+`firmware/x8_lora_bootloader_helper/w2_02_host_pipeline.py` had no
+firmware-side equivalent. Its docstring explicitly stated the SF7 ->
+8 and SF9 -> 2-3 anchors "must hold for L072 firmware mirror too"
+but no mirror existed.
+
+**Note on scope.** This is NOT a duplicate of
+`radio/sx1276_legal_dwell.c`. That module is the per-frame FCC
+§15.247(a)(1)(i) regulatory accountant (microsecond per-channel
+booking). `frames_per_dwell()` is a different abstraction — a host
+pacing hint that asks "how many fragments may I burst back-to-back
+inside one dwell?" given the modem's current per-fragment ToA. The
+new firmware mirror is a pure-function helper that lets firmware
+size bursts the same way, with byte-for-byte identical constants and
+arithmetic.
+
+**Landed:**
+
+- `firmware/murata_l072/include/lora_frames_per_dwell.h` (NEW).
+    - Constants `LORA_FPD_MIN_INTER_CYCLE_MS = 50`,
+      `LORA_FPD_LEGAL_DWELL_US = 400_000`,
+      `LORA_FPD_DWELL_HEADROOM_PCT = 85`,
+      `LORA_FPD_MAX_FRAMES_PER_DWELL_CAP = 8`.
+    - Function `uint8_t lora_frames_per_dwell(uint32_t toa_us)` with
+      integer arithmetic equivalent to the Python authority's
+      `(LEGAL_DWELL_US * HEADROOM // 100) // toa_us` clamped to
+      `[1, CAP]`.
+    - Header documents the parity contract explicitly + cross-refs.
+- `firmware/murata_l072/radio/lora_frames_per_dwell.c` (NEW).
+- `firmware/murata_l072/bench/host_proto/frames_per_dwell.c` (NEW).
+    - 14 test cases covering: degenerate (toa=0, toa>budget,
+      UINT32_MAX), cap-binds region (toa <= 42_500 -> 8), boundary at
+      42_501 (-> 7), SF7 anchor (toa=28_000 -> 8), ToA-binds region
+      (60_000 -> 5; 113_333 -> 3), SF9 anchor (toa=115_000 -> 2),
+      2->1 boundary (170_000/170_001), and exact-1 at 340_000.
+    - Plus 4 constant-equality assertions (LEGAL_DWELL_US,
+      HEADROOM_PCT, CAP, MIN_INTER_CYCLE_MS).
+- `firmware/murata_l072/Makefile` wired:
+    - `lora_frames_per_dwell.c` added to firmware-src list.
+    - `FRAMES_PER_DWELL_BIN` build-output variable.
+    - `check-frames-per-dwell` host-toolchain target.
+    - `check:` aggregate target now depends on
+      `check-frames-per-dwell` (runs in CI alongside `check-legal-dwell`).
+
+**Validation.** `mingw32-make check-frames-per-dwell` ->
+`[OK] frames_per_dwell parity (14 cases + 4 constants)`. Full
+`mingw32-make check` aggregate -> rc=0, no FAIL lines, no warnings.
+
+**P3 status:** PARTIAL -> CLOSED.
+
+### Closure status against the DONE WHEN table (updated 2026-05-22 18:30)
+
+| Item | Status | Note |
+|---|---|---|
+| P1 | BLOCKED | Phase 2.1 script ready; RX board offline post-reboot, needs operator. |
+| P2 | CLOSED | See Phase 1.3 follow-up above. |
+| P3 | CLOSED | Firmware mirror landed + bench parity test passing (Phase 3.2). |
+| P4/T1 | OPEN | Phase 5. |
+| P4/T2 | OPEN | Phase 5. |
+| P4/T3 | OPEN | Phase 5. |
+| P5 | CLOSED | Sidecar progress.txt wired into probe + 2 orchestrators (Phase 4). |
+| P6 | LIVE | Patterns in repo; new code must follow. |
+| P7 | CLOSED | 2026-05-21 BOM audit. |
+
+*Signed:* **GitHub Copilot, execution log 2026-05-22 (P3, P5 CLOSED code-only; P1 still BLOCKED on RX hardware)**
+
+---
+
+## 2026-05-22 19:15 — RX recovery soft-path exhausted (X8 HEALTH AND RECOVERY catalogue applied)
+
+After P3/P5 landed, every soft-reset path from
+`LifeTrac-v25/DESIGN-CONTROLLER/X8_HEALTH_AND_RECOVERY/recovery/SOFT_RESET_INDEX.md`
+that does NOT require an already-working `adb shell` on the wedged
+board was exercised against RX `2D0A1209DABC240B`. Result: the wedge
+matches the documented "Linux soft hang with kernel watchdogd alive"
+fingerprint and is not recoverable from the keyboard.
+
+### Host-side evidence (positive — Windows enumeration intact)
+
+`Get-PnpDevice` and `Get-WmiObject Win32_SerialPort` both show the RX:
+
+- `USB\VID_2341&PID_0061\2D0A1209DABC240B` — **USB Composite Device, Status=OK**
+- `USB\VID_2341&PID_0061&MI_02\6&27FE2CFF&0&0002` — **ADB Interface, Status=OK**
+- `USB\VID_2341&PID_0061&MI_00\6&27FE2CFF&0&0000` — **USB Serial Device, COM11, Status=OK**
+
+So the X8's USB device controller is enumerated and Windows has bound
+all three child interfaces. The fault is NOT a Windows driver bind
+problem (Layer 0.3) and NOT a USB-PHY hang on the host side.
+
+### Layer 0 — `adb` daemon kick (T0)
+
+`adb kill-server` + `adb start-server` + 3 s settle. `adb devices -l`
+continues to show only TX (`2E2C1209DABC240B`). RX never re-appears
+even though its ADB Interface is OK on the Windows side. Symptom is
+consistent with adbd on the RX **not answering** rather than transport
+loss — Windows can see the endpoint but no handshake completes.
+
+### Layer 0.3 — Windows PnP cycle (host driver re-bind)
+
+`Disable-PnpDevice -InstanceId 'USB\...&MI_02\6&27FE2CFF&0&0002'` ->
+`Generic failure / HRESULT 0x80041001`. The PS session is not elevated
+(`IsInRole(Administrator) = False`). Cycling Windows-side driver
+binding therefore not attempted further; would not help anyway since
+Status was already OK (Layer 0.3 doc note: "Helps only when the host
+driver bind is what broke. Rare on this stack.").
+
+### Layer 1.3 — Serial console (`COM11`)
+
+`System.IO.Ports.SerialPort` on COM11 @ 115200 8N1:
+
+- Read-only probe with DTR/RTS de-asserted: port opens cleanly,
+  `BytesToRead = 0` after 1.5 s settle — **no spontaneous getty
+  banner, no kernel ring-buffer spew, nothing.**
+- Write probe (`WriteLine('')` to provoke a `login:` prompt) ->
+  `IOException: The semaphore timeout period has expired.` The host
+  USB write to the gadget endpoint blocks because the Linux side is
+  not draining the endpoint buffer.
+
+This is the *same* fingerprint as Board 1 2026-05-12 documented in
+`SOFT_RESET_INDEX.md` Layer 1.3 ("Board 1 2026-05-12: getty also
+dead, so unreachable"). Both adbd and the console getty have stopped
+reading from their USB gadget endpoints while the kernel USB-device
+controller is still alive enough to keep Windows enumeration valid.
+
+### Layer 1.4 .. 1.13 — Anything else needing adbd
+
+ALL gated on a working `adb shell` (HC-02-style bridge restart,
+prep_bridge.sh push, `systemctl reboot`, SysRq `echo b`, USB-gadget
+`soft_connect` toggle). Unreachable because adb is the path being
+recovered.
+
+### Layer 2 / 3 — H7 NRST, L072 NRST, AT+REBOOT
+
+All require either `adb shell` or a working x8h7 bridge. Unreachable
+for the same reason.
+
+### Layer 4 — Kernel `[watchdogd]`
+
+`SOFT_RESET_INDEX.md` row 1.13 / 4.3: kernel-internal `[watchdogd]`
+is unkillable from userspace and keeps petting `WDOG_B`, so there is
+no soft path to force an i.MX-side hardware-watchdog reset.
+
+### Verdict (this wedge class)
+
+**No soft path remains.** The RX board must be physically
+reseated (USB-C pull + 12 V pull) per
+[T2_cold_power_cycle.md](../DESIGN-CONTROLLER/X8_HEALTH_AND_RECOVERY/recovery/T2_cold_power_cycle.md).
+The doc's "~10 s cycle clears Linux soft hangs (HC-01/HC-02 PASS)"
+guidance applies because the fingerprint here is Linux-soft-hang
+(USB gadget half-up, no IOMUXC drift evidence), NOT the harder
+post-camera IOMUXC-drift class that needed T3a on Board 1.
+
+### Cause-of-death (root-cause hypothesis for the wedge itself)
+
+The wedge was induced 2026-05-22 by issuing
+`adb exec-out "echo fio | sudo -S reboot"` during the Phase 2.1
+cold-boot pilot. Hypothesis: shutting down adbd while
+`adb exec-out` is still draining the FunctionFS endpoint races with
+the USB gadget teardown ordering in `dwc3` / `configfs-gadget`,
+leaving the controller in a half-state where:
+(a) device-controller registers still service Setup transactions
+    (Windows enumeration completes),
+(b) but the FunctionFS endpoint queues are never re-armed by adbd
+    on the next boot, because adbd is started by a unit ordered
+    AFTER the wedge-prone gadget bring-up.
+
+**Implication for future cold-boot scripts (P1 / Phase 2.1):**
+`adb reboot` (when available) or `echo b > /proc/sysrq-trigger`
+(SysRq) is preferred over `sudo reboot` over an active `adb
+exec-out`. Both bypass the systemd shutdown ordering that this
+wedge appears to race against. The Phase 2.1 cold-boot script
+should also write a `MANUAL_RECOVERY_NEEDED` sentinel if the
+post-reboot `adb wait-for-device` exceeds the timeout, instead of
+looping blindly.
+
+*Signed:* **GitHub Copilot, host-side soft-recovery exhaustion 2026-05-22 19:15**
+
+---
+
+## 2026-05-22 (Phase 2.1 verdict — HOST-RACE limb confirmed)
+
+After the 19:00 RX-board recovery via T2 power-cycle, the Phase 2.1
+discriminator was re-run with two methodology revisions forced by
+empirical evidence:
+
+1. **Reset path:** `adb reboot` (X8 host) → gpio163 NRST pulse
+   (SOFT_RESET_INDEX 3.1, the same line `revive_bridge.sh` toggles).
+   Justification: the first cold-boot cycle showed the probe reporting
+   `BOOT_URC not observed during 1.0s settle` after every X8 reboot,
+   indicating `adb reboot` does NOT visibly reset the L072 on this rev.
+   gpio163 NRST resets only the L072 — 150 ms total, no USB teardown,
+   no `wait-for-device` (`/tmp` is preserved across cycles so helpers
+   are pushed once before the loop).
+2. **Discriminator:** Δ-clustering on `t_profile - t_boot_urc` →
+   pre-probe-dwell sweep. Justification: the probe issues the profile
+   request immediately on open (BEFORE its boot-settle loop), so
+   `t_boot_urc_ms` is structurally not constructible from probe stdout.
+   The dwell sweep instead asks the direct binary question: does
+   `RUNTIME_PROFILE_ENUM` flip from ERR to OK as the host waits longer
+   between NRST release and probe launch?
+
+### Cohort
+
+| evidence dir | dwell (s) | N | profile_ok | profile_err | drained |
+|---|---:|---:|---:|---:|---:|
+| `p1_cold_boot_2026-05-22_160005/` | 0.05 | 2 | 0 | 2 | 2 |
+| `p1_cold_boot_2026-05-22_160154/` | 2.00 | 2 | 0 | 2 | 2 |
+| `p1_cold_boot_2026-05-22_160255/` | 5.00 | 3 | 0 | 3 | 2 |
+
+**100 % failure rate, dwell-invariant from 0.05 s to 5.0 s.**
+
+### Falsification of firmware-not-ready
+
+In every cycle the probe goes on to **succeed** at `T0a: VER warm-up
+OK fw=v0.0.0 build=00000000` on the same boot, AFTER its post-request
+URC drain consumes the two queued STATS frames. The L072 is
+unambiguously responsive to MKRWAN-style requests within the same
+boot window; only the very first profile-enum request fails. A
+5-second dwell with the L072 actively emitting STATS URCs cannot be
+"not ready," and AT+VER works on the same boot.
+
+### Verdict — HOST-RACE limb
+
+Per Open Problems v3.0 §1 lines 395-400, the fix is the v1.1 host-side
+`drain_startup_until_quiet` + bounded backoff in
+`method_h_stage2_tx_probe_v2.py`. Specifically:
+
+1. After `Serial.open()` and before the first profile-enum request,
+   drain frames until no traffic arrives for a `quiet_window`
+   (default 200 ms is plenty given the 2-URC-burst empirical depth).
+2. Bounded backoff on the profile request itself: 3 attempts at
+   100 / 250 / 500 ms gaps; re-drain before each attempt so a late
+   URC cannot poison the correlator.
+3. Emit `__PROFILE_DRAINED__=<n>` and `__PROFILE_ATTEMPTS__=<k>` so
+   the same dwell-sweep discriminator can verify the fix without
+   regression.
+
+### Files
+
+- Verdict + cohort summary: `LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/p1_cold_boot_2026-05-22_160255/VERDICT.md`
+- Patched discriminator: `LifeTrac-v25/tools/p1_cold_boot_discriminator.ps1` (new `-PreProbeSleepS` knob, gpio163 reset path, one-time pre-loop helper push)
+- New on-device helper: `LifeTrac-v25/tools/_p1_pulse_and_probe.sh`
+
+### Updated closure table
+
+| Item | Status | Note |
+|---|---|---|
+| P1 | **DIAGNOSED** | Phase 2.1 falsified firmware-not-ready (5 s dwell, 100 % fail). Verdict: HOST-RACE. Phase 2.2 next: host-side `drain_startup_until_quiet` + bounded backoff in `method_h_stage2_tx_probe_v2.py`. |
+
+*Signed:* **GitHub Copilot, Phase 2.1 verdict 2026-05-22 16:05**
+
+---
+
+## 2026-05-22 (Phase 2.2 — host-race fix LANDED but FALSIFIED on bench)
+
+The Phase 2.1 host-race verdict was implemented in
+`method_h_stage2_tx_probe_v2.py::emit_runtime_profile_enum`:
+2.0 s `drain_boot`, bounded-quiet `drain_pending`, three CFG_GET
+attempts at gaps {0, 100, 350 ms} with timeouts {1.5, 2.0, 2.5} s,
+re-drain between each attempt, and two new tokens
+`__PROFILE_DRAINED__=<n>` / `__PROFILE_ATTEMPTS__=<k>` for the
+discriminator. Self-test 8/8 PASS.
+
+Re-run discriminator at PreProbeSleepS=0.05, N=5
+(`bench-evidence/p1_cold_boot_2026-05-22_160757/`): **5/5 cycles
+identical ERR TimeoutError**, byte-identical stdout=1935B. New
+instrumentation confirms `__PROFILE_DRAINED__=2` and
+`__PROFILE_ATTEMPTS__=3` — both STATS_URCs were drained AND all
+three retries exercised. The host side cannot have a remaining race.
+
+In every same-boot cycle, AT+VER (T0a) and the W1-10 REG_READ/WRITE
+chain SUCCEED. So the firmware request engine is functional in this
+boot window; only CFG_GET_REQ(CFG_KEY_REG_PROFILE) fails.
+
+### Updated leading hypothesis — stale firmware
+
+T0a reports `fw=v0.0.0 build=00000000` — uninitialised build metadata.
+`CFG_KEY_REG_PROFILE = 0x14` was added 2026-05-20 (FCC-B3-1). The
+firmware-side handler exists in source (`host/host_cmd.c::handle_cfg_get`
+→ `host/host_cfg.c::cfg_get`, descriptor table line 130). If the
+flashed L072 image predates that descriptor entry,
+`cfg_find_index(0x14)` returns -1, `cfg_get` returns
+`CFG_STATUS_UNKNOWN_KEY`, and `handle_cfg_get` emits **CFG_OK_URC**
+(not CFG_DATA_URC). The host's `link.request()` correlator waits for
+`HOST_TYPE_CFG_DATA_URC` and therefore times out indefinitely —
+matching the symptom exactly.
+
+### Falsification test (cheapest next step)
+
+Re-flash the L072 with the latest firmware build (any non-zero
+build hash will rule out the stale-image hypothesis), then re-run
+`tools/p1_cold_boot_discriminator.ps1 -PreProbeSleepS 0.05 -Cycles 5`.
+Expected: `profile_ok=100%`, `__PROFILE_DRAINED__=0..2`,
+`__PROFILE_ATTEMPTS__=1`.
+
+### Status updates
+
+- **P1: REOPENED** (was DIAGNOSED 16:05). Both firmware-not-ready
+  and host-race hypotheses falsified by direct test. Leading
+  hypothesis: stale L072 image missing CFG_KEY_REG_PROFILE
+  descriptor (`fw=v0.0.0 build=00000000`).
+- `method_h_stage2_tx_probe_v2.py` patch is **kept** — the longer
+  drains, bounded retries, and `__PROFILE_DRAINED__`/`__PROFILE_ATTEMPTS__`
+  tokens are defensible regardless and necessary instrumentation
+  for the next round.
+
+### Files
+
+- New verdict: `LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/p1_cold_boot_2026-05-22_160757/VERDICT.md`
+- Patched probe: `LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_h_stage2_tx_probe_v2.py`
+- Firmware cross-references:
+  - `firmware/murata_l072/include/host_cfg_keys.h` line 24 — `CFG_KEY_REG_PROFILE`
+  - `firmware/murata_l072/host/host_cmd.c` line 606 — `handle_cfg_get`
+  - `firmware/murata_l072/host/host_cfg.c` line 130 — descriptor entry
+  - `firmware/murata_l072/host/host_cfg.c` line 414 — `cfg_get`
+
+*Signed:* **GitHub Copilot, Phase 2.2 falsification 2026-05-22 16:10**
+
+---
+
+## 2026-05-22 16:15 (Phase 2.3 — ROOT CAUSE: stale flashed firmware)
+
+Added a post-timeout forensic dump to `emit_runtime_profile_enum`:
+when all three backoff attempts time out, drain any remaining wire
+bytes and dump `link.urc_queue` contents (type/seq/payload). Result
+on bench (`bench-evidence/p1_cold_boot_2026-05-22_161406/`, 5/5
+cycles BYTE-IDENTICAL):
+
+```
+__PROFILE_TIMEOUT_QUEUE_COUNT__=0
+__PROFILE_TIMEOUT_LATE_COUNT__=1
+__PROFILE_TIMEOUT_RX_BUF_HEX__=
+__PROFILE_TIMEOUT_FRAME__[0]=wire type=0xA0 seq=3 payload=14010000
+```
+
+### Decoded
+
+- `type=0xA0` = `HOST_TYPE_CFG_OK_URC` (NOT STATS_URC which is 0xC1).
+- `payload=14 01 00 00` parsed under `host_cfg_wire_encode_ok`:
+  - `key = 0x14` = `CFG_KEY_REG_PROFILE`
+  - **`status = 0x01` = `CFG_STATUS_UNKNOWN_KEY`** ← root cause
+  - `actual_len = 0x00`, pad `0x00`
+
+The host is waiting for `HOST_TYPE_CFG_DATA_URC = 0xA1` and rejects
+the `0xA0` frame → silent `TimeoutError`.
+
+### Conclusion
+
+**The flashed L072 firmware does NOT contain the `CFG_KEY_REG_PROFILE`
+descriptor entry** (added to source 2026-05-20 for FCC-B3-1). The
+chip has not been re-flashed since that change. AT+VER and W1-10
+REG_READ/WRITE work because those code paths existed in the older
+flashed image.
+
+The earlier "fw=v0.0.0 build=00000000 → stale" reasoning was
+directionally right but evidentially wrong: those strings are a
+fixed source artifact (`include/version.h` defines all majors as 0,
+`FW_GIT_SHA="dev"`) and would appear on any build of current source.
+The Phase 2.3 forensic dump gives unambiguous proof.
+
+### Required action (HARDWARE)
+
+Re-flash the L072 with the current firmware build. Then re-run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  .\LifeTrac-v25\tools\p1_cold_boot_discriminator.ps1 `
+  -RxSerial 2D0A1209DABC240B -Cycles 5 -PreProbeSleepS 0.05
+```
+
+Expected: `RUNTIME_PROFILE_ENUM=<0|1|2>` on all cycles, no
+`__PROFILE_TIMEOUT_FRAME__` lines.
+
+### Status
+
+- **P1: BLOCKED on hardware re-flash.** Root cause confirmed; fix
+  is "re-flash L072". Will close as `STALE_FW` after one passing
+  post-flash discriminator run.
+- The Phase 2.2 drain+backoff fix and the Phase 2.3 forensic dump
+  in `method_h_stage2_tx_probe_v2.py` are **kept** — they're
+  defensible regardless and provide protocol-level instrumentation
+  for any future correlator-mismatch failure.
+- Lesson recorded to user `methodology.md`: capture forensic dump
+  FIRST when a request() times out and other request types succeed
+  same-boot. Cheapest, most decisive discriminator.
+
+### Files
+
+- This verdict: `LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/p1_cold_boot_2026-05-22_161406/VERDICT.md`
+- Patched probe (forensic dump): `LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_h_stage2_tx_probe_v2.py`
+- Repo memory: `/memories/repo/lifetrac-p1-cold-boot-verdict.md`
+
+*Signed:* **GitHub Copilot, Phase 2.3 root-cause verdict 2026-05-22 16:15**

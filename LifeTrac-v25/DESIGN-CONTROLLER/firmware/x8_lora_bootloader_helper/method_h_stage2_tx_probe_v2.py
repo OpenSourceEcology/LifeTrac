@@ -66,6 +66,35 @@ BENIGN_FAULT_CODES = (
 )
 
 
+# 2026-05-22 P5: sidecar progress.txt. Per Open Problems doc v4.1 §4 the
+# cheapest fix for PowerShell live-tail buffering is a tiny file the
+# orchestrator polls every 1 s. Overwrite-truncate single line so a stat()
+# + 1 read is always sufficient (no log rotation, no tail bookkeeping).
+# Module global so probe modes don't need to thread a path through every
+# helper signature; main() sets it once from --progress-file.
+_PROGRESS_PATH: "str | None" = None
+
+
+def _emit_progress(tag: str, **kv) -> None:
+    """Write '<iso-ts> tag k=v k=v\\n' to _PROGRESS_PATH (overwrite-truncate).
+
+    Silent best-effort: any I/O error is swallowed. The probe must never
+    crash because the sidecar file became unwritable mid-run.
+    """
+    if not _PROGRESS_PATH:
+        return
+    try:
+        ts = time.strftime("%Y-%m-%dT%H:%M:%S")
+        parts = [ts, tag] + [f"{k}={v}" for k, v in kv.items()]
+        line = " ".join(parts) + "\n"
+        # Open-for-write truncates; flush+close guarantees the orchestrator's
+        # next poll sees a complete line.
+        with open(_PROGRESS_PATH, "w", encoding="utf-8") as fh:
+            fh.write(line)
+    except Exception:
+        pass
+
+
 HOST_TYPE_TX_FRAME_REQ = 0x10
 HOST_TYPE_TX_DONE_URC = 0x90
 HOST_TYPE_CFG_SET_REQ = 0x20
@@ -270,25 +299,54 @@ def emit_runtime_profile_enum(link: HostLink) -> None:
     2026-05-20 P2-1 fix: drain BOOT_URC + any pending traffic first, then
     retry once with a longer timeout if the initial CFG_GET races the boot
     storm (cold-start TimeoutError seen in walk_power_pilot/T4 evidence).
+
+    2026-05-22 Phase 2.2 fix (P1 HOST-RACE limb): the 0.5 s drain windows
+    above were empirically insufficient — `p1_cold_boot_discriminator.ps1`
+    showed 100 % `request_failed:TimeoutError` across 7 cycles at
+    PreProbeSleepS in {0.05, 2.0, 5.0} s, with `drained=2` STATS_URC
+    frames arriving at the *next* drain (W1-10 boot-settle) ~3-5 s later
+    while AT+VER on the same boot succeeded. Verdict: the two STATS_URC
+    frames the L072 emits within the first few seconds of cold boot
+    weren't yet kernel-visible during the short drain windows here, then
+    they poisoned the link.request() correlator. Fix: lengthen drains to
+    cover the empirical 2-URC burst window (~2 s), and re-drain before
+    EACH retry so a late URC can't poison a backoff attempt. Emit
+    `__PROFILE_DRAINED__=<n>` / `__PROFILE_ATTEMPTS__=<k>` tokens so the
+    Phase 2.1 discriminator can verify the fix without regression.
+    See `LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/p1_cold_boot_2026-05-22_160255/VERDICT.md`.
     """
     global _runtime_profile_emitted
     if _runtime_profile_emitted:
         return
     _runtime_profile_emitted = True
-    # Quiet the link before the CFG_GET so the response isn't buried under
-    # BOOT_URC / STATS_URC traffic. Both helpers are no-ops if nothing is
-    # pending; failure here is non-fatal.
+    drained_total = 0
+    # Initial drain: cover the empirical 2 s STATS_URC arrival window.
     try:
-        drain_boot(link, 0.5)
+        drain_boot(link, 2.0)
     except Exception:
         pass
     try:
-        drain_pending(link, quiet_s=0.10, max_s=0.5)
+        drained_total += drain_pending(link, quiet_s=0.30, max_s=2.0)
     except Exception:
         pass
     last_exc = None
     line = None
-    for attempt_timeout in (1.5, 2.5):
+    attempts = 0
+    # Three-attempt bounded backoff with re-drain between each attempt
+    # (per Phase 2.1 verdict §"Phase 2.2 implementation"). Gaps follow
+    # the 100/250/500 ms cadence in the verdict doc; per-attempt timeout
+    # bumps so a slow first-CFG response on a busy bus still succeeds.
+    backoff_pairs = ((0.000, 1.5), (0.100, 2.0), (0.350, 2.5))
+    for gap_s, attempt_timeout in backoff_pairs:
+        if gap_s > 0:
+            time.sleep(gap_s)
+            # Re-drain before each retry: a late URC arriving between
+            # attempts is the exact failure mode this defends against.
+            try:
+                drained_total += drain_pending(link, quiet_s=0.20, max_s=0.8)
+            except Exception:
+                pass
+        attempts += 1
         try:
             frame = link.request(HOST_TYPE_CFG_GET_REQ, HOST_TYPE_CFG_DATA_URC,
                                  bytes([CFG_KEY_REG_PROFILE]),
@@ -300,7 +358,52 @@ def emit_runtime_profile_enum(link: HostLink) -> None:
             continue
     if line is None:
         line = _format_runtime_profile_line(exc=last_exc)
+        # 2026-05-22 Phase 2.3 forensic dump (host-race AND firmware-not-ready
+        # both falsified by direct test — bench evidence
+        # `p1_cold_boot_2026-05-22_160757/`). When the three-attempt backoff
+        # exhausts, dump whatever the firmware actually responded with.
+        # Discriminator hypotheses:
+        #   * nothing on wire/queue       -> firmware silently dropped CFG_GET
+        #     (dispatcher not wired in flashed image, or input handler stalled).
+        #   * CFG_OK_URC (0x23) present   -> firmware took the error branch
+        #     in handle_cfg_get (UNKNOWN_KEY / OUT_OF_RANGE / READ_ONLY).
+        #   * CFG_DATA_URC w/ wrong seq   -> host correlator bug
+        #     (seq drift between request and response).
+        #   * other type                  -> protocol/encoding mismatch.
+        try:
+            late_frames = link.read_frames(0.5)
+        except Exception:
+            late_frames = []
+        queued = []
+        try:
+            queued = list(link.urc_queue)
+            link.urc_queue.clear()
+        except Exception:
+            pass
+        try:
+            rx_buf_hex = bytes(link.rx_buf).hex()
+        except Exception:
+            rx_buf_hex = ""
+        all_post = list(queued) + list(late_frames)
+        print(f"__PROFILE_TIMEOUT_QUEUE_COUNT__={len(queued)}")
+        print(f"__PROFILE_TIMEOUT_LATE_COUNT__={len(late_frames)}")
+        print(f"__PROFILE_TIMEOUT_RX_BUF_HEX__={rx_buf_hex}")
+        for idx, fr in enumerate(all_post):
+            try:
+                src = "queue" if idx < len(queued) else "wire"
+                print(f"__PROFILE_TIMEOUT_FRAME__[{idx}]={src} "
+                      f"type=0x{fr.get('type', 0):02X} "
+                      f"seq={fr.get('seq', 0)} "
+                      f"payload={fr.get('payload', b'').hex()}")
+            except Exception:
+                pass
     print(line)
+    # Verdict tokens for the Phase 2.1 discriminator (parsed by
+    # `p1_cold_boot_discriminator.ps1` cohort summary). Emit on a
+    # separate line so existing FCC-B3-2 grep on `RUNTIME_PROFILE_ENUM=`
+    # is unaffected.
+    print(f"__PROFILE_DRAINED__={drained_total}")
+    print(f"__PROFILE_ATTEMPTS__={attempts}")
     sys.stdout.flush()
 
 
@@ -1018,10 +1121,13 @@ def run_rx_listen(link: HostLink, window_s: float = 30.0) -> int:
     # safely start the TX side.
     sys.stdout.write("__W1_10B_LISTEN_READY__\n")
     sys.stdout.flush()
+    _emit_progress("rx_listen_ready", window_s=f"{window_s:.1f}")
 
     deadline = time.time() + window_s
     rx_count = 0
     real_faults = 0
+    # P5 sidecar: emit no more than once per second (cheap throttle).
+    next_progress_ts = 0.0
     # 2026-05-20 P1-3 fix: graceful SIGINT shutdown. Without this, the
     # orchestrator's `pkill -INT` (paired_walk_power_sweep.ps1) lands inside
     # link.read_frames() and Python emits a full KeyboardInterrupt traceback
@@ -1032,6 +1138,12 @@ def run_rx_listen(link: HostLink, window_s: float = 30.0) -> int:
     stopped_by_signal = False
     try:
         while time.time() < deadline:
+            now = time.time()
+            if now >= next_progress_ts:
+                _emit_progress("rx_listen",
+                               remaining_s=f"{deadline - now:.1f}",
+                               rx=rx_count, faults=real_faults)
+                next_progress_ts = now + 1.0
             for frame in link.read_frames(0.2):
                 ftype = frame["type"]
                 if ftype == HOST_TYPE_RX_FRAME_URC:
@@ -1125,12 +1237,17 @@ def run_tx_burst(link: HostLink, count: int = 100, inter_s: float = 0.2,
 
     sys.stdout.write("__W1_10B_BURST_READY__\n")
     sys.stdout.flush()
+    _emit_progress("tx_burst_ready", count=count, inter_s=f"{inter_s:.3f}")
 
     real_faults = 0
     tx_done_ok = 0
     tx_done_fail = 0
     tx_timeout = 0
     for i in range(count):
+        # P5: per-iteration sidecar update so a frozen burst's last index
+        # is always visible to the orchestrator. Cheap: ~1 file write/frame.
+        _emit_progress("tx_burst", idx=f"{i + 1}/{count}",
+                       ok=tx_done_ok, fail=tx_done_fail, to=tx_timeout)
         tx_id = i & 0xFF
         rand = _os.urandom(4).hex()
         payload = f"W1-10b seq={i:04d} {rand}".encode("ascii")
@@ -1535,6 +1652,10 @@ def run_walk_power(link: HostLink,
               f"timeout={tx_timeout_n} per_pct={tx_per_pct:.2f} "
               f"mean_toa_us={mean_toa:.0f} echoed_dbm={first_echoed}")
         sys.stdout.flush()
+        _emit_progress("walk_step_done",
+                       step=f"{step_idx + 1}/{len(powers)}",
+                       dbm=dbm, ok=tx_done_ok, fail=tx_done_fail,
+                       timeout=tx_timeout_n)
 
     csv_fh.close()
     if pp_fh is not None:
@@ -2281,10 +2402,24 @@ def main(argv=None) -> int:
                              "over canned CFG_DATA_URC payloads and exception "
                              "cases. Exits 0 on pass, 1 on any mismatch. Does "
                              "not open the serial link or touch the radio.")
+    # 2026-05-22 P5: sidecar progress.txt path. Overwrite-truncate single
+    # line, polled by the orchestrator every 1 s. See _emit_progress()
+    # docstring + Open Problems doc v4.1 §4.
+    parser.add_argument("--progress-file", default=None,
+                        help="P5 sidecar: write a one-line progress.txt "
+                             "(overwrite-truncate) at every major event so "
+                             "an orchestrator can tail it for liveness "
+                             "without parsing stdout.")
     args = parser.parse_args(argv)
 
     if args.self_test_profile_emit:
         return _self_test_profile_emit()
+
+    # P5: install the sidecar BEFORE any potentially-blocking work so a
+    # frozen probe still tells the orchestrator at which phase it froze.
+    global _PROGRESS_PATH
+    _PROGRESS_PATH = args.progress_file
+    _emit_progress("starting", probe=args.probe, dev=args.dev, baud=args.baud)
 
     print(f"MODE: {args.probe}")
     print(f"dev={args.dev} baud={args.baud}")
@@ -2293,7 +2428,9 @@ def main(argv=None) -> int:
         link = HostLink(args.dev, args.baud)
     except Exception as exc:
         print(f"FATAL: link open failed: {exc}")
+        _emit_progress("link_open_failed", err=type(exc).__name__)
         return 2
+    _emit_progress("link_open_ok")
 
     # 2026-05-20 FCC-B3-1: publish RUNTIME_PROFILE_ENUM=<N> exactly once per
     # probe process so the FCC-B3-2 gate (`tools/check_run_profile.py`) can
@@ -2302,49 +2439,56 @@ def main(argv=None) -> int:
     # `RUNTIME_PROFILE_ENUM=ERR <reason>` and probe execution continues so
     # we don't regress the existing capture surface.
     emit_runtime_profile_enum(link)
+    _emit_progress("profile_emit_done", mode=args.probe)
 
+    rc = 2
     try:
+        _emit_progress("mode_enter", mode=args.probe)
         if args.probe == "tx":
-            return run_tx_probe(link, args)
-        if args.probe == "regversion":
-            return run_regversion_burst(link, count=args.burst_count)
-        if args.probe == "fsk":
-            return run_fsk_stdby(link)
-        if args.probe == "opmode_walk":
-            return run_opmode_walk(link)
-        if args.probe == "rx":
-            return run_rx_liveness(link, window_s=args.rx_window)
-        if args.probe == "rx_listen":
-            return run_rx_listen(link, window_s=args.rx_window)
-        if args.probe == "tx_burst":
-            return run_tx_burst(link, count=args.tx_count,
+            rc = run_tx_probe(link, args)
+        elif args.probe == "regversion":
+            rc = run_regversion_burst(link, count=args.burst_count)
+        elif args.probe == "fsk":
+            rc = run_fsk_stdby(link)
+        elif args.probe == "opmode_walk":
+            rc = run_opmode_walk(link)
+        elif args.probe == "rx":
+            rc = run_rx_liveness(link, window_s=args.rx_window)
+        elif args.probe == "rx_listen":
+            rc = run_rx_listen(link, window_s=args.rx_window)
+        elif args.probe == "tx_burst":
+            rc = run_tx_burst(link, count=args.tx_count,
+                              inter_s=args.inter_cycle_s,
+                              timeout=args.timeout)
+        elif args.probe == "rx_echo":
+            rc = run_rx_echo(link, window_s=args.rx_window,
+                             echo_timeout_s=args.timeout)
+        elif args.probe == "ping_pong":
+            rc = run_ping_pong(link, count=args.tx_count,
+                               inter_s=args.inter_cycle_s,
+                               timeout=args.timeout,
+                               rtt_timeout=args.rtt_timeout)
+        elif args.probe == "walk_power":
+            rc = run_walk_power(link,
+                                power_min=args.power_min,
+                                power_max=args.power_max,
+                                power_step=args.power_step,
+                                per_step_count=args.per_step_count,
+                                timeout=args.timeout,
                                 inter_s=args.inter_cycle_s,
-                                timeout=args.timeout)
-        if args.probe == "rx_echo":
-            return run_rx_echo(link, window_s=args.rx_window,
-                               echo_timeout_s=args.timeout)
-        if args.probe == "ping_pong":
-            return run_ping_pong(link, count=args.tx_count,
-                                 inter_s=args.inter_cycle_s,
-                                 timeout=args.timeout,
-                                 rtt_timeout=args.rtt_timeout)
-        if args.probe == "walk_power":
-            return run_walk_power(link,
-                                  power_min=args.power_min,
-                                  power_max=args.power_max,
-                                  power_step=args.power_step,
-                                  per_step_count=args.per_step_count,
-                                  timeout=args.timeout,
-                                  inter_s=args.inter_cycle_s,
-                                  csv_out=args.csv_out,
-                                  payload_len=args.walk_payload_len,
-                                  lbt_enable=args.lbt_enable)
-        print(f"FATAL: unknown probe mode: {args.probe}")
-        return 2
+                                csv_out=args.csv_out,
+                                payload_len=args.walk_payload_len,
+                                lbt_enable=args.lbt_enable)
+        else:
+            print(f"FATAL: unknown probe mode: {args.probe}")
+            rc = 2
+        _emit_progress("mode_exit", mode=args.probe, rc=rc)
+        return rc
     finally:
         if getattr(args, "sleep_on_exit", True):
             sleep_radio_safely(link, label=args.probe)
         link.close()
+        _emit_progress("link_closed", mode=args.probe, rc=rc)
 
 
 if __name__ == "__main__":

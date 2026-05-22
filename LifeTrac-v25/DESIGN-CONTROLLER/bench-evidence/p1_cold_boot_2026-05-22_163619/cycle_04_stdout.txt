@@ -1,0 +1,42 @@
+﻿7[r[999;999H[6nPULSE_DONE_AT=1779484137.085526375
+PRE_PROBE_SLEEP=0.05
+MODE: rx
+dev=/dev/ttymxc3 baud=921600
+RUNTIME_PROFILE_ENUM=0
+__PROFILE_DRAINED__=0
+__PROFILE_ATTEMPTS__=1
+=== W1-10 probe RX: single-board RX-liveness (window=0.5s) ===
+BOOT_URC not observed during 1.0s settle (firmware likely already past boot ΓÇö continuing).
+T0a: VER warm-up OK fw=v0.0.0 build=00000000
+T0b: post-VER drain consumed 0 frames
+T0c STATS(before): radio_state=4 (4=RX_CONT) radio_rx_ok=0 radio_crc_err=0 host_parse_err=0
+T1: RegOpMode(pre) = 0x80 (expected 0x85 = LoRa+RXCONTINUOUS)
+  WARN: pre-state not RXCONTINUOUS (got 0x80)
+T2: RegRssiValue A=0x00 (-157 dBm) B=0x00 (-157 dBm) in_band=False varies=False
+T3: RegModemStat(0x18) = 0x00 (bit0=SigDetect bit1=SigSync bit2=RxOngoing bit3=HdrInfoValid bit4=ModemClear)
+T4: observation window 0.5s (quiet bench, no peer expected)
+T5: RegOpMode(post) = 0x80 (stuck-in-RXCONT = False)
+T5 STATS(after): radio_rx_ok=0 (delta=0) radio_crc_err=0 (delta=0) radio_state=4 host_parse_err=0
+
+Critical checks:
+  [FAIL] A1 RegOpMode(pre)  == 0x85 (LoRa+RXCONTINUOUS)
+  [FAIL] A2 RegOpMode(post) == 0x85 (LoRa+RXCONTINUOUS)
+  [FAIL] B1 RegRssiValue in plausible band [10..200]
+  [FAIL] B2 RegRssiValue varies between samples (AGC alive)
+  [PASS] C  radio_state == 4 (RX_CONT)
+  [PASS] D  host invariants stable
+  [PASS] E  no real FAULT_URC during window
+
+Bonus evidence: rx_frames_received=0 (0 expected on single-board quiet bench)
+__W1_10_RX_FRAMES__=0
+__W1_10_RSSI_PRE__=-157
+__W1_10_RSSI_POST__=-157
+__W1_10_OPMODE_PRE__=0x80
+__W1_10_OPMODE_POST__=0x80
+__W1_10_REAL_FAULTS__=0
+__W1_10_VERDICT__=RX_LIVENESS_FAIL_4_CHECKS
+VERDICT: FAIL (4 critical check(s) failed)
+__RADIO_SLEEP_ON_EXIT__ (rx) ack=0180 RegOpMode(post)=0x80 (target=0x80)
+
+--- STDERR ---
+

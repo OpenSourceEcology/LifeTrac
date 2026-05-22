@@ -7,6 +7,8 @@
 
 #include "sx1276_rx_scan_fail.h"
 
+#include <stddef.h>
+
 sx1276_rx_scan_fail_eval_t sx1276_rx_scan_fail_eval(
     const sx1276_rx_scan_fail_input_t *in) {
     sx1276_rx_scan_fail_eval_t out;

@@ -66,6 +66,7 @@ SRCS := \
 	radio/sx1276_airtime.c \
 	radio/sx1276_cad.c \
 	radio/lora_pkt_hdr.c \
+	radio/lora_frames_per_dwell.c \
 	radio/sx1276_fhss_chantab.c \
 	radio/sx1276_fhss.c \
 	radio/sx1276_lbt.c \
@@ -219,6 +220,7 @@ CFG_WIRE_BIN      := $(BUILD)/cfg_wire_vectors
 FHSS_CHANTAB_BIN   := $(BUILD)/fhss_chantab_vectors
 FHSS_SCHEDULER_BIN := $(BUILD)/fhss_scheduler_vectors
 LEGAL_DWELL_BIN    := $(BUILD)/legal_dwell
+FRAMES_PER_DWELL_BIN := $(BUILD)/frames_per_dwell
 RFCO_PERTX_BIN     := $(BUILD)/rfco_pertx
 RFCO_SUMMARY_COUNTERS_BIN := $(BUILD)/rfco_summary_counters
 RFCO_SUMMARY_BIN   := $(BUILD)/rfco_summary
@@ -236,7 +238,7 @@ RX_SCAN_COUNTERS_BIN := $(BUILD)/rx_scan_counters
 RX_SCAN_FAIL_BIN := $(BUILD)/rx_scan_fail
 AIRTIME_INVARIANT_BIN := $(BUILD)/airtime_invariant
 
-check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-airtime-invariant check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail
+check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-airtime-invariant check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail
 	@echo "[OK] memory map invariants hold"
 
 check-cpp: $(BUILD)
@@ -426,6 +428,21 @@ check-legal-dwell: $(BUILD)
 	    -o $(LEGAL_DWELL_BIN)
 	@echo "[DWELL] Running legal-dwell test ..."
 	@$(LEGAL_DWELL_BIN)
+
+# P3 / Phase 3.2 (Open Problems 2026-05-21): frames_per_dwell() host<->firmware
+# parity. Builds the firmware mirror lora_frames_per_dwell.c against the host
+# toolchain and asserts the same anchor values the Python authority
+# frames_per_dwell() in w2_02_host_pipeline.py pins in its docstring
+# (SF7/BW250/64B -> 8, SF9/BW250/64B -> 2-3), plus cap-binds and clamp-to-1
+# edges. Keeps the host pacing-hint and firmware mirror in lockstep.
+check-frames-per-dwell: $(BUILD)
+	@echo "[FPD  ] Building frames_per_dwell parity test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/frames_per_dwell.c \
+	    radio/lora_frames_per_dwell.c \
+	    -o $(FRAMES_PER_DWELL_BIN)
+	@echo "[FPD  ] Running frames_per_dwell parity test ..."
+	@$(FRAMES_PER_DWELL_BIN)
 
 # FCC-B1-PERTX (plan §14.2 step 7): per-TX RFCO URC packer + emit().
 # Compiles host/host_rfco.c against the host toolchain with a stub for

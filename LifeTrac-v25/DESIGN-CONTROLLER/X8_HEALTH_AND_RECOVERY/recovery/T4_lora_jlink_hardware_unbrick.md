@@ -12,6 +12,7 @@ Because the Max Carrier routes the L072 `SWDIO` and `SWCLK` to this 10-pin heade
 
 ## When NOT to use (try first instead)
 * **2026-05-18 update — Tier 4 is now last-resort.** The X8-resident UART flasher handles the formerly-J-Link-only "mass-erase NACK" case via page-by-page Extended Erase. Run [HC-04](../routines/HC-04_stage1_standard_quant.md) first; if it PASSes, no J-Link work is needed.
+* **2026-05-22 update — newer-openocd `SWD DPIDR 0xdeadbeef` is NOT a brick.** If HC-04 fails with `flash_ocd.log` ending at `Info : SWD DPIDR 0xdeadbeef` and you confirm the X8's openocd build is `0.11.0-dirty 2025-07-14-18:35` or newer, the L072 is fine — the host-side `imx_gpio` mmap driver is racing with sysfs gpio claims. Fix is in `run_flash_l072.sh` (unexport gpio8/10/15 before `nohup openocd ... &`; 25 s `READY:` poll). See HC-04 "Common failure modes" and `AI NOTES/2026-05-22_RX_Reflash_And_P1_Resolution_v1_0.md`. Do NOT attach a J-Link in this case; you will waste time chasing a phantom RDP scenario.
 
 ## Prerequisites
 

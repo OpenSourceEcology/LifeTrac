@@ -2,31 +2,50 @@
 import os
 import sys
 import time
-import termios
 import struct
 
+# Portenta X8 LmP Python 3.10 ships without `termios` (see repo memory
+# lifetrac-x8-python-stripped). The bash wrapper (run_flash_l072.sh)
+# already runs `stty -F /dev/ttymxc3 19200 cs8 parenb -parodd -cstopb
+# raw -echo` before invoking us, so termios.tcsetattr() here is
+# redundant on that platform. Make it optional so the flasher runs on
+# both stripped (X8) and full (dev workstation) Python stdlib.
+try:
+    import termios  # type: ignore[import-not-found]
+    _HAVE_TERMIOS = True
+except ImportError:
+    termios = None  # type: ignore[assignment]
+    _HAVE_TERMIOS = False
+
 PORT = "/dev/ttymxc3"
-BAUD = termios.B19200
+BAUD = termios.B19200 if _HAVE_TERMIOS else 0
 ACK = b'\x79'
 NACK = b'\x1f'
 
 def open_port():
     print(f"Opening {PORT} at 19200 8E1...")
     fd = os.open(PORT, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-    
-    # Configure termios
-    # 8E1: CS8, PARENB (parity enable), INPCK (input parity checking). CLEAR PARODD for Even.
-    iflag, oflag, cflag, lflag, ispeed, ospeed, cc = termios.tcgetattr(fd)
-    
-    cflag &= ~(termios.PARENB | termios.PARODD | termios.CSIZE | termios.CSTOPB | termios.CRTSCTS)
-    cflag |= (termios.CS8 | termios.PARENB | termios.CREAD | termios.CLOCAL)
-    
-    iflag &= ~(termios.IXON | termios.IXOFF | termios.IXANY | termios.INLCR | termios.IGNCR | termios.ICRNL)
-    oflag &= ~termios.OPOST
-    lflag &= ~(termios.ICANON | termios.ECHO | termios.ECHOE | termios.ISIG)
-    
-    termios.tcsetattr(fd, termios.TCSANOW, [iflag, oflag, cflag, lflag, BAUD, BAUD, cc])
-    
+
+    if _HAVE_TERMIOS:
+        # Configure termios
+        # 8E1: CS8, PARENB (parity enable), INPCK (input parity checking). CLEAR PARODD for Even.
+        iflag, oflag, cflag, lflag, ispeed, ospeed, cc = termios.tcgetattr(fd)
+
+        cflag &= ~(termios.PARENB | termios.PARODD | termios.CSIZE | termios.CSTOPB | termios.CRTSCTS)
+        cflag |= (termios.CS8 | termios.PARENB | termios.CREAD | termios.CLOCAL)
+
+        iflag &= ~(termios.IXON | termios.IXOFF | termios.IXANY | termios.INLCR | termios.IGNCR | termios.ICRNL)
+        oflag &= ~termios.OPOST
+        lflag &= ~(termios.ICANON | termios.ECHO | termios.ECHOE | termios.ISIG)
+
+        termios.tcsetattr(fd, termios.TCSANOW, [iflag, oflag, cflag, lflag, BAUD, BAUD, cc])
+    else:
+        # termios unavailable (e.g. Portenta X8 LmP stripped stdlib).
+        # The bash wrapper run_flash_l072.sh runs `stty -F $DEV 19200
+        # cs8 parenb -parodd -cstopb raw -echo` before calling us, so
+        # the port is already correctly configured. Proceed.
+        print("  (termios unavailable; relying on prior stty configuration)")
+
     # Clear NOCTTY/NONBLOCK for blocking IO with timeout
     os.set_blocking(fd, False)
     return fd

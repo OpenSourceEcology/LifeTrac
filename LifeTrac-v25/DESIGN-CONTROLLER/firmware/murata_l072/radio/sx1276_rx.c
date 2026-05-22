@@ -27,6 +27,18 @@
 _Static_assert(sizeof(sx1276_rx_frame_t) <= 280U,
                "sx1276_rx_frame_t must stay within main-loop stack budget");
 
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+/* Forward declarations for FCC-A6c-3-b scan-fail bookkeeping symbols used
+ * from sx1276_rx_service() (below) but defined further down in the routed
+ * block (search "FCC-A6c-3-b file-statics" and "scan_feed_frame"). The
+ * tentative-definition rule in C99/C11 (§6.9.2 ¶2) allows these to appear
+ * as additional file-scope declarations without creating multiple objects;
+ * the linker resolves them to the single definitions below. */
+static bool s_scan_got_any_irq;
+static bool s_scan_crc_seen;
+static void scan_feed_frame(bool header_valid);
+#endif
+
 bool sx1276_rx_arm(void) {
     if (!sx1276_modes_to_rx_cont()) {
         return false;
