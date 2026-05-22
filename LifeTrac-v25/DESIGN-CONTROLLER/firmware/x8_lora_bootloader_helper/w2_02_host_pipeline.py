@@ -84,6 +84,78 @@ FRAG_DATA_MAX_V2 = L072_TX_MAX - 5     # 59 B (v2)
 FRAGMENT_MAGIC_V2 = 0xFD
 MAX_REDUNDANCY_V2 = 15                 # one nibble
 
+# ---------------------------------------------------------------------------
+# P3 (2026-05-21): cadence + dwell guardrails.
+#
+# Two independent constraints, often conflated:
+#
+#   1. Host-loop inter-cycle pacing (MIN_LORA_HOST_INTER_CYCLE_S).
+#      The 2026-05-21 walk_power_falsification_matrix verdict found a
+#      +13.38pp PER cliff at 0.02s vs 0.05s inter-cycle pacing on the
+#      host orchestrator (TX board cadence). Anything below 50 ms drives
+#      the L072 HostLink ring into back-pressure. LBT was FALSIFIED as
+#      the cause; the cliff is host-side. Callers requesting <50 ms must
+#      be clamped + warned.
+#
+#   2. FCC §15.247(a)(1) airtime cap (LEGAL_DWELL_US).
+#      400 ms PER CHANNEL of airtime within any 10 s window. This is
+#      AIRTIME, not wall-clock — long inter-frame gaps don't help. At
+#      SF7/BW250 a fragment's ToA is ~25-30 us… err, ~25 ms, so 8 frames
+#      ≈ 200-240 ms airtime, well under cap. At SF9/BW250 ToA jumps and
+#      the safe per-dwell count falls. `frames_per_dwell()` recomputes
+#      from the current profile's ToA and applies an 85% headroom factor
+#      to leave room for retransmits and dwell-boundary slop.
+#
+# v4.1 review correction (2026-05-21): keep MAX_FRAMES_PER_DWELL_CAP=8
+# (NOT 6 as v4.0 §2 suggested). v4.0's recommendation assumed worst-case
+# ToA; at the deployed SF7/BW250 8 frames is legal. The profile-aware
+# guard below is what protects SF9 etc.
+# ---------------------------------------------------------------------------
+MIN_LORA_HOST_INTER_CYCLE_S = 0.05      # walk_power matrix verdict (2026-05-21)
+LEGAL_DWELL_US              = 400_000   # FCC §15.247(a)(1) per-channel airtime
+DWELL_HEADROOM_PCT          = 85        # leave 15% for retransmits / slop
+MAX_FRAMES_PER_DWELL_CAP    = 8         # v4.1: keep 8 (v4.0's "6" was overcautious)
+
+
+def frames_per_dwell(toa_us: int) -> int:
+    """Return the legal number of fragments per dwell for a given ToA.
+
+    `toa_us` is the on-air time of a single fragment in microseconds. The
+    result is the integer floor of (LEGAL_DWELL_US * headroom / toa_us),
+    clamped to [1, MAX_FRAMES_PER_DWELL_CAP].
+
+    Unit-test anchor (must hold for L072 firmware mirror too):
+      - SF7  / BW250 / 64 B  (~28_000 us)  -> 8   (cap binds)
+      - SF9  / BW250 / 64 B  (~115_000 us) -> 2-3 (ToA binds)
+    """
+    if toa_us <= 0:
+        return 1
+    n = (LEGAL_DWELL_US * DWELL_HEADROOM_PCT // 100) // toa_us
+    if n < 1:
+        return 1
+    if n > MAX_FRAMES_PER_DWELL_CAP:
+        return MAX_FRAMES_PER_DWELL_CAP
+    return int(n)
+
+
+def clamp_inter_cycle_s(requested_s: float, *, logger=None) -> float:
+    """Enforce MIN_LORA_HOST_INTER_CYCLE_S with a one-shot warning.
+
+    Returns the clamped value. Pass a callable `logger(str)` (e.g.
+    `print` or `logging.warning`) to surface the clamp event; default is
+    silent so it's safe to call from tight inner loops.
+    """
+    if requested_s < MIN_LORA_HOST_INTER_CYCLE_S:
+        if logger is not None:
+            logger(
+                "P3-CLAMP: requested inter_cycle_s={:.4f} < min {:.4f}; "
+                "raising (walk_power matrix 2026-05-21).".format(
+                    requested_s, MIN_LORA_HOST_INTER_CYCLE_S
+                )
+            )
+        return MIN_LORA_HOST_INTER_CYCLE_S
+    return requested_s
+
 
 def _encode_tile_webp(rgb: bytes, quality: int = 55) -> bytes:
     from PIL import Image

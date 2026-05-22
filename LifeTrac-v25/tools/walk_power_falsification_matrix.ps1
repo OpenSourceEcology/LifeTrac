@@ -52,6 +52,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# P2-3: adb prints a transfer summary to stderr on success, which PowerShell
+# surfaces as a NativeCommandError record. Under -ErrorActionPreference=Stop
+# that aborts mid-matrix. Restore EAP to 'Continue' only around adb pulls
+# (we keep 'Stop' for all real failures).
+$adbEAP = 'Continue'
 $adb = "C:\Users\dorkm\AppData\Local\Microsoft\WinGet\Packages\Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe\platform-tools\adb.exe"
 
 $runStartTs = Get-Date -Format 'yyyy-MM-dd_HHmmss'
@@ -141,11 +146,18 @@ function Invoke-WalkPowerPass {
     if (-not $rxProc.HasExited) { Stop-Process -Id $rxProc.Id -Force -ErrorAction SilentlyContinue }
   }
 
-  # Pull CSVs.
+  # Pull CSVs. adb writes its progress summary to stderr even on success;
+  # tolerate that here so the matrix continues to the next pass.
   $localCsv = Join-Path $passDir "walk_power_tx_side.csv"
   $localCsvPerPkt = Join-Path $passDir "walk_power_tx_side_perpacket.csv"
-  & $adb -s $BoardA pull $remoteCsv $localCsv 2>&1 | Out-Null
-  & $adb -s $BoardA pull $remoteCsvPerPkt $localCsvPerPkt 2>&1 | Out-Null
+  $prevEAP = $ErrorActionPreference
+  $ErrorActionPreference = $adbEAP
+  try {
+    & $adb -s $BoardA pull $remoteCsv $localCsv 2>&1 | Out-Null
+    & $adb -s $BoardA pull $remoteCsvPerPkt $localCsvPerPkt 2>&1 | Out-Null
+  } finally {
+    $ErrorActionPreference = $prevEAP
+  }
 
   # Quick visibility into the result.
   $rxCount = (Select-String -Path $rxLog -Pattern "__RX_FRAME__|RX_FRAME_URC:" | Measure-Object).Count

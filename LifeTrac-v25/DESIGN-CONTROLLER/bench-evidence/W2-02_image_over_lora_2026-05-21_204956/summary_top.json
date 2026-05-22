@@ -1,0 +1,72 @@
+{
+    "timestamp":  "2026-05-21_204956",
+    "tx_board":  "2E2C1209DABC240B",
+    "rx_board":  "2D0A1209DABC240B",
+    "video_dev":  "/dev/video1",
+    "n_fragments_planned":  206,
+    "n_tx_done":  206,
+    "n_tx_ok":  206,
+    "n_tx_timeout":  0,
+    "n_rx_frames":  206,
+    "n_rx_matched":  206,
+    "tx_ok_rate":  1,
+    "rx_match_rate":  1,
+    "rssi_median_dbm":  -111,
+    "snr_median_db":  5,
+    "tx_duration_s":  58,
+    "frame_complete":  true,
+    "tiles_decoded":  96,
+    "decode":  {
+                   "n_rx_frames":  206,
+                   "completed_frames":  1,
+                   "first_frame":  {
+                                       "kind":  "key",
+                                       "base_seq":  0,
+                                       "grid_w":  12,
+                                       "grid_h":  8,
+                                       "tile_px":  32,
+                                       "tiles_changed":  96,
+                                       "tiles_decoded":  96,
+                                       "tiles_failed":  0
+                                   },
+                   "reassembler":  {
+                                       "completed_frames":  1,
+                                       "decode_errors":  0,
+                                       "duplicate_fragments":  0,
+                                       "bad_magic_passthroughs":  0,
+                                       "timeouts":  0
+                                   },
+                   "newest_frame_wins":  {
+                                             "accepted":  1,
+                                             "stale_dropped":  0,
+                                             "duplicate_dropped":  0,
+                                             "first_frame_accepted":  true,
+                                             "last_accepted_seq":  0
+                                         },
+                   "pending_seqs":  [
+
+                                    ]
+               },
+    "gates":  [
+                  {
+                      "id":  "V1",
+                      "label":  "tx_ok_rate \u003e= 0.99 (got 1)",
+                      "ok":  true
+                  },
+                  {
+                      "id":  "V2",
+                      "label":  "rx_match_rate \u003e= 0.95 (got 1)",
+                      "ok":  true
+                  },
+                  {
+                      "id":  "V3",
+                      "label":  "frame_complete (got True)",
+                      "ok":  true
+                  },
+                  {
+                      "id":  "V4",
+                      "label":  "tiles_decoded == 96 (got 96)",
+                      "ok":  true
+                  }
+              ]
+}

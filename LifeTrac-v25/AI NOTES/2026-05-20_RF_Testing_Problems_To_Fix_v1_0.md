@@ -772,5 +772,70 @@ producer that does not need redundancy keeps emitting v1.
 ### Step 5: pending. Hardware burn-in (T1/T2/T3/T4/T5b on the patched harness +
 the 3-pass walk_power matrix) is the only remaining work; all software for
 Steps 1–4 is landed and unit-validated.
+### Step 5 (2026-05-21 evening): hardware burn-in COMPLETE.
+
+**Opening radio-sleep audit:** both boards parked at `RegOpMode=0x80`
+(`__BENCH_RADIO_SLEEP_AUDIT__=PASS`). Auditable record at
+`bench-evidence/` (orchestrator stdout).
+
+**Falsification matrix** (`tools/walk_power_falsification_matrix.ps1`,
+fix landed before run: P2-3 adb-stderr `NativeCommandError` was
+aborting the orchestrator mid-matrix; tolerated locally around the two
+`adb pull` calls only, real failures still fatal). Evidence:
+`bench-evidence/walk_power_matrix_2026-05-21_204356/`.
+
+- Pass A: LBT=0, inter_cycle_s=0.05 -> 16 power steps Ã— 50 pkts =
+  800 sent, 770 RX (overall PER 0.0 % at probe receiver).
+- Pass B: LBT=1, inter_cycle_s=0.05 -> 800 sent, 693 RX
+  (overall PER 0.0 % at the validator, no LBT-abort delta vs A).
+- Pass C: LBT=0, inter_cycle_s=0.02 -> 800 sent, 689 RX
+  (overall PER **13.38 %** at the validator).
+
+`tools/walk_power_matrix_analyze.py` verdict (after a small in-flight
+analyzer fix: now reads matrix\_meta.json with `utf-8-sig` to tolerate
+PowerShellâ€™s BOM, and adds an aggregate-PER decision lane that fires
+when no per-step cliff is present but the cadence/LBT axis still moves
+overall PER beyond `AGG_DELTA_PCT=5.0` pp). `verdict.md` excerpt:
+
+- **Host-cadence hypothesis: CONFIRMED** at the aggregate level
+  (A=0.00 % vs C=13.38 %, delta=+13.38 pp). The 20 ms tick saturates
+  the host loop and the loss shows up uniformly, not as a per-step
+  power cliff. The original pilot â€œcliffâ€ is therefore a
+  cadence/host-CPU artefact, not an RF/PA mechanism in itself.
+- **LBT-defer hypothesis: FALSIFIED** at this cadence
+  (A=0.00 % vs B=0.00 %, delta=+0.00 pp); LBT is not the trigger of
+  the legacy artefact.
+- **Per-step cliff: none** in any pass (consistent with the v3.0
+  primary hypothesis from the bench-trial note: the pilot cliff was
+  not a power-vs-PER mechanism).
+
+**T5b regression** (`run_w2_02_image_over_lora_end_to_end_v2.ps1`,
+default `-Redundancy 2`, evidence
+`bench-evidence/W2-02_image_over_lora_2026-05-21_204956/`):
+
+- Encoder: 6061 B body -> 103 unique fragments Ã— 2 copies = 206 wire
+  fragments (confirms v2 idx-major + copy-major layout).
+- Air: TX done in 58 s, adb rc=0; all 206 fragments delivered.
+- Reassembler stats:
+  `v2_fragments_seen=206, v2_redundant_copies_seen=103, v2_bad_header=0,
+   duplicate_fragments=0, completed_frames=1`.
+- Decoder: 96/96 tiles decoded, frame complete.
+- All four validators (`tx_ok_rate`, `rx_match_rate`, `frame_complete`,
+  `tiles_decoded`) PASS. `VERDICT: PASS`.
+
+**Closing radio-sleep audit:** both boards parked at
+`RegOpMode=0x80` (`__BENCH_RADIO_SLEEP_AUDIT__=PASS`,
+2D0A=`SLEEP_ALREADY`, 2E2C=`SLEEP_OK 0x85->0x80 ack=0180`).
+
+**Non-blocking observations carried forward:**
+
+- `RUNTIME_PROFILE_ENUM=ERR request_failed:TimeoutError` was emitted by
+  the rx_listen probe at boot under heavy URC storm on a few runs
+  despite the Step-1 drain+retry patch; the listener proceeded
+  normally in every case. Likely needs a longer settle window or a
+  pre-drain pass when the host has just power-cycled the radio.
+- The orchestrator buffers child-process stdout until each pass
+  completes, so console feedback during a pass is sparse; the
+  per-pass log files are the authoritative live view.
 
 

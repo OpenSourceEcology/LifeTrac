@@ -105,12 +105,49 @@ def render_verdict(meta: dict, summaries: dict[str, dict]) -> str:
     out.append("")
 
     a, b, c = cliff_map.get("A"), cliff_map.get("B"), cliff_map.get("C")
+    # Aggregate PER per pass (used for cadence/LBT effects that don't show
+    # as a per-step cliff but as a uniform PER offset).
+    def _pct(name):
+        v = summaries.get(name, {}).get("overall_per_pct")
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+    per_a, per_b, per_c = _pct("A"), _pct("B"), _pct("C")
+    AGG_DELTA_PCT = 5.0  # uniform PER offset that we treat as significant
+
     out.append("## Decision rule application")
     out.append("")
     verdict_lines: list[str] = []
 
-    # Host-cadence falsification
-    if a is None and c is not None:
+    # Host-cadence: prefer aggregate PER delta (A vs C); fall back to per-step
+    # cliff detection if aggregates unavailable.
+    if per_a is not None and per_c is not None:
+        delta_ac = per_c - per_a
+        if delta_ac >= AGG_DELTA_PCT:
+            verdict_lines.append(
+                f"- **Host-cadence hypothesis**: aggregate PER A={per_a:.2f}% "
+                f"vs C={per_c:.2f}% (delta={delta_ac:+.2f} pp, threshold "
+                f">= {AGG_DELTA_PCT:.1f} pp). Only differing variable is "
+                "`inter_cycle_s` (A=0.05, C=0.02). **CONFIRMED**: host cadence "
+                "is a real factor in the legacy 20 ms tick regime. (May still "
+                "be downstream of a real RF/duty-cycle effect that only "
+                "manifests when ToA + cadence saturate the host.)"
+            )
+        elif delta_ac <= -AGG_DELTA_PCT:
+            verdict_lines.append(
+                f"- **Host-cadence hypothesis**: A={per_a:.2f}% > C={per_c:.2f}% "
+                "(C lower-loss than A) -- nonsensical; investigate pass-order "
+                "or thermal drift."
+            )
+        else:
+            verdict_lines.append(
+                f"- **Host-cadence hypothesis**: aggregate PER A={per_a:.2f}% "
+                f"vs C={per_c:.2f}% (delta={delta_ac:+.2f} pp, threshold "
+                f">= {AGG_DELTA_PCT:.1f} pp). **FALSIFIED at aggregate level**: "
+                "cadence is not a major contributor."
+            )
+    elif a is None and c is not None:
         verdict_lines.append(
             "- **Host-cadence hypothesis**: A clean, C cliff -> only differing "
             "variable is `inter_cycle_s` (A=0.05, C=0.02). "
@@ -129,8 +166,24 @@ def render_verdict(meta: dict, summaries: dict[str, dict]) -> str:
             "- **Host-cadence hypothesis**: inconclusive (missing pass A or C)."
         )
 
-    # LBT falsification
-    if a is None and b is not None:
+    # LBT: prefer aggregate PER (A vs B at same cadence); fall back to cliff.
+    if per_a is not None and per_b is not None:
+        delta_ab = per_b - per_a
+        if delta_ab >= AGG_DELTA_PCT:
+            verdict_lines.append(
+                f"- **LBT-defer hypothesis**: aggregate PER A={per_a:.2f}% vs "
+                f"B={per_b:.2f}% (delta={delta_ab:+.2f} pp, threshold "
+                f">= {AGG_DELTA_PCT:.1f} pp). LBT-on adds measurable PER at "
+                "fixed cadence."
+            )
+        else:
+            verdict_lines.append(
+                f"- **LBT-defer hypothesis**: aggregate PER A={per_a:.2f}% vs "
+                f"B={per_b:.2f}% (delta={delta_ab:+.2f} pp). **FALSIFIED at "
+                "aggregate level**: LBT is not a major contributor at this "
+                "cadence."
+            )
+    elif a is None and b is not None:
         b_lbt_jumps = (b.get("abort_lbt_delta", 0) > 0) if b else False
         if b_lbt_jumps:
             verdict_lines.append(
@@ -197,7 +250,8 @@ def main(argv: list[str]) -> int:
     if not meta_path.exists():
         print(f"ERROR: {meta_path} not found")
         return 2
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    # PowerShell's `Out-File -Encoding utf8` writes a BOM on PS 5.1, so tolerate it.
+    meta = json.loads(meta_path.read_text(encoding="utf-8-sig"))
     summaries: dict[str, dict] = {}
     for p in meta.get("passes", []):
         name = p["name"]

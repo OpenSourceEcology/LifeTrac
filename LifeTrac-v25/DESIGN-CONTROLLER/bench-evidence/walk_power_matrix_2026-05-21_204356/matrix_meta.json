@@ -1,0 +1,32 @@
+﻿{
+    "boardB_rx":  "2E2C1209DABC240B",
+    "per_step_count":  50,
+    "run_start_ts_local":  "2026-05-21_204356",
+    "run_uuid":  "fbfcc984-9080-4e93-9501-3604a9b30304",
+    "orchestrator":  "walk_power_falsification_matrix.ps1",
+    "power_step":  1,
+    "boardA_tx":  "2D0A1209DABC240B",
+    "git_sha_short":  "156ee63",
+    "power_min":  2,
+    "power_max":  17,
+    "passes":  [
+                   {
+                       "inter_cycle_s":  0.05,
+                       "lbt":  0,
+                       "name":  "A",
+                       "rationale":  "Python loop stutter isolation (LBT off, slow cadence)"
+                   },
+                   {
+                       "inter_cycle_s":  0.05,
+                       "lbt":  1,
+                       "name":  "B",
+                       "rationale":  "LBT-defer hypothesis test (LBT on, slow cadence)"
+                   },
+                   {
+                       "inter_cycle_s":  0.02,
+                       "lbt":  0,
+                       "name":  "C",
+                       "rationale":  "Legacy cadence reproduction (LBT off, 20 ms inter-packet)"
+                   }
+               ]
+}

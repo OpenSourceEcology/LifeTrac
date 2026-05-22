@@ -78,6 +78,54 @@ function Resolve-RepoRoot {
 }
 
 $null = Get-Command adb -ErrorAction Stop
+
+# ---------------------------------------------------------------------------
+# P2 fix (2026-05-21): scoped-EAP adb wrapper.
+#
+# Under `$ErrorActionPreference = "Stop"`, PowerShell 5.1 treats any text
+# on a native command's stderr as a NativeCommandError record. `adb push`
+# / `adb pull` write their *success* transfer summary
+# ("N files pushed, 0 skipped. X MB/s …") to stderr, which then aborts
+# the script (or, when piped through `| Out-Null`, surfaces as a fatal-
+# looking red block in the tee log even though the push succeeded).
+#
+# `Invoke-AdbScoped` flips EAP to 'Continue' for the duration of the adb
+# call only, then checks `$LASTEXITCODE` itself so genuine adb failures
+# still abort. `-NoThrow` is provided for the `ls /tmp/ffmpeg` style
+# probe where rc!=0 is a legitimate "not present" signal.
+#
+# Regression fixture: tools/tests/adb_wrapper.Tests.ps1 (Pester).
+# ---------------------------------------------------------------------------
+function Invoke-AdbScoped {
+    [CmdletBinding()]
+    param(
+        [string]$Serial,
+        [Parameter(Mandatory)] [string[]]$AdbArgs,
+        [switch]$NoThrow,
+        [switch]$MergeStderr
+    )
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $cmd = @()
+        if ($Serial) { $cmd += @('-s', $Serial) }
+        $cmd += $AdbArgs
+        if ($MergeStderr) {
+            $out = & adb @cmd 2>&1
+        } else {
+            $out = & adb @cmd
+        }
+        $rc = $LASTEXITCODE
+        if ($rc -ne 0 -and -not $NoThrow) {
+            throw "adb $($cmd -join ' ') failed rc=$rc on serial='$Serial'"
+        }
+        # Return both rc and output so callers can branch on rc when -NoThrow.
+        return [pscustomobject]@{ Rc = $rc; Output = $out }
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+}
+
 if ($TxAdbSerial -eq $RxAdbSerial) {
     throw "TxAdbSerial and RxAdbSerial must differ."
 }
@@ -103,7 +151,7 @@ Write-Host "Host ffmpeg static: $hostFfmpeg (present=$(Test-Path -LiteralPath $h
 # ---------------------------------------------------------------------------
 # 1. Verify both boards are present.
 # ---------------------------------------------------------------------------
-$devicesOut = (& adb devices) | Out-String
+$devicesOut = (Invoke-AdbScoped -AdbArgs @('devices')).Output | Out-String
 foreach ($pair in @(@("TX", $TxAdbSerial), @("RX", $RxAdbSerial))) {
     if ($devicesOut -notmatch [regex]::Escape($pair[1])) {
         throw "$($pair[0]) board '$($pair[1])' not present in 'adb devices'."
@@ -116,23 +164,22 @@ Write-Host "Both boards present: TX=$TxAdbSerial RX=$RxAdbSerial"
 # ---------------------------------------------------------------------------
 foreach ($serial in @($TxAdbSerial, $RxAdbSerial)) {
     Write-Host "Pushing helper toolkit to $serial..."
-    & adb -s $serial push "$helperDir/." "/tmp/lifetrac_p0c/" | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "adb push to $serial failed (rc=$LASTEXITCODE)" }
-    & adb -s $serial exec-out "echo fio | sudo -S -p '' bash -lc 'chmod +x /tmp/lifetrac_p0c/*.sh'" | Out-Null
+    [void](Invoke-AdbScoped -Serial $serial -AdbArgs @('push', "$helperDir/.", '/tmp/lifetrac_p0c/'))
+    [void](Invoke-AdbScoped -Serial $serial -AdbArgs @('exec-out', "echo fio | sudo -S -p '' bash -lc 'chmod +x /tmp/lifetrac_p0c/*.sh'"))
 }
 
 # ---------------------------------------------------------------------------
 # 3. Ensure ffmpeg static binary present on the TX board.
 # ---------------------------------------------------------------------------
-$ffCheck = (& adb -s $TxAdbSerial exec-out "ls /tmp/ffmpeg 2>/dev/null") | Out-String
+# -NoThrow: ls returns rc=1 when /tmp/ffmpeg is absent (legitimate signal).
+$ffCheck = (Invoke-AdbScoped -Serial $TxAdbSerial -AdbArgs @('exec-out', 'ls /tmp/ffmpeg 2>/dev/null') -NoThrow).Output | Out-String
 if ([string]::IsNullOrWhiteSpace($ffCheck)) {
     if (-not (Test-Path -LiteralPath $hostFfmpeg)) {
         throw "ffmpeg missing on TX board and not found at host path: $hostFfmpeg"
     }
     Write-Host "Pushing ffmpeg static to TX board ($hostFfmpeg)..."
-    & adb -s $TxAdbSerial push $hostFfmpeg /tmp/ffmpeg | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "ffmpeg push failed (rc=$LASTEXITCODE)" }
-    & adb -s $TxAdbSerial exec-out "chmod +x /tmp/ffmpeg" | Out-Null
+    [void](Invoke-AdbScoped -Serial $TxAdbSerial -AdbArgs @('push', $hostFfmpeg, '/tmp/ffmpeg'))
+    [void](Invoke-AdbScoped -Serial $TxAdbSerial -AdbArgs @('exec-out', 'chmod +x /tmp/ffmpeg'))
 } else {
     Write-Host "ffmpeg already present on TX board."
 }
@@ -141,8 +188,9 @@ if ([string]::IsNullOrWhiteSpace($ffCheck)) {
 # 4. Capture one raw RGB frame on the TX board.
 # ---------------------------------------------------------------------------
 Write-Host "Capturing single RGB frame on TX board ($VideoDev)..."
-$capOut = & adb -s $TxAdbSerial exec-out "echo fio | sudo -S -p '' env LT_VIDEO_DEV=$VideoDev bash /tmp/lifetrac_p0c/w2_02_capture_raw_rgb.sh"
-$capRc = $LASTEXITCODE
+$capRes = Invoke-AdbScoped -Serial $TxAdbSerial -AdbArgs @('exec-out', "echo fio | sudo -S -p '' env LT_VIDEO_DEV=$VideoDev bash /tmp/lifetrac_p0c/w2_02_capture_raw_rgb.sh") -NoThrow
+$capOut = $capRes.Output
+$capRc = $capRes.Rc
 $capText = ($capOut | Out-String)
 Set-Content -LiteralPath (Join-Path $evidence "capture_stdout.txt") -Value $capText
 if ($capRc -ne 0 -or -not ($capText -match "__W2_02_CAPTURE_OK__")) {
@@ -152,8 +200,7 @@ Write-Host "Capture OK."
 
 # Pull raw RGB bytes.
 $rawLocal = Join-Path $evidence "frame.rgb"
-& adb -s $TxAdbSerial pull /tmp/w2_02_frame.rgb $rawLocal | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "adb pull failed (rc=$LASTEXITCODE)" }
+[void](Invoke-AdbScoped -Serial $TxAdbSerial -AdbArgs @('pull', '/tmp/w2_02_frame.rgb', $rawLocal))
 $rawSize = (Get-Item -LiteralPath $rawLocal).Length
 Write-Host "Pulled raw frame: $rawSize bytes"
 if ($rawSize -ne 294912) { throw "Raw frame size $rawSize != 294912 (RGB24 384x256)" }
@@ -191,8 +238,7 @@ Write-Host "Encoded $nFragments fragments (includes redundancy copies)."
 # ---------------------------------------------------------------------------
 # 6. Push fragments to TX board.
 # ---------------------------------------------------------------------------
-& adb -s $TxAdbSerial push $fragLocal /tmp/w2_02_fragments.hex | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "fragments push failed (rc=$LASTEXITCODE)" }
+[void](Invoke-AdbScoped -Serial $TxAdbSerial -AdbArgs @('push', $fragLocal, '/tmp/w2_02_fragments.hex'))
 
 # ---------------------------------------------------------------------------
 # 7. Plan RX window based on fragment count + airtime budget.
@@ -234,8 +280,8 @@ $rxRemoteCmd = "cd /tmp/lifetrac_p0c && echo fio | sudo -S -p '' python3 -u meth
 $rxWrapBody = "#!/bin/sh`n$rxRemoteCmd`nrc=`$?`nprintf '__METHOD_H_RC__=%s\n' `"`$rc`"`n"
 $rxWrapLocal = Join-Path $evidence "_rx_wrap.sh"
 [System.IO.File]::WriteAllText($rxWrapLocal, ($rxWrapBody -replace "`r`n", "`n"))
-& adb -s $RxAdbSerial push $rxWrapLocal /tmp/lifetrac_p0c/_rx_wrap.sh | Out-Null
-& adb -s $RxAdbSerial exec-out "chmod +x /tmp/lifetrac_p0c/_rx_wrap.sh" | Out-Null
+[void](Invoke-AdbScoped -Serial $RxAdbSerial -AdbArgs @('push', $rxWrapLocal, '/tmp/lifetrac_p0c/_rx_wrap.sh'))
+[void](Invoke-AdbScoped -Serial $RxAdbSerial -AdbArgs @('exec-out', 'chmod +x /tmp/lifetrac_p0c/_rx_wrap.sh'))
 
 Write-Host "Starting RX listener on $RxAdbSerial (window=${rxWindowS}s)..."
 $rxProc = Start-Process -FilePath "adb" `
@@ -280,13 +326,14 @@ printf '__METHOD_H_RC__=%s\n' "`$rc"
 "@
 $txWrapLocal = Join-Path $evidence "_tx_wrap.sh"
 [System.IO.File]::WriteAllText($txWrapLocal, ($txWrapBody -replace "`r`n", "`n"))
-& adb -s $TxAdbSerial push $txWrapLocal /tmp/lifetrac_p0c/_tx_wrap.sh | Out-Null
-& adb -s $TxAdbSerial exec-out "chmod +x /tmp/lifetrac_p0c/_tx_wrap.sh" | Out-Null
+[void](Invoke-AdbScoped -Serial $TxAdbSerial -AdbArgs @('push', $txWrapLocal, '/tmp/lifetrac_p0c/_tx_wrap.sh'))
+[void](Invoke-AdbScoped -Serial $TxAdbSerial -AdbArgs @('exec-out', 'chmod +x /tmp/lifetrac_p0c/_tx_wrap.sh'))
 
 Write-Host "Starting TX fragment burst on $TxAdbSerial ($nFragments fragments)..."
 $tStart = Get-Date
-$txOut = & adb -s $TxAdbSerial exec-out "bash /tmp/lifetrac_p0c/_tx_wrap.sh" 2>&1
-$txAdbRc = $LASTEXITCODE
+$txRes = Invoke-AdbScoped -Serial $TxAdbSerial -AdbArgs @('exec-out', 'bash /tmp/lifetrac_p0c/_tx_wrap.sh') -NoThrow -MergeStderr
+$txOut = $txRes.Output
+$txAdbRc = $txRes.Rc
 $tEnd = Get-Date
 $txText = ($txOut | Out-String)
 Set-Content -LiteralPath $txStdout -Value $txText

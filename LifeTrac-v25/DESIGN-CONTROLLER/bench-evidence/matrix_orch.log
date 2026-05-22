@@ -1,0 +1,30 @@
+﻿
+##############################################################
+## Pass A : LBT=0 inter_cycle_s=0.05
+## Python loop stutter isolation
+##############################################################
+RX listener window: 79 s
+103198 /bin/bash -c echo fio | sudo -S pkill -INT -f 'method_h_stage2.*rx_listen' 2>/dev/null; sleep 0.2; pgrep -af method_h_stage2 || echo no-residual
+
+Pass A : __WALK_POWER_STEP__ count = 16 ; RX __RX_FRAME__ count = 770
+
+##############################################################
+## Pass B : LBT=1 inter_cycle_s=0.05
+## LBT-defer hypothesis
+##############################################################
+RX listener window: 79 s
+103245 /bin/bash -c echo fio | sudo -S pkill -INT -f 'method_h_stage2.*rx_listen' 2>/dev/null; sleep 0.2; pgrep -af method_h_stage2 || echo no-residual
+
+Pass B : __WALK_POWER_STEP__ count = 16 ; RX __RX_FRAME__ count = 693
+
+##############################################################
+## Pass C : LBT=0 inter_cycle_s=0.02
+## Legacy cadence reproduction
+##############################################################
+RX listener window: 55 s
+103278 /bin/bash -c echo fio | sudo -S pkill -INT -f 'method_h_stage2.*rx_listen' 2>/dev/null; sleep 0.2; pgrep -af method_h_stage2 || echo no-residual
+
+Pass C : __WALK_POWER_STEP__ count = 16 ; RX __RX_FRAME__ count = 689
+
+=== Matrix complete: C:\Users\dorkm\Documents\GitHub\LifeTrac\LifeTrac-v25\tools\..\DESIGN-CONTROLLER\bench-evidence\walk_power_matrix_2026-05-21_204356 ===
+Run the analyzer next: py -3 LifeTrac-v25/tools/walk_power_matrix_analyze.py "C:\Users\dorkm\Documents\GitHub\LifeTrac\LifeTrac-v25\tools\..\DESIGN-CONTROLLER\bench-evidence\walk_power_matrix_2026-05-21_204356"
