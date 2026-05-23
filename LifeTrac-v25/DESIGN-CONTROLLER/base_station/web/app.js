@@ -220,14 +220,20 @@
   createPad('pad-right', 'rhx', 'rhy');
 
   // ----- Button strip -----
+  let screenButtons = 0;
+  let screenFlags = 0;
   document.querySelectorAll('.buttons button[data-btn]').forEach(btn => {
     const bit = 1 << parseInt(btn.dataset.btn, 10);
     const set = (down) => {
       if (controlsLocked) return;
-      if (down) state.buttons |= bit; else state.buttons &= ~bit;
+      if (down) screenButtons |= bit; else screenButtons &= ~bit;
       // Take-control button → also set flags bit0 while held.
       if (parseInt(btn.dataset.btn, 10) === 7) {
-        if (down) state.flags |= 0x01; else state.flags &= ~0x01;
+        if (down) screenFlags |= 0x01; else screenFlags &= ~0x01;
+      }
+      if (!gamepadActive) {
+        state.buttons = screenButtons;
+        state.flags = screenFlags;
       }
     };
     btn.addEventListener('pointerdown', () => set(true));
@@ -279,8 +285,8 @@
         pill.classList.remove('on');
         for (const k in prevButtons) prevButtons[k] = false;
         state.lhx = state.lhy = state.rhx = state.rhy = 0;
-        state.buttons = 0;
-        state.flags = 0;
+        state.buttons = screenButtons;
+        state.flags = screenFlags;
       }
       return;
     }
@@ -313,8 +319,8 @@
     }
     // Refresh hold-to-track edge memory for the buttons we report by level.
     [0, 1, 2, 3, 5].forEach(i => { prevButtons[i] = !!gp.buttons[i]?.pressed; });
-    state.buttons = buttons & 0xFFFF;
-    state.flags   = flags   & 0xFF;
+    state.buttons = (buttons | screenButtons) & 0xFFFF;
+    state.flags   = (flags | screenFlags) & 0xFF;
   }
   setInterval(pollGamepad, 20);   // 50 Hz
   window.addEventListener('gamepadconnected',    pollGamepad);

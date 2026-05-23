@@ -77,6 +77,30 @@
       grid-column: span 2; font-weight: 700; font-size: 18px; }
     .buttons button.takectl { background: var(--warn); color: #000; }
     #camera-switch button.active { background: #2a8; color: #fff; }
+    #image-panel {
+      position: relative;
+    }
+    #image-canvas,
+    #image-badges,
+    #image-staleness,
+    #image-detections,
+    #image-fade {
+      width: 100% !important;
+      height: auto !important;
+      image-rendering: pixelated;
+      border-radius: 8px;
+    }
+    #image-badges,
+    #image-staleness,
+    #image-detections,
+    #image-fade {
+      position: absolute !important;
+      top: 8px !important;
+      left: 8px !important;
+      width: calc(100% - 16px) !important;
+      height: calc(100% - 16px) !important;
+      pointer-events: none !important;
+    }
     footer {
       padding: 4px 16px; background: var(--panel);
       border-top: 1px solid #333; font-size: 12px; opacity: 0.85;
