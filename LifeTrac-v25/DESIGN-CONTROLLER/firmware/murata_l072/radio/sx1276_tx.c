@@ -26,7 +26,7 @@
 
 #define SX1276_IRQ_TX_DONE                 0x08U
 
-#define SX1276_TX_TIMEOUT_GUARD_US         50000UL
+#define SX1276_TX_TIMEOUT_GUARD_US         150000UL
 
 #ifdef LIFETRAC_FHSS_TX_ROUTED
 /*
@@ -41,7 +41,7 @@
  * that operators bisecting RFCO logs can distinguish "PLL not
  * locked yet" from "modem still in sleep/standby transition".
  */
-#define SX1276_TX_PLL_SETTLE_US            200UL
+#define SX1276_TX_PLL_SETTLE_US            1000UL
 #endif
 
 typedef enum sx1276_tx_state_e {

@@ -217,7 +217,7 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
 #ifdef LIFETRAC_FHSS_TX_ROUTED
 
 #ifndef SX1276_RX_PLL_SETTLE_US
-#define SX1276_RX_PLL_SETTLE_US     200UL
+#define SX1276_RX_PLL_SETTLE_US     1000UL
 #endif
 
 /* FCC-A6c-2-b/c file-statics: defined here (top of routed block) so

@@ -47,7 +47,7 @@ Write-Host "TX serial     : $TxAdbSerial"
 Write-Host "RX serial     : $RxAdbSerial"
 Write-Host "===================================================="
 
-$orchestrator = Join-Path $PSScriptRoot "run_w2_02_image_over_lora_end_to_end.ps1"
+$orchestrator = Join-Path $PSScriptRoot "run_w2_02_image_over_lora_end_to_end_v2.ps1"
 if (-not (Test-Path $orchestrator)) {
     throw "Orchestrator not found: $orchestrator"
 }

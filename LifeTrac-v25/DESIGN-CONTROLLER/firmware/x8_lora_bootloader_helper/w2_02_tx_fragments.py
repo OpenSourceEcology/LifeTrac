@@ -23,12 +23,12 @@ import sys
 import time
 
 # Same directory layout as the W1-10b orchestrator pushes: helper toolkit
-# lives at /tmp/lifetrac_p0c/ with method_h_stage2_tx_probe.py alongside.
+# lives at /tmp/lifetrac_p0c/ with method_h_stage2_tx_probe_v2.py alongside.
 _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from method_h_stage2_tx_probe import (  # noqa: E402
+from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     HostLink,
     HOST_TYPE_VER_REQ,
     HOST_TYPE_VER_URC,
@@ -40,6 +40,7 @@ from method_h_stage2_tx_probe import (  # noqa: E402
     drain_boot,
     drain_pending,
     wait_for_tx_done,
+    configure_regulatory_profile_if_needed,
 )
 
 
@@ -79,7 +80,17 @@ def main(argv=None) -> int:
 
     print(f"=== W2-02 TX: {n} fragments, uart={args.uart} ===")
     link = HostLink(args.uart, args.baud)
-    drain_boot(link, 1.0)
+    
+    # 2026-05-22 Phase 4 Optimization: Send a system reset request to the co-processor
+    # to ensure a clean start before burst transmission and clear any stuck states
+    print("Re-setting co-processor via HostLink system reset...")
+    try:
+        link.send(0x03)  # HOST_TYPE_RESET_REQ
+        drain_boot(link, settle_s=1.5)
+        print("Co-processor system reset complete.")
+    except Exception as exc:
+        print(f"WARN: System reset failed: {exc} (continuing)")
+
     try:
         link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=1.0)
     except Exception as exc:
@@ -87,6 +98,12 @@ def main(argv=None) -> int:
         print("__W2_02_TX_VERDICT__=TRANSPORT_FAIL")
         return 2
     drain_pending(link, quiet_s=0.25, max_s=1.0)
+
+    # 2026-05-22 Phase 4 fix: Set the regulatory profile before transmission, matching high safety limits
+    try:
+        configure_regulatory_profile_if_needed(link)
+    except Exception as exc:
+        print(f"WARN: configure_regulatory_profile_if_needed failed: {exc}")
 
     # LBT off (matches W1-10b TX_BURST rationale).
     try:

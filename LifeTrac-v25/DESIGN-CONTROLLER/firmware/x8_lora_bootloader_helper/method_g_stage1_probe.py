@@ -305,9 +305,12 @@ class HostLink:
         # without ever pulling new bytes, and request() spins until timeout.
         pending = list(self.urc_queue)
         self.urc_queue.clear()
+        unmatched_local = []
         while True:
             if not pending:
                 if time.time() >= deadline:
+                    if unmatched_local:
+                        self.urc_queue.extend(unmatched_local)
                     raise TimeoutError(
                         f"timeout waiting for response type 0x{rsp_type:02X} "
                         f"to req 0x{req_type:02X}"
@@ -320,7 +323,7 @@ class HostLink:
                     matched = (idx, frame)
                     break
                 if frame["type"] == HOST_TYPE_ERR_PROTO_URC and frame["seq"] == seq:
-                    self.urc_queue.extend(keep + pending[idx + 1:])
+                    self.urc_queue.extend(unmatched_local + keep + pending[idx + 1:])
                     details = format_err_proto_payload(frame["payload"])
                     raise RuntimeError(f"ERR_PROTO for req 0x{req_type:02X}: {details}")
                 # Stale type-match (response from prior request that was
@@ -335,13 +338,12 @@ class HostLink:
             if matched is not None:
                 idx, frame = matched
                 leftovers = keep + pending[idx + 1:]
-                if leftovers:
-                    self.urc_queue.extend(leftovers)
+                self.urc_queue.extend(unmatched_local + leftovers)
                 return frame
-            # No match in this batch — keep unrelated frames for later
-            # consumers, then drop back to the wire-read path.
+            # No match in this batch — keep unrelated frames locally,
+            # then drop back to the wire-read path.
             if keep:
-                self.urc_queue.extend(keep)
+                unmatched_local.extend(keep)
             pending = []
 
 

@@ -1,0 +1,32 @@
+7[r[999;999H[6nMODE: rx_listen
+dev=/dev/ttymxc3 baud=921600
+Re-setting co-processor via HostLink system reset...
+BOOT_URC observed during settle (payload=000112010201)
+INFO: drained type=0xF2 seq=0 during boot settle
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x08 sub=0x01 raw=08010000000000000000000000000000000000000e000000
+Co-processor system reset complete.
+Initializing regulatory profile on co-processor...
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+CFG_SET_REQ(REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) OK: 14000100
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x09 sub=0x01 lanes=LPUART1 raw=09010000000000000000000000000000000000008f020000
+STATS_URC(boot) drained seq=0 (unsolicited snapshot — discarding so it can't poison later request() calls)
+RUNTIME_PROFILE_ENUM=1
+__PROFILE_DRAINED__=0
+__PROFILE_ATTEMPTS__=1
+=== W1-10b probe RX_LISTEN: window=173.0s ===
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+RX_LISTEN: STATS(before) radio_rx_ok=0 radio_crc_err=0 radio_state=4
+RX_LISTEN: RegOpMode(pre)=0x85 (expected 0x85)
+__V2_AUTOWAKE__ opmode_pre=0x85 opmode_post=0x85 action=none
+__W1_10B_LISTEN_READY__
+__RX_FAULT__ code=0x0D sub=0x20 raw=0d200000000000000000000000000000000000003e750000
+__RX_FAULT__ code=0x0D sub=0x21 raw=0d210000000000000000000000000000000000006eea0000
+__RX_FAULT__ code=0x0D sub=0x22 raw=0d220000000000000000000000000000000000009e5f0100
+__RX_FAULT__ code=0x0D sub=0xA3 raw=0da3000000000000000000000000000000000000ced40100
+RX_LISTEN: STATS(after) radio_rx_ok=0 (delta=0) radio_crc_err=1 (delta=1)
+__W1_10B_LISTEN_DONE__ rx_frames=0 radio_rx_ok_delta=0 radio_crc_err_delta=1 real_faults=4 invariants_violated=0 stopped_by_signal=0
+__RADIO_SLEEP_ON_EXIT__ (rx_listen) ack=0180 RegOpMode(post)=0x80 (target=0x80)
+__METHOD_H_RC__=0

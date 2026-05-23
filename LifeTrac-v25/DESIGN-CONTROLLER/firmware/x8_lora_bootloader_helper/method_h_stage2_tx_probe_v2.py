@@ -33,6 +33,12 @@ import argparse
 import struct
 import sys
 import time
+import builtins
+
+# Force unbuffered stdout output for all prints in this module to avoid buffering in pipes
+def print(*args, **kwargs):
+    kwargs.setdefault('flush', True)
+    builtins.print(*args, **kwargs)
 
 # Reuse all the framing / link helpers from the Stage 1 probe.  The two
 # scripts live in the same directory on the X8 (/tmp/lifetrac_p0c).
@@ -105,6 +111,24 @@ HOST_TYPE_REG_READ_REQ = 0x30
 HOST_TYPE_REG_WRITE_REQ = 0x31
 HOST_TYPE_REG_DATA_URC = 0xB0
 HOST_TYPE_REG_WRITE_ACK_URC = 0xB1
+
+# P3 host pacing constants matching w2_02_host_pipeline.py authority
+MIN_LORA_HOST_INTER_CYCLE_S = 0.05
+
+def clamp_inter_cycle_s(requested_s: float) -> float:
+    """Enforce MIN_LORA_HOST_INTER_CYCLE_S = 0.05 with a warning if lower.
+    Cites walk_power_falsification_matrix 2026-05-21 and §15.247 spacing headroom.
+    """
+    if requested_s < MIN_LORA_HOST_INTER_CYCLE_S:
+        print(
+            "P3-CLAMP: requested inter_cycle_s={:.4f} < min {:.4f}; "
+            "raising to floor (walk_power matrix 2026-05-21).".format(
+                requested_s, MIN_LORA_HOST_INTER_CYCLE_S
+            )
+        )
+        sys.stdout.flush()
+        return MIN_LORA_HOST_INTER_CYCLE_S
+    return requested_s
 
 CFG_KEY_LBT_ENABLE = 0x03
 # 2026-05-18 S1.1: TX-power adapter sweep (`--probe walk_power`). Mirrors
@@ -1253,6 +1277,7 @@ def run_tx_burst(link: HostLink, count: int = 100, inter_s: float = 0.2,
     successful TX_DONE_URC. Final summary on `__W1_10B_BURST_DONE__`.
     """
     import os as _os
+    inter_s = clamp_inter_cycle_s(inter_s)
     print(f"=== W1-10b probe TX_BURST: count={count} inter={inter_s:.2f}s "
           f"timeout={timeout:.1f}s ===")
     drain_boot(link, 1.0)
@@ -1466,6 +1491,7 @@ def run_walk_power(link: HostLink,
     any step's CFG_SET timed out; returns 2 on transport-fatal."""
     import os as _os
     import datetime as _dt
+    inter_s = clamp_inter_cycle_s(inter_s)
 
     if power_step <= 0:
         print(f"FATAL: --power-step must be > 0 (got {power_step})")
@@ -1875,6 +1901,7 @@ def run_ping_pong(link: "HostLink", count: int = 100, inter_s: float = 0.2,
     (deferred).
     """
     import os as _os
+    inter_s = clamp_inter_cycle_s(inter_s)
     print(f"=== W1-11 probe PING_PONG: count={count} inter={inter_s:.2f}s "
           f"tx_timeout={timeout:.1f}s rtt_timeout={rtt_timeout:.1f}s ===")
     drain_boot(link, 1.0)
@@ -2482,6 +2509,16 @@ def main(argv=None) -> int:
         _emit_progress("link_open_failed", err=type(exc).__name__)
         return 2
     _emit_progress("link_open_ok")
+
+    # 2026-05-22 Phase 4 Optimization: Send a system reset request to the co-processor
+    # to clear any potential previous fault states (like RX_SCAN_FAILED stuck state)
+    print("Re-setting co-processor via HostLink system reset...")
+    try:
+        link.send(0x03)  # HOST_TYPE_RESET_REQ
+        drain_boot(link, settle_s=1.5)
+        print("Co-processor system reset complete.")
+    except Exception as exc:
+        print(f"WARN: System reset failed or timed out: {exc} (continuing)")
 
     # Configure regulatory profile so the FHSS scheduler is initialized
     configure_regulatory_profile_if_needed(link)

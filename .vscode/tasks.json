@@ -132,6 +132,13 @@
 			"label": "Pull Frame",
 			"type": "shell",
 			"command": "adb pull /tmp/test_frame.jpg .\\test_frame.jpg"
+		},
+		{
+			"label": "Build L072 Radio Firmware",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build.ps1",
+			"isBackground": false,
+			"group": "build"
 		}
 	]
 }

@@ -1,0 +1,20 @@
+7[r[999;999H[6nMODE: rx_listen
+dev=/dev/ttymxc3 baud=921600
+Initializing regulatory profile on co-processor...
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+CFG_SET_REQ(REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) OK: 14000100
+RUNTIME_PROFILE_ENUM=1
+__PROFILE_DRAINED__=0
+__PROFILE_ATTEMPTS__=1
+=== W1-10b probe RX_LISTEN: window=146.0s ===
+RX_LISTEN: STATS(before) radio_rx_ok=0 radio_crc_err=0 radio_state=4
+RX_LISTEN: RegOpMode(pre)=0x80 (expected 0x85)
+__V2_AUTOWAKE__ opmode_pre=0x80 opmode_post=0x85 action=write
+__W1_10B_LISTEN_READY__
+__RX_FAULT__ code=0x0D sub=0xA3 raw=0da3000000000000000000000000000000000000ced40100
+RX_LISTEN: STATS(after) radio_rx_ok=0 (delta=0) radio_crc_err=0 (delta=0)
+__W1_10B_LISTEN_DONE__ rx_frames=0 radio_rx_ok_delta=0 radio_crc_err_delta=0 real_faults=1 invariants_violated=0 stopped_by_signal=0
+__RADIO_SLEEP_ON_EXIT__ (rx_listen) ack=0180 RegOpMode(post)=0x80 (target=0x80)
+__METHOD_H_RC__=0

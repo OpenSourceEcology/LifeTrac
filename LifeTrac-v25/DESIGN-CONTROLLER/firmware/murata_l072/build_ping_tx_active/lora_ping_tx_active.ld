@@ -3,17 +3,15 @@ OUTPUT_ARCH(arm)
 ENTRY(Reset_Handler)
 MEMORY
 {
-    BOOT (rx) : ORIGIN = 0x08000000, LENGTH = (4 * 1024)
-    APP (rx) : ORIGIN = (0x08000000 + (4 * 1024)), LENGTH = (180 * 1024)
-    CFG (r) : ORIGIN = ((0x08000000 + (4 * 1024)) + (180 * 1024)), LENGTH = (8 * 1024)
+    FLASH (rx) : ORIGIN = 0x08000000, LENGTH = (192 * 1024)
+    CFG (r) : ORIGIN = (0x08000000 + 0x2E000), LENGTH = (8 * 1024)
     RAM (rwx) : ORIGIN = 0x20000000, LENGTH = (20 * 1024)
 }
 _estack = (0x20000000 + (20 * 1024));
 _stack_size = (2560);
 _stack_bottom = ((0x20000000 + (20 * 1024)) - (2560));
-_boot_start = 0x08000000; _boot_end = 0x08000000 + (4 * 1024);
-_app_start = (0x08000000 + (4 * 1024)); _app_end = (0x08000000 + (4 * 1024)) + (180 * 1024);
-_cfg_start = ((0x08000000 + (4 * 1024)) + (180 * 1024)); _cfg_end = ((0x08000000 + (4 * 1024)) + (180 * 1024)) + (8 * 1024);
+_app_start = 0x08000000; _app_end = 0x08000000 + (192 * 1024);
+_cfg_start = (0x08000000 + 0x2E000); _cfg_end = (0x08000000 + 0x2E000) + (8 * 1024);
 SECTIONS
 {
     .isr_vector :
@@ -21,21 +19,7 @@ SECTIONS
         . = ALIGN(4);
         KEEP(*(.isr_vector))
         . = ALIGN(4);
-    } > BOOT
-    .boot_text :
-    {
-        . = ALIGN(4);
-        KEEP(*(.boot_text))
-        KEEP(*(.boot_text.*))
-        . = ALIGN(4);
-    } > BOOT
-    .boot_rodata :
-    {
-        . = ALIGN(4);
-        KEEP(*(.boot_rodata))
-        KEEP(*(.boot_rodata.*))
-        . = ALIGN(4);
-    } > BOOT
+    } > FLASH
     .text :
     {
         . = ALIGN(4);
@@ -48,17 +32,17 @@ SECTIONS
         *(.eh_frame)
         . = ALIGN(4);
         _etext = .;
-    } > APP
+    } > FLASH
     .ARM.extab :
     {
         *(.ARM.extab* .gnu.linkonce.armextab.*)
-    } > APP
+    } > FLASH
     .ARM :
     {
         __exidx_start = .;
         *(.ARM.exidx*)
         __exidx_end = .;
-    } > APP
+    } > FLASH
     _sidata = LOADADDR(.data);
     .data :
     {
@@ -68,7 +52,7 @@ SECTIONS
         *(.data.*)
         . = ALIGN(4);
         _edata = .;
-    } > RAM AT> APP
+    } > RAM AT> FLASH
     .noinit (NOLOAD) :
     {
         . = ALIGN(4);
@@ -114,9 +98,7 @@ SECTIONS
         *(.comment)
     }
 }
-ASSERT((4 * 1024) + (180 * 1024) + (8 * 1024) == (192 * 1024),
-       "Linker: Flash regions must sum to 192 KB");
-ASSERT(0x08000000 == 0x08000000,
-       "Linker: BOOT must start at Flash base");
-ASSERT(((0x08000000 + (4 * 1024)) + (180 * 1024)) + (8 * 1024) == (0x08000000 + (192 * 1024)),
-       "Linker: CFG must end exactly at Flash end");
+ASSERT(0x08000000 + (192 * 1024) == ((0x08000000 + 0x2E000) + (8 * 1024)),
+       "Linker: FLASH + CFG must cover full 192 KB");
+ASSERT((0x08000000 + 0x2E000) >= 0x08000000,
+       "Linker: CFG region must fall within overall memory");
