@@ -1,0 +1,129 @@
+{
+  "stamp": "2026-05-22_201518",
+  "probe": "tx_burst",
+  "rx_serial": "2E2C1209DABC240B",
+  "tx_serial": "2D0A1209DABC240B",
+  "cycles": 50,
+  "inter_cycle_s": 0.2,
+  "rx_window_s": 51,
+  "tx_done_ok": 0,
+  "tx_done_rate": 0,
+  "tx_timeouts": 0,
+  "rx_frames_received": 0,
+  "rx_match": 0,
+  "rx_orphan": 0,
+  "rx_match_rate": 0,
+  "rssi_median_dbm": null,
+  "snr_median_db": null,
+  "radio_tx_abort_airtime_delta": 999,
+  "tx_real_faults": 999,
+  "rx_real_faults": 1,
+  "tx_invariants_violated": 999,
+  "rx_invariants_violated": 0,
+  "rtt_match_rate": null,
+  "rtt_count": 0,
+  "rtt_ms_p50": null,
+  "rtt_ms_p99": null,
+  "rtt_ms_max": null,
+  "gates": [
+    {
+      "id": "B1",
+      "label": "tx_done_rate >= 0.99 (got 0)",
+      "ok": false
+    },
+    {
+      "id": "B2",
+      "label": "rx_match_rate >= 0.99 (got 0)",
+      "ok": false
+    },
+    {
+      "id": "B3",
+      "label": "radio_tx_abort_airtime_delta == 0 (got 999)",
+      "ok": false
+    },
+    {
+      "id": "B4",
+      "label": "no real FAULT_URC (tx=999 rx=1)",
+      "ok": false
+    },
+    {
+      "id": "B5",
+      "label": "host invariants stable (tx_violated=999 rx_violated=0)",
+      "ok": false
+    },
+    {
+      "id": "B6",
+      "label": "median RSSI in [-120,-30] dBm (got )",
+      "ok": false
+    }
+  ],
+  "verdict": "RX_PAIR_FAIL_6_GATES",
+  "latency": {
+    "evidence_dir": "C:\\Users\\dorkm\\Documents\\GitHub\\LifeTrac\\LifeTrac-v25\\DESIGN-CONTROLLER\\bench-evidence\\W1-10b_rx_pair_2026-05-22_201518",
+    "tx_done_count": 0,
+    "tx_done_ok_count": 0,
+    "rx_frame_count": 0,
+    "matched_pair_count": 0,
+    "toa_ms": {
+      "n": 0,
+      "min": 0.0,
+      "p50": 0.0,
+      "p90": 0.0,
+      "p95": 0.0,
+      "p99": 0.0,
+      "p999": 0.0,
+      "max": 0.0,
+      "mean": 0.0,
+      "stdev": 0.0
+    },
+    "elapsed_ms": {
+      "n": 0,
+      "min": 0.0,
+      "p50": 0.0,
+      "p90": 0.0,
+      "p95": 0.0,
+      "p99": 0.0,
+      "p999": 0.0,
+      "max": 0.0,
+      "mean": 0.0,
+      "stdev": 0.0
+    },
+    "rx_inter_arrival_ms": {
+      "n": 0,
+      "min": 0.0,
+      "p50": 0.0,
+      "p90": 0.0,
+      "p95": 0.0,
+      "p99": 0.0,
+      "p999": 0.0,
+      "max": 0.0,
+      "mean": 0.0,
+      "stdev": 0.0
+    },
+    "rtt_estimate_ms": {
+      "p50": 0.0,
+      "p99": 0.0
+    },
+    "budget_predictions": {
+      "toa_sf7_bw125_ms": 30.0,
+      "host_overhead_ms": 21.0,
+      "w4_00b_target_ms": 90.0,
+      "w4_00b_window_ms": 4.5
+    },
+    "verdicts": {
+      "toa_match_pct": null,
+      "w4_00b_within_5pct": null,
+      "w4_00b_within_5pct_pingpong": null
+    },
+    "pingpong_rtt_ms": null,
+    "pingpong_rtt_raw_ms": null,
+    "pingpong_rtt_censoring": {
+      "rtt_timeout_s_detected": null,
+      "rtt_timeout_s_effective": null,
+      "rtt_censor_margin_ms": 20.0,
+      "raw_sample_count": 0,
+      "censored_near_timeout_count": 0,
+      "explicit_timeout_count": 0
+    }
+  }
+}

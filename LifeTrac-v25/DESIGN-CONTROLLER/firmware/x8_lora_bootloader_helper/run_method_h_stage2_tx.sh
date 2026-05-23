@@ -28,7 +28,7 @@ if [ -n "$INTER_CYCLE_S" ]; then EXTRA_ARGS="$EXTRA_ARGS --inter-cycle-s $INTER_
 if [ -n "$RTT_TIMEOUT" ]; then EXTRA_ARGS="$EXTRA_ARGS --rtt-timeout $RTT_TIMEOUT"; fi
 
 TOOLDIR=/tmp/lifetrac_p0c
-PROBE=$TOOLDIR/method_h_stage2_tx_probe.py
+PROBE=$TOOLDIR/method_h_stage2_tx_probe_v2.py
 STAGE1_PROBE=$TOOLDIR/method_g_stage1_probe.py
 CFG_BOOT=$TOOLDIR/08_boot_user_app.cfg
 DEV_LIST_DEFAULT="/dev/ttymxc3 /dev/ttymxc2 /dev/ttymxc1 /dev/ttymxc0"

@@ -123,6 +123,12 @@ Write-Host "Probe pair: rx=$rxMode tx=$txMode"
 # 3. Push helper toolkit to both boards.
 # ---------------------------------------------------------------------------
 foreach ($serial in @($RxAdbSerial, $TxAdbSerial)) {
+    Write-Host "Running GPIO preflight on $serial..."
+    $gpioPreflight = 'for n in 8 10 15; do [ -d /sys/class/gpio/gpio$n ] || echo $n > /sys/class/gpio/export 2>/dev/null; done; echo out > /sys/class/gpio/gpio10/direction 2>/dev/null; echo 1 > /sys/class/gpio/gpio10/value 2>/dev/null; sleep 1; cat /sys/class/gpio/gpio10/value'
+    $gpioPreflightRemote = "echo fio | sudo -S -p '' bash -lc '$gpioPreflight'"
+    & adb -s $serial exec-out $gpioPreflightRemote | Out-Null
+    Write-Host "GPIO preflight on $serial complete."
+
     Write-Host "Pushing helper toolkit to $serial..."
     & adb -s $serial push "$helperDir/." "/tmp/lifetrac_p0c/" | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "adb push to $serial failed (rc=$LASTEXITCODE)" }
