@@ -223,7 +223,7 @@ if ($wakeText -notmatch "__W2_02_WAKE_OK__") {
     throw "RX wake to RXCONT failed. See $((Join-Path $evidence 'rx_wake.log'))"
 }
 
-$rxRemoteCmd = "cd /tmp/lifetrac_p0c && echo fio | sudo -S -p '' python3 -u method_h_stage2_tx_probe.py --dev /dev/ttymxc3 --baud 921600 --probe rx_listen --rx-window $rxWindowS"
+$rxRemoteCmd = "cd /tmp/lifetrac_p0c && echo fio | sudo -S -p '' python3 -u method_h_stage2_tx_probe_v2.py --dev /dev/ttymxc3 --baud 921600 --probe rx_listen --rx-window $rxWindowS"
 $rxWrapBody = "#!/bin/sh`n$rxRemoteCmd`nrc=`$?`nprintf '__METHOD_H_RC__=%s\n' `"`$rc`"`n"
 $rxWrapLocal = Join-Path $evidence "_rx_wrap.sh"
 [System.IO.File]::WriteAllText($rxWrapLocal, ($rxWrapBody -replace "`r`n", "`n"))

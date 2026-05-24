@@ -46,7 +46,7 @@ The v25 BOM ([`HARDWARE_BOM.md`](../HARDWARE_BOM.md)) is **mostly sufficient**. 
 | Wheel/track odometry | — | Optional: hall-effect or magnetic on each track sprocket (~$30) |
 | Steering actuator | manual joystick → hydraulic valves (already) | None; autonomy commands the same valve coils via `lora_proto` |
 | Throttle | — | **New**: a way to command engine throttle (servo on the throttle linkage, or J1939 if engine ECU supports it). Currently operator-only. |
-| Compute | Portenta X8 Linux (already) | Sufficient for waypoint follow / pure-pursuit. Add a Coral USB Accelerator (~$60) only if onboard vision-based obstacle detection is in scope. |
+| Compute | Portenta X8 Linux (already) | Sufficient for waypoint follow / pure-pursuit, as well as vision-based obstacle detection using optimized **NanoDet-Plus (320x320 INT8)** on the native CPU cores. No hardware accelerator is required. |
 | Obstacle sense | UVC webcam (already) | Optional: time-of-flight or 2D LiDAR (~$200) for obstacle stop |
 | Bumper kill switches | — | **Recommended**: front and rear contact switches into the PSR safety relay chain |
 
@@ -227,10 +227,10 @@ This is the lowest-bar autonomy capability *and* the one most relevant to v25 �
 │                                                                   │
 │  USB cam ──► v4l2 ──► obstacle_detector.py ──► IPC flag ──┐      │
 │  (Kurokesu)         │                                       │      │
-│                     ├─ Coral USB Accelerator (TPU)         │      │
-│                     │  running an Edge TPU person/animal    │      │
-│                     │  detector (e.g. MobileNet-SSD,        │      │
-│                     │  EfficientDet-Lite, YOLOv8n)          │      │
+│                     ├─ X8 CPU Cores (Arm A53)              │      │
+│                     │  running a lightweight, NEON-baked    │      │
+│                     │  NanoDet-Plus (320x320 INT8)          │      │
+│                     │  person/animal detector (<= 50 ms)    │      │
 │                     │                                        ▼      │
 │                     └─ publishes safety/obstacle_event   ┌────────┐│
 │                                                          │ M7/M4  ││
@@ -253,7 +253,7 @@ The **safety-relevant path is the IPC flag from X8 → H747** (a few ms). The Lo
 
 | Item | Cost | Notes |
 |---|---:|---|
-| Google Coral USB Accelerator (TPU) | $60 | Inference offload from X8 CPU. Without it, MobileNet runs at ~5 fps on the X8 CPU (marginal); with it, ~30+ fps headroom. |
+| NanoDet-Plus INT8 Weights | $0 | Leverage optimized ONNX Runtime directly on the X8 A53 CPU cores. Real-time vision-based labeling runs at <= 50 ms per frame with a very mild single-core CPU allocation. No hardware accelerators needed. |
 | Bumper kill switches (front + rear, contact / pull-cord) | $20–40 | Wired into the **PSR safety relay chain**, NOT into a software input. This is the redundant non-software safety. Vision is the *first* line; the bumper is the *unconditional* line. |
 | Existing Kurokesu C2-290C front cam | $0 | Already in BOM. Sufficient for ~10–15 m person detection at 1080p. |
 | (Optional) RPLIDAR A2M12 or similar 2D LiDAR | $200 | Better in fog/rain/dust where vision degrades. Defer until vision-only is proven inadequate. |
@@ -275,7 +275,7 @@ These are the **hooks**, not the implementation:
 
 If/when implemented:
 
-- **Detection latency budget:** ≤ 250 ms from object entering frame to valves de-energized. (Inference ≤ 50 ms on Coral, IPC ≤ 5 ms, M4 latch ≤ 10 ms, valve-side stop per [`LATENCY_BUDGET.md`](LATENCY_BUDGET.md) items #10–#13.)
+- **Detection latency budget:** ≤ 250 ms from object entering frame to valves de-energized. (Inference ≤ 50 ms on X8 CPU via NanoDet-Plus INT8, IPC ≤ 5 ms, M4 latch ≤ 10 ms, valve-side stop per [`LATENCY_BUDGET.md`](LATENCY_BUDGET.md) items #10–#13.)
 - **Detection range:** ≥ 5 m for a standing adult at 1080p with a 60° HFOV lens.
 - **False-positive policy:** `confidence_pct ≥ 70%` AND object persists ≥ 3 frames before triggering. Single-frame detections are logged but do not stop. Operator can re-tune thresholds in `params_service.py`.
 - **Recovery:** stop is latched. Operator must press CLEAR ESTOP on the base or handheld (same UX as any other E-stop). No auto-clear.
@@ -306,7 +306,7 @@ Concrete cheap actions that keep future-release options open without expanding v
 
 - **Wire one D1608S input as a future bumper-switch loop.** Suggest input **I12**, terminated to a screw block on the enclosure with a "FUTURE: BUMPER" label. Document in [`TRACTOR_NODE.md`](../TRACTOR_NODE.md) wiring diagram.
 - **Mount the front Kurokesu camera with a 60–90° HFOV lens** rather than the narrowest available option, so a future obstacle-detector has useful field of view.
-- **Leave a USB-A port free on the tractor X8** (do not consume all of them with cameras and the FT232H). The Coral USB Accelerator and the FT232H both want USB-A.
+- **Leave a USB-A port free on the tractor X8** (do not consume all of them with cameras). The cameras and the FT232H want USB-A access.
 - **Reserve ~2 GB of free space on the X8 eMMC** for future model weights and a small log of obstacle events.
 - **Run a 4-conductor cable from the cab to the front bumper** when assembling the harness, even if no switches are mounted. Pulling cable later through finished hydraulics is painful.
 
@@ -318,7 +318,7 @@ Concrete cheap actions that keep future-release options open without expanding v
 
 ### 10.4 Out of scope for v25 (do NOT do)
 
-- Do not buy the Coral, RTK GPS, throttle actuator, or LiDAR for v25. The §10.2 / §10.3 changes are sufficient hooks.
+- Do not buy the RTK GPS, throttle actuator, or LiDAR for v25. The §10.2 / §10.3 changes are sufficient hooks.
 - Do not implement `CMD_AUTO_*` or `CMD_OBSTACLE_STOP` handlers beyond the "log and ignore" stub above.
 - Do not commit any model weights or vision pipeline code to `firmware/tractor_x8/`.
 - Do not expand the §5 bring-up gate or §8.15 field-test gate to include autonomy criteria.

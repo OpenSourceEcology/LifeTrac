@@ -43,6 +43,64 @@
     return 'unknown';
   }
 
+  let lastSource = null;
+  function playHandoffAudioCue(newSource) {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      const now = ctx.currentTime;
+      if (newSource === 'base') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.linearRampToValueAtTime(880, now + 0.15);
+        osc.frequency.setValueAtTime(880, now + 0.15);
+        osc.frequency.linearRampToValueAtTime(1320, now + 0.3);
+        
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      } else {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(660, now);
+        osc.frequency.linearRampToValueAtTime(330, now + 0.2);
+        
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+      }
+
+      if ('speechSynthesis' in window) {
+        let msgStr = "";
+        if (newSource === 'base') {
+          msgStr = "Operator control active";
+        } else if (newSource === 'handheld') {
+          msgStr = "Handheld controller active";
+        } else if (newSource === 'autonomy') {
+          msgStr = "Autonomous steering active";
+        } else {
+          msgStr = "Control authority " + newSource;
+        }
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(msgStr);
+        utterance.rate = 1.15;
+        utterance.pitch = 1.0;
+        utterance.volume = 0.6;
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (e) {
+      console.warn("Audio feedback play failed:", e);
+    }
+  }
+
   function setSource(value) {
     const source = normalizeSource(value);
     document.getElementById('t-src').textContent = source;
@@ -58,6 +116,10 @@
       state.buttons = 0;
       state.flags = 0;
     }
+    if (lastSource !== null && lastSource !== source) {
+      playHandoffAudioCue(source);
+    }
+    lastSource = source;
   }
 
   function pct(value) {
@@ -156,7 +218,25 @@
         meta.textContent = 'decode err: ' + e.message;
       }
     });
-    wsImg.addEventListener('close', () => { meta.textContent = 'image link closed'; });
+
+    let stateFrames = 0;
+    let stateLastTs = performance.now();
+    window.addEventListener('lifetrac-state', (ev) => {
+      stateFrames++;
+      const now = performance.now();
+      if (now - stateLastTs > 1000) {
+        meta.textContent = `${stateFrames} Hz · tile stream`;
+        stateFrames = 0;
+        stateLastTs = now;
+      }
+    });
+
+    wsImg.addEventListener('close', () => {
+      // If we are actively receiving state stream updates, don't show closed legacy image link message.
+      if (performance.now() - stateLastTs > 2000) {
+        meta.textContent = 'image link closed';
+      }
+    });
     setInterval(() => {
       if (wsImg.readyState === WebSocket.OPEN) wsImg.send('ping');
     }, 5000);

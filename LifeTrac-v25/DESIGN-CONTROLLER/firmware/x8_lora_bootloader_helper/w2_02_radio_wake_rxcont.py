@@ -34,7 +34,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
 from method_g_stage1_probe import HostLink  # noqa: E402
-from method_h_stage2_tx_probe import (  # noqa: E402
+from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     drain_boot,
     drain_pending,
     read_reg,

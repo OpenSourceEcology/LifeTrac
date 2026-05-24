@@ -43,16 +43,19 @@
     main {
       display: grid;
       grid-template-columns: 1fr 1fr 280px;
-      gap: 16px;
-      padding: 16px;
-      height: calc(100% - 90px);
+      grid-template-rows: 1.2fr auto auto 1fr;
+      gap: 12px;
+      padding: 12px;
+      height: calc(100% - 80px);
+      box-sizing: border-box;
     }
     .joystick-pad {
       background: var(--panel); border-radius: 12px;
       display: flex; align-items: center; justify-content: center;
       position: relative; user-select: none;
+      min-height: 0;
     }
-    .joystick-pad canvas { width: 100%; height: 100%; }
+    .joystick-pad canvas { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
     .joystick-pad .label {
       position: absolute; top: 8px; left: 12px; font-size: 12px; opacity: 0.7;
     }
@@ -64,6 +67,9 @@
       background: var(--panel); border-radius: 12px; padding: 16px;
       display: flex; flex-direction: column; gap: 8px; font-family: ui-monospace, monospace;
       font-size: 13px;
+      grid-row: 1 / span 4;
+      min-height: 0;
+      overflow-y: auto;
     }
     aside h3 { margin: 0 0 8px 0; font-size: 13px; opacity: 0.7; text-transform: uppercase; }
     .row { display: flex; justify-content: space-between; }
@@ -79,6 +85,18 @@
     #camera-switch button.active { background: #2a8; color: #fff; }
     #image-panel {
       position: relative;
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 0;
+    }
+    .image-wrapper {
+      position: relative;
+      height: 100%;
+      aspect-ratio: 1.5; /* 384 / 256 = 1.5 */
     }
     #image-canvas,
     #image-badges,
@@ -86,7 +104,7 @@
     #image-detections,
     #image-fade {
       width: 100% !important;
-      height: auto !important;
+      height: 100% !important;
       image-rendering: pixelated;
       border-radius: 8px;
     }
@@ -95,10 +113,8 @@
     #image-detections,
     #image-fade {
       position: absolute !important;
-      top: 8px !important;
-      left: 8px !important;
-      width: calc(100% - 16px) !important;
-      height: calc(100% - 16px) !important;
+      top: 0 !important;
+      left: 0 !important;
       pointer-events: none !important;
     }
     footer {
@@ -169,16 +185,14 @@
       ones stay as the last received pixel data per the I/P scheme.
       Spans both joystick columns; sidebar untouched.
     -->
-    <div id="image-panel" style="grid-column: 1 / span 2;
-                                  background: var(--panel); border-radius: 12px;
-                                  padding: 8px; position: relative;">
-      <canvas id="image-canvas" width="384" height="256"
-              style="width: 100%; height: auto; image-rendering: pixelated;
-                     background: #000; border-radius: 8px;"></canvas>
-      <div id="image-meta" style="position: absolute; top: 12px; right: 16px;
-                                   font-family: ui-monospace, monospace;
-                                   font-size: 11px; opacity: 0.8;">
-        no image
+    <div id="image-panel" style="grid-column: 1 / span 2;">
+      <div class="image-wrapper">
+        <canvas id="image-canvas" width="384" height="256" style="background:#000;"></canvas>
+        <div id="image-meta" style="position: absolute; top: 12px; right: 16px;
+                                     font-family: ui-monospace, monospace;
+                                     font-size: 11px; opacity: 0.8; z-index: 20;">
+          no image
+        </div>
       </div>
     </div>
   </main>
@@ -208,13 +222,13 @@
     body.raw-mode #image-badges,
     body.raw-mode #image-detections { display: none !important; }
   </style>
-  <script src="/static/img/canvas_renderer.js"></script>
+  <script src="/static/img/canvas_renderer.js?v=2"></script>
   <script src="/static/img/fade_shader.js"></script>
   <script src="/static/img/staleness_overlay.js"></script>
   <script src="/static/img/badge_renderer.js"></script>
   <script src="/static/img/detection_overlay.js"></script>
   <script src="/static/img/accel_status.js"></script>
   <script src="/static/img/raw_mode_toggle.js"></script>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=2"></script>
 </body>
 </html>

@@ -16,6 +16,7 @@ param(
     [string[]]$AdbSerial,
     [string]$ProbePath,
     [string]$V2ProbePath,
+    [string]$V1ProbePath,
     [string]$RemoteDir = '/tmp/lifetrac_p0c',
     [string]$Dev = '/dev/ttymxc3',
     [string]$Baud = '921600',
@@ -32,6 +33,7 @@ if (-not $scriptDir) {
 }
 if (-not $ProbePath)   { $ProbePath   = Join-Path $scriptDir 'radio_sleep.py' }
 if (-not $V2ProbePath) { $V2ProbePath = Join-Path $scriptDir 'method_h_stage2_tx_probe_v2.py' }
+if (-not $V1ProbePath) { $V1ProbePath = Join-Path $scriptDir 'method_g_stage1_probe.py' }
 
 function Resolve-AdbSerials {
     param([string[]]$Requested)
@@ -56,10 +58,18 @@ function Push-ProbeFiles {
         [string]$Serial,
         [string]$RemoteDir,
         [string]$RadioSleepLocal,
-        [string]$V2ProbeLocal
+        [string]$V2ProbeLocal,
+        [string]$V1ProbeLocal
     )
     & adb -s $Serial shell "mkdir -p $RemoteDir" | Out-Null
     & adb -s $Serial push $RadioSleepLocal "$RemoteDir/radio_sleep.py" | Out-Null
+    
+    # V1 (method_g_stage1_probe) is imported by V2 probe. Ensure it exists as well.
+    $existsV1 = & adb -s $Serial shell "test -f $RemoteDir/method_g_stage1_probe.py && echo PRESENT || echo MISSING"
+    if ($existsV1 -match 'MISSING') {
+        & adb -s $Serial push $V1ProbeLocal "$RemoteDir/method_g_stage1_probe.py" | Out-Null
+    }
+
     # V2 probe carries the HostLink class + SX1276 helpers that radio_sleep imports.
     # Only push if remote copy is missing — it's 93 KB and rarely changes here.
     $existsOut = & adb -s $Serial shell "test -f $RemoteDir/method_h_stage2_tx_probe_v2.py && echo PRESENT || echo MISSING"
@@ -112,7 +122,8 @@ foreach ($s in $serials) {
     if (-not $SkipPush) {
         try {
             Push-ProbeFiles -Serial $s -RemoteDir $RemoteDir `
-                -RadioSleepLocal $ProbePath -V2ProbeLocal $V2ProbePath
+                -RadioSleepLocal $ProbePath -V2ProbeLocal $V2ProbePath `
+                -V1ProbeLocal $V1ProbePath
         } catch {
             Write-Warning "push failed for $s : $_"
             $rows += [pscustomobject]@{

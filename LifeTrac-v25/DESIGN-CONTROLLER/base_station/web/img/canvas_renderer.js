@@ -61,7 +61,16 @@
       await Promise.allSettled(promises);
       if (useOffscreen) {
         const img = offscreen.transferToImageBitmap();
-        visible.getContext('bitmaprenderer').transferFromImageBitmap(img);
+        const r = visible.getContext('bitmaprenderer');
+        if (r) {
+          r.transferFromImageBitmap(img);
+        } else {
+          const mainCtx = visible.getContext('2d');
+          if (mainCtx) {
+            mainCtx.drawImage(img, 0, 0);
+          }
+          if (img.close) img.close();
+        }
       }
     }
 

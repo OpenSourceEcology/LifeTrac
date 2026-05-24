@@ -241,6 +241,181 @@
     ws.onerror = () => ws.close();
   }
 
+  // ---- Autonomy & Boustrophedon Sweep UI (BC-06, Round 30) ---------------
+  let drawModeActive = false;
+  let drawnPoints = []; // List of [lat, lon]
+  let geofencePolygon = null; // Leaflet polygon
+  let sweepPathPolyline = null; // Leaflet polyline
+  let startMarker = null; // Entry waypoint marker
+  let endMarker = null; // Exit waypoint marker
+
+  const btnDraw = document.getElementById("btn-draw");
+  const btnCalc = document.getElementById("btn-calc");
+  const btnClear = document.getElementById("btn-clear");
+  const drawCount = document.getElementById("draw-count");
+  const swathInput = document.getElementById("swath-width");
+  const autonomyStatus = document.getElementById("autonomy-status");
+
+  function updateAutonomyUI() {
+    if (drawCount) drawCount.textContent = drawnPoints.length;
+    if (btnCalc) btnCalc.disabled = drawnPoints.length < 3;
+    if (btnDraw) {
+      if (drawModeActive) {
+        btnDraw.textContent = "Finish Drawing";
+        btnDraw.style.background = "#e6a23c";
+        btnDraw.style.color = "#000";
+      } else {
+        btnDraw.textContent = "Start Drawing";
+        btnDraw.style.background = "#444";
+        btnDraw.style.color = "#ffe";
+      }
+    }
+  }
+
+  function clearAutonomyPlan() {
+    if (geofencePolygon) {
+      map.removeLayer(geofencePolygon);
+      geofencePolygon = null;
+    }
+    if (sweepPathPolyline) {
+      map.removeLayer(sweepPathPolyline);
+      sweepPathPolyline = null;
+    }
+    if (startMarker) {
+      map.removeLayer(startMarker);
+      startMarker = null;
+    }
+    if (endMarker) {
+      map.removeLayer(endMarker);
+      endMarker = null;
+    }
+    drawnPoints = [];
+    if (autonomyStatus) autonomyStatus.textContent = "";
+    updateAutonomyUI();
+  }
+
+  if (btnDraw) {
+    btnDraw.addEventListener("click", () => {
+      drawModeActive = !drawModeActive;
+      if (autonomyStatus) {
+        autonomyStatus.textContent = drawModeActive
+          ? "Click on the map to add geofence vertices."
+          : (drawnPoints.length >= 3 ? "Drawing finished. Ready to generate sweep path." : "");
+        autonomyStatus.style.color = "var(--warn)";
+      }
+      updateAutonomyUI();
+    });
+  }
+
+  map.on("click", (e) => {
+    if (!drawModeActive) return;
+    const lat = e.latlng.lat;
+    const lon = e.latlng.lng;
+    drawnPoints.push([lat, lon]);
+
+    if (!geofencePolygon) {
+      geofencePolygon = L.polygon(drawnPoints, {
+        color: "#ff7a00",
+        fillColor: "#ff7a00",
+        fillOpacity: 0.25,
+        weight: 3
+      }).addTo(map);
+    } else {
+      geofencePolygon.setLatLngs(drawnPoints);
+    }
+    updateAutonomyUI();
+  });
+
+  if (btnClear) {
+    btnClear.addEventListener("click", () => {
+      clearAutonomyPlan();
+      if (drawModeActive) {
+        drawModeActive = false;
+      }
+      updateAutonomyUI();
+    });
+  }
+
+  if (btnCalc) {
+    btnCalc.addEventListener("click", async () => {
+      if (drawnPoints.length < 3) return;
+      const swathWidth = parseFloat(swathInput.value) || 2.5;
+      
+      if (autonomyStatus) {
+        autonomyStatus.textContent = "Calculating optimal sweeping lanes...";
+        autonomyStatus.style.color = "var(--warn)";
+      }
+
+      try {
+        const resp = await fetch("/api/autonomy/calculate-sweep", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            polygon: drawnPoints,
+            swath_width_m: swathWidth
+          })
+        });
+
+        if (!resp.ok) {
+          const errorData = await resp.json().catch(() => ({ detail: "Unknown server error" }));
+          throw new Error(errorData.detail || `HTTP ${resp.status}`);
+        }
+
+        const result = await resp.json();
+        if (sweepPathPolyline) map.removeLayer(sweepPathPolyline);
+        if (startMarker) map.removeLayer(startMarker);
+        if (endMarker) map.removeLayer(endMarker);
+
+        if (result.waypoints && result.waypoints.length > 0) {
+          const pathCoords = result.waypoints.map(wp => [wp.lat, wp.lon]);
+          
+          // Render planned Boustrophedon route as dynamic golden line
+          sweepPathPolyline = L.polyline(pathCoords, {
+            color: "#ffbc00",
+            weight: 4,
+            dashArray: "5, 10",
+            opacity: 0.95
+          }).addTo(map);
+
+          // Add start and end point markers
+          const startPt = pathCoords[0];
+          const endPt = pathCoords[pathCoords.length - 1];
+
+          startMarker = L.circleMarker(startPt, {
+            radius: 8,
+            fillColor: "#4caf50",
+            color: "#fff",
+            weight: 2,
+            fillOpacity: 1.0
+          }).addTo(map).bindPopup("<b>Sweep Plan Entry</b>");
+
+          endMarker = L.circleMarker(endPt, {
+            radius: 8,
+            fillColor: "#d62828",
+            color: "#fff",
+            weight: 2,
+            fillOpacity: 1.0
+          }).addTo(map).bindPopup("<b>Sweep Plan Exit</b>");
+
+          if (autonomyStatus) {
+            autonomyStatus.textContent = `Generated sweep path with ${result.waypoints.length} path targets. Plan loaded!`;
+            autonomyStatus.style.color = "var(--ok)";
+          }
+        } else {
+          throw new Error("Calculator finished but returned 0 waypoints.");
+        }
+      } catch (err) {
+        if (autonomyStatus) {
+          autonomyStatus.textContent = `Calculation Failed: ${err.message}`;
+          autonomyStatus.style.color = "var(--danger)";
+        }
+      }
+    });
+  }
+
   setInterval(ageSweep, 500);
   connect();
 })();

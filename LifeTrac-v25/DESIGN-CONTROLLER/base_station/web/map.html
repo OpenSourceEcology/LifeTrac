@@ -92,6 +92,25 @@
       <div class="row"><span>LINK ↑</span><span id="link-pill-up" class="pill">—</span></div>
       <div class="row"><span>LINK ↓</span><span id="link-pill-dn" class="pill">—</span></div>
       <div class="row" id="link-reason-row" style="opacity:.7"><span>reason</span><span id="link-reason">—</span></div>
+
+      <h3>Autonomy</h3>
+      <div class="row" style="margin-top: 4px;">
+        <button id="btn-draw" style="width:100%; padding: 6px; background:#444; border:1px solid #666; color:#ffe; font-family:inherit; cursor:pointer; font-weight:600;">Start Drawing</button>
+      </div>
+      <div class="row">
+        <span>vertices</span><span id="draw-count">0</span>
+      </div>
+      <div class="row" style="align-items:center;">
+        <span>swath (m)</span>
+        <input id="swath-width" type="number" min="0.5" max="30.0" step="0.5" value="2.5" style="width:70px; background:#1e1e1e; border:1px solid #555; color:#ffe; text-align:right;" />
+      </div>
+      <div class="row" style="margin-top:4px;">
+        <button id="btn-calc" style="width:100%; padding: 6px; background:var(--warn); border:none; color:#000; font-weight:bold; font-family:inherit; cursor:pointer;" disabled>Generate Sweep</button>
+      </div>
+      <div class="row" style="margin-top:4px;">
+        <button id="btn-clear" style="width:100%; padding: 6px; background:#d62828; border:none; color:#fff; font-family:inherit; cursor:pointer;">Clear Plan</button>
+      </div>
+      <div id="autonomy-status" style="font-size:11px; color:var(--warn); margin-top:4px; white-space:pre-wrap; max-width:250px; overflow-wrap:break-word;"></div>
     </aside>
   </main>
 

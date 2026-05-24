@@ -139,6 +139,783 @@
 			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build.ps1",
 			"isBackground": false,
 			"group": "build"
+		},
+		{
+			"label": "Grep PROBE on Device",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell grep PROBE /tmp/lifetrac_p0c/run_method_h_stage2_tx.sh"
+		},
+		{
+			"label": "Grep configure_regulatory_profile_if_needed on Device",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell grep configure_regulatory_profile_if_needed /tmp/lifetrac_p0c/method_h_stage2_tx_probe_v2.py"
+		},
+		{
+			"label": "Print main of remote python file",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"sed -n '2500,2540p' /tmp/lifetrac_p0c/method_h_stage2_tx_probe_v2.py\""
+		},
+		{
+			"label": "Get remote file listing",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell ls -l /tmp/lifetrac_p0c/method_h_stage2_tx_probe_v2.py"
+		},
+		{
+			"label": "Run W1-11 Ping Pong E2E",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_w1_10b_rx_pair_end_to_end.ps1 -RxAdbSerial 2D0A1209DABC240B -TxAdbSerial 2E2C1209DABC240B -Cycles 20 -Probe ping_pong"
+		},
+		{
+			"label": "Check usb wifi task",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"lsusb ; echo '=== LINK ===' ; ip link ; echo '=== DMESG ===' ; dmesg | grep -i usb | tail -n 20\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check IP Link on Portenta",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"ip link\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check Portenta Dmesg",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"dmesg | grep -i -E 'usb|wifi|wlan' | tail -n 40\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check Portenta Dmesg Escaped",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \\\"dmesg | grep -i -E 'usb|wifi|wlan' | tail -n 40\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check available adb devices",
+			"type": "shell",
+			"command": "adb devices",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Scan Host USB Portenta",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Get-PnpDevice -Class USB | Where-Object { $_.FriendlyName -like '*Portenta*' -or $_.FriendlyName -like '*Arduino*' -or $_.FriendlyName -like '*ADB*' -or $_.FriendlyName -like '*Composite*' -or $_.FriendlyName -like '*Serial*' } | Select-Object FriendlyName, Status, InstanceId | Format-Table -AutoSize\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Scan Host All PNP Devices",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Get-PnpDevice | Where-Object { $_.FriendlyName -like '*Portenta*' -or $_.FriendlyName -like '*Arduino*' -or $_.FriendlyName -like '*ADB*' -or $_.FriendlyName -like '*Serial*' -or $_.FriendlyName -like '*Unknown*' -or $_.Status -eq 'Error' } | Select-Object FriendlyName, Status, InstanceId, Class | Format-Table -AutoSize\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Scan Host USB All",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Get-PnpDevice -Class USB | Select-Object FriendlyName, Status, InstanceId | Sort-Object FriendlyName | Format-Table -AutoSize\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "CIM USB Scan",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"[System.Web.HttpUtility] | Out-Null; $devices = Get-CimInstance Win32_PnPEntity; $devices | Where-Object { $_.Name -like '*USB*' -or $_.Caption -like '*USB*' -or $_.Name -like '*Serial*' -or $_.Caption -like '*Portenta*' } | Select-Object Name, Status, DeviceID | Format-Table -AutoSize\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check ADB Devices Post Power Cycle",
+			"type": "shell",
+			"command": "adb devices",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check Wi-Fi on newly detected Portenta",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \"lsusb ; echo '=== IP LINK ===' ; ip link ; echo '=== DMESG ===' ; dmesg | grep -i -E 'usb|wifi|wlan' | tail -n 25\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check IP Link on newly detected Portenta Escaped",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"ip link\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check Portenta Dmesg new board",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"dmesg | grep -i -E 'usb|wifi|wlan|netgear' | tail -n 40\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check newly detected Portenta dmesg end",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"dmesg | tail -n 60\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check kernel environment",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \"uname -r ; zcat /proc/config.gz || zcat /proc/config || ls /lib/modules\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check newly detected Portenta kernel details",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"uname -r ; ls -la /lib/modules\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check for mt76 driver in modules",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"find /lib/modules -type f -name '*.ko*' | grep -i mt76\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check for USB network modules",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"find /lib/modules -type f -name '*.ko*' | grep -i usb\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "WiFi Scan 1 nmcli",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"nmcli dev wifi list\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "WiFi Scan iw",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"iw dev wlan0 scan | grep -i SSID | head -n 30\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "WiFi Scan sudo iw",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S iw dev wlan0 scan | grep -i SSID | head -n 30\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "WiFi Scan sudo nmcli",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S nmcli dev wifi list\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "WiFi Scan sudo nmcli list raw",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S nmcli --mode term --colors no dev wifi list\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "WiFi Scan sudo nmcli compact",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S nmcli -m tabular dev wifi list\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "WiFi Scan nmcli flat",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "WiFi Scan nmcli flat run",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "WiFi Scan nmcli full fields",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S nmcli -t -f SSID,SIGNAL,BSSID,CHAN,RATE,SECURITY dev wifi list\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Reload brcmfmac module",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S modprobe -r brcmfmac && sleep 1 && echo fio | sudo -S modprobe brcmfmac && sleep 1 && dmesg | tail -n 25\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "WiFi Scan After SW Reset",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check dmesg after reset scan",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"dmesg | tail -n 25\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Discover SDIO topology",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"ls /sys/bus/sdio/devices/ ; echo '---' ; ls /sys/bus/mmc/devices/ ; echo '---' ; ls /sys/bus/platform/drivers/ | grep -i -E 'sdhci|mmc|esdhc|usdhc'\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Method 2 SDIO remove + rescan",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S sh -c 'echo 1 > /sys/bus/sdio/devices/mmc0:0001:1/remove' ; sleep 1 ; echo fio | sudo -S sh -c 'echo 1 > /sys/bus/mmc/devices/mmc0:0001/../rescan' 2>&1 ; sleep 2 ; dmesg | tail -n 20\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Method 2 retry tee",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S tee /sys/bus/sdio/devices/mmc0:0001:1/remove <<< 1 ; sleep 2 ; echo '--- after remove ---' ; ls /sys/bus/sdio/devices/ ; echo '--- rescan host ---' ; echo fio | sudo -S tee /sys/class/mmc_host/mmc0/device/rescan <<< 1 2>&1 ; sleep 3 ; ls /sys/bus/sdio/devices/ ; echo '--- dmesg ---' ; dmesg | tail -n 15\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check sudo perms",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S id ; echo '---' ; echo fio | sudo -S ls -la /sys/bus/sdio/devices/mmc0:0001:1/remove ; echo '---' ; echo fio | sudo -S cat /sys/bus/sdio/devices/mmc0:0001:1/uevent\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Discover sysfs leaves",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S ls /sys/bus/sdio/devices/mmc0:0001:1/ ; echo '---driver---' ; echo fio | sudo -S ls /sys/bus/sdio/drivers/ ; echo '---mmc host---' ; echo fio | sudo -S ls /sys/class/mmc_host/mmc0/ ; echo '---platform sdhci---' ; echo fio | sudo -S ls /sys/bus/platform/drivers/sdhci-esdhc-imx/\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Method 1 SDHCI platform unbind rebind",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S sh -c 'echo 30b40000.mmc > /sys/bus/platform/drivers/sdhci-esdhc-imx/unbind' ; sleep 2 ; echo '--- after unbind ---' ; ls /sys/bus/sdio/devices/ 2>&1 ; ls /sys/class/mmc_host/ ; echo '--- rebind ---' ; echo fio | sudo -S sh -c 'echo 30b40000.mmc > /sys/bus/platform/drivers/sdhci-esdhc-imx/bind' ; sleep 4 ; echo '--- after rebind ---' ; ls /sys/bus/sdio/devices/ ; ls /sys/class/mmc_host/ ; echo '--- dmesg ---' ; dmesg | tail -n 30\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check post rebind status",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"sleep 3 ; echo '--- sdio devices ---' ; ls /sys/bus/sdio/devices/ ; echo '--- mmc0 device dir ---' ; ls /sys/class/mmc_host/mmc0/device/ 2>&1 | head -n 30 ; echo '--- dmesg tail ---' ; dmesg | tail -n 15 ; echo '--- iface ---' ; ip link show wlan0 2>&1\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Find WL_REG_ON GPIO",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S cat /sys/kernel/debug/gpio 2>&1 | grep -i -E 'wl|bt|wifi|wireless|reg_on'\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Dump all GPIOs",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S cat /sys/kernel/debug/gpio 2>&1 | head -n 120\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Find sd1_regulator state",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S grep -l sd1 /sys/class/regulator/*/name 2>&1 ; echo '---' ; for r in /sys/class/regulator/regulator.*; do n=$(cat $r/name 2>/dev/null); s=$(cat $r/state 2>/dev/null); echo \\\\\\\"$r name=$n state=$s\\\\\\\"; done | grep -i -E 'sd|wl|wifi'\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Run BCM reset script",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B push bcm_reset.sh /tmp/bcm_reset.sh ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/bcm_reset.sh ; echo fio | sudo -S /tmp/bcm_reset.sh\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Find rescan and regulator debug",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S ls /sys/class/regulator/regulator.3/ ; echo '---debug---' ; echo fio | sudo -S ls /sys/kernel/debug/regulator/ 2>&1 ; echo '---wlan-power-en debug---' ; echo fio | sudo -S ls /sys/kernel/debug/regulator/wlan-power-en/ 2>&1 ; echo '---rescan paths---' ; echo fio | sudo -S find /sys -name rescan 2>/dev/null ; echo fio | sudo -S find /sys -name scan -path '*mmc*' 2>/dev/null\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Inspect mmc0 host",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S ls /sys/class/mmc_host/mmc0/ ; echo '---device dir---' ; echo fio | sudo -S ls /sys/class/mmc_host/mmc0/device/ ; echo '---power dir---' ; echo fio | sudo -S ls /sys/class/mmc_host/mmc0/device/power/ ; echo '---mmc0:0001 if exists---' ; echo fio | sudo -S ls /sys/class/mmc_host/mmc0/mmc0:0001/ 2>&1\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Run BCM full reset",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B push bcm_reset2.sh /tmp/bcm_reset2.sh ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/bcm_reset2.sh ; echo fio | sudo -S /tmp/bcm_reset2.sh 2>&1\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check mmc0 runtime PM",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S cat /sys/class/mmc_host/mmc0/device/power/runtime_status ; echo fio | sudo -S cat /sys/class/mmc_host/mmc0/device/power/control ; echo '---' ; echo fio | sudo -S dmesg | grep -E 'mmc0|brcmf|wlan-power' | tail -n 60\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Run BCM reset3 (force PM resume)",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B push bcm_reset3.sh /tmp/bcm_reset3.sh ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/bcm_reset3.sh ; echo fio | sudo -S /tmp/bcm_reset3.sh 2>&1\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "sudo reboot board",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S reboot\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Verify post-reboot WiFi",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B wait-for-device ; adb -s 2D0A1209DABC240B shell \\\"uptime ; echo '---wlan0---' ; ip link show wlan0 2>&1 ; echo '---brcmfmac dmesg---' ; dmesg | grep -iE 'brcmf|wlan|mmc0:' | tail -n 25 ; echo '---scan---' ; echo fio | sudo -S nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list 2>&1 | head -n 20\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Connect WiFi 5 star LAN",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B push wifi_connect.sh /tmp/wifi_connect.sh ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/wifi_connect.sh ; echo fio | sudo -S /tmp/wifi_connect.sh 2>&1\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Diagnose wifi connect fail",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S rfkill list ; echo '---' ; echo fio | sudo -S nmcli dev status ; echo '---' ; echo fio | sudo -S nmcli radio ; echo '---dmesg recent---' ; dmesg | tail -n 20\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Reboot then connect",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B push wifi_connect_fast.sh /tmp/wifi_connect_fast.sh ; adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S reboot\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Wait and connect WiFi",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B wait-for-device ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/wifi_connect_fast.sh ; echo fio | sudo -S /tmp/wifi_connect_fast.sh 2>&1\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Push and connect WiFi v2",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B wait-for-device ; adb -s 2D0A1209DABC240B push wifi_connect_fast.sh /tmp/wifi_connect_fast.sh ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/wifi_connect_fast.sh ; echo fio | sudo -S /tmp/wifi_connect_fast.sh 2>&1\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Rescan then connect",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S nmcli dev wifi rescan ifname wlan0 ; sleep 6 ; echo '--- visible nets ---' ; echo fio | sudo -S nmcli -t -f SSID,SIGNAL dev wifi list ifname wlan0 | head -n 15 ; echo '--- connect ---' ; echo fio | sudo -S nmcli dev wifi connect \\\\\\\"I'm a 5 star LAN!\\\\\\\" password 9182603083 ifname wlan0 ; sleep 3 ; echo '--- status ---' ; nmcli -t -f NAME,DEVICE,STATE con show --active ; ip -4 addr show wlan0\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Rescan connect via script",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B push wifi_rescan_connect.sh /tmp/wrc.sh ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/wrc.sh ; echo fio | sudo -S /tmp/wrc.sh 2>&1\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Persist profile and reboot",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B push wifi_persist_and_reboot.sh /tmp/wpr.sh ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/wpr.sh ; echo fio | sudo -S /tmp/wpr.sh 2>&1\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Verify autoconnect after reboot",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B wait-for-device ; adb -s 2D0A1209DABC240B shell \\\"echo '--- wait 25s for nm autoconnect ---' ; sleep 25 ; echo '--- active connections ---' ; nmcli -t -f NAME,DEVICE,STATE con show --active ; echo '--- ip ---' ; ip -4 addr show wlan0 ; echo '--- ping ---' ; ping -c 3 -W 2 8.8.8.8 ; echo '--- dmesg brcm ---' ; dmesg | grep -iE 'brcmf|wlan|ieee80211' | tail -n 15\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Modinfo brcmfmac",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S modinfo brcmfmac\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Run workaround test",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B push bcm_reset_workaround.sh /tmp/bcm_wa.sh ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/bcm_wa.sh ; echo fio | sudo -S /tmp/bcm_wa.sh 2>&1\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Write modprobe conf",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo 'options brcmfmac txglomsz=0' | sudo tee /etc/modprobe.d/brcmfmac.conf ; echo '---' ; cat /etc/modprobe.d/brcmfmac.conf\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Reboot with wa profile",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S reboot\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Verify wa autoconnect",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B wait-for-device ; adb -s 2D0A1209DABC240B shell \\\"echo '--- wait 25s ---' ; sleep 25 ; echo '--- active connections ---' ; nmcli -t -f NAME,DEVICE,STATE con show --active ; echo '--- ip ---' ; ip -4 addr show wlan0 ; echo '--- ping ---' ; ping -c 4 -W 2 8.8.8.8 ; echo '--- dmesg tail mmc0 ---' ; dmesg | grep -iE 'brcmf|wlan|mmc0' | tail -n 25\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Append roamoff and feature disable",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo 'options brcmfmac roamoff=1 feature_disable=0x8' | sudo tee -a /etc/modprobe.d/brcmfmac.conf ; echo '---' ; cat /etc/modprobe.d/brcmfmac.conf\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Reboot unit with new workaround",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S reboot\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Verify new workaround",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B wait-for-device ; adb -s 2D0A1209DABC240B shell \\\"echo '--- wait 25s ---' ; sleep 25 ; echo '--- active connections ---' ; nmcli -t -f NAME,DEVICE,STATE con show --active ; echo '--- ip ---' ; ip -4 addr show wlan0 ; echo '--- ping ---' ; ping -c 4 -W 2 8.8.8.8 ; echo '--- dmesg tail mmc0 ---' ; dmesg | grep -iE 'brcmf|wlan|mmc0' | tail -n 25\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Restore baseline and reboot board",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo '--- restore baseline ---' ; echo fio | sudo -S rm /etc/modprobe.d/brcmfmac.conf 2>/dev/null || true ; echo fio | sudo -S reboot\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check Ethernet PHY Health on Unit B",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo '=== LINK & ADDR ===' ; ip addr show eth0 ; echo '=== DRIVER & PHY STATUS ===' ; dmesg | grep -iE 'fec|phy|eth0' ; echo '=== ETHTOOL ===' ; ethtool eth0\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check Ethernet Sysfs Details",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo '=== PHY STATS & CARRIER ===' ; ls -la /sys/class/net/eth0/device/ ; cat /sys/class/net/eth0/carrier 2>/dev/null || echo 'no carrier' ; cat /sys/class/net/eth0/operstate ; cat /sys/class/net/eth0/statistics/tx_packets ; cat /sys/class/net/eth0/statistics/rx_packets\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check Ethernet Both Boards",
+			"type": "shell",
+			"command": "adb devices ; echo '=== Unit B eth0 ===' ; adb -s 2D0A1209DABC240B shell \\\"ip -4 addr show eth0 ; cat /sys/class/net/eth0/carrier ; cat /sys/class/net/eth0/operstate\\\" ; echo '=== Unit A eth0 ===' ; adb -s 2E2C1209DABC240B shell \\\"ip -4 addr show eth0 ; cat /sys/class/net/eth0/carrier ; cat /sys/class/net/eth0/operstate\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check Ethernet IP + ping",
+			"type": "shell",
+			"command": "echo '=== Unit B FULL ===' ; adb -s 2D0A1209DABC240B shell \\\"ip addr show eth0 ; ip route ; ping -c 2 -W 2 8.8.8.8\\\" ; echo '=== Unit A FULL ===' ; adb -s 2E2C1209DABC240B shell \\\"ip addr show eth0\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "DHCP eth0 Unit B",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S sh -c 'ip route del default via 192.168.1.254 dev wlan0 2>/dev/null; udhcpc -i eth0 -n -q 2>&1 | tail -20; echo ---; ip -4 addr show eth0; ip route'\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Wlan down then DHCP eth0",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S sh -c 'ip link set wlan0 down; ip addr flush dev wlan0; ip link set eth0 down; sleep 1; ip link set eth0 up; sleep 3; cat /sys/class/net/eth0/carrier; cat /sys/class/net/eth0/operstate; echo ---; udhcpc -i eth0 -n -q -t 6 2>&1 | tail -25; echo ---; ip -4 addr show eth0; ip route'\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Static IP eth0 + ping gateway",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S sh -c 'ip addr flush dev eth0; ip addr add 192.168.1.150/24 dev eth0; ip route add default via 192.168.1.254 dev eth0 metric 100 2>/dev/null; ip -4 addr show eth0; echo ---; ping -c 3 -W 2 192.168.1.254; echo ---; ping -c 2 -W 2 8.8.8.8'\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Probe deps Unit B",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell ls /home/fio/ ; echo === ; adb -s 2D0A1209DABC240B shell \\\"which mosquitto ; which python3 ; python3 --version\\\" ; echo === ; adb -s 2D0A1209DABC240B shell \\\"python3 -c 'import fastapi,uvicorn,paho.mqtt.client; print(123)' 2>&1\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Probe python stdlib + docker",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"python3 -c 'import json,logging,hashlib,socket,select,dataclasses,queue,fcntl; print(11)' 2>&1\\\" ; echo === ; adb -s 2D0A1209DABC240B shell \\\"which docker; docker ps 2>&1 | head -3\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Probe host python",
+			"type": "shell",
+			"command": "python --version ; python -c \"import fastapi, uvicorn, paho.mqtt.client, cryptography, jinja2; print('all deps present')\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Probe host py launcher",
+			"type": "shell",
+			"command": "py -3 --version ; py -3 -c \"import fastapi, uvicorn, paho.mqtt.client, cryptography, jinja2; print('all deps present')\" 2>&1",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Probe host deps",
+			"type": "shell",
+			"command": "py -3 probe_deps.py",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Install host deps",
+			"type": "shell",
+			"command": "py -3 -m pip install --quiet uvicorn[standard] jinja2 ; py -3 probe_deps.py",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Install amqtt",
+			"type": "shell",
+			"command": "py -3 -m pip install --quiet amqtt 2>&1 | tail -5 ; py -3 -c \"import amqtt; print('amqtt ok')\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Install amqtt v2",
+			"type": "shell",
+			"command": "py -3 -m pip install --quiet amqtt ; py -3 -c \"import amqtt,sys;print('amqtt',amqtt.__version__ if hasattr(amqtt,'__version__') else 'ok')\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Install amqtt v3",
+			"type": "shell",
+			"command": "py -3 -m pip install --quiet amqtt ; py -3 probe_amqtt.py",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Probe web UI",
+			"type": "shell",
+			"command": "Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAddress -like '192.168.*' -or $_.IPAddress -like '10.*'} | Select-Object IPAddress, InterfaceAlias | Format-Table -AutoSize ; Write-Host '---' ; try { $r = Invoke-WebRequest -Uri http://127.0.0.1:8080/ -UseBasicParsing -TimeoutSec 5 ; Write-Host \"HTTP $($r.StatusCode) - $($r.Content.Length) bytes\" } catch { Write-Host \"ERR: $_\" }",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Curl from X8 to host",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"curl -s -o /dev/null -w 'HTTP %{http_code} bytes=%{size_download} time=%{time_total}s\\n' http://192.168.1.79:8080/\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "wget from X8 to host",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"wget -q -O /tmp/probe.html http://192.168.1.79:8080/ && wc -c /tmp/probe.html && head -c 200 /tmp/probe.html\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Recheck eth0 state",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"ip -4 addr show eth0; echo ---; ip route; echo ---; ping -c 2 -W 2 192.168.1.79\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "nmcli persistent eth0",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S sh -c 'nmcli con delete LifeTrac-eth-static 2>/dev/null; nmcli con add type ethernet ifname eth0 con-name LifeTrac-eth-static ip4 192.168.1.150/24 gw4 192.168.1.254 ipv4.dns 8.8.8.8 ipv4.route-metric 50 autoconnect yes; nmcli con up LifeTrac-eth-static; ip -4 addr show eth0; echo ---; ping -c 2 -W 2 192.168.1.79'\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "wget X8 to host 8080",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"wget -q -O - --timeout=5 http://192.168.1.79:8080/ 2>&1 | head -c 300 ; echo ; echo EXIT=$?\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Open firewall 8080",
+			"type": "shell",
+			"command": "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile','-Command','New-NetFirewallRule -DisplayName \\\"LifeTrac-BaseStation-8080\\\" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow -Profile Any | Out-Null ; Write-Host done' ; Write-Host '---rule status---' ; Get-NetFirewallRule -DisplayName 'LifeTrac-BaseStation-8080' -ErrorAction SilentlyContinue | Select-Object DisplayName, Enabled, Action, Direction | Format-Table -AutoSize",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "wget retry after firewall",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \\\"wget -q -O - --timeout=5 http://192.168.1.79:8080/ 2>&1 | head -c 400\\\"",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Host ping X8",
+			"type": "shell",
+			"command": "ping -n 2 -w 1500 192.168.1.150 ; Write-Host '---' ; Test-NetConnection -ComputerName 192.168.1.150 -Port 22 -InformationLevel Detailed 2>&1 | Select-Object -First 12",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Real TCP host to X8",
+			"type": "shell",
+			"command": "Write-Host '=== Host -> X8 (Test real TCP) ===' ; $r = New-Object System.Net.Sockets.TcpClient ; try { $r.ReceiveTimeout=3000; $r.SendTimeout=3000; $iar=$r.BeginConnect('192.168.1.150',22,$null,$null); $ok=$iar.AsyncWaitHandle.WaitOne(3000,$false); if($ok){$r.EndConnect($iar); Write-Host \"connected to :22 OK\"} else {Write-Host TIMEOUT} } catch { Write-Host \"ERR: $_\" } finally { $r.Close() } ; Write-Host '---' ; arp -a | Select-String '192.168.1.150|192.168.1.254|192.168.1.79'",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Firewall profile check",
+			"type": "shell",
+			"command": "Get-NetConnectionProfile | Select-Object Name, InterfaceAlias, NetworkCategory | Format-Table -AutoSize ; Write-Host '---' ; Get-NetFirewallProfile | Select-Object Name, Enabled, DefaultInboundAction | Format-Table -AutoSize",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Verify rule and listener",
+			"type": "shell",
+			"command": "Get-NetFirewallRule -DisplayName 'LifeTrac-BaseStation-8080' | Format-List DisplayName, Enabled, Profile, Direction, Action ; Write-Host '---' ; Get-NetFirewallRule -DisplayName 'LifeTrac-BaseStation-8080' | Get-NetFirewallPortFilter ; Write-Host '---listening?---' ; Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | Select-Object LocalAddress, LocalPort, State, OwningProcess | Format-Table -AutoSize",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "test"
 		}
 	]
 }

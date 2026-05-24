@@ -130,6 +130,9 @@ class LibcameraCamera:
         return arr.tobytes()
 
 
+LIFETRAC_CAMERA_DESHAKE = os.environ.get("LIFETRAC_CAMERA_DESHAKE", "1") == "1"
+
+
 def build_ffmpeg_argv(device: str = V4L2_DEVICE,
                       input_format: str = V4L2_INPUT_FORMAT,
                       input_size: str = V4L2_INPUT_SIZE,
@@ -142,16 +145,20 @@ def build_ffmpeg_argv(device: str = V4L2_DEVICE,
     Mirrors the 2026-05-15 invocation that produced the first real frame
     off the Kurokesu C2:
 
-        ffmpeg -hide_banner -loglevel error \\
-               -f v4l2 -input_format mjpeg \\
-               -video_size 1920x1080 -framerate 30 \\
-               -i /dev/video1 \\
-               -vf scale=384:256 -pix_fmt rgb24 \\
+        ffmpeg -hide_banner -loglevel error \
+               -f v4l2 -input_format mjpeg \
+               -video_size 1920x1080 -framerate 30 \
+               -i /dev/video1 \
+               -vf scale=384:256 -pix_fmt rgb24 \
                -f rawvideo -
 
     Pure helper so the unit tests can pin the argv shape without spawning
     a subprocess.
     """
+    scale_filter = f"scale={canvas_w}:{canvas_h}"
+    if LIFETRAC_CAMERA_DESHAKE:
+        scale_filter += ",deshake=open2=1:search=16"
+
     return [
         ffmpeg_path,
         "-hide_banner", "-loglevel", "error",
@@ -160,7 +167,7 @@ def build_ffmpeg_argv(device: str = V4L2_DEVICE,
         "-video_size", input_size,
         "-framerate", str(int(input_fps)),
         "-i", device,
-        "-vf", f"scale={canvas_w}:{canvas_h}",
+        "-vf", scale_filter,
         "-pix_fmt", "rgb24",
         "-f", "rawvideo",
         "-",

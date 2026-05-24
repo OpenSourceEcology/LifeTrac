@@ -37,6 +37,6 @@ PY
 echo "--- /dev/ttymxc3 ---"
 ls -l /dev/ttymxc3 2>/dev/null || echo "(no ttymxc3)"
 echo "--- L072 firmware presence ---"
-ls -l /tmp/lifetrac_p0c/firmware.bin /tmp/lifetrac_p0c/method_h_stage2_tx_probe.py 2>/dev/null || \
+ls -l /tmp/lifetrac_p0c/firmware.bin /tmp/lifetrac_p0c/method_h_stage2_tx_probe_v2.py 2>/dev/null || \
   echo "(L072 helper toolkit not pushed)"
 echo "=== DONE ==="

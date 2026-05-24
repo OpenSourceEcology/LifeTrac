@@ -520,6 +520,7 @@ mqtt_client.subscribe("lifetrac/v25/telemetry/#")
 mqtt_client.subscribe("lifetrac/v25/status/#")
 mqtt_client.subscribe("lifetrac/v25/video/#")
 mqtt_client.subscribe("lifetrac/v25/control/#")
+mqtt_client.subscribe("lifetrac/v25/cmd/image_frame")
 mqtt_client.subscribe("lifetrac/v25/params/changed")
 
 
@@ -825,7 +826,26 @@ async def ws_control(ws: WebSocket):
     last_tx = 0.0
     try:
         while True:
-            raw = await ws.receive_text()
+            try:
+                raw = await asyncio.wait_for(ws.receive_text(), timeout=0.15)
+            except asyncio.TimeoutError:
+                # Deadman threshold exceeded (150 ms)
+                if _base_controls_allowed():
+                    logging.warning("web_ui: Control frame timeout. Halting vehicle.")
+                    frame = pack_control(
+                        seq=seq,
+                        lhx=0,
+                        lhy=0,
+                        rhx=0,
+                        rhy=0,
+                        buttons=0,
+                        flags=0,
+                        hb=hb,
+                    )
+                    mqtt_client.publish("lifetrac/v25/cmd/control", frame, qos=0)
+                    seq = (seq + 1) & 0xFFFF
+                    hb = (hb + 1) & 0xFF
+                continue
             # IP-203: cap payload size before parsing. ControlMsg fully
             # populated with extreme integers fits in well under 256 bytes.
             if len(raw) > 512:
@@ -857,7 +877,25 @@ async def ws_control(ws: WebSocket):
             hb = (hb + 1) & 0xFF
     except WebSocketDisconnect:
         pass
+    except Exception as e:
+        logging.error("web_ui: websocket error in ws_control: %s", e)
     finally:
+        if _base_controls_allowed():
+            logging.info("web_ui: Control websocket closed. Halting vehicle.")
+            try:
+                frame = pack_control(
+                    seq=seq,
+                    lhx=0,
+                    lhy=0,
+                    rhx=0,
+                    rhy=0,
+                    buttons=0,
+                    flags=0,
+                    hb=hb,
+                )
+                mqtt_client.publish("lifetrac/v25/cmd/control", frame, qos=0)
+            except Exception:
+                pass
         _discard_subscriber(control_subscribers, ws)
 
 
@@ -1354,3 +1392,29 @@ async def api_params_set(request: Request,
     mqtt_client.publish("lifetrac/v25/params/set",
                         json.dumps(body.params), qos=1)
     return {"ok": True, "submitted": body.params}
+
+
+# ---- Autonomy & Route Planning (BC-06, Round 30) ---------------------
+class GeofencePlanRequest(BaseModel):
+    """Pydantic model for calculating a Boustrophedon sweep route.
+    
+    Accepts polygon vertices as standard lat/lon tuples, and optional swath width.
+    """
+    polygon: list[tuple[float, float]]
+    swath_width_m: float = Field(default=2.5, gt=0.5, lt=30.0)
+
+@app.post("/api/autonomy/calculate-sweep")
+async def api_calculate_sweep(body: GeofencePlanRequest,
+                              _session: str = Depends(_require_session)):
+    """Calculate and return Boustrophedon sweep waypoints from custom geofence."""
+    import planner
+    try:
+        waypoints = planner.generate_sweep_coverage(body.polygon, body.swath_width_m)
+        return {
+            "ok": True,
+            "swath_width_m": body.swath_width_m,
+            "waypoints": [wp.to_dict() for wp in waypoints]
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+

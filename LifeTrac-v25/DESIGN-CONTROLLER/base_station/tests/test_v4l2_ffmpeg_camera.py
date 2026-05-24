@@ -53,7 +53,7 @@ class BuildFfmpegArgvTests(unittest.TestCase):
         ):
             self.assertIn(token, argv, f"missing token {token!r} in argv {argv}")
         # Scale filter must request the canvas dims (384x256).
-        self.assertIn(f"scale={CANVAS_W}:{CANVAS_H}", argv)
+        self.assertTrue(any(f"scale={CANVAS_W}:{CANVAS_H}" in arg for arg in argv))
         # Output sink is stdout.
         self.assertEqual(argv[-1], "-")
 
