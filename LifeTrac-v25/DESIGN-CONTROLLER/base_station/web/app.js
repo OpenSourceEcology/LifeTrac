@@ -269,7 +269,7 @@
   // ----- Button strip -----
   let screenButtons = 0;
   let screenFlags = 0;
-  document.querySelectorAll('.buttons button[data-btn]').forEach(btn => {
+  document.querySelectorAll('button[data-btn]').forEach(btn => {
     const bit = 1 << parseInt(btn.dataset.btn, 10);
     const set = (down) => {
       if (controlsLocked) return;
@@ -325,12 +325,38 @@
         const data = await resp.json().catch(() => ({}));
         const ok = !!(resp.ok && data && data.ok);
         if (radioStatus) {
-          radioStatus.textContent = ok
-            ? `Radio bench: ${mode} OK`
-            : `Radio bench: ${mode} FAIL`;
+          if (ok) {
+            radioStatus.textContent = `Radio bench: ${mode} OK`;
+          } else {
+            // Surface the real reason instead of an opaque "FAIL".
+            // 401 → not logged in; 403 → bench disabled via env flag;
+            // otherwise show returncode + last line of helper output
+            // (or `error` / `detail` if the server attached one).
+            let why;
+            if (resp.status === 401) {
+              why = 'login required (PIN)';
+            } else if (resp.status === 403) {
+              why = data.detail || 'bench control disabled';
+            } else if (data && data.error) {
+              why = data.error;
+            } else if (data && data.detail) {
+              why = data.detail;
+            } else if (data && Array.isArray(data.output_tail) && data.output_tail.length) {
+              const last = data.output_tail[data.output_tail.length - 1];
+              const rc = (data.returncode !== undefined) ? `rc=${data.returncode} ` : '';
+              why = `${rc}${last}`;
+            } else if (data && data.returncode !== undefined) {
+              why = `rc=${data.returncode}`;
+            } else {
+              why = `HTTP ${resp.status}`;
+            }
+            radioStatus.textContent = `Radio bench: ${mode} FAIL — ${why}`;
+            // Also drop the full payload to the console for deeper triage.
+            console.warn('bench radio FAIL', { status: resp.status, body: data });
+          }
         }
       } catch (e) {
-        if (radioStatus) radioStatus.textContent = 'Radio bench: request failed';
+        if (radioStatus) radioStatus.textContent = `Radio bench: request failed — ${e && e.message ? e.message : e}`;
       }
     });
   });

@@ -28,10 +28,19 @@
       overflow: hidden;
       touch-action: none;
     }
+    /* --------------------------------------------------------------
+       Layout 2026-05-25: live image fills the area between <header>
+       and <footer>. All other UI (top buttons, joysticks, E-STOP,
+       telemetry, gear-driven settings drawer) is overlaid with a
+       partially transparent background so the camera shows through.
+       Element IDs unchanged so app.js / canvas_renderer.js / overlays
+       keep working.
+       -------------------------------------------------------------- */
     header {
       display: flex; justify-content: space-between; align-items: center;
       padding: 8px 16px; background: var(--panel);
       border-bottom: 1px solid #333;
+      position: relative; z-index: 50;
     }
     header .title { font-weight: 600; }
     header .source-banner { padding: 4px 12px; border-radius: 4px;
@@ -40,86 +49,207 @@
     header .source-banner.handheld{ background: var(--warn); }
     header .source-banner.none    { background: var(--danger); color: #fff; }
 
+    /* <main> is a single positioned canvas-and-overlays surface. */
     main {
-      display: grid;
-      grid-template-columns: 1fr 1fr 280px;
-      grid-template-rows: 1.2fr auto auto 1fr;
-      gap: 12px;
-      padding: 12px;
-      height: calc(100% - 80px);
-      box-sizing: border-box;
-    }
-    .joystick-pad {
-      background: var(--panel); border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      position: relative; user-select: none;
-      min-height: 0;
-    }
-    .joystick-pad canvas { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
-    .joystick-pad .label {
-      position: absolute; top: 8px; left: 12px; font-size: 12px; opacity: 0.7;
-    }
-    body.controls-locked .joystick-pad,
-    body.controls-locked .buttons button:not(.estop) {
-      opacity: 0.45;
-    }
-    aside {
-      background: var(--panel); border-radius: 12px; padding: 16px;
-      display: flex; flex-direction: column; gap: 8px; font-family: ui-monospace, monospace;
-      font-size: 13px;
-      grid-row: 1 / span 4;
-      min-height: 0;
-      overflow-y: auto;
-    }
-    aside h3 { margin: 0 0 8px 0; font-size: 13px; opacity: 0.7; text-transform: uppercase; }
-    .row { display: flex; justify-content: space-between; }
-    .buttons { grid-column: 1 / span 2; display: grid;
-      grid-template-columns: repeat(6, 1fr); gap: 8px; }
-    .buttons button {
-      padding: 16px; border-radius: 8px; border: 1px solid #444;
-      background: #2c3239; color: var(--fg); font-size: 14px;
-    }
-    .buttons button.estop { background: var(--danger); color: #fff;
-      grid-column: span 2; font-weight: 700; font-size: 18px; }
-    .buttons button.takectl { background: var(--warn); color: #000; }
-    #camera-switch button.active { background: #2a8; color: #fff; }
-    #image-panel {
       position: relative;
-      background: var(--panel);
-      border-radius: 12px;
-      padding: 8px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 0;
+      height: calc(100% - 80px);
+      width: 100%;
+      box-sizing: border-box;
+      background: #000;
+      overflow: hidden;
+    }
+
+    /* Image fills the entire main surface as the background layer. */
+    #image-panel {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background: #000;
     }
     .image-wrapper {
-      position: relative;
-      height: 100%;
-      aspect-ratio: 1.5; /* 384 / 256 = 1.5 */
+      position: absolute;
+      inset: 0;
     }
     #image-canvas,
     #image-badges,
     #image-staleness,
     #image-detections,
     #image-fade {
-      width: 100% !important;
-      height: 100% !important;
+      position: absolute !important;
+      top: 0 !important; left: 0 !important;
+      width: 100% !important; height: 100% !important;
       image-rendering: pixelated;
-      border-radius: 8px;
+      border-radius: 0;
     }
     #image-badges,
     #image-staleness,
     #image-detections,
     #image-fade {
-      position: absolute !important;
-      top: 0 !important;
-      left: 0 !important;
       pointer-events: none !important;
     }
+    #image-meta {
+      position: absolute;
+      top: 12px; left: 50%; transform: translateX(-50%);
+      font-family: ui-monospace, monospace;
+      font-size: 11px; opacity: 0.75; z-index: 20;
+      background: rgba(0,0,0,0.4); padding: 2px 8px; border-radius: 4px;
+      pointer-events: none;
+    }
+
+    /* Shared semi-transparent overlay-panel style. */
+    .overlay-panel {
+      background: rgba(35,40,48,0.55);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+    }
+
+    /* ---- Top button bar (primary actions + gear) ---- */
+    .top-bar {
+      position: absolute; top: 12px; left: 12px; right: 12px;
+      display: flex; gap: 8px; align-items: center;
+      z-index: 30;
+    }
+    .top-bar .spacer { flex: 1; }
+    .top-bar button {
+      padding: 10px 14px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(44,50,57,0.55);
+      color: var(--fg); font-size: 14px;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      cursor: pointer;
+    }
+    .top-bar button:hover { background: rgba(44,50,57,0.75); }
+    .top-bar button.takectl { background: rgba(255,122,0,0.55); color: #000; }
+    .top-bar button.icon {
+      width: 42px; height: 42px; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    #settings-toggle.active,
+    #telemetry-toggle.active { background: rgba(76,175,80,0.7); color: #000; }
+
+    /* ---- Bottom row: joysticks + E-STOP ---- */
+    .bottom-bar {
+      position: absolute; left: 0; right: 0; bottom: 12px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: end;
+      gap: 16px;
+      padding: 0 16px;
+      z-index: 30;
+      pointer-events: none; /* children re-enable */
+    }
+    .bottom-bar > * { pointer-events: auto; }
+    .joystick-pad {
+      position: relative;
+      width: clamp(180px, 22vw, 320px);
+      height: clamp(180px, 22vw, 320px);
+      background: rgba(35,40,48,0.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 50%;
+      user-select: none;
+      touch-action: none;
+    }
+    #pad-left  { justify-self: start; }
+    #pad-right { justify-self: end; }
+    .joystick-pad canvas {
+      position: absolute; inset: 0;
+      width: 100% !important; height: 100% !important;
+    }
+    .joystick-pad .label {
+      position: absolute; top: 8px; left: 0; right: 0;
+      text-align: center;
+      font-size: 12px; opacity: 0.8;
+      pointer-events: none;
+    }
+    body.controls-locked .joystick-pad,
+    body.controls-locked .top-bar button:not(.icon),
+    body.controls-locked .settings-drawer button {
+      opacity: 0.45;
+    }
+    /* E-STOP: rectangular, anchored near the bottom of the image so it
+       blocks less of the camera view. Sits between the two joystick
+       circles. */
+    .estop-wrap {
+      justify-self: center;
+      display: flex; align-items: flex-end;
+      padding-bottom: 0;
+    }
+    #estop {
+      width: clamp(160px, 18vw, 260px);
+      height: clamp(48px, 6vw, 72px);
+      border-radius: 10px;
+      background: var(--danger); color: #fff;
+      border: 3px solid #fff;
+      font-weight: 800; font-size: clamp(16px, 1.6vw, 22px);
+      letter-spacing: 0.06em;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.55), 0 0 0 3px rgba(214,40,40,0.35);
+      cursor: pointer;
+    }
+    #estop:active { transform: translateY(1px); }
+
+    /* ---- Telemetry sidebar (overlay, right side) ----
+       Hidden by default; revealed by the bar-chart toggle in the top bar.
+       When open it floats above the joysticks (z-index 40) so the values
+       stay readable. */
+    aside {
+      position: absolute; top: 70px; right: 12px;
+      width: 220px;
+      max-height: calc(100% - 90px);
+      padding: 10px 12px;
+      display: none;
+      flex-direction: column; gap: 4px;
+      font-family: ui-monospace, monospace; font-size: 12px;
+      overflow-y: auto;
+      z-index: 40;
+    }
+    aside.open { display: flex; }
+    aside h3 { margin: 0 0 4px 0; font-size: 11px; opacity: 0.7; text-transform: uppercase; }
+    .row { display: flex; justify-content: space-between; }
+
+    /* ---- Settings drawer (gear-toggled) ----
+       z-index 40 puts it ON TOP of the left joystick (bottom-bar is 30)
+       so the AUX / CAM / RADIO buttons stay readable while open. */
+    .settings-drawer {
+      position: absolute; top: 70px; left: 12px;
+      width: clamp(260px, 30vw, 360px);
+      padding: 14px;
+      display: none;
+      flex-direction: column; gap: 12px;
+      z-index: 40;
+    }
+    .settings-drawer.open { display: flex; }
+    .settings-drawer .group-label {
+      font-size: 11px; text-transform: uppercase; opacity: 0.7;
+      margin-bottom: 4px; letter-spacing: 0.05em;
+    }
+    .settings-drawer .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+    .settings-drawer button {
+      padding: 10px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(44,50,57,0.65); color: var(--fg);
+      font-size: 13px; cursor: pointer;
+    }
+    .settings-drawer button:hover { background: rgba(44,50,57,0.85); }
+    .settings-drawer #camera-switch button.active,
+    #camera-switch button.active { background: rgba(42,170,136,0.75); color: #fff; }
+    .settings-drawer #radio-bench-status {
+      grid-column: span 2; opacity: 0.85; font-size: 12px;
+    }
+
     footer {
       padding: 4px 16px; background: var(--panel);
       border-top: 1px solid #333; font-size: 12px; opacity: 0.85;
+      position: relative; z-index: 50;
     }
     .gamepad-pill { padding: 2px 8px; border-radius: 12px;
       background: #444; font-size: 11px; }
@@ -136,16 +266,70 @@
   </header>
 
   <main>
-    <div class="joystick-pad" id="pad-left">
-      <span class="label">LH · drive</span>
-      <canvas></canvas>
-    </div>
-    <div class="joystick-pad" id="pad-right">
-      <span class="label">RH · boom / aux</span>
-      <canvas></canvas>
+    <!--
+      Background layer: tile-delta image canvas. Fills the entire main
+      area between header and footer (LORA_PROTOCOL.md § TileDeltaFrame,
+      topic 0x25). Tiles older than IMAGE_STALE_S get a yellow tint via
+      overlay; missing ones stay as the last received pixel data.
+    -->
+    <div id="image-panel">
+      <div class="image-wrapper">
+        <canvas id="image-canvas" width="384" height="256" style="background:#000;"></canvas>
+        <div id="image-meta">no image</div>
+      </div>
     </div>
 
-    <aside>
+    <!-- Top button bar: primary buttons + gear icon for settings drawer. -->
+    <div class="top-bar">
+      <button data-btn="0">CURL</button>
+      <button data-btn="1">DUMP</button>
+      <button data-btn="7" class="takectl">REQ CTRL</button>
+      <div class="spacer"></div>
+      <button id="telemetry-toggle" class="icon" title="Toggle telemetry"
+              aria-label="Toggle telemetry" aria-expanded="false">
+        <!-- bar chart glyph -->
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="4"  y1="17" x2="4"  y2="11"/>
+          <line x1="10" y1="17" x2="10" y2="6"/>
+          <line x1="16" y1="17" x2="16" y2="13"/>
+          <line x1="2"  y1="18" x2="18" y2="18"/>
+        </svg>
+      </button>
+      <button id="settings-toggle" class="icon" title="Toggle settings"
+              aria-label="Toggle settings" aria-expanded="false">⚙</button>
+    </div>
+
+    <!-- Gear-toggled drawer: AUX, camera switch, radio bench, telemetry helpers. -->
+    <div id="settings-drawer" class="settings-drawer overlay-panel">
+      <div>
+        <div class="group-label">Aux outputs</div>
+        <div class="grid">
+          <button data-btn="2">AUX 1</button>
+          <button data-btn="3">AUX 2</button>
+        </div>
+      </div>
+      <div>
+        <div class="group-label">Camera</div>
+        <div class="grid" id="camera-switch">
+          <button data-cam="front">FRONT</button>
+          <button data-cam="rear">REAR</button>
+          <button data-cam="implement">IMPL</button>
+          <button data-cam="auto" class="active">AUTO*</button>
+        </div>
+      </div>
+      <div>
+        <div class="group-label">Radio bench</div>
+        <div class="grid" id="radio-bench-switch">
+          <button data-radio="wake">RADIO ON</button>
+          <button data-radio="sleep">RADIO OFF</button>
+          <button id="radio-bench-status" disabled>Radio bench: idle</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Telemetry sidebar (overlay on right edge, bar-chart-button toggled). -->
+    <aside id="telemetry-panel" class="overlay-panel">
       <h3>Telemetry</h3>
       <div class="row"><span>Engine RPM</span><span id="t-rpm">—</span></div>
       <div class="row"><span>Oil temp</span><span id="t-oil">—</span></div>
@@ -157,48 +341,23 @@
       <div class="row"><span>Image use</span><span id="t-img-use">—</span></div>
       <div class="row"><span>Encode</span><span id="t-encode">—</span></div>
       <div class="row"><span>NDVI</span><span id="t-ndvi">—</span></div>
-      <h3 style="margin-top:16px">Active source</h3>
+      <h3 style="margin-top:10px">Active source</h3>
       <div class="row"><span>Source</span><span id="t-src">—</span></div>
       <div class="row"><span>Camera</span><span id="t-cam">—</span></div>
     </aside>
 
-    <div class="buttons">
-      <button data-btn="0">CURL</button>
-      <button data-btn="1">DUMP</button>
-      <button data-btn="2">AUX 1</button>
-      <button data-btn="3">AUX 2</button>
-      <button data-btn="7" class="takectl">REQ CTRL</button>
-      <button id="estop" class="estop">E-STOP</button>
-    </div>
-
-    <div class="buttons" id="camera-switch" style="grid-column: 1 / span 2;">
-      <button data-cam="front">CAM FRONT</button>
-      <button data-cam="rear">CAM REAR</button>
-      <button data-cam="implement">CAM IMPL</button>
-      <button data-cam="auto" class="active">CAM AUTO*</button>
-    </div>
-
-    <div class="buttons" id="radio-bench-switch" style="grid-column: 1 / span 2;">
-      <button data-radio="wake">RADIO ON (RXCONT)</button>
-      <button data-radio="sleep">RADIO OFF (SLEEP)</button>
-      <button id="radio-bench-status" disabled style="grid-column: span 4; opacity:0.8;">Radio bench: idle</button>
-    </div>
-
-    <!--
-      Tile-delta image canvas. Renders the persistent canvas reassembled
-      from TileDeltaFrame (LORA_PROTOCOL.md § TileDeltaFrame, topic 0x25).
-      Tiles older than IMAGE_STALE_S get a yellow tint via overlay; missing
-      ones stay as the last received pixel data per the I/P scheme.
-      Spans both joystick columns; sidebar untouched.
-    -->
-    <div id="image-panel" style="grid-column: 1 / span 2;">
-      <div class="image-wrapper">
-        <canvas id="image-canvas" width="384" height="256" style="background:#000;"></canvas>
-        <div id="image-meta" style="position: absolute; top: 12px; right: 16px;
-                                     font-family: ui-monospace, monospace;
-                                     font-size: 11px; opacity: 0.8; z-index: 20;">
-          no image
-        </div>
+    <!-- Bottom bar: left joystick · E-STOP · right joystick. -->
+    <div class="bottom-bar">
+      <div class="joystick-pad" id="pad-left">
+        <span class="label">LH · drive</span>
+        <canvas></canvas>
+      </div>
+      <div class="estop-wrap">
+        <button id="estop">E-STOP</button>
+      </div>
+      <div class="joystick-pad" id="pad-right">
+        <span class="label">RH · boom / aux</span>
+        <canvas></canvas>
       </div>
     </div>
   </main>
@@ -236,6 +395,35 @@
   <script src="/static/img/source_guard.js"></script>
   <script src="/static/img/accel_status.js"></script>
   <script src="/static/img/raw_mode_toggle.js"></script>
-  <script src="/static/app.js?v=5"></script>
+  <script src="/static/app.js?v=7"></script>
+  <script>
+    // Gear-icon toggle for the settings drawer (AUX / camera / radio bench).
+    // Bar-chart-icon toggle for the telemetry sidebar.
+    (function () {
+      function bindToggle(btnId, panelId) {
+        const btn = document.getElementById(btnId);
+        const panel = document.getElementById(panelId);
+        if (!btn || !panel) return null;
+        btn.addEventListener('click', () => {
+          const open = panel.classList.toggle('open');
+          btn.classList.toggle('active', open);
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+        return { btn, panel };
+      }
+      const settings = bindToggle('settings-toggle', 'settings-drawer');
+      const telemetry = bindToggle('telemetry-toggle', 'telemetry-panel');
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        for (const t of [settings, telemetry]) {
+          if (t && t.panel.classList.contains('open')) {
+            t.panel.classList.remove('open');
+            t.btn.classList.remove('active');
+            t.btn.setAttribute('aria-expanded', 'false');
+          }
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
