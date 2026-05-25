@@ -188,37 +188,14 @@
     if (wsTele.readyState === WebSocket.OPEN) wsTele.send('ping');
   }, 5000);
 
-  // ----- Image canvas (tile-delta reassembled frames from /ws/image) -----
-  // The base reassembles TileDeltaFrame fragments into a single WebP/PNG
-  // blob and pushes it as a binary WebSocket message. We draw via
-  // createImageBitmap so the browser handles WebP natively.
+  // ----- Image metadata (authoritative /ws/state event stream) -----
+  // Image pixels are rendered by img/canvas_renderer.js from `/ws/state`.
+  // Keep app.js limited to UI metadata so no secondary renderer can
+  // overwrite tile-delta output.
   (() => {
     const cvs  = document.getElementById('image-canvas');
     const meta = document.getElementById('image-meta');
     if (!cvs) return;
-    const ctx  = cvs.getContext('2d');
-    const wsImg = new WebSocket(`ws://${location.host}/ws/image`);
-    wsImg.binaryType = 'arraybuffer';
-    let frames = 0;
-    let lastTs = performance.now();
-    wsImg.addEventListener('message', async (ev) => {
-      try {
-        const blob = new Blob([ev.data]);
-        const bmp  = await createImageBitmap(blob);
-        ctx.drawImage(bmp, 0, 0, cvs.width, cvs.height);
-        bmp.close && bmp.close();
-        frames++;
-        const now = performance.now();
-        if (now - lastTs > 1000) {
-          meta.textContent = `${frames} fps · ${ev.data.byteLength} B`;
-          frames = 0;
-          lastTs = now;
-        }
-      } catch (e) {
-        meta.textContent = 'decode err: ' + e.message;
-      }
-    });
-
     let stateFrames = 0;
     let stateLastTs = performance.now();
     window.addEventListener('lifetrac-state', (ev) => {
@@ -230,16 +207,6 @@
         stateLastTs = now;
       }
     });
-
-    wsImg.addEventListener('close', () => {
-      // If we are actively receiving state stream updates, don't show closed legacy image link message.
-      if (performance.now() - stateLastTs > 2000) {
-        meta.textContent = 'image link closed';
-      }
-    });
-    setInterval(() => {
-      if (wsImg.readyState === WebSocket.OPEN) wsImg.send('ping');
-    }, 5000);
   })();
 
   // ----- Virtual joystick pads (touch + mouse) -----
@@ -339,6 +306,32 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ camera: cam }),
       });
+    });
+  });
+
+  // ----- Bench radio toggles (temporary diagnostics control) -----
+  const radioStatus = document.getElementById('radio-bench-status');
+  document.querySelectorAll('#radio-bench-switch button[data-radio]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const mode = btn.dataset.radio;
+      if (!mode) return;
+      if (radioStatus) radioStatus.textContent = `Radio bench: ${mode}...`;
+      try {
+        const resp = await fetch('/api/bench/radio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        const ok = !!(resp.ok && data && data.ok);
+        if (radioStatus) {
+          radioStatus.textContent = ok
+            ? `Radio bench: ${mode} OK`
+            : `Radio bench: ${mode} FAIL`;
+        }
+      } catch (e) {
+        if (radioStatus) radioStatus.textContent = 'Radio bench: request failed';
+      }
     });
   });
 

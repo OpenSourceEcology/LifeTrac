@@ -184,6 +184,8 @@ class Bridge:
             logging.warning("build_config: load failed (%s); bridge continues", _bc_exc)
         self.ser = serial.Serial(port, 115200, timeout=0.1)
         self.dec = KissDecoder()
+        # Must exist before mqtt.loop_start(): callbacks may run immediately.
+        self.nonce_store = None
         self.mqtt = mqtt.Client(client_id="lora_bridge")
         self.mqtt.on_message = self._on_mqtt_message
         self.mqtt.connect(mqtt_host, 1883)

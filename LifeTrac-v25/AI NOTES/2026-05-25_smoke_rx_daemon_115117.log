@@ -1,0 +1,14 @@
+2026-05-25 11:26:12,700 INFO image_rx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+2026-05-25 11:26:12,702 INFO image_rx_daemon: image_rx_daemon started; mqtt=192.168.1.117:1883 uart=/dev/ttymxc3
+2026-05-25 11:26:12,712 INFO image_rx_daemon: MQTT connected; ready to publish lifetrac/v25/video/tile_delta
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x09 sub=0x01 lanes=LPUART1 raw=090100000000000000000000000000000000000092e30e00
+STATS_URC(boot) drained seq=0 (unsolicited snapshot — discarding so it can't poison later request() calls)
+WARNING: dropped malformed frame: truncated COBS payload
+WARNING: dropped malformed frame: truncated COBS payload
+WARNING: dropped malformed frame: truncated COBS payload
+2026-05-25 11:26:13,704 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+WARNING: dropped malformed frame: truncated COBS payload
+WARNING: dropped malformed frame: truncated COBS payload
+2026-05-25 11:26:15,448 ERROR image_rx_daemon: VER warm-up failed: timeout waiting for response type 0x81 to req 0x01
+2026-05-25 11:26:15,450 ERROR image_rx_daemon: fatal: cannot open L072 HostLink: timeout waiting for response type 0x81 to req 0x01
+2026-05-25 11:26:15,719 INFO image_rx_daemon: image_rx_daemon exit

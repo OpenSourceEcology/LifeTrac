@@ -16,6 +16,8 @@ Exit codes:
   2 = Fatal transport / timeout failure
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import struct

@@ -1,0 +1,370 @@
+2026-05-25 11:26:15,900 INFO image_tx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+2026-05-25 11:26:15,902 INFO image_tx_daemon: image_tx_daemon started; mqtt=192.168.1.117:1883 uart=/dev/ttymxc3
+2026-05-25 11:26:15,911 INFO image_tx_daemon: MQTT connected; subscribing to lifetrac/v25/cmd/image_frame
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x09 sub=0x01 lanes=LPUART1 raw=0901000000000000000000000000000000000000575c7200
+STATS_URC(boot) drained seq=0 (unsolicited snapshot — discarding so it can't poison later request() calls)
+BOOT_URC observed during settle (payload=000112010200)
+INFO: drained type=0xF2 seq=0 during boot settle
+2026-05-25 11:26:16,903 INFO image_tx_daemon: stats: frames_in=0 ok=0 fail=0 drop_full=0 frags_ok=0 frags_fail=0 qdepth=0
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+Initializing regulatory profile 1 on co-processor...
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+CFG_SET_REQ(REG_PROFILE=1) OK: 14000100
+2026-05-25 11:26:17,808 INFO image_tx_daemon: LBT_ENABLE=0 (matches W1-10b TX_BURST rationale)
+2026-05-25 11:26:17,809 INFO image_tx_daemon: TX worker ready (inter_cycle_s=0.050, max 8 frags/dwell)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:19,629 WARNING image_tx_daemon: TX_DONE non-OK: seq=1 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:20,121 WARNING image_tx_daemon: TX_DONE non-OK: seq=1 idx=3 tx_id=0x03 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:20,462 INFO image_tx_daemon: frame seq=1 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:21,018 WARNING image_tx_daemon: TX_DONE non-OK: seq=2 idx=3 tx_id=0x03 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:21,348 INFO image_tx_daemon: frame seq=2 done: 6/7 fragments ok (1 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:21,564 WARNING image_tx_daemon: TX_DONE non-OK: seq=3 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:21,830 WARNING image_tx_daemon: TX_DONE non-OK: seq=3 idx=1 tx_id=0x01 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:22,322 WARNING image_tx_daemon: TX_DONE non-OK: seq=3 idx=4 tx_id=0x04 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:22,540 INFO image_tx_daemon: frame seq=3 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:22,755 WARNING image_tx_daemon: TX_DONE non-OK: seq=4 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:23,021 WARNING image_tx_daemon: TX_DONE non-OK: seq=4 idx=1 tx_id=0x01 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:23,627 WARNING image_tx_daemon: TX_DONE non-OK: seq=4 idx=5 tx_id=0x05 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:23,731 INFO image_tx_daemon: frame seq=4 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:23,947 WARNING image_tx_daemon: TX_DONE non-OK: seq=5 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:24,326 WARNING image_tx_daemon: TX_DONE non-OK: seq=5 idx=2 tx_id=0x02 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:24,818 WARNING image_tx_daemon: TX_DONE non-OK: seq=5 idx=5 tx_id=0x05 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:24,922 INFO image_tx_daemon: frame seq=5 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:25,138 WARNING image_tx_daemon: TX_DONE non-OK: seq=7 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:25,517 WARNING image_tx_daemon: TX_DONE non-OK: seq=7 idx=2 tx_id=0x02 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:26,113 WARNING image_tx_daemon: TX_DONE non-OK: seq=7 idx=6 tx_id=0x06 status=1(TIMEOUT) toa_us=41088
+2026-05-25 11:26:26,113 INFO image_tx_daemon: frame seq=7 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:26,329 WARNING image_tx_daemon: TX_DONE non-OK: seq=9 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:26,822 WARNING image_tx_daemon: TX_DONE non-OK: seq=9 idx=3 tx_id=0x03 status=1(TIMEOUT) toa_us=48768
+2026-05-25 11:26:26,914 INFO image_tx_daemon: stats: frames_in=14 ok=0 fail=6 drop_full=3 frags_ok=27 frags_fail=15 qdepth=4
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:27,153 INFO image_tx_daemon: frame seq=9 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:27,823 WARNING image_tx_daemon: TX_DONE non-OK: seq=11 idx=4 tx_id=0x04 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:28,040 INFO image_tx_daemon: frame seq=11 done: 6/7 fragments ok (1 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:28,256 WARNING image_tx_daemon: TX_DONE non-OK: seq=13 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:28,521 WARNING image_tx_daemon: TX_DONE non-OK: seq=13 idx=1 tx_id=0x01 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:29,014 WARNING image_tx_daemon: TX_DONE non-OK: seq=13 idx=4 tx_id=0x04 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:29,231 INFO image_tx_daemon: frame seq=13 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:29,447 WARNING image_tx_daemon: TX_DONE non-OK: seq=15 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:29,713 WARNING image_tx_daemon: TX_DONE non-OK: seq=15 idx=1 tx_id=0x01 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:30,320 WARNING image_tx_daemon: TX_DONE non-OK: seq=15 idx=5 tx_id=0x05 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:30,424 INFO image_tx_daemon: frame seq=15 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:30,640 WARNING image_tx_daemon: TX_DONE non-OK: seq=17 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:31,019 WARNING image_tx_daemon: TX_DONE non-OK: seq=17 idx=2 tx_id=0x02 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:31,512 WARNING image_tx_daemon: TX_DONE non-OK: seq=17 idx=5 tx_id=0x05 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:31,615 INFO image_tx_daemon: frame seq=17 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:31,831 WARNING image_tx_daemon: TX_DONE non-OK: seq=19 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:32,210 WARNING image_tx_daemon: TX_DONE non-OK: seq=19 idx=2 tx_id=0x02 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:32,654 INFO image_tx_daemon: frame seq=19 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:33,210 WARNING image_tx_daemon: TX_DONE non-OK: seq=21 idx=3 tx_id=0x03 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:33,541 INFO image_tx_daemon: frame seq=21 done: 6/7 fragments ok (1 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:33,757 WARNING image_tx_daemon: TX_DONE non-OK: seq=22 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:34,022 WARNING image_tx_daemon: TX_DONE non-OK: seq=22 idx=1 tx_id=0x01 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:34,515 WARNING image_tx_daemon: TX_DONE non-OK: seq=22 idx=4 tx_id=0x04 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:34,733 INFO image_tx_daemon: frame seq=22 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:34,948 WARNING image_tx_daemon: TX_DONE non-OK: seq=24 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:35,214 WARNING image_tx_daemon: TX_DONE non-OK: seq=24 idx=1 tx_id=0x01 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:35,708 WARNING image_tx_daemon: TX_DONE non-OK: seq=24 idx=4 tx_id=0x04 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:35,925 INFO image_tx_daemon: frame seq=24 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:36,141 WARNING image_tx_daemon: TX_DONE non-OK: seq=27 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:36,406 WARNING image_tx_daemon: TX_DONE non-OK: seq=27 idx=1 tx_id=0x01 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:36,926 INFO image_tx_daemon: stats: frames_in=31 ok=0 fail=15 drop_full=11 frags_ok=69 frags_fail=36 qdepth=4
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:37,012 WARNING image_tx_daemon: TX_DONE non-OK: seq=27 idx=5 tx_id=0x05 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:37,116 INFO image_tx_daemon: frame seq=27 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:37,332 WARNING image_tx_daemon: TX_DONE non-OK: seq=29 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:37,711 WARNING image_tx_daemon: TX_DONE non-OK: seq=29 idx=2 tx_id=0x02 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:38,204 WARNING image_tx_daemon: TX_DONE non-OK: seq=29 idx=5 tx_id=0x05 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:38,287 INFO image_tx_daemon: frame seq=29 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:38,503 WARNING image_tx_daemon: TX_DONE non-OK: seq=31 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:39,110 WARNING image_tx_daemon: TX_DONE non-OK: seq=31 idx=4 tx_id=0x04 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:39,328 INFO image_tx_daemon: frame seq=31 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:39,544 WARNING image_tx_daemon: TX_DONE non-OK: seq=33 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:39,809 WARNING image_tx_daemon: TX_DONE non-OK: seq=33 idx=1 tx_id=0x01 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:40,302 WARNING image_tx_daemon: TX_DONE non-OK: seq=33 idx=4 tx_id=0x04 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:40,519 INFO image_tx_daemon: frame seq=33 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:40,735 WARNING image_tx_daemon: TX_DONE non-OK: seq=34 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:41,000 WARNING image_tx_daemon: TX_DONE non-OK: seq=34 idx=1 tx_id=0x01 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:41,606 WARNING image_tx_daemon: TX_DONE non-OK: seq=34 idx=5 tx_id=0x05 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:41,720 INFO image_tx_daemon: frame seq=34 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:41,936 WARNING image_tx_daemon: TX_DONE non-OK: seq=36 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:42,202 WARNING image_tx_daemon: TX_DONE non-OK: seq=36 idx=1 tx_id=0x01 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:42,694 WARNING image_tx_daemon: TX_DONE non-OK: seq=36 idx=4 tx_id=0x04 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:43,004 INFO image_tx_daemon: frame seq=36 done: 5/8 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:43,220 WARNING image_tx_daemon: TX_DONE non-OK: seq=38 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:43,599 WARNING image_tx_daemon: TX_DONE non-OK: seq=38 idx=2 tx_id=0x02 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:43,703 INFO image_tx_daemon: frame seq=38 done: 2/4 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:43,918 WARNING image_tx_daemon: TX_DONE non-OK: seq=40 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:44,297 WARNING image_tx_daemon: TX_DONE non-OK: seq=40 idx=2 tx_id=0x02 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:44,401 INFO image_tx_daemon: frame seq=40 done: 2/4 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:44,617 WARNING image_tx_daemon: TX_DONE non-OK: seq=41 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:44,996 WARNING image_tx_daemon: TX_DONE non-OK: seq=41 idx=2 tx_id=0x02 status=1(TIMEOUT) toa_us=48768
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:45,100 INFO image_tx_daemon: frame seq=41 done: 2/4 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 11:26:45,317 WARNING image_tx_daemon: TX_DONE non-OK: seq=42 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=48768
+2026-05-25 11:26:45,323 INFO image_tx_daemon: signal received; shutting down
+2026-05-25 11:26:45,367 INFO image_tx_daemon: frame seq=42 done: 0/4 fragments ok (1 fail)
+2026-05-25 11:26:45,819 INFO image_tx_daemon: image_tx_daemon exit

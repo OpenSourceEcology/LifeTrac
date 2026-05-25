@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import secrets
+import subprocess
 import threading
 import time
 from collections import defaultdict
@@ -78,6 +79,11 @@ class LoginBody(BaseModel):
 class AccelToggleBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool
+
+
+class BenchRadioBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: str = Field(..., pattern="^(sleep|wake)$")
 
 
 class ParamsBody(BaseModel):
@@ -473,7 +479,13 @@ def _on_mqtt_message(_c, _u, msg):
                 fut.add_done_callback(_ws_send_done("image"))
         return
 
-    if msg.topic.endswith("/video/tile_delta") or msg.topic.endswith("/cmd/image_frame"):
+    # Bench-only compatibility path: some legacy bring-up scripts publish
+    # tile payloads on /cmd/image_frame. Keep this disabled by default so a
+    # local synthetic publisher cannot override the authoritative radio path.
+    allow_cmd_image = os.environ.get("LIFETRAC_ALLOW_CMD_IMAGE_FRAME", "").strip() == "1"
+    if msg.topic.endswith("/video/tile_delta") or (
+        allow_cmd_image and msg.topic.endswith("/cmd/image_frame")
+    ):
         _ingest_tile_delta(bytes(msg.payload))
         return
 
@@ -486,7 +498,9 @@ def _on_mqtt_message(_c, _u, msg):
             candidate = _source_name(data)
         if candidate is not None:
             _set_active_source(candidate)
-    _maybe_capture_params(msg.topic, data)
+    maybe_capture = globals().get("_maybe_capture_params")
+    if callable(maybe_capture):
+        maybe_capture(msg.topic, data)
 
     # S7.1 LINK-pill cross-process glue: forward the per-direction
     # adapter snapshot published by lora_bridge._airtime_worker on
@@ -520,7 +534,8 @@ mqtt_client.subscribe("lifetrac/v25/telemetry/#")
 mqtt_client.subscribe("lifetrac/v25/status/#")
 mqtt_client.subscribe("lifetrac/v25/video/#")
 mqtt_client.subscribe("lifetrac/v25/control/#")
-mqtt_client.subscribe("lifetrac/v25/cmd/image_frame")
+if os.environ.get("LIFETRAC_ALLOW_CMD_IMAGE_FRAME", "").strip() == "1":
+    mqtt_client.subscribe("lifetrac/v25/cmd/image_frame")
 mqtt_client.subscribe("lifetrac/v25/params/changed")
 
 
@@ -903,6 +918,80 @@ async def ws_control(ws: WebSocket):
 async def estop(_session: str = Depends(_require_session)):
     mqtt_client.publish("lifetrac/v25/cmd/estop", b"", qos=1)
     return {"ok": True}
+
+
+def _run_bench_radio_script(mode: str) -> dict[str, Any]:
+    helper_dir = (Path(__file__).resolve().parent / ".." /
+                  "firmware" / "x8_lora_bootloader_helper").resolve()
+    script_name = "run_radio_sleep.ps1" if mode == "sleep" else "run_radio_wake_rxcont.ps1"
+    script_path = helper_dir / script_name
+    if not script_path.exists():
+        return {
+            "ok": False,
+            "mode": mode,
+            "error": f"helper script missing: {script_path}",
+            "returncode": -1,
+            "output_tail": [],
+        }
+
+    cmd = [
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(script_path),
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            text=True,
+            capture_output=True,
+            timeout=180,
+            cwd=str(helper_dir),
+            check=False,
+        )
+        merged = ((proc.stdout or "") + "\n" + (proc.stderr or "")).strip()
+        lines = [ln for ln in merged.splitlines() if ln.strip()]
+        return {
+            "ok": proc.returncode == 0,
+            "mode": mode,
+            "returncode": proc.returncode,
+            "output_tail": lines[-40:],
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "ok": False,
+            "mode": mode,
+            "returncode": 124,
+            "error": "bench radio helper timed out",
+            "output_tail": [],
+        }
+
+
+@app.post("/api/bench/radio")
+async def api_bench_radio(body: BenchRadioBody,
+                          _session: str = Depends(_require_session)):
+    # Bench-only guard so production deployments can hard-disable this switch.
+    flag = os.environ.get("LIFETRAC_ENABLE_BENCH_RADIO", "1").strip().lower()
+    if flag not in {"1", "true", "yes", "on"}:
+        raise HTTPException(status_code=403, detail="bench radio control disabled")
+
+    result = _run_bench_radio_script(body.mode)
+    try:
+        mqtt_client.publish(
+            "lifetrac/v25/control/bench_radio",
+            json.dumps({
+                "mode": body.mode,
+                "ok": bool(result.get("ok")),
+                "returncode": int(result.get("returncode", -1)),
+            }).encode(),
+            qos=1,
+        )
+    except Exception:
+        pass
+    code = 200 if result.get("ok") else 500
+    return JSONResponse(result, status_code=code)
 
 
 # Camera selection: maps human-readable name -> CMD_CAMERA_SELECT payload byte.

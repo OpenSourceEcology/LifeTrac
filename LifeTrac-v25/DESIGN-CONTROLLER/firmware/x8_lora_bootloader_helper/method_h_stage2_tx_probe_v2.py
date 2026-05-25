@@ -29,6 +29,8 @@ W1-9b probe modes (--probe regversion|fsk):
   2 = fatal transport setup (no BOOT_URC, link open failure, etc.)
 """
 
+from __future__ import annotations
+
 import argparse
 import struct
 import sys
@@ -319,17 +321,55 @@ def _format_runtime_profile_line(payload: bytes = None, exc: BaseException = Non
     return f"RUNTIME_PROFILE_ENUM={payload[2]}"
 
 
-def configure_regulatory_profile_if_needed(link: HostLink) -> None:
+def configure_regulatory_profile_if_needed(link: HostLink, profile_id: int = 1) -> None:
     """Configures the required regulatory profile parameters and activates the
-    FHSS profile REG_PROFILE_FCC_15_247_FHSS_50CH_BW250 on the co-processor.
-    This fulfills the production requirement for FHSS channel hopping.
+    specified regulatory profile (default 1 = REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) on the co-processor.
+    If profile_id = 2, activates REG_PROFILE_FCC_15_247_DTS_BW500.
+
+    Profile 0 = REG_PROFILE_BENCH_ONLY_FIXED_915 — deterministic single-channel
+    915 MHz, 125 kHz BW. Use this for two-peer bench air-link tests (the
+    50-ch FHSS profile (1) has per-board channel-pick non-determinism: each
+    board picks a different starting channel from the mask, and re-activating
+    the same profile does NOT re-tune FRF, so two peers end up on different
+    carriers and never decode each other — root cause of the 2026-05-25
+    rx_frames=0 bug, see AI NOTES/2026-05-25_Radio_RX_Frames_Zero_Channel_Mismatch.md).
+
+    Env overrides:
+      LIFETRAC_REG_PROFILE=<0|1|2>     — override profile_id (default = caller arg).
+      LIFETRAC_FHSS_WIDE_MASK=1        — restore historical 50-ch wide mask
+                                        (otherwise narrow to single channel).
+      LIFETRAC_FHSS_CHANNEL=<0..49>    — single-channel mask index (default 0).
     """
-    print("Initializing regulatory profile on co-processor...")
-    
-    # 1. Set the FHSS channel mask (50 channels required, indices 0..49)
-    # 0x0003FFFFFFFFFFFF (50 continuous active channels)
-    # Little-endian representation of 0x0003FFFFFFFFFFFF is \xff\xff\xff\xff\xff\xff\x03\x00 (8 bytes)
-    channel_mask_payload = bytes([CFG_KEY_FHSS_CHANNEL_MASK, 0x08, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03, 0x00])
+    import os as _os
+    env_prof = _os.environ.get("LIFETRAC_REG_PROFILE")
+    if env_prof is not None:
+        try:
+            profile_id = int(env_prof)
+        except ValueError:
+            pass
+    print(f"Initializing regulatory profile {profile_id} on co-processor...")
+
+    # 1. Set the FHSS channel mask.
+    #
+    # NOTE: the L072 driver only re-tunes FRF on a profile *transition*; a
+    # mid-session mask narrowing does not retroactively change the picked
+    # channel. The mask still matters for any future profile activation /
+    # FHSS hop, so we narrow it by default; combine with profile=0
+    # (BENCH_ONLY_FIXED_915) for a deterministic 915 MHz two-peer bench link.
+    if _os.environ.get("LIFETRAC_FHSS_WIDE_MASK") == "1":
+        mask_bytes = bytes([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03, 0x00])
+        print("  FHSS mask: WIDE (50 channels) [LIFETRAC_FHSS_WIDE_MASK=1]")
+    else:
+        try:
+            ch = int(_os.environ.get("LIFETRAC_FHSS_CHANNEL", "0"))
+        except ValueError:
+            ch = 0
+        if not 0 <= ch <= 49:
+            ch = 0
+        mask_int = 1 << ch
+        mask_bytes = mask_int.to_bytes(8, "little")
+        print(f"  FHSS mask: single channel {ch} ({mask_bytes.hex()})")
+    channel_mask_payload = bytes([CFG_KEY_FHSS_CHANNEL_MASK, 0x08]) + mask_bytes
     try:
         ack = link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC, channel_mask_payload, timeout=1.0)
         print(f"CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: {ack['payload'].hex()}")
@@ -354,13 +394,73 @@ def configure_regulatory_profile_if_needed(link: HostLink) -> None:
     except Exception as exc:
         print(f"WARN: CFG_SET_REQ(HW_CEILING_DBM) failed: {exc}")
         
-    # 4. Set the regulatory profile to REG_PROFILE_FCC_15_247_FHSS_50CH_BW250 (1) and activate
-    reg_profile_payload = bytes([CFG_KEY_REG_PROFILE, 0x01, REG_PROFILE_FCC_15_247_FHSS_50CH_BW250])
+    # 4. Set the regulatory profile to profile_id and activate
+    reg_profile_payload = bytes([CFG_KEY_REG_PROFILE, 0x01, profile_id])
     try:
         ack = link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC, reg_profile_payload, timeout=1.0)
-        print(f"CFG_SET_REQ(REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) OK: {ack['payload'].hex()}")
+        print(f"CFG_SET_REQ(REG_PROFILE={profile_id}) OK: {ack['payload'].hex()}")
     except Exception as exc:
-        print(f"WARN: CFG_SET_REQ(REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) failed: {exc}")
+        print(f"WARN: CFG_SET_REQ(REG_PROFILE={profile_id}) failed: {exc}")
+
+    # 5. Force-pin the SX1276 FRF (carrier frequency) directly via register
+    # writes if requested. This is the *workaround* for the 2026-05-25
+    # "rx_frames=0" bug where the L072 firmware ACKs CFG_SET(REG_PROFILE) with
+    # OK but does NOT re-tune RegFrf{Msb,Mid,Lsb} on the SX1276 (it only
+    # re-applies on a *real* profile-id transition, and even then it picks a
+    # different starting channel per board from the FHSS mask — see
+    # AI NOTES/2026-05-25_Radio_RX_Frames_Zero_Channel_Mismatch.md).
+    #
+    # Env: LIFETRAC_FORCE_FRF_HZ=<int>   — explicit override (e.g. 915000000).
+    # Default: when profile_id==0 (BENCH_ONLY_FIXED_915) we auto-pin to
+    # 915_000_000 Hz so both peers land on the same carrier. Other profile
+    # IDs leave FRF untouched unless the env var is set.
+    force_frf_hz = None
+    env_frf = _os.environ.get("LIFETRAC_FORCE_FRF_HZ")
+    if env_frf:
+        try:
+            force_frf_hz = int(env_frf)
+        except ValueError:
+            print(f"WARN: ignoring non-integer LIFETRAC_FORCE_FRF_HZ={env_frf!r}")
+    elif profile_id == 0:
+        force_frf_hz = 915_000_000
+
+    if force_frf_hz is not None:
+        # FRF = freq_hz * 2^19 / 32_000_000 (SX1276 with 32 MHz TCXO).
+        frf_raw = (force_frf_hz * (1 << 19)) // 32_000_000
+        frf_msb = (frf_raw >> 16) & 0xFF
+        frf_mid = (frf_raw >> 8) & 0xFF
+        frf_lsb = frf_raw & 0xFF
+        print(f"  forcing FRF -> {force_frf_hz/1e6:.3f} MHz "
+              f"(raw=0x{frf_raw:06X} -> Msb=0x{frf_msb:02X} Mid=0x{frf_mid:02X} Lsb=0x{frf_lsb:02X})")
+        # Drop to standby first if currently in RX/TX (FRF can only be
+        # safely changed in SLEEP or STANDBY per SX1276 datasheet 4.1.4).
+        prev_opmode = None
+        try:
+            prev_opmode, _ = read_reg(link, SX1276_REG_OP_MODE, timeout=0.5)
+        except Exception as exc:
+            print(f"  WARN: could not read opmode before FRF write: {exc}")
+        try:
+            if prev_opmode is not None and (prev_opmode & 0x07) not in (0x00, 0x01):
+                # Force STANDBY (LoRa long-range bit + mode=001).
+                write_reg(link, SX1276_REG_OP_MODE, 0x81, timeout=0.5)
+            write_reg(link, 0x06, frf_msb, timeout=0.5)
+            write_reg(link, 0x07, frf_mid, timeout=0.5)
+            write_reg(link, 0x08, frf_lsb, timeout=0.5)
+            # Restore prior opmode (e.g. RXCONTINUOUS=0x85) so the new FRF
+            # is committed on the next mode entry.
+            if prev_opmode is not None and (prev_opmode & 0x07) not in (0x00, 0x01):
+                write_reg(link, SX1276_REG_OP_MODE, prev_opmode, timeout=0.5)
+            # Verify.
+            rb_msb, _ = read_reg(link, 0x06, timeout=0.5)
+            rb_mid, _ = read_reg(link, 0x07, timeout=0.5)
+            rb_lsb, _ = read_reg(link, 0x08, timeout=0.5)
+            actual = (rb_msb << 16) | (rb_mid << 8) | rb_lsb
+            actual_hz = (actual * 32_000_000) // (1 << 19)
+            ok = (rb_msb == frf_msb and rb_mid == frf_mid and rb_lsb == frf_lsb)
+            print(f"  FRF readback: 0x{actual:06X} = {actual_hz/1e6:.3f} MHz "
+                  f"({'OK' if ok else '**MISMATCH**'})")
+        except Exception as exc:
+            print(f"  WARN: FRF force-write failed: {exc}")
 
 
 def emit_runtime_profile_enum(link: HostLink) -> None:

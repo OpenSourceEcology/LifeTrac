@@ -24,6 +24,157 @@
 			"command": "adb shell ls /dev/video*"
 		},
 		{
+			"label": "X8 ADB Devices",
+			"type": "shell",
+			"command": "adb devices"
+		},
+		{
+			"label": "X8 Check Video Devices (serial)",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell ls /dev/video*"
+		},
+		{
+			"label": "X8 Python Version (serial)",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell python3 -V"
+		},
+		{
+			"label": "X8 Sudo ID (serial)",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"printf 'fio\\n' | sudo -S -p '' id\""
+		},
+		{
+			"label": "X8 Sudo ID (process)",
+			"type": "process",
+			"command": "adb",
+			"args": [
+				"-s",
+				"2E2C1209DABC240B",
+				"shell",
+				"printf 'fio\\n' | sudo -S -p '' id"
+			]
+		},
+		{
+			"label": "X8 Camera Service Log Tail",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell tail -n 120 /tmp/lifetrac_camera_service.log"
+		},
+		{
+			"label": "X8 Run Camera Service v4l2 (no deshake)",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"export PYTHONPATH=/tmp/lifetrac_camera ; export LIFETRAC_CAMERA_SOURCE=v4l2 ; export LIFETRAC_CAMERA_DEVICE=/dev/video2 ; export LIFETRAC_FFMPEG_PATH=/tmp/ffmpeg ; export LIFETRAC_CAMERA_FPS=2 ; export LIFETRAC_CAMERA_DESHAKE=0 ; nohup python3 /tmp/lifetrac_camera/camera_service.py >/tmp/lifetrac_camera_service.log 2>&1 &\""
+		},
+		{
+			"label": "X8 Run Camera Service v4l2 Foreground",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"PYTHONPATH=/tmp/lifetrac_camera LIFETRAC_CAMERA_SOURCE=v4l2 LIFETRAC_CAMERA_DEVICE=/dev/video2 LIFETRAC_FFMPEG_PATH=/tmp/ffmpeg LIFETRAC_CAMERA_FPS=2 LIFETRAC_CAMERA_DESHAKE=0 python3 /tmp/lifetrac_camera/camera_service.py\""
+		},
+		{
+			"label": "X8 Run Camera Container",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_camera_container_x8.ps1 -AdbSerial 2E2C1209DABC240B -NoDeshake"
+		},
+		{
+			"label": "X8 Camera Container Logs",
+			"type": "process",
+			"command": "adb",
+			"args": [
+				"-s",
+				"2E2C1209DABC240B",
+				"shell",
+				"printf 'fio\\n' | sudo -S -p '' docker logs --tail 160 lifetrac-camera-x8"
+			]
+		},
+		{
+			"label": "X8 Check Camera Container",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/check_camera_container_x8.ps1 -AdbSerial 2E2C1209DABC240B"
+		},
+		{
+			"label": "X8 Probe UVC Controls",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/probe_uvc_controls_x8_v2.ps1 -AdbSerial 2E2C1209DABC240B"
+		},
+		{
+			"label": "X8 Host which v4l2-ctl",
+			"type": "process",
+			"command": "adb",
+			"args": [
+				"-s",
+				"2E2C1209DABC240B",
+				"shell",
+				"printf 'fio\\n' | sudo -S -p '' which v4l2-ctl"
+			]
+		},
+		{
+			"label": "X8 Host list ctrls video1",
+			"type": "process",
+			"command": "adb",
+			"args": [
+				"-s",
+				"2E2C1209DABC240B",
+				"shell",
+				"printf 'fio\\n' | sudo -S -p '' v4l2-ctl -d /dev/video1 --list-ctrls-menus"
+			]
+		},
+		{
+			"label": "X8 Host list ctrls video3",
+			"type": "process",
+			"command": "adb",
+			"args": [
+				"-s",
+				"2E2C1209DABC240B",
+				"shell",
+				"printf 'fio\\n' | sudo -S -p '' v4l2-ctl -d /dev/video3 --list-ctrls-menus"
+			]
+		},
+		{
+			"label": "X8 Capture Still (process)",
+			"type": "process",
+			"command": "adb",
+			"args": [
+				"-s",
+				"2E2C1209DABC240B",
+				"shell",
+				"printf 'fio\\n' | sudo -S -p '' /tmp/ffmpeg -y -f v4l2 -input_format mjpeg -i /dev/video2 -vframes 1 /tmp/test_frame_live.jpg"
+			]
+		},
+		{
+			"label": "X8 Pull Still (process)",
+			"type": "process",
+			"command": "adb",
+			"args": [
+				"-s",
+				"2E2C1209DABC240B",
+				"pull",
+				"/tmp/test_frame_live.jpg",
+				"test_frame_live.jpg"
+			]
+		},
+		{
+			"label": "X8 Capture Still video1 yuyv (process)",
+			"type": "process",
+			"command": "adb",
+			"args": [
+				"-s",
+				"2E2C1209DABC240B",
+				"shell",
+				"printf 'fio\\n' | sudo -S -p '' /tmp/ffmpeg -y -f v4l2 -input_format yuyv422 -video_size 1920x1080 -i /dev/video1 -vframes 1 /tmp/test_frame_video1_yuyv.jpg"
+			]
+		},
+		{
+			"label": "X8 Pull Still video1 yuyv (process)",
+			"type": "process",
+			"command": "adb",
+			"args": [
+				"-s",
+				"2E2C1209DABC240B",
+				"pull",
+				"/tmp/test_frame_video1_yuyv.jpg",
+				"test_frame_video1_yuyv.jpg"
+			]
+		},
+		{
 			"label": "Check Native Python",
 			"type": "shell",
 			"command": "adb shell python3 -V"
@@ -915,6 +1066,277 @@
 			"command": "Get-NetFirewallRule -DisplayName 'LifeTrac-BaseStation-8080' | Format-List DisplayName, Enabled, Profile, Direction, Action ; Write-Host '---' ; Get-NetFirewallRule -DisplayName 'LifeTrac-BaseStation-8080' | Get-NetFirewallPortFilter ; Write-Host '---listening?---' ; Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | Select-Object LocalAddress, LocalPort, State, OwningProcess | Format-Table -AutoSize",
 			"isBackground": false,
 			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "Check X8 Camera Container Status",
+			"type": "shell",
+			"command": "adb",
+			"args": [
+				"-s",
+				"2E2C1209DABC240B",
+				"shell",
+				"echo fio | sudo -S docker ps -a --format '{{.Names}} {{.Status}}' | grep lifetrac-camera-x8"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Inspect X8 camera container",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"echo fio | sudo -S docker ps -a --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}'\" ; adb -s 2E2C1209DABC240B shell \"echo fio | sudo -S docker logs --tail 120 lifetrac-camera 2>&1\" ; adb -s 2E2C1209DABC240B shell \"echo fio | sudo -S ps aux | grep -E 'camera_service.py|ffmpeg' | grep -v grep\"",
+			"isBackground": false
+		},
+		{
+			"label": "X8 Docker PS",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"sh -lc 'echo fio | sudo -S docker ps -a --format \\\"table {{.Names}}\\\\t{{.Image}}\\\\t{{.Status}}\\\"'\"",
+			"isBackground": false
+		},
+		{
+			"label": "X8 docker ps no sudo",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"docker ps -a --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}'\"",
+			"isBackground": false
+		},
+		{
+			"label": "X8 docker ps plain",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"docker ps\"",
+			"isBackground": false
+		},
+		{
+			"label": "X8 sudo whoami test",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"sh -lc 'echo fio | sudo -S whoami'\"",
+			"isBackground": false
+		},
+		{
+			"label": "X8 docker ps quick",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell docker ps",
+			"isBackground": false
+		},
+		{
+			"label": "X8 docker ps sudo check",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"echo fio | sudo -S -p '' docker ps --filter name=lifetrac-camera-x8 --format '{{.Names}} {{.Status}}'\"",
+			"isBackground": false
+		},
+		{
+			"label": "X8 Check Camera Container board2",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/check_camera_container_x8.ps1 -AdbSerial 2D0A1209DABC240B",
+			"isBackground": false
+		},
+		{
+			"label": "Board A host camera procs",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"ps aux | grep camera_service.py | grep -v grep\"",
+			"isBackground": false
+		},
+		{
+			"label": "Board B host camera procs",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell \"ps aux | grep camera_service.py | grep -v grep\"",
+			"isBackground": false
+		},
+		{
+			"label": "Board A pgrep camera",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell pgrep -af camera_service.py",
+			"isBackground": false
+		},
+		{
+			"label": "Board B pgrep camera",
+			"type": "shell",
+			"command": "adb -s 2D0A1209DABC240B shell pgrep -af camera_service.py",
+			"isBackground": false
+		},
+		{
+			"label": "Board A capture still realcam",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"echo fio | sudo -S -p '' /tmp/ffmpeg -y -f v4l2 -input_format mjpeg -i /dev/video1 -vframes 1 /tmp/test_frame_live.jpg\"",
+			"isBackground": false
+		},
+		{
+			"label": "X8 Run Camera Container boardB",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_camera_container_x8.ps1 -AdbSerial 2D0A1209DABC240B -NoDeshake",
+			"isBackground": false
+		},
+		{
+			"label": "Board A camera node names",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell \"grep -H '' /sys/class/video4linux/video*/name\"",
+			"isBackground": false
+		},
+		{
+			"label": "Board A list video class",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell ls -l /sys/class/video4linux",
+			"isBackground": false
+		},
+		{
+			"label": "Board A list dev video",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell ls -l /dev/video*",
+			"isBackground": false
+		},
+		{
+			"label": "Board A v0 name",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell cat /sys/class/video4linux/video0/name",
+			"isBackground": false
+		},
+		{
+			"label": "Board A v1 name",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell cat /sys/class/video4linux/video1/name",
+			"isBackground": false
+		},
+		{
+			"label": "Board A v2 name",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell cat /sys/class/video4linux/video2/name",
+			"isBackground": false
+		},
+		{
+			"label": "Board A v3 name",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell cat /sys/class/video4linux/video3/name",
+			"isBackground": false
+		},
+		{
+			"label": "Board A v4 name",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell cat /sys/class/video4linux/video4/name",
+			"isBackground": false
+		},
+		{
+			"label": "X8 Run Camera Container video2",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_camera_container_x8.ps1 -AdbSerial 2E2C1209DABC240B -CameraDevice /dev/video2 -NoDeshake",
+			"isBackground": false
+		},
+		{
+			"label": "X8 Run Camera Container video3",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_camera_container_x8.ps1 -AdbSerial 2E2C1209DABC240B -CameraDevice /dev/video3 -NoDeshake",
+			"isBackground": false
+		},
+		{
+			"label": "X8 Run Camera Container video4",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_camera_container_x8.ps1 -AdbSerial 2E2C1209DABC240B -CameraDevice /dev/video4 -NoDeshake",
+			"isBackground": false
+		},
+		{
+			"label": "X8 Run Camera Container video0",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_camera_container_x8.ps1 -AdbSerial 2E2C1209DABC240B -CameraDevice /dev/video0 -NoDeshake",
+			"isBackground": false
+		},
+		{
+			"label": "Board A check v4l2-ctl",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell which v4l2-ctl",
+			"isBackground": false
+		},
+		{
+			"label": "Host find camera_service procs",
+			"type": "shell",
+			"command": "powershell -NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'camera_service.py' } | Select-Object ProcessId, Name, CommandLine | Format-List\"",
+			"isBackground": false
+		},
+		{
+			"label": "Host docker ps",
+			"type": "shell",
+			"command": "docker ps --format \"table {{.Names}}\\t{{.Image}}\\t{{.Status}}\"",
+			"isBackground": false
+		},
+		{
+			"label": "Probe X8 v4l2 formats",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/probe_v4l2_formats_x8.ps1 -AdbSerial 2E2C1209DABC240B",
+			"isBackground": false
+		},
+		{
+			"label": "X8 Run Camera Container video3 h264",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_camera_container_x8.ps1 -AdbSerial 2E2C1209DABC240B -CameraDevice /dev/video3 -V4l2InputFormat h264 -NoDeshake",
+			"isBackground": false
+		},
+		{
+			"label": "X8 Run Camera Container video1 yuyv",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_camera_container_x8.ps1 -AdbSerial 2E2C1209DABC240B -CameraDevice /dev/video1 -V4l2InputFormat yuyv422 -NoDeshake",
+			"isBackground": false
+		},
+		{
+			"label": "X8 has apt-get",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell which apt-get",
+			"isBackground": false
+		},
+		{
+			"label": "X8 has apk",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell which apk",
+			"isBackground": false
+		},
+		{
+			"label": "X8 has opkg",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell which opkg",
+			"isBackground": false
+		},
+		{
+			"label": "Run ADB Devices via Task",
+			"type": "shell",
+			"command": "C:\\Users\\dorkm\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe\\platform-tools\\adb.exe devices",
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Push Daemons and Helpers to Devices",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell mkdir -p /tmp/lifetrac_strict && adb -s 2E2C1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_x8/image_tx_daemon.py /tmp/lifetrac_strict/image_tx_daemon.py && adb -s 2E2C1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_h_stage2_tx_probe_v2.py /tmp/lifetrac_strict/method_h_stage2_tx_probe_v2.py && adb -s 2E2C1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_g_stage1_probe.py /tmp/lifetrac_strict/method_g_stage1_probe.py && adb -s 2D0A1209DABC240B shell mkdir -p /tmp/lifetrac_strict && adb -s 2D0A1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/base_station/image_rx_daemon.py /tmp/lifetrac_strict/image_rx_daemon.py && adb -s 2D0A1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_h_stage2_tx_probe_v2.py /tmp/lifetrac_strict/method_h_stage2_tx_probe_v2.py && adb -s 2D0A1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_g_stage1_probe.py /tmp/lifetrac_strict/method_g_stage1_probe.py",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Push Daemons and Helpers to Devices PS",
+			"type": "shell",
+			"command": "adb -s 2E2C1209DABC240B shell mkdir -p /tmp/lifetrac_strict ; adb -s 2E2C1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_x8/image_tx_daemon.py /tmp/lifetrac_strict/image_tx_daemon.py ; adb -s 2E2C1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_h_stage2_tx_probe_v2.py /tmp/lifetrac_strict/method_h_stage2_tx_probe_v2.py ; adb -s 2E2C1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_g_stage1_probe.py /tmp/lifetrac_strict/method_g_stage1_probe.py ; adb -s 2D0A1209DABC240B shell mkdir -p /tmp/lifetrac_strict ; adb -s 2D0A1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/base_station/image_rx_daemon.py /tmp/lifetrac_strict/image_rx_daemon.py ; adb -s 2D0A1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_h_stage2_tx_probe_v2.py /tmp/lifetrac_strict/method_h_stage2_tx_probe_v2.py ; adb -s 2D0A1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_g_stage1_probe.py /tmp/lifetrac_strict/method_g_stage1_probe.py",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Setup MQTT Link",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/common/setup_x8_mqtt_link.ps1 -Serial 2E2C1209DABC240B",
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Run Concurrent Smoke Test",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_concurrent_smoke.ps1 -HostIp 192.168.1.79",
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Run Concurrent Smoke Test 2",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_concurrent_smoke.ps1 -HostIp 192.168.1.79",
+			"isBackground": false,
+			"group": "test"
+		},
+		{
+			"label": "Run Concurrent Smoke Test 3",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/run_concurrent_smoke.ps1 -HostIp 192.168.1.79",
+			"isBackground": false,
 			"group": "test"
 		}
 	]
