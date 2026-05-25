@@ -273,6 +273,17 @@ bool sx1276_init(void) {
     sx1276_set_sf_bw_cr(7U, 250U, 5U);
     sx1276_set_tx_power_dbm(14U);
 
+    /* 2026-05-25 (REVERTED): an earlier "fix" wrote 0x33=0x26 + 0x3B=0x1D
+     * here based on a misread of the SX1276 datasheet. In Semtech's own
+     * LoRaMac-node driver, RFLR_INVERTIQ_TX_OFF == 0x01 (i.e. "TX inversion
+     * OFF" is the BIT-SET state, not bit-clear). With reserved bits 5,2,1
+     * hardwired at 0x26, the canonical RX-non-inverted value of 0x33 is
+     * 0x27 (= 0x26 | TX_OFF_bit). That IS already the chip's reset default,
+     * so writing 0x26 INVERTED the TX path and silently broke decoding
+     * (post-fix sniff: irq_flags_or=0x00, irq_events=0 -- worse than the
+     * pre-fix 0x10/9). Leaving the reset defaults alone is correct. The
+     * rx_frames=0 root cause is elsewhere (still under investigation). */
+
     return true;
 }
 

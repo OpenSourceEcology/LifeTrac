@@ -150,36 +150,64 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
      * scheduler BEFORE LBT/CAD/TX-start. Capturing (hop_idx, epoch)
      * here makes every RFCO_PERTX emit below truthful even on
      * fail-closed paths.
+     *
+     * 2026-05-25 bench-profile bypass: REG_PROFILE_BENCH_ONLY_FIXED_915
+     * intentionally does NOT init the FHSS scheduler (see
+     * host_cfg_profile_activate() — only the FCC 50-ch FHSS profile
+     * calls sx1276_fhss_init). Without this gate, sx1276_fhss_next_channel()
+     * returns NOT_INIT, sx1276_tx_begin() refuses every TX with FORBIDDEN,
+     * and bench two-peer air tests can never key the radio. Root cause of
+     * the 2026-05-25 air_coupling_rssi_sniff false-negative
+     * (rx_frames=0, irq_flags_or=0x00). Decoded ERR_PROTO payload
+     * `10 01 08 00 00` = TX_FRAME_REQ + FORBIDDEN + detail=0.
+     *
+     * Under BENCH profile we leave the radio on whatever FRF the host
+     * pinned (typically 915 MHz via the LIFETRAC_FORCE_FRF_HZ host-side
+     * workaround in configure_regulatory_profile_if_needed()), skip the
+     * retune below, and zero the hop telemetry so RFCO snapshots stay
+     * truthful. channel_idx==0 keeps airtime/legal-dwell accounting on
+     * a single bucket consistent with the single-channel bench profile.
      */
     {
-        uint8_t  hop_channel_idx = 0U;
-        uint32_t hop_center_hz   = 0U;
-        const sx1276_fhss_status_t hop_st =
-            sx1276_fhss_next_channel(&hop_channel_idx, &hop_center_hz);
-        if (hop_st != SX1276_FHSS_OK) {
-            /* Scheduler not initialised / corrupted: emit an INTERNAL
-             * snapshot with zeroed hop fields so bench post-processing
-             * can detect the fault, then refuse the TX. */
+        const host_cfg_profile_req_t *active_prof = host_cfg_profile_active();
+        const uint8_t active_id = (active_prof != NULL)
+            ? active_prof->profile_id
+            : (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915;
+        if (active_id == (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915) {
             s_hop_idx     = 0U;
             s_hop_epoch   = 0U;
             s_hop_freq_hz = 0U;
             s_channel_idx = 0U;
-            tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_INTERNAL, 0U);
-            return false;
+        } else {
+            uint8_t  hop_channel_idx = 0U;
+            uint32_t hop_center_hz   = 0U;
+            const sx1276_fhss_status_t hop_st =
+                sx1276_fhss_next_channel(&hop_channel_idx, &hop_center_hz);
+            if (hop_st != SX1276_FHSS_OK) {
+                /* Scheduler not initialised / corrupted: emit an INTERNAL
+                 * snapshot with zeroed hop fields so bench post-processing
+                 * can detect the fault, then refuse the TX. */
+                s_hop_idx     = 0U;
+                s_hop_epoch   = 0U;
+                s_hop_freq_hz = 0U;
+                s_channel_idx = 0U;
+                tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_INTERNAL, 0U);
+                return false;
+            }
+            s_channel_idx = hop_channel_idx;
+            s_hop_freq_hz = hop_center_hz;
+            /* sx1276_fhss_current_slot() is the NEXT slot the scheduler
+             * will hand out; the one we just consumed is therefore
+             * (slot - 1) within the current epoch. Slot wrap is folded
+             * back to the last index of the previous epoch. */
+            {
+                const uint8_t slot_after = sx1276_fhss_current_slot();
+                s_hop_idx = (slot_after == 0U)
+                    ? (uint8_t)(SX1276_FHSS_CHANNEL_COUNT - 1U)
+                    : (uint8_t)(slot_after - 1U);
+            }
+            s_hop_epoch = sx1276_fhss_current_epoch();
         }
-        s_channel_idx = hop_channel_idx;
-        s_hop_freq_hz = hop_center_hz;
-        /* sx1276_fhss_current_slot() is the NEXT slot the scheduler
-         * will hand out; the one we just consumed is therefore
-         * (slot - 1) within the current epoch. Slot wrap is folded
-         * back to the last index of the previous epoch. */
-        {
-            const uint8_t slot_after = sx1276_fhss_current_slot();
-            s_hop_idx = (slot_after == 0U)
-                ? (uint8_t)(SX1276_FHSS_CHANNEL_COUNT - 1U)
-                : (uint8_t)(slot_after - 1U);
-        }
-        s_hop_epoch = sx1276_fhss_current_epoch();
     }
 #else
     s_channel_idx = 0U;
@@ -197,9 +225,17 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
      * Retune the synthesiser now that the modem is in standby, then
      * wait the documented PLL settle budget so LBT/CAD samples the
      * correct channel rather than the previous one.
+     *
+     * 2026-05-25 bench-profile bypass: under BENCH_ONLY_FIXED_915
+     * s_hop_freq_hz was zeroed above (no scheduler), so retuning would
+     * drop the synth to 0 Hz and break the host-pinned 915 MHz carrier.
+     * Skip retune entirely for bench — the host-side force-FRF
+     * workaround owns the channel.
      */
-    sx1276_set_frequency_hz(s_hop_freq_hz);
-    pll_settle_busy_wait(SX1276_TX_PLL_SETTLE_US);
+    if (s_hop_freq_hz != 0U) {
+        sx1276_set_frequency_hz(s_hop_freq_hz);
+        pll_settle_busy_wait(SX1276_TX_PLL_SETTLE_US);
+    }
 #endif
 
     lbt_result = sx1276_lbt_check_and_backoff();
@@ -267,22 +303,38 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
      * against the 400 ms / 10 s per-channel cap. The QoS reserve above
      * is the 1 s fairness window; this is the regulatory 10 s window.
      * Both are kept separate per plan delta #11.
+     *
+     * 2026-05-25 bench-profile bypass: BENCH_ONLY_FIXED_915 is a
+     * single-channel non-regulatory profile; with 60-burst probes the
+     * 400ms/10s cap would exhaust after ~12 TXs and the rest would
+     * abort with LEGAL_DWELL. Bench is explicitly out-of-regulatory
+     * scope — skip the reserve so air-coupling falsification can
+     * actually exercise the radio. The active profile id is the same
+     * sentinel set at the FHSS-scheduler gate above.
      */
     {
-        s_legal_dwell_handle = SX1276_DWELL_HANDLE_INVALID;
-        const sx1276_dwell_status_t dst = sx1276_legal_dwell_reserve(
-            s_channel_idx,
-            s_predicted_toa_us,
-            platform_now_ms(),
-            SX1276_DWELL_WINDOW_10S_MS,
-            SX1276_DWELL_DEFAULT_CAP_US,
-            &s_legal_dwell_handle);
-        if (dst != SX1276_DWELL_OK) {
-            sx1276_airtime_release(s_channel_idx, s_reserved_airtime_us);
-            tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_ABORT_LEGAL_DWELL,
-                               s_predicted_toa_us);
-            sx1276_tx_cleanup();
-            return false;
+        const host_cfg_profile_req_t *dwell_prof = host_cfg_profile_active();
+        const uint8_t dwell_id = (dwell_prof != NULL)
+            ? dwell_prof->profile_id
+            : (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915;
+        if (dwell_id != (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915) {
+            s_legal_dwell_handle = SX1276_DWELL_HANDLE_INVALID;
+            const sx1276_dwell_status_t dst = sx1276_legal_dwell_reserve(
+                s_channel_idx,
+                s_predicted_toa_us,
+                platform_now_ms(),
+                SX1276_DWELL_WINDOW_10S_MS,
+                SX1276_DWELL_DEFAULT_CAP_US,
+                &s_legal_dwell_handle);
+            if (dst != SX1276_DWELL_OK) {
+                sx1276_airtime_release(s_channel_idx, s_reserved_airtime_us);
+                tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_ABORT_LEGAL_DWELL,
+                                   s_predicted_toa_us);
+                sx1276_tx_cleanup();
+                return false;
+            }
+        } else {
+            s_legal_dwell_handle = SX1276_DWELL_HANDLE_INVALID;
         }
     }
 #endif

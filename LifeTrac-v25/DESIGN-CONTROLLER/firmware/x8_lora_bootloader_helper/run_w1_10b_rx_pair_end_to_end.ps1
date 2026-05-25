@@ -58,6 +58,7 @@ param(
     [ValidateSet("tx_burst", "ping_pong")]
     [string]$Probe = "tx_burst",
     [double]$RttTimeout = 5.0,
+    [string]$RegProfile = "0",
     [string]$RepoRoot = ""
 )
 
@@ -156,7 +157,7 @@ $rxStderr = Join-Path $evidenceDir "rx_stderr.txt"
 # through Start-Process -ArgumentList, which re-quotes single-quoted args and
 # breaks the nested `sh -lc '...'` quoting (the inline form works only with
 # the PowerShell call operator, as in the TX path below).
-$rxRemoteCmd = "echo fio | sudo -S -p '' env LIFETRAC_PROBE_MODE=$rxMode LIFETRAC_RX_WINDOW=$rxWindowS bash /tmp/lifetrac_p0c/run_method_h_stage2_tx.sh"
+$rxRemoteCmd = "echo fio | sudo -S -p '' env LIFETRAC_REG_PROFILE=$RegProfile LIFETRAC_PROBE_MODE=$rxMode LIFETRAC_RX_WINDOW=$rxWindowS bash /tmp/lifetrac_p0c/run_method_h_stage2_tx.sh"
 $rxWrapBody = "#!/bin/sh`n$rxRemoteCmd`nrc=`$?`nprintf '__METHOD_H_RC__=%s\n' `"`$rc`"`n"
 $rxWrapLocal = Join-Path $evidenceDir "_rx_wrap.sh"
 # Force LF line endings so /bin/sh on the X8 doesn't choke on CRLF.
@@ -197,7 +198,7 @@ Write-Host "RX listener READY."
 $txStdout = Join-Path $evidenceDir "tx_stdout.txt"
 $txCountStr = $Cycles.ToString([System.Globalization.CultureInfo]::InvariantCulture)
 $interStr = Format-Invariant $InterCycleS
-$txRemoteCmd = "echo fio | sudo -S -p '' env LIFETRAC_PROBE_MODE=$txMode LIFETRAC_TX_COUNT=$txCountStr LIFETRAC_INTER_CYCLE_S=$interStr"
+$txRemoteCmd = "echo fio | sudo -S -p '' env LIFETRAC_REG_PROFILE=$RegProfile LIFETRAC_PROBE_MODE=$txMode LIFETRAC_TX_COUNT=$txCountStr LIFETRAC_INTER_CYCLE_S=$interStr"
 if ($Probe -eq "ping_pong") {
     $rttStr = Format-Invariant $RttTimeout
     $txRemoteCmd += " LIFETRAC_RTT_TIMEOUT=$rttStr"

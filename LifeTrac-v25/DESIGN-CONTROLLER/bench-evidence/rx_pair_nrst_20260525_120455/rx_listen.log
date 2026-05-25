@@ -1,0 +1,61 @@
+MODE: rx_listen
+dev=/dev/ttymxc3 baud=921600
+Re-setting co-processor via HostLink system reset...
+BOOT_URC observed during settle (payload=000112010201)
+INFO: drained type=0xF2 seq=0 during boot settle
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x08 sub=0x01 raw=08010000000000000000000000000000000000000e000000
+Co-processor system reset complete.
+Initializing regulatory profile 0 on co-processor...
+  FHSS mask: single channel 0 (0100000000000000)
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+CFG_SET_REQ(REG_PROFILE=0) OK: 14000100
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x09 sub=0x01 lanes=LPUART1 raw=090100000000000000000000000000000000000096020000
+STATS_URC(boot) drained seq=0 (unsolicited snapshot — discarding so it can't poison later request() calls)
+RUNTIME_PROFILE_ENUM=0
+__PROFILE_DRAINED__=0
+__PROFILE_ATTEMPTS__=1
+=== W1-10b probe RX_LISTEN: window=31.0s ===
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+RX_LISTEN: STATS(before) radio_rx_ok=0 radio_crc_err=0 radio_state=4
+RX_LISTEN: RegOpMode(pre)=0x85 (expected 0x85)
+__V2_AUTOWAKE__ opmode_pre=0x85 opmode_post=0x85 action=none
+__W1_10B_LISTEN_READY__
+__RX_FRAME__ idx=1 rssi=-91 snr=9 len=24 timestamp_us=11303674 payload_hex=57312d313062207365713d30303030206330316338373839
+__RX_FRAME__ idx=2 rssi=-92 snr=9 len=24 timestamp_us=11607152 payload_hex=57312d313062207365713d30303031206662383764373535
+__RX_FRAME__ idx=3 rssi=-91 snr=9 len=24 timestamp_us=11910514 payload_hex=57312d313062207365713d30303032203436366665316164
+__RX_FRAME__ idx=4 rssi=-92 snr=9 len=24 timestamp_us=12213873 payload_hex=57312d313062207365713d30303033203566363066343230
+__RX_FRAME__ idx=5 rssi=-92 snr=9 len=24 timestamp_us=12517207 payload_hex=57312d313062207365713d30303034203064643233393161
+__RX_FRAME__ idx=6 rssi=-91 snr=9 len=24 timestamp_us=12820569 payload_hex=57312d313062207365713d30303035203738616565666163
+__RX_FRAME__ idx=7 rssi=-92 snr=9 len=24 timestamp_us=13123881 payload_hex=57312d313062207365713d30303036206238303237313839
+__RX_FRAME__ idx=8 rssi=-92 snr=9 len=24 timestamp_us=13427122 payload_hex=57312d313062207365713d30303037206661613861656635
+__RX_FRAME__ idx=9 rssi=-92 snr=9 len=24 timestamp_us=13730409 payload_hex=57312d313062207365713d30303038203334386366643637
+__RX_FRAME__ idx=10 rssi=-91 snr=9 len=24 timestamp_us=14033741 payload_hex=57312d313062207365713d30303039203837353361393065
+__RX_FRAME__ idx=11 rssi=-92 snr=9 len=24 timestamp_us=14336997 payload_hex=57312d313062207365713d30303130206131633238623633
+__RX_FRAME__ idx=12 rssi=-92 snr=8 len=24 timestamp_us=14640548 payload_hex=57312d313062207365713d30303131203932336133666465
+__RX_FRAME__ idx=13 rssi=-91 snr=9 len=24 timestamp_us=14943921 payload_hex=57312d313062207365713d30303132203538323432326532
+Get-Content rx_pair_nrst_run1.log -Tail 80
+__RX_FRAME__ idx=14 rssi=-92 snr=9 len=24 timestamp_us=15247253 payload_hex=57312d313062207365713d30303133206130363563376562
+__RX_FRAME__ idx=15 rssi=-92 snr=9 len=24 timestamp_us=15550598 payload_hex=57312d313062207365713d30303134206239386665613735
+__RX_FRAME__ idx=16 rssi=-91 snr=10 len=24 timestamp_us=15853810 payload_hex=57312d313062207365713d30303135206439336261663065
+__RX_FRAME__ idx=17 rssi=-92 snr=9 len=24 timestamp_us=16157012 payload_hex=57312d313062207365713d30303136206462393731303939
+__RX_FRAME__ idx=18 rssi=-92 snr=9 len=24 timestamp_us=16460381 payload_hex=57312d313062207365713d30303137203462616464393534
+__RX_FRAME__ idx=19 rssi=-92 snr=9 len=24 timestamp_us=16763723 payload_hex=57312d313062207365713d30303138203334363339613330
+__RX_FRAME__ idx=20 rssi=-92 snr=9 len=24 timestamp_us=17067062 payload_hex=57312d313062207365713d30303139203965376562643631
+__RX_FRAME__ idx=21 rssi=-92 snr=9 len=24 timestamp_us=17371304 payload_hex=57312d313062207365713d30303230206165393532353836
+__RX_FRAME__ idx=22 rssi=-92 snr=10 len=24 timestamp_us=17673593 payload_hex=57312d313062207365713d30303231203831613638656339
+__RX_FRAME__ idx=23 rssi=-91 snr=9 len=24 timestamp_us=17976976 payload_hex=57312d313062207365713d30303232203365363335363831
+__RX_FRAME__ idx=24 rssi=-93 snr=9 len=24 timestamp_us=18280114 payload_hex=57312d313062207365713d30303233206633656531306235
+__RX_FRAME__ idx=25 rssi=-92 snr=9 len=24 timestamp_us=18583437 payload_hex=57312d313062207365713d30303234203030386362613166
+__RX_FRAME__ idx=26 rssi=-92 snr=9 len=24 timestamp_us=18886584 payload_hex=57312d313062207365713d30303235203965616235366361
+__RX_FRAME__ idx=27 rssi=-92 snr=9 len=24 timestamp_us=19189853 payload_hex=57312d313062207365713d30303236206534396161346238
+__RX_FRAME__ idx=28 rssi=-91 snr=9 len=24 timestamp_us=19493129 payload_hex=57312d313062207365713d30303237206339313738623366
+__RX_FRAME__ idx=29 rssi=-92 snr=9 len=24 timestamp_us=19796507 payload_hex=57312d313062207365713d30303238203536343762343665
+__RX_FRAME__ idx=30 rssi=-92 snr=9 len=24 timestamp_us=20099828 payload_hex=57312d313062207365713d30303239203263353338656565
+RX_LISTEN: STATS(after) radio_rx_ok=30 (delta=30) radio_crc_err=0 (delta=0)
+__W1_10B_LISTEN_DONE__ rx_frames=30 radio_rx_ok_delta=30 radio_crc_err_delta=0 real_faults=0 invariants_violated=0 stopped_by_signal=0
+__RADIO_SLEEP_ON_EXIT__ (rx_listen) ack=0180 RegOpMode(post)=0x80 (target=0x80)

@@ -10,7 +10,8 @@
 param(
     [string]$TxAdbSerial = "2E2C1209DABC240B",
     [string]$RxAdbSerial = "2D0A1209DABC240B",
-    [string]$HostIp       = "192.168.1.79"
+    [string]$HostIp       = "192.168.1.79",
+    [int]$DurationS       = 30
 )
 
 Set-StrictMode -Version Latest
@@ -40,6 +41,36 @@ $nrstCmd = "echo fio | sudo -S -p '' sh -c '[ -d /sys/class/gpio/gpio163 ] || ec
 # Allow L072 firmware to finish boot (BOOT_URC ~200ms after NRST release).
 Start-Sleep -Milliseconds 1500
 
+# 2026-05-25: previous version assumed image_rx_daemon.py and image_tx_daemon.py
+# were already deployed to /tmp/lifetrac_strict on each board. In practice
+# image_tx_daemon.py was MISSING on the TX board, so the smoke ran with
+# zero TX traffic and the "rx_frames=0" verdict was incorrectly blamed on
+# the firmware/RF chain (see AI NOTES 2026-05-25_Smoke_RxFrames_Was_Missing_TX_Daemon.md).
+# Push them (plus their dependencies) every run to make this hermetic.
+Write-Host "Deploying daemons + helpers to both boards..."
+$repoRoot   = (Resolve-Path "$PSScriptRoot\..\..\..\..").Path
+$baseStation = Join-Path $repoRoot "LifeTrac-v25\DESIGN-CONTROLLER\base_station"
+$tractorX8   = Join-Path $repoRoot "LifeTrac-v25\DESIGN-CONTROLLER\firmware\tractor_x8"
+$helperDir   = $PSScriptRoot
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "Continue"  # adb push reports success on stderr; don't treat as fatal
+foreach ($s in @($TxAdbSerial, $RxAdbSerial)) {
+    cmd /c "adb -s $s shell `"echo fio | sudo -S -p '' mkdir -p /tmp/lifetrac_strict ; echo fio | sudo -S -p '' chmod 0777 /tmp/lifetrac_strict`"" 2>&1 | Out-Null
+    cmd /c "adb -s $s push `"$(Join-Path $helperDir 'method_h_stage2_tx_probe_v2.py')`" /tmp/lifetrac_strict/" 2>&1 | Out-Null
+    cmd /c "adb -s $s push `"$(Join-Path $baseStation 'lora_proto.py')`" /tmp/lifetrac_strict/" 2>&1 | Out-Null
+    cmd /c "adb -s $s push `"$(Join-Path $baseStation 'image_rx_daemon.py')`" /tmp/lifetrac_strict/" 2>&1 | Out-Null
+    cmd /c "adb -s $s push `"$(Join-Path $tractorX8 'image_tx_daemon.py')`" /tmp/lifetrac_strict/" 2>&1 | Out-Null
+    cmd /c "adb -s $s push `"$(Join-Path $baseStation 'image_pipeline')`" /tmp/lifetrac_strict/" 2>&1 | Out-Null
+    $pahoLocal = Join-Path $repoRoot "_paho_pull\paho"
+    if (Test-Path $pahoLocal) {
+        cmd /c "adb -s $s push `"$pahoLocal`" /tmp/lifetrac_strict/" 2>&1 | Out-Null
+    } else {
+        Write-Warning "Local paho dir not found at $pahoLocal - TX/RX daemons may fail at import paho"
+    }
+}
+$ErrorActionPreference = $prevEAP
+Write-Host "Daemon deployment complete."
+
 $rxLog = "rx_daemon_smoke.log"
 $txLog = "tx_daemon_smoke.log"
 "" | Out-File -FilePath $rxLog -Encoding ascii
@@ -60,7 +91,14 @@ $txProc = Start-Process -FilePath "adb" -ArgumentList $txArg -RedirectStandardOu
 Start-Sleep -Seconds 3 # Let TX start and subscribe
 
 Write-Host "Starting synthetic camera publisher on Host..."
-$pubProc = Start-Process -FilePath "C:\Users\dorkm\AppData\Local\Python\pythoncore-3.14-64\python.exe" -ArgumentList "publish_synthetic_frames.py" -PassThru -NoNewWindow
+$env:LIFETRAC_MQTT_HOST = $HostIp
+# 2026-05-25: must use absolute path to publisher script. When the smoke is
+# launched from inside the helper dir, a relative path fails with ENOENT and
+# the publisher silently dies, producing frames_in=0 on the TX daemon.
+$pubScript = Join-Path $repoRoot "publish_synthetic_frames.py"
+$pubLog    = Join-Path $repoRoot "publisher.log"
+$pubErrLog = Join-Path $repoRoot "publisher_err.log"
+$pubProc = Start-Process -FilePath "C:\Users\dorkm\AppData\Local\Python\pythoncore-3.14-64\python.exe" -ArgumentList "`"$pubScript`"" -PassThru -NoNewWindow -RedirectStandardOutput $pubLog -RedirectStandardError $pubErrLog -WorkingDirectory $repoRoot
 
 Write-Host "Both daemons running concurrently. Waiting for 35 seconds..."
 $timeout = (Get-Date).AddSeconds(45)
@@ -95,7 +133,7 @@ Write-Host "======================`n"
 $rxContent = ""
 if (Test-Path $rxLog) { $rxContent = Get-Content $rxLog -Raw }
 if ($rxContent -match "rx_frames(?:_seen)?=([1-9]\d*)") {
-    Write-Host "SUCCESS: Demodulated frame(s) seen by RX daemon! Match group: $1" -ForegroundColor Green
+    Write-Host "SUCCESS: Demodulated frame(s) seen by RX daemon! Match group: $($matches[1])" -ForegroundColor Green
     exit 0
 } else {
     Write-Error "FAILURE: No frames demodulated or rx_frames_seen remains 0."

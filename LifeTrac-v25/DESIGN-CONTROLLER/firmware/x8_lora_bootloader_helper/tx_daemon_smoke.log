@@ -1,0 +1,19 @@
+2026-05-25 17:27:27,351 INFO image_tx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+2026-05-25 17:27:27,353 INFO image_tx_daemon: image_tx_daemon started; mqtt=192.168.1.79:1883 uart=/dev/ttymxc3
+2026-05-25 17:27:27,363 INFO image_tx_daemon: MQTT connected; subscribing to lifetrac/v25/cmd/image_frame
+2026-05-25 17:27:27,367 INFO image_tx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+Initializing regulatory profile 0 on co-processor...
+  FHSS mask: single channel 0 (0100000000000000)
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+CFG_SET_REQ(REG_PROFILE=0) OK: 14000100
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+2026-05-25 17:27:28,169 INFO image_tx_daemon: LBT_ENABLE=0 (matches W1-10b TX_BURST rationale)
+2026-05-25 17:27:28,169 INFO image_tx_daemon: TX worker ready (inter_cycle_s=0.050, max 8 frags/dwell)
+2026-05-25 17:27:28,353 INFO image_tx_daemon: stats: frames_in=0 ok=0 fail=0 drop_full=0 frags_ok=0 frags_fail=0 qdepth=0
+2026-05-25 17:27:38,364 INFO image_tx_daemon: stats: frames_in=0 ok=0 fail=0 drop_full=0 frags_ok=0 frags_fail=0 qdepth=0
+2026-05-25 17:27:48,375 INFO image_tx_daemon: stats: frames_in=0 ok=0 fail=0 drop_full=0 frags_ok=0 frags_fail=0 qdepth=0
+2026-05-25 17:27:56,430 INFO image_tx_daemon: signal received; shutting down
+2026-05-25 17:27:57,415 INFO image_tx_daemon: image_tx_daemon exit

@@ -480,7 +480,9 @@ static bool reg_write_allowed(uint8_t reg_addr) {
         case 0x1EU:
         case 0x26U:
         case 0x31U:
+        case 0x33U:  /* 2026-05-25: RegInvertIQ -- host-side IQ-normalize diag */
         case 0x37U:
+        case 0x3BU:  /* 2026-05-25: RegInvertIQ2 -- companion to 0x33 */
         case 0x40U:  /* W1-9 diag: allow DIO_MAPPING1 */
             return true;
         default:

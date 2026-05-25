@@ -1,0 +1,23 @@
+2026-05-25 17:27:24,064 INFO image_rx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+2026-05-25 17:27:24,067 INFO image_rx_daemon: image_rx_daemon started; mqtt=192.168.1.79:1883 uart=/dev/ttymxc3
+2026-05-25 17:27:24,080 INFO image_rx_daemon: MQTT connected; ready to publish lifetrac/v25/video/tile_delta
+2026-05-25 17:27:24,083 INFO image_rx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+2026-05-25 17:27:24,517 INFO image_rx_daemon: L072 VER warm-up ok
+Initializing regulatory profile 0 on co-processor...
+  FHSS mask: single channel 0 (0100000000000000)
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+CFG_SET_REQ(REG_PROFILE=0) OK: 14000100
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+2026-05-25 17:27:24,952 INFO image_rx_daemon: SX1276 already in RXCONT (opmode=0x85)
+2026-05-25 17:27:24,953 INFO image_rx_daemon: RX worker ready; draining RX_FRAME_URC...
+2026-05-25 17:27:25,068 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+Get-Content concurrent_smoke_with_ui.log -Tail 80
+2026-05-25 17:27:35,082 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+2026-05-25 17:27:45,096 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+2026-05-25 17:27:55,110 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+2026-05-25 17:27:58,309 INFO image_rx_daemon: signal received; shutting down
+2026-05-25 17:27:58,318 INFO image_rx_daemon: RX worker exit
+2026-05-25 17:27:59,149 INFO image_rx_daemon: image_rx_daemon exit

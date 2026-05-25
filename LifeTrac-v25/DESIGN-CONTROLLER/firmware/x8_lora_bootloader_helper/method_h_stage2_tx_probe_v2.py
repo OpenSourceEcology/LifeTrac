@@ -462,6 +462,18 @@ def configure_regulatory_profile_if_needed(link: HostLink, profile_id: int = 1) 
         except Exception as exc:
             print(f"  WARN: FRF force-write failed: {exc}")
 
+    # 6. (REMOVED 2026-05-25) An earlier block here wrote 0x33=0x26 +
+    # 0x3B=0x1D, based on a misread of the SX1276 datasheet — bit 0 of
+    # 0x33 was assumed to be "TX inversion enable" (set = inverted),
+    # but per Semtech's own LoRaMac-node driver it is the opposite:
+    # RFLR_INVERTIQ_TX_OFF == 0x01 (set = OFF). With reserved bits
+    # 5,2,1 hardwired at 0x26, the canonical RX-non-inverted value
+    # IS 0x27 (the chip's reset default). Writing 0x26 therefore
+    # silently INVERTED the TX path; air-coupling sniff after the
+    # "fix" showed irq_flags_or=0x00, irq_events=0 -- strictly worse
+    # than the pre-fix 0x10/9. Leaving the reset defaults alone. The
+    # rx_frames=0 root cause is elsewhere (under investigation).
+
 
 def emit_runtime_profile_enum(link: HostLink) -> None:
     """FCC-B3-1: issue one CFG_GET_REQ(CFG_KEY_REG_PROFILE) and print exactly

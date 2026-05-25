@@ -1,1 +1,663 @@
-2026-05-25 12:25:00,890 ERROR image_tx_daemon: MQTT connect to 192.168.1.79:1883 failed: timed out
+2026-05-25 17:29:35,491 INFO image_tx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+2026-05-25 17:29:35,498 INFO image_tx_daemon: image_tx_daemon started; mqtt=192.168.1.79:1883 uart=/dev/ttymxc3
+2026-05-25 17:29:35,504 INFO image_tx_daemon: MQTT connected; subscribing to lifetrac/v25/cmd/image_frame
+2026-05-25 17:29:35,507 INFO image_tx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+Initializing regulatory profile 0 on co-processor...
+  FHSS mask: single channel 0 (0100000000000000)
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+CFG_SET_REQ(REG_PROFILE=0) OK: 14000100
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+2026-05-25 17:29:36,308 INFO image_tx_daemon: LBT_ENABLE=0 (matches W1-10b TX_BURST rationale)
+2026-05-25 17:29:36,309 INFO image_tx_daemon: TX worker ready (inter_cycle_s=0.050, max 8 frags/dwell)
+2026-05-25 17:29:36,493 INFO image_tx_daemon: stats: frames_in=0 ok=0 fail=0 drop_full=0 frags_ok=0 frags_fail=0 qdepth=0
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:38,277 INFO image_tx_daemon: frame seq=1 done: 7/7 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:38,404 WARNING image_tx_daemon: TX_DONE exception: seq=2 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:38,467 WARNING image_tx_daemon: TX_DONE exception: seq=2 idx=2: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:38,530 WARNING image_tx_daemon: TX_DONE exception: seq=2 idx=3: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:38,861 INFO image_tx_daemon: frame seq=2 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:39,442 WARNING image_tx_daemon: TX_DONE exception: seq=3 idx=5: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:39,504 WARNING image_tx_daemon: TX_DONE exception: seq=3 idx=6: ERR_PROTO during TX wait: 1001080000
+2026-05-25 17:29:39,505 INFO image_tx_daemon: frame seq=3 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:39,518 WARNING image_tx_daemon: TX_DONE exception: seq=4 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:39,582 WARNING image_tx_daemon: TX_DONE exception: seq=4 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:40,139 INFO image_tx_daemon: frame seq=4 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:40,493 WARNING image_tx_daemon: TX_DONE exception: seq=5 idx=3: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:40,556 WARNING image_tx_daemon: TX_DONE exception: seq=5 idx=4: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:40,619 WARNING image_tx_daemon: TX_DONE exception: seq=5 idx=5: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:40,723 INFO image_tx_daemon: frame seq=5 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:41,458 INFO image_tx_daemon: frame seq=6 done: 7/7 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:41,471 WARNING image_tx_daemon: TX_DONE exception: seq=7 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:41,534 WARNING image_tx_daemon: TX_DONE exception: seq=7 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:41,598 WARNING image_tx_daemon: TX_DONE exception: seq=7 idx=2: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:41,661 WARNING image_tx_daemon: TX_DONE exception: seq=7 idx=3: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:41,991 INFO image_tx_daemon: frame seq=7 done: 3/7 fragments ok (4 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:42,572 WARNING image_tx_daemon: TX_DONE exception: seq=8 idx=5: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:42,635 WARNING image_tx_daemon: TX_DONE exception: seq=8 idx=6: ERR_PROTO during TX wait: 1001080000
+2026-05-25 17:29:42,636 INFO image_tx_daemon: frame seq=8 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:42,649 WARNING image_tx_daemon: TX_DONE exception: seq=9 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:42,712 WARNING image_tx_daemon: TX_DONE exception: seq=9 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:43,270 INFO image_tx_daemon: frame seq=9 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:43,623 WARNING image_tx_daemon: TX_DONE exception: seq=10 idx=3: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:43,687 WARNING image_tx_daemon: TX_DONE exception: seq=10 idx=4: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:43,750 WARNING image_tx_daemon: TX_DONE exception: seq=10 idx=5: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:43,843 INFO image_tx_daemon: frame seq=10 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:44,578 INFO image_tx_daemon: frame seq=11 done: 7/7 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:44,592 WARNING image_tx_daemon: TX_DONE exception: seq=12 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:44,655 WARNING image_tx_daemon: TX_DONE exception: seq=12 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:44,718 WARNING image_tx_daemon: TX_DONE exception: seq=12 idx=2: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:44,781 WARNING image_tx_daemon: TX_DONE exception: seq=12 idx=3: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:45,111 INFO image_tx_daemon: frame seq=12 done: 3/7 fragments ok (4 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:45,692 WARNING image_tx_daemon: TX_DONE exception: seq=13 idx=5: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:45,755 WARNING image_tx_daemon: TX_DONE exception: seq=13 idx=6: ERR_PROTO during TX wait: 1001080000
+2026-05-25 17:29:45,756 INFO image_tx_daemon: frame seq=13 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:45,769 WARNING image_tx_daemon: TX_DONE exception: seq=14 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:45,833 WARNING image_tx_daemon: TX_DONE exception: seq=14 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:46,390 INFO image_tx_daemon: frame seq=14 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:46,504 INFO image_tx_daemon: stats: frames_in=17 ok=3 fail=11 drop_full=0 frags_ok=69 frags_fail=29 qdepth=2
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:46,745 WARNING image_tx_daemon: TX_DONE exception: seq=15 idx=3: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:46,808 WARNING image_tx_daemon: TX_DONE exception: seq=15 idx=4: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:46,871 WARNING image_tx_daemon: TX_DONE exception: seq=15 idx=5: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:46,965 INFO image_tx_daemon: frame seq=15 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:47,699 INFO image_tx_daemon: frame seq=16 done: 7/7 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:47,713 WARNING image_tx_daemon: TX_DONE exception: seq=17 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:47,776 WARNING image_tx_daemon: TX_DONE exception: seq=17 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:47,839 WARNING image_tx_daemon: TX_DONE exception: seq=17 idx=2: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:47,902 WARNING image_tx_daemon: TX_DONE exception: seq=17 idx=3: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:48,233 INFO image_tx_daemon: frame seq=17 done: 3/7 fragments ok (4 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:48,813 WARNING image_tx_daemon: TX_DONE exception: seq=18 idx=5: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:48,876 WARNING image_tx_daemon: TX_DONE exception: seq=18 idx=6: ERR_PROTO during TX wait: 1001080000
+2026-05-25 17:29:48,877 INFO image_tx_daemon: frame seq=18 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:48,890 WARNING image_tx_daemon: TX_DONE exception: seq=19 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:48,953 WARNING image_tx_daemon: TX_DONE exception: seq=19 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:49,511 INFO image_tx_daemon: frame seq=19 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:49,864 WARNING image_tx_daemon: TX_DONE exception: seq=20 idx=3: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:49,927 WARNING image_tx_daemon: TX_DONE exception: seq=20 idx=4: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:49,990 WARNING image_tx_daemon: TX_DONE exception: seq=20 idx=5: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:50,084 INFO image_tx_daemon: frame seq=20 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:50,819 INFO image_tx_daemon: frame seq=21 done: 7/7 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:50,832 WARNING image_tx_daemon: TX_DONE exception: seq=22 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:50,896 WARNING image_tx_daemon: TX_DONE exception: seq=22 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:50,959 WARNING image_tx_daemon: TX_DONE exception: seq=22 idx=2: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:51,022 WARNING image_tx_daemon: TX_DONE exception: seq=22 idx=3: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:51,343 INFO image_tx_daemon: frame seq=22 done: 3/7 fragments ok (4 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:51,923 WARNING image_tx_daemon: TX_DONE exception: seq=23 idx=5: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:51,986 WARNING image_tx_daemon: TX_DONE exception: seq=23 idx=6: ERR_PROTO during TX wait: 1001080000
+2026-05-25 17:29:51,987 INFO image_tx_daemon: frame seq=23 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:52,000 WARNING image_tx_daemon: TX_DONE exception: seq=25 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:52,064 WARNING image_tx_daemon: TX_DONE exception: seq=25 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:52,621 INFO image_tx_daemon: frame seq=25 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:52,975 WARNING image_tx_daemon: TX_DONE exception: seq=26 idx=3: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:53,038 WARNING image_tx_daemon: TX_DONE exception: seq=26 idx=4: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:53,101 WARNING image_tx_daemon: TX_DONE exception: seq=26 idx=5: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:53,195 INFO image_tx_daemon: frame seq=26 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:53,930 INFO image_tx_daemon: frame seq=27 done: 7/7 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:53,943 WARNING image_tx_daemon: TX_DONE exception: seq=28 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:54,006 WARNING image_tx_daemon: TX_DONE exception: seq=28 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:54,069 WARNING image_tx_daemon: TX_DONE exception: seq=28 idx=2: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:54,133 WARNING image_tx_daemon: TX_DONE exception: seq=28 idx=3: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:54,463 INFO image_tx_daemon: frame seq=28 done: 3/7 fragments ok (4 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:55,044 WARNING image_tx_daemon: TX_DONE exception: seq=29 idx=5: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:55,106 WARNING image_tx_daemon: TX_DONE exception: seq=29 idx=6: ERR_PROTO during TX wait: 1001080000
+2026-05-25 17:29:55,107 INFO image_tx_daemon: frame seq=29 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:55,121 WARNING image_tx_daemon: TX_DONE exception: seq=31 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:55,184 WARNING image_tx_daemon: TX_DONE exception: seq=31 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:55,744 INFO image_tx_daemon: frame seq=31 done: 5/7 fragments ok (2 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:56,098 WARNING image_tx_daemon: TX_DONE exception: seq=32 idx=3: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:56,161 WARNING image_tx_daemon: TX_DONE exception: seq=32 idx=4: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:56,225 WARNING image_tx_daemon: TX_DONE exception: seq=32 idx=5: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:56,318 INFO image_tx_daemon: frame seq=32 done: 4/7 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:56,517 INFO image_tx_daemon: stats: frames_in=36 ok=6 fail=24 drop_full=2 frags_ok=145 frags_fail=65 qdepth=3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:57,053 INFO image_tx_daemon: frame seq=33 done: 7/7 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:57,066 WARNING image_tx_daemon: TX_DONE exception: seq=34 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:57,129 WARNING image_tx_daemon: TX_DONE exception: seq=34 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:57,192 WARNING image_tx_daemon: TX_DONE exception: seq=34 idx=2: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:57,256 WARNING image_tx_daemon: TX_DONE exception: seq=34 idx=3: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:57,596 INFO image_tx_daemon: frame seq=34 done: 3/7 fragments ok (4 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:58,177 WARNING image_tx_daemon: TX_DONE exception: seq=35 idx=5: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:58,241 WARNING image_tx_daemon: TX_DONE exception: seq=35 idx=6: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:58,303 WARNING image_tx_daemon: TX_DONE exception: seq=35 idx=7: ERR_PROTO during TX wait: 1001080000
+2026-05-25 17:29:58,304 INFO image_tx_daemon: frame seq=35 done: 5/8 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:59,142 INFO image_tx_daemon: frame seq=37 done: 8/8 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:59,156 WARNING image_tx_daemon: TX_DONE exception: seq=38 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:59,219 WARNING image_tx_daemon: TX_DONE exception: seq=38 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:59,282 WARNING image_tx_daemon: TX_DONE exception: seq=38 idx=2: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:59,386 INFO image_tx_daemon: frame seq=38 done: 1/4 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:29:59,781 INFO image_tx_daemon: frame seq=39 done: 4/4 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:00,135 WARNING image_tx_daemon: TX_DONE exception: seq=40 idx=3: ERR_PROTO during TX wait: 1001080000
+2026-05-25 17:30:00,136 INFO image_tx_daemon: frame seq=40 done: 3/4 fragments ok (1 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:00,149 WARNING image_tx_daemon: TX_DONE exception: seq=41 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:00,212 WARNING image_tx_daemon: TX_DONE exception: seq=41 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:00,276 WARNING image_tx_daemon: TX_DONE exception: seq=41 idx=2: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:00,339 WARNING image_tx_daemon: TX_DONE exception: seq=41 idx=3: ERR_PROTO during TX wait: 1001080000
+2026-05-25 17:30:00,340 INFO image_tx_daemon: frame seq=41 done: 0/4 fragments ok (4 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:00,725 INFO image_tx_daemon: frame seq=42 done: 4/4 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:01,119 INFO image_tx_daemon: frame seq=43 done: 4/4 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:01,133 WARNING image_tx_daemon: TX_DONE exception: seq=44 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:01,196 WARNING image_tx_daemon: TX_DONE exception: seq=44 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:01,259 WARNING image_tx_daemon: TX_DONE exception: seq=44 idx=2: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:01,362 INFO image_tx_daemon: frame seq=44 done: 1/4 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:01,757 INFO image_tx_daemon: frame seq=45 done: 4/4 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:02,141 INFO image_tx_daemon: frame seq=46 done: 4/4 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:02,155 WARNING image_tx_daemon: TX_DONE exception: seq=47 idx=0: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:02,218 WARNING image_tx_daemon: TX_DONE exception: seq=47 idx=1: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:02,281 WARNING image_tx_daemon: TX_DONE exception: seq=47 idx=2: ERR_PROTO during TX wait: 1001080000
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:02,374 INFO image_tx_daemon: frame seq=47 done: 1/4 fragments ok (3 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:02,759 INFO image_tx_daemon: frame seq=48 done: 4/4 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:03,241 INFO image_tx_daemon: frame seq=49 done: 4/4 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:03,765 INFO image_tx_daemon: frame seq=50 done: 4/4 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC4
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:04,324 INFO image_tx_daemon: frame seq=51 done: 4/4 fragments ok (0 fail)
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+2026-05-25 17:30:04,554 INFO image_tx_daemon: signal received; shutting down
+2026-05-25 17:30:04,574 INFO image_tx_daemon: frame seq=52 done: 1/4 fragments ok (0 fail)
+2026-05-25 17:30:05,497 INFO image_tx_daemon: image_tx_daemon exit

@@ -1,0 +1,119 @@
+MODE: tx_burst
+dev=/dev/ttymxc3 baud=921600
+Re-setting co-processor via HostLink system reset...
+BOOT_URC observed during settle (payload=000112010201)
+INFO: drained type=0xF2 seq=0 during boot settle
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x08 sub=0x01 raw=08010000000000000000000000000000000000000e000000
+Co-processor system reset complete.
+Initializing regulatory profile 0 on co-processor...
+  FHSS mask: single channel 0 (0100000000000000)
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+CFG_SET_REQ(REG_PROFILE=0) OK: 14000100
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x09 sub=0x01 lanes=LPUART1 raw=090100000000000000000000000000000000000079020000
+STATS_URC(boot) drained seq=0 (unsolicited snapshot — discarding so it can't poison later request() calls)
+RUNTIME_PROFILE_ENUM=0
+__PROFILE_DRAINED__=0
+__PROFILE_ATTEMPTS__=1
+=== W1-10b probe TX_BURST: count=30 inter=0.25s timeout=5.0s ===
+INFO: post-VER drain queued type=0xF1 seq=0
+INFO: post-VER drain queued type=0xC1 seq=0
+CFG_OK_URC: LBT_ENABLE=0
+TX_BURST: STATS(before) radio_tx_ok=0 radio_tx_abort_lbt=0 radio_tx_abort_airtime=0
+__W1_10B_BURST_READY__
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=0 tx_id=0x00 status=0(OK) toa_us=35968 elapsed_ms=52.9 payload_hex=57312d313062207365713d30303030206330316338373839
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=1 tx_id=0x01 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303031206662383764373535
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=2 tx_id=0x02 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303032203436366665316164
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=3 tx_id=0x03 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303033203566363066343230
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=4 tx_id=0x04 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303034203064643233393161
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=5 tx_id=0x05 status=0(OK) toa_us=35968 elapsed_ms=52.9 payload_hex=57312d313062207365713d30303035203738616565666163
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=6 tx_id=0x06 status=0(OK) toa_us=35968 elapsed_ms=52.7 payload_hex=57312d313062207365713d30303036206238303237313839
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=7 tx_id=0x07 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303037206661613861656635
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=8 tx_id=0x08 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303038203334386366643637
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=9 tx_id=0x09 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303039203837353361393065
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=10 tx_id=0x0A status=0(OK) toa_us=35968 elapsed_ms=53.1 payload_hex=57312d313062207365713d30303130206131633238623633
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=11 tx_id=0x0B status=0(OK) toa_us=35968 elapsed_ms=52.9 payload_hex=57312d313062207365713d30303131203932336133666465
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=12 tx_id=0x0C status=0(OK) toa_us=35968 elapsed_ms=52.9 payload_hex=57312d313062207365713d30303132203538323432326532
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=13 tx_id=0x0D status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303133206130363563376562
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=14 tx_id=0x0E status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303134206239386665613735
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=15 tx_id=0x0F status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303135206439336261663065
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=16 tx_id=0x10 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303136206462393731303939
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=17 tx_id=0x11 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303137203462616464393534
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=18 tx_id=0x12 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303138203334363339613330
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=19 tx_id=0x13 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303139203965376562643631
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=20 tx_id=0x14 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303230206165393532353836
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=21 tx_id=0x15 status=0(OK) toa_us=35968 elapsed_ms=53.0 payload_hex=57312d313062207365713d30303231203831613638656339
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=22 tx_id=0x16 status=0(OK) toa_us=35968 elapsed_ms=52.7 payload_hex=57312d313062207365713d30303232203365363335363831
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=23 tx_id=0x17 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303233206633656531306235
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=24 tx_id=0x18 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303234203030386362613166
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=25 tx_id=0x19 status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303235203965616235366361
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=26 tx_id=0x1A status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303236206534396161346238
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=27 tx_id=0x1B status=0(OK) toa_us=35968 elapsed_ms=52.9 payload_hex=57312d313062207365713d30303237206339313738623366
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=28 tx_id=0x1C status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303238203536343762343665
+INFO: unrelated frame during TX wait type=0xC0
+INFO: unrelated frame during TX wait type=0xC3
+__TX_DONE__ idx=29 tx_id=0x1D status=0(OK) toa_us=35968 elapsed_ms=52.8 payload_hex=57312d313062207365713d30303239203263353338656565
+TX_BURST: STATS(after) radio_tx_ok=30 (delta=30) radio_tx_abort_lbt=0 (delta=0) radio_tx_abort_airtime=0 (delta=0)
+__W1_10B_BURST_DONE__ tx_count=30 tx_done_ok=30 tx_done_fail=0 tx_timeout=0 radio_tx_ok_delta=30 radio_tx_abort_lbt_delta=0 radio_tx_abort_airtime_delta=0 real_faults=0 invariants_violated=0
+__RADIO_SLEEP_ON_EXIT__ (tx_burst) ack=0180 RegOpMode(post)=0x80 (target=0x80)
