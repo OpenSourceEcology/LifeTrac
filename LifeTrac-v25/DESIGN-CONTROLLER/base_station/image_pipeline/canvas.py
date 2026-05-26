@@ -14,13 +14,23 @@ badges in their own modules.
 """
 from __future__ import annotations
 
+import logging
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Callable, Iterator
 
 from lora_proto import Badge
 
-from .frame_format import TileDeltaFrame
+from .codec_decode import CodecDecodeError, transcode_to_webp
+from .frame_format import CODEC_WEBP, TileDeltaFrame
+
+LOG = logging.getLogger(__name__)
+
+# Max distinct (codec, blob) tuples to remember when transcoding non-WebP
+# tiles. 256 covers ~2.6 full keyframes worth of unique tiles, which is
+# more than enough to absorb a static scene re-shipping the same blobs.
+_TRANSCODE_CACHE_MAX = 256
 
 
 @dataclass
@@ -59,6 +69,8 @@ class Canvas:
         self._clock_ms = clock_ms or (lambda: int(time.monotonic() * 1000))
         self._last_base_seq: int | None = None
         self._has_keyframe = False
+        # (codec, blob) -> transcoded WebP blob. LRU-trimmed.
+        self._transcode_cache: "OrderedDict[tuple[int, bytes], bytes]" = OrderedDict()
 
     @property
     def n_tiles(self) -> int:
@@ -120,13 +132,42 @@ class Canvas:
             self._last_base_seq = frame.base_seq
 
         for tile in frame.tiles:
+            try:
+                webp_blob = self._transcoded(frame.codec, tile.blob)
+            except CodecDecodeError as exc:
+                LOG.warning("canvas: dropping tile %d codec=%d: %s",
+                            tile.index, frame.codec, exc)
+                update.request_keyframe = True
+                update.reason = update.reason or f"codec_decode_error: {exc}"
+                continue
             slot = self._tiles[tile.index]
-            slot.blob = tile.blob
+            slot.blob = webp_blob
             slot.arrived_ms = now
             slot.badge = Badge.RAW
             update.updated_indices.append(tile.index)
 
         return update
+
+    def _transcoded(self, codec: int, blob: bytes) -> bytes:
+        """Return the browser-WebP form of ``blob`` for the given codec.
+
+        Caches by ``(codec, blob)`` so a static scene re-shipping the
+        same tile bytes doesn't re-pay the PIL decode cost on every
+        refresh. CODEC_WEBP short-circuits the cache because identity
+        transcode is already free.
+        """
+        if codec == CODEC_WEBP:
+            return blob
+        key = (codec, blob)
+        hit = self._transcode_cache.get(key)
+        if hit is not None:
+            self._transcode_cache.move_to_end(key)
+            return hit
+        out = transcode_to_webp(codec, blob, self.tile_px)
+        self._transcode_cache[key] = out
+        if len(self._transcode_cache) > _TRANSCODE_CACHE_MAX:
+            self._transcode_cache.popitem(last=False)
+        return out
 
     def snapshot(self) -> Iterator[tuple[int, TileState]]:
         """Yield ``(index, TileState)`` for every populated tile.

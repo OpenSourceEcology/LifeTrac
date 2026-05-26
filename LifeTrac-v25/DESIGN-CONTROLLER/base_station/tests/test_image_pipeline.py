@@ -80,6 +80,31 @@ class FrameFormatTests(unittest.TestCase):
         with self.assertRaises(FrameDecodeError):
             parse_tile_delta_frame(wire + b"\x00")
 
+    def test_codec_byte_round_trip(self):
+        # Default codec is WEBP (0); old payloads always decoded to 0.
+        default = parse_tile_delta_frame(
+            encode_tile_delta_frame(_make_keyframe(0, [0])))
+        self.assertEqual(default.codec, 0)
+        # Each codec id 0..15 must survive a round trip.
+        for codec in range(0, 16):
+            frame = _make_keyframe(1, [0, 5])
+            frame.codec = codec
+            decoded = parse_tile_delta_frame(encode_tile_delta_frame(frame))
+            self.assertEqual(decoded.codec, codec)
+
+    def test_codec_out_of_range_rejected_on_encode(self):
+        frame = _make_keyframe(0, [0])
+        frame.codec = 16
+        with self.assertRaises(FrameDecodeError):
+            encode_tile_delta_frame(frame)
+
+    def test_codec_out_of_range_rejected_on_decode(self):
+        # Hand-craft a payload with codec=200 and confirm parser rejects.
+        good = encode_tile_delta_frame(_make_keyframe(0, [0]))
+        bad = bytes(good[:5]) + b"\xc8" + bytes(good[6:])
+        with self.assertRaises(FrameDecodeError):
+            parse_tile_delta_frame(bad)
+
 
 class CanvasTests(unittest.TestCase):
     def setUp(self):
@@ -102,6 +127,48 @@ class CanvasTests(unittest.TestCase):
     def test_delta_before_keyframe_requests_keyframe(self):
         upd = self.canvas.apply(_make_delta(5, [0]))
         self.assertTrue(upd.request_keyframe)
+
+    def test_mono_g4_round_trip_through_canvas(self):
+        """End-to-end: tractor MONO_G4 blob -> base transcode -> WebP."""
+        from PIL import Image
+        try:
+            import zlib
+        except ImportError:                                  # pragma: no cover
+            self.skipTest("zlib not available")
+        # Build a 32x32 RGB ramp, dither it 1bpp, MSB-pack, zlib-wrap.
+        ramp = bytes((i * 8) % 256 for i in range(32 * 32 * 3))
+        img = Image.frombytes("RGB", (32, 32), ramp)
+        bits = img.convert("1").tobytes()
+        self.assertEqual(len(bits), 128)
+        zbuf = zlib.compress(bits, level=9)
+        mono_blob = b"\x01" + zbuf
+        kf = TileDeltaFrame(
+            frame_kind=1, base_seq=0, grid_w=12, grid_h=8, tile_px=32,
+            changed_indices=[7],
+            tiles=[TileBlob(index=7, tx=7, ty=0, blob=mono_blob)],
+            codec=1,  # CODEC_MONO_G4
+        )
+        self.now[0] = 42  # snapshot() skips tiles whose arrived_ms == 0
+        upd = self.canvas.apply(kf)
+        self.assertEqual(upd.updated_indices, [7])
+        self.assertFalse(upd.request_keyframe)
+        slot_blob = next(
+            slot.blob for idx, slot in self.canvas.snapshot() if idx == 7)
+        # Transcoded output must be a real WebP container.
+        self.assertEqual(slot_blob[:4], b"RIFF")
+        self.assertEqual(slot_blob[8:12], b"WEBP")
+
+    def test_bad_codec_drops_tile_and_requests_keyframe(self):
+        from image_pipeline.frame_format import CODEC_BTC4_PER_TILE
+        kf = TileDeltaFrame(
+            frame_kind=1, base_seq=0, grid_w=12, grid_h=8, tile_px=32,
+            changed_indices=[3],
+            tiles=[TileBlob(index=3, tx=3, ty=0, blob=b"\x00\x01\x02")],
+            codec=CODEC_BTC4_PER_TILE,  # not implemented yet
+        )
+        upd = self.canvas.apply(kf)
+        self.assertTrue(upd.request_keyframe)
+        self.assertEqual(upd.updated_indices, [])
 
     def test_base_seq_gap_requests_keyframe(self):
         self.canvas.apply(_make_keyframe(0, [0]))

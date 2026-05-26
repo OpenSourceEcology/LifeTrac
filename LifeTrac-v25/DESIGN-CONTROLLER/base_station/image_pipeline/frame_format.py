@@ -3,17 +3,18 @@
 Wire format (matches ``firmware/tractor_x8/camera_service.py:_build_frame``
 and ``LORA_PROTOCOL.md § TileDeltaFrame``):
 
-    header (5 + bitmap_bytes):
+    header (6 + bitmap_bytes):
         u8  frame_kind      ; 1=keyframe (I), 0=delta (P)
         u8  base_seq        ; rolls 0..255
         u8  grid_w          ; tiles across (12)
         u8  grid_h          ; tiles down  (8)
         u8  tile_px         ; pixels per tile edge (32)
+        u8  codec           ; per-frame codec id (see CODEC_* constants)
         u8  changed_bitmap[(grid_w*grid_h + 7)//8]
 
     body (zero or more, in row-major order over the SET bits):
-        u8  tile_size_minus1     ; webp blob length is this+1, max 256 B
-        u8  webp_blob[size]
+        u8  tile_size_minus1     ; blob length is this+1, max 256 B
+        u8  tile_blob[size]      ; codec-specific encoded tile
 
 This module deliberately has zero dependencies on PIL/cryptography/paho so it
 can be used inside the bridge process, the web_ui process, the offline
@@ -28,7 +29,16 @@ from typing import Iterable
 
 FRAME_KIND_KEY = 1
 FRAME_KIND_DELTA = 0
-HEADER_FIXED_LEN = 5
+HEADER_FIXED_LEN = 6
+
+# Per-frame codec ids. Values 0..3 are first-class; 4..14 are reserved for
+# future codecs; 15 is the escape hatch for a hypothetical per-tile-codec
+# variant (see AI NOTES 2026-05-25 Encoder Method Cycle Button plan).
+CODEC_WEBP            = 0   # FULL or Y_ONLY: a WebP container per tile.
+CODEC_MONO_G4         = 1   # 1-bit Floyd-Steinberg dither, zlib-packed.
+CODEC_BTC4_PER_TILE   = 2   # 4-level palette + 2 bpp index plane, per tile.
+CODEC_BTC4_PER_FRAME  = 3   # 4 × RGB palette in body prefix + 2 bpp tiles.
+CODEC_RESERVED_MAX    = 15  # parser rejects codec > this
 
 
 @dataclass
@@ -37,7 +47,7 @@ class TileBlob:
     index: int        # row-major index into the (grid_w, grid_h) grid
     tx: int
     ty: int
-    blob: bytes       # raw WebP bytes, ready to hand to a decoder
+    blob: bytes       # codec-specific encoded bytes (default codec: raw WebP)
 
 
 @dataclass
@@ -50,6 +60,10 @@ class TileDeltaFrame:
     tile_px: int
     changed_indices: list[int] = field(default_factory=list)
     tiles: list[TileBlob] = field(default_factory=list)
+    # Per-frame codec id (see CODEC_* constants). Defaults to WEBP so any
+    # caller that constructs a TileDeltaFrame the old way keeps shipping
+    # WebP tiles. ``parse_tile_delta_frame`` always populates this.
+    codec: int = CODEC_WEBP
 
     @property
     def is_keyframe(self) -> bool:
@@ -80,14 +94,16 @@ def parse_tile_delta_frame(payload: bytes) -> TileDeltaFrame:
     """
     if len(payload) < HEADER_FIXED_LEN:
         raise FrameDecodeError(f"payload too short: {len(payload)} < {HEADER_FIXED_LEN}")
-    frame_kind, base_seq, grid_w, grid_h, tile_px = struct.unpack_from(
-        "BBBBB", payload, 0)
+    frame_kind, base_seq, grid_w, grid_h, tile_px, codec = struct.unpack_from(
+        "BBBBBB", payload, 0)
     if frame_kind not in (FRAME_KIND_KEY, FRAME_KIND_DELTA):
         raise FrameDecodeError(f"bad frame_kind {frame_kind}")
     if not (1 <= grid_w <= 32 and 1 <= grid_h <= 32):
         raise FrameDecodeError(f"grid {grid_w}x{grid_h} out of range")
     if tile_px == 0:
         raise FrameDecodeError("tile_px must be > 0")
+    if codec > CODEC_RESERVED_MAX:
+        raise FrameDecodeError(f"codec id {codec} > reserved max {CODEC_RESERVED_MAX}")
 
     n_tiles = grid_w * grid_h
     bitmap_len = (n_tiles + 7) // 8
@@ -133,6 +149,7 @@ def parse_tile_delta_frame(payload: bytes) -> TileDeltaFrame:
         tile_px=tile_px,
         changed_indices=changed,
         tiles=tiles,
+        codec=codec,
     )
 
 
@@ -140,6 +157,9 @@ def encode_tile_delta_frame(frame: TileDeltaFrame) -> bytes:
     """Round-trip helper used by tests and the synthetic-injector in
     fallback_render so the canvas/reassembler can be exercised without a
     real tractor."""
+    if not 0 <= frame.codec <= CODEC_RESERVED_MAX:
+        raise FrameDecodeError(
+            f"codec id {frame.codec} out of [0,{CODEC_RESERVED_MAX}]")
     n_tiles = frame.grid_w * frame.grid_h
     bitmap = bytearray((n_tiles + 7) // 8)
     seen = set()
@@ -151,9 +171,10 @@ def encode_tile_delta_frame(frame: TileDeltaFrame) -> bytes:
         seen.add(tile.index)
         bitmap[tile.index // 8] |= (1 << (tile.index % 8))
     out = bytearray()
-    out += struct.pack("BBBBB",
+    out += struct.pack("BBBBBB",
                        frame.frame_kind, frame.base_seq,
-                       frame.grid_w, frame.grid_h, frame.tile_px)
+                       frame.grid_w, frame.grid_h, frame.tile_px,
+                       frame.codec)
     out += bytes(bitmap)
     # Tiles must be emitted in ascending index order (matches the camera).
     for tile in sorted(frame.tiles, key=lambda t: t.index):

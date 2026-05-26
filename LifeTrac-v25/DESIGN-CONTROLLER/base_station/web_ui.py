@@ -1614,21 +1614,67 @@ async def api_encode_mode_set(body: EncodeModeBody,
     The bridge handler (`lora_bridge._on_mqtt_message`) calls
     ``EncodeModeController.set_operator_ceiling`` with the parsed mode.
     """
+    return _set_encode_mode_override(body.mode)
+
+
+# Subset of `_ENCODE_MODE_UI_CHOICES` that the gamepad / pill cycle button
+# advances through. Kept narrow for bench testing so the operator can
+# eyeball each mode change without having to step through legacy or
+# not-yet-implemented codecs. Order matches the on-screen pill rotation.
+_ENCODE_MODE_CYCLE_ORDER: tuple[str, ...] = (
+    "auto",
+    "full",
+    "y_only",
+    "mono_g4",
+)
+
+
+def _set_encode_mode_override(mode: str) -> dict:
+    """Persist + publish an encode-mode operator-ceiling override.
+
+    Shared by ``POST /api/settings/encode_mode`` and
+    ``POST /api/encode_mode/cycle`` so both endpoints stay in lock-step
+    on persistence semantics and the retained-topic payload shape.
+    Returns the JSON body the endpoints surface to clients.
+    """
+    if mode not in _ENCODE_MODE_UI_CHOICES:
+        raise HTTPException(status_code=400,
+                            detail=f"unknown encode mode: {mode!r}")
     try:
-        _persist_encode_mode_override(body.mode)
+        _persist_encode_mode_override(mode)
     except OSError as exc:
         logging.error("failed to persist encode_mode override to %s: %s",
                       ENCODE_MODE_STORE_PATH, exc)
         raise HTTPException(status_code=500,
                             detail=f"could not persist override: {exc}")
-    payload = json.dumps({"mode": body.mode})
+    payload = json.dumps({"mode": mode})
     info = mqtt_client.publish(_ENCODE_MODE_TOPIC, payload, retain=True, qos=0)
-    # paho returns MQTTMessageInfo; rc!=0 is a publish failure but we've
-    # already persisted to disk so the bridge will pick it up via the
-    # retained topic once the broker is reachable. Surface as 200 with a
-    # `delivered` flag rather than fail the request.
     delivered = bool(info and info.rc == 0)
-    return {"ok": True, "mode": body.mode, "delivered": delivered}
+    return {"ok": True, "mode": mode, "delivered": delivered}
+
+
+@app.post("/api/encode_mode/cycle")
+async def api_encode_mode_cycle(_session: str = Depends(_require_session)):
+    """Advance the operator-ceiling encode mode through the cycle order.
+
+    Reads the current persisted override, rotates to the next entry in
+    :data:`_ENCODE_MODE_CYCLE_ORDER`, and persists + publishes the new
+    value. Wired to the gamepad BACK/SELECT button (idx 8) and the web
+    encoder-mode pill so a bench operator can sweep visually-distinct
+    codecs without touching the settings page.
+    """
+    current = _load_encode_mode_override()
+    if current in _ENCODE_MODE_CYCLE_ORDER:
+        i = _ENCODE_MODE_CYCLE_ORDER.index(current)
+        nxt = _ENCODE_MODE_CYCLE_ORDER[(i + 1) % len(_ENCODE_MODE_CYCLE_ORDER)]
+    else:
+        # The persisted value is a legitimate UI choice but not in the
+        # narrow cycle list (e.g. btc4_*, adaptive). Snap back to the
+        # head of the cycle on the next press.
+        nxt = _ENCODE_MODE_CYCLE_ORDER[0]
+    result = _set_encode_mode_override(nxt)
+    result["previous"] = current
+    return result
 
 
 # ---- Tractor params proxy (TODO bucket C item 4) -----------------------

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+from typing import Callable
 
 from lora_proto import (
     CMD_ENCODE_MODE,
@@ -39,6 +40,19 @@ from lora_proto import (
     lora_time_on_air_ms,
     pack_command,
 )
+
+
+# Safe-mode hysteresis thresholds: when image airtime utilization stays
+# critically high for a few consecutive windows, ``EncodeModeController``
+# force-pins ``EncodeMode.MONO_G4`` regardless of any operator-selected
+# ceiling. When it drops back well below the saturation knee for a
+# longer streak, the floor releases. The asymmetric window counts (3 to
+# engage, 5 to clear) bias toward staying conservative once the link has
+# proven itself fragile, per the encoder-cycle plan AI NOTE.
+SAFE_MODE_CRITICAL: float = 0.95
+SAFE_MODE_CLEAR: float = 0.60
+SAFE_MODE_CRITICAL_WINDOWS: int = 3
+SAFE_MODE_CLEAR_WINDOWS: int = 5
 
 
 @dataclass(frozen=True)
@@ -125,6 +139,21 @@ class EncodeModeController:
     The ceiling only affects the *target* the controller chases; the
     3-window hysteresis is preserved so a flicker on either the ceiling
     or the airtime signal cannot flap the encoder.
+
+    Safe-mode floor (independent of operator pin)
+    ---------------------------------------------
+    A second hysteresis layer watches for the link going **critically**
+    saturated. When ``image_util`` stays >= :data:`SAFE_MODE_CRITICAL`
+    for :data:`SAFE_MODE_CRITICAL_WINDOWS` consecutive observations, the
+    controller force-pins :data:`EncodeMode.MONO_G4` regardless of any
+    operator ceiling — a safety override the operator cannot defeat.
+    When ``image_util`` drops back to <= :data:`SAFE_MODE_CLEAR` for
+    :data:`SAFE_MODE_CLEAR_WINDOWS` consecutive observations, the safe-
+    mode flag clears and the operator's pin (if any) is honoured again.
+
+    Callers register a ``safe_mode_callback(active: bool)`` to surface
+    the state on MQTT / the web UI; the callback is fired once on each
+    edge (no spam every tick).
     """
 
     def __init__(self, required_windows: int = 3) -> None:
@@ -133,6 +162,10 @@ class EncodeModeController:
         self._candidate = self.mode
         self._candidate_count = 0
         self._operator_ceiling: EncodeMode | None = None
+        self._safe_mode_active: bool = False
+        self._safe_mode_enter_count: int = 0
+        self._safe_mode_clear_count: int = 0
+        self._safe_mode_callback: "Callable[[bool], None] | None" = None
 
     def set_operator_ceiling(self, ceiling: EncodeMode | None) -> None:
         """Pin (or clear) the operator-selected maximum-quality mode.
@@ -155,9 +188,25 @@ class EncodeModeController:
     def operator_ceiling(self) -> EncodeMode | None:
         return self._operator_ceiling
 
+    @property
+    def safe_mode_active(self) -> bool:
+        """True iff the safe-mode floor is currently force-pinning MONO_G4."""
+        return self._safe_mode_active
+
+    def set_safe_mode_callback(
+        self, callback: "Callable[[bool], None] | None") -> None:
+        """Register a one-shot edge callback for safe-mode transitions.
+
+        ``callback(True)`` fires when the floor engages, ``callback(False)``
+        fires when it clears. Idempotent re-observations do not fire.
+        """
+        self._safe_mode_callback = callback
+
     def observe(self, utilization: AirtimeUtilization) -> EncodeMode | None:
+        self._update_safe_mode(utilization.image)
         target = self._target_for(utilization.image)
         target = self._apply_operator_ceiling(target, utilization)
+        target = self._apply_safe_mode(target)
         if target == self.mode:
             self._candidate = target
             self._candidate_count = 0
@@ -172,6 +221,48 @@ class EncodeModeController:
             self._candidate_count = 0
             return self.mode
         return None
+
+    def _update_safe_mode(self, image_util: float) -> None:
+        """Advance the safe-mode hysteresis counters and fire edge callbacks."""
+        if not self._safe_mode_active:
+            if image_util >= SAFE_MODE_CRITICAL:
+                self._safe_mode_enter_count += 1
+            else:
+                self._safe_mode_enter_count = 0
+            if self._safe_mode_enter_count >= SAFE_MODE_CRITICAL_WINDOWS:
+                self._safe_mode_active = True
+                self._safe_mode_enter_count = 0
+                self._safe_mode_clear_count = 0
+                if self._safe_mode_callback is not None:
+                    try:
+                        self._safe_mode_callback(True)
+                    except Exception:  # pragma: no cover - never crash ctrl
+                        pass
+        else:
+            if image_util <= SAFE_MODE_CLEAR:
+                self._safe_mode_clear_count += 1
+            else:
+                self._safe_mode_clear_count = 0
+            if self._safe_mode_clear_count >= SAFE_MODE_CLEAR_WINDOWS:
+                self._safe_mode_active = False
+                self._safe_mode_clear_count = 0
+                self._safe_mode_enter_count = 0
+                if self._safe_mode_callback is not None:
+                    try:
+                        self._safe_mode_callback(False)
+                    except Exception:  # pragma: no cover - never crash ctrl
+                        pass
+
+    def _apply_safe_mode(self, candidate: EncodeMode) -> EncodeMode:
+        """Clamp ``candidate`` to the MONO_G4 floor when safe-mode is on."""
+        if not self._safe_mode_active:
+            return candidate
+        try:
+            cand_idx = ENCODE_MODE_LADDER.index(candidate)
+            floor_idx = ENCODE_MODE_LADDER.index(EncodeMode.MONO_G4)
+        except ValueError:
+            return EncodeMode.MONO_G4
+        return ENCODE_MODE_LADDER[max(cand_idx, floor_idx)]
 
     def command_frame(self, seq: int, mode: EncodeMode | None = None) -> bytes:
         selected = self.mode if mode is None else mode

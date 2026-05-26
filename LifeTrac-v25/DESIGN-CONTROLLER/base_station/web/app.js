@@ -182,6 +182,14 @@
           && ('active_source' in msg.data || 'source' in msg.data);
         if (typeof msg.data !== 'object' || hasSourceField) setSource(msg.data);
       }
+      // Encoder-cycle plan step 11: safe-mode floor banner. lora_bridge
+      // publishes {"active": bool, "since_ms": int} retained on this
+      // topic; we surface as a red flash on the encoder pill so the
+      // operator sees the override the moment the link degrades.
+      if (msg.topic.endsWith('/control/safe_mode_active')) {
+        const active = !!(msg.data && msg.data.active);
+        setSafeMode(active);
+      }
     } catch (e) { /* shrug */ }
   });
   setInterval(() => {
@@ -361,6 +369,75 @@
     });
   });
 
+  // ----- Encoder-mode pill (encoder-cycle plan, steps 9 + 10 + 11) -----
+  // Short click cycles through the narrow on-bench codec subset by
+  // POSTing /api/encode_mode/cycle. Long-press (>=800 ms) jumps to the
+  // full settings page. The pill text mirrors the persisted operator
+  // ceiling, and a safe-mode flag (published retained on
+  // lifetrac/v25/control/safe_mode_active) replaces the label with a
+  // red flashing "SAFE: mono_g4" until the link recovers.
+  const encPill = document.getElementById('encode-mode-pill');
+  let encSafeMode = false;
+  let encCurrentMode = 'auto';
+  function _renderEncPill() {
+    if (!encPill) return;
+    if (encSafeMode) {
+      encPill.textContent = 'SAFE: mono_g4';
+      encPill.classList.add('safe');
+    } else {
+      encPill.textContent = `enc: ${encCurrentMode} \u25B8`;
+      encPill.classList.remove('safe');
+    }
+  }
+  function setSafeMode(active) {
+    if (encSafeMode === active) return;
+    encSafeMode = active;
+    _renderEncPill();
+  }
+  function _setEncMode(mode) {
+    encCurrentMode = (typeof mode === 'string' && mode) ? mode : 'auto';
+    _renderEncPill();
+  }
+  // Seed from the persisted-override endpoint on page load.
+  fetch('/api/settings/encode_mode')
+    .then(r => r.ok ? r.json() : null)
+    .then(j => { if (j && j.current) _setEncMode(j.current); })
+    .catch(() => { /* leave default */ });
+  function cycleEncodeMode() {
+    fetch('/api/encode_mode/cycle', { method: 'POST' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j && j.mode) _setEncMode(j.mode); })
+      .catch(() => { /* shrug */ });
+  }
+  if (encPill) {
+    let encPressStart = 0;
+    let encLongFired = false;
+    const LONG_PRESS_MS = 800;
+    let encLongTimer = null;
+    const startPress = (ev) => {
+      ev.preventDefault();
+      encPressStart = performance.now();
+      encLongFired = false;
+      encLongTimer = setTimeout(() => {
+        encLongFired = true;
+        window.location = '/settings#encmode';
+      }, LONG_PRESS_MS);
+    };
+    const endPress = (ev) => {
+      ev.preventDefault();
+      if (encLongTimer) { clearTimeout(encLongTimer); encLongTimer = null; }
+      if (encLongFired) return;
+      cycleEncodeMode();
+    };
+    encPill.addEventListener('mousedown',  startPress);
+    encPill.addEventListener('mouseup',    endPress);
+    encPill.addEventListener('mouseleave', () => {
+      if (encLongTimer) { clearTimeout(encLongTimer); encLongTimer = null; }
+    });
+    encPill.addEventListener('touchstart', startPress, { passive: false });
+    encPill.addEventListener('touchend',   endPress,   { passive: false });
+  }
+
   // ----- USB Gamepad -----
   let gamepadActive = false;
   // Edge-detection memory for momentary actions (E-stop, etc.). Without this
@@ -409,6 +486,13 @@
     // E-stop: rising edge only.
     if (pressed(gp, 9)) {
       fetch('/api/estop', { method: 'POST' });
+    }
+    // Encoder method cycle: BACK/SELECT (button 8) on standard XInput.
+    // Edge-triggered so a long press still cycles exactly once. Mirrors
+    // the on-screen pill so a bench operator can sweep codecs without
+    // looking at the laptop. (Encoder-cycle plan, step 10.)
+    if (pressed(gp, 8)) {
+      cycleEncodeMode();
     }
     if (controlsLocked) {
       state.lhx = state.lhy = state.rhx = state.rhy = 0;

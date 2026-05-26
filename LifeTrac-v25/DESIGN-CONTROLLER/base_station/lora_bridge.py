@@ -202,6 +202,14 @@ class Bridge:
         # we translate to EncodeMode and pin the controller's ceiling.
         self.mqtt.subscribe("lifetrac/v25/control/encode_mode_override")
         self.mqtt.loop_start()
+        # Step 3 of the encoder-cycle plan: seed the retained safe-mode
+        # state so freshly-loaded web clients show "link healthy" without
+        # waiting for the first hysteresis edge. Subsequent transitions
+        # are fired by the controller callback registered in __init__.
+        try:
+            self._publish_safe_mode_state(self.encode_ctrl.safe_mode_active)
+        except Exception as exc:  # pragma: no cover - mqtt down at boot
+            logging.warning("safe_mode: initial publish failed (%s)", exc)
         # IP-101: persist the SRC_BASE TX nonce-seq across restarts so a
         # crash inside the same wall-clock second cannot reuse a (key, nonce).
         store_path = nonce_store_path or os.environ.get(
@@ -223,6 +231,13 @@ class Bridge:
         # Airtime ledger + encode-mode controller (LORA_IMPLEMENTATION.md \u00a74, \u00a77).
         self.ledger = RollingAirtimeLedger(window_ms=10_000)
         self.encode_ctrl = EncodeModeController(required_windows=3)
+        # Step 3 (encoder-cycle plan): surface safe-mode floor transitions
+        # on a retained topic so freshly-loaded web clients see the
+        # current state immediately. ``_publish_safe_mode_state`` is the
+        # edge callback; we also seed the retained slot with the
+        # current (False) state at startup so subscribers don't have to
+        # wait for the first edge to know the link is healthy.
+        self.encode_ctrl.set_safe_mode_callback(self._publish_safe_mode_state)
         # S6.5 + S6.6: per-link-direction TX-power adapters, gated by
         # `LIFETRAC_TX_POWER_ADAPTER_V3=1`. Two independent instances so
         # each direction tracks its own SNR/PER/airtime (§21.3-5). When
@@ -425,6 +440,28 @@ class Bridge:
         if adapter is None:
             return                                    # flag disabled
         adapter.observe_packet(_now_ms(), snr_db, ok)
+
+    def _publish_safe_mode_state(self, active: bool) -> None:
+        """Publish the encoder safe-mode floor state on a retained topic.
+
+        Wired as the edge callback for ``EncodeModeController`` and also
+        invoked once at startup to seed the retained slot. The payload is
+        a small JSON object so future fields (entry reason, ledger
+        snapshot, ...) can be added without breaking subscribers.
+        """
+        payload = json.dumps({
+            "active": bool(active),
+            "since_ms": _now_ms(),
+        }).encode("ascii")
+        try:
+            self.mqtt.publish(
+                "lifetrac/v25/control/safe_mode_active",
+                payload, qos=1, retain=True,
+            )
+        except Exception as exc:  # pragma: no cover - paho already disconnected
+            logging.warning("safe_mode publish failed: %s", exc)
+        else:
+            logging.info("safe_mode_active=%s", active)
 
     def _on_mqtt_message(self, _client, _userdata, msg):
         if msg.topic.endswith("/cmd/control"):

@@ -374,6 +374,7 @@ _ENCODE_MODE_IMPLEMENTED = frozenset({
     ENCODE_MODE_Y_ONLY,
     ENCODE_MODE_MOTION_ONLY,
     ENCODE_MODE_WIREFRAME,
+    ENCODE_MODE_MONO_G4,
 })
 
 
@@ -399,6 +400,39 @@ WIREFRAME_QUALITY   = max(5, min(100, int(os.environ.get(
     "LIFETRAC_WIREFRAME_QUALITY",   "20"))))
 ENCODE_MODE = _clamp_encode_mode(int(os.environ.get("LIFETRAC_ENCODE_MODE", "0")))
 
+# Per-frame codec ids (mirrors base_station/image_pipeline/frame_format.py).
+# Kept duplicated to avoid importing the base-station tree from the tractor.
+CODEC_WEBP            = 0
+CODEC_MONO_G4         = 1
+CODEC_BTC4_PER_TILE   = 2
+CODEC_BTC4_PER_FRAME  = 3
+
+# Map operator-selected EncodeMode -> wire codec for the frame header.
+# Modes whose encoders are not implemented yet still use CODEC_WEBP
+# because ``_clamp_encode_mode`` demotes them to Y_ONLY. Each later step
+# (MONO_G4, BTC4_*, ADAPTIVE) flips one row of this table.
+_ENCODE_MODE_CODEC: dict[int, int] = {
+    ENCODE_MODE_FULL:            CODEC_WEBP,
+    ENCODE_MODE_Y_ONLY:          CODEC_WEBP,
+    ENCODE_MODE_MOTION_ONLY:     CODEC_WEBP,
+    ENCODE_MODE_WIREFRAME:       CODEC_WEBP,
+    ENCODE_MODE_BTC4_PER_TILE:   CODEC_WEBP,   # placeholder; clamped to Y_ONLY
+    ENCODE_MODE_BTC4_PER_FRAME:  CODEC_WEBP,   # placeholder; clamped to Y_ONLY
+    ENCODE_MODE_MONO_G4:         CODEC_MONO_G4,
+    ENCODE_MODE_ADAPTIVE:        CODEC_WEBP,   # placeholder; clamped to Y_ONLY
+}
+
+
+def _codec_for_mode(mode: int) -> int:
+    """Return the wire codec for ``mode`` after the safe-clamp.
+
+    Always returns the codec of the *actually-shipped* mode, so the
+    base-station decoder dispatches to the matching path. This is the
+    single point where the encoder ladder and the wire-format byte are
+    kept consistent.
+    """
+    return _ENCODE_MODE_CODEC.get(_clamp_encode_mode(mode), CODEC_WEBP)
+
 
 def _apply_encode_mode_quality(quality: int, mode: int) -> int:
     """Return the effective quality for ``mode`` given a requested ``quality``.
@@ -410,6 +444,33 @@ def _apply_encode_mode_quality(quality: int, mode: int) -> int:
     if mode == ENCODE_MODE_WIREFRAME:
         return min(quality, WIREFRAME_QUALITY)
     return quality
+
+
+def _encode_tile_mono_g4(img) -> bytes:
+    """Encode a 32x32 RGB tile as MONO_G4 (1-bit Floyd-Steinberg + zlib).
+
+    Wire layout matches ``base_station/image_pipeline/codec_decode.py
+    :_decode_mono_g4``:
+
+        u8  flag         ; bit0 set iff payload is zlib-compressed
+        u8  payload[]    ; raw 1bpp packed (MSB-first row-major) or zlib
+
+    We compress with zlib level 9 and fall back to raw packed bits when
+    zlib actually grows the payload (rare on noisy tiles). Result is
+    bounded by ``1 + (TILE_PX*TILE_PX)//8 = 129 B`` worst case, so it
+    always fits the ``tile_size_minus1`` u8 envelope.
+    """
+    import zlib
+    bits_packed = img.convert("1").tobytes()  # PIL emits MSB-first packed.
+    expected = (TILE_PX * TILE_PX + 7) // 8
+    if len(bits_packed) != expected:                # pragma: no cover
+        # PIL's "1" mode is documented to pack tightly; this guard is
+        # defensive for the (unsupported) non-multiple-of-8 tile case.
+        bits_packed = bits_packed[:expected].ljust(expected, b"\x00")
+    zbuf = zlib.compress(bits_packed, level=9)
+    if len(zbuf) < len(bits_packed):
+        return b"\x01" + zbuf
+    return b"\x00" + bits_packed
 
 
 def _encode_tile(rgb_canvas: bytes, tx: int, ty: int,
@@ -429,6 +490,8 @@ def _encode_tile(rgb_canvas: bytes, tx: int, ty: int,
     out = _slice_tile_rgb(rgb_canvas, tx, ty)
     img = Image.frombytes("RGB", (TILE_PX, TILE_PX), out)
     mode = ENCODE_MODE if encode_mode is None else _clamp_encode_mode(encode_mode)
+    if mode == ENCODE_MODE_MONO_G4:
+        return _encode_tile_mono_g4(img)
     if mode != ENCODE_MODE_FULL:
         # Drop chroma. PIL's L→RGB round-trip keeps the WebP container
         # in RGB so the wire decoder doesn't need to know about modes.
@@ -785,11 +848,13 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
 
     # Header per LORA_PROTOCOL.md § TileDeltaFrame:
     #   frame_kind (1) | seq (1) | grid_w (1) | grid_h (1) | tile_px (1)
-    #   | changed_bitmap (bitmap_bytes)
+    #   | codec (1) | changed_bitmap (bitmap_bytes)
     accum.seq = (accum.seq + 1) & 0xFF
-    header = struct.pack("BBBBB",
+    codec = _codec_for_mode(ENCODE_MODE)
+    header = struct.pack("BBBBBB",
                          1 if is_key else 0,
-                         accum.seq, GRID_W, GRID_H, TILE_PX) + bytes(bitmap)
+                         accum.seq, GRID_W, GRID_H, TILE_PX,
+                         codec) + bytes(bitmap)
     body = bytearray()
     for _i, blob in kept:
         # tile_size_minus1 is u8 → max 256 B

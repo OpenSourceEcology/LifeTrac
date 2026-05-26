@@ -254,12 +254,28 @@
     .gamepad-pill { padding: 2px 8px; border-radius: 12px;
       background: #444; font-size: 11px; }
     .gamepad-pill.on { background: var(--accent); color: #000; }
+    /* Encoder-mode pill (encoder-cycle plan, step 9). Short click
+       cycles through the narrow on-bench codec subset; long-press
+       opens the full settings UI. Safe-mode override forces a red
+       flash and the text is replaced with the floor mode. */
+    .encmode-pill { padding: 2px 8px; border-radius: 12px;
+      background: #444; font-size: 11px; cursor: pointer;
+      user-select: none; margin-right: 6px; }
+    .encmode-pill.safe { background: #c33; color: #fff;
+      animation: safe-flash 1s infinite; }
+    @keyframes safe-flash {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.55; }
+    }
   </style>
 </head>
 <body>
   <header>
     <div class="title">LifeTrac v25 · Base Station</div>
     <div>
+      <span id="encode-mode-pill" class="encmode-pill"
+            title="Click: cycle encoder method · Long-press: open settings"
+            >enc: auto ▸</span>
       <span id="gamepad-pill" class="gamepad-pill">no gamepad</span>
       <span id="source-banner" class="source-banner none">SOURCE: NONE</span>
     </div>

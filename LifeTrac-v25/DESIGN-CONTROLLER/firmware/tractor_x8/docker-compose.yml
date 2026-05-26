@@ -1,0 +1,40 @@
+version: '3.8'
+services:
+  camera:
+    image: lifetrac-tractor-x8:latest
+    container_name: tractor-camera
+    restart: unless-stopped
+    environment:
+      - LIFETRAC_CAMERA_DEVICE=/dev/video1
+      - LIFETRAC_MQTT_HOST=mosquitto
+      - LIFETRAC_MQTT_PORT=1883
+      - LIFETRAC_KEYFRAME_PERIOD_S=10
+      - LIFETRAC_CAMERA_FPS=2
+      - LIFETRAC_CAMERA_DESHAKE=0
+      - LIFETRAC_V4L2_INPUT_FORMAT=mjpeg
+      - LIFETRAC_V4L2_INPUT_FPS=15
+      - LIFETRAC_M7_UART=/dev/ttymxc3
+      - LIFETRAC_CAMERA_DEBUG_MQTT=1
+      - LIFETRAC_WEBP_QUALITY=55
+    devices:
+      - /dev/video1:/dev/video1
+      - /dev/ttymxc3:/dev/ttymxc3
+    depends_on:
+      - mosquitto
+    user: "0:0"
+    # Add group_add: ["video"] if needed for camera access
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: tractor-mosquitto
+    restart: unless-stopped
+    networks:
+      - default
+    # No ports exposed to LAN; internal only
+    volumes:
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_config:/mosquitto/config
+
+volumes:
+  mosquitto_data:
+  mosquitto_config:

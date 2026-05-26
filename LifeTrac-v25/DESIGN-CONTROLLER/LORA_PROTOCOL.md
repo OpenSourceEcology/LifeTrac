@@ -285,6 +285,7 @@ Layout (after framing/AES-GCM unwrap, before fragmentation):
 | `grid_w` | 1 | Tile-grid width in tiles (default 12) |
 | `grid_h` | 1 | Tile-grid height in tiles (default 8) |
 | `tile_px` | 1 | Tile edge in pixels (default 32) |
+| `codec` | 1 | Per-frame codec id. `0`=WEBP (FULL/Y_ONLY), `1`=MONO_G4 (1-bit Floyd-Steinberg + zlib), `2`=BTC4_PER_TILE (4-level palette + 2 bpp), `3`=BTC4_PER_FRAME (palette in body prefix), `4..14` reserved, `15` reserved for per-tile-codec escape. Added 2026-05-25 — operator-cyclable from `/settings`. See [`../AI NOTES/2026-05-25_Encoder_Method_Cycle_Button_Implementation_Plan_Copilot_v1_0.md`](../AI%20NOTES/2026-05-25_Encoder_Method_Cycle_Button_Implementation_Plan_Copilot_v1_0.md). |
 | `flags` | 1 | bit0 = ROI-mode-loading, bit1 = ROI-mode-driving, bit2 = grayscale (chroma dropped, base may colorize), bit3 = optical-flow degraded mode (no pixels, vector field only — see image analysis §5.3) |
 | `changed_bitmap` | ⌈grid_w·grid_h/8⌉ | Default 12 B for 12×8 grid. One bit per tile (row-major). For I-frames every bit is 1. |
 | (per changed tile, in row-major order) | | |
