@@ -11,3 +11,91 @@ Launching RX Daemon...
 Launching TX Daemon...
 Launching camera publisher container on TX board (device=/dev/video1)...
 Pipeline running. Waiting up to 615s ...
+
+=== CAMERA PUBLISHER LOG (tail) ===
+2026-05-26 00:18:29,193 INFO publish_camera_frames: [1185] published 155 B (key=False)
+
+2026-05-26 00:18:29,694 INFO publish_camera_frames: [1186] published 150 B (key=False)
+
+2026-05-26 00:18:30,194 INFO publish_camera_frames: [1187] published 241 B (key=False)
+
+2026-05-26 00:18:30,694 INFO publish_camera_frames: [1188] published 229 B (key=False)
+
+2026-05-26 00:18:31,195 INFO publish_camera_frames: [1189] published 205 B (key=False)
+
+2026-05-26 00:18:31,695 INFO publish_camera_frames: [1190] published 167 B (key=False)
+
+2026-05-26 00:18:32,194 INFO publish_camera_frames: [1191] published 153 B (key=False)
+
+2026-05-26 00:18:32,694 INFO publish_camera_frames: [1192] published 207 B (key=False)
+
+2026-05-26 00:18:33,194 INFO publish_camera_frames: [1193] published 142 B (key=False)
+
+2026-05-26 00:18:33,694 INFO publish_camera_frames: [1194] published 263 B (key=False)
+
+2026-05-26 00:18:34,194 INFO publish_camera_frames: [1195] published 207 B (key=False)
+
+2026-05-26 00:18:34,693 INFO publish_camera_frames: [1196] published 185 B (key=False)
+
+2026-05-26 00:18:35,194 INFO publish_camera_frames: [1197] published 153 B (key=False)
+
+2026-05-26 00:18:35,693 INFO publish_camera_frames: [1198] published 155 B (key=False)
+
+2026-05-26 00:18:36,164 INFO publish_camera_frames: duration_s=600.0 elapsed; exiting cleanly
+
+
+=== TX DAEMON LOG (tail) ===
+2026-05-26 00:18:37,074 WARNING image_tx_daemon: TX_DONE exception: seq=175 idx=1: ERR_PROTO during TX wait: 1001080000
+
+INFO: unrelated frame during TX wait type=0xC3
+
+2026-05-26 00:18:37,137 WARNING image_tx_daemon: TX_DONE exception: seq=175 idx=2: ERR_PROTO during TX wait: 1001080000
+
+INFO: unrelated frame during TX wait type=0xC3
+
+2026-05-26 00:18:37,201 WARNING image_tx_daemon: TX_DONE exception: seq=175 idx=3: ERR_PROTO during TX wait: 1001080000
+
+INFO: unrelated frame during TX wait type=0xC0
+
+INFO: unrelated frame during TX wait type=0xC3
+
+2026-05-26 00:18:37,294 INFO image_tx_daemon: frame seq=175 done: 2/5 fragments ok (3 fail)
+
+2026-05-26 00:18:42,163 INFO image_tx_daemon: signal received; shutting down
+
+2026-05-26 00:18:42,785 INFO image_tx_daemon: image_tx_daemon exit
+
+
+=== RX DAEMON LOG (tail) ===
+
+2026-05-26 00:18:18,481 INFO image_rx_daemon: published frame_id=0 230 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-26 00:18:21,281 INFO image_rx_daemon: published frame_id=0 145 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-26 00:18:21,637 INFO image_rx_daemon: stats: rx_frames=4574 rx_decode_err=0 frames_published=317 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=831
+
+2026-05-26 00:18:26,602 INFO image_rx_daemon: published frame_id=0 224 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-26 00:18:29,804 INFO image_rx_daemon: published frame_id=0 171 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-26 00:18:30,529 INFO image_rx_daemon: published frame_id=0 147 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-26 00:18:31,652 INFO image_rx_daemon: stats: rx_frames=4654 rx_decode_err=0 frames_published=320 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=849
+
+2026-05-26 00:18:34,878 INFO image_rx_daemon: published frame_id=0 142 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-26 00:18:36,945 INFO image_rx_daemon: published frame_id=0 153 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-26 00:18:39,031 INFO image_rx_daemon: signal received; shutting down
+
+2026-05-26 00:18:39,075 INFO image_rx_daemon: RX worker exit
+
+2026-05-26 00:18:39,955 INFO image_rx_daemon: image_rx_daemon exit
+
+
+=== VERDICT ===
+camera_publisher published frames : 1199
+image_tx_daemon frames_in        : 1197
+image_rx_daemon rx_frames        : 4654
+image_rx_daemon frames_published : 320
+SUCCESS: live camera frames flowed end-to-end over LoRa to the base station UI.
