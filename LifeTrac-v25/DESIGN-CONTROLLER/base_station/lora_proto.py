@@ -78,10 +78,32 @@ class Badge(IntEnum):
 
 
 class EncodeMode(IntEnum):
-    FULL = 0
-    Y_ONLY = 1
-    MOTION_ONLY = 2
-    WIREFRAME = 3
+    # Stable wire values — DO NOT renumber. The first four are the original
+    # auto-fallback ladder; values 4..7 are the bench-rotation candidates
+    # from `AI NOTES/2026-05-25_Grayscale_Quantization_Encoding_Research_Copilot_v1_0.md`.
+    FULL = 0           # Plan A0 baseline: full color WebP per tile
+    Y_ONLY = 1         # Plan A: luma-only WebP, chroma re-estimated at base
+    MOTION_ONLY = 2    # legacy: luma-only WebP at MOTION_ONLY_QUALITY
+    WIREFRAME = 3      # legacy: luma-only WebP at WIREFRAME_QUALITY
+    BTC4_PER_TILE = 4  # Plan C-2bit: per-tile 4-level palette + LZ4
+    BTC4_PER_FRAME = 5 # Plan C-2: one 4-level palette per frame + LZ4
+    MONO_G4 = 6        # Plan D: 1-bit Floyd-Steinberg dither + Group-4 fax
+    ADAPTIVE = 7       # Plan H: per-tile entropy heuristic picks among 1/4/256
+
+
+# Resilience ladder — most bandwidth-hungry (least resilient) first.
+# Used by `link_monitor.EncodeModeController` to clamp the auto-fallback
+# ladder under the operator-selected ceiling, and to define the auto-
+# demotion order when the link degrades. ADAPTIVE is intentionally NOT
+# in the ladder — when the operator pins it the auto-fallback layer
+# leaves it alone unless the link goes critical, then jumps to the floor.
+ENCODE_MODE_LADDER: tuple["EncodeMode", ...] = (
+    EncodeMode.FULL,            # ceiling — best quality
+    EncodeMode.Y_ONLY,
+    EncodeMode.BTC4_PER_TILE,
+    EncodeMode.BTC4_PER_FRAME,
+    EncodeMode.MONO_G4,         # floor — survives the worst link
+)
 
 
 KISS_FEND = 0xC0

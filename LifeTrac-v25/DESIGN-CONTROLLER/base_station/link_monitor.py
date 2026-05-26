@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from lora_proto import (
     CMD_ENCODE_MODE,
     CMD_LINK_PROFILE,
+    ENCODE_MODE_LADDER,
     EncodeMode,
     LINK_PHY_NAMES,
     PHY_BY_NAME,
@@ -105,6 +106,25 @@ class EncodeModeController:
       full < 25 %, y_only < 50 %, motion_only < 80 %, wireframe otherwise.
     A candidate must be observed for ``required_windows`` consecutive windows
     before it becomes active.
+
+    Operator ceiling (Phase 1 bench-rotation feature)
+    -------------------------------------------------
+    ``set_operator_ceiling(mode)`` lets the web UI pin a maximum-quality
+    mode the auto-fallback ladder may not exceed. Semantics:
+      * ``None`` (default) \u2014 no override; behave exactly as before.
+      * ``EncodeMode.ADAPTIVE`` \u2014 sticky operator pin; the auto-ladder
+        is suppressed entirely unless image utilization crosses the
+        critical threshold (>= 0.80), at which point we jump straight to
+        the resilience floor (``EncodeMode.MONO_G4``) and stay there
+        until the operator clears the pin.
+      * any other ``EncodeMode`` \u2014 treated as a ceiling: the auto-ladder
+        still runs but its output is clamped so the chosen mode is never
+        more bandwidth-hungry than the ceiling (per the
+        :data:`lora_proto.ENCODE_MODE_LADDER` ordering, ceiling-first).
+
+    The ceiling only affects the *target* the controller chases; the
+    3-window hysteresis is preserved so a flicker on either the ceiling
+    or the airtime signal cannot flap the encoder.
     """
 
     def __init__(self, required_windows: int = 3) -> None:
@@ -112,9 +132,32 @@ class EncodeModeController:
         self.mode = EncodeMode.FULL
         self._candidate = self.mode
         self._candidate_count = 0
+        self._operator_ceiling: EncodeMode | None = None
+
+    def set_operator_ceiling(self, ceiling: EncodeMode | None) -> None:
+        """Pin (or clear) the operator-selected maximum-quality mode.
+
+        Idempotent. Does not itself emit a CMD_ENCODE_MODE; the next
+        ``observe()`` tick will pick up the new ceiling and \u2014 if a
+        transition is warranted \u2014 emit on its normal schedule.
+        """
+        if ceiling is not None and not isinstance(ceiling, EncodeMode):
+            ceiling = EncodeMode(int(ceiling))
+        self._operator_ceiling = ceiling
+        # Reset the hysteresis counter so the new ceiling can take effect
+        # on the very next window if it forces a target change; otherwise
+        # an operator-initiated promotion would always wait the full
+        # ``required_windows`` for no reason.
+        self._candidate = self.mode
+        self._candidate_count = 0
+
+    @property
+    def operator_ceiling(self) -> EncodeMode | None:
+        return self._operator_ceiling
 
     def observe(self, utilization: AirtimeUtilization) -> EncodeMode | None:
         target = self._target_for(utilization.image)
+        target = self._apply_operator_ceiling(target, utilization)
         if target == self.mode:
             self._candidate = target
             self._candidate_count = 0
@@ -143,6 +186,43 @@ class EncodeModeController:
         if image_utilization >= 0.25:
             return EncodeMode.Y_ONLY
         return EncodeMode.FULL
+
+    def _apply_operator_ceiling(self, auto_target: EncodeMode,
+                                utilization: AirtimeUtilization) -> EncodeMode:
+        """Clamp ``auto_target`` against ``self._operator_ceiling``.
+
+        See class docstring for semantics. ``utilization`` is consulted
+        only for the ADAPTIVE-pin emergency-floor escape.
+        """
+        ceiling = self._operator_ceiling
+        if ceiling is None:
+            return auto_target
+        if ceiling == EncodeMode.ADAPTIVE:
+            # Operator wants per-tile heuristic. Honour it until the link
+            # crosses the critical airtime threshold (>= 0.80, the same
+            # bar that would have triggered WIREFRAME in the legacy
+            # ladder), at which point we bail to the resilience floor.
+            if utilization.image >= 0.80:
+                return EncodeMode.MONO_G4
+            return EncodeMode.ADAPTIVE
+        # Ceiling clamp via the explicit resilience ladder (ceiling first,
+        # floor last). Pick the more-conservative of (auto_target, ceiling).
+        try:
+            ceiling_idx = ENCODE_MODE_LADDER.index(ceiling)
+        except ValueError:
+            # ceiling is a legacy slot (MOTION_ONLY / WIREFRAME) that
+            # isn't in the canonical ladder \u2014 treat it as no-op so we
+            # never silently demote the operator's pick.
+            return auto_target
+        try:
+            auto_idx = ENCODE_MODE_LADDER.index(auto_target)
+        except ValueError:
+            # auto_target is a legacy slot too \u2014 leave it alone.
+            return auto_target
+        # Larger index = more conservative. Pick the bigger of the two so
+        # the ceiling caps quality but never *raises* it above the
+        # auto-ladder's suggestion when the link is degraded.
+        return ENCODE_MODE_LADDER[max(auto_idx, ceiling_idx)]
 
 
 # ---------------------------------------------------------------------------

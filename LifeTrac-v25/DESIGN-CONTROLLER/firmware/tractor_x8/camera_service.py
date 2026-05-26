@@ -350,18 +350,54 @@ def _slice_tile_rgb(rgb_canvas: bytes, tx: int, ty: int) -> bytes:
 # leaning on WebP at very low quality, which already strips fine detail to
 # blocky luma — the operator-visible "is anything moving?" signal survives
 # while bandwidth collapses by ~5×.
-ENCODE_MODE_FULL        = 0
-ENCODE_MODE_Y_ONLY      = 1
-ENCODE_MODE_MOTION_ONLY = 2
-ENCODE_MODE_WIREFRAME   = 3
-ENCODE_MODE_NAMES = ("full", "y_only", "motion_only", "wireframe")
+ENCODE_MODE_FULL           = 0
+ENCODE_MODE_Y_ONLY         = 1
+ENCODE_MODE_MOTION_ONLY    = 2
+ENCODE_MODE_WIREFRAME      = 3
+# Bench-rotation modes from AI NOTES/2026-05-25_Grayscale_Quantization_*
+# Encoder branches land in a follow-up patch; until then the receiver
+# logs the requested mode and clamps to Y_ONLY so the link does not
+# crash on a CMD_ENCODE_MODE for an unimplemented value.
+ENCODE_MODE_BTC4_PER_TILE  = 4
+ENCODE_MODE_BTC4_PER_FRAME = 5
+ENCODE_MODE_MONO_G4        = 6
+ENCODE_MODE_ADAPTIVE       = 7
+ENCODE_MODE_NAMES = (
+    "full", "y_only", "motion_only", "wireframe",
+    "btc4_per_tile", "btc4_per_frame", "mono_g4", "adaptive",
+)
+# Modes whose encoder is actually implemented today. Anything outside
+# this set is silently clamped to ENCODE_MODE_Y_ONLY at the receive
+# boundary so a stale base-station can't brick the tractor's video.
+_ENCODE_MODE_IMPLEMENTED = frozenset({
+    ENCODE_MODE_FULL,
+    ENCODE_MODE_Y_ONLY,
+    ENCODE_MODE_MOTION_ONLY,
+    ENCODE_MODE_WIREFRAME,
+})
+
+
+def _clamp_encode_mode(requested: int) -> int:
+    """Clamp ``requested`` to an implemented encoder mode.
+
+    Unknown or unimplemented values fall back to ``ENCODE_MODE_Y_ONLY`` so
+    the tractor never refuses to encode just because the base sent a
+    forward-compatible mode this build doesn't ship yet.
+    """
+    try:
+        m = int(requested)
+    except (TypeError, ValueError):
+        return ENCODE_MODE_Y_ONLY
+    if m in _ENCODE_MODE_IMPLEMENTED:
+        return m
+    return ENCODE_MODE_Y_ONLY
 # Quality ceilings applied as ``min(requested_quality, ceiling)`` so the
 # ROI-inside boost still wins when the ceiling is high enough.
 MOTION_ONLY_QUALITY = max(5, min(100, int(os.environ.get(
     "LIFETRAC_MOTION_ONLY_QUALITY", "30"))))
 WIREFRAME_QUALITY   = max(5, min(100, int(os.environ.get(
     "LIFETRAC_WIREFRAME_QUALITY",   "20"))))
-ENCODE_MODE = max(0, min(3, int(os.environ.get("LIFETRAC_ENCODE_MODE", "0"))))
+ENCODE_MODE = _clamp_encode_mode(int(os.environ.get("LIFETRAC_ENCODE_MODE", "0")))
 
 
 def _apply_encode_mode_quality(quality: int, mode: int) -> int:
@@ -392,7 +428,7 @@ def _encode_tile(rgb_canvas: bytes, tx: int, ty: int,
     from PIL import Image  # type: ignore
     out = _slice_tile_rgb(rgb_canvas, tx, ty)
     img = Image.frombytes("RGB", (TILE_PX, TILE_PX), out)
-    mode = ENCODE_MODE if encode_mode is None else max(0, min(3, int(encode_mode)))
+    mode = ENCODE_MODE if encode_mode is None else _clamp_encode_mode(encode_mode)
     if mode != ENCODE_MODE_FULL:
         # Drop chroma. PIL's L→RGB round-trip keeps the WebP container
         # in RGB so the wire decoder doesn't need to know about modes.
@@ -825,14 +861,25 @@ def dispatch_back_channel(frame: bytes, force_key_evt, *,
     elif opcode == CMD_ENCODE_MODE:
         if len(frame) >= 3:
             raw_mode = frame[2]
-            if 0 <= raw_mode <= 3:
-                global ENCODE_MODE  # noqa: PLW0603
-                ENCODE_MODE = raw_mode
+            effective = _clamp_encode_mode(raw_mode)
+            global ENCODE_MODE  # noqa: PLW0603
+            ENCODE_MODE = effective
+            if effective == raw_mode:
                 LOG.info("camera_service: CMD_ENCODE_MODE -> %d (%s)",
-                         raw_mode, ENCODE_MODE_NAMES[raw_mode])
+                         effective, ENCODE_MODE_NAMES[effective])
             else:
-                LOG.warning("camera_service: CMD_ENCODE_MODE rejected (mode=%d)",
-                            raw_mode)
+                # Forward-compatible mode this build can't encode yet.
+                # We accept it on the wire so the base can stay current,
+                # but log clearly that we fell back so the operator can
+                # tell the bench dashboard from the running encoder.
+                req_name = (ENCODE_MODE_NAMES[raw_mode]
+                            if 0 <= raw_mode < len(ENCODE_MODE_NAMES)
+                            else f"unknown({raw_mode})")
+                LOG.warning(
+                    "camera_service: CMD_ENCODE_MODE %d (%s) not implemented; "
+                    "clamping to %d (%s)",
+                    raw_mode, req_name, effective, ENCODE_MODE_NAMES[effective],
+                )
     elif opcode == CMD_ROI_HINT:
         # Args: col_lo, col_hi, row_lo, row_hi (each u8, tile coords).
         if roi_planner is not None and len(frame) >= 6:

@@ -197,5 +197,112 @@
       pinStatus.textContent = 'PIN updated';
     });
   </script>
+
+  <h2>Image encode mode (bench rotation)</h2>
+  <p class="meta">
+    Pin a maximum-quality encoder for the tractor's image link. The
+    automatic airtime-driven controller may demote <em>below</em> your
+    choice if the link degrades, but never above it. Pick <code>Auto</code>
+    to hand full control back to the airtime ladder. Pick <code>Adaptive</code>
+    to enable per-tile heuristic selection that survives until the link
+    goes critical, then falls back to the resilience floor.
+    See <code>AI&nbsp;NOTES/2026-05-25_Grayscale_Quantization_Encoding_Research_Copilot_v1_0.md</code>.
+  </p>
+  <div class="row" id="encmode-buttons" role="radiogroup" aria-label="Encode mode">
+    <!-- Buttons are injected by JS so the catalogue is server-driven. -->
+  </div>
+  <div class="row">
+    <span>Current pin:</span>
+    <span id="encmode-current" class="pill grey">unknown</span>
+    <span id="encmode-status" class="meta"></span>
+  </div>
+  <style>
+    #encmode-buttons button {
+      padding: 0.45em 0.9em; border: 1px solid #bbb; background: #f7f7f7;
+      cursor: pointer; border-radius: 4px; font-size: 0.95em;
+    }
+    #encmode-buttons button.active {
+      background: #2a8a3e; color: #fff; border-color: #1f6a2f;
+    }
+    #encmode-buttons button:hover:not(.active) { background: #ececec; }
+    #encmode-buttons button:disabled { opacity: 0.5; cursor: wait; }
+  </style>
+
+  <script>
+    const encWrap   = document.getElementById('encmode-buttons');
+    const encPill   = document.getElementById('encmode-current');
+    const encStatus = document.getElementById('encmode-status');
+
+    // Human labels + short descriptions for each mode. Order matches the
+    // bandwidth/resilience ladder (highest quality → most resilient),
+    // with Auto / Adaptive at the ends.
+    const ENC_META = {
+      'auto':            {label: 'Auto',           desc: 'airtime-driven ladder picks'},
+      'full':            {label: 'Full color',     desc: 'baseline RGB WebP (~26 B/tile)'},
+      'y_only':          {label: 'Y-only WebP',    desc: 'luma only, recolor at base (~19 B/tile)'},
+      'btc4_per_tile':   {label: 'BTC4 / tile',    desc: '4-level per-tile palette + LZ4 (~8 B/tile)'},
+      'btc4_per_frame':  {label: 'BTC4 / frame',   desc: '4-level per-frame palette + LZ4 (~5 B/tile)'},
+      'mono_g4':         {label: 'Mono / G4',      desc: '1-bit dither + Group-4 fax (~4 B/tile, most resilient)'},
+      'adaptive':        {label: 'Adaptive',       desc: 'per-tile heuristic; falls back to Mono on critical link'},
+    };
+
+    function paintCurrent(mode) {
+      encPill.textContent = (ENC_META[mode] && ENC_META[mode].label) || mode;
+      encPill.className = 'pill ' + (mode === 'auto' ? 'grey'
+                                    : mode === 'mono_g4' ? 'orange'
+                                    : mode === 'adaptive' ? 'yellow'
+                                    : 'green');
+      for (const btn of encWrap.querySelectorAll('button')) {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      }
+    }
+
+    async function loadEncodeMode() {
+      const r = await fetch('/api/settings/encode_mode', {credentials:'include'});
+      if (r.status === 401) { location = '/'; return; }
+      const data = await r.json();
+      // Build buttons from the server's catalogue so a future build can
+      // add or drop modes without a UI redeploy.
+      encWrap.innerHTML = '';
+      for (const mode of data.choices) {
+        const btn = document.createElement('button');
+        btn.dataset.mode = mode;
+        const meta = ENC_META[mode] || {label: mode, desc: ''};
+        btn.textContent = meta.label;
+        btn.title = meta.desc;
+        btn.addEventListener('click', () => setEncodeMode(mode));
+        encWrap.appendChild(btn);
+      }
+      paintCurrent(data.current);
+    }
+
+    async function setEncodeMode(mode) {
+      encStatus.textContent = 'sending…';
+      for (const btn of encWrap.querySelectorAll('button')) btn.disabled = true;
+      try {
+        const r = await fetch('/api/settings/encode_mode', {
+          method:'POST', credentials:'include',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({mode}),
+        });
+        if (r.status === 401) { location = '/'; return; }
+        if (!r.ok) {
+          encStatus.textContent = 'set failed: HTTP ' + r.status;
+          return;
+        }
+        const data = await r.json();
+        paintCurrent(data.mode);
+        encStatus.textContent = data.delivered
+          ? 'pinned (bridge will apply within ~1 s)'
+          : 'persisted (broker offline — will apply when bridge reconnects)';
+      } catch (e) {
+        encStatus.textContent = 'error: ' + e.message;
+      } finally {
+        for (const btn of encWrap.querySelectorAll('button')) btn.disabled = false;
+      }
+    }
+
+    loadEncodeMode();
+  </script>
 </body>
 </html>

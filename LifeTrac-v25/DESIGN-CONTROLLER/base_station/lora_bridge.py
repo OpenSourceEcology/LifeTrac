@@ -32,6 +32,7 @@ import serial
 
 from audit_log import DEFAULT_PATH as AUDIT_LOG_DEFAULT_PATH, AuditLog
 from link_monitor import EncodeModeController, RollingAirtimeLedger
+from lora_proto import EncodeMode  # for set_operator_ceiling decode
 # S6.6: opt-in TX-power adapter (default OFF). When the env var
 # `LIFETRAC_TX_POWER_ADAPTER_V3=1` is set at bridge boot, we instantiate
 # the v3 state-machine controller and publish its decisions on the
@@ -195,6 +196,11 @@ class Bridge:
         # IP-103: image pipeline / X8 vision can request an MJPEG keyframe
         # over the LoRa command channel. Payload = empty (opcode-only).
         self.mqtt.subscribe("lifetrac/v25/cmd/req_keyframe")
+        # Operator-ceiling override for CMD_ENCODE_MODE (Phase 1 bench rotation).
+        # Retained JSON: {"mode": "auto"|"full"|"y_only"|"btc4_per_tile"|
+        # "btc4_per_frame"|"mono_g4"|"adaptive"}. The web UI publishes here;
+        # we translate to EncodeMode and pin the controller's ceiling.
+        self.mqtt.subscribe("lifetrac/v25/control/encode_mode_override")
         self.mqtt.loop_start()
         # IP-101: persist the SRC_BASE TX nonce-seq across restarts so a
         # crash inside the same wall-clock second cannot reuse a (key, nonce).
@@ -466,6 +472,32 @@ class Bridge:
             seq = self._reserve_tx_seq()
             cmd = pack_command(seq, CMD_REQ_KEYFRAME)
             self._tx(SRC_BASE, cmd, nonce_seq=seq)
+        elif msg.topic.endswith("/control/encode_mode_override"):
+            # Operator-ceiling pin for the encode-mode ladder. JSON payload
+            # {"mode": "<name>" | "auto" | null}. "auto" / null clears the
+            # pin and lets the airtime-driven controller pick freely.
+            try:
+                body = json.loads(msg.payload.decode("utf-8") or "{}")
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                logging.warning("encode_mode_override: bad JSON (%s)", exc)
+                return
+            requested = body.get("mode")
+            if requested in (None, "auto", ""):
+                self.encode_ctrl.set_operator_ceiling(None)
+                logging.info("encode_mode_override: cleared (auto ladder active)")
+                return
+            try:
+                # Accept either name ("y_only") or int (1).
+                if isinstance(requested, str):
+                    mode = EncodeMode[requested.upper()]
+                else:
+                    mode = EncodeMode(int(requested))
+            except (KeyError, ValueError) as exc:
+                logging.warning("encode_mode_override: unknown mode %r (%s)",
+                                requested, exc)
+                return
+            self.encode_ctrl.set_operator_ceiling(mode)
+            logging.info("encode_mode_override: ceiling = %s", mode.name)
 
     def _reserve_tx_seq(self) -> int:
         # IP-101: prefer the persistent store so a crash + restart cannot

@@ -87,6 +87,30 @@ class AccelToggleBody(BaseModel):
     enabled: bool
 
 
+# Allowed values for POST /api/settings/encode_mode. Mirrors
+# ``lora_proto.EncodeMode`` names (lower-case) plus the sentinel
+# ``"auto"`` which clears the operator pin and hands control back to
+# the airtime-driven ladder. ``motion_only`` / ``wireframe`` are legacy
+# slots intentionally excluded from the operator UI; they remain on the
+# wire for backward compatibility but the operator cannot pin them.
+_ENCODE_MODE_UI_CHOICES = (
+    "auto",
+    "full",
+    "y_only",
+    "btc4_per_tile",
+    "btc4_per_frame",
+    "mono_g4",
+    "adaptive",
+)
+
+
+class EncodeModeBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: str = Field(...,
+                      pattern=r"^(auto|full|y_only|btc4_per_tile|"
+                              r"btc4_per_frame|mono_g4|adaptive)$")
+
+
 class BenchRadioBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     mode: str = Field(..., pattern="^(sleep|wake)$")
@@ -178,6 +202,40 @@ LIFETRAC_PIN = _load_operator_pin()    # 4-6 digits, see _load_operator_pin
 SESSION_TTL_S = 30 * 60          # 30 min idle timeout
 LOCKOUT_FAILS = 5                # wrong PINs before lockout
 LOCKOUT_S     = 60               # seconds of cool-off
+
+# ---- Encode-mode override store ----------------------------------------
+# Persists the operator's choice from the settings UI so it survives a
+# web_ui restart. The bridge picks it up via the retained MQTT topic
+# ``lifetrac/v25/control/encode_mode_override``; we re-publish on startup
+# below so a bridge that came up *after* web_ui still gets the pin.
+ENCODE_MODE_STORE_PATH = Path(
+    os.environ.get(
+        "LIFETRAC_ENCODE_MODE_STORE",
+        str(Path(__file__).parent / ".encode_mode_override"),
+    )
+)
+_ENCODE_MODE_TOPIC = "lifetrac/v25/control/encode_mode_override"
+
+
+def _load_encode_mode_override() -> str:
+    """Return the persisted mode name, defaulting to ``"auto"`` (no pin)."""
+    try:
+        if ENCODE_MODE_STORE_PATH.exists():
+            val = ENCODE_MODE_STORE_PATH.read_text(encoding="utf-8").strip()
+            if val in _ENCODE_MODE_UI_CHOICES:
+                return val
+    except OSError as exc:
+        logging.warning("encode_mode override file unreadable: %s", exc)
+    return "auto"
+
+
+def _persist_encode_mode_override(mode: str) -> None:
+    """Write ``mode`` to ``ENCODE_MODE_STORE_PATH`` atomically."""
+    ENCODE_MODE_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = ENCODE_MODE_STORE_PATH.with_suffix(
+        ENCODE_MODE_STORE_PATH.suffix + ".tmp")
+    tmp.write_text(mode + "\n", encoding="utf-8")
+    os.replace(tmp, ENCODE_MODE_STORE_PATH)
 
 _sessions: dict[str, float] = {}             # token -> last_used_ts
 _sessions_lock = threading.Lock()
@@ -331,6 +389,20 @@ def _connect_mqtt_with_retry() -> None:
 
 _connect_mqtt_with_retry()
 mqtt_client.loop_start()
+
+# Re-publish the persisted encode-mode override (retained) so a bridge
+# that came up after web_ui still applies the operator's last choice.
+# Best-effort: if the broker is still flaky we'll catch up on the next
+# POST /api/settings/encode_mode.
+try:
+    _initial_override = _load_encode_mode_override()
+    mqtt_client.publish(_ENCODE_MODE_TOPIC,
+                        json.dumps({"mode": _initial_override}),
+                        retain=True, qos=0)
+    logging.info("encode_mode_override: republished %s on startup",
+                 _initial_override)
+except Exception as exc:  # pragma: no cover — startup-best-effort
+    logging.warning("encode_mode_override: startup republish failed: %s", exc)
 
 # ---- BC-04: load build configuration -----------------------------------
 # Module-level singleton consumed below for MAX_CONTROL_SUBSCRIBERS,
@@ -1511,6 +1583,52 @@ async def api_accel_refresh(_session: str = Depends(_require_session)):
     it' case without waiting for the 30 s background poll.
     """
     return _accel_get().refresh().to_dict()
+
+
+# ---- Encode-mode override (Phase 1 bench rotation) ---------------------
+# Operator-as-ceiling semantics per
+# AI NOTES/2026-05-25_Grayscale_Quantization_Encoding_Research_Copilot_v1_0.md:
+# the chosen mode caps the auto-fallback ladder; the airtime-driven
+# controller in lora_bridge may still demote BELOW the ceiling but never
+# above it. Pin "adaptive" disables auto-demote until the link goes
+# critical, then jumps to the floor (mono_g4).
+@app.get("/api/settings/encode_mode")
+async def api_encode_mode_get(_session: str = Depends(_require_session)):
+    """Return the persisted operator ceiling + the catalogue of choices
+    the UI is allowed to surface.
+    """
+    return {
+        "current": _load_encode_mode_override(),
+        "choices": list(_ENCODE_MODE_UI_CHOICES),
+    }
+
+
+@app.post("/api/settings/encode_mode")
+async def api_encode_mode_set(body: EncodeModeBody,
+                              _session: str = Depends(_require_session)):
+    """Set the operator-ceiling encode mode.
+
+    Persists to disk so the choice survives a web_ui restart, then
+    publishes a retained JSON message on ``lifetrac/v25/control/
+    encode_mode_override`` so the bridge applies it on the next tick.
+    The bridge handler (`lora_bridge._on_mqtt_message`) calls
+    ``EncodeModeController.set_operator_ceiling`` with the parsed mode.
+    """
+    try:
+        _persist_encode_mode_override(body.mode)
+    except OSError as exc:
+        logging.error("failed to persist encode_mode override to %s: %s",
+                      ENCODE_MODE_STORE_PATH, exc)
+        raise HTTPException(status_code=500,
+                            detail=f"could not persist override: {exc}")
+    payload = json.dumps({"mode": body.mode})
+    info = mqtt_client.publish(_ENCODE_MODE_TOPIC, payload, retain=True, qos=0)
+    # paho returns MQTTMessageInfo; rc!=0 is a publish failure but we've
+    # already persisted to disk so the bridge will pick it up via the
+    # retained topic once the broker is reachable. Surface as 200 with a
+    # `delivered` flag rather than fail the request.
+    delivered = bool(info and info.rc == 0)
+    return {"ok": True, "mode": body.mode, "delivered": delivered}
 
 
 # ---- Tractor params proxy (TODO bucket C item 4) -----------------------
