@@ -416,6 +416,44 @@ class FrameAccum:
     last_canvas: bytes | None = None
     last_keyframe_t: float = 0.0
     seq: int = 0
+    # IP-PlanRev (Method C): per-tile monotonic counter of when each tile
+    # was last *shipped*. Used by the rotating fair-share sweep so the
+    # canvas eventually paints in full even when motion is concentrated
+    # in one ROI. Lazily allocated on first use to keep Method A's
+    # FrameAccum() construction signature unchanged.
+    tile_last_seq: list[int] | None = None
+    sweep_seq: int = 0
+
+
+# IP-PlanRev: image-pipeline plan revision selector. Letter scheme parallel
+# to the LoRa "Method G" tracker. See
+# ``LifeTrac-v25/DESIGN-CONTROLLER/IMAGE_PIPELINE_METHODS.md``.
+#
+#   A  shipping behaviour: byte-diff bitmap + (rank, idx) row-major priority.
+#   B  magnitude-ranked priority: tile-level L1 diff above a noise floor;
+#      changed tiles encoded in descending magnitude so a tight byte budget
+#      spends bytes on actual motion, not on the top-left strip.
+#   C  Method B + rotating fair-share sweep: each P-frame promotes
+#      ``LIFETRAC_SWEEP_STEP`` of the longest-unsent tiles into the
+#      changed bitmap so a still scene still converges to full coverage.
+IMAGE_METHOD = os.environ.get("LIFETRAC_IMAGE_METHOD", "A").strip().upper()
+if IMAGE_METHOD not in ("A", "B", "C"):
+    LOG.warning("LIFETRAC_IMAGE_METHOD=%r unknown; falling back to A", IMAGE_METHOD)
+    IMAGE_METHOD = "A"
+
+# Method B/C: L1-magnitude floor (sum of |cur-prev| over the 32×32×3 RGB
+# tile). Set ≈ 8000 to filter typical sensor noise (~3072 pixels × ~2.5
+# levels) while catching real motion (~25k+). 0 disables the floor.
+TILE_MAGNITUDE_MIN = max(0, int(os.environ.get(
+    "LIFETRAC_TILE_MAGNITUDE_MIN", "8000")))
+
+# Method C: how many "stale" tiles to force into each P-frame's changed
+# bitmap. With SWEEP_STEP=2 and a 1 fps loop, a static 96-tile canvas
+# converges to full coverage in ~48 s even with zero motion. 0 disables.
+SWEEP_STEP = max(0, int(os.environ.get("LIFETRAC_SWEEP_STEP", "2")))
+
+LOG.info("IP-PlanRev: IMAGE_METHOD=%s TILE_MAGNITUDE_MIN=%d SWEEP_STEP=%d numpy=%s",
+         IMAGE_METHOD, TILE_MAGNITUDE_MIN, SWEEP_STEP, _HAS_NUMPY)
 
 
 # IP-W2-03: per-tile quality split for the ROI planner. Inside-ROI tiles
@@ -541,10 +579,38 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
     n_tiles = GRID_W * GRID_H
     bitmap_bytes = (n_tiles + 7) // 8
     bitmap = bytearray(bitmap_bytes)
+
+    # IP-PlanRev Method B/C: per-tile L1 magnitudes (sum of |cur-prev| over
+    # the 32×32×3 RGB tile). ``magnitudes[i] == 0`` for I-frames or when
+    # numpy is unavailable. Computed once and reused for both the bitmap
+    # decision and the priority sort.
+    magnitudes: list[int] = [0] * n_tiles
+    if (not is_key and accum.last_canvas is not None
+            and IMAGE_METHOD in ("B", "C") and _HAS_NUMPY):
+        prev = accum.last_canvas
+        cur_a = _np.frombuffer(canvas, dtype=_np.uint8).reshape(
+            GRID_H, TILE_PX, GRID_W, TILE_PX, 3).astype(_np.int16)
+        prv_a = _np.frombuffer(prev, dtype=_np.uint8).reshape(
+            GRID_H, TILE_PX, GRID_W, TILE_PX, 3).astype(_np.int16)
+        mag_grid = _np.abs(cur_a - prv_a).sum(axis=(1, 3, 4))
+        for ty in range(GRID_H):
+            for tx in range(GRID_W):
+                magnitudes[ty * GRID_W + tx] = int(mag_grid[ty, tx])
+
     if is_key:
         for i in range(n_tiles):
             bitmap[i // 8] |= (1 << (i % 8))
+    elif IMAGE_METHOD in ("B", "C") and _HAS_NUMPY and accum.last_canvas is not None:
+        # Method B/C: motion-aware bitmap. A tile is "changed" iff its L1
+        # magnitude exceeds TILE_MAGNITUDE_MIN — kills sensor-noise
+        # false-positives that otherwise mark every tile changed under
+        # the legacy byte-diff path.
+        for i, m in enumerate(magnitudes):
+            if m > TILE_MAGNITUDE_MIN:
+                bitmap[i // 8] |= (1 << (i % 8))
     else:
+        # Method A (and Method B/C fallback when numpy is missing): legacy
+        # byte-diff bitmap.
         prev = accum.last_canvas
         if _HAS_NUMPY:
             # IP-309: vectorize per-tile any-diff. Reshape RGB byte buffer
@@ -578,6 +644,22 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
                         i = ty * GRID_W + tx
                         bitmap[i // 8] |= (1 << (i % 8))
 
+    # Method C: promote the SWEEP_STEP longest-unsent tiles so a still
+    # scene (or a numpy-less Method-A fallback) still converges to full
+    # coverage instead of stalling on whatever was in the last keyframe.
+    # Applies on P-frames only — keyframes already set every bit, but
+    # the priority sort below uses tile_last_seq to rotate them.
+    sweep_indices: set[int] = set()
+    if IMAGE_METHOD == "C" and not is_key and SWEEP_STEP > 0:
+        if accum.tile_last_seq is None:
+            accum.tile_last_seq = [0] * n_tiles
+        unsent = [i for i in range(n_tiles)
+                  if not (bitmap[i // 8] & (1 << (i % 8)))]
+        unsent.sort(key=lambda j: accum.tile_last_seq[j])  # oldest first
+        for j in unsent[:SWEEP_STEP]:
+            bitmap[j // 8] |= (1 << (j % 8))
+            sweep_indices.add(j)
+
     # Collect the row-major changed indices.
     changed_indices: list[int] = []
     for ty in range(GRID_H):
@@ -587,6 +669,15 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
                 changed_indices.append(i)
 
     # Decide per-tile quality + priority order using the (optional) ROI mask.
+    # IP-PlanRev:
+    #   Method A — (rank, idx) so the lowest-index tiles always win. This
+    #              is what shipped first; under a tight byte budget it
+    #              produces the well-known top-left-strip starvation
+    #              symptom documented in
+    #              ``AI NOTES/2026-05-25_Live_Camera_Pipeline.md``.
+    #   Method B/C — (rank, -magnitude, idx) so the most-changed tiles win
+    #              within each ROI rank. idx is the deterministic tie
+    #              breaker for tests.
     if roi_planner is not None:
         roi_mask = roi_planner.mask()
         inside_q  = ROI_QUALITY_INSIDE
@@ -601,9 +692,28 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
         priority = [(0, i, WEBP_QUALITY) for i in changed_indices]
 
     # Encode in priority order so a budget cap drops the right tiles.
-    # We sort by (rank, idx) so within each rank the row-major order is kept;
-    # this also makes the kept set deterministic for tests.
-    priority.sort(key=lambda t: (t[0], t[1]))
+    if IMAGE_METHOD == "C" and is_key and accum.tile_last_seq is not None:
+        # Method C keyframe rotation: when a tight byte budget clips the
+        # keyframe (typical at LIFETRAC_FRAGMENT_BUDGET≈250), ship the
+        # longest-unsent tiles first so successive keyframes rotate
+        # through the canvas instead of re-shipping the top-left strip
+        # every 10 s. tile_last_seq=0 → never shipped → wins first.
+        priority.sort(key=lambda t: (t[0], accum.tile_last_seq[t[1]], t[1]))
+    elif IMAGE_METHOD in ("B", "C") and not is_key:
+        # IP-PlanRev Method C fairness fix: sweep-injected tiles have
+        # magnitude≈0 (that's why they're stale) so a pure -magnitude
+        # sort drops them every frame, defeating the rotation. Tier 0 =
+        # sweep (always wins its slot), tier 1 = motion (competes within
+        # the remaining budget by -magnitude).
+        priority.sort(key=lambda t: (
+            t[0],
+            0 if t[1] in sweep_indices else 1,
+            -magnitudes[t[1]],
+            t[1],
+        ))
+    else:
+        # Method A (and Method B/C first-frame): (rank, idx) row-major.
+        priority.sort(key=lambda t: (t[0], t[1]))
     kept: list[tuple[int, bytes]] = []   # (idx, blob)
     used = 0
     cap = byte_budget if (byte_budget is not None and byte_budget > 0) else None
@@ -654,6 +764,14 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
     accum.last_canvas = canvas
     if is_key:
         accum.last_keyframe_t = now
+    # IP-PlanRev Method C: track ship age per tile so the next P-frame's
+    # sweep promotes the longest-unsent tiles. Updated for every method
+    # so a runtime switch from A → C immediately has useful data.
+    if accum.tile_last_seq is None:
+        accum.tile_last_seq = [0] * n_tiles
+    accum.sweep_seq += 1
+    for i, _blob in kept:
+        accum.tile_last_seq[i] = accum.sweep_seq
     return bytes(header + body)
 
 

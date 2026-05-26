@@ -1,0 +1,101 @@
+=== LIVE CAMERA PIPELINE: 180 s ===
+TX Serial:  2E2C1209DABC240B    Camera: /dev/video1
+RX Serial:  2D0A1209DABC240B
+MQTT Host:  192.168.1.79
+Capture:    1920x1080 @ 30 fps   Publish: 2 fps
+Image method: C   Fragment budget: 250 B   Keyframe: 10 s
+Cleaning up lingering containers...
+Pulsing gpio163 (L072 NRST) on both boards...
+Deploying daemons + camera publisher + ffmpeg...
+Launching RX Daemon...
+Launching TX Daemon...
+Launching camera publisher container on TX board (device=/dev/video1)...
+Pipeline running. Waiting up to 195s ...
+
+=== CAMERA PUBLISHER LOG (tail) ===
+2026-05-25 20:03:08,830 INFO publish_camera_frames: [0345] published 257 B (key=False)
+
+2026-05-25 20:03:09,331 INFO publish_camera_frames: [0346] published 205 B (key=False)
+
+2026-05-25 20:03:09,835 INFO publish_camera_frames: [0347] published 175 B (key=False)
+
+2026-05-25 20:03:10,331 INFO publish_camera_frames: [0348] published 153 B (key=False)
+
+2026-05-25 20:03:10,830 INFO publish_camera_frames: [0349] published 159 B (key=False)
+
+2026-05-25 20:03:11,333 INFO publish_camera_frames: [0350] published 251 B (key=False)
+
+2026-05-25 20:03:11,830 INFO publish_camera_frames: [0351] published 209 B (key=False)
+
+2026-05-25 20:03:12,330 INFO publish_camera_frames: [0352] published 169 B (key=False)
+
+2026-05-25 20:03:12,830 INFO publish_camera_frames: [0353] published 191 B (key=False)
+
+2026-05-25 20:03:13,314 INFO publish_camera_frames: [0354] published 208 B (key=False)
+
+2026-05-25 20:03:13,831 INFO publish_camera_frames: [0355] published 151 B (key=False)
+
+2026-05-25 20:03:14,331 INFO publish_camera_frames: [0356] published 165 B (key=False)
+
+2026-05-25 20:03:14,832 INFO publish_camera_frames: [0357] published 190 B (key=False)
+
+2026-05-25 20:03:15,330 INFO publish_camera_frames: [0358] published 261 B (key=False)
+
+2026-05-25 20:03:15,800 INFO publish_camera_frames: duration_s=180.0 elapsed; exiting cleanly
+
+
+=== TX DAEMON LOG (tail) ===
+INFO: unrelated frame during TX wait type=0xC3
+
+INFO: unrelated frame during TX wait type=0xC0
+
+INFO: unrelated frame during TX wait type=0xC3
+
+INFO: unrelated frame during TX wait type=0xC0
+
+INFO: unrelated frame during TX wait type=0xC3
+
+INFO: unrelated frame during TX wait type=0xC0
+
+INFO: unrelated frame during TX wait type=0xC3
+
+2026-05-25 20:03:17,362 INFO image_tx_daemon: frame seq=103 done: 8/8 fragments ok (0 fail)
+
+2026-05-25 20:03:21,777 INFO image_tx_daemon: signal received; shutting down
+
+2026-05-25 20:03:22,349 INFO image_tx_daemon: image_tx_daemon exit
+
+
+=== RX DAEMON LOG (tail) ===
+
+2026-05-25 20:03:04,693 INFO image_rx_daemon: published frame_id=0 173 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-25 20:03:05,855 INFO image_rx_daemon: published frame_id=0 151 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-25 20:03:06,872 INFO image_rx_daemon: published frame_id=0 237 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-25 20:03:08,957 INFO image_rx_daemon: published frame_id=0 161 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-25 20:03:09,863 INFO image_rx_daemon: published frame_id=0 211 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-25 20:03:10,684 INFO image_rx_daemon: stats: rx_frames=1359 rx_decode_err=0 frames_published=100 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=238
+
+2026-05-25 20:03:11,756 INFO image_rx_daemon: published frame_id=0 175 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-25 20:03:16,078 INFO image_rx_daemon: published frame_id=0 165 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-25 20:03:17,360 INFO image_rx_daemon: published frame_id=0 261 B ƒ+' lifetrac/v25/video/tile_delta
+
+2026-05-25 20:03:18,660 INFO image_rx_daemon: signal received; shutting down
+
+2026-05-25 20:03:18,876 INFO image_rx_daemon: RX worker exit
+
+2026-05-25 20:03:19,371 INFO image_rx_daemon: image_rx_daemon exit
+
+
+=== VERDICT ===
+camera_publisher published frames : 359
+image_tx_daemon frames_in        : 356
+image_rx_daemon rx_frames        : 1359
+image_rx_daemon frames_published : 100
+SUCCESS: live camera frames flowed end-to-end over LoRa to the base station UI.

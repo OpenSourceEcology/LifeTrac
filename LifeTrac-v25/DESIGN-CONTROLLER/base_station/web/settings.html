@@ -145,5 +145,57 @@
 
     loadParams();
   </script>
+
+  <h2>Operator PIN</h2>
+  <p class="meta">
+    Default PIN is <code>1234</code>. Change it here once logged in; the new
+    PIN is persisted on the base station and other sessions will be logged
+    out. 4–6 digits.
+  </p>
+  <div class="row">
+    <label>Current PIN: <input type="password" id="pin-current" maxlength="16" autocomplete="current-password" inputmode="numeric"></label>
+  </div>
+  <div class="row">
+    <label>New PIN: <input type="password" id="pin-new" maxlength="6" pattern="\d{4,6}" autocomplete="new-password" inputmode="numeric"></label>
+    <label>Confirm: <input type="password" id="pin-new2" maxlength="6" pattern="\d{4,6}" autocomplete="new-password" inputmode="numeric"></label>
+  </div>
+  <div class="row">
+    <button id="pin-save">Change PIN</button>
+    <span id="pin-status" class="meta"></span>
+  </div>
+
+  <script>
+    const pinCur    = document.getElementById('pin-current');
+    const pinNew    = document.getElementById('pin-new');
+    const pinNew2   = document.getElementById('pin-new2');
+    const pinSave   = document.getElementById('pin-save');
+    const pinStatus = document.getElementById('pin-status');
+
+    pinSave.addEventListener('click', async () => {
+      pinStatus.textContent = '';
+      const cur = pinCur.value, n1 = pinNew.value, n2 = pinNew2.value;
+      if (!/^\d{4,6}$/.test(n1)) {
+        pinStatus.textContent = 'new PIN must be 4–6 digits'; return;
+      }
+      if (n1 !== n2) {
+        pinStatus.textContent = 'PIN confirmation does not match'; return;
+      }
+      const r = await fetch('/api/settings/pin', {
+        method:'POST', credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({current_pin: cur, new_pin: n1}),
+      });
+      if (r.status === 401) {
+        const d = await r.json().catch(() => ({}));
+        pinStatus.textContent = d.detail || 'unauthorized';
+        return;
+      }
+      if (!r.ok) {
+        pinStatus.textContent = 'change failed: HTTP ' + r.status; return;
+      }
+      pinCur.value = pinNew.value = pinNew2.value = '';
+      pinStatus.textContent = 'PIN updated';
+    });
+  </script>
 </body>
 </html>

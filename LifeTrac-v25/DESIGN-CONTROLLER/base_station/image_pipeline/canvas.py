@@ -104,11 +104,19 @@ class Canvas:
                 return update
             expected = ((self._last_base_seq or 0) + 1) & 0xFF
             if frame.base_seq != expected:
+                # IP-PlanRev gap-tolerant merge: a base_seq gap means one or
+                # more intermediate P-frames were lost in transport (LoRa
+                # reassembler timeout / fragment drop). The tiles inside
+                # THIS frame are still valid pixels — they're just snapshots
+                # of those tile positions at a later moment. Refusing to
+                # apply them (the pre-IP-PlanRev behaviour) used to starve
+                # the canvas down to keyframe-only coverage whenever the
+                # link was lossy, since every gap caused a full-frame drop.
+                # Now we apply the tiles AND request a keyframe in parallel
+                # so the operator still sees motion immediately.
                 update.request_keyframe = True
                 update.reason = (
                     f"base_seq gap: got {frame.base_seq}, expected {expected}")
-                # Don't mutate canvas on a bad chain — wait for keyframe.
-                return update
             self._last_base_seq = frame.base_seq
 
         for tile in frame.tiles:

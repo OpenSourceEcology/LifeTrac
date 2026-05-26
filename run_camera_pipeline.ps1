@@ -39,7 +39,9 @@ param(
     [int]$V4l2InputFps    = 30,
     [int]$PublishFps      = 2,
     [int]$FragmentBudget  = 250,
-    [double]$KeyframePeriodS = 10.0
+    [double]$KeyframePeriodS = 10.0,
+    [ValidateSet('A','B','C')]
+    [string]$ImageMethod  = 'C'
 )
 
 Set-StrictMode -Version Latest
@@ -50,6 +52,7 @@ Write-Host "TX Serial:  $TxAdbSerial    Camera: $VideoDevice"
 Write-Host "RX Serial:  $RxAdbSerial"
 Write-Host "MQTT Host:  $HostIp"
 Write-Host "Capture:    $V4l2InputSize @ $V4l2InputFps fps   Publish: $PublishFps fps"
+Write-Host "Image method: $ImageMethod   Fragment budget: $FragmentBudget B   Keyframe: $KeyframePeriodS s"
 
 $repoRoot    = (Resolve-Path "$PSScriptRoot").Path
 $baseStation = Join-Path $repoRoot "LifeTrac-v25\DESIGN-CONTROLLER\base_station"
@@ -136,6 +139,7 @@ $envFlags = @(
     "-e LIFETRAC_FFMPEG_PATH=/work/ffmpeg",
     "-e LIFETRAC_FRAGMENT_BUDGET=$FragmentBudget",
     "-e LIFETRAC_KEYFRAME_PERIOD_S=$KeyframePeriodS",
+    "-e LIFETRAC_IMAGE_METHOD=$ImageMethod",
     "-e LIFETRAC_CAMERA_DESHAKE=0"
 ) -join " "
 

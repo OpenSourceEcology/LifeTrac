@@ -76,6 +76,12 @@ class LoginBody(BaseModel):
     pin: str = Field(..., min_length=1, max_length=16)
 
 
+class ChangePinBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    current_pin: str = Field(..., min_length=1, max_length=16)
+    new_pin: str = Field(..., pattern=r"^\d{4,6}$")
+
+
 class AccelToggleBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool
@@ -109,25 +115,66 @@ WEB_DIR = Path(__file__).parent / "web"
 # Single shared PIN, LAN-only, plain HTTP for v25. Telemetry views are public;
 # control/E-stop/camera-select require the PIN. The hardware E-stop on the
 # base is auth-independent.
-def _load_operator_pin() -> str:
-    """Load the operator PIN from a Docker secret file or env var.
+DEFAULT_OPERATOR_PIN = "1234"
+# Persistent store for UI-changed PINs. Lives next to the module so a
+# pip-installed deployment writes alongside its own files. Overridable via
+# env for tests / containerised deployments that mount a writable volume.
+PIN_STORE_PATH = Path(
+    os.environ.get(
+        "LIFETRAC_PIN_STORE",
+        str(Path(__file__).parent / ".operator_pin"),
+    )
+)
 
-    Source order (matches IP-002 / IP-008 secret-file pattern):
-      1. ``LIFETRAC_PIN_FILE``  — preferred, file is mounted by Docker.
-      2. ``LIFETRAC_PIN``       — fallback, mostly for dev / unit tests.
-    Empty / unreadable values fall through to "" so the runtime check in
-    ``api_login`` returns 503 (refuse-to-grant) rather than fail-open.
+
+def _read_pin_file(path: str | Path) -> str:
+    try:
+        return Path(path).read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        logging.warning("PIN file %r unreadable: %s", str(path), exc)
+        return ""
+
+
+def _load_operator_pin() -> str:
+    """Load the operator PIN.
+
+    Priority (first non-empty wins):
+      1. ``PIN_STORE_PATH`` (user-changed PIN persisted by settings UI).
+      2. ``LIFETRAC_PIN_FILE`` env (Docker secret mount; IP-002 / IP-008).
+      3. ``LIFETRAC_PIN`` env (dev / unit tests).
+      4. ``DEFAULT_OPERATOR_PIN`` ("1234") so first boot is never lockout.
     """
+    if PIN_STORE_PATH.exists():
+        pin = _read_pin_file(PIN_STORE_PATH)
+        if pin:
+            return pin
     path = os.environ.get("LIFETRAC_PIN_FILE", "").strip()
     if path:
-        try:
-            return open(path, "r", encoding="utf-8").read().strip()
-        except OSError as exc:
-            logging.warning("LIFETRAC_PIN_FILE=%r unreadable: %s", path, exc)
-    return os.environ.get("LIFETRAC_PIN", "").strip()
+        pin = _read_pin_file(path)
+        if pin:
+            return pin
+    env_pin = os.environ.get("LIFETRAC_PIN", "").strip()
+    if env_pin:
+        return env_pin
+    return DEFAULT_OPERATOR_PIN
 
 
-LIFETRAC_PIN = _load_operator_pin()    # 4-6 digits, set at first boot
+def _persist_operator_pin(new_pin: str) -> None:
+    """Write the new PIN to ``PIN_STORE_PATH`` with restrictive perms.
+
+    Raises ``OSError`` on failure; callers translate to HTTP 500.
+    """
+    PIN_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = PIN_STORE_PATH.with_suffix(PIN_STORE_PATH.suffix + ".tmp")
+    tmp.write_text(new_pin + "\n", encoding="utf-8")
+    try:
+        os.chmod(tmp, 0o600)
+    except OSError:
+        pass  # Windows / FAT — best-effort
+    os.replace(tmp, PIN_STORE_PATH)
+
+
+LIFETRAC_PIN = _load_operator_pin()    # 4-6 digits, see _load_operator_pin
 SESSION_TTL_S = 30 * 60          # 30 min idle timeout
 LOCKOUT_FAILS = 5                # wrong PINs before lockout
 LOCKOUT_S     = 60               # seconds of cool-off
@@ -1389,6 +1436,35 @@ async def api_logout(session: str | None = Cookie(default=None)):
 @app.get("/api/session")
 async def api_session(session: str | None = Cookie(default=None)):
     return {"authenticated": _session_valid(session)}
+
+
+@app.post("/api/settings/pin")
+async def api_change_pin(body: ChangePinBody,
+                         _session: str = Depends(_require_session)):
+    """Operator-changeable PIN. Requires current PIN + valid session.
+
+    New PIN must be 4-6 digits. Persisted to ``PIN_STORE_PATH`` so it
+    survives restart; reload happens in-process so the next login uses
+    the new value immediately. All other sessions are invalidated.
+    """
+    global LIFETRAC_PIN
+    if not hmac.compare_digest(body.current_pin, LIFETRAC_PIN):
+        raise HTTPException(status_code=401, detail="invalid current PIN")
+    try:
+        _persist_operator_pin(body.new_pin)
+    except OSError as exc:
+        logging.error("failed to persist PIN to %s: %s", PIN_STORE_PATH, exc)
+        raise HTTPException(status_code=500,
+                            detail=f"could not persist PIN: {exc}")
+    LIFETRAC_PIN = body.new_pin
+    # Invalidate every session except the caller's so other devices must
+    # re-authenticate with the new PIN.
+    with _sessions_lock:
+        keep = _sessions.get(_session)
+        _sessions.clear()
+        if keep is not None:
+            _sessions[_session] = keep
+    return {"ok": True}
 
 
 # ---- Coral / accelerator settings (DECISIONS.md D-CORAL-1..3) ----------

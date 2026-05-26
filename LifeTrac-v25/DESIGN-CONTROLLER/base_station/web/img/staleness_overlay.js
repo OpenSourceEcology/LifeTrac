@@ -6,6 +6,9 @@
 //
 // Tints any tile whose age >= STALE_MS with a yellow alpha overlay scaled
 // by how stale it is, and writes the age in seconds in the corner.
+//
+// Off by default so the canvas is unobstructed. Opt in with `?diag=1` in
+// the URL or by running `localStorage.lifetracDiag = '1'` in DevTools.
 
 (function () {
   'use strict';
@@ -13,7 +16,16 @@
   const STALE_MS = 1000;
   const VERY_STALE_MS = 5000;
 
+  function diagEnabled() {
+    try {
+      if (new URLSearchParams(window.location.search).get('diag') === '1') return true;
+      if (window.localStorage && window.localStorage.getItem('lifetracDiag') === '1') return true;
+    } catch (_) {}
+    return false;
+  }
+
   function init() {
+    if (!diagEnabled()) return;
     const base = document.getElementById('image-canvas');
     if (!base) return;
     let overlay = document.getElementById('image-staleness');

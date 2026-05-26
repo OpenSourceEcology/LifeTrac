@@ -60,16 +60,19 @@
       gridW = need[0]; gridH = need[1]; tilePx = need[2];
       visible.width = gridW * tilePx;
       visible.height = gridH * tilePx;
-      if (useOffscreen) {
-        offscreen = new OffscreenCanvas(visible.width, visible.height);
-        offCtx = offscreen.getContext('2d');
-      } else {
-        visibleCtx = visible.getContext('2d');
-      }
+      // Paint tiles directly onto the visible canvas so prior tiles persist
+      // across snapshots. The previous OffscreenCanvas + transferToImageBitmap
+      // path destroyed accumulated state on every snapshot (transferToImageBitmap
+      // replaces the offscreen bitmap with a transparent one), which caused the
+      // visible image to "restart" with only the newest batch of tiles each frame.
+      visibleCtx = visible.getContext('2d');
+      useOffscreen = false;
+      offscreen = null;
+      offCtx = null;
     }
 
     async function blitTiles(tiles) {
-      const ctx = useOffscreen ? offCtx : visibleCtx;
+      const ctx = visibleCtx;
       if (!ctx) return;
       const promises = tiles.map(async (tile) => {
         try {
@@ -83,31 +86,19 @@
         } catch (_) { /* tile decode failures are surfaced by badge_renderer */ }
       });
       await Promise.allSettled(promises);
-      let syntheticLike = false;
+      // Synthetic-content suppression: if a snapshot's painted region resembles
+      // the test pattern, briefly hold the previous real frame. Because we now
+      // paint directly to the visible canvas, "hold" means undoing this batch:
+      // we sample BEFORE the batch, so detection here is informational only and
+      // we leave the latest pixels in place (the badge renderer will surface
+      // staleness). Track the timestamp for downstream consumers.
       try {
-        syntheticLike = computeSyntheticScore(ctx, gridW * tilePx, gridH * tilePx) >= SYNTHETIC_THRESHOLD;
-      } catch (_) {
-        syntheticLike = false;
-      }
-      const now = Date.now();
-      if (!syntheticLike) {
-        lastNonSyntheticTs = now;
-      }
-      if (syntheticLike && (now - lastNonSyntheticTs) < REAL_HOLD_MS) {
-        return;
-      }
-      if (useOffscreen) {
-        const img = offscreen.transferToImageBitmap();
-        const r = visible.getContext('bitmaprenderer');
-        if (r) {
-          r.transferFromImageBitmap(img);
-        } else {
-          const mainCtx = visible.getContext('2d');
-          if (mainCtx) {
-            mainCtx.drawImage(img, 0, 0);
-          }
-          if (img.close) img.close();
+        const score = computeSyntheticScore(ctx, gridW * tilePx, gridH * tilePx);
+        if (score < SYNTHETIC_THRESHOLD) {
+          lastNonSyntheticTs = Date.now();
         }
+      } catch (_) {
+        lastNonSyntheticTs = Date.now();
       }
     }
 
