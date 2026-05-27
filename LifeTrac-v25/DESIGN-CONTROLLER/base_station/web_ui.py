@@ -686,10 +686,27 @@ def _publish_state_snapshot() -> None:
 
 
 def _ingest_tile_delta(payload: bytes) -> None:
+    global _image_canvas
     with _image_lock:
         frame = _image_reassembler.feed(payload)
         if frame is None:
             return
+        # 2026-05-27: auto-adopt the upstream camera's grid on the first
+        # keyframe whose layout differs from our current Canvas. Before
+        # this, _image_canvas was hardcoded 12x8@32px and any camera with
+        # a different grid (e.g. the LoRa-bridge synthetic 6x4@32px) was
+        # rejected by Canvas.apply() with "grid mismatch", leaving every
+        # /ws/state snapshot with tiles=[] and the operator canvas black.
+        if frame.is_keyframe and (
+            (frame.grid_w, frame.grid_h, frame.tile_px)
+            != (_image_canvas.grid_w, _image_canvas.grid_h, _image_canvas.tile_px)
+        ):
+            _image_canvas = Canvas(
+                grid_w=frame.grid_w,
+                grid_h=frame.grid_h,
+                tile_px=frame.tile_px,
+            )
+            _image_publisher.canvas = _image_canvas
         update = _image_canvas.apply(frame)
         if update.request_keyframe:
             _image_publisher.needs_keyframe = True
