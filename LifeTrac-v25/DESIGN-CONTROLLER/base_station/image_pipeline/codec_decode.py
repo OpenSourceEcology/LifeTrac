@@ -44,6 +44,7 @@ from .frame_format import (
     CODEC_BTC4_PER_TILE,
     CODEC_MONO_G4,
     CODEC_WEBP,
+    CODEC_WEBP_LUMA,
 )
 
 
@@ -82,12 +83,26 @@ def _decode_mono_g4(blob: bytes, tile_px: int) -> bytes:
     return buf.getvalue()
 
 
+def _decode_webp_luma(blob: bytes, tile_px: int) -> bytes:  # noqa: ARG001
+    """Pass-through for Y_ONLY tiles.
+
+    A CODEC_WEBP_LUMA blob is a valid grayscale WebP container; every
+    modern browser paints it natively, so no transcode is required. The
+    distinct codec id exists so the canvas / state-publisher can tag the
+    tile with ``Badge.RECOLOURISED`` and so future base-side fusion
+    (Recolouriser GLSL composite) can take over without changing the
+    wire format.
+    """
+    return blob
+
+
 # Codec id -> transcoder. Each transcoder takes (blob, tile_px) and
 # returns a WebP blob the browser can paint. Codecs that are not yet
 # implemented are absent so ``transcode_to_webp`` can raise a precise
 # error instead of silently swallowing them.
 _TRANSCODERS: dict[int, Callable[[bytes, int], bytes]] = {
     CODEC_MONO_G4: _decode_mono_g4,
+    CODEC_WEBP_LUMA: _decode_webp_luma,
 }
 
 

@@ -29,25 +29,39 @@
     overlay.height = base.height;
     const ctx2d = overlay.getContext('2d');
 
-    const pending = new Map();           // tileIdx → frames-remaining
+    const pending = new Map();           // tileIdx → {frames, tx, ty}
     const FRAMES = 3;
+    let gridW = 12, gridH = 8, tilePx = 32;
+
+    window.addEventListener('lifetrac-state', (ev) => {
+      const snap = ev.detail;
+      if (!snap || !snap.grid) return;
+      gridW = snap.grid.w | 0;
+      gridH = snap.grid.h | 0;
+      tilePx = snap.grid.tile_px | 0;
+      if (overlay.width !== base.width || overlay.height !== base.height) {
+        overlay.width = base.width;
+        overlay.height = base.height;
+      }
+    });
 
     window.addEventListener('lifetrac-tile-painted', (ev) => {
       const t = ev.detail;
       if (!t) return;
-      pending.set(t.i, FRAMES);
+      // Trust server-supplied tile coords; fall back to grid math only if absent.
+      const tx = (typeof t.tx === 'number') ? t.tx : (t.i % gridW);
+      const ty = (typeof t.ty === 'number') ? t.ty : Math.floor(t.i / gridW);
+      pending.set(t.i, { frames: FRAMES, tx, ty });
     });
 
     function tick() {
       ctx2d.clearRect(0, 0, overlay.width, overlay.height);
-      const tilePx = base.width / 12;     // dynamic refresh handled by canvas_renderer
-      for (const [idx, frames] of pending) {
-        const tx = idx % 12, ty = Math.floor(idx / 12);
-        const alpha = frames / FRAMES * 0.35;
+      for (const [idx, entry] of pending) {
+        const alpha = entry.frames / FRAMES * 0.35;
         ctx2d.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
-        ctx2d.fillRect(tx * tilePx, ty * tilePx, tilePx, tilePx);
-        if (frames <= 1) pending.delete(idx);
-        else pending.set(idx, frames - 1);
+        ctx2d.fillRect(entry.tx * tilePx, entry.ty * tilePx, tilePx, tilePx);
+        if (entry.frames <= 1) pending.delete(idx);
+        else entry.frames -= 1;
       }
       requestAnimationFrame(tick);
     }

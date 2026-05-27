@@ -31,13 +31,14 @@ FRAME_KIND_KEY = 1
 FRAME_KIND_DELTA = 0
 HEADER_FIXED_LEN = 6
 
-# Per-frame codec ids. Values 0..3 are first-class; 4..14 are reserved for
+# Per-frame codec ids. Values 0..4 are first-class; 5..14 are reserved for
 # future codecs; 15 is the escape hatch for a hypothetical per-tile-codec
 # variant (see AI NOTES 2026-05-25 Encoder Method Cycle Button plan).
-CODEC_WEBP            = 0   # FULL or Y_ONLY: a WebP container per tile.
+CODEC_WEBP            = 0   # FULL: a colour WebP container per tile.
 CODEC_MONO_G4         = 1   # 1-bit Floyd-Steinberg dither, zlib-packed.
 CODEC_BTC4_PER_TILE   = 2   # 4-level palette + 2 bpp index plane, per tile.
 CODEC_BTC4_PER_FRAME  = 3   # 4 × RGB palette in body prefix + 2 bpp tiles.
+CODEC_WEBP_LUMA       = 4   # Y_ONLY: grayscale WebP per tile (luma-only).
 CODEC_RESERVED_MAX    = 15  # parser rejects codec > this
 
 

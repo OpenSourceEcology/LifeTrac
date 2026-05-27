@@ -449,6 +449,7 @@ CODEC_WEBP            = 0
 CODEC_MONO_G4         = 1
 CODEC_BTC4_PER_TILE   = 2
 CODEC_BTC4_PER_FRAME  = 3
+CODEC_WEBP_LUMA       = 4   # grayscale WebP; base routes through Recolouriser
 
 # Map operator-selected EncodeMode -> wire codec for the frame header.
 # Modes whose encoders are not implemented yet still use CODEC_WEBP
@@ -456,13 +457,13 @@ CODEC_BTC4_PER_FRAME  = 3
 # (MONO_G4, BTC4_*, ADAPTIVE) flips one row of this table.
 _ENCODE_MODE_CODEC: dict[int, int] = {
     ENCODE_MODE_FULL:            CODEC_WEBP,
-    ENCODE_MODE_Y_ONLY:          CODEC_WEBP,
-    ENCODE_MODE_MOTION_ONLY:     CODEC_WEBP,
-    ENCODE_MODE_WIREFRAME:       CODEC_WEBP,
-    ENCODE_MODE_BTC4_PER_TILE:   CODEC_WEBP,   # placeholder; clamped to Y_ONLY
-    ENCODE_MODE_BTC4_PER_FRAME:  CODEC_WEBP,   # placeholder; clamped to Y_ONLY
+    ENCODE_MODE_Y_ONLY:          CODEC_WEBP_LUMA,
+    ENCODE_MODE_MOTION_ONLY:     CODEC_WEBP_LUMA,
+    ENCODE_MODE_WIREFRAME:       CODEC_WEBP_LUMA,
+    ENCODE_MODE_BTC4_PER_TILE:   CODEC_WEBP_LUMA,   # placeholder; clamped to Y_ONLY
+    ENCODE_MODE_BTC4_PER_FRAME:  CODEC_WEBP_LUMA,   # placeholder; clamped to Y_ONLY
     ENCODE_MODE_MONO_G4:         CODEC_MONO_G4,
-    ENCODE_MODE_ADAPTIVE:        CODEC_WEBP,   # placeholder; clamped to Y_ONLY
+    ENCODE_MODE_ADAPTIVE:        CODEC_WEBP_LUMA,   # placeholder; clamped to Y_ONLY
 }
 
 

@@ -23,9 +23,20 @@ from typing import Callable, Iterator
 from lora_proto import Badge
 
 from .codec_decode import CodecDecodeError, transcode_to_webp
-from .frame_format import CODEC_WEBP, TileDeltaFrame
+from .frame_format import CODEC_MONO_G4, CODEC_WEBP, CODEC_WEBP_LUMA, TileDeltaFrame
 
 LOG = logging.getLogger(__name__)
+
+# Per-frame codec -> default Badge applied to every tile from that frame.
+# CODEC_WEBP is the colour baseline (RAW); CODEC_WEBP_LUMA carries a
+# luma-only WebP that the operator should see tagged as RECOLOURISED so
+# they know the colour is held over (Plan A / IMAGE_PIPELINE.md §8). The
+# 1-bit dither codec lands in the WIREFRAME bucket per the same §3.3.
+_CODEC_BADGE: dict[int, Badge] = {
+    CODEC_WEBP:       Badge.RAW,
+    CODEC_WEBP_LUMA:  Badge.RECOLOURISED,
+    CODEC_MONO_G4:    Badge.WIREFRAME,
+}
 
 # Max distinct (codec, blob) tuples to remember when transcoding non-WebP
 # tiles. 256 covers ~2.6 full keyframes worth of unique tiles, which is
@@ -143,7 +154,7 @@ class Canvas:
             slot = self._tiles[tile.index]
             slot.blob = webp_blob
             slot.arrived_ms = now
-            slot.badge = Badge.RAW
+            slot.badge = _CODEC_BADGE.get(frame.codec, Badge.RAW)
             update.updated_indices.append(tile.index)
 
         return update
