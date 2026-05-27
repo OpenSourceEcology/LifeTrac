@@ -266,6 +266,21 @@ for ($cycle = 1; $cycle -le $Cycles; $cycle++) {
     Append-TextWithRetry -Path $launcherLog -Value $cycleHeader
     Write-Host $cycleHeader
 
+    # 2026-05-26 Blocker B3 hardening: per-cycle preflight to evict any
+    # /dev/ttymxc3 holders (camera tx/rx daemons, stale flasher), kill
+    # any stale openocd from a prior cycle (which would otherwise hold
+    # the H7 SWD GPIOs and make the next DPIDR read 0xdeadbeef), and
+    # re-assert NRST high. Without this, cycle N can be contaminated by
+    # cycle N-1's residue.
+    # Note: the preflight body lives in per_cycle_preflight.sh (pushed with the
+    # rest of the helper toolkit above). Earlier in-line attempts using
+    # `bash -c "..."` got truncated by embedded double-quotes inside the body
+    # (PREFLIGHT_HOLDERS="$HOLD"). Invoking a script file eliminates all
+    # shell-quoting issues and guarantees the captures land in launcher.log.
+    $preflightWrapped = "echo fio | sudo -S -p '' bash /tmp/lifetrac_p0c/per_cycle_preflight.sh"
+    $preflightOut = & adb @chmodPrefix exec-out $preflightWrapped 2>&1 | Out-String
+    Append-TextWithRetry -Path $launcherLog -Value "--- per-cycle preflight ---`n$preflightOut`n--- end preflight ---"
+
     $serialForRemote = if ($AdbSerial) { $AdbSerial } else { "(auto)" }
     $runnerCmd = "echo fio | sudo -S -p '' bash /tmp/lifetrac_p0c/run_stage1_standard_contract.sh $remoteImage '$serialForRemote'"
     $remoteWrappedCmd = "sh -lc '$runnerCmd; rc=`$?; printf ""__STD_RC__=%s\n"" ""`$rc""'"
@@ -388,6 +403,27 @@ if ($RunGate) {
     & $gateScript -SummaryPath $summaryTxt -ExpectedCycles $Cycles
     $gateRc = $LASTEXITCODE
     if ($gateRc -ne 0) {
+        # Still try to restore the camera service before throwing, so the
+        # tractor leaves the test in a clean state regardless of pass/fail.
+        try {
+            Write-Host "Restoring lifetrac-camera.service after gate FAIL..."
+            & adb -s $AdbSerial shell "echo fio | sudo -S -p '' systemctl start lifetrac-camera.service" 2>$null | Out-Null
+        } catch {
+            Write-Host "WARN: camera-service restart attempt failed: $($_.Exception.Message)"
+        }
         throw "Quant gate failed with exit code $gateRc"
     }
+}
+
+# 2026-05-26: per_cycle_preflight.sh and run_flash_l072.sh stop
+# lifetrac-camera.service for the duration of each flash cycle to evict the
+# camera_service python from /dev/ttymxc3. The systemd unit is NOT auto-
+# restarted by either helper. Restart it here so the tractor returns to
+# production state after the quant loop completes.
+try {
+    Write-Host "Restoring lifetrac-camera.service (post-quant)..."
+    & adb -s $AdbSerial shell "echo fio | sudo -S -p '' systemctl start lifetrac-camera.service" 2>$null | Out-Null
+    Write-Host "lifetrac-camera.service restart issued."
+} catch {
+    Write-Host "WARN: camera-service restart attempt failed: $($_.Exception.Message)"
 }

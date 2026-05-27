@@ -1,0 +1,120 @@
+=== sanity ===
+-rw-rw-rw- 1 fio fio  2334 May  8 04:50 /tmp/lifetrac_p0c/07_assert_pa11_pf4_long.cfg
+-rw-rw-rw- 1 fio fio 21332 May 25 16:54 /tmp/lifetrac_p0c/firmware.bin
+-rw-rw-rw- 1 fio fio 10312 May 22 21:25 /tmp/lifetrac_p0c/stm32_an3155_flasher.py
+fuser /dev/ttymxc3 (pre-evict): /dev/ttymxc3:         1973
+speed 9600 baud; rows 0; columns 0; line = 0;
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+
+=== running flasher (with --verify) ===
+Opening /dev/ttymxc3 at 19200 8E1...
+  (termios unavailable; relying on prior stty configuration)
+Connecting to Bootloader...
+Sending sync byte 0x7F...
+Traceback (most recent call last):
+  File "/tmp/lifetrac_p0c/stm32_an3155_flasher.py", line 283, in <module>
+    synced = sync(fd)
+  File "/tmp/lifetrac_p0c/stm32_an3155_flasher.py", line 87, in sync
+    write_cmd(fd, b'\x7F')
+  File "/tmp/lifetrac_p0c/stm32_an3155_flasher.py", line 68, in write_cmd
+    os.write(fd, data)
+BlockingIOError: [Errno 11] Resource temporarily unavailable
+flasher exit code = 1
+
+=== killing openocd (1951) ===
+fuser /dev/ttymxc3 (post-evict): 
+
+=== launching openocd (600s hold) ===
+
+=== final openocd log ===
+
+=== overall result: flasher RC=1 ===
+gpio10_value_before_unexport=1
+OCD_PID=2579
+
+=== openocd output so far ===
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+  RCC_AHB4ENR before = 0x00000000
+  RCC_AHB4ENR after  = 0x00000021
+Phase B: drive PA_11 HIGH (LoRa BOOT0)
+  GPIOA_IDR.PA_11 = 1   (expect 1)
+Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+Phase D: re-assert PA_11 HIGH
+  GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+
+READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+Run flasher in a parallel shell.
+
+=== configure UART 19200 8E1 raw ===
+speed 19200 baud; rows 0; columns 0; line = 0;
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+
+=== running flasher (with --verify) ===
+Opening /dev/ttymxc3 at 19200 8E1...
+  (termios unavailable; relying on prior stty configuration)
+Connecting to Bootloader...
+Sending sync byte 0x7F...
+Timeout waiting for ACK
+Sync failed (got NACK or Timeout). The autobaud might already be locked.
+Attempting to proceed anyway...
+Sending GET command (0x00 0xFF)...
+Traceback (most recent call last):
+  File "/tmp/lifetrac_p0c/stm32_an3155_flasher.py", line 289, in <module>
+    if get_command(fd) is not None:
+  File "/tmp/lifetrac_p0c/stm32_an3155_flasher.py", line 92, in get_command
+    write_cmd(fd, b'\x00\xFF')
+  File "/tmp/lifetrac_p0c/stm32_an3155_flasher.py", line 68, in write_cmd
+    os.write(fd, data)
+BlockingIOError: [Errno 11] Resource temporarily unavailable
+flasher exit code = 1
+
+=== killing openocd (2579) ===
+
+=== final openocd log ===
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Info : clock speed 1805 kHz
+Info : SWD DPIDR 0x6ba02477
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+Info : Listening on port 3333 for gdb connections
+target halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+  RCC_AHB4ENR before = 0x00000000
+  RCC_AHB4ENR after  = 0x00000021
+Phase B: drive PA_11 HIGH (LoRa BOOT0)
+  GPIOA_IDR.PA_11 = 1   (expect 1)
+Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+Phase D: re-assert PA_11 HIGH
+  GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+
+READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+Run flasher in a parallel shell.
+
+=== overall result: flasher RC=1 ===

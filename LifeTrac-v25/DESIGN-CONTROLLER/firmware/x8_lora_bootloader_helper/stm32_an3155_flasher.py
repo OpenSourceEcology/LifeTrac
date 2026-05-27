@@ -268,28 +268,37 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(f"Usage: {sys.argv[0]} <firmware.bin>")
         sys.exit(1)
-        
+
     filepath = sys.argv[1]
     fd = open_port()
-    
+    exit_code = 1
+
     try:
         # Drain any pending RX
         try:
             os.read(fd, 1024)
         except:
             pass
-            
+
         print("Connecting to Bootloader...")
         synced = sync(fd)
-        
+
         if not synced:
             print("Sync failed (got NACK or Timeout). The autobaud might already be locked.")
             print("Attempting to proceed anyway...")
-            
+
         if get_command(fd) is not None:
-            flash_file(fd, filepath, 0x08000000)
+            try:
+                flash_file(fd, filepath, 0x08000000)
+                exit_code = 0
+            except Exception as ex:
+                print(f"flash_file raised: {ex}")
+                exit_code = 1
         else:
             print("Failed to communicate with the STM32 Bootloader. Reset the Murata chip and try again.")
-            
+            exit_code = 1
+
     finally:
         os.close(fd)
+
+    sys.exit(exit_code)

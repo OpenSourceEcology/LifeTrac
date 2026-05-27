@@ -46,6 +46,19 @@ bool_from_grep() {
   fi
 }
 
+# bool_and_not_grep: 1 iff positive pattern hits AND negative pattern does NOT.
+# Used by SYNC_OK so we do not false-positive on the banner line alone.
+bool_and_not_grep() {
+  local pos="$1"
+  local neg="$2"
+  local file="$3"
+  if grep -Eq "$pos" "$file" && ! grep -Eq "$neg" "$file"; then
+    echo 1
+  else
+    echo 0
+  fi
+}
+
 cat > "$RUN_META" <<EOF
 RUN_ID=$RUN_ID
 BOARD_SERIAL=$BOARD_SERIAL
@@ -79,7 +92,15 @@ fi
 [ -f "$TOOLDIR/flash_ocd.log" ] && cp -f "$TOOLDIR/flash_ocd.log" "$OUTDIR/flash_ocd.log"
 [ -f "$TOOLDIR/boot_probe.log" ] && cp -f "$TOOLDIR/boot_probe.log" "$BOOT_PROBE_LOG"
 
-SYNC_OK=$(bool_from_grep "Sending sync byte 0x7F" "$FLASH_LOG")
+# SYNC_OK: must have sent the sync byte AND not seen any sync-failure marker.
+# The old grep on "Sending sync byte 0x7F" was a false positive: that line is
+# printed by sync() BEFORE the ACK wait, so it appears even when wait_ack times
+# out or receives a NACK. We now require the banner AND absence of either the
+# "Timeout waiting for ACK" line (printed by wait_ack on TimeoutError) or the
+# "Sync failed (got NACK or Timeout)" line (printed by the main block when
+# sync() returns False). Matches the 2026-05-26 root-cause fix where pre-camera-
+# stop runs had FAIL_ID but were misreported as SYNC_OK=1.
+SYNC_OK=$(bool_and_not_grep "Sending sync byte 0x7F" "Timeout waiting for ACK|Sync failed" "$FLASH_LOG")
 GETID_OK=$(bool_from_grep "Bootloader version" "$FLASH_LOG")
 ERASE_OK=$(bool_from_grep "Extended Erase complete|Standard Erase complete|page batches complete" "$FLASH_LOG")
 WRITE_OK=$(bool_from_grep "Flash complete in" "$FLASH_LOG")

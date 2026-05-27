@@ -1,0 +1,106 @@
+# Video-test compose (v1, 2026-05-26)
+#
+# Replaces the legacy `lora_bridge` with the strict-path `image_rx_daemon`
+# for end-to-end image-over-LoRa display testing. `lora_bridge` cannot
+# coexist with `image_rx_daemon` because both want exclusive ownership
+# of /dev/ttymxc3 (the L072 HostLink). `lora_bridge` also speaks the
+# old KISS-framed 115200-baud envelope, which the Method-G firmware on
+# the L072 does not implement — so the bridge has been silently
+# producing zero MQTT traffic on `lifetrac/v25/video/tile_delta` since
+# the firmware migration.
+#
+# Bring up (replaces the production stack — only run on the bench while
+# debugging the video pipeline):
+#     docker compose -f docker-compose.video-test.yml -p lifetrac-vtest up -d
+# Logs:
+#     docker compose -p lifetrac-vtest logs -f image_rx
+# Tear down (restore the production stack):
+#     docker compose -p lifetrac-vtest down
+#     docker compose up -d
+#
+# NOTE: this file does NOT define `lora_bridge`. Control TX (estop,
+# camera_select, link_tune, req_keyframe) will not work while this
+# stack is up. This is for visual verification of the video chain
+# only — switch back to the production compose before exiting the
+# debug session.
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    volumes:
+      - ./base_station/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+    ports:
+      - "127.0.0.1:1883:1883"
+
+  image_rx:
+    image: lifetrac-v25:latest
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    # Map the L072 HostLink. /dev/ttymxc3 must NOT be opened by any other
+    # process while this container is up.
+    devices:
+      - "${LIFETRAC_LORA_DEVICE:-/dev/ttymxc3}:/dev/ttymxc3"
+    environment:
+      LIFETRAC_MQTT_HOST: mosquitto
+      LIFETRAC_L072_UART: /dev/ttymxc3
+      LIFETRAC_L072_BAUD: "921600"
+      # Default: let the daemon issue a soft UART RESET_REQ on open.
+      # Set to "1" if an external NRST is pulsed before container start.
+      LIFETRAC_SKIP_RESET_REQ: "0"
+      LIFETRAC_IMAGE_RX_LOG_LEVEL: INFO
+      # 2026-05-26: Bench-only single-channel 915 MHz, no FHSS scheduler.
+      # Avoids the W1-11 FHSS RX_SCAN_FAILED gate while we verify the
+      # image pipeline end-to-end. Must match the TX-side probe env.
+      LIFETRAC_REG_PROFILE: "0"
+    volumes:
+      - lifetrac_state:/var/lib/lifetrac
+      - lifetrac_logs:/var/log/lifetrac
+    # Pass mosquitto via positional override — literal value so we don't
+    # depend on a host-side .env that may not exist in test runs.
+    command: ["python", "/app/base_station/image_rx_daemon.py", "--mqtt-host", "mosquitto"]
+
+  web_ui:
+    image: lifetrac-v25:latest
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      LIFETRAC_MQTT_HOST: mosquitto
+      LIFETRAC_PIN_FILE: /run/secrets/lifetrac_pin
+      LIFETRAC_PIN: "${LIFETRAC_PIN:-}"
+      LIFETRAC_SETTINGS_PATH: /var/lib/lifetrac/settings.json
+      LIFETRAC_TRUSTED_PROXIES: "${LIFETRAC_TRUSTED_PROXIES:-}"
+    volumes:
+      - lifetrac_state:/var/lib/lifetrac
+      - lifetrac_logs:/var/log/lifetrac
+    ports:
+      - "8080:8080"
+    secrets:
+      - lifetrac_pin
+    command: ["uvicorn", "web_ui:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers"]
+
+  audit_tail:
+    image: lifetrac-v25:latest
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      LIFETRAC_MQTT_HOST: mosquitto
+      LIFETRAC_AUDIT_PATH: /var/log/lifetrac/audit.jsonl
+    volumes:
+      - lifetrac_logs:/var/log/lifetrac
+    command: ["python", "-m", "audit_log", "--tail-mqtt"]
+
+volumes:
+  mosquitto_data:
+  mosquitto_logs:
+  lifetrac_state:
+  lifetrac_logs:
+
+secrets:
+  lifetrac_pin:
+    file: ./secrets/lifetrac_pin

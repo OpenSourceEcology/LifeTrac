@@ -501,13 +501,27 @@ def format_fault_payload(payload: bytes) -> str:
 
 
 def format_err_proto_payload(payload: bytes) -> str:
-    if len(payload) < 6:
+    # Firmware emits ERR_PROTO payload as 5 bytes:
+    #   off  size  field
+    #   ---- ----  -------------------------
+    #    0    1   offending_type
+    #    1    1   offending_ver
+    #    2    1   err_code
+    #    3    2   detail (uint16, little-endian)
+    # Older callers also produce 6-byte payloads with a reserved gap byte;
+    # accept both so legacy logs continue to decode.
+    if len(payload) < 5:
         return payload.hex()
 
     offending_type = payload[0]
     offending_ver = payload[1]
     err_code = payload[2]
-    detail = struct.unpack("<H", payload[4:6])[0]
+    if len(payload) >= 6:
+        # Legacy 6-byte layout with reserved gap at payload[3].
+        detail = struct.unpack("<H", payload[4:6])[0]
+    else:
+        # Current 5-byte layout: detail is bytes [3:5].
+        detail = struct.unpack("<H", payload[3:5])[0]
     err_names = {
         HOST_ERR_PROTO_BAD_VERSION: "BAD_VERSION",
         HOST_ERR_PROTO_UNKNOWN_TYPE: "UNKNOWN_TYPE",

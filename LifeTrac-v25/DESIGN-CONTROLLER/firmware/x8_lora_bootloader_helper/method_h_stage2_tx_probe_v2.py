@@ -105,6 +105,44 @@ def _emit_progress(tag: str, **kv) -> None:
 
 HOST_TYPE_TX_FRAME_REQ = 0x10
 HOST_TYPE_TX_DONE_URC = 0x90
+HOST_TYPE_RFCO_PERTX_URC = 0xC3
+
+# Mirror of host_rfco_tx_status_t (see include/host_rfco.h).
+RFCO_TX_STATUS_NAMES = {
+    0x00: "OK",
+    0x01: "ABORT_AIRTIME_INVARIANT",
+    0x02: "ABORT_LBT",
+    0x03: "ABORT_LEGAL_DWELL",
+    0x04: "ABORT_QOS",
+    0x05: "TX_TIMEOUT",
+    0x06: "TX_FAIL",
+    0xFF: "INTERNAL",
+}
+HOST_RFCO_PERTX_SCHEMA_VER = 1
+HOST_RFCO_PERTX_PAYLOAD_LEN = 21
+
+
+def format_rfco_pertx_payload(payload: bytes) -> str:
+    if len(payload) < HOST_RFCO_PERTX_PAYLOAD_LEN:
+        return f"short raw={payload.hex()}"
+    schema_ver = payload[0]
+    if schema_ver != HOST_RFCO_PERTX_SCHEMA_VER:
+        return f"schema_ver=0x{schema_ver:02X} (unknown) raw={payload.hex()}"
+    profile_id = payload[1]
+    tx_status = payload[2]
+    hop_idx = payload[3]
+    channel_idx = payload[4]
+    epoch = struct.unpack("<I", payload[5:9])[0]
+    freq_hz = struct.unpack("<I", payload[9:13])[0]
+    pkt_toa_us = struct.unpack("<I", payload[13:17])[0]
+    legal_dwell_us = struct.unpack("<I", payload[17:21])[0]
+    status_name = RFCO_TX_STATUS_NAMES.get(tx_status, f"0x{tx_status:02X}")
+    return (
+        f"profile_id={profile_id} tx_status=0x{tx_status:02X}({status_name}) "
+        f"hop_idx={hop_idx} channel_idx={channel_idx} epoch={epoch} "
+        f"freq_hz={freq_hz} pkt_toa_us={pkt_toa_us} "
+        f"legal_dwell_used_us_10s={legal_dwell_us}"
+    )
 HOST_TYPE_CFG_SET_REQ = 0x20
 HOST_TYPE_CFG_GET_REQ = 0x21
 HOST_TYPE_CFG_OK_URC = 0xA0
@@ -2228,6 +2266,13 @@ def wait_for_tx_done(link: HostLink, expected_tx_id: int, timeout: float):
             elif ftype == HOST_TYPE_ERR_PROTO_URC:
                 desc = format_err_proto_payload(frame["payload"])
                 raise RuntimeError(f"ERR_PROTO during TX wait: {desc}")
+            elif ftype == HOST_TYPE_RFCO_PERTX_URC:
+                # Firmware emits one RFCO_PERTX URC per TX attempt with the
+                # named refusal bucket (LBT / QOS / LEGAL_DWELL / INTERNAL /
+                # TX_FAIL / TX_TIMEOUT / OK). Surface it instead of dropping
+                # it as "unrelated frame".
+                desc = format_rfco_pertx_payload(frame["payload"])
+                print(f"RFCO_PERTX during TX wait: {desc}")
             else:
                 print(f"INFO: unrelated frame during TX wait type=0x{ftype:02X}")
     raise TimeoutError(f"timeout waiting for TX_DONE_URC tx_id=0x{expected_tx_id:02X}")

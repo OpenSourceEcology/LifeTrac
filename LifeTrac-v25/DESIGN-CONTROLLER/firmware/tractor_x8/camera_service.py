@@ -48,9 +48,9 @@ except ImportError:                   # X8 image without numpy still works
 
 LOG = logging.getLogger("camera_service")
 
-GRID_W = 12
-GRID_H = 8
-TILE_PX = 32
+GRID_W = int(os.environ.get("LIFETRAC_GRID_W", "12"))
+GRID_H = int(os.environ.get("LIFETRAC_GRID_H", "8"))
+TILE_PX = int(os.environ.get("LIFETRAC_TILE_PX", "32"))
 CANVAS_W = GRID_W * TILE_PX        # 384
 CANVAS_H = GRID_H * TILE_PX        # 256
 TILE_BYTES_MAX = 256               # tile_size_minus1 is u8, so ≤256 B
@@ -82,6 +82,14 @@ FFMPEG_PATH       = os.environ.get("LIFETRAC_FFMPEG_PATH", "ffmpeg")
 # can subscribe without the M7 having to bridge it.
 M7_UART_DEVICE    = os.environ.get("LIFETRAC_M7_UART", "/dev/ttymxc1")
 DEBUG_MQTT        = os.environ.get("LIFETRAC_CAMERA_DEBUG_MQTT", "").strip() == "1"
+# 2026-05-27 W2-02 strict-path bridge: when set, the daemon hands
+# /dev/ttymxc3 off to image_tx_daemon (which speaks the Method-G
+# HostLink protocol the L072 actually understands) and routes every
+# TileDeltaFrame over MQTT instead of writing to the M7 directly.
+# Implies DEBUG_MQTT=1.
+USE_LORA_BRIDGE   = os.environ.get("LIFETRAC_USE_LORA_BRIDGE", "").strip() == "1"
+if USE_LORA_BRIDGE:
+    DEBUG_MQTT = True
 
 PUBLISH_TOPIC     = "lifetrac/v25/cmd/image_frame"
 KEYFRAME_REQ_TOPIC = "lifetrac/v25/cmd/req_keyframe"
@@ -92,7 +100,17 @@ KEYFRAME_REQ_TOPIC = "lifetrac/v25/cmd/req_keyframe"
 class SyntheticCamera:
     """Test-only source: emits a slowly-shifting gradient. Useful when the
     X8 has no MIPI sensor wired up yet — exercises the diff/encode path
-    without needing libcamera."""
+    without needing libcamera.
+
+    2026-05-27 W2-02 LoRa bridge: when ``LIFETRAC_SYNTHETIC_MODE=delta``
+    the gradient is FROZEN and only one tile per second flips between
+    two values. This keeps P-frames tiny (~1 tile of WebP) so the SF7
+    fragment budget actually has headroom — the original scrolling mode
+    re-encodes every pixel every frame and overflows the 256-fragment
+    ceiling.
+    """
+
+    _MODE = os.environ.get("LIFETRAC_SYNTHETIC_MODE", "scroll").strip().lower()
 
     def __init__(self) -> None:
         self._t = 0
@@ -102,6 +120,31 @@ class SyntheticCamera:
         # something to encode.
         self._t = (self._t + 1) & 0xFF
         out = bytearray(CANVAS_W * CANVAS_H * 3)
+        if self._MODE == "delta":
+            # Frozen background gradient; one tile (top-left 32×32)
+            # alternates colour every grab so exactly one tile shows up
+            # in the diff. Background uses t=0 so the gradient never
+            # moves underneath.
+            t = 0
+            for y in range(CANVAS_H):
+                for x in range(CANVAS_W):
+                    v = (x + y) & 0xFF
+                    i = (y * CANVAS_W + x) * 3
+                    out[i]     = v
+                    out[i + 1] = (v << 1) & 0xFF
+                    out[i + 2] = (255 - v) & 0xFF
+            # Paint the top-left tile a flat colour that toggles per
+            # grab. Keeps the magnitude bin well above the diff floor.
+            flat = 0x40 if (self._t & 1) else 0xC0
+            for y in range(min(TILE_PX, CANVAS_H)):
+                for x in range(min(TILE_PX, CANVAS_W)):
+                    i = (y * CANVAS_W + x) * 3
+                    out[i]     = flat
+                    out[i + 1] = flat
+                    out[i + 2] = flat
+            return bytes(out)
+        # Legacy scrolling mode (default — preserves the original
+        # behaviour for any non-LoRa-bridge consumers).
         t = self._t
         for y in range(CANVAS_H):
             for x in range(CANVAS_W):
@@ -984,9 +1027,17 @@ def main() -> None:
 
     # IP-104: open the X8 → H747 UART writer. Lazy import keeps the
     # synthetic-camera test path free of pyserial requirements.
-    from image_pipeline.ipc_to_h747 import IpcWriter
-    ipc = IpcWriter(device=M7_UART_DEVICE)
-    ipc.open()
+    # 2026-05-27 W2-02: when LIFETRAC_USE_LORA_BRIDGE=1, image_tx_daemon
+    # owns /dev/ttymxc3 (HostLink protocol) and we mirror frames over
+    # MQTT only, so skip the M7 IpcWriter entirely.
+    if USE_LORA_BRIDGE:
+        LOG.info("camera_service: LIFETRAC_USE_LORA_BRIDGE=1 — skipping "
+                 "M7 IpcWriter; frames routed to MQTT %s only", PUBLISH_TOPIC)
+        ipc = None
+    else:
+        from image_pipeline.ipc_to_h747 import IpcWriter
+        ipc = IpcWriter(device=M7_UART_DEVICE)
+        ipc.open()
 
     # IP-W2-03: optional ROI planner + airtime byte-budget. Both are
     # opt-in via env vars so the default service behaves identically to
@@ -1065,8 +1116,11 @@ def main() -> None:
                 else:
                     buf.append(b)
 
-    threading.Thread(target=_back_channel_reader, name="x8-back-channel",
-                     daemon=True).start()
+    if not USE_LORA_BRIDGE:
+        # The back-channel reader opens M7_UART_DEVICE for read — skip it
+        # under the LoRa-bridge path so we never contend with image_tx_daemon.
+        threading.Thread(target=_back_channel_reader, name="x8-back-channel",
+                         daemon=True).start()
 
     client = None
     if DEBUG_MQTT:
@@ -1097,13 +1151,16 @@ def main() -> None:
                                    roi_planner=roi_planner,
                                    byte_budget=link_budget.bytes,
                                    encode_cache=encode_cache)
-            # Primary: UART to the M7 (length-framed).
-            try:
-                ipc.write(payload, is_keyframe=force)
-            except OSError as exc:
-                LOG.warning("camera_service: UART write failed (%s); reopening", exc)
-                ipc.close()
-                ipc.open()
+            # Primary: UART to the M7 (length-framed). Skipped under the
+            # LoRa-bridge path; image_tx_daemon picks up the same payload
+            # over MQTT and feeds the L072 HostLink directly.
+            if ipc is not None:
+                try:
+                    ipc.write(payload, is_keyframe=force)
+                except OSError as exc:
+                    LOG.warning("camera_service: UART write failed (%s); reopening", exc)
+                    ipc.close()
+                    ipc.open()
             # Optional: forensic MQTT mirror.
             if client is not None:
                 client.publish(PUBLISH_TOPIC, payload, qos=0)

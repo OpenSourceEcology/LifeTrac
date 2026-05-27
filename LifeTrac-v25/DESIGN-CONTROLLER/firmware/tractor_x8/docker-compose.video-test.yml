@@ -1,0 +1,86 @@
+# Tractor video-test compose (v1, 2026-05-26).
+#
+# Splits the legacy single-container `camera_service` model into:
+#   - tractor-camera-v2:  same image, captures + encodes frames, publishes
+#                         each TileDeltaFrame to MQTT `lifetrac/v25/cmd/
+#                         image_frame`. The legacy IpcWriter path falls
+#                         back to /dev/null automatically (no ttymxc3
+#                         device mapping = OSError → /dev/null per
+#                         image_pipeline/ipc_to_h747.py).
+#   - tractor-image-tx-v2: same image, runs image_tx_daemon.py. Owns
+#                          /dev/ttymxc3 exclusively, subscribes to the
+#                          MQTT topic above, fragments + HostLink TX_FRAME_REQ
+#                          to the L072 → SX1276 → air → basestation.
+#
+# WHY: the deployed camera_service was designed for an H747 M7 mid-bridge
+# that does not exist on the current hardware (L072 sits directly on
+# ttymxc3 with the Method-G HostLink firmware). camera_service writes
+# IPC frames (0xA5 marker) that the L072 firmware ignores → no LoRa TX →
+# basestation RX silent. The strict-path migration (Phase B) splits the
+# pipeline: camera_service stays as encoder, image_tx_daemon becomes the
+# HostLink transmitter.
+#
+# Bring up (replaces the production tractor stack — bench debug only):
+#   docker compose -f docker-compose.video-test.yml -p tractor-vtest up -d
+# Logs:
+#   docker compose -p tractor-vtest logs -f image_tx
+# Restore production stack:
+#   docker compose -p tractor-vtest down
+#   docker compose up -d                 # in /opt/lifetrac/compose-apps/lifetrac-camera
+
+services:
+  camera:
+    image: lifetrac-tractor-x8:latest
+    container_name: tractor-camera-v2
+    restart: unless-stopped
+    environment:
+      - LIFETRAC_CAMERA_DEVICE=/dev/video1
+      - LIFETRAC_MQTT_HOST=mosquitto
+      - LIFETRAC_MQTT_PORT=1883
+      - LIFETRAC_KEYFRAME_PERIOD_S=10
+      - LIFETRAC_CAMERA_FPS=2
+      - LIFETRAC_CAMERA_DESHAKE=0
+      - LIFETRAC_V4L2_INPUT_FORMAT=mjpeg
+      - LIFETRAC_V4L2_INPUT_FPS=15
+      # NOTE: ttymxc3 NOT mapped → IpcWriter.open() OSErrors → falls back
+      # to /dev/null. Back-channel reader also OSErrors and bails. The
+      # MQTT publish on `lifetrac/v25/cmd/image_frame` is unaffected.
+      - LIFETRAC_M7_UART=/dev/null
+      - LIFETRAC_CAMERA_DEBUG_MQTT=1
+      - LIFETRAC_WEBP_QUALITY=55
+    devices:
+      - /dev/video1:/dev/video1
+    depends_on:
+      - mosquitto
+    user: "0:0"
+
+  image_tx:
+    image: lifetrac-tractor-x8:latest
+    container_name: tractor-image-tx-v2
+    restart: unless-stopped
+    devices:
+      - /dev/ttymxc3:/dev/ttymxc3
+    environment:
+      - LIFETRAC_L072_UART=/dev/ttymxc3
+      - LIFETRAC_L072_BAUD=921600
+      - LIFETRAC_MQTT_HOST=mosquitto
+      - LIFETRAC_MQTT_PORT=1883
+      - LIFETRAC_IMAGE_TX_LOG_LEVEL=INFO
+      # Leave default reset behaviour; the daemon issues its own UART
+      # RESET_REQ on startup (no external NRST pulse on this bench).
+    depends_on:
+      - mosquitto
+    user: "0:0"
+    command: ["python", "/app/image_tx_daemon.py"]
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: tractor-mosquitto-v2
+    restart: unless-stopped
+    volumes:
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_config:/mosquitto/config
+
+volumes:
+  mosquitto_data:
+  mosquitto_config:

@@ -1,5 +1,25 @@
 # LifeTrac v25 — TODO
 
+> **🟢 Milestone (2026-05-26) — image-over-LoRa air link proven end-to-end:**
+> Tractor camera → tile-delta encode → MQTT (intra-X8) → image_tx_daemon →
+> Murata L072 → 915 MHz LoRa → base L072 → image_rx_daemon → MQTT
+> (intra-X8) → web_ui `/ws/state` → browser `<canvas id="image-canvas">`.
+> Sustained zero-fragment-loss P-frame runs at SF7/BW500, `frames_published`
+> climbing on the base, "2 Hz · tile stream" badge live in the UI. Final
+> visual-pixel confirmation in the browser pending a base-X8 power cycle.
+> Full status + open blockers (B1–B6):
+> [AI NOTES/2026-05-26_Image_Over_LoRa_AirLink_Proven_Status_Copilot_v1_0.md](AI%20NOTES/2026-05-26_Image_Over_LoRa_AirLink_Proven_Status_Copilot_v1_0.md).
+>
+> **📦 First-release packaging plan (2026-05-26) — v25.0.1-bench:**
+> Recommendation = git tag + a single combined `LifeTrac-v25/RELEASE/v25.0.1-bench/`
+> manifest directory (Dockerfiles, compose, L072 firmware binaries + sha256,
+> install.sh, SBOM, release notes). **Do not** create `TractorCodeV25.0.1/` /
+> `BaseStationCodeV25.0.1/` duplicate source trees. Code triage (~70 % ships,
+> ~20 % dev/diagnostic, ~10 % retire to `_retired/`), 10-step cut-the-tag
+> runbook, image-compression-protocol readiness, and direct answers to the
+> user's release questions are all in:
+> [AI NOTES/2026-05-26_v25.0.1_Release_Packaging_Plan_Copilot_v1_0.md](AI%20NOTES/2026-05-26_v25.0.1_Release_Packaging_Plan_Copilot_v1_0.md).
+>
 > **� New blocker (2026-05-22 17:15) — P8:** First post-reflash W1-11
 > ping_pong run failed 5/7 gates (`radio_tx_ok=0/100`, no RX frames). Root
 > cause: commit `d4dfcb8` (2026-05-20) added `-DLIFETRAC_FHSS_TX_ROUTED=1`
