@@ -79,6 +79,7 @@ SRCS := \
 	radio/sx1276_rx_scan_policy.c \
 	radio/sx1276_rx_scan_counters.c \
 	radio/sx1276_rx_scan_fail.c \
+	radio/sx1276_rx_scan_walker.c \
 	radio/sx1276_tx.c \
 	radio/sx1276.c \
     include/static_asserts.c
@@ -141,7 +142,7 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters help
+.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker help
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
 
@@ -236,9 +237,10 @@ RX_RETUNE_COUNTERS_BIN := $(BUILD)/rx_retune_counters
 RX_SCAN_POLICY_BIN := $(BUILD)/rx_scan_policy
 RX_SCAN_COUNTERS_BIN := $(BUILD)/rx_scan_counters
 RX_SCAN_FAIL_BIN := $(BUILD)/rx_scan_fail
+RX_SCAN_WALKER_BIN := $(BUILD)/rx_scan_walker
 AIRTIME_INVARIANT_BIN := $(BUILD)/airtime_invariant
 
-check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-airtime-invariant check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail
+check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-airtime-invariant check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker
 	@echo "[OK] memory map invariants hold"
 
 check-cpp: $(BUILD)
@@ -752,6 +754,24 @@ check-rx-scan-fail: $(BUILD)
 	    -o $(RX_SCAN_FAIL_BIN)
 	@echo "[RXSCF] Running rx-scan-fail test ..."
 	@$(RX_SCAN_FAIL_BIN)
+
+# FCC-A6c-2-c-i-α': RX cold-start scan walker decouples the scan path
+# from the shared sx1276_fhss scheduler state (which TX and γ-1 also
+# write). 7-case host golden vector verifies: NULL out_idx defensive
+# contract (no advance, 0UL return), first-call-yields-idx-0, full
+# pass visits all 50 channels in linear order, wrap-to-0 after
+# CHANNEL_COUNT calls, reset-mid-walk restores idx=0, peek does not
+# advance, hz mapping matches sx1276_fhss_chantab_center_hz byte-for-
+# byte. See 2026-05-27 AI NOTE "RX Scan: Current vs Proposed" §8.
+check-rx-scan-walker: $(BUILD)
+	@echo "[RXSCW] Building rx-scan-walker test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rx_scan_walker.c \
+	    radio/sx1276_rx_scan_walker.c \
+	    radio/sx1276_fhss_chantab.c \
+	    -o $(RX_SCAN_WALKER_BIN)
+	@echo "[RXSCW] Running rx-scan-walker test ..."
+	@$(RX_SCAN_WALKER_BIN)
 
 $(BUILD):
 	@$(call MKDIR_P,$(BUILD))

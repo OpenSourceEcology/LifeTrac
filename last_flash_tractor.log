@@ -1,0 +1,331 @@
+﻿powershell : C:\Users\dorkm\Documents\GitHub\LifeTrac\LifeTrac-v25\DESIGN-CONTR
+OLLER\firmware\x8_lora_bootloader_helper\.\: 325 files pushed, 0 skipped. 5.2 
+MB/s (1536941 bytes in 0.280s)
+At line:1 char:8
++ $out = powershell -ExecutionPolicy Bypass -File flash_unitA.ps1 2>&1
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\dorkm\...ytes in 0.280s) 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+C:\Users\dorkm\Documents\GitHub\LifeTrac\LifeTrac-v25\DESIGN-CONTROLLER\firmwar
+e\x8_lora_bootloader_helper\stm32_an3155_flasher.py: 1 file pushed, 0 skipped. 
+44.6 MB/s (10501 bytes in 0.000s)
+C:\Users\dorkm\Documents\GitHub\LifeTrac\LifeTrac-v25\DESIGN-CONTROLLER\firmwar
+e\murata_l072\build\firmware.bin: 1 file pushed, 0 skipped. 80.5 MB/s (21332 
+bytes in 0.000s)
+Password: === T-1 Wed May 27 23:20:23 UTC 2026 wdt_pet start (HW WDT is 60s; flashes >60s reboot otherwise) ===
+
+wdt_pet started pid=8533
+
+=== T0 Wed May 27 23:20:23 UTC 2026 prep_bridge ===
+
+=== [1/4] unexport x8h7 gpios (160..193) ===
+
+=== [2/4] unbind in-kernel x8h7 gpio consumers ===
+
+  unbind cs42l52_regulator OK
+
+=== [3/4] rmmod x8h7 modules ===
+
+=== [4/4] verify ===
+
+  all x8h7 modules unloaded
+
+=== SUCCESS: bridge is now safe to halt with openocd ===
+
+prep_rc=0
+
+
+
+=== T1 Wed May 27 23:20:25 UTC 2026 flash /tmp/lifetrac_p0c/firmware.bin ===
+
+=== sanity ===
+
+-rw-rw-rw- 1 fio fio  2334 May  8 04:50 /tmp/lifetrac_p0c/07_assert_pa11_pf4_long.cfg
+
+-rw-rw-rw- 1 fio fio 21332 May 27  2026 /tmp/lifetrac_p0c/firmware.bin
+
+-rw-rw-rw- 1 fio fio 10501 May 26 22:24 /tmp/lifetrac_p0c/stm32_an3155_flasher.py
+
+fuser /dev/ttymxc3 (pre-evict): 
+
+fuser /dev/ttymxc3 (post-evict): 
+
+
+
+=== diag 0: BASELINE passive listen 3.0s (no openocd, no NRST) ===
+
+baseline_bytes=0
+
+
+
+=== launching openocd (600s hold) ===
+
+gpio10_value_before_unexport=1
+
+OCD_PID=8861
+
+
+
+=== openocd output so far ===
+
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+
+Licensed under GNU GPL v2
+
+For bug reports, read
+
+	http://openocd.org/doc/doxygen/bugs.html
+
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+
+Info : clock speed 1805 kHz
+
+Info : SWD DPIDR 0x6ba02477
+
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+
+Info : Listening on port 3333 for gdb connections
+
+target halted due to debug-request, current mode: Thread 
+
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+
+Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+
+  RCC_AHB4ENR before = 0x00000000
+
+  RCC_AHB4ENR after  = 0x00000021
+
+Phase B: drive PA_11 HIGH (LoRa BOOT0)
+
+  GPIOA_IDR.PA_11 = 1   (expect 1)
+
+Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+
+Phase D: re-assert PA_11 HIGH
+
+  GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+
+
+
+READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+
+Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+
+Run flasher in a parallel shell.
+
+
+
+=== configure UART 19200 8E1 raw ===
+
+--- stty -a (post-config) ---
+
+speed 19200 baud; rows 0; columns 0; line = 0;
+
+intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+
+eol2 = <undef>; swtch = <undef>; start = ^Q; stop = ^S; susp = ^Z; rprnt = ^R;
+
+werase = ^W; lnext = ^V; discard = ^O; min = 1; time = 0;
+
+parenb -parodd -cmspar cs8 hupcl -cstopb cread clocal -crtscts
+
+-ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr -igncr -icrnl -ixon -ixoff
+
+-iuclc -ixany -imaxbel -iutf8
+
+-opost -olcuc -ocrnl onlcr -onocr -onlret -ofill -ofdel nl0 cr0 tab0 bs0 vt0 ff0
+
+-isig -icanon iexten -echo echoe echok -echonl -noflsh -xcase -tostop -echoprt
+
+echoctl echoke -flusho -extproc
+
+--- end stty ---
+
+
+
+=== diag A: passive listen 3.0s post-NRST (expect EMPTY in ROM; if firmware runs and BOOT0 ignored, we should see LT_BOOT_HEARTBEAT here) ===
+
+passive_bytes=0
+
+
+
+=== diag B: raw 0x7F probe SKIPPED (FLASH_DIAG_RAW_PROBE!=1; would corrupt autobaud) ===
+
+
+
+=== running flasher (with --verify) ===
+
+Opening /dev/ttymxc3 at 19200 8E1...
+
+  (termios unavailable; relying on prior stty configuration)
+
+Connecting to Bootloader...
+
+Sending sync byte 0x7F...
+
+Sending GET command (0x00 0xFF)...
+
+Bootloader version: 31
+
+Reading payload /tmp/lifetrac_p0c/firmware.bin...
+
+Firmware size: 21332 bytes
+
+Erasing memory... (This may take up to 60 seconds)
+
+Received NACK!
+
+  mass-erase parameter NACK; falling back to page-by-page erase
+
+  page-by-page Extended Erase: 167 pages (21376 bytes)
+
+Extended Erase complete! (167 page batches complete via page-by-page fallback)
+
+Starting flash process...
+
+
+[----------------------------------------] 1.2% (0x100 / 0x5354)
+[----------------------------------------] 2.4% (0x200 / 0x5354)
+[=---------------------------------------] 3.6% (0x300 / 0x5354)
+[=---------------------------------------] 4.8% (0x400 / 0x5354)
+[==--------------------------------------] 6.0% (0x500 / 0x5354)
+[==--------------------------------------] 7.2% (0x600 / 0x5354)
+[===-------------------------------------] 8.4% (0x700 / 0x5354)
+[===-------------------------------------] 9.6% (0x800 / 0x5354)
+[====------------------------------------] 10.8% (0x900 / 0x5354)
+[====------------------------------------] 12.0% (0xA00 / 0x5354)
+[=====-----------------------------------] 13.2% (0xB00 / 0x5354)
+[=====-----------------------------------] 14.4% (0xC00 / 0x5354)
+[======----------------------------------] 15.6% (0xD00 / 0x5354)Unexpected response: 00
+
+
+
+Write failed at offset 00000D00, retrying...
+
+Timeout waiting for ACK
+
+
+
+Write failed at offset 00000D00, retrying...
+
+Timeout waiting for ACK
+
+
+
+Write failed at offset 00000D00, retrying...
+
+
+
+Failed to write at address 0x08000D00 after 3 retries.
+
+flasher exit code = 0
+
+
+
+=== killing openocd (8861) ===
+
+/tmp/lifetrac_p0c/run_flash_l072.sh: line 200:  8861 Killed                  nohup openocd -f /usr/arduino/extra/openocd_script-imx_gpio.cfg -f $CFG > $OCD_LOG 2>&1 < /dev/null
+
+
+
+=== final openocd log ===
+
+Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+
+Licensed under GNU GPL v2
+
+For bug reports, read
+
+	http://openocd.org/doc/doxygen/bugs.html
+
+Info : imx_gpio GPIO JTAG/SWD bitbang driver
+
+Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+
+Info : clock speed 1805 kHz
+
+Info : SWD DPIDR 0x6ba02477
+
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+
+Info : Listening on port 3333 for gdb connections
+
+target halted due to debug-request, current mode: Thread 
+
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+
+Phase A: enable GPIOA + GPIOF clocks (bits 0 + 5)
+
+  RCC_AHB4ENR before = 0x00000000
+
+  RCC_AHB4ENR after  = 0x00000021
+
+Phase B: drive PA_11 HIGH (LoRa BOOT0)
+
+  GPIOA_IDR.PA_11 = 1   (expect 1)
+
+Phase C: pulse PF_4 LOW(250ms) then HIGH (LoRa NRST)
+
+  GPIOF_IDR.PF_4 (low)  = 0   (expect 0)
+
+  GPIOF_IDR.PF_4 (high) = 1   (expect 1)
+
+Phase D: re-assert PA_11 HIGH
+
+  GPIOA_IDR.PA_11 (post-reset) = 1   (expect 1)
+
+
+
+READY: L072 in STM32 ROM bootloader on /dev/ttymxc3 @ 19200 8E1.
+
+Holding halted for 600s with PA_11=HIGH (re-asserted every 1s).
+
+Run flasher in a parallel shell.
+
+
+
+=== overall result: flasher RC=0 ===
+
+flash_rc=0
+
+
+
+=== T2 Wed May 27 23:20:54 UTC 2026 revive_bridge ===
+
+=== [1/5] kill stragglers ===
+
+=== [2/5] openocd: reset run + shutdown ===
+
+Info : clock speed 1805 kHz
+
+Info : SWD DPIDR 0x6ba02477
+
+Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+
+Info : starting gdb server for stm32h7x.cpu0 on 3333
+
+Info : Listening on port 3333 for gdb connections
+
+target halted due to debug-request, current mode: Thread 
+
+xPSR: 0x01000000 pc: 0x1ff09abc msp: 0x24003af8
+
+shutdown command invoked
+
+=== [3/5] unexport x8h7 gpios (160..193) ===
+
+=== [4/5] rmmod by name + reload ===
+

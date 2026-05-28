@@ -8,6 +8,7 @@
 #ifdef LIFETRAC_FHSS_TX_ROUTED
 #include "sx1276_fhss.h"
 #include "sx1276_rx_scan_fail.h"
+#include "sx1276_rx_scan_walker.h"
 #include "sx1276_tx.h"
 #endif
 
@@ -37,6 +38,19 @@ _Static_assert(sizeof(sx1276_rx_frame_t) <= 280U,
 static bool s_scan_got_any_irq;
 static bool s_scan_crc_seen;
 static void scan_feed_frame(bool header_valid);
+/* FCC-A6c-2-c-ii-δ (2026-05-27): same-rule forward declarations for the
+ * γ-1 retune anchors and the PLL-settle helper, consumed by
+ * sx1276_rx_service()'s post-SNAP follow path but defined further down
+ * alongside the γ-1 tick. The #define for SX1276_RX_PLL_SETTLE_US lives
+ * below the routed block's forward-decl section, so we redeclare its
+ * literal value here (1000 µs == STM32L072 + SX1276 chain settle budget
+ * from §A6c-2-c HW notes) to keep the post-SNAP follow standalone. */
+#ifndef SX1276_RX_PLL_SETTLE_US
+#define SX1276_RX_PLL_SETTLE_US     1000UL
+#endif
+static uint32_t s_rx_last_retune_ms;
+static uint8_t  s_rx_last_retune_ms_valid;
+static void     rx_pll_settle_busy_wait(uint32_t delay_us);
 #endif
 
 bool sx1276_rx_arm(void) {
@@ -154,9 +168,52 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
                     sx1276_fhss_consider_remote(parsed.epoch,
                                                 parsed.hop_idx);
                 sx1276_rx_counter_record(dec);
-                /* FCC-A6c-2-b-ii: header unpacked + schema OK →
+                /* FCC-A6c-2-c-ii-δ (2026-05-27): on SNAPPED, the
+                 * local scheduler was wrong and consider_remote()
+                 * just parked s_fhss.slot at (remote_hop_idx + 1).
+                 * Immediately consume that slot and retune the
+                 * radio so we are listening on the channel TX will
+                 * use for its NEXT packet — do not wait for the
+                 * next γ-1 tick (the placeholder γ-2 period is the
+                 * 380 ms dwell cap, which is far longer than TX's
+                 * packet-to-packet inter-hop time for image
+                 * traffic). Without this, alpha-prime catches a
+                 * single packet and then drifts again until γ-1
+                 * eventually fires.
+                 *
+                 * ALIGNED — we were already in sync; γ-1 owns the
+                 * synth, do nothing here.
+                 * REJECTED_* — do not touch the synth.
+                 *
+                 * The follow-up next_channel() advances s_fhss.slot
+                 * by exactly 1 (consuming what snap_to parked),
+                 * matching the consume-then-tune convention γ-1 and
+                 * TX both use. See AI NOTES
+                 * "2026-05-27_RX_Scan_Current_vs_Proposed_v25_0_6_5_v1_0.md"
+                 * §3 Option δ. */
+                if (dec == SX1276_FHSS_SNAP_DEC_SNAPPED) {
+                    uint8_t  follow_idx = 0U;
+                    uint32_t follow_hz  = 0U;
+                    const sx1276_fhss_status_t fst =
+                        sx1276_fhss_next_channel(&follow_idx,
+                                                 &follow_hz);
+                    if (fst == SX1276_FHSS_OK) {
+                        (void)sx1276_modes_to_standby();
+                        sx1276_set_frequency_hz(follow_hz);
+                        rx_pll_settle_busy_wait(SX1276_RX_PLL_SETTLE_US);
+                        (void)sx1276_rx_arm();
+                        /* Anchor γ-1's last-retune timestamp to now
+                         * so its next tick treats the immediate
+                         * follow as the start of the post-LOCK
+                         * timing window rather than firing a
+                         * spurious DO_WRAP. */
+                        s_rx_last_retune_ms       = platform_now_ms();
+                        s_rx_last_retune_ms_valid = 1U;
+                    }
+                }
+                /* FCC-A6c-2-b-ii: header unpacked + schema OK —>
                  * FRAME_VALID with header_valid=true. This is what
-                 * drives SCANNING→LOCKED in the A6c-1 policy; A6c-2-c
+                 * drives SCANNING—>LOCKED in the A6c-1 policy; A6c-2-c
                  * will additionally seed γ-1 from (epoch, hop_idx). */
                 scan_feed_frame(true);
             }
@@ -384,12 +441,32 @@ static void scan_dispatch_action(sx1276_rx_scan_action_t action,
                                  uint32_t                now_ms) {
     switch (action) {
         case SX1276_RX_SCAN_ACTION_BEGIN_SCAN:
+            /* FCC-A6c-2-c-i-α' (2026-05-27): every fresh BEGIN_SCAN
+             * edge restarts the walker at channel 0 so an A6c-3
+             * non-final retry resumes from a deterministic point
+             * rather than wherever ADVANCE_CHANNEL last left the
+             * walker mid-pass. ADVANCE_CHANNEL deliberately does
+             * NOT reset — it must keep marching through the table. */
+            sx1276_rx_scan_walker_reset();
+            /* fallthrough */
         case SX1276_RX_SCAN_ACTION_ADVANCE_CHANNEL: {
+            /* FCC-A6c-2-c-i-α' (2026-05-27): walk the chantab DIRECTLY
+             * via the dedicated walker TU. The previous implementation
+             * called sx1276_fhss_next_channel(), which mutates the
+             * shared s_fhss scheduler that the TX path and γ-1 RX
+             * retune loop also read — leaving s_fhss.slot in an
+             * arbitrary state by the time the first valid frame
+             * triggered sx1276_fhss_consider_remote()'s snap. Bench
+             * evidence 2026-05-27: ~6 frames/min under wide-mask FHSS
+             * vs. v25.0.1's ~168 frames/min. See AI NOTES
+             * "2026-05-27_RX_Scan_Current_vs_Proposed_v25_0_6_5_v1_0.md"
+             * §3 Option α-prime for the design contract. */
             uint8_t  next_idx = 0U;
-            uint32_t next_hz  = 0U;
-            const sx1276_fhss_status_t fst =
-                sx1276_fhss_next_channel(&next_idx, &next_hz);
-            if (fst != SX1276_FHSS_OK) {
+            const uint32_t next_hz = sx1276_rx_scan_walker_next(&next_idx);
+            if (next_hz == 0UL) {
+                /* Chantab corruption — do not write 0 to RegFrf.
+                 * Leave the synth alone; the next ADVANCE will retry
+                 * with the post-incremented walker index. */
                 return;
             }
             /* FCC-A6c-3-b: fresh scan window for the next channel —

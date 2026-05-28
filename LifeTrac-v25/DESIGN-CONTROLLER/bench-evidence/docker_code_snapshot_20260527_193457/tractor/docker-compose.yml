@@ -1,0 +1,115 @@
+# Tractor video-test compose (v2, 2026-05-27).
+#
+# Differences from v1:
+#   * Synthetic camera source (no /dev/video1 dependency for the bench
+#     bring-up). Switch to v4l2 once we confirm the LoRa link visibly
+#     animates the base-station web UI.
+#   * camera_service uses LIFETRAC_USE_LORA_BRIDGE=1 (added 2026-05-27)
+#     to skip the M7 IpcWriter cleanly instead of relying on the
+#     OSError-to-/dev/null fallback.
+#   * image_tx_daemon uses LIFETRAC_REG_PROFILE=0 (BENCH_ONLY_FIXED_915)
+#     because the FHSS profile-1 RX-side RegFrf trap is still unfixed
+#     (see /memories/repo/lifetrac-image-pipeline-fhss-rx-trap.md).
+#   * Helper modules (lora_proto.py, method_h_stage2_tx_probe_v2.py)
+#     and the patched camera_service.py / image_tx_daemon.py are
+#     bind-mounted from /opt/lifetrac/video-test/src so we can iterate
+#     without rebuilding the image. Push them with:
+#
+#       adb -s 2E2C1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_x8/camera_service.py \
+#           /opt/lifetrac/video-test/src/camera_service.py
+#       adb -s 2E2C1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_x8/image_tx_daemon.py \
+#           /opt/lifetrac/video-test/src/image_tx_daemon.py
+#       adb -s 2E2C1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/base_station/lora_proto.py \
+#           /opt/lifetrac/video-test/src/lora_proto.py
+#       adb -s 2E2C1209DABC240B push LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/method_h_stage2_tx_probe_v2.py \
+#           /opt/lifetrac/video-test/src/method_h_stage2_tx_probe_v2.py
+#
+# Bring up (after stopping legacy tractor-camera):
+#   docker compose -f docker-compose.video-test.yml -p tractor-vtest up -d
+# Logs:
+#   docker compose -p tractor-vtest logs -f image_tx camera
+
+services:
+  camera:
+    image: lifetrac-tractor-x8:latest
+    container_name: tractor-camera-v2
+    restart: unless-stopped
+    environment:
+      - LIFETRAC_CAMERA_SOURCE=v4l2
+      - LIFETRAC_CAMERA_DEVICE=/dev/video1
+      - LIFETRAC_V4L2_INPUT_FORMAT=mjpeg
+      - LIFETRAC_V4L2_INPUT_SIZE=640x480
+      - LIFETRAC_V4L2_INPUT_FPS=5
+      - LIFETRAC_MQTT_HOST=mosquitto
+      - LIFETRAC_MQTT_PORT=1883
+      # Link budget: SF7/BW500 ≈ 48 ms TX-on-air per fragment, so a
+      # 67-fragment keyframe needs >3 s of air time. Camera FPS 0.5 +
+      # keyframe period 60 s gives the link ample headroom while
+      # tiny one-tile P-frames keep up with motion.
+      - LIFETRAC_KEYFRAME_PERIOD_S=30
+      - LIFETRAC_CAMERA_FPS=1.0
+      - LIFETRAC_CAMERA_DESHAKE=0
+      - LIFETRAC_USE_LORA_BRIDGE=1
+      - LIFETRAC_WEBP_QUALITY=30
+      # Shrink the canvas to keep keyframes under the L072 256-fragment
+      # ceiling on synthetic gradient (every tile changes every frame).
+      # 6x4 grid x 32 px → 192x128 canvas → ~3 KB/keyframe.
+      - LIFETRAC_GRID_W=6
+      - LIFETRAC_GRID_H=4
+      - LIFETRAC_TILE_PX=32
+      - LIFETRAC_FRAGMENT_BUDGET=200
+      - LIFETRAC_FRAGMENT_PROFILE=image
+    devices:
+      - /dev/video1:/dev/video1
+    volumes:
+      - /opt/lifetrac/video-test/src/camera_service.py:/app/camera_service.py:ro
+      - /opt/lifetrac/bin/ffmpeg:/usr/local/bin/ffmpeg:ro
+    depends_on:
+      - mosquitto
+    user: "0:0"
+    command: ["python3", "/app/camera_service.py"]
+
+  image_tx:
+    image: lifetrac-tractor-x8:latest
+    container_name: tractor-image-tx-v2
+    restart: unless-stopped
+    devices:
+      - /dev/ttymxc3:/dev/ttymxc3
+    environment:
+      - LIFETRAC_L072_UART=/dev/ttymxc3
+      - LIFETRAC_L072_BAUD=921600
+      - LIFETRAC_MQTT_HOST=mosquitto
+      - LIFETRAC_MQTT_PORT=1883
+      - LIFETRAC_REG_PROFILE=0
+      - LIFETRAC_IMAGE_TX_LOG_LEVEL=INFO
+      - LIFETRAC_IMAGE_TX_QUEUE_DEPTH=4
+      # 50 ms inter-cycle is unsafe at SF7/BW500 (TX-on-air≈48.7 ms);
+      # the L072 returns FORBIDDEN / ABORT_QOS when a TX_FRAME_REQ
+      # arrives before the prior TX_DONE settles. 150 ms gives margin.
+      - LIFETRAC_LORA_INTER_CYCLE_S=0.15
+    volumes:
+      - /opt/lifetrac/video-test/src/image_tx_daemon.py:/app/image_tx_daemon.py:ro
+      - /opt/lifetrac/video-test/src/lora_proto.py:/app/lora_proto.py:ro
+      - /opt/lifetrac/video-test/src/method_h_stage2_tx_probe_v2.py:/app/method_h_stage2_tx_probe_v2.py:ro
+      - /opt/lifetrac/video-test/src/method_g_stage1_probe.py:/app/method_g_stage1_probe.py:ro
+    depends_on:
+      - mosquitto
+    user: "0:0"
+    command: ["python3", "/app/image_tx_daemon.py", "--mqtt-host", "mosquitto"]
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: tractor-mosquitto-v2
+    restart: unless-stopped
+    # eclipse-mosquitto:2 ships with anonymous=false and no listener,
+    # so without a config the broker rejects every connection. We
+    # seed a minimal anonymous-on-1883 config from the host. Push it
+    # once with:
+    #   adb -s 2E2C1209DABC240B push <local>/mosquitto.conf \
+    #       /opt/lifetrac/video-test/mosquitto/mosquitto.conf
+    volumes:
+      - /opt/lifetrac/video-test/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+
+volumes:
+  mosquitto_data:

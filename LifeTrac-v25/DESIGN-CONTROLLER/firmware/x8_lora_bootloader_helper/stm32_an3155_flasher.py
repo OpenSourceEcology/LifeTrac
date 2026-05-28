@@ -199,6 +199,32 @@ def write_memory(fd, address, data):
         
     return True
 
+def read_memory(fd, address, length):
+    data = bytearray()
+    while length > 0:
+        chunk_len = min(length, 256)
+        write_cmd(fd, b'\x11\xEE')
+        if not wait_ack(fd, timeout=2.0):
+            raise IOError(f"READ_MEMORY command NACK at 0x{address:08X}")
+
+        addr_bytes = struct.pack('>I', address)
+        write_cmd(fd, addr_bytes + bytes([xor_checksum(addr_bytes)]))
+        if not wait_ack(fd, timeout=2.0):
+            raise IOError(f"READ_MEMORY address NACK at 0x{address:08X}")
+
+        n_minus_1 = chunk_len - 1
+        write_cmd(fd, bytes([n_minus_1, n_minus_1 ^ 0xFF]))
+        if not wait_ack(fd, timeout=2.0):
+            raise IOError(f"READ_MEMORY length NACK at 0x{address:08X}")
+
+        chunk = read_exact(fd, chunk_len, timeout=3.0)
+        if len(chunk) != chunk_len:
+            raise IOError(f"READ_MEMORY short read at 0x{address:08X}: {len(chunk)}/{chunk_len}")
+        data.extend(chunk)
+        address += chunk_len
+        length -= chunk_len
+    return bytes(data)
+
 def flash_file(fd, filepath, start_address=0x08000000):
     print(f"Reading payload {filepath}...")
     try:
@@ -262,40 +288,89 @@ def flash_file(fd, filepath, start_address=0x08000000):
     elapsed = time.time() - start_time
     if elapsed == 0: elapsed = 0.1
     print(f"\n\nFlash complete in {elapsed:.1f} seconds! ({firmware_len / elapsed / 1024:.1f} KB/s)")
+
+    print("Verifying flash readback...")
+    readback = read_memory(fd, start_address, firmware_len)
+    if readback != firmware:
+        for i, (expected, actual) in enumerate(zip(firmware, readback)):
+            if expected != actual:
+                print(
+                    f"Verify failed at offset 0x{i:08X}: "
+                    f"expected 0x{expected:02X}, read 0x{actual:02X}"
+                )
+                break
+        else:
+            print(f"Verify failed: length mismatch expected {firmware_len}, read {len(readback)}")
+        return False
+    print("Verify OK")
+    return True
+
+def verify_file(fd, filepath, start_address=0x08000000):
+    print(f"Reading expected payload {filepath}...")
+    try:
+        with open(filepath, 'rb') as f:
+            firmware = f.read()
+    except Exception as e:
+        print(f"Failed to open file: {e}")
+        return False
+
+    firmware_len = len(firmware)
+    print(f"Expected firmware size: {firmware_len} bytes")
+    print("Reading flash for compare...")
+    readback = read_memory(fd, start_address, firmware_len)
+    if readback != firmware:
+        for i, (expected, actual) in enumerate(zip(firmware, readback)):
+            if expected != actual:
+                print(
+                    f"Verify-only failed at offset 0x{i:08X}: "
+                    f"expected 0x{expected:02X}, read 0x{actual:02X}"
+                )
+                break
+        else:
+            print(f"Verify-only failed: length mismatch expected {firmware_len}, read {len(readback)}")
+        return False
+    print("Verify-only OK")
+    return True
+
+def connect_bootloader(fd):
+    try:
+        os.read(fd, 1024)
+    except:
+        pass
+
+    print("Connecting to Bootloader...")
+    synced = sync(fd)
+
+    if not synced:
+        print("Sync failed (got NACK or Timeout). The autobaud might already be locked.")
+        print("Attempting to proceed anyway...")
+
+    if get_command(fd) is None:
+        print("Failed to communicate with the STM32 Bootloader. Reset the Murata chip and try again.")
+        return False
     return True
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <firmware.bin>")
+        print(f"Usage: {sys.argv[0]} <firmware.bin> [--verify-only]")
         sys.exit(1)
 
     filepath = sys.argv[1]
+    verify_only = "--verify-only" in sys.argv[2:]
     fd = open_port()
     exit_code = 1
 
     try:
-        # Drain any pending RX
-        try:
-            os.read(fd, 1024)
-        except:
-            pass
-
-        print("Connecting to Bootloader...")
-        synced = sync(fd)
-
-        if not synced:
-            print("Sync failed (got NACK or Timeout). The autobaud might already be locked.")
-            print("Attempting to proceed anyway...")
-
-        if get_command(fd) is not None:
+        if connect_bootloader(fd):
             try:
-                flash_file(fd, filepath, 0x08000000)
-                exit_code = 0
+                if verify_only:
+                    exit_code = 0 if verify_file(fd, filepath, 0x08000000) else 1
+                else:
+                    exit_code = 0 if flash_file(fd, filepath, 0x08000000) else 1
             except Exception as ex:
-                print(f"flash_file raised: {ex}")
+                print(f"operation raised: {ex}")
                 exit_code = 1
         else:
-            print("Failed to communicate with the STM32 Bootloader. Reset the Murata chip and try again.")
             exit_code = 1
 
     finally:

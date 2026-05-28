@@ -189,8 +189,13 @@ fi
 timeout 0.3 dd if=$DEV of=/dev/null bs=1 count=64 2>/dev/null || true
 
 echo "" | tee -a $LOG
-echo "=== running flasher (with --verify) ===" | tee -a $LOG
-python3 -u $FLASHER $IMAGE --verify 2>&1 | tee -a $LOG
+if [ "${FLASH_VERIFY_ONLY:-0}" = "1" ]; then
+    echo "=== running flasher (readback verify only) ===" | tee -a $LOG
+    python3 -u $FLASHER $IMAGE --verify-only 2>&1 | tee -a $LOG
+else
+    echo "=== running flasher (with --verify) ===" | tee -a $LOG
+    python3 -u $FLASHER $IMAGE --verify 2>&1 | tee -a $LOG
+fi
 RC=${PIPESTATUS[0]}
 echo "flasher exit code = $RC" | tee -a $LOG
 

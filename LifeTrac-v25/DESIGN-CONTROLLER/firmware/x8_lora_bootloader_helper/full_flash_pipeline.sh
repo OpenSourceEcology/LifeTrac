@@ -44,4 +44,7 @@ bash $TOOLDIR/wdt_pet.sh stop 2>&1 | tee -a "$LOG"
 
 echo "" | tee -a "$LOG"
 echo "=== T3 $(date) DONE: prep=$PREP_RC flash=$FLASH_RC revive=$REVIVE_RC ===" | tee -a "$LOG"
-exit $REVIVE_RC
+if [ "$FLASH_RC" -ne 0 ]; then
+  exit "$FLASH_RC"
+fi
+exit "$REVIVE_RC"

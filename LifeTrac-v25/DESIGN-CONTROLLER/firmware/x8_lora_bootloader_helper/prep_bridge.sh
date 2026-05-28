@@ -34,6 +34,18 @@ for g in $(seq 160 193); do
 done
 sleep 0.3
 
+echo "=== [1.5/4] unexport x8h7 PWM channels ==="
+for chip in /sys/class/pwm/pwmchip*; do
+  [ -d "$chip" ] || continue
+  for pwm in "$chip"/pwm*; do
+    [ -d "$pwm" ] || continue
+    ch=${pwm##*pwm}
+    echo 0 > "$pwm/enable" 2>/dev/null || true
+    echo "$ch" > "$chip/unexport" 2>/dev/null && echo "  unexport ${chip##*/}/pwm$ch OK"
+  done
+done
+sleep 0.3
+
 # In-kernel consumers of x8h7 gpios (e.g. cs42l52_regulator @ gpio-160)
 # hold module refcounts that sysfs unexport cannot release. We must unbind
 # the consuming drivers from their devices first. Discovered empirically:
