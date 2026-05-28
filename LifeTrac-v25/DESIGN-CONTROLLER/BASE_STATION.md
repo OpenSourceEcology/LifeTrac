@@ -189,6 +189,61 @@ All topics under `lifetrac/v25/`. Mosquitto runs in a container on the X8 and th
 - Firewall: allow inbound 80/443 from LAN only; Mosquitto 1883 LAN-only; never expose to public internet
 - TLS: self-signed cert acceptable for LAN; use Let's Encrypt only if the base station is behind a publicly-routable hostname
 
+## HTTPS / PWA setup
+
+The operator console ships as a **Progressive Web App (PWA)**: it includes a
+web-app manifest (`/manifest.json`) and a service worker (`/sw.js`) that
+caches the app shell for fast load and provides a graceful offline page when
+the base station is temporarily unreachable.
+
+**PWA features require a secure origin** (HTTPS or `http://localhost`).  On a
+LAN the practical options are:
+
+### Option A — Self-signed certificate (recommended)
+
+```sh
+# On the base-station device (or any host with openssl):
+openssl req -x509 -newkey rsa:2048 -nodes \
+    -keyout /etc/lifetrac/key.pem \
+    -out    /etc/lifetrac/cert.pem \
+    -days 3650 \
+    -subj "/CN=lifetrac-base" \
+    -addext "subjectAltName=IP:192.168.1.42,DNS:lifetrac-base.local,DNS:localhost"
+
+# Run the web UI with TLS (port 8443 by convention):
+uvicorn web_ui:app --host 0.0.0.0 --port 8443 \
+    --ssl-keyfile /etc/lifetrac/key.pem \
+    --ssl-certfile /etc/lifetrac/cert.pem
+```
+
+Each operator device must accept the self-signed certificate once.  For
+Android / iOS install the cert as a trusted CA (`cert.pem`) to permanently
+dismiss the browser warning and enable the **Add to Home Screen** prompt.
+
+### Option B — Reverse proxy (nginx or Caddy)
+
+Place an HTTPS proxy in front of the FastAPI server on port 8080.  Caddy with
+`tls internal` issues a local-network-trusted cert automatically if the
+`mkcert` root CA has been installed on client devices.
+
+### Option C — localhost only
+
+If the operator tablet *is* the base-station device, access the UI at
+`http://localhost:8080`.  Browsers treat `localhost` as a secure origin and
+the service worker will register normally without any certificate setup.
+
+### What works without HTTPS
+
+The full operator UI — joystick control, live telemetry, video stream — works
+over plain HTTP.  Only the PWA-specific features are gated on a secure origin:
+
+| Feature                  | Plain HTTP | HTTPS / localhost |
+|--------------------------|:----------:|:-----------------:|
+| Operator console         | ✅         | ✅                |
+| Manifest (install prompt)| ✅ link only| ✅ with install   |
+| Service worker / offline | ❌         | ✅                |
+| Add to Home Screen       | ❌         | ✅                |
+
 ## Link-loss behavior
 
 When the LoRa link to the tractor is lost (no telemetry for 30 s), the base UI shows a banner, stops sending joystick `ControlFrame`s, and leaves E-stop available. There is no Cat-M1 or MQTT-over-cellular fallback in v25; recovery is LoRa link restoration or a local hardware/service intervention.

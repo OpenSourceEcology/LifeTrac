@@ -12,6 +12,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
   <title>LifeTrac v25 — Base Station</title>
+  <!-- PWA metadata -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#1a1d22" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="LifeTrac" />
+  <link rel="apple-touch-icon" href="/static/icons/icon.svg" />
   <style>
     :root {
       --bg: #1a1d22;
@@ -440,6 +447,24 @@
         }
       });
     })();
+  </script>
+  <script>
+    // Register the PWA service worker so the app shell is cached for fast
+    // subsequent loads and the offline fallback is available.
+    // Service workers require HTTPS (or localhost) — see BASE_STATION.md
+    // § "HTTPS / PWA setup" for how to enable TLS on the base station.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then((reg) => {
+            console.log('[PWA] service worker registered, scope:', reg.scope);
+          })
+          .catch((err) => {
+            // Silently swallow on plain-HTTP LAN (SW blocked by browser).
+            console.warn('[PWA] service worker registration failed:', err);
+          });
+      });
+    }
   </script>
 </body>
 </html>

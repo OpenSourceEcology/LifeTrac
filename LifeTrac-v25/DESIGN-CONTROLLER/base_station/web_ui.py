@@ -7,8 +7,40 @@ support via the browser Gamepad API. Pushes ControlFrames to lora_bridge.py
 through MQTT (`lifetrac/v25/cmd/control`) at 20 Hz, and streams telemetry to
 the page over a WebSocket.
 
-Run:
+Run (plain HTTP — LAN only):
     uvicorn web_ui:app --host 0.0.0.0 --port 8080
+
+HTTPS / PWA setup
+-----------------
+Progressive Web App features (service worker, Add-to-Home-Screen, offline
+caching) require a secure origin — HTTPS or http://localhost.  On a LAN
+the practical options are:
+
+1. Self-signed certificate (recommended for a private base station):
+
+    # Generate a self-signed cert valid for 365 days:
+    openssl req -x509 -newkey rsa:2048 -nodes \\
+        -keyout key.pem -out cert.pem -days 365 \\
+        -subj "/CN=lifetrac-base" \\
+        -addext "subjectAltName=IP:<BASE_STATION_IP>,DNS:localhost"
+
+    # Run uvicorn with TLS:
+    uvicorn web_ui:app --host 0.0.0.0 --port 8443 \\
+        --ssl-keyfile key.pem --ssl-certfile cert.pem
+
+    Browsers will warn about the self-signed cert; add an exception once.
+    Android / iOS require installing the cert as a trusted CA to dismiss
+    the warning permanently.
+
+2. Reverse-proxy with TLS (nginx, Caddy, Traefik):
+    Put the proxy in front on port 443; the proxy forwards to this server
+    on port 8080.  Caddy with ``tls internal`` issues a locally-trusted
+    cert automatically if the `mkcert` root CA is installed on client devices.
+
+3. localhost access only:
+    If the operator tablet is the base-station device itself, access via
+    http://localhost:8080 — browsers treat localhost as a secure origin and
+    will register the service worker even over plain HTTP.
 """
 
 from __future__ import annotations
@@ -28,7 +60,7 @@ from typing import Any
 
 import paho.mqtt.client as mqtt
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
@@ -743,6 +775,41 @@ def _maybe_capture_params(topic: str, data: Any) -> None:
 @app.on_event("startup")
 async def _startup():
     app.state.loop = asyncio.get_event_loop()
+
+
+# ---- PWA: service worker and manifest at the root scope ----------------
+# The service worker MUST be served from the root path so that its scope
+# covers all pages (/, /login, /map, etc.).  Serving from /static/sw.js
+# would limit scope to /static/* which is useless for navigation caching.
+# The ``Service-Worker-Allowed`` response header explicitly grants the
+# full scope so browsers accept the registration even though the SW file
+# itself lives under /static/ conceptually.
+
+@app.get("/sw.js")
+async def service_worker():
+    """PWA service worker — served at root so scope covers all pages."""
+    content = (WEB_DIR / "sw.js").read_text(encoding="utf-8")
+    return Response(
+        content=content,
+        media_type="application/javascript",
+        headers={
+            # Allow the browser to register this SW for the full site scope.
+            "Service-Worker-Allowed": "/",
+            # Never cache the SW file itself; browsers need to see updates.
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+    )
+
+
+@app.get("/manifest.json")
+async def manifest():
+    """PWA web app manifest."""
+    content = (WEB_DIR / "manifest.json").read_text(encoding="utf-8")
+    return Response(
+        content=content,
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "max-age=86400"},
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
