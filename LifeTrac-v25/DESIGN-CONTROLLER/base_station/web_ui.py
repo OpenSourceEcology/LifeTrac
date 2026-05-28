@@ -179,9 +179,72 @@ CERT_PATH = Path(
         str(Path("/etc/lifetrac/cert.pem")),
     )
 )
+# Path to the TLS private key.  Never served over the network.  Used only by
+# the auto-generation logic on first boot.  Set LIFETRAC_TLS_KEY to override.
+KEY_PATH = Path(
+    os.environ.get(
+        "LIFETRAC_TLS_KEY",
+        str(Path("/etc/lifetrac/key.pem")),
+    )
+)
 # Port on which uvicorn is listening with TLS.  Used only for the /setup
 # page to build the "Open HTTPS site" link.
 HTTPS_PORT = int(os.environ.get("LIFETRAC_HTTPS_PORT", "8443"))
+
+
+def _ensure_self_signed_cert() -> None:
+    """Generate a self-signed TLS cert+key on first boot if neither exists.
+
+    Writes to CERT_PATH / KEY_PATH (defaulting to /etc/lifetrac/).  Does
+    nothing when either file already exists so operator-supplied certs are
+    never overwritten.  Logs a warning and returns silently when ``openssl``
+    is not available so the server still starts without TLS.
+    """
+    if CERT_PATH.is_file() or KEY_PATH.is_file():
+        return
+    try:
+        import socket
+        hostname = socket.gethostname()
+    except Exception:
+        hostname = "lifetrac-base"
+    try:
+        CERT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(
+            [
+                "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+                "-keyout", str(KEY_PATH),
+                "-out", str(CERT_PATH),
+                "-days", "3650",
+                "-subj", f"/CN={hostname}",
+                "-addext", f"subjectAltName=DNS:{hostname},DNS:localhost",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            try:
+                os.chmod(KEY_PATH, 0o600)
+            except OSError:
+                pass  # best-effort; FAT or non-POSIX filesystem
+            logging.info(
+                "auto-generated self-signed TLS cert at %s (CN=%s)",
+                CERT_PATH, hostname,
+            )
+        else:
+            logging.warning(
+                "openssl cert generation failed (rc=%d): %s",
+                result.returncode, result.stderr.strip(),
+            )
+    except FileNotFoundError:
+        logging.warning(
+            "openssl not found — skipping auto-cert generation. "
+            "Install openssl or generate %s / %s manually.",
+            CERT_PATH, KEY_PATH,
+        )
+    except Exception as exc:
+        logging.warning("auto-cert generation error: %s", exc)
 
 # ---- PIN auth (MASTER_PLAN.md §8.5 / DECISIONS.md D-E1) -----------------
 # Single shared PIN, LAN-only, plain HTTP for v25. Telemetry views are public;
@@ -791,6 +854,10 @@ def _maybe_capture_params(topic: str, data: Any) -> None:
 @app.on_event("startup")
 async def _startup():
     app.state.loop = asyncio.get_event_loop()
+    # Auto-generate a self-signed TLS cert on first boot if none exists.
+    # Runs in a thread so it doesn't block the event loop during openssl.
+    loop = app.state.loop
+    await loop.run_in_executor(None, _ensure_self_signed_cert)
 
 
 # ---- PWA: service worker and manifest at the root scope ----------------

@@ -237,5 +237,163 @@ class PwaRoutesTests(unittest.TestCase):
         self.assertIn("iPhone", r.text)
 
 
+class AutoCertTests(unittest.TestCase):
+    """Tests for _ensure_self_signed_cert() first-boot auto-generation."""
+
+    def _import_wu(self):
+        import web_ui as _wu
+        return _wu
+
+    def test_no_op_when_cert_exists(self):
+        """Does nothing when CERT_PATH already points to an existing file."""
+        import tempfile
+        _wu = self._import_wu()
+        orig_cert = _wu.CERT_PATH
+        orig_key = _wu.KEY_PATH
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".pem", delete=False) as f:
+                f.write(b"-----BEGIN CERTIFICATE-----\nFAKE\n-----END CERTIFICATE-----\n")
+                tmp_cert = Path(f.name)
+            _wu.CERT_PATH = tmp_cert
+            _wu.KEY_PATH = Path("/nonexistent/key.pem")
+            with mock.patch("subprocess.run") as mock_run:
+                _wu._ensure_self_signed_cert()
+                mock_run.assert_not_called()
+        finally:
+            _wu.CERT_PATH = orig_cert
+            _wu.KEY_PATH = orig_key
+            tmp_cert.unlink(missing_ok=True)
+
+    def test_no_op_when_key_exists(self):
+        """Does nothing when KEY_PATH already points to an existing file."""
+        import tempfile
+        _wu = self._import_wu()
+        orig_cert = _wu.CERT_PATH
+        orig_key = _wu.KEY_PATH
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".pem", delete=False) as f:
+                f.write(b"-----BEGIN RSA PRIVATE KEY-----\nFAKE\n-----END RSA PRIVATE KEY-----\n")
+                tmp_key = Path(f.name)
+            _wu.CERT_PATH = Path("/nonexistent/cert.pem")
+            _wu.KEY_PATH = tmp_key
+            with mock.patch("subprocess.run") as mock_run:
+                _wu._ensure_self_signed_cert()
+                mock_run.assert_not_called()
+        finally:
+            _wu.CERT_PATH = orig_cert
+            _wu.KEY_PATH = orig_key
+            tmp_key.unlink(missing_ok=True)
+
+    def test_calls_openssl_when_no_cert_or_key(self):
+        """Calls openssl when neither cert nor key exists."""
+        import tempfile
+        _wu = self._import_wu()
+        orig_cert = _wu.CERT_PATH
+        orig_key = _wu.KEY_PATH
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                _wu.CERT_PATH = Path(tmp_dir) / "cert.pem"
+                _wu.KEY_PATH = Path(tmp_dir) / "key.pem"
+                mock_result = mock.MagicMock()
+                mock_result.returncode = 0
+                with mock.patch("subprocess.run", return_value=mock_result) as mock_run:
+                    _wu._ensure_self_signed_cert()
+                    mock_run.assert_called_once()
+                    cmd = mock_run.call_args[0][0]
+                    self.assertEqual(cmd[0], "openssl")
+                    self.assertIn("-x509", cmd)
+                    self.assertIn(str(_wu.CERT_PATH), cmd)
+                    self.assertIn(str(_wu.KEY_PATH), cmd)
+        finally:
+            _wu.CERT_PATH = orig_cert
+            _wu.KEY_PATH = orig_key
+
+    def test_openssl_subj_uses_hostname(self):
+        """The -subj CN must match the current hostname."""
+        import socket
+        import tempfile
+        _wu = self._import_wu()
+        orig_cert = _wu.CERT_PATH
+        orig_key = _wu.KEY_PATH
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                _wu.CERT_PATH = Path(tmp_dir) / "cert.pem"
+                _wu.KEY_PATH = Path(tmp_dir) / "key.pem"
+                mock_result = mock.MagicMock()
+                mock_result.returncode = 0
+                with mock.patch("subprocess.run", return_value=mock_result) as mock_run:
+                    _wu._ensure_self_signed_cert()
+                    cmd = mock_run.call_args[0][0]
+                    subj_idx = cmd.index("-subj") + 1
+                    self.assertIn(socket.gethostname(), cmd[subj_idx])
+        finally:
+            _wu.CERT_PATH = orig_cert
+            _wu.KEY_PATH = orig_key
+
+    def test_graceful_when_openssl_missing(self):
+        """Logs a warning and returns without raising when openssl is absent."""
+        import tempfile
+        _wu = self._import_wu()
+        orig_cert = _wu.CERT_PATH
+        orig_key = _wu.KEY_PATH
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                _wu.CERT_PATH = Path(tmp_dir) / "cert.pem"
+                _wu.KEY_PATH = Path(tmp_dir) / "key.pem"
+                with mock.patch("subprocess.run", side_effect=FileNotFoundError("openssl")):
+                    # Must not raise
+                    _wu._ensure_self_signed_cert()
+        finally:
+            _wu.CERT_PATH = orig_cert
+            _wu.KEY_PATH = orig_key
+
+    def test_graceful_on_subprocess_error(self):
+        """Logs a warning and returns without raising on unexpected subprocess errors."""
+        import tempfile
+        _wu = self._import_wu()
+        orig_cert = _wu.CERT_PATH
+        orig_key = _wu.KEY_PATH
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                _wu.CERT_PATH = Path(tmp_dir) / "cert.pem"
+                _wu.KEY_PATH = Path(tmp_dir) / "key.pem"
+                with mock.patch("subprocess.run", side_effect=OSError("permission denied")):
+                    _wu._ensure_self_signed_cert()
+        finally:
+            _wu.CERT_PATH = orig_cert
+            _wu.KEY_PATH = orig_key
+
+    def test_key_permissions_set_to_600_on_success(self):
+        """Private key gets chmod 600 after generation."""
+        import tempfile
+        import stat
+        _wu = self._import_wu()
+        orig_cert = _wu.CERT_PATH
+        orig_key = _wu.KEY_PATH
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                cert_path = Path(tmp_dir) / "cert.pem"
+                key_path = Path(tmp_dir) / "key.pem"
+                _wu.CERT_PATH = cert_path
+                _wu.KEY_PATH = key_path
+
+                def _fake_openssl(cmd, **_kw):
+                    # Create the files openssl would normally create
+                    cert_path.write_text("FAKE CERT\n")
+                    key_path.write_text("FAKE KEY\n")
+                    r = mock.MagicMock()
+                    r.returncode = 0
+                    return r
+
+                with mock.patch("subprocess.run", side_effect=_fake_openssl):
+                    _wu._ensure_self_signed_cert()
+
+                mode = oct(stat.S_IMODE(os.stat(key_path).st_mode))
+                self.assertEqual(mode, oct(0o600))
+        finally:
+            _wu.CERT_PATH = orig_cert
+            _wu.KEY_PATH = orig_key
+
+
 if __name__ == "__main__":
     unittest.main()
