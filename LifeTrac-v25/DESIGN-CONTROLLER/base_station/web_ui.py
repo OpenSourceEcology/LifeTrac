@@ -167,6 +167,22 @@ class ParamsBody(BaseModel):
 
 WEB_DIR = Path(__file__).parent / "web"
 
+# ---- HTTPS bootstrap config ----------------------------------------------
+# Path to the TLS public certificate so the /cert.pem endpoint can serve it
+# to client devices for installation.  Only the *public* cert is ever served;
+# the private key is never exposed.  Set LIFETRAC_TLS_CERT to override the
+# default path.  The server itself does not manage TLS — TLS termination is
+# done by uvicorn's --ssl-certfile argument.
+CERT_PATH = Path(
+    os.environ.get(
+        "LIFETRAC_TLS_CERT",
+        str(Path("/etc/lifetrac/cert.pem")),
+    )
+)
+# Port on which uvicorn is listening with TLS.  Used only for the /setup
+# page to build the "Open HTTPS site" link.
+HTTPS_PORT = int(os.environ.get("LIFETRAC_HTTPS_PORT", "8443"))
+
 # ---- PIN auth (MASTER_PLAN.md §8.5 / DECISIONS.md D-E1) -----------------
 # Single shared PIN, LAN-only, plain HTTP for v25. Telemetry views are public;
 # control/E-stop/camera-select require the PIN. The hardware E-stop on the
@@ -810,6 +826,58 @@ async def manifest():
         media_type="application/manifest+json",
         headers={"Cache-Control": "max-age=86400"},
     )
+
+
+@app.get("/cert.pem")
+async def download_cert():
+    """Serve the TLS public certificate for installation on client devices.
+
+    Intended for the HTTP bootstrap path: operator visits /setup over plain
+    HTTP, downloads cert.pem, installs it as a trusted CA, then navigates to
+    the HTTPS site.  Only the *public* certificate is served — the private key
+    (key.pem) is never exposed through this endpoint.
+
+    Returns 404 when no certificate has been generated yet, with a hint
+    directing the operator to run the openssl command documented in
+    BASE_STATION.md.
+    """
+    if not CERT_PATH.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "TLS certificate not found. "
+                "Generate one with openssl (see BASE_STATION.md § HTTPS / PWA setup) "
+                "then set LIFETRAC_TLS_CERT or place the file at "
+                f"{CERT_PATH}."
+            ),
+        )
+    content = CERT_PATH.read_bytes()
+    return Response(
+        content=content,
+        media_type="application/x-pem-file",
+        headers={
+            "Content-Disposition": 'attachment; filename="lifetrac-cert.pem"',
+            # Never cache — the cert may be regenerated at any time.
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@app.get("/setup", response_class=HTMLResponse)
+async def setup_page():
+    """HTTPS / cert bootstrap page — no session required.
+
+    Accessible over plain HTTP so an operator can download the TLS cert before
+    switching to the HTTPS site.  The page injects the HTTPS port (from
+    LIFETRAC_HTTPS_PORT) and cert availability flag so the client-side JS can
+    build the correct HTTPS URL and enable/disable the download button.
+    """
+    html = (WEB_DIR / "setup.html").read_text(encoding="utf-8")
+    cert_available = "true" if CERT_PATH.is_file() else "false"
+    # Inject server-side config into the JS placeholders before serving.
+    html = html.replace("__HTTPS_PORT__", str(HTTPS_PORT))
+    html = html.replace("__CERT_AVAILABLE__", cert_available)
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/", response_class=HTMLResponse)

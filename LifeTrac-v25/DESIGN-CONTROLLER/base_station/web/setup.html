@@ -1,0 +1,251 @@
+<!doctype html>
+<!--
+  setup.html — LifeTrac v25 HTTPS / PWA bootstrap page.
+
+  Accessible over plain HTTP so operators can download and install the
+  self-signed TLS certificate before switching to the HTTPS site.  No login
+  required — this page intentionally has no session gate.
+
+  The server injects __HTTPS_PORT__ and __CERT_AVAILABLE__ at serve time.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LifeTrac v25 — HTTPS Setup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; min-height: 100%;
+      background: #1a1d22; color: #e6e8eb;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+    }
+    body { padding: 24px 16px 48px; }
+    .wrap { max-width: 640px; margin: 0 auto; }
+    h1 { margin: 0 0 4px; font-size: 22px; }
+    .sub { opacity: 0.6; font-size: 13px; margin: 0 0 32px; }
+    /* step cards */
+    .step {
+      background: #232830; border-radius: 12px;
+      padding: 22px 24px; margin-bottom: 16px;
+    }
+    .step-num {
+      display: inline-block; width: 28px; height: 28px; line-height: 28px;
+      text-align: center; border-radius: 50%;
+      background: #4caf50; color: #000; font-weight: 700; font-size: 13px;
+      margin-right: 10px; flex-shrink: 0;
+    }
+    .step-head { display: flex; align-items: center; margin-bottom: 12px; }
+    .step-head h2 { margin: 0; font-size: 16px; }
+    /* cert status badge */
+    .badge {
+      display: inline-block; padding: 3px 10px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; margin-left: 10px;
+    }
+    .badge-ok   { background: #1b4d1f; color: #69f07a; }
+    .badge-miss { background: #4d1b1b; color: #f07a69; }
+    /* primary action button */
+    .btn {
+      display: inline-block; padding: 12px 24px; font-size: 15px;
+      font-weight: 600; border-radius: 8px; border: 0; cursor: pointer;
+      text-decoration: none; text-align: center;
+    }
+    .btn-green  { background: #4caf50; color: #000; }
+    .btn-green:hover { background: #43a047; }
+    .btn-blue   { background: #1976d2; color: #fff; }
+    .btn-blue:hover { background: #1565c0; }
+    .btn-disabled { background: #333; color: #666; cursor: not-allowed; }
+    /* OS tabs */
+    .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+    .tab {
+      padding: 6px 14px; border-radius: 6px; font-size: 13px;
+      cursor: pointer; background: #2e333c; border: 1px solid #3a4050;
+      color: #ccc;
+    }
+    .tab.active { background: #1976d2; color: #fff; border-color: #1976d2; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    ol { padding-left: 20px; line-height: 1.8; margin: 0; font-size: 14px; }
+    code {
+      background: #1a1d22; padding: 2px 6px; border-radius: 4px;
+      font-size: 13px; color: #adf;
+    }
+    pre {
+      background: #1a1d22; padding: 10px 14px; border-radius: 6px;
+      overflow-x: auto; margin: 8px 0 4px; white-space: pre;
+    }
+    pre code { background: transparent; padding: 0; }
+    .note {
+      background: #1c2530; border-left: 3px solid #1976d2;
+      padding: 10px 14px; border-radius: 0 6px 6px 0;
+      font-size: 13px; opacity: 0.9; margin-top: 12px; line-height: 1.6;
+    }
+    /* https launch */
+    #https-url { font-size: 18px; font-weight: 600; margin: 12px 0; color: #69f07a; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔒 HTTPS / PWA Setup</h1>
+  <p class="sub">Follow these steps to enable full-screen PWA install on your phone.</p>
+
+  <!-- Step 1: download cert -->
+  <div class="step">
+    <div class="step-head">
+      <span class="step-num">1</span>
+      <h2>Download the certificate
+        <span id="cert-badge" class="badge badge-miss">not found</span>
+      </h2>
+    </div>
+    <p style="font-size:14px;opacity:0.8;margin:0 0 14px">
+      The base station uses a self-signed TLS certificate.  Download it here,
+      then install it as a <strong>trusted CA</strong> on every device that will
+      access the HTTPS site.  This is the public certificate — the private key
+      is never exposed.
+    </p>
+    <a id="cert-dl" href="/cert.pem" class="btn btn-green btn-disabled"
+       download="lifetrac-cert.pem">⬇ Download lifetrac-cert.pem</a>
+    <p id="cert-missing-note" class="note" style="display:none">
+      No certificate found on the base station yet.  Generate one first:
+      <pre><code>openssl req -x509 -newkey rsa:2048 -nodes \
+  -keyout /etc/lifetrac/key.pem \
+  -out /etc/lifetrac/cert.pem \
+  -days 3650 \
+  -subj "/CN=lifetrac-base" \
+  -addext "subjectAltName=IP:$(hostname -I | awk '{print $1}'),DNS:localhost"</code></pre>
+      Then restart uvicorn with <code>--ssl-certfile /etc/lifetrac/cert.pem --ssl-keyfile /etc/lifetrac/key.pem</code>.
+    </p>
+  </div>
+
+  <!-- Step 2: install cert -->
+  <div class="step">
+    <div class="step-head">
+      <span class="step-num">2</span>
+      <h2>Install the certificate on this device</h2>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('android',this)">Android</button>
+      <button class="tab" onclick="showTab('ios',this)">iPhone / iPad</button>
+      <button class="tab" onclick="showTab('windows',this)">Windows</button>
+      <button class="tab" onclick="showTab('mac',this)">macOS</button>
+      <button class="tab" onclick="showTab('linux',this)">Linux</button>
+    </div>
+
+    <div id="tab-android" class="panel active">
+      <ol>
+        <li>Tap the downloaded <code>lifetrac-cert.pem</code> file in your notifications or Files app.</li>
+        <li>Android will open a certificate installer — set <strong>Certificate name</strong> to <code>LifeTrac Base</code>.</li>
+        <li>Under <strong>Used for</strong> choose <strong>Wi-Fi</strong> (Android 11+: choose <strong>CA certificate</strong>).</li>
+        <li>Tap <strong>OK / Install</strong>.</li>
+        <li>On Android 14+ go to <em>Settings → Security → Encryption &amp; credentials → Trusted credentials → User</em> to verify it appears.</li>
+      </ol>
+      <div class="note">
+        Chrome on Android trusts user-installed CAs for HTTPS pages automatically.
+        Firefox for Android requires <em>Settings → About Firefox</em> → scroll to <em>Certificates</em> → enable <strong>Use third-party CAs</strong>.
+      </div>
+    </div>
+
+    <div id="tab-ios" class="panel">
+      <ol>
+        <li>Tap the downloaded cert file — iOS will say <em>"Profile Downloaded"</em>.</li>
+        <li>Go to <em>Settings → General → VPN &amp; Device Management</em>.</li>
+        <li>Tap the <strong>LifeTrac Base</strong> profile → <strong>Install</strong> → enter your passcode → <strong>Install</strong> again.</li>
+        <li>Go to <em>Settings → General → About → Certificate Trust Settings</em>.</li>
+        <li>Under <strong>Enable Full Trust For Root Certificates</strong>, toggle on <strong>LifeTrac Base</strong>.</li>
+      </ol>
+      <div class="note">
+        Both Safari and Chrome on iOS use the system trust store, so one install covers all browsers.
+      </div>
+    </div>
+
+    <div id="tab-windows" class="panel">
+      <ol>
+        <li>Double-click <code>lifetrac-cert.pem</code> → <strong>Open</strong>.</li>
+        <li>Click <strong>Install Certificate…</strong> → <strong>Local Machine</strong> → <strong>Next</strong>.</li>
+        <li>Choose <strong>Place all certificates in the following store</strong> → <strong>Browse</strong> → <strong>Trusted Root Certification Authorities</strong> → <strong>OK</strong> → <strong>Next</strong> → <strong>Finish</strong>.</li>
+        <li>Restart Chrome / Edge.</li>
+      </ol>
+    </div>
+
+    <div id="tab-mac" class="panel">
+      <ol>
+        <li>Double-click <code>lifetrac-cert.pem</code> — Keychain Access opens.</li>
+        <li>Add it to the <strong>System</strong> keychain.</li>
+        <li>Find <strong>lifetrac-base</strong> in the list, double-click it.</li>
+        <li>Expand <strong>Trust</strong> → set <strong>When using this certificate</strong> to <strong>Always Trust</strong>.</li>
+        <li>Close and enter your password to save.</li>
+      </ol>
+    </div>
+
+    <div id="tab-linux" class="panel">
+      <ol>
+        <li>Copy the cert to the system CA directory:<br>
+            <code>sudo cp lifetrac-cert.pem /usr/local/share/ca-certificates/lifetrac-cert.crt</code></li>
+        <li>Rebuild the CA bundle:<br>
+            <code>sudo update-ca-certificates</code></li>
+        <li>Restart your browser (Chrome/Chromium also needs a full quit).</li>
+      </ol>
+      <div class="note">
+        On Fedora/RHEL use <code>/etc/pki/ca-trust/source/anchors/</code> and <code>sudo update-ca-trust</code>.
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: open HTTPS site -->
+  <div class="step">
+    <div class="step-head">
+      <span class="step-num">3</span>
+      <h2>Open the HTTPS site &amp; install as PWA</h2>
+    </div>
+    <p id="https-url">https://<span id="https-host">…</span></p>
+    <a id="https-link" href="#" class="btn btn-blue" target="_blank">
+      Open HTTPS Site →
+    </a>
+    <div class="note" style="margin-top:16px">
+      After the cert is trusted, the browser should load the console without
+      any security warning.  To install as a full-screen app:
+      <ul style="margin:8px 0 0;padding-left:18px;line-height:1.8">
+        <li><strong>Android (Chrome):</strong> tap ⋮ menu → <em>Add to Home Screen</em> → <em>Install</em></li>
+        <li><strong>iPhone / iPad:</strong> tap Share (□↑) → <em>Add to Home Screen</em></li>
+      </ul>
+      The app will open in landscape full-screen mode with no browser chrome.
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var HTTPS_PORT = __HTTPS_PORT__;
+    var CERT_AVAILABLE = __CERT_AVAILABLE__;
+
+    // Build the HTTPS URL from the current host, substituting the HTTPS port.
+    var host = location.hostname;
+    var httpsUrl = 'https://' + host + (HTTPS_PORT === 443 ? '' : ':' + HTTPS_PORT) + '/';
+    document.getElementById('https-host').textContent = host + (HTTPS_PORT === 443 ? '' : ':' + HTTPS_PORT);
+    var link = document.getElementById('https-link');
+    link.href = httpsUrl;
+
+    // Cert availability state.
+    var badge = document.getElementById('cert-badge');
+    var dlBtn  = document.getElementById('cert-dl');
+    var missingNote = document.getElementById('cert-missing-note');
+
+    if (CERT_AVAILABLE) {
+      badge.textContent = 'ready';
+      badge.className = 'badge badge-ok';
+      dlBtn.classList.remove('btn-disabled');
+    } else {
+      missingNote.style.display = 'block';
+    }
+  })();
+
+  function showTab(name, btn) {
+    document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+</body>
+</html>

@@ -127,6 +127,115 @@ class PwaRoutesTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("svg", r.headers.get("content-type", "").lower())
 
+    # ---- /cert.pem download endpoint ------------------------------------
+
+    def test_cert_pem_returns_404_when_no_cert(self):
+        """Returns 404 with a hint when no TLS cert has been generated."""
+        import web_ui as _wu
+        orig = _wu.CERT_PATH
+        try:
+            _wu.CERT_PATH = Path("/nonexistent/path/cert.pem")
+            r = self.client.get("/cert.pem")
+            self.assertEqual(r.status_code, 404)
+        finally:
+            _wu.CERT_PATH = orig
+
+    def test_cert_pem_returns_pem_file_when_cert_exists(self):
+        """Returns the certificate file with correct headers when present."""
+        import tempfile
+        import web_ui as _wu
+        orig = _wu.CERT_PATH
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".pem", delete=False) as f:
+                f.write(b"-----BEGIN CERTIFICATE-----\nFAKE\n-----END CERTIFICATE-----\n")
+                tmp_cert = Path(f.name)
+            _wu.CERT_PATH = tmp_cert
+            r = self.client.get("/cert.pem")
+            self.assertEqual(r.status_code, 200)
+            self.assertIn("pem", r.headers.get("content-type", "").lower())
+            self.assertIn("attachment", r.headers.get("content-disposition", "").lower())
+            self.assertIn("lifetrac-cert.pem", r.headers.get("content-disposition", ""))
+            self.assertIn(b"BEGIN CERTIFICATE", r.content)
+        finally:
+            _wu.CERT_PATH = orig
+            tmp_cert.unlink(missing_ok=True)
+
+    def test_cert_pem_never_caches(self):
+        """Cache-Control must be no-store so stale certs are never used."""
+        import tempfile
+        import web_ui as _wu
+        orig = _wu.CERT_PATH
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".pem", delete=False) as f:
+                f.write(b"-----BEGIN CERTIFICATE-----\nFAKE\n-----END CERTIFICATE-----\n")
+                tmp_cert = Path(f.name)
+            _wu.CERT_PATH = tmp_cert
+            r = self.client.get("/cert.pem")
+            self.assertIn("no-store", r.headers.get("cache-control", ""))
+        finally:
+            _wu.CERT_PATH = orig
+            tmp_cert.unlink(missing_ok=True)
+
+    # ---- /setup page ----------------------------------------------------
+
+    def test_setup_page_accessible_without_session(self):
+        """/setup must be reachable without a login cookie."""
+        r = self.client.get("/setup")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("text/html", r.headers.get("content-type", ""))
+
+    def test_setup_page_injects_https_port(self):
+        """The server must inject the HTTPS port into the page."""
+        import web_ui as _wu
+        orig = _wu.HTTPS_PORT
+        try:
+            _wu.HTTPS_PORT = 9443
+            r = self.client.get("/setup")
+            self.assertIn("9443", r.text)
+        finally:
+            _wu.HTTPS_PORT = orig
+
+    def test_setup_page_cert_available_true_when_cert_exists(self):
+        """cert_available flag is 'true' when the cert file is present."""
+        import tempfile
+        import web_ui as _wu
+        orig = _wu.CERT_PATH
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".pem", delete=False) as f:
+                f.write(b"-----BEGIN CERTIFICATE-----\nFAKE\n-----END CERTIFICATE-----\n")
+                tmp_cert = Path(f.name)
+            _wu.CERT_PATH = tmp_cert
+            r = self.client.get("/setup")
+            self.assertIn("true", r.text)
+        finally:
+            _wu.CERT_PATH = orig
+            tmp_cert.unlink(missing_ok=True)
+
+    def test_setup_page_cert_available_false_when_no_cert(self):
+        """cert_available flag is 'false' when no cert has been generated."""
+        import web_ui as _wu
+        orig = _wu.CERT_PATH
+        try:
+            _wu.CERT_PATH = Path("/nonexistent/path/cert.pem")
+            r = self.client.get("/setup")
+            self.assertIn("false", r.text)
+        finally:
+            _wu.CERT_PATH = orig
+
+    def test_setup_page_not_cached(self):
+        """Setup page must not be cached (cert state may change)."""
+        r = self.client.get("/setup")
+        self.assertIn("no-store", r.headers.get("cache-control", ""))
+
+    def test_setup_page_contains_cert_download_link(self):
+        r = self.client.get("/setup")
+        self.assertIn("/cert.pem", r.text)
+
+    def test_setup_page_contains_android_ios_instructions(self):
+        r = self.client.get("/setup")
+        self.assertIn("Android", r.text)
+        self.assertIn("iPhone", r.text)
+
 
 if __name__ == "__main__":
     unittest.main()
