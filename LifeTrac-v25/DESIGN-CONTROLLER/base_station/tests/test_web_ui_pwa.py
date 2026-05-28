@@ -253,8 +253,8 @@ class AutoCertTests(unittest.TestCase):
         try:
             with tempfile.NamedTemporaryFile(suffix=".pem", delete=False) as f:
                 f.write(b"-----BEGIN CERTIFICATE-----\nFAKE\n-----END CERTIFICATE-----\n")
-                tmp_cert = Path(f.name)
-            _wu.CERT_PATH = tmp_cert
+                tmp_cert_path = Path(f.name)
+            _wu.CERT_PATH = tmp_cert_path
             _wu.KEY_PATH = Path("/nonexistent/key.pem")
             with mock.patch("subprocess.run") as mock_run:
                 _wu._ensure_self_signed_cert()
@@ -262,7 +262,7 @@ class AutoCertTests(unittest.TestCase):
         finally:
             _wu.CERT_PATH = orig_cert
             _wu.KEY_PATH = orig_key
-            tmp_cert.unlink(missing_ok=True)
+            tmp_cert_path.unlink(missing_ok=True)
 
     def test_no_op_when_key_exists(self):
         """Does nothing when KEY_PATH already points to an existing file."""
@@ -273,16 +273,16 @@ class AutoCertTests(unittest.TestCase):
         try:
             with tempfile.NamedTemporaryFile(suffix=".pem", delete=False) as f:
                 f.write(b"-----BEGIN RSA PRIVATE KEY-----\nFAKE\n-----END RSA PRIVATE KEY-----\n")
-                tmp_key = Path(f.name)
+                tmp_key_path = Path(f.name)
             _wu.CERT_PATH = Path("/nonexistent/cert.pem")
-            _wu.KEY_PATH = tmp_key
+            _wu.KEY_PATH = tmp_key_path
             with mock.patch("subprocess.run") as mock_run:
                 _wu._ensure_self_signed_cert()
                 mock_run.assert_not_called()
         finally:
             _wu.CERT_PATH = orig_cert
             _wu.KEY_PATH = orig_key
-            tmp_key.unlink(missing_ok=True)
+            tmp_key_path.unlink(missing_ok=True)
 
     def test_calls_openssl_when_no_cert_or_key(self):
         """Calls openssl when neither cert nor key exists."""

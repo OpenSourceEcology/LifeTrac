@@ -51,6 +51,7 @@ import json
 import logging
 import os
 import secrets
+import socket
 import subprocess
 import threading
 import time
@@ -190,6 +191,8 @@ KEY_PATH = Path(
 # Port on which uvicorn is listening with TLS.  Used only for the /setup
 # page to build the "Open HTTPS site" link.
 HTTPS_PORT = int(os.environ.get("LIFETRAC_HTTPS_PORT", "8443"))
+# Validity period for the auto-generated self-signed certificate (days).
+CERT_VALIDITY_DAYS = 3650  # ~10 years; long-lived for embedded device use
 
 
 def _ensure_self_signed_cert() -> None:
@@ -203,7 +206,6 @@ def _ensure_self_signed_cert() -> None:
     if CERT_PATH.is_file() or KEY_PATH.is_file():
         return
     try:
-        import socket
         hostname = socket.gethostname()
     except Exception:
         hostname = "lifetrac-base"
@@ -215,7 +217,7 @@ def _ensure_self_signed_cert() -> None:
                 "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
                 "-keyout", str(KEY_PATH),
                 "-out", str(CERT_PATH),
-                "-days", "3650",
+                "-days", str(CERT_VALIDITY_DAYS),
                 "-subj", f"/CN={hostname}",
                 "-addext", f"subjectAltName=DNS:{hostname},DNS:localhost",
             ],
