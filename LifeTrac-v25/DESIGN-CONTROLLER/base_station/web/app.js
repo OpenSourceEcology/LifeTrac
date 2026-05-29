@@ -218,6 +218,11 @@
   })();
 
   // ----- Virtual joystick pads (touch + mouse) -----
+  const virtualPads = {};
+  function syncPadVisuals(fromGamepad) {
+    if (virtualPads.l) virtualPads.l.setFromAxes(state.lhx, state.lhy, fromGamepad);
+    if (virtualPads.r) virtualPads.r.setFromAxes(state.rhx, state.rhy, fromGamepad);
+  }
   function createPad(id, axisX, axisY) {
     const pad = document.getElementById(id);
     const canvas = pad.querySelector('canvas');
@@ -239,6 +244,21 @@
       ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = active ? '#4caf50' : '#888';
       ctx.beginPath(); ctx.arc(cx + hx, cy + hy, 28, 0, Math.PI * 2); ctx.fill();
+    }
+    function setFromAxes(ax, ay, isActive) {
+      if (!isActive) {
+        hx = 0;
+        hy = 0;
+        active = false;
+        draw();
+        return;
+      }
+      const nx = Math.max(-1, Math.min(1, (ax || 0) / 127));
+      const ny = Math.max(-1, Math.min(1, (ay || 0) / 127));
+      hx = nx * radius;
+      hy = -ny * radius;
+      active = (hx !== 0 || hy !== 0);
+      draw();
     }
 
     function setFromEvent(ev) {
@@ -270,15 +290,24 @@
       draw();
     });
     resize();
+    return { setFromAxes };
   }
-  createPad('pad-left',  'lhx', 'lhy');
-  createPad('pad-right', 'rhx', 'rhy');
+  virtualPads.l = createPad('pad-left',  'lhx', 'lhy');
+  virtualPads.r = createPad('pad-right', 'rhx', 'rhy');
 
   // ----- Button strip -----
   let screenButtons = 0;
   let screenFlags = 0;
+  const buttonVisuals = [];
+  function syncButtonVisuals(mask) {
+    buttonVisuals.forEach(({ el, maskBit }) => {
+      el.classList.toggle('active', !!(mask & maskBit));
+    });
+  }
   document.querySelectorAll('button[data-btn]').forEach(btn => {
-    const bit = 1 << parseInt(btn.dataset.btn, 10);
+    const idx = parseInt(btn.dataset.btn, 10);
+    const bit = 1 << idx;
+    buttonVisuals.push({ el: btn, maskBit: bit });
     const set = (down) => {
       if (controlsLocked) return;
       if (down) screenButtons |= bit; else screenButtons &= ~bit;
@@ -289,6 +318,7 @@
       if (!gamepadActive) {
         state.buttons = screenButtons;
         state.flags = screenFlags;
+        syncButtonVisuals(state.buttons);
       }
     };
     btn.addEventListener('pointerdown', () => set(true));
@@ -463,6 +493,8 @@
         state.lhx = state.lhy = state.rhx = state.rhy = 0;
         state.buttons = screenButtons;
         state.flags = screenFlags;
+        syncPadVisuals(false);
+        syncButtonVisuals(state.buttons);
       }
       return;
     }
@@ -477,6 +509,7 @@
     state.lhy = clip(-Math.round(dz(gp.axes[1]) * 127));
     state.rhx = clip( Math.round(dz(gp.axes[2] || 0) * 127));
     state.rhy = clip(-Math.round(dz(gp.axes[3] || 0) * 127));
+    syncPadVisuals(true);
     let buttons = 0, flags = 0;
     if (gp.buttons[0]?.pressed) buttons |= (1 << 0);   // A → curl
     if (gp.buttons[1]?.pressed) buttons |= (1 << 1);   // B → dump
@@ -498,12 +531,15 @@
       state.lhx = state.lhy = state.rhx = state.rhy = 0;
       state.buttons = 0;
       state.flags = 0;
+      syncPadVisuals(false);
+      syncButtonVisuals(0);
       return;
     }
     // Refresh hold-to-track edge memory for the buttons we report by level.
     [0, 1, 2, 3, 5].forEach(i => { prevButtons[i] = !!gp.buttons[i]?.pressed; });
     state.buttons = (buttons | screenButtons) & 0xFFFF;
     state.flags   = (flags | screenFlags) & 0xFF;
+    syncButtonVisuals(state.buttons);
   }
   setInterval(pollGamepad, 20);   // 50 Hz
   window.addEventListener('gamepadconnected',    pollGamepad);
