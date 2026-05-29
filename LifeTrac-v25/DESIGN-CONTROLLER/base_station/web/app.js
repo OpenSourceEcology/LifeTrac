@@ -246,11 +246,18 @@
       ctx.beginPath(); ctx.arc(cx + hx, cy + hy, 28, 0, Math.PI * 2); ctx.fill();
     }
     function setFromAxes(ax, ay, isActive) {
+      if (!isActive) {
+        hx = 0;
+        hy = 0;
+        active = false;
+        draw();
+        return;
+      }
       const nx = Math.max(-1, Math.min(1, (ax || 0) / 127));
       const ny = Math.max(-1, Math.min(1, (ay || 0) / 127));
       hx = nx * radius;
       hy = -ny * radius;
-      active = !!isActive && (hx !== 0 || hy !== 0);
+      active = (hx !== 0 || hy !== 0);
       draw();
     }
 
@@ -291,16 +298,16 @@
   // ----- Button strip -----
   let screenButtons = 0;
   let screenFlags = 0;
-  const buttonElsByBit = {};
+  const buttonVisuals = [];
   function syncButtonVisuals(mask) {
-    Object.keys(buttonElsByBit).forEach((bit) => {
-      buttonElsByBit[bit].classList.toggle('active', !!(mask & (1 << bit)));
+    buttonVisuals.forEach(({ el, maskBit }) => {
+      el.classList.toggle('active', !!(mask & maskBit));
     });
   }
   document.querySelectorAll('button[data-btn]').forEach(btn => {
     const idx = parseInt(btn.dataset.btn, 10);
     const bit = 1 << idx;
-    buttonElsByBit[idx] = btn;
+    buttonVisuals.push({ el: btn, maskBit: bit });
     const set = (down) => {
       if (controlsLocked) return;
       if (down) screenButtons |= bit; else screenButtons &= ~bit;
