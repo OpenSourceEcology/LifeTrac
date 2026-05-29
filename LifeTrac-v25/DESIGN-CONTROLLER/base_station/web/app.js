@@ -25,6 +25,8 @@
     buttons: 0,    // bitmap: bit0 curl, bit1 dump, bit2 aux1, bit3 aux2, bit6 mode, bit7 takectl
     flags: 0,      // bit0 takectl_held
   };
+  let gamepadActive = false;
+  let gamepadButtonsMask = 0;
 
   // ----- WebSockets -----
   const wsCtrl = new WebSocket(`ws://${location.host}/ws/control`);
@@ -115,6 +117,10 @@
       state.lhx = state.lhy = state.rhx = state.rhy = 0;
       state.buttons = 0;
       state.flags = 0;
+      syncPadVisuals(false);
+      syncButtonVisuals(0);
+    } else {
+      syncButtonVisuals(state.buttons);
     }
     if (lastSource !== null && lastSource !== source) {
       playHandoffAudioCue(source);
@@ -469,7 +475,6 @@
   }
 
   // ----- USB Gamepad -----
-  let gamepadActive = false;
   // Edge-detection memory for momentary actions (E-stop, etc.). Without this
   // the 50 Hz poll would re-fire fetch('/api/estop') every 20 ms while the
   // operator holds START — DoSing the server and re-latching the fault.
@@ -487,6 +492,7 @@
     if (!gp) {
       if (gamepadActive) {
         gamepadActive = false;
+        gamepadButtonsMask = 0;
         pill.textContent = 'no gamepad';
         pill.classList.remove('on');
         for (const k in prevButtons) prevButtons[k] = false;
@@ -516,6 +522,7 @@
     if (gp.buttons[2]?.pressed) buttons |= (1 << 2);   // X → aux1
     if (gp.buttons[3]?.pressed) buttons |= (1 << 3);   // Y → aux2
     if (gp.buttons[5]?.pressed) { buttons |= (1 << 7); flags |= 0x01; } // RB → take-control
+    gamepadButtonsMask = buttons;
     // E-stop: rising edge only.
     if (pressed(gp, 9)) {
       fetch('/api/estop', { method: 'POST' });
