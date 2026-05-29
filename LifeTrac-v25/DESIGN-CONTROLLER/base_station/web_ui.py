@@ -7,8 +7,40 @@ support via the browser Gamepad API. Pushes ControlFrames to lora_bridge.py
 through MQTT (`lifetrac/v25/cmd/control`) at 20 Hz, and streams telemetry to
 the page over a WebSocket.
 
-Run:
+Run (plain HTTP — LAN only):
     uvicorn web_ui:app --host 0.0.0.0 --port 8080
+
+HTTPS / PWA setup
+-----------------
+Progressive Web App features (service worker, Add-to-Home-Screen, offline
+caching) require a secure origin — HTTPS or http://localhost.  On a LAN
+the practical options are:
+
+1. Self-signed certificate (recommended for a private base station):
+
+    # Generate a self-signed cert valid for 365 days:
+    openssl req -x509 -newkey rsa:2048 -nodes \\
+        -keyout key.pem -out cert.pem -days 365 \\
+        -subj "/CN=lifetrac-base" \\
+        -addext "subjectAltName=IP:<BASE_STATION_IP>,DNS:localhost"
+
+    # Run uvicorn with TLS:
+    uvicorn web_ui:app --host 0.0.0.0 --port 8443 \\
+        --ssl-keyfile key.pem --ssl-certfile cert.pem
+
+    Browsers will warn about the self-signed cert; add an exception once.
+    Android / iOS require installing the cert as a trusted CA to dismiss
+    the warning permanently.
+
+2. Reverse-proxy with TLS (nginx, Caddy, Traefik):
+    Put the proxy in front on port 443; the proxy forwards to this server
+    on port 8080.  Caddy with ``tls internal`` issues a locally-trusted
+    cert automatically if the `mkcert` root CA is installed on client devices.
+
+3. localhost access only:
+    If the operator tablet is the base-station device itself, access via
+    http://localhost:8080 — browsers treat localhost as a secure origin and
+    will register the service worker even over plain HTTP.
 """
 
 from __future__ import annotations
@@ -19,6 +51,7 @@ import json
 import logging
 import os
 import secrets
+import socket
 import subprocess
 import threading
 import time
@@ -28,7 +61,7 @@ from typing import Any
 
 import paho.mqtt.client as mqtt
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
@@ -134,6 +167,86 @@ class ParamsBody(BaseModel):
         return v
 
 WEB_DIR = Path(__file__).parent / "web"
+
+# ---- HTTPS bootstrap config ----------------------------------------------
+# Path to the TLS public certificate so the /cert.pem endpoint can serve it
+# to client devices for installation.  Only the *public* cert is ever served;
+# the private key is never exposed.  Set LIFETRAC_TLS_CERT to override the
+# default path.  The server itself does not manage TLS — TLS termination is
+# done by uvicorn's --ssl-certfile argument.
+CERT_PATH = Path(
+    os.environ.get(
+        "LIFETRAC_TLS_CERT",
+        str(Path("/etc/lifetrac/cert.pem")),
+    )
+)
+# Path to the TLS private key.  Never served over the network.  Used only by
+# the auto-generation logic on first boot.  Set LIFETRAC_TLS_KEY to override.
+KEY_PATH = Path(
+    os.environ.get(
+        "LIFETRAC_TLS_KEY",
+        str(Path("/etc/lifetrac/key.pem")),
+    )
+)
+# Port on which uvicorn is listening with TLS.  Used only for the /setup
+# page to build the "Open HTTPS site" link.
+HTTPS_PORT = int(os.environ.get("LIFETRAC_HTTPS_PORT", "8443"))
+# Validity period for the auto-generated self-signed certificate (days).
+CERT_VALIDITY_DAYS = 3650  # ~10 years; long-lived for embedded device use
+
+
+def _ensure_self_signed_cert() -> None:
+    """Generate a self-signed TLS cert+key on first boot if neither exists.
+
+    Writes to CERT_PATH / KEY_PATH (defaulting to /etc/lifetrac/).  Does
+    nothing when either file already exists so operator-supplied certs are
+    never overwritten.  Logs a warning and returns silently when ``openssl``
+    is not available so the server still starts without TLS.
+    """
+    if CERT_PATH.is_file() or KEY_PATH.is_file():
+        return
+    try:
+        hostname = socket.gethostname()
+    except Exception:
+        hostname = "lifetrac-base"
+    try:
+        CERT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(
+            [
+                "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+                "-keyout", str(KEY_PATH),
+                "-out", str(CERT_PATH),
+                "-days", str(CERT_VALIDITY_DAYS),
+                "-subj", f"/CN={hostname}",
+                "-addext", f"subjectAltName=DNS:{hostname},DNS:localhost",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            try:
+                os.chmod(KEY_PATH, 0o600)
+            except OSError:
+                pass  # best-effort; FAT or non-POSIX filesystem
+            logging.info(
+                "auto-generated self-signed TLS cert at %s (CN=%s)",
+                CERT_PATH, hostname,
+            )
+        else:
+            logging.warning(
+                "openssl cert generation failed (rc=%d): %s",
+                result.returncode, result.stderr.strip(),
+            )
+    except FileNotFoundError:
+        logging.warning(
+            "openssl not found — skipping auto-cert generation. "
+            "Install openssl or generate %s / %s manually.",
+            CERT_PATH, KEY_PATH,
+        )
+    except Exception as exc:
+        logging.warning("auto-cert generation error: %s", exc)
 
 # ---- PIN auth (MASTER_PLAN.md §8.5 / DECISIONS.md D-E1) -----------------
 # Single shared PIN, LAN-only, plain HTTP for v25. Telemetry views are public;
@@ -743,6 +856,97 @@ def _maybe_capture_params(topic: str, data: Any) -> None:
 @app.on_event("startup")
 async def _startup():
     app.state.loop = asyncio.get_event_loop()
+    # Auto-generate a self-signed TLS cert on first boot if none exists.
+    # Runs in a thread so it doesn't block the event loop during openssl.
+    loop = app.state.loop
+    await loop.run_in_executor(None, _ensure_self_signed_cert)
+
+
+# ---- PWA: service worker and manifest at the root scope ----------------
+# The service worker MUST be served from the root path so that its scope
+# covers all pages (/, /login, /map, etc.).  Serving from /static/sw.js
+# would limit scope to /static/* which is useless for navigation caching.
+# The ``Service-Worker-Allowed`` response header explicitly grants the
+# full scope so browsers accept the registration even though the SW file
+# itself lives under /static/ conceptually.
+
+@app.get("/sw.js")
+async def service_worker():
+    """PWA service worker — served at root so scope covers all pages."""
+    content = (WEB_DIR / "sw.js").read_text(encoding="utf-8")
+    return Response(
+        content=content,
+        media_type="application/javascript",
+        headers={
+            # Allow the browser to register this SW for the full site scope.
+            "Service-Worker-Allowed": "/",
+            # Never cache the SW file itself; browsers need to see updates.
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+    )
+
+
+@app.get("/manifest.json")
+async def manifest():
+    """PWA web app manifest."""
+    content = (WEB_DIR / "manifest.json").read_text(encoding="utf-8")
+    return Response(
+        content=content,
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "max-age=86400"},
+    )
+
+
+@app.get("/cert.pem")
+async def download_cert():
+    """Serve the TLS public certificate for installation on client devices.
+
+    Intended for the HTTP bootstrap path: operator visits /setup over plain
+    HTTP, downloads cert.pem, installs it as a trusted CA, then navigates to
+    the HTTPS site.  Only the *public* certificate is served — the private key
+    (key.pem) is never exposed through this endpoint.
+
+    Returns 404 when no certificate has been generated yet, with a hint
+    directing the operator to run the openssl command documented in
+    BASE_STATION.md.
+    """
+    if not CERT_PATH.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "TLS certificate not found. "
+                "Generate one with openssl (see BASE_STATION.md § HTTPS / PWA setup) "
+                "then set LIFETRAC_TLS_CERT or place the file at "
+                f"{CERT_PATH}."
+            ),
+        )
+    content = CERT_PATH.read_bytes()
+    return Response(
+        content=content,
+        media_type="application/x-pem-file",
+        headers={
+            "Content-Disposition": 'attachment; filename="lifetrac-cert.pem"',
+            # Never cache — the cert may be regenerated at any time.
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@app.get("/setup", response_class=HTMLResponse)
+async def setup_page():
+    """HTTPS / cert bootstrap page — no session required.
+
+    Accessible over plain HTTP so an operator can download the TLS cert before
+    switching to the HTTPS site.  The page injects the HTTPS port (from
+    LIFETRAC_HTTPS_PORT) and cert availability flag so the client-side JS can
+    build the correct HTTPS URL and enable/disable the download button.
+    """
+    html = (WEB_DIR / "setup.html").read_text(encoding="utf-8")
+    cert_available = "true" if CERT_PATH.is_file() else "false"
+    # Inject server-side config into the JS placeholders before serving.
+    html = html.replace("__HTTPS_PORT__", str(HTTPS_PORT))
+    html = html.replace("__CERT_AVAILABLE__", cert_available)
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/", response_class=HTMLResponse)
