@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import secrets
+import shutil
 import subprocess
 import threading
 import time
@@ -583,79 +584,95 @@ def _decode_payload(topic: str, payload: bytes) -> Any:
 
 
 def _on_mqtt_message(_c, _u, msg):
-    # Image frames stream as raw bytes on a separate WS so we don't pay
-    # the JSON-encode cost on every fragment. The reassembled canvas is
-    # published by image_pipeline/reassemble.py on
-    # `lifetrac/v25/video/canvas` as a single WebP/PNG blob the browser
-    # can draw directly via createImageBitmap.
-    if msg.topic.endswith("/video/canvas"):
-        loop_img = getattr(app.state, "loop", None)
-        if loop_img is not None:
-            for ws in _snapshot_subscribers(image_subscribers):
-                fut = asyncio.run_coroutine_threadsafe(
-                    ws.send_bytes(msg.payload), loop_img
-                )
-                fut.add_done_callback(_ws_send_done("image"))
-        return
+    try:
+        # Image frames stream as raw bytes on a separate WS so we don't pay
+        # the JSON-encode cost on every fragment. The reassembled canvas is
+        # published by image_pipeline/reassemble.py on
+        # `lifetrac/v25/video/canvas` as a single WebP/PNG blob the browser
+        # can draw directly via createImageBitmap.
+        if msg.topic.endswith("/video/canvas"):
+            loop_img = getattr(app.state, "loop", None)
+            if loop_img is not None:
+                for ws in _snapshot_subscribers(image_subscribers):
+                    fut = asyncio.run_coroutine_threadsafe(
+                        ws.send_bytes(msg.payload), loop_img
+                    )
+                    fut.add_done_callback(_ws_send_done("image"))
+            return
 
-    # Bench-only compatibility path: some legacy bring-up scripts publish
-    # tile payloads on /cmd/image_frame. Keep this disabled by default so a
-    # local synthetic publisher cannot override the authoritative radio path.
-    allow_cmd_image = os.environ.get("LIFETRAC_ALLOW_CMD_IMAGE_FRAME", "").strip() == "1"
-    if msg.topic.endswith("/video/tile_delta") or (
-        allow_cmd_image and msg.topic.endswith("/cmd/image_frame")
-    ):
-        _ingest_tile_delta(bytes(msg.payload))
-        return
+        # Bench-only compatibility path: some legacy bring-up scripts publish
+        # tile payloads on /cmd/image_frame. Keep this disabled by default so a
+        # local synthetic publisher cannot override the authoritative radio path.
+        allow_cmd_image = os.environ.get("LIFETRAC_ALLOW_CMD_IMAGE_FRAME", "").strip() == "1"
+        if msg.topic.endswith("/video/tile_delta") or (
+            allow_cmd_image and msg.topic.endswith("/cmd/image_frame")
+        ):
+            _ingest_tile_delta(bytes(msg.payload))
+            return
 
-    data = _decode_payload(msg.topic, msg.payload)
-    if msg.topic.endswith("/source_active"):
-        candidate = None
-        if isinstance(data, dict):
-            candidate = _source_name(data.get("active_source"))
-        else:
-            candidate = _source_name(data)
-        if candidate is not None:
-            _set_active_source(candidate)
-    maybe_capture = globals().get("_maybe_capture_params")
-    if callable(maybe_capture):
-        maybe_capture(msg.topic, data)
+        data = _decode_payload(msg.topic, msg.payload)
+        if msg.topic.endswith("/source_active"):
+            candidate = None
+            if isinstance(data, dict):
+                candidate = _source_name(data.get("active_source"))
+            else:
+                candidate = _source_name(data)
+            if candidate is not None:
+                _set_active_source(candidate)
+        maybe_capture = globals().get("_maybe_capture_params")
+        if callable(maybe_capture):
+            maybe_capture(msg.topic, data)
 
-    # S7.1 LINK-pill cross-process glue: forward the per-direction
-    # adapter snapshot published by lora_bridge._airtime_worker on
-    # `lifetrac/v25/control/link_power/{direction}` into the
-    # StatePublisher so /ws/state carries it to map.js. Bridge and
-    # web_ui are separate processes (they share only the broker), so
-    # this MQTT subscription is the seam — there is no in-process
-    # object handoff. Refusal-on-bad-payload: silently drop anything
-    # that isn't a dict on a known direction, per §6.1.
-    if msg.topic.startswith("lifetrac/v25/control/link_power/"):
-        direction = msg.topic.rsplit("/", 1)[-1]
-        if direction in ("uplink", "downlink") and isinstance(data, dict):
-            try:
-                _image_publisher.link_power[direction] = data
-            except Exception:
-                pass
+        # S7.1 LINK-pill cross-process glue: forward the per-direction
+        # adapter snapshot published by lora_bridge._airtime_worker on
+        # `lifetrac/v25/control/link_power/{direction}` into the
+        # StatePublisher so /ws/state carries it to map.js. Bridge and
+        # web_ui are separate processes (they share only the broker), so
+        # this MQTT subscription is the seam — there is no in-process
+        # object handoff. Refusal-on-bad-payload: silently drop anything
+        # that isn't a dict on a known direction, per §6.1.
+        if msg.topic.startswith("lifetrac/v25/control/link_power/"):
+            direction = msg.topic.rsplit("/", 1)[-1]
+            if direction in ("uplink", "downlink") and isinstance(data, dict):
+                try:
+                    _image_publisher.link_power[direction] = data
+                except Exception:
+                    pass
 
-    payload = {"topic": msg.topic, "data": data}
-    loop = getattr(app.state, "loop", None)
-    if loop is None:
-        return
-    for ws in _snapshot_subscribers(telemetry_subscribers):
-        fut = asyncio.run_coroutine_threadsafe(
-            ws.send_text(json.dumps(payload)), loop
-        )
-        fut.add_done_callback(_ws_send_done("telemetry"))
+        payload = {"topic": msg.topic, "data": data}
+        loop = getattr(app.state, "loop", None)
+        if loop is None:
+            return
+        for ws in _snapshot_subscribers(telemetry_subscribers):
+            fut = asyncio.run_coroutine_threadsafe(
+                ws.send_text(json.dumps(payload)), loop
+            )
+            fut.add_done_callback(_ws_send_done("telemetry"))
+    except Exception:
+        # Keep the Paho loop thread alive even if one payload is malformed.
+        logging.exception("web_ui: mqtt callback crashed for topic %s", getattr(msg, "topic", "?"))
+
+
+def _subscribe_mqtt_topics() -> None:
+    mqtt_client.subscribe("lifetrac/v25/telemetry/#")
+    mqtt_client.subscribe("lifetrac/v25/status/#")
+    mqtt_client.subscribe("lifetrac/v25/video/#")
+    mqtt_client.subscribe("lifetrac/v25/control/#")
+    if os.environ.get("LIFETRAC_ALLOW_CMD_IMAGE_FRAME", "").strip() == "1":
+        mqtt_client.subscribe("lifetrac/v25/cmd/image_frame")
+    mqtt_client.subscribe("lifetrac/v25/params/changed")
+
+
+def _on_mqtt_connect(_c, _u, _flags, rc):
+    if rc == 0:
+        _subscribe_mqtt_topics()
+    else:
+        logging.warning("mqtt: connect callback rc=%s", rc)
 
 
 mqtt_client.on_message = _on_mqtt_message
-mqtt_client.subscribe("lifetrac/v25/telemetry/#")
-mqtt_client.subscribe("lifetrac/v25/status/#")
-mqtt_client.subscribe("lifetrac/v25/video/#")
-mqtt_client.subscribe("lifetrac/v25/control/#")
-if os.environ.get("LIFETRAC_ALLOW_CMD_IMAGE_FRAME", "").strip() == "1":
-    mqtt_client.subscribe("lifetrac/v25/cmd/image_frame")
-mqtt_client.subscribe("lifetrac/v25/params/changed")
+mqtt_client.on_connect = _on_mqtt_connect
+_subscribe_mqtt_topics()
 
 
 # ---- image-pipeline state publisher (bucket A wiring) ------------------
@@ -1059,7 +1076,28 @@ async def estop(_session: str = Depends(_require_session)):
 def _run_bench_radio_script(mode: str) -> dict[str, Any]:
     helper_dir = (Path(__file__).resolve().parent / ".." /
                   "firmware" / "x8_lora_bootloader_helper").resolve()
-    script_name = "run_radio_sleep.ps1" if mode == "sleep" else "run_radio_wake_rxcont.ps1"
+    use_powershell = shutil.which("powershell") is not None
+    if use_powershell:
+        script_name = "run_radio_sleep.ps1" if mode == "sleep" else "run_radio_wake_rxcont.ps1"
+        cmd = [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+        ]
+    else:
+        script_name = "radio_sleep.py" if mode == "sleep" else "w2_02_radio_wake_rxcont.py"
+        py = shutil.which("python3") or shutil.which("python")
+        if py is None:
+            return {
+                "ok": False,
+                "mode": mode,
+                "error": "bench radio helper unavailable: python3/python not found",
+                "returncode": -1,
+                "output_tail": [],
+            }
+        cmd = [py]
     script_path = helper_dir / script_name
     if not script_path.exists():
         return {
@@ -1069,15 +1107,7 @@ def _run_bench_radio_script(mode: str) -> dict[str, Any]:
             "returncode": -1,
             "output_tail": [],
         }
-
-    cmd = [
-        "powershell",
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        str(script_path),
-    ]
+    cmd.append(str(script_path))
     try:
         proc = subprocess.run(
             cmd,
@@ -1101,6 +1131,14 @@ def _run_bench_radio_script(mode: str) -> dict[str, Any]:
             "mode": mode,
             "returncode": 124,
             "error": "bench radio helper timed out",
+            "output_tail": [],
+        }
+    except OSError as exc:
+        return {
+            "ok": False,
+            "mode": mode,
+            "returncode": -1,
+            "error": f"bench radio helper launch failed: {exc}",
             "output_tail": [],
         }
 
