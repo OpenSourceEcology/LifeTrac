@@ -378,3 +378,36 @@ Once the image-pipeline byte budget was settled, eight inconsistencies and weakn
 
 The optional Coral Edge TPU is gated by a single operator master switch in the base-station web UI (Settings panel) and persisted to `/var/lib/lifetrac/base_settings.json` via [`base_station/settings_store.py`](base_station/settings_store.py). The dispatchers in [`base_station/image_pipeline/superres.py`](base_station/image_pipeline/superres.py) and [`base_station/image_pipeline/detect.py`](base_station/image_pipeline/detect.py) call `accel.is_active()` per inference, so the toggle and hot-unplug both take effect within one frame. Three-level state (`present` / `usable` / `enabled`) is exposed via `GET /api/settings/accel`; see [`CORAL.md`](CORAL.md) for the operator workflow and the four pill states.
 
+---
+
+## 15. Operational recovery record
+
+This project is routinely repaired inside Docker containers on the two Portenta X8 boards. Keep the live runtime and the docs aligned so a hard reset does not lose the recovery path.
+
+Containers to remember:
+
+- Tractor camera: `tractor-camera-v2`
+- Tractor image TX: `tractor-image-tx-v2`
+- Tractor MQTT: `tractor-mosquitto-v2`
+- Base UI: `design-controller-web_ui-1`
+- Base image RX: `design-controller-image_rx-1`
+- Base MQTT: `design-controller-mosquitto-1`
+
+Files used during the last recovery passes:
+
+- [`firmware/tractor_x8/camera_service.py`](firmware/tractor_x8/camera_service.py)
+- [`base_station/image_rx_daemon.py`](base_station/image_rx_daemon.py)
+- [`base_station/web_ui.py`](base_station/web_ui.py)
+- [`base_station/web/app.js`](base_station/web/app.js)
+- [`base_station/web/index.html`](base_station/web/index.html)
+
+Common Docker commands used on the X8s:
+
+- `docker ps --format 'table {{.Names}}\t{{.Status}}'`
+- `docker logs --tail <N> <container>`
+- `docker inspect <container> --format '{{json .Mounts}}'`
+- `docker cp /tmp/<file> <container>:/path/in/container`
+- `docker restart <container>`
+
+If you need the detailed symptom-to-fix trace, see [2026-05-29 Tile Update Stall: Method C Priority Under Tight Budget](../AI%20NOTES/2026-05-29_Tile_Update_Stall_MethodC_Priority.md).
+
