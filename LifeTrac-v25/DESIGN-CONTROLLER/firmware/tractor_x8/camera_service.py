@@ -173,7 +173,8 @@ class LibcameraCamera:
         return arr.tobytes()
 
 
-LIFETRAC_CAMERA_DESHAKE = os.environ.get("LIFETRAC_CAMERA_DESHAKE", "1") == "1"
+_default_deshake = "0" if USE_LORA_BRIDGE else "1"
+LIFETRAC_CAMERA_DESHAKE = os.environ.get("LIFETRAC_CAMERA_DESHAKE", _default_deshake) == "1"
 
 
 def build_ffmpeg_argv(device: str = V4L2_DEVICE,
@@ -181,6 +182,7 @@ def build_ffmpeg_argv(device: str = V4L2_DEVICE,
                       input_size: str = V4L2_INPUT_SIZE,
                       input_fps: int = V4L2_INPUT_FPS,
                       ffmpeg_path: str = FFMPEG_PATH,
+                      output_fps: float = TARGET_FPS,
                       canvas_w: int = CANVAS_W,
                       canvas_h: int = CANVAS_H) -> list[str]:
     """Argv for the bench-validated USB-camera capture pipeline.
@@ -198,7 +200,10 @@ def build_ffmpeg_argv(device: str = V4L2_DEVICE,
     Pure helper so the unit tests can pin the argv shape without spawning
     a subprocess.
     """
-    scale_filter = f"scale={canvas_w}:{canvas_h}"
+    # Keep capture latency bounded: emit at the same rate the encoder loop
+    # consumes so ffmpeg stdout does not accumulate stale rawvideo frames.
+    target_fps = max(0.1, float(output_fps))
+    scale_filter = f"fps={target_fps:g},scale={canvas_w}:{canvas_h}"
     if LIFETRAC_CAMERA_DESHAKE:
         scale_filter += ",deshake=open2=1:search=16"
 
@@ -209,6 +214,11 @@ def build_ffmpeg_argv(device: str = V4L2_DEVICE,
         "-input_format", input_format,
         "-video_size", input_size,
         "-framerate", str(int(input_fps)),
+        "-thread_queue_size", "2",
+        "-fflags", "nobuffer",
+        "-flags", "low_delay",
+        "-analyzeduration", "0",
+        "-probesize", "32",
         "-i", device,
         "-vf", scale_filter,
         "-pix_fmt", "rgb24",
@@ -579,16 +589,23 @@ class FrameAccum:
 #   C  Method B + rotating fair-share sweep: each P-frame promotes
 #      ``LIFETRAC_SWEEP_STEP`` of the longest-unsent tiles into the
 #      changed bitmap so a still scene still converges to full coverage.
-IMAGE_METHOD = os.environ.get("LIFETRAC_IMAGE_METHOD", "A").strip().upper()
+# Default selection:
+#   * LoRa-bridge mode: Method C so we keep emitting useful tile deltas even
+#     when scene motion is low/noisy and avoid long runs of empty 9-byte P-frames.
+#   * Non-bridge mode: preserve legacy Method A behaviour unless explicitly set.
+_default_image_method = "C" if USE_LORA_BRIDGE else "A"
+IMAGE_METHOD = os.environ.get("LIFETRAC_IMAGE_METHOD", _default_image_method).strip().upper()
 if IMAGE_METHOD not in ("A", "B", "C"):
-    LOG.warning("LIFETRAC_IMAGE_METHOD=%r unknown; falling back to A", IMAGE_METHOD)
-    IMAGE_METHOD = "A"
+    LOG.warning("LIFETRAC_IMAGE_METHOD=%r unknown; falling back to %s",
+                IMAGE_METHOD, _default_image_method)
+    IMAGE_METHOD = _default_image_method
 
 # Method B/C: L1-magnitude floor (sum of |cur-prev| over the 32×32×3 RGB
-# tile). Set ≈ 8000 to filter typical sensor noise (~3072 pixels × ~2.5
-# levels) while catching real motion (~25k+). 0 disables the floor.
+# tile). In LoRa-bridge mode keep a low-but-nonzero default: high values can
+# misclassify slow real motion as static and make the UI appear frozen.
+_default_tile_mag_min = "4000" if USE_LORA_BRIDGE else "8000"
 TILE_MAGNITUDE_MIN = max(0, int(os.environ.get(
-    "LIFETRAC_TILE_MAGNITUDE_MIN", "8000")))
+    "LIFETRAC_TILE_MAGNITUDE_MIN", _default_tile_mag_min)))
 
 # Method C: how many "stale" tiles to force into each P-frame's changed
 # bitmap. With SWEEP_STEP=2 and a 1 fps loop, a static 96-tile canvas
@@ -626,22 +643,29 @@ def _compute_link_bytes(n_fragments: int, profile_name: str) -> int | None:
     """Resolve ``(n_fragments, profile_name)`` -> byte cap, or ``None``."""
     if n_fragments <= 0:
         return None
+    # Conservative fallback used when protocol helpers are unavailable in a
+    # stripped runtime image: keep payload small enough to preserve recency.
+    fallback_bytes = n_fragments * 40
     try:
         from image_pipeline.fragment import max_payload_for_n_fragments
         from lora_proto import PHY_BY_NAME
     except Exception:                                         # pragma: no cover
-        return None
+        return fallback_bytes
     profile = PHY_BY_NAME.get(profile_name)
     if profile is None:
-        return None
+        return fallback_bytes
     try:
         return max_payload_for_n_fragments(n_fragments, profile=profile)
     except Exception:                                         # pragma: no cover
-        return None
+        return fallback_bytes
 
 
 def _resolve_byte_budget() -> int | None:
     raw = os.environ.get("LIFETRAC_FRAGMENT_BUDGET", "").strip()
+    if not raw and USE_LORA_BRIDGE:
+        # Keep bridge mode responsive by default: cap each frame to a
+        # LoRa-friendly fragment budget unless the unit file overrides it.
+        raw = os.environ.get("LIFETRAC_FRAGMENT_BUDGET_BRIDGE_DEFAULT", "12").strip()
     if not raw:
         return None
     try:
@@ -843,14 +867,12 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
         # every 10 s. tile_last_seq=0 → never shipped → wins first.
         priority.sort(key=lambda t: (t[0], accum.tile_last_seq[t[1]], t[1]))
     elif IMAGE_METHOD in ("B", "C") and not is_key:
-        # IP-PlanRev Method C fairness fix: sweep-injected tiles have
-        # magnitude≈0 (that's why they're stale) so a pure -magnitude
-        # sort drops them every frame, defeating the rotation. Tier 0 =
-        # sweep (always wins its slot), tier 1 = motion (competes within
-        # the remaining budget by -magnitude).
+        # Under tight byte budgets, sweep-first ordering can starve true
+        # motion (the sweep tiles are often static and consume all slots).
+        # Keep sweep as a fallback, but send measured motion first.
         priority.sort(key=lambda t: (
             t[0],
-            0 if t[1] in sweep_indices else 1,
+            1 if t[1] in sweep_indices else 0,
             -magnitudes[t[1]],
             t[1],
         ))
@@ -1144,6 +1166,11 @@ def main() -> None:
 
     period = 1.0 / max(TARGET_FPS, 0.1)
     next_t = time.monotonic()
+    frame_health_log = os.environ.get("LIFETRAC_CAMERA_HEALTH_LOG", "").strip() == "1"
+    frame_health_every_s = max(1.0, float(os.environ.get("LIFETRAC_CAMERA_HEALTH_EVERY_S", "2")))
+    _last_health_t = 0.0
+    _last_canvas_sig: int | None = None
+    _same_canvas_run = 0
     while True:
         force = force_key_evt.is_set()
         force_key_evt.clear()
@@ -1152,6 +1179,18 @@ def main() -> None:
                                    roi_planner=roi_planner,
                                    byte_budget=link_budget.bytes,
                                    encode_cache=encode_cache)
+            if frame_health_log and accum.last_canvas is not None:
+                sig = hash(accum.last_canvas[:4096])
+                if _last_canvas_sig is not None and sig == _last_canvas_sig:
+                    _same_canvas_run += 1
+                else:
+                    _same_canvas_run = 0
+                now_h = time.monotonic()
+                if (now_h - _last_health_t) >= frame_health_every_s:
+                    LOG.info("camera_service: frame_health same_run=%d sig=%s fps=%.2f",
+                             _same_canvas_run, sig, TARGET_FPS)
+                    _last_health_t = now_h
+                _last_canvas_sig = sig
             # Primary: UART to the M7 (length-framed). Skipped under the
             # LoRa-bridge path; image_tx_daemon picks up the same payload
             # over MQTT and feeds the L072 HostLink directly.

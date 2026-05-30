@@ -29,10 +29,44 @@
   let gamepadButtonsMask = 0;
 
   // ----- WebSockets -----
-  const wsCtrl = new WebSocket(`ws://${location.host}/ws/control`);
-  const wsTele = new WebSocket(`ws://${location.host}/ws/telemetry`);
   const linkEl = document.getElementById('link-status');
   let controlsLocked = false;
+
+  // ----- WebSockets -----
+  // wsCtrl auto-reconnects on close so a transient server restart or
+  // cap-rejection doesn't permanently break the control link.
+  let wsCtrl = null;
+  let wsCtrlReconnectTimer = null;
+  let wsCtrlReconnectDelayMs = 1000;
+
+  function connectCtrl() {
+    if (wsCtrlReconnectTimer) { clearTimeout(wsCtrlReconnectTimer); wsCtrlReconnectTimer = null; }
+    wsCtrl = new WebSocket(`ws://${location.host}/ws/control`);
+    wsCtrl.addEventListener('open', () => {
+      linkEl.textContent = 'link: connected';
+      wsCtrlReconnectDelayMs = 1000;
+    });
+    wsCtrl.addEventListener('close', () => {
+      linkEl.textContent = 'link: DISCONNECTED';
+      if (!wsCtrlReconnectTimer) {
+        wsCtrlReconnectTimer = setTimeout(() => { wsCtrlReconnectTimer = null; connectCtrl(); }, wsCtrlReconnectDelayMs);
+        wsCtrlReconnectDelayMs = Math.min(10000, wsCtrlReconnectDelayMs * 2);
+      }
+    });
+    wsCtrl.addEventListener('error', () => {
+      linkEl.textContent = 'link: error';
+      try { wsCtrl.close(); } catch(_) {}
+    });
+    attachCtrlListeners(wsCtrl);
+  }
+
+  function attachCtrlListeners(ws) {
+    ws.addEventListener('message', (ev) => {
+      // Control socket receives no messages currently; reserved for ACK/telemetry.
+    });
+  }
+
+  const wsTele = new WebSocket(`ws://${location.host}/ws/telemetry`);
 
   function normalizeSource(value) {
     if (typeof value === 'string') return value.toLowerCase();
@@ -140,9 +174,8 @@
     if ('encode_mode' in data) document.getElementById('t-encode').textContent = String(data.encode_mode).toLowerCase();
   }
 
-  wsCtrl.addEventListener('open',  () => linkEl.textContent = 'link: connected');
-  wsCtrl.addEventListener('close', () => linkEl.textContent = 'link: DISCONNECTED');
-  wsCtrl.addEventListener('error', () => linkEl.textContent = 'link: error');
+  // Kick off the initial control WebSocket (auto-reconnects on close).
+  connectCtrl();
 
   // 20 Hz tx (server also rate-limits)
   setInterval(() => {
@@ -413,15 +446,30 @@
   // lifetrac/v25/control/safe_mode_active) replaces the label with a
   // red flashing "SAFE: mono_g4" until the link recovers.
   const encPill = document.getElementById('encode-mode-pill');
+  const encMeta = {
+    auto: { label: 'Auto', desc: 'airtime-driven ladder picks' },
+    full: { label: 'Full color', desc: 'baseline RGB WebP' },
+    y_only: { label: 'Y-only WebP', desc: 'luma only, recolor at base' },
+    motion_only: { label: 'Motion-only gray', desc: 'pure grayscale with quality cap for bandwidth' },
+    btc4_per_tile: { label: 'BTC4 / tile', desc: '4-level per-tile palette' },
+    btc4_per_frame: { label: 'BTC4 / frame', desc: '4-level per-frame palette' },
+    mono_g4: { label: 'Mono / G4', desc: '1-bit dither + Group-4 fax' },
+    adaptive: { label: 'Adaptive', desc: 'per-tile heuristic, falls back to Mono / G4' },
+  };
   let encSafeMode = false;
   let encCurrentMode = 'auto';
   function _renderEncPill() {
     if (!encPill) return;
     if (encSafeMode) {
       encPill.textContent = 'SAFE: mono_g4';
+      encPill.title = 'Safe mode: Mono / G4 floor until the link recovers';
       encPill.classList.add('safe');
     } else {
-      encPill.textContent = `enc: ${encCurrentMode} \u25B8`;
+      const meta = encMeta[encCurrentMode] || { label: encCurrentMode, desc: '' };
+      encPill.textContent = `enc: ${meta.label} \u25B8`;
+      encPill.title = meta.desc
+        ? `${meta.label} — ${meta.desc}`
+        : `Current encode mode: ${encCurrentMode}`;
       encPill.classList.remove('safe');
     }
   }

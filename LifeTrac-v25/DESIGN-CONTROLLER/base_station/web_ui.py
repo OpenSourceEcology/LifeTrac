@@ -91,13 +91,14 @@ class AccelToggleBody(BaseModel):
 # Allowed values for POST /api/settings/encode_mode. Mirrors
 # ``lora_proto.EncodeMode`` names (lower-case) plus the sentinel
 # ``"auto"`` which clears the operator pin and hands control back to
-# the airtime-driven ladder. ``motion_only`` / ``wireframe`` are legacy
-# slots intentionally excluded from the operator UI; they remain on the
-# wire for backward compatibility but the operator cannot pin them.
+# the airtime-driven ladder. ``wireframe`` remains excluded from the
+# operator UI; it's kept on-wire for backward compatibility but not
+# surfaced in the bench controls.
 _ENCODE_MODE_UI_CHOICES = (
     "auto",
     "full",
     "y_only",
+    "motion_only",
     "btc4_per_tile",
     "btc4_per_frame",
     "mono_g4",
@@ -108,7 +109,7 @@ _ENCODE_MODE_UI_CHOICES = (
 class EncodeModeBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     mode: str = Field(...,
-                      pattern=r"^(auto|full|y_only|btc4_per_tile|"
+                      pattern=r"^(auto|full|y_only|motion_only|btc4_per_tile|"
                               r"btc4_per_frame|mono_g4|adaptive)$")
 
 
@@ -475,7 +476,7 @@ def _snapshot_subscribers(pool: set[WebSocket]) -> list[WebSocket]:
 # connections"), modelled after HTTP 429.
 MAX_TELEMETRY_SUBSCRIBERS = 8
 MAX_IMAGE_SUBSCRIBERS     = 4
-MAX_STATE_SUBSCRIBERS     = 4
+MAX_STATE_SUBSCRIBERS     = 8
 # §B (Round 9): /ws/control was previously unbounded — flagged independently
 # by the second-pass GPT-5.3-Codex and Gemini reviews. Tractor-side replay
 # windows already gate by source_id, but at the WS layer an attacker that
@@ -1680,6 +1681,7 @@ _ENCODE_MODE_CYCLE_ORDER: tuple[str, ...] = (
     "auto",
     "full",
     "y_only",
+    "motion_only",
     "mono_g4",
 )
 
