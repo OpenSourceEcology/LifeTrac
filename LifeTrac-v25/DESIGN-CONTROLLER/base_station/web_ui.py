@@ -88,29 +88,25 @@ class AccelToggleBody(BaseModel):
     enabled: bool
 
 
-# Allowed values for POST /api/settings/encode_mode. Mirrors
-# ``lora_proto.EncodeMode`` names (lower-case) plus the sentinel
-# ``"auto"`` which clears the operator pin and hands control back to
-# the airtime-driven ladder. ``wireframe`` remains excluded from the
-# operator UI; it's kept on-wire for backward compatibility but not
-# surfaced in the bench controls.
+# Allowed values for POST /api/settings/encode_mode. This list is explicit
+# operator-selected methods only; there is no auto ladder mode in the UI.
+# ``wireframe`` remains excluded from the operator UI; it's kept on-wire for
+# backward compatibility but not surfaced in the bench controls.
 _ENCODE_MODE_UI_CHOICES = (
-    "auto",
     "full",
     "y_only",
     "motion_only",
     "btc4_per_tile",
     "btc4_per_frame",
     "mono_g4",
-    "adaptive",
 )
 
 
 class EncodeModeBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     mode: str = Field(...,
-                      pattern=r"^(auto|full|y_only|motion_only|btc4_per_tile|"
-                              r"btc4_per_frame|mono_g4|adaptive)$")
+              pattern=r"^(full|y_only|motion_only|btc4_per_tile|"
+                  r"btc4_per_frame|mono_g4)$")
 
 
 class BenchRadioBody(BaseModel):
@@ -217,18 +213,22 @@ ENCODE_MODE_STORE_PATH = Path(
     )
 )
 _ENCODE_MODE_TOPIC = "lifetrac/v25/control/encode_mode_override"
+_encode_mode_runtime_lock = threading.Lock()
+_encode_mode_runtime_override = "full"
 
 
 def _load_encode_mode_override() -> str:
-    """Return the persisted mode name, defaulting to ``"auto"`` (no pin)."""
+    """Return persisted mode name, defaulting to ``"full"``."""
     try:
         if ENCODE_MODE_STORE_PATH.exists():
             val = ENCODE_MODE_STORE_PATH.read_text(encoding="utf-8").strip()
+            if val == "auto":
+                return "full"
             if val in _ENCODE_MODE_UI_CHOICES:
                 return val
     except OSError as exc:
         logging.warning("encode_mode override file unreadable: %s", exc)
-    return "auto"
+    return "full"
 
 
 def _persist_encode_mode_override(mode: str) -> None:
@@ -238,6 +238,17 @@ def _persist_encode_mode_override(mode: str) -> None:
         ENCODE_MODE_STORE_PATH.suffix + ".tmp")
     tmp.write_text(mode + "\n", encoding="utf-8")
     os.replace(tmp, ENCODE_MODE_STORE_PATH)
+
+
+def _get_runtime_encode_mode_override() -> str:
+    with _encode_mode_runtime_lock:
+        return _encode_mode_runtime_override
+
+
+def _set_runtime_encode_mode_override(mode: str) -> None:
+    global _encode_mode_runtime_override
+    with _encode_mode_runtime_lock:
+        _encode_mode_runtime_override = mode
 
 _sessions: dict[str, float] = {}             # token -> last_used_ts
 _sessions_lock = threading.Lock()
@@ -398,6 +409,7 @@ mqtt_client.loop_start()
 # POST /api/settings/encode_mode.
 try:
     _initial_override = _load_encode_mode_override()
+    _set_runtime_encode_mode_override(_initial_override)
     mqtt_client.publish(_ENCODE_MODE_TOPIC,
                         json.dumps({"mode": _initial_override}),
                         retain=True, qos=0)
@@ -1641,16 +1653,12 @@ async def api_accel_refresh(_session: str = Depends(_require_session)):
     return _accel_get().refresh().to_dict()
 
 
-# ---- Encode-mode override (Phase 1 bench rotation) ---------------------
-# Operator-as-ceiling semantics per
-# AI NOTES/2026-05-25_Grayscale_Quantization_Encoding_Research_Copilot_v1_0.md:
-# the chosen mode caps the auto-fallback ladder; the airtime-driven
-# controller in lora_bridge may still demote BELOW the ceiling but never
-# above it. Pin "adaptive" disables auto-demote until the link goes
-# critical, then jumps to the floor (mono_g4).
+# ---- Encode-mode selection (manual operator control) ---------------------
+# The selected mode is applied directly by lora_bridge and remains active
+# until the operator selects a new mode.
 @app.get("/api/settings/encode_mode")
 async def api_encode_mode_get(_session: str = Depends(_require_session)):
-    """Return the persisted operator ceiling + the catalogue of choices
+    """Return the persisted operator-selected mode + available choices.
     the UI is allowed to surface.
     """
     return {
@@ -1659,18 +1667,31 @@ async def api_encode_mode_get(_session: str = Depends(_require_session)):
     }
 
 
+@app.get("/api/encode_mode/current")
+async def api_encode_mode_current(_session: str = Depends(_require_session)):
+    """Return the active runtime override used by pill/gamepad cycling.
+
+    This value intentionally does not persist to disk unless the operator
+    explicitly sets it in the Settings page.
+    """
+    return {
+        "current": _get_runtime_encode_mode_override(),
+        "choices": list(_ENCODE_MODE_UI_CHOICES),
+    }
+
+
 @app.post("/api/settings/encode_mode")
 async def api_encode_mode_set(body: EncodeModeBody,
                               _session: str = Depends(_require_session)):
-    """Set the operator-ceiling encode mode.
+    """Set the operator-selected encode mode.
 
     Persists to disk so the choice survives a web_ui restart, then
     publishes a retained JSON message on ``lifetrac/v25/control/
     encode_mode_override`` so the bridge applies it on the next tick.
-    The bridge handler (`lora_bridge._on_mqtt_message`) calls
-    ``EncodeModeController.set_operator_ceiling`` with the parsed mode.
+    The bridge handler (`lora_bridge._on_mqtt_message`) applies the
+    selected mode immediately.
     """
-    return _set_encode_mode_override(body.mode)
+    return _set_encode_mode_override(body.mode, persist=True)
 
 
 # Subset of `_ENCODE_MODE_UI_CHOICES` that the gamepad / pill cycle button
@@ -1678,58 +1699,66 @@ async def api_encode_mode_set(body: EncodeModeBody,
 # eyeball each mode change without having to step through legacy or
 # not-yet-implemented codecs. Order matches the on-screen pill rotation.
 _ENCODE_MODE_CYCLE_ORDER: tuple[str, ...] = (
-    "auto",
     "full",
     "y_only",
     "motion_only",
+    "btc4_per_tile",
+    "btc4_per_frame",
     "mono_g4",
 )
 
 
-def _set_encode_mode_override(mode: str) -> dict:
-    """Persist + publish an encode-mode operator-ceiling override.
+def _set_encode_mode_override(mode: str, *, persist: bool) -> dict:
+    """Set + publish an operator-selected encode mode.
 
     Shared by ``POST /api/settings/encode_mode`` and
-    ``POST /api/encode_mode/cycle`` so both endpoints stay in lock-step
-    on persistence semantics and the retained-topic payload shape.
+    ``POST /api/encode_mode/cycle`` while allowing different persistence
+    semantics.
     Returns the JSON body the endpoints surface to clients.
     """
     if mode not in _ENCODE_MODE_UI_CHOICES:
         raise HTTPException(status_code=400,
                             detail=f"unknown encode mode: {mode!r}")
-    try:
-        _persist_encode_mode_override(mode)
-    except OSError as exc:
-        logging.error("failed to persist encode_mode override to %s: %s",
-                      ENCODE_MODE_STORE_PATH, exc)
-        raise HTTPException(status_code=500,
-                            detail=f"could not persist override: {exc}")
+    if persist:
+        try:
+            _persist_encode_mode_override(mode)
+        except OSError as exc:
+            logging.error("failed to persist encode_mode override to %s: %s",
+                          ENCODE_MODE_STORE_PATH, exc)
+            raise HTTPException(status_code=500,
+                                detail=f"could not persist override: {exc}")
+    _set_runtime_encode_mode_override(mode)
     payload = json.dumps({"mode": mode})
     info = mqtt_client.publish(_ENCODE_MODE_TOPIC, payload, retain=True, qos=0)
     delivered = bool(info and info.rc == 0)
-    return {"ok": True, "mode": mode, "delivered": delivered}
+    return {
+        "ok": True,
+        "mode": mode,
+        "delivered": delivered,
+        "persisted": persist,
+    }
 
 
 @app.post("/api/encode_mode/cycle")
 async def api_encode_mode_cycle(_session: str = Depends(_require_session)):
-    """Advance the operator-ceiling encode mode through the cycle order.
+    """Advance the operator-selected encode mode through the cycle order.
 
-    Reads the current persisted override, rotates to the next entry in
-    :data:`_ENCODE_MODE_CYCLE_ORDER`, and persists + publishes the new
-    value. Wired to the gamepad BACK/SELECT button (idx 8) and the web
+    Reads the current runtime override, rotates to the next entry in
+    :data:`_ENCODE_MODE_CYCLE_ORDER`, and publishes the new value without
+    changing the persisted Settings value. Wired to the gamepad
+    BACK/SELECT button (idx 8) and the web
     encoder-mode pill so a bench operator can sweep visually-distinct
     codecs without touching the settings page.
     """
-    current = _load_encode_mode_override()
+    current = _get_runtime_encode_mode_override()
     if current in _ENCODE_MODE_CYCLE_ORDER:
         i = _ENCODE_MODE_CYCLE_ORDER.index(current)
         nxt = _ENCODE_MODE_CYCLE_ORDER[(i + 1) % len(_ENCODE_MODE_CYCLE_ORDER)]
     else:
-        # The persisted value is a legitimate UI choice but not in the
-        # narrow cycle list (e.g. btc4_*, adaptive). Snap back to the
-        # head of the cycle on the next press.
+        # Persisted/runtime value is outside the cycle list; snap back
+        # to the head of the cycle on the next press.
         nxt = _ENCODE_MODE_CYCLE_ORDER[0]
-    result = _set_encode_mode_override(nxt)
+    result = _set_encode_mode_override(nxt, persist=False)
     result["previous"] = current
     return result
 

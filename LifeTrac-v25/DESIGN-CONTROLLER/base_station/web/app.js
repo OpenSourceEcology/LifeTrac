@@ -221,13 +221,9 @@
           && ('active_source' in msg.data || 'source' in msg.data);
         if (typeof msg.data !== 'object' || hasSourceField) setSource(msg.data);
       }
-      // Encoder-cycle plan step 11: safe-mode floor banner. lora_bridge
-      // publishes {"active": bool, "since_ms": int} retained on this
-      // topic; we surface as a red flash on the encoder pill so the
-      // operator sees the override the moment the link degrades.
+      // Encode mode is manual-only; ignore legacy safe-mode topic payloads.
       if (msg.topic.endsWith('/control/safe_mode_active')) {
-        const active = !!(msg.data && msg.data.active);
-        setSafeMode(active);
+        setSafeMode(false);
       }
     } catch (e) { /* shrug */ }
   });
@@ -438,60 +434,106 @@
     });
   });
 
-  // ----- Encoder-mode pill (encoder-cycle plan, steps 9 + 10 + 11) -----
-  // Short click cycles through the narrow on-bench codec subset by
-  // POSTing /api/encode_mode/cycle. Long-press (>=800 ms) jumps to the
-  // full settings page. The pill text mirrors the persisted operator
-  // ceiling, and a safe-mode flag (published retained on
-  // lifetrac/v25/control/safe_mode_active) replaces the label with a
-  // red flashing "SAFE: mono_g4" until the link recovers.
+  // ----- Encoder-mode pill -----
+  // Short click cycles operator-selected encode modes by POSTing
+  // /api/encode_mode/cycle. Long-press (>=800 ms) jumps to settings.
+  // On mode switch we clear the canvas and show a temporary mode label
+  // until the first tile of the new stream is painted.
   const encPill = document.getElementById('encode-mode-pill');
   const encMeta = {
-    auto: { label: 'Auto', desc: 'airtime-driven ladder picks' },
     full: { label: 'Full color', desc: 'baseline RGB WebP' },
     y_only: { label: 'Y-only WebP', desc: 'luma only, recolor at base' },
     motion_only: { label: 'Motion-only gray', desc: 'pure grayscale with quality cap for bandwidth' },
     btc4_per_tile: { label: 'BTC4 / tile', desc: '4-level per-tile palette' },
     btc4_per_frame: { label: 'BTC4 / frame', desc: '4-level per-frame palette' },
     mono_g4: { label: 'Mono / G4', desc: '1-bit dither + Group-4 fax' },
-    adaptive: { label: 'Adaptive', desc: 'per-tile heuristic, falls back to Mono / G4' },
   };
-  let encSafeMode = false;
-  let encCurrentMode = 'auto';
+  const modeOverlay = (() => {
+    const canvas = document.getElementById('image-canvas');
+    if (!canvas || !canvas.parentElement) return null;
+    const el = document.createElement('div');
+    el.id = 'encode-switch-overlay';
+    el.style.position = 'absolute';
+    el.style.left = '50%';
+    el.style.top = '50%';
+    el.style.transform = 'translate(-50%, -50%)';
+    el.style.padding = '8px 12px';
+    el.style.borderRadius = '10px';
+    el.style.background = 'rgba(0, 0, 0, 0.55)';
+    el.style.border = '1px solid rgba(255, 255, 255, 0.35)';
+    el.style.color = '#d5ffd5';
+    el.style.font = '700 14px/1.2 monospace';
+    el.style.letterSpacing = '0.04em';
+    el.style.textTransform = 'uppercase';
+    el.style.pointerEvents = 'none';
+    el.style.display = 'none';
+    canvas.parentElement.appendChild(el);
+    return el;
+  })();
+  let waitingForModeFrame = false;
+  let encCurrentMode = 'full';
+  function clearImageForModeSwitch(mode) {
+    const canvas = document.getElementById('image-canvas');
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+    const meta = encMeta[mode] || { label: mode };
+    if (modeOverlay) {
+      modeOverlay.textContent = `loading: ${meta.label}`;
+      modeOverlay.style.display = 'block';
+    }
+    waitingForModeFrame = true;
+  }
+  window.addEventListener('lifetrac-tile-painted', () => {
+    if (!waitingForModeFrame) return;
+    waitingForModeFrame = false;
+    if (modeOverlay) modeOverlay.style.display = 'none';
+  });
   function _renderEncPill() {
     if (!encPill) return;
-    if (encSafeMode) {
-      encPill.textContent = 'SAFE: mono_g4';
-      encPill.title = 'Safe mode: Mono / G4 floor until the link recovers';
-      encPill.classList.add('safe');
-    } else {
-      const meta = encMeta[encCurrentMode] || { label: encCurrentMode, desc: '' };
-      encPill.textContent = `enc: ${meta.label} \u25B8`;
-      encPill.title = meta.desc
-        ? `${meta.label} — ${meta.desc}`
-        : `Current encode mode: ${encCurrentMode}`;
-      encPill.classList.remove('safe');
-    }
+    const meta = encMeta[encCurrentMode] || { label: encCurrentMode, desc: '' };
+    encPill.textContent = `enc: ${meta.label} \u25b8`;
+    encPill.title = meta.desc
+      ? `${meta.label} - ${meta.desc}`
+      : `Current encode mode: ${encCurrentMode}`;
+    encPill.classList.remove('safe');
   }
-  function setSafeMode(active) {
-    if (encSafeMode === active) return;
-    encSafeMode = active;
-    _renderEncPill();
-  }
+  function setSafeMode(_active) {}
   function _setEncMode(mode) {
-    encCurrentMode = (typeof mode === 'string' && mode) ? mode : 'auto';
+    encCurrentMode = (typeof mode === 'string' && mode) ? mode : 'full';
     _renderEncPill();
   }
-  // Seed from the persisted-override endpoint on page load.
-  fetch('/api/settings/encode_mode')
+  // Seed from the runtime endpoint so pill cycling is session-only.
+  fetch('/api/encode_mode/current')
     .then(r => r.ok ? r.json() : null)
     .then(j => { if (j && j.current) _setEncMode(j.current); })
     .catch(() => { /* leave default */ });
   function cycleEncodeMode() {
+    if (modeOverlay) {
+      modeOverlay.textContent = 'switching encode mode...';
+      modeOverlay.style.display = 'block';
+    }
+    waitingForModeFrame = true;
     fetch('/api/encode_mode/cycle', { method: 'POST' })
       .then(r => r.ok ? r.json() : null)
-      .then(j => { if (j && j.mode) _setEncMode(j.mode); })
-      .catch(() => { /* shrug */ });
+      .then(j => {
+        if (j && j.mode) {
+          _setEncMode(j.mode);
+          clearImageForModeSwitch(j.mode);
+        } else {
+          waitingForModeFrame = false;
+          if (modeOverlay) modeOverlay.style.display = 'none';
+        }
+      })
+      .catch(() => {
+        waitingForModeFrame = false;
+        if (modeOverlay) modeOverlay.style.display = 'none';
+      });
   }
   if (encPill) {
     let encPressStart = 0;

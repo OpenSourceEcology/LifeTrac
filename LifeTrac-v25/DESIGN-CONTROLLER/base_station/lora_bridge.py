@@ -196,10 +196,11 @@ class Bridge:
         # IP-103: image pipeline / X8 vision can request an MJPEG keyframe
         # over the LoRa command channel. Payload = empty (opcode-only).
         self.mqtt.subscribe("lifetrac/v25/cmd/req_keyframe")
-        # Operator-ceiling override for CMD_ENCODE_MODE (Phase 1 bench rotation).
-        # Retained JSON: {"mode": "auto"|"full"|"y_only"|"btc4_per_tile"|
-        # "btc4_per_frame"|"mono_g4"|"adaptive"}. The web UI publishes here;
-        # we translate to EncodeMode and pin the controller's ceiling.
+        # Operator-selected mode for CMD_ENCODE_MODE.
+        # Retained JSON: {"mode": "full"|"y_only"|"motion_only"|
+        # "btc4_per_tile"|"btc4_per_frame"|"mono_g4"}.
+        # The web UI publishes here; the bridge applies the selected mode
+        # directly and emits CMD_ENCODE_MODE immediately.
         self.mqtt.subscribe("lifetrac/v25/control/encode_mode_override")
         self.mqtt.loop_start()
         # Step 3 of the encoder-cycle plan: seed the retained safe-mode
@@ -510,19 +511,20 @@ class Bridge:
             cmd = pack_command(seq, CMD_REQ_KEYFRAME)
             self._tx(SRC_BASE, cmd, nonce_seq=seq)
         elif msg.topic.endswith("/control/encode_mode_override"):
-            # Operator-ceiling pin for the encode-mode ladder. JSON payload
-            # {"mode": "<name>" | "auto" | null}. "auto" / null clears the
-            # pin and lets the airtime-driven controller pick freely.
+            # Operator-selected encode mode. JSON payload
+            # {"mode": "<name>" | <int>}. The bridge applies this mode
+            # directly and emits CMD_ENCODE_MODE immediately.
             try:
                 body = json.loads(msg.payload.decode("utf-8") or "{}")
             except (UnicodeDecodeError, json.JSONDecodeError) as exc:
                 logging.warning("encode_mode_override: bad JSON (%s)", exc)
                 return
             requested = body.get("mode")
-            if requested in (None, "auto", ""):
-                self.encode_ctrl.set_operator_ceiling(None)
-                logging.info("encode_mode_override: cleared (auto ladder active)")
+            if requested in (None, ""):
+                logging.warning("encode_mode_override: missing mode")
                 return
+            if requested == "auto":
+                requested = "full"
             try:
                 # Accept either name ("y_only") or int (1).
                 if isinstance(requested, str):
@@ -534,7 +536,14 @@ class Bridge:
                                 requested, exc)
                 return
             self.encode_ctrl.set_operator_ceiling(mode)
-            logging.info("encode_mode_override: ceiling = %s", mode.name)
+            self.encode_ctrl.mode = mode
+            self.encode_ctrl._candidate = mode
+            self.encode_ctrl._candidate_count = 0
+            self.encode_ctrl._safe_mode_active = False
+            seq = self._reserve_tx_seq()
+            cmd = self.encode_ctrl.command_frame(seq, mode)
+            self._tx(SRC_BASE, cmd, nonce_seq=seq)
+            logging.info("encode_mode_override: selected = %s", mode.name)
 
     def _reserve_tx_seq(self) -> int:
         # IP-101: prefer the persistent store so a crash + restart cannot
@@ -657,10 +666,10 @@ class Bridge:
                 logging.exception("tx worker write failed")
                 self.audit.record("tx_error", source_id=source_id, seq=seq)
 
-    # ---- airtime worker: poll ledger, emit CMD_ENCODE_MODE, publish 0x10 ----
+    # ---- airtime worker: poll ledger and publish 0x10 ----
     def _airtime_worker(self) -> None:
-        """Periodically observe utilization, emit CMD_ENCODE_MODE on rung change,
-        publish the airtime triple for the operator UI, and log alarm thresholds.
+        """Periodically publish the airtime triple for the operator UI,
+        and log alarm thresholds.
 
         Per LORA_IMPLEMENTATION.md \u00a74 + \u00a77.
         """
@@ -668,20 +677,7 @@ class Bridge:
         while not self._stop_evt.wait(AIRTIME_POLL_INTERVAL_S):
             try:
                 util = self.ledger.utilization(_now_ms())
-                # 1. Mode-change detection (3-window hysteresis lives in EncodeModeController).
-                new_mode = self.encode_ctrl.observe(util)
-                if new_mode is not None:
-                    seq = self._reserve_tx_seq()
-                    cmd = self.encode_ctrl.command_frame(seq, new_mode)
-                    logging.info("CMD_ENCODE_MODE \u2192 %s (U_image=%.1f%%)",
-                                 new_mode.name, util.image * 100)
-                    self.audit.record("encode_mode_change",
-                                      mode=new_mode.name,
-                                      u_image=round(util.image, 4),
-                                      u_telemetry=round(util.telemetry, 4),
-                                      u_total=round(util.total, 4))
-                    self._tx(SRC_BASE, cmd, nonce_seq=seq)
-                # 2. Publish airtime triple alongside the source-active topic
+                # 1. Publish airtime triple alongside the source-active topic
                 #    so the UI has one place to read everything link-related.
                 #    NOTE: topic 0x10 (`control/source_active`) is owned by the
                 #    tractor's 1 Hz active-source byte, so airtime lands on a
@@ -694,7 +690,7 @@ class Bridge:
                 }).encode()
                 self.mqtt.publish("lifetrac/v25/control/link_airtime",
                                   payload, qos=0, retain=True)
-                # 2b. S6.2 + S7.2: feed the airtime triple to each enabled
+                # 1b. S6.2 + S7.2: feed the airtime triple to each enabled
                 #     TX-power adapter, advance the state machine, and
                 #     publish the resulting decision on the sibling topic
                 #     `link_power`. The actual radio command (write

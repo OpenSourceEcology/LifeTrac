@@ -200,13 +200,8 @@
 
   <h2>Image encode mode (bench rotation)</h2>
   <p class="meta">
-    Pin a maximum-quality encoder for the tractor's image link. The
-    automatic airtime-driven controller may demote <em>below</em> your
-    choice if the link degrades, but never above it. Pick <code>Auto</code>
-    to hand full control back to the airtime ladder. Pick <code>Adaptive</code>
-    to enable per-tile heuristic selection that survives until the link
-    goes critical, then falls back to the resilience floor.
-    See <code>AI&nbsp;NOTES/2026-05-25_Grayscale_Quantization_Encoding_Research_Copilot_v1_0.md</code>.
+    Select the active encoder method for the tractor image link.
+    The selected mode stays active until you choose another mode.
   </p>
   <div class="row" id="encmode-buttons" role="radiogroup" aria-label="Encode mode">
     <!-- Buttons are injected by JS so the catalogue is server-driven. -->
@@ -233,26 +228,19 @@
     const encPill   = document.getElementById('encmode-current');
     const encStatus = document.getElementById('encmode-status');
 
-    // Human labels + short descriptions for each mode. Order matches the
-    // bandwidth/resilience ladder (highest quality → most resilient),
-    // with Auto / Adaptive at the ends.
+    // Human labels + short descriptions for each mode.
     const ENC_META = {
-      'auto':            {label: 'Auto',           desc: 'airtime-driven ladder picks'},
       'full':            {label: 'Full color',     desc: 'baseline RGB WebP (~26 B/tile)'},
       'y_only':          {label: 'Y-only WebP',    desc: 'luma only, recolor at base (~19 B/tile)'},
       'motion_only':     {label: 'Motion-only gray', desc: 'pure grayscale with capped quality (~low bandwidth)'},
       'btc4_per_tile':   {label: 'BTC4 / tile',    desc: '4-level per-tile palette + LZ4 (~8 B/tile)'},
       'btc4_per_frame':  {label: 'BTC4 / frame',   desc: '4-level per-frame palette + LZ4 (~5 B/tile)'},
       'mono_g4':         {label: 'Mono / G4',      desc: '1-bit dither + Group-4 fax (~4 B/tile, most resilient)'},
-      'adaptive':        {label: 'Adaptive',       desc: 'per-tile heuristic; falls back to Mono on critical link'},
     };
 
     function paintCurrent(mode) {
       encPill.textContent = (ENC_META[mode] && ENC_META[mode].label) || mode;
-      encPill.className = 'pill ' + (mode === 'auto' ? 'grey'
-                                    : mode === 'mono_g4' ? 'orange'
-                                    : mode === 'adaptive' ? 'yellow'
-                                    : 'green');
+      encPill.className = 'pill ' + (mode === 'mono_g4' ? 'orange' : 'green');
       for (const btn of encWrap.querySelectorAll('button')) {
         btn.classList.toggle('active', btn.dataset.mode === mode);
       }

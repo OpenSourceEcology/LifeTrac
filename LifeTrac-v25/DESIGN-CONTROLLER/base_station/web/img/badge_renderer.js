@@ -66,8 +66,6 @@
         overlay.height = base.height;
       }
       ctx.clearRect(0, 0, overlay.width, overlay.height);
-      ctx.font = `${Math.max(8, tilePx / 4)}px monospace`;
-      ctx.textBaseline = 'bottom';
       for (const t of snap.tiles) {
         if (!VALID.has(t.badge)) {
           reportRefusal('invalid_badge', t.i);
@@ -83,8 +81,6 @@
         if (tint) {
           ctx.fillStyle = tint;
           ctx.fillRect(t.tx * tilePx, t.ty * tilePx, tilePx, tilePx);
-          ctx.fillStyle = 'rgba(0,0,0,0.85)';
-          ctx.fillText(LABEL[t.badge].slice(0, 4), t.tx * tilePx + 2, (t.ty + 1) * tilePx - 2);
         }
       }
     });
