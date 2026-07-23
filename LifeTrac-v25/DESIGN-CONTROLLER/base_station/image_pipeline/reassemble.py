@@ -202,6 +202,12 @@ class FragmentReassembler:
         to decide whether to send `CMD_REQ_KEYFRAME`."""
         return list(self._partials.keys())
 
+    def tick(self, now_ms: int | None = None) -> None:
+        """Run GC without feeding a fragment. Call from the RX drain loop so
+        partials expire during RF silence (F16b) — today _gc only runs
+        inside feed(), i.e. never when the link goes quiet."""
+        self._gc(self._clock_ms() if now_ms is None else now_ms)
+
     def _gc(self, now_ms: int) -> None:
         if not self._partials:
             return

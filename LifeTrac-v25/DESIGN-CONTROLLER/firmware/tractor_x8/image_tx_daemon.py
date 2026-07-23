@@ -50,6 +50,7 @@ Notes/limitations:
 from __future__ import annotations
 
 import argparse
+import collections
 import logging
 import os
 import queue
@@ -79,6 +80,12 @@ for _p in (_BASE_STATION, _X8_HELPER, _HERE):
 
 from lora_proto import (  # noqa: E402
     PHY_IMAGE,
+    PHY_IMAGE_BW250,
+    LORA_HOP_HDR_LEN,
+    IMAGE_FRAG_AIR_CAP_MS,
+    lora_time_on_air_ms,
+    pack_image_fragments,
+    pack_image_fragments_v2,
     pack_telemetry_fragments,
 )
 from method_h_stage2_tx_probe_v2 import (  # noqa: E402
@@ -93,6 +100,8 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     drain_pending,
     wait_for_tx_done,
     configure_regulatory_profile_if_needed,
+    verify_modem_matches_profile,
+    read_reg,
 )
 
 LOG = logging.getLogger("image_tx_daemon")
@@ -103,6 +112,35 @@ LEGAL_DWELL_US = 400_000                  # FCC §15.247(a)(1) 400 ms dwell
 MAX_FRAMES_PER_DWELL_CAP = 8
 DWELL_HEADROOM_PCT = 85
 PER_FRAGMENT_TX_TIMEOUT_S = 3.0
+
+class AirtimeBudget:
+    """Host mirror of the firmware per-channel QoS gate
+    (sx1276_airtime.c: 400 ms ToA per 1 s window). Rolling window =
+    strictly more conservative than the firmware's fixed-anchor window,
+    so a paced TX can never draw ABORT_QOS. 380 ms budget leaves
+    a 20 ms guard for estimator rounding."""
+
+    def __init__(self, budget_us: int = 380_000, window_s: float = 1.0):
+        self.budget_us, self.window_s = budget_us, window_s
+        self._events: collections.deque[tuple[float, int]] = collections.deque()
+
+    def _used(self, now: float) -> int:
+        while self._events and now - self._events[0][0] >= self.window_s:
+            self._events.popleft()
+        return sum(toa for _, toa in self._events)
+
+    def admit(self, est_toa_us: int, stop: threading.Event) -> bool:
+        """Block until est_toa_us fits the window. Returns False on stop."""
+        while not stop.is_set():
+            now = time.monotonic()
+            if self._used(now) + est_toa_us <= self.budget_us:
+                return True
+            wait = self._events[0][0] + self.window_s - now  # oldest expiry
+            stop.wait(min(max(wait, 0.005), 0.25))
+        return False
+
+    def record(self, toa_us: int) -> None:
+        self._events.append((time.monotonic(), toa_us))
 
 # Topic the daemon subscribes to. camera_service.py already publishes
 # here as part of the fallback path; the new daemon piggybacks so a
@@ -148,6 +186,7 @@ class ImageTxDaemon:
         self.mqtt_host = mqtt_host
         self.mqtt_port = mqtt_port
         self.inter_cycle_s = max(MIN_LORA_HOST_INTER_CYCLE_S, inter_cycle_s)
+        self.budget = AirtimeBudget()
         # Bounded queue: under sustained overload we drop OLDEST so the
         # newest video stays current (visual systems prefer freshness over
         # completeness).
@@ -158,10 +197,12 @@ class ImageTxDaemon:
         self.lock = threading.Lock()
         self.frames_in = 0
         self.frames_dropped_queue_full = 0
+        self.frames_dropped_stale = 0
         self.frames_tx_ok = 0
         self.frames_tx_fail = 0
         self.fragments_tx_ok = 0
         self.fragments_tx_fail = 0
+        self.bytes_tx_ok = 0
 
     # ---- MQTT side ----
     def _on_message(self, _client, _userdata, msg) -> None:
@@ -234,8 +275,9 @@ class ImageTxDaemon:
         drain_pending(link, quiet_s=0.25, max_s=1.0)
         try:
             configure_regulatory_profile_if_needed(link)
+            verify_modem_matches_profile(link, PHY_IMAGE_BW250)
         except Exception as exc:                              # pragma: no cover
-            LOG.warning("regulatory profile config failed: %s", exc)
+            LOG.warning("regulatory profile config / contract check failed: %s", exc)
         try:
             link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
                          bytes([CFG_KEY_LBT_ENABLE, 0x01, 0x00]), timeout=1.0)
@@ -260,10 +302,36 @@ class ImageTxDaemon:
                 continue
             self._tx_one_frame(link, frame)
 
+    def recent_frag_loss_rate(self) -> float:
+        with self.lock:
+            total = self.fragments_tx_ok + self.fragments_tx_fail
+            return (self.fragments_tx_fail / total) if total > 0 else 0.0
+
+    def _pack_for(self, frame: _PendingFrame) -> list[bytes]:
+        is_key = frame.payload[:1] == b"\x01"          # frame_kind byte
+        copies = int(os.environ.get("LIFETRAC_KEYFRAME_COPIES", "1"))
+        if copies <= 1 and is_key and self.recent_frag_loss_rate() > 0.005:
+            copies = 2                                  # auto: only when PER says so
+        if is_key and copies > 1:
+            return pack_image_fragments_v2(frame.payload, frame.seq,
+                                           PHY_IMAGE_BW250, IMAGE_FRAG_AIR_CAP_MS,
+                                           copies=copies)
+        return pack_image_fragments(frame.payload, frame.seq,
+                                    PHY_IMAGE_BW250, IMAGE_FRAG_AIR_CAP_MS)
+
     def _tx_one_frame(self, link: HostLink, frame: _PendingFrame) -> None:
+        # F16a: Stale-frame cancellation
+        frame_max_age_ms = int(os.environ.get("LIFETRAC_FRAME_MAX_AGE_MS", "10000"))
+        age_ms = int(time.monotonic() * 1000) - frame.enqueued_ms
+        if age_ms > frame_max_age_ms and not self._q.empty():
+            with self.lock:
+                self.frames_dropped_stale += 1
+            LOG.info("dropping stale frame seq=%d (age %d ms, fresher queued)",
+                     frame.seq, age_ms)
+            return
+
         try:
-            fragments = pack_telemetry_fragments(
-                frame.payload, frame.seq, PHY_IMAGE)
+            fragments = self._pack_for(frame)
         except Exception as exc:
             LOG.error("fragment pack failed (seq=%d, %d B): %s",
                       frame.seq, len(frame.payload), exc)
@@ -272,98 +340,93 @@ class ImageTxDaemon:
             return
 
         n = len(fragments)
-        if n > MAX_FRAMES_PER_DWELL_CAP:
-            LOG.warning(
-                "frame seq=%d requires %d fragments (>%d dwell cap); "
-                "transmitting anyway with extra cadence padding",
-                frame.seq, n, MAX_FRAMES_PER_DWELL_CAP)
         LOG.debug("TX frame seq=%d %d B → %d fragments", frame.seq,
                   len(frame.payload), n)
 
-        ok = fail = 0
+        max_qos_retries = 4   # FORBIDDEN/ABORT_QOS: not admitted, ZERO RF spent
+        max_rf_retries  = 1   # TX_DONE non-OK / timeout: airtime was spent
+
         for idx, body in enumerate(fragments):
             if self._stop.is_set():
                 break
-            # L072 firmware caps TX_FRAME_REQ bodies at 64 B (matches
-            # W1-10b run_tx_burst clamp). The image-profile fragmenter
-            # respects this via TELEMETRY_FRAGMENT_MAX_AIRTIME_MS, but
-            # guard anyway since a clamp surprise here would silently
-            # truncate fragments and break reassembly.
-            if len(body) > 64:
-                fail += 1
-                LOG.error("fragment %d body %d B > 64 B L072 cap; dropping",
-                          idx, len(body))
-                continue
-            tx_id = idx & 0xFF
-            # TX_FRAME_REQ payload format (matches w2_02_tx_fragments.py):
-            #   u8 tx_id, u8 len, u8 body[len]
-            tx_frame = bytes([tx_id, len(body)]) + body
-            try:
-                link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
-            except Exception as exc:
-                fail += 1
-                LOG.warning("TX send exception: seq=%d idx=%d: %s",
-                            frame.seq, idx, exc)
-                continue
-            try:
-                done, faults = wait_for_tx_done(
-                    link, tx_id, timeout=PER_FRAGMENT_TX_TIMEOUT_S)
-            except TimeoutError as exc:
-                fail += 1
-                LOG.warning("TX_DONE timeout: seq=%d idx=%d tx_id=0x%02x %s",
-                            frame.seq, idx, tx_id, exc)
-                if idx + 1 < n:
-                    time.sleep(self.inter_cycle_s)
-                continue
-            except Exception as exc:
-                fail += 1
-                LOG.warning("TX_DONE exception: seq=%d idx=%d: %s",
-                            frame.seq, idx, exc)
-                if idx + 1 < n:
-                    time.sleep(self.inter_cycle_s)
-                continue
-            if done["status"] == 0:  # SX1276_TX_STATUS_OK
-                ok += 1
-            else:
-                fail += 1
-                LOG.warning("TX_DONE non-OK: seq=%d idx=%d tx_id=0x%02x "
-                            "status=%d(%s) toa_us=%d",
-                            frame.seq, idx, tx_id, done["status"],
-                            done.get("status_name", "?"),
-                            done.get("time_on_air_us", 0))
-            for f in faults:
-                LOG.warning("TX fault: seq=%d idx=%d %s",
-                            frame.seq, idx, f)
-            # Cadence pacing — sleep between fragments.
-            if idx + 1 < n:
-                time.sleep(self.inter_cycle_s)
+            est_us = int(lora_time_on_air_ms(len(body) + LORA_HOP_HDR_LEN,
+                                             PHY_IMAGE_BW250) * 1000)
+            sent = False
+            for attempt in range(1 + max_qos_retries + max_rf_retries):
+                if not self.budget.admit(est_us, self._stop):
+                    return                                     # shutting down
+                try:
+                    tx_id = idx & 0xFF
+                    tx_frame = bytes([tx_id, len(body)]) + body
+                    link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
+                    done, faults = wait_for_tx_done(
+                        link, tx_id, timeout=PER_FRAGMENT_TX_TIMEOUT_S)
+                except RuntimeError as exc:      # ERR_PROTO FORBIDDEN == QoS refusal:
+                    time.sleep(est_us / 2e6)                   # cheap, no RF spent
+                    continue
+                except TimeoutError:
+                    self.budget.record(est_us)                 # assume RF spent
+                    with self.lock:
+                        self.fragments_tx_fail += 1
+                    continue                                   # counts vs RF retries
+                except Exception as exc:
+                    self.budget.record(est_us)
+                    with self.lock:
+                        self.fragments_tx_fail += 1
+                    continue
+
+                actual_toa = done.get("time_on_air_us") or est_us
+                self.budget.record(actual_toa)
+                if done["status"] == 0:  # SX1276_TX_STATUS_OK
+                    sent = True
+                    with self.lock:
+                        self.fragments_tx_ok += 1
+                        self.bytes_tx_ok += len(body)
+                    break
+                else:
+                    with self.lock:
+                        self.fragments_tx_fail += 1
+                    LOG.warning("TX_DONE non-OK: seq=%d idx=%d tx_id=0x%02x "
+                                "status=%d(%s) toa_us=%d",
+                                frame.seq, idx, tx_id, done["status"],
+                                done.get("status_name", "?"),
+                                done.get("time_on_air_us", 0))
+
+            if not sent:
+                # F4: a frame missing any fragment can never reassemble --
+                # stop burning airtime on it and let RX request a keyframe.
+                with self.lock:
+                    self.frames_tx_fail += 1
+                LOG.warning("frame seq=%d ABORTED at fragment %d/%d",
+                            frame.seq, idx, len(fragments))
+                return
 
         with self.lock:
-            self.fragments_tx_ok += ok
-            self.fragments_tx_fail += fail
-            if fail == 0 and ok == n:
-                self.frames_tx_ok += 1
-            else:
-                self.frames_tx_fail += 1
-        LOG.info("frame seq=%d done: %d/%d fragments ok (%d fail)",
-                 frame.seq, ok, n, fail)
+            self.frames_tx_ok += 1
+        LOG.info("frame seq=%d done: %d fragments ok", frame.seq, n)
 
     # ---- stats printer ----
     def _stats_worker(self, interval_s: float) -> None:
-        last = 0.0
+        last = time.monotonic()
+        last_bytes = 0
         while not self._stop.is_set():
             time.sleep(1.0)
             now = time.monotonic()
-            if now - last < interval_s:
+            elapsed = now - last
+            if elapsed < interval_s:
                 continue
-            last = now
             with self.lock:
+                cur_bytes = self.bytes_tx_ok
+                bytes_delta = cur_bytes - last_bytes
+                bps = bytes_delta / elapsed if elapsed > 0 else 0.0
                 LOG.info(
-                    "stats: frames_in=%d ok=%d fail=%d drop_full=%d "
-                    "frags_ok=%d frags_fail=%d qdepth=%d",
-                    self.frames_in, self.frames_tx_ok, self.frames_tx_fail,
-                    self.frames_dropped_queue_full, self.fragments_tx_ok,
-                    self.fragments_tx_fail, self._q.qsize())
+                    "stats: goodput=%.1f B/s frames_in=%d ok=%d fail=%d "
+                    "drop_full=%d drop_stale=%d frags_ok=%d frags_fail=%d qdepth=%d",
+                    bps, self.frames_in, self.frames_tx_ok, self.frames_tx_fail,
+                    self.frames_dropped_queue_full, self.frames_dropped_stale,
+                    self.fragments_tx_ok, self.fragments_tx_fail, self._q.qsize())
+            last = now
+            last_bytes = cur_bytes
 
     # ---- lifecycle ----
     def run(self, *, stats_interval_s: float) -> int:

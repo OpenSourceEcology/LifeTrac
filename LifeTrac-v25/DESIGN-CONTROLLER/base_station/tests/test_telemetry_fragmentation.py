@@ -7,11 +7,17 @@ import unittest
 
 from lora_proto import (
     PHY_IMAGE,
+    PHY_IMAGE_BW500,
+    PHY_IMAGE_BW250,
     PHY_TELEMETRY,
     TELEMETRY_FRAGMENT_MAGIC,
+    TELEMETRY_FRAGMENT_MAGIC_V2,
     TelemetryReassembler,
     max_telemetry_fragment_payload,
     pack_telemetry_fragments,
+    max_image_fragment_body,
+    pack_image_fragments,
+    pack_image_fragments_v2,
     parse_telemetry_fragment,
     lora_time_on_air_ms,
     TELEM_HEADER_LEN,
@@ -26,10 +32,10 @@ class TelemetryFragmentationTests(unittest.TestCase):
         # SF9/BW250 telemetry PHY has a 33 ms preamble alone and so can't
         # carry any fragment under a 25 ms cap — that's why R-6 demands
         # a retune to the image PHY for the fragmented hot path.
-        chunk = max_telemetry_fragment_payload(PHY_IMAGE, 25.0)
+        chunk = max_telemetry_fragment_payload(PHY_IMAGE_BW500, 25.0)
         self.assertGreater(chunk, 0)
         body_len = TELEM_HEADER_LEN + CRC_LEN + 4 + chunk  # +4 for fragment header
-        air = lora_time_on_air_ms(body_len, PHY_IMAGE)
+        air = lora_time_on_air_ms(body_len, PHY_IMAGE_BW500)
         self.assertLessEqual(air, 25.0 + 1e-6)
         # And one extra byte should bust the cap
         air_over = lora_time_on_air_ms(body_len + 1, PHY_TELEMETRY)
@@ -40,7 +46,7 @@ class TelemetryFragmentationTests(unittest.TestCase):
 
     def test_pack_single_fragment_round_trip(self):
         payload = b"hello world"
-        frags = pack_telemetry_fragments(payload, frag_seq=7, profile=PHY_IMAGE)
+        frags = pack_telemetry_fragments(payload, frag_seq=7, profile=PHY_IMAGE_BW500)
         self.assertEqual(len(frags), 1)
         seq, idx, total, data = parse_telemetry_fragment(frags[0])
         self.assertEqual((seq, idx, total), (7, 0, 1))
@@ -48,7 +54,7 @@ class TelemetryFragmentationTests(unittest.TestCase):
 
     def test_pack_multi_fragment_round_trip(self):
         payload = bytes(range(200))
-        frags = pack_telemetry_fragments(payload, frag_seq=42, profile=PHY_IMAGE)
+        frags = pack_telemetry_fragments(payload, frag_seq=42, profile=PHY_IMAGE_BW500)
         self.assertGreater(len(frags), 1)
         for f in frags:
             self.assertEqual(f[0], TELEMETRY_FRAGMENT_MAGIC)
@@ -60,6 +66,22 @@ class TelemetryFragmentationTests(unittest.TestCase):
             self.assertEqual(idx, i)
             self.assertEqual(total, len(frags))
 
+    def test_pack_image_fragments(self):
+        payload = bytes(range(200))
+        frags = pack_image_fragments(payload, frag_seq=100, profile=PHY_IMAGE_BW250, max_air_ms=170.0)
+        self.assertGreater(len(frags), 0)
+        for f in frags:
+            self.assertEqual(f[0], TELEMETRY_FRAGMENT_MAGIC)
+        parsed = [parse_telemetry_fragment(f) for f in frags]
+        self.assertTrue(all(p is not None for p in parsed))
+
+    def test_pack_image_fragments_v2(self):
+        payload = bytes(range(200))
+        frags = pack_image_fragments_v2(payload, frag_seq=101, profile=PHY_IMAGE_BW250, max_air_ms=170.0, copies=2)
+        self.assertEqual(len(frags), len(pack_image_fragments(payload, 101)) * 2)
+        for f in frags:
+            self.assertEqual(f[0], TELEMETRY_FRAGMENT_MAGIC_V2)
+
     def test_reassembler_passes_through_unfragmented_payloads(self):
         ra = TelemetryReassembler()
         out = ra.feed(source_id=3, topic_id=0x07, body=b"unfragmented", now_ms=10)
@@ -68,7 +90,7 @@ class TelemetryFragmentationTests(unittest.TestCase):
 
     def test_reassembler_recovers_full_payload(self):
         payload = bytes(range(180))
-        frags = pack_telemetry_fragments(payload, frag_seq=9, profile=PHY_IMAGE)
+        frags = pack_telemetry_fragments(payload, frag_seq=9, profile=PHY_IMAGE_BW500)
         ra = TelemetryReassembler()
         out = None
         for i, f in enumerate(frags):
@@ -78,7 +100,7 @@ class TelemetryFragmentationTests(unittest.TestCase):
 
     def test_reassembler_dedupes(self):
         payload = bytes(range(180))
-        frags = pack_telemetry_fragments(payload, frag_seq=11, profile=PHY_IMAGE)
+        frags = pack_telemetry_fragments(payload, frag_seq=11, profile=PHY_IMAGE_BW500)
         ra = TelemetryReassembler()
         # Feed first fragment twice.
         ra.feed(3, 0x07, frags[0], now_ms=1)
@@ -91,7 +113,7 @@ class TelemetryFragmentationTests(unittest.TestCase):
 
     def test_reassembler_times_out_partials(self):
         payload = bytes(range(180))
-        frags = pack_telemetry_fragments(payload, frag_seq=13, profile=PHY_IMAGE)
+        frags = pack_telemetry_fragments(payload, frag_seq=13, profile=PHY_IMAGE_BW500)
         ra = TelemetryReassembler(timeout_ms=50)
         ra.feed(3, 0x07, frags[0], now_ms=0)
         # Trigger GC long after timeout.

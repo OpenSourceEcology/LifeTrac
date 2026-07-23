@@ -63,6 +63,7 @@ for _p in (_REPO_ROOT_BASE, _X8_HELPER, _HERE):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+from lora_proto import PHY_IMAGE  # noqa: E402
 from image_pipeline.frame_format import encode_tile_delta_frame  # noqa: E402
 from image_pipeline.reassemble import FragmentReassembler         # noqa: E402
 from method_h_stage2_tx_probe_v2 import (  # noqa: E402
@@ -74,6 +75,7 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     drain_boot,
     drain_pending,
     configure_regulatory_profile_if_needed,
+    verify_modem_matches_profile,
     read_reg,
     write_reg,
     SX1276_REG_OP_MODE,
@@ -86,6 +88,7 @@ LOG = logging.getLogger("image_rx_daemon")
 # bridge would have used. We publish into the same MQTT slot so web_ui
 # does not have to change.
 MQTT_TOPIC_OUT = "lifetrac/v25/video/tile_delta"
+KEYFRAME_REQ_TOPIC = "lifetrac/v25/cmd/req_keyframe"   # camera_service listens
 
 # MQTT defaults; assume `adb reverse tcp:1883 tcp:1883` is wired so the
 # X8 can reach the Windows host mosquitto via localhost.
@@ -97,6 +100,29 @@ DEFAULT_BAUD = "921600"
 
 # How long to wait per HostLink poll cycle when no frame is present.
 RX_POLL_TIMEOUT_S = 0.25
+
+
+class KeyframeRequester:
+    """Rate-limited req_keyframe on reassembly failure. Publishes to the
+    same topic web_ui's manual button uses, so it inherits whatever
+    broker relay the deployment already has for that path."""
+
+    def __init__(self, client_supplier, min_interval_s: float = 5.0):
+        self._client_supplier = client_supplier
+        self._min = min_interval_s
+        self._last = 0.0
+
+    def poke(self, reason: str) -> None:
+        now = time.monotonic()
+        client = self._client_supplier()
+        if client is None or now - self._last < self._min:
+            return
+        self._last = now
+        LOG.info("requesting keyframe (%s)", reason)
+        try:
+            client.publish(KEYFRAME_REQ_TOPIC, b"\x01", qos=0)
+        except Exception as exc:
+            LOG.warning("failed to publish keyframe request: %s", exc)
 
 
 @dataclass
@@ -165,8 +191,9 @@ class ImageRxDaemon:
         drain_pending(link, quiet_s=0.25, max_s=1.0)
         try:
             configure_regulatory_profile_if_needed(link)
+            verify_modem_matches_profile(link, PHY_IMAGE)
         except Exception as exc:                              # pragma: no cover
-            LOG.warning("regulatory profile config failed: %s", exc)
+            LOG.warning("regulatory profile config / contract check failed: %s", exc)
         # 2026-05-25 fix: explicitly wake the SX1276 into LORA_RXCONTINUOUS
         # (RegOpMode=0x85). The firmware does NOT auto-enter RXCONT after
         # boot — prior probes (and any prior TX-side cleanup) leave the
@@ -235,6 +262,13 @@ class ImageRxDaemon:
                 time.sleep(0.1)
                 continue
             if not frames:
+                self.reassembler.tick()
+                cur_timeout = self.reassembler.stats.timeouts
+                if cur_timeout != last_timeouts:
+                    with self._lock:
+                        self.stats.reassembler_timeouts += (cur_timeout - last_timeouts)
+                    last_timeouts = cur_timeout
+                    self._kf_req.poke(f"reassembly timeout #{cur_timeout}")
                 continue
 
             for frame in frames:
@@ -279,9 +313,11 @@ class ImageRxDaemon:
                     if cur_decode != last_decode_errors:
                         self.stats.reassembler_decode_errors += (cur_decode - last_decode_errors)
                         last_decode_errors = cur_decode
+                        self._kf_req.poke(f"decode error #{cur_decode}")
                     if cur_timeout != last_timeouts:
                         self.stats.reassembler_timeouts += (cur_timeout - last_timeouts)
                         last_timeouts = cur_timeout
+                        self._kf_req.poke(f"reassembly timeout #{cur_timeout}")
 
                 if completed is not None:
                     try:

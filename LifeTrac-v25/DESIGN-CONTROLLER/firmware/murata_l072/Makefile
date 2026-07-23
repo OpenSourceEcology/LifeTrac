@@ -239,8 +239,9 @@ RX_SCAN_COUNTERS_BIN := $(BUILD)/rx_scan_counters
 RX_SCAN_FAIL_BIN := $(BUILD)/rx_scan_fail
 RX_SCAN_WALKER_BIN := $(BUILD)/rx_scan_walker
 AIRTIME_INVARIANT_BIN := $(BUILD)/airtime_invariant
+TX_LEN_GUARD_BIN   := $(BUILD)/tx_len_guard
 
-check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-airtime-invariant check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker
+check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker
 	@echo "[OK] memory map invariants hold"
 
 check-cpp: $(BUILD)
@@ -580,6 +581,8 @@ check-cfg-profile: $(BUILD)
 	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
 	    bench/host_proto/cfg_profile.c \
 	    host/host_cfg_profile.c \
+	    radio/sx1276_fhss.c \
+	    radio/sx1276_fhss_chantab.c \
 	    -o $(CFG_PROFILE_BIN)
 	@echo "[CFGP ] Running cfg-profile test ..."
 	@$(CFG_PROFILE_BIN)
@@ -598,9 +601,28 @@ check-cfg-profile-wire: $(BUILD)
 	    bench/host_proto/sx1276_stub.c \
 	    host/host_cfg.c \
 	    host/host_cfg_profile.c \
+	    radio/sx1276_fhss.c \
+	    radio/sx1276_fhss_chantab.c \
 	    -o $(CFG_PROFILE_WIRE_BIN)
 	@echo "[CFGPW] Running cfg-profile-wire test ..."
 	@$(CFG_PROFILE_WIRE_BIN)
+
+# C1/F7 regression pin for sx1276_tx_begin length guard
+check-tx-len-guard: $(BUILD)
+	@echo "[TXLEN] Building tx-len-guard test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    -DLIFETRAC_FHSS_TX_ROUTED \
+	    bench/host_proto/tx_len_guard.c \
+	    bench/host_proto/sx1276_stub.c \
+	    radio/sx1276_tx.c \
+	    radio/sx1276_airtime.c \
+	    radio/sx1276_legal_dwell.c \
+	    host/host_rfco.c \
+	    radio/sx1276_fhss.c \
+	    radio/sx1276_fhss_chantab.c \
+	    -o $(TX_LEN_GUARD_BIN)
+	@echo "[TXLEN] Running tx-len-guard test ..."
+	@$(TX_LEN_GUARD_BIN)
 
 # FCC-EVID-D10 — exhaustive (profile, antenna_gain, hw_ceiling,
 # mask_class, tx_routed) Cartesian-product fuzz of the

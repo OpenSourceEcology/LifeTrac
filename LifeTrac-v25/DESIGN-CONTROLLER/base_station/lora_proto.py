@@ -147,11 +147,13 @@ PHY_CONTROL_SF7 = PhyProfile("control_sf7", 7, 250, 5, 8)
 PHY_CONTROL_SF8 = PhyProfile("control_sf8", 8, 125, 5, 8)
 PHY_CONTROL_SF9 = PhyProfile("control_sf9", 9, 125, 5, 8)
 PHY_TELEMETRY = PhyProfile("telemetry", 9, 250, 8, 12)
-PHY_IMAGE = PhyProfile("image", 7, 500, 5, 8)
+PHY_IMAGE_BW250 = PhyProfile("image_bw250", 7, 250, 5, 8)   # what the radio RUNS today
+PHY_IMAGE_BW500 = PhyProfile("image_bw500", 7, 500, 5, 8)   # valid after Phase 2.4
+PHY_IMAGE = PhyProfile("image", 7, 250, 5, 8)                # alias to BW250 (fixes F1)
 
 PHY_BY_NAME = {
     profile.name: profile
-    for profile in (PHY_CONTROL_SF7, PHY_CONTROL_SF8, PHY_CONTROL_SF9, PHY_TELEMETRY, PHY_IMAGE)
+    for profile in (PHY_CONTROL_SF7, PHY_CONTROL_SF8, PHY_CONTROL_SF9, PHY_TELEMETRY, PHY_IMAGE, PHY_IMAGE_BW250, PHY_IMAGE_BW500)
 }
 
 # IP-W2-04: shared ordered tuple used as the wire-side index space for
@@ -159,7 +161,7 @@ PHY_BY_NAME = {
 # decoder MUST agree on this order; the X8 mirrors it as
 # ``camera_service.LINK_PHY_NAMES``.
 LINK_PHY_NAMES: tuple[str, ...] = (
-    "image", "telemetry", "control_sf9", "control_sf8", "control_sf7",
+    "image", "telemetry", "control_sf9", "control_sf8", "control_sf7", "image_bw250", "image_bw500"
 )
 
 
@@ -825,6 +827,72 @@ TELEMETRY_FRAGMENT_HEADER_LEN = 4
 TELEMETRY_FRAGMENT_MAGIC_V2 = 0xFD
 TELEMETRY_FRAGMENT_HEADER_LEN_V2 = 5
 TELEMETRY_FRAGMENT_MAX_AIRTIME_MS = 25.0
+
+# Image strict-path fragmentation constants
+LORA_HOP_HDR_LEN = 8            # lora_pkt_hdr.h LORA_PKT_HDR_LEN
+TX_FRAME_BODY_MAX = 255 - LORA_HOP_HDR_LEN   # 247: F7-safe hard ceiling
+IMAGE_FRAG_AIR_CAP_MS = float(os.environ.get("LIFETRAC_FRAG_AIR_CAP_MS", "170.0"))
+
+
+def max_image_fragment_body(profile: PhyProfile = PHY_IMAGE_BW250,
+                            max_air_ms: float = IMAGE_FRAG_AIR_CAP_MS,
+                            body_ceiling: int = TX_FRAME_BODY_MAX) -> int:
+    """Largest TX_FRAME_REQ body whose ON-AIR time (body + hop header)
+    fits max_air_ms. Unlike max_telemetry_fragment_payload() this does
+    NOT inherit the 118 B TelemetryFrame clamp (F13) and does NOT add
+    the 9 B telemetry envelope the strict path never sends."""
+    lo, hi, best = 1, body_ceiling, 0
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        if lora_time_on_air_ms(mid + LORA_HOP_HDR_LEN, profile) <= max_air_ms:
+            best, lo = mid, mid + 1
+        else:
+            hi = mid - 1
+    return best
+
+
+def pack_image_fragments(payload: bytes, frag_seq: int,
+                         profile: PhyProfile = PHY_IMAGE_BW250,
+                         max_air_ms: float = IMAGE_FRAG_AIR_CAP_MS) -> list[bytes]:
+    """pack_telemetry_fragments twin for the image strict path (0xFE v1
+    header, same reassembler) sized by max_image_fragment_body()."""
+    chunk = max_image_fragment_body(profile, max_air_ms) - TELEMETRY_FRAGMENT_HEADER_LEN
+    if chunk <= 0:
+        raise ValueError(f"{profile.name}: no fragment fits {max_air_ms} ms")
+    total = max(1, (len(payload) + chunk - 1) // chunk)
+    if total > 256:
+        raise ValueError(f"payload needs {total} fragments; max 256")
+    out: list[bytes] = []
+    for i in range(total):
+        body = payload[i * chunk:(i + 1) * chunk]
+        header = bytes([TELEMETRY_FRAGMENT_MAGIC,
+                        frag_seq & 0xFF,
+                        i & 0xFF,
+                        (total - 1) & 0xFF])
+        out.append(header + body)
+    return out
+
+
+def pack_image_fragments_v2(payload: bytes, frag_seq: int,
+                            profile: PhyProfile = PHY_IMAGE_BW250,
+                            max_air_ms: float = IMAGE_FRAG_AIR_CAP_MS,
+                            copies: int = 2) -> list[bytes]:
+    """Wrap fragments in the v2 0xFD redundancy header that
+    image_pipeline/reassemble.py ALREADY dedups (first copy wins, W2-02
+    P0c). Unlike a TX_DONE retry (local-only), independent copies
+    repair AIR loss: P(fragment lost) = p^copies."""
+    if not 1 <= copies <= 15:
+        raise ValueError("copies must be 1..15 (4-bit nibble)")
+    base = pack_image_fragments(payload, frag_seq, profile, max_air_ms)
+    if copies == 1:
+        return base
+    out: list[bytes] = []
+    for body in base:                       # body = 0xFE hdr(4) + data
+        _, seq, idx, total_m1 = body[0], body[1], body[2], body[3]
+        for copy_idx in range(copies):
+            out.append(bytes([TELEMETRY_FRAGMENT_MAGIC_V2, seq, idx, total_m1,
+                              ((copies & 0x0F) << 4) | copy_idx]) + body[4:])
+    return out
 
 
 def max_telemetry_fragment_payload(profile: PhyProfile,

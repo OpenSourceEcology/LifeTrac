@@ -559,9 +559,20 @@ def _encode_tile(rgb_canvas: bytes, tx: int, ty: int,
         if len(blob) <= TILE_BYTES_MAX:
             return blob
         quality -= 10
-    # Last resort: ship a minimal WebP — accept >256 B truncation by
-    # caller's policy. Returning the smallest blob we managed.
-    return blob
+    # F14: NEVER return >256 B — _build_frame would ship blob[:256], a
+    # truncated RIFF container the base cannot decode (pure wasted airtime
+    # + a spurious decode-error keyframe request). Per-tile MONO_G4 is NOT
+    # wire-legal (codec is a per-frame header byte; 15 = reserved escape),
+    # so: grayscale re-try (typically halves the size), then drop.
+    gray = img.convert("L").convert("RGB")
+    buf = io.BytesIO()
+    gray.save(buf, format="WEBP", quality=5, method=6)
+    blob = buf.getvalue()
+    if len(blob) <= TILE_BYTES_MAX:
+        return blob
+    LOG.warning("tile unencodable <=%d B even gray-q5 (%d B); dropping",
+                TILE_BYTES_MAX, len(blob))
+    return None                      # caller: skip tile, keep bitmap honest
 
 
 @dataclass
@@ -893,9 +904,12 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
             blob = encode_cache.lookup(i, key_input)
             if blob is None:
                 blob = _encode_tile(canvas, tx, ty, quality=q)
-                encode_cache.store(i, key_input, blob)
+                if blob is not None:
+                    encode_cache.store(i, key_input, blob)
         else:
             blob = _encode_tile(canvas, tx, ty, quality=q)
+        if blob is None:
+            continue
         cost = min(len(blob), TILE_BYTES_MAX) + 1   # +1 for size prefix
         if cap is not None and used + cost > cap and kept:
             # No room for this one and we've already shipped at least one tile;

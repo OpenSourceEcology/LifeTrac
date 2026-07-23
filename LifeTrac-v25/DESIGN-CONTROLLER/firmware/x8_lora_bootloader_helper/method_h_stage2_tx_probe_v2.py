@@ -359,6 +359,69 @@ def _format_runtime_profile_line(payload: bytes = None, exc: BaseException = Non
     return f"RUNTIME_PROFILE_ENUM={payload[2]}"
 
 
+CFG_STATUS_NAMES = {
+    0: "OK", 1: "UNKNOWN_KEY", 2: "BAD_LENGTH", 3: "OUT_OF_RANGE",
+    4: "APPLY_FAILED", 5: "DEFERRED", 6: "READ_ONLY", 7: "PROFILE_UNROUTED",
+    8: "PROFILE_REJECT_MASK_POPCOUNT", 9: "PROFILE_REJECT_MASK_OUT_OF_TABLE",
+    10: "PROFILE_REJECT_BW_MISMATCH", 11: "PROFILE_REJECT_ANTENNA_OUT_OF_RANGE",
+    12: "PROFILE_REJECT_NO_POWER_HEADROOM", 13: "PROFILE_REJECT_NOT_STAGED",
+}   # host_cfg.h cfg_status_t
+
+def cfg_set_checked(link: HostLink, key: int, value: bytes, timeout: float = 1.0) -> dict:
+    """CFG_SET that actually reads the status byte. CFG_OK_URC payload is
+    [key, status, actual_len, 0] (host_cfg_wire.c) — status != 0 arrives on
+    the SAME URC type, so request() returns 'success' for rejections (F15:
+    '14 08 00 00' = REG_PROFILE refused MASK_POPCOUNT, printed as OK)."""
+    ack = link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
+                       bytes([key, len(value)]) + value, timeout=timeout)
+    p = ack["payload"]
+    if len(p) < 2 or p[0] != (key & 0xFF):
+        raise RuntimeError(f"CFG_OK_URC malformed/mismatched: {p.hex()}")
+    if p[1] != 0:
+        raise RuntimeError(
+            f"CFG_SET(0x{key:02X}) REJECTED: status={p[1]} "
+            f"({CFG_STATUS_NAMES.get(p[1], '?')}) — do NOT treat as OK")
+    return ack
+
+def verify_active_profile(link: HostLink, expected_id: int, timeout: float = 1.0) -> None:
+    """Post-activation readback — profile 1 with the default single-channel
+    mask silently stays 0 (popcount >= 50 required). Fail loud instead."""
+    ack = link.request(HOST_TYPE_CFG_GET_REQ, HOST_TYPE_CFG_DATA_URC,
+                       bytes([CFG_KEY_REG_PROFILE]), timeout=timeout)
+    p = ack["payload"]           # CFG_DATA: [key, value_len, value...]
+    active = p[2] if len(p) >= 3 else -1
+    if active != expected_id:
+        raise RuntimeError(
+            f"REG_PROFILE readback={active}, expected {expected_id} — "
+            "activation was rejected upstream (check mask popcount / F15)")
+
+
+_BW_KHZ_BY_BITS = {7: 125, 8: 250, 9: 500}   # sx1276.c bw_to_reg_bits()
+
+def verify_modem_matches_profile(link: HostLink, profile) -> None:
+    """Fail LOUD at startup if the L072's live modem registers disagree
+    with the PhyProfile the fragmenter is about to size against (F1)."""
+    cfg1, _ = read_reg(link, 0x1D, timeout=0.5)   # RegModemConfig1
+    cfg2, _ = read_reg(link, 0x1E, timeout=0.5)   # RegModemConfig2
+    pre_msb, _ = read_reg(link, 0x20, timeout=0.5)
+    pre_lsb, _ = read_reg(link, 0x21, timeout=0.5)
+    actual = {
+        "sf": (cfg2 >> 4) & 0x0F,
+        "bw_khz": _BW_KHZ_BY_BITS.get((cfg1 >> 4) & 0x0F, -1),
+        "cr_den": ((cfg1 >> 1) & 0x07) + 4,
+        "preamble": (pre_msb << 8) | pre_lsb,
+    }
+    expected = {"sf": profile.sf, "bw_khz": profile.bw_khz,
+                "cr_den": profile.cr_den, "preamble": profile.preamble_len}
+    if actual != expected:
+        raise RuntimeError(
+            f"PHY CONTRACT VIOLATION: modem={actual} profile={expected}. "
+            "Refusing to start — fragment sizing would be wrong (see "
+            "CODE REVIEWS 2026-07-23 F1). Fix the profile constant or "
+            "the firmware config; do not silence this check.")
+    print(f"PHY contract OK: {profile.name} == {actual}")
+
+
 def configure_regulatory_profile_if_needed(link: HostLink, profile_id: int = 1) -> None:
     """Configures the required regulatory profile parameters and activates the
     specified regulatory profile (default 1 = REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) on the co-processor.
@@ -407,36 +470,33 @@ def configure_regulatory_profile_if_needed(link: HostLink, profile_id: int = 1) 
         mask_int = 1 << ch
         mask_bytes = mask_int.to_bytes(8, "little")
         print(f"  FHSS mask: single channel {ch} ({mask_bytes.hex()})")
-    channel_mask_payload = bytes([CFG_KEY_FHSS_CHANNEL_MASK, 0x08]) + mask_bytes
     try:
-        ack = link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC, channel_mask_payload, timeout=1.0)
+        ack = cfg_set_checked(link, CFG_KEY_FHSS_CHANNEL_MASK, mask_bytes, timeout=1.0)
         print(f"CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: {ack['payload'].hex()}")
     except Exception as exc:
         print(f"WARN: CFG_SET_REQ(FHSS_CHANNEL_MASK) failed: {exc}")
         
     # 2. Set the antenna gain in dBi
     # Let's use 2 dBi as standard (1 byte, signed 0x02)
-    antenna_gain_payload = bytes([CFG_KEY_ANTENNA_GAIN_DBI, 0x01, 0x02])
     try:
-        ack = link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC, antenna_gain_payload, timeout=1.0)
+        ack = cfg_set_checked(link, CFG_KEY_ANTENNA_GAIN_DBI, bytes([0x02]), timeout=1.0)
         print(f"CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: {ack['payload'].hex()}")
     except Exception as exc:
         print(f"WARN: CFG_SET_REQ(ANTENNA_GAIN_DBI) failed: {exc}")
         
     # 3. Set the HW ceiling in dBm
     # Let's use 17 dBm (1 byte, unsigned 0x11)
-    hw_ceiling_payload = bytes([CFG_KEY_HW_CEILING_DBM, 0x01, 0x11])
     try:
-        ack = link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC, hw_ceiling_payload, timeout=1.0)
+        ack = cfg_set_checked(link, CFG_KEY_HW_CEILING_DBM, bytes([0x11]), timeout=1.0)
         print(f"CFG_SET_REQ(HW_CEILING_DBM) OK: {ack['payload'].hex()}")
     except Exception as exc:
         print(f"WARN: CFG_SET_REQ(HW_CEILING_DBM) failed: {exc}")
         
     # 4. Set the regulatory profile to profile_id and activate
-    reg_profile_payload = bytes([CFG_KEY_REG_PROFILE, 0x01, profile_id])
     try:
-        ack = link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC, reg_profile_payload, timeout=1.0)
+        ack = cfg_set_checked(link, CFG_KEY_REG_PROFILE, bytes([profile_id]), timeout=1.0)
         print(f"CFG_SET_REQ(REG_PROFILE={profile_id}) OK: {ack['payload'].hex()}")
+        verify_active_profile(link, profile_id, timeout=1.0)
     except Exception as exc:
         print(f"WARN: CFG_SET_REQ(REG_PROFILE={profile_id}) failed: {exc}")
 
