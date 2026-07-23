@@ -211,6 +211,7 @@ class ImageTxDaemon:
             if not isinstance(payload, (bytes, bytearray)):
                 LOG.debug("ignoring non-bytes payload (%s)", type(payload).__name__)
                 return
+            LOG.info("MQTT frame received on %s (%d B)", msg.topic, len(payload))
             with self.lock:
                 self.frames_in += 1
                 self._next_seq = (self._next_seq + 1) & 0xFF
@@ -256,22 +257,26 @@ class ImageTxDaemon:
             "LIFETRAC_SKIP_RESET_REQ", "0") not in ("0", "", "false", "False")
         if not skip_reset:
             try:
+                LOG.info("sending RESET_REQ (0x03)...")
                 link.send(0x03)  # HOST_TYPE_RESET_REQ
-                drain_boot(link, settle_s=1.5)
+                LOG.info("draining boot (settle_s=2.5)...")
+                drain_boot(link, settle_s=2.5)
+                LOG.info("drain_boot finished")
             except Exception as exc:                          # pragma: no cover
                 LOG.warning("L072 reset failed: %s (continuing)", exc)
         else:
             LOG.info("LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; "
                      "draining boot chatter only")
             try:
-                drain_boot(link, settle_s=0.25)
+                drain_boot(link, settle_s=1.5)
             except Exception as exc:                          # pragma: no cover
                 LOG.warning("post-NRST drain failed: %s (continuing)", exc)
         try:
             link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=1.0)
+            LOG.info("L072 VER warm-up ok")
         except Exception as exc:
-            LOG.error("VER warm-up failed: %s", exc)
-            raise
+            LOG.warning("VER warm-up failed: %s (continuing)", exc)
+        drain_pending(link, quiet_s=0.25, max_s=1.0)
         drain_pending(link, quiet_s=0.25, max_s=1.0)
         try:
             configure_regulatory_profile_if_needed(link)
@@ -437,8 +442,9 @@ class ImageTxDaemon:
         client = mqtt.Client(client_id=f"lifetrac-image-tx-{os.getpid()}")
         client.on_message = self._on_message
 
-        def _on_connect(_c, _u, _f, rc):
-            if rc == 0:
+        def _on_connect(_c, _u, _f, rc, *args):
+            rc_val = getattr(rc, "value", rc)
+            if rc_val == 0 or str(rc) == "Success":
                 LOG.info("MQTT connected; subscribing to %s", MQTT_TOPIC_IN)
                 client.subscribe(MQTT_TOPIC_IN, qos=0)
             else:

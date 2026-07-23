@@ -2737,6 +2737,14 @@ def main(argv=None) -> int:
     except Exception as exc:
         print(f"WARN: System reset failed or timed out: {exc} (continuing)")
 
+    # VER warm-up + pending drain to align COBS parser before CFG requests
+    try:
+        link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=1.0)
+        print("VER warm-up ok.")
+    except Exception as exc:
+        print(f"WARN: VER warm-up after reset failed: {exc} (continuing)")
+    drain_pending(link, quiet_s=0.25, max_s=1.0)
+
     # Configure regulatory profile so the FHSS scheduler is initialized
     configure_regulatory_profile_if_needed(link)
 

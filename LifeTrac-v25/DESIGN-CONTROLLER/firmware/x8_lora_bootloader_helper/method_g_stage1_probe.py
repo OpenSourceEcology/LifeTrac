@@ -321,7 +321,7 @@ class HostLink:
             keep = []
             matched = None
             for idx, frame in enumerate(pending):
-                if frame["type"] == rsp_type and frame["seq"] == seq:
+                if frame["type"] == rsp_type and (frame["seq"] == seq or rsp_type == HOST_TYPE_VER_URC):
                     matched = (idx, frame)
                     break
                 if frame["type"] == HOST_TYPE_ERR_PROTO_URC and frame["seq"] == seq:

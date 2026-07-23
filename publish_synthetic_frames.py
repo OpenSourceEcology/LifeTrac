@@ -11,7 +11,7 @@ sys.path.insert(0, r"c:\Users\dorkm\Documents\GitHub\LifeTrac\LifeTrac-v25\DESIG
 from camera_service import SyntheticCamera, FrameAccum, _build_frame
 
 def main():
-    broker = os.environ.get("LIFETRAC_MQTT_HOST", "192.168.1.117")
+    broker = os.environ.get("LIFETRAC_MQTT_HOST", "192.168.1.79")
     print(f"Starting synthetic camera publisher on Host (broker={broker})...")
     client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id="synthetic_camera_host")
     client.connect(broker, 1883)

@@ -172,22 +172,29 @@ class ImageRxDaemon:
         if not skip_reset:
             try:
                 link.send(0x03)  # HOST_TYPE_RESET_REQ
-                drain_boot(link, settle_s=1.5)
+                drain_boot(link, settle_s=2.5)
             except Exception as exc:                          # pragma: no cover
                 LOG.warning("L072 reset failed: %s (continuing)", exc)
         else:
             LOG.info("LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; "
                      "draining boot chatter only")
             try:
-                drain_boot(link, settle_s=0.25)
+                drain_boot(link, settle_s=1.5)
             except Exception as exc:                          # pragma: no cover
                 LOG.warning("post-NRST drain failed: %s (continuing)", exc)
-        try:
-            link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=1.0)
-            LOG.info("L072 VER warm-up ok")
-        except Exception as exc:
-            LOG.error("VER warm-up failed: %s", exc)
-            raise
+        ver_ok = False
+        for attempt in range(3):
+            try:
+                link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=1.0)
+                LOG.info("L072 VER warm-up ok")
+                ver_ok = True
+                break
+            except Exception as exc:
+                LOG.warning("VER warm-up attempt %d failed: %s", attempt + 1, exc)
+                drain_pending(link, quiet_s=0.25, max_s=1.0)
+        if not ver_ok:
+            LOG.error("VER warm-up failed after 3 attempts")
+            raise RuntimeError("VER warm-up failed")
         drain_pending(link, quiet_s=0.25, max_s=1.0)
         try:
             configure_regulatory_profile_if_needed(link)

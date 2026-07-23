@@ -45,7 +45,9 @@ param(
 )
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
+
+$env:PATH += ";C:\Users\dorkm\AppData\Local\Microsoft\WinGet\Packages\Google.PlatformTools_8wekyb3d8bbwe\platform-tools"
 
 Write-Host "=== LIVE CAMERA PIPELINE: $DurationS s ===" -ForegroundColor Cyan
 Write-Host "TX Serial:  $TxAdbSerial    Camera: $VideoDevice"
@@ -85,6 +87,7 @@ Start-Sleep -Milliseconds 1500
 Write-Host "Deploying daemons + camera publisher + ffmpeg..."
 foreach ($s in @($TxAdbSerial, $RxAdbSerial)) {
     cmd /c "adb -s $s shell `"echo fio | sudo -S -p '' mkdir -p /tmp/lifetrac_strict ; echo fio | sudo -S -p '' chmod 0777 /tmp/lifetrac_strict`"" 2>&1 | Out-Null
+    cmd /c "adb -s $s push `"$(Join-Path $helperDir 'method_g_stage1_probe.py')`" /tmp/lifetrac_strict/" 2>&1 | Out-Null
     cmd /c "adb -s $s push `"$(Join-Path $helperDir 'method_h_stage2_tx_probe_v2.py')`" /tmp/lifetrac_strict/" 2>&1 | Out-Null
     cmd /c "adb -s $s push `"$(Join-Path $baseStation 'lora_proto.py')`" /tmp/lifetrac_strict/" 2>&1 | Out-Null
     cmd /c "adb -s $s push `"$(Join-Path $baseStation 'image_rx_daemon.py')`" /tmp/lifetrac_strict/" 2>&1 | Out-Null
