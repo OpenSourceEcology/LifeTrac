@@ -587,6 +587,23 @@ static void scan_dispatch_action(sx1276_rx_scan_action_t action,
 static void scan_drive(sx1276_rx_scan_event_t event,
                        bool                    header_valid,
                        uint32_t                now_ms) {
+    /*
+     * 2026-07-24 saturation-bench root cause: the A6c scan SM used to
+     * run UNCONDITIONALLY — including under REG_PROFILE_BENCH_ONLY_
+     * FIXED_915 / DTS where the FHSS scheduler is deliberately never
+     * initialised. BOOT→BEGIN_SCAN then walked the chantab (911 MHz
+     * first), stealing the synth from the host-pinned 915 MHz carrier,
+     * and each ADVANCE's modes_to_standby() could yank the modem out
+     * of an in-flight TX → every TX ended TX_TIMEOUT with the FRF
+     * readback parked on a scan channel (evidence: _saturation_run11,
+     * FRF 911.000 MHz MISMATCH + tx_status=0x05 on 100% of frames).
+     * Scan-and-lock only has meaning when a hopset is active, so gate
+     * the whole SM — including its BOOT exit — on the scheduler being
+     * initialised (profile 1 activation calls sx1276_fhss_init).
+     */
+    if (sx1276_fhss_is_initialized() == 0U) {
+        return;
+    }
     const sx1276_rx_scan_input_t in = {
         .state               = s_scan_state,
         .now_ms              = now_ms,

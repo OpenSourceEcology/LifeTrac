@@ -193,12 +193,24 @@ class ImageRxDaemon:
                 drain_boot(link, settle_s=0.25)
             except Exception as exc:                          # pragma: no cover
                 LOG.warning("post-NRST drain failed: %s (continuing)", exc)
-        try:
-            link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=1.0)
-            LOG.info("L072 VER warm-up ok")
-        except Exception as exc:
-            LOG.error("VER warm-up failed: %s", exc)
-            raise
+        # VER warm-up with retry (mirrors image_tx_daemon 2026-07-24): a
+        # freshly hard-reset L072 can miss the first request while it
+        # drains its boot burst; a single 1.0 s attempt produced spurious
+        # "cannot open HostLink" fatals during the saturation bench.
+        # VER_REQ is idempotent, so retrying is safe.
+        last_exc = None
+        for attempt in range(1, 6):
+            try:
+                link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=2.0)
+                LOG.info("L072 VER warm-up ok (attempt %d)", attempt)
+                last_exc = None
+                break
+            except Exception as exc:
+                last_exc = exc
+                LOG.warning("VER warm-up attempt %d/5 failed: %s", attempt, exc)
+        if last_exc is not None:
+            LOG.error("VER warm-up failed: %s", last_exc)
+            raise last_exc
         drain_pending(link, quiet_s=0.25, max_s=1.0)
         try:
             configure_regulatory_profile_if_needed(link)

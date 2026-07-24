@@ -264,6 +264,13 @@ class FragmentReassembler:
         to decide whether to send `CMD_REQ_KEYFRAME`."""
         return list(self._partials.keys())
 
+    def tick(self) -> None:
+        """Run staleness GC without feeding a payload. Callers with idle
+        RX loops (image_rx_daemon) invoke this so partial frames still time
+        out (and bump ``stats.timeouts``) when the link goes quiet — F16:
+        GC previously only ran inside ``feed()``."""
+        self._gc(self._clock_ms())
+
     def _gc(self, now_ms: int) -> None:
         if not self._partials:
             return

@@ -1,0 +1,790 @@
+﻿2026-07-24 22:05:04,837 INFO image_tx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-07-24 22:05:04,839 INFO image_tx_daemon: image_tx_daemon started; mqtt=192.168.1.79:1883 uart=/dev/ttymxc3
+
+2026-07-24 22:05:04,854 INFO image_tx_daemon: LIFETRAC_SKIP_RESET_REQ=1 ΓÇö relying on external NRST; draining boot chatter only
+
+2026-07-24 22:05:04,859 INFO image_tx_daemon: MQTT connected; subscribing to lifetrac/v25/cmd/image_frame
+
+INFO: post-VER drain queued type=0xF1 seq=0
+
+INFO: post-VER drain queued type=0xC1 seq=0
+
+INFO: post-VER drain queued type=0xF1 seq=0
+
+INFO: post-VER drain queued type=0xC1 seq=0
+
+Initializing regulatory profile 0 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+CFG_SET_REQ(REG_PROFILE=0) OK: 14000100
+
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+
+PHY contract OK: image_bw250 == {'sf': 7, 'bw_khz': 250, 'cr_den': 5, 'preamble': 8}
+
+2026-07-24 22:05:05,721 INFO image_tx_daemon: LBT_ENABLE=0 (matches W1-10b TX_BURST rationale)
+
+2026-07-24 22:05:05,721 INFO image_tx_daemon: TX worker ready (inter_cycle_s=0.050, max 8 frags/dwell)
+
+2026-07-24 22:05:05,840 INFO image_tx_daemon: stats: goodput=0.0 B/s util=0% pipeline=v2 frames_in=0 ok=0 fail=0 drop_full=0 drop_stale=0 frags_ok=0 frags_fail=0 qdepth=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=56448 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:09,327 INFO image_tx_daemon: frame seq=1 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=53888 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:10,525 INFO image_tx_daemon: frame seq=2 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=56448 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:11,723 INFO image_tx_daemon: frame seq=7 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=51328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:12,911 INFO image_tx_daemon: frame seq=14 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=51328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:14,109 INFO image_tx_daemon: frame seq=21 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=51328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:15,308 INFO image_tx_daemon: frame seq=28 done: 2 fragments ok
+
+2026-07-24 22:05:15,854 INFO image_tx_daemon: stats: goodput=152.2 B/s util=13% pipeline=v2 frames_in=42 ok=6 fail=0 drop_full=31 drop_stale=0 frags_ok=12 frags_fail=0 qdepth=4
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=64128 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:16,526 INFO image_tx_daemon: frame seq=35 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=117888 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:16,663 INFO image_tx_daemon: frame seq=43 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=117888 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:17,578 INFO image_tx_daemon: frame seq=44 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:17,715 INFO image_tx_daemon: frame seq=49 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:17,852 INFO image_tx_daemon: frame seq=50 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:18,714 INFO image_tx_daemon: frame seq=51 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:18,851 INFO image_tx_daemon: frame seq=56 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:18,988 INFO image_tx_daemon: frame seq=57 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=105088 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:19,840 INFO image_tx_daemon: frame seq=58 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:19,987 INFO image_tx_daemon: frame seq=63 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=112768 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:20,124 INFO image_tx_daemon: frame seq=64 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:20,976 INFO image_tx_daemon: frame seq=65 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=135808 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:21,143 INFO image_tx_daemon: frame seq=69 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=140928 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:22,143 INFO image_tx_daemon: frame seq=70 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=153728 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:22,321 INFO image_tx_daemon: frame seq=76 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=156288 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:23,320 INFO image_tx_daemon: frame seq=77 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=41088 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:23,572 INFO image_tx_daemon: frame seq=83 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=43648 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:24,574 INFO image_tx_daemon: frame seq=85 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=74368 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:25,812 INFO image_tx_daemon: frame seq=91 done: 2 fragments ok
+
+2026-07-24 22:05:25,864 INFO image_tx_daemon: stats: goodput=316.5 B/s util=27% pipeline=v2 frames_in=101 ok=25 fail=0 drop_full=72 drop_stale=0 frags_ok=35 frags_fail=0 qdepth=3
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=64128 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:27,000 INFO image_tx_daemon: frame seq=98 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=48768 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:28,177 INFO image_tx_daemon: frame seq=106 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=158848 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:28,366 INFO image_tx_daemon: frame seq=113 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=158848 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:29,303 INFO image_tx_daemon: frame seq=114 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=148608 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:29,544 INFO image_tx_daemon: frame seq=119 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=140928 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:30,469 INFO image_tx_daemon: frame seq=121 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=61568 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:30,816 INFO image_tx_daemon: frame seq=126 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=51328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:32,004 INFO image_tx_daemon: frame seq=128 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=38528 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:33,192 INFO image_tx_daemon: frame seq=136 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=48768 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:34,202 INFO image_tx_daemon: frame seq=143 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=46208 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:34,652 INFO image_tx_daemon: frame seq=149 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=46208 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:35,851 INFO image_tx_daemon: frame seq=151 done: 2 fragments ok
+
+2026-07-24 22:05:35,875 INFO image_tx_daemon: stats: goodput=273.1 B/s util=24% pipeline=v2 frames_in=161 ok=37 fail=0 drop_full=120 drop_stale=0 frags_ok=55 frags_fail=0 qdepth=3
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=48768 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:37,049 INFO image_tx_daemon: frame seq=158 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:37,186 INFO image_tx_daemon: frame seq=166 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=110208 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:38,121 INFO image_tx_daemon: frame seq=167 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=107648 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:38,248 INFO image_tx_daemon: frame seq=172 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=105088 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:38,375 INFO image_tx_daemon: frame seq=173 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=120448 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:39,268 INFO image_tx_daemon: frame seq=174 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:39,405 INFO image_tx_daemon: frame seq=179 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=117888 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:39,542 INFO image_tx_daemon: frame seq=180 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:40,404 INFO image_tx_daemon: frame seq=181 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=120448 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:40,557 INFO image_tx_daemon: frame seq=186 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=117888 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:40,695 INFO image_tx_daemon: frame seq=187 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=117888 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:41,540 INFO image_tx_daemon: frame seq=188 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=120448 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:41,703 INFO image_tx_daemon: frame seq=193 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=133248 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:41,861 INFO image_tx_daemon: frame seq=194 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=135808 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:42,859 INFO image_tx_daemon: frame seq=195 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=148608 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:43,043 INFO image_tx_daemon: frame seq=201 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=163968 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:44,047 INFO image_tx_daemon: frame seq=202 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=28288 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:44,289 INFO image_tx_daemon: frame seq=208 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=28288 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:45,293 INFO image_tx_daemon: frame seq=209 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:45,885 INFO image_tx_daemon: stats: goodput=316.8 B/s util=27% pipeline=v2 frames_in=222 ok=56 fail=0 drop_full=161 drop_stale=0 frags_ok=78 frags_fail=0 qdepth=4
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=69248 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:46,334 INFO image_tx_daemon: frame seq=215 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=66688 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:46,774 INFO image_tx_daemon: frame seq=222 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=71808 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:47,972 INFO image_tx_daemon: frame seq=224 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=66688 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:49,170 INFO image_tx_daemon: frame seq=231 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=48768 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:50,349 INFO image_tx_daemon: frame seq=239 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=166528 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:51,474 INFO image_tx_daemon: frame seq=246 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=140928 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:51,643 INFO image_tx_daemon: frame seq=252 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=140928 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:52,641 INFO image_tx_daemon: frame seq=253 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=53888 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:52,919 INFO image_tx_daemon: frame seq=3 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=53888 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:54,117 INFO image_tx_daemon: frame seq=5 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=51328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:55,305 INFO image_tx_daemon: frame seq=12 done: 2 fragments ok
+
+2026-07-24 22:05:55,899 INFO image_tx_daemon: stats: goodput=243.6 B/s util=21% pipeline=v2 frames_in=282 ok=67 fail=0 drop_full=210 drop_stale=0 frags_ok=96 frags_fail=0 qdepth=4
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=51328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:56,503 INFO image_tx_daemon: frame seq=19 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=51328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:57,701 INFO image_tx_daemon: frame seq=27 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=61568 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:58,909 INFO image_tx_daemon: frame seq=34 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=117888 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:59,046 INFO image_tx_daemon: frame seq=41 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:05:59,971 INFO image_tx_daemon: frame seq=42 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:00,108 INFO image_tx_daemon: frame seq=47 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:00,245 INFO image_tx_daemon: frame seq=48 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:01,107 INFO image_tx_daemon: frame seq=49 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:01,244 INFO image_tx_daemon: frame seq=54 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:01,382 INFO image_tx_daemon: frame seq=55 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:02,245 INFO image_tx_daemon: frame seq=56 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=105088 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:02,372 INFO image_tx_daemon: frame seq=61 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=107648 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:02,507 INFO image_tx_daemon: frame seq=62 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=115328 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:03,382 INFO image_tx_daemon: frame seq=63 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=130688 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:03,539 INFO image_tx_daemon: frame seq=68 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC4
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=135808 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:04,542 INFO image_tx_daemon: frame seq=69 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=156288 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:04,721 INFO image_tx_daemon: frame seq=75 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=153728 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:05,720 INFO image_tx_daemon: frame seq=76 done: 1 fragments ok
+
+2026-07-24 22:06:05,911 INFO image_tx_daemon: stats: goodput=288.0 B/s util=25% pipeline=v2 frames_in=342 ok=85 fail=0 drop_full=252 drop_stale=0 frags_ok=117 frags_fail=0 qdepth=4
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=25728 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:05,962 INFO image_tx_daemon: frame seq=82 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=41088 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:06,972 INFO image_tx_daemon: frame seq=83 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=35968 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:07,972 INFO image_tx_daemon: frame seq=89 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=64128 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:08,255 INFO image_tx_daemon: frame seq=95 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=41088 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:09,422 INFO image_tx_daemon: frame seq=97 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=43648 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:10,423 INFO image_tx_daemon: frame seq=104 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=33408 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:10,863 INFO image_tx_daemon: frame seq=110 done: 2 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=158848 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:11,610 INFO image_tx_daemon: frame seq=113 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=151168 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:11,997 INFO image_tx_daemon: frame seq=117 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=143488 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:12,777 INFO image_tx_daemon: frame seq=120 done: 1 fragments ok
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=169088 legal_dwell_used_us_10s=0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=0 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=64128 legal_dwell_used_us_10s=0
+
+2026-07-24 22:06:13,281 INFO image_tx_daemon: frame seq=124 done: 2 fragments ok
+

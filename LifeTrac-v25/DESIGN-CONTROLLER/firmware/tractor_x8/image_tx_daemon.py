@@ -296,11 +296,33 @@ class ImageTxDaemon:
                 drain_boot(link, settle_s=0.25)
             except Exception as exc:                          # pragma: no cover
                 LOG.warning("post-NRST drain failed: %s (continuing)", exc)
-        try:
-            link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=1.0)
-        except Exception as exc:
-            LOG.error("VER warm-up failed: %s", exc)
-            raise
+        # VER warm-up with retry. A freshly hard-reset L072 (SWD/NRST path)
+        # can miss or answer the first request slowly while it drains its
+        # boot burst + periodic STATS URCs; a single 1.0 s attempt produced
+        # spurious "cannot open HostLink" fatals (2026-07-24 saturation
+        # bench). VER_REQ is idempotent, so retrying is safe. On failure we
+        # dump whatever frames DID arrive (wrong-type-match forensics).
+        last_exc: Exception | None = None
+        for attempt in range(1, 6):
+            try:
+                link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=2.0)
+                last_exc = None
+                break
+            except Exception as exc:
+                last_exc = exc
+                LOG.warning("VER warm-up attempt %d/5 failed: %s", attempt, exc)
+                try:
+                    stray = list(link.urc_queue)
+                    link.urc_queue.clear()
+                    stray += link.read_frames(0.3)
+                    for f in stray:
+                        LOG.warning("  stray frame type=0x%02x len=%d",
+                                    f.get("type", 0), len(f.get("payload", b"")))
+                except Exception:
+                    pass
+        if last_exc is not None:
+            LOG.error("VER warm-up failed: %s", last_exc)
+            raise last_exc
         drain_pending(link, quiet_s=0.25, max_s=1.0)
         try:
             configure_regulatory_profile_if_needed(link)
