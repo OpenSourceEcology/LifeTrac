@@ -46,7 +46,8 @@ void host_stats_radio_tx_ok_inc(void) {}
 void host_stats_radio_tx_abort_airtime_inc(void) {}
 void host_stats_radio_tx_abort_lbt_inc(void) {}
 const host_cfg_profile_req_t *host_cfg_profile_active(void) { return NULL; }
-bool sx1276_modes_to_standby(void) { return true; }
+/* sx1276_modes_to_standby / sx1276_set_sf_bw_cr / sx1276_set_tx_power_dbm
+ * come from bench/host_proto/sx1276_stub.c — do not redefine here. */
 bool sx1276_modes_to_tx(void) { return true; }
 uint8_t sx1276_modes_get_state(void) { return 0U; }
 void sx1276_rx_arm(uint8_t mode) { (void)mode; }

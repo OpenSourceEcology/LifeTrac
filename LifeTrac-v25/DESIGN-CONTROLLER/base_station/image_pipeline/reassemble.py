@@ -46,11 +46,13 @@ from .frame_format import (
     parse_tile_delta_frame,
 )
 
-# v1 (legacy) and v2 (W2-02 P0c redundancy header).
+# v1 (legacy), v2 (W2-02 P0c redundancy header), and v3 XOR-parity header (0xFC).
 FRAGMENT_MAGIC = 0xFE
 FRAGMENT_HEADER_LEN = 4
 FRAGMENT_MAGIC_V2 = 0xFD
 FRAGMENT_HEADER_LEN_V2 = 5
+FRAGMENT_MAGIC_PARITY = 0xFC
+FRAGMENT_HEADER_LEN_PARITY = 4
 DEFAULT_TIMEOUT_MS = 1500
 
 
@@ -63,6 +65,8 @@ class _PartialFrame:
     # v2 only: per-idx bitmask of which copy_idx values arrived.
     # Bit `k` set => copy_idx=k has been seen for that frag_idx.
     copy_bitmasks: dict[int, int] = field(default_factory=dict)
+    # v3 XOR-parity: (group_start, group_len) -> parity_body
+    parities: dict[tuple[int, int], bytes] = field(default_factory=dict)
 
 
 @dataclass
@@ -76,6 +80,8 @@ class ReassemblyStats:
     v2_fragments_seen: int = 0
     v2_redundant_copies_seen: int = 0   # copies beyond the first that filled the slot
     v2_bad_header: int = 0              # copy_idx >= total_copies, or total_copies == 0
+    # XOR parity counter
+    parity_reconstructions: int = 0
 
 
 class FragmentReassembler:
@@ -111,6 +117,36 @@ class FragmentReassembler:
         while len(self._completed_recent) > self._COMPLETED_LRU_CAP:
             self._completed_recent.pop(next(iter(self._completed_recent)))
 
+    def _try_parity_reconstruct(self, partial: _PartialFrame) -> bool:
+        if not partial.parities or partial.total == 0:
+            return False
+        reconstructed_any = False
+        for (group_start, group_len), parity_body in list(partial.parities.items()):
+            group_end = min(partial.total, group_start + group_len)
+            missing = [i for i in range(group_start, group_end) if i not in partial.parts]
+            if len(missing) == 1:
+                missing_idx = missing[0]
+                if missing_idx == partial.total - 1:
+                    # The frame's LAST fragment may be shorter than the
+                    # group's XOR width; reconstructing it would append
+                    # padding the frame parser rejects as trailing bytes
+                    # (2026-07-24 probe: 512 B payload reassembled to a
+                    # corrupt 609 B). Every other index is exactly
+                    # chunk-sized, so reconstruction there is byte-exact.
+                    # A lost last fragment falls back to GC-timeout +
+                    # keyframe request.
+                    continue
+                present = [partial.parts[i] for i in range(group_start, group_end) if i in partial.parts]
+                max_len = max(len(parity_body), max((len(p) for p in present), default=0))
+                acc = bytearray(parity_body.ljust(max_len, b"\x00"))
+                for p in present:
+                    for i, b in enumerate(p):
+                        acc[i] ^= b
+                partial.parts[missing_idx] = bytes(acc)
+                self.stats.parity_reconstructions += 1
+                reconstructed_any = True
+        return reconstructed_any
+
     def feed(self, raw: bytes) -> TileDeltaFrame | None:
         """Process one MQTT/UART payload. Returns a full frame iff this
         payload completed (or *was*) one. Returns ``None`` while a frame is
@@ -126,6 +162,29 @@ class FragmentReassembler:
         elif magic == FRAGMENT_MAGIC_V2:
             header_len = FRAGMENT_HEADER_LEN_V2
             is_v2 = True
+        elif magic == FRAGMENT_MAGIC_PARITY:
+            if len(raw) < FRAGMENT_HEADER_LEN_PARITY:
+                self.stats.decode_errors += 1
+                return None
+            frag_seq = raw[1]
+            group_start = raw[2]
+            group_len = raw[3]
+            parity_body = bytes(raw[FRAGMENT_HEADER_LEN_PARITY:])
+            if frag_seq in self._completed_recent:
+                return None
+            partial = self._partials.get(frag_seq)
+            if partial is None:
+                partial = _PartialFrame(total=0, first_seen_ms=now, last_seen_ms=now)
+                self._partials[frag_seq] = partial
+            partial.parities[(group_start, group_len)] = parity_body
+            partial.last_seen_ms = now
+            self._try_parity_reconstruct(partial)
+            if partial.total > 0 and len(partial.parts) == partial.total:
+                del self._partials[frag_seq]
+                self._mark_completed(frag_seq)
+                full = b"".join(partial.parts[i] for i in range(partial.total))
+                return self._decode_or_record_error(full)
+            return None
         else:
             self.stats.bad_magic_passthroughs += 1
             return self._decode_or_record_error(raw)
@@ -163,10 +222,12 @@ class FragmentReassembler:
         if partial is None:
             partial = _PartialFrame(total=total, first_seen_ms=now, last_seen_ms=now)
             self._partials[frag_seq] = partial
-        if partial.total != total:
+        if partial.total != total and total > 0:
             # Producer changed its mind mid-frame. Restart this slot.
             partial = _PartialFrame(total=total, first_seen_ms=now, last_seen_ms=now)
             self._partials[frag_seq] = partial
+        if partial.total == 0 and total > 0:
+            partial.total = total
         # v2 per-idx copy bookkeeping (no-op for v1 traffic).
         if is_v2:
             mask = partial.copy_bitmasks.get(frag_idx, 0)
@@ -190,10 +251,11 @@ class FragmentReassembler:
                 return None
         partial.parts[frag_idx] = body
         partial.last_seen_ms = now
-        if len(partial.parts) == total:
+        self._try_parity_reconstruct(partial)
+        if partial.total > 0 and len(partial.parts) == partial.total:
             del self._partials[frag_seq]
             self._mark_completed(frag_seq)
-            full = b"".join(partial.parts[i] for i in range(total))
+            full = b"".join(partial.parts[i] for i in range(partial.total))
             return self._decode_or_record_error(full)
         return None
 
@@ -201,12 +263,6 @@ class FragmentReassembler:
         """Frag seqs that still have missing fragments. Used by `canvas.py`
         to decide whether to send `CMD_REQ_KEYFRAME`."""
         return list(self._partials.keys())
-
-    def tick(self, now_ms: int | None = None) -> None:
-        """Run GC without feeding a fragment. Call from the RX drain loop so
-        partials expire during RF silence (F16b) — today _gc only runs
-        inside feed(), i.e. never when the link goes quiet."""
-        self._gc(self._clock_ms() if now_ms is None else now_ms)
 
     def _gc(self, now_ms: int) -> None:
         if not self._partials:

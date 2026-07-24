@@ -46,7 +46,7 @@ import random
 import unittest
 
 from lora_proto import (
-    PHY_IMAGE,
+    PHY_IMAGE_BW500 as PHY_IMAGE,
     PHY_CONTROL_SF7,
     PHY_CONTROL_SF8,
     PHY_CONTROL_SF9,
@@ -65,7 +65,7 @@ from lora_proto import (
 
 # Profiles fast enough to actually carry a fragment under the 25 ms cap.
 # PHY_TELEMETRY (SF9/BW250) preamble alone is ~33 ms so it's excluded
-# (the live code path retunes to PHY_IMAGE for fragmented telemetry —
+# (the live code path retunes to PHY_IMAGE_BW500 for fragmented telemetry —
 # see the docstring at lora_proto.py:494).
 FAST_PROFILES = (PHY_IMAGE, PHY_CONTROL_SF7)
 # Slower profiles still pack, just into more fragments.

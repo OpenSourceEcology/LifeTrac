@@ -18,6 +18,11 @@
 
 static bool s_radio_ok;
 static uint8_t s_radio_version;
+static sx1276_tx_request_t s_tx_pending;
+static bool s_tx_pending_valid;
+/* M2: original request seq, carried so a failed deferred TX can emit a
+ * correlatable ERR_PROTO instead of seq=0. */
+static uint16_t s_tx_pending_seq;
 
 #if HOST_AT_SHELL_ENABLE
 static char at_upper(char ch) {
@@ -447,11 +452,17 @@ static void handle_tx_frame(const host_frame_t *frame) {
     }
 
     if (sx1276_tx_busy()) {
-        host_uart_send_err_proto(frame->seq,
-                                 frame->type,
-                                 frame->ver,
-                                 HOST_ERR_PROTO_QUEUE_FULL,
-                                 0U);
+        if (s_tx_pending_valid) {
+            host_uart_send_err_proto(frame->seq,
+                                     frame->type,
+                                     frame->ver,
+                                     HOST_ERR_PROTO_QUEUE_FULL,
+                                     0U);
+            return;
+        }
+        s_tx_pending = req;
+        s_tx_pending_seq = frame->seq;
+        s_tx_pending_valid = true;
         return;
     }
 
@@ -677,6 +688,7 @@ void host_cmd_init(bool radio_ok, uint8_t radio_version) {
 
     s_radio_ok = radio_ok;
     s_radio_version = radio_version;
+    s_tx_pending_valid = false;
 
     cfg_init();
     host_stats_reset();
@@ -843,6 +855,22 @@ void host_cmd_emit_tx_done(const sx1276_tx_result_t *result) {
                        0U,
                        payload,
                        (uint16_t)sizeof(payload));
+}
+
+void host_cmd_service_tx_mailbox(void) {
+    if (!s_tx_pending_valid || sx1276_tx_busy()) {
+        return;
+    }
+    sx1276_tx_request_t next = s_tx_pending;
+    uint16_t next_seq = s_tx_pending_seq;
+    s_tx_pending_valid = false;
+    if (!sx1276_tx_begin(&next)) {
+        /* M2: carry the parked request's seq so the host can correlate
+         * the failure with the TX_FRAME_REQ it parked. */
+        host_uart_send_err_proto(next_seq, HOST_TYPE_TX_FRAME_REQ,
+                                 HOST_PROTOCOL_VER,
+                                 HOST_ERR_PROTO_FORBIDDEN, 0U);
+    }
 }
 
 void host_cmd_emit_fault(uint8_t code, uint8_t sub) {

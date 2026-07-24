@@ -148,7 +148,7 @@ PHY_CONTROL_SF8 = PhyProfile("control_sf8", 8, 125, 5, 8)
 PHY_CONTROL_SF9 = PhyProfile("control_sf9", 9, 125, 5, 8)
 PHY_TELEMETRY = PhyProfile("telemetry", 9, 250, 8, 12)
 PHY_IMAGE_BW250 = PhyProfile("image_bw250", 7, 250, 5, 8)   # what the radio RUNS today
-PHY_IMAGE_BW500 = PhyProfile("image_bw500", 7, 500, 5, 8)   # valid after Phase 2.4
+PHY_IMAGE_BW500 = PhyProfile("image_bw500", 7, 500, 5, 8)   # valid after Phase 2.4 (DTS)
 PHY_IMAGE = PhyProfile("image", 7, 250, 5, 8)                # alias to BW250 (fixes F1)
 
 PHY_BY_NAME = {
@@ -159,9 +159,11 @@ PHY_BY_NAME = {
 # IP-W2-04: shared ordered tuple used as the wire-side index space for
 # CMD_LINK_PROFILE (opcode 0x64). The base-station emitter and the X8
 # decoder MUST agree on this order; the X8 mirrors it as
-# ``camera_service.LINK_PHY_NAMES``.
+# ``camera_service.LINK_PHY_NAMES``. New names are append-only so the
+# 0..4 wire indices stay stable.
 LINK_PHY_NAMES: tuple[str, ...] = (
-    "image", "telemetry", "control_sf9", "control_sf8", "control_sf7", "image_bw250", "image_bw500"
+    "image", "telemetry", "control_sf9", "control_sf8", "control_sf7",
+    "image_bw250", "image_bw500",
 )
 
 
@@ -826,9 +828,10 @@ TELEMETRY_FRAGMENT_HEADER_LEN = 4
 # copies as dedup-by-(seq, idx) with first-copy-wins semantics.
 TELEMETRY_FRAGMENT_MAGIC_V2 = 0xFD
 TELEMETRY_FRAGMENT_HEADER_LEN_V2 = 5
+TELEMETRY_FRAGMENT_MAGIC_PARITY = 0xFC
+TELEMETRY_FRAGMENT_HEADER_LEN_PARITY = 4
 TELEMETRY_FRAGMENT_MAX_AIRTIME_MS = 25.0
 
-# Image strict-path fragmentation constants
 LORA_HOP_HDR_LEN = 8            # lora_pkt_hdr.h LORA_PKT_HDR_LEN
 TX_FRAME_BODY_MAX = 255 - LORA_HOP_HDR_LEN   # 247: F7-safe hard ceiling
 IMAGE_FRAG_AIR_CAP_MS = float(os.environ.get("LIFETRAC_FRAG_AIR_CAP_MS", "170.0"))
@@ -839,7 +842,7 @@ def max_image_fragment_body(profile: PhyProfile = PHY_IMAGE_BW250,
                             body_ceiling: int = TX_FRAME_BODY_MAX) -> int:
     """Largest TX_FRAME_REQ body whose ON-AIR time (body + hop header)
     fits max_air_ms. Unlike max_telemetry_fragment_payload() this does
-    NOT inherit the 118 B TelemetryFrame clamp (F13) and does NOT add
+    NOT inherit the 118 B TelemetryFrame clamp and does NOT add
     the 9 B telemetry envelope the strict path never sends."""
     lo, hi, best = 1, body_ceiling, 0
     while lo <= hi:
@@ -892,6 +895,40 @@ def pack_image_fragments_v2(payload: bytes, frag_seq: int,
         for copy_idx in range(copies):
             out.append(bytes([TELEMETRY_FRAGMENT_MAGIC_V2, seq, idx, total_m1,
                               ((copies & 0x0F) << 4) | copy_idx]) + body[4:])
+    return out
+
+
+def add_parity_fragments(fragments: list[bytes], frag_seq: int,
+                         group_len: int = 8) -> list[bytes]:
+    """Interleave XOR parity fragments (0xFC magic) into packed fragment list.
+
+    For every contiguous group of up to group_len fragments, computes the XOR
+    parity across fragment bodies and appends a 0xFC parity fragment.
+    0xFC header: magic (0xFC) | frag_seq (1B) | group_start (1B) | group_len (1B).
+    """
+    if not fragments or group_len <= 0:
+        return fragments
+    out: list[bytes] = []
+    for g in range(0, len(fragments), group_len):
+        chunk = fragments[g:g + group_len]
+        out.extend(chunk)
+        bodies = []
+        for f in chunk:
+            parsed = parse_telemetry_fragment(f)
+            if parsed is not None:
+                bodies.append(parsed[3])
+            else:
+                bodies.append(f)
+        if not bodies:
+            continue
+        max_len = max(len(b) for b in bodies)
+        acc = bytearray(max_len)
+        for b in bodies:
+            for i, val in enumerate(b):
+                acc[i] ^= val
+        parity_hdr = bytes([TELEMETRY_FRAGMENT_MAGIC_PARITY, frag_seq & 0xFF,
+                            g & 0xFF, group_len & 0xFF])
+        out.append(parity_hdr + bytes(acc))
     return out
 
 
@@ -950,19 +987,20 @@ def pack_telemetry_fragments(payload: bytes, frag_seq: int,
 def parse_telemetry_fragment(body: bytes) -> tuple[int, int, int, bytes] | None:
     """Inverse of pack_telemetry_fragments(); returns (seq, idx, total, data).
 
-    Accepts both v1 (0xFE, 4-byte header) and v2 (0xFD, 5-byte header
-    with extra redundancy nibble byte). For v2 the redundancy byte is
-    silently dropped here -- callers that care about copy_idx use the
-    image_pipeline FragmentReassembler directly. Returns None when no
-    known magic matches (caller should treat the body as a complete
-    unfragmented payload -- keeps backward compat with telemetry topics
-    whose payloads always fit under 25 ms).
+    Accepts v1 (0xFE, 4-byte header), v2 (0xFD, 5-byte header), and parity (0xFC,
+    4-byte header: seq, group_start, group_len, parity_data).
     """
     if len(body) < TELEMETRY_FRAGMENT_HEADER_LEN:
         return None
     magic = body[0]
     if magic == TELEMETRY_FRAGMENT_MAGIC:
         header_len = TELEMETRY_FRAGMENT_HEADER_LEN
+        frag_seq = body[1]
+        frag_idx = body[2]
+        total = body[3] + 1
+        if frag_idx >= total:
+            return None
+        return frag_seq, frag_idx, total, bytes(body[header_len:])
     elif magic == TELEMETRY_FRAGMENT_MAGIC_V2:
         if len(body) < TELEMETRY_FRAGMENT_HEADER_LEN_V2:
             return None
@@ -972,14 +1010,22 @@ def parse_telemetry_fragment(body: bytes) -> tuple[int, int, int, bytes] | None:
         if total_copies == 0 or copy_idx >= total_copies:
             return None
         header_len = TELEMETRY_FRAGMENT_HEADER_LEN_V2
+        frag_seq = body[1]
+        frag_idx = body[2]
+        total = body[3] + 1
+        if frag_idx >= total:
+            return None
+        return frag_seq, frag_idx, total, bytes(body[header_len:])
+    elif magic == TELEMETRY_FRAGMENT_MAGIC_PARITY:
+        if len(body) < TELEMETRY_FRAGMENT_HEADER_LEN_PARITY:
+            return None
+        header_len = TELEMETRY_FRAGMENT_HEADER_LEN_PARITY
+        frag_seq = body[1]
+        group_start = body[2]
+        group_len = body[3]
+        return frag_seq, group_start, group_len, bytes(body[header_len:])
     else:
         return None
-    frag_seq = body[1]
-    frag_idx = body[2]
-    total = body[3] + 1
-    if frag_idx >= total:
-        return None
-    return frag_seq, frag_idx, total, bytes(body[header_len:])
 
 
 @dataclass

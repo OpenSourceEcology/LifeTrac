@@ -105,6 +105,8 @@ static void test_fhss_happy_when_routed(void) {
            "state machine swapped to FHSS");
     EXPECT(host_cfg_profile_active()->modem_bw_hz == HOST_CFG_PROFILE_FHSS_BW_HZ,
            "FHSS synthesised BW matches profile default");
+    EXPECT(sx1276_stub_last_bw_khz() == 250,
+           "modem programmed to 250 kHz on FHSS activation");
 }
 
 static void test_dts_happy_when_routed(void) {
@@ -117,6 +119,8 @@ static void test_dts_happy_when_routed(void) {
            "cfg_get reflects DTS profile");
     EXPECT(host_cfg_profile_active()->modem_bw_hz == HOST_CFG_PROFILE_DTS_BW_HZ,
            "DTS synthesised BW matches profile default");
+    EXPECT(sx1276_stub_last_bw_khz() == 500,
+           "modem programmed to 500 kHz on DTS activation");
 }
 
 static void test_profile_unknown_oor(void) {

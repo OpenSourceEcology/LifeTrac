@@ -173,7 +173,8 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
         const uint8_t active_id = (active_prof != NULL)
             ? active_prof->profile_id
             : (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915;
-        if (active_id == (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915) {
+        if (active_id == (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915 ||
+            active_id == (uint8_t)REG_PROFILE_FCC_15_247_DTS_BW500) {
             s_hop_idx     = 0U;
             s_hop_epoch   = 0U;
             s_hop_freq_hz = 0U;
@@ -317,7 +318,8 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
         const uint8_t dwell_id = (dwell_prof != NULL)
             ? dwell_prof->profile_id
             : (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915;
-        if (dwell_id != (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915) {
+        if (dwell_id != (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915 &&
+            dwell_id != (uint8_t)REG_PROFILE_FCC_15_247_DTS_BW500) {
             s_legal_dwell_handle = SX1276_DWELL_HANDLE_INVALID;
             const sx1276_dwell_status_t dst = sx1276_legal_dwell_reserve(
                 s_channel_idx,

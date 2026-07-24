@@ -21,6 +21,7 @@ from lora_proto import (
     KissDecoder,
     PHY_CONTROL_SF7,
     PHY_IMAGE,
+    PHY_IMAGE_BW500,
     PHY_TELEMETRY,
     PRIO_P0,
     PRIO_P1,
@@ -84,7 +85,7 @@ class LoraProtoTests(unittest.TestCase):
     def test_image_fragment_fits_25ms_cap_at_bw500(self):
         # DECISIONS.md D-A3: image PHY is SF7/BW500 so a 32 B fragment
         # stays under the 25 ms per-fragment cap (LORA_IMPLEMENTATION.md §4).
-        self.assertLessEqual(lora_time_on_air_ms(32, PHY_IMAGE), 25.0)
+        self.assertLessEqual(lora_time_on_air_ms(32, PHY_IMAGE_BW500), 25.0)
 
     # --- 2026-05-18 design-doc D13 / D14 / §17 worked-example pins ---------
     #
@@ -148,13 +149,13 @@ class LoraProtoTests(unittest.TestCase):
         # D13 GCM-64 = 23.10 ms (fits with ~2 ms margin).
         # D14 plain+CRC32 = 20.54 ms (fits with ~4.5 ms margin).
         toa_shipped = lora_time_on_air_ms(
-            encrypted_payload_len(32, CRYPTO_GCM128_EXPLICIT), PHY_IMAGE,
+            encrypted_payload_len(32, CRYPTO_GCM128_EXPLICIT), PHY_IMAGE_BW500,
         )
         toa_d13 = lora_time_on_air_ms(
-            encrypted_payload_len(32, CRYPTO_GCM64_IMPLICIT), PHY_IMAGE,
+            encrypted_payload_len(32, CRYPTO_GCM64_IMPLICIT), PHY_IMAGE_BW500,
         )
         toa_d14 = lora_time_on_air_ms(
-            encrypted_payload_len(32, CRYPTO_IMAGE_PLAIN_CRC32), PHY_IMAGE,
+            encrypted_payload_len(32, CRYPTO_IMAGE_PLAIN_CRC32), PHY_IMAGE_BW500,
         )
         self.assertAlmostEqual(toa_shipped, 28.224, places=3)
         self.assertAlmostEqual(toa_d13, 23.104, places=3)

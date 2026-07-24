@@ -14,6 +14,7 @@ void host_cmd_dispatch_at_line(const char *line, uint16_t len);
 void host_cmd_on_radio_events(uint32_t radio_events);
 void host_cmd_emit_rx_frame(const sx1276_rx_frame_t *frame);
 void host_cmd_emit_tx_done(const sx1276_tx_result_t *result);
+void host_cmd_service_tx_mailbox(void);
 void host_cmd_emit_fault(uint8_t code, uint8_t sub);
 void host_cmd_emit_stats_snapshot(void);
 

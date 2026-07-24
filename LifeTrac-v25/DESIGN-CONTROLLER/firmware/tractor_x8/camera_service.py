@@ -415,9 +415,10 @@ ENCODE_MODE_BTC4_PER_TILE  = 4
 ENCODE_MODE_BTC4_PER_FRAME = 5
 ENCODE_MODE_MONO_G4        = 6
 ENCODE_MODE_ADAPTIVE       = 7
+ENCODE_MODE_RAWSTREAM      = 8
 ENCODE_MODE_NAMES = (
     "full", "y_only", "motion_only", "wireframe",
-    "btc4_per_tile", "btc4_per_frame", "mono_g4", "adaptive",
+    "btc4_per_tile", "btc4_per_frame", "mono_g4", "adaptive", "rawstream",
 )
 # Modes whose encoder is actually implemented today. Anything outside
 # this set is silently clamped to ENCODE_MODE_Y_ONLY at the receive
@@ -428,6 +429,7 @@ _ENCODE_MODE_IMPLEMENTED = frozenset({
     ENCODE_MODE_MOTION_ONLY,
     ENCODE_MODE_WIREFRAME,
     ENCODE_MODE_MONO_G4,
+    ENCODE_MODE_RAWSTREAM,
 })
 
 
@@ -460,6 +462,7 @@ CODEC_MONO_G4         = 1
 CODEC_BTC4_PER_TILE   = 2
 CODEC_BTC4_PER_FRAME  = 3
 CODEC_WEBP_LUMA       = 4   # grayscale WebP; base routes through Recolouriser
+CODEC_WEBP_RAWSTREAM  = 5   # raw WebP VP8/VP8L bitstream (container-stripped)
 
 # Map operator-selected EncodeMode -> wire codec for the frame header.
 # Modes whose encoders are not implemented yet still use CODEC_WEBP
@@ -474,7 +477,15 @@ _ENCODE_MODE_CODEC: dict[int, int] = {
     ENCODE_MODE_BTC4_PER_FRAME:  CODEC_WEBP_LUMA,   # placeholder; clamped to Y_ONLY
     ENCODE_MODE_MONO_G4:         CODEC_MONO_G4,
     ENCODE_MODE_ADAPTIVE:        CODEC_WEBP_LUMA,   # placeholder; clamped to Y_ONLY
+    ENCODE_MODE_RAWSTREAM:       CODEC_WEBP_RAWSTREAM,
 }
+
+# Deployment knob: strip WebP containers for FULL-mode tiles without a
+# CMD_ENCODE_MODE round trip. Honored by BOTH _encode_tile (strips the
+# bytes) and _codec_for_mode (flips the wire codec byte) so the two can
+# never desynchronise. Read once at import; the per-mode RAWSTREAM path
+# does not depend on it.
+CONTAINER_STRIP = os.environ.get("LIFETRAC_CONTAINER_STRIP", "0") == "1"
 
 
 def _codec_for_mode(mode: int) -> int:
@@ -485,7 +496,10 @@ def _codec_for_mode(mode: int) -> int:
     single point where the encoder ladder and the wire-format byte are
     kept consistent.
     """
-    return _ENCODE_MODE_CODEC.get(_clamp_encode_mode(mode), CODEC_WEBP)
+    codec = _ENCODE_MODE_CODEC.get(_clamp_encode_mode(mode), CODEC_WEBP)
+    if CONTAINER_STRIP and codec == CODEC_WEBP:
+        return CODEC_WEBP_RAWSTREAM   # matches _encode_tile's strip path
+    return codec
 
 
 def _apply_encode_mode_quality(quality: int, mode: int) -> int:
@@ -529,7 +543,8 @@ def _encode_tile_mono_g4(img) -> bytes:
 
 def _encode_tile(rgb_canvas: bytes, tx: int, ty: int,
                  quality: int | None = None,
-                 encode_mode: int | None = None) -> bytes:
+                 encode_mode: int | None = None,
+                 is_key: bool = False) -> bytes | None:
     """Encode tile (tx,ty) as a WebP blob. Caller is responsible for
     keeping the blob ≤ TILE_BYTES_MAX; we degrade quality if needed.
 
@@ -546,33 +561,44 @@ def _encode_tile(rgb_canvas: bytes, tx: int, ty: int,
     mode = ENCODE_MODE if encode_mode is None else _clamp_encode_mode(encode_mode)
     if mode == ENCODE_MODE_MONO_G4:
         return _encode_tile_mono_g4(img)
-    if mode != ENCODE_MODE_FULL:
+    if mode not in (ENCODE_MODE_FULL, ENCODE_MODE_RAWSTREAM):
         # Drop chroma. PIL's L→RGB round-trip keeps the WebP container
         # in RGB so the wire decoder doesn't need to know about modes.
+        # RAWSTREAM is exempt: it is FULL-colour with the container
+        # stripped, NOT a degraded mode (2026-07-24 fix — mode 8 was
+        # silently grayscale because this branch caught it).
         img = img.convert("L").convert("RGB")
     quality = WEBP_QUALITY if quality is None else max(5, min(100, int(quality)))
     quality = _apply_encode_mode_quality(quality, mode)
+    # Strip only when the wire codec byte will say RAWSTREAM (see
+    # _codec_for_mode) — stripping under any other codec id ships tiles
+    # the base cannot decode (2026-07-24 fix: the env knob used to strip
+    # while the codec byte stayed CODEC_WEBP).
+    strip_container = (mode == ENCODE_MODE_RAWSTREAM
+                       or (CONTAINER_STRIP and mode == ENCODE_MODE_FULL))
+    method = 6 if is_key else 4
     while quality >= 5:
         buf = io.BytesIO()
-        img.save(buf, format="WEBP", quality=quality, method=4)
+        img.save(buf, format="WEBP", quality=quality, method=method)
         blob = buf.getvalue()
         if len(blob) <= TILE_BYTES_MAX:
+            if strip_container and len(blob) >= 20 and blob.startswith(b"RIFF"):
+                blob = blob[20:]
             return blob
         quality -= 10
     # F14: NEVER return >256 B — _build_frame would ship blob[:256], a
-    # truncated RIFF container the base cannot decode (pure wasted airtime
-    # + a spurious decode-error keyframe request). Per-tile MONO_G4 is NOT
-    # wire-legal (codec is a per-frame header byte; 15 = reserved escape),
-    # so: grayscale re-try (typically halves the size), then drop.
+    # truncated RIFF container the base cannot decode. Grayscale retry, then drop.
     gray = img.convert("L").convert("RGB")
     buf = io.BytesIO()
     gray.save(buf, format="WEBP", quality=5, method=6)
     blob = buf.getvalue()
     if len(blob) <= TILE_BYTES_MAX:
+        if strip_container and len(blob) >= 20 and blob.startswith(b"RIFF"):
+            blob = blob[20:]
         return blob
     LOG.warning("tile unencodable <=%d B even gray-q5 (%d B); dropping",
                 TILE_BYTES_MAX, len(blob))
-    return None                      # caller: skip tile, keep bitmap honest
+    return None
 
 
 @dataclass
@@ -903,11 +929,11 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
             key_input = raw + bytes([q & 0xFF, ENCODE_MODE & 0xFF])
             blob = encode_cache.lookup(i, key_input)
             if blob is None:
-                blob = _encode_tile(canvas, tx, ty, quality=q)
+                blob = _encode_tile(canvas, tx, ty, quality=q, is_key=is_key)
                 if blob is not None:
                     encode_cache.store(i, key_input, blob)
         else:
-            blob = _encode_tile(canvas, tx, ty, quality=q)
+            blob = _encode_tile(canvas, tx, ty, quality=q, is_key=is_key)
         if blob is None:
             continue
         cost = min(len(blob), TILE_BYTES_MAX) + 1   # +1 for size prefix

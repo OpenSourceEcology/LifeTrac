@@ -63,7 +63,7 @@ for _p in (_REPO_ROOT_BASE, _X8_HELPER, _HERE):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from lora_proto import PHY_IMAGE  # noqa: E402
+from lora_proto import PHY_IMAGE_BW250, PHY_IMAGE_BW500  # noqa: E402
 from image_pipeline.frame_format import encode_tile_delta_frame  # noqa: E402
 from image_pipeline.reassemble import FragmentReassembler         # noqa: E402
 from method_h_stage2_tx_probe_v2 import (  # noqa: E402
@@ -89,6 +89,8 @@ LOG = logging.getLogger("image_rx_daemon")
 # does not have to change.
 MQTT_TOPIC_OUT = "lifetrac/v25/video/tile_delta"
 KEYFRAME_REQ_TOPIC = "lifetrac/v25/cmd/req_keyframe"   # camera_service listens
+
+_PROFILE_TO_PHY = {0: PHY_IMAGE_BW250, 1: PHY_IMAGE_BW250, 2: PHY_IMAGE_BW500}
 
 # MQTT defaults; assume `adb reverse tcp:1883 tcp:1883` is wired so the
 # X8 can reach the Windows host mosquitto via localhost.
@@ -154,6 +156,7 @@ class ImageRxDaemon:
         self.stats = _Stats()
         self._lock = threading.Lock()
         self._client = None
+        self._kf_req = KeyframeRequester(lambda: self._client)
 
     def _open_link(self) -> HostLink:
         LOG.info("opening L072 HostLink on %s @ %s", self.uart, self.baud)
@@ -172,35 +175,31 @@ class ImageRxDaemon:
         if not skip_reset:
             try:
                 link.send(0x03)  # HOST_TYPE_RESET_REQ
-                drain_boot(link, settle_s=2.5)
+                drain_boot(link, settle_s=1.5)
             except Exception as exc:                          # pragma: no cover
                 LOG.warning("L072 reset failed: %s (continuing)", exc)
         else:
             LOG.info("LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; "
                      "draining boot chatter only")
             try:
-                drain_boot(link, settle_s=1.5)
+                drain_boot(link, settle_s=0.25)
             except Exception as exc:                          # pragma: no cover
                 LOG.warning("post-NRST drain failed: %s (continuing)", exc)
-        ver_ok = False
-        for attempt in range(3):
-            try:
-                link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=1.0)
-                LOG.info("L072 VER warm-up ok")
-                ver_ok = True
-                break
-            except Exception as exc:
-                LOG.warning("VER warm-up attempt %d failed: %s", attempt + 1, exc)
-                drain_pending(link, quiet_s=0.25, max_s=1.0)
-        if not ver_ok:
-            LOG.error("VER warm-up failed after 3 attempts")
-            raise RuntimeError("VER warm-up failed")
+        try:
+            link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=1.0)
+            LOG.info("L072 VER warm-up ok")
+        except Exception as exc:
+            LOG.error("VER warm-up failed: %s", exc)
+            raise
         drain_pending(link, quiet_s=0.25, max_s=1.0)
         try:
             configure_regulatory_profile_if_needed(link)
-            verify_modem_matches_profile(link, PHY_IMAGE)
         except Exception as exc:                              # pragma: no cover
-            LOG.warning("regulatory profile config / contract check failed: %s", exc)
+            LOG.warning("regulatory profile config failed: %s", exc)
+        if _os.environ.get("LIFETRAC_SKIP_PHY_CONTRACT", "0") != "1":
+            prof_id = int(_os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+            active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
+            verify_modem_matches_profile(link, active_phy)
         # 2026-05-25 fix: explicitly wake the SX1276 into LORA_RXCONTINUOUS
         # (RegOpMode=0x85). The firmware does NOT auto-enter RXCONT after
         # boot — prior probes (and any prior TX-side cleanup) leave the

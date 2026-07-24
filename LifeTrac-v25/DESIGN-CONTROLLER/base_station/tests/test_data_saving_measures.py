@@ -55,7 +55,7 @@ def _fake_encode_tile_factory(blob_size: int = 50,
     if calls is None:
         calls = []
 
-    def _fake(rgb_canvas, tx, ty, quality=None):
+    def _fake(rgb_canvas, tx, ty, quality=None, encode_mode=None, is_key=False):
         calls.append((tx, ty, quality))
         # Tile content includes (tx, ty) so different tiles round-trip
         # to distinct blobs through parse_tile_delta_frame.

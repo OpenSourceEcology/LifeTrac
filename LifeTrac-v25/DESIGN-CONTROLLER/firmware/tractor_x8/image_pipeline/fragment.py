@@ -30,26 +30,26 @@ to guarantee the X8 and the base station stay byte-identical.
 from __future__ import annotations
 
 from lora_proto import (   # noqa: E402  (sys.path is configured by the runner)
-    PHY_IMAGE,
+    PHY_IMAGE_BW250,
     PhyProfile,
+    IMAGE_FRAG_AIR_CAP_MS,
     TELEMETRY_FRAGMENT_HEADER_LEN,
     TELEMETRY_FRAGMENT_MAGIC,
-    TELEMETRY_FRAGMENT_MAX_AIRTIME_MS,
-    max_telemetry_fragment_payload,
-    pack_telemetry_fragments,
+    max_image_fragment_body,
+    pack_image_fragments as _pack_image_fragments,
 )
 
 # Re-export so callers don't have to reach into base_station from this side.
 IMAGE_FRAGMENT_MAGIC = TELEMETRY_FRAGMENT_MAGIC
 IMAGE_FRAGMENT_HEADER_LEN = TELEMETRY_FRAGMENT_HEADER_LEN
-IMAGE_FRAGMENT_MAX_AIRTIME_MS = TELEMETRY_FRAGMENT_MAX_AIRTIME_MS
+IMAGE_FRAGMENT_MAX_AIRTIME_MS = IMAGE_FRAG_AIR_CAP_MS
 
 
 def pack_image_fragments(payload: bytes,
                          frag_seq: int,
                          *,
-                         profile: PhyProfile = PHY_IMAGE,
-                         max_air_ms: float = TELEMETRY_FRAGMENT_MAX_AIRTIME_MS) -> list[bytes]:
+                         profile: PhyProfile = PHY_IMAGE_BW250,
+                         max_air_ms: float = IMAGE_FRAG_AIR_CAP_MS) -> list[bytes]:
     """Split an encoded TileDeltaFrame into ≤``max_air_ms`` fragment bodies.
 
     Returns the list of fragment bodies (header + data). Each body is
@@ -57,13 +57,17 @@ def pack_image_fragments(payload: bytes,
     going on the air. ``frag_seq`` rolls 0..255 per logical image frame
     and lets the reassembler distinguish back-to-back frames.
     """
-    return pack_telemetry_fragments(payload, frag_seq, profile, max_air_ms=max_air_ms)
+    return _pack_image_fragments(payload, frag_seq, profile, max_air_ms=max_air_ms)
+
+
+def _chunk(profile: PhyProfile, max_air_ms: float) -> int:
+    return max_image_fragment_body(profile, max_air_ms) - IMAGE_FRAGMENT_HEADER_LEN
 
 
 def estimate_fragment_count(payload_len: int,
                             *,
-                            profile: PhyProfile = PHY_IMAGE,
-                            max_air_ms: float = TELEMETRY_FRAGMENT_MAX_AIRTIME_MS) -> int:
+                            profile: PhyProfile = PHY_IMAGE_BW250,
+                            max_air_ms: float = IMAGE_FRAG_AIR_CAP_MS) -> int:
     """How many fragments a payload of ``payload_len`` bytes would produce.
 
     Used by the X8's quality controller to back off WebP quality / tile
@@ -72,17 +76,17 @@ def estimate_fragment_count(payload_len: int,
     """
     if payload_len <= 0:
         return 0
-    chunk = max_telemetry_fragment_payload(profile, max_air_ms)
-    if chunk <= 0:
+    c = _chunk(profile, max_air_ms)
+    if c <= 0:
         raise ValueError(
             f"profile {profile.name} cannot fit any fragment in {max_air_ms} ms")
-    return max(1, (payload_len + chunk - 1) // chunk)
+    return max(1, (payload_len + c - 1) // c)
 
 
 def max_payload_for_n_fragments(n_fragments: int,
                                 *,
-                                profile: PhyProfile = PHY_IMAGE,
-                                max_air_ms: float = TELEMETRY_FRAGMENT_MAX_AIRTIME_MS) -> int:
+                                profile: PhyProfile = PHY_IMAGE_BW250,
+                                max_air_ms: float = IMAGE_FRAG_AIR_CAP_MS) -> int:
     """Inverse of :func:`estimate_fragment_count`.
 
     Returns the maximum logical payload size (in bytes) that fits inside
@@ -91,5 +95,4 @@ def max_payload_for_n_fragments(n_fragments: int,
     """
     if n_fragments <= 0:
         return 0
-    chunk = max_telemetry_fragment_payload(profile, max_air_ms)
-    return chunk * n_fragments
+    return n_fragments * _chunk(profile, max_air_ms)

@@ -48,6 +48,13 @@ class EncodeModeDispatchTests(unittest.TestCase):
         camera_service.ENCODE_MODE = self._saved
 
     def test_valid_modes_update_global_and_force_keyframe(self) -> None:
+        # LORA_PROTOCOL.md (CMD_ENCODE_MODE): the tractor "clamps
+        # unknown/unimplemented modes to y_only rather than crashing".
+        # The dispatcher therefore commits _clamp_encode_mode(mode):
+        # implemented modes verbatim, everything else -> Y_ONLY.
+        # (2026-07-24: test aligned to the documented semantics — it
+        # previously demanded unimplemented modes commit verbatim, which
+        # contradicted both the doc and the sibling bad-mode test.)
         for mode, name in enumerate(camera_service.ENCODE_MODE_NAMES):
             self.evt.clear()
             camera_service.dispatch_back_channel(
@@ -55,26 +62,32 @@ class EncodeModeDispatchTests(unittest.TestCase):
                        camera_service.CMD_ENCODE_MODE,
                        mode]),
                 self.evt)
-            self.assertEqual(camera_service.ENCODE_MODE, mode,
-                             f"mode {mode} ({name}) not committed")
+            expected = camera_service._clamp_encode_mode(mode)
+            if mode in camera_service._ENCODE_MODE_IMPLEMENTED:
+                self.assertEqual(expected, mode,
+                                 f"implemented mode {mode} must clamp to itself")
+            self.assertEqual(camera_service.ENCODE_MODE, expected,
+                             f"mode {mode} ({name}) not committed as {expected}")
             self.assertTrue(self.evt.is_set(),
                             f"mode {mode} ({name}) did not force keyframe")
 
     def test_out_of_range_mode_rejected_but_keyframe_still_forced(self) -> None:
-        # Operator-visible: a malformed mode shouldn't silently change
-        # the encoder, but we still want a fresh keyframe so the bridge
-        # surfaces "I heard the request" instantly.
-        camera_service.ENCODE_MODE = camera_service.ENCODE_MODE_FULL
+        # Unimplemented/out-of-range modes clamp to Y_ONLY (never crash,
+        # never commit the raw value) and still force a keyframe so the
+        # bridge surfaces "I heard the request" instantly.
         for bad in (4, 7, 99, 0xFF):
+            camera_service.ENCODE_MODE = camera_service.ENCODE_MODE_FULL
             self.evt.clear()
             camera_service.dispatch_back_channel(
                 bytes([camera_service.X8_CMD_TOPIC,
                        camera_service.CMD_ENCODE_MODE,
                        bad]),
                 self.evt)
+            self.assertNotIn(bad, camera_service._ENCODE_MODE_IMPLEMENTED,
+                             f"test premise: {bad} must be unimplemented")
             self.assertEqual(camera_service.ENCODE_MODE,
-                             camera_service.ENCODE_MODE_FULL,
-                             f"bad mode {bad} mutated ENCODE_MODE")
+                             camera_service.ENCODE_MODE_Y_ONLY,
+                             f"bad mode {bad} must clamp to Y_ONLY")
             self.assertTrue(self.evt.is_set(),
                             f"bad mode {bad} did not force keyframe")
 
@@ -226,7 +239,7 @@ class EncodeCacheInvalidatesOnModeChangeTests(unittest.TestCase):
         calls = []
         original = camera_service._encode_tile
 
-        def _stub(rgb, tx, ty, quality=None, encode_mode=None):
+        def _stub(rgb, tx, ty, quality=None, encode_mode=None, is_key=False):
             calls.append((tx, ty, quality, encode_mode,
                           camera_service.ENCODE_MODE))
             head = bytes([tx & 0xFF, ty & 0xFF,

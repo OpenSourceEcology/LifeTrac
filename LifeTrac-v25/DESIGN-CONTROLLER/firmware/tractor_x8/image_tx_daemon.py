@@ -81,8 +81,10 @@ for _p in (_BASE_STATION, _X8_HELPER, _HERE):
 from lora_proto import (  # noqa: E402
     PHY_IMAGE,
     PHY_IMAGE_BW250,
+    PHY_IMAGE_BW500,
     LORA_HOP_HDR_LEN,
     IMAGE_FRAG_AIR_CAP_MS,
+    add_parity_fragments,
     lora_time_on_air_ms,
     pack_image_fragments,
     pack_image_fragments_v2,
@@ -101,7 +103,6 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     wait_for_tx_done,
     configure_regulatory_profile_if_needed,
     verify_modem_matches_profile,
-    read_reg,
 )
 
 LOG = logging.getLogger("image_tx_daemon")
@@ -112,6 +113,8 @@ LEGAL_DWELL_US = 400_000                  # FCC §15.247(a)(1) 400 ms dwell
 MAX_FRAMES_PER_DWELL_CAP = 8
 DWELL_HEADROOM_PCT = 85
 PER_FRAGMENT_TX_TIMEOUT_S = 3.0
+
+_PROFILE_TO_PHY = {0: PHY_IMAGE_BW250, 1: PHY_IMAGE_BW250, 2: PHY_IMAGE_BW500}
 
 class AirtimeBudget:
     """Host mirror of the firmware per-channel QoS gate
@@ -211,7 +214,6 @@ class ImageTxDaemon:
             if not isinstance(payload, (bytes, bytearray)):
                 LOG.debug("ignoring non-bytes payload (%s)", type(payload).__name__)
                 return
-            LOG.info("MQTT frame received on %s (%d B)", msg.topic, len(payload))
             with self.lock:
                 self.frames_in += 1
                 self._next_seq = (self._next_seq + 1) & 0xFF
@@ -257,32 +259,31 @@ class ImageTxDaemon:
             "LIFETRAC_SKIP_RESET_REQ", "0") not in ("0", "", "false", "False")
         if not skip_reset:
             try:
-                LOG.info("sending RESET_REQ (0x03)...")
                 link.send(0x03)  # HOST_TYPE_RESET_REQ
-                LOG.info("draining boot (settle_s=2.5)...")
-                drain_boot(link, settle_s=2.5)
-                LOG.info("drain_boot finished")
+                drain_boot(link, settle_s=1.5)
             except Exception as exc:                          # pragma: no cover
                 LOG.warning("L072 reset failed: %s (continuing)", exc)
         else:
             LOG.info("LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; "
                      "draining boot chatter only")
             try:
-                drain_boot(link, settle_s=1.5)
+                drain_boot(link, settle_s=0.25)
             except Exception as exc:                          # pragma: no cover
                 LOG.warning("post-NRST drain failed: %s (continuing)", exc)
         try:
             link.request(HOST_TYPE_VER_REQ, HOST_TYPE_VER_URC, timeout=1.0)
-            LOG.info("L072 VER warm-up ok")
         except Exception as exc:
-            LOG.warning("VER warm-up failed: %s (continuing)", exc)
-        drain_pending(link, quiet_s=0.25, max_s=1.0)
+            LOG.error("VER warm-up failed: %s", exc)
+            raise
         drain_pending(link, quiet_s=0.25, max_s=1.0)
         try:
             configure_regulatory_profile_if_needed(link)
-            verify_modem_matches_profile(link, PHY_IMAGE_BW250)
         except Exception as exc:                              # pragma: no cover
-            LOG.warning("regulatory profile config / contract check failed: %s", exc)
+            LOG.warning("regulatory profile config failed: %s", exc)
+        if _os.environ.get("LIFETRAC_SKIP_PHY_CONTRACT", "0") != "1":
+            prof_id = int(_os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+            active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
+            verify_modem_matches_profile(link, active_phy)
         try:
             link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
                          bytes([CFG_KEY_LBT_ENABLE, 0x01, 0x00]), timeout=1.0)
@@ -317,12 +318,22 @@ class ImageTxDaemon:
         copies = int(os.environ.get("LIFETRAC_KEYFRAME_COPIES", "1"))
         if copies <= 1 and is_key and self.recent_frag_loss_rate() > 0.005:
             copies = 2                                  # auto: only when PER says so
+        prof_id = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+        active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
         if is_key and copies > 1:
             return pack_image_fragments_v2(frame.payload, frame.seq,
-                                           PHY_IMAGE_BW250, IMAGE_FRAG_AIR_CAP_MS,
+                                           active_phy, IMAGE_FRAG_AIR_CAP_MS,
                                            copies=copies)
-        return pack_image_fragments(frame.payload, frame.seq,
-                                    PHY_IMAGE_BW250, IMAGE_FRAG_AIR_CAP_MS)
+        frags = pack_image_fragments(frame.payload, frame.seq,
+                                     active_phy, IMAGE_FRAG_AIR_CAP_MS)
+        # Phase 3: optional XOR parity (0xFC). RX-side reconstruction
+        # shipped first (reassemble.py); enable emission per deployment
+        # via LIFETRAC_PARITY_GROUP=8. v1 path only — the v2 copies path
+        # above already carries its own redundancy.
+        parity_group = int(os.environ.get("LIFETRAC_PARITY_GROUP", "0"))
+        if parity_group > 0:
+            frags = add_parity_fragments(frags, frame.seq, parity_group)
+        return frags
 
     def _tx_one_frame(self, link: HostLink, frame: _PendingFrame) -> None:
         # F16a: Stale-frame cancellation
@@ -350,14 +361,19 @@ class ImageTxDaemon:
 
         max_qos_retries = 4   # FORBIDDEN/ABORT_QOS: not admitted, ZERO RF spent
         max_rf_retries  = 1   # TX_DONE non-OK / timeout: airtime was spent
+        prof_id = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+        active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
 
         for idx, body in enumerate(fragments):
             if self._stop.is_set():
                 break
             est_us = int(lora_time_on_air_ms(len(body) + LORA_HOP_HDR_LEN,
-                                             PHY_IMAGE_BW250) * 1000)
+                                             active_phy) * 1000)
             sent = False
-            for attempt in range(1 + max_qos_retries + max_rf_retries):
+            qos_retries_left = max_qos_retries
+            rf_retries_left = max_rf_retries
+
+            while True:
                 if not self.budget.admit(est_us, self._stop):
                     return                                     # shutting down
                 try:
@@ -367,18 +383,19 @@ class ImageTxDaemon:
                     done, faults = wait_for_tx_done(
                         link, tx_id, timeout=PER_FRAGMENT_TX_TIMEOUT_S)
                 except RuntimeError as exc:      # ERR_PROTO FORBIDDEN == QoS refusal:
+                    qos_retries_left -= 1
+                    if qos_retries_left < 0:
+                        LOG.warning("QoS refusal cap reached for frag %d", idx)
+                        break
                     time.sleep(est_us / 2e6)                   # cheap, no RF spent
                     continue
-                except TimeoutError:
+                except (TimeoutError, Exception) as exc:
                     self.budget.record(est_us)                 # assume RF spent
-                    with self.lock:
-                        self.fragments_tx_fail += 1
-                    continue                                   # counts vs RF retries
-                except Exception as exc:
-                    self.budget.record(est_us)
-                    with self.lock:
-                        self.fragments_tx_fail += 1
-                    continue
+                    rf_retries_left -= 1
+                    if rf_retries_left < 0:
+                        LOG.warning("RF send error for frag %d: %s", idx, exc)
+                        break
+                    continue                                   # retry
 
                 actual_toa = done.get("time_on_air_us") or est_us
                 self.budget.record(actual_toa)
@@ -389,18 +406,20 @@ class ImageTxDaemon:
                         self.bytes_tx_ok += len(body)
                     break
                 else:
-                    with self.lock:
-                        self.fragments_tx_fail += 1
+                    rf_retries_left -= 1
                     LOG.warning("TX_DONE non-OK: seq=%d idx=%d tx_id=0x%02x "
                                 "status=%d(%s) toa_us=%d",
                                 frame.seq, idx, tx_id, done["status"],
                                 done.get("status_name", "?"),
                                 done.get("time_on_air_us", 0))
+                    if rf_retries_left < 0:
+                        break
 
             if not sent:
                 # F4: a frame missing any fragment can never reassemble --
                 # stop burning airtime on it and let RX request a keyframe.
                 with self.lock:
+                    self.fragments_tx_fail += 1
                     self.frames_tx_fail += 1
                 LOG.warning("frame seq=%d ABORTED at fragment %d/%d",
                             frame.seq, idx, len(fragments))
@@ -412,26 +431,20 @@ class ImageTxDaemon:
 
     # ---- stats printer ----
     def _stats_worker(self, interval_s: float) -> None:
-        last = time.monotonic()
-        last_bytes = 0
+        last = 0.0
         while not self._stop.is_set():
             time.sleep(1.0)
             now = time.monotonic()
-            elapsed = now - last
-            if elapsed < interval_s:
+            if now - last < interval_s:
                 continue
-            with self.lock:
-                cur_bytes = self.bytes_tx_ok
-                bytes_delta = cur_bytes - last_bytes
-                bps = bytes_delta / elapsed if elapsed > 0 else 0.0
-                LOG.info(
-                    "stats: goodput=%.1f B/s frames_in=%d ok=%d fail=%d "
-                    "drop_full=%d drop_stale=%d frags_ok=%d frags_fail=%d qdepth=%d",
-                    bps, self.frames_in, self.frames_tx_ok, self.frames_tx_fail,
-                    self.frames_dropped_queue_full, self.frames_dropped_stale,
-                    self.fragments_tx_ok, self.fragments_tx_fail, self._q.qsize())
             last = now
-            last_bytes = cur_bytes
+            with self.lock:
+                LOG.info(
+                    "stats: frames_in=%d ok=%d fail=%d drop_full=%d "
+                    "frags_ok=%d frags_fail=%d qdepth=%d",
+                    self.frames_in, self.frames_tx_ok, self.frames_tx_fail,
+                    self.frames_dropped_queue_full, self.fragments_tx_ok,
+                    self.fragments_tx_fail, self._q.qsize())
 
     # ---- lifecycle ----
     def run(self, *, stats_interval_s: float) -> int:
@@ -442,9 +455,8 @@ class ImageTxDaemon:
         client = mqtt.Client(client_id=f"lifetrac-image-tx-{os.getpid()}")
         client.on_message = self._on_message
 
-        def _on_connect(_c, _u, _f, rc, *args):
-            rc_val = getattr(rc, "value", rc)
-            if rc_val == 0 or str(rc) == "Success":
+        def _on_connect(_c, _u, _f, rc):
+            if rc == 0:
                 LOG.info("MQTT connected; subscribing to %s", MQTT_TOPIC_IN)
                 client.subscribe(MQTT_TOPIC_IN, qos=0)
             else:

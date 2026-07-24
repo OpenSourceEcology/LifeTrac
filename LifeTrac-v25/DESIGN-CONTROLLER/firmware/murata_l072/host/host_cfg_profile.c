@@ -6,6 +6,8 @@
 #include "host_cfg_profile.h"
 #include "host_cfg_keys.h"
 #include "sx1276_fhss.h"
+#include "sx1276.h"
+#include "sx1276_modes.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -182,8 +184,17 @@ host_cfg_profile_reject_t host_cfg_profile_activate(void) {
         return HOST_CFG_PROFILE_REJECT_NOT_STAGED;
     }
     s_active    = s_staged;
+    /* D2: RegModemConfig writes require SLEEP/STANDBY (Semtech DS §4.1;
+     * sx1276_apply_profile_full() sequences the same way). Activation
+     * can be requested while the RX daemon has RXCONT armed. */
+    (void)sx1276_modes_to_standby();
     if (s_active.profile_id == REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) {
         (void)sx1276_fhss_init(0ULL, 0ULL, 0U);
+        sx1276_set_sf_bw_cr(7U, 250U, 5U);
+    } else if (s_active.profile_id == REG_PROFILE_FCC_15_247_DTS_BW500) {
+        sx1276_set_sf_bw_cr(7U, 500U, 5U);
+    } else if (s_active.profile_id == REG_PROFILE_BENCH_ONLY_FIXED_915) {
+        sx1276_set_sf_bw_cr(7U, 250U, 5U);
     }
     memset(&s_staged, 0, sizeof(s_staged));
     s_has_stage = false;

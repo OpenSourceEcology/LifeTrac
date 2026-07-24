@@ -149,6 +149,15 @@ int main(void) {
                 host_cmd_emit_rx_frame(&rx_frame);
             }
 
+            /* Drain the depth-2 TX mailbox AFTER the RX service window:
+             * the SX1276 has a single 256 B FIFO shared by RX and TX, and
+             * sx1276_tx_begin() rewinds FIFO_ADDR_PTR to 0. Draining
+             * before the rx_service line would keep sx1276_tx_busy()
+             * true across every iteration of a back-to-back stream and
+             * let the next TX overwrite an unread RX frame (M1,
+             * 2026-07-23 Phase-2 review §3.1). */
+            host_cmd_service_tx_mailbox();
+
             /* FCC-A6c-2-b: drive the Scanning state machine. Must
              * run BEFORE sx1276_rx_tick() so the (state, action)
              * counters reflect the SM that γ-1 retune will (in

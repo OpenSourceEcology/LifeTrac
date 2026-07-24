@@ -39,6 +39,7 @@ CODEC_MONO_G4         = 1   # 1-bit Floyd-Steinberg dither, zlib-packed.
 CODEC_BTC4_PER_TILE   = 2   # 4-level palette + 2 bpp index plane, per tile.
 CODEC_BTC4_PER_FRAME  = 3   # 4 × RGB palette in body prefix + 2 bpp tiles.
 CODEC_WEBP_LUMA       = 4   # Y_ONLY: grayscale WebP per tile (luma-only).
+CODEC_WEBP_RAWSTREAM  = 5   # RAWSTREAM: container-stripped WebP bitstream per tile.
 CODEC_RESERVED_MAX    = 15  # parser rejects codec > this
 
 

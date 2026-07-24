@@ -348,6 +348,7 @@ check-cfg-contract-unit: $(BUILD)
 	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
 	    bench/host_proto/cfg_contract.c \
 	    bench/host_proto/sx1276_stub.c \
+	    bench/host_proto/fhss_stub.c \
 	    host/host_cfg.c \
 	    host/host_cfg_profile.c \
 	    -o $(CFG_CONTRACT_BIN)
@@ -359,6 +360,7 @@ check-cfg-contract-wire: $(BUILD)
 	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
 	    bench/host_proto/cfg_wire_vectors.c \
 	    bench/host_proto/sx1276_stub.c \
+	    bench/host_proto/fhss_stub.c \
 	    host/host_cfg.c \
 	    host/host_cfg_profile.c \
 	    host/host_cfg_wire.c \
@@ -580,9 +582,9 @@ check-cfg-profile: $(BUILD)
 	@echo "[CFGP ] Building cfg-profile test ..."
 	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
 	    bench/host_proto/cfg_profile.c \
+	    bench/host_proto/sx1276_stub.c \
+	    bench/host_proto/fhss_stub.c \
 	    host/host_cfg_profile.c \
-	    radio/sx1276_fhss.c \
-	    radio/sx1276_fhss_chantab.c \
 	    -o $(CFG_PROFILE_BIN)
 	@echo "[CFGP ] Running cfg-profile test ..."
 	@$(CFG_PROFILE_BIN)
@@ -599,15 +601,19 @@ check-cfg-profile-wire: $(BUILD)
 	    -DLIFETRAC_FHSS_TX_ROUTED \
 	    bench/host_proto/cfg_profile_wire.c \
 	    bench/host_proto/sx1276_stub.c \
+	    bench/host_proto/fhss_stub.c \
 	    host/host_cfg.c \
 	    host/host_cfg_profile.c \
-	    radio/sx1276_fhss.c \
-	    radio/sx1276_fhss_chantab.c \
 	    -o $(CFG_PROFILE_WIRE_BIN)
 	@echo "[CFGPW] Running cfg-profile-wire test ..."
 	@$(CFG_PROFILE_WIRE_BIN)
 
-# C1/F7 regression pin for sx1276_tx_begin length guard
+# C1/F7 regression pin for the sx1276_tx_begin length guard: length+8 >
+# 255 must be refused BEFORE any FIFO or scheduler side effect. Links
+# the REAL sx1276_tx.c/airtime/dwell/fhss objects so the guard is pinned
+# against the production path; tx_len_guard.c provides the platform and
+# host-boundary stubs (sx1276_stub.c provides set_tx_power/set_sf_bw_cr/
+# modes_to_standby — do NOT re-stub those locally).
 check-tx-len-guard: $(BUILD)
 	@echo "[TXLEN] Building tx-len-guard test ..."
 	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
@@ -639,6 +645,8 @@ check-cfg-clamp-fuzz: $(BUILD)
 	@echo "[CFGF ] Building cfg-clamp-fuzz test ..."
 	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
 	    bench/host_proto/cfg_clamp_fuzz.c \
+	    bench/host_proto/sx1276_stub.c \
+	    bench/host_proto/fhss_stub.c \
 	    host/host_cfg_profile.c \
 	    -o $(CFG_CLAMP_FUZZ_BIN)
 	@echo "[CFGF ] Running cfg-clamp-fuzz test ..."

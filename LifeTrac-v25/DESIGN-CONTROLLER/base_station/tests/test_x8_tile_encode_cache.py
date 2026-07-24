@@ -51,7 +51,7 @@ def _fake_encode_factory(blob_size: int = 24, calls: list | None = None):
     if calls is None:
         calls = []
 
-    def _fake(rgb_canvas, tx, ty, quality=None):
+    def _fake(rgb_canvas, tx, ty, quality=None, encode_mode=None, is_key=False):
         calls.append((tx, ty, quality))
         body = bytes([tx & 0xFF, ty & 0xFF, (quality or 0) & 0xFF])
         pad = max(0, blob_size - len(body))

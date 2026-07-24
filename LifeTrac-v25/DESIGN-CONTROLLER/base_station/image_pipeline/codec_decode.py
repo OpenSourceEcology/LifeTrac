@@ -45,6 +45,7 @@ from .frame_format import (
     CODEC_MONO_G4,
     CODEC_WEBP,
     CODEC_WEBP_LUMA,
+    CODEC_WEBP_RAWSTREAM,
 )
 
 
@@ -96,6 +97,20 @@ def _decode_webp_luma(blob: bytes, tile_px: int) -> bytes:  # noqa: ARG001
     return blob
 
 
+def rewrap_webp(raw: bytes) -> bytes:
+    """Re-wrap a stripped VP8/VP8L rawstream into a valid RIFF WebP container."""
+    if not raw:
+        raise CodecDecodeError("rawstream empty")
+    fourcc = b"VP8L" if raw[:1] == b"\x2f" else b"VP8 "
+    chunk = fourcc + len(raw).to_bytes(4, "little") + raw + (b"\x00" if len(raw) & 1 else b"")
+    return b"RIFF" + (4 + len(chunk)).to_bytes(4, "little") + b"WEBP" + chunk
+
+
+def _decode_webp_rawstream(blob: bytes, tile_px: int) -> bytes:  # noqa: ARG001
+    """Re-wrap a stripped VP8/VP8L rawstream tile into a RIFF WebP container."""
+    return rewrap_webp(blob)
+
+
 # Codec id -> transcoder. Each transcoder takes (blob, tile_px) and
 # returns a WebP blob the browser can paint. Codecs that are not yet
 # implemented are absent so ``transcode_to_webp`` can raise a precise
@@ -103,6 +118,7 @@ def _decode_webp_luma(blob: bytes, tile_px: int) -> bytes:  # noqa: ARG001
 _TRANSCODERS: dict[int, Callable[[bytes, int], bytes]] = {
     CODEC_MONO_G4: _decode_mono_g4,
     CODEC_WEBP_LUMA: _decode_webp_luma,
+    CODEC_WEBP_RAWSTREAM: _decode_webp_rawstream,
 }
 
 
