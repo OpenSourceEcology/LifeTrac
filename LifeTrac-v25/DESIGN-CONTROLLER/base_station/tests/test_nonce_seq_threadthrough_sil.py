@@ -112,12 +112,17 @@ def _make_bridge() -> Bridge:
 
 
 def _drain_queue(b: Bridge) -> list[tuple[int, int, bytes]]:
-    """Pop everything off ``_tx_queue`` in priority + FIFO order."""
+    """Pop everything off ``_tx_queue`` in priority + FIFO order.
+
+    Queue items are ``(source_id, seq, pt, latency_token)`` since the S1.2
+    tx_latency_meter landed; these tests only assert on the first three
+    fields, so normalize to 3-tuples here instead of at every unpack site.
+    """
     out: list[tuple[int, int, bytes]] = []
     with b._tx_cv:
         while b._tx_queue:
             _prio, _ord, item = heapq.heappop(b._tx_queue)
-            out.append(item)
+            out.append(tuple(item[:3]))
     return out
 
 

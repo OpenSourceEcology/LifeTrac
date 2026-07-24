@@ -84,6 +84,15 @@ try {
         $ErrorActionPreference = "Continue"
         $output = & py -3 -m unittest $verb $mod 2>&1
         $exit = $LASTEXITCODE
+        if ($exit -ne 0 -and ($output -match "NO TESTS RAN")) {
+            # pytest-style file (bare test_* functions, no TestCase): the
+            # unittest loader collects nothing and exits 5. Re-run under
+            # pytest so these files are judged honestly instead of being
+            # permanent runner false-failures (test_tx_power_adapter_v3,
+            # test_lora_bridge_tx_adapter_v3_wiring).
+            $output = & py -3 -m pytest -q $f.FullName 2>&1
+            $exit = $LASTEXITCODE
+        }
         $ErrorActionPreference = $prevEAP
 
         if ($exit -eq 0) {

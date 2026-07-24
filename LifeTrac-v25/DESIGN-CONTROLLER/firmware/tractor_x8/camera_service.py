@@ -691,7 +691,13 @@ def _compute_link_bytes(n_fragments: int, profile_name: str) -> int | None:
         return fallback_bytes
     profile = PHY_BY_NAME.get(profile_name)
     if profile is None:
-        return fallback_bytes
+        # Unknown profile NAME is bad input (mis-typed env / stale wire
+        # index), not a degraded runtime: return None so the caller
+        # rejects it (LinkBudget.update -> False, _resolve_byte_budget ->
+        # uncapped) instead of silently running with a 40 B/frag guess.
+        # The n*40 fallback above stays reserved for stripped runtimes
+        # where the protocol helpers cannot even be imported.
+        return None
     try:
         return max_payload_for_n_fragments(n_fragments, profile=profile)
     except Exception:                                         # pragma: no cover
