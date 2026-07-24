@@ -11,7 +11,20 @@ param(
     [string]$TxAdbSerial = "2E2C1209DABC240B",
     [string]$RxAdbSerial = "2D0A1209DABC240B",
     [string]$HostIp       = "192.168.1.79",
-    [int]$DurationS       = 30
+    [int]$DurationS       = 30,
+    # Saturation mode (2026-07-24): offered load must EXCEED capacity for
+    # the reported goodput to be a measurement rather than a traffic
+    # report (post-impl review §7.3). At 194 B frames the single-channel
+    # BW250 ceiling is ~2 frames/s, so 6 fps ≈ 3x saturation. The
+    # publisher prints its own OFFERED line for the evidence bundle.
+    [double]$SynthFps     = 2,
+    [int]$SynthBudgetB    = 250,
+    # LIFETRAC_TX_PIPELINE for the TX daemon: 'v2' serial, 'v3' pipelined
+    # (depth-2 firmware mailbox).
+    [string]$TxPipeline   = "v2",
+    # Archive final logs + parameters under bench-evidence/ with the git
+    # SHA in the folder name (evidence discipline per CODE REVIEWS docs).
+    [switch]$Archive
 )
 
 Set-StrictMode -Version Latest
@@ -78,13 +91,16 @@ Start-Sleep -Seconds 2
 
 # 6. Launch TX daemon in background
 Write-Host "[LAUNCH] Starting TX Daemon on Board $TxAdbSerial..." -ForegroundColor Yellow
-cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f tx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name tx_smoke --network=host --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=$HostIp -e LIFETRAC_SKIP_RESET_REQ=1 -e LIFETRAC_REG_PROFILE=0 hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44 python3 -u /work/image_tx_daemon.py --log-level INFO`""
+cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f tx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name tx_smoke --network=host --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=$HostIp -e LIFETRAC_SKIP_RESET_REQ=1 -e LIFETRAC_REG_PROFILE=0 -e LIFETRAC_TX_PIPELINE=$TxPipeline hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44 python3 -u /work/image_tx_daemon.py --log-level INFO`""
 
 Start-Sleep -Seconds 2
 
 # 7. Start Synthetic Frame Publisher on Host
-Write-Host "[STREAM] Starting synthetic camera publisher on Host..." -ForegroundColor Yellow
+Write-Host "[STREAM] Starting synthetic camera publisher on Host (fps=$SynthFps, budget=$SynthBudgetB B)..." -ForegroundColor Yellow
 $env:LIFETRAC_MQTT_HOST = $HostIp
+$env:LIFETRAC_SYNTH_FPS = "$SynthFps"
+$env:LIFETRAC_SYNTH_DURATION_S = "$($DurationS + 10)"
+$env:LIFETRAC_SYNTH_BYTE_BUDGET = "$SynthBudgetB"
 $pubScript = Join-Path $repoRoot "publish_synthetic_frames.py"
 $pubProc = Start-Process -FilePath "C:\Users\dorkm\AppData\Local\Python\pythoncore-3.14-64\python.exe" -ArgumentList "`"$pubScript`"" -PassThru -NoNewWindow -WorkingDirectory $repoRoot
 
@@ -116,5 +132,28 @@ Write-Host "--- TX DAEMON FINAL LOGS ---" -ForegroundColor Yellow
 Write-Host $txFinal
 Write-Host "--- RX DAEMON FINAL LOGS ---" -ForegroundColor Yellow
 Write-Host $rxFinal
+
+# 9. Evidence bundle (per the CODE REVIEWS evidence discipline: no
+#    verification claim without a SHA + raw transcript).
+if ($Archive) {
+    $sha = (git -C $repoRoot rev-parse --short HEAD 2>$null)
+    $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $dir = Join-Path $repoRoot "LifeTrac-v25\DESIGN-CONTROLLER\bench-evidence\radio_monitor_${stamp}_${sha}"
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $txFinal | Out-File -FilePath (Join-Path $dir "tx_daemon.log") -Encoding utf8
+    $rxFinal | Out-File -FilePath (Join-Path $dir "rx_daemon.log") -Encoding utf8
+    @(
+        "git_sha=$sha",
+        "duration_s=$DurationS",
+        "synth_fps=$SynthFps",
+        "synth_budget_b=$SynthBudgetB",
+        "tx_pipeline=$TxPipeline",
+        "tx_serial=$TxAdbSerial",
+        "rx_serial=$RxAdbSerial",
+        "host_ip=$HostIp",
+        "timestamp=$stamp"
+    ) | Out-File -FilePath (Join-Path $dir "params.txt") -Encoding utf8
+    Write-Host "[EVIDENCE] archived to $dir" -ForegroundColor Green
+}
 
 Write-Host "=== LIVE LORA RADIO MONITOR COMPLETE ===" -ForegroundColor Green

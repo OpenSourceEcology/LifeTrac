@@ -8,6 +8,7 @@
 #include "sx1276_fhss.h"
 #include "sx1276.h"
 #include "sx1276_modes.h"
+#include "sx1276_airtime.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -191,10 +192,14 @@ host_cfg_profile_reject_t host_cfg_profile_activate(void) {
     if (s_active.profile_id == REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) {
         (void)sx1276_fhss_init(0ULL, 0ULL, 0U);
         sx1276_set_sf_bw_cr(7U, 250U, 5U);
+        sx1276_airtime_set_budget_us(SX1276_AIRTIME_BUDGET_DEFAULT_US);
     } else if (s_active.profile_id == REG_PROFILE_FCC_15_247_DTS_BW500) {
         sx1276_set_sf_bw_cr(7U, 500U, 5U);
+        /* D4: PSD-based profile — QoS gate widened to 95 % duty. */
+        sx1276_airtime_set_budget_us(SX1276_AIRTIME_BUDGET_DTS_US);
     } else if (s_active.profile_id == REG_PROFILE_BENCH_ONLY_FIXED_915) {
         sx1276_set_sf_bw_cr(7U, 250U, 5U);
+        sx1276_airtime_set_budget_us(SX1276_AIRTIME_BUDGET_DEFAULT_US);
     }
     memset(&s_staged, 0, sizeof(s_staged));
     s_has_stage = false;

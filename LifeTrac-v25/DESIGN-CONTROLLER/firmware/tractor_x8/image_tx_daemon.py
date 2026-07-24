@@ -97,7 +97,14 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     HOST_TYPE_CFG_SET_REQ,
     HOST_TYPE_CFG_OK_URC,
     HOST_TYPE_TX_FRAME_REQ,
+    HOST_TYPE_TX_DONE_URC,
+    HOST_TYPE_ERR_PROTO_URC,
+    HOST_TYPE_FAULT_URC,
     CFG_KEY_LBT_ENABLE,
+    BENIGN_FAULT_CODES,
+    parse_tx_done,
+    format_err_proto_payload,
+    format_fault_payload,
     drain_boot,
     drain_pending,
     wait_for_tx_done,
@@ -115,6 +122,19 @@ DWELL_HEADROOM_PCT = 85
 PER_FRAGMENT_TX_TIMEOUT_S = 3.0
 
 _PROFILE_TO_PHY = {0: PHY_IMAGE_BW250, 1: PHY_IMAGE_BW250, 2: PHY_IMAGE_BW500}
+
+# D4 host mirror: the firmware widens its per-channel QoS budget to
+# 950 ms/s under REG_PROFILE_FCC_15_247_DTS_BW500 (PSD-based compliance,
+# no P0 on the strict path). The host bucket stays 20 ms under the
+# firmware cap so a paced TX can never draw ABORT_QOS.
+_PROFILE_TO_BUDGET_US = {0: 380_000, 1: 380_000, 2: 930_000}
+
+# LIFETRAC_TX_PIPELINE: 'v2' (default) = serial send->TX_DONE->send;
+# 'v3' = keep 2 TX_FRAME_REQs in flight against the firmware's depth-2
+# mailbox (host_cmd.c s_tx_pending) so the UART turnaround rides inside
+# the previous fragment's time-on-air.
+TX_PIPELINE = os.environ.get("LIFETRAC_TX_PIPELINE", "v2").strip().lower()
+PIPELINE_DEPTH = 2
 
 class AirtimeBudget:
     """Host mirror of the firmware per-channel QoS gate
@@ -206,6 +226,12 @@ class ImageTxDaemon:
         self.fragments_tx_ok = 0
         self.fragments_tx_fail = 0
         self.bytes_tx_ok = 0
+        self.toa_us_sum = 0
+        # D4 host mirror: budget follows the active regulatory profile
+        # (DTS BW500 -> 930 ms/s, 20 ms under the firmware's 950 ms cap).
+        _prof = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+        self.budget = AirtimeBudget(
+            budget_us=_PROFILE_TO_BUDGET_US.get(_prof, 380_000))
 
     # ---- MQTT side ----
     def _on_message(self, _client, _userdata, msg) -> None:
@@ -364,6 +390,11 @@ class ImageTxDaemon:
         prof_id = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
         active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
 
+        if TX_PIPELINE == "v3":
+            self._tx_fragments_pipelined(link, frame, fragments, active_phy,
+                                         max_qos_retries, max_rf_retries)
+            return
+
         for idx, body in enumerate(fragments):
             if self._stop.is_set():
                 break
@@ -399,6 +430,8 @@ class ImageTxDaemon:
 
                 actual_toa = done.get("time_on_air_us") or est_us
                 self.budget.record(actual_toa)
+                with self.lock:
+                    self.toa_us_sum += actual_toa
                 if done["status"] == 0:  # SX1276_TX_STATUS_OK
                     sent = True
                     with self.lock:
@@ -429,22 +462,171 @@ class ImageTxDaemon:
             self.frames_tx_ok += 1
         LOG.info("frame seq=%d done: %d fragments ok", frame.seq, n)
 
+    def _tx_fragments_pipelined(self, link: HostLink, frame: _PendingFrame,
+                                fragments: list, active_phy,
+                                max_qos_retries: int,
+                                max_rf_retries: int) -> None:
+        """v3 pipelined TX against the firmware depth-2 mailbox.
+
+        Keeps up to PIPELINE_DEPTH TX_FRAME_REQs outstanding: while
+        fragment N radiates, fragment N+1 is already parked in the
+        L072's s_tx_pending mailbox (host_cmd.c), so the UART round
+        trip + host turnaround ride inside N's time-on-air instead of
+        adding dead air between fragments. Correlation:
+          * TX_DONE_URC  -> in-flight fragment by payload tx_id
+          * ERR_PROTO    -> in-flight fragment by request seq (QoS
+                            refusal of the PARKED frame: no RF spent)
+        Budget admission is per fragment, identical to the serial path,
+        so the QoS gate still can never fire under nominal pacing.
+        """
+        n = len(fragments)
+        inflight: dict = {}          # tx_id -> state dict
+        seq_to_txid: dict = {}       # host-link seq -> tx_id
+        next_i = 0
+        aborted = False
+        ok_count = 0
+
+        def _submit(i: int, rf_left: int, qos_left: int) -> bool:
+            body = fragments[i]
+            est_us = int(lora_time_on_air_ms(len(body) + LORA_HOP_HDR_LEN,
+                                             active_phy) * 1000)
+            if not self.budget.admit(est_us, self._stop):
+                return False                       # shutting down
+            tx_id = i & 0xFF
+            send_seq = link.send(HOST_TYPE_TX_FRAME_REQ,
+                                 bytes([tx_id, len(body)]) + body)
+            inflight[tx_id] = {
+                "idx": i, "body": body, "est_us": est_us,
+                "rf_left": rf_left, "qos_left": qos_left,
+                "sent_at": time.monotonic(),
+            }
+            seq_to_txid[send_seq] = tx_id
+            return True
+
+        def _fail_fragment(tx_id: int, st: dict, why: str) -> None:
+            nonlocal aborted
+            with self.lock:
+                self.fragments_tx_fail += 1
+            LOG.warning("frag %d failed (%s); aborting frame seq=%d",
+                        st["idx"], why, frame.seq)
+            aborted = True
+
+        while not self._stop.is_set() and (inflight or (next_i < n and not aborted)):
+            while (not aborted and next_i < n
+                   and len(inflight) < PIPELINE_DEPTH):
+                if not _submit(next_i, max_rf_retries, max_qos_retries):
+                    return                          # stop requested mid-frame
+                next_i += 1
+
+            if not inflight:
+                break
+
+            events = link.read_frames(0.05)
+            now = time.monotonic()
+
+            # Watchdog: a fragment with no verdict inside the timeout is
+            # treated as RF-spent (conservative for the budget mirror).
+            for tx_id, st in list(inflight.items()):
+                if now - st["sent_at"] > PER_FRAGMENT_TX_TIMEOUT_S:
+                    self.budget.record(st["est_us"])
+                    st["rf_left"] -= 1
+                    del inflight[tx_id]
+                    if st["rf_left"] >= 0 and not aborted:
+                        if not _submit(st["idx"], st["rf_left"], st["qos_left"]):
+                            return
+                    else:
+                        _fail_fragment(tx_id, st, "TX_DONE timeout")
+
+            for fr in events:
+                ftype = fr.get("type")
+                if ftype == HOST_TYPE_TX_DONE_URC:
+                    try:
+                        done = parse_tx_done(fr["payload"])
+                    except Exception:
+                        continue
+                    st = inflight.pop(done["tx_id"], None)
+                    if st is None:
+                        continue                    # stale URC from a past frame
+                    self.budget.record(done.get("time_on_air_us") or st["est_us"])
+                    with self.lock:
+                        self.toa_us_sum += done.get("time_on_air_us") or st["est_us"]
+                    if done["status"] == 0:
+                        ok_count += 1
+                        with self.lock:
+                            self.fragments_tx_ok += 1
+                            self.bytes_tx_ok += len(st["body"])
+                    else:
+                        st["rf_left"] -= 1
+                        LOG.warning("TX_DONE non-OK: seq=%d idx=%d status=%d(%s)",
+                                    frame.seq, st["idx"], done["status"],
+                                    done.get("status_name", "?"))
+                        if st["rf_left"] >= 0 and not aborted:
+                            if not _submit(st["idx"], st["rf_left"], st["qos_left"]):
+                                return
+                        else:
+                            _fail_fragment(done["tx_id"], st, "RF retries exhausted")
+                elif ftype == HOST_TYPE_ERR_PROTO_URC:
+                    tx_id = seq_to_txid.get(fr.get("seq"))
+                    st = inflight.pop(tx_id, None) if tx_id is not None else None
+                    if st is None:
+                        LOG.warning("ERR_PROTO (uncorrelated): %s",
+                                    format_err_proto_payload(fr["payload"]))
+                        continue
+                    st["qos_left"] -= 1           # refusal: zero RF was spent
+                    if st["qos_left"] >= 0 and not aborted:
+                        time.sleep(st["est_us"] / 2e6)
+                        if not _submit(st["idx"], st["rf_left"], st["qos_left"]):
+                            return
+                    else:
+                        _fail_fragment(tx_id, st, "QoS refusal cap reached")
+                elif ftype == HOST_TYPE_FAULT_URC:
+                    payload = fr.get("payload", b"")
+                    code = payload[0] if payload else None
+                    if code not in BENIGN_FAULT_CODES:
+                        LOG.warning("FAULT during pipelined TX: %s",
+                                    format_fault_payload(payload))
+                # RFCO_PERTX / STATS etc: informational, skip.
+
+        with self.lock:
+            if not aborted and ok_count == n:
+                self.frames_tx_ok += 1
+            else:
+                self.frames_tx_fail += 1
+        if aborted:
+            LOG.warning("frame seq=%d ABORTED (pipelined): %d/%d fragments ok",
+                        frame.seq, ok_count, n)
+        else:
+            LOG.info("frame seq=%d done (pipelined): %d fragments ok",
+                     frame.seq, ok_count)
+
     # ---- stats printer ----
     def _stats_worker(self, interval_s: float) -> None:
         last = 0.0
+        last_bytes = 0
+        last_toa_us = 0
         while not self._stop.is_set():
             time.sleep(1.0)
             now = time.monotonic()
             if now - last < interval_s:
                 continue
+            elapsed = (now - last) if last else interval_s
             last = now
             with self.lock:
+                cur_bytes = self.bytes_tx_ok
+                cur_toa = self.toa_us_sum
+                bps = (cur_bytes - last_bytes) / elapsed
+                util = ((cur_toa - last_toa_us) / 1e6) / elapsed
                 LOG.info(
-                    "stats: frames_in=%d ok=%d fail=%d drop_full=%d "
+                    "stats: goodput=%.1f B/s util=%.0f%% pipeline=%s "
+                    "frames_in=%d ok=%d fail=%d drop_full=%d drop_stale=%d "
                     "frags_ok=%d frags_fail=%d qdepth=%d",
+                    bps, util * 100.0, TX_PIPELINE,
                     self.frames_in, self.frames_tx_ok, self.frames_tx_fail,
-                    self.frames_dropped_queue_full, self.fragments_tx_ok,
-                    self.fragments_tx_fail, self._q.qsize())
+                    self.frames_dropped_queue_full, self.frames_dropped_stale,
+                    self.fragments_tx_ok, self.fragments_tx_fail,
+                    self._q.qsize())
+                last_bytes = cur_bytes
+                last_toa_us = cur_toa
 
     # ---- lifecycle ----
     def run(self, *, stats_interval_s: float) -> int:

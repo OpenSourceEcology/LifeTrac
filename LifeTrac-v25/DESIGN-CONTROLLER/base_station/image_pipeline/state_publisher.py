@@ -56,6 +56,13 @@ class StatePublisher:
     # has not yet emitted a sample (cold-start before first tick).
     link_power: dict[str, dict[str, Any] | None] = field(
         default_factory=lambda: {"uplink": None, "downlink": None})
+    # 2026-07-24 link-speed telemetry. Mirrors the rolling RX-side
+    # counters published by image_rx_daemon on
+    # `lifetrac/v25/video/link_stats` every ~2 s. Schema:
+    # ``{bps, frames_per_s, rx_frames_seen, frames_published,
+    #    rssi_dbm, snr_db, parity_reconstructions, timeouts,
+    #    decode_errors, ts}``. ``None`` until the first sample lands.
+    link_stats: dict[str, Any] | None = None
     clock_ms: Callable[[], int] = field(default=lambda: int(time.monotonic() * 1000))
 
     def snapshot(self) -> dict[str, Any]:
@@ -91,4 +98,5 @@ class StatePublisher:
                 "uplink": self.link_power.get("uplink"),
                 "downlink": self.link_power.get("downlink"),
             },
+            "link_stats": self.link_stats,
         }

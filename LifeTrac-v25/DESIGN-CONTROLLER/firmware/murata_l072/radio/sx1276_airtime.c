@@ -12,6 +12,34 @@
 #define SX1276_AIRTIME_WINDOW_MS            1000U
 #define SX1276_AIRTIME_BUDGET_US            400000U
 
+/*
+ * D4 (2026-07-24): the per-channel QoS budget is a POLICY gate that
+ * protects P0 ControlFrame TX-start latency — it is not itself an FCC
+ * requirement. Under REG_PROFILE_FCC_15_247_DTS_BW500 the compliance
+ * basis is PSD (§15.247(e)), there is no dwell/duty limit, and the
+ * strict-path image link carries no P0 traffic, so the profile
+ * activation raises the budget to SX1276_AIRTIME_BUDGET_DTS_US
+ * (95 % duty; the 5 % headroom keeps a service window for the
+ * back-channel RX between bursts). FHSS/bench profiles keep the
+ * 400 ms/s default. Runtime-settable so activation—not a rebuild—
+ * selects the regime; fail-safe floor/ceiling guards below.
+ */
+static uint32_t s_budget_cap_us = SX1276_AIRTIME_BUDGET_US;
+
+void sx1276_airtime_set_budget_us(uint32_t budget_us) {
+    if (budget_us < 10000U) {              /* refuse a nonsensical floor */
+        budget_us = 10000U;
+    }
+    if (budget_us > 950000U) {             /* leave >=50 ms RX headroom */
+        budget_us = 950000U;
+    }
+    s_budget_cap_us = budget_us;
+}
+
+uint32_t sx1276_airtime_get_budget_us(void) {
+    return s_budget_cap_us;
+}
+
 typedef struct sx1276_airtime_budget_s {
     uint32_t window_start_ms;
     uint32_t used_us;
@@ -180,7 +208,7 @@ sx1276_airtime_result_t sx1276_airtime_reserve(uint8_t channel_idx,
 
     refresh_budget_window(channel_idx, now_ms);
 
-    if ((SX1276_AIRTIME_BUDGET_US - s_budget[channel_idx].used_us) < estimate_us) {
+    if ((s_budget_cap_us - s_budget[channel_idx].used_us) < estimate_us) {
         return SX1276_AIRTIME_OVER_BUDGET;
     }
 
@@ -216,8 +244,8 @@ void sx1276_airtime_commit(uint8_t channel_idx, uint32_t used_us, uint32_t now_m
         return;
     }
 
-    if ((SX1276_AIRTIME_BUDGET_US - s_budget[channel_idx].used_us) < used_us) {
-        s_budget[channel_idx].used_us = SX1276_AIRTIME_BUDGET_US;
+    if ((s_budget_cap_us - s_budget[channel_idx].used_us) < used_us) {
+        s_budget[channel_idx].used_us = s_budget_cap_us;
         return;
     }
 

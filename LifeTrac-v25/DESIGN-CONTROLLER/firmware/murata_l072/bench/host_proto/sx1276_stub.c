@@ -20,6 +20,13 @@ void sx1276_set_sf_bw_cr(uint8_t sf, uint16_t bw_khz, uint8_t cr_den) {
     s_stub_cr = cr_den;
 }
 
+/* D4 budget capture lives in fhss_stub.c — NOT here — because
+ * check-tx-len-guard links this file together with the REAL
+ * radio/sx1276_airtime.c and a stub sx1276_airtime_set_budget_us()
+ * here would collide at link time. sx1276_stub_last_budget_us() is
+ * declared in sx1276_stub.h but defined in fhss_stub.c so only the
+ * real-radio-absent targets see it. */
+
 bool sx1276_modes_to_standby(void) {
     return true;
 }

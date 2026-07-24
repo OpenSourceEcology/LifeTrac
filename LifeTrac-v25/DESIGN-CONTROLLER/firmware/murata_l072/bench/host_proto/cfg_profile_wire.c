@@ -121,6 +121,8 @@ static void test_dts_happy_when_routed(void) {
            "DTS synthesised BW matches profile default");
     EXPECT(sx1276_stub_last_bw_khz() == 500,
            "modem programmed to 500 kHz on DTS activation");
+    EXPECT(sx1276_stub_last_budget_us() == 950000UL,
+           "D4: DTS activation widens the QoS budget to 950 ms/s");
 }
 
 static void test_profile_unknown_oor(void) {

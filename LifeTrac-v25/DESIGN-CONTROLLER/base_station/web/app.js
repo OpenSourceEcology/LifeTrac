@@ -238,6 +238,7 @@
   (() => {
     const cvs  = document.getElementById('image-canvas');
     const meta = document.getElementById('image-meta');
+    const speed = document.getElementById('image-link-speed');
     if (!cvs) return;
     let stateFrames = 0;
     let stateLastTs = performance.now();
@@ -248,6 +249,24 @@
         meta.textContent = `${stateFrames} Hz · tile stream`;
         stateFrames = 0;
         stateLastTs = now;
+      }
+      // 2026-07-24 link-speed panel: RX-side rolling counters published
+      // by image_rx_daemon ride /ws/state as snapshot.link_stats.
+      const ls = ev.detail && ev.detail.link_stats;
+      if (speed && ls && typeof ls.bps === 'number') {
+        const bps = ls.bps >= 1024
+          ? `${(ls.bps / 1024).toFixed(2)} KB/s`
+          : `${ls.bps.toFixed(0)} B/s`;
+        const parts = [
+          `▲ ${bps}`,
+          `${(ls.frames_per_s ?? 0).toFixed(2)} frames/s`,
+        ];
+        if (typeof ls.rssi_dbm === 'number') parts.push(`RSSI ${ls.rssi_dbm} dBm`);
+        if (typeof ls.snr_db === 'number') parts.push(`SNR ${ls.snr_db > 0 ? '+' : ''}${ls.snr_db} dB`);
+        if (ls.parity_reconstructions > 0) parts.push(`parity saves ${ls.parity_reconstructions}`);
+        if (ls.timeouts > 0) parts.push(`⚠ ${ls.timeouts} timeouts`);
+        speed.textContent = parts.join(' · ');
+        speed.classList.toggle('stale', (Date.now() / 1000 - (ls.ts || 0)) > 10);
       }
     });
   })();

@@ -35,6 +35,18 @@ void sx1276_airtime_release(uint8_t channel_idx, uint32_t reserved_us);
 void sx1276_airtime_commit(uint8_t channel_idx, uint32_t used_us, uint32_t now_ms);
 
 /*
+ * D4 (2026-07-24): per-profile QoS budget. Default 400 000 µs per
+ * rolling 1 s per channel (P0-latency policy gate). DTS BW500
+ * activation raises it to SX1276_AIRTIME_BUDGET_DTS_US — PSD-based
+ * compliance has no duty limit and the image strict path carries no
+ * P0 traffic. Clamped to [10 000, 950 000] µs inside the setter.
+ */
+#define SX1276_AIRTIME_BUDGET_DEFAULT_US      400000UL
+#define SX1276_AIRTIME_BUDGET_DTS_US          950000UL
+void sx1276_airtime_set_budget_us(uint32_t budget_us);
+uint32_t sx1276_airtime_get_budget_us(void);
+
+/*
  * Pure ToA calculator (no register reads, no globals). Used by the
  * config-time invariant check and by host-side mirrors. Returns the
  * computed time-on-air in microseconds for the supplied tuple.

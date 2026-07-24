@@ -89,6 +89,10 @@ LOG = logging.getLogger("image_rx_daemon")
 # does not have to change.
 MQTT_TOPIC_OUT = "lifetrac/v25/video/tile_delta"
 KEYFRAME_REQ_TOPIC = "lifetrac/v25/cmd/req_keyframe"   # camera_service listens
+# 2026-07-24: rolling RX-side link-speed sample for the web UI's image
+# panel (web_ui forwards it into /ws/state as snapshot.link_stats).
+LINK_STATS_TOPIC = "lifetrac/v25/video/link_stats"
+LINK_STATS_INTERVAL_S = 2.0
 
 _PROFILE_TO_PHY = {0: PHY_IMAGE_BW250, 1: PHY_IMAGE_BW250, 2: PHY_IMAGE_BW500}
 
@@ -157,6 +161,10 @@ class ImageRxDaemon:
         self._lock = threading.Lock()
         self._client = None
         self._kf_req = KeyframeRequester(lambda: self._client)
+        # 2026-07-24 link-speed telemetry (read by _link_stats_worker).
+        self._air_bytes = 0                  # on-air payload bytes received
+        self._last_rssi_dbm = None
+        self._last_snr_db = None
 
     def _open_link(self) -> HostLink:
         LOG.info("opening L072 HostLink on %s @ %s", self.uart, self.baud)
@@ -297,6 +305,13 @@ class ImageRxDaemon:
                 data: bytes = parsed.get("payload", b"")
                 with self._lock:
                     self.stats.rx_frames_seen += 1
+                    # 2026-07-24 link-speed telemetry: rolling counters
+                    # consumed by _link_stats_worker → /video/link_stats.
+                    self._air_bytes += len(data)
+                    if parsed.get("rssi_dbm") is not None:
+                        self._last_rssi_dbm = parsed["rssi_dbm"]
+                    if parsed.get("snr_db") is not None:
+                        self._last_snr_db = parsed["snr_db"]
                 LOG.debug(
                     "RX_FRAME_URC #%d len=%d snr=%s rssi=%s payload_head=%s",
                     self.stats.rx_frames_seen, len(data),
@@ -354,6 +369,51 @@ class ImageRxDaemon:
                     s.reassembled_frames_published, s.publish_errors,
                     s.reassembler_decode_errors, s.reassembler_timeouts)
 
+    def _link_stats_worker(self) -> None:
+        """Publish a rolling link-speed JSON sample every ~2 s.
+
+        ``bps`` counts ON-AIR payload bytes received (fragment headers
+        included) — the honest received-throughput number; the web UI
+        renders it under the image canvas. QoS 0, best-effort: a missed
+        sample just leaves the previous one on screen (the UI greys the
+        line once samples stop for >10 s).
+        """
+        import json as _json
+        last_bytes = 0
+        last_frames = 0
+        last_t = time.monotonic()
+        while not self._stop.is_set():
+            time.sleep(LINK_STATS_INTERVAL_S)
+            now = time.monotonic()
+            elapsed = max(now - last_t, 1e-3)
+            last_t = now
+            with self._lock:
+                cur_bytes = self._air_bytes
+                cur_frames = self.stats.reassembled_frames_published
+                sample = {
+                    "bps": round((cur_bytes - last_bytes) / elapsed, 1),
+                    "frames_per_s": round((cur_frames - last_frames) / elapsed, 2),
+                    "rx_frames_seen": self.stats.rx_frames_seen,
+                    "frames_published": cur_frames,
+                    "rssi_dbm": self._last_rssi_dbm,
+                    "snr_db": self._last_snr_db,
+                    "parity_reconstructions":
+                        self.reassembler.stats.parity_reconstructions,
+                    "timeouts": self.stats.reassembler_timeouts,
+                    "decode_errors": self.stats.reassembler_decode_errors,
+                    "ts": round(time.time(), 1),
+                }
+            last_bytes = cur_bytes
+            last_frames = cur_frames
+            client = self._client
+            if client is None:
+                continue
+            try:
+                client.publish(LINK_STATS_TOPIC,
+                               _json.dumps(sample).encode("utf-8"), qos=0)
+            except Exception as exc:                          # pragma: no cover
+                LOG.debug("link_stats publish failed: %s", exc)
+
     def run(self, *, stats_interval_s: float) -> int:
         import paho.mqtt.client as mqtt
 
@@ -381,6 +441,10 @@ class ImageRxDaemon:
                                         args=(stats_interval_s,),
                                         name="image-rx-stats", daemon=True)
         stats_thread.start()
+        link_stats_thread = threading.Thread(target=self._link_stats_worker,
+                                             name="image-rx-link-stats",
+                                             daemon=True)
+        link_stats_thread.start()
 
         def _handle_signal(_signum, _frame):
             LOG.info("signal received; shutting down")

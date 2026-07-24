@@ -95,6 +95,17 @@
       background: rgba(0,0,0,0.4); padding: 2px 8px; border-radius: 4px;
       pointer-events: none;
     }
+    /* 2026-07-24 link-speed line: RX-side goodput/RSSI/SNR published by
+       image_rx_daemon on /video/link_stats, delivered via /ws/state. */
+    #image-link-speed {
+      position: absolute;
+      bottom: 10px; left: 50%; transform: translateX(-50%);
+      font-family: ui-monospace, monospace;
+      font-size: 11px; z-index: 20; color: #9ef01a;
+      background: rgba(0,0,0,0.45); padding: 2px 8px; border-radius: 4px;
+      pointer-events: none; white-space: nowrap;
+    }
+    #image-link-speed.stale { color: #999; }
 
     /* Shared semi-transparent overlay-panel style. */
     .overlay-panel {
@@ -303,6 +314,7 @@
       <div class="image-wrapper">
         <canvas id="image-canvas" width="384" height="256" style="background:#000;"></canvas>
         <div id="image-meta">no image</div>
+        <div id="image-link-speed">link: waiting for stats…</div>
       </div>
     </div>
 

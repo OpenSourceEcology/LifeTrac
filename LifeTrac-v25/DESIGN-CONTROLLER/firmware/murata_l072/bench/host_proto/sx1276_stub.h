@@ -8,5 +8,6 @@ void sx1276_stub_reset(void);
 uint8_t sx1276_stub_last_tx_power_dbm(void);
 uint32_t sx1276_stub_tx_power_call_count(void);
 uint16_t sx1276_stub_last_bw_khz(void);
+uint32_t sx1276_stub_last_budget_us(void);
 
 #endif /* LIFETRAC_MURATA_L072_BENCH_SX1276_STUB_H */

@@ -613,6 +613,19 @@ def _on_mqtt_message(_c, _u, msg):
                     fut.add_done_callback(_ws_send_done("image"))
             return
 
+        # 2026-07-24 link-speed telemetry: image_rx_daemon publishes a
+        # rolling B/s + RSSI/SNR JSON sample on /video/link_stats every
+        # ~2 s. Forward into the StatePublisher so /ws/state carries it
+        # to the image panel (same seam as the S7.1 link_power glue).
+        if msg.topic.endswith("/video/link_stats"):
+            try:
+                stats = json.loads(msg.payload.decode("utf-8"))
+                if isinstance(stats, dict):
+                    _image_publisher.link_stats = stats
+            except Exception:
+                pass
+            return
+
         # Bench-only compatibility path: some legacy bring-up scripts publish
         # tile payloads on /cmd/image_frame. Keep this disabled by default so a
         # local synthetic publisher cannot override the authoritative radio path.

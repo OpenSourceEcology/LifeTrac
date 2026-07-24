@@ -168,30 +168,39 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
                     sx1276_fhss_consider_remote(parsed.epoch,
                                                 parsed.hop_idx);
                 sx1276_rx_counter_record(dec);
-                /* FCC-A6c-2-c-ii-δ (2026-05-27): on SNAPPED, the
-                 * local scheduler was wrong and consider_remote()
-                 * just parked s_fhss.slot at (remote_hop_idx + 1).
-                 * Immediately consume that slot and retune the
-                 * radio so we are listening on the channel TX will
-                 * use for its NEXT packet — do not wait for the
-                 * next γ-1 tick (the placeholder γ-2 period is the
-                 * 380 ms dwell cap, which is far longer than TX's
-                 * packet-to-packet inter-hop time for image
-                 * traffic). Without this, alpha-prime catches a
-                 * single packet and then drifts again until γ-1
-                 * eventually fires.
+                /* FCC-A6c-2-c-ii-δ (2026-05-27, extended 2026-07-24):
+                 * TX consumes one hop slot PER PACKET, so a locked
+                 * receiver must follow on EVERY valid FHSS packet —
+                 * not only when the scheduler had to be corrected.
                  *
-                 * ALIGNED — we were already in sync; γ-1 owns the
-                 * synth, do nothing here.
+                 * SNAPPED — the local scheduler was wrong and
+                 * consider_remote() just parked s_fhss.slot at
+                 * (remote_hop_idx + 1). Consume that slot and retune
+                 * so we are listening where TX transmits NEXT.
+                 *
+                 * ALIGNED — we were listening on the right channel
+                 * and received this packet; TX's next packet is on
+                 * the NEXT slot, so the follow is identical. (The
+                 * pre-2026-07-24 code did nothing here and waited
+                 * for the γ-1 380 ms tick — but TX's inter-packet
+                 * gap under budget pacing is ~200 ms, so lock-step
+                 * died after the first follow: v25.0.6.5 root cause.)
+                 *
                  * REJECTED_* — do not touch the synth.
                  *
                  * The follow-up next_channel() advances s_fhss.slot
-                 * by exactly 1 (consuming what snap_to parked),
-                 * matching the consume-then-tune convention γ-1 and
-                 * TX both use. See AI NOTES
+                 * by exactly 1, matching the consume-then-tune
+                 * convention γ-1 and TX both use. γ-1's anchor is
+                 * reset after each follow, so γ-1 only walks during
+                 * RF silence — where TX (which hops per packet, i.e.
+                 * faster than one slot per 380 ms) re-crosses the
+                 * receiver's slow walk within a bounded number of
+                 * packets and the first hit re-locks via SNAPPED.
+                 * See AI NOTES
                  * "2026-05-27_RX_Scan_Current_vs_Proposed_v25_0_6_5_v1_0.md"
                  * §3 Option δ. */
-                if (dec == SX1276_FHSS_SNAP_DEC_SNAPPED) {
+                if (dec == SX1276_FHSS_SNAP_DEC_SNAPPED ||
+                    dec == SX1276_FHSS_SNAP_DEC_ALIGNED) {
                     uint8_t  follow_idx = 0U;
                     uint32_t follow_hz  = 0U;
                     const sx1276_fhss_status_t fst =
