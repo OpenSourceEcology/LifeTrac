@@ -673,6 +673,7 @@ ROI_QUALITY_OUTSIDE = max( 5, min(100, int(os.environ.get(
 # recompute bytes via :func:`max_payload_for_n_fragments`.
 LINK_PHY_NAMES: tuple[str, ...] = (
     "image", "telemetry", "control_sf9", "control_sf8", "control_sf7",
+    "image_bw250", "image_bw500",   # append-only: wire indices 0-4 stay stable
 )
 
 

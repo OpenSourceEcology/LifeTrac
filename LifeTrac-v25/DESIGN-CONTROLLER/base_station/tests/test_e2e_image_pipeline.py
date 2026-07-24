@@ -57,7 +57,7 @@ from image_pipeline.frame_format import (                    # noqa: E402
 from image_pipeline.reassemble import FragmentReassembler    # noqa: E402
 from image_pipeline.state_publisher import StatePublisher    # noqa: E402
 from lora_proto import (                                     # noqa: E402
-    PHY_IMAGE,
+    PHY_IMAGE_BW500 as PHY_IMAGE,  # legacy 25 ms-cap vectors were calibrated at BW500 (F1 postmortem)
     TelemetryReassembler,
     pack_telemetry_fragments,
     parse_telemetry_fragment,
