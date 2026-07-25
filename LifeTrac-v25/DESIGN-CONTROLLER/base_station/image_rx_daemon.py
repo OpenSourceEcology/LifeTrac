@@ -85,6 +85,9 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     HOST_TYPE_VER_URC,
     HOST_TYPE_RX_FRAME_URC,
     HOST_TYPE_TX_FRAME_REQ,
+    HOST_TYPE_CFG_SET_REQ,
+    HOST_TYPE_CFG_OK_URC,
+    CFG_KEY_LBT_ENABLE,
     parse_rx_frame,
     drain_boot,
     drain_pending,
@@ -125,9 +128,15 @@ _PROFILE_CHOICES = (0, 1, 2)
 # Two-phase profile switch (base side): command the tractor, hold on the
 # OLD profile until its ACK arrives (or give up), then switch locally;
 # confirm back on the NEW profile at first proof-of-life, else revert.
-PROFILE_ACK_TIMEOUT_S     = 6.0
-PROFILE_REVERT_TIMEOUT_S  = 30.0
-KEYFRAME_CMD_MIN_GAP_S    = 2.0
+# The ACK window covers several re-send volleys (tractor listens only in
+# its inter-fragment gaps); the revert window covers worst-case FHSS
+# re-acquisition after a switch INTO profile 1 (50-ch scan → ~25 s).
+PROFILE_ACK_TIMEOUT_S     = 12.0
+PROFILE_REVERT_TIMEOUT_S  = 45.0
+# Keyframe-request commands are a convenience, not a control loop — a
+# sparse cadence keeps the base's TX duty (and the run-33 bidirectional
+# UART-stress window) tiny. The reassembler self-heals regardless.
+KEYFRAME_CMD_MIN_GAP_S    = 10.0
 
 # codec-id -> short name for link_stats (mirrors frame_format CODEC_*).
 _CODEC_NAMES = {0: "webp", 1: "mono_g4", 2: "btc4_tile", 3: "btc4_frame",
@@ -219,6 +228,7 @@ class ImageRxDaemon:
         self._ctrl_out: "queue.Queue[bytes]" = queue.Queue(maxsize=16)
         self._await_ack_profile: int | None = None
         self._await_ack_deadline: float = 0.0
+        self._await_ack_last_send: float = 0.0
         self._confirm_pending = False
         self._revert_deadline: float = 0.0
         self._revert_to: int | None = None
@@ -282,6 +292,18 @@ class ImageRxDaemon:
             configure_regulatory_profile_if_needed(link)
         except Exception as exc:                              # pragma: no cover
             LOG.warning("regulatory profile config failed: %s", exc)
+        # 2026-07-25 run-32 root cause: this daemon now TRANSMITS (0xFB
+        # command uplink) and the firmware boots with LBT enabled — with
+        # the tractor streaming at ~58 % duty the channel always sounds
+        # busy, so every command TX died ABORT_LBT/FORBIDDEN. Disable LBT
+        # exactly like image_tx_daemon does (W1-10b TX_BURST rationale).
+        try:
+            link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
+                         bytes([CFG_KEY_LBT_ENABLE, 0x01, 0x00]), timeout=1.0)
+            LOG.info("LBT_ENABLE=0 (command uplink shares the image channel)")
+        except Exception as exc:                              # pragma: no cover
+            LOG.warning("CFG_SET(LBT_ENABLE=0) failed: %s — command TX may "
+                        "abort under load", exc)
         if _os.environ.get("LIFETRAC_SKIP_PHY_CONTRACT", "0") != "1":
             prof_id = int(_os.environ.get("LIFETRAC_REG_PROFILE", "0"))
             active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
@@ -348,15 +370,23 @@ class ImageRxDaemon:
             except queue.Empty:
                 break
             self._send_command_frame(link, body)
-        # Phase-A timeout: tractor never acked — stay on the old profile.
-        if (self._await_ack_profile is not None
-                and now > self._await_ack_deadline):
-            LOG.warning("radio_profile: no tractor ACK within %.0f s — "
-                        "staying on profile %d", PROFILE_ACK_TIMEOUT_S,
-                        self._active_profile)
-            self._await_ack_profile = None
-            self._ack_profile(False, self._active_profile,
-                              error="no tractor ack")
+        # Phase-A: while awaiting the tractor's ACK, re-send the command
+        # every ~1.5 s — the tractor listens only in its inter-fragment
+        # gaps, so a single volley has a real chance of landing while
+        # its modem is keyed. Idempotent, tiny, worth the airtime.
+        if self._await_ack_profile is not None:
+            if now > self._await_ack_deadline:
+                LOG.warning("radio_profile: no tractor ACK within %.0f s — "
+                            "staying on profile %d", PROFILE_ACK_TIMEOUT_S,
+                            self._active_profile)
+                self._await_ack_profile = None
+                self._ack_profile(False, self._active_profile,
+                                  error="no tractor ack")
+            elif now - self._await_ack_last_send > 1.5:
+                self._await_ack_last_send = now
+                self._send_command_frame(link, pack_command_frame(
+                    CMD_OP_RADIO_PROFILE,
+                    bytes([self._await_ack_profile])))
         # Revert watchdog: switched locally but never heard the tractor
         # on the new grid.
         if self._confirm_pending and now > self._revert_deadline:
@@ -382,18 +412,43 @@ class ImageRxDaemon:
             link, pack_command_frame(CMD_OP_RADIO_PROFILE, bytes([target])))
         self._await_ack_profile = target
         self._await_ack_deadline = now + PROFILE_ACK_TIMEOUT_S
+        self._await_ack_last_send = now
+
+    def _ensure_rxcont(self, link: HostLink) -> None:
+        """Re-arm RXCONT if our own TX dropped it (run-31 root cause).
+
+        The daemons arm RXCONT via RAW opmode register writes, so the
+        L072 firmware's tracked state never records RX-armed. Its TX
+        path therefore takes the standby branch and leaves the radio in
+        STANDBY after TX_DONE — one command transmission deafened the
+        base for the whole of run 31 (rx_frames=1/300 s). After ANY
+        local TX, put the modem back into RXCONT ourselves.
+        """
+        try:
+            opm, _ = read_reg(link, SX1276_REG_OP_MODE, timeout=0.5)
+            if opm != SX1276_OPMODE_LORA_RXCONT:
+                write_reg(link, SX1276_REG_OP_MODE,
+                          SX1276_OPMODE_LORA_RXCONT, timeout=0.5)
+                LOG.debug("RXCONT re-armed (opmode 0x%02x -> 0x85)", opm)
+        except Exception as exc:                              # pragma: no cover
+            LOG.warning("RXCONT re-arm failed: %s", exc)
 
     def _send_command_frame(self, link: HostLink, body: bytes,
                             copies: int = 2) -> None:
         """TX one 0xFB command frame via this daemon's L072 (idempotent)."""
-        for _ in range(max(1, copies)):
-            try:
-                tx_frame = bytes([0xFD, len(body)]) + body
-                link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
-                wait_for_tx_done(link, 0xFD, timeout=2.0)
-            except Exception as exc:
-                LOG.warning("command TX failed: %s", exc)
-                return
+        try:
+            for _ in range(max(1, copies)):
+                try:
+                    tx_frame = bytes([0xFD, len(body)]) + body
+                    link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
+                    wait_for_tx_done(link, 0xFD, timeout=2.0)
+                except Exception as exc:
+                    LOG.warning("command TX failed: %s", exc)
+                    return
+        finally:
+            # CRITICAL: our TX parks the modem in STANDBY (see
+            # _ensure_rxcont docstring) — re-arm or go deaf.
+            self._ensure_rxcont(link)
 
     def _handle_command(self, link: HostLink, opcode: int,
                         args: bytes) -> None:
@@ -431,6 +486,25 @@ class ImageRxDaemon:
                     self._apply_profile(link, previous)
                     self._ack_profile(False, self._active_profile,
                                       error="local apply failed")
+            elif (self._await_ack_profile is None and len(args) >= 1
+                    and args[0] in _PROFILE_CHOICES
+                    and args[0] != self._active_profile):
+                # LATE ACK (run-33 split-link freeze): the tractor heard a
+                # command copy AFTER our ACK window expired and committed
+                # to the new profile while we stayed behind — the link is
+                # split and the stream is dead until someone moves. The
+                # tractor is already there; follow it (cheaper and faster
+                # than waiting out its 45 s CONF-revert), with the same
+                # proof-of-life/revert protection as the normal path.
+                target = int(args[0])
+                previous = self._active_profile
+                LOG.warning("radio_profile: LATE tractor ACK for %d — "
+                            "following to heal the split", target)
+                if self._apply_profile(link, target):
+                    self._confirm_pending = True
+                    self._revert_to = previous
+                    self._revert_deadline = (time.monotonic()
+                                             + PROFILE_REVERT_TIMEOUT_S)
         elif opcode == CMD_OP_ENCODE_MODE_ACK:
             # Tractor's encode ack, forwarded over the air — republish
             # retained so web_ui's cache works with zero LAN to the
@@ -591,6 +665,11 @@ class ImageRxDaemon:
                     last_timeouts = cur_timeout
                     self._kf_req.poke(f"reassembly timeout #{cur_timeout}")
                 self._maybe_switch_profile(link)
+                # Defensive: heal a silently dropped RXCONT (throttled).
+                now_arm = time.monotonic()
+                if now_arm - getattr(self, "_last_arm_check", 0.0) > 5.0:
+                    self._last_arm_check = now_arm
+                    self._ensure_rxcont(link)
                 continue
 
             for frame in frames:

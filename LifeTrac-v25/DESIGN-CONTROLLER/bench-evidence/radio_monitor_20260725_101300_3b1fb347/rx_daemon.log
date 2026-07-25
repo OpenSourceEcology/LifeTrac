@@ -1,0 +1,170 @@
+﻿2026-07-25 15:07:56,018 WARNING image_rx_daemon: ctrl MQTT connect to 192.168.1.79 failed: timed out ΓÇö control plane rides the primary broker only
+
+2026-07-25 15:07:56,022 INFO image_rx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-07-25 15:07:56,026 INFO image_rx_daemon: image_rx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-07-25 15:07:56,033 INFO image_rx_daemon: MQTT connected; ready to publish lifetrac/v25/video/tile_delta
+
+2026-07-25 15:07:56,038 INFO image_rx_daemon: LIFETRAC_SKIP_RESET_REQ=1 ΓÇö relying on external NRST; draining boot chatter only
+
+INFO: drained type=0xC0 seq=0 during boot settle
+
+INFO: drained type=0x91 seq=0 during boot settle
+
+INFO: drained type=0xC0 seq=0 during boot settle
+
+INFO: drained type=0x91 seq=0 during boot settle
+
+INFO: drained type=0xC0 seq=0 during boot settle
+
+INFO: drained type=0x91 seq=0 during boot settle
+
+INFO: drained type=0xC0 seq=0 during boot settle
+
+INFO: drained type=0x91 seq=0 during boot settle
+
+INFO: drained type=0xC0 seq=0 during boot settle
+
+2026-07-25 15:07:56,397 INFO image_rx_daemon: L072 VER warm-up ok (attempt 1)
+
+INFO: post-VER drain queued type=0x91 seq=0
+
+INFO: post-VER drain queued type=0xC0 seq=0
+
+INFO: post-VER drain queued type=0x91 seq=0
+
+INFO: post-VER drain wire   type=0xC0 seq=0
+
+INFO: post-VER drain wire   type=0x91 seq=0
+
+INFO: post-VER drain wire   type=0xC0 seq=0
+
+INFO: post-VER drain wire   type=0x91 seq=0
+
+INFO: post-VER drain wire   type=0xC0 seq=0
+
+INFO: post-VER drain wire   type=0x91 seq=0
+
+INFO: post-VER drain wire   type=0xC0 seq=0
+
+INFO: post-VER drain wire   type=0x91 seq=0
+
+INFO: post-VER drain wire   type=0xC0 seq=0
+
+INFO: post-VER drain wire   type=0x91 seq=0
+
+INFO: post-VER drain wire   type=0xC0 seq=0
+
+INFO: post-VER drain wire   type=0x91 seq=0
+
+2026-07-25 15:07:57,025 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+INFO: post-VER drain wire   type=0xC0 seq=0
+
+INFO: post-VER drain wire   type=0x91 seq=0
+
+INFO: post-VER drain wire   type=0xC0 seq=0
+
+INFO: post-VER drain wire   type=0x91 seq=0
+
+INFO: post-VER drain wire   type=0xC0 seq=0
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-07-25 15:07:57,667 INFO image_rx_daemon: SX1276 RXCONT autowake: opmode 0x81 -> 0x85
+
+2026-07-25 15:07:57,668 INFO image_rx_daemon: RX worker ready; draining RX_FRAME_URC...
+
+2026-07-25 15:07:57,671 INFO image_rx_daemon: published frame_id=0 242 B ΓåÆ lifetrac/v25/video/tile_delta
+
+INFO: unrelated frame during TX wait type=0xC0
+
+INFO: unrelated frame during TX wait type=0xC0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x02(ABORT_LBT) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=0 legal_dwell_used_us_10s=0
+
+2026-07-25 15:07:57,717 WARNING image_rx_daemon: command TX failed: ERR_PROTO during TX wait: offending_type=0x10 offending_ver=1 err_code=0x08(FORBIDDEN) detail=0 raw=1001080000
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x02(ABORT_LBT) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=0 legal_dwell_used_us_10s=0
+
+2026-07-25 15:07:57,732 WARNING image_rx_daemon: command TX failed: ERR_PROTO during TX wait: offending_type=0x10 offending_ver=1 err_code=0x08(FORBIDDEN) detail=0 raw=1001080000
+
+2026-07-25 15:08:07,032 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:08:17,036 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:08:27,039 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:08:37,044 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:08:47,047 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:08:57,050 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:09:07,054 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:09:17,058 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:09:27,063 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:09:37,066 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:09:47,069 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:09:57,073 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:10:07,078 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:10:17,081 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:10:27,085 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:10:37,089 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:10:47,093 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:10:57,097 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:11:07,102 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:11:17,106 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:11:27,110 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:11:37,114 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:11:47,118 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:11:57,122 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:12:07,125 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:12:17,129 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:12:27,133 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:12:37,136 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:12:47,140 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-25 15:12:57,143 INFO image_rx_daemon: stats: rx_frames=1 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+

@@ -207,8 +207,10 @@ _PROFILE_CHOICES = (0, 1, 2)
 # Two-phase profile switch (tractor side): ack on the OLD profile, dwell
 # so the ack flushes, switch, then REVERT unless the base confirms on the
 # new profile within the window (fail-safe against a half-switched link).
+# Window covers worst-case FHSS re-acquisition on the base (~25 s scan)
+# plus its proof-of-life wait and the CONF flight time.
 PROFILE_SWITCH_ACK_FLUSH_S   = 0.7
-PROFILE_CONFIRM_TIMEOUT_S    = 30.0
+PROFILE_CONFIRM_TIMEOUT_S    = 45.0
 
 # Local MQTT broker (camera_service publishes here, daemon subscribes).
 DEFAULT_MQTT_HOST = "127.0.0.1"
@@ -423,13 +425,33 @@ class ImageTxDaemon:
             try:
                 frame = self._q.get(timeout=0.25)
             except queue.Empty:
-                # Idle: poll the link for inbound command frames. During
-                # active TX the drain happens implicitly (commands wait at
-                # most one frame time — acceptable for control traffic).
+                # Idle: re-arm the command downlink (our own TXes park the
+                # modem in STANDBY — see _ensure_rxcont), then poll for
+                # inbound command frames.
+                self._ensure_rxcont(link)
                 for rx in self._drain_rx_frames(link, 0.05):
                     self._dispatch_command(rx)
                 continue
             self._tx_one_frame(link, frame)
+
+    def _ensure_rxcont(self, link: HostLink) -> None:
+        """Re-arm RXCONT for the command downlink (run-31 root cause).
+
+        RXCONT is armed via a RAW opmode write, so the firmware's TX
+        path doesn't know RX was armed and leaves the modem in STANDBY
+        after every image fragment — the downlink was deaf from the
+        first TX in run 31. Re-arm in the idle gaps between frames;
+        during continuous TX the tractor listens only in those gaps
+        (acceptable: commands are retried ×2 and idempotent).
+        """
+        try:
+            opm, _ = read_reg(link, SX1276_REG_OP_MODE, timeout=0.5)
+            if opm != SX1276_OPMODE_LORA_RXCONT:
+                write_reg(link, SX1276_REG_OP_MODE,
+                          SX1276_OPMODE_LORA_RXCONT, timeout=0.5)
+                LOG.debug("RXCONT re-armed (opmode 0x%02x -> 0x85)", opm)
+        except Exception as exc:                              # pragma: no cover
+            LOG.warning("RXCONT re-arm failed: %s", exc)
 
     # ---- LoRa control plane (2026-07-25) ----
     def _drain_rx_frames(self, link: HostLink, timeout_s: float) -> list:
@@ -489,14 +511,17 @@ class ImageTxDaemon:
     def _send_command_frame(self, link: HostLink, body: bytes,
                             copies: int = 2) -> None:
         """Fire-and-forget TX of one command frame (idempotent, tiny)."""
-        for _ in range(max(1, copies)):
-            try:
-                tx_frame = bytes([0xFE, len(body)]) + body
-                link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
-                wait_for_tx_done(link, 0xFE, timeout=2.0)
-            except Exception as exc:
-                LOG.warning("command TX failed: %s", exc)
-                return
+        try:
+            for _ in range(max(1, copies)):
+                try:
+                    tx_frame = bytes([0xFE, len(body)]) + body
+                    link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
+                    wait_for_tx_done(link, 0xFE, timeout=2.0)
+                except Exception as exc:
+                    LOG.warning("command TX failed: %s", exc)
+                    return
+        finally:
+            self._ensure_rxcont(link)
 
     def _service_control_plane(self, link: HostLink) -> None:
         # Forward camera_service's encode ack over LoRa (latest wins).
@@ -700,6 +725,13 @@ class ImageTxDaemon:
                     with self.lock:
                         self.fragments_tx_ok += 1
                         self.bytes_tx_ok += len(body)
+                    # Command downlink: every TX parks the modem in
+                    # STANDBY (raw-armed RXCONT is invisible to the
+                    # firmware) — re-arm so the inter-fragment gap is
+                    # listen time, and dispatch anything already heard.
+                    self._ensure_rxcont(link)
+                    for rx in self._drain_rx_frames(link, 0.0):
+                        self._dispatch_command(rx)
                     break
                 else:
                     rf_retries_left -= 1
@@ -855,6 +887,12 @@ class ImageTxDaemon:
                 self.frames_tx_ok += 1
             else:
                 self.frames_tx_fail += 1
+        # Command downlink: restore RXCONT after the pipelined burst and
+        # dispatch any command frames the drains queued up (see
+        # _ensure_rxcont — raw-armed RXCONT drops on every TX).
+        self._ensure_rxcont(link)
+        for rx in self._drain_rx_frames(link, 0.0):
+            self._dispatch_command(rx)
         if aborted:
             LOG.warning("frame seq=%d ABORTED (pipelined): %d/%d fragments ok",
                         frame.seq, ok_count, n)
