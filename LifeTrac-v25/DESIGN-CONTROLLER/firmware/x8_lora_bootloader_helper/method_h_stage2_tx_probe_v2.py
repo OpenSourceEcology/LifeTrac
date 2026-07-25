@@ -510,8 +510,14 @@ def configure_regulatory_profile_if_needed(link: HostLink, profile_id: int = 1) 
     #
     # Env: LIFETRAC_FORCE_FRF_HZ=<int>   — explicit override (e.g. 915000000).
     # Default: when profile_id==0 (BENCH_ONLY_FIXED_915) we auto-pin to
-    # 915_000_000 Hz so both peers land on the same carrier. Other profile
-    # IDs leave FRF untouched unless the env var is set.
+    # 915_000_000 Hz so both peers land on the same carrier. Profile 2
+    # (FCC_15_247_DTS_BW500) is ALSO single-carrier: firmware DTS
+    # activation rewrites RegModemConfig (BW 500 kHz) but never touches
+    # RegFrf, so without a pin the two peers sit on whatever carrier the
+    # previous profile/boot left behind (same bug class as 2026-05-25).
+    # 915.0 MHz keeps the 500 kHz occupied BW >12 MHz inside the 902–928
+    # band edges. FHSS profile (1) leaves FRF untouched unless the env
+    # var is set — the hop scheduler owns the synth there.
     force_frf_hz = None
     env_frf = _os.environ.get("LIFETRAC_FORCE_FRF_HZ")
     if env_frf:
@@ -519,7 +525,7 @@ def configure_regulatory_profile_if_needed(link: HostLink, profile_id: int = 1) 
             force_frf_hz = int(env_frf)
         except ValueError:
             print(f"WARN: ignoring non-integer LIFETRAC_FORCE_FRF_HZ={env_frf!r}")
-    elif profile_id == 0:
+    elif profile_id in (0, 2):
         force_frf_hz = 915_000_000
 
     if force_frf_hz is not None:
