@@ -94,6 +94,19 @@ KEYFRAME_REQ_TOPIC = "lifetrac/v25/cmd/req_keyframe"   # camera_service listens
 LINK_STATS_TOPIC = "lifetrac/v25/video/link_stats"
 LINK_STATS_INTERVAL_S = 2.0
 
+# 2026-07-25 radio-profile selector: operator/auto policy publishes a
+# retained {"profile": 0|1|2} on this topic; both image daemons apply it
+# live (re-run the co-processor profile config + re-verify the PHY
+# contract + re-arm) and confirm on the retained status topic below.
+RADIO_PROFILE_TOPIC     = "lifetrac/v25/control/radio_profile"
+RADIO_PROFILE_ACK_TOPIC = "lifetrac/v25/status/radio_profile/rx"
+
+_PROFILE_CHOICES = (0, 1, 2)
+
+# codec-id -> short name for link_stats (mirrors frame_format CODEC_*).
+_CODEC_NAMES = {0: "webp", 1: "mono_g4", 2: "btc4_tile", 3: "btc4_frame",
+                4: "webp_luma", 5: "webp_rawstream"}
+
 _PROFILE_TO_PHY = {0: PHY_IMAGE_BW250, 1: PHY_IMAGE_BW250, 2: PHY_IMAGE_BW500}
 
 # MQTT defaults; assume `adb reverse tcp:1883 tcp:1883` is wired so the
@@ -165,6 +178,23 @@ class ImageRxDaemon:
         self._air_bytes = 0                  # on-air payload bytes received
         self._last_rssi_dbm = None
         self._last_snr_db = None
+        # 2026-07-25 encoder-selector implicit ACK: codec of the most
+        # recently completed TileDeltaFrame (surfaced via link_stats).
+        self._last_rx_codec: int | None = None
+        self._last_rx_frame_kind: int | None = None
+        # 2026-07-25 radio-profile selector: latest requested profile
+        # (applied by the RX worker between poll cycles — the worker owns
+        # the HostLink, MQTT callbacks must never touch it directly).
+        self._pending_profile: int | None = None
+        self._active_profile = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+        # Optional split-broker control plane: the bench base board
+        # publishes video on its LOCAL mosquitto while web_ui (host)
+        # publishes control on the HOST broker. When set, a second MQTT
+        # client subscribes to control topics there and mirrors
+        # link_stats/acks so the web UI sees them.
+        self._ctrl_client = None
+        self.ctrl_mqtt_host = os.environ.get(
+            "LIFETRAC_CTRL_MQTT_HOST", "").strip() or None
 
     def _open_link(self) -> HostLink:
         LOG.info("opening L072 HostLink on %s @ %s", self.uart, self.baud)
@@ -262,6 +292,89 @@ class ImageRxDaemon:
                 self.stats.publish_errors += 1
             LOG.warning("publish failed for frame_id=%d: %s", frame_id, exc)
 
+    def _maybe_switch_profile(self, link: HostLink) -> None:
+        """Apply a pending radio-profile change on the RX worker thread.
+
+        Runs the SAME config path used at startup (co-processor CFG_SET
+        sequence + FRF pin for single-carrier profiles + PHY-contract
+        verify) so a live switch and a restart are behaviourally
+        identical. On contract failure the previous profile is re-applied
+        once (fail-safe: a deaf receiver on the OLD grid beats a deaf
+        receiver on a half-configured new one). Acks retained on
+        RADIO_PROFILE_ACK_TOPIC either way.
+        """
+        with self._lock:
+            target = self._pending_profile
+            self._pending_profile = None
+        if target is None or target == self._active_profile:
+            return
+        previous = self._active_profile
+        LOG.info("radio_profile: switching %d -> %d", previous, target)
+        ok = self._apply_profile(link, target)
+        if not ok:
+            LOG.error("radio_profile: switch to %d FAILED; reverting to %d",
+                      target, previous)
+            if not self._apply_profile(link, previous):
+                LOG.critical("radio_profile: revert to %d ALSO failed — "
+                             "link needs operator attention", previous)
+        self._ack_profile(ok, target if ok else previous)
+
+    def _apply_profile(self, link: HostLink, profile: int) -> bool:
+        try:
+            os.environ["LIFETRAC_REG_PROFILE"] = str(profile)
+            # Firmware profile-1 validator rejects popcount<50, so the
+            # wide mask must accompany FHSS; single-carrier profiles
+            # narrow the mask (configure's default) for determinism.
+            if profile == 1:
+                os.environ["LIFETRAC_FHSS_WIDE_MASK"] = "1"
+            else:
+                os.environ.pop("LIFETRAC_FHSS_WIDE_MASK", None)
+            drain_pending(link, quiet_s=0.2, max_s=1.0)
+            configure_regulatory_profile_if_needed(link, profile)
+            if os.environ.get("LIFETRAC_SKIP_PHY_CONTRACT", "0") != "1":
+                verify_modem_matches_profile(
+                    link, _PROFILE_TO_PHY.get(profile, PHY_IMAGE_BW250))
+            # Re-arm RXCONT: profile activation sequences through
+            # standby; a receiver must never be left parked there.
+            opm, _ = read_reg(link, SX1276_REG_OP_MODE, timeout=0.5)
+            if opm != SX1276_OPMODE_LORA_RXCONT:
+                write_reg(link, SX1276_REG_OP_MODE,
+                          SX1276_OPMODE_LORA_RXCONT, timeout=0.5)
+                LOG.info("radio_profile: RXCONT re-armed (opmode 0x%02x -> 0x85)",
+                         opm)
+            self._active_profile = profile
+            return True
+        except Exception as exc:
+            LOG.error("radio_profile: apply %d failed: %s", profile, exc)
+            return False
+
+    def _ack_profile(self, ok: bool, active: int) -> None:
+        import json as _json
+        ack = _json.dumps({"ok": ok, "profile": active,
+                           "ts": round(time.time(), 1)})
+        for c in (self._client, self._ctrl_client):
+            if c is None:
+                continue
+            try:
+                c.publish(RADIO_PROFILE_ACK_TOPIC, ack, qos=0, retain=True)
+            except Exception:                                 # pragma: no cover
+                pass
+
+    def _on_radio_profile_msg(self, _c, _u, msg) -> None:
+        try:
+            import json as _json
+            body = _json.loads(msg.payload.decode("utf-8") or "{}")
+            profile = int(body.get("profile"))
+        except (ValueError, TypeError, UnicodeDecodeError) as exc:
+            LOG.warning("radio_profile: bad payload %r (%s)",
+                        msg.payload[:64], exc)
+            return
+        if profile not in _PROFILE_CHOICES:
+            LOG.warning("radio_profile: unknown profile %d", profile)
+            return
+        with self._lock:
+            self._pending_profile = profile
+
     def _rx_worker(self) -> None:
         try:
             link = self._open_link()
@@ -295,6 +408,7 @@ class ImageRxDaemon:
                         self.stats.reassembler_timeouts += (cur_timeout - last_timeouts)
                     last_timeouts = cur_timeout
                     self._kf_req.poke(f"reassembly timeout #{cur_timeout}")
+                self._maybe_switch_profile(link)
                 continue
 
             for frame in frames:
@@ -359,7 +473,17 @@ class ImageRxDaemon:
                         LOG.warning("encode_tile_delta_frame failed: %s", exc)
                         continue
                     frame_id = getattr(completed, "frame_id", 0) or 0
+                    with self._lock:
+                        # Implicit encoder-mode ACK: frames self-describe
+                        # their codec; the base UI compares this against
+                        # the operator's pin (keyframe-forced on every
+                        # mode change, so it converges within one frame).
+                        self._last_rx_codec = getattr(completed, "codec", 0)
+                        self._last_rx_frame_kind = getattr(
+                            completed, "frame_kind", 0)
                     self._publish(payload_out, frame_id)
+
+            self._maybe_switch_profile(link)
 
         LOG.info("RX worker exit")
 
@@ -413,6 +537,13 @@ class ImageRxDaemon:
                         self.reassembler.stats.parity_reconstructions,
                     "timeouts": self.stats.reassembler_timeouts,
                     "decode_errors": self.stats.reassembler_decode_errors,
+                    # 2026-07-25 implicit encoder ACK + radio-profile state
+                    # for the web UI selectors / auto-profile policy.
+                    "rx_codec": self._last_rx_codec,
+                    "rx_codec_name": _CODEC_NAMES.get(
+                        self._last_rx_codec, None)
+                        if self._last_rx_codec is not None else None,
+                    "radio_profile": self._active_profile,
                     "ts": round(time.time(), 1),
                 }
             last_bytes = cur_bytes
@@ -421,8 +552,14 @@ class ImageRxDaemon:
             if client is None:
                 continue
             try:
-                client.publish(LINK_STATS_TOPIC,
-                               _json.dumps(sample).encode("utf-8"), qos=0)
+                payload = _json.dumps(sample).encode("utf-8")
+                client.publish(LINK_STATS_TOPIC, payload, qos=0)
+                # Split-broker bench topology: mirror onto the control
+                # broker so web_ui (host) can render link speed + drive
+                # the auto-profile policy without an MQTT bridge.
+                ctrl = self._ctrl_client
+                if ctrl is not None:
+                    ctrl.publish(LINK_STATS_TOPIC, payload, qos=0)
             except Exception as exc:                          # pragma: no cover
                 LOG.debug("link_stats publish failed: %s", exc)
 
@@ -435,9 +572,13 @@ class ImageRxDaemon:
         def _on_connect(_c, _u, _f, rc):
             if rc == 0:
                 LOG.info("MQTT connected; ready to publish %s", MQTT_TOPIC_OUT)
+                # Retained: a restart re-applies the operator's last choice.
+                self._client.subscribe(RADIO_PROFILE_TOPIC, qos=1)
             else:
                 LOG.error("MQTT connect rc=%s", rc)
         self._client.on_connect = _on_connect
+        self._client.message_callback_add(
+            RADIO_PROFILE_TOPIC, self._on_radio_profile_msg)
 
         try:
             self._client.connect(self.mqtt_host, self.mqtt_port, keepalive=30)
@@ -445,6 +586,29 @@ class ImageRxDaemon:
             LOG.error("MQTT connect to %s:%d failed: %s",
                       self.mqtt_host, self.mqtt_port, exc)
             return 2
+
+        # Optional split-broker control plane (bench: video on the base
+        # board's local mosquitto, control on the host broker web_ui uses).
+        if self.ctrl_mqtt_host and self.ctrl_mqtt_host != self.mqtt_host:
+            try:
+                self._ctrl_client = mqtt.Client(
+                    client_id=f"lifetrac-image-rx-ctrl-{os.getpid()}")
+                self._ctrl_client.message_callback_add(
+                    RADIO_PROFILE_TOPIC, self._on_radio_profile_msg)
+
+                def _ctrl_on_connect(_c, _u, _f, rc):
+                    if rc == 0:
+                        LOG.info("ctrl MQTT connected (%s)", self.ctrl_mqtt_host)
+                        self._ctrl_client.subscribe(RADIO_PROFILE_TOPIC, qos=1)
+                self._ctrl_client.on_connect = _ctrl_on_connect
+                self._ctrl_client.connect(self.ctrl_mqtt_host,
+                                          self.mqtt_port, keepalive=30)
+                self._ctrl_client.loop_start()
+            except Exception as exc:                          # pragma: no cover
+                LOG.warning("ctrl MQTT connect to %s failed: %s — control "
+                            "plane rides the primary broker only",
+                            self.ctrl_mqtt_host, exc)
+                self._ctrl_client = None
 
         rx_thread = threading.Thread(target=self._rx_worker,
                                      name="image-rx-worker", daemon=True)

@@ -109,6 +109,11 @@ class EncodeModeBody(BaseModel):
                   r"btc4_per_frame|mono_g4)$")
 
 
+class RadioProfileBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    profile: str = Field(..., pattern=r"^(auto|0|1|2)$")
+
+
 class BenchRadioBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     mode: str = Field(..., pattern="^(sleep|wake)$")
@@ -249,6 +254,122 @@ def _set_runtime_encode_mode_override(mode: str) -> None:
     global _encode_mode_runtime_override
     with _encode_mode_runtime_lock:
         _encode_mode_runtime_override = mode
+
+
+# ---- Radio-profile selector + auto policy (2026-07-25) -----------------
+# Operator picks the regulatory/PHY profile for the image link, or "auto".
+# Concrete picks publish retained {"profile": N} on the control topic; the
+# image daemons apply it live (co-processor reconfig + PHY re-verify) and
+# confirm on lifetrac/v25/status/radio_profile/{tx,rx}. "auto" hands the
+# choice to AutoRadioPolicy below, driven by the RX daemon's link_stats.
+RADIO_PROFILE_STORE_PATH = Path(
+    os.environ.get(
+        "LIFETRAC_RADIO_PROFILE_STORE",
+        str(Path(__file__).parent / ".radio_profile_override"),
+    )
+)
+_RADIO_PROFILE_TOPIC = "lifetrac/v25/control/radio_profile"
+_RADIO_PROFILE_UI_CHOICES = ("auto", "0", "1", "2")
+_RADIO_PROFILE_LABELS = {
+    "0": "Fixed 915 (bench)",
+    "1": "FHSS 50ch BW250",
+    "2": "DTS BW500",
+    "auto": "Auto",
+}
+_radio_profile_lock = threading.Lock()
+_radio_profile_mode = "2"          # UI selection (may be "auto")
+_radio_profile_active = 2          # concrete profile last commanded
+_radio_acks: dict[str, dict] = {}  # "tx"/"rx" -> last retained ack
+_encode_mode_ack: dict | None = None   # tractor camera_service status
+
+
+def _load_radio_profile() -> str:
+    try:
+        if RADIO_PROFILE_STORE_PATH.exists():
+            val = RADIO_PROFILE_STORE_PATH.read_text(encoding="utf-8").strip()
+            if val in _RADIO_PROFILE_UI_CHOICES:
+                return val
+    except OSError as exc:
+        logging.warning("radio_profile store unreadable: %s", exc)
+    return "2"
+
+
+def _persist_radio_profile(mode: str) -> None:
+    RADIO_PROFILE_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = RADIO_PROFILE_STORE_PATH.with_suffix(
+        RADIO_PROFILE_STORE_PATH.suffix + ".tmp")
+    tmp.write_text(mode + "\n", encoding="utf-8")
+    os.replace(tmp, RADIO_PROFILE_STORE_PATH)
+
+
+def _publish_radio_profile(profile: int, source: str) -> bool:
+    global _radio_profile_active
+    payload = json.dumps({"profile": int(profile), "source": source})
+    info = mqtt_client.publish(_RADIO_PROFILE_TOPIC, payload,
+                               retain=True, qos=0)
+    with _radio_profile_lock:
+        _radio_profile_active = int(profile)
+    logging.info("radio_profile: published profile=%d (%s)", profile, source)
+    return bool(info and info.rc == 0)
+
+
+class AutoRadioPolicy:
+    """Pick the fastest profile the environment currently supports.
+
+    Inputs (from the RX daemon's ~2 s link_stats samples):
+      * sample age   — a stale/absent sample means the link is down or
+                       the RX daemon died; treat as unhealthy.
+      * timeout rate — reassembler timeouts accumulating means frames
+                       are being lost mid-flight (interference / range).
+
+    Policy (v1, bench-calibrated):
+      * Prefer DTS BW500 (profile 2) — measured 1.76 KB/s sustained,
+        the fastest link — while the link is healthy.
+      * Degrade 2 -> 1 (FHSS 50ch) when unhealthy: hopping trades ~60 %
+        of the throughput for interference/frequency diversity.
+      * Promote 1 -> 2 only after PROMOTE_AFTER_S of continuous health
+        AND at least MIN_SWITCH_GAP_S since the last switch (hysteresis
+        + min-dwell so a marginal RF environment cannot flap the link,
+        which costs a reconfig outage each time).
+      * Profile 0 (fixed 915) is bench-only and never auto-selected.
+
+    Pure state machine — no I/O — so the unit suite can drive it with
+    synthetic clocks (see tests/test_web_ui_radio_profile.py).
+    """
+
+    STALE_LINK_S     = 20.0
+    TIMEOUT_RATE_MAX = 2.5     # timeouts per 10 s window
+    PROMOTE_AFTER_S  = 60.0
+    MIN_SWITCH_GAP_S = 60.0
+
+    def __init__(self, initial_profile: int = 2, now: float = 0.0):
+        self.profile = 2 if initial_profile not in (1, 2) else initial_profile
+        self._last_switch_t = now
+        self._healthy_since: float | None = None
+
+    def evaluate(self, *, now: float, sample_age_s: float | None,
+                 timeouts_per_10s: float) -> int | None:
+        """Return a new profile to command, or None to hold."""
+        healthy = (sample_age_s is not None
+                   and sample_age_s <= self.STALE_LINK_S
+                   and timeouts_per_10s <= self.TIMEOUT_RATE_MAX)
+        if healthy:
+            if self._healthy_since is None:
+                self._healthy_since = now
+        else:
+            self._healthy_since = None
+        gap_ok = (now - self._last_switch_t) >= self.MIN_SWITCH_GAP_S
+        if self.profile == 2 and not healthy and gap_ok:
+            self.profile = 1
+            self._last_switch_t = now
+            return 1
+        if (self.profile == 1 and healthy and gap_ok
+                and self._healthy_since is not None
+                and (now - self._healthy_since) >= self.PROMOTE_AFTER_S):
+            self.profile = 2
+            self._last_switch_t = now
+            return 2
+        return None
 
 _sessions: dict[str, float] = {}             # token -> last_used_ts
 _sessions_lock = threading.Lock()
@@ -417,6 +538,71 @@ try:
                  _initial_override)
 except Exception as exc:  # pragma: no cover — startup-best-effort
     logging.warning("encode_mode_override: startup republish failed: %s", exc)
+
+# Radio-profile startup: restore the persisted selection. Concrete picks
+# republish retained so daemons that came up after web_ui still converge;
+# "auto" starts the policy from the last commanded profile.
+_radio_auto_policy: AutoRadioPolicy | None = None
+try:
+    _radio_profile_mode = _load_radio_profile()
+    if _radio_profile_mode in ("0", "1", "2"):
+        _publish_radio_profile(int(_radio_profile_mode), "startup")
+    else:
+        _radio_auto_policy = AutoRadioPolicy(
+            initial_profile=_radio_profile_active, now=time.monotonic())
+        _publish_radio_profile(_radio_auto_policy.profile, "auto-startup")
+    logging.info("radio_profile: restored %r on startup", _radio_profile_mode)
+except Exception as exc:  # pragma: no cover — startup-best-effort
+    logging.warning("radio_profile: startup restore failed: %s", exc)
+
+
+def _radio_auto_worker() -> None:
+    """Drive AutoRadioPolicy off the RX daemon's link_stats samples.
+
+    Evaluates every 5 s; only acts while the UI selection is "auto".
+    The timeout RATE is derived from the monotonic `timeouts` counter
+    in successive samples (the counter itself never resets mid-run).
+    """
+    global _radio_auto_policy
+    last_timeouts: int | None = None
+    last_eval_t = time.monotonic()
+    while True:
+        time.sleep(5.0)
+        try:
+            with _radio_profile_lock:
+                mode = _radio_profile_mode
+                policy = _radio_auto_policy
+            if mode != "auto" or policy is None:
+                last_timeouts = None
+                continue
+            now = time.monotonic()
+            stats = getattr(_image_publisher, "link_stats", None) or {}
+            ts = stats.get("ts")
+            sample_age_s = (time.time() - ts) if isinstance(
+                ts, (int, float)) else None
+            timeouts = stats.get("timeouts")
+            window_s = max(now - last_eval_t, 1e-3)
+            if isinstance(timeouts, int) and last_timeouts is not None:
+                rate_per_10s = max(0, timeouts - last_timeouts) / window_s * 10.0
+            else:
+                rate_per_10s = 0.0
+            if isinstance(timeouts, int):
+                last_timeouts = timeouts
+            last_eval_t = now
+            new_profile = policy.evaluate(now=now,
+                                          sample_age_s=sample_age_s,
+                                          timeouts_per_10s=rate_per_10s)
+            if new_profile is not None:
+                logging.info(
+                    "radio_profile[auto]: %s (sample_age=%s, rate=%.1f/10s)",
+                    new_profile, sample_age_s, rate_per_10s)
+                _publish_radio_profile(new_profile, "auto")
+        except Exception:                                     # pragma: no cover
+            logging.exception("radio_profile auto worker crashed; continuing")
+
+
+threading.Thread(target=_radio_auto_worker, name="radio-auto",
+                 daemon=True).start()
 
 # ---- BC-04: load build configuration -----------------------------------
 # Module-level singleton consumed below for MAX_CONTROL_SUBSCRIBERS,
@@ -624,6 +810,31 @@ def _on_mqtt_message(_c, _u, msg):
                     _image_publisher.link_stats = stats
             except Exception:
                 pass
+            return
+
+        # 2026-07-25 selector acks: tractor camera_service confirms every
+        # applied encoder mode (requested vs effective — surfaces silent
+        # clamps); each image daemon confirms radio-profile switches.
+        # All retained, so web_ui restarts repopulate the caches.
+        if msg.topic.endswith("/status/encode_mode"):
+            try:
+                body = json.loads(msg.payload.decode("utf-8"))
+                if isinstance(body, dict):
+                    global _encode_mode_ack
+                    _encode_mode_ack = body
+            except Exception:
+                pass
+            return
+        if "/status/radio_profile/" in msg.topic:
+            side = msg.topic.rsplit("/", 1)[-1]
+            if side in ("tx", "rx"):
+                try:
+                    body = json.loads(msg.payload.decode("utf-8"))
+                    if isinstance(body, dict):
+                        with _radio_profile_lock:
+                            _radio_acks[side] = body
+                except Exception:
+                    pass
             return
 
         # Bench-only compatibility path: some legacy bring-up scripts publish
@@ -1684,12 +1895,20 @@ async def api_encode_mode_get(_session: str = Depends(_require_session)):
 async def api_encode_mode_current(_session: str = Depends(_require_session)):
     """Return the active runtime override used by pill/gamepad cycling.
 
-    This value intentionally does not persist to disk unless the operator
-    explicitly sets it in the Settings page.
+    Also carries the confirmation loop (2026-07-25): ``tractor`` is the
+    retained ack from camera_service (requested vs effective — non-null
+    ``clamped`` means the tractor demoted an unimplemented codec), and
+    ``rx_codec_name`` is the codec of the most recently REASSEMBLED
+    frame (the implicit over-the-air ack — mode changes force a
+    keyframe, so this converges within one frame of a real switch).
     """
+    stats = getattr(_image_publisher, "link_stats", None) or {}
     return {
         "current": _get_runtime_encode_mode_override(),
         "choices": list(_ENCODE_MODE_UI_CHOICES),
+        "tractor": _encode_mode_ack,
+        "rx_codec": stats.get("rx_codec"),
+        "rx_codec_name": stats.get("rx_codec_name"),
     }
 
 
@@ -1774,6 +1993,76 @@ async def api_encode_mode_cycle(_session: str = Depends(_require_session)):
     result = _set_encode_mode_override(nxt, persist=False)
     result["previous"] = current
     return result
+
+
+# ---- Radio-profile selector endpoints (2026-07-25) ----------------------
+@app.get("/api/settings/radio_profile")
+async def api_radio_profile_get(_session: str = Depends(_require_session)):
+    """Return the radio-profile selection + both daemons' retained acks.
+
+    ``acks.tx`` / ``acks.rx`` carry the last CONFIRMED profile per side;
+    a side whose ack disagrees with ``active_profile`` is mid-switch,
+    unreachable, or failed-and-reverted (``ok: false``) — the settings
+    UI renders each state distinctly.
+    """
+    with _radio_profile_lock:
+        mode = _radio_profile_mode
+        active = _radio_profile_active
+        acks = {k: dict(v) for k, v in _radio_acks.items()}
+    stats = getattr(_image_publisher, "link_stats", None) or {}
+    ts = stats.get("ts")
+    age = round(time.time() - ts, 1) if isinstance(ts, (int, float)) else None
+    return {
+        "current": mode,
+        "choices": list(_RADIO_PROFILE_UI_CHOICES),
+        "labels": dict(_RADIO_PROFILE_LABELS),
+        "active_profile": active,
+        "acks": acks,
+        "link_stats_age_s": age,
+    }
+
+
+@app.post("/api/settings/radio_profile")
+async def api_radio_profile_set(body: RadioProfileBody,
+                                _session: str = Depends(_require_session)):
+    """Select the image-link radio profile (or hand it to auto policy).
+
+    Concrete picks publish retained ``{"profile": N}`` on
+    ``lifetrac/v25/control/radio_profile``; both image daemons apply the
+    switch live and ack on ``status/radio_profile/{tx,rx}``. ``auto``
+    starts :class:`AutoRadioPolicy` seeded from the last commanded
+    profile — it will only ever choose FHSS (1) or DTS (2).
+    """
+    global _radio_profile_mode, _radio_auto_policy
+    try:
+        _persist_radio_profile(body.profile)
+    except OSError as exc:
+        logging.error("failed to persist radio_profile to %s: %s",
+                      RADIO_PROFILE_STORE_PATH, exc)
+        raise HTTPException(status_code=500,
+                            detail=f"could not persist selection: {exc}")
+    with _radio_profile_lock:
+        _radio_profile_mode = body.profile
+    delivered = True
+    if body.profile in ("0", "1", "2"):
+        with _radio_profile_lock:
+            _radio_auto_policy = None
+        delivered = _publish_radio_profile(int(body.profile), "operator")
+    else:
+        with _radio_profile_lock:
+            seed = _radio_profile_active
+        policy = AutoRadioPolicy(initial_profile=seed, now=time.monotonic())
+        with _radio_profile_lock:
+            _radio_auto_policy = policy
+        # Immediately command the policy's starting profile so "auto"
+        # has a defined state even before the first evaluation tick.
+        delivered = _publish_radio_profile(policy.profile, "auto-start")
+    return {
+        "ok": True,
+        "current": body.profile,
+        "active_profile": _radio_profile_active,
+        "delivered": delivered,
+    }
 
 
 # ---- Tractor params proxy (TODO bucket C item 4) -----------------------

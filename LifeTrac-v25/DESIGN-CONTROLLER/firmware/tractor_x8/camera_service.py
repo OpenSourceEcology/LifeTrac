@@ -93,6 +93,14 @@ if USE_LORA_BRIDGE:
 
 PUBLISH_TOPIC     = "lifetrac/v25/cmd/image_frame"
 KEYFRAME_REQ_TOPIC = "lifetrac/v25/cmd/req_keyframe"
+# 2026-07-25 encoder-selector closure: in LoRa-bridge mode the M7 KISS
+# back-channel reader is skipped (image_tx_daemon owns the UART), which
+# used to strand CMD_ENCODE_MODE — the web UI pill changed nothing on
+# the tractor. The bridge deployment has LAN MQTT, so consume the same
+# retained override topic web_ui publishes, and confirm every applied
+# mode on a retained status topic (web_ui subscribes lifetrac/v25/status/#).
+ENCODE_MODE_OVERRIDE_TOPIC = "lifetrac/v25/control/encode_mode_override"
+ENCODE_MODE_STATUS_TOPIC   = "lifetrac/v25/status/encode_mode"
 
 
 # ---- capture backends -------------------------------------------------
@@ -1007,6 +1015,56 @@ CMD_LINK_PROFILE   = 0x64
 X8_KISS_FEND, X8_KISS_FESC = 0xC0, 0xDB
 X8_KISS_TFEND, X8_KISS_TFESC = 0xDC, 0xDD
 
+# Module-global forensic/bridge MQTT client (set in main() when DEBUG_MQTT).
+# Used by _apply_encode_mode for the retained status ack; None-safe.
+_MQTT_CLIENT = None
+
+
+def _apply_encode_mode(raw_mode: int, source: str, force_key_evt) -> int:
+    """Clamp + apply an encode-mode request from ANY transport.
+
+    Shared by the M7 KISS back-channel (CMD_ENCODE_MODE 0x63) and the
+    bridge-mode MQTT override path so both stay in lockstep. Publishes a
+    retained ack on ENCODE_MODE_STATUS_TOPIC carrying both the requested
+    and the effective mode — the base UI renders a mismatch when the
+    tractor clamped an unimplemented codec (previously only visible in
+    tractor logs). Returns the effective mode.
+    """
+    effective = _clamp_encode_mode(raw_mode)
+    global ENCODE_MODE  # noqa: PLW0603
+    ENCODE_MODE = effective
+    if effective == raw_mode:
+        LOG.info("camera_service: encode_mode -> %d (%s) [%s]",
+                 effective, ENCODE_MODE_NAMES[effective], source)
+    else:
+        req_name = (ENCODE_MODE_NAMES[raw_mode]
+                    if 0 <= raw_mode < len(ENCODE_MODE_NAMES)
+                    else f"unknown({raw_mode})")
+        LOG.warning(
+            "camera_service: encode_mode %d (%s) not implemented; "
+            "clamping to %d (%s) [%s]",
+            raw_mode, req_name, effective, ENCODE_MODE_NAMES[effective],
+            source)
+    force_key_evt.set()
+    client = _MQTT_CLIENT
+    if client is not None:
+        try:
+            import json as _json
+            ack = {
+                "requested": raw_mode,
+                "effective": effective,
+                "effective_name": ENCODE_MODE_NAMES[effective],
+                "clamped": effective != raw_mode,
+                "codec": _ENCODE_MODE_CODEC.get(effective, 0),
+                "source": source,
+                "ts": round(time.time(), 1),
+            }
+            client.publish(ENCODE_MODE_STATUS_TOPIC,
+                           _json.dumps(ack), qos=0, retain=True)
+        except Exception as exc:                          # pragma: no cover
+            LOG.debug("encode_mode ack publish failed: %s", exc)
+    return effective
+
 
 def dispatch_back_channel(frame: bytes, force_key_evt, *,
                           roi_planner=None,
@@ -1038,26 +1096,7 @@ def dispatch_back_channel(frame: bytes, force_key_evt, *,
             LOG.info("camera_service: CMD_CAMERA_QUALITY -> %d", q)
     elif opcode == CMD_ENCODE_MODE:
         if len(frame) >= 3:
-            raw_mode = frame[2]
-            effective = _clamp_encode_mode(raw_mode)
-            global ENCODE_MODE  # noqa: PLW0603
-            ENCODE_MODE = effective
-            if effective == raw_mode:
-                LOG.info("camera_service: CMD_ENCODE_MODE -> %d (%s)",
-                         effective, ENCODE_MODE_NAMES[effective])
-            else:
-                # Forward-compatible mode this build can't encode yet.
-                # We accept it on the wire so the base can stay current,
-                # but log clearly that we fell back so the operator can
-                # tell the bench dashboard from the running encoder.
-                req_name = (ENCODE_MODE_NAMES[raw_mode]
-                            if 0 <= raw_mode < len(ENCODE_MODE_NAMES)
-                            else f"unknown({raw_mode})")
-                LOG.warning(
-                    "camera_service: CMD_ENCODE_MODE %d (%s) not implemented; "
-                    "clamping to %d (%s)",
-                    raw_mode, req_name, effective, ENCODE_MODE_NAMES[effective],
-                )
+            _apply_encode_mode(frame[2], "back_channel", force_key_evt)
     elif opcode == CMD_ROI_HINT:
         # Args: col_lo, col_hi, row_lo, row_hi (each u8, tile coords).
         if roi_planner is not None and len(frame) >= 6:
@@ -1202,14 +1241,42 @@ def main() -> None:
             client = mqtt.Client(client_id="camera_service")
 
             def _on_msg(_c, _u, _msg):
-                # CMD_REQ_KEYFRAME forwarded by the M7. Payload contents are
-                # ignored; receipt alone is the trigger.
-                force_key_evt.set()
+                # Topic-dispatched control plane. CMD_REQ_KEYFRAME payload
+                # contents are ignored; receipt alone is the trigger.
+                if _msg.topic == KEYFRAME_REQ_TOPIC:
+                    force_key_evt.set()
+                    return
+                if _msg.topic == ENCODE_MODE_OVERRIDE_TOPIC:
+                    # Same retained JSON web_ui publishes for lora_bridge:
+                    # {"mode": "<name>" | <int>}. Name or wire id accepted.
+                    try:
+                        import json as _json
+                        body = _json.loads(_msg.payload.decode("utf-8") or "{}")
+                        requested = body.get("mode")
+                        if requested in (None, "", "auto"):
+                            return
+                        if isinstance(requested, str):
+                            raw = ENCODE_MODE_NAMES.index(requested.lower())
+                        else:
+                            raw = int(requested)
+                    except (ValueError, KeyError, UnicodeDecodeError) as exc:
+                        LOG.warning("encode_mode_override: bad payload %r (%s)",
+                                    _msg.payload[:64], exc)
+                        return
+                    _apply_encode_mode(raw, "mqtt_override", force_key_evt)
 
             client.on_message = _on_msg
             client.connect(MQTT_HOST, 1883)
             client.subscribe(KEYFRAME_REQ_TOPIC, qos=1)
+            # Retained topic: a freshly (re)started camera_service picks up
+            # the operator's last selection immediately on subscribe.
+            client.subscribe(ENCODE_MODE_OVERRIDE_TOPIC, qos=1)
             client.loop_start()
+            global _MQTT_CLIENT  # noqa: PLW0603
+            _MQTT_CLIENT = client
+            # Boot ack: report the env-derived startup mode so the base UI
+            # never renders "unknown" for a live tractor.
+            _apply_encode_mode(ENCODE_MODE, "boot", force_key_evt)
 
     period = 1.0 / max(TARGET_FPS, 0.1)
     next_t = time.monotonic()

@@ -178,6 +178,14 @@ class AirtimeBudget:
 # single camera_service run feeds both paths until Phase D cutover.
 MQTT_TOPIC_IN = "lifetrac/v25/cmd/image_frame"
 
+# 2026-07-25 radio-profile selector: retained {"profile": 0|1|2} from the
+# web UI (or its auto policy). Applied by the TX worker BETWEEN frames —
+# the worker owns the HostLink; the MQTT callback only latches the wish.
+# Confirmed on the retained ack topic (web_ui subscribes status/#).
+RADIO_PROFILE_TOPIC     = "lifetrac/v25/control/radio_profile"
+RADIO_PROFILE_ACK_TOPIC = "lifetrac/v25/status/radio_profile/tx"
+_PROFILE_CHOICES = (0, 1, 2)
+
 # Local MQTT broker (camera_service publishes here, daemon subscribes).
 DEFAULT_MQTT_HOST = "127.0.0.1"
 DEFAULT_MQTT_PORT = 1883
@@ -240,6 +248,10 @@ class ImageTxDaemon:
         _prof = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
         self.budget = AirtimeBudget(
             budget_us=_PROFILE_TO_BUDGET_US.get(_prof, 380_000))
+        # 2026-07-25 radio-profile selector state.
+        self._pending_profile: int | None = None
+        self._active_profile = _prof
+        self._mqtt_client = None            # set in run(); used for acks
 
     # ---- MQTT side ----
     def _on_message(self, _client, _userdata, msg) -> None:
@@ -358,11 +370,86 @@ class ImageTxDaemon:
         LOG.info("TX worker ready (inter_cycle_s=%.3f, max %d frags/dwell)",
                  self.inter_cycle_s, MAX_FRAMES_PER_DWELL_CAP)
         while not self._stop.is_set():
+            self._maybe_switch_profile(link)
             try:
                 frame = self._q.get(timeout=0.25)
             except queue.Empty:
                 continue
             self._tx_one_frame(link, frame)
+
+    # ---- radio-profile live switch (2026-07-25) ----
+    def _on_radio_profile_msg(self, _c, _u, msg) -> None:
+        try:
+            import json as _json
+            body = _json.loads(msg.payload.decode("utf-8") or "{}")
+            profile = int(body.get("profile"))
+        except (ValueError, TypeError, UnicodeDecodeError) as exc:
+            LOG.warning("radio_profile: bad payload %r (%s)",
+                        msg.payload[:64], exc)
+            return
+        if profile not in _PROFILE_CHOICES:
+            LOG.warning("radio_profile: unknown profile %d", profile)
+            return
+        with self.lock:
+            self._pending_profile = profile
+
+    def _maybe_switch_profile(self, link: HostLink) -> None:
+        """Apply a pending profile change between frames (TX-worker thread).
+
+        Identical semantics to image_rx_daemon._maybe_switch_profile:
+        startup config path re-run + PHY-contract verify + revert-once on
+        failure. Fragment sizing (_pack_for) and the QoS budget mirror
+        both key off the env/budget updated here, so the very next frame
+        is packed and paced for the new profile.
+        """
+        with self.lock:
+            target = self._pending_profile
+            self._pending_profile = None
+        if target is None or target == self._active_profile:
+            return
+        previous = self._active_profile
+        LOG.info("radio_profile: switching %d -> %d", previous, target)
+        ok = self._apply_profile(link, target)
+        if not ok:
+            LOG.error("radio_profile: switch to %d FAILED; reverting to %d",
+                      target, previous)
+            if not self._apply_profile(link, previous):
+                LOG.critical("radio_profile: revert to %d ALSO failed — "
+                             "link needs operator attention", previous)
+        self._ack_profile(ok, target if ok else previous)
+
+    def _apply_profile(self, link: HostLink, profile: int) -> bool:
+        try:
+            os.environ["LIFETRAC_REG_PROFILE"] = str(profile)
+            if profile == 1:
+                os.environ["LIFETRAC_FHSS_WIDE_MASK"] = "1"
+            else:
+                os.environ.pop("LIFETRAC_FHSS_WIDE_MASK", None)
+            drain_pending(link, quiet_s=0.2, max_s=1.0)
+            configure_regulatory_profile_if_needed(link, profile)
+            if os.environ.get("LIFETRAC_SKIP_PHY_CONTRACT", "0") != "1":
+                verify_modem_matches_profile(
+                    link, _PROFILE_TO_PHY.get(profile, PHY_IMAGE_BW250))
+            self.budget = AirtimeBudget(
+                budget_us=_PROFILE_TO_BUDGET_US.get(profile, 380_000))
+            self._active_profile = profile
+            return True
+        except Exception as exc:
+            LOG.error("radio_profile: apply %d failed: %s", profile, exc)
+            return False
+
+    def _ack_profile(self, ok: bool, active: int) -> None:
+        client = self._mqtt_client
+        if client is None:
+            return
+        try:
+            import json as _json
+            client.publish(RADIO_PROFILE_ACK_TOPIC,
+                           _json.dumps({"ok": ok, "profile": active,
+                                        "ts": round(time.time(), 1)}),
+                           qos=0, retain=True)
+        except Exception:                                     # pragma: no cover
+            pass
 
     def recent_frag_loss_rate(self) -> float:
         with self.lock:
@@ -666,11 +753,16 @@ class ImageTxDaemon:
 
         client = mqtt.Client(client_id=f"lifetrac-image-tx-{os.getpid()}")
         client.on_message = self._on_message
+        client.message_callback_add(
+            RADIO_PROFILE_TOPIC, self._on_radio_profile_msg)
+        self._mqtt_client = client
 
         def _on_connect(_c, _u, _f, rc):
             if rc == 0:
                 LOG.info("MQTT connected; subscribing to %s", MQTT_TOPIC_IN)
                 client.subscribe(MQTT_TOPIC_IN, qos=0)
+                # Retained: a restart re-applies the operator's last choice.
+                client.subscribe(RADIO_PROFILE_TOPIC, qos=1)
             else:
                 LOG.error("MQTT connect rc=%s", rc)
         client.on_connect = _on_connect

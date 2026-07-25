@@ -285,6 +285,9 @@
       user-select: none; margin-right: 6px; }
     .encmode-pill.safe { background: #c33; color: #fff;
       animation: safe-flash 1s infinite; }
+    /* 2026-07-25 confirmation loop: operator pin != tractor-confirmed
+       mode (clamped codec, lost command, or mid-switch). */
+    .encmode-pill.mismatch { background: #b36b00; color: #fff; }
     @keyframes safe-flash {
       0%, 100% { opacity: 1; }
       50%      { opacity: 0.55; }

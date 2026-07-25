@@ -293,5 +293,109 @@
 
     loadEncodeMode();
   </script>
+
+  <h2>Radio profile (image link)</h2>
+  <p class="meta">
+    PHY / regulatory profile for the image LoRa link. Both radio daemons
+    reconfigure live and confirm below; <b>Auto</b> prefers DTS BW500
+    (fastest) and drops to FHSS when the link degrades.
+  </p>
+  <div class="row" id="radioprof-buttons" role="radiogroup" aria-label="Radio profile">
+    <!-- Buttons injected by JS from the server catalogue. -->
+  </div>
+  <div class="row">
+    <span>Selected:</span>
+    <span id="radioprof-current" class="pill grey">unknown</span>
+    <span>Confirmed:</span>
+    <span id="radioprof-acks" class="meta">tx: — · rx: —</span>
+    <span id="radioprof-status" class="meta"></span>
+  </div>
+  <style>
+    #radioprof-buttons button {
+      padding: 0.45em 0.9em; border: 1px solid #bbb; background: #f7f7f7;
+      cursor: pointer; border-radius: 4px; font-size: 0.95em;
+    }
+    #radioprof-buttons button.active {
+      background: #2a5e8a; color: #fff; border-color: #1f476a;
+    }
+    #radioprof-buttons button:hover:not(.active) { background: #ececec; }
+    #radioprof-buttons button:disabled { opacity: 0.5; cursor: wait; }
+  </style>
+
+  <script>
+    const rpWrap   = document.getElementById('radioprof-buttons');
+    const rpPill   = document.getElementById('radioprof-current');
+    const rpAcks   = document.getElementById('radioprof-acks');
+    const rpStatus = document.getElementById('radioprof-status');
+    const RP_DESC = {
+      'auto': 'policy picks DTS while healthy, FHSS under loss (never bench 915)',
+      '0':    'single fixed carrier at 915 MHz — bench diagnostics only',
+      '1':    'FCC 15.247 FHSS, 50 channels, BW250 — interference-robust',
+      '2':    'FCC 15.247 DTS, BW500 — fastest (1.76 KB/s bench-measured)',
+    };
+    let rpLabels = {};
+
+    function rpPaint(data) {
+      rpLabels = data.labels || rpLabels;
+      rpPill.textContent = (rpLabels[data.current] || data.current) +
+        (data.current === 'auto' ? ` → ${rpLabels[String(data.active_profile)] || data.active_profile}` : '');
+      rpPill.className = 'pill ' + (data.current === 'auto' ? 'yellow' : 'green');
+      for (const btn of rpWrap.querySelectorAll('button')) {
+        btn.classList.toggle('active', btn.dataset.profile === data.current);
+      }
+      const a = data.acks || {};
+      const fmt = (s) => {
+        const v = a[s];
+        if (!v) return '—';
+        const lab = rpLabels[String(v.profile)] || v.profile;
+        return v.ok === false ? `${lab} (FAILED)` : lab;
+      };
+      rpAcks.textContent = `tx: ${fmt('tx')} · rx: ${fmt('rx')}`;
+      const mismatch = ['tx','rx'].some(s => a[s] &&
+        (a[s].profile !== data.active_profile || a[s].ok === false));
+      rpAcks.style.color = mismatch ? '#b36b00' : '';
+    }
+
+    async function loadRadioProfile() {
+      const r = await fetch('/api/settings/radio_profile', {credentials:'include'});
+      if (r.status === 401) { location = '/'; return; }
+      const data = await r.json();
+      rpWrap.innerHTML = '';
+      for (const p of data.choices) {
+        const btn = document.createElement('button');
+        btn.dataset.profile = p;
+        btn.textContent = (data.labels && data.labels[p]) || p;
+        btn.title = RP_DESC[p] || '';
+        btn.addEventListener('click', () => setRadioProfile(p));
+        rpWrap.appendChild(btn);
+      }
+      rpPaint(data);
+    }
+
+    async function setRadioProfile(profile) {
+      rpStatus.textContent = 'sending…';
+      for (const btn of rpWrap.querySelectorAll('button')) btn.disabled = true;
+      try {
+        const r = await fetch('/api/settings/radio_profile', {
+          method:'POST', credentials:'include',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({profile}),
+        });
+        if (r.status === 401) { location = '/'; return; }
+        if (!r.ok) { rpStatus.textContent = 'set failed: HTTP ' + r.status; return; }
+        rpStatus.textContent =
+          'commanded — daemons reconfigure in-flight (~2 s outage)';
+        await loadRadioProfile();
+      } catch (e) {
+        rpStatus.textContent = 'error: ' + e.message;
+      } finally {
+        for (const btn of rpWrap.querySelectorAll('button')) btn.disabled = false;
+      }
+    }
+
+    loadRadioProfile();
+    // Acks arrive asynchronously after the daemons finish reconfiguring.
+    setInterval(loadRadioProfile, 5000);
+  </script>
 </body>
 </html>

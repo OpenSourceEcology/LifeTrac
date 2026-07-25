@@ -463,8 +463,8 @@
     full: { label: 'Full color', desc: 'baseline RGB WebP' },
     y_only: { label: 'Y-only WebP', desc: 'luma only, recolor at base' },
     motion_only: { label: 'Motion-only gray', desc: 'pure grayscale with quality cap for bandwidth' },
-    btc4_per_tile: { label: 'BTC4 / tile', desc: '4-level per-tile palette' },
-    btc4_per_frame: { label: 'BTC4 / frame', desc: '4-level per-frame palette' },
+    btc4_per_tile: { label: 'BTC4 / tile', desc: '4-level per-tile palette — encoder pending, tractor falls back to Y-only' },
+    btc4_per_frame: { label: 'BTC4 / frame', desc: '4-level per-frame palette — encoder pending, tractor falls back to Y-only' },
     mono_g4: { label: 'Mono / G4', desc: '1-bit dither + Group-4 fax' },
   };
   const modeOverlay = (() => {
@@ -491,6 +491,12 @@
   })();
   let waitingForModeFrame = false;
   let encCurrentMode = 'full';
+  // 2026-07-25 confirmation loop: the tractor acks every applied mode on
+  // a retained status topic (requested vs effective — catches silent
+  // clamps), and reassembled frames self-describe their codec. Both
+  // surface through /api/encode_mode/current; render a mismatch instead
+  // of trusting the optimistic POST response forever.
+  let encTractorAck = null;   // {effective_name, clamped, ...} | null
   function clearImageForModeSwitch(mode) {
     const canvas = document.getElementById('image-canvas');
     if (canvas) {
@@ -516,22 +522,46 @@
   function _renderEncPill() {
     if (!encPill) return;
     const meta = encMeta[encCurrentMode] || { label: encCurrentMode, desc: '' };
-    encPill.textContent = `enc: ${meta.label} \u25b8`;
-    encPill.title = meta.desc
-      ? `${meta.label} - ${meta.desc}`
-      : `Current encode mode: ${encCurrentMode}`;
+    let text = `enc: ${meta.label} \u25b8`;
+    let mismatch = false;
+    if (encTractorAck && encTractorAck.effective_name) {
+      const eff = encTractorAck.effective_name;
+      if (encTractorAck.clamped || (eff !== encCurrentMode)) {
+        const effMeta = encMeta[eff] || { label: eff };
+        text = `enc: ${meta.label} \u2192 ${effMeta.label} \u25b8`;
+        mismatch = true;
+      }
+    }
+    encPill.textContent = text;
+    encPill.title = (encTractorAck && encTractorAck.effective_name)
+      ? `pinned: ${encCurrentMode} \u00b7 tractor runs: ${encTractorAck.effective_name}`
+        + (encTractorAck.clamped ? ' (clamped \u2014 encoder not implemented)' : '')
+      : (meta.desc ? `${meta.label} - ${meta.desc}`
+                   : `Current encode mode: ${encCurrentMode}`);
     encPill.classList.remove('safe');
+    encPill.classList.toggle('mismatch', mismatch);
   }
   function setSafeMode(_active) {}
   function _setEncMode(mode) {
     encCurrentMode = (typeof mode === 'string' && mode) ? mode : 'full';
     _renderEncPill();
   }
-  // Seed from the runtime endpoint so pill cycling is session-only.
-  fetch('/api/encode_mode/current')
-    .then(r => r.ok ? r.json() : null)
-    .then(j => { if (j && j.current) _setEncMode(j.current); })
-    .catch(() => { /* leave default */ });
+  // Seed from the runtime endpoint so pill cycling is session-only, then
+  // keep polling: the tractor ack and rx codec arrive asynchronously, and
+  // another tab / the gamepad / safe-mode can change the pin under us.
+  function refreshEncodeMode() {
+    fetch('/api/encode_mode/current')
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (!j) return;
+        if (j.current) encCurrentMode = j.current;
+        encTractorAck = j.tractor || null;
+        _renderEncPill();
+      })
+      .catch(() => { /* keep last known state */ });
+  }
+  refreshEncodeMode();
+  setInterval(refreshEncodeMode, 5000);
   function cycleEncodeMode() {
     if (modeOverlay) {
       modeOverlay.textContent = 'switching encode mode...';
