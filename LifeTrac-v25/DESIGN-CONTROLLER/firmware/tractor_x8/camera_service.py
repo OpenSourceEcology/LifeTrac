@@ -93,13 +93,16 @@ if USE_LORA_BRIDGE:
 
 PUBLISH_TOPIC     = "lifetrac/v25/cmd/image_frame"
 KEYFRAME_REQ_TOPIC = "lifetrac/v25/cmd/req_keyframe"
-# 2026-07-25 encoder-selector closure: in LoRa-bridge mode the M7 KISS
-# back-channel reader is skipped (image_tx_daemon owns the UART), which
-# used to strand CMD_ENCODE_MODE — the web UI pill changed nothing on
-# the tractor. The bridge deployment has LAN MQTT, so consume the same
-# retained override topic web_ui publishes, and confirm every applied
-# mode on a retained status topic (web_ui subscribes lifetrac/v25/status/#).
-ENCODE_MODE_OVERRIDE_TOPIC = "lifetrac/v25/control/encode_mode_override"
+# 2026-07-25 "LoRa-only tractor comms": control reaches the tractor ONLY
+# as 0xFB command frames over the LoRa link; image_tx_daemon receives
+# them and rebroadcasts on these TRACTOR-scoped topics as the intra-board
+# hop. The topic names deliberately differ from the base-side control/
+# cmd topics so a shared bench broker cannot silently bypass the radio —
+# if the LoRa command path is broken, the pill stops working, loudly.
+# Every applied mode is confirmed on the retained status topic; the TX
+# daemon forwards that ack back over LoRa to the base.
+ENCODE_MODE_OVERRIDE_TOPIC = "lifetrac/v25/tractor/encode_mode_override"
+TRACTOR_KEYFRAME_TOPIC     = "lifetrac/v25/tractor/req_keyframe"
 ENCODE_MODE_STATUS_TOPIC   = "lifetrac/v25/status/encode_mode"
 
 
@@ -1241,14 +1244,15 @@ def main() -> None:
             client = mqtt.Client(client_id="camera_service")
 
             def _on_msg(_c, _u, _msg):
-                # Topic-dispatched control plane. CMD_REQ_KEYFRAME payload
-                # contents are ignored; receipt alone is the trigger.
-                if _msg.topic == KEYFRAME_REQ_TOPIC:
+                # Topic-dispatched control plane. Keyframe requests arrive
+                # on the legacy cmd/ topic (M7 path) or the tractor-scoped
+                # topic (LoRa strict path); receipt alone is the trigger.
+                if _msg.topic in (KEYFRAME_REQ_TOPIC, TRACTOR_KEYFRAME_TOPIC):
                     force_key_evt.set()
                     return
                 if _msg.topic == ENCODE_MODE_OVERRIDE_TOPIC:
-                    # Same retained JSON web_ui publishes for lora_bridge:
-                    # {"mode": "<name>" | <int>}. Name or wire id accepted.
+                    # {"mode": <int> | "<name>"} — re-published locally by
+                    # image_tx_daemon after decoding the LoRa 0xFB frame.
                     try:
                         import json as _json
                         body = _json.loads(_msg.payload.decode("utf-8") or "{}")
@@ -1263,11 +1267,12 @@ def main() -> None:
                         LOG.warning("encode_mode_override: bad payload %r (%s)",
                                     _msg.payload[:64], exc)
                         return
-                    _apply_encode_mode(raw, "mqtt_override", force_key_evt)
+                    _apply_encode_mode(raw, "lora_cmd", force_key_evt)
 
             client.on_message = _on_msg
             client.connect(MQTT_HOST, 1883)
             client.subscribe(KEYFRAME_REQ_TOPIC, qos=1)
+            client.subscribe(TRACTOR_KEYFRAME_TOPIC, qos=1)
             # Retained topic: a freshly (re)started camera_service picks up
             # the operator's last selection immediately on subscribe.
             client.subscribe(ENCODE_MODE_OVERRIDE_TOPIC, qos=1)

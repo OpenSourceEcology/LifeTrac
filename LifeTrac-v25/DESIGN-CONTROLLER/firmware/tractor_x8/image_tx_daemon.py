@@ -89,6 +89,14 @@ from lora_proto import (  # noqa: E402
     pack_image_fragments,
     pack_image_fragments_v2,
     pack_telemetry_fragments,
+    pack_command_frame,
+    parse_command_frame,
+    CMD_OP_REQ_KEYFRAME,
+    CMD_OP_ENCODE_MODE,
+    CMD_OP_RADIO_PROFILE,
+    CMD_OP_RADIO_PROFILE_ACK,
+    CMD_OP_RADIO_PROFILE_CONF,
+    CMD_OP_ENCODE_MODE_ACK,
 )
 from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     HostLink,
@@ -110,6 +118,12 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     wait_for_tx_done,
     configure_regulatory_profile_if_needed,
     verify_modem_matches_profile,
+    HOST_TYPE_RX_FRAME_URC,
+    parse_rx_frame,
+    read_reg,
+    write_reg,
+    SX1276_REG_OP_MODE,
+    SX1276_OPMODE_LORA_RXCONT,
 )
 
 LOG = logging.getLogger("image_tx_daemon")
@@ -178,13 +192,23 @@ class AirtimeBudget:
 # single camera_service run feeds both paths until Phase D cutover.
 MQTT_TOPIC_IN = "lifetrac/v25/cmd/image_frame"
 
-# 2026-07-25 radio-profile selector: retained {"profile": 0|1|2} from the
-# web UI (or its auto policy). Applied by the TX worker BETWEEN frames —
-# the worker owns the HostLink; the MQTT callback only latches the wish.
-# Confirmed on the retained ack topic (web_ui subscribes status/#).
-RADIO_PROFILE_TOPIC     = "lifetrac/v25/control/radio_profile"
-RADIO_PROFILE_ACK_TOPIC = "lifetrac/v25/status/radio_profile/tx"
+# 2026-07-25 "LoRa-only tractor comms": control traffic reaches this
+# daemon EXCLUSIVELY as 0xFB command frames over the LoRa link (base
+# image_rx_daemon transmits them). The daemon then rebroadcasts on
+# TRACTOR-scoped MQTT topics as the intra-board hop to camera_service —
+# deliberately DIFFERENT topic names from the base-side control/cmd
+# topics so a shared bench broker cannot silently bypass the radio.
+# Acks travel back over LoRa the same way (this daemon is the TX side).
+RADIO_PROFILE_ACK_TOPIC   = "lifetrac/v25/status/radio_profile/tx"   # local log only
+TRACTOR_ENCODE_MODE_TOPIC = "lifetrac/v25/tractor/encode_mode_override"
+TRACTOR_KEYFRAME_TOPIC    = "lifetrac/v25/tractor/req_keyframe"
+TRACTOR_ENC_STATUS_TOPIC  = "lifetrac/v25/status/encode_mode"        # camera_service ack (local)
 _PROFILE_CHOICES = (0, 1, 2)
+# Two-phase profile switch (tractor side): ack on the OLD profile, dwell
+# so the ack flushes, switch, then REVERT unless the base confirms on the
+# new profile within the window (fail-safe against a half-switched link).
+PROFILE_SWITCH_ACK_FLUSH_S   = 0.7
+PROFILE_CONFIRM_TIMEOUT_S    = 30.0
 
 # Local MQTT broker (camera_service publishes here, daemon subscribes).
 DEFAULT_MQTT_HOST = "127.0.0.1"
@@ -252,6 +276,13 @@ class ImageTxDaemon:
         self._pending_profile: int | None = None
         self._active_profile = _prof
         self._mqtt_client = None            # set in run(); used for acks
+        # LoRa-only control plane: pending outbound command frames
+        # (acks) + the revert deadline armed after a profile switch.
+        self._cmd_out: "queue.Queue[bytes]" = queue.Queue(maxsize=8)
+        self._confirm_deadline: float | None = None
+        self._revert_profile: int | None = None
+        # camera_service's local encode ack, forwarded over LoRa.
+        self._enc_ack_out: bytes | None = None
 
     # ---- MQTT side ----
     def _on_message(self, _client, _userdata, msg) -> None:
@@ -367,40 +398,150 @@ class ImageTxDaemon:
             LOG.error("fatal: cannot open L072 HostLink: %s", exc)
             self._stop.set()
             return
+        # LoRa-only control plane: arm RXCONT so the tractor can HEAR the
+        # base's 0xFB command frames between its own transmissions (the
+        # firmware re-arms RX after each TX when it was armed before —
+        # sx1276_tx.c s_rearm_rx).
+        try:
+            opm, _ = read_reg(link, SX1276_REG_OP_MODE, timeout=0.5)
+            if opm != SX1276_OPMODE_LORA_RXCONT:
+                write_reg(link, SX1276_REG_OP_MODE,
+                          SX1276_OPMODE_LORA_RXCONT, timeout=0.5)
+                LOG.info("RXCONT armed for command downlink (opmode "
+                         "0x%02x -> 0x85)", opm)
+        except Exception as exc:                              # pragma: no cover
+            LOG.warning("RXCONT arm failed: %s — command downlink deaf "
+                        "until next TX re-arm", exc)
         LOG.info("TX worker ready (inter_cycle_s=%.3f, max %d frags/dwell)",
                  self.inter_cycle_s, MAX_FRAMES_PER_DWELL_CAP)
         while not self._stop.is_set():
+            # ORDER MATTERS: flush the control plane FIRST so a profile
+            # ACK radiates on the OLD grid before _maybe_switch_profile
+            # retunes us (two-phase contract with the base).
+            self._service_control_plane(link)
             self._maybe_switch_profile(link)
             try:
                 frame = self._q.get(timeout=0.25)
             except queue.Empty:
+                # Idle: poll the link for inbound command frames. During
+                # active TX the drain happens implicitly (commands wait at
+                # most one frame time — acceptable for control traffic).
+                for rx in self._drain_rx_frames(link, 0.05):
+                    self._dispatch_command(rx)
                 continue
             self._tx_one_frame(link, frame)
 
-    # ---- radio-profile live switch (2026-07-25) ----
-    def _on_radio_profile_msg(self, _c, _u, msg) -> None:
+    # ---- LoRa control plane (2026-07-25) ----
+    def _drain_rx_frames(self, link: HostLink, timeout_s: float) -> list:
+        """Return RX_FRAME payloads seen within timeout (never raises)."""
+        out = []
         try:
-            import json as _json
-            body = _json.loads(msg.payload.decode("utf-8") or "{}")
-            profile = int(body.get("profile"))
-        except (ValueError, TypeError, UnicodeDecodeError) as exc:
-            LOG.warning("radio_profile: bad payload %r (%s)",
-                        msg.payload[:64], exc)
+            for f in link.read_frames(timeout_s):
+                if f.get("type") != HOST_TYPE_RX_FRAME_URC:
+                    continue
+                try:
+                    parsed = parse_rx_frame(f["payload"])
+                except Exception:
+                    continue
+                out.append(parsed.get("payload", b""))
+        except Exception as exc:                              # pragma: no cover
+            LOG.debug("command drain failed: %s", exc)
+        return out
+
+    def _dispatch_command(self, data: bytes) -> None:
+        cmd = parse_command_frame(data)
+        if cmd is None:
             return
-        if profile not in _PROFILE_CHOICES:
-            LOG.warning("radio_profile: unknown profile %d", profile)
-            return
-        with self.lock:
-            self._pending_profile = profile
+        opcode, args = cmd
+        client = self._mqtt_client
+        if opcode == CMD_OP_REQ_KEYFRAME:
+            LOG.info("LoRa cmd: REQ_KEYFRAME")
+            if client is not None:
+                client.publish(TRACTOR_KEYFRAME_TOPIC, b"\x01", qos=0)
+        elif opcode == CMD_OP_ENCODE_MODE:
+            if len(args) >= 1:
+                mode = args[0]
+                LOG.info("LoRa cmd: ENCODE_MODE %d", mode)
+                if client is not None:
+                    import json as _json
+                    client.publish(TRACTOR_ENCODE_MODE_TOPIC,
+                                   _json.dumps({"mode": int(mode)}),
+                                   qos=0, retain=True)
+        elif opcode == CMD_OP_RADIO_PROFILE:
+            if len(args) >= 1 and args[0] in _PROFILE_CHOICES:
+                profile = args[0]
+                LOG.info("LoRa cmd: RADIO_PROFILE %d (two-phase)", profile)
+                # Phase 1: ack on the CURRENT profile so the base knows we
+                # heard it; the switch itself happens in _service_control
+                # _plane after the ack flushes.
+                try:
+                    self._cmd_out.put_nowait(pack_command_frame(
+                        CMD_OP_RADIO_PROFILE_ACK, bytes([profile])))
+                except queue.Full:
+                    pass
+                with self.lock:
+                    self._pending_profile = int(profile)
+        elif opcode == CMD_OP_RADIO_PROFILE_CONF:
+            LOG.info("LoRa cmd: RADIO_PROFILE_CONF — switch confirmed")
+            self._confirm_deadline = None
+            self._revert_profile = None
+
+    def _send_command_frame(self, link: HostLink, body: bytes,
+                            copies: int = 2) -> None:
+        """Fire-and-forget TX of one command frame (idempotent, tiny)."""
+        for _ in range(max(1, copies)):
+            try:
+                tx_frame = bytes([0xFE, len(body)]) + body
+                link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
+                wait_for_tx_done(link, 0xFE, timeout=2.0)
+            except Exception as exc:
+                LOG.warning("command TX failed: %s", exc)
+                return
+
+    def _service_control_plane(self, link: HostLink) -> None:
+        # Forward camera_service's encode ack over LoRa (latest wins).
+        ack = self._enc_ack_out
+        if ack is not None:
+            self._enc_ack_out = None
+            self._send_command_frame(link, pack_command_frame(
+                CMD_OP_ENCODE_MODE_ACK, ack[:200]), copies=1)
+        # Flush queued command frames (profile acks).
+        flushed_profile_ack = False
+        while True:
+            try:
+                body = self._cmd_out.get_nowait()
+            except queue.Empty:
+                break
+            self._send_command_frame(link, body)
+            if len(body) >= 2 and body[1] == CMD_OP_RADIO_PROFILE_ACK:
+                flushed_profile_ack = True
+        if flushed_profile_ack:
+            # Phase 2: dwell so the last ack copy finishes radiating on
+            # the old grid, then _maybe_switch_profile (caller) applies
+            # the pending switch and arms the revert window.
+            time.sleep(PROFILE_SWITCH_ACK_FLUSH_S)
+        # Revert watchdog: no CONF on the new profile in time → the base
+        # never made it over; return to the previous profile so the link
+        # heals on the old grid.
+        if (self._confirm_deadline is not None
+                and time.monotonic() > self._confirm_deadline):
+            revert_to = self._revert_profile
+            self._confirm_deadline = None
+            self._revert_profile = None
+            if revert_to is not None and revert_to != self._active_profile:
+                LOG.warning("radio_profile: no CONF within %.0f s — "
+                            "reverting to %d", PROFILE_CONFIRM_TIMEOUT_S,
+                            revert_to)
+                self._apply_profile(link, revert_to)
+                self._ack_profile(False, self._active_profile)
 
     def _maybe_switch_profile(self, link: HostLink) -> None:
         """Apply a pending profile change between frames (TX-worker thread).
 
-        Identical semantics to image_rx_daemon._maybe_switch_profile:
-        startup config path re-run + PHY-contract verify + revert-once on
-        failure. Fragment sizing (_pack_for) and the QoS budget mirror
-        both key off the env/budget updated here, so the very next frame
-        is packed and paced for the new profile.
+        LoRa-only two-phase: the ACK was already flushed on the old grid
+        (_service_control_plane); here we switch and arm the revert
+        window — if the base's CONF frame doesn't arrive on the NEW
+        profile within PROFILE_CONFIRM_TIMEOUT_S the watchdog reverts.
         """
         with self.lock:
             target = self._pending_profile
@@ -416,7 +557,12 @@ class ImageTxDaemon:
             if not self._apply_profile(link, previous):
                 LOG.critical("radio_profile: revert to %d ALSO failed — "
                              "link needs operator attention", previous)
-        self._ack_profile(ok, target if ok else previous)
+            self._ack_profile(False, self._active_profile)
+            return
+        # Armed: revert unless the base confirms on the new profile.
+        self._revert_profile = previous
+        self._confirm_deadline = time.monotonic() + PROFILE_CONFIRM_TIMEOUT_S
+        self._ack_profile(True, self._active_profile)
 
     def _apply_profile(self, link: HostLink, profile: int) -> bool:
         try:
@@ -753,16 +899,19 @@ class ImageTxDaemon:
 
         client = mqtt.Client(client_id=f"lifetrac-image-tx-{os.getpid()}")
         client.on_message = self._on_message
-        client.message_callback_add(
-            RADIO_PROFILE_TOPIC, self._on_radio_profile_msg)
+        # LoRa-only control plane: forward camera_service's LOCAL encode
+        # ack over the radio (latest-wins snapshot; worker flushes it).
+
+        def _on_enc_ack(_c, _u, msg):
+            self._enc_ack_out = bytes(msg.payload)[:200]
+        client.message_callback_add(TRACTOR_ENC_STATUS_TOPIC, _on_enc_ack)
         self._mqtt_client = client
 
         def _on_connect(_c, _u, _f, rc):
             if rc == 0:
                 LOG.info("MQTT connected; subscribing to %s", MQTT_TOPIC_IN)
                 client.subscribe(MQTT_TOPIC_IN, qos=0)
-                # Retained: a restart re-applies the operator's last choice.
-                client.subscribe(RADIO_PROFILE_TOPIC, qos=1)
+                client.subscribe(TRACTOR_ENC_STATUS_TOPIC, qos=0)
             else:
                 LOG.error("MQTT connect rc=%s", rc)
         client.on_connect = _on_connect

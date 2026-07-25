@@ -932,6 +932,63 @@ def add_parity_fragments(fragments: list[bytes], frag_seq: int,
     return out
 
 
+# ---- strict-path COMMAND frames (0xFB) ---------------------------------
+# 2026-07-25 "LoRa-only tractor comms": in the strict-path deployment the
+# image daemons own both L072s and the ONLY base->tractor transport is the
+# LoRa link itself. Control traffic (encoder mode, radio profile, keyframe
+# requests) rides tiny single-fragment command frames so no LAN/IP path to
+# the tractor is ever required; MQTT survives only as an INTRA-board hop.
+#
+#     u8 magic  = 0xFB      (below the 0xFC/0xFD/0xFE fragment magics —
+#                            receivers check magic BEFORE the reassembler,
+#                            so image reassembly never sees these)
+#     u8 opcode             (shares the LORA_PROTOCOL.md back-channel ids
+#                            0x60/0x63/0x64; 0x65+ are strict-path-only)
+#     u8 args[N]            (opcode-specific, N <= 200)
+#
+# SECURITY NOTE: these frames are PLAINTEXT, matching the current bench
+# posture of the strict-path image link. Worst-case abuse is a video
+# degradation/DoS (codec or profile flip), never actuation — driving
+# commands stay on the AEAD-framed lora_bridge path (pack_command with
+# nonce store + replay windows). Before field deployment these must move
+# into the same AEAD envelope; tracked in the 2026-07-25 roadmap doc.
+COMMAND_FRAME_MAGIC = 0xFB
+CMD_OP_REQ_KEYFRAME       = 0x60   # args: none
+CMD_OP_ENCODE_MODE        = 0x63   # args: u8 mode id
+CMD_OP_RADIO_PROFILE      = 0x65   # args: u8 profile id (0/1/2)
+CMD_OP_RADIO_PROFILE_ACK  = 0x66   # args: u8 profile id (tractor -> base)
+CMD_OP_RADIO_PROFILE_CONF = 0x67   # args: u8 profile id (base -> tractor)
+CMD_OP_ENCODE_MODE_ACK    = 0x68   # args: UTF-8 JSON ack (<=200 B)
+_CMD_OPS = frozenset({CMD_OP_REQ_KEYFRAME, CMD_OP_ENCODE_MODE,
+                      CMD_OP_RADIO_PROFILE, CMD_OP_RADIO_PROFILE_ACK,
+                      CMD_OP_RADIO_PROFILE_CONF, CMD_OP_ENCODE_MODE_ACK})
+COMMAND_FRAME_MAX_ARGS = 200
+
+
+def pack_command_frame(opcode: int, args: bytes = b"") -> bytes:
+    """Pack one strict-path command frame (single LoRa fragment)."""
+    if opcode not in _CMD_OPS:
+        raise ValueError(f"unknown command opcode 0x{opcode:02x}")
+    if len(args) > COMMAND_FRAME_MAX_ARGS:
+        raise ValueError(f"command args too long ({len(args)} B)")
+    return bytes([COMMAND_FRAME_MAGIC, opcode & 0xFF]) + bytes(args)
+
+
+def parse_command_frame(body: bytes) -> tuple[int, bytes] | None:
+    """Inverse of pack_command_frame(); None if not a command frame.
+
+    Unknown opcodes under the right magic return None too (forward
+    compatibility: an old receiver ignores a new command instead of
+    feeding it to the image reassembler).
+    """
+    if len(body) < 2 or body[0] != COMMAND_FRAME_MAGIC:
+        return None
+    opcode = body[1]
+    if opcode not in _CMD_OPS:
+        return None
+    return opcode, bytes(body[2:])
+
+
 def max_telemetry_fragment_payload(profile: PhyProfile,
                                    max_air_ms: float = TELEMETRY_FRAGMENT_MAX_AIRTIME_MS) -> int:
     """Largest fragment-body byte count whose on-air time ≤ ``max_air_ms``.
