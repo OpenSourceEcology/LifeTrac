@@ -136,6 +136,17 @@ void sx1276_rx_retune_counter_record(sx1276_rx_retune_decision_t dec);
 void sx1276_rx_scan_tick(uint32_t now_ms);
 
 /*
+ * v25.0.7 slot-clock boundary follower: when LOCKED with a phase-
+ * anchored slot clock, retunes the receiver at every hop-slot boundary
+ * along the shared schedule — independent of decode success — so one
+ * air loss costs one packet instead of a re-acquisition. Call once per
+ * main-loop pass after sx1276_rx_scan_tick(). No-op while the clock is
+ * unanchored, while not LOCKED, while a TX is keyed, and in unrouted
+ * builds.
+ */
+void sx1276_rx_slot_follow(uint32_t now_ms);
+
+/*
  * 2026-07-24 FHSS bring-up: return the A6c scan SM to BOOT so the next
  * tick runs a fresh BEGIN_SCAN. Called from host_cfg_profile_activate()
  * when the FHSS profile is (re-)activated — without this, an SM that

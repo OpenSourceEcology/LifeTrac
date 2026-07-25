@@ -26,4 +26,14 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req);
 bool sx1276_tx_poll(uint32_t events, sx1276_tx_result_t *out_result);
 bool sx1276_tx_busy(void);
 
+/*
+ * v25.0.7 slot-clock fit advisory. Returns 0 when a frame of
+ * `payload_len` upper-layer bytes may key up immediately, else the
+ * microseconds until the next hop-slot boundary. Pure query (no radio,
+ * scheduler, or accounting side effects) so host_cmd.c can park the
+ * request in the TX mailbox and re-ask on later main-loop passes.
+ * Always 0 for non-FHSS profiles and in unrouted builds.
+ */
+uint32_t sx1276_tx_slot_wait_us(uint8_t payload_len);
+
 #endif /* LIFETRAC_MURATA_L072_SX1276_TX_H */

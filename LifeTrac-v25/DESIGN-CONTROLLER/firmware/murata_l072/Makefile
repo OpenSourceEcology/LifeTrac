@@ -69,6 +69,7 @@ SRCS := \
 	radio/lora_frames_per_dwell.c \
 	radio/sx1276_fhss_chantab.c \
 	radio/sx1276_fhss.c \
+	radio/sx1276_fhss_clock.c \
 	radio/sx1276_lbt.c \
 	radio/sx1276_legal_dwell.c \
 	radio/sx1276_modes.c \
@@ -142,7 +143,7 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker help
+.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker help
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
 
@@ -238,10 +239,11 @@ RX_SCAN_POLICY_BIN := $(BUILD)/rx_scan_policy
 RX_SCAN_COUNTERS_BIN := $(BUILD)/rx_scan_counters
 RX_SCAN_FAIL_BIN := $(BUILD)/rx_scan_fail
 RX_SCAN_WALKER_BIN := $(BUILD)/rx_scan_walker
+FHSS_CLOCK_BIN     := $(BUILD)/fhss_clock_test
 AIRTIME_INVARIANT_BIN := $(BUILD)/airtime_invariant
 TX_LEN_GUARD_BIN   := $(BUILD)/tx_len_guard
 
-check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker
+check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker
 	@echo "[OK] memory map invariants hold"
 
 check-cpp: $(BUILD)
@@ -625,6 +627,7 @@ check-tx-len-guard: $(BUILD)
 	    radio/sx1276_legal_dwell.c \
 	    host/host_rfco.c \
 	    radio/sx1276_fhss.c \
+	    radio/sx1276_fhss_clock.c \
 	    radio/sx1276_fhss_chantab.c \
 	    -o $(TX_LEN_GUARD_BIN)
 	@echo "[TXLEN] Running tx-len-guard test ..."
@@ -802,6 +805,20 @@ check-rx-scan-walker: $(BUILD)
 	    -o $(RX_SCAN_WALKER_BIN)
 	@echo "[RXSCW] Running rx-scan-walker test ..."
 	@$(RX_SCAN_WALKER_BIN)
+
+# v25.0.7 slot-clock FHSS: pins the pure time→slot math (boundary
+# arithmetic, u32 tick wrap, epoch/hop decomposition, re-anchor
+# semantics, grid geometry) that both the TX slot gate
+# (sx1276_tx_slot_wait_us) and the RX boundary follower
+# (sx1276_rx_slot_follow) derive channel decisions from.
+check-fhss-clock: $(BUILD)
+	@echo "[FHCLK] Building fhss-clock test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/fhss_clock_test.c \
+	    radio/sx1276_fhss_clock.c \
+	    -o $(FHSS_CLOCK_BIN)
+	@echo "[FHCLK] Running fhss-clock test ..."
+	@$(FHSS_CLOCK_BIN)
 
 $(BUILD):
 	@$(call MKDIR_P,$(BUILD))

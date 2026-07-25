@@ -14,6 +14,7 @@
 #include "host_rfco.h"
 #include "lora_pkt_hdr.h"
 #include "sx1276_fhss.h"
+#include "sx1276_fhss_clock.h"
 #include "sx1276_legal_dwell.h"
 #endif
 
@@ -62,9 +63,19 @@ static uint8_t s_channel_idx;
 static uint32_t s_hop_freq_hz;
 static uint8_t  s_hop_idx;
 static uint32_t s_hop_epoch;
+static uint8_t  s_hop_slot_offset_ms;   /* v25.0.7: in-slot ms at key-up */
 static uint16_t s_legal_dwell_handle = SX1276_DWELL_HANDLE_INVALID;
 static uint32_t s_predicted_toa_us;
 static uint16_t s_rfco_pertx_seq;
+
+/* v25.0.7: is the ACTIVE profile the slot-clocked FHSS one? Bench and
+ * DTS are single-carrier — no grid. */
+static bool tx_profile_is_fhss(void) {
+    const host_cfg_profile_req_t *p = host_cfg_profile_active();
+    const uint8_t id = (p != NULL) ? p->profile_id
+                                   : (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915;
+    return id == (uint8_t)REG_PROFILE_FCC_15_247_FHSS_50CH_BW250;
+}
 
 static void pll_settle_busy_wait(uint32_t delay_us) {
     const uint32_t start = platform_now_us();
@@ -179,7 +190,38 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
             s_hop_epoch   = 0U;
             s_hop_freq_hz = 0U;
             s_channel_idx = 0U;
+            s_hop_slot_offset_ms = 0U;
         } else {
+            /*
+             * v25.0.7 slot-clock: the hop is a function of TIME, not of
+             * the packet count. Anchor the local grid lazily at the
+             * first FHSS TX (our own grid is authoritative on the TX
+             * side; a receiver phase-locks to us via the header's
+             * slot_offset byte). Then force the scheduler to the slot
+             * the clock says is active NOW — packet loss, host pauses,
+             * or a peer re-activation can never desynchronise the
+             * sequence from the grid because the grid is re-derived
+             * from the clock on every TX.
+             */
+            const uint32_t tx_now_ms = platform_now_ms();
+            if (sx1276_fhss_clock_valid() == 0U) {
+                /* First FHSS TX after boot/activation: this instant
+                 * becomes the start of the scheduler's CURRENT slot. */
+                const uint32_t cur_abs = sx1276_fhss_clock_abs_of(
+                    sx1276_fhss_current_epoch(),
+                    sx1276_fhss_current_slot());
+                sx1276_fhss_clock_anchor(tx_now_ms, cur_abs);
+            }
+            {
+                const uint32_t abs_now =
+                    sx1276_fhss_clock_abs_slot(tx_now_ms);
+                (void)sx1276_fhss_snap_to(
+                    sx1276_fhss_clock_epoch_of(abs_now),
+                    sx1276_fhss_clock_hop_of(abs_now));
+            }
+            s_hop_slot_offset_ms = (uint8_t)((sx1276_fhss_clock_in_slot_ms(tx_now_ms) > 255U)
+                ? 255U
+                : sx1276_fhss_clock_in_slot_ms(tx_now_ms));
             uint8_t  hop_channel_idx = 0U;
             uint32_t hop_center_hz   = 0U;
             const sx1276_fhss_status_t hop_st =
@@ -359,8 +401,9 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
         hdr.profile_id = (active != NULL)
             ? active->profile_id
             : (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915;
-        hdr.hop_idx    = s_hop_idx;
-        hdr.epoch      = s_hop_epoch;
+        hdr.hop_idx        = s_hop_idx;
+        hdr.epoch          = s_hop_epoch;
+        hdr.slot_offset_ms = s_hop_slot_offset_ms;  /* v25.0.7 phase byte */
         (void)lora_pkt_hdr_pack(&hdr, hdr_bytes);
         sx1276_write_burst(SX1276_REG_FIFO, hdr_bytes, LORA_PKT_HDR_LEN);
     }
@@ -449,4 +492,50 @@ bool sx1276_tx_poll(uint32_t events, sx1276_tx_result_t *out_result) {
 
 bool sx1276_tx_busy(void) {
     return s_tx_state != SX1276_TX_STATE_IDLE;
+}
+
+uint32_t sx1276_tx_slot_wait_us(uint8_t payload_len) {
+#ifdef LIFETRAC_FHSS_TX_ROUTED
+    /*
+     * v25.0.7 slot-clock fit advisory (see include/sx1276_fhss_clock.h).
+     * Pure query — NO radio or scheduler side effects, so the caller
+     * (host_cmd.c) can park the request in the TX mailbox and retry
+     * on a later main-loop pass without burning a hop slot or FIFO
+     * state. Returns 0 when the frame may key up now:
+     *   - non-FHSS profile (bench / DTS have no grid), or
+     *   - clock not yet anchored (first TX anchors it), or
+     *   - remaining slot time fits ToA + guard.
+     * Otherwise returns the µs until the next slot boundary.
+     */
+    if (!tx_profile_is_fhss() || sx1276_fhss_clock_valid() == 0U) {
+        return 0U;
+    }
+    {
+        const uint32_t now_ms     = platform_now_ms();
+        const uint32_t in_slot_ms = sx1276_fhss_clock_in_slot_ms(now_ms);
+        const uint32_t in_slot_us = in_slot_ms * 1000UL;
+        const uint32_t slot_us    = (uint32_t)SX1276_FHSS_SLOT_MS * 1000UL;
+        /* Head-start hold: never key before the receiver's boundary
+         * retune has finished (see SX1276_FHSS_SLOT_TX_HEADSTART_MS). */
+        if (in_slot_ms < (uint32_t)SX1276_FHSS_SLOT_TX_HEADSTART_MS) {
+            return ((uint32_t)SX1276_FHSS_SLOT_TX_HEADSTART_MS
+                    - in_slot_ms) * 1000UL;
+        }
+        const uint8_t  effective_len =
+            (uint8_t)((payload_len > (255U - LORA_PKT_HDR_LEN))
+                          ? 255U
+                          : (payload_len + LORA_PKT_HDR_LEN));
+        const uint32_t toa_us =
+            sx1276_airtime_estimate_toa_us(effective_len);
+        if (in_slot_us + toa_us + SX1276_FHSS_SLOT_TX_GUARD_US <= slot_us) {
+            return 0U;
+        }
+        /* Wait to the next boundary plus the head-start hold. */
+        return (slot_us - in_slot_us)
+               + (uint32_t)SX1276_FHSS_SLOT_TX_HEADSTART_MS * 1000UL;
+    }
+#else
+    (void)payload_len;
+    return 0U;
+#endif
 }

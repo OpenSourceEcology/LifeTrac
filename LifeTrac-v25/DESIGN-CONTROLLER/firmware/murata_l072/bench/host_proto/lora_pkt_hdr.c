@@ -83,7 +83,7 @@ static void test_nominal_golden(void) {
 }
 
 static void test_all_zero_golden(void) {
-    const lora_pkt_hdr_t in = { 0U, 0U, 0U };
+    const lora_pkt_hdr_t in = {0};
     const uint8_t expected[LORA_PKT_HDR_LEN] = {
         0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
     };
@@ -108,10 +108,36 @@ static void test_edge_values(void) {
           "edge values must round-trip without truncation");
 }
 
+static void test_slot_offset_byte(void) {
+    /* v25.0.7 slot-clock: byte 3 (former _reserved) now carries
+     * slot_offset_ms. Packing must place it verbatim; unpack must
+     * surface it; a zero value keeps the pre-v25.0.7 wire image
+     * byte-for-byte (additive evolution, schema_ver stays 1). */
+    const lora_pkt_hdr_t in = {
+        .profile_id     = 1U,
+        .hop_idx        = 5U,
+        .epoch          = 0x00000002U,
+        .slot_offset_ms = 0xABU,
+    };
+    const uint8_t expected[LORA_PKT_HDR_LEN] = {
+        0x01, 0x01, 0x05, 0xAB, 0x02, 0x00, 0x00, 0x00
+    };
+    uint8_t actual[LORA_PKT_HDR_LEN];
+    lora_pkt_hdr_t back;
+    CHECK(lora_pkt_hdr_pack(&in, actual) == true, "pack slot_offset");
+    CHECK(memcmp(actual, expected, LORA_PKT_HDR_LEN) == 0,
+          "slot_offset_ms must land in byte 3");
+    CHECK(lora_pkt_hdr_unpack(actual, LORA_PKT_HDR_LEN, &back)
+              == LORA_PKT_HDR_OK,
+          "unpack slot_offset");
+    CHECK(back.slot_offset_ms == 0xABU,
+          "slot_offset_ms must round-trip");
+}
+
 static void test_pack_null_rejected(void) {
     uint8_t buf[LORA_PKT_HDR_LEN];
     memset(buf, 0xAA, sizeof(buf));
-    const lora_pkt_hdr_t in = { 0U, 0U, 0U };
+    const lora_pkt_hdr_t in = {0};
     CHECK(lora_pkt_hdr_pack(NULL, buf) == false, "pack(NULL,buf) should reject");
     CHECK(lora_pkt_hdr_pack(&in, NULL) == false, "pack(in,NULL) should reject");
     /* Verify pack(NULL,...) did not mutate the buffer. */
@@ -122,12 +148,13 @@ static void test_pack_null_rejected(void) {
 
 static void test_round_trip(void) {
     const lora_pkt_hdr_t in = {
-        .profile_id = 2U,
-        .hop_idx    = 33U,
-        .epoch      = 0xCAFEBABEU,
+        .profile_id     = 2U,
+        .hop_idx        = 33U,
+        .epoch          = 0xCAFEBABEU,
+        .slot_offset_ms = 199U,
     };
     uint8_t buf[LORA_PKT_HDR_LEN];
-    lora_pkt_hdr_t out = { 0U, 0U, 0U };
+    lora_pkt_hdr_t out = {0};
 
     CHECK(lora_pkt_hdr_pack(&in, buf) == true, "round-trip pack");
     CHECK(lora_pkt_hdr_unpack(buf, LORA_PKT_HDR_LEN, &out) == LORA_PKT_HDR_OK,
@@ -135,6 +162,8 @@ static void test_round_trip(void) {
     CHECK(out.profile_id == in.profile_id, "round-trip profile_id");
     CHECK(out.hop_idx == in.hop_idx, "round-trip hop_idx");
     CHECK(out.epoch == in.epoch, "round-trip epoch");
+    CHECK(out.slot_offset_ms == in.slot_offset_ms,
+          "round-trip slot_offset_ms");
 }
 
 static void test_unpack_short_input(void) {
@@ -185,11 +214,14 @@ static void test_unpack_null_rejected(void) {
 }
 
 static void test_unpack_ignores_reserved(void) {
-    /* Same as nominal golden but with reserved byte forced to 0xAB. */
+    /* Same as nominal golden but with reserved byte forced to 0xAB.
+     * v25.0.7: byte 3 is now surfaced as slot_offset_ms — the case
+     * doubles as proof that pre-slot-clock parsers' "ignore" rule and
+     * the new field are the same wire byte. */
     const uint8_t buf[LORA_PKT_HDR_LEN] = {
         0x01, 0x01, 0x11, 0xAB, 0x78, 0x56, 0x34, 0x12
     };
-    lora_pkt_hdr_t out = { 0U, 0U, 0U };
+    lora_pkt_hdr_t out = {0};
     CHECK(lora_pkt_hdr_unpack(buf, LORA_PKT_HDR_LEN, &out) == LORA_PKT_HDR_OK,
           "non-zero reserved byte must NOT fail unpack");
     CHECK(out.profile_id == 1U, "profile_id after reserved-byte ignore");
@@ -202,6 +234,7 @@ int main(void) {
     test_nominal_golden();
     test_all_zero_golden();
     test_edge_values();
+    test_slot_offset_byte();
     test_pack_null_rejected();
     test_round_trip();
     test_unpack_short_input();
@@ -213,6 +246,6 @@ int main(void) {
         fprintf(stderr, "[FAIL] lora_pkt_hdr: %d failure(s)\n", g_failures);
         return 1;
     }
-    printf("[PASS] lora_pkt_hdr: 10 cases\n");
+    printf("[PASS] lora_pkt_hdr: 11 cases\n");
     return 0;
 }

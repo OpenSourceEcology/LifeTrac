@@ -127,7 +127,15 @@ _PROFILE_TO_PHY = {0: PHY_IMAGE_BW250, 1: PHY_IMAGE_BW250, 2: PHY_IMAGE_BW500}
 # 950 ms/s under REG_PROFILE_FCC_15_247_DTS_BW500 (PSD-based compliance,
 # no P0 on the strict path). The host bucket stays 20 ms under the
 # firmware cap so a paced TX can never draw ABORT_QOS.
-_PROFILE_TO_BUDGET_US = {0: 380_000, 1: 380_000, 2: 930_000}
+#
+# v25.0.7 slot-clock: profile 1's real throttle is now the 200 ms hop
+# grid (5 slots/s x <=173 ms ToA ~= 865 ms air/s ceiling), and the
+# firmware QoS gate is per-CHANNEL (each channel sees <=2 packets per
+# 10 s under hopping, nowhere near its 400 ms/s bucket). The old
+# 380 ms/s HOST bucket was a single-carrier assumption that throttled
+# FHSS to ~2.3 pkt/s; raise it to 860 ms/s so the slot grid, not the
+# host, is the binding constraint.
+_PROFILE_TO_BUDGET_US = {0: 380_000, 1: 860_000, 2: 930_000}
 
 # LIFETRAC_TX_PIPELINE: 'v2' (default) = serial send->TX_DONE->send;
 # 'v3' = keep 2 TX_FRAME_REQs in flight against the firmware's depth-2

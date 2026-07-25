@@ -451,7 +451,26 @@ static void handle_tx_frame(const host_frame_t *frame) {
         return;
     }
 
-    if (sx1276_tx_busy()) {
+    /*
+     * 2026-07-24 CRITICAL FIX: copy the payload into `req` BEFORE any
+     * park-in-mailbox branch. The previous order copied it only on the
+     * direct-TX path, so every request deferred through s_tx_pending
+     * transmitted UNINITIALISED STACK BYTES — the depth-2 mailbox
+     * (v3 pipelining) shipped garbage on the second in-flight fragment
+     * (root cause of the run-15 "v3 delivers worse than v2" result).
+     */
+    if (req.length > 0U) {
+        memcpy(req.payload, &frame->payload[2], req.length);
+    }
+
+    /*
+     * v25.0.7 slot-clock: park when the modem is busy OR when the
+     * frame does not fit the remaining hop-slot time. The mailbox
+     * doubles as the slot waiting room — host_cmd_service_tx_mailbox()
+     * re-asks every main-loop pass and releases the frame on the next
+     * boundary. Pure advisory: no scheduler/radio side effects here.
+     */
+    if (sx1276_tx_busy() || sx1276_tx_slot_wait_us(req.length) > 0U) {
         if (s_tx_pending_valid) {
             host_uart_send_err_proto(frame->seq,
                                      frame->type,
@@ -464,10 +483,6 @@ static void handle_tx_frame(const host_frame_t *frame) {
         s_tx_pending_seq = frame->seq;
         s_tx_pending_valid = true;
         return;
-    }
-
-    if (req.length > 0U) {
-        memcpy(req.payload, &frame->payload[2], req.length);
     }
 
     if (!sx1276_tx_begin(&req)) {
@@ -859,6 +874,12 @@ void host_cmd_emit_tx_done(const sx1276_tx_result_t *result) {
 
 void host_cmd_service_tx_mailbox(void) {
     if (!s_tx_pending_valid || sx1276_tx_busy()) {
+        return;
+    }
+    /* v25.0.7 slot-clock: hold the parked frame until it fits the
+     * remaining hop-slot time. Re-asked every main-loop pass; the
+     * advisory is pure so this costs a few u32 ops per pass. */
+    if (sx1276_tx_slot_wait_us(s_tx_pending.length) > 0U) {
         return;
     }
     sx1276_tx_request_t next = s_tx_pending;

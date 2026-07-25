@@ -167,6 +167,11 @@ int main(void) {
              * No-op in unrouted builds. */
             sx1276_rx_scan_tick(now_ms);
 
+            /* v25.0.7 slot-clock: boundary follower runs between the
+             * scan SM (acquisition owner) and γ-1 (legacy silence
+             * walk, now gated out whenever the clock is anchored). */
+            sx1276_rx_slot_follow(now_ms);
+
             /* FCC-A6b-2-ii-γ-2: drive the RX retune scheduler. No-op
              * in unrouted builds; in routed builds, advances the
              * FHSS channel and retunes the synth so the receiver

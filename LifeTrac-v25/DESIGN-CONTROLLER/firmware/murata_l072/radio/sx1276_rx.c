@@ -6,7 +6,9 @@
 #include "sx1276.h"
 #include "sx1276_modes.h"
 #ifdef LIFETRAC_FHSS_TX_ROUTED
+#include "sx1276_airtime.h"
 #include "sx1276_fhss.h"
+#include "sx1276_fhss_clock.h"
 #include "sx1276_rx_scan_fail.h"
 #include "sx1276_rx_scan_walker.h"
 #include "sx1276_tx.h"
@@ -50,6 +52,11 @@ static void scan_feed_frame(bool header_valid);
 #endif
 static uint32_t s_rx_last_retune_ms;
 static uint8_t  s_rx_last_retune_ms_valid;
+/* v25.0.7 slot-clock follower bookkeeping: the absolute slot most
+ * recently tuned by sx1276_rx_slot_follow() (or marked followed by
+ * the anchor path when a packet is received mid-slot). */
+static uint32_t s_rx_last_followed_abs;
+static uint8_t  s_rx_last_followed_abs_valid;
 static void     rx_pll_settle_busy_wait(uint32_t delay_us);
 #endif
 
@@ -168,57 +175,40 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
                     sx1276_fhss_consider_remote(parsed.epoch,
                                                 parsed.hop_idx);
                 sx1276_rx_counter_record(dec);
-                /* FCC-A6c-2-c-ii-δ (2026-05-27, extended 2026-07-24):
-                 * TX consumes one hop slot PER PACKET, so a locked
-                 * receiver must follow on EVERY valid FHSS packet —
-                 * not only when the scheduler had to be corrected.
+                /* v25.0.7 slot-clock (supersedes the 2026-07-24
+                 * per-packet immediate-follow): instead of consuming
+                 * a slot per received packet — which breaks lock-step
+                 * on the FIRST air loss because TX hops whether or not
+                 * we heard it — phase-lock the local slot clock to the
+                 * sender's grid and let sx1276_rx_slot_follow() retune
+                 * on slot boundaries regardless of decode success.
                  *
-                 * SNAPPED — the local scheduler was wrong and
-                 * consider_remote() just parked s_fhss.slot at
-                 * (remote_hop_idx + 1). Consume that slot and retune
-                 * so we are listening where TX transmits NEXT.
-                 *
-                 * ALIGNED — we were listening on the right channel
-                 * and received this packet; TX's next packet is on
-                 * the NEXT slot, so the follow is identical. (The
-                 * pre-2026-07-24 code did nothing here and waited
-                 * for the γ-1 380 ms tick — but TX's inter-packet
-                 * gap under budget pacing is ~200 ms, so lock-step
-                 * died after the first follow: v25.0.6.5 root cause.)
-                 *
-                 * REJECTED_* — do not touch the synth.
-                 *
-                 * The follow-up next_channel() advances s_fhss.slot
-                 * by exactly 1, matching the consume-then-tune
-                 * convention γ-1 and TX both use. γ-1's anchor is
-                 * reset after each follow, so γ-1 only walks during
-                 * RF silence — where TX (which hops per packet, i.e.
-                 * faster than one slot per 380 ms) re-crosses the
-                 * receiver's slow walk within a bounded number of
-                 * packets and the first hit re-locks via SNAPPED.
-                 * See AI NOTES
-                 * "2026-05-27_RX_Scan_Current_vs_Proposed_v25_0_6_5_v1_0.md"
-                 * §3 Option δ. */
+                 * Anchor math: the packet occupied the sender's slot
+                 * (epoch, hop_idx); it was keyed slot_offset_ms after
+                 * that slot's boundary and spent toa_ms on air, so the
+                 * boundary in LOCAL time is now - toa - slot_offset.
+                 * ToA comes from the live modem-config estimate over
+                 * the full on-air length (header included). Anchoring
+                 * on every accepted header keeps phase error at the
+                 * ms level; ±2 ppm TCXOs drift ~0.12 ms/min between
+                 * anchors. REJECTED_* headers do not move the clock
+                 * (same trust gate as the scheduler snap). */
                 if (dec == SX1276_FHSS_SNAP_DEC_SNAPPED ||
                     dec == SX1276_FHSS_SNAP_DEC_ALIGNED) {
-                    uint8_t  follow_idx = 0U;
-                    uint32_t follow_hz  = 0U;
-                    const sx1276_fhss_status_t fst =
-                        sx1276_fhss_next_channel(&follow_idx,
-                                                 &follow_hz);
-                    if (fst == SX1276_FHSS_OK) {
-                        (void)sx1276_modes_to_standby();
-                        sx1276_set_frequency_hz(follow_hz);
-                        rx_pll_settle_busy_wait(SX1276_RX_PLL_SETTLE_US);
-                        (void)sx1276_rx_arm();
-                        /* Anchor γ-1's last-retune timestamp to now
-                         * so its next tick treats the immediate
-                         * follow as the start of the post-LOCK
-                         * timing window rather than firing a
-                         * spurious DO_WRAP. */
-                        s_rx_last_retune_ms       = platform_now_ms();
-                        s_rx_last_retune_ms_valid = 1U;
-                    }
+                    const uint32_t now_anchor_ms = platform_now_ms();
+                    const uint32_t toa_ms =
+                        sx1276_airtime_estimate_toa_us((uint8_t)rx_len)
+                            / 1000UL;
+                    const uint32_t remote_abs = sx1276_fhss_clock_abs_of(
+                        parsed.epoch, parsed.hop_idx);
+                    sx1276_fhss_clock_anchor(
+                        now_anchor_ms - toa_ms
+                            - (uint32_t)parsed.slot_offset_ms,
+                        remote_abs);
+                    /* The follower must not re-arm mid-slot for the
+                     * slot we just received in — mark it followed. */
+                    s_rx_last_followed_abs = remote_abs;
+                    s_rx_last_followed_abs_valid = 1U;
                 }
                 /* FCC-A6c-2-b-ii: header unpacked + schema OK —>
                  * FRAME_VALID with header_valid=true. This is what
@@ -345,6 +335,16 @@ void sx1276_rx_tick(uint32_t now_ms) {
          * cleanly rather than firing a spurious DO_WRAP off stale
          * pre-LOCK timing. */
         s_rx_last_retune_ms_valid = 0U;
+        return;
+    }
+
+    /* v25.0.7: when the slot clock is phase-locked the boundary
+     * follower (sx1276_rx_slot_follow) owns the synth — γ-1's silence
+     * walk would fight it. γ-1 remains the fallback for LOCKED-
+     * without-clock, which cannot normally occur (LOCK requires a
+     * frame and every accepted frame anchors the clock) but is kept
+     * fail-safe for a clock reset racing a still-LOCKED SM. */
+    if (sx1276_fhss_clock_valid() != 0U) {
         return;
     }
 
@@ -631,6 +631,18 @@ static void scan_drive(sx1276_rx_scan_event_t event,
 
     sx1276_rx_scan_counter_record(s_scan_state, dec.action);
 
+    /* v25.0.7: a LOCKED→SCANNING loss-of-sync demotion invalidates the
+     * phase anchor — the sender may have rebooted or re-gridded, so a
+     * fresh acquisition must re-derive it. Detected here (prev state
+     * LOCKED + BEGIN_SCAN action) because scan_dispatch_action cannot
+     * distinguish this from the cold-boot BEGIN_SCAN, and cold-boot
+     * must NOT clear a TX-side clock that activation just anchored. */
+    if (s_scan_state == SX1276_RX_SCAN_STATE_LOCKED &&
+        dec.action == SX1276_RX_SCAN_ACTION_BEGIN_SCAN) {
+        sx1276_fhss_clock_reset();
+        s_rx_last_followed_abs_valid = 0U;
+    }
+
     switch (dec.action) {
         case SX1276_RX_SCAN_ACTION_BEGIN_SCAN:
         case SX1276_RX_SCAN_ACTION_REANCHOR:
@@ -660,6 +672,52 @@ void sx1276_rx_scan_tick(uint32_t now_ms) {
     scan_drive(SX1276_RX_SCAN_EVENT_TICK, false, now_ms);
 }
 
+/*
+ * v25.0.7 slot-clock boundary follower. Called once per main-loop pass
+ * (after the scan tick, before γ-1). When the receiver is LOCKED and
+ * the slot clock is phase-anchored, retune at every slot boundary to
+ * the channel the shared schedule assigns to the new slot — whether or
+ * not the previous slot's packet was decoded. This is what makes one
+ * air loss cost exactly one packet instead of a re-acquisition.
+ *
+ * Interlocks:
+ *   - tx_busy: never yank the modem out of an in-flight TX (the TX
+ *     path re-derives its own channel from the same clock anyway).
+ *   - The TX-side fit guard (SX1276_FHSS_SLOT_TX_GUARD_US) guarantees
+ *     packets END before the boundary, so a boundary retune here
+ *     cannot clip a frame that is mid-air for us.
+ */
+void sx1276_rx_slot_follow(uint32_t now_ms) {
+    if (sx1276_fhss_clock_valid() == 0U ||
+        s_scan_state != SX1276_RX_SCAN_STATE_LOCKED ||
+        sx1276_tx_busy()) {
+        return;
+    }
+    const uint32_t abs_now = sx1276_fhss_clock_abs_slot(now_ms);
+    if (s_rx_last_followed_abs_valid != 0U &&
+        abs_now == s_rx_last_followed_abs) {
+        return;
+    }
+    /* Force the shared scheduler onto the clock's slot, then consume
+     * it — identical convention to the TX path, so hop_idx stamping
+     * and consider_remote()'s local-slot comparison stay symmetric. */
+    (void)sx1276_fhss_snap_to(sx1276_fhss_clock_epoch_of(abs_now),
+                              sx1276_fhss_clock_hop_of(abs_now));
+    {
+        uint8_t  idx = 0U;
+        uint32_t hz  = 0U;
+        if (sx1276_fhss_next_channel(&idx, &hz) == SX1276_FHSS_OK &&
+            hz != 0UL) {
+            (void)sx1276_modes_to_standby();
+            sx1276_set_frequency_hz(hz);
+            rx_pll_settle_busy_wait(SX1276_RX_PLL_SETTLE_US);
+            (void)sx1276_rx_arm();
+        }
+    }
+    s_rx_last_followed_abs       = abs_now;
+    s_rx_last_followed_abs_valid = 1U;
+}
+
 void sx1276_rx_scan_reset(void) {
     /* Return to BOOT: the next scan tick issues a fresh BEGIN_SCAN
      * (which also resets the chantab walker). Clears the retry budget
@@ -670,6 +728,11 @@ void sx1276_rx_scan_reset(void) {
     s_scan_got_any_irq        = false;
     s_scan_crc_seen           = false;
     s_rx_last_retune_ms_valid = 0U;
+    /* v25.0.7: fresh acquisition ⇒ fresh phase. The TX side re-anchors
+     * its own grid lazily at its next transmission, so resetting here
+     * is safe on both roles. */
+    sx1276_fhss_clock_reset();
+    s_rx_last_followed_abs_valid = 0U;
 }
 
 /*
@@ -700,6 +763,10 @@ static void scan_feed_frame(bool header_valid) {
 #else  /* !LIFETRAC_FHSS_TX_ROUTED */
 
 void sx1276_rx_scan_tick(uint32_t now_ms) {
+    (void)now_ms;
+}
+
+void sx1276_rx_slot_follow(uint32_t now_ms) {
     (void)now_ms;
 }
 

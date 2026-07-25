@@ -11,11 +11,17 @@
  *
  *   off  size  field
  *   ---  ----  ---------------------------------------------------
- *     0   1    schema_ver   (== LORA_PKT_HDR_SCHEMA_VER)
- *     1   1    profile_id   (REG_PROFILE_* from host_cfg_keys.h)
- *     2   1    hop_idx      (0 .. SX1276_FHSS_CHANNEL_COUNT-1)
- *     3   1    _reserved    (must be 0 on emit, ignored on parse)
- *     4   4    epoch_le     (uint32 FHSS scheduler epoch)
+ *     0   1    schema_ver     (== LORA_PKT_HDR_SCHEMA_VER)
+ *     1   1    profile_id     (REG_PROFILE_* from host_cfg_keys.h)
+ *     2   1    hop_idx        (0 .. SX1276_FHSS_CHANNEL_COUNT-1)
+ *     3   1    slot_offset_ms (v25.0.7 slot-clock: ms from the TX's
+ *                             slot boundary to TX key-up, saturated
+ *                             at 255. Occupies the former _reserved
+ *                             byte under the additive-evolution rule
+ *                             — v1 parsers ignored it, so schema_ver
+ *                             stays 1. 0 = keyed exactly on boundary
+ *                             OR sender has no slot clock.)
+ *     4   4    epoch_le       (uint32 FHSS scheduler epoch)
  *
  * Schema evolution (FCC notes §17.3 #4 additive-only rule):
  *
@@ -44,6 +50,9 @@ typedef struct lora_pkt_hdr_s {
     uint8_t  profile_id;
     uint8_t  hop_idx;
     uint32_t epoch;
+    /* v25.0.7: ms from the sender's slot boundary to TX key-up (u8,
+     * saturated). Enables single-packet phase anchoring on RX. */
+    uint8_t  slot_offset_ms;
 } lora_pkt_hdr_t;
 
 typedef enum {
