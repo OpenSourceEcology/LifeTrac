@@ -9,6 +9,7 @@
 #include "sx1276.h"
 #include "sx1276_modes.h"
 #include "sx1276_airtime.h"
+#include "sx1276_rx.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -193,6 +194,13 @@ host_cfg_profile_reject_t host_cfg_profile_activate(void) {
         (void)sx1276_fhss_init(0ULL, 0ULL, 0U);
         sx1276_set_sf_bw_cr(7U, 250U, 5U);
         sx1276_airtime_set_budget_us(SX1276_AIRTIME_BUDGET_DEFAULT_US);
+        /* 2026-07-24 FHSS bring-up: (re-)activation must also revive the
+         * A6c scan SM. Without this the SM burns its 30 s redesign
+         * budget on an empty band at boot, parks in the absorbing
+         * FAILED state (standby), and no later activation ever
+         * re-arms the receiver — fhss_rx_probe evidence 2026-07-24:
+         * 75 s under active TX hopping, zero RX_FRAME, zero FAULT. */
+        sx1276_rx_scan_reset();
     } else if (s_active.profile_id == REG_PROFILE_FCC_15_247_DTS_BW500) {
         sx1276_set_sf_bw_cr(7U, 500U, 5U);
         /* D4: PSD-based profile — QoS gate widened to 95 % duty. */

@@ -254,18 +254,33 @@ static void test_scanning_frame_invalid_holds(void) {
 }
 
 static void test_locked_tick(void) {
+    /* Fresh anchor: HOLD/LOCKED below the loss budget. */
     sx1276_rx_scan_input_t in = {
         .state               = SX1276_RX_SCAN_STATE_LOCKED,
-        .channel_entry_ms    = 0U,
+        .channel_entry_ms    = 1000U,
         .cold_start_entry_ms = 0U,
-        .now_ms              = 999999U,
+        .now_ms              = 1000U + (SX1276_RX_SCAN_LOCK_LOSS_MS - 1U),
         .event               = SX1276_RX_SCAN_EVENT_TICK,
         .frame_header_valid  = false,
     };
     sx1276_rx_scan_decision_t d = sx1276_rx_scan_eval(&in);
-    check_decision("(13) LOCKED+TICK",
+    check_decision("(13) LOCKED+TICK (fresh)",
                    d,
                    SX1276_RX_SCAN_ACTION_HOLD,
+                   SX1276_RX_SCAN_STATE_LOCKED);
+    /* 2026-07-24 loss-of-sync: at/after the budget → BEGIN_SCAN/SCANNING. */
+    in.now_ms = 1000U + SX1276_RX_SCAN_LOCK_LOSS_MS;
+    d = sx1276_rx_scan_eval(&in);
+    check_decision("(13b) LOCKED+TICK (loss-of-sync)",
+                   d,
+                   SX1276_RX_SCAN_ACTION_BEGIN_SCAN,
+                   SX1276_RX_SCAN_STATE_SCANNING);
+    /* Wrapped clock re-anchors instead of demoting. */
+    in.now_ms = 999U;
+    d = sx1276_rx_scan_eval(&in);
+    check_decision("(13c) LOCKED+TICK (wrap)",
+                   d,
+                   SX1276_RX_SCAN_ACTION_REANCHOR,
                    SX1276_RX_SCAN_STATE_LOCKED);
 }
 
@@ -279,9 +294,11 @@ static void test_locked_frame_valid(void) {
         .frame_header_valid  = true,
     };
     sx1276_rx_scan_decision_t d = sx1276_rx_scan_eval(&in);
+    /* 2026-07-24 loss-of-sync: FRAME_VALID re-anchors the channel
+     * timer so an active link never trips the loss budget. */
     check_decision("(14) LOCKED+FRAME_VALID",
                    d,
-                   SX1276_RX_SCAN_ACTION_HOLD,
+                   SX1276_RX_SCAN_ACTION_REANCHOR,
                    SX1276_RX_SCAN_STATE_LOCKED);
 }
 

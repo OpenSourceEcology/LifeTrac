@@ -60,7 +60,21 @@
  * conservative 100 ms. A6c-2 may parameterize this off the running
  * profile's preamble length.
  */
-#define SX1276_RX_SCAN_DWELL_MS         100U
+#define SX1276_RX_SCAN_DWELL_MS         500U
+
+/*
+ * 2026-07-24 FHSS bring-up (run-18 evidence): LOCKED used to be absorbing
+ * — one missed follow (single lost packet while TX hops per packet) left
+ * the receiver parked on a stale channel forever; rx_frames froze at 3
+ * with no fault and no re-acquisition. A LOCKED receiver that has not
+ * seen a valid frame for this long is demoted back to SCANNING via a
+ * fresh BEGIN_SCAN. The driver re-anchors channel_entry_ms on every
+ * FRAME_VALID in LOCKED (REANCHOR action), so an active link never
+ * trips this. 2 s ≈ 12 packet times at the 165 ms bench cadence —
+ * tolerant of QoS pacing gaps, fast enough that a video stream resumes
+ * within one scan acquisition.
+ */
+#define SX1276_RX_SCAN_LOCK_LOSS_MS    2000U
 
 /*
  * §7 Q6 acceptance target: worst-case cold-start hop-sync reacquire

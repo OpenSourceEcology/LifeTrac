@@ -604,6 +604,21 @@ static void scan_drive(sx1276_rx_scan_event_t event,
     if (sx1276_fhss_is_initialized() == 0U) {
         return;
     }
+    /*
+     * 2026-07-24 FHSS run-16 root cause: under profile 1 the scheduler
+     * IS initialised on the TX board too, so the scan SM ran there and
+     * its ADVANCE_CHANNEL dispatch (standby → set_freq → rx_arm) fired
+     * every SX1276_RX_SCAN_DWELL_MS with NO tx-busy interlock — γ-1
+     * has SKIP_BUSY, the scan SM did not. Each dispatch yanked the PA
+     * out of an in-flight TX → 100% tx_status=0x05 TX_TIMEOUT while
+     * hop telemetry looked perfect (hop_idx/epoch advancing). Evidence:
+     * _fhss_run16.log. Freeze the SM while a TX is keyed: the tick
+     * retries a few ms later, and frame events cannot occur mid-TX
+     * (single-FIFO radio), so nothing is lost.
+     */
+    if (sx1276_tx_busy()) {
+        return;
+    }
     const sx1276_rx_scan_input_t in = {
         .state               = s_scan_state,
         .now_ms              = now_ms,
@@ -645,6 +660,18 @@ void sx1276_rx_scan_tick(uint32_t now_ms) {
     scan_drive(SX1276_RX_SCAN_EVENT_TICK, false, now_ms);
 }
 
+void sx1276_rx_scan_reset(void) {
+    /* Return to BOOT: the next scan tick issues a fresh BEGIN_SCAN
+     * (which also resets the chantab walker). Clears the retry budget
+     * and per-window flags; the sticky ever-locked bit survives so
+     * post-reset FAIL sub-bytes still carry link history. */
+    s_scan_state              = SX1276_RX_SCAN_STATE_BOOT;
+    s_scan_fail_retries       = 0U;
+    s_scan_got_any_irq        = false;
+    s_scan_crc_seen           = false;
+    s_rx_last_retune_ms_valid = 0U;
+}
+
 /*
  * FCC-A6c-2-b-ii: frame-event feed.
  *
@@ -674,6 +701,9 @@ static void scan_feed_frame(bool header_valid) {
 
 void sx1276_rx_scan_tick(uint32_t now_ms) {
     (void)now_ms;
+}
+
+void sx1276_rx_scan_reset(void) {
 }
 
 #endif /* LIFETRAC_FHSS_TX_ROUTED */

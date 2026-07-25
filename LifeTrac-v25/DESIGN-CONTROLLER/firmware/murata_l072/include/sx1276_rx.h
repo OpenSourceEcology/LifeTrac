@@ -135,4 +135,15 @@ void sx1276_rx_retune_counter_record(sx1276_rx_retune_decision_t dec);
  */
 void sx1276_rx_scan_tick(uint32_t now_ms);
 
+/*
+ * 2026-07-24 FHSS bring-up: return the A6c scan SM to BOOT so the next
+ * tick runs a fresh BEGIN_SCAN. Called from host_cfg_profile_activate()
+ * when the FHSS profile is (re-)activated — without this, an SM that
+ * reached the absorbing FAILED state before the peer started radiating
+ * (30 s empty-band budget at boot) stays parked in standby FOREVER and
+ * the receiver is deaf regardless of later profile activations.
+ * No-op when LIFETRAC_FHSS_TX_ROUTED is not defined.
+ */
+void sx1276_rx_scan_reset(void);
+
 #endif /* LIFETRAC_MURATA_L072_SX1276_RX_H */

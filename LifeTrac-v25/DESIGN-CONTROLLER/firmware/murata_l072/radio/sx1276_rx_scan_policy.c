@@ -113,9 +113,36 @@ sx1276_rx_scan_decision_t sx1276_rx_scan_eval(const sx1276_rx_scan_input_t *in) 
         }
 
     case SX1276_RX_SCAN_STATE_LOCKED: {
-        /* A6c-1 surface treats LOCKED as absorbing — γ-1 owns the
-         * retune loop from here. A6c (post-γ-3) may add a LOSS-OF-
-         * SYNC re-scan transition. */
+        /* 2026-07-24 loss-of-sync (run-18): LOCKED is no longer fully
+         * absorbing. FRAME_VALID re-anchors the channel timer (REANCHOR;
+         * the γ-1/immediate-follow path owns the synth, so no HW action).
+         * A TICK with no valid frame for LOCK_LOSS_MS demotes back to
+         * SCANNING via BEGIN_SCAN — the caller resets the walker and
+         * re-runs acquisition. Wrap/backwards time re-anchors. */
+        if (event == SX1276_RX_SCAN_EVENT_FRAME_VALID) {
+            sx1276_rx_scan_decision_t d = {
+                .action     = SX1276_RX_SCAN_ACTION_REANCHOR,
+                .next_state = SX1276_RX_SCAN_STATE_LOCKED,
+            };
+            return d;
+        }
+        if (event == SX1276_RX_SCAN_EVENT_TICK) {
+            if (tick_wrapped(in->now_ms, in->channel_entry_ms)) {
+                sx1276_rx_scan_decision_t d = {
+                    .action     = SX1276_RX_SCAN_ACTION_REANCHOR,
+                    .next_state = SX1276_RX_SCAN_STATE_LOCKED,
+                };
+                return d;
+            }
+            if ((in->now_ms - in->channel_entry_ms) >=
+                SX1276_RX_SCAN_LOCK_LOSS_MS) {
+                sx1276_rx_scan_decision_t d = {
+                    .action     = SX1276_RX_SCAN_ACTION_BEGIN_SCAN,
+                    .next_state = SX1276_RX_SCAN_STATE_SCANNING,
+                };
+                return d;
+            }
+        }
         sx1276_rx_scan_decision_t d = {
             .action     = SX1276_RX_SCAN_ACTION_HOLD,
             .next_state = SX1276_RX_SCAN_STATE_LOCKED,

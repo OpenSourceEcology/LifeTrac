@@ -22,6 +22,10 @@ param(
     # LIFETRAC_TX_PIPELINE for the TX daemon: 'v2' serial, 'v3' pipelined
     # (depth-2 firmware mailbox).
     [string]$TxPipeline   = "v2",
+    # Regulatory profile for BOTH daemons: 0=BENCH_ONLY_FIXED_915 (single
+    # channel), 1=FCC_FHSS_50CH_BW250 (wide mask auto-enabled — the firmware
+    # validator rejects popcount<50 for profile 1), 2=FCC_DTS_BW500.
+    [int]$RegProfile      = 0,
     # Archive final logs + parameters under bench-evidence/ with the git
     # SHA in the folder name (evidence discipline per CODE REVIEWS docs).
     [switch]$Archive
@@ -29,6 +33,10 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Continue"
+
+# Profile env for both daemons; profile 1 needs the 50-ch wide mask.
+$profEnv = "-e LIFETRAC_REG_PROFILE=$RegProfile"
+if ($RegProfile -eq 1) { $profEnv = "$profEnv -e LIFETRAC_FHSS_WIDE_MASK=1" }
 
 # Resolve adb dynamically (the winget package dir name varies per
 # machine/source); fall back to the historical hardcoded path.
@@ -139,7 +147,7 @@ $swdReset = "echo fio | sudo -S -p '' sh -c 'mkdir -p /tmp/lifetrac_p0c; pkill -
 cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"$swdReset`""
 
 Write-Host "[LAUNCH] Starting TX Daemon on Board $TxAdbSerial..." -ForegroundColor Yellow
-cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f tx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name tx_smoke --network=host --entrypoint python3 --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=$HostIp -e LIFETRAC_SKIP_RESET_REQ=1 -e LIFETRAC_REG_PROFILE=0 -e LIFETRAC_TX_PIPELINE=$TxPipeline hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44 -u /work/image_tx_daemon.py --log-level INFO`""
+cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f tx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name tx_smoke --network=host --entrypoint python3 --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=$HostIp -e LIFETRAC_SKIP_RESET_REQ=1 $profEnv -e LIFETRAC_TX_PIPELINE=$TxPipeline hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44 -u /work/image_tx_daemon.py --log-level INFO`""
 
 # 6. Launch RX daemon.
 # RX publishes to the BASE BOARD's own mosquitto (127.0.0.1 via
@@ -148,7 +156,7 @@ cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -
 # production topology has the base web_ui subscribed to the base
 # broker anyway — tile_delta + link_stats land where the web UI reads.
 Write-Host "[LAUNCH] Starting RX Daemon on Board $RxAdbSerial..." -ForegroundColor Yellow
-cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f rx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name rx_smoke --network=host --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_SKIP_RESET_REQ=1 -e LIFETRAC_REG_PROFILE=0 lifetrac-v25:latest python3 -u /work/image_rx_daemon.py --log-level INFO`""
+cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f rx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name rx_smoke --network=host --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_SKIP_RESET_REQ=1 $profEnv lifetrac-v25:latest python3 -u /work/image_rx_daemon.py --log-level INFO`""
 
 Start-Sleep -Seconds 4
 

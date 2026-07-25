@@ -35,3 +35,10 @@ void sx1276_airtime_set_budget_us(uint32_t budget_us) {
 uint32_t sx1276_stub_last_budget_us(void) {
     return s_stub_budget_us;
 }
+
+/* 2026-07-24 FHSS bring-up: host_cfg_profile_activate() now also calls
+ * sx1276_rx_scan_reset() when activating the FHSS profile. Same
+ * placement rationale as above — targets that link the real
+ * radio/sx1276_rx.c must not see a second definition. */
+void sx1276_rx_scan_reset(void) {
+}
