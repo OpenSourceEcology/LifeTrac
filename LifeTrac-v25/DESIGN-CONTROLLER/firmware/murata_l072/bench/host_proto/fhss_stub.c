@@ -22,6 +22,12 @@ sx1276_fhss_status_t sx1276_fhss_init(uint64_t farm_id,
     return SX1276_FHSS_OK;
 }
 
+/* 2026-07-25 run-23 stale-state fix: non-FHSS activation branches now
+ * tear down the scheduler. Same collision rule as sx1276_fhss_init
+ * above — real symbol lives in radio/sx1276_fhss.c. */
+void sx1276_fhss_reset(void) {
+}
+
 /* D4: capture the QoS budget programmed by profile activation so
  * cfg_profile_wire.c can assert DTS -> 950 ms. Lives here (not in
  * sx1276_stub.c) because targets that link the REAL

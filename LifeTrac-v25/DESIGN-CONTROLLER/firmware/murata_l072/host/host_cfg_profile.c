@@ -202,10 +202,27 @@ host_cfg_profile_reject_t host_cfg_profile_activate(void) {
          * 75 s under active TX hopping, zero RX_FRAME, zero FAULT. */
         sx1276_rx_scan_reset();
     } else if (s_active.profile_id == REG_PROFILE_FCC_15_247_DTS_BW500) {
+        /* 2026-07-25 run-23 deafness: activation must fully DEFINE the
+         * radio's channel-agility state, not just add to it. If a prior
+         * boot epoch activated the FHSS profile and the inter-run NRST
+         * failed to land (the harness reset is fire-and-forget), the
+         * scheduler stays initialised and the A6c scan SM keeps walking
+         * the chantab — silently dragging the synth off the fixed
+         * carrier the host just pinned (evidence: _run23_v3_p0.log,
+         * rx_frames=0 for 120 s with FRF readback 915.000 OK at t0;
+         * unreproducible once a clean reset preceded the run). De-init
+         * the scheduler (closes the scan SM's is_initialized gate) and
+         * reset the SM + slot clock so no hop-era state survives into
+         * a single-carrier profile. */
+        sx1276_fhss_reset();
+        sx1276_rx_scan_reset();
         sx1276_set_sf_bw_cr(7U, 500U, 5U);
         /* D4: PSD-based profile — QoS gate widened to 95 % duty. */
         sx1276_airtime_set_budget_us(SX1276_AIRTIME_BUDGET_DTS_US);
     } else if (s_active.profile_id == REG_PROFILE_BENCH_ONLY_FIXED_915) {
+        /* Same teardown rationale as the DTS branch above. */
+        sx1276_fhss_reset();
+        sx1276_rx_scan_reset();
         sx1276_set_sf_bw_cr(7U, 250U, 5U);
         sx1276_airtime_set_budget_us(SX1276_AIRTIME_BUDGET_DEFAULT_US);
     }
