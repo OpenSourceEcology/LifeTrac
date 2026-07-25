@@ -121,6 +121,204 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 
 ---
 
+## Radio system — v25.0.7+ outstanding work (added 2026-07-25)
+
+> **Context:** the 2026-07-23→25 sessions landed slot-clock FHSS (2× fixed-channel),
+> the first DTS BW500 air link (**1.76 KB/s sustained**, 6.1× baseline), operator
+> selectors for encoder + radio profile with an auto policy, and the **LoRa-only
+> tractor control plane** (0xFB command frames; base→tractor over the radio, MQTT
+> demoted to intra-board hops). Live-air runs 31–33 then killed two real bugs
+> (raw-armed RXCONT invisible to firmware TX state; LBT refusing command TX under
+> load). Roadmaps: [`../AI NOTES/2026-07-25_LoRa_Image_Pipeline_Future_Work_Roadmap_Copilot_v1_0.md`](../AI%20NOTES/2026-07-25_LoRa_Image_Pipeline_Future_Work_Roadmap_Copilot_v1_0.md)
+> (speed/reliability queue) and [`../AI NOTES/2026-07-25_Keyframe_Elimination_Strategies_Copilot_v1_0.md`](../AI%20NOTES/2026-07-25_Keyframe_Elimination_Strategies_Copilot_v1_0.md)
+> (K-phases). Profile ladder measured on bench: p0 fixed ~307 B/s · p1 FHSS 699 B/s
+> · p2 DTS 1755 B/s. Evidence: `bench-evidence/radio_monitor_2026072{4,5}_*`.
+
+### RS-1 — Control-plane verification (next bench session, highest priority)
+
+- [ ] **RS-1.1 One clean control-plane run** — confirm the tractor now hears
+  0xFB commands in its **inter-fragment listening gaps** (per-fragment
+  `_ensure_rxcont` + drain fix, landed `faed3f02` but not yet air-verified)
+  and completes the full **two-phase DTS→FHSS→DTS handshake** (cmd → ACK on
+  old grid → both switch → proof-of-life → CONF; independent 45 s
+  revert watchdogs). Use the on-board injector pattern
+  (`_ctrl_inject.sh` via `docker exec rx_smoke` — host→base IP is dead on
+  this bench and host-side adb concurrent with the harness wedges the run).
+  Include one deliberate CONF-drop to watch both ends revert cleanly.
+- [ ] **RS-1.2 Base RX-worker freeze under bidirectional load** — run 33
+  froze the base worker at 15:30:38 during simultaneous command TX + image
+  RX (stats thread alive, worker stuck; suspect blocking UART write vs
+  RX-drain contention in `HostLink`). Chase at the firmware/HostLink level:
+  add a write timeout / non-blocking send path, instrument the worker loop
+  with a heartbeat counter, and soak bidirectional traffic ≥30 min.
+  **The control plane cannot be trusted under load until this closes.**
+- [ ] **RS-1.3 Encoder confirmation loop end-to-end** — pill press → base
+  0xFB ENCODE_MODE over LoRa → tractor `camera_service` applies + acks →
+  ack rides back over the air → web pill shows pin→actual (amber on
+  mismatch). Verified in parts; never as one loop with a real camera_service.
+- [ ] **RS-1.4 AutoRadioPolicy live validation** — set profile selector to
+  Auto, attenuate/detune to force timeouts, watch it degrade DTS→FHSS and
+  promote back after the 60 s health dwell. Policy is unit-tested
+  (`test_web_ui_radio_profile.py`); zero air evidence yet.
+
+### RS-2 — Re-baseline under LoRa-only control plane
+
+- [ ] **RS-2.1 Re-measure FHSS + DTS throughput with the control plane ON**
+  — all published numbers (699 B/s FHSS, 1755 B/s DTS) predate the 0xFB
+  uplink: command volleys, acks, and keyframe requests now consume airtime
+  and the tractor pays RXCONT re-arm time per fragment. Re-run the
+  saturation benchmarks (profile 1 + profile 2, v3, 12 fps) and update the
+  profile-ladder table in the roadmap doc.
+- [ ] **RS-2.2 DTS BW500 soak** — 30-minute saturation soak at profile 2:
+  watch reassembler timeouts, QUEUE_FULL, UART overruns, thermal drift, and
+  the RS-1.2 freeze signature. Latency histogram (P-frame age TX→publish)
+  while at it. (Roadmap §2.1.)
+- [ ] **RS-2.3 Explain the 25 % idle budget at DTS saturation** — instrument
+  inter-TX gap via RFCO timestamps to split fragment-underfill vs UART
+  turnaround loss *before* buying either fix.
+
+### RS-3 — Throughput levers (roadmap §2)
+
+- [ ] **RS-3.1 Fragment batching to 247 B bodies** — pack multiple small
+  tile-delta frames into one fragment train up to the body ceiling
+  (length-prefixed concat in `image_tx_daemon` + reassembler passthrough).
+  Projected +20–35 % FHSS, +10–15 % DTS. Re-tune reassembler timeout and
+  sweep/NACK cadence together with this (loss granularity grows).
+- [ ] **RS-3.2 Slot overhead trim (FHSS)** — measure the RX boundary-retune
+  latency with a scope/cycle counter, then shrink the 12 ms TX head-start
+  and 15 ms guard (13.5 % of every 200 ms slot) to measured+margin.
+  Do NOT raise `SLOT_MS` — 200 ms is load-bearing for the FCC per-channel
+  dwell math.
+- [ ] **RS-3.3 Real-camera benchmark rerun** — the synth workload underfills
+  fragments (150–275 B frames); real keyframes chunk at max body size.
+  Re-run the FHSS + DTS benchmarks fed by `camera_service.py` live before
+  optimizing further.
+- [ ] **RS-3.4 Make v3 the default pipeline** for profiles 1 and 2
+  (measured better: 268 vs 175 published under FHSS; parity at p0) —
+  config/default change + one confirmation run.
+- [ ] **RS-3.5 Profile-0 400 B/s target disposition** — decide: declare the
+  Phase-1 single-channel target superseded by DTS (recommended), or chase
+  it via `LIFETRAC_FRAG_AIR_CAP_MS` 170→200 (486 B/s ceiling, 384 µs dwell
+  margin — needs one RFCO sweep) + token-bucket pacing.
+
+### RS-4 — Reliability & firmware hardening
+
+- [ ] **RS-4.1 Parity fragments (0xFC) on keyframes** — `add_parity_fragments`
+  exists, is tested, and is wired but default-off (`LIFETRAC_PARITY_GROUP=0`).
+  Enable for keyframes on the bench, measure timeout reduction vs airtime
+  cost (75 timeouts/120 s under FHSS pre-fix is the baseline to beat).
+- [ ] **RS-4.2 Reassembler timeout derived from live PHY** — `max(3 s,
+  3 × expected_gap)` using the active profile's ToA instead of the fixed
+  1500 ms default (spurious evictions under FHSS slot cadence).
+- [ ] **RS-4.3 LOCK_LOSS coasting under valid slot clock** — with the
+  boundary follower, lock-loss demotion is the only remaining full-rescan
+  path; consider raising `LOCK_LOSS_MS` 2000→4000–6000 when
+  `sx1276_fhss_clock_valid()` (grid coasts on TCXO at ~0.12 ms/min drift).
+- [ ] **RS-4.4 TX idle beacon** — after a multi-minute host pause the RX
+  follower starves (no headers to re-anchor). Lightweight header-only
+  beacon ~1/s when the TX queue is idle (~7 ms/s airtime).
+- [ ] **RS-4.5 Slot-follower golden-vector test** — `sx1276_rx_slot_follow`
+  has no host-linked TU (clock TU covers arithmetic only): scripted
+  sequence test for anchor → boundary follows → skip-under-tx-busy →
+  reset-on-demotion.
+- [ ] **RS-4.6 RFCO freq visibility under bench/DTS** — profile-0/2 RFCO
+  zeroes `freq_hz`, which made run 23's off-channel synth invisible in
+  logs. Add a bench-only FRF readback to the per-TX snapshot or a low-rate
+  FRF-echo URC.
+- [ ] **RS-4.7 Boot-count/uptime in VER_URC** — one cheap firmware field
+  that makes NRST verification (RS-5.1) and "did it reboot?" forensics a
+  single request.
+- [ ] **RS-4.8 Daemon watchdogs** — tx/rx daemons have no supervision; a
+  UART wedge or MQTT drop kills the pipeline silently. docker
+  `--restart on-failure` + a health topic, or systemd-in-container.
+
+### RS-5 — Harness & bench tooling
+
+- [ ] **RS-5.1 Harness NRST + deploy verification** — the inter-run reset is
+  fire-and-forget (`gpio163` pulse piped to `Out-Null`; tractor SWD reset
+  backgrounded) and the file push is unverified (`adb push | Out-Null`).
+  Failed-reset produced run 23's 120 s false negative; a stale push
+  crash-looped both daemons for all of run 28. Add: post-reset VER +
+  uptime/boot-count gate on both L072s, and board-side `md5sum` vs local
+  compare after push — abort loudly on either mismatch.
+- [ ] **RS-5.2 Deploy gpio — tractor gpio163 dead** — L072 reset on the
+  tractor works only via the fragile OpenOCD/SWD path (7–10 s, occasionally
+  hangs). Root-cause the GPIO (pinmux? blown pad?) or add a hardware NRST
+  jumper on the carrier. Largest single bench-fragility item.
+- [ ] **RS-5.3 Dev-loop smoke tier** — `-DurationS 30 -NoArchive` harness
+  mode to cut the edit→verdict loop from ~9 min to ~4; keep 120 s+archive
+  for evidence runs.
+- [ ] **RS-5.4 Harness robustness from runs 31–33** — rely on `MONITOR
+  COMPLETE` in the log (parent PS can hang after the child exits; console
+  shared with the publisher); never run host-side adb concurrent with the
+  harness's polling (wedges adb + everything behind it); injectors run ON
+  the base board (`docker exec` into `rx_smoke`), not on the host.
+- [ ] **RS-5.5 Bidirectional-load test mode** — harness knob that generates
+  continuous keyframe-request + profile-flip traffic during a stream, so
+  RS-1.2-class bugs surface on demand instead of by accident.
+
+### RS-6 — Keyframe elimination (K-phases, now LoRa-only)
+
+> Per the 2026-07-25 architecture rule (**base→tractor strictly over LoRa**),
+> the K-phase back-channels (`req_tiles` NACK, hash-beacon mismatch requests,
+> connect-time sync) must be specified as **0xFB command-frame opcodes over
+> the radio** — not MQTT topics to the tractor as originally sketched in the
+> keyframe-elimination doc. Update that doc's §3/§5 accordingly before
+> implementing. Airtime for the uplink is tiny (14 B bitmap ≈ 25 ms at
+> control rates) but must be admitted through the same QoS/slot machinery.
+
+- [ ] **RS-6.0 Update K-phase design doc for LoRa-only transport** — revise
+  [`../AI NOTES/2026-07-25_Keyframe_Elimination_Strategies_Copilot_v1_0.md`](../AI%20NOTES/2026-07-25_Keyframe_Elimination_Strategies_Copilot_v1_0.md)
+  §K-B/K-C/K-G: back-channel = new 0xFB opcodes (e.g. `CMD_OP_REQ_TILES`
+  + 12-byte bitmap, `CMD_OP_TILE_HASHES`), uplink budget accounting, and
+  the K-C hash beacon as a downlink payload type.
+- [ ] **RS-6.1 Per-tile staleness histogram on RX** — prerequisite metric
+  for every K-phase exit test: `age_since_applied` per grid cell,
+  published on `link_stats`. The system currently cannot see tile
+  staleness at all.
+- [ ] **RS-6.2 Phase K1 — keyframeless steady state** — adaptive Method-C
+  sweep (`SWEEP_STEP` scales with spare frame budget) +
+  `KEYFRAME_PERIOD_S=∞` + connect-time paced sync (K-G) via a LoRa
+  `req_keyframe`/`req_tiles(all)` command. Exit: kill RX mid-stream,
+  restart, canvas fully painted ≤15 s at FHSS rates with zero I-frames.
+- [ ] **RS-6.3 Phase K2 — targeted repair** — K-C canvas-hash beacon
+  (96×CRC-8 ≈ one fragment) + K-B `req_tiles` NACK over LoRa + K-F
+  idle-airtime refresh. Exit: 20 % injected frame loss; P95 tile
+  staleness ≤2× loss-free; repair bytes ≤1.2× (lost tiles × size).
+- [ ] **RS-6.4 Phase K3 (conditional on field data)** — K-E XOR-heal /
+  fountain tiles (repair with no uplink; wins for multicast), K-D
+  receiver-state ARQ only if repair-byte overhead matters at fleet scale.
+- [ ] **RS-6.5 Keyframe period stopgap** — until K1 lands: restore
+  `KEYFRAME_PERIOD_S` 60→15–20 s in production configs + validate the
+  RX self-heal (`req_keyframe` on reassembly failure) fires over the
+  LoRa path — the largest *perceived*-latency win available today.
+
+### RS-7 — Security & compliance runway (pre-field)
+
+- [ ] **RS-7.1 AEAD for 0xFB command frames** — the strict-path control
+  plane is **plaintext** (worst-case abuse = video DoS, never actuation —
+  driving stays on the AEAD lora_bridge path). Before field deployment,
+  move command frames into the same AES-GCM + nonce-store + replay-window
+  envelope. Flagged in the `3b1fb347` commit message.
+- [ ] **RS-7.2 DTS PSD/OBW lab measurement** — §15.247(a)(2) needs measured
+  6 dB occupied BW ≥500 kHz and conducted PSD ≤8 dBm/3 kHz on the actual
+  Murata module (+17 dBm into 500 kHz has ~comfortable margin on paper;
+  chirp BW ≠ occupied BW by assumption). Spectrum-analyser session.
+- [ ] **RS-7.3 FHSS spectrum verification refresh** — the existing
+  Phase 2.LoRa.2 spectrum-analyser task predates the 50-channel/BW250
+  slot-clock design (old text says 8-channel); re-verify ≤400 ms per-channel
+  dwell per 10 s (measured ~118 ms/10 s on bench accounting) and no OOB.
+- [ ] **RS-7.4 EIRP bookkeeping wired to HW ceiling** — antenna-gain CFG key
+  exists; enforce the §15.247(b)(4) 1-for-1 conducted-power reduction for
+  >6 dBi antennas in the ceiling clamp before any mast antenna is fitted.
+- [ ] **RS-7.5 Field rendezvous/fallback hardening for profile switching** —
+  the two-phase switch + independent revert watchdogs cover the bench; a
+  field-grade design should add a fixed rendezvous profile (FHSS) both
+  ends fall back to after N minutes of total silence, so no sequence of
+  lost commands can strand the link permanently.
+
+---
+
 ## Phase 0 — Hardware procurement & shop setup
 
 ### Tractor node hardware
