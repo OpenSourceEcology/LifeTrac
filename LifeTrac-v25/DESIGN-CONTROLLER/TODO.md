@@ -904,6 +904,21 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   field-grade design should add a fixed rendezvous profile (FHSS) both
   ends fall back to after N minutes of total silence, so no sequence of
   lost commands can strand the link permanently.
+  **FLAW DEMONSTRATED ON AIR 2026-07-26 (run V,
+  `radio_monitor_20260726_163103`): proof-of-life is spoofable by
+  cross-profile garbage decodes.** A stale retained `{"profile": 1}`
+  (operator-side config skew) made the base command a 2→1 switch mid-DTS
+  stream; the tractor ACKed but never received CONF and reverted to DTS —
+  while the base accepted a **53-byte wrong-grid decode that happened to
+  pass CRC as "proof-of-life on profile 1"**, disarmed its revert
+  watchdog, and confirmed itself onto FHSS permanently. Grids diverged
+  for 29 minutes with the base fully confident (rx_frames froze at 28;
+  every command gave up). **Fixes:** proof-of-life must require a frame
+  that PARSES as a fragment/command (not merely CRC-valid), or ≥N frames
+  within the window; and the silence-rendezvous fallback this item
+  proposes would have healed the divergence in minutes. Also: retained
+  control topics are exactly the "unaccounted actor" class RS-9 warns
+  about — second occurrence (web_ui republish was the first).
 
 ### RS-8 — Crypto profile cutover (S5.1b: D13 GCM-64 implicit + D14 split-trust)
 

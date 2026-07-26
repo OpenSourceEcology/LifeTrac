@@ -1,0 +1,708 @@
+﻿2026-07-26 21:00:51,230 INFO image_rx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-07-26 21:00:51,233 INFO image_rx_daemon: image_rx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-07-26 21:00:51,239 INFO image_rx_daemon: ctrl MQTT connected (192.168.1.79)
+
+2026-07-26 21:00:51,244 INFO image_rx_daemon: MQTT connected; ready to publish lifetrac/v25/video/tile_delta
+
+2026-07-26 21:00:51,245 INFO image_rx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-07-26 21:00:51,670 INFO image_rx_daemon: L072 VER warm-up ok (attempt 1)
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+
+2026-07-26 21:00:52,091 INFO image_rx_daemon: LBT_ENABLE=0 (command uplink shares the image channel)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-07-26 21:00:52,175 INFO image_rx_daemon: SX1276 RXCONT autowake: opmode 0x81 -> 0x85
+
+2026-07-26 21:00:52,176 INFO image_rx_daemon: RX worker ready; draining RX_FRAME_URC...
+
+2026-07-26 21:00:52,232 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-26 21:00:52,454 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-07-26 21:00:52,467 INFO image_rx_daemon: radio_profile: commanding tractor 2 -> 1 (two-phase)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-26 21:00:52,498 INFO image_rx_daemon: command TX opcode=0x65 copy=1/2 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-26 21:00:52,530 INFO image_rx_daemon: command TX opcode=0x65 copy=2/2 OK (on air)
+
+2026-07-26 21:00:52,784 INFO image_rx_daemon: radio_profile: tractor ACK for 1 — switching locally
+
+INFO: post-VER drain wire   type=0x91 seq=0
+
+INFO: post-VER drain wire   type=0x91 seq=0
+
+INFO: post-VER drain wire   type=0x91 seq=0
+
+Initializing regulatory profile 1 on co-processor...
+
+  FHSS mask: WIDE (50 channels) [LIFETRAC_FHSS_WIDE_MASK=1]
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+CFG_SET_REQ(REG_PROFILE=1) OK: 14000100
+
+PHY contract OK: image_bw250 == {'sf': 7, 'bw_khz': 250, 'cr_den': 5, 'preamble': 8}
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=0 channel_idx=3 epoch=0 freq_hz=904250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:53,474 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=1 channel_idx=19 epoch=0 freq_hz=912250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:53,777 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=3 channel_idx=14 epoch=0 freq_hz=909750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:54,080 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=4 channel_idx=22 epoch=0 freq_hz=913750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:54,382 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=6 channel_idx=10 epoch=0 freq_hz=907750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:54,693 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=7 channel_idx=0 epoch=0 freq_hz=902750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:54,996 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=9 channel_idx=40 epoch=0 freq_hz=922750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:55,298 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=10 channel_idx=37 epoch=0 freq_hz=921250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:55,599 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=12 channel_idx=32 epoch=0 freq_hz=918750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:55,910 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=13 channel_idx=44 epoch=0 freq_hz=924750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:56,211 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=15 channel_idx=7 epoch=0 freq_hz=906250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:56,512 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=16 channel_idx=4 epoch=0 freq_hz=904750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:56,814 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=18 channel_idx=47 epoch=0 freq_hz=926250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:57,116 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=19 channel_idx=34 epoch=0 freq_hz=919750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:57,424 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=21 channel_idx=17 epoch=0 freq_hz=911250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:57,727 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=23 channel_idx=43 epoch=0 freq_hz=924250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:58,082 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=24 channel_idx=49 epoch=0 freq_hz=927250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:58,383 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=26 channel_idx=18 epoch=0 freq_hz=911750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:58,682 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=27 channel_idx=9 epoch=0 freq_hz=907250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:00:58,982 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-07-26 21:00:59,247 WARNING image_rx_daemon: cmd 0x63 GAVE UP after 20 attempts (8.0 s)
+
+2026-07-26 21:01:02,236 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+2026-07-26 21:01:12,240 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+2026-07-26 21:01:22,244 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+2026-07-26 21:01:24,845 INFO image_rx_daemon: radio_profile: proof-of-life on profile 1 — sending CONF
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=42 channel_idx=24 epoch=1 freq_hz=914750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:24,879 INFO image_rx_daemon: command TX opcode=0x67 copy=1/2 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=42 channel_idx=24 epoch=1 freq_hz=914750000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 21:01:24,915 INFO image_rx_daemon: command TX opcode=0x67 copy=2/2 OK (on air)
+
+2026-07-26 21:01:25,309 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=45 channel_idx=31 epoch=1 freq_hz=918250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:25,599 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=47 channel_idx=18 epoch=1 freq_hz=911750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:25,902 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=49 channel_idx=7 epoch=1 freq_hz=906250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:26,408 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 21:01:26,673 INFO image_rx_daemon: requesting keyframe (reassembly timeout #1)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=1 channel_idx=24 epoch=2 freq_hz=914750000 pkt_toa_us=20608 legal_dwell_used_us_10s=61824
+
+2026-07-26 21:01:26,715 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=3 channel_idx=6 epoch=2 freq_hz=905750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:27,199 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=5 channel_idx=22 epoch=2 freq_hz=913750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:27,502 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=7 channel_idx=4 epoch=2 freq_hz=904750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:28,016 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=9 channel_idx=3 epoch=2 freq_hz=904250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:28,325 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=11 channel_idx=38 epoch=2 freq_hz=921750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:28,800 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=13 channel_idx=15 epoch=2 freq_hz=910250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:29,112 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=15 channel_idx=40 epoch=2 freq_hz=922750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:29,605 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=17 channel_idx=31 epoch=2 freq_hz=918250000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 21:01:29,906 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=19 channel_idx=39 epoch=2 freq_hz=922250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:30,400 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=21 channel_idx=27 epoch=2 freq_hz=916250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:30,702 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=23 channel_idx=32 epoch=2 freq_hz=918750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:31,210 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=25 channel_idx=10 epoch=2 freq_hz=907750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:31,511 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 21:01:31,707 INFO image_rx_daemon: requesting keyframe (reassembly timeout #7)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=27 channel_idx=23 epoch=2 freq_hz=914250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:31,998 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 21:01:32,251 INFO image_rx_daemon: stats: rx_frames=11 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=7 parity_recon=0
+
+2026-07-26 21:01:32,252 INFO image_rx_daemon: air_gap: n=10 dt_med=792507us dt_p95=808050us len_med=53B cmd_tx_ok=41 cmd_tx_fail=0
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=29 channel_idx=1 epoch=2 freq_hz=903250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:32,294 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=31 channel_idx=34 epoch=2 freq_hz=919750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:32,816 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=33 channel_idx=42 epoch=2 freq_hz=923750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:33,127 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 21:01:33,560 WARNING image_rx_daemon: cmd 0x60 GAVE UP after 20 attempts (8.2 s)
+
+2026-07-26 21:01:33,629 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 21:01:34,121 INFO image_rx_daemon: published frame_id=0 252 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 21:01:34,911 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 21:01:35,722 INFO image_rx_daemon: published frame_id=0 252 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 21:01:36,513 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=1 channel_idx=15 epoch=3 freq_hz=910250000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 21:01:36,812 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=3 channel_idx=0 epoch=3 freq_hz=902750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:37,113 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=5 channel_idx=44 epoch=3 freq_hz=924750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:37,605 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=7 channel_idx=18 epoch=3 freq_hz=911750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:37,907 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=9 channel_idx=24 epoch=3 freq_hz=914750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:38,392 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=11 channel_idx=8 epoch=3 freq_hz=906750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:38,693 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 21:01:38,922 INFO image_rx_daemon: requesting keyframe (reassembly timeout #11)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=13 channel_idx=7 epoch=3 freq_hz=906250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:39,220 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=15 channel_idx=42 epoch=3 freq_hz=923750000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 21:01:39,534 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=17 channel_idx=33 epoch=3 freq_hz=919250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:39,878 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=18 channel_idx=31 epoch=3 freq_hz=918250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:40,189 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=20 channel_idx=4 epoch=3 freq_hz=904750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:40,489 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=21 channel_idx=49 epoch=3 freq_hz=927250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:40,790 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=23 channel_idx=34 epoch=3 freq_hz=919750000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 21:01:41,091 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=24 channel_idx=39 epoch=3 freq_hz=922250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:41,395 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=26 channel_idx=13 epoch=3 freq_hz=909250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:41,707 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=27 channel_idx=3 epoch=3 freq_hz=904250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:42,017 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 21:01:42,255 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:01:42,257 INFO image_rx_daemon: air_gap: n=17 dt_med=400107us dt_p95=808183us len_med=53B cmd_tx_ok=60 cmd_tx_fail=0
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=29 channel_idx=35 epoch=3 freq_hz=920250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:42,319 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=30 channel_idx=12 epoch=3 freq_hz=908750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:42,630 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=32 channel_idx=37 epoch=3 freq_hz=921250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:42,931 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=33 channel_idx=17 epoch=3 freq_hz=911250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 21:01:43,231 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 21:01:43,495 WARNING image_rx_daemon: cmd 0x60 GAVE UP after 20 attempts (7.0 s)
+
+2026-07-26 21:01:52,261 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:02:02,265 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:02:12,269 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:02:22,273 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:02:32,277 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:02:42,281 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:02:52,285 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:03:02,289 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:03:12,293 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:03:22,297 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:03:32,301 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:03:42,305 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:03:52,308 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:04:02,312 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:04:12,315 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:04:22,319 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:04:32,324 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:04:42,328 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:04:52,332 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:05:02,337 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:05:12,341 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:05:22,345 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:05:32,350 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:05:42,354 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:05:52,358 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:06:02,361 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:06:12,366 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:06:22,369 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:06:32,375 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:06:42,379 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:06:52,382 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:07:02,386 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:07:12,389 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:07:22,393 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:07:32,397 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:07:42,401 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:07:52,404 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:08:02,408 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:08:12,411 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:08:22,415 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:08:32,418 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:08:42,422 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:08:52,427 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:09:02,431 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:09:12,435 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:09:22,439 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:09:32,442 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:09:42,446 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:09:52,450 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:10:02,452 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:10:12,457 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:10:22,461 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:10:32,465 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:10:42,470 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:10:52,474 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:11:02,479 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:11:12,484 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:11:22,489 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:11:32,494 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:11:42,498 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:11:52,502 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:12:02,507 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:12:12,510 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:12:22,514 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:12:32,518 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:12:42,521 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:12:52,525 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:13:02,528 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:13:12,531 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:13:22,536 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:13:32,541 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:13:42,545 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:13:52,548 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:14:02,552 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:14:12,555 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:14:22,560 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:14:32,564 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:14:42,568 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:14:52,572 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:15:02,576 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:15:12,580 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:15:22,584 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:15:32,588 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:15:42,592 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:15:52,596 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:16:02,600 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:16:12,604 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:16:22,608 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:16:32,613 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:16:42,617 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:16:52,621 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:17:02,624 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:17:12,627 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:17:22,631 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:17:32,635 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:17:42,638 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:17:52,642 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:18:02,645 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:18:12,649 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:18:22,653 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:18:32,658 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:18:42,662 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:18:52,665 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:19:02,669 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:19:12,673 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:19:22,676 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:19:32,680 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:19:42,683 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:19:52,687 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:20:02,692 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:20:12,695 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:20:22,699 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:20:32,702 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:20:42,706 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:20:52,710 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:21:02,714 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:21:12,718 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:21:22,722 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:21:32,725 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:21:42,729 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:21:52,733 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:22:02,736 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:22:12,739 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:22:22,743 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:22:32,746 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:22:42,750 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:22:52,755 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:23:02,759 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:23:12,763 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:23:22,766 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:23:32,770 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:23:42,774 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:23:52,779 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:24:02,783 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:24:12,787 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:24:22,791 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:24:32,795 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:24:42,798 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:24:52,802 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:25:02,805 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:25:12,810 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:25:22,814 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:25:32,818 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:25:42,822 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:25:52,826 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:26:02,830 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:26:12,833 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:26:22,837 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:26:32,840 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:26:42,845 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:26:52,850 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:27:02,854 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:27:12,857 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:27:22,861 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:27:32,865 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:27:42,869 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:27:52,871 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:28:02,876 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:28:12,880 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:28:22,884 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:28:32,887 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:28:42,891 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:28:52,894 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:29:02,898 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:29:12,902 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:29:22,906 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:29:32,910 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:29:42,915 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:29:52,920 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:30:02,924 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:30:12,928 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:30:22,933 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:30:32,938 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:30:42,941 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
+2026-07-26 21:30:52,945 INFO image_rx_daemon: stats: rx_frames=28 rx_decode_err=0 frames_published=6 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=1
+
