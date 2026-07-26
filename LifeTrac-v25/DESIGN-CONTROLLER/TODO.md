@@ -521,6 +521,23 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   exists, is tested, and is wired but default-off (`LIFETRAC_PARITY_GROUP=0`).
   Enable for keyframes on the bench, measure timeout reduction vs airtime
   cost (75 timeouts/120 s under FHSS pre-fix is the baseline to beat).
+  **First air test 2026-07-26 (run T, `radio_monitor_20260726_135348`,
+  FHSS + batching + parity_group=4 + requests ON): NEGATIVE WITH
+  CONFOUNDS — worst FHSS numbers of the program** (54 frames delivered,
+  62 evictions, 188 request copies = biggest storm yet, goodput 758 B/s).
+  **Cannot conclude parity failed — the experiment was flawed twice:**
+  (1) NO parity observability: neither stats line reports emissions or
+  reconstructions, so "0 reconstructs in the log" means zero instrument,
+  not zero function; (2) wrong sequencing — parity's +25 % airtime was
+  tested straight into storm conditions instead of against the quiet
+  2–3 % baseline first. **Required order next session: (i) add parity
+  emit/reconstruct counters to both stats lines; (ii) parity +
+  `-KfRequestDisable 1` vs run Q (pure parity vs quiet baseline);
+  (iii) only then requests-on.** Also check the last-fragment
+  reconstruction exemption (reassemble.py) against batched trains — the
+  runt tail may null parity for exactly the losses that matter; consider
+  ordering parity before the runt or padding the final fragment.
+  Harness knob landed: `-ParityGroup` (0 = off).
   **Verified 2026-07-25 — parity and keyframe-copies are mutually exclusive,
   and the switch between them is automatic and loss-triggered.** When
   `is_key and copies > 1` the packer returns at

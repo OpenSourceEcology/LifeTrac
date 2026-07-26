@@ -35,6 +35,11 @@ param(
     # RS-4.14 diagnostic (2026-07-26): 1 = suppress self-heal keyframe
     # requests on the RX side (tests whether command TX feeds FHSS loss).
     [int]$KfRequestDisable = 0,
+    # RS-4.1 (2026-07-26): XOR parity per N data fragments (0 = off).
+    # 4 aligns one parity with each 4-fragment batched train — absorbs
+    # single-fragment loss so evictions (and the request storm they
+    # spark at FHSS) never start. ~+25% airtime per train.
+    [int]$ParityGroup     = 0,
     # RS-3.10 gap knob passthrough for the policy A/B (ms).
     [int]$TrainGapMs      = 40,
     # RS-5.9 (2026-07-25): where tx_smoke gets its frame feed.
@@ -183,7 +188,7 @@ if ($TxFeed -eq "local") {
 }
 
 Write-Host "[LAUNCH] Starting TX Daemon on Board $TxAdbSerial (mqtt=$txMqtt, depth=$TxPipelineDepth)..." -ForegroundColor Yellow
-cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f tx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name tx_smoke --network=host --entrypoint python3 --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=$txMqtt -e LIFETRAC_SKIP_RESET_REQ=1 $profEnv -e LIFETRAC_TX_PIPELINE=$TxPipeline -e LIFETRAC_TX_PIPELINE_DEPTH=$TxPipelineDepth -e LIFETRAC_TX_BATCH=$TxBatch -e LIFETRAC_TX_PREPARE_AHEAD=$TxPrepareAhead -e LIFETRAC_TRAIN_GAP_MS=$TrainGapMs hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44 -u /work/image_tx_daemon.py --log-level INFO`""
+cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f tx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name tx_smoke --network=host --entrypoint python3 --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=$txMqtt -e LIFETRAC_SKIP_RESET_REQ=1 $profEnv -e LIFETRAC_TX_PIPELINE=$TxPipeline -e LIFETRAC_TX_PIPELINE_DEPTH=$TxPipelineDepth -e LIFETRAC_TX_BATCH=$TxBatch -e LIFETRAC_TX_PREPARE_AHEAD=$TxPrepareAhead -e LIFETRAC_TRAIN_GAP_MS=$TrainGapMs -e LIFETRAC_PARITY_GROUP=$ParityGroup hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44 -u /work/image_tx_daemon.py --log-level INFO`""
 
 # 6. Launch RX daemon.
 # RX publishes to the BASE BOARD's own mosquitto (127.0.0.1 via
@@ -279,6 +284,7 @@ if ($Archive) {
         "tx_prepare_ahead=$TxPrepareAhead",
         "train_gap_ms=$TrainGapMs",
         "kf_request_disable=$KfRequestDisable",
+        "parity_group=$ParityGroup",
         "tx_feed=$TxFeed",
         "reg_profile=$RegProfile",
         "tx_serial=$TxAdbSerial",
