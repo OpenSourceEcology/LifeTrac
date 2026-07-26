@@ -363,13 +363,13 @@ class ImageRxDaemon:
         both ends heal on the old grid without further coordination).
         """
         now = time.monotonic()
-        # Outbound command queue (keyframe / encode-mode / profile cmds).
-        while True:
-            try:
-                body = self._ctrl_out.get_nowait()
-            except queue.Empty:
-                break
-            self._send_command_frame(link, body)
+        # RS-1.x (2026-07-26 Run I forensics): the queue drain that lived
+        # here ran on EVERY loop pass and silently defeated the aligned
+        # pump — the second enqueued copy drained ~37 ms behind the pump's
+        # send, into the same stale window. Command draining now happens
+        # ONLY via the aligned+spaced pump (busy link) or
+        # _drain_ctrl_idle (quiet link). This method keeps its actual
+        # job: the two-phase profile-switch state machine.
         # Phase-A: while awaiting the tractor's ACK, re-send the command
         # every ~1.5 s — the tractor listens only in its inter-fragment
         # gaps, so a single volley has a real chance of landing while
@@ -433,17 +433,43 @@ class ImageRxDaemon:
         except Exception as exc:                              # pragma: no cover
             LOG.warning("RXCONT re-arm failed: %s", exc)
 
+    def _drain_ctrl_idle(self, link: HostLink) -> None:
+        """Idle-link fallback: drain queued commands when no image stream
+        is flowing (the tractor is listening continuously then, so timing
+        does not matter). During a stream the ONLY drain is the aligned,
+        ≥120 ms-spaced pump in the RX loop."""
+        while True:
+            try:
+                body = self._ctrl_out.get_nowait()
+            except queue.Empty:
+                return
+            self._send_command_frame(link, body, copies=1)
+
     def _send_command_frame(self, link: HostLink, body: bytes,
                             copies: int = 2) -> None:
-        """TX one 0xFB command frame via this daemon's L072 (idempotent)."""
+        """TX one 0xFB command frame via this daemon's L072 (idempotent).
+
+        2026-07-25 RS-1.1 instrumentation: every attempt is logged with the
+        opcode and outcome. A logged OK means the L072 reported TX_DONE —
+        the frame went ON AIR — so "never sent" vs "sent and lost at the
+        tractor" is now distinguishable from this log alone (the 2026-07-25
+        re-baseline runs could not tell the two apart).
+        """
+        op = body[1] if len(body) > 1 else 0
+        n = max(1, copies)
         try:
-            for _ in range(max(1, copies)):
+            for i in range(n):
                 try:
                     tx_frame = bytes([0xFD, len(body)]) + body
                     link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
                     wait_for_tx_done(link, 0xFD, timeout=2.0)
+                    self._cmd_tx_ok = getattr(self, "_cmd_tx_ok", 0) + 1
+                    LOG.info("command TX opcode=0x%02x copy=%d/%d OK (on air)",
+                             op, i + 1, n)
                 except Exception as exc:
-                    LOG.warning("command TX failed: %s", exc)
+                    self._cmd_tx_fail = getattr(self, "_cmd_tx_fail", 0) + 1
+                    LOG.warning("command TX opcode=0x%02x copy=%d/%d FAILED: %s",
+                                op, i + 1, n, exc)
                     return
         finally:
             # CRITICAL: our TX parks the modem in STANDBY (see
@@ -606,8 +632,11 @@ class ImageRxDaemon:
                         msg.payload[:64], exc)
             return
         try:
-            self._ctrl_out.put_nowait(pack_command_frame(
-                CMD_OP_ENCODE_MODE, bytes([mode & 0xFF])))
+            # RS-1.x: two entries = two copies, sent one-per-window by the
+            # aligned pump (independent windows beat back-to-back copies).
+            body = pack_command_frame(CMD_OP_ENCODE_MODE, bytes([mode & 0xFF]))
+            self._ctrl_out.put_nowait(body)
+            self._ctrl_out.put_nowait(body)
         except queue.Full:
             LOG.warning("encode_mode_override: command queue full")
 
@@ -618,8 +647,10 @@ class ImageRxDaemon:
             return
         self._last_kf_cmd_t = now
         try:
-            self._ctrl_out.put_nowait(
-                pack_command_frame(CMD_OP_REQ_KEYFRAME))
+            # RS-1.x: two entries = two copies across independent windows.
+            body = pack_command_frame(CMD_OP_REQ_KEYFRAME)
+            self._ctrl_out.put_nowait(body)
+            self._ctrl_out.put_nowait(body)
         except queue.Full:
             pass
 
@@ -664,6 +695,7 @@ class ImageRxDaemon:
                         self.stats.reassembler_timeouts += (cur_timeout - last_timeouts)
                     last_timeouts = cur_timeout
                     self._kf_req.poke(f"reassembly timeout #{cur_timeout}")
+                self._drain_ctrl_idle(link)
                 self._maybe_switch_profile(link)
                 # Defensive: heal a silently dropped RXCONT (throttled).
                 now_arm = time.monotonic()
@@ -672,6 +704,8 @@ class ImageRxDaemon:
                     self._ensure_rxcont(link)
                 continue
 
+            saw_rx = False       # (kept for logging/diagnostics)
+            frame_done = False   # RS-1.x: did a frame COMPLETE this pass?
             for frame in frames:
                 ftype = frame.get("type")
                 if ftype != HOST_TYPE_RX_FRAME_URC:
@@ -700,6 +734,24 @@ class ImageRxDaemon:
                 # Any valid frame on a freshly switched profile is proof
                 # the tractor made it over — confirm + disarm the revert.
                 self._note_proof_of_life(link)
+                # 2026-07-25 RS-2.3 forensics: inter-arrival gap between raw
+                # fragments from the firmware RX timestamp (u32 µs, wraps
+                # ~71 min — wrap-safe subtract). At saturation the median
+                # delta minus the median fragment's ToA IS the per-fragment
+                # dead time we are hunting; deltas >5 s are stream pauses,
+                # not gaps, and are discarded.
+                ts = parsed.get("timestamp_us")
+                if ts is not None:
+                    prev = getattr(self, "_gap_prev_ts", None)
+                    self._gap_prev_ts = ts
+                    if prev is not None:
+                        d = (ts - prev) & 0xFFFFFFFF
+                        if 0 < d < 5_000_000:
+                            if not hasattr(self, "_gap_samples"):
+                                self._gap_samples = []
+                            self._gap_samples.append((d, len(data)))
+
+                saw_rx = True
                 with self._lock:
                     self.stats.rx_frames_seen += 1
                     # 2026-07-24 link-speed telemetry: rolling counters
@@ -738,21 +790,58 @@ class ImageRxDaemon:
                         self._kf_req.poke(f"reassembly timeout #{cur_timeout}")
 
                 if completed is not None:
+                    # RS-1.x: a COMPLETED frame means that was the train's
+                    # LAST fragment — the tractor's ~44 ms host-turnaround
+                    # window opens NOW (mid-train the RS-4.12 ring restarts
+                    # TX within ~5 ms, so any-fragment alignment — Run E's
+                    # mistake — is no better than chance).
+                    frame_done = True
+                    # RS-3.1: a batched payload completes into a LIST of
+                    # frames; bare payloads stay a single frame. Publish
+                    # each — stats and web_ui see individual frames.
+                    done_list = (completed if isinstance(completed, list)
+                                 else [completed])
+                    for done in done_list:
+                        try:
+                            payload_out = encode_tile_delta_frame(done)
+                        except Exception as exc:
+                            LOG.warning("encode_tile_delta_frame failed: %s",
+                                        exc)
+                            continue
+                        frame_id = getattr(done, "frame_id", 0) or 0
+                        with self._lock:
+                            # Implicit encoder-mode ACK: frames self-describe
+                            # their codec; the base UI compares this against
+                            # the operator's pin (keyframe-forced on every
+                            # mode change, so it converges within one frame).
+                            self._last_rx_codec = getattr(done, "codec", 0)
+                            self._last_rx_frame_kind = getattr(
+                                done, "frame_kind", 0)
+                        self._publish(payload_out, frame_id)
+
+            # RS-1.x window-aligned command TX (2026-07-25): a fragment in
+            # this pass means the tractor JUST finished a TX — its armed
+            # RXCONT turnaround window (~44 ms measured, Run D) is open
+            # right now. Send ONE queued command copy per window; the ×2
+            # redundancy is spread across independent windows at enqueue.
+            # Run D showed unaligned delivery ≈ window-alignment odds
+            # (2/12); aligned TX should approach deterministic.
+            if frame_done and not self._ctrl_out.empty():
+                # Run H forensics (2026-07-26): without spacing, the two
+                # enqueued copies go out ~37 ms apart — both into the SAME
+                # (already stale) window, collapsing to one attempt. A
+                # ≥120 ms gap forces copy 2 onto a later train boundary,
+                # making the copies independent shots (expected per-command
+                # delivery 1-(1-p)^2 instead of p).
+                now_pump = time.monotonic()
+                if now_pump - getattr(self, "_last_pump_t", 0.0) >= 0.12:
                     try:
-                        payload_out = encode_tile_delta_frame(completed)
-                    except Exception as exc:
-                        LOG.warning("encode_tile_delta_frame failed: %s", exc)
-                        continue
-                    frame_id = getattr(completed, "frame_id", 0) or 0
-                    with self._lock:
-                        # Implicit encoder-mode ACK: frames self-describe
-                        # their codec; the base UI compares this against
-                        # the operator's pin (keyframe-forced on every
-                        # mode change, so it converges within one frame).
-                        self._last_rx_codec = getattr(completed, "codec", 0)
-                        self._last_rx_frame_kind = getattr(
-                            completed, "frame_kind", 0)
-                    self._publish(payload_out, frame_id)
+                        body = self._ctrl_out.get_nowait()
+                    except queue.Empty:
+                        body = None
+                    if body is not None:
+                        self._send_command_frame(link, body, copies=1)
+                        self._last_pump_t = now_pump
 
             self._maybe_switch_profile(link)
 
@@ -775,6 +864,22 @@ class ImageRxDaemon:
                     s.rx_frames_seen, s.rx_decode_errors,
                     s.reassembled_frames_published, s.publish_errors,
                     s.reassembler_decode_errors, s.reassembler_timeouts)
+            # RS-2.3 forensics + RS-1.1 command counters (outside the lock;
+            # the sample list is only touched from the ingest thread and a
+            # briefly stale read here is fine for a log line).
+            samples = getattr(self, "_gap_samples", None)
+            if samples:
+                self._gap_samples = []
+                ds = sorted(x[0] for x in samples)
+                ls = sorted(x[1] for x in samples)
+                n = len(ds)
+                LOG.info(
+                    "air_gap: n=%d dt_med=%dus dt_p95=%dus len_med=%dB "
+                    "cmd_tx_ok=%d cmd_tx_fail=%d",
+                    n, ds[n // 2], ds[min(n - 1, (n * 95) // 100)],
+                    ls[n // 2],
+                    getattr(self, "_cmd_tx_ok", 0),
+                    getattr(self, "_cmd_tx_fail", 0))
 
     def _link_stats_worker(self) -> None:
         """Publish a rolling link-speed JSON sample every ~2 s.

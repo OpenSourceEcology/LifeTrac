@@ -156,7 +156,27 @@ _PROFILE_TO_BUDGET_US = {0: 380_000, 1: 860_000, 2: 930_000}
 # mailbox (host_cmd.c s_tx_pending) so the UART turnaround rides inside
 # the previous fragment's time-on-air.
 TX_PIPELINE = os.environ.get("LIFETRAC_TX_PIPELINE", "v2").strip().lower()
-PIPELINE_DEPTH = 2
+# RS-2.3 (2026-07-25): outstanding TX_FRAME_REQs kept in flight in v3 mode.
+# Was a hard 2, matched to the old single-slot firmware mailbox. The
+# 2026-07-25 firmware carries a depth-4 park ring (1 transmitting + 4
+# parked), so up to 4 never NAKs. Latency guard (RS-9.7): keep <=3 at
+# FHSS; 4 is for DTS. Default stays 2 for old-firmware compatibility.
+PIPELINE_DEPTH = max(1, int(os.environ.get("LIFETRAC_TX_PIPELINE_DEPTH", "2")))
+# RS-3.1 (2026-07-25): batch multiple non-key frames into one fragment
+# train so the measured ~44 ms host-side per-handoff overhead (Run D
+# forensics) amortizes across 2-4 frames. Default OFF until air-verified;
+# the bench harness enables it explicitly.
+TX_BATCH = int(os.environ.get("LIFETRAC_TX_BATCH", "0"))
+# 520: fits a PAIR of ~250 B frames (4 + 2×(2+248) = 504) or a triple of
+# ~160 B ones. Run E's 480 default silently rejected every pair (two 246 B
+# synth frames need 498) and batching never engaged — size the budget off
+# REAL frame sizes, not wishful ones.
+BATCH_BUDGET_B = int(os.environ.get("LIFETRAC_BATCH_BUDGET_B", "520"))
+BATCH_MAX_FRAMES = max(1, int(os.environ.get("LIFETRAC_BATCH_MAX_FRAMES", "4")))
+try:
+    from image_pipeline.frame_format import pack_frame_batch
+except Exception:                                             # pragma: no cover
+    pack_frame_batch = None                                   # old deployments
 
 class AirtimeBudget:
     """Host mirror of the firmware per-channel QoS gate
@@ -278,6 +298,7 @@ class ImageTxDaemon:
         self._pending_profile: int | None = None
         self._active_profile = _prof
         self._mqtt_client = None            # set in run(); used for acks
+        self._carry: "_PendingFrame | None" = None   # RS-3.1 batch look-ahead
         # LoRa-only control plane: pending outbound command frames
         # (acks) + the revert deadline armed after a profile switch.
         self._cmd_out: "queue.Queue[bytes]" = queue.Queue(maxsize=8)
@@ -423,7 +444,10 @@ class ImageTxDaemon:
             self._service_control_plane(link)
             self._maybe_switch_profile(link)
             try:
-                frame = self._q.get(timeout=0.25)
+                if self._carry is not None:
+                    frame, self._carry = self._carry, None
+                else:
+                    frame = self._q.get(timeout=0.25)
             except queue.Empty:
                 # Idle: re-arm the command downlink (our own TXes park the
                 # modem in STANDBY — see _ensure_rxcont), then poll for
@@ -432,7 +456,46 @@ class ImageTxDaemon:
                 for rx in self._drain_rx_frames(link, 0.05):
                     self._dispatch_command(rx)
                 continue
+            frame = self._batch_more(frame)   # RS-3.1 (no-op unless enabled)
             self._tx_one_frame(link, frame)
+
+    def _batch_more(self, first: "_PendingFrame") -> "_PendingFrame":
+        """RS-3.1: greedily pull queued non-key frames into one batched
+        payload (length-prefixed container, FRAME_BATCH_MAGIC). A frame
+        that does not fit is CARRIED to the next loop pass — never pushed
+        back to the queue tail, so air order == submit order. Keyframes
+        are never batched (they keep the copies/parity paths)."""
+        if TX_BATCH == 0 or pack_frame_batch is None:
+            return first
+        if first.payload[:1] == b"\x01":       # keyframe: never batch
+            return first
+        batch = [first]
+        total = 2 + 2 + len(first.payload)     # magic+count + len+seg
+        while len(batch) < BATCH_MAX_FRAMES:
+            try:
+                nxt = self._q.get_nowait()
+            except queue.Empty:
+                break
+            if (nxt.payload[:1] == b"\x01"
+                    or total + 2 + len(nxt.payload) > BATCH_BUDGET_B):
+                self._carry = nxt
+                break
+            batch.append(nxt)
+            total += 2 + len(nxt.payload)
+        if len(batch) == 1:
+            return first
+        self._batched_frames = getattr(self, "_batched_frames", 0) + len(batch)
+        self._batched_trains = getattr(self, "_batched_trains", 0) + 1
+        if self._batched_trains % 25 == 1:
+            LOG.info("batching: %d frames in %d trains so far (this train: "
+                     "%d frames, %d B)", self._batched_frames,
+                     self._batched_trains, len(batch),
+                     sum(len(f.payload) for f in batch))
+        return _PendingFrame(
+            seq=first.seq,
+            payload=pack_frame_batch([f.payload for f in batch]),
+            enqueued_ms=first.enqueued_ms,     # oldest member: stale check
+            source_topic=first.source_topic)
 
     def _ensure_rxcont(self, link: HostLink) -> None:
         """Re-arm RXCONT for the command downlink (run-31 root cause).
@@ -880,6 +943,18 @@ class ImageTxDaemon:
                     if code not in BENIGN_FAULT_CODES:
                         LOG.warning("FAULT during pipelined TX: %s",
                                     format_fault_payload(payload))
+                elif ftype == HOST_TYPE_RX_FRAME_URC:
+                    # RS-1.x (2026-07-25): inbound frames arriving MID-BURST
+                    # were silently discarded here — with RS-4.12 arming the
+                    # radio through every turnaround, THIS loop sees most
+                    # inbound 0xFB command traffic (measured: 1/12 delivery
+                    # in runs D and F, both explained by this drop). Dispatch,
+                    # don't discard.
+                    try:
+                        parsed = parse_rx_frame(fr["payload"])
+                        self._dispatch_command(parsed.get("payload", b""))
+                    except Exception as exc:
+                        LOG.debug("mid-burst RX dispatch failed: %s", exc)
                 # RFCO_PERTX / STATS etc: informational, skip.
 
         with self.lock:

@@ -40,6 +40,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable
 
+from .frame_format import FRAME_BATCH_MAGIC, unpack_frame_batch
 from .frame_format import (
     FrameDecodeError,
     TileDeltaFrame,
@@ -280,7 +281,24 @@ class FragmentReassembler:
             del self._partials[seq]
             self.stats.timeouts += 1
 
-    def _decode_or_record_error(self, full: bytes) -> TileDeltaFrame | None:
+    def _decode_or_record_error(self, full: bytes):
+        # RS-3.1 (2026-07-25): batched container — split and decode each
+        # segment, returning a LIST of frames (callers normalize; the
+        # single-frame return shape is unchanged for bare payloads).
+        if full[:1] == bytes((FRAME_BATCH_MAGIC,)):
+            try:
+                segs = unpack_frame_batch(full)
+            except FrameDecodeError:
+                self.stats.decode_errors += 1
+                return None
+            frames = []
+            for seg in segs:
+                try:
+                    frames.append(parse_tile_delta_frame(seg))
+                except FrameDecodeError:
+                    self.stats.decode_errors += 1
+            self.stats.completed_frames += len(frames)
+            return frames or None
         try:
             frame = parse_tile_delta_frame(full)
         except FrameDecodeError:

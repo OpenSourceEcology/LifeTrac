@@ -29,6 +29,51 @@ from typing import Iterable
 
 FRAME_KIND_KEY = 1
 FRAME_KIND_DELTA = 0
+
+# RS-3.1 (2026-07-25): batched-frame container. Multiple encoded
+# TileDeltaFrames ride one fragment train so the ~44 ms host-side
+# per-handoff overhead (measured, Run D forensics) amortizes across
+# 2-4 frames. 0xB5 cannot collide with a bare frame (leading byte is
+# frame_kind: 0 or 1) or the fragment magics (0xFB/0xFC/0xFD/0xFE).
+# Wire: u8 magic | u8 count | (u16le seg_len | seg_bytes) * count.
+FRAME_BATCH_MAGIC = 0xB5
+
+
+def pack_frame_batch(frames: "list[bytes]") -> bytes:
+    """Concatenate encoded frames into one batch container."""
+    if not frames or len(frames) > 255:
+        raise FrameDecodeError(f"batch count {len(frames)} out of [1,255]")
+    out = bytearray((FRAME_BATCH_MAGIC, len(frames) & 0xFF))
+    for f in frames:
+        if not f or len(f) > 0xFFFF:
+            raise FrameDecodeError("batch segment empty or >64KiB")
+        out += struct.pack("<H", len(f))
+        out += f
+    return bytes(out)
+
+
+def unpack_frame_batch(payload: bytes) -> "list[bytes]":
+    """Inverse of pack_frame_batch. Raises FrameDecodeError on any
+    malformation (bad magic, truncated segment, trailing bytes)."""
+    if len(payload) < 2 or payload[0] != FRAME_BATCH_MAGIC:
+        raise FrameDecodeError("not a frame batch")
+    count = payload[1]
+    if count == 0:
+        raise FrameDecodeError("batch count 0")
+    segs = []
+    off = 2
+    for _ in range(count):
+        if off + 2 > len(payload):
+            raise FrameDecodeError("batch truncated at segment header")
+        (seg_len,) = struct.unpack_from("<H", payload, off)
+        off += 2
+        if seg_len == 0 or off + seg_len > len(payload):
+            raise FrameDecodeError("batch truncated at segment body")
+        segs.append(bytes(payload[off:off + seg_len]))
+        off += seg_len
+    if off != len(payload):
+        raise FrameDecodeError("batch trailing bytes")
+    return segs
 HEADER_FIXED_LEN = 6
 
 # Per-frame codec ids. Values 0..4 are first-class; 5..14 are reserved for
