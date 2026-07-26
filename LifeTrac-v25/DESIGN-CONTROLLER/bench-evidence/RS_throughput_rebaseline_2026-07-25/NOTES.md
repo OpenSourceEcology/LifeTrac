@@ -305,6 +305,36 @@ above pre-control-plane baselines, commands live) · FHSS train survival
 with self-reporting failure · every mechanism measured, every claim
 archived.
 
+## Runs R/S — base redeploy, the accidental handshake, and the honest storm verdict (2026-07-26)
+
+**Base redeploy (RS-5.1):** the June `--build` exit-17 finally diagnosed —
+docker **layer-store corruption** ("layer does not exist" at export;
+survives `builder prune -af`; my bad-cable theory was wrong as the primary
+cause, though the network fix was necessary for recovery). Cure: save the
+stale image as a rollback tarball, purge the damaged image chain, bounce
+dockerd, rebuild from a fresh pull — **BUILD_RC=0** after six weeks of
+failures. web_ui + audit_tail now run CURRENT code (the stale-404 endpoint
+answers 401); the systemd unit's build path works again.
+
+**Run R (`radio_monitor_20260726_133257`) — the accidental RS-1.1
+verification:** the redeployed web_ui republished its persisted profile
+"2" at startup, triggering a LIVE two-phase FHSS→DTS switch under
+saturated traffic: Phase-A retries on the old hop grid (ACK radiating at
+925.25→915.25 MHz — RS-4.6 freq visibility live), ACK → local switch →
+proof-of-life on the new grid in 7 s → CONF → stream unbroken at
+1780 B/s. The production trigger path, not a synthetic injector.
+
+**Run S (`radio_monitor_20260726_133647`) — the storm re-ignites with
+web_ui current:** 115 requests, 76 evictions, 115 frames delivered.
+Redeploy was necessary, not sufficient. Refined model: **the
+request-storm loop has gain >1 at FHSS saturation structurally** (every
+slot carries a fragment ⇒ every command TX costs one; 3 natural
+evictions/2 min are spark enough), gain <1 at DTS (aligned windows) —
+which is why DTS runs are healthy with requests on. Fix order: parity
+(RS-4.1, promoted — starve the loop of its spark), reserved reverse-slot
+in the hop schedule (true TDMA), or self-heal suppression at FHSS
+saturation.
+
 ## Perspective on the firmware patch
 
 The patch's throughput levers (SPI, URC, ring) did not raise the DTS ceiling —

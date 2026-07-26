@@ -141,7 +141,18 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   `_ensure_rxcont` + drain fix, landed `faed3f02` but not yet air-verified)
   and completes the full **two-phase DTS→FHSS→DTS handshake** (cmd → ACK on
   old grid → both switch → proof-of-life → CONF; independent 45 s
-  revert watchdogs). Use the on-board injector pattern
+  revert watchdogs).
+  **HANDSHAKE AIR-VERIFIED 2026-07-26 (run R,
+  `radio_monitor_20260726_133257`) — accidentally, via the PRODUCTION
+  trigger:** the freshly-redeployed web_ui republished its persisted
+  profile at startup, and the daemons executed a live FHSS→DTS two-phase
+  switch under saturated traffic: Phase-A retries on the old hop grid
+  (RFCO shows the ACK radiating at 925.25→915.25 MHz hops — RS-4.6 freq
+  visibility working at FHSS), base "tractor ACK — switching locally",
+  tractor "switching 1 → 2", proof-of-life on the new grid in 7 s, CONF
+  delivered, stream unbroken at 1780 B/s. **Still open from this item:
+  the deliberate CONF-drop revert test** (both 45 s watchdogs) and the
+  command-reception half is covered by the runs C–J arc evidence. Use the on-board injector pattern
   (`_ctrl_inject.sh` via `docker exec rx_smoke` — host→base IP is dead on
   this bench and host-side adb concurrent with the harness wedges the run).
   Include one deliberate CONF-drop to watch both ends revert cleanly.
@@ -288,6 +299,21 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   loss to start); (3) longer term, FHSS command TX should prefer the
   tractor's inter-train gap exactly as the DTS pump does — nothing is
   inbound then, so the base's TX deafness is free.
+  **RE-IGNITION TEST 2026-07-26 (run S, `radio_monitor_20260726_133647`,
+  web_ui CURRENT): the storm RE-IGNITED — 115 requests, evictions 76,
+  delivery 115 frames.** The redeploy was necessary hygiene, not the fix.
+  **Refined model: the loop's gain is >1 at FHSS saturation structurally**
+  — every slot carries a fragment, so every command TX costs one; even
+  run Q's 3 natural evictions/2 min are enough spark. At DTS the gain is
+  <1 (aligned windows, deafness brief vs fragment rate) — runs K/L/O ran
+  healthy with requests on. **Structural fixes, in preference order:**
+  (a) **RS-4.1 parity fragments — PROMOTED to the FHSS fix**: absorb the
+  2–3 % baseline loss instead of requesting keyframes, starving the loop
+  of its spark; (b) a reserved reverse-slot in the hop schedule (true
+  TDMA — every Nth slot the tractor holds, giving commands a free
+  window; ties to the RS-6 uplink-budget design); (c) suppress self-heal
+  requests at FHSS saturation and accept stale-canvas + periodic
+  keyframes (RS-6.5's cadence) until (a) or (b) lands.
 - [ ] **RS-2.2 DTS BW500 soak** — 30-minute saturation soak at profile 2:
   watch reassembler timeouts, QUEUE_FULL, UART overruns, thermal drift, and
   the RS-1.2 freeze signature. Latency histogram (P-frame age TX→publish)
