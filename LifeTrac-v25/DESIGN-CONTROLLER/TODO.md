@@ -538,6 +538,19 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   runt tail may null parity for exactly the losses that matter; consider
   ordering parity before the runt or padding the final fragment.
   Harness knob landed: `-ParityGroup` (0 = off).
+  **Run U 2026-07-26 (`radio_monitor_20260726_154833`, instrumented,
+  quiet baseline): emission PROVEN (`parity_tx=104`), reconstruction
+  UNOBSERVED (`parity_recon=0`), delivery statistically unchanged
+  (191 frames / 2 evictions vs Q's 174 / 3 — within variance).**
+  Verdict: quiet FHSS is already nearly lossless (~1–3 %), so 2-min runs
+  cannot show parity's value or exercise its reconstruction on air; and
+  the storm (parity's motivating case) has a deafness-driven cost
+  structure parity does not address. **RS-4.1's remaining questions
+  need the RS-9.8 30-min soak with injected loss** (exercise
+  reconstruction statistically + check the last-fragment exemption
+  against batched-train runts). Storm mitigation moves to RS-4.14's
+  candidates (b)/(c): reverse-slot TDMA or self-heal suppression at
+  FHSS saturation.
   **Verified 2026-07-25 — parity and keyframe-copies are mutually exclusive,
   and the switch between them is automatic and loss-triggered.** When
   `is_key and copies > 1` the packer returns at

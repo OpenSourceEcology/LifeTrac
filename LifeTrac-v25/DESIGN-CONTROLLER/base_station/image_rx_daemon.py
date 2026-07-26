@@ -926,10 +926,12 @@ class ImageRxDaemon:
                 LOG.info(
                     "stats: rx_frames=%d rx_decode_err=%d "
                     "frames_published=%d publish_err=%d "
-                    "reassembler_decode_err=%d reassembler_timeouts=%d",
+                    "reassembler_decode_err=%d reassembler_timeouts=%d "
+                    "parity_recon=%d",
                     s.rx_frames_seen, s.rx_decode_errors,
                     s.reassembled_frames_published, s.publish_errors,
-                    s.reassembler_decode_errors, s.reassembler_timeouts)
+                    s.reassembler_decode_errors, s.reassembler_timeouts,
+                    self.reassembler.stats.parity_reconstructions)
             # RS-2.3 forensics + RS-1.1 command counters (outside the lock;
             # the sample list is only touched from the ingest thread and a
             # briefly stale read here is fine for a log line).

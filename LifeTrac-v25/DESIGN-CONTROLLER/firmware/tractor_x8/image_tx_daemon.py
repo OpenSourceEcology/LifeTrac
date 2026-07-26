@@ -763,7 +763,13 @@ class ImageTxDaemon:
         # above already carries its own redundancy.
         parity_group = int(os.environ.get("LIFETRAC_PARITY_GROUP", "0"))
         if parity_group > 0:
+            n_data = len(frags)
             frags = add_parity_fragments(frags, frame.seq, parity_group)
+            # RS-4.1 observability (2026-07-26, run-T lesson): count what we
+            # actually emit — "no reconstructions logged" must never again be
+            # ambiguous between zero-function and zero-instrument.
+            self._parity_frags_tx = (getattr(self, "_parity_frags_tx", 0)
+                                     + len(frags) - n_data)
         return frags
 
     def _tx_one_frame(self, link: HostLink, frame: _PendingFrame) -> None:
@@ -1051,12 +1057,13 @@ class ImageTxDaemon:
                 LOG.info(
                     "stats: goodput=%.1f B/s util=%.0f%% pipeline=%s "
                     "frames_in=%d ok=%d fail=%d drop_full=%d drop_stale=%d "
-                    "frags_ok=%d frags_fail=%d qdepth=%d",
+                    "frags_ok=%d frags_fail=%d qdepth=%d parity_tx=%d",
                     bps, util * 100.0, TX_PIPELINE,
                     self.frames_in, self.frames_tx_ok, self.frames_tx_fail,
                     self.frames_dropped_queue_full, self.frames_dropped_stale,
                     self.fragments_tx_ok, self.fragments_tx_fail,
-                    self._q.qsize())
+                    self._q.qsize(),
+                    getattr(self, "_parity_frags_tx", 0))
                 last_bytes = cur_bytes
                 last_toa_us = cur_toa
 
