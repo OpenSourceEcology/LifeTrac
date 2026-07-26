@@ -167,6 +167,12 @@ PIPELINE_DEPTH = max(1, int(os.environ.get("LIFETRAC_TX_PIPELINE_DEPTH", "2")))
 # forensics) amortizes across 2-4 frames. Default OFF until air-verified;
 # the bench harness enables it explicitly.
 TX_BATCH = int(os.environ.get("LIFETRAC_TX_BATCH", "0"))
+# RS-3.10 (2026-07-26): build train N+1 while train N is on air (the
+# pipelined wait loop is ~mostly idle polling for TX_DONEs), then hold a
+# DESIGNED inter-train gap spent actively listening — the reverse-slot
+# command window — instead of an accidental gap of Python overhead.
+TX_PREPARE_AHEAD = int(os.environ.get("LIFETRAC_TX_PREPARE_AHEAD", "0"))
+TRAIN_GAP_S = max(0.0, float(os.environ.get("LIFETRAC_TRAIN_GAP_MS", "40")) / 1000.0)
 # 760 (2026-07-26 runt analysis): admits TRIPLES of ~246 B frames (748 B →
 # 4 fragments at ~111 ms/frame vs pairs' ~120). The runt fragment is
 # structural for frames >243 B (one fragment body) — batching amortizes it:
@@ -304,6 +310,8 @@ class ImageTxDaemon:
         self._active_profile = _prof
         self._mqtt_client = None            # set in run(); used for acks
         self._carry: "_PendingFrame | None" = None   # RS-3.1 batch look-ahead
+        self._next_train: "_PendingFrame | None" = None  # RS-3.10 prepared
+        self._last_train_done_t = 0.0                    # RS-3.10 gap timer
         # LoRa-only control plane: pending outbound command frames
         # (acks) + the revert deadline armed after a profile switch.
         self._cmd_out: "queue.Queue[bytes]" = queue.Queue(maxsize=8)
@@ -448,21 +456,50 @@ class ImageTxDaemon:
             # retunes us (two-phase contract with the base).
             self._service_control_plane(link)
             self._maybe_switch_profile(link)
-            try:
-                if self._carry is not None:
-                    frame, self._carry = self._carry, None
-                else:
-                    frame = self._q.get(timeout=0.25)
-            except queue.Empty:
-                # Idle: re-arm the command downlink (our own TXes park the
-                # modem in STANDBY — see _ensure_rxcont), then poll for
-                # inbound command frames.
-                self._ensure_rxcont(link)
-                for rx in self._drain_rx_frames(link, 0.05):
-                    self._dispatch_command(rx)
-                continue
-            frame = self._batch_more(frame)   # RS-3.1 (no-op unless enabled)
-            self._tx_one_frame(link, frame)
+            # RS-3.10: a train prepared during the previous burst goes out
+            # after the DESIGNED reverse-slot gap (spent listening, so the
+            # command window survives prepare-ahead by construction).
+            prepared = None
+            if self._next_train is not None:
+                prepared, self._next_train = self._next_train, None
+                gap = TRAIN_GAP_S - (time.monotonic()
+                                     - self._last_train_done_t)
+                if gap > 0:
+                    for rx in self._drain_rx_frames(link, gap):
+                        self._dispatch_command(rx)
+            if prepared is None:
+                try:
+                    if self._carry is not None:
+                        frame, self._carry = self._carry, None
+                    else:
+                        frame = self._q.get(timeout=0.25)
+                except queue.Empty:
+                    # Idle: re-arm the command downlink (our own TXes park
+                    # the modem in STANDBY — see _ensure_rxcont), then poll
+                    # for inbound command frames.
+                    self._ensure_rxcont(link)
+                    for rx in self._drain_rx_frames(link, 0.05):
+                        self._dispatch_command(rx)
+                    continue
+                prepared = self._batch_more(frame)   # RS-3.1
+            self._tx_one_frame(link, prepared)
+            self._last_train_done_t = time.monotonic()
+
+    def _prep_next_train(self) -> None:
+        """RS-3.10: called from the pipelined wait loop — build the next
+        train from queued frames while the current one is on air. Pure
+        host-side work (dequeue + batch); fragmentation stays at TX time
+        so a profile switch between trains re-fragments correctly."""
+        if TX_PREPARE_AHEAD == 0 or self._next_train is not None:
+            return
+        try:
+            if self._carry is not None:
+                frame, self._carry = self._carry, None
+            else:
+                frame = self._q.get_nowait()
+        except queue.Empty:
+            return
+        self._next_train = self._batch_more(frame)
 
     def _batch_more(self, first: "_PendingFrame") -> "_PendingFrame":
         """RS-3.1: greedily pull queued non-key frames into one batched
@@ -898,6 +935,8 @@ class ImageTxDaemon:
 
             events = link.read_frames(0.05)
             now = time.monotonic()
+            # RS-3.10: use the wait-loop's idle time to build train N+1.
+            self._prep_next_train()
 
             # Watchdog: a fragment with no verdict inside the timeout is
             # treated as RF-spent (conservative for the budget mirror).

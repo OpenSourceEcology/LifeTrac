@@ -1,0 +1,946 @@
+﻿2026-07-26 17:41:58,592 INFO image_rx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-07-26 17:41:58,595 INFO image_rx_daemon: image_rx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-07-26 17:41:58,597 INFO image_rx_daemon: ctrl MQTT connected (192.168.1.79)
+
+2026-07-26 17:41:58,603 INFO image_rx_daemon: MQTT connected; ready to publish lifetrac/v25/video/tile_delta
+
+2026-07-26 17:41:58,607 INFO image_rx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-07-26 17:41:59,038 INFO image_rx_daemon: L072 VER warm-up ok (attempt 1)
+
+Initializing regulatory profile 1 on co-processor...
+
+  FHSS mask: WIDE (50 channels) [LIFETRAC_FHSS_WIDE_MASK=1]
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+CFG_SET_REQ(REG_PROFILE=1) OK: 14000100
+
+2026-07-26 17:41:59,374 INFO image_rx_daemon: LBT_ENABLE=0 (command uplink shares the image channel)
+
+PHY contract OK: image_bw250 == {'sf': 7, 'bw_khz': 250, 'cr_den': 5, 'preamble': 8}
+
+2026-07-26 17:41:59,434 INFO image_rx_daemon: SX1276 already in RXCONT (opmode=0x85)
+
+2026-07-26 17:41:59,435 INFO image_rx_daemon: RX worker ready; draining RX_FRAME_URC...
+
+2026-07-26 17:41:59,594 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=0 channel_idx=3 epoch=0 freq_hz=904250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:41:59,733 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=1 channel_idx=19 epoch=0 freq_hz=912250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:00,046 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=3 channel_idx=14 epoch=0 freq_hz=909750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:00,348 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=4 channel_idx=22 epoch=0 freq_hz=913750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:00,661 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=6 channel_idx=10 epoch=0 freq_hz=907750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:00,962 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=7 channel_idx=0 epoch=0 freq_hz=902750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:01,264 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=9 channel_idx=40 epoch=0 freq_hz=922750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:01,570 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=10 channel_idx=37 epoch=0 freq_hz=921250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:01,872 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=12 channel_idx=32 epoch=0 freq_hz=918750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:02,181 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=13 channel_idx=44 epoch=0 freq_hz=924750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:02,482 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=15 channel_idx=7 epoch=0 freq_hz=906250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:02,784 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=16 channel_idx=4 epoch=0 freq_hz=904750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:03,091 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=18 channel_idx=47 epoch=0 freq_hz=926250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:03,394 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=19 channel_idx=34 epoch=0 freq_hz=919750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:03,694 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=21 channel_idx=17 epoch=0 freq_hz=911250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:03,995 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=23 channel_idx=43 epoch=0 freq_hz=924250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:04,347 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=24 channel_idx=49 epoch=0 freq_hz=927250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:04,645 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=26 channel_idx=18 epoch=0 freq_hz=911750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:04,944 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=27 channel_idx=9 epoch=0 freq_hz=907250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:05,256 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=29 channel_idx=12 epoch=0 freq_hz=908750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:05,567 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-07-26 17:42:05,831 WARNING image_rx_daemon: cmd 0x63 GAVE UP after 20 attempts (7.2 s)
+
+2026-07-26 17:42:09,597 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-26 17:42:19,602 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0
+
+2026-07-26 17:42:24,877 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=46 channel_idx=44 epoch=1 freq_hz=924750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:25,168 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=48 channel_idx=26 epoch=1 freq_hz=915750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:25,558 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:26,478 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=4 channel_idx=20 epoch=2 freq_hz=912750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:26,767 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:26,865 INFO image_rx_daemon: requesting keyframe (reassembly timeout #1)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=6 channel_idx=44 epoch=2 freq_hz=924750000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 17:42:27,161 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:28,078 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=12 channel_idx=5 epoch=2 freq_hz=905250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:28,369 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=14 channel_idx=0 epoch=2 freq_hz=902750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:28,760 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:29,605 INFO image_rx_daemon: stats: rx_frames=19 rx_decode_err=0 frames_published=3 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=4
+
+2026-07-26 17:42:29,606 INFO image_rx_daemon: air_gap: n=18 dt_med=248972us dt_p95=519094us len_med=207B cmd_tx_ok=26 cmd_tx_fail=0
+
+2026-07-26 17:42:29,672 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=20 channel_idx=37 epoch=2 freq_hz=921250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:29,956 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=22 channel_idx=17 epoch=2 freq_hz=911250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:30,361 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:31,271 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=28 channel_idx=2 epoch=2 freq_hz=903750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:31,561 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=30 channel_idx=9 epoch=2 freq_hz=907250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:31,953 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:32,550 INFO image_rx_daemon: requesting keyframe (reassembly timeout #8)
+
+2026-07-26 17:42:32,878 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=36 channel_idx=14 epoch=2 freq_hz=909750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:33,166 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=38 channel_idx=30 epoch=2 freq_hz=917750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:33,555 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:34,475 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=44 channel_idx=7 epoch=2 freq_hz=906250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:34,766 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:35,113 WARNING image_rx_daemon: cmd 0x60 GAVE UP after 13 attempts (10.2 s)
+
+2026-07-26 17:42:35,749 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:42:35,751 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:42:35,752 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:42:36,076 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=2 channel_idx=14 epoch=3 freq_hz=909750000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 17:42:36,367 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=4 channel_idx=27 epoch=3 freq_hz=916250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:36,757 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:37,676 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=10 channel_idx=36 epoch=3 freq_hz=920750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:37,965 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:38,068 INFO image_rx_daemon: requesting keyframe (reassembly timeout #14)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=12 channel_idx=29 epoch=3 freq_hz=917250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:38,370 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=17 channel_idx=33 epoch=3 freq_hz=919250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:39,242 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=18 channel_idx=31 epoch=3 freq_hz=918250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:39,544 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:39,608 INFO image_rx_daemon: stats: rx_frames=55 rx_decode_err=0 frames_published=12 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=15
+
+2026-07-26 17:42:39,610 INFO image_rx_daemon: air_gap: n=36 dt_med=200054us dt_p95=518789us len_med=207B cmd_tx_ok=39 cmd_tx_fail=0
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=20 channel_idx=4 epoch=3 freq_hz=904750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:39,956 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:40,870 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=26 channel_idx=13 epoch=3 freq_hz=909250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:41,159 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=28 channel_idx=32 epoch=3 freq_hz=918750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:41,559 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:42,467 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=34 channel_idx=20 epoch=3 freq_hz=912750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:42,755 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=36 channel_idx=22 epoch=3 freq_hz=913750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:43,158 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:43,747 INFO image_rx_daemon: requesting keyframe (reassembly timeout #21)
+
+2026-07-26 17:42:44,070 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=42 channel_idx=9 epoch=3 freq_hz=907250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:44,364 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=44 channel_idx=25 epoch=3 freq_hz=915250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:44,751 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:45,676 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:42:45,930 WARNING image_rx_daemon: cmd 0x60 GAVE UP after 13 attempts (10.2 s)
+
+2026-07-26 17:42:46,068 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:42:46,951 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:42:46,953 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:42:46,954 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:42:47,271 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=8 channel_idx=26 epoch=4 freq_hz=915750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:47,565 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=10 channel_idx=20 epoch=4 freq_hz=912750000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 17:42:47,956 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:48,866 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=16 channel_idx=32 epoch=4 freq_hz=918750000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 17:42:49,167 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:49,269 INFO image_rx_daemon: requesting keyframe (reassembly timeout #26)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=18 channel_idx=30 epoch=4 freq_hz=917750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:49,569 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:49,612 INFO image_rx_daemon: stats: rx_frames=94 rx_decode_err=0 frames_published=22 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=26
+
+2026-07-26 17:42:49,614 INFO image_rx_daemon: air_gap: n=39 dt_med=199935us dt_p95=518837us len_med=207B cmd_tx_ok=50 cmd_tx_fail=0
+
+2026-07-26 17:42:50,465 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=24 channel_idx=0 epoch=4 freq_hz=902750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:50,754 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=26 channel_idx=33 epoch=4 freq_hz=919250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:51,158 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:52,066 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=32 channel_idx=2 epoch=4 freq_hz=903750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:52,356 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=34 channel_idx=23 epoch=4 freq_hz=914250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:52,750 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:53,663 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=40 channel_idx=36 epoch=4 freq_hz=920750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:53,953 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=42 channel_idx=3 epoch=4 freq_hz=904250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:54,344 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:54,943 INFO image_rx_daemon: requesting keyframe (reassembly timeout #33)
+
+2026-07-26 17:42:55,259 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=48 channel_idx=35 epoch=4 freq_hz=920250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:55,546 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=0 channel_idx=15 epoch=5 freq_hz=910250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:55,947 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:57,093 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:42:57,094 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=8 channel_idx=2 epoch=5 freq_hz=903750000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 17:42:57,438 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=10 channel_idx=19 epoch=5 freq_hz=912250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:57,945 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=12 channel_idx=29 epoch=5 freq_hz=917250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:58,347 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=16 channel_idx=10 epoch=5 freq_hz=907750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:42:59,033 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=17 channel_idx=3 epoch=5 freq_hz=904250000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 17:42:59,347 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:42:59,619 INFO image_rx_daemon: stats: rx_frames=129 rx_decode_err=0 frames_published=28 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=39
+
+2026-07-26 17:42:59,620 INFO image_rx_daemon: air_gap: n=35 dt_med=248982us dt_p95=565956us len_med=207B cmd_tx_ok=63 cmd_tx_fail=0
+
+2026-07-26 17:43:00,387 INFO image_rx_daemon: requesting keyframe (reassembly timeout #40)
+
+2026-07-26 17:43:00,721 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:00,722 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:00,724 INFO image_rx_daemon: published frame_id=0 230 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=26 channel_idx=49 epoch=5 freq_hz=927250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:01,026 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=27 channel_idx=32 epoch=5 freq_hz=918750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:01,327 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:02,507 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:02,509 INFO image_rx_daemon: published frame_id=0 226 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:02,510 INFO image_rx_daemon: published frame_id=0 234 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=35 channel_idx=38 epoch=5 freq_hz=921750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:02,825 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:03,305 WARNING image_rx_daemon: cmd 0x60 GAVE UP after 20 attempts (16.3 s)
+
+2026-07-26 17:43:03,935 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:03,936 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:03,937 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:04,488 INFO image_rx_daemon: published frame_id=0 230 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:04,489 INFO image_rx_daemon: published frame_id=0 248 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:05,290 INFO image_rx_daemon: published frame_id=0 248 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:05,292 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:05,652 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:06,059 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:06,682 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:06,683 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:07,054 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:07,933 INFO image_rx_daemon: published frame_id=0 250 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:07,935 INFO image_rx_daemon: published frame_id=0 248 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:07,936 INFO image_rx_daemon: published frame_id=0 248 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:08,727 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:08,728 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:08,730 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=16 channel_idx=6 epoch=6 freq_hz=905750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:09,019 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=17 channel_idx=0 epoch=6 freq_hz=902750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:09,321 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:09,623 INFO image_rx_daemon: stats: rx_frames=170 rx_decode_err=0 frames_published=52 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=43
+
+2026-07-26 17:43:09,624 INFO image_rx_daemon: air_gap: n=41 dt_med=199857us dt_p95=556455us len_med=207B cmd_tx_ok=68 cmd_tx_fail=0
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=19 channel_idx=13 epoch=6 freq_hz=909250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:09,765 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=24 channel_idx=48 epoch=6 freq_hz=926750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:10,616 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=25 channel_idx=31 epoch=6 freq_hz=918250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:10,916 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:11,196 INFO image_rx_daemon: requesting keyframe (reassembly timeout #44)
+
+2026-07-26 17:43:12,095 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:12,096 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:12,098 INFO image_rx_daemon: published frame_id=0 226 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=33 channel_idx=10 epoch=6 freq_hz=907750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:12,423 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=34 channel_idx=33 epoch=6 freq_hz=919250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:12,726 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=36 channel_idx=19 epoch=6 freq_hz=912250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:13,169 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=41 channel_idx=46 epoch=6 freq_hz=925750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:14,026 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=42 channel_idx=29 epoch=6 freq_hz=917250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:14,336 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=46 channel_idx=47 epoch=6 freq_hz=926250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:15,019 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=49 channel_idx=49 epoch=6 freq_hz=927250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:15,616 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=1 channel_idx=18 epoch=7 freq_hz=911750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:16,150 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:16,375 INFO image_rx_daemon: requesting keyframe (reassembly timeout #49)
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=6 channel_idx=37 epoch=7 freq_hz=921250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:17,019 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=9 channel_idx=17 epoch=7 freq_hz=911250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:17,623 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=10 channel_idx=32 epoch=7 freq_hz=918750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:17,933 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:18,644 INFO image_rx_daemon: cmd 0x60 CONVERGED after 16 attempts (10.7 s): keyframe received
+
+2026-07-26 17:43:18,646 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:19,508 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:19,510 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:19,513 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:19,626 INFO image_rx_daemon: stats: rx_frames=199 rx_decode_err=0 frames_published=59 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=53
+
+2026-07-26 17:43:19,628 INFO image_rx_daemon: air_gap: n=29 dt_med=199842us dt_p95=850966us len_med=207B cmd_tx_ok=82 cmd_tx_fail=0
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=20 channel_idx=1 epoch=7 freq_hz=903250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:19,820 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=23 channel_idx=26 epoch=7 freq_hz=915750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:20,412 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=25 channel_idx=22 epoch=7 freq_hz=913750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:20,941 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:21,760 INFO image_rx_daemon: requesting keyframe (reassembly timeout #55)
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=30 channel_idx=15 epoch=7 freq_hz=910250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:21,816 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=33 channel_idx=7 epoch=7 freq_hz=906250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:22,415 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=34 channel_idx=2 epoch=7 freq_hz=903750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:22,719 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:23,445 INFO image_rx_daemon: cmd 0x60 CONVERGED after 6 attempts (3.9 s): keyframe received
+
+2026-07-26 17:43:23,449 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:24,301 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:24,302 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:24,303 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:24,878 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:24,880 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:25,451 INFO image_rx_daemon: published frame_id=0 252 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:26,299 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:26,300 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:26,302 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:26,871 INFO image_rx_daemon: published frame_id=0 230 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:26,873 INFO image_rx_daemon: published frame_id=0 248 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:27,919 INFO image_rx_daemon: published frame_id=0 248 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:27,921 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:27,922 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:28,238 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:29,107 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:29,108 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:29,109 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:29,631 INFO image_rx_daemon: stats: rx_frames=237 rx_decode_err=0 frames_published=78 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=59
+
+2026-07-26 17:43:29,633 INFO image_rx_daemon: air_gap: n=38 dt_med=199830us dt_p95=573434us len_med=207B cmd_tx_ok=88 cmd_tx_fail=0
+
+2026-07-26 17:43:29,669 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:29,670 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=21 channel_idx=31 epoch=8 freq_hz=918250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:30,009 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=23 channel_idx=2 epoch=8 freq_hz=903750000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 17:43:30,538 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:31,672 INFO image_rx_daemon: published frame_id=0 230 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:31,673 INFO image_rx_daemon: published frame_id=0 248 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:31,926 INFO image_rx_daemon: requesting keyframe (reassembly timeout #60)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=31 channel_idx=20 epoch=8 freq_hz=912750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:32,014 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=32 channel_idx=32 epoch=8 freq_hz=918750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:32,327 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:33,043 INFO image_rx_daemon: cmd 0x60 CONVERGED after 4 attempts (3.4 s): keyframe received
+
+2026-07-26 17:43:33,044 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:34,105 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:34,106 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:34,107 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:34,911 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:34,913 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:34,913 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:35,673 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:35,675 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:36,026 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:36,430 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:36,830 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:37,697 INFO image_rx_daemon: published frame_id=0 230 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:37,698 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:37,700 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:38,481 INFO image_rx_daemon: published frame_id=0 226 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:38,482 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:38,484 INFO image_rx_daemon: published frame_id=0 248 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:39,488 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:39,490 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:39,491 INFO image_rx_daemon: published frame_id=0 226 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:39,636 INFO image_rx_daemon: stats: rx_frames=278 rx_decode_err=0 frames_published=103 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=62
+
+2026-07-26 17:43:39,638 INFO image_rx_daemon: air_gap: n=41 dt_med=199840us dt_p95=518544us len_med=207B cmd_tx_ok=92 cmd_tx_fail=0
+
+2026-07-26 17:43:40,295 INFO image_rx_daemon: published frame_id=0 234 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:40,296 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:40,297 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=24 channel_idx=25 epoch=9 freq_hz=915250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:40,594 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=25 channel_idx=13 epoch=9 freq_hz=909250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:40,902 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=27 channel_idx=45 epoch=9 freq_hz=925250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:41,347 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=29 channel_idx=30 epoch=9 freq_hz=917750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:41,718 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:42,758 INFO image_rx_daemon: requesting keyframe (reassembly timeout #63)
+
+2026-07-26 17:43:42,865 INFO image_rx_daemon: published frame_id=0 230 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:42,866 INFO image_rx_daemon: published frame_id=0 248 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=37 channel_idx=5 epoch=9 freq_hz=905250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:43,196 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=38 channel_idx=37 epoch=9 freq_hz=921250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:43,510 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=42 channel_idx=3 epoch=9 freq_hz=904250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:44,199 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=43 channel_idx=28 epoch=9 freq_hz=916750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:44,499 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=48 channel_idx=43 epoch=9 freq_hz=924250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:45,400 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=1 channel_idx=42 epoch=10 freq_hz=923750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:45,996 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=3 channel_idx=46 epoch=10 freq_hz=925750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:46,516 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=8 channel_idx=12 epoch=10 freq_hz=908750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:47,397 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:47,914 INFO image_rx_daemon: requesting keyframe (reassembly timeout #69)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=11 channel_idx=13 epoch=10 freq_hz=909250000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 17:43:48,000 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=12 channel_idx=20 epoch=10 freq_hz=912750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:48,298 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:49,031 INFO image_rx_daemon: cmd 0x60 CONVERGED after 14 attempts (8.7 s): keyframe received
+
+2026-07-26 17:43:49,034 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:49,641 INFO image_rx_daemon: stats: rx_frames=307 rx_decode_err=0 frames_published=109 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=71
+
+2026-07-26 17:43:49,642 INFO image_rx_daemon: air_gap: n=29 dt_med=200041us dt_p95=890154us len_med=207B cmd_tx_ok=106 cmd_tx_fail=0
+
+2026-07-26 17:43:49,893 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:49,895 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:49,896 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:50,458 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:50,460 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=25 channel_idx=27 epoch=10 freq_hz=916250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:50,790 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=27 channel_idx=10 epoch=10 freq_hz=907750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:51,326 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:52,701 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:52,702 INFO image_rx_daemon: published frame_id=0 248 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:52,703 INFO image_rx_daemon: published frame_id=0 248 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=36 channel_idx=41 epoch=10 freq_hz=923250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:52,994 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=37 channel_idx=16 epoch=10 freq_hz=910750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:53,300 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:53,563 INFO image_rx_daemon: requesting keyframe (reassembly timeout #74)
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=41 channel_idx=26 epoch=10 freq_hz=915750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:53,991 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=43 channel_idx=29 epoch=10 freq_hz=917250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:54,542 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:55,303 INFO image_rx_daemon: published frame_id=0 248 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:55,304 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:55,306 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:56,096 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:56,099 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:43:56,100 INFO image_rx_daemon: published frame_id=0 248 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=3 channel_idx=49 epoch=11 freq_hz=927250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:56,399 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=4 channel_idx=20 epoch=11 freq_hz=912750000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 17:43:56,714 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=8 channel_idx=44 epoch=11 freq_hz=924750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:57,397 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=9 channel_idx=30 epoch=11 freq_hz=917750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:57,709 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=12 channel_idx=24 epoch=11 freq_hz=914750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:58,192 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:58,672 INFO image_rx_daemon: requesting keyframe (reassembly timeout #77)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=14 channel_idx=0 epoch=11 freq_hz=902750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:58,711 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=16 channel_idx=7 epoch=11 freq_hz=906250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:59,116 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:43:59,646 INFO image_rx_daemon: stats: rx_frames=338 rx_decode_err=0 frames_published=123 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=78
+
+2026-07-26 17:43:59,647 INFO image_rx_daemon: air_gap: n=31 dt_med=199973us dt_p95=846495us len_med=207B cmd_tx_ok=119 cmd_tx_fail=0
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=21 channel_idx=40 epoch=11 freq_hz=922750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:43:59,991 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=22 channel_idx=18 epoch=11 freq_hz=911750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:44:00,292 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:44:00,663 WARNING image_rx_daemon: cmd 0x60 GAVE UP after 15 attempts (10.1 s)
+
+2026-07-26 17:44:00,822 INFO image_rx_daemon: published frame_id=0 246 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:44:01,683 INFO image_rx_daemon: published frame_id=0 230 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:44:01,685 INFO image_rx_daemon: published frame_id=0 244 B → lifetrac/v25/video/tile_delta
+
+2026-07-26 17:44:01,685 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=31 channel_idx=2 epoch=11 freq_hz=903750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:44:01,991 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=32 channel_idx=15 epoch=11 freq_hz=910250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:44:02,295 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=34 channel_idx=32 epoch=11 freq_hz=918750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:44:02,720 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=39 channel_idx=34 epoch=11 freq_hz=919750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:44:03,591 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=40 channel_idx=19 epoch=11 freq_hz=912250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:44:03,902 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+2026-07-26 17:44:04,027 INFO image_rx_daemon: requesting keyframe (reassembly timeout #83)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=42 channel_idx=13 epoch=11 freq_hz=909250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:44:04,318 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=47 channel_idx=8 epoch=11 freq_hz=906750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:44:05,204 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=48 channel_idx=12 epoch=11 freq_hz=908750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:44:05,505 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=0 channel_idx=13 epoch=12 freq_hz=909250000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 17:44:05,914 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+INFO: unrelated frame during TX wait type=0x91
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=5 channel_idx=16 epoch=12 freq_hz=910750000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-07-26 17:44:06,791 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=6 channel_idx=7 epoch=12 freq_hz=906250000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 17:44:07,093 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=8 channel_idx=8 epoch=12 freq_hz=906750000 pkt_toa_us=20608 legal_dwell_used_us_10s=41216
+
+2026-07-26 17:44:07,514 INFO image_rx_daemon: command TX opcode=0x60 copy=1/1 OK (on air)
+

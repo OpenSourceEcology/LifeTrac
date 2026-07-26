@@ -241,7 +241,25 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   (vs 1755 published; −6.5 % = the control plane's cost, as predicted).
   Saturated, deterministic, zero TX/RX errors — evidence
   [`bench-evidence/RS_throughput_rebaseline_2026-07-25/`](bench-evidence/RS_throughput_rebaseline_2026-07-25/).
-  FHSS half still pending.
+  **FHSS half DONE 2026-07-26 (runs M/N): ~785 B/s batched with the live
+  control plane** (vs 699 published; +12 %) — and the A/B control proved
+  batching strongly POSITIVE at FHSS (unbatched: 617 B/s, 55 frames
+  delivered vs batched 123). Ladder update: p1 785 · p2 1827 (Run L).
+  **Headline discovery: ~50 % per-fragment loss at FHSS** (both runs) —
+  see RS-4.14; the follower, not the host stack, is the FHSS bottleneck.
+- [ ] **RS-4.14 FHSS slot-follower fragment loss ~50 % — found 2026-07-26
+  (runs M/N)** — at profile 1 saturation only ~2.7 fragments/s arrive
+  against ~5 offered slots/s, consistently across batched and unbatched
+  runs; reassembler evictions (78–180/run) and command starvation (11
+  GAVE UP unbatched) are downstream symptoms of the same loss. The slot
+  follower is missing roughly every other slot — suspects: boundary
+  retune timing (RS-3.2's unmeasured 12 ms head-start assumption), the
+  follower's skip-under-tx-busy path, LOCK wobble (RS-4.3's HSI16 drift
+  premise), per-slot deafness during the base's own hop retune. Dwarfs
+  all host-side FHSS optimization and likely underlies the old 699 B/s
+  baseline. Diagnose with per-slot RX counters (RS-4.5/4.6 machinery:
+  scan/retune counters + RFCO freq visibility) BEFORE further FHSS
+  throughput work. Prerequisite for the FHSS half of RS-9.8.
 - [ ] **RS-2.2 DTS BW500 soak** — 30-minute saturation soak at profile 2:
   watch reassembler timeouts, QUEUE_FULL, UART overruns, thermal drift, and
   the RS-1.2 freeze signature. Latency histogram (P-frame age TX→publish)

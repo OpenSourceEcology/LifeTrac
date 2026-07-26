@@ -242,6 +242,37 @@ sizes; a tiny frame may still ride an existing runt at equal ratio).
   window (the gap is currently an accident of Python overhead; RS-3.10
   makes it a deliberate reverse-slot).
 
+## Runs M/N — FHSS re-baseline + batching A/B (2026-07-26)
+
+M = `radio_monitor_20260726_124411` (batched), N = `radio_monitor_20260726_124732`
+(unbatched control). Profile 1, otherwise identical.
+
+| | Unbatched (N) | Batched (M) |
+|---|---|---|
+| Goodput | 617 B/s, util 54 % | **785 B/s, util 66 %** |
+| Frames delivered | 55 | **123** |
+| Reassembler evictions | **180** | 78 |
+| Commands | 0 CONVERGED / 11 GAVE UP | 4 / 5 |
+
+**RS-2.1 FHSS re-baseline: ~785 B/s** (batched, control plane live) vs the
+699 B/s published pre-control-plane number — +12 %.
+
+**Correction to the Run M snap-read: batching is strongly POSITIVE at
+FHSS** (+27 % goodput, +124 % delivered frames), not something to switch
+off — fragments are slot-paced, so fuller fragments convert directly to
+slot efficiency and the runt-slot waste amortizes. The eviction rate is
+WORSE without batching.
+
+**The real FHSS finding: ~50 % per-fragment loss** (293 fragments received
+in ~110 s against ~5 offered slots/s, both runs consistent). The slot
+follower is systematically missing about half the slots — the dominant
+FHSS bottleneck, dwarfing all host-side optimization, and almost certainly
+underlying the old 699 baseline too (nobody measured loss then). Command
+convergence at FHSS is starved by the same loss (both directions ride the
+hop grid). Queued as RS-4.14: follower retune/timing forensics using the
+per-slot RX counters (RS-4.5/4.6 machinery) before any further FHSS
+throughput work.
+
 ## Perspective on the firmware patch
 
 The patch's throughput levers (SPI, URC, ring) did not raise the DTS ceiling —

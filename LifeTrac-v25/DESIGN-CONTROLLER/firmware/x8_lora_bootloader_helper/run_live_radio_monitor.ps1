@@ -29,6 +29,9 @@ param(
     # RS-3.1 (2026-07-25): batch multiple non-key frames per fragment train
     # (amortizes the measured ~44 ms host per-handoff overhead). 1 = on.
     [int]$TxBatch         = 1,
+    # RS-3.10 (2026-07-26): prepare train N+1 during train N's airtime;
+    # the inter-train gap becomes a designed listening reverse-slot.
+    [int]$TxPrepareAhead  = 1,
     # RS-5.9 (2026-07-25): where tx_smoke gets its frame feed.
     #   local = broker + synth publisher run ON the tractor (127.0.0.1).
     #           Required now that tractor WiFi is off per MASTER_PLAN §8.13.
@@ -175,7 +178,7 @@ if ($TxFeed -eq "local") {
 }
 
 Write-Host "[LAUNCH] Starting TX Daemon on Board $TxAdbSerial (mqtt=$txMqtt, depth=$TxPipelineDepth)..." -ForegroundColor Yellow
-cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f tx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name tx_smoke --network=host --entrypoint python3 --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=$txMqtt -e LIFETRAC_SKIP_RESET_REQ=1 $profEnv -e LIFETRAC_TX_PIPELINE=$TxPipeline -e LIFETRAC_TX_PIPELINE_DEPTH=$TxPipelineDepth -e LIFETRAC_TX_BATCH=$TxBatch hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44 -u /work/image_tx_daemon.py --log-level INFO`""
+cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f tx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name tx_smoke --network=host --entrypoint python3 --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=$txMqtt -e LIFETRAC_SKIP_RESET_REQ=1 $profEnv -e LIFETRAC_TX_PIPELINE=$TxPipeline -e LIFETRAC_TX_PIPELINE_DEPTH=$TxPipelineDepth -e LIFETRAC_TX_BATCH=$TxBatch -e LIFETRAC_TX_PREPARE_AHEAD=$TxPrepareAhead hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44 -u /work/image_tx_daemon.py --log-level INFO`""
 
 # 6. Launch RX daemon.
 # RX publishes to the BASE BOARD's own mosquitto (127.0.0.1 via
@@ -268,6 +271,7 @@ if ($Archive) {
         "tx_pipeline=$TxPipeline",
         "tx_pipeline_depth=$TxPipelineDepth",
         "tx_batch=$TxBatch",
+        "tx_prepare_ahead=$TxPrepareAhead",
         "tx_feed=$TxFeed",
         "reg_profile=$RegProfile",
         "tx_serial=$TxAdbSerial",
