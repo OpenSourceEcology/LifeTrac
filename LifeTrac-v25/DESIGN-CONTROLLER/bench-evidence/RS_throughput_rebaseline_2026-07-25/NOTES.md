@@ -273,6 +273,38 @@ hop grid). Queued as RS-4.14: follower retune/timing forensics using the
 per-slot RX counters (RS-4.5/4.6 machinery) before any further FHSS
 throughput work.
 
+## Runs P/Q — RS-4.14 root-caused: the FHSS loss was self-inflicted (2026-07-26)
+
+P = `radio_monitor_20260726_125943` (daemon keyframe poke suppressed),
+Q = `radio_monitor_20260726_130412` (gate moved to the subscription choke
+point — truly quiet after the early ENCODE give-up burst).
+
+| FHSS | M (full cmds) | P (129 cmds leaked) | Q (quiet) |
+|---|---|---|---|
+| Evictions | 78 | 67 | **3** |
+| Frames delivered | 123 | 140 | **174** |
+| Train survival | ~61 % | ~68 % | **~97 %** |
+
+**Run P's contamination was its own discovery:** 109 of the leaked sends
+were REQ_KEYFRAME published by the 22-commit-stale **web_ui** container's
+I-frame recovery logic — an unaccounted control-plane actor injecting
+commands into every run from outside the strict-path system, bypassing
+all daemon rate limits (major exhibit for RS-9 single ownership and
+RS-5.1 redeploy).
+
+**Run Q's verdict:** the "~50 % FHSS fragment loss" was control-plane
+self-interference — each command TX deafens the half-duplex base ~33 ms,
+a mistimed one costs a 200 ms slot's fragment, each loss triggers another
+request: a self-sustaining storm. Residual genuine loss ≈ 2–3 %. The slot
+follower was never the problem; all firmware timing suspects downgraded.
+RS-1.5's give-up caps LIMIT the storm; the stale web_ui bypassed them.
+
+**End state of the two-day program:** DTS 1827 B/s · FHSS 785 B/s (both
+above pre-control-plane baselines, commands live) · FHSS train survival
+97 % once the rogue requester is silenced · commands converge sub-second
+with self-reporting failure · every mechanism measured, every claim
+archived.
+
 ## Perspective on the firmware patch
 
 The patch's throughput levers (SPI, URC, ring) did not raise the DTS ceiling —

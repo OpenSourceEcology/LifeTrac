@@ -260,6 +260,34 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   baseline. Diagnose with per-slot RX counters (RS-4.5/4.6 machinery:
   scan/retune counters + RFCO freq visibility) BEFORE further FHSS
   throughput work. Prerequisite for the FHSS half of RS-9.8.
+  **Run P (2026-07-26, `radio_monitor_20260726_125943`): first
+  discriminator attempt CONTAMINATED — and the contamination is its own
+  finding.** With the daemon's keyframe poke suppressed, 129 command
+  copies still went on air: **109 were REQ_KEYFRAME published by the
+  22-commit-stale `web_ui` container's own I-frame recovery logic** —
+  an unaccounted control-plane actor injecting commands from outside
+  the strict-path system into every run (feeds the RS-9 single-ownership
+  case and RS-5.1 deployment drift). Delivery moved only marginally
+  (140 frames / 67 evictions vs 123/78), consistent with commands still
+  flowing. Gate moved to the subscription choke point; the clean
+  commands-quiet run is the next data point.
+  **ROOT CAUSE FOUND 2026-07-26 (run Q, `radio_monitor_20260726_130412`):
+  the loss is control-plane SELF-INTERFERENCE, not the follower.** With
+  commands quiet: evictions **78 → 3**, delivered frames **123 → 174**,
+  train survival ~61 % → **~97 %**. Mechanism: each command TX deafens
+  the half-duplex base ~33 ms → a mistimed one costs a whole slot's
+  fragment → eviction → keyframe request → another TX — a self-
+  sustaining storm, with the stale web_ui's unthrottled recovery
+  requests as the accelerant (109 in 2 min, bypassing all rate limits).
+  Residual genuine RF/follower loss ≈ **2–3 %** — the follower timing
+  suspects (head-start/guard/LOCK wobble) are all DOWNGRADED; RS-3.2's
+  scope session is no longer urgent. **Fixes:** (1) redeploy web_ui
+  (RS-5.1) — kills the rogue requester; (2) verify next session that
+  with requests re-enabled and web_ui current, the storm does not
+  re-ignite from the now-low baseline loss (the loop needs high initial
+  loss to start); (3) longer term, FHSS command TX should prefer the
+  tractor's inter-train gap exactly as the DTS pump does — nothing is
+  inbound then, so the base's TX deafness is free.
 - [ ] **RS-2.2 DTS BW500 soak** — 30-minute saturation soak at profile 2:
   watch reassembler timeouts, QUEUE_FULL, UART overruns, thermal drift, and
   the RS-1.2 freeze signature. Latency histogram (P-frame age TX→publish)

@@ -167,6 +167,13 @@ class KeyframeRequester:
         self._last = 0.0
 
     def poke(self, reason: str) -> None:
+        # RS-4.14 diagnostic knob (2026-07-26): suppress self-heal keyframe
+        # requests entirely. At FHSS, requests may FEED the loss they react
+        # to (base command TX near a slot boundary -> follower
+        # skip-under-tx-busy -> missed slot -> eviction -> another request).
+        # A clean run with this =1 vs the normal run discriminates.
+        if os.environ.get("LIFETRAC_KF_REQUEST_DISABLE", "0") == "1":
+            return
         now = time.monotonic()
         client = self._client_supplier()
         if client is None or now - self._last < self._min:
@@ -695,6 +702,14 @@ class ImageRxDaemon:
 
     def _on_req_keyframe_msg(self, _c, _u, _msg) -> None:
         """cmd/req_keyframe (self-heal poke or web button) → LoRa cmd."""
+        # RS-4.14 diagnostic (2026-07-26): gate at the SUBSCRIPTION — the
+        # choke point ALL request sources pass through. Run P proved the
+        # poke-only gate insufficient: the (22-commit-stale) web_ui's own
+        # I-frame recovery logic published 109 requests from outside the
+        # daemon, contaminating the commands-off experiment. That web_ui
+        # is an unaccounted control-plane actor is itself an RS-9 finding.
+        if os.environ.get("LIFETRAC_KF_REQUEST_DISABLE", "0") == "1":
+            return
         now = time.monotonic()
         if now - self._last_kf_cmd_t < KEYFRAME_CMD_MIN_GAP_S:
             return
