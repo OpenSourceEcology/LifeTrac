@@ -368,6 +368,18 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   delivery regresses to mid-train-only. The gap becomes a DESIGNED
   reverse-slot rather than an accident of Python overhead — which is
   also the cleaner architecture.
+  **IMPLEMENTED + MEASURED 2026-07-26 (run O,
+  `radio_monitor_20260726_125048`): null on goodput BY CONSTRUCTION,
+  real on architecture.** `_prep_next_train()` builds train N+1 inside
+  the pipelined wait loop; the inter-train gap is now
+  `LIFETRAC_TRAIN_GAP_MS` (default 40) spent inside `_drain_rx_frames` —
+  actively listening. Goodput 1710–1761 B/s ≈ Run L because the 40 ms
+  designed gap ≈ the 44 ms accidental one it replaced; the predicted
+  throughput now lives in the knob (40→15 ms ≈ +7–8 %, narrower command
+  window — a policy trade, cleanly exposed for the first time). Command
+  convergence unchanged (11/1, sub-second); timeouts 6 (arc best). The
+  reverse-slot is the link's first deliberate TX/RX scheduling element;
+  gap-tuning A/B queued for the next session alongside RS-4.14.
 - [ ] **RS-3.2 Slot overhead trim (FHSS)** — measure the RX boundary-retune
   latency with a scope/cycle counter, then shrink the 12 ms TX head-start
   and 15 ms guard (13.5 % of every 200 ms slot) to measured+margin.
