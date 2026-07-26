@@ -167,11 +167,16 @@ PIPELINE_DEPTH = max(1, int(os.environ.get("LIFETRAC_TX_PIPELINE_DEPTH", "2")))
 # forensics) amortizes across 2-4 frames. Default OFF until air-verified;
 # the bench harness enables it explicitly.
 TX_BATCH = int(os.environ.get("LIFETRAC_TX_BATCH", "0"))
-# 520: fits a PAIR of ~250 B frames (4 + 2×(2+248) = 504) or a triple of
-# ~160 B ones. Run E's 480 default silently rejected every pair (two 246 B
-# synth frames need 498) and batching never engaged — size the budget off
-# REAL frame sizes, not wishful ones.
-BATCH_BUDGET_B = int(os.environ.get("LIFETRAC_BATCH_BUDGET_B", "520"))
+# 760 (2026-07-26 runt analysis): admits TRIPLES of ~246 B frames (748 B →
+# 4 fragments at ~111 ms/frame vs pairs' ~120). The runt fragment is
+# structural for frames >243 B (one fragment body) — batching amortizes it:
+# 1 runt per N frames instead of per frame. The efficiency guard in
+# _batch_more rejects adds that worsen fragments-per-frame, so variable
+# real-camera sizes can't produce pathological fits. History: 480 silently
+# rejected every pair (Run E); 520 allowed pairs (runs F–K).
+BATCH_BUDGET_B = int(os.environ.get("LIFETRAC_BATCH_BUDGET_B", "760"))
+# Fragment body capacity (TX_FRAME_BODY_MAX 247 − 4 B fragment header).
+_FRAG_BODY_B = 243
 BATCH_MAX_FRAMES = max(1, int(os.environ.get("LIFETRAC_BATCH_MAX_FRAMES", "4")))
 try:
     from image_pipeline.frame_format import pack_frame_batch
@@ -476,12 +481,24 @@ class ImageTxDaemon:
                 nxt = self._q.get_nowait()
             except queue.Empty:
                 break
+            cand = total + 2 + len(nxt.payload)
+            # Runt-aware efficiency guard (2026-07-26): accept the frame
+            # only if fragments-per-frame does not get WORSE — e.g. a
+            # 246 B pair (3 frags / 2 frames = 1.5) beats singles (2/1),
+            # and a triple (4/3 = 1.33) beats the pair; but a fit that
+            # would spill a near-empty extra fragment for a tiny frame
+            # is rejected and carried to the next train.
+            frags_with = -(-cand // _FRAG_BODY_B)
+            frags_without = -(-total // _FRAG_BODY_B)
+            eff_ok = (frags_with * len(batch)
+                      <= frags_without * (len(batch) + 1))
             if (nxt.payload[:1] == b"\x01"
-                    or total + 2 + len(nxt.payload) > BATCH_BUDGET_B):
+                    or cand > BATCH_BUDGET_B
+                    or not eff_ok):
                 self._carry = nxt
                 break
             batch.append(nxt)
-            total += 2 + len(nxt.payload)
+            total = cand
         if len(batch) == 1:
             return first
         self._batched_frames = getattr(self, "_batched_frames", 0) + len(batch)

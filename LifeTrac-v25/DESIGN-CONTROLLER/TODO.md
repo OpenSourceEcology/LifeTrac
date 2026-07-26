@@ -329,6 +329,27 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   traps recorded for posterity: size the budget off REAL frame sizes
   (480 silently rejected every 498 B pair), and log engagement so a
   silent no-op can't masquerade as a null result.
+  **Run L (2026-07-26, `radio_monitor_20260726_123122_8688ebe5`):
+  runt-aware efficiency guard + budget 760 → TRIPLES (742–744 B trains);
+  goodput 1803–1827 B/s (+4 % over pairs; arc cumulative 1640→1827,
+  +11 %); best delivered-frames of the arc (744), timeouts 10.**
+  Diminishing returns confirmed: per-train host overhead scales with
+  train size (3× MQTT dequeue + pack + 4× TX_DONE handling), so deeper
+  batching alone cannot close the remaining ~24 % idle → RS-3.10.
+- [ ] **RS-3.10 Cross-train prepare-ahead (added 2026-07-26, from Run L)**
+  — the TX daemon performs its ~44 ms+ of per-train host work (MQTT
+  dequeue, batch pack, frame build) AFTER the previous train's last
+  TX_DONE, serialized with airtime; v3 pipelines fragments WITHIN a train
+  but nothing pipelines ACROSS trains. Preparing train N+1 while train N
+  is on air (~275 ms of free CPU time) and submitting its first fragment
+  immediately on the final TX_DONE would hide the host turnaround
+  entirely: predicted util 76 → ~90 %+, goodput toward ~2.1–2.3 KB/s.
+  Interaction to preserve: the inter-train gap IS the command-listening
+  window (RS-1.5 pump aims at it) — prepare-ahead must keep a deliberate
+  minimum gap (e.g. 40 ms) rather than closing it to zero, or command
+  delivery regresses to mid-train-only. The gap becomes a DESIGNED
+  reverse-slot rather than an accident of Python overhead — which is
+  also the cleaner architecture.
 - [ ] **RS-3.2 Slot overhead trim (FHSS)** — measure the RX boundary-retune
   latency with a scope/cycle counter, then shrink the 12 ms TX head-start
   and 15 ms guard (13.5 % of every 200 ms slot) to measured+margin.

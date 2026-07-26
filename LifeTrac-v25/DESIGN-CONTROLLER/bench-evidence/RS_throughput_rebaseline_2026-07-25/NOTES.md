@@ -224,6 +224,24 @@ explicit ACK opcode; 20-attempt/10 s caps with loud give-up.
 delivered-and-confirmed with sub-second convergence and self-reporting
 failure — from a starting point of 0/22 silent loss.**
 
+## Run L — triples via the runt-aware efficiency guard (2026-07-26)
+
+`radio_monitor_20260726_123122_8688ebe5`. Budget 520→760 + accept-a-frame
+only-if-frags-per-frame-improves rule (protects variable real-camera
+sizes; a tiny frame may still ride an existing runt at equal ratio).
+
+- Trains: 3 × ~246 B frames, 742–744 B (guard + budget working as designed).
+- **Goodput 1803–1827 B/s** (+4 % vs pairs; arc cumulative **1640 → 1827**).
+- **frames_published 744 — best of the arc**; timeouts 10; convergence
+  11 CONVERGED / 1 expected GAVE UP; goodput/commands stable together.
+- Finding: per-train host overhead scales with train size, so batch depth
+  has diminishing returns; the residual ~24 % idle is host work serialized
+  AFTER each train. Next lever: cross-train prepare-ahead (RS-3.10) —
+  build train N+1 during train N's ~275 ms of airtime, submit on final
+  TX_DONE, and keep a DESIGNED ~40 ms inter-train gap as the command
+  window (the gap is currently an accident of Python overhead; RS-3.10
+  makes it a deliberate reverse-slot).
+
 ## Perspective on the firmware patch
 
 The patch's throughput levers (SPI, URC, ring) did not raise the DTS ceiling —
