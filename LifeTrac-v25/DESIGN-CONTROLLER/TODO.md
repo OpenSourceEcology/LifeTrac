@@ -194,6 +194,16 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   add a write timeout / non-blocking send path, instrument the worker loop
   with a heartbeat counter, and soak bidirectional traffic ≥30 min.
   **The control plane cannot be trusted under load until this closes.**
+  **30-MIN SOAK PASSED 2026-07-26 (run W,
+  `radio_monitor_20260726_171138`): the freeze did not reproduce** —
+  181/181 stats intervals on both daemons, rx_frames climbed to 15,238
+  continuously, 171/1 command convergence, goodput flat at ~1870 B/s,
+  under full bidirectional load (saturated stream + ~90 keyframe-request
+  cycles) with the post-run-33 stack (RS-4.12 arming, aligned pump,
+  convergence caps). 15× the exposure of the original failure. The
+  explicit write-timeout/heartbeat hardening remains worth doing as
+  defense-in-depth, but the trust condition is substantially met for
+  the DTS profile.
   **Firmware-side mechanisms (2026-07-25 analysis,
   [`../AI NOTES/2026-07-25_Method_G_Firmware_Analysis_Claude_v1_0.md`](../AI%20NOTES/2026-07-25_Method_G_Firmware_Analysis_Claude_v1_0.md) §3):**
   the L072 cannot deadlock while its UARTs clock, but TX-begin can stall its
@@ -318,6 +328,11 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   watch reassembler timeouts, QUEUE_FULL, UART overruns, thermal drift, and
   the RS-1.2 freeze signature. Latency histogram (P-frame age TX→publish)
   while at it. (Roadmap §2.1.)
+  **DONE 2026-07-26 (run W): goodput 1873→1846 B/s over 30 min (−1.5 %,
+  ~noise), util pinned 77 %, 16,501 fragments / 0 TX failures, timeouts
+  linear (~10/min), no QUEUE_FULL, no freeze, 8,469 frames delivered.**
+  Only the latency histogram remains (needs per-frame TX→publish
+  timestamping — small instrumentation).
 - [ ] **RS-2.3 Explain the 25 % idle budget at DTS saturation** — instrument
   inter-TX gap via RFCO timestamps to split fragment-underfill vs UART
   turnaround loss *before* buying either fix.
@@ -551,6 +566,13 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   against batched-train runts). Storm mitigation moves to RS-4.14's
   candidates (b)/(c): reverse-slot TDMA or self-heal suppression at
   FHSS saturation.
+  **RECONSTRUCTION PROVEN ON AIR 2026-07-26 (run W, 30-min DTS soak):
+  `parity_recon=95`** — 95 trains saved vs 297 evictions that still
+  occurred ≈ **24 % of would-be losses recovered** at ~24 % airtime cost
+  (3,979 parity frags / 16,501 total). The unrecovered 76 % is the
+  last-fragment exemption + parity-frag-loss + double-loss — the
+  exemption analysis (pad or reorder the final fragment) is now the
+  highest-value parity improvement, potentially doubling the save rate.
   **Verified 2026-07-25 — parity and keyframe-copies are mutually exclusive,
   and the switch between them is automatic and loss-triggered.** When
   `is_key and copies > 1` the packer returns at
