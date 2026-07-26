@@ -213,6 +213,21 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   retries until `CMD_OP_ENCODE_MODE_ACK` (opcode exists). Converges in
   ~2–4 windows (≈0.5–1 s) regardless of per-attempt odds, and
   self-terminates. Replaces the ×2-copies heuristic entirely.
+  **IMPLEMENTED + AIR-VALIDATED 2026-07-26 (run K,
+  `radio_monitor_20260726_092403_a50618bb`):** `_pending_cmds` registry,
+  one retry per aligned window, deadline/attempt caps, convergence
+  receipts. Eleven keyframe requests converged in **0.1–3.7 s each**;
+  reassembler timeouts dropped to 5 (best of the whole arc); goodput
+  unchanged (1755 B/s); **20/20 command copies delivered this run**.
+  Two notes: (a) this synth workload emits a keyframe every 10th frame,
+  so requests often converge off the natural cadence ("0 attempts") —
+  request-delivery-driven convergence needs a keyframeless workload to
+  exercise fully (K1's world, where it matters most); (b) `cmd 0x63 GAVE
+  UP after 20 attempts` is the machinery catching a REAL bench topology
+  gap loudly: no camera_service listens on the bench_mqtt broker, so
+  ENCODE_MODE can never ack on this harness — previously this failed
+  silently. Wire camera_service into the bench feed or accept the
+  give-up as expected bench behavior.
 
 ### RS-2 — Re-baseline under LoRa-only control plane
 

@@ -226,6 +226,13 @@ class ImageRxDaemon:
         # callbacks, drained by the RX worker (single link owner). Plus
         # the two-phase switch state machine fields.
         self._ctrl_out: "queue.Queue[bytes]" = queue.Queue(maxsize=16)
+        # RS-1.5 (2026-07-26): ack-driven command convergence. Keyed by
+        # opcode; the pump re-sends one copy per aligned window until the
+        # command's ACK OBSERVABLE fires (keyframe arrival / ENCODE ACK)
+        # or the caps trip. Replaces fire-and-forget ×2 copies for the
+        # opcodes wired to it (generalizes the profile-switch Phase-A
+        # retry pattern). Guarded by self._lock.
+        self._pending_cmds: "dict[int, dict]" = {}
         self._await_ack_profile: int | None = None
         self._await_ack_deadline: float = 0.0
         self._await_ack_last_send: float = 0.0
@@ -433,17 +440,65 @@ class ImageRxDaemon:
         except Exception as exc:                              # pragma: no cover
             LOG.warning("RXCONT re-arm failed: %s", exc)
 
+    def _set_pending(self, opcode: int, body: bytes,
+                     timeout_s: float = 10.0, max_attempts: int = 20) -> None:
+        """Register (or refresh) an ack-driven command. Idempotent: while
+        already pending, a re-trigger just extends the deadline."""
+        now = time.monotonic()
+        with self._lock:
+            cur = self._pending_cmds.get(opcode)
+            if cur is not None:
+                cur["deadline"] = now + timeout_s
+                return
+            self._pending_cmds[opcode] = {
+                "body": body, "attempts": 0, "t0": now,
+                "deadline": now + timeout_s, "max_attempts": max_attempts,
+            }
+
+    def _clear_pending(self, opcode: int, reason: str) -> None:
+        with self._lock:
+            cur = self._pending_cmds.pop(opcode, None)
+        if cur is not None:
+            LOG.info("cmd 0x%02x CONVERGED after %d attempts (%.1f s): %s",
+                     opcode, cur["attempts"],
+                     time.monotonic() - cur["t0"], reason)
+
+    def _next_ctrl_body(self, now: float) -> "bytes | None":
+        """Pump source: pending (ack-driven) commands first, oldest first;
+        legacy one-shot queue entries second. Enforces give-up caps."""
+        with self._lock:
+            for opcode in sorted(self._pending_cmds,
+                                 key=lambda k: self._pending_cmds[k]["t0"]):
+                cur = self._pending_cmds[opcode]
+                if cur["attempts"] >= cur["max_attempts"] or now > cur["deadline"]:
+                    del self._pending_cmds[opcode]
+                    LOG.warning("cmd 0x%02x GAVE UP after %d attempts (%.1f s)",
+                                opcode, cur["attempts"], now - cur["t0"])
+                    continue
+                cur["attempts"] += 1
+                return cur["body"]
+        try:
+            return self._ctrl_out.get_nowait()
+        except queue.Empty:
+            return None
+
     def _drain_ctrl_idle(self, link: HostLink) -> None:
         """Idle-link fallback: drain queued commands when no image stream
         is flowing (the tractor is listening continuously then, so timing
         does not matter). During a stream the ONLY drain is the aligned,
         ≥120 ms-spaced pump in the RX loop."""
-        while True:
+        # Pending (ack-driven) commands: one retry per idle pass — the
+        # loop's ~0.25 s read timeout is the natural retry cadence, and
+        # an idle tractor listens continuously so timing is free.
+        body = self._next_ctrl_body(time.monotonic())
+        while body is not None:
+            self._send_command_frame(link, body, copies=1)
+            # Only continue draining the LEGACY queue in one go; pending
+            # entries retry across passes, not in a tight loop.
             try:
                 body = self._ctrl_out.get_nowait()
             except queue.Empty:
                 return
-            self._send_command_frame(link, body, copies=1)
 
     def _send_command_frame(self, link: HostLink, body: bytes,
                             copies: int = 2) -> None:
@@ -532,6 +587,8 @@ class ImageRxDaemon:
                     self._revert_deadline = (time.monotonic()
                                              + PROFILE_REVERT_TIMEOUT_S)
         elif opcode == CMD_OP_ENCODE_MODE_ACK:
+            # RS-1.5: explicit ack — stop retrying ENCODE_MODE.
+            self._clear_pending(CMD_OP_ENCODE_MODE, "ENCODE_MODE_ACK")
             # Tractor's encode ack, forwarded over the air — republish
             # retained so web_ui's cache works with zero LAN to the
             # tractor. Payload is the camera_service JSON as-is.
@@ -631,14 +688,10 @@ class ImageRxDaemon:
             LOG.warning("encode_mode_override: bad payload %r (%s)",
                         msg.payload[:64], exc)
             return
-        try:
-            # RS-1.x: two entries = two copies, sent one-per-window by the
-            # aligned pump (independent windows beat back-to-back copies).
-            body = pack_command_frame(CMD_OP_ENCODE_MODE, bytes([mode & 0xFF]))
-            self._ctrl_out.put_nowait(body)
-            self._ctrl_out.put_nowait(body)
-        except queue.Full:
-            LOG.warning("encode_mode_override: command queue full")
+        # RS-1.5: retry until the tractor's ENCODE_MODE_ACK arrives.
+        self._set_pending(
+            CMD_OP_ENCODE_MODE,
+            pack_command_frame(CMD_OP_ENCODE_MODE, bytes([mode & 0xFF])))
 
     def _on_req_keyframe_msg(self, _c, _u, _msg) -> None:
         """cmd/req_keyframe (self-heal poke or web button) → LoRa cmd."""
@@ -646,13 +699,10 @@ class ImageRxDaemon:
         if now - self._last_kf_cmd_t < KEYFRAME_CMD_MIN_GAP_S:
             return
         self._last_kf_cmd_t = now
-        try:
-            # RS-1.x: two entries = two copies across independent windows.
-            body = pack_command_frame(CMD_OP_REQ_KEYFRAME)
-            self._ctrl_out.put_nowait(body)
-            self._ctrl_out.put_nowait(body)
-        except queue.Full:
-            pass
+        # RS-1.5: retry until a keyframe actually arrives — the keyframe
+        # IS the ack (cleared in the completed-frame handler).
+        self._set_pending(CMD_OP_REQ_KEYFRAME,
+                          pack_command_frame(CMD_OP_REQ_KEYFRAME))
 
     def _subscribe_control(self, client) -> None:
         client.message_callback_add(
@@ -817,6 +867,10 @@ class ImageRxDaemon:
                             self._last_rx_codec = getattr(done, "codec", 0)
                             self._last_rx_frame_kind = getattr(
                                 done, "frame_kind", 0)
+                        # RS-1.5: a keyframe arriving IS the req_keyframe ack.
+                        if getattr(done, "frame_kind", 0) == 1:
+                            self._clear_pending(CMD_OP_REQ_KEYFRAME,
+                                                "keyframe received")
                         self._publish(payload_out, frame_id)
 
             # RS-1.x window-aligned command TX (2026-07-25): a fragment in
@@ -835,10 +889,7 @@ class ImageRxDaemon:
                 # delivery 1-(1-p)^2 instead of p).
                 now_pump = time.monotonic()
                 if now_pump - getattr(self, "_last_pump_t", 0.0) >= 0.12:
-                    try:
-                        body = self._ctrl_out.get_nowait()
-                    except queue.Empty:
-                        body = None
+                    body = self._next_ctrl_body(now_pump)
                     if body is not None:
                         self._send_command_frame(link, body, copies=1)
                         self._last_pump_t = now_pump

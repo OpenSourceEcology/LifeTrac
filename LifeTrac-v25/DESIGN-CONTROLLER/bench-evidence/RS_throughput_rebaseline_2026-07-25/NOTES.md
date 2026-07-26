@@ -199,6 +199,31 @@ into one window (no spacing); (5) an unconditional drain path silently
 bypassing the pump. Per-copy odds now ~3× chance; RS-1.5 (ack-driven
 convergence) remains the field-grade closure on top.
 
+## Run K — RS-1.5 ack-driven convergence validated (2026-07-26)
+
+`radio_monitor_20260726_092403_a50618bb`. The command plane's character
+change: keyframe requests now retry once per aligned window until the
+keyframe itself arrives (the payload is the ack); ENCODE_MODE until its
+explicit ACK opcode; 20-attempt/10 s caps with loud give-up.
+
+- **11/11 keyframe requests converged, 0.1–3.7 s each** (median ~0.4 s).
+- **Reassembler timeouts: 5** — best of the entire arc (was 16–27) — the
+  convergence loop heals losses as fast as they occur.
+- **20/20 command copies delivered** this run (per-copy delivery has
+  climbed each iteration: 19 % → 62 % → 100 % here).
+- Goodput unchanged: 1755 B/s, util 74 %.
+- Caveats: the synth emits a keyframe every 10th frame, so many requests
+  converge off the natural cadence ("0 attempts") — a keyframeless
+  workload (the K1 target world) is needed to exercise request-delivery
+  convergence fully. And `cmd 0x63 GAVE UP after 20 attempts (7.0 s)` is
+  the machinery surfacing a real bench gap loudly: no camera_service is
+  attached to the bench_mqtt broker, so ENCODE_MODE cannot ack on this
+  harness — previously that failure was silent.
+
+**Control-plane end state for the arc: commands at DTS saturation are
+delivered-and-confirmed with sub-second convergence and self-reporting
+failure — from a starting point of 0/22 silent loss.**
+
 ## Perspective on the firmware patch
 
 The patch's throughput levers (SPI, URC, ring) did not raise the DTS ceiling —
