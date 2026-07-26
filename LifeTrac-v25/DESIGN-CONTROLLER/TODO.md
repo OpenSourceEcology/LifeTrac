@@ -145,6 +145,37 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   (`_ctrl_inject.sh` via `docker exec rx_smoke` — host→base IP is dead on
   this bench and host-side adb concurrent with the harness wedges the run).
   Include one deliberate CONF-drop to watch both ends revert cleanly.
+  **Partial air evidence 2026-07-25 (new firmware):** `ENCODE_MODE` 0xFB
+  commands received in the tractor's inter-fragment gaps in every
+  re-baseline run — but **only during the pre-saturation ramp. At
+  saturation no command was observed arriving, and the base's ~24
+  keyframe-request pokes never appeared tractor-side** (the RX daemon's
+  send is unlogged, so not-sent vs sent-and-lost is indistinguishable —
+  add a log line + counter there first). Command delivery under saturated
+  downlink is now the sharpest open control-plane question → fold into
+  the RS-9.8 soak pass criteria.
+  **Progression measured 2026-07-25 (runs C→G): 0/11 → 3/12 commands at
+  DTS saturation**, via three stacked fixes each removing a proven
+  mechanism: RS-4.12 (radio deaf in STANDBY through every turnaround),
+  completion-aligned command TX on the base (any-fragment alignment is
+  chance — post-RS-4.12 the only window is per-TRAIN), and the tractor
+  host's pipelined TX_DONE loop **silently discarding RX_FRAME_URCs**
+  mid-burst (commands the firmware heard, dropped by the host — fixed).
+  **Residual gate unidentified from logs. Next diagnostic queued: diff the
+  tractor firmware `radio_rx_ok` counter against commands-sent per run** —
+  radio-counted ⇒ host-path remainder; not counted ⇒ RF/timing. Evidence:
+  [`bench-evidence/RS_throughput_rebaseline_2026-07-25/`](bench-evidence/RS_throughput_rebaseline_2026-07-25/).
+  **ARC CLOSED 2026-07-26 (runs H/I/J): command delivery at DTS saturation
+  is now near-total at zero goodput cost.** The diagnostic (H) proved the
+  host path perfect (`radio_rx_ok=5=dispatched`) and the loss to be window
+  misses (`RADIO_CRC_ERR=0`); I found the ≥120 ms pump gate being defeated
+  by `_maybe_switch_profile`'s every-pass drain-all (the pump had been
+  decorative since it was written); J, with the pump finally exclusive:
+  **16/26 copies delivered (62 %/copy, ~3× chance), 14 REQ_KEYFRAME
+  receptions from 12 commands, goodput unchanged 1779 B/s.** Five stacked
+  mechanisms total, each measured before/after — see the evidence NOTES
+  arc summary. RS-1.5 ack-driven convergence remains the field-grade
+  closure on top of these odds.
 - [ ] **RS-1.2 Base RX-worker freeze under bidirectional load** — run 33
   froze the base worker at 15:30:38 during simultaneous command TX + image
   RX (stats thread alive, worker stuck; suspect blocking UART write vs
@@ -152,6 +183,14 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   add a write timeout / non-blocking send path, instrument the worker loop
   with a heartbeat counter, and soak bidirectional traffic ≥30 min.
   **The control plane cannot be trusted under load until this closes.**
+  **Firmware-side mechanisms (2026-07-25 analysis,
+  [`../AI NOTES/2026-07-25_Method_G_Firmware_Analysis_Claude_v1_0.md`](../AI%20NOTES/2026-07-25_Method_G_Firmware_Analysis_Claude_v1_0.md) §3):**
+  the L072 cannot deadlock while its UARTs clock, but TX-begin can stall its
+  main loop ≤25 ms/attempt (PLL spin + CAD poll) and every URC is a blocking
+  dual-lane busy-wait (~3 ms/lane for a max RX_FRAME_URC); during stalls,
+  inbound bytes silently overflow the 512 B ring and corrupt subsequent host
+  frames. Freeze signature to look for host-side: CRC-failed/garbage frames
+  arriving immediately after load bursts. Host code remains prime suspect.
 - [ ] **RS-1.3 Encoder confirmation loop end-to-end** — pill press → base
   0xFB ENCODE_MODE over LoRa → tractor `camera_service` applies + acks →
   ack rides back over the air → web pill shows pin→actual (amber on
@@ -160,6 +199,20 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   Auto, attenuate/detune to force timeouts, watch it degrade DTS→FHSS and
   promote back after the 60 s health dwell. Policy is unit-tested
   (`test_web_ui_radio_profile.py`); zero air evidence yet.
+- [ ] **RS-1.5 Ack-driven command convergence (added 2026-07-26, from the
+  run C→I delivery investigation)** — fire-and-forget command copies can
+  never be reliable at saturation: the tractor's armed window is ~44 ms
+  per ~230 ms train, and the base's send timing references daemon
+  *processing* time, which lags air-arrival by a variable 0–150 ms —
+  measured per-attempt delivery ~25 % (Run H: 21/26 copies never decoded,
+  `RADIO_CRC_ERR=0`, i.e. window misses, not collisions). **The robust
+  pattern already exists in-repo:** the profile switch's Phase-A loop
+  re-sends every ~1.5 s until the tractor's ACK arrives. Generalize it:
+  REQ_KEYFRAME retries each train-completion until a keyframe frame
+  actually arrives (the keyframe IS the ack — observable); ENCODE_MODE
+  retries until `CMD_OP_ENCODE_MODE_ACK` (opcode exists). Converges in
+  ~2–4 windows (≈0.5–1 s) regardless of per-attempt odds, and
+  self-terminates. Replaces the ×2-copies heuristic entirely.
 
 ### RS-2 — Re-baseline under LoRa-only control plane
 
@@ -169,6 +222,11 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   and the tractor pays RXCONT re-arm time per fragment. Re-run the
   saturation benchmarks (profile 1 + profile 2, v3, 12 fps) and update the
   profile-ladder table in the roadmap doc.
+  **DTS half DONE 2026-07-25: ~1640 B/s with the live control plane**
+  (vs 1755 published; −6.5 % = the control plane's cost, as predicted).
+  Saturated, deterministic, zero TX/RX errors — evidence
+  [`bench-evidence/RS_throughput_rebaseline_2026-07-25/`](bench-evidence/RS_throughput_rebaseline_2026-07-25/).
+  FHSS half still pending.
 - [ ] **RS-2.2 DTS BW500 soak** — 30-minute saturation soak at profile 2:
   watch reassembler timeouts, QUEUE_FULL, UART overruns, thermal drift, and
   the RS-1.2 freeze signature. Latency histogram (P-frame age TX→publish)
@@ -176,6 +234,64 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 - [ ] **RS-2.3 Explain the 25 % idle budget at DTS saturation** — instrument
   inter-TX gap via RFCO timestamps to split fragment-underfill vs UART
   turnaround loss *before* buying either fix.
+  **Verified 2026-07-25 — a third cause outranks both candidates, and it is
+  structural.** `PIPELINE_DEPTH = 2` ([`image_tx_daemon.py:159`](firmware/tractor_x8/image_tx_daemon.py))
+  is not a tuning choice: it is matched to the L072's **single-slot** TX
+  mailbox — `static sx1276_tx_request_t s_tx_pending;` + `s_tx_pending_valid`
+  ([`host_cmd.c:21`](firmware/murata_l072/host/host_cmd.c)) — i.e. one frame
+  transmitting + one queued, and nothing more. Raising the host-side depth
+  alone cannot help: the extra request is refused at the
+  `if (s_tx_pending_valid)` branch ([`host_cmd.c:474`](firmware/murata_l072/host/host_cmd.c)).
+  The roadmap already reached the same place from the other direction
+  ("v3 keeps only 2 frames in flight; small tail", roadmap §2 line 56).
+  **So the instrumentation should first test the in-flight ceiling, and the
+  real fix is a small TX ring in firmware — this is the most direct lever on
+  sustained broadcast throughput available anywhere in RS-1..RS-8.**
+  Size the ring against RS-1.2 first: a deeper mailbox increases exactly the
+  bidirectional UART pressure suspected in the base RX-worker freeze.
+  **2026-07-25 firmware analysis — the idle has FIVE stacked contributors, not
+  one** ([analysis doc](../AI%20NOTES/2026-07-25_Method_G_Firmware_Analysis_Claude_v1_0.md) §4):
+  (1) depth-2 pipeline refill latency (single parked slot verified);
+  (2) **SPI at ~250 kHz per-byte busy-wait — ~8 ms per 255 B FIFO load**
+  (`sx1276.c:231`), ~9 % of a DTS fragment cycle by itself → RS-3.6;
+  (3) blocking dual-lane URC emission, 3–6 ms per URC → RS-3.7; (4) FHSS
+  27 ms/slot fixed overhead (13.5 %) → RS-3.2; (5) LBT stalls ≤25 ms.
+  Bonus: `HOST_TXQ_DEPTH 8` + `HOST_TXQ_P0_RESERVED 1` are already defined
+  and RAM-budgeted (`config.h:50`) — the ring was planned and never built.
+  Refactor traps: keep the payload memcpy at PARK time (the 2026-07-24
+  uninitialized-stack bug, `host_cmd.c:454`), and **cap ring depth by P0
+  latency**: with max-fill fragments a FIFO ring of depth N makes a command
+  wait ~N×89 ms (DTS) / ~N×170 ms (FHSS) — depth ≥4 at FHSS breaches the
+  500 ms P0 budget (RS-9.7). Keep the deep priority queue host-side and the
+  firmware ring ≤2–3, or add priority-insert/cancel for parked slots.
+  **Status 2026-07-25: ring IMPLEMENTED in the working tree** — depth 4
+  (`HOST_TXQ_DEPTH` 8→4 with the latency math in config.h), FIFO-ordering
+  guard (a fresh request parks behind queued entries even when the radio is
+  momentarily free), drain-through on begin-refusal, by-value entries so
+  memcpy-at-park holds structurally, ring reset in `host_cmd_init`. Built
+  clean (22,504 B) + full SIL suite green. **FLASHED + VERIFIED on BOTH
+  boards 2026-07-25** (Stage 1 quant 3/3 PASS each, Method G probe VERDICT
+  PASS, `REG 0x42 = 0x12`, `rx_ring_ovf=0`, `host_parse_err=0` — evidence
+  [`bench-evidence/RS_firmware_patch_flash_2026-07-25/`](bench-evidence/RS_firmware_patch_flash_2026-07-25/)).
+  **Still pending: raise host `PIPELINE_DEPTH` 2→4 (DTS) / ≤3 (FHSS) + the
+  RS-2.1 re-baseline — blocked on RS-5.9 (harness MQTT path).**
+  Wire-compatible: QUEUE_FULL just arrives 3 parks later.
+  **MEASURED 2026-07-25 (same session) — clean negative at DTS: depth 4 vs
+  depth 2 = 1639 vs 1640 B/s, util 69–70 % both.** Host-refill latency is
+  NOT the DTS bottleneck. **Correction (same day): LBT is eliminated too —
+  BOTH daemons CFG-disable it at startup** (`image_tx_daemon._open_link`
+  and `image_rx_daemon` both send `CFG_SET(LBT_ENABLE=0)`; verified in the
+  A2/B logs), so the measurements already ran LBT-free and an LBT-off A/B
+  is moot. With SPI and URC also fixed pre-measurement, **four of five
+  original candidates are gone**; the ~30 % idle now narrows to:
+  **the RXCONT disarm→retune→TX→re-arm cycle around every fragment, PLL
+  settle + mode transitions, and daemon-side pacing/UART turnaround.**
+  Forensics landed same session: `image_rx_daemon` now logs per-fragment
+  inter-arrival deltas from the firmware RX timestamp (`air_gap:` stats
+  line) — median Δt minus median-fragment ToA = the dead time, split per
+  run. The ring stays (capacity for command coexistence + FHSS may use
+  it; the slot clock interacts differently).
+  Evidence: [`bench-evidence/RS_throughput_rebaseline_2026-07-25/`](bench-evidence/RS_throughput_rebaseline_2026-07-25/).
 
 ### RS-3 — Throughput levers (roadmap §2)
 
@@ -184,6 +300,20 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   (length-prefixed concat in `image_tx_daemon` + reassembler passthrough).
   Projected +20–35 % FHSS, +10–15 % DTS. Re-tune reassembler timeout and
   sweep/NACK cadence together with this (loss granularity grows).
+  **IMPLEMENTED + AIR-TESTED 2026-07-25 (runs E/F/G) — engaged and
+  air-efficient but net-NEUTRAL on delivered goodput so far.**
+  `FRAME_BATCH_MAGIC 0xB5` container in `frame_format.py` (SIL round-trip
+  through fragmentation + reassembly green), carry-slot batching in
+  `image_tx_daemon._batch_more` (never reorders), split at the
+  reassembler's completion seam. Run F: pairs formed cleanly, air cycle
+  shrank 130.5→104.9 ms — but the +16 % offered was eaten by loss
+  (timeouts 16→25; suspected: the inherent 14 B runt third-fragment of a
+  ~498 B pair + base-command/train half-duplex collisions). **To convert
+  the win: runt-aware batch sizing (fill whole 243 B bodies) + collision
+  avoidance; keep harness-opt-in (`-TxBatch`) until then.** Two Run-E
+  traps recorded for posterity: size the budget off REAL frame sizes
+  (480 silently rejected every 498 B pair), and log engagement so a
+  silent no-op can't masquerade as a null result.
 - [ ] **RS-3.2 Slot overhead trim (FHSS)** — measure the RX boundary-retune
   latency with a scope/cycle counter, then shrink the 12 ms TX head-start
   and 15 ms guard (13.5 % of every 200 ms slot) to measured+margin.
@@ -196,10 +326,74 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 - [ ] **RS-3.4 Make v3 the default pipeline** for profiles 1 and 2
   (measured better: 268 vs 175 published under FHSS; parity at p0) —
   config/default change + one confirmation run.
+  **Verified 2026-07-25 — pure config flip, no code change.** The selector is
+  the `LIFETRAC_TX_PIPELINE` env var, read once at
+  [`image_tx_daemon.py:158`](firmware/tractor_x8/image_tx_daemon.py)
+  (`"v2"` default) and passed through by the harness
+  ([`run_live_radio_monitor.ps1:150`](firmware/x8_lora_bootloader_helper/run_live_radio_monitor.ps1)).
+  **Scope note to prevent a misread:** `v2`/`v3` here select *TX scheduling*
+  (serial send→TX_DONE→send vs depth-2 pipelined, dispatched at
+  [`:681`](firmware/tractor_x8/image_tx_daemon.py)) and are applied *after*
+  fragments are built. They are unrelated to `pack_image_fragments_v2`, which
+  is the keyframe-**copies** packer. Two different "v2"s; changing this one
+  does not touch parity (RS-4.1) or fragment layout. Consider renaming one of
+  them while both are still only in config.
 - [ ] **RS-3.5 Profile-0 400 B/s target disposition** — decide: declare the
   Phase-1 single-channel target superseded by DTS (recommended), or chase
   it via `LIFETRAC_FRAG_AIR_CAP_MS` 170→200 (486 B/s ceiling, 384 µs dwell
   margin — needs one RFCO sweep) + token-bucket pacing.
+- [ ] **RS-3.6 SPI prescaler 250 kHz → 2–4 MHz (added 2026-07-25)** —
+  `spi1_transfer` busy-waits per byte at PCLK2/64 (~250 kHz), so every 255 B
+  FIFO load steals **~8 ms of main-loop time per fragment** (`sx1276.c:231`);
+  the SX1276 SPI is rated to 10 MHz. A /8 or /4 prescaler cuts the load to
+  ~0.5–1 ms — ~7 ms back per fragment (~8 % of a DTS cycle) plus main-loop
+  headroom that directly shortens RS-1.2-class stalls. One-line divisor
+  change + bench regression (REG 0x42 readback, one TX/RX cycle, Stage 1
+  quant).
+  **Status 2026-07-25: implemented** — `SPI_CR1_BR_DIV64` → `DIV8` (2 MHz,
+  5× margin to the SX1276's 10 MHz rating) in `sx1276_spi_init()`. Built +
+  SIL green; pending the bench gate above.
+- [ ] **RS-3.7 URC emission cost (added 2026-07-25)** — every URC busy-waits
+  BOTH UART lanes (LPUART1 + USART1 mirror) synchronously with no timeout
+  (`host_uart.c:564`); a max RX_FRAME_URC costs ~3 ms/lane at 921600, paid
+  per received fragment on the RX side. Cheap now: CFG-gate the USART1
+  mirror off in production (halves the cost) and compile out `RADIO_IRQ_URC`
+  debug emission (`host_cmd.c:841`, ~16 wire B per radio-event batch). Right
+  later: IRQ-driven UART TX ring so URC emission never blocks the main loop
+  — which also removes one of the three RS-4.10 wedge modes.
+  **Status 2026-07-25: both quick wins implemented** — USART1 TX mirror
+  compile-gated OFF (`HOST_UART_TX_MIRROR_USART1`, re-enable via make
+  CFLAGS) and `HOST_EMIT_RADIO_IRQ_DEBUG_URC` default 0. RX on both lanes
+  unchanged. The IRQ-driven TX ring remains open.
+- [ ] **RS-3.8 SF6 implicit-header mode for DTS profile 2 (added 2026-07-25)**
+  — SF6@BW500 carries ~75 % more raw bitrate than SF7 at ~2.5 dB sensitivity
+  cost, but requires implicit headers + fixed-length frames. Both constraints
+  fit the image lane: max-fill fragments are constant-size anyway (RS-9.7),
+  and DTS is fixed-channel so nothing needs the explicit header for slot
+  anchoring. **FHSS profile 1 keeps SF7/explicit** — the RX follower anchors
+  on decoded headers. Needs both-ends profile plumbing, a fixed-length
+  reassembler mode, and a range/PER bench pass before adoption. Adjunct
+  micro-win: DTS preamble 8 → 6 symbols (~0.5 ms/frame).
+- [ ] **RS-3.9 Amortized / passive LBT for the field politeness policy
+  (operator question 2026-07-25: "can LBT look for sustained broadcasts
+  less often instead of brief checks frequently?" — yes).** Today both
+  daemons simply CFG LBT off (bench posture; §15.247 does not require LBT,
+  so any policy is compliant). When a field politeness posture is wanted,
+  do NOT return to per-TX CAD (~6 ms/fragment ≈ 10 % airtime); design
+  tiers: **(a) cached assessment** — one CAD+RSSI sweep per channel per
+  T seconds grants TX for the window; **(b) passive assessment (best fit
+  here)** — the tractor already sits in RXCONT between fragments, which IS
+  listening: harvest it (no preamble decoded + RSSI at noise floor over
+  the last T ms of armed time ⇒ channel clear, zero dedicated airtime
+  spent). Continuous observation also *better* matches the stated goal —
+  a 1 ms CAD can only catch a preamble mid-flight, while passive
+  integration over seconds catches both LoRa activity and sustained
+  non-LoRa carriers; **(c) per-class split** — P0/command TX keeps a real
+  (brief) assessment, P3 bulk rides the cached/passive verdict. Firmware
+  hooks: `sx1276_lbt_check` entry point, RXCONT residency already tracked
+  by the scan/retune counters, `RegRssiValue` readable from the main loop.
+  Gate on the field-deployment politeness decision (record in DECISIONS.md
+  with RS-7's compliance items).
 
 ### RS-4 — Reliability & firmware hardening
 
@@ -207,16 +401,58 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   exists, is tested, and is wired but default-off (`LIFETRAC_PARITY_GROUP=0`).
   Enable for keyframes on the bench, measure timeout reduction vs airtime
   cost (75 timeouts/120 s under FHSS pre-fix is the baseline to beat).
+  **Verified 2026-07-25 — parity and keyframe-copies are mutually exclusive,
+  and the switch between them is automatic and loss-triggered.** When
+  `is_key and copies > 1` the packer returns at
+  [`image_tx_daemon.py:637`](firmware/tractor_x8/image_tx_daemon.py), before
+  `add_parity_fragments` is ever reached (deliberate — the copies path carries
+  its own redundancy). `LIFETRAC_KEYFRAME_COPIES` defaults to `1`, **but
+  auto-escalates to 2 whenever `recent_frag_loss_rate() > 0.005`**
+  ([`:632`](firmware/tractor_x8/image_tx_daemon.py)). Net effect: parity runs
+  on a clean link and **silently disables itself exactly when loss makes it
+  valuable** — a quiet bench would show "parity works", the degraded field case
+  would fall back to copies with no log line saying so. Before benching,
+  either pin `LIFETRAC_KEYFRAME_COPIES=1` for the run or log which redundancy
+  strategy each keyframe actually used, or the result is uninterpretable.
+- [ ] **RS-4.1a Re-aim parity at tile-delta fragments, not keyframes** —
+  RS-4.1's whole premise is keyframe protection, and the program direction is
+  **keyframe-free operation** (RS-6, and the 2026-07-25 scope note that
+  keyframes should not be *required*). If K1 lands, parity-on-keyframes
+  protects a frame class that is being designed out. Decide whether parity is
+  better spent on P-frame/tile-delta fragment groups — where loss currently
+  produces stale tiles the operator sees — and re-scope or close RS-4.1
+  accordingly. Cheap to decide, and it changes whether RS-4.1 deserves bench
+  time at all.
 - [ ] **RS-4.2 Reassembler timeout derived from live PHY** — `max(3 s,
   3 × expected_gap)` using the active profile's ToA instead of the fixed
   1500 ms default (spurious evictions under FHSS slot cadence).
+  **Verified 2026-07-25 — the knob already exists; only the derivation is
+  missing.** `--reassembler-timeout-ms` is a CLI arg with an env-var default
+  ([`image_rx_daemon.py:929`](base_station/image_rx_daemon.py)) feeding
+  `FragmentReassembler(timeout_ms=…)`, so this is a computed default, not new
+  plumbing. **Regression trap:** there is a *second* reassembler —
+  `TelemetryReassembler(timeout_ms=1500)` is **hardcoded** at
+  [`lora_bridge.py:231`](base_station/lora_bridge.py) with no CLI or env
+  override. A fix applied only to the image path leaves telemetry on the fixed
+  1500 ms and will read as a partial regression under FHSS cadence. Change both.
 - [ ] **RS-4.3 LOCK_LOSS coasting under valid slot clock** — with the
   boundary follower, lock-loss demotion is the only remaining full-rescan
   path; consider raising `LOCK_LOSS_MS` 2000→4000–6000 when
   `sx1276_fhss_clock_valid()` (grid coasts on TCXO at ~0.12 ms/min drift).
+  **Premise correction (2026-07-25 analysis):** the 0.12 ms/min figure
+  assumes the ±2 ppm TCXO, but `platform_now_ms()` is SysTick clocked from
+  **HSI16 (±1 % class)** — SYSCLK deliberately stays on HSI16 even when the
+  TCXO locks (W1-9d). Recompute the coasting budget from the real timebase
+  before raising `LOCK_LOSS_MS`; demotion also currently hard-resets the
+  slot clock (`sx1276_rx.c:721`), which coasting must not.
 - [ ] **RS-4.4 TX idle beacon** — after a multi-minute host pause the RX
   follower starves (no headers to re-anchor). Lightweight header-only
   beacon ~1/s when the TX queue is idle (~7 ms/s airtime).
+  **Verified 2026-07-25:** plumbing already half-exists —
+  `LORA_FW_BEACON_ENABLE=1` (config.h:40) and CFG keys 0x09/0x0A are stored
+  but consumed by nothing, and the RX side already anchors its clock on 8 B
+  header-only frames. TX-side-only work: a cadence check beside the mailbox
+  drain in the main loop.
 - [ ] **RS-4.5 Slot-follower golden-vector test** — `sx1276_rx_slot_follow`
   has no host-linked TU (clock TU covers arithmetic only): scripted
   sequence test for anchor → boundary follows → skip-under-tx-busy →
@@ -225,12 +461,112 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   zeroes `freq_hz`, which made run 23's off-channel synth invisible in
   logs. Add a bench-only FRF readback to the per-TX snapshot or a low-rate
   FRF-echo URC.
+  **Verified 2026-07-25:** `freq_hz` is already latched per-TX and carried
+  in RFCO_PERTX (0xC3) — bench/DTS deliberately zero it because profile
+  activation never programs FRF (the host force-FRF workaround owns the
+  carrier). Fix = populate from the host-pinned FRF or emit
+  `sx1276_fhss_chantab_center_hz(idx)`; no new URC needed.
 - [ ] **RS-4.7 Boot-count/uptime in VER_URC** — one cheap firmware field
   that makes NRST verification (RS-5.1) and "did it reboot?" forensics a
   single request.
+  **Scope correction (2026-07-25):** `uptime_ms` already ships in FAULT_URC
+  offset 20, and VER_URC byte 7 is an explicit reserved=0 with an
+  additive-friendly layout — the uptime half is trivial. **A boot counter is
+  not currently possible:** no RTC, no backup registers, and no flash write
+  path exists (the 8 KB CFG region is declared, never written). Scope to
+  uptime-only, or add a flash writer first.
 - [ ] **RS-4.8 Daemon watchdogs** — tx/rx daemons have no supervision; a
   UART wedge or MQTT drop kills the pipeline silently. docker
   `--restart on-failure` + a health topic, or systemd-in-container.
+  **Verified 2026-07-25 — the pattern already exists; adopt it rather than
+  design one.** All four compose services (`mosquitto`, `lora_bridge`,
+  `web_ui`, `audit_tail`) already carry `restart: unless-stopped` in
+  [`docker-compose.yml`](docker-compose.yml). The image tx/rx daemons are the
+  only unsupervised processes because they are **not compose services** — the
+  harness starts them with bare `docker run -d --name tx_smoke/rx_smoke`
+  ([`run_live_radio_monitor.ps1:150`](firmware/x8_lora_bootloader_helper/run_live_radio_monitor.ps1)).
+  Promote them to compose entries with the same restart policy. **Caveat:** a
+  restart policy will also mask the RS-1.2 freeze by bouncing the worker, so
+  land the heartbeat counter first or the freeze becomes harder to catch, not
+  easier — and keep the bench harness on the bare-`docker run` path so
+  evidence runs still fail loudly.
+- [ ] **RS-4.9 CAD-timeout latch wedges all LBT TX — VERIFIED BUG (2026-07-25),
+  fix first** — the LBT timeout path (`sx1276_lbt.c:122-127`) returns ERROR
+  without clearing `s_cad_active`, and `sx1276_cad.c` has no abort API (only
+  a CAD_DONE poll clears the latch), so after ONE CAD timeout every
+  `sx1276_cad_begin()` returns false and every LBT-enabled TX is refused —
+  as indistinguishable ERR_PROTO FORBIDDEN — until reboot. With no watchdog
+  (RS-4.10) the wedge is permanent. Fix: clear the latch on the timeout path
+  or add `sx1276_cad_abort()`; add a SIL vector for timeout-then-begin.
+  **Status 2026-07-25: FIXED in the working tree** — `sx1276_cad_abort()`
+  added (clears latch + IRQ flags + standby, no-op when idle) and the LBT
+  deadline path now calls it. Built + SIL green. The timeout-then-begin SIL
+  vector is still to add (CAD touches SPI, needs the stub pattern).
+- [ ] **RS-4.10 Start the watchdog — none exists (verified 2026-07-25)** —
+  `IWDG_BOOT/RUN_WINDOW_MS` constants (config.h:88-89), CFG key 0x0D, and
+  RESET_CAUSE_IWDG decode all exist, but the IWDG peripheral is never
+  started. Combined with blocking dual-lane URC writes (RS-3.7) and RS-4.9,
+  the firmware has three designed-in permanent-wedge modes and zero
+  recovery. Start IWDG at the run window, kick once per main-loop pass,
+  verify a deliberate wedge reboots with BOOT_URC reset_cause=IWDG.
+- [ ] **RS-4.11 NVIC priorities silently all zero — VERIFIED BUG (2026-07-25)**
+  — `nvic_enable_irq` writes `priority << 4` but Cortex-M0+ implements only
+  bits [7:6] (`stm32l072_regs.h:239-241`), so both priorities in use (1 =
+  host UART, 3 = radio DIO) decode to hardware 0: the intended
+  UART-over-radio ordering has never existed. Fix the shift to `<< 6`; also
+  make NVIC_IPR access word-wide (byte MMIO is out of ARMv6-M contract).
+  Re-baseline UART error counters after — this may quietly improve RX
+  integrity under radio load.
+  **Status 2026-07-25: FIXED in the working tree** — 2-bit priority now
+  lands at IPR[7:6] via a word-access read-modify-write; host UART (1)
+  preempts radio DIO (3) for the first time in this firmware's life. Built +
+  SIL green; counter re-baseline pending flash.
+- [ ] **RS-4.12 Track raw-armed RXCONT in firmware (run-31 root cause, still
+  open)** — `sx1276_tx_begin` keys post-TX re-arm off *tracked* state
+  (`sx1276_tx.c:259`), so RXCONT armed via raw `REG_WRITE(RegOpMode)` parks
+  the modem in STANDBY after TX — deaf. `faed3f02` fixed this host-side only
+  (per-fragment `_ensure_rxcont`); every HostLink client inherits the
+  workaround until the firmware either snoops opmode REG_WRITEs into
+  tracked state or reads back RegOpMode in tx_begin. Closing this deletes a
+  mandatory client-side trap from the RS-9.3 port.
+  **PROMOTED 2026-07-25 (Run C forensics) — this is now the unified fix for
+  BOTH program goals.** Measured at DTS saturation: ~54 ms dead air per
+  fragment (38 % of the cycle) that is host-side `_ensure_rxcont`/turnaround
+  overhead with the radio DEAF in STANDBY, and **0/22 command copies
+  delivered at saturation with send-side TX_DONE-proven** (the host
+  workaround's re-arm lives in the `queue.Empty` idle branch, which never
+  runs at saturation — its "acceptable: retried ×2" assumption only holds
+  below saturation). Firmware auto-re-arm on TX_DONE (+ disarm at next
+  `tx_begin`) turns the dead time into genuine armed listening AND deletes
+  two UART round trips per frame: **estimated ~+35–45 % throughput
+  (~2.2–2.4 KB/s) and restored control-under-load, one firmware change.**
+  Evidence: [`bench-evidence/RS_throughput_rebaseline_2026-07-25/`](bench-evidence/RS_throughput_rebaseline_2026-07-25/) Run C.
+  **SHIPPED + AIR-VERIFIED 2026-07-25 (Run D, firmware 22,580 B):**
+  `sx1276_modes_sync_external()` folds raw opmode writes into tracked state;
+  the existing post-TX re-arm path now fires for raw-armed RXCONT. Measured:
+  command delivery at saturation **0/11 → 2/12** (matches window-alignment
+  physics: ~44 ms armed window / 130 ms cycle, ×2 copies ≈ 23 %/command);
+  `dt_med` 141 → 130.5 ms; goodput 1640 → **1745–1790 B/s (util 74–76 %)**
+  — at/above the pre-control-plane baseline WITH commands landing. The
+  estimate's upper half didn't materialize because the 54 ms dead time was
+  only ~10 ms register dance — the remaining **~44 ms is host-daemon
+  per-frame overhead**, which RS-3.1 batching amortizes. **Follow-up queued:
+  base should TX commands immediately on fragment-RX-complete** (it knows
+  the tractor's window just opened) for near-deterministic delivery — the
+  remaining gap between 23 % and ~100 % command delivery is scheduling, not
+  radio. The RS-9.3 port checklist item "replicate `_ensure_rxcont`" can be
+  downgraded to a no-op read on new firmware.
+- [ ] **RS-4.13 Small-fix batch from the 2026-07-25 analysis** (one bench pass
+  together): (a) QoS airtime unsigned underflow when the budget cap is
+  lowered below booked usage mid-window (`sx1276_airtime.c:211`) — clamp;
+  (b) `sx1276_reg_dump()` reads RegFifo 0x00 and pops a FIFO byte mid-RX/TX
+  (`sx1276.c:497`) — skip 0x00; (c) reset-cause decode checks PINRSTF before
+  PORRSTF (`platform.c:37`) so a true power-on reset reports as pin reset —
+  reorder (feeds RS-5.1's gate); (d) LBT backoff refuses without re-sampling
+  for up to 500 ms (`sx1276_lbt.c:97`, the run-33 mechanism) — re-sample on
+  P0-class requests; (e) repair `tools/check_size_budget.py` (evaluates
+  deleted `MM_BOOT_*` symbols, always exits nonzero) + the stale Makefile
+  size banner.
 
 ### RS-5 — Harness & bench tooling
 
@@ -241,6 +577,11 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   crash-looped both daemons for all of run 28. Add: post-reset VER +
   uptime/boot-count gate on both L072s, and board-side `md5sum` vs local
   compare after push — abort loudly on either mismatch.
+  **2026-07-25:** the gate half-exists — BOOT_URC already carries
+  `reset_cause` + `clock_source_id` after the 500 ms safe-mode boot window,
+  which is exactly the post-reset assert wanted here. Caveat: reset-cause
+  decode mis-orders PINRSTF/PORRSTF (RS-4.13c), so "external reset" vs
+  "power-on" is only trustworthy after that lands.
 - [ ] **RS-5.2 Deploy gpio — tractor gpio163 dead** — L072 reset on the
   tractor works only via the fragile OpenOCD/SWD path (7–10 s, occasionally
   hangs). Root-cause the GPIO (pinmux? blown pad?) or add a hardware NRST
@@ -248,6 +589,12 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 - [ ] **RS-5.3 Dev-loop smoke tier** — `-DurationS 30 -NoArchive` harness
   mode to cut the edit→verdict loop from ~9 min to ~4; keep 120 s+archive
   for evidence runs.
+  **Verified 2026-07-25 — half of this already ships.** `-DurationS` is an
+  existing parameter and **already defaults to 30**
+  ([`run_live_radio_monitor.ps1:14`](firmware/x8_lora_bootloader_helper/run_live_radio_monitor.ps1)),
+  threaded through the monitor loop and the summary record. Only `-NoArchive`
+  is missing, so the remaining work is one switch guarding the archive step —
+  materially smaller than the item implied.
 - [ ] **RS-5.4 Harness robustness from runs 31–33** — rely on `MONITOR
   COMPLETE` in the log (parent PS can hang after the child exits; console
   shared with the publisher); never run host-side adb concurrent with the
@@ -256,6 +603,60 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 - [ ] **RS-5.5 Bidirectional-load test mode** — harness knob that generates
   continuous keyframe-request + profile-flip traffic during a stream, so
   RS-1.2-class bugs surface on demand instead of by accident.
+- [ ] **RS-5.8 Stage 1 quant's camera "restore" steals the L072 UART on the
+  tractor — found 2026-07-25** — `run_stage1_standard_quant_end_to_end.ps1`
+  ends with "Restoring lifetrac-camera.service (post-quant)", which starts a
+  **duplicate** camera stack (`tractor-camera` + `tractor-mosquitto`) beside
+  the pre-existing `-v2` pair. `docker inspect` confirms `tractor-camera` maps
+  **`/dev/ttymxc3`** while `tractor-camera-v2` does not — and it crash-loops
+  (`camera_service.py:1096 _build_frame`), so it opens/closes the port
+  repeatedly. **This made a perfectly good post-flash firmware look dead:**
+  the Method G probe returned `FATAL: timeout waiting for 0x81`, `fuser`
+  showed the port free between crashes, and a raw poke returned 6 garbled
+  bytes. After `systemctl stop lifetrac-camera.service` the identical probe
+  returned VERDICT: PASS. Fix: stop restoring it (the unit is systemd-
+  `disabled` anyway), or gate the restore on the board actually owning a
+  camera, or have it bring up the `-v2` stack rather than a duplicate.
+  Evidence: [`bench-evidence/RS_firmware_patch_flash_2026-07-25/`](bench-evidence/RS_firmware_patch_flash_2026-07-25/).
+- [ ] **RS-5.9 Harness MQTT path is dead now that tractor WiFi is off** —
+  `run_live_radio_monitor.ps1:150` starts `tx_smoke` with
+  `-e LIFETRAC_MQTT_HOST=$HostIp` (192.168.1.79), a LAN hop from tractor to
+  bench PC. Tractor WiFi was disabled 2026-07-25 per MASTER_PLAN §8.13 and the
+  tractor has no ethernet, so **the harness cannot run as written**. Re-point
+  `tx_smoke` at the tractor-local broker (`image_tx_daemon`'s own default is
+  `127.0.0.1`) — which is also the architecturally correct wiring, since the
+  LAN-MQTT hop was itself a workaround for `adb reverse` being broken on this
+  LmP build (ADB_TIPS §3.1). **Blocks RS-2.1 / RS-9.8 throughput runs.**
+  **FIXED + VALIDATED 2026-07-25 (same session):** harness `-TxFeed local`
+  mode — bench mosquitto on the tractor loopback (`bench_mqtt.conf`), synth
+  publisher runs on-board in the `lifetrac-tractor-x8` image, `-TxFeed host`
+  preserved as legacy. Three archived runs end-to-end, zero tractor LAN use.
+  Shaken out en route: paho 1.x/2.x compat shim + `LIFETRAC_SYNTH_PREBUILD`
+  replay mode in `publish_synthetic_frames.py` (the i.MX builds only
+  ~3.3 fps — live-build synth silently de-saturates the measurement), and
+  the base mosquitto's `127.0.0.1:1883` mapping restored (the stale
+  deployed compose had lost it — RS-5.1-class drift, surfaced by
+  rx_smoke's refused connect).
+- [ ] **RS-5.6 Order-dependent SIL test — encode-mode cache** — found
+  2026-07-25 while baselining. `tests/test_x8_encode_mode.py::
+  EncodeCacheInvalidatesOnModeChangeTests::test_mode_flip_forces_full_re_encode`
+  **passes in isolation (11/11) but fails in the full-suite run** — leaked
+  module-level state between test modules, not a product defect. Suite
+  baseline is otherwise **1008 passed / 1 failed / 2 skipped**. Fix the
+  isolation (fixture-scope the encode cache) so the gate is trustworthy:
+  this test guards encode-cache invalidation on mode change, which is exactly
+  the path RS-1.3's encoder confirmation loop depends on, and an
+  order-dependent red masks real breakage there.
+- [ ] **RS-5.7 Test-env bootstrap for the SIL suite** — four modules cannot
+  even collect from a clean checkout: `test_data_saving_measures.py`,
+  `test_ipc_to_h747_roundtrip.py`, `test_link_adaptive_budget.py`,
+  `test_x8_tile_encode_cache.py` fail on `No module named
+  'image_pipeline.fragment'` / `'.tile_cache'`, because
+  `base_station/image_pipeline/` shadows the different
+  `firmware/tractor_x8/image_pipeline/` package of the same name; a fifth
+  needs `LIFETRAC_FLEET_KEY_HEX` set. Add a `conftest.py` path fix (or rename
+  one package) + a documented dev-key default so `pytest tests/` runs green
+  without hand-set environment. Until then ~4 modules are silently unexercised.
 
 ### RS-6 — Keyframe elimination (K-phases, now LoRa-only)
 
@@ -266,6 +667,17 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 > keyframe-elimination doc. Update that doc's §3/§5 accordingly before
 > implementing. Airtime for the uplink is tiny (14 B bitmap ≈ 25 ms at
 > control rates) but must be admitted through the same QoS/slot machinery.
+>
+> **Program direction (2026-07-25):** sustained broadcast throughput
+> tractor→base is the primary objective — the link carries video-like imagery
+> that is relayed over ethernet to the operator laptop and refined there.
+> **Keyframes are explicitly not a requirement of the design.** Treat RS-6 as
+> the intended steady state rather than an optional optimisation, and read
+> RS-6.5 (`KEYFRAME_PERIOD_S` 60→15–20 s) as a stopgap whose value decays as
+> K1 approaches — it buys perceived latency today at the cost of airtime that
+> a keyframeless pipeline would not spend. Where an item's premise is
+> keyframe protection (RS-4.1), re-justify it against this direction before
+> spending bench time (see RS-4.1a).
 
 - [ ] **RS-6.0 Update K-phase design doc for LoRa-only transport** — revise
   [`../AI NOTES/2026-07-25_Keyframe_Elimination_Strategies_Copilot_v1_0.md`](../AI%20NOTES/2026-07-25_Keyframe_Elimination_Strategies_Copilot_v1_0.md)
@@ -276,6 +688,16 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   for every K-phase exit test: `age_since_applied` per grid cell,
   published on `link_stats`. The system currently cannot see tile
   staleness at all.
+  **Scope raised 2026-07-25:** this is no longer only a K-phase exit metric.
+  The delivery chain is tractor →(LoRa)→ base →(ethernet)→ operator laptop,
+  where a further stage post-processes the tile stream into the video-like
+  result. Per-tile age is the input that stage needs to decide what to
+  interpolate, hold, or visually de-emphasise — without it the laptop cannot
+  distinguish "this tile is genuinely static" from "this tile is stale".
+  **Carry `age_since_applied` through the ethernet hop to the laptop, not just
+  into `link_stats` on the base.** That makes RS-6.1 a dependency of the
+  operator-side pipeline as well as of K1/K2, and moves it ahead of most of
+  RS-6 in ordering.
 - [ ] **RS-6.2 Phase K1 — keyframeless steady state** — adaptive Method-C
   sweep (`SWEEP_STEP` scales with spare frame budget) +
   `KEYFRAME_PERIOD_S=∞` + connect-time paced sync (K-G) via a LoRa
@@ -311,11 +733,323 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 - [ ] **RS-7.4 EIRP bookkeeping wired to HW ceiling** — antenna-gain CFG key
   exists; enforce the §15.247(b)(4) 1-for-1 conducted-power reduction for
   >6 dBi antennas in the ceiling clamp before any mast antenna is fitted.
+  **Verified 2026-07-25 — considerably more scaffolding exists than "CFG key"
+  suggests.** `CFG_KEY_ANTENNA_GAIN_DBI` is a live firmware key with default
+  2 dBi, read into `req.antenna_gain_dBi`
+  ([`host_cfg.c:294`](firmware/murata_l072/host/host_cfg.c)); every profile
+  carries both `antenna_gain_dBi` and `hw_ceiling_dBm`; and
+  `host_cfg_profile_validate()` already rejects negative gain and gain above
+  `HOST_CFG_PROFILE_ANTENNA_GAIN_MAX_DBI` (30 dBi) with unit tests for both
+  paths ([`cfg_profile.c:155`](firmware/murata_l072/bench/host_proto/cfg_profile.c)).
+  **Correction (2026-07-25 firmware analysis): the arithmetic already exists —
+  the enforcement is missing.** `host_cfg_profile.c:103` implements exactly
+  the wanted rule (`Pmax = min(tier_ceiling − max(0, gain−6), hw_ceiling)`,
+  floor 2 dBm) but uses it only as a pass/fail headroom check at profile-set;
+  the computed ceiling is **never applied** to TX power, and the gain/ceiling
+  CFG keys accept writes AFTER activation with no re-validation
+  (`host_cfg.c:323`). Fix = wire the clamp output into the TX ceiling +
+  re-run validation on those key writes.
 - [ ] **RS-7.5 Field rendezvous/fallback hardening for profile switching** —
   the two-phase switch + independent revert watchdogs cover the bench; a
   field-grade design should add a fixed rendezvous profile (FHSS) both
   ends fall back to after N minutes of total silence, so no sequence of
   lost commands can strand the link permanently.
+
+### RS-8 — Crypto profile cutover (S5.1b: D13 GCM-64 implicit + D14 split-trust)
+
+> **Context:** this work is *designed, implemented, and bench-validated — but
+> not switched on.* [`lora_proto.py:601`](base_station/lora_proto.py) still pins
+> `CRYPTO_PROFILE_DEFAULT = CRYPTO_GCM128_EXPLICIT` (**28 B/frame**: 12 B
+> explicit nonce + 16 B tag). All three profiles are defined, the
+> `encrypt_frame_gcm64_implicit` / `decrypt_frame_gcm64_implicit` codec exists,
+> the fail-closed class enforcer `enforce_class_tag_boundary()` is wired, and
+> [`bench_loopback_d13_d14.py`](base_station/bench_loopback_d13_d14.py) covers
+> round-trip + MAC-tamper + boot-ctr mismatch + replay. Only the cutover is
+> missing. Rationale and the full ten-scheme ranking:
+> [`../AI NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md`](../AI%20NOTES/2026-05-18_TX_Power_Adaptation_And_Safety_Burst_Design_Copilot_v1_0.md) §19;
+> normative per-class table in [LORA_PROTOCOL.md](LORA_PROTOCOL.md) §traffic-class taxonomy.
+>
+> **Payoff (§19.4/§19.5):** 28 B → 12 B saves 12.80 ms per 16 B ControlFrame
+> (256 ms/s at 20 Hz) and 5.12 ms per image fragment (~650 ms/s) —
+> **~0.9 s/s reclaimed on a saturated link**, described in the source note as
+> "effectively a free doubling of usable channel time." For scale, RS-3.1
+> fragment batching is chasing +20–35 %. Two independent savings are stacked:
+> the implicit nonce (−8 B net) is a **pure wire-format win with zero
+> cryptographic cost** — the same construction DTLS 1.3/QUIC/IPsec use — while
+> tag truncation 16→8 B moves forgery odds from 1-in-3.4×10³⁸ to 1-in-1.8×10¹⁹,
+> both unreachable (§19.6: ~billions of years to expected forgery at 10
+> attempts/s). **64-bit is the responsible floor for control traffic**; 32-bit
+> is defensible only with receiver-side MAC-failure rate limiting + key
+> rotation + authenticated reboot counter.
+>
+> **This section is no longer only an airtime optimisation — it gates RS-9.**
+> The D14 image profile (+6 B vs +28 B) is what makes it affordable for the
+> bridge's P3 lane to carry image traffic under the 25 ms fragment cap, which
+> is the precondition for one process owning the radio and serving **both**
+> image throughput and hydraulic control. Sequence RS-8.1 ahead of RS-9.3.
+
+- [ ] **RS-8.1 Flip `CRYPTO_PROFILE_DEFAULT` to per-class selection** — route
+  P0/P1/P2 → `CRYPTO_GCM64_IMPLICIT` (12 B) and P3 → `CRYPTO_IMAGE_PLAIN_CRC32`
+  (6 B, no MAC) per the LORA_PROTOCOL normative class table, instead of one
+  global default. `enforce_class_tag_boundary()`
+  ([`lora_proto.py:474`](base_station/lora_proto.py)) already fails closed if a
+  P0/P1/P2 frame is ever routed onto the unauthenticated D14 path, so the
+  safety rail for this change is in place ahead of it.
+- [ ] **RS-8.2 Firmware-side GCM-64 implicit codec** — the M7/handheld side is
+  GCM-128-explicit only: [`lora_proto.h:242`](firmware/common/lora_proto/lora_proto.h)
+  hard-codes `LP_NONCE_LEN 12` / `LP_TAG_LEN 16`, with no implicit-nonce path
+  and no boot counter. **Note the header + `lp_crypto_real.cpp` are vendored
+  into three trees** (`firmware/common/lora_proto/`,
+  `firmware/handheld_mkr/src/lora_proto/`, `firmware/tractor_h7/src/lora_proto/`)
+  — land the change in all three or dedupe first. Regenerate
+  [`firmware/bench/crypto_vectors/vectors.json`](firmware/bench/crypto_vectors/vectors.json)
+  and re-run `host_check.c` against `test_crypto_vectors.py`.
+  **Scope clarification (2026-07-25): `murata_l072` needs NO crypto work.**
+  Crypto Profile A is explicit (`config.h:24`): the X8/H7 owns AES-GCM, the
+  L072 transports opaque bytes, `CFG_KEY_CRYPTO_IN_L072` is permanently
+  unwritable, and the LoRa header reserves `schema_ver=2` for a future
+  trailing MIC. D13 lands only in the host-side Python + the three vendored
+  H7/handheld trees above.
+- [ ] **RS-8.3 `boot_ctr` plumbing + nonce-reuse guard — highest-risk item in
+  this section.** The implicit nonce is reconstructed from
+  (`src` ‖ `boot_ctr` ‖ `seq`); a seq reset across reboot **without** a
+  boot-counter bump reuses a (key, nonce) pair, and GCM fails catastrophically
+  there — it leaks the authentication subkey H and enables arbitrary forgery,
+  not just one bad frame. Needs non-volatile boot counters on the M7 and
+  handheld mirroring the base's `NonceStore`
+  ([`lora_bridge.py:214`](base_station/lora_bridge.py)), plus an explicit test
+  that no reboot sequence can repeat a nonce.
+- [ ] **RS-8.4 E-STOP sequence-zero replay bug — SAFETY, independent of the
+  cutover.** Per §19.7 the base builds its E-STOP header with sequence `0`, so
+  after any normal base traffic the tractor can reject the **legitimate**
+  emergency stop as a replay. The 5-copy D4 safety burst makes it worse: all
+  five copies carry the same sequence, so four are guaranteed rejects. Fix =
+  monotonically increasing seq per burst copy. Flagged independently by two
+  prior reviewers. **Land this before or with S5.1b**, not after.
+- [ ] **RS-8.5 Close the 25 ms fragment-cap violation + re-measure** — §19.4
+  computes a 32 B image fragment at **28.22 ms** on air under the shipped
+  profile, against the 25 ms per-fragment cap in
+  [IMAGE_PIPELINE.md](IMAGE_PIPELINE.md) C1 — i.e. **the current crypto profile
+  breaches the cap by itself**, and GCM-128-*implicit* still misses at 25.66 ms.
+  D13 lands at 23.10 ms. Capture post-cutover ToA evidence and update the
+  cap-compliance claim. Sequence this with RS-2.1 so one re-baseline covers both.
+  *(2026-07-25: RS-9.7 raises the P3 cap itself, superseding the 25 ms
+  compliance framing for image fragments — the historical finding that the
+  shipped crypto breached even the old cap stands as recorded; the 25 ms cap
+  remains in force for P2 telemetry.)*
+- [ ] **RS-8.6 Land RS-7.1 under D13, not GCM-128** — AEAD for the 0xFB command
+  frames costs **12 B under D13 vs 28 B** under the shipped profile. Order
+  RS-7.1 after this cutover so the strict-path control plane inherits the cheap
+  envelope instead of being retrofitted twice.
+- [ ] **RS-8.7 Record D13/D14 in [DECISIONS.md](DECISIONS.md)** — both currently
+  exist only in the 2026-05-18 AI note and the LORA_PROTOCOL class table.
+  S5.1b is a deliberate reduction in security parameter and belongs in the
+  decision log, carrying the §19.6 caveat (64-bit floor for control; 32-bit only
+  with rate-limiting + rotation + authenticated reboot counter) and the §19.2
+  split-trust rationale for leaving image traffic unauthenticated.
+- [ ] **RS-8.8 Correct the AES-256 claim in [CYBERSECURITY_CASE.md](CYBERSECURITY_CASE.md)**
+  — §2 trust-zone table and §4.2 threat table both state **AES-256-GCM with a
+  256-bit shared key**, but the implementation enforces a **16-byte** key
+  (AES-128): [`lora_bridge.py:136`](base_station/lora_bridge.py) raises
+  `"fleet key must be 16 bytes"`, matching the module and loader docstrings.
+  AES-128-GCM is entirely adequate at SL-1, so **the fix is the document, not
+  the code** — but that doc is the only written description of the shipped
+  scheme. Refresh the §3 FR-3/FR-4 rows in the same pass once mixed profiles land.
+
+### RS-9 — Single-radio ownership: image throughput **and** hydraulic control
+
+> **Discovered on the bench 2026-07-25.** The program needs both sustained
+> image throughput *and* base→tractor hydraulic control signalling. **Today
+> those two requirements are mutually exclusive**, because one L072 / one
+> `/dev/ttymxc3` is contended by two processes that each implement half the
+> job:
+>
+> | | hydraulic control | image delivery |
+> |---|---|---|
+> | [`lora_bridge.py`](base_station/lora_bridge.py) | **yes in design** — `ControlFrame`, AEAD `pack_command`, nonce store, replay window. *As deployed: NO — transport dead at baud/framing/protocol level, T0-verified; see RS-9.3(c)* | **yes in design, but slow** — the pre-2026-07 path: `FT_TELEMETRY` topic `0x25` → AEAD-decrypt → CRC → `TelemetryReassembler` → `mqtt.publish(topic_name(0x25), …)` (`:345`) |
+> | [`image_rx_daemon.py`](base_station/image_rx_daemon.py) | **none** — no `ControlFrame`, no `pack_command`, no AEAD; only 0xFB *video* opcodes | **yes, fast** — the strict path (1755 B/s DTS), raw `0xFC/0xFD/0xFE` fragment magics straight off the UART |
+>
+> Whichever process holds the UART, hydraulic control is either present or
+> absent — `image_rx_daemon` cannot carry it at all. This is not a
+> configuration choice.
+>
+> **Both image paths publish the same MQTT topic.** `lora_bridge`'s
+> `topic_name(0x25)` and `image_rx_daemon`'s `MQTT_TOPIC_OUT` are both
+> `lifetrac/v25/video/tile_delta`, which [`web_ui.py:896`](base_station/web_ui.py)
+> picks up via `subscribe("lifetrac/v25/video/#")` → `_ingest_tile_delta()` →
+> WebSocket fan-out. The strict path is a **drop-in replacement at the MQTT
+> boundary** — the browser never knew which one fed it. **So RS-9.3 is not
+> "build an image path into the bridge"; the bridge already has one and it is
+> what the website used before 2026-07. RS-9.3 is "make the bridge's existing
+> P3 lane fast enough to retire the bypass" — and `web_ui` needs no change
+> either way.**
+>
+> **The mechanism already exists in the bridge.** `lora_bridge` imports
+> `heapq`, builds a priority TX queue ("All TX goes through a…" — `:260`),
+> classifies with `classify_priority()` (`:587`), and runs a single TX writer
+> popping highest-priority-first (`:613`) — i.e. the **strict-priority drain
+> P0→P1→P2→P3** that [LORA_PROTOCOL.md](LORA_PROTOCOL.md) specifies and that
+> [MASTER_PLAN.md](MASTER_PLAN.md) §2 describes (`lora_bridge` = the
+> LoRa↔MQTT gateway; everything else rides the internal MQTT bus).
+> **The strict path is the deviation**, not the bridge.
+>
+> **Why it deviated — and note there are TWO overheads, not one.** Per image
+> fragment the bridge path pays:
+>
+> 1. **AES-GCM-128-explicit — +28 B.** Per §19.4 this alone puts a 32 B
+>    fragment at **28.22 ms, over the 25 ms per-fragment cap**.
+> 2. **The `TelemetryFrame` envelope — +9 B** (5 B header + 2 B topic/length
+>    tag + 2 B CRC), documented at
+>    [`lora_proto.py:998`](base_station/lora_proto.py) where
+>    `max_telemetry_fragment_payload()` adds it as a constant.
+>
+> **≈ +37 B/fragment** versus roughly +6–9 B for the strict path's raw
+> fragment magics. RS-8 / D14 repairs **only the first** (image fragments →
+> plaintext + 4 B seq + 2 B CRC32 = +6 B, 23.10 ms, under the cap, while
+> P0/P1/P2 keep GCM-64 authentication). **So RS-8 is a prerequisite of RS-9
+> but not sufficient on its own** — RS-9.3 must also decide whether P3 keeps
+> riding the `FT_TELEMETRY` envelope or gets a leaner frame type. Budget both
+> before predicting converged throughput.
+
+- [ ] **RS-9.1 Tractor silently discards ControlFrames — SAFETY, fix first.**
+  While `image_tx_daemon` owns the tractor L072, every received frame goes to
+  `_dispatch_command()`, which calls `parse_command_frame()` and returns `None`
+  for anything lacking the 0xFB magic — including a base `ControlFrame`. The
+  handler then does a bare `return`
+  ([`image_tx_daemon.py:474`](firmware/tractor_x8/image_tx_daemon.py)), so the
+  frame is dropped with **no log line, no counter, no fault**. Combined with
+  the base-side contention above, hydraulic control fails at *both* ends in
+  strict-path mode, and the tractor end fails **silently**. Minimum fix
+  (cheap, independent of any convergence work): count and log unrecognised
+  RX frames by leading magic, and raise a fault if `ControlFrame`-shaped
+  traffic arrives on a path that cannot deliver it. Nothing can actuate today
+  (no OPTA RS-485 fitted), which is exactly why this must be closed **before**
+  one is — a silent drop discovered in the field is the bad version of this bug.
+- [ ] **RS-9.2 Decide and record the radio-ownership model** — the design
+  intent (single owner, priority-drained, peers on MQTT IPC) is stated in
+  MASTER_PLAN §2 and LORA_PROTOCOL's strict-priority-drain section, but the
+  bench runs a second UART owner and no document acknowledges the split.
+  Record the decision in [DECISIONS.md](DECISIONS.md) with the three
+  candidates: **(a)** bridge owns radio, image pipeline submits/receives P3
+  over MQTT (recommended — matches §2, restores P0 preemption);
+  **(b)** image daemon owns radio and grows a control path (rejected on sight:
+  duplicates AEAD/nonce/replay into a process that has none — see RS-7.1);
+  **(c)** two-radio split, documented but explicitly not adopted for v25
+  (MASTER_PLAN §8.17.1) — the fallback only if (a) cannot match strict-path
+  throughput.
+- [ ] **RS-9.3 Retire the UART bypass: make the bridge's existing P3 lane fast
+  enough** — *not* new-path work. The bridge already reassembles topic `0x25`
+  and publishes `lifetrac/v25/video/tile_delta`; that is what the website used
+  before 2026-07, and `web_ui` consumes the same topic from either producer, so
+  **no web-side change is required**. Three sub-decisions: (a) land RS-8.1 + D14
+  so P3 costs +6 B rather than +28 B; (b) decide whether P3 keeps the
+  `FT_TELEMETRY` envelope (+9 B) or gets a leaner frame type — the strict
+  path's raw `0xFC/0xFD/0xFE` magics skip it entirely; (c) **replace the
+  bridge's serial layer — found 2026-07-25: the bridge speaks KISS framing**
+  (docstring [`lora_bridge.py:9`](base_station/lora_bridge.py), `kiss_encode`
+  at `:649`; the compose comment "Bridge needs the SX1276 USB-CDC" is the
+  fossil) from the USB-dongle era, while the current L072 firmware speaks the
+  Method G HostLink COBS protocol (`TX_FRAME_REQ`/`RX_FRAME_URC`/CFG).
+  **T0 VERIFIED 2026-07-25 — and worse than framing: THREE stacked
+  incompatibilities, each independently fatal.** A/B + quiet-window counter
+  experiment on the base L072 (evidence:
+  [`bench-evidence/T0_bridge_transport_2026-07-25/`](bench-evidence/T0_bridge_transport_2026-07-25/)):
+  (1) **baud** — the deployed bridge opens `serial.Serial(port, 115200)`
+  against the L072's 921600 host UART; (2) **framing** — KISS vs COBS;
+  (3) **protocol** — transparent-dongle assumption vs the Method G command
+  set. Measured: bridge running → the L072 ingests ~500 B/s of framing
+  garbage (+6,531 B / +5,258 line errors in one 15 s window; **2.09 M bytes /
+  1.77 M line errors accumulated**, `HOST_PARSE_OK` frozen at 366 — all 366
+  from prior harness HostLink probes, proving the firmware parses fine when
+  spoken to correctly); bridge stopped → 20 s quiet window shows **+0
+  errors**. The bridge decoded **zero** frames in 68 min of runtime.
+  **Conclusion: as deployed the bridge provides no control path at all — it
+  only pollutes the control UART — so "bridge running = hydraulic control
+  maintained" was false; there is currently NO base→tractor hydraulic control
+  path on this bench by any process.** Bridge container stopped 2026-07-25
+  (`sudo -n docker start design-controller-lora_bridge-1` restores).
+  Side-finding for RS-4: the L072 absorbed ~2 M garbage bytes with zero
+  parse corruption, zero queue-full, and a responsive AT shell — the W1-7
+  IDLE-recovery design holding under sustained abuse. Fix: port the bridge
+  onto `HostLink` @ 921600 — the same transport the daemons use, so the
+  profile/CFG machinery arrives with it. Then move
+  `image_rx_daemon`'s reassembler/profile/stats logic behind the bridge's
+  priority queue so P0 hydraulic frames preempt image fragments, and delete the
+  second UART owner.
+  **Port contract now documented (2026-07-25):** full wire spec + ten client
+  rules (no-ACK error model, three no-reply requests, VER-matched-by-type,
+  CFG replay after every reset — nothing persists — etc.) in
+  [`../AI NOTES/2026-07-25_Method_G_Firmware_Analysis_Claude_v1_0.md`](../AI%20NOTES/2026-07-25_Method_G_Firmware_Analysis_Claude_v1_0.md) §2.
+  Until RS-4.12 lands, the ported bridge MUST replicate the per-fragment
+  `_ensure_rxcont` workaround or it re-inherits the run-31 deafness bug.
+- [ ] **RS-9.4 Converge tractor image TX symmetrically** — same change on the
+  tractor: one process owns `/dev/ttymxc3`, drains by priority, and routes
+  non-image frames to their handlers instead of dropping them (closes RS-9.1
+  structurally rather than by instrumentation).
+- [ ] **RS-9.5 Interlock until convergence lands** — today nothing prevents
+  starting `lora_bridge` and `rx_smoke` against the same device; the loser
+  fails at `open()` with a bare errno, or worse the harness runs believing
+  control is live when it is not. Add a mutual-exclusion guard (advisory lock
+  on the device, or a compose/harness pre-flight) that **fails loudly and names
+  the conflict**. Related: RS-4.8 — note that `design-controller-image_rx-1`
+  exists as an *orphan* container on the base, so `image_rx` was a compose
+  service at some point; promoting the daemons back into compose is restoring
+  a prior arrangement, not new design.
+- [ ] **RS-9.6 Measure the converged path against the strict-path baseline** —
+  exit criterion for RS-9.3/9.4: sustained goodput at profile 2 within a few
+  percent of the 1755 B/s strict-path number, with P0 latency under
+  bidirectional load bounded by the RS-9.7 worst-case predictions
+  (~150 ms DTS / ~230 ms FHSS — the 25 ms cap is superseded). **Do not
+  assume the loopback MQTT hop is the cost** — the FHSS slot-clock and DTS
+  profile machinery live in the image daemons, so some of the strict path's
+  advantage may not be crypto-related. If the gap is real and irreducible,
+  escalate to RS-9.2 candidate (c).
+- [ ] **RS-9.7 Raise the P3 fragment air cap — PINNED 2026-07-25 (operator
+  decision): the P0 response budget is ≤500 ms.** The machine operates at very
+  low ground speed; §8.15's E-stop <500 ms p99 becomes the *single* hard
+  latency gate (it was already the safety-case pin — this stops over-delivering
+  on P3's account, it does not loosen the case). With that budget the 25 ms
+  telemetry cap is obsolete for P3, and the useful maximum is pinned by
+  physics, not latency:
+  - **DTS BW500:** the 255 B frame ceiling (`TX_FRAME_BODY_MAX` 247 + hop
+    header) caps a fragment at ≈89 ms ToA (≈7.7 ms preamble/header +
+    0.32 ms/B, per §19.4's measured points). Raising the cap past ~90 ms buys
+    nothing.
+  - **FHSS BW250:** 200 ms slot − 12 ms head-start − 15 ms guard ≈ 173 ms —
+    the existing `IMAGE_FRAG_AIR_CAP_MS = 170` is already at the ceiling
+    (≈241 B frame at 0.64 ms/B). Do **not** raise past the slot; `SLOT_MS`
+    is FCC-load-bearing (RS-3.2).
+  Worst-case P0 arithmetic at max caps: DTS ≈ 89 ms in-flight + ~17 ms own TX
+  + turnaround ≈ **~110–150 ms**; FHSS ≈ 170 + slot wait + 33 ≈ **~230 ms**
+  (~430 ms with one lost slot) — all inside 500 ms with margin for the LAN
+  and Modbus legs of joystick→valve. Concretely: P3 through the bridge rides
+  `IMAGE_FRAG_AIR_CAP_MS` fill-the-frame semantics (automatic if RS-9.3(b)
+  chooses raw-magic pass-through); `TELEMETRY_FRAGMENT_MAX_AIRTIME_MS = 25.0`
+  stays for P2. Costs to budget: per-fragment loss probability scales with
+  ToA (an 89 ms frame has ~3.5× the exposure of a 25 ms one), so RS-4.2's
+  PHY-derived reassembler timeout graduates from nice-to-have to **required**,
+  and the coarser loss granularity is absorbed by repair (RS-4.1a, RS-6).
+  This also kills the adaptive-cap design sketch — a static max-fill policy
+  per profile suffices. Record the 500 ms pin in [DECISIONS.md](DECISIONS.md)
+  alongside the RS-9.2 ownership entry.
+  **Operator update (2026-07-25, later same day): the P0 budget may rise to
+  ≤700 ms if needed** — pinned to permit the RS-2.3 firmware TX ring at
+  depth 4. Resulting math: DTS worst case ~390 ms (inside even the old
+  500 ms); FHSS max-fill with host in-flight ≤3 ≈ ~560 ms (needs the 700 ms
+  budget), in-flight ≤2 ≈ ~400 ms (holds the old 500 ms). **Open tension to
+  record in DECISIONS.md:** §8.15 pins E-stop <500 ms p99 as the *field
+  acceptance gate* — either keep FHSS in-flight ≤2 when field-gating, or
+  formally revise §8.15 to 700 ms; don't leave the two numbers disagreeing
+  silently.
+- [ ] **RS-9.8 Verification soak at max caps** (replaces the cap-sweep
+  experiment — RS-9.7 decides the cap, so the bench work shrinks from "find
+  the cap" to "verify the model"): P3 saturation + continuous P0 control-lease
+  traffic at max fragment size, both profiles, ≥30 min — fold into the RS-1.2
+  bidirectional soak, same run. Pass: E-stop first-copy p99 <500 ms (§8.15),
+  control-lease refresh never starves, measured P0 queue delay matches the
+  ~150/~230 ms predictions, per-class PER within the LORA_PROTOCOL loss
+  policy. Fail → shrink the cap stepwise (90→60→45 ms at DTS) before
+  considering RS-9.2 candidate (c).
 
 ---
 

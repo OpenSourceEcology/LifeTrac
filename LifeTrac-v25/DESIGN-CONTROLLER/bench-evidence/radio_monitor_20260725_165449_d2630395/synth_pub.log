@@ -1,0 +1,16 @@
+﻿Starting synthetic camera publisher (broker=127.0.0.1, fps=20.0, duration=130.0s, budget=250B)...
+
+Traceback (most recent call last):
+
+  File "/work/publish_synthetic_frames.py", line 59, in <module>
+
+    main()
+
+  File "/work/publish_synthetic_frames.py", line 24, in main
+
+    client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2, client_id="synthetic_camera_host")
+
+                                              ^^^^^^^^^^^^^^^^^^^^^^^
+
+AttributeError: module 'paho.mqtt.client' has no attribute 'CallbackAPIVersion'
+

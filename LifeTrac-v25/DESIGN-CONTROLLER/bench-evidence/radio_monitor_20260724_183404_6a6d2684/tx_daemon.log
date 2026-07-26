@@ -1,0 +1,808 @@
+﻿2026-07-24 23:32:25,926 INFO image_tx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-07-24 23:32:25,929 INFO image_tx_daemon: image_tx_daemon started; mqtt=192.168.1.79:1883 uart=/dev/ttymxc3
+
+2026-07-24 23:32:25,939 INFO image_tx_daemon: MQTT connected; subscribing to lifetrac/v25/cmd/image_frame
+
+2026-07-24 23:32:25,943 INFO image_tx_daemon: LIFETRAC_SKIP_RESET_REQ=1 ΓÇö relying on external NRST; draining boot chatter only
+
+INFO: post-VER drain queued type=0xF1 seq=0
+
+INFO: post-VER drain queued type=0xC1 seq=0
+
+INFO: post-VER drain queued type=0xF1 seq=0
+
+INFO: post-VER drain queued type=0xC1 seq=0
+
+Initializing regulatory profile 1 on co-processor...
+
+  FHSS mask: WIDE (50 channels) [LIFETRAC_FHSS_WIDE_MASK=1]
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+CFG_SET_REQ(REG_PROFILE=1) OK: 14000100
+
+PHY contract OK: image_bw250 == {'sf': 7, 'bw_khz': 250, 'cr_den': 5, 'preamble': 8}
+
+2026-07-24 23:32:26,730 INFO image_tx_daemon: LBT_ENABLE=0 (matches W1-10b TX_BURST rationale)
+
+2026-07-24 23:32:26,731 INFO image_tx_daemon: TX worker ready (inter_cycle_s=0.050, max 8 frags/dwell)
+
+2026-07-24 23:32:26,929 INFO image_tx_daemon: stats: goodput=0.0 B/s util=0% pipeline=v2 frames_in=0 ok=0 fail=0 drop_full=0 drop_stale=0 frags_ok=0 frags_fail=0 qdepth=0
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=0 channel_idx=3 epoch=0 freq_hz=904250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:30,748 WARNING image_tx_daemon: TX_DONE non-OK: seq=1 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=1 channel_idx=19 epoch=0 freq_hz=912250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:31,098 WARNING image_tx_daemon: TX_DONE non-OK: seq=1 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:31,099 WARNING image_tx_daemon: frame seq=1 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=2 channel_idx=31 epoch=0 freq_hz=918250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:32,098 WARNING image_tx_daemon: TX_DONE non-OK: seq=4 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=3 channel_idx=14 epoch=0 freq_hz=909750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:32,448 WARNING image_tx_daemon: TX_DONE non-OK: seq=4 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:32,449 WARNING image_tx_daemon: frame seq=4 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=4 channel_idx=22 epoch=0 freq_hz=913750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:33,447 WARNING image_tx_daemon: TX_DONE non-OK: seq=12 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=5 channel_idx=46 epoch=0 freq_hz=925750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:33,797 WARNING image_tx_daemon: TX_DONE non-OK: seq=12 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:33,798 WARNING image_tx_daemon: frame seq=12 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=6 channel_idx=10 epoch=0 freq_hz=907750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:34,797 WARNING image_tx_daemon: TX_DONE non-OK: seq=20 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=7 channel_idx=0 epoch=0 freq_hz=902750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:35,149 WARNING image_tx_daemon: TX_DONE non-OK: seq=20 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:35,150 WARNING image_tx_daemon: frame seq=20 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=8 channel_idx=36 epoch=0 freq_hz=920750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:36,146 WARNING image_tx_daemon: TX_DONE non-OK: seq=28 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=9 channel_idx=40 epoch=0 freq_hz=922750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:36,502 WARNING image_tx_daemon: TX_DONE non-OK: seq=28 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:36,502 WARNING image_tx_daemon: frame seq=28 ABORTED at fragment 0/2
+
+2026-07-24 23:32:36,940 INFO image_tx_daemon: stats: goodput=0.0 B/s util=17% pipeline=v2 frames_in=38 ok=0 fail=5 drop_full=29 drop_stale=0 frags_ok=0 frags_fail=5 qdepth=3
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=10 channel_idx=37 epoch=0 freq_hz=921250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:37,496 WARNING image_tx_daemon: TX_DONE non-OK: seq=35 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=11 channel_idx=20 epoch=0 freq_hz=912750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:37,852 WARNING image_tx_daemon: TX_DONE non-OK: seq=35 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:37,852 WARNING image_tx_daemon: frame seq=35 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=12 channel_idx=32 epoch=0 freq_hz=918750000 pkt_toa_us=117888 legal_dwell_used_us_10s=117888
+
+2026-07-24 23:32:38,783 WARNING image_tx_daemon: TX_DONE non-OK: seq=43 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=117888
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=13 channel_idx=44 epoch=0 freq_hz=924750000 pkt_toa_us=117888 legal_dwell_used_us_10s=117888
+
+2026-07-24 23:32:39,139 WARNING image_tx_daemon: TX_DONE non-OK: seq=43 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=117888
+
+2026-07-24 23:32:39,140 WARNING image_tx_daemon: frame seq=43 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=14 channel_idx=16 epoch=0 freq_hz=910750000 pkt_toa_us=115328 legal_dwell_used_us_10s=115328
+
+2026-07-24 23:32:39,429 WARNING image_tx_daemon: TX_DONE non-OK: seq=52 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=15 channel_idx=7 epoch=0 freq_hz=906250000 pkt_toa_us=115328 legal_dwell_used_us_10s=115328
+
+2026-07-24 23:32:40,071 WARNING image_tx_daemon: TX_DONE non-OK: seq=52 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+2026-07-24 23:32:40,071 WARNING image_tx_daemon: frame seq=52 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=16 channel_idx=4 epoch=0 freq_hz=904750000 pkt_toa_us=115328 legal_dwell_used_us_10s=115328
+
+2026-07-24 23:32:40,430 WARNING image_tx_daemon: TX_DONE non-OK: seq=57 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=17 channel_idx=8 epoch=0 freq_hz=906750000 pkt_toa_us=115328 legal_dwell_used_us_10s=115328
+
+2026-07-24 23:32:40,718 WARNING image_tx_daemon: TX_DONE non-OK: seq=57 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+2026-07-24 23:32:40,718 WARNING image_tx_daemon: frame seq=57 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=18 channel_idx=47 epoch=0 freq_hz=926250000 pkt_toa_us=107648 legal_dwell_used_us_10s=107648
+
+2026-07-24 23:32:41,349 WARNING image_tx_daemon: TX_DONE non-OK: seq=61 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=107648
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=19 channel_idx=34 epoch=0 freq_hz=919750000 pkt_toa_us=107648 legal_dwell_used_us_10s=107648
+
+2026-07-24 23:32:41,707 WARNING image_tx_daemon: TX_DONE non-OK: seq=61 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=107648
+
+2026-07-24 23:32:41,707 WARNING image_tx_daemon: frame seq=61 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=20 channel_idx=24 epoch=0 freq_hz=914750000 pkt_toa_us=112768 legal_dwell_used_us_10s=112768
+
+2026-07-24 23:32:42,005 WARNING image_tx_daemon: TX_DONE non-OK: seq=64 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=112768
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=21 channel_idx=17 epoch=0 freq_hz=911250000 pkt_toa_us=112768 legal_dwell_used_us_10s=112768
+
+2026-07-24 23:32:42,636 WARNING image_tx_daemon: TX_DONE non-OK: seq=64 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=112768
+
+2026-07-24 23:32:42,637 WARNING image_tx_daemon: frame seq=64 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=22 channel_idx=41 epoch=0 freq_hz=923250000 pkt_toa_us=140928 legal_dwell_used_us_10s=140928
+
+2026-07-24 23:32:43,025 WARNING image_tx_daemon: TX_DONE non-OK: seq=73 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=140928
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=23 channel_idx=43 epoch=0 freq_hz=924250000 pkt_toa_us=140928 legal_dwell_used_us_10s=140928
+
+2026-07-24 23:32:43,954 WARNING image_tx_daemon: TX_DONE non-OK: seq=73 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=140928
+
+2026-07-24 23:32:43,955 WARNING image_tx_daemon: frame seq=73 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=24 channel_idx=49 epoch=0 freq_hz=927250000 pkt_toa_us=158848 legal_dwell_used_us_10s=158848
+
+2026-07-24 23:32:44,365 WARNING image_tx_daemon: TX_DONE non-OK: seq=80 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=158848
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=25 channel_idx=23 epoch=0 freq_hz=914250000 pkt_toa_us=158848 legal_dwell_used_us_10s=158848
+
+2026-07-24 23:32:45,294 WARNING image_tx_daemon: TX_DONE non-OK: seq=80 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=158848
+
+2026-07-24 23:32:45,294 WARNING image_tx_daemon: frame seq=80 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=26 channel_idx=18 epoch=0 freq_hz=911750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:45,715 WARNING image_tx_daemon: TX_DONE non-OK: seq=85 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=27 channel_idx=9 epoch=0 freq_hz=907250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:46,643 WARNING image_tx_daemon: TX_DONE non-OK: seq=85 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:46,644 WARNING image_tx_daemon: frame seq=85 ABORTED at fragment 0/2
+
+2026-07-24 23:32:46,951 INFO image_tx_daemon: stats: goodput=0.0 B/s util=24% pipeline=v2 frames_in=101 ok=0 fail=14 drop_full=82 drop_stale=0 frags_ok=0 frags_fail=14 qdepth=4
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=28 channel_idx=27 epoch=0 freq_hz=916250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:47,065 WARNING image_tx_daemon: TX_DONE non-OK: seq=96 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=29 channel_idx=12 epoch=0 freq_hz=908750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:47,993 WARNING image_tx_daemon: TX_DONE non-OK: seq=96 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:47,993 WARNING image_tx_daemon: frame seq=96 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=30 channel_idx=35 epoch=0 freq_hz=920250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:48,415 WARNING image_tx_daemon: TX_DONE non-OK: seq=103 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=31 channel_idx=5 epoch=0 freq_hz=905250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:49,343 WARNING image_tx_daemon: TX_DONE non-OK: seq=103 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:49,343 WARNING image_tx_daemon: frame seq=103 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=32 channel_idx=45 epoch=0 freq_hz=925250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:49,764 WARNING image_tx_daemon: TX_DONE non-OK: seq=106 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=33 channel_idx=25 epoch=0 freq_hz=915250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:50,692 WARNING image_tx_daemon: TX_DONE non-OK: seq=106 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:50,693 WARNING image_tx_daemon: frame seq=106 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=34 channel_idx=1 epoch=0 freq_hz=903250000 pkt_toa_us=151168 legal_dwell_used_us_10s=151168
+
+2026-07-24 23:32:51,094 WARNING image_tx_daemon: TX_DONE non-OK: seq=117 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=151168
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=35 channel_idx=30 epoch=0 freq_hz=917750000 pkt_toa_us=151168 legal_dwell_used_us_10s=151168
+
+2026-07-24 23:32:52,021 WARNING image_tx_daemon: TX_DONE non-OK: seq=117 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=151168
+
+2026-07-24 23:32:52,021 WARNING image_tx_daemon: frame seq=117 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=36 channel_idx=21 epoch=0 freq_hz=913250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:52,444 WARNING image_tx_daemon: TX_DONE non-OK: seq=125 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=37 channel_idx=26 epoch=0 freq_hz=915750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:53,371 WARNING image_tx_daemon: TX_DONE non-OK: seq=125 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:53,371 WARNING image_tx_daemon: frame seq=125 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=38 channel_idx=29 epoch=0 freq_hz=917250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:53,793 WARNING image_tx_daemon: TX_DONE non-OK: seq=126 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=39 channel_idx=28 epoch=0 freq_hz=916750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:54,720 WARNING image_tx_daemon: TX_DONE non-OK: seq=126 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:54,720 WARNING image_tx_daemon: frame seq=126 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=40 channel_idx=38 epoch=0 freq_hz=921750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:55,142 WARNING image_tx_daemon: TX_DONE non-OK: seq=127 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=41 channel_idx=6 epoch=0 freq_hz=905750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:56,069 WARNING image_tx_daemon: TX_DONE non-OK: seq=127 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:56,070 WARNING image_tx_daemon: frame seq=127 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=42 channel_idx=13 epoch=0 freq_hz=909250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:56,495 WARNING image_tx_daemon: TX_DONE non-OK: seq=128 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:56,962 INFO image_tx_daemon: stats: goodput=0.0 B/s util=25% pipeline=v2 frames_in=162 ok=0 fail=21 drop_full=136 drop_stale=0 frags_ok=0 frags_fail=21 qdepth=4
+
+FAULT_URC during TX wait: code=0x0D sub=0x20 raw=0d200000000000000000000000000000000000008e790000
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=43 channel_idx=33 epoch=0 freq_hz=919250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:57,420 WARNING image_tx_daemon: TX_DONE non-OK: seq=128 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:57,420 WARNING image_tx_daemon: frame seq=128 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=44 channel_idx=48 epoch=0 freq_hz=926750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:57,844 WARNING image_tx_daemon: TX_DONE non-OK: seq=159 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=45 channel_idx=2 epoch=0 freq_hz=903750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:32:58,769 WARNING image_tx_daemon: TX_DONE non-OK: seq=159 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:32:58,770 WARNING image_tx_daemon: frame seq=159 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=46 channel_idx=11 epoch=0 freq_hz=908250000 pkt_toa_us=105088 legal_dwell_used_us_10s=105088
+
+2026-07-24 23:32:59,121 WARNING image_tx_daemon: TX_DONE non-OK: seq=169 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=105088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=47 channel_idx=15 epoch=0 freq_hz=910250000 pkt_toa_us=105088 legal_dwell_used_us_10s=105088
+
+2026-07-24 23:32:59,399 WARNING image_tx_daemon: TX_DONE non-OK: seq=169 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=105088
+
+2026-07-24 23:32:59,400 WARNING image_tx_daemon: frame seq=169 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=48 channel_idx=42 epoch=0 freq_hz=923750000 pkt_toa_us=105088 legal_dwell_used_us_10s=105088
+
+2026-07-24 23:33:00,047 WARNING image_tx_daemon: TX_DONE non-OK: seq=173 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=105088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=49 channel_idx=39 epoch=0 freq_hz=922250000 pkt_toa_us=105088 legal_dwell_used_us_10s=105088
+
+2026-07-24 23:33:00,399 WARNING image_tx_daemon: TX_DONE non-OK: seq=173 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=105088
+
+2026-07-24 23:33:00,399 WARNING image_tx_daemon: frame seq=173 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=0 channel_idx=27 epoch=1 freq_hz=916250000 pkt_toa_us=115328 legal_dwell_used_us_10s=115328
+
+2026-07-24 23:33:00,688 WARNING image_tx_daemon: TX_DONE non-OK: seq=179 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=1 channel_idx=14 epoch=1 freq_hz=909750000 pkt_toa_us=115328 legal_dwell_used_us_10s=115328
+
+2026-07-24 23:33:01,335 WARNING image_tx_daemon: TX_DONE non-OK: seq=179 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+2026-07-24 23:33:01,336 WARNING image_tx_daemon: frame seq=179 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=2 channel_idx=30 epoch=1 freq_hz=917750000 pkt_toa_us=117888 legal_dwell_used_us_10s=269056
+
+2026-07-24 23:33:01,687 WARNING image_tx_daemon: TX_DONE non-OK: seq=184 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=117888
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=3 channel_idx=11 epoch=1 freq_hz=908250000 pkt_toa_us=117888 legal_dwell_used_us_10s=222976
+
+2026-07-24 23:33:01,979 WARNING image_tx_daemon: TX_DONE non-OK: seq=184 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=117888
+
+2026-07-24 23:33:01,979 WARNING image_tx_daemon: frame seq=184 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=4 channel_idx=39 epoch=1 freq_hz=922250000 pkt_toa_us=115328 legal_dwell_used_us_10s=220416
+
+2026-07-24 23:33:02,622 WARNING image_tx_daemon: TX_DONE non-OK: seq=189 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=5 channel_idx=10 epoch=1 freq_hz=907750000 pkt_toa_us=115328 legal_dwell_used_us_10s=115328
+
+2026-07-24 23:33:02,975 WARNING image_tx_daemon: TX_DONE non-OK: seq=189 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+2026-07-24 23:33:02,975 WARNING image_tx_daemon: frame seq=189 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=6 channel_idx=19 epoch=1 freq_hz=912250000 pkt_toa_us=135808 legal_dwell_used_us_10s=135808
+
+2026-07-24 23:33:03,290 WARNING image_tx_daemon: TX_DONE non-OK: seq=195 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=135808
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=7 channel_idx=29 epoch=1 freq_hz=917250000 pkt_toa_us=135808 legal_dwell_used_us_10s=135808
+
+2026-07-24 23:33:04,283 WARNING image_tx_daemon: TX_DONE non-OK: seq=195 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=135808
+
+2026-07-24 23:33:04,284 WARNING image_tx_daemon: frame seq=195 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=8 channel_idx=20 epoch=1 freq_hz=912750000 pkt_toa_us=163968 legal_dwell_used_us_10s=163968
+
+2026-07-24 23:33:04,630 WARNING image_tx_daemon: TX_DONE non-OK: seq=202 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=163968
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=9 channel_idx=49 epoch=1 freq_hz=927250000 pkt_toa_us=163968 legal_dwell_used_us_10s=163968
+
+2026-07-24 23:33:05,623 WARNING image_tx_daemon: TX_DONE non-OK: seq=202 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=163968
+
+2026-07-24 23:33:05,624 WARNING image_tx_daemon: frame seq=202 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=10 channel_idx=45 epoch=1 freq_hz=925250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:05,980 WARNING image_tx_daemon: TX_DONE non-OK: seq=210 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:06,974 INFO image_tx_daemon: stats: goodput=0.0 B/s util=24% pipeline=v2 frames_in=222 ok=0 fail=30 drop_full=187 drop_stale=0 frags_ok=0 frags_fail=30 qdepth=4
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=11 channel_idx=6 epoch=1 freq_hz=905750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:06,976 WARNING image_tx_daemon: TX_DONE non-OK: seq=210 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:06,976 WARNING image_tx_daemon: frame seq=210 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=12 channel_idx=43 epoch=1 freq_hz=924250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:07,333 WARNING image_tx_daemon: TX_DONE non-OK: seq=219 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=13 channel_idx=16 epoch=1 freq_hz=910750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:08,325 WARNING image_tx_daemon: TX_DONE non-OK: seq=219 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:08,326 WARNING image_tx_daemon: frame seq=219 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=14 channel_idx=1 epoch=1 freq_hz=903250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:08,683 WARNING image_tx_daemon: TX_DONE non-OK: seq=227 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=15 channel_idx=4 epoch=1 freq_hz=904750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:09,675 WARNING image_tx_daemon: TX_DONE non-OK: seq=227 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:09,675 WARNING image_tx_daemon: frame seq=227 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=16 channel_idx=32 epoch=1 freq_hz=918750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:10,032 WARNING image_tx_daemon: TX_DONE non-OK: seq=235 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=17 channel_idx=5 epoch=1 freq_hz=905250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:11,025 WARNING image_tx_daemon: TX_DONE non-OK: seq=235 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:11,025 WARNING image_tx_daemon: frame seq=235 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=18 channel_idx=25 epoch=1 freq_hz=915250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:11,382 WARNING image_tx_daemon: TX_DONE non-OK: seq=243 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=19 channel_idx=48 epoch=1 freq_hz=926750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:12,374 WARNING image_tx_daemon: TX_DONE non-OK: seq=243 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:12,375 WARNING image_tx_daemon: frame seq=243 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=20 channel_idx=8 epoch=1 freq_hz=906750000 pkt_toa_us=148608 legal_dwell_used_us_10s=148608
+
+2026-07-24 23:33:12,712 WARNING image_tx_daemon: TX_DONE non-OK: seq=251 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=148608
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=21 channel_idx=42 epoch=1 freq_hz=923750000 pkt_toa_us=148608 legal_dwell_used_us_10s=148608
+
+2026-07-24 23:33:13,703 WARNING image_tx_daemon: TX_DONE non-OK: seq=251 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=148608
+
+2026-07-24 23:33:13,704 WARNING image_tx_daemon: frame seq=251 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=22 channel_idx=33 epoch=1 freq_hz=919250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:14,061 WARNING image_tx_daemon: TX_DONE non-OK: seq=3 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=23 channel_idx=36 epoch=1 freq_hz=920750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:15,052 WARNING image_tx_daemon: TX_DONE non-OK: seq=3 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:15,053 WARNING image_tx_daemon: frame seq=3 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=24 channel_idx=28 epoch=1 freq_hz=916750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:15,411 WARNING image_tx_daemon: TX_DONE non-OK: seq=11 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=25 channel_idx=2 epoch=1 freq_hz=903750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:16,402 WARNING image_tx_daemon: TX_DONE non-OK: seq=11 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:16,403 WARNING image_tx_daemon: frame seq=11 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=26 channel_idx=17 epoch=1 freq_hz=911250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:16,760 WARNING image_tx_daemon: TX_DONE non-OK: seq=19 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:16,985 INFO image_tx_daemon: stats: goodput=0.0 B/s util=27% pipeline=v2 frames_in=282 ok=0 fail=38 drop_full=239 drop_stale=0 frags_ok=0 frags_fail=38 qdepth=4
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=27 channel_idx=22 epoch=1 freq_hz=913750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:17,752 WARNING image_tx_daemon: TX_DONE non-OK: seq=19 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:17,752 WARNING image_tx_daemon: frame seq=19 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=28 channel_idx=23 epoch=1 freq_hz=914250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:18,112 WARNING image_tx_daemon: TX_DONE non-OK: seq=27 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=29 channel_idx=13 epoch=1 freq_hz=909250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:19,101 WARNING image_tx_daemon: TX_DONE non-OK: seq=27 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:19,102 WARNING image_tx_daemon: frame seq=27 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=30 channel_idx=15 epoch=1 freq_hz=910250000 pkt_toa_us=171648 legal_dwell_used_us_10s=171648
+
+2026-07-24 23:33:19,462 WARNING image_tx_daemon: TX_DONE non-OK: seq=35 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=171648
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=31 channel_idx=12 epoch=1 freq_hz=908750000 pkt_toa_us=171648 legal_dwell_used_us_10s=171648
+
+2026-07-24 23:33:20,452 WARNING image_tx_daemon: TX_DONE non-OK: seq=35 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=171648
+
+2026-07-24 23:33:20,452 WARNING image_tx_daemon: frame seq=35 ABORTED at fragment 0/4
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=32 channel_idx=46 epoch=1 freq_hz=925750000 pkt_toa_us=117888 legal_dwell_used_us_10s=117888
+
+2026-07-24 23:33:20,750 WARNING image_tx_daemon: TX_DONE non-OK: seq=44 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=117888
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=33 channel_idx=34 epoch=1 freq_hz=919750000 pkt_toa_us=117888 legal_dwell_used_us_10s=117888
+
+2026-07-24 23:33:21,740 WARNING image_tx_daemon: TX_DONE non-OK: seq=44 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=117888
+
+2026-07-24 23:33:21,740 WARNING image_tx_daemon: frame seq=44 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=34 channel_idx=41 epoch=1 freq_hz=923250000 pkt_toa_us=115328 legal_dwell_used_us_10s=115328
+
+2026-07-24 23:33:22,028 WARNING image_tx_daemon: TX_DONE non-OK: seq=51 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=35 channel_idx=9 epoch=1 freq_hz=907250000 pkt_toa_us=115328 legal_dwell_used_us_10s=115328
+
+2026-07-24 23:33:22,317 WARNING image_tx_daemon: TX_DONE non-OK: seq=51 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+2026-07-24 23:33:22,318 WARNING image_tx_daemon: frame seq=51 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=36 channel_idx=21 epoch=1 freq_hz=913250000 pkt_toa_us=115328 legal_dwell_used_us_10s=115328
+
+2026-07-24 23:33:23,027 WARNING image_tx_daemon: TX_DONE non-OK: seq=55 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=37 channel_idx=38 epoch=1 freq_hz=921750000 pkt_toa_us=115328 legal_dwell_used_us_10s=115328
+
+2026-07-24 23:33:23,321 WARNING image_tx_daemon: TX_DONE non-OK: seq=55 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+2026-07-24 23:33:23,322 WARNING image_tx_daemon: frame seq=55 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=38 channel_idx=35 epoch=1 freq_hz=920250000 pkt_toa_us=105088 legal_dwell_used_us_10s=105088
+
+2026-07-24 23:33:23,602 WARNING image_tx_daemon: TX_DONE non-OK: seq=61 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=105088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=39 channel_idx=47 epoch=1 freq_hz=926250000 pkt_toa_us=105088 legal_dwell_used_us_10s=105088
+
+2026-07-24 23:33:24,305 WARNING image_tx_daemon: TX_DONE non-OK: seq=61 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=105088
+
+2026-07-24 23:33:24,306 WARNING image_tx_daemon: frame seq=61 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=40 channel_idx=37 epoch=1 freq_hz=921250000 pkt_toa_us=133248 legal_dwell_used_us_10s=133248
+
+2026-07-24 23:33:24,629 WARNING image_tx_daemon: TX_DONE non-OK: seq=67 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=133248
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=41 channel_idx=3 epoch=1 freq_hz=904250000 pkt_toa_us=133248 legal_dwell_used_us_10s=133248
+
+2026-07-24 23:33:24,938 WARNING image_tx_daemon: TX_DONE non-OK: seq=67 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=133248
+
+2026-07-24 23:33:24,938 WARNING image_tx_daemon: frame seq=67 ABORTED at fragment 0/1
+
+INFO: unrelated frame during TX wait type=0xC4
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=42 channel_idx=24 epoch=1 freq_hz=914750000 pkt_toa_us=140928 legal_dwell_used_us_10s=140928
+
+2026-07-24 23:33:25,941 WARNING image_tx_daemon: TX_DONE non-OK: seq=70 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=140928
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=43 channel_idx=40 epoch=1 freq_hz=922750000 pkt_toa_us=140928 legal_dwell_used_us_10s=140928
+
+2026-07-24 23:33:26,260 WARNING image_tx_daemon: TX_DONE non-OK: seq=70 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=140928
+
+2026-07-24 23:33:26,261 WARNING image_tx_daemon: frame seq=70 ABORTED at fragment 0/1
+
+FAULT_URC during TX wait: code=0x0D sub=0x21 raw=0d21000000000000000000000000000000000000beee0000
+
+2026-07-24 23:33:26,996 INFO image_tx_daemon: stats: goodput=0.0 B/s util=23% pipeline=v2 frames_in=342 ok=0 fail=47 drop_full=290 drop_stale=0 frags_ok=0 frags_fail=47 qdepth=4
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=44 channel_idx=0 epoch=1 freq_hz=902750000 pkt_toa_us=163968 legal_dwell_used_us_10s=163968
+
+2026-07-24 23:33:27,282 WARNING image_tx_daemon: TX_DONE non-OK: seq=78 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=163968
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=45 channel_idx=31 epoch=1 freq_hz=918250000 pkt_toa_us=163968 legal_dwell_used_us_10s=163968
+
+2026-07-24 23:33:27,622 WARNING image_tx_daemon: TX_DONE non-OK: seq=78 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=163968
+
+2026-07-24 23:33:27,622 WARNING image_tx_daemon: frame seq=78 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=46 channel_idx=44 epoch=1 freq_hz=924750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:28,632 WARNING image_tx_daemon: TX_DONE non-OK: seq=87 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=47 channel_idx=18 epoch=1 freq_hz=911750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:28,984 WARNING image_tx_daemon: TX_DONE non-OK: seq=87 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:28,985 WARNING image_tx_daemon: frame seq=87 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=48 channel_idx=26 epoch=1 freq_hz=915750000 pkt_toa_us=171648 legal_dwell_used_us_10s=171648
+
+2026-07-24 23:33:29,981 WARNING image_tx_daemon: TX_DONE non-OK: seq=95 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=171648
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=49 channel_idx=7 epoch=1 freq_hz=906250000 pkt_toa_us=171648 legal_dwell_used_us_10s=171648
+
+2026-07-24 23:33:30,337 WARNING image_tx_daemon: TX_DONE non-OK: seq=95 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=171648
+
+2026-07-24 23:33:30,337 WARNING image_tx_daemon: frame seq=95 ABORTED at fragment 0/4
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=0 channel_idx=18 epoch=2 freq_hz=911750000 pkt_toa_us=169088 legal_dwell_used_us_10s=338176
+
+2026-07-24 23:33:31,331 WARNING image_tx_daemon: TX_DONE non-OK: seq=103 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=1 channel_idx=24 epoch=2 freq_hz=914750000 pkt_toa_us=169088 legal_dwell_used_us_10s=310016
+
+2026-07-24 23:33:31,686 WARNING image_tx_daemon: TX_DONE non-OK: seq=103 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:31,687 WARNING image_tx_daemon: frame seq=103 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=2 channel_idx=36 epoch=2 freq_hz=920750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:32,680 WARNING image_tx_daemon: TX_DONE non-OK: seq=111 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=3 channel_idx=6 epoch=2 freq_hz=905750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:33,036 WARNING image_tx_daemon: TX_DONE non-OK: seq=111 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:33,036 WARNING image_tx_daemon: frame seq=111 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=4 channel_idx=20 epoch=2 freq_hz=912750000 pkt_toa_us=148608 legal_dwell_used_us_10s=148608
+
+2026-07-24 23:33:34,009 WARNING image_tx_daemon: TX_DONE non-OK: seq=119 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=148608
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=5 channel_idx=22 epoch=2 freq_hz=913750000 pkt_toa_us=148608 legal_dwell_used_us_10s=148608
+
+2026-07-24 23:33:34,366 WARNING image_tx_daemon: TX_DONE non-OK: seq=119 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=148608
+
+2026-07-24 23:33:34,367 WARNING image_tx_daemon: frame seq=119 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=6 channel_idx=44 epoch=2 freq_hz=924750000 pkt_toa_us=169088 legal_dwell_used_us_10s=338176
+
+2026-07-24 23:33:35,359 WARNING image_tx_daemon: TX_DONE non-OK: seq=127 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=7 channel_idx=4 epoch=2 freq_hz=904750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:35,715 WARNING image_tx_daemon: TX_DONE non-OK: seq=127 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:35,716 WARNING image_tx_daemon: frame seq=127 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=8 channel_idx=13 epoch=2 freq_hz=909250000 pkt_toa_us=171648 legal_dwell_used_us_10s=171648
+
+2026-07-24 23:33:36,708 WARNING image_tx_daemon: TX_DONE non-OK: seq=135 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=171648
+
+2026-07-24 23:33:37,007 INFO image_tx_daemon: stats: goodput=0.0 B/s util=25% pipeline=v2 frames_in=402 ok=0 fail=54 drop_full=343 drop_stale=0 frags_ok=0 frags_fail=54 qdepth=4
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=9 channel_idx=3 epoch=2 freq_hz=904250000 pkt_toa_us=171648 legal_dwell_used_us_10s=171648
+
+2026-07-24 23:33:37,065 WARNING image_tx_daemon: TX_DONE non-OK: seq=135 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=171648
+
+2026-07-24 23:33:37,065 WARNING image_tx_daemon: frame seq=135 ABORTED at fragment 0/4
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=10 channel_idx=35 epoch=2 freq_hz=920250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:38,058 WARNING image_tx_daemon: TX_DONE non-OK: seq=143 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=11 channel_idx=38 epoch=2 freq_hz=921750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:38,415 WARNING image_tx_daemon: TX_DONE non-OK: seq=143 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:38,415 WARNING image_tx_daemon: frame seq=143 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=12 channel_idx=5 epoch=2 freq_hz=905250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:39,407 WARNING image_tx_daemon: TX_DONE non-OK: seq=151 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=13 channel_idx=15 epoch=2 freq_hz=910250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:39,765 WARNING image_tx_daemon: TX_DONE non-OK: seq=151 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:39,766 WARNING image_tx_daemon: frame seq=151 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=14 channel_idx=0 epoch=2 freq_hz=902750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:40,757 WARNING image_tx_daemon: TX_DONE non-OK: seq=160 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=15 channel_idx=40 epoch=2 freq_hz=922750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:41,115 WARNING image_tx_daemon: TX_DONE non-OK: seq=160 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:41,115 WARNING image_tx_daemon: frame seq=160 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=16 channel_idx=29 epoch=2 freq_hz=917250000 pkt_toa_us=107648 legal_dwell_used_us_10s=107648
+
+2026-07-24 23:33:42,034 WARNING image_tx_daemon: TX_DONE non-OK: seq=168 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=107648
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=17 channel_idx=31 epoch=2 freq_hz=918250000 pkt_toa_us=107648 legal_dwell_used_us_10s=107648
+
+2026-07-24 23:33:42,393 WARNING image_tx_daemon: TX_DONE non-OK: seq=168 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=107648
+
+2026-07-24 23:33:42,393 WARNING image_tx_daemon: frame seq=168 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=18 channel_idx=45 epoch=2 freq_hz=925250000 pkt_toa_us=117888 legal_dwell_used_us_10s=117888
+
+2026-07-24 23:33:42,682 WARNING image_tx_daemon: TX_DONE non-OK: seq=175 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=117888
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=19 channel_idx=39 epoch=2 freq_hz=922250000 pkt_toa_us=117888 legal_dwell_used_us_10s=117888
+
+2026-07-24 23:33:43,322 WARNING image_tx_daemon: TX_DONE non-OK: seq=175 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=117888
+
+2026-07-24 23:33:43,323 WARNING image_tx_daemon: frame seq=175 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=20 channel_idx=37 epoch=2 freq_hz=921250000 pkt_toa_us=115328 legal_dwell_used_us_10s=115328
+
+2026-07-24 23:33:43,680 WARNING image_tx_daemon: TX_DONE non-OK: seq=181 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=21 channel_idx=27 epoch=2 freq_hz=916250000 pkt_toa_us=115328 legal_dwell_used_us_10s=115328
+
+2026-07-24 23:33:43,973 WARNING image_tx_daemon: TX_DONE non-OK: seq=181 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=115328
+
+2026-07-24 23:33:43,974 WARNING image_tx_daemon: frame seq=181 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=22 channel_idx=17 epoch=2 freq_hz=911250000 pkt_toa_us=117888 legal_dwell_used_us_10s=117888
+
+2026-07-24 23:33:44,610 WARNING image_tx_daemon: TX_DONE non-OK: seq=185 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=117888
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=23 channel_idx=32 epoch=2 freq_hz=918750000 pkt_toa_us=117888 legal_dwell_used_us_10s=117888
+
+2026-07-24 23:33:44,968 WARNING image_tx_daemon: TX_DONE non-OK: seq=185 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=117888
+
+2026-07-24 23:33:44,968 WARNING image_tx_daemon: frame seq=185 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=24 channel_idx=33 epoch=2 freq_hz=919250000 pkt_toa_us=117888 legal_dwell_used_us_10s=117888
+
+2026-07-24 23:33:45,264 WARNING image_tx_daemon: TX_DONE non-OK: seq=191 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=117888
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=25 channel_idx=10 epoch=2 freq_hz=907750000 pkt_toa_us=117888 legal_dwell_used_us_10s=117888
+
+2026-07-24 23:33:45,898 WARNING image_tx_daemon: TX_DONE non-OK: seq=191 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=117888
+
+2026-07-24 23:33:45,898 WARNING image_tx_daemon: frame seq=191 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=26 channel_idx=21 epoch=2 freq_hz=913250000 pkt_toa_us=138368 legal_dwell_used_us_10s=138368
+
+2026-07-24 23:33:46,287 WARNING image_tx_daemon: TX_DONE non-OK: seq=196 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=138368
+
+2026-07-24 23:33:47,018 INFO image_tx_daemon: stats: goodput=0.0 B/s util=25% pipeline=v2 frames_in=462 ok=0 fail=63 drop_full=394 drop_stale=0 frags_ok=0 frags_fail=63 qdepth=4
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=27 channel_idx=23 epoch=2 freq_hz=914250000 pkt_toa_us=138368 legal_dwell_used_us_10s=138368
+
+2026-07-24 23:33:47,216 WARNING image_tx_daemon: TX_DONE non-OK: seq=196 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=138368
+
+2026-07-24 23:33:47,217 WARNING image_tx_daemon: frame seq=196 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=28 channel_idx=2 epoch=2 freq_hz=903750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:47,637 WARNING image_tx_daemon: TX_DONE non-OK: seq=203 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=29 channel_idx=1 epoch=2 freq_hz=903250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:48,566 WARNING image_tx_daemon: TX_DONE non-OK: seq=203 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:48,567 WARNING image_tx_daemon: frame seq=203 ABORTED at fragment 0/1
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=30 channel_idx=9 epoch=2 freq_hz=907250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:48,986 WARNING image_tx_daemon: TX_DONE non-OK: seq=212 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=31 channel_idx=34 epoch=2 freq_hz=919750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:49,915 WARNING image_tx_daemon: TX_DONE non-OK: seq=212 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:49,916 WARNING image_tx_daemon: frame seq=212 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=32 channel_idx=43 epoch=2 freq_hz=924250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:50,337 WARNING image_tx_daemon: TX_DONE non-OK: seq=220 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=33 channel_idx=42 epoch=2 freq_hz=923750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:51,265 WARNING image_tx_daemon: TX_DONE non-OK: seq=220 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:51,265 WARNING image_tx_daemon: frame seq=220 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=34 channel_idx=48 epoch=2 freq_hz=926750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:51,686 WARNING image_tx_daemon: TX_DONE non-OK: seq=228 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=35 channel_idx=19 epoch=2 freq_hz=912250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:52,615 WARNING image_tx_daemon: TX_DONE non-OK: seq=228 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:52,615 WARNING image_tx_daemon: frame seq=228 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=36 channel_idx=14 epoch=2 freq_hz=909750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:53,036 WARNING image_tx_daemon: TX_DONE non-OK: seq=237 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=37 channel_idx=16 epoch=2 freq_hz=910750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:53,964 WARNING image_tx_daemon: TX_DONE non-OK: seq=237 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:53,965 WARNING image_tx_daemon: frame seq=237 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=38 channel_idx=30 epoch=2 freq_hz=917750000 pkt_toa_us=161408 legal_dwell_used_us_10s=161408
+
+2026-07-24 23:33:54,376 WARNING image_tx_daemon: TX_DONE non-OK: seq=245 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=161408
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=39 channel_idx=28 epoch=2 freq_hz=916750000 pkt_toa_us=161408 legal_dwell_used_us_10s=161408
+
+2026-07-24 23:33:55,304 WARNING image_tx_daemon: TX_DONE non-OK: seq=245 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=161408
+
+2026-07-24 23:33:55,304 WARNING image_tx_daemon: frame seq=245 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=40 channel_idx=12 epoch=2 freq_hz=908750000 pkt_toa_us=140928 legal_dwell_used_us_10s=140928
+
+2026-07-24 23:33:55,694 WARNING image_tx_daemon: TX_DONE non-OK: seq=253 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=140928
+
+FAULT_URC during TX wait: code=0x0D sub=0x22 raw=0d22000000000000000000000000000000000000ee630100
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=41 channel_idx=47 epoch=2 freq_hz=926250000 pkt_toa_us=140928 legal_dwell_used_us_10s=140928
+
+2026-07-24 23:33:56,623 WARNING image_tx_daemon: TX_DONE non-OK: seq=253 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=140928
+
+2026-07-24 23:33:56,624 WARNING image_tx_daemon: frame seq=253 ABORTED at fragment 0/1
+
+INFO: unrelated frame during TX wait type=0xC0
+
+2026-07-24 23:33:57,028 INFO image_tx_daemon: stats: goodput=0.0 B/s util=24% pipeline=v2 frames_in=522 ok=0 fail=71 drop_full=446 drop_stale=0 frags_ok=0 frags_fail=71 qdepth=4
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=42 channel_idx=26 epoch=2 freq_hz=915750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:57,044 WARNING image_tx_daemon: TX_DONE non-OK: seq=5 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=43 channel_idx=46 epoch=2 freq_hz=925750000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:57,973 WARNING image_tx_daemon: TX_DONE non-OK: seq=5 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:57,973 WARNING image_tx_daemon: frame seq=5 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=44 channel_idx=7 epoch=2 freq_hz=906250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:58,394 WARNING image_tx_daemon: TX_DONE non-OK: seq=13 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=45 channel_idx=25 epoch=2 freq_hz=915250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:59,323 WARNING image_tx_daemon: TX_DONE non-OK: seq=13 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:33:59,323 WARNING image_tx_daemon: frame seq=13 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=46 channel_idx=41 epoch=2 freq_hz=923250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:33:59,744 WARNING image_tx_daemon: TX_DONE non-OK: seq=21 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=47 channel_idx=11 epoch=2 freq_hz=908250000 pkt_toa_us=169088 legal_dwell_used_us_10s=169088
+
+2026-07-24 23:34:00,672 WARNING image_tx_daemon: TX_DONE non-OK: seq=21 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=169088
+
+2026-07-24 23:34:00,673 WARNING image_tx_daemon: frame seq=21 ABORTED at fragment 0/2
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x05(TX_TIMEOUT) hop_idx=48 channel_idx=8 epoch=2 freq_hz=906750000 pkt_toa_us=171648 legal_dwell_used_us_10s=171648
+
+2026-07-24 23:34:01,093 WARNING image_tx_daemon: TX_DONE non-OK: seq=29 idx=0 tx_id=0x00 status=1(TIMEOUT) toa_us=171648
+
