@@ -122,7 +122,10 @@ sx1276_lbt_result_t sx1276_lbt_check_and_backoff(void) {
         } while ((int32_t)(platform_now_us() - cad_deadline_us) < 0);
 
         if ((int32_t)(platform_now_us() - cad_deadline_us) >= 0) {
-            (void)sx1276_modes_to_standby();
+            /* RS-4.9 (2026-07-25): abort the CAD properly instead of a bare
+             * standby — the old path left s_cad_active latched, so ONE CAD
+             * timeout wedged every later LBT-enabled TX until reboot. */
+            sx1276_cad_abort();
             return SX1276_LBT_RESULT_ERROR;
         }
     }

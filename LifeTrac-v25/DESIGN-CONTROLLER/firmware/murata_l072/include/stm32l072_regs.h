@@ -237,7 +237,19 @@
 #define RNG_LPUART1_IRQn           29U
 
 static inline void nvic_enable_irq(uint32_t irqn, uint8_t priority) {
-    NVIC_IPR(irqn) = (uint8_t)(priority << 4);
+    /* RS-4.11 (2026-07-25): Cortex-M0+ implements exactly TWO priority
+     * bits, at IPR[7:6] — and ARMv6-M requires word access to NVIC
+     * registers. The previous byte write of (priority << 4) landed both
+     * priorities in use (1 = host UART, 3 = radio DIO EXTI) in
+     * unimplemented bits, so every IRQ ran at hardware priority 0 and
+     * the intended UART-over-radio ordering never existed. `priority`
+     * is now interpreted as a 2-bit level (0 = highest, 3 = lowest). */
+    const uint32_t reg = NVIC_IPR_BASE + ((irqn / 4U) * 4U);
+    const uint32_t shift = (irqn % 4U) * 8U;
+    uint32_t val = MMIO32(reg);
+    val &= ~(0xFFUL << shift);
+    val |= (((uint32_t)(priority & 0x3U) << 6) & 0xFFUL) << shift;
+    MMIO32(reg) = val;
     NVIC_ISER0 = (1UL << irqn);
 }
 

@@ -8,6 +8,7 @@
 #include "host_uart.h"
 #include "platform.h"
 #include "sx1276.h"
+#include "sx1276_modes.h"   /* RS-4.12: sync raw opmode writes */
 #include "stm32l072_regs.h"
 #include "version.h"
 
@@ -18,11 +19,22 @@
 
 static bool s_radio_ok;
 static uint8_t s_radio_version;
-static sx1276_tx_request_t s_tx_pending;
-static bool s_tx_pending_valid;
-/* M2: original request seq, carried so a failed deferred TX can emit a
- * correlatable ERR_PROTO instead of seq=0. */
-static uint16_t s_tx_pending_seq;
+
+/* RS-2.3 (2026-07-25): the single parked slot (s_tx_pending + valid +
+ * seq) is now a small FIFO ring of HOST_TXQ_DEPTH entries. Entries are
+ * by-value copies, so the 2026-07-24 memcpy-at-park invariant holds
+ * structurally — a parked request can never transmit stack garbage.
+ * Depth is CAPACITY, not policy: the host bounds P0 latency by limiting
+ * its own in-flight count (see config.h). M2 seq is carried per entry so
+ * a failed deferred TX still emits a correlatable ERR_PROTO. */
+typedef struct tx_park_entry_s {
+    sx1276_tx_request_t req;
+    uint16_t seq;
+} tx_park_entry_t;
+
+static tx_park_entry_t s_txq[HOST_TXQ_DEPTH];
+static uint8_t s_txq_head;    /* pop index */
+static uint8_t s_txq_count;
 
 #if HOST_AT_SHELL_ENABLE
 static char at_upper(char ch) {
@@ -465,13 +477,22 @@ static void handle_tx_frame(const host_frame_t *frame) {
 
     /*
      * v25.0.7 slot-clock: park when the modem is busy OR when the
-     * frame does not fit the remaining hop-slot time. The mailbox
+     * frame does not fit the remaining hop-slot time. The ring
      * doubles as the slot waiting room — host_cmd_service_tx_mailbox()
-     * re-asks every main-loop pass and releases the frame on the next
-     * boundary. Pure advisory: no scheduler/radio side effects here.
+     * re-asks every main-loop pass and releases frames on boundaries.
+     * Pure advisory: no scheduler/radio side effects here.
+     *
+     * RS-2.3 ordering guard: if ANYTHING is already parked, this frame
+     * must park behind it even when the radio is momentarily free —
+     * otherwise a fresh request overtakes queued fragments and the
+     * air order no longer matches the submit order.
      */
-    if (sx1276_tx_busy() || sx1276_tx_slot_wait_us(req.length) > 0U) {
-        if (s_tx_pending_valid) {
+    if (s_txq_count > 0U ||
+        sx1276_tx_busy() ||
+        sx1276_tx_slot_wait_us(req.length) > 0U) {
+        uint8_t tail;
+
+        if (s_txq_count >= HOST_TXQ_DEPTH) {
             host_uart_send_err_proto(frame->seq,
                                      frame->type,
                                      frame->ver,
@@ -479,9 +500,10 @@ static void handle_tx_frame(const host_frame_t *frame) {
                                      0U);
             return;
         }
-        s_tx_pending = req;
-        s_tx_pending_seq = frame->seq;
-        s_tx_pending_valid = true;
+        tail = (uint8_t)((s_txq_head + s_txq_count) % HOST_TXQ_DEPTH);
+        s_txq[tail].req = req;
+        s_txq[tail].seq = frame->seq;
+        s_txq_count++;
         return;
     }
 
@@ -562,6 +584,16 @@ static void handle_reg_write(const host_frame_t *frame) {
     }
 
     sx1276_write_reg(frame->payload[0], frame->payload[1]);
+
+    /* RS-4.12 (2026-07-25): a raw write to RegOpMode (0x01) changes the
+     * radio's mode behind the state machine's back — fold it into the
+     * tracked state so the TX path's re-arm snapshot sees it. This is
+     * the firmware half of the run-31 fix: a host that raw-arms RXCONT
+     * now KEEPS an armed receiver across firmware TXes, instead of the
+     * modem parking deaf in STANDBY after every fragment. */
+    if (frame->payload[0] == 0x01U) {
+        sx1276_modes_sync_external(frame->payload[1]);
+    }
 
     host_uart_send_urc(HOST_TYPE_REG_WRITE_ACK_URC,
                        frame->seq,
@@ -703,7 +735,8 @@ void host_cmd_init(bool radio_ok, uint8_t radio_version) {
 
     s_radio_ok = radio_ok;
     s_radio_version = radio_version;
-    s_tx_pending_valid = false;
+    s_txq_head = 0U;
+    s_txq_count = 0U;
 
     cfg_init();
     host_stats_reset();
@@ -873,24 +906,36 @@ void host_cmd_emit_tx_done(const sx1276_tx_result_t *result) {
 }
 
 void host_cmd_service_tx_mailbox(void) {
-    if (!s_tx_pending_valid || sx1276_tx_busy()) {
+    /* RS-2.3: drain the ring head-first. On a begin() refusal the failed
+     * entry is popped (matching the old single-slot semantics) and the
+     * loop continues so one poisoned frame cannot stall those behind it.
+     * On a successful begin the radio is busy — return immediately. */
+    while (s_txq_count > 0U) {
+        sx1276_tx_request_t next;
+        uint16_t next_seq;
+
+        if (sx1276_tx_busy()) {
+            return;
+        }
+        /* v25.0.7 slot-clock: hold the head frame until it fits the
+         * remaining hop-slot time. Re-asked every main-loop pass; the
+         * advisory is pure so this costs a few u32 ops per pass. */
+        if (sx1276_tx_slot_wait_us(s_txq[s_txq_head].req.length) > 0U) {
+            return;
+        }
+        next = s_txq[s_txq_head].req;
+        next_seq = s_txq[s_txq_head].seq;
+        s_txq_head = (uint8_t)((s_txq_head + 1U) % HOST_TXQ_DEPTH);
+        s_txq_count--;
+        if (!sx1276_tx_begin(&next)) {
+            /* M2: carry the parked request's seq so the host can correlate
+             * the failure with the TX_FRAME_REQ it parked. */
+            host_uart_send_err_proto(next_seq, HOST_TYPE_TX_FRAME_REQ,
+                                     HOST_PROTOCOL_VER,
+                                     HOST_ERR_PROTO_FORBIDDEN, 0U);
+            continue;
+        }
         return;
-    }
-    /* v25.0.7 slot-clock: hold the parked frame until it fits the
-     * remaining hop-slot time. Re-asked every main-loop pass; the
-     * advisory is pure so this costs a few u32 ops per pass. */
-    if (sx1276_tx_slot_wait_us(s_tx_pending.length) > 0U) {
-        return;
-    }
-    sx1276_tx_request_t next = s_tx_pending;
-    uint16_t next_seq = s_tx_pending_seq;
-    s_tx_pending_valid = false;
-    if (!sx1276_tx_begin(&next)) {
-        /* M2: carry the parked request's seq so the host can correlate
-         * the failure with the TX_FRAME_REQ it parked. */
-        host_uart_send_err_proto(next_seq, HOST_TYPE_TX_FRAME_REQ,
-                                 HOST_PROTOCOL_VER,
-                                 HOST_ERR_PROTO_FORBIDDEN, 0U);
     }
 }
 

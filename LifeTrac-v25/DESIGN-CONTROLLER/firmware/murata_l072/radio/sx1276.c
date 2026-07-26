@@ -225,10 +225,15 @@ static void sx1276_spi_init(void) {
     SPI1_CR1 = 0U;
     SPI1_CR2 = SPI_CR2_DS_8BIT | SPI_CR2_FRXTH;
 
+    /* RS-3.6 (2026-07-25): DIV64 gave ~250 kHz SCK — a full 255 B FIFO
+     * burst busy-waited ~8 ms of main-loop time per fragment. The SX1276
+     * SPI is rated to 10 MHz; DIV8 = 2 MHz at 16 MHz PCLK2 cuts the burst
+     * to ~1 ms with 5× margin. Bench gate: REG 0x42 VERSION == 0x12
+     * readback + one TX/RX cycle + Stage 1 quant. */
     SPI1_CR1 = SPI_CR1_MSTR |
                SPI_CR1_SSM |
                SPI_CR1_SSI |
-               SPI_CR1_BR_DIV64;
+               SPI_CR1_BR_DIV8;
     SPI1_CR1 |= SPI_CR1_SPE;
 }
 

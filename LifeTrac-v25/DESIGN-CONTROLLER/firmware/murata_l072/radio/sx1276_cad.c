@@ -24,6 +24,19 @@ bool sx1276_cad_begin(void) {
     return true;
 }
 
+void sx1276_cad_abort(void) {
+    /* RS-4.9: the only path that clears s_cad_active is cad_poll() seeing
+     * CAD_DONE; a caller that gives up early (LBT deadline) previously
+     * left the latch set forever, refusing every subsequent LBT TX. */
+    if (s_cad_active == 0U) {
+        return;
+    }
+
+    s_cad_active = 0U;
+    sx1276_write_reg(SX1276_REG_IRQ_FLAGS, 0xFFU);
+    (void)sx1276_modes_to_standby();
+}
+
 sx1276_cad_result_t sx1276_cad_poll(void) {
     uint8_t irq_flags;
 

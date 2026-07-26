@@ -145,6 +145,39 @@ sx1276_state_t sx1276_modes_get_state(void) {
     return s_state;
 }
 
+void sx1276_modes_sync_external(uint8_t raw_opmode) {
+    /* RS-4.12: mirror a host raw RegOpMode write into tracked state.
+     * Mode bits 2:0 per SX1276 datasheet §6.2; FSTX (2) and FSRX (4)
+     * are transient synthesizer states — track them as STANDBY, which
+     * is what the chip settles back into for control purposes. Applies
+     * regardless of LongRangeMode (bit 7): the mode field means the
+     * same thing in both families. */
+    switch (raw_opmode & 0x07U) {
+        case 0x00U:
+            s_state = SX1276_STATE_SLEEP;
+            break;
+        case 0x01U:
+        case 0x02U:
+        case 0x04U:
+            s_state = SX1276_STATE_STANDBY;
+            break;
+        case 0x03U:
+            s_state = SX1276_STATE_TX;
+            break;
+        case 0x05U:
+            s_state = SX1276_STATE_RX_CONT;
+            break;
+        case 0x06U:
+            s_state = SX1276_STATE_RX_SINGLE;
+            break;
+        case 0x07U:
+            s_state = SX1276_STATE_CAD;
+            break;
+        default:
+            break;
+    }
+}
+
 bool sx1276_modes_to_sleep(void) {
     return sx1276_modes_apply(mode_desc_for_state(SX1276_STATE_SLEEP));
 }

@@ -240,7 +240,12 @@ void Reset_Handler(void) {
     }
 }
 
-void __attribute__((noreturn)) Default_Handler(void) {
+/* 2026-07-25: `noreturn` removed — GCC 12 (-Werror=missing-attributes)
+ * rejects weak-aliasing non-noreturn handler prototypes to a noreturn
+ * target, and several aliased handlers ARE legitimately overridden by
+ * returning ISRs elsewhere, so the attribute was wrong at the alias
+ * level. Behaviourally identical (infinite WFI loop either way). */
+void Default_Handler(void) {
     for (;;) {
         cpu_wfi();
     }

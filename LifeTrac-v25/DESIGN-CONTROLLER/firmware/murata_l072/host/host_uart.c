@@ -567,10 +567,15 @@ static void usart2_write_byte(uint8_t byte) {
 
     LPUART1_TDR = byte;
 
+#if HOST_UART_TX_MIRROR_USART1
+    /* RS-3.7 (2026-07-25): the USART1 mirror is now compile-gated — it
+     * doubled every URC's blocking busy-wait for a bring-up-era routing
+     * fallback nothing on the bench consumes. */
     while ((USART1_ISR & USART_ISR_TXE) == 0U) {
     }
 
     USART1_TDR = byte;
+#endif
 }
 
 static void usart2_write_bytes(const uint8_t *buf, uint16_t len) {
@@ -581,8 +586,10 @@ static void usart2_write_bytes(const uint8_t *buf, uint16_t len) {
     while ((LPUART1_ISR & USART_ISR_TC) == 0U) {
     }
 
+#if HOST_UART_TX_MIRROR_USART1
     while ((USART1_ISR & USART_ISR_TC) == 0U) {
     }
+#endif
 }
 
 static void send_inner_frame(const uint8_t *inner, uint16_t inner_len) {

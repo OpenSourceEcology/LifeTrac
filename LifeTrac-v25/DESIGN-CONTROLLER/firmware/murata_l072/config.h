@@ -47,12 +47,32 @@
 #define HOST_BAUD_DEFAULT             921600UL
 #define HOST_INNER_MAX_LEN            320U      /* max decoded inner frame */
 #define HOST_COBS_MAX_LEN             325U      /* worst-case encoded + framing */
-#define HOST_TXQ_DEPTH                8U
+/* RS-2.3 (2026-07-25): firmware TX ring depth — was 8, planned and never
+ * referenced; now implemented at 4. Worst-case P0 wait behind a full ring
+ * of max-fill fragments ≈ depth × ToA (89 ms DTS / 170 ms FHSS) + own TX.
+ * Operator P0 budget is 700 ms (RS-9.7 update 2026-07-25): depth 4 fits
+ * DTS (~390 ms); at FHSS the HOST must keep ≤3 image frames in flight
+ * (~560 ms) — the ring is capacity, the host priority queue is policy.
+ * RAM: 4 × ~260 B ≈ 1.0 KB .bss. */
+#define HOST_TXQ_DEPTH                4U
 #define HOST_TXQ_P0_RESERVED          1U        /* per Claude §H5: keep one P0 */
 
 /* Diagnostic/prototyping controls. Keep these conservative in production. */
 #define HOST_ALLOW_REG_WRITE_DIAG     1
-#define HOST_EMIT_RADIO_IRQ_DEBUG_URC 1
+/* RS-3.7 (2026-07-25): was 1 — every nonzero radio-event batch emitted a
+ * ~16-wire-byte debug URC through the blocking TX path. Bench builds can
+ * re-enable via make CFLAGS="-DHOST_EMIT_RADIO_IRQ_DEBUG_URC=1". */
+#ifndef HOST_EMIT_RADIO_IRQ_DEBUG_URC
+#define HOST_EMIT_RADIO_IRQ_DEBUG_URC 0
+#endif
+/* RS-3.7 (2026-07-25): mirror all host TX onto USART1 alongside LPUART1.
+ * Bring-up routing fallback; costs a second blocking TXE busy-wait per
+ * byte on EVERY URC (~doubles URC emission time). Production default OFF;
+ * re-enable via make CFLAGS="-DHOST_UART_TX_MIRROR_USART1=1". RX on both
+ * lanes is unchanged. */
+#ifndef HOST_UART_TX_MIRROR_USART1
+#define HOST_UART_TX_MIRROR_USART1    0
+#endif
 #define HOST_DEBUG_OPMODE_GUARD       0
 #ifndef HOST_AT_SHELL_ENABLE
 #define HOST_AT_SHELL_ENABLE          1
