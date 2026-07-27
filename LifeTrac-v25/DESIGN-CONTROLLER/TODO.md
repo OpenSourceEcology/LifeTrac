@@ -326,6 +326,41 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   5. Auto-profile boot test: restart web_ui with auto selected mid-run;
      confirm NO retained re-pin and no profile flap.
 
+### RS-0.13 — Single-radio control-plane options (decision pending)
+
+Full analysis: [`SINGLE_RADIO_CONTROL_PLANE_OPTIONS.md`](SINGLE_RADIO_CONTROL_PLANE_OPTIONS.md).
+Operator has ruled out a second radio, so drive + E-stop must share the image
+radio. Six architectures enumerated (A0 image-only … A5 stream-off doctrine);
+Route A, bare-0xFB actuation and D13-as-the-choice are **rejected with verified
+evidence**. Three things are settled: **envelope = GCM-128** (cadence, not frame
+size, is the constraint — all envelopes fit the boundary window ≥9×);
+**E-stop by absence** (the 200 ms deadman is airtime-free, unforgeable, and
+delivery-independent); **Route B is unavoidable** for any delivered drive.
+No delivered-drive architecture can be committed until RS-0.12's phase-swept
+measurement returns `P(delivery | phase)`.
+
+No-regrets work, correct under every surviving architecture (do first):
+
+- [ ] **RS-0.13a Fix the contaminated `REQ_KEYFRAME` observable** —
+  `image_rx_daemon.py:1064` clears a pending request on ANY `frame_kind==1`.
+  Prerequisite to trusting any further delivery metric (this produced the
+  retracted 171/1).
+- [ ] **RS-0.13b Run-J bisection A/B** — toggle exactly one of `parity_group` /
+  `TX_PREPARE_AHEAD` / `train_gap_ms` per run, scored TRACTOR-side on
+  `LoRa cmd:` truth. Zero code, ~15 min; may recover Run J's 58% alignment.
+- [ ] **RS-0.13c `/api/estop` must gate the control publisher** — VERIFIED
+  defect: `_base_controls_allowed()` (`web_ui.py:874`) gates only on
+  `active_source`, never on E-stop state, so `ws_control` keeps forwarding
+  20 Hz joystick frames after a software E-stop.
+- [ ] **RS-0.13d Fix SRC_BASE arbitration** — VERIFIED: `pick_active_source`
+  (`tractor_h7.ino:585`) needs a fresh heartbeat AND control frame, but
+  `web_ui.py:36` imports only `pack_control` and never calls `pack_heartbeat`
+  (`lora_proto.py:266`). **Any base-originated drive is silently inert today.**
+- [ ] **RS-0.13e Debuggability floor** (RS-9.1/9.5) — per-magic RX + MAC-fail
+  counters, fault on undeliverable ControlFrame-shaped traffic.
+- [ ] **RS-0.13f Close RS-8.3 `boot_ctr`** + minimum auth posture before ANY
+  actuation opcode rides the link.
+
 ### RS-1 — Control-plane verification (next bench session, highest priority)
 
 - [ ] **RS-1.1 One clean control-plane run** — confirm the tractor now hears
