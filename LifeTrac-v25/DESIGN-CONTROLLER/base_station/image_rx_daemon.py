@@ -155,6 +155,11 @@ DEFAULT_BAUD = "921600"
 # How long to wait per HostLink poll cycle when no frame is present.
 RX_POLL_TIMEOUT_S = 0.25
 
+# Completion-aligned command pump (RS-1.x). Set LIFETRAC_ALIGNED_PUMP=0 to
+# fall back to idle-drain-only command TX — the behavior the 171/1
+# convergence soak actually measured, kept as a bench A/B control.
+ALIGNED_PUMP_ENABLE = os.environ.get("LIFETRAC_ALIGNED_PUMP", "1") != "0"
+
 
 class KeyframeRequester:
     """Rate-limited req_keyframe on reassembly failure. Publishes to the
@@ -229,6 +234,10 @@ class ImageRxDaemon:
         # the HostLink, MQTT callbacks must never touch it directly).
         self._pending_profile: int | None = None
         self._active_profile = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+        # True once ANY retained radio_profile pin has been delivered to
+        # this process — gates the age check so the boot replay (restart
+        # convergence) is always honored and only reconnect replays age out.
+        self._retained_profile_seen = False
         # LoRa-only control plane: outbound command frames queued by MQTT
         # callbacks, drained by the RX worker (single link owner). Plus
         # the two-phase switch state machine fields.
@@ -449,16 +458,26 @@ class ImageRxDaemon:
 
     def _set_pending(self, opcode: int, body: bytes,
                      timeout_s: float = 10.0, max_attempts: int = 20) -> None:
-        """Register (or refresh) an ack-driven command. Idempotent: while
-        already pending, a re-trigger just extends the deadline."""
+        """Register (or refresh) an ack-driven command.
+
+        Same opcode + same body: just extend the deadline (idempotent
+        re-trigger). Same opcode + DIFFERENT body (e.g. a rapid encode
+        A→B change): replace the payload and restart the retry budget —
+        before 2026-07-26 the new body was silently discarded and the
+        pump kept retrying the stale command.
+        """
         now = time.monotonic()
         with self._lock:
             cur = self._pending_cmds.get(opcode)
             if cur is not None:
-                cur["deadline"] = now + timeout_s
-                return
+                if cur["body"] == body:
+                    cur["deadline"] = now + timeout_s
+                    return
+                LOG.info("cmd 0x%02x superseded while pending (after %d "
+                         "attempts) — body replaced, retry budget reset",
+                         opcode, cur["attempts"])
             self._pending_cmds[opcode] = {
-                "body": body, "attempts": 0, "t0": now,
+                "body": body, "attempts": 0, "t0": now, "last_send": 0.0,
                 "deadline": now + timeout_s, "max_attempts": max_attempts,
             }
 
@@ -469,6 +488,11 @@ class ImageRxDaemon:
             LOG.info("cmd 0x%02x CONVERGED after %d attempts (%.1f s): %s",
                      opcode, cur["attempts"],
                      time.monotonic() - cur["t0"], reason)
+
+    # Minimum spacing between retries of the SAME pending command: keeps
+    # the 20-attempt budget spread across the whole 10 s deadline instead
+    # of exhausting in ~5 s when completions (or idle polls) come fast.
+    PENDING_RETRY_MIN_GAP_S = 0.4
 
     def _next_ctrl_body(self, now: float) -> "bytes | None":
         """Pump source: pending (ack-driven) commands first, oldest first;
@@ -482,7 +506,10 @@ class ImageRxDaemon:
                     LOG.warning("cmd 0x%02x GAVE UP after %d attempts (%.1f s)",
                                 opcode, cur["attempts"], now - cur["t0"])
                     continue
+                if now - cur.get("last_send", 0.0) < self.PENDING_RETRY_MIN_GAP_S:
+                    continue
                 cur["attempts"] += 1
+                cur["last_send"] = now
                 return cur["body"]
         try:
             return self._ctrl_out.get_nowait()
@@ -594,8 +621,38 @@ class ImageRxDaemon:
                     self._revert_deadline = (time.monotonic()
                                              + PROFILE_REVERT_TIMEOUT_S)
         elif opcode == CMD_OP_ENCODE_MODE_ACK:
-            # RS-1.5: explicit ack — stop retrying ENCODE_MODE.
-            self._clear_pending(CMD_OP_ENCODE_MODE, "ENCODE_MODE_ACK")
+            # RS-1.5: explicit ack — stop retrying ENCODE_MODE, but ONLY
+            # if the ack matches the mode we are retrying. Before
+            # 2026-07-26 ANY 0x68 cleared the retry — including the stale
+            # retained ack the tractor re-radiates on every MQTT
+            # reconnect — falsely "confirming" a command that never
+            # landed. An ack for a different mode leaves the retry alive.
+            # Compare-and-pop under ONE lock acquisition: the ack is parsed
+            # outside the lock, but the match is re-checked against the
+            # entry we actually remove. Dropping the lock between "read
+            # body" and "pop" let a paho-thread _set_pending slip a NEW
+            # command into the slot that then got popped unacked.
+            ack = self._parse_encode_ack(args)
+            if ack is None:
+                LOG.warning("ENCODE_MODE_ACK unparseable (%r) — keeping "
+                            "retry pending", args[:64])
+            else:
+                with self._lock:
+                    cur = self._pending_cmds.get(CMD_OP_ENCODE_MODE)
+                    matched = (cur is not None
+                               and self._ack_matches_body(ack, cur["body"]))
+                    if matched:
+                        del self._pending_cmds[CMD_OP_ENCODE_MODE]
+                if cur is not None:
+                    if matched:
+                        LOG.info("cmd 0x%02x CONVERGED after %d attempts "
+                                 "(%.1f s): ENCODE_MODE_ACK %r",
+                                 CMD_OP_ENCODE_MODE, cur["attempts"],
+                                 time.monotonic() - cur["t0"], ack)
+                    else:
+                        LOG.info("ENCODE_MODE_ACK %r does not match pending "
+                                 "%s — still retrying", ack,
+                                 cur["body"][2:].hex())
             # Tractor's encode ack, forwarded over the air — republish
             # retained so web_ui's cache works with zero LAN to the
             # tractor. Payload is the camera_service JSON as-is.
@@ -607,6 +664,59 @@ class ImageRxDaemon:
                               qos=0, retain=True)
                 except Exception:                             # pragma: no cover
                     pass
+
+    # camera_service clamps an operator quality request into this range
+    # before applying it, and echoes the CLAMPED value in its ack — so the
+    # base must clamp identically to know what a matching ack looks like.
+    TRACTOR_QUALITY_MIN = 20
+    TRACTOR_QUALITY_MAX = 100
+
+    @staticmethod
+    def _parse_encode_ack(args: bytes) -> "dict | None":
+        """Extract {mode, quality} from a 0x68 ack JSON body (None = unparseable)."""
+        try:
+            import json as _json
+            body = _json.loads(args.decode("utf-8"))
+        except Exception:
+            return None
+        if not isinstance(body, dict):
+            return None
+        mode = None
+        for key in ("requested", "requested_mode", "mode", "effective"):
+            val = body.get(key)
+            if isinstance(val, int):
+                mode = val
+                break
+        if mode is None:
+            return None
+        quality = body.get("quality")
+        return {"mode": mode,
+                "quality": quality if isinstance(quality, int) else None}
+
+    @classmethod
+    def _ack_matches_body(cls, ack: dict, body: bytes) -> bool:
+        """Does this 0x68 ack confirm the pending 0x63 frame ``body``?
+
+        Body layout: [0xFB, 0x63, mode] or [0xFB, 0x63, mode, quality].
+        The mode must always match. When we commanded a QUALITY too, the
+        ack's effective quality must equal our request clamped the way the
+        tractor clamps it — otherwise an in-flight ack from the PREVIOUS
+        (same mode, old quality) command would falsely confirm the new one
+        and the quality change would be silently dropped.
+        """
+        if len(body) < 3 or ack.get("mode") != body[2]:
+            return False
+        if len(body) < 4:
+            return True                    # mode-only command: no q to check
+        want = max(cls.TRACTOR_QUALITY_MIN,
+                   min(cls.TRACTOR_QUALITY_MAX, body[3]))
+        got = ack.get("quality")
+        if got is None:
+            # Old tractor build with no quality in its ack: it cannot
+            # confirm the quality half, so keep retrying rather than
+            # claim a convergence we did not observe.
+            return False
+        return got == want
 
     def _note_proof_of_life(self, link: HostLink) -> None:
         """First frame on a freshly switched profile → confirm to tractor."""
@@ -664,6 +774,41 @@ class ImageRxDaemon:
             except Exception:                                 # pragma: no cover
                 pass
 
+    # Retained control pins older than this are ignored on a RECONNECT
+    # (run-V incident: a stale retained {"profile": N} re-commanded the
+    # tractor mid-run when the daemon's MQTT session bounced). Publishers
+    # stamp "ts"; a payload without one is treated as live for backward
+    # compatibility.
+    MAX_RETAINED_CMD_AGE_S = 600.0
+
+    def _retained_and_stale(self, msg, body: dict) -> bool:
+        """Should this retained pin be ignored?
+
+        The FIRST retained delivery after process start is always honored
+        regardless of age — that replay is how a restarting daemon
+        converges to the operator's standing selection, and it is the
+        pre-2026-07-26 behavior the age gate must not break. Only LATER
+        replays (i.e. a mid-run broker reconnect, the run-V case) are
+        age-gated, because by then we already hold a live profile that a
+        stale pin must not override.
+        """
+        if not getattr(msg, "retain", False):
+            return False
+        if not self._retained_profile_seen:
+            LOG.info("accepting first retained %s pin after start "
+                     "(restart convergence)", msg.topic)
+            return False
+        ts = body.get("ts")
+        if not isinstance(ts, (int, float)):
+            return False
+        age = time.time() - ts
+        if age > self.MAX_RETAINED_CMD_AGE_S:
+            LOG.warning("ignoring retained %s pin aged %.0f s (> %.0f s) on "
+                        "reconnect", msg.topic, age,
+                        self.MAX_RETAINED_CMD_AGE_S)
+            return True
+        return False
+
     def _on_radio_profile_msg(self, _c, _u, msg) -> None:
         try:
             import json as _json
@@ -676,11 +821,26 @@ class ImageRxDaemon:
         if profile not in _PROFILE_CHOICES:
             LOG.warning("radio_profile: unknown profile %d", profile)
             return
+        stale = isinstance(body, dict) and self._retained_and_stale(msg, body)
+        if getattr(msg, "retain", False):
+            self._retained_profile_seen = True
+        if stale:
+            return
         with self._lock:
             self._pending_profile = profile
 
+    # Wire-valid encode modes (values only — the tractor clamps
+    # unimplemented ones itself and says so in the 0x68 ack).
+    _VALID_ENCODE_MODES = frozenset(int(m.value) for m in EncodeMode)
+
     def _on_encode_mode_msg(self, _c, _u, msg) -> None:
-        """control/encode_mode_override → LoRa CMD_OP_ENCODE_MODE."""
+        """control/encode_mode_override → LoRa CMD_OP_ENCODE_MODE.
+
+        Payload {"mode": <name>|<int>, "quality": 1-100?, "ts": ...}.
+        Quality rides as an optional second args byte on the same 0x63
+        frame (old tractors ignore it; omitting it keeps the tractor's
+        current quality).
+        """
         try:
             import json as _json
             body = _json.loads(msg.payload.decode("utf-8") or "{}")
@@ -695,10 +855,29 @@ class ImageRxDaemon:
             LOG.warning("encode_mode_override: bad payload %r (%s)",
                         msg.payload[:64], exc)
             return
+        if mode not in self._VALID_ENCODE_MODES:
+            # Reject instead of masking &0xFF onto the air — an arbitrary
+            # byte here would be retried for 10 s against a tractor that
+            # can only clamp what it can parse.
+            LOG.warning("encode_mode_override: mode %d outside EncodeMode — "
+                        "rejected", mode)
+            return
+        quality = body.get("quality") if isinstance(body, dict) else None
+        args = bytes([mode])
+        if quality is not None:
+            try:
+                q = int(quality)
+            except (TypeError, ValueError):
+                q = -1
+            if 1 <= q <= 100:
+                args = bytes([mode, q])
+            else:
+                LOG.warning("encode_mode_override: quality %r out of range — "
+                            "sending mode only", quality)
         # RS-1.5: retry until the tractor's ENCODE_MODE_ACK arrives.
         self._set_pending(
             CMD_OP_ENCODE_MODE,
-            pack_command_frame(CMD_OP_ENCODE_MODE, bytes([mode & 0xFF])))
+            pack_command_frame(CMD_OP_ENCODE_MODE, args))
 
     def _on_req_keyframe_msg(self, _c, _u, _msg) -> None:
         """cmd/req_keyframe (self-heal poke or web button) → LoRa cmd."""
@@ -895,7 +1074,23 @@ class ImageRxDaemon:
             # redundancy is spread across independent windows at enqueue.
             # Run D showed unaligned delivery ≈ window-alignment odds
             # (2/12); aligned TX should approach deterministic.
-            if frame_done and not self._ctrl_out.empty():
+            # 2026-07-26 pump-gate fix: the gate used to check only the
+            # legacy _ctrl_out queue, but every subscribed command now
+            # registers via _set_pending — so the aligned pump NEVER
+            # fired and delivery leaned entirely on the idle drain
+            # between trains. Gate on either source.
+            #
+            # NOTE (air-test pending, RS-0.9): the 171/1 convergence soak
+            # was measured with this pump dead, so the aligned path is
+            # UNPROVEN on air. Our command TX makes the base deaf for its
+            # ToA plus the host round trip; if that overruns the tractor's
+            # ~40 ms reverse-slot gap it can clip the head of the next
+            # train. LIFETRAC_ALIGNED_PUMP=0 restores the pre-fix
+            # (idle-drain-only) behavior for a clean A/B at the bench.
+            with self._lock:
+                have_pending = bool(self._pending_cmds)
+            if (ALIGNED_PUMP_ENABLE and frame_done
+                    and (have_pending or not self._ctrl_out.empty())):
                 # Run H forensics (2026-07-26): without spacing, the two
                 # enqueued copies go out ~37 ms apart — both into the SAME
                 # (already stale) window, collapsing to one attempt. A

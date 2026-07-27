@@ -92,21 +92,37 @@ class AccelToggleBody(BaseModel):
 # operator-selected methods only; there is no auto ladder mode in the UI.
 # ``wireframe`` remains excluded from the operator UI; it's kept on-wire for
 # backward compatibility but not surfaced in the bench controls.
+# 2026-07-26: btc4_per_tile / btc4_per_frame removed from the UI — the
+# tractor has no BTC4 encoder and silently clamps both to y_only, so the
+# menu entries were placebos. Their EncodeMode wire values (4, 5) stay
+# reserved in lora_proto for when an encoder lands.
 _ENCODE_MODE_UI_CHOICES = (
     "full",
     "y_only",
     "motion_only",
-    "btc4_per_tile",
-    "btc4_per_frame",
     "mono_g4",
 )
 
 
 class EncodeModeBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    mode: str = Field(...,
-              pattern=r"^(full|y_only|motion_only|btc4_per_tile|"
-                  r"btc4_per_frame|mono_g4)$")
+    # Both fields optional so a quality-only change does not have to
+    # restate the mode: the settings page holds a mode value it read at
+    # page load, and sending that back would silently revert a mode
+    # changed since (from the console pill, the gamepad, or another tab).
+    # Omitted mode -> keep the current one. At least one is required.
+    mode: str | None = Field(None,
+              pattern=r"^(full|y_only|motion_only|mono_g4)$")
+    # Optional WebP/codec quality (1-100) carried in the same 0x63 command
+    # frame as the mode. Omitted -> keep the current quality override.
+    quality: int | None = Field(None, ge=1, le=100)
+
+    @field_validator("quality")
+    @classmethod
+    def _need_one(cls, v, info):
+        if v is None and not info.data.get("mode"):
+            raise ValueError("provide at least one of 'mode' or 'quality'")
+        return v
 
 
 class RadioProfileBody(BaseModel):
@@ -220,28 +236,51 @@ ENCODE_MODE_STORE_PATH = Path(
 _ENCODE_MODE_TOPIC = "lifetrac/v25/control/encode_mode_override"
 _encode_mode_runtime_lock = threading.Lock()
 _encode_mode_runtime_override = "full"
+_encode_mode_runtime_quality: int | None = None   # None = tractor default
+
+
+def _load_encode_mode_state() -> tuple[str, int | None]:
+    """Return persisted (mode, quality), defaulting to ("full", None).
+
+    Store format is JSON ``{"mode": ..., "quality": ...}``; a legacy
+    bare-mode line (pre-quality store) is still accepted.
+    """
+    try:
+        if ENCODE_MODE_STORE_PATH.exists():
+            raw = ENCODE_MODE_STORE_PATH.read_text(encoding="utf-8").strip()
+            mode, quality = "full", None
+            try:
+                body = json.loads(raw)
+                if isinstance(body, dict):
+                    mode = str(body.get("mode", "full"))
+                    q = body.get("quality")
+                    if isinstance(q, int) and 1 <= q <= 100:
+                        quality = q
+            except json.JSONDecodeError:
+                mode = raw           # legacy single-line store
+            if mode == "auto":
+                mode = "full"
+            if mode in _ENCODE_MODE_UI_CHOICES:
+                return mode, quality
+    except OSError as exc:
+        logging.warning("encode_mode override file unreadable: %s", exc)
+    return "full", None
 
 
 def _load_encode_mode_override() -> str:
     """Return persisted mode name, defaulting to ``"full"``."""
-    try:
-        if ENCODE_MODE_STORE_PATH.exists():
-            val = ENCODE_MODE_STORE_PATH.read_text(encoding="utf-8").strip()
-            if val == "auto":
-                return "full"
-            if val in _ENCODE_MODE_UI_CHOICES:
-                return val
-    except OSError as exc:
-        logging.warning("encode_mode override file unreadable: %s", exc)
-    return "full"
+    return _load_encode_mode_state()[0]
 
 
-def _persist_encode_mode_override(mode: str) -> None:
-    """Write ``mode`` to ``ENCODE_MODE_STORE_PATH`` atomically."""
+def _persist_encode_mode_override(mode: str, quality: int | None) -> None:
+    """Write mode+quality to ``ENCODE_MODE_STORE_PATH`` atomically."""
     ENCODE_MODE_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp = ENCODE_MODE_STORE_PATH.with_suffix(
         ENCODE_MODE_STORE_PATH.suffix + ".tmp")
-    tmp.write_text(mode + "\n", encoding="utf-8")
+    body: dict[str, Any] = {"mode": mode}
+    if quality is not None:
+        body["quality"] = quality
+    tmp.write_text(json.dumps(body) + "\n", encoding="utf-8")
     os.replace(tmp, ENCODE_MODE_STORE_PATH)
 
 
@@ -250,10 +289,18 @@ def _get_runtime_encode_mode_override() -> str:
         return _encode_mode_runtime_override
 
 
-def _set_runtime_encode_mode_override(mode: str) -> None:
-    global _encode_mode_runtime_override
+def _get_runtime_encode_state() -> tuple[str, int | None]:
+    with _encode_mode_runtime_lock:
+        return _encode_mode_runtime_override, _encode_mode_runtime_quality
+
+
+def _set_runtime_encode_mode_override(mode: str,
+                                      quality: int | None = None) -> None:
+    global _encode_mode_runtime_override, _encode_mode_runtime_quality
     with _encode_mode_runtime_lock:
         _encode_mode_runtime_override = mode
+        if quality is not None:
+            _encode_mode_runtime_quality = quality
 
 
 # ---- Radio-profile selector + auto policy (2026-07-25) -----------------
@@ -279,8 +326,17 @@ _RADIO_PROFILE_LABELS = {
 _radio_profile_lock = threading.Lock()
 _radio_profile_mode = "2"          # UI selection (may be "auto")
 _radio_profile_active = 2          # concrete profile last commanded
+# True once a radio_profile pin has been observed on the broker (retained
+# replay at connect, or any live publish). Distinguishes "auto restarted,
+# the link already has a profile" from "nothing on the wire at all".
+_radio_profile_pin_seen = False
 _radio_acks: dict[str, dict] = {}  # "tx"/"rx" -> last retained ack
 _encode_mode_ack: dict | None = None   # tractor camera_service status
+# link_monitor / lora_bridge safe-mode override. Cached here because the
+# bridge publishes it retained + edge-only: a browser that connects after
+# the edge gets nothing on /ws/telemetry, so the console reads it from
+# /api/encode_mode/current instead of waiting for the next transition.
+_safe_mode_active = False
 
 
 def _load_radio_profile() -> str:
@@ -304,11 +360,17 @@ def _persist_radio_profile(mode: str) -> None:
 
 def _publish_radio_profile(profile: int, source: str) -> bool:
     global _radio_profile_active
-    payload = json.dumps({"profile": int(profile), "source": source})
+    # "ts" lets daemon-side consumers age-gate a stale retained pin
+    # (run-V incident class: a stale retained profile re-commanded the
+    # tractor mid-run). Consumers without the field treat it as live.
+    payload = json.dumps({"profile": int(profile), "source": source,
+                          "ts": time.time()})
     info = mqtt_client.publish(_RADIO_PROFILE_TOPIC, payload,
                                retain=True, qos=0)
+    global _radio_profile_pin_seen
     with _radio_profile_lock:
         _radio_profile_active = int(profile)
+        _radio_profile_pin_seen = True
     logging.info("radio_profile: published profile=%d (%s)", profile, source)
     return bool(info and info.rc == 0)
 
@@ -527,30 +589,41 @@ mqtt_client.loop_start()
 # Re-publish the persisted encode-mode override (retained) so a bridge
 # that came up after web_ui still applies the operator's last choice.
 # Best-effort: if the broker is still flaky we'll catch up on the next
-# POST /api/settings/encode_mode.
+# POST /api/settings/encode_mode. (Cycle now persists too, so the store
+# always matches the last operator action — the boot re-publish can no
+# longer roll back a mode cycled after the last settings save.)
 try:
-    _initial_override = _load_encode_mode_override()
-    _set_runtime_encode_mode_override(_initial_override)
+    _initial_mode, _initial_quality = _load_encode_mode_state()
+    _set_runtime_encode_mode_override(_initial_mode, _initial_quality)
+    _startup_payload: dict[str, Any] = {"mode": _initial_mode,
+                                        "ts": time.time()}
+    if _initial_quality is not None:
+        _startup_payload["quality"] = _initial_quality
     mqtt_client.publish(_ENCODE_MODE_TOPIC,
-                        json.dumps({"mode": _initial_override}),
+                        json.dumps(_startup_payload),
                         retain=True, qos=0)
-    logging.info("encode_mode_override: republished %s on startup",
-                 _initial_override)
+    logging.info("encode_mode_override: republished %s (q=%s) on startup",
+                 _initial_mode, _initial_quality)
 except Exception as exc:  # pragma: no cover — startup-best-effort
     logging.warning("encode_mode_override: startup republish failed: %s", exc)
 
 # Radio-profile startup: restore the persisted selection. Concrete picks
-# republish retained so daemons that came up after web_ui still converge;
-# "auto" starts the policy from the last commanded profile.
+# republish retained (the operator's explicit persisted choice) so daemons
+# that came up after web_ui still converge. "auto" must NOT publish at
+# boot: the module-default active profile (2) is not what the policy had
+# converged to before the restart, and re-pinning it retained is exactly
+# the run-V incident class (base re-commanded a stale profile mid-run).
+# Instead the auto worker below creates its policy lazily on the first
+# tick, seeded from _radio_profile_active — which by then reflects the
+# broker's retained pin via the _on_mqtt_message capture.
 _radio_auto_policy: AutoRadioPolicy | None = None
 try:
     _radio_profile_mode = _load_radio_profile()
     if _radio_profile_mode in ("0", "1", "2"):
         _publish_radio_profile(int(_radio_profile_mode), "startup")
     else:
-        _radio_auto_policy = AutoRadioPolicy(
-            initial_profile=_radio_profile_active, now=time.monotonic())
-        _publish_radio_profile(_radio_auto_policy.profile, "auto-startup")
+        logging.info("radio_profile: auto selected; deferring to the "
+                     "broker's retained pin (no boot re-publish)")
     logging.info("radio_profile: restored %r on startup", _radio_profile_mode)
 except Exception as exc:  # pragma: no cover — startup-best-effort
     logging.warning("radio_profile: startup restore failed: %s", exc)
@@ -572,7 +645,42 @@ def _radio_auto_worker() -> None:
             with _radio_profile_lock:
                 mode = _radio_profile_mode
                 policy = _radio_auto_policy
-            if mode != "auto" or policy is None:
+            if mode != "auto":
+                last_timeouts = None
+                continue
+            if policy is None:
+                # Don't seed until the broker session is up, or a slow
+                # connect would let this tick beat the retained replay and
+                # seed from the module default — the very thing the
+                # no-boot-publish change exists to avoid.
+                if not mqtt_client.is_connected():
+                    logging.info("radio_profile[auto]: broker not connected "
+                                 "yet; deferring policy seed")
+                    continue
+                # Lazily create the policy after boot, seeded from the
+                # profile actually on the wire (retained capture in
+                # _on_mqtt_message) — never from the module default.
+                with _radio_profile_lock:
+                    seed = _radio_profile_active
+                    seen = _radio_profile_pin_seen
+                policy = AutoRadioPolicy(initial_profile=seed,
+                                         now=time.monotonic())
+                with _radio_profile_lock:
+                    _radio_auto_policy = policy
+                if seen:
+                    logging.info("radio_profile[auto]: policy seeded from "
+                                 "retained pin %d (no boot re-pin)", seed)
+                else:
+                    # Nothing on the wire at all (fresh broker / first
+                    # boot). AutoRadioPolicy.evaluate() only publishes on a
+                    # TRANSITION, so without this the daemons would sit on
+                    # their env default forever while the policy believed
+                    # it was at `seed`. Publishing once here is safe: there
+                    # is no live pin for it to override, which is exactly
+                    # what made the boot re-pin dangerous in the first place.
+                    logging.info("radio_profile[auto]: no retained pin found "
+                                 "— seeding the link at profile %d", seed)
+                    _publish_radio_profile(seed, "auto-seed")
                 last_timeouts = None
                 continue
             now = time.monotonic()
@@ -816,6 +924,19 @@ def _on_mqtt_message(_c, _u, msg):
         # applied encoder mode (requested vs effective — surfaces silent
         # clamps); each image daemon confirms radio-profile switches.
         # All retained, so web_ui restarts repopulate the caches.
+        # Safe-mode state must be CACHED, not just fanned out live: the
+        # bridge publishes it retained and only on edges, so a page loaded
+        # after safe mode engaged would otherwise never learn about it and
+        # would show the operator's encode pin as if it were in force.
+        if msg.topic.endswith("/control/safe_mode_active"):
+            global _safe_mode_active
+            try:
+                body = json.loads(msg.payload.decode("utf-8"))
+                _safe_mode_active = bool(body.get("active")) \
+                    if isinstance(body, dict) else bool(body)
+            except Exception:
+                pass
+            # fall through: live subscribers still get the telemetry frame
         if msg.topic.endswith("/status/encode_mode"):
             try:
                 body = json.loads(msg.payload.decode("utf-8"))
@@ -848,6 +969,17 @@ def _on_mqtt_message(_c, _u, msg):
             return
 
         data = _decode_payload(msg.topic, msg.payload)
+        # Track the commanded radio profile actually on the wire (retained
+        # replay at connect + live publishes, including our own). Keeps
+        # _radio_profile_active truthful across restarts so the lazy auto
+        # policy seeds from reality, not the module default.
+        if msg.topic.endswith("/control/radio_profile") and isinstance(data, dict):
+            prof = data.get("profile")
+            if isinstance(prof, int) and prof in (0, 1, 2):
+                global _radio_profile_active, _radio_profile_pin_seen
+                with _radio_profile_lock:
+                    _radio_profile_active = prof
+                    _radio_profile_pin_seen = True
         if msg.topic.endswith("/source_active"):
             candidate = None
             if isinstance(data, dict):
@@ -1170,17 +1302,35 @@ async def ws_state(ws: WebSocket):
         _discard_subscriber(state_subscribers, ws)
 
 
+MAX_AUDIT_EVENT_BODY_BYTES = 2048   # cap for the two audit-intent POSTs below
+
+
+async def _bounded_json_body(request: Request) -> dict:
+    """Read a small JSON dict body; anything oversized/non-dict becomes {}."""
+    try:
+        raw = await request.body()
+    except Exception:
+        return {}
+    if len(raw) > MAX_AUDIT_EVENT_BODY_BYTES:
+        return {"truncated": True, "size": len(raw)}
+    try:
+        body = json.loads(raw or b"{}")
+    except Exception:
+        return {}
+    return body if isinstance(body, dict) else {}
+
+
 @app.post("/api/health/refusal")
-async def api_health_refusal(request: Request):
+async def api_health_refusal(request: Request,
+                             _session: str = Depends(_require_session)):
     """Browser badge_renderer.js posts here when it refuses a tile.
 
     We append to the audit log via the same channel as MQTT events so
-    refusal events become part of the black-box record.
+    refusal events become part of the black-box record. Session-gated and
+    size-capped: this used to relay arbitrary unauthenticated client JSON
+    onto the control/# namespace.
     """
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
+    body = await _bounded_json_body(request)
     try:
         mqtt_client.publish("lifetrac/v25/control/badge_refusal",
                             json.dumps(body).encode(), qos=1)
@@ -1190,13 +1340,12 @@ async def api_health_refusal(request: Request):
 
 
 @app.post("/api/audit/view_mode")
-async def api_audit_view_mode(request: Request):
+async def api_audit_view_mode(request: Request,
+                              _session: str = Depends(_require_session)):
     """Browser raw_mode_toggle.js posts here whenever the operator flips
-    raw mode. Logged to the black-box audit trail."""
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
+    raw mode. Logged to the black-box audit trail. Session-gated and
+    size-capped like /api/health/refusal."""
+    body = await _bounded_json_body(request)
     try:
         mqtt_client.publish("lifetrac/v25/control/view_mode",
                             json.dumps(body).encode(), qos=1)
@@ -1306,8 +1455,49 @@ async def ws_control(ws: WebSocket):
 
 @app.post("/api/estop")
 async def estop(_session: str = Depends(_require_session)):
-    mqtt_client.publish("lifetrac/v25/cmd/estop", b"", qos=1)
-    return {"ok": True}
+    """Latch the tractor E-stop via MQTT -> lora_bridge -> LoRa.
+
+    Reports what it can actually prove: whether the qos-1 publish was
+    confirmed by the LOCAL broker. Radio delivery has no ack path, so
+    ``delivered`` here means "handed to the bridge plane", not "tractor
+    stopped" — the frontend words its banner accordingly. Previously this
+    returned ``{"ok": true}`` unconditionally, even with MQTT down.
+    """
+    if not mqtt_client.is_connected():
+        return JSONResponse(
+            {"ok": False, "delivered": False,
+             "detail": "MQTT broker disconnected"},
+            status_code=503,
+        )
+    info = mqtt_client.publish("lifetrac/v25/cmd/estop", b"", qos=1)
+    delivered = bool(info and info.rc == mqtt.MQTT_ERR_SUCCESS)
+    if delivered and not info.is_published():
+        def _wait_confirm() -> bool:
+            """True if the broker confirmed; False if it definitely didn't.
+
+            Returns True on paho builds too old to support a bounded wait:
+            blocking an E-stop response on an unbounded wait would be
+            worse than reporting the enqueue, and reporting FAILED for a
+            publish that probably succeeded would train operators to
+            ignore the banner.
+            """
+            try:
+                info.wait_for_publish(timeout=1.0)
+            except TypeError:      # paho < 1.6 has no timeout kwarg
+                return True
+            except Exception:
+                return False
+            return info.is_published()
+        delivered = await asyncio.to_thread(_wait_confirm)
+    al = _get_audit_log()
+    if al is not None:
+        try:
+            al.record("estop_pressed", component="web_ui",
+                      delivered=delivered)
+        except Exception:  # pragma: no cover
+            pass
+    detail = None if delivered else "MQTT publish not confirmed by broker"
+    return {"ok": delivered, "delivered": delivered, "detail": detail}
 
 
 def _run_bench_radio_script(mode: str) -> dict[str, Any]:
@@ -1380,6 +1570,10 @@ def _run_bench_radio_script(mode: str) -> dict[str, Any]:
         }
 
 
+# One bench-radio helper at a time (they share the physical L072).
+_bench_radio_busy = asyncio.Lock()
+
+
 @app.post("/api/bench/radio")
 async def api_bench_radio(body: BenchRadioBody,
                           _session: str = Depends(_require_session)):
@@ -1388,7 +1582,17 @@ async def api_bench_radio(body: BenchRadioBody,
     if flag not in {"1", "true", "yes", "on"}:
         raise HTTPException(status_code=403, detail="bench radio control disabled")
 
-    result = _run_bench_radio_script(body.mode)
+    # The helper shells out to adb/serial probes and can legitimately take
+    # minutes; run it off the event loop so the whole UI (including
+    # /api/estop) stays responsive while it grinds. Single-flight: the
+    # helpers drive the SAME L072 over the same serial port, and moving
+    # off the loop removed the accidental serialization that used to
+    # prevent two concurrent probes from fighting over the modem.
+    if _bench_radio_busy.locked():
+        raise HTTPException(status_code=409,
+                            detail="bench radio helper already running")
+    async with _bench_radio_busy:
+        result = await asyncio.to_thread(_run_bench_radio_script, body.mode)
     try:
         mqtt_client.publish(
             "lifetrac/v25/control/bench_radio",
@@ -1885,8 +2089,10 @@ async def api_encode_mode_get(_session: str = Depends(_require_session)):
     """Return the persisted operator-selected mode + available choices.
     the UI is allowed to surface.
     """
+    mode, quality = _load_encode_mode_state()
     return {
-        "current": _load_encode_mode_override(),
+        "current": mode,
+        "quality": quality,
         "choices": list(_ENCODE_MODE_UI_CHOICES),
     }
 
@@ -1903,12 +2109,15 @@ async def api_encode_mode_current(_session: str = Depends(_require_session)):
     keyframe, so this converges within one frame of a real switch).
     """
     stats = getattr(_image_publisher, "link_stats", None) or {}
+    mode, quality = _get_runtime_encode_state()
     return {
-        "current": _get_runtime_encode_mode_override(),
+        "current": mode,
+        "quality": quality,
         "choices": list(_ENCODE_MODE_UI_CHOICES),
         "tractor": _encode_mode_ack,
         "rx_codec": stats.get("rx_codec"),
         "rx_codec_name": stats.get("rx_codec_name"),
+        "safe_mode": _safe_mode_active,
     }
 
 
@@ -1923,51 +2132,58 @@ async def api_encode_mode_set(body: EncodeModeBody,
     The bridge handler (`lora_bridge._on_mqtt_message`) applies the
     selected mode immediately.
     """
-    return _set_encode_mode_override(body.mode, persist=True)
+    mode = body.mode or _get_runtime_encode_mode_override()
+    return _set_encode_mode_override(mode, persist=True,
+                                     quality=body.quality)
 
 
 # Subset of `_ENCODE_MODE_UI_CHOICES` that the gamepad / pill cycle button
-# advances through. Kept narrow for bench testing so the operator can
-# eyeball each mode change without having to step through legacy or
-# not-yet-implemented codecs. Order matches the on-screen pill rotation.
+# advances through. Order matches the on-screen pill rotation.
 _ENCODE_MODE_CYCLE_ORDER: tuple[str, ...] = (
     "full",
     "y_only",
     "motion_only",
-    "btc4_per_tile",
-    "btc4_per_frame",
     "mono_g4",
 )
 
 
-def _set_encode_mode_override(mode: str, *, persist: bool) -> dict:
-    """Set + publish an operator-selected encode mode.
+def _set_encode_mode_override(mode: str, *, persist: bool,
+                              quality: int | None = None) -> dict:
+    """Set + publish an operator-selected encode mode (+ optional quality).
 
     Shared by ``POST /api/settings/encode_mode`` and
-    ``POST /api/encode_mode/cycle`` while allowing different persistence
-    semantics.
-    Returns the JSON body the endpoints surface to clients.
+    ``POST /api/encode_mode/cycle``. ``quality=None`` keeps the current
+    quality override. Returns the JSON body the endpoints surface.
     """
     if mode not in _ENCODE_MODE_UI_CHOICES:
         raise HTTPException(status_code=400,
                             detail=f"unknown encode mode: {mode!r}")
+    # Persist BEFORE mutating runtime state: an OSError here must leave
+    # the runtime override, the store, and the wire all agreeing on the
+    # old value rather than stranding a change only this process knows.
+    eff_quality = quality if quality is not None else _get_runtime_encode_state()[1]
+    eff_mode = mode
     if persist:
         try:
-            _persist_encode_mode_override(mode)
+            _persist_encode_mode_override(eff_mode, eff_quality)
         except OSError as exc:
             logging.error("failed to persist encode_mode override to %s: %s",
                           ENCODE_MODE_STORE_PATH, exc)
             raise HTTPException(status_code=500,
                                 detail=f"could not persist override: {exc}")
-    _set_runtime_encode_mode_override(mode)
-    payload = json.dumps({"mode": mode})
-    info = mqtt_client.publish(_ENCODE_MODE_TOPIC, payload, retain=True, qos=0)
+    _set_runtime_encode_mode_override(eff_mode, eff_quality)
+    body: dict[str, Any] = {"mode": eff_mode, "ts": time.time()}
+    if eff_quality is not None:
+        body["quality"] = eff_quality
+    info = mqtt_client.publish(_ENCODE_MODE_TOPIC, json.dumps(body),
+                               retain=True, qos=0)
     delivered = bool(info and info.rc == 0)
     return {
         "ok": True,
-        "mode": mode,
-        "delivered": delivered,
-        "persisted": persist,
+        "mode": eff_mode,
+        "quality": eff_quality,
+        "delivered": delivered,   # local broker enqueue only — the real
+        "persisted": persist,     # confirmation is the tractor 0x68 ack
     }
 
 
@@ -1976,11 +2192,10 @@ async def api_encode_mode_cycle(_session: str = Depends(_require_session)):
     """Advance the operator-selected encode mode through the cycle order.
 
     Reads the current runtime override, rotates to the next entry in
-    :data:`_ENCODE_MODE_CYCLE_ORDER`, and publishes the new value without
-    changing the persisted Settings value. Wired to the gamepad
-    BACK/SELECT button (idx 8) and the web
-    encoder-mode pill so a bench operator can sweep visually-distinct
-    codecs without touching the settings page.
+    :data:`_ENCODE_MODE_CYCLE_ORDER`, publishes AND persists it (2026-07-26:
+    cycling used to skip persistence, so a restart re-pinned the stale
+    settings value over the last cycled mode). Wired to the gamepad
+    BACK/SELECT button (idx 8) and the web encoder-mode pill.
     """
     current = _get_runtime_encode_mode_override()
     if current in _ENCODE_MODE_CYCLE_ORDER:
@@ -1990,7 +2205,7 @@ async def api_encode_mode_cycle(_session: str = Depends(_require_session)):
         # Persisted/runtime value is outside the cycle list; snap back
         # to the head of the cycle on the next press.
         nxt = _ENCODE_MODE_CYCLE_ORDER[0]
-    result = _set_encode_mode_override(nxt, persist=False)
+    result = _set_encode_mode_override(nxt, persist=True)
     result["previous"] = current
     return result
 

@@ -66,7 +66,36 @@
     });
   }
 
-  const wsTele = new WebSocket(`ws://${location.host}/ws/telemetry`);
+  // Telemetry socket auto-reconnects like the control socket. Without
+  // this a single drop (e.g. a web_ui restart) froze the source banner,
+  // the controls-lock state, and the camera echo forever — and, since
+  // 2026-07-26, latched the control-radio pill at a permanent false
+  // "STALE" because its only data source is this socket.
+  let wsTele = null;
+  let wsTeleReconnectTimer = null;
+  let wsTeleReconnectDelayMs = 1000;
+
+  function connectTele() {
+    if (wsTeleReconnectTimer) { clearTimeout(wsTeleReconnectTimer); wsTeleReconnectTimer = null; }
+    wsTele = new WebSocket(`ws://${location.host}/ws/telemetry`);
+    wsTele.addEventListener('open', () => {
+      wsTeleReconnectDelayMs = 1000;
+      // Re-seed cached server state the live stream can't replay.
+      refreshEncodeMode();
+    });
+    wsTele.addEventListener('close', () => {
+      if (!wsTeleReconnectTimer) {
+        wsTeleReconnectTimer = setTimeout(() => {
+          wsTeleReconnectTimer = null; connectTele();
+        }, wsTeleReconnectDelayMs);
+        wsTeleReconnectDelayMs = Math.min(10000, wsTeleReconnectDelayMs * 2);
+      }
+    });
+    wsTele.addEventListener('error', () => {
+      try { wsTele.close(); } catch (_) {}
+    });
+    wsTele.addEventListener('message', onTeleMessage);
+  }
 
   function normalizeSource(value) {
     if (typeof value === 'string') return value.toLowerCase();
@@ -151,6 +180,12 @@
       state.lhx = state.lhy = state.rhx = state.rhy = 0;
       state.buttons = 0;
       state.flags = 0;
+      // Also clear the on-screen latches: a pointerup that arrives while
+      // locked is swallowed by set(), so without this a held button
+      // (worst case REQ CTRL, buttons bit7 + flags bit0) would re-emerge
+      // latched on the first frame after unlock.
+      screenButtons = 0;
+      screenFlags = 0;
       syncPadVisuals(false);
       syncButtonVisuals(0);
     } else {
@@ -170,7 +205,7 @@
     if (!data || typeof data !== 'object') return;
     if ('u_total' in data) document.getElementById('t-link-use').textContent = pct(data.u_total);
     if ('u_image' in data) document.getElementById('t-img-use').textContent = pct(data.u_image);
-    if ('u_telemetry' in data) document.getElementById('t-loss').textContent = `telem ${pct(data.u_telemetry)}`;
+    if ('u_telemetry' in data) document.getElementById('t-loss').textContent = pct(data.u_telemetry);
     if ('encode_mode' in data) document.getElementById('t-encode').textContent = String(data.encode_mode).toLowerCase();
   }
 
@@ -185,7 +220,7 @@
   }, 50);
 
   // ----- Telemetry sidebar -----
-  wsTele.addEventListener('message', (ev) => {
+  function onTeleMessage(ev) {
     try {
       const msg = JSON.parse(ev.data);
       // Decoders are placeholders — real schema lives in lora_proto/MQTT-SN topic table.
@@ -213,6 +248,15 @@
         const ndvi = (d && typeof d.ndvi_mean === 'number') ? d.ndvi_mean.toFixed(2) : d;
         document.getElementById('t-ndvi').textContent = ndvi;
       }
+      // control/link_airtime is the topic the bridge actually publishes
+      // ({u_image, u_telemetry, u_total, encode_mode}); /status/link kept
+      // only for legacy payloads. Its arrival doubles as the control-radio
+      // heartbeat for the header pill (retained replay fakes one beat on
+      // reconnect; the staleness window absorbs that).
+      if (msg.topic.endsWith('/control/link_airtime')) {
+        lastAirtimeMs = performance.now();
+        setLinkStatus(msg.data);
+      }
       if (msg.topic.endsWith('/status/link') || (msg.topic.endsWith('/source_active') && msg.data && typeof msg.data === 'object')) {
         setLinkStatus(msg.data);
       }
@@ -221,15 +265,52 @@
           && ('active_source' in msg.data || 'source' in msg.data);
         if (typeof msg.data !== 'object' || hasSourceField) setSource(msg.data);
       }
-      // Encode mode is manual-only; ignore legacy safe-mode topic payloads.
       if (msg.topic.endsWith('/control/safe_mode_active')) {
-        setSafeMode(false);
+        // Bridge payload: {"active": bool, "since_ms": ...}; tolerate
+        // bare booleans/ints from older publishers.
+        const d = msg.data;
+        const active = (d && typeof d === 'object') ? !!d.active
+                     : (d === true || d === 1 || d === '1' || d === 'true');
+        setSafeMode(active);
       }
     } catch (e) { /* shrug */ }
-  });
+  }
+
+  // Start the telemetry socket (auto-reconnecting).
+  connectTele();
   setInterval(() => {
-    if (wsTele.readyState === WebSocket.OPEN) wsTele.send('ping');
+    if (wsTele && wsTele.readyState === WebSocket.OPEN) wsTele.send('ping');
   }, 5000);
+
+  // ----- Control-radio health pill -----
+  // Fed by control/link_airtime arrival (the bridge's periodic publish).
+  // Before this pill, a dead lora_bridge / control radio was invisible:
+  // the footer "link" pill only covers the browser-to-server WebSocket.
+  const ctrlLinkPill = document.getElementById('ctrl-link-pill');
+  setInterval(() => {
+    if (!ctrlLinkPill) return;
+    // Distinguish "the control radio is quiet" from "MY telemetry socket
+    // is down" — otherwise any web_ui restart latches a red alarm about
+    // hardware that is perfectly healthy.
+    if (!wsTele || wsTele.readyState !== WebSocket.OPEN) {
+      ctrlLinkPill.textContent = 'ctrl radio: no telemetry link';
+      ctrlLinkPill.classList.remove('on');
+      return;
+    }
+    if (!lastAirtimeMs) {
+      ctrlLinkPill.textContent = 'ctrl radio: no data';
+      ctrlLinkPill.classList.remove('on');
+      return;
+    }
+    const ageS = (performance.now() - lastAirtimeMs) / 1000;
+    if (ageS < 15) {
+      ctrlLinkPill.textContent = 'ctrl radio: OK';
+      ctrlLinkPill.classList.add('on');
+    } else {
+      ctrlLinkPill.textContent = `ctrl radio: STALE ${Math.round(ageS)}s`;
+      ctrlLinkPill.classList.remove('on');
+    }
+  }, 2000);
 
   // ----- Image metadata (authoritative /ws/state event stream) -----
   // Image pixels are rendered by img/canvas_renderer.js from `/ws/state`.
@@ -261,7 +342,12 @@
           `▲ ${bps}`,
           `${(ls.frames_per_s ?? 0).toFixed(2)} frames/s`,
         ];
-        if (typeof ls.rssi_dbm === 'number') parts.push(`RSSI ${ls.rssi_dbm} dBm`);
+        if (typeof ls.rssi_dbm === 'number') {
+          parts.push(`RSSI ${ls.rssi_dbm} dBm`);
+          // Feed the telemetry-sidebar RSSI row too (it had no writer).
+          const rssiRow = document.getElementById('t-rssi');
+          if (rssiRow) rssiRow.textContent = `${ls.rssi_dbm} dBm`;
+        }
         if (typeof ls.snr_db === 'number') parts.push(`SNR ${ls.snr_db > 0 ? '+' : ''}${ls.snr_db} dB`);
         if (ls.parity_reconstructions > 0) parts.push(`parity saves ${ls.parity_reconstructions}`);
         if (ls.timeouts > 0) parts.push(`⚠ ${ls.timeouts} timeouts`);
@@ -363,7 +449,10 @@
     const bit = 1 << idx;
     buttonVisuals.push({ el: btn, maskBit: bit });
     const set = (down) => {
-      if (controlsLocked) return;
+      // Presses are ignored while another source holds control, but
+      // releases must ALWAYS clear their bit — swallowing a pointerup
+      // during a locked interval latches the bit until the next press.
+      if (down && controlsLocked) return;
       if (down) screenButtons |= bit; else screenButtons &= ~bit;
       // Take-control button → also set flags bit0 while held.
       if (parseInt(btn.dataset.btn, 10) === 7) {
@@ -380,9 +469,68 @@
     btn.addEventListener('pointerleave',() => set(false));
   });
 
-  document.getElementById('estop').addEventListener('click', () => {
-    fetch('/api/estop', { method: 'POST' });
-  });
+  // ----- E-stop dispatch with visible delivery feedback -----
+  // /api/estop only proves the request reached web_ui and its local MQTT
+  // publish succeeded — the radio hop has no ack path — so report exactly
+  // that, and scream when even that much fails. A web_ui restart wipes the
+  // in-memory session store, and the resulting 401 used to be totally
+  // silent: the operator pressed E-STOP and nothing happened, visibly or
+  // otherwise.
+  const estopBanner = (() => {
+    const el = document.createElement('div');
+    el.id = 'estop-banner';
+    el.style.position = 'fixed';
+    el.style.top = '50px';
+    el.style.left = '50%';
+    el.style.transform = 'translateX(-50%)';
+    el.style.padding = '10px 18px';
+    el.style.borderRadius = '8px';
+    el.style.font = '700 16px/1.3 monospace';
+    el.style.letterSpacing = '0.03em';
+    el.style.color = '#fff';
+    el.style.zIndex = '999';
+    el.style.display = 'none';
+    el.style.boxShadow = '0 4px 18px rgba(0,0,0,0.6)';
+    document.body.appendChild(el);
+    return el;
+  })();
+  let estopBannerTimer = null;
+  function showEstopBanner(text, background, holdMs) {
+    estopBanner.textContent = text;
+    estopBanner.style.background = background;
+    estopBanner.style.display = 'block';
+    estopBanner.style.pointerEvents = 'none';
+    estopBanner.style.cursor = 'default';
+    estopBanner.onclick = null;
+    if (estopBannerTimer) { clearTimeout(estopBannerTimer); estopBannerTimer = null; }
+    if (holdMs) {
+      estopBannerTimer = setTimeout(() => { estopBanner.style.display = 'none'; }, holdMs);
+    }
+  }
+  function fireEstop() {
+    showEstopBanner('E-STOP: sending…', '#b36b00', 0);
+    fetch('/api/estop', { method: 'POST' })
+      .then(async (resp) => {
+        const data = await resp.json().catch(() => ({}));
+        if (resp.status === 401) {
+          showEstopBanner('E-STOP NOT SENT — SESSION EXPIRED — TAP HERE TO LOG IN', '#d62828', 0);
+          estopBanner.style.pointerEvents = 'auto';
+          estopBanner.style.cursor = 'pointer';
+          estopBanner.onclick = () => { window.location = '/login'; };
+          return;
+        }
+        if (resp.ok && data && data.ok !== false && data.delivered !== false) {
+          showEstopBanner('E-STOP SENT (radio delivery unconfirmed)', '#2e7d32', 4000);
+        } else {
+          const why = (data && (data.detail || data.error)) || `HTTP ${resp.status}`;
+          showEstopBanner(`E-STOP FAILED — ${why} — USE HARDWARE STOP`, '#d62828', 0);
+        }
+      })
+      .catch(() => {
+        showEstopBanner('E-STOP FAILED — NO SERVER LINK — USE HARDWARE STOP', '#d62828', 0);
+      });
+  }
+  document.getElementById('estop').addEventListener('click', fireEstop);
 
   // ----- Camera switcher -----
   // Sends CMD_CAMERA_SELECT via the web_ui /api/camera/select endpoint, which
@@ -459,12 +607,12 @@
   // On mode switch we clear the canvas and show a temporary mode label
   // until the first tile of the new stream is painted.
   const encPill = document.getElementById('encode-mode-pill');
+  // btc4_* removed 2026-07-26 — no tractor encoder exists; the server
+  // catalogue and cycle order no longer offer them.
   const encMeta = {
     full: { label: 'Full color', desc: 'baseline RGB WebP' },
     y_only: { label: 'Y-only WebP', desc: 'luma only, recolor at base' },
     motion_only: { label: 'Motion-only gray', desc: 'pure grayscale with quality cap for bandwidth' },
-    btc4_per_tile: { label: 'BTC4 / tile', desc: '4-level per-tile palette — encoder pending, tractor falls back to Y-only' },
-    btc4_per_frame: { label: 'BTC4 / frame', desc: '4-level per-frame palette — encoder pending, tractor falls back to Y-only' },
     mono_g4: { label: 'Mono / G4', desc: '1-bit dither + Group-4 fax' },
   };
   const modeOverlay = (() => {
@@ -496,7 +644,10 @@
   // clamps), and reassembled frames self-describe their codec. Both
   // surface through /api/encode_mode/current; render a mismatch instead
   // of trusting the optimistic POST response forever.
-  let encTractorAck = null;   // {effective_name, clamped, ...} | null
+  let encTractorAck = null;   // {effective_name, clamped, quality?, ...} | null
+  let encQuality = null;      // operator-pinned quality (1-100) | null
+  let safeModeActive = false; // link_monitor safe-mode override (bridge plane)
+  let lastAirtimeMs = 0;      // performance.now() of last control/link_airtime
   function clearImageForModeSwitch(mode) {
     const canvas = document.getElementById('image-canvas');
     if (canvas) {
@@ -532,16 +683,29 @@
         mismatch = true;
       }
     }
+    if (safeModeActive) text = 'SAFE MODE \u00b7 ' + text;
     encPill.textContent = text;
     encPill.title = (encTractorAck && encTractorAck.effective_name)
       ? `pinned: ${encCurrentMode} \u00b7 tractor runs: ${encTractorAck.effective_name}`
+        + (typeof encTractorAck.quality === 'number'
+            ? ` @ q${encTractorAck.quality}` : '')
         + (encTractorAck.clamped ? ' (clamped \u2014 encoder not implemented)' : '')
       : (meta.desc ? `${meta.label} - ${meta.desc}`
-                   : `Current encode mode: ${encCurrentMode}`);
-    encPill.classList.remove('safe');
-    encPill.classList.toggle('mismatch', mismatch);
+                   : `Current encode mode: ${encCurrentMode}`)
+        + (encQuality != null ? ` \u00b7 q${encQuality} pinned` : '');
+    if (safeModeActive) {
+      encPill.title = 'Link monitor engaged SAFE MODE \u2014 the bridge floor-clamps '
+        + 'the encode mode regardless of the operator pin. ' + encPill.title;
+    }
+    encPill.classList.toggle('safe', safeModeActive);
+    encPill.classList.toggle('mismatch', mismatch && !safeModeActive);
   }
-  function setSafeMode(_active) {}
+  function setSafeMode(active) {
+    active = !!active;
+    if (active === safeModeActive) return;
+    safeModeActive = active;
+    _renderEncPill();
+  }
   function _setEncMode(mode) {
     encCurrentMode = (typeof mode === 'string' && mode) ? mode : 'full';
     _renderEncPill();
@@ -555,7 +719,12 @@
       .then(j => {
         if (!j) return;
         if (j.current) encCurrentMode = j.current;
+        encQuality = (typeof j.quality === 'number') ? j.quality : null;
         encTractorAck = j.tractor || null;
+        // Server-cached safe mode: the bridge publishes that topic
+        // edge-only, so a page loaded mid-safe-mode would never see it
+        // from the telemetry socket alone.
+        if (typeof j.safe_mode === 'boolean') safeModeActive = j.safe_mode;
         _renderEncPill();
       })
       .catch(() => { /* keep last known state */ });
@@ -569,12 +738,26 @@
     }
     waitingForModeFrame = true;
     fetch('/api/encode_mode/cycle', { method: 'POST' })
-      .then(r => r.ok ? r.json() : null)
+      .then(async (r) => {
+        if (r.status === 401) {
+          // Same silent-failure class as the old E-stop handler: a
+          // web_ui restart wipes sessions and the pill would just sit
+          // there looking like the tractor ignored the command.
+          waitingForModeFrame = false;
+          if (modeOverlay) {
+            modeOverlay.textContent = 'session expired — log in again';
+            modeOverlay.style.display = 'block';
+            setTimeout(() => { modeOverlay.style.display = 'none'; }, 4000);
+          }
+          return null;
+        }
+        return r.ok ? r.json() : null;
+      })
       .then(j => {
         if (j && j.mode) {
           _setEncMode(j.mode);
           clearImageForModeSwitch(j.mode);
-        } else {
+        } else if (waitingForModeFrame) {
           waitingForModeFrame = false;
           if (modeOverlay) modeOverlay.style.display = 'none';
         }
@@ -662,9 +845,10 @@
     if (gp.buttons[3]?.pressed) buttons |= (1 << 3);   // Y → aux2
     if (gp.buttons[5]?.pressed) { buttons |= (1 << 7); flags |= 0x01; } // RB → take-control
     gamepadButtonsMask = buttons;
-    // E-stop: rising edge only.
+    // E-stop: rising edge only. Shares the feedback banner with the
+    // on-screen button so gamepad E-stops also surface failures.
     if (pressed(gp, 9)) {
-      fetch('/api/estop', { method: 'POST' });
+      fireEstop();
     }
     // Encoder method cycle: BACK/SELECT (button 8) on standard XInput.
     // Edge-triggered so a long press still cycles exactly once. Mirrors

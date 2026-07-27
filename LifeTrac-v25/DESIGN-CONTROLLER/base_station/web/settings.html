@@ -211,6 +211,19 @@
     <span id="encmode-current" class="pill grey">unknown</span>
     <span id="encmode-status" class="meta"></span>
   </div>
+  <div class="row">
+    <span>Quality:</span>
+    <input type="range" id="encq-slider" min="20" max="100" step="5" value="55"
+           aria-label="Codec quality">
+    <span id="encq-value" class="pill grey">—</span>
+    <button id="encq-send">Apply quality</button>
+    <span id="encq-status" class="meta"></span>
+  </div>
+  <p class="meta">
+    Codec quality (20–100) rides the same 0x63 LoRa command as the mode;
+    the tractor echoes the effective value in its ack. Lower = smaller
+    frames = faster link.
+  </p>
   <style>
     #encmode-buttons button {
       padding: 0.45em 0.9em; border: 1px solid #bbb; background: #f7f7f7;
@@ -229,22 +242,60 @@
     const encStatus = document.getElementById('encmode-status');
 
     // Human labels + short descriptions for each mode.
+    // (btc4_per_tile / btc4_per_frame removed 2026-07-26: no tractor
+    // encoder exists — they clamped to y_only and were placebo entries.
+    // The server catalogue no longer offers them.)
     const ENC_META = {
       'full':            {label: 'Full color',     desc: 'baseline RGB WebP (~26 B/tile)'},
       'y_only':          {label: 'Y-only WebP',    desc: 'luma only, recolor at base (~19 B/tile)'},
       'motion_only':     {label: 'Motion-only gray', desc: 'pure grayscale with capped quality (~low bandwidth)'},
-      'btc4_per_tile':   {label: 'BTC4 / tile',    desc: '4-level per-tile palette + LZ4 (~8 B/tile)'},
-      'btc4_per_frame':  {label: 'BTC4 / frame',   desc: '4-level per-frame palette + LZ4 (~5 B/tile)'},
       'mono_g4':         {label: 'Mono / G4',      desc: '1-bit dither + Group-4 fax (~4 B/tile, most resilient)'},
     };
 
+    let encCurrentMode = 'full';
     function paintCurrent(mode) {
+      encCurrentMode = mode;
       encPill.textContent = (ENC_META[mode] && ENC_META[mode].label) || mode;
       encPill.className = 'pill ' + (mode === 'mono_g4' ? 'orange' : 'green');
       for (const btn of encWrap.querySelectorAll('button')) {
         btn.classList.toggle('active', btn.dataset.mode === mode);
       }
     }
+
+    // ---- Quality control (rides the same 0x63 frame as the mode) ----
+    const encqSlider = document.getElementById('encq-slider');
+    const encqValue  = document.getElementById('encq-value');
+    const encqSend   = document.getElementById('encq-send');
+    const encqStatus = document.getElementById('encq-status');
+    encqSlider.addEventListener('input', () => {
+      encqValue.textContent = encqSlider.value;
+    });
+    encqSend.addEventListener('click', async () => {
+      encqStatus.textContent = 'sending…';
+      encqSend.disabled = true;
+      try {
+        const r = await fetch('/api/settings/encode_mode', {
+          method:'POST', credentials:'include',
+          headers:{'Content-Type':'application/json'},
+          // Quality only — deliberately NOT restating the mode: this
+          // page's copy can be stale (console pill / gamepad / another
+          // tab), and echoing it back would revert their change.
+          body: JSON.stringify({quality: parseInt(encqSlider.value, 10)}),
+        });
+        if (r.status === 401) { location = '/'; return; }
+        if (!r.ok) { encqStatus.textContent = 'set failed: HTTP ' + r.status; return; }
+        const data = await r.json();
+        encqValue.textContent = data.quality != null ? data.quality : '—';
+        if (data.mode) paintCurrent(data.mode);   // server is authoritative
+        encqStatus.textContent = data.delivered
+          ? 'pinned — tractor ack will confirm the effective value'
+          : 'persisted (broker offline)';
+      } catch (e) {
+        encqStatus.textContent = 'error: ' + e.message;
+      } finally {
+        encqSend.disabled = false;
+      }
+    });
 
     async function loadEncodeMode() {
       const r = await fetch('/api/settings/encode_mode', {credentials:'include'});
@@ -263,6 +314,10 @@
         encWrap.appendChild(btn);
       }
       paintCurrent(data.current);
+      if (data.quality != null) {
+        encqSlider.value = data.quality;
+        encqValue.textContent = data.quality;
+      }
     }
 
     async function setEncodeMode(mode) {

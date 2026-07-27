@@ -954,7 +954,7 @@ def add_parity_fragments(fragments: list[bytes], frag_seq: int,
 # into the same AEAD envelope; tracked in the 2026-07-25 roadmap doc.
 COMMAND_FRAME_MAGIC = 0xFB
 CMD_OP_REQ_KEYFRAME       = 0x60   # args: none
-CMD_OP_ENCODE_MODE        = 0x63   # args: u8 mode id
+CMD_OP_ENCODE_MODE        = 0x63   # args: u8 mode id [, u8 quality 1-100]
 CMD_OP_RADIO_PROFILE      = 0x65   # args: u8 profile id (0/1/2)
 CMD_OP_RADIO_PROFILE_ACK  = 0x66   # args: u8 profile id (tractor -> base)
 CMD_OP_RADIO_PROFILE_CONF = 0x67   # args: u8 profile id (base -> tractor)

@@ -72,8 +72,17 @@ class PinAuthTests(unittest.TestCase):
     def test_protected_route_works_after_login(self):
         self.client.post("/api/login", json={"pin": "424242"})
         r = self.client.post("/api/estop")
-        self.assertEqual(r.status_code, 200)
-        self.assertTrue(r.json().get("ok"))
+        # Auth contract: the route must be REACHABLE after login (never
+        # 401). Since 2026-07-26 /api/estop reports real MQTT delivery
+        # (ok == delivered) instead of an unconditional ok:true; with the
+        # unit-test broker mock the delivery verdict is whatever the mock
+        # yields, so this test asserts only the auth property + response
+        # shape and leaves delivery semantics to the endpoint's own tests.
+        self.assertNotEqual(r.status_code, 401)
+        self.assertIn(r.status_code, (200, 503))
+        body = r.json()
+        self.assertIn("ok", body)
+        self.assertIn("delivered", body)
 
     def test_logout_invalidates_session(self):
         self.client.post("/api/login", json={"pin": "424242"})

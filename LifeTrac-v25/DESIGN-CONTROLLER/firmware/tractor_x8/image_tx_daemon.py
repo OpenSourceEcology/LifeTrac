@@ -319,6 +319,9 @@ class ImageTxDaemon:
         self._revert_profile: int | None = None
         # camera_service's local encode ack, forwarded over LoRa.
         self._enc_ack_out: bytes | None = None
+        # Last encode ack actually radiated as 0x68 — used to suppress the
+        # retained-replay echo paho re-delivers on every MQTT reconnect.
+        self._enc_ack_last_fwd: bytes | None = None
 
     # ---- MQTT side ----
     def _on_message(self, _client, _userdata, msg) -> None:
@@ -587,6 +590,16 @@ class ImageTxDaemon:
             LOG.debug("command drain failed: %s", exc)
         return out
 
+    def _dispatch_rx_pending(self, frames: list) -> None:
+        """Dispatch RX frames harvested by a wait_for_tx_done rx_sink."""
+        for f in frames:
+            try:
+                parsed = parse_rx_frame(f["payload"])
+                self._dispatch_command(parsed.get("payload", b""))
+            except Exception as exc:
+                LOG.debug("rx_sink dispatch failed: %s", exc)
+        frames.clear()
+
     def _dispatch_command(self, data: bytes) -> None:
         cmd = parse_command_frame(data)
         if cmd is None:
@@ -600,11 +613,19 @@ class ImageTxDaemon:
         elif opcode == CMD_OP_ENCODE_MODE:
             if len(args) >= 1:
                 mode = args[0]
-                LOG.info("LoRa cmd: ENCODE_MODE %d", mode)
+                body = {"mode": int(mode)}
+                # Optional second byte (2026-07-26): codec quality 1-100,
+                # same frame. Old bases send 1-byte args; out-of-range
+                # bytes are dropped rather than guessed at.
+                if len(args) >= 2 and 1 <= args[1] <= 100:
+                    body["quality"] = int(args[1])
+                LOG.info("LoRa cmd: ENCODE_MODE %d%s", mode,
+                         (" q=%d" % body["quality"]) if "quality" in body
+                         else "")
                 if client is not None:
                     import json as _json
                     client.publish(TRACTOR_ENCODE_MODE_TOPIC,
-                                   _json.dumps({"mode": int(mode)}),
+                                   _json.dumps(body),
                                    qos=0, retain=True)
         elif opcode == CMD_OP_RADIO_PROFILE:
             if len(args) >= 1 and args[0] in _PROFILE_CHOICES:
@@ -628,25 +649,35 @@ class ImageTxDaemon:
     def _send_command_frame(self, link: HostLink, body: bytes,
                             copies: int = 2) -> None:
         """Fire-and-forget TX of one command frame (idempotent, tiny)."""
+        rx_pending: list = []
         try:
             for _ in range(max(1, copies)):
                 try:
                     tx_frame = bytes([0xFE, len(body)]) + body
                     link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
-                    wait_for_tx_done(link, 0xFE, timeout=2.0)
+                    wait_for_tx_done(link, 0xFE, timeout=2.0,
+                                     rx_sink=rx_pending)
                 except Exception as exc:
                     LOG.warning("command TX failed: %s", exc)
                     return
         finally:
             self._ensure_rxcont(link)
+            # Frames captured during our own command TX (e.g. the base's
+            # CONF landing while an ack radiates) are dispatched, not lost.
+            self._dispatch_rx_pending(rx_pending)
 
     def _service_control_plane(self, link: HostLink) -> None:
         # Forward camera_service's encode ack over LoRa (latest wins).
-        ack = self._enc_ack_out
-        if ack is not None:
+        # Atomic swap under the lock: the paho thread writes _enc_ack_out,
+        # and an unlocked read-then-clear here could drop an ack that
+        # arrived between the two statements (2026-07-26).
+        with self.lock:
+            ack = self._enc_ack_out
             self._enc_ack_out = None
+        if ack is not None:
             self._send_command_frame(link, pack_command_frame(
                 CMD_OP_ENCODE_MODE_ACK, ack[:200]), copies=1)
+            self._enc_ack_last_fwd = ack
         # Flush queued command frames (profile acks).
         flushed_profile_ack = False
         while True:
@@ -818,13 +849,21 @@ class ImageTxDaemon:
             while True:
                 if not self.budget.admit(est_us, self._stop):
                     return                                     # shutting down
+                rx_pending: list = []
                 try:
                     tx_id = idx & 0xFF
                     tx_frame = bytes([tx_id, len(body)]) + body
                     link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
+                    # rx_sink (2026-07-26): commands arriving during the
+                    # TX-verdict wait used to be consumed-and-dropped
+                    # inside wait_for_tx_done — the v2-path half of the
+                    # mid-burst command-discard bug (v3 got its fix on
+                    # 2026-07-25; this is the DEFAULT path's).
                     done, faults = wait_for_tx_done(
-                        link, tx_id, timeout=PER_FRAGMENT_TX_TIMEOUT_S)
+                        link, tx_id, timeout=PER_FRAGMENT_TX_TIMEOUT_S,
+                        rx_sink=rx_pending)
                 except RuntimeError as exc:      # ERR_PROTO FORBIDDEN == QoS refusal:
+                    self._dispatch_rx_pending(rx_pending)
                     qos_retries_left -= 1
                     if qos_retries_left < 0:
                         LOG.warning("QoS refusal cap reached for frag %d", idx)
@@ -832,6 +871,9 @@ class ImageTxDaemon:
                     time.sleep(est_us / 2e6)                   # cheap, no RF spent
                     continue
                 except (TimeoutError, Exception) as exc:
+                    # Commands captured before the failure are still valid
+                    # — a refused/timed-out TX must not swallow them.
+                    self._dispatch_rx_pending(rx_pending)
                     self.budget.record(est_us)                 # assume RF spent
                     rf_retries_left -= 1
                     if rf_retries_left < 0:
@@ -843,6 +885,7 @@ class ImageTxDaemon:
                 self.budget.record(actual_toa)
                 with self.lock:
                     self.toa_us_sum += actual_toa
+                self._dispatch_rx_pending(rx_pending)
                 if done["status"] == 0:  # SX1276_TX_STATUS_OK
                     sent = True
                     with self.lock:
@@ -1079,7 +1122,15 @@ class ImageTxDaemon:
         # ack over the radio (latest-wins snapshot; worker flushes it).
 
         def _on_enc_ack(_c, _u, msg):
-            self._enc_ack_out = bytes(msg.payload)[:200]
+            payload = bytes(msg.payload)[:200]
+            # Retained replay identical to the last ack we radiated is the
+            # MQTT reconnect echo, not a new ack from camera_service —
+            # re-radiating it as 0x68 falsely "confirmed" whatever encode
+            # command the base happened to be retrying (2026-07-26).
+            if getattr(msg, "retain", False) and payload == self._enc_ack_last_fwd:
+                return
+            with self.lock:
+                self._enc_ack_out = payload
         client.message_callback_add(TRACTOR_ENC_STATUS_TOPIC, _on_enc_ack)
         self._mqtt_client = client
 

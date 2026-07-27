@@ -134,6 +134,123 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 > (K-phases). Profile ladder measured on bench: p0 fixed ~307 B/s · p1 FHSS 699 B/s
 > · p2 DTS 1755 B/s. Evidence: `bench-evidence/radio_monitor_2026072{4,5}_*`.
 
+### RS-0 — 2026-07-26 web-UI wiring review + fix batch (code-landed, AIR-TEST QUEUE)
+
+> **Context:** the 23-agent static review (`bench-evidence/web_ui_wiring_review_2026-07-26/REVIEW.md`)
+> traced every UI control into the radio path. Verdicts: encode-MODE selection
+> was active + closed-loop end to end; encode QUALITY had **no transport**;
+> hydraulic drive + E-stop do NOT ride the 0xFB plane (they depend on
+> lora_bridge, still "DRAFT FOR REVIEW", on a second radio, with zero delivery
+> feedback). The same-day fix batch landed code-only (boards were powered off —
+> NOTHING below is air-verified yet):
+
+- [x] **RS-0.1 Quality over 0x63** — optional second args byte (1-100) on the
+  ENCODE_MODE command; camera_service clamps to [20,100] into WEBP_QUALITY and
+  echoes `"quality"` in the 0x68 ack; settings page gained a slider; store file
+  is now JSON `{mode, quality}` (legacy bare-line still read). Backward
+  compatible both directions (old tractor reads args[0] only; new tractor
+  treats a 1-byte frame as "keep quality").
+- [x] **RS-0.2 BTC4 placebo modes removed from UI** — server catalogue, cycle
+  order, and both metadata maps; EncodeMode wire values 4/5 stay reserved.
+- [x] **RS-0.3 Pump-gate fix** — the completion-aligned command pump was gated
+  on the never-fed legacy `_ctrl_out` queue and NEVER fired; it now also fires
+  on `_pending_cmds`, with a new 0.4 s per-command retry spacing so the
+  20-attempt budget spans the full 10 s deadline.
+- [x] **RS-0.4 RS-1.5 hardening** — `_set_pending` replaces the body + resets
+  the budget when the same opcode arrives with a new payload (rapid A→B mode
+  change no longer silently drops B); 0x68 only clears the pending 0x63 when
+  the ack's `"requested"` matches the pending mode byte (stale retained-ack
+  replay can no longer falsely confirm); tractor suppresses retained-identical
+  ack re-radiation on MQTT reconnect and lock-guards the ack swap.
+- [x] **RS-0.5 v2-path mid-burst command dispatch** — `wait_for_tx_done` gained
+  `rx_sink`; the DEFAULT serial fragment loop and the tractor's command TX now
+  dispatch 0xFB frames captured during the TX-verdict wait instead of dropping
+  them (v3 got its fix 2026-07-25; this is the v2 half).
+- [x] **RS-0.6 Retained-pin incident class closed at three points** — web_ui no
+  longer republishes a retained profile from the module default at boot in
+  auto mode (policy lazily seeds from the broker's actual retained pin);
+  retained publishes carry `ts`; the daemon ignores retained radio_profile
+  pins older than 600 s. NOTE the behavior change: a daemon restart >10 min
+  after the last operator action no longer re-applies the profile pin
+  automatically (web_ui restart or operator action refreshes ts).
+- [x] **RS-0.7 E-stop honesty** — /api/estop returns real broker-delivery state
+  (503 when MQTT is down) + audit record; the UI shows a banner on every
+  outcome incl. tap-to-login on session expiry (was: totally silent 401).
+  Gamepad START shares the path. Radio-hop delivery is STILL unacknowledged —
+  see RS-9 (drive/E-stop opcodes on the 0xFB plane vs productionizing
+  lora_bridge; operator feedback for the drive path).
+- [x] **RS-0.8 Frontend truthfulness** — stuck-button latch across
+  controls-locked transitions fixed (worst case: silent take-control re-send);
+  sidebar rows rewired to `control/link_airtime`; "Pkt loss" relabeled "Telem
+  use"; RSSI row fed from link_stats; safe-mode override now VISIBLE on the
+  encoder pill (was an empty stub); new "ctrl radio" heartbeat pill exposes a
+  dead lora_bridge; /api/encode_mode/cycle persists (restart no longer flips
+  modes); /api/health/refusal + /api/audit/view_mode session-gated;
+  /api/bench/radio no longer freezes the event loop (to_thread).
+- [x] **RS-0.10 Adversarial review round on the fix batch** (13-agent workflow;
+  7 agents completed before a session-limit cut, so the protocol-compat lens
+  and 5 verifiers did not run — **the batch has NOT had a full second-pass
+  review**). Confirmed findings, all fixed in the same batch:
+  - 0x68 ack matched the mode byte only, so an in-flight ack from the
+    previous (same mode, old quality) command falsely confirmed a
+    quality-only change — the exact RS-1.5 silent-discard class, reintroduced
+    by the new quality feature. Now compares the ack's effective quality
+    against our request clamped the way camera_service clamps it, and an ack
+    with no `quality` field never confirms a quality command. Covered by
+    `tests/test_encode_mode_ack_matching.py` (15 tests).
+  - The ack path dropped `self._lock` between reading the pending body and
+    popping it, so a paho-thread `_set_pending` in that window was popped
+    unacked → now a single-acquisition compare-and-pop.
+  - `_publish_radio_profile`'s "auto" no-boot-publish left a fresh broker
+    with NO pin at all (the policy only publishes on a transition), so the
+    daemons would sit on their env default forever → the policy now seeds
+    the link once when no pin exists, defers seeding until MQTT is
+    connected, and tracks whether a pin was ever observed.
+  - The 600 s retained-pin gate also killed the daemon-restart convergence
+    path → the FIRST retained delivery after process start is now always
+    honored (that replay is the restore); only reconnect replays age out.
+  - Settings-page quality POST restated a possibly-stale mode, silently
+    reverting mode changes made from the console/gamepad → `mode` is now
+    optional server-side and the page sends quality alone.
+  - Safe mode was invisible to any page loaded AFTER the edge (the bridge
+    publishes it retained + edge-only) → web_ui caches it and serves it on
+    `/api/encode_mode/current`.
+  - The new ctrl-radio pill latched a permanent false "STALE" after any
+    telemetry-WS drop because `wsTele` had no reconnect → `wsTele` now
+    auto-reconnects (also un-freezes the source banner / controls-lock /
+    camera echo, a pre-existing review finding) and the pill distinguishes
+    "no telemetry link" from "radio quiet".
+  - Also fixed: bench-radio helper single-flight (moving it off the event
+    loop removed the accidental serialization protecting the shared L072);
+    v2 `rx_sink` frames are now dispatched on the QoS-refusal and RF-timeout
+    paths too; E-stop's paho<1.6 fallback no longer reports a false FAILED;
+    `_set_encode_mode_override` persists before mutating runtime state;
+    encode-cycle surfaces session expiry instead of failing silently.
+- [ ] **RS-0.11 Finish the second-pass review** — re-run the protocol-compat
+  lens and the 5 cut verifiers (`Workflow({scriptPath: ...
+  review-control-plane-fix-batch-wf_4953caa7-796.js, resumeFromRunId:
+  'wf_4953caa7-796'})` replays the completed agents from cache).
+- [ ] **RS-0.9 AIR-TEST QUEUE (first bench session with radios on):**
+  1. Encode mode+quality smoke: cycle modes from the pill, then set quality
+     40→80 from settings; confirm 0x68 acks echo `quality`, pill tooltip
+     shows `@ qNN`, and frame sizes shift accordingly.
+  2. **Aligned-pump A/B (highest-risk item in the batch).** The 171/1
+     convergence soak was measured with the aligned pump DEAD, so the
+     aligned path is unproven on air: our command TX makes the base deaf
+     for its ToA plus the host round trip, and if that overruns the
+     tractor's ~40 ms reverse-slot gap it can clip the head of the next
+     train — i.e. trade image throughput for command latency, against the
+     stated priority. Run the command soak twice, `LIFETRAC_ALIGNED_PUMP=1`
+     (new default) vs `=0` (pre-fix behavior), and compare BOTH convergence
+     (delivered/gave-up) and goodput/util. Keep whichever wins; the env
+     knob exists so this needs no code change at the bench.
+  3. v2-path command test: run one session with `LIFETRAC_TX_PIPELINE`
+     unset (serial path) and confirm mid-burst command delivery now works
+     there like v3.
+  4. Rapid mode-change test: A→B within 1 s; confirm B (not A) lands.
+  5. Auto-profile boot test: restart web_ui with auto selected mid-run;
+     confirm NO retained re-pin and no profile flap.
+
 ### RS-1 — Control-plane verification (next bench session, highest priority)
 
 - [ ] **RS-1.1 One clean control-plane run** — confirm the tractor now hears

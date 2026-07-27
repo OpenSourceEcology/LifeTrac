@@ -301,6 +301,8 @@
       <span id="encode-mode-pill" class="encmode-pill"
             title="Click: cycle encoder method · Long-press: open settings"
         >enc: Full color ▸</span>
+      <span id="ctrl-link-pill" class="gamepad-pill"
+            title="Control-radio bridge heartbeat (control/link_airtime)">ctrl radio: no data</span>
       <span id="gamepad-pill" class="gamepad-pill">no gamepad</span>
       <span id="source-banner" class="source-banner none">SOURCE: NONE</span>
     </div>
@@ -378,7 +380,9 @@
       <div class="row"><span>Battery</span><span id="t-bat">—</span></div>
       <div class="row"><span>GPS fix</span><span id="t-gps">—</span></div>
       <div class="row"><span>RSSI</span><span id="t-rssi">—</span></div>
-      <div class="row"><span>Pkt loss</span><span id="t-loss">—</span></div>
+      <!-- Renamed from "Pkt loss" 2026-07-26: the value wired here has
+           always been the telemetry airtime share, not packet loss. -->
+      <div class="row"><span>Telem use</span><span id="t-loss">—</span></div>
       <div class="row"><span>Link use</span><span id="t-link-use">—</span></div>
       <div class="row"><span>Image use</span><span id="t-img-use">—</span></div>
       <div class="row"><span>Encode</span><span id="t-encode">—</span></div>
@@ -437,7 +441,7 @@
   <script src="/static/img/source_guard.js"></script>
   <script src="/static/img/accel_status.js"></script>
   <script src="/static/img/raw_mode_toggle.js"></script>
-  <script src="/static/app.js?v=7"></script>
+  <script src="/static/app.js?v=8"></script>
   <script>
     // Gear-icon toggle for the settings drawer (AUX / camera / radio bench).
     // Bar-chart-icon toggle for the telemetry sidebar.

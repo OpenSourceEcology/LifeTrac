@@ -2300,10 +2300,17 @@ def parse_tx_done(payload: bytes) -> dict:
     }
 
 
-def wait_for_tx_done(link: HostLink, expected_tx_id: int, timeout: float):
+def wait_for_tx_done(link: HostLink, expected_tx_id: int, timeout: float,
+                     rx_sink: "list | None" = None):
     """Wait up to `timeout` seconds for a TX_DONE_URC matching expected_tx_id.
 
     Returns (tx_done_dict, faults_list).  Raises TimeoutError on miss.
+
+    ``rx_sink`` (2026-07-26): RX_FRAME_URC frames arriving during the wait
+    are appended here instead of being printed-and-dropped — inbound 0xFB
+    command frames used to vanish inside this window (the serial-path half
+    of the mid-burst command-discard bug). Callers that pass a sink MUST
+    process it afterwards. ``None`` keeps the historical drop behaviour.
     """
     deadline = time.time() + timeout
     faults = []
@@ -2311,6 +2318,9 @@ def wait_for_tx_done(link: HostLink, expected_tx_id: int, timeout: float):
         frames = link.read_frames(0.2)
         for frame in frames:
             ftype = frame["type"]
+            if ftype == HOST_TYPE_RX_FRAME_URC and rx_sink is not None:
+                rx_sink.append(frame)
+                continue
             if ftype == HOST_TYPE_TX_DONE_URC:
                 done = parse_tx_done(frame["payload"])
                 if done["tx_id"] != expected_tx_id:

@@ -1023,7 +1023,8 @@ X8_KISS_TFEND, X8_KISS_TFESC = 0xDC, 0xDD
 _MQTT_CLIENT = None
 
 
-def _apply_encode_mode(raw_mode: int, source: str, force_key_evt) -> int:
+def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
+                       quality: "int | None" = None) -> int:
     """Clamp + apply an encode-mode request from ANY transport.
 
     Shared by the M7 KISS back-channel (CMD_ENCODE_MODE 0x63) and the
@@ -1032,10 +1033,26 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt) -> int:
     and the effective mode — the base UI renders a mismatch when the
     tractor clamped an unimplemented codec (previously only visible in
     tractor logs). Returns the effective mode.
+
+    ``quality`` (2026-07-26): optional codec quality from the extended
+    0x63 command (second args byte). Clamped to the same [20, 100] range
+    as the legacy CMD_CAMERA_QUALITY back-channel, applied to the
+    module-global WEBP_QUALITY (read per frame build, so it takes effect
+    on the very next frame). ``None`` keeps the current quality.
     """
     effective = _clamp_encode_mode(raw_mode)
-    global ENCODE_MODE  # noqa: PLW0603
+    global ENCODE_MODE, WEBP_QUALITY  # noqa: PLW0603
     ENCODE_MODE = effective
+    if quality is not None:
+        try:
+            q = max(20, min(100, int(quality)))
+        except (TypeError, ValueError):
+            q = None
+        if q is not None:
+            if q != WEBP_QUALITY:
+                LOG.info("camera_service: quality %s -> %d [%s]",
+                         WEBP_QUALITY, q, source)
+            WEBP_QUALITY = q
     if effective == raw_mode:
         LOG.info("camera_service: encode_mode -> %d (%s) [%s]",
                  effective, ENCODE_MODE_NAMES[effective], source)
@@ -1059,6 +1076,10 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt) -> int:
                 "effective_name": ENCODE_MODE_NAMES[effective],
                 "clamped": effective != raw_mode,
                 "codec": _ENCODE_MODE_CODEC.get(effective, 0),
+                # Effective quality after clamping — lets the base UI show
+                # what the encoder is actually running, and diverges from
+                # the request when the [20,100] clamp bites.
+                "quality": WEBP_QUALITY,
                 "source": source,
                 "ts": round(time.time(), 1),
             }
@@ -1251,8 +1272,9 @@ def main() -> None:
                     force_key_evt.set()
                     return
                 if _msg.topic == ENCODE_MODE_OVERRIDE_TOPIC:
-                    # {"mode": <int> | "<name>"} — re-published locally by
-                    # image_tx_daemon after decoding the LoRa 0xFB frame.
+                    # {"mode": <int> | "<name>", "quality": 1-100?} —
+                    # re-published locally by image_tx_daemon after
+                    # decoding the LoRa 0xFB frame.
                     try:
                         import json as _json
                         body = _json.loads(_msg.payload.decode("utf-8") or "{}")
@@ -1267,7 +1289,16 @@ def main() -> None:
                         LOG.warning("encode_mode_override: bad payload %r (%s)",
                                     _msg.payload[:64], exc)
                         return
-                    _apply_encode_mode(raw, "lora_cmd", force_key_evt)
+                    q_req = body.get("quality") if isinstance(body, dict) else None
+                    if q_req is not None:
+                        try:
+                            q_req = int(q_req)
+                        except (TypeError, ValueError):
+                            q_req = None
+                        if q_req is not None and not (1 <= q_req <= 100):
+                            q_req = None
+                    _apply_encode_mode(raw, "lora_cmd", force_key_evt,
+                                       quality=q_req)
 
             client.on_message = _on_msg
             client.connect(MQTT_HOST, 1883)
