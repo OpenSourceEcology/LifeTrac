@@ -226,6 +226,81 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
     paths too; E-stop's paho<1.6 fallback no longer reports a false FAILED;
     `_set_encode_mode_override` persists before mutating runtime state;
     encode-cycle surfaces session expiry instead of failing silently.
+- [ ] **RS-0.12 ⚠ THE CONTROL PLANE DOES NOT DELIVERY UNDER LOAD — measured
+  2026-07-27 from the 2026-07-26 archive.** Re-analysis of yesterday's own
+  logs (no hardware needed) overturned the control-plane result and the
+  geometry every latency estimate was built on. **This blocks the RS-9
+  single-radio architecture decision and the RS-0.9 air tests.**
+  - **In-stream delivery is ~0.** Record run (`174656`): base logged 94
+    command TXs `OK (on air)`, `cmd_tx_fail=0`; the tractor logged **0**
+    receptions — all 20 of its `LoRa cmd:` lines are timestamped
+    22:31:44–50, before the stream's first frame-done at 22:32:01.658.
+    Aggregate DTS with the reverse slot on: **0 of 386 copies** (95% upper
+    bound 0.78%). FHSS: **1 of 701** (0.14%).
+  - **The gap geometry was wrong by ~9×.** Measured inter-fragment dead
+    air at DTS is **4.98 ms** (dt_med 104.884 ms − 99.904 ms ToA; stable
+    4.87–5.01 ms across 8 runs and 6 SHAs) — not the ~44 ms this repo has
+    been citing. The 44 ms was a per-FRAME host-turnaround number from
+    Run D promoted to a per-fragment radio window. Worse, those gaps are
+    **deaf by construction**: `sx1276_tx.c:259` only re-arms RX when the
+    FIRMWARE-tracked state is RX_CONT, but the host arms RXCONT via a raw
+    register write the firmware never sees, so `sx1276_tx_cleanup()` parks
+    the modem in STANDBY after every fragment. Listening exists ONLY in
+    the train boundary, restored once per train at `image_tx_daemon.py:1073`.
+  - **The real window is the train boundary and it is generous: 242.6 ms
+    every 1850 ms** (record run; 92.3 ms every 449 ms in the soak; budget
+    closes exactly: 736.5 s airtime + 37.0 s intra-fragment + 116.4 s
+    boundary = 889.9 s span). So **frame size is NOT the constraint** — a
+    15.4 ms bare frame, a 20.5 ms D13 frame and a 25.7 ms GCM-128 frame
+    all fit ≥9× over. Choosing a cheaper crypto profile buys *zero*
+    additional delivery opportunities. **Cadence is the constraint:
+    0.54 usable windows/s.** Airtime is not the constraint either (17–24%
+    of wall clock is already dead air; 10 Hz × 15.4 ms = 15.4%).
+  - **It is a scheduling failure, not a physics failure.** Record-run
+    phase analysis: the 95 in-stream command TXs land at offsets
+    p10=176 / med=1225 / p90=1570 ms into an 1869 ms train period whose
+    armed window is the first ~243 ms — i.e. near-uniform, firing squarely
+    into the middle of the tractor's transmission. Consistent with the
+    in-tree note that the aligned pump was dead (`image_rx_daemon.py:1083`).
+  - **A working configuration EXISTS in the archive:** Run J (`084712`,
+    no parity, no prepare-ahead, no train gap, 65 ms window every 243 ms,
+    255 ms copy spacing) delivered **14 of 24 in-stream copies = 58%**,
+    3.2× chance, at the same ~75% util. So the raw-opmode RXCONT re-arm
+    genuinely works. Something introduced between Run J and the RS-3.10
+    runs — `parity_group=4`, `TX_PREPARE_AHEAD=1`, `train_gap_ms=40`, in
+    some combination — destroyed a working alignment. **No run varies
+    them one at a time.** Open anomaly: the soak's pump WAS clustered at
+    the boundary (offset med=77 ms vs an 87–92 ms window, 222/255 copies
+    within 130 ms of train-done) and still delivered 0 outside the fault
+    stall. Geometry says ~20% by chance alone; observed 0 (P=1.8e-22).
+  - **Consequence for RS-9:** no drive cadence or latency bound is
+    supported by any evidence we have. Even at Run J's best-ever 58%/copy
+    you need ~5.3 copies at ≥255 ms spacing ≈ **1.35 s for ONE one-way
+    command at 99% confidence** — two orders of magnitude off a hydraulic
+    loop, and disqualifying for E-stop. Every command ever flown was a
+    2-byte body (10.304 ms, firmware-confirmed `pkt_toa_us=10304` in
+    115/115 and 275/275 TXs); a real 16 B ControlFrame has NEVER been on
+    air and can only do worse.
+  - [ ] **DECISIVE NEXT RUN — phase-swept command delivery.** At DTS
+    saturation, have the base transmit a 26 B control frame at a COMMANDED
+    offset from each train boundary (not on reassembly completion),
+    sweeping the offset in ~20 ms steps across the full train period, and
+    count tractor-side receptions per offset bin. Instrument the tractor
+    to log a monotonic timestamp when RXCONT is actually re-armed
+    (`image_tx_daemon.py:1073`) and when the next train's first fragment
+    is submitted — that pair IS the armed window, measured not inferred —
+    and stream it back so both clocks can be tied together (cross-board
+    skew is demonstrably ≥50 ms: runs `163103`/`133257` log a tractor
+    dispatch AFTER the base already has the ack). One 5-min run yields
+    P(delivery | phase) and settles whether the single-radio architecture
+    is solvable. Two cheap add-ons: record `LIFETRAC_ALIGNED_PUMP` + the
+    three RS-3.10 knobs in `params.txt`, and log a raw gap histogram
+    instead of med/p95 (`image_rx_daemon.py:1139-1145`, two lines).
+  - [ ] **Fix the contaminated observable** — `REQ_KEYFRAME` must not be
+    acked by any arriving keyframe. Either tag requests and require a
+    matching response, or count only keyframes whose generation the
+    tractor attributes to a received request (the 0x68-style content
+    check already added for ENCODE_MODE is the pattern).
 - [ ] **RS-0.11 Finish the second-pass review** — re-run the protocol-compat
   lens and the 5 cut verifiers (`Workflow({scriptPath: ...
   review-control-plane-fix-batch-wf_4953caa7-796.js, resumeFromRunId:
@@ -314,13 +389,25 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   **30-MIN SOAK PASSED 2026-07-26 (run W,
   `radio_monitor_20260726_171138`): the freeze did not reproduce** —
   181/181 stats intervals on both daemons, rx_frames climbed to 15,238
-  continuously, 171/1 command convergence, goodput flat at ~1870 B/s,
-  under full bidirectional load (saturated stream + ~90 keyframe-request
-  cycles) with the post-run-33 stack (RS-4.12 arming, aligned pump,
-  convergence caps). 15× the exposure of the original failure. The
-  explicit write-timeout/heartbeat hardening remains worth doing as
-  defense-in-depth, but the trust condition is substantially met for
-  the DTS profile.
+  continuously, goodput flat at ~1870 B/s, under full bidirectional load
+  with the post-run-33 stack. 15× the exposure of the original failure.
+  The explicit write-timeout/heartbeat hardening remains worth doing as
+  defense-in-depth, but the *freeze* trust condition is met for DTS.
+
+  > **⚠ RETRACTION 2026-07-27 — the "171/1 command convergence" figure
+  > originally quoted here was a MEASUREMENT ARTIFACT and is withdrawn.**
+  > It counted convergences, not deliveries. `image_rx_daemon.py:1064-1067`
+  > clears a pending `REQ_KEYFRAME` on ANY arriving frame with
+  > `frame_kind == 1`, and the synthetic camera emits keyframes on its own
+  > cadence — so the encoder's routine keyframes were "acking" requests
+  > that were never delivered, and in 61 of the 171 cases never even
+  > transmitted (attempts histogram: `{0:61, 1:53, 2:21, 3:14, 4:7, 5:9,
+  > 6:3, 7:1, 9:1, 11:1, 20:1}`). Ground truth from the tractor's own log
+  > in that same soak: **26 `LoRa cmd:` receptions total, of which only 6
+  > arrived in-stream — all six inside a 3.19 s window when a firmware
+  > FAULT (code=0x0B) had stalled the tractor's transmitter.** The
+  > derived p50/p90/p95 of 1.5/5.7/7.3 s measured the KEYFRAME INTERVAL,
+  > not control latency. Do not cite 171/1 anywhere. See RS-0.12.
   **Firmware-side mechanisms (2026-07-25 analysis,
   [`../AI NOTES/2026-07-25_Method_G_Firmware_Analysis_Claude_v1_0.md`](../AI%20NOTES/2026-07-25_Method_G_Firmware_Analysis_Claude_v1_0.md) §3):**
   the L072 cannot deadlock while its UARTs clock, but TX-begin can stall its
