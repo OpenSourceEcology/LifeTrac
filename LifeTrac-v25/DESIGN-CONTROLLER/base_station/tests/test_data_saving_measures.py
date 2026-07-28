@@ -140,12 +140,18 @@ class ByteBudgetDropsTests(unittest.TestCase):
         accum = camera_service.FrameAccum()
 
         # Each fake tile body is 20 B + 1 B size prefix = 21 B per tile.
-        # Budget = 21 * 6 = 126 B \u2192 exactly the 6 inside tiles fit.
+        # 2026-07-27: the budget now bounds the WIRE payload (6 B header +
+        # bitmap counted inside the cap), so the tile-body budget is the
+        # cap minus that header. Size the cap so exactly the 6 inside tiles
+        # fit: 21*6 tile bytes + header.
+        _hdr = 6 + (camera_service.GRID_W * camera_service.GRID_H + 7) // 8
         fake, _calls = _fake_encode_tile_factory(blob_size=20)
         with mock.patch.object(camera_service, "_encode_tile", fake):
             payload = camera_service._build_frame(
                 cam, accum, force_keyframe=True,
-                roi_planner=roi, byte_budget=21 * 6)
+                roi_planner=roi, byte_budget=21 * 6 + _hdr)
+        # The whole point of the exactness fix: payload fits the cap.
+        self.assertLessEqual(len(payload), 21 * 6 + _hdr)
 
         decoded = parse_tile_delta_frame(payload)
         # Indices 0,1,2 (row 0 cols 0\u20132) and 12,13,14 (row 1 cols 0\u20132).
@@ -174,12 +180,15 @@ class ByteBudgetDropsTests(unittest.TestCase):
         cam = camera_service.SyntheticCamera()
         accum = camera_service.FrameAccum()
         fake, _calls = _fake_encode_tile_factory(blob_size=20)
-        # Budget for 4 tiles \xd7 21 B = 84 B.
+        # Budget for 4 tiles x 21 B = 84 B of tile bodies, plus the header
+        # now charged inside the cap (2026-07-27 exactness fix).
+        _hdr = 6 + (camera_service.GRID_W * camera_service.GRID_H + 7) // 8
         with mock.patch.object(camera_service, "_encode_tile", fake):
             payload = camera_service._build_frame(
-                cam, accum, force_keyframe=True, byte_budget=84)
+                cam, accum, force_keyframe=True, byte_budget=84 + _hdr)
         decoded = parse_tile_delta_frame(payload)
         self.assertEqual(decoded.changed_indices, [0, 1, 2, 3])
+        self.assertLessEqual(len(payload), 84 + _hdr)
 
 
 class CmdRoiHintDispatchTests(unittest.TestCase):

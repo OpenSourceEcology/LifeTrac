@@ -326,6 +326,54 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   5. Auto-profile boot test: restart web_ui with auto selected mid-run;
      confirm NO retained re-pin and no profile flap.
 
+### RS-0.14 — Control-plane + image schedule (design converged 2026-07-27)
+
+Full design: [`CONTROL_PLANE_DESIGN.md`](CONTROL_PLANE_DESIGN.md). Adopted
+direction: **control-first TDMA** (fixed control schedule primary; image fills
+the rest), with **per-slot skip frames** contracting the DTS superframe (skip =
+explicit 10.3 ms frame carrying free heartbeat/ack/budget freight, NOT CAD
+silence), **slot-stealing** at FHSS, and **encode-to-fit** tile packing sized to
+the live fragment quantum. FHSS and DTS share one 200 ms period, different
+interiors. The skip frame supersedes the two-state IDLE/ACTIVE machine.
+
+**Shipped tonight (code-only, bench-testable without radios; 85/85 tests pass):**
+
+- [x] **RS-0.14a Encode-to-fit increment** — budget now bounds the WIRE payload
+  (header+bitmap charged inside the cap; oversized-first-tile bypass removed) so
+  a 243 B budget is truly one fragment; greedy-continue packing; carry fix
+  (dropped changed tiles re-flag next frame); age-escalation (rolling refresh
+  converges under motion); live per-profile budget via retained
+  `tractor/link_budget` → `LinkBudget.update` (encoder finally sizes to
+  243/203 not a boot-frozen env); batcher `_frag_body_b()` profile-aware;
+  quality-only 0x63 no longer forces a keyframe. Tests:
+  `base_station/tests/test_encode_to_fit.py`.
+- [x] **RS-0.14b Bench instrumentation** — `CMD_OP_PROBE` (0x69) / `PROBE_ECHO`
+  (0x6A): base fires a no-op probe at fragment-RX-complete, tractor logs+echoes,
+  base measures honest in-stream delivery + RTT. `LIFETRAC_REACTIVE_FIRE` +
+  `LIFETRAC_PROBE_PHASE_SWEEP_MS`; raw `air_gap_hist(ms)` (bimodal, med/p95 hid
+  the boundary mode); keyframe-ack clear logged UNVERIFIED (source of the
+  retracted 171/1). Harness gained `-AlignedPump / -ReactiveFire /
+  -ProbePhaseSweepMs`, all recorded in `params.txt`.
+
+**Tomorrow's ordered bench plan (see CONTROL_PLANE_DESIGN.md §8):**
+
+- [ ] **1. Run-J bisection (cheapest, first).** Recover the 58% alignment:
+  toggle ONE of `-AlignedPump` / `-TxBatch` / `-TxPrepareAhead` / `-ParityGroup`
+  per run, scored tractor-side on `LoRa cmd:`.
+- [ ] **2. Reactive-fire phase sweep (RS-0.12, decisive).**
+  `-ReactiveFire 1 -ProbePhaseSweepMs "0,20,40,60,80,100,120"`. The one run that
+  sets the guard budget, P(delivery|phase), and whether contraction works.
+  Best-bin P high → DTS schedule buildable; ≤60% → fall back to stream-off (A5).
+- [ ] **3. Encode-to-fit verify.** `LIFETRAC_FRAGMENT_BUDGET=1`: confirm true
+  single-fragment frames at both profiles, no runt sawtooth, mono_g4/y_only
+  tiles-per-frame match §5; quality sweep 40→80 with no keyframe storm.
+- [ ] **4. After 1–3:** decide envelope (D13 vs GCM-128, §6), then start Route B.
+
+**Design follow-ons (post-measurement, tracked):** quality servo (slow AIMD on
+avg tile bytes, ROI-pair aware); gap-tolerant-merge keyframe-request debounce;
+skip-frame + mandatory-beacon firmware (L072); SF link-ladder idle fix; speed-
+gated deadman ladder; the `SAFETY_CASE.md` three-chain correction.
+
 ### RS-0.13 — Single-radio control-plane options (decision pending)
 
 Full analysis: [`SINGLE_RADIO_CONTROL_PLANE_OPTIONS.md`](SINGLE_RADIO_CONTROL_PLANE_OPTIONS.md).

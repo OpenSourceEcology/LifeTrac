@@ -76,6 +76,8 @@ from lora_proto import (  # noqa: E402
     CMD_OP_RADIO_PROFILE_ACK,
     CMD_OP_RADIO_PROFILE_CONF,
     CMD_OP_ENCODE_MODE_ACK,
+    CMD_OP_PROBE,
+    CMD_OP_PROBE_ECHO,
 )
 from image_pipeline.frame_format import encode_tile_delta_frame  # noqa: E402
 from image_pipeline.reassemble import FragmentReassembler         # noqa: E402
@@ -238,6 +240,26 @@ class ImageRxDaemon:
         # this process — gates the age check so the boot replay (restart
         # convergence) is always honored and only reconnect replays age out.
         self._retained_profile_seen = False
+        # 2026-07-27 RS-0.12 reactive-fire probe instrumentation (bench only).
+        # LIFETRAC_REACTIVE_FIRE=1 fires a no-op PROBE at each fragment-RX-
+        # complete (the moment the tractor's RXCONT re-arms), sweeping the
+        # commanded delay so P(delivery | phase) can be measured. It uses the
+        # SAME TX machinery a real ControlFrame would, so its delivery rate
+        # IS the drive-command delivery rate. Off in production.
+        self._reactive_fire = os.environ.get("LIFETRAC_REACTIVE_FIRE", "0") == "1"
+        self._probe_seq = 0
+        self._probe_tx = 0
+        self._probe_echo_rx = 0
+        self._probe_pending: "dict[int, float]" = {}   # seq -> monotonic send t
+        self._probe_rtts: "list[float]" = []
+        # Phase sweep: 0 = fire immediately at completion; else step through
+        # the list (ms) round-robin so each offset bin gets samples.
+        _sweep = os.environ.get("LIFETRAC_PROBE_PHASE_SWEEP_MS", "").strip()
+        self._probe_sweep = [int(x) for x in _sweep.split(",") if x.strip()] \
+            if _sweep else [0]
+        self._probe_min_gap_s = float(os.environ.get(
+            "LIFETRAC_PROBE_MIN_GAP_S", "0.5"))
+        self._last_probe_t = 0.0
         # LoRa-only control plane: outbound command frames queued by MQTT
         # callbacks, drained by the RX worker (single link owner). Plus
         # the two-phase switch state machine fields.
@@ -620,6 +642,22 @@ class ImageRxDaemon:
                     self._revert_to = previous
                     self._revert_deadline = (time.monotonic()
                                              + PROFILE_REVERT_TIMEOUT_S)
+        elif opcode == CMD_OP_PROBE_ECHO:
+            # 2026-07-27 RS-0.12: the tractor received our probe and echoed
+            # it. This is a CONFIRMED in-stream round trip — the honest
+            # delivery signal the contaminated keyframe-ack never was.
+            seq = int.from_bytes(args[0:4], "little") if len(args) >= 4 else 0
+            t0 = self._probe_pending.pop(seq, None)
+            self._probe_echo_rx += 1
+            if t0 is not None:
+                rtt_ms = (time.monotonic() - t0) * 1000.0
+                self._probe_rtts.append(rtt_ms)
+                LOG.info("PROBE ECHO seq=%d rtt=%.0f ms (echo#%d, delivered "
+                         "%d/%d)", seq, rtt_ms, self._probe_echo_rx,
+                         self._probe_echo_rx, self._probe_tx)
+            else:
+                LOG.info("PROBE ECHO seq=%d (unmatched; echo#%d)", seq,
+                         self._probe_echo_rx)
         elif opcode == CMD_OP_ENCODE_MODE_ACK:
             # RS-1.5: explicit ack — stop retrying ENCODE_MODE, but ONLY
             # if the ack matches the mode we are retrying. Before
@@ -1061,10 +1099,21 @@ class ImageRxDaemon:
                             self._last_rx_codec = getattr(done, "codec", 0)
                             self._last_rx_frame_kind = getattr(
                                 done, "frame_kind", 0)
-                        # RS-1.5: a keyframe arriving IS the req_keyframe ack.
+                        # RS-1.5: a keyframe arriving clears a pending
+                        # req_keyframe. 2026-07-27 CAUTION: this is a
+                        # CONTAMINATED delivery signal — the synth/encoder
+                        # emits keyframes on its own cadence, so a keyframe
+                        # arriving does NOT prove our request was delivered
+                        # (this produced the retracted 171/1 result). The
+                        # clear is logged as UNVERIFIED, and _clear_pending
+                        # says so, so no future analysis mistakes it for a
+                        # confirmed round trip. Use CMD_OP_PROBE for honest
+                        # delivery measurement.
                         if getattr(done, "frame_kind", 0) == 1:
-                            self._clear_pending(CMD_OP_REQ_KEYFRAME,
-                                                "keyframe received")
+                            self._clear_pending(
+                                CMD_OP_REQ_KEYFRAME,
+                                "keyframe received (UNVERIFIED delivery — "
+                                "keyframe may be encoder-initiated)")
                         self._publish(payload_out, frame_id)
 
             # RS-1.x window-aligned command TX (2026-07-25): a fragment in
@@ -1104,9 +1153,40 @@ class ImageRxDaemon:
                         self._send_command_frame(link, body, copies=1)
                         self._last_pump_t = now_pump
 
+            # 2026-07-27 RS-0.12 reactive-fire: a fragment completed the tile
+            # of the last train, so the tractor's RXCONT just re-armed. Fire
+            # a no-op PROBE now (optionally after a commanded phase delay) —
+            # this is the honest measurement of in-stream base->tractor
+            # delivery, using the exact TX path a drive command would.
+            if self._reactive_fire and frame_done:
+                self._maybe_fire_probe(link)
+
             self._maybe_switch_profile(link)
 
         LOG.info("RX worker exit")
+
+    def _maybe_fire_probe(self, link: HostLink) -> None:
+        now = time.monotonic()
+        if now - self._last_probe_t < self._probe_min_gap_s:
+            return
+        self._last_probe_t = now
+        # Round-robin the sweep offsets so each phase bin accumulates samples.
+        phase_ms = self._probe_sweep[self._probe_seq % len(self._probe_sweep)]
+        if phase_ms > 0:
+            time.sleep(phase_ms / 1000.0)
+        self._probe_seq = (self._probe_seq + 1) & 0xFFFFFFFF
+        seq = self._probe_seq
+        args = seq.to_bytes(4, "little") + (phase_ms & 0xFFFF).to_bytes(2, "little")
+        self._probe_pending[seq] = time.monotonic()
+        # Cap the pending map so a long run does not grow unbounded.
+        if len(self._probe_pending) > 512:
+            for k in sorted(self._probe_pending)[:256]:
+                self._probe_pending.pop(k, None)
+        self._probe_tx += 1
+        LOG.info("PROBE TX seq=%d phase_ms=%d (tx#%d)", seq, phase_ms,
+                 self._probe_tx)
+        self._send_command_frame(
+            link, pack_command_frame(CMD_OP_PROBE, args), copies=1)
 
     def _stats_worker(self, interval_s: float) -> None:
         last = 0.0
@@ -1143,6 +1223,42 @@ class ImageRxDaemon:
                     ls[n // 2],
                     getattr(self, "_cmd_tx_ok", 0),
                     getattr(self, "_cmd_tx_fail", 0))
+                # 2026-07-27 RS-0.12: RAW gap histogram, not just med/p95 —
+                # the distribution is bimodal (intra-fragment ~5 ms vs train
+                # boundary), and med/p95 hide the boundary mode a control
+                # frame must land in. Log fixed-edge buckets in ms.
+                edges = (2, 5, 10, 20, 40, 80, 120, 200, 400, 1000)
+                buckets = [0] * (len(edges) + 1)
+                for d_us in ds:
+                    d_ms = d_us / 1000.0
+                    placed = False
+                    for bi, e in enumerate(edges):
+                        if d_ms < e:
+                            buckets[bi] += 1
+                            placed = True
+                            break
+                    if not placed:
+                        buckets[-1] += 1
+                labels = ["<2", "<5", "<10", "<20", "<40", "<80", "<120",
+                          "<200", "<400", "<1000", ">=1000"]
+                hist = " ".join(f"{lab}:{cnt}" for lab, cnt in
+                                zip(labels, buckets) if cnt)
+                LOG.info("air_gap_hist(ms): %s", hist)
+            # RS-0.12 probe delivery summary (reactive-fire runs only).
+            if self._reactive_fire and self._probe_tx:
+                rtts = sorted(self._probe_rtts)
+                self._probe_rtts = []
+                deliv = (100.0 * self._probe_echo_rx / self._probe_tx)
+                if rtts:
+                    m = len(rtts)
+                    LOG.info("probe: tx=%d echo=%d (%.1f%% delivered) "
+                             "rtt_med=%.0fms rtt_p95=%.0fms",
+                             self._probe_tx, self._probe_echo_rx, deliv,
+                             rtts[m // 2], rtts[min(m - 1, (m * 95) // 100)])
+                else:
+                    LOG.info("probe: tx=%d echo=%d (%.1f%% delivered) "
+                             "no echoes this window", self._probe_tx,
+                             self._probe_echo_rx, deliv)
 
     def _link_stats_worker(self) -> None:
         """Publish a rolling link-speed JSON sample every ~2 s.

@@ -97,6 +97,8 @@ from lora_proto import (  # noqa: E402
     CMD_OP_RADIO_PROFILE_ACK,
     CMD_OP_RADIO_PROFILE_CONF,
     CMD_OP_ENCODE_MODE_ACK,
+    CMD_OP_PROBE,
+    CMD_OP_PROBE_ECHO,
 )
 from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     HostLink,
@@ -181,8 +183,18 @@ TRAIN_GAP_S = max(0.0, float(os.environ.get("LIFETRAC_TRAIN_GAP_MS", "40")) / 10
 # real-camera sizes can't produce pathological fits. History: 480 silently
 # rejected every pair (Run E); 520 allowed pairs (runs F–K).
 BATCH_BUDGET_B = int(os.environ.get("LIFETRAC_BATCH_BUDGET_B", "760"))
-# Fragment body capacity (TX_FRAME_BODY_MAX 247 − 4 B fragment header).
-_FRAG_BODY_B = 243
+# Fragment body capacity per radio profile: TX_FRAME_BODY_MAX − 4 B
+# fragment header at BW500 (profile 2) = 243; at BW250 (profiles 0/1) the
+# 170 ms air cap limits bodies to 207 → 203 usable. 2026-07-27: was a
+# hardcoded 243, which mis-sized the batching efficiency guard whenever
+# the radio ran FHSS.
+_FRAG_BODY_BY_PROFILE = {0: 203, 1: 203, 2: 243}
+
+
+def _frag_body_b(profile: int) -> int:
+    return _FRAG_BODY_BY_PROFILE.get(int(profile), 203)
+
+
 BATCH_MAX_FRAMES = max(1, int(os.environ.get("LIFETRAC_BATCH_MAX_FRAMES", "4")))
 try:
     from image_pipeline.frame_format import pack_frame_batch
@@ -234,6 +246,16 @@ RADIO_PROFILE_ACK_TOPIC   = "lifetrac/v25/status/radio_profile/tx"   # local log
 TRACTOR_ENCODE_MODE_TOPIC = "lifetrac/v25/tractor/encode_mode_override"
 TRACTOR_KEYFRAME_TOPIC    = "lifetrac/v25/tractor/req_keyframe"
 TRACTOR_ENC_STATUS_TOPIC  = "lifetrac/v25/status/encode_mode"        # camera_service ack (local)
+# 2026-07-27 encode-to-fit: this daemon owns the radio profile, so it tells
+# camera_service the live per-frame byte budget (one fragment body at the
+# active profile) via LinkBudget.update. Replaces the CMD_LINK_PROFILE M7
+# back-channel that USE_LORA_BRIDGE mode never starts, so the encoder
+# finally sizes frames to the real air quantum (243 DTS / 203 FHSS) instead
+# of a boot-frozen env default.
+TRACTOR_LINK_BUDGET_TOPIC = "lifetrac/v25/tractor/link_budget"
+# LINK_PHY_NAMES index (camera_service / lora_proto) for each radio profile:
+# profile 0/1 (BW250) -> "image_bw250" (idx 5); profile 2 (BW500) -> idx 6.
+_PROFILE_TO_LINK_PHY_IDX = {0: 5, 1: 5, 2: 6}
 _PROFILE_CHOICES = (0, 1, 2)
 # Two-phase profile switch (tractor side): ack on the OLD profile, dwell
 # so the ack flushes, switch, then REVERT unless the base confirms on the
@@ -528,8 +550,9 @@ class ImageTxDaemon:
             # and a triple (4/3 = 1.33) beats the pair; but a fit that
             # would spill a near-empty extra fragment for a tiny frame
             # is rejected and carried to the next train.
-            frags_with = -(-cand // _FRAG_BODY_B)
-            frags_without = -(-total // _FRAG_BODY_B)
+            body_b = _frag_body_b(self._active_profile)
+            frags_with = -(-cand // body_b)
+            frags_without = -(-total // body_b)
             eff_ok = (frags_with * len(batch)
                       <= frags_without * (len(batch) + 1))
             if (nxt.payload[:1] == b"\x01"
@@ -645,6 +668,22 @@ class ImageTxDaemon:
             LOG.info("LoRa cmd: RADIO_PROFILE_CONF — switch confirmed")
             self._confirm_deadline = None
             self._revert_profile = None
+        elif opcode == CMD_OP_PROBE:
+            # 2026-07-27 RS-0.12 reactive-fire instrumentation. A probe is a
+            # no-op the tractor logs (with the base's commanded phase offset)
+            # and echoes back so the base can measure in-stream delivery and
+            # round-trip. THIS log line is the ground-truth delivery counter
+            # — unlike REQ_KEYFRAME, nothing else can spuriously satisfy it.
+            seq = int.from_bytes(args[0:4], "little") if len(args) >= 4 else 0
+            phase = int.from_bytes(args[4:6], "little") if len(args) >= 6 else 0
+            self._probe_rx = getattr(self, "_probe_rx", 0) + 1
+            LOG.info("LoRa cmd: PROBE seq=%d phase_ms=%d (rx#%d)",
+                     seq, phase, self._probe_rx)
+            try:
+                self._cmd_out.put_nowait(pack_command_frame(
+                    CMD_OP_PROBE_ECHO, seq.to_bytes(4, "little")))
+            except queue.Full:
+                pass
 
     def _send_command_frame(self, link: HostLink, body: bytes,
                             copies: int = 2) -> None:
@@ -752,10 +791,38 @@ class ImageTxDaemon:
             self.budget = AirtimeBudget(
                 budget_us=_PROFILE_TO_BUDGET_US.get(profile, 380_000))
             self._active_profile = profile
+            self._publish_link_budget(profile)
             return True
         except Exception as exc:
             LOG.error("radio_profile: apply %d failed: %s", profile, exc)
             return False
+
+    def _publish_link_budget(self, profile: int,
+                             n_fragments: int = 1) -> None:
+        """Tell camera_service the per-frame byte budget for this profile.
+
+        Retained so a (re)starting camera_service picks it up immediately.
+        n_fragments=1 makes every frame a single fragment — the natural unit
+        under control-first TDMA; a unit file may widen it via
+        LIFETRAC_IMAGE_FRAGMENTS_PER_FRAME for the parked/full-image mode.
+        """
+        client = self._mqtt_client
+        if client is None:
+            return
+        n = int(os.environ.get("LIFETRAC_IMAGE_FRAGMENTS_PER_FRAME",
+                               str(n_fragments)))
+        idx = _PROFILE_TO_LINK_PHY_IDX.get(int(profile), 5)
+        try:
+            import json as _json
+            client.publish(TRACTOR_LINK_BUDGET_TOPIC,
+                           _json.dumps({"n_fragments": max(1, n),
+                                        "profile_index": idx,
+                                        "ts": round(time.time(), 1)}),
+                           qos=0, retain=True)
+            LOG.info("link_budget: published n_frag=%d profile_idx=%d "
+                     "(profile %d)", max(1, n), idx, profile)
+        except Exception as exc:                              # pragma: no cover
+            LOG.debug("link_budget publish failed: %s", exc)
 
     def _ack_profile(self, ok: bool, active: int) -> None:
         client = self._mqtt_client
@@ -1139,6 +1206,10 @@ class ImageTxDaemon:
                 LOG.info("MQTT connected; subscribing to %s", MQTT_TOPIC_IN)
                 client.subscribe(MQTT_TOPIC_IN, qos=0)
                 client.subscribe(TRACTOR_ENC_STATUS_TOPIC, qos=0)
+                # Seed the encoder's budget on connect (retained), so a
+                # camera_service that started first still sizes to the air
+                # quantum without waiting for a profile switch.
+                self._publish_link_budget(self._active_profile)
             else:
                 LOG.error("MQTT connect rc=%s", rc)
         client.on_connect = _on_connect

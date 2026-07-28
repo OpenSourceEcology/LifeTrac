@@ -959,9 +959,19 @@ CMD_OP_RADIO_PROFILE      = 0x65   # args: u8 profile id (0/1/2)
 CMD_OP_RADIO_PROFILE_ACK  = 0x66   # args: u8 profile id (tractor -> base)
 CMD_OP_RADIO_PROFILE_CONF = 0x67   # args: u8 profile id (base -> tractor)
 CMD_OP_ENCODE_MODE_ACK    = 0x68   # args: UTF-8 JSON ack (<=200 B)
+# 2026-07-27 bench instrumentation: a no-op probe the tractor ONLY logs +
+# echoes, used to measure base->tractor in-stream delivery honestly (the
+# RS-0.12 reactive-fire / phase-sweep experiment). args: u32le probe_seq +
+# u16le commanded phase-offset-ms (diagnostic only; tractor does not act on
+# it). The echo (0x6A) carries the same seq back so the base can time the
+# round trip. Kept in the strict path so it shares the exact TX machinery
+# a real ControlFrame would.
+CMD_OP_PROBE              = 0x69   # args: u32le seq + u16le phase_ms
+CMD_OP_PROBE_ECHO         = 0x6A   # args: u32le seq (tractor -> base)
 _CMD_OPS = frozenset({CMD_OP_REQ_KEYFRAME, CMD_OP_ENCODE_MODE,
                       CMD_OP_RADIO_PROFILE, CMD_OP_RADIO_PROFILE_ACK,
-                      CMD_OP_RADIO_PROFILE_CONF, CMD_OP_ENCODE_MODE_ACK})
+                      CMD_OP_RADIO_PROFILE_CONF, CMD_OP_ENCODE_MODE_ACK,
+                      CMD_OP_PROBE, CMD_OP_PROBE_ECHO})
 COMMAND_FRAME_MAX_ARGS = 200
 
 

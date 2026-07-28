@@ -51,6 +51,17 @@ param(
     # channel), 1=FCC_FHSS_50CH_BW250 (wide mask auto-enabled — the firmware
     # validator rejects popcount<50 for profile 1), 2=FCC_DTS_BW500.
     [int]$RegProfile      = 0,
+    # RS-0.13b (2026-07-27): 1 = aligned command pump on (default), 0 =
+    # idle-drain-only. The Run-J bisection toggles this + Batch + PrepareAhead
+    # + ParityGroup one at a time to find which killed the 58% alignment.
+    [int]$AlignedPump     = 1,
+    # RS-0.12 (2026-07-27): reactive-fire probe. 1 = base fires a no-op PROBE
+    # at every fragment-RX-complete and measures echo delivery — the honest
+    # in-stream base->tractor delivery experiment. Off = normal run.
+    [int]$ReactiveFire    = 0,
+    # RS-0.12 phase sweep (ms, comma-separated) e.g. "0,20,40,60,80,100,120".
+    # Empty = fire immediately at completion (offset 0).
+    [string]$ProbePhaseSweepMs = "",
     # Archive final logs + parameters under bench-evidence/ with the git
     # SHA in the folder name (evidence discipline per CODE REVIEWS docs).
     [switch]$Archive
@@ -196,8 +207,11 @@ cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -
 # Wi-Fi leg drops ARP within a minute (see [NET] warm-up), and
 # production topology has the base web_ui subscribed to the base
 # broker anyway — tile_delta + link_stats land where the web UI reads.
+# RS-0.13b/RS-0.12 (2026-07-27): aligned-pump A/B + reactive-fire probe env.
+$rxExtraEnv = "-e LIFETRAC_ALIGNED_PUMP=$AlignedPump -e LIFETRAC_REACTIVE_FIRE=$ReactiveFire"
+if ($ProbePhaseSweepMs -ne "") { $rxExtraEnv = "$rxExtraEnv -e LIFETRAC_PROBE_PHASE_SWEEP_MS=$ProbePhaseSweepMs" }
 Write-Host "[LAUNCH] Starting RX Daemon on Board $RxAdbSerial..." -ForegroundColor Yellow
-cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f rx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name rx_smoke --network=host --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CTRL_MQTT_HOST=$HostIp -e LIFETRAC_SKIP_RESET_REQ=1 -e LIFETRAC_KF_REQUEST_DISABLE=$KfRequestDisable $profEnv lifetrac-v25:latest python3 -u /work/image_rx_daemon.py --log-level INFO`""
+cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f rx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name rx_smoke --network=host --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CTRL_MQTT_HOST=$HostIp -e LIFETRAC_SKIP_RESET_REQ=1 -e LIFETRAC_KF_REQUEST_DISABLE=$KfRequestDisable $rxExtraEnv $profEnv lifetrac-v25:latest python3 -u /work/image_rx_daemon.py --log-level INFO`""
 
 Start-Sleep -Seconds 4
 
@@ -285,6 +299,9 @@ if ($Archive) {
         "train_gap_ms=$TrainGapMs",
         "kf_request_disable=$KfRequestDisable",
         "parity_group=$ParityGroup",
+        "aligned_pump=$AlignedPump",
+        "reactive_fire=$ReactiveFire",
+        "probe_phase_sweep_ms=$ProbePhaseSweepMs",
         "tx_feed=$TxFeed",
         "reg_profile=$RegProfile",
         "tx_serial=$TxAdbSerial",

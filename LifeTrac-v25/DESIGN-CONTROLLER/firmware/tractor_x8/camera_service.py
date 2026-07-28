@@ -104,6 +104,10 @@ KEYFRAME_REQ_TOPIC = "lifetrac/v25/cmd/req_keyframe"
 ENCODE_MODE_OVERRIDE_TOPIC = "lifetrac/v25/tractor/encode_mode_override"
 TRACTOR_KEYFRAME_TOPIC     = "lifetrac/v25/tractor/req_keyframe"
 ENCODE_MODE_STATUS_TOPIC   = "lifetrac/v25/status/encode_mode"
+# 2026-07-27 encode-to-fit: image_tx_daemon (radio owner) publishes the live
+# per-frame byte budget here so the encoder sizes frames to the real air
+# quantum. Replaces the dead CMD_LINK_PROFILE M7 back-channel in bridge mode.
+TRACTOR_LINK_BUDGET_TOPIC  = "lifetrac/v25/tractor/link_budget"
 
 
 # ---- capture backends -------------------------------------------------
@@ -465,6 +469,17 @@ MOTION_ONLY_QUALITY = max(5, min(100, int(os.environ.get(
 WIREFRAME_QUALITY   = max(5, min(100, int(os.environ.get(
     "LIFETRAC_WIREFRAME_QUALITY",   "20"))))
 ENCODE_MODE = _clamp_encode_mode(int(os.environ.get("LIFETRAC_ENCODE_MODE", "0")))
+
+# 2026-07-27 encode-to-fit starvation guard: a tile whose age (frames since
+# it last shipped) exceeds this jumps to the front of the pack order,
+# oldest first. Guarantees rolling-refresh convergence under sustained
+# motion at tight budgets. 0 disables.
+TILE_AGE_ESCALATE_FRAMES = max(0, int(os.environ.get(
+    "LIFETRAC_TILE_AGE_ESCALATE_FRAMES", "40")))
+# Bound on wasted encode passes once the budget is full: after the first
+# overflow, keep scanning at most this many more tiles for a smaller fit.
+OVERFLOW_SCAN_LIMIT = max(1, int(os.environ.get(
+    "LIFETRAC_OVERFLOW_SCAN_LIMIT", "6")))
 
 # Per-frame codec ids (mirrors base_station/image_pipeline/frame_format.py).
 # Kept duplicated to avoid importing the base-station tree from the tractor.
@@ -934,9 +949,38 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
     else:
         # Method A (and Method B/C first-frame): (rank, idx) row-major.
         priority.sort(key=lambda t: (t[0], t[1]))
+    # 2026-07-27 starvation guard (encode-to-fit): under a tight budget the
+    # motion-first ordering can starve the sweep forever (sweep tiles sort
+    # last, the budget break drops the tail every frame, tile age grows
+    # unbounded). Escalate any tile older than the threshold to the FRONT,
+    # oldest first — among escalated tiles this degenerates to round-robin,
+    # so every tile is guaranteed to ship eventually even under sustained
+    # full-budget motion.
+    if (accum.tile_last_seq is not None and not is_key
+            and IMAGE_METHOD in ("B", "C")):
+        _ages = accum.tile_last_seq
+        _now_seq = accum.sweep_seq
+
+        def _escalate_key(t):
+            rank, idx = t[0], t[1]
+            age = _now_seq - _ages[idx]
+            if age > TILE_AGE_ESCALATE_FRAMES:
+                return (rank, -1, -age, idx)          # oldest first
+            in_sweep = 1 if idx in sweep_indices else 0
+            return (rank, in_sweep, -magnitudes[idx], idx)
+        priority.sort(key=_escalate_key)
     kept: list[tuple[int, bytes]] = []   # (idx, blob)
     used = 0
     cap = byte_budget if (byte_budget is not None and byte_budget > 0) else None
+    # 2026-07-27 encode-to-fit: the budget bounds the WIRE payload, so the
+    # fixed 6 B header + changed-bitmap are charged against it up front.
+    # Before this, a "243 B" budget produced a 261 B payload — one runt
+    # fragment per budget-full frame, by construction (the exact sawtooth
+    # the single-fragment schedule exists to kill).
+    tile_cap = None
+    if cap is not None:
+        tile_cap = max(0, cap - 6 - bitmap_bytes)
+    _overflow_scans = 0
     for _rank, i, q in priority:
         ty, tx = divmod(i, GRID_W)
         if encode_cache is not None:
@@ -955,12 +999,21 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
         if blob is None:
             continue
         cost = min(len(blob), TILE_BYTES_MAX) + 1   # +1 for size prefix
-        if cap is not None and used + cost > cap and kept:
-            # No room for this one and we've already shipped at least one tile;
-            # drop this tile and every lower-priority one.
-            LOG.debug("camera_service: byte_budget=%d hit at tile %d (used=%d, cost=%d); dropping remainder",
-                      cap, i, used, cost)
-            break
+        if tile_cap is not None and used + cost > tile_cap:
+            # Over budget for THIS tile. Two 2026-07-27 changes vs the old
+            # break-on-first-overflow: (a) no first-tile bypass — a single
+            # oversized tile can no longer bust the cap (the old `and kept`
+            # admitted it, making "single-fragment frame" a lie); (b) greedy
+            # continue — a lower-priority tile may be smaller and still fit,
+            # so scan on (bounded, to cap the wasted encode CPU) instead of
+            # abandoning the remaining budget.
+            _overflow_scans += 1
+            if _overflow_scans >= OVERFLOW_SCAN_LIMIT or tile_cap - used < 6:
+                LOG.debug("camera_service: byte_budget=%d full (used=%d, "
+                          "scans=%d); dropping remainder", cap, used,
+                          _overflow_scans)
+                break
+            continue
         kept.append((i, blob))
         used += cost
 
@@ -986,6 +1039,31 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
         body.append(size - 1)
         body.extend(blob[:size])
 
+    # 2026-07-27 carry fix (encode-to-fit): a CHANGED tile dropped by the
+    # budget must stay "changed" for the next diff. Before this, last_canvas
+    # was updated wholesale, so a tile that changed, missed the budget, and
+    # then went static was silently forgotten until the 2-tile/frame sweep
+    # reached it (up to ~48 frames on a 12x8 grid). Splice the OLD pixels
+    # back into the dropped tiles' regions so they re-flag next frame at
+    # full motion priority.
+    if (cap is not None and accum.last_canvas is not None
+            and len(accum.last_canvas) == len(canvas)):
+        # Length guard: a runtime grid change makes last_canvas a different
+        # size; splicing then would shrink/corrupt the bytearray. Skip the
+        # carry that frame (the next keyframe repaints everything anyway).
+        kept_set = {i for i, _b in kept}
+        dropped = [t[1] for t in priority if t[1] not in kept_set]
+        if dropped:
+            canvas = bytearray(canvas)
+            row_bytes = TILE_PX * 3
+            for i in dropped:
+                ty, tx = divmod(i, GRID_W)
+                x0 = tx * TILE_PX * 3
+                for r in range(TILE_PX):
+                    off = ((ty * TILE_PX + r) * CANVAS_W * 3) + x0
+                    canvas[off:off + row_bytes] = \
+                        accum.last_canvas[off:off + row_bytes]
+            canvas = bytes(canvas)
     accum.last_canvas = canvas
     if is_key:
         accum.last_keyframe_t = now
@@ -1042,6 +1120,7 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
     """
     effective = _clamp_encode_mode(raw_mode)
     global ENCODE_MODE, WEBP_QUALITY  # noqa: PLW0603
+    mode_changed = (effective != ENCODE_MODE)
     ENCODE_MODE = effective
     if quality is not None:
         try:
@@ -1065,7 +1144,15 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
             "clamping to %d (%s) [%s]",
             raw_mode, req_name, effective, ENCODE_MODE_NAMES[effective],
             source)
-    force_key_evt.set()
+    # 2026-07-27: force a keyframe only when the MODE actually changed (the
+    # codec byte in every frame header makes the switch decode-safe, but a
+    # full repaint is the right UX) or at boot (initial paint). A
+    # quality-only change needs NO keyframe: quality is not on the wire,
+    # tiles are self-describing, and the encode cache keys include quality
+    # — the old unconditional force cost ~1-2 s of air per slider move and
+    # re-fired on every retained-message replay at MQTT reconnect.
+    if mode_changed or source == "boot":
+        force_key_evt.set()
     client = _MQTT_CLIENT
     if client is not None:
         try:
@@ -1271,6 +1358,24 @@ def main() -> None:
                 if _msg.topic in (KEYFRAME_REQ_TOPIC, TRACTOR_KEYFRAME_TOPIC):
                     force_key_evt.set()
                     return
+                if _msg.topic == TRACTOR_LINK_BUDGET_TOPIC:
+                    # {"n_fragments": N, "profile_index": i} from the radio
+                    # owner. Feeds the existing LinkBudget.update seam so the
+                    # per-frame byte_budget (read at the encode loop below)
+                    # tracks the live radio profile, not a boot-frozen env.
+                    try:
+                        import json as _json
+                        b = _json.loads(_msg.payload.decode("utf-8") or "{}")
+                        nf = int(b.get("n_fragments", 0))
+                        pi = int(b.get("profile_index", -1))
+                    except (ValueError, TypeError, UnicodeDecodeError) as exc:
+                        LOG.warning("link_budget: bad payload %r (%s)",
+                                    _msg.payload[:64], exc)
+                        return
+                    if link_budget.update(nf, pi):
+                        LOG.info("link_budget: -> %s B/frame (n=%d, %s)",
+                                 link_budget.bytes, nf, link_budget.profile_name)
+                    return
                 if _msg.topic == ENCODE_MODE_OVERRIDE_TOPIC:
                     # {"mode": <int> | "<name>", "quality": 1-100?} —
                     # re-published locally by image_tx_daemon after
@@ -1304,6 +1409,7 @@ def main() -> None:
             client.connect(MQTT_HOST, 1883)
             client.subscribe(KEYFRAME_REQ_TOPIC, qos=1)
             client.subscribe(TRACTOR_KEYFRAME_TOPIC, qos=1)
+            client.subscribe(TRACTOR_LINK_BUDGET_TOPIC, qos=1)
             # Retained topic: a freshly (re)started camera_service picks up
             # the operator's last selection immediately on subscribe.
             client.subscribe(ENCODE_MODE_OVERRIDE_TOPIC, qos=1)
