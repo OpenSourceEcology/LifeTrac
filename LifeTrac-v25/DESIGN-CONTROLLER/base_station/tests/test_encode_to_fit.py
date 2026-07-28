@@ -138,6 +138,73 @@ class BudgetExactnessTests(unittest.TestCase):
         self.assertEqual(len(parsed.changed_indices), n_tiles)
 
 
+class EnvContractTests(unittest.TestCase):
+    """Env-var contracts flagged in PR review (2026-07-27).
+
+    Bench boxes edit these by hand, so a typo must degrade to the default
+    rather than stop a daemon from starting, and a documented "0 disables"
+    must actually disable.
+    """
+
+    def test_env_int_defaults_on_garbage(self):
+        os.environ["_LT_TEST_BAD"] = "not-an-int"
+        try:
+            self.assertEqual(
+                camera_service._env_int("_LT_TEST_BAD", 40), 40)
+        finally:
+            del os.environ["_LT_TEST_BAD"]
+
+    def test_env_int_defaults_on_empty_and_blank(self):
+        for raw in ("", "   "):
+            os.environ["_LT_TEST_EMPTY"] = raw
+            try:
+                self.assertEqual(
+                    camera_service._env_int("_LT_TEST_EMPTY", 7), 7)
+            finally:
+                del os.environ["_LT_TEST_EMPTY"]
+
+    def test_env_int_clamps(self):
+        os.environ["_LT_TEST_CLAMP"] = "-5"
+        try:
+            self.assertEqual(
+                camera_service._env_int("_LT_TEST_CLAMP", 6, lo=1), 1)
+            self.assertEqual(
+                camera_service._env_int("_LT_TEST_CLAMP", 6, lo=0), 0)
+        finally:
+            del os.environ["_LT_TEST_CLAMP"]
+        os.environ["_LT_TEST_CLAMP2"] = "999"
+        try:
+            self.assertEqual(
+                camera_service._env_int("_LT_TEST_CLAMP2", 6, hi=100), 100)
+        finally:
+            del os.environ["_LT_TEST_CLAMP2"]
+
+    def test_age_escalate_zero_actually_disables(self):
+        # Documented contract: 0 disables. Before the fix, `age > 0` made a
+        # value of 0 escalate EVERY aged tile — the opposite of disabled.
+        cam = camera_service.SyntheticCamera()
+        accum = camera_service.FrameAccum()
+        saved = camera_service.TILE_AGE_ESCALATE_FRAMES
+        camera_service.TILE_AGE_ESCALATE_FRAMES = 0
+        try:
+            with mock.patch.object(camera_service, "_encode_tile",
+                                   _fixed_tile(20)):
+                camera_service._build_frame(cam, accum, force_keyframe=True,
+                                            byte_budget=120)
+                # Age every tile well past any threshold, then confirm the
+                # escalation path is not taken (no crash, budget respected,
+                # and the over-budget valve stays shut).
+                accum.sweep_seq += 10_000
+                with mock.patch.object(camera_service, "_encode_tile",
+                                       _fixed_tile(250)):
+                    payload = camera_service._build_frame(
+                        cam, accum, force_keyframe=False, byte_budget=120)
+            # Valve disabled -> no over-budget admission.
+            self.assertLessEqual(len(payload), 120)
+        finally:
+            camera_service.TILE_AGE_ESCALATE_FRAMES = saved
+
+
 class QualityKeyframeTests(unittest.TestCase):
     """Quality-only changes must not force a keyframe; mode changes must."""
 

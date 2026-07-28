@@ -809,8 +809,17 @@ class ImageTxDaemon:
         client = self._mqtt_client
         if client is None:
             return
-        n = int(os.environ.get("LIFETRAC_IMAGE_FRAGMENTS_PER_FRAME",
-                               str(n_fragments)))
+        # Parse defensively: this runs inside the paho on_connect callback
+        # and inside _apply_profile, so a malformed env value must not raise
+        # (it would abort connect — losing every subscription — or make a
+        # profile switch report failure).
+        _raw = os.environ.get("LIFETRAC_IMAGE_FRAGMENTS_PER_FRAME", "").strip()
+        try:
+            n = int(_raw) if _raw else int(n_fragments)
+        except ValueError:
+            LOG.warning("bad LIFETRAC_IMAGE_FRAGMENTS_PER_FRAME=%r — using %d",
+                        _raw, n_fragments)
+            n = int(n_fragments)
         idx = _PROFILE_TO_LINK_PHY_IDX.get(int(profile), 5)
         try:
             import json as _json

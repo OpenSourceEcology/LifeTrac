@@ -470,16 +470,38 @@ WIREFRAME_QUALITY   = max(5, min(100, int(os.environ.get(
     "LIFETRAC_WIREFRAME_QUALITY",   "20"))))
 ENCODE_MODE = _clamp_encode_mode(int(os.environ.get("LIFETRAC_ENCODE_MODE", "0")))
 
+def _env_int(name: str, default: int, lo: int | None = None,
+             hi: int | None = None) -> int:
+    """Parse an int env var without ever raising.
+
+    A malformed value on a bench box (a stray comma, an empty string from a
+    templated unit file) must not stop the camera service from starting —
+    log it and use the default. Clamped to [lo, hi] when given.
+    """
+    raw = os.environ.get(name, "")
+    try:
+        val = int(str(raw).strip()) if str(raw).strip() else default
+    except ValueError:
+        LOG.warning("camera_service: bad %s=%r — using %d", name, raw, default)
+        val = default
+    if lo is not None:
+        val = max(lo, val)
+    if hi is not None:
+        val = min(hi, val)
+    return val
+
+
 # 2026-07-27 encode-to-fit starvation guard: a tile whose age (frames since
-# it last shipped) exceeds this jumps to the front of the pack order,
-# oldest first. Guarantees rolling-refresh convergence under sustained
-# motion at tight budgets. 0 disables.
-TILE_AGE_ESCALATE_FRAMES = max(0, int(os.environ.get(
-    "LIFETRAC_TILE_AGE_ESCALATE_FRAMES", "40")))
+# it last shipped) EXCEEDS this jumps to the front of the pack order, oldest
+# first. Guarantees rolling-refresh convergence under sustained motion at
+# tight budgets. 0 DISABLES escalation entirely (see the explicit `> 0`
+# guards at the use sites — without them a value of 0 would escalate every
+# tile with age >= 1, i.e. the exact opposite of "disabled").
+TILE_AGE_ESCALATE_FRAMES = _env_int(
+    "LIFETRAC_TILE_AGE_ESCALATE_FRAMES", 40, lo=0)
 # Bound on wasted encode passes once the budget is full: after the first
 # overflow, keep scanning at most this many more tiles for a smaller fit.
-OVERFLOW_SCAN_LIMIT = max(1, int(os.environ.get(
-    "LIFETRAC_OVERFLOW_SCAN_LIMIT", "6")))
+OVERFLOW_SCAN_LIMIT = _env_int("LIFETRAC_OVERFLOW_SCAN_LIMIT", 6, lo=1)
 
 # Per-frame codec ids (mirrors base_station/image_pipeline/frame_format.py).
 # Kept duplicated to avoid importing the base-station tree from the tractor.
@@ -961,8 +983,8 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
     # gets budget priority); the over-budget liveness valve in the packing
     # loop handles the remaining case (an aged tile too large to EVER fit).
     # Together they guarantee every tile ships eventually.
-    if (accum.tile_last_seq is not None and not is_key
-            and IMAGE_METHOD in ("B", "C")):
+    if (TILE_AGE_ESCALATE_FRAMES > 0 and accum.tile_last_seq is not None
+            and not is_key and IMAGE_METHOD in ("B", "C")):
         _ages = accum.tile_last_seq
         _now_seq = accum.sweep_seq
 
@@ -997,7 +1019,10 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
     _aged_valve_used = False
 
     def _is_aged(idx: int) -> bool:
-        if accum.tile_last_seq is None or is_key:
+        # TILE_AGE_ESCALATE_FRAMES == 0 disables the whole aging feature,
+        # including this over-budget liveness valve.
+        if (TILE_AGE_ESCALATE_FRAMES <= 0 or accum.tile_last_seq is None
+                or is_key):
             return False
         return (accum.sweep_seq - accum.tile_last_seq[idx]
                 > TILE_AGE_ESCALATE_FRAMES)

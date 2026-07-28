@@ -265,8 +265,14 @@ class ImageRxDaemon:
         # `or [0]`: an empty/blank env (or a bad parse) falls back to a
         # single offset-0 bin (fire immediately at completion).
         self._probe_sweep = parsed_sweep or [0]
-        self._probe_min_gap_s = float(os.environ.get(
-            "LIFETRAC_PROBE_MIN_GAP_S", "0.5"))
+        # Same defensive-parse rule as the sweeps above: a typo in a bench
+        # param must not stop the daemon from starting.
+        _gap = os.environ.get("LIFETRAC_PROBE_MIN_GAP_S", "").strip()
+        try:
+            self._probe_min_gap_s = float(_gap) if _gap else 0.5
+        except ValueError:
+            LOG.warning("bad LIFETRAC_PROBE_MIN_GAP_S %r — using 0.5", _gap)
+            self._probe_min_gap_s = 0.5
         self._last_probe_t = 0.0
         # 2026-07-27 SIZE sweep: pad probes to emulate the real control-plane
         # frame sizes so tomorrow measures P(delivery | phase, SIZE), not just
