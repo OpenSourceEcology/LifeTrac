@@ -91,6 +91,40 @@ class BudgetExactnessTests(unittest.TestCase):
         self.assertGreaterEqual(len(parsed.changed_indices), 2)
         self.assertLessEqual(len(payload), 243)
 
+    def test_aged_oversized_tile_eventually_ships(self):
+        # Liveness valve: a tile whose smallest blob exceeds tile_cap must
+        # not be starved forever. Drive many P-frames at a tight budget with
+        # one tile always larger than the cap; assert it ships within a
+        # bounded number of frames (age escalation + over-budget valve).
+        cam = camera_service.SyntheticCamera()
+        accum = camera_service.FrameAccum()
+        n_tiles = camera_service.GRID_W * camera_service.GRID_H
+        big_idx = 0
+
+        def _sized(rgb, tx, ty, quality=None, encode_mode=None, is_key=False):
+            i = ty * camera_service.GRID_W + tx
+            # big tile always 200 B (> any tight tile_cap); others 8 B.
+            n = 200 if i == big_idx else 8
+            return bytes([tx & 0xFF, ty & 0xFF]) + b"\xAA" * (n - 2)
+
+        shipped_big = False
+        with mock.patch.object(camera_service, "_encode_tile", _sized):
+            # First frame keyframe to seed last_canvas + tile_last_seq.
+            camera_service._build_frame(cam, accum, force_keyframe=True,
+                                        byte_budget=120)
+            # Then P-frames. The synth changes tiles each frame; the big
+            # tile can never fit 120 B, so only the valve ships it.
+            escalate = camera_service.TILE_AGE_ESCALATE_FRAMES
+            for _ in range(escalate + 5):
+                payload = camera_service._build_frame(
+                    cam, accum, force_keyframe=False, byte_budget=120)
+                parsed = parse_tile_delta_frame(payload)
+                if big_idx in parsed.changed_indices:
+                    shipped_big = True
+                    break
+        self.assertTrue(shipped_big,
+                        "aged oversized tile was starved forever")
+
     def test_no_budget_is_unbounded(self):
         # byte_budget=None keeps the legacy "encode everything" behaviour.
         cam = camera_service.SyntheticCamera()

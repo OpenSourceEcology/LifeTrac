@@ -794,12 +794,16 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
         :data:`ROI_QUALITY_INSIDE` and outside-ROI tiles at
         :data:`ROI_QUALITY_OUTSIDE`. Inside-ROI tiles are always sent
         first when a budget cap forces drops.
-      * ``byte_budget`` — soft cap on the combined size of the encoded
-        tile bodies (each tile contributes ``len(blob) + 1`` bytes for
-        its ``tile_size_minus1`` prefix). Outside-ROI tiles are dropped
-        first; if still over, the lowest-priority inside tiles are
-        dropped. The header + bitmap are always emitted; dropped tiles
-        are cleared from the bitmap so the parser stays in sync.
+      * ``byte_budget`` — cap on the whole WIRE payload (2026-07-27): the
+        6-byte header + changed-bitmap are charged against it, so the
+        emitted frame is ``<= byte_budget`` and fits its fragment budget
+        exactly. Tile bodies (each ``len(blob) + 1`` for the size prefix)
+        fill the remainder in priority order; outside-ROI then
+        lowest-priority inside tiles are dropped, and dropped bits are
+        cleared from the bitmap so the parser stays in sync. Exception:
+        an AGED tile too large to ever fit is admitted over-budget once
+        per frame (that frame spills to ~2 fragments) so a complex region
+        is never starved forever — see the liveness valve below.
       * ``encode_cache`` — :class:`image_pipeline.tile_cache.TileEncodeCache`.
         When provided, a tile whose raw 32×32 RGB slice byte-hashes to a
         recently encoded blob is reused instead of round-tripping through
@@ -953,9 +957,10 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
     # motion-first ordering can starve the sweep forever (sweep tiles sort
     # last, the budget break drops the tail every frame, tile age grows
     # unbounded). Escalate any tile older than the threshold to the FRONT,
-    # oldest first — among escalated tiles this degenerates to round-robin,
-    # so every tile is guaranteed to ship eventually even under sustained
-    # full-budget motion.
+    # oldest first. This handles the common case (a smaller aged tile now
+    # gets budget priority); the over-budget liveness valve in the packing
+    # loop handles the remaining case (an aged tile too large to EVER fit).
+    # Together they guarantee every tile ships eventually.
     if (accum.tile_last_seq is not None and not is_key
             and IMAGE_METHOD in ("B", "C")):
         _ages = accum.tile_last_seq
@@ -981,6 +986,22 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
     if cap is not None:
         tile_cap = max(0, cap - 6 - bitmap_bytes)
     _overflow_scans = 0
+    # Liveness valve: a tile whose SMALLEST encodable blob exceeds tile_cap
+    # (a high-detail tile at a tight budget) can never fit, so the strict
+    # no-bust packer would starve it forever — permanent staleness of a
+    # complex region under sustained motion. Once a tile has AGED past the
+    # escalation threshold, admit it over-budget ONCE per frame (that frame
+    # becomes ~2 fragments — rare and bounded) so it finally ships. This
+    # keeps the "every tile ships eventually" guarantee true; the common
+    # case stays single-fragment.
+    _aged_valve_used = False
+
+    def _is_aged(idx: int) -> bool:
+        if accum.tile_last_seq is None or is_key:
+            return False
+        return (accum.sweep_seq - accum.tile_last_seq[idx]
+                > TILE_AGE_ESCALATE_FRAMES)
+
     for _rank, i, q in priority:
         ty, tx = divmod(i, GRID_W)
         if encode_cache is not None:
@@ -1007,6 +1028,19 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
             # continue — a lower-priority tile may be smaller and still fit,
             # so scan on (bounded, to cap the wasted encode CPU) instead of
             # abandoning the remaining budget.
+            # Liveness valve: an AGED tile that can never fit gets admitted
+            # over-budget once per frame so it is not starved forever. Only
+            # when nothing has shipped yet (kept empty) or its own size is
+            # the blocker — otherwise let the greedy scan keep packing.
+            if (not _aged_valve_used and _is_aged(i)
+                    and cost > tile_cap):     # can't fit even an empty frame
+                _aged_valve_used = True
+                kept.append((i, blob))
+                used += cost
+                LOG.debug("camera_service: aged tile %d admitted over-budget "
+                          "(cost=%d > tile_cap=%d) to avoid starvation",
+                          i, cost, tile_cap)
+                break                          # frame is over budget; stop
             _overflow_scans += 1
             if _overflow_scans >= OVERFLOW_SCAN_LIMIT or tile_cap - used < 6:
                 LOG.debug("camera_service: byte_budget=%d full (used=%d, "

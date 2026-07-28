@@ -255,8 +255,16 @@ class ImageRxDaemon:
         # Phase sweep: 0 = fire immediately at completion; else step through
         # the list (ms) round-robin so each offset bin gets samples.
         _sweep = os.environ.get("LIFETRAC_PROBE_PHASE_SWEEP_MS", "").strip()
-        self._probe_sweep = [int(x) for x in _sweep.split(",") if x.strip()] \
-            if _sweep else [0]
+        try:
+            parsed_sweep = [max(0, int(x)) for x in _sweep.split(",")
+                            if x.strip()]
+        except ValueError:
+            LOG.warning("bad LIFETRAC_PROBE_PHASE_SWEEP_MS %r — using [0]",
+                        _sweep)
+            parsed_sweep = []
+        # `or [0]`: an empty/blank env (or a bad parse) falls back to a
+        # single offset-0 bin (fire immediately at completion).
+        self._probe_sweep = parsed_sweep or [0]
         self._probe_min_gap_s = float(os.environ.get(
             "LIFETRAC_PROBE_MIN_GAP_S", "0.5"))
         self._last_probe_t = 0.0
