@@ -104,6 +104,47 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
 
 LOG = logging.getLogger("image_rx_daemon")
 
+# ---- defensive env parsing (2026-07-27, PR-review follow-up) ----------
+# These tunables are hand-edited on the bench and injected via docker -e /
+# systemd units, so a typo or an empty substitution is routine. A bare
+# int()/float() turns that into a crash — at module scope it stops the
+# daemon from starting at all; inside an MQTT callback it can abort
+# on_connect and silently lose every subscription. These never raise.
+
+def _env_int(name: str, default: int, lo: "int | None" = None,
+             hi: "int | None" = None) -> int:
+    raw = os.environ.get(name, "")
+    try:
+        val = int(str(raw).strip()) if str(raw).strip() else default
+    except ValueError:
+        LOG.warning("bad %s=%r — using %s", name, raw, default)
+        val = default
+    if lo is not None and val < lo:
+        LOG.warning("%s=%s below %s; clamping", name, val, lo)
+        val = lo
+    if hi is not None and val > hi:
+        LOG.warning("%s=%s above %s; clamping", name, val, hi)
+        val = hi
+    return val
+
+
+def _env_float(name: str, default: float, lo: "float | None" = None,
+               hi: "float | None" = None) -> float:
+    raw = os.environ.get(name, "")
+    try:
+        val = float(str(raw).strip()) if str(raw).strip() else default
+    except ValueError:
+        LOG.warning("bad %s=%r — using %s", name, raw, default)
+        val = default
+    if lo is not None and val < lo:
+        LOG.warning("%s=%s below %s; clamping", name, val, lo)
+        val = lo
+    if hi is not None and val > hi:
+        LOG.warning("%s=%s above %s; clamping", name, val, hi)
+        val = hi
+    return val
+
+
 # Same topic ID 0x25 → "lifetrac/v25/video/tile_delta" as the production
 # bridge would have used. We publish into the same MQTT slot so web_ui
 # does not have to change.
@@ -235,7 +276,7 @@ class ImageRxDaemon:
         # (applied by the RX worker between poll cycles — the worker owns
         # the HostLink, MQTT callbacks must never touch it directly).
         self._pending_profile: int | None = None
-        self._active_profile = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+        self._active_profile = _env_int("LIFETRAC_REG_PROFILE", 0, lo=0, hi=2)
         # True once ANY retained radio_profile pin has been delivered to
         # this process — gates the age check so the boot replay (restart
         # convergence) is always honored and only reconnect replays age out.
@@ -383,7 +424,7 @@ class ImageRxDaemon:
             LOG.warning("CFG_SET(LBT_ENABLE=0) failed: %s — command TX may "
                         "abort under load", exc)
         if _os.environ.get("LIFETRAC_SKIP_PHY_CONTRACT", "0") != "1":
-            prof_id = int(_os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+            prof_id = _env_int("LIFETRAC_REG_PROFILE", 0, lo=0, hi=2)
             active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
             verify_modem_matches_profile(link, active_phy)
         # 2026-05-25 fix: explicitly wake the SX1276 into LORA_RXCONTINUOUS
@@ -1469,8 +1510,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         "LIFETRAC_L072_BAUD", DEFAULT_BAUD))
     ap.add_argument("--mqtt-host", default=os.environ.get(
         "LIFETRAC_MQTT_HOST", DEFAULT_MQTT_HOST))
-    ap.add_argument("--mqtt-port", type=int, default=int(os.environ.get(
-        "LIFETRAC_MQTT_PORT", str(DEFAULT_MQTT_PORT))))
+    ap.add_argument("--mqtt-port", type=int, default=_env_int(
+        "LIFETRAC_MQTT_PORT", DEFAULT_MQTT_PORT, lo=1, hi=65535))
     ap.add_argument("--reassembler-timeout-ms", type=int, default=int(
         os.environ.get("LIFETRAC_REASSEMBLER_TIMEOUT_MS", "1500")))
     ap.add_argument("--stats-interval-s", type=float, default=10.0)

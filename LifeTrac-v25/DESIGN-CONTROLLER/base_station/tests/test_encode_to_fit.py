@@ -179,6 +179,29 @@ class EnvContractTests(unittest.TestCase):
         finally:
             del os.environ["_LT_TEST_CLAMP2"]
 
+    def test_no_bare_env_numeric_parses_remain(self):
+        # Guard against regression: every numeric env read in the image
+        # path must go through _env_int/_env_float, which never raise. A
+        # bare int()/float() at module scope stops a daemon from starting;
+        # inside an MQTT callback it can abort on_connect and silently lose
+        # every subscription.
+        import re
+        targets = [
+            os.path.join(_X8_DIR, "camera_service.py"),
+            os.path.join(_X8_DIR, "image_tx_daemon.py"),
+            os.path.join(_BS_DIR, "image_rx_daemon.py"),
+        ]
+        pat = re.compile(r"(?<!_env_)\b(?:int|float)\(\s*(?:os|_os)\.environ")
+        offenders = []
+        for path in targets:
+            with open(path, encoding="utf-8") as fh:
+                for n, line in enumerate(fh, 1):
+                    if pat.search(line):
+                        offenders.append(
+                            f"{os.path.basename(path)}:{n}: {line.strip()}")
+        self.assertEqual(offenders, [], "bare env numeric parse(s) found:\n"
+                         + "\n".join(offenders))
+
     def test_age_escalate_zero_actually_disables(self):
         # Documented contract: 0 disables. Before the fix, `age > 0` made a
         # value of 0 escalate EVERY aged tile — the opposite of disabled.

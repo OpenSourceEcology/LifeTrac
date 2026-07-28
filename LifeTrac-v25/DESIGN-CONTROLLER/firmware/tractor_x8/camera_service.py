@@ -48,21 +48,67 @@ except ImportError:                   # X8 image without numpy still works
 
 LOG = logging.getLogger("camera_service")
 
-GRID_W = int(os.environ.get("LIFETRAC_GRID_W", "12"))
-GRID_H = int(os.environ.get("LIFETRAC_GRID_H", "8"))
-TILE_PX = int(os.environ.get("LIFETRAC_TILE_PX", "32"))
+
+# ---- defensive env parsing (2026-07-27) -------------------------------
+# Every tunable below is hand-edited on the bench and injected through
+# docker -e / systemd unit files, where a stray comma or an empty
+# substitution is routine. A bare int()/float() at module scope turns that
+# typo into an ImportError — the camera service never starts, and the
+# operator sees a traceback instead of a warning. These helpers never
+# raise: bad input logs and falls back to the default. Out-of-range values
+# are clamped WITH a warning (generalizing the old IP-208 WEBP_QUALITY
+# check, which was the only parse that bothered).
+
+def _env_int(name: str, default: int, lo: int | None = None,
+             hi: int | None = None) -> int:
+    """Parse an int env var without ever raising. Clamps to [lo, hi]."""
+    raw = os.environ.get(name, "")
+    try:
+        val = int(str(raw).strip()) if str(raw).strip() else default
+    except ValueError:
+        LOG.warning("camera_service: bad %s=%r — using %d", name, raw, default)
+        val = default
+    return _clamp_env(name, val, lo, hi)
+
+
+def _env_float(name: str, default: float, lo: float | None = None,
+               hi: float | None = None) -> float:
+    """Parse a float env var without ever raising. Clamps to [lo, hi]."""
+    raw = os.environ.get(name, "")
+    try:
+        val = float(str(raw).strip()) if str(raw).strip() else default
+    except ValueError:
+        LOG.warning("camera_service: bad %s=%r — using %s", name, raw, default)
+        val = default
+    return _clamp_env(name, val, lo, hi)
+
+
+def _clamp_env(name, val, lo, hi):
+    if lo is not None and val < lo:
+        LOG.warning("camera_service: %s=%s below %s; clamping", name, val, lo)
+        return lo
+    if hi is not None and val > hi:
+        LOG.warning("camera_service: %s=%s above %s; clamping", name, val, hi)
+        return hi
+    return val
+
+
+# Grid geometry must stay positive or CANVAS_* and every tile index break.
+GRID_W = _env_int("LIFETRAC_GRID_W", 12, lo=1)
+GRID_H = _env_int("LIFETRAC_GRID_H", 8, lo=1)
+TILE_PX = _env_int("LIFETRAC_TILE_PX", 32, lo=1)
 CANVAS_W = GRID_W * TILE_PX        # 384
 CANVAS_H = GRID_H * TILE_PX        # 256
 TILE_BYTES_MAX = 256               # tile_size_minus1 is u8, so ≤256 B
 
-KEYFRAME_PERIOD_S = float(os.environ.get("LIFETRAC_KEYFRAME_PERIOD_S", "10"))
-TARGET_FPS        = float(os.environ.get("LIFETRAC_CAMERA_FPS", "2"))
+# Periods/rates must be > 0: TARGET_FPS divides into the loop period and
+# KEYFRAME_PERIOD_S gates the keyframe timer, so 0 would divide-by-zero or
+# force a keyframe every frame.
+KEYFRAME_PERIOD_S = _env_float("LIFETRAC_KEYFRAME_PERIOD_S", 10.0, lo=0.1)
+TARGET_FPS        = _env_float("LIFETRAC_CAMERA_FPS", 2.0, lo=0.1)
 # IP-208: clamp WEBP quality to a sensible range so a typo can't disable
 # the encoder entirely (1 would skip the in-loop guard) or push past lossless.
-_RAW_WEBP_Q = int(os.environ.get("LIFETRAC_WEBP_QUALITY", "55"))
-if _RAW_WEBP_Q < 20 or _RAW_WEBP_Q > 100:
-    LOG.warning("WEBP_QUALITY=%d out of range; clamping to [20, 100]", _RAW_WEBP_Q)
-WEBP_QUALITY      = max(20, min(100, _RAW_WEBP_Q))
+WEBP_QUALITY      = _env_int("LIFETRAC_WEBP_QUALITY", 55, lo=20, hi=100)
 SOURCE            = os.environ.get("LIFETRAC_CAMERA_SOURCE", "libcamera")
 MQTT_HOST         = os.environ.get("LIFETRAC_MQTT_HOST", "localhost")
 
@@ -73,7 +119,7 @@ MQTT_HOST         = os.environ.get("LIFETRAC_MQTT_HOST", "localhost")
 V4L2_DEVICE       = os.environ.get("LIFETRAC_CAMERA_DEVICE", "/dev/video1")
 V4L2_INPUT_FORMAT = os.environ.get("LIFETRAC_V4L2_INPUT_FORMAT", "mjpeg")
 V4L2_INPUT_SIZE   = os.environ.get("LIFETRAC_V4L2_INPUT_SIZE", "1920x1080")
-V4L2_INPUT_FPS    = int(os.environ.get("LIFETRAC_V4L2_INPUT_FPS", "30"))
+V4L2_INPUT_FPS    = _env_int("LIFETRAC_V4L2_INPUT_FPS", 30, lo=1)
 FFMPEG_PATH       = os.environ.get("LIFETRAC_FFMPEG_PATH", "ffmpeg")
 
 # IP-104: primary path for encoded image fragments is the X8 → H747 UART
@@ -464,32 +510,9 @@ def _clamp_encode_mode(requested: int) -> int:
     return ENCODE_MODE_Y_ONLY
 # Quality ceilings applied as ``min(requested_quality, ceiling)`` so the
 # ROI-inside boost still wins when the ceiling is high enough.
-MOTION_ONLY_QUALITY = max(5, min(100, int(os.environ.get(
-    "LIFETRAC_MOTION_ONLY_QUALITY", "30"))))
-WIREFRAME_QUALITY   = max(5, min(100, int(os.environ.get(
-    "LIFETRAC_WIREFRAME_QUALITY",   "20"))))
-ENCODE_MODE = _clamp_encode_mode(int(os.environ.get("LIFETRAC_ENCODE_MODE", "0")))
-
-def _env_int(name: str, default: int, lo: int | None = None,
-             hi: int | None = None) -> int:
-    """Parse an int env var without ever raising.
-
-    A malformed value on a bench box (a stray comma, an empty string from a
-    templated unit file) must not stop the camera service from starting —
-    log it and use the default. Clamped to [lo, hi] when given.
-    """
-    raw = os.environ.get(name, "")
-    try:
-        val = int(str(raw).strip()) if str(raw).strip() else default
-    except ValueError:
-        LOG.warning("camera_service: bad %s=%r — using %d", name, raw, default)
-        val = default
-    if lo is not None:
-        val = max(lo, val)
-    if hi is not None:
-        val = min(hi, val)
-    return val
-
+MOTION_ONLY_QUALITY = _env_int("LIFETRAC_MOTION_ONLY_QUALITY", 30, lo=5, hi=100)
+WIREFRAME_QUALITY   = _env_int("LIFETRAC_WIREFRAME_QUALITY", 20, lo=5, hi=100)
+ENCODE_MODE = _clamp_encode_mode(_env_int("LIFETRAC_ENCODE_MODE", 0))
 
 # 2026-07-27 encode-to-fit starvation guard: a tile whose age (frames since
 # it last shipped) EXCEEDS this jumps to the front of the pack order, oldest
@@ -688,14 +711,14 @@ if IMAGE_METHOD not in ("A", "B", "C"):
 # Method B/C: L1-magnitude floor (sum of |cur-prev| over the 32×32×3 RGB
 # tile). In LoRa-bridge mode keep a low-but-nonzero default: high values can
 # misclassify slow real motion as static and make the UI appear frozen.
-_default_tile_mag_min = "4000" if USE_LORA_BRIDGE else "8000"
-TILE_MAGNITUDE_MIN = max(0, int(os.environ.get(
-    "LIFETRAC_TILE_MAGNITUDE_MIN", _default_tile_mag_min)))
+_default_tile_mag_min = 4000 if USE_LORA_BRIDGE else 8000
+TILE_MAGNITUDE_MIN = _env_int(
+    "LIFETRAC_TILE_MAGNITUDE_MIN", _default_tile_mag_min, lo=0)
 
 # Method C: how many "stale" tiles to force into each P-frame's changed
 # bitmap. With SWEEP_STEP=2 and a 1 fps loop, a static 96-tile canvas
 # converges to full coverage in ~48 s even with zero motion. 0 disables.
-SWEEP_STEP = max(0, int(os.environ.get("LIFETRAC_SWEEP_STEP", "2")))
+SWEEP_STEP = _env_int("LIFETRAC_SWEEP_STEP", 2, lo=0)
 
 LOG.info("IP-PlanRev: IMAGE_METHOD=%s TILE_MAGNITUDE_MIN=%d SWEEP_STEP=%d numpy=%s",
          IMAGE_METHOD, TILE_MAGNITUDE_MIN, SWEEP_STEP, _HAS_NUMPY)
@@ -704,10 +727,9 @@ LOG.info("IP-PlanRev: IMAGE_METHOD=%s TILE_MAGNITUDE_MIN=%d SWEEP_STEP=%d numpy=
 # IP-W2-03: per-tile quality split for the ROI planner. Inside-ROI tiles
 # get ``ROI_QUALITY_INSIDE`` (default 65), outside-ROI tiles get
 # ``ROI_QUALITY_OUTSIDE`` (default 30) when a planner is wired in.
-ROI_QUALITY_INSIDE  = max(20, min(100, int(os.environ.get(
-    "LIFETRAC_ROI_QUALITY_INSIDE",  str(WEBP_QUALITY + 10)))))
-ROI_QUALITY_OUTSIDE = max( 5, min(100, int(os.environ.get(
-    "LIFETRAC_ROI_QUALITY_OUTSIDE", "30"))))
+ROI_QUALITY_INSIDE  = _env_int("LIFETRAC_ROI_QUALITY_INSIDE",
+                               WEBP_QUALITY + 10, lo=20, hi=100)
+ROI_QUALITY_OUTSIDE = _env_int("LIFETRAC_ROI_QUALITY_OUTSIDE", 30, lo=5, hi=100)
 
 # IP-W2-03: optional airtime byte-budget. When set (positive int), the
 # encoder drops outside-ROI changed tiles first, then oldest inside-ROI
@@ -1349,7 +1371,7 @@ def main() -> None:
     if os.environ.get("LIFETRAC_TILE_CACHE_ENABLE", "").strip() == "1":
         try:
             from image_pipeline.tile_cache import TileEncodeCache
-            history = max(1, int(os.environ.get("LIFETRAC_TILE_CACHE_HISTORY", "4")))
+            history = _env_int("LIFETRAC_TILE_CACHE_HISTORY", 4, lo=1)
             encode_cache = TileEncodeCache(n_tiles=GRID_W * GRID_H, history=history)
             LOG.info("camera_service: tile encode cache enabled (history=%d)", history)
         except Exception as exc:                              # pragma: no cover
@@ -1482,7 +1504,7 @@ def main() -> None:
     period = 1.0 / max(TARGET_FPS, 0.1)
     next_t = time.monotonic()
     frame_health_log = os.environ.get("LIFETRAC_CAMERA_HEALTH_LOG", "").strip() == "1"
-    frame_health_every_s = max(1.0, float(os.environ.get("LIFETRAC_CAMERA_HEALTH_EVERY_S", "2")))
+    frame_health_every_s = _env_float("LIFETRAC_CAMERA_HEALTH_EVERY_S", 2.0, lo=1.0)
     _last_health_t = 0.0
     _last_canvas_sig: int | None = None
     _same_canvas_run = 0

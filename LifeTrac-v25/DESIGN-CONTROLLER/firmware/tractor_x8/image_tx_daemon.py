@@ -130,6 +130,47 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
 
 LOG = logging.getLogger("image_tx_daemon")
 
+# ---- defensive env parsing (2026-07-27, PR-review follow-up) ----------
+# These tunables are hand-edited on the bench and injected via docker -e /
+# systemd units, so a typo or an empty substitution is routine. A bare
+# int()/float() turns that into a crash — at module scope it stops the
+# daemon from starting at all; inside an MQTT callback it can abort
+# on_connect and silently lose every subscription. These never raise.
+
+def _env_int(name: str, default: int, lo: "int | None" = None,
+             hi: "int | None" = None) -> int:
+    raw = os.environ.get(name, "")
+    try:
+        val = int(str(raw).strip()) if str(raw).strip() else default
+    except ValueError:
+        LOG.warning("bad %s=%r — using %s", name, raw, default)
+        val = default
+    if lo is not None and val < lo:
+        LOG.warning("%s=%s below %s; clamping", name, val, lo)
+        val = lo
+    if hi is not None and val > hi:
+        LOG.warning("%s=%s above %s; clamping", name, val, hi)
+        val = hi
+    return val
+
+
+def _env_float(name: str, default: float, lo: "float | None" = None,
+               hi: "float | None" = None) -> float:
+    raw = os.environ.get(name, "")
+    try:
+        val = float(str(raw).strip()) if str(raw).strip() else default
+    except ValueError:
+        LOG.warning("bad %s=%r — using %s", name, raw, default)
+        val = default
+    if lo is not None and val < lo:
+        LOG.warning("%s=%s below %s; clamping", name, val, lo)
+        val = lo
+    if hi is not None and val > hi:
+        LOG.warning("%s=%s above %s; clamping", name, val, hi)
+        val = hi
+    return val
+
+
 # ---- pacing constants (cloned from w2_02_host_pipeline.py) -----------
 MIN_LORA_HOST_INTER_CYCLE_S = 0.05        # 50 ms between consecutive TX_FRAME_REQ
 LEGAL_DWELL_US = 400_000                  # FCC §15.247(a)(1) 400 ms dwell
@@ -163,18 +204,18 @@ TX_PIPELINE = os.environ.get("LIFETRAC_TX_PIPELINE", "v2").strip().lower()
 # 2026-07-25 firmware carries a depth-4 park ring (1 transmitting + 4
 # parked), so up to 4 never NAKs. Latency guard (RS-9.7): keep <=3 at
 # FHSS; 4 is for DTS. Default stays 2 for old-firmware compatibility.
-PIPELINE_DEPTH = max(1, int(os.environ.get("LIFETRAC_TX_PIPELINE_DEPTH", "2")))
+PIPELINE_DEPTH = _env_int("LIFETRAC_TX_PIPELINE_DEPTH", 2, lo=1)
 # RS-3.1 (2026-07-25): batch multiple non-key frames into one fragment
 # train so the measured ~44 ms host-side per-handoff overhead (Run D
 # forensics) amortizes across 2-4 frames. Default OFF until air-verified;
 # the bench harness enables it explicitly.
-TX_BATCH = int(os.environ.get("LIFETRAC_TX_BATCH", "0"))
+TX_BATCH = _env_int("LIFETRAC_TX_BATCH", 0)
 # RS-3.10 (2026-07-26): build train N+1 while train N is on air (the
 # pipelined wait loop is ~mostly idle polling for TX_DONEs), then hold a
 # DESIGNED inter-train gap spent actively listening — the reverse-slot
 # command window — instead of an accidental gap of Python overhead.
-TX_PREPARE_AHEAD = int(os.environ.get("LIFETRAC_TX_PREPARE_AHEAD", "0"))
-TRAIN_GAP_S = max(0.0, float(os.environ.get("LIFETRAC_TRAIN_GAP_MS", "40")) / 1000.0)
+TX_PREPARE_AHEAD = _env_int("LIFETRAC_TX_PREPARE_AHEAD", 0)
+TRAIN_GAP_S = _env_float("LIFETRAC_TRAIN_GAP_MS", 40.0, lo=0.0) / 1000.0
 # 760 (2026-07-26 runt analysis): admits TRIPLES of ~246 B frames (748 B →
 # 4 fragments at ~111 ms/frame vs pairs' ~120). The runt fragment is
 # structural for frames >243 B (one fragment body) — batching amortizes it:
@@ -182,7 +223,7 @@ TRAIN_GAP_S = max(0.0, float(os.environ.get("LIFETRAC_TRAIN_GAP_MS", "40")) / 10
 # _batch_more rejects adds that worsen fragments-per-frame, so variable
 # real-camera sizes can't produce pathological fits. History: 480 silently
 # rejected every pair (Run E); 520 allowed pairs (runs F–K).
-BATCH_BUDGET_B = int(os.environ.get("LIFETRAC_BATCH_BUDGET_B", "760"))
+BATCH_BUDGET_B = _env_int("LIFETRAC_BATCH_BUDGET_B", 760, lo=1)
 # Fragment body capacity per radio profile: TX_FRAME_BODY_MAX − 4 B
 # fragment header at BW500 (profile 2) = 243; at BW250 (profiles 0/1) the
 # 170 ms air cap limits bodies to 207 → 203 usable. 2026-07-27: was a
@@ -195,7 +236,7 @@ def _frag_body_b(profile: int) -> int:
     return _FRAG_BODY_BY_PROFILE.get(int(profile), 203)
 
 
-BATCH_MAX_FRAMES = max(1, int(os.environ.get("LIFETRAC_BATCH_MAX_FRAMES", "4")))
+BATCH_MAX_FRAMES = _env_int("LIFETRAC_BATCH_MAX_FRAMES", 4, lo=1)
 try:
     from image_pipeline.frame_format import pack_frame_batch
 except Exception:                                             # pragma: no cover
@@ -324,7 +365,7 @@ class ImageTxDaemon:
         self.toa_us_sum = 0
         # D4 host mirror: budget follows the active regulatory profile
         # (DTS BW500 -> 930 ms/s, 20 ms under the firmware's 950 ms cap).
-        _prof = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+        _prof = _env_int("LIFETRAC_REG_PROFILE", 0, lo=0, hi=2)
         self.budget = AirtimeBudget(
             budget_us=_PROFILE_TO_BUDGET_US.get(_prof, 380_000))
         # 2026-07-25 radio-profile selector state.
@@ -441,7 +482,7 @@ class ImageTxDaemon:
         except Exception as exc:                              # pragma: no cover
             LOG.warning("regulatory profile config failed: %s", exc)
         if _os.environ.get("LIFETRAC_SKIP_PHY_CONTRACT", "0") != "1":
-            prof_id = int(_os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+            prof_id = _env_int("LIFETRAC_REG_PROFILE", 0, lo=0, hi=2)
             active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
             verify_modem_matches_profile(link, active_phy)
         try:
@@ -853,10 +894,10 @@ class ImageTxDaemon:
 
     def _pack_for(self, frame: _PendingFrame) -> list[bytes]:
         is_key = frame.payload[:1] == b"\x01"          # frame_kind byte
-        copies = int(os.environ.get("LIFETRAC_KEYFRAME_COPIES", "1"))
+        copies = _env_int("LIFETRAC_KEYFRAME_COPIES", 1, lo=1)
         if copies <= 1 and is_key and self.recent_frag_loss_rate() > 0.005:
             copies = 2                                  # auto: only when PER says so
-        prof_id = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+        prof_id = _env_int("LIFETRAC_REG_PROFILE", 0, lo=0, hi=2)
         active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
         if is_key and copies > 1:
             return pack_image_fragments_v2(frame.payload, frame.seq,
@@ -868,7 +909,7 @@ class ImageTxDaemon:
         # shipped first (reassemble.py); enable emission per deployment
         # via LIFETRAC_PARITY_GROUP=8. v1 path only — the v2 copies path
         # above already carries its own redundancy.
-        parity_group = int(os.environ.get("LIFETRAC_PARITY_GROUP", "0"))
+        parity_group = _env_int("LIFETRAC_PARITY_GROUP", 0, lo=0)
         if parity_group > 0:
             n_data = len(frags)
             frags = add_parity_fragments(frags, frame.seq, parity_group)
@@ -881,7 +922,7 @@ class ImageTxDaemon:
 
     def _tx_one_frame(self, link: HostLink, frame: _PendingFrame) -> None:
         # F16a: Stale-frame cancellation
-        frame_max_age_ms = int(os.environ.get("LIFETRAC_FRAME_MAX_AGE_MS", "10000"))
+        frame_max_age_ms = _env_int("LIFETRAC_FRAME_MAX_AGE_MS", 10000, lo=0)
         age_ms = int(time.monotonic() * 1000) - frame.enqueued_ms
         if age_ms > frame_max_age_ms and not self._q.empty():
             with self.lock:
@@ -905,7 +946,7 @@ class ImageTxDaemon:
 
         max_qos_retries = 4   # FORBIDDEN/ABORT_QOS: not admitted, ZERO RF spent
         max_rf_retries  = 1   # TX_DONE non-OK / timeout: airtime was spent
-        prof_id = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+        prof_id = _env_int("LIFETRAC_REG_PROFILE", 0, lo=0, hi=2)
         active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
 
         if TX_PIPELINE == "v3":
@@ -1269,12 +1310,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         "LIFETRAC_L072_BAUD", DEFAULT_BAUD))
     ap.add_argument("--mqtt-host", default=os.environ.get(
         "LIFETRAC_MQTT_HOST", DEFAULT_MQTT_HOST))
-    ap.add_argument("--mqtt-port", type=int, default=int(os.environ.get(
-        "LIFETRAC_MQTT_PORT", str(DEFAULT_MQTT_PORT))))
-    ap.add_argument("--inter-cycle-s", type=float, default=float(os.environ.get(
-        "LIFETRAC_LORA_INTER_CYCLE_S", str(MIN_LORA_HOST_INTER_CYCLE_S))))
-    ap.add_argument("--max-queue-depth", type=int, default=int(os.environ.get(
-        "LIFETRAC_IMAGE_TX_QUEUE_DEPTH", "4")))
+    ap.add_argument("--mqtt-port", type=int, default=_env_int(
+        "LIFETRAC_MQTT_PORT", DEFAULT_MQTT_PORT, lo=1, hi=65535))
+    ap.add_argument("--inter-cycle-s", type=float, default=_env_float(
+        "LIFETRAC_LORA_INTER_CYCLE_S", MIN_LORA_HOST_INTER_CYCLE_S, lo=0.0))
+    ap.add_argument("--max-queue-depth", type=int, default=_env_int(
+        "LIFETRAC_IMAGE_TX_QUEUE_DEPTH", 4, lo=1))
     ap.add_argument("--stats-interval-s", type=float, default=10.0)
     ap.add_argument("--log-level", default=os.environ.get(
         "LIFETRAC_IMAGE_TX_LOG_LEVEL", "INFO"))
