@@ -268,6 +268,25 @@ class ImageRxDaemon:
         self._probe_min_gap_s = float(os.environ.get(
             "LIFETRAC_PROBE_MIN_GAP_S", "0.5"))
         self._last_probe_t = 0.0
+        # 2026-07-27 SIZE sweep: pad probes to emulate the real control-plane
+        # frame sizes so tomorrow measures P(delivery | phase, SIZE), not just
+        # phase. This is what actually prices the "ditto" repeat-frame idea:
+        # its airtime saving is only ~5.12 ms/slot at BW500, so its real value
+        # is whether a SHORTER frame lands in a marginal reverse window more
+        # often. Sizes are TOTAL on-air payload bytes incl. the 8 B hop header
+        # (e.g. "23,38" = D13 ditto vs D13 control). Empty = no padding.
+        _sizes = os.environ.get("LIFETRAC_PROBE_SIZES_B", "").strip()
+        try:
+            parsed_sizes = [int(x) for x in _sizes.split(",") if x.strip()]
+        except ValueError:
+            LOG.warning("bad LIFETRAC_PROBE_SIZES_B %r — no padding", _sizes)
+            parsed_sizes = []
+        # On-air payload = 8 B hop hdr + 2 B (magic+opcode) + args.
+        # args already carries 4 B seq + 2 B phase, so the floor is 16 B.
+        self._probe_sizes = [s for s in parsed_sizes if s >= 16] or [0]
+        # seq -> (phase_ms, size_b) so the echo can be attributed to its bin.
+        self._probe_bins: "dict[int, tuple[int, int]]" = {}
+        self._probe_stats: "dict[tuple[int, int], list[int]]" = {}
         # LoRa-only control plane: outbound command frames queued by MQTT
         # callbacks, drained by the RX worker (single link owner). Plus
         # the two-phase switch state machine fields.
@@ -657,6 +676,10 @@ class ImageRxDaemon:
             seq = int.from_bytes(args[0:4], "little") if len(args) >= 4 else 0
             t0 = self._probe_pending.pop(seq, None)
             self._probe_echo_rx += 1
+            _bin = self._probe_bins.pop(seq, None)
+            if _bin is not None:
+                st = self._probe_stats.setdefault(_bin, [0, 0])
+                st[1] += 1
             if t0 is not None:
                 rtt_ms = (time.monotonic() - t0) * 1000.0
                 self._probe_rtts.append(rtt_ms)
@@ -1185,14 +1208,26 @@ class ImageRxDaemon:
         self._probe_seq = (self._probe_seq + 1) & 0xFFFFFFFF
         seq = self._probe_seq
         args = seq.to_bytes(4, "little") + (phase_ms & 0xFFFF).to_bytes(2, "little")
+        # Size sweep: pad to the requested TOTAL on-air payload so delivery
+        # can be scored per (phase, size) — the measurement that prices the
+        # ditto frame. 8 B hop hdr + 2 B magic/opcode + len(args) = size.
+        size_b = self._probe_sizes[self._probe_seq % len(self._probe_sizes)]
+        if size_b:
+            pad = max(0, size_b - 10 - len(args))
+            args = args + bytes(pad)
+        self._probe_bins[seq] = (phase_ms, size_b)
         self._probe_pending[seq] = time.monotonic()
         # Cap the pending map so a long run does not grow unbounded.
         if len(self._probe_pending) > 512:
             for k in sorted(self._probe_pending)[:256]:
                 self._probe_pending.pop(k, None)
+                self._probe_bins.pop(k, None)
         self._probe_tx += 1
-        LOG.info("PROBE TX seq=%d phase_ms=%d (tx#%d)", seq, phase_ms,
-                 self._probe_tx)
+        # Per-bin attempt tally: [attempts, echoes]
+        st = self._probe_stats.setdefault((phase_ms, size_b), [0, 0])
+        st[0] += 1
+        LOG.info("PROBE TX seq=%d phase_ms=%d size_b=%d (tx#%d)", seq,
+                 phase_ms, size_b or (10 + len(args)), self._probe_tx)
         self._send_command_frame(
             link, pack_command_frame(CMD_OP_PROBE, args), copies=1)
 
@@ -1267,6 +1302,18 @@ class ImageRxDaemon:
                     LOG.info("probe: tx=%d echo=%d (%.1f%% delivered) "
                              "no echoes this window", self._probe_tx,
                              self._probe_echo_rx, deliv)
+                # Per-(phase, size) delivery grid — cumulative, so the last
+                # line of a run is the whole result. THIS is the RS-0.12
+                # deliverable: P(delivery | phase) picks the slot design,
+                # and the size axis prices the ditto frame.
+                if self._probe_stats:
+                    cells = []
+                    for (ph, sz) in sorted(self._probe_stats):
+                        att, ech = self._probe_stats[(ph, sz)]
+                        if att:
+                            cells.append("p%d/s%d:%d/%d(%.0f%%)" % (
+                                ph, sz, ech, att, 100.0 * ech / att))
+                    LOG.info("probe_grid: %s", " ".join(cells))
 
     def _link_stats_worker(self) -> None:
         """Publish a rolling link-speed JSON sample every ~2 s.

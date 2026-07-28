@@ -336,6 +336,22 @@ silence), **slot-stealing** at FHSS, and **encode-to-fit** tile packing sized to
 the live fragment quantum. FHSS and DTS share one 200 ms period, different
 interiors. The skip frame supersedes the two-state IDLE/ACTIVE machine.
 
+**2026-07-27 addition — the "ditto" repeat frame.** The control slot now has
+THREE occupancies: SKIP (idle, 10.3 ms, deliberately lets control go stale —
+safe because the operator is neutral), **DITTO** (steady stick: re-apply
+ControlFrame `ref_seq`, 15.4 ms D13, DOES refresh the deadman), and FULL
+(20.5 ms D13). Ditto carries a **u16 ref_seq and is honored only on exact match
+with the receiver's last-applied frame** — this is safety-critical, not an
+optimization: a naive "repeat last" lets a lost transition frame strand the
+tractor on a stale command while dittos keep refreshing its deadman (base
+commands STOP, frame lost, tractor repeats FORWARD indefinitely). Mismatch /
+malformed / nothing-applied → ignore → deadman → neutral, i.e. a desync
+degrades to the ordinary loss path. Wire format + the `ditto_applies()`
+reference rule are implemented and unit-tested now (`CMD_OP_CTRL_DITTO` 0x6B);
+the ref bytes are free by symbol quantization. Airtime saving is honest but
+modest (one quantization step: 5.12 ms at BW500 ≈ 3.5% image); the real prize
+may be delivery probability, which run 2 below measures.
+
 **Shipped tonight (code-only, bench-testable without radios; 85/85 tests pass):**
 
 - [x] **RS-0.14a Encode-to-fit increment** — budget now bounds the WIRE payload
@@ -347,6 +363,13 @@ interiors. The skip frame supersedes the two-state IDLE/ACTIVE machine.
   243/203 not a boot-frozen env); batcher `_frag_body_b()` profile-aware;
   quality-only 0x63 no longer forces a keyframe. Tests:
   `base_station/tests/test_encode_to_fit.py`.
+- [x] **RS-0.14c Ditto wire contract** — `CMD_OP_CTRL_DITTO` (0x6B),
+  `pack_ctrl_ditto` / `parse_ctrl_ditto` / `ditto_applies` in lora_proto, the
+  last a pure function so the H7 can reuse the anti-desync rule verbatim.
+  4 tests incl. the exact-match contract, malformed-args rejection, the
+  free-quantization property, and the one-symbol-step saving (pins the doc's
+  number against drift). Nothing transmits it yet — the drive plane needs
+  Route B first — but the contract is fixed and reviewable now.
 - [x] **RS-0.14b Bench instrumentation** — `CMD_OP_PROBE` (0x69) / `PROBE_ECHO`
   (0x6A): base fires a no-op probe at fragment-RX-complete, tractor logs+echoes,
   base measures honest in-stream delivery + RTT. `LIFETRAC_REACTIVE_FIRE` +
@@ -360,10 +383,16 @@ interiors. The skip frame supersedes the two-state IDLE/ACTIVE machine.
 - [ ] **1. Run-J bisection (cheapest, first).** Recover the 58% alignment:
   toggle ONE of `-AlignedPump` / `-TxBatch` / `-TxPrepareAhead` / `-ParityGroup`
   per run, scored tractor-side on `LoRa cmd:`.
-- [ ] **2. Reactive-fire phase sweep (RS-0.12, decisive).**
-  `-ReactiveFire 1 -ProbePhaseSweepMs "0,20,40,60,80,100,120"`. The one run that
-  sets the guard budget, P(delivery|phase), and whether contraction works.
-  Best-bin P high → DTS schedule buildable; ≤60% → fall back to stream-off (A5).
+- [ ] **2. Reactive-fire phase×size sweep (RS-0.12, decisive).**
+  `-ReactiveFire 1 -ProbePhaseSweepMs "0,20,40,60,80,100,120" -ProbeSizesB "23,38"`
+  for ≥10 min (14 bins × ≥30 samples at the 0.5 s min gap). Sizes are a D13
+  **ditto** (23 B) and a D13 **control frame** (38 B) — the two frames the real
+  control plane sends. Read the cumulative `probe_grid:` line plus
+  `air_gap_hist(ms)`. Sets the guard budget, P(delivery|phase) (best-bin high →
+  DTS schedule buildable; ≤60% → stream-off A5), AND P(delivery|size) — if 23 B
+  ≫ 38 B, ditto is load-bearing for reliability and D13 beats GCM-128; if equal,
+  ditto is only an airtime nicety (~3.5%) and GCM-128 keeps handheld parity.
+  See the decision table in CONTROL_PLANE_DESIGN.md §8.
 - [ ] **3. Encode-to-fit verify.** `LIFETRAC_FRAGMENT_BUDGET=1`: confirm true
   single-fragment frames at both profiles, no runt sawtooth, mono_g4/y_only
   tiles-per-frame match §5; quality sweep 40→80 with no keyframe storm.

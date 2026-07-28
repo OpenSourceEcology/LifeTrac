@@ -140,6 +140,75 @@ it under D13, or authenticate the mandatory beacon).
 FHSS can't contract (grid welded to the hop law) → there skip *steals the slot*
 (~201 B extra image payload), grid unchanged.
 
+### 4a. The "ditto" repeat frame — three slot occupancies, not two
+
+Skip covers "operator idle." It does **not** cover the common driving case:
+the operator holds a steady stick and the next ControlFrame is *byte-identical
+to the last*. Re-sending 16 bytes to say "no change" is waste. So the control
+slot has **three** occupancies, selected by a 2-bit type in the frame the slot
+already carries:
+
+| Slot type | Meaning | On air (BW500, D13) | Refreshes deadman? | Superframe |
+|---|---|---|---|---|
+| **SKIP** | nothing to send (operator idle) | 10.30 ms | **No** | full contraction |
+| **DITTO** | re-apply ControlFrame `ref_seq` | 15.42 ms | **Yes** (if ref matches) | partial contraction |
+| **FULL** | new ControlFrame | 20.54 ms | Yes | none |
+
+**Why skip and ditto must stay semantically distinct even though the wire cost
+is similar:** skip deliberately lets control go stale — safe, because the
+operator is commanding neutral and staleness converges to exactly the state the
+deadman would force. Ditto deliberately *keeps control alive* at a non-neutral
+value. Same slot, opposite deadman intent. That is the whole reason it is two
+bits rather than one.
+
+**THE SAFETY HAZARD, and the design that removes it.** A naive "repeat last"
+ditto is dangerous, and in a way that defeats the deadman:
+
+> Base sends FULL "stop" (a transition). The frame is lost. The operator is
+> still holding stop, so the next slot is — from the base's point of view — "no
+> change", and it sends a ditto. The tractor never received "stop"; it repeats
+> its last-applied command, **"forward"**. Every subsequent ditto refreshes the
+> deadman, so the machine drives on indefinitely while the base believes it
+> commanded a stop.
+
+That converts a single lost frame into unbounded stale motion — strictly worse
+than plain loss, which the deadman handles. The fix is to make the ditto
+*referential* rather than relative: it carries the **u16 sequence number of the
+ControlFrame it is repeating**, and the receiver honors it **only** if that
+matches its own last-applied frame. Any mismatch, any malformed ditto, or a
+receiver that has applied nothing yet → **ignore, do not refresh freshness** →
+control goes stale → 200 ms deadman → neutral. A desync degrades to the
+ordinary loss path, which is already safe.
+
+This is implemented and unit-tested now (`lora_proto.ditto_applies()` is a pure
+function precisely so the H7 implementation can reuse the contract verbatim):
+`CMD_OP_CTRL_DITTO = 0x6B`, args `u16le ref_seq`.
+
+**The reference byte is free.** LoRa symbol quantization means 9–12 B of on-air
+payload all cost 10.304 ms at BW500, so a ditto with its 2-byte ref is the same
+airtime as a bare skip. Belt-and-braces: bound ditto runs (force a FULL frame
+every K dittos) so any undetected divergence self-heals within K slots.
+
+**Honest airtime accounting.** Authenticated, a ditto saves **exactly one
+quantization step**: 5.12 ms at BW500 (D13 ditto 15.42 vs control 20.54),
+10.24 ms at BW250. At 8 Hz with a 70% ditto rate that is ~29 ms/s ≈ **~71 B/s
+of image goodput (~3.5%)** — real but modest. Unauthenticated it would save
+10.24 ms, but an unauthenticated ditto is a replay weapon (capture one, keep the
+machine moving) and is rejected for the same reason as bare 0xFB actuation.
+
+**The bigger prize is delivery probability, and it is unmeasured.** A 15.4 ms
+frame fits a marginal reverse window that a 20.5 ms frame misses. If the window
+turns out tight, ditto's value is mostly *reliability*, not airtime — so
+tomorrow's probe sweeps **size as well as phase** (§8 run 2) to measure
+P(delivery | phase, size) directly.
+
+**Ditto hit rate depends on quantization, not on wishful thinking.** Axes are
+integers in −127…127 with `AXIS_DEADBAND = 13`, so neutral (→ exactly 0),
+pinned full-travel, and held detents produce byte-identical frames — precisely
+the sustained-driving cases. Mid-range analog jitter will not ditto, and should
+not: an epsilon ("near enough") would trade control fidelity for airtime and is
+left as a tunable, defaulting off.
+
 ---
 
 ## 5. Encode-to-fit (implemented tonight)
@@ -220,20 +289,41 @@ for every run below shipped tonight.
    truth: `-AlignedPump 0/1`, `-TxBatch 0/1`, `-TxPrepareAhead 0/1`,
    `-ParityGroup 0/4`. Four short runs. Whichever restores in-stream delivery
    tells us which RS-3.10 change broke it.
-2. **Reactive-fire delivery + phase sweep (RS-0.12) — the decisive run.**
-   `-ReactiveFire 1 -ProbePhaseSweepMs "0,20,40,60,80,100,120"`. The base fires
-   a no-op PROBE at each fragment-RX-complete; the tractor echoes it. Read
-   `probe: tx=N echo=M (P% delivered) rtt_med=...` and the new `air_gap_hist(ms)`
-   from `rx_daemon.log`. **This one histogram sets the guard budget (the number
-   the whole superframe cost rests on), the real P(delivery | phase), and
-   whether contraction works.** If best-bin P clears comfortably, §3's DTS
-   schedule is buildable; if it never exceeds ~60%, fall back to stream-off
-   control (options-doc A5).
+2. **Reactive-fire delivery + phase×size sweep (RS-0.12) — the decisive run.**
+   `-ReactiveFire 1 -ProbePhaseSweepMs "0,20,40,60,80,100,120" -ProbeSizesB "23,38"`.
+   The base fires a no-op PROBE at each fragment-RX-complete; the tractor
+   echoes it. Sizes 23 B and 38 B are a **D13 ditto** and a **D13 control
+   frame** — the same two frames the real control plane will send — so one run
+   yields both the phase answer and the ditto answer. Read `probe_grid:` (the
+   cumulative per-bin `pN/sM:echo/att(P%)` table), `probe: … rtt_med=…`, and
+   the new `air_gap_hist(ms)` from `rx_daemon.log`.
+   **What it decides:** the guard budget (the number the whole superframe cost
+   rests on); P(delivery | phase) — best-bin high → §3's DTS schedule is
+   buildable, never above ~60% → fall back to stream-off (options-doc A5); and
+   P(delivery | size) — if the 23 B bin materially beats the 38 B bin, ditto's
+   value is reliability rather than the modest ~3.5% airtime saving, which
+   promotes it from nice-to-have to load-bearing.
+   Suggested duration ≥10 min so each of the 14 (phase × size) bins gets ≥30
+   samples at the 0.5 s min gap.
 3. **Encode-to-fit verify.** `LIFETRAC_FRAGMENT_BUDGET=1` (single fragment).
    Confirm every frame is one fragment at both profiles (no runt sawtooth),
    goodput at 243 B vs today's 3000 B, and the mono_g4/y_only tiles-per-frame
    match §5. Then a quality sweep 40→80 confirming no keyframe storm.
-4. **Only after 1–3:** decide envelope (§6), then start Route B.
+4. **Only after 1–3:** decide envelope (§6) — now informed by the size axis,
+   since a tight window makes the +12 vs +28 B difference a *delivery* question
+   and not just an airtime one — then start Route B.
+
+**Reading the results — decision table:**
+
+| Observation | Conclusion | Next action |
+|---|---|---|
+| Bisection restores in-stream delivery | the RS-3.10 knob that broke Run J is identified | pin it; re-baseline goodput |
+| `probe_grid` best phase bin ≥ ~90% | the armed window is real and hittable | build the DTS slot clock (firmware F1–F3) |
+| Best bin 60–90% | window exists but is marginal | widen guards / lengthen control preamble (F4), re-measure |
+| Best bin ≤ ~60% at every phase | in-stream delivered drive is not solvable here | adopt A5 stream-off doctrine; ditto/skip become moot |
+| s23 bin ≫ s38 bin | frame size dominates delivery | ditto is load-bearing; prefer D13 over GCM-128 |
+| s23 ≈ s38 | size is not the constraint | ditto is an airtime nicety; prefer GCM-128 (handheld parity) |
+| `air_gap_hist` shows a clean boundary mode | contraction has room to work | proceed to skip-frame firmware |
 
 The old RS-0.9 air-test queue (encode mode+quality smoke, convergence re-check)
 still applies and folds into runs 2–3.
@@ -297,7 +387,7 @@ gate re-evaluates already-parked fragments and nothing can outrun it.
 |---|---|---|---|
 | F1 | **DTS slot clock** | The slot machinery is FHSS-only: `sx1276_tx.c:187-193` zeroes hop/epoch/slot_offset for DTS and `sx1276_tx_slot_wait_us()` short-circuits for non-FHSS profiles (`:510`). DTS needs a *virtual* grid (same clock TU, no hopping) so both ends share slot phase — the header fields already exist to carry it. | `sx1276_tx.c`, `sx1276_fhss_clock.*` |
 | F2 | **Control-window mute gate** | Extend the slot-wait advisory into "never key up inside the control window." Because it is consulted at park AND drain, parked fragments respect it with no TX-abort needed. | `host_cmd.c:492/:923` |
-| F3 | **Skip-frame handling + contraction** | Tractor: decode skip in the control window → start the next fragment immediately (contract). Base: IRQ-driven auto-TX of a pre-armed control/skip frame at fragment-RX-done + PLL settle (tightens the listen window from ~10 ms to ~5 ms). | `sx1276_rx.c`, `sx1276_tx.c`, `host_cmd.c` |
+| F3 | **Skip/ditto handling + contraction** | Tractor: decode the slot type and contract by the frame's actual length (skip = full contraction, ditto = partial, full = none). Base: IRQ-driven auto-TX of a pre-armed control/ditto/skip frame at fragment-RX-done + PLL settle (tightens the listen window ~10 → ~5 ms). Ditto adds the H7-side rule: honor only on exact `ref_seq` match (`lora_proto.ditto_applies()` is the reference implementation), else let the deadman run; and force a FULL frame every K dittos. | `sx1276_rx.c`, `sx1276_tx.c`, `host_cmd.c`, `tractor_h7.ino` |
 | F4 | **Per-frame-type preamble** | Control frames get a longer preamble (12–16 symbols, ~+1–2 ms) for detection margin. `RegPreambleMsb/Lsb` are never written today (POR default 8); the airtime guard already reads the registers back (`sx1276_airtime.c:171`), so the budget check auto-honors it. | `sx1276_tx.c` |
 | F5 | **P0 reserved slot in the host TX ring** | `HOST_TXQ_P0_RESERVED` is defined in `config.h:58` and referenced by **zero lines of C** — the designed priority reservation was never implemented. A control lane in the ring lets an urgent frame (engine-kill latch) jump parked image fragments. | `host_cmd.c` |
 

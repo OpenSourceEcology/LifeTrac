@@ -211,6 +211,47 @@ class ProbeOpcodeTests(unittest.TestCase):
         self.assertEqual(op, self.lp.CMD_OP_PROBE_ECHO)
         self.assertEqual(int.from_bytes(out[0:4], "little"), seq)
 
+    def test_ditto_roundtrip_and_free_quantization(self):
+        f = self.lp.pack_ctrl_ditto(0x1234)
+        op, args = self.lp.parse_command_frame(f)
+        self.assertEqual(op, self.lp.CMD_OP_CTRL_DITTO)
+        self.assertEqual(self.lp.parse_ctrl_ditto(args), 0x1234)
+        # The 2 B ref must be FREE: a ditto and a bare skip frame must sit
+        # in the same LoRa symbol bucket (9..12 B payload incl 8 B hop hdr).
+        toa = self.lp.lora_time_on_air_ms
+        phy = self.lp.PHY_IMAGE_BW500
+        skip_b = 8 + 1
+        ditto_b = 8 + len(f)          # hop hdr + magic+opcode+2 B ref
+        self.assertLessEqual(ditto_b, 12)
+        self.assertEqual(toa(ditto_b, phy), toa(skip_b, phy))
+
+    def test_ditto_only_applies_on_exact_seq_match(self):
+        # THE anti-desync contract: anything but an exact match must fall
+        # through to the deadman rather than replay a stale command.
+        self.assertTrue(self.lp.ditto_applies(7, 7))
+        self.assertFalse(self.lp.ditto_applies(7, 6))      # missed a frame
+        self.assertFalse(self.lp.ditto_applies(7, 8))      # ahead somehow
+        self.assertFalse(self.lp.ditto_applies(7, None))   # nothing applied
+        self.assertFalse(self.lp.ditto_applies(None, 7))   # malformed ditto
+        # u16 wrap compares on the low 16 bits, both sides.
+        self.assertTrue(self.lp.ditto_applies(0x10001, 1))
+
+    def test_malformed_ditto_args_rejected(self):
+        for bad in (b"", b"\x01"):
+            self.assertIsNone(self.lp.parse_ctrl_ditto(bad))
+            self.assertFalse(
+                self.lp.ditto_applies(self.lp.parse_ctrl_ditto(bad), 1))
+
+    def test_ditto_saves_exactly_one_symbol_step_when_authenticated(self):
+        # Honest accounting for the design doc: with D13 (+12 B) a ditto is
+        # 23 B vs a 38 B control frame -> one quantization step (5.12 ms at
+        # BW500). Pin it so the doc's number cannot silently drift.
+        toa = self.lp.lora_time_on_air_ms
+        phy = self.lp.PHY_IMAGE_BW500
+        ditto_d13 = toa(8 + 2 + 2 + 12, phy)     # hdr+magic/op+ref+tag
+        ctrl_d13 = toa(8 + 2 + 16 + 12, phy)     # hdr+magic/op+ControlFrame+tag
+        self.assertAlmostEqual(ctrl_d13 - ditto_d13, 5.12, places=2)
+
     def test_probe_opcodes_are_distinct_and_known(self):
         self.assertEqual(self.lp.CMD_OP_PROBE, 0x69)
         self.assertEqual(self.lp.CMD_OP_PROBE_ECHO, 0x6A)
