@@ -414,6 +414,7 @@ gate re-evaluates already-parked fragments and nothing can outrun it.
 | F6 | **Fix the epoch-drift lock-out** | `scan_feed_frame(true)` fires even on `REJECTED_EPOCH_DRIFT`, so the scan SM stays LOCKED, the 2000 ms loss demotion never runs, and the clock reset that would recover is never reached — a **permanent, unrecoverable desync** that exists today, independent of TDMA. | `sx1276_rx.c:214`, `sx1276_fhss.h:141` |
 | F7 | **Fix the one-sided phase bias** | `slot_offset_ms` is sampled *before* PLL settle + FIFO burst (`sx1276_tx.c:206/224`), so TX always keys later than advertised; the RX anchor then truncates ToA µs→ms (`sx1276_rx.c:199-201`, −0.904 ms on a full fragment). Both errors push the same way and silently eat guard margin. Sample at actual key-up; round, don't truncate. | `sx1276_tx.c`, `sx1276_rx.c` |
 | F8 | **Expose phase telemetry in RX_FRAME_URC** | The firmware strips the 8 B hop header before delivery (`sx1276_rx.c:389-402`) and `RX_FRAME_URC` carries no epoch/hop_idx/slot_offset — slot alignment is currently **unverifiable from either host**. Append the header fields to the URC (additive, host parsers ignore extra bytes). | `host_cmd.c:955-976` |
+| F4 | **Per-frame-type preamble** *(promoted from Batch 2, 2026-07-29)* | `RegPreambleMsb/Lsb` are never written today (POR default 8 symbols); the airtime guard already reads them back (`sx1276_airtime.c:171`), so the budget check auto-honors any value we set. **Now the highest-value PHY change we have measured.** The C2 simplex run showed a ~3.8% one-way fragment loss floor with the base radio completely silent and `rx_decode_err = 0` — i.e. packets lost *before* header lock, which is a receiver-readiness problem, not a corruption problem. Preamble length is the only knob that widens the catch window for a re-arming receiver, and it costs +1.0% airtime at 12 symbols / +2.0% at 16 — against +19% for the cheapest coding-rate step, which repairs a failure class we have zero instances of. Ungated: it depends on nothing in the TDMA schedule. | `sx1276_tx.c` |
 | F9 | **Make opmode-sync first-class** | RS-4.12's `sx1276_modes_sync_external()` — the fix that makes host RXCONT arming visible to firmware — is reachable only through `HOST_ALLOW_REG_WRITE_DIAG=1` (`config.h:61`), a "diagnostic" flag whose own comment says keep conservative in production. Turning it off silently re-breaks RX arming. Promote to a dedicated host op or always-on path. | `config.h`, `host_cmd.c:594` |
 
 ### Batch 2 — the TDMA schedule itself (gated on the RS-0.12 measurement)
@@ -423,8 +424,38 @@ gate re-evaluates already-parked fragments and nothing can outrun it.
 | F1 | **DTS slot clock** | The slot machinery is FHSS-only: `sx1276_tx.c:187-193` zeroes hop/epoch/slot_offset for DTS and `sx1276_tx_slot_wait_us()` short-circuits for non-FHSS profiles (`:510`). DTS needs a *virtual* grid (same clock TU, no hopping) so both ends share slot phase — the header fields already exist to carry it. | `sx1276_tx.c`, `sx1276_fhss_clock.*` |
 | F2 | **Control-window mute gate** | Extend the slot-wait advisory into "never key up inside the control window." Because it is consulted at park AND drain, parked fragments respect it with no TX-abort needed. | `host_cmd.c:492/:923` |
 | F3 | **Skip/ditto handling + contraction** | Tractor: decode the slot type and contract by the frame's actual length (skip = full contraction, ditto = partial, full = none). Base: IRQ-driven auto-TX of a pre-armed control/ditto/skip frame at fragment-RX-done + PLL settle (tightens the listen window ~10 → ~5 ms). Ditto adds the H7-side rule: honor only on exact `ref_seq` match (`lora_proto.ditto_applies()` is the reference implementation), else let the deadman run; and force a FULL frame every K dittos. | `sx1276_rx.c`, `sx1276_tx.c`, `host_cmd.c`, `tractor_h7.ino` |
-| F4 | **Per-frame-type preamble** | Control frames get a longer preamble (12–16 symbols, ~+1–2 ms) for detection margin. `RegPreambleMsb/Lsb` are never written today (POR default 8); the airtime guard already reads the registers back (`sx1276_airtime.c:171`), so the budget check auto-honors it. | `sx1276_tx.c` |
+| F10 | **Replace the self-heal keyframe request with a stale-tile report (`0x6C CMD_OP_TILE_STALE`)** | Measured (n=2 each) on 2026-07-29: the reassembly-timeout keyframe request costs **+1.88 pts fragment loss, −16% published frames, +31% reassembly timeouts** — it increases the condition it fires on. Wrong trigger (fragment loss ≠ canvas staleness), wrong response (a keyframe is 1298.8 ms of airtime to repair a few tiles), wrong schedule (fires on a timer, lands mid-train). Replace with a base→tractor staleness bitmap: `u16le base_seq_ref` + 12 B bitmap = **15.4 ms, 84x cheaper**, computed from `TileState.arrived_ms` which the base already stamps (`canvas.py:51`). The tractor treats it as advisory dirty marks feeding the existing age-escalation path, so the repair rides the next scheduled image frame at zero extra image airtime. **Do not simply disable the current mechanism** — the canvas is persistent (`canvas.py:1`), so without a replacement a tile lost once stays visibly wrong until the scene there changes. Keep the keyframe request for cold start / `base_seq` mismatch / mode change only. Rationale: [RESULTS §8](bench-evidence/RS_0_12_phase_sweep_2026-07-29/RESULTS.md). | `image_rx_daemon.py`, `camera_service.py`, `lora_proto.py` |
 | F5 | **P0 reserved slot in the host TX ring** | `HOST_TXQ_P0_RESERVED` is defined in `config.h:58` and referenced by **zero lines of C** — the designed priority reservation was never implemented. A control lane in the ring lets an urgent frame (engine-kill latch) jump parked image fragments. | `host_cmd.c` |
+
+### PHY parameters we deliberately are *not* changing
+
+**Coding rate stays at 4/5 on all three profiles.** `PhyProfile.cr_den`
+(`base_station/lora_proto.py:142`) is per-profile settable and fully plumbed
+through both the firmware (`sx1276_set_sf_bw_cr()`, `sx1276.c:379`) and the
+airtime model, so this is a decision rather than a limitation.
+
+The reason is measured, not assumed. FEC repairs packets that lock their header
+and then fail CRC. Across ~19,000 received frames in ten runs on 2026-07-29,
+`rx_decode_err` and `reassembler_decode_err` were **zero in every single run** —
+we have never observed one packet of the class coding rate exists to fix. Our
+losses are deafness and scheduling. Meanwhile the ladder costs +19% / +38% /
++57% of image airtime at 4/6, 4/7, 4/8, against a priority that is throughput.
+Two supporting details: explicit-header mode is enabled (`MODEM_CONFIG1` bit 0
+= 0, `sx1276.c:450`), so the header is *already* protected at 4/8 regardless of
+payload CR; and payload CRC is on (`MODEM_CONFIG2` bit 2, `:452`), which is why
+the zero is trustworthy rather than merely an absence of reporting.
+
+> **Revisit trigger:** if `rx_decode_err / rx_frames` exceeds ~1% in any field
+> run, corruption has become real and CR 4/6 is the first step. Bench range
+> carries far more link margin than the field will; this decision is bounded by
+> range, and the counter that bounds it is already logged.
+
+Held in reserve: a DITTO frame at CR 4/8 costs 13.376 ms, still *less* than a
+FULL control frame at CR 4/5 (14.144 ms). If field data ever shows control-frame
+bit errors, the repeat frame can be armoured to maximum FEC and still fit the
+slot budget already reserved for an unarmoured full frame — at no schedule cost.
+Full analysis:
+[`bench-evidence/RS_0_12_phase_sweep_2026-07-29/RESULTS.md` §7](bench-evidence/RS_0_12_phase_sweep_2026-07-29/RESULTS.md).
 
 **Recommendation on sequencing:** do NOT flash new firmware before tomorrow —
 the bench plan (§8) was deliberately designed to run on the current build

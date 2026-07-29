@@ -276,3 +276,288 @@ fix, the age-escalation and the liveness valve — is **not in the loop at all**
 Verifying it needs `camera_service` running against the USB camera (the RS-3.3
 real-camera item). The unit tests cover the logic; the on-air check is
 outstanding and must not be reported as done.
+
+---
+
+## 7. Coding Rate 4/5 — what it is, and why we are keeping it
+
+### 7.1 What the setting means
+
+LoRa's coding rate is a forward-error-correction (FEC) ratio written into
+`SX1276_REG_MODEM_CONFIG1` bits 3:1 by `sx1276_set_sf_bw_cr()`
+(`firmware/murata_l072/radio/sx1276.c:379`, register write at `:450`). It is
+already a per-profile field — `PhyProfile.cr_den` (`base_station/lora_proto.py:142`)
+— and it is already honoured by the airtime model (`cr = cr_den - 4`, `:520`).
+So this is a knob we *can* turn per profile; we simply have never swept it.
+
+`4/5` means every 4 data bits carry 1 parity bit: 1.25x expansion. In LoRa's
+Hamming-style code, 4/5 and 4/6 give **detection only** — they can tell a
+codeword is wrong but cannot repair it. Only 4/7 and 4/8 add enough redundancy
+to **correct** bit errors, and they cost 1.75x and 2.0x the payload symbols.
+
+Two facts about our PHY configuration matter for the decision, both confirmed
+in firmware this session:
+
+- **Explicit header mode** — `MODEM_CONFIG1` bit 0 is written `0`
+  (`sx1276.c:450`). In explicit mode the LoRa *header* is always transmitted
+  at CR 4/8 regardless of the payload CR. The most fragile part of the packet
+  is therefore already maximally protected, and raising the payload CR does
+  nothing for it.
+- **Payload CRC is enabled** — `MODEM_CONFIG2` bit 2 is set (`sx1276.c:452`).
+  A packet whose header locks but whose payload is corrupted is *reported*, as
+  a CRC error, not silently dropped. That is what makes the next section
+  conclusive rather than merely suggestive.
+
+### 7.2 The measurement that decides it
+
+Across all ten runs today — roughly 19,000 received frames — the counters read:
+
+```
+rx_decode_err = 0        reassembler_decode_err = 0
+```
+
+Zero. Not "low": zero, in every run, without exception.
+
+Given explicit-header + payload-CRC, that result partitions our losses cleanly:
+
+- A packet that arrives with a corrupted payload raises a CRC error. We have
+  **none**, so no arriving packet is corrupted.
+- Therefore every lost fragment failed *before* header lock — the receiver
+  either was not listening, or never detected the preamble.
+
+FEC repairs the first class. We have zero of the first class. **Raising the
+coding rate would buy us nothing on this link.**
+
+### 7.3 The simplex floor — runs C1 and C2
+
+To find out what the residual loss actually is, two 240 s control runs stripped
+the base's transmitter out of the picture (`4d33b499`, DTS profile 2, v3
+pipeline, 3000 B synthetic frames):
+
+Each condition was run **twice** so that differences could be read against the
+observed run-to-run spread rather than asserted from a single sample:
+
+| Run | keyframe reqs | base TX | frags TX | frags RX | loss | decode err | frames published | reasm timeouts |
+|-----|---------------|--------:|---------:|---------:|-----:|-----------:|-----------------:|---------------:|
+| C1  | on  | 86 | 1914 | 1815 | 5.17% | 0 | 81  | 70 |
+| C1b | on  | 93 | 1917 | 1808 | 5.69% | 0 | 82  | 69 |
+| C2  | off | 17 | 1914 | 1841 | 3.81% | 0 | 92  | 59 |
+| C2b | off | 17 | 1915 | 1852 | 3.29% | 0 | 103 | 47 |
+
+| Condition | loss (mean) | published (mean) | reasm timeouts (mean) |
+|-----------|------------:|-----------------:|----------------------:|
+| keyframe requests **on**  | **5.43%** | 81.5 | 69.5 |
+| keyframe requests **off** | **3.55%** | 97.5 | 53.0 |
+| delta | **+1.88 pts** | **−16.0 frames (−16%)** | **+16.5 (+31%)** |
+
+Within-condition spread is 0.52 points in both conditions, so the 1.88-point
+separation is roughly 3.6x the noise. Readings, all with zero decode errors:
+
+1. **There is a ~3.5% one-way fragment loss floor with the base radio silent**
+   (3.29% / 3.81%, n=2). Nothing the base does causes it, and it is not
+   corruption — it is the receiver missing packets it was not ready for. This
+   is the number that motivates the preamble work (F4) and rules out FEC.
+2. **The self-heal keyframe request is net harmful, and the effect replicates.**
+   It costs 1.88 points of fragment loss, delivers 16% *fewer* complete frames,
+   and produces 31% *more* reassembly timeouts — i.e. it measurably increases
+   the very condition it fires on. See §8 for why and what should replace it.
+3. **Scale check on the mechanism.** The ~76 extra base transmissions cost ~36
+   extra lost fragments — 0.47 fragments per base TX. Each base transmission
+   deafens the base for its 10.3 ms ToA plus the host round trip (~40 ms
+   total) against a ~100 ms fragment cadence, which predicts ~0.4. Measurement
+   and geometry agree, so the mechanism is understood, not merely observed.
+
+**Retracted:** an earlier draft of this section compared run A2 (2.31%, with
+112 gap-aligned probes) against a single C2 and concluded that *timing* of base
+TX dominates *volume*. With n=2 now in hand, A2 sits 1.2 points below the C2
+mean — outside the observed spread and currently **unexplained**. The
+timing-beats-volume claim may well be true (it is what the slot design assumes)
+but it is not established by this data and has been withdrawn pending a
+replicated probes-on/probes-off A/B.
+
+### 7.4 Cost of the alternatives, measured against our actual failure mode
+
+For a 255 B fragment at SF7/BW500 (`lora_time_on_air_ms`):
+
+| Knob | Airtime | Delta | Repairs |
+|------|--------:|------:|---------|
+| CR 4/5, preamble 8 (current) | 99.904 ms | — | baseline |
+| CR 4/6 | 118.848 ms | +19.0% | payload bit errors (we have 0) |
+| CR 4/7 | 137.792 ms | +37.9% | payload bit errors (we have 0) |
+| CR 4/8 | 156.736 ms | +56.9% | payload bit errors (we have 0) |
+| preamble 12 | 100.928 ms | **+1.0%** | receiver re-arm window (+1.02 ms) |
+| preamble 16 | 101.952 ms | **+2.0%** | receiver re-arm window (+2.05 ms) |
+| preamble 24 | 104.000 ms | +4.1% | receiver re-arm window (+4.10 ms) |
+| preamble 32 | 106.048 ms | +6.1% | receiver re-arm window (+6.14 ms) |
+
+**Preamble length, not coding rate, is the knob that addresses our failure
+mode, and it is roughly twenty times cheaper.** A receiver that is re-arming
+RXCONT between fragments can only catch a packet if it starts listening during
+the preamble; lengthening the preamble widens that catch window directly. FEC
+does not widen it at all.
+
+Preamble length is currently **not settable** — the firmware never writes
+`REG_PREAMBLE_MSB/LSB` (0x20/0x21); it only reads them back in
+`sx1276_airtime.c:171`. The chip default of 8 symbols is what we have been
+running. Making it per-profile settable is roadmap item **F4**, which this
+measurement now justifies quantitatively rather than by intuition.
+
+### 7.5 Coding rate on the control plane — checked, also no
+
+Small frames were worth checking separately, because LoRa quantizes payload
+symbols and we already exploit that (9-12 B all cost 10.304 ms, which is what
+makes DITTO's 2-byte reference free). If a control frame's symbol count had
+headroom, stronger FEC on the safety-critical link might have been free:
+
+| Body | On-air | CR 4/5 | CR 4/6 | CR 4/7 | CR 4/8 |
+|-----:|-------:|-------:|-------:|-------:|-------:|
+| 2 B (DITTO) | 10 B | 10.304 | 11.328 | 12.352 | 13.376 |
+| 4 B (SKIP/probe) | 12 B | 10.304 | 11.328 | 12.352 | 13.376 |
+| 9 B (ctrl min) | 17 B | 12.864 | 14.400 | 15.936 | 17.472 |
+| 12 B (ctrl full) | 20 B | **14.144** | 15.936 | 17.728 | 19.520 |
+
+It is not free — CR 4/8 costs +3.07 ms even on the smallest frame. The
+hypothesis was wrong and is recorded as such.
+
+One asymmetry does survive and is worth keeping in the design's back pocket:
+**a DITTO at CR 4/8 (13.376 ms) is still cheaper than a FULL control frame at
+CR 4/5 (14.144 ms)**. If a future field measurement shows control-frame bit
+errors, the repeat frame can be armoured to maximum FEC and *still* fit inside
+the slot budget already reserved for an unarmoured full frame. That is a free
+option we are not exercising yet.
+
+### 7.6 Decision, and the trigger to revisit
+
+**Keep CR 4/5 on all three profiles.** Today's losses are deafness and
+scheduling, provably not corruption, and every step up the CR ladder costs
+19-57% of the image throughput that is the current priority.
+
+This conclusion is bounded by range. The bench boards sit a few feet apart with
+enormous link margin; field range will shrink SNR and bit errors will
+eventually appear. The decision should be revisited on evidence, not on a
+calendar, and the evidence is already instrumented:
+
+> **Revisit trigger:** if `rx_decode_err / rx_frames` exceeds ~1% in any field
+> run, corruption has become real and CR 4/6 (+19%) is the first step. Until
+> that ratio leaves zero, raising CR is pure airtime loss.
+
+`rx_decode_err` counts only packets that locked their header and failed CRC, so
+it is a clean corruption signal and will not be contaminated by the deafness
+losses discussed above. Range work should log RSSI/SNR alongside it — those are
+published to `link_stats` on MQTT but are only written to `rx_daemon.log` at
+DEBUG level, so an INFO-level periodic margin line is a small instrumentation
+gap worth closing before the first range test.
+
+---
+
+## 8. The keyframe request should be redesigned, not deleted
+
+### 8.1 The verdict from §7.3
+
+The C1/C1b vs C2/C2b A/B is unambiguous and replicated: turning the self-heal
+keyframe request on costs **+1.88 points of fragment loss**, delivers **16%
+fewer complete frames**, and produces **31% more reassembly timeouts**. It
+increases the very condition it fires on.
+
+The mechanism is understood. Every base transmission deafens the base for its
+own time-on-air plus the host round trip (~40 ms) against a ~100 ms fragment
+cadence, so each request costs ~0.4 fragments — measured 0.47. Losing fragments
+creates reassembly timeouts, timeouts fire requests, requests lose fragments.
+The loop is bounded (`_set_pending` caps at 20 attempts / 10 s, and
+`KEYFRAME_CMD_MIN_GAP_S = 10.0` gates re-pokes) so it does not run away, but it
+does sit at a stable operating point that is worse than not reacting at all.
+
+### 8.2 Why deleting it outright would be wrong
+
+The obvious response — default `LIFETRAC_KF_REQUEST_DISABLE=1` and move on —
+would trade a measured throughput gain for an unmeasured and worse image
+defect, because of what the base-side canvas actually is:
+
+> `image_pipeline/canvas.py:1` — *"Persistent tile canvas... keeps the
+> most-recent encoded blob per tile."*
+
+The canvas is persistent. When a tile update is lost in flight, the base keeps
+displaying the **old** blob for that tile, indefinitely, until the encoder
+happens to send that tile again. The encoder's own age-escalation
+(`TILE_AGE_ESCALATE_FRAMES` in `camera_service.py`) does not help here: it
+escalates on *encoder-side* age — how long since the encoder re-encoded a tile
+— and the encoder has no idea which tiles the base failed to receive. In a
+static scene the encoder has no reason to resend an unchanged tile, so a tile
+lost once can stay visibly wrong on the operator's screen for as long as that
+part of the scene holds still.
+
+That is a worse failure than 1.88 points of fragment loss, and on a machine
+where the operator is steering from that image it is the safety-relevant one.
+The keyframe request is currently the **only** mechanism closing that loop. It
+is load-bearing, and it must not be removed until something replaces it.
+
+### 8.3 What is actually wrong with it
+
+Both halves of the mechanism are mismatched to the problem:
+
+- **Wrong trigger.** A reassembly timeout means "some fragments of one frame
+  went missing." It says nothing about whether the *canvas* is stale — which
+  is the condition we actually care about. Routine single-fragment loss (which
+  at a 3.5% floor happens constantly) fires it needlessly.
+- **Wrong response, by roughly two orders of magnitude.** A keyframe is the
+  single most expensive thing this system transmits: ~13 fragments, **1.30 s
+  of airtime** at a 3000 B budget. It is used to repair, typically, a handful
+  of tiles.
+- **Wrong schedule.** It fires when a timer expires, uncorrelated with the
+  tractor's transmit pattern, so it lands wherever it lands.
+
+### 8.4 Proposed replacement — a receiver-driven stale-tile report
+
+Invert it. The base is the only party that knows what actually arrived, so let
+the base report **canvas staleness** rather than request a retransmission:
+
+- New opcode **`0x6C CMD_OP_TILE_STALE`**, body = `u16le base_seq_ref` +
+  `u8 bitmap[(n_tiles+7)/8]`. At the 12x8 grid that is a 12 B bitmap, 15 B
+  body, 23 B on-air, **15.4 ms** — versus 1298.8 ms for the keyframe it
+  replaces, an **84x** reduction.
+- The base computes it from state it *already keeps*: `TileState.arrived_ms`
+  (`canvas.py:51`) is stamped per tile on every apply. Any tile whose
+  `arrived_ms` is older than a threshold, and which the encoder has not
+  refreshed, is stale. No new bookkeeping is required.
+- The tractor treats the bitmap as **advisory dirty marks**, not as a
+  retransmission command: those tiles enter the next encode's candidate set
+  with elevated priority, exactly where `TILE_AGE_ESCALATE_FRAMES` already
+  injects escalated tiles. The repair therefore rides the **next scheduled
+  image frame** and consumes no additional image airtime — the encode-to-fit
+  packer simply spends its existing budget on the tiles that need it.
+- No frame buffering on the tractor, no retransmission state machine, no
+  timing urgency. If a report is lost, the next one carries the same
+  information, because staleness is a level, not an edge.
+- It is control-plane traffic, so it belongs in the scheduled reverse slot
+  (F2/F3) rather than the free-running pump.
+
+This also settles where NACK-style signalling genuinely belongs. Per §4a, acks
+on the command path were pure cost. Here the logic reverses: the receiver holds
+information the transmitter cannot derive, the report is level-triggered rather
+than edge-triggered, and it is 84x cheaper than the alternative. Feedback earns
+its airtime when it carries knowledge only the receiver has.
+
+### 8.5 What the keyframe request should still be used for
+
+Keep it, narrowly, for genuine desynchronisation where an incremental repair is
+not defined:
+
+- stream start / decoder cold start,
+- `base_seq` mismatch (the canvas already detects this — `canvas.py:1`),
+- encode-mode or radio-profile change,
+- a stale fraction so large that a keyframe is genuinely cheaper than the
+  equivalent tile repairs (the bitmap makes this a computable comparison
+  rather than a guess).
+
+Explicitly **not** for routine fragment loss, which is what it does today.
+
+### 8.6 Interim recommendation
+
+Until `0x6C` exists, the honest position is that **neither setting is right**:
+requests on costs 1.88 points and 16% of frames; requests off risks permanent
+stale tiles. For bench throughput work keep `LIFETRAC_KF_REQUEST_DISABLE=1`
+(the numbers there are what we are trying to measure, and the synthetic feed has
+no operator looking at it). Do **not** ship that default to the tractor without
+the replacement.
+
+Roadmap item: **F10**, in the same batch as the reverse-slot work it depends on.
