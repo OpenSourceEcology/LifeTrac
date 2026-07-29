@@ -237,6 +237,10 @@ def _frag_body_b(profile: int) -> int:
 
 
 BATCH_MAX_FRAMES = _env_int("LIFETRAC_BATCH_MAX_FRAMES", 4, lo=1)
+# 2026-07-29 ack-cost experiment: 0 suppresses the probe echo entirely so a
+# run measures the IMAGE cost of carrying acks. Tractor-side "LoRa cmd: PROBE"
+# remains the authoritative delivery counter either way.
+PROBE_ECHO_ENABLE = _env_int("LIFETRAC_PROBE_ECHO", 1, lo=0, hi=1) == 1
 try:
     from image_pipeline.frame_format import pack_frame_batch
 except Exception:                                             # pragma: no cover
@@ -720,11 +724,18 @@ class ImageTxDaemon:
             self._probe_rx = getattr(self, "_probe_rx", 0) + 1
             LOG.info("LoRa cmd: PROBE seq=%d phase_ms=%d (rx#%d)",
                      seq, phase, self._probe_rx)
-            try:
-                self._cmd_out.put_nowait(pack_command_frame(
-                    CMD_OP_PROBE_ECHO, seq.to_bytes(4, "little")))
-            except queue.Full:
-                pass
+            # 2026-07-29 ack-cost experiment: LIFETRAC_PROBE_ECHO=0 suppresses
+            # the echo entirely so a run measures the IMAGE cost of carrying
+            # acks at all (delivery is then scored tractor-side only, which is
+            # the authoritative counter anyway — the log line above). The echo
+            # otherwise rides the shared _cmd_out drain, which uses
+            # _send_command_frame's default copies=2.
+            if PROBE_ECHO_ENABLE:
+                try:
+                    self._cmd_out.put_nowait(pack_command_frame(
+                        CMD_OP_PROBE_ECHO, seq.to_bytes(4, "little")))
+                except queue.Full:
+                    pass
 
     def _send_command_frame(self, link: HostLink, body: bytes,
                             copies: int = 2) -> None:
@@ -746,6 +757,12 @@ class ImageTxDaemon:
             # CONF landing while an ack radiates) are dispatched, not lost.
             self._dispatch_rx_pending(rx_pending)
 
+    # 2026-07-29: copies used when radiating a queued reply (echo/ack). The
+    # historical default was 2, which doubles the tractor's ack airtime AND
+    # made the base's raw echo counter read ~2x. Tunable so the ack-cost
+    # experiment can compare 2 vs 1 on air.
+    ACK_COPIES = _env_int("LIFETRAC_ACK_COPIES", 2, lo=1, hi=4)
+
     def _service_control_plane(self, link: HostLink) -> None:
         # Forward camera_service's encode ack over LoRa (latest wins).
         # Atomic swap under the lock: the paho thread writes _enc_ack_out,
@@ -765,8 +782,13 @@ class ImageTxDaemon:
                 body = self._cmd_out.get_nowait()
             except queue.Empty:
                 break
-            self._send_command_frame(link, body)
-            if len(body) >= 2 and body[1] == CMD_OP_RADIO_PROFILE_ACK:
+            # Profile ACKs keep the historical 2 copies (a lost one splits
+            # the link mid-switch); everything else uses ACK_COPIES so the
+            # ack-cost experiment can vary it.
+            _is_prof_ack = len(body) >= 2 and body[1] == CMD_OP_RADIO_PROFILE_ACK
+            self._send_command_frame(
+                link, body, copies=2 if _is_prof_ack else self.ACK_COPIES)
+            if _is_prof_ack:
                 flushed_profile_ack = True
         if flushed_profile_ack:
             # Phase 2: dwell so the last ack copy finishes radiating on

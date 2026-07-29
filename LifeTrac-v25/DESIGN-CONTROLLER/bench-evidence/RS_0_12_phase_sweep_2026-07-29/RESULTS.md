@@ -9,6 +9,40 @@ built that way after the 171/1 retraction.
 
 ---
 
+## 0. THE HEADLINE — the ACK was destroying the command channel
+
+Suppressing the tractor's reply raises **forward command delivery from 56% to
+91%**. Same code, same profile, same frames — the *only* difference is whether
+the tractor echoes.
+
+| Config (v3 + 3000 B, all else identical) | Forward delivery | 95% CI | Image goodput |
+|---|---|---|---|
+| echo ON, 2 copies (B5) | 55.6% (99/178) | [48.3, 62.9] | 1999 B/s |
+| echo ON, 1 copy (A1) | 59.3% (54/91) | [49.2, 69.4] | 2014 B/s |
+| **echo OFF (A2)** | **91.1% (102/112)** | **[85.8, 96.4]** | **2019 B/s** |
+
+CIs do not overlap. **The reply transmission occupies and deafens exactly the
+reverse-slot window the next command needs** — `_service_control_plane` flushes
+queued replies at the top of the TX-worker loop, immediately before the next
+train, which is precisely where the base is aiming.
+
+**Two consequences, both large:**
+
+1. **Every "delivery" number measured earlier today is depressed by our own
+   measurement apparatus.** The 53–57% figures — and the whole phase sweep —
+   ran with echoes on. True opportunistic forward delivery is ~91%.
+2. **The architecture verdict changes.** At p = 0.911: one copy 91.1%, **two
+   copies 99.2%**, three 99.9%. A usable one-way control plane may be
+   achievable *opportunistically, today, with no firmware slot at all* —
+   the firmware TDMA work becomes an optimization and a determinism
+   guarantee rather than a precondition. (Caveat: measured with a small probe
+   at ~0.5/s on a clean short-range bench link. Higher command rates mean more
+   base TX, which may self-interfere; needs confirming at cadence.)
+
+This is also the strongest possible evidence for the standing "no ack on
+actuation" rule: acking does not merely cost airtime, **it cuts command
+delivery by 35 points.**
+
 ## 1. Headline results
 
 Full 2×2 (pipeline × frame size), with 95% CIs:
@@ -134,13 +168,19 @@ Per the pre-registered decision table (`CONTROL_PLANE_DESIGN.md` §8):
 
 ## 4. What this means for the architecture
 
-**Opportunistic delivery caps around 53%. That is not enough for a control
-plane, and that is precisely the argument for the firmware slot work.**
+> **SUPERSEDED BY §0.** The paragraph below was written before the ack-cost
+> experiment and reflects delivery measured *with the echo enabled* — i.e.
+> depressed by our own instrument. Corrected verdict: opportunistic forward
+> delivery is **~91%**, and **2 copies gives 99.2%**, so a one-way control
+> plane looks achievable without the firmware slot. The slot becomes an
+> optimization and a determinism guarantee, not a precondition. Retained
+> below for the record.
 
-Retry math at p=0.53: 2 copies → 78%, **3 copies → 90%**, 4 → 95%, 5 → 98%.
-So a usable control plane today would need 3–5 copies per command, at ≥0.5 s
-spacing — i.e. 1.5–2.5 s to land one command with confidence. Two orders off a
-hydraulic loop, exactly as predicted.
+~~**Opportunistic delivery caps around 53%. That is not enough for a control
+plane, and that is precisely the argument for the firmware slot work.**
+Retry math at p=0.53: 2 copies → 78%, 3 copies → 90%, 4 → 95%, 5 → 98%. So a
+usable control plane today would need 3–5 copies per command, at ≥0.5 s
+spacing — i.e. 1.5–2.5 s to land one command with confidence.~~
 
 The TDMA design (firmware F1–F3) exists to convert this *opportunistic* window
 into a *scheduled* one. The measurement supports the design in the strongest
@@ -156,6 +196,57 @@ guard sizing is *not* the risk it was thought to be. The risk is phase
 acquisition, not guard width.
 
 ---
+
+## 4a. ACK vs NACK — measured answers (2026-07-29)
+
+**Q: does an ack waste airtime?** Two costs, and the indirect one dominates.
+
+*Direct* — negligible at these rates, ruinous at control cadence. One echo copy
+is 10.304 ms at BW500. At the ~0.4 acks/s these probes fired, that is 0.8% of
+goodput (measured: 1999 vs 2019 B/s, inside noise). Scaled:
+
+| Ack rate | ×1 copy | ×2 copies |
+|---|---|---|
+| 0.4/s (probes) | 0.4% wall | 0.8% wall |
+| 5 Hz | 5.2% (~127 B/s) | 10.3% (~255 B/s) |
+| 10 Hz | 10.3% (~255 B/s) | **20.6% (~509 B/s)** |
+
+*Indirect* — **35 points of forward command delivery** (§0). This dwarfs the
+airtime cost and is the real reason not to ack.
+
+**Q: is the round trip reliable?** No. Base-side echo receipt is 46.1% with 2
+copies, 22.2% with 1 (CIs disjoint). Backing out `P(echo home | probe
+arrived)`: **83% with 2 copies, 37% with 1**. So the return path is *better*
+than the forward path, yet the **combined round trip completes under half the
+time**. An ack-gated retry loop therefore retransmits commands that already
+landed more often than not — spending the *expensive* direction to compensate
+for losses in the *cheap* one.
+
+**Q: use NACK instead?** No, for three independent reasons:
+1. **Structural.** A NACK requires knowing something *should* have arrived.
+   Commands are aperiodic; a wholly-lost command leaves no gap to detect, and
+   silence is indistinguishable from "nothing to say". NACK only becomes
+   expressible once every slot carries something (the scheduled design).
+2. **It fails unsafe.** The tractor→base path is ~83% reliable, so a NACK goes
+   missing ~17% of the time — and **a lost NACK reads as success**. A lost ACK
+   merely causes a redundant retry.
+3. **It does not dodge the real cost.** A NACK is still a tractor→base TX in
+   the reverse-slot window, so it inflicts the same −35-point wound as an ACK.
+
+**Recommended policy (all measured, not argued):**
+- **Actuation (drive, E-stop): no reply of any kind.** One-way + deadman.
+  Refresh, don't confirm.
+- **Configuration (encode mode, radio profile): prefer the IMPLICIT ack** —
+  the frame header is self-describing, so a changed codec byte already proves
+  the command landed at zero airtime and zero window damage (partly built:
+  `rx_codec` in link_stats). Where an explicit ack is unavoidable, keep 2
+  copies (37% → 83% return for ~10 ms) but send it **only** when a command is
+  outstanding, never periodically.
+- **Long term: piggyback.** Reverse-direction data rides the image stream,
+  which is already running ~80% of the time. A few ack bits in the fragment or
+  hop header cost nothing and — critically — add no extra TX event, so they
+  avoid the window damage entirely. Needs the schema bump already planned for
+  the MIC.
 
 ## 5. Corrections and defects found today
 

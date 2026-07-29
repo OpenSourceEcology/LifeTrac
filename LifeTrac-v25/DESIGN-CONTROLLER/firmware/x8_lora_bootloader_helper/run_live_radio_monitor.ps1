@@ -1,4 +1,4 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 <#
 .SYNOPSIS
     Live LoRa Radio Transmission Monitor & Speed Benchmark.
@@ -73,6 +73,12 @@ param(
     # D13 ditto against a D13 control frame at every phase bin. Empty = no
     # padding (probe stays at its natural 16 B).
     [string]$ProbeSizesB  = "",
+    # 2026-07-29 ack-cost experiment: copies used for queued tractor replies
+    # (echoes/encode acks). Historical default 2. Profile ACKs always use 2.
+    [int]$AckCopies       = 2,
+    # 0 = tractor does NOT echo probes, so the run measures the IMAGE cost of
+    # carrying acks at all (delivery still scored tractor-side).
+    [int]$ProbeEcho       = 1,
     # Archive final logs + parameters under bench-evidence/ with the git
     # SHA in the folder name (evidence discipline per CODE REVIEWS docs).
     [switch]$Archive
@@ -210,7 +216,7 @@ if ($TxFeed -eq "local") {
 }
 
 Write-Host "[LAUNCH] Starting TX Daemon on Board $TxAdbSerial (mqtt=$txMqtt, depth=$TxPipelineDepth)..." -ForegroundColor Yellow
-cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f tx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name tx_smoke --network=host --entrypoint python3 --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=$txMqtt -e LIFETRAC_SKIP_RESET_REQ=1 $profEnv -e LIFETRAC_TX_PIPELINE=$TxPipeline -e LIFETRAC_TX_PIPELINE_DEPTH=$TxPipelineDepth -e LIFETRAC_TX_BATCH=$TxBatch -e LIFETRAC_TX_PREPARE_AHEAD=$TxPrepareAhead -e LIFETRAC_TRAIN_GAP_MS=$TrainGapMs -e LIFETRAC_PARITY_GROUP=$ParityGroup hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44 -u /work/image_tx_daemon.py --log-level INFO`""
+cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f tx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name tx_smoke --network=host --entrypoint python3 --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=$txMqtt -e LIFETRAC_SKIP_RESET_REQ=1 $profEnv -e LIFETRAC_TX_PIPELINE=$TxPipeline -e LIFETRAC_TX_PIPELINE_DEPTH=$TxPipelineDepth -e LIFETRAC_TX_BATCH=$TxBatch -e LIFETRAC_TX_PREPARE_AHEAD=$TxPrepareAhead -e LIFETRAC_TRAIN_GAP_MS=$TrainGapMs -e LIFETRAC_PARITY_GROUP=$ParityGroup -e LIFETRAC_ACK_COPIES=$AckCopies -e LIFETRAC_PROBE_ECHO=$ProbeEcho hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44 -u /work/image_tx_daemon.py --log-level INFO`""
 
 # 6. Launch RX daemon.
 # RX publishes to the BASE BOARD's own mosquitto (127.0.0.1 via
@@ -315,6 +321,8 @@ if ($Archive) {
         "reactive_fire=$ReactiveFire",
         "probe_phase_sweep_ms=$ProbePhaseSweepMs",
         "probe_sizes_b=$ProbeSizesB",
+        "ack_copies=$AckCopies",
+        "probe_echo=$ProbeEcho",
         "tx_feed=$TxFeed",
         "reg_profile=$RegProfile",
         "tx_serial=$TxAdbSerial",

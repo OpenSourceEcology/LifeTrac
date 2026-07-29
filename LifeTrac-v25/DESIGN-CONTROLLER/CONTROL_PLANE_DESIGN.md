@@ -18,13 +18,24 @@ code at the cited `file:line`.
 > The gating RS-0.12 run is done. Headlines, all tractor-side ground truth:
 > the armed window **exists**, sits at frame completion, is **~60–80 ms wide**
 > (far wider than the 8–10 ms guard this design assumed), and decays
-> monotonically with offset. Opportunistic delivery **caps at ~53%** —
-> enough to prove the window, not enough for a control plane, which is
-> exactly the case for the firmware slot. **Frame size does not affect
-> delivery** (23 B 15.1% vs 38 B 15.8%), which settles the envelope question
-> in favour of GCM-128 and demotes ditto to an airtime-only optimization.
-> Two things below are now retracted by measurement and marked inline:
-> the RS-3.10 bisection hypothesis (§8) and D13's preference (§6).
+> monotonically with offset.
+>
+> **Opportunistic delivery is ~91%, NOT the 53–57% first measured.** The
+> earlier figures were depressed by our own instrument: the tractor's ECHO
+> transmission occupies and deafens the very reverse-slot window the next
+> command needs, costing **35 points** of forward delivery (91.1% echo-off
+> vs 55.6% echo-on, disjoint CIs). At 91%, **two copies gives 99.2%** — so a
+> one-way control plane looks achievable *opportunistically*, and the
+> firmware slot becomes an optimization and a determinism guarantee rather
+> than a precondition. This is also decisive for ack policy: **acking does
+> not merely cost airtime, it cuts command delivery by a third.** See
+> RESULTS.md §0 and §4a (ACK/NACK measured answers).
+>
+> **Frame size does not affect delivery** (23 B 15.1% vs 38 B 15.8%), which
+> settles the envelope question in favour of GCM-128 and demotes ditto to an
+> airtime-only optimization. Three things below are retracted by measurement
+> and marked inline: the RS-3.10 bisection hypothesis (§8), D13's preference
+> (§6), and the "53% is not enough" verdict (§7/RESULTS §4).
 
 ---
 
