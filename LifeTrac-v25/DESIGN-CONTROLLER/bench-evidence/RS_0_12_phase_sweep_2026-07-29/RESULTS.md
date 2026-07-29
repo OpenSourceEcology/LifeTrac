@@ -19,7 +19,12 @@ Full 2×2 (pipeline × frame size), with 95% CIs:
 | B3 | **v2** | 250 B | **15%** (29/196) | [9.8, 19.8] | 1722 B/s @ 72% |
 | B2 | **v3** | 250 B | **53%** (132/248) | [47.0, 59.4] | 1754 B/s @ 74% |
 | **B4** | **v3** | **3000 B** | **57%** (35/61) | [45.0, 69.8] | **2005 B/s @ 79%** |
+| **B5** | **v3** | **3000 B** | **56%** (99/178) | [48.3, 62.9] | **1999 B/s @ 81%** |
 | Sweep | v3 | 250 B | 17% aggregate over 14 phase×size bins | — | 1803 B/s @ 75% |
+
+**B5 (7 min) confirms B4.** Pooled v3 + 3000 B: **134/239 = 56.1%,
+95% CI [49.8, 62.4]** at ~2000 B/s. This is the recommended operating point
+and it now has the matrix's largest sample behind it.
 
 **PIPELINE IS THE WHOLE STORY. Frame size does not matter on v3.**
 B4's and B2's confidence intervals overlap heavily (45–70 vs 47–59) — they are
@@ -35,8 +40,22 @@ UNNECESSARY.** Keep 3000 B frames. (The *separate* loss-survival argument for
 single-fragment frames — 95.7% vs 56.5% at 4.3% fragment loss — is untouched
 by this and still stands on its own merits.)
 
-**Measured RTT (base→tractor→base):** median 245–281 ms, p95 367–503 ms.
-First single-clock round-trip figure the project has under load.
+**Measured RTT (base→tractor→base):** 245–281 ms median with 250 B frames,
+but **1482 ms median with 3000 B frames.** First single-clock round-trip
+figures the project has under load.
+
+**The RTT difference is a finding, not noise: echo latency is dominated by
+the tractor's TRAIN LENGTH, not by the air.** The tractor queues its echo on
+`_cmd_out` and only flushes it in `_service_control_plane` at the top of the
+next TX-worker iteration — so a reply waits out the train in progress
+(~1.7 s for a 17-fragment 3000 B train, ~0.2 s for a 250 B one). Consequences:
+- **One-way commands (drive, E-stop) are unaffected** — arrival is fast; the
+  probe's *forward* delivery is what 56% measures.
+- **Anything needing a round trip pays a full train period.** Ack-driven
+  convergence (RS-1.5), the two-phase profile switch, and any request/response
+  command inherit this. It is a strong argument for keeping actuation
+  one-way + deadman rather than ack-gated, and for the reverse-slot design
+  where the tractor can answer without waiting out its own train.
 
 ---
 

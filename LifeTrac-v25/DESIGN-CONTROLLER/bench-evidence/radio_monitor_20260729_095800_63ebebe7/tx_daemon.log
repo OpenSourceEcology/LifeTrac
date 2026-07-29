@@ -1,0 +1,1298 @@
+﻿2026-07-27 00:47:13,606 INFO image_tx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-07-27 00:47:13,615 INFO image_tx_daemon: image_tx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-07-27 00:47:13,620 INFO image_tx_daemon: MQTT connected; subscribing to lifetrac/v25/cmd/image_frame
+
+2026-07-27 00:47:13,622 INFO image_tx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-07-27 00:47:13,641 INFO image_tx_daemon: link_budget: published n_frag=1 profile_idx=6 (profile 2)
+
+INFO: post-VER drain queued type=0xF1 seq=0
+
+INFO: post-VER drain queued type=0xC1 seq=0
+
+INFO: post-VER drain queued type=0xF1 seq=0
+
+INFO: post-VER drain queued type=0xC1 seq=0
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-07-27 00:47:14,493 INFO image_tx_daemon: LBT_ENABLE=0 (matches W1-10b TX_BURST rationale)
+
+2026-07-27 00:47:14,515 INFO image_tx_daemon: RXCONT armed for command downlink (opmode 0x81 -> 0x85)
+
+2026-07-27 00:47:14,516 INFO image_tx_daemon: TX worker ready (inter_cycle_s=0.050, max 8 frags/dwell)
+
+2026-07-27 00:47:14,615 INFO image_tx_daemon: stats: goodput=0.0 B/s util=0% pipeline=v3 frames_in=0 ok=0 fail=0 drop_full=0 drop_stale=0 frags_ok=0 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-07-27 00:47:15,401 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:15,695 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:16,270 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:16,844 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:17,419 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:17,995 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:18,571 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:19,147 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:19,722 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:20,297 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:20,872 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:21,176 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:21,751 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:22,326 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:22,901 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:23,476 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:24,051 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-27 00:47:24,626 INFO image_tx_daemon: stats: goodput=0.0 B/s util=0% pipeline=v3 frames_in=0 ok=0 fail=0 drop_full=0 drop_stale=0 frags_ok=0 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-07-27 00:47:32,121 INFO image_tx_daemon: frame seq=1 done (pipelined): 13 fragments ok
+
+2026-07-27 00:47:33,563 INFO image_tx_daemon: frame seq=2 done (pipelined): 13 fragments ok
+
+2026-07-27 00:47:34,637 INFO image_tx_daemon: stats: goodput=803.6 B/s util=33% pipeline=v3 frames_in=9 ok=2 fail=0 drop_full=1 drop_stale=0 frags_ok=34 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:47:35,112 INFO image_tx_daemon: frame seq=3 done (pipelined): 13 fragments ok
+
+2026-07-27 00:47:35,263 INFO image_tx_daemon: LoRa cmd: PROBE seq=1 phase_ms=0 (rx#1)
+
+2026-07-27 00:47:36,622 INFO image_tx_daemon: frame seq=4 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:47:38,107 INFO image_tx_daemon: frame seq=7 done (pipelined): 13 fragments ok
+
+2026-07-27 00:47:39,655 INFO image_tx_daemon: frame seq=10 done (pipelined): 13 fragments ok
+
+2026-07-27 00:47:41,176 INFO image_tx_daemon: frame seq=13 done (pipelined): 13 fragments ok
+
+2026-07-27 00:47:42,650 INFO image_tx_daemon: frame seq=16 done (pipelined): 13 fragments ok
+
+2026-07-27 00:47:42,798 INFO image_tx_daemon: LoRa cmd: PROBE seq=3 phase_ms=0 (rx#2)
+
+2026-07-27 00:47:44,201 INFO image_tx_daemon: frame seq=19 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:47:44,648 INFO image_tx_daemon: stats: goodput=1958.7 B/s util=80% pipeline=v3 frames_in=29 ok=9 fail=0 drop_full=14 drop_stale=0 frags_ok=118 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:47:45,749 INFO image_tx_daemon: frame seq=22 done (pipelined): 13 fragments ok
+
+2026-07-27 00:47:45,896 INFO image_tx_daemon: LoRa cmd: PROBE seq=5 phase_ms=0 (rx#3)
+
+2026-07-27 00:47:47,288 INFO image_tx_daemon: frame seq=25 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:47:48,793 INFO image_tx_daemon: frame seq=28 done (pipelined): 12 fragments ok
+
+2026-07-27 00:47:50,245 INFO image_tx_daemon: frame seq=31 done (pipelined): 12 fragments ok
+
+2026-07-27 00:47:51,803 INFO image_tx_daemon: frame seq=37 done (pipelined): 12 fragments ok
+
+2026-07-27 00:47:53,242 INFO image_tx_daemon: frame seq=38 done (pipelined): 12 fragments ok
+
+2026-07-27 00:47:54,663 INFO image_tx_daemon: stats: goodput=2006.6 B/s util=81% pipeline=v3 frames_in=49 ok=15 fail=0 drop_full=28 drop_stale=0 frags_ok=201 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:47:54,729 INFO image_tx_daemon: frame seq=40 done (pipelined): 13 fragments ok
+
+2026-07-27 00:47:54,952 INFO image_tx_daemon: LoRa cmd: PROBE seq=8 phase_ms=0 (rx#4)
+
+2026-07-27 00:47:56,421 INFO image_tx_daemon: frame seq=43 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:47:57,834 INFO image_tx_daemon: frame seq=49 done (pipelined): 12 fragments ok
+
+2026-07-27 00:47:57,929 INFO image_tx_daemon: LoRa cmd: PROBE seq=10 phase_ms=0 (rx#5)
+
+2026-07-27 00:47:59,321 INFO image_tx_daemon: frame seq=50 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:00,776 INFO image_tx_daemon: frame seq=52 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:02,219 INFO image_tx_daemon: frame seq=55 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:03,746 INFO image_tx_daemon: frame seq=58 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:04,673 INFO image_tx_daemon: stats: goodput=1992.8 B/s util=81% pipeline=v3 frames_in=69 ok=22 fail=0 drop_full=41 drop_stale=0 frags_ok=286 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:48:05,219 INFO image_tx_daemon: frame seq=61 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:05,305 INFO image_tx_daemon: LoRa cmd: PROBE seq=13 phase_ms=0 (rx#6)
+
+2026-07-27 00:48:06,664 INFO image_tx_daemon: frame seq=64 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:08,181 INFO image_tx_daemon: frame seq=67 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:08,329 INFO image_tx_daemon: LoRa cmd: PROBE seq=14 phase_ms=0 (rx#7)
+
+2026-07-27 00:48:09,678 INFO image_tx_daemon: frame seq=70 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:11,268 INFO image_tx_daemon: frame seq=73 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:12,669 INFO image_tx_daemon: frame seq=76 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:12,720 INFO image_tx_daemon: LoRa cmd: PROBE seq=15 phase_ms=0 (rx#8)
+
+2026-07-27 00:48:14,112 INFO image_tx_daemon: frame seq=79 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:14,684 INFO image_tx_daemon: stats: goodput=2021.1 B/s util=82% pipeline=v3 frames_in=89 ok=29 fail=0 drop_full=54 drop_stale=0 frags_ok=372 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:48:15,567 INFO image_tx_daemon: frame seq=82 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:15,619 INFO image_tx_daemon: LoRa cmd: PROBE seq=17 phase_ms=0 (rx#9)
+
+2026-07-27 00:48:17,021 INFO image_tx_daemon: frame seq=85 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:18,570 INFO image_tx_daemon: frame seq=91 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:18,717 INFO image_tx_daemon: LoRa cmd: PROBE seq=19 phase_ms=0 (rx#10)
+
+2026-07-27 00:48:20,065 INFO image_tx_daemon: frame seq=92 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:21,676 INFO image_tx_daemon: frame seq=93 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:21,708 INFO image_tx_daemon: LoRa cmd: PROBE seq=21 phase_ms=0 (rx#11)
+
+2026-07-27 00:48:23,110 INFO image_tx_daemon: frame seq=97 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:24,657 INFO image_tx_daemon: frame seq=103 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:24,694 INFO image_tx_daemon: stats: goodput=2013.7 B/s util=82% pipeline=v3 frames_in=109 ok=36 fail=0 drop_full=68 drop_stale=0 frags_ok=458 frags_fail=0 qdepth=3 parity_tx=0
+
+2026-07-27 00:48:26,209 INFO image_tx_daemon: frame seq=104 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:26,356 INFO image_tx_daemon: LoRa cmd: PROBE seq=22 phase_ms=0 (rx#12)
+
+2026-07-27 00:48:27,758 INFO image_tx_daemon: frame seq=106 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:29,275 INFO image_tx_daemon: frame seq=109 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:29,347 INFO image_tx_daemon: LoRa cmd: PROBE seq=24 phase_ms=0 (rx#13)
+
+2026-07-27 00:48:30,749 INFO image_tx_daemon: frame seq=112 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:32,297 INFO image_tx_daemon: frame seq=115 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:32,445 INFO image_tx_daemon: LoRa cmd: PROBE seq=26 phase_ms=0 (rx#14)
+
+2026-07-27 00:48:33,847 INFO image_tx_daemon: frame seq=118 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:34,705 INFO image_tx_daemon: stats: goodput=1961.7 B/s util=80% pipeline=v3 frames_in=129 ok=42 fail=0 drop_full=81 drop_stale=0 frags_ok=542 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:48:35,394 INFO image_tx_daemon: frame seq=121 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:35,542 INFO image_tx_daemon: LoRa cmd: PROBE seq=28 phase_ms=0 (rx#15)
+
+2026-07-27 00:48:36,893 INFO image_tx_daemon: frame seq=124 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:38,346 INFO image_tx_daemon: frame seq=127 done (pipelined): 12 fragments ok
+
+2026-07-27 00:48:38,430 INFO image_tx_daemon: LoRa cmd: PROBE seq=29 phase_ms=0 (rx#16)
+
+2026-07-27 00:48:39,789 INFO image_tx_daemon: frame seq=133 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:41,338 INFO image_tx_daemon: frame seq=134 done (pipelined): 12 fragments ok
+
+2026-07-27 00:48:42,832 INFO image_tx_daemon: frame seq=136 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:44,255 INFO image_tx_daemon: frame seq=139 done (pipelined): 12 fragments ok
+
+2026-07-27 00:48:44,719 INFO image_tx_daemon: stats: goodput=2006.3 B/s util=81% pipeline=v3 frames_in=149 ok=49 fail=0 drop_full=95 drop_stale=0 frags_ok=625 frags_fail=0 qdepth=3 parity_tx=0
+
+2026-07-27 00:48:45,736 INFO image_tx_daemon: frame seq=145 done (pipelined): 12 fragments ok
+
+2026-07-27 00:48:45,831 INFO image_tx_daemon: LoRa cmd: PROBE seq=32 phase_ms=0 (rx#17)
+
+2026-07-27 00:48:47,223 INFO image_tx_daemon: frame seq=146 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:48,678 INFO image_tx_daemon: frame seq=148 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:48,730 INFO image_tx_daemon: LoRa cmd: PROBE seq=34 phase_ms=0 (rx#18)
+
+2026-07-27 00:48:50,121 INFO image_tx_daemon: frame seq=151 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:51,565 INFO image_tx_daemon: frame seq=154 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:53,029 INFO image_tx_daemon: frame seq=157 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:53,179 INFO image_tx_daemon: LoRa cmd: PROBE seq=36 phase_ms=0 (rx#19)
+
+2026-07-27 00:48:54,537 INFO image_tx_daemon: frame seq=159 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:48:54,735 INFO image_tx_daemon: stats: goodput=2015.5 B/s util=82% pipeline=v3 frames_in=169 ok=56 fail=0 drop_full=109 drop_stale=0 frags_ok=711 frags_fail=0 qdepth=2 parity_tx=0
+
+2026-07-27 00:48:56,084 INFO image_tx_daemon: frame seq=166 done (pipelined): 12 fragments ok
+
+2026-07-27 00:48:57,570 INFO image_tx_daemon: frame seq=167 done (pipelined): 13 fragments ok
+
+2026-07-27 00:48:59,022 INFO image_tx_daemon: frame seq=169 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:00,496 INFO image_tx_daemon: frame seq=171 done (pipelined): 12 fragments ok
+
+2026-07-27 00:49:01,928 INFO image_tx_daemon: frame seq=177 done (pipelined): 12 fragments ok
+
+2026-07-27 00:49:02,023 INFO image_tx_daemon: LoRa cmd: PROBE seq=39 phase_ms=0 (rx#20)
+
+2026-07-27 00:49:03,520 INFO image_tx_daemon: frame seq=178 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:04,746 INFO image_tx_daemon: stats: goodput=2031.3 B/s util=82% pipeline=v3 frames_in=189 ok=62 fail=0 drop_full=121 drop_stale=0 frags_ok=796 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:49:04,975 INFO image_tx_daemon: frame seq=180 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:05,026 INFO image_tx_daemon: LoRa cmd: PROBE seq=41 phase_ms=0 (rx#21)
+
+2026-07-27 00:49:06,428 INFO image_tx_daemon: frame seq=184 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:07,954 INFO image_tx_daemon: frame seq=186 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:08,017 INFO image_tx_daemon: LoRa cmd: PROBE seq=42 phase_ms=0 (rx#22)
+
+2026-07-27 00:49:09,421 INFO image_tx_daemon: frame seq=189 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:10,917 INFO image_tx_daemon: frame seq=192 done (pipelined): 12 fragments ok
+
+2026-07-27 00:49:10,999 INFO image_tx_daemon: LoRa cmd: PROBE seq=44 phase_ms=0 (rx#23)
+
+2026-07-27 00:49:12,401 INFO image_tx_daemon: frame seq=195 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:13,896 INFO image_tx_daemon: frame seq=198 done (pipelined): 12 fragments ok
+
+2026-07-27 00:49:13,989 INFO image_tx_daemon: LoRa cmd: PROBE seq=46 phase_ms=0 (rx#24)
+
+2026-07-27 00:49:14,757 INFO image_tx_daemon: stats: goodput=2025.7 B/s util=82% pipeline=v3 frames_in=209 ok=69 fail=0 drop_full=134 drop_stale=0 frags_ok=882 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:49:15,370 INFO image_tx_daemon: frame seq=201 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:16,826 INFO image_tx_daemon: frame seq=204 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:16,877 INFO image_tx_daemon: LoRa cmd: PROBE seq=48 phase_ms=0 (rx#25)
+
+2026-07-27 00:49:18,268 INFO image_tx_daemon: frame seq=207 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:19,724 INFO image_tx_daemon: frame seq=210 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:19,775 INFO image_tx_daemon: LoRa cmd: PROBE seq=50 phase_ms=0 (rx#26)
+
+2026-07-27 00:49:21,177 INFO image_tx_daemon: frame seq=213 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:22,725 INFO image_tx_daemon: frame seq=219 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:24,325 INFO image_tx_daemon: frame seq=220 done (pipelined): 12 fragments ok
+
+2026-07-27 00:49:24,768 INFO image_tx_daemon: stats: goodput=2002.0 B/s util=81% pipeline=v3 frames_in=229 ok=76 fail=0 drop_full=147 drop_stale=0 frags_ok=968 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:49:25,769 INFO image_tx_daemon: frame seq=222 done (pipelined): 12 fragments ok
+
+2026-07-27 00:49:27,247 INFO image_tx_daemon: frame seq=225 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:28,981 INFO image_tx_daemon: frame seq=231 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:29,023 INFO image_tx_daemon: LoRa cmd: PROBE seq=53 phase_ms=0 (rx#27)
+
+2026-07-27 00:49:30,426 INFO image_tx_daemon: frame seq=232 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:31,972 INFO image_tx_daemon: frame seq=234 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:33,504 INFO image_tx_daemon: frame seq=237 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:34,780 INFO image_tx_daemon: stats: goodput=1977.8 B/s util=80% pipeline=v3 frames_in=249 ok=82 fail=0 drop_full=161 drop_stale=0 frags_ok=1052 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:49:34,967 INFO image_tx_daemon: frame seq=240 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:35,114 INFO image_tx_daemon: LoRa cmd: PROBE seq=54 phase_ms=0 (rx#28)
+
+2026-07-27 00:49:36,508 INFO image_tx_daemon: frame seq=243 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:38,058 INFO image_tx_daemon: frame seq=246 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:38,205 INFO image_tx_daemon: LoRa cmd: PROBE seq=56 phase_ms=0 (rx#29)
+
+2026-07-27 00:49:39,597 INFO image_tx_daemon: frame seq=249 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:41,112 INFO image_tx_daemon: frame seq=252 done (pipelined): 12 fragments ok
+
+2026-07-27 00:49:42,553 INFO image_tx_daemon: frame seq=0 done (pipelined): 12 fragments ok
+
+2026-07-27 00:49:42,637 INFO image_tx_daemon: LoRa cmd: PROBE seq=58 phase_ms=0 (rx#30)
+
+2026-07-27 00:49:44,039 INFO image_tx_daemon: frame seq=3 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:44,796 INFO image_tx_daemon: stats: goodput=1980.8 B/s util=80% pipeline=v3 frames_in=269 ok=89 fail=0 drop_full=174 drop_stale=0 frags_ok=1136 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:49:45,545 INFO image_tx_daemon: frame seq=5 done (pipelined): 12 fragments ok
+
+2026-07-27 00:49:45,629 INFO image_tx_daemon: LoRa cmd: PROBE seq=60 phase_ms=0 (rx#31)
+
+2026-07-27 00:49:47,010 INFO image_tx_daemon: frame seq=9 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:48,432 INFO image_tx_daemon: frame seq=11 done (pipelined): 12 fragments ok
+
+2026-07-27 00:49:49,863 INFO image_tx_daemon: frame seq=17 done (pipelined): 12 fragments ok
+
+2026-07-27 00:49:51,347 INFO image_tx_daemon: frame seq=18 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:51,399 INFO image_tx_daemon: LoRa cmd: PROBE seq=62 phase_ms=0 (rx#32)
+
+2026-07-27 00:49:52,791 INFO image_tx_daemon: frame seq=20 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:54,246 INFO image_tx_daemon: frame seq=23 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:54,298 INFO image_tx_daemon: LoRa cmd: PROBE seq=64 phase_ms=0 (rx#33)
+
+2026-07-27 00:49:54,807 INFO image_tx_daemon: stats: goodput=2060.1 B/s util=84% pipeline=v3 frames_in=289 ok=96 fail=0 drop_full=187 drop_stale=0 frags_ok=1223 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:49:55,678 INFO image_tx_daemon: frame seq=26 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:49:57,146 INFO image_tx_daemon: frame seq=29 done (pipelined): 13 fragments ok
+
+2026-07-27 00:49:58,649 INFO image_tx_daemon: frame seq=32 done (pipelined): 12 fragments ok
+
+2026-07-27 00:50:00,134 INFO image_tx_daemon: frame seq=35 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:01,639 INFO image_tx_daemon: frame seq=38 done (pipelined): 12 fragments ok
+
+2026-07-27 00:50:03,112 INFO image_tx_daemon: frame seq=41 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:04,555 INFO image_tx_daemon: frame seq=44 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:04,607 INFO image_tx_daemon: LoRa cmd: PROBE seq=65 phase_ms=0 (rx#34)
+
+2026-07-27 00:50:04,818 INFO image_tx_daemon: stats: goodput=2018.4 B/s util=82% pipeline=v3 frames_in=309 ok=103 fail=0 drop_full=200 drop_stale=0 frags_ok=1309 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:50:05,998 INFO image_tx_daemon: frame seq=47 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:07,411 INFO image_tx_daemon: frame seq=49 done (pipelined): 12 fragments ok
+
+2026-07-27 00:50:07,505 INFO image_tx_daemon: LoRa cmd: PROBE seq=67 phase_ms=0 (rx#35)
+
+2026-07-27 00:50:08,896 INFO image_tx_daemon: frame seq=52 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:10,351 INFO image_tx_daemon: frame seq=55 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:10,403 INFO image_tx_daemon: LoRa cmd: PROBE seq=69 phase_ms=0 (rx#36)
+
+2026-07-27 00:50:11,784 INFO image_tx_daemon: frame seq=58 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:13,252 INFO image_tx_daemon: frame seq=61 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:13,398 INFO image_tx_daemon: LoRa cmd: PROBE seq=71 phase_ms=0 (rx#37)
+
+2026-07-27 00:50:14,756 INFO image_tx_daemon: frame seq=64 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:14,830 INFO image_tx_daemon: stats: goodput=2066.2 B/s util=84% pipeline=v3 frames_in=329 ok=110 fail=0 drop_full=214 drop_stale=0 frags_ok=1397 frags_fail=0 qdepth=3 parity_tx=0
+
+2026-07-27 00:50:16,241 INFO image_tx_daemon: frame seq=67 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:16,389 INFO image_tx_daemon: LoRa cmd: PROBE seq=73 phase_ms=0 (rx#38)
+
+2026-07-27 00:50:17,737 INFO image_tx_daemon: frame seq=70 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:19,211 INFO image_tx_daemon: frame seq=73 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:19,273 INFO image_tx_daemon: LoRa cmd: PROBE seq=75 phase_ms=0 (rx#39)
+
+2026-07-27 00:50:20,664 INFO image_tx_daemon: frame seq=76 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:22,119 INFO image_tx_daemon: frame seq=79 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:22,171 INFO image_tx_daemon: LoRa cmd: PROBE seq=77 phase_ms=0 (rx#40)
+
+2026-07-27 00:50:23,562 INFO image_tx_daemon: frame seq=82 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:24,841 INFO image_tx_daemon: stats: goodput=2042.4 B/s util=83% pipeline=v3 frames_in=349 ok=116 fail=0 drop_full=228 drop_stale=0 frags_ok=1484 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:50:25,038 INFO image_tx_daemon: frame seq=85 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:26,557 INFO image_tx_daemon: frame seq=90 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:28,020 INFO image_tx_daemon: frame seq=91 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:28,168 INFO image_tx_daemon: LoRa cmd: PROBE seq=79 phase_ms=0 (rx#41)
+
+2026-07-27 00:50:29,572 INFO image_tx_daemon: frame seq=93 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:31,078 INFO image_tx_daemon: frame seq=96 done (pipelined): 12 fragments ok
+
+2026-07-27 00:50:32,517 INFO image_tx_daemon: frame seq=100 done (pipelined): 12 fragments ok
+
+2026-07-27 00:50:34,107 INFO image_tx_daemon: frame seq=103 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:34,149 INFO image_tx_daemon: LoRa cmd: PROBE seq=80 phase_ms=0 (rx#42)
+
+2026-07-27 00:50:34,853 INFO image_tx_daemon: stats: goodput=1978.6 B/s util=80% pipeline=v3 frames_in=369 ok=123 fail=0 drop_full=240 drop_stale=0 frags_ok=1568 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:50:35,539 INFO image_tx_daemon: frame seq=105 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:36,984 INFO image_tx_daemon: frame seq=109 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:38,443 INFO image_tx_daemon: frame seq=112 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:38,591 INFO image_tx_daemon: LoRa cmd: PROBE seq=81 phase_ms=0 (rx#43)
+
+2026-07-27 00:50:39,982 INFO image_tx_daemon: frame seq=114 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:41,451 INFO image_tx_daemon: frame seq=117 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:42,999 INFO image_tx_daemon: frame seq=123 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:43,147 INFO image_tx_daemon: LoRa cmd: PROBE seq=83 phase_ms=0 (rx#44)
+
+2026-07-27 00:50:44,601 INFO image_tx_daemon: frame seq=124 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:44,864 INFO image_tx_daemon: stats: goodput=2002.1 B/s util=81% pipeline=v3 frames_in=389 ok=130 fail=0 drop_full=254 drop_stale=0 frags_ok=1654 frags_fail=0 qdepth=3 parity_tx=0
+
+2026-07-27 00:50:46,024 INFO image_tx_daemon: frame seq=126 done (pipelined): 12 fragments ok
+
+2026-07-27 00:50:46,109 INFO image_tx_daemon: LoRa cmd: PROBE seq=85 phase_ms=0 (rx#45)
+
+2026-07-27 00:50:47,510 INFO image_tx_daemon: frame seq=130 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:49,015 INFO image_tx_daemon: frame seq=132 done (pipelined): 12 fragments ok
+
+2026-07-27 00:50:49,100 INFO image_tx_daemon: LoRa cmd: PROBE seq=87 phase_ms=0 (rx#46)
+
+2026-07-27 00:50:50,502 INFO image_tx_daemon: frame seq=135 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:52,051 INFO image_tx_daemon: frame seq=138 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:53,581 INFO image_tx_daemon: frame seq=141 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:54,877 INFO image_tx_daemon: stats: goodput=2018.0 B/s util=82% pipeline=v3 frames_in=409 ok=136 fail=0 drop_full=267 drop_stale=0 frags_ok=1739 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:50:55,044 INFO image_tx_daemon: frame seq=144 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:56,583 INFO image_tx_daemon: frame seq=148 done (pipelined): 13 fragments ok
+
+2026-07-27 00:50:56,633 INFO image_tx_daemon: LoRa cmd: PROBE seq=89 phase_ms=0 (rx#47)
+
+2026-07-27 00:50:58,141 INFO image_tx_daemon: frame seq=150 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:50:59,657 INFO image_tx_daemon: frame seq=154 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:01,313 INFO image_tx_daemon: frame seq=157 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:01,355 INFO image_tx_daemon: LoRa cmd: PROBE seq=91 phase_ms=0 (rx#48)
+
+2026-07-27 00:51:02,713 INFO image_tx_daemon: frame seq=160 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:04,199 INFO image_tx_daemon: frame seq=163 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:04,896 INFO image_tx_daemon: stats: goodput=1983.2 B/s util=81% pipeline=v3 frames_in=429 ok=143 fail=0 drop_full=280 drop_stale=0 frags_ok=1824 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:51:05,804 INFO image_tx_daemon: frame seq=166 done (pipelined): 12 fragments ok
+
+2026-07-27 00:51:07,278 INFO image_tx_daemon: frame seq=169 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:08,733 INFO image_tx_daemon: frame seq=172 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:08,867 INFO image_tx_daemon: LoRa cmd: PROBE seq=94 phase_ms=0 (rx#49)
+
+2026-07-27 00:51:10,369 INFO image_tx_daemon: frame seq=175 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:11,824 INFO image_tx_daemon: frame seq=178 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:11,875 INFO image_tx_daemon: LoRa cmd: PROBE seq=96 phase_ms=0 (rx#50)
+
+2026-07-27 00:51:13,278 INFO image_tx_daemon: frame seq=181 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:14,826 INFO image_tx_daemon: frame seq=187 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:14,907 INFO image_tx_daemon: stats: goodput=1977.3 B/s util=80% pipeline=v3 frames_in=449 ok=150 fail=0 drop_full=294 drop_stale=0 frags_ok=1909 frags_fail=0 qdepth=3 parity_tx=0
+
+2026-07-27 00:51:16,321 INFO image_tx_daemon: frame seq=188 done (pipelined): 12 fragments ok
+
+2026-07-27 00:51:16,415 INFO image_tx_daemon: LoRa cmd: PROBE seq=97 phase_ms=0 (rx#51)
+
+2026-07-27 00:51:17,774 INFO image_tx_daemon: frame seq=190 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:19,262 INFO image_tx_daemon: frame seq=193 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:19,410 INFO image_tx_daemon: LoRa cmd: PROBE seq=99 phase_ms=0 (rx#52)
+
+2026-07-27 00:51:20,907 INFO image_tx_daemon: frame seq=199 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:22,466 INFO image_tx_daemon: frame seq=200 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:22,521 INFO image_tx_daemon: LoRa cmd: PROBE seq=100 phase_ms=0 (rx#53)
+
+2026-07-27 00:51:23,974 INFO image_tx_daemon: frame seq=202 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:24,918 INFO image_tx_daemon: stats: goodput=1975.4 B/s util=80% pipeline=v3 frames_in=469 ok=156 fail=0 drop_full=307 drop_stale=0 frags_ok=1992 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:51:25,510 INFO image_tx_daemon: frame seq=205 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:25,573 INFO image_tx_daemon: LoRa cmd: PROBE seq=102 phase_ms=0 (rx#54)
+
+2026-07-27 00:51:26,965 INFO image_tx_daemon: frame seq=208 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:28,524 INFO image_tx_daemon: frame seq=211 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:28,671 INFO image_tx_daemon: LoRa cmd: PROBE seq=103 phase_ms=0 (rx#55)
+
+2026-07-27 00:51:30,076 INFO image_tx_daemon: frame seq=214 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:31,615 INFO image_tx_daemon: frame seq=217 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:31,772 INFO image_tx_daemon: LoRa cmd: PROBE seq=105 phase_ms=0 (rx#56)
+
+2026-07-27 00:51:33,174 INFO image_tx_daemon: frame seq=221 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:34,680 INFO image_tx_daemon: frame seq=224 done (pipelined): 12 fragments ok
+
+2026-07-27 00:51:34,929 INFO image_tx_daemon: stats: goodput=1960.6 B/s util=80% pipeline=v3 frames_in=489 ok=163 fail=0 drop_full=321 drop_stale=0 frags_ok=2076 frags_fail=0 qdepth=3 parity_tx=0
+
+2026-07-27 00:51:36,164 INFO image_tx_daemon: frame seq=227 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:36,312 INFO image_tx_daemon: LoRa cmd: PROBE seq=107 phase_ms=0 (rx#57)
+
+2026-07-27 00:51:37,660 INFO image_tx_daemon: frame seq=230 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:39,134 INFO image_tx_daemon: frame seq=233 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:39,196 INFO image_tx_daemon: LoRa cmd: PROBE seq=109 phase_ms=0 (rx#58)
+
+2026-07-27 00:51:40,693 INFO image_tx_daemon: frame seq=236 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:42,148 INFO image_tx_daemon: frame seq=239 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:42,200 INFO image_tx_daemon: LoRa cmd: PROBE seq=111 phase_ms=0 (rx#59)
+
+2026-07-27 00:51:43,591 INFO image_tx_daemon: frame seq=242 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:44,940 INFO image_tx_daemon: stats: goodput=2042.5 B/s util=83% pipeline=v3 frames_in=509 ok=169 fail=0 drop_full=335 drop_stale=0 frags_ok=2163 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:51:45,059 INFO image_tx_daemon: frame seq=245 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:45,205 INFO image_tx_daemon: LoRa cmd: PROBE seq=112 phase_ms=0 (rx#60)
+
+2026-07-27 00:51:46,586 INFO image_tx_daemon: frame seq=250 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:48,051 INFO image_tx_daemon: frame seq=251 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:49,556 INFO image_tx_daemon: frame seq=254 done (pipelined): 12 fragments ok
+
+2026-07-27 00:51:49,640 INFO image_tx_daemon: LoRa cmd: PROBE seq=114 phase_ms=0 (rx#61)
+
+2026-07-27 00:51:51,106 INFO image_tx_daemon: frame seq=0 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:52,571 INFO image_tx_daemon: frame seq=3 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:54,110 INFO image_tx_daemon: frame seq=7 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:54,267 INFO image_tx_daemon: LoRa cmd: PROBE seq=116 phase_ms=0 (rx#62)
+
+2026-07-27 00:51:54,951 INFO image_tx_daemon: stats: goodput=1978.9 B/s util=80% pipeline=v3 frames_in=529 ok=176 fail=0 drop_full=347 drop_stale=0 frags_ok=2247 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:51:55,648 INFO image_tx_daemon: frame seq=9 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:51:57,085 INFO image_tx_daemon: frame seq=13 done (pipelined): 13 fragments ok
+
+2026-07-27 00:51:57,158 INFO image_tx_daemon: LoRa cmd: PROBE seq=117 phase_ms=0 (rx#63)
+
+2026-07-27 00:51:58,560 INFO image_tx_daemon: frame seq=16 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:00,107 INFO image_tx_daemon: frame seq=19 done (pipelined): 13 fragments ok
+
+2026-07-27 00:52:00,255 INFO image_tx_daemon: LoRa cmd: PROBE seq=119 phase_ms=0 (rx#64)
+
+2026-07-27 00:52:01,657 INFO image_tx_daemon: frame seq=22 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:03,196 INFO image_tx_daemon: frame seq=25 done (pipelined): 13 fragments ok
+
+2026-07-27 00:52:04,711 INFO image_tx_daemon: frame seq=28 done (pipelined): 12 fragments ok
+
+2026-07-27 00:52:04,962 INFO image_tx_daemon: stats: goodput=1978.2 B/s util=80% pipeline=v3 frames_in=549 ok=183 fail=0 drop_full=361 drop_stale=0 frags_ok=2332 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:52:06,152 INFO image_tx_daemon: frame seq=31 done (pipelined): 12 fragments ok
+
+2026-07-27 00:52:06,236 INFO image_tx_daemon: LoRa cmd: PROBE seq=121 phase_ms=0 (rx#65)
+
+2026-07-27 00:52:07,711 INFO image_tx_daemon: frame seq=37 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:09,123 INFO image_tx_daemon: frame seq=38 done (pipelined): 12 fragments ok
+
+2026-07-27 00:52:09,217 INFO image_tx_daemon: LoRa cmd: PROBE seq=123 phase_ms=0 (rx#66)
+
+2026-07-27 00:52:10,619 INFO image_tx_daemon: frame seq=40 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:12,127 INFO image_tx_daemon: frame seq=43 done (pipelined): 12 fragments ok
+
+2026-07-27 00:52:12,208 INFO image_tx_daemon: LoRa cmd: PROBE seq=125 phase_ms=0 (rx#67)
+
+2026-07-27 00:52:13,557 INFO image_tx_daemon: frame seq=49 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:14,973 INFO image_tx_daemon: stats: goodput=2024.7 B/s util=82% pipeline=v3 frames_in=569 ok=189 fail=0 drop_full=374 drop_stale=0 frags_ok=2415 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:52:15,041 INFO image_tx_daemon: frame seq=50 done (pipelined): 13 fragments ok
+
+2026-07-27 00:52:15,093 INFO image_tx_daemon: LoRa cmd: PROBE seq=127 phase_ms=0 (rx#68)
+
+2026-07-27 00:52:16,484 INFO image_tx_daemon: frame seq=52 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:17,950 INFO image_tx_daemon: frame seq=54 done (pipelined): 13 fragments ok
+
+2026-07-27 00:52:18,098 INFO image_tx_daemon: LoRa cmd: PROBE seq=128 phase_ms=0 (rx#69)
+
+2026-07-27 00:52:19,489 INFO image_tx_daemon: frame seq=57 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:20,994 INFO image_tx_daemon: frame seq=60 done (pipelined): 12 fragments ok
+
+2026-07-27 00:52:21,089 INFO image_tx_daemon: LoRa cmd: PROBE seq=130 phase_ms=0 (rx#70)
+
+2026-07-27 00:52:22,442 INFO image_tx_daemon: frame seq=63 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:23,884 INFO image_tx_daemon: frame seq=69 done (pipelined): 12 fragments ok
+
+2026-07-27 00:52:24,984 INFO image_tx_daemon: stats: goodput=2042.7 B/s util=83% pipeline=v3 frames_in=589 ok=196 fail=0 drop_full=387 drop_stale=0 frags_ok=2501 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:52:25,319 INFO image_tx_daemon: frame seq=70 done (pipelined): 12 fragments ok
+
+2026-07-27 00:52:25,413 INFO image_tx_daemon: LoRa cmd: PROBE seq=132 phase_ms=0 (rx#71)
+
+2026-07-27 00:52:26,815 INFO image_tx_daemon: frame seq=72 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:28,430 INFO image_tx_daemon: frame seq=75 done (pipelined): 12 fragments ok
+
+2026-07-27 00:52:29,859 INFO image_tx_daemon: frame seq=81 done (pipelined): 12 fragments ok
+
+2026-07-27 00:52:31,333 INFO image_tx_daemon: frame seq=82 done (pipelined): 13 fragments ok
+
+2026-07-27 00:52:31,468 INFO image_tx_daemon: LoRa cmd: PROBE seq=135 phase_ms=0 (rx#72)
+
+2026-07-27 00:52:32,975 INFO image_tx_daemon: frame seq=84 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:33,031 INFO image_tx_daemon: LoRa cmd: PROBE seq=136 phase_ms=0 (rx#73)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:34,486 INFO image_tx_daemon: frame seq=87 done (pipelined): 13 fragments ok
+
+2026-07-27 00:52:34,995 INFO image_tx_daemon: stats: goodput=1964.8 B/s util=80% pipeline=v3 frames_in=609 ok=203 fail=0 drop_full=400 drop_stale=0 frags_ok=2584 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:52:35,939 INFO image_tx_daemon: frame seq=91 done (pipelined): 13 fragments ok
+
+2026-07-27 00:52:36,087 INFO image_tx_daemon: LoRa cmd: PROBE seq=137 phase_ms=0 (rx#74)
+
+2026-07-27 00:52:37,488 INFO image_tx_daemon: frame seq=93 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:38,993 INFO image_tx_daemon: frame seq=96 done (pipelined): 12 fragments ok
+
+2026-07-27 00:52:39,078 INFO image_tx_daemon: LoRa cmd: PROBE seq=138 phase_ms=0 (rx#75)
+
+2026-07-27 00:52:40,473 INFO image_tx_daemon: frame seq=99 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:41,968 INFO image_tx_daemon: frame seq=102 done (pipelined): 12 fragments ok
+
+2026-07-27 00:52:42,063 INFO image_tx_daemon: LoRa cmd: PROBE seq=139 phase_ms=0 (rx#76)
+
+2026-07-27 00:52:43,443 INFO image_tx_daemon: frame seq=105 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:44,899 INFO image_tx_daemon: frame seq=108 done (pipelined): 13 fragments ok
+
+2026-07-27 00:52:45,007 INFO image_tx_daemon: stats: goodput=2000.8 B/s util=81% pipeline=v3 frames_in=629 ok=210 fail=0 drop_full=414 drop_stale=0 frags_ok=2669 frags_fail=0 qdepth=3 parity_tx=0
+
+2026-07-27 00:52:46,447 INFO image_tx_daemon: frame seq=111 done (pipelined): 13 fragments ok
+
+2026-07-27 00:52:47,847 INFO image_tx_daemon: frame seq=114 done (pipelined): 13 fragments ok
+
+2026-07-27 00:52:49,301 INFO image_tx_daemon: frame seq=117 done (pipelined): 13 fragments ok
+
+2026-07-27 00:52:49,448 INFO image_tx_daemon: LoRa cmd: PROBE seq=142 phase_ms=0 (rx#77)
+
+2026-07-27 00:52:50,850 INFO image_tx_daemon: frame seq=123 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:52,346 INFO image_tx_daemon: frame seq=124 done (pipelined): 12 fragments ok
+
+2026-07-27 00:52:53,798 INFO image_tx_daemon: frame seq=126 done (pipelined): 12 fragments ok
+
+2026-07-27 00:52:53,882 INFO image_tx_daemon: LoRa cmd: PROBE seq=144 phase_ms=0 (rx#78)
+
+2026-07-27 00:52:55,018 INFO image_tx_daemon: stats: goodput=2044.9 B/s util=83% pipeline=v3 frames_in=649 ok=216 fail=0 drop_full=428 drop_stale=0 frags_ok=2755 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:52:55,284 INFO image_tx_daemon: frame seq=129 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:52:56,824 INFO image_tx_daemon: frame seq=135 done (pipelined): 13 fragments ok
+
+2026-07-27 00:52:58,383 INFO image_tx_daemon: frame seq=136 done (pipelined): 13 fragments ok
+
+2026-07-27 00:52:58,531 INFO image_tx_daemon: LoRa cmd: PROBE seq=146 phase_ms=0 (rx#79)
+
+2026-07-27 00:53:00,049 INFO image_tx_daemon: frame seq=138 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:53:01,564 INFO image_tx_daemon: frame seq=141 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:03,169 INFO image_tx_daemon: frame seq=145 done (pipelined): 12 fragments ok
+
+2026-07-27 00:53:04,641 INFO image_tx_daemon: frame seq=147 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:05,029 INFO image_tx_daemon: stats: goodput=1908.3 B/s util=78% pipeline=v3 frames_in=669 ok=223 fail=0 drop_full=441 drop_stale=0 frags_ok=2837 frags_fail=0 qdepth=3 parity_tx=0
+
+2026-07-27 00:53:06,118 INFO image_tx_daemon: frame seq=151 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:07,552 INFO image_tx_daemon: frame seq=154 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:09,017 INFO image_tx_daemon: frame seq=157 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:09,165 INFO image_tx_daemon: LoRa cmd: PROBE seq=148 phase_ms=0 (rx#80)
+
+2026-07-27 00:53:10,524 INFO image_tx_daemon: frame seq=159 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:53:11,956 INFO image_tx_daemon: frame seq=166 done (pipelined): 12 fragments ok
+
+2026-07-27 00:53:12,050 INFO image_tx_daemon: LoRa cmd: PROBE seq=150 phase_ms=0 (rx#81)
+
+2026-07-27 00:53:13,441 INFO image_tx_daemon: frame seq=167 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:53:15,000 INFO image_tx_daemon: frame seq=168 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:15,041 INFO image_tx_daemon: stats: goodput=2046.6 B/s util=83% pipeline=v3 frames_in=689 ok=230 fail=0 drop_full=454 drop_stale=0 frags_ok=2924 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:53:16,505 INFO image_tx_daemon: frame seq=171 done (pipelined): 12 fragments ok
+
+2026-07-27 00:53:16,590 INFO image_tx_daemon: LoRa cmd: PROBE seq=151 phase_ms=0 (rx#82)
+
+2026-07-27 00:53:18,054 INFO image_tx_daemon: frame seq=177 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:53:19,509 INFO image_tx_daemon: frame seq=178 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:20,962 INFO image_tx_daemon: frame seq=181 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:22,488 INFO image_tx_daemon: frame seq=186 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:22,551 INFO image_tx_daemon: LoRa cmd: PROBE seq=153 phase_ms=0 (rx#83)
+
+2026-07-27 00:53:23,956 INFO image_tx_daemon: frame seq=187 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:53:25,054 INFO image_tx_daemon: stats: goodput=2016.6 B/s util=82% pipeline=v3 frames_in=709 ok=236 fail=0 drop_full=467 drop_stale=0 frags_ok=3009 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:53:25,494 INFO image_tx_daemon: frame seq=189 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:26,999 INFO image_tx_daemon: frame seq=192 done (pipelined): 12 fragments ok
+
+2026-07-27 00:53:28,484 INFO image_tx_daemon: frame seq=195 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:29,979 INFO image_tx_daemon: frame seq=198 done (pipelined): 12 fragments ok
+
+2026-07-27 00:53:30,074 INFO image_tx_daemon: LoRa cmd: PROBE seq=154 phase_ms=0 (rx#84)
+
+2026-07-27 00:53:31,561 INFO image_tx_daemon: frame seq=201 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:53:33,016 INFO image_tx_daemon: frame seq=204 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:33,068 INFO image_tx_daemon: LoRa cmd: PROBE seq=156 phase_ms=0 (rx#85)
+
+2026-07-27 00:53:34,470 INFO image_tx_daemon: frame seq=208 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:53:35,070 INFO image_tx_daemon: stats: goodput=1974.4 B/s util=80% pipeline=v3 frames_in=729 ok=243 fail=0 drop_full=480 drop_stale=0 frags_ok=3093 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:53:36,008 INFO image_tx_daemon: frame seq=210 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:36,059 INFO image_tx_daemon: LoRa cmd: PROBE seq=158 phase_ms=0 (rx#86)
+
+2026-07-27 00:53:37,461 INFO image_tx_daemon: frame seq=213 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:53:39,009 INFO image_tx_daemon: frame seq=219 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:39,157 INFO image_tx_daemon: LoRa cmd: PROBE seq=160 phase_ms=0 (rx#87)
+
+2026-07-27 00:53:40,506 INFO image_tx_daemon: frame seq=220 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:53:41,959 INFO image_tx_daemon: frame seq=222 done (pipelined): 12 fragments ok
+
+2026-07-27 00:53:43,444 INFO image_tx_daemon: frame seq=225 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:43,592 INFO image_tx_daemon: LoRa cmd: PROBE seq=162 phase_ms=0 (rx#88)
+
+2026-07-27 00:53:45,081 INFO image_tx_daemon: stats: goodput=1999.1 B/s util=81% pipeline=v3 frames_in=750 ok=249 fail=0 drop_full=495 drop_stale=0 frags_ok=3177 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:53:45,100 INFO image_tx_daemon: frame seq=231 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:53:46,651 INFO image_tx_daemon: frame seq=232 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:46,714 INFO image_tx_daemon: LoRa cmd: PROBE seq=164 phase_ms=0 (rx#89)
+
+2026-07-27 00:53:48,113 INFO image_tx_daemon: frame seq=235 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:53:49,574 INFO image_tx_daemon: frame seq=241 done (pipelined): 12 fragments ok
+
+2026-07-27 00:53:51,048 INFO image_tx_daemon: frame seq=242 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:51,100 INFO image_tx_daemon: LoRa cmd: PROBE seq=166 phase_ms=0 (rx#90)
+
+2026-07-27 00:53:52,491 INFO image_tx_daemon: frame seq=244 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:53:53,958 INFO image_tx_daemon: frame seq=246 done (pipelined): 13 fragments ok
+
+2026-07-27 00:53:54,105 INFO image_tx_daemon: LoRa cmd: PROBE seq=167 phase_ms=0 (rx#91)
+
+2026-07-27 00:53:55,092 INFO image_tx_daemon: stats: goodput=2026.3 B/s util=82% pipeline=v3 frames_in=770 ok=256 fail=0 drop_full=508 drop_stale=0 frags_ok=3263 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:53:55,603 INFO image_tx_daemon: frame seq=249 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:53:57,108 INFO image_tx_daemon: frame seq=252 done (pipelined): 12 fragments ok
+
+2026-07-27 00:53:58,732 INFO image_tx_daemon: frame seq=0 done (pipelined): 12 fragments ok
+
+2026-07-27 00:54:00,203 INFO image_tx_daemon: frame seq=3 done (pipelined): 13 fragments ok
+
+2026-07-27 00:54:00,290 INFO image_tx_daemon: LoRa cmd: PROBE seq=169 phase_ms=0 (rx#92)
+
+2026-07-27 00:54:01,639 INFO image_tx_daemon: frame seq=6 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:54:03,113 INFO image_tx_daemon: frame seq=9 done (pipelined): 13 fragments ok
+
+2026-07-27 00:54:04,569 INFO image_tx_daemon: frame seq=12 done (pipelined): 13 fragments ok
+
+2026-07-27 00:54:04,621 INFO image_tx_daemon: LoRa cmd: PROBE seq=170 phase_ms=0 (rx#93)
+
+2026-07-27 00:54:05,103 INFO image_tx_daemon: stats: goodput=1964.3 B/s util=80% pipeline=v3 frames_in=790 ok=263 fail=0 drop_full=521 drop_stale=0 frags_ok=3346 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:54:06,012 INFO image_tx_daemon: frame seq=15 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:54:06,068 INFO image_tx_daemon: LoRa cmd: PROBE seq=171 phase_ms=0 (rx#94)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:54:07,480 INFO image_tx_daemon: frame seq=17 done (pipelined): 12 fragments ok
+
+2026-07-27 00:54:07,575 INFO image_tx_daemon: LoRa cmd: PROBE seq=172 phase_ms=0 (rx#95)
+
+2026-07-27 00:54:08,978 INFO image_tx_daemon: frame seq=21 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:54:10,505 INFO image_tx_daemon: frame seq=26 done (pipelined): 13 fragments ok
+
+2026-07-27 00:54:10,567 INFO image_tx_daemon: LoRa cmd: PROBE seq=173 phase_ms=0 (rx#96)
+
+2026-07-27 00:54:11,969 INFO image_tx_daemon: frame seq=27 done (pipelined): 13 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:54:13,626 INFO image_tx_daemon: frame seq=29 done (pipelined): 13 fragments ok
+
+2026-07-27 00:54:13,666 INFO image_tx_daemon: LoRa cmd: PROBE seq=175 phase_ms=0 (rx#97)
+
+2026-07-27 00:54:15,015 INFO image_tx_daemon: frame seq=32 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:54:15,119 INFO image_tx_daemon: stats: goodput=1998.6 B/s util=81% pipeline=v3 frames_in=810 ok=270 fail=0 drop_full=534 drop_stale=0 frags_ok=3431 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-27 00:54:16,467 INFO image_tx_daemon: frame seq=36 done (pipelined): 12 fragments ok
+
+2026-07-27 00:54:16,548 INFO image_tx_daemon: LoRa cmd: PROBE seq=176 phase_ms=0 (rx#98)
+
+2026-07-27 00:54:17,897 INFO image_tx_daemon: frame seq=38 done (pipelined): 12 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=11584 legal_dwell_used_us_10s=0
+
+2026-07-27 00:54:19,373 INFO image_tx_daemon: frame seq=41 done (pipelined): 13 fragments ok
+
+2026-07-27 00:54:19,433 INFO image_tx_daemon: LoRa cmd: PROBE seq=178 phase_ms=0 (rx#99)
+

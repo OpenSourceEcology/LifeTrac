@@ -378,6 +378,23 @@ may be delivery probability, which run 2 below measures.
   retracted 171/1). Harness gained `-AlignedPump / -ReactiveFire /
   -ProbePhaseSweepMs`, all recorded in `params.txt`.
 
+> **BENCH SESSION 2026-07-29 — runs 1 and 2 DONE.** Results:
+> [`bench-evidence/RS_0_12_phase_sweep_2026-07-29/RESULTS.md`](bench-evidence/RS_0_12_phase_sweep_2026-07-29/RESULTS.md).
+> Six runs, tractor-side ground truth. Settled: **pipeline v3 is the entire
+> Run-J regression** (a *harness default*, not a code change — default now
+> flipped); **frame size is irrelevant on v3**, so keep 3000 B (best delivery
+> AND best goodput, ~2000 B/s at 56% delivery, pooled n=239);
+> **the armed window is real, at frame completion, ~60–80 ms wide**;
+> **frame size buys no delivery**, so ditto is airtime-only and the
+> **envelope is GCM-128** (supersedes RS-8.6's D13). Opportunistic delivery
+> caps ~56% — proves the window, insufficient for a control plane, which is
+> the case FOR the firmware slot. New finding: **echo RTT is dominated by
+> train length** (1482 ms at 3000 B vs 245 ms at 250 B), so ack-gated
+> commands pay a full train — argues for one-way actuation + deadman.
+> Run 3 (encode-to-fit) NOT done: the bench feeds pre-built frames straight
+> to image_tx_daemon, so `camera_service` is not in the loop — needs the
+> real-camera path (RS-3.3).
+
 **Tomorrow's ordered bench plan (see CONTROL_PLANE_DESIGN.md §8):**
 
 - [ ] **1. Run-J bisection (cheapest, first).** Recover the 58% alignment:
