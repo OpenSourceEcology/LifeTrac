@@ -302,14 +302,17 @@ for every run below shipped tonight.
    whichever restores delivery identifies what broke Run J.~~
    **DONE 2026-07-29 — and the hypothesis was WRONG.** Neither
    `parity_group`, `TX_PREPARE_AHEAD` nor `train_gap_ms` was responsible;
-   all three were off in both the 53% run and the 15% run. The real causes:
-   **pipeline v3 vs v2 (+38 points)** — Run J used v3 and every run since
-   defaulted to v2 because that is the *harness* default
-   (`run_live_radio_monitor.ps1:24`), a test-fixture regression no code diff
-   could reveal — and **frame size (+15 points)**, 250 B giving ~10× more
-   train boundaries than 3000 B. Both nearly free in goodput (1722–1886 B/s).
-   **Consequence: pass `-TxPipeline v3` explicitly in every future run, and
-   change the harness default.**
+   all three were off in both the 53% run and the 15% run. The full 2×2 shows
+   **pipeline v3 vs v2 is the ENTIRE effect**: +57 points at 3000 B (0%→57%),
+   +38 at 250 B (15%→53%). Run J used v3; every run since defaulted to v2
+   because that is the *harness* default (`run_live_radio_monitor.ps1:24`) —
+   a test-fixture regression no code diff could reveal. **Frame size has no
+   effect on v3** (57% vs 53%, overlapping CIs); it only appeared to matter on
+   v2, where small frames partially compensated for v2's broken RX arming.
+   **Consequences: (a) harness default flipped to v3; (b) KEEP 3000 B frames —
+   they give the best delivery AND the best goodput (2005 B/s, near the 2046
+   record), so the "shorten trains for more boundaries" lever in §4 is
+   unnecessary.**
 2. **Reactive-fire delivery + phase×size sweep (RS-0.12) — the decisive run.**
    `-ReactiveFire 1 -ProbePhaseSweepMs "0,20,40,60,80,100,120" -ProbeSizesB "23,38"`.
    The base fires a no-op PROBE at each fragment-RX-complete; the tractor

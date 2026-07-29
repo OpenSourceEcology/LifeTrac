@@ -11,12 +11,29 @@ built that way after the 171/1 retraction.
 
 ## 1. Headline results
 
-| # | Pipeline | Frame | fps | Probe delivery (tractor-side) | Goodput |
+Full 2×2 (pipeline × frame size), with 95% CIs:
+
+| # | Pipeline | Frame | Probe delivery (tractor-side) | 95% CI | Goodput |
 |---|---|---|---|---|---|
-| B1 | **v2** | 3000 B | 2 | **0%** (0/86) | 1886 B/s @ 77% |
-| B3 | **v2** | 250 B | 20 | **15%** (29/196) | 1722 B/s @ 72% |
-| B2 | **v3** | 250 B | 20 | **53%** (132/248) | 1754 B/s @ 74% |
-| Sweep | v3 | 250 B | 20 | 17% aggregate across 14 phase×size bins | 1803 B/s @ 75% |
+| B1 | **v2** | 3000 B | **0%** (0/86) | [0, 0] | 1886 B/s @ 77% |
+| B3 | **v2** | 250 B | **15%** (29/196) | [9.8, 19.8] | 1722 B/s @ 72% |
+| B2 | **v3** | 250 B | **53%** (132/248) | [47.0, 59.4] | 1754 B/s @ 74% |
+| **B4** | **v3** | **3000 B** | **57%** (35/61) | [45.0, 69.8] | **2005 B/s @ 79%** |
+| Sweep | v3 | 250 B | 17% aggregate over 14 phase×size bins | — | 1803 B/s @ 75% |
+
+**PIPELINE IS THE WHOLE STORY. Frame size does not matter on v3.**
+B4's and B2's confidence intervals overlap heavily (45–70 vs 47–59) — they are
+statistically indistinguishable — while both sit far outside v2's. The
+frame-size effect seen on v2 (0% → 15%) was small frames *partially
+compensating* for v2's broken RX arming, not a property of the link. On v3 it
+buys nothing, **and large frames deliver 14% more goodput** (2005 vs
+1754 B/s), close to the project record 2046 B/s while simultaneously carrying
+57% command delivery.
+
+**Design consequence: the "shorten trains for more boundaries" lever is
+UNNECESSARY.** Keep 3000 B frames. (The *separate* loss-survival argument for
+single-fragment frames — 95.7% vs 56.5% at 4.3% fragment loss — is untouched
+by this and still stands on its own merits.)
 
 **Measured RTT (base→tractor→base):** median 245–281 ms, p95 367–503 ms.
 First single-clock round-trip figure the project has under load.
@@ -31,19 +48,22 @@ and TODO RS-0.14 both said the RS-3.10 change set (`parity_group`,
 three knobs were **off in both B2 (53%) and B3 (15%)**, which differ only in
 pipeline. Two causes, both isolated:
 
-- **Pipeline v3 vs v2 — the dominant factor, +38 points** (53% vs 15% at
-  identical frame size). v3 is the path with mid-burst RX dispatch and an
-  end-of-train RXCONT re-arm. Run J used v3; every run since defaulted to v2
-  **because that is the harness default** (`run_live_radio_monitor.ps1:24`,
-  `[string]$TxPipeline = "v2"`) and no run passed `-TxPipeline`. The
-  regression was a *test-harness default*, not a code change — which is why
-  reading the diffs never found it.
-- **Frame size — +15 points** (15% vs 0%, same pipeline). 250 B frames give
-  ~10× more train boundaries than 3000 B, and boundaries are the only armed
-  windows. Independent on-air confirmation of the "shorten trains" lever.
+- **Pipeline v3 vs v2 — this is the entire effect.** +57 points at 3000 B
+  (0% → 57%) and +38 points at 250 B (15% → 53%). v3 is the path with
+  mid-burst RX dispatch and an end-of-train RXCONT re-arm. Run J used v3;
+  every run since defaulted to v2 **because that is the harness default**
+  (`run_live_radio_monitor.ps1:24`, `[string]$TxPipeline = "v2"`) and no run
+  passed `-TxPipeline`. The regression was a *test-harness default*, not a
+  code change — which is why reading the diffs never found it. `params.txt`
+  did record it, which is how it was eventually caught: evidence discipline
+  paid for itself.
+- **Frame size — NO effect on v3** (57% @ 3000 B vs 53% @ 250 B, CIs overlap).
+  It appeared to matter on v2 only (0% → 15%) because small frames partially
+  compensate for v2's broken RX arming. *Initially reported as "+15 points"
+  before B4 completed the 2×2; corrected here.*
 
-Both are nearly free: goodput spans 1722–1886 B/s (<9%) while delivery spans
-0→53%.
+Delivery spans 0→57% while goodput spans 1722–2005 B/s, and the **best
+delivery coincides with the best goodput** (v3 + 3000 B).
 
 ---
 
