@@ -21,7 +21,13 @@ param(
     [int]$SynthBudgetB    = 250,
     # LIFETRAC_TX_PIPELINE for the TX daemon: 'v2' serial, 'v3' pipelined
     # (depth-2 firmware mailbox).
-    [string]$TxPipeline   = "v2",
+    # 2026-07-29: default flipped v2 -> v3 after the RS-0.13b bisection. The
+    # v2 default silently changed the code path under test across ~30 runs and
+    # cost 38 POINTS of in-stream command delivery (v3 53% vs v2 15% at
+    # identical frame size) — a test-fixture regression no code diff could
+    # reveal. v3 is the pipelined path with mid-burst RX dispatch and an
+    # end-of-train RXCONT re-arm; it is what Run J actually used.
+    [string]$TxPipeline   = "v3",
     # RS-2.3 (2026-07-25): outstanding TX_FRAME_REQs the v3 daemon keeps in
     # flight. The new firmware TX ring holds 1 transmitting + 4 parked, so
     # <=4 never NAKs. Keep <=3 at FHSS (P0 latency math, RS-9.7); 4 = DTS.

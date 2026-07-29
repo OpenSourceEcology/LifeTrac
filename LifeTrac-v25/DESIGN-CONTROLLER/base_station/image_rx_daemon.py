@@ -722,7 +722,15 @@ class ImageRxDaemon:
             # delivery signal the contaminated keyframe-ack never was.
             seq = int.from_bytes(args[0:4], "little") if len(args) >= 4 else 0
             t0 = self._probe_pending.pop(seq, None)
-            self._probe_echo_rx += 1
+            # Count UNIQUE probes echoed, not echo frames received: the
+            # tractor's queued echo is radiated by _send_command_frame with
+            # its default copies=2, so raw arrivals double-count and the
+            # headline rate reads ~2x (observed 105.8% on 2026-07-29 run
+            # B2). The pop above makes the first arrival the only one that
+            # counts; duplicates fall through to the "unmatched" log. The
+            # per-(phase,size) grid was already pop-keyed and unaffected.
+            if t0 is not None:
+                self._probe_echo_rx += 1
             _bin = self._probe_bins.pop(seq, None)
             if _bin is not None:
                 st = self._probe_stats.setdefault(_bin, [0, 0])

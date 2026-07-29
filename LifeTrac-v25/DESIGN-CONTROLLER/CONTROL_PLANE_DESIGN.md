@@ -13,10 +13,18 @@ the repo's own PHY model (`base_station/lora_proto.py:505` `lora_time_on_air_ms`
 and validated against the measured 2046 B/s / 82.8% baseline, or read from
 code at the cited `file:line`.
 
-> **Everything below is a DESIGN. Nothing here is air-verified.** The one
-> measurement that gates the whole thing is the RS-0.12 reactive-fire /
-> phase-sweep run (§8). The code shipped tonight is the instrumentation for
-> that run plus the encode-to-fit increment, both bench-testable without radios.
+> **MEASURED 2026-07-29 — results in
+> [`bench-evidence/RS_0_12_phase_sweep_2026-07-29/RESULTS.md`](bench-evidence/RS_0_12_phase_sweep_2026-07-29/RESULTS.md).**
+> The gating RS-0.12 run is done. Headlines, all tractor-side ground truth:
+> the armed window **exists**, sits at frame completion, is **~60–80 ms wide**
+> (far wider than the 8–10 ms guard this design assumed), and decays
+> monotonically with offset. Opportunistic delivery **caps at ~53%** —
+> enough to prove the window, not enough for a control plane, which is
+> exactly the case for the firmware slot. **Frame size does not affect
+> delivery** (23 B 15.1% vs 38 B 15.8%), which settles the envelope question
+> in favour of GCM-128 and demotes ditto to an airtime-only optimization.
+> Two things below are now retracted by measurement and marked inline:
+> the RS-3.10 bisection hypothesis (§8) and D13's preference (§6).
 
 ---
 
@@ -260,9 +268,15 @@ image goodput vs bare, D13 ~3.9%. This reopens the choice:
 - **But** D13's implicit nonce makes RS-8.3 `boot_ctr` a hard blocker and forces
   an atomic three-tree handheld cutover; GCM-128 sidesteps both.
 
-**Decision deferred to the measured slot geometry.** Settle after §8. Either way:
-no actuation opcode goes on the link without AEAD + replay windows + `boot_ctr`
-closed first (a forged 0xFB `RADIO_PROFILE_ACK` already retunes the base PHY).
+**SETTLED 2026-07-29 — GCM-128.** The sweep measured frame size to have **no
+effect on delivery** (23 B 15.1% vs 38 B 15.8%, +0.7 points, inside noise and
+favouring the *larger* frame). Since bytes buy no reliability, the choice
+reverts to compatibility, and GCM-128 is byte-for-byte the shape
+`tractor_h7.ino:1106` already decrypts — no `boot_ctr` blocker, no atomic
+three-tree handheld cutover. **This supersedes RS-8.6's D13 preference.**
+Either way: no actuation opcode goes on the link without AEAD + replay windows
++ `boot_ctr` closed first (a forged 0xFB `RADIO_PROFILE_ACK` already retunes
+the base PHY).
 
 ---
 
@@ -284,11 +298,18 @@ closed first (a forged 0xFB `RADIO_PROFILE_ACK` already retunes the base PHY).
 All runs DTS BW500 unless noted. Boards + serials per the bench memory. The code
 for every run below shipped tonight.
 
-1. **Run-J bisection (RS-0.13b) — cheapest, highest value, do first.** Recover
-   the 58% alignment. Toggle ONE knob per run against tractor-side `LoRa cmd:`
-   truth: `-AlignedPump 0/1`, `-TxBatch 0/1`, `-TxPrepareAhead 0/1`,
-   `-ParityGroup 0/4`. Four short runs. Whichever restores in-stream delivery
-   tells us which RS-3.10 change broke it.
+1. ~~**Run-J bisection (RS-0.13b).** Toggle one RS-3.10 knob per run;
+   whichever restores delivery identifies what broke Run J.~~
+   **DONE 2026-07-29 — and the hypothesis was WRONG.** Neither
+   `parity_group`, `TX_PREPARE_AHEAD` nor `train_gap_ms` was responsible;
+   all three were off in both the 53% run and the 15% run. The real causes:
+   **pipeline v3 vs v2 (+38 points)** — Run J used v3 and every run since
+   defaulted to v2 because that is the *harness* default
+   (`run_live_radio_monitor.ps1:24`), a test-fixture regression no code diff
+   could reveal — and **frame size (+15 points)**, 250 B giving ~10× more
+   train boundaries than 3000 B. Both nearly free in goodput (1722–1886 B/s).
+   **Consequence: pass `-TxPipeline v3` explicitly in every future run, and
+   change the harness default.**
 2. **Reactive-fire delivery + phase×size sweep (RS-0.12) — the decisive run.**
    `-ReactiveFire 1 -ProbePhaseSweepMs "0,20,40,60,80,100,120" -ProbeSizesB "23,38"`.
    The base fires a no-op PROBE at each fragment-RX-complete; the tractor
