@@ -80,7 +80,11 @@ from lora_proto import (  # noqa: E402
     CMD_OP_PROBE_ECHO,
 )
 from image_pipeline.frame_format import encode_tile_delta_frame  # noqa: E402
-from image_pipeline.reassemble import FragmentReassembler         # noqa: E402
+from image_pipeline.reassemble import (                           # noqa: E402
+    FRAGMENT_MAGIC,
+    FRAGMENT_MAGIC_V2,
+    FragmentReassembler,
+)
 from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     HostLink,
     HOST_TYPE_VER_REQ,
@@ -1108,6 +1112,32 @@ class ImageRxDaemon:
                 # delta minus the median fragment's ToA IS the per-fragment
                 # dead time we are hunting; deltas >5 s are stream pauses,
                 # not gaps, and are discarded.
+                # 2026-07-29 RS-11.1: parse the fragment header so each gap can
+                # be ATTRIBUTED. Without this the air_gap histogram cannot tell
+                # a train boundary from a lost fragment — one loss makes the
+                # next delta ~2x ToA (~200 ms), landing in the same bucket as a
+                # real boundary. At the measured ~3.4% loss that is ~60
+                # contaminating samples per run, so every boundary size derived
+                # from the old histogram was an upper bound, not a measurement.
+                #
+                # Layout per image_pipeline/reassemble.py: raw[0]=magic,
+                # [1]=frag_seq, [2]=frag_idx, [3]=total_minus1. Parity frames
+                # (magic 0xFC) reuse [2]/[3] as group_start/group_len, so they
+                # are deliberately excluded rather than misread as indices.
+                frag_seq = frag_idx = frag_total = None
+                if len(data) >= 4 and data[0] in (
+                        FRAGMENT_MAGIC, FRAGMENT_MAGIC_V2):
+                    frag_seq = data[1]
+                    frag_idx = data[2]
+                    frag_total = data[3] + 1
+                    if frag_idx >= frag_total:
+                        # Same guard the reassembler applies; don't let a
+                        # corrupt header poison the loss statistics.
+                        frag_seq = frag_idx = frag_total = None
+
+                if frag_idx is not None:
+                    self._note_frag_arrival(frag_seq, frag_idx, frag_total)
+
                 ts = parsed.get("timestamp_us")
                 if ts is not None:
                     prev = getattr(self, "_gap_prev_ts", None)
@@ -1117,7 +1147,13 @@ class ImageRxDaemon:
                         if 0 < d < 5_000_000:
                             if not hasattr(self, "_gap_samples"):
                                 self._gap_samples = []
-                            self._gap_samples.append((d, len(data)))
+                            # gap_class is what makes the histogram readable:
+                            # "seq" = contiguous within one frame (the true
+                            # inter-fragment dead air), "boundary" = frame
+                            # changed, "post_loss" = index jumped, so this gap
+                            # spans one or more fragments that never arrived.
+                            self._gap_samples.append(
+                                (d, len(data), self._last_gap_class))
 
                 saw_rx = True
                 with self._lock:
@@ -1251,6 +1287,81 @@ class ImageRxDaemon:
 
         LOG.info("RX worker exit")
 
+    # 2026-07-29 RS-11.1 loss attribution. Set by _note_frag_arrival() and
+    # read at the gap-sample site; "seq" until the first fragment classifies.
+    _last_gap_class = "seq"
+
+    def _note_frag_arrival(self, frag_seq: int, frag_idx: int,
+                           frag_total: int) -> None:
+        """Classify this fragment's arrival against the previous one.
+
+        Answers two questions the old instrumentation could not:
+
+        1. Is an oversized inter-arrival gap a train boundary or a lost
+           fragment? Both look identical in a duration histogram.
+        2. Does the ~3.5% loss floor cluster at fragment index 0 — the
+           RXCONT re-arm-gap hypothesis behind firmware item F4 — or is it
+           spread uniformly? F4 is gated on this answer (TODO RS-10.1);
+           spending a firmware cycle on preamble length against an assumed
+           mechanism is exactly what this exists to prevent.
+
+        LoRa delivery here is in-order within a frame, so an index that skips
+        forward means the intervening fragments never arrived. Fragments that
+        arrive out of order would be misread as loss-then-duplicate; the
+        reassembler's own dedup is the authority on what was really lost, so
+        treat these counters as a *distribution* hint, not a delivery total.
+        """
+        prev = getattr(self, "_frag_prev", None)
+        self._frag_prev = (frag_seq, frag_idx, frag_total)
+
+        if not hasattr(self, "_lost_idx_hist"):
+            self._lost_idx_hist: "dict[int, int]" = {}
+            self._frag_idx_seen: "dict[int, int]" = {}
+            self._gap_class_us: "dict[str, list[int]]" = {
+                "seq": [], "boundary": [], "post_loss": []}
+            self._frames_observed = 0
+
+        self._frag_idx_seen[frag_idx] = self._frag_idx_seen.get(frag_idx, 0) + 1
+
+        if prev is None:
+            self._last_gap_class = "seq"
+            return
+
+        prev_seq, prev_idx, _prev_total = prev
+        if frag_seq != prev_seq:
+            # New frame. The gap that just elapsed spans the train boundary,
+            # which is where the reverse-slot listening window lives.
+            self._frames_observed += 1
+            if frag_idx > 0:
+                # The new frame's FIRST fragments never arrived. This case is
+                # the whole reason F4 exists — if the receiver is still
+                # re-arming RXCONT when a train starts, index 0 is exactly what
+                # it misses. An earlier version of this classifier returned
+                # here on any seq change and so was structurally blind to the
+                # one measurement it was built to make.
+                for missing in range(0, frag_idx):
+                    self._lost_idx_hist[missing] = (
+                        self._lost_idx_hist.get(missing, 0) + 1)
+                self._last_gap_class = "post_loss"
+            else:
+                self._last_gap_class = "boundary"
+            return
+
+        step = frag_idx - prev_idx
+        if step == 1:
+            self._last_gap_class = "seq"
+        elif step > 1:
+            # Indices (prev_idx, frag_idx) exclusive never arrived.
+            for missing in range(prev_idx + 1, frag_idx):
+                self._lost_idx_hist[missing] = (
+                    self._lost_idx_hist.get(missing, 0) + 1)
+            self._last_gap_class = "post_loss"
+        else:
+            # step <= 0: a duplicate or a reordered copy. Not a loss, and not
+            # representative dead air either — classify as boundary-ish so it
+            # cannot masquerade as clean inter-fragment spacing.
+            self._last_gap_class = "boundary"
+
     def _maybe_fire_probe(self, link: HostLink) -> None:
         now = time.monotonic()
         if now - self._last_probe_t < self._probe_min_gap_s:
@@ -1342,6 +1453,54 @@ class ImageRxDaemon:
                 hist = " ".join(f"{lab}:{cnt}" for lab, cnt in
                                 zip(labels, buckets) if cnt)
                 LOG.info("air_gap_hist(ms): %s", hist)
+
+                # 2026-07-29 RS-11.1: the same gaps, split by what actually
+                # caused them. The aggregate histogram above is bimodal and its
+                # upper mode mixes train boundaries with post-loss gaps, so
+                # neither could be sized. Per-class medians separate them.
+                by_class: "dict[str, list[int]]" = {}
+                for smp in samples:
+                    cls = smp[2] if len(smp) > 2 else "seq"
+                    by_class.setdefault(cls, []).append(smp[0])
+                parts = []
+                for cls in ("seq", "boundary", "post_loss"):
+                    vals = sorted(by_class.get(cls, ()))
+                    if not vals:
+                        continue
+                    parts.append(
+                        f"{cls}: n={len(vals)} med={vals[len(vals) // 2] / 1000.0:.1f}ms")
+                if parts:
+                    LOG.info("air_gap_by_class: %s", " | ".join(parts))
+
+            # 2026-07-29 RS-11.1: WHICH fragment indices go missing. This is
+            # the gate on firmware F4 (settable preamble) per TODO RS-10.1: if
+            # loss clusters at index 0 the RXCONT re-arm gap is the mechanism
+            # and a longer preamble targets it; if it is uniform, preamble is
+            # the wrong lever and the firmware cycle should not be spent.
+            lost = getattr(self, "_lost_idx_hist", None)
+            if lost:
+                seen = getattr(self, "_frag_idx_seen", {})
+                total_lost = sum(lost.values())
+                idx0 = lost.get(0, 0)
+                # Normalise: index k only has an opportunity to go missing on
+                # frames that reach k fragments, so compare RATES, not counts.
+                opp0 = seen.get(0, 0) + idx0
+                rest_lost = total_lost - idx0
+                rest_opp = sum(v for k, v in seen.items() if k) + rest_lost
+                r0 = (100.0 * idx0 / opp0) if opp0 else 0.0
+                rr = (100.0 * rest_lost / rest_opp) if rest_opp else 0.0
+                top = " ".join(
+                    f"{k}:{v}" for k, v in
+                    sorted(lost.items(), key=lambda kv: -kv[1])[:8])
+                LOG.info(
+                    "lost_frag_idx: n=%d idx0=%d (%.2f%% of idx0 arrivals) "
+                    "other=%d (%.2f%%) verdict=%s | top %s",
+                    total_lost, idx0, r0, rest_lost, rr,
+                    "CLUSTERED-AT-0" if (opp0 and rest_opp and r0 > 2.0 * rr)
+                    else "not-clustered",
+                    top)
+                self._lost_idx_hist = {}
+                self._frag_idx_seen = {}
             # RS-0.12 probe delivery summary (reactive-fire runs only).
             if self._reactive_fire and self._probe_tx:
                 rtts = sorted(self._probe_rtts)
