@@ -1186,6 +1186,29 @@ No-regrets work, correct under every surviving architecture (do first):
     decided by the 53 test files that mutate `sys.path`. It is an
     order-dependent failure, not a logic defect — do not "fix" the assertion.
 
+- [ ] **RS-5.8 The L072 flash size budget has never actually been enforced.**
+  `tools/check_size_budget.py` (added `e599269b`, 2026-05-05) is run by the
+  "L072 cross-compile" CI job after `arm-none-eabi-size`, and that job has been
+  **red for months** — so the guard against overflowing the 192 KB part has
+  been decorative. Two independent bugs:
+  1. **FIXED 2026-07-29** — macro values carrying a trailing C comment reached
+     `ast.parse()` verbatim: `#define MM_FLASH_SIZE (192 * 1024) /* 0x30000 */`
+     (`include/memory_map.h:30`, unchanged since 2026-05-10) produced
+     `SyntaxError: invalid syntax`. Now stripped by `strip_c_comments()`.
+  2. **OPEN — schema drift.** The script evaluates `MM_BOOT_BASE` and
+     `MM_BOOT_SIZE`, and **neither exists in `memory_map.h` any more**; the
+     unified flash-layout remediation removed the separate BOOT region. Present
+     today: `MM_FLASH_BASE/SIZE/END`, `MM_APP_BASE/SIZE`, `MM_CFG_BASE`,
+     `MM_RAM_*`, `MM_STACK_SIZE`. Note `MM_APP_SIZE == MM_FLASH_SIZE` (192 KB)
+     while the Makefile's own banner still prints "BOOT = 4 KB / APP = 180 KB /
+     CFG = 8 KB", so the two disagree about the layout as well.
+  This needs a decision, not a mechanical patch: what should the budget assert
+  under a unified layout — app-vs-CFG-base headroom, or total-vs-flash? Pick it
+  deliberately, then reconcile the Makefile banner to match so there is one
+  source of truth. Until then treat firmware size as unguarded and check it by
+  eye (`mingw32-make all` prints Total; it was 37890 → 38326 bytes on
+  2026-07-29 with the ERP + FHSS-seed fixes).
+
 ### RS-6 — Keyframe elimination (K-phases, now LoRa-only)
 
 > Per the 2026-07-25 architecture rule (**base→tractor strictly over LoRa**),
