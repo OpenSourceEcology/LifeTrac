@@ -194,6 +194,30 @@ _PROFILE_TO_PHY = {0: PHY_IMAGE_BW250, 1: PHY_IMAGE_BW250, 2: PHY_IMAGE_BW500}
 # host, is the binding constraint.
 _PROFILE_TO_BUDGET_US = {0: 380_000, 1: 860_000, 2: 930_000}
 
+
+def _budget_for(profile: int) -> int:
+    """Host airtime budget for a profile, with a diagnostic override.
+
+    2026-07-30 (RS-11.4): this pacer is the prime suspect for the reproducible
+    fragment-index-10 loss notch. `admit()` blocks until the fragment fits a
+    ROLLING 1.0 s window, and at DTS the numbers land exactly on the
+    observation: 930_000 / 99_904 us-per-fragment = 9.309, so at most 9
+    fragments fit a fresh window, and with PIPELINE_DEPTH=2 the first refusal
+    falls on index floor(930000/99904) + 2 - 1 = 10.
+
+    It also explains the idle dependency, which nothing else did: the window is
+    ROLLING over 1.0 s, so it only drains fully when the gap between trains
+    exceeds 1 s. Measured — notch present at 1.14 s and 1.97 s idle, absent at
+    0.64 s and when saturated.
+
+    Overridable so the trip point can be MOVED and the notch observed to move
+    with it, which is the confirmation that matters. Changing the budget is a
+    regulatory-adjacent knob: it paces our own duty cycle, so a bench override
+    must never be shipped as a default.
+    """
+    base = _PROFILE_TO_BUDGET_US.get(profile, 380_000)
+    return _env_int("LIFETRAC_AIRTIME_BUDGET_US", base, lo=50_000, hi=1_000_000)
+
 # LIFETRAC_TX_PIPELINE: 'v2' (default) = serial send->TX_DONE->send;
 # 'v3' = keep 2 TX_FRAME_REQs in flight against the firmware's depth-2
 # mailbox (host_cmd.c s_tx_pending) so the UART turnaround rides inside
@@ -371,7 +395,7 @@ class ImageTxDaemon:
         # (DTS BW500 -> 930 ms/s, 20 ms under the firmware's 950 ms cap).
         _prof = _env_int("LIFETRAC_REG_PROFILE", 0, lo=0, hi=2)
         self.budget = AirtimeBudget(
-            budget_us=_PROFILE_TO_BUDGET_US.get(_prof, 380_000))
+            budget_us=_budget_for(_prof))
         # 2026-07-25 radio-profile selector state.
         self._pending_profile: int | None = None
         self._active_profile = _prof
@@ -852,7 +876,7 @@ class ImageTxDaemon:
                 verify_modem_matches_profile(
                     link, _PROFILE_TO_PHY.get(profile, PHY_IMAGE_BW250))
             self.budget = AirtimeBudget(
-                budget_us=_PROFILE_TO_BUDGET_US.get(profile, 380_000))
+                budget_us=_budget_for(profile))
             self._active_profile = profile
             self._publish_link_budget(profile)
             return True

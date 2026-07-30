@@ -1,4 +1,4 @@
-﻿#requires -Version 5.1
+#requires -Version 5.1
 <#
 .SYNOPSIS
     Live LoRa Radio Transmission Monitor & Speed Benchmark.
@@ -96,6 +96,12 @@ param(
     # these have no effect at profiles 0/2.
     [string]$FhssFarmId   = "0",
     [string]$FhssLinkId   = "0",
+    # 2026-07-30 RS-11.4: override the tractor's host airtime pacer
+    # (_PROFILE_TO_BUDGET_US, default 930000 us at DTS over a rolling 1.0 s
+    # window). Diagnostic only -- this paces our own duty cycle, so never ship
+    # a non-zero value as a default. 0 = leave the profile default alone.
+    # First blocked fragment index = floor(budget/99904) + TxPipelineDepth - 1.
+    [int]$AirtimeBudgetUs = 0,
     # Archive final logs + parameters under bench-evidence/ with the git
     # SHA in the folder name (evidence discipline per CODE REVIEWS docs).
     [switch]$Archive
@@ -110,6 +116,7 @@ if ($RegProfile -eq 1) { $profEnv = "$profEnv -e LIFETRAC_FHSS_WIDE_MASK=1" }
 # FHSS seed — same value to both daemons by construction (see the
 # FhssLinkId param comment for why that matters).
 $profEnv = "$profEnv -e LIFETRAC_FHSS_FARM_ID=$FhssFarmId -e LIFETRAC_FHSS_LINK_ID=$FhssLinkId"
+if ($AirtimeBudgetUs -gt 0) { $profEnv = "$profEnv -e LIFETRAC_AIRTIME_BUDGET_US=$AirtimeBudgetUs" }
 
 # Resolve adb dynamically (the winget package dir name varies per
 # machine/source); fall back to the historical hardcoded path.
@@ -345,6 +352,7 @@ if ($Archive) {
         "probe_echo=$ProbeEcho",
         "fhss_farm_id=$FhssFarmId",
         "fhss_link_id=$FhssLinkId",
+        "airtime_budget_us=$AirtimeBudgetUs",
         "tx_feed=$TxFeed",
         "reg_profile=$RegProfile",
         "tx_serial=$TxAdbSerial",

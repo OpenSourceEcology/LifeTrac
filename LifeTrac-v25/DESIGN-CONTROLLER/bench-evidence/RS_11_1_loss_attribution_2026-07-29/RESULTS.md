@@ -255,3 +255,99 @@ calm, i.e. precisely when an operator is most likely to trust it.
 
 Next: identify the mechanism (code analysis in flight), then confirm by moving
 the trip point rather than by removing the symptom.
+
+
+---
+
+# G-series: the notch mechanism identified — our own host airtime pacer
+
+## The mechanism
+
+`AirtimeBudget.admit()` in `firmware/tractor_x8/image_tx_daemon.py:265` is a
+**blocking** gate: it spins in `stop.wait()` until a fragment's estimated
+time-on-air fits a **rolling 1.0 s window** (`window_s = 1.0`, `:256`). The DTS
+budget is **930_000 us** (`_PROFILE_TO_BUDGET_US[2]`, `:195`).
+
+Per-fragment ToA at SF7/BW500/CR4-5, 255 B on air, is **99_904 us** — which
+matches the measured 104.9 ms inter-fragment spacing minus the 5.0 ms dead air
+bit-for-bit, so this is arithmetic rather than estimation.
+
+930_000 / 99_904 = **9.309**, so at most 9 fragments fit a freshly-drained
+window and the ~10th is refused. This is not RF loss at all: it is the tractor
+pacing itself, opening a dead-air hole mid-train.
+
+## Why it explains the idle dependency, which nothing else did
+
+The window is **rolling over 1.0 s**, so it only drains completely when the gap
+between trains exceeds one second:
+
+| fps | idle | window at train start | observed |
+|---|---:|---|---|
+| 2.0 | 0 (saturated) | permanently loaded | smooth gradient, no notch |
+| 0.5 | 0.64 s | still loaded | no clean notch |
+| 0.4 | 1.14 s | **fully drained** | notch idx 10, ~59% |
+| 0.3 | 1.97 s | **fully drained** | notch idx 10, 55% |
+
+**The measured threshold sat between 0.64 s and 1.14 s. The window is 1.000 s.**
+That is the fit that makes this mechanism rather than coincidence.
+
+## Causal confirmation by intervention
+
+Run G2, identical to E6 except `LIFETRAC_AIRTIME_BUDGET_US=600000`:
+
+| | idx 10 | total loss |
+|---|---:|---:|
+| E6, budget 930_000 | **59.1%** | 2.27% |
+| G2, budget 600_000 | **7.5%** | 4.02% |
+
+Moving the budget destroyed the notch. That is the confirmation that matters —
+the symptom tracks the knob.
+
+## Where the simple model is WRONG, stated plainly
+
+The prediction was `first blocked index = floor(budget/99_904) + depth - 1`,
+giving index 7 at a 600_000 budget. **Observed: no notch at 7, a much weaker
+peak at index 8 (15.05%).** So:
+
+- The mechanism is confirmed, but the closed-form index formula is **not**. It
+  is off by one at the second data point, and the two candidate models
+  (`k-1` vs `k-2` events in the deque at admit time) each fit one budget and
+  fail the other. Real timing — the rolling expiry, the `stop.wait` clamp of
+  250 ms, TX_DONE arrival jitter — is not captured by the static arithmetic.
+- The magnitude also collapsed (59% -> 15%). A smaller budget blocks earlier
+  and more often, so the throttle spreads across indices instead of
+  concentrating. That is consistent with the saturated case showing a gradient
+  rather than a notch: same pacer, never a fresh window.
+- Total loss **rose** at the lower budget (2.27% -> 4.02%), so the pacer's
+  disruption is worse when it bites more often.
+
+## The depth test could not be run
+
+Predicted index 12 at `PIPELINE_DEPTH=4`. The run (G1) is **invalid**: 548
+attributed losses against 2.06% actual, ~100% "loss" at indices 4-10, and
+`post_loss` gaps at 104.8 ms — identical to normal spacing, where a genuine
+post-loss gap is ~210 ms. With four fragments in flight the sequential
+classifier cannot track arrivals. **The instrument is only sound at depth <= 2**;
+that is now a known limit, not a result.
+
+## What this means
+
+The largest single identified contributor to the loss floor is **self-inflicted
+host-side pacing**, not the radio. Three consequences worth acting on:
+
+1. The 930 ms/s budget paces us to 93% duty, and the blocking implementation
+   converts that into a *concentrated stall* rather than smooth spacing. Smooth
+   pacing (spread the wait across fragments) would keep the same duty without
+   the hole.
+2. It bites hardest exactly where a real deployment lives — a static scene means
+   small frames and long idles, which is the regime that drains the window.
+   The saturated bench case is the one regime that hides it.
+3. Any future measurement of "RF loss" at sub-saturation must account for this
+   first. Several earlier numbers in this file are contaminated by it.
+
+Note on method: an adversarial code-analysis workflow raised 17 candidates and
+reported **zero survived**, but three independent agents had converged on this
+exact mechanism with exact arithmetic. The refutation instruction ("default to
+refuted when uncertain") was over-tuned and the aggregate verdict was wrong.
+The candidates themselves were right; reading them individually was what
+mattered.
