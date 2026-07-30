@@ -1318,8 +1318,12 @@ class ImageRxDaemon:
             self._lost_idx_hist: "dict[int, int]" = {}
             self._frag_idx_seen: "dict[int, int]" = {}
             self._gap_class_us: "dict[str, list[int]]" = {
-                "seq": [], "boundary": [], "post_loss": []}
+                "seq": [], "boundary": [], "post_loss": [], "reordered": []}
             self._frames_observed = 0
+            # Provisional loss bookings, retracted if the fragment shows up
+            # late. Keyed (frag_seq, frag_idx) so a rolled seq cannot collide.
+            self._pending_lost: "set[tuple[int, int]]" = set()
+            self._reordered = 0
 
         self._frag_idx_seen[frag_idx] = self._frag_idx_seen.get(frag_idx, 0) + 1
 
@@ -1355,20 +1359,62 @@ class ImageRxDaemon:
                 self._last_gap_class = "boundary"
             return
 
+        # Retract a provisional booking on ANY arrival of that index, not only
+        # an out-of-order-looking one. Once a late fragment lands, `prev_idx`
+        # moves with it, so the NEXT late fragment presents as a normal +1 step
+        # — the first version of this check only fired on step <= 0 and so
+        # retracted 9 but left 10 booked. Caught by
+        # test_late_arrival_retracts_the_provisional_loss.
+        was_pending = (frag_seq, frag_idx) in self._pending_lost
+        if was_pending:
+            self._pending_lost.discard((frag_seq, frag_idx))
+            cur = self._lost_idx_hist.get(frag_idx, 0)
+            if cur > 0:
+                self._lost_idx_hist[frag_idx] = cur - 1
+                if self._lost_idx_hist[frag_idx] == 0:
+                    del self._lost_idx_hist[frag_idx]
+            self._reordered += 1
+
         step = frag_idx - prev_idx
-        if step == 1:
+        if was_pending:
+            # A late arrival's gap is unrepresentative of anything; never let it
+            # be averaged into the clean inter-fragment figure.
+            self._last_gap_class = "reordered"
+        elif step == 1:
             self._last_gap_class = "seq"
         elif step > 1:
-            # Indices (prev_idx, frag_idx) exclusive never arrived.
+            # Indices (prev_idx, frag_idx) exclusive have not arrived YET.
+            # Provisional: a later out-of-order arrival retracts it below.
+            #
+            # Book each (seq, idx) AT MOST ONCE. Reordering churn can replay the
+            # same jump — e.g. 9 -> 11 seen twice — and an unconditional
+            # increment then inflates the count while only one booking is ever
+            # retractable. That left index 10 reporting 58% loss in a run whose
+            # true total loss was 2.19%, i.e. more losses at one index than
+            # existed in the entire run.
             for missing in range(prev_idx + 1, frag_idx):
+                key_m = (frag_seq, missing)
+                if key_m in self._pending_lost:
+                    continue
+                self._pending_lost.add(key_m)
                 self._lost_idx_hist[missing] = (
                     self._lost_idx_hist.get(missing, 0) + 1)
             self._last_gap_class = "post_loss"
         else:
-            # step <= 0: a duplicate or a reordered copy. Not a loss, and not
-            # representative dead air either — classify as boundary-ish so it
-            # cannot masquerade as clean inter-fragment spacing.
-            self._last_gap_class = "boundary"
+            # step <= 0 within one frame: a duplicate, or a fragment arriving
+            # LATE and out of order.
+            #
+            # 2026-07-30: this is not hypothetical. The RS-11.4 sweep produced
+            # a 4-6x over-attribution at 0.4 fps — 170 "losses" against a 2.45%
+            # measured rate — with a deterministic paired signature at indices
+            # 9 and 10 in ~80% of trains. That is the fingerprint of the host
+            # URC queue draining out of order, not of RF loss: 11 and 12 are
+            # seen first, 9 and 10 are provisionally booked as lost, and then
+            # they turn up. Retract the booking rather than reporting a
+            # fabricated loss.
+            # Retraction already handled above; what remains here is a plain
+            # duplicate of an index we had already seen.
+            self._last_gap_class = "reordered"
 
     def _maybe_fire_probe(self, link: HostLink) -> None:
         now = time.monotonic()
@@ -1507,8 +1553,18 @@ class ImageRxDaemon:
                     "CLUSTERED-AT-0" if (opp0 and rest_opp and r0 > 2.0 * rr)
                     else "not-clustered",
                     top)
+                if getattr(self, "_reordered", 0):
+                    LOG.info(
+                        "frag_reordered: %d late out-of-order arrivals had a "
+                        "provisional loss retracted (in-order assumption "
+                        "violated — see RS-11.4)", self._reordered)
                 self._lost_idx_hist = {}
                 self._frag_idx_seen = {}
+                self._reordered = 0
+                # Bound the provisional set; anything this old will not be
+                # retracted anyway and must not leak.
+                if len(self._pending_lost) > 4096:
+                    self._pending_lost.clear()
             # RS-0.12 probe delivery summary (reactive-fire runs only).
             if self._reactive_fire and self._probe_tx:
                 rtts = sorted(self._probe_rtts)

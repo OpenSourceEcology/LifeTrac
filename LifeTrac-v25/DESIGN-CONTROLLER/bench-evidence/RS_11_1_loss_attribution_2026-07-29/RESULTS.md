@@ -112,3 +112,82 @@ consequences, both worth stating plainly:
    fall further against a larger tail. The "not clustered at 0" verdict is
    therefore safe; the exact shape of the tail should be re-measured on the
    fixed build before anyone reasons quantitatively about it.
+
+
+---
+
+# RS-11.4 train-length / duty-cycle sweep, 2026-07-30
+
+Six runs, 240 s each, all else pinned to the D1 operating point.
+
+## The valid comparison: E1 vs E2 (both saturated)
+
+| run | frame | fragments/train | total loss | idx-0 rate | late/early ratio |
+|---|---|---|---:|---:|---:|
+| E1 | 3000 B @ 2 fps | 13 | 3.73% | 1.95% | **2.87x** |
+| E2 | 750 B @ 2 fps | 3 | 3.49% | 3.44% | **1.07x** |
+
+**The per-index gradient depends on train LENGTH, not on index.** Long trains
+climb from ~2% early to 11.04% at index 11; short trains are flat (3.44 / 3.66 /
+3.44 / 5.17%) at statistically identical total loss. A 3-fragment train loses
+uniformly; a 13-fragment train loses progressively.
+
+That rules out anything index-intrinsic (a fixed pipeline slot, a per-index
+code path) and points at a mechanism that **accumulates over the ~1.3 s a long
+train takes**. It also independently re-confirms the F4 closure: in the flat
+short-train case index 0 is no better or worse than any other position.
+
+## The low-duty runs cost three instrument fixes, and are only now trustworthy
+
+E3–E6 held train length at 13 and dropped offered load to 0.4 fps (~50% duty) to
+test whether idle time between trains lets the mechanism recover — the
+thermal/dwell discriminator. Every one of them over-attributed loss, and chasing
+that found three real defects in the classifier:
+
+| run | attributed | actual missing | over-count | fix applied after |
+|---|---:|---:|---:|---|
+| E3 | 130 | ~32 | ~4x | — |
+| E4 (prepare-ahead off) | 170 | ~28 | ~6x | — |
+| E5 | 77 | ~60 | 1.3x | out-of-order retraction |
+| E6 | 80 | ~60 | 1.3x | book each (seq,idx) at most once |
+
+1. **Out-of-order arrival misread as loss.** The host URC queue does not always
+   drain in order: 11 and 12 arrive, 9 and 10 are booked lost, then 9 and 10
+   turn up. The in-order assumption was documented in the code as an assumption
+   and is now measured to be false. Bookings are provisional and retracted on
+   arrival; 54 retractions in E6.
+2. **Retraction fired only on a backwards step.** Once a late fragment landed,
+   the next one presented as a normal +1 step, so 9 was retracted and 10 was
+   not. Now checked on every arrival.
+3. **Double booking.** `_pending_lost` is a set but the histogram was
+   incremented unconditionally, so replayed churn (9 -> 11 seen twice) inflated
+   an index while only one booking was retractable.
+
+**E4's result should not be read as evidence about prepare-ahead.** Disabling it
+appeared to make things worse, but E4 predates all three fixes and sat at the 6x
+over-count. That test needs re-running.
+
+## What survives, and what is still open
+
+**Survives:** a deterministic failure of **fragment index 10 in ~59% of long
+trains at low duty** (55/93 in E6), which persisted through all three fixes and
+now roughly reconciles with the byte counters — index 10 accounts for most of the
+run's total loss. This is a sharp, repeatable, single-index notch, not a smooth
+ramp. Smooth thermal droop does not produce that shape.
+
+**Still open — and the sweep did NOT answer its original question.** Whether the
+long-train gradient is thermal, dwell-window, or receiver backpressure remains
+undetermined, because it took until E6 to get an instrument whose attribution
+reconciles. The next session should:
+
+- Re-run the duty-cycle comparison (2 fps vs 0.4 fps) on the E6 build, n=2, now
+  that attribution is trustworthy.
+- Re-run the prepare-ahead A/B on the E6 build.
+- Chase the index-10 notch directly: it is at ~1049 ms into the train, it is
+  duty-dependent (a gradient at 2 fps, a spike at 0.4 fps), and it is the single
+  largest identified contributor to the loss floor.
+
+**Method note.** Every low-duty conclusion in this section would have been wrong
+without the arithmetic check "does attributed loss reconcile with
+frags_tx - rx_frames". Three separate defects hid behind plausible-looking
+histograms. Run that check before believing any per-index result.

@@ -83,14 +83,62 @@ class GapClassificationTests(unittest.TestCase):
         self.assertEqual(s._lost_idx_hist, {1: 1})
 
     def test_duplicate_or_reorder_is_not_counted_as_loss(self) -> None:
-        """step <= 0 is a duplicate or a reordered copy. It must not create
-        negative-range 'losses', and it must not be classed as clean
+        """step <= 0 is a duplicate or a late out-of-order arrival. It must not
+        create negative-range 'losses', and it must not be classed as clean
         inter-fragment spacing either, since its gap is unrepresentative."""
         s = _Stub()
         classes = _feed(s, [(4, 3, 13), (4, 3, 13), (4, 2, 13)])
-        self.assertEqual(classes, ["seq", "boundary", "boundary"])
+        self.assertEqual(classes, ["seq", "reordered", "reordered"])
         self.assertEqual(s._lost_idx_hist, {},
                          "a duplicate/reorder must never register a loss")
+
+
+class OutOfOrderRetractionTests(unittest.TestCase):
+    """RS-11.4: the in-order assumption is violated in practice. At 0.4 fps the
+    sweep attributed 170 losses against a 2.45% measured rate — a 6x over-count
+    — with a deterministic paired signature at indices 9 and 10 in ~80% of
+    trains. That is the host URC queue draining out of order: 11 and 12 are seen
+    first, 9 and 10 get provisionally booked as lost, then they arrive.
+
+    A provisional booking must be RETRACTED when the fragment turns up."""
+
+    def test_late_arrival_retracts_the_provisional_loss(self) -> None:
+        s = _Stub()
+        # 9,10 skipped, 11 seen -> 9,10 booked. Then 9 and 10 actually arrive.
+        classes = _feed(s, [(1, 8, 13), (1, 11, 13), (1, 9, 13), (1, 10, 13)])
+        self.assertEqual(classes, ["seq", "post_loss", "reordered", "reordered"])
+        self.assertEqual(s._lost_idx_hist, {},
+                         "both bookings must be retracted once they arrive")
+        self.assertEqual(s._reordered, 2)
+
+    def test_partial_retraction_keeps_the_genuinely_lost_one(self) -> None:
+        s = _Stub()
+        # 9,10 booked; only 9 arrives late. 10 stays lost.
+        classes = _feed(s, [(1, 8, 13), (1, 11, 13), (1, 9, 13)])
+        self.assertEqual(classes, ["seq", "post_loss", "reordered"])
+        self.assertEqual(s._lost_idx_hist, {10: 1})
+        self.assertEqual(s._reordered, 1)
+
+    def test_retraction_is_scoped_to_the_frame(self) -> None:
+        """A later frame reusing an index must not retract an earlier frame's
+        genuine loss — bookings are keyed by (frag_seq, frag_idx)."""
+        s = _Stub()
+        # total=4 so frame 1 genuinely ENDS at index 3 — otherwise the trailing
+        # fragment rule correctly books the unseen tail and swamps the point.
+        _feed(s, [(1, 0, 4), (1, 3, 4)])            # frame 1 loses 1,2
+        self.assertEqual(s._lost_idx_hist, {1: 1, 2: 1})
+        _feed(s, [(2, 0, 4), (2, 1, 4), (2, 2, 4), (2, 3, 4)])  # frame 2 clean
+        self.assertEqual(
+            s._lost_idx_hist, {1: 1, 2: 1},
+            "frame 2's indices 1,2 must not cancel frame 1's real losses")
+        self.assertEqual(s._reordered, 0)
+
+    def test_reordered_arrivals_do_not_drive_the_count_negative(self) -> None:
+        s = _Stub()
+        # A duplicate of an index never booked as lost must be a no-op.
+        _feed(s, [(1, 0, 13), (1, 1, 13), (1, 1, 13), (1, 0, 13)])
+        self.assertEqual(s._lost_idx_hist, {})
+        self.assertTrue(all(v >= 0 for v in s._lost_idx_hist.values()))
 
     def test_loss_at_index_zero_is_attributed_to_index_zero(self) -> None:
         """THE case F4 exists for: the receiver is still re-arming RXCONT when a
@@ -187,3 +235,36 @@ class LossRateNormalisationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DoubleBookingTests(unittest.TestCase):
+    """RS-11.4: reordering churn can replay the same index jump. Booking the
+    same (frag_seq, frag_idx) twice inflates the histogram while only one
+    booking is retractable — which left index 10 reporting 58% loss in a run
+    whose true TOTAL loss was 2.19%, more losses at one index than the whole
+    run contained."""
+
+    def test_replayed_jump_books_each_index_only_once(self) -> None:
+        s = _Stub()
+        # 9 -> 11 twice (reordering churn), index 10 never arrives.
+        _feed(s, [(1, 9, 13), (1, 11, 13), (1, 9, 13), (1, 11, 13)])
+        self.assertEqual(s._lost_idx_hist, {10: 1},
+                         "index 10 is one lost fragment, not two")
+
+    def test_replayed_jump_then_late_arrival_fully_retracts(self) -> None:
+        s = _Stub()
+        _feed(s, [(1, 9, 13), (1, 11, 13), (1, 9, 13), (1, 11, 13),
+                  (1, 10, 13)])
+        self.assertEqual(s._lost_idx_hist, {},
+                         "the single booking must retract when 10 arrives")
+
+    def test_attributed_total_cannot_exceed_frame_size(self) -> None:
+        """Sanity invariant the sweep violated: within one frame, attributed
+        losses can never exceed the number of fragments the frame has."""
+        s = _Stub()
+        arrivals = []
+        for _ in range(6):                       # replay the same churn a lot
+            arrivals += [(1, 2, 13), (1, 8, 13)]
+        _feed(s, arrivals)
+        self.assertLessEqual(sum(s._lost_idx_hist.values()), 13)
+        self.assertEqual(s._lost_idx_hist, {3: 1, 4: 1, 5: 1, 6: 1, 7: 1})
