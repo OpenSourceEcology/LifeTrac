@@ -44,3 +44,16 @@ LifeTrac-v25/DESIGN-CONTROLLER/build/loopback_driver
 LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/build/loopback_driver
 LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/build/loopback_driver_tcp.exe
 
+
+# 2026-07-29: murata_l072 firmware intermediates. The 35 .o + 34 .d files under
+# build/ were tracked by accident and dirtied 31 files on every `mingw32-make`,
+# making `git status` useless for spotting real changes. The FLASHABLE artifacts
+# (firmware.bin/.hex/.elf/.map) stay tracked deliberately — they let someone
+# flash a board without the arm-none-eabi toolchain, and the .map catches size
+# regressions.
+LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build/**/*.o
+LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build/**/*.d
+LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build/firmware.ld
+LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build/*.preproc
+# Host-side bench test binaries built by the `make check-*` targets.
+LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build/*.exe

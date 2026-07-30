@@ -1,0 +1,15 @@
+# Base-station DEV/TEST deps. Install this (not requirements.txt) to run the
+# SIL suite — CI installs exactly this file.
+#
+# Added 2026-07-29 (RS-5.7): the CI job ran `unittest discover` after
+# setup-python but never installed anything, so "Base station protocol tests"
+# was red on every commit with 49 missing-import errors (paho x25, fastapi x19,
+# cryptography x3, pytest x2) and ZERO assertion failures. A gate that is always
+# red carries no information, which is why two other test-env defects survived
+# unnoticed for months.
+
+-r requirements.txt
+
+# A handful of SIL modules use pytest directly (the rest are unittest.TestCase,
+# which pytest also collects — it finds ~1044 tests vs unittest discover's 964).
+pytest>=8.0
