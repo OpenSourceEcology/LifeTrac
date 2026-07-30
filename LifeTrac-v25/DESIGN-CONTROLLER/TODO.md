@@ -1592,9 +1592,11 @@ it was zero — so absence of evidence here really is absence of testing.
   silent**, at `rx_decode_err = 0` — packets lost before header lock, i.e. a
   receiver-readiness problem. Preamble is the only knob that widens the catch
   window for a re-arming receiver, and it costs +1.0% airtime at 12 symbols /
-  +2.0% at 16, against +19% for the cheapest coding-rate step. Blocked on
-  firmware **F4**: `RegPreambleMsb/Lsb` (0x20/0x21) are never written today
-  (chip POR = 8) and are not in the REG_WRITE allowlist. **Both halves must
+  +2.0% at 16, against +19% for the cheapest coding-rate step. **GATED ON RS-11.1(b)** — confirm the loss actually clusters at fragment
+  index 0 before spending a firmware cycle on preamble; the re-arm-gap
+  mechanism is currently assumed, not shown. Then blocked on firmware **F4**:
+  `RegPreambleMsb/Lsb` (0x20/0x21) are never written today (chip POR = 8) and
+  are not in the REG_WRITE allowlist. **Both halves must
   land together** — the airtime invariant *assumes* 8 symbols, so writing the
   register without feeding the value into `sx1276_airtime_compute` breaks the
   ToA prediction the dwell accountant reconciles against. Pass: fragment loss
@@ -1755,6 +1757,129 @@ for whoever tries to use one; the decision for each is *wire it or delete it*.
   DEBUG, so no archived run carries link margin. Every range test will want it,
   and it is the companion signal to the RS-10.2 coding-rate trigger. Small fix,
   do it before the first field run.
+
+### RS-11 — Next-session sequencing, and the one instrument that gates it (added 2026-07-29)
+
+#### RS-11.0 Correction: where the dead time actually is
+
+**A dead-time decomposition offered on 2026-07-29 was wrong and is retracted
+here before it can propagate.** It derived "≈16 ms per fragment of unexplained
+host scheduling" by dividing whole-run `util` by fragment count. That is the
+same error RS-0.14 already caught and corrected (see "The gap geometry was
+wrong by ~9x" in that section) — promoting a per-FRAME host-turnaround number
+to a per-fragment radio window — committed again in a new form. Recording it because this repo has now been bitten twice by exactly
+this arithmetic.
+
+The measured truth, re-confirmed against today's C2b run
+(`radio_monitor_20260729_104808_4d33b499`): the RX daemon's own `air_gap:` line
+reports `dt_med=104908us len_med=247B`. Against a 255 B on-air ToA of
+99.904 ms that is **5.00 ms of inter-fragment dead air** — matching the
+previously recorded 4.87–5.01 ms across 8 runs and 6 SHAs. Not 16 ms, not
+44 ms.
+
+So the dead time is **not spread across fragments — it is concentrated in the
+train boundary**, exactly as RS-0.14 found (242.6 ms every 1850 ms in the
+record run; today's `dt_p95=219387us` is that boundary showing up in the tail).
+
+Two consequences for what is worth doing next:
+
+1. **The host-handoff lever is already built and already measured.** RS-3.10
+   (cross-train prepare-ahead) shipped 2026-07-26 and replaced the ~44 ms
+   accidental gap with `LIFETRAC_TRAIN_GAP_MS` (default 40) spent actively
+   listening inside `_drain_rx_frames`. It was null on goodput *by
+   construction*, because the designed 40 ms ≈ the accidental 44 ms it
+   replaced. There is no hidden 15% sitting in the host path.
+2. **What remains is the gap-tuning policy trade, and RS-3.10 already owns
+   it**: 40 → 15 ms is worth roughly +7–8% goodput against a narrower command
+   window. That A/B was queued for "the next session" on 2026-07-26 and has
+   still not run. It is the actual throughput item, and it is a *policy*
+   decision, not an optimisation — see RS-11.2.
+
+#### RS-11.1 The instrument is contaminated — fix this first, it unblocks three things
+
+- [ ] **RS-11.1 Log the received fragment index alongside the air-gap sample.**
+  The `air_gap` histogram cannot currently distinguish a **train boundary**
+  from a **lost fragment**, because both produce an oversized inter-arrival
+  gap: a single loss makes the next observed Δt ≈ 2× ToA ≈ 200 ms, landing in
+  the same `<200`/`<400` buckets as a real boundary. At today's ~3.4% fragment
+  loss over ~1900 fragments that is ~60 contaminating samples, and C2b's
+  histogram shows 17 samples above the 120 ms bucket where only ~6 train
+  boundaries should exist. **Every boundary-size number derived from this
+  histogram is therefore an upper bound, not a measurement.**
+
+  The fix is small and entirely host-side: the reassembler already knows which
+  indices arrived and which are missing (`image_pipeline/reassemble.py:127`
+  computes exactly that for parity reconstruction) — it simply never logs it.
+  Emit the fragment index with each gap sample, then a gap is attributable.
+
+  This one change unblocks three separate questions:
+  - **(a) Sizes the train boundary honestly** — the input to RS-3.10's gap
+    tuning. Right now we would be tuning against a contaminated number.
+  - **(b) Answers whether the 3.55% loss floor clusters at fragment index 0**
+    of each train. That is the RXCONT re-arm-gap hypothesis, and it is
+    currently assumed rather than shown.
+  - **(c) Gates F4 (settable preamble).** F4 is the proposed fix for the
+    readiness floor, but if the missing indices turn out uniformly distributed
+    rather than boundary-clustered, preamble is the wrong target and a firmware
+    cycle would be spent for nothing. **Do not flash F4 before (b) answers.**
+
+  No firmware required. This is the cheapest high-value item on the list.
+
+#### RS-11.2 Then the gap-tuning A/B — as a policy decision, not a tweak
+
+- [ ] **RS-11.2 Run RS-3.10's queued gap sweep with the new evidence in hand.**
+  `LIFETRAC_TRAIN_GAP_MS` 40 → 25 → 15 → 60, at the pinned operating point
+  (v3 / DTS / 3000 B / `ProbeEcho 0` / `KfRequestDisable 1`), n=2 per point
+  because the run-to-run spread is 0.52 points (§7.3 of the 07-29 results).
+
+  **The reason to re-run it now rather than in 2026-07-26's terms: the trade's
+  exchange rate changed today.** The 40 ms default was chosen when forward
+  command delivery was believed to be 53–57%. That figure was depressed by our
+  own ack traffic; with echoes off it is **91.1% [85.8, 96.4]**, and at
+  p = 0.911 two copies give 99.2%. So the command window may be substantially
+  over-provisioned, and airtime bought back from it is now much cheaper in
+  delivery terms than it looked. Score both axes in the same run — goodput
+  *and* tractor-side probe delivery — or the trade cannot be evaluated.
+
+  Pass criterion is a decision, not a number: pick the gap that holds two-copy
+  command delivery ≥99% while maximising goodput, and record the chosen point
+  in `CONTROL_PLANE_DESIGN.md` as a policy with its evidence.
+
+#### RS-11.3 Recommended order for the next session
+
+Sequenced by payoff-to-risk, and deliberately front-loading everything that
+needs no firmware flash — the flash loop is the expensive one here, because
+RS-5.2 records the tractor's `gpio163` reset is dead and L072 reset only works
+through a fragile 7–10 s OpenOCD/SWD path that occasionally hangs.
+
+1. **RS-11.1** — fragment-index logging. Host-side, minutes of work, unblocks
+   everything below and gates F4.
+2. **RS-11.2** — gap-tuning A/B. The real throughput lever (+7–8%), now with a
+   changed exchange rate. Host-side.
+3. **RS-3.3** — real-camera run. `camera_service` owns the encode-to-fit budget
+   packer, carry fix, age-escalation and liveness valve, and **none of it has
+   ever been on air** — the synth harness feeds pre-built frames straight to
+   `image_tx_daemon`, bypassing it entirely. Highest chance of hiding a real
+   defect; needs the camera rig rather than another harness run.
+4. **Firmware Batch 1** — F6/F7/F8, plus F4 *only if* RS-11.1(b) confirms
+   boundary-clustered loss. F8 (phase telemetry in `RX_FRAME_URC`) matters
+   independently: slot alignment is currently unverifiable from either host.
+5. **RS-10.4 / RS-10.3** — the two-node FHSS collision test and the ERP
+   antenna-gain sweep, once firmware carrying the 2026-07-29 fixes is flashed.
+
+**Validity note for anything measured before that flash:** the ERP/FHSS commit
+(`7c57b8e9`) is not on the boards. Measurements on the current build stay valid
+for it, because at profile 2 with default seeds the new firmware is
+behaviourally identical — ERP allowance 17 with 2 dBi declared, configured
+power 14, so the PA is programmed to the same 14 dBm it already boots at, and
+seed 0/0 reproduces the historical permutation bit-for-bit. That equivalence
+holds **only** at profile 2 with default seeds; it stops being true at p1 with
+distinct seeds.
+
+**Pin the operating point explicitly on every command line.** Today's runs
+were the second time a harness default silently changed the code path under
+test; the `TxPipeline` v2/v3 default cost 38 points of command delivery across
+~30 runs before `params.txt` caught it.
 
 ---
 
