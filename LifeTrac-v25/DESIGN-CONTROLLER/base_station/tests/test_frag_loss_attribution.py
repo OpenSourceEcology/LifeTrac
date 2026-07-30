@@ -113,6 +113,33 @@ class GapClassificationTests(unittest.TestCase):
         self.assertEqual(classes, ["seq", "post_loss"])
         self.assertEqual(s._lost_idx_hist, {0: 1, 1: 1, 2: 1})
 
+    def test_lost_trailing_fragment_is_attributed(self) -> None:
+        """Symmetric to the leading case and equally invisible to naive index
+        arithmetic: if frame N's last fragment is lost, the next arrival is
+        frame N+1 index 0 — indistinguishable from a clean transition unless the
+        outgoing frame's `total` is checked."""
+        s = _Stub()
+        # 13-fragment frame that stops at index 10: 11 and 12 never arrived.
+        classes = _feed(s, [(2, 9, 13), (2, 10, 13), (3, 0, 13), (3, 1, 13)])
+        self.assertEqual(classes, ["seq", "seq", "boundary", "seq"])
+        self.assertEqual(s._lost_idx_hist, {11: 1, 12: 1})
+
+    def test_complete_frame_then_transition_records_no_loss(self) -> None:
+        """The guard must not fire on a frame that ended properly, or every
+        clean boundary would manufacture a phantom tail loss."""
+        s = _Stub()
+        classes = _feed(s, [(2, 11, 13), (2, 12, 13), (3, 0, 13)])
+        self.assertEqual(classes, ["seq", "seq", "boundary"])
+        self.assertEqual(s._lost_idx_hist, {},
+                         "a frame that reached its final index lost nothing")
+
+    def test_both_tail_and_head_loss_in_one_transition(self) -> None:
+        s = _Stub()
+        # frame 4 stops at 10 (11,12 lost); frame 5 first seen at 2 (0,1 lost).
+        classes = _feed(s, [(4, 10, 13), (5, 2, 13)])
+        self.assertEqual(classes, ["seq", "post_loss"])
+        self.assertEqual(s._lost_idx_hist, {11: 1, 12: 1, 0: 1, 1: 1})
+
     def test_joining_mid_stream_is_not_counted_as_loss(self) -> None:
         """The very first fragment ever seen may be mid-frame simply because we
         attached late. With no previous arrival there is nothing to infer, so it

@@ -1327,11 +1327,19 @@ class ImageRxDaemon:
             self._last_gap_class = "seq"
             return
 
-        prev_seq, prev_idx, _prev_total = prev
+        prev_seq, prev_idx, prev_total = prev
         if frag_seq != prev_seq:
             # New frame. The gap that just elapsed spans the train boundary,
             # which is where the reverse-slot listening window lives.
             self._frames_observed += 1
+            # The OUTGOING frame's tail: if we never saw its last index, those
+            # fragments were lost. Symmetric to the leading-fragment case
+            # below, and equally invisible to naive index arithmetic — a lost
+            # final fragment looks exactly like a clean frame transition.
+            if prev_total and prev_idx < prev_total - 1:
+                for missing in range(prev_idx + 1, prev_total):
+                    self._lost_idx_hist[missing] = (
+                        self._lost_idx_hist.get(missing, 0) + 1)
             if frag_idx > 0:
                 # The new frame's FIRST fragments never arrived. This case is
                 # the whole reason F4 exists — if the receiver is still

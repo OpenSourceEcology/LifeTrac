@@ -1632,7 +1632,22 @@ it was zero — so absence of evidence here really is absence of testing.
 
 #### Highest value first
 
-- [ ] **RS-10.1 Preamble length sweep — 8 → 12 → 16 → 24 symbols.** The single
+- [x] **RS-10.1 Preamble length sweep — CLOSED 2026-07-29, NOT SUPPORTED.**
+  RS-11.1's loss attribution ran and the gate answered **no**: of 67 attributed
+  fragment losses, **index 0 took 1 (1.5%)** where uniform loss would predict
+  7.7%, and the distribution instead climbs monotonically toward the end of the
+  train (indices 8–11 hold 55% of all loss). The first fragment after a train
+  boundary is the *least* lossy position, so the RXCONT re-arm-gap mechanism
+  that preamble length would widen the window for is **not** our failure mode.
+  Firmware **F4 must not be flashed on this rationale** — cycle saved.
+  **Retracted:** this item previously called preamble "the single highest-value
+  PHY experiment we are not running," reasoning from `rx_decode_err = 0`. That
+  result shows losses are pre-header-lock; it says nothing about *where in the
+  train* they occur, and collapsing one to the other was unjustified. Evidence:
+  [`bench-evidence/RS_11_1_loss_attribution_2026-07-29/RESULTS.md`](bench-evidence/RS_11_1_loss_attribution_2026-07-29/RESULTS.md).
+  Superseded by RS-11.4.
+
+- [ ] **RS-10.1b (superseded context) original rationale.** The single
   highest-value PHY experiment we are not running. Measured 2026-07-29: a
   ~3.5% one-way fragment loss floor persists with the base radio **completely
   silent**, at `rx_decode_err = 0` — packets lost before header lock, i.e. a
@@ -1843,7 +1858,17 @@ Two consequences for what is worth doing next:
 
 #### RS-11.1 The instrument is contaminated — fix this first, it unblocks three things
 
-- [ ] **RS-11.1 Log the received fragment index alongside the air-gap sample.**
+- [x] **RS-11.1 Log the received fragment index alongside the air-gap sample —
+  DONE 2026-07-29** (`image_rx_daemon.py`; `air_gap_by_class` + `lost_frag_idx`
+  log lines, 15 unit tests). First run measured the train boundary cleanly for
+  the first time (**213.9 ms** median, vs 40 ms of designed `TRAIN_GAP_MS` — so
+  ~174 ms is host turnaround prepare-ahead is not hiding) and confirmed the
+  contamination it was built to remove: `post_loss` gaps sit at 210.3 ms and
+  boundaries at 213.9 ms, 4 ms apart, and 65 of 220 oversized samples (30%) were
+  losses masquerading as boundaries. It also closed the F4 gate — see RS-10.1.
+  Original description follows.
+
+- [x] **RS-11.1 (original) Log the received fragment index alongside the air-gap sample.**
   The `air_gap` histogram cannot currently distinguish a **train boundary**
   from a **lost fragment**, because both produce an oversized inter-arrival
   gap: a single loss makes the next observed Δt ≈ 2× ToA ≈ 200 ms, landing in
@@ -1891,6 +1916,35 @@ Two consequences for what is worth doing next:
   command delivery ≥99% while maximising goodput, and record the chosen point
   in `CONTROL_PLANE_DESIGN.md` as a policy with its evidence.
 
+#### RS-11.4 Why does loss rise with position inside a train? (opened 2026-07-29)
+
+- [ ] **RS-11.4 Discriminate the cumulative-loss mechanism.** RS-11.1 measured
+  fragment loss climbing monotonically with index inside a ~1.3 s train: index 0
+  took 1 of 67 losses, indices 8–11 took 37 of 67. That is the *opposite* of
+  the boundary-re-arm hypothesis and points at something **cumulative within a
+  train** rather than positional at its edge. Candidates, none tested:
+  - **PA thermal droop** — 13 x 100 ms of near-continuous keying; later
+    fragments radiate slightly lower.
+  - **Dwell / QoS throttling** — the airtime accountant or the 95%-duty DTS
+    budget gate biting later in a train.
+  - **Receiver-side backpressure** — the base's host pipeline falling behind as
+    the train progresses, so RXCONT re-arm slips further each fragment.
+  - **Intra-train clock drift** — the slot follower drifting across the train so
+    later fragments land further from the expected window.
+
+  **The cheap discriminator, and it needs no firmware:** vary train length
+  (fragments per frame) and re-read the per-index loss rate. If loss tracks
+  *elapsed time since train start*, it is thermal or dwell. If it tracks *index*
+  regardless of train length, it is pipeline depth or backpressure. Sweep
+  `SynthBudgetB` 3000 / 1500 / 750 (13 / 7 / 4 fragments) at n=2, and read
+  `lost_frag_idx` per index rather than the aggregate rate.
+
+  Re-measure on a build carrying the trailing-fragment fix — run D1 predates it
+  and undercounts the final index, which understates the very trend being
+  investigated.
+
+  This is now the live lead on the ~3.5% loss floor, in place of F4.
+
 #### RS-11.3 Recommended order for the next session
 
 Sequenced by payoff-to-risk, and deliberately front-loading everything that
@@ -1907,10 +1961,12 @@ through a fragile 7–10 s OpenOCD/SWD path that occasionally hangs.
    ever been on air** — the synth harness feeds pre-built frames straight to
    `image_tx_daemon`, bypassing it entirely. Highest chance of hiding a real
    defect; needs the camera rig rather than another harness run.
-4. **Firmware Batch 1** — F6/F7/F8, plus F4 *only if* RS-11.1(b) confirms
-   boundary-clustered loss. F8 (phase telemetry in `RX_FRAME_URC`) matters
-   independently: slot alignment is currently unverifiable from either host.
-5. **RS-10.4 / RS-10.3** — the two-node FHSS collision test and the ERP
+4. **RS-11.4** — train-length sweep to discriminate the cumulative-loss
+   mechanism. Host-side, and it is now the live lead on the loss floor.
+5. **Firmware Batch 1** — F6/F7/F8. **F4 is dropped**: RS-11.1 ran and the gate
+   answered no (RS-10.1). F8 (phase telemetry in `RX_FRAME_URC`) matters
+   independently — slot alignment is currently unverifiable from either host.
+6. **RS-10.4 / RS-10.3** — the two-node FHSS collision test and the ERP
    antenna-gain sweep, once firmware carrying the 2026-07-29 fixes is flashed.
 
 **Validity note for anything measured before that flash:** the ERP/FHSS commit
