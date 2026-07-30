@@ -1162,6 +1162,29 @@ No-regrets work, correct under every surviving architecture (do first):
   needs `LIFETRAC_FLEET_KEY_HEX` set. Add a `conftest.py` path fix (or rename
   one package) + a documented dev-key default so `pytest tests/` runs green
   without hand-set environment. Until then ~4 modules are silently unexercised.
+  **2026-07-29 escalation — the CI gate for this suite has never worked, so
+  none of the above was ever going to be caught.** `arduino-ci.yml` runs
+  `python -m unittest discover -s tests` after `setup-python` but **never runs
+  `pip install`** (grep for `pip install`/`requirements` in the workflow returns
+  nothing). Latest branch run: `Ran 964 tests ... FAILED (errors=55)`, of which
+  **49 are missing third-party imports** — `paho` ×25, `fastapi` ×19,
+  `cryptography` ×3, `pytest` ×2 — 3 are the `image_pipeline` shadowing above,
+  and **zero are assertion failures**. So "Base station protocol tests" has been
+  red on every commit for reasons unrelated to any code change, which is exactly
+  why the shadowing and the missing dev key persisted unnoticed.
+  Consequences to fix together:
+  - Add a dependency install step (and a `requirements-dev.txt` if none exists)
+    so the job can actually fail *informatively*.
+  - **Right now the only trustworthy CI gate in this repo is
+    `L072 firmware static checks`** (`make check` + the two owner guards),
+    which does pass — it needs no Python deps. Treat every other job's colour
+    as unknown until this lands, and do not read a red badge as a regression.
+  - A fifth victim of the same shadowing: `test_x8_encode_mode.py::
+    EncodeCacheInvalidatesOnModeChangeTests::test_mode_flip_forces_full_re_encode`
+    **passes in isolation and fails in-suite** (`No module named
+    'image_pipeline.tile_cache'`), because whichever `sys.path` entry wins is
+    decided by the 53 test files that mutate `sys.path`. It is an
+    order-dependent failure, not a logic defect — do not "fix" the assertion.
 
 ### RS-6 — Keyframe elimination (K-phases, now LoRa-only)
 
