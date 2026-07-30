@@ -191,3 +191,67 @@ reconciles. The next session should:
 without the arithmetic check "does attributed loss reconcile with
 frags_tx - rx_frames". Three separate defects hid behind plausible-looking
 histograms. Run that check before believing any per-index result.
+
+
+---
+
+# F-series: the index-10 notch characterised, 2026-07-30
+
+Four duty-cycle points, all 3000 B / 13-fragment trains, all else pinned. Each
+fragment is 99.904 ms on air and lands 104.9 ms apart, so a train occupies
+~1.364 s.
+
+| run | fps | frame period | **idle between trains** | notch at idx 10 | late/early |
+|---|---:|---:|---:|---|---:|
+| E1 | 2.0 | 0.50 s | 0 (saturated) | **no** — smooth gradient to 11.04% at idx 11 | 2.87x |
+| F1 | 0.5 | 2.00 s | 0.64 s | **no** — scattered, max 8.8% | 1.39x |
+| E5/E6 | 0.4 | 2.50 s | 1.14 s | **YES ~59%** (55/93), reproduced twice | 5.78x |
+| F2 | 0.3 | 3.33 s | 1.97 s | **YES 55.07%** (38/69) | 8.27x |
+
+## What this rules out
+
+**Frame-period locking is dead.** The prediction was that a once-per-period
+event would move the notch: at 0.5 fps it should have appeared near index 5. It
+did not appear at all, and at 0.3 fps it returned to **exactly index 10** rather
+than moving. The notch is fixed to a position in the TRAIN, not to the frame
+clock.
+
+## What the data now says
+
+Two independent conditions, both required:
+
+1. **Position: index 10 = 999 ms of cumulative airtime into the train.**
+   Essentially exactly one second. Identical at 0.4 and 0.3 fps despite the
+   frame period changing by a third.
+2. **A preceding idle longer than a threshold between 0.64 s and 1.14 s.** Below
+   it (0.64 s idle, and saturated) there is no notch; above it (1.14 s, 1.97 s)
+   the notch is present at ~55-59% and does not grow much with more idle.
+
+That is the signature of something that **arms or resets during a sufficiently
+long idle, then trips at ~1 s of continuous airtime**. It is not a gradual
+accumulation — it is a switch. Note also that the saturated case shows a smooth
+gradient rather than a notch, which is consistent with the same trip point
+existing but never being armed (no idle), leaving only whatever produces the
+milder positional trend.
+
+Candidates worth checking against this shape, in rough order of fit:
+
+- A **1-second window accumulator** (duty-cycle, dwell, or QoS budget) whose
+  credit is refilled by idle and exhausted by ~1 s of airtime. The DTS legal
+  dwell is 400 ms over a 10 s window, which does NOT fit 1 s, so if this is the
+  mechanism it is a different budget — the DTS "95% duty" gate is the obvious
+  one to check.
+- A **receiver state machine that demotes during idle** (LOCKED to SCANNING, or
+  a scan/re-anchor path) and then mis-handles re-acquisition at a fixed offset.
+- Anything on either host with a **~1 s timer** that is restarted by idle.
+
+## Why this matters beyond the bench
+
+The saturated case is the operating point we actually run, and it shows no
+notch. But a real tractor stream is **not** saturated — a static scene produces
+small frames and long idles, which is exactly the regime where the notch
+appears. If it survives to the field it would bite hardest when the picture is
+calm, i.e. precisely when an operator is most likely to trust it.
+
+Next: identify the mechanism (code analysis in flight), then confirm by moving
+the trip point rather than by removing the symptom.
