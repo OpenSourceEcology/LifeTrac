@@ -194,6 +194,10 @@ _PROFILE_TO_PHY = {0: PHY_IMAGE_BW250, 1: PHY_IMAGE_BW250, 2: PHY_IMAGE_BW500}
 # host, is the binding constraint.
 _PROFILE_TO_BUDGET_US = {0: 380_000, 1: 860_000, 2: 930_000}
 
+# Fraction of the budget smooth pacing aims at. Must be < 1.0 so the rolling
+# window check stays a BACKSTOP rather than a co-participant — see admit().
+_PACING_HEADROOM = 0.92
+
 
 def _budget_for(profile: int) -> int:
     """Host airtime budget for a profile, with a diagnostic override.
@@ -280,6 +284,15 @@ class AirtimeBudget:
     def __init__(self, budget_us: int = 380_000, window_s: float = 1.0):
         self.budget_us, self.window_s = budget_us, window_s
         self._events: collections.deque[tuple[float, int]] = collections.deque()
+        # RS-11.4 smooth pacing. "bucket" restores the pre-2026-07-30
+        # burst-then-stall behaviour for A/B against the recorded evidence.
+        # DEFAULT IS "bucket" until smooth pacing is verified on air. The
+        # first smooth implementation regressed badly (see admit()), so the
+        # known-good behaviour stays the default and the fix ships opt-in.
+        self._smooth = os.environ.get(
+            "LIFETRAC_AIRTIME_PACING", "bucket").strip().lower() == "smooth"
+        # Far enough in the past that the first fragment is never delayed.
+        self._last_admit = 0.0
 
     def _used(self, now: float) -> int:
         while self._events and now - self._events[0][0] >= self.window_s:
@@ -287,10 +300,55 @@ class AirtimeBudget:
         return sum(toa for _, toa in self._events)
 
     def admit(self, est_toa_us: int, stop: threading.Event) -> bool:
-        """Block until est_toa_us fits the window. Returns False on stop."""
+        """Block until est_toa_us fits the window. Returns False on stop.
+
+        2026-07-30 (RS-11.4): SMOOTH pacing replaces the pure token bucket.
+
+        A token bucket bursts to the budget and then stalls hard. Measured on
+        air, that meant 9 fragments back-to-back followed by a ~161 ms block,
+        opening a ~60 ms dead-air hole mid-train and costing fragment index 10
+        in ~59% of trains whenever the preceding idle exceeded the 1 s window
+        (see bench-evidence/RS_11_1_loss_attribution_2026-07-29/RESULTS.md).
+
+        Holding each fragment to the average spacing the duty target already
+        implies removes the hole without changing the duty at all:
+
+            spacing = ToA x window / budget
+                    = 99.904 ms x 1.0 / 0.930 = 107.4 ms at DTS
+
+        which is 1000/107.4 = 9.31 fragments/s x 99.904 ms = 930 ms/s -- the
+        budget, exactly. It is also FASTER end to end: 13 x 107.4 = 1397 ms
+        against the bucket's 944 + 161 + 420 = 1525 ms.
+
+        The rolling-window check below is RETAINED as the hard backstop. Pacing
+        is an optimisation of when we transmit; the window is the regulatory
+        guarantee that we never exceed the duty, and it must survive a wrong
+        spacing calculation, a mid-train profile change, or a clock jump.
+        """
+        if self._smooth and self.budget_us > 0:
+            # Pace to a FRACTION of the budget, not to 100% of it.
+            #
+            # 2026-07-30, measured: pacing to exactly the budget put the hard
+            # window check on a knife edge (used == budget), so the backstop
+            # fired on timing jitter and its stall COMPOUNDED with the pacing
+            # delay instead of being replaced by it. Result was worse than the
+            # bucket it replaced: loss 2.27% -> 19.41%, goodput 2000 ->
+            # 1204 B/s, util 81% -> 49%, with new 97% notches at indices 1 and
+            # 9. The spacing arithmetic was right (107.6 ms observed vs 107.4
+            # predicted); the missing headroom was the defect.
+            spacing_s = (est_toa_us * self.window_s
+                         / (self.budget_us * _PACING_HEADROOM))
+            due = self._last_admit + spacing_s
+            while not stop.is_set():
+                now = time.monotonic()
+                if now >= due:
+                    break
+                stop.wait(min(due - now, 0.25))
+
         while not stop.is_set():
             now = time.monotonic()
             if self._used(now) + est_toa_us <= self.budget_us:
+                self._last_admit = time.monotonic()
                 return True
             wait = self._events[0][0] + self.window_s - now  # oldest expiry
             stop.wait(min(max(wait, 0.005), 0.25))

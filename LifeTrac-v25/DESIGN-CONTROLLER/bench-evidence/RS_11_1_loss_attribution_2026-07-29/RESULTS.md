@@ -351,3 +351,58 @@ exact mechanism with exact arithmetic. The refutation instruction ("default to
 refuted when uncertain") was over-tuned and the aggregate verdict was wrong.
 The candidates themselves were right; reading them individually was what
 mattered.
+
+
+---
+
+# H-series: the pacer fix attempt — a regression, and a correction to my own reading
+
+## What was tried
+
+Replace the token bucket with **smooth pacing**: hold each fragment to the
+spacing the duty target already implies (`ToA x window / budget`), so the same
+duty is spread evenly instead of bursting to the budget and stalling.
+
+## Result: it made things worse
+
+| run | pacing | config | fragment loss |
+|---|---|---|---:|
+| E6 | bucket | 0.4 fps, depth 2 | 2.27% |
+| H1 | **smooth, no headroom** | identical | **19.41%** |
+| H2 | bucket (restored default) | identical | 2.45% |
+
+H1 also produced new 97% notches at indices 1 and 9 — worse and differently
+shaped than the single index-10 notch it was meant to remove.
+
+**The spacing arithmetic was correct** — predicted 107.4 ms, measured `seq`
+gap 107.6 ms. The defect was that pacing aimed at **100% of the budget**, which
+leaves `used == budget` and puts the hard window check on a knife edge. The
+backstop then fired on ordinary timing jitter, and its stall **compounded with**
+the pacing delay rather than being replaced by it.
+
+Fixed by pacing to `_PACING_HEADROOM = 0.92` of budget so the backstop stays a
+backstop. **Default reverted to `bucket`** until a run confirms the fix on air —
+a known-good default beats an unverified improvement.
+
+## A correction to my own analysis of H1
+
+I initially reported H1 as also dropping goodput 2000 -> 1204 B/s and util
+81% -> 49%. **That comparison was wrong.** Offered load at 0.4 fps x 3000 B is
+1200 B/s, and both H1 and H2 measured ~1204 B/s — i.e. exactly the offer. At
+0.4 fps the link is **not saturated**, so goodput and util there measure what is
+being asked of it, not what it can do. I had compared against E1, which ran at
+2.0 fps *saturated*.
+
+The loss regression is real and was measured at identical config. The throughput
+regression was an artefact of comparing two different offered loads.
+
+**Rule for this file going forward: never compare goodput or util across runs
+with different `SynthFps` unless both are saturated.** Only the saturated runs
+measure capacity.
+
+## Also worth recording: the notch magnitude is not stable
+
+Index 10 was 59.1% in E6 and 23.9% in H2 at identical settings. The mechanism
+reproduces; the magnitude does not. Any future before/after on this notch needs
+n>=2 per side, and a change of less than roughly 2x should not be called an
+effect.
