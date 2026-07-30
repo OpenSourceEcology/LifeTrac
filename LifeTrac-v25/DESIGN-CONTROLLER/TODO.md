@@ -1571,6 +1571,191 @@ No-regrets work, correct under every surviving architecture (do first):
   policy. Fail → shrink the cap stepwise (90→60→45 ms at DTS) before
   considering RS-9.2 candidate (c).
 
+### RS-10 — Settings coverage: parameters we have never exercised (added 2026-07-29)
+
+Derived from [`SETTINGS_REFERENCE.md`](SETTINGS_REFERENCE.md), which catalogues
+810 settings with a `file:line` each. That inventory made two things visible
+that no single-file review had: a set of knobs that *look* configurable but are
+inert, and a set of harness legs we believed were tested but never actually
+flew. Both classes are listed here because both cause false confidence.
+
+**Reading rule for this section:** "never flown" claims come from the 70
+archived `params.txt` files (§11 of the reference). A missing key in an old
+`params.txt` means the knob did not exist in that script version, **not** that
+it was zero — so absence of evidence here really is absence of testing.
+
+#### Highest value first
+
+- [ ] **RS-10.1 Preamble length sweep — 8 → 12 → 16 → 24 symbols.** The single
+  highest-value PHY experiment we are not running. Measured 2026-07-29: a
+  ~3.5% one-way fragment loss floor persists with the base radio **completely
+  silent**, at `rx_decode_err = 0` — packets lost before header lock, i.e. a
+  receiver-readiness problem. Preamble is the only knob that widens the catch
+  window for a re-arming receiver, and it costs +1.0% airtime at 12 symbols /
+  +2.0% at 16, against +19% for the cheapest coding-rate step. Blocked on
+  firmware **F4**: `RegPreambleMsb/Lsb` (0x20/0x21) are never written today
+  (chip POR = 8) and are not in the REG_WRITE allowlist. **Both halves must
+  land together** — the airtime invariant *assumes* 8 symbols, so writing the
+  register without feeding the value into `sx1276_airtime_compute` breaks the
+  ToA prediction the dwell accountant reconciles against. Pass: fragment loss
+  floor drops below 2% at ≤+2% airtime. Evidence:
+  [`bench-evidence/RS_0_12_phase_sweep_2026-07-29/RESULTS.md` §7.4](bench-evidence/RS_0_12_phase_sweep_2026-07-29/RESULTS.md).
+- [ ] **RS-10.2 Coding rate — hold 4/5, and do not re-litigate at bench range.**
+  Recorded so this is not re-opened on intuition: CR is per-profile settable
+  (`PhyProfile.cr_den`) and fully plumbed, and we deliberately keep 4/5.
+  Across ~19,000 received frames in ten runs, `rx_decode_err` and
+  `reassembler_decode_err` were **zero in every run**; with explicit-header
+  mode (header already protected at 4/8) and payload CRC on, that means we have
+  never observed one packet of the class FEC repairs. The ladder costs
+  +19/+38/+57% airtime. **Field-range test to run:** log
+  `rx_decode_err / rx_frames` at increasing distance and find where it leaves
+  zero. That ratio crossing ~1% is the trigger to try CR 4/6 — nothing else
+  is. Held in reserve: a DITTO at CR 4/8 (13.376 ms) still fits inside the slot
+  budget reserved for a FULL frame at 4/5 (14.144 ms), so the safety-critical
+  repeat can be armoured for free if control-frame bit errors ever appear.
+- [ ] **RS-10.3 Verify the ERP clamp actually limits power** — **firmware fix
+  LANDED 2026-07-29** (`host_cfg.c`: activation programs `min(configured,
+  erp_max)`; `CFG_KEY_TX_POWER_DBM` writes capped at the active allowance; 4
+  new `cfg_profile_wire.c` cases, one of which was confirmed to fail on the
+  pre-fix code). **The on-air half is still open** — unit tests assert what the
+  firmware asks the PA for, not what the antenna radiates. Sweep declared `antenna_gain_dBi` across
+  0 / 6 / 9 / 12 dBi and confirm conducted power drops accordingly — read back
+  `RegPaConfig` (0x09) and cross-check against the `tx_power_dbm` field in
+  `HOST_TYPE_TX_DONE_URC`. Then verify the ordering hazard is closed: write
+  `CFG_KEY_TX_POWER_DBM` (0x01) to 17 dBm *after* activating a profile whose
+  clamp is lower, and confirm the write is clamped rather than honoured. This
+  is the regression test for a regulatory property, so it belongs in the
+  permanent bench script, not a one-off.
+- [ ] **RS-10.4 Two-node FHSS collision test** — **firmware + host fix LANDED
+  2026-07-29** (`CFG_KEY_FHSS_FARM_ID` 0x17 / `CFG_KEY_FHSS_NODE_ID` 0x18, wired
+  through `host_cfg_profile_req_t` and provisioned by
+  `configure_regulatory_profile_if_needed()` before `CFG_KEY_REG_PROFILE`;
+  harness exposes `-FhssFarmId` / `-FhssLinkId` via the shared `$profEnv` so
+  both ends cannot diverge). **The two-pair measurement is still open.**
+  Before the fix, every node derived the identical hop permutation from a
+  hardcoded `(0,0,0)` seed. With distinct `node_id`s, run two tractor↔base
+  pairs simultaneously under p1 and measure per-pair PER against the
+  single-pair baseline. Pass: no systematic degradation — collisions become
+  statistical (~1/50 per dwell) instead of total. Also confirm the base and
+  tractor stay in step when the seed is non-zero, since that path has never
+  been exercised.
+
+#### Harness legs we believed were tested and were not
+
+- [ ] **RS-10.5 `AlignedPump 0` has never been flown.** The parameter exists
+  specifically as an A/B toggle and its comment describes restoring the
+  pre-fix idle-drain-only behaviour, but all 13 recorded uses are `1`. The
+  aligned-pump path is therefore **unproven against its own control**. Run the
+  0 leg at the current operating point before treating window-aligned command
+  TX as established.
+- [ ] **RS-10.6 `TxFeed host` has never been exercised** since the knob was
+  added — all 38 recorded uses are `local`. The 31 earlier runs used the
+  then-hardcoded host wiring, so the LAN-broker feed path has had no coverage
+  since it became optional. Worth one run purely to prove it still works
+  before we need it.
+- [ ] **RS-10.7 Phase sweep flew exactly once.** `ProbePhaseSweepMs` and
+  `ProbeSizesB` were exercised in a single 600 s run
+  (`20260729_094545_e43d07cf`) — and that run's aggregate was later shown to
+  be *depressed by its own ack traffic*. The window-shape result (delivery
+  decaying from ~32% at offset 0 to ~2% at 100 ms) should be re-measured with
+  `ProbeEcho 0` now that we know the echo was destroying the channel.
+- [ ] **RS-10.8 `ParityGroup` only ever 0 or 4** — never 2, 3 or 8. Parity
+  costs airtime on every train, so the group size is a real throughput knob
+  that has had a two-point sweep. Include `parity_recon` counts in the read-out
+  (all runs so far report 0 reconstructions, which suggests parity has never
+  actually saved a frame — worth confirming before keeping it on).
+- [ ] **RS-10.9 `TrainGapMs` and `TxPrepareAhead` were never varied
+  independently** — they move in perfect lockstep (40↔1, 0↔0) across all 21
+  runs that set either. Their individual contributions are therefore
+  unattributed. Decouple them for one 2×2.
+- [ ] **RS-10.10 `TxPipelineDepth` effectively untested** — 38 runs at depth 2,
+  exactly one at depth 4, none at 1 or 3. The firmware TX ring holds
+  1 transmitting + 4 parked, and the P0 latency math (RS-9.7) wants ≤3 at
+  FHSS. Sweep 1–4 at both profiles and confirm the latency model.
+
+#### Settings that are inert — decide wire-up or deletion
+
+Each of these reads as configurable and is not. Leaving them in place is a trap
+for whoever tries to use one; the decision for each is *wire it or delete it*.
+
+- [ ] **RS-10.11 `CFG_KEY_FHSS_ENABLE` (0x05) is validated, stored, and never
+  read.** Setting it to 0 does **not** stop hopping — hopping is decided purely
+  by which profile is active. Either make it gate hopping or remove the key.
+  This one is actively dangerous: an operator could believe they disabled
+  frequency hopping.
+- [ ] **RS-10.12 `HOST_TXQ_P0_RESERVED` is referenced by zero lines of C**
+  (`config.h:58`). The designed priority reservation — a control lane that lets
+  an engine-kill latch jump parked image fragments — was never implemented.
+  This is firmware roadmap **F5**; the define should not sit there implying it
+  works.
+- [ ] **RS-10.13 `CFG_KEY_HOST_BAUD` (0x0B) accepts a value and answers
+  DEFERRED, but nothing re-inits the UART** — not even after reboot, since the
+  value is never persisted. Either persist it and read it in `main.c`, or
+  reject the key.
+- [ ] **RS-10.14 IWDG constants and `CFG_KEY_IWDG_WINDOW_MS` (0x0D) exist with
+  no watchdog driver behind them.** Tracked as N-20; noted here because the
+  presence of the key implies a watchdog that does not exist.
+- [ ] **RS-10.15 Chip-POR PHY registers we have never characterised** — sync
+  word (POR `0x12`, never written; must match the H7 peer), LNA gain / LNA
+  boost, OCP, PA ramp, PA_DAC, and `RegIrqFlagsMask`. AgcAutoOn is forced on,
+  so manual LNA gain is inert anyway, but the rest are untested defaults on a
+  link we are about to take to field range. At minimum: confirm the sync word
+  matches both ends, and characterise LNA boost at range where it might matter.
+
+- [ ] **RS-10.19 `SX1276_TX_PLL_SETTLE_US` comment contradicts its value by 5x.**
+  `radio/sx1276_tx.c:32-45` explains the budget as "the 200 us budget here is a
+  4x conservative envelope" over the datasheet's ~50 us PLL lock (rev 7
+  §4.1.4), but the define immediately below is `1000UL`. Costs nothing on the
+  image path today — the settle is gated on `s_hop_freq_hz != 0` and DTS zeroes
+  that at `:191`, so profile 2 skips it entirely — but it is 1 ms per fragment
+  at FHSS (p1), and the mismatch will mislead whoever tunes it. Decide which
+  number is intended, then characterise on the bench under the actual Murata
+  TCXO as the comment already asks. Surfaced 2026-07-29 while evaluating a set
+  of proposed SX1276 register optimisations.
+
+#### Reproducibility gaps in the evidence trail
+
+- [ ] **RS-10.16 Record what the harness currently omits.** `params.txt`
+  captures 22 keys but not: container image tags (hardcoded `latest`, so no run
+  records which image it actually ran), `LIFETRAC_SYNTH_PREBUILD`,
+  `LIFETRAC_FHSS_WIDE_MASK`, or the derived broker hosts. The `latest` tag is
+  the serious one — the 2026-07-29 session began with a base board that had **no
+  image at all** after a reboot, and nothing in the evidence bundle would have
+  revealed a silently different image. Also note `git_sha` records repo HEAD,
+  not the script version, so working-tree edits are invisible.
+- [ ] **RS-10.18 Post-activation 0x15/0x16 drift vs the ERP allowance.** The
+  2026-07-29 ERP fix enforces `conducted <= allowance` for the two routes it
+  set out to close: activation programs `min(configured, erp_max)` into the PA,
+  and `CFG_KEY_TX_POWER_DBM` writes are capped. It does **not** make
+  `CFG_KEY_ANTENNA_GAIN_DBI` (0x15) / `CFG_KEY_HW_CEILING_DBM` (0x16) writes
+  re-clamp: those keys are sampled into the profile request only at
+  `cfg_set(CFG_KEY_REG_PROFILE)`, so a host that declares 25 dBi *after*
+  activation, without re-activating, leaves the enforced allowance derived from
+  the older declaration. This is the documented pre-existing contract
+  (`host_cfg_keys.h:25-31` — those keys are validator inputs, and the profile
+  validator is the authoritative gate), not a regression, but it is a real gap
+  between what an operator declares and what the PA is limited to.
+
+  **Do NOT close it by recomputing the allowance from the live cfg table** —
+  an adversarial review of the fix established that this is strictly worse.
+  0x15/0x16 accept the full type range with no validator, so
+  `power_clamp(30, hw=1, gain=30)` returns the 0 no-headroom sentinel; because
+  the clamp sites are guarded `erp_max != 0U`, a host could write `0x16=1` and
+  **disarm ERP enforcement entirely**, then write 0x01=17. Sourcing the ceiling
+  from `s_active` is deliberate: it is the only state with a proven
+  non-sentinel invariant, since `validate()` rejects NO_POWER_HEADROOM before
+  `stage()` will store a request.
+
+  The correct shape is therefore to *reject* rather than *skip*: make 0x15/0x16
+  writes re-derive the allowance and refuse the write (or force re-staging)
+  when it would fall to the sentinel, so the clamp can never be disarmed.
+  Needs a decision on whether 0x15/0x16 should become re-staging triggers.
+- [ ] **RS-10.17 Add an INFO-level link-margin line.** RSSI and SNR are
+  published to `link_stats` on MQTT but only written to `rx_daemon.log` at
+  DEBUG, so no archived run carries link margin. Every range test will want it,
+  and it is the companion signal to the RS-10.2 coding-rate trigger. Small fix,
+  do it before the first field run.
+
 ---
 
 ## Phase 0 — Hardware procurement & shop setup

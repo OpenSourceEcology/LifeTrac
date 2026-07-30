@@ -203,6 +203,196 @@ static void test_reapply_same_profile_is_ok(void) {
            "re-applying same profile is idempotent");
 }
 
+/*
+ * ---------------------------------------------------------------
+ * FCC §A5 ERP enforcement (2026-07-29)
+ *
+ * Before this fix host_cfg_profile_power_clamp() was computed once per
+ * staging attempt, compared against 0 to accept or reject the profile,
+ * and then discarded — host_cfg_profile.c contained ZERO calls to
+ * sx1276_set_tx_power_dbm(). Declaring antenna gain therefore did not
+ * reduce conducted power, and CFG_KEY_TX_POWER_DBM could be written up
+ * to 17 dBm afterwards with cfg_get showing nothing anomalous.
+ *
+ * These cases pin the regulatory property in hardware terms: what the
+ * PA is actually programmed to.
+ * ---------------------------------------------------------------
+ */
+
+static cfg_status_t set_hw_ceiling(uint8_t dbm) {
+    return cfg_set(CFG_KEY_HW_CEILING_DBM, &dbm, 1U);
+}
+
+static cfg_status_t set_tx_power(uint8_t dbm) {
+    return cfg_set(CFG_KEY_TX_POWER_DBM, &dbm, 1U);
+}
+
+static uint8_t get_tx_power_or_0xFF(void) {
+    uint8_t v = 0xFFU;
+    uint8_t got_len = 0U;
+    cfg_status_t s = cfg_get(CFG_KEY_TX_POWER_DBM, &v, 1U, &got_len);
+    if (s != CFG_STATUS_OK || got_len != 1U) {
+        return 0xFFU;
+    }
+    return v;
+}
+
+/* Activation must program the PA at all — the core omission. */
+static void test_erp_activation_programs_pa(void) {
+    cfg_init();
+    sx1276_stub_reset();
+
+    /*
+     * hw ceiling 10 -> bench allowance min(17 - 0, 10) = 10, below the
+     * 14 dBm cfg default, so activation must LOWER the PA to 10.
+     */
+    EXPECT(set_hw_ceiling(10U) == CFG_STATUS_OK, "hw ceiling 10 accepted at wire");
+    EXPECT(set_reg_profile(REG_PROFILE_BENCH_ONLY_FIXED_915) == CFG_STATUS_OK,
+           "bench activates with a reduced hw ceiling");
+    EXPECT(sx1276_stub_tx_power_call_count() >= 1U,
+           "activation MUST program the PA (pre-fix it never did)");
+    EXPECT(sx1276_stub_last_tx_power_dbm() == 10U,
+           "PA must be clamped to the ERP allowance, not left at 14");
+    EXPECT(get_tx_power_or_0xFF() == 10U,
+           "cfg_get must report the clamped value, not the stale 14");
+}
+
+/* The headline regulatory property: declared gain reduces real power. */
+static void test_erp_antenna_gain_reduces_conducted_power(void) {
+    cfg_init();
+    sx1276_stub_reset();
+
+    /* 12 dBi -> reduction 12-6 = 6 -> bench allowance 17-6 = 11. */
+    EXPECT(set_antenna_gain(12) == CFG_STATUS_OK, "12 dBi accepted at wire");
+    EXPECT(set_reg_profile(REG_PROFILE_BENCH_ONLY_FIXED_915) == CFG_STATUS_OK,
+           "bench activates at 12 dBi");
+    EXPECT(sx1276_stub_last_tx_power_dbm() == 11U,
+           "declaring 12 dBi must cut conducted power to 11 dBm");
+}
+
+/* The exceedance route that was reachable before the fix. */
+static void test_erp_tx_power_write_cannot_exceed_allowance(void) {
+    cfg_init();
+    sx1276_stub_reset();
+
+    EXPECT(set_hw_ceiling(10U) == CFG_STATUS_OK, "hw ceiling 10");
+    EXPECT(set_reg_profile(REG_PROFILE_BENCH_ONLY_FIXED_915) == CFG_STATUS_OK,
+           "activate at allowance 10");
+
+    /*
+     * Normalised, not rejected — this key's contract is that 0 -> 2 and
+     * 30 -> 17 are both CFG_STATUS_OK, so the ERP clamp follows suit
+     * rather than introducing a new reject class on a live wire.
+     */
+    EXPECT(set_tx_power(17U) == CFG_STATUS_OK,
+           "over-allowance write is clamped, not rejected");
+    EXPECT(sx1276_stub_last_tx_power_dbm() == 10U,
+           "17 dBm must not reach the PA when the allowance is 10");
+    EXPECT(get_tx_power_or_0xFF() == 10U,
+           "readback must show the clamped value");
+}
+
+/* The clamp is a ceiling, not a target: operator intent survives. */
+static void test_erp_activation_does_not_raise_reduced_power(void) {
+    cfg_init();
+    sx1276_stub_reset();
+
+    EXPECT(set_tx_power(5U) == CFG_STATUS_OK, "operator drops to 5 dBm");
+    /* Bench allowance is the full 17 here, so there is headroom to raise. */
+    EXPECT(set_reg_profile(REG_PROFILE_BENCH_ONLY_FIXED_915) == CFG_STATUS_OK,
+           "activate with allowance 17");
+    EXPECT(sx1276_stub_last_tx_power_dbm() == 5U,
+           "activation must not raise a deliberately-reduced setting");
+}
+
+/*
+ * ---------------------------------------------------------------
+ * FHSS seed identity (2026-07-29)
+ *
+ * sx1276_fhss_init() was called with a hardcoded (0, 0, 0) at its only
+ * production call site, so every radio ever built derived the same
+ * 50-channel permutation.
+ * ---------------------------------------------------------------
+ */
+
+static cfg_status_t set_fhss_farm_id(uint64_t v) {
+    uint8_t bytes[8];
+    write_u64_le(bytes, v);
+    return cfg_set(CFG_KEY_FHSS_FARM_ID, bytes, 8U);
+}
+
+static cfg_status_t set_fhss_node_id(uint64_t v) {
+    uint8_t bytes[8];
+    write_u64_le(bytes, v);
+    return cfg_set(CFG_KEY_FHSS_NODE_ID, bytes, 8U);
+}
+
+static void test_fhss_seed_reaches_scheduler(void) {
+    cfg_init();
+    sx1276_stub_reset();
+    sx1276_stub_fhss_capture_reset();
+
+    EXPECT(set_channel_mask(HOST_CFG_PROFILE_FHSS_50CH_REQUIRED_MASK) == CFG_STATUS_OK,
+           "required 50-ch mask");
+    EXPECT(set_fhss_farm_id(0x1122334455667788ULL) == CFG_STATUS_OK, "farm id accepted");
+    EXPECT(set_fhss_node_id(0xAABBCCDDEEFF0011ULL) == CFG_STATUS_OK, "node id accepted");
+    EXPECT(set_reg_profile(REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) == CFG_STATUS_OK,
+           "FHSS activates");
+
+    EXPECT(sx1276_stub_fhss_init_call_count() == 1U, "activation inits the scheduler once");
+    EXPECT(sx1276_stub_last_fhss_farm_id() == 0x1122334455667788ULL,
+           "farm_id must reach sx1276_fhss_init, not a hardcoded 0");
+    EXPECT(sx1276_stub_last_fhss_node_id() == 0xAABBCCDDEEFF0011ULL,
+           "node_id must reach sx1276_fhss_init, not a hardcoded 0");
+    EXPECT(sx1276_stub_last_fhss_initial_epoch() == 0U,
+           "initial_epoch stays 0 — it is a throwaway phase origin, not identity");
+}
+
+/* Un-provisioned fleet must keep the historical permutation exactly. */
+static void test_fhss_seed_defaults_preserve_legacy_zero(void) {
+    cfg_init();
+    sx1276_stub_reset();
+    sx1276_stub_fhss_capture_reset();
+
+    EXPECT(set_channel_mask(HOST_CFG_PROFILE_FHSS_50CH_REQUIRED_MASK) == CFG_STATUS_OK,
+           "required 50-ch mask");
+    EXPECT(set_reg_profile(REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) == CFG_STATUS_OK,
+           "FHSS activates without provisioning a seed");
+
+    EXPECT(sx1276_stub_last_fhss_farm_id() == 0ULL &&
+           sx1276_stub_last_fhss_node_id() == 0ULL,
+           "default seed must stay (0,0) so an un-provisioned fleet is unchanged");
+}
+
+/* The ORDERING CONTRACT in host_cfg_keys.h, pinned. */
+static void test_fhss_seed_written_after_activation_is_not_live(void) {
+    cfg_init();
+    sx1276_stub_reset();
+
+    EXPECT(set_channel_mask(HOST_CFG_PROFILE_FHSS_50CH_REQUIRED_MASK) == CFG_STATUS_OK,
+           "required 50-ch mask");
+    EXPECT(set_reg_profile(REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) == CFG_STATUS_OK,
+           "FHSS activates with the default seed");
+
+    sx1276_stub_fhss_capture_reset();
+    EXPECT(set_fhss_node_id(0xDEADBEEFULL) == CFG_STATUS_OK,
+           "seed key accepts a late write");
+    EXPECT(sx1276_stub_fhss_init_call_count() == 0U,
+           "a late seed write must NOT re-init the scheduler — "
+           "the seed is consumed only at activation, so hosts must "
+           "write it BEFORE CFG_KEY_REG_PROFILE");
+}
+
+static void test_fhss_seed_rejects_wrong_length(void) {
+    cfg_init();
+
+    uint8_t short_val[4] = { 1U, 2U, 3U, 4U };
+    EXPECT(cfg_set(CFG_KEY_FHSS_FARM_ID, short_val, 4U) == CFG_STATUS_BAD_LENGTH,
+           "farm id is exactly 8 bytes");
+    EXPECT(cfg_set(CFG_KEY_FHSS_NODE_ID, short_val, 4U) == CFG_STATUS_BAD_LENGTH,
+           "node id is exactly 8 bytes");
+}
+
 int main(void) {
     test_bench_happy_default();
     test_fhss_happy_when_routed();
@@ -214,11 +404,23 @@ int main(void) {
     test_no_power_headroom();
     test_reapply_same_profile_is_ok();
 
+    /* FCC §A5 ERP enforcement (2026-07-29) */
+    test_erp_activation_programs_pa();
+    test_erp_antenna_gain_reduces_conducted_power();
+    test_erp_tx_power_write_cannot_exceed_allowance();
+    test_erp_activation_does_not_raise_reduced_power();
+
+    /* FHSS seed identity (2026-07-29) */
+    test_fhss_seed_reaches_scheduler();
+    test_fhss_seed_defaults_preserve_legacy_zero();
+    test_fhss_seed_written_after_activation_is_not_live();
+    test_fhss_seed_rejects_wrong_length();
+
     if (g_failures != 0U) {
         printf("[FAIL] cfg_profile_wire: %lu failures\n",
                (unsigned long)g_failures);
         return 1;
     }
-    printf("[PASS] cfg_profile_wire: 9 cases\n");
+    printf("[PASS] cfg_profile_wire: 17 cases\n");
     return 0;
 }

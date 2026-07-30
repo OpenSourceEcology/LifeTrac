@@ -79,6 +79,23 @@ param(
     # 0 = tractor does NOT echo probes, so the run measures the IMAGE cost of
     # carrying acks at all (delivery still scored tractor-side).
     [int]$ProbeEcho       = 1,
+    # 2026-07-29 FHSS seed identity (RS-10.4). Seeds the FNV-1a ->
+    # Fisher-Yates channel permutation. Before the firmware fix the only
+    # production call site passed a hardcoded (0,0,0), so every radio in
+    # the fleet hopped in the same order.
+    #
+    # Both are fed via $profEnv, which goes to BOTH daemons — that is
+    # deliberate and load-bearing. FhssLinkId is LINK-scoped: if the two
+    # ends ever receive different values their permutations diverge, the
+    # follower retunes to the wrong channel every slot and never holds
+    # lock. Routing it through the shared env block makes that failure
+    # unreachable from this harness.
+    #
+    # 0/0 (default) reproduces the historical shared permutation, so
+    # existing evidence stays comparable. Only profile 1 (FHSS) hops, so
+    # these have no effect at profiles 0/2.
+    [string]$FhssFarmId   = "0",
+    [string]$FhssLinkId   = "0",
     # Archive final logs + parameters under bench-evidence/ with the git
     # SHA in the folder name (evidence discipline per CODE REVIEWS docs).
     [switch]$Archive
@@ -90,6 +107,9 @@ $ErrorActionPreference = "Continue"
 # Profile env for both daemons; profile 1 needs the 50-ch wide mask.
 $profEnv = "-e LIFETRAC_REG_PROFILE=$RegProfile"
 if ($RegProfile -eq 1) { $profEnv = "$profEnv -e LIFETRAC_FHSS_WIDE_MASK=1" }
+# FHSS seed — same value to both daemons by construction (see the
+# FhssLinkId param comment for why that matters).
+$profEnv = "$profEnv -e LIFETRAC_FHSS_FARM_ID=$FhssFarmId -e LIFETRAC_FHSS_LINK_ID=$FhssLinkId"
 
 # Resolve adb dynamically (the winget package dir name varies per
 # machine/source); fall back to the historical hardcoded path.
@@ -323,6 +343,8 @@ if ($Archive) {
         "probe_sizes_b=$ProbeSizesB",
         "ack_copies=$AckCopies",
         "probe_echo=$ProbeEcho",
+        "fhss_farm_id=$FhssFarmId",
+        "fhss_link_id=$FhssLinkId",
         "tx_feed=$TxFeed",
         "reg_profile=$RegProfile",
         "tx_serial=$TxAdbSerial",
