@@ -1834,6 +1834,25 @@ for whoever tries to use one; the decision for each is *wire it or delete it*.
   and it is the companion signal to the RS-10.2 coding-rate trigger. Small fix,
   do it before the first field run.
 
+### Firmware Batch 1 status (2026-07-30): CODE-COMPLETE, awaiting flash
+
+F6/F7/F8/F9 are implemented on PR #87 (branch `fw-batch1-f6-f9`) against the
+verified maps in [`FIRMWARE_BATCH1_MAPS.md`](FIRMWARE_BATCH1_MAPS.md), host
+suites green (27 bench targets, 1079 python). NOT yet flashed. On-air
+acceptance, in order, next flash session:
+1. Flash H7 FIRST (relaxed RX_FRAME parser), then L072 — reversed order
+   freezes the H7's rx_frame_count under Method-G.
+2. Re-push `method_h_stage2_tx_probe_v2.py` to both X8s (stale deployed copy
+   keeps the old parse_rx_frame dict shape and hides the F8 telemetry).
+3. FHSS two-board run: every RX_FRAME_URC flags=1, epoch/hop advancing,
+   slot_offset <= guard (verifies F7+F8).
+4. Force a demotion; confirm re-adoption within one acquisition while both
+   nodes transmit (verifies F6 — the s_grid_adopted flag is air-testable
+   only).
+5. One build with `EXTRA_CFLAGS=-DHOST_ALLOW_REG_WRITE_DIAG=0`: arming works,
+   profile switch completes without the revert path, 0x1D write FORBIDDEN
+   (verifies F9). The default flip is a separate commit after this soak.
+
 ### RS-11 — Next-session sequencing, and the one instrument that gates it (added 2026-07-29)
 
 #### RS-11.0 Correction: where the dead time actually is
