@@ -6,6 +6,7 @@
 #include "host_stats.h"
 #include "host_types.h"
 #include "host_uart.h"
+#include "host_rx_wire.h"
 #include "platform.h"
 #include "sx1276.h"
 #include "sx1276_modes.h"   /* RS-4.12: sync raw opmode writes */
@@ -953,23 +954,26 @@ void host_cmd_emit_fault(uint8_t code, uint8_t sub) {
 }
 
 void host_cmd_emit_rx_frame(const sx1276_rx_frame_t *frame) {
-    uint8_t payload[264];
+    /* F8 (2026-07-30): 8 fixed + 255 max payload + 8 telemetry tail =
+     * 271; 272 keeps the buffer even. Layout lives in host_rx_wire.c
+     * (pure, bench-pinned by check-rx-frame-urc) — do not pack inline
+     * here again. */
+    uint8_t payload[272];
+    uint16_t urc_len;
 
     if (frame == NULL) {
         return;
     }
 
-    payload[0] = frame->length;
-    payload[1] = (uint8_t)frame->snr_db;
-    put_u16_le(&payload[2], (uint16_t)frame->rssi_dbm);
-    put_u32_le(&payload[4], frame->timestamp_us);
-    if (frame->length > 0U) {
-        memcpy(&payload[8], frame->payload, frame->length);
+    urc_len = host_rx_frame_urc_pack(frame, payload,
+                                     (uint16_t)sizeof(payload));
+    if (urc_len == 0U) {
+        return;
     }
 
     host_uart_send_urc(HOST_TYPE_RX_FRAME_URC,
                        0U,
                        0U,
                        payload,
-                       (uint16_t)(8U + frame->length));
+                       urc_len);
 }

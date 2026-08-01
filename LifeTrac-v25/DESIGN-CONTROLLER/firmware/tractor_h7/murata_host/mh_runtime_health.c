@@ -102,7 +102,17 @@ bool mh_runtime_health_on_frame(mh_runtime_health_t *health,
             }
 
             rx_len = frame->payload[0];
-            if (frame->payload_len != (uint16_t)(8U + rx_len)) {
+            /* F8 (2026-07-30): RELAXED from strict equality. The L072
+             * now appends an 8-byte phase-telemetry tail after
+             * payload[rx_len] (host_types.h / host_rx_wire.h), and this
+             * parser was the ONE consumer that rejected extended URCs —
+             * strict equality would freeze rx_frame_count and make
+             * runtime health read a dead RX the moment F8 firmware was
+             * flashed. `<` keeps truncated frames rejected while
+             * accepting both legacy (8+len) and extended (8+len+8)
+             * lengths; a partial tail (<8 spare bytes) parses as
+             * legacy with phase fields defaulted to zero. */
+            if (frame->payload_len < (uint16_t)(8U + rx_len)) {
                 return false;
             }
 
@@ -113,6 +123,20 @@ bool mh_runtime_health_on_frame(mh_runtime_health_t *health,
             health->last_rx_timestamp_us = read_u32_le(&frame->payload[4]);
             if (rx_len > 0U) {
                 memcpy(health->last_rx_payload, &frame->payload[8], rx_len);
+            }
+            if (frame->payload_len >= (uint16_t)(8U + rx_len + 8U)) {
+                const uint8_t *tail = &frame->payload[8U + rx_len];
+                health->last_rx_phase_flags    = tail[0];
+                health->last_rx_profile_id     = tail[1];
+                health->last_rx_hop_idx        = tail[2];
+                health->last_rx_slot_offset_ms = tail[3];
+                health->last_rx_epoch          = read_u32_le(&tail[4]);
+            } else {
+                health->last_rx_phase_flags    = 0U;
+                health->last_rx_profile_id     = 0U;
+                health->last_rx_hop_idx        = 0U;
+                health->last_rx_slot_offset_ms = 0U;
+                health->last_rx_epoch          = 0U;
             }
             health->rx_frame_seen_at_ms = now_ms;
             return true;

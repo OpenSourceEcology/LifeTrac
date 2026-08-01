@@ -55,6 +55,7 @@ SRCS := \
     boot/safe_mode.c \
 	hal/platform.c \
 	host/host_cfg.c \
+	host/host_rx_wire.c \
 	host/host_cfg_profile.c \
 	host/host_cfg_wire.c \
 	host/host_cmd.c \
@@ -143,7 +144,7 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker help
+.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc help
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
 
@@ -224,6 +225,7 @@ FHSS_SCHEDULER_BIN := $(BUILD)/fhss_scheduler_vectors
 LEGAL_DWELL_BIN    := $(BUILD)/legal_dwell
 FRAMES_PER_DWELL_BIN := $(BUILD)/frames_per_dwell
 RFCO_PERTX_BIN     := $(BUILD)/rfco_pertx
+RX_FRAME_URC_BIN     := $(BUILD)/rx_frame_urc_vectors
 RFCO_SUMMARY_COUNTERS_BIN := $(BUILD)/rfco_summary_counters
 RFCO_SUMMARY_BIN   := $(BUILD)/rfco_summary
 RFCO_SUMMARY_EMIT_BIN := $(BUILD)/rfco_summary_emit
@@ -243,7 +245,7 @@ FHSS_CLOCK_BIN     := $(BUILD)/fhss_clock_test
 AIRTIME_INVARIANT_BIN := $(BUILD)/airtime_invariant
 TX_LEN_GUARD_BIN   := $(BUILD)/tx_len_guard
 
-check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker
+check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc
 	@echo "[OK] memory map invariants hold"
 
 check-cpp: $(BUILD)
@@ -458,6 +460,15 @@ check-frames-per-dwell: $(BUILD)
 # schema_ver byte (= 1), the URC type (= 0xC3), the status enum
 # sentinels, and that emit() forwards the correct (type, payload, len)
 # triple. Bench post-processing depends on these constants.
+check-rx-frame-urc: $(BUILD)
+	@echo "[RXURC] Building rx-frame-urc wire test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -DLIFETRAC_FHSS_TX_ROUTED=1 -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rx_frame_urc_vectors.c \
+	    host/host_rx_wire.c \
+	    -o $(RX_FRAME_URC_BIN)
+	@echo "[RXURC] Running rx-frame-urc wire test ..."
+	@$(RX_FRAME_URC_BIN)
+
 check-rfco-pertx: $(BUILD)
 	@echo "[RFCO ] Building per-TX RFCO test ..."
 	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \

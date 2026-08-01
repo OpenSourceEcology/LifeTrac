@@ -1209,12 +1209,36 @@ def parse_rx_frame(payload: bytes) -> dict:
         raise ValueError(
             f"RX_FRAME_URC payload truncated: have {len(payload)} need {expected}")
     rx_payload = bytes(payload[8:8 + rx_len])
+    # F8 (2026-07-30): additive 8-byte phase-telemetry tail after
+    # payload[rx_len] — {u8 phase_flags (bit0 = hop hdr valid),
+    # u8 profile_id, u8 hop_idx, u8 slot_offset_ms, u32le epoch}.
+    # None on all five keys when the firmware predates F8; zeros with
+    # phase_valid False when the L072 saw no valid hop header (DTS
+    # frames carry zeroed hop fields until F1 lands the virtual grid).
+    tail = payload[8 + rx_len:]
+    if len(tail) >= 8:
+        phase_valid = bool(tail[0] & 0x01)
+        profile_id = tail[1]
+        hop_idx = tail[2]
+        slot_offset_ms = tail[3]
+        epoch = struct.unpack("<I", bytes(tail[4:8]))[0]
+    else:
+        phase_valid = None
+        profile_id = None
+        hop_idx = None
+        slot_offset_ms = None
+        epoch = None
     return {
         "len": rx_len,
         "snr_db": snr_db,
         "rssi_dbm": rssi_dbm,
         "timestamp_us": timestamp_us,
         "payload": rx_payload,
+        "phase_valid": phase_valid,
+        "profile_id": profile_id,
+        "hop_idx": hop_idx,
+        "slot_offset_ms": slot_offset_ms,
+        "epoch": epoch,
     }
 
 

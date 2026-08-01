@@ -45,8 +45,16 @@
 
 #define HOST_TYPE_TX_DONE_URC                0x90U
 /* TX_DONE_URC payload: {u8 tx_id, u8 status, u32 time_on_air_us_le, u8 tx_power_dbm} */
-/* RX_FRAME_URC payload: {u8 len, i8 snr_db, i16 rssi_dbm_le, u32 timestamp_us_le, payload[len]} */
+/* RX_FRAME_URC payload: {u8 len, i8 snr_db, i16 rssi_dbm_le,
+ * u32 timestamp_us_le, payload[len],
+ * F8 additive tail (always present, +8 B): u8 phase_flags (bit0 = hop
+ * header valid), u8 profile_id, u8 hop_idx, u8 slot_offset_ms,
+ * u32 epoch_le. `len` EXCLUDES the tail; pre-F8 parsers that slice by
+ * it keep working. Constants in host_rx_wire.h; layout packed by
+ * host_rx_frame_urc_pack() and pinned by check-rx-frame-urc. */
 #define HOST_TYPE_RX_FRAME_URC               0x91U
+#define HOST_RX_FRAME_URC_TAIL_LEN           8U
+#define HOST_RX_FRAME_URC_PHASE_VALID        0x01U
 
 #define HOST_TYPE_CFG_OK_URC                 0xA0U
 #define HOST_TYPE_CFG_DATA_URC               0xA1U

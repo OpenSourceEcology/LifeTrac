@@ -212,6 +212,83 @@ static void test_rejects(void) {
     expect_true(!mh_runtime_health_on_frame(&health, &bad_rx, 4010U), "Malformed RX_FRAME should reject");
 }
 
+
+/* F8 (2026-07-30): the extended RX_FRAME_URC with the 8-byte phase
+ * tail, plus the compatibility matrix the relaxed length check must
+ * hold: extended accepted+parsed, legacy accepted with zero defaults,
+ * partial tail treated as legacy, truncation still rejected. */
+static void test_rx_frame_phase_tail(void) {
+    mh_runtime_health_t health;
+    /* len=3 payload AA BB CC, then tail: flags=1, profile=2, hop=37,
+     * slotoff=215 (F7 straddle value), epoch 0x0A0B0C0D LE. */
+    const uint8_t ext_payload[19] = {
+        3U, (uint8_t)0xFE, 0xA9U, 0xFFU,
+        0x04U, 0x03U, 0x02U, 0x01U,
+        0xAAU, 0xBBU, 0xCCU,
+        0x01U, 0x02U, 37U, 215U,
+        0x0DU, 0x0CU, 0x0BU, 0x0AU
+    };
+    murata_host_frame_t ext = make_frame(HOST_TYPE_RX_FRAME_URC,
+                                         ext_payload,
+                                         (uint16_t)sizeof(ext_payload));
+
+    mh_runtime_health_reset(&health);
+    expect_true(mh_runtime_health_on_frame(&health, &ext, 6000U),
+                "extended RX_FRAME (8+len+8) must be accepted");
+    expect_true(health.rx_frame_count == 1U, "extended frame counts");
+    expect_true(health.last_rx_len == 3U, "len byte still the radio len");
+    expect_true(health.last_rx_phase_flags == 0x01U, "phase flags parsed");
+    expect_true(health.last_rx_profile_id == 0x02U, "profile parsed");
+    expect_true(health.last_rx_hop_idx == 37U, "hop parsed");
+    expect_true(health.last_rx_slot_offset_ms == 215U,
+                "slot offset parsed (F7 straddle value >199 intact)");
+    expect_true(health.last_rx_epoch == 0x0A0B0C0DUL, "epoch LE parsed");
+}
+
+static void test_rx_frame_legacy_defaults_phase(void) {
+    mh_runtime_health_t health;
+    const uint8_t legacy_payload[11] = {
+        3U, (uint8_t)0xFE, 0xA9U, 0xFFU,
+        0x04U, 0x03U, 0x02U, 0x01U,
+        0xAAU, 0xBBU, 0xCCU
+    };
+    murata_host_frame_t legacy = make_frame(HOST_TYPE_RX_FRAME_URC,
+                                            legacy_payload,
+                                            (uint16_t)sizeof(legacy_payload));
+
+    mh_runtime_health_reset(&health);
+    /* Poison the fields first so the zero-default is proven, not
+     * inherited from reset(). */
+    health.last_rx_phase_flags = 0xEEU;
+    health.last_rx_epoch = 0xDEADBEEFUL;
+    expect_true(mh_runtime_health_on_frame(&health, &legacy, 6100U),
+                "legacy RX_FRAME (8+len) must still be accepted");
+    expect_true(health.last_rx_phase_flags == 0U,
+                "legacy frame zeroes phase flags");
+    expect_true(health.last_rx_epoch == 0UL, "legacy frame zeroes epoch");
+}
+
+static void test_rx_frame_partial_tail_is_legacy(void) {
+    mh_runtime_health_t health;
+    /* 8+len+3: three spare bytes — not a full tail, parse as legacy. */
+    const uint8_t partial_payload[14] = {
+        3U, (uint8_t)0xFE, 0xA9U, 0xFFU,
+        0x04U, 0x03U, 0x02U, 0x01U,
+        0xAAU, 0xBBU, 0xCCU,
+        0x01U, 0x02U, 37U
+    };
+    murata_host_frame_t partial = make_frame(HOST_TYPE_RX_FRAME_URC,
+                                             partial_payload,
+                                             (uint16_t)sizeof(partial_payload));
+
+    mh_runtime_health_reset(&health);
+    expect_true(mh_runtime_health_on_frame(&health, &partial, 6200U),
+                "partial tail (8+len+3) accepted as legacy");
+    expect_true(health.rx_frame_count == 1U, "partial-tail frame counts");
+    expect_true(health.last_rx_phase_flags == 0U,
+                "partial tail must NOT be parsed as phase fields");
+}
+
 int main(void) {
     test_boot_offsets();
     test_tx_done_and_rx_frame();
@@ -219,12 +296,15 @@ int main(void) {
     test_ver_urc();
     test_ver_urc_malformed();
     test_rejects();
+    test_rx_frame_phase_tail();
+    test_rx_frame_legacy_defaults_phase();
+    test_rx_frame_partial_tail_is_legacy();
 
     if (g_failures != 0) {
         fprintf(stderr, "[FAIL] mh_runtime_health_vectors: %d failures\n", g_failures);
         return 1;
     }
 
-    printf("[PASS] mh_runtime_health_vectors: 6 vectors\n");
+    printf("[PASS] mh_runtime_health_vectors: 9 vectors\n");
     return 0;
 }
