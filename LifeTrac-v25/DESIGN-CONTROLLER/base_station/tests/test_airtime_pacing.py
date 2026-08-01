@@ -110,19 +110,20 @@ class SpacingArithmeticTests(unittest.TestCase):
 
 class ModeSelectionTests(unittest.TestCase):
 
-    def test_bucket_is_the_default_until_smooth_is_verified_on_air(self) -> None:
-        """The first smooth implementation regressed on air (loss 2.27% ->
-        19.41%, util 81% -> 49%) because it paced to 100% of budget and
-        compounded with the backstop. The known-good behaviour stays the
-        default; the headroom fix ships opt-in until a run confirms it."""
+    def test_smooth_is_the_default_after_on_air_verification(self) -> None:
+        """Verified 2026-07-30, n=2 per side at 0.4 fps plus a saturated check:
+        the idx-10 notch went 59.1/23.9% -> 2.15/2.15% with total loss
+        unchanged, and at saturation goodput cost only 2.7% while loss fell
+        3.73% -> 2.24%. The headroom-less first attempt is why this test
+        exists — do not flip the default without re-running that A/B."""
         b = _fresh({"LIFETRAC_AIRTIME_PACING": None},
                    budget_us=DTS_BUDGET_US, window_s=1.0)
-        self.assertFalse(b._smooth)
-
-    def test_smooth_mode_is_reachable_for_the_on_air_retest(self) -> None:
-        b = _fresh({"LIFETRAC_AIRTIME_PACING": "smooth"},
-                   budget_us=DTS_BUDGET_US, window_s=1.0)
         self.assertTrue(b._smooth)
+
+    def test_bucket_mode_is_reachable_for_ab_against_recorded_evidence(self) -> None:
+        b = _fresh({"LIFETRAC_AIRTIME_PACING": "bucket"},
+                   budget_us=DTS_BUDGET_US, window_s=1.0)
+        self.assertFalse(b._smooth)
 
 
 if __name__ == "__main__":

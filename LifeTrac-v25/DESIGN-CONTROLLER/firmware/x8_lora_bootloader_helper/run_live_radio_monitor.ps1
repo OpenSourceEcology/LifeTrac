@@ -102,6 +102,17 @@ param(
     # a non-zero value as a default. 0 = leave the profile default alone.
     # First blocked fragment index = floor(budget/99904) + TxPipelineDepth - 1.
     [int]$AirtimeBudgetUs = 0,
+    # 2026-07-30 RS-11.4: tractor airtime pacing mode.
+    #   bucket = token bucket (default) — bursts to budget then hard-stalls,
+    #            which is what opens the mid-train dead-air hole.
+    #   smooth = hold each fragment to the spacing the duty target implies,
+    #            at _PACING_HEADROOM (0.92) of budget so the rolling-window
+    #            backstop stays a backstop rather than a co-participant.
+    # The first headroom-less smooth attempt REGRESSED loss 2.45% -> 19.41%;
+    # with headroom it was verified n=2 and smooth became the daemon default
+    # on 2026-07-30. Kept here so bucket can be re-run against the evidence.
+    [ValidateSet("bucket", "smooth")]
+    [string]$PacingMode   = "smooth",
     # Archive final logs + parameters under bench-evidence/ with the git
     # SHA in the folder name (evidence discipline per CODE REVIEWS docs).
     [switch]$Archive
@@ -117,6 +128,7 @@ if ($RegProfile -eq 1) { $profEnv = "$profEnv -e LIFETRAC_FHSS_WIDE_MASK=1" }
 # FhssLinkId param comment for why that matters).
 $profEnv = "$profEnv -e LIFETRAC_FHSS_FARM_ID=$FhssFarmId -e LIFETRAC_FHSS_LINK_ID=$FhssLinkId"
 if ($AirtimeBudgetUs -gt 0) { $profEnv = "$profEnv -e LIFETRAC_AIRTIME_BUDGET_US=$AirtimeBudgetUs" }
+$profEnv = "$profEnv -e LIFETRAC_AIRTIME_PACING=$PacingMode"
 
 # Resolve adb dynamically (the winget package dir name varies per
 # machine/source); fall back to the historical hardcoded path.
@@ -353,6 +365,7 @@ if ($Archive) {
         "fhss_farm_id=$FhssFarmId",
         "fhss_link_id=$FhssLinkId",
         "airtime_budget_us=$AirtimeBudgetUs",
+        "pacing_mode=$PacingMode",
         "tx_feed=$TxFeed",
         "reg_profile=$RegProfile",
         "tx_serial=$TxAdbSerial",

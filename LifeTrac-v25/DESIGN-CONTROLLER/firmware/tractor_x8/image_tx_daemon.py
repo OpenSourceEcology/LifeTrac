@@ -286,11 +286,16 @@ class AirtimeBudget:
         self._events: collections.deque[tuple[float, int]] = collections.deque()
         # RS-11.4 smooth pacing. "bucket" restores the pre-2026-07-30
         # burst-then-stall behaviour for A/B against the recorded evidence.
-        # DEFAULT IS "bucket" until smooth pacing is verified on air. The
-        # first smooth implementation regressed badly (see admit()), so the
-        # known-good behaviour stays the default and the fix ships opt-in.
+        # DEFAULT IS "smooth", verified on air 2026-07-30 (n=2 per side at
+        # 0.4 fps, plus a saturated check):
+        #   low duty  idx-10 notch 59.1/23.9% (bucket) -> 2.15/2.15% (smooth)
+        #             total loss unchanged, 2.36% vs 2.36%
+        #   saturated goodput 2005 -> 1952 B/s (-2.7%), util 79% both,
+        #             and loss 3.73% -> 2.24%
+        # "bucket" restores the pre-2026-07-30 behaviour for A/B against the
+        # recorded evidence.
         self._smooth = os.environ.get(
-            "LIFETRAC_AIRTIME_PACING", "bucket").strip().lower() == "smooth"
+            "LIFETRAC_AIRTIME_PACING", "smooth").strip().lower() != "bucket"
         # Far enough in the past that the first fragment is never delayed.
         self._last_admit = 0.0
 

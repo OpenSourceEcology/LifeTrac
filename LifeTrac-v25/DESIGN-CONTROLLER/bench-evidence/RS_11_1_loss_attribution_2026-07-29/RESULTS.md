@@ -406,3 +406,62 @@ Index 10 was 59.1% in E6 and 23.9% in H2 at identical settings. The mechanism
 reproduces; the magnitude does not. Any future before/after on this notch needs
 n>=2 per side, and a change of less than roughly 2x should not be called an
 effect.
+
+
+---
+
+# I-series: smooth pacing verified, and shipped as the default (2026-07-30)
+
+The headroom fix (`_PACING_HEADROOM = 0.92`) re-tested, n=2 per side at the
+0.4 fps / depth-2 / 3000 B operating point, plus a saturated check.
+
+## Low duty — the notch is gone, at no cost
+
+| mode | run | total loss | **idx 10** | attributed vs actual |
+|---|---|---:|---:|---|
+| bucket | E6 | 2.27% | **59.14%** | 80 vs ~26 (3x over) |
+| bucket | H2 | 2.45% | **23.91%** | — |
+| **smooth** | I1 | 2.36% | **2.15%** | 27 vs 27 |
+| **smooth** | I2 | 2.45% | **2.15%** | 28 vs 28 |
+
+A **19x reduction** in the notch, far outside the >=2x bar this file set after
+seeing the magnitude swing 24-59% between identical bucket runs. Total loss is
+unchanged (2.36% mean both modes), so the notch was removed rather than
+redistributed. Measured spacing 117.0 ms against 116.8 ms predicted.
+
+Two secondary results worth as much as the headline:
+
+- **Smooth is repeatable where bucket was not.** 2.15% twice, against bucket's
+  24-59% swing. A mechanism that only sometimes bites is far harder to reason
+  about than one that does not bite at all.
+- **Attribution now reconciles EXACTLY** (27/27, 28/28), where bucket
+  over-attributed ~3x. That is independent evidence the pacer stall was itself
+  causing the out-of-order delivery that broke the instrument in the E-series —
+  one defect, two symptoms.
+
+## Saturated — cheaper than predicted, and it cuts loss too
+
+| | goodput | util | total loss | late/early |
+|---|---:|---:|---:|---:|
+| E1 bucket, 2 fps | 2005 B/s | 79% | 3.73% | 2.87x |
+| I3 smooth, 2 fps | 1952 B/s | 79% | **2.24%** | 3.45x |
+
+Predicted cost was ~8% goodput, since smooth paces to 92% of budget. **Measured
+cost is 2.7%** — because the bucket was never actually achieving its 930 ms/s:
+its stalls, clamped at 250 ms, wasted most of the difference. And loss fell 40%
+at saturation as well, which was not predicted at all.
+
+## Decision
+
+**Default flipped to `smooth`** in the daemon, the harness, and the tests. A
+2.7% goodput cost buys a 19x reduction in a concentrated single-index failure at
+low duty, a 40% loss reduction at saturation, and an instrument whose numbers
+reconcile. `LIFETRAC_AIRTIME_PACING=bucket` and `-PacingMode bucket` restore the
+old behaviour for A/B against everything recorded above.
+
+## Caveat carried forward
+
+`_PACING_HEADROOM = 0.92` was chosen to clear the knife edge, not tuned. The
+saturated goodput cost scales roughly with it, so 0.95-0.98 may recover most of
+the 2.7% while still keeping the backstop from firing. That is a cheap follow-up
+sweep and it should be run before anyone treats 0.92 as considered.
