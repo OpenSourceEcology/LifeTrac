@@ -98,6 +98,7 @@ from lora_proto import (  # noqa: E402
     CMD_OP_RADIO_PROFILE_CONF,
     CMD_OP_ENCODE_MODE_ACK,
     CMD_OP_PROBE,
+    CMD_OP_TILE_STALE,
     CMD_OP_PROBE_ECHO,
 )
 from method_h_stage2_tx_probe_v2 import (  # noqa: E402
@@ -392,6 +393,8 @@ TRACTOR_ENC_STATUS_TOPIC  = "lifetrac/v25/status/encode_mode"        # camera_se
 # finally sizes frames to the real air quantum (243 DTS / 203 FHSS) instead
 # of a boot-frozen env default.
 TRACTOR_LINK_BUDGET_TOPIC = "lifetrac/v25/tractor/link_budget"
+# F10: stale-tile bitmaps from the base, handed to camera_service.
+TRACTOR_TILE_STALE_TOPIC = "lifetrac/v25/tractor/tile_stale"
 # LINK_PHY_NAMES index (camera_service / lora_proto) for each radio profile:
 # profile 0/1 (BW250) -> "image_bw250" (idx 5); profile 2 (BW500) -> idx 6.
 _PROFILE_TO_LINK_PHY_IDX = {0: 5, 1: 5, 2: 6}
@@ -807,6 +810,14 @@ class ImageTxDaemon:
             LOG.info("LoRa cmd: RADIO_PROFILE_CONF — switch confirmed")
             self._confirm_deadline = None
             self._revert_profile = None
+        elif opcode == CMD_OP_TILE_STALE:
+            # F10: advisory dirty marks from the base's persistent canvas.
+            # Hand the raw args to camera_service, which folds marked
+            # tiles into its age-escalation path. No ack (level-triggered;
+            # the next periodic report supersedes a lost one).
+            LOG.info("LoRa cmd: TILE_STALE %d B", len(args))
+            if client is not None and len(args) >= 3:
+                client.publish(TRACTOR_TILE_STALE_TOPIC, bytes(args), qos=0)
         elif opcode == CMD_OP_PROBE:
             # 2026-07-27 RS-0.12 reactive-fire instrumentation. A probe is a
             # no-op the tractor logs (with the base's commanded phase offset)

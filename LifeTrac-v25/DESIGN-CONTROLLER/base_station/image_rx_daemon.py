@@ -77,6 +77,7 @@ from lora_proto import (  # noqa: E402
     CMD_OP_RADIO_PROFILE_CONF,
     CMD_OP_ENCODE_MODE_ACK,
     CMD_OP_PROBE,
+    CMD_OP_TILE_STALE,
     CMD_OP_PROBE_ECHO,
 )
 from image_pipeline.frame_format import encode_tile_delta_frame  # noqa: E402
@@ -154,6 +155,8 @@ def _env_float(name: str, default: float, lo: "float | None" = None,
 # does not have to change.
 MQTT_TOPIC_OUT = "lifetrac/v25/video/tile_delta"
 KEYFRAME_REQ_TOPIC = "lifetrac/v25/cmd/req_keyframe"   # camera_service listens
+# F10: raw CMD_OP_TILE_STALE args from web_ui, radiated verbatim.
+TILE_STALE_TOPIC = "lifetrac/v25/cmd/tile_stale"
 # 2026-07-24: rolling RX-side link-speed sample for the web UI's image
 # panel (web_ui forwards it into /ws/state as snapshot.link_stats).
 LINK_STATS_TOPIC = "lifetrac/v25/video/link_stats"
@@ -184,6 +187,15 @@ PROFILE_REVERT_TIMEOUT_S  = 45.0
 # sparse cadence keeps the base's TX duty (and the run-33 bidirectional
 # UART-stress window) tiny. The reassembler self-heals regardless.
 KEYFRAME_CMD_MIN_GAP_S    = 10.0
+# F10 (2026-08-01): reassembly-timeout keyframe requests were MEASURED net
+# harmful (n=2/side: +1.88 pts fragment loss, -16% frames delivered, +31%
+# timeouts — they amplify the condition they fire on) and their legitimate
+# job (canvas staleness) is now covered by the 0x6C stale-tile report,
+# which is 84x cheaper and rides the next scheduled frame. Default OFF;
+# the keyframe request remains for cold start / base_seq mismatch / mode
+# change, which fire through web_ui's Canvas.apply path, not this one.
+KF_ON_REASM_TIMEOUT = os.environ.get(
+    "LIFETRAC_KF_ON_REASM_TIMEOUT", "0") == "1"
 
 # codec-id -> short name for link_stats (mirrors frame_format CODEC_*).
 _CODEC_NAMES = {0: "webp", 1: "mono_g4", 2: "btc4_tile", 3: "btc4_frame",
@@ -1033,6 +1045,22 @@ class ImageRxDaemon:
             ENCODE_MODE_OVERRIDE_TOPIC, self._on_encode_mode_msg)
         client.message_callback_add(
             KEYFRAME_REQ_TOPIC, self._on_req_keyframe_msg)
+        client.message_callback_add(
+            TILE_STALE_TOPIC, self._on_tile_stale_msg)
+
+    def _on_tile_stale_msg(self, _client, _userdata, msg) -> None:
+        # F10: level-triggered advisory — radiate as a ONE-SHOT single
+        # copy. A lost report is superseded by the next periodic one, so
+        # no pending/retry machinery and no extra copies. Body arrives
+        # pre-packed from web_ui (u16le base_seq + bitmap).
+        body = bytes(msg.payload or b"")
+        if len(body) < 3 or len(body) > 200:
+            return
+        try:
+            self._ctrl_out.put_nowait(
+                pack_command_frame(CMD_OP_TILE_STALE, body))
+        except queue.Full:
+            pass
 
     def _rx_worker(self) -> None:
         try:
@@ -1066,7 +1094,8 @@ class ImageRxDaemon:
                     with self._lock:
                         self.stats.reassembler_timeouts += (cur_timeout - last_timeouts)
                     last_timeouts = cur_timeout
-                    self._kf_req.poke(f"reassembly timeout #{cur_timeout}")
+                    if KF_ON_REASM_TIMEOUT:
+                        self._kf_req.poke(f"reassembly timeout #{cur_timeout}")
                 self._drain_ctrl_idle(link)
                 self._maybe_switch_profile(link)
                 # Defensive: heal a silently dropped RXCONT (throttled).
@@ -1216,7 +1245,9 @@ class ImageRxDaemon:
                     if cur_timeout != last_timeouts:
                         self.stats.reassembler_timeouts += (cur_timeout - last_timeouts)
                         last_timeouts = cur_timeout
-                        self._kf_req.poke(f"reassembly timeout #{cur_timeout}")
+                        if KF_ON_REASM_TIMEOUT:
+                            self._kf_req.poke(
+                                f"reassembly timeout #{cur_timeout}")
 
                 if completed is not None:
                     # RS-1.x: a COMPLETED frame means that was the train's
@@ -1702,6 +1733,7 @@ class ImageRxDaemon:
                 self._client.subscribe(RADIO_PROFILE_TOPIC, qos=1)
                 self._client.subscribe(ENCODE_MODE_OVERRIDE_TOPIC, qos=1)
                 self._client.subscribe(KEYFRAME_REQ_TOPIC, qos=0)
+                self._client.subscribe(TILE_STALE_TOPIC, qos=0)
             else:
                 LOG.error("MQTT connect rc=%s", rc)
         self._client.on_connect = _on_connect
@@ -1729,6 +1761,7 @@ class ImageRxDaemon:
                         self._ctrl_client.subscribe(
                             ENCODE_MODE_OVERRIDE_TOPIC, qos=1)
                         self._ctrl_client.subscribe(KEYFRAME_REQ_TOPIC, qos=0)
+                        self._ctrl_client.subscribe(TILE_STALE_TOPIC, qos=0)
                 self._ctrl_client.on_connect = _ctrl_on_connect
                 self._ctrl_client.connect(self.ctrl_mqtt_host,
                                           self.mqtt_port, keepalive=30)

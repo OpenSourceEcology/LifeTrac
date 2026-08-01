@@ -58,16 +58,24 @@
 #define HOST_TXQ_P0_RESERVED          1U        /* per Claude §H5: keep one P0 */
 
 /* Diagnostic/prototyping controls. Keep these conservative in production.
- * F9 (2026-07-30): production RX arming no longer depends on this flag —
- * host_reg_gate.c accepts opmode {0x80,0x81,0x85} unconditionally — so 0
- * is now VIABLE in production. Override with
- *   make EXTRA_CFLAGS="-DHOST_ALLOW_REG_WRITE_DIAG=0"
- * (EXTRA_CFLAGS, not CFLAGS= which clobbers the MCU flag set). Default
- * stays 1 for one bench soak cycle: the T2 TCXO probe writes opmode
- * 0x00/0x01 and the SPI-isolation probe writes 0x83, plus registers
- * 0x40/0x33/... — all need diag builds. Flip in a separate commit. */
+ * F9 (2026-07-30): production RX arming does not depend on this flag —
+ * host_reg_gate.c accepts opmode {0x80,0x81,0x85} unconditionally.
+ *
+ * DEFAULT FLIPPED TO 0 on 2026-08-01 after the soak passed on air:
+ * a flag=0 build was flashed to both boards, the wire probe confirmed
+ * production arming ACKs while 0x1D and raw-TX 0x83 are FORBIDDEN, and
+ * a full 360 s FHSS bench run (1318 frames, rx_decode_err=0) ran clean
+ * (bench-evidence/FW_BATCH1_acceptance_2026-07-30). Production builds
+ * now ship with the 13-register diagnostic surface CLOSED — including
+ * 0x1D/0x1E, the FCC airtime-invariant bypass.
+ *
+ * Bench/diagnostic builds (T2 TCXO probe writes opmode 0x00/0x01, the
+ * SPI-isolation probe writes 0x83, plus registers 0x40/0x33/...) must
+ * now build with:
+ *   make EXTRA_CFLAGS="-DHOST_ALLOW_REG_WRITE_DIAG=1"
+ * (EXTRA_CFLAGS, not CFLAGS= which clobbers the MCU flag set.) */
 #ifndef HOST_ALLOW_REG_WRITE_DIAG
-#define HOST_ALLOW_REG_WRITE_DIAG     1
+#define HOST_ALLOW_REG_WRITE_DIAG     0
 #endif
 /* RS-3.7 (2026-07-25): was 1 — every nonzero radio-event batch emitted a
  * ~16-wire-byte debug URC through the blocking TX path. Bench builds can

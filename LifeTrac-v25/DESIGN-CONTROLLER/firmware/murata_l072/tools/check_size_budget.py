@@ -179,13 +179,23 @@ def main() -> int:
     defines = load_defines(args.memory_map)
     cache: Dict[str, int] = {}
 
+    # RS-5.8 (2026-08-01): re-anchored to the UNIFIED flash layout. The
+    # separate BOOT region was removed by the flash-layout remediation
+    # (MM_BOOT_BASE/MM_BOOT_SIZE no longer exist in memory_map.h), and
+    # MM_APP_SIZE == MM_FLASH_SIZE (192K) is nominal, not enforceable —
+    # the REAL hazard is the app load image growing into the CFG region
+    # at MM_CFG_BASE. The enforced budget is therefore
+    # [MM_APP_BASE, MM_CFG_BASE), which also naturally excludes the
+    # .cfg_reserved section that starts AT cfg_base.
+    #
+    # Historical note: this script asserted the pre-unification schema
+    # and had ALSO been crashing on C comments in macro values since
+    # 2026-05-10 — so the L072 cross-compile CI job was red for months
+    # and the size budget was never actually enforced. Both fixed.
     app_base = eval_macro("MM_APP_BASE", defines, cache, set())
-    app_size = eval_macro("MM_APP_SIZE", defines, cache, set())
-    app_end = app_base + app_size
-
-    boot_base = eval_macro("MM_BOOT_BASE", defines, cache, set())
-    boot_size = eval_macro("MM_BOOT_SIZE", defines, cache, set())
-    boot_end = boot_base + boot_size
+    cfg_base = eval_macro("MM_CFG_BASE", defines, cache, set())
+    app_size = cfg_base - app_base
+    app_end = cfg_base
 
     ram_base = eval_macro("MM_RAM_BASE", defines, cache, set())
     ram_size = eval_macro("MM_RAM_SIZE", defines, cache, set())
@@ -197,15 +207,11 @@ def main() -> int:
     sections, size_stdout = parse_size_sections(args.elf)
 
     app_used = 0
-    boot_used = 0
     ram_used = 0
 
     for section_name, (section_size, section_addr) in sections.items():
         if section_size == 0:
             continue
-
-        if boot_base <= section_addr < boot_end:
-            boot_used += section_size
 
         if app_base <= section_addr < app_end:
             app_used += section_size
@@ -220,8 +226,7 @@ def main() -> int:
     app_ok = app_used <= app_size
     ram_ok = ram_used <= ram_budget
 
-    print("[size-budget] Region usage summary")
-    print(f"  BOOT used : {fmt_kib(boot_used)} / {fmt_kib(boot_size)}")
+    print("[size-budget] Region usage summary (unified layout: app budget ends at MM_CFG_BASE)")
     print(f"  APP used  : {fmt_kib(app_used)} / {fmt_kib(app_size)}")
     print(f"  RAM used  : {fmt_kib(ram_used)} / {fmt_kib(ram_budget)} (stack reserved: {fmt_kib(stack_size)})")
 

@@ -127,7 +127,7 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 
 One paragraph per finding, newest context first; every claim carries evidence
 in `bench-evidence/` or a commit. PR #86 (merged, `ffae3e51`) holds the bench
-campaign; PR #87 (open) holds firmware Batch 1.
+campaign; PR #87 (merged, `47cff1b7`) holds firmware Batch 1.
 
 **Link measurements that changed the architecture.**
 - **The ack was destroying the command channel**: suppressing the tractor echo
@@ -168,9 +168,11 @@ campaign; PR #87 (open) holds firmware Batch 1.
   power change (allowance 17, configured 14). Residual: RS-10.18.
 - **FHSS per-link hop seed** (CFG 0x17/0x18; was hardcoded (0,0,0) — every
   radio hopped identically). `LIFETRAC_FHSS_LINK_ID` is LINK-scoped.
-- **Batch 1 code-complete on PR #87** (F7 phase bias, F8 RX_FRAME_URC phase
-  tail, F9 opmode gate, F6 epoch-drift lock-out with grid adoption). 27 bench
-  targets green; NOT yet flashed — acceptance checklist below.
+- **Batch 1 merged on PR #87 (`47cff1b7`) and ACCEPTED ON AIR 2026-07-30**
+  (F7 phase bias, F8 RX_FRAME_URC phase tail, F9 opmode gate, F6 epoch-drift
+  lock-out with grid adoption). All four verified on the two-board bench —
+  see `bench-evidence/FW_BATCH1_acceptance_2026-07-30/RESULTS.md` and the
+  checked-off acceptance list below.
 
 **Instruments and infrastructure.**
 - Loss attribution (`lost_frag_idx`, `air_gap_by_class`) with out-of-order
@@ -1274,7 +1276,16 @@ No-regrets work, correct under every surviving architecture (do first):
     decided by the 53 test files that mutate `sys.path`. It is an
     order-dependent failure, not a logic defect — do not "fix" the assertion.
 
-- [ ] **RS-5.8 The L072 flash size budget has never actually been enforced.**
+- [x] **RS-5.8 CLOSED 2026-08-01 (branch `post-batch1-cleanup`).** Decision:
+  under the unified layout the enforceable hazard is the app load image
+  growing into the CFG region, so the budget is **[MM_APP_BASE, MM_CFG_BASE)
+  = 184 KB** — `MM_APP_SIZE` (192 K nominal) is not the guard. The checker now
+  evaluates exactly that (`app_size = MM_CFG_BASE - MM_APP_BASE`), and the
+  Makefile banner was reconciled to the same wording ("APP = 184 KB (unified;
+  boot merged, RS-5.8)"), one source of truth. Passes locally at 23,036 B
+  load-image / 184 KB. This should turn the months-red "L072 cross-compile"
+  CI job green for the first time. Original item follows.
+- [ ] **RS-5.8 (original) The L072 flash size budget has never actually been enforced.**
   `tools/check_size_budget.py` (added `e599269b`, 2026-05-05) is run by the
   "L072 cross-compile" CI job after `arm-none-eabi-size`, and that job has been
   **red for months** — so the guard against overflowing the 192 KB part has
@@ -1907,24 +1918,48 @@ for whoever tries to use one; the decision for each is *wire it or delete it*.
   and it is the companion signal to the RS-10.2 coding-rate trigger. Small fix,
   do it before the first field run.
 
-### Firmware Batch 1 status (2026-07-30): CODE-COMPLETE, awaiting flash
+### Firmware Batch 1 status (2026-07-30): MERGED + ACCEPTED ON AIR
 
-F6/F7/F8/F9 are implemented on PR #87 (branch `fw-batch1-f6-f9`) against the
-verified maps in [`FIRMWARE_BATCH1_MAPS.md`](FIRMWARE_BATCH1_MAPS.md), host
-suites green (27 bench targets, 1079 python). NOT yet flashed. On-air
-acceptance, in order, next flash session:
-1. Flash H7 FIRST (relaxed RX_FRAME parser), then L072 — reversed order
-   freezes the H7's rx_frame_count under Method-G.
-2. Re-push `method_h_stage2_tx_probe_v2.py` to both X8s (stale deployed copy
-   keeps the old parse_rx_frame dict shape and hides the F8 telemetry).
-3. FHSS two-board run: every RX_FRAME_URC flags=1, epoch/hop advancing,
-   slot_offset <= guard (verifies F7+F8).
-4. Force a demotion; confirm re-adoption within one acquisition while both
-   nodes transmit (verifies F6 — the s_grid_adopted flag is air-testable
-   only).
-5. One build with `EXTRA_CFLAGS=-DHOST_ALLOW_REG_WRITE_DIAG=0`: arming works,
-   profile switch completes without the revert path, 0x1D write FORBIDDEN
-   (verifies F9). The default flip is a separate commit after this soak.
+F6/F7/F8/F9 merged on PR #87 (`47cff1b7`) against the verified maps in
+[`FIRMWARE_BATCH1_MAPS.md`](FIRMWARE_BATCH1_MAPS.md), host suites green
+(27 bench targets, 1079 python). Flash session ran 2026-07-30; all five
+acceptance steps passed — full record in
+`bench-evidence/FW_BATCH1_acceptance_2026-07-30/RESULTS.md`:
+1. [x] Flash H7 FIRST (relaxed RX_FRAME parser), then L072 — done in that
+   order; Method-G rx_frame_count live throughout.
+2. [x] Re-pushed `method_h_stage2_tx_probe_v2.py` to both X8s.
+3. [x] FHSS two-board run: phase_telemetry valid=all, epoch exactly 1/10 s,
+   slot_off 14–18 ms (= 12 ms designed head-start + honest delays)
+   (verifies F7+F8).
+4. [x] Forced 30 s silence: demotion, then resume at Δepoch=2 within one
+   acquisition — impossible pre-F6 (verifies F6).
+5. [x] flag=0 build: arming + profile switch clean, 0x1D/0x83 write
+   FORBIDDEN via committed `f9_gate_probe.py`, 360 s soak (verifies F9).
+   Default flipped to 0 on `post-batch1-cleanup` as the follow-up commit;
+   bench builds now need `EXTRA_CFLAGS="-DHOST_ALLOW_REG_WRITE_DIAG=1"`.
+
+### Post-Batch-1 cleanup (2026-08-01, branch `post-batch1-cleanup`)
+
+- [x] **RS-5.8 budget decision + fix** — see the RS-5.8 closure above.
+- [x] **F9 default flip** — `HOST_ALLOW_REG_WRITE_DIAG` now defaults 0 in
+  `config.h` after the passed soak; boards currently run the flag=1 bench
+  build (diag surface needed for bench work).
+- [x] **F10 — `0x6C` CMD_OP_TILE_STALE end-to-end.** The measured-harmful
+  reassembly-timeout keyframe self-heal (+1.88 pts loss, −16% frames, +31%
+  timeouts) is now default-OFF (`LIFETRAC_KF_ON_REASM_TIMEOUT=0`); its
+  legitimate job is covered by the receiver-driven stale-tile report:
+  web_ui scans `Canvas.arrived_ms` every 3 s for tiles >20 s stale (horizon
+  must exceed the encoder sweep rotation — a static-scene receiver cannot
+  tell "static" from "lost" except via the sweep's periodic re-ship) and
+  publishes a u16le base_seq + tile bitmap (14 B at 12×8 ≈ 15.4 ms on air,
+  84× cheaper than the keyframe it replaces); image_rx_daemon radiates one
+  copy per report (level-triggered, no retry); the tractor folds marks into
+  the existing age-escalation by back-dating `tile_last_seq`, so repairs
+  ride the next scheduled frame at zero extra image airtime. Keyframe
+  requests remain for cold start / base_seq mismatch / mode change only.
+  10 new tests; suite 1089/2446 subtests green. **Not yet verified on air**
+  — needs a bench run with deliberate fragment loss to watch a marked tile
+  re-ship (queue for the next flash/bench session).
 
 ### RS-11 — Next-session sequencing, and the one instrument that gates it (added 2026-07-29)
 

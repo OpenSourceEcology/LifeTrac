@@ -981,11 +981,23 @@ CMD_OP_PROBE_ECHO         = 0x6A   # args: u32le seq (tractor -> base)
 # Free by symbol quantization: 9..12 B payload all cost 10.304 ms at
 # BW500, so the 2 B ref costs nothing over a bare skip frame.
 CMD_OP_CTRL_DITTO         = 0x6B   # args: u16le ref_seq
+# F10 (2026-08-01, from the measured keyframe-self-heal harm — RESULTS
+# 2026-07-29 §8): receiver-driven STALE-TILE REPORT, base -> tractor.
+# args: u16le base_seq_ref + u8 bitmap[(n_tiles+7)//8], bit k = tile k
+# has not refreshed on the base canvas within the staleness horizon.
+# ADVISORY dirty marks, not a retransmission command: the tractor folds
+# marked tiles into its existing age-escalation, so the repair rides
+# the next scheduled image frame at zero extra image airtime. Level-
+# triggered — a lost report is superseded by the next one. 14 B body at
+# the 12x8 grid = 15.4 ms on air, vs 1298.8 ms for the keyframe the
+# old self-heal fired (84x cheaper), and the keyframe request remains
+# only for cold start / base_seq mismatch / mode change.
+CMD_OP_TILE_STALE         = 0x6C   # args: u16le base_seq + stale bitmap
 _CMD_OPS = frozenset({CMD_OP_REQ_KEYFRAME, CMD_OP_ENCODE_MODE,
                       CMD_OP_RADIO_PROFILE, CMD_OP_RADIO_PROFILE_ACK,
                       CMD_OP_RADIO_PROFILE_CONF, CMD_OP_ENCODE_MODE_ACK,
                       CMD_OP_PROBE, CMD_OP_PROBE_ECHO,
-                      CMD_OP_CTRL_DITTO})
+                      CMD_OP_CTRL_DITTO, CMD_OP_TILE_STALE})
 COMMAND_FRAME_MAX_ARGS = 200
 
 
@@ -1017,6 +1029,32 @@ def parse_command_frame(body: bytes) -> tuple[int, bytes] | None:
 # A ditto says "re-apply ControlFrame seq=ref_seq" instead of re-sending
 # the whole 16 B frame. See CMD_OP_CTRL_DITTO above for why ref_seq is
 # safety-critical rather than an optimization.
+
+def pack_tile_stale(base_seq: int, stale_indices, n_tiles: int) -> bytes:
+    """F10: args for CMD_OP_TILE_STALE. Pure; raises on out-of-range."""
+    if not 0 < n_tiles <= 1024:
+        raise ValueError(f"n_tiles out of range: {n_tiles}")
+    bitmap = bytearray((n_tiles + 7) // 8)
+    for idx in stale_indices:
+        i = int(idx)
+        if not 0 <= i < n_tiles:
+            raise ValueError(f"tile index {i} out of range for {n_tiles}")
+        bitmap[i // 8] |= 1 << (i % 8)
+    return (int(base_seq) & 0xFFFF).to_bytes(2, "little") + bytes(bitmap)
+
+
+def parse_tile_stale(args: bytes) -> "tuple[int, list[int]] | None":
+    """F10: inverse of pack_tile_stale. None on a truncated body."""
+    if len(args) < 3:
+        return None
+    base_seq = int.from_bytes(args[0:2], "little")
+    out = []
+    for byte_i, b in enumerate(args[2:]):
+        for bit in range(8):
+            if b & (1 << bit):
+                out.append(byte_i * 8 + bit)
+    return base_seq, out
+
 
 def pack_ctrl_ditto(ref_seq: int) -> bytes:
     """Pack a ditto referencing the ControlFrame sequence being repeated."""
