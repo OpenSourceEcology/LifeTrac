@@ -7,6 +7,7 @@
 #include "host_types.h"
 #include "host_uart.h"
 #include "host_rx_wire.h"
+#include "host_reg_gate.h"
 #include "platform.h"
 #include "sx1276.h"
 #include "sx1276_modes.h"   /* RS-4.12: sync raw opmode writes */
@@ -517,31 +518,9 @@ static void handle_tx_frame(const host_frame_t *frame) {
     }
 }
 
-static bool reg_write_allowed(uint8_t reg_addr) {
-#if HOST_ALLOW_REG_WRITE_DIAG
-    switch (reg_addr) {
-        case 0x01U:  /* W1-9 diag: allow OPMODE for SPI-write isolation */
-        case 0x06U:
-        case 0x07U:
-        case 0x08U:
-        case 0x09U:
-        case 0x1DU:
-        case 0x1EU:
-        case 0x26U:
-        case 0x31U:
-        case 0x33U:  /* 2026-05-25: RegInvertIQ -- host-side IQ-normalize diag */
-        case 0x37U:
-        case 0x3BU:  /* 2026-05-25: RegInvertIQ2 -- companion to 0x33 */
-        case 0x40U:  /* W1-9 diag: allow DIO_MAPPING1 */
-            return true;
-        default:
-            return false;
-    }
-#else
-    (void)reg_addr;
-    return false;
-#endif
-}
+/* F9 (2026-07-30): the acceptance policy moved to host_reg_gate.c so the
+ * bench can pin it; production opmode values {0x80,0x81,0x85} are now
+ * accepted regardless of HOST_ALLOW_REG_WRITE_DIAG. */
 
 static void handle_reg_read(const host_frame_t *frame) {
     uint8_t payload[2];
@@ -575,7 +554,8 @@ static void handle_reg_write(const host_frame_t *frame) {
         return;
     }
 
-    if (!reg_write_allowed(frame->payload[0])) {
+    if (!host_reg_write_allowed(frame->payload[0], frame->payload[1],
+                                HOST_ALLOW_REG_WRITE_DIAG != 0)) {
         host_uart_send_err_proto(frame->seq,
                                  frame->type,
                                  frame->ver,
