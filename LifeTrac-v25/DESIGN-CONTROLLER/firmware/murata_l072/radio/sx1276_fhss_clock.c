@@ -49,3 +49,9 @@ void sx1276_fhss_clock_anchor_rx(uint32_t rx_done_ms, uint32_t toa_us,
     sx1276_fhss_clock_anchor(rx_done_ms - toa_ms - (uint32_t)slot_offset_ms,
                              abs_slot);
 }
+
+uint32_t sx1276_fhss_clock_age_ms(uint32_t now_ms) {
+    /* F6: caller gates on clock_valid(); wrap-safe by the same u32
+     * idiom the rest of this TU uses. */
+    return now_ms - s_clk.anchor_ms;
+}

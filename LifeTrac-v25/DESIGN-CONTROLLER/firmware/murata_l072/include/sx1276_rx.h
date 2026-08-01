@@ -35,17 +35,17 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame);
 
 /*
  * FCC-A6b-2-ii-β: per-decision counters for the snap-policy gate.
- * Indexed by sx1276_fhss_snap_decision_t (0..4). Mutated only under
+ * Indexed by sx1276_fhss_snap_decision_t (0..5). Mutated only under
  * LIFETRAC_FHSS_TX_ROUTED (consider_remote() is called from
  * sx1276_rx_service after a successful A6a header parse). The
  * getter is unconditionally available so FCC-B1-SUMMARY can read it
  * without an ifdef wrapper — when unrouted, all entries are zero.
  *
- * Drop visibility (REJECTED_BAD_HOP / REJECTED_EPOCH_DRIFT,
+ * Drop visibility (REJECTED_BAD_HOP / REJECTED_EPOCH_DRIFT / REJECTED_LOCKED_OUT,
  * REJECTED_NOT_INIT) lives here rather than in host_stats to avoid
  * bumping the host↔X8 SerialRPC wire layout — FCC-B1-SUMMARY will
  * expose these via an additive URC, not via a host_stats field. */
-#define SX1276_RX_CONSIDER_REMOTE_COUNT_DIM 5U
+#define SX1276_RX_CONSIDER_REMOTE_COUNT_DIM 6U
 void sx1276_rx_consider_remote_counts(
     uint32_t out_counts[SX1276_RX_CONSIDER_REMOTE_COUNT_DIM]);
 void sx1276_rx_consider_remote_counts_reset(void);

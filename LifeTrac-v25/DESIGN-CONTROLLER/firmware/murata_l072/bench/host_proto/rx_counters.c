@@ -64,6 +64,7 @@ static void test_each_slot_increments_in_isolation(void) {
         SX1276_FHSS_SNAP_DEC_REJECTED_NOT_INIT,
         SX1276_FHSS_SNAP_DEC_REJECTED_BAD_HOP,
         SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT,
+        SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT,
     };
     for (size_t k = 0; k < sizeof(all) / sizeof(all[0]); ++k) {
         uint32_t counts[SX1276_RX_CONSIDER_REMOTE_COUNT_DIM];
@@ -210,11 +211,11 @@ static void test_dim_matches_enum(void) {
     /* Catches a future enum addition that forgets to bump the DIM
      * constant — record() would silently drop the new value. */
     CHECK(SX1276_RX_CONSIDER_REMOTE_COUNT_DIM ==
-              ((uint32_t)SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT + 1U),
+              ((uint32_t)SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT + 1U),
           "SX1276_RX_CONSIDER_REMOTE_COUNT_DIM (%u) must equal "
           "max-enum + 1 (%u)",
           SX1276_RX_CONSIDER_REMOTE_COUNT_DIM,
-          (unsigned int)SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT + 1U);
+          (unsigned int)SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT + 1U);
 }
 
 static void test_round_trip_after_reset_is_fresh(void) {

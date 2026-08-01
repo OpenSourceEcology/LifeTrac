@@ -191,7 +191,7 @@ Discarded input sections
  .text.sx1276_rx_consider_remote_counts
                 0x00000000       0x18 build/radio/sx1276_rx_counters.o
  .text.sx1276_rx_consider_remote_counts_reset
-                0x00000000       0x14 build/radio/sx1276_rx_counters.o
+                0x00000000       0x18 build/radio/sx1276_rx_counters.o
  .comment       0x00000000       0x56 build/radio/sx1276_rx_counters.o
  .text          0x00000000        0x0 build/radio/sx1276_rx_retune_policy.o
  .data          0x00000000        0x0 build/radio/sx1276_rx_retune_policy.o
@@ -401,7 +401,7 @@ END GROUP
 .boot_rodata    0x080000c4       0x14
  .boot_rodata   0x080000c4       0x14 build/boot/safe_mode.o
 
-.text           0x080000d8     0x5690
+.text           0x080000d8     0x56fc
                 0x080000d8                        . = ALIGN (0x4)
  *(.text)
  .text          0x080000d8       0x14 c:/program files (x86)/arm gnu toolchain arm-none-eabi/12.2 mpacbti-rel1/bin/../lib/gcc/arm-none-eabi/12.2.1/thumb/v6-m/nofp\libgcc.a(_thumb1_case_uqi.o)
@@ -891,310 +891,313 @@ END GROUP
                 0x080037ec       0x34 build/radio/sx1276_fhss.o
                 0x080037ec                sx1276_fhss_snap_to
  .text.sx1276_fhss_consider_remote
-                0x08003820       0x58 build/radio/sx1276_fhss.o
+                0x08003820       0x60 build/radio/sx1276_fhss.o
                 0x08003820                sx1276_fhss_consider_remote
  .text.sx1276_fhss_active_count
-                0x08003878       0x40 build/radio/sx1276_fhss.o
-                0x08003878                sx1276_fhss_active_count
+                0x08003880       0x40 build/radio/sx1276_fhss.o
+                0x08003880                sx1276_fhss_active_count
  .text.sx1276_fhss_record_lbt_block
-                0x080038b8       0x1c build/radio/sx1276_fhss.o
-                0x080038b8                sx1276_fhss_record_lbt_block
+                0x080038c0       0x1c build/radio/sx1276_fhss.o
+                0x080038c0                sx1276_fhss_record_lbt_block
  .text.sx1276_fhss_record_hop
-                0x080038d4       0x20 build/radio/sx1276_fhss.o
-                0x080038d4                sx1276_fhss_record_hop
+                0x080038dc       0x20 build/radio/sx1276_fhss.o
+                0x080038dc                sx1276_fhss_record_hop
  .text.sx1276_fhss_hop_count_snapshot_and_clear
-                0x080038f4       0x2c build/radio/sx1276_fhss.o
-                0x080038f4                sx1276_fhss_hop_count_snapshot_and_clear
+                0x080038fc       0x2c build/radio/sx1276_fhss.o
+                0x080038fc                sx1276_fhss_hop_count_snapshot_and_clear
  .text.sx1276_fhss_current_epoch
-                0x08003920        0xc build/radio/sx1276_fhss.o
-                0x08003920                sx1276_fhss_current_epoch
+                0x08003928        0xc build/radio/sx1276_fhss.o
+                0x08003928                sx1276_fhss_current_epoch
  .text.sx1276_fhss_current_slot
-                0x0800392c        0xc build/radio/sx1276_fhss.o
-                0x0800392c                sx1276_fhss_current_slot
+                0x08003934        0xc build/radio/sx1276_fhss.o
+                0x08003934                sx1276_fhss_current_slot
  .text.sx1276_fhss_is_initialized
-                0x08003938        0xc build/radio/sx1276_fhss.o
-                0x08003938                sx1276_fhss_is_initialized
+                0x08003940        0xc build/radio/sx1276_fhss.o
+                0x08003940                sx1276_fhss_is_initialized
  .text.sx1276_fhss_clock_reset
-                0x08003944       0x10 build/radio/sx1276_fhss_clock.o
-                0x08003944                sx1276_fhss_clock_reset
+                0x0800394c       0x10 build/radio/sx1276_fhss_clock.o
+                0x0800394c                sx1276_fhss_clock_reset
  .text.sx1276_fhss_clock_anchor
-                0x08003954       0x10 build/radio/sx1276_fhss_clock.o
-                0x08003954                sx1276_fhss_clock_anchor
+                0x0800395c       0x10 build/radio/sx1276_fhss_clock.o
+                0x0800395c                sx1276_fhss_clock_anchor
  .text.sx1276_fhss_clock_valid
-                0x08003964        0xc build/radio/sx1276_fhss_clock.o
-                0x08003964                sx1276_fhss_clock_valid
+                0x0800396c        0xc build/radio/sx1276_fhss_clock.o
+                0x0800396c                sx1276_fhss_clock_valid
  .text.sx1276_fhss_clock_abs_slot
-                0x08003970       0x18 build/radio/sx1276_fhss_clock.o
-                0x08003970                sx1276_fhss_clock_abs_slot
+                0x08003978       0x18 build/radio/sx1276_fhss_clock.o
+                0x08003978                sx1276_fhss_clock_abs_slot
  .text.sx1276_fhss_clock_in_slot_ms
-                0x08003988       0x18 build/radio/sx1276_fhss_clock.o
-                0x08003988                sx1276_fhss_clock_in_slot_ms
+                0x08003990       0x18 build/radio/sx1276_fhss_clock.o
+                0x08003990                sx1276_fhss_clock_in_slot_ms
  .text.sx1276_fhss_clock_anchor_rx
-                0x080039a0       0x28 build/radio/sx1276_fhss_clock.o
-                0x080039a0                sx1276_fhss_clock_anchor_rx
+                0x080039a8       0x28 build/radio/sx1276_fhss_clock.o
+                0x080039a8                sx1276_fhss_clock_anchor_rx
+ .text.sx1276_fhss_clock_age_ms
+                0x080039d0        0xc build/radio/sx1276_fhss_clock.o
+                0x080039d0                sx1276_fhss_clock_age_ms
  .text.lbt_arm_backoff
-                0x080039c8       0x38 build/radio/sx1276_lbt.o
+                0x080039dc       0x38 build/radio/sx1276_lbt.o
  .text.cfg_read_u8
-                0x08003a00       0x30 build/radio/sx1276_lbt.o
+                0x08003a14       0x30 build/radio/sx1276_lbt.o
  .text.sx1276_lbt_check_and_backoff
-                0x08003a30      0x108 build/radio/sx1276_lbt.o
-                0x08003a30                sx1276_lbt_check_and_backoff
+                0x08003a44      0x108 build/radio/sx1276_lbt.o
+                0x08003a44                sx1276_lbt_check_and_backoff
  .text.sx1276_legal_dwell_used_us
-                0x08003b38       0x50 build/radio/sx1276_legal_dwell.o
-                0x08003b38                sx1276_legal_dwell_used_us
+                0x08003b4c       0x50 build/radio/sx1276_legal_dwell.o
+                0x08003b4c                sx1276_legal_dwell_used_us
  .text.sx1276_legal_dwell_reserve
-                0x08003b88       0xc4 build/radio/sx1276_legal_dwell.o
-                0x08003b88                sx1276_legal_dwell_reserve
+                0x08003b9c       0xc4 build/radio/sx1276_legal_dwell.o
+                0x08003b9c                sx1276_legal_dwell_reserve
  .text.sx1276_legal_dwell_reconcile
-                0x08003c4c       0x34 build/radio/sx1276_legal_dwell.o
-                0x08003c4c                sx1276_legal_dwell_reconcile
+                0x08003c60       0x34 build/radio/sx1276_legal_dwell.o
+                0x08003c60                sx1276_legal_dwell_reconcile
  .text.sx1276_legal_dwell_peak_us_snapshot_and_clear
-                0x08003c80       0x20 build/radio/sx1276_legal_dwell.o
-                0x08003c80                sx1276_legal_dwell_peak_us_snapshot_and_clear
+                0x08003c94       0x20 build/radio/sx1276_legal_dwell.o
+                0x08003c94                sx1276_legal_dwell_peak_us_snapshot_and_clear
  .text.mode_desc_for_state
-                0x08003ca0       0x30 build/radio/sx1276_modes.o
+                0x08003cb4       0x30 build/radio/sx1276_modes.o
  .text.sx1276_delay_us
-                0x08003cd0       0x16 build/radio/sx1276_modes.o
- *fill*         0x08003ce6        0x2 
+                0x08003ce4       0x16 build/radio/sx1276_modes.o
+ *fill*         0x08003cfa        0x2 
  .text.sx1276_modes_apply
-                0x08003ce8       0xb8 build/radio/sx1276_modes.o
+                0x08003cfc       0xb8 build/radio/sx1276_modes.o
  .text.sx1276_modes_get_state
-                0x08003da0        0xc build/radio/sx1276_modes.o
-                0x08003da0                sx1276_modes_get_state
+                0x08003db4        0xc build/radio/sx1276_modes.o
+                0x08003db4                sx1276_modes_get_state
  .text.sx1276_modes_sync_external
-                0x08003dac       0x34 build/radio/sx1276_modes.o
-                0x08003dac                sx1276_modes_sync_external
+                0x08003dc0       0x34 build/radio/sx1276_modes.o
+                0x08003dc0                sx1276_modes_sync_external
  .text.sx1276_modes_to_sleep
-                0x08003de0        0xe build/radio/sx1276_modes.o
-                0x08003de0                sx1276_modes_to_sleep
+                0x08003df4        0xe build/radio/sx1276_modes.o
+                0x08003df4                sx1276_modes_to_sleep
  .text.sx1276_modes_to_standby
-                0x08003dee        0xe build/radio/sx1276_modes.o
-                0x08003dee                sx1276_modes_to_standby
+                0x08003e02        0xe build/radio/sx1276_modes.o
+                0x08003e02                sx1276_modes_to_standby
  .text.sx1276_modes_to_tx
-                0x08003dfc        0xe build/radio/sx1276_modes.o
-                0x08003dfc                sx1276_modes_to_tx
+                0x08003e10        0xe build/radio/sx1276_modes.o
+                0x08003e10                sx1276_modes_to_tx
  .text.sx1276_modes_to_rx_cont
-                0x08003e0a        0xe build/radio/sx1276_modes.o
-                0x08003e0a                sx1276_modes_to_rx_cont
+                0x08003e1e        0xe build/radio/sx1276_modes.o
+                0x08003e1e                sx1276_modes_to_rx_cont
  .text.sx1276_modes_to_cad
-                0x08003e18       0x16 build/radio/sx1276_modes.o
-                0x08003e18                sx1276_modes_to_cad
- *fill*         0x08003e2e        0x2 
+                0x08003e2c       0x16 build/radio/sx1276_modes.o
+                0x08003e2c                sx1276_modes_to_cad
+ *fill*         0x08003e42        0x2 
  .text.sx1276_modes_init
-                0x08003e30       0x48 build/radio/sx1276_modes.o
-                0x08003e30                sx1276_modes_init
+                0x08003e44       0x48 build/radio/sx1276_modes.o
+                0x08003e44                sx1276_modes_init
  .text.rx_pll_settle_busy_wait.constprop.0
-                0x08003e78       0x18 build/radio/sx1276_rx.o
+                0x08003e8c       0x18 build/radio/sx1276_rx.o
  .text.sx1276_rx_arm
-                0x08003e90       0x2a build/radio/sx1276_rx.o
-                0x08003e90                sx1276_rx_arm
- *fill*         0x08003eba        0x2 
+                0x08003ea4       0x2a build/radio/sx1276_rx.o
+                0x08003ea4                sx1276_rx_arm
+ *fill*         0x08003ece        0x2 
  .text.scan_dispatch_action
-                0x08003ebc       0xcc build/radio/sx1276_rx.o
+                0x08003ed0       0xcc build/radio/sx1276_rx.o
  .text.scan_drive
-                0x08003f88       0xa0 build/radio/sx1276_rx.o
+                0x08003f9c       0xa8 build/radio/sx1276_rx.o
  .text.scan_feed_frame
-                0x08004028       0x18 build/radio/sx1276_rx.o
+                0x08004044       0x18 build/radio/sx1276_rx.o
  .text.sx1276_rx_disarm
-                0x08004040        0x8 build/radio/sx1276_rx.o
-                0x08004040                sx1276_rx_disarm
+                0x0800405c        0x8 build/radio/sx1276_rx.o
+                0x0800405c                sx1276_rx_disarm
  .text.sx1276_rx_service
-                0x08004048      0x15c build/radio/sx1276_rx.o
-                0x08004048                sx1276_rx_service
+                0x08004064      0x194 build/radio/sx1276_rx.o
+                0x08004064                sx1276_rx_service
  .text.sx1276_rx_tick
-                0x080041a4       0x8c build/radio/sx1276_rx.o
-                0x080041a4                sx1276_rx_tick
+                0x080041f8       0x8c build/radio/sx1276_rx.o
+                0x080041f8                sx1276_rx_tick
  .text.sx1276_rx_scan_tick
-                0x08004230        0xe build/radio/sx1276_rx.o
-                0x08004230                sx1276_rx_scan_tick
- *fill*         0x0800423e        0x2 
+                0x08004284        0xe build/radio/sx1276_rx.o
+                0x08004284                sx1276_rx_scan_tick
+ *fill*         0x08004292        0x2 
  .text.sx1276_rx_slot_follow
-                0x08004240       0x8c build/radio/sx1276_rx.o
-                0x08004240                sx1276_rx_slot_follow
+                0x08004294       0x8c build/radio/sx1276_rx.o
+                0x08004294                sx1276_rx_slot_follow
  .text.sx1276_rx_scan_reset
-                0x080042cc       0x3c build/radio/sx1276_rx.o
-                0x080042cc                sx1276_rx_scan_reset
+                0x08004320       0x44 build/radio/sx1276_rx.o
+                0x08004320                sx1276_rx_scan_reset
  .text.sx1276_rx_counter_record
-                0x08004308       0x18 build/radio/sx1276_rx_counters.o
-                0x08004308                sx1276_rx_counter_record
+                0x08004364       0x18 build/radio/sx1276_rx_counters.o
+                0x08004364                sx1276_rx_counter_record
  .text.sx1276_rx_retune_eval
-                0x08004320       0x26 build/radio/sx1276_rx_retune_policy.o
-                0x08004320                sx1276_rx_retune_eval
- *fill*         0x08004346        0x2 
+                0x0800437c       0x26 build/radio/sx1276_rx_retune_policy.o
+                0x0800437c                sx1276_rx_retune_eval
+ *fill*         0x080043a2        0x2 
  .text.sx1276_rx_retune_counter_record
-                0x08004348       0x18 build/radio/sx1276_rx_retune_counters.o
-                0x08004348                sx1276_rx_retune_counter_record
+                0x080043a4       0x18 build/radio/sx1276_rx_retune_counters.o
+                0x080043a4                sx1276_rx_retune_counter_record
  .text.sx1276_rx_scan_eval
-                0x08004360       0xac build/radio/sx1276_rx_scan_policy.o
-                0x08004360                sx1276_rx_scan_eval
+                0x080043bc       0xac build/radio/sx1276_rx_scan_policy.o
+                0x080043bc                sx1276_rx_scan_eval
  .text.sx1276_rx_scan_counter_record
-                0x0800440c       0x30 build/radio/sx1276_rx_scan_counters.o
-                0x0800440c                sx1276_rx_scan_counter_record
+                0x08004468       0x30 build/radio/sx1276_rx_scan_counters.o
+                0x08004468                sx1276_rx_scan_counter_record
  .text.sx1276_rx_scan_fail_eval
-                0x0800443c       0x5e build/radio/sx1276_rx_scan_fail.o
-                0x0800443c                sx1276_rx_scan_fail_eval
- *fill*         0x0800449a        0x2 
+                0x08004498       0x5e build/radio/sx1276_rx_scan_fail.o
+                0x08004498                sx1276_rx_scan_fail_eval
+ *fill*         0x080044f6        0x2 
  .text.sx1276_rx_scan_walker_reset
-                0x0800449c        0xc build/radio/sx1276_rx_scan_walker.o
-                0x0800449c                sx1276_rx_scan_walker_reset
+                0x080044f8        0xc build/radio/sx1276_rx_scan_walker.o
+                0x080044f8                sx1276_rx_scan_walker_reset
  .text.sx1276_rx_scan_walker_next
-                0x080044a8       0x28 build/radio/sx1276_rx_scan_walker.o
-                0x080044a8                sx1276_rx_scan_walker_next
+                0x08004504       0x28 build/radio/sx1276_rx_scan_walker.o
+                0x08004504                sx1276_rx_scan_walker_next
  .text.tx_emit_rfco_pertx
-                0x080044d0       0x70 build/radio/sx1276_tx.o
+                0x0800452c       0x70 build/radio/sx1276_tx.o
  .text.sx1276_tx_cleanup
-                0x08004540       0x2c build/radio/sx1276_tx.o
+                0x0800459c       0x2c build/radio/sx1276_tx.o
  .text.sx1276_tx_begin
-                0x0800456c      0x340 build/radio/sx1276_tx.o
-                0x0800456c                sx1276_tx_begin
+                0x080045c8      0x350 build/radio/sx1276_tx.o
+                0x080045c8                sx1276_tx_begin
  .text.sx1276_tx_poll
-                0x080048ac       0xd0 build/radio/sx1276_tx.o
-                0x080048ac                sx1276_tx_poll
+                0x08004918       0xd0 build/radio/sx1276_tx.o
+                0x08004918                sx1276_tx_poll
  .text.sx1276_tx_busy
-                0x0800497c       0x10 build/radio/sx1276_tx.o
-                0x0800497c                sx1276_tx_busy
+                0x080049e8       0x10 build/radio/sx1276_tx.o
+                0x080049e8                sx1276_tx_busy
  .text.sx1276_tx_slot_wait_us
-                0x0800498c       0x6c build/radio/sx1276_tx.o
-                0x0800498c                sx1276_tx_slot_wait_us
+                0x080049f8       0x6c build/radio/sx1276_tx.o
+                0x080049f8                sx1276_tx_slot_wait_us
  .text.gpio_mode_output
-                0x080049f8       0x32 build/radio/sx1276.o
+                0x08004a64       0x32 build/radio/sx1276.o
  .text.gpio_mode_input
-                0x08004a2a       0x14 build/radio/sx1276.o
- *fill*         0x08004a3e        0x2 
+                0x08004a96       0x14 build/radio/sx1276.o
+ *fill*         0x08004aaa        0x2 
  .text.spi1_transfer
-                0x08004a40       0x2c build/radio/sx1276.o
+                0x08004aac       0x2c build/radio/sx1276.o
  .text.sx1276_select
-                0x08004a6c       0x18 build/radio/sx1276.o
+                0x08004ad8       0x18 build/radio/sx1276.o
  .text.sx1276_radio_reset
-                0x08004a84       0x34 build/radio/sx1276.o
-                0x08004a84                sx1276_radio_reset
+                0x08004af0       0x34 build/radio/sx1276.o
+                0x08004af0                sx1276_radio_reset
  .text.sx1276_read_reg
-                0x08004ab8       0x24 build/radio/sx1276.o
-                0x08004ab8                sx1276_read_reg
+                0x08004b24       0x24 build/radio/sx1276.o
+                0x08004b24                sx1276_read_reg
  .text.sx1276_write_reg
-                0x08004adc       0x22 build/radio/sx1276.o
-                0x08004adc                sx1276_write_reg
+                0x08004b48       0x22 build/radio/sx1276.o
+                0x08004b48                sx1276_write_reg
  .text.sx1276_read_burst
-                0x08004afe       0x2e build/radio/sx1276.o
-                0x08004afe                sx1276_read_burst
+                0x08004b6a       0x2e build/radio/sx1276.o
+                0x08004b6a                sx1276_read_burst
  .text.sx1276_write_burst
-                0x08004b2c       0x2e build/radio/sx1276.o
-                0x08004b2c                sx1276_write_burst
+                0x08004b98       0x2e build/radio/sx1276.o
+                0x08004b98                sx1276_write_burst
  .text.sx1276_read_version
-                0x08004b5a        0xa build/radio/sx1276.o
-                0x08004b5a                sx1276_read_version
+                0x08004bc6        0xa build/radio/sx1276.o
+                0x08004bc6                sx1276_read_version
  .text.sx1276_set_frequency_hz
-                0x08004b64       0x34 build/radio/sx1276.o
-                0x08004b64                sx1276_set_frequency_hz
+                0x08004bd0       0x34 build/radio/sx1276.o
+                0x08004bd0                sx1276_set_frequency_hz
  .text.sx1276_set_tx_power_dbm
-                0x08004b98       0x26 build/radio/sx1276.o
-                0x08004b98                sx1276_set_tx_power_dbm
- *fill*         0x08004bbe        0x2 
+                0x08004c04       0x26 build/radio/sx1276.o
+                0x08004c04                sx1276_set_tx_power_dbm
+ *fill*         0x08004c2a        0x2 
  .text.sx1276_set_sf_bw_cr_checked
-                0x08004bc0      0x150 build/radio/sx1276.o
-                0x08004bc0                sx1276_set_sf_bw_cr_checked
+                0x08004c2c      0x150 build/radio/sx1276.o
+                0x08004c2c                sx1276_set_sf_bw_cr_checked
  .text.sx1276_set_sf_bw_cr
-                0x08004d10        0x8 build/radio/sx1276.o
-                0x08004d10                sx1276_set_sf_bw_cr
+                0x08004d7c        0x8 build/radio/sx1276.o
+                0x08004d7c                sx1276_set_sf_bw_cr
  .text.sx1276_init
-                0x08004d18      0x268 build/radio/sx1276.o
-                0x08004d18                sx1276_init
+                0x08004d84      0x268 build/radio/sx1276.o
+                0x08004d84                sx1276_init
  .text.sx1276_take_irq_events
-                0x08004f80       0x18 build/radio/sx1276.o
-                0x08004f80                sx1276_take_irq_events
+                0x08004fec       0x18 build/radio/sx1276.o
+                0x08004fec                sx1276_take_irq_events
  .text.EXTI0_1_IRQHandler
-                0x08004f98       0x38 build/radio/sx1276.o
-                0x08004f98                EXTI0_1_IRQHandler
+                0x08005004       0x38 build/radio/sx1276.o
+                0x08005004                EXTI0_1_IRQHandler
  .text.EXTI4_15_IRQHandler
-                0x08004fd0       0x3c build/radio/sx1276.o
-                0x08004fd0                EXTI4_15_IRQHandler
+                0x0800503c       0x3c build/radio/sx1276.o
+                0x0800503c                EXTI4_15_IRQHandler
  .text.__udivmoddi4
-                0x0800500c      0x198 c:/program files (x86)/arm gnu toolchain arm-none-eabi/12.2 mpacbti-rel1/bin/../lib/gcc/arm-none-eabi/12.2.1/thumb/v6-m/nofp\libgcc.a(_udivmoddi4.o)
-                0x0800500c                __udivmoddi4
- .text.memcmp   0x080051a4       0x1c c:/program files (x86)/arm gnu toolchain arm-none-eabi/12.2 mpacbti-rel1/bin/../lib/gcc/arm-none-eabi/12.2.1/thumb/v6-m/nofp\libc_nano.a(libc_a-memcmp.o)
-                0x080051a4                memcmp
- .text.memset   0x080051c0       0x10 c:/program files (x86)/arm gnu toolchain arm-none-eabi/12.2 mpacbti-rel1/bin/../lib/gcc/arm-none-eabi/12.2.1/thumb/v6-m/nofp\libc_nano.a(libc_a-memset.o)
-                0x080051c0                memset
- .text.memcpy   0x080051d0       0x12 c:/program files (x86)/arm gnu toolchain arm-none-eabi/12.2 mpacbti-rel1/bin/../lib/gcc/arm-none-eabi/12.2.1/thumb/v6-m/nofp\libc_nano.a(libc_a-memcpy-stub.o)
-                0x080051d0                memcpy
+                0x08005078      0x198 c:/program files (x86)/arm gnu toolchain arm-none-eabi/12.2 mpacbti-rel1/bin/../lib/gcc/arm-none-eabi/12.2.1/thumb/v6-m/nofp\libgcc.a(_udivmoddi4.o)
+                0x08005078                __udivmoddi4
+ .text.memcmp   0x08005210       0x1c c:/program files (x86)/arm gnu toolchain arm-none-eabi/12.2 mpacbti-rel1/bin/../lib/gcc/arm-none-eabi/12.2.1/thumb/v6-m/nofp\libc_nano.a(libc_a-memcmp.o)
+                0x08005210                memcmp
+ .text.memset   0x0800522c       0x10 c:/program files (x86)/arm gnu toolchain arm-none-eabi/12.2 mpacbti-rel1/bin/../lib/gcc/arm-none-eabi/12.2.1/thumb/v6-m/nofp\libc_nano.a(libc_a-memset.o)
+                0x0800522c                memset
+ .text.memcpy   0x0800523c       0x12 c:/program files (x86)/arm gnu toolchain arm-none-eabi/12.2 mpacbti-rel1/bin/../lib/gcc/arm-none-eabi/12.2.1/thumb/v6-m/nofp\libc_nano.a(libc_a-memcpy-stub.o)
+                0x0800523c                memcpy
  *(.rodata)
  *(.rodata.*)
  .rodata.NMI_Handler.str1.1
-                0x080051e2        0xe build/startup.o
+                0x0800524e        0xe build/startup.o
  .rodata.Reset_Handler.str1.1
-                0x080051f0       0x36 build/startup.o
+                0x0800525c       0x36 build/startup.o
  .rodata.main.str1.1
-                0x08005226       0x11 build/main.o
- *fill*         0x08005237        0x1 
+                0x08005292       0x11 build/main.o
+ *fill*         0x080052a3        0x1 
  .rodata.k_cfg_desc
-                0x08005238      0x190 build/host/host_cfg.o
+                0x080052a4      0x190 build/host/host_cfg.o
  .rodata.CSWTCH.6
-                0x080053c8        0xa build/host/host_cfg_profile.o
- *fill*         0x080053d2        0x2 
+                0x08005434        0xa build/host/host_cfg_profile.o
+ *fill*         0x0800543e        0x2 
  .rodata.CSWTCH.4
-                0x080053d4        0xc build/host/host_cfg_profile.o
+                0x08005440        0xc build/host/host_cfg_profile.o
  .rodata.at_send_ok.str1.1
-                0x080053e0       0x11 build/host/host_cmd.o
+                0x0800544c       0x11 build/host/host_cmd.o
                                   0x5 (size before relaxing)
  .rodata.at_send_u32.str1.1
-                0x080053e0       0x11 build/host/host_cmd.o
+                0x0800544c       0x11 build/host/host_cmd.o
                                   0x2 (size before relaxing)
  .rodata.at_send_key_u32.str1.1
-                0x080053e0       0x11 build/host/host_cmd.o
+                0x0800544c       0x11 build/host/host_cmd.o
                                   0x2 (size before relaxing)
  .rodata.at_send_version_triplet.str1.1
-                0x080053e0        0x2 build/host/host_cmd.o
+                0x0800544c        0x2 build/host/host_cmd.o
  .rodata.host_cmd_init.str1.1
-                0x080053e2       0x5a build/host/host_cmd.o
+                0x0800544e       0x5a build/host/host_cmd.o
  .rodata.host_cmd_dispatch.str1.1
-                0x0800543c       0x4d build/host/host_cmd.o
+                0x080054a8       0x4d build/host/host_cmd.o
  .rodata.host_cmd_dispatch_at_line.str1.1
-                0x08005489      0x203 build/host/host_cmd.o
+                0x080054f5      0x203 build/host/host_cmd.o
                                 0x209 (size before relaxing)
  .rodata.host_uart_flush_diag_traces.str1.1
-                0x0800568c       0xba build/host/host_uart.o
+                0x080056f8       0xba build/host/host_uart.o
  .rodata.k_mode_descs
-                0x08005746       0x1e build/radio/sx1276_modes.o
+                0x080057b2       0x1e build/radio/sx1276_modes.o
  .rodata.sx1276_tx_slot_wait_us.cst1
-                0x08005764        0x1 build/radio/sx1276_tx.o
+                0x080057d0        0x1 build/radio/sx1276_tx.o
  *(.glue_7)
- .glue_7        0x08005765        0x0 linker stubs
+ .glue_7        0x080057d1        0x0 linker stubs
  *(.glue_7t)
- .glue_7t       0x08005765        0x0 linker stubs
+ .glue_7t       0x080057d1        0x0 linker stubs
  *(.eh_frame)
-                0x08005768                        . = ALIGN (0x4)
- *fill*         0x08005765        0x3 
-                0x08005768                        _etext = .
+                0x080057d4                        . = ALIGN (0x4)
+ *fill*         0x080057d1        0x3 
+                0x080057d4                        _etext = .
 
-.vfp11_veneer   0x08005768        0x0
- .vfp11_veneer  0x08005768        0x0 linker stubs
+.vfp11_veneer   0x080057d4        0x0
+ .vfp11_veneer  0x080057d4        0x0 linker stubs
 
-.v4_bx          0x08005768        0x0
- .v4_bx         0x08005768        0x0 linker stubs
+.v4_bx          0x080057d4        0x0
+ .v4_bx         0x080057d4        0x0 linker stubs
 
-.iplt           0x08005768        0x0
- .iplt          0x08005768        0x0 build/startup.o
+.iplt           0x080057d4        0x0
+ .iplt          0x080057d4        0x0 build/startup.o
 
-.boot_text      0x08005768      0x20c
- .boot_text     0x08005768      0x20c build/boot/safe_mode.o
-                0x08005768                jump_to_bootloader
-                0x080057e0                safe_mode_listen
+.boot_text      0x080057d4      0x20c
+ .boot_text     0x080057d4      0x20c build/boot/safe_mode.o
+                0x080057d4                jump_to_bootloader
+                0x0800584c                safe_mode_listen
 
 .ARM.extab
  *(.ARM.extab* .gnu.linkonce.armextab.*)
 
-.ARM            0x08005974        0x8
-                0x08005974                        __exidx_start = .
+.ARM            0x080059e0        0x8
+                0x080059e0                        __exidx_start = .
  *(.ARM.exidx*)
  .ARM.exidx.text.__udivmoddi4
-                0x08005974        0x8 c:/program files (x86)/arm gnu toolchain arm-none-eabi/12.2 mpacbti-rel1/bin/../lib/gcc/arm-none-eabi/12.2.1/thumb/v6-m/nofp\libgcc.a(_udivmoddi4.o)
-                0x0800597c                        __exidx_end = .
-                0x0800597c                        _sidata = LOADADDR (.data)
+                0x080059e0        0x8 c:/program files (x86)/arm gnu toolchain arm-none-eabi/12.2 mpacbti-rel1/bin/../lib/gcc/arm-none-eabi/12.2.1/thumb/v6-m/nofp\libgcc.a(_udivmoddi4.o)
+                0x080059e8                        __exidx_end = .
+                0x080059e8                        _sidata = LOADADDR (.data)
 
-.rel.dyn        0x0800597c        0x0
- .rel.iplt      0x0800597c        0x0 build/startup.o
+.rel.dyn        0x080059e8        0x0
+ .rel.iplt      0x080059e8        0x0 build/startup.o
 
-.data           0x20000000       0x14 load address 0x0800597c
+.data           0x20000000       0x14 load address 0x080059e8
                 0x20000000                        . = ALIGN (0x4)
                 0x20000000                        _sdata = .
  *(.data)
@@ -1217,17 +1220,17 @@ END GROUP
  *fill*         0x20000012        0x2 
                 0x20000014                        _edata = .
 
-.igot.plt       0x20000014        0x0 load address 0x08005990
+.igot.plt       0x20000014        0x0 load address 0x080059fc
  .igot.plt      0x20000014        0x0 build/startup.o
 
-.noinit         0x20000014       0x18 load address 0x08005990
+.noinit         0x20000014       0x18 load address 0x080059fc
                 0x20000014                        . = ALIGN (0x4)
  *(.noinit)
  .noinit        0x20000014       0x18 build/hal/platform.o
  *(.noinit.*)
                 0x2000002c                        . = ALIGN (0x4)
 
-.bss            0x20000030     0x19ac load address 0x08005990
+.bss            0x20000030     0x19b0 load address 0x080059fc
                 0x20000030                        . = ALIGN (0x4)
                 0x20000030                        _sbss = .
                 0x20000030                        __bss_start__ = _sbss
@@ -1400,9 +1403,11 @@ END GROUP
                 0x2000193c        0x4 build/radio/sx1276_rx.o
  .bss.s_scan_state
                 0x20001940        0x1 build/radio/sx1276_rx.o
- .bss.s_rx_last_followed_abs_valid
+ .bss.s_grid_adopted
                 0x20001941        0x1 build/radio/sx1276_rx.o
- *fill*         0x20001942        0x2 
+ .bss.s_rx_last_followed_abs_valid
+                0x20001942        0x1 build/radio/sx1276_rx.o
+ *fill*         0x20001943        0x1 
  .bss.s_rx_last_followed_abs
                 0x20001944        0x4 build/radio/sx1276_rx.o
  .bss.s_rx_last_retune_ms_valid
@@ -1416,68 +1421,67 @@ END GROUP
                 0x20001951        0x1 build/radio/sx1276_rx.o
  *fill*         0x20001952        0x2 
  .bss.s_consider_remote_counts
-                0x20001954       0x14 build/radio/sx1276_rx_counters.o
+                0x20001954       0x18 build/radio/sx1276_rx_counters.o
  .bss.s_retune_counts
-                0x20001968       0x14 build/radio/sx1276_rx_retune_counters.o
+                0x2000196c       0x14 build/radio/sx1276_rx_retune_counters.o
  .bss.s_action_counts
-                0x2000197c       0x18 build/radio/sx1276_rx_scan_counters.o
+                0x20001980       0x18 build/radio/sx1276_rx_scan_counters.o
  .bss.s_state_counts
-                0x20001994       0x10 build/radio/sx1276_rx_scan_counters.o
+                0x20001998       0x10 build/radio/sx1276_rx_scan_counters.o
  .bss.s_walker_idx
-                0x200019a4        0x1 build/radio/sx1276_rx_scan_walker.o
- *fill*         0x200019a5        0x1 
+                0x200019a8        0x1 build/radio/sx1276_rx_scan_walker.o
+ *fill*         0x200019a9        0x1 
  .bss.s_rfco_pertx_seq
-                0x200019a6        0x2 build/radio/sx1276_tx.o
+                0x200019aa        0x2 build/radio/sx1276_tx.o
  .bss.s_predicted_toa_us
-                0x200019a8        0x4 build/radio/sx1276_tx.o
+                0x200019ac        0x4 build/radio/sx1276_tx.o
  .bss.s_slot_boundary_valid
-                0x200019ac        0x1 build/radio/sx1276_tx.o
- *fill*         0x200019ad        0x3 
+                0x200019b0        0x1 build/radio/sx1276_tx.o
+ *fill*         0x200019b1        0x3 
  .bss.s_slot_boundary_ms
-                0x200019b0        0x4 build/radio/sx1276_tx.o
+                0x200019b4        0x4 build/radio/sx1276_tx.o
  .bss.s_hop_slot_offset_ms
-                0x200019b4        0x1 build/radio/sx1276_tx.o
- *fill*         0x200019b5        0x3 
+                0x200019b8        0x1 build/radio/sx1276_tx.o
+ *fill*         0x200019b9        0x3 
  .bss.s_hop_epoch
-                0x200019b8        0x4 build/radio/sx1276_tx.o
+                0x200019bc        0x4 build/radio/sx1276_tx.o
  .bss.s_hop_idx
-                0x200019bc        0x1 build/radio/sx1276_tx.o
- *fill*         0x200019bd        0x3 
+                0x200019c0        0x1 build/radio/sx1276_tx.o
+ *fill*         0x200019c1        0x3 
  .bss.s_hop_freq_hz
-                0x200019c0        0x4 build/radio/sx1276_tx.o
+                0x200019c4        0x4 build/radio/sx1276_tx.o
  .bss.s_channel_idx
-                0x200019c4        0x1 build/radio/sx1276_tx.o
- *fill*         0x200019c5        0x3 
+                0x200019c8        0x1 build/radio/sx1276_tx.o
+ *fill*         0x200019c9        0x3 
  .bss.s_reserved_airtime_us
-                0x200019c8        0x4 build/radio/sx1276_tx.o
- .bss.s_deadline_us
                 0x200019cc        0x4 build/radio/sx1276_tx.o
- .bss.s_expected_toa_us
+ .bss.s_deadline_us
                 0x200019d0        0x4 build/radio/sx1276_tx.o
+ .bss.s_expected_toa_us
+                0x200019d4        0x4 build/radio/sx1276_tx.o
  .bss.s_rearm_rx
-                0x200019d4        0x1 build/radio/sx1276_tx.o
+                0x200019d8        0x1 build/radio/sx1276_tx.o
  .bss.s_tx_power_dbm
-                0x200019d5        0x1 build/radio/sx1276_tx.o
- .bss.s_tx_id   0x200019d6        0x1 build/radio/sx1276_tx.o
+                0x200019d9        0x1 build/radio/sx1276_tx.o
+ .bss.s_tx_id   0x200019da        0x1 build/radio/sx1276_tx.o
  .bss.s_tx_state
-                0x200019d7        0x1 build/radio/sx1276_tx.o
+                0x200019db        0x1 build/radio/sx1276_tx.o
  .bss.s_irq_events
-                0x200019d8        0x4 build/radio/sx1276.o
+                0x200019dc        0x4 build/radio/sx1276.o
  *(COMMON)
-                0x200019dc                        . = ALIGN (0x4)
-                0x200019dc                        _ebss = .
-                0x200019dc                        __bss_end__ = _ebss
+                0x200019e0                        . = ALIGN (0x4)
+                0x200019e0                        _ebss = .
+                0x200019e0                        __bss_end__ = _ebss
 
-._user_heap     0x200019dc        0x4 load address 0x08005990
+._user_heap     0x200019e0        0x0 load address 0x080059fc
                 0x200019e0                        . = ALIGN (0x8)
- *fill*         0x200019dc        0x4 
                 0x200019e0                        _end = .
                 0x200019e0                        _heap_start = .
                 0x200019e0                        . = (. + 0x0)
                 0x200019e0                        . = ALIGN (0x8)
                 0x200019e0                        _heap_end = .
 
-.stack_check    0x200019e0        0x0 load address 0x08005990
+.stack_check    0x200019e0        0x0 load address 0x080059fc
                 0x200019e0                        . = ALIGN (0x8)
                 0x200019e0                        . = (. + 0x0)
                 0x00000001                        ASSERT (((_heap_end + _stack_size) <= _estack), Linker error: not enough RAM left for the reserved stack)

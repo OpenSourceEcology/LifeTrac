@@ -207,8 +207,10 @@ sx1276_fhss_status_t sx1276_fhss_snap_to(uint32_t target_epoch,
     return SX1276_FHSS_OK;
 }
 
-sx1276_fhss_snap_decision_t sx1276_fhss_consider_remote(uint32_t remote_epoch,
-                                                        uint8_t  remote_hop_idx) {
+sx1276_fhss_snap_decision_t sx1276_fhss_consider_remote(
+    uint32_t remote_epoch,
+    uint8_t  remote_hop_idx,
+    sx1276_fhss_clock_health_t local_clock_health) {
     if (s_fhss.initialized == 0U) {
         return SX1276_FHSS_SNAP_DEC_REJECTED_NOT_INIT;
     }
@@ -226,13 +228,28 @@ sx1276_fhss_snap_decision_t sx1276_fhss_consider_remote(uint32_t remote_epoch,
         return SX1276_FHSS_SNAP_DEC_ALIGNED;
     }
 
+    /* F6 (2026-07-30): three-tier health gate. FRESH = the local grid
+     * is authoritative, refuse ALL disagreement (Defect B: a healthy
+     * follower could be walked off its grid one +/-1 snap at a time).
+     * UNANCHORED = the local grid has no authority (recovery path,
+     * Defect A: after a demotion the node used to re-lock on its own
+     * stale epoch forever, since nothing ever moved the scheduler
+     * epoch toward the remote). STALE falls through to the legacy
+     * drift rule below. No mutation on any REJECTED_*. */
+    if (local_clock_health == SX1276_FHSS_CLOCK_FRESH) {
+        return SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT;
+    }
+
     /* uint32_t subtraction wraps cleanly across epoch=0 boundary;
      * casting the difference to int32_t yields the signed delta
      * provided |Δ| <= INT32_MAX (always true for our ±1 tolerance). */
-    const int32_t  delta     = (int32_t)(remote_epoch - s_fhss.epoch);
-    const uint32_t abs_delta = (delta < 0) ? (uint32_t)(-delta) : (uint32_t)delta;
-    if (abs_delta > SX1276_FHSS_SNAP_MAX_EPOCH_DRIFT) {
-        return SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT;
+    if (local_clock_health != SX1276_FHSS_CLOCK_UNANCHORED) {
+        const int32_t  delta     = (int32_t)(remote_epoch - s_fhss.epoch);
+        const uint32_t abs_delta =
+            (delta < 0) ? (uint32_t)(-delta) : (uint32_t)delta;
+        if (abs_delta > SX1276_FHSS_SNAP_MAX_EPOCH_DRIFT) {
+            return SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT;
+        }
     }
 
     /* Remote just emitted on remote_hop_idx; next slot it will use is

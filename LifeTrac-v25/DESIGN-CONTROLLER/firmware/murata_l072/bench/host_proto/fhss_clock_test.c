@@ -166,6 +166,53 @@ static void test_anchor_rx(void) {
           "(8) wrap-spanning phase = 113ms");
 }
 
+
+/* F6 (2026-07-30): anchor age + the TX recency-refresh identity. */
+static void test_age_and_tx_refresh(void) {
+    /* age at the anchor instant is 0; grows linearly; wrap-safe. */
+    sx1276_fhss_clock_reset();
+    sx1276_fhss_clock_anchor(1000U, 7U);
+    CHECK(sx1276_fhss_clock_age_ms(1000U) == 0U, "(9) age 0 at anchor");
+    CHECK(sx1276_fhss_clock_age_ms(3500U) == 2500U, "(9) age 2500");
+    sx1276_fhss_clock_reset();
+    sx1276_fhss_clock_anchor(0xFFFFFF00U, 7U);
+    CHECK(sx1276_fhss_clock_age_ms(0x00000100U) == 0x200U,
+          "(9) age wrap-safe across the u32 tick wrap");
+
+    /* FRESH_MS pin: the health horizon the RX gate uses. */
+    CHECK(SX1276_FHSS_CLOCK_FRESH_MS == 2000U, "(9) FRESH_MS = 2000");
+
+    /* TX refresh identity: re-anchoring at (t - in_slot_ms(t),
+     * abs_slot(t)) must leave the grid BIT-IDENTICAL for all later
+     * times — only recency changes. Pins the F6 tx.c refresh. */
+    sx1276_fhss_clock_reset();
+    sx1276_fhss_clock_anchor(1000U, 40U);
+    {
+        const uint32_t t0 = 1737U;   /* mid-slot instant */
+        const uint32_t pre_abs  = sx1276_fhss_clock_abs_slot(t0);
+        const uint32_t pre_phase = sx1276_fhss_clock_in_slot_ms(t0);
+        sx1276_fhss_clock_anchor(t0 - sx1276_fhss_clock_in_slot_ms(t0),
+                                 sx1276_fhss_clock_abs_slot(t0));
+        CHECK(sx1276_fhss_clock_abs_slot(t0) == pre_abs,
+              "(9) refresh: abs_slot identical at t0");
+        CHECK(sx1276_fhss_clock_in_slot_ms(t0) == pre_phase,
+              "(9) refresh: phase identical at t0");
+        for (uint32_t dt = 1U; dt < 1000U; dt += 97U) {
+            const uint32_t u = t0 + dt;
+            CHECK(sx1276_fhss_clock_age_ms(u) <= dt + 200U,
+                  "(9) refresh made the anchor recent");
+            /* the grid itself: abs/phase must match a never-refreshed
+             * clock — recompute from the original anchor. */
+            CHECK(sx1276_fhss_clock_abs_slot(u) ==
+                      40U + (u - 1000U) / SX1276_FHSS_SLOT_MS,
+                  "(9) refresh: abs_slot identity at +%u", dt);
+            CHECK(sx1276_fhss_clock_in_slot_ms(u) ==
+                      (u - 1000U) % SX1276_FHSS_SLOT_MS,
+                  "(9) refresh: phase identity at +%u", dt);
+        }
+    }
+}
+
 int main(void) {
     test_lifecycle();
     test_abs_slot();
@@ -175,11 +222,12 @@ int main(void) {
     test_reanchor();
     test_geometry();
     test_anchor_rx();
+    test_age_and_tx_refresh();
 
     if (g_failures != 0) {
         fprintf(stderr, "[FAIL] fhss_clock: %d failure(s)\n", g_failures);
         return 1;
     }
-    printf("[PASS] fhss_clock: 34 cases\n");
+    printf("[PASS] fhss_clock: 34 base + F6 age/refresh cases\n");
     return 0;
 }

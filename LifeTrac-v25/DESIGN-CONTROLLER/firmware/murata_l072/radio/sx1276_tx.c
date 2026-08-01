@@ -235,6 +235,17 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
                 (void)sx1276_fhss_snap_to(
                     sx1276_fhss_clock_epoch_of(abs_now),
                     sx1276_fhss_clock_hop_of(abs_now));
+                /* F6: refresh anchor RECENCY so a transmitting node
+                 * that has adopted a grid reads FRESH and is not
+                 * dragged by an idler. Phase-exact by the floor
+                 * identity: re-anchoring at (t - in_slot_ms(t),
+                 * abs_slot(t)) leaves abs_slot()/in_slot_ms()
+                 * bit-identical for all later times (pinned in
+                 * check-fhss-clock). It cannot re-arm lock-out after a
+                 * demotion — only RX adoption sets s_grid_adopted. */
+                sx1276_fhss_clock_anchor(
+                    tx_now_ms - sx1276_fhss_clock_in_slot_ms(tx_now_ms),
+                    abs_now);
             }
             /* F7: record the admission slot's boundary instead of sampling
              * the phase here. The phase byte itself is computed at
