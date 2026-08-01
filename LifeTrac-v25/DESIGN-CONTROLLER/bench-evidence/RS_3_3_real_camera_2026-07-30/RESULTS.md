@@ -78,7 +78,43 @@ non-functional on the actual tractor hardware. Either the gate is wrong (deshake
 should be off unless explicitly enabled) or the tractor is expected to run with
 `USE_LORA_BRIDGE=1` — in which case the LoRa bench path should set it.
 
-## Open — camera_service starts, then publishes nothing
+## Open — camera_service blocks in `_read_exact`, and it is NOT ffmpeg
+
+Isolated by elimination on 2026-07-30. `faulthandler` (SIGABRT to the running
+container) puts the block precisely:
+
+    Current thread (most recent call first):
+      File "/work/camera_service.py", line 347 in _read_exact
+      File "/work/camera_service.py", line 358 in grab_rgb
+      File "/work/camera_service.py", line 858 in _build_frame
+      File "/work/camera_service.py", line 1515 in main
+
+Four independent things were then ruled OUT, each measured:
+
+| hypothesis | test | result |
+|---|---|---|
+| camera broken | direct ffmpeg to a file | 589,824 B = 2 frames, exact |
+| ffmpeg cannot write to a PIPE | real argv, `\| head -c 294912` | **294,912 B, one frame** |
+| the extra flags break it (`-probesize 32`, `-thread_queue_size 2`, `-fflags nobuffer`) | printed the REAL `build_ffmpeg_argv()` and ran it verbatim | **works** |
+| Python's Popen wiring (stdout+stderr PIPE, `bufsize=0`) | standalone script doing exactly that, same argv | **294,912 B in 2.5 s**, arriving in 32 KB chunks |
+| device contention from a previous container | `fuser /dev/video1` -> NONE, then fresh start | still blocks |
+
+So: the camera works, the argv works, the pipe works, the exact Popen+read
+pattern works in 2.5 s, and the device is free — yet `camera_service` sits in
+`_read_exact` indefinitely, emitting exactly one log line and never restarting.
+
+**Remaining hypothesis, untested:** something in `camera_service` between
+spawning ffmpeg and first reading it takes long enough that ffmpeg fills its
+64 KB stdout pipe buffer and wedges — plausible given `-thread_queue_size 2`
+and `-fflags nobuffer`, which are tuned for minimum latency and leave almost no
+slack. The isolation probe read immediately; `main()` does MQTT setup and starts
+a `_back_channel_reader` thread first (visible in the same faulthandler dump).
+
+Next diagnostic: timestamp the gap between `Popen` and the first `stdout.read()`
+inside `camera_service`, and if it is more than ~1 s, either read-and-discard
+during startup or spawn ffmpeg lazily at first `grab_rgb`.
+
+## Superseded note — camera_service starts, then publishes nothing
 
 With all three fixed, `camera_svc` stays **Up** but emits exactly **one** log
 line (the ffmpeg startup) and zero publish/encode activity. `image_tx_daemon`
