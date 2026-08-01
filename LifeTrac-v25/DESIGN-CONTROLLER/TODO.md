@@ -1957,9 +1957,29 @@ acceptance steps passed — full record in
   the existing age-escalation by back-dating `tile_last_seq`, so repairs
   ride the next scheduled frame at zero extra image airtime. Keyframe
   requests remain for cold start / base_seq mismatch / mode change only.
-  10 new tests; suite 1089/2446 subtests green. **Not yet verified on air**
-  — needs a bench run with deliberate fragment loss to watch a marked tile
-  re-ship (queue for the next flash/bench session).
+  10 new tests; suite 1089/2446 subtests green.
+- [x] **F10 VERIFIED ON AIR 2026-08-01** — full record in
+  `bench-evidence/F10_tile_stale_acceptance_2026-08-01/RESULTS.md` (raw
+  daemon logs in `radio_monitor_20260801_182119_0697e5dd/`). Camera feed,
+  DTS profile 2, production web_ui scanning on the base board. All legs
+  passed: cold-fill acceleration; zero false positives on a healthy link
+  (threshold 30 s > the bench's 24 s sweep rotation); 18-frame timed
+  outage repaired in 27 s with marks clearing 3–9 s after appearing (sweep
+  counterfactual: up to 24 s/tile); repair-loss re-marks absorbed by the
+  level-triggered design; `reassembler_timeouts=0`, no keyframe used for
+  any tile repair. Also surfaced (recorded in RESULTS §6): a pre-existing
+  `Canvas.apply` silent-desync bug (filed as its own task), the
+  dual-broker retained-override trap (bench rule: clear retained control
+  state on BOTH brokers between campaigns), and the deployment rule
+  `LIFETRAC_TILE_STALE_AFTER_MS ≥ ~1.25 × n_tiles/(SWEEP_STEP × fps)`.
+- [ ] **F11 (candidate, from F10 acceptance §5): demote web_ui's seq-gap
+  keyframe request.** The gap-tolerant apply requests a keyframe on EVERY
+  base_seq gap — including a single lost delta frame (two such on-air
+  events in the surgical window, each costing a ~2.4 KB keyframe at the
+  243 B/frame budget; the 10 s KeyframeRequester throttle is the only
+  damper). F10's stale reporting makes this largely redundant: staleness
+  is now detected and repaired tile-by-tile. Same protocol as F10: gate it
+  behind an env (default unchanged), measure the A/B on air, then flip.
 
 ### RS-11 — Next-session sequencing, and the one instrument that gates it (added 2026-07-29)
 
