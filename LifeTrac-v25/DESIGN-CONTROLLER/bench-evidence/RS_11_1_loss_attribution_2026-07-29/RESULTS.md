@@ -465,3 +465,52 @@ old behaviour for A/B against everything recorded above.
 saturated goodput cost scales roughly with it, so 0.95-0.98 may recover most of
 the 2.7% while still keeping the backstop from firing. That is a cheap follow-up
 sweep and it should be run before anyone treats 0.92 as considered.
+
+
+---
+
+# J-series: the headroom sweep — 0.92 stands, and goodput is the wrong metric
+
+`_PACING_HEADROOM` was flagged as chosen-not-tuned, with the expectation that
+raising it would recover most of the 2.7% saturated goodput cost. It does. It
+also delivers FEWER usable frames.
+
+Saturated (2 fps, 3000 B, depth 2, smooth):
+
+| headroom | spacing | goodput | fragment loss | **frames published** | reasm timeouts |
+|---:|---:|---:|---:|---:|---:|
+| 0.92 | 116.8 ms | 1951.6 B/s | **2.24%** | **105** | 42 |
+| 0.96 | 112.1 ms | 1984.8 B/s | 3.17% | 97 | 51 |
+| bucket (ref) | 104.9 ms | 2005 B/s | 3.73% | — | — |
+
+Raising headroom to 0.96 recovered 1.7% of TX goodput and cost 0.93 points of
+fragment loss — and **8% of delivered frames** (105 -> 97), with 21% more
+reassembly timeouts.
+
+## The trap worth naming
+
+**TX goodput is the wrong optimisation target for this link.** A fragment lost
+mid-frame destroys the whole frame, so a small rise in fragment loss costs far
+more delivered frames than the extra bytes buy. The three headroom points sit on
+a monotonic curve where goodput and delivered-frames move in OPPOSITE directions:
+
+    headroom -> 1.0   =  more bytes transmitted, fewer pictures arriving
+
+That is also the shape that makes the pre-fix bucket look defensible on a
+dashboard — 2005 B/s is the best goodput number in this entire file, and it was
+produced by the configuration with the worst loss.
+
+**Standing rule for this project: rank pacing/scheduling changes by
+`frames_published`, not by `goodput`.** Goodput measures what we put on the air;
+frames_published measures what the operator can actually see.
+
+## Decision
+
+**Keep `_PACING_HEADROOM = 0.92`.** It was chosen for the right reason (clear
+the knife edge) and it turns out to also be the better operating point on the
+metric that matters. 0.99 was not run — the 0.92 -> 0.96 trend already moves the
+wrong way on delivered frames, and going closer to 1.0 approaches the bucket
+pathology the headroom exists to prevent.
+
+`LIFETRAC_PACING_HEADROOM` and `-PacingHeadroom` remain available for future
+sweeps, e.g. if fragment size or profile changes move the trade.

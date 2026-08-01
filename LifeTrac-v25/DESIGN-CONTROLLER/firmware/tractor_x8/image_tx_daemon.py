@@ -196,7 +196,14 @@ _PROFILE_TO_BUDGET_US = {0: 380_000, 1: 860_000, 2: 930_000}
 
 # Fraction of the budget smooth pacing aims at. Must be < 1.0 so the rolling
 # window check stays a BACKSTOP rather than a co-participant — see admit().
-_PACING_HEADROOM = 0.92
+#
+# 0.92 was chosen to clear the knife edge, NOT tuned: at 1.00 the backstop fired
+# on jitter and its stall compounded with the pacing delay, regressing loss
+# 2.45% -> 19.41%. Saturated goodput cost scales roughly with this value
+# (measured 2.7% at 0.92), so higher may recover throughput — but only until the
+# backstop starts firing again, which is the failure this constant exists to
+# prevent. Sweep it on air; do not raise it on reasoning alone.
+_PACING_HEADROOM = _env_float("LIFETRAC_PACING_HEADROOM", 0.92, lo=0.50, hi=0.995)
 
 
 def _budget_for(profile: int) -> int:

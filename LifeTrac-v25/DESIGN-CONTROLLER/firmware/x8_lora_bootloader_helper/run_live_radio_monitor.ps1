@@ -113,6 +113,11 @@ param(
     # on 2026-07-30. Kept here so bucket can be re-run against the evidence.
     [ValidateSet("bucket", "smooth")]
     [string]$PacingMode   = "smooth",
+    # 2026-07-30 RS-11.4: fraction of the airtime budget smooth pacing aims at.
+    # 0 = leave the daemon default (0.92). Raising it recovers saturated
+    # goodput but only until the rolling-window backstop starts firing again,
+    # which is exactly the compounding failure headroom exists to prevent.
+    [double]$PacingHeadroom = 0,
     # Archive final logs + parameters under bench-evidence/ with the git
     # SHA in the folder name (evidence discipline per CODE REVIEWS docs).
     [switch]$Archive
@@ -129,6 +134,7 @@ if ($RegProfile -eq 1) { $profEnv = "$profEnv -e LIFETRAC_FHSS_WIDE_MASK=1" }
 $profEnv = "$profEnv -e LIFETRAC_FHSS_FARM_ID=$FhssFarmId -e LIFETRAC_FHSS_LINK_ID=$FhssLinkId"
 if ($AirtimeBudgetUs -gt 0) { $profEnv = "$profEnv -e LIFETRAC_AIRTIME_BUDGET_US=$AirtimeBudgetUs" }
 $profEnv = "$profEnv -e LIFETRAC_AIRTIME_PACING=$PacingMode"
+if ($PacingHeadroom -gt 0) { $profEnv = "$profEnv -e LIFETRAC_PACING_HEADROOM=$PacingHeadroom" }
 
 # Resolve adb dynamically (the winget package dir name varies per
 # machine/source); fall back to the historical hardcoded path.
@@ -366,6 +372,7 @@ if ($Archive) {
         "fhss_link_id=$FhssLinkId",
         "airtime_budget_us=$AirtimeBudgetUs",
         "pacing_mode=$PacingMode",
+        "pacing_headroom=$PacingHeadroom",
         "tx_feed=$TxFeed",
         "reg_profile=$RegProfile",
         "tx_serial=$TxAdbSerial",
