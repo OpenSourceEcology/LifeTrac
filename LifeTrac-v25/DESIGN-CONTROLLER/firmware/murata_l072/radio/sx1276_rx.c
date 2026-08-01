@@ -196,14 +196,18 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
                 if (dec == SX1276_FHSS_SNAP_DEC_SNAPPED ||
                     dec == SX1276_FHSS_SNAP_DEC_ALIGNED) {
                     const uint32_t now_anchor_ms = platform_now_ms();
-                    const uint32_t toa_ms =
-                        sx1276_airtime_estimate_toa_us((uint8_t)rx_len)
-                            / 1000UL;
                     const uint32_t remote_abs = sx1276_fhss_clock_abs_of(
                         parsed.epoch, parsed.hop_idx);
-                    sx1276_fhss_clock_anchor(
-                        now_anchor_ms - toa_ms
-                            - (uint32_t)parsed.slot_offset_ms,
+                    /* F7: round-not-truncate ToA (the old inline /1000
+                     * discarded up to 0.999 ms, one-sidedly LATE). The
+                     * arithmetic lives in the clock TU so the bench can
+                     * pin it. now_anchor_ms is still main-loop service
+                     * time, not the DIO0 edge — that residual lateness
+                     * is known and deliberately out of F7 scope. */
+                    sx1276_fhss_clock_anchor_rx(
+                        now_anchor_ms,
+                        sx1276_airtime_estimate_toa_us((uint8_t)rx_len),
+                        parsed.slot_offset_ms,
                         remote_abs);
                     /* The follower must not re-arm mid-slot for the
                      * slot we just received in — mark it followed. */
@@ -259,7 +263,8 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
  * can read the histogram via sx1276_rx_retune_counts() (additive URC).
  *
  * PLL settle budget mirrors sx1276_tx.c's pll_settle_busy_wait at
- * SX1276_TX_PLL_SETTLE_US (200 µs). Duplicated rather than hoisted
+ * SX1276_TX_PLL_SETTLE_US (1000 µs; RS-10.19 — an older comment said
+ * 200 µs, the define was always 1000). Duplicated rather than hoisted
  * to keep this change a point edit; the two sites have identical
  * physical justification (no settle IRQ on the L072 wiring) and
  * different operational meaning (TX vs RX retune) per the comment in

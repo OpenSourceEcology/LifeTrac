@@ -16,7 +16,14 @@
  *     2   1    hop_idx        (0 .. SX1276_FHSS_CHANNEL_COUNT-1)
  *     3   1    slot_offset_ms (v25.0.7 slot-clock: ms from the TX's
  *                             slot boundary to TX key-up, saturated
- *                             at 255. Occupies the former _reserved
+ *                             at 255. F7 2026-07-30: measured at
+ *                             header-pack time from the ADMISSION
+ *                             slot's stored boundary, so it now
+ *                             includes standby/PLL/LBT/FIFO delays,
+ *                             and MAY EXCEED SLOT_MS-1 (199) when
+ *                             key-up straddles the boundary; the RX
+ *                             anchor math is linear in this byte and
+ *                             decodes straddle values correctly. Occupies the former _reserved
  *                             byte under the additive-evolution rule
  *                             — v1 parsers ignored it, so schema_ver
  *                             stays 1. 0 = keyed exactly on boundary

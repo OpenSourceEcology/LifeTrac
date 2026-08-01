@@ -35,9 +35,11 @@
  * change before LBT/CAD/TX-start may sample the channel. The SX1276
  * datasheet (rev 7, §4.1.4 Frequency Synthesis) characterises the
  * PLL lock time at the "PllBandwidth" default (75 kHz) as ~50 µs
- * worst-case across temperature; the 200 µs budget here is a 4x
+ * worst-case across temperature; the 1000 µs budget here is a 20x
  * conservative envelope pending bench characterisation under the
- * actual Murata CMWX1ZZABZ TCXO. This delay is intentionally
+ * actual Murata CMWX1ZZABZ TCXO (RS-10.19: an earlier revision of this
+ * comment said 200 µs while the define below said 1000 — the DEFINE was
+ * always what ran; the comment now matches it). This delay is intentionally
  * separate from the 1 ms modes_to_standby() settle in sx1276.c so
  * that operators bisecting RFCO logs can distinguish "PLL not
  * locked yet" from "modem still in sleep/standby transition".
@@ -64,6 +66,16 @@ static uint32_t s_hop_freq_hz;
 static uint8_t  s_hop_idx;
 static uint32_t s_hop_epoch;
 static uint8_t  s_hop_slot_offset_ms;   /* v25.0.7: in-slot ms at key-up */
+/* F7 (2026-07-30): local time of the ADMISSION slot's boundary, so the
+ * header's phase byte can be sampled at header-pack time instead of at
+ * admission. Sampling at admission understated the true key-up phase by
+ * every delay between admission and key-up (standby transition, PLL
+ * settle, LBT when enabled, ToA estimates, FIFO load) — ~2.3-3.6 ms in
+ * the daemons' LBT-off steady state, ~9-14 ms with LBT on — and the RX
+ * anchor inherited the full bias, eating the 12 ms TX head-start that
+ * exists so the receiver is armed before the sender keys. */
+static uint32_t s_slot_boundary_ms;
+static uint8_t  s_slot_boundary_valid;
 static uint16_t s_legal_dwell_handle = SX1276_DWELL_HANDLE_INVALID;
 static uint32_t s_predicted_toa_us;
 static uint16_t s_rfco_pertx_seq;
@@ -147,6 +159,7 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
         s_hop_epoch   = 0U;
         s_hop_freq_hz = 0U;
         s_channel_idx = 0U;
+        s_slot_boundary_valid = 0U;   /* F7: defensive */
         tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_INTERNAL, 0U);
         return false;
     }
@@ -191,6 +204,10 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
             s_hop_freq_hz = 0U;
             s_channel_idx = 0U;
             s_hop_slot_offset_ms = 0U;
+            /* Required clear: this is the only non-FHSS path that reaches
+             * header pack, and a stale boundary from a previous FHSS
+             * activation must not leak into a BENCH/DTS frame's byte 3. */
+            s_slot_boundary_valid = 0U;
         } else {
             /*
              * v25.0.7 slot-clock: the hop is a function of TIME, not of
@@ -219,9 +236,19 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
                     sx1276_fhss_clock_epoch_of(abs_now),
                     sx1276_fhss_clock_hop_of(abs_now));
             }
-            s_hop_slot_offset_ms = (uint8_t)((sx1276_fhss_clock_in_slot_ms(tx_now_ms) > 255U)
-                ? 255U
-                : sx1276_fhss_clock_in_slot_ms(tx_now_ms));
+            /* F7: record the admission slot's boundary instead of sampling
+             * the phase here. The phase byte itself is computed at
+             * header-pack time from this stored boundary — NOT by
+             * re-calling in_slot_ms() there, which would wrap modulo
+             * SLOT_MS if key-up ever slipped past the boundary and pair
+             * the old slot's (epoch, hop_idx) with the next slot's
+             * offset, corrupting the RX anchor by a full slot. Measured
+             * against the stored boundary, a straddling frame honestly
+             * reports 200-255 and the linear RX anchor math still
+             * decodes it correctly. */
+            s_slot_boundary_ms    = tx_now_ms
+                - sx1276_fhss_clock_in_slot_ms(tx_now_ms);
+            s_slot_boundary_valid = 1U;
             uint8_t  hop_channel_idx = 0U;
             uint32_t hop_center_hz   = 0U;
             const sx1276_fhss_status_t hop_st =
@@ -234,6 +261,7 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
                 s_hop_epoch   = 0U;
                 s_hop_freq_hz = 0U;
                 s_channel_idx = 0U;
+                s_slot_boundary_valid = 0U;   /* F7: defensive */
                 tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_INTERNAL, 0U);
                 return false;
             }
@@ -403,6 +431,15 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
             : (uint8_t)REG_PROFILE_BENCH_ONLY_FIXED_915;
         hdr.hop_idx        = s_hop_idx;
         hdr.epoch          = s_hop_epoch;
+        /* F7: sample the phase byte HERE, at header-pack time, measured
+         * from the stored admission boundary — after standby/PLL/LBT/
+         * estimate delays instead of before them. Wrap-safe u32 diff. */
+        if (s_slot_boundary_valid != 0U) {
+            const uint32_t off = platform_now_ms() - s_slot_boundary_ms;
+            s_hop_slot_offset_ms = (off > 255U) ? 255U : (uint8_t)off;
+        } else {
+            s_hop_slot_offset_ms = 0U;
+        }
         hdr.slot_offset_ms = s_hop_slot_offset_ms;  /* v25.0.7 phase byte */
         (void)lora_pkt_hdr_pack(&hdr, hdr_bytes);
         sx1276_write_burst(SX1276_REG_FIFO, hdr_bytes, LORA_PKT_HDR_LEN);

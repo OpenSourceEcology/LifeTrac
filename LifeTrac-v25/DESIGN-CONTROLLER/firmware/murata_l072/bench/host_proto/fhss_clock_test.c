@@ -109,6 +109,63 @@ static void test_geometry(void) {
     CHECK(SX1276_FHSS_SLOT_TX_HEADSTART_MS == 12U, "(7) TX head-start 12 ms");
 }
 
+
+/* F7 (2026-07-30): the RX anchor helper — round-not-truncate ToA plus
+ * full anchor placement. The old inline call site truncated toa_us/1000
+ * (one-sidedly LATE by up to 0.999 ms, 0.904 ms on a 255 B DTS
+ * fragment); nothing pinned it, which is how the bug stayed
+ * test-invisible. These cases make the truncation un-reintroducible. */
+static void test_anchor_rx(void) {
+    /* Half-up rounding rule, pinned at the boundary. */
+    sx1276_fhss_clock_reset();
+    sx1276_fhss_clock_anchor_rx(10000U, 99499U, 0U, 40U);
+    CHECK(sx1276_fhss_clock_abs_slot(10000U - 99U) == 40U,
+          "(8) 99499us rounds DOWN to 99ms (slot_start 9901)");
+    CHECK(sx1276_fhss_clock_in_slot_ms(10000U - 99U) == 0U,
+          "(8) slot_start phase is 0 at 9901");
+
+    sx1276_fhss_clock_reset();
+    sx1276_fhss_clock_anchor_rx(10000U, 99500U, 0U, 40U);
+    CHECK(sx1276_fhss_clock_in_slot_ms(10000U - 100U) == 0U,
+          "(8) 99500us rounds UP to 100ms (slot_start 9900)");
+
+    /* The F7 number: a full 255 B DTS fragment is 99904us. Truncation
+     * gave 99 ms (0.904 late); rounding gives 100. */
+    sx1276_fhss_clock_reset();
+    sx1276_fhss_clock_anchor_rx(10000U, 99904U, 13U, 40U);
+    /* slot_start = 10000 - 100 - 13 = 9887 */
+    CHECK(sx1276_fhss_clock_abs_slot(9887U) == 40U,
+          "(8) 255B DTS anchor lands at 9887, abs preserved");
+    CHECK(sx1276_fhss_clock_in_slot_ms(9887U) == 0U,
+          "(8) 9887 is the slot boundary");
+    CHECK(sx1276_fhss_clock_in_slot_ms(9987U) == 100U,
+          "(8) +100ms phase from the rounded anchor");
+
+    /* FHSS slot-fit frame: 169088us -> 169 (frac 0.088 rounds down). */
+    sx1276_fhss_clock_reset();
+    sx1276_fhss_clock_anchor_rx(10000U, 169088U, 0U, 40U);
+    CHECK(sx1276_fhss_clock_in_slot_ms(10000U - 169U) == 0U,
+          "(8) 169088us -> 169ms");
+
+    /* Boundary-straddle offset (>199): the F7 TX side may honestly
+     * report 200-255 when key-up slips past the admission boundary;
+     * the anchor math is linear in the byte and must decode it. */
+    sx1276_fhss_clock_reset();
+    sx1276_fhss_clock_anchor_rx(10000U, 99904U, 215U, 40U);
+    /* slot_start = 10000 - 100 - 215 = 9685 */
+    CHECK(sx1276_fhss_clock_abs_slot(9685U) == 40U,
+          "(8) straddle offset 215 decodes linearly");
+
+    /* u32 wrap: rx_done just after the ms tick wraps. */
+    sx1276_fhss_clock_reset();
+    sx1276_fhss_clock_anchor_rx(50U, 99904U, 13U, 40U);
+    /* slot_start = 50 - 113 = wraps below zero */
+    CHECK(sx1276_fhss_clock_abs_slot(50U) == 40U,
+          "(8) wrap-spanning anchor still yields the anchored slot");
+    CHECK(sx1276_fhss_clock_in_slot_ms(50U) == 113U,
+          "(8) wrap-spanning phase = 113ms");
+}
+
 int main(void) {
     test_lifecycle();
     test_abs_slot();
@@ -117,11 +174,12 @@ int main(void) {
     test_decompose();
     test_reanchor();
     test_geometry();
+    test_anchor_rx();
 
     if (g_failures != 0) {
         fprintf(stderr, "[FAIL] fhss_clock: %d failure(s)\n", g_failures);
         return 1;
     }
-    printf("[PASS] fhss_clock: 24 cases\n");
+    printf("[PASS] fhss_clock: 34 cases\n");
     return 0;
 }

@@ -74,6 +74,20 @@ void sx1276_fhss_clock_reset(void);
  * START of absolute slot `abs_slot`. */
 void sx1276_fhss_clock_anchor(uint32_t slot_start_ms, uint32_t abs_slot);
 
+/*
+ * F7 (2026-07-30): anchor from a received A6a header. Computes
+ *   slot_start = rx_done_ms - round(toa_us / 1000) - slot_offset_ms
+ * with HALF-UP rounding — the old inline call site truncated toa_us/1000,
+ * discarding up to 0.999 ms (0.904 ms on a full 255 B DTS fragment), and
+ * that loss was one-sided: the follower grid anchored LATE by it, on top
+ * of the TX-side admission-sampling bias, together eating the 12 ms TX
+ * head-start. Pure and wrap-safe; lives in this HW-free TU so the bench
+ * check-fhss-clock target can pin the arithmetic (sx1276_rx.c is linked
+ * by zero bench targets).
+ */
+void sx1276_fhss_clock_anchor_rx(uint32_t rx_done_ms, uint32_t toa_us,
+                                 uint8_t slot_offset_ms, uint32_t abs_slot);
+
 /* 1 when an anchor is set. */
 uint8_t sx1276_fhss_clock_valid(void);
 
