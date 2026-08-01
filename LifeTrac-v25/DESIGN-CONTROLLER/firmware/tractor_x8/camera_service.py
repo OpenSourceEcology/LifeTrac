@@ -36,6 +36,7 @@ import io
 import logging
 import os
 import struct
+import threading
 import time
 from dataclasses import dataclass
 
@@ -157,6 +158,7 @@ ENCODE_MODE_STATUS_TOPIC   = "lifetrac/v25/status/encode_mode"
 # per-frame byte budget here so the encoder sizes frames to the real air
 # quantum. Replaces the dead CMD_LINK_PROFILE M7 back-channel in bridge mode.
 TRACTOR_LINK_BUDGET_TOPIC  = "lifetrac/v25/tractor/link_budget"
+TRACTOR_TILE_STALE_TOPIC   = "lifetrac/v25/tractor/tile_stale"
 
 
 # ---- capture backends -------------------------------------------------
@@ -540,6 +542,13 @@ ENCODE_MODE = _clamp_encode_mode(_env_int("LIFETRAC_ENCODE_MODE", 0))
 # tight budgets. 0 DISABLES escalation entirely (see the explicit `> 0`
 # guards at the use sites — without them a value of 0 would escalate every
 # tile with age >= 1, i.e. the exact opposite of "disabled").
+# F10 (2026-08-01): advisory stale marks from the base (0x6C via
+# image_tx_daemon). Applied by back-dating tile_last_seq inside
+# _build_frame, then cleared — level-triggered, so a re-mark simply
+# arrives with the next report if the repair frame is lost too.
+_stale_marks: set = set()
+_stale_marks_lock = threading.Lock()
+
 TILE_AGE_ESCALATE_FRAMES = _env_int(
     "LIFETRAC_TILE_AGE_ESCALATE_FRAMES", 40, lo=0)
 # Bound on wasted encode passes once the budget is full: after the first
@@ -1025,6 +1034,21 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
     # gets budget priority); the over-budget liveness valve in the packing
     # loop handles the remaining case (an aged tile too large to EVER fit).
     # Together they guarantee every tile ships eventually.
+    # F10: apply pending stale marks by back-dating the tiles' last-shipped
+    # counter past the escalation horizon — the sort below then front-runs
+    # them, and the sweep picks them even when the local diff sees no
+    # change (a lost UPDATE means the base shows a stale blob while the
+    # tractor sees an unchanged tile).
+    if accum.tile_last_seq is not None and IMAGE_METHOD in ("B", "C"):
+        with _stale_marks_lock:
+            marks = list(_stale_marks)
+            _stale_marks.clear()
+        horizon = max(TILE_AGE_ESCALATE_FRAMES, 1) + 1
+        for m in marks:
+            if 0 <= m < len(accum.tile_last_seq):
+                accum.tile_last_seq[m] = min(
+                    accum.tile_last_seq[m], accum.sweep_seq - horizon)
+
     if (TILE_AGE_ESCALATE_FRAMES > 0 and accum.tile_last_seq is not None
             and not is_key and IMAGE_METHOD in ("B", "C")):
         _ages = accum.tile_last_seq
@@ -1459,6 +1483,26 @@ def main() -> None:
                 if _msg.topic in (KEYFRAME_REQ_TOPIC, TRACTOR_KEYFRAME_TOPIC):
                     force_key_evt.set()
                     return
+                if _msg.topic == TRACTOR_TILE_STALE_TOPIC:
+                    # F10: fold the base's stale marks into the age
+                    # escalation by BACK-DATING tile_last_seq — the
+                    # existing escalation sort, fair-share sweep, and
+                    # over-budget liveness valve then treat the tile as
+                    # maximally aged and front-run it into the next
+                    # frame's budget. Reuses the whole shipping
+                    # machinery; nothing new to schedule. Guarded to
+                    # methods B/C (method A has no tile_last_seq).
+                    body = bytes(_msg.payload or b"")
+                    if len(body) >= 3:
+                        marks = []
+                        for byte_i, b in enumerate(body[2:]):
+                            for bit in range(8):
+                                if b & (1 << bit):
+                                    marks.append(byte_i * 8 + bit)
+                        with _stale_marks_lock:
+                            _stale_marks.update(
+                                m for m in marks if m < GRID_W * GRID_H)
+                    return
                 if _msg.topic == TRACTOR_LINK_BUDGET_TOPIC:
                     # {"n_fragments": N, "profile_index": i} from the radio
                     # owner. Feeds the existing LinkBudget.update seam so the
@@ -1511,6 +1555,7 @@ def main() -> None:
             client.subscribe(KEYFRAME_REQ_TOPIC, qos=1)
             client.subscribe(TRACTOR_KEYFRAME_TOPIC, qos=1)
             client.subscribe(TRACTOR_LINK_BUDGET_TOPIC, qos=1)
+            client.subscribe(TRACTOR_TILE_STALE_TOPIC, qos=0)
             # Retained topic: a freshly (re)started camera_service picks up
             # the operator's last selection immediately on subscribe.
             client.subscribe(ENCODE_MODE_OVERRIDE_TOPIC, qos=1)

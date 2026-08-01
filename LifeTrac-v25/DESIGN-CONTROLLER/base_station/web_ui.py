@@ -1057,6 +1057,63 @@ _image_reassembler = FragmentReassembler()
 _image_publisher = StatePublisher(canvas=_image_canvas)
 _image_lock = threading.Lock()
 
+# F10 (2026-08-01): receiver-driven stale-tile reporting. The canvas is
+# PERSISTENT — a tile whose update is lost keeps showing the old blob until
+# the encoder happens to resend it, and the encoder cannot know (its age
+# escalation is encoder-side). The base is the only party that knows what
+# arrived, so it reports staleness and the tractor treats the bitmap as
+# advisory dirty marks. Semantics note: with tile-delta on a static scene
+# the receiver cannot distinguish "static, nothing sent" from "sent and
+# lost" — what makes age evidence of loss is the encoder's fair-share
+# SWEEP, which re-ships every tile within its rotation period on a healthy
+# link. STALE_AFTER_MS must therefore exceed the full sweep rotation
+# (n_tiles / LIFETRAC_SWEEP_STEP frames at the current fps); marks are
+# advisory, so a false positive merely re-ships one tile early.
+_TILE_STALE_ENABLE = os.environ.get("LIFETRAC_TILE_STALE_ENABLE", "1") == "1"
+_TILE_STALE_AFTER_MS = int(os.environ.get("LIFETRAC_TILE_STALE_AFTER_MS",
+                                          "20000"))
+_TILE_STALE_PERIOD_S = float(os.environ.get("LIFETRAC_TILE_STALE_PERIOD_S",
+                                            "3.0"))
+TILE_STALE_TOPIC = "lifetrac/v25/cmd/tile_stale"
+
+
+def compute_stale_tiles(canvas, now_ms: int, stale_after_ms: int) -> list:
+    """Pure: indices of tiles that have not refreshed within the horizon.
+
+    Only meaningful once a keyframe has populated the canvas; a tile with
+    arrived_ms == 0 after that point never arrived at all and counts as
+    stale too.
+    """
+    if not canvas.has_keyframe:
+        return []
+    out = []
+    for idx, tile in enumerate(canvas._tiles):
+        arrived = tile.arrived_ms
+        if arrived == 0 or (now_ms - arrived) > stale_after_ms:
+            out.append(idx)
+    return out
+
+
+def _tile_stale_worker() -> None:
+    from lora_proto import pack_tile_stale
+    while True:
+        time.sleep(_TILE_STALE_PERIOD_S)
+        try:
+            with _image_lock:
+                canvas = _image_canvas
+                now_ms = int(time.monotonic() * 1000)
+                stale = compute_stale_tiles(canvas, now_ms,
+                                            _TILE_STALE_AFTER_MS)
+                n_tiles = canvas.n_tiles
+                base_seq = getattr(canvas, "_last_base_seq", None) or 0
+            if not stale:
+                continue
+            body = pack_tile_stale(base_seq, stale, n_tiles)
+            mqtt_client.publish(TILE_STALE_TOPIC, body, qos=0)
+        except Exception:
+            # Advisory path: never let a transient error kill the worker.
+            pass
+
 
 def _publish_state_snapshot() -> None:
     loop = getattr(app.state, "loop", None)
@@ -1128,6 +1185,9 @@ def _maybe_capture_params(topic: str, data: Any) -> None:
 # ---- routes ------------------------------------------------------------
 @app.on_event("startup")
 async def _startup():
+    if _TILE_STALE_ENABLE:
+        threading.Thread(target=_tile_stale_worker,
+                         name="tile-stale", daemon=True).start()
     app.state.loop = asyncio.get_event_loop()
 
 
