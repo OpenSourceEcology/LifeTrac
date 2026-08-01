@@ -185,6 +185,20 @@ CFG_KEY_REG_PROFILE = 0x14
 CFG_KEY_FHSS_CHANNEL_MASK = 0x07
 CFG_KEY_ANTENNA_GAIN_DBI = 0x15
 CFG_KEY_HW_CEILING_DBM = 0x16
+# 2026-07-29 FHSS seed identity. Both u64 little-endian; mirrors
+# `CFG_KEY_FHSS_FARM_ID` / `CFG_KEY_FHSS_NODE_ID` in
+# `firmware/murata_l072/include/host_cfg_keys.h`.
+#
+# These seed the FNV-1a -> Fisher-Yates channel permutation. The
+# firmware previously hardcoded (0, 0, 0) at its only call site, so
+# every radio in the fleet hopped in the same order.
+#
+# CFG_KEY_FHSS_NODE_ID IS LINK-SCOPED. Both ends of one link must be
+# given the SAME value or their permutations diverge and the follower
+# can never hold lock. That is why the env var below is called
+# LIFETRAC_FHSS_LINK_ID rather than ..._NODE_ID.
+CFG_KEY_FHSS_FARM_ID = 0x17
+CFG_KEY_FHSS_NODE_ID = 0x18
 
 REG_PROFILE_BENCH_ONLY_FIXED_915 = 0
 REG_PROFILE_FCC_15_247_FHSS_50CH_BW250 = 1
@@ -440,6 +454,15 @@ def configure_regulatory_profile_if_needed(link: HostLink, profile_id: int = 1) 
       LIFETRAC_FHSS_WIDE_MASK=1        — restore historical 50-ch wide mask
                                         (otherwise narrow to single channel).
       LIFETRAC_FHSS_CHANNEL=<0..49>    — single-channel mask index (default 0).
+      LIFETRAC_FHSS_FARM_ID=<u64>      — FHSS seed, farm/fleet scope (default 0).
+      LIFETRAC_FHSS_LINK_ID=<u64>      — FHSS seed, LINK scope (default 0).
+                                        Maps to CFG_KEY_FHSS_NODE_ID. BOTH ends
+                                        of a link MUST use the same value, or
+                                        their channel permutations diverge and
+                                        the follower never holds lock. Accepts
+                                        decimal or 0x-prefixed hex. 0/0 keeps
+                                        the pre-2026-07-29 shared permutation
+                                        that every radio used to derive.
     """
     import os as _os
     env_prof = _os.environ.get("LIFETRAC_REG_PROFILE")
@@ -492,6 +515,58 @@ def configure_regulatory_profile_if_needed(link: HostLink, profile_id: int = 1) 
     except Exception as exc:
         print(f"WARN: CFG_SET_REQ(HW_CEILING_DBM) failed: {exc}")
         
+    # 3b. Provision the FHSS hop-sequence seed.
+    #
+    # MUST happen BEFORE step 4: the firmware consumes the seed only
+    # inside host_cfg_profile_activate(), and there is no re-seed path
+    # short of re-activating the profile. Writing it after step 4 stores
+    # the value but leaves the live permutation on the old seed.
+    #
+    # Default 0/0 reproduces the pre-2026-07-29 hardcoded seed exactly,
+    # so an un-provisioned bench behaves identically to before.
+    #
+    # LIFETRAC_FHSS_LINK_ID maps to CFG_KEY_FHSS_NODE_ID and is
+    # deliberately NOT named ..._NODE_ID: it is scoped to a
+    # tractor<->base LINK, and both ends must be given the same value.
+    # Per-board values would give each end a different permutation, and
+    # the follower would retune to the wrong channel every slot, lose
+    # lock and re-scan forever.
+    def _seed_env(name: str) -> int:
+        raw = (_os.environ.get(name) or "").strip()
+        if not raw:
+            return 0
+        try:
+            val = int(raw, 0)          # accepts 0x... and decimal
+        except ValueError:
+            print(f"WARN: bad {name}={raw!r} — using 0 (legacy shared seed)")
+            return 0
+        if not 0 <= val <= 0xFFFFFFFFFFFFFFFF:
+            print(f"WARN: {name}={raw!r} out of u64 range — using 0")
+            return 0
+        return val
+
+    _farm_id = _seed_env("LIFETRAC_FHSS_FARM_ID")
+    _link_id = _seed_env("LIFETRAC_FHSS_LINK_ID")
+    if _farm_id == 0 and _link_id == 0:
+        print("  FHSS seed: (0,0) legacy shared permutation "
+              "[set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]")
+    else:
+        print(f"  FHSS seed: farm=0x{_farm_id:016x} link=0x{_link_id:016x} "
+              "(BOTH ends of this link must match)")
+    for _key, _name, _val in (
+        (CFG_KEY_FHSS_FARM_ID, "FHSS_FARM_ID", _farm_id),
+        (CFG_KEY_FHSS_NODE_ID, "FHSS_NODE_ID", _link_id),
+    ):
+        try:
+            ack = cfg_set_checked(link, _key,
+                                  _val.to_bytes(8, "little"), timeout=1.0)
+            print(f"CFG_SET_REQ({_name}) OK: {ack['payload'].hex()}")
+        except Exception as exc:
+            # Older firmware without these keys answers UNKNOWN_KEY; that
+            # is survivable (it just keeps the legacy shared seed), so warn
+            # rather than abort the whole profile bring-up.
+            print(f"WARN: CFG_SET_REQ({_name}) failed: {exc}")
+
     # 4. Set the regulatory profile to profile_id and activate
     try:
         ack = cfg_set_checked(link, CFG_KEY_REG_PROFILE, bytes([profile_id]), timeout=1.0)

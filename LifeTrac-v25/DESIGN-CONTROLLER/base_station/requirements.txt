@@ -5,3 +5,10 @@ pyserial>=3.5
 paho-mqtt>=2.0
 cryptography>=42       # AES-128-GCM (real impl, replaces crypto_stub.c)
 jinja2>=3.1
+# 2026-07-29: was missing entirely, though three base-station modules import it
+# at RUNTIME — image_pipeline/codec_decode.py (decodes received tile blobs),
+# image_pipeline/fallback_render.py, and replay_ipc_capture.py. It was declared
+# only in firmware/tractor_x8/requirements.txt, so the base station happened to
+# work on any machine that had it installed for the tractor side. Same version
+# floor as the tractor's declaration.
+Pillow>=10.0.0

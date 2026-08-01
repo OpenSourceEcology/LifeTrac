@@ -48,21 +48,67 @@ except ImportError:                   # X8 image without numpy still works
 
 LOG = logging.getLogger("camera_service")
 
-GRID_W = int(os.environ.get("LIFETRAC_GRID_W", "12"))
-GRID_H = int(os.environ.get("LIFETRAC_GRID_H", "8"))
-TILE_PX = int(os.environ.get("LIFETRAC_TILE_PX", "32"))
+
+# ---- defensive env parsing (2026-07-27) -------------------------------
+# Every tunable below is hand-edited on the bench and injected through
+# docker -e / systemd unit files, where a stray comma or an empty
+# substitution is routine. A bare int()/float() at module scope turns that
+# typo into an ImportError — the camera service never starts, and the
+# operator sees a traceback instead of a warning. These helpers never
+# raise: bad input logs and falls back to the default. Out-of-range values
+# are clamped WITH a warning (generalizing the old IP-208 WEBP_QUALITY
+# check, which was the only parse that bothered).
+
+def _env_int(name: str, default: int, lo: int | None = None,
+             hi: int | None = None) -> int:
+    """Parse an int env var without ever raising. Clamps to [lo, hi]."""
+    raw = os.environ.get(name, "")
+    try:
+        val = int(str(raw).strip()) if str(raw).strip() else default
+    except ValueError:
+        LOG.warning("camera_service: bad %s=%r — using %d", name, raw, default)
+        val = default
+    return _clamp_env(name, val, lo, hi)
+
+
+def _env_float(name: str, default: float, lo: float | None = None,
+               hi: float | None = None) -> float:
+    """Parse a float env var without ever raising. Clamps to [lo, hi]."""
+    raw = os.environ.get(name, "")
+    try:
+        val = float(str(raw).strip()) if str(raw).strip() else default
+    except ValueError:
+        LOG.warning("camera_service: bad %s=%r — using %s", name, raw, default)
+        val = default
+    return _clamp_env(name, val, lo, hi)
+
+
+def _clamp_env(name, val, lo, hi):
+    if lo is not None and val < lo:
+        LOG.warning("camera_service: %s=%s below %s; clamping", name, val, lo)
+        return lo
+    if hi is not None and val > hi:
+        LOG.warning("camera_service: %s=%s above %s; clamping", name, val, hi)
+        return hi
+    return val
+
+
+# Grid geometry must stay positive or CANVAS_* and every tile index break.
+GRID_W = _env_int("LIFETRAC_GRID_W", 12, lo=1)
+GRID_H = _env_int("LIFETRAC_GRID_H", 8, lo=1)
+TILE_PX = _env_int("LIFETRAC_TILE_PX", 32, lo=1)
 CANVAS_W = GRID_W * TILE_PX        # 384
 CANVAS_H = GRID_H * TILE_PX        # 256
 TILE_BYTES_MAX = 256               # tile_size_minus1 is u8, so ≤256 B
 
-KEYFRAME_PERIOD_S = float(os.environ.get("LIFETRAC_KEYFRAME_PERIOD_S", "10"))
-TARGET_FPS        = float(os.environ.get("LIFETRAC_CAMERA_FPS", "2"))
+# Periods/rates must be > 0: TARGET_FPS divides into the loop period and
+# KEYFRAME_PERIOD_S gates the keyframe timer, so 0 would divide-by-zero or
+# force a keyframe every frame.
+KEYFRAME_PERIOD_S = _env_float("LIFETRAC_KEYFRAME_PERIOD_S", 10.0, lo=0.1)
+TARGET_FPS        = _env_float("LIFETRAC_CAMERA_FPS", 2.0, lo=0.1)
 # IP-208: clamp WEBP quality to a sensible range so a typo can't disable
 # the encoder entirely (1 would skip the in-loop guard) or push past lossless.
-_RAW_WEBP_Q = int(os.environ.get("LIFETRAC_WEBP_QUALITY", "55"))
-if _RAW_WEBP_Q < 20 or _RAW_WEBP_Q > 100:
-    LOG.warning("WEBP_QUALITY=%d out of range; clamping to [20, 100]", _RAW_WEBP_Q)
-WEBP_QUALITY      = max(20, min(100, _RAW_WEBP_Q))
+WEBP_QUALITY      = _env_int("LIFETRAC_WEBP_QUALITY", 55, lo=20, hi=100)
 SOURCE            = os.environ.get("LIFETRAC_CAMERA_SOURCE", "libcamera")
 MQTT_HOST         = os.environ.get("LIFETRAC_MQTT_HOST", "localhost")
 
@@ -73,7 +119,7 @@ MQTT_HOST         = os.environ.get("LIFETRAC_MQTT_HOST", "localhost")
 V4L2_DEVICE       = os.environ.get("LIFETRAC_CAMERA_DEVICE", "/dev/video1")
 V4L2_INPUT_FORMAT = os.environ.get("LIFETRAC_V4L2_INPUT_FORMAT", "mjpeg")
 V4L2_INPUT_SIZE   = os.environ.get("LIFETRAC_V4L2_INPUT_SIZE", "1920x1080")
-V4L2_INPUT_FPS    = int(os.environ.get("LIFETRAC_V4L2_INPUT_FPS", "30"))
+V4L2_INPUT_FPS    = _env_int("LIFETRAC_V4L2_INPUT_FPS", 30, lo=1)
 FFMPEG_PATH       = os.environ.get("LIFETRAC_FFMPEG_PATH", "ffmpeg")
 
 # IP-104: primary path for encoded image fragments is the X8 → H747 UART
@@ -82,6 +128,9 @@ FFMPEG_PATH       = os.environ.get("LIFETRAC_FFMPEG_PATH", "ffmpeg")
 # can subscribe without the M7 having to bridge it.
 M7_UART_DEVICE    = os.environ.get("LIFETRAC_M7_UART", "/dev/ttymxc1")
 DEBUG_MQTT        = os.environ.get("LIFETRAC_CAMERA_DEBUG_MQTT", "").strip() == "1"
+# RS-3.3: per-read timing for the capture pipeline. Off by default; the log
+# volume is one line per read() syscall.
+CAMERA_TRACE      = os.environ.get("LIFETRAC_CAMERA_TRACE", "").strip() == "1"
 # 2026-05-27 W2-02 strict-path bridge: when set, the daemon hands
 # /dev/ttymxc3 off to image_tx_daemon (which speaks the Method-G
 # HostLink protocol the L072 actually understands) and routes every
@@ -104,6 +153,10 @@ KEYFRAME_REQ_TOPIC = "lifetrac/v25/cmd/req_keyframe"
 ENCODE_MODE_OVERRIDE_TOPIC = "lifetrac/v25/tractor/encode_mode_override"
 TRACTOR_KEYFRAME_TOPIC     = "lifetrac/v25/tractor/req_keyframe"
 ENCODE_MODE_STATUS_TOPIC   = "lifetrac/v25/status/encode_mode"
+# 2026-07-27 encode-to-fit: image_tx_daemon (radio owner) publishes the live
+# per-frame byte budget here so the encoder sizes frames to the real air
+# quantum. Replaces the dead CMD_LINK_PROFILE M7 back-channel in bridge mode.
+TRACTOR_LINK_BUDGET_TOPIC  = "lifetrac/v25/tractor/link_budget"
 
 
 # ---- capture backends -------------------------------------------------
@@ -286,6 +339,7 @@ class V4l2FfmpegCamera:
             raise RuntimeError(
                 f"V4l2FfmpegCamera: failed to spawn {self.ffmpeg_path!r}: {exc}"
             ) from exc
+        self._spawn_t = time.monotonic()
         LOG.info("camera_service: v4l2/ffmpeg pid=%s device=%s %s@%dfps -> %dx%d rgb24",
                  self._proc.pid, self.device, self.input_size, self.input_fps,
                  CANVAS_W, CANVAS_H)
@@ -293,8 +347,24 @@ class V4l2FfmpegCamera:
     def _read_exact(self, n: int) -> bytes | None:
         assert self._proc is not None and self._proc.stdout is not None
         out = bytearray()
+        # 2026-07-30 RS-3.3 diagnostic. camera_service blocks here on hardware
+        # while an identical standalone Popen+read of the SAME argv returns a
+        # full frame in 2.5 s. ffmpeg, the argv, the pipe, stdin=DEVNULL and
+        # device contention have all been ruled out by measurement, so the
+        # remaining suspect is the delay between spawning ffmpeg and first
+        # draining it: -thread_queue_size 2 with -fflags nobuffer leaves almost
+        # no slack, and a stalled reader can wedge the 64 KB stdout pipe.
+        if CAMERA_TRACE:
+            LOG.info("camera_trace: first read starting %.2f s after spawn",
+                     time.monotonic() - getattr(self, "_spawn_t", time.monotonic()))
         while len(out) < n:
+            t_chunk = time.monotonic()
             chunk = self._proc.stdout.read(n - len(out))
+            if CAMERA_TRACE:
+                LOG.info("camera_trace: read() returned %s bytes after %.2f s "
+                         "(have %d/%d)",
+                         len(chunk) if chunk else 0,
+                         time.monotonic() - t_chunk, len(out), n)
             if not chunk:
                 return None
             out.extend(chunk)
@@ -460,11 +530,21 @@ def _clamp_encode_mode(requested: int) -> int:
     return ENCODE_MODE_Y_ONLY
 # Quality ceilings applied as ``min(requested_quality, ceiling)`` so the
 # ROI-inside boost still wins when the ceiling is high enough.
-MOTION_ONLY_QUALITY = max(5, min(100, int(os.environ.get(
-    "LIFETRAC_MOTION_ONLY_QUALITY", "30"))))
-WIREFRAME_QUALITY   = max(5, min(100, int(os.environ.get(
-    "LIFETRAC_WIREFRAME_QUALITY",   "20"))))
-ENCODE_MODE = _clamp_encode_mode(int(os.environ.get("LIFETRAC_ENCODE_MODE", "0")))
+MOTION_ONLY_QUALITY = _env_int("LIFETRAC_MOTION_ONLY_QUALITY", 30, lo=5, hi=100)
+WIREFRAME_QUALITY   = _env_int("LIFETRAC_WIREFRAME_QUALITY", 20, lo=5, hi=100)
+ENCODE_MODE = _clamp_encode_mode(_env_int("LIFETRAC_ENCODE_MODE", 0))
+
+# 2026-07-27 encode-to-fit starvation guard: a tile whose age (frames since
+# it last shipped) EXCEEDS this jumps to the front of the pack order, oldest
+# first. Guarantees rolling-refresh convergence under sustained motion at
+# tight budgets. 0 DISABLES escalation entirely (see the explicit `> 0`
+# guards at the use sites — without them a value of 0 would escalate every
+# tile with age >= 1, i.e. the exact opposite of "disabled").
+TILE_AGE_ESCALATE_FRAMES = _env_int(
+    "LIFETRAC_TILE_AGE_ESCALATE_FRAMES", 40, lo=0)
+# Bound on wasted encode passes once the budget is full: after the first
+# overflow, keep scanning at most this many more tiles for a smaller fit.
+OVERFLOW_SCAN_LIMIT = _env_int("LIFETRAC_OVERFLOW_SCAN_LIMIT", 6, lo=1)
 
 # Per-frame codec ids (mirrors base_station/image_pipeline/frame_format.py).
 # Kept duplicated to avoid importing the base-station tree from the tractor.
@@ -651,14 +731,14 @@ if IMAGE_METHOD not in ("A", "B", "C"):
 # Method B/C: L1-magnitude floor (sum of |cur-prev| over the 32×32×3 RGB
 # tile). In LoRa-bridge mode keep a low-but-nonzero default: high values can
 # misclassify slow real motion as static and make the UI appear frozen.
-_default_tile_mag_min = "4000" if USE_LORA_BRIDGE else "8000"
-TILE_MAGNITUDE_MIN = max(0, int(os.environ.get(
-    "LIFETRAC_TILE_MAGNITUDE_MIN", _default_tile_mag_min)))
+_default_tile_mag_min = 4000 if USE_LORA_BRIDGE else 8000
+TILE_MAGNITUDE_MIN = _env_int(
+    "LIFETRAC_TILE_MAGNITUDE_MIN", _default_tile_mag_min, lo=0)
 
 # Method C: how many "stale" tiles to force into each P-frame's changed
 # bitmap. With SWEEP_STEP=2 and a 1 fps loop, a static 96-tile canvas
 # converges to full coverage in ~48 s even with zero motion. 0 disables.
-SWEEP_STEP = max(0, int(os.environ.get("LIFETRAC_SWEEP_STEP", "2")))
+SWEEP_STEP = _env_int("LIFETRAC_SWEEP_STEP", 2, lo=0)
 
 LOG.info("IP-PlanRev: IMAGE_METHOD=%s TILE_MAGNITUDE_MIN=%d SWEEP_STEP=%d numpy=%s",
          IMAGE_METHOD, TILE_MAGNITUDE_MIN, SWEEP_STEP, _HAS_NUMPY)
@@ -667,10 +747,9 @@ LOG.info("IP-PlanRev: IMAGE_METHOD=%s TILE_MAGNITUDE_MIN=%d SWEEP_STEP=%d numpy=
 # IP-W2-03: per-tile quality split for the ROI planner. Inside-ROI tiles
 # get ``ROI_QUALITY_INSIDE`` (default 65), outside-ROI tiles get
 # ``ROI_QUALITY_OUTSIDE`` (default 30) when a planner is wired in.
-ROI_QUALITY_INSIDE  = max(20, min(100, int(os.environ.get(
-    "LIFETRAC_ROI_QUALITY_INSIDE",  str(WEBP_QUALITY + 10)))))
-ROI_QUALITY_OUTSIDE = max( 5, min(100, int(os.environ.get(
-    "LIFETRAC_ROI_QUALITY_OUTSIDE", "30"))))
+ROI_QUALITY_INSIDE  = _env_int("LIFETRAC_ROI_QUALITY_INSIDE",
+                               WEBP_QUALITY + 10, lo=20, hi=100)
+ROI_QUALITY_OUTSIDE = _env_int("LIFETRAC_ROI_QUALITY_OUTSIDE", 30, lo=5, hi=100)
 
 # IP-W2-03: optional airtime byte-budget. When set (positive int), the
 # encoder drops outside-ROI changed tiles first, then oldest inside-ROI
@@ -779,12 +858,16 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
         :data:`ROI_QUALITY_INSIDE` and outside-ROI tiles at
         :data:`ROI_QUALITY_OUTSIDE`. Inside-ROI tiles are always sent
         first when a budget cap forces drops.
-      * ``byte_budget`` — soft cap on the combined size of the encoded
-        tile bodies (each tile contributes ``len(blob) + 1`` bytes for
-        its ``tile_size_minus1`` prefix). Outside-ROI tiles are dropped
-        first; if still over, the lowest-priority inside tiles are
-        dropped. The header + bitmap are always emitted; dropped tiles
-        are cleared from the bitmap so the parser stays in sync.
+      * ``byte_budget`` — cap on the whole WIRE payload (2026-07-27): the
+        6-byte header + changed-bitmap are charged against it, so the
+        emitted frame is ``<= byte_budget`` and fits its fragment budget
+        exactly. Tile bodies (each ``len(blob) + 1`` for the size prefix)
+        fill the remainder in priority order; outside-ROI then
+        lowest-priority inside tiles are dropped, and dropped bits are
+        cleared from the bitmap so the parser stays in sync. Exception:
+        an AGED tile too large to ever fit is admitted over-budget once
+        per frame (that frame spills to ~2 fragments) so a complex region
+        is never starved forever — see the liveness valve below.
       * ``encode_cache`` — :class:`image_pipeline.tile_cache.TileEncodeCache`.
         When provided, a tile whose raw 32×32 RGB slice byte-hashes to a
         recently encoded blob is reused instead of round-tripping through
@@ -934,9 +1017,58 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
     else:
         # Method A (and Method B/C first-frame): (rank, idx) row-major.
         priority.sort(key=lambda t: (t[0], t[1]))
+    # 2026-07-27 starvation guard (encode-to-fit): under a tight budget the
+    # motion-first ordering can starve the sweep forever (sweep tiles sort
+    # last, the budget break drops the tail every frame, tile age grows
+    # unbounded). Escalate any tile older than the threshold to the FRONT,
+    # oldest first. This handles the common case (a smaller aged tile now
+    # gets budget priority); the over-budget liveness valve in the packing
+    # loop handles the remaining case (an aged tile too large to EVER fit).
+    # Together they guarantee every tile ships eventually.
+    if (TILE_AGE_ESCALATE_FRAMES > 0 and accum.tile_last_seq is not None
+            and not is_key and IMAGE_METHOD in ("B", "C")):
+        _ages = accum.tile_last_seq
+        _now_seq = accum.sweep_seq
+
+        def _escalate_key(t):
+            rank, idx = t[0], t[1]
+            age = _now_seq - _ages[idx]
+            if age > TILE_AGE_ESCALATE_FRAMES:
+                return (rank, -1, -age, idx)          # oldest first
+            in_sweep = 1 if idx in sweep_indices else 0
+            return (rank, in_sweep, -magnitudes[idx], idx)
+        priority.sort(key=_escalate_key)
     kept: list[tuple[int, bytes]] = []   # (idx, blob)
     used = 0
     cap = byte_budget if (byte_budget is not None and byte_budget > 0) else None
+    # 2026-07-27 encode-to-fit: the budget bounds the WIRE payload, so the
+    # fixed 6 B header + changed-bitmap are charged against it up front.
+    # Before this, a "243 B" budget produced a 261 B payload — one runt
+    # fragment per budget-full frame, by construction (the exact sawtooth
+    # the single-fragment schedule exists to kill).
+    tile_cap = None
+    if cap is not None:
+        tile_cap = max(0, cap - 6 - bitmap_bytes)
+    _overflow_scans = 0
+    # Liveness valve: a tile whose SMALLEST encodable blob exceeds tile_cap
+    # (a high-detail tile at a tight budget) can never fit, so the strict
+    # no-bust packer would starve it forever — permanent staleness of a
+    # complex region under sustained motion. Once a tile has AGED past the
+    # escalation threshold, admit it over-budget ONCE per frame (that frame
+    # becomes ~2 fragments — rare and bounded) so it finally ships. This
+    # keeps the "every tile ships eventually" guarantee true; the common
+    # case stays single-fragment.
+    _aged_valve_used = False
+
+    def _is_aged(idx: int) -> bool:
+        # TILE_AGE_ESCALATE_FRAMES == 0 disables the whole aging feature,
+        # including this over-budget liveness valve.
+        if (TILE_AGE_ESCALATE_FRAMES <= 0 or accum.tile_last_seq is None
+                or is_key):
+            return False
+        return (accum.sweep_seq - accum.tile_last_seq[idx]
+                > TILE_AGE_ESCALATE_FRAMES)
+
     for _rank, i, q in priority:
         ty, tx = divmod(i, GRID_W)
         if encode_cache is not None:
@@ -955,12 +1087,34 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
         if blob is None:
             continue
         cost = min(len(blob), TILE_BYTES_MAX) + 1   # +1 for size prefix
-        if cap is not None and used + cost > cap and kept:
-            # No room for this one and we've already shipped at least one tile;
-            # drop this tile and every lower-priority one.
-            LOG.debug("camera_service: byte_budget=%d hit at tile %d (used=%d, cost=%d); dropping remainder",
-                      cap, i, used, cost)
-            break
+        if tile_cap is not None and used + cost > tile_cap:
+            # Over budget for THIS tile. Two 2026-07-27 changes vs the old
+            # break-on-first-overflow: (a) no first-tile bypass — a single
+            # oversized tile can no longer bust the cap (the old `and kept`
+            # admitted it, making "single-fragment frame" a lie); (b) greedy
+            # continue — a lower-priority tile may be smaller and still fit,
+            # so scan on (bounded, to cap the wasted encode CPU) instead of
+            # abandoning the remaining budget.
+            # Liveness valve: an AGED tile that can never fit gets admitted
+            # over-budget once per frame so it is not starved forever. Only
+            # when nothing has shipped yet (kept empty) or its own size is
+            # the blocker — otherwise let the greedy scan keep packing.
+            if (not _aged_valve_used and _is_aged(i)
+                    and cost > tile_cap):     # can't fit even an empty frame
+                _aged_valve_used = True
+                kept.append((i, blob))
+                used += cost
+                LOG.debug("camera_service: aged tile %d admitted over-budget "
+                          "(cost=%d > tile_cap=%d) to avoid starvation",
+                          i, cost, tile_cap)
+                break                          # frame is over budget; stop
+            _overflow_scans += 1
+            if _overflow_scans >= OVERFLOW_SCAN_LIMIT or tile_cap - used < 6:
+                LOG.debug("camera_service: byte_budget=%d full (used=%d, "
+                          "scans=%d); dropping remainder", cap, used,
+                          _overflow_scans)
+                break
+            continue
         kept.append((i, blob))
         used += cost
 
@@ -986,6 +1140,31 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
         body.append(size - 1)
         body.extend(blob[:size])
 
+    # 2026-07-27 carry fix (encode-to-fit): a CHANGED tile dropped by the
+    # budget must stay "changed" for the next diff. Before this, last_canvas
+    # was updated wholesale, so a tile that changed, missed the budget, and
+    # then went static was silently forgotten until the 2-tile/frame sweep
+    # reached it (up to ~48 frames on a 12x8 grid). Splice the OLD pixels
+    # back into the dropped tiles' regions so they re-flag next frame at
+    # full motion priority.
+    if (cap is not None and accum.last_canvas is not None
+            and len(accum.last_canvas) == len(canvas)):
+        # Length guard: a runtime grid change makes last_canvas a different
+        # size; splicing then would shrink/corrupt the bytearray. Skip the
+        # carry that frame (the next keyframe repaints everything anyway).
+        kept_set = {i for i, _b in kept}
+        dropped = [t[1] for t in priority if t[1] not in kept_set]
+        if dropped:
+            canvas = bytearray(canvas)
+            row_bytes = TILE_PX * 3
+            for i in dropped:
+                ty, tx = divmod(i, GRID_W)
+                x0 = tx * TILE_PX * 3
+                for r in range(TILE_PX):
+                    off = ((ty * TILE_PX + r) * CANVAS_W * 3) + x0
+                    canvas[off:off + row_bytes] = \
+                        accum.last_canvas[off:off + row_bytes]
+            canvas = bytes(canvas)
     accum.last_canvas = canvas
     if is_key:
         accum.last_keyframe_t = now
@@ -1042,6 +1221,7 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
     """
     effective = _clamp_encode_mode(raw_mode)
     global ENCODE_MODE, WEBP_QUALITY  # noqa: PLW0603
+    mode_changed = (effective != ENCODE_MODE)
     ENCODE_MODE = effective
     if quality is not None:
         try:
@@ -1065,7 +1245,15 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
             "clamping to %d (%s) [%s]",
             raw_mode, req_name, effective, ENCODE_MODE_NAMES[effective],
             source)
-    force_key_evt.set()
+    # 2026-07-27: force a keyframe only when the MODE actually changed (the
+    # codec byte in every frame header makes the switch decode-safe, but a
+    # full repaint is the right UX) or at boot (initial paint). A
+    # quality-only change needs NO keyframe: quality is not on the wire,
+    # tiles are self-describing, and the encode cache keys include quality
+    # — the old unconditional force cost ~1-2 s of air per slider move and
+    # re-fired on every retained-message replay at MQTT reconnect.
+    if mode_changed or source == "boot":
+        force_key_evt.set()
     client = _MQTT_CLIENT
     if client is not None:
         try:
@@ -1203,7 +1391,7 @@ def main() -> None:
     if os.environ.get("LIFETRAC_TILE_CACHE_ENABLE", "").strip() == "1":
         try:
             from image_pipeline.tile_cache import TileEncodeCache
-            history = max(1, int(os.environ.get("LIFETRAC_TILE_CACHE_HISTORY", "4")))
+            history = _env_int("LIFETRAC_TILE_CACHE_HISTORY", 4, lo=1)
             encode_cache = TileEncodeCache(n_tiles=GRID_W * GRID_H, history=history)
             LOG.info("camera_service: tile encode cache enabled (history=%d)", history)
         except Exception as exc:                              # pragma: no cover
@@ -1271,6 +1459,24 @@ def main() -> None:
                 if _msg.topic in (KEYFRAME_REQ_TOPIC, TRACTOR_KEYFRAME_TOPIC):
                     force_key_evt.set()
                     return
+                if _msg.topic == TRACTOR_LINK_BUDGET_TOPIC:
+                    # {"n_fragments": N, "profile_index": i} from the radio
+                    # owner. Feeds the existing LinkBudget.update seam so the
+                    # per-frame byte_budget (read at the encode loop below)
+                    # tracks the live radio profile, not a boot-frozen env.
+                    try:
+                        import json as _json
+                        b = _json.loads(_msg.payload.decode("utf-8") or "{}")
+                        nf = int(b.get("n_fragments", 0))
+                        pi = int(b.get("profile_index", -1))
+                    except (ValueError, TypeError, UnicodeDecodeError) as exc:
+                        LOG.warning("link_budget: bad payload %r (%s)",
+                                    _msg.payload[:64], exc)
+                        return
+                    if link_budget.update(nf, pi):
+                        LOG.info("link_budget: -> %s B/frame (n=%d, %s)",
+                                 link_budget.bytes, nf, link_budget.profile_name)
+                    return
                 if _msg.topic == ENCODE_MODE_OVERRIDE_TOPIC:
                     # {"mode": <int> | "<name>", "quality": 1-100?} —
                     # re-published locally by image_tx_daemon after
@@ -1304,6 +1510,7 @@ def main() -> None:
             client.connect(MQTT_HOST, 1883)
             client.subscribe(KEYFRAME_REQ_TOPIC, qos=1)
             client.subscribe(TRACTOR_KEYFRAME_TOPIC, qos=1)
+            client.subscribe(TRACTOR_LINK_BUDGET_TOPIC, qos=1)
             # Retained topic: a freshly (re)started camera_service picks up
             # the operator's last selection immediately on subscribe.
             client.subscribe(ENCODE_MODE_OVERRIDE_TOPIC, qos=1)
@@ -1317,7 +1524,7 @@ def main() -> None:
     period = 1.0 / max(TARGET_FPS, 0.1)
     next_t = time.monotonic()
     frame_health_log = os.environ.get("LIFETRAC_CAMERA_HEALTH_LOG", "").strip() == "1"
-    frame_health_every_s = max(1.0, float(os.environ.get("LIFETRAC_CAMERA_HEALTH_EVERY_S", "2")))
+    frame_health_every_s = _env_float("LIFETRAC_CAMERA_HEALTH_EVERY_S", 2.0, lo=1.0)
     _last_health_t = 0.0
     _last_canvas_sig: int | None = None
     _same_canvas_run = 0

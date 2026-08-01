@@ -31,13 +31,46 @@
  */
 #define CFG_KEY_ANTENNA_GAIN_DBI             0x15U
 #define CFG_KEY_HW_CEILING_DBM               0x16U
+/*
+ * FHSS hop-sequence identity (2026-07-29). Both u64 little-endian,
+ * synthesised into the profile request alongside 0x15/0x16.
+ *
+ * These feed sx1276_fhss_init(farm_id, node_id, epoch), whose FNV-1a
+ * seed drives the Fisher-Yates channel permutation. Before they
+ * existed that call site passed a hardcoded (0, 0, 0), so every radio
+ * in the fleet derived the SAME 50-channel hop order — two machines in
+ * the same area would collide on every dwell instead of statistically
+ * avoiding each other, and the hop sequence was fully predictable.
+ *
+ * CFG_KEY_FHSS_NODE_ID IS LINK-SCOPED, NOT PER-RADIO. Both ends of one
+ * link MUST be given the same node_id or their permutations diverge:
+ * the follower retunes to the wrong channel every slot, loses lock and
+ * demotes to SCANNING indefinitely. Provision one id per
+ * tractor<->base pair, not one per board. The name is inherited from
+ * sx1276_fhss_init(); read it as "link id".
+ *
+ * Default 0 on both keys reproduces the pre-2026-07-29 permutation
+ * exactly, so an un-provisioned fleet is bit-for-bit unchanged.
+ *
+ * ORDERING CONTRACT: write these BEFORE CFG_KEY_REG_PROFILE. The seed
+ * is consumed only inside host_cfg_profile_activate(), and there is no
+ * re-seed path short of re-activating the profile.
+ *
+ * There is deliberately NO epoch key. epoch is a runtime time
+ * coordinate — one per 10 s, continuously re-derived from the slot
+ * clock and re-anchored from the peer's air header — not stable
+ * identity. Its init-time value is a throwaway phase origin that the
+ * first FHSS TX overwrites.
+ */
+#define CFG_KEY_FHSS_FARM_ID                 0x17U
+#define CFG_KEY_FHSS_NODE_ID                 0x18U
 
 #define CFG_KEY_PROTOCOL_VERSION             0x80U
 #define CFG_KEY_WIRE_SCHEMA_VERSION          0x81U
 #define CFG_KEY_CFG_DIRTY                    0x82U
 
 #define CFG_KEY_MAX_VALUE_LEN                8U
-#define CFG_KEY_COUNT                        23U
+#define CFG_KEY_COUNT                        25U
 
 /*
  * Regulatory operating-mode enum for CFG_KEY_REG_PROFILE (u8).

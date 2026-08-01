@@ -1,0 +1,33 @@
+# Base-station DEV/TEST deps. Install this (not requirements.txt) to run the
+# SIL suite — CI installs exactly this file.
+#
+# Added 2026-07-29 (RS-5.7): the CI job ran `unittest discover` after
+# setup-python but never installed anything, so "Base station protocol tests"
+# was red on every commit with 49 missing-import errors (paho x25, fastapi x19,
+# cryptography x3, pytest x2) and ZERO assertion failures. A gate that is always
+# red carries no information, which is why two other test-env defects survived
+# unnoticed for months.
+
+-r requirements.txt
+
+# A handful of SIL modules use pytest directly (the rest are unittest.TestCase,
+# which pytest also collects — it finds ~1044 tests vs unittest discover's 964).
+pytest>=8.0
+
+# starlette's TestClient needs an HTTP client, which nothing declared — five
+# web_ui test modules cannot even collect without it.
+httpx>=0.27
+
+# PINNED, unlike requirements.txt ("DRAFT — not pinned").
+#
+# The unpinned `fastapi>=0.110` made CI and the bench PC resolve DIFFERENT
+# starlette versions, and they disagree about which HTTP client TestClient
+# wants: the bench PC's starlette 1.0.0 asks for `httpx`, while the version CI
+# resolved asks for `httpx2`. So "tests pass locally" and "tests pass in CI"
+# were not the same claim. A test environment has to be reproducible or a green
+# badge means nothing — which is the whole point of the RS-5.7 fix this file is
+# part of.
+#
+# These are the versions the 1044-passing local run was verified against.
+# Bump deliberately, and re-run the suite when you do.
+fastapi==0.136.1

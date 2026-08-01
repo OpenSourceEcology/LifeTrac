@@ -13,13 +13,59 @@
 
 #include <stdint.h>
 
+/*
+ * 2026-07-29 FHSS seed identity: capture the seed so cfg_profile_wire.c
+ * can pin that CFG_KEY_FHSS_FARM_ID / CFG_KEY_FHSS_NODE_ID actually
+ * reach the scheduler. Before that fix this call site passed a
+ * hardcoded (0, 0, 0), so every radio derived the same hop permutation
+ * — and nothing observed the arguments, which is precisely why the
+ * defect survived. Accessors are declared in sx1276_stub.h alongside
+ * sx1276_stub_last_budget_us(), which is defined here for the same
+ * duplicate-symbol reason.
+ */
+static uint64_t s_stub_fhss_farm_id;
+static uint64_t s_stub_fhss_node_id;
+static uint32_t s_stub_fhss_initial_epoch;
+static uint32_t s_stub_fhss_init_calls;
+
 sx1276_fhss_status_t sx1276_fhss_init(uint64_t farm_id,
                                       uint64_t node_id,
                                       uint32_t initial_epoch) {
-    (void)farm_id;
-    (void)node_id;
-    (void)initial_epoch;
+    s_stub_fhss_farm_id       = farm_id;
+    s_stub_fhss_node_id       = node_id;
+    s_stub_fhss_initial_epoch = initial_epoch;
+    s_stub_fhss_init_calls++;
     return SX1276_FHSS_OK;
+}
+
+uint64_t sx1276_stub_last_fhss_farm_id(void) {
+    return s_stub_fhss_farm_id;
+}
+
+uint64_t sx1276_stub_last_fhss_node_id(void) {
+    return s_stub_fhss_node_id;
+}
+
+uint32_t sx1276_stub_last_fhss_initial_epoch(void) {
+    return s_stub_fhss_initial_epoch;
+}
+
+uint32_t sx1276_stub_fhss_init_call_count(void) {
+    return s_stub_fhss_init_calls;
+}
+
+/*
+ * Deliberately NOT folded into sx1276_fhss_reset() below: that is the
+ * real API the non-FHSS activation branches call, so clearing the
+ * capture there would erase the very evidence a DTS-then-FHSS test
+ * sequence needs. Also cannot live in sx1276_stub_reset() — that is a
+ * different TU and these are file-statics.
+ */
+void sx1276_stub_fhss_capture_reset(void) {
+    s_stub_fhss_farm_id       = 0ULL;
+    s_stub_fhss_node_id       = 0ULL;
+    s_stub_fhss_initial_epoch = 0U;
+    s_stub_fhss_init_calls    = 0U;
 }
 
 /* 2026-07-25 run-23 stale-state fix: non-FHSS activation branches now

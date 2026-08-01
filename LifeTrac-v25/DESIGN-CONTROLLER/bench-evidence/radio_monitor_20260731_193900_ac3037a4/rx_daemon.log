@@ -1,0 +1,530 @@
+﻿2026-08-01 00:34:49,853 INFO image_rx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-08-01 00:34:49,856 INFO image_rx_daemon: image_rx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-08-01 00:34:49,859 INFO image_rx_daemon: ctrl MQTT connected (192.168.1.79)
+
+2026-08-01 00:34:49,867 INFO image_rx_daemon: MQTT connected; ready to publish lifetrac/v25/video/tile_delta
+
+2026-08-01 00:34:49,870 INFO image_rx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-08-01 00:34:49,884 INFO image_rx_daemon: accepting first retained lifetrac/v25/control/radio_profile pin after start (restart convergence)
+
+2026-08-01 00:34:50,299 INFO image_rx_daemon: L072 VER warm-up ok (attempt 1)
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+WARN: CFG_SET_REQ(FHSS_FARM_ID) failed: CFG_SET(0x17) REJECTED: status=1 (UNKNOWN_KEY) — do NOT treat as OK
+
+WARN: CFG_SET_REQ(FHSS_NODE_ID) failed: CFG_SET(0x18) REJECTED: status=1 (UNKNOWN_KEY) — do NOT treat as OK
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+
+2026-08-01 00:34:50,746 INFO image_rx_daemon: LBT_ENABLE=0 (command uplink shares the image channel)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-08-01 00:34:50,831 INFO image_rx_daemon: SX1276 RXCONT autowake: opmode 0x81 -> 0x85
+
+2026-08-01 00:34:50,832 INFO image_rx_daemon: RX worker ready; draining RX_FRAME_URC...
+
+2026-08-01 00:34:50,855 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:51,114 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:51,669 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:52,229 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:52,773 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:53,317 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:53,861 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:54,403 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:54,951 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:55,496 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:56,039 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:56,600 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:57,153 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:57,697 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:58,257 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:58,812 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:59,365 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 00:34:59,908 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-08-01 00:35:00,180 WARNING image_rx_daemon: cmd 0x63 GAVE UP after 17 attempts (10.3 s)
+
+2026-08-01 00:35:00,860 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+2026-08-01 00:35:10,708 INFO image_rx_daemon: published frame_id=0 2980 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:35:10,867 INFO image_rx_daemon: stats: rx_frames=23 rx_decode_err=0 frames_published=1 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=1 parity_recon=0
+
+2026-08-01 00:35:10,868 INFO image_rx_daemon: air_gap: n=22 dt_med=104853us dt_p95=293088us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:35:10,871 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:16 <400:4 >=1000:1
+
+2026-08-01 00:35:10,872 INFO image_rx_daemon: air_gap_by_class: seq: n=19 med=104.8ms | boundary: n=1 med=1158.2ms | post_loss: n=2 med=209.7ms
+
+2026-08-01 00:35:10,874 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (12.50%) verdict=not-clustered | top 2:1 7:1 12:1
+
+2026-08-01 00:35:13,199 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:35:18,172 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:35:20,665 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:35:20,878 INFO image_rx_daemon: stats: rx_frames=71 rx_decode_err=0 frames_published=4 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=2 parity_recon=0
+
+2026-08-01 00:35:20,882 INFO image_rx_daemon: air_gap: n=48 dt_med=104848us dt_p95=1120891us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:35:20,885 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:39 <400:4 >=1000:4
+
+2026-08-01 00:35:20,885 INFO image_rx_daemon: air_gap_by_class: seq: n=43 med=104.8ms | boundary: n=4 med=1159.1ms | post_loss: n=1 med=397.7ms
+
+2026-08-01 00:35:20,886 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (2.22%) verdict=not-clustered | top 8:1
+
+2026-08-01 00:35:25,704 INFO image_rx_daemon: published frame_id=0 2986 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:35:28,181 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:35:30,701 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:35:30,889 INFO image_rx_daemon: stats: rx_frames=122 rx_decode_err=0 frames_published=7 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 00:35:30,891 INFO image_rx_daemon: air_gap: n=51 dt_med=104855us dt_p95=1123261us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:35:30,892 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <120:38 <400:5 >=1000:4
+
+2026-08-01 00:35:30,893 INFO image_rx_daemon: air_gap_by_class: seq: n=46 med=104.9ms | boundary: n=4 med=1137.6ms | post_loss: n=1 med=209.7ms
+
+2026-08-01 00:35:30,894 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (2.08%) verdict=not-clustered | top 4:1
+
+2026-08-01 00:35:33,164 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:35:35,686 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:35:40,666 INFO image_rx_daemon: published frame_id=0 2901 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:35:40,897 INFO image_rx_daemon: stats: rx_frames=171 rx_decode_err=0 frames_published=10 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=4 parity_recon=0
+
+2026-08-01 00:35:40,899 INFO image_rx_daemon: air_gap: n=49 dt_med=104855us dt_p95=1130952us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:35:40,902 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:40 <400:4 >=1000:4
+
+2026-08-01 00:35:40,904 INFO image_rx_daemon: air_gap_by_class: seq: n=42 med=104.9ms | boundary: n=4 med=1159.0ms | post_loss: n=2 med=286.0ms
+
+2026-08-01 00:35:40,906 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (4.26%) verdict=not-clustered | top 10:1 12:1
+
+2026-08-01 00:35:40,908 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:35:45,686 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:35:48,164 INFO image_rx_daemon: published frame_id=0 2892 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:35:50,677 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:35:50,911 INFO image_rx_daemon: stats: rx_frames=221 rx_decode_err=0 frames_published=13 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=5 parity_recon=0
+
+2026-08-01 00:35:50,912 INFO image_rx_daemon: air_gap: n=50 dt_med=104876us dt_p95=1163843us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:35:50,913 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <120:40 <400:4 >=1000:4
+
+2026-08-01 00:35:50,914 INFO image_rx_daemon: air_gap_by_class: seq: n=40 med=104.9ms | boundary: n=4 med=1165.3ms | post_loss: n=4 med=285.9ms
+
+2026-08-01 00:35:50,915 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (6.12%) verdict=not-clustered | top 10:2 12:1
+
+2026-08-01 00:35:50,915 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:35:55,687 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:00,685 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:00,924 INFO image_rx_daemon: stats: rx_frames=271 rx_decode_err=0 frames_published=15 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=7 parity_recon=0
+
+2026-08-01 00:36:00,925 INFO image_rx_daemon: air_gap: n=50 dt_med=104875us dt_p95=1129321us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:36:00,927 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:2 <120:38 <400:5 >=1000:4
+
+2026-08-01 00:36:00,928 INFO image_rx_daemon: air_gap_by_class: seq: n=39 med=104.9ms | boundary: n=4 med=1131.2ms | post_loss: n=5 med=209.7ms
+
+2026-08-01 00:36:00,929 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (8.00%) verdict=not-clustered | top 10:2 12:1 5:1
+
+2026-08-01 00:36:00,930 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:36:03,180 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:05,705 INFO image_rx_daemon: published frame_id=0 3000 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:08,196 INFO image_rx_daemon: published frame_id=0 2974 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:10,666 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:10,935 INFO image_rx_daemon: stats: rx_frames=323 rx_decode_err=0 frames_published=19 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=7 parity_recon=0
+
+2026-08-01 00:36:10,937 INFO image_rx_daemon: air_gap: n=52 dt_med=104859us dt_p95=1123079us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:36:10,940 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:1 <120:40 <400:4 >=1000:4
+
+2026-08-01 00:36:10,941 INFO image_rx_daemon: air_gap_by_class: seq: n=42 med=104.9ms | boundary: n=4 med=1123.2ms | post_loss: n=4 med=285.7ms
+
+2026-08-01 00:36:10,941 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (4.00%) verdict=not-clustered | top 10:2
+
+2026-08-01 00:36:10,942 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:36:15,659 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:18,201 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:20,956 INFO image_rx_daemon: stats: rx_frames=371 rx_decode_err=0 frames_published=21 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=8 parity_recon=0
+
+2026-08-01 00:36:20,958 INFO image_rx_daemon: air_gap: n=48 dt_med=104862us dt_p95=1123226us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:36:20,961 INFO image_rx_daemon: air_gap_hist(ms): <80:2 <120:36 <400:6 >=1000:4
+
+2026-08-01 00:36:20,963 INFO image_rx_daemon: air_gap_by_class: seq: n=33 med=104.8ms | boundary: n=4 med=1149.1ms | post_loss: n=8 med=210.7ms
+
+2026-08-01 00:36:20,967 INFO image_rx_daemon: lost_frag_idx: n=5 idx0=0 (0.00% of idx0 arrivals) other=5 (10.20%) verdict=not-clustered | top 10:3 4:1 2:1
+
+2026-08-01 00:36:20,968 INFO image_rx_daemon: frag_reordered: 3 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:36:23,164 INFO image_rx_daemon: published frame_id=0 2903 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:25,669 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:30,699 INFO image_rx_daemon: published frame_id=0 2980 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:30,971 INFO image_rx_daemon: stats: rx_frames=420 rx_decode_err=0 frames_published=24 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=10 parity_recon=0
+
+2026-08-01 00:36:30,972 INFO image_rx_daemon: air_gap: n=49 dt_med=104881us dt_p95=1164739us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:36:30,974 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:1 <120:38 <400:5 >=1000:4
+
+2026-08-01 00:36:30,975 INFO image_rx_daemon: air_gap_by_class: seq: n=38 med=104.9ms | boundary: n=4 med=1165.4ms | post_loss: n=5 med=209.7ms
+
+2026-08-01 00:36:30,976 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (6.25%) verdict=not-clustered | top 10:2 3:1
+
+2026-08-01 00:36:30,977 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:36:35,659 INFO image_rx_daemon: published frame_id=0 2905 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:38,160 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:40,659 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:40,981 INFO image_rx_daemon: stats: rx_frames=468 rx_decode_err=0 frames_published=27 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=11 parity_recon=0
+
+2026-08-01 00:36:40,982 INFO image_rx_daemon: air_gap: n=48 dt_med=104895us dt_p95=1126039us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:36:40,984 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:39 <400:4 >=1000:4
+
+2026-08-01 00:36:40,985 INFO image_rx_daemon: air_gap_by_class: seq: n=38 med=104.9ms | boundary: n=4 med=1163.6ms | post_loss: n=4 med=286.0ms
+
+2026-08-01 00:36:40,986 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (6.38%) verdict=not-clustered | top 10:2 8:1
+
+2026-08-01 00:36:40,987 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:36:43,190 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:45,703 INFO image_rx_daemon: published frame_id=0 2986 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:48,159 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:50,699 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:50,990 INFO image_rx_daemon: stats: rx_frames=520 rx_decode_err=0 frames_published=31 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=11 parity_recon=0
+
+2026-08-01 00:36:50,992 INFO image_rx_daemon: air_gap: n=52 dt_med=104878us dt_p95=1129540us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:36:50,994 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <120:40 <400:4 >=1000:4
+
+2026-08-01 00:36:50,995 INFO image_rx_daemon: air_gap_by_class: seq: n=42 med=104.9ms | boundary: n=4 med=1144.3ms | post_loss: n=4 med=285.8ms
+
+2026-08-01 00:36:50,996 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (4.00%) verdict=not-clustered | top 10:2
+
+2026-08-01 00:36:50,997 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:36:53,172 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:36:58,169 INFO image_rx_daemon: published frame_id=0 2919 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:00,652 INFO image_rx_daemon: published frame_id=0 2901 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:00,999 INFO image_rx_daemon: stats: rx_frames=569 rx_decode_err=0 frames_published=34 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=12 parity_recon=0
+
+2026-08-01 00:37:01,000 INFO image_rx_daemon: air_gap: n=49 dt_med=104853us dt_p95=1131771us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:37:01,001 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <120:38 <400:5 >=1000:4
+
+2026-08-01 00:37:01,002 INFO image_rx_daemon: air_gap_by_class: seq: n=41 med=104.8ms | boundary: n=4 med=1144.5ms | post_loss: n=3 med=210.2ms
+
+2026-08-01 00:37:01,003 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (4.26%) verdict=not-clustered | top 10:2
+
+2026-08-01 00:37:01,004 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:37:05,696 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:08,157 INFO image_rx_daemon: published frame_id=0 2892 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:11,005 INFO image_rx_daemon: stats: rx_frames=618 rx_decode_err=0 frames_published=36 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=0
+
+2026-08-01 00:37:11,006 INFO image_rx_daemon: air_gap: n=49 dt_med=104843us dt_p95=1131899us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:37:11,007 INFO image_rx_daemon: air_gap_hist(ms): <40:3 <120:37 <400:5 >=1000:4
+
+2026-08-01 00:37:11,008 INFO image_rx_daemon: air_gap_by_class: seq: n=38 med=104.8ms | boundary: n=4 med=1168.6ms | post_loss: n=5 med=209.6ms
+
+2026-08-01 00:37:11,010 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (8.16%) verdict=not-clustered | top 10:2 5:1 8:1
+
+2026-08-01 00:37:11,010 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:37:13,195 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:15,667 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:20,703 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:21,012 INFO image_rx_daemon: stats: rx_frames=669 rx_decode_err=0 frames_published=39 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=15 parity_recon=0
+
+2026-08-01 00:37:21,013 INFO image_rx_daemon: air_gap: n=51 dt_med=104863us dt_p95=1121259us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:37:21,013 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:2 <120:38 <400:5 >=1000:4
+
+2026-08-01 00:37:21,014 INFO image_rx_daemon: air_gap_by_class: seq: n=43 med=104.9ms | boundary: n=4 med=1134.8ms | post_loss: n=3 med=209.7ms
+
+2026-08-01 00:37:21,014 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (4.08%) verdict=not-clustered | top 10:1 4:1
+
+2026-08-01 00:37:21,015 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:37:23,162 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:25,699 INFO image_rx_daemon: published frame_id=0 3000 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:28,187 INFO image_rx_daemon: published frame_id=0 2974 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:30,668 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:31,019 INFO image_rx_daemon: stats: rx_frames=721 rx_decode_err=0 frames_published=43 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=15 parity_recon=0
+
+2026-08-01 00:37:31,019 INFO image_rx_daemon: air_gap: n=52 dt_med=104880us dt_p95=1120730us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:37:31,020 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:1 <120:40 <400:4 >=1000:4
+
+2026-08-01 00:37:31,021 INFO image_rx_daemon: air_gap_by_class: seq: n=36 med=104.9ms | boundary: n=4 med=1129.7ms | post_loss: n=8 med=285.7ms
+
+2026-08-01 00:37:31,021 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (7.69%) verdict=not-clustered | top 10:4
+
+2026-08-01 00:37:31,022 INFO image_rx_daemon: frag_reordered: 4 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:37:33,192 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:35,652 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:38,188 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:40,668 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:41,025 INFO image_rx_daemon: stats: rx_frames=771 rx_decode_err=0 frames_published=47 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=15 parity_recon=0
+
+2026-08-01 00:37:41,025 INFO image_rx_daemon: air_gap: n=50 dt_med=104882us dt_p95=1123237us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:37:41,026 INFO image_rx_daemon: air_gap_hist(ms): <80:2 <120:40 <400:4 >=1000:4
+
+2026-08-01 00:37:41,026 INFO image_rx_daemon: air_gap_by_class: seq: n=37 med=104.9ms | boundary: n=4 med=1149.6ms | post_loss: n=6 med=285.9ms
+
+2026-08-01 00:37:41,027 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (6.12%) verdict=not-clustered | top 10:3
+
+2026-08-01 00:37:41,027 INFO image_rx_daemon: frag_reordered: 3 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:37:43,151 INFO image_rx_daemon: published frame_id=0 2903 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:45,655 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:48,195 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:50,695 INFO image_rx_daemon: published frame_id=0 2980 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:51,029 INFO image_rx_daemon: stats: rx_frames=821 rx_decode_err=0 frames_published=51 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=15 parity_recon=0
+
+2026-08-01 00:37:51,029 INFO image_rx_daemon: air_gap: n=50 dt_med=104895us dt_p95=1159628us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:37:51,030 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <120:40 <400:4 >=1000:4
+
+2026-08-01 00:37:51,031 INFO image_rx_daemon: air_gap_by_class: seq: n=43 med=104.9ms | boundary: n=4 med=1161.9ms | post_loss: n=2 med=286.7ms
+
+2026-08-01 00:37:51,031 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (2.13%) verdict=not-clustered | top 10:1
+
+2026-08-01 00:37:51,032 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:37:53,191 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:37:58,163 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:01,046 INFO image_rx_daemon: stats: rx_frames=868 rx_decode_err=0 frames_published=53 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=16 parity_recon=0
+
+2026-08-01 00:38:01,047 INFO image_rx_daemon: air_gap: n=47 dt_med=104872us dt_p95=1125974us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:38:01,048 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:38 <400:4 >=1000:4
+
+2026-08-01 00:38:01,050 INFO image_rx_daemon: air_gap_by_class: seq: n=32 med=104.9ms | boundary: n=4 med=1165.6ms | post_loss: n=7 med=286.6ms
+
+2026-08-01 00:38:01,050 INFO image_rx_daemon: lost_frag_idx: n=6 idx0=0 (0.00% of idx0 arrivals) other=6 (12.24%) verdict=not-clustered | top 10:4 11:1 8:1
+
+2026-08-01 00:38:01,051 INFO image_rx_daemon: frag_reordered: 4 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:38:03,179 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:05,683 INFO image_rx_daemon: published frame_id=0 2986 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:10,684 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:11,059 INFO image_rx_daemon: stats: rx_frames=919 rx_decode_err=0 frames_published=56 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=18 parity_recon=0
+
+2026-08-01 00:38:11,060 INFO image_rx_daemon: air_gap: n=51 dt_med=104873us dt_p95=1129694us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:38:11,061 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <120:38 <400:5 >=1000:4
+
+2026-08-01 00:38:11,062 INFO image_rx_daemon: air_gap_by_class: seq: n=37 med=104.9ms | boundary: n=4 med=1136.9ms | post_loss: n=7 med=209.6ms
+
+2026-08-01 00:38:11,062 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (7.84%) verdict=not-clustered | top 10:3 4:1
+
+2026-08-01 00:38:11,063 INFO image_rx_daemon: frag_reordered: 3 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:38:13,156 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:15,661 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:18,163 INFO image_rx_daemon: published frame_id=0 2919 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:20,655 INFO image_rx_daemon: published frame_id=0 2901 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:21,065 INFO image_rx_daemon: stats: rx_frames=969 rx_decode_err=0 frames_published=60 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=18 parity_recon=0
+
+2026-08-01 00:38:21,067 INFO image_rx_daemon: air_gap: n=50 dt_med=104856us dt_p95=1137628us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:38:21,070 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <120:40 <400:4 >=1000:4
+
+2026-08-01 00:38:21,072 INFO image_rx_daemon: air_gap_by_class: seq: n=40 med=104.9ms | boundary: n=4 med=1144.2ms | post_loss: n=4 med=285.6ms
+
+2026-08-01 00:38:21,073 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (4.17%) verdict=not-clustered | top 10:2
+
+2026-08-01 00:38:21,073 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:38:23,159 INFO image_rx_daemon: published frame_id=0 2949 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:25,679 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:30,662 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:31,077 INFO image_rx_daemon: stats: rx_frames=1018 rx_decode_err=0 frames_published=63 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=19 parity_recon=0
+
+2026-08-01 00:38:31,079 INFO image_rx_daemon: air_gap: n=49 dt_med=104866us dt_p95=1138924us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:38:31,081 INFO image_rx_daemon: air_gap_hist(ms): <40:3 <120:37 <400:5 >=1000:4
+
+2026-08-01 00:38:31,082 INFO image_rx_daemon: air_gap_by_class: seq: n=32 med=104.9ms | boundary: n=4 med=1169.6ms | post_loss: n=9 med=285.8ms
+
+2026-08-01 00:38:31,083 INFO image_rx_daemon: lost_frag_idx: n=6 idx0=0 (0.00% of idx0 arrivals) other=6 (11.76%) verdict=not-clustered | top 10:4 4:1 5:1
+
+2026-08-01 00:38:31,083 INFO image_rx_daemon: frag_reordered: 4 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:38:33,183 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:35,661 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:38,196 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:40,687 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:41,086 INFO image_rx_daemon: stats: rx_frames=1070 rx_decode_err=0 frames_published=67 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=19 parity_recon=0
+
+2026-08-01 00:38:41,090 INFO image_rx_daemon: air_gap: n=52 dt_med=104893us dt_p95=1128480us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:38:41,099 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:2 <120:40 <400:4 >=1000:4
+
+2026-08-01 00:38:41,099 INFO image_rx_daemon: air_gap_by_class: seq: n=42 med=104.9ms | boundary: n=4 med=1136.2ms | post_loss: n=4 med=285.7ms
+
+2026-08-01 00:38:41,100 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (4.00%) verdict=not-clustered | top 10:2
+
+2026-08-01 00:38:41,100 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:38:43,162 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:45,703 INFO image_rx_daemon: published frame_id=0 3000 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:50,656 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 00:38:51,103 INFO image_rx_daemon: stats: rx_frames=1120 rx_decode_err=0 frames_published=70 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=20 parity_recon=0
+
+2026-08-01 00:38:51,105 INFO image_rx_daemon: air_gap: n=50 dt_med=104871us dt_p95=1123952us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-08-01 00:38:51,108 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:1 <120:37 <400:5 >=1000:4
+
+2026-08-01 00:38:51,109 INFO image_rx_daemon: air_gap_by_class: seq: n=39 med=104.9ms | boundary: n=4 med=1130.0ms | post_loss: n=5 med=285.8ms
+
+2026-08-01 00:38:51,111 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (8.00%) verdict=not-clustered | top 10:2 4:1 5:1
+
+2026-08-01 00:38:51,111 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 00:38:53,184 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+

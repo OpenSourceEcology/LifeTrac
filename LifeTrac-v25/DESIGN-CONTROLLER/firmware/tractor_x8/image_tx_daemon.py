@@ -97,6 +97,8 @@ from lora_proto import (  # noqa: E402
     CMD_OP_RADIO_PROFILE_ACK,
     CMD_OP_RADIO_PROFILE_CONF,
     CMD_OP_ENCODE_MODE_ACK,
+    CMD_OP_PROBE,
+    CMD_OP_PROBE_ECHO,
 )
 from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     HostLink,
@@ -128,6 +130,47 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
 
 LOG = logging.getLogger("image_tx_daemon")
 
+# ---- defensive env parsing (2026-07-27, PR-review follow-up) ----------
+# These tunables are hand-edited on the bench and injected via docker -e /
+# systemd units, so a typo or an empty substitution is routine. A bare
+# int()/float() turns that into a crash — at module scope it stops the
+# daemon from starting at all; inside an MQTT callback it can abort
+# on_connect and silently lose every subscription. These never raise.
+
+def _env_int(name: str, default: int, lo: "int | None" = None,
+             hi: "int | None" = None) -> int:
+    raw = os.environ.get(name, "")
+    try:
+        val = int(str(raw).strip()) if str(raw).strip() else default
+    except ValueError:
+        LOG.warning("bad %s=%r — using %s", name, raw, default)
+        val = default
+    if lo is not None and val < lo:
+        LOG.warning("%s=%s below %s; clamping", name, val, lo)
+        val = lo
+    if hi is not None and val > hi:
+        LOG.warning("%s=%s above %s; clamping", name, val, hi)
+        val = hi
+    return val
+
+
+def _env_float(name: str, default: float, lo: "float | None" = None,
+               hi: "float | None" = None) -> float:
+    raw = os.environ.get(name, "")
+    try:
+        val = float(str(raw).strip()) if str(raw).strip() else default
+    except ValueError:
+        LOG.warning("bad %s=%r — using %s", name, raw, default)
+        val = default
+    if lo is not None and val < lo:
+        LOG.warning("%s=%s below %s; clamping", name, val, lo)
+        val = lo
+    if hi is not None and val > hi:
+        LOG.warning("%s=%s above %s; clamping", name, val, hi)
+        val = hi
+    return val
+
+
 # ---- pacing constants (cloned from w2_02_host_pipeline.py) -----------
 MIN_LORA_HOST_INTER_CYCLE_S = 0.05        # 50 ms between consecutive TX_FRAME_REQ
 LEGAL_DWELL_US = 400_000                  # FCC §15.247(a)(1) 400 ms dwell
@@ -151,6 +194,41 @@ _PROFILE_TO_PHY = {0: PHY_IMAGE_BW250, 1: PHY_IMAGE_BW250, 2: PHY_IMAGE_BW500}
 # host, is the binding constraint.
 _PROFILE_TO_BUDGET_US = {0: 380_000, 1: 860_000, 2: 930_000}
 
+# Fraction of the budget smooth pacing aims at. Must be < 1.0 so the rolling
+# window check stays a BACKSTOP rather than a co-participant — see admit().
+#
+# 0.92 was chosen to clear the knife edge, NOT tuned: at 1.00 the backstop fired
+# on jitter and its stall compounded with the pacing delay, regressing loss
+# 2.45% -> 19.41%. Saturated goodput cost scales roughly with this value
+# (measured 2.7% at 0.92), so higher may recover throughput — but only until the
+# backstop starts firing again, which is the failure this constant exists to
+# prevent. Sweep it on air; do not raise it on reasoning alone.
+_PACING_HEADROOM = _env_float("LIFETRAC_PACING_HEADROOM", 0.92, lo=0.50, hi=0.995)
+
+
+def _budget_for(profile: int) -> int:
+    """Host airtime budget for a profile, with a diagnostic override.
+
+    2026-07-30 (RS-11.4): this pacer is the prime suspect for the reproducible
+    fragment-index-10 loss notch. `admit()` blocks until the fragment fits a
+    ROLLING 1.0 s window, and at DTS the numbers land exactly on the
+    observation: 930_000 / 99_904 us-per-fragment = 9.309, so at most 9
+    fragments fit a fresh window, and with PIPELINE_DEPTH=2 the first refusal
+    falls on index floor(930000/99904) + 2 - 1 = 10.
+
+    It also explains the idle dependency, which nothing else did: the window is
+    ROLLING over 1.0 s, so it only drains fully when the gap between trains
+    exceeds 1 s. Measured — notch present at 1.14 s and 1.97 s idle, absent at
+    0.64 s and when saturated.
+
+    Overridable so the trip point can be MOVED and the notch observed to move
+    with it, which is the confirmation that matters. Changing the budget is a
+    regulatory-adjacent knob: it paces our own duty cycle, so a bench override
+    must never be shipped as a default.
+    """
+    base = _PROFILE_TO_BUDGET_US.get(profile, 380_000)
+    return _env_int("LIFETRAC_AIRTIME_BUDGET_US", base, lo=50_000, hi=1_000_000)
+
 # LIFETRAC_TX_PIPELINE: 'v2' (default) = serial send->TX_DONE->send;
 # 'v3' = keep 2 TX_FRAME_REQs in flight against the firmware's depth-2
 # mailbox (host_cmd.c s_tx_pending) so the UART turnaround rides inside
@@ -161,18 +239,18 @@ TX_PIPELINE = os.environ.get("LIFETRAC_TX_PIPELINE", "v2").strip().lower()
 # 2026-07-25 firmware carries a depth-4 park ring (1 transmitting + 4
 # parked), so up to 4 never NAKs. Latency guard (RS-9.7): keep <=3 at
 # FHSS; 4 is for DTS. Default stays 2 for old-firmware compatibility.
-PIPELINE_DEPTH = max(1, int(os.environ.get("LIFETRAC_TX_PIPELINE_DEPTH", "2")))
+PIPELINE_DEPTH = _env_int("LIFETRAC_TX_PIPELINE_DEPTH", 2, lo=1)
 # RS-3.1 (2026-07-25): batch multiple non-key frames into one fragment
 # train so the measured ~44 ms host-side per-handoff overhead (Run D
 # forensics) amortizes across 2-4 frames. Default OFF until air-verified;
 # the bench harness enables it explicitly.
-TX_BATCH = int(os.environ.get("LIFETRAC_TX_BATCH", "0"))
+TX_BATCH = _env_int("LIFETRAC_TX_BATCH", 0)
 # RS-3.10 (2026-07-26): build train N+1 while train N is on air (the
 # pipelined wait loop is ~mostly idle polling for TX_DONEs), then hold a
 # DESIGNED inter-train gap spent actively listening — the reverse-slot
 # command window — instead of an accidental gap of Python overhead.
-TX_PREPARE_AHEAD = int(os.environ.get("LIFETRAC_TX_PREPARE_AHEAD", "0"))
-TRAIN_GAP_S = max(0.0, float(os.environ.get("LIFETRAC_TRAIN_GAP_MS", "40")) / 1000.0)
+TX_PREPARE_AHEAD = _env_int("LIFETRAC_TX_PREPARE_AHEAD", 0)
+TRAIN_GAP_S = _env_float("LIFETRAC_TRAIN_GAP_MS", 40.0, lo=0.0) / 1000.0
 # 760 (2026-07-26 runt analysis): admits TRIPLES of ~246 B frames (748 B →
 # 4 fragments at ~111 ms/frame vs pairs' ~120). The runt fragment is
 # structural for frames >243 B (one fragment body) — batching amortizes it:
@@ -180,10 +258,24 @@ TRAIN_GAP_S = max(0.0, float(os.environ.get("LIFETRAC_TRAIN_GAP_MS", "40")) / 10
 # _batch_more rejects adds that worsen fragments-per-frame, so variable
 # real-camera sizes can't produce pathological fits. History: 480 silently
 # rejected every pair (Run E); 520 allowed pairs (runs F–K).
-BATCH_BUDGET_B = int(os.environ.get("LIFETRAC_BATCH_BUDGET_B", "760"))
-# Fragment body capacity (TX_FRAME_BODY_MAX 247 − 4 B fragment header).
-_FRAG_BODY_B = 243
-BATCH_MAX_FRAMES = max(1, int(os.environ.get("LIFETRAC_BATCH_MAX_FRAMES", "4")))
+BATCH_BUDGET_B = _env_int("LIFETRAC_BATCH_BUDGET_B", 760, lo=1)
+# Fragment body capacity per radio profile: TX_FRAME_BODY_MAX − 4 B
+# fragment header at BW500 (profile 2) = 243; at BW250 (profiles 0/1) the
+# 170 ms air cap limits bodies to 207 → 203 usable. 2026-07-27: was a
+# hardcoded 243, which mis-sized the batching efficiency guard whenever
+# the radio ran FHSS.
+_FRAG_BODY_BY_PROFILE = {0: 203, 1: 203, 2: 243}
+
+
+def _frag_body_b(profile: int) -> int:
+    return _FRAG_BODY_BY_PROFILE.get(int(profile), 203)
+
+
+BATCH_MAX_FRAMES = _env_int("LIFETRAC_BATCH_MAX_FRAMES", 4, lo=1)
+# 2026-07-29 ack-cost experiment: 0 suppresses the probe echo entirely so a
+# run measures the IMAGE cost of carrying acks. Tractor-side "LoRa cmd: PROBE"
+# remains the authoritative delivery counter either way.
+PROBE_ECHO_ENABLE = _env_int("LIFETRAC_PROBE_ECHO", 1, lo=0, hi=1) == 1
 try:
     from image_pipeline.frame_format import pack_frame_batch
 except Exception:                                             # pragma: no cover
@@ -199,6 +291,20 @@ class AirtimeBudget:
     def __init__(self, budget_us: int = 380_000, window_s: float = 1.0):
         self.budget_us, self.window_s = budget_us, window_s
         self._events: collections.deque[tuple[float, int]] = collections.deque()
+        # RS-11.4 smooth pacing. "bucket" restores the pre-2026-07-30
+        # burst-then-stall behaviour for A/B against the recorded evidence.
+        # DEFAULT IS "smooth", verified on air 2026-07-30 (n=2 per side at
+        # 0.4 fps, plus a saturated check):
+        #   low duty  idx-10 notch 59.1/23.9% (bucket) -> 2.15/2.15% (smooth)
+        #             total loss unchanged, 2.36% vs 2.36%
+        #   saturated goodput 2005 -> 1952 B/s (-2.7%), util 79% both,
+        #             and loss 3.73% -> 2.24%
+        # "bucket" restores the pre-2026-07-30 behaviour for A/B against the
+        # recorded evidence.
+        self._smooth = os.environ.get(
+            "LIFETRAC_AIRTIME_PACING", "smooth").strip().lower() != "bucket"
+        # Far enough in the past that the first fragment is never delayed.
+        self._last_admit = 0.0
 
     def _used(self, now: float) -> int:
         while self._events and now - self._events[0][0] >= self.window_s:
@@ -206,10 +312,55 @@ class AirtimeBudget:
         return sum(toa for _, toa in self._events)
 
     def admit(self, est_toa_us: int, stop: threading.Event) -> bool:
-        """Block until est_toa_us fits the window. Returns False on stop."""
+        """Block until est_toa_us fits the window. Returns False on stop.
+
+        2026-07-30 (RS-11.4): SMOOTH pacing replaces the pure token bucket.
+
+        A token bucket bursts to the budget and then stalls hard. Measured on
+        air, that meant 9 fragments back-to-back followed by a ~161 ms block,
+        opening a ~60 ms dead-air hole mid-train and costing fragment index 10
+        in ~59% of trains whenever the preceding idle exceeded the 1 s window
+        (see bench-evidence/RS_11_1_loss_attribution_2026-07-29/RESULTS.md).
+
+        Holding each fragment to the average spacing the duty target already
+        implies removes the hole without changing the duty at all:
+
+            spacing = ToA x window / budget
+                    = 99.904 ms x 1.0 / 0.930 = 107.4 ms at DTS
+
+        which is 1000/107.4 = 9.31 fragments/s x 99.904 ms = 930 ms/s -- the
+        budget, exactly. It is also FASTER end to end: 13 x 107.4 = 1397 ms
+        against the bucket's 944 + 161 + 420 = 1525 ms.
+
+        The rolling-window check below is RETAINED as the hard backstop. Pacing
+        is an optimisation of when we transmit; the window is the regulatory
+        guarantee that we never exceed the duty, and it must survive a wrong
+        spacing calculation, a mid-train profile change, or a clock jump.
+        """
+        if self._smooth and self.budget_us > 0:
+            # Pace to a FRACTION of the budget, not to 100% of it.
+            #
+            # 2026-07-30, measured: pacing to exactly the budget put the hard
+            # window check on a knife edge (used == budget), so the backstop
+            # fired on timing jitter and its stall COMPOUNDED with the pacing
+            # delay instead of being replaced by it. Result was worse than the
+            # bucket it replaced: loss 2.27% -> 19.41%, goodput 2000 ->
+            # 1204 B/s, util 81% -> 49%, with new 97% notches at indices 1 and
+            # 9. The spacing arithmetic was right (107.6 ms observed vs 107.4
+            # predicted); the missing headroom was the defect.
+            spacing_s = (est_toa_us * self.window_s
+                         / (self.budget_us * _PACING_HEADROOM))
+            due = self._last_admit + spacing_s
+            while not stop.is_set():
+                now = time.monotonic()
+                if now >= due:
+                    break
+                stop.wait(min(due - now, 0.25))
+
         while not stop.is_set():
             now = time.monotonic()
             if self._used(now) + est_toa_us <= self.budget_us:
+                self._last_admit = time.monotonic()
                 return True
             wait = self._events[0][0] + self.window_s - now  # oldest expiry
             stop.wait(min(max(wait, 0.005), 0.25))
@@ -234,6 +385,16 @@ RADIO_PROFILE_ACK_TOPIC   = "lifetrac/v25/status/radio_profile/tx"   # local log
 TRACTOR_ENCODE_MODE_TOPIC = "lifetrac/v25/tractor/encode_mode_override"
 TRACTOR_KEYFRAME_TOPIC    = "lifetrac/v25/tractor/req_keyframe"
 TRACTOR_ENC_STATUS_TOPIC  = "lifetrac/v25/status/encode_mode"        # camera_service ack (local)
+# 2026-07-27 encode-to-fit: this daemon owns the radio profile, so it tells
+# camera_service the live per-frame byte budget (one fragment body at the
+# active profile) via LinkBudget.update. Replaces the CMD_LINK_PROFILE M7
+# back-channel that USE_LORA_BRIDGE mode never starts, so the encoder
+# finally sizes frames to the real air quantum (243 DTS / 203 FHSS) instead
+# of a boot-frozen env default.
+TRACTOR_LINK_BUDGET_TOPIC = "lifetrac/v25/tractor/link_budget"
+# LINK_PHY_NAMES index (camera_service / lora_proto) for each radio profile:
+# profile 0/1 (BW250) -> "image_bw250" (idx 5); profile 2 (BW500) -> idx 6.
+_PROFILE_TO_LINK_PHY_IDX = {0: 5, 1: 5, 2: 6}
 _PROFILE_CHOICES = (0, 1, 2)
 # Two-phase profile switch (tractor side): ack on the OLD profile, dwell
 # so the ack flushes, switch, then REVERT unless the base confirms on the
@@ -302,9 +463,9 @@ class ImageTxDaemon:
         self.toa_us_sum = 0
         # D4 host mirror: budget follows the active regulatory profile
         # (DTS BW500 -> 930 ms/s, 20 ms under the firmware's 950 ms cap).
-        _prof = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+        _prof = _env_int("LIFETRAC_REG_PROFILE", 0, lo=0, hi=2)
         self.budget = AirtimeBudget(
-            budget_us=_PROFILE_TO_BUDGET_US.get(_prof, 380_000))
+            budget_us=_budget_for(_prof))
         # 2026-07-25 radio-profile selector state.
         self._pending_profile: int | None = None
         self._active_profile = _prof
@@ -419,7 +580,7 @@ class ImageTxDaemon:
         except Exception as exc:                              # pragma: no cover
             LOG.warning("regulatory profile config failed: %s", exc)
         if _os.environ.get("LIFETRAC_SKIP_PHY_CONTRACT", "0") != "1":
-            prof_id = int(_os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+            prof_id = _env_int("LIFETRAC_REG_PROFILE", 0, lo=0, hi=2)
             active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
             verify_modem_matches_profile(link, active_phy)
         try:
@@ -528,8 +689,9 @@ class ImageTxDaemon:
             # and a triple (4/3 = 1.33) beats the pair; but a fit that
             # would spill a near-empty extra fragment for a tiny frame
             # is rejected and carried to the next train.
-            frags_with = -(-cand // _FRAG_BODY_B)
-            frags_without = -(-total // _FRAG_BODY_B)
+            body_b = _frag_body_b(self._active_profile)
+            frags_with = -(-cand // body_b)
+            frags_without = -(-total // body_b)
             eff_ok = (frags_with * len(batch)
                       <= frags_without * (len(batch) + 1))
             if (nxt.payload[:1] == b"\x01"
@@ -645,6 +807,29 @@ class ImageTxDaemon:
             LOG.info("LoRa cmd: RADIO_PROFILE_CONF — switch confirmed")
             self._confirm_deadline = None
             self._revert_profile = None
+        elif opcode == CMD_OP_PROBE:
+            # 2026-07-27 RS-0.12 reactive-fire instrumentation. A probe is a
+            # no-op the tractor logs (with the base's commanded phase offset)
+            # and echoes back so the base can measure in-stream delivery and
+            # round-trip. THIS log line is the ground-truth delivery counter
+            # — unlike REQ_KEYFRAME, nothing else can spuriously satisfy it.
+            seq = int.from_bytes(args[0:4], "little") if len(args) >= 4 else 0
+            phase = int.from_bytes(args[4:6], "little") if len(args) >= 6 else 0
+            self._probe_rx = getattr(self, "_probe_rx", 0) + 1
+            LOG.info("LoRa cmd: PROBE seq=%d phase_ms=%d (rx#%d)",
+                     seq, phase, self._probe_rx)
+            # 2026-07-29 ack-cost experiment: LIFETRAC_PROBE_ECHO=0 suppresses
+            # the echo entirely so a run measures the IMAGE cost of carrying
+            # acks at all (delivery is then scored tractor-side only, which is
+            # the authoritative counter anyway — the log line above). The echo
+            # otherwise rides the shared _cmd_out drain, which uses
+            # _send_command_frame's default copies=2.
+            if PROBE_ECHO_ENABLE:
+                try:
+                    self._cmd_out.put_nowait(pack_command_frame(
+                        CMD_OP_PROBE_ECHO, seq.to_bytes(4, "little")))
+                except queue.Full:
+                    pass
 
     def _send_command_frame(self, link: HostLink, body: bytes,
                             copies: int = 2) -> None:
@@ -666,6 +851,12 @@ class ImageTxDaemon:
             # CONF landing while an ack radiates) are dispatched, not lost.
             self._dispatch_rx_pending(rx_pending)
 
+    # 2026-07-29: copies used when radiating a queued reply (echo/ack). The
+    # historical default was 2, which doubles the tractor's ack airtime AND
+    # made the base's raw echo counter read ~2x. Tunable so the ack-cost
+    # experiment can compare 2 vs 1 on air.
+    ACK_COPIES = _env_int("LIFETRAC_ACK_COPIES", 2, lo=1, hi=4)
+
     def _service_control_plane(self, link: HostLink) -> None:
         # Forward camera_service's encode ack over LoRa (latest wins).
         # Atomic swap under the lock: the paho thread writes _enc_ack_out,
@@ -685,8 +876,13 @@ class ImageTxDaemon:
                 body = self._cmd_out.get_nowait()
             except queue.Empty:
                 break
-            self._send_command_frame(link, body)
-            if len(body) >= 2 and body[1] == CMD_OP_RADIO_PROFILE_ACK:
+            # Profile ACKs keep the historical 2 copies (a lost one splits
+            # the link mid-switch); everything else uses ACK_COPIES so the
+            # ack-cost experiment can vary it.
+            _is_prof_ack = len(body) >= 2 and body[1] == CMD_OP_RADIO_PROFILE_ACK
+            self._send_command_frame(
+                link, body, copies=2 if _is_prof_ack else self.ACK_COPIES)
+            if _is_prof_ack:
                 flushed_profile_ack = True
         if flushed_profile_ack:
             # Phase 2: dwell so the last ack copy finishes radiating on
@@ -750,12 +946,49 @@ class ImageTxDaemon:
                 verify_modem_matches_profile(
                     link, _PROFILE_TO_PHY.get(profile, PHY_IMAGE_BW250))
             self.budget = AirtimeBudget(
-                budget_us=_PROFILE_TO_BUDGET_US.get(profile, 380_000))
+                budget_us=_budget_for(profile))
             self._active_profile = profile
+            self._publish_link_budget(profile)
             return True
         except Exception as exc:
             LOG.error("radio_profile: apply %d failed: %s", profile, exc)
             return False
+
+    def _publish_link_budget(self, profile: int,
+                             n_fragments: int = 1) -> None:
+        """Tell camera_service the per-frame byte budget for this profile.
+
+        Retained so a (re)starting camera_service picks it up immediately.
+        n_fragments=1 makes every frame a single fragment — the natural unit
+        under control-first TDMA; a unit file may widen it via
+        LIFETRAC_IMAGE_FRAGMENTS_PER_FRAME for the parked/full-image mode.
+        """
+        client = self._mqtt_client
+        if client is None:
+            return
+        # Parse defensively: this runs inside the paho on_connect callback
+        # and inside _apply_profile, so a malformed env value must not raise
+        # (it would abort connect — losing every subscription — or make a
+        # profile switch report failure).
+        _raw = os.environ.get("LIFETRAC_IMAGE_FRAGMENTS_PER_FRAME", "").strip()
+        try:
+            n = int(_raw) if _raw else int(n_fragments)
+        except ValueError:
+            LOG.warning("bad LIFETRAC_IMAGE_FRAGMENTS_PER_FRAME=%r — using %d",
+                        _raw, n_fragments)
+            n = int(n_fragments)
+        idx = _PROFILE_TO_LINK_PHY_IDX.get(int(profile), 5)
+        try:
+            import json as _json
+            client.publish(TRACTOR_LINK_BUDGET_TOPIC,
+                           _json.dumps({"n_fragments": max(1, n),
+                                        "profile_index": idx,
+                                        "ts": round(time.time(), 1)}),
+                           qos=0, retain=True)
+            LOG.info("link_budget: published n_frag=%d profile_idx=%d "
+                     "(profile %d)", max(1, n), idx, profile)
+        except Exception as exc:                              # pragma: no cover
+            LOG.debug("link_budget publish failed: %s", exc)
 
     def _ack_profile(self, ok: bool, active: int) -> None:
         client = self._mqtt_client
@@ -777,10 +1010,10 @@ class ImageTxDaemon:
 
     def _pack_for(self, frame: _PendingFrame) -> list[bytes]:
         is_key = frame.payload[:1] == b"\x01"          # frame_kind byte
-        copies = int(os.environ.get("LIFETRAC_KEYFRAME_COPIES", "1"))
+        copies = _env_int("LIFETRAC_KEYFRAME_COPIES", 1, lo=1)
         if copies <= 1 and is_key and self.recent_frag_loss_rate() > 0.005:
             copies = 2                                  # auto: only when PER says so
-        prof_id = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+        prof_id = _env_int("LIFETRAC_REG_PROFILE", 0, lo=0, hi=2)
         active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
         if is_key and copies > 1:
             return pack_image_fragments_v2(frame.payload, frame.seq,
@@ -792,7 +1025,7 @@ class ImageTxDaemon:
         # shipped first (reassemble.py); enable emission per deployment
         # via LIFETRAC_PARITY_GROUP=8. v1 path only — the v2 copies path
         # above already carries its own redundancy.
-        parity_group = int(os.environ.get("LIFETRAC_PARITY_GROUP", "0"))
+        parity_group = _env_int("LIFETRAC_PARITY_GROUP", 0, lo=0)
         if parity_group > 0:
             n_data = len(frags)
             frags = add_parity_fragments(frags, frame.seq, parity_group)
@@ -805,7 +1038,7 @@ class ImageTxDaemon:
 
     def _tx_one_frame(self, link: HostLink, frame: _PendingFrame) -> None:
         # F16a: Stale-frame cancellation
-        frame_max_age_ms = int(os.environ.get("LIFETRAC_FRAME_MAX_AGE_MS", "10000"))
+        frame_max_age_ms = _env_int("LIFETRAC_FRAME_MAX_AGE_MS", 10000, lo=0)
         age_ms = int(time.monotonic() * 1000) - frame.enqueued_ms
         if age_ms > frame_max_age_ms and not self._q.empty():
             with self.lock:
@@ -829,7 +1062,7 @@ class ImageTxDaemon:
 
         max_qos_retries = 4   # FORBIDDEN/ABORT_QOS: not admitted, ZERO RF spent
         max_rf_retries  = 1   # TX_DONE non-OK / timeout: airtime was spent
-        prof_id = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+        prof_id = _env_int("LIFETRAC_REG_PROFILE", 0, lo=0, hi=2)
         active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
 
         if TX_PIPELINE == "v3":
@@ -1139,6 +1372,10 @@ class ImageTxDaemon:
                 LOG.info("MQTT connected; subscribing to %s", MQTT_TOPIC_IN)
                 client.subscribe(MQTT_TOPIC_IN, qos=0)
                 client.subscribe(TRACTOR_ENC_STATUS_TOPIC, qos=0)
+                # Seed the encoder's budget on connect (retained), so a
+                # camera_service that started first still sizes to the air
+                # quantum without waiting for a profile switch.
+                self._publish_link_budget(self._active_profile)
             else:
                 LOG.error("MQTT connect rc=%s", rc)
         client.on_connect = _on_connect
@@ -1189,12 +1426,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         "LIFETRAC_L072_BAUD", DEFAULT_BAUD))
     ap.add_argument("--mqtt-host", default=os.environ.get(
         "LIFETRAC_MQTT_HOST", DEFAULT_MQTT_HOST))
-    ap.add_argument("--mqtt-port", type=int, default=int(os.environ.get(
-        "LIFETRAC_MQTT_PORT", str(DEFAULT_MQTT_PORT))))
-    ap.add_argument("--inter-cycle-s", type=float, default=float(os.environ.get(
-        "LIFETRAC_LORA_INTER_CYCLE_S", str(MIN_LORA_HOST_INTER_CYCLE_S))))
-    ap.add_argument("--max-queue-depth", type=int, default=int(os.environ.get(
-        "LIFETRAC_IMAGE_TX_QUEUE_DEPTH", "4")))
+    ap.add_argument("--mqtt-port", type=int, default=_env_int(
+        "LIFETRAC_MQTT_PORT", DEFAULT_MQTT_PORT, lo=1, hi=65535))
+    ap.add_argument("--inter-cycle-s", type=float, default=_env_float(
+        "LIFETRAC_LORA_INTER_CYCLE_S", MIN_LORA_HOST_INTER_CYCLE_S, lo=0.0))
+    ap.add_argument("--max-queue-depth", type=int, default=_env_int(
+        "LIFETRAC_IMAGE_TX_QUEUE_DEPTH", 4, lo=1))
     ap.add_argument("--stats-interval-s", type=float, default=10.0)
     ap.add_argument("--log-level", default=os.environ.get(
         "LIFETRAC_IMAGE_TX_LOG_LEVEL", "INFO"))

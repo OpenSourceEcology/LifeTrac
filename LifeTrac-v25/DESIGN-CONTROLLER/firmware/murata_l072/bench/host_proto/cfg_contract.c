@@ -516,8 +516,19 @@ int main(void) {
             { REG_PROFILE_BENCH_ONLY_FIXED_915 },
             1U,
             false, /* setting default value does not flip dirty */
-            false,
-            0U
+            /*
+             * FCC §A5 ERP enforcement (2026-07-29): activation now
+             * programs the PA, where before it left TX power entirely
+             * alone — that omission was the defect. Effective power is
+             * min(configured, erp_max): configured is the 14 dBm cfg
+             * default, and the bench tier allows min(17 - 0, 17) = 17,
+             * so 14 goes to the radio unreduced.
+             *
+             * Dirty stays false because 14 IS the stored default, so
+             * writing it back does not make the table non-default.
+             */
+            true,
+            14U
         },
         {
             "reg_profile_fcc_fhss_unrouted",

@@ -133,6 +133,17 @@ static const cfg_key_desc_t k_cfg_desc[CFG_KEY_COUNT] = {
       { DEFAULT_ANTENNA_GAIN_DBI, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
     { CFG_KEY_HW_CEILING_DBM,        1U, CFG_KIND_U8,   0U,                NULL,
       { DEFAULT_HW_CEILING_DBM, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
+    /*
+     * FHSS seed identity. Default 0 reproduces the pre-2026-07-29
+     * hardcoded (0,0,0) permutation exactly, so adding these keys
+     * changes no behaviour until a host provisions them. No apply
+     * hook: the seed is consumed at profile activation, not on write
+     * (see the ORDERING CONTRACT in host_cfg_keys.h).
+     */
+    { CFG_KEY_FHSS_FARM_ID,          8U, CFG_KIND_U64,  0U,                NULL,
+      { 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
+    { CFG_KEY_FHSS_NODE_ID,          8U, CFG_KIND_U64,  0U,                NULL,
+      { 0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
     { CFG_KEY_PROTOCOL_VERSION,      1U, CFG_KIND_U8,   CFG_FLAG_READ_ONLY, NULL,
       { HOST_PROTOCOL_VER, 0U, 0U, 0U, 0U, 0U, 0U, 0U } },
     { CFG_KEY_WIRE_SCHEMA_VERSION,   1U, CFG_KIND_U8,   CFG_FLAG_READ_ONLY, NULL,
@@ -182,17 +193,73 @@ static bool cfg_value_is_default(int index, const uint8_t *value) {
     return memcmp(value, k_cfg_desc[index].default_value, k_cfg_desc[index].len) == 0;
 }
 
+/*
+ * FCC §A5 ERP enforcement (2026-07-29).
+ *
+ * Maximum conducted dBm the ACTIVE profile permits. Before this
+ * existed, host_cfg_profile_power_clamp() was computed once per
+ * staging attempt, compared against 0 to accept or reject the profile,
+ * and then thrown away — so the ERP ceiling the profile system appears
+ * to enforce was never enforced in hardware. Two exceedance routes
+ * were reachable: declare a high antenna gain (or a low hw ceiling),
+ * let the profile be accepted at a reduced ceiling, then write
+ * CFG_KEY_TX_POWER_DBM up to 17 dBm unopposed.
+ *
+ * No new state is needed. s_active inside host_cfg_profile.c retains
+ * every clamp input the validator actually approved, and the tier
+ * ceiling is derivable from its profile_id.
+ *
+ * Returns 0 for "no ceiling known" — which is also power_clamp()'s
+ * no-headroom sentinel and is never a valid transmit power, so callers
+ * must test for it rather than clamping to it. Reachable when
+ * host_cfg_profile_active() is NULL, which the tx_len_guard bench TU
+ * deliberately stubs.
+ */
+static uint8_t cfg_active_erp_max_dbm(void) {
+    const host_cfg_profile_req_t *active = host_cfg_profile_active();
+    if (active == NULL) {
+        return 0U;
+    }
+    return host_cfg_profile_power_clamp(
+        host_cfg_profile_tier_ceiling_dBm(active->profile_id),
+        active->hw_ceiling_dBm,
+        active->antenna_gain_dBi);
+}
+
 static cfg_status_t cfg_validate_and_normalize(uint8_t key, uint8_t *value, uint8_t len) {
     (void)len;
 
     switch (key) {
-        case CFG_KEY_TX_POWER_DBM:
+        case CFG_KEY_TX_POWER_DBM: {
             if (value[0] < 2U) {
                 value[0] = 2U;
             } else if (value[0] > 17U) {
                 value[0] = 17U;
             }
+            /*
+             * FCC §A5 ERP enforcement (2026-07-29): also clamp to what
+             * the ACTIVE profile allows. Without this a host could
+             * declare 24 dBi of antenna gain, have the profile accepted
+             * at a 12 dBm allowance, then write 17 dBm here and
+             * transmit 5 dB over the ERP limit — with cfg_get showing
+             * nothing anomalous.
+             *
+             * Normalise rather than reject, matching this key's
+             * existing contract (0 -> 2, 30 -> 17 are both OK, not
+             * OUT_OF_RANGE) so the wire behaviour and the golden
+             * vectors in cfg_contract.c stay consistent.
+             *
+             * A 0 answer means "no ceiling known" and is deliberately
+             * NOT applied as a ceiling of 0 — doing so would clamp
+             * every write to the 2 dBm floor and effectively brick the
+             * key in any TU where host_cfg_profile_active() is NULL.
+             */
+            const uint8_t erp_max = cfg_active_erp_max_dbm();
+            if (erp_max != 0U && value[0] > erp_max) {
+                value[0] = erp_max;
+            }
             return CFG_STATUS_OK;
+        }
 
         case CFG_KEY_TX_POWER_ADAPT_ENABLE:
         case CFG_KEY_LBT_ENABLE:
@@ -304,6 +371,27 @@ static cfg_status_t cfg_validate_and_normalize(uint8_t key, uint8_t *value, uint
                 }
                 req.hw_ceiling_dBm = s_cfg_values[idx].bytes[0];
             }
+            /*
+             * FHSS hop-sequence identity (2026-07-29). Collected here
+             * so activate() can forward it to sx1276_fhss_init(), which
+             * used to receive a hardcoded (0, 0, 0) and therefore gave
+             * every radio in the fleet the same channel permutation.
+             * Zero defaults reproduce that historical seed exactly.
+             */
+            {
+                int idx = cfg_find_index(CFG_KEY_FHSS_FARM_ID);
+                if (idx < 0) {
+                    return CFG_STATUS_APPLY_FAILED;
+                }
+                req.farm_id = read_u64_le(s_cfg_values[idx].bytes);
+            }
+            {
+                int idx = cfg_find_index(CFG_KEY_FHSS_NODE_ID);
+                if (idx < 0) {
+                    return CFG_STATUS_APPLY_FAILED;
+                }
+                req.node_id = read_u64_le(s_cfg_values[idx].bytes);
+            }
 
 #ifdef LIFETRAC_FHSS_TX_ROUTED
             const bool tx_routed = true;
@@ -317,7 +405,65 @@ static cfg_status_t cfg_validate_and_normalize(uint8_t key, uint8_t *value, uint
                 return host_cfg_profile_reject_to_cfg_status(r);
             }
             r = host_cfg_profile_activate();
-            return host_cfg_profile_reject_to_cfg_status(r);
+            if (r != HOST_CFG_PROFILE_REJECT_NONE) {
+                return host_cfg_profile_reject_to_cfg_status(r);
+            }
+
+            /*
+             * FCC §A5 ERP enforcement (2026-07-29): program the PA to
+             * the newly-active allowance.
+             *
+             * activate() previously left TX power completely untouched,
+             * which broke the guarantee in both directions: the ERP
+             * clamp never reached RegPaConfig at all, and switching to a
+             * MORE restrictive profile did not lower an already-high
+             * setting.
+             *
+             * Semantics: effective = min(configured, erp_max). This
+             * only ever LOWERS power — it deliberately does not raise a
+             * deliberately-reduced setting up to the new ceiling,
+             * because the operator's chosen power is intent while the
+             * clamp is a limit.
+             *
+             * We program unconditionally rather than only when clamping
+             * is required, so that after any activation the hardware and
+             * the cfg table are guaranteed to agree. At boot they agree
+             * only by coincidence: sx1276_init() hard-codes 14 dBm and
+             * cfg_init() seeds the table without invoking any apply
+             * hook, so nothing had ever reconciled them.
+             *
+             * erp_max == 0 means the clamp found no headroom above the
+             * +2 dBm floor. That cannot happen here — validate()
+             * rejects such a request before activate() can run — but if
+             * it ever did, passing the sentinel to
+             * sx1276_set_tx_power_dbm() would be silently raised to
+             * 2 dBm and TRANSMIT. Fail closed: leave the PA alone and
+             * report the failure.
+             */
+            {
+                const uint8_t erp_max = cfg_active_erp_max_dbm();
+                const int pidx = cfg_find_index(CFG_KEY_TX_POWER_DBM);
+                if (pidx < 0) {
+                    return CFG_STATUS_APPLY_FAILED;
+                }
+                if (erp_max == 0U) {
+                    return CFG_STATUS_APPLY_FAILED;
+                }
+
+                uint8_t effective = s_cfg_values[pidx].bytes[0];
+                if (effective > erp_max) {
+                    effective = erp_max;
+                }
+                s_cfg_values[pidx].bytes[0] = effective;
+                sx1276_set_tx_power_dbm(effective);
+
+                if (!s_cfg_dirty &&
+                        !cfg_value_is_default(pidx, s_cfg_values[pidx].bytes)) {
+                    s_cfg_dirty = true;
+                }
+            }
+
+            return CFG_STATUS_OK;
         }
 
         default:

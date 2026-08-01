@@ -124,6 +124,22 @@ typedef struct host_cfg_profile_req_s {
     uint32_t modem_bw_hz;
     int8_t   antenna_gain_dBi;
     uint8_t  hw_ceiling_dBm;
+    /*
+     * FHSS hop-sequence identity (2026-07-29), collected from
+     * CFG_KEY_FHSS_FARM_ID / CFG_KEY_FHSS_NODE_ID exactly as
+     * channel_mask and the power fields are. activate() forwards these
+     * to sx1276_fhss_init(); the validator ignores them, since any
+     * 64-bit value is a legal seed.
+     *
+     * node_id is LINK-scoped: both ends of a link must carry the same
+     * value or their channel permutations diverge and the follower can
+     * never hold lock. See host_cfg_keys.h for the full contract.
+     *
+     * Zero on both = the pre-2026-07-29 hardcoded seed, so a
+     * memset(0) request keeps the historical permutation.
+     */
+    uint64_t farm_id;
+    uint64_t node_id;
 } host_cfg_profile_req_t;
 
 /* Pure validator. tx_routed mirrors compile-time LIFETRAC_FHSS_TX_ROUTED. */

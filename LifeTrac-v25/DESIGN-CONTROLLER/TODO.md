@@ -326,6 +326,100 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
   5. Auto-profile boot test: restart web_ui with auto selected mid-run;
      confirm NO retained re-pin and no profile flap.
 
+### RS-0.14 — Control-plane + image schedule (design converged 2026-07-27)
+
+Full design: [`CONTROL_PLANE_DESIGN.md`](CONTROL_PLANE_DESIGN.md). Adopted
+direction: **control-first TDMA** (fixed control schedule primary; image fills
+the rest), with **per-slot skip frames** contracting the DTS superframe (skip =
+explicit 10.3 ms frame carrying free heartbeat/ack/budget freight, NOT CAD
+silence), **slot-stealing** at FHSS, and **encode-to-fit** tile packing sized to
+the live fragment quantum. FHSS and DTS share one 200 ms period, different
+interiors. The skip frame supersedes the two-state IDLE/ACTIVE machine.
+
+**2026-07-27 addition — the "ditto" repeat frame.** The control slot now has
+THREE occupancies: SKIP (idle, 10.3 ms, deliberately lets control go stale —
+safe because the operator is neutral), **DITTO** (steady stick: re-apply
+ControlFrame `ref_seq`, 15.4 ms D13, DOES refresh the deadman), and FULL
+(20.5 ms D13). Ditto carries a **u16 ref_seq and is honored only on exact match
+with the receiver's last-applied frame** — this is safety-critical, not an
+optimization: a naive "repeat last" lets a lost transition frame strand the
+tractor on a stale command while dittos keep refreshing its deadman (base
+commands STOP, frame lost, tractor repeats FORWARD indefinitely). Mismatch /
+malformed / nothing-applied → ignore → deadman → neutral, i.e. a desync
+degrades to the ordinary loss path. Wire format + the `ditto_applies()`
+reference rule are implemented and unit-tested now (`CMD_OP_CTRL_DITTO` 0x6B);
+the ref bytes are free by symbol quantization. Airtime saving is honest but
+modest (one quantization step: 5.12 ms at BW500 ≈ 3.5% image); the real prize
+may be delivery probability, which run 2 below measures.
+
+**Shipped tonight (code-only, bench-testable without radios; 85/85 tests pass):**
+
+- [x] **RS-0.14a Encode-to-fit increment** — budget now bounds the WIRE payload
+  (header+bitmap charged inside the cap; oversized-first-tile bypass removed) so
+  a 243 B budget is truly one fragment; greedy-continue packing; carry fix
+  (dropped changed tiles re-flag next frame); age-escalation (rolling refresh
+  converges under motion); live per-profile budget via retained
+  `tractor/link_budget` → `LinkBudget.update` (encoder finally sizes to
+  243/203 not a boot-frozen env); batcher `_frag_body_b()` profile-aware;
+  quality-only 0x63 no longer forces a keyframe. Tests:
+  `base_station/tests/test_encode_to_fit.py`.
+- [x] **RS-0.14c Ditto wire contract** — `CMD_OP_CTRL_DITTO` (0x6B),
+  `pack_ctrl_ditto` / `parse_ctrl_ditto` / `ditto_applies` in lora_proto, the
+  last a pure function so the H7 can reuse the anti-desync rule verbatim.
+  4 tests incl. the exact-match contract, malformed-args rejection, the
+  free-quantization property, and the one-symbol-step saving (pins the doc's
+  number against drift). Nothing transmits it yet — the drive plane needs
+  Route B first — but the contract is fixed and reviewable now.
+- [x] **RS-0.14b Bench instrumentation** — `CMD_OP_PROBE` (0x69) / `PROBE_ECHO`
+  (0x6A): base fires a no-op probe at fragment-RX-complete, tractor logs+echoes,
+  base measures honest in-stream delivery + RTT. `LIFETRAC_REACTIVE_FIRE` +
+  `LIFETRAC_PROBE_PHASE_SWEEP_MS`; raw `air_gap_hist(ms)` (bimodal, med/p95 hid
+  the boundary mode); keyframe-ack clear logged UNVERIFIED (source of the
+  retracted 171/1). Harness gained `-AlignedPump / -ReactiveFire /
+  -ProbePhaseSweepMs`, all recorded in `params.txt`.
+
+> **BENCH SESSION 2026-07-29 — runs 1 and 2 DONE.** Results:
+> [`bench-evidence/RS_0_12_phase_sweep_2026-07-29/RESULTS.md`](bench-evidence/RS_0_12_phase_sweep_2026-07-29/RESULTS.md).
+> Six runs, tractor-side ground truth. Settled: **pipeline v3 is the entire
+> Run-J regression** (a *harness default*, not a code change — default now
+> flipped); **frame size is irrelevant on v3**, so keep 3000 B (best delivery
+> AND best goodput, ~2000 B/s at 56% delivery, pooled n=239);
+> **the armed window is real, at frame completion, ~60–80 ms wide**;
+> **frame size buys no delivery**, so ditto is airtime-only and the
+> **envelope is GCM-128** (supersedes RS-8.6's D13). Opportunistic delivery
+> caps ~56% — proves the window, insufficient for a control plane, which is
+> the case FOR the firmware slot. New finding: **echo RTT is dominated by
+> train length** (1482 ms at 3000 B vs 245 ms at 250 B), so ack-gated
+> commands pay a full train — argues for one-way actuation + deadman.
+> Run 3 (encode-to-fit) NOT done: the bench feeds pre-built frames straight
+> to image_tx_daemon, so `camera_service` is not in the loop — needs the
+> real-camera path (RS-3.3).
+
+**Tomorrow's ordered bench plan (see CONTROL_PLANE_DESIGN.md §8):**
+
+- [ ] **1. Run-J bisection (cheapest, first).** Recover the 58% alignment:
+  toggle ONE of `-AlignedPump` / `-TxBatch` / `-TxPrepareAhead` / `-ParityGroup`
+  per run, scored tractor-side on `LoRa cmd:`.
+- [ ] **2. Reactive-fire phase×size sweep (RS-0.12, decisive).**
+  `-ReactiveFire 1 -ProbePhaseSweepMs "0,20,40,60,80,100,120" -ProbeSizesB "23,38"`
+  for ≥10 min (14 bins × ≥30 samples at the 0.5 s min gap). Sizes are a D13
+  **ditto** (23 B) and a D13 **control frame** (38 B) — the two frames the real
+  control plane sends. Read the cumulative `probe_grid:` line plus
+  `air_gap_hist(ms)`. Sets the guard budget, P(delivery|phase) (best-bin high →
+  DTS schedule buildable; ≤60% → stream-off A5), AND P(delivery|size) — if 23 B
+  ≫ 38 B, ditto is load-bearing for reliability and D13 beats GCM-128; if equal,
+  ditto is only an airtime nicety (~3.5%) and GCM-128 keeps handheld parity.
+  See the decision table in CONTROL_PLANE_DESIGN.md §8.
+- [ ] **3. Encode-to-fit verify.** `LIFETRAC_FRAGMENT_BUDGET=1`: confirm true
+  single-fragment frames at both profiles, no runt sawtooth, mono_g4/y_only
+  tiles-per-frame match §5; quality sweep 40→80 with no keyframe storm.
+- [ ] **4. After 1–3:** decide envelope (D13 vs GCM-128, §6), then start Route B.
+
+**Design follow-ons (post-measurement, tracked):** quality servo (slow AIMD on
+avg tile bytes, ROI-pair aware); gap-tolerant-merge keyframe-request debounce;
+skip-frame + mandatory-beacon firmware (L072); SF link-ladder idle fix; speed-
+gated deadman ladder; the `SAFETY_CASE.md` three-chain correction.
+
 ### RS-0.13 — Single-radio control-plane options (decision pending)
 
 Full analysis: [`SINGLE_RADIO_CONTROL_PLANE_OPTIONS.md`](SINGLE_RADIO_CONTROL_PLANE_OPTIONS.md).
@@ -693,7 +787,22 @@ No-regrets work, correct under every surviving architecture (do first):
   and 15 ms guard (13.5 % of every 200 ms slot) to measured+margin.
   Do NOT raise `SLOT_MS` — 200 ms is load-bearing for the FCC per-channel
   dwell math.
-- [ ] **RS-3.3 Real-camera benchmark rerun** — the synth workload underfills
+- [x] **RS-3.3 Real-camera benchmark — DONE 2026-07-30, encode-to-fit VERIFIED
+  ON AIR.** 240 s run, real USB UVC camera through camera_service's encode-to-fit
+  packer, over LoRa to the base: 492 frames encoded (491 ok, 0 dropped), 556
+  fragments, 472 complete frames delivered, rx_decode_err=0. Keyframes measured
+  2381/2389/2426/2430 B against a logged `byte_budget=2436 B/frame` — every one
+  under budget, the largest within 6 B. That is the packer filling the transport
+  quantum without exceeding it, on real camera data.
+  Requires `LIFETRAC_USE_LORA_BRIDGE=1`: it skips the M7 IpcWriter (which
+  otherwise opens /dev/ttymxc3 that image_tx_daemon owns), creates the MQTT
+  client without which frames are silently discarded, and turns deshake off
+  (the i.MX8 cannot produce one frame through deshake in 30 s). Harness now
+  has `-TxFeed camera`. Evidence:
+  [`bench-evidence/RS_3_3_real_camera_2026-07-30/RESULTS.md`](bench-evidence/RS_3_3_real_camera_2026-07-30/RESULTS.md).
+  Original item follows.
+
+- [x] **RS-3.3 (original) Real-camera benchmark rerun** — the synth workload underfills
   fragments (150–275 B frames); real keyframes chunk at max body size.
   Re-run the FHSS + DTS benchmarks fed by `camera_service.py` live before
   optimizing further.
@@ -1068,6 +1177,52 @@ No-regrets work, correct under every surviving architecture (do first):
   needs `LIFETRAC_FLEET_KEY_HEX` set. Add a `conftest.py` path fix (or rename
   one package) + a documented dev-key default so `pytest tests/` runs green
   without hand-set environment. Until then ~4 modules are silently unexercised.
+  **2026-07-29 escalation — the CI gate for this suite has never worked, so
+  none of the above was ever going to be caught.** `arduino-ci.yml` runs
+  `python -m unittest discover -s tests` after `setup-python` but **never runs
+  `pip install`** (grep for `pip install`/`requirements` in the workflow returns
+  nothing). Latest branch run: `Ran 964 tests ... FAILED (errors=55)`, of which
+  **49 are missing third-party imports** — `paho` ×25, `fastapi` ×19,
+  `cryptography` ×3, `pytest` ×2 — 3 are the `image_pipeline` shadowing above,
+  and **zero are assertion failures**. So "Base station protocol tests" has been
+  red on every commit for reasons unrelated to any code change, which is exactly
+  why the shadowing and the missing dev key persisted unnoticed.
+  Consequences to fix together:
+  - Add a dependency install step (and a `requirements-dev.txt` if none exists)
+    so the job can actually fail *informatively*.
+  - **Right now the only trustworthy CI gate in this repo is
+    `L072 firmware static checks`** (`make check` + the two owner guards),
+    which does pass — it needs no Python deps. Treat every other job's colour
+    as unknown until this lands, and do not read a red badge as a regression.
+  - A fifth victim of the same shadowing: `test_x8_encode_mode.py::
+    EncodeCacheInvalidatesOnModeChangeTests::test_mode_flip_forces_full_re_encode`
+    **passes in isolation and fails in-suite** (`No module named
+    'image_pipeline.tile_cache'`), because whichever `sys.path` entry wins is
+    decided by the 53 test files that mutate `sys.path`. It is an
+    order-dependent failure, not a logic defect — do not "fix" the assertion.
+
+- [ ] **RS-5.8 The L072 flash size budget has never actually been enforced.**
+  `tools/check_size_budget.py` (added `e599269b`, 2026-05-05) is run by the
+  "L072 cross-compile" CI job after `arm-none-eabi-size`, and that job has been
+  **red for months** — so the guard against overflowing the 192 KB part has
+  been decorative. Two independent bugs:
+  1. **FIXED 2026-07-29** — macro values carrying a trailing C comment reached
+     `ast.parse()` verbatim: `#define MM_FLASH_SIZE (192 * 1024) /* 0x30000 */`
+     (`include/memory_map.h:30`, unchanged since 2026-05-10) produced
+     `SyntaxError: invalid syntax`. Now stripped by `strip_c_comments()`.
+  2. **OPEN — schema drift.** The script evaluates `MM_BOOT_BASE` and
+     `MM_BOOT_SIZE`, and **neither exists in `memory_map.h` any more**; the
+     unified flash-layout remediation removed the separate BOOT region. Present
+     today: `MM_FLASH_BASE/SIZE/END`, `MM_APP_BASE/SIZE`, `MM_CFG_BASE`,
+     `MM_RAM_*`, `MM_STACK_SIZE`. Note `MM_APP_SIZE == MM_FLASH_SIZE` (192 KB)
+     while the Makefile's own banner still prints "BOOT = 4 KB / APP = 180 KB /
+     CFG = 8 KB", so the two disagree about the layout as well.
+  This needs a decision, not a mechanical patch: what should the budget assert
+  under a unified layout — app-vs-CFG-base headroom, or total-vs-flash? Pick it
+  deliberately, then reconcile the Makefile banner to match so there is one
+  source of truth. Until then treat firmware size as unguarded and check it by
+  eye (`mingw32-make all` prints Total; it was 37890 → 38326 bytes on
+  2026-07-29 with the ERP + FHSS-seed fixes).
 
 ### RS-6 — Keyframe elimination (K-phases, now LoRa-only)
 
@@ -1476,6 +1631,385 @@ No-regrets work, correct under every surviving architecture (do first):
   ~150/~230 ms predictions, per-class PER within the LORA_PROTOCOL loss
   policy. Fail → shrink the cap stepwise (90→60→45 ms at DTS) before
   considering RS-9.2 candidate (c).
+
+### RS-10 — Settings coverage: parameters we have never exercised (added 2026-07-29)
+
+Derived from [`SETTINGS_REFERENCE.md`](SETTINGS_REFERENCE.md), which catalogues
+810 settings with a `file:line` each. That inventory made two things visible
+that no single-file review had: a set of knobs that *look* configurable but are
+inert, and a set of harness legs we believed were tested but never actually
+flew. Both classes are listed here because both cause false confidence.
+
+**Reading rule for this section:** "never flown" claims come from the 70
+archived `params.txt` files (§11 of the reference). A missing key in an old
+`params.txt` means the knob did not exist in that script version, **not** that
+it was zero — so absence of evidence here really is absence of testing.
+
+#### Highest value first
+
+- [x] **RS-10.1 Preamble length sweep — CLOSED 2026-07-29, NOT SUPPORTED.**
+  RS-11.1's loss attribution ran and the gate answered **no**: of 67 attributed
+  fragment losses, **index 0 took 1 (1.5%)** where uniform loss would predict
+  7.7%, and the distribution instead climbs monotonically toward the end of the
+  train (indices 8–11 hold 55% of all loss). The first fragment after a train
+  boundary is the *least* lossy position, so the RXCONT re-arm-gap mechanism
+  that preamble length would widen the window for is **not** our failure mode.
+  Firmware **F4 must not be flashed on this rationale** — cycle saved.
+  **Retracted:** this item previously called preamble "the single highest-value
+  PHY experiment we are not running," reasoning from `rx_decode_err = 0`. That
+  result shows losses are pre-header-lock; it says nothing about *where in the
+  train* they occur, and collapsing one to the other was unjustified. Evidence:
+  [`bench-evidence/RS_11_1_loss_attribution_2026-07-29/RESULTS.md`](bench-evidence/RS_11_1_loss_attribution_2026-07-29/RESULTS.md).
+  Superseded by RS-11.4.
+
+- [ ] **RS-10.1b (superseded context) original rationale.** The single
+  highest-value PHY experiment we are not running. Measured 2026-07-29: a
+  ~3.5% one-way fragment loss floor persists with the base radio **completely
+  silent**, at `rx_decode_err = 0` — packets lost before header lock, i.e. a
+  receiver-readiness problem. Preamble is the only knob that widens the catch
+  window for a re-arming receiver, and it costs +1.0% airtime at 12 symbols /
+  +2.0% at 16, against +19% for the cheapest coding-rate step. **GATED ON RS-11.1(b)** — confirm the loss actually clusters at fragment
+  index 0 before spending a firmware cycle on preamble; the re-arm-gap
+  mechanism is currently assumed, not shown. Then blocked on firmware **F4**:
+  `RegPreambleMsb/Lsb` (0x20/0x21) are never written today (chip POR = 8) and
+  are not in the REG_WRITE allowlist. **Both halves must
+  land together** — the airtime invariant *assumes* 8 symbols, so writing the
+  register without feeding the value into `sx1276_airtime_compute` breaks the
+  ToA prediction the dwell accountant reconciles against. Pass: fragment loss
+  floor drops below 2% at ≤+2% airtime. Evidence:
+  [`bench-evidence/RS_0_12_phase_sweep_2026-07-29/RESULTS.md` §7.4](bench-evidence/RS_0_12_phase_sweep_2026-07-29/RESULTS.md).
+- [ ] **RS-10.2 Coding rate — hold 4/5, and do not re-litigate at bench range.**
+  Recorded so this is not re-opened on intuition: CR is per-profile settable
+  (`PhyProfile.cr_den`) and fully plumbed, and we deliberately keep 4/5.
+  Across ~19,000 received frames in ten runs, `rx_decode_err` and
+  `reassembler_decode_err` were **zero in every run**; with explicit-header
+  mode (header already protected at 4/8) and payload CRC on, that means we have
+  never observed one packet of the class FEC repairs. The ladder costs
+  +19/+38/+57% airtime. **Field-range test to run:** log
+  `rx_decode_err / rx_frames` at increasing distance and find where it leaves
+  zero. That ratio crossing ~1% is the trigger to try CR 4/6 — nothing else
+  is. Held in reserve: a DITTO at CR 4/8 (13.376 ms) still fits inside the slot
+  budget reserved for a FULL frame at 4/5 (14.144 ms), so the safety-critical
+  repeat can be armoured for free if control-frame bit errors ever appear.
+- [ ] **RS-10.3 Verify the ERP clamp actually limits power** — **firmware fix
+  LANDED 2026-07-29** (`host_cfg.c`: activation programs `min(configured,
+  erp_max)`; `CFG_KEY_TX_POWER_DBM` writes capped at the active allowance; 4
+  new `cfg_profile_wire.c` cases, one of which was confirmed to fail on the
+  pre-fix code). **The on-air half is still open** — unit tests assert what the
+  firmware asks the PA for, not what the antenna radiates. Sweep declared `antenna_gain_dBi` across
+  0 / 6 / 9 / 12 dBi and confirm conducted power drops accordingly — read back
+  `RegPaConfig` (0x09) and cross-check against the `tx_power_dbm` field in
+  `HOST_TYPE_TX_DONE_URC`. Then verify the ordering hazard is closed: write
+  `CFG_KEY_TX_POWER_DBM` (0x01) to 17 dBm *after* activating a profile whose
+  clamp is lower, and confirm the write is clamped rather than honoured. This
+  is the regression test for a regulatory property, so it belongs in the
+  permanent bench script, not a one-off.
+- [ ] **RS-10.4 Two-node FHSS collision test** — **firmware + host fix LANDED
+  2026-07-29** (`CFG_KEY_FHSS_FARM_ID` 0x17 / `CFG_KEY_FHSS_NODE_ID` 0x18, wired
+  through `host_cfg_profile_req_t` and provisioned by
+  `configure_regulatory_profile_if_needed()` before `CFG_KEY_REG_PROFILE`;
+  harness exposes `-FhssFarmId` / `-FhssLinkId` via the shared `$profEnv` so
+  both ends cannot diverge). **The two-pair measurement is still open.**
+  Before the fix, every node derived the identical hop permutation from a
+  hardcoded `(0,0,0)` seed. With distinct `node_id`s, run two tractor↔base
+  pairs simultaneously under p1 and measure per-pair PER against the
+  single-pair baseline. Pass: no systematic degradation — collisions become
+  statistical (~1/50 per dwell) instead of total. Also confirm the base and
+  tractor stay in step when the seed is non-zero, since that path has never
+  been exercised.
+
+#### Harness legs we believed were tested and were not
+
+- [ ] **RS-10.5 `AlignedPump 0` has never been flown.** The parameter exists
+  specifically as an A/B toggle and its comment describes restoring the
+  pre-fix idle-drain-only behaviour, but all 13 recorded uses are `1`. The
+  aligned-pump path is therefore **unproven against its own control**. Run the
+  0 leg at the current operating point before treating window-aligned command
+  TX as established.
+- [ ] **RS-10.6 `TxFeed host` has never been exercised** since the knob was
+  added — all 38 recorded uses are `local`. The 31 earlier runs used the
+  then-hardcoded host wiring, so the LAN-broker feed path has had no coverage
+  since it became optional. Worth one run purely to prove it still works
+  before we need it.
+- [ ] **RS-10.7 Phase sweep flew exactly once.** `ProbePhaseSweepMs` and
+  `ProbeSizesB` were exercised in a single 600 s run
+  (`20260729_094545_e43d07cf`) — and that run's aggregate was later shown to
+  be *depressed by its own ack traffic*. The window-shape result (delivery
+  decaying from ~32% at offset 0 to ~2% at 100 ms) should be re-measured with
+  `ProbeEcho 0` now that we know the echo was destroying the channel.
+- [ ] **RS-10.8 `ParityGroup` only ever 0 or 4** — never 2, 3 or 8. Parity
+  costs airtime on every train, so the group size is a real throughput knob
+  that has had a two-point sweep. Include `parity_recon` counts in the read-out
+  (all runs so far report 0 reconstructions, which suggests parity has never
+  actually saved a frame — worth confirming before keeping it on).
+- [ ] **RS-10.9 `TrainGapMs` and `TxPrepareAhead` were never varied
+  independently** — they move in perfect lockstep (40↔1, 0↔0) across all 21
+  runs that set either. Their individual contributions are therefore
+  unattributed. Decouple them for one 2×2.
+- [ ] **RS-10.10 `TxPipelineDepth` effectively untested** — 38 runs at depth 2,
+  exactly one at depth 4, none at 1 or 3. The firmware TX ring holds
+  1 transmitting + 4 parked, and the P0 latency math (RS-9.7) wants ≤3 at
+  FHSS. Sweep 1–4 at both profiles and confirm the latency model.
+
+#### Settings that are inert — decide wire-up or deletion
+
+Each of these reads as configurable and is not. Leaving them in place is a trap
+for whoever tries to use one; the decision for each is *wire it or delete it*.
+
+- [ ] **RS-10.11 `CFG_KEY_FHSS_ENABLE` (0x05) is validated, stored, and never
+  read.** Setting it to 0 does **not** stop hopping — hopping is decided purely
+  by which profile is active. Either make it gate hopping or remove the key.
+  This one is actively dangerous: an operator could believe they disabled
+  frequency hopping.
+- [ ] **RS-10.12 `HOST_TXQ_P0_RESERVED` is referenced by zero lines of C**
+  (`config.h:58`). The designed priority reservation — a control lane that lets
+  an engine-kill latch jump parked image fragments — was never implemented.
+  This is firmware roadmap **F5**; the define should not sit there implying it
+  works.
+- [ ] **RS-10.13 `CFG_KEY_HOST_BAUD` (0x0B) accepts a value and answers
+  DEFERRED, but nothing re-inits the UART** — not even after reboot, since the
+  value is never persisted. Either persist it and read it in `main.c`, or
+  reject the key.
+- [ ] **RS-10.14 IWDG constants and `CFG_KEY_IWDG_WINDOW_MS` (0x0D) exist with
+  no watchdog driver behind them.** Tracked as N-20; noted here because the
+  presence of the key implies a watchdog that does not exist.
+- [ ] **RS-10.15 Chip-POR PHY registers we have never characterised** — sync
+  word (POR `0x12`, never written; must match the H7 peer), LNA gain / LNA
+  boost, OCP, PA ramp, PA_DAC, and `RegIrqFlagsMask`. AgcAutoOn is forced on,
+  so manual LNA gain is inert anyway, but the rest are untested defaults on a
+  link we are about to take to field range. At minimum: confirm the sync word
+  matches both ends, and characterise LNA boost at range where it might matter.
+
+- [ ] **RS-10.19 `SX1276_TX_PLL_SETTLE_US` comment contradicts its value by 5x.**
+  `radio/sx1276_tx.c:32-45` explains the budget as "the 200 us budget here is a
+  4x conservative envelope" over the datasheet's ~50 us PLL lock (rev 7
+  §4.1.4), but the define immediately below is `1000UL`. Costs nothing on the
+  image path today — the settle is gated on `s_hop_freq_hz != 0` and DTS zeroes
+  that at `:191`, so profile 2 skips it entirely — but it is 1 ms per fragment
+  at FHSS (p1), and the mismatch will mislead whoever tunes it. Decide which
+  number is intended, then characterise on the bench under the actual Murata
+  TCXO as the comment already asks. Surfaced 2026-07-29 while evaluating a set
+  of proposed SX1276 register optimisations.
+
+#### Reproducibility gaps in the evidence trail
+
+- [ ] **RS-10.16 Record what the harness currently omits.** `params.txt`
+  captures 22 keys but not: container image tags (hardcoded `latest`, so no run
+  records which image it actually ran), `LIFETRAC_SYNTH_PREBUILD`,
+  `LIFETRAC_FHSS_WIDE_MASK`, or the derived broker hosts. The `latest` tag is
+  the serious one — the 2026-07-29 session began with a base board that had **no
+  image at all** after a reboot, and nothing in the evidence bundle would have
+  revealed a silently different image. Also note `git_sha` records repo HEAD,
+  not the script version, so working-tree edits are invisible.
+- [ ] **RS-10.18 Post-activation 0x15/0x16 drift vs the ERP allowance.** The
+  2026-07-29 ERP fix enforces `conducted <= allowance` for the two routes it
+  set out to close: activation programs `min(configured, erp_max)` into the PA,
+  and `CFG_KEY_TX_POWER_DBM` writes are capped. It does **not** make
+  `CFG_KEY_ANTENNA_GAIN_DBI` (0x15) / `CFG_KEY_HW_CEILING_DBM` (0x16) writes
+  re-clamp: those keys are sampled into the profile request only at
+  `cfg_set(CFG_KEY_REG_PROFILE)`, so a host that declares 25 dBi *after*
+  activation, without re-activating, leaves the enforced allowance derived from
+  the older declaration. This is the documented pre-existing contract
+  (`host_cfg_keys.h:25-31` — those keys are validator inputs, and the profile
+  validator is the authoritative gate), not a regression, but it is a real gap
+  between what an operator declares and what the PA is limited to.
+
+  **Do NOT close it by recomputing the allowance from the live cfg table** —
+  an adversarial review of the fix established that this is strictly worse.
+  0x15/0x16 accept the full type range with no validator, so
+  `power_clamp(30, hw=1, gain=30)` returns the 0 no-headroom sentinel; because
+  the clamp sites are guarded `erp_max != 0U`, a host could write `0x16=1` and
+  **disarm ERP enforcement entirely**, then write 0x01=17. Sourcing the ceiling
+  from `s_active` is deliberate: it is the only state with a proven
+  non-sentinel invariant, since `validate()` rejects NO_POWER_HEADROOM before
+  `stage()` will store a request.
+
+  The correct shape is therefore to *reject* rather than *skip*: make 0x15/0x16
+  writes re-derive the allowance and refuse the write (or force re-staging)
+  when it would fall to the sentinel, so the clamp can never be disarmed.
+  Needs a decision on whether 0x15/0x16 should become re-staging triggers.
+- [ ] **RS-10.17 Add an INFO-level link-margin line.** RSSI and SNR are
+  published to `link_stats` on MQTT but only written to `rx_daemon.log` at
+  DEBUG, so no archived run carries link margin. Every range test will want it,
+  and it is the companion signal to the RS-10.2 coding-rate trigger. Small fix,
+  do it before the first field run.
+
+### RS-11 — Next-session sequencing, and the one instrument that gates it (added 2026-07-29)
+
+#### RS-11.0 Correction: where the dead time actually is
+
+**A dead-time decomposition offered on 2026-07-29 was wrong and is retracted
+here before it can propagate.** It derived "≈16 ms per fragment of unexplained
+host scheduling" by dividing whole-run `util` by fragment count. That is the
+same error RS-0.14 already caught and corrected (see "The gap geometry was
+wrong by ~9x" in that section) — promoting a per-FRAME host-turnaround number
+to a per-fragment radio window — committed again in a new form. Recording it because this repo has now been bitten twice by exactly
+this arithmetic.
+
+The measured truth, re-confirmed against today's C2b run
+(`radio_monitor_20260729_104808_4d33b499`): the RX daemon's own `air_gap:` line
+reports `dt_med=104908us len_med=247B`. Against a 255 B on-air ToA of
+99.904 ms that is **5.00 ms of inter-fragment dead air** — matching the
+previously recorded 4.87–5.01 ms across 8 runs and 6 SHAs. Not 16 ms, not
+44 ms.
+
+So the dead time is **not spread across fragments — it is concentrated in the
+train boundary**, exactly as RS-0.14 found (242.6 ms every 1850 ms in the
+record run; today's `dt_p95=219387us` is that boundary showing up in the tail).
+
+Two consequences for what is worth doing next:
+
+1. **The host-handoff lever is already built and already measured.** RS-3.10
+   (cross-train prepare-ahead) shipped 2026-07-26 and replaced the ~44 ms
+   accidental gap with `LIFETRAC_TRAIN_GAP_MS` (default 40) spent actively
+   listening inside `_drain_rx_frames`. It was null on goodput *by
+   construction*, because the designed 40 ms ≈ the accidental 44 ms it
+   replaced. There is no hidden 15% sitting in the host path.
+2. **What remains is the gap-tuning policy trade, and RS-3.10 already owns
+   it**: 40 → 15 ms is worth roughly +7–8% goodput against a narrower command
+   window. That A/B was queued for "the next session" on 2026-07-26 and has
+   still not run. It is the actual throughput item, and it is a *policy*
+   decision, not an optimisation — see RS-11.2.
+
+#### RS-11.1 The instrument is contaminated — fix this first, it unblocks three things
+
+- [x] **RS-11.1 Log the received fragment index alongside the air-gap sample —
+  DONE 2026-07-29** (`image_rx_daemon.py`; `air_gap_by_class` + `lost_frag_idx`
+  log lines, 15 unit tests). First run measured the train boundary cleanly for
+  the first time (**213.9 ms** median, vs 40 ms of designed `TRAIN_GAP_MS` — so
+  ~174 ms is host turnaround prepare-ahead is not hiding) and confirmed the
+  contamination it was built to remove: `post_loss` gaps sit at 210.3 ms and
+  boundaries at 213.9 ms, 4 ms apart, and 65 of 220 oversized samples (30%) were
+  losses masquerading as boundaries. It also closed the F4 gate — see RS-10.1.
+  Original description follows.
+
+- [x] **RS-11.1 (original) Log the received fragment index alongside the air-gap sample.**
+  The `air_gap` histogram cannot currently distinguish a **train boundary**
+  from a **lost fragment**, because both produce an oversized inter-arrival
+  gap: a single loss makes the next observed Δt ≈ 2× ToA ≈ 200 ms, landing in
+  the same `<200`/`<400` buckets as a real boundary. At today's ~3.4% fragment
+  loss over ~1900 fragments that is ~60 contaminating samples, and C2b's
+  histogram shows 17 samples above the 120 ms bucket where only ~6 train
+  boundaries should exist. **Every boundary-size number derived from this
+  histogram is therefore an upper bound, not a measurement.**
+
+  The fix is small and entirely host-side: the reassembler already knows which
+  indices arrived and which are missing (`image_pipeline/reassemble.py:127`
+  computes exactly that for parity reconstruction) — it simply never logs it.
+  Emit the fragment index with each gap sample, then a gap is attributable.
+
+  This one change unblocks three separate questions:
+  - **(a) Sizes the train boundary honestly** — the input to RS-3.10's gap
+    tuning. Right now we would be tuning against a contaminated number.
+  - **(b) Answers whether the 3.55% loss floor clusters at fragment index 0**
+    of each train. That is the RXCONT re-arm-gap hypothesis, and it is
+    currently assumed rather than shown.
+  - **(c) Gates F4 (settable preamble).** F4 is the proposed fix for the
+    readiness floor, but if the missing indices turn out uniformly distributed
+    rather than boundary-clustered, preamble is the wrong target and a firmware
+    cycle would be spent for nothing. **Do not flash F4 before (b) answers.**
+
+  No firmware required. This is the cheapest high-value item on the list.
+
+#### RS-11.2 Then the gap-tuning A/B — as a policy decision, not a tweak
+
+- [x] **RS-11.2 Gap sweep DONE 2026-07-30 — the trade dissolved; keep 40 ms.**
+  Six saturated runs (15/40/80 ms, n=2 each, smooth pacing): goodput flat
+  1977-2001 B/s, delivery at ceiling everywhere. Under smooth pacing the
+  transmitter is pacing-limited, not gap-limited, so the +7-8% estimate (made
+  against the bucket) no longer applies. Headline side-result: pooled
+  single-copy in-stream command delivery is **628/629 = 99.8%** vs 91.1% under
+  the bucket — smooth pacing's 17 ms inter-fragment gaps exceed the 10.3 ms
+  command ToA, so every gap is now a command slot. Firmware Batch 2 (the TDMA
+  slot) is hereby demoted from prerequisite to optimisation (+0.2 points
+  measured ceiling); Batch 1 unaffected. Evidence: L-series in
+  [`bench-evidence/RS_11_1_loss_attribution_2026-07-29/RESULTS.md`](bench-evidence/RS_11_1_loss_attribution_2026-07-29/RESULTS.md).
+  Original item follows.
+
+- [x] **RS-11.2 (original) Run RS-3.10's queued gap sweep with the new evidence in hand.**
+  `LIFETRAC_TRAIN_GAP_MS` 40 → 25 → 15 → 60, at the pinned operating point
+  (v3 / DTS / 3000 B / `ProbeEcho 0` / `KfRequestDisable 1`), n=2 per point
+  because the run-to-run spread is 0.52 points (§7.3 of the 07-29 results).
+
+  **The reason to re-run it now rather than in 2026-07-26's terms: the trade's
+  exchange rate changed today.** The 40 ms default was chosen when forward
+  command delivery was believed to be 53–57%. That figure was depressed by our
+  own ack traffic; with echoes off it is **91.1% [85.8, 96.4]**, and at
+  p = 0.911 two copies give 99.2%. So the command window may be substantially
+  over-provisioned, and airtime bought back from it is now much cheaper in
+  delivery terms than it looked. Score both axes in the same run — goodput
+  *and* tractor-side probe delivery — or the trade cannot be evaluated.
+
+  Pass criterion is a decision, not a number: pick the gap that holds two-copy
+  command delivery ≥99% while maximising goodput, and record the chosen point
+  in `CONTROL_PLANE_DESIGN.md` as a policy with its evidence.
+
+#### RS-11.4 Why does loss rise with position inside a train? (opened 2026-07-29)
+
+- [ ] **RS-11.4 Discriminate the cumulative-loss mechanism.** RS-11.1 measured
+  fragment loss climbing monotonically with index inside a ~1.3 s train: index 0
+  took 1 of 67 losses, indices 8–11 took 37 of 67. That is the *opposite* of
+  the boundary-re-arm hypothesis and points at something **cumulative within a
+  train** rather than positional at its edge. Candidates, none tested:
+  - **PA thermal droop** — 13 x 100 ms of near-continuous keying; later
+    fragments radiate slightly lower.
+  - **Dwell / QoS throttling** — the airtime accountant or the 95%-duty DTS
+    budget gate biting later in a train.
+  - **Receiver-side backpressure** — the base's host pipeline falling behind as
+    the train progresses, so RXCONT re-arm slips further each fragment.
+  - **Intra-train clock drift** — the slot follower drifting across the train so
+    later fragments land further from the expected window.
+
+  **The cheap discriminator, and it needs no firmware:** vary train length
+  (fragments per frame) and re-read the per-index loss rate. If loss tracks
+  *elapsed time since train start*, it is thermal or dwell. If it tracks *index*
+  regardless of train length, it is pipeline depth or backpressure. Sweep
+  `SynthBudgetB` 3000 / 1500 / 750 (13 / 7 / 4 fragments) at n=2, and read
+  `lost_frag_idx` per index rather than the aggregate rate.
+
+  Re-measure on a build carrying the trailing-fragment fix — run D1 predates it
+  and undercounts the final index, which understates the very trend being
+  investigated.
+
+  This is now the live lead on the ~3.5% loss floor, in place of F4.
+
+#### RS-11.3 Recommended order for the next session
+
+Sequenced by payoff-to-risk, and deliberately front-loading everything that
+needs no firmware flash — the flash loop is the expensive one here, because
+RS-5.2 records the tractor's `gpio163` reset is dead and L072 reset only works
+through a fragile 7–10 s OpenOCD/SWD path that occasionally hangs.
+
+1. **RS-11.1** — fragment-index logging. Host-side, minutes of work, unblocks
+   everything below and gates F4.
+2. **RS-11.2** — gap-tuning A/B. The real throughput lever (+7–8%), now with a
+   changed exchange rate. Host-side.
+3. **RS-3.3** — real-camera run. `camera_service` owns the encode-to-fit budget
+   packer, carry fix, age-escalation and liveness valve, and **none of it has
+   ever been on air** — the synth harness feeds pre-built frames straight to
+   `image_tx_daemon`, bypassing it entirely. Highest chance of hiding a real
+   defect; needs the camera rig rather than another harness run.
+4. **RS-11.4** — train-length sweep to discriminate the cumulative-loss
+   mechanism. Host-side, and it is now the live lead on the loss floor.
+5. **Firmware Batch 1** — F6/F7/F8. **F4 is dropped**: RS-11.1 ran and the gate
+   answered no (RS-10.1). F8 (phase telemetry in `RX_FRAME_URC`) matters
+   independently — slot alignment is currently unverifiable from either host.
+6. **RS-10.4 / RS-10.3** — the two-node FHSS collision test and the ERP
+   antenna-gain sweep, once firmware carrying the 2026-07-29 fixes is flashed.
+
+**Validity note for anything measured before that flash:** the ERP/FHSS commit
+(`7c57b8e9`) is not on the boards. Measurements on the current build stay valid
+for it, because at profile 2 with default seeds the new firmware is
+behaviourally identical — ERP allowance 17 with 2 dBi declared, configured
+power 14, so the PA is programmed to the same 14 dBm it already boots at, and
+seed 0/0 reproduces the historical permutation bit-for-bit. That equivalence
+holds **only** at profile 2 with default seeds; it stops being true at p1 with
+distinct seeds.
+
+**Pin the operating point explicitly on every command line.** Today's runs
+were the second time a harness default silently changed the code path under
+test; the `TxPipeline` v2/v3 default cost 38 points of command delivery across
+~30 runs before `params.txt` caught it.
 
 ---
 

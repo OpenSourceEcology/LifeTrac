@@ -959,9 +959,33 @@ CMD_OP_RADIO_PROFILE      = 0x65   # args: u8 profile id (0/1/2)
 CMD_OP_RADIO_PROFILE_ACK  = 0x66   # args: u8 profile id (tractor -> base)
 CMD_OP_RADIO_PROFILE_CONF = 0x67   # args: u8 profile id (base -> tractor)
 CMD_OP_ENCODE_MODE_ACK    = 0x68   # args: UTF-8 JSON ack (<=200 B)
+# 2026-07-27 bench instrumentation: a no-op probe the tractor ONLY logs +
+# echoes, used to measure base->tractor in-stream delivery honestly (the
+# RS-0.12 reactive-fire / phase-sweep experiment). args: u32le probe_seq +
+# u16le commanded phase-offset-ms (diagnostic only; tractor does not act on
+# it). The echo (0x6A) carries the same seq back so the base can time the
+# round trip. Kept in the strict path so it shares the exact TX machinery
+# a real ControlFrame would.
+CMD_OP_PROBE              = 0x69   # args: u32le seq + u16le phase_ms
+CMD_OP_PROBE_ECHO         = 0x6A   # args: u32le seq (tractor -> base)
+# 2026-07-27 "ditto": repeat the last ControlFrame instead of re-sending it.
+# args: u16le ref_seq — the sequence number of the ControlFrame being
+# repeated. THE REF IS SAFETY-CRITICAL, NOT AN OPTIMIZATION: a bare
+# "repeat last" would let a lost transition frame strand the tractor on a
+# stale command while dittos keep refreshing its deadman (base commands
+# STOP, frame is lost, base then dittos because the operator is still
+# holding stop, tractor repeats FORWARD forever). The receiver applies a
+# ditto ONLY if its own last-applied ControlFrame seq == ref_seq;
+# otherwise it IGNORES it, control goes stale, and the 200 ms deadman
+# neutralizes — i.e. a desync degrades to the ordinary loss path.
+# Free by symbol quantization: 9..12 B payload all cost 10.304 ms at
+# BW500, so the 2 B ref costs nothing over a bare skip frame.
+CMD_OP_CTRL_DITTO         = 0x6B   # args: u16le ref_seq
 _CMD_OPS = frozenset({CMD_OP_REQ_KEYFRAME, CMD_OP_ENCODE_MODE,
                       CMD_OP_RADIO_PROFILE, CMD_OP_RADIO_PROFILE_ACK,
-                      CMD_OP_RADIO_PROFILE_CONF, CMD_OP_ENCODE_MODE_ACK})
+                      CMD_OP_RADIO_PROFILE_CONF, CMD_OP_ENCODE_MODE_ACK,
+                      CMD_OP_PROBE, CMD_OP_PROBE_ECHO,
+                      CMD_OP_CTRL_DITTO})
 COMMAND_FRAME_MAX_ARGS = 200
 
 
@@ -987,6 +1011,44 @@ def parse_command_frame(body: bytes) -> tuple[int, bytes] | None:
     if opcode not in _CMD_OPS:
         return None
     return opcode, bytes(body[2:])
+
+
+# ---- "ditto" control repeat (2026-07-27) --------------------------------
+# A ditto says "re-apply ControlFrame seq=ref_seq" instead of re-sending
+# the whole 16 B frame. See CMD_OP_CTRL_DITTO above for why ref_seq is
+# safety-critical rather than an optimization.
+
+def pack_ctrl_ditto(ref_seq: int) -> bytes:
+    """Pack a ditto referencing the ControlFrame sequence being repeated."""
+    return pack_command_frame(CMD_OP_CTRL_DITTO,
+                              (int(ref_seq) & 0xFFFF).to_bytes(2, "little"))
+
+
+def parse_ctrl_ditto(args: bytes) -> int | None:
+    """Extract ref_seq from a ditto's args; None if malformed.
+
+    A malformed ditto MUST be treated as "no command received" (let the
+    deadman run), never as "repeat whatever I had".
+    """
+    if len(args) < 2:
+        return None
+    return int.from_bytes(args[0:2], "little")
+
+
+def ditto_applies(ref_seq: int | None, last_applied_seq: int | None) -> bool:
+    """Receiver rule: honor a ditto ONLY if it references the exact
+    ControlFrame we last applied.
+
+    Returns False for a malformed ditto (ref_seq None), for a receiver
+    that has applied nothing yet (last_applied_seq None), and for any
+    mismatch — every one of which must fall through to the deadman rather
+    than replay a stale command. This is the whole anti-desync contract
+    and it is deliberately a pure function so it can be unit-tested and
+    reused verbatim by the H7 implementation.
+    """
+    if ref_seq is None or last_applied_seq is None:
+        return False
+    return (int(ref_seq) & 0xFFFF) == (int(last_applied_seq) & 0xFFFF)
 
 
 def max_telemetry_fragment_payload(profile: PhyProfile,

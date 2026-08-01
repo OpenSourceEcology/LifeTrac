@@ -76,9 +76,15 @@ from lora_proto import (  # noqa: E402
     CMD_OP_RADIO_PROFILE_ACK,
     CMD_OP_RADIO_PROFILE_CONF,
     CMD_OP_ENCODE_MODE_ACK,
+    CMD_OP_PROBE,
+    CMD_OP_PROBE_ECHO,
 )
 from image_pipeline.frame_format import encode_tile_delta_frame  # noqa: E402
-from image_pipeline.reassemble import FragmentReassembler         # noqa: E402
+from image_pipeline.reassemble import (                           # noqa: E402
+    FRAGMENT_MAGIC,
+    FRAGMENT_MAGIC_V2,
+    FragmentReassembler,
+)
 from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     HostLink,
     HOST_TYPE_VER_REQ,
@@ -101,6 +107,47 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
 )
 
 LOG = logging.getLogger("image_rx_daemon")
+
+# ---- defensive env parsing (2026-07-27, PR-review follow-up) ----------
+# These tunables are hand-edited on the bench and injected via docker -e /
+# systemd units, so a typo or an empty substitution is routine. A bare
+# int()/float() turns that into a crash — at module scope it stops the
+# daemon from starting at all; inside an MQTT callback it can abort
+# on_connect and silently lose every subscription. These never raise.
+
+def _env_int(name: str, default: int, lo: "int | None" = None,
+             hi: "int | None" = None) -> int:
+    raw = os.environ.get(name, "")
+    try:
+        val = int(str(raw).strip()) if str(raw).strip() else default
+    except ValueError:
+        LOG.warning("bad %s=%r — using %s", name, raw, default)
+        val = default
+    if lo is not None and val < lo:
+        LOG.warning("%s=%s below %s; clamping", name, val, lo)
+        val = lo
+    if hi is not None and val > hi:
+        LOG.warning("%s=%s above %s; clamping", name, val, hi)
+        val = hi
+    return val
+
+
+def _env_float(name: str, default: float, lo: "float | None" = None,
+               hi: "float | None" = None) -> float:
+    raw = os.environ.get(name, "")
+    try:
+        val = float(str(raw).strip()) if str(raw).strip() else default
+    except ValueError:
+        LOG.warning("bad %s=%r — using %s", name, raw, default)
+        val = default
+    if lo is not None and val < lo:
+        LOG.warning("%s=%s below %s; clamping", name, val, lo)
+        val = lo
+    if hi is not None and val > hi:
+        LOG.warning("%s=%s above %s; clamping", name, val, hi)
+        val = hi
+    return val
+
 
 # Same topic ID 0x25 → "lifetrac/v25/video/tile_delta" as the production
 # bridge would have used. We publish into the same MQTT slot so web_ui
@@ -233,11 +280,64 @@ class ImageRxDaemon:
         # (applied by the RX worker between poll cycles — the worker owns
         # the HostLink, MQTT callbacks must never touch it directly).
         self._pending_profile: int | None = None
-        self._active_profile = int(os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+        self._active_profile = _env_int("LIFETRAC_REG_PROFILE", 0, lo=0, hi=2)
         # True once ANY retained radio_profile pin has been delivered to
         # this process — gates the age check so the boot replay (restart
         # convergence) is always honored and only reconnect replays age out.
         self._retained_profile_seen = False
+        # 2026-07-27 RS-0.12 reactive-fire probe instrumentation (bench only).
+        # LIFETRAC_REACTIVE_FIRE=1 fires a no-op PROBE at each fragment-RX-
+        # complete (the moment the tractor's RXCONT re-arms), sweeping the
+        # commanded delay so P(delivery | phase) can be measured. It uses the
+        # SAME TX machinery a real ControlFrame would, so its delivery rate
+        # IS the drive-command delivery rate. Off in production.
+        self._reactive_fire = os.environ.get("LIFETRAC_REACTIVE_FIRE", "0") == "1"
+        self._probe_seq = 0
+        self._probe_tx = 0
+        self._probe_echo_rx = 0
+        self._probe_pending: "dict[int, float]" = {}   # seq -> monotonic send t
+        self._probe_rtts: "list[float]" = []
+        # Phase sweep: 0 = fire immediately at completion; else step through
+        # the list (ms) round-robin so each offset bin gets samples.
+        _sweep = os.environ.get("LIFETRAC_PROBE_PHASE_SWEEP_MS", "").strip()
+        try:
+            parsed_sweep = [max(0, int(x)) for x in _sweep.split(",")
+                            if x.strip()]
+        except ValueError:
+            LOG.warning("bad LIFETRAC_PROBE_PHASE_SWEEP_MS %r — using [0]",
+                        _sweep)
+            parsed_sweep = []
+        # `or [0]`: an empty/blank env (or a bad parse) falls back to a
+        # single offset-0 bin (fire immediately at completion).
+        self._probe_sweep = parsed_sweep or [0]
+        # Same defensive-parse rule as the sweeps above: a typo in a bench
+        # param must not stop the daemon from starting.
+        _gap = os.environ.get("LIFETRAC_PROBE_MIN_GAP_S", "").strip()
+        try:
+            self._probe_min_gap_s = float(_gap) if _gap else 0.5
+        except ValueError:
+            LOG.warning("bad LIFETRAC_PROBE_MIN_GAP_S %r — using 0.5", _gap)
+            self._probe_min_gap_s = 0.5
+        self._last_probe_t = 0.0
+        # 2026-07-27 SIZE sweep: pad probes to emulate the real control-plane
+        # frame sizes so tomorrow measures P(delivery | phase, SIZE), not just
+        # phase. This is what actually prices the "ditto" repeat-frame idea:
+        # its airtime saving is only ~5.12 ms/slot at BW500, so its real value
+        # is whether a SHORTER frame lands in a marginal reverse window more
+        # often. Sizes are TOTAL on-air payload bytes incl. the 8 B hop header
+        # (e.g. "23,38" = D13 ditto vs D13 control). Empty = no padding.
+        _sizes = os.environ.get("LIFETRAC_PROBE_SIZES_B", "").strip()
+        try:
+            parsed_sizes = [int(x) for x in _sizes.split(",") if x.strip()]
+        except ValueError:
+            LOG.warning("bad LIFETRAC_PROBE_SIZES_B %r — no padding", _sizes)
+            parsed_sizes = []
+        # On-air payload = 8 B hop hdr + 2 B (magic+opcode) + args.
+        # args already carries 4 B seq + 2 B phase, so the floor is 16 B.
+        self._probe_sizes = [s for s in parsed_sizes if s >= 16] or [0]
+        # seq -> (phase_ms, size_b) so the echo can be attributed to its bin.
+        self._probe_bins: "dict[int, tuple[int, int]]" = {}
+        self._probe_stats: "dict[tuple[int, int], list[int]]" = {}
         # LoRa-only control plane: outbound command frames queued by MQTT
         # callbacks, drained by the RX worker (single link owner). Plus
         # the two-phase switch state machine fields.
@@ -328,7 +428,7 @@ class ImageRxDaemon:
             LOG.warning("CFG_SET(LBT_ENABLE=0) failed: %s — command TX may "
                         "abort under load", exc)
         if _os.environ.get("LIFETRAC_SKIP_PHY_CONTRACT", "0") != "1":
-            prof_id = int(_os.environ.get("LIFETRAC_REG_PROFILE", "0"))
+            prof_id = _env_int("LIFETRAC_REG_PROFILE", 0, lo=0, hi=2)
             active_phy = _PROFILE_TO_PHY.get(prof_id, PHY_IMAGE_BW250)
             verify_modem_matches_profile(link, active_phy)
         # 2026-05-25 fix: explicitly wake the SX1276 into LORA_RXCONTINUOUS
@@ -620,6 +720,34 @@ class ImageRxDaemon:
                     self._revert_to = previous
                     self._revert_deadline = (time.monotonic()
                                              + PROFILE_REVERT_TIMEOUT_S)
+        elif opcode == CMD_OP_PROBE_ECHO:
+            # 2026-07-27 RS-0.12: the tractor received our probe and echoed
+            # it. This is a CONFIRMED in-stream round trip — the honest
+            # delivery signal the contaminated keyframe-ack never was.
+            seq = int.from_bytes(args[0:4], "little") if len(args) >= 4 else 0
+            t0 = self._probe_pending.pop(seq, None)
+            # Count UNIQUE probes echoed, not echo frames received: the
+            # tractor's queued echo is radiated by _send_command_frame with
+            # its default copies=2, so raw arrivals double-count and the
+            # headline rate reads ~2x (observed 105.8% on 2026-07-29 run
+            # B2). The pop above makes the first arrival the only one that
+            # counts; duplicates fall through to the "unmatched" log. The
+            # per-(phase,size) grid was already pop-keyed and unaffected.
+            if t0 is not None:
+                self._probe_echo_rx += 1
+            _bin = self._probe_bins.pop(seq, None)
+            if _bin is not None:
+                st = self._probe_stats.setdefault(_bin, [0, 0])
+                st[1] += 1
+            if t0 is not None:
+                rtt_ms = (time.monotonic() - t0) * 1000.0
+                self._probe_rtts.append(rtt_ms)
+                LOG.info("PROBE ECHO seq=%d rtt=%.0f ms (echo#%d, delivered "
+                         "%d/%d)", seq, rtt_ms, self._probe_echo_rx,
+                         self._probe_echo_rx, self._probe_tx)
+            else:
+                LOG.info("PROBE ECHO seq=%d (unmatched; echo#%d)", seq,
+                         self._probe_echo_rx)
         elif opcode == CMD_OP_ENCODE_MODE_ACK:
             # RS-1.5: explicit ack — stop retrying ENCODE_MODE, but ONLY
             # if the ack matches the mode we are retrying. Before
@@ -984,6 +1112,32 @@ class ImageRxDaemon:
                 # delta minus the median fragment's ToA IS the per-fragment
                 # dead time we are hunting; deltas >5 s are stream pauses,
                 # not gaps, and are discarded.
+                # 2026-07-29 RS-11.1: parse the fragment header so each gap can
+                # be ATTRIBUTED. Without this the air_gap histogram cannot tell
+                # a train boundary from a lost fragment — one loss makes the
+                # next delta ~2x ToA (~200 ms), landing in the same bucket as a
+                # real boundary. At the measured ~3.4% loss that is ~60
+                # contaminating samples per run, so every boundary size derived
+                # from the old histogram was an upper bound, not a measurement.
+                #
+                # Layout per image_pipeline/reassemble.py: raw[0]=magic,
+                # [1]=frag_seq, [2]=frag_idx, [3]=total_minus1. Parity frames
+                # (magic 0xFC) reuse [2]/[3] as group_start/group_len, so they
+                # are deliberately excluded rather than misread as indices.
+                frag_seq = frag_idx = frag_total = None
+                if len(data) >= 4 and data[0] in (
+                        FRAGMENT_MAGIC, FRAGMENT_MAGIC_V2):
+                    frag_seq = data[1]
+                    frag_idx = data[2]
+                    frag_total = data[3] + 1
+                    if frag_idx >= frag_total:
+                        # Same guard the reassembler applies; don't let a
+                        # corrupt header poison the loss statistics.
+                        frag_seq = frag_idx = frag_total = None
+
+                if frag_idx is not None:
+                    self._note_frag_arrival(frag_seq, frag_idx, frag_total)
+
                 ts = parsed.get("timestamp_us")
                 if ts is not None:
                     prev = getattr(self, "_gap_prev_ts", None)
@@ -993,7 +1147,13 @@ class ImageRxDaemon:
                         if 0 < d < 5_000_000:
                             if not hasattr(self, "_gap_samples"):
                                 self._gap_samples = []
-                            self._gap_samples.append((d, len(data)))
+                            # gap_class is what makes the histogram readable:
+                            # "seq" = contiguous within one frame (the true
+                            # inter-fragment dead air), "boundary" = frame
+                            # changed, "post_loss" = index jumped, so this gap
+                            # spans one or more fragments that never arrived.
+                            self._gap_samples.append(
+                                (d, len(data), self._last_gap_class))
 
                 saw_rx = True
                 with self._lock:
@@ -1061,10 +1221,21 @@ class ImageRxDaemon:
                             self._last_rx_codec = getattr(done, "codec", 0)
                             self._last_rx_frame_kind = getattr(
                                 done, "frame_kind", 0)
-                        # RS-1.5: a keyframe arriving IS the req_keyframe ack.
+                        # RS-1.5: a keyframe arriving clears a pending
+                        # req_keyframe. 2026-07-27 CAUTION: this is a
+                        # CONTAMINATED delivery signal — the synth/encoder
+                        # emits keyframes on its own cadence, so a keyframe
+                        # arriving does NOT prove our request was delivered
+                        # (this produced the retracted 171/1 result). The
+                        # clear is logged as UNVERIFIED, and _clear_pending
+                        # says so, so no future analysis mistakes it for a
+                        # confirmed round trip. Use CMD_OP_PROBE for honest
+                        # delivery measurement.
                         if getattr(done, "frame_kind", 0) == 1:
-                            self._clear_pending(CMD_OP_REQ_KEYFRAME,
-                                                "keyframe received")
+                            self._clear_pending(
+                                CMD_OP_REQ_KEYFRAME,
+                                "keyframe received (UNVERIFIED delivery — "
+                                "keyframe may be encoder-initiated)")
                         self._publish(payload_out, frame_id)
 
             # RS-1.x window-aligned command TX (2026-07-25): a fragment in
@@ -1104,9 +1275,181 @@ class ImageRxDaemon:
                         self._send_command_frame(link, body, copies=1)
                         self._last_pump_t = now_pump
 
+            # 2026-07-27 RS-0.12 reactive-fire: a fragment completed the tile
+            # of the last train, so the tractor's RXCONT just re-armed. Fire
+            # a no-op PROBE now (optionally after a commanded phase delay) —
+            # this is the honest measurement of in-stream base->tractor
+            # delivery, using the exact TX path a drive command would.
+            if self._reactive_fire and frame_done:
+                self._maybe_fire_probe(link)
+
             self._maybe_switch_profile(link)
 
         LOG.info("RX worker exit")
+
+    # 2026-07-29 RS-11.1 loss attribution. Set by _note_frag_arrival() and
+    # read at the gap-sample site; "seq" until the first fragment classifies.
+    _last_gap_class = "seq"
+
+    def _note_frag_arrival(self, frag_seq: int, frag_idx: int,
+                           frag_total: int) -> None:
+        """Classify this fragment's arrival against the previous one.
+
+        Answers two questions the old instrumentation could not:
+
+        1. Is an oversized inter-arrival gap a train boundary or a lost
+           fragment? Both look identical in a duration histogram.
+        2. Does the ~3.5% loss floor cluster at fragment index 0 — the
+           RXCONT re-arm-gap hypothesis behind firmware item F4 — or is it
+           spread uniformly? F4 is gated on this answer (TODO RS-10.1);
+           spending a firmware cycle on preamble length against an assumed
+           mechanism is exactly what this exists to prevent.
+
+        LoRa delivery here is in-order within a frame, so an index that skips
+        forward means the intervening fragments never arrived. Fragments that
+        arrive out of order would be misread as loss-then-duplicate; the
+        reassembler's own dedup is the authority on what was really lost, so
+        treat these counters as a *distribution* hint, not a delivery total.
+        """
+        prev = getattr(self, "_frag_prev", None)
+        self._frag_prev = (frag_seq, frag_idx, frag_total)
+
+        if not hasattr(self, "_lost_idx_hist"):
+            self._lost_idx_hist: "dict[int, int]" = {}
+            self._frag_idx_seen: "dict[int, int]" = {}
+            self._gap_class_us: "dict[str, list[int]]" = {
+                "seq": [], "boundary": [], "post_loss": [], "reordered": []}
+            self._frames_observed = 0
+            # Provisional loss bookings, retracted if the fragment shows up
+            # late. Keyed (frag_seq, frag_idx) so a rolled seq cannot collide.
+            self._pending_lost: "set[tuple[int, int]]" = set()
+            self._reordered = 0
+
+        self._frag_idx_seen[frag_idx] = self._frag_idx_seen.get(frag_idx, 0) + 1
+
+        if prev is None:
+            self._last_gap_class = "seq"
+            return
+
+        prev_seq, prev_idx, prev_total = prev
+        if frag_seq != prev_seq:
+            # New frame. The gap that just elapsed spans the train boundary,
+            # which is where the reverse-slot listening window lives.
+            self._frames_observed += 1
+            # The OUTGOING frame's tail: if we never saw its last index, those
+            # fragments were lost. Symmetric to the leading-fragment case
+            # below, and equally invisible to naive index arithmetic — a lost
+            # final fragment looks exactly like a clean frame transition.
+            if prev_total and prev_idx < prev_total - 1:
+                for missing in range(prev_idx + 1, prev_total):
+                    self._lost_idx_hist[missing] = (
+                        self._lost_idx_hist.get(missing, 0) + 1)
+            if frag_idx > 0:
+                # The new frame's FIRST fragments never arrived. This case is
+                # the whole reason F4 exists — if the receiver is still
+                # re-arming RXCONT when a train starts, index 0 is exactly what
+                # it misses. An earlier version of this classifier returned
+                # here on any seq change and so was structurally blind to the
+                # one measurement it was built to make.
+                for missing in range(0, frag_idx):
+                    self._lost_idx_hist[missing] = (
+                        self._lost_idx_hist.get(missing, 0) + 1)
+                self._last_gap_class = "post_loss"
+            else:
+                self._last_gap_class = "boundary"
+            return
+
+        # Retract a provisional booking on ANY arrival of that index, not only
+        # an out-of-order-looking one. Once a late fragment lands, `prev_idx`
+        # moves with it, so the NEXT late fragment presents as a normal +1 step
+        # — the first version of this check only fired on step <= 0 and so
+        # retracted 9 but left 10 booked. Caught by
+        # test_late_arrival_retracts_the_provisional_loss.
+        was_pending = (frag_seq, frag_idx) in self._pending_lost
+        if was_pending:
+            self._pending_lost.discard((frag_seq, frag_idx))
+            cur = self._lost_idx_hist.get(frag_idx, 0)
+            if cur > 0:
+                self._lost_idx_hist[frag_idx] = cur - 1
+                if self._lost_idx_hist[frag_idx] == 0:
+                    del self._lost_idx_hist[frag_idx]
+            self._reordered += 1
+
+        step = frag_idx - prev_idx
+        if was_pending:
+            # A late arrival's gap is unrepresentative of anything; never let it
+            # be averaged into the clean inter-fragment figure.
+            self._last_gap_class = "reordered"
+        elif step == 1:
+            self._last_gap_class = "seq"
+        elif step > 1:
+            # Indices (prev_idx, frag_idx) exclusive have not arrived YET.
+            # Provisional: a later out-of-order arrival retracts it below.
+            #
+            # Book each (seq, idx) AT MOST ONCE. Reordering churn can replay the
+            # same jump — e.g. 9 -> 11 seen twice — and an unconditional
+            # increment then inflates the count while only one booking is ever
+            # retractable. That left index 10 reporting 58% loss in a run whose
+            # true total loss was 2.19%, i.e. more losses at one index than
+            # existed in the entire run.
+            for missing in range(prev_idx + 1, frag_idx):
+                key_m = (frag_seq, missing)
+                if key_m in self._pending_lost:
+                    continue
+                self._pending_lost.add(key_m)
+                self._lost_idx_hist[missing] = (
+                    self._lost_idx_hist.get(missing, 0) + 1)
+            self._last_gap_class = "post_loss"
+        else:
+            # step <= 0 within one frame: a duplicate, or a fragment arriving
+            # LATE and out of order.
+            #
+            # 2026-07-30: this is not hypothetical. The RS-11.4 sweep produced
+            # a 4-6x over-attribution at 0.4 fps — 170 "losses" against a 2.45%
+            # measured rate — with a deterministic paired signature at indices
+            # 9 and 10 in ~80% of trains. That is the fingerprint of the host
+            # URC queue draining out of order, not of RF loss: 11 and 12 are
+            # seen first, 9 and 10 are provisionally booked as lost, and then
+            # they turn up. Retract the booking rather than reporting a
+            # fabricated loss.
+            # Retraction already handled above; what remains here is a plain
+            # duplicate of an index we had already seen.
+            self._last_gap_class = "reordered"
+
+    def _maybe_fire_probe(self, link: HostLink) -> None:
+        now = time.monotonic()
+        if now - self._last_probe_t < self._probe_min_gap_s:
+            return
+        self._last_probe_t = now
+        # Round-robin the sweep offsets so each phase bin accumulates samples.
+        phase_ms = self._probe_sweep[self._probe_seq % len(self._probe_sweep)]
+        if phase_ms > 0:
+            time.sleep(phase_ms / 1000.0)
+        self._probe_seq = (self._probe_seq + 1) & 0xFFFFFFFF
+        seq = self._probe_seq
+        args = seq.to_bytes(4, "little") + (phase_ms & 0xFFFF).to_bytes(2, "little")
+        # Size sweep: pad to the requested TOTAL on-air payload so delivery
+        # can be scored per (phase, size) — the measurement that prices the
+        # ditto frame. 8 B hop hdr + 2 B magic/opcode + len(args) = size.
+        size_b = self._probe_sizes[self._probe_seq % len(self._probe_sizes)]
+        if size_b:
+            pad = max(0, size_b - 10 - len(args))
+            args = args + bytes(pad)
+        self._probe_bins[seq] = (phase_ms, size_b)
+        self._probe_pending[seq] = time.monotonic()
+        # Cap the pending map so a long run does not grow unbounded.
+        if len(self._probe_pending) > 512:
+            for k in sorted(self._probe_pending)[:256]:
+                self._probe_pending.pop(k, None)
+                self._probe_bins.pop(k, None)
+        self._probe_tx += 1
+        # Per-bin attempt tally: [attempts, echoes]
+        st = self._probe_stats.setdefault((phase_ms, size_b), [0, 0])
+        st[0] += 1
+        LOG.info("PROBE TX seq=%d phase_ms=%d size_b=%d (tx#%d)", seq,
+                 phase_ms, size_b or (10 + len(args)), self._probe_tx)
+        self._send_command_frame(
+            link, pack_command_frame(CMD_OP_PROBE, args), copies=1)
 
     def _stats_worker(self, interval_s: float) -> None:
         last = 0.0
@@ -1143,6 +1486,112 @@ class ImageRxDaemon:
                     ls[n // 2],
                     getattr(self, "_cmd_tx_ok", 0),
                     getattr(self, "_cmd_tx_fail", 0))
+                # 2026-07-27 RS-0.12: RAW gap histogram, not just med/p95 —
+                # the distribution is bimodal (intra-fragment ~5 ms vs train
+                # boundary), and med/p95 hide the boundary mode a control
+                # frame must land in. Log fixed-edge buckets in ms.
+                edges = (2, 5, 10, 20, 40, 80, 120, 200, 400, 1000)
+                buckets = [0] * (len(edges) + 1)
+                for d_us in ds:
+                    d_ms = d_us / 1000.0
+                    placed = False
+                    for bi, e in enumerate(edges):
+                        if d_ms < e:
+                            buckets[bi] += 1
+                            placed = True
+                            break
+                    if not placed:
+                        buckets[-1] += 1
+                labels = ["<2", "<5", "<10", "<20", "<40", "<80", "<120",
+                          "<200", "<400", "<1000", ">=1000"]
+                hist = " ".join(f"{lab}:{cnt}" for lab, cnt in
+                                zip(labels, buckets) if cnt)
+                LOG.info("air_gap_hist(ms): %s", hist)
+
+                # 2026-07-29 RS-11.1: the same gaps, split by what actually
+                # caused them. The aggregate histogram above is bimodal and its
+                # upper mode mixes train boundaries with post-loss gaps, so
+                # neither could be sized. Per-class medians separate them.
+                by_class: "dict[str, list[int]]" = {}
+                for smp in samples:
+                    cls = smp[2] if len(smp) > 2 else "seq"
+                    by_class.setdefault(cls, []).append(smp[0])
+                parts = []
+                for cls in ("seq", "boundary", "post_loss"):
+                    vals = sorted(by_class.get(cls, ()))
+                    if not vals:
+                        continue
+                    parts.append(
+                        f"{cls}: n={len(vals)} med={vals[len(vals) // 2] / 1000.0:.1f}ms")
+                if parts:
+                    LOG.info("air_gap_by_class: %s", " | ".join(parts))
+
+            # 2026-07-29 RS-11.1: WHICH fragment indices go missing. This is
+            # the gate on firmware F4 (settable preamble) per TODO RS-10.1: if
+            # loss clusters at index 0 the RXCONT re-arm gap is the mechanism
+            # and a longer preamble targets it; if it is uniform, preamble is
+            # the wrong lever and the firmware cycle should not be spent.
+            lost = getattr(self, "_lost_idx_hist", None)
+            if lost:
+                seen = getattr(self, "_frag_idx_seen", {})
+                total_lost = sum(lost.values())
+                idx0 = lost.get(0, 0)
+                # Normalise: index k only has an opportunity to go missing on
+                # frames that reach k fragments, so compare RATES, not counts.
+                opp0 = seen.get(0, 0) + idx0
+                rest_lost = total_lost - idx0
+                rest_opp = sum(v for k, v in seen.items() if k) + rest_lost
+                r0 = (100.0 * idx0 / opp0) if opp0 else 0.0
+                rr = (100.0 * rest_lost / rest_opp) if rest_opp else 0.0
+                top = " ".join(
+                    f"{k}:{v}" for k, v in
+                    sorted(lost.items(), key=lambda kv: -kv[1])[:8])
+                LOG.info(
+                    "lost_frag_idx: n=%d idx0=%d (%.2f%% of idx0 arrivals) "
+                    "other=%d (%.2f%%) verdict=%s | top %s",
+                    total_lost, idx0, r0, rest_lost, rr,
+                    "CLUSTERED-AT-0" if (opp0 and rest_opp and r0 > 2.0 * rr)
+                    else "not-clustered",
+                    top)
+                if getattr(self, "_reordered", 0):
+                    LOG.info(
+                        "frag_reordered: %d late out-of-order arrivals had a "
+                        "provisional loss retracted (in-order assumption "
+                        "violated — see RS-11.4)", self._reordered)
+                self._lost_idx_hist = {}
+                self._frag_idx_seen = {}
+                self._reordered = 0
+                # Bound the provisional set; anything this old will not be
+                # retracted anyway and must not leak.
+                if len(self._pending_lost) > 4096:
+                    self._pending_lost.clear()
+            # RS-0.12 probe delivery summary (reactive-fire runs only).
+            if self._reactive_fire and self._probe_tx:
+                rtts = sorted(self._probe_rtts)
+                self._probe_rtts = []
+                deliv = (100.0 * self._probe_echo_rx / self._probe_tx)
+                if rtts:
+                    m = len(rtts)
+                    LOG.info("probe: tx=%d echo=%d (%.1f%% delivered) "
+                             "rtt_med=%.0fms rtt_p95=%.0fms",
+                             self._probe_tx, self._probe_echo_rx, deliv,
+                             rtts[m // 2], rtts[min(m - 1, (m * 95) // 100)])
+                else:
+                    LOG.info("probe: tx=%d echo=%d (%.1f%% delivered) "
+                             "no echoes this window", self._probe_tx,
+                             self._probe_echo_rx, deliv)
+                # Per-(phase, size) delivery grid — cumulative, so the last
+                # line of a run is the whole result. THIS is the RS-0.12
+                # deliverable: P(delivery | phase) picks the slot design,
+                # and the size axis prices the ditto frame.
+                if self._probe_stats:
+                    cells = []
+                    for (ph, sz) in sorted(self._probe_stats):
+                        att, ech = self._probe_stats[(ph, sz)]
+                        if att:
+                            cells.append("p%d/s%d:%d/%d(%.0f%%)" % (
+                                ph, sz, ech, att, 100.0 * ech / att))
+                    LOG.info("probe_grid: %s", " ".join(cells))
 
     def _link_stats_worker(self) -> None:
         """Publish a rolling link-speed JSON sample every ~2 s.
@@ -1292,8 +1741,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         "LIFETRAC_L072_BAUD", DEFAULT_BAUD))
     ap.add_argument("--mqtt-host", default=os.environ.get(
         "LIFETRAC_MQTT_HOST", DEFAULT_MQTT_HOST))
-    ap.add_argument("--mqtt-port", type=int, default=int(os.environ.get(
-        "LIFETRAC_MQTT_PORT", str(DEFAULT_MQTT_PORT))))
+    ap.add_argument("--mqtt-port", type=int, default=_env_int(
+        "LIFETRAC_MQTT_PORT", DEFAULT_MQTT_PORT, lo=1, hi=65535))
     ap.add_argument("--reassembler-timeout-ms", type=int, default=int(
         os.environ.get("LIFETRAC_REASSEMBLER_TIMEOUT_MS", "1500")))
     ap.add_argument("--stats-interval-s", type=float, default=10.0)

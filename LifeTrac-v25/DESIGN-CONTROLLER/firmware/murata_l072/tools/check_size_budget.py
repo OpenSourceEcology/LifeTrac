@@ -13,6 +13,25 @@ from typing import Dict, Set, Tuple
 
 DEFINE_RE = re.compile(r"^#define\s+([A-Za-z_][A-Za-z0-9_]*)\s+(.+)$")
 NUM_SUFFIX_RE = re.compile(r"\b(0[xX][0-9A-Fa-f]+|\d+)(?:[uU][lL]?|[lL][uU]?|[uU]|[lL])\b")
+# 2026-07-29: macro VALUES may carry a trailing C comment, which reached
+# ast.parse() verbatim and killed this checker outright:
+#
+#   #define MM_FLASH_SIZE  (192 * 1024)     /* 0x30000 */   (memory_map.h:30)
+#   -> SyntaxError: invalid syntax
+#
+# That define has been in the header since 2026-05-10, so the "L072
+# cross-compile" CI job had been failing on it for months — the size budget it
+# exists to guard was never actually checked. Strip balanced /* */ first, then
+# any unterminated /* or // tail. Safe for C macro arithmetic: `//` is not an
+# operator in C, and `/*` cannot begin a valid sub-expression here.
+BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/")
+COMMENT_TAIL_RE = re.compile(r"(/\*|//).*$")
+
+
+def strip_c_comments(expr: str) -> str:
+    """Remove C comments from a single-line macro value."""
+    expr = BLOCK_COMMENT_RE.sub(" ", expr)
+    return COMMENT_TAIL_RE.sub("", expr).strip()
 SECTION_RE = re.compile(r"^\s*([.A-Za-z0-9_]+)\s+(\d+)\s+(\d+)\s*$")
 
 
@@ -84,7 +103,12 @@ def load_defines(memory_map_path: pathlib.Path) -> Dict[str, str]:
         if not match:
             continue
         name, expr = match.groups()
-        defines[name] = expr.strip()
+        expr = strip_c_comments(expr)
+        if not expr:
+            # Comment-only value (or a bare #define). Not evaluable; skip
+            # rather than store something ast.parse() will choke on later.
+            continue
+        defines[name] = expr
 
     return defines
 

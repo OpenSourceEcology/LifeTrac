@@ -1,0 +1,476 @@
+﻿2026-07-30 10:19:31,537 INFO image_rx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-07-30 10:19:31,540 INFO image_rx_daemon: image_rx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-07-30 10:19:31,542 INFO image_rx_daemon: ctrl MQTT connected (192.168.1.79)
+
+2026-07-30 10:19:31,550 INFO image_rx_daemon: MQTT connected; ready to publish lifetrac/v25/video/tile_delta
+
+2026-07-30 10:19:31,553 INFO image_rx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-07-30 10:19:31,567 INFO image_rx_daemon: accepting first retained lifetrac/v25/control/radio_profile pin after start (restart convergence)
+
+2026-07-30 10:19:31,978 INFO image_rx_daemon: L072 VER warm-up ok (attempt 1)
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+WARN: CFG_SET_REQ(FHSS_FARM_ID) failed: CFG_SET(0x17) REJECTED: status=1 (UNKNOWN_KEY) — do NOT treat as OK
+
+WARN: CFG_SET_REQ(FHSS_NODE_ID) failed: CFG_SET(0x18) REJECTED: status=1 (UNKNOWN_KEY) — do NOT treat as OK
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+
+2026-07-30 10:19:32,422 INFO image_rx_daemon: LBT_ENABLE=0 (command uplink shares the image channel)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-07-30 10:19:32,507 INFO image_rx_daemon: SX1276 RXCONT autowake: opmode 0x81 -> 0x85
+
+2026-07-30 10:19:32,508 INFO image_rx_daemon: RX worker ready; draining RX_FRAME_URC...
+
+2026-07-30 10:19:32,539 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:32,789 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:33,345 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:33,897 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:34,443 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:34,986 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:35,532 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:36,074 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:36,618 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:37,162 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:37,708 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:38,270 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:38,815 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:39,359 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:39,910 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:40,455 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:41,002 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 10:19:41,556 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-07-30 10:19:41,821 WARNING image_rx_daemon: cmd 0x63 GAVE UP after 17 attempts (10.3 s)
+
+2026-07-30 10:19:42,544 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+2026-07-30 10:19:49,784 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:19:52,267 INFO image_rx_daemon: published frame_id=0 2980 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:19:52,549 INFO image_rx_daemon: stats: rx_frames=26 rx_decode_err=0 frames_published=2 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+2026-07-30 10:19:52,551 INFO image_rx_daemon: air_gap: n=25 dt_med=104770us dt_p95=286330us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:19:52,553 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <120:20 <400:2 >=1000:1
+
+2026-07-30 10:19:52,555 INFO image_rx_daemon: air_gap_by_class: seq: n=18 med=104.8ms | boundary: n=3 med=104.8ms | post_loss: n=4 med=285.4ms
+
+2026-07-30 10:19:52,557 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (14.29%) verdict=not-clustered | top 9:2 10:2
+
+2026-07-30 10:19:54,776 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:19:57,240 INFO image_rx_daemon: published frame_id=0 2905 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:19:59,740 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:20:02,560 INFO image_rx_daemon: stats: rx_frames=74 rx_decode_err=0 frames_published=5 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+2026-07-30 10:20:02,562 INFO image_rx_daemon: air_gap: n=48 dt_med=104761us dt_p95=1126259us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:20:02,565 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:38 <400:5 >=1000:4
+
+2026-07-30 10:20:02,567 INFO image_rx_daemon: air_gap_by_class: seq: n=31 med=104.8ms | boundary: n=8 med=1125.2ms | post_loss: n=9 med=209.6ms
+
+2026-07-30 10:20:02,568 INFO image_rx_daemon: lost_frag_idx: n=9 idx0=0 (0.00% of idx0 arrivals) other=9 (16.98%) verdict=not-clustered | top 9:4 10:4 3:1
+
+2026-07-30 10:20:07,263 INFO image_rx_daemon: published frame_id=0 2986 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:20:12,276 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:20:12,570 INFO image_rx_daemon: stats: rx_frames=124 rx_decode_err=0 frames_published=7 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-07-30 10:20:12,572 INFO image_rx_daemon: air_gap: n=50 dt_med=104790us dt_p95=1124120us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:20:12,575 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <120:37 <400:5 >=1000:4
+
+2026-07-30 10:20:12,578 INFO image_rx_daemon: air_gap_by_class: seq: n=36 med=104.8ms | boundary: n=7 med=1122.8ms | post_loss: n=7 med=209.5ms
+
+2026-07-30 10:20:12,579 INFO image_rx_daemon: lost_frag_idx: n=8 idx0=0 (0.00% of idx0 arrivals) other=8 (14.81%) verdict=not-clustered | top 9:3 10:3 2:1 8:1
+
+2026-07-30 10:20:14,740 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:20:17,254 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:20:19,744 INFO image_rx_daemon: published frame_id=0 2919 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:20:22,583 INFO image_rx_daemon: stats: rx_frames=173 rx_decode_err=0 frames_published=10 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-07-30 10:20:22,585 INFO image_rx_daemon: air_gap: n=49 dt_med=104767us dt_p95=1136699us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:20:22,588 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <120:39 <400:4 >=1000:4
+
+2026-07-30 10:20:22,590 INFO image_rx_daemon: air_gap_by_class: seq: n=34 med=104.8ms | boundary: n=8 med=1125.1ms | post_loss: n=7 med=286.4ms
+
+2026-07-30 10:20:22,591 INFO image_rx_daemon: lost_frag_idx: n=7 idx0=0 (0.00% of idx0 arrivals) other=7 (13.46%) verdict=not-clustered | top 9:4 10:3
+
+2026-07-30 10:20:27,275 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:20:32,259 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:20:32,594 INFO image_rx_daemon: stats: rx_frames=222 rx_decode_err=0 frames_published=12 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=6 parity_recon=0
+
+2026-07-30 10:20:32,596 INFO image_rx_daemon: air_gap: n=49 dt_med=104768us dt_p95=1138111us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:20:32,599 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <120:38 <200:1 <400:4 >=1000:4
+
+2026-07-30 10:20:32,601 INFO image_rx_daemon: air_gap_by_class: seq: n=39 med=104.8ms | boundary: n=6 med=1138.1ms | post_loss: n=4 med=286.4ms
+
+2026-07-30 10:20:32,603 INFO image_rx_daemon: lost_frag_idx: n=8 idx0=0 (0.00% of idx0 arrivals) other=8 (15.09%) verdict=not-clustered | top 10:3 11:2 9:2 8:1
+
+2026-07-30 10:20:34,770 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:20:42,621 INFO image_rx_daemon: stats: rx_frames=271 rx_decode_err=0 frames_published=13 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=8 parity_recon=0
+
+2026-07-30 10:20:42,623 INFO image_rx_daemon: air_gap: n=49 dt_med=104791us dt_p95=1126353us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:20:42,626 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:1 <120:36 <400:6 >=1000:4
+
+2026-07-30 10:20:42,626 INFO image_rx_daemon: air_gap_by_class: seq: n=34 med=104.8ms | boundary: n=7 med=1122.7ms | post_loss: n=8 med=209.6ms
+
+2026-07-30 10:20:42,627 INFO image_rx_daemon: lost_frag_idx: n=8 idx0=0 (0.00% of idx0 arrivals) other=8 (15.09%) verdict=not-clustered | top 9:3 10:3 4:2
+
+2026-07-30 10:20:49,763 INFO image_rx_daemon: published frame_id=0 2974 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:20:52,234 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:20:52,638 INFO image_rx_daemon: stats: rx_frames=321 rx_decode_err=0 frames_published=15 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=11 parity_recon=0
+
+2026-07-30 10:20:52,639 INFO image_rx_daemon: air_gap: n=50 dt_med=104780us dt_p95=1129483us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:20:52,643 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:1 <120:37 <400:5 >=1000:4
+
+2026-07-30 10:20:52,644 INFO image_rx_daemon: air_gap_by_class: seq: n=33 med=104.8ms | boundary: n=7 med=104.8ms | post_loss: n=10 med=285.3ms
+
+2026-07-30 10:20:52,644 INFO image_rx_daemon: lost_frag_idx: n=11 idx0=1 (25.00% of idx0 arrivals) other=10 (17.54%) verdict=not-clustered | top 9:4 10:4 12:1 0:1 2:1
+
+2026-07-30 10:20:54,777 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:20:57,232 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:20:59,780 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:02,236 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:02,646 INFO image_rx_daemon: stats: rx_frames=371 rx_decode_err=0 frames_published=19 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=11 parity_recon=0
+
+2026-07-30 10:21:02,647 INFO image_rx_daemon: air_gap: n=50 dt_med=104791us dt_p95=1122612us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:21:02,649 INFO image_rx_daemon: air_gap_hist(ms): <80:2 <120:40 <400:4 >=1000:4
+
+2026-07-30 10:21:02,650 INFO image_rx_daemon: air_gap_by_class: seq: n=37 med=104.8ms | boundary: n=7 med=1115.6ms | post_loss: n=6 med=285.4ms
+
+2026-07-30 10:21:02,651 INFO image_rx_daemon: lost_frag_idx: n=6 idx0=0 (0.00% of idx0 arrivals) other=6 (11.54%) verdict=not-clustered | top 9:3 10:3
+
+2026-07-30 10:21:09,764 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:12,655 INFO image_rx_daemon: stats: rx_frames=417 rx_decode_err=0 frames_published=20 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=0
+
+2026-07-30 10:21:12,657 INFO image_rx_daemon: air_gap: n=46 dt_med=104815us dt_p95=1164228us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:21:12,660 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:35 <400:6 >=1000:4
+
+2026-07-30 10:21:12,661 INFO image_rx_daemon: air_gap_by_class: seq: n=34 med=104.8ms | boundary: n=6 med=1164.2ms | post_loss: n=6 med=285.6ms
+
+2026-07-30 10:21:12,662 INFO image_rx_daemon: lost_frag_idx: n=7 idx0=0 (0.00% of idx0 arrivals) other=7 (14.29%) verdict=not-clustered | top 10:3 9:3 8:1
+
+2026-07-30 10:21:14,784 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:17,232 INFO image_rx_daemon: published frame_id=0 2905 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:22,232 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:22,665 INFO image_rx_daemon: stats: rx_frames=465 rx_decode_err=0 frames_published=23 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=15 parity_recon=0
+
+2026-07-30 10:21:22,667 INFO image_rx_daemon: air_gap: n=48 dt_med=104793us dt_p95=1163997us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:21:22,670 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:39 <400:4 >=1000:4
+
+2026-07-30 10:21:22,672 INFO image_rx_daemon: air_gap_by_class: seq: n=32 med=104.8ms | boundary: n=8 med=1125.2ms | post_loss: n=8 med=286.4ms
+
+2026-07-30 10:21:22,674 INFO image_rx_daemon: lost_frag_idx: n=10 idx0=0 (0.00% of idx0 arrivals) other=10 (18.52%) verdict=not-clustered | top 9:4 10:4 12:1 8:1
+
+2026-07-30 10:21:24,767 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:29,740 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:32,273 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:32,677 INFO image_rx_daemon: stats: rx_frames=516 rx_decode_err=0 frames_published=26 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=16 parity_recon=0
+
+2026-07-30 10:21:32,679 INFO image_rx_daemon: air_gap: n=51 dt_med=104781us dt_p95=1129012us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:21:32,682 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <120:38 <400:5 >=1000:4
+
+2026-07-30 10:21:32,684 INFO image_rx_daemon: air_gap_by_class: seq: n=37 med=104.8ms | boundary: n=7 med=1122.9ms | post_loss: n=7 med=209.6ms
+
+2026-07-30 10:21:32,684 INFO image_rx_daemon: lost_frag_idx: n=7 idx0=0 (0.00% of idx0 arrivals) other=7 (12.96%) verdict=not-clustered | top 9:3 10:3 2:1
+
+2026-07-30 10:21:34,732 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:37,247 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:39,740 INFO image_rx_daemon: published frame_id=0 2919 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:42,220 INFO image_rx_daemon: published frame_id=0 2901 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:42,688 INFO image_rx_daemon: stats: rx_frames=566 rx_decode_err=0 frames_published=30 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=16 parity_recon=0
+
+2026-07-30 10:21:42,691 INFO image_rx_daemon: air_gap: n=50 dt_med=104772us dt_p95=1130136us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:21:42,692 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <120:40 <400:4 >=1000:4
+
+2026-07-30 10:21:42,693 INFO image_rx_daemon: air_gap_by_class: seq: n=40 med=104.8ms | boundary: n=6 med=1130.1ms | post_loss: n=4 med=285.4ms
+
+2026-07-30 10:21:42,694 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (8.00%) verdict=not-clustered | top 9:2 10:2
+
+2026-07-30 10:21:44,738 INFO image_rx_daemon: published frame_id=0 2949 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:49,723 INFO image_rx_daemon: published frame_id=0 2892 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:52,239 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:52,697 INFO image_rx_daemon: stats: rx_frames=616 rx_decode_err=0 frames_published=33 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=17 parity_recon=0
+
+2026-07-30 10:21:52,699 INFO image_rx_daemon: air_gap: n=50 dt_med=104806us dt_p95=1138590us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:21:52,702 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <120:39 <200:1 <400:4 >=1000:4
+
+2026-07-30 10:21:52,703 INFO image_rx_daemon: air_gap_by_class: seq: n=34 med=104.8ms | boundary: n=8 med=1125.5ms | post_loss: n=8 med=285.5ms
+
+2026-07-30 10:21:52,703 INFO image_rx_daemon: lost_frag_idx: n=9 idx0=0 (0.00% of idx0 arrivals) other=9 (16.36%) verdict=not-clustered | top 9:4 10:4 11:1
+
+2026-07-30 10:21:54,761 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:57,246 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:21:59,779 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:02,711 INFO image_rx_daemon: stats: rx_frames=667 rx_decode_err=0 frames_published=36 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=17 parity_recon=0
+
+2026-07-30 10:22:02,713 INFO image_rx_daemon: air_gap: n=51 dt_med=104812us dt_p95=1127680us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:22:02,716 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:2 <120:38 <400:5 >=1000:4
+
+2026-07-30 10:22:02,719 INFO image_rx_daemon: air_gap_by_class: seq: n=37 med=104.8ms | boundary: n=7 med=1114.4ms | post_loss: n=7 med=209.6ms
+
+2026-07-30 10:22:02,720 INFO image_rx_daemon: lost_frag_idx: n=7 idx0=0 (0.00% of idx0 arrivals) other=7 (12.96%) verdict=not-clustered | top 9:3 10:3 4:1
+
+2026-07-30 10:22:04,755 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:07,272 INFO image_rx_daemon: published frame_id=0 3000 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:12,242 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:12,739 INFO image_rx_daemon: stats: rx_frames=718 rx_decode_err=0 frames_published=39 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=19 parity_recon=0
+
+2026-07-30 10:22:12,741 INFO image_rx_daemon: air_gap: n=51 dt_med=104823us dt_p95=1121612us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:22:12,744 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:1 <120:38 <400:5 >=1000:4
+
+2026-07-30 10:22:12,744 INFO image_rx_daemon: air_gap_by_class: seq: n=37 med=104.8ms | boundary: n=7 med=1120.0ms | post_loss: n=7 med=209.6ms
+
+2026-07-30 10:22:12,745 INFO image_rx_daemon: lost_frag_idx: n=7 idx0=0 (0.00% of idx0 arrivals) other=7 (12.96%) verdict=not-clustered | top 9:3 10:3 1:1
+
+2026-07-30 10:22:14,766 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:17,230 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:19,768 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:22,237 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:22,749 INFO image_rx_daemon: stats: rx_frames=768 rx_decode_err=0 frames_published=43 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=19 parity_recon=0
+
+2026-07-30 10:22:22,753 INFO image_rx_daemon: air_gap: n=50 dt_med=104823us dt_p95=1123423us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:22:22,757 INFO image_rx_daemon: air_gap_hist(ms): <80:2 <120:40 <400:4 >=1000:4
+
+2026-07-30 10:22:22,758 INFO image_rx_daemon: air_gap_by_class: seq: n=34 med=104.8ms | boundary: n=8 med=1123.3ms | post_loss: n=8 med=286.4ms
+
+2026-07-30 10:22:22,759 INFO image_rx_daemon: lost_frag_idx: n=8 idx0=0 (0.00% of idx0 arrivals) other=8 (14.81%) verdict=not-clustered | top 9:4 10:4
+
+2026-07-30 10:22:24,724 INFO image_rx_daemon: published frame_id=0 2903 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:27,232 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:32,272 INFO image_rx_daemon: published frame_id=0 2980 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:32,762 INFO image_rx_daemon: stats: rx_frames=817 rx_decode_err=0 frames_published=46 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=20 parity_recon=0
+
+2026-07-30 10:22:32,763 INFO image_rx_daemon: air_gap: n=49 dt_med=104806us dt_p95=1164974us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:22:32,765 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <120:39 <400:4 >=1000:4
+
+2026-07-30 10:22:32,766 INFO image_rx_daemon: air_gap_by_class: seq: n=38 med=104.8ms | boundary: n=6 med=1165.0ms | post_loss: n=5 med=104.8ms
+
+2026-07-30 10:22:32,767 INFO image_rx_daemon: lost_frag_idx: n=5 idx0=0 (0.00% of idx0 arrivals) other=5 (10.00%) verdict=not-clustered | top 10:3 9:2
+
+2026-07-30 10:22:34,767 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:39,733 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:42,227 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:42,770 INFO image_rx_daemon: stats: rx_frames=865 rx_decode_err=0 frames_published=49 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=21 parity_recon=0
+
+2026-07-30 10:22:42,772 INFO image_rx_daemon: air_gap: n=48 dt_med=104816us dt_p95=1125745us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:22:42,773 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:38 <400:5 >=1000:4
+
+2026-07-30 10:22:42,774 INFO image_rx_daemon: air_gap_by_class: seq: n=37 med=104.8ms | boundary: n=6 med=1125.7ms | post_loss: n=5 med=205.7ms
+
+2026-07-30 10:22:42,775 INFO image_rx_daemon: lost_frag_idx: n=5 idx0=0 (0.00% of idx0 arrivals) other=5 (10.20%) verdict=not-clustered | top 10:3 9:2
+
+2026-07-30 10:22:49,738 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:52,263 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:52,779 INFO image_rx_daemon: stats: rx_frames=915 rx_decode_err=0 frames_published=51 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=23 parity_recon=0
+
+2026-07-30 10:22:52,780 INFO image_rx_daemon: air_gap: n=50 dt_med=104822us dt_p95=1129502us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:22:52,782 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <120:36 <400:6 >=1000:4
+
+2026-07-30 10:22:52,783 INFO image_rx_daemon: air_gap_by_class: seq: n=32 med=104.8ms | boundary: n=8 med=1125.8ms | post_loss: n=10 med=209.7ms
+
+2026-07-30 10:22:52,784 INFO image_rx_daemon: lost_frag_idx: n=10 idx0=0 (0.00% of idx0 arrivals) other=10 (17.86%) verdict=not-clustered | top 9:4 10:4 7:1 6:1
+
+2026-07-30 10:22:54,735 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:57,234 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:22:59,736 INFO image_rx_daemon: published frame_id=0 2919 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:23:02,224 INFO image_rx_daemon: published frame_id=0 2901 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:23:02,788 INFO image_rx_daemon: stats: rx_frames=965 rx_decode_err=0 frames_published=55 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=23 parity_recon=0
+
+2026-07-30 10:23:02,791 INFO image_rx_daemon: air_gap: n=50 dt_med=104835us dt_p95=1137465us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:23:02,793 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <120:40 <400:4 >=1000:4
+
+2026-07-30 10:23:02,794 INFO image_rx_daemon: air_gap_by_class: seq: n=34 med=104.8ms | boundary: n=8 med=1125.7ms | post_loss: n=8 med=286.5ms
+
+2026-07-30 10:23:02,794 INFO image_rx_daemon: lost_frag_idx: n=8 idx0=0 (0.00% of idx0 arrivals) other=8 (14.81%) verdict=not-clustered | top 9:4 10:4
+
+2026-07-30 10:23:04,732 INFO image_rx_daemon: published frame_id=0 2949 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:23:07,260 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:23:09,721 INFO image_rx_daemon: published frame_id=0 2892 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:23:12,798 INFO image_rx_daemon: stats: rx_frames=1015 rx_decode_err=0 frames_published=58 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=23 parity_recon=0
+
+2026-07-30 10:23:12,801 INFO image_rx_daemon: air_gap: n=50 dt_med=104830us dt_p95=1139684us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:23:12,803 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <120:39 <200:1 <400:4 >=1000:4
+
+2026-07-30 10:23:12,804 INFO image_rx_daemon: air_gap_by_class: seq: n=40 med=104.8ms | boundary: n=6 med=1139.7ms | post_loss: n=4 med=285.5ms
+
+2026-07-30 10:23:12,805 INFO image_rx_daemon: lost_frag_idx: n=5 idx0=0 (0.00% of idx0 arrivals) other=5 (9.80%) verdict=not-clustered | top 9:2 10:2 11:1
+
+2026-07-30 10:23:14,767 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:23:19,751 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:23:22,263 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:23:22,816 INFO image_rx_daemon: stats: rx_frames=1066 rx_decode_err=0 frames_published=61 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=25 parity_recon=0
+
+2026-07-30 10:23:22,818 INFO image_rx_daemon: air_gap: n=51 dt_med=104809us dt_p95=1122249us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:23:22,819 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:2 <120:38 <400:5 >=1000:4
+
+2026-07-30 10:23:22,820 INFO image_rx_daemon: air_gap_by_class: seq: n=37 med=104.8ms | boundary: n=7 med=1122.0ms | post_loss: n=7 med=209.6ms
+
+2026-07-30 10:23:22,821 INFO image_rx_daemon: lost_frag_idx: n=7 idx0=0 (0.00% of idx0 arrivals) other=7 (12.96%) verdict=not-clustered | top 9:3 10:3 5:1
+
+2026-07-30 10:23:24,743 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:23:29,747 INFO image_rx_daemon: published frame_id=0 2974 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:23:32,228 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-07-30 10:23:32,825 INFO image_rx_daemon: stats: rx_frames=1116 rx_decode_err=0 frames_published=64 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=26 parity_recon=0
+
+2026-07-30 10:23:32,827 INFO image_rx_daemon: air_gap: n=50 dt_med=104834us dt_p95=1122769us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 10:23:32,830 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:1 <120:36 <400:6 >=1000:4
+
+2026-07-30 10:23:32,831 INFO image_rx_daemon: air_gap_by_class: seq: n=32 med=104.8ms | boundary: n=8 med=1120.5ms | post_loss: n=10 med=210.6ms
+
+2026-07-30 10:23:32,832 INFO image_rx_daemon: lost_frag_idx: n=10 idx0=0 (0.00% of idx0 arrivals) other=10 (17.86%) verdict=not-clustered | top 9:4 10:4 1:1 3:1
+

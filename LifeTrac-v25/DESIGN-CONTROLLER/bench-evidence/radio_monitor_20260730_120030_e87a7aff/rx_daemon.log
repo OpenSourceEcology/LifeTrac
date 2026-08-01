@@ -1,0 +1,348 @@
+﻿2026-07-30 16:56:18,299 INFO image_rx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-07-30 16:56:18,302 INFO image_rx_daemon: image_rx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-07-30 16:56:18,306 INFO image_rx_daemon: ctrl MQTT connected (192.168.1.79)
+
+2026-07-30 16:56:18,308 INFO image_rx_daemon: MQTT connected; ready to publish lifetrac/v25/video/tile_delta
+
+2026-07-30 16:56:18,316 INFO image_rx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-07-30 16:56:18,330 INFO image_rx_daemon: accepting first retained lifetrac/v25/control/radio_profile pin after start (restart convergence)
+
+2026-07-30 16:56:18,742 INFO image_rx_daemon: L072 VER warm-up ok (attempt 1)
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+WARN: CFG_SET_REQ(FHSS_FARM_ID) failed: CFG_SET(0x17) REJECTED: status=1 (UNKNOWN_KEY) — do NOT treat as OK
+
+WARN: CFG_SET_REQ(FHSS_NODE_ID) failed: CFG_SET(0x18) REJECTED: status=1 (UNKNOWN_KEY) — do NOT treat as OK
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+
+2026-07-30 16:56:19,185 INFO image_rx_daemon: LBT_ENABLE=0 (command uplink shares the image channel)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-07-30 16:56:19,268 INFO image_rx_daemon: SX1276 RXCONT autowake: opmode 0x81 -> 0x85
+
+2026-07-30 16:56:19,268 INFO image_rx_daemon: RX worker ready; draining RX_FRAME_URC...
+
+2026-07-30 16:56:19,302 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:19,547 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:20,103 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:20,648 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:21,194 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:21,755 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:22,302 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:22,845 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:23,391 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:23,937 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:24,480 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:25,043 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:25,594 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:26,139 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:26,683 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:27,228 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:27,773 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-07-30 16:56:28,323 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-07-30 16:56:28,587 WARNING image_rx_daemon: cmd 0x63 GAVE UP after 17 attempts (10.2 s)
+
+2026-07-30 16:56:29,306 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+2026-07-30 16:56:39,309 INFO image_rx_daemon: stats: rx_frames=20 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=1 parity_recon=0
+
+2026-07-30 16:56:39,311 INFO image_rx_daemon: air_gap: n=19 dt_med=107664us dt_p95=1130731us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:56:39,313 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:11 <400:6 >=1000:1
+
+2026-07-30 16:56:39,315 INFO image_rx_daemon: air_gap_by_class: seq: n=14 med=107.6ms | boundary: n=1 med=1130.7ms | post_loss: n=4 med=260.5ms
+
+2026-07-30 16:56:39,316 INFO image_rx_daemon: lost_frag_idx: n=6 idx0=0 (0.00% of idx0 arrivals) other=6 (25.00%) verdict=not-clustered | top 1:2 9:2 8:1 12:1
+
+2026-07-30 16:56:49,319 INFO image_rx_daemon: stats: rx_frames=60 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=5 parity_recon=0
+
+2026-07-30 16:56:49,320 INFO image_rx_daemon: air_gap: n=40 dt_med=107686us dt_p95=1158077us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:56:49,323 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:22 <400:13 >=1000:4
+
+2026-07-30 16:56:49,326 INFO image_rx_daemon: air_gap_by_class: seq: n=27 med=107.6ms | boundary: n=4 med=1158.1ms | post_loss: n=9 med=218.4ms
+
+2026-07-30 16:56:49,327 INFO image_rx_daemon: lost_frag_idx: n=9 idx0=0 (0.00% of idx0 arrivals) other=9 (20.00%) verdict=not-clustered | top 1:4 9:4 5:1
+
+2026-07-30 16:56:59,331 INFO image_rx_daemon: stats: rx_frames=104 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=9 parity_recon=0
+
+2026-07-30 16:56:59,331 INFO image_rx_daemon: air_gap: n=44 dt_med=107662us dt_p95=1122513us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:56:59,332 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <120:24 <400:12 >=1000:4
+
+2026-07-30 16:56:59,332 INFO image_rx_daemon: air_gap_by_class: seq: n=32 med=107.6ms | boundary: n=4 med=1137.4ms | post_loss: n=8 med=259.8ms
+
+2026-07-30 16:56:59,333 INFO image_rx_daemon: lost_frag_idx: n=8 idx0=0 (0.00% of idx0 arrivals) other=8 (16.67%) verdict=not-clustered | top 1:4 9:4
+
+2026-07-30 16:57:09,347 INFO image_rx_daemon: stats: rx_frames=143 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=13 parity_recon=0
+
+2026-07-30 16:57:09,349 INFO image_rx_daemon: air_gap: n=39 dt_med=107804us dt_p95=1143141us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:57:09,351 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <120:20 <400:13 >=1000:4
+
+2026-07-30 16:57:09,352 INFO image_rx_daemon: air_gap_by_class: seq: n=26 med=107.6ms | boundary: n=4 med=1143.1ms | post_loss: n=9 med=217.7ms
+
+2026-07-30 16:57:09,353 INFO image_rx_daemon: lost_frag_idx: n=11 idx0=0 (0.00% of idx0 arrivals) other=11 (23.91%) verdict=not-clustered | top 1:4 9:4 8:2 5:1
+
+2026-07-30 16:57:19,358 INFO image_rx_daemon: stats: rx_frames=182 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=17 parity_recon=0
+
+2026-07-30 16:57:19,359 INFO image_rx_daemon: air_gap: n=39 dt_med=107691us dt_p95=1166678us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:57:19,362 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <120:19 <400:14 >=1000:4
+
+2026-07-30 16:57:19,364 INFO image_rx_daemon: air_gap_by_class: seq: n=25 med=107.6ms | boundary: n=4 med=1166.7ms | post_loss: n=10 med=259.8ms
+
+2026-07-30 16:57:19,366 INFO image_rx_daemon: lost_frag_idx: n=12 idx0=0 (0.00% of idx0 arrivals) other=12 (25.53%) verdict=not-clustered | top 1:4 9:4 2:1 3:1 12:1 4:1
+
+2026-07-30 16:57:29,369 INFO image_rx_daemon: stats: rx_frames=224 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=21 parity_recon=0
+
+2026-07-30 16:57:29,370 INFO image_rx_daemon: air_gap: n=42 dt_med=107662us dt_p95=1121555us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:57:29,373 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:2 <120:21 <400:13 >=1000:4
+
+2026-07-30 16:57:29,375 INFO image_rx_daemon: air_gap_by_class: seq: n=29 med=107.6ms | boundary: n=4 med=1127.8ms | post_loss: n=9 med=217.6ms
+
+2026-07-30 16:57:29,376 INFO image_rx_daemon: lost_frag_idx: n=10 idx0=0 (0.00% of idx0 arrivals) other=10 (20.83%) verdict=not-clustered | top 1:4 9:4 5:1 8:1
+
+2026-07-30 16:57:39,382 INFO image_rx_daemon: stats: rx_frames=264 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=25 parity_recon=0
+
+2026-07-30 16:57:39,384 INFO image_rx_daemon: air_gap: n=40 dt_med=107776us dt_p95=1122685us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:57:39,386 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <80:1 <120:18 <400:15 >=1000:4
+
+2026-07-30 16:57:39,387 INFO image_rx_daemon: air_gap_by_class: seq: n=24 med=107.6ms | boundary: n=4 med=1122.7ms | post_loss: n=12 med=217.6ms
+
+2026-07-30 16:57:39,388 INFO image_rx_daemon: lost_frag_idx: n=12 idx0=0 (0.00% of idx0 arrivals) other=12 (25.00%) verdict=not-clustered | top 1:4 9:4 7:2 3:1 11:1
+
+2026-07-30 16:57:49,392 INFO image_rx_daemon: stats: rx_frames=305 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=29 parity_recon=0
+
+2026-07-30 16:57:49,393 INFO image_rx_daemon: air_gap: n=41 dt_med=107677us dt_p95=1116135us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:57:49,393 INFO image_rx_daemon: air_gap_hist(ms): <80:2 <120:23 <400:12 >=1000:4
+
+2026-07-30 16:57:49,394 INFO image_rx_daemon: air_gap_by_class: seq: n=29 med=107.5ms | boundary: n=4 med=1142.0ms | post_loss: n=8 med=259.6ms
+
+2026-07-30 16:57:49,394 INFO image_rx_daemon: lost_frag_idx: n=9 idx0=0 (0.00% of idx0 arrivals) other=9 (19.57%) verdict=not-clustered | top 1:4 9:4 8:1
+
+2026-07-30 16:57:59,397 INFO image_rx_daemon: stats: rx_frames=345 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=33 parity_recon=0
+
+2026-07-30 16:57:59,399 INFO image_rx_daemon: air_gap: n=40 dt_med=107767us dt_p95=1163652us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:57:59,402 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:1 <120:20 <400:14 >=1000:4
+
+2026-07-30 16:57:59,404 INFO image_rx_daemon: air_gap_by_class: seq: n=26 med=107.6ms | boundary: n=4 med=1163.7ms | post_loss: n=10 med=218.5ms
+
+2026-07-30 16:57:59,405 INFO image_rx_daemon: lost_frag_idx: n=10 idx0=0 (0.00% of idx0 arrivals) other=10 (21.74%) verdict=not-clustered | top 1:4 9:4 3:1 6:1
+
+2026-07-30 16:58:09,410 INFO image_rx_daemon: stats: rx_frames=382 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=37 parity_recon=0
+
+2026-07-30 16:58:09,411 INFO image_rx_daemon: air_gap: n=37 dt_med=107790us dt_p95=1158527us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:58:09,414 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:19 <400:12 <1000:1 >=1000:4
+
+2026-07-30 16:58:09,416 INFO image_rx_daemon: air_gap_by_class: seq: n=24 med=107.6ms | boundary: n=4 med=1158.5ms | post_loss: n=9 med=259.4ms
+
+2026-07-30 16:58:09,417 INFO image_rx_daemon: lost_frag_idx: n=12 idx0=0 (0.00% of idx0 arrivals) other=12 (26.67%) verdict=not-clustered | top 1:4 9:4 3:2 8:1 2:1
+
+2026-07-30 16:58:19,420 INFO image_rx_daemon: stats: rx_frames=424 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=41 parity_recon=0
+
+2026-07-30 16:58:19,424 INFO image_rx_daemon: air_gap: n=42 dt_med=107644us dt_p95=1122832us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:58:19,430 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <120:21 <400:13 >=1000:4
+
+2026-07-30 16:58:19,432 INFO image_rx_daemon: air_gap_by_class: seq: n=29 med=107.6ms | boundary: n=4 med=1137.0ms | post_loss: n=9 med=259.2ms
+
+2026-07-30 16:58:19,432 INFO image_rx_daemon: lost_frag_idx: n=10 idx0=0 (0.00% of idx0 arrivals) other=10 (20.83%) verdict=not-clustered | top 1:4 9:4 7:1 2:1
+
+2026-07-30 16:58:29,435 INFO image_rx_daemon: stats: rx_frames=465 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=45 parity_recon=0
+
+2026-07-30 16:58:29,437 INFO image_rx_daemon: air_gap: n=41 dt_med=107670us dt_p95=1130468us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:58:29,439 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:24 <400:12 >=1000:4
+
+2026-07-30 16:58:29,440 INFO image_rx_daemon: air_gap_by_class: seq: n=28 med=107.6ms | boundary: n=4 med=1143.5ms | post_loss: n=9 med=232.6ms
+
+2026-07-30 16:58:29,441 INFO image_rx_daemon: lost_frag_idx: n=9 idx0=0 (0.00% of idx0 arrivals) other=9 (19.57%) verdict=not-clustered | top 1:4 9:4 11:1
+
+2026-07-30 16:58:39,459 INFO image_rx_daemon: stats: rx_frames=506 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=49 parity_recon=0
+
+2026-07-30 16:58:39,460 INFO image_rx_daemon: air_gap: n=41 dt_med=107652us dt_p95=1132188us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:58:39,463 INFO image_rx_daemon: air_gap_hist(ms): <40:3 <120:20 <400:14 >=1000:4
+
+2026-07-30 16:58:39,465 INFO image_rx_daemon: air_gap_by_class: seq: n=27 med=107.6ms | boundary: n=4 med=1166.5ms | post_loss: n=10 med=217.7ms
+
+2026-07-30 16:58:39,467 INFO image_rx_daemon: lost_frag_idx: n=10 idx0=0 (0.00% of idx0 arrivals) other=10 (21.28%) verdict=not-clustered | top 1:4 9:4 5:1 3:1
+
+2026-07-30 16:58:49,473 INFO image_rx_daemon: stats: rx_frames=547 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=53 parity_recon=0
+
+2026-07-30 16:58:49,475 INFO image_rx_daemon: air_gap: n=41 dt_med=107724us dt_p95=1121152us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:58:49,476 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:2 <120:19 <400:14 >=1000:4
+
+2026-07-30 16:58:49,477 INFO image_rx_daemon: air_gap_by_class: seq: n=27 med=107.6ms | boundary: n=4 med=1127.8ms | post_loss: n=10 med=259.3ms
+
+2026-07-30 16:58:49,478 INFO image_rx_daemon: lost_frag_idx: n=11 idx0=0 (0.00% of idx0 arrivals) other=11 (22.92%) verdict=not-clustered | top 1:4 9:4 6:2 2:1
+
+2026-07-30 16:58:59,487 INFO image_rx_daemon: stats: rx_frames=590 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=57 parity_recon=0
+
+2026-07-30 16:58:59,489 INFO image_rx_daemon: air_gap: n=43 dt_med=107653us dt_p95=1122969us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:58:59,492 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:1 <120:24 <400:11 >=1000:4
+
+2026-07-30 16:58:59,494 INFO image_rx_daemon: air_gap_by_class: seq: n=32 med=107.6ms | boundary: n=3 med=1123.0ms | post_loss: n=8 med=259.7ms
+
+2026-07-30 16:58:59,495 INFO image_rx_daemon: lost_frag_idx: n=9 idx0=1 (25.00% of idx0 arrivals) other=8 (16.67%) verdict=not-clustered | top 1:4 9:4 0:1
+
+2026-07-30 16:59:09,499 INFO image_rx_daemon: stats: rx_frames=631 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=61 parity_recon=0
+
+2026-07-30 16:59:09,501 INFO image_rx_daemon: air_gap: n=41 dt_med=107685us dt_p95=1116620us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:59:09,503 INFO image_rx_daemon: air_gap_hist(ms): <80:2 <120:22 <400:13 >=1000:4
+
+2026-07-30 16:59:09,503 INFO image_rx_daemon: air_gap_by_class: seq: n=28 med=107.6ms | boundary: n=4 med=1142.4ms | post_loss: n=9 med=217.7ms
+
+2026-07-30 16:59:09,504 INFO image_rx_daemon: lost_frag_idx: n=9 idx0=0 (0.00% of idx0 arrivals) other=9 (19.57%) verdict=not-clustered | top 1:4 9:4 6:1
+
+2026-07-30 16:59:19,507 INFO image_rx_daemon: stats: rx_frames=671 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=65 parity_recon=0
+
+2026-07-30 16:59:19,508 INFO image_rx_daemon: air_gap: n=40 dt_med=107739us dt_p95=1162949us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:59:19,509 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <120:20 <400:14 >=1000:4
+
+2026-07-30 16:59:19,510 INFO image_rx_daemon: air_gap_by_class: seq: n=26 med=107.6ms | boundary: n=4 med=1162.9ms | post_loss: n=10 med=217.8ms
+
+2026-07-30 16:59:19,511 INFO image_rx_daemon: lost_frag_idx: n=10 idx0=0 (0.00% of idx0 arrivals) other=10 (21.74%) verdict=not-clustered | top 1:4 9:4 5:2
+
+2026-07-30 16:59:29,515 INFO image_rx_daemon: stats: rx_frames=711 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=69 parity_recon=0
+
+2026-07-30 16:59:29,519 INFO image_rx_daemon: air_gap: n=40 dt_med=107672us dt_p95=1158151us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:59:29,522 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <120:22 <400:13 >=1000:4
+
+2026-07-30 16:59:29,523 INFO image_rx_daemon: air_gap_by_class: seq: n=27 med=107.6ms | boundary: n=4 med=1158.2ms | post_loss: n=9 med=217.5ms
+
+2026-07-30 16:59:29,523 INFO image_rx_daemon: lost_frag_idx: n=9 idx0=0 (0.00% of idx0 arrivals) other=9 (20.00%) verdict=not-clustered | top 1:4 9:4 3:1
+
+2026-07-30 16:59:39,526 INFO image_rx_daemon: stats: rx_frames=754 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=73 parity_recon=0
+
+2026-07-30 16:59:39,528 INFO image_rx_daemon: air_gap: n=43 dt_med=107650us dt_p95=1122628us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:59:39,531 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <120:22 <400:13 >=1000:4
+
+2026-07-30 16:59:39,533 INFO image_rx_daemon: air_gap_by_class: seq: n=30 med=107.6ms | boundary: n=4 med=1137.3ms | post_loss: n=9 med=217.6ms
+
+2026-07-30 16:59:39,534 INFO image_rx_daemon: lost_frag_idx: n=9 idx0=0 (0.00% of idx0 arrivals) other=9 (18.75%) verdict=not-clustered | top 1:4 9:4 3:1
+
+2026-07-30 16:59:49,537 INFO image_rx_daemon: stats: rx_frames=795 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=77 parity_recon=0
+
+2026-07-30 16:59:49,539 INFO image_rx_daemon: air_gap: n=41 dt_med=107688us dt_p95=1130131us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:59:49,542 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <120:23 <400:12 >=1000:4
+
+2026-07-30 16:59:49,543 INFO image_rx_daemon: air_gap_by_class: seq: n=29 med=107.6ms | boundary: n=4 med=1143.3ms | post_loss: n=8 med=259.4ms
+
+2026-07-30 16:59:49,543 INFO image_rx_daemon: lost_frag_idx: n=9 idx0=0 (0.00% of idx0 arrivals) other=9 (19.57%) verdict=not-clustered | top 1:4 9:4 2:1
+
+2026-07-30 16:59:59,553 INFO image_rx_daemon: stats: rx_frames=838 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=81 parity_recon=0
+
+2026-07-30 16:59:59,554 INFO image_rx_daemon: air_gap: n=43 dt_med=107656us dt_p95=1132190us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 16:59:59,557 INFO image_rx_daemon: air_gap_hist(ms): <40:3 <120:24 <400:12 >=1000:4
+
+2026-07-30 16:59:59,558 INFO image_rx_daemon: air_gap_by_class: seq: n=31 med=107.6ms | boundary: n=4 med=1166.5ms | post_loss: n=8 med=259.5ms
+
+2026-07-30 16:59:59,559 INFO image_rx_daemon: lost_frag_idx: n=8 idx0=0 (0.00% of idx0 arrivals) other=8 (17.02%) verdict=not-clustered | top 1:4 9:4
+
+2026-07-30 17:00:09,561 INFO image_rx_daemon: stats: rx_frames=880 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=85 parity_recon=0
+
+2026-07-30 17:00:09,563 INFO image_rx_daemon: air_gap: n=42 dt_med=107676us dt_p95=1128365us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 17:00:09,565 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:1 <120:24 <400:10 <1000:1 >=1000:4
+
+2026-07-30 17:00:09,566 INFO image_rx_daemon: air_gap_by_class: seq: n=30 med=107.6ms | boundary: n=4 med=1130.8ms | post_loss: n=8 med=258.8ms
+
+2026-07-30 17:00:09,567 INFO image_rx_daemon: lost_frag_idx: n=10 idx0=0 (0.00% of idx0 arrivals) other=10 (20.83%) verdict=not-clustered | top 1:4 9:4 10:1 12:1
+
+2026-07-30 17:00:19,571 INFO image_rx_daemon: stats: rx_frames=922 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=89 parity_recon=0
+
+2026-07-30 17:00:19,572 INFO image_rx_daemon: air_gap: n=42 dt_med=107672us dt_p95=1116659us len_med=247B cmd_tx_ok=17 cmd_tx_fail=0
+
+2026-07-30 17:00:19,575 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:1 <120:21 <400:13 >=1000:4
+
+2026-07-30 17:00:19,577 INFO image_rx_daemon: air_gap_by_class: seq: n=29 med=107.6ms | boundary: n=4 med=1123.0ms | post_loss: n=9 med=217.5ms
+
+2026-07-30 17:00:19,578 INFO image_rx_daemon: lost_frag_idx: n=10 idx0=0 (0.00% of idx0 arrivals) other=10 (20.83%) verdict=not-clustered | top 1:4 9:4 6:1 8:1
+

@@ -191,7 +191,27 @@ host_cfg_profile_reject_t host_cfg_profile_activate(void) {
      * can be requested while the RX daemon has RXCONT armed. */
     (void)sx1276_modes_to_standby();
     if (s_active.profile_id == REG_PROFILE_FCC_15_247_FHSS_50CH_BW250) {
-        (void)sx1276_fhss_init(0ULL, 0ULL, 0U);
+        /*
+         * FHSS hop-sequence identity (2026-07-29). This call used to
+         * pass a hardcoded (0ULL, 0ULL, 0U) at the only production call
+         * site, so the FNV-1a seed — and therefore the Fisher-Yates
+         * 50-channel permutation — was identical on every radio ever
+         * built. Two machines operating nearby hopped in lockstep and
+         * collided on every dwell rather than statistically avoiding
+         * each other, and the sequence was fully predictable.
+         *
+         * farm_id/node_id now arrive with the staged request, collected
+         * from CFG_KEY_FHSS_FARM_ID / CFG_KEY_FHSS_NODE_ID. They stay 0
+         * unless a host provisions them, so the historical permutation
+         * is preserved bit-for-bit by default.
+         *
+         * initial_epoch stays 0 deliberately and has no CFG key: epoch
+         * is a runtime time coordinate that the first FHSS TX overwrites
+         * when it anchors the slot clock, and which is thereafter
+         * re-derived per slot and re-anchored from the peer's air
+         * header. Only farm_id/node_id are stable identity.
+         */
+        (void)sx1276_fhss_init(s_active.farm_id, s_active.node_id, 0U);
         sx1276_set_sf_bw_cr(7U, 250U, 5U);
         sx1276_airtime_set_budget_us(SX1276_AIRTIME_BUDGET_DEFAULT_US);
         /* 2026-07-24 FHSS bring-up: (re-)activation must also revive the
