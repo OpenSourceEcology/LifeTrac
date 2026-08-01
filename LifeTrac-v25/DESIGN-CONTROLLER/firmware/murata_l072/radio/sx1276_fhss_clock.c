@@ -40,3 +40,18 @@ uint32_t sx1276_fhss_clock_in_slot_ms(uint32_t now_ms) {
     const uint32_t elapsed = now_ms - s_clk.anchor_ms;
     return elapsed % SX1276_FHSS_SLOT_MS;
 }
+
+void sx1276_fhss_clock_anchor_rx(uint32_t rx_done_ms, uint32_t toa_us,
+                                 uint8_t slot_offset_ms, uint32_t abs_slot) {
+    /* F7: half-up µs->ms rounding; see the header comment. All u32
+     * arithmetic is wrap-safe by the same idiom the rest of this TU uses. */
+    const uint32_t toa_ms = (toa_us + 500UL) / 1000UL;
+    sx1276_fhss_clock_anchor(rx_done_ms - toa_ms - (uint32_t)slot_offset_ms,
+                             abs_slot);
+}
+
+uint32_t sx1276_fhss_clock_age_ms(uint32_t now_ms) {
+    /* F6: caller gates on clock_valid(); wrap-safe by the same u32
+     * idiom the rest of this TU uses. */
+    return now_ms - s_clk.anchor_ms;
+}

@@ -438,17 +438,17 @@ static void test_snap_to_preserves_quality_history(void) {
  * malformed remote_hop_idx; both paths must NOT mutate scheduler state. */
 static void test_consider_remote_fails_closed(void) {
     sx1276_fhss_reset();
-    CHECK(sx1276_fhss_consider_remote(0U, 0U)
+    CHECK(sx1276_fhss_consider_remote(0U, 0U, SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_REJECTED_NOT_INIT,
           "consider_remote before init must return REJECTED_NOT_INIT");
 
     (void)sx1276_fhss_init(100ULL, 200ULL, 50U);
     const uint32_t epoch_before = sx1276_fhss_current_epoch();
     const uint8_t  slot_before  = sx1276_fhss_current_slot();
-    CHECK(sx1276_fhss_consider_remote(50U, SX1276_FHSS_CHANNEL_COUNT)
+    CHECK(sx1276_fhss_consider_remote(50U, SX1276_FHSS_CHANNEL_COUNT, SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_REJECTED_BAD_HOP,
           "remote_hop_idx == CHANNEL_COUNT must return REJECTED_BAD_HOP");
-    CHECK(sx1276_fhss_consider_remote(50U, 0xFFU)
+    CHECK(sx1276_fhss_consider_remote(50U, 0xFFU, SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_REJECTED_BAD_HOP,
           "remote_hop_idx == 0xFF must return REJECTED_BAD_HOP");
     CHECK(sx1276_fhss_current_epoch() == epoch_before,
@@ -471,7 +471,7 @@ static void test_consider_remote_aligned(void) {
     const uint32_t epoch_now = sx1276_fhss_current_epoch();
     const uint8_t  slot_now  = sx1276_fhss_current_slot();
 
-    CHECK(sx1276_fhss_consider_remote(epoch_now, 0U)
+    CHECK(sx1276_fhss_consider_remote(epoch_now, 0U, SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_ALIGNED,
           "matching (epoch, hop_idx=0) after one hop must be ALIGNED");
     CHECK(sx1276_fhss_current_epoch() == epoch_now,
@@ -496,7 +496,7 @@ static void test_consider_remote_snapped_same_epoch(void) {
     CHECK(sx1276_fhss_current_slot() == 3U, "sanity: slot should be 3");
 
     /* Remote claims it just emitted on hop_idx 20 (same epoch). */
-    CHECK(sx1276_fhss_consider_remote(epoch_now, 20U)
+    CHECK(sx1276_fhss_consider_remote(epoch_now, 20U, SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_SNAPPED,
           "same-epoch hop mismatch must be SNAPPED");
     CHECK(sx1276_fhss_current_epoch() == epoch_now,
@@ -516,14 +516,14 @@ static void test_consider_remote_snapped_epoch_drift_one(void) {
     (void)sx1276_fhss_next_channel(&idx, &hz);
 
     /* +1 epoch drift accepted. */
-    CHECK(sx1276_fhss_consider_remote(1001U, 5U)
+    CHECK(sx1276_fhss_consider_remote(1001U, 5U, SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_SNAPPED,
           "Δepoch=+1 must be SNAPPED");
     CHECK(sx1276_fhss_current_epoch() == 1001U,
           "post-snap epoch must follow remote");
 
     /* -1 epoch drift accepted. */
-    CHECK(sx1276_fhss_consider_remote(1000U, 5U)
+    CHECK(sx1276_fhss_consider_remote(1000U, 5U, SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_SNAPPED,
           "Δepoch=-1 must be SNAPPED");
     CHECK(sx1276_fhss_current_epoch() == 1000U,
@@ -542,19 +542,19 @@ static void test_consider_remote_rejected_drift(void) {
     const uint8_t  slot_before  = sx1276_fhss_current_slot();
 
     /* Δepoch = +2 → REJECTED. */
-    CHECK(sx1276_fhss_consider_remote(502U, 0U)
+    CHECK(sx1276_fhss_consider_remote(502U, 0U, SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT,
           "Δepoch=+2 must be REJECTED_EPOCH_DRIFT");
     /* Δepoch = -2 → REJECTED. */
-    CHECK(sx1276_fhss_consider_remote(498U, 0U)
+    CHECK(sx1276_fhss_consider_remote(498U, 0U, SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT,
           "Δepoch=-2 must be REJECTED_EPOCH_DRIFT");
     /* Stale frame from far past. */
-    CHECK(sx1276_fhss_consider_remote(0U, 0U)
+    CHECK(sx1276_fhss_consider_remote(0U, 0U, SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT,
           "Δepoch=-500 must be REJECTED_EPOCH_DRIFT");
     /* Far-future replay. */
-    CHECK(sx1276_fhss_consider_remote(0xFFFFFFFFU, 0U)
+    CHECK(sx1276_fhss_consider_remote(0xFFFFFFFFU, 0U, SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT,
           "Δepoch=UINT32_MAX must be REJECTED_EPOCH_DRIFT");
 
@@ -576,14 +576,14 @@ static void test_consider_remote_epoch_wrap_boundary(void) {
     (void)sx1276_fhss_next_channel(&idx, &hz);
 
     /* Δepoch = (0xFFFFFFFF - 0xFFFFFFFE) = +1 → SNAPPED. */
-    CHECK(sx1276_fhss_consider_remote(0xFFFFFFFFU, 10U)
+    CHECK(sx1276_fhss_consider_remote(0xFFFFFFFFU, 10U, SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_SNAPPED,
           "Δepoch=+1 across UINT32_MAX-1 must be SNAPPED");
     CHECK(sx1276_fhss_current_epoch() == 0xFFFFFFFFU,
           "post-snap epoch must equal UINT32_MAX");
 
     /* Now wrap: Δepoch = (0 - 0xFFFFFFFF) = +1 (mod 2^32) → SNAPPED. */
-    CHECK(sx1276_fhss_consider_remote(0U, 5U)
+    CHECK(sx1276_fhss_consider_remote(0U, 5U, SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_SNAPPED,
           "Δepoch=+1 across UINT32_MAX→0 wrap must be SNAPPED");
     CHECK(sx1276_fhss_current_epoch() == 0U,
@@ -601,7 +601,7 @@ static void test_consider_remote_snapped_wrap_slot(void) {
     (void)sx1276_fhss_next_channel(&idx, &hz);
 
     CHECK(sx1276_fhss_consider_remote(100U,
-                                      (uint8_t)(SX1276_FHSS_CHANNEL_COUNT - 1U))
+                                      (uint8_t)(SX1276_FHSS_CHANNEL_COUNT - 1U), SX1276_FHSS_CLOCK_STALE)
               == SX1276_FHSS_SNAP_DEC_SNAPPED,
           "remote on last hop must be SNAPPED");
     CHECK(sx1276_fhss_current_slot() == SX1276_FHSS_CHANNEL_COUNT,
@@ -610,6 +610,66 @@ static void test_consider_remote_snapped_wrap_slot(void) {
     (void)sx1276_fhss_next_channel(&idx, &hz);
     CHECK(sx1276_fhss_current_epoch() == 101U,
           "next_channel after wrap-snap must auto-advance epoch");
+}
+
+
+/* F6 (2026-07-30): the three-tier health gate. STALE re-pins every
+ * legacy case above (all 14 legacy calls now pass STALE explicitly);
+ * these cases pin the two new tiers and the precedence rules. */
+static void test_f6_fresh_tier(void) {
+    /* FRESH + exact match -> ALIGNED (lock-step peers unaffected). */
+    (void)sx1276_fhss_init(1U, 2U, 700U);
+    (void)sx1276_fhss_snap_to(700U, 6U);   /* slot=6 => local_hop=5 */
+    CHECK(sx1276_fhss_consider_remote(700U, 5U, SX1276_FHSS_CLOCK_FRESH)
+              == SX1276_FHSS_SNAP_DEC_ALIGNED,
+          "(F6) FRESH + exact match stays ALIGNED");
+
+    /* FRESH + same-epoch hop mismatch -> LOCKED_OUT, no mutation. */
+    CHECK(sx1276_fhss_consider_remote(700U, 9U, SX1276_FHSS_CLOCK_FRESH)
+              == SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT,
+          "(F6) FRESH + hop mismatch locked out");
+    CHECK(sx1276_fhss_current_epoch() == 700U,
+          "(F6) locked-out: epoch unmutated");
+    CHECK(sx1276_fhss_current_slot() == 6U,
+          "(F6) locked-out: slot unmutated");
+
+    /* FRESH + delta=1 (legacy would SNAP) -> LOCKED_OUT. */
+    CHECK(sx1276_fhss_consider_remote(701U, 5U, SX1276_FHSS_CLOCK_FRESH)
+              == SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT,
+          "(F6) FRESH + delta 1 locked out");
+    /* FRESH + huge delta -> LOCKED_OUT (not EPOCH_DRIFT). */
+    CHECK(sx1276_fhss_consider_remote(5600U, 5U, SX1276_FHSS_CLOCK_FRESH)
+              == SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT,
+          "(F6) FRESH + huge delta locked out, not drift");
+}
+
+static void test_f6_unanchored_tier(void) {
+    /* UNANCHORED + any epoch delta -> SNAPPED: the recovery path that
+     * fixes Defect A (post-demotion nodes used to re-lock on their own
+     * stale epoch forever). */
+    (void)sx1276_fhss_init(1U, 2U, 700U);
+    (void)sx1276_fhss_snap_to(700U, 6U);
+    CHECK(sx1276_fhss_consider_remote(5600U, 10U,
+                                      SX1276_FHSS_CLOCK_UNANCHORED)
+              == SX1276_FHSS_SNAP_DEC_SNAPPED,
+          "(F6) UNANCHORED + delta 4900 SNAPPED (recovery)");
+    CHECK(sx1276_fhss_current_epoch() == 5600U,
+          "(F6) recovery adopted the remote epoch");
+    CHECK(sx1276_fhss_current_slot() == 11U,
+          "(F6) recovery slot = remote hop + 1");
+
+    /* Precedence: BAD_HOP beats health even when unanchored. */
+    CHECK(sx1276_fhss_consider_remote(5600U, SX1276_FHSS_CHANNEL_COUNT,
+                                      SX1276_FHSS_CLOCK_UNANCHORED)
+              == SX1276_FHSS_SNAP_DEC_REJECTED_BAD_HOP,
+          "(F6) BAD_HOP precedence over UNANCHORED accept");
+
+    /* Precedence: NOT_INIT beats health. */
+    sx1276_fhss_reset();
+    CHECK(sx1276_fhss_consider_remote(1U, 1U,
+                                      SX1276_FHSS_CLOCK_UNANCHORED)
+              == SX1276_FHSS_SNAP_DEC_REJECTED_NOT_INIT,
+          "(F6) NOT_INIT precedence over UNANCHORED");
 }
 
 int main(void) {
@@ -636,6 +696,9 @@ int main(void) {
     test_consider_remote_rejected_drift();
     test_consider_remote_epoch_wrap_boundary();
     test_consider_remote_snapped_wrap_slot();
+
+    test_f6_fresh_tier();
+    test_f6_unanchored_tier();
 
     if (g_failures != 0) {
         fprintf(stderr, "[FAIL] fhss_scheduler_vectors: %d failure(s)\n", g_failures);

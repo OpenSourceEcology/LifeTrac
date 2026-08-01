@@ -28,6 +28,8 @@
 #define HOST_TYPE_UID_URC                    0x82U
 #define HOST_TYPE_TX_DONE_URC                0x90U
 #define HOST_TYPE_RX_FRAME_URC               0x91U
+#define HOST_RX_FRAME_URC_TAIL_LEN           8U
+#define HOST_RX_FRAME_URC_PHASE_VALID        0x01U
 #define HOST_TYPE_CFG_OK_URC                 0xA0U
 #define HOST_TYPE_CFG_DATA_URC               0xA1U
 #define HOST_TYPE_REG_DATA_URC               0xB0U

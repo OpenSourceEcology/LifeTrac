@@ -34,10 +34,15 @@
  * Anchoring discipline:
  *   - TX side anchors LAZILY at its first FHSS transmission
  *     (sx1276_tx.c) — its own grid is authoritative.
- *   - RX side re-anchors on EVERY accepted A6a header
+ *   - RX side re-anchors on every ACCEPTED A6a header
  *     (sx1276_rx.c): slot_start_local = rx_done_ms - toa_ms -
- *     hdr.slot_offset_ms. Whoever hears the other adopts the other's
- *     grid, so two-way traffic converges on the busier node's clock.
+ *     hdr.slot_offset_ms. F6 (2026-07-30): acceptance is now
+ *     health-gated -- a FRESH, adopted local grid refuses disagreeing
+ *     remotes (REJECTED_LOCKED_OUT), so "whoever hears the other
+ *     adopts the other's grid" only holds while the local grid is
+ *     unadopted or stale. TX also refreshes anchor RECENCY on every
+ *     FHSS transmission (phase-identical re-anchor), so a busier node
+ *     stays FRESH and is not dragged by an idler.
  *   - sx1276_rx_scan_reset() and a LOCKED→SCANNING loss demotion
  *     reset the clock (fresh acquisition ⇒ fresh phase).
  *
@@ -73,6 +78,33 @@ void sx1276_fhss_clock_reset(void);
 /* Set/replace the anchor: `slot_start_ms` is the local time of the
  * START of absolute slot `abs_slot`. */
 void sx1276_fhss_clock_anchor(uint32_t slot_start_ms, uint32_t abs_slot);
+
+/* F6 (2026-07-30): freshness horizon for the health gate computed in
+ * sx1276_rx.c. Deliberately equal to SX1276_RX_SCAN_LOCK_LOSS_MS: a
+ * clock is authoritative exactly as long as the link-loss demotion
+ * would not yet have fired (equality pinned by a _Static_assert in
+ * sx1276_rx.c). */
+#define SX1276_FHSS_CLOCK_FRESH_MS 2000U
+
+/* F6: ms since the last anchor. Caller must gate on clock_valid();
+ * wrap-safe u32 subtraction. anchor_ms is a slot-START time, so age
+ * overstates by up to toa + slot_offset (~0.37 s worst at BW250) --
+ * irrelevant against the 2000 ms horizon. */
+uint32_t sx1276_fhss_clock_age_ms(uint32_t now_ms);
+
+/*
+ * F7 (2026-07-30): anchor from a received A6a header. Computes
+ *   slot_start = rx_done_ms - round(toa_us / 1000) - slot_offset_ms
+ * with HALF-UP rounding — the old inline call site truncated toa_us/1000,
+ * discarding up to 0.999 ms (0.904 ms on a full 255 B DTS fragment), and
+ * that loss was one-sided: the follower grid anchored LATE by it, on top
+ * of the TX-side admission-sampling bias, together eating the 12 ms TX
+ * head-start. Pure and wrap-safe; lives in this HW-free TU so the bench
+ * check-fhss-clock target can pin the arithmetic (sx1276_rx.c is linked
+ * by zero bench targets).
+ */
+void sx1276_fhss_clock_anchor_rx(uint32_t rx_done_ms, uint32_t toa_us,
+                                 uint8_t slot_offset_ms, uint32_t abs_slot);
 
 /* 1 when an anchor is set. */
 uint8_t sx1276_fhss_clock_valid(void);

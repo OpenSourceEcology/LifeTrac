@@ -57,6 +57,20 @@ static uint8_t  s_rx_last_retune_ms_valid;
  * the anchor path when a packet is received mid-slot). */
 static uint32_t s_rx_last_followed_abs;
 static uint8_t  s_rx_last_followed_abs_valid;
+/* F6 (2026-07-30): has ANY remote grid been accepted (ALIGNED/SNAPPED)
+ * since the last acquisition reset? While 0 the health passed to
+ * consider_remote() is UNANCHORED even if the clock is TX-self-anchored
+ * -- a self-anchored grid has no authority to refuse a remote one.
+ * Without this flag the TX lazy anchor re-validates the stale grid
+ * immediately after every demotion and the recovery tier is
+ * unreachable on duplex nodes (map correction C1). Cleared at boot
+ * (bss), on the LOCKED->SCANNING demotion edge, and in scan_reset. */
+static uint8_t  s_grid_adopted;
+/* F6: the freshness horizon and the demotion horizon must move
+ * together -- a clock is authoritative exactly as long as link loss
+ * would not yet have demoted the lock. */
+_Static_assert(SX1276_FHSS_CLOCK_FRESH_MS == SX1276_RX_SCAN_LOCK_LOSS_MS,
+               "F6: FRESH_MS must equal LOCK_LOSS_MS (coherence rule)");
 static void     rx_pll_settle_busy_wait(uint32_t delay_us);
 #endif
 
@@ -171,9 +185,21 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
                  * hop_idx (>= CHANNEL_COUNT), which the A6a header
                  * spec disallows; counting it surfaces a remote-side
                  * encoder bug rather than a transport problem. */
+                /* F6: compute local clock health for the snap gate.
+                 * UNANCHORED until a remote grid has been adopted --
+                 * see s_grid_adopted above. */
+                const sx1276_fhss_clock_health_t health =
+                    (sx1276_fhss_clock_valid() == 0U ||
+                     s_grid_adopted == 0U)
+                        ? SX1276_FHSS_CLOCK_UNANCHORED
+                        : ((sx1276_fhss_clock_age_ms(platform_now_ms())
+                                <= SX1276_FHSS_CLOCK_FRESH_MS)
+                               ? SX1276_FHSS_CLOCK_FRESH
+                               : SX1276_FHSS_CLOCK_STALE);
                 const sx1276_fhss_snap_decision_t dec =
                     sx1276_fhss_consider_remote(parsed.epoch,
-                                                parsed.hop_idx);
+                                                parsed.hop_idx,
+                                                health);
                 sx1276_rx_counter_record(dec);
                 /* v25.0.7 slot-clock (supersedes the 2026-07-24
                  * per-packet immediate-follow): instead of consuming
@@ -196,25 +222,40 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
                 if (dec == SX1276_FHSS_SNAP_DEC_SNAPPED ||
                     dec == SX1276_FHSS_SNAP_DEC_ALIGNED) {
                     const uint32_t now_anchor_ms = platform_now_ms();
-                    const uint32_t toa_ms =
-                        sx1276_airtime_estimate_toa_us((uint8_t)rx_len)
-                            / 1000UL;
                     const uint32_t remote_abs = sx1276_fhss_clock_abs_of(
                         parsed.epoch, parsed.hop_idx);
-                    sx1276_fhss_clock_anchor(
-                        now_anchor_ms - toa_ms
-                            - (uint32_t)parsed.slot_offset_ms,
+                    /* F7: round-not-truncate ToA (the old inline /1000
+                     * discarded up to 0.999 ms, one-sidedly LATE). The
+                     * arithmetic lives in the clock TU so the bench can
+                     * pin it. now_anchor_ms is still main-loop service
+                     * time, not the DIO0 edge — that residual lateness
+                     * is known and deliberately out of F7 scope. */
+                    sx1276_fhss_clock_anchor_rx(
+                        now_anchor_ms,
+                        sx1276_airtime_estimate_toa_us((uint8_t)rx_len),
+                        parsed.slot_offset_ms,
                         remote_abs);
                     /* The follower must not re-arm mid-slot for the
                      * slot we just received in — mark it followed. */
                     s_rx_last_followed_abs = remote_abs;
                     s_rx_last_followed_abs_valid = 1U;
+                    /* F6: a remote grid is now adopted — the local
+                     * clock gains refusal authority (FRESH tier). */
+                    s_grid_adopted = 1U;
                 }
-                /* FCC-A6c-2-b-ii: header unpacked + schema OK —>
-                 * FRAME_VALID with header_valid=true. This is what
-                 * drives SCANNING—>LOCKED in the A6c-1 policy; A6c-2-c
-                 * will additionally seed γ-1 from (epoch, hop_idx). */
-                scan_feed_frame(true);
+                /* FCC-A6c-2-b-ii + F6: only an ACCEPTED header is
+                 * FRAME_VALID to the scan SM. Pre-F6 this fed true
+                 * unconditionally, so a REJECTED_EPOCH_DRIFT frame
+                 * could (a) starve the LOCKED loss-demotion by
+                 * refreshing channel_entry_ms via REANCHOR, and
+                 * (b) re-LOCK a desynced node from SCANNING — the
+                 * permanent-desync half of Defect A. REJECTED_* now
+                 * feeds FRAME_INVALID: LOCKED+INVALID -> HOLD (the
+                 * demotion countdown runs), SCANNING+INVALID -> HOLD
+                 * (a rejected frame can no longer LOCK). */
+                scan_feed_frame(
+                    dec == SX1276_FHSS_SNAP_DEC_SNAPPED ||
+                    dec == SX1276_FHSS_SNAP_DEC_ALIGNED);
             }
             {
                 const uint8_t payload_len =
@@ -259,7 +300,8 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
  * can read the histogram via sx1276_rx_retune_counts() (additive URC).
  *
  * PLL settle budget mirrors sx1276_tx.c's pll_settle_busy_wait at
- * SX1276_TX_PLL_SETTLE_US (200 µs). Duplicated rather than hoisted
+ * SX1276_TX_PLL_SETTLE_US (1000 µs; RS-10.19 — an older comment said
+ * 200 µs, the define was always 1000). Duplicated rather than hoisted
  * to keep this change a point edit; the two sites have identical
  * physical justification (no settle IRQ on the L072 wiring) and
  * different operational meaning (TX vs RX retune) per the comment in
@@ -641,6 +683,11 @@ static void scan_drive(sx1276_rx_scan_event_t event,
         dec.action == SX1276_RX_SCAN_ACTION_BEGIN_SCAN) {
         sx1276_fhss_clock_reset();
         s_rx_last_followed_abs_valid = 0U;
+        /* F6: the adopted grid is gone with the lock. Clearing this is
+         * what makes the UNANCHORED recovery tier reachable — the next
+         * TX will re-validate the clock on the stale grid, but without
+         * adoption it carries no refusal authority. */
+        s_grid_adopted = 0U;
     }
 
     switch (dec.action) {
@@ -733,6 +780,7 @@ void sx1276_rx_scan_reset(void) {
      * is safe on both roles. */
     sx1276_fhss_clock_reset();
     s_rx_last_followed_abs_valid = 0U;
+    s_grid_adopted = 0U;   /* F6: fresh acquisition => no adopted grid */
 }
 
 /*

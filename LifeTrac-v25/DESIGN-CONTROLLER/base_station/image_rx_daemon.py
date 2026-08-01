@@ -1138,6 +1138,31 @@ class ImageRxDaemon:
                 if frag_idx is not None:
                     self._note_frag_arrival(frag_seq, frag_idx, frag_total)
 
+                # F8 (2026-07-30) acceptance telemetry: the firmware now
+                # appends {phase_valid, profile_id, hop_idx, slot_offset_ms,
+                # epoch} to every RX_FRAME_URC and parse_rx_frame surfaces
+                # them (None = pre-F8 firmware). Aggregated into the stats
+                # line so the flash-session acceptance can read alignment
+                # without tractor-side log archaeology.
+                pv = parsed.get("phase_valid")
+                if not hasattr(self, "_phase_stats"):
+                    self._phase_stats = {"none": 0, "valid": 0, "invalid": 0,
+                                         "last_epoch": None, "last_hop": None,
+                                         "off_min": None, "off_max": None}
+                ps = self._phase_stats
+                if pv is None:
+                    ps["none"] += 1
+                elif pv:
+                    ps["valid"] += 1
+                    ps["last_epoch"] = parsed.get("epoch")
+                    ps["last_hop"] = parsed.get("hop_idx")
+                    off = parsed.get("slot_offset_ms")
+                    if off is not None:
+                        ps["off_min"] = off if ps["off_min"] is None else min(ps["off_min"], off)
+                        ps["off_max"] = off if ps["off_max"] is None else max(ps["off_max"], off)
+                else:
+                    ps["invalid"] += 1
+
                 ts = parsed.get("timestamp_us")
                 if ts is not None:
                     prev = getattr(self, "_gap_prev_ts", None)
@@ -1507,6 +1532,19 @@ class ImageRxDaemon:
                 hist = " ".join(f"{lab}:{cnt}" for lab, cnt in
                                 zip(labels, buckets) if cnt)
                 LOG.info("air_gap_hist(ms): %s", hist)
+
+            ps = getattr(self, "_phase_stats", None)
+            if ps is not None and (ps["valid"] or ps["invalid"] or ps["none"]):
+                LOG.info(
+                    "phase_telemetry: valid=%d invalid=%d pre_f8=%d "
+                    "last_epoch=%s last_hop=%s slot_off=[%s..%s]",
+                    ps["valid"], ps["invalid"], ps["none"],
+                    ps["last_epoch"], ps["last_hop"],
+                    ps["off_min"], ps["off_max"])
+                self._phase_stats = {"none": 0, "valid": 0, "invalid": 0,
+                                     "last_epoch": ps["last_epoch"],
+                                     "last_hop": ps["last_hop"],
+                                     "off_min": None, "off_max": None}
 
                 # 2026-07-29 RS-11.1: the same gaps, split by what actually
                 # caused them. The aggregate histogram above is bimodal and its

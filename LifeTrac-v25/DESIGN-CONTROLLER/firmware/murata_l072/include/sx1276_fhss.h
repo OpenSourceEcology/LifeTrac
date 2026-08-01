@@ -33,10 +33,12 @@
  * it only accumulates per-channel quality statistics for RFCO telemetry
  * (Track B) and never modifies the active set.
  *
- * Single source of truth — host-side mirror at
- *   bench/host_proto/fhss_scheduler.py
- * MUST stay bit-identical (golden vectors in bench/host_proto/
- * cross-check both implementations).
+ * Single source of truth for the hop sequence is THIS C implementation.
+ * There is NO python mirror: an earlier revision of this comment promised
+ * bench/host_proto/fhss_scheduler.py, which never existed (F6 2026-07-30
+ * audit). The golden vectors that pin the seed derivation and the
+ * Fisher-Yates permutation are C-only, in
+ * bench/host_proto/fhss_scheduler_vectors.c.
  */
 
 #include <stdint.h>
@@ -111,6 +113,34 @@ sx1276_fhss_status_t sx1276_fhss_epoch_advance(void);
 sx1276_fhss_status_t sx1276_fhss_snap_to(uint32_t target_epoch,
                                          uint8_t  snap_to_slot);
 
+/* F6 (2026-07-30): local slot-clock health as computed by the CALLER
+ * (sx1276_rx.c) and passed into consider_remote(). Defined here, not in
+ * the clock header, so sx1276_fhss.c stays free of clock includes --
+ * load-bearing for the bench: check-fhss-scheduler links only
+ * sx1276_fhss.c + sx1276_fhss_chantab.c, no clock TU.
+ *
+ *   UNANCHORED -- no valid clock, OR no remote grid accepted since the
+ *                last acquisition reset (the s_grid_adopted flag in
+ *                sx1276_rx.c). The local grid has no authority to
+ *                refuse a remote one; accept ANY epoch. This is the
+ *                recovery tier, and the adoption flag is what makes it
+ *                reachable on duplex nodes: without it, the TX-side
+ *                lazy anchor re-validates the stale grid right after
+ *                every demotion and the node locks itself out forever.
+ *   STALE      -- valid + adopted, but anchor older than
+ *                SX1276_FHSS_CLOCK_FRESH_MS: legacy drift rule.
+ *   FRESH      -- valid + adopted + recent: authoritative. Disagreeing
+ *                remotes are REJECTED_LOCKED_OUT; a healthy follower
+ *                can no longer be walked off its grid one snap at a
+ *                time (or by a forged v1 header -- the real barrier is
+ *                still the schema_ver=2 MIC).
+ */
+typedef enum {
+    SX1276_FHSS_CLOCK_UNANCHORED = 0,
+    SX1276_FHSS_CLOCK_STALE      = 1,
+    SX1276_FHSS_CLOCK_FRESH      = 2
+} sx1276_fhss_clock_health_t;
+
 /* FCC-A6b-2-ii-alpha (plan §14.2 step 10): snap-policy decision returned
  * by sx1276_fhss_consider_remote(). Distinct from sx1276_fhss_status_t
  * because "REJECTED" is an outcome of an authorized API call, not an
@@ -130,7 +160,12 @@ typedef enum {
     /* |remote_epoch - local_epoch| > SX1276_FHSS_SNAP_MAX_EPOCH_DRIFT.
      * Treated as a spoof / replay until MIC ships in schema_ver=2 —
      * no mutation. */
-    SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT = 4
+    SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT = 4,
+    /* F6: local clock is FRESH (valid + adopted + recently anchored)
+     * and the remote disagrees -- the local grid is authoritative, so
+     * the snap is refused regardless of drift size. Appended only:
+     * counters index by numeric value. No mutation. */
+    SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT = 5
 } sx1276_fhss_snap_decision_t;
 
 /* Maximum absolute epoch delta consider_remote() will accept as a
@@ -159,12 +194,19 @@ typedef enum {
  *   - All REJECTED_* outcomes are no-ops (scheduler state preserved).
  *     The caller MUST log REJECTED_EPOCH_DRIFT for FCC-B1-SUMMARY
  *     diagnostics so persistent drift is observable.
+ *   - F6 health tiers (precedence: NOT_INIT > BAD_HOP > ALIGNED >
+ *     health): UNANCHORED accepts any epoch (recovery); FRESH refuses
+ *     any disagreement (REJECTED_LOCKED_OUT); STALE keeps the legacy
+ *     +/-SX1276_FHSS_SNAP_MAX_EPOCH_DRIFT rule. ALIGNED always passes,
+ *     so lock-step peers count ALIGNED in every tier.
  *   - Warm-up state is NOT consulted: A6c (Scanning state) will gate
  *     consider_remote() calls during cold-start, but once Scanning
  *     hands off to normal RX, every accepted snap correctly clears
  *     warmup_hops_remaining via snap_to's contract. */
-sx1276_fhss_snap_decision_t sx1276_fhss_consider_remote(uint32_t remote_epoch,
-                                                        uint8_t  remote_hop_idx);
+sx1276_fhss_snap_decision_t sx1276_fhss_consider_remote(
+    uint32_t remote_epoch,
+    uint8_t  remote_hop_idx,
+    sx1276_fhss_clock_health_t local_clock_health);
 
 /* Request that channel `idx` be removed from the active set. Refused
  * (returns BLACKLIST_FLOOR) if the legal floor would be violated,

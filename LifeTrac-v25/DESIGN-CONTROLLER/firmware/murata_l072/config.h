@@ -57,8 +57,18 @@
 #define HOST_TXQ_DEPTH                4U
 #define HOST_TXQ_P0_RESERVED          1U        /* per Claude §H5: keep one P0 */
 
-/* Diagnostic/prototyping controls. Keep these conservative in production. */
+/* Diagnostic/prototyping controls. Keep these conservative in production.
+ * F9 (2026-07-30): production RX arming no longer depends on this flag —
+ * host_reg_gate.c accepts opmode {0x80,0x81,0x85} unconditionally — so 0
+ * is now VIABLE in production. Override with
+ *   make EXTRA_CFLAGS="-DHOST_ALLOW_REG_WRITE_DIAG=0"
+ * (EXTRA_CFLAGS, not CFLAGS= which clobbers the MCU flag set). Default
+ * stays 1 for one bench soak cycle: the T2 TCXO probe writes opmode
+ * 0x00/0x01 and the SPI-isolation probe writes 0x83, plus registers
+ * 0x40/0x33/... — all need diag builds. Flip in a separate commit. */
+#ifndef HOST_ALLOW_REG_WRITE_DIAG
 #define HOST_ALLOW_REG_WRITE_DIAG     1
+#endif
 /* RS-3.7 (2026-07-25): was 1 — every nonzero radio-event batch emitted a
  * ~16-wire-byte debug URC through the blocking TX path. Bench builds can
  * re-enable via make CFLAGS="-DHOST_EMIT_RADIO_IRQ_DEBUG_URC=1". */
