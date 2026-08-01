@@ -52,7 +52,15 @@ param(
     #   local = broker + synth publisher run ON the tractor (127.0.0.1).
     #           Required now that tractor WiFi is off per MASTER_PLAN §8.13.
     #   host  = legacy wiring via the bench PC's broker over the LAN.
+    #   camera = RS-3.3 real-camera path: camera_service captures the USB UVC
+    #            camera and runs the encode-to-fit packer, which the synthetic
+    #            feed bypasses entirely.
+    [ValidateSet("local", "host", "camera")]
     [string]$TxFeed       = "local",
+    # UVC capture node for -TxFeed camera. The board enumerates a "C2"
+    # (16d0:0ed4) UVC 1.00 device; /dev/video0 is the separate built-in
+    # mx6s-csi MIPI bridge, NOT the USB camera.
+    [string]$CameraDevice = "/dev/video1",
     # Regulatory profile for BOTH daemons: 0=BENCH_ONLY_FIXED_915 (single
     # channel), 1=FCC_FHSS_50CH_BW250 (wide mask auto-enabled — the firmware
     # validator rejects popcount<50 for profile 1), 2=FCC_DTS_BW500.
@@ -183,6 +191,16 @@ foreach ($s in @($TxAdbSerial, $RxAdbSerial)) {
     cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $repoRoot 'publish_synthetic_frames.py')`" /tmp/lifetrac_strict/" | Out-Null
     cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $helperDir 'bench_mqtt.conf')`" /tmp/lifetrac_strict/" | Out-Null
     cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $baseStation 'image_pipeline')`" /tmp/lifetrac_strict/" | Out-Null
+    # 2026-07-30 RS-3.3: the TRACTOR's image_pipeline too. Two different
+    # packages share the name `image_pipeline` (RS-5.7), and only the base
+    # station's was being deployed — so camera_service died on
+    # "No module named 'image_pipeline.ipc_to_h747'" the first time it was
+    # ever run on hardware. They merge safely: of 16 + 11 modules the ONLY
+    # overlapping filename is __init__.py, and both are docstring-only.
+    # image_tx_daemon needs frame_format from the base copy while
+    # camera_service needs ipc_to_h747/tile_cache from this one, so the
+    # tractor genuinely requires both.
+    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $tractorX8 'image_pipeline')`" /tmp/lifetrac_strict/" | Out-Null
     $pahoLocal = Join-Path $repoRoot "_paho_pull\paho"
     if (Test-Path $pahoLocal) {
         cmd /c "`"$adbExe`" -s $s push `"$pahoLocal`" /tmp/lifetrac_strict/" | Out-Null
@@ -253,7 +271,10 @@ cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"$swdReset`""
 # RS-5.9: local feed = bench broker on the tractor's own loopback. The
 # conf mount pins the listener to 127.0.0.1 (host netns via --network=host).
 $txMqtt = $HostIp
-if ($TxFeed -eq "local") {
+# "camera" is a local-broker feed too: camera_service publishes to the tractor
+# loopback exactly as the synthetic publisher does. Omitting it here left the TX
+# daemon pointed at $HostIp with no broker reachable ("Network unreachable").
+if ($TxFeed -eq "local" -or $TxFeed -eq "camera") {
     $txMqtt = "127.0.0.1"
     Write-Host "[MQTT] Starting bench broker on tractor loopback (RS-5.9 local feed)..." -ForegroundColor Yellow
     cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f bench_mqtt 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name bench_mqtt --network=host -v /tmp/lifetrac_strict/bench_mqtt.conf:/mosquitto/config/mosquitto.conf eclipse-mosquitto:2`"" | Out-Null
@@ -279,9 +300,36 @@ cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -
 Start-Sleep -Seconds 4
 
 # 7. Start Synthetic Frame Publisher (RS-5.9: on the tractor in local mode)
-Write-Host "[STREAM] Starting synthetic camera publisher (feed=$TxFeed, fps=$SynthFps, budget=$SynthBudgetB B)..." -ForegroundColor Yellow
+Write-Host "[STREAM] Starting frame source (feed=$TxFeed, fps=$SynthFps, budget=$SynthBudgetB B)..." -ForegroundColor Yellow
 $pubProc = $null
-if ($TxFeed -eq "local") {
+if ($TxFeed -eq "camera") {
+    # RS-3.3 REAL-CAMERA path. The synthetic feed publishes PRE-BUILT tile-delta
+    # frames straight to image_tx_daemon, so camera_service -- and with it the
+    # whole encode-to-fit budget packer, carry fix, age-escalation and liveness
+    # valve -- is bypassed and has NEVER run on air.
+    #
+    # Runs in lifetrac-tractor-x8:latest because that image carries ffmpeg
+    # (Dockerfile:8); the host has none, which is why camera_service otherwise
+    # logs "v4l2/ffmpeg unavailable ... falling back to synthetic" and silently
+    # tests nothing. --device is required or the container cannot see the UVC
+    # node (a "C2" 16d0:0ed4 UVC 1.00 device on /dev/video1; /dev/video0 is the
+    # separate built-in mx6s-csi MIPI bridge).
+    #
+    # LIFETRAC_CAMERA_DESHAKE=0 is REQUIRED, not cosmetic. camera_service
+    # defaults deshake ON (_default_deshake = "0" if USE_LORA_BRIDGE else "1",
+    # and USE_LORA_BRIDGE defaults false), and measured 2026-07-30 the i.MX8
+    # cannot produce a SINGLE frame through
+    # "fps=2,scale=384:256,deshake=open2=1:search=16" in 30 s -- 0 bytes, vs
+    # 589824 bytes (2 frames, exact) with the identical pipeline minus deshake.
+    # Left at its default, camera_service restarts ffmpeg forever and delivers
+    # nothing. Set explicitly rather than via LIFETRAC_USE_LORA_BRIDGE=1, which
+    # would also flip the image method A->C and confound the encode-to-fit test.
+    $camRun = "echo fio | sudo -S -p '' docker rm -f camera_svc 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name camera_svc --network=host --entrypoint python3 --device=$CameraDevice -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CAMERA_SOURCE=v4l2 -e LIFETRAC_CAMERA_DEVICE=$CameraDevice -e LIFETRAC_CAMERA_FPS=$SynthFps -e LIFETRAC_CAMERA_DESHAKE=0 $profEnv lifetrac-tractor-x8:latest -u /work/camera_service.py"
+    cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"$camRun`"" | Out-Null
+    Start-Sleep -Seconds 4
+    Write-Host "  [CAMERA] camera_service launched on $CameraDevice - encode-to-fit IS in the loop" -ForegroundColor Green
+    cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker logs camera_svc 2>&1 | tail -6`""
+} elseif ($TxFeed -eq "local") {
     # Runs in the lifetrac-tractor-x8 image because camera_service's
     # synthetic path needs its numpy/cv2 deps (the ootb python image
     # lacks them). Publishes to the tractor-loopback bench broker.
