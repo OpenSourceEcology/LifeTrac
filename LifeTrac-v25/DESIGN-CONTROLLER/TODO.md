@@ -123,6 +123,79 @@ Tasks are organized by phase. Hardware purchases come first because lead times d
 
 ## Radio system — v25.0.7+ outstanding work (added 2026-07-25)
 
+### Week in review, 2026-07-24 → 08-01 (radio campaign summary)
+
+One paragraph per finding, newest context first; every claim carries evidence
+in `bench-evidence/` or a commit. PR #86 (merged, `ffae3e51`) holds the bench
+campaign; PR #87 (open) holds firmware Batch 1.
+
+**Link measurements that changed the architecture.**
+- **The ack was destroying the command channel**: suppressing the tractor echo
+  took in-stream command delivery 56% → 91% (CIs disjoint). Standing rule: no
+  acks on actuation; NACK-style feedback only where the receiver holds
+  information the transmitter cannot derive (F10 stale-tile design).
+- **The keyframe self-heal is net harmful** (n=2/side: +1.88 pts loss, −16%
+  frames, +31% timeouts — it amplifies the condition it fires on). Kept only
+  because the persistent canvas makes silent tile-staleness worse; replacement
+  is F10 (`0x6C` stale-tile bitmap, 84× cheaper than a keyframe).
+- **Coding rate stays 4/5**: zero payload CRC errors in ~19k frames — losses
+  are receiver-readiness, not corruption. Revisit trigger: `rx_decode_err /
+  rx_frames > ~1%` in a field run. Preamble work (F4) later **dropped**: loss
+  attribution showed index 0 is the *least* lossy position, refuting the
+  re-arm-gap hypothesis it rested on.
+- **The index-10 notch → our own pacer.** A reproducible 55–59% loss of
+  fragment index 10 (idle-gated, ≥1 s) was isolated to `AirtimeBudget.admit()`
+  — a token bucket whose rolling 1.0 s window blocks the ~10th fragment after
+  any drained-window idle. Confirmed causally by moving the budget. **Smooth
+  pacing** (same duty, spread; 0.92 headroom after the 1.00 version regressed
+  19.4% loss) shipped as default: notch 59→2.15%, saturated loss −40% at
+  −2.7% goodput. Headroom sweep says 0.92 stands — and exposed the metric
+  trap: **rank by frames_published, not goodput** (best goodput in the whole
+  record came from the worst-loss config).
+- **Single-copy command delivery is now 99.8%** (628/629 pooled, was 91.1%
+  under the bucket): smooth pacing's ~17 ms inter-fragment gaps exceed the
+  10.3 ms command ToA, so every gap is a command slot. The gap-tuning trade
+  dissolved (goodput flat 15–80 ms; keep 40). **Firmware Batch 2 (TDMA slot)
+  demoted from prerequisite to optimisation** (+0.2 pts measured ceiling).
+- **Encode-to-fit verified on air with the real camera** (RS-3.3): 472 frames
+  delivered; keyframes 2381–2430 B against a 2436 B budget. Requires
+  `LIFETRAC_USE_LORA_BRIDGE=1` (three-way gate; without it the service
+  captures and silently discards). Harness has `-TxFeed camera`.
+
+**Firmware landed.**
+- **FCC §A5 ERP clamp now enforced in hardware** (was computed and discarded;
+  antenna-gain declarations never reduced power). Ceiling-not-target; no bench
+  power change (allowance 17, configured 14). Residual: RS-10.18.
+- **FHSS per-link hop seed** (CFG 0x17/0x18; was hardcoded (0,0,0) — every
+  radio hopped identically). `LIFETRAC_FHSS_LINK_ID` is LINK-scoped.
+- **Batch 1 code-complete on PR #87** (F7 phase bias, F8 RX_FRAME_URC phase
+  tail, F9 opmode gate, F6 epoch-drift lock-out with grid adoption). 27 bench
+  targets green; NOT yet flashed — acceptance checklist below.
+
+**Instruments and infrastructure.**
+- Loss attribution (`lost_frag_idx`, `air_gap_by_class`) with out-of-order
+  retraction — three of its own bugs found by reconciling against byte
+  counters; the standing check is "attributed ≈ frags_tx − rx_frames".
+  Instrument valid at pipeline depth ≤ 2 only.
+- CI repaired: the base-station gate had never installed dependencies (49/55
+  errors were imports; an always-red gate carries no information). Pinned
+  test env; Pillow was a genuinely missing *runtime* dep. Python gate now
+  green; `L072 firmware static checks` remains the only other trustworthy job.
+- `SETTINGS_REFERENCE.md` (810 settings), `FIRMWARE_BATCH1_MAPS.md` (verified
+  maps; the F6 recovery-loop flaw was caught on paper), 69 build intermediates
+  untracked, size-budget checker's parse bug fixed (schema drift open as
+  RS-5.8).
+
+**Corrections culture (kept on the record):** the 44 ms-per-fragment
+decomposition (retracted; real inter-fragment dead air is 5.0 ms), the F4
+preamble recommendation (retracted after measurement), the RS-3.3 "three
+defects" (one missing flag), the "camera_service blocked" diagnosis (it was
+parked correctly), and the E3–E6 instrument over-attribution (three classifier
+bugs). Method rule that caught most of these: instrument before diagnosing,
+and reconcile every per-index claim against byte counters.
+
+
+
 > **Context:** the 2026-07-23→25 sessions landed slot-clock FHSS (2× fixed-channel),
 > the first DTS BW500 air link (**1.76 KB/s sustained**, 6.1× baseline), operator
 > selectors for encoder + radio profile with an auto policy, and the **LoRa-only
