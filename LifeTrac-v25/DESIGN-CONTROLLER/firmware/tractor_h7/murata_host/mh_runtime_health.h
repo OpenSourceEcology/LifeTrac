@@ -52,7 +52,8 @@ typedef struct mh_runtime_health_s {
     uint8_t last_rx_payload[HOST_MAX_PAYLOAD_LEN];
     /* F8 (2026-07-30): phase-telemetry tail from the extended
      * RX_FRAME_URC. All zero for legacy-length frames or when
-     * last_rx_phase_flags bit0 (MH_RX_FRAME_PHASE_VALID) is clear. */
+     * last_rx_phase_flags bit0 (HOST_RX_FRAME_URC_PHASE_VALID, defined
+     * in mh_wire.h) is clear. */
     uint8_t last_rx_phase_flags;
     uint8_t last_rx_profile_id;
     uint8_t last_rx_hop_idx;

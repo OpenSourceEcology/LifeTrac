@@ -33,11 +33,12 @@
  * it only accumulates per-channel quality statistics for RFCO telemetry
  * (Track B) and never modifies the active set.
  *
- * Single source of truth — host-side mirror at
- *   (F6 2026-07-30: the python mirror this comment used to promise --
- *   bench/host_proto/fhss_scheduler.py -- never existed; the golden
- *   vectors are C-only, in bench/host_proto/fhss_scheduler_vectors.c.) (golden vectors in bench/host_proto/
- * cross-check both implementations).
+ * Single source of truth for the hop sequence is THIS C implementation.
+ * There is NO python mirror: an earlier revision of this comment promised
+ * bench/host_proto/fhss_scheduler.py, which never existed (F6 2026-07-30
+ * audit). The golden vectors that pin the seed derivation and the
+ * Fisher-Yates permutation are C-only, in
+ * bench/host_proto/fhss_scheduler_vectors.c.
  */
 
 #include <stdint.h>
