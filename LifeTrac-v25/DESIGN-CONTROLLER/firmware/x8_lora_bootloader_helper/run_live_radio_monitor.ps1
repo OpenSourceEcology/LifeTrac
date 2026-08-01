@@ -315,16 +315,22 @@ if ($TxFeed -eq "camera") {
     # node (a "C2" 16d0:0ed4 UVC 1.00 device on /dev/video1; /dev/video0 is the
     # separate built-in mx6s-csi MIPI bridge).
     #
-    # LIFETRAC_CAMERA_DESHAKE=0 is REQUIRED, not cosmetic. camera_service
-    # defaults deshake ON (_default_deshake = "0" if USE_LORA_BRIDGE else "1",
-    # and USE_LORA_BRIDGE defaults false), and measured 2026-07-30 the i.MX8
-    # cannot produce a SINGLE frame through
-    # "fps=2,scale=384:256,deshake=open2=1:search=16" in 30 s -- 0 bytes, vs
-    # 589824 bytes (2 frames, exact) with the identical pipeline minus deshake.
-    # Left at its default, camera_service restarts ffmpeg forever and delivers
-    # nothing. Set explicitly rather than via LIFETRAC_USE_LORA_BRIDGE=1, which
-    # would also flip the image method A->C and confound the encode-to-fit test.
-    $camRun = "echo fio | sudo -S -p '' docker rm -f camera_svc 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name camera_svc --network=host --entrypoint python3 --device=$CameraDevice -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CAMERA_SOURCE=v4l2 -e LIFETRAC_CAMERA_DEVICE=$CameraDevice -e LIFETRAC_CAMERA_FPS=$SynthFps -e LIFETRAC_CAMERA_DESHAKE=0 $profEnv lifetrac-tractor-x8:latest -u /work/camera_service.py"
+    # LIFETRAC_USE_LORA_BRIDGE=1 is THE flag for this path and is REQUIRED.
+    # It is not merely a label -- camera_service branches on it three ways:
+    #   1. skips the M7 IpcWriter (camera_service.py:1354), which otherwise
+    #      imports image_pipeline.ipc_to_h747 AND opens /dev/ttymxc3, a device
+    #      image_tx_daemon already owns on this path;
+    #   2. creates the MQTT client, without which `client is None` and the
+    #      publish at :1563 is silently skipped -- frames are captured and
+    #      thrown away, with no log line at all;
+    #   3. turns deshake OFF (_default_deshake, :240). That default matters:
+    #      the i.MX8 cannot produce a single frame through
+    #      "deshake=open2=1:search=16" in 30 s (measured: 0 bytes, vs 589824 B
+    #      = 2 frames exactly without it).
+    # Omitting it makes camera_service look broken in three unrelated-looking
+    # ways at once. It is not broken; the flag declares which transport owns
+    # the frames.
+    $camRun = "echo fio | sudo -S -p '' docker rm -f camera_svc 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name camera_svc --network=host --entrypoint python3 --device=$CameraDevice -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CAMERA_SOURCE=v4l2 -e LIFETRAC_CAMERA_DEVICE=$CameraDevice -e LIFETRAC_CAMERA_FPS=$SynthFps -e LIFETRAC_USE_LORA_BRIDGE=1 $profEnv lifetrac-tractor-x8:latest -u /work/camera_service.py"
     cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"$camRun`"" | Out-Null
     Start-Sleep -Seconds 4
     Write-Host "  [CAMERA] camera_service launched on $CameraDevice - encode-to-fit IS in the loop" -ForegroundColor Green

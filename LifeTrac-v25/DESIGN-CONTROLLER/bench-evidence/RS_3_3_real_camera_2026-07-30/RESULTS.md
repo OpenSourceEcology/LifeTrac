@@ -1,139 +1,88 @@
-# RS-3.3 — first attempt to run the real camera on air (2026-07-30)
+# RS-3.3 — real camera on air: VERIFIED (2026-07-30)
 
 `camera_service` owns the encode-to-fit budget packer, the carry fix,
 age-escalation and the liveness valve. The synthetic bench feed publishes
 PRE-BUILT tile-delta frames straight to `image_tx_daemon`, so none of that code
-had ever executed on hardware. This is the first attempt to run it.
+had ever executed on hardware. **It now has.**
 
-**Outcome: not yet delivering frames.** Three real defects were found and fixed
-along the way; a fourth is open. Every one of them was invisible to the
-synthetic path.
+## Result
 
----
+Run `radio_monitor_20260731_213152_9db14d4d`, 240 s, real USB camera through
+encode-to-fit, over LoRa (DTS profile 2, v3 pipeline, smooth pacing), to the
+base station:
 
-## Confirmed working
+| | |
+|---|---|
+| camera frames encoded | `frames_in=492 ok=491 fail=0 drop_full=0 drop_stale=0` |
+| fragments transmitted | `frags_ok=556` |
+| base received | `rx_frames=529 rx_decode_err=0` |
+| **complete frames delivered** | **472** |
 
-- **The camera is attached and functional.** A UVC 1.00 device "C2"
-  (`16d0:0ed4`) on `/dev/video1` — `dmesg` shows
-  `uvcvideo: Found UVC 1.00 device C2`. `/dev/video0` is the separate built-in
-  `mx6s-csi` MIPI bridge, NOT the USB camera; pointing at it would silently
-  capture nothing.
-- **Capture works end to end when invoked correctly.** Verified by hand:
-  `ffmpeg -f v4l2 -input_format mjpeg -video_size 1920x1080 -framerate 30
-  -i /dev/video1 -vf fps=2,scale=384:256 -pix_fmt rgb24 -f rawvideo`
-  produced **589,824 bytes for 2 frames — exactly 2 x 384 x 256 x 3.**
-- Supported formats: `mjpeg` and `yuyv422`, both up to 1920x1080.
+**Encode-to-fit is confirmed working against the budget.** `camera_service`
+logged `byte_budget=2436 B/frame`, and the keyframes it produced measured
+**2381, 2389, 2426 and 2430 B — every one under budget, the largest within 6 B
+of it.** That is the packer filling the transport quantum without exceeding it,
+which is precisely what encode-to-fit exists to do, now demonstrated on real
+camera data rather than on synthetic frames built to order.
 
-## Defect 1 — the `image_pipeline` package collision breaks PRODUCTION, not just tests
+Steady-state frames are 243 B because the bench scene is static — tile-delta
+correctly sends almost nothing when nothing moves. Goodput 368 B/s at 15%
+utilisation reflects that, and is not a defect.
 
-`camera_service` died immediately on:
+## CORRECTION: the earlier "three defects" were largely one misconfiguration
 
-    ModuleNotFoundError: No module named 'image_pipeline.ipc_to_h747'
+An earlier revision of this file reported three independent product defects.
+**That was wrong and is retracted.** All three collapse to a single missing
+environment flag: `LIFETRAC_USE_LORA_BRIDGE=1`.
 
-This is RS-5.7's two-packages-one-name problem, and it had been filed as *test*
-debt. It is not: it stops the tractor's camera service from starting at all. The
-harness deployed only `base_station/image_pipeline`, while `camera_service`
-needs the tractor's.
+`camera_service` branches on that flag three separate ways
+(`camera_service.py:1354`, `:1446`, `:240`):
 
-They merge safely — of 16 + 11 modules the **only** overlapping filename is
-`__init__.py`, and both are docstring-only. The tractor genuinely needs both
-copies: `image_tx_daemon` imports `image_pipeline.frame_format` from the base
-station's, `camera_service` imports `ipc_to_h747` / `tile_cache` from its own.
-Fixed by deploying both.
+1. **Skips the M7 `IpcWriter`** — which otherwise imports
+   `image_pipeline.ipc_to_h747` *and* opens `/dev/ttymxc3`, a device
+   `image_tx_daemon` already owns on this path. My "ModuleNotFoundError" defect
+   was this import, and with the flag set the import never happens.
+2. **Creates the MQTT client.** Without it `client is None` and the publish at
+   `:1563` is silently skipped — frames are captured and thrown away with no log
+   line at all. That is what made the service look hung.
+3. **Turns deshake off.** The default really is unusable on this hardware (the
+   i.MX8 produced 0 bytes in 30 s through `deshake=open2=1:search=16`, against
+   589,824 B = 2 frames exactly without it) — but the default is *correct*,
+   because it is off whenever the LoRa bridge owns the frames.
 
-## Defect 2 — the camera feed never started the local broker
+Omitting one flag made a working service look broken in three unrelated ways at
+once. The gate is coherent: it declares which transport owns the frames, and
+everything else follows.
 
-`-TxFeed camera` (added here) skipped the bench-broker startup that `-TxFeed
-local` performs, leaving the TX daemon pointed at `$HostIp` with nothing
-listening:
+**What survives as a genuine finding:** the harness's `-TxFeed camera` mode did
+not start the bench broker (mine, introduced with the branch, fixed), and
+deploying only `base_station/image_pipeline` is still wrong for the tractor —
+harmless once the flag is set, but it would bite any non-bridge path.
 
-    image_tx_daemon: MQTT connect to 192.168.1.79:1883 failed: [Errno 101] Network unreachable
+## Also corrected: the "camera_service is blocked" diagnosis
 
-Mine, introduced with the camera branch. Fixed by treating `camera` as a
-local-broker feed.
+An earlier revision reported `camera_service` blocked in `_read_exact`, based on
+a `faulthandler` stack dump. **Also wrong.** At 2 fps the process legitimately
+spends nearly all its time waiting in `_read_exact` for the next frame, so
+catching it there proves nothing. Tracing added under `LIFETRAC_CAMERA_TRACE=1`
+showed complete 294,912-byte frames arriving every ~0.25 s the whole time. It was
+capturing correctly and discarding the result for want of an MQTT client.
 
-## Defect 3 — camera_service's DEFAULT config cannot capture a single frame
+The elimination work around it was still sound and is worth keeping: ffmpeg, the
+real argv (including `-probesize 32`, `-thread_queue_size 2`, `-fflags
+nobuffer`), the pipe, `stdin=DEVNULL` and device contention were each ruled out
+by measurement. They were simply all innocent.
 
-`_default_deshake = "0" if USE_LORA_BRIDGE else "1"`, and `USE_LORA_BRIDGE`
-defaults false — so on the LoRa path **deshake defaults ON**, adding
-`deshake=open2=1:search=16` to a 1920x1080@30 pipeline.
+## Instrumentation left behind
 
-Measured on the i.MX8, identical pipelines, 30 s budget each:
+`LIFETRAC_CAMERA_TRACE=1` logs one line per `read()` with elapsed time and the
+spawn-to-first-read gap. Off by default. It is what turned "appears hung" into
+"capturing fine, discarding output" in one run.
 
-| filter chain | output |
-|---|---:|
-| `fps=2,scale=384:256` | **589,824 bytes** (2 frames, exact) |
-| `fps=2,scale=384:256,deshake=open2=1:search=16` | **0 bytes** |
+## Method note
 
-The board cannot produce one frame through deshake in 30 seconds. Left at its
-default, `camera_service` restarts ffmpeg forever and delivers nothing —
-`grab_rgb` raises "ffmpeg refused to produce a frame after restart" on a loop.
-
-The harness now sets `LIFETRAC_CAMERA_DESHAKE=0` explicitly rather than setting
-`LIFETRAC_USE_LORA_BRIDGE=1`, which would also flip the image method A->C and
-confound the encode-to-fit measurement.
-
-**This deserves a decision, not just a bench override:** the shipped default is
-non-functional on the actual tractor hardware. Either the gate is wrong (deshake
-should be off unless explicitly enabled) or the tractor is expected to run with
-`USE_LORA_BRIDGE=1` — in which case the LoRa bench path should set it.
-
-## Open — camera_service blocks in `_read_exact`, and it is NOT ffmpeg
-
-Isolated by elimination on 2026-07-30. `faulthandler` (SIGABRT to the running
-container) puts the block precisely:
-
-    Current thread (most recent call first):
-      File "/work/camera_service.py", line 347 in _read_exact
-      File "/work/camera_service.py", line 358 in grab_rgb
-      File "/work/camera_service.py", line 858 in _build_frame
-      File "/work/camera_service.py", line 1515 in main
-
-Four independent things were then ruled OUT, each measured:
-
-| hypothesis | test | result |
-|---|---|---|
-| camera broken | direct ffmpeg to a file | 589,824 B = 2 frames, exact |
-| ffmpeg cannot write to a PIPE | real argv, `\| head -c 294912` | **294,912 B, one frame** |
-| the extra flags break it (`-probesize 32`, `-thread_queue_size 2`, `-fflags nobuffer`) | printed the REAL `build_ffmpeg_argv()` and ran it verbatim | **works** |
-| Python's Popen wiring (stdout+stderr PIPE, `bufsize=0`) | standalone script doing exactly that, same argv | **294,912 B in 2.5 s**, arriving in 32 KB chunks |
-| device contention from a previous container | `fuser /dev/video1` -> NONE, then fresh start | still blocks |
-
-So: the camera works, the argv works, the pipe works, the exact Popen+read
-pattern works in 2.5 s, and the device is free — yet `camera_service` sits in
-`_read_exact` indefinitely, emitting exactly one log line and never restarting.
-
-**Remaining hypothesis, untested:** something in `camera_service` between
-spawning ffmpeg and first reading it takes long enough that ffmpeg fills its
-64 KB stdout pipe buffer and wedges — plausible given `-thread_queue_size 2`
-and `-fflags nobuffer`, which are tuned for minimum latency and leave almost no
-slack. The isolation probe read immediately; `main()` does MQTT setup and starts
-a `_back_channel_reader` thread first (visible in the same faulthandler dump).
-
-Next diagnostic: timestamp the gap between `Popen` and the first `stdout.read()`
-inside `camera_service`, and if it is more than ~1 s, either read-and-discard
-during startup or spawn ffmpeg lazily at first `grab_rgb`.
-
-## Superseded note — camera_service starts, then publishes nothing
-
-With all three fixed, `camera_svc` stays **Up** but emits exactly **one** log
-line (the ffmpeg startup) and zero publish/encode activity. `image_tx_daemon`
-reports `frames_in=0`, so nothing reaches the broker.
-
-Alive but stuck after spawning ffmpeg. Next steps, in order:
-1. Run `camera_service` in the foreground with `--log-level DEBUG` to see where
-   it blocks — most likely inside `_read_exact` waiting for a full 294,912-byte
-   rgb24 frame, or on the MQTT connect.
-2. Confirm the broker is actually reachable from inside the camera container
-   (`--network=host` should make 127.0.0.1 work, but this is untested for this
-   container specifically).
-3. Check whether the `fps=2` filter interacts badly with the read loop — the
-   hand-verified capture used the same filter and worked, so the difference is
-   in camera_service's consumption, not the pipeline.
-
-## Why this matters
-
-Four independent defects sat in the one code path that had never been exercised
-on hardware, and the synthetic harness could not have surfaced any of them —
-it bypasses `camera_service` entirely. The encode-to-fit logic *still* has not
-executed on air. Everything RS-3.3 was meant to verify remains unverified.
+Two wrong diagnoses in one investigation, both from reasoning about a system
+instead of instrumenting it. The stack dump was over-read (a thread parked where
+it belongs), and three symptoms were attributed to three causes when a single
+config gate explained all of them. The trace flag settled it in one run and cost
+less than any of the guesses.

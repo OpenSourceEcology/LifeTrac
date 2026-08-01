@@ -1,0 +1,1214 @@
+﻿2026-08-01 02:27:34,952 INFO image_rx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-08-01 02:27:34,955 INFO image_rx_daemon: image_rx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-08-01 02:27:34,958 INFO image_rx_daemon: ctrl MQTT connected (192.168.1.79)
+
+2026-08-01 02:27:34,966 INFO image_rx_daemon: MQTT connected; ready to publish lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:34,970 INFO image_rx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-08-01 02:27:34,983 INFO image_rx_daemon: accepting first retained lifetrac/v25/control/radio_profile pin after start (restart convergence)
+
+2026-08-01 02:27:35,403 INFO image_rx_daemon: L072 VER warm-up ok (attempt 1)
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+WARN: CFG_SET_REQ(FHSS_FARM_ID) failed: CFG_SET(0x17) REJECTED: status=1 (UNKNOWN_KEY) — do NOT treat as OK
+
+WARN: CFG_SET_REQ(FHSS_NODE_ID) failed: CFG_SET(0x18) REJECTED: status=1 (UNKNOWN_KEY) — do NOT treat as OK
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+
+2026-08-01 02:27:35,847 INFO image_rx_daemon: LBT_ENABLE=0 (command uplink shares the image channel)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-08-01 02:27:35,932 INFO image_rx_daemon: SX1276 RXCONT autowake: opmode 0x81 -> 0x85
+
+2026-08-01 02:27:35,933 INFO image_rx_daemon: RX worker ready; draining RX_FRAME_URC...
+
+2026-08-01 02:27:35,953 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+2026-08-01 02:27:38,099 INFO image_rx_daemon: published frame_id=0 2381 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 02:27:38,126 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-08-01 02:27:39,372 INFO image_rx_daemon: published frame_id=0 2426 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 02:27:39,399 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-08-01 02:27:40,619 INFO image_rx_daemon: published frame_id=0 2430 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 02:27:40,646 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 02:27:42,138 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-08-01 02:27:44,346 INFO image_rx_daemon: published frame_id=0 2389 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 02:27:44,373 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-08-01 02:27:44,523 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:44,616 INFO image_rx_daemon: cmd 0x63 CONVERGED after 5 attempts (9.6 s): ENCODE_MODE_ACK {'mode': 6, 'quality': 55}
+
+2026-08-01 02:27:44,717 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:44,918 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:44,920 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:45,329 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:45,969 INFO image_rx_daemon: stats: rx_frames=71 rx_decode_err=0 frames_published=9 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:27:45,971 INFO image_rx_daemon: air_gap: n=70 dt_med=117130us dt_p95=228801us len_med=247B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:27:45,974 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <120:57 <200:5 <400:4 <1000:2
+
+2026-08-01 02:27:45,974 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:45,975 INFO image_rx_daemon: air_gap_by_class: seq: n=59 med=117.1ms | boundary: n=9 med=189.6ms | post_loss: n=2 med=449.8ms
+
+2026-08-01 02:27:45,976 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=1 (9.09% of idx0 arrivals) other=2 (3.12%) verdict=CLUSTERED-AT-0 | top 3:1 0:1 1:1
+
+2026-08-01 02:27:46,695 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:47,203 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:47,711 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:48,723 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:49,219 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:49,715 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:50,167 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:50,656 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:51,151 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:51,638 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:52,135 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:52,662 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:53,160 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:53,651 INFO image_rx_daemon: published frame_id=0 139 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:54,156 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:54,660 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:55,135 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:55,660 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:55,979 INFO image_rx_daemon: stats: rx_frames=90 rx_decode_err=0 frames_published=28 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:27:55,981 INFO image_rx_daemon: air_gap: n=19 dt_med=495715us dt_p95=1012220us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:27:55,983 INFO image_rx_daemon: air_gap_hist(ms): <1000:18 >=1000:1
+
+2026-08-01 02:27:55,985 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=495.7ms
+
+2026-08-01 02:27:56,150 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:56,655 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:57,139 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:57,691 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:58,175 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:58,676 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:59,174 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:27:59,660 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:00,147 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:00,651 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:01,179 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:01,677 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:02,174 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:02,673 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:03,182 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:03,667 INFO image_rx_daemon: published frame_id=0 141 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:04,163 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:04,691 INFO image_rx_daemon: published frame_id=0 234 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:05,143 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:05,678 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:05,989 INFO image_rx_daemon: stats: rx_frames=110 rx_decode_err=0 frames_published=48 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:28:05,990 INFO image_rx_daemon: air_gap: n=20 dt_med=494798us dt_p95=549054us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:28:05,992 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-08-01 02:28:05,994 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=494.8ms
+
+2026-08-01 02:28:06,171 INFO image_rx_daemon: published frame_id=0 138 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:06,670 INFO image_rx_daemon: published frame_id=0 143 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:07,154 INFO image_rx_daemon: published frame_id=0 123 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:07,655 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:08,188 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:08,695 INFO image_rx_daemon: published frame_id=0 144 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:09,181 INFO image_rx_daemon: published frame_id=0 135 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:09,678 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:10,163 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:10,659 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:11,162 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:11,715 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:12,201 INFO image_rx_daemon: published frame_id=0 143 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:12,691 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:13,184 INFO image_rx_daemon: published frame_id=0 134 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:13,675 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:14,167 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:14,659 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:15,156 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:15,651 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:15,996 INFO image_rx_daemon: stats: rx_frames=130 rx_decode_err=0 frames_published=68 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:28:15,998 INFO image_rx_daemon: air_gap: n=20 dt_med=495886us dt_p95=550076us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:28:16,000 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-08-01 02:28:16,002 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=495.9ms
+
+2026-08-01 02:28:16,131 INFO image_rx_daemon: published frame_id=0 140 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:17,159 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:17,659 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:18,149 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:18,635 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:19,176 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:19,667 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:20,151 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:20,687 INFO image_rx_daemon: published frame_id=0 234 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:21,150 INFO image_rx_daemon: published frame_id=0 143 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:21,691 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:22,175 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:22,663 INFO image_rx_daemon: published frame_id=0 128 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:23,150 INFO image_rx_daemon: published frame_id=0 140 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:23,649 INFO image_rx_daemon: published frame_id=0 144 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:24,139 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:24,681 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:25,167 INFO image_rx_daemon: published frame_id=0 142 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:25,667 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:26,004 INFO image_rx_daemon: stats: rx_frames=149 rx_decode_err=0 frames_published=87 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:28:26,005 INFO image_rx_daemon: air_gap: n=19 dt_med=494371us dt_p95=1020479us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:28:26,006 INFO image_rx_daemon: air_gap_hist(ms): <1000:18 >=1000:1
+
+2026-08-01 02:28:26,007 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=494.4ms
+
+2026-08-01 02:28:26,151 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:26,647 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:27,175 INFO image_rx_daemon: published frame_id=0 141 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:27,712 INFO image_rx_daemon: published frame_id=0 239 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:28,208 INFO image_rx_daemon: published frame_id=0 243 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:28,660 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:29,160 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:29,691 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:30,174 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:30,733 INFO image_rx_daemon: published frame_id=0 227 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:31,716 INFO image_rx_daemon: published frame_id=0 223 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:32,217 INFO image_rx_daemon: published frame_id=0 243 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:32,694 INFO image_rx_daemon: published frame_id=0 243 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:33,156 INFO image_rx_daemon: published frame_id=0 144 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:33,683 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:34,183 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:34,704 INFO image_rx_daemon: published frame_id=0 227 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:35,200 INFO image_rx_daemon: published frame_id=0 222 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:35,691 INFO image_rx_daemon: published frame_id=0 218 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:36,008 INFO image_rx_daemon: stats: rx_frames=168 rx_decode_err=0 frames_published=106 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:28:36,009 INFO image_rx_daemon: air_gap: n=19 dt_med=494686us dt_p95=990301us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:28:36,010 INFO image_rx_daemon: air_gap_hist(ms): <1000:19
+
+2026-08-01 02:28:36,011 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=494.7ms
+
+2026-08-01 02:28:36,231 INFO image_rx_daemon: published frame_id=0 230 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:36,723 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:37,179 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:37,670 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:38,184 INFO image_rx_daemon: published frame_id=0 216 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:38,704 INFO image_rx_daemon: published frame_id=0 233 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:39,184 INFO image_rx_daemon: published frame_id=0 223 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:39,680 INFO image_rx_daemon: published frame_id=0 204 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:40,155 INFO image_rx_daemon: published frame_id=0 138 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:40,658 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:41,188 INFO image_rx_daemon: published frame_id=0 230 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:41,643 INFO image_rx_daemon: published frame_id=0 143 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:42,144 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:42,628 INFO image_rx_daemon: published frame_id=0 135 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:43,171 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:43,651 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:44,171 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:44,659 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:45,636 INFO image_rx_daemon: published frame_id=0 141 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:46,013 INFO image_rx_daemon: stats: rx_frames=187 rx_decode_err=0 frames_published=125 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:28:46,013 INFO image_rx_daemon: air_gap: n=19 dt_med=493755us dt_p95=980263us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:28:46,014 INFO image_rx_daemon: air_gap_hist(ms): <1000:19
+
+2026-08-01 02:28:46,014 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=493.8ms
+
+2026-08-01 02:28:46,123 INFO image_rx_daemon: published frame_id=0 131 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:46,666 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:47,154 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:47,663 INFO image_rx_daemon: published frame_id=0 141 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:48,150 INFO image_rx_daemon: published frame_id=0 136 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:48,712 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:49,144 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:49,675 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:50,159 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:50,665 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:51,164 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:51,654 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:52,143 INFO image_rx_daemon: published frame_id=0 141 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:52,695 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:53,190 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:53,715 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:54,215 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:54,711 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:55,160 INFO image_rx_daemon: published frame_id=0 140 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:55,649 INFO image_rx_daemon: published frame_id=0 138 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:56,016 INFO image_rx_daemon: stats: rx_frames=207 rx_decode_err=0 frames_published=145 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:28:56,016 INFO image_rx_daemon: air_gap: n=20 dt_med=495695us dt_p95=553584us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:28:56,017 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-08-01 02:28:56,018 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=495.7ms
+
+2026-08-01 02:28:56,181 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:56,672 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:57,224 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:57,691 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:58,188 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:28:58,678 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:00,194 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:00,688 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:01,175 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:01,675 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:02,115 INFO image_rx_daemon: published frame_id=0 137 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:02,667 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:03,153 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:03,652 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:04,139 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:04,644 INFO image_rx_daemon: published frame_id=0 143 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:05,119 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:05,655 INFO image_rx_daemon: published frame_id=0 143 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:06,019 INFO image_rx_daemon: stats: rx_frames=225 rx_decode_err=0 frames_published=163 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:29:06,019 INFO image_rx_daemon: air_gap: n=18 dt_med=493735us dt_p95=1519704us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:29:06,020 INFO image_rx_daemon: air_gap_hist(ms): <1000:17 >=1000:1
+
+2026-08-01 02:29:06,020 INFO image_rx_daemon: air_gap_by_class: boundary: n=18 med=493.7ms
+
+2026-08-01 02:29:06,692 INFO image_rx_daemon: published frame_id=0 243 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:07,143 INFO image_rx_daemon: published frame_id=0 143 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:07,632 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:08,161 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:09,195 INFO image_rx_daemon: published frame_id=0 231 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:09,687 INFO image_rx_daemon: published frame_id=0 227 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:10,179 INFO image_rx_daemon: published frame_id=0 218 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:10,663 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:11,198 INFO image_rx_daemon: published frame_id=0 236 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:11,655 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:12,156 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:12,699 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:13,743 INFO image_rx_daemon: published frame_id=0 225 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:14,251 INFO image_rx_daemon: published frame_id=0 219 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:14,762 INFO image_rx_daemon: published frame_id=0 225 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:15,190 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:15,735 INFO image_rx_daemon: published frame_id=0 210 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:16,022 INFO image_rx_daemon: stats: rx_frames=242 rx_decode_err=0 frames_published=180 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:29:16,022 INFO image_rx_daemon: air_gap: n=17 dt_med=505996us dt_p95=1044255us len_med=222B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:29:16,022 INFO image_rx_daemon: air_gap_hist(ms): <1000:14 >=1000:3
+
+2026-08-01 02:29:16,023 INFO image_rx_daemon: air_gap_by_class: boundary: n=17 med=506.0ms
+
+2026-08-01 02:29:16,205 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:16,759 INFO image_rx_daemon: published frame_id=0 243 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:17,255 INFO image_rx_daemon: published frame_id=0 233 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:17,744 INFO image_rx_daemon: published frame_id=0 226 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:18,188 INFO image_rx_daemon: published frame_id=0 205 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:18,687 INFO image_rx_daemon: published frame_id=0 216 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:19,145 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:19,675 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:20,162 INFO image_rx_daemon: published frame_id=0 132 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:20,663 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:21,159 INFO image_rx_daemon: published frame_id=0 140 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:21,656 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:22,185 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:22,695 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:23,191 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:23,691 INFO image_rx_daemon: published frame_id=0 139 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:24,183 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:24,668 INFO image_rx_daemon: published frame_id=0 129 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:25,172 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:25,663 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:26,024 INFO image_rx_daemon: stats: rx_frames=262 rx_decode_err=0 frames_published=200 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:29:26,025 INFO image_rx_daemon: air_gap: n=20 dt_med=497248us dt_p95=547807us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:29:26,025 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-08-01 02:29:26,026 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=497.2ms
+
+2026-08-01 02:29:26,151 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:26,647 INFO image_rx_daemon: published frame_id=0 140 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:27,150 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:27,647 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:28,156 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:28,663 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:29,209 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:29,676 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:30,182 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:30,681 INFO image_rx_daemon: published frame_id=0 123 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:31,187 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:31,703 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:32,198 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:32,702 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:33,157 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:33,691 INFO image_rx_daemon: published frame_id=0 241 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:34,134 INFO image_rx_daemon: published frame_id=0 140 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:34,663 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:35,175 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:35,665 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:36,027 INFO image_rx_daemon: stats: rx_frames=282 rx_decode_err=0 frames_published=220 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:29:36,028 INFO image_rx_daemon: air_gap: n=20 dt_med=503532us dt_p95=546919us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:29:36,028 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-08-01 02:29:36,029 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=503.5ms
+
+2026-08-01 02:29:36,140 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:36,647 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:37,676 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:38,148 INFO image_rx_daemon: published frame_id=0 135 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:38,643 INFO image_rx_daemon: published frame_id=0 124 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:39,146 INFO image_rx_daemon: published frame_id=0 141 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:39,635 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:40,188 INFO image_rx_daemon: published frame_id=0 142 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:40,675 INFO image_rx_daemon: published frame_id=0 144 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:41,679 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:42,166 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:42,658 INFO image_rx_daemon: published frame_id=0 137 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:43,142 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:43,636 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:44,659 INFO image_rx_daemon: published frame_id=0 141 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:45,199 INFO image_rx_daemon: published frame_id=0 233 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:45,708 INFO image_rx_daemon: published frame_id=0 235 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:46,031 INFO image_rx_daemon: stats: rx_frames=299 rx_decode_err=0 frames_published=237 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:29:46,032 INFO image_rx_daemon: air_gap: n=17 dt_med=494185us dt_p95=1033197us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:29:46,032 INFO image_rx_daemon: air_gap_hist(ms): <1000:14 >=1000:3
+
+2026-08-01 02:29:46,033 INFO image_rx_daemon: air_gap_by_class: boundary: n=17 med=494.2ms
+
+2026-08-01 02:29:46,206 INFO image_rx_daemon: published frame_id=0 142 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:46,728 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:47,214 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:47,714 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:48,171 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:48,733 INFO image_rx_daemon: published frame_id=0 229 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:49,216 INFO image_rx_daemon: published frame_id=0 221 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:49,667 INFO image_rx_daemon: published frame_id=0 221 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:50,160 INFO image_rx_daemon: published frame_id=0 243 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:50,703 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:51,147 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:51,639 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:52,135 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:52,663 INFO image_rx_daemon: published frame_id=0 222 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:53,192 INFO image_rx_daemon: published frame_id=0 225 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:53,691 INFO image_rx_daemon: published frame_id=0 228 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:54,188 INFO image_rx_daemon: published frame_id=0 241 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:54,684 INFO image_rx_daemon: published frame_id=0 213 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:55,147 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:55,687 INFO image_rx_daemon: published frame_id=0 236 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:56,035 INFO image_rx_daemon: stats: rx_frames=319 rx_decode_err=0 frames_published=257 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:29:56,037 INFO image_rx_daemon: air_gap: n=20 dt_med=496555us dt_p95=558907us len_med=225B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:29:56,039 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-08-01 02:29:56,041 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=496.6ms
+
+2026-08-01 02:29:56,183 INFO image_rx_daemon: published frame_id=0 212 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:56,735 INFO image_rx_daemon: published frame_id=0 235 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:57,220 INFO image_rx_daemon: published frame_id=0 225 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:57,667 INFO image_rx_daemon: published frame_id=0 215 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:58,171 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:58,667 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:59,155 INFO image_rx_daemon: published frame_id=0 144 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:29:59,639 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:00,127 INFO image_rx_daemon: published frame_id=0 139 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:00,630 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:01,159 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:01,651 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:02,139 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:02,679 INFO image_rx_daemon: published frame_id=0 136 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:03,175 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:03,670 INFO image_rx_daemon: published frame_id=0 130 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:04,187 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:04,695 INFO image_rx_daemon: published frame_id=0 139 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:05,175 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:05,667 INFO image_rx_daemon: published frame_id=0 142 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:06,045 INFO image_rx_daemon: stats: rx_frames=339 rx_decode_err=0 frames_published=277 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:30:06,047 INFO image_rx_daemon: air_gap: n=20 dt_med=495324us dt_p95=551019us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:30:06,049 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-08-01 02:30:06,050 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=495.3ms
+
+2026-08-01 02:30:06,159 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:06,664 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:07,147 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:07,645 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:08,183 INFO image_rx_daemon: published frame_id=0 142 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:08,681 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:09,184 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:09,660 INFO image_rx_daemon: published frame_id=0 134 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:10,641 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:11,170 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:11,667 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:12,168 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:12,659 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:13,183 INFO image_rx_daemon: published frame_id=0 141 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:13,639 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:14,124 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:14,623 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:15,151 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:15,649 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:16,055 INFO image_rx_daemon: stats: rx_frames=358 rx_decode_err=0 frames_published=296 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:30:16,056 INFO image_rx_daemon: air_gap: n=19 dt_med=494208us dt_p95=981631us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:30:16,058 INFO image_rx_daemon: air_gap_hist(ms): <1000:19
+
+2026-08-01 02:30:16,060 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=494.2ms
+
+2026-08-01 02:30:16,152 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:16,658 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:17,639 INFO image_rx_daemon: published frame_id=0 125 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:18,143 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:18,643 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:19,123 INFO image_rx_daemon: published frame_id=0 144 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:19,661 INFO image_rx_daemon: published frame_id=0 139 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:20,157 INFO image_rx_daemon: published frame_id=0 133 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:20,655 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:21,148 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:21,663 INFO image_rx_daemon: published frame_id=0 139 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:22,179 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:22,667 INFO image_rx_daemon: published frame_id=0 142 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:23,157 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:23,696 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:24,683 INFO image_rx_daemon: published frame_id=0 233 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:25,219 INFO image_rx_daemon: published frame_id=0 239 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:25,663 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:26,063 INFO image_rx_daemon: stats: rx_frames=376 rx_decode_err=0 frames_published=314 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:30:26,065 INFO image_rx_daemon: air_gap: n=18 dt_med=503622us dt_p95=986159us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:30:26,066 INFO image_rx_daemon: air_gap_hist(ms): <1000:18
+
+2026-08-01 02:30:26,067 INFO image_rx_daemon: air_gap_by_class: boundary: n=18 med=503.6ms
+
+2026-08-01 02:30:26,171 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:26,654 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:27,184 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:27,672 INFO image_rx_daemon: published frame_id=0 225 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:28,203 INFO image_rx_daemon: published frame_id=0 220 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:28,712 INFO image_rx_daemon: published frame_id=0 241 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:29,211 INFO image_rx_daemon: published frame_id=0 239 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:29,654 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:30,147 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:30,652 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:31,699 INFO image_rx_daemon: published frame_id=0 214 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:32,195 INFO image_rx_daemon: published frame_id=0 231 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:32,693 INFO image_rx_daemon: published frame_id=0 238 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:33,175 INFO image_rx_daemon: published frame_id=0 213 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:33,725 INFO image_rx_daemon: published frame_id=0 243 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:34,212 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:34,700 INFO image_rx_daemon: published frame_id=0 234 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:35,187 INFO image_rx_daemon: published frame_id=0 221 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:35,716 INFO image_rx_daemon: published frame_id=0 219 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:36,070 INFO image_rx_daemon: stats: rx_frames=395 rx_decode_err=0 frames_published=333 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:30:36,072 INFO image_rx_daemon: air_gap: n=19 dt_med=493284us dt_p95=1054459us len_med=225B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:30:36,074 INFO image_rx_daemon: air_gap_hist(ms): <1000:18 >=1000:1
+
+2026-08-01 02:30:36,076 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=493.3ms
+
+2026-08-01 02:30:36,174 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:36,691 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:37,199 INFO image_rx_daemon: published frame_id=0 137 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:37,702 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:38,683 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:39,177 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:39,695 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:40,199 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:40,676 INFO image_rx_daemon: published frame_id=0 139 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:41,176 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:41,659 INFO image_rx_daemon: published frame_id=0 129 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:42,155 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:42,651 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:43,155 INFO image_rx_daemon: published frame_id=0 140 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:43,655 INFO image_rx_daemon: published frame_id=0 136 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:44,147 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:44,643 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:45,151 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:45,679 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:46,080 INFO image_rx_daemon: stats: rx_frames=414 rx_decode_err=0 frames_published=352 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:30:46,081 INFO image_rx_daemon: air_gap: n=19 dt_med=503754us dt_p95=976172us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:30:46,084 INFO image_rx_daemon: air_gap_hist(ms): <1000:19
+
+2026-08-01 02:30:46,086 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=503.8ms
+
+2026-08-01 02:30:46,210 INFO image_rx_daemon: published frame_id=0 241 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:46,669 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:47,157 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:47,641 INFO image_rx_daemon: published frame_id=0 131 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:48,146 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:48,669 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:49,163 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:49,652 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:50,151 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:50,640 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:51,169 INFO image_rx_daemon: published frame_id=0 140 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:51,687 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:52,184 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:52,660 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:53,159 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:53,679 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:54,167 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:54,651 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:55,147 INFO image_rx_daemon: published frame_id=0 138 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:55,674 INFO image_rx_daemon: published frame_id=0 126 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:56,089 INFO image_rx_daemon: stats: rx_frames=434 rx_decode_err=0 frames_published=372 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:30:56,091 INFO image_rx_daemon: air_gap: n=20 dt_med=494498us dt_p95=528586us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:30:56,092 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-08-01 02:30:56,093 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=494.5ms
+
+2026-08-01 02:30:56,172 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:56,659 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:57,151 INFO image_rx_daemon: published frame_id=0 142 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:57,652 INFO image_rx_daemon: published frame_id=0 144 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:58,179 INFO image_rx_daemon: published frame_id=0 142 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:58,684 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:59,163 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:30:59,659 INFO image_rx_daemon: published frame_id=0 144 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:00,155 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:00,687 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:01,143 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:01,692 INFO image_rx_daemon: published frame_id=0 241 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:02,179 INFO image_rx_daemon: published frame_id=0 240 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:02,679 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:03,671 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:04,179 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:04,691 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:05,199 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:05,739 INFO image_rx_daemon: published frame_id=0 220 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:06,096 INFO image_rx_daemon: stats: rx_frames=453 rx_decode_err=0 frames_published=391 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:31:06,098 INFO image_rx_daemon: air_gap: n=19 dt_med=497172us dt_p95=1002681us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:31:06,099 INFO image_rx_daemon: air_gap_hist(ms): <1000:18 >=1000:1
+
+2026-08-01 02:31:06,100 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=497.2ms
+
+2026-08-01 02:31:06,712 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:07,208 INFO image_rx_daemon: published frame_id=0 241 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:07,715 INFO image_rx_daemon: published frame_id=0 221 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:08,187 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:08,736 INFO image_rx_daemon: published frame_id=0 243 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:09,227 INFO image_rx_daemon: published frame_id=0 239 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:09,719 INFO image_rx_daemon: published frame_id=0 224 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:10,176 INFO image_rx_daemon: published frame_id=0 235 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:10,704 INFO image_rx_daemon: published frame_id=0 241 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:11,184 INFO image_rx_daemon: published frame_id=0 215 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:11,649 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:12,208 INFO image_rx_daemon: published frame_id=0 243 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:12,712 INFO image_rx_daemon: published frame_id=0 233 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:13,686 INFO image_rx_daemon: published frame_id=0 212 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:14,151 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:14,647 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:15,167 INFO image_rx_daemon: published frame_id=0 137 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:15,668 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:16,103 INFO image_rx_daemon: stats: rx_frames=471 rx_decode_err=0 frames_published=409 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:31:16,104 INFO image_rx_daemon: air_gap: n=18 dt_med=503283us dt_p95=975707us len_med=228B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:31:16,106 INFO image_rx_daemon: air_gap_hist(ms): <1000:18
+
+2026-08-01 02:31:16,108 INFO image_rx_daemon: air_gap_by_class: boundary: n=18 med=503.3ms
+
+2026-08-01 02:31:16,155 INFO image_rx_daemon: published frame_id=0 134 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:16,647 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:17,155 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:17,715 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:18,212 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:18,752 INFO image_rx_daemon: published frame_id=0 242 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:19,162 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:19,659 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:20,687 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:21,657 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:22,153 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:22,647 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:23,181 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:23,680 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:24,170 INFO image_rx_daemon: published frame_id=0 143 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:24,655 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:25,160 INFO image_rx_daemon: published frame_id=0 139 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:25,679 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:26,111 INFO image_rx_daemon: stats: rx_frames=489 rx_decode_err=0 frames_published=427 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:31:26,112 INFO image_rx_daemon: air_gap: n=18 dt_med=503992us dt_p95=1028906us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:31:26,115 INFO image_rx_daemon: air_gap_hist(ms): <1000:17 >=1000:1
+
+2026-08-01 02:31:26,116 INFO image_rx_daemon: air_gap_by_class: boundary: n=18 med=504.0ms
+
+2026-08-01 02:31:26,175 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:26,667 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:27,146 INFO image_rx_daemon: published frame_id=0 143 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:27,643 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:28,135 INFO image_rx_daemon: published frame_id=0 143 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:28,627 INFO image_rx_daemon: published frame_id=0 138 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:29,125 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:29,655 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:30,152 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:30,651 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:31,141 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:31,627 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:32,167 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:32,654 INFO image_rx_daemon: published frame_id=0 142 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:33,150 INFO image_rx_daemon: published frame_id=0 128 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:33,667 INFO image_rx_daemon: published frame_id=0 145 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:34,175 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:34,671 INFO image_rx_daemon: published frame_id=0 143 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:35,155 INFO image_rx_daemon: published frame_id=0 141 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:35,651 INFO image_rx_daemon: published frame_id=0 137 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:36,131 INFO image_rx_daemon: stats: rx_frames=509 rx_decode_err=0 frames_published=447 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:31:36,133 INFO image_rx_daemon: air_gap: n=20 dt_med=491264us dt_p95=535567us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:31:36,135 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-08-01 02:31:36,137 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=491.3ms
+
+2026-08-01 02:31:36,146 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:36,643 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:37,122 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:37,658 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:38,151 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:38,650 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:39,135 INFO image_rx_daemon: published frame_id=0 144 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:39,667 INFO image_rx_daemon: published frame_id=0 226 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:40,196 INFO image_rx_daemon: published frame_id=0 237 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:40,695 INFO image_rx_daemon: published frame_id=0 228 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:41,196 INFO image_rx_daemon: published frame_id=0 238 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:41,648 INFO image_rx_daemon: published frame_id=0 147 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:42,184 INFO image_rx_daemon: published frame_id=0 146 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:42,660 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:43,152 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:43,699 INFO image_rx_daemon: published frame_id=0 229 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:44,207 INFO image_rx_daemon: published frame_id=0 220 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:44,707 INFO image_rx_daemon: published frame_id=0 144 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:45,207 INFO image_rx_daemon: published frame_id=0 236 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:45,691 INFO image_rx_daemon: published frame_id=0 228 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:46,151 INFO image_rx_daemon: stats: rx_frames=529 rx_decode_err=0 frames_published=467 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=3 parity_recon=0
+
+2026-08-01 02:31:46,153 INFO image_rx_daemon: air_gap: n=20 dt_med=495810us dt_p95=541981us len_med=152B cmd_tx_ok=5 cmd_tx_fail=0
+
+2026-08-01 02:31:46,155 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-08-01 02:31:46,155 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=495.8ms
+
+2026-08-01 02:31:46,174 INFO image_rx_daemon: published frame_id=0 239 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:46,715 INFO image_rx_daemon: published frame_id=0 237 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:47,172 INFO image_rx_daemon: published frame_id=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:47,699 INFO image_rx_daemon: published frame_id=0 221 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 02:31:48,204 INFO image_rx_daemon: published frame_id=0 234 B → lifetrac/v25/video/tile_delta
+

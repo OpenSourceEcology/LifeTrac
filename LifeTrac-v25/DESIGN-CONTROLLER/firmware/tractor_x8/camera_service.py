@@ -128,6 +128,9 @@ FFMPEG_PATH       = os.environ.get("LIFETRAC_FFMPEG_PATH", "ffmpeg")
 # can subscribe without the M7 having to bridge it.
 M7_UART_DEVICE    = os.environ.get("LIFETRAC_M7_UART", "/dev/ttymxc1")
 DEBUG_MQTT        = os.environ.get("LIFETRAC_CAMERA_DEBUG_MQTT", "").strip() == "1"
+# RS-3.3: per-read timing for the capture pipeline. Off by default; the log
+# volume is one line per read() syscall.
+CAMERA_TRACE      = os.environ.get("LIFETRAC_CAMERA_TRACE", "").strip() == "1"
 # 2026-05-27 W2-02 strict-path bridge: when set, the daemon hands
 # /dev/ttymxc3 off to image_tx_daemon (which speaks the Method-G
 # HostLink protocol the L072 actually understands) and routes every
@@ -336,6 +339,7 @@ class V4l2FfmpegCamera:
             raise RuntimeError(
                 f"V4l2FfmpegCamera: failed to spawn {self.ffmpeg_path!r}: {exc}"
             ) from exc
+        self._spawn_t = time.monotonic()
         LOG.info("camera_service: v4l2/ffmpeg pid=%s device=%s %s@%dfps -> %dx%d rgb24",
                  self._proc.pid, self.device, self.input_size, self.input_fps,
                  CANVAS_W, CANVAS_H)
@@ -343,8 +347,24 @@ class V4l2FfmpegCamera:
     def _read_exact(self, n: int) -> bytes | None:
         assert self._proc is not None and self._proc.stdout is not None
         out = bytearray()
+        # 2026-07-30 RS-3.3 diagnostic. camera_service blocks here on hardware
+        # while an identical standalone Popen+read of the SAME argv returns a
+        # full frame in 2.5 s. ffmpeg, the argv, the pipe, stdin=DEVNULL and
+        # device contention have all been ruled out by measurement, so the
+        # remaining suspect is the delay between spawning ffmpeg and first
+        # draining it: -thread_queue_size 2 with -fflags nobuffer leaves almost
+        # no slack, and a stalled reader can wedge the 64 KB stdout pipe.
+        if CAMERA_TRACE:
+            LOG.info("camera_trace: first read starting %.2f s after spawn",
+                     time.monotonic() - getattr(self, "_spawn_t", time.monotonic()))
         while len(out) < n:
+            t_chunk = time.monotonic()
             chunk = self._proc.stdout.read(n - len(out))
+            if CAMERA_TRACE:
+                LOG.info("camera_trace: read() returned %s bytes after %.2f s "
+                         "(have %d/%d)",
+                         len(chunk) if chunk else 0,
+                         time.monotonic() - t_chunk, len(out), n)
             if not chunk:
                 return None
             out.extend(chunk)

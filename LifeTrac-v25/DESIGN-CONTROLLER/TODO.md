@@ -787,7 +787,22 @@ No-regrets work, correct under every surviving architecture (do first):
   and 15 ms guard (13.5 % of every 200 ms slot) to measured+margin.
   Do NOT raise `SLOT_MS` — 200 ms is load-bearing for the FCC per-channel
   dwell math.
-- [ ] **RS-3.3 Real-camera benchmark rerun** — the synth workload underfills
+- [x] **RS-3.3 Real-camera benchmark — DONE 2026-07-30, encode-to-fit VERIFIED
+  ON AIR.** 240 s run, real USB UVC camera through camera_service's encode-to-fit
+  packer, over LoRa to the base: 492 frames encoded (491 ok, 0 dropped), 556
+  fragments, 472 complete frames delivered, rx_decode_err=0. Keyframes measured
+  2381/2389/2426/2430 B against a logged `byte_budget=2436 B/frame` — every one
+  under budget, the largest within 6 B. That is the packer filling the transport
+  quantum without exceeding it, on real camera data.
+  Requires `LIFETRAC_USE_LORA_BRIDGE=1`: it skips the M7 IpcWriter (which
+  otherwise opens /dev/ttymxc3 that image_tx_daemon owns), creates the MQTT
+  client without which frames are silently discarded, and turns deshake off
+  (the i.MX8 cannot produce one frame through deshake in 30 s). Harness now
+  has `-TxFeed camera`. Evidence:
+  [`bench-evidence/RS_3_3_real_camera_2026-07-30/RESULTS.md`](bench-evidence/RS_3_3_real_camera_2026-07-30/RESULTS.md).
+  Original item follows.
+
+- [x] **RS-3.3 (original) Real-camera benchmark rerun** — the synth workload underfills
   fragments (150–275 B frames); real keyframes chunk at max body size.
   Re-run the FHSS + DTS benchmarks fed by `camera_service.py` live before
   optimizing further.
