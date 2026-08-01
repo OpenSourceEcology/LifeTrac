@@ -1,0 +1,1282 @@
+﻿2026-08-01 15:51:46,450 INFO image_rx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-08-01 15:51:46,453 INFO image_rx_daemon: ctrl MQTT connected (192.168.1.79)
+
+2026-08-01 15:51:46,456 INFO image_rx_daemon: image_rx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-08-01 15:51:46,464 INFO image_rx_daemon: MQTT connected; ready to publish lifetrac/v25/video/tile_delta
+
+2026-08-01 15:51:46,469 INFO image_rx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-08-01 15:51:46,481 INFO image_rx_daemon: accepting first retained lifetrac/v25/control/radio_profile pin after start (restart convergence)
+
+2026-08-01 15:51:46,902 INFO image_rx_daemon: L072 VER warm-up ok (attempt 1)
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+WARN: CFG_SET_REQ(FHSS_FARM_ID) failed: CFG_SET(0x17) REJECTED: status=1 (UNKNOWN_KEY) — do NOT treat as OK
+
+WARN: CFG_SET_REQ(FHSS_NODE_ID) failed: CFG_SET(0x18) REJECTED: status=1 (UNKNOWN_KEY) — do NOT treat as OK
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+
+2026-08-01 15:51:47,348 INFO image_rx_daemon: LBT_ENABLE=0 (command uplink shares the image channel)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-08-01 15:51:47,431 INFO image_rx_daemon: SX1276 RXCONT autowake: opmode 0x81 -> 0x85
+
+2026-08-01 15:51:47,432 INFO image_rx_daemon: RX worker ready; draining RX_FRAME_URC...
+
+2026-08-01 15:51:47,452 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:47,713 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+INFO: unrelated frame during TX wait type=0xC4
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:48,282 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:48,826 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:49,376 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:49,920 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:50,468 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:51,010 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:51,553 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:52,103 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:52,649 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:53,210 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:53,763 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:54,307 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:54,851 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:55,408 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:55,957 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-01 15:51:56,508 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-08-01 15:51:56,770 WARNING image_rx_daemon: cmd 0x63 GAVE UP after 17 attempts (10.3 s)
+
+2026-08-01 15:51:57,455 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+2026-08-01 15:52:01,400 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:01,401 INFO image_rx_daemon: PROBE TX seq=1 phase_ms=0 size_b=16 (tx#1)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:01,423 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:03,007 INFO image_rx_daemon: published frame_id=0 2980 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:03,009 INFO image_rx_daemon: PROBE TX seq=2 phase_ms=0 size_b=16 (tx#2)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:03,034 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:04,600 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:04,601 INFO image_rx_daemon: PROBE TX seq=3 phase_ms=0 size_b=16 (tx#3)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:04,627 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:07,459 INFO image_rx_daemon: stats: rx_frames=60 rx_decode_err=0 frames_published=3 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+2026-08-01 15:52:07,460 INFO image_rx_daemon: air_gap: n=59 dt_med=116783us dt_p95=265172us len_med=247B cmd_tx_ok=20 cmd_tx_fail=0
+
+2026-08-01 15:52:07,464 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:1 <120:52 <400:4
+
+2026-08-01 15:52:07,465 INFO image_rx_daemon: air_gap_by_class: seq: n=55 med=116.8ms | boundary: n=4 med=265.4ms
+
+2026-08-01 15:52:07,466 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (1.79%) verdict=not-clustered | top 11:1
+
+2026-08-01 15:52:07,467 INFO image_rx_daemon: probe: tx=3 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:52:07,467 INFO image_rx_daemon: probe_grid: p0/s0:0/3(0%)
+
+2026-08-01 15:52:07,651 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:07,652 INFO image_rx_daemon: PROBE TX seq=4 phase_ms=0 size_b=16 (tx#4)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:07,678 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:09,144 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:09,145 INFO image_rx_daemon: PROBE TX seq=5 phase_ms=0 size_b=16 (tx#5)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:09,172 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:10,735 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:10,736 INFO image_rx_daemon: PROBE TX seq=6 phase_ms=0 size_b=16 (tx#6)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:10,764 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:12,304 INFO image_rx_daemon: published frame_id=0 2919 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:12,305 INFO image_rx_daemon: PROBE TX seq=7 phase_ms=0 size_b=16 (tx#7)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:12,332 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:13,808 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:13,809 INFO image_rx_daemon: PROBE TX seq=8 phase_ms=0 size_b=16 (tx#8)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:13,835 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:15,379 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:15,379 INFO image_rx_daemon: PROBE TX seq=9 phase_ms=0 size_b=16 (tx#9)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:15,405 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:16,854 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:16,855 INFO image_rx_daemon: PROBE TX seq=10 phase_ms=0 size_b=16 (tx#10)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:16,886 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:17,491 INFO image_rx_daemon: stats: rx_frames=144 rx_decode_err=0 frames_published=10 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=1 parity_recon=0
+
+2026-08-01 15:52:17,494 INFO image_rx_daemon: air_gap: n=85 dt_med=116832us dt_p95=171595us len_med=247B cmd_tx_ok=27 cmd_tx_fail=0
+
+2026-08-01 15:52:17,495 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:5 <120:72 <200:4 <400:3
+
+2026-08-01 15:52:17,496 INFO image_rx_daemon: air_gap_by_class: seq: n=78 med=116.8ms | boundary: n=7 med=187.0ms
+
+2026-08-01 15:52:17,496 INFO image_rx_daemon: probe: tx=10 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:52:17,497 INFO image_rx_daemon: probe_grid: p0/s0:0/10(0%)
+
+2026-08-01 15:52:18,316 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:18,317 INFO image_rx_daemon: PROBE TX seq=11 phase_ms=0 size_b=16 (tx#11)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:18,343 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:19,824 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:19,825 INFO image_rx_daemon: PROBE TX seq=12 phase_ms=0 size_b=16 (tx#12)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:19,852 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:25,962 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:25,963 INFO image_rx_daemon: PROBE TX seq=13 phase_ms=0 size_b=16 (tx#13)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:25,994 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:27,439 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:27,439 INFO image_rx_daemon: PROBE TX seq=14 phase_ms=0 size_b=16 (tx#14)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:27,472 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:27,506 INFO image_rx_daemon: stats: rx_frames=226 rx_decode_err=0 frames_published=14 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=4 parity_recon=0
+
+2026-08-01 15:52:27,508 INFO image_rx_daemon: air_gap: n=81 dt_med=116851us dt_p95=214596us len_med=247B cmd_tx_ok=31 cmd_tx_fail=0
+
+2026-08-01 15:52:27,513 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:1 <120:70 <200:2 <400:5
+
+2026-08-01 15:52:27,514 INFO image_rx_daemon: air_gap_by_class: seq: n=74 med=116.8ms | boundary: n=6 med=261.9ms | post_loss: n=1 med=233.7ms
+
+2026-08-01 15:52:27,515 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (1.92%) verdict=not-clustered | top 1:1 12:1 11:1
+
+2026-08-01 15:52:27,515 INFO image_rx_daemon: probe: tx=14 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:52:27,516 INFO image_rx_daemon: probe_grid: p0/s0:0/14(0%)
+
+2026-08-01 15:52:28,905 INFO image_rx_daemon: published frame_id=0 2949 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:28,906 INFO image_rx_daemon: PROBE TX seq=15 phase_ms=0 size_b=16 (tx#15)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:28,932 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:30,390 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:30,391 INFO image_rx_daemon: PROBE TX seq=16 phase_ms=0 size_b=16 (tx#16)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:30,423 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:31,878 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:31,879 INFO image_rx_daemon: PROBE TX seq=17 phase_ms=0 size_b=16 (tx#17)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:31,905 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:33,471 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:33,472 INFO image_rx_daemon: PROBE TX seq=18 phase_ms=0 size_b=16 (tx#18)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:33,499 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:36,522 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:36,522 INFO image_rx_daemon: PROBE TX seq=19 phase_ms=0 size_b=16 (tx#19)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:36,545 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:37,523 INFO image_rx_daemon: stats: rx_frames=308 rx_decode_err=0 frames_published=19 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=5 parity_recon=0
+
+2026-08-01 15:52:37,524 INFO image_rx_daemon: air_gap: n=82 dt_med=116917us dt_p95=186954us len_med=247B cmd_tx_ok=36 cmd_tx_fail=0
+
+2026-08-01 15:52:37,524 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:2 <120:70 <200:4 <400:4
+
+2026-08-01 15:52:37,525 INFO image_rx_daemon: air_gap_by_class: seq: n=74 med=116.8ms | boundary: n=7 med=187.0ms | post_loss: n=1 med=233.5ms
+
+2026-08-01 15:52:37,525 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.60%) verdict=not-clustered | top 4:1 11:1
+
+2026-08-01 15:52:37,526 INFO image_rx_daemon: probe: tx=19 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:52:37,526 INFO image_rx_daemon: probe_grid: p0/s0:0/19(0%)
+
+2026-08-01 15:52:38,029 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:38,029 INFO image_rx_daemon: PROBE TX seq=20 phase_ms=0 size_b=16 (tx#20)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:38,056 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:39,599 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:39,600 INFO image_rx_daemon: PROBE TX seq=21 phase_ms=0 size_b=16 (tx#21)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:39,628 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:42,800 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:42,800 INFO image_rx_daemon: PROBE TX seq=22 phase_ms=0 size_b=16 (tx#22)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:42,831 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:44,359 INFO image_rx_daemon: published frame_id=0 2919 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:44,360 INFO image_rx_daemon: PROBE TX seq=23 phase_ms=0 size_b=16 (tx#23)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:44,391 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:45,807 INFO image_rx_daemon: published frame_id=0 2892 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:45,809 INFO image_rx_daemon: PROBE TX seq=24 phase_ms=0 size_b=16 (tx#24)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:45,834 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:47,311 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:47,311 INFO image_rx_daemon: PROBE TX seq=25 phase_ms=0 size_b=16 (tx#25)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:47,339 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:47,538 INFO image_rx_daemon: stats: rx_frames=390 rx_decode_err=0 frames_published=25 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=6 parity_recon=0
+
+2026-08-01 15:52:47,540 INFO image_rx_daemon: air_gap: n=82 dt_med=116873us dt_p95=204430us len_med=247B cmd_tx_ok=42 cmd_tx_fail=0
+
+2026-08-01 15:52:47,544 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:4 <120:70 <200:2 <400:5
+
+2026-08-01 15:52:47,547 INFO image_rx_daemon: air_gap_by_class: seq: n=75 med=116.8ms | boundary: n=7 med=264.0ms
+
+2026-08-01 15:52:47,548 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (1.32%) verdict=not-clustered | top 12:1
+
+2026-08-01 15:52:47,550 INFO image_rx_daemon: probe: tx=25 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:52:47,551 INFO image_rx_daemon: probe_grid: p0/s0:0/25(0%)
+
+2026-08-01 15:52:48,778 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:48,778 INFO image_rx_daemon: PROBE TX seq=26 phase_ms=0 size_b=16 (tx#26)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:48,809 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:50,240 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:50,241 INFO image_rx_daemon: PROBE TX seq=27 phase_ms=0 size_b=16 (tx#27)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:50,267 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:51,753 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:51,754 INFO image_rx_daemon: PROBE TX seq=28 phase_ms=0 size_b=16 (tx#28)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:51,780 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:53,294 INFO image_rx_daemon: published frame_id=0 2903 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:53,295 INFO image_rx_daemon: PROBE TX seq=29 phase_ms=0 size_b=16 (tx#29)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:53,321 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:57,553 INFO image_rx_daemon: stats: rx_frames=472 rx_decode_err=0 frames_published=29 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=7 parity_recon=0
+
+2026-08-01 15:52:57,555 INFO image_rx_daemon: air_gap: n=82 dt_med=116847us dt_p95=197960us len_med=247B cmd_tx_ok=46 cmd_tx_fail=0
+
+2026-08-01 15:52:57,559 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:1 <120:71 <200:3 <400:4
+
+2026-08-01 15:52:57,561 INFO image_rx_daemon: air_gap_by_class: seq: n=75 med=116.8ms | boundary: n=6 med=261.3ms | post_loss: n=1 med=235.0ms
+
+2026-08-01 15:52:57,562 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.56%) verdict=not-clustered | top 11:1 2:1
+
+2026-08-01 15:52:57,562 INFO image_rx_daemon: probe: tx=29 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:52:57,563 INFO image_rx_daemon: probe_grid: p0/s0:0/29(0%)
+
+2026-08-01 15:52:57,860 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:57,860 INFO image_rx_daemon: PROBE TX seq=30 phase_ms=0 size_b=16 (tx#30)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:57,886 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:52:59,341 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:52:59,341 INFO image_rx_daemon: PROBE TX seq=31 phase_ms=0 size_b=16 (tx#31)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:52:59,367 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:00,812 INFO image_rx_daemon: published frame_id=0 2949 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:00,812 INFO image_rx_daemon: PROBE TX seq=32 phase_ms=0 size_b=16 (tx#32)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:00,837 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:03,848 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:03,849 INFO image_rx_daemon: PROBE TX seq=33 phase_ms=0 size_b=16 (tx#33)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:03,876 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:05,435 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:05,436 INFO image_rx_daemon: PROBE TX seq=34 phase_ms=0 size_b=16 (tx#34)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:05,463 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:07,570 INFO image_rx_daemon: stats: rx_frames=555 rx_decode_err=0 frames_published=34 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=9 parity_recon=0
+
+2026-08-01 15:53:07,571 INFO image_rx_daemon: air_gap: n=83 dt_med=116832us dt_p95=165385us len_med=247B cmd_tx_ok=51 cmd_tx_fail=0
+
+2026-08-01 15:53:07,574 INFO image_rx_daemon: air_gap_hist(ms): <40:3 <80:2 <120:70 <200:4 <400:4
+
+2026-08-01 15:53:07,575 INFO image_rx_daemon: air_gap_by_class: seq: n=75 med=116.8ms | boundary: n=7 med=218.2ms | post_loss: n=1 med=144.6ms
+
+2026-08-01 15:53:07,576 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.56%) verdict=not-clustered | top 11:2
+
+2026-08-01 15:53:07,577 INFO image_rx_daemon: probe: tx=34 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:53:07,578 INFO image_rx_daemon: probe_grid: p0/s0:0/34(0%)
+
+2026-08-01 15:53:11,612 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:11,612 INFO image_rx_daemon: PROBE TX seq=35 phase_ms=0 size_b=16 (tx#35)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:11,643 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:13,197 INFO image_rx_daemon: published frame_id=0 2986 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:13,198 INFO image_rx_daemon: PROBE TX seq=36 phase_ms=0 size_b=16 (tx#36)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:13,222 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:14,784 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:14,785 INFO image_rx_daemon: PROBE TX seq=37 phase_ms=0 size_b=16 (tx#37)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:14,811 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:17,585 INFO image_rx_daemon: stats: rx_frames=634 rx_decode_err=0 frames_published=37 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=12 parity_recon=0
+
+2026-08-01 15:53:17,586 INFO image_rx_daemon: air_gap: n=79 dt_med=116897us dt_p95=264120us len_med=247B cmd_tx_ok=54 cmd_tx_fail=0
+
+2026-08-01 15:53:17,588 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <120:66 <200:1 <400:8
+
+2026-08-01 15:53:17,590 INFO image_rx_daemon: air_gap_by_class: seq: n=70 med=116.8ms | boundary: n=6 med=264.3ms | post_loss: n=3 med=233.7ms
+
+2026-08-01 15:53:17,591 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (3.95%) verdict=not-clustered | top 7:1 5:1 11:1
+
+2026-08-01 15:53:17,591 INFO image_rx_daemon: probe: tx=37 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:53:17,592 INFO image_rx_daemon: probe_grid: p0/s0:0/37(0%)
+
+2026-08-01 15:53:17,895 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:17,896 INFO image_rx_daemon: PROBE TX seq=38 phase_ms=0 size_b=16 (tx#38)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:17,922 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:19,475 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:19,475 INFO image_rx_daemon: PROBE TX seq=39 phase_ms=0 size_b=16 (tx#39)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:19,502 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:20,943 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:20,944 INFO image_rx_daemon: PROBE TX seq=40 phase_ms=0 size_b=16 (tx#40)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:20,971 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:22,402 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:22,402 INFO image_rx_daemon: PROBE TX seq=41 phase_ms=0 size_b=16 (tx#41)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:22,429 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:25,460 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:25,461 INFO image_rx_daemon: PROBE TX seq=42 phase_ms=0 size_b=16 (tx#42)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:25,487 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:26,967 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:26,968 INFO image_rx_daemon: PROBE TX seq=43 phase_ms=0 size_b=16 (tx#43)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:26,994 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:27,596 INFO image_rx_daemon: stats: rx_frames=718 rx_decode_err=0 frames_published=43 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=14 parity_recon=0
+
+2026-08-01 15:53:27,597 INFO image_rx_daemon: air_gap: n=84 dt_med=116838us dt_p95=192857us len_med=247B cmd_tx_ok=60 cmd_tx_fail=0
+
+2026-08-01 15:53:27,597 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:4 <80:1 <120:70 <200:4 <400:4
+
+2026-08-01 15:53:27,598 INFO image_rx_daemon: air_gap_by_class: seq: n=76 med=116.8ms | boundary: n=7 med=192.9ms | post_loss: n=1 med=233.6ms
+
+2026-08-01 15:53:27,599 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (1.28%) verdict=not-clustered | top 6:1
+
+2026-08-01 15:53:27,599 INFO image_rx_daemon: probe: tx=43 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:53:27,599 INFO image_rx_daemon: probe_grid: p0/s0:0/43(0%)
+
+2026-08-01 15:53:30,027 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:30,028 INFO image_rx_daemon: PROBE TX seq=44 phase_ms=0 size_b=16 (tx#44)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:30,058 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:33,035 INFO image_rx_daemon: published frame_id=0 2949 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:33,035 INFO image_rx_daemon: PROBE TX seq=45 phase_ms=0 size_b=16 (tx#45)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:33,058 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:34,516 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:34,517 INFO image_rx_daemon: PROBE TX seq=46 phase_ms=0 size_b=16 (tx#46)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:34,546 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:36,008 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:36,010 INFO image_rx_daemon: PROBE TX seq=47 phase_ms=0 size_b=16 (tx#47)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:36,036 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:37,602 INFO image_rx_daemon: stats: rx_frames=800 rx_decode_err=0 frames_published=47 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=16 parity_recon=0
+
+2026-08-01 15:53:37,602 INFO image_rx_daemon: air_gap: n=82 dt_med=116847us dt_p95=233671us len_med=247B cmd_tx_ok=64 cmd_tx_fail=0
+
+2026-08-01 15:53:37,603 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <80:2 <120:67 <200:3 <400:6
+
+2026-08-01 15:53:37,604 INFO image_rx_daemon: air_gap_by_class: seq: n=73 med=116.8ms | boundary: n=6 med=218.2ms | post_loss: n=3 med=233.7ms
+
+2026-08-01 15:53:37,604 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (5.00%) verdict=not-clustered | top 11:1 2:1 4:1 9:1
+
+2026-08-01 15:53:37,605 INFO image_rx_daemon: probe: tx=47 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:53:37,605 INFO image_rx_daemon: probe_grid: p0/s0:0/47(0%)
+
+2026-08-01 15:53:40,651 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:40,652 INFO image_rx_daemon: PROBE TX seq=48 phase_ms=0 size_b=16 (tx#48)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:40,683 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:43,727 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:43,728 INFO image_rx_daemon: PROBE TX seq=49 phase_ms=0 size_b=16 (tx#49)
+
+2026-08-01 15:53:43,751 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:46,923 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:46,924 INFO image_rx_daemon: PROBE TX seq=50 phase_ms=0 size_b=16 (tx#50)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:46,950 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:47,608 INFO image_rx_daemon: stats: rx_frames=876 rx_decode_err=0 frames_published=50 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=20 parity_recon=0
+
+2026-08-01 15:53:47,611 INFO image_rx_daemon: air_gap: n=76 dt_med=116902us dt_p95=264363us len_med=247B cmd_tx_ok=67 cmd_tx_fail=0
+
+2026-08-01 15:53:47,615 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <120:62 <200:1 <400:9
+
+2026-08-01 15:53:47,617 INFO image_rx_daemon: air_gap_by_class: seq: n=66 med=116.8ms | boundary: n=7 med=264.4ms | post_loss: n=3 med=233.8ms
+
+2026-08-01 15:53:47,619 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (5.48%) verdict=not-clustered | top 2:1 11:1 4:1 10:1
+
+2026-08-01 15:53:47,620 INFO image_rx_daemon: probe: tx=50 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:53:47,620 INFO image_rx_daemon: probe_grid: p0/s0:0/50(0%)
+
+2026-08-01 15:53:48,468 INFO image_rx_daemon: published frame_id=0 2901 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:48,469 INFO image_rx_daemon: PROBE TX seq=51 phase_ms=0 size_b=16 (tx#51)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:48,495 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:52,980 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:52,981 INFO image_rx_daemon: PROBE TX seq=52 phase_ms=0 size_b=16 (tx#52)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:53,003 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:56,008 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:56,008 INFO image_rx_daemon: PROBE TX seq=53 phase_ms=0 size_b=16 (tx#53)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:56,031 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:57,548 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:57,548 INFO image_rx_daemon: PROBE TX seq=54 phase_ms=0 size_b=16 (tx#54)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:57,575 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:53:57,629 INFO image_rx_daemon: stats: rx_frames=957 rx_decode_err=0 frames_published=54 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=23 parity_recon=0
+
+2026-08-01 15:53:57,631 INFO image_rx_daemon: air_gap: n=81 dt_med=116903us dt_p95=198365us len_med=247B cmd_tx_ok=71 cmd_tx_fail=0
+
+2026-08-01 15:53:57,635 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:1 <120:72 <200:3 <400:4
+
+2026-08-01 15:53:57,638 INFO image_rx_daemon: air_gap_by_class: seq: n=74 med=116.9ms | boundary: n=6 med=235.7ms | post_loss: n=1 med=147.1ms
+
+2026-08-01 15:53:57,639 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (3.85%) verdict=not-clustered | top 11:2 12:1
+
+2026-08-01 15:53:57,640 INFO image_rx_daemon: probe: tx=54 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:53:57,641 INFO image_rx_daemon: probe_grid: p0/s0:0/54(0%)
+
+2026-08-01 15:53:59,068 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:53:59,070 INFO image_rx_daemon: PROBE TX seq=55 phase_ms=0 size_b=16 (tx#55)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:53:59,096 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:02,118 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:02,118 INFO image_rx_daemon: PROBE TX seq=56 phase_ms=0 size_b=16 (tx#56)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:02,144 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:03,599 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:03,600 INFO image_rx_daemon: PROBE TX seq=57 phase_ms=0 size_b=16 (tx#57)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:03,632 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:05,064 INFO image_rx_daemon: published frame_id=0 2949 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:05,065 INFO image_rx_daemon: PROBE TX seq=58 phase_ms=0 size_b=16 (tx#58)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:05,091 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:06,546 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:06,547 INFO image_rx_daemon: PROBE TX seq=59 phase_ms=0 size_b=16 (tx#59)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:06,575 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:07,653 INFO image_rx_daemon: stats: rx_frames=1042 rx_decode_err=0 frames_published=59 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=24 parity_recon=0
+
+2026-08-01 15:54:07,653 INFO image_rx_daemon: air_gap: n=85 dt_med=116902us dt_p95=161353us len_med=247B cmd_tx_ok=76 cmd_tx_fail=0
+
+2026-08-01 15:54:07,654 INFO image_rx_daemon: air_gap_hist(ms): <40:5 <120:73 <200:5 <400:2
+
+2026-08-01 15:54:07,654 INFO image_rx_daemon: air_gap_by_class: seq: n=78 med=116.9ms | boundary: n=7 med=165.9ms
+
+2026-08-01 15:54:07,655 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (1.27%) verdict=not-clustered | top 11:1
+
+2026-08-01 15:54:07,655 INFO image_rx_daemon: probe: tx=59 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:54:07,656 INFO image_rx_daemon: probe_grid: p0/s0:0/59(0%)
+
+2026-08-01 15:54:08,032 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:08,033 INFO image_rx_daemon: PROBE TX seq=60 phase_ms=0 size_b=16 (tx#60)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:08,062 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:09,636 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:09,637 INFO image_rx_daemon: PROBE TX seq=61 phase_ms=0 size_b=16 (tx#61)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:09,663 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:12,679 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:12,680 INFO image_rx_daemon: PROBE TX seq=62 phase_ms=0 size_b=16 (tx#62)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:12,706 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:17,364 INFO image_rx_daemon: published frame_id=0 2986 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:17,365 INFO image_rx_daemon: PROBE TX seq=63 phase_ms=0 size_b=16 (tx#63)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:17,391 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:17,675 INFO image_rx_daemon: stats: rx_frames=1120 rx_decode_err=0 frames_published=63 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=27 parity_recon=0
+
+2026-08-01 15:54:17,677 INFO image_rx_daemon: air_gap: n=78 dt_med=116932us dt_p95=263115us len_med=247B cmd_tx_ok=80 cmd_tx_fail=0
+
+2026-08-01 15:54:17,681 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:3 <120:64 <200:1 <400:8
+
+2026-08-01 15:54:17,683 INFO image_rx_daemon: air_gap_by_class: seq: n=69 med=116.9ms | boundary: n=7 med=263.1ms | post_loss: n=2 med=234.0ms
+
+2026-08-01 15:54:17,685 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (4.05%) verdict=not-clustered | top 11:1 3:1 4:1
+
+2026-08-01 15:54:17,686 INFO image_rx_daemon: probe: tx=63 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:54:17,686 INFO image_rx_daemon: probe_grid: p0/s0:0/63(0%)
+
+2026-08-01 15:54:18,951 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:18,952 INFO image_rx_daemon: PROBE TX seq=64 phase_ms=0 size_b=16 (tx#64)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:18,979 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:20,505 INFO image_rx_daemon: published frame_id=0 2901 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:20,506 INFO image_rx_daemon: PROBE TX seq=65 phase_ms=0 size_b=16 (tx#65)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:20,532 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:21,973 INFO image_rx_daemon: published frame_id=0 2892 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:21,974 INFO image_rx_daemon: PROBE TX seq=66 phase_ms=0 size_b=16 (tx#66)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:22,000 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:25,004 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:25,005 INFO image_rx_daemon: PROBE TX seq=67 phase_ms=0 size_b=16 (tx#67)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:25,027 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:26,472 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:26,472 INFO image_rx_daemon: PROBE TX seq=68 phase_ms=0 size_b=16 (tx#68)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:26,499 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:27,704 INFO image_rx_daemon: stats: rx_frames=1203 rx_decode_err=0 frames_published=68 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=28 parity_recon=0
+
+2026-08-01 15:54:27,706 INFO image_rx_daemon: air_gap: n=83 dt_med=116939us dt_p95=198505us len_med=247B cmd_tx_ok=85 cmd_tx_fail=0
+
+2026-08-01 15:54:27,707 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <120:73 <200:3 <400:4
+
+2026-08-01 15:54:27,708 INFO image_rx_daemon: air_gap_by_class: seq: n=76 med=116.9ms | boundary: n=6 med=203.9ms | post_loss: n=1 med=234.0ms
+
+2026-08-01 15:54:27,708 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.53%) verdict=not-clustered | top 12:1 5:1
+
+2026-08-01 15:54:27,709 INFO image_rx_daemon: probe: tx=68 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:54:27,709 INFO image_rx_daemon: probe_grid: p0/s0:0/68(0%)
+
+2026-08-01 15:54:31,061 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:31,062 INFO image_rx_daemon: PROBE TX seq=69 phase_ms=0 size_b=16 (tx#69)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:31,088 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:34,102 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:34,103 INFO image_rx_daemon: PROBE TX seq=70 phase_ms=0 size_b=16 (tx#70)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:34,129 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:35,591 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:35,592 INFO image_rx_daemon: PROBE TX seq=71 phase_ms=0 size_b=16 (tx#71)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:35,622 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:37,055 INFO image_rx_daemon: published frame_id=0 2949 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:37,056 INFO image_rx_daemon: PROBE TX seq=72 phase_ms=0 size_b=16 (tx#72)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:37,086 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:37,714 INFO image_rx_daemon: stats: rx_frames=1285 rx_decode_err=0 frames_published=72 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=31 parity_recon=0
+
+2026-08-01 15:54:37,715 INFO image_rx_daemon: air_gap: n=82 dt_med=116914us dt_p95=165331us len_med=247B cmd_tx_ok=89 cmd_tx_fail=0
+
+2026-08-01 15:54:37,716 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <80:1 <120:70 <200:3 <400:4
+
+2026-08-01 15:54:37,717 INFO image_rx_daemon: air_gap_by_class: seq: n=74 med=116.9ms | boundary: n=7 med=261.5ms
+
+2026-08-01 15:54:37,718 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.60%) verdict=not-clustered | top 11:2
+
+2026-08-01 15:54:37,718 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 15:54:37,719 INFO image_rx_daemon: probe: tx=72 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:54:37,719 INFO image_rx_daemon: probe_grid: p0/s0:0/72(0%)
+
+2026-08-01 15:54:38,540 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:38,541 INFO image_rx_daemon: PROBE TX seq=73 phase_ms=0 size_b=16 (tx#73)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:38,568 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:40,036 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:40,037 INFO image_rx_daemon: PROBE TX seq=74 phase_ms=0 size_b=16 (tx#74)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:40,064 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:44,669 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:44,669 INFO image_rx_daemon: PROBE TX seq=75 phase_ms=0 size_b=16 (tx#75)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:44,696 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:46,175 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:46,176 INFO image_rx_daemon: PROBE TX seq=76 phase_ms=0 size_b=16 (tx#76)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:46,203 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:47,727 INFO image_rx_daemon: stats: rx_frames=1366 rx_decode_err=0 frames_published=76 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=33 parity_recon=0
+
+2026-08-01 15:54:47,728 INFO image_rx_daemon: air_gap: n=81 dt_med=116897us dt_p95=233817us len_med=247B cmd_tx_ok=93 cmd_tx_fail=0
+
+2026-08-01 15:54:47,729 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:2 <120:70 <200:2 <400:5
+
+2026-08-01 15:54:47,730 INFO image_rx_daemon: air_gap_by_class: seq: n=73 med=116.9ms | boundary: n=6 med=261.9ms | post_loss: n=1 med=233.8ms
+
+2026-08-01 15:54:47,731 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.60%) verdict=not-clustered | top 9:1 11:1
+
+2026-08-01 15:54:47,731 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 15:54:47,732 INFO image_rx_daemon: probe: tx=76 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:54:47,732 INFO image_rx_daemon: probe_grid: p0/s0:0/76(0%)
+
+2026-08-01 15:54:47,751 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:47,753 INFO image_rx_daemon: PROBE TX seq=77 phase_ms=0 size_b=16 (tx#77)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:47,779 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:50,943 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:50,944 INFO image_rx_daemon: PROBE TX seq=78 phase_ms=0 size_b=16 (tx#78)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:50,970 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:52,481 INFO image_rx_daemon: published frame_id=0 2901 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:52,481 INFO image_rx_daemon: PROBE TX seq=79 phase_ms=0 size_b=16 (tx#79)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:52,512 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:57,005 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:57,006 INFO image_rx_daemon: PROBE TX seq=80 phase_ms=0 size_b=16 (tx#80)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:57,028 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:57,744 INFO image_rx_daemon: stats: rx_frames=1443 rx_decode_err=0 frames_published=80 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=36 parity_recon=0
+
+2026-08-01 15:54:57,747 INFO image_rx_daemon: air_gap: n=77 dt_med=116915us dt_p95=264109us len_med=247B cmd_tx_ok=97 cmd_tx_fail=0
+
+2026-08-01 15:54:57,751 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <120:63 <200:2 <400:8
+
+2026-08-01 15:54:57,753 INFO image_rx_daemon: air_gap_by_class: seq: n=67 med=116.9ms | boundary: n=7 med=264.0ms | post_loss: n=3 med=234.7ms
+
+2026-08-01 15:54:57,755 INFO image_rx_daemon: lost_frag_idx: n=5 idx0=0 (0.00% of idx0 arrivals) other=5 (6.67%) verdict=not-clustered | top 10:2 11:2 2:1
+
+2026-08-01 15:54:57,756 INFO image_rx_daemon: probe: tx=80 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:54:57,757 INFO image_rx_daemon: probe_grid: p0/s0:0/80(0%)
+
+2026-08-01 15:54:58,476 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:58,477 INFO image_rx_daemon: PROBE TX seq=81 phase_ms=0 size_b=16 (tx#81)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:54:58,503 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:54:59,980 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:54:59,981 INFO image_rx_daemon: PROBE TX seq=82 phase_ms=0 size_b=16 (tx#82)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:00,004 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:01,532 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:01,533 INFO image_rx_daemon: PROBE TX seq=83 phase_ms=0 size_b=16 (tx#83)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:01,559 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:06,088 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:06,089 INFO image_rx_daemon: PROBE TX seq=84 phase_ms=0 size_b=16 (tx#84)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:06,115 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:07,569 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:07,570 INFO image_rx_daemon: PROBE TX seq=85 phase_ms=0 size_b=16 (tx#85)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:07,596 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:07,759 INFO image_rx_daemon: stats: rx_frames=1526 rx_decode_err=0 frames_published=85 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=38 parity_recon=0
+
+2026-08-01 15:55:07,761 INFO image_rx_daemon: air_gap: n=83 dt_med=116864us dt_p95=192705us len_med=247B cmd_tx_ok=102 cmd_tx_fail=0
+
+2026-08-01 15:55:07,763 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:3 <80:1 <120:70 <200:4 <400:4
+
+2026-08-01 15:55:07,764 INFO image_rx_daemon: air_gap_by_class: seq: n=75 med=116.8ms | boundary: n=7 med=192.7ms | post_loss: n=1 med=233.7ms
+
+2026-08-01 15:55:07,765 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.56%) verdict=not-clustered | top 5:1 11:1
+
+2026-08-01 15:55:07,766 INFO image_rx_daemon: probe: tx=85 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:55:07,767 INFO image_rx_daemon: probe_grid: p0/s0:0/85(0%)
+
+2026-08-01 15:55:09,051 INFO image_rx_daemon: published frame_id=0 2949 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:09,053 INFO image_rx_daemon: PROBE TX seq=86 phase_ms=0 size_b=16 (tx#86)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:09,086 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:10,531 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:10,532 INFO image_rx_daemon: PROBE TX seq=87 phase_ms=0 size_b=16 (tx#87)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:10,559 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:12,018 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:12,019 INFO image_rx_daemon: PROBE TX seq=88 phase_ms=0 size_b=16 (tx#88)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:12,050 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:13,616 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:13,617 INFO image_rx_daemon: PROBE TX seq=89 phase_ms=0 size_b=16 (tx#89)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:13,644 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:17,770 INFO image_rx_daemon: stats: rx_frames=1607 rx_decode_err=0 frames_published=89 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=39 parity_recon=0
+
+2026-08-01 15:55:17,771 INFO image_rx_daemon: air_gap: n=81 dt_med=116894us dt_p95=210775us len_med=247B cmd_tx_ok=106 cmd_tx_fail=0
+
+2026-08-01 15:55:17,773 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:2 <120:70 <200:2 <400:5
+
+2026-08-01 15:55:17,774 INFO image_rx_daemon: air_gap_by_class: seq: n=72 med=116.9ms | boundary: n=6 med=261.4ms | post_loss: n=1 med=234.0ms
+
+2026-08-01 15:55:17,775 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (1.32%) verdict=not-clustered | top 11:1
+
+2026-08-01 15:55:17,776 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 15:55:17,777 INFO image_rx_daemon: probe: tx=89 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:55:17,778 INFO image_rx_daemon: probe_grid: p0/s0:0/89(0%)
+
+2026-08-01 15:55:18,187 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:18,188 INFO image_rx_daemon: PROBE TX seq=90 phase_ms=0 size_b=16 (tx#90)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:18,214 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:19,775 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:19,776 INFO image_rx_daemon: PROBE TX seq=91 phase_ms=0 size_b=16 (tx#91)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:19,802 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:21,368 INFO image_rx_daemon: published frame_id=0 2986 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:21,369 INFO image_rx_daemon: PROBE TX seq=92 phase_ms=0 size_b=16 (tx#92)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:21,395 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:24,505 INFO image_rx_daemon: published frame_id=0 2901 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:24,505 INFO image_rx_daemon: PROBE TX seq=93 phase_ms=0 size_b=16 (tx#93)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:24,531 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:27,496 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:27,498 INFO image_rx_daemon: PROBE TX seq=94 phase_ms=0 size_b=16 (tx#94)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:27,526 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:27,781 INFO image_rx_daemon: stats: rx_frames=1688 rx_decode_err=0 frames_published=94 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=42 parity_recon=0
+
+2026-08-01 15:55:27,781 INFO image_rx_daemon: air_gap: n=81 dt_med=116872us dt_p95=263920us len_med=247B cmd_tx_ok=111 cmd_tx_fail=0
+
+2026-08-01 15:55:27,782 INFO image_rx_daemon: air_gap_hist(ms): <40:5 <120:68 <200:2 <400:6
+
+2026-08-01 15:55:27,782 INFO image_rx_daemon: air_gap_by_class: seq: n=73 med=116.9ms | boundary: n=7 med=264.1ms | post_loss: n=1 med=233.8ms
+
+2026-08-01 15:55:27,783 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.63%) verdict=not-clustered | top 6:1 11:1
+
+2026-08-01 15:55:27,783 INFO image_rx_daemon: probe: tx=94 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:55:27,784 INFO image_rx_daemon: probe_grid: p0/s0:0/94(0%)
+
+2026-08-01 15:55:28,959 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:28,960 INFO image_rx_daemon: PROBE TX seq=95 phase_ms=0 size_b=16 (tx#95)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:28,990 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:33,539 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:33,540 INFO image_rx_daemon: PROBE TX seq=96 phase_ms=0 size_b=16 (tx#96)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:33,570 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:35,032 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:35,034 INFO image_rx_daemon: PROBE TX seq=97 phase_ms=0 size_b=16 (tx#97)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:35,062 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:37,786 INFO image_rx_daemon: stats: rx_frames=1767 rx_decode_err=0 frames_published=97 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=44 parity_recon=0
+
+2026-08-01 15:55:37,788 INFO image_rx_daemon: air_gap: n=79 dt_med=116849us dt_p95=233738us len_med=247B cmd_tx_ok=114 cmd_tx_fail=0
+
+2026-08-01 15:55:37,791 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:1 <120:67 <200:2 <400:6
+
+2026-08-01 15:55:37,792 INFO image_rx_daemon: air_gap_by_class: seq: n=70 med=116.8ms | boundary: n=6 med=260.3ms | post_loss: n=2 med=233.7ms
+
+2026-08-01 15:55:37,792 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (3.95%) verdict=not-clustered | top 1:1 7:1 11:1
+
+2026-08-01 15:55:37,793 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 15:55:37,794 INFO image_rx_daemon: probe: tx=97 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:55:37,795 INFO image_rx_daemon: probe_grid: p0/s0:0/97(0%)
+
+2026-08-01 15:55:39,619 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:39,619 INFO image_rx_daemon: PROBE TX seq=98 phase_ms=0 size_b=16 (tx#98)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:39,645 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:42,624 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:42,624 INFO image_rx_daemon: PROBE TX seq=99 phase_ms=0 size_b=16 (tx#99)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:42,651 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:44,121 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:44,122 INFO image_rx_daemon: PROBE TX seq=100 phase_ms=0 size_b=16 (tx#100)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:44,149 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:45,711 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:45,712 INFO image_rx_daemon: PROBE TX seq=101 phase_ms=0 size_b=16 (tx#101)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:45,738 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:47,813 INFO image_rx_daemon: stats: rx_frames=1848 rx_decode_err=0 frames_published=101 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=47 parity_recon=0
+
+2026-08-01 15:55:47,819 INFO image_rx_daemon: air_gap: n=81 dt_med=116892us dt_p95=233575us len_med=247B cmd_tx_ok=118 cmd_tx_fail=0
+
+2026-08-01 15:55:47,820 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <80:2 <120:65 <200:3 <400:6 <1000:1
+
+2026-08-01 15:55:47,820 INFO image_rx_daemon: air_gap_by_class: seq: n=68 med=116.9ms | boundary: n=7 med=218.0ms | post_loss: n=2 med=233.8ms
+
+2026-08-01 15:55:47,821 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (5.13%) verdict=not-clustered | top 8:1 5:1 10:1 11:1
+
+2026-08-01 15:55:47,821 INFO image_rx_daemon: frag_reordered: 4 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-01 15:55:47,822 INFO image_rx_daemon: probe: tx=101 echo=0 (0.0% delivered) no echoes this window
+
+2026-08-01 15:55:47,822 INFO image_rx_daemon: probe_grid: p0/s0:0/101(0%)
+
+2026-08-01 15:55:48,773 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:48,773 INFO image_rx_daemon: PROBE TX seq=102 phase_ms=0 size_b=16 (tx#102)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:48,800 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:50,259 INFO image_rx_daemon: published frame_id=0 2980 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:50,260 INFO image_rx_daemon: PROBE TX seq=103 phase_ms=0 size_b=16 (tx#103)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:50,286 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+
+2026-08-01 15:55:51,822 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-01 15:55:51,822 INFO image_rx_daemon: PROBE TX seq=104 phase_ms=0 size_b=16 (tx#104)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=12864 legal_dwell_used_us_10s=0
+
+2026-08-01 15:55:51,848 INFO image_rx_daemon: command TX opcode=0x69 copy=1/1 OK (on air)
+

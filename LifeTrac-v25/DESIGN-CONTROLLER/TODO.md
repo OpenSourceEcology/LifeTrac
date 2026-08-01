@@ -1913,7 +1913,20 @@ Two consequences for what is worth doing next:
 
 #### RS-11.2 Then the gap-tuning A/B — as a policy decision, not a tweak
 
-- [ ] **RS-11.2 Run RS-3.10's queued gap sweep with the new evidence in hand.**
+- [x] **RS-11.2 Gap sweep DONE 2026-07-30 — the trade dissolved; keep 40 ms.**
+  Six saturated runs (15/40/80 ms, n=2 each, smooth pacing): goodput flat
+  1977-2001 B/s, delivery at ceiling everywhere. Under smooth pacing the
+  transmitter is pacing-limited, not gap-limited, so the +7-8% estimate (made
+  against the bucket) no longer applies. Headline side-result: pooled
+  single-copy in-stream command delivery is **628/629 = 99.8%** vs 91.1% under
+  the bucket — smooth pacing's 17 ms inter-fragment gaps exceed the 10.3 ms
+  command ToA, so every gap is now a command slot. Firmware Batch 2 (the TDMA
+  slot) is hereby demoted from prerequisite to optimisation (+0.2 points
+  measured ceiling); Batch 1 unaffected. Evidence: L-series in
+  [`bench-evidence/RS_11_1_loss_attribution_2026-07-29/RESULTS.md`](bench-evidence/RS_11_1_loss_attribution_2026-07-29/RESULTS.md).
+  Original item follows.
+
+- [x] **RS-11.2 (original) Run RS-3.10's queued gap sweep with the new evidence in hand.**
   `LIFETRAC_TRAIN_GAP_MS` 40 → 25 → 15 → 60, at the pinned operating point
   (v3 / DTS / 3000 B / `ProbeEcho 0` / `KfRequestDisable 1`), n=2 per point
   because the run-to-run spread is 0.52 points (§7.3 of the 07-29 results).

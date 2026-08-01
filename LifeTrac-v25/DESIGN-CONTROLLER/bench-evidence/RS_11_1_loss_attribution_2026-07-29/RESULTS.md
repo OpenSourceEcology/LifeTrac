@@ -514,3 +514,73 @@ pathology the headroom exists to prevent.
 
 `LIFETRAC_PACING_HEADROOM` and `-PacingHeadroom` remain available for future
 sweeps, e.g. if fragment size or profile changes move the trade.
+
+
+---
+
+# L-series: RS-11.2 gap sweep — the trade dissolved, and delivery hit the ceiling (2026-07-30)
+
+Six runs, 240 s each, saturated (2 fps / 3000 B), smooth pacing, `ReactiveFire 1`
+(base fires a probe at every frame completion), `ProbeEcho 0`, delivery scored
+tractor-side per the standing rule. `TrainGapMs` in {15, 40, 80}, n=2 per point.
+
+| gap ms | probes TX | probes RX | delivery | goodput | loss% | frames published |
+|---:|---:|---:|---:|---:|---:|---:|
+| 15 | 100 | 99 | 99.0% | 1979 B/s | 2.52 | 98 |
+| 15 | 105 | 105 | 100% | 2001 B/s | 2.57 | 101 |
+| 40 | 106 | 106 | 100% | 2001 B/s | 2.36 | 105 |
+| 40 | 106 | 106 | 100% | 1977 B/s | 2.31 | 105 |
+| 80 | 108 | 108 | 100% | 1977 B/s | 2.48 | 104 |
+| 80 | 104 | 104 | 100% | 1977 B/s | 2.69 | 101 |
+
+## Finding 1 — the RS-3.10 gap trade no longer exists
+
+The queued A/B assumed a trade: shrink the gap, gain ~7-8% goodput, lose command
+window. Measured under smooth pacing there is NO trade on either axis: goodput
+is flat (1977-2001 B/s across 15-80 ms) and delivery is at ceiling everywhere.
+
+The reason is structural. Under smooth pacing the transmitter is
+**pacing-limited, not gap-limited**: train duration is set by the 116.8 ms
+fragment spacing, and the designed gap is a small constant added at the
+boundary. Shrinking it from 40 to 15 ms saves ~25 ms per ~1.6 s train (~1.5%),
+which disappears into run-to-run noise. The 2026-07-26 estimate of +7-8% was
+made against the bucket pacer, whose accidental ~44 ms host gap the designed gap
+replaced 1:1; smooth pacing changed the denominator.
+
+**Decision (RS-11.2 closed): keep `TRAIN_GAP_MS = 40`.** No axis rewards
+changing it, 40 matches every run in the evidence record, and a larger designed
+window is free insurance for the aligned command pump.
+
+## Finding 2 — the headline: single-copy command delivery is now ~99.8%
+
+Pooled across all six runs: **628 of 629 probes delivered (99.84%; 95% CI
+lower bound ≈ 99.1%)**. Under the token bucket, the identical measurement on
+2026-07-29 gave **91.1%** [85.8, 96.4]. Smooth pacing did not just fix the
+index-10 notch — it took the in-stream command channel from "usable with two
+copies" to "effectively lossless at one copy".
+
+The mechanism is geometric. The bucket's inter-fragment dead air was 5.0 ms —
+narrower than a command frame's 10.3 ms ToA, so mid-train arrivals were
+impossible and everything rode the train boundary. Smooth pacing's spacing is
+116.8 ms against a 99.9 ms fragment, leaving **~17 ms of listening air between
+every fragment — wider than the 10.3 ms command ToA.** Every inter-fragment gap
+is now a viable command slot, not just the boundary. (Probes here still fire at
+frame completion; the widened gaps also stop the completion window being
+clipped by URC-queue churn, which the E-series attribution work showed was
+reordering deliveries under the bucket.)
+
+At p = 0.998 single-copy, two copies give ~99.9997%. For the control plane this
+is an architecture-level result:
+
+> **The opportunistic (no-TDMA) control plane now meets a harder bar than the
+> firmware slot design was invented to reach.** Firmware Batch 2 (F1 DTS slot
+> clock, F2 mute gate, F3 skip/ditto contraction) should be re-evaluated as an
+> *optimisation with a measured ceiling of +0.2 points*, not as a
+> prerequisite for control. Batch 1 (F6-F9) is unaffected — those are latent
+> correctness bugs regardless of architecture.
+
+Caveats that keep this honest: bench-range link margin, ~0.44 probes/s (not
+full command cadence — the cadence confirmation in RS-1 still stands), one
+bench day, and probes fire gap-aligned rather than at random phase. The 91% ->
+99.8% comparison holds all of those constant across the two pacers, so the
+DELTA is solid even where the absolute number needs field confirmation.

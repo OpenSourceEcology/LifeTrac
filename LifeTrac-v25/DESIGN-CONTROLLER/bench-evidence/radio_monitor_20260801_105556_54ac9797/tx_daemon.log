@@ -1,0 +1,648 @@
+﻿2026-07-30 01:48:26,940 INFO image_tx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-07-30 01:48:26,942 INFO image_tx_daemon: image_tx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-07-30 01:48:26,951 INFO image_tx_daemon: MQTT connected; subscribing to lifetrac/v25/cmd/image_frame
+
+2026-07-30 01:48:26,955 INFO image_tx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-07-30 01:48:26,972 INFO image_tx_daemon: link_budget: published n_frag=1 profile_idx=6 (profile 2)
+
+FAULT_URC during settle (expected for W1-9 lenient init): code=0x0A sub=0x00 reason=no_ingress_during_probe_window raw=0a00000000000000000000000000000000000000c50b0000
+
+STATS_URC(boot) drained seq=0 (unsolicited snapshot — discarding so it can't poison later request() calls)
+
+INFO: post-VER drain queued type=0xF1 seq=0
+
+INFO: post-VER drain queued type=0xC1 seq=0
+
+INFO: post-VER drain queued type=0xF1 seq=0
+
+INFO: post-VER drain queued type=0xC1 seq=0
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+WARN: CFG_SET_REQ(FHSS_FARM_ID) failed: CFG_SET(0x17) REJECTED: status=1 (UNKNOWN_KEY) — do NOT treat as OK
+
+WARN: CFG_SET_REQ(FHSS_NODE_ID) failed: CFG_SET(0x18) REJECTED: status=1 (UNKNOWN_KEY) — do NOT treat as OK
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-07-30 01:48:27,856 INFO image_tx_daemon: LBT_ENABLE=0 (matches W1-10b TX_BURST rationale)
+
+2026-07-30 01:48:27,878 INFO image_tx_daemon: RXCONT armed for command downlink (opmode 0x81 -> 0x85)
+
+2026-07-30 01:48:27,879 INFO image_tx_daemon: TX worker ready (inter_cycle_s=0.050, max 8 frags/dwell)
+
+2026-07-30 01:48:27,943 INFO image_tx_daemon: stats: goodput=0.0 B/s util=0% pipeline=v3 frames_in=0 ok=0 fail=0 drop_full=0 drop_stale=0 frags_ok=0 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-07-30 01:48:28,765 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:29,340 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:29,915 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:30,489 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:31,064 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:31,640 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:31,944 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:32,520 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:33,094 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:33,668 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:34,242 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:34,817 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:35,391 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:35,965 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:36,541 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:37,115 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:37,689 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 6
+
+2026-07-30 01:48:37,954 INFO image_tx_daemon: stats: goodput=0.0 B/s util=0% pipeline=v3 frames_in=0 ok=0 fail=0 drop_full=0 drop_stale=0 frags_ok=0 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-07-30 01:48:42,353 INFO image_tx_daemon: frame seq=1 done (pipelined): 13 fragments ok
+
+2026-07-30 01:48:42,365 INFO image_tx_daemon: LoRa cmd: PROBE seq=1 phase_ms=0 (rx#1)
+
+2026-07-30 01:48:43,944 INFO image_tx_daemon: frame seq=2 done (pipelined): 13 fragments ok
+
+2026-07-30 01:48:43,965 INFO image_tx_daemon: LoRa cmd: PROBE seq=2 phase_ms=0 (rx#2)
+
+2026-07-30 01:48:45,534 INFO image_tx_daemon: frame seq=3 done (pipelined): 13 fragments ok
+
+2026-07-30 01:48:45,556 INFO image_tx_daemon: LoRa cmd: PROBE seq=3 phase_ms=0 (rx#3)
+
+2026-07-30 01:48:47,073 INFO image_tx_daemon: frame seq=4 done (pipelined): 12 fragments ok
+
+2026-07-30 01:48:47,966 INFO image_tx_daemon: stats: goodput=1352.4 B/s util=55% pipeline=v3 frames_in=15 ok=4 fail=0 drop_full=4 drop_stale=0 frags_ok=57 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:48:48,572 INFO image_tx_daemon: frame seq=5 done (pipelined): 12 fragments ok
+
+2026-07-30 01:48:48,614 INFO image_tx_daemon: LoRa cmd: PROBE seq=4 phase_ms=0 (rx#4)
+
+2026-07-30 01:48:50,082 INFO image_tx_daemon: frame seq=7 done (pipelined): 13 fragments ok
+
+2026-07-30 01:48:50,104 INFO image_tx_daemon: LoRa cmd: PROBE seq=5 phase_ms=0 (rx#5)
+
+2026-07-30 01:48:51,683 INFO image_tx_daemon: frame seq=10 done (pipelined): 13 fragments ok
+
+2026-07-30 01:48:51,694 INFO image_tx_daemon: LoRa cmd: PROBE seq=6 phase_ms=0 (rx#6)
+
+2026-07-30 01:48:53,247 INFO image_tx_daemon: frame seq=13 done (pipelined): 13 fragments ok
+
+2026-07-30 01:48:53,269 INFO image_tx_daemon: LoRa cmd: PROBE seq=7 phase_ms=0 (rx#7)
+
+2026-07-30 01:48:54,746 INFO image_tx_daemon: frame seq=16 done (pipelined): 13 fragments ok
+
+2026-07-30 01:48:54,768 INFO image_tx_daemon: LoRa cmd: PROBE seq=8 phase_ms=0 (rx#8)
+
+2026-07-30 01:48:56,329 INFO image_tx_daemon: frame seq=20 done (pipelined): 13 fragments ok
+
+2026-07-30 01:48:56,340 INFO image_tx_daemon: LoRa cmd: PROBE seq=9 phase_ms=0 (rx#9)
+
+2026-07-30 01:48:57,797 INFO image_tx_daemon: frame seq=23 done (pipelined): 13 fragments ok
+
+2026-07-30 01:48:57,819 INFO image_tx_daemon: LoRa cmd: PROBE seq=10 phase_ms=0 (rx#10)
+
+2026-07-30 01:48:57,976 INFO image_tx_daemon: stats: goodput=1979.3 B/s util=80% pipeline=v3 frames_in=35 ok=11 fail=0 drop_full=18 drop_stale=0 frags_ok=142 frags_fail=0 qdepth=3 parity_tx=0
+
+2026-07-30 01:48:59,262 INFO image_tx_daemon: frame seq=26 done (pipelined): 13 fragments ok
+
+2026-07-30 01:48:59,274 INFO image_tx_daemon: LoRa cmd: PROBE seq=11 phase_ms=0 (rx#11)
+
+2026-07-30 01:49:00,760 INFO image_tx_daemon: frame seq=29 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:00,782 INFO image_tx_daemon: LoRa cmd: PROBE seq=12 phase_ms=0 (rx#12)
+
+2026-07-30 01:49:02,301 INFO image_tx_daemon: frame seq=32 done (pipelined): 12 fragments ok
+
+2026-07-30 01:49:03,846 INFO image_tx_daemon: frame seq=35 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:05,380 INFO image_tx_daemon: frame seq=38 done (pipelined): 12 fragments ok
+
+2026-07-30 01:49:06,905 INFO image_tx_daemon: frame seq=41 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:06,927 INFO image_tx_daemon: LoRa cmd: PROBE seq=13 phase_ms=0 (rx#13)
+
+2026-07-30 01:49:07,988 INFO image_tx_daemon: stats: goodput=1965.0 B/s util=80% pipeline=v3 frames_in=55 ok=17 fail=0 drop_full=31 drop_stale=0 frags_ok=225 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:49:08,386 INFO image_tx_daemon: frame seq=44 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:08,398 INFO image_tx_daemon: LoRa cmd: PROBE seq=14 phase_ms=0 (rx#14)
+
+2026-07-30 01:49:09,859 INFO image_tx_daemon: frame seq=47 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:09,870 INFO image_tx_daemon: LoRa cmd: PROBE seq=15 phase_ms=0 (rx#15)
+
+2026-07-30 01:49:11,334 INFO image_tx_daemon: frame seq=50 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:11,355 INFO image_tx_daemon: LoRa cmd: PROBE seq=16 phase_ms=0 (rx#16)
+
+2026-07-30 01:49:12,819 INFO image_tx_daemon: frame seq=53 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:12,840 INFO image_tx_daemon: LoRa cmd: PROBE seq=17 phase_ms=0 (rx#17)
+
+2026-07-30 01:49:14,411 INFO image_tx_daemon: frame seq=59 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:14,433 INFO image_tx_daemon: LoRa cmd: PROBE seq=18 phase_ms=0 (rx#18)
+
+2026-07-30 01:49:15,944 INFO image_tx_daemon: frame seq=60 done (pipelined): 12 fragments ok
+
+2026-07-30 01:49:17,442 INFO image_tx_daemon: frame seq=62 done (pipelined): 12 fragments ok
+
+2026-07-30 01:49:17,484 INFO image_tx_daemon: LoRa cmd: PROBE seq=19 phase_ms=0 (rx#19)
+
+2026-07-30 01:49:17,999 INFO image_tx_daemon: stats: goodput=1999.6 B/s util=81% pipeline=v3 frames_in=75 ok=24 fail=0 drop_full=45 drop_stale=0 frags_ok=310 frags_fail=0 qdepth=3 parity_tx=0
+
+2026-07-30 01:49:18,962 INFO image_tx_daemon: frame seq=65 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:18,994 INFO image_tx_daemon: LoRa cmd: PROBE seq=20 phase_ms=0 (rx#20)
+
+2026-07-30 01:49:20,543 INFO image_tx_daemon: frame seq=71 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:20,564 INFO image_tx_daemon: LoRa cmd: PROBE seq=21 phase_ms=0 (rx#21)
+
+2026-07-30 01:49:22,143 INFO image_tx_daemon: frame seq=72 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:23,733 INFO image_tx_daemon: frame seq=74 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:23,765 INFO image_tx_daemon: LoRa cmd: PROBE seq=22 phase_ms=0 (rx#22)
+
+2026-07-30 01:49:25,299 INFO image_tx_daemon: frame seq=77 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:25,321 INFO image_tx_daemon: LoRa cmd: PROBE seq=23 phase_ms=0 (rx#23)
+
+2026-07-30 01:49:26,740 INFO image_tx_daemon: frame seq=81 done (pipelined): 12 fragments ok
+
+2026-07-30 01:49:26,772 INFO image_tx_daemon: LoRa cmd: PROBE seq=24 phase_ms=0 (rx#24)
+
+2026-07-30 01:49:28,010 INFO image_tx_daemon: stats: goodput=1951.0 B/s util=79% pipeline=v3 frames_in=95 ok=30 fail=0 drop_full=58 drop_stale=0 frags_ok=393 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:49:28,262 INFO image_tx_daemon: frame seq=84 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:28,274 INFO image_tx_daemon: LoRa cmd: PROBE seq=25 phase_ms=0 (rx#25)
+
+2026-07-30 01:49:29,731 INFO image_tx_daemon: frame seq=87 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:29,742 INFO image_tx_daemon: LoRa cmd: PROBE seq=26 phase_ms=0 (rx#26)
+
+2026-07-30 01:49:31,192 INFO image_tx_daemon: frame seq=90 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:31,204 INFO image_tx_daemon: LoRa cmd: PROBE seq=27 phase_ms=0 (rx#27)
+
+2026-07-30 01:49:32,691 INFO image_tx_daemon: frame seq=93 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:32,713 INFO image_tx_daemon: LoRa cmd: PROBE seq=28 phase_ms=0 (rx#28)
+
+2026-07-30 01:49:34,228 INFO image_tx_daemon: frame seq=95 done (pipelined): 12 fragments ok
+
+2026-07-30 01:49:34,260 INFO image_tx_daemon: LoRa cmd: PROBE seq=29 phase_ms=0 (rx#29)
+
+2026-07-30 01:49:35,699 INFO image_tx_daemon: frame seq=102 done (pipelined): 12 fragments ok
+
+2026-07-30 01:49:37,233 INFO image_tx_daemon: frame seq=103 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:38,022 INFO image_tx_daemon: stats: goodput=1969.8 B/s util=80% pipeline=v3 frames_in=115 ok=37 fail=0 drop_full=71 drop_stale=0 frags_ok=477 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:49:38,814 INFO image_tx_daemon: frame seq=105 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:38,826 INFO image_tx_daemon: LoRa cmd: PROBE seq=30 phase_ms=0 (rx#30)
+
+2026-07-30 01:49:40,296 INFO image_tx_daemon: frame seq=108 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:40,307 INFO image_tx_daemon: LoRa cmd: PROBE seq=31 phase_ms=0 (rx#31)
+
+2026-07-30 01:49:41,768 INFO image_tx_daemon: frame seq=111 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:41,769 INFO image_tx_daemon: LoRa cmd: PROBE seq=32 phase_ms=0 (rx#32)
+
+2026-07-30 01:49:43,243 INFO image_tx_daemon: frame seq=114 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:44,787 INFO image_tx_daemon: frame seq=117 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:44,809 INFO image_tx_daemon: LoRa cmd: PROBE seq=33 phase_ms=0 (rx#33)
+
+2026-07-30 01:49:46,378 INFO image_tx_daemon: frame seq=123 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:46,399 INFO image_tx_daemon: LoRa cmd: PROBE seq=34 phase_ms=0 (rx#34)
+
+2026-07-30 01:49:47,912 INFO image_tx_daemon: frame seq=124 done (pipelined): 12 fragments ok
+
+2026-07-30 01:49:48,040 INFO image_tx_daemon: stats: goodput=1975.9 B/s util=80% pipeline=v3 frames_in=135 ok=44 fail=0 drop_full=85 drop_stale=0 frags_ok=562 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:49:49,410 INFO image_tx_daemon: frame seq=126 done (pipelined): 12 fragments ok
+
+2026-07-30 01:49:50,954 INFO image_tx_daemon: frame seq=129 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:52,535 INFO image_tx_daemon: frame seq=135 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:52,577 INFO image_tx_daemon: LoRa cmd: PROBE seq=35 phase_ms=0 (rx#35)
+
+2026-07-30 01:49:54,135 INFO image_tx_daemon: frame seq=136 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:54,157 INFO image_tx_daemon: LoRa cmd: PROBE seq=36 phase_ms=0 (rx#36)
+
+2026-07-30 01:49:55,726 INFO image_tx_daemon: frame seq=138 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:55,748 INFO image_tx_daemon: LoRa cmd: PROBE seq=37 phase_ms=0 (rx#37)
+
+2026-07-30 01:49:57,290 INFO image_tx_daemon: frame seq=141 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:58,052 INFO image_tx_daemon: stats: goodput=1928.6 B/s util=78% pipeline=v3 frames_in=155 ok=50 fail=0 drop_full=98 drop_stale=0 frags_ok=644 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:49:58,835 INFO image_tx_daemon: frame seq=144 done (pipelined): 13 fragments ok
+
+2026-07-30 01:49:58,856 INFO image_tx_daemon: LoRa cmd: PROBE seq=38 phase_ms=0 (rx#38)
+
+2026-07-30 01:50:00,417 INFO image_tx_daemon: frame seq=148 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:00,439 INFO image_tx_daemon: LoRa cmd: PROBE seq=39 phase_ms=0 (rx#39)
+
+2026-07-30 01:50:01,889 INFO image_tx_daemon: frame seq=151 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:01,911 INFO image_tx_daemon: LoRa cmd: PROBE seq=40 phase_ms=0 (rx#40)
+
+2026-07-30 01:50:03,355 INFO image_tx_daemon: frame seq=154 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:03,367 INFO image_tx_daemon: LoRa cmd: PROBE seq=41 phase_ms=0 (rx#41)
+
+2026-07-30 01:50:04,853 INFO image_tx_daemon: frame seq=157 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:06,393 INFO image_tx_daemon: frame seq=160 done (pipelined): 12 fragments ok
+
+2026-07-30 01:50:06,425 INFO image_tx_daemon: LoRa cmd: PROBE seq=42 phase_ms=0 (rx#42)
+
+2026-07-30 01:50:07,917 INFO image_tx_daemon: frame seq=163 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:07,929 INFO image_tx_daemon: LoRa cmd: PROBE seq=43 phase_ms=0 (rx#43)
+
+2026-07-30 01:50:08,063 INFO image_tx_daemon: stats: goodput=1980.6 B/s util=81% pipeline=v3 frames_in=175 ok=57 fail=0 drop_full=112 drop_stale=0 frags_ok=729 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:50:09,452 INFO image_tx_daemon: frame seq=166 done (pipelined): 12 fragments ok
+
+2026-07-30 01:50:10,978 INFO image_tx_daemon: frame seq=169 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:10,989 INFO image_tx_daemon: LoRa cmd: PROBE seq=44 phase_ms=0 (rx#44)
+
+2026-07-30 01:50:12,459 INFO image_tx_daemon: frame seq=172 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:13,991 INFO image_tx_daemon: frame seq=175 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:14,003 INFO image_tx_daemon: LoRa cmd: PROBE seq=45 phase_ms=0 (rx#45)
+
+2026-07-30 01:50:15,466 INFO image_tx_daemon: frame seq=178 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:15,477 INFO image_tx_daemon: LoRa cmd: PROBE seq=46 phase_ms=0 (rx#46)
+
+2026-07-30 01:50:16,950 INFO image_tx_daemon: frame seq=181 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:16,972 INFO image_tx_daemon: LoRa cmd: PROBE seq=47 phase_ms=0 (rx#47)
+
+2026-07-30 01:50:18,075 INFO image_tx_daemon: stats: goodput=1993.7 B/s util=81% pipeline=v3 frames_in=195 ok=63 fail=0 drop_full=125 drop_stale=0 frags_ok=814 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:50:18,541 INFO image_tx_daemon: frame seq=187 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:20,075 INFO image_tx_daemon: frame seq=188 done (pipelined): 12 fragments ok
+
+2026-07-30 01:50:21,573 INFO image_tx_daemon: frame seq=190 done (pipelined): 12 fragments ok
+
+2026-07-30 01:50:21,615 INFO image_tx_daemon: LoRa cmd: PROBE seq=48 phase_ms=0 (rx#48)
+
+2026-07-30 01:50:23,093 INFO image_tx_daemon: frame seq=193 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:24,674 INFO image_tx_daemon: frame seq=199 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:24,695 INFO image_tx_daemon: LoRa cmd: PROBE seq=49 phase_ms=0 (rx#49)
+
+2026-07-30 01:50:26,274 INFO image_tx_daemon: frame seq=200 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:27,864 INFO image_tx_daemon: frame seq=202 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:27,886 INFO image_tx_daemon: LoRa cmd: PROBE seq=50 phase_ms=0 (rx#50)
+
+2026-07-30 01:50:28,087 INFO image_tx_daemon: stats: goodput=1909.4 B/s util=78% pipeline=v3 frames_in=215 ok=70 fail=0 drop_full=139 drop_stale=0 frags_ok=895 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:50:29,402 INFO image_tx_daemon: frame seq=206 done (pipelined): 12 fragments ok
+
+2026-07-30 01:50:29,434 INFO image_tx_daemon: LoRa cmd: PROBE seq=51 phase_ms=0 (rx#51)
+
+2026-07-30 01:50:30,871 INFO image_tx_daemon: frame seq=209 done (pipelined): 12 fragments ok
+
+2026-07-30 01:50:32,408 INFO image_tx_daemon: frame seq=212 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:33,939 INFO image_tx_daemon: frame seq=215 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:33,951 INFO image_tx_daemon: LoRa cmd: PROBE seq=52 phase_ms=0 (rx#52)
+
+2026-07-30 01:50:35,402 INFO image_tx_daemon: frame seq=218 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:36,941 INFO image_tx_daemon: frame seq=221 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:36,973 INFO image_tx_daemon: LoRa cmd: PROBE seq=53 phase_ms=0 (rx#53)
+
+2026-07-30 01:50:38,097 INFO image_tx_daemon: stats: goodput=1987.7 B/s util=81% pipeline=v3 frames_in=235 ok=76 fail=0 drop_full=152 drop_stale=0 frags_ok=979 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:50:38,487 INFO image_tx_daemon: frame seq=224 done (pipelined): 12 fragments ok
+
+2026-07-30 01:50:38,519 INFO image_tx_daemon: LoRa cmd: PROBE seq=54 phase_ms=0 (rx#54)
+
+2026-07-30 01:50:40,010 INFO image_tx_daemon: frame seq=227 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:40,032 INFO image_tx_daemon: LoRa cmd: PROBE seq=55 phase_ms=0 (rx#55)
+
+2026-07-30 01:50:41,545 INFO image_tx_daemon: frame seq=230 done (pipelined): 12 fragments ok
+
+2026-07-30 01:50:43,071 INFO image_tx_daemon: frame seq=233 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:43,083 INFO image_tx_daemon: LoRa cmd: PROBE seq=56 phase_ms=0 (rx#56)
+
+2026-07-30 01:50:44,552 INFO image_tx_daemon: frame seq=236 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:44,563 INFO image_tx_daemon: LoRa cmd: PROBE seq=57 phase_ms=0 (rx#57)
+
+2026-07-30 01:50:46,016 INFO image_tx_daemon: frame seq=239 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:46,027 INFO image_tx_daemon: LoRa cmd: PROBE seq=58 phase_ms=0 (rx#58)
+
+2026-07-30 01:50:47,499 INFO image_tx_daemon: frame seq=242 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:47,510 INFO image_tx_daemon: LoRa cmd: PROBE seq=59 phase_ms=0 (rx#59)
+
+2026-07-30 01:50:48,111 INFO image_tx_daemon: stats: goodput=1991.9 B/s util=81% pipeline=v3 frames_in=255 ok=83 fail=0 drop_full=166 drop_stale=0 frags_ok=1064 frags_fail=0 qdepth=3 parity_tx=0
+
+2026-07-30 01:50:48,984 INFO image_tx_daemon: frame seq=245 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:48,995 INFO image_tx_daemon: LoRa cmd: PROBE seq=60 phase_ms=0 (rx#60)
+
+2026-07-30 01:50:50,575 INFO image_tx_daemon: frame seq=251 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:50,607 INFO image_tx_daemon: LoRa cmd: PROBE seq=61 phase_ms=0 (rx#61)
+
+2026-07-30 01:50:52,109 INFO image_tx_daemon: frame seq=252 done (pipelined): 12 fragments ok
+
+2026-07-30 01:50:53,607 INFO image_tx_daemon: frame seq=254 done (pipelined): 12 fragments ok
+
+2026-07-30 01:50:53,650 INFO image_tx_daemon: LoRa cmd: PROBE seq=62 phase_ms=0 (rx#62)
+
+2026-07-30 01:50:55,127 INFO image_tx_daemon: frame seq=1 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:56,708 INFO image_tx_daemon: frame seq=7 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:58,127 INFO image_tx_daemon: stats: goodput=1951.1 B/s util=79% pipeline=v3 frames_in=275 ok=89 fail=0 drop_full=179 drop_stale=0 frags_ok=1146 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:50:58,308 INFO image_tx_daemon: frame seq=8 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:58,330 INFO image_tx_daemon: LoRa cmd: PROBE seq=63 phase_ms=0 (rx#63)
+
+2026-07-30 01:50:59,899 INFO image_tx_daemon: frame seq=10 done (pipelined): 13 fragments ok
+
+2026-07-30 01:50:59,921 INFO image_tx_daemon: LoRa cmd: PROBE seq=64 phase_ms=0 (rx#64)
+
+2026-07-30 01:51:01,437 INFO image_tx_daemon: frame seq=14 done (pipelined): 12 fragments ok
+
+2026-07-30 01:51:01,468 INFO image_tx_daemon: LoRa cmd: PROBE seq=65 phase_ms=0 (rx#65)
+
+2026-07-30 01:51:02,906 INFO image_tx_daemon: frame seq=17 done (pipelined): 12 fragments ok
+
+2026-07-30 01:51:02,937 INFO image_tx_daemon: LoRa cmd: PROBE seq=66 phase_ms=0 (rx#66)
+
+2026-07-30 01:51:04,427 INFO image_tx_daemon: frame seq=20 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:05,959 INFO image_tx_daemon: frame seq=23 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:05,970 INFO image_tx_daemon: LoRa cmd: PROBE seq=67 phase_ms=0 (rx#67)
+
+2026-07-30 01:51:07,422 INFO image_tx_daemon: frame seq=26 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:07,444 INFO image_tx_daemon: LoRa cmd: PROBE seq=68 phase_ms=0 (rx#68)
+
+2026-07-30 01:51:08,138 INFO image_tx_daemon: stats: goodput=1969.6 B/s util=80% pipeline=v3 frames_in=295 ok=96 fail=0 drop_full=192 drop_stale=0 frags_ok=1230 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:51:08,919 INFO image_tx_daemon: frame seq=29 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:10,460 INFO image_tx_daemon: frame seq=32 done (pipelined): 12 fragments ok
+
+2026-07-30 01:51:12,004 INFO image_tx_daemon: frame seq=35 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:12,026 INFO image_tx_daemon: LoRa cmd: PROBE seq=69 phase_ms=0 (rx#69)
+
+2026-07-30 01:51:13,539 INFO image_tx_daemon: frame seq=38 done (pipelined): 12 fragments ok
+
+2026-07-30 01:51:15,064 INFO image_tx_daemon: frame seq=41 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:15,075 INFO image_tx_daemon: LoRa cmd: PROBE seq=70 phase_ms=0 (rx#70)
+
+2026-07-30 01:51:16,545 INFO image_tx_daemon: frame seq=44 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:16,557 INFO image_tx_daemon: LoRa cmd: PROBE seq=71 phase_ms=0 (rx#71)
+
+2026-07-30 01:51:18,017 INFO image_tx_daemon: frame seq=47 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:18,029 INFO image_tx_daemon: LoRa cmd: PROBE seq=72 phase_ms=0 (rx#72)
+
+2026-07-30 01:51:18,149 INFO image_tx_daemon: stats: goodput=1971.7 B/s util=80% pipeline=v3 frames_in=315 ok=103 fail=0 drop_full=206 drop_stale=0 frags_ok=1314 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:51:19,493 INFO image_tx_daemon: frame seq=50 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:19,515 INFO image_tx_daemon: LoRa cmd: PROBE seq=73 phase_ms=0 (rx#73)
+
+2026-07-30 01:51:20,978 INFO image_tx_daemon: frame seq=53 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:21,010 INFO image_tx_daemon: LoRa cmd: PROBE seq=74 phase_ms=0 (rx#74)
+
+2026-07-30 01:51:22,569 INFO image_tx_daemon: frame seq=59 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:24,103 INFO image_tx_daemon: frame seq=60 done (pipelined): 12 fragments ok
+
+2026-07-30 01:51:25,601 INFO image_tx_daemon: frame seq=62 done (pipelined): 12 fragments ok
+
+2026-07-30 01:51:25,642 INFO image_tx_daemon: LoRa cmd: PROBE seq=75 phase_ms=0 (rx#75)
+
+2026-07-30 01:51:27,121 INFO image_tx_daemon: frame seq=65 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:27,143 INFO image_tx_daemon: LoRa cmd: PROBE seq=76 phase_ms=0 (rx#76)
+
+2026-07-30 01:51:28,161 INFO image_tx_daemon: stats: goodput=1974.4 B/s util=80% pipeline=v3 frames_in=335 ok=109 fail=0 drop_full=219 drop_stale=0 frags_ok=1397 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:51:28,701 INFO image_tx_daemon: frame seq=71 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:28,723 INFO image_tx_daemon: LoRa cmd: PROBE seq=77 phase_ms=0 (rx#77)
+
+2026-07-30 01:51:30,302 INFO image_tx_daemon: frame seq=72 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:31,893 INFO image_tx_daemon: frame seq=74 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:31,914 INFO image_tx_daemon: LoRa cmd: PROBE seq=78 phase_ms=0 (rx#78)
+
+2026-07-30 01:51:33,430 INFO image_tx_daemon: frame seq=78 done (pipelined): 12 fragments ok
+
+2026-07-30 01:51:33,452 INFO image_tx_daemon: LoRa cmd: PROBE seq=79 phase_ms=0 (rx#79)
+
+2026-07-30 01:51:34,900 INFO image_tx_daemon: frame seq=81 done (pipelined): 12 fragments ok
+
+2026-07-30 01:51:36,436 INFO image_tx_daemon: frame seq=84 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:37,968 INFO image_tx_daemon: frame seq=87 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:37,979 INFO image_tx_daemon: LoRa cmd: PROBE seq=80 phase_ms=0 (rx#80)
+
+2026-07-30 01:51:38,172 INFO image_tx_daemon: stats: goodput=1950.1 B/s util=79% pipeline=v3 frames_in=355 ok=116 fail=0 drop_full=233 drop_stale=0 frags_ok=1480 frags_fail=0 qdepth=3 parity_tx=0
+
+2026-07-30 01:51:39,429 INFO image_tx_daemon: frame seq=90 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:39,450 INFO image_tx_daemon: LoRa cmd: PROBE seq=81 phase_ms=0 (rx#81)
+
+2026-07-30 01:51:40,928 INFO image_tx_daemon: frame seq=93 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:40,950 INFO image_tx_daemon: LoRa cmd: PROBE seq=82 phase_ms=0 (rx#82)
+
+2026-07-30 01:51:42,469 INFO image_tx_daemon: frame seq=96 done (pipelined): 12 fragments ok
+
+2026-07-30 01:51:42,500 INFO image_tx_daemon: LoRa cmd: PROBE seq=83 phase_ms=0 (rx#83)
+
+2026-07-30 01:51:43,992 INFO image_tx_daemon: frame seq=99 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:45,527 INFO image_tx_daemon: frame seq=102 done (pipelined): 12 fragments ok
+
+2026-07-30 01:51:47,052 INFO image_tx_daemon: frame seq=105 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:47,063 INFO image_tx_daemon: LoRa cmd: PROBE seq=84 phase_ms=0 (rx#84)
+
+2026-07-30 01:51:48,185 INFO image_tx_daemon: stats: goodput=1989.2 B/s util=81% pipeline=v3 frames_in=375 ok=122 fail=0 drop_full=246 drop_stale=0 frags_ok=1564 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:51:48,533 INFO image_tx_daemon: frame seq=108 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:48,535 INFO image_tx_daemon: LoRa cmd: PROBE seq=85 phase_ms=0 (rx#85)
+
+2026-07-30 01:51:50,005 INFO image_tx_daemon: frame seq=111 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:50,027 INFO image_tx_daemon: LoRa cmd: PROBE seq=86 phase_ms=0 (rx#86)
+
+2026-07-30 01:51:51,484 INFO image_tx_daemon: frame seq=114 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:51,506 INFO image_tx_daemon: LoRa cmd: PROBE seq=87 phase_ms=0 (rx#87)
+
+2026-07-30 01:51:52,969 INFO image_tx_daemon: frame seq=117 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:52,991 INFO image_tx_daemon: LoRa cmd: PROBE seq=88 phase_ms=0 (rx#88)
+
+2026-07-30 01:51:54,560 INFO image_tx_daemon: frame seq=123 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:54,592 INFO image_tx_daemon: LoRa cmd: PROBE seq=89 phase_ms=0 (rx#89)
+
+2026-07-30 01:51:56,095 INFO image_tx_daemon: frame seq=124 done (pipelined): 12 fragments ok
+
+2026-07-30 01:51:57,592 INFO image_tx_daemon: frame seq=126 done (pipelined): 12 fragments ok
+
+2026-07-30 01:51:58,196 INFO image_tx_daemon: stats: goodput=1975.1 B/s util=80% pipeline=v3 frames_in=395 ok=129 fail=0 drop_full=260 drop_stale=0 frags_ok=1648 frags_fail=0 qdepth=3 parity_tx=0
+
+2026-07-30 01:51:59,136 INFO image_tx_daemon: frame seq=129 done (pipelined): 13 fragments ok
+
+2026-07-30 01:51:59,158 INFO image_tx_daemon: LoRa cmd: PROBE seq=90 phase_ms=0 (rx#90)
+
+2026-07-30 01:52:00,717 INFO image_tx_daemon: frame seq=135 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:00,748 INFO image_tx_daemon: LoRa cmd: PROBE seq=91 phase_ms=0 (rx#91)
+
+2026-07-30 01:52:02,316 INFO image_tx_daemon: frame seq=136 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:02,338 INFO image_tx_daemon: LoRa cmd: PROBE seq=92 phase_ms=0 (rx#92)
+
+2026-07-30 01:52:03,908 INFO image_tx_daemon: frame seq=138 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:05,446 INFO image_tx_daemon: frame seq=142 done (pipelined): 12 fragments ok
+
+2026-07-30 01:52:05,477 INFO image_tx_daemon: LoRa cmd: PROBE seq=93 phase_ms=0 (rx#93)
+
+2026-07-30 01:52:06,915 INFO image_tx_daemon: frame seq=145 done (pipelined): 12 fragments ok
+
+2026-07-30 01:52:08,207 INFO image_tx_daemon: stats: goodput=1948.8 B/s util=79% pipeline=v3 frames_in=415 ok=135 fail=0 drop_full=273 drop_stale=0 frags_ok=1730 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:52:08,451 INFO image_tx_daemon: frame seq=148 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:08,473 INFO image_tx_daemon: LoRa cmd: PROBE seq=94 phase_ms=0 (rx#94)
+
+2026-07-30 01:52:09,923 INFO image_tx_daemon: frame seq=151 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:09,935 INFO image_tx_daemon: LoRa cmd: PROBE seq=95 phase_ms=0 (rx#95)
+
+2026-07-30 01:52:11,384 INFO image_tx_daemon: frame seq=154 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:12,928 INFO image_tx_daemon: frame seq=157 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:14,468 INFO image_tx_daemon: frame seq=160 done (pipelined): 12 fragments ok
+
+2026-07-30 01:52:14,510 INFO image_tx_daemon: LoRa cmd: PROBE seq=96 phase_ms=0 (rx#96)
+
+2026-07-30 01:52:15,991 INFO image_tx_daemon: frame seq=163 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:16,003 INFO image_tx_daemon: LoRa cmd: PROBE seq=97 phase_ms=0 (rx#97)
+
+2026-07-30 01:52:17,526 INFO image_tx_daemon: frame seq=166 done (pipelined): 12 fragments ok
+
+2026-07-30 01:52:18,219 INFO image_tx_daemon: stats: goodput=1971.4 B/s util=80% pipeline=v3 frames_in=435 ok=142 fail=0 drop_full=286 drop_stale=0 frags_ok=1814 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:52:19,051 INFO image_tx_daemon: frame seq=169 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:20,584 INFO image_tx_daemon: frame seq=172 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:20,596 INFO image_tx_daemon: LoRa cmd: PROBE seq=98 phase_ms=0 (rx#98)
+
+2026-07-30 01:52:22,056 INFO image_tx_daemon: frame seq=175 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:23,586 INFO image_tx_daemon: frame seq=178 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:23,598 INFO image_tx_daemon: LoRa cmd: PROBE seq=99 phase_ms=0 (rx#99)
+
+2026-07-30 01:52:25,078 INFO image_tx_daemon: frame seq=181 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:25,089 INFO image_tx_daemon: LoRa cmd: PROBE seq=100 phase_ms=0 (rx#100)
+
+2026-07-30 01:52:26,664 INFO image_tx_daemon: frame seq=187 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:26,686 INFO image_tx_daemon: LoRa cmd: PROBE seq=101 phase_ms=0 (rx#101)
+
+2026-07-30 01:52:28,200 INFO image_tx_daemon: frame seq=188 done (pipelined): 12 fragments ok
+
+2026-07-30 01:52:28,230 INFO image_tx_daemon: stats: goodput=1977.3 B/s util=80% pipeline=v3 frames_in=455 ok=149 fail=0 drop_full=300 drop_stale=0 frags_ok=1899 frags_fail=0 qdepth=4 parity_tx=0
+
+2026-07-30 01:52:29,697 INFO image_tx_daemon: frame seq=190 done (pipelined): 12 fragments ok
+
+2026-07-30 01:52:29,749 INFO image_tx_daemon: LoRa cmd: PROBE seq=102 phase_ms=0 (rx#102)
+
+2026-07-30 01:52:31,217 INFO image_tx_daemon: frame seq=194 done (pipelined): 13 fragments ok
+
+2026-07-30 01:52:31,229 INFO image_tx_daemon: LoRa cmd: PROBE seq=103 phase_ms=0 (rx#103)
+
+2026-07-30 01:52:32,761 INFO image_tx_daemon: frame seq=197 done (pipelined): 12 fragments ok
+
+2026-07-30 01:52:32,793 INFO image_tx_daemon: LoRa cmd: PROBE seq=104 phase_ms=0 (rx#104)
+
