@@ -203,7 +203,7 @@ size: $(BUILD)/$(TARGET).elf
 	@$(SIZE) -A -d $<
 	@echo
 	@echo "Region budgets (from include/memory_map.h):"
-	@echo "  BOOT  = 4 KB    APP = 180 KB    CFG = 8 KB    Total = 192 KB"
+	@echo "  APP = 184 KB (unified; boot merged, RS-5.8)    CFG = 8 KB    Total = 192 KB"
 	@echo "  RAM   = 20 KB    Stack reserved = 2.5 KB"
 
 # --------------------------------------------------------------------------
