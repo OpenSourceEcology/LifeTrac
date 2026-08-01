@@ -39,15 +39,50 @@ burst) that F7 now includes by sampling at header-pack time — with LBT off,
 which is the daemons' steady state. Values sit far inside the 185 ms slot
 budget; no straddles observed at this duty.
 
-## Still open from the acceptance checklist
+## F9 — PASS (flag=0 build, direct wire probe)
 
-- **F6 demotion/re-adoption test** — needs a forced demotion mid-run (e.g.
-  one-sided traffic hold >2 s) while both nodes transmit; the
-  `s_grid_adopted` flag is air-testable only.
-- **F9 flag=0 build** — one build with
-  `EXTRA_CFLAGS=-DHOST_ALLOW_REG_WRITE_DIAG=0`, then: arming works, profile
-  switch completes, 0x1D write FORBIDDEN. After that soak, the default flip
-  is its own commit.
+Both boards were flashed with an `EXTRA_CFLAGS=-DHOST_ALLOW_REG_WRITE_DIAG=0`
+build (23,040 B) and probed over the wire (`f9_gate_probe.py`):
+
+    PASS rxcont-arm:        reg 0x01 <- 0x85 ACKed
+    PASS standby:           reg 0x01 <- 0x81 ACKed
+    PASS modemconfig1-diag: refused (ERR_PROTO)      <- diag surface CLOSED
+    PASS raw-tx-value-gate: refused (ERR_PROTO)      <- value gate holds
+    PASS re-arm:            reg 0x01 <- 0x85 ACKed
+
+Production arming and the profile machinery then ran a full 360 s FHSS bench
+run on the same build (the F6 test below) — daemons connected, profile
+activated, RXCONT armed, 1318 frames received, `rx_decode_err=0`. The run-31
+failure class is structurally closed: a flag=0 build now works.
+
+## F6 — PASS (forced demotion + Δepoch=2 recovery)
+
+Run `radio_monitor_20260801_153738`, 360 s FHSS, with `synth_pub` frozen for
+30 s at ~T+90 (injected mid-run), silencing the tractor for ~3 epochs:
+
+    epoch  1..9    steady, 41-43 valid frames per ~10 s interval
+    epoch 10       partial interval (valid=27) — silence begins
+    epoch 12       delivery RESUMES (valid=32), epoch 11 skipped in silence
+    epoch 13..31   steady 41-43/interval, nineteen clean epochs
+
+The recovery frame arrived with the tractor at epoch 12 against a base
+scheduler frozen at ~10 — **Δepoch = 2, beyond the ±1 drift tolerance**. On
+pre-F6 firmware that frame is `REJECTED_EPOCH_DRIFT`, yet the scan SM still
+re-LOCKs (unconditional `scan_feed_frame(true)`), leaving the base locked on
+its stale grid delivering nothing, forever — the exact Defect A signature.
+On F6 firmware: the >2 s silence demoted the lock, demotion cleared
+`s_grid_adopted`, the first heard frame hit the UNANCHORED tier, was SNAPPED
+at Δ=2, and full-rate delivery resumed within the same stats interval.
+
+`slot_off` stayed [14..18] throughout — F7's truthful phase byte, unchanged
+across demotion and recovery.
+
+## Wrap-up
+
+All four Batch 1 items are now verified on air. Both boards were re-flashed
+with the DEFAULT (flag=1) build afterwards (RC=0 both) so the bench probes
+(T2 TCXO, SPI-isolation) keep working; the F9 default flip remains its own
+future commit per the soak rule.
 - FHSS goodput under smooth pacing (812 B/s at 67% util here) has no
   pre-Batch-1 FHSS/3000 B baseline to compare against — collect one if FHSS
   throughput ever matters; DTS remains the image-path profile.
