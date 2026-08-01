@@ -11,6 +11,7 @@ rides the tractor's existing age-escalation machinery.
 import os
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -22,7 +23,27 @@ from lora_proto import (  # noqa: E402
     parse_tile_stale,
 )
 from image_pipeline.canvas import Canvas  # noqa: E402
-from web_ui import compute_stale_tiles    # noqa: E402
+
+# web_ui connects to the MQTT broker at import time (and RAISES after 30 s
+# if none is listening — CI has no broker), so it must be imported under the
+# same paho stub the other web_ui tests use. Skip cleanly on pure-firmware
+# checkouts without fastapi/paho.
+try:
+    import paho.mqtt.client  # noqa: F401
+    import fastapi           # noqa: F401
+except ImportError:
+    raise unittest.SkipTest("paho-mqtt + fastapi required for web_ui import")
+
+with mock.patch("paho.mqtt.client.Client") as _mqtt_class:
+    _instance = _mqtt_class.return_value
+    _instance.connect = mock.MagicMock()
+    _instance.loop_start = mock.MagicMock()
+    _instance.subscribe = mock.MagicMock()
+    _instance.publish = mock.MagicMock()
+    import importlib
+    import web_ui
+    importlib.reload(web_ui)   # rebind module-level mqtt stub
+    compute_stale_tiles = web_ui.compute_stale_tiles
 
 
 class ProtoRoundtripTests(unittest.TestCase):
