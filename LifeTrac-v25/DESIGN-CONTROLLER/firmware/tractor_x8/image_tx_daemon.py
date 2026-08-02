@@ -395,6 +395,18 @@ TRACTOR_ENC_STATUS_TOPIC  = "lifetrac/v25/status/encode_mode"        # camera_se
 TRACTOR_LINK_BUDGET_TOPIC = "lifetrac/v25/tractor/link_budget"
 # F10: stale-tile bitmaps from the base, handed to camera_service.
 TRACTOR_TILE_STALE_TOPIC = "lifetrac/v25/tractor/tile_stale"
+
+# RS-11.5 diagnostic (2026-08-02): 0 = never arm RXCONT, so the firmware's
+# RS-4.12 re-arm chain (s_rearm_rx: re-arm iff armed at tx_begin) never
+# starts and the radio stays STANDBY between fragments — no TX->RXCONT->TX
+# turnaround cycling. This makes the tractor COMPLETELY DEAF to the
+# command downlink; it exists only to discriminate whether the turnaround
+# is the source of the slot-(total-2) on-air CRC corruption
+# (bench-evidence/RS_11_4_train_length_sweep_2026-08-02 §8). NEVER ship 0:
+# in-stream command delivery (99.8%) lives in the inter-fragment listening
+# gaps this disables, and inter-train-only delivery would blow the 700 ms
+# hydraulic-control latency budget.
+RXCONT_ARM = os.environ.get("LIFETRAC_RXCONT_ARM", "1") == "1"
 # LINK_PHY_NAMES index (camera_service / lora_proto) for each radio profile:
 # profile 0/1 (BW250) -> "image_bw250" (idx 5); profile 2 (BW500) -> idx 6.
 _PROFILE_TO_LINK_PHY_IDX = {0: 5, 1: 5, 2: 6}
@@ -605,16 +617,20 @@ class ImageTxDaemon:
         # base's 0xFB command frames between its own transmissions (the
         # firmware re-arms RX after each TX when it was armed before —
         # sx1276_tx.c s_rearm_rx).
-        try:
-            opm, _ = read_reg(link, SX1276_REG_OP_MODE, timeout=0.5)
-            if opm != SX1276_OPMODE_LORA_RXCONT:
-                write_reg(link, SX1276_REG_OP_MODE,
-                          SX1276_OPMODE_LORA_RXCONT, timeout=0.5)
-                LOG.info("RXCONT armed for command downlink (opmode "
-                         "0x%02x -> 0x85)", opm)
-        except Exception as exc:                              # pragma: no cover
-            LOG.warning("RXCONT arm failed: %s — command downlink deaf "
-                        "until next TX re-arm", exc)
+        if not RXCONT_ARM:
+            LOG.warning("RS-11.5 diagnostic: RXCONT arming DISABLED — "
+                        "command downlink deaf for this run")
+        else:
+            try:
+                opm, _ = read_reg(link, SX1276_REG_OP_MODE, timeout=0.5)
+                if opm != SX1276_OPMODE_LORA_RXCONT:
+                    write_reg(link, SX1276_REG_OP_MODE,
+                              SX1276_OPMODE_LORA_RXCONT, timeout=0.5)
+                    LOG.info("RXCONT armed for command downlink (opmode "
+                             "0x%02x -> 0x85)", opm)
+            except Exception as exc:                          # pragma: no cover
+                LOG.warning("RXCONT arm failed: %s — command downlink deaf "
+                            "until next TX re-arm", exc)
         LOG.info("TX worker ready (inter_cycle_s=%.3f, max %d frags/dwell)",
                  self.inter_cycle_s, MAX_FRAMES_PER_DWELL_CAP)
         while not self._stop.is_set():
@@ -729,6 +745,8 @@ class ImageTxDaemon:
         during continuous TX the tractor listens only in those gaps
         (acceptable: commands are retried ×2 and idempotent).
         """
+        if not RXCONT_ARM:
+            return          # RS-11.5 diagnostic: stay STANDBY, see the flag
         try:
             opm, _ = read_reg(link, SX1276_REG_OP_MODE, timeout=0.5)
             if opm != SX1276_OPMODE_LORA_RXCONT:

@@ -172,18 +172,53 @@ opmode-guarded. The corruption source sits below host-side evidence —
 inside the fragment-turnaround (TX→STANDBY→RXCONT→TX cycling with the
 mailbox drain timing) or the PA/synth behaviour around it.
 
-## 8. Session verdict and residuals
+## 8. Leg C — RXCONT turnaround refuted; host-side discriminator space closed
+
+A daemon env gate (`LIFETRAC_RXCONT_ARM=0`, harness `-RxcontArm 0`,
+production default unchanged) disables all RXCONT arming, so the
+firmware's RS-4.12 re-arm chain never starts and the tractor radio sits
+in STANDBY between fragments — no TX→RXCONT→TX cycling at all (command
+downlink deliberately deaf for the run). 300 s @ 3000 B, probe-bracketed
+(archive `radio_monitor_20260802_094053_86bf5d7f`):
+
+| leg | RXCONT cycling | Δcrc_err | attributed | idx 11 |
+|-----|---------------:|---------:|-----------:|-------:|
+| A/B | on             | +75/+80  | 82/79      | 23/21  |
+| C   | **off**        | +62      | 66         | **22** |
+
+The spike and the CRC rate are unchanged (Δ within run-to-run spread).
+The inter-fragment turnaround is NOT the mechanism.
+
+Incidental: the idle bench accumulated +47 radio CRC errors over ~11 h
+overnight (ambient noise false-demods at ~4/h) — negligible against
+62–80 per 300 s run, but worth knowing the counter's noise floor.
+
+**With leg C, every software-layer candidate is eliminated** (TX skips,
+host command TX, RX re-arm at start, prepare-ahead, host-side drops,
+in-train cumulative, RXCONT turnaround). What remains is physical/
+silicon-level at slot total−2: the transmitter radiating corrupt bits
+for a reason invisible to the C-code guards (FIFO/PLL/PA behaviour), or
+deterministic self-EMI at the tractor (e.g., host UART burst timing).
+Discriminating those needs an SDR capture of a corrupt slot, or firmware
+instrumentation (post-TX FIFO readback CRC, IRQ-flag dumps) — a flash
+session either way.
+
+## 9. Session verdict and residuals
 
 **Diagnosis: 11–18% of trains lose per-frame slot total−2 to on-air CRC
-corruption; every other candidate eliminated; root cause is inside the
-L072 TX turnaround at the train tail and needs firmware-level
-instrumentation (or an SDR capture) to pin further.**
+corruption; every software-layer candidate eliminated (including, via
+leg C, the RXCONT turnaround); root cause is physical/silicon-level in
+the transmit chain or deterministic self-EMI, and needs an SDR capture
+or firmware instrumentation (post-TX FIFO readback CRC, IRQ-flag dumps,
+measured TX duration in RFCO) to pin further — a flash session either
+way.**
 
 Residuals for RS-11.5 follow-up:
-- Firmware discriminator ideas: per-fragment RFCO with measured (not
-  estimated) TX duration; a counter on RXCONT-arm-while-TX-pending;
-  disabling the inter-fragment RXCONT re-arm for one run (firmware
-  toggle) to test the turnaround-interference theory directly.
+- Firmware discriminators for the flash session: post-TX FIFO readback
+  CRC at slot total−2 (splits FIFO-corrupted-before-radiating from
+  radiated-clean-and-damaged-in-flight); measured (not estimated) TX
+  duration in RFCO_PERTX; SX1276 IRQ-flag capture per fragment. An SDR
+  capture of a corrupt slot would settle it without a flash.
 - Base board gpio163 NRST no longer resets the L072 (counters survived
   ~8 harness launches; harness resets silently no-op) — bench
   infrastructure fix needed; probe deltas are the workaround.

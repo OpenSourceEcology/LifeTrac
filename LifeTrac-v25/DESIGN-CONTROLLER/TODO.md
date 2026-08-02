@@ -2132,11 +2132,17 @@ Two consequences for what is worth doing next:
   Δcrc_err + Δtx_ok reconciles exactly; ring/host drops zero; CRC delta
   ≈ attributed loss). Eliminated: TX skips, host cmd TX, RX re-arm at
   start, prepare-ahead (A/B, spike unchanged), host drops, cumulative
-  in-train. Host+firmware audit clean at visible layers — root cause is
-  inside the L072 TX turnaround at the train tail (drain phase: all
-  submitted, last parked). Next: firmware discriminators — measured TX
-  duration in RFCO_PERTX, a counter on rearm-while-tx-pending, or one
-  run with inter-fragment RXCONT re-arm disabled. Also: (a) fix base
+  in-train. **Leg C (2026-08-02) also exonerated the RXCONT turnaround**:
+  with `LIFETRAC_RXCONT_ARM=0` (new daemon env + harness `-RxcontArm`,
+  production default 1 — NEVER ship 0, in-stream command delivery lives
+  in those listening gaps) the radio sat in STANDBY between fragments
+  and the spike was unchanged (idx11 22/66, Δcrc +62). Every
+  software-layer candidate is now eliminated; the cause is
+  physical/silicon (TX chain radiating corrupt bits, or deterministic
+  self-EMI). Next: **flash session** with firmware discriminators
+  (post-TX FIFO readback CRC at slot total−2, measured TX duration in
+  RFCO_PERTX, IRQ-flag capture) — or an SDR capture, which would settle
+  it without a flash. Also: (a) fix base
   gpio163 NRST (no longer resets the L072 — harness resets silently
   no-op; probe deltas are the workaround); (b) once fixed, revisit the
   CR-4/5 decision — its "zero CRC errors" basis was measured at the
