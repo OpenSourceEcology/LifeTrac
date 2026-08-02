@@ -2101,7 +2101,50 @@ Two consequences for what is worth doing next:
 
 #### RS-11.4 Why does loss rise with position inside a train? (opened 2026-07-29)
 
-- [ ] **RS-11.4 Discriminate the cumulative-loss mechanism.** RS-11.1 measured
+- [x] **RS-11.4 CLOSED 2026-08-02 — question mooted by re-baseline; new
+  dominant mechanism found.** The prescribed train-length sweep ran
+  (3000/1500/750 B, n=2, `bench-evidence/RS_11_4_train_length_sweep_2026-08-02/RESULTS.md`):
+  the D1 in-train index gradient is GONE under smooth pacing (in-train
+  attributed loss 67 → 2–8/run) — the cumulative mechanism was the
+  token bucket, fixed 2026-07-30 before this sweep ran. The remaining
+  dominant loss is a **per-train-boundary event** (~0.20–0.25
+  events/boundary, ~1.3–1.8 fragments each): raw loss scales INVERSELY
+  with train length (4.9% at 13-frag → 10% at 4-frag) and times out
+  23–34% of trains. **Correction, same session:** an initial read of
+  "2–8 attributed vs 118–190 raw" was an ANALYSIS error (the
+  `lost_frag_idx` histogram resets every 10 s window; summing windows the
+  instrument attributes 68–143 ≈ 55–75% of raw, residual ~40–60/run).
+  The corrected per-index histograms localize the boundary event to the
+  **SECOND-TO-LAST fragment of the train at every train length** (30% /
+  50% / 75% of attributed loss at 13/7/4-frag; index 0 near-baseline —
+  RX-re-arm-at-start is dead). TX_DONE + synth size-mix accounting shows
+  the tractor radiated everything, and 17 command TXs/run can't explain
+  50–105 penultimate losses — the drop is base-side or never-demodulated.
+  Also: retained 0x63 pending-ack retries on ack-less benches are
+  BOUNDED — 17 attempts in ~10 s then an explicit GAVE UP (a first
+  "radiates forever" read was an averaging artifact, corrected on
+  review). Stop quoting the ~3.5% floor; the real cost is 11–18% of
+  trains losing their penultimate fragment. Follow-up is RS-11.5.
+- [ ] **RS-11.5 Fix the slot-(total−2) on-air corruption (diagnosis
+  DONE 2026-08-02, RESULTS §6–§8; fix open).** The counter split and
+  prepare-ahead A/B pinned it: **11–18% of trains lose per-frame slot
+  total−2 to on-air CRC corruption at the base radio** (Δdio0 = Δrx_ok +
+  Δcrc_err + Δtx_ok reconciles exactly; ring/host drops zero; CRC delta
+  ≈ attributed loss). Eliminated: TX skips, host cmd TX, RX re-arm at
+  start, prepare-ahead (A/B, spike unchanged), host drops, cumulative
+  in-train. Host+firmware audit clean at visible layers — root cause is
+  inside the L072 TX turnaround at the train tail (drain phase: all
+  submitted, last parked). Next: firmware discriminators — measured TX
+  duration in RFCO_PERTX, a counter on rearm-while-tx-pending, or one
+  run with inter-fragment RXCONT re-arm disabled. Also: (a) fix base
+  gpio163 NRST (no longer resets the L072 — harness resets silently
+  no-op; probe deltas are the workaround); (b) once fixed, revisit the
+  CR-4/5 decision — its "zero CRC errors" basis was measured at the
+  daemon layer, which structurally cannot see radio-CRC failures
+  (radio-layer rate is 3.2–3.4%, past the ~1% revisit trigger). (The
+  0x63 retry-bound item dissolved on review: the machinery already
+  gives up after 17 attempts/10.3 s.)
+- [ ] **RS-11.4 (original, superseded) Discriminate the cumulative-loss mechanism.** RS-11.1 measured
   fragment loss climbing monotonically with index inside a ~1.3 s train: index 0
   took 1 of 67 losses, indices 8–11 took 37 of 67. That is the *opposite* of
   the boundary-re-arm hypothesis and points at something **cumulative within a
