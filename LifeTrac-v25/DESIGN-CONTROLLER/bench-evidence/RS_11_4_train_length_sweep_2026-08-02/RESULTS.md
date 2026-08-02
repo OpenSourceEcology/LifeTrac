@@ -308,16 +308,26 @@ packet RSSI/SNR, length, and the corrupt bytes. One 300 s forward run
     flip turning "WEBP" into "WMBP"). No truncation, no fill patterns
     (longest 0x00 run 9, 0xFF run 3). Corrupt frag indices ~uniform.
 
-**−97 dBm mean at bench distance is the answer.** HIL_RUNBOOK.md §
-"no RF in the picture, no antennas attached" — this bench deliberately
-runs ANTENNA-LESS on leakage coupling. The link therefore sits at the
-demodulation floor with ~0–6 dB SNR margin, and the ~4% fragment
-corruption is ordinary noise-floor bit-flip loss inherent to that
-regime. Every prior observation now fits: receiver-side (noise lives at
-the receiver), both directions (both leakage paths are marginal),
-board-specific rates (slightly different leakage geometries), the idle
-CRC floor (ambient noise at the same threshold), and the clean TX
-digital path (leg D).
+**−97 dBm mean at bench distance is the anomaly that names the cause.**
+CORRECTION (2026-08-02, operator input): an initial reading blamed an
+"antenna-less bench" via HIL_RUNBOOK's "no antennas attached" line —
+that line describes the H7 HIL rig, NOT this radio bench. The boards
+carry Würth WIRL-ACCE Hermippe-III antennas (868 MHz, 2.5 dBi, SMA,
+50 Ω) on the Max Carriers. With antennas present, −97 dBm at bench
+range is ~60 dB of MISSING link budget — and the firmware audit found
+it: **the Murata ABZ antenna-switch mapping is wrong in
+sx1276{,_modes}.c** (PA1=CRF1 is the RX enable per the module
+reference; the code treated it as a TX/RX direction pin and drove
+PC1=CRF2, the TX-RFO arm, high in RX — the receiver listened through
+the wrong switch branch). The link therefore sat at the demodulation
+floor with ~0–6 dB SNR margin, and the ~4% fragment corruption is
+ordinary noise-floor bit-flip loss in that regime. Every prior
+observation fits: receiver-side, both directions (same wrong firmware
+on both boards), board-specific rates (switch-leakage tolerances), the
+idle CRC floor, and the clean TX digital path (leg D). Secondary,
+recorded: the Hermippe-III is EU-band (868 MHz) and the bench runs
+902–928 MHz — a few dB of mismatch per antenna; a US-band antenna swap
+is worth queuing but is not the 60 dB story.
 
 Reassessments per the corrections discipline:
 - **The "slot-(total−2) position lock" was most likely an instrument

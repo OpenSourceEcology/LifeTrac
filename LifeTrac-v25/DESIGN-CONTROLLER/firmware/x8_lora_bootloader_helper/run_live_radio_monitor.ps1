@@ -132,6 +132,11 @@ param(
     # diagnostic runs only (discriminates the slot-(total-2) CRC
     # corruption mechanism). Production default 1.
     [int]$RxcontArm = 1,
+    # RS-11.5 diagnostic (2026-08-02): TX power override in dBm (empty =
+    # profile default 14). CFG_SET at daemon startup; the firmware's ERP
+    # clamp still applies, so this can only go below the ceiling. Used for
+    # the SIR discriminator on the fixed RF switch.
+    [string]$TxPowerDbm = "",
     # Archive final logs + parameters under bench-evidence/ with the git
     # SHA in the folder name (evidence discipline per CODE REVIEWS docs).
     [switch]$Archive
@@ -288,7 +293,7 @@ if ($TxFeed -eq "local" -or $TxFeed -eq "camera") {
 }
 
 Write-Host "[LAUNCH] Starting TX Daemon on Board $TxAdbSerial (mqtt=$txMqtt, depth=$TxPipelineDepth)..." -ForegroundColor Yellow
-cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f tx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name tx_smoke --network=host --entrypoint python3 --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=$txMqtt -e LIFETRAC_SKIP_RESET_REQ=1 $profEnv -e LIFETRAC_TX_PIPELINE=$TxPipeline -e LIFETRAC_TX_PIPELINE_DEPTH=$TxPipelineDepth -e LIFETRAC_TX_BATCH=$TxBatch -e LIFETRAC_TX_PREPARE_AHEAD=$TxPrepareAhead -e LIFETRAC_TRAIN_GAP_MS=$TrainGapMs -e LIFETRAC_PARITY_GROUP=$ParityGroup -e LIFETRAC_ACK_COPIES=$AckCopies -e LIFETRAC_PROBE_ECHO=$ProbeEcho -e LIFETRAC_RXCONT_ARM=$RxcontArm hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44 -u /work/image_tx_daemon.py --log-level INFO`""
+cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f tx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name tx_smoke --network=host --entrypoint python3 --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=$txMqtt -e LIFETRAC_SKIP_RESET_REQ=1 $profEnv -e LIFETRAC_TX_PIPELINE=$TxPipeline -e LIFETRAC_TX_PIPELINE_DEPTH=$TxPipelineDepth -e LIFETRAC_TX_BATCH=$TxBatch -e LIFETRAC_TX_PREPARE_AHEAD=$TxPrepareAhead -e LIFETRAC_TRAIN_GAP_MS=$TrainGapMs -e LIFETRAC_PARITY_GROUP=$ParityGroup -e LIFETRAC_ACK_COPIES=$AckCopies -e LIFETRAC_PROBE_ECHO=$ProbeEcho -e LIFETRAC_RXCONT_ARM=$RxcontArm -e LIFETRAC_TX_POWER_DBM=$TxPowerDbm hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44 -u /work/image_tx_daemon.py --log-level INFO`""
 
 # 6. Launch RX daemon.
 # RX publishes to the BASE BOARD's own mosquitto (127.0.0.1 via
