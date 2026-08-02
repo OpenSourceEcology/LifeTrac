@@ -7,6 +7,11 @@
 
 void host_stats_reset(void);
 void host_stats_note_radio_events(uint32_t events);
+
+/* RS-11.5 TX FIFO readback discriminator (sx1276_tx.c). */
+void host_stats_tx_fifo_rb_ok(void);
+void host_stats_tx_fifo_rb_bad(void);
+void host_stats_tx_done_early(void);
 void host_stats_radio_rx_ok(void);
 void host_stats_radio_crc_err(void);
 void host_stats_radio_tx_ok(void);

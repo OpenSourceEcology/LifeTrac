@@ -1,5 +1,6 @@
 #include "sx1276_tx.h"
 
+#include "host_cmd.h"     /* RS-11.5: host_cmd_emit_fault */
 #include "host_stats.h"
 #include "platform.h"
 #include "sx1276_airtime.h"
@@ -56,6 +57,30 @@ static sx1276_tx_state_t s_tx_state = SX1276_TX_STATE_IDLE;
 static uint8_t s_tx_id;
 static uint8_t s_tx_power_dbm;
 static uint8_t s_rearm_rx;
+
+/*
+ * RS-11.5 (2026-08-02) TX-path discriminators for the slot-(total-2)
+ * on-air CRC corruption (bench-evidence/RS_11_4_train_length_sweep §8):
+ * checksum the FIFO content at load time, read it back after TX_DONE and
+ * compare, and flag a TX_DONE that lands >5 ms before the expected ToA.
+ * Reported via host_stats counters (additive STATS tail) plus a FAULT
+ * URC whose `sub` byte carries the fragment's tx_id, so the host log
+ * shows WHICH slot misbehaved. The readback burst costs ~1-2 ms inside
+ * the ~17 ms inter-fragment gap; if the corruption VANISHES under this
+ * instrumentation, that timing sensitivity is itself the finding.
+ */
+static uint32_t s_tx_load_ck;
+static uint8_t  s_tx_ck_len;
+static uint32_t s_tx_start_us;
+#define SX1276_TX_EARLY_SLACK_US 5000U
+
+static uint32_t tx_ck32_step(uint32_t ck, const uint8_t *data, uint8_t len) {
+    uint8_t i;
+    for (i = 0U; i < len; i++) {
+        ck = (ck * 31U) + data[i];
+    }
+    return ck;
+}
 static uint32_t s_expected_toa_us;
 static uint32_t s_deadline_us;
 static uint32_t s_reserved_airtime_us;
@@ -454,11 +479,16 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
         hdr.slot_offset_ms = s_hop_slot_offset_ms;  /* v25.0.7 phase byte */
         (void)lora_pkt_hdr_pack(&hdr, hdr_bytes);
         sx1276_write_burst(SX1276_REG_FIFO, hdr_bytes, LORA_PKT_HDR_LEN);
+        s_tx_load_ck = tx_ck32_step(5381U, hdr_bytes, LORA_PKT_HDR_LEN);
     }
+#else
+    s_tx_load_ck = 5381U;
 #endif
     if (req->length > 0U) {
         sx1276_write_burst(SX1276_REG_FIFO, req->payload, req->length);
+        s_tx_load_ck = tx_ck32_step(s_tx_load_ck, req->payload, req->length);
     }
+    s_tx_ck_len = effective_len;
     sx1276_write_reg(SX1276_REG_IRQ_FLAGS, 0xFFU);
 
     if (!sx1276_modes_to_tx()) {
@@ -481,9 +511,38 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
     if (s_expected_toa_us == 0U) {
         s_expected_toa_us = sx1276_airtime_estimate_toa_us(effective_len);
     }
-    s_deadline_us = platform_now_us() + s_expected_toa_us + SX1276_TX_TIMEOUT_GUARD_US;
+    s_tx_start_us = platform_now_us();
+    s_deadline_us = s_tx_start_us + s_expected_toa_us + SX1276_TX_TIMEOUT_GUARD_US;
     s_tx_state = SX1276_TX_STATE_WAIT_DONE;
     return true;
+}
+
+/*
+ * RS-11.5: after TX_DONE the SX1276 auto-returns to STANDBY and the FIFO
+ * retains the transmitted bytes (cleared only in SLEEP). Rewind the
+ * address pointer and re-checksum in 32-byte chunks (no large stack
+ * buffer). A mismatch means the FIFO content changed between load and
+ * TX_DONE — the radiated bits were corrupt at the source.
+ */
+static void tx_fifo_readback_check(void) {
+    uint8_t chunk[32];
+    uint32_t ck = 5381U;
+    uint8_t remaining = s_tx_ck_len;
+
+    sx1276_write_reg(SX1276_REG_FIFO_ADDR_PTR, 0x00U);
+    while (remaining > 0U) {
+        const uint8_t take = (remaining > 32U) ? 32U : remaining;
+        sx1276_read_burst(SX1276_REG_FIFO, chunk, take);
+        ck = tx_ck32_step(ck, chunk, take);
+        remaining = (uint8_t)(remaining - take);
+    }
+
+    if (ck == s_tx_load_ck) {
+        host_stats_tx_fifo_rb_ok();
+    } else {
+        host_stats_tx_fifo_rb_bad();
+        host_cmd_emit_fault(HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH, s_tx_id);
+    }
 }
 
 bool sx1276_tx_poll(uint32_t events, sx1276_tx_result_t *out_result) {
@@ -498,6 +557,18 @@ bool sx1276_tx_poll(uint32_t events, sx1276_tx_result_t *out_result) {
         sx1276_write_reg(SX1276_REG_IRQ_FLAGS, irq_flags);
 
         if ((irq_flags & SX1276_IRQ_TX_DONE) != 0U) {
+            /* RS-11.5 duration check FIRST (before any SPI traffic adds
+             * latency): TxDone earlier than ToA-5ms == truncated
+             * radiation. Poll latency only ever makes `measured` larger,
+             * so this can under-report but never false-positive. */
+            {
+                const uint32_t measured_us = platform_now_us() - s_tx_start_us;
+                if (measured_us + SX1276_TX_EARLY_SLACK_US < s_expected_toa_us) {
+                    host_stats_tx_done_early();
+                    host_cmd_emit_fault(HOST_FAULT_CODE_TX_DONE_EARLY, s_tx_id);
+                }
+            }
+            tx_fifo_readback_check();
             out_result->tx_id = s_tx_id;
             out_result->status = SX1276_TX_STATUS_OK;
             out_result->tx_power_dbm = s_tx_power_dbm;

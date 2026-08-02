@@ -20,6 +20,7 @@ drain_boot(link)
 stats = fetch_stats(link)
 for key in ("radio_rx_ok", "radio_crc_err", "radio_dio0", "radio_tx_ok",
             "host_rx_ring_ovf", "host_dropped", "host_queue_full",
-            "host_parse_ok", "host_parse_err", "radio_state"):
+            "host_parse_ok", "host_parse_err", "radio_state",
+            "tx_fifo_rb_ok", "tx_fifo_rb_bad", "tx_done_early"):
     print(f"{key}={stats.get(key, 'ABSENT')}")
 print("ALL:", {k: v for k, v in stats.items() if v})

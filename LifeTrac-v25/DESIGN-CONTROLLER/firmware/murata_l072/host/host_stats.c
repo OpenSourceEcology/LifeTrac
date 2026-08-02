@@ -40,6 +40,10 @@ typedef struct host_stats_wire_s {
     uint32_t host_uart_ne_usart1;
     uint32_t host_uart_ore_usart1;
     uint32_t host_rx_ring_ovf;
+    /* RS-11.5 additive tail (2026-08-02): TX FIFO readback discriminator. */
+    uint32_t tx_fifo_rb_ok;
+    uint32_t tx_fifo_rb_bad;
+    uint32_t tx_done_early;
 } host_stats_wire_t;
 
 _Static_assert(sizeof(host_stats_wire_t) == HOST_STATS_PAYLOAD_LEN,
@@ -54,6 +58,9 @@ static uint32_t s_radio_rx_ok;
 static uint32_t s_radio_tx_ok;
 static uint32_t s_radio_tx_abort_lbt;
 static uint32_t s_radio_tx_abort_airtime;
+static uint32_t s_tx_fifo_rb_ok;
+static uint32_t s_tx_fifo_rb_bad;
+static uint32_t s_tx_done_early;
 
 static void put_u32_le(uint8_t *dst, uint32_t value) {
     dst[0] = (uint8_t)(value & 0xFFU);
@@ -72,8 +79,23 @@ void host_stats_reset(void) {
     s_radio_tx_ok = 0U;
     s_radio_tx_abort_lbt = 0U;
     s_radio_tx_abort_airtime = 0U;
+    s_tx_fifo_rb_ok = 0U;
+    s_tx_fifo_rb_bad = 0U;
+    s_tx_done_early = 0U;
 
     host_uart_stats_reset();
+}
+
+void host_stats_tx_fifo_rb_ok(void) {
+    s_tx_fifo_rb_ok++;
+}
+
+void host_stats_tx_fifo_rb_bad(void) {
+    s_tx_fifo_rb_bad++;
+}
+
+void host_stats_tx_done_early(void) {
+    s_tx_done_early++;
 }
 
 void host_stats_radio_rx_ok(void) {
@@ -155,7 +177,10 @@ uint16_t host_stats_serialize(uint8_t *out, uint16_t out_cap) {
     put_u32_le(&out[idx], host_uart_stats_uart_fe_usart1());  idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], host_uart_stats_uart_ne_usart1());  idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], host_uart_stats_uart_ore_usart1()); idx = (uint16_t)(idx + 4U);
-    put_u32_le(&out[idx], host_uart_stats_rx_ring_ovf());
+    put_u32_le(&out[idx], host_uart_stats_rx_ring_ovf()); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], s_tx_fifo_rb_ok); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], s_tx_fifo_rb_bad); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], s_tx_done_early);
 
     return HOST_STATS_PAYLOAD_LEN;
 }
