@@ -1972,14 +1972,22 @@ acceptance steps passed — full record in
   dual-broker retained-override trap (bench rule: clear retained control
   state on BOTH brokers between campaigns), and the deployment rule
   `LIFETRAC_TILE_STALE_AFTER_MS ≥ ~1.25 × n_tiles/(SWEEP_STEP × fps)`.
-- [ ] **F11 (candidate, from F10 acceptance §5): demote web_ui's seq-gap
-  keyframe request.** The gap-tolerant apply requests a keyframe on EVERY
-  base_seq gap — including a single lost delta frame (two such on-air
-  events in the surgical window, each costing a ~2.4 KB keyframe at the
-  243 B/frame budget; the 10 s KeyframeRequester throttle is the only
-  damper). F10's stale reporting makes this largely redundant: staleness
-  is now detected and repaired tile-by-tile. Same protocol as F10: gate it
-  behind an env (default unchanged), measure the A/B on air, then flip.
+- [x] **F11 DONE + VERIFIED ON AIR 2026-08-02 (branch `f11-kf-on-seq-gap`)
+  — web_ui's per-gap keyframe request demoted, default OFF.** The
+  gap-tolerant apply requested a keyframe on EVERY base_seq gap, including
+  a single lost delta frame; F10's stale reporting made it redundant.
+  Implementation: structured causes on CanvasUpdate (`seq_gap`,
+  `tile_error` — no reason-string matching), suppression only for
+  pure-gap requests under `LIFETRAC_KF_ON_SEQ_GAP=0`; cold start, grid
+  mismatch, and tile-decode errors always pass through. On-air A/B in
+  `bench-evidence/F11_kf_on_gap_2026-08-02/RESULTS.md`: gate-off, 4
+  induced gaps + 2 natural single-frame losses → 6 suppressions, ZERO
+  keyframe requests, canvas fully healthy (short gaps re-swept below the
+  stale horizon; gap stragglers repaired by 0x6C in 1–2 report periods);
+  ungated cold-start request verified live mid-stream. Control = the F10
+  surgical window (every gap requested, two keyframe trains granted).
+  Default flipped to 0 after the pass, per the measure-then-flip
+  protocol; `=1` restores the old behaviour.
 
 ### RS-11 — Next-session sequencing, and the one instrument that gates it (added 2026-07-29)
 

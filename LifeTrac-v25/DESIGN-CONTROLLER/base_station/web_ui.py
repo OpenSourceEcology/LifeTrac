@@ -1076,6 +1076,25 @@ _TILE_STALE_PERIOD_S = float(os.environ.get("LIFETRAC_TILE_STALE_PERIOD_S",
                                             "3.0"))
 TILE_STALE_TOPIC = "lifetrac/v25/cmd/tile_stale"
 
+# F11 (2026-08-01, from the F10 acceptance §5 observation): the gap-tolerant
+# canvas requests a keyframe on EVERY base_seq gap — including a single lost
+# delta frame — and each granted request costs a multi-frame keyframe train
+# at the current link budget. F10's stale-tile reporting now detects and
+# repairs exactly that damage tile-by-tile at ~zero extra airtime, so the
+# per-gap keyframe is largely redundant. Cold start, grid mismatch, and
+# tile-decode errors are NOT gated — those are the keyframe request's
+# legitimate jobs.
+#
+# Default flipped to 0 after the on-air A/B PASSED 2026-08-02
+# (bench-evidence/F11_kf_on_gap_2026-08-02/RESULTS.md): gate-off, 4
+# induced gaps + 2 natural single-frame air losses → 6 suppressions,
+# ZERO keyframe requests, canvas fully healthy (F10 repaired the
+# stragglers in 1-2 report periods); the ungated cold-start request
+# verified live mid-stream. Control (gate-on) is the F10 acceptance
+# surgical window: every gap requested, two keyframe trains granted.
+# Set LIFETRAC_KF_ON_SEQ_GAP=1 to restore the old behaviour.
+_KF_ON_SEQ_GAP = os.environ.get("LIFETRAC_KF_ON_SEQ_GAP", "0") == "1"
+
 
 def compute_stale_tiles(canvas, now_ms: int, stale_after_ms: int) -> list:
     """Pure: indices of tiles that have not refreshed within the horizon.
@@ -1151,7 +1170,18 @@ def _ingest_tile_delta(payload: bytes) -> None:
             )
             _image_publisher.canvas = _image_canvas
         update = _image_canvas.apply(frame)
-        if update.request_keyframe:
+        # F11: a request caused ONLY by a base_seq gap is suppressed when
+        # the gate is off — the gap's tiles were still applied (gap-tolerant
+        # merge) and whatever the lost frames staled is repaired by the 0x6C
+        # stale-tile path. Any co-occurring tile error un-suppresses.
+        suppress_gap_kf = (update.request_keyframe and update.seq_gap
+                           and not update.tile_error and not _KF_ON_SEQ_GAP)
+        if suppress_gap_kf:
+            # warning, not info: uvicorn leaves the root logger at its
+            # WARNING default, so an info here is silently dropped — and
+            # this line is the bench A/B's suppression counter (F11).
+            logging.warning("kf-on-gap suppressed (F11): %s", update.reason)
+        if update.request_keyframe and not suppress_gap_kf:
             _image_publisher.needs_keyframe = True
             _image_publisher.last_keyframe_reason = update.reason
             try:
