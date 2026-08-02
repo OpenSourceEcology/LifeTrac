@@ -2151,7 +2151,12 @@ Two consequences for what is worth doing next:
   868 MHz Hermippe-III antennas). When hands are at the bench:
   reposition/separate the antennas (and consider US-band 915 MHz
   replacements), then one 300 s leg per change — the crc_dump
-  instrument reads the effect directly. Meanwhile: bench runs at
+  instrument reads the effect directly. **Field deployment antenna
+  (decided 2026-08-02): Taoglas TD.95.6H31 Blade, 868/915 MHz
+  dual-band omni dipole, terminal mount — properly tuned for
+  902–928 MHz; ~2 dBi-class gain is under the §15.247 6 dBi threshold
+  (no ERP reduction; declare datasheet gain in the field profile's
+  antenna_gain CFG at provisioning).** Meanwhile: bench runs at
   `-TxPowerDbm 17` get a free ~1.4× loss reduction; and add
   healthy-frame RSSI/SNR logging (currently only corrupt packets carry
   it) before deep-modeling the tail.
