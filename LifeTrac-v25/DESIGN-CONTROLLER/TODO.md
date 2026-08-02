@@ -2124,18 +2124,24 @@ Two consequences for what is worth doing next:
   nothing acks (bench artifact + robustness point). Stop quoting the
   ~3.5% floor; the real cost is 11–18% of trains losing their penultimate
   fragment. Follow-up is RS-11.5.
-- [ ] **RS-11.5 Pin the penultimate-fragment drop mechanism (opened
-  2026-08-02, reframed after the RS-11.4 correction).** The index-0-vs-
-  tail discrimination is ALREADY answered: the loss is position-locked to
-  train index total−2, 11–18% of ALL trains, at every train length — the
-  single largest known throughput lever (23–34% of trains time out on
-  it). Remaining steps: (1) L072 counter split — read radio_rx_ok /
-  radio_crc_err / host_rx_ring_ovf after a run (probe:
-  `rs115_stats_probe.py`) to separate demodulated-but-dropped-host-side
-  from never-demodulated (PHY/radio state at train end); (2) chase the
-  implicated layer (host drain vs firmware RX path around end-of-train);
-  (3) bound the 0x63 pending-ack retries (give-up counter or backoff
-  cap) — unacked retries currently radiate forever.
+- [ ] **RS-11.5 Fix the slot-(total−2) on-air corruption (diagnosis
+  DONE 2026-08-02, RESULTS §6–§8; fix open).** The counter split and
+  prepare-ahead A/B pinned it: **11–18% of trains lose per-frame slot
+  total−2 to on-air CRC corruption at the base radio** (Δdio0 = Δrx_ok +
+  Δcrc_err + Δtx_ok reconciles exactly; ring/host drops zero; CRC delta
+  ≈ attributed loss). Eliminated: TX skips, host cmd TX, RX re-arm at
+  start, prepare-ahead (A/B, spike unchanged), host drops, cumulative
+  in-train. Host+firmware audit clean at visible layers — root cause is
+  inside the L072 TX turnaround at the train tail (drain phase: all
+  submitted, last parked). Next: firmware discriminators — measured TX
+  duration in RFCO_PERTX, a counter on rearm-while-tx-pending, or one
+  run with inter-fragment RXCONT re-arm disabled. Also: (a) bound the
+  0x63 pending-ack retries (radiate forever unacked); (b) fix base
+  gpio163 NRST (no longer resets the L072 — harness resets silently
+  no-op; probe deltas are the workaround); (c) once fixed, revisit the
+  CR-4/5 decision — its "zero CRC errors" basis was measured at the
+  daemon layer, which structurally cannot see radio-CRC failures
+  (radio-layer rate is 3.2–3.4%, past the ~1% revisit trigger).
 - [ ] **RS-11.4 (original, superseded) Discriminate the cumulative-loss mechanism.** RS-11.1 measured
   fragment loss climbing monotonically with index inside a ~1.3 s train: index 0
   took 1 of 67 losses, indices 8–11 took 37 of 67. That is the *opposite* of

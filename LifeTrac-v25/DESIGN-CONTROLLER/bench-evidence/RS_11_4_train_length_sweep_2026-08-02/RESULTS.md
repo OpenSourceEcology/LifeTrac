@@ -109,14 +109,79 @@ SynthBudgetB 3000 / 1500 / 750 → 13 / 7 / 4 fragments per train, n=2 each.
   floor is ~5% at 13-frag trains, it lives at the train tail, and the
   train-failure rate (23–34% timeouts) is the throughput cost to attack.
 
-## 6. L072 counter split (run after the correction, same session)
+## 6. L072 counter split — the loss is ON-AIR CRC CORRUPTION
 
-Design: one 300 s run at 3000 B; STOP the rx daemon without resetting the
-L072 (docker stop does not touch NRST) and read the L072's own counters
-via the deployed diag probe (STATS_DUMP → STATS_URC survives in RAM). If
-the L072's demodulated-frame count ≈ TX frags (~2300+) while the daemon
-saw ~118 fewer → the loss is host-side (ring/UART drain). If the L072
-count matches the daemon's (both ≈ TX − ~118) → the penultimate fragment
-is never demodulated: a PHY/firmware-state event at train end (e.g., the
-radio's end-of-train state transition clipping the tail of RXCONT).
-Result recorded below when run.
+Probe-bracketed runs (`rs115_stats_probe.py`; counters are cumulative —
+see §7 finding on the dead base NRST — so deltas are taken around each
+run). Both runs 300 s @ 3000 B, n=1 each arm:
+
+| leg | PrepareAhead | Δradio_rx_ok | Δradio_crc_err | Δdio0 | Δtx_ok | ring_ovf/dropped |
+|-----|-------------:|-------------:|---------------:|------:|-------:|-----------------:|
+| A   | 1 (default)  | +2353 | **+75** | +2445 | +17 | 0 / 0 |
+| B   | 0            | +2361 | **+80** | +2458 | +17 | 0 / 0 |
+
+`Δdio0 = Δrx_ok + Δcrc_err + Δtx_ok` reconciles EXACTLY in both legs:
+every transmitted fragment reaches the base demodulator; the missing ones
+arrive **corrupt (CRC fail)**. Host-side drops are zero at every counter.
+The CRC delta (~75–80) matches the attributed per-run loss (76–82) — the
+whole boundary event is corruption, not deafness.
+
+Note the layering trap this exposes: the CR-4/5 coding-rate decision
+rested on "zero payload CRC errors in ~19k frames" measured at the DAEMON
+(rx_decode_err) — a layer that never sees radio-CRC failures (corrupt
+frames produce no URC). At the radio layer the error rate is 3.2–3.4%,
+past the ~1% revisit trigger in spirit. Revisit belongs on the table once
+the mechanism is fixed (parity/CR would mask, not fix).
+
+## 7. Prepare-ahead A/B — hypothesis refuted; position lock refined
+
+The prepare-ahead SPI/FIFO-during-TX hypothesis predicted the penultimate
+spike collapses with `-TxPrepareAhead 0`. It did not move:
+
+| run | PrepareAhead | attributed | idx 11 | idx 12 |
+|-----|-------------:|-----------:|-------:|-------:|
+| sweep #1 | 1 | 70 | 20 | 4 |
+| sweep #2 | 1 | 68 | 22 | 3 |
+| rs115 #1 | 1 | 76 | 21 | 1 |
+| A        | 1 | 82 | 23 | 6 |
+| B        | **0** | 79 | **21** | 3 |
+
+Position-lock refinement from the synth size mix (22–27% of frames are
+12-fragment): a "last fragment of the train" mechanism would put ~73% of
+the spike at index 12 — observed is the opposite. The lock is **per-frame
+slot total−2** (13-frag → 11, 12-frag → 10 [moderate counts observed],
+7-frag → 5, 4-frag → 2), i.e., exactly where the v3 pipeline enters its
+drain phase (all fragments submitted, last one parked, nothing left to
+feed).
+
+Exonerated across the session: TX-side skips (TX_DONE + size-mix
+accounting), host command TX (17/run vs 50–105 losses), RX re-arm at
+train start (index 0 near-baseline), prepare-ahead (this A/B), host-side
+drops (all counters zero), cumulative in-train (gone with the bucket).
+
+Host and firmware code audit (image_tx_daemon v3 path; sx1276_tx.c) shows
+clean discipline at the visible layers: FIFO writes only from IDLE,
+mailbox parks in RAM, raw host RXCONT writes post-burst and
+opmode-guarded. The corruption source sits below host-side evidence —
+inside the fragment-turnaround (TX→STANDBY→RXCONT→TX cycling with the
+mailbox drain timing) or the PA/synth behaviour around it.
+
+## 8. Session verdict and residuals
+
+**Diagnosis: 11–18% of trains lose per-frame slot total−2 to on-air CRC
+corruption; every other candidate eliminated; root cause is inside the
+L072 TX turnaround at the train tail and needs firmware-level
+instrumentation (or an SDR capture) to pin further.**
+
+Residuals for RS-11.5 follow-up:
+- Firmware discriminator ideas: per-fragment RFCO with measured (not
+  estimated) TX duration; a counter on RXCONT-arm-while-TX-pending;
+  disabling the inter-fragment RXCONT re-arm for one run (firmware
+  toggle) to test the turnaround-interference theory directly.
+- Bound the 0x63 pending-ack retries (still radiating ~1/18 s unacked).
+- Base board gpio163 NRST no longer resets the L072 (counters survived
+  ~8 harness launches; harness resets silently no-op) — bench
+  infrastructure fix needed; probe deltas are the workaround.
+- The daemon-level rx_frames vs Δrx_ok gap (~50) is the tractor's
+  DurationS+10 synth overrun transmitting after the daemon stops —
+  bench artifact, not loss.
