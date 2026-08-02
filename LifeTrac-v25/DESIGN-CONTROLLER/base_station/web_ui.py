@@ -1096,6 +1096,42 @@ TILE_STALE_TOPIC = "lifetrac/v25/cmd/tile_stale"
 _KF_ON_SEQ_GAP = os.environ.get("LIFETRAC_KF_ON_SEQ_GAP", "0") == "1"
 
 
+# RS-6.1 (2026-08-02): aggregate tile-age telemetry — the K-phase exit
+# metric the TODO flagged ("the system currently cannot see tile
+# staleness at all", written pre-F10). Per-tile age already rides the
+# /ws/state payload (age_ms) and the diag staleness overlay renders it;
+# this adds the ARCHIVABLE aggregate on MQTT so bench runs and K1/K2
+# exit tests can score staleness without a WS client.
+TILE_AGE_TOPIC = "lifetrac/v25/status/tile_age"
+
+
+def summarize_tile_ages(canvas, now_ms: int, stale_after_ms: int) -> "dict | None":
+    """Pure: percentile summary of per-tile canvas age. None before the
+    first keyframe (no meaningful ages yet). Never-arrived tiles are
+    reported in `missing` rather than polluting the percentiles."""
+    if not canvas.has_keyframe:
+        return None
+    ages = []
+    missing = 0
+    for tile in canvas._tiles:
+        if tile.arrived_ms == 0:
+            missing += 1
+        else:
+            ages.append(max(0, now_ms - tile.arrived_ms))
+    ages.sort()
+    n = len(ages)
+    return {
+        "ts_ms": now_ms,
+        "n_tiles": canvas.n_tiles,
+        "missing": missing,
+        "p50_ms": ages[n // 2] if n else None,
+        "p95_ms": ages[min(n - 1, (n * 95) // 100)] if n else None,
+        "max_ms": ages[-1] if n else None,
+        "stale": sum(1 for a in ages if a > stale_after_ms) + missing,
+        "stale_after_ms": stale_after_ms,
+    }
+
+
 def compute_stale_tiles(canvas, now_ms: int, stale_after_ms: int) -> list:
     """Pure: indices of tiles that have not refreshed within the horizon.
 
@@ -1123,8 +1159,16 @@ def _tile_stale_worker() -> None:
                 now_ms = int(time.monotonic() * 1000)
                 stale = compute_stale_tiles(canvas, now_ms,
                                             _TILE_STALE_AFTER_MS)
+                summary = summarize_tile_ages(canvas, now_ms,
+                                              _TILE_STALE_AFTER_MS)
                 n_tiles = canvas.n_tiles
                 base_seq = getattr(canvas, "_last_base_seq", None) or 0
+            if summary is not None:
+                # RS-6.1 aggregate — every tick, even when nothing is
+                # stale: a quiet link's p95 age IS the sweep-rotation
+                # measurement the K-phase exit tests need.
+                mqtt_client.publish(TILE_AGE_TOPIC,
+                                    json.dumps(summary), qos=0)
             if not stale:
                 continue
             body = pack_tile_stale(base_seq, stale, n_tiles)

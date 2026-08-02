@@ -44,6 +44,7 @@ with mock.patch("paho.mqtt.client.Client") as _mqtt_class:
     import web_ui
     importlib.reload(web_ui)   # rebind module-level mqtt stub
     compute_stale_tiles = web_ui.compute_stale_tiles
+    summarize_tile_ages = web_ui.summarize_tile_ages
 
 
 class ProtoRoundtripTests(unittest.TestCase):
@@ -113,6 +114,43 @@ class StaleScanTests(unittest.TestCase):
         for t in c._tiles:
             t.arrived_ms = 80_000           # exactly 20 s: NOT stale (>)
         self.assertEqual(compute_stale_tiles(c, 100_000, 20_000), [])
+
+
+class TileAgeSummaryTests(unittest.TestCase):
+    """RS-6.1 aggregate age telemetry (published on status/tile_age)."""
+
+    def _canvas(self, now_ms: int) -> Canvas:
+        c = Canvas(clock_ms=lambda: now_ms)
+        c._has_keyframe = True
+        return c
+
+    def test_none_before_keyframe(self) -> None:
+        c = Canvas(clock_ms=lambda: 1000)
+        self.assertIsNone(summarize_tile_ages(c, 1000, 20_000))
+
+    def test_percentiles_and_stale_count(self) -> None:
+        c = self._canvas(100_000)
+        for i, t in enumerate(c._tiles):
+            t.arrived_ms = 100_000 - (i + 1) * 100   # ages 100..9600 ms
+        s = summarize_tile_ages(c, 100_000, 5_000)
+        self.assertEqual(s["n_tiles"], 96)
+        self.assertEqual(s["missing"], 0)
+        self.assertEqual(s["max_ms"], 9_600)
+        self.assertEqual(s["p50_ms"], 4_900)          # sorted ages, idx 48
+        self.assertEqual(s["p95_ms"], 9_200)          # idx 91
+        # ages 5100..9600 exceed the 5 s threshold -> 46 stale
+        self.assertEqual(s["stale"], 46)
+
+    def test_never_arrived_counts_in_missing_and_stale(self) -> None:
+        c = self._canvas(50_000)
+        for t in c._tiles:
+            t.arrived_ms = 49_000
+        c._tiles[7].arrived_ms = 0
+        s = summarize_tile_ages(c, 50_000, 20_000)
+        self.assertEqual(s["missing"], 1)
+        self.assertEqual(s["stale"], 1, "missing tiles count as stale")
+        self.assertEqual(s["max_ms"], 1_000,
+                         "missing tiles stay out of the percentiles")
 
 
 if __name__ == "__main__":

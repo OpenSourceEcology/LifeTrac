@@ -1334,7 +1334,19 @@ No-regrets work, correct under every surviving architecture (do first):
   §K-B/K-C/K-G: back-channel = new 0xFB opcodes (e.g. `CMD_OP_REQ_TILES`
   + 12-byte bitmap, `CMD_OP_TILE_HASHES`), uplink budget accounting, and
   the K-C hash beacon as a downlink payload type.
-- [ ] **RS-6.1 Per-tile staleness histogram on RX** — prerequisite metric
+- [x] **RS-6.1 DONE 2026-08-02 — per-tile staleness visible end to end.**
+  Audit found most of it had landed with F10: per-tile `age_ms` already
+  rides `/ws/state` to the operator browser (state_publisher fills
+  `age_ms_at_publish` server-side), and `staleness_overlay.js` renders
+  the age veil (diag-gated `?diag=1`; server-authoritative ages by
+  design). The genuinely missing piece — the ARCHIVABLE aggregate for
+  K-phase exit scoring — is now published every stale-scan tick on
+  `lifetrac/v25/status/tile_age`: {n_tiles, missing, p50/p95/max age,
+  stale count vs the F10 horizon}. Published every tick even when quiet:
+  a healthy link's p95 age IS the sweep-rotation measurement K1/K2 exit
+  tests need. Residual note: the overlay's 1 s/5 s thresholds predate
+  the sweep-rotation insight — tune when K1 sets a real staleness SLA.
+- [ ] **RS-6.1 (original, superseded) Per-tile staleness histogram on RX** — prerequisite metric
   for every K-phase exit test: `age_since_applied` per grid cell,
   published on `link_stats`. The system currently cannot see tile
   staleness at all.
