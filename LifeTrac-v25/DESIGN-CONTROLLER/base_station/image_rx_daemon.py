@@ -1233,6 +1233,14 @@ class ImageRxDaemon:
                         self._last_rssi_dbm = parsed["rssi_dbm"]
                     if parsed.get("snr_db") is not None:
                         self._last_snr_db = parsed["snr_db"]
+                # RS-11.6 instrument (2026-08-02): HEALTHY-population RF
+                # stats. Until now only corrupt packets carried visible
+                # RSSI/SNR (crc_dump) — the good-frame distribution was
+                # never logged, which blocked SNR-margin analysis (the
+                # RS-11.5 closure's known-missing instrument). Windowed,
+                # summarized in the 10 s stats block.
+                self._note_frag_rf(parsed.get("rssi_dbm"),
+                                   parsed.get("snr_db"))
                 LOG.debug(
                     "RX_FRAME_URC #%d len=%d snr=%s rssi=%s payload_head=%s",
                     self.stats.rx_frames_seen, len(data),
@@ -1361,6 +1369,19 @@ class ImageRxDaemon:
     # read at the gap-sample site; "seq" until the first fragment classifies.
     _last_gap_class = "seq"
 
+    def _note_frag_rf(self, rssi_dbm, snr_db) -> None:
+        """RS-11.6: accumulate the HEALTHY-frame RF window (summarized +
+        reset in the 10 s stats block). Corrupt frames never reach here —
+        they surface via crc_dump — so together the two lines give both
+        population distributions."""
+        if not hasattr(self, "_rf_rssi"):
+            self._rf_rssi = []
+            self._rf_snr = []
+        if rssi_dbm is not None:
+            self._rf_rssi.append(int(rssi_dbm))
+        if snr_db is not None:
+            self._rf_snr.append(float(snr_db))
+
     def _note_frag_arrival(self, frag_seq: int, frag_idx: int,
                            frag_total: int) -> None:
         """Classify this fragment's arrival against the previous one.
@@ -1387,6 +1408,8 @@ class ImageRxDaemon:
         if not hasattr(self, "_lost_idx_hist"):
             self._lost_idx_hist: "dict[int, int]" = {}
             self._frag_idx_seen: "dict[int, int]" = {}
+            self._rf_rssi: "list[int]" = []
+            self._rf_snr: "list[float]" = []
             self._gap_class_us: "dict[str, list[int]]" = {
                 "seq": [], "boundary": [], "post_loss": [], "reordered": []}
             self._frames_observed = 0
@@ -1400,6 +1423,7 @@ class ImageRxDaemon:
         if prev is None:
             self._last_gap_class = "seq"
             return
+
 
         prev_seq, prev_idx, prev_total = prev
         if frag_seq != prev_seq:
@@ -1577,6 +1601,23 @@ class ImageRxDaemon:
                 hist = " ".join(f"{lab}:{cnt}" for lab, cnt in
                                 zip(labels, buckets) if cnt)
                 LOG.info("air_gap_hist(ms): %s", hist)
+
+            # RS-11.6 (2026-08-02): healthy-population RF distribution per
+            # window. min/med/max on both axes; the corrupt population's
+            # counterpart is the crc_dump lines. This is the SNR-margin
+            # instrument the RS-11.5 closure flagged as missing.
+            rf_rssi = getattr(self, "_rf_rssi", None)
+            if rf_rssi:
+                rf_snr = self._rf_snr
+                r = sorted(rf_rssi)
+                s = sorted(rf_snr) if rf_snr else [0.0]
+                LOG.info(
+                    "rx_rf: n=%d rssi[min/med/max]=%d/%d/%d "
+                    "snr[min/med/max]=%.1f/%.1f/%.1f",
+                    len(r), r[0], r[len(r) // 2], r[-1],
+                    s[0], s[len(s) // 2], s[-1])
+                self._rf_rssi = []
+                self._rf_snr = []
 
             ps = getattr(self, "_phase_stats", None)
             if ps is not None and (ps["valid"] or ps["invalid"] or ps["none"]):
