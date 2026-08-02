@@ -61,6 +61,13 @@ class CanvasUpdate:
     updated_indices: list[int] = field(default_factory=list)
     request_keyframe: bool = False
     reason: str = ""
+    # F11: structured causes so the POLICY layer (web_ui) can gate the
+    # seq-gap keyframe request without parsing reason strings. A gap and a
+    # tile error can co-occur in one frame; `reason` keeps only whichever
+    # fired first, so these flags are the reliable discriminator. Canvas
+    # stays mechanism-only: it always REPORTS, the caller decides.
+    seq_gap: bool = False
+    tile_error: bool = False
 
 
 class Canvas:
@@ -138,6 +145,7 @@ class Canvas:
                 # Now we apply the tiles AND request a keyframe in parallel
                 # so the operator still sees motion immediately.
                 update.request_keyframe = True
+                update.seq_gap = True
                 update.reason = (
                     f"base_seq gap: got {frame.base_seq}, expected {expected}")
             self._last_base_seq = frame.base_seq
@@ -156,6 +164,7 @@ class Canvas:
                 LOG.warning("canvas: dropping tile %d codec=%d: %s",
                             tile.index, frame.codec, exc)
                 update.request_keyframe = True
+                update.tile_error = True
                 update.reason = update.reason or f"codec_decode_error: {exc}"
                 continue
             except Exception as exc:
@@ -163,6 +172,7 @@ class Canvas:
                               "(unexpected transcode failure)",
                               tile.index, frame.codec)
                 update.request_keyframe = True
+                update.tile_error = True
                 update.reason = update.reason or (
                     f"tile_apply_error: {type(exc).__name__}: {exc}")
                 continue
