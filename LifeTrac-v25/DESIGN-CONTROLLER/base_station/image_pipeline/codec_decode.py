@@ -137,4 +137,19 @@ def transcode_to_webp(codec: int, blob: bytes, tile_px: int) -> bytes:
     if transcoder is None:
         raise CodecDecodeError(
             f"codec id {codec} not implemented in this base-station build")
-    return transcoder(blob, tile_px)
+    try:
+        return transcoder(blob, tile_px)
+    except CodecDecodeError:
+        raise
+    except Exception as exc:
+        # 2026-08-01 (F10 acceptance §6): a transcoder failing with anything
+        # OTHER than CodecDecodeError — observed on air: ImportError from the
+        # lazy PIL import when Pillow is absent and the stream switched to
+        # mono_g4 — escaped the canvas's per-tile handling and killed the
+        # whole frame apply mid-way (base_seq adopted, zero tiles applied,
+        # no keyframe requested). Every transcoder failure IS a decode
+        # failure from the caller's perspective, so fold it into the
+        # taxonomy the canvas already handles.
+        raise CodecDecodeError(
+            f"codec {codec} transcoder failed: {type(exc).__name__}: {exc}"
+        ) from exc
