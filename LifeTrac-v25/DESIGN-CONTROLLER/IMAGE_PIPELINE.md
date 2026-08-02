@@ -171,7 +171,7 @@ Lives in `base_station/image_pipeline/` on the X8 Linux side. Browser-tier offlo
 |---|---|:-:|
 | `accel_select.py` | Auto-detect Coral at startup; export `HAS_CORAL`; expose status to UI. | 1 |
 | `reassemble.py` | Collect `TileDeltaFrame` (`0x25`) fragments; time out missing fragments; mark stale tiles. | 1 |
-| `canvas.py` | Persistent tile canvas; replace changed tiles in place; on `base_seq` mismatch send `CMD_REQ_KEYFRAME` (`0x62`). Per-tile staleness clock. **Attaches badge enum to every published tile.** | 1 |
+| `canvas.py` | Persistent tile canvas; replace changed tiles in place. Per-tile staleness clock (`arrived_ms`). **Attaches badge enum to every published tile.** *Keyframe-request policy updated 2026-08-01/02 (F10/F11): requests fire only on cold start, grid mismatch, and tile-decode errors — the per-`base_seq`-gap and reassembly-timeout triggers are env-gated OFF (both measured harmful/redundant on air); staleness repair rides the `0x6C` stale-tile report instead (see LORA_PROTOCOL § shipped 0xFB set). Gap-tolerant merge still applies the gap frame's tiles.* | 1 |
 | `recolourise.py` | Re-colour Y-only tiles from rolling 30 s colour reference; sets `Recolourised` badge. | 1 (week 2.5) |
 | `bg_cache.py` | Rolling per-tile median keyed by tractor's segmenter class output; fills holes with `Cached` badge + age. | 1 |
 | `link_monitor.py` | Rolling 10 s `bytes/refresh`; emits `CMD_ENCODE_MODE` per the §3.4 ladder. | 1 |
@@ -189,6 +189,11 @@ Lives in `base_station/image_pipeline/` on the X8 Linux side. Browser-tier offlo
 
 - End-to-end image latency ≤500 ms p99 CPU-only (≤300 ms with Coral).
 - `CMD_REQ_KEYFRAME` recovery: induce I-frame loss, fresh I within 1 refresh.
+  *(2026-08: superseded for tile-level loss by the F10 stale-tile path —
+  the equivalent gate is now "induced fragment loss repairs via `0x6C`
+  marks with NO keyframe", verified on air 2026-08-01; keyframe recovery
+  remains the gate for cold start / grid change only. Aggregate staleness
+  is scored from `lifetrac/v25/status/tile_age` (RS-6.1).)*
 - Coral fallback: yank Coral mid-operation, UI flips to "AI accelerator: offline" within 10 s, pipeline continues degraded.
 - Auto-fallback ladder: attenuate the LoRa link in 50 B/s steps; verify the encoder downshifts through `full → y_only → motion_only → wireframe` without operator intervention and without losing the canvas.
 
