@@ -1329,11 +1329,18 @@ No-regrets work, correct under every surviving architecture (do first):
 > keyframe protection (RS-4.1), re-justify it against this direction before
 > spending bench time (see RS-4.1a).
 
-- [ ] **RS-6.0 Update K-phase design doc for LoRa-only transport** — revise
-  [`../AI NOTES/2026-07-25_Keyframe_Elimination_Strategies_Copilot_v1_0.md`](../AI%20NOTES/2026-07-25_Keyframe_Elimination_Strategies_Copilot_v1_0.md)
-  §K-B/K-C/K-G: back-channel = new 0xFB opcodes (e.g. `CMD_OP_REQ_TILES`
-  + 12-byte bitmap, `CMD_OP_TILE_HASHES`), uplink budget accounting, and
-  the K-C hash beacon as a downlink payload type.
+- [x] **RS-6.0 DONE 2026-08-02 — K-phase doc revised for LoRa-only
+  transport** (addendum v1.1 in
+  [`../AI NOTES/2026-07-25_Keyframe_Elimination_Strategies_Copilot_v1_0.md`](../AI%20NOTES/2026-07-25_Keyframe_Elimination_Strategies_Copilot_v1_0.md)):
+  K-B is recorded as substantially SHIPPED by F10's `0x6C` (the
+  staleness-driven NACK, on air since 2026-08-01) with F11 removing the
+  per-gap keyframe; K-C respecified as a downlink payload type whose
+  mismatch response reuses `0x6C`; K-G's connect-time sync mapped to
+  the retained cold-start request with a `req_tiles(all)` form proposed
+  as an all-ones `0x6C` bitmap + flag; uplink budget accounted
+  (<0.6 % duty even reporting continuously); the `0x60`/`0x62`
+  namespace collision flagged for deliberate K1/K2 reconciliation
+  (also documented in LORA_PROTOCOL.md's new shipped-0xFB table).
 - [x] **RS-6.1 DONE 2026-08-02 — per-tile staleness visible end to end.**
   Audit found most of it had landed with F10: per-tile `age_ms` already
   rides `/ws/state` to the operator browser (state_publisher fills

@@ -251,6 +251,33 @@ Opcodes:
 | `0x62` | `CMD_REQ_KEYFRAME` | `(empty)` | **Base → tractor**: the persistent canvas is too stale or the base lost an I-frame; please send a full I-frame on the next image transmission instead of a P-frame. P1-class. |
 | `0x63` | `CMD_ENCODE_MODE` | `mode (1 B)` | **Base → tractor**: image-link auto-fallback ladder output from `base_station/link_monitor.py`, optionally clamped under an operator-selected ceiling via `POST /api/settings/encode_mode`. Values: `0=full`, `1=y_only`, `2=motion_only`, `3=wireframe`, `4=btc4_per_tile`, `5=btc4_per_frame`, `6=mono_g4`, `7=adaptive` — see [`base_station/lora_proto.py::EncodeMode`](base_station/lora_proto.py) and [`AI NOTES/2026-05-25_Grayscale_Quantization_Encoding_Research_Copilot_v1_0.md`](../AI%20NOTES/2026-05-25_Grayscale_Quantization_Encoding_Research_Copilot_v1_0.md). Auto-fallback ladder = `{full, y_only, btc4_per_tile, btc4_per_frame, mono_g4}`; `motion_only`/`wireframe` are legacy slots, `adaptive` is operator-pinnable only. Requires 3 consecutive bad 5 s windows before changing modes. P2-class; never blocks ControlFrame. Tractor receiver clamps unknown/unimplemented modes to `y_only` (see [`camera_service.py`](firmware/tractor_x8/camera_service.py)) rather than crashing. |
 
+### Shipped 0xFB bench command set (`lora_proto.CMD_OP_*`) — and a numbering drift warning
+
+> **⚠ Namespace drift (recorded 2026-08-02).** The table ABOVE is the
+> design-era `frame_type = 0x30` command set (`lora_proto.CMD_*`). The
+> bridge-mode bench link that has actually been on air since 2026-07
+> uses a SEPARATE envelope — `COMMAND_FRAME_MAGIC 0xFB` — with its own
+> opcode constants (`lora_proto.CMD_OP_*`), and the two namespaces
+> COLLIDE on two bytes: `0x60` is `CMD_PERSON_APPEARED` above but
+> `CMD_OP_REQ_KEYFRAME` on the shipped 0xFB path, and `0x62` is
+> `CMD_REQ_KEYFRAME` above but unassigned on the 0xFB path. Nothing
+> mis-parses today because the envelopes differ, but any future
+> unification (RS-6 K-phases, RS-7 AEAD) must reconcile the numbering
+> DELIBERATELY. `base_station/lora_proto.py` is the shipped truth.
+
+| 0xFB opcode | Name (`CMD_OP_*`) | Args | Semantics |
+|------------|-------------------|------|-----------|
+| `0x60` | `REQ_KEYFRAME` | none | Base → tractor. Since F10/F11 (2026-08-01/02) fires only on cold start, grid mismatch, and tile-decode errors — the reassembly-timeout and per-seq-gap triggers are env-gated OFF (`LIFETRAC_KF_ON_REASM_TIMEOUT`, `LIFETRAC_KF_ON_SEQ_GAP`; both measured harmful/redundant on air). |
+| `0x63` | `ENCODE_MODE` | `u8 mode [, u8 quality 1-100]` | Base → tractor; quality byte additive (2026-07 increment). Pending-ack machinery retries then gives up after 17 attempts/~10 s. |
+| `0x65` | `RADIO_PROFILE` | `u8 profile (0/1/2)` | Base → tractor: two-phase profile switch, step 1. |
+| `0x66` | `RADIO_PROFILE_ACK` | `u8 profile` | Tractor → base, on the OLD grid. |
+| `0x67` | `RADIO_PROFILE_CONF` | `u8 profile` | Base → tractor: confirm; tractor cancels its revert timer. |
+| `0x68` | `ENCODE_MODE_ACK` | UTF-8 JSON ≤200 B | Tractor → base. |
+| `0x69` | `PROBE` | `u32le seq + u16le phase_ms` | RS-0.12 reactive-fire delivery instrument (no-op at the tractor beyond logging/echo). |
+| `0x6A` | `PROBE_ECHO` | `u32le seq` | Tractor → base. |
+| `0x6B` | `CTRL_DITTO` | `u16le ref_seq` | Referential control-repeat frame — see `CONTROL_PLANE_DESIGN.md §4a`; receiver applies only on exact last-applied-seq match. |
+| `0x6C` | `TILE_STALE` | `u16le base_seq + u8 bitmap[(n_tiles+7)/8]` | F10 (2026-08-01): base → tractor advisory stale-tile report, level-triggered, single-copy; tractor folds marks into age-escalation so repairs ride the next scheduled frame. 84× cheaper than the keyframe it replaced; verified on air. |
+
 The `CMD_CAMERA_SELECT` semantics:
 
 - **`0x00 auto-by-mode`** (default): tractor picks the camera based on operating mode. Tele-op forward = front; tele-op with reverse stick deflection >50% for >1 s = rear; autonomy = front; parked = whichever was last selected. This is the one most operators want.

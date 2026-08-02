@@ -1,7 +1,7 @@
 # Keyframe Elimination Strategies for the Tile-Delta Image Pipeline
 ## Creative ways to avoid the required use of keyframes
 
-**Document version:** v1.0
+**Document version:** v1.1 (RS-6.0 transport revision, 2026-08-02 — see addendum below)
 **Date:** 2026-07-25
 **Author:** GitHub Copilot (assistant-owned document)
 **Scope:** `camera_service.py` → LoRa → `image_rx_daemon.py` → web canvas
@@ -9,6 +9,53 @@
 - `DESIGN-CONTROLLER/IMAGE_PIPELINE_METHODS.md` (Method A/B/C tile selection)
 - `2026-07-25_LoRa_Image_Pipeline_Future_Work_Roadmap_Copilot_v1_0.md` (§3.1, §4.1)
 - `CODE REVIEWS/2026-07-23_LoRa_Comm_and_Image_TX_RX_Optimization_Review_Copilot_v1_0.md` (P1/P6)
+
+---
+
+## Addendum v1.1 — RS-6.0 LoRa-only transport revision (2026-08-02)
+
+Per the 2026-07-25 architecture rule (**base→tractor strictly over
+LoRa**), every back-channel this document sketched as an MQTT topic is
+respecified as a **0xFB command-frame opcode over the radio**, admitted
+through the same QoS/slot machinery as all command traffic. Concretely:
+
+1. **K-B is substantially SHIPPED.** F10 (merged 2026-08-01, verified on
+   air — `bench-evidence/F10_tile_stale_acceptance_2026-08-01`) is
+   K-B's staleness-driven NACK in all but name: `CMD_OP_TILE_STALE`
+   (`0xFB` opcode `0x6C`, `u16le base_seq_ref + 12 B bitmap`, 14 B body
+   ≈ 15.4 ms at DTS) reports stale tiles from the base's
+   `arrived_ms` clock; the tractor ORs the marks into the Method-C
+   age-escalation exactly as §K-B's "TX ORs the requested bitmap"
+   prescribed. Level-triggered single-copy, no retry machinery. The
+   "field note" about the LAN back-channel is obsolete — it rides LoRa
+   today. F11 (2026-08-02) additionally removed the per-seq-gap
+   keyframe request, so gap repair is now K-B-style tile repair by
+   default. Remaining delta to full K-B: an explicit `req_tiles(all)`
+   connect-time form (see K-G below).
+2. **K-C hash beacon = a DOWNLINK payload type**, not a topic: specify
+   as a new tile-delta stream frame kind (or a `0xFB` downlink-adjacent
+   frame) carrying the 96×CRC-8 vector — one ~102 B fragment every M
+   seconds inside the image budget. The mismatch response reuses `0x6C`
+   with the diffed bitmap (detector K-C → effector K-B, unchanged).
+3. **K-G connect-time sync**: the cold-start `req_keyframe` retained by
+   F10/F11 (`0xFB` opcode `0x60`) is the interim K-G trigger; the K1
+   target replaces its response with paced P-frame chunks (`req_tiles
+   (all)` semantics — proposed as `0x6C` with an all-ones bitmap +
+   a reserved flag, avoiding a new opcode).
+4. **Uplink budget accounting**: `0x6C` costs one command slot per
+   report tick (default 3 s, level-triggered so silence is free); at
+   DTS the 24 B on-air frame ≈ 15.4 ms — under 0.6 % duty even
+   reporting continuously. All uplink forms above must stay within the
+   command-plane admission (same pump/idle-drain paths as today).
+5. **Numbering caution**: the 0xFB `CMD_OP_*` namespace collides with
+   the design-era `frame_type 0x30` table on `0x60`/`0x62` — see
+   `LORA_PROTOCOL.md § Shipped 0xFB bench command set`. K1/K2 work must
+   reconcile deliberately.
+6. **Exit-metric instrumentation now exists** (RS-6.1, 2026-08-02):
+   per-tile `age_ms` rides `/ws/state`, and the archivable aggregate
+   (`p50/p95/max age, missing, stale count`) publishes on
+   `lifetrac/v25/status/tile_age` every scan tick — a healthy link's
+   p95 age is the sweep-rotation measurement K1/K2 exits score against.
 
 ---
 
