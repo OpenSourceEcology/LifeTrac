@@ -34,11 +34,13 @@ SynthBudgetB 3000 / 1500 / 750 → 13 / 7 / 4 fragments per train, n=2 each.
    |  750 B |  4 | 583 | 1895 | 190 | 10.0% | (twin) | | 428 |
 
    `published + timeouts ≈ trains` in every run (122+64≈190, 280+94≈382,
-   436+133≈569) — every train either completes or times out; there is no
-   third bucket. Loss events per boundary are near-constant at ~0.20–0.25
-   after subtracting the 17 periodic 0x63 radiations per run (see §4),
-   while events per second double across the sweep — the event is tied to
-   the boundary, not to wall clock. Each event costs ~1.3–1.8 fragments
+   436+133≈569) — nearly every train either completes or times out; the
+   remainder (4–13 trains/run) is whole-train losses plus trains
+   in-flight at teardown. Loss events per boundary are near-constant at
+   ~0.20–0.25 (the 17 0x63 radiations per run are confined to the first
+   ~10 s — see §4 — and cannot drive the steady-state rate), while
+   events per second double across the sweep — the event is tied to the
+   boundary, not to wall clock. Each event costs ~1.3–1.8 fragments
    (raw lost / timeouts), consistent with the `post_loss` gap median of
    ~234 ms ≈ exactly two 116.9 ms fragment slots.
 
@@ -83,12 +85,16 @@ SynthBudgetB 3000 / 1500 / 750 → 13 / 7 / 4 fragments per train, n=2 each.
 ## 4. Secondary observations
 
 - **17 × 0x63 (ENCODE_MODE) radiations in every run** — the retained
-  encode-mode override retries unacked for the whole session because the
-  synth feed has no camera_service to ack it (pending-ack machinery never
-  gives up; throttled to ~1/18 s). Each TX blinds the base's RX briefly:
-  a real robustness point (bounded retries needed) and a bench artifact
-  to subtract from loss accounting. Constant across tiers, so it does not
-  drive the inverse scaling.
+  encode-mode override retries unacked because the synth feed has no
+  camera_service to ack it. **Correction (review catch, 2026-08-02):**
+  the first write-up said the machinery "never gives up, ~1/18 s" — that
+  was an averaging artifact (17 ÷ 300 s without checking the
+  distribution). The log is explicit: all 17 attempts land in the first
+  ~10 s and then `cmd 0x63 GAVE UP after 17 attempts (10.3 s)` — the
+  pending-ack machinery is already bounded, and the "add a retry bound"
+  follow-up dissolves. Startup-confined, so it cannot contribute to
+  steady-state loss at all (stronger exoneration than the count
+  argument alone).
 - Boundary gap median grows as trains shorten: 178 ms (13/7-frag) →
   274.7 ms (4-frag) — prepare-ahead has less in-train time to build the
   next frame at short trains. Not separately investigated.
@@ -178,7 +184,6 @@ Residuals for RS-11.5 follow-up:
   estimated) TX duration; a counter on RXCONT-arm-while-TX-pending;
   disabling the inter-fragment RXCONT re-arm for one run (firmware
   toggle) to test the turnaround-interference theory directly.
-- Bound the 0x63 pending-ack retries (still radiating ~1/18 s unacked).
 - Base board gpio163 NRST no longer resets the L072 (counters survived
   ~8 harness launches; harness resets silently no-op) — bench
   infrastructure fix needed; probe deltas are the workaround.
