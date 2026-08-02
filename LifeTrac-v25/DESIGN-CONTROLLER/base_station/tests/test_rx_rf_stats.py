@@ -48,6 +48,17 @@ class RfWindowTests(unittest.TestCase):
         self.assertTrue(hasattr(s, "_rf_rssi"))
         self.assertTrue(hasattr(s, "_rf_snr"))
 
+    def test_single_axis_windows_accumulate_independently(self) -> None:
+        """PR #95 review case: the axes can be independently absent; an
+        SNR-only window must still carry its samples (the stats block
+        gates on EITHER list and resets both)."""
+        s = _Stub()
+        note = rxd.ImageRxDaemon._note_frag_rf
+        note(s, None, 4.0)
+        note(s, None, 6.0)
+        self.assertEqual(s._rf_rssi, [])
+        self.assertEqual(s._rf_snr, [4.0, 6.0])
+
 
 if __name__ == "__main__":
     unittest.main()

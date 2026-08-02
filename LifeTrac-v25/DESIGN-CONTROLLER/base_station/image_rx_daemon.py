@@ -1606,16 +1606,26 @@ class ImageRxDaemon:
             # window. min/med/max on both axes; the corrupt population's
             # counterpart is the crc_dump lines. This is the SNR-margin
             # instrument the RS-11.5 closure flagged as missing.
-            rf_rssi = getattr(self, "_rf_rssi", None)
-            if rf_rssi:
-                rf_snr = self._rf_snr
-                r = sorted(rf_rssi)
-                s = sorted(rf_snr) if rf_snr else [0.0]
+            # Review catch (PR #95): the axes can be independently absent
+            # (pre-F8 frames yield None on either), so gate on EITHER,
+            # report per-axis counts, format a missing axis as None, and
+            # ALWAYS reset both — an SNR-only window must neither grow
+            # unbounded nor log a fabricated 0.0.
+            rf_rssi = getattr(self, "_rf_rssi", None) or []
+            rf_snr = getattr(self, "_rf_snr", None) or []
+            if rf_rssi or rf_snr:
+                def _mmm(vals, fmt):
+                    if not vals:
+                        return "None"
+                    v = sorted(vals)
+                    return "/".join(fmt(x) for x in
+                                    (v[0], v[len(v) // 2], v[-1]))
                 LOG.info(
-                    "rx_rf: n=%d rssi[min/med/max]=%d/%d/%d "
-                    "snr[min/med/max]=%.1f/%.1f/%.1f",
-                    len(r), r[0], r[len(r) // 2], r[-1],
-                    s[0], s[len(s) // 2], s[-1])
+                    "rx_rf: n_rssi=%d n_snr=%d rssi[min/med/max]=%s "
+                    "snr[min/med/max]=%s",
+                    len(rf_rssi), len(rf_snr),
+                    _mmm(rf_rssi, lambda x: f"{x:d}"),
+                    _mmm(rf_snr, lambda x: f"{x:.1f}"))
                 self._rf_rssi = []
                 self._rf_snr = []
 
