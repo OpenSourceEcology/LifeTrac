@@ -295,7 +295,73 @@ separation/orientation change (user hands required — no RF equipment on
 this bench), or firmware capture of RegIrqFlags + RSSI + payload dump
 for corrupt receptions (RX-side instrumentation, next flash increment).
 
-## 14. Session verdict and residuals
+## 14. Leg G — corrupt-reception capture: ROOT CAUSE FOUND
+
+RX-side firmware capture (both boards flashed): on every payload-CRC
+failure the L072 now ships `RX_CRC_DUMP_URC` (0xC5) with IRQ flags,
+packet RSSI/SNR, length, and the corrupt bytes. One 300 s forward run
+(archive `radio_monitor_20260802_132817_30e1fbc6`) captured 126 dumps:
+
+    RSSI: −86..−115 dBm, mean −96.8      SNR: −12.0..+5.8, mean +1.7
+    Content: our own fragments, mostly intact — "RIFF…WEBPVP8" plainly
+    visible in ASCII — with scattered single-bit flips (e.g. one 0x08
+    flip turning "WEBP" into "WMBP"). No truncation, no fill patterns
+    (longest 0x00 run 9, 0xFF run 3). Corrupt frag indices ~uniform.
+
+**−97 dBm mean at bench distance is the answer.** HIL_RUNBOOK.md §
+"no RF in the picture, no antennas attached" — this bench deliberately
+runs ANTENNA-LESS on leakage coupling. The link therefore sits at the
+demodulation floor with ~0–6 dB SNR margin, and the ~4% fragment
+corruption is ordinary noise-floor bit-flip loss inherent to that
+regime. Every prior observation now fits: receiver-side (noise lives at
+the receiver), both directions (both leakage paths are marginal),
+board-specific rates (slightly different leakage geometries), the idle
+CRC floor (ambient noise at the same threshold), and the clean TX
+digital path (leg D).
+
+Reassessments per the corrections discipline:
+- **The "slot-(total−2) position lock" was most likely an instrument
+  artifact.** The dump-level frag-index distribution — ground truth —
+  is uniform. The attributed histograms' penultimate spike plausibly
+  reflects the attribution method's observability structure (which
+  losses are bookable given surrounding arrivals and timeouts), not the
+  channel. The attribution instrument remains valid as a loss COUNTER;
+  its per-index SHAPE should not be trusted without dump-level
+  confirmation.
+- **Leg F's interpretation softens**: the 2 dBm CFG did reach the PA
+  (cfg_apply → sx1276_set_tx_power_dbm, floor is exactly 2), so the
+  flat CRC rate under −12 dB TX says the corrupt fraction is set by the
+  floor-adjacent regime's tail, not that power is irrelevant. The
+  "overload refuted" conclusion stands (less power ≠ more corruption).
+
+## 15. RS-11.5 CLOSED — verdict
+
+**The ~4–5% bench "loss floor" is noise-floor bit-flip corruption on
+the deliberately antenna-less bench link (−97 dBm mean, ~0–6 dB SNR
+margin). It is a property of the bench RF configuration, not a defect
+in firmware, daemons, or protocol — those were each exonerated by
+direct measurement along the way. The field configuration (real
+antennas, real ranges, engineered link margins) is a different regime
+entirely.**
+
+What to do with it:
+- The user's pending antenna work is the real fix; after it, re-run one
+  300 s leg and re-baseline the floor (expect ≪1%).
+- Until then, bench throughput numbers carry an inherent ~4% fragment
+  loss + 23–34% train-timeout tax; keep ranking configs relative to
+  each other, not against a loss-free ideal.
+- RS-4.1 XOR parity (~+25% airtime per train, absorbs single-fragment
+  loss) is the software mitigation if the bench floor must go away
+  before antennas arrive.
+- The CR-4/5 revisit note is resolved: radio-layer CRC errors are the
+  bench regime, not a field signal.
+
+Diagnostic instrumentation retained in the tree (all additive,
+production-safe defaults): TX FIFO readback + early-TX_DONE counters,
+RX_CRC_DUMP_URC capture, LIFETRAC_RXCONT_ARM, LIFETRAC_TX_POWER_DBM,
+rs115_stats_probe.py.
+
+## 16. Session verdict and residuals (superseded by §15)
 
 **Diagnosis after legs A–E: 11–18% of trains lose per-frame slot
 total−2 to CRC corruption that enters BETWEEN the transmitter's FIFO

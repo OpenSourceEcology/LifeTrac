@@ -2125,7 +2125,28 @@ Two consequences for what is worth doing next:
   "radiates forever" read was an averaging artifact, corrected on
   review). Stop quoting the ~3.5% floor; the real cost is 11–18% of
   trains losing their penultimate fragment. Follow-up is RS-11.5.
-- [ ] **RS-11.5 Fix the slot-(total−2) on-air corruption (diagnosis
+- [x] **RS-11.5 CLOSED 2026-08-02 — root cause: noise-floor corruption
+  on the antenna-less bench link.** The leg-G corrupt-reception capture
+  (RX_CRC_DUMP_URC, both boards flashed) measured the truth directly:
+  our fragments arrive at **−97 dBm mean / ~0–6 dB SNR** (the bench
+  deliberately runs with no antennas — HIL_RUNBOOK) and the ~4% loss is
+  ordinary noise-floor single-bit corruption ("WEBP"→"WMBP"-class
+  flips, uniform across positions). Firmware, daemons, and protocol
+  each exonerated by direct measurement en route (legs A–G; the
+  penultimate "position lock" was an attribution-observability
+  artifact — dump-level truth is uniform). Fix = the pending ANTENNA
+  installation; after it, re-run one 300 s leg and re-baseline (expect
+  ≪1%). Until then: bench numbers carry ~4% inherent fragment loss;
+  RS-4.1 parity is the interim software mitigation if needed; CR-4/5
+  revisit resolved (bench regime, not field signal). Diagnostic
+  instrumentation retained: TX FIFO readback, RX_CRC_DUMP_URC,
+  RXCONT_ARM + TX_POWER_DBM knobs, stats probe. Full record:
+  `bench-evidence/RS_11_4_train_length_sweep_2026-08-02/RESULTS.md`.
+- [ ] **RS-11.6 Post-antenna re-baseline.** Once antennas are mounted:
+  one 300 s leg at the pinned operating point + a crc_dump count;
+  expect RSSI ≈ −30 dBm-class and the loss floor to collapse. Then
+  re-run the RS-11.2-style gap policy question against the clean link.
+- [ ] **RS-11.5 (original, superseded) Fix the slot-(total−2) on-air corruption (diagnosis
   DONE 2026-08-02, RESULTS §6–§8; fix open).** The counter split and
   prepare-ahead A/B pinned it: **11–18% of trains lose per-frame slot
   total−2 to on-air CRC corruption at the base radio** (Δdio0 = Δrx_ok +

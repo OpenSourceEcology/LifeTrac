@@ -123,6 +123,14 @@
  * FCC-B1-SUMMARY-b and FCC-B1-SUMMARY-c.
  */
 #define HOST_TYPE_RFCO_SUMMARY_URC           0xC4U
+/* RS-11.5 (2026-08-02) RX corrupt-frame capture: emitted on every LoRa
+ * payload-CRC failure so the host can characterize the damage the radio
+ * currently throws away. Payload:
+ *   {u8 ver=1, u8 irq_flags, u8 rx_len, u8 pkt_snr_q4, u8 pkt_rssi_raw,
+ *    u8 payload[min(rx_len, 251)]}
+ * pkt_rssi_raw converts as dBm = raw - 157 (HF port); snr_db = q4/4.
+ * Diagnostic-rate traffic (~0.3/s at the observed 4% corruption). */
+#define HOST_TYPE_RX_CRC_DUMP_URC            0xC5U
 
 /* STATS_URC payload layout is additive-only; parsers must tolerate trailing bytes. */
 #define HOST_STATS_OFFSET_HOST_DROPPED       0U
