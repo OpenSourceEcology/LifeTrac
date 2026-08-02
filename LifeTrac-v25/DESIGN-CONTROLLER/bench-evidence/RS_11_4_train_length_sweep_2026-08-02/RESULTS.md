@@ -203,22 +203,60 @@ Discriminating those needs an SDR capture of a corrupt slot, or firmware
 instrumentation (post-TX FIFO readback CRC, IRQ-flag dumps) — a flash
 session either way.
 
-## 9. Session verdict and residuals
+## 9. Leg D — instrumented firmware: the transmitter's DIGITAL path is clean
 
-**Diagnosis: 11–18% of trains lose per-frame slot total−2 to on-air CRC
-corruption; every software-layer candidate eliminated (including, via
-leg C, the RXCONT turnaround); root cause is physical/silicon-level in
-the transmit chain or deterministic self-EMI, and needs an SDR capture
-or firmware instrumentation (post-TX FIFO readback CRC, IRQ-flag dumps,
-measured TX duration in RFCO) to pin further — a flash session either
-way.**
+Experimental L072 firmware (branch `rs115-fw-discriminators`, flashed to
+the tractor via SWD/AN3155, `flasher RC=0`): DJB checksum over the FIFO
+at load, chunked FIFO readback + compare after TX_DONE, and an
+early-TX_DONE check (>5 ms before expected ToA). Reported via three
+additive STATS counters and FAULT URCs 0x0D/0x0E carrying the fragment's
+tx_id. One 300 s run at the standard operating point (archive
+`radio_monitor_20260802_105435_87821c90`; tractor counters zeroed by
+the launch reset; the aborted leg E archived as `..._110209_...`):
+
+    tractor:  radio_tx_ok = 2468
+              tx_fifo_rb_ok = 2468   tx_fifo_rb_bad = 0
+              tx_done_early = 0      FAULT lines: none
+    base:     Δradio_crc_err = +110  (corruption at full rate)
+
+**Every transmitted fragment left an intact FIFO and radiated for its
+full expected duration — yet ~110 fragments still arrived corrupt.**
+The instrumentation's ~1–2 ms added inter-fragment latency did not
+suppress the effect. Combined with legs A–C, the transmitter's entire
+digital path (host feed → mailbox → FIFO → duration) is exonerated by
+direct measurement. The corruption enters between the SX1276 modulator
+and the base demodulator: analog/RF at either end, or receiver silicon.
+
+## 10. Leg E (role swap) — aborted, no data; two rig facts learned
+
+Swapping -TxAdbSerial/-RxAdbSerial aborts before any TX: the harness's
+TX container image (`arduino-ootb-python-devel`) exists only on the
+tractor, and `lifetrac-v25` on the base lacks numpy for the synth
+publisher. No stream, no harm. Learned: (1) the OpenOCD SWD reset path
+WORKS on the base board — its L072 counters are now cleanly zeroed, a
+working substitute for the dead gpio163; (2) a proper swap needs
+`-TxFeed host` (PC-side publisher over the base's ethernet) with the tx
+daemon in `lifetrac-v25`. The swap remains the designed discriminator:
+corruption following the ROLE = systemic/protocol-timing; corruption
+vanishing or changing = unit-specific analog hardware (antenna,
+connector, front-end).
+
+## 11. Session verdict and residuals
+
+**Diagnosis after legs A–E: 11–18% of trains lose per-frame slot
+total−2 to CRC corruption that enters BETWEEN the transmitter's FIFO
+(proven intact, full-duration radiation, leg D) and the receiver's
+demodulator. Every software and digital-TX layer is eliminated by
+direct measurement. Remaining: analog/RF at either end, or receiver
+silicon — with the position lock still unexplained.**
 
 Residuals for RS-11.5 follow-up:
-- Firmware discriminators for the flash session: post-TX FIFO readback
-  CRC at slot total−2 (splits FIFO-corrupted-before-radiating from
-  radiated-clean-and-damaged-in-flight); measured (not estimated) TX
-  duration in RFCO_PERTX; SX1276 IRQ-flag capture per fragment. An SDR
-  capture of a corrupt slot would settle it without a flash.
+- The role swap (leg E recipe: -TxFeed host, tx daemon in lifetrac-v25
+  on the base, rx on the tractor) — corruption follows role vs
+  hardware unit.
+- Physical inspection: antennas/connectors/separation (boards are
+  bench-adjacent at 14 dBm — front-end compression is plausible, though
+  it does not explain the position lock by itself).
 - Base board gpio163 NRST no longer resets the L072 (counters survived
   ~8 harness launches; harness resets silently no-op) — bench
   infrastructure fix needed; probe deltas are the workaround.
