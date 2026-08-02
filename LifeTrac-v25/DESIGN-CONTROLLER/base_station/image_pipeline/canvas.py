@@ -143,20 +143,28 @@ class Canvas:
             self._last_base_seq = frame.base_seq
 
         for tile in frame.tiles:
+            # One bad tile must never kill the frame: an exception escaping
+            # this loop unwinds AFTER _last_base_seq was adopted and BEFORE
+            # the remaining tiles apply, silently freezing the canvas while
+            # it appears to track the stream (seen on air 2026-08-01, F10
+            # acceptance §6). transcode_to_webp folds transcoder failures
+            # into CodecDecodeError; the broad catch is the invariant's
+            # backstop for anything else (and keeps its traceback).
             try:
                 webp_blob = self._transcoded(frame.codec, tile.blob)
-            except Exception as exc:
-                # One bad tile must never kill the frame: an exception
-                # escaping here unwinds AFTER _last_base_seq was adopted
-                # and BEFORE the remaining tiles apply, silently freezing
-                # the canvas while it appears to track the stream (seen on
-                # air 2026-08-01, F10 acceptance §6). transcode_to_webp
-                # folds transcoder failures into CodecDecodeError; this
-                # broad catch is the invariant's backstop.
+            except CodecDecodeError as exc:
                 LOG.warning("canvas: dropping tile %d codec=%d: %s",
                             tile.index, frame.codec, exc)
                 update.request_keyframe = True
                 update.reason = update.reason or f"codec_decode_error: {exc}"
+                continue
+            except Exception as exc:
+                LOG.exception("canvas: dropping tile %d codec=%d "
+                              "(unexpected transcode failure)",
+                              tile.index, frame.codec)
+                update.request_keyframe = True
+                update.reason = update.reason or (
+                    f"tile_apply_error: {type(exc).__name__}: {exc}")
                 continue
             slot = self._tiles[tile.index]
             slot.blob = webp_blob

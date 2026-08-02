@@ -95,8 +95,11 @@ class CanvasSurvivesTranscoderDeathTests(unittest.TestCase):
         self.assertTrue(upd.request_keyframe)
         self.assertIn("PIL", upd.reason)
         self.assertEqual(upd.updated_indices, [])
-        # The keyframe-era tiles are untouched, not refreshed and not zeroed.
+        # The keyframe-era tiles are untouched, not refreshed and not
+        # zeroed — both tiles the failing frame carried (5, 6) and a
+        # bystander (7).
         self.assertEqual(self.canvas._tiles[5].arrived_ms, 50)
+        self.assertEqual(self.canvas._tiles[6].arrived_ms, 50)
         self.assertEqual(self.canvas._tiles[7].arrived_ms, 50)
 
     def test_backstop_survives_arbitrary_exception_mid_frame(self) -> None:
@@ -117,7 +120,10 @@ class CanvasSurvivesTranscoderDeathTests(unittest.TestCase):
         self.assertEqual(self.canvas._tiles[11].arrived_ms, 50)
         self.assertEqual(self.canvas._tiles[12].arrived_ms, 1000)
         self.assertTrue(upd.request_keyframe)
-        self.assertIn("cache exploded", upd.reason)
+        # The backstop labels non-codec failures with the real type instead
+        # of the misleading codec_decode_error prefix.
+        self.assertIn("tile_apply_error: RuntimeError: cache exploded",
+                      upd.reason)
 
 
 if __name__ == "__main__":
