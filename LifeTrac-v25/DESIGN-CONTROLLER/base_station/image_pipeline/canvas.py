@@ -145,7 +145,14 @@ class Canvas:
         for tile in frame.tiles:
             try:
                 webp_blob = self._transcoded(frame.codec, tile.blob)
-            except CodecDecodeError as exc:
+            except Exception as exc:
+                # One bad tile must never kill the frame: an exception
+                # escaping here unwinds AFTER _last_base_seq was adopted
+                # and BEFORE the remaining tiles apply, silently freezing
+                # the canvas while it appears to track the stream (seen on
+                # air 2026-08-01, F10 acceptance §6). transcode_to_webp
+                # folds transcoder failures into CodecDecodeError; this
+                # broad catch is the invariant's backstop.
                 LOG.warning("canvas: dropping tile %d codec=%d: %s",
                             tile.index, frame.codec, exc)
                 update.request_keyframe = True
