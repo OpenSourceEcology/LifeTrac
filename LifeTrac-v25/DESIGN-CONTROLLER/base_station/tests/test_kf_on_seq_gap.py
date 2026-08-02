@@ -1,10 +1,12 @@
 """F11 — gating the per-gap keyframe request behind LIFETRAC_KF_ON_SEQ_GAP.
 
-The gap-tolerant canvas (IP-PlanRev) requests a keyframe on EVERY base_seq
+The gap-tolerant canvas (IP-PlanRev) requested a keyframe on EVERY base_seq
 gap, including a single lost delta frame. F10's 0x6C stale-tile path now
 detects and repairs exactly that damage tile-by-tile, so the per-gap
-keyframe is largely redundant — but per the F10 protocol the default stays
-ON until the A/B is measured on air. These tests pin the gate mechanics:
+keyframe is largely redundant. Per the F10 protocol the gate shipped with
+the default ON, and the default was flipped OFF after the on-air A/B
+passed 2026-08-02 (bench-evidence/F11_kf_on_gap_2026-08-02/RESULTS.md).
+These tests pin the gate mechanics:
 
 - Canvas reports structured causes (seq_gap / tile_error) so web_ui's
   policy never string-matches reasons.
@@ -137,7 +139,7 @@ class WebUiGateTests(unittest.TestCase):
         # The gap's own tiles were still applied.
         self.assertEqual(web_ui._image_canvas._tiles[3].arrived_ms, 1000)
 
-    def test_gate_on_default_still_requests_on_gap(self) -> None:
+    def test_gate_on_still_requests_on_gap(self) -> None:
         web_ui._KF_ON_SEQ_GAP = True
         self._ingest(_frame(0, range(96), keyframe=True))
         self._ingest(_frame(5, [3]))
