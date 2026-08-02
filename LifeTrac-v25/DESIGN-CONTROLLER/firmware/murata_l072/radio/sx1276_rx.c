@@ -2,6 +2,8 @@
 
 #include "host_cmd.h"
 #include "host_stats.h"
+#include "host_types.h"   /* RS-11.5: HOST_TYPE_RX_CRC_DUMP_URC */
+#include "host_uart.h"    /* RS-11.5: host_uart_send_urc */
 #include "platform.h"
 #include "sx1276.h"
 #include "sx1276_modes.h"
@@ -115,6 +117,31 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
 
     if ((irq_flags & SX1276_IRQ_PAYLOAD_CRC_ERROR) != 0U) {
         host_stats_radio_crc_err();
+        /* RS-11.5 (2026-08-02): capture what we have always thrown away.
+         * The demodulator locked (header OK) but the payload failed CRC —
+         * read the metadata AND the corrupt bytes and ship them up as
+         * RX_CRC_DUMP_URC for offline damage analysis (burst vs scatter
+         * vs truncation; slot identification via the known header
+         * fields). Reuses out_frame->payload as scratch: on this path the
+         * caller sees `false` and never reads the buffer. */
+        {
+            const uint8_t rx_len = sx1276_read_reg(SX1276_REG_RX_NB_BYTES);
+            const uint8_t fifo_addr =
+                sx1276_read_reg(SX1276_REG_FIFO_RX_CURRENT_ADDR);
+            const uint8_t dump_len = (rx_len > 251U) ? 251U : rx_len;
+            uint8_t *buf = out_frame->payload;
+            buf[0] = 1U;                                    /* ver */
+            buf[1] = irq_flags;
+            buf[2] = rx_len;
+            buf[3] = sx1276_read_reg(SX1276_REG_PKT_SNR_VALUE);
+            buf[4] = sx1276_read_reg(SX1276_REG_PKT_RSSI_VALUE);
+            sx1276_write_reg(SX1276_REG_FIFO_ADDR_PTR, fifo_addr);
+            if (dump_len > 0U) {
+                sx1276_read_burst(SX1276_REG_FIFO, &buf[5], dump_len);
+            }
+            host_uart_send_urc(HOST_TYPE_RX_CRC_DUMP_URC, 0U, 0U,
+                               buf, (uint16_t)(5U + dump_len));
+        }
 #ifdef LIFETRAC_FHSS_TX_ROUTED
         /* FCC-A6c-2-b-ii: payload CRC error is a FRAME_INVALID event
          * to the scan SM regardless of any later header check. */

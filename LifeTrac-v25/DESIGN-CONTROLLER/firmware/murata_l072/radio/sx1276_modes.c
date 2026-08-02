@@ -56,14 +56,33 @@ static void sx1276_delay_us(uint32_t delay_us) {
     }
 }
 
+/*
+ * RS-11.5 root-cause fix (2026-08-02): the Murata CMWX1ZZABZ antenna
+ * switch pins are, per the module reference (ST B-L072Z-LRWAN1 BSP,
+ * hardwario lora-modem):
+ *   PA1 = CRF1 = RX path enable
+ *   PC1 = CRF2 = TX RFO path enable
+ *   PC2 = CRF3 = TX PA_BOOST path enable
+ * EXACTLY ONE path high per mode. The original code treated PA1 as a
+ * "TX/RX direction" pin and PC1 as "RX enable" — so in RX the real RX
+ * branch was OFF and the TX-RFO branch was ON: the receiver listened
+ * through the wrong switch arm. Measured consequence: −97 dBm mean at
+ * bench distance WITH antennas installed, ~0–6 dB SNR margin, and the
+ * ~4% noise-floor fragment corruption chased across RS-11.4/11.5
+ * legs A–G (bench-evidence/RS_11_4_train_length_sweep_2026-08-02).
+ * Macro names kept (TXRX==CRF1/PA1, RX==CRF2/PC1, TX_BOOST==CRF3/PC2)
+ * to keep the diff surgical; the truth table below is the contract.
+ */
 static void rf_switch_set_tx(uint8_t tx_mode) {
     if (tx_mode != 0U) {
-        GPIO_BSRR(SX1276_RF_SW_TXRX_PORT) = (1UL << SX1276_RF_SW_TXRX_PIN);
+        /* TX via PA_BOOST: CRF3 only. */
+        GPIO_BSRR(SX1276_RF_SW_TXRX_PORT) = (1UL << (SX1276_RF_SW_TXRX_PIN + 16U));
         GPIO_BSRR(SX1276_RF_SW_RX_PORT) = (1UL << (SX1276_RF_SW_RX_PIN + 16U));
         GPIO_BSRR(SX1276_RF_SW_TX_BOOST_PORT) = (1UL << SX1276_RF_SW_TX_BOOST_PIN);
     } else {
-        GPIO_BSRR(SX1276_RF_SW_TXRX_PORT) = (1UL << (SX1276_RF_SW_TXRX_PIN + 16U));
-        GPIO_BSRR(SX1276_RF_SW_RX_PORT) = (1UL << SX1276_RF_SW_RX_PIN);
+        /* RX: CRF1 only. */
+        GPIO_BSRR(SX1276_RF_SW_TXRX_PORT) = (1UL << SX1276_RF_SW_TXRX_PIN);
+        GPIO_BSRR(SX1276_RF_SW_RX_PORT) = (1UL << (SX1276_RF_SW_RX_PIN + 16U));
         GPIO_BSRR(SX1276_RF_SW_TX_BOOST_PORT) = (1UL << (SX1276_RF_SW_TX_BOOST_PIN + 16U));
     }
 }

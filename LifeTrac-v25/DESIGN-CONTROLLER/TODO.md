@@ -2125,7 +2125,42 @@ Two consequences for what is worth doing next:
   "radiates forever" read was an averaging artifact, corrected on
   review). Stop quoting the ~3.5% floor; the real cost is 11–18% of
   trains losing their penultimate fragment. Follow-up is RS-11.5.
-- [ ] **RS-11.5 Fix the slot-(total−2) on-air corruption (diagnosis
+- [x] **RS-11.5 CLOSED 2026-08-02 — root cause: noise-floor corruption
+  on the antenna-less bench link.** The leg-G corrupt-reception capture
+  (RX_CRC_DUMP_URC, both boards flashed) measured the truth directly:
+  our fragments arrive at **−97 dBm mean / ~0–6 dB SNR** (the bench
+  deliberately runs with no antennas — HIL_RUNBOOK) and the ~4% loss is
+  ordinary noise-floor single-bit corruption ("WEBP"→"WMBP"-class
+  flips, uniform across positions). Firmware, daemons, and protocol
+  each exonerated by direct measurement en route (legs A–G; the
+  penultimate "position lock" was an attribution-observability
+  artifact — dump-level truth is uniform). Fix = the pending ANTENNA
+  installation; after it, re-run one 300 s leg and re-baseline (expect
+  ≪1%). Until then: bench numbers carry ~4% inherent fragment loss;
+  RS-4.1 parity is the interim software mitigation if needed; CR-4/5
+  revisit resolved (bench regime, not field signal). Diagnostic
+  instrumentation retained: TX FIFO readback, RX_CRC_DUMP_URC,
+  RXCONT_ARM + TX_POWER_DBM knobs, stats probe. Full record:
+  `bench-evidence/RS_11_4_train_length_sweep_2026-08-02/RESULTS.md`.
+- [ ] **RS-11.6 Antenna-position experiment + re-baseline (updated
+  2026-08-02 after the RF-switch fix).** The switch-mapping bug is
+  FIXED (+33 dB verified, legs H–J); the residual ~4% floor (at
+  17 dBm) is signal-proportional self-interference at bench geometry
+  (corrupt packets pinned at ≈+2 dB SNR across 48 dB of signal
+  change — multipath/near-field at close range with the detuned
+  868 MHz Hermippe-III antennas). When hands are at the bench:
+  reposition/separate the antennas (and consider US-band 915 MHz
+  replacements), then one 300 s leg per change — the crc_dump
+  instrument reads the effect directly. **Field deployment antenna
+  (decided 2026-08-02): Taoglas TD.95.6H31 Blade, 868/915 MHz
+  dual-band omni dipole, terminal mount — properly tuned for
+  902–928 MHz; ~2 dBi-class gain is under the §15.247 6 dBi threshold
+  (no ERP reduction; declare datasheet gain in the field profile's
+  antenna_gain CFG at provisioning).** Meanwhile: bench runs at
+  `-TxPowerDbm 17` get a free ~1.4× loss reduction; and add
+  healthy-frame RSSI/SNR logging (currently only corrupt packets carry
+  it) before deep-modeling the tail.
+- [ ] **RS-11.5 (original, superseded) Fix the slot-(total−2) on-air corruption (diagnosis
   DONE 2026-08-02, RESULTS §6–§8; fix open).** The counter split and
   prepare-ahead A/B pinned it: **11–18% of trains lose per-frame slot
   total−2 to on-air CRC corruption at the base radio** (Δdio0 = Δrx_ok +
@@ -2137,12 +2172,21 @@ Two consequences for what is worth doing next:
   production default 1 — NEVER ship 0, in-stream command delivery lives
   in those listening gaps) the radio sat in STANDBY between fragments
   and the spike was unchanged (idx11 22/66, Δcrc +62). Every
-  software-layer candidate is now eliminated; the cause is
-  physical/silicon (TX chain radiating corrupt bits, or deterministic
-  self-EMI). Next: **flash session** with firmware discriminators
-  (post-TX FIFO readback CRC at slot total−2, measured TX duration in
-  RFCO_PERTX, IRQ-flag capture) — or an SDR capture, which would settle
-  it without a flash. Also: (a) fix base
+  software-layer candidate is now eliminated. **Legs D–F (2026-08-02,
+  instrumented firmware flashed to the tractor, branch
+  `rs115-fw-discriminators`) narrowed it decisively**: FIFO readback +
+  duration in-firmware prove the TX digital path clean (2468/2468 and
+  2613/2613 intact); the role swap shows corruption FOLLOWS THE
+  RECEIVER (tractor-as-RX: 6.6%, uniform; base-as-RX: 3–4.5%,
+  slot-(total−2) locked); a 12 dB power drop (new
+  `LIFETRAC_TX_POWER_DBM` knob) changes nothing (overload refuted); the
+  idle floor (~4 CRC/h vs 75–170/300 s active) refutes ambient
+  interference. Diagnosis: ~4% of our own fragments arrive
+  payload-corrupt at the receiver, both directions, power-independent —
+  receiver-side host/board coupling or board EMI, shape board-specific.
+  Next: physical separation/orientation test (needs hands at the
+  bench), or RX-side firmware capture (IRQ flags + RSSI + corrupt
+  payload dump) as the next flash increment. Also: (a) fix base
   gpio163 NRST (no longer resets the L072 — harness resets silently
   no-op; probe deltas are the workaround); (b) once fixed, revisit the
   CR-4/5 decision — its "zero CRC errors" basis was measured at the

@@ -123,6 +123,14 @@
  * FCC-B1-SUMMARY-b and FCC-B1-SUMMARY-c.
  */
 #define HOST_TYPE_RFCO_SUMMARY_URC           0xC4U
+/* RS-11.5 (2026-08-02) RX corrupt-frame capture: emitted on every LoRa
+ * payload-CRC failure so the host can characterize the damage the radio
+ * currently throws away. Payload:
+ *   {u8 ver=1, u8 irq_flags, u8 rx_len, u8 pkt_snr_q4, u8 pkt_rssi_raw,
+ *    u8 payload[min(rx_len, 251)]}
+ * pkt_rssi_raw converts as dBm = raw - 157 (HF port); snr_db = q4/4.
+ * Diagnostic-rate traffic (~0.3/s at the observed 4% corruption). */
+#define HOST_TYPE_RX_CRC_DUMP_URC            0xC5U
 
 /* STATS_URC payload layout is additive-only; parsers must tolerate trailing bytes. */
 #define HOST_STATS_OFFSET_HOST_DROPPED       0U
@@ -160,7 +168,12 @@
 #define HOST_STATS_OFFSET_HOST_UART_NE_USART1  120U
 #define HOST_STATS_OFFSET_HOST_UART_ORE_USART1 124U
 #define HOST_STATS_OFFSET_HOST_RX_RING_OVF     128U
-#define HOST_STATS_PAYLOAD_LEN               132U
+/* RS-11.5 (2026-08-02) additive tail: TX FIFO readback discriminator.
+ * Older host parsers tolerate the growth (offset-guarded label list). */
+#define HOST_STATS_OFFSET_TX_FIFO_RB_OK        132U
+#define HOST_STATS_OFFSET_TX_FIFO_RB_BAD       136U
+#define HOST_STATS_OFFSET_TX_DONE_EARLY       140U
+#define HOST_STATS_PAYLOAD_LEN               144U
 
 #define HOST_TYPE_BOOT_URC                   0xF0U
 /* FAULT_URC payload: {u8 code, u8 sub, u16 reserved, u32 pc, u32 lr, u32 psr, u32 bfar, u32 uptime_ms} */
@@ -182,6 +195,14 @@
 #define HOST_FAULT_CODE_HOST_RX_INACTIVE     0x0AU
 #define HOST_FAULT_CODE_HOST_PARSE_ERROR     0x0BU
 #define HOST_FAULT_CODE_HOST_DIAG_MARK       0x0CU
+/* RS-11.5 (2026-08-02) TX-path discriminators for the slot-(total-2)
+ * on-air CRC corruption. sub = the fragment's tx_id (== index).
+ * 0x0D: post-TX FIFO readback checksum != load-time checksum — the FIFO
+ *       was altered between load and TX_DONE (corrupt at the source).
+ * 0x0E: TX_DONE arrived >5 ms EARLIER than the expected ToA — the
+ *       radiation was truncated. */
+#define HOST_FAULT_CODE_TX_FIFO_RB_MISMATCH  0x0DU
+#define HOST_FAULT_CODE_TX_DONE_EARLY        0x0EU
 
 /*
  * RX_SCAN_FAILED — emitted by the SCANNING-state failure handler in

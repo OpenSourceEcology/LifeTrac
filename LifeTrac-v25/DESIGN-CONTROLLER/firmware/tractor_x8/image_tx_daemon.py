@@ -112,6 +112,7 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     HOST_TYPE_ERR_PROTO_URC,
     HOST_TYPE_FAULT_URC,
     CFG_KEY_LBT_ENABLE,
+    CFG_KEY_TX_POWER_DBM,
     BENIGN_FAULT_CODES,
     parse_tx_done,
     format_err_proto_payload,
@@ -604,6 +605,34 @@ class ImageTxDaemon:
             LOG.info("LBT_ENABLE=0 (matches W1-10b TX_BURST rationale)")
         except Exception as exc:                              # pragma: no cover
             LOG.warning("CFG_SET(LBT_ENABLE=0) failed: %s", exc)
+        # RS-11.5 diagnostic (2026-08-02): optional TX power override for the
+        # front-end-overload discriminator (bench antennas sit inches apart
+        # at the default 14 dBm). Empty = leave the firmware default alone.
+        # Regulatory: the firmware's ERP clamp still applies — this can only
+        # LOWER power below the configured ceiling on the bench.
+        tx_dbm = _os.environ.get("LIFETRAC_TX_POWER_DBM", "").strip()
+        if tx_dbm:
+            # Host-side range check BEFORE the wire: a negative value would
+            # wrap via `& 0xFF` to 255, which the firmware NORMALIZES DOWN
+            # to 17 dBm — i.e. junk input could silently RAISE power. The
+            # SX1276/firmware legal range is 2..17; the ERP clamp still
+            # applies on top (review catch, PR #94).
+            try:
+                dbm = int(tx_dbm)
+            except ValueError:
+                dbm = None
+            if dbm is None or not 2 <= dbm <= 17:
+                LOG.warning("LIFETRAC_TX_POWER_DBM=%r outside 2..17 — "
+                            "IGNORED, profile default power stands", tx_dbm)
+            else:
+                try:
+                    link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
+                                 bytes([CFG_KEY_TX_POWER_DBM, 0x01, dbm]),
+                                 timeout=1.0)
+                    LOG.warning("RS-11.5 diagnostic: TX_POWER_DBM=%d", dbm)
+                except Exception as exc:                      # pragma: no cover
+                    LOG.warning("CFG_SET(TX_POWER_DBM=%d) failed: %s",
+                                dbm, exc)
         return link
 
     def _tx_worker(self) -> None:

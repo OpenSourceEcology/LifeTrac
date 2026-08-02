@@ -1243,6 +1243,8 @@ def parse_rx_frame(payload: bytes) -> dict:
 
 
 HOST_TYPE_RX_FRAME_URC = 0x91
+# RS-11.5 (2026-08-02): corrupt-reception capture — see host_types.h.
+HOST_TYPE_RX_CRC_DUMP_URC = 0xC5
 
 
 def run_rx_liveness(link: HostLink, window_s: float = 10.0) -> int:

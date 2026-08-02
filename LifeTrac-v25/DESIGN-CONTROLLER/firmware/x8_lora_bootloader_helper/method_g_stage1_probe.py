@@ -421,6 +421,10 @@ def parse_stats(payload: bytes) -> dict:
         "host_uart_ne_usart1",
         "host_uart_ore_usart1",
         "host_rx_ring_ovf",
+        # RS-11.5 (2026-08-02) additive: TX FIFO readback discriminator.
+        "tx_fifo_rb_ok",
+        "tx_fifo_rb_bad",
+        "tx_done_early",
     ]
     stats = {}
     for index, label in enumerate(labels):

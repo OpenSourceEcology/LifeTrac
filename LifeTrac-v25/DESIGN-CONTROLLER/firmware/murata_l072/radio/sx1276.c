@@ -159,14 +159,19 @@ static uint8_t bw_to_reg_bits(uint16_t bw_khz) {
     return 7U;
 }
 
+/* RS-11.5 root-cause fix (2026-08-02): see rf_switch_set_tx() in
+ * sx1276_modes.c for the full story. ABZ truth table: RX -> CRF1(PA1)
+ * only; TX PA_BOOST -> CRF3(PC2) only. The original mapping listened
+ * through the TX-RFO arm in RX (−97 dBm at bench distance with
+ * antennas installed). */
 static void sx1276_set_rf_switch_tx(uint8_t tx_mode) {
     if (tx_mode != 0U) {
-        gpio_write(SX1276_RF_SW_TXRX_PORT, SX1276_RF_SW_TXRX_PIN, 1U);
+        gpio_write(SX1276_RF_SW_TXRX_PORT, SX1276_RF_SW_TXRX_PIN, 0U);
         gpio_write(SX1276_RF_SW_RX_PORT, SX1276_RF_SW_RX_PIN, 0U);
         gpio_write(SX1276_RF_SW_TX_BOOST_PORT, SX1276_RF_SW_TX_BOOST_PIN, 1U);
     } else {
-        gpio_write(SX1276_RF_SW_TXRX_PORT, SX1276_RF_SW_TXRX_PIN, 0U);
-        gpio_write(SX1276_RF_SW_RX_PORT, SX1276_RF_SW_RX_PIN, 1U);
+        gpio_write(SX1276_RF_SW_TXRX_PORT, SX1276_RF_SW_TXRX_PIN, 1U);
+        gpio_write(SX1276_RF_SW_RX_PORT, SX1276_RF_SW_RX_PIN, 0U);
         gpio_write(SX1276_RF_SW_TX_BOOST_PORT, SX1276_RF_SW_TX_BOOST_PIN, 0U);
     }
 }

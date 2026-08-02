@@ -91,6 +91,7 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     HOST_TYPE_VER_REQ,
     HOST_TYPE_VER_URC,
     HOST_TYPE_RX_FRAME_URC,
+    HOST_TYPE_RX_CRC_DUMP_URC,
     HOST_TYPE_TX_FRAME_REQ,
     HOST_TYPE_CFG_SET_REQ,
     HOST_TYPE_CFG_OK_URC,
@@ -1109,6 +1110,19 @@ class ImageRxDaemon:
             frame_done = False   # RS-1.x: did a frame COMPLETE this pass?
             for frame in frames:
                 ftype = frame.get("type")
+                if ftype == HOST_TYPE_RX_CRC_DUMP_URC:
+                    # RS-11.5: the L072 captured a payload-CRC-failed
+                    # reception (metadata + the corrupt bytes). Log the
+                    # whole thing for offline damage analysis; this is the
+                    # instrument the corruption diagnosis runs on.
+                    p = frame.get("payload", b"")
+                    if len(p) >= 5:
+                        snr_db = ((p[3] - 256) if p[3] > 127 else p[3]) / 4.0
+                        LOG.warning(
+                            "crc_dump: irq=0x%02x rx_len=%d snr=%.1f "
+                            "rssi=%d dump=%s",
+                            p[1], p[2], snr_db, p[4] - 157, p[5:].hex())
+                    continue
                 if ftype != HOST_TYPE_RX_FRAME_URC:
                     # FAULT_URC / STATS / TX_DONE etc — not our concern
                     # in the RX-only daemon. Log at DEBUG.
