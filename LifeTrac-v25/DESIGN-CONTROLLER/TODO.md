@@ -2110,24 +2110,32 @@ Two consequences for what is worth doing next:
   dominant loss is a **per-train-boundary event** (~0.20–0.25
   events/boundary, ~1.3–1.8 fragments each): raw loss scales INVERSELY
   with train length (4.9% at 13-frag → 10% at 4-frag) and times out
-  23–34% of trains. Also found: `lost_frag_idx` never attributes
-  timed-out trains' losses (2–8 attributed vs 118–190 raw — the
-  reconcile rule catch), so all prior per-index claims described only
-  completing trains; and the retained 0x63 pending-ack retries radiate
-  ~1/18 s forever when nothing acks (bench artifact + robustness point).
-  Stop quoting the ~3.5% floor; the current floor is ~5% at 13-frag and
-  lives at boundaries. Follow-up is RS-11.5.
-- [ ] **RS-11.5 Attribute timeout losses, then discriminate the boundary
-  event (opened 2026-08-02, from the RS-11.4 close-out).** Host-side,
-  two steps: (1) make the reassembler attribute the missing indices of
-  evicted/timed-out trains into `lost_frag_idx` before eviction —
-  restores the attributed ≈ raw reconcile invariant; (2) re-run one
-  13-frag + one 4-frag pair and read the per-index histogram of FAILED
-  trains: mass at index 0–1 = RX-side re-arm race at the boundary
-  (lever: RXCONT re-arm timing / prepare-ahead overlap), mass at the
-  tail = TX-side train teardown. With a 23–34% train-failure rate this
-  is the single largest throughput lever currently known. Also bound the
-  0x63 pending-ack retries (give-up counter or backoff cap).
+  23–34% of trains. **Correction, same session:** an initial read of
+  "2–8 attributed vs 118–190 raw" was an ANALYSIS error (the
+  `lost_frag_idx` histogram resets every 10 s window; summing windows the
+  instrument attributes 68–143 ≈ 55–75% of raw, residual ~40–60/run).
+  The corrected per-index histograms localize the boundary event to the
+  **SECOND-TO-LAST fragment of the train at every train length** (30% /
+  50% / 75% of attributed loss at 13/7/4-frag; index 0 near-baseline —
+  RX-re-arm-at-start is dead). TX_DONE + synth size-mix accounting shows
+  the tractor radiated everything, and 17 command TXs/run can't explain
+  50–105 penultimate losses — the drop is base-side or never-demodulated.
+  Also: retained 0x63 pending-ack retries radiate ~1/18 s forever when
+  nothing acks (bench artifact + robustness point). Stop quoting the
+  ~3.5% floor; the real cost is 11–18% of trains losing their penultimate
+  fragment. Follow-up is RS-11.5.
+- [ ] **RS-11.5 Pin the penultimate-fragment drop mechanism (opened
+  2026-08-02, reframed after the RS-11.4 correction).** The index-0-vs-
+  tail discrimination is ALREADY answered: the loss is position-locked to
+  train index total−2, 11–18% of ALL trains, at every train length — the
+  single largest known throughput lever (23–34% of trains time out on
+  it). Remaining steps: (1) L072 counter split — read radio_rx_ok /
+  radio_crc_err / host_rx_ring_ovf after a run (probe:
+  `rs115_stats_probe.py`) to separate demodulated-but-dropped-host-side
+  from never-demodulated (PHY/radio state at train end); (2) chase the
+  implicated layer (host drain vs firmware RX path around end-of-train);
+  (3) bound the 0x63 pending-ack retries (give-up counter or backoff
+  cap) — unacked retries currently radiate forever.
 - [ ] **RS-11.4 (original, superseded) Discriminate the cumulative-loss mechanism.** RS-11.1 measured
   fragment loss climbing monotonically with index inside a ~1.3 s train: index 0
   took 1 of 67 losses, indices 8–11 took 37 of 67. That is the *opposite* of

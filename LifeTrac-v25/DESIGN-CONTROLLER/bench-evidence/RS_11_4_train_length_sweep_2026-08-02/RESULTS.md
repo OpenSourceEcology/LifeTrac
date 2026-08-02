@@ -42,16 +42,43 @@ SynthBudgetB 3000 / 1500 / 750 → 13 / 7 / 4 fragments per train, n=2 each.
    (raw lost / timeouts), consistent with the `post_loss` gap median of
    ~234 ms ≈ exactly two 116.9 ms fragment slots.
 
-3. **Instrument gap (violates the standing reconcile rule):** the
-   `lost_frag_idx` attribution counts 2–8 losses per run against a raw
-   delta of 118–190 — it never attributes fragments belonging to trains
-   that TIME OUT, which is now ~95% of all loss. Every per-index claim
-   from it (including D1's, and the F4 gate answer) described only the
-   completing-train subset. The fix is the next increment: attribute the
-   missing indices of evicted/timed-out trains before eviction, then
-   re-read the per-index histogram of FAILED trains — mass at index 0–1
-   discriminates RX re-arm at the boundary from TX-side teardown at the
-   tail.
+3. **CORRECTION (2026-08-02, same session): the "instrument gap" first
+   reported here was an ANALYSIS error, not an instrument defect.**
+   `lost_frag_idx` logs are per-10 s-window (the histogram is reset after
+   every stats log — image_rx_daemon.py:1630); the first read took the
+   LAST window as a run cumulative and concluded 2–8 attributed vs
+   118–190 raw. Summing windows, the instrument attributes 68–143 per
+   run ≈ 55–75% of raw — a residual of ~40–60/run (whole-train losses
+   and tail losses where `frag_total` context is absent), roughly
+   train-length-independent. Kept on the record per the corrections
+   discipline.
+
+   **The corrected per-index histograms answer the boundary-event
+   discrimination outright — the loss is position-locked to the
+   SECOND-TO-LAST fragment of the train at every train length:**
+
+   | frags/train | penultimate idx | its share of attributed | idx-0 share |
+   |------------:|----------------:|------------------------:|------------:|
+   | 13 | 11 | 20/70, 22/68 (~30%) | 8/70, 3/68 |
+   | 7  | 5  | 52/102, 49/101 (~50%) | 11/102, 8/101 |
+   | 4  | 2  | 110/143, 99/140 (~75%) | 10/143, 13/140 |
+
+   11–18% of ALL trains lose exactly their penultimate fragment. Index 0
+   is near-baseline — the RX re-arm-at-train-start hypothesis is dead
+   (again, consistent with RS-10.1). Constant-per-boundary event rate +
+   position total−2 = an end-of-train mechanism.
+
+   Localization from existing data:
+   - **Not TX-side skips:** the TX `fragments ok` mix (12/13 at 27%)
+     matches the synth bank's size spread (2892–3000 B → 22% need only
+     12 fragments) and every fragment got TX_DONE — the L072 reports the
+     penultimate fragment went on air.
+   - **Not host command TX blinding:** only 17 command radiations per run
+     (the unacked 0x63 retries) against 50–105 penultimate losses at the
+     short-train tiers — arithmetically impossible.
+   - Remaining split — base L072 demodulated-but-dropped (ring/UART) vs
+     never-demodulated (PHY/firmware state at train end) — needs the
+     L072's own STATS counters; that is the §6 experiment.
 
 ## 4. Secondary observations
 
@@ -74,7 +101,22 @@ SynthBudgetB 3000 / 1500 / 750 → 13 / 7 / 4 fragments per train, n=2 each.
 
 - RS-11.4 CLOSED (question answered by re-baseline: mechanism was the
   bucket; already fixed).
-- New item RS-11.5 opened: timeout-loss attribution (host-side, small),
-  then the boundary-event discrimination (index 0–1 vs tail) it enables.
+- RS-11.5 reframed by the correction: the index-0-vs-tail discrimination
+  is ALREADY answered (tail: penultimate slot, 11–18% of trains). The
+  open question is the §6 split — L072-demodulated-but-dropped vs
+  never-demodulated — plus bounding the 0x63 pending retries.
 - The ~3.5% "loss floor" number should stop being quoted — the current
-  floor is ~5% at 13-frag trains and it lives at boundaries, not in-train.
+  floor is ~5% at 13-frag trains, it lives at the train tail, and the
+  train-failure rate (23–34% timeouts) is the throughput cost to attack.
+
+## 6. L072 counter split (run after the correction, same session)
+
+Design: one 300 s run at 3000 B; STOP the rx daemon without resetting the
+L072 (docker stop does not touch NRST) and read the L072's own counters
+via the deployed diag probe (STATS_DUMP → STATS_URC survives in RAM). If
+the L072's demodulated-frame count ≈ TX frags (~2300+) while the daemon
+saw ~118 fewer → the loss is host-side (ring/UART drain). If the L072
+count matches the daemon's (both ≈ TX − ~118) → the penultimate fragment
+is never demodulated: a PHY/firmware-state event at train end (e.g., the
+radio's end-of-train state transition clipping the tail of RXCONT).
+Result recorded below when run.
