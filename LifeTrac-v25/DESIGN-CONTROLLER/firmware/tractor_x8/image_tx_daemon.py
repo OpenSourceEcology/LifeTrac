@@ -112,6 +112,7 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     HOST_TYPE_ERR_PROTO_URC,
     HOST_TYPE_FAULT_URC,
     CFG_KEY_LBT_ENABLE,
+    CFG_KEY_TX_POWER_DBM,
     BENIGN_FAULT_CODES,
     parse_tx_done,
     format_err_proto_payload,
@@ -604,6 +605,21 @@ class ImageTxDaemon:
             LOG.info("LBT_ENABLE=0 (matches W1-10b TX_BURST rationale)")
         except Exception as exc:                              # pragma: no cover
             LOG.warning("CFG_SET(LBT_ENABLE=0) failed: %s", exc)
+        # RS-11.5 diagnostic (2026-08-02): optional TX power override for the
+        # front-end-overload discriminator (bench antennas sit inches apart
+        # at the default 14 dBm). Empty = leave the firmware default alone.
+        # Regulatory: the firmware's ERP clamp still applies — this can only
+        # LOWER power below the configured ceiling on the bench.
+        tx_dbm = _os.environ.get("LIFETRAC_TX_POWER_DBM", "").strip()
+        if tx_dbm:
+            try:
+                dbm = int(tx_dbm)
+                link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
+                             bytes([CFG_KEY_TX_POWER_DBM, 0x01, dbm & 0xFF]),
+                             timeout=1.0)
+                LOG.warning("RS-11.5 diagnostic: TX_POWER_DBM=%d", dbm)
+            except Exception as exc:                          # pragma: no cover
+                LOG.warning("CFG_SET(TX_POWER_DBM=%s) failed: %s", tx_dbm, exc)
         return link
 
     def _tx_worker(self) -> None:

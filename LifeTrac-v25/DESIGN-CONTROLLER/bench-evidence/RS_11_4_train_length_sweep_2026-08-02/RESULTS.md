@@ -241,7 +241,61 @@ corruption following the ROLE = systemic/protocol-timing; corruption
 vanishing or changing = unit-specific analog hardware (antenna,
 connector, front-end).
 
-## 11. Session verdict and residuals
+## 11. Leg E′ — manual role swap: the corruption FOLLOWS THE ROLE
+
+Manual swap (tx daemon on the BASE in `lifetrac-v25`, host-feed from the
+bench PC broker over ethernet; rx daemon on the TRACTOR against its
+bench_mqtt; both L072 counter baselines zeroed by prior resets):
+
+    base   (TX): radio_tx_ok = 2596 — clean
+    tractor(RX): Δrx_ok = 2422, Δcrc_err = **170** (6.6%!)
+                 dio0 reconciles exactly (2422 + 170 = 2592)
+    per-index (rx daemon, summed windows): 0:2 1:13 2:12 3:17 4:14 5:15
+                 6:12 7:16 8:15 9:15 10:7 11:18 12:4 — **UNIFORM**, no
+                 penultimate lock; timeouts 124.
+
+Both boards corrupt as receivers; both are clean as transmitters. Unit-
+specific hardware defect eliminated — but the SHAPE is board-specific:
+base-as-RX locks at slot total−2 (~3–4.5%), tractor-as-RX is uniform and
+worse (6.6%).
+
+## 12. Leg F — 12 dB power drop: front-end overload REFUTED
+
+New host-side knob `LIFETRAC_TX_POWER_DBM` (CFG_SET at daemon startup;
+can only lower below the ERP-clamped ceiling). Forward roles at
+**2 dBm** (vs default 14):
+
+    tractor(TX): Δtx_ok = 2613, FIFO readbacks all intact
+    base   (RX): Δrx_ok = 2492, Δcrc_err = **+101 (3.9%)** — UNCHANGED
+
+A 12 dB receiver-input reduction did not move the corruption rate.
+Overload is out. And the overnight idle floor (§8: ~4 false-demod CRC
+events/HOUR) rules out ambient interference: active runs take 75–170 per
+300 s — three orders of magnitude above background, so it is OUR OWN
+packets arriving corrupt.
+
+## 13. Final state of the diagnosis
+
+**~4% of image fragments arrive payload-corrupt at the receiver (header
+demodulates, payload CRC fails), in BOTH link directions, at BOTH power
+levels, with the transmit digital path proven intact by in-firmware
+readback. Eliminated by direct measurement: TX skips, host command TX,
+RX re-arm, prepare-ahead, RXCONT turnaround, host-side drops, in-train
+cumulative effects, unit-specific hardware, front-end overload, ambient
+interference. The corruption shape is receiver-board-specific (base:
+slot-(total−2) locked; tractor: uniform).**
+
+Remaining hypothesis space (needs physical intervention or deeper
+firmware work): (a) receiver-side host/board coupling into demodulation
+— the base's position lock suggests something train-aware or
+117-ms-periodic on the receiving host disturbing the radio; (b)
+conducted/radiated EMI from the receiving board's own X8 with
+board-specific activity signatures. Next discriminators: physical
+separation/orientation change (user hands required — no RF equipment on
+this bench), or firmware capture of RegIrqFlags + RSSI + payload dump
+for corrupt receptions (RX-side instrumentation, next flash increment).
+
+## 14. Session verdict and residuals
 
 **Diagnosis after legs A–E: 11–18% of trains lose per-frame slot
 total−2 to CRC corruption that enters BETWEEN the transmitter's FIFO

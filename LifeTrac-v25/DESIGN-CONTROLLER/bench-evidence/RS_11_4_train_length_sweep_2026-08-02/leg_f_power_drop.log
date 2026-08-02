@@ -1,0 +1,38 @@
+[cleanup]
+tx_smoke
+rx_smoke
+--- PROBE F-before-base(RX) (16:14:01) ---
+radio_rx_ok=0
+radio_crc_err=0
+radio_dio0=2596
+radio_tx_ok=2596
+ALL: {'host_errors': 4, 'host_irq_idle': 2867, 'radio_dio0': 2596, 'radio_dio1': 3, 'radio_tx_ok': 2596, 'radio_state': 4, 'host_rx_bytes': 653940, 'host_rx_lpuart_bytes': 653940, 'host_parse_ok': 2871, 'host_parse_err': 1, 'host_uart_err_lpuart': 3, 'host_uart_ore_lpuart': 3}
+--- PROBE F-before-tractor(TX) (16:14:04) ---
+radio_rx_ok=2439
+radio_crc_err=170
+radio_dio0=5077
+radio_tx_ok=2468
+ALL: {'host_irq_idle': 2791, 'radio_dio0': 5077, 'radio_crc_err': 170, 'radio_rx_ok': 2439, 'radio_tx_ok': 2468, 'radio_state': 4, 'host_rx_bytes': 619263, 'host_rx_lpuart_bytes': 619263, 'host_parse_ok': 2791, 'tx_fifo_rb_ok': 2468}
+[launch tx on tractor @2dBm]
+4777ff55d525382744c765b6b0bf07c701e63ece4ade1233996229f1f17f3709
+[launch rx on base]
+6541c1013c0049b7e6953e370132a4289347ff7669d5e238e54750667afc9d6e
+[launch synth on tractor]
+bb48a9a5e38a617603e6013e025bd77a62316bd4d26cac824e01a63dc546e358
+[wait 320s]
+[teardown + probes]
+tx-frames-done: 203
+2026-07-31 02:10:54,699 WARNING image_tx_daemon: RS-11.5 diagnostic: TX_POWER_DBM=2
+--- PROBE F-after-base(RX) (16:19:30) ---
+radio_rx_ok=2492
+radio_crc_err=101
+radio_dio0=5199
+radio_tx_ok=2596
+ALL: {'host_errors': 4, 'host_irq_idle': 2868, 'radio_dio0': 5199, 'radio_dio1': 3, 'radio_crc_err': 101, 'radio_rx_ok': 2492, 'radio_tx_ok': 2596, 'radio_state': 4, 'host_rx_bytes': 653952, 'host_rx_lpuart_bytes': 653952, 'host_parse_ok': 2872, 'host_parse_err': 1, 'host_uart_err_lpuart': 3, 'host_uart_ore_lpuart': 3}
+--- PROBE F-after-tractor(TX) (16:19:33) ---
+radio_rx_ok=2439
+radio_crc_err=170
+radio_dio0=7690
+radio_tx_ok=5081
+ALL: {'host_irq_idle': 5660, 'radio_dio0': 7690, 'radio_crc_err': 170, 'radio_rx_ok': 2439, 'radio_tx_ok': 5081, 'radio_state': 4, 'host_rx_bytes': 1273269, 'host_rx_lpuart_bytes': 1273269, 'host_parse_ok': 5660, 'tx_fifo_rb_ok': 5081}
+RS115-F-COMPLETE

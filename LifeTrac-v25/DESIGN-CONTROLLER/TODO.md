@@ -2137,12 +2137,21 @@ Two consequences for what is worth doing next:
   production default 1 — NEVER ship 0, in-stream command delivery lives
   in those listening gaps) the radio sat in STANDBY between fragments
   and the spike was unchanged (idx11 22/66, Δcrc +62). Every
-  software-layer candidate is now eliminated; the cause is
-  physical/silicon (TX chain radiating corrupt bits, or deterministic
-  self-EMI). Next: **flash session** with firmware discriminators
-  (post-TX FIFO readback CRC at slot total−2, measured TX duration in
-  RFCO_PERTX, IRQ-flag capture) — or an SDR capture, which would settle
-  it without a flash. Also: (a) fix base
+  software-layer candidate is now eliminated. **Legs D–F (2026-08-02,
+  instrumented firmware flashed to the tractor, branch
+  `rs115-fw-discriminators`) narrowed it decisively**: FIFO readback +
+  duration in-firmware prove the TX digital path clean (2468/2468 and
+  2613/2613 intact); the role swap shows corruption FOLLOWS THE
+  RECEIVER (tractor-as-RX: 6.6%, uniform; base-as-RX: 3–4.5%,
+  slot-(total−2) locked); a 12 dB power drop (new
+  `LIFETRAC_TX_POWER_DBM` knob) changes nothing (overload refuted); the
+  idle floor (~4 CRC/h vs 75–170/300 s active) refutes ambient
+  interference. Diagnosis: ~4% of our own fragments arrive
+  payload-corrupt at the receiver, both directions, power-independent —
+  receiver-side host/board coupling or board EMI, shape board-specific.
+  Next: physical separation/orientation test (needs hands at the
+  bench), or RX-side firmware capture (IRQ flags + RSSI + corrupt
+  payload dump) as the next flash increment. Also: (a) fix base
   gpio163 NRST (no longer resets the L072 — harness resets silently
   no-op; probe deltas are the workaround); (b) once fixed, revisit the
   CR-4/5 decision — its "zero CRC errors" basis was measured at the
