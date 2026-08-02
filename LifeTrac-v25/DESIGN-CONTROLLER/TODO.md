@@ -2101,7 +2101,34 @@ Two consequences for what is worth doing next:
 
 #### RS-11.4 Why does loss rise with position inside a train? (opened 2026-07-29)
 
-- [ ] **RS-11.4 Discriminate the cumulative-loss mechanism.** RS-11.1 measured
+- [x] **RS-11.4 CLOSED 2026-08-02 — question mooted by re-baseline; new
+  dominant mechanism found.** The prescribed train-length sweep ran
+  (3000/1500/750 B, n=2, `bench-evidence/RS_11_4_train_length_sweep_2026-08-02/RESULTS.md`):
+  the D1 in-train index gradient is GONE under smooth pacing (in-train
+  attributed loss 67 → 2–8/run) — the cumulative mechanism was the
+  token bucket, fixed 2026-07-30 before this sweep ran. The remaining
+  dominant loss is a **per-train-boundary event** (~0.20–0.25
+  events/boundary, ~1.3–1.8 fragments each): raw loss scales INVERSELY
+  with train length (4.9% at 13-frag → 10% at 4-frag) and times out
+  23–34% of trains. Also found: `lost_frag_idx` never attributes
+  timed-out trains' losses (2–8 attributed vs 118–190 raw — the
+  reconcile rule catch), so all prior per-index claims described only
+  completing trains; and the retained 0x63 pending-ack retries radiate
+  ~1/18 s forever when nothing acks (bench artifact + robustness point).
+  Stop quoting the ~3.5% floor; the current floor is ~5% at 13-frag and
+  lives at boundaries. Follow-up is RS-11.5.
+- [ ] **RS-11.5 Attribute timeout losses, then discriminate the boundary
+  event (opened 2026-08-02, from the RS-11.4 close-out).** Host-side,
+  two steps: (1) make the reassembler attribute the missing indices of
+  evicted/timed-out trains into `lost_frag_idx` before eviction —
+  restores the attributed ≈ raw reconcile invariant; (2) re-run one
+  13-frag + one 4-frag pair and read the per-index histogram of FAILED
+  trains: mass at index 0–1 = RX-side re-arm race at the boundary
+  (lever: RXCONT re-arm timing / prepare-ahead overlap), mass at the
+  tail = TX-side train teardown. With a 23–34% train-failure rate this
+  is the single largest throughput lever currently known. Also bound the
+  0x63 pending-ack retries (give-up counter or backoff cap).
+- [ ] **RS-11.4 (original, superseded) Discriminate the cumulative-loss mechanism.** RS-11.1 measured
   fragment loss climbing monotonically with index inside a ~1.3 s train: index 0
   took 1 of 67 losses, indices 8–11 took 37 of 67. That is the *opposite* of
   the boundary-re-arm hypothesis and points at something **cumulative within a
