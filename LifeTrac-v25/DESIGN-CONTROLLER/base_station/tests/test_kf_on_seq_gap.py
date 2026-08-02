@@ -161,10 +161,12 @@ class WebUiGateTests(unittest.TestCase):
             self._ingest(_frame(7, [3], codec=CODEC_MONO_G4))
         self.assertEqual(len(self._kf_publishes()), 1)
 
-    def test_default_env_is_gate_on(self) -> None:
-        self.assertTrue(self._saved_gate,
-                        "F11 protocol: default must stay ON until the "
-                        "on-air A/B is measured")
+    def test_default_env_is_gate_off(self) -> None:
+        self.assertFalse(
+            self._saved_gate,
+            "F11 default flipped OFF after the on-air A/B passed "
+            "2026-08-02 (6 suppressions, zero keyframes, canvas healthy "
+            "— see bench-evidence/F11_kf_on_gap_2026-08-02)")
 
 
 if __name__ == "__main__":
