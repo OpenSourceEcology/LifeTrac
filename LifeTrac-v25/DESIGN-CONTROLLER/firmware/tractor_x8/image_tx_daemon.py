@@ -612,14 +612,27 @@ class ImageTxDaemon:
         # LOWER power below the configured ceiling on the bench.
         tx_dbm = _os.environ.get("LIFETRAC_TX_POWER_DBM", "").strip()
         if tx_dbm:
+            # Host-side range check BEFORE the wire: a negative value would
+            # wrap via `& 0xFF` to 255, which the firmware NORMALIZES DOWN
+            # to 17 dBm — i.e. junk input could silently RAISE power. The
+            # SX1276/firmware legal range is 2..17; the ERP clamp still
+            # applies on top (review catch, PR #94).
             try:
                 dbm = int(tx_dbm)
-                link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
-                             bytes([CFG_KEY_TX_POWER_DBM, 0x01, dbm & 0xFF]),
-                             timeout=1.0)
-                LOG.warning("RS-11.5 diagnostic: TX_POWER_DBM=%d", dbm)
-            except Exception as exc:                          # pragma: no cover
-                LOG.warning("CFG_SET(TX_POWER_DBM=%s) failed: %s", tx_dbm, exc)
+            except ValueError:
+                dbm = None
+            if dbm is None or not 2 <= dbm <= 17:
+                LOG.warning("LIFETRAC_TX_POWER_DBM=%r outside 2..17 — "
+                            "IGNORED, profile default power stands", tx_dbm)
+            else:
+                try:
+                    link.request(HOST_TYPE_CFG_SET_REQ, HOST_TYPE_CFG_OK_URC,
+                                 bytes([CFG_KEY_TX_POWER_DBM, 0x01, dbm]),
+                                 timeout=1.0)
+                    LOG.warning("RS-11.5 diagnostic: TX_POWER_DBM=%d", dbm)
+                except Exception as exc:                      # pragma: no cover
+                    LOG.warning("CFG_SET(TX_POWER_DBM=%d) failed: %s",
+                                dbm, exc)
         return link
 
     def _tx_worker(self) -> None:

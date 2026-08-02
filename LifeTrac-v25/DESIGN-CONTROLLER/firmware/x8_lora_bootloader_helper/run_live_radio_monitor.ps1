@@ -131,6 +131,7 @@ param(
     # stays STANDBY between fragments. Command downlink fully deaf —
     # diagnostic runs only (discriminates the slot-(total-2) CRC
     # corruption mechanism). Production default 1.
+    [ValidateSet(0, 1)]
     [int]$RxcontArm = 1,
     # RS-11.5 diagnostic (2026-08-02): TX power override in dBm (empty =
     # profile default 14). CFG_SET at daemon startup; the firmware's ERP
@@ -438,6 +439,8 @@ if ($Archive) {
         "airtime_budget_us=$AirtimeBudgetUs",
         "pacing_mode=$PacingMode",
         "pacing_headroom=$PacingHeadroom",
+        "rxcont_arm=$RxcontArm",
+        "tx_power_dbm=$TxPowerDbm",
         "tx_feed=$TxFeed",
         "reg_profile=$RegProfile",
         "tx_serial=$TxAdbSerial",
