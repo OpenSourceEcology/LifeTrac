@@ -2142,10 +2142,19 @@ Two consequences for what is worth doing next:
   instrumentation retained: TX FIFO readback, RX_CRC_DUMP_URC,
   RXCONT_ARM + TX_POWER_DBM knobs, stats probe. Full record:
   `bench-evidence/RS_11_4_train_length_sweep_2026-08-02/RESULTS.md`.
-- [ ] **RS-11.6 Post-antenna re-baseline.** Once antennas are mounted:
-  one 300 s leg at the pinned operating point + a crc_dump count;
-  expect RSSI ≈ −30 dBm-class and the loss floor to collapse. Then
-  re-run the RS-11.2-style gap policy question against the clean link.
+- [ ] **RS-11.6 Antenna-position experiment + re-baseline (updated
+  2026-08-02 after the RF-switch fix).** The switch-mapping bug is
+  FIXED (+33 dB verified, legs H–J); the residual ~4% floor (at
+  17 dBm) is signal-proportional self-interference at bench geometry
+  (corrupt packets pinned at ≈+2 dB SNR across 48 dB of signal
+  change — multipath/near-field at close range with the detuned
+  868 MHz Hermippe-III antennas). When hands are at the bench:
+  reposition/separate the antennas (and consider US-band 915 MHz
+  replacements), then one 300 s leg per change — the crc_dump
+  instrument reads the effect directly. Meanwhile: bench runs at
+  `-TxPowerDbm 17` get a free ~1.4× loss reduction; and add
+  healthy-frame RSSI/SNR logging (currently only corrupt packets carry
+  it) before deep-modeling the tail.
 - [ ] **RS-11.5 (original, superseded) Fix the slot-(total−2) on-air corruption (diagnosis
   DONE 2026-08-02, RESULTS §6–§8; fix open).** The counter split and
   prepare-ahead A/B pinned it: **11–18% of trains lose per-frame slot

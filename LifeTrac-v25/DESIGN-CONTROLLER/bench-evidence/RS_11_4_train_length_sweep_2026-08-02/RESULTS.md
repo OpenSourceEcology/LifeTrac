@@ -371,7 +371,48 @@ production-safe defaults): TX FIFO readback + early-TX_DONE counters,
 RX_CRC_DUMP_URC capture, LIFETRAC_RXCONT_ARM, LIFETRAC_TX_POWER_DBM,
 rs115_stats_probe.py.
 
-## 16. Session verdict and residuals (superseded by §15)
+## 16. Legs H–J — the RF-switch fix verified (+33 dB) and the residual floor characterized
+
+Leg H (both boards on the fixed switch, standard point): corrupt-dump
+RSSI mean **−96.8 → −64.3 dBm** — the mapping fix recovered ~33 dB of
+link budget. Loss did NOT collapse (131 raw, 72 dumps): SNR of corrupt
+packets stayed at +1.7 mean.
+
+Legs I/J (SIR sweep on the fixed switch, new harness `-TxPowerDbm`):
+
+| power | raw loss | crc dumps | corrupt RSSI mean | corrupt SNR mean |
+|------:|---------:|----------:|------------------:|-----------------:|
+| 2 dBm | 6.3% | 78 | −73 | +1.7 |
+| 14 dBm (H) | 5.4% | 72 | −64 | +1.7 |
+| 17 dBm | 4.0% | 67 | −61 | +1.8 |
+
+Reading: power helps mildly (6.3→4.0% over 15 dB) and the corrupt
+population sits at the demod threshold (≈+2 dB SNR) at EVERY power and
+BOTH switch configurations — the effective noise tracks our own signal
+across ~48 dB of combined change. A fixed external interferer cannot do
+that: the residual floor is **signal-proportional self-interference at
+bench geometry** (close-range multipath / near-field coupling between
+the two detuned 868 MHz antennas and the surrounding electronics).
+Caveat recorded: the healthy-packet SNR distribution is still
+unmeasured (no per-frame RSSI/SNR logging for good frames) — worth
+adding before deep-modeling the tail.
+
+## 17. FINAL closure
+
+1. **Firmware bug found and fixed (ships regardless of bench):** the
+   Murata ABZ antenna-switch mapping listened through the TX-RFO arm in
+   RX since radio bring-up. +33 dB verified on air. This alone
+   transforms every future range/field number.
+2. **Residual bench floor (~4% at 17 dBm):** physical-layer at bench
+   geometry, signal-proportional — the antenna-position/separation
+   experiment (user's deferred hardware task, RS-11.6) is the designed
+   next step, now on a rig that measures corrupt packets directly.
+   Raising bench TX power to 17 dBm is a free ~1.4× loss reduction in
+   the meantime.
+3. Everything else exonerated along the way stands: TX digital path,
+   host layers, protocol, turnaround, overload-at-the-LNA.
+
+## 18. (superseded by §17)
 
 **Diagnosis after legs A–E: 11–18% of trains lose per-frame slot
 total−2 to CRC corruption that enters BETWEEN the transmitter's FIFO
