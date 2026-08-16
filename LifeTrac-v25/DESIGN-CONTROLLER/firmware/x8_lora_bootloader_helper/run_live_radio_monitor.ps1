@@ -189,6 +189,18 @@ if (-not $waitResult -or -not $socket.Connected) {
 Write-Host "[CLEANUP] Stopping old containers..."
 cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S docker rm -f tx_smoke 2>/dev/null`"" | Out-Null
 cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S docker rm -f rx_smoke 2>/dev/null`"" | Out-Null
+# 2026-08-08: the PRODUCTION `tractor-camera` container maps
+# /dev/ttymxc3 and is recreated by compose on every reboot. It steals the
+# radio UART, and the failure looks nothing like contention: the L072
+# still TRANSMITS (raw capture shows `C:SEND_BOOT` + a COBS READY URC)
+# but never answers a HostLink request, and SWD resets do not help — it
+# reads as the documented break-storm ISR livelock. Cost an hour of
+# misdiagnosis after an unplanned reboot. `stop`, not `rm`: the
+# container stays defined so `docker start tractor-camera` restores the
+# production stack after bench work.
+foreach ($s in @($TxAdbSerial, $RxAdbSerial)) {
+    cmd /c "`"$adbExe`" -s $s shell `"echo fio | sudo -S -p '' docker stop -t 3 tractor-camera 2>/dev/null`"" | Out-Null
+}
 
 # 3. Deploy code
 Write-Host "[DEPLOY] Syncing code to both boards..."
