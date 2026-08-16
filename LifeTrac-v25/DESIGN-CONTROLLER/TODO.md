@@ -2161,7 +2161,34 @@ Two consequences for what is worth doing next:
   instrumentation retained: TX FIFO readback, RX_CRC_DUMP_URC,
   RXCONT_ARM + TX_POWER_DBM knobs, stats probe. Full record:
   `bench-evidence/RS_11_4_train_length_sweep_2026-08-02/RESULTS.md`.
-- [ ] **RS-11.6 Antenna-position experiment + re-baseline (updated
+- [x] **RS-11.6 LEG 1 DONE 2026-08-16 — Taoglas swap is a NULL; the
+  residual floor is INTERFERENCE, not link margin.**
+  (`bench-evidence/RS_11_6_antenna_swap_2026-08-16/RESULTS.md`, archive
+  `radio_monitor_20260816_122735_9c891670`.) Taoglas TD.95.6H31 blades
+  installed on both carriers, swapped in place, operating point
+  identical to leg H: loss 5.9% vs 5.4%, corrupt RSSI −65.8 vs −64.3 —
+  indistinguishable. **The 868-vs-915 detuning was never the limiter.**
+  The new `rx_rf` healthy-frame instrument then produced the decisive
+  measurement: healthy frames arrive at **−69 dBm / +5.0 dB SNR**,
+  corrupt frames at **−65.8 dBm / +0.3 dB SNR** — i.e. corrupt packets
+  are ~3 dB STRONGER but ~5 dB WORSE in SNR (one capture at −43 dBm /
+  −10.8 dB). Path loss cannot do that; a second emitter adding energy
+  during reception can. This explains every null in RS-11.5 (TX power,
+  switch fix beyond its +33 dB, antenna tuning): none of them change an
+  interferer.
+- [ ] **RS-11.6 leg 2+ — separate the interferer (next session).** Two
+  candidate sources, each one 300 s leg with the SAME prediction
+  (corrupt-population SNR rises toward the healthy population's):
+  (a) **near-field coupling from the carriers/harnesses** — physically
+  reposition/separate the antennas from the boards (hands needed);
+  (b) **USB 3.0 broadband noise at 900 MHz** — move both carriers to
+  USB 2.0 ports or route cabling away from the antennas (hands, 5 min).
+  Also worth one long idle capture with `rx_rf` + crc_dump running to
+  characterise the ambient floor directly. Bench check while at it:
+  confirm both Taoglas blades are fully seated/finger-tight on SMA —
+  received power did not move at all on the swap, which a loose
+  connector would also explain.
+- [ ] **RS-11.6 (original) Antenna-position experiment + re-baseline (updated
   2026-08-02 after the RF-switch fix).** The switch-mapping bug is
   FIXED (+33 dB verified, legs H–J); the residual ~4% floor (at
   17 dBm) is signal-proportional self-interference at bench geometry
