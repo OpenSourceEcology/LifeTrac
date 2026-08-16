@@ -98,6 +98,12 @@ def analyse(path: pathlib.Path, out=sys.stdout) -> dict | None:
     off = nearest_offset(ev, pubs)
     frac_100 = float((np.abs(off) <= 0.100).mean())
     med_abs = float(np.median(np.abs(off)))
+    # Review catch (PR #99): the documented boundary proxy is the NEXT TRAIN
+    # START, which follows the publish by the ~213.9 ms designed gap -- a
+    # boundary-concentrated population would center at +214 ms and
+    # structurally miss a publish-centered window. Test that window too.
+    off_b = nearest_offset(ev, pubs + 0.2139)
+    frac_100_b = float((np.abs(off_b) <= 0.100).mean())
 
     # uniform null over the same span, against the same publish stream
     rng = np.random.default_rng(20260816)
@@ -112,6 +118,7 @@ def analyse(path: pathlib.Path, out=sys.stdout) -> dict | None:
     print(f"{name[14:29]}  bulk n={len(bulk):3d}  pubs={len(pubs):3d}  "
           f"|off| med={med_abs * 1000:6.0f} ms  "
           f"within±100ms={frac_100 * 100:5.1f}%  "
+          f"@boundary(+214ms)={frac_100_b * 100:5.1f}%  "
           f"null={null_frac.mean() * 100:5.1f}%  p={p:.4f}", file=out)
     return {"n": len(bulk), "frac": frac_100,
             "null": float(null_frac.mean()), "p": p,

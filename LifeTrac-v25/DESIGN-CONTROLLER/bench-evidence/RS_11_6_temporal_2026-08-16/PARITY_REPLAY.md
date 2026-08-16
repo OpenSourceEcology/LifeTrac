@@ -77,21 +77,30 @@ loss held at calibration and the *achieved* share reported:
 | share requested → achieved | off | G=4 | G=8 | G=13 |
 |---|---:|---:|---:|---:|
 | 0 % → 0 % | 72.2 % | 79.5 % | 80.7 % | 81.3 % |
-| **13 % → 12.8 % (measured)** | 67.6 % | 80.9 % | 81.8 % | 82.0 % |
-| 30 % → 29.6 % | 61.5 % | 82.6 % | 83.0 % | 83.3 % |
-| 60 % → 29.8 % *(infeasible)* | 61.4 % | 82.6 % | 83.0 % | 83.3 % |
-| 100 % → 29.8 % *(infeasible)* | 61.4 % | 82.6 % | 83.0 % | 83.3 % |
+| **13 % → 12.8 % (measured)** | 67.5 % | 80.7 % | 81.9 % | 81.7 % |
+| 30 % → 23.7 % *(infeasible)* | 63.6 % | 81.9 % | 82.7 % | 82.5 % |
+| 60 % → 23.7 % *(infeasible)* | 63.6 % | 81.9 % | 82.7 % | 82.5 % |
+| 100 % → 23.7 % *(infeasible)* | 63.6 % | 81.9 % | 82.7 % | 82.5 % |
+
+*(Second correction, review catch on the collision window: an earlier
+revision of this table showed the ceiling at ~30 %, using a ±117 ms
+nearest-start acceptance window — 234 ms of exposure for a 99.904 ms
+packet, ~2.3× too generous. A tick now collides only if it lands inside a
+fragment's actual on-air interval. The measured-share row moved by less
+than the trial sd; the ceiling tightened.)*
 
 Two results replace the first revision's "98 % if interferer-only" claim,
 which is retracted:
 
-1. **The share axis saturates at ~30 %, and that is physics, not a sim
-   artifact.** A 7.085 s emitter produces only ~61–65 ticks in a run that
-   suffers ~190–200 losses at the measured 5.9 % rate, so it can account for
-   at most ~a third of the measured loss volume. Corollary worth having on
-   the record: **even removing the emitter entirely cannot cut the bench
-   floor below roughly 4 %** — the clustered bulk process owns the other two
-   thirds. (Consistent with the observed corrupt-capture share, 11/86 ≈ 13 %.)
+1. **The share axis saturates at ~24 %, and that is physics, not a sim
+   artifact.** A 7.085 s emitter produces only ~61–65 ticks per run, and
+   only those landing inside a fragment's ~100 ms on-air window can take a
+   fragment — against ~190–200 losses at the measured 5.9 % rate, the
+   emitter can therefore own at most ~a quarter of the measured loss volume.
+   Corollary, now stronger than first stated: **even removing the emitter
+   entirely cannot cut the bench floor much below ~4.5 %** — the clustered
+   bulk process owns the rest. (Consistent with the observed corrupt-capture
+   share, 11/86 ≈ 13 %.)
 2. **Within the feasible range, parity's advantage grows as the interferer's
    share rises** (delivery with G=13 rises 81.3 → 83.3 % while no-parity
    *falls* 72.2 → 61.4 %). The periodic component is the part parity handles
