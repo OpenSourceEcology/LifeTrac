@@ -2176,7 +2176,51 @@ Two consequences for what is worth doing next:
   during reception can. This explains every null in RS-11.5 (TX power,
   switch fix beyond its +33 dB, antenna tuning): none of them change an
   interferer.
-- [ ] **RS-11.6 leg 2+ — separate the interferer (next session).** Two
+- [x] **RS-11.6 item 1 DONE 2026-08-16 — the interferer has a HARD 7.085 s
+  CADENCE.** Desk analysis, no bench time
+  (`bench-evidence/RS_11_6_temporal_2026-08-16/RESULTS.md`, tool
+  `tools/crc_dump_temporal.py`, tracking issue #98). Swept all five
+  archives carrying `crc_dump` (429 captures, not just leg 1's 86 — the
+  instrument shipped 2026-08-02). Selecting the captures that are BOTH
+  stronger than their run's healthy median AND below −5 dB SNR isolates
+  the interferer population, and its arrival times fit a fixed grid:
+  **7.0842 s** (`…0802_172500`, R=0.986) and **7.0853 s**
+  (`…0816_122735`, R=0.987) — agreement to 16 ppm across runs **14 days
+  apart**, every event within 0.076 of an integer cycle. Also present
+  pre-RF-switch-fix (`…0802_132817`, 7.1447 s), so it predates and
+  survives that fix. SNR signature stable at −10.0/−10.8/−10.8 dB.
+  **Not bursty** — Fano 0.68–1.04 and CV 0.79, i.e. UNDER-dispersed,
+  which is duty-cycled-emitter behaviour. **Self-interference ruled out
+  in all five runs**: the base sends its commands in the first 10 s
+  window and nothing for the remaining ~290 s while corruption
+  continues. **Not locked to any cadence of ours** (fragment ToA, slot,
+  synth frame, train boundary, stats window all null). Two corrections
+  to the leg-1 record go with this: (a) the −65.8 dBm corrupt mean pools
+  four regimes — warm-up, bulk, noise-floor tail, and the interferer at
+  −43…−47 dBm; the interferer sits ~26 dB above the healthy median, not
+  3 dB; (b) the first ~60 s of every run is a warm-up regime that no
+  prior analysis excluded. Methodological note recorded in-document: an
+  initial whole-population "best period 3.5458 s" was a RENEWAL
+  ARTIFACT (a fold scan peaks at ~the mean inter-arrival with no clock
+  present) and is retracted — the shuffled-interval null that catches it
+  is now part of the tool.
+- [ ] **RS-11.6 leg 2+ — separate the interferer (next session).**
+  **Re-ordered 2026-08-16 by item 1**: hunt the 7.085 s line directly
+  rather than watching the loss rate (loss needs a 300 s run and carries
+  ~0.5 pt run-to-run spread; the periodic line is unambiguous and shows
+  up in far less). (i) One IDLE capture with `rx_rf` + crc_dump and no
+  traffic — if the line persists with our radios silent the emitter is
+  fully external; highest value, needs no traffic. (ii) Switch suspects
+  off one at a time and watch the line — anything on a ~7 s duty cycle
+  near the bench, with the tractor's USB camera worth isolating
+  specifically. (iii) The profile-0 A/B is now LOWER value and is
+  confounded three ways (profile 0 is SF7/BW250 fixed-915 vs profile 2's
+  SF7/BW500: frequency, noise bandwidth and per-fragment airtime all
+  move together — see issue #98). **Mitigation note:** CR 4/8 and RS-4.1
+  parity were framed against a random floor; against a fixed-cadence hit
+  ~26 dB hot, FEC is unlikely to recover the affected symbols, and
+  fragment-level parity is the better-matched of the two. Both should
+  wait for (i)/(ii). Original candidates follow. Two
   candidate sources, each one 300 s leg with the SAME prediction
   (corrupt-population SNR rises toward the healthy population's):
   (a) **near-field coupling from the carriers/harnesses** — physically

@@ -1,0 +1,267 @@
+
+==============================================================================
+ARCHIVE radio_monitor_20260802_132817_30e1fbc6
+==============================================================================
+span 305.6 s   captures 126   healthy windows 0
+
+-- corrupt population (all) --
+  n=126  rssi mean=-96.8 med=-97 min=-115 max=-86
+           snr  mean=+1.68 med=+2.0 min=-12.0 max=+5.8
+
+-- burstiness (Fano factor; 1.0 = Poisson, >1 = clustered) --
+   bin   2.0s   F= 0.930   mean/bin= 0.82
+   bin   5.0s   F= 0.791   mean/bin= 2.05
+   bin  10.0s   F= 0.901   mean/bin= 4.07
+   bin  20.0s   F= 1.047   mean/bin= 8.13
+   bin  30.0s   F= 1.046   mean/bin=12.20
+   inter-arrival: mean=2.30s med=1.48s min=0.108s CV=0.906  (CV=1 Poisson)
+
+-- periodicity (Rayleigh fold scan) --
+   best period 0.1139s  R=0.381  p_raw=1.13e-08  n_indep~6108  p_corrected=6.93e-05
+   (mean inter-arrival is 2.30s -- a best period near that value is the renewal artifact, not a clock)
+   interval-shuffled null: best-R 95th pct=0.273, observed R=0.381, fraction of nulls >= observed = 0.000
+   verdict: PERIODIC beyond renewal structure (p<0.05 vs shuffled null)
+
+   targeted tests at known system cadences:
+     fragment ToA ~0.100s     R=0.020 p=0.949
+     fragment slot ~0.117s    R=0.108 p=0.231
+     synth frame 0.500s       R=0.167 p=0.030
+     train boundary ~1.85s    R=0.065 p=0.591
+     1 s                      R=0.239 p=0.001  <-- concentrated
+     10 s stats window        R=0.097 p=0.308
+
+-- burst structure --
+   gap>0.5s: 99 bursts, 23 multi-event, largest=4
+   gap>1.0s: 83 bursts, 31 multi-event, largest=7
+   gap>2.0s: 54 bursts, 35 multi-event, largest=12
+
+   [interferer cut: snr < -5 dB AND rssi > -97 dBm (this run's healthy median)]
+
+-- HOT cluster (rssi > -60 dBm), n=7 --
+   rssi med=-86 (range -92..-86)  snr med=-10.0 (range -10.2..-6.5)
+   times: 34.6, 69.7, 105.6, 126.6, 205.6, 227.6, 305.6
+   inter-arrival: mean=45.2s med=35.5s min=21.1s max=78.9s
+   first at t=34.6s, last at t=305.6s (run span 306s)
+   GRID FIT: period=7.1447s  R=0.962  p=1.54e-03
+     cycle index : 0, 5, 10, 13, 24, 27, 38
+     residual    : +0.000, -0.076, -0.061, -0.115, -0.067, +0.025, -0.070
+     residual RMS=0.0683 cycles, max=0.1146 cycles
+     => quasi-periodic (grid with jitter)
+
+-- self-TX correlation (base's own command TXs) --
+   base sent no commands after the first window -- self-TX cannot explain any of these captures
+
+-- payload shape -- rx_len hist {45: 1, 46: 1, 47: 1, 48: 1, 58: 1, 63: 1, 116: 1, 118: 1, 129: 1, 150: 1, 175: 1, 177: 1, 180: 1, 216: 1, 233: 1, 255: 111}
+   RIFF magic intact in 52/126, WEBP in 53/126
+
+==============================================================================
+ARCHIVE radio_monitor_20260802_171735_107634bb
+==============================================================================
+span 307.8 s   captures 72   healthy windows 0
+
+-- corrupt population (all) --
+  n=72  rssi mean=-64.3 med=-62 min=-113 max=-44
+           snr  mean=+1.32 med=+1.2 min=-12.0 max=+6.5
+
+-- burstiness (Fano factor; 1.0 = Poisson, >1 = clustered) --
+   bin   5.0s   F= 1.110   mean/bin= 1.15
+   bin  10.0s   F= 0.638   mean/bin= 2.33
+   bin  20.0s   F= 0.905   mean/bin= 4.67
+   bin  30.0s   F= 1.029   mean/bin= 7.00
+   inter-arrival: mean=3.89s med=2.62s min=0.169s CV=0.846  (CV=1 Poisson)
+
+-- periodicity (Rayleigh fold scan) --
+   best period 10.6457s  R=0.533  p_raw=1.31e-09  n_indep~6153  p_corrected=8.04e-06
+   (mean inter-arrival is 3.89s -- a best period near that value is the renewal artifact, not a clock)
+   interval-shuffled null: best-R 95th pct=0.373, observed R=0.533, fraction of nulls >= observed = 0.000
+   verdict: PERIODIC beyond renewal structure (p<0.05 vs shuffled null)
+
+   targeted tests at known system cadences:
+     fragment ToA ~0.100s     R=0.195 p=0.065
+     fragment slot ~0.117s    R=0.112 p=0.404
+     synth frame 0.500s       R=0.317 p=0.001  <-- concentrated
+     train boundary ~1.85s    R=0.022 p=0.966
+     1 s                      R=0.083 p=0.606
+     10 s stats window        R=0.047 p=0.854
+
+-- burst structure --
+   gap>0.5s: 66 bursts, 5 multi-event, largest=3
+   gap>1.0s: 55 bursts, 15 multi-event, largest=3
+   gap>2.0s: 40 bursts, 23 multi-event, largest=4
+
+   [interferer cut: snr < -5 dB AND rssi > -62 dBm (this run's healthy median)]
+
+-- self-TX correlation (base's own command TXs) --
+   base sent no commands after the first window -- self-TX cannot explain any of these captures
+
+-- payload shape -- rx_len hist {4: 1, 62: 1, 64: 1, 88: 1, 107: 1, 133: 1, 141: 2, 175: 2, 185: 1, 198: 1, 255: 60}
+   RIFF magic intact in 15/72, WEBP in 16/72
+
+==============================================================================
+ARCHIVE radio_monitor_20260802_172500_03ce8044
+==============================================================================
+span 308.3 s   captures 78   healthy windows 0
+
+-- corrupt population (all) --
+  n=78  rssi mean=-74.3 med=-75 min=-114 max=-54
+           snr  mean=+1.38 med=+2.6 min=-12.2 max=+6.2
+
+-- burstiness (Fano factor; 1.0 = Poisson, >1 = clustered) --
+   bin   2.0s   F= 0.734   mean/bin= 0.50
+   bin   5.0s   F= 0.647   mean/bin= 1.26
+   bin  10.0s   F= 0.425   mean/bin= 2.47
+   bin  20.0s   F= 0.553   mean/bin= 4.93
+   bin  30.0s   F= 0.735   mean/bin= 7.40
+   inter-arrival: mean=3.66s med=3.06s min=0.099s CV=0.689  (CV=1 Poisson)
+
+-- periodicity (Rayleigh fold scan) --
+   best period 1.7741s  R=0.579  p_raw=4.24e-12  n_indep~6164  p_corrected=2.61e-08
+   (mean inter-arrival is 3.66s -- a best period near that value is the renewal artifact, not a clock)
+   interval-shuffled null: best-R 95th pct=0.369, observed R=0.579, fraction of nulls >= observed = 0.000
+   verdict: PERIODIC beyond renewal structure (p<0.05 vs shuffled null)
+
+   targeted tests at known system cadences:
+     fragment ToA ~0.100s     R=0.130 p=0.270
+     fragment slot ~0.117s    R=0.018 p=0.976
+     synth frame 0.500s       R=0.364 p=0.000  <-- concentrated
+     train boundary ~1.85s    R=0.039 p=0.887
+     1 s                      R=0.290 p=0.001  <-- concentrated
+     10 s stats window        R=0.108 p=0.404
+
+-- burst structure --
+   gap>0.5s: 74 bursts, 4 multi-event, largest=2
+   gap>1.0s: 71 bursts, 6 multi-event, largest=3
+   gap>2.0s: 50 bursts, 18 multi-event, largest=3
+
+   [interferer cut: snr < -5 dB AND rssi > -75 dBm (this run's healthy median)]
+
+-- HOT cluster (rssi > -60 dBm), n=8 --
+   rssi med=-54 (range -64..-54)  snr med=-10.8 (range -11.0..-6.2)
+   times: 26.3, 33.4, 146.6, 154.2, 161.2, 168.2, 231.6, 267.2
+   inter-arrival: mean=34.4s med=7.6s min=7.0s max=113.2s
+   first at t=26.3s, last at t=267.2s (run span 308s)
+   GRID FIT: period=7.0842s  R=0.986  p=4.16e-04
+     cycle index : 0, 1, 17, 18, 19, 20, 29, 34
+     residual    : +0.000, -0.005, -0.025, +0.047, +0.041, +0.024, -0.028, +0.003
+     residual RMS=0.0272 cycles, max=0.0473 cycles
+     => events lie on a HARD GRID: fixed-cadence emitter
+
+-- self-TX correlation (base's own command TXs) --
+   base sent no commands after the first window -- self-TX cannot explain any of these captures
+
+-- payload shape -- rx_len hist {11: 1, 16: 1, 41: 1, 47: 1, 69: 1, 110: 1, 151: 1, 162: 1, 170: 1, 175: 1, 249: 1, 255: 67}
+   RIFF magic intact in 24/78, WEBP in 24/78
+
+==============================================================================
+ARCHIVE radio_monitor_20260802_173023_03ce8044
+==============================================================================
+span 299.2 s   captures 67   healthy windows 0
+
+-- corrupt population (all) --
+  n=67  rssi mean=-61.7 med=-60 min=-115 max=-59
+           snr  mean=+1.58 med=+2.0 min=-12.5 max=+5.5
+
+-- burstiness (Fano factor; 1.0 = Poisson, >1 = clustered) --
+   bin   5.0s   F= 1.129   mean/bin= 1.10
+   bin  10.0s   F= 0.605   mean/bin= 2.24
+   bin  20.0s   F= 1.023   mean/bin= 4.43
+   bin  30.0s   F= 1.300   mean/bin= 6.67
+   inter-arrival: mean=4.19s med=2.80s min=0.190s CV=0.831  (CV=1 Poisson)
+
+-- periodicity (Rayleigh fold scan) --
+   best period 10.6566s  R=0.557  p_raw=9.46e-10  n_indep~5981  p_corrected=5.66e-06
+   (mean inter-arrival is 4.19s -- a best period near that value is the renewal artifact, not a clock)
+   interval-shuffled null: best-R 95th pct=0.375, observed R=0.557, fraction of nulls >= observed = 0.000
+   verdict: PERIODIC beyond renewal structure (p<0.05 vs shuffled null)
+
+   targeted tests at known system cadences:
+     fragment ToA ~0.100s     R=0.346 p=0.000  <-- concentrated
+     fragment slot ~0.117s    R=0.086 p=0.611
+     synth frame 0.500s       R=0.214 p=0.046
+     train boundary ~1.85s    R=0.057 p=0.804
+     1 s                      R=0.129 p=0.327
+     10 s stats window        R=0.191 p=0.086
+
+-- burst structure --
+   gap>0.5s: 62 bursts, 4 multi-event, largest=3
+   gap>1.0s: 52 bursts, 11 multi-event, largest=4
+   gap>2.0s: 41 bursts, 19 multi-event, largest=4
+
+   [interferer cut: snr < -5 dB AND rssi > -60 dBm (this run's healthy median)]
+
+-- self-TX correlation (base's own command TXs) --
+   base sent no commands after the first window -- self-TX cannot explain any of these captures
+
+-- payload shape -- rx_len hist {15: 1, 24: 1, 107: 1, 109: 1, 110: 1, 112: 1, 156: 1, 169: 1, 244: 1, 248: 1, 255: 57}
+   RIFF magic intact in 11/67, WEBP in 7/67
+
+==============================================================================
+ARCHIVE radio_monitor_20260816_122735_9c891670
+==============================================================================
+span 303.1 s   captures 86   healthy windows 29
+
+-- corrupt population (all) --
+  n=86  rssi mean=-65.8 med=-65 min=-114 max=-43
+           snr  mean=+0.29 med=+1.1 min=-12.0 max=+6.2
+
+-- healthy windows -- rssi med-of-med=-69 (range -84..-69)  snr med-of-med=+5.0
+   link settles at t=61s (modal healthy median -69 dBm; 4 warm-up window(s) excluded below)
+
+-- corrupt population (settled only, t>=61s) --
+  n=76  rssi mean=-64.1 med=-65 min=-114 max=-43
+           snr  mean=-0.02 med=+1.0 min=-12.0 max=+6.2
+
+-- burstiness (Fano factor; 1.0 = Poisson, >1 = clustered) --
+   bin   2.0s   F= 0.978   mean/bin= 0.56
+   bin   5.0s   F= 0.783   mean/bin= 1.42
+   bin  10.0s   F= 0.684   mean/bin= 2.83
+   bin  20.0s   F= 0.792   mean/bin= 5.67
+   bin  30.0s   F= 1.041   mean/bin= 8.50
+   inter-arrival: mean=3.25s med=2.63s min=0.091s CV=0.789  (CV=1 Poisson)
+
+-- periodicity (Rayleigh fold scan) --
+   best period 3.5458s  R=0.468  p_raw=6.78e-09  n_indep~6060  p_corrected=4.11e-05
+   (mean inter-arrival is 3.25s -- a best period near that value is the renewal artifact, not a clock)
+   interval-shuffled null: best-R 95th pct=0.325, observed R=0.468, fraction of nulls >= observed = 0.000
+   verdict: PERIODIC beyond renewal structure (p<0.05 vs shuffled null)
+
+   targeted tests at known system cadences:
+     fragment ToA ~0.100s     R=0.172 p=0.078
+     fragment slot ~0.117s    R=0.146 p=0.161
+     synth frame 0.500s       R=0.074 p=0.625
+     train boundary ~1.85s    R=0.053 p=0.786
+     1 s                      R=0.220 p=0.016
+     10 s stats window        R=0.120 p=0.293
+
+-- burst structure --
+   gap>0.5s: 74 bursts, 10 multi-event, largest=3
+   gap>1.0s: 68 bursts, 16 multi-event, largest=3
+   gap>2.0s: 52 bursts, 24 multi-event, largest=4
+
+   [interferer cut: snr < -5 dB AND rssi > -69 dBm (this run's healthy median)]
+
+-- HOT cluster (rssi > -60 dBm), n=11 --
+   rssi med=-43 (range -47..-43)  snr med=-10.8 (range -11.2..-8.2)
+   times: 83.5, 97.5, 111.5, 118.5, 132.6, 161.5, 189.6, 210.7, 267.5, 295.6, 303.1
+   inter-arrival: mean=22.0s med=17.6s min=7.1s max=56.8s
+   first at t=83.5s, last at t=303.1s (run span 303s)
+   GRID FIT: period=7.0853s  R=0.987  p=2.23e-05
+     cycle index : 0, 2, 4, 5, 7, 11, 15, 18, 26, 30, 31
+     residual    : +0.000, -0.027, -0.050, -0.053, -0.076, +0.005, -0.030, -0.052, -0.035, -0.063, +0.001
+     residual RMS=0.0433 cycles, max=0.0758 cycles
+     => events lie on a HARD GRID: fixed-cadence emitter
+
+-- self-TX correlation (base's own command TXs) --
+   base sent no commands after the first window -- self-TX cannot explain any of these captures
+
+-- payload shape -- rx_len hist {7: 1, 20: 1, 55: 1, 60: 1, 71: 1, 94: 1, 167: 1, 171: 1, 173: 2, 207: 1, 254: 1, 255: 74}
+   RIFF magic intact in 26/86, WEBP in 26/86
+
+==============================================================================
+CROSS-RUN
+==============================================================================
+  0260802_132817_  start 18:23  n= 126  rssi med= -97.0  snr med= +2.0  snr<-5dB=  8
+  0260802_171735_  start 22:12  n=  72  rssi med= -62.5  snr med= +1.2  snr<-5dB=  4
+  0260802_172500_  start 22:19  n=  78  rssi med= -75.0  snr med= +2.6  snr<-5dB= 10
+  0260802_173023_  start 22:25  n=  67  rssi med= -60.0  snr med= +2.0  snr<-5dB=  1
+  0260816_122735_  start 17:22  n=  86  rssi med= -65.0  snr med= +1.1  snr<-5dB= 13
