@@ -448,6 +448,17 @@ jobs:
               0x00, 0x00, 0x00, 0x00 }
           #endif
           KEYEOF
+          # CI repair layer 4 (this job only): the Method G host path links
+          # mh_runtime_* from murata_host/*.c, but arduino-cli compiles only
+          # the sketch root .ino plus src/** — the murata_host directory next
+          # to the sketch never built, so the Method G compile has NEVER
+          # linked in CI (undefined reference to mh_runtime_begin/loop).
+          # Every runtime source is guarded by LIFETRAC_USE_METHOD_G_HOST
+          # (and the POSIX/TCP UART adapters by !defined(ARDUINO)), so
+          # staging them is inert in the default-path build and the
+          # check-mh-runtime-off-symbols leak guard stays meaningful.
+          cp -r LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/murata_host \
+                LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/src/
       - name: Compile default path (Method G disabled)
         run: |
           arduino-cli compile --fqbn arduino:mbed_portenta:envie_m7 \
