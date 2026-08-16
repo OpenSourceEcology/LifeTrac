@@ -136,13 +136,22 @@ def simulate(group_len: int, interferer_share: float, seed: int,
     # --- how many losses of each kind
     n_loss_total = int(round(TOTAL_LOSS_RATE * total_frags))
     n_loss_int = int(round(n_loss_total * interferer_share))
-    n_loss_bulk = n_loss_total - n_loss_int
 
     lost: set[tuple[int, int]] = set()
 
     # Interferer: losses land on the 7.085 s grid. Each hit takes whichever
     # fragment is in flight at that instant -- which is the whole point, since
     # it makes their placement CORRELATED in time rather than independent.
+    #
+    # FEASIBILITY (review catch, PR #99): a 7.085 s emitter produces only
+    # ~duration/7.085 ticks per run (~61-65 here), so a requested share can be
+    # PHYSICALLY IMPOSSIBLE -- share=1.0 asks for ~200 interferer losses when
+    # only ~65 ticks exist. The first version of this code silently dropped
+    # the unplaced losses, which cut TOTAL loss to ~a third of calibration in
+    # the 60%/100% sweep rows and made parity look better for the wrong
+    # reason. Now the shortfall goes back into the bulk pool so total loss
+    # stays calibrated, and the ACHIEVED share is reported alongside the
+    # requested one.
     hits = interferer_hits(duration, rng.uniform(0.0, INTERFERER_PERIOD_S))
     rng.shuffle(hits)
     placed = 0
@@ -156,6 +165,8 @@ def simulate(group_len: int, interferer_share: float, seed: int,
             if key not in lost:
                 lost.add(key)
                 placed += 1
+
+    n_loss_bulk = n_loss_total - placed
 
     # Bulk. THIS IS THE PART THAT DECIDES THE ANSWER, so it is calibrated
     # against measurement rather than assumed independent.
@@ -200,7 +211,7 @@ def simulate(group_len: int, interferer_share: float, seed: int,
                     remaining -= 1
     else:
         guard = 0
-        while len(lost) < n_loss_int + n_loss_bulk and guard < 10 ** 6:
+        while len(lost) < n_loss_total and guard < 10 ** 6:
             guard += 1
             e = timeline[rng.randrange(len(timeline))]
             lost.add((e[0], e[1]))
@@ -234,6 +245,9 @@ def simulate(group_len: int, interferer_share: float, seed: int,
     airtime_mult = frags_per_train / TRAIN_FRAGS
     return {
         "affected_train_pct": 100.0 * affected / frames,
+        "requested_int": n_loss_int,
+        "placed_int": placed,
+        "achieved_share": placed / n_loss_total if n_loss_total else 0.0,
         "group_len": group_len,
         "frames": frames,
         "delivered": delivered,
@@ -287,18 +301,27 @@ def main() -> int:
                   f"{d:>15.1f}% +/- {sd:4.1f} "
                   f"{hit:>10.1f}%{delta}")
 
-    # --- sensitivity to the least certain input
-    print(f"\n{'interferer share':>18}  " +
+    # --- sensitivity to the least certain input.
+    # "requested" is the share asked for; "achieved" is what the 7.085 s tick
+    # supply could actually deliver with total loss held at calibration
+    # (shortfall returns to the bulk pool). Rows where the two diverge are
+    # physically infeasible AT THIS TICK CADENCE and are shown to bound the
+    # trend, not as attainable operating points.
+    print(f"\n{'share req->achieved':>21}  " +
           "  ".join(f"G={g:<5}" for g in (0, 4, 8, 13)))
-    print("-" * 74)
+    print("-" * 78)
     for share in (0.0, 0.128, 0.30, 0.60, 1.0):
         cells = []
+        ach = []
         for g in (0, 4, 8, 13):
             runs = [simulate(g, share, seed=2000 + t, frames=args.frames)
                     for t in range(args.trials)]
             cells.append(sum(r["delivery_pct"] for r in runs) / len(runs))
-        print(f"{share * 100:>17.0f}%  " +
-              "  ".join(f"{c:>6.1f}%" for c in cells))
+            ach.append(sum(r["achieved_share"] for r in runs) / len(runs))
+        a = sum(ach) / len(ach)
+        flag = "" if abs(a - share) < 0.02 else "  (infeasible as requested)"
+        print(f"{share * 100:>9.0f}% -> {a * 100:>5.1f}%  " +
+              "  ".join(f"{c:>6.1f}%" for c in cells) + flag)
 
     # --- airtime cost of the alternative
     print("\n-- airtime cost comparison --")

@@ -166,6 +166,14 @@ def fano(times: np.ndarray, duration: float, bin_w: float) -> tuple[float, float
 
     Returns (F, mean_count). Meaningless when mean_count is tiny, so the caller
     should filter on it.
+
+    The trailing PARTIAL bin is dropped deliberately (floor(duration/bin_w)
+    bins over [0, nbins*bin_w)): a partial bin's expected count is lower than
+    a full bin's, so including it would inflate the variance and bias F
+    upward -- i.e. toward falsely reporting clustering. The cost is that
+    events in the last <bin_w seconds do not contribute at that bin width;
+    with 300 s runs and 1-30 s bins that is at most ~10% of the data at the
+    coarsest width, and the same events are still counted at finer widths.
     """
     nbins = max(1, int(math.floor(duration / bin_w)))
     counts, _ = np.histogram(times, bins=nbins, range=(0.0, nbins * bin_w))
@@ -454,11 +462,19 @@ def analyse(arch: Archive, out=sys.stdout) -> None:
     if arch.windows:
         wm = np.array([w.rssi_med for w in arch.windows], dtype=float)
         ref_rssi = float(np.median(wm[len(wm) // 2:]))
+        ref_src = "healthy rx_rf median"
     else:
+        # Archives predating the rx_rf healthy-frame instrument (shipped
+        # 2026-08-02, first data 2026-08-16) have no healthy population to
+        # reference. Fall back to the corrupt-capture median -- and SAY SO:
+        # an earlier revision labeled this fallback "healthy median", which
+        # overstated what was measured (review catch, PR #99).
         ref_rssi = float(np.median([c.rssi for c in caps]))
+        ref_src = ("corrupt-capture median -- NO rx_rf windows in this "
+                   "archive, healthy population unmeasured")
     hot = [c for c in caps if c.snr < HOT_SNR and c.rssi > ref_rssi]
     print(f"\n   [interferer cut: snr < {HOT_SNR:+.0f} dB AND rssi > "
-          f"{ref_rssi:.0f} dBm (this run's healthy median)]", file=out)
+          f"{ref_rssi:.0f} dBm ({ref_src})]", file=out)
     if len(hot) >= 4:
         ht = np.array([c.t for c in hot])
         hr = np.array([c.rssi for c in hot], dtype=float)
@@ -502,9 +518,19 @@ def analyse(arch: Archive, out=sys.stdout) -> None:
         d_cmd = np.diff(wc)
         edges = wt
         n_crc, _ = np.histogram(t, bins=edges)
+        # BLIND SPOT, stated explicitly (review catch, PR #99): the histogram
+        # bins start at the FIRST air_gap mark (~10 s in), which is exactly
+        # where the base's startup commands fly. Captures before that mark
+        # are outside the correlation, so the conclusion below is about the
+        # post-first-window span only.
+        n_early = int((t < wt[0]).sum()) if len(wt) else 0
+        print(f"   ({n_early} capture(s) precede the first air_gap window "
+              f"and are outside this correlation -- the base's startup "
+              f"commands land in that span)", file=out)
         if d_cmd.sum() == 0:
             print("   base sent no commands after the first window -- "
-                  "self-TX cannot explain any of these captures", file=out)
+                  "self-TX cannot explain the captures from there on "
+                  f"({len(caps) - n_early} of {len(caps)})", file=out)
         elif len(d_cmd) > 2 and d_cmd.std() > 0 and n_crc.std() > 0:
             r = float(np.corrcoef(d_cmd, n_crc)[0, 1])
             print(f"   per-window cmd_tx delta vs corrupt count: r={r:+.3f} "

@@ -70,19 +70,33 @@ as its default.
 
 ## 3. The interferer is the part parity fixes well
 
-Sweeping the interferer's share of total loss:
+**(Corrected after review — the first revision of this table was wrong; see
+§6.)** Sweeping the interferer's requested share of total loss, with total
+loss held at calibration and the *achieved* share reported:
 
-| interferer share | off | G=4 | G=8 | G=13 |
+| share requested → achieved | off | G=4 | G=8 | G=13 |
 |---|---:|---:|---:|---:|
-| 0 % | 72.2 % | 79.5 % | 80.7 % | 81.3 % |
-| **13 % (measured)** | 67.6 % | 80.9 % | 81.8 % | 82.0 % |
-| 30 % | 61.5 % | 82.8 % | 83.0 % | 83.3 % |
-| 60 % | 67.9 % | 89.2 % | 89.4 % | 89.4 % |
-| 100 % | 77.0 % | 98.3 % | 98.2 % | **98.4 %** |
+| 0 % → 0 % | 72.2 % | 79.5 % | 80.7 % | 81.3 % |
+| **13 % → 12.8 % (measured)** | 67.6 % | 80.9 % | 81.8 % | 82.0 % |
+| 30 % → 29.6 % | 61.5 % | 82.6 % | 83.0 % | 83.3 % |
+| 60 % → 29.8 % *(infeasible)* | 61.4 % | 82.6 % | 83.0 % | 83.3 % |
+| 100 % → 29.8 % *(infeasible)* | 61.4 % | 82.6 % | 83.0 % | 83.3 % |
 
-Parity gets *more* effective as the interferer's share rises, reaching ~98 %
-delivery if the interferer were the only loss source. That is the direct
-answer to the aliasing worry raised in `RESULTS.md` §9:
+Two results replace the first revision's "98 % if interferer-only" claim,
+which is retracted:
+
+1. **The share axis saturates at ~30 %, and that is physics, not a sim
+   artifact.** A 7.085 s emitter produces only ~61–65 ticks in a run that
+   suffers ~190–200 losses at the measured 5.9 % rate, so it can account for
+   at most ~a third of the measured loss volume. Corollary worth having on
+   the record: **even removing the emitter entirely cannot cut the bench
+   floor below roughly 4 %** — the clustered bulk process owns the other two
+   thirds. (Consistent with the observed corrupt-capture share, 11/86 ≈ 13 %.)
+2. **Within the feasible range, parity's advantage grows as the interferer's
+   share rises** (delivery with G=13 rises 81.3 → 83.3 % while no-parity
+   *falls* 72.2 → 61.4 %). The periodic component is the part parity handles
+   best. That is the direct answer to the aliasing worry raised in
+   `RESULTS.md` §9:
 
 **There is no aliasing.** At 7.085 s against a ~1.85 s train cadence the ratio
 is 3.83 — hits land in roughly one train in four, at a drifting position, and
@@ -137,6 +151,17 @@ is lost still falls back to GC-timeout plus a keyframe request.
   they fit inside the train. The corrected numbers moved G=13 from 81.3 % to
   82.4 % and changed the ranking of G=13 against G=4 from "equal" to
   "equal-or-better", which is why the §2 conclusion is stated the way it is.
+- **A second bug, caught in PR review (Copilot), is likewise on the record.**
+  At requested interferer shares above the tick supply (~61–65 ticks per run
+  vs ~190–200 calibrated losses), the first revision silently discarded the
+  unplaced interferer losses instead of returning them to the bulk pool —
+  total loss fell to ~a third of calibration in the 60 %/100 % rows, and the
+  headline-grabbing "98 % delivery if interferer-only" figure was an artifact
+  of that reduced loss, not of parity. The shortfall now returns to bulk
+  (total loss stays calibrated), the achieved share is reported next to the
+  requested one, and infeasible rows are flagged. §3 carries the corrected
+  table; the measured-share row and the §2 headline table were feasible all
+  along and did not change.
 - **The interferer share (13 %) is the least certain input** — corrupt
   *captures* are not the same population as total losses, since a fragment can
   be lost without producing a `crc_dump` at all. Hence the sweep in §3, which

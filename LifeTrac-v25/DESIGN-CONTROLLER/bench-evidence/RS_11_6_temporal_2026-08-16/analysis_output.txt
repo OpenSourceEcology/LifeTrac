@@ -35,7 +35,7 @@ span 305.6 s   captures 126   healthy windows 0
    gap>1.0s: 83 bursts, 31 multi-event, largest=7
    gap>2.0s: 54 bursts, 35 multi-event, largest=12
 
-   [interferer cut: snr < -5 dB AND rssi > -97 dBm (this run's healthy median)]
+   [interferer cut: snr < -5 dB AND rssi > -97 dBm (corrupt-capture median -- NO rx_rf windows in this archive, healthy population unmeasured)]
 
 -- HOT cluster (rssi > -60 dBm), n=7 --
    rssi med=-86 (range -92..-86)  snr med=-10.0 (range -10.2..-6.5)
@@ -49,7 +49,8 @@ span 305.6 s   captures 126   healthy windows 0
      => quasi-periodic (grid with jitter)
 
 -- self-TX correlation (base's own command TXs) --
-   base sent no commands after the first window -- self-TX cannot explain any of these captures
+   (1 capture(s) precede the first air_gap window and are outside this correlation -- the base's startup commands land in that span)
+   base sent no commands after the first window -- self-TX cannot explain the captures from there on (125 of 126)
 
 -- corruption shape (integrity proxies by population) --
    interferer  n=   7  header intact (rx_len=255) 100.0%   RIFF landmark intact  85.7%
@@ -91,10 +92,11 @@ span 307.8 s   captures 72   healthy windows 0
    gap>1.0s: 55 bursts, 15 multi-event, largest=3
    gap>2.0s: 40 bursts, 23 multi-event, largest=4
 
-   [interferer cut: snr < -5 dB AND rssi > -62 dBm (this run's healthy median)]
+   [interferer cut: snr < -5 dB AND rssi > -62 dBm (corrupt-capture median -- NO rx_rf windows in this archive, healthy population unmeasured)]
 
 -- self-TX correlation (base's own command TXs) --
-   base sent no commands after the first window -- self-TX cannot explain any of these captures
+   (0 capture(s) precede the first air_gap window and are outside this correlation -- the base's startup commands land in that span)
+   base sent no commands after the first window -- self-TX cannot explain the captures from there on (72 of 72)
 
 -- corruption shape (integrity proxies by population) --
    interferer  n=   2  header intact (rx_len=255) 100.0%   RIFF landmark intact 100.0%
@@ -137,7 +139,7 @@ span 308.3 s   captures 78   healthy windows 0
    gap>1.0s: 71 bursts, 6 multi-event, largest=3
    gap>2.0s: 50 bursts, 18 multi-event, largest=3
 
-   [interferer cut: snr < -5 dB AND rssi > -75 dBm (this run's healthy median)]
+   [interferer cut: snr < -5 dB AND rssi > -75 dBm (corrupt-capture median -- NO rx_rf windows in this archive, healthy population unmeasured)]
 
 -- HOT cluster (rssi > -60 dBm), n=8 --
    rssi med=-54 (range -64..-54)  snr med=-10.8 (range -11.0..-6.2)
@@ -151,7 +153,8 @@ span 308.3 s   captures 78   healthy windows 0
      => events lie on a HARD GRID: fixed-cadence emitter
 
 -- self-TX correlation (base's own command TXs) --
-   base sent no commands after the first window -- self-TX cannot explain any of these captures
+   (0 capture(s) precede the first air_gap window and are outside this correlation -- the base's startup commands land in that span)
+   base sent no commands after the first window -- self-TX cannot explain the captures from there on (78 of 78)
 
 -- corruption shape (integrity proxies by population) --
    interferer  n=   8  header intact (rx_len=255) 100.0%   RIFF landmark intact 100.0%
@@ -193,10 +196,11 @@ span 299.2 s   captures 67   healthy windows 0
    gap>1.0s: 52 bursts, 11 multi-event, largest=4
    gap>2.0s: 41 bursts, 19 multi-event, largest=4
 
-   [interferer cut: snr < -5 dB AND rssi > -60 dBm (this run's healthy median)]
+   [interferer cut: snr < -5 dB AND rssi > -60 dBm (corrupt-capture median -- NO rx_rf windows in this archive, healthy population unmeasured)]
 
 -- self-TX correlation (base's own command TXs) --
-   base sent no commands after the first window -- self-TX cannot explain any of these captures
+   (0 capture(s) precede the first air_gap window and are outside this correlation -- the base's startup commands land in that span)
+   base sent no commands after the first window -- self-TX cannot explain the captures from there on (67 of 67)
 
 -- corruption shape (integrity proxies by population) --
    bulk        n=  67  header intact (rx_len=255)  85.1%   RIFF landmark intact  16.4%
@@ -245,7 +249,7 @@ span 303.1 s   captures 86   healthy windows 29
    gap>1.0s: 68 bursts, 16 multi-event, largest=3
    gap>2.0s: 52 bursts, 24 multi-event, largest=4
 
-   [interferer cut: snr < -5 dB AND rssi > -69 dBm (this run's healthy median)]
+   [interferer cut: snr < -5 dB AND rssi > -69 dBm (healthy rx_rf median)]
 
 -- HOT cluster (rssi > -60 dBm), n=11 --
    rssi med=-43 (range -47..-43)  snr med=-10.8 (range -11.2..-8.2)
@@ -259,7 +263,8 @@ span 303.1 s   captures 86   healthy windows 29
      => events lie on a HARD GRID: fixed-cadence emitter
 
 -- self-TX correlation (base's own command TXs) --
-   base sent no commands after the first window -- self-TX cannot explain any of these captures
+   (0 capture(s) precede the first air_gap window and are outside this correlation -- the base's startup commands land in that span)
+   base sent no commands after the first window -- self-TX cannot explain the captures from there on (86 of 86)
 
 -- corruption shape (integrity proxies by population) --
    interferer  n=  11  header intact (rx_len=255) 100.0%   RIFF landmark intact 100.0%

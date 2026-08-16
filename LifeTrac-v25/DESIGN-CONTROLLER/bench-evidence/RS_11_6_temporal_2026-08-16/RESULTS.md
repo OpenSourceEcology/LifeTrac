@@ -6,19 +6,28 @@ Raw transcript: [`analysis_output.txt`](analysis_output.txt).
 Inputs: every committed archive containing `crc_dump` captures — five runs,
 **429 captures**, all `reg_profile=2`, all 300 s.
 
-| archive | started | n | healthy median | note |
+| archive | started | n | RSSI reference† | note |
 |---|---|---:|---:|---|
-| `radio_monitor_20260802_132817_30e1fbc6` | 18:23 | 126 | −97 dBm | pre-RF-switch-fix |
-| `radio_monitor_20260802_171735_107634bb` | 22:12 | 72 | −62 dBm | post-fix |
-| `radio_monitor_20260802_172500_03ce8044` | 22:19 | 78 | −75 dBm | post-fix |
-| `radio_monitor_20260802_173023_03ce8044` | 22:25 | 67 | −60 dBm | post-fix |
+| `radio_monitor_20260802_132817_30e1fbc6` | 18:23 | 126 | −97 dBm* | pre-RF-switch-fix |
+| `radio_monitor_20260802_171735_107634bb` | 22:12 | 72 | −62 dBm* | post-fix |
+| `radio_monitor_20260802_172500_03ce8044` | 22:19 | 78 | −75 dBm* | post-fix |
+| `radio_monitor_20260802_173023_03ce8044` | 22:25 | 67 | −60 dBm* | post-fix |
 | `radio_monitor_20260816_122735_9c891670` | 17:22 | 86 | −69 dBm | leg 1, Taoglas |
+
+† **Correction (review catch, PR #99): this column was first published as
+"healthy median", which overstated what was measured.** Only the 2026-08-16
+archive carries the `rx_rf` healthy-frame instrument (`healthy windows 29`);
+the four earlier archives report `healthy windows 0`, and their reference
+(\*) is the **median of the corrupt captures themselves** — the tool's
+fallback, now labeled as such in its output. The −69 dBm leg-1 value is a
+true healthy median.
 
 ## 1. The headline: the interferer has a hard 7.085 s cadence
 
 Separating the captures that carry **both halves** of the interference
-signature — stronger than that run's own healthy median **and** SNR below
-−5 dB — and fitting a period to their arrival times:
+signature — stronger than that run's RSSI reference (healthy median where
+measured, see table note) **and** SNR below −5 dB — and fitting a period to
+their arrival times:
 
 | archive | n | fitted period | R | residual RMS | verdict |
 |---|---:|---:|---:|---:|---|
@@ -63,6 +72,13 @@ This is a clean negative and it holds in every archive. The tractor's TX
 schedule could not be cross-checked directly — see the clock caveat in §6 —
 but the base is the receiver, so the base's own TX is the transmission that
 would matter, and it is flat.
+
+Scope note (review catch, PR #99): the correlation's bins start at the first
+`air_gap` mark ~10 s in, so captures before that mark — the span where the
+startup commands actually fly — sit outside it. Counted explicitly: **at most
+1 of the 429 captures across all five archives falls in that span**, so the
+blind spot is immaterial; the exoneration covers 428/429 by measurement and
+the remaining 1 by absence of anything to correlate against.
 
 ## 4. It is not locked to any cadence of ours
 

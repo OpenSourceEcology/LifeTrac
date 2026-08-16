@@ -970,9 +970,15 @@ No-regrets work, correct under every surviving architecture (do first):
   airtime; real loss CLUSTERS (RS-11.4's 23–34% affected trains vs IID's
   55%), and the calibrated model reproduces 32.5%. Parity is well matched to
   the INTERFERER half of the loss (periodic hits arrive alone — no aliasing
-  against the train cadence, 7.085/1.85 = 3.83; delivery reaches 98% if the
-  interferer were the only source) and poorly matched to the clustered bulk
-  half. **Recommendation: do not build yet** — this is a return on
+  against the train cadence, 7.085/1.85 = 3.83) and poorly matched to the
+  clustered bulk half. **CORRECTION per PR #99 review: an earlier revision
+  claimed "delivery reaches 98% if the interferer were the only source" —
+  RETRACTED, it was an artifact of a sim bug that silently under-delivered
+  loss at high interferer shares.** The corrected finding is stronger in a
+  different way: the 7.085 s tick supply (~61–65/run) can carry at most
+  ~30% of the measured loss volume, so **even removing the emitter entirely
+  cannot cut the bench floor below roughly 4%** — the clustered bulk
+  process owns the rest. **Recommendation: do not build yet** — this is a return on
   *tolerating* the emitter, and the idle capture that might remove it is one
   300 s leg away. Also recorded there: CR 4/8 costs **+57% airtime, not the
   ~37% this file has been quoting** (99.9 → 156.7 ms, SF7/BW500/255 B), and
@@ -2204,7 +2210,11 @@ Two consequences for what is worth doing next:
   `tools/crc_dump_temporal.py`, tracking issue #98). Swept all five
   archives carrying `crc_dump` (429 captures, not just leg 1's 86 — the
   instrument shipped 2026-08-02). Selecting the captures that are BOTH
-  stronger than their run's healthy median AND below −5 dB SNR isolates
+  stronger than their run's RSSI reference AND below −5 dB SNR
+  (reference = the rx_rf healthy median for leg 1, the only archive
+  carrying that instrument; the four earlier archives fall back to their
+  corrupt-capture median — correction per PR #99 review, the first wording
+  said "healthy median" for all five) isolates
   the interferer population, and its arrival times fit a fixed grid:
   **7.0842 s** (`…0802_172500`, R=0.986) and **7.0853 s**
   (`…0816_122735`, R=0.987) — agreement to 16 ppm across runs **14 days
