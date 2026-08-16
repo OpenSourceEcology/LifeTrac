@@ -244,6 +244,14 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=30.0)
     args = parser.parse_args()
 
+    # Resolve --driver to absolute BEFORE anything changes directories:
+    # _launch_driver spawns the binary with cwd=ROOT (DESIGN-CONTROLLER), and
+    # Popen resolves a relative program path against the CHILD's cwd — so a
+    # repo-root-relative path passes the exists() check below yet ENOENTs at
+    # spawn. This bit CI on 2026-08-16, the first time the PTY job ran after
+    # a fortnight of being skip-masked behind the red wire-tests gate.
+    args.driver = args.driver.resolve()
+
     if not args.driver.exists():
         print(f"driver not found: {args.driver}", file=sys.stderr)
         return 2
