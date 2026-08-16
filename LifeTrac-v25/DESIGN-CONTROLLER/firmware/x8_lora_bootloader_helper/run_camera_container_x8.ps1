@@ -57,7 +57,7 @@ if ($FallbackHostMqtt) {
 
 Write-Host "[1/4] Verifying camera payload exists on target ..."
 Invoke-Adb shell "test -f /tmp/lifetrac_camera/camera_service.py"
-Invoke-Adb shell "test -d /tmp/lifetrac_camera/image_pipeline"
+Invoke-Adb shell "test -d /tmp/lifetrac_camera/x8_image_pipeline"
 
 Write-Host "[2/4] Stopping any previous camera container ..."
 Invoke-Adb shell "echo fio | sudo -S -p '' docker rm -f $ContainerName >/dev/null 2>&1 || true"

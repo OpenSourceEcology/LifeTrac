@@ -1,14 +1,15 @@
 # run_tests.ps1 — run base_station unittest suite with process isolation.
 #
-# Background (W2-09 follow-up): the repo has two `image_pipeline` packages
-# on disk (base-side at base_station/image_pipeline/, X8-side at
-# firmware/tractor_x8/image_pipeline/). They share a top-level package
-# name, so whichever side imports first wins inside a single Python
-# process and the other side fails with ModuleNotFoundError on its own
-# submodules (e.g. `image_pipeline.tile_cache`). Until the rename slated
-# for IP-W2-10, this script sidesteps the collision by running each test
-# *file* in its own `py -3 -m unittest` invocation. Slower than discover,
-# but deterministic and lets CI go fully green today.
+# Background (W2-09 follow-up): the repo USED TO have two `image_pipeline`
+# packages on disk (base-side at base_station/image_pipeline/, X8-side at
+# firmware/tractor_x8/image_pipeline/) sharing one top-level name, so
+# whichever side imported first won inside a single Python process and the
+# other side failed with ModuleNotFoundError on its own submodules. The
+# rename slated as IP-W2-10 landed 2026-08-16 (RS-5.7): the X8-side package
+# is now `x8_image_pipeline`, and `pytest tests/` runs the whole suite in
+# one process with no exclusions. This script's per-file process isolation
+# is therefore no longer load-bearing; it is kept as a debugging aid for
+# isolating genuinely order-dependent failures.
 #
 # Usage (from base_station/):
 #   .\run_tests.ps1                # run every tests/test_*.py

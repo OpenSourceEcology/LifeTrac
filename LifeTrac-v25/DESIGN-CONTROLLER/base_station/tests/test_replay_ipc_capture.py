@@ -62,7 +62,7 @@ def _load_replay_module():
 def _load_x8_ipc_module():
     spec = importlib.util.spec_from_file_location(
         "_x8_ipc_for_replay_test",
-        os.path.join(_X8_DIR, "image_pipeline", "ipc_to_h747.py"))
+        os.path.join(_X8_DIR, "x8_image_pipeline", "ipc_to_h747.py"))
     assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod

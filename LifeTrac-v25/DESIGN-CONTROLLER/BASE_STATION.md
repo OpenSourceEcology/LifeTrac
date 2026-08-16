@@ -288,7 +288,7 @@ fades, badge labels, status pills, raw-mode toggle.
 | CPU super-res (Badge.ENHANCED)                | ✅ `image_pipeline/superres_cpu.py`                          | ❌                        |
 | Independent safety detector (R6)              | ✅ `image_pipeline/detect_yolo.py`                           | ❌                        |
 | Detector cross-check + verdict                | ✅ `image_pipeline/detect_yolo.cross_check`                  | ❌                        |
-| ROI hint generation (`CMD_ROI_HINT` 0x61)     | ✅ `firmware/tractor_x8/image_pipeline/roi.py`               | ❌                        |
+| ROI hint generation (`CMD_ROI_HINT` 0x61)     | ✅ `firmware/tractor_x8/x8_image_pipeline/roi.py`               | ❌                        |
 | Keyframe-request decision (`CMD_REQ_KEYFRAME`)| ✅ `image_pipeline/canvas.py` → `web_ui.py` MQTT publish     | ❌                        |
 | Encode-mode demotion (`CMD_ENCODE_MODE`)      | ✅ `link_monitor.py` orchestrator                            | ❌                        |
 | Audit-log "view-mode at command time"         | ✅ `audit_log.py`                                            | ❌ (sends notifications)  |

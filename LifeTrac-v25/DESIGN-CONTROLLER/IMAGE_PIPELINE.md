@@ -133,7 +133,7 @@ Reserve a new opcode for the encoder hint: **`0x63 CMD_ENCODE_MODE`** (base → 
 
 ## 4. Tractor-side software
 
-Lives in `firmware/tractor_x8/image_pipeline/` on the X8 Linux side (not the M7). All targets are CPU-only.
+Lives in `firmware/tractor_x8/x8_image_pipeline/` on the X8 Linux side (not the M7). All targets are CPU-only.
 
 ### 4.1 Module layout
 

@@ -124,7 +124,7 @@ V4L2_INPUT_FPS    = _env_int("LIFETRAC_V4L2_INPUT_FPS", 30, lo=1)
 FFMPEG_PATH       = os.environ.get("LIFETRAC_FFMPEG_PATH", "ffmpeg")
 
 # IP-104: primary path for encoded image fragments is the X8 → H747 UART
-# (length-framed via image_pipeline/ipc_to_h747.py). The MQTT publish is
+# (length-framed via x8_image_pipeline/ipc_to_h747.py). The MQTT publish is
 # kept only when ``LIFETRAC_CAMERA_DEBUG_MQTT=1`` so a forensic listener
 # can subscribe without the M7 having to bridge it.
 M7_UART_DEVICE    = os.environ.get("LIFETRAC_M7_UART", "/dev/ttymxc1")
@@ -784,7 +784,7 @@ def _compute_link_bytes(n_fragments: int, profile_name: str) -> int | None:
     # stripped runtime image: keep payload small enough to preserve recency.
     fallback_bytes = n_fragments * 40
     try:
-        from image_pipeline.fragment import max_payload_for_n_fragments
+        from x8_image_pipeline.fragment import max_payload_for_n_fragments
         from lora_proto import PHY_BY_NAME
     except Exception:                                         # pragma: no cover
         return fallback_bytes
@@ -862,7 +862,7 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
     forward it byte-for-byte after fragmentation.
 
     Optional data-saving knobs:
-      * ``roi_planner`` — :class:`image_pipeline.roi.RoiPlanner`. When
+      * ``roi_planner`` — :class:`x8_image_pipeline.roi.RoiPlanner`. When
         provided, inside-ROI changed tiles are encoded at
         :data:`ROI_QUALITY_INSIDE` and outside-ROI tiles at
         :data:`ROI_QUALITY_OUTSIDE`. Inside-ROI tiles are always sent
@@ -877,7 +877,7 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
         an AGED tile too large to ever fit is admitted over-budget once
         per frame (that frame spills to ~2 fragments) so a complex region
         is never starved forever — see the liveness valve below.
-      * ``encode_cache`` — :class:`image_pipeline.tile_cache.TileEncodeCache`.
+      * ``encode_cache`` — :class:`x8_image_pipeline.tile_cache.TileEncodeCache`.
         When provided, a tile whose raw 32×32 RGB slice byte-hashes to a
         recently encoded blob is reused instead of round-tripping through
         WebP. Pure CPU saver; wire payload is unchanged. Quality changes
@@ -1309,7 +1309,7 @@ def dispatch_back_channel(frame: bytes, force_key_evt, *,
 
     ``force_key_evt`` is a ``threading.Event`` (the encode loop reads
     ``.is_set()`` / clears it). ``roi_planner`` is an optional
-    :class:`image_pipeline.roi.RoiPlanner`; when present, ``CMD_ROI_HINT``
+    :class:`x8_image_pipeline.roi.RoiPlanner`; when present, ``CMD_ROI_HINT``
     forwards the operator-painted rectangle into it. ``link_budget`` is
     an optional :class:`LinkBudget` mutated by ``CMD_LINK_PROFILE``.
     Returning early on malformed input keeps the reader thread tolerant
@@ -1380,7 +1380,7 @@ def main() -> None:
                  "M7 IpcWriter; frames routed to MQTT %s only", PUBLISH_TOPIC)
         ipc = None
     else:
-        from image_pipeline.ipc_to_h747 import IpcWriter
+        from x8_image_pipeline.ipc_to_h747 import IpcWriter
         ipc = IpcWriter(device=M7_UART_DEVICE)
         ipc.open()
 
@@ -1390,7 +1390,7 @@ def main() -> None:
     roi_planner = None
     if os.environ.get("LIFETRAC_ROI_ENABLE", "").strip() == "1":
         try:
-            from image_pipeline.roi import RoiPlanner
+            from x8_image_pipeline.roi import RoiPlanner
             roi_planner = RoiPlanner()
             roi_planner.update_mode(
                 os.environ.get("LIFETRAC_ROI_DEFAULT_MODE", "idle"))
@@ -1414,7 +1414,7 @@ def main() -> None:
     encode_cache = None
     if os.environ.get("LIFETRAC_TILE_CACHE_ENABLE", "").strip() == "1":
         try:
-            from image_pipeline.tile_cache import TileEncodeCache
+            from x8_image_pipeline.tile_cache import TileEncodeCache
             history = _env_int("LIFETRAC_TILE_CACHE_HISTORY", 4, lo=1)
             encode_cache = TileEncodeCache(n_tiles=GRID_W * GRID_H, history=history)
             LOG.info("camera_service: tile encode cache enabled (history=%d)", history)

@@ -1,5 +1,5 @@
 # IP-W2-05/06 on-device dry-run harness for the X8 image-pipeline
-# data-saving stack. Pushes camera_service.py + image_pipeline/ + the
+# data-saving stack. Pushes camera_service.py + x8_image_pipeline/ + the
 # dry-run script over ADB to a writable home dir, runs it with python3
 # on the device, and surfaces pass/fail to the host.
 #
@@ -30,7 +30,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $x8Dir    = Join-Path $repoRoot "firmware\tractor_x8"
-$pipeDir  = Join-Path $x8Dir "image_pipeline"
+$pipeDir  = Join-Path $x8Dir "x8_image_pipeline"
 $dryRun   = Join-Path $x8Dir "dry_run_w2_05.py"
 $loraProto = Join-Path $repoRoot "base_station\lora_proto.py"
 
@@ -56,12 +56,12 @@ Write-Host "      device online: $state"
 
 # 2. Stage source files on the device.
 Write-Host "[2/4] Pushing sources to $DeviceDir ..."
-Invoke-Adb shell "rm -rf $DeviceDir; mkdir -p $DeviceDir/image_pipeline" | Out-Null
+Invoke-Adb shell "rm -rf $DeviceDir; mkdir -p $DeviceDir/x8_image_pipeline" | Out-Null
 Invoke-Adb push $dryRun "$DeviceDir/dry_run_w2_05.py" | Out-Null
 Invoke-Adb push (Join-Path $x8Dir "camera_service.py") "$DeviceDir/camera_service.py" | Out-Null
 Invoke-Adb push $loraProto "$DeviceDir/lora_proto.py" | Out-Null
 Get-ChildItem -Path $pipeDir -File -Filter "*.py" | ForEach-Object {
-    Invoke-Adb push $_.FullName "$DeviceDir/image_pipeline/$($_.Name)" | Out-Null
+    Invoke-Adb push $_.FullName "$DeviceDir/x8_image_pipeline/$($_.Name)" | Out-Null
 }
 
 # 3. Verify python3 is present and run the dry-run.

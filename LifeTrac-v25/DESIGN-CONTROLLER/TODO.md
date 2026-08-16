@@ -1270,7 +1270,25 @@ No-regrets work, correct under every surviving architecture (do first):
   this test guards encode-cache invalidation on mode change, which is exactly
   the path RS-1.3's encoder confirmation loop depends on, and an
   order-dependent red masks real breakage there.
-- [ ] **RS-5.7 Test-env bootstrap for the SIL suite** — four modules cannot
+- [x] **RS-5.7 RESOLVED 2026-08-16 — the shadowing package is renamed and
+  the full suite runs with no exclusions.** The X8-side package is now
+  `firmware/tractor_x8/x8_image_pipeline/` (the IP-W2-10 rename;
+  base-side `base_station/image_pipeline/` is unchanged). All four dark
+  modules collect and pass, and the order-dependent
+  `test_mode_flip_forces_full_re_encode` passes in-suite: **pytest
+  1158 passed, 0 failed, 0 excluded** (was 1110 with 4 ignores + 1
+  deselect). CI's exclusion list is deleted; `run_tests.ps1`'s per-file
+  isolation is no longer load-bearing (kept as a debugging aid). The
+  harness merge-hack is retired too: `run_live_radio_monitor.ps1` used to
+  merge both same-named packages into one on-device directory — they now
+  coexist under distinct names, image_tx_daemon still importing base
+  `image_pipeline.frame_format` and camera_service importing
+  `x8_image_pipeline.*`. NOTE for the next bench session: the on-device
+  trees under `/tmp/lifetrac_strict` and `/tmp/lifetrac_camera` are
+  rebuilt by the harness at launch, but anything ELSE that was hand-pushed
+  to import `image_pipeline.ipc_to_h747` (e.g. a manually started
+  camera stack) must be re-pushed after this lands. Original item follows.
+- [ ] **RS-5.7 (original) Test-env bootstrap for the SIL suite** — four modules cannot
   even collect from a clean checkout: `test_data_saving_measures.py`,
   `test_ipc_to_h747_roundtrip.py`, `test_link_adaptive_budget.py`,
   `test_x8_tile_encode_cache.py` fail on `No module named

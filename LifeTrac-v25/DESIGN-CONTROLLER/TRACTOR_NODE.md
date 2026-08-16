@@ -370,7 +370,7 @@ Per [MASTER_PLAN.md §8.19](MASTER_PLAN.md) and [`../AI NOTES/2026-04-27_Image_T
 **Source layout (X8-side, when implemented):**
 
 ```
-firmware/tractor_x8/image_pipeline/
+firmware/tractor_x8/x8_image_pipeline/
 ├── capture.py            # V4L2 → numpy
 ├── tile_diff.py          # pHash + bitmap, NEON via numpy
 ├── roi.py                # valve-state → ROI mask

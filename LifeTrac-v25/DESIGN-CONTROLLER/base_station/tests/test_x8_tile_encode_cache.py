@@ -40,7 +40,7 @@ if _X8_DIR not in sys.path:
     sys.path.insert(0, _X8_DIR)
 
 import camera_service  # noqa: E402
-from image_pipeline.tile_cache import (  # noqa: E402
+from x8_image_pipeline.tile_cache import (  # noqa: E402
     DEFAULT_HISTORY,
     TileEncodeCache,
 )
@@ -216,7 +216,7 @@ class BuildFrameWithCacheTests(unittest.TestCase):
             def grab_rgb(self_inner) -> bytes:
                 return canvas
 
-        from image_pipeline.roi import RoiPlanner
+        from x8_image_pipeline.roi import RoiPlanner
         roi = RoiPlanner(grid_w=camera_service.GRID_W,
                          grid_h=camera_service.GRID_H)
         # Phase 1: no ROI → uniform WEBP_QUALITY for every tile.

@@ -33,7 +33,7 @@ if _X8_DIR not in sys.path:
     sys.path.insert(0, _X8_DIR)
 
 import camera_service  # noqa: E402
-from image_pipeline.fragment import max_payload_for_n_fragments  # noqa: E402
+from x8_image_pipeline.fragment import max_payload_for_n_fragments  # noqa: E402
 from lora_proto import PHY_BY_NAME  # noqa: E402
 
 

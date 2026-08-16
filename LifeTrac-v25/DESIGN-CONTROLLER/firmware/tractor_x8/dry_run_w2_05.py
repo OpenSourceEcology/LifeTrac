@@ -198,7 +198,7 @@ def main() -> int:
 
     # --- 4. Tile encode cache: 2nd identical canvas -> 0 re-encodes -----
     try:
-        from image_pipeline.tile_cache import TileEncodeCache
+        from x8_image_pipeline.tile_cache import TileEncodeCache
     except Exception as exc:                                  # pragma: no cover
         _fail(f"import tile_cache failed: {exc!r}")
     cache = TileEncodeCache(n_tiles=n_tiles, history=4)

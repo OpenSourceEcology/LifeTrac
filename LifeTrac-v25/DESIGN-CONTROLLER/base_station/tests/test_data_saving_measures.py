@@ -44,7 +44,7 @@ if _X8_DIR not in sys.path:
     sys.path.insert(0, _X8_DIR)
 
 import camera_service  # noqa: E402
-from image_pipeline.roi import RoiPlanner  # noqa: E402
+from x8_image_pipeline.roi import RoiPlanner  # noqa: E402
 
 
 def _fake_encode_tile_factory(blob_size: int = 50,
