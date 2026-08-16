@@ -236,7 +236,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install arduino-cli
         run: |
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s -- -b /usr/local/bin
+          # 2026-08-16 CI repair: upstream install.sh changed its argument parsing
+          # and began treating `-b` as a VERSION string, downloading
+          # arduino-cli_-b_Linux_64bit.tar.gz -> HTTP 404. Every Arduino compile
+          # job has been red since 2026-08-02 because of this. BINDIR is the
+          # documented way to choose the install dir, and the version is pinned
+          # so upstream script drift cannot silently break the gate again.
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
           arduino-cli version
       - name: Install cores
         run: |
@@ -280,7 +286,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install arduino-cli
         run: |
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s -- -b /usr/local/bin
+          # 2026-08-16 CI repair: upstream install.sh changed its argument parsing
+          # and began treating `-b` as a VERSION string, downloading
+          # arduino-cli_-b_Linux_64bit.tar.gz -> HTTP 404. Every Arduino compile
+          # job has been red since 2026-08-02 because of this. BINDIR is the
+          # documented way to choose the install dir, and the version is pinned
+          # so upstream script drift cannot silently break the gate again.
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
       - name: Install cores
         run: |
           arduino-cli core update-index
@@ -318,7 +330,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install arduino-cli
         run: |
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s -- -b /usr/local/bin
+          # 2026-08-16 CI repair: upstream install.sh changed its argument parsing
+          # and began treating `-b` as a VERSION string, downloading
+          # arduino-cli_-b_Linux_64bit.tar.gz -> HTTP 404. Every Arduino compile
+          # job has been red since 2026-08-02 because of this. BINDIR is the
+          # documented way to choose the install dir, and the version is pinned
+          # so upstream script drift cannot silently break the gate again.
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
       - name: Install cores
         run: |
           arduino-cli core update-index
@@ -349,7 +367,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install arduino-cli
         run: |
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s -- -b /usr/local/bin
+          # 2026-08-16 CI repair: upstream install.sh changed its argument parsing
+          # and began treating `-b` as a VERSION string, downloading
+          # arduino-cli_-b_Linux_64bit.tar.gz -> HTTP 404. Every Arduino compile
+          # job has been red since 2026-08-02 because of this. BINDIR is the
+          # documented way to choose the install dir, and the version is pinned
+          # so upstream script drift cannot silently break the gate again.
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
       - name: Install cores
         run: |
           arduino-cli core update-index
@@ -410,7 +434,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install arduino-cli
         run: |
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s -- -b /usr/local/bin
+          # 2026-08-16 CI repair: upstream install.sh changed its argument parsing
+          # and began treating `-b` as a VERSION string, downloading
+          # arduino-cli_-b_Linux_64bit.tar.gz -> HTTP 404. Every Arduino compile
+          # job has been red since 2026-08-02 because of this. BINDIR is the
+          # documented way to choose the install dir, and the version is pinned
+          # so upstream script drift cannot silently break the gate again.
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
       - name: Install cores
         run: |
           arduino-cli core update-index
