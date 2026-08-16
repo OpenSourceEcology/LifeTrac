@@ -241,8 +241,9 @@ jobs:
           # arduino-cli_-b_Linux_64bit.tar.gz -> HTTP 404. Every Arduino compile
           # job has been red since 2026-08-02 because of this. BINDIR is the
           # documented way to choose the install dir, and the version is pinned
-          # so upstream script drift cannot silently break the gate again.
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
+          # and the script URL is pinned to the same tag, so no unpinned
+          # upstream input remains in this step (review catch, PR #102).
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/v1.5.1/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
           arduino-cli version
       - name: Install cores
         run: |
@@ -291,8 +292,9 @@ jobs:
           # arduino-cli_-b_Linux_64bit.tar.gz -> HTTP 404. Every Arduino compile
           # job has been red since 2026-08-02 because of this. BINDIR is the
           # documented way to choose the install dir, and the version is pinned
-          # so upstream script drift cannot silently break the gate again.
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
+          # and the script URL is pinned to the same tag, so no unpinned
+          # upstream input remains in this step (review catch, PR #102).
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/v1.5.1/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
       - name: Install cores
         run: |
           arduino-cli core update-index
@@ -335,8 +337,9 @@ jobs:
           # arduino-cli_-b_Linux_64bit.tar.gz -> HTTP 404. Every Arduino compile
           # job has been red since 2026-08-02 because of this. BINDIR is the
           # documented way to choose the install dir, and the version is pinned
-          # so upstream script drift cannot silently break the gate again.
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
+          # and the script URL is pinned to the same tag, so no unpinned
+          # upstream input remains in this step (review catch, PR #102).
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/v1.5.1/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
       - name: Install cores
         run: |
           arduino-cli core update-index
@@ -401,8 +404,9 @@ jobs:
           # arduino-cli_-b_Linux_64bit.tar.gz -> HTTP 404. Every Arduino compile
           # job has been red since 2026-08-02 because of this. BINDIR is the
           # documented way to choose the install dir, and the version is pinned
-          # so upstream script drift cannot silently break the gate again.
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
+          # and the script URL is pinned to the same tag, so no unpinned
+          # upstream input remains in this step (review catch, PR #102).
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/v1.5.1/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
       - name: Install cores
         run: |
           arduino-cli core update-index
@@ -508,8 +512,9 @@ jobs:
           # arduino-cli_-b_Linux_64bit.tar.gz -> HTTP 404. Every Arduino compile
           # job has been red since 2026-08-02 because of this. BINDIR is the
           # documented way to choose the install dir, and the version is pinned
-          # so upstream script drift cannot silently break the gate again.
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
+          # and the script URL is pinned to the same tag, so no unpinned
+          # upstream input remains in this step (review catch, PR #102).
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/v1.5.1/install.sh | BINDIR=/usr/local/bin sh -s 1.5.1
       - name: Install cores
         run: |
           arduino-cli core update-index
