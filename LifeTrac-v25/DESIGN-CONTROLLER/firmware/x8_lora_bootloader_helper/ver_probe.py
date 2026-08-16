@@ -16,11 +16,22 @@ from method_h_stage2_tx_probe_v2 import (  # noqa: E402
 
 
 def main() -> int:
-    link = HostLink("/dev/ttymxc3", "921600")
+    # Init failures (stty error, device missing, tractor-camera holding the
+    # UART) must honour the VER-FAIL contract too, not escape as tracebacks —
+    # callers grep for VER-OK/VER-FAIL and branch on exit code.
+    try:
+        link = HostLink("/dev/ttymxc3", "921600")
+    except Exception as exc:
+        print("VER-FAIL open:", exc)
+        return 1
     if "--reset" in sys.argv:
         print("sending HOST_TYPE_RESET_REQ (0x03)...")
-        link.send(0x03)
-        drain_boot(link, settle_s=3.0)
+        try:
+            link.send(0x03)
+            drain_boot(link, settle_s=3.0)
+        except Exception as exc:
+            print("VER-FAIL reset:", exc)
+            return 1
     try:
         drain_boot(link, settle_s=0.25)
     except Exception as exc:
