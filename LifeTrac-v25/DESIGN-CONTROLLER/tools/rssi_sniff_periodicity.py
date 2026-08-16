@@ -68,16 +68,30 @@ def hunt_verdict(t: np.ndarray, r: np.ndarray) -> int:
     if len(hot) >= 2:
         keep = np.concatenate([[True], np.diff(hot) > 0.5])
         hot = hot[keep]
-    if len(hot) >= 3:
+    # Review catch (PR #99): with very few excursions, maximising R over a
+    # free period grid reaches R>=0.8 by chance and would falsely report
+    # PRESENT after the emitter is actually removed — the costly hunt error.
+    # Gates: (a) at least 4 excursions, (b) residual RMS <= 0.12 cycles (the
+    # real line measures 0.03-0.10), so the fit must be a grid, not merely a
+    # concentrated fold. 3 or fewer hot excursions is reported as ambiguous
+    # rather than PRESENT.
+    if len(hot) >= 4:
         fit = refine_period(hot, 6.5, 7.5, n_grid=40000)
-        if fit["R"] >= 0.8:
+        if fit["R"] >= 0.8 and fit["resid_rms"] <= 0.12:
             print(f"LINE PRESENT: {len(hot)} excursions, "
                   f"period {fit['period']:.3f}s, R={fit['R']:.2f}, "
+                  f"resid={fit['resid_rms']:.3f} cyc, "
                   f"hottest {r.max():.0f} dBm")
             return 10
         print(f"HOT ENERGY PRESENT but not on the grid: {len(hot)} "
-              f"excursions, best 6.5-7.5s fit R={fit['R']:.2f}, "
+              f"excursions, best 6.5-7.5s fit R={fit['R']:.2f} "
+              f"resid={fit['resid_rms']:.3f}, "
               f"hottest {r.max():.0f} dBm — investigate")
+        return 11
+    if len(hot) == 3:
+        print(f"AMBIGUOUS: only 3 hot excursions in {dur:.0f}s — too few to "
+              f"confirm the grid (hottest {r.max():.0f} dBm). Extend the "
+              f"sniff (-DurationS 240) and re-run.")
         return 11
     if dur < 60.0:
         print(f"INCONCLUSIVE: only {dur:.0f}s of data (<60s) — "
