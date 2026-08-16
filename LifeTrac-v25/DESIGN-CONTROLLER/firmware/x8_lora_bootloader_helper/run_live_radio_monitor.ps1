@@ -215,16 +215,13 @@ foreach ($s in @($TxAdbSerial, $RxAdbSerial)) {
     cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $repoRoot 'publish_synthetic_frames.py')`" /tmp/lifetrac_strict/" | Out-Null
     cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $helperDir 'bench_mqtt.conf')`" /tmp/lifetrac_strict/" | Out-Null
     cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $baseStation 'image_pipeline')`" /tmp/lifetrac_strict/" | Out-Null
-    # 2026-07-30 RS-3.3: the TRACTOR's image_pipeline too. Two different
-    # packages share the name `image_pipeline` (RS-5.7), and only the base
-    # station's was being deployed — so camera_service died on
-    # "No module named 'image_pipeline.ipc_to_h747'" the first time it was
-    # ever run on hardware. They merge safely: of 16 + 11 modules the ONLY
-    # overlapping filename is __init__.py, and both are docstring-only.
-    # image_tx_daemon needs frame_format from the base copy while
-    # camera_service needs ipc_to_h747/tile_cache from this one, so the
-    # tractor genuinely requires both.
-    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $tractorX8 'image_pipeline')`" /tmp/lifetrac_strict/" | Out-Null
+    # 2026-07-30 RS-3.3: the TRACTOR's pipeline package too — image_tx_daemon
+    # needs frame_format from the base copy while camera_service needs
+    # ipc_to_h747/tile_cache from this one, so the tractor genuinely requires
+    # both. (Until RS-5.7 landed 2026-08-16 both packages were named
+    # `image_pipeline` and MERGED into one on-device directory; the X8-side
+    # package is now `x8_image_pipeline`, so they simply coexist.)
+    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $tractorX8 'x8_image_pipeline')`" /tmp/lifetrac_strict/" | Out-Null
     $pahoLocal = Join-Path $repoRoot "_paho_pull\paho"
     if (Test-Path $pahoLocal) {
         cmd /c "`"$adbExe`" -s $s push `"$pahoLocal`" /tmp/lifetrac_strict/" | Out-Null
@@ -342,7 +339,7 @@ if ($TxFeed -eq "camera") {
     # LIFETRAC_USE_LORA_BRIDGE=1 is THE flag for this path and is REQUIRED.
     # It is not merely a label -- camera_service branches on it three ways:
     #   1. skips the M7 IpcWriter (camera_service.py:1354), which otherwise
-    #      imports image_pipeline.ipc_to_h747 AND opens /dev/ttymxc3, a device
+    #      imports x8_image_pipeline.ipc_to_h747 AND opens /dev/ttymxc3, a device
     #      image_tx_daemon already owns on this path;
     #   2. creates the MQTT client, without which `client is None` and the
     #      publish at :1563 is silently skipped -- frames are captured and

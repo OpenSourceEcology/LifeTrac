@@ -19,7 +19,7 @@ Wire format (CMD_PERSON_APPEARED args, 6 bytes):
     u8  age_ms_div10     ; how stale the detection was when emitted (10 ms ticks, 0..255)
     u8  reserved         ; 0
 
-The cls_id table mirrors :mod:`firmware.tractor_x8.image_pipeline.detect_nanodet`
+The cls_id table mirrors :mod:`firmware.tractor_x8.x8_image_pipeline.detect_nanodet`
 so the base side can decode tractor-emitted alerts without translation.
 
 Public API

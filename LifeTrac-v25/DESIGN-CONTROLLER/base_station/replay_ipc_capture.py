@@ -2,7 +2,7 @@
 
 The X8 publishes one IPC frame per encoded TileDeltaFrame onto
 ``/dev/ttymxc1`` toward the H747 M7 (see
-``firmware/tractor_x8/image_pipeline/ipc_to_h747.py``). When debugging
+``firmware/tractor_x8/x8_image_pipeline/ipc_to_h747.py``). When debugging
 adaptive-budget / encode-mode / ROI behaviour against a real run it's
 much easier to capture that stream once::
 
@@ -54,7 +54,7 @@ def _load_x8_ipc_module():
         sys.path.insert(0, _X8_DIR)
     spec = importlib.util.spec_from_file_location(
         "_x8_ipc_to_h747",
-        os.path.join(_X8_DIR, "image_pipeline", "ipc_to_h747.py"))
+        os.path.join(_X8_DIR, "x8_image_pipeline", "ipc_to_h747.py"))
     assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod

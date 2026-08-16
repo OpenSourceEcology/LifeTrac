@@ -34,7 +34,7 @@ _BS_DIR = os.path.normpath(os.path.join(_HERE, ".."))
 # ``image_pipeline`` — putting them both on sys.path would let one mask
 # the other. Load the base-station ``frame_format`` directly from its
 # file so the parser is unambiguous, then put the tractor side on
-# sys.path for ``import image_pipeline.ipc_to_h747`` and ``camera_service``.
+# sys.path for ``import x8_image_pipeline.ipc_to_h747`` and ``camera_service``.
 _FF_PATH = os.path.join(_BS_DIR, "image_pipeline", "frame_format.py")
 _spec = importlib.util.spec_from_file_location("_bs_frame_format", _FF_PATH)
 assert _spec is not None and _spec.loader is not None
@@ -48,7 +48,7 @@ if _X8_DIR not in sys.path:
     sys.path.insert(0, _X8_DIR)
 
 # Tractor-side modules.
-from image_pipeline.ipc_to_h747 import (  # noqa: E402
+from x8_image_pipeline.ipc_to_h747 import (  # noqa: E402
     FLAG_MOTION,
     FLAG_WIREFRAME,
     FRAME_MARKER,

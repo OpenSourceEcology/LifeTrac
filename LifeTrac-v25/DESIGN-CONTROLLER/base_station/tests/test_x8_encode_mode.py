@@ -231,7 +231,7 @@ class EncodeCacheInvalidatesOnModeChangeTests(unittest.TestCase):
         return _R()
 
     def test_mode_flip_forces_full_re_encode(self) -> None:
-        from image_pipeline.tile_cache import TileEncodeCache
+        from x8_image_pipeline.tile_cache import TileEncodeCache
         n_tiles = camera_service.GRID_W * camera_service.GRID_H
         cache = TileEncodeCache(n_tiles=n_tiles, history=2)
 
