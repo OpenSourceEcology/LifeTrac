@@ -248,3 +248,25 @@ the 380 000 µs dwell cap by 19.6 ms**; the largest payload that fits is
 usual size would transmit over the cap and the airtime accountant may abort
 those TXs — confounding exactly the comparison it was meant to make. Any
 profile-0 leg must drop to ≤243 B fragments.
+
+## 10. Addendum (2026-08-16 late): the bulk population vs train boundaries
+
+A follow-up test of RS-11.4's boundary-event mechanism using the crc_dump
+captures against `published frame_id` events (same log, one clock — tool
+[`tools/bulk_loss_boundary.py`](../../tools/bulk_loss_boundary.py),
+transcript [`bulk_boundary_output.txt`](bulk_boundary_output.txt)):
+
+**0 of 359 bulk (non-interferer, settled) captures fall within ±100 ms of a
+publish event, against a uniform-null expectation of ~7 % — in all five
+archives independently.** Median |offset| ≈ 1.5 s ≈ one train period.
+
+This is NOT evidence against boundary clustering — it is a selection effect
+with its own information: **a corrupt fragment usually kills its own train's
+publish**, so the reference event is removed by the very corruption being
+located, and the nearest surviving publish sits a full train away. The
+instrument therefore cannot localise bulk corruption within the train; the
+per-index `lost_frag_idx` attribution (RS-11.4) remains the right tool for
+that. What this DOES independently confirm is the capture↔train-kill
+linkage: captured bulk corruption lives almost exclusively in trains that
+failed to publish, quantifying RS-11.4's 23–34 % timeout observation from a
+second instrument.

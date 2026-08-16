@@ -29,7 +29,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from crc_dump_temporal import rayleigh, scan_periods  # noqa: E402
+from crc_dump_temporal import rayleigh, refine_period, scan_periods  # noqa: E402
 
 TARGET_PERIOD = 7.0853
 
@@ -53,17 +53,59 @@ def load(path: pathlib.Path) -> tuple[np.ndarray, np.ndarray]:
     return t, r
 
 
+def hunt_verdict(t: np.ndarray, r: np.ndarray) -> int:
+    """One-line PRESENT/ABSENT verdict for the suspect-elimination loop.
+
+    Detection = hot samples (>-75 dBm, far above any plausible floor and
+    ~consistent with the emitter's known -43..-63 dBm range at bench
+    geometry) whose de-duplicated excursion times fit a 6.5-7.5 s grid with
+    R >= 0.8, needing >= 3 excursions. At the measured catch rate the line
+    produces ~1 excursion per ~2 cycles minimum, so 120 s (~17 cycles) gives
+    plenty of margin; an ABSENT verdict on <60 s of data is refused.
+    """
+    dur = float(t[-1]) if len(t) else 0.0
+    hot = t[r > -75.0]
+    if len(hot) >= 2:
+        keep = np.concatenate([[True], np.diff(hot) > 0.5])
+        hot = hot[keep]
+    if len(hot) >= 3:
+        fit = refine_period(hot, 6.5, 7.5, n_grid=40000)
+        if fit["R"] >= 0.8:
+            print(f"LINE PRESENT: {len(hot)} excursions, "
+                  f"period {fit['period']:.3f}s, R={fit['R']:.2f}, "
+                  f"hottest {r.max():.0f} dBm")
+            return 10
+        print(f"HOT ENERGY PRESENT but not on the grid: {len(hot)} "
+              f"excursions, best 6.5-7.5s fit R={fit['R']:.2f}, "
+              f"hottest {r.max():.0f} dBm — investigate")
+        return 11
+    if dur < 60.0:
+        print(f"INCONCLUSIVE: only {dur:.0f}s of data (<60s) — "
+              f"cannot call ABSENT")
+        return 12
+    print(f"LINE ABSENT: 0-{len(hot)} hot excursion(s) in {dur:.0f}s "
+          f"(~{dur / 7.08:.0f} emitter cycles), floor median "
+          f"{np.median(r):.0f} dBm, max {r.max():.0f} dBm")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("jsonl", type=pathlib.Path)
     ap.add_argument("--margin-db", type=float, default=6.0,
                     help="event threshold above median floor")
+    ap.add_argument("--hunt", action="store_true",
+                    help="one-line PRESENT/ABSENT verdict for the "
+                         "suspect-elimination loop (exit 10=present, "
+                         "11=hot-but-aperiodic, 12=inconclusive, 0=absent)")
     args = ap.parse_args()
 
     t, r = load(args.jsonl)
     if len(t) < 100:
         print(f"only {len(t)} samples parsed — not enough to analyse")
         return 1
+    if args.hunt:
+        return hunt_verdict(t, r)
 
     dur = float(t[-1])
     med = float(np.median(r))
