@@ -83,7 +83,40 @@ traffic, but it may account for part of the weak-tail corrupt population.
    corrected): removing this emitter buys back at most ~⅓ of the 5.9 %
    loss. The clustered bulk component is a separate hunt.
 
-## 5. Caveats
+## 5. Leg 2c — twin 600 s sniffs localize the emitter to the base carrier
+
+Simultaneous 600 s sniffs on both radios
+([`rssi_sniff_idle_base_600s.jsonl`](rssi_sniff_idle_base_600s.jsonl),
+[`rssi_sniff_idle_tractor_600s.jsonl`](rssi_sniff_idle_tractor_600s.jsonl)),
+zero traffic, ~84 emitter cycles each:
+
+| radio | hot level | period | R | excursions |
+|---|---:|---:|---:|---:|
+| base | **−42…−45 dBm** | 7.0797 s | 0.883 | 34 |
+| tractor | −62…−63 dBm | 7.0805 s | 0.875 | 49 |
+
+Same grid on both radios to within 0.8 ms — one emitter — and **20 dB
+hotter at the base**. In free space 20 dB is a ~10× distance ratio, so the
+source sits within roughly a tenth of the carrier-to-carrier separation
+from the base antenna: **arm's reach of the base carrier**. The hunt zone
+is the base station's immediate surroundings — shelf above/below, the wall
+directly behind, anything battery-powered sitting on or next to it.
+
+Period note: the 600 s fits (7.0797/7.0805) sit between the 300 s sniff
+(7.0733) and the traffic-capture fits (7.0842/7.0853). Spread ≈ 0.07 %
+across captures hours apart — consistent with a cheap drifting oscillator,
+i.e. more evidence for a battery device, and a caution against using the
+fourth decimal as an identity check between sessions.
+
+### The 1 Hz-class tickers are board-local, not room emitters
+
+The base sees a line at exactly **1.00000 s** (R = 0.438); the tractor
+instead shows **0.93554 s** (R = 0.363). Different periods on different
+radios means these are each board's own local electronics, not something in
+the room. Both are weak (median ≈ −102 dBm, ~24 dB under healthy signal)
+and are deprioritized — worth one line in the record, not a hunt.
+
+## 6. Caveats
 
 - The sniffer period (7.0733 s) sits ~0.17 % below the crc_dump-derived
   7.0842/7.0853 s. With 13 events over 39 cycles the fit uncertainty is
