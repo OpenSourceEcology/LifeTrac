@@ -158,7 +158,7 @@ static bool on_frame(const murata_host_frame_t *frame, void *user_ctx) {
             if (!mh_stats_parse(frame->payload, frame->payload_len, &parsed)) {
                 return false;
             }
-            if (frame->payload_len >= HOST_STATS_PAYLOAD_LEN) {
+            if (frame->payload_len >= HOST_STATS_MIN_LEN_WITH_AIRTIME) {
                 state->stats_additive++;
             } else if (frame->payload_len >= HOST_STATS_LEGACY_PAYLOAD_LEN) {
                 state->stats_legacy++;
