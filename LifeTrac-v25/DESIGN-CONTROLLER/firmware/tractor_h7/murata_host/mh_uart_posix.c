@@ -67,10 +67,19 @@ static bool posix_open(void *ctx, uint32_t baud) {
 
     uart->fd = open(uart->path, O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (uart->fd < 0) {
+        /* Diagnosability (2026-08-16): this open path failed on CI with no
+         * errno visible anywhere, which made the failure undiagnosable from
+         * the logs. Every failure branch now names its call site. */
+        fprintf(stderr, "mh_uart_posix: open(%s) failed: %s
+",
+                uart->path, strerror(errno));
         return false;
     }
 
     if (tcgetattr(uart->fd, &tio) != 0) {
+        fprintf(stderr, "mh_uart_posix: tcgetattr(%s) failed: %s
+",
+                uart->path, strerror(errno));
         close(uart->fd);
         uart->fd = -1;
         return false;
@@ -83,12 +92,18 @@ static bool posix_open(void *ctx, uint32_t baud) {
     tio.c_cc[VTIME] = 0;
 
     if (cfsetispeed(&tio, speed) != 0 || cfsetospeed(&tio, speed) != 0) {
+        fprintf(stderr, "mh_uart_posix: cfset[io]speed(%s, %u) failed: %s
+",
+                uart->path, (unsigned)baud, strerror(errno));
         close(uart->fd);
         uart->fd = -1;
         return false;
     }
 
     if (tcsetattr(uart->fd, TCSANOW, &tio) != 0) {
+        fprintf(stderr, "mh_uart_posix: tcsetattr(%s) failed: %s
+",
+                uart->path, strerror(errno));
         close(uart->fd);
         uart->fd = -1;
         return false;
