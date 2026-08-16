@@ -957,6 +957,34 @@ No-regrets work, correct under every surviving architecture (do first):
 
 - [ ] **RS-4.1 Parity fragments (0xFC) on keyframes** — `add_parity_fragments`
   exists, is tested, and is wired but default-off (`LIFETRAC_PARITY_GROUP=0`).
+  **DESK REPLAY 2026-08-16 — if this is enabled, use GROUP=13, not 4 or 8**
+  (`bench-evidence/RS_11_6_temporal_2026-08-16/PARITY_REPLAY.md`, tool
+  `tools/interferer_replay.py`, which drives the real TX/RX code). Replaying
+  the RS-11.6 measured loss process: parity buys **+14.7 pts of frame
+  delivery (67.6% → 82.4%) at +8% airtime with G=13**, and G=4/G=8 buy the
+  same within noise while costing +31%/+15%. Two mechanisms: a burst takes
+  2+ fragments in the SAME group whatever the group size, and every extra
+  parity fragment is itself exposed (G=4 pushes trains-with-loss 32.5% →
+  39.9%, G=13 only to 34.0%). **The loss model is what decides this** — an
+  IID model inverts the ranking and would have specified G=4 for 4× the
+  airtime; real loss CLUSTERS (RS-11.4's 23–34% affected trains vs IID's
+  55%), and the calibrated model reproduces 32.5%. Parity is well matched to
+  the INTERFERER half of the loss (periodic hits arrive alone — no aliasing
+  against the train cadence, 7.085/1.85 = 3.83) and poorly matched to the
+  clustered bulk half. **CORRECTION per PR #99 review: an earlier revision
+  claimed "delivery reaches 98% if the interferer were the only source" —
+  RETRACTED, it was an artifact of a sim bug that silently under-delivered
+  loss at high interferer shares.** The corrected finding is stronger in a
+  different way: the 7.085 s tick supply (~61–65/run) can carry at most
+  ~30% of the measured loss volume, so **even removing the emitter entirely
+  cannot cut the bench floor below roughly 4%** — the clustered bulk
+  process owns the rest. **Recommendation: do not build yet** — this is a return on
+  *tolerating* the emitter, and the idle capture that might remove it is one
+  300 s leg away. Also recorded there: CR 4/8 costs **+57% airtime, not the
+  ~37% this file has been quoting** (99.9 → 156.7 ms, SF7/BW500/255 B), and
+  the 700 ms budget is hydraulic-control latency, NOT image-frame latency (a
+  13-fragment train is already 1521 ms) — these mitigations spend airtime,
+  so their cost lands on control margin.
   Enable for keyframes on the bench, measure timeout reduction vs airtime
   cost (75 timeouts/120 s under FHSS pre-fix is the baseline to beat).
   **First air test 2026-07-26 (run T, `radio_monitor_20260726_135348`,
@@ -2176,7 +2204,98 @@ Two consequences for what is worth doing next:
   during reception can. This explains every null in RS-11.5 (TX power,
   switch fix beyond its +33 dB, antenna tuning): none of them change an
   interferer.
-- [ ] **RS-11.6 leg 2+ — separate the interferer (next session).** Two
+- [x] **RS-11.6 item 1 DONE 2026-08-16 — the interferer has a HARD 7.085 s
+  CADENCE.** Desk analysis, no bench time
+  (`bench-evidence/RS_11_6_temporal_2026-08-16/RESULTS.md`, tool
+  `tools/crc_dump_temporal.py`, tracking issue #98). Swept all five
+  archives carrying `crc_dump` (429 captures, not just leg 1's 86 — the
+  instrument shipped 2026-08-02). Selecting the captures that are BOTH
+  stronger than their run's RSSI reference AND below −5 dB SNR
+  (reference = the rx_rf healthy median for leg 1, the only archive
+  carrying that instrument; the four earlier archives fall back to their
+  corrupt-capture median — correction per PR #99 review, the first wording
+  said "healthy median" for all five) isolates
+  the interferer population, and its arrival times fit a fixed grid:
+  **7.0842 s** (`…0802_172500`, R=0.986) and **7.0853 s**
+  (`…0816_122735`, R=0.987) — agreement to 16 ppm across runs **14 days
+  apart**, every event within 0.076 of an integer cycle. Also present
+  pre-RF-switch-fix (`…0802_132817`, 7.1447 s), so it predates and
+  survives that fix. SNR signature stable at −10.0/−10.8/−10.8 dB.
+  **Not bursty** — Fano 0.68–1.04 and CV 0.79, i.e. UNDER-dispersed,
+  which is duty-cycled-emitter behaviour. **Self-interference ruled out
+  in all five runs**: the base sends its commands in the first 10 s
+  window and nothing for the remaining ~290 s while corruption
+  continues. **Not locked to any cadence of ours** (fragment ToA, slot,
+  synth frame, train boundary, stats window all null). Two corrections
+  to the leg-1 record go with this: (a) the −65.8 dBm corrupt mean pools
+  four regimes — warm-up, bulk, noise-floor tail, and the interferer at
+  −43…−47 dBm; the interferer sits ~26 dB above the healthy median, not
+  3 dB; (b) the first ~60 s of every run is a warm-up regime that no
+  prior analysis excluded. Methodological note recorded in-document: an
+  initial whole-population "best period 3.5458 s" was a RENEWAL
+  ARTIFACT (a fold scan peaks at ~the mean inter-arrival with no clock
+  present) and is retracted — the shuffled-interval null that catches it
+  is now part of the tool.
+- [x] **RS-11.6 leg 2 DONE 2026-08-16 — the emitter is EXTERNAL, confirmed
+  in raw energy with all radios silent.**
+  (`bench-evidence/RS_11_6_idle_sniff_2026-08-16/RESULTS.md`; idle-harness
+  archive `radio_monitor_20260816_153155_e1092868`.) Two idle legs, SHA
+  e1092868: (2a) standard harness at `-SynthFps 0` — ONE crc_dump in 300 s
+  (−108 dBm noise-floor class), nothing at the interferer signature; (2b)
+  `air_coupling_rssi_sniff.py` sampling raw RegRssiValue at ~12.9 Hz —
+  **13 samples at −43…−45 dBm on a hard 7.0733 s grid (R=0.983, resid RMS
+  0.030 cyc)** with zero LoRa traffic in the air. Burst duration ≈25 ms
+  (from catch statistics), which resolves 2a's null: a ~25 ms non-LoRa
+  burst never triggers LoRa preamble detection alone — it only surfaces as
+  crc_dump when it lands inside one of our 100 ms fragments. Fingerprint
+  matches a battery 915 MHz ISM telemetry sensor (weather/temp/TPMS-class,
+  ~7 s beacon, tens-of-ms OOK burst). **SECOND emitter found**: 174 weak
+  excursions (med −102 dBm) on a 1.00003 s digital tick, not a subharmonic
+  of the 7.08 s line; mostly harmless at ~24 dB below healthy signal but
+  likely explains part of the weak-tail corrupt population (and the
+  marginal 1 s concentration, p=0.016, in the traffic-run captures).
+  Near-field-coupling and USB-3.0 candidates are DEMOTED for the periodic
+  component (neither predicts a rigid 7.08 s clock with our systems idle;
+  both remain candidates for the clustered bulk ~⅔ of the floor). NEXT —
+  **the physical hunt, hands needed**: search the bench/room for a battery
+  ISM sensor; use the sniffer as the live detector (line shows in ~70 s, so
+  120 s sniffs per suspect removal — no 300 s loss runs needed). Original
+  item follows.
+- [ ] **RS-11.6 leg 2+ (original) — separate the interferer (next session).**
+  **Re-ordered 2026-08-16 by item 1**: hunt the 7.085 s line directly
+  rather than watching the loss rate (loss needs a 300 s run and carries
+  ~0.5 pt run-to-run spread; the periodic line is unambiguous and shows
+  up in far less). (i) One IDLE capture with `rx_rf` + crc_dump and no
+  traffic — if the line persists with our radios silent the emitter is
+  fully external; highest value, needs no traffic. (ii) Switch suspects
+  off one at a time and watch the line — anything on a ~7 s duty cycle
+  near the bench, with the tractor's USB camera worth isolating
+  specifically. (iii) The profile-0 A/B is now LOWER value and is
+  confounded three ways (profile 0 is SF7/**BW125** fixed-915 vs profile
+  2's SF7/BW500: frequency, noise bandwidth and per-fragment airtime all
+  move together — see issue #98). **CORRECTION 2026-08-16: profile 0 is
+  BW125, not BW250** — `host_cfg_profile_default_bw_hz()` returns
+  `HOST_CFG_PROFILE_BENCH_BW_HZ` = 125 000. The BW250 figure came from
+  `bench/host_proto/airtime_invariant.c`'s private profile table, which
+  never cross-checked the runtime resolver and so predicted HALF the real
+  ToA for profile 0; table fixed and the test now asserts the truth.
+  **Consequence for the leg: at BW125 a 255 B fragment is 399 616 µs,
+  19.6 ms OVER the 380 000 µs dwell cap; max payload that fits is 243 B.**
+  The standard leg sends 255 B, so a profile-0 A/B at the usual size
+  transmits over the cap and the airtime accountant may abort those TXs.
+  Any profile-0 leg MUST drop to ≤243 B fragments.
+  **Mitigation note (REVISED — the damage shape was measured):** CR 4/8
+  and RS-4.1 parity were framed against a random floor, and an earlier
+  read here said FEC would not help because a 26 dB-hot hit is
+  overwhelming. That premise is now refuted: the interferer population is
+  **100 % header-intact (28/28) and 96 % RIFF-landmark-intact**, versus
+  85 %/25 % for bulk corruption — the hit damages a BOUNDED region inside
+  an otherwise-clean packet, which is the case FEC is for. Both
+  mitigations are live; sizing CR 4/8 honestly needs the damaged-symbol
+  count, which requires TX-side reference logging (host-side, no
+  firmware). Still, both should wait for (i)/(ii) — removing the emitter
+  beats paying 25–37 % airtime to tolerate it. Original candidates
+  follow. Two
   candidate sources, each one 300 s leg with the SAME prediction
   (corrupt-population SNR rises toward the healthy population's):
   (a) **near-field coupling from the carriers/harnesses** — physically

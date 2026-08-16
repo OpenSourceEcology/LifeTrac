@@ -1,0 +1,45 @@
+==========================================================================
+RS-4.1 XOR parity against the RS-11.6 measured loss process
+==========================================================================
+train=13 frags  spacing=117.0ms  loss=5.9%  interferer period=7.0853s
+trials=24  frames/trial=250
+
+== loss model: IID (independent per-fragment loss) -- SHOWN ONLY AS A FOIL ==
+  parity  frags  airtime   delivery (mean +/- sd)  trains hit
+------------------------------------------------------------------------------
+     off     13    1.00x            44.7% +/-  1.6       55.3%
+       4     17    1.31x            86.0% +/-  1.8       65.1%  (+41.3 pts)
+       8     15    1.15x            82.6% +/-  2.1       60.5%  (+37.9 pts)
+      13     14    1.08x            77.9% +/-  1.8       57.8%  (+33.2 pts)
+
+== loss model: CLUSTERED (calibrated to RS-11.4's 23-34% affected trains) ==
+  parity  frags  airtime   delivery (mean +/- sd)  trains hit
+------------------------------------------------------------------------------
+     off     13    1.00x            67.6% +/-  2.0       32.5%
+       4     17    1.31x            81.3% +/-  1.4       39.9%  (+13.6 pts)
+       8     15    1.15x            82.2% +/-  1.4       36.2%  (+14.6 pts)
+      13     14    1.08x            82.4% +/-  1.7       34.0%  (+14.7 pts)
+
+  share req->achieved  G=0      G=4      G=8      G=13   
+------------------------------------------------------------------------------
+        0% ->   0.0%    72.2%    79.5%    80.7%    81.3%
+       13% ->  12.8%    67.6%    80.9%    81.8%    82.0%
+       30% ->  29.6%    61.5%    82.6%    83.0%    83.3%
+       60% ->  29.8%    61.4%    82.6%    83.0%    83.3%  (infeasible as requested)
+      100% ->  29.8%    61.4%    82.6%    83.0%    83.3%  (infeasible as requested)
+
+-- airtime cost comparison --
+   CR4/5 255B ToA = 99.9 ms
+   CR4/8 255B ToA = 156.7 ms  (+57% airtime)
+   parity G=4  airtime +31%  (train 13 -> 17 fragments, latency 1989 ms)
+   parity G=8  airtime +15%  (train 13 -> 15 fragments, latency 1755 ms)
+   parity G=13 airtime +8%  (train 13 -> 14 fragments, latency 1638 ms)
+   baseline train = 1521 ms
+   NOTE: the 700 ms budget is base->tractor HYDRAULIC CONTROL
+   latency, not image-frame latency. A 13-fragment image train is
+   already 1521 ms and is not under that budget. What parity and
+   CR4/8 actually spend is AIRTIME, which competes with the
+   command slots that control latency depends on -- so the cost
+   lands on control margin, not on image latency.
+   CORRECTION: the campaign recorded CR4/8 as '~37% airtime'.
+   Measured against the same ToA function: +57%.

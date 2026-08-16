@@ -39,7 +39,7 @@ bool mh_stats_parse(const uint8_t *payload, uint16_t payload_len, mh_stats_t *ou
     out->radio_tx_ok = read_u32_le(&payload[HOST_STATS_OFFSET_RADIO_TX_OK]);
     out->radio_tx_abort_lbt = read_u32_le(&payload[HOST_STATS_OFFSET_RADIO_TX_ABORT_LBT]);
 
-    if (payload_len >= HOST_STATS_PAYLOAD_LEN) {
+    if (payload_len >= HOST_STATS_MIN_LEN_WITH_AIRTIME) {
         out->radio_tx_abort_airtime = read_u32_le(&payload[HOST_STATS_OFFSET_RADIO_TX_ABORT_AIRTIME]);
         out->radio_state = read_u32_le(&payload[HOST_STATS_OFFSET_RADIO_STATE]);
         out->has_tx_abort_airtime = true;

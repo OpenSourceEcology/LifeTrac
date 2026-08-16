@@ -1,0 +1,50 @@
+samples=3876  span=300.0s  effective rate=12.9 Hz
+floor: median=-114.0 dBm  p95=-106.0  p99=-94.0  max=-43.0  min=-125.0
+
+-- events: rssi > -108.0 dBm (median + 6) -> n=249 --
+   174 distinct excursions
+   Rayleigh @ 7.0853s: R=0.082 p=0.311
+   best-period scan: 0.9998s R=0.458 p_corrected=0.000
+
+-- phase fold @ 7.0853s, 24 bins --
+   bin means (dBm): -112.4, -112.5, -112.7, -113.3, -112.5, -112.7, -111.0, -109.8, -112.1, -112.7, -112.8, -112.5, -112.5, -112.6, -112.0, -111.9, -112.8, -113.2, -113.0, -113.2, -112.8, -112.6, -113.2, -112.8
+   max-min spread = 3.54 dB
+   circular-shift null: spread 95th pct=3.24 dB, fraction >= observed = 0.005
+   verdict: PERIODIC RSSI elevation at the target period
+
+== HOT samples (> -60 dBm) ==
+n=13  rssi: -43, -43, -43, -43, -44, -45, -43, -43, -43, -43, -43, -43, -43
+times: 23.45, 44.61, 94.45, 108.54, 129.52, 150.57, 178.57, 186.45, 200.47, 214.50, 228.57, 270.93, 299.44
+grid fit: period=7.0733s R=0.983 residRMS=0.0295 cycles=[np.int64(0), np.int64(3), np.int64(10), np.int64(12), np.int64(15), np.int64(18), np.int64(22), np.int64(23), np.int64(25), np.int64(27), np.int64(29), np.int64(35), np.int64(39)]
+
+== 1 Hz line ==
+n_exc=174 period=1.00003s R=0.462
+
+================ LEG 2c: twin 600 s sniffs (base + tractor, simultaneous) ================
+samples=7746  span=599.9s  effective rate=12.9 Hz
+floor: median=-114.0 dBm  p95=-105.0  p99=-94.0  max=-42.0  min=-125.0
+
+-- events: rssi > -108.0 dBm (median + 6) -> n=541 --
+   359 distinct excursions
+   Rayleigh @ 7.0853s: R=0.125 p=0.004
+   best-period scan: 0.5000s R=0.371 p_corrected=0.000
+
+-- phase fold @ 7.0853s, 24 bins --
+   bin means (dBm): -112.5, -112.7, -112.8, -112.8, -113.2, -112.0, -110.3, -110.7, -111.3, -111.7, -112.1, -111.9, -112.6, -112.0, -112.0, -112.3, -112.8, -112.5, -113.1, -112.6, -112.8, -113.0, -112.7, -112.5
+   max-min spread = 2.87 dB
+   circular-shift null: spread 95th pct=3.35 dB, fraction >= observed = 0.200
+   verdict: no periodic elevation detectable at 7.0853s in this capture
+
+samples=11155  span=600.0s  effective rate=18.6 Hz
+floor: median=-111.0 dBm  p95=-107.0  p99=-96.0  max=-57.0  min=-125.0
+
+-- events: rssi > -105.0 dBm (median + 6) -> n=342 --
+   268 distinct excursions
+   Rayleigh @ 7.0853s: R=0.101 p=0.063
+   best-period scan: 0.9353s R=0.348 p_corrected=0.000
+
+-- phase fold @ 7.0853s, 24 bins --
+   bin means (dBm): -110.4, -110.6, -110.2, -110.6, -110.3, -110.3, -110.2, -110.6, -110.3, -110.3, -110.6, -110.5, -110.0, -108.8, -109.4, -110.0, -110.2, -110.6, -110.5, -110.3, -110.5, -110.5, -110.5, -110.6
+   max-min spread = 1.84 dB
+   circular-shift null: spread 95th pct=1.83 dB, fraction >= observed = 0.045
+   verdict: PERIODIC RSSI elevation at the target period

@@ -57,3 +57,18 @@ LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build/firmware.ld
 LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build/*.preproc
 # Host-side bench test binaries built by the `make check-*` targets.
 LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/build/*.exe
+
+# 2026-08-16: repo-root bench scratch. The radio campaign leaves per-run
+# transcripts and probe dumps at the repo root (`_rs115_*.log`,
+# `_saturation_run*.log`, `_run*_summary.txt`, `_fwbuild*.log`, …) — ~130 of
+# them by now. They are working notes, not evidence: anything load-bearing is
+# archived under DESIGN-CONTROLLER/bench-evidence/ with its SHA. Left
+# untracked they are one `git add -A` away from landing in a commit and
+# burying the real diff, which is why they are pinned here rather than swept
+# away — the files stay on disk, they just stop being offered.
+# Anchored to the root so nested `_`-prefixed sources are unaffected.
+/_*
+/run_tests_full.log
+# Stray root copy of the helper-dir OpenOCD cfg (byte-identical to
+# firmware/x8_lora_bootloader_helper/09_resume_h7.cfg; that one is canonical).
+/09_resume_h7.cfg
