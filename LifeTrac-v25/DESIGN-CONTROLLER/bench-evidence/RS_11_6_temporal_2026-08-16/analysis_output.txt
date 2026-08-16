@@ -51,8 +51,10 @@ span 305.6 s   captures 126   healthy windows 0
 -- self-TX correlation (base's own command TXs) --
    base sent no commands after the first window -- self-TX cannot explain any of these captures
 
--- payload shape -- rx_len hist {45: 1, 46: 1, 47: 1, 48: 1, 58: 1, 63: 1, 116: 1, 118: 1, 129: 1, 150: 1, 175: 1, 177: 1, 180: 1, 216: 1, 233: 1, 255: 111}
-   RIFF magic intact in 52/126, WEBP in 53/126
+-- corruption shape (integrity proxies by population) --
+   interferer  n=   7  header intact (rx_len=255) 100.0%   RIFF landmark intact  85.7%
+   bulk        n= 119  header intact (rx_len=255)  87.4%   RIFF landmark intact  38.7%
+   rx_len hist {45: 1, 46: 1, 47: 1, 48: 1, 58: 1, 63: 1, 116: 1, 118: 1, 129: 1, 150: 1, 175: 1, 177: 1, 180: 1, 216: 1, 233: 1, 255: 111}
 
 ==============================================================================
 ARCHIVE radio_monitor_20260802_171735_107634bb
@@ -94,8 +96,10 @@ span 307.8 s   captures 72   healthy windows 0
 -- self-TX correlation (base's own command TXs) --
    base sent no commands after the first window -- self-TX cannot explain any of these captures
 
--- payload shape -- rx_len hist {4: 1, 62: 1, 64: 1, 88: 1, 107: 1, 133: 1, 141: 2, 175: 2, 185: 1, 198: 1, 255: 60}
-   RIFF magic intact in 15/72, WEBP in 16/72
+-- corruption shape (integrity proxies by population) --
+   interferer  n=   2  header intact (rx_len=255) 100.0%   RIFF landmark intact 100.0%
+   bulk        n=  70  header intact (rx_len=255)  82.9%   RIFF landmark intact  18.6%
+   rx_len hist {4: 1, 62: 1, 64: 1, 88: 1, 107: 1, 133: 1, 141: 2, 175: 2, 185: 1, 198: 1, 255: 60}
 
 ==============================================================================
 ARCHIVE radio_monitor_20260802_172500_03ce8044
@@ -149,8 +153,10 @@ span 308.3 s   captures 78   healthy windows 0
 -- self-TX correlation (base's own command TXs) --
    base sent no commands after the first window -- self-TX cannot explain any of these captures
 
--- payload shape -- rx_len hist {11: 1, 16: 1, 41: 1, 47: 1, 69: 1, 110: 1, 151: 1, 162: 1, 170: 1, 175: 1, 249: 1, 255: 67}
-   RIFF magic intact in 24/78, WEBP in 24/78
+-- corruption shape (integrity proxies by population) --
+   interferer  n=   8  header intact (rx_len=255) 100.0%   RIFF landmark intact 100.0%
+   bulk        n=  70  header intact (rx_len=255)  84.3%   RIFF landmark intact  22.9%
+   rx_len hist {11: 1, 16: 1, 41: 1, 47: 1, 69: 1, 110: 1, 151: 1, 162: 1, 170: 1, 175: 1, 249: 1, 255: 67}
 
 ==============================================================================
 ARCHIVE radio_monitor_20260802_173023_03ce8044
@@ -192,8 +198,9 @@ span 299.2 s   captures 67   healthy windows 0
 -- self-TX correlation (base's own command TXs) --
    base sent no commands after the first window -- self-TX cannot explain any of these captures
 
--- payload shape -- rx_len hist {15: 1, 24: 1, 107: 1, 109: 1, 110: 1, 112: 1, 156: 1, 169: 1, 244: 1, 248: 1, 255: 57}
-   RIFF magic intact in 11/67, WEBP in 7/67
+-- corruption shape (integrity proxies by population) --
+   bulk        n=  67  header intact (rx_len=255)  85.1%   RIFF landmark intact  16.4%
+   rx_len hist {15: 1, 24: 1, 107: 1, 109: 1, 110: 1, 112: 1, 156: 1, 169: 1, 244: 1, 248: 1, 255: 57}
 
 ==============================================================================
 ARCHIVE radio_monitor_20260816_122735_9c891670
@@ -254,8 +261,10 @@ span 303.1 s   captures 86   healthy windows 29
 -- self-TX correlation (base's own command TXs) --
    base sent no commands after the first window -- self-TX cannot explain any of these captures
 
--- payload shape -- rx_len hist {7: 1, 20: 1, 55: 1, 60: 1, 71: 1, 94: 1, 167: 1, 171: 1, 173: 2, 207: 1, 254: 1, 255: 74}
-   RIFF magic intact in 26/86, WEBP in 26/86
+-- corruption shape (integrity proxies by population) --
+   interferer  n=  11  header intact (rx_len=255) 100.0%   RIFF landmark intact 100.0%
+   bulk        n=  75  header intact (rx_len=255)  84.0%   RIFF landmark intact  20.0%
+   rx_len hist {7: 1, 20: 1, 55: 1, 60: 1, 71: 1, 94: 1, 167: 1, 171: 1, 173: 2, 207: 1, 254: 1, 255: 74}
 
 ==============================================================================
 CROSS-RUN

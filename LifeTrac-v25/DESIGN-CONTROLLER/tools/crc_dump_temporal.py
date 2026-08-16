@@ -513,11 +513,29 @@ def analyse(arch: Archive, out=sys.stdout) -> None:
             print(f"   insufficient variance to correlate "
                   f"({int(d_cmd.sum())} total cmd TX)", file=out)
 
-    # -- corruption shape
+    # -- corruption SHAPE, compared between populations.
+    #    We have no clean reference payload, so damaged bytes cannot be
+    #    localised directly. Two reference-free integrity proxies survive:
+    #      rx_len == 255  -> the LoRa explicit header demodulated correctly,
+    #                        so damage did not reach the header;
+    #      RIFF magic     -> a 4-byte known-plaintext landmark inside the
+    #                        payload survived.
+    #    Comparing those between the interferer and bulk populations
+    #    distinguishes LOCALISED damage from DISTRIBUTED damage.
+    print("\n-- corruption shape (integrity proxies by population) --", file=out)
+    hot_ids = {id(c) for c in hot}
+    for label, group in (("interferer", hot),
+                         ("bulk", [c for c in caps if id(c) not in hot_ids])):
+        if not group:
+            continue
+        full = sum(1 for c in group if c.rx_len == 255)
+        riff = sum(1 for c in group if b"RIFF" in c.dump)
+        print(f"   {label:11s} n={len(group):4d}  header intact (rx_len=255) "
+              f"{100.0 * full / len(group):5.1f}%   RIFF landmark intact "
+              f"{100.0 * riff / len(group):5.1f}%", file=out)
+
     shape = corruption_shape(caps)
-    print(f"\n-- payload shape -- rx_len hist {shape['rx_len_hist']}", file=out)
-    print(f"   RIFF magic intact in {shape['riff_intact']}/{shape['n']}, "
-          f"WEBP in {shape['webp_intact']}/{shape['n']}", file=out)
+    print(f"   rx_len hist {shape['rx_len_hist']}", file=out)
 
 
 def main() -> int:

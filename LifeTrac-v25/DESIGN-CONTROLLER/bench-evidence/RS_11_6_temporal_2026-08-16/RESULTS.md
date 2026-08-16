@@ -117,7 +117,52 @@ healthy median**, not 3 dB.
 analysis excluded it. The tool now detects the settle point and reports the
 settled population separately.
 
-## 7. Caveats
+## 7. The damage is LOCALISED, not total
+
+We have no clean reference payload, so damaged bytes cannot be diffed
+directly. Two reference-free integrity proxies survive:
+
+- **`rx_len == 255`** — the LoRa explicit header demodulated correctly, so
+  damage did not reach the header.
+- **`RIFF` magic present** — a 4-byte known-plaintext landmark inside the
+  payload survived.
+
+Comparing those between populations, in each archive independently:
+
+| archive | interferer: header / RIFF | bulk: header / RIFF |
+|---|---|---|
+| `…0802_132817` | 100 % / 85.7 % (n=7) | 87.4 % / 38.7 % (n=119) |
+| `…0802_171735` | 100 % / 100 % (n=2) | 82.9 % / 18.6 % (n=70) |
+| `…0802_172500` | 100 % / 100 % (n=8) | 84.3 % / 22.9 % (n=70) |
+| `…0816_122735` | 100 % / 100 % (n=11) | 84.0 % / 20.0 % (n=75) |
+| **pooled** | **100 % / 96.4 % (n=28)** | **85.0 % / 25.2 % (n=401)** |
+
+**Every interferer-population capture kept its header, and all but one kept
+the RIFF landmark.** The bulk population loses the header 15 % of the time
+and the landmark 75 % of the time. Under a binomial null at the bulk's
+25.2 % landmark-survival rate, 27 of 28 survivals is not a chance outcome.
+
+So the strong periodic hit does **not** destroy the packet. It corrupts a
+bounded region while leaving the header and the payload's early structure
+demodulating cleanly — a short, hard hit inside an otherwise good reception.
+The ordinary bulk corruption is the opposite: damage distributed widely
+enough to take out the header and the landmark most of the time.
+
+**This reverses the mitigation guidance given in §9 of this document's first
+revision**, which argued FEC was unlikely to help because the interference
+was "overwhelming for the duration of the hit". That was written before the
+shape was measured and was wrong about the premise: the hit is bounded, and
+bounded symbol damage inside an otherwise-clean packet is precisely the case
+FEC exists for. What is still unmeasured is *how many* symbols are damaged,
+which decides whether CR 4/8 has enough redundancy — see §8.
+
+**The instrument that would settle it:** have the tractor log the fragment it
+transmitted, so a true byte-level diff becomes possible. That is a host-side
+change on the TX daemon, needs no firmware, and would turn every future
+crc_dump into an exact damage map — position, run length, and burst count.
+It is the natural successor to this analysis.
+
+## 8. Caveats
 
 - **Possible aliasing.** We only observe the interferer when it collides with
   one of our receptions, and our fragments arrive on a ~117 ms cadence. A
@@ -133,7 +178,14 @@ settled population separately.
   cut, so no fit is reported for them. Absence of a fit there is not evidence
   of absence of the emitter.
 
-## 8. What this buys the next bench session
+- **The RIFF landmark is a proxy, not a damage map.** A fragment only
+  contains `RIFF` if it spans a WebP frame start, so landmark *absence* is
+  ambiguous between "corrupted" and "never present". Landmark *presence* is
+  unambiguous, and it is the direction the interferer population sits in, so
+  the comparison holds — but it caps how far this can be pushed without the
+  TX-side reference described in §7.
+
+## 9. What this buys the next bench session
 
 The emitter now has a **fingerprint**: ~7.085 s, ~26 dB above our healthy
 level, SNR ≈ −10.8 dB. That converts leg 2 from "try things and see if loss
@@ -152,10 +204,31 @@ moves" into a direct search, and it changes the recommended order:
 3. Only then the profile-0 A/B, which is confounded three ways (see issue #98)
    and is now a lower-value test than the two above.
 
-**A note on mitigations.** CR 4/8 and RS-4.1 XOR parity were framed as
-responses to a random corruption floor. Against a fixed-cadence emitter that
-lands ~26 dB hot, FEC is unlikely to recover the affected symbols — the
-interference is not marginal, it is overwhelming for the duration of the hit.
-Parity across fragments is the better-matched mitigation of the two, since it
-absorbs a whole lost fragment rather than trying to correct within one. Both
-should wait until §8.1/§8.2 have run.
+**A note on mitigations (revised — see §7).** CR 4/8 and RS-4.1 XOR parity
+were framed as responses to a random corruption floor. An earlier revision of
+this document argued FEC would not help because a 26 dB-hot hit is
+overwhelming; **§7 measured the shape and that reasoning does not hold** —
+the interferer leaves the header and the payload's early structure intact and
+damages a bounded region, which is the case FEC is designed for. Both
+mitigations are therefore live:
+
+- **CR 4/8** is now plausible rather than dismissed, at ~37 % airtime. Whether
+  it has enough redundancy depends on the damaged-symbol count, which §7's
+  proxies cannot measure — the TX-side reference logging described there is
+  the prerequisite for sizing it honestly.
+- **RS-4.1 XOR parity** remains well matched at ~25 % airtime per train,
+  since it absorbs a whole lost fragment regardless of intra-packet damage
+  extent, and single-fragment loss is the observed failure mode.
+
+Neither should be built before §9.1/§9.2 run: removing the emitter is worth
+more than paying 25–37 % airtime to tolerate it.
+
+**Bench-configuration warning for the profile-0 leg.** Profile 0 is
+SF7/**BW125** at the runtime (`host_cfg_profile_default_bw_hz()` returns
+`HOST_CFG_PROFILE_BENCH_BW_HZ` = 125 000), not BW250 as this campaign's notes
+previously recorded. At BW125 a **255 B fragment is 399 616 µs, which exceeds
+the 380 000 µs dwell cap by 19.6 ms**; the largest payload that fits is
+**243 B**. The standard leg sends 255 B fragments, so a profile-0 A/B at the
+usual size would transmit over the cap and the airtime accountant may abort
+those TXs — confounding exactly the comparison it was meant to make. Any
+profile-0 leg must drop to ≤243 B fragments.

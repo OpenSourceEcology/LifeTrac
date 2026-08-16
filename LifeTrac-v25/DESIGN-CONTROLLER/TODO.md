@@ -2214,13 +2214,31 @@ Two consequences for what is worth doing next:
   off one at a time and watch the line — anything on a ~7 s duty cycle
   near the bench, with the tractor's USB camera worth isolating
   specifically. (iii) The profile-0 A/B is now LOWER value and is
-  confounded three ways (profile 0 is SF7/BW250 fixed-915 vs profile 2's
-  SF7/BW500: frequency, noise bandwidth and per-fragment airtime all
-  move together — see issue #98). **Mitigation note:** CR 4/8 and RS-4.1
-  parity were framed against a random floor; against a fixed-cadence hit
-  ~26 dB hot, FEC is unlikely to recover the affected symbols, and
-  fragment-level parity is the better-matched of the two. Both should
-  wait for (i)/(ii). Original candidates follow. Two
+  confounded three ways (profile 0 is SF7/**BW125** fixed-915 vs profile
+  2's SF7/BW500: frequency, noise bandwidth and per-fragment airtime all
+  move together — see issue #98). **CORRECTION 2026-08-16: profile 0 is
+  BW125, not BW250** — `host_cfg_profile_default_bw_hz()` returns
+  `HOST_CFG_PROFILE_BENCH_BW_HZ` = 125 000. The BW250 figure came from
+  `bench/host_proto/airtime_invariant.c`'s private profile table, which
+  never cross-checked the runtime resolver and so predicted HALF the real
+  ToA for profile 0; table fixed and the test now asserts the truth.
+  **Consequence for the leg: at BW125 a 255 B fragment is 399 616 µs,
+  19.6 ms OVER the 380 000 µs dwell cap; max payload that fits is 243 B.**
+  The standard leg sends 255 B, so a profile-0 A/B at the usual size
+  transmits over the cap and the airtime accountant may abort those TXs.
+  Any profile-0 leg MUST drop to ≤243 B fragments.
+  **Mitigation note (REVISED — the damage shape was measured):** CR 4/8
+  and RS-4.1 parity were framed against a random floor, and an earlier
+  read here said FEC would not help because a 26 dB-hot hit is
+  overwhelming. That premise is now refuted: the interferer population is
+  **100 % header-intact (28/28) and 96 % RIFF-landmark-intact**, versus
+  85 %/25 % for bulk corruption — the hit damages a BOUNDED region inside
+  an otherwise-clean packet, which is the case FEC is for. Both
+  mitigations are live; sizing CR 4/8 honestly needs the damaged-symbol
+  count, which requires TX-side reference logging (host-side, no
+  firmware). Still, both should wait for (i)/(ii) — removing the emitter
+  beats paying 25–37 % airtime to tolerate it. Original candidates
+  follow. Two
   candidate sources, each one 300 s leg with the SAME prediction
   (corrupt-population SNR rises toward the healthy population's):
   (a) **near-field coupling from the carriers/harnesses** — physically

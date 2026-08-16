@@ -54,8 +54,14 @@ typedef struct profile_tuple_s {
 } profile_tuple_t;
 
 static const profile_tuple_t k_profile_tuples[] = {
-    /* Bench-only fixed 915 MHz: SF7/BW250/CR45 (lab use, not FCC-routed). */
-    { REG_PROFILE_BENCH_ONLY_FIXED_915,         7U, 250U, 5U },
+    /* Bench-only fixed 915 MHz: SF7/BW125/CR45 (lab use, not FCC-routed).
+     * BW125 is what the runtime actually programs -- see
+     * host_cfg_profile_default_bw_hz(), which returns
+     * HOST_CFG_PROFILE_BENCH_BW_HZ (125000) for this profile. This mirror
+     * said BW250 until 2026-08-16; because nothing cross-checked the two,
+     * the error was invisible to CI and made this table predict HALF the
+     * real time-on-air for profile 0. */
+    { REG_PROFILE_BENCH_ONLY_FIXED_915,         7U, 125U, 5U },
     /* FCC §15.247 FHSS 50ch BW250: same SF7/BW250/CR45 modem config; the
      * 50-channel hop schedule is layered on top by FCC-A3. */
     { REG_PROFILE_FCC_15_247_FHSS_50CH_BW250,   7U, 250U, 5U },
@@ -282,16 +288,42 @@ static void test_host_mirror_matches_helper_fhss_profile(void) {
 
 static void test_host_mirror_rejects_oversized_for_bench_profile(void) {
     /*
-     * Bench profile is SF7/BW250 which accepts everything up to 255 B.
-     * Mirror should agree (and X8 should NOT block any payload there).
+     * Bench profile is SF7/BW125, so unlike the other two profiles it does
+     * NOT accept everything up to 255 B: at 125 kHz a 255 B payload is
+     * 399 616 us, which is 19 616 us OVER the 380 000 us dwell cap. The
+     * largest payload that fits is 243 B (379 136 us).
+     *
+     * This test previously asserted the opposite -- that 255 B was under the
+     * cap -- and passed, because the profile table above claimed BW250 and
+     * therefore predicted exactly half the real time-on-air. Anything sized
+     * against that number was sized against a fiction.
+     *
+     * Practical consequence, recorded because it nearly cost a bench
+     * session: the standard radio-monitor leg sends 255 B fragments, so a
+     * profile-0 A/B run at the usual fragment size transmits over the dwell
+     * cap and the airtime accountant is entitled to abort those TXs
+     * (radio_tx_abort_airtime). Profile-0 legs must drop to <=243 B.
      */
-    uint32_t mirror_toa = 0U;
-    const bool found = host_predict_toa_for_profile(
-        REG_PROFILE_BENCH_ONLY_FIXED_915, 255U, &mirror_toa);
-    CHECK(found, "bench profile missing from host mirror");
-    CHECK(mirror_toa <= SX1276_AIRTIME_DWELL_CAP_US,
-          "bench profile @255B (%u us) unexpectedly over cap %u us",
-          (unsigned)mirror_toa, (unsigned)SX1276_AIRTIME_DWELL_CAP_US);
+    uint32_t toa_243 = 0U;
+    uint32_t toa_244 = 0U;
+    uint32_t toa_255 = 0U;
+
+    CHECK(host_predict_toa_for_profile(REG_PROFILE_BENCH_ONLY_FIXED_915, 243U, &toa_243),
+          "bench profile missing from host mirror");
+    CHECK(host_predict_toa_for_profile(REG_PROFILE_BENCH_ONLY_FIXED_915, 244U, &toa_244),
+          "bench profile missing from host mirror");
+    CHECK(host_predict_toa_for_profile(REG_PROFILE_BENCH_ONLY_FIXED_915, 255U, &toa_255),
+          "bench profile missing from host mirror");
+
+    CHECK(toa_243 <= SX1276_AIRTIME_DWELL_CAP_US,
+          "bench profile @243B (%u us) should fit under cap %u us",
+          (unsigned)toa_243, (unsigned)SX1276_AIRTIME_DWELL_CAP_US);
+    CHECK(toa_244 > SX1276_AIRTIME_DWELL_CAP_US,
+          "bench profile @244B (%u us) should EXCEED cap %u us",
+          (unsigned)toa_244, (unsigned)SX1276_AIRTIME_DWELL_CAP_US);
+    CHECK(toa_255 > SX1276_AIRTIME_DWELL_CAP_US,
+          "bench profile @255B (%u us) should EXCEED cap %u us",
+          (unsigned)toa_255, (unsigned)SX1276_AIRTIME_DWELL_CAP_US);
 }
 
 static void test_host_mirror_unknown_profile(void) {
