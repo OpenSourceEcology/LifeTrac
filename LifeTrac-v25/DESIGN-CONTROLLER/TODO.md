@@ -2236,7 +2236,32 @@ Two consequences for what is worth doing next:
   ARTIFACT (a fold scan peaks at ~the mean inter-arrival with no clock
   present) and is retracted — the shuffled-interval null that catches it
   is now part of the tool.
-- [ ] **RS-11.6 leg 2+ — separate the interferer (next session).**
+- [x] **RS-11.6 leg 2 DONE 2026-08-16 — the emitter is EXTERNAL, confirmed
+  in raw energy with all radios silent.**
+  (`bench-evidence/RS_11_6_idle_sniff_2026-08-16/RESULTS.md`; idle-harness
+  archive `radio_monitor_20260816_153155_e1092868`.) Two idle legs, SHA
+  e1092868: (2a) standard harness at `-SynthFps 0` — ONE crc_dump in 300 s
+  (−108 dBm noise-floor class), nothing at the interferer signature; (2b)
+  `air_coupling_rssi_sniff.py` sampling raw RegRssiValue at ~12.9 Hz —
+  **13 samples at −43…−45 dBm on a hard 7.0733 s grid (R=0.983, resid RMS
+  0.030 cyc)** with zero LoRa traffic in the air. Burst duration ≈25 ms
+  (from catch statistics), which resolves 2a's null: a ~25 ms non-LoRa
+  burst never triggers LoRa preamble detection alone — it only surfaces as
+  crc_dump when it lands inside one of our 100 ms fragments. Fingerprint
+  matches a battery 915 MHz ISM telemetry sensor (weather/temp/TPMS-class,
+  ~7 s beacon, tens-of-ms OOK burst). **SECOND emitter found**: 174 weak
+  excursions (med −102 dBm) on a 1.00003 s digital tick, not a subharmonic
+  of the 7.08 s line; mostly harmless at ~24 dB below healthy signal but
+  likely explains part of the weak-tail corrupt population (and the
+  marginal 1 s concentration, p=0.016, in the traffic-run captures).
+  Near-field-coupling and USB-3.0 candidates are DEMOTED for the periodic
+  component (neither predicts a rigid 7.08 s clock with our systems idle;
+  both remain candidates for the clustered bulk ~⅔ of the floor). NEXT —
+  **the physical hunt, hands needed**: search the bench/room for a battery
+  ISM sensor; use the sniffer as the live detector (line shows in ~70 s, so
+  120 s sniffs per suspect removal — no 300 s loss runs needed). Original
+  item follows.
+- [ ] **RS-11.6 leg 2+ (original) — separate the interferer (next session).**
   **Re-ordered 2026-08-16 by item 1**: hunt the 7.085 s line directly
   rather than watching the loss rate (loss needs a 300 s run and carries
   ~0.5 pt run-to-run spread; the periodic line is unambiguous and shows
