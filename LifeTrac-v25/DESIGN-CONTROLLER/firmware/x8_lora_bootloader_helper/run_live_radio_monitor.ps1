@@ -339,8 +339,11 @@ if ($TxFeed -eq "camera") {
     # LIFETRAC_USE_LORA_BRIDGE=1 is THE flag for this path and is REQUIRED.
     # It is not merely a label -- camera_service branches on it three ways:
     #   1. skips the M7 IpcWriter (camera_service.py:1354), which otherwise
-    #      imports x8_image_pipeline.ipc_to_h747 AND opens /dev/ttymxc3, a device
-    #      image_tx_daemon already owns on this path;
+    #      imports x8_image_pipeline.ipc_to_h747 AND opens the M7 IPC UART
+    #      (LIFETRAC_M7_UART, default /dev/ttymxc1) -- a transport nothing is
+    #      listening to on this path. (An earlier revision of this comment
+    #      claimed it opened /dev/ttymxc3; wrong -- ttymxc3 is the L072 radio
+    #      UART, owned by image_tx_daemon, and IpcWriter never touches it.)
     #   2. creates the MQTT client, without which `client is None` and the
     #      publish at :1563 is silently skipped -- frames are captured and
     #      thrown away, with no log line at all;
