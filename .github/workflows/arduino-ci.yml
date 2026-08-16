@@ -353,6 +353,13 @@ jobs:
                 LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/src/
           cp LifeTrac-v25/DESIGN-CONTROLLER/firmware/common/shared_mem.h \
              LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/src/
+          # 2026-08-16 CI repair layer 2: tractor_h7.ino gained
+          # `#include "src/lifetrac_build_config.h"` while this workflow was
+          # dead behind the arduino-cli install 404, so these stage steps
+          # never learned to copy it (the local stage_firmware_sketches.ps1
+          # does). The header is committed at firmware/common/.
+          cp LifeTrac-v25/DESIGN-CONTROLLER/firmware/common/lifetrac_build_config.h \
+             LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/src/
       - name: Compile (stub crypto)
         run: |
           arduino-cli compile --fqbn arduino:mbed_portenta:envie_m7 \
@@ -389,6 +396,13 @@ jobs:
           cp -r LifeTrac-v25/DESIGN-CONTROLLER/firmware/common/lora_proto \
                 LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/src/
           cp LifeTrac-v25/DESIGN-CONTROLLER/firmware/common/shared_mem.h \
+             LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/src/
+          # 2026-08-16 CI repair layer 2: tractor_h7.ino gained
+          # `#include "src/lifetrac_build_config.h"` while this workflow was
+          # dead behind the arduino-cli install 404, so these stage steps
+          # never learned to copy it (the local stage_firmware_sketches.ps1
+          # does). The header is committed at firmware/common/.
+          cp LifeTrac-v25/DESIGN-CONTROLLER/firmware/common/lifetrac_build_config.h \
              LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/src/
       - name: Compile default path (Method G disabled)
         run: |
