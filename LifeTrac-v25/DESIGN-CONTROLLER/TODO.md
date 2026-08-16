@@ -957,6 +957,28 @@ No-regrets work, correct under every surviving architecture (do first):
 
 - [ ] **RS-4.1 Parity fragments (0xFC) on keyframes** — `add_parity_fragments`
   exists, is tested, and is wired but default-off (`LIFETRAC_PARITY_GROUP=0`).
+  **DESK REPLAY 2026-08-16 — if this is enabled, use GROUP=13, not 4 or 8**
+  (`bench-evidence/RS_11_6_temporal_2026-08-16/PARITY_REPLAY.md`, tool
+  `tools/interferer_replay.py`, which drives the real TX/RX code). Replaying
+  the RS-11.6 measured loss process: parity buys **+14.7 pts of frame
+  delivery (67.6% → 82.4%) at +8% airtime with G=13**, and G=4/G=8 buy the
+  same within noise while costing +31%/+15%. Two mechanisms: a burst takes
+  2+ fragments in the SAME group whatever the group size, and every extra
+  parity fragment is itself exposed (G=4 pushes trains-with-loss 32.5% →
+  39.9%, G=13 only to 34.0%). **The loss model is what decides this** — an
+  IID model inverts the ranking and would have specified G=4 for 4× the
+  airtime; real loss CLUSTERS (RS-11.4's 23–34% affected trains vs IID's
+  55%), and the calibrated model reproduces 32.5%. Parity is well matched to
+  the INTERFERER half of the loss (periodic hits arrive alone — no aliasing
+  against the train cadence, 7.085/1.85 = 3.83; delivery reaches 98% if the
+  interferer were the only source) and poorly matched to the clustered bulk
+  half. **Recommendation: do not build yet** — this is a return on
+  *tolerating* the emitter, and the idle capture that might remove it is one
+  300 s leg away. Also recorded there: CR 4/8 costs **+57% airtime, not the
+  ~37% this file has been quoting** (99.9 → 156.7 ms, SF7/BW500/255 B), and
+  the 700 ms budget is hydraulic-control latency, NOT image-frame latency (a
+  13-fragment train is already 1521 ms) — these mitigations spend airtime,
+  so their cost lands on control margin.
   Enable for keyframes on the bench, measure timeout reduction vs airtime
   cost (75 timeouts/120 s under FHSS pre-fix is the baseline to beat).
   **First air test 2026-07-26 (run T, `radio_monitor_20260726_135348`,
