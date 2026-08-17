@@ -89,7 +89,9 @@ def main() -> int:
     if isinstance(legs, dict):
         legs = [legs]
 
-    arms: dict[int, list[dict]] = {1: [], 2: []}
+    # Arms: legs.json entries carry either "arm" (string label) or the
+    # legacy "depth" int. Exactly two distinct arms are compared.
+    arms: dict[str, list[dict]] = {}
     print(f"{'leg':<16}{'depth':>6}{'loss%':>8}{'pen%':>7}"
           f"{'fwdrop':>8}{'offered':>9}{'goodput':>9}")
     for leg in legs:
@@ -100,8 +102,9 @@ def main() -> int:
         if not m:
             print(f"{leg['tag']:<16}{leg['depth']:>6}   (archive unreadable)")
             continue
-        arms[int(leg["depth"])].append(m)
-        print(f"{leg['tag']:<16}{leg['depth']:>6}{m['loss_pct']:>8.1f}"
+        arm = str(leg.get("arm", leg.get("depth")))
+        arms.setdefault(arm, []).append(m)
+        print(f"{leg['tag']:<16}{arm:>6}{m['loss_pct']:>8.1f}"
               f"{m['pen_share']:>7.0f}"
               f"{(m['fw_drop'] if m['fw_drop'] is not None else -1):>8}"
               f"{m['offered']:>9}{m['goodput']:>9.0f}")
@@ -111,17 +114,21 @@ def main() -> int:
                                         ("pen_share", "penultimate %", True),
                                         ("fw_drop", "firmware drops", True),
                                         ("goodput", "goodput B/s", False)):
-        d2 = [x[metric] for x in arms[2] if x[metric] is not None]
-        d1 = [x[metric] for x in arms[1] if x[metric] is not None]
+        names = sorted(arms.keys())
+        if len(names) != 2:
+            continue
+        na, nb = names
+        d2 = [x[metric] for x in arms[na] if x[metric] is not None]
+        d1 = [x[metric] for x in arms[nb] if x[metric] is not None]
         if len(d2) < 2 or len(d1) < 2:
             continue
         m2, m1 = statistics.mean(d2), statistics.mean(d1)
         s2 = statistics.stdev(d2) if len(d2) > 1 else 0.0
         s1 = statistics.stdev(d1) if len(d1) > 1 else 0.0
         p = perm_test(d2, d1)
-        better = ("depth1" if ((m1 < m2) == lower_better) else "depth2")
-        print(f"{label:<16} depth2={m2:7.1f} +/-{s2:5.1f}   "
-              f"depth1={m1:7.1f} +/-{s1:5.1f}   "
+        better = (nb if ((m1 < m2) == lower_better) else na)
+        print(f"{label:<16} {na}={m2:7.1f} +/-{s2:5.1f}   "
+              f"{nb}={m1:7.1f} +/-{s1:5.1f}   "
               f"delta={m1 - m2:+7.1f}  perm p={p:.2f}  favours {better}")
 
     print("\nNote: at n=3/arm the exact permutation floor is p=0.10, so p=0.10"
