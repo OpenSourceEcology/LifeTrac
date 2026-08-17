@@ -259,6 +259,10 @@ transcript [`bulk_boundary_output.txt`](bulk_boundary_output.txt)):
 **0 of 359 bulk (non-interferer, settled) captures fall within ±100 ms of a
 publish event, against a uniform-null expectation of ~7 % — in all five
 archives independently.** Median |offset| ≈ 1.5 s ≈ one train period.
+*(Refinement per PR #99 review: the documented boundary proxy is the next
+train START ≈ publish + 213.9 ms, so the window was also tested centered
+at +214 ms — 1.6–3.2 % across the five archives, still well below the ~7 %
+null. The anti-correlation holds against the correctly-centered window.)*
 
 This is NOT evidence against boundary clustering — it is a selection effect
 with its own information: **a corrupt fragment usually kills its own train's

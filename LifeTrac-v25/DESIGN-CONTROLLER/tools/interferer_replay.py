@@ -152,16 +152,29 @@ def simulate(group_len: int, interferer_share: float, seed: int,
     # reason. Now the shortfall goes back into the bulk pool so total loss
     # stays calibrated, and the ACHIEVED share is reported alongside the
     # requested one.
-    hits = interferer_hits(duration, rng.uniform(0.0, INTERFERER_PERIOD_S))
+    # Horizon includes the final fragment's ToA (review catch, PR #105):
+    # `duration` is the LAST START time, so ticks landing during the
+    # final fragment's airtime were silently dropped.
+    hits = interferer_hits(duration + TOA_255_US / 1e6,
+                           rng.uniform(0.0, INTERFERER_PERIOD_S))
     rng.shuffle(hits)
     placed = 0
+    # Collision = the tick lands DURING a fragment's actual on-air time
+    # [start, start + ToA), not merely near a start. The first revision
+    # accepted the nearest start within +/-117 ms -- a 234 ms exposure
+    # window for a 99.904 ms packet, overstating collision probability
+    # ~2.3x (review catch, PR #99). With the honest window the tick-supply
+    # feasibility ceiling TIGHTENS, strengthening the removing-the-emitter
+    # bound.
+    toa_s = TOA_255_US / 1e6
+    starts = [e[2] for e in timeline]
+    import bisect
     for ht in hits:
         if placed >= n_loss_int:
             break
-        # nearest transmitted fragment to this instant, if one is in flight
-        best = min(timeline, key=lambda e: abs(e[2] - ht))
-        if abs(best[2] - ht) <= (FRAG_MS / 1000.0):
-            key = (best[0], best[1])
+        i = bisect.bisect_right(starts, ht) - 1
+        if i >= 0 and ht < starts[i] + toa_s:
+            key = (timeline[i][0], timeline[i][1])
             if key not in lost:
                 lost.add(key)
                 placed += 1
