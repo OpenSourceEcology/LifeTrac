@@ -220,6 +220,16 @@ RX_POLL_TIMEOUT_S = 0.25
 # convergence soak actually measured, kept as a bench A/B control.
 ALIGNED_PUMP_ENABLE = os.environ.get("LIFETRAC_ALIGNED_PUMP", "1") != "0"
 
+# RS-12 (2026-08-17): per-fragment arrival logging. One INFO line per data
+# fragment carrying the FIRMWARE microsecond RX timestamp, so the silent
+# L072 URC drop's timing shape can be read without a firmware flash: in a
+# train missing idx N-2, the fw_us gap between idx N-3 and idx N-1 says
+# whether the lost fragment's slot passed on schedule (pure emission loss),
+# was compressed (TX timing anomaly), or was followed by a stall (main-loop
+# blockage). ~2300 lines per 300 s leg at the bench rate — diagnostic only.
+LOG_FRAG_ARRIVALS = os.environ.get(
+    "LIFETRAC_LOG_FRAG_ARRIVALS", "0") == "1"
+
 
 class KeyframeRequester:
     """Rate-limited req_keyframe on reassembly failure. Publishes to the
@@ -1222,6 +1232,11 @@ class ImageRxDaemon:
                             # spans one or more fragments that never arrived.
                             self._gap_samples.append(
                                 (d, len(data), self._last_gap_class))
+
+                if LOG_FRAG_ARRIVALS and frag_idx is not None:
+                    LOG.info("frag_arrival: seq=%d idx=%d total=%d fw_us=%s "
+                             "len=%d", frag_seq, frag_idx, frag_total,
+                             parsed.get("timestamp_us"), len(data))
 
                 saw_rx = True
                 with self._lock:

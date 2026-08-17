@@ -72,6 +72,13 @@ param(
     # the same argument as FhssLinkId. The known bench interferer sits in the
     # 915.0 MHz channel; e.g. -ForceFrfHz 917000000 moves the link off it.
     [int]$ForceFrfHz      = 0,
+    # RS-12 (2026-08-17): 1 = RX daemon logs one line per data fragment with
+    # the firmware us RX timestamp (frag_arrival:). Diagnostic instrument for
+    # the silent URC-drop timing shape; adds ~2300 log lines per 300 s leg.
+    [int]$LogFragArrivals = 0,
+    # RS-12 fix candidate (2026-08-17): 1 = TX daemon never parks the final
+    # fragment (restores paced spacing for the last pair; see daemon comment).
+    [int]$NoParkLast      = 0,
     # RS-0.13b (2026-07-27): 1 = aligned command pump on (default), 0 =
     # idle-drain-only. The Run-J bisection toggles this + Batch + PrepareAhead
     # + ParityGroup one at a time to find which killed the 58% alignment.
@@ -162,6 +169,13 @@ $profEnv = "$profEnv -e LIFETRAC_FHSS_FARM_ID=$FhssFarmId -e LIFETRAC_FHSS_LINK_
 if ($AirtimeBudgetUs -gt 0) { $profEnv = "$profEnv -e LIFETRAC_AIRTIME_BUDGET_US=$AirtimeBudgetUs" }
 $profEnv = "$profEnv -e LIFETRAC_AIRTIME_PACING=$PacingMode"
 if ($PacingHeadroom -gt 0) { $profEnv = "$profEnv -e LIFETRAC_PACING_HEADROOM=$PacingHeadroom" }
+if ($NoParkLast -eq 1) { $profEnv = "$profEnv -e LIFETRAC_NO_PARK_LAST=1" }
+if ($LogFragArrivals -eq 1) {
+    # One knob, both ends: RX logs frag_arrival (fw us + host wall), TX logs
+    # txdone_arrival (host wall + toa_us). Routed via $profEnv so both
+    # daemons get their flag; each reads only its own.
+    $profEnv = "$profEnv -e LIFETRAC_LOG_FRAG_ARRIVALS=1 -e LIFETRAC_LOG_TX_DONE=1"
+}
 if ($ForceFrfHz -gt 0) {
     # Review catch (PR #106): the shared helper writes this straight into the
     # 24-bit FRF registers with no band check, so a typo could key BOTH

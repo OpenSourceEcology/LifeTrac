@@ -144,3 +144,81 @@ Operational note: `-TxPipelineDepth 1` costs throughput (2262 frags
 offered vs ~2420 at depth 2, −6.5 %) but cut loss to 3.9 % in this
 sample — not a recommendation yet (n=1, variance §3), but worth the n=3
 A/B if the firmware fix stalls.
+
+## 7. Addendum 2 (2026-08-17 evening) — MECHANISM FOUND, host-side fix validated
+
+Three instrumented legs (H, I, J at the day's stability channel 927.5 MHz)
+with a new dual-clock instrument — per-fragment RX demod timestamps
+(`frag_arrival:`, firmware µs clock) and per-fragment TX_DONE times
+(`txdone_arrival:`, with `toa_us`) — closed the case. The route had two
+wrong turns, both recorded:
+
+**Wrong turn 1 (leg H): "TX compression".** Drop-train neighbours' demod
+gaps read 1.16–1.36 slots instead of the expected 2.0, which looked like
+the transmitter squeezing the end of the train. The real explanation was
+an unexamined assumption: *the last fragment is short* (the ~36 B frame
+remainder, ~20 ms ToA), and it rides the firmware's fire-on-TX_DONE ~42 ms
+behind the penultimate BY DESIGN. 117+42 = 159 ms ≈ 1.36 slots — drop-train
+timing is completely NORMAL. The `len=` field that settles this was in the
+instrument's own log line from the start, unread for two legs.
+
+**Wrong turn 2 (this document's §1): the "firmware drop" metric is
+ack-contaminated.** Host `rx_frames` excludes command/ack frames (they are
+dispatched before the counter increments) while radio `rx_ok` includes
+them, so every Δrx_ok−URCs figure in §1/§6 and the depth A/B carries
+roughly the leg's ack traffic (~32 frames: 16 base commands × 2 tractor
+ack copies) as a constant inflation. The penultimate-loss localisation
+survives this — corrupt-capture indices stay uniform while losses lock —
+but the absolute drop counts do not separate "URC lost" from "ack not
+counted", and the clean instrument remains the future `rx_urc_lost`
+firmware counter.
+
+### The mechanism
+
+**The penultimate fragment is the only fragment whose successor arrives
+~42 ms later instead of ~117 ms** (the short last fragment rides
+TX_DONE). Its full-size 255 B URC therefore has a 2.8×-tighter deadline
+through the L072's single pending-URC path than any other fragment; when
+emission slips past the deadline, the successor's arrival silently
+overwrites the pending URC. Every prior observation follows: the
+penultimate lock and its tracking across train lengths (the ride exists at
+every length), depth-1 collapsing the lock (no park → no ride → no tight
+deadline), gap-width irrelevance (the ride is inside the train), channel/
+power irrelevance, role-swap asymmetry (v3 park pattern only in the
+tractor→base direction), and corrupt-capture uniformity (this failure
+erases, it never corrupts).
+
+Confirmed at both ends in leg I: TX_DONE(pen)→TX_DONE(last) median 42 ms
+with full 99904 µs ToA on the penultimate (192 trains), and RX demod gap
+for the same pair median 41.7 ms vs 117.0 ms mid-train control.
+
+### The fix (host-side, no flash): `LIFETRAC_NO_PARK_LAST=1`
+
+The TX daemon holds the final fragment until the pipeline drains, so the
+last pair is host-paced like every other pair. Leg J (n=1, dual-
+instrumented, bracketed):
+
+| metric | leg H (ride) | leg J (fix) |
+|---|---:|---:|
+| last-pair RX demod gap | 41.7 ms | **114.7 ms** |
+| penultimate lock | 42 % | **7 % (= uniform)** |
+| raw loss | 3.3 % | **1.7 % — campaign best** |
+| reassembler timeouts | 69 | **37** |
+| frames published | 117 | **144** |
+| offered fragments | 2377 | 2319 (−2.4 %) |
+
+Residual: 24 % of last pairs still arrive <80 ms apart (the hold releases
+on TX_DONE receipt, which can still beat the pacer), and the ack-
+contaminated drop metric still reads ~36 after subtraction — the firmware
+counter session remains the final confirmation. But every user-visible
+endpoint moved the right way at n=1, at a third of depth-1's throughput
+cost.
+
+### Status
+
+- `-NoParkLast 1` / `LIFETRAC_NO_PARK_LAST=1` is the recommended bench
+  operating point pending n=3 confirmation.
+- The flash session's brief is now confirmation + real fix, not search:
+  add `rx_urc_lost` where the pending URC is overwritten, then either
+  double-buffer the URC path or have firmware enforce a minimum
+  inter-fire spacing on parked fragments.
