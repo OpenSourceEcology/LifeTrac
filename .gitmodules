@@ -1,0 +1,13 @@
+# Restored 2026-08-16 (PR #102 follow-up): the repo has carried these two
+# gitlinks without a .gitmodules file, which made every `git submodule`
+# operation fatal ("No url found for submodule path ... in .gitmodules") —
+# visible as a cleanup warning in every CI job and a hard failure for anyone
+# running `git submodule update --init`. URLs recovered from the local
+# clones' origin remotes. CI does not check out submodules (actions/checkout
+# default), so this only silences the warning and makes fresh clones usable.
+[submodule "LifeTrac-v25/tools/MKRWAN"]
+	path = LifeTrac-v25/tools/MKRWAN
+	url = https://github.com/arduino-libraries/MKRWAN.git
+[submodule "LifeTrac-v25/tools/mkrwan1300-fw"]
+	path = LifeTrac-v25/tools/mkrwan1300-fw
+	url = https://github.com/arduino/mkrwan1300-fw.git
