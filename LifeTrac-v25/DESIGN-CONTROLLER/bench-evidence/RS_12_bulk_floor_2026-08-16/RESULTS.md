@@ -123,6 +123,12 @@ Reading, with the run-to-run depth variance (§3) kept in mind — the lock
   therefore a major component of the trigger — but not all of it: 16
   penultimate losses remain, ~2× uniform, and at depth 1 the mailbox
   still drains 1→0 at train end.
+  > **SUPERSEDED 2026-08-17** by the n=3 interleaved A/B
+  > (`../RS_12_depth_ab_2026-08-17/RESULTS.md`). The lock collapse
+  > reproduces (37 % → 6.6 %), but the drop-count reduction does NOT:
+  > 25.7 vs 24.0 drops, p=0.90. Leg F's low count was run-to-run spread.
+  > The drain **aims** the drops, it does not cause them — "a major
+  > component of the trigger" is withdrawn.
 - Instrument closure held in every leg (Δcrc_err vs crc_dumps: 126/126,
   126/124, 94/94) — corruption and the silent drop remain fully separate
   channels throughout.
