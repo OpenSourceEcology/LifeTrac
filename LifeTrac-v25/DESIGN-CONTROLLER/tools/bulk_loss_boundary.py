@@ -109,17 +109,20 @@ def analyse(path: pathlib.Path, out=sys.stdout) -> dict | None:
     rng = np.random.default_rng(20260816)
     n_iter = 10000
     null_frac = np.empty(n_iter)
+    null_frac_b = np.empty(n_iter)
     for k in range(n_iter):
         synth = rng.uniform(span[0], span[1], size=len(ev))
         null_frac[k] = (np.abs(nearest_offset(synth, pubs)) <= 0.100).mean()
+        null_frac_b[k] = (np.abs(nearest_offset(synth, pubs + 0.2139)) <= 0.100).mean()
     p = float((null_frac >= frac_100).mean())
+    p_b = float((null_frac_b >= frac_100_b).mean())
 
     name = path.name
     print(f"{name[14:29]}  bulk n={len(bulk):3d}  pubs={len(pubs):3d}  "
           f"|off| med={med_abs * 1000:6.0f} ms  "
-          f"within±100ms={frac_100 * 100:5.1f}%  "
-          f"@boundary(+214ms)={frac_100_b * 100:5.1f}%  "
-          f"null={null_frac.mean() * 100:5.1f}%  p={p:.4f}", file=out)
+          f"within+/-100ms={frac_100 * 100:5.1f}% (null={null_frac.mean() * 100:4.1f}% p={p:.4f})  "
+          f"@boundary(+214ms)={frac_100_b * 100:5.1f}% "
+          f"(null={null_frac_b.mean() * 100:4.1f}% p={p_b:.4f})", file=out)
     return {"n": len(bulk), "frac": frac_100,
             "null": float(null_frac.mean()), "p": p,
             "offsets_ms": (off * 1000).tolist()}

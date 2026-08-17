@@ -152,7 +152,11 @@ def simulate(group_len: int, interferer_share: float, seed: int,
     # reason. Now the shortfall goes back into the bulk pool so total loss
     # stays calibrated, and the ACHIEVED share is reported alongside the
     # requested one.
-    hits = interferer_hits(duration, rng.uniform(0.0, INTERFERER_PERIOD_S))
+    # Horizon includes the final fragment's ToA (review catch, PR #105):
+    # `duration` is the LAST START time, so ticks landing during the
+    # final fragment's airtime were silently dropped.
+    hits = interferer_hits(duration + TOA_255_US / 1e6,
+                           rng.uniform(0.0, INTERFERER_PERIOD_S))
     rng.shuffle(hits)
     placed = 0
     # Collision = the tick lands DURING a fragment's actual on-air time
