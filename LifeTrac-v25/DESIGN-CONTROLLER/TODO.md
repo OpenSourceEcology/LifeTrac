@@ -2254,6 +2254,20 @@ Two consequences for what is worth doing next:
   ARTIFACT (a fold scan peaks at ~the mean inter-arrival with no clock
   present) and is retracted — the shuffled-interval null that catches it
   is now part of the tool.
+- [ ] **RS-12 — the clustered bulk loss floor (campaign opened 2026-08-16,
+  issue #107).** With the interferers escaped (902.5 MHz), the remaining
+  ~3.3 % is the RS-11.4 clustered process. **Opening desk finding: the
+  penultimate losses are NEVER-DEMODULATED, not corrupted** — at 902.5,
+  corrupt captures with readable frag headers are ~uniform across indices
+  (idx-11 = 9 % ≈ 1/13) while attributed losses concentrate at idx-11
+  (35 %). Combined with the RS-11.5 exonerations (TX FIFO readback clean,
+  receiver-side by role swap, power-independent) the target is: a
+  base-board receiver-deafness mechanism, phase-locked to the
+  second-to-last fragment, invisible to the crc_dump instrument. Plan in
+  #107: n=2 @ 902.5 → train-length sweep @ 902.5 → stats-probe deltas
+  (incl. the never-read tx_done_early counter) → software-only
+  activity-modulation legs (ethernet flood on the gigabit-marginal base
+  cable, USB, CPU) → hands only after the coupling path is named.
 - [ ] **RS-11.7 Operator spectrum survey in web_ui (proposed 2026-08-16).**
   Turn the channel-survey diagnostic into a field feature: a
   maintenance-mode button that pauses the RX daemon, sweeps 902–928 MHz
