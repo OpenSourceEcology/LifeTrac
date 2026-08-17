@@ -2254,6 +2254,27 @@ Two consequences for what is worth doing next:
   ARTIFACT (a fold scan peaks at ~the mean inter-arrival with no clock
   present) and is retracted — the shuffled-interval null that catches it
   is now part of the tool.
+- [ ] **RS-11.7 Operator spectrum survey in web_ui (proposed 2026-08-16).**
+  Turn the channel-survey diagnostic into a field feature: a
+  maintenance-mode button that pauses the RX daemon, sweeps 902–928 MHz
+  (`channel_survey_sniff.py`), renders the per-channel map with a
+  recommended center, and restarts the daemon. Two dwell modes offered
+  honestly: quick floor scan (~2 s/ch, ~2 min — misses low-duty beacons)
+  and beacon-safe (~30 s/ch, ~25 min — catches a 7 s-class beacon with
+  ≥4 ticks/channel). **v0 scope:** survey + recommend only; APPLY stays
+  manual via `-ForceFrfHz`/`LIFETRAC_FORCE_FRF_HZ` at session start; only
+  runs when the link is idle; recommendation hard-clamped so the 500 kHz
+  occupied BW stays inside 902–928. **v1 (sequenced behind
+  dependencies):** a validated firmware CFG key for the DTS center
+  (clamp + reg-write-gate + host tests — NOT the bench reg-write
+  backdoor the survey tool uses), a coordinated two-end announce/
+  switch/confirm channel change with a fallback channel, AEAD-gated once
+  RS-7.1/8.6 land (an attacker who can move the channel owns link
+  availability), persisted per-site config. Also add a site survey to the
+  Phase 6 mast-install checklist — interferer populations are per-site
+  and change over weeks, so at-install matters at least as much as
+  daily. Motivation and first field data: RS-11.6 (the bench's own
+  915.000 MHz squatter, found by exactly this sweep).
 - [x] **RS-11.6 leg 2 DONE 2026-08-16 — the emitter is EXTERNAL, confirmed
   in raw energy with all radios silent.**
   (`bench-evidence/RS_11_6_idle_sniff_2026-08-16/RESULTS.md`; idle-harness

@@ -65,6 +65,13 @@ param(
     # channel), 1=FCC_FHSS_50CH_BW250 (wide mask auto-enabled — the firmware
     # validator rejects popcount<50 for profile 1), 2=FCC_DTS_BW500.
     [int]$RegProfile      = 0,
+    # RS-11.6 channel escape (2026-08-16): override the carrier both daemons
+    # program at profile init (LIFETRAC_FORCE_FRF_HZ in the shared HostLink
+    # helper). 0 = profile default (915.000 MHz at profile 2). Routed through
+    # $profEnv so BOTH peers always get the same carrier by construction --
+    # the same argument as FhssLinkId. The known bench interferer sits in the
+    # 915.0 MHz channel; e.g. -ForceFrfHz 917000000 moves the link off it.
+    [int]$ForceFrfHz      = 0,
     # RS-0.13b (2026-07-27): 1 = aligned command pump on (default), 0 =
     # idle-drain-only. The Run-J bisection toggles this + Batch + PrepareAhead
     # + ParityGroup one at a time to find which killed the 58% alignment.
@@ -155,6 +162,16 @@ $profEnv = "$profEnv -e LIFETRAC_FHSS_FARM_ID=$FhssFarmId -e LIFETRAC_FHSS_LINK_
 if ($AirtimeBudgetUs -gt 0) { $profEnv = "$profEnv -e LIFETRAC_AIRTIME_BUDGET_US=$AirtimeBudgetUs" }
 $profEnv = "$profEnv -e LIFETRAC_AIRTIME_PACING=$PacingMode"
 if ($PacingHeadroom -gt 0) { $profEnv = "$profEnv -e LIFETRAC_PACING_HEADROOM=$PacingHeadroom" }
+if ($ForceFrfHz -gt 0) {
+    # Review catch (PR #106): the shared helper writes this straight into the
+    # 24-bit FRF registers with no band check, so a typo could key BOTH
+    # radios outside 902-928 MHz. Reject any center whose 500 kHz occupied
+    # bandwidth would cross the band edges.
+    if ($ForceFrfHz -lt 902250000 -or $ForceFrfHz -gt 927750000) {
+        throw "ForceFrfHz $ForceFrfHz out of range: center must be 902.25-927.75 MHz so the 500 kHz occupied BW stays inside 902-928"
+    }
+    $profEnv = "$profEnv -e LIFETRAC_FORCE_FRF_HZ=$ForceFrfHz"
+}
 
 # Resolve adb dynamically (the winget package dir name varies per
 # machine/source); fall back to the historical hardcoded path.
@@ -455,6 +472,7 @@ if ($Archive) {
         "tx_power_dbm=$TxPowerDbm",
         "tx_feed=$TxFeed",
         "reg_profile=$RegProfile",
+        "force_frf_hz=$ForceFrfHz",
         "tx_serial=$TxAdbSerial",
         "rx_serial=$RxAdbSerial",
         "host_ip=$HostIp",
