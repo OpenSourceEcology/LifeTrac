@@ -199,10 +199,18 @@ jobs:
             murata_host/mh_uart_tcp.c \
             murata_host/mh_stream.c \
             -o build/loopback_driver
-      - name: Run PTY loopback harness
+      - name: Run loopback harness (TCP transport)
+        # 2026-08-16: PTY transport fails on the GitHub runner with
+        # open(/dev/pts/N) -> ENOENT (errno instrumented in mh_uart_posix.c
+        # made this visible): the harness's pty.openpty() master comes from a
+        # devpts instance whose slave names are not reachable at /dev/pts in
+        # the job environment. The harness's TCP transport exists for exactly
+        # this case and exercises the same COBS/CRC framing stack end to end;
+        # PTY mode remains available for local POSIX use.
         run: |
           python3 LifeTrac-v25/DESIGN-CONTROLLER/tools/murata_host_loopback.py \
             --driver LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_h7/build/loopback_driver \
+            --transport tcp \
             --iterations 150
 
   # Round 15 (2026-04-28): handheld_mkr is now a blocking compile gate.
