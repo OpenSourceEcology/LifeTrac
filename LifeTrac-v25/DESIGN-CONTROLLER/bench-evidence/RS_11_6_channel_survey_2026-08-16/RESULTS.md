@@ -6,10 +6,14 @@ Escape-leg archive: `radio_monitor_20260816_200712_9fee4460`.
 
 ## 1. The band survey: not one emitter — two
 
-52 channels × 500 kHz × 30 s dwell (≥4 ticks of a 7 s-class beacon each),
-base radio, profile-2 modem settings, radios otherwise silent.
+902.0–928.0 MHz inclusive at 500 kHz steps — 53 points × 30 s dwell (≥4
+ticks of a 7 s-class beacon each), base radio, profile-2 modem settings,
+radios otherwise silent.
 
-**Every channel from 903 to 927 MHz shows hot samples at −42…−48 dBm.**
+**46 of the 49 channels from 903.0 to 927.0 MHz show hot samples at
+−42…−48 dBm** (the three exceptions — 905.5, 907.0, 925.5 — are
+consistent with the ~20 % per-dwell miss probability; 927.5 at the top
+edge also read quiet at max −75; see §4).
 Per-channel burst intervals split the activity into two families:
 
 | device | period | dominant zone | peak |

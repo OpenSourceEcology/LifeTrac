@@ -162,7 +162,16 @@ $profEnv = "$profEnv -e LIFETRAC_FHSS_FARM_ID=$FhssFarmId -e LIFETRAC_FHSS_LINK_
 if ($AirtimeBudgetUs -gt 0) { $profEnv = "$profEnv -e LIFETRAC_AIRTIME_BUDGET_US=$AirtimeBudgetUs" }
 $profEnv = "$profEnv -e LIFETRAC_AIRTIME_PACING=$PacingMode"
 if ($PacingHeadroom -gt 0) { $profEnv = "$profEnv -e LIFETRAC_PACING_HEADROOM=$PacingHeadroom" }
-if ($ForceFrfHz -gt 0) { $profEnv = "$profEnv -e LIFETRAC_FORCE_FRF_HZ=$ForceFrfHz" }
+if ($ForceFrfHz -gt 0) {
+    # Review catch (PR #106): the shared helper writes this straight into the
+    # 24-bit FRF registers with no band check, so a typo could key BOTH
+    # radios outside 902-928 MHz. Reject any center whose 500 kHz occupied
+    # bandwidth would cross the band edges.
+    if ($ForceFrfHz -lt 902250000 -or $ForceFrfHz -gt 927750000) {
+        throw "ForceFrfHz $ForceFrfHz out of range: center must be 902.25-927.75 MHz so the 500 kHz occupied BW stays inside 902-928"
+    }
+    $profEnv = "$profEnv -e LIFETRAC_FORCE_FRF_HZ=$ForceFrfHz"
+}
 
 # Resolve adb dynamically (the winget package dir name varies per
 # machine/source); fall back to the historical hardcoded path.
