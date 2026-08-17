@@ -1,0 +1,960 @@
+﻿2026-08-17 02:14:47,147 INFO image_rx_daemon: ctrl MQTT connected (192.168.1.79)
+
+2026-08-17 02:14:47,160 INFO image_rx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-08-17 02:14:47,191 INFO image_rx_daemon: image_rx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-08-17 02:14:47,233 INFO image_rx_daemon: MQTT connected; ready to publish lifetrac/v25/video/tile_delta
+
+2026-08-17 02:14:47,261 INFO image_rx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-08-17 02:14:47,389 INFO image_rx_daemon: accepting first retained lifetrac/v25/control/radio_profile pin after start (restart convergence)
+
+2026-08-17 02:14:47,698 INFO image_rx_daemon: L072 VER warm-up ok (attempt 1)
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+CFG_SET_REQ(FHSS_FARM_ID) OK: 17000800
+
+CFG_SET_REQ(FHSS_NODE_ID) OK: 18000800
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 902.500 MHz (raw=0xE1A000 -> Msb=0xE1 Mid=0xA0 Lsb=0x00)
+
+2026-08-17 02:14:48,177 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+  FRF readback: 0xE1A000 = 902.500 MHz (OK)
+
+2026-08-17 02:14:48,216 INFO image_rx_daemon: LBT_ENABLE=0 (command uplink shares the image channel)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-08-17 02:14:48,327 INFO image_rx_daemon: SX1276 RXCONT autowake: opmode 0x81 -> 0x85
+
+2026-08-17 02:14:48,330 INFO image_rx_daemon: RX worker ready; draining RX_FRAME_URC...
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:48,624 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:49,206 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:49,777 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:50,346 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:50,921 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:51,497 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:52,064 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:52,631 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:53,198 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:53,769 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:54,351 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:54,918 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:55,482 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:56,043 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:56,611 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 02:14:57,181 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-08-17 02:14:57,456 WARNING image_rx_daemon: cmd 0x63 GAVE UP after 16 attempts (10.1 s)
+
+2026-08-17 02:14:58,191 INFO image_rx_daemon: stats: rx_frames=4 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+2026-08-17 02:14:58,194 INFO image_rx_daemon: air_gap: n=3 dt_med=116995us dt_p95=117063us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:14:58,197 INFO image_rx_daemon: air_gap_hist(ms): <120:3
+
+2026-08-17 02:14:58,207 INFO image_rx_daemon: rx_rf: n_rssi=4 n_snr=4 rssi[min/med/max]=-67/-67/-65 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:14:58,210 INFO image_rx_daemon: phase_telemetry: valid=4 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:14:58,218 INFO image_rx_daemon: air_gap_by_class: seq: n=3 med=117.0ms
+
+2026-08-17 02:14:59,047 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:00,641 INFO image_rx_daemon: published frame_id=0 2980 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:02,229 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:03,791 INFO image_rx_daemon: published frame_id=0 2905 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:04,268 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.0 rssi=-68 dump=0102000000000000fe05020b1fab164818ef6a1c01ecc18c5c848417ffc830370d6fc7027172120de325d6fbc9815d9d234fbc4d6182a325ec9248c39dba51e1bf9aa12f18d1687255a210baf9dbd317376192eeb1cc3310d9b855b4b64f619927c1f9d069a423f7f6d138a128471aa12e688a921cbb8868e23477d534935435c004148620a530b67a0518846b6cf643cccaa85584f50dc4c2b4dc518aab3c09c382a6a6c1044c2235e3c0289b55fb28eebf36d079bd86927b4528ca55d5e5a03f099581644eba9c48a8adbf1a7836f6c770b956a98988fb53d8feefbeee0a5d97deeb21f1c692528c1253277c5537cc64830fd1a26afbb34bd300
+
+2026-08-17 02:15:04,861 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.2 rssi=-67 dump=01c2000000000000fe05075b1c01ecc18c58e484175fc830370dafc7027172120da325d6fb09815d9d234fbc4561e2a325ec9208c39dba01e1bf9aa12f58d168b255a210baf9dbd317376192eeb00c3310d9b855b4b64f6199e7c1f8d0693423f7f6d138a128471ea12e688a921ebb8868e23437c996d254b7d826b4acaac21184390000006f5245464568003000575542505650fb205c0000007004009d012a200020023ec1d0a74eb44523b32808038018096d00a92381fa04180010a00a9f9b4ccaf9a60000fee352dc8e4ecccbff4206b9af18bd70116286c0681dec6840df747921eee7ae23134c74f83878cb440121010000008752491646
+
+2026-08-17 02:15:06,899 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:08,242 INFO image_rx_daemon: stats: rx_frames=84 rx_decode_err=0 frames_published=5 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=1 parity_recon=0
+
+2026-08-17 02:15:08,246 INFO image_rx_daemon: air_gap: n=80 dt_med=116980us dt_p95=261902us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:15:08,255 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:3 <120:68 <400:8
+
+2026-08-17 02:15:08,258 INFO image_rx_daemon: rx_rf: n_rssi=80 n_snr=80 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=4.0/5.0/6.0
+
+2026-08-17 02:15:08,261 INFO image_rx_daemon: phase_telemetry: valid=79 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:15:08,266 INFO image_rx_daemon: air_gap_by_class: seq: n=72 med=117.0ms | boundary: n=6 med=262.0ms | post_loss: n=2 med=234.0ms
+
+2026-08-17 02:15:08,270 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.53%) verdict=not-clustered | top 2:1 7:1
+
+2026-08-17 02:15:08,489 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:10,040 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=0.0 rssi=-63 dump=97edeaa03b5ade6658802b76f434f4738ecf3d509927ee46f98d23b1468492203389fc29b1afd729ef431a79adc51f157fae568b2aa8c770c5280c8ca669291769e6ec0c70930dbd20c0d0c5a3f09041edde8d68ea9a9923f87307fccb45e5611f489d470b269ee0bf4dee3ee7fc8b66c4c59c39c5251f257720c1344de728a6747e1719af39ab078ee3c88392f5ec960170584392260554f62741e3944b41d450430f154d53f2da94e8e0b4a24c0a668e9cfc0d21dbf823415c2958b3d0c4f5f69251c0f0807c68664a97191e73cec81ffe5f7ae4a4a7054e1abc5060b1200754229bb04f57094441a424350890c5427d7223bfdb5a6af10c3533
+
+2026-08-17 02:15:10,303 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.8 rssi=-68 dump=01c20000000000003e11000b00110c082800ffff0f00000800000000009073524946466c000400574542505654382060000900100400bd012a800020003ec15aa74e342523b22808028018c964009d2f77f9a8040802afe5ce2d0c0c00fefcd9b724d3b332ffacd1ca2d7768ff9278a3ee00691dec6efcfb2c617f21cb4bc1189a988c7cbde3dff706f95c142abd6b6e3800006b3249464364000005574542505e503820580000003004009d01aa200020003ec15ca64e142523b32408024018090400a92734399fb37083e400085a4cd20000f8c5ea6f4e0b956fd5262600f98c3c2ae0a6597ddb81bf448bef46fcafde74ff1c48f7ef5ed34fdd
+
+2026-08-17 02:15:11,231 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-10.8 rssi=-45 dump=0102000000000000fe11080bb3176848b5d0abfa3d9b80ff4468149f1bb9765d26c821fb974d34ab3d00e7cd2fd2d14a6502191312729f6b13fd89849d68d47502e7bc8e7cb2217b1dc1beec4f368000a752494646a00000005745425056503820940000001005009d012a200020003ec15aa74ea7a523b32808026018096600ae35a01e80039407e800703abc7126dd5e92bd61030000fed31e7c2cfda73758b41f8e45ff4208691400d09095af0a2a0b8ab43dfe5edf93a5275a0ebee5f4c8f08f23fc55ddfabd607ec2710cefcf89da83d84e29923ff69add877eedcb8c894f2a23d316fe80b6ce45aa2932b1507450c58beec9aaa7c908ddfe
+
+2026-08-17 02:15:11,574 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.0 rssi=-64 dump=010a00f8b39dfa2aec5cb45c831ef9e3f7cb9a26869ad0598739d682b3a25574bb20b20ca75d3f5fe7ffaf26e3ca962fc00333f523e2e93cbe2a45908bc29e8a399cde551235b0802e3ca116b9e6c2f0c47552c4963b7a9e8b891c185fca37b355498a968b7f78ba8cb6cb7fcf2ce242a8ab518247a1096076ea30173799ef7cc8ca16ff0a3a5ef2c276991a405dcc33d3aa6590b0747dfdd9815fdc9331e141488dc94aa8aedfd222d885b4e5b4d4c4cf7fca42f5b6b46d8b24af83a7c419d1be9538c71209dd9f6c418e83ac2dc3d6ff5fa2ae2c684d845ae6107c6e4d70b9ed3cff38879a89c59bacee5c4ea82549bd21e75668183d7194a967
+
+2026-08-17 02:15:12,198 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=120 snr=0.2 rssi=-65 dump=45335558706147c8d61f54abcb226258e4cf32f8a65e00c098a7f03c676263a981d7307813b585f50e06f483d88922ea586a875e9bce28a078cc77ca46922e563afad5ba923b778a2660ddb59dd3fe73bed41882b884625cf40422429b32a0c0818c613c324d341ac190e050891f9708dd0f7bea4382b34b
+
+2026-08-17 02:15:13,003 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.5 rssi=-67 dump=01c2000000000000fe1c0a0c6f524946466860008057454250055038205a000060d004009d012a200020003ec15ca742b42523b32808028018096c009de88164000427ff4529dbf7cc8000eec3d7782ea976debefab5f263c7f1776238be2f83f765f7c86520330adbb07afa36582ddf7589c723a051524a8191834000eb52494646e40c00005745423056503820d80000091007009d012a200820063ec15aa74ea7a323b328c8026018096c609d2f90fa4f0ff6406600ae807000748ff91d93206d402d0c3132e00a81a9d0c5e1794b5d240000fef0ad91bd733c2ddecb3f59de1fd3bbfe1ddfc6b27746b41f504417e04ff7cf3e3e2e7ece95ee
+
+2026-08-17 02:15:14,713 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:16,280 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:17,855 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:18,285 INFO image_rx_daemon: stats: rx_frames=159 rx_decode_err=0 frames_published=9 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=4 parity_recon=0
+
+2026-08-17 02:15:18,289 INFO image_rx_daemon: air_gap: n=75 dt_med=116986us dt_p95=259297us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:15:18,298 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:2 <120:60 <400:9 <1000:1
+
+2026-08-17 02:15:18,302 INFO image_rx_daemon: rx_rf: n_rssi=75 n_snr=75 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:15:18,304 INFO image_rx_daemon: phase_telemetry: valid=75 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:15:18,309 INFO image_rx_daemon: air_gap_by_class: seq: n=65 med=116.9ms | boundary: n=6 med=259.3ms | post_loss: n=4 med=233.9ms
+
+2026-08-17 02:15:18,312 INFO image_rx_daemon: lost_frag_idx: n=6 idx0=1 (14.29% of idx0 arrivals) other=5 (6.76%) verdict=CLUSTERED-AT-0 | top 11:2 0:1 8:1 4:1 10:1
+
+2026-08-17 02:15:18,367 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.8 rssi=-67 dump=0102000000000000fe20020b5c0000003004009d012a200020003ec15ca64eb42523b32808028018096400ae554138000850054fcda3457ca4c8087ae452061186d5969d23e0ba8ff8a2bab080292ad9215f7fe5639ffafcdac3bbaf243e09dc984d96730e77192dafa5cec1836ba7d17ac88c030057454250565038205c0000007004009d012a200020003ec15aa84e3425243228080280180964009d333442c8b8b4000462420798e7dcb14000fec7f7e82ea97486d8d7d446f46a2cb6a748ef6350461be5644cbd5dd13acac37cae318fa71df8f6946985b800000073524946466c0000005745425056503820600000005004009d012a200020
+
+2026-08-17 02:15:18,594 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.5 rssi=-67 dump=01c20000000000003e2a045b1e0b9e4c61c7a19b66ba326a8614f899ee6ba326aa7e287a7ea1d207aa1d5bb8f1b7c02402e5e6e4adc7a24597456cb3a3009088c1a306472293c1516b5d19351f281eb595a449e62287a92e72543826a36c89e9d399f2765478e94352008071524946466a000000574f4250565038205e0000003004301d012a200820003e015aa74e6425a3b228c80290188964009d308258030850054fcda345ad6c0000feefa7df9cbaadd97fe9367fd13ff44f41fc19350193cf8c6bbc9f9b5f1c6325345b75fb648aa2449299ee81862fc792a8005071524946466a00000057254250565038205e0000009004009d012a1000
+
+2026-08-17 02:15:18,951 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=5 snr=-10.2 rssi=-120 dump=68cfedbab0
+
+2026-08-17 02:15:20,498 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=46 snr=1.8 rssi=-65 dump=f4d4dc71464b309739e2cd40bd73924ca6c001e52d93c1d473ef273faf018590c635cddc76b7375a87083b7ecc1f
+
+2026-08-17 02:15:22,565 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:24,159 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:25,255 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-3.2 rssi=-58 dump=0102000000000000fe2d070c2b281fb85b9b29ae3a0000fec389c9951f37c66eb69f8e19ff92d39d953fe8410d3f33f30ae50a3073a8551891e7cad93fe2c1e12646d17668e74cd787af9a1ce6f9c3c684b75596182936800c770c9c6cb515a4263bf6f5880b2868c935142a74d833f3bf65d3d994361fcb68fd9013bea5e01436d98584f060c000006f524946466800000057454250565038205c0000001004009d012a20002000be41d4e63d95b001d12abeaa873ccd6808e570f649ecff284a0285df9c78f16ace32a5cd39dace540bf84e6673361168462c31a893790f5714612cb2b3cb619eaa1def05872dfa166f399d8ec3ec806104c48f
+
+2026-08-17 02:15:26,228 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.5 rssi=-68 dump=01c2000000000000fe30020ca77588d2aefd1667773158eb5f91aff8d5db18706a132971cf3eb4fa31f68904aa79d262563f36efe7d5643bf6d5bf9bf9f4428afd855fec3f1d0741dff72faa1624fb456b2a3c8cf96fbfb9104e58ba9ffe6f1f0a62b8066b5219464664000000544542505650384058000005f003008d012a20002000bec15aa74e342523b228080280180964003729a00042802a7e6d1a2d6b6000fee64f2d825ba0a38c4ff2ebd49f3579a72d5079ef9d914a423418cd96069407cd15d93847f8c7872d989c000003006d574f46466600000057454250565038205a0060007004009d012aaa0020a036c15aa74eb44523b32808
+
+2026-08-17 02:15:28,329 INFO image_rx_daemon: stats: rx_frames=236 rx_decode_err=0 frames_published=11 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=7 parity_recon=0
+
+2026-08-17 02:15:28,333 INFO image_rx_daemon: air_gap: n=77 dt_med=116983us dt_p95=261909us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:15:28,342 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <80:3 <120:61 <400:11
+
+2026-08-17 02:15:28,346 INFO image_rx_daemon: rx_rf: n_rssi=77 n_snr=77 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:15:28,349 INFO image_rx_daemon: phase_telemetry: valid=77 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:15:28,353 INFO image_rx_daemon: air_gap_by_class: seq: n=66 med=117.0ms | boundary: n=6 med=261.9ms | post_loss: n=5 med=234.0ms
+
+2026-08-17 02:15:28,357 INFO image_rx_daemon: lost_frag_idx: n=5 idx0=0 (0.00% of idx0 arrivals) other=5 (6.58%) verdict=not-clustered | top 2:2 4:1 8:1 7:1
+
+2026-08-17 02:15:28,902 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:30,491 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:32,073 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:33,144 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.8 rssi=-67 dump=0102000000000000fe3d070c0240180966009d19a00033bff394d6f52286170cf56f9afe64c3bc00fdc4c8fccb58b468fc33412fd712f04370e45f1fa9d4df916faff1f7abff04bd8f63fda639277f1e7e05572c58490d2e313590b444e43ff21ff54835f1d3fd4d8000005f126b4c887e3aca4f722172dc1751f05005c50a0aa00a889c8080a2c85e9da62b8deccbcbd907affc5b7edf618d7405e2ea26eae7fc55049bbee18cafd30db684a94ad48f72df2a8199fed45a3357e25ecb27da99afa2c24ff5cc49c4e7464000eb52494646e40000005745425056503820d80000001008009d012a200020003ec14c9e4aa7a422b33008026018096c
+
+2026-08-17 02:15:33,381 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.2 rssi=-67 dump=01c20000000000003e3d090cf52286170cf56f9afe64c3bc00fdc4c8fccb54b46b7033412fd712f04370e45f1fa9d4df916fa9f1f78bbf04bd8f63fda639277f1e7e0537a058490d263135d0b444e43ff21ff5483531d3fd4d8000006f524946066800000857254250565038205c000000f003009d012a200024003e415aa14eb4252433280802881869e4009de9af017db3936c9684665d0000fed27bf27b3b326ab5817d47c61bdfb7b6ed609f65a217618b79a3e0476ed43d01ce0a9479a3e071f56f47cd5065e2b2c000066d5b4946466600000057454258565038205a000000d804639d011a204020303ec15ca74ee42523b3280802802809
+
+2026-08-17 02:15:35,207 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:36,768 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:37,545 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=131 snr=0.8 rssi=-64 dump=66a5a92639dfbc1804603d66f812617809bf2dde6eeba72d14b30a4cc728ff1732970986acdcfa3b1034612c9dd345b80c857464d297bf4af302b9d8c19ac21288ea1e463613b938cdf6cdbe29dd552b8528da6f82d9b99c240deb16b158af0e82bbe6f2ae38deab2f0afff2d99e928667a97a9491c864ecbfab25b91cfe5d6bdb259b
+
+2026-08-17 02:15:38,314 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.0 rssi=-64 dump=01020000000000a58cd614cea79381ba484b0267035c0175ee93637ad24250a310b0f776dc0fd5fac04ecddaa3426d4757a79320b386735c1cb7c1d0961d3457a2d3c102b6f7261f3ced57e8fccb99d7035a7e3b9fbbb7803d5a1017d0688057ec737708f1bf3eae9f1abee7054ed0d83ce4fff362c9c752ada735eb7ff69da15aa6a94667d085eb915f85d0431c88a74dc4bc7d38a0737588adc86ef0005cd5f0881ca90fc260d00d0a0807087d885fcbc45bcd98dbfc38df307d98ea07ef9552f125a191a489c0e129fc6163c10b23613c6ffd13a34e8d09f36fc6e0b8befd8c21b5f6a253c99e2d529d49762d36dce0d9fd05a221cb59f68181
+
+2026-08-17 02:15:38,386 INFO image_rx_daemon: stats: rx_frames=314 rx_decode_err=0 frames_published=16 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=9 parity_recon=0
+
+2026-08-17 02:15:38,390 INFO image_rx_daemon: air_gap: n=78 dt_med=116990us dt_p95=258508us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:15:38,399 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <80:3 <120:64 <400:9
+
+2026-08-17 02:15:38,403 INFO image_rx_daemon: rx_rf: n_rssi=78 n_snr=78 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:15:38,405 INFO image_rx_daemon: phase_telemetry: valid=78 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:15:38,410 INFO image_rx_daemon: air_gap_by_class: seq: n=69 med=117.0ms | boundary: n=6 med=259.6ms | post_loss: n=3 med=234.0ms
+
+2026-08-17 02:15:38,413 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (4.00%) verdict=not-clustered | top 7:1 9:1 5:1
+
+2026-08-17 02:15:39,627 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.8 rssi=-67 dump=0102000000000000fe49090ca03c32b84d63019a77d174a3772fd903c58b5bbb8ed0c3e3155ae075aa4a3edc1bc715e0a7a0a58000006f524946466800000057454250565038205c0000005004009d012a200020003ec15aa74e342523b228080280180964009d32deb8f7ba0042802a7e5ce2d0c0c000feea1b8e866dd0566a87fed259fcb6764f48e7517f5c92f3c42908ab4ca6387b8c9492d4cb3487fa723fa59a9c3847555b7dc2868683d7c0085b319d3ece91d18ae454912159a2d3303672afd3cb565b619ba35ce569f17297bc9d878572e5644b51c200007db1d0e4f588a2ebd69f5ab2e6a77aef44dba8277e7add55076df79f3a6e16
+
+2026-08-17 02:15:41,452 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:43,035 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:44,124 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=3.0 rssi=-67 dump=01c20000000000003e53070c90df8aee4f3ab714de8049235b8a6f5e0050b352494646ac0000005745425056543820a0000000900400b5012a800020003ec15aa74e27a523b22808024018096c009d2fc11f2022000bc68d2e7b05e535a1c2040cfed34a170310462a17c80180212dfecb4f600b4d6c00d6ba3f9117cd508d55962134903dd9f37756a96777b9b04f5041fc35a09ea373feabbc7e3cb5bc5df51ef2186c2a2071f4292b56cf41dd6e6a7dcbeb21e68d3ac697f21815f8654fd79566f6cad9c04b7be7cf89cfd9f8ccdcfc30006b5249460664010000574642705650382038000000b003009d012a200020003ec15ca74eb42523b3
+
+2026-08-17 02:15:46,212 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:48,429 INFO image_rx_daemon: stats: rx_frames=393 rx_decode_err=0 frames_published=19 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=12 parity_recon=0
+
+2026-08-17 02:15:48,433 INFO image_rx_daemon: air_gap: n=79 dt_med=116997us dt_p95=261917us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:15:48,441 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <80:2 <120:63 <400:10
+
+2026-08-17 02:15:48,446 INFO image_rx_daemon: rx_rf: n_rssi=79 n_snr=79 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:15:48,448 INFO image_rx_daemon: phase_telemetry: valid=79 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:15:48,452 INFO image_rx_daemon: air_gap_by_class: seq: n=69 med=117.0ms | boundary: n=7 med=261.9ms | post_loss: n=3 med=234.1ms
+
+2026-08-17 02:15:48,456 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (5.26%) verdict=not-clustered | top 11:1 9:1 7:1 6:1
+
+2026-08-17 02:15:49,350 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.2 rssi=-64 dump=0102000000000007d0a0dad2b315e38e72d1507e41758dd4c261dcbde3103bdf0959a9054255c9fdece02d1c053872619e1194411c213d0a7825ba5b07c93b9decedfe5cbe47f3288e161c615d0f1d12f58c4653a26ffff260c63eaa99fd384986b35d956b274a5c2d72aca4767ae602ea6cb8e12db4fab29f111494a2c6ea6f203ca0e1db32ab74b8222ba89b0cc139d55cb2bb05b2a317c10c06a99a03773a29e5ce52735374b02d8b34bb4d7c3846a8cc2fd2a9a3f6ab63527e1ee2de4fbe8fa3d6860fb67cfbefeba22d35f62e962c6f671e9fdb6b7bc80ea55eae91b832bcd89513748bce885b751f24fcc0de573418959bafe2e36a6917b2
+
+2026-08-17 02:15:49,951 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.5 rssi=-67 dump=01c2000000000000fe5f030b454250565038205e0000007004009d012a260020003e515aa74e642523b228c88280180364009d27a27aac4800119039b58ade185d2100007ee1a31d595ba0aff5a834e8dcd7c52360c7e30e0f3decd6c362aebdbf6b9a7a1a10b730a9f0712f33b9f9b43f34200000ff52794046f800000057454250565c3820ec0000005000009d012a200020003edd58c44ca8a4a33b300802601b892c00ad7284799f99f141386b00e901e0c175ffa4cbfaabd600e5feb303fbb29577f2468b407628ab486bde53ffc5e1b1a420e70000fef4d7c6087089ffeefab9f7c343f7c3c3f82cc1762fab5d0424b7835ac544d8f6a900
+
+2026-08-17 02:15:50,877 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.2 rssi=-64 dump=2007ff44a3aeb78f6085e4c92cbc8ec1d15c7154a86c577215431267e14838c5dc19c54ccf2406a01a9e857f9961d8e81203f50cb0035af0f65f340c536f2dc3a057d9513fa7fcd3b367eb89aaa0fddaaad2b1428558e36a35acd0c03e22b6a39f3056aca67f52aa0f23408ee980ebafa320537460c7edf31d950708bfecfb590f81f3f9e16ef40cf7183b9592ad63d290573324cfcb955e3bd9245a3f83b83ffc02710b57eec4e3ef22b6b7364c66b772038807e426eb3bb2b91015717de0e6a5d42599ff32ef93b02a81f3938f64dca8fb5c2bc5c5a59f3f3b2526f0b3310b65d087ccde28da2efe49c53704da8b21857dcca764d636d6dba7c4
+
+2026-08-17 02:15:51,488 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.0 rssi=-67 dump=01c20000000000003e66030b448befe5128e7c707e74f3241072317c5645b391ff621fd51e0c6b524946466400000057454b5056503b20580000083004009d012aa00020003ec160ac4fb425a480ae08028018096405b11e8492cba06f516e00071475678090ae6b6e79676e652bc17ff849dac7b74aeaffbbf7dc48a8494be0d4af8e00fe67ef940a330d77197630e34f8000abf2c146259280010595152250565538aa8860400150c5048831ea203040083ec15bac4c67b523b036100b02291809e700adbfa2eaccc80790071e194b4c7ea795a985b8cea76a8609fee9968e8f6dd457afcfa1a49eb0ee544dd1f1148e80c119fdbe37df9e8f82
+
+2026-08-17 02:15:52,411 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=1.5 rssi=-64 dump=01020000000000ada726b38c99cb31273f8e492d68f1a0c820dbbd975f3dbf35d56bd6c7f9cb2a212e4fda071cc006fce9b9bab447553f93f6d0b20571d1dcbd43323cfd48b457e4c1192c603928b373a88da5d0761c90da3f0d62a1939576bc6e5d4890641b89e604f167ca32116bf3d40d8215b016b1dda0ee68a9550010216d5dd7340cb92eec6e07570abadd377c265fd3a2a693c21b13d3100987c7dcac9f31a7a4c09f3488d443afc0df60f5e6205ffe7089a587c3f08d336120880ce2be63fbce2c655d220ae3b71ef83ef5e1faa54103ae578c52468a263c7e864512430e02632f05ba34e0bf5a91ad4e4c3755deb1fac458567e29dada
+
+2026-08-17 02:15:53,976 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:54,256 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.0 rssi=-68 dump=0102000000000000fe69000c00090c082000ffff0f000000000000000e4033c2d934066a88028c578d833c50fcf8a171d9c3f0602788c8bc6198b149c09601ca68aa43a7e493aa4c88f8625306b37171b1d3a68b77d6c2d3cc39b1920030feee885377585cab7ff3d33ec37d86e7bbc132b66eef66d89ef7fb2a0e5eca3b8e8e771b3dba63ddbc34902ec7c661985a02e800006f524946466800000057454250565038205c0000003004009d012a200020003ec15aa74e342523b228080280180964009d328482cfa0719b64000925c6580000fedffebc2742e55bfa9a25dcefcc17f02eb1e663e882c4cde1c34fd45e383f3a7f8d01420323c0e1
+
+2026-08-17 02:15:57,137 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:15:58,358 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=119 snr=0.5 rssi=-64 dump=1fb68afdea3da18137ba6635179ff9a04bbff475e5fd10f10d2f1196d7a60d7c78913813244c187c0a746c709ed0183b2003e889072aa5ec92bb78dadbda4617fb471eff7273bf57396297bc94396ea52e404927d3d0605d86456a49467b98c9b43af900cd20338d3ef1d057ce5194171032c042ff9c51
+
+2026-08-17 02:15:58,485 INFO image_rx_daemon: stats: rx_frames=466 rx_decode_err=0 frames_published=21 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=17 parity_recon=0
+
+2026-08-17 02:15:58,489 INFO image_rx_daemon: air_gap: n=73 dt_med=117004us dt_p95=358996us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:15:58,498 INFO image_rx_daemon: air_gap_hist(ms): <40:3 <120:61 <400:9
+
+2026-08-17 02:15:58,501 INFO image_rx_daemon: rx_rf: n_rssi=73 n_snr=73 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:15:58,504 INFO image_rx_daemon: phase_telemetry: valid=73 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:15:58,508 INFO image_rx_daemon: air_gap_by_class: seq: n=64 med=117.0ms | boundary: n=5 med=359.0ms | post_loss: n=4 med=234.8ms
+
+2026-08-17 02:15:58,512 INFO image_rx_daemon: lost_frag_idx: n=7 idx0=1 (16.67% of idx0 arrivals) other=6 (8.11%) verdict=CLUSTERED-AT-0 | top 11:3 3:2 0:1 6:1
+
+2026-08-17 02:15:59,435 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.0 rssi=-67 dump=01c2000000000000fe72040cf69dd0eb506d68ffe622681531f28e7acaaabc465cb2cd76984d2dd6dca06714d0231636fc527e869242228b17cc9ffa8fe19c130df0b4f8c97cdfffb47f6ce0906f85a5c64bdc5feb86c34456f0d1a8400000c152494646b20000005745425056003820ae000a00d00900ad012a200020003ec15aa74e27a513b22808026018096a009d37825803f64bf55482034803f40039f70f3fe76bc090afccbd530000feed47a80d2921c7ea38db918c301e62192c412d99411f7457b4c458c36985612c2eef000d9d1e36e7d10a73fd1854a54de8f5fa8fed9ae5d9e1658359fe1ffea3fb66b972785960fe7fc22afb24da
+
+2026-08-17 02:16:01,127 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.5 rssi=-67 dump=0102000000000000fe75050cc73e495fd99ebd7f181cae8e71485f17d2f797e18503f25a688d973ce03cea031537df1edb848039098018000073524946466c0000005745425056503820600000003004009d012a200020003ec15ca74eb42523b328080280180964009d328462500850054fcda345b3a6c000feebfab72393b332ffcb3fc976056c53d71cab73e8de35de4b7cc9658d2fe44c1be62dd02d1918f6e2fbd23ffd45f0094374268baeeb1ae16c1292a6c6a9376bf026326f3175c4f968464a45478fd1819a49e3a09eb43795022c9be33fac86ceb58db13e568d25a1d2ce44e608a43333cda163aa2b7415fe495169a5dfe22c057622
+
+2026-08-17 02:16:01,481 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.2 rssi=-67 dump=01c2000000000000fe7f080c16c1e7ddbc66e22be80f8ff8fefceffe4751a82ee6077b7c77090e4b100000d75e494646d000000057454e5056503820c4000000d006009d012a200020003e815aa74ea7a523ba2808026818596c009d28c964025403786ffebbf6009e3fb400895cb720f17224a6a2176c82b9519575610c0000fe52f429ac4d35eb0324dbff8b43fc94ff6355f74ae4bb2017d05fb0be8be25999d7ede9ca38d981ce937f49777248c3c83a982aa2e7d17c822738d6b515bbbfbfa7045b6ca9424dfc663769830da0e9593b4f939ec3d97bf184d20480e827216777932711fb5330b39ca355ff330878a18f91bc3441f6b62e8483
+
+2026-08-17 02:16:03,438 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=81 snr=-7.2 rssi=-101 dump=003605c7461e14953dc14d01a4e4174252a4241bee1e24b2e31376f3331012f9628beb8e4958b2438e7497b2ee7659ec5ab5b36876d56097efebeb237480f821145f03935d9b93760474d397457686d2ec
+
+2026-08-17 02:16:04,990 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.8 rssi=-65 dump=010200000000004557429be1b7bce976b31e1ba40b58a4e1ecb000c5427396a341d3b77efdead54a9a0dc57bb9a004bbd17a80cc991f457400f0458d56de1c26596c6b14620d099ea92acb728366b3b670a8997e1d9800aaf2dd4443983007fb35f8d8730570bb8106594981f78e38aaa3d0157f09fe88517af609da71bdc7c2953b67bec91d66b1add5a38385153a658e86dd12b63f78e5d9464f05374f2fe446da7b63e397abcece4b5b2f3ea342cf5e6bb8b4b2ec8c06d50607c10df4f5331251ccfd644b8167bd38f864980fa0e8ca9168f2030713013e4d4a396ba3674aa63d32a7a6fdd4637d97ae79848ac0e8a9d467e01fdf1e0ff6e5f8
+
+2026-08-17 02:16:06,523 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-1.8 rssi=-63 dump=b83676a1750b8a20d7d0bdbca76600c254a59dfc59f147817abc967f525b1e68fdf21296fe3f8632fdf96ecfee8f8e0e5f150d896105c6fac8a3231836de50ef1a226604053adedb61b4810d3fe36d0557a89bbd1bbe7b665249306d222b41693f510f6e7eb231b16b38b7922b03c9756a71673576ebc9319d6c5618a4ace3d8d3a5c2073c051c95ea1f68bc91e8f1c4b68d74ce02d9c14fd0a29b8e8da641de1cf56ebda354b5c69949b70fbb02fbfaa301fd7224ba2bdfb1ae82615fac1ea169ed315b4ca533328c4f3887c00de9f1d67e6f0b58115179ceed73775a7808df14288fe3d516e55b6b6ed800d7d11fa88f81a43431f2476e0eafa7
+
+2026-08-17 02:16:08,085 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:08,541 INFO image_rx_daemon: stats: rx_frames=540 rx_decode_err=0 frames_published=22 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=23 parity_recon=0
+
+2026-08-17 02:16:08,547 INFO image_rx_daemon: air_gap: n=74 dt_med=117002us dt_p95=261890us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:16:08,566 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:1 <120:60 <400:11
+
+2026-08-17 02:16:08,571 INFO image_rx_daemon: rx_rf: n_rssi=74 n_snr=74 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:16:08,573 INFO image_rx_daemon: phase_telemetry: valid=74 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:16:08,588 INFO image_rx_daemon: air_gap_by_class: seq: n=63 med=117.0ms | boundary: n=7 med=261.9ms | post_loss: n=4 med=234.1ms
+
+2026-08-17 02:16:08,598 INFO image_rx_daemon: lost_frag_idx: n=7 idx0=0 (0.00% of idx0 arrivals) other=7 (9.46%) verdict=not-clustered | top 11:2 9:1 4:1 5:1 8:1 12:1
+
+2026-08-17 02:16:08,922 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.0 rssi=-67 dump=01c2000000000000fe8c050b8aa08a7c014c75ca58153656a611e8bf5e547a9a0ded4d5a4421be6ff1b61ae03cc6bc7bfb47a9dc6891f07efae8448680000071524946456a00000057454250565038205e0000005094009d012a200020043ec15aa74e342523b268080286180964009d32e382b5a0c042a02a7e6d7a2d6b5000feeee45b7c585ca37fe7a67f017ec0f2ffc0e483f7d8dd23b18c30a6d91873a2421e050b48d6f0c3214f2f03dbd05980a0006f02494646680000005b4742305e5038205c0006803004009d012c200020003ec19fa74ee4a323832e080280180964009d2fb05a00042802a7e6db87da340000fee21f1d545ba0afff
+
+2026-08-17 02:16:09,609 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=1.8 rssi=-64 dump=01020000000000baff8331bb2079344435e7f5ea49274bdc7b6748aca8f67d563aac610d70be45fe4c782cdd06e5ef3b1c4ef10024d8cba23038ca67980ff17828aa974aec94990f117cc3f40cdefdeefd0826618057bcb7ba42537ddd89158060309bded9497622f03410c6509ec6228323fe762f918c2bed979386dbb5e6af715a6a98354f05500db89b9b6993a914aad8e658e78b8537b4cee627cdfc6b04a2f24838a346f093210b79f16065da7065459d0f47d87088eef68c851d7ee73ecdbc3fffeb4e8154bf2496db75209e6e7d55bfbbb23cb9d5eb1968e7193fc4af39e51e3900cb9bc7ad3b39266a7eba7cc9bf6f1ef59e1d6252665a
+
+2026-08-17 02:16:10,218 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=1.2 rssi=-67 dump=01c20000000000003e88030c5038204e0000001903009d012a200a20001e9160b0583327a7a79300904b2004e998de2003f90c7200fdb2d0e4f34bb2ebdacb755395fd5dff67a9cf6d9c34b986ccff4f317335f458498009bee36618e9d3e0000c9752494e46960a000057454230565038208a0000c01005009d012a200020003ec156a24ba7b42331ba18083240180968009d0284817faac880029cd7f01d55ad2213291d6a0601fe29dcd7856dd057ffc1a0ef9d9772b8d3658adf1ff532ff26c4a161e85fe3df8a22e7ff2b144bfad640783759fb68d0d0bfaa03df5c54fc0a15387fdf5fcaea9ae73ffbaffc1e77b7f7f9f3b7baf38be40b2c
+
+2026-08-17 02:16:14,275 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=1.8 rssi=-63 dump=01020040c823bba154ad766b12b3c125de1d79f8ec45e31636f5818d250e9c9d4a2b69415bc33cde3c14afc5c4d02ddd03943f8964fe97141e835e52a500628bba1ec0055b1a3abcdb9fdbbb0ec8e0175f50861103b2f763c7bd8be85f9d9a88d16d39fe854b3659422df2ead73fd300af6d0055bec48a6468b23ee1255c8ed4653812c3760cdc6b755d6e3f0b11d6ad938ccd314d3f9979c592d5511c9b792de5da63848fe92609b87e1053f15286463389ac0ca7842532d5dd75a332985488d9f134bafd8b4539d0163cecaf89f1f12f6b49006d106ef5a01250afdf2f3f0de17d117bf1afa0250559b40b2f806866e6a5c4863d68b69c5ba0a6
+
+2026-08-17 02:16:15,231 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.0 rssi=-67 dump=0102000000000000fe92060cd3fc6f0f295017bfecd11506f47eb200bd52494646b60000005745425056503820aa0000007006009d012a200020003ec15aa64e27a523b22808ce8854e5d787b01e4246020c0dabd8e5099e7b97f2af6710eac20178517d67a9049bbb7d68f3cc9a037cd07640edbc161e7dc4608e83971a0100bfe959b6ad2872314fc4979b940bee4e2f503d218433bd8786076c30427b94486191b24acad792319d89a20894df5e27203a5c176f072566328226a802f4d7efc0dd816a50aa44f53b4f626aa5a647d7ea9356a84518a393ac01a6a942094c46021c000054c542515058380112000006fc3400d7011a2004285322
+
+2026-08-17 02:16:18,627 INFO image_rx_daemon: stats: rx_frames=615 rx_decode_err=0 frames_published=22 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=28 parity_recon=0
+
+2026-08-17 02:16:18,631 INFO image_rx_daemon: air_gap: n=75 dt_med=116994us dt_p95=261722us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:16:18,639 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:1 <120:61 <400:11
+
+2026-08-17 02:16:18,643 INFO image_rx_daemon: rx_rf: n_rssi=75 n_snr=75 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:16:18,646 INFO image_rx_daemon: phase_telemetry: valid=75 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:16:18,651 INFO image_rx_daemon: air_gap_by_class: seq: n=64 med=117.0ms | boundary: n=6 med=262.0ms | post_loss: n=5 med=233.9ms
+
+2026-08-17 02:16:18,654 INFO image_rx_daemon: lost_frag_idx: n=7 idx0=0 (0.00% of idx0 arrivals) other=7 (9.21%) verdict=not-clustered | top 5:2 11:2 3:1 7:1 6:1
+
+2026-08-17 02:16:18,989 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:20,567 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:22,149 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:23,708 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:25,301 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:26,892 INFO image_rx_daemon: published frame_id=0 2986 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:28,489 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:28,682 INFO image_rx_daemon: stats: rx_frames=696 rx_decode_err=0 frames_published=29 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=29 parity_recon=0
+
+2026-08-17 02:16:28,687 INFO image_rx_daemon: air_gap: n=81 dt_med=116947us dt_p95=261307us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:16:28,698 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:4 <120:69 <400:6
+
+2026-08-17 02:16:28,702 INFO image_rx_daemon: rx_rf: n_rssi=81 n_snr=81 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:16:28,704 INFO image_rx_daemon: phase_telemetry: valid=81 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:16:28,709 INFO image_rx_daemon: air_gap_by_class: seq: n=75 med=116.9ms | boundary: n=6 med=261.8ms
+
+2026-08-17 02:16:29,226 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-10.8 rssi=-45 dump=0102000000000000feae040b023a0e89ff78be47e3548591c61f04ecde2b237f4b3efcbb709d70a046d84d2befe45c157fbe18e1ef864e31e1ff9dcec3df0c9c65ff13477d3bdaed8d48ad0d8b28280000eb52494646e40000005745425056503820d80000007007009d012a200020003ec152a14c27a4a322280d50f018096c009d32847036c023003d003f5ebd20099034803f4003b38a2ac68dd03be80c2e49c08e3b84785e54da0000feea82682280098eb50f41c34ae3bea93e9e25a76ff35b8da4258dc0649dfd441ed4c9b33c763cbbb2dffd1827ffef86387be1a8fbf49282b7dca0f5547db78a0c4176bcb066f3c7ae76459c1958dadc
+
+2026-08-17 02:16:30,030 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=3.0 rssi=-64 dump=7cbb87aef2414e35edc13b059dfbe1aa8efd245e3f79c412de1b482dcc38b3fd61c0e0d3a5112d3c2f1faee9d8e21d632d86174251edbc8cfb438121a99a9d5186eb1942550813089919125cedc8e0b4b02505e2aa7858d5f048cabe6152a602653b09312330aabaebb222daae4e961d5655d40acc31aeecb30071726ca011ef7557b6b97bd3da16add76d49340f63431de064b42e9ce9abdd469050bf45386e4894254451ca240dbc32f749a93b203a76bdde30a35235ce739e0eb405871982d63e29bb115c24d321e4fdd8bab36dbfce5e90d324154596d2c38a53d156f702ecf5c5ffa2e21474e138a1150d253084410f749442fcf9d52e8ae0
+
+2026-08-17 02:16:31,557 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=3.5 rssi=-64 dump=8982006898c1e1d40d16ae5c76eae9b5a5c133ab2aac22101b1c2f0e2bfd79617b851650a1a7335ee49f7ed5f9daf4cc421b661c27510a7ba67c8dc8e3e40cb26b569666bea58c97a1a49029b7e7382e7e43e754c4c8a4862e2fa1400d8cbff6fa438160c173db1d4686f091d64d4d4cbcf11f92e644cd6124e09c22509de40f82de2c49722e259d83875c6e51aeb42bdb6fc198e27c6a682c8d458f5bb95177ca3c3a052cca3c94398b93a8161fc0d1a5992353003a9cfb81309f36a3d46ad218b5ed0b26afb2cfbfe798b297434fb67b58bb5d6b4665325ec47323734cff53905a893cb60f2dc5d8c5fe6caf293dbc57c0e4f0a524095eb0fb92
+
+2026-08-17 02:16:33,127 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:34,095 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=3.0 rssi=-67 dump=01c2000000000000feb7060c2beb3f305b9a98d778f25042cf9c805ae040d921c4dc04182ff9b132142ac060e352494646dc0000005745426056503870d00000a090060097012a200070003ec158a44ea7a4a93328080a6018096c309d28823a4d300abffd264c6002200d0e05e473824ad9eb61e855c61726353e2f1e0000feed87c23867f5159d048d6cde7ef8b43fc94ff6312578ec07cdaa77279a65898b11803ccfcfdcf6bbada7875b8335e4458144ddd51b1eb492ba99cdce49859f2bf6b75cf2fca305adce5bf311dc49220ec873acb9e33bdfa365cfd1fa8cc380231bff79ad67c724c20fa7067c549ea846aac75134b35dc108825a4b
+
+2026-08-17 02:16:36,260 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-10.2 rssi=-45 dump=0102000000000000feba0b0c64ad82020db49f20334daad64f45979d07ade20ffd215be843dcb5ca20f1e07a49192bffe6b9eaee9592b6081996db42dcabd312b1448d18eb1bc9475d3009b5d6fe17edabfe4ec37e2d0d920417df38fd1600504d4400a1524946469a00000057454250565038208e000000f003009d012a200020003ec15aa74ea7a523b328080260180966009d2faf1560065cc0ae940bdb7e00feeb8bf6e9e41395db4736498ff78935ac7ccc0cd8fa59f7e462dcfc99ff51fdb3ff8fa70fd3fe8bbfeaf6487c9ecccba0427748896d1d2096111f6dd1b4d9946ddd050b87cee425d2bbe929388b7caf670f08d911aa9408f639
+
+2026-08-17 02:16:37,343 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.5 rssi=-67 dump=01c2000000000000febd070c0240180966009d19a00033b7c394d6f522b6170c956f9afea4c3bc03fdc4c8fccf58b464fc33412fd772f04370e45f1fa9d4d3916faff1f73bff047d8d63ffa639277f1e7e055b2c58490d2e31f590b4e4e43ff21ff54835f9d3cd4d8000005f5249464658000000574f4250505038204c0000003003301d012a200820603e0148b05827d3252514026818096400ae4b8e85a148ae0000dc7ad0e4f54bb2fd8f62146e9f72de39ed9d9cd45a3457e25ecb27da99afa2c24ff5cc48c4e74640002d52494646e4300600574542545650b820d80008001000009d012a2006600034c14c9e4aa7a422b7300802601809ec
+
+2026-08-17 02:16:38,722 INFO image_rx_daemon: stats: rx_frames=770 rx_decode_err=0 frames_published=30 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=33 parity_recon=0
+
+2026-08-17 02:16:38,726 INFO image_rx_daemon: air_gap: n=74 dt_med=116995us dt_p95=350870us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:16:38,734 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:1 <120:61 <400:10
+
+2026-08-17 02:16:38,740 INFO image_rx_daemon: rx_rf: n_rssi=74 n_snr=74 rssi[min/med/max]=-68/-67/-67 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:16:38,743 INFO image_rx_daemon: phase_telemetry: valid=74 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:16:38,748 INFO image_rx_daemon: air_gap_by_class: seq: n=64 med=116.9ms | boundary: n=7 med=261.9ms | post_loss: n=3 med=233.9ms
+
+2026-08-17 02:16:38,752 INFO image_rx_daemon: lost_frag_idx: n=8 idx0=0 (0.00% of idx0 arrivals) other=8 (5.33%) verdict=not-clustered | top 11:3 4:1 5:1 6:1 12:1 7:1
+
+2026-08-17 02:16:39,406 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:42,556 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:43,308 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.5 rssi=-67 dump=0102000000000000feca040c34323f25b9c9ab4a3101d96ca1f51eca59513bdb24d614373f9f3edd87f92442552c48ec6cc3b8bae1b3b2e0cccd833a2d60beaf5f53d912e74e8b2c8312a74749fb7d169cfc34d5330577520bd2f656ee84b15e6cd1fae32bbad6e4c10157ffa501fa4bd600e5feb303f92fa007e8007670f3eccf3c67eda61429ae7e28b28a49a1f50000fedeab7287c49a0596754536c0825537c017e3a7e8f26359a718293dfff35fbced4fbd26ffbe271ad9d047b19047d084f57c44f163d48f3cf9899421c2221eae23a1745c3399dd604680061ffb47f6cfc94d1983a6d72d0f54fe3cd54a1278883f2126021dedb46f8f06
+
+2026-08-17 02:16:43,775 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=3.2 rssi=-67 dump=01c20000000000303ec0080fc781f7e86a3f3a7f9241ce49cfc5268f1fb2696255558378009b52494a4694000000574542505650382082000000b005009d012a200020037ec158a34da7c532b2290aaa5048096c009d390039beaccf668900f40a220029697edb2d7561e0c45f6dee8000fe6093787d7aa5d72f8abe83b05778de5663ffdde30c979e1754c6fd851cf2aec5432373274c3f11757db152cc09066673f4af37f06f2638086727d818954cb555aa9f6b088efe0d7998b914237ec00000dd52498344d60005006745425056503820ca000000900700cd092a700020303ebd4a9f4aa72422a1b7f55800e017896c009d32847037a0719a
+
+2026-08-17 02:16:45,732 INFO image_rx_daemon: published frame_id=0 2919 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:47,303 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:48,787 INFO image_rx_daemon: stats: rx_frames=849 rx_decode_err=0 frames_published=34 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=36 parity_recon=0
+
+2026-08-17 02:16:48,792 INFO image_rx_daemon: air_gap: n=79 dt_med=116940us dt_p95=261907us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:16:48,801 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <80:3 <120:65 <400:9
+
+2026-08-17 02:16:48,804 INFO image_rx_daemon: rx_rf: n_rssi=79 n_snr=79 rssi[min/med/max]=-68/-67/-67 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:16:48,807 INFO image_rx_daemon: phase_telemetry: valid=79 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:16:48,812 INFO image_rx_daemon: air_gap_by_class: seq: n=70 med=116.9ms | boundary: n=6 med=262.1ms | post_loss: n=3 med=234.0ms
+
+2026-08-17 02:16:48,816 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (3.95%) verdict=not-clustered | top 9:1 4:1 8:1
+
+2026-08-17 02:16:48,896 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:52,059 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:53,626 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:55,195 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:16:56,762 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=106 snr=-12.0 rssi=-115 dump=d69b2c74e09284131bca66f3161f812a6a90101fcd063c26ef303da20d2af5895ff9e02b7174cce1921e5d1acb2f002a5f52650f8efe7e2db13fb958cf2fdc4d5ae17776114170f4b69dbd1729200bdc3661ec17ca2bc86b853d87c0c0f824b64c828bbac0beea7797ea
+
+2026-08-17 02:16:57,382 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.5 rssi=-67 dump=0102000000000000fee6030b448bef40128e7c707e74ff241072317c7645b391ff621fd518006b52494646640000005745425056503820580000003004009d012a200020003ec160ac4fb425a4b0a808028018096400b11e8482cfa06f416e00021475618000fe4b6e49a766252a617fd20a6b85bae0e7df4dfb898fe859596094a5d4b366c98dba6656511465e6b68e79643dfb6319b78165268f3fd783cad09a3bd443800050005005009d012a200020003ec152a44ca7b123b33018080260180968009d2fa27aac480790011a014b4c369755a1158882a76f8000fee9dc8e866dd057ffc5a1a49bb2ee57ed91c1d49e80f115bd8ef1d78e8f42
+
+2026-08-17 02:16:58,304 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=4.5 rssi=-64 dump=01020000000000c67afe6adff302aa4642122be223c8c76d148395d44a118abb2145bb6e8f66c57adf80d5888b5658e2f3b3640b0b87858845b5b708a7e1bac7e51ccda51a6f1e4ef3a15e1a72d1ca9e1379cddb0fe9bd040edf8c0b1027806d1217e6fbdb136d3977cb986ca7ef959c2dee38c7c166c357c5c9fcfa805a1c94f0ab86e646c8d301395c1174721a927d7ca1b89d6bd67a816b1559aaba115e7376b9664acdc3cfd29eecc20e2d8e0aae1de84ac27f6fa86b5018043b6e96d97e2a51488581f5a0de109abcb19cee1b0386eb77ae89275d180ffb0989fae11b70fedbafee52da6d1cdb1c41e0d235640afe51ffa02e1190faeab014
+
+2026-08-17 02:16:58,833 INFO image_rx_daemon: stats: rx_frames=926 rx_decode_err=0 frames_published=38 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=38 parity_recon=0
+
+2026-08-17 02:16:58,837 INFO image_rx_daemon: air_gap: n=77 dt_med=116983us dt_p95=263099us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:16:58,847 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <80:2 <120:64 <400:9
+
+2026-08-17 02:16:58,850 INFO image_rx_daemon: rx_rf: n_rssi=77 n_snr=77 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/7.0
+
+2026-08-17 02:16:58,853 INFO image_rx_daemon: phase_telemetry: valid=77 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:16:58,857 INFO image_rx_daemon: air_gap_by_class: seq: n=68 med=117.0ms | boundary: n=7 med=263.1ms | post_loss: n=2 med=234.1ms
+
+2026-08-17 02:16:58,861 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (5.41%) verdict=not-clustered | top 10:1 12:1 3:1 11:1
+
+2026-08-17 02:16:59,732 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.2 rssi=-68 dump=01c2000000000000fee90a0c00e1ec9896466f40009bf2494646940000005745425056503820880000004005009d012a200080003ec156a24ba7b22331f01808024018096800ad333442cfa06500ee0005392fe03aa15a4426e322f20008fe891696ab6dd057ffc5a11b63f5b3f87b4077c7fd4cbfc9e2c6875529ffc835d3c9425f844b9423fa6989f05ba76c51459bf45f2db2e351a3f41a7de563fdd7fe4feb6ffbfd7fdbdd6defe6791c4606c4b0c000db52494646d40000005b4742305e5008a0c8000680b067009d012c2000230a3ea9849a4a96a3a2a12768009015016c50993e862036f13f687830a63ff456bc806d9542623e2e8e013a
+
+2026-08-17 02:17:01,445 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:03,027 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:06,200 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:07,787 INFO image_rx_daemon: published frame_id=0 2974 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:08,890 INFO image_rx_daemon: stats: rx_frames=1005 rx_decode_err=0 frames_published=42 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=41 parity_recon=0
+
+2026-08-17 02:17:08,894 INFO image_rx_daemon: air_gap: n=79 dt_med=117022us dt_p95=261831us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:17:08,902 INFO image_rx_daemon: air_gap_hist(ms): <40:3 <80:2 <120:66 <400:8
+
+2026-08-17 02:17:08,906 INFO image_rx_daemon: rx_rf: n_rssi=79 n_snr=79 rssi[min/med/max]=-68/-67/-61 snr[min/med/max]=3.0/5.0/6.0
+
+2026-08-17 02:17:08,909 INFO image_rx_daemon: phase_telemetry: valid=79 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:17:08,913 INFO image_rx_daemon: air_gap_by_class: seq: n=71 med=117.0ms | boundary: n=6 med=261.8ms | post_loss: n=2 med=351.0ms
+
+2026-08-17 02:17:08,917 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (5.19%) verdict=not-clustered | top 10:1 12:1 4:1 5:1
+
+2026-08-17 02:17:09,334 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.0 rssi=-64 dump=01020000000000db4ff3aab407b52ad36c1e2ba16a4862692cd08cd473148abb22c5bb7e0b66cd73da0df4b8b5aaf7bdd50fd628892ce9749135499d6f5618223c6c3b77e42c29f8b5b232fe0766733f62a1da7e3d0a8aae915e047b521897c8b3f0e1d54a6088cd4ef9ea0de3edf2a2938619770a7888511f3601d9feb5f7a41dbb4737892ce53dbdb6a389b4d0706dfdc0d5024333d0ecd5c64fc3afd71c2e4eca1463e3f4ed465ec1df2f5e664aff98e5b8273ee8bcc55b16244a89e7039f12540a7d74ddc96fdef4d154fe4fa8a836114831220770e13a7c2d356baaadcaf6382cb69577dc52dd1faa1a288bc08d25d4672f17cf2d03c6b616
+
+2026-08-17 02:17:10,765 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.0 rssi=-68 dump=01c2000000000000fef50a0b003ec15aa71e342523b228080280980964009d2fa27aac4800119039b6cade185d210000fee1a31d515ba0aff5a8f4e8dcd7c52360c7e30e4f3dece0c362a4bdbf6baa7a1a10b770a9f0712f33b97cb40f3c200000ff52494e46f80000005245423356503820ec0000c09008009d012a200020003ecd58a44ca8a4a333304802601b8b6c00943284799f99c141b86b00e901e00175ffa2cdeaabd600d5feb703fbb2bd77c2468b401628ab486fde037fc5e1e1a428e70000fef4d7c6087c89feeefab1f7c343f7c349fe2cc77f2fab5d0424b3835ac042d8f6a90295099285af474a49c62567e0dc273df567a886e9
+
+2026-08-17 02:17:10,862 WARNING image_rx_daemon: crc_dump: irq=0x60 rx_len=255 snr=4.0 rssi=-65 dump=99e105c74b8e0ce2b5472738d3394ed558c4adb31ac8959a0830f7ca9cbbce5dcd7091edda0b3ce52c5ae4ec57b19811891b05ecac364d74429fda153a0ae1d75638d5d2c669d879cfd5d8ea729c3ad1ba442c6e141e09f77458165827e798c3bace57d6cdd7310f4322d2fff58d08210b7799ff614478e42ec57c6218e8cf024431c6a06536a5434b5b83919c5961a2a1f22f852fbddf355d7010838503894f3213a1e11b1c7d696f123561362cc38584196467f82a7f6b71e97998bf6f1c24ad80ca4fc7f0bcde56f329d3a0ed291c5e79625d8a4d9426b30b69494ce6cec7d4e351b2fe8d5b06fe86485771148f7a4f54a2bbe0a4c91dcbd872
+
+2026-08-17 02:17:11,594 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.5 rssi=-68 dump=01c2000000000030fe0c040b689be0960984f00adfdf01221ac076b34e77db94123ef223180429ed2e9f2c9d1ff923d70bcc46a26448d26beab1800050f3524946c6ec0000005785425056501821e00000007007009d012a400000003ef564a84eaaa5e3a6300c01501e497c009d32d5384faaf0ff6406d80bbc0de1bfdaa67ff5981ffd121d1c8197fd7848fb32de1fa9096cf381e800feea833cf2a034a4a66886241162f07cdaf37e1dbacc921f3fffff9c7f9e8df3d7d38ff973d835dccee3c4839f24c6ffe9d36dd8aedc0971ac0ae28a32105f60fff60239f205ffe4065411582b03a63c7744ea79b5889a890e2627c27e1f97c8f8cc77d2
+
+2026-08-17 02:17:12,176 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.2 rssi=-67 dump=0102000000000000fe06090b4aa72422a2308c88e097817c21fd31a64e78fec2ea1ee66317add73311932cc7fcb650c3671a708d319bb454cd9735594eadc7944723d936baec8c3284548193096844584e3ba75252ede2ee88cf6b73ae38f6ffc28e001759f7e25d283fff295b04eb27cf84e7e269ceb2b3152a9f3cb71e31b2bb8390524878681b3e5d51775ff5949ff13e3631fc437783633b16f0d06932aafd5c252e79ea97b009cf26c1f2115fc196d935cf15881d2ddea163936fb608b56f48bc474a036d341a0a2eca821f6f72f8ccb593fa892a6e33ef4618a1365f8f08ae5b9575c000006b524946466400000057454250565038205800
+
+2026-08-17 02:17:12,392 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.2 rssi=-65 dump=01c20000000000d1b22c6a42aafcefcb1017285422f991e56435192de528125261b75a98a4c01d02ac51cbb4f1e01d20a0de959ee59a35e27b364ba86935ac180eadc369dd58082bd2ae6f9b11805102d56e96326e6cb8e9940272897734cecc33f45ad6ad543d2df3771839e07f3b93bbdf913c27f40d29985f31fd5c41ad15414acf9db7d5e4265bdb40293f845100f8b8a9a1f5c6180b41d6f014400997eef170fc21bcab3dc2e5d85c84d99253edbac1d920fcd6e40d34e5548d57d5a24ac23e8706633a512951dbad56bdeacf93750a08505c23ead0657deb1857a30cf409158e6cdbb54e4867b02fc3ac006ee013fad62791977057a607d0
+
+2026-08-17 02:17:13,965 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:15,555 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:16,616 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.0 rssi=-64 dump=a45dee8542ee13e58b939e2fee7f73aa6883183a355cc2161453b137e16d0087f60372dc47711fdc16a6884e855af0286a930b7dc3303970cd9b94b3cd454526972917d525422d7618c21e2bee4437b942cd9dbe5b5c56c8b03fd25a905b1e258f9ec1906cb92504673a015929b6a950bedb08c99b814353c7571f84d3699dcf36b38c895c573af545a21c6a27855a774164e831bf9cc0b0ef863c72e9c505108ba00e5ac4dd1a1e8a633a625a885b0c8d04a68ef5966ec872cc083b4e3787068d3b8c0bc1a48f17c3cb58ec849555294e1f4acb4db0d4ec371857cbe420588e17442cd14525abdfdd24dae09f2defb9cc0340ce0a8e9d7e70ca47
+
+2026-08-17 02:17:16,863 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.5 rssi=-67 dump=01c20000000000003e0c090cbb338b5a2bc70000fec344446513bce07023026cfb83f19cc7762ba2ca01c7f9fd67851425e38e75ece85a88ff8ed37287a3e43e66b75dd91a3d780df9c3c6bbb7558e000f49020b9d08305980667b25b694b49d5b4504f3df5e7ca4ea9924d6633bf5b9eff56e8ca4ddfe17969c0424cd4135adb9f3df527c9ec3d9c4a6542d7f6cc78c06190000ab52494646640005025745425956553820580000001004009e012a200020003ec15ca64eb42523ba2808c2801869e4009d19a00021cc70892b1320f64b0000fee8773e13a112ab9299fc98f527e55e69af5b00fb382f473d726664b0565dc70f919268312ae55c
+
+2026-08-17 02:17:18,691 INFO image_rx_daemon: published frame_id=0 2949 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:18,964 INFO image_rx_daemon: stats: rx_frames=1077 rx_decode_err=0 frames_published=45 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=45 parity_recon=0
+
+2026-08-17 02:17:18,969 INFO image_rx_daemon: air_gap: n=73 dt_med=117005us dt_p95=266000us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:17:18,978 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <120:58 <400:10 <1000:1
+
+2026-08-17 02:17:18,982 INFO image_rx_daemon: rx_rf: n_rssi=72 n_snr=72 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:17:18,987 INFO image_rx_daemon: phase_telemetry: valid=73 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:17:18,991 INFO image_rx_daemon: air_gap_by_class: seq: n=62 med=117.0ms | boundary: n=7 med=266.0ms | post_loss: n=4 med=234.3ms
+
+2026-08-17 02:17:18,995 INFO image_rx_daemon: lost_frag_idx: n=8 idx0=0 (0.00% of idx0 arrivals) other=8 (10.81%) verdict=not-clustered | top 11:3 9:2 10:1 4:1 7:1
+
+2026-08-17 02:17:21,848 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:23,441 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:24,215 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=130 snr=2.2 rssi=-63 dump=1ff418f6a041ac18dc92fe5ed0e81ad795e00893bada0a1546a6651ccb03af52dd56b4584793916faffafdf355c87994c43bb96cc719f22e892a3067d3773bab166e63b265b6fbe68721c76bf76947b2c98d06bf9c1bae23bee39354e19fb7fed0397e3086a7d36f02ede615eb1ee1194f05a9cfb8bbeac14b56c62d18142c59eba9
+
+2026-08-17 02:17:24,983 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=0.8 rssi=-63 dump=01020000000000efa4c00d0b42e8ed2d4bf9c6dad5afd79eebfcf4b90830617d4e8cc7c97892c78ab8ee0f4f086b6840cda9e1aada032c2a97b3b103c3f0455f9e15e2ecc7190016b6ac42bb713ce9be4dfdb5f5e8cf33d11d1b840c0cb7de53da94264c771fea2bfb58c0f042eee7ada442da06a444701885e90728712353c018a66fb42aaeadc25221833c0b1e3af6e661dabb75e258e379edfbee00802af11ccf7463f6cb208338b99caa59633af7cb2c10334943027f87d3b9335f723d0df5456962950a2786f887764cfa15c25a9ba277a9f8fcbeddf96539941c4ab031c66f95a964abc9f83a3b6a3a4031285b8aad2a7277b02273b11407
+
+2026-08-17 02:17:26,185 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.8 rssi=-68 dump=0102000000000000fe1f88928110b5989f98003e60620c4c183530f0ba4143273932089eda2b4d17698322227036d9085a9725eea0612a9cf7cbe6c4a4002eaa4709c3b9770906e9bc2da03228059f8ff0373a6042900000fee11de87c829a7b1a5f7f26e99ff9b03a6366f31368f1e3ed653c962ba046833ef0d4af0924978703765dcffa2d6041e149362f5a2fa0bcc6fba7f7fb165a3fdb7105c5eee444fbb656be3dcbc27699647277fa5e54466d57dad4ec082d352934b8314180adafd692a06e23e8cf8b841118a526c78bddb0f5b8d8bddced894e454aafc0f34dd3b43014e2c1e2d3b18fd2480000795249464672000000574542505650
+
+2026-08-17 02:17:26,519 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.2 rssi=-63 dump=ff90b899be1e0c4acf03f3c3f097f55b8d5ebaa6cc4ba1bbcb78eda9bdeeb98550a5dbe0553f2b15691d8e485ce23cf624b6c20bc02d3d9f9e9610a42887b5602743a29737476caeb1c0197386bc8662c67679f4d89016094ebfc8a2391c6ddf93ba7e9549a0a6c94072a6a32a42cc05ada0e0bdceb2bfbd70d3318e97231f60b0f34f19f5dc3122242be709e6e6e560cfed0fe3af0f30ce98884e30689c4862a263cb48198033ce9641a9f789b02a2874f2443b3a33d429067393118803251cdb9fb108518e63c0470fdb42f51265e99e926fbf2f17941721d80cde9a929c566c8761d92cdb9a3e31036fdcac92ccadd3657dfd5c4d6bb2a30a9c
+
+2026-08-17 02:17:28,081 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:29,022 INFO image_rx_daemon: stats: rx_frames=1152 rx_decode_err=0 frames_published=48 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=48 parity_recon=0
+
+2026-08-17 02:17:29,026 INFO image_rx_daemon: air_gap: n=74 dt_med=117015us dt_p95=260278us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:17:29,039 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:2 <120:61 <400:10
+
+2026-08-17 02:17:29,043 INFO image_rx_daemon: rx_rf: n_rssi=74 n_snr=74 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:17:29,051 INFO image_rx_daemon: phase_telemetry: valid=75 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:17:29,056 INFO image_rx_daemon: air_gap_by_class: seq: n=64 med=117.0ms | boundary: n=6 med=261.6ms | post_loss: n=4 med=234.1ms
+
+2026-08-17 02:17:29,060 INFO image_rx_daemon: lost_frag_idx: n=6 idx0=0 (0.00% of idx0 arrivals) other=6 (8.00%) verdict=not-clustered | top 11:2 2:1 5:1 4:1 8:1
+
+2026-08-17 02:17:29,596 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-1.0 rssi=-64 dump=01020000000000dcba0c2778a221864332368e66b7b0d9258d7e484924c658c88f38ce80501fb21568151a96b121b10904688b1010213d4dfbfad0bb499f0492bada882f3ecfe595acdea9b067a150c360e5ef0ff8b5a7ebddf221e95a54e1880e108185e1d4b28cbeec6675c6691861f0ac6340e4cdb2b423bf46673ed76b494ac54547d612ab7ae2b30185b542d1d89140af88e5a100c9489c3d40c26fd9d785ee9830754e64c079441ef68779b9dc43d2aa2b93402a764753f11a8ae1a70501bebd81544c3b939de1ab978b9158efe90face00ecf88813895e35a83663fcc2f09b4c77f77f05d05da6cc6d79150f4a1ba628191e443089dcdb1
+
+2026-08-17 02:17:29,856 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.2 rssi=-67 dump=01c2000000000030fe22006c00080c082400ffff0f00000000000000009073524946466c000400574542505654382060000900500400bd012a800020003ec13ca74eb4e523b32808028018c964009d332547fb200042882a1e6d9a2be69800feeeb7d37a3a5cab7fe7a67fa4dfe5be07f5c1ccd3375ab48ef5663837d29b7c70ae005e162347a72e11023ae9ead906100000006ff24946266800000555454250565038205c0000005004009d01aa200020003ec15ca74e142523b324080240180964009d3363882f200042802a7e5cdae3e94006fadffdf02742b553ff07177b0d480d75bb1464c4dab8d1a5bd2058ee0fbca7c4540ab9f185bef4
+
+2026-08-17 02:17:32,750 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:33,234 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.8 rssi=-67 dump=0102000000000000fe31020b2cfda73758b41f8e45ff4208691400d09095af0a2a0b8ab43dfe5edf93a5275a0ebee5f4c8f08f23fc55ddfa75e4faaa277e99e02206ff89c423882d8bcdd84a2a603acf1c3d18dfcfd63be53b9ede5d62750a99e5ead553c63bc864ed9cc8dbd959f3a7e2a9a153c3dc9e5003522258800000760509fd1d2a23a622000e815ca78eb225702329086288180ae408a92d793432a2000a8332839d2264a7fd40009de5617da5c52d4b4a8f85269e28a30bb2f919adbf35e6f78a853c5f53717f5715c845bf909c388e68000041d24a4a466400200a6785464054103020590c10003504009b0122600b203062c55aa544
+
+2026-08-17 02:17:34,271 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=1.2 rssi=-63 dump=898a884880412ac2c6da1bcd21e9a2a94a8c33b2f4e51e7dba5645d460fcb4a04b721020c860f90793947766524dea1fbec9b5dda255f9535e597466e09646625da928e784ef8ffa17c920a0ebfa9a8a7b189c9e49b14b336c1c6bf9f823b88789bba5d9e3d0df48dea9c506a2fc3412f540fc57f5b737dd111fcad383d2a4a6e56641ebf857801141c14fe0bb9b71b6ce2a07295799d85ac7535046ae2d65fd76f601ea545aeb89bc983e58446c4fdb944c2f7c66f5ab062a812b10758dcf644944be81ed4e6653ee54760ce49f96cd2dfe2d5915d220700968c5a481cc2cdb307984abe958268fd9040baed6f35d0398d61322eb32369e1d4df4
+
+2026-08-17 02:17:35,830 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:37,406 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:38,991 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:39,083 INFO image_rx_daemon: stats: rx_frames=1229 rx_decode_err=0 frames_published=52 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=51 parity_recon=0
+
+2026-08-17 02:17:39,088 INFO image_rx_daemon: air_gap: n=77 dt_med=117023us dt_p95=261692us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:17:39,098 INFO image_rx_daemon: air_gap_hist(ms): <40:3 <80:1 <120:65 <400:7 <1000:1
+
+2026-08-17 02:17:39,102 INFO image_rx_daemon: rx_rf: n_rssi=76 n_snr=76 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:17:39,104 INFO image_rx_daemon: phase_telemetry: valid=76 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:17:39,111 INFO image_rx_daemon: air_gap_by_class: seq: n=69 med=117.0ms | boundary: n=5 med=261.7ms | post_loss: n=3 med=234.1ms
+
+2026-08-17 02:17:39,115 INFO image_rx_daemon: lost_frag_idx: n=5 idx0=1 (16.67% of idx0 arrivals) other=4 (5.33%) verdict=CLUSTERED-AT-0 | top 11:2 0:1 4:1 2:1
+
+2026-08-17 02:17:40,182 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.8 rssi=-67 dump=01020080000088a65817b20957ae732027c45df62d1a46e2e29484da61328368db56b649cd5b4d9e0d0f6b8bba91e603cc1195e49be855ae6339a94fa4b4088b716a9ce409b0ab90c043030003ff52494646f80000005745425056503820ec0000001007009d012a200020003ebd4a9b4aa7242233300c026017896c009d3283cab35c3700b701bc01bc5e4409bb3596ddeffebf81dd51287bc6d1c6e9f98e8eff03c000fed3529c0e8bb50872a1730baab85ffcd81ff2ebfc114b4d11dbfe04a40c625eb9b002afec5784924b1a22cb43273479b1ed7a81512870005c882869d6fbc459f819b271fc8e34ee2b12eb2d3a1eb29e4b1b4f5027d656
+
+2026-08-17 02:17:40,839 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.8 rssi=-68 dump=01c2000000000000fe3e000b001e0c082800ff750700000800000000009073524946466c000400574542505654382060000000d00400bd012a800020003ec13ca64eb6e523b328c8028018c964009d328482cfa06f66ee0002540153f2e716e5dd0000fee8775e13a172adff8ddf10d41d9e55c27bad5a767ae8e97a9a3adbc4d9e835fccb729b99eda32b7b5a57e68a030c0051524146265a000005574542505e3038204e000001f002009d01aa200020002e9160b068332fa7a79a00934b2004ea7f303a2d3ef800ff7ad0e4f54bb2fb533650aa3f8b7a15cd793f84402992421bde674e6fdf740120fc30d068308eb83e82800000fb52494646
+
+2026-08-17 02:17:43,700 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:45,292 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:46,579 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=150 snr=3.2 rssi=-64 dump=97c00a8924d047eb8aae732cf9e00bee43b1126cfb54f1963b4b8b17b93c7c3b38d230dc3b338ea898c30d340b15c59f5ced324b0d808c99ba368fb78c35887a65f41dee407e01d3feda1c5c771ed6fc051e76ad2d44119ebea0b8bb2414d4175f20b62ce7c54218cde5dcb7d86066f57f34fbb6fa06aff84e01b6c159433b9e280b0e509a5268e6e01f31c3ac663804f7823989ba8b
+
+2026-08-17 02:17:47,621 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.5 rssi=-67 dump=01c2000000000030fe40040c34323f25b98903a0b90416fc6cffa4fed9ffb95707ec2eff87df07b553010e0008f952494646f2000000574542505e503820e6000000b058009d012a200020003ed906a44ca824a3a2b4f558010a1b086c009d3284799fb37e2af0ee6601f1ffa501fa4bd6c0e5feb383f92fa007e0027670f3eccf3c67e1a61429ee7e28b28a49a2f50000fedeab728fc49a0996754536c0e25537c0b7e3a7e8f26359a718293dfff35fbce54fbd26ffbe271ad9d047b19047d084957c44f1a3dc8f3cf5899421c2321ea423a114dc33997d604680071f9b47f6cf094d19d3a6d72c0f54fe5cd54a1278883f21660218edb46f8f06
+
+2026-08-17 02:17:49,143 INFO image_rx_daemon: stats: rx_frames=1305 rx_decode_err=0 frames_published=54 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=54 parity_recon=0
+
+2026-08-17 02:17:49,148 INFO image_rx_daemon: air_gap: n=76 dt_med=117024us dt_p95=261963us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:17:49,156 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:4 <120:60 <400:11
+
+2026-08-17 02:17:49,160 INFO image_rx_daemon: rx_rf: n_rssi=76 n_snr=76 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:17:49,163 INFO image_rx_daemon: phase_telemetry: valid=76 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:17:49,167 INFO image_rx_daemon: air_gap_by_class: seq: n=65 med=117.0ms | boundary: n=6 med=262.0ms | post_loss: n=5 med=234.1ms
+
+2026-08-17 02:17:49,171 INFO image_rx_daemon: lost_frag_idx: n=5 idx0=1 (14.29% of idx0 arrivals) other=4 (5.41%) verdict=CLUSTERED-AT-0 | top 8:1 0:1 9:1 1:1 4:1
+
+2026-08-17 02:17:50,014 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-1.8 rssi=-64 dump=ce4e41a79687cf8dbbe304132d63e1a10e8dea27b8fe7c0833c6bfd2fbef28de6c57b32014964bce65a5e355d813cd0a10e7c8168e634fbaec67014b8df526ced9d1ea8bff73e4bd4127f850799f02601ea4b998567fa0c9daf664d004f44fb5451002e0b6d3556ef852607cf35851a5bd4ef5ae01bb6d0a7059c1fa5a0cd72043029551fdd62de37108928a493f1d0a2fec0632149b03134a8c7dcf65d48616323c85f4285d4a111b2c6121eaf468469be736cf3eb8d12f15a9bbd668ab69c1509c89a3dccc54aeb4f2b453917f0b068509defce43180592150562db0d951647e2db2018d455b3a0b9af8ee12931ca4dce764c4808998cca8122f
+
+2026-08-17 02:17:51,550 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-1.2 rssi=-63 dump=00c208582daedee90eecb2e664ed1e6df738dd2ebff9b4cee4ce70a7f93cb023374b779e3f505c76f8e641b2dbd8032bf1801f60507f511fc85511e33431054d600514e59de83716ea5a78edd8811abab8fb30caedb76ac5aeab1857581204d515704e9f9e943d8d33503a7725d28a72e606add35b9d21a7babb57c893a438b650a64f3733441444b6ba52b2973e5710af5805d83b161e02d9a8ea11ec5f34786c45010bc858f071a597ed9710c52d60123098adfc960a5cca13ec9d52c262b5dc4a24f7e7d1e4f4a14a976608ac630cf5ff57d016f94760ff041980329bebb92b3e9ede9e4860333c2cbee0faa38807fb42687b3ed3deacfb2f77
+
+2026-08-17 02:17:53,114 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:54,317 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.8 rssi=-68 dump=0102000000000000fe57080c49a76665f8f4e9abeb90c4fb2cfd470e7b50eae6f8720ae2e3ead564409d4db63ce83e938ec824656c4065751155948cd1054cbd9fa960a7a492f12094cf11dd0b48626662aefa4fc9cff2c5a7b4408ed84f72070ce9a0f7398e7a43be7759d0254f6002200d0005e7f3824adfeb6188d5c61726353e2f1e0000feed87f2b867f5139d048d6cda7ff8b43fc94ff6312578ec07cbaa77279a658a8b11803cc7cfdcf6bb9da7c75b8335e4458544ddd7111eb492ba99cd8e49859f2bf6b74cf2cca305adae57f311dc49220dc8739cb9e32bdfa365cfd1fa8ca380231bff7dad67c724c2cfa5061c549ea846aac75134
+
+2026-08-17 02:17:54,675 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.2 rssi=-67 dump=01c2000000000000fe570b0c12525fae82bffd9a47ff988fffaf4bc387e28ac2330e62929c4c46da9b437e19ce030421124a1fbd06fa4d6a50f8941b98964a7f31efeea47fcc48e39eef42b35253307783bc4b2cc45e2bcf99bae362ff83cb487fb05d7862cc256fb4e86a00f67e7067fd53bf627c4a24d9c935a14d2329d3fbac10286fc1c154f17428a3c0fa374fa3f5f17121bbc3278cf3fe9ee0ced155260bbbe6673645de71a0f6f81160c00171c7c7467666c079c6d74502fc5ef0fe285e632c0880c5829d02a22030e0423ea2f6a77ff2253f8228c00b40110b018e9702438ef7a09c429ef4c810a76759a6b274b036e3c73fc19fea3f3a
+
+2026-08-17 02:17:56,264 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:57,834 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:17:59,199 INFO image_rx_daemon: stats: rx_frames=1383 rx_decode_err=0 frames_published=57 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=58 parity_recon=0
+
+2026-08-17 02:17:59,203 INFO image_rx_daemon: air_gap: n=78 dt_med=116991us dt_p95=257541us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:17:59,212 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:1 <80:1 <120:67 <200:1 <400:7
+
+2026-08-17 02:17:59,216 INFO image_rx_daemon: rx_rf: n_rssi=78 n_snr=78 rssi[min/med/max]=-68/-67/-65 snr[min/med/max]=3.0/5.0/6.0
+
+2026-08-17 02:17:59,219 INFO image_rx_daemon: phase_telemetry: valid=78 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:17:59,223 INFO image_rx_daemon: air_gap_by_class: seq: n=70 med=117.0ms | boundary: n=6 med=258.5ms | post_loss: n=2 med=233.9ms
+
+2026-08-17 02:17:59,227 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (5.26%) verdict=not-clustered | top 11:3 8:1
+
+2026-08-17 02:17:59,398 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:00,959 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:01,239 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.2 rssi=-67 dump=0102000000000000fe67000c00070c082000ffff0700000000000000000073524946466c0000005745425056503820600000003004009d012a200020003ec15ca64eb42523b3626fa51196c8467604b08c5a466faaa64cdba5dc9e7489831d92713ffaf4163706ff9a3af4bf1d50eaaff3e94cadc59de8057de6040ff507718097348fbb0fc76494ca93318fb0a3c9ec00000071524946466a00000057454250565038205e000000f003009d012a200020003ec15ca64eb42523b328080280180964009d2e928042802a7e6d18e6a1bc00fee126fc9ececccbff0414cba404f7af317f6fce51635de4ff62d24183ae13f64cb7f199c9596b2ccb71
+
+2026-08-17 02:18:02,173 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.5 rssi=-67 dump=01c2000000000000fe6f080cff62e24183ae13f64cb7f19dc959672ccbb1b58b96e6ea7eedc58b00008f52e94246880c0000574542505a503820740050001005c09d012a2000200037c156a64d27a4b431280aaa80180966009d3284872fa6c489102014bcbe08661afd72fff60ce000ced73aaccf93b332e2961effeecd100643d0bc6bbc6bcb65ca6617020e7e581b43ee8634407c181196c968c44912d7fdf01bbd6da9b0ff884b8a5b8af21dcd29596de7494538116e60008352494646dc0000005745425056502820d00100009007009d91aa200020003eb54c9c2aa723a261b7faa800e016896c009d3284784fa2f08293ff4a73d801a4fd
+
+2026-08-17 02:18:04,148 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:05,724 INFO image_rx_daemon: published frame_id=0 2919 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:07,284 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:08,270 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.8 rssi=-67 dump=0102000000000000fe73060c00febfb5e13a172adf4772d0539f87d845d9f885765f7c006ea9be2f85420cf8be74ff247fdbee11c8812d27b5a0390f0000d152494646ca000008d74d1295555fbc21f6042645f012559b630fc3b6202a9401d2564705d7afaa310902d5adc10d6a2b2da37320c79dcfebbceede29ed84d23b690bf12ee4f154901c88d3146a4796adbbe97a6addacef42147159232e7a2893be8bb9b96641e7bc73ee845afc582ef0a3c80e314665510ee5d64ebb1d51f3f28c16b6ba1f1609964aa2038c51a25443b975d097d1634b870000f48deb26a61df1118f6c3a6a9877c4a8fd1ab42d54d2d0c76c653220a01a09dc35a0
+
+2026-08-17 02:18:09,260 INFO image_rx_daemon: stats: rx_frames=1461 rx_decode_err=0 frames_published=62 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=59 parity_recon=0
+
+2026-08-17 02:18:09,264 INFO image_rx_daemon: air_gap: n=78 dt_med=116975us dt_p95=261740us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:18:09,279 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:3 <120:63 <400:9
+
+2026-08-17 02:18:09,283 INFO image_rx_daemon: rx_rf: n_rssi=78 n_snr=78 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:18:09,286 INFO image_rx_daemon: phase_telemetry: valid=78 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:18:09,290 INFO image_rx_daemon: air_gap_by_class: seq: n=69 med=116.9ms | boundary: n=6 med=261.7ms | post_loss: n=3 med=234.2ms
+
+2026-08-17 02:18:09,294 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=1 (14.29% of idx0 arrivals) other=2 (2.70%) verdict=CLUSTERED-AT-0 | top 0:1 8:1 6:1
+
+2026-08-17 02:18:10,472 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:10,863 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=3.2 rssi=-67 dump=01c20000000000003e70010c56503820cc000000b007009d012a200020003eb948934aa7442b33300c02601b096c00aa95c0fe01f8887413f61a1ffa51dec00d3aeb383fd7b22d1a8e8509e067f13fc66ea5a31ca21bad6edd0000fec35db6f5f6ad5ef27de7b6be574dc9a7659ffcbaffac64abe5afa12e39ff27bf1ca4180679422f9c21e56a89e4cd576e301986d541f520a0737de82eaf1349678a3b7e18e5f25ba273c1fe82237c1eac3f489721bd2f09202bdfe33f942a6021aa458699f7e49d460a3fcd9f23862b5828dddeaed31064add4ce3cae892c8f4f5fa30000a1924946468000600057454230565038207e0000007004009d022a
+
+2026-08-17 02:18:12,870 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.0 rssi=-63 dump=e77ea410e74a16a832400512ae70d301fcb2eccef800722f8437a87b064ca399a54fd7fdd3330766cb489eddc6279ef83449d5e1546392ea9f0757d78f8fb1b5f39334a7a4551d0290b2277f46e3f34d248226a50070a621e7e8936956b0b6179d77fc55bcdebd232971915f3d6b9ba9a5d917827a23009a00cfa87144576f946ba8a9960383c4d92deabf83f5df568d2afb76036ba2f1391eaf4b920d8482153e60e6b6f3a8963f886b0730bf18a86f70d32e15e79cf3a7cdbd5b27f913d09847184873f14ed3611850de56219cc9e79de30c6adacb37845aa1f02eea7a1683ffb748d5f846363fc1760175fa2a80dab75e98356600c155c3eaaf
+
+2026-08-17 02:18:15,186 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:16,015 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=3.2 rssi=-67 dump=01c20000000000303e89050c3bfe06916919cf8fc2ffb9d368f4a8ed54de9bbbbb478fdfc73983e3392cb429e0000073524946466c00200057454a5055503820608000003004099d012a200020003ec15ca64eb41525b328080280180964009d331c7ffd1ccf5ace60ed3172a1000cfeeaffdb9179d9997fe849fe02fd81ec8794f19cdbbd9b627bd2b374e95971bd7ec215e1bd103e97b1760927dc49c3b9168f6800006d50c946466600000057454250565038205a0000085003009d01ea200023003ec15fa74e342523b22d08028018096400a90da000428eac3000fee5691d05d52ecbff8873f5afee6134ebd719780433c98c1e7be732901d
+
+2026-08-17 02:18:18,290 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=1.0 rssi=-63 dump=01020000000000c7c20936cda8b65df704f1f5d3d52f1b9e7737f42898807957c82caf3cd63441a7d836351cd0b5dcd3067737412c8be426015dcc4dab835f49fc62b729a39ca959d168f032868fcefff5f7a645b1314e7789ae734c8261bd2023288d2b02501512e835ca0e50af8c29d3365a748fddf48abd1a93a5a1b5d7ccaf560bdfb70f6f7315db3c1355a4e104fa1c6c611705950e54c6b2b2e9fcf2c227571e902245760710f435e553afda4185fb9f4cde90037b66f68f06c052b1b4c5ec9972f2e8ca658cad8bdf40a80e1dab5e867e5a3cd939637c4beb156b22a33923d50155cb92e7c1eb3204ebc2ea12c92e0991b19f8dec54063d
+
+2026-08-17 02:18:19,312 INFO image_rx_daemon: stats: rx_frames=1539 rx_decode_err=0 frames_published=64 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=63 parity_recon=0
+
+2026-08-17 02:18:19,316 INFO image_rx_daemon: air_gap: n=78 dt_med=116997us dt_p95=259130us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:18:19,326 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <80:3 <120:65 <400:9
+
+2026-08-17 02:18:19,330 INFO image_rx_daemon: rx_rf: n_rssi=78 n_snr=78 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:18:19,332 INFO image_rx_daemon: phase_telemetry: valid=78 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:18:19,337 INFO image_rx_daemon: air_gap_by_class: seq: n=68 med=117.0ms | boundary: n=6 med=259.2ms | post_loss: n=3 med=234.0ms
+
+2026-08-17 02:18:19,340 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (4.00%) verdict=not-clustered | top 1:1 5:1 11:1
+
+2026-08-17 02:18:19,343 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 02:18:19,844 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=30 snr=2.8 rssi=-67 dump=01020000000000003e830c0c1b3dba63ddbc34902ec7c361985a02e80000
+
+2026-08-17 02:18:21,420 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:22,269 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.8 rssi=-67 dump=0102000000000000fe8f050c2493a6f9dec1495d1620ea0e0a7f29dd21f5680d76f4ac527db92a908ef6bdd46d80006f524946466800000057454250565038205c0000007004009d012a200020003ec15ca74eb42523b32808028049b86d8499eb458667902ad05fd9f09e26020bdcc1215c4d87e987c277701bff754f3232bbe3368e1b56eb6869fc1e9334b520c9ff5f4df1391a339266bbdb0034c5103f5902498d0f3493a6784a4fc7de4f907c5d260e000000b003009d012a200020003ec15aa74eb42523b328080280180964009d19a0004cebd96f8861b000fed27bf27b3b332fd5df63fe79b97d7de50ec51a6f9b806c97e73e0e30db24
+
+2026-08-17 02:18:23,730 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.2 rssi=-66 dump=01c20000000000003e99040cf2e70a3ed90186e730cde8acc420c4a6de65be0f8ffece7116cee7c57c9e087d9f9049c5d1cf69ad5477412c296d771d5e3ffb39c25b3bbbb20aef82fc245c5b050091aded73ec7034e6705fa81fc7d8e0d8cdf2e2c5a26fd1182d757c960bfd3ee4bfdf5df274aebc3dd93b5fdf663274aebe3ddfe04011419e9bc010b758497646b0000000574544d05630bd20a4060000000f08cbc1aa206060010e0158a74ea1ad23bf2808616a1839ac08cd79b0deb0dfac7e9082c801bcd1b6c00585e3cb12ad591608fb2b50ef02fe34f5227231fb3fcd311264f110bad43198b34f9d3e456de36d8260451ff1afd8b1212d
+
+2026-08-17 02:18:26,171 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:27,761 INFO image_rx_daemon: published frame_id=0 2974 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:29,172 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=173 snr=0.5 rssi=-65 dump=2ef56dd6d49cdc0516050cbb466ff9f0da620374b06900548db7081470777332cda98692ace138b27b9779c12489b8a696e8677295ffd8952f600b2d760dfde61982a0a7a442ffe10e3e81d904bfd6fae33a58790184d81a346fc06c1ba1f115187a74fb783d42bd6f94d619b39dc196acbf2555d5db4f829661bcc0b2b5f6da000a1e16ab4527b871649471e73dd73990e5e5f61c563b626f381b6b9790d2f45f51d25233153e8779dd49a72d
+
+2026-08-17 02:18:29,301 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=0.5 rssi=-64 dump=01020000000000e944802c07eb4dd38e5db5dc7f70b30544a1eeddbd7c982bb48551f0c3ca45a8b4b859b294155bfe65afd718517fad7f3bbf3daa388891cb5bc4dd9fd0b67e34339eb59069cc899102070a4ea66427af91afc2076d14e853c58e829bbd5154e55e1cb0b4b085acee338ce42897c2b5c97e91417d88aaf62ce7204f7ca3e2f4b140dbadb99b68845d5a5a58817d48a2c4cbc37da6e5ca64fb3e1a21c4ca10d57620ebc3a048ab7809b0e05c4d07ab1a31a373a1921ad33903aeec2f92e5cbfb6cc960e3834bbde64d1a245ea156afb8e77afda8ed0ecf4d994179f00570f8e3bd4ed3253caefef539df0e7b1993dc266b580a9bb6
+
+2026-08-17 02:18:29,377 INFO image_rx_daemon: stats: rx_frames=1617 rx_decode_err=0 frames_published=67 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=67 parity_recon=0
+
+2026-08-17 02:18:29,381 INFO image_rx_daemon: air_gap: n=78 dt_med=116939us dt_p95=259902us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:18:29,391 INFO image_rx_daemon: air_gap_hist(ms): <40:4 <80:1 <120:65 <400:8
+
+2026-08-17 02:18:29,394 INFO image_rx_daemon: rx_rf: n_rssi=78 n_snr=78 rssi[min/med/max]=-68/-67/-67 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:18:29,397 INFO image_rx_daemon: phase_telemetry: valid=78 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:18:29,402 INFO image_rx_daemon: air_gap_by_class: seq: n=70 med=116.9ms | boundary: n=6 med=264.5ms | post_loss: n=2 med=233.9ms
+
+2026-08-17 02:18:29,405 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (4.00%) verdict=not-clustered | top 12:1 5:1 4:1
+
+2026-08-17 02:18:30,832 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=0.5 rssi=-64 dump=d67be4e2371cbd5bff0cb3ddbb8b0496d2bd0d4576468dcae1bec6355e7a5578c1a5e28ced38617a3abd2a7ae6f5eae87b005b04da60ffa76a3e0dec17901e9d43f4bcd2efd516adafc39cdf60c596e651a6d7cbdb454ce0906787ba45bc1ea1c062ef08170dd909e1a2964e21be77a6b5f7d874dd571ea232ba2e52a9d701628cfa2bd48af8a53361883e187cb36385fe2e0cddab573f11fe0afee5ddb062c7fa22d32207981e809c7efea708731046dd40c819a48249a5ce30516f8414876e2714e8e9317b8e698f0555e547f7c6f83afc33a8519d359f1236340ca6b105eb05ddb2759fe4336d5c5f3bd17fd1e9c0f5814bef16eb2ff2c7e38e
+
+2026-08-17 02:18:31,318 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-0.8 rssi=-64 dump=f48db89bdf0930d0bdda298bcd61f374ca502c7f168cd518bef794a35ad2ebf14ac1e68a9d235c8f457f68361fd83b7055b691f9a78fbd975e560f7cf66f04a6093a848d9129ed6ddfcffb5383023510d49411413ac059559b6aa5b5f6c83a3ebc5f8972fba193eb6b49da89e05f70f05e79ffebe0878bece23781a98b7e9c725883aa8a0aae6f7077bde8e7a769accd80cc67858cb105b484311eb6ac32af5ca1b1bb87d9429d4efb8c084e508b18d6bede35fcb1960bd03f9a56f77d095d2808316a0378f6d5f67054b4f84cc3ee1ce27e2ddd50c3a4a276a356e39b268eb7af340b4f64fa0dbbf0cefe6d2d3774b0a762745ccc68e038cd925b
+
+2026-08-17 02:18:32,371 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.5 rssi=-63 dump=01020000000000ddeaad7b7eaaf27ab496db33f241254b54c231c6bdda10b34e0949a964875559fba3f22d8c2ac01c72900fa1aaac89dd4a0f4dcaf2afb3f94b64a15b210699a149de643607845eceadef31d189b9213c9b8a8fd6248e020d0300ed0fbbf2ec55271812da0d7ca725c61126196e0574014bab4829b30219f6f5991ecbf621473330999b29b75e96a38bfe3dfa452b77ec067763b6ae13b0566b24c38ff33b215f9118ca63a9531e4c219d89dfcceb0541eb00ee4f2734d62157edf0f0d7eaf8c94ab49e4e5b10cb8e3798b8aeee30b1ff00f5423b283fc94733b5b3962b93c807c65b2b2448ca67874ac9a50db8743e9def4ec208
+
+2026-08-17 02:18:33,907 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.0 rssi=-67 dump=01c20000000000003ea70b0cba26947947e3c9349ed7f1157cdae76d7f1ff3c23f8d5aa10c3b5ba93ff51fdb3ff85c7afd3feeb3ced1ee5902475e8e004000f9c24bd6467e000000777542549650a820e630c004109e089d512c2100b0043e816ea949a82c2366b7f298c4081a6a6c089c348879cf95f0e6bd60804c5fe94978a075e3797f9cc07c11b40c98a304e4c6a2146c42eb689288add82b9bc8009d6d47b7511b5beab09c22d87b762f8b39d49cae03ee5a903487f7d4e0fa377e456ffff2fd73c849ac87aa50f0dad1a87495ce11c0a8d3ad30a8f08d82f58228ae3ec85efd709b3140ee4d601965f5f4072176865f048411328e87940c
+
+2026-08-17 02:18:35,523 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:36,363 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.2 rssi=-67 dump=0102000000000000feac050c7fbe5464cdc964442290bb2362eb358ad3bc23bf11f75f06c794ac656473ba47ca28357014185fc47a9ea37da199ccec5e3a5f1819e51aabb000fb95517313308f7805e1a2da36e155dd4d6033ad1cb17a04480010a00a9f9b468b5ad80000feede5c75456e82bffe712ef3765bb4ee9d375adc5ebb2fbd5d92b5fe70deea36253f221b16dcbfaf5c567481e20006f524946466800000057454250565038205c0000001004009d012a200020003ec15ca74eb42523b328080280180964009d333218000850054fcd09fbda0000fedb0db91c9d9997f707527b1d56fafb62ec4c87213079ef78144bf39e96cc1f939b
+
+2026-08-17 02:18:36,482 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=1.8 rssi=-67 dump=01c2000000000000feac060c99938cffd90b98700c0000009f5249464698000000d745425056c038608c01c0007055009d012a200020003ec156a34d27a4b2b1280aaa5014096c0094328464089512c5ebc7838c0003bcf088461124b5daa3510000cee2b968727a25d99a51ff9058763684fc58bb2fbe003753e7fa7b02d2c29a7d8d40e43b10d97df1648021ac46b2e60e0b785fd0a7472e4b26581f3121a61a6f102f4171e175e60bbca6997af29a7df4701efd99128000cf51c94676c800000057454256d65038b0bc3000905006009d0129200020003ef12ea34aa7a42321a80d50f098096c009d3284f47da02586b7e4ff6a88d037407e8c
+
+2026-08-17 02:18:38,670 INFO image_rx_daemon: published frame_id=0 2949 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:39,428 INFO image_rx_daemon: stats: rx_frames=1691 rx_decode_err=0 frames_published=69 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=72 parity_recon=0
+
+2026-08-17 02:18:39,432 INFO image_rx_daemon: air_gap: n=74 dt_med=116964us dt_p95=350769us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:18:39,440 INFO image_rx_daemon: air_gap_hist(ms): <40:3 <120:59 <200:2 <400:9 <1000:1
+
+2026-08-17 02:18:39,444 INFO image_rx_daemon: rx_rf: n_rssi=74 n_snr=74 rssi[min/med/max]=-68/-67/-67 snr[min/med/max]=5.0/5.0/7.0
+
+2026-08-17 02:18:39,447 INFO image_rx_daemon: phase_telemetry: valid=74 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:18:39,451 INFO image_rx_daemon: air_gap_by_class: seq: n=63 med=116.9ms | boundary: n=7 med=265.9ms | post_loss: n=4 med=234.1ms
+
+2026-08-17 02:18:39,455 INFO image_rx_daemon: lost_frag_idx: n=9 idx0=0 (0.00% of idx0 arrivals) other=9 (11.84%) verdict=not-clustered | top 11:4 10:1 1:1 2:1 5:1 6:1
+
+2026-08-17 02:18:40,245 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:41,822 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:43,415 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:44,156 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.5 rssi=-67 dump=0102000000000000febc040b5bd8acb80f51563e793b0804bf9b39f1efdaae5bf7bb8e53e9f6b054d33c259c34b9d047112d1442549d3c92653a48aae85597feb5f3015acb80f7e91ebcfc347dc580a22ed74c26a143f7a9edf665154bd70df27527b7a0021b54f971c0c511330bcb6140ccc2978f9dca4ce8933a595710cb3e4ffa7806fca1bb0fc41f39457a44c27f8bd390349713fd17b5888bb9bb930454a03305c8378258000566211494b421b7fe21f800fd02da34342eab00f7d7d7fecbb1f7b7663990badffe4dbe0e13f79ffcfbf526d7efd8e3fffd6dff72fa1f9d97e4cfc6eefaacc50c7e04e5284c9616bee3e7bd0a946b0bb9835f
+
+2026-08-17 02:18:44,855 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.0 rssi=-67 dump=01c2000000000000febc0a0b23b328080a8018096400a927343995b30042cc7089eb132098ea0000fedddc7b6fc2e05bf18615f66ade1ed487396183cf79ed90b936190c02c59d0c43f68445503f87605f4275e9e7ee9df800f352491646ec00000057e54a5056cc3820e0a000005007009d012a204020003ed556a44ca824a3b3300c02601a896e00fd79c0bacfd279800f006e807000748f791e14c4bc41bc03f404b906b048959e40f53f2e6362b00200fe94bbf8270d7f72fb22fdc91bfffef0da3ffef86d1f672a3576e767d440d4d05e185a4b1a533d727798eb186c3ad4b47112cc4c6d5be8acb80f51563ed97b0804bf9b39f1efdaad9b
+
+2026-08-17 02:18:44,952 WARNING image_rx_daemon: crc_dump: irq=0x60 rx_len=255 snr=2.8 rssi=-64 dump=0102000000000066c295f2345746e489d0971a04ae50308a0c8103605ee1c52944e21bfacd2c0e4ba307c761da86c58211fe10af391d6cb184a026a55eebdc2a690f8314438828a2d3a6cb53446b27f57aa2b8e81c844326b2e88262c2538bfd146ed3e746ccb9b8c2dd19e27bce513c3244766301cd4e50e2a487d85878ec52cf87678f0d7576d225d79345648559e5cbb64b538f59c8a5fc83ee1565c02edd80f84220afbe0241c65b29f33c8acdcb4e9ba4161b188416968005f0cb1565509a57ed6be07b4b7cb1995d6f884d25eaf357e9a260ab1134fa657a4b4723528e4ead52beaccc184221f4e2d88d2f4078cb5966d9d95d8e5ddae9c9
+
+2026-08-17 02:18:46,481 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=3.2 rssi=-63 dump=ff96ac575509c0bb54b537bb713201342f18144c72c60d5f524a2bf2ad85d891377ee075e0656fb5c502914191f8a8baeedb933a1e4a2b0d34ad21a7d5c74a82cc7c9992cd5e0b173bcba2328917395e8b147948b5102038b1e2e6973ae990c2b25c4cb0f06be9d0c46fa906d0ce4482976d354e91765cca03778ff62379dc20c42e162f5877a4c6ff52894830c46bbafd76e1459a3232a26bfd3632bcd70c9659a1b43f99f89bcbe658ea8047b658043d4a220601d6df4bf7ebc85cca4edacb4f80e93c6a1842d90168973a546b33da778a5bf58a62b5ee581a811fd5ffa97a46f4c41a6efe232cd5316447be96d712f1dd804c441505879b471d
+
+2026-08-17 02:18:48,056 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:18:49,472 INFO image_rx_daemon: stats: rx_frames=1767 rx_decode_err=0 frames_published=73 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=74 parity_recon=0
+
+2026-08-17 02:18:49,477 INFO image_rx_daemon: air_gap: n=76 dt_med=116989us dt_p95=259106us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:18:49,491 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:2 <120:66 <400:6 <1000:1
+
+2026-08-17 02:18:49,495 INFO image_rx_daemon: rx_rf: n_rssi=76 n_snr=76 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:18:49,497 INFO image_rx_daemon: phase_telemetry: valid=76 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:18:49,505 INFO image_rx_daemon: air_gap_by_class: seq: n=69 med=117.0ms | boundary: n=6 med=261.6ms | post_loss: n=1 med=234.2ms
+
+2026-08-17 02:18:49,508 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (5.33%) verdict=not-clustered | top 11:2 4:1 10:1
+
+2026-08-17 02:18:49,575 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=0.8 rssi=-64 dump=0102000000000010148beb30d1501778d9b6ecea70810308a18dc7bd1c08231e801d90c3cfc7a2216dc5bb04baf3f0f0a0f92f3bcf0379b9cb65969423b2ccbdec3138ad02a957c1e207da033198c6bdbcbdc3887fa92c6e0f87e7c29a127ee942d4c930629fd9252dd4c25d2a2b27efd768290b8a7c318d8578da3c900800ddc95c44fe10817b20fe172d8699b4b3e8723dcb8263678f8a7f5a70b643d3da6917900e6b58ad47a1d2e2f3c8dc0a29e7b599b640e32c8763311d933f0589654b8e7cf8d62ff0592a388c7e9e98dbedd19aa10860a8d25308cc8413285c450362d19ba6481cca3460d3b95684ca567802caf681b04df8b5fa2d2e0c
+
+2026-08-17 02:18:50,887 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.8 rssi=-67 dump=01c2000000000000fec2090cab14d4cbdff1559d60258032e06fc95fabfec222fceaa0a7167f0130e37f3e326bd02bef379a54c64be8b06ded37171fa234502ba6b6a5266c9f667bf1bffc17be3e25491015a1d022964324e53b80006b52490646640000085725c2505650382058000000930400cd012a200024003e415caf8eb42523b3280802881869e4009def6dfb37083e40c0855054fcda345ad6c000feea9196ab6dd05e988753fa3afa57446ff3dc9ef57193c78846d7a3dbabb61437590e5d2b47b200000061524946865a60000057454250365038204e0000001003059d312a200c20002e9160e0543327a7a79305904b2004e998de20
+
+2026-08-17 02:18:51,126 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.2 rssi=-67 dump=0102000000000000fec80b0ca4b7e800c015096c009d3284799ec03f003a2a300263ff4903c803d955f68abe53303f807e8014e3e6ee81b6558600f27c0142cfe791dbe237d000feeb1972816beb01d9031ff487abd468fb13db1ebff4d16dc676fc2fd6736ecaf13013bfba54f47d68f8cd6cb03b916754154cd7eeedcf4f3f29b777af01db023fdc7e852b765789809dafdfb4d79cd5e60eeba0ad59a3d104a1ef89e2531f7ac6e09a9c8f236da77643da39b2d44cba9e23f136f2fd7ef76bdee6ffc3338979240f29e8d2f9a4bf44cc5e2725645eb0d9216660bc43a3e0213fb4be29f434ea45fd537f6436255179805ea74eb42523b3280802
+
+2026-08-17 02:18:51,897 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=3.0 rssi=-68 dump=01c2000000000000fecb040b6acb26a12620afbfdf26fdbb120ad0224cbffbf6247f225ed25640682feb1bf764945cdde74e8fdf08e3d4d1ffbb5ae4e9617777f4aacc0000ff52494646f800003057454230565038e0ec000000d007009d012a200010c03ec130a24b27a4a322a80d50f018096c009d32d5384faaf0866d36e00f400fd7af4612640d2000ece37f9837bbef9f3666744d1f7e5d708c9d9e0d52a000fee729200399b837d69663ba45589dbae06a9b8e126f70b27318cab22c7fe8c3fbcdb56fb8c91fcfbcd150fb8c91f86ffdf66a277a7b6f87b90c94ff09e8c9bd5d0a698390ca29ffd1c37e2ec9315f8078f3a6d13a5d6c6add
+
+2026-08-17 02:18:54,244 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=3.8 rssi=-63 dump=01020060786cbda255c1060c25e7d9463110400f225e99599ab037515ddd76442b8af255e2ac26a393d3b29328ad8c718dc662d5a66f32a62e7e1dd4c1e3748fe4f07a35aac1636f1220ec2ee746b36dd74673770bc0fce7f60ce1f32cc36ef9622dab2d5877a1e646f501815b03288eb03efab9876358d93868244e12bbdc0b0e34b35cae12bc80c5ac5afd53430ef1322a3802b0813f78b8d40d2432644afc69db79c739e68bc449bc7a5ccc97103f65a62f2e02e7d5419e6311567d89cb23379aa54e957c065bdb238e3669c0b859d545c8fb229eff1045a30215c32288c0ec8f4a63003a51565f940d36124e5ebcad28f0216b33c556d63153
+
+2026-08-17 02:18:54,503 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=3.0 rssi=-68 dump=01c20000000000003ed8000c00120c082800fff50700000800000000009071524946466a00000057454250565438205e0009007004001d012a200020003ec15aa74e342523b22808028018c964009d3284540890002160153ff68d16b5b00000f7ec8db72393b3b2ffccd1de5728b629d69a04ede1fdd97df001b2a5f8be151ae1f466899bf5f5a6d02168d8a40c4000006b5249464664000000574542505650382058000060f00b009d032a200020003ec15aa84e342524322808028229096c00fd333472c9a04483010a3a70ca00fdc7f7e82ea9763eaa4c5856facfa1fdb87385c7768bb177eeae231a400bf9d23aef0f7adc178fec991506d8
+
+2026-08-17 02:18:57,231 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-1.0 rssi=-64 dump=4120d1adb2b6e4baca9408ec1fdca0152ef70afde7c306f2935dd31b1ccbefa830ebd5af993ba6ab3d916590fe2575118d3dd4169e7b8a059f605f322b84708d46340fb3a675f84e04ce3382f120521915eaacbf8bc79ae0c3f4496531fceb868b65f6f3e07c763d25c22d77b50e8143b095422abd57e69709e53460fedef27f0004014ab012f69115ac48cadf62775c6b18258237a1b311ca51f9122a422d65950c5ce5af822c9629f087cdc84817093db1f3c63d53f8e24b1f1dba27b294813cdcd0735449790de67becd0384f23c10bbb52dfab07481b2ec15b211a247f99f98c1436253ae458856ed04dbd70553a13ac91a2708d68ee9d70ab
+
+2026-08-17 02:18:58,125 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.2 rssi=-67 dump=0102000000000000fed7040c06cacd6a60f8901bf8964a7ff7fffec4ffcc49d392ef429f5253a67783bfcb2cc4fb2fcfc9baeb523f81cb4b73b45d7d6acc456f74e9ca80f62e5c67fdffff627fe624e9c977a12e2b29d338a41078efc1f150fb74482fc0fbf14fa3a57d71111bcb27ec7fffbe20cad1556d0b8b2c673625527190f0fc21000000a952494646a20000005745425056503820960000009004009d012a20002059fed87287cebf29ffa324860b28b4214ecf44e571de44db6320166f0f1bf48c7fe6ebcd0be0c5b6d583f29e2857ff87d14351a60ed1927bf75416017ea6788fc126ada87faf563e0d7bfea9ffa8fed9ffc2e387e9ff
+
+2026-08-17 02:18:59,537 INFO image_rx_daemon: stats: rx_frames=1840 rx_decode_err=0 frames_published=73 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=80 parity_recon=0
+
+2026-08-17 02:18:59,541 INFO image_rx_daemon: air_gap: n=73 dt_med=116984us dt_p95=261912us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:18:59,549 INFO image_rx_daemon: air_gap_hist(ms): <40:3 <120:58 <200:1 <400:10 <1000:1
+
+2026-08-17 02:18:59,554 INFO image_rx_daemon: rx_rf: n_rssi=73 n_snr=73 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:18:59,564 INFO image_rx_daemon: phase_telemetry: valid=72 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:18:59,569 INFO image_rx_daemon: air_gap_by_class: seq: n=61 med=116.9ms | boundary: n=6 med=261.9ms | post_loss: n=6 med=234.1ms
+
+2026-08-17 02:18:59,579 INFO image_rx_daemon: lost_frag_idx: n=8 idx0=1 (14.29% of idx0 arrivals) other=7 (9.59%) verdict=not-clustered | top 11:3 4:2 9:1 0:1 10:1
+
+2026-08-17 02:19:00,545 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:02,114 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:02,586 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-1.0 rssi=-64 dump=00674b300923ff41ffee4fd2384dd47a989019d65027eba6b280c9ab0f88bcfd1988ff2a382b64d5693fed935c7c61f05db73e31078f54af77b523ed10f2555d6df83ff32d9d42ebd4fef16ed16bdd75e11d0fa5c8932c7ca7cf16dddf77a13f5e03a8c71bd1e7e830b18fc7e03fa6006a3c253660eee2d20a7d04462e4318365849e2419993bd34cb19337ac73de7cfac665c8aef1b6564f9f422cb3cd031b019a36541ccff318ae57f00fefe2079d1bf38b56a2c76e5f6fd37d63e12579921a4d97b44de66ffe8a2f0c32850f7db99e92ef5e4469927295513d1601bbd28905075603a2f8ffee32d92578aa1265b0519462415cd4ab126ce0dfa
+
+2026-08-17 02:19:05,135 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.0 rssi=-67 dump=0102000000000000fee70a0c9b98d7791b00cadf142c7a265ae9b50d4562ef1b40000a03800065524946465e0000005745425056503820520000005003009d012a200020003ec154a44ab4253321a80d5280180964009d328002b0373d1000fdb1b91c9d9994621d91853fb6dcd6df784b34261d433c0b9cca5c543d161262bfcb8c14554c0b6d7c728543c000a3524946469c00000057c5cad846ae3200a9edce145369e813218646b275221eb99f292ce561155bbc77e7b0685b3ff485b123ca5894ef6e1488cba56f6e2e1db832028d0ae32860234b7f6b82d32decaf62f34fa6ec8cebdb309795db8d1f664a43f2585f002fefc20094419072
+
+2026-08-17 02:19:06,871 INFO image_rx_daemon: published frame_id=0 2986 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:08,449 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:09,603 INFO image_rx_daemon: stats: rx_frames=1919 rx_decode_err=0 frames_published=77 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=83 parity_recon=0
+
+2026-08-17 02:19:09,608 INFO image_rx_daemon: air_gap: n=79 dt_med=116973us dt_p95=261785us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:19:09,616 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:4 <120:65 <400:9
+
+2026-08-17 02:19:09,621 INFO image_rx_daemon: rx_rf: n_rssi=79 n_snr=79 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/7.0
+
+2026-08-17 02:19:09,623 INFO image_rx_daemon: phase_telemetry: valid=79 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:19:09,628 INFO image_rx_daemon: air_gap_by_class: seq: n=70 med=117.0ms | boundary: n=6 med=262.0ms | post_loss: n=3 med=234.0ms
+
+2026-08-17 02:19:09,631 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (3.95%) verdict=not-clustered | top 2:1 1:1 10:1
+
+2026-08-17 02:19:10,035 INFO image_rx_daemon: published frame_id=0 2919 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:11,559 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.0 rssi=-63 dump=0102804020b65d9eea2e2e3e79bbc0460815481f24755f8182a3cb950cab309d1b6d6574006e3dc6735c86c00a847e8e899408872e0e54361f20d75e944aecbb1dda4b560b5002195d8bed11237be38f5b03cff933c2b1fb96b705c1fad192d98ba1a9d8425a60ffcacd9765476f918ca758a43de28ec66cce2436e11f86873dc02c8059782aea6fe16f21b16bb160b5c3ef1c00e8c3b1180a1adc22b0df2acb6ddb634f87854a80284fb047c1389a275064a41fe129e49753fc46e37b88cd08dbcb4c929c2ec121e08cba2e3c23e167ec43493fad8a0fbf4932f35fdf42dc24dddc016b01d5b94405d71d5955cc6c0563a59484fd0893105333f0
+
+2026-08-17 02:19:12,171 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-10.5 rssi=-45 dump=0102000000000000fef4030c454250565038205c0000001004009d012a200020003ec15ca74eb42523b328080280180964009d288164000427ff45a9dbf7cc8000fec3d7e82ea9765ebefab5f263c7f1776238be2f83f765f7ce6520330adbb01afa36582ddf7589c723a091524a8191834000eb52494646e40000005745425056503820d80000001007009d012a200020003ec15aa74ea7a523b32808026018096c009d2f90fa4f0ff64066006e807000748ff91d93206d802d0c3132e06a8da9d0c6e17d4b5d640000fef0ad9bbd73fc2ddecbff59de1fd3bbfe9ddfa6983f2074597c2677e2fff4f2df882f656e11d2e097d81285960058beaf
+
+2026-08-17 02:19:14,702 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:16,278 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:17,844 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:19,177 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-9.5 rssi=-49 dump=0102000000000000fe00090b1c2d41d7908c00006f524946466800000057454250565038205c0000007004009d012a200020003ec15aa84e3425243228080280180964009d333442c8b8b4000462420798e7dcb14000fec7f7e82ea97486d8d7d446f46a2cb6a748ef6350461be5644cbd5dd13acac37cae318fa71df8f6946985b800000073524946466c0000005745425056503820600000005004009d012a200020003ec15ca64eb42523b328080280180964009d333442cfa000462553e90d2cfd360000fee1a31d515ba0affad5f5eb475ed44b8adcb9c1e7bb492effe155b9013f29af10f01684c401773aa727296334cc36dbb4b5406459
+
+2026-08-17 02:19:19,660 INFO image_rx_daemon: stats: rx_frames=1996 rx_decode_err=0 frames_published=81 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=85 parity_recon=0
+
+2026-08-17 02:19:19,665 INFO image_rx_daemon: air_gap: n=77 dt_med=116963us dt_p95=257901us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:19:19,678 INFO image_rx_daemon: air_gap_hist(ms): <20:2 <40:2 <80:1 <120:64 <400:8
+
+2026-08-17 02:19:19,682 INFO image_rx_daemon: rx_rf: n_rssi=78 n_snr=78 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:19:19,686 INFO image_rx_daemon: phase_telemetry: valid=78 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:19:19,691 INFO image_rx_daemon: air_gap_by_class: seq: n=69 med=117.0ms | boundary: n=6 med=257.9ms | post_loss: n=2 med=345.3ms
+
+2026-08-17 02:19:19,695 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (5.33%) verdict=not-clustered | top 11:1 3:1 9:1 10:1
+
+2026-08-17 02:19:20,975 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:22,557 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:23,538 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.5 rssi=-67 dump=01c20000000000003e02060c3f3a7f92436e41cfc526991fb2696255d5234000cb3249564694000000574542505650382088000000b005009d012a200020003e0758a34da7a532b2a80aaa1a180968009d390039beaccf668980f400220029697edb2b7561e0c4530dee8000fee053787d7aa5d72f8abe83b05370dd5660f37de30c9f9e1774c67d851cf2aec54323b3270c3f1d757db152cc09066673f4af37f1ef2630086f21d818954cb557aa9f6b088efe6d6998b91423b8c02000dd52494646d6000000574542505650f820ca60000090c7049d012a200c20013ebd469f4aa72422a1b7f55800e017e9ec009d32847037a071aa13ff4a73d8
+
+2026-08-17 02:19:25,736 INFO image_rx_daemon: published frame_id=0 2919 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:26,223 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.8 rssi=-67 dump=0102000000000000fe10020ca77588d2aefd166777319eeb5f91aff8e5db18706a132971cf3eb4fa3bf68904ea79d262563ff6efe7d5683bf615bf9bf9f4428afd856fec3f1d3787d7f72faa1624fd456b7a3a8cf96fbfb9100e58ba9ffe6f1f0662b8006b5249464664000000574542505650382058000000f003009d012a200020003ec15aa74e942f2314288982293e056430ad2e050e66803676a12b4d913a9eea96b31bb8d84294a6f7f829fac584e3cee4d69337dd54cc21495e81982aee069ae4e7d20af6f7ee0d889c0000030c6d524fc64e0620c80597454000963838e35a0060097105a49d017aa000203536c158bb46847523a96a88
+
+2026-08-17 02:19:26,458 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.5 rssi=-68 dump=01c20000000000003e10040cffb71988c6cfcf2a08231aa978eebd5c00b152494646aa00000057454250565038209e0000003005009d012a200028003ec148a04aa7b3e321b7f558066018096c009d32c8670037c07e801710abcb1281d431ebc894ee8000feea83773ec9ad1362e71465c5c9004e8acbc174793e2ecd38afe6310c6971a7152e6bfff751cdffa8fad689ffbfd7fdbdcc4635efffa8fed689efbfd73dbdcc46367dc1168816bfa07b94038f3ff9c51985c5bcf262d9c55f0e46ea1d9eca50f0152d5bf74b569b3000006f524943466800000057454a50555038205c0000005c0c009d012a200020003ec15ca74eb425b3b3280802
+
+2026-08-17 02:19:28,894 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:29,728 INFO image_rx_daemon: stats: rx_frames=2075 rx_decode_err=0 frames_published=85 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=88 parity_recon=0
+
+2026-08-17 02:19:29,733 INFO image_rx_daemon: air_gap: n=79 dt_med=116960us dt_p95=262158us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:19:29,747 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <40:2 <80:3 <120:62 <400:11
+
+2026-08-17 02:19:29,751 INFO image_rx_daemon: rx_rf: n_rssi=78 n_snr=78 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:19:29,753 INFO image_rx_daemon: phase_telemetry: valid=78 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:19:29,758 INFO image_rx_daemon: air_gap_by_class: seq: n=68 med=117.0ms | boundary: n=7 med=262.2ms | post_loss: n=4 med=233.8ms
+
+2026-08-17 02:19:29,761 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (5.26%) verdict=not-clustered | top 6:1 9:1 2:1 4:1
+
+2026-08-17 02:19:30,487 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:32,656 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=1.8 rssi=-64 dump=83b1381000b21ac789936ad12446c4dda21816187f7c6fdbf31fef2ea8ce981aa44f11f5c3504b4ac8be29db0d07d4c1f021c53b7e63a32c8091fa0bb39b06f5290184cb3c7ae06782d1f0f4d80bfa81f85f28afdff3bcf89b77b2426ce9bd499c0e30b98de3b3582288487b5b2a47d65c2a9974b4548203b5db07fe7931164f2f7076435211e8866b4c4742fe222dcdb4f0ee8ae8f031d3f70055109eadd4c0f8afd1eb991577835f5165f822d443bdb084874f3032a60181f39516107f4febcd1f2de818a647f80ffaca6607b57a9c4295cd87e5d7783aa8021f7f78a0328f1a0e392e18fbf2b79534e02b8302ea32ca9a63bf692945e6aa06bc
+
+2026-08-17 02:19:33,256 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-10.2 rssi=-45 dump=0102000000000000fe1d080cf806b07580ac00e900de22fda1268778827807e802bb77b1ff1959d219bfd1fd36271bf3613f41d7dbaf8000fed38527b3c3d3f9ab17e9787397ec2ffe6c0ffecdffe3d11a4abab02cb74423b09b76a34ae13781110cb4459803323313bea4000c837badcb70ceb81f102b89b7e4206d91037c26cb920e10902eb15bbeb8627551bfae0e21339295bc0e337f0a60f1f368c8fdf4ced670e85182a7b7a7ad8f0d761df873b4699832fec4989a217bd67057fd62ae6cfa188197e48b1eacffb8aa9fa17868dce0f3669c6e3242001777e0a83c5e4f0dd1c935e227b53c0200eb5e351287576ecc7a97c07773ff7a1bbd
+
+2026-08-17 02:19:35,196 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:36,759 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:38,308 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.8 rssi=-64 dump=0102000000000005b4976f49a50f80ea604c512e0b7d64f1e6e38cf473b79e931139b54e3ba2d5897308f52b2f560ea8db96308d8b77af502cd41390f5c1be664397d9f550e71bec78ed3e607b429f509b29bd939f1eb11c3e95082eb3a4903c764f479455a70df417b27b6337b553903d8db7d39203cb52a247a4bb45fa9d615cabdf2c6ff326e93d0f5ff973dd16bb1e47b08d9ea222d34785f908b4515efcfcb8a3cd57910cd294c306064e610aac286c48b491ffc9cb91282e7173078cd3eaab63ada2612cd612e3f4983a0f0350a3ee6ecb9fa30d4285c36a0de8d85171af8e31f6ab15e978e8de9dd9942d003f304d9feabe116e4ddfd2ee
+
+2026-08-17 02:19:39,032 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.8 rssi=-67 dump=01c20000000000003e23046c00005745425056503820c8000000b007009d012a200020003ea9429adaa623a7a1b7e800c015096c009d32847036c03f002800233ff4806c803d954a623e439e01f20053939d047906f91b3d5af4186e0c3eadd000f6ea83449aa418a3b1a6f0d82ac63992629e079fffa68a3345e7ee6f45edbb6bc17855fee8ca8746a642edd1dba58f4661800641202aef40edffec20b057ee3f45edbb2ba17455c70fe807f4f56e13b5b42268ba92ce63a8a13649de3c6816cbfdc7e8beb765782f0ab7f7adc77eec9dc276b7472d478e1290fb72db545ae7430073524946465c0000005745425056583820600400003004009d
+
+2026-08-17 02:19:39,785 INFO image_rx_daemon: stats: rx_frames=2150 rx_decode_err=0 frames_published=88 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=91 parity_recon=0
+
+2026-08-17 02:19:39,789 INFO image_rx_daemon: air_gap: n=75 dt_med=116994us dt_p95=262049us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:19:39,798 INFO image_rx_daemon: air_gap_hist(ms): <20:1 <80:2 <120:62 <400:10
+
+2026-08-17 02:19:39,801 INFO image_rx_daemon: rx_rf: n_rssi=75 n_snr=75 rssi[min/med/max]=-68/-67/-67 snr[min/med/max]=5.0/5.0/6.0
+
+2026-08-17 02:19:39,804 INFO image_rx_daemon: phase_telemetry: valid=75 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:19:39,808 INFO image_rx_daemon: air_gap_by_class: seq: n=62 med=117.0ms | boundary: n=6 med=262.0ms | post_loss: n=4 med=234.1ms
+
+2026-08-17 02:19:39,818 INFO image_rx_daemon: lost_frag_idx: n=6 idx0=0 (0.00% of idx0 arrivals) other=6 (8.00%) verdict=not-clustered | top 7:1 8:1 3:1 12:1 11:1 4:1
+
+2026-08-17 02:19:39,821 INFO image_rx_daemon: frag_reordered: 3 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 02:19:43,032 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 02:19:44,687 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-12.2 rssi=-114 dump=a227fcabba64e3b0450f9db9978f5267153e9949d371cf3d42bcfc06b8763b775a1af43022f5cd1584488504068d028abb2ca67e0868dbd1e0a75225a548a175ea33e50b0cb04674fa1ce5bd357c7b92734104baf68b146ac4a9a8e8549356b77795595d55345eafed536d3712de00263f942567989ce256c5f030e0ecfaf0965f2564043571aa68f161c20ef685e6389112bc8c1fda12402c7facfc36d76d1b88d6af53f6d69ffd776c101a0f169b6b13b986b7565db3d7cfc845b9e52984ce0e00fb6af612516fb7f853e0bc7436a99d183dc52dea7e5ef67601c977f044412713a91cec93f897eb5a424952b1752993c071a4994581cd5a8c02
+
+2026-08-17 02:19:44,892 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.5 rssi=-67 dump=01c20000000000003e36000c00160c082800ff7f0b0000080000000000006f524946466800000057454250565438205c000900300400bd012a800020003ec13ca74eb4e523b32808028018c96400993332180000500545cda345ad6d0000feebedaf0940b95effcb3ffd2b7e95ae1bd7a876953eefd6d89ef58144ef39e96cc1696dc3c85b9835ccc462d331a016086b52494646640000005745425056506820580000003007409d012a200020003ec15ea74eb425a3b32e08028014096400b91ee486b5a0004f976f50a02a5e6000fec3cf6096e82bfd38c397f87d7c279e14f8b7765f79f7ffb7dea8442521b0808576b61fc26c39eff3500000
+
+2026-08-17 02:19:47,298 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.5 rssi=-67 dump=0102000000000000fe39070ca6070c767800fedeef8b9fb4e6eb168d1f86b8d5bbc6a347e0189f9afb97d437e8c888193fbf89da83d853bcff264a7bbc72b5aea1f9303454b10b1b2469e53c7dd9073eae3382d2cb548fa1f98128600000006b524946466430a290c14d7e344a0df921d0cc00903805afee51792044ec845dfd622f063d2f41d1608d4a87f4f04826ae9b0672d4327457522759a693b176f5f1a47caec2cdbb96d463a377087dc33127dfcc8a09e47550fdf366fc99f437920c1b96180f856bbaf3f40004605b5649165cc40086005746c25c5650b420e8000800a047009e0122b006a0103ccd50944b2790c31188045870180a60
+
+2026-08-17 02:19:47,955 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=240 snr=-11.8 rssi=-114 dump=8fd13b6d7c6bb286bf32702c61fef9c1aa1ad6437835567bdc6e69489ec1ab8361829471a96dc1266dcac279af0a084316925855a85b460cdcde6cd4a25034a28a6f03d55479d94c170602237a79a01e5c8dcb7b5155612f39e812d5249154ba22dc78d27f2184c4c4d4fac9be994e5c498691aa4f857e61ec481409bd44736b505e3caf2a61eda957d199e5485e1b436336495a5d90980ccb56340c2d3a3d2cdbc2d03d7e7d365a02df8ed39b9c0f1826a42a941df65fbe127b0eba568ef58bfce424f0a0ba32641b0a6dd38a68c7719d3998f6262b8f430bd4eb837b8f92b5c6585a5fc3c563c58a5fc8512073a918
+
+2026-08-17 02:19:49,341 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-1.0 rssi=-64 dump=01020000000000dbbdb2f289f25a46fe083d8e66b7ba19278d7c784927c658c18f38ce80501fb21679142aa02fd39e5c68bdad0267afd6cfcffdc9b0daa82f6074ba13c84f783d239d51d7003aa108708b106bc7f773a0ad1f99c2ef12a256e527e73aab938b6de7b8fb84579f90df9f6dfd4bd7031c57fc5143f84ca302a1736010b8d064dab723ca0a535e40b8fe425161a4d599e0db0db2fbd1bcc17cf18bee7d52a9087b59864a53c754e2ddcba8e3aecbc280193ebbe12dd1af353adb75702db7c0aa6c168362ca45e6ecb0c7d88190c34bcd0ce5603dece7ac201f28c5674666cc28136ba5e3c3d565def558437ca71b2a0328f0521d591f
+
+2026-08-17 02:19:49,855 INFO image_rx_daemon: stats: rx_frames=2227 rx_decode_err=0 frames_published=89 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=96 parity_recon=0
+
+2026-08-17 02:19:49,860 INFO image_rx_daemon: air_gap: n=77 dt_med=116987us dt_p95=261970us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 02:19:49,868 INFO image_rx_daemon: air_gap_hist(ms): <40:3 <80:2 <120:63 <400:8 <1000:1
+
+2026-08-17 02:19:49,872 INFO image_rx_daemon: rx_rf: n_rssi=77 n_snr=77 rssi[min/med/max]=-68/-67/-66 snr[min/med/max]=5.0/5.0/7.0
+
+2026-08-17 02:19:49,875 INFO image_rx_daemon: phase_telemetry: valid=77 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 02:19:49,879 INFO image_rx_daemon: air_gap_by_class: seq: n=67 med=117.0ms | boundary: n=6 med=262.0ms | post_loss: n=3 med=234.1ms
+
+2026-08-17 02:19:49,883 INFO image_rx_daemon: lost_frag_idx: n=5 idx0=1 (14.29% of idx0 arrivals) other=4 (5.33%) verdict=CLUSTERED-AT-0 | top 1:1 12:1 0:1 7:1 11:1
+
+2026-08-17 02:19:49,885 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 02:19:50,868 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-1.2 rssi=-64 dump=2a1a35da8e2025a1cda7e1f2a921dcfc9a4d8efaf7b1ef16afc723928c98e7da7aa470d28152f84dfb28caa28a223c85c6c222596f8dfb133ba567531b9edac41b57755d10b2102ee018e5285d47e9825655d0256440ba55e18c6c46e950a5662d95e8246c061cb0b8fe08d696a4de7a2dac809fc5500b34cd7cb2e78eb97621cdce77f40ee5e2aa8832d232e61392279c86cc01db987ab282aaaed2ccafb49b5904ed0dbe71ea377078ccc572bd975536306b0305188fa0a0cf3238f4b5fd91da375c0c797a997978017203cbd42f538d1aab36a7eacab209bebf748a1310bd9b8dedbf5a132979716bbf6eaf4e5d908691638f8b382aa025497f
+
+2026-08-17 02:19:52,404 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.2 rssi=-64 dump=010200000000009fb1baa6c8ec1d4a13be961a57e49c954628d84a1a6dc4610787a83ece5826221b5c17c392d8d2335f2581d9104667639ff7b3f0144487468e22f274a62ead5fd1091b3f70372910f696ddee5c77bf0717f562e2a95655446c2d114805c013fa9acdf33ed63341081b76a84617a0d58d7d338ea06f2f8421217b03e71384f98b4b66371de69adab164155cffa7a991f68150df1168f1cf8ec696a19000d0aa74a2d68a21928f21ebb64ba1fca303abf6367695638be0ad3fa4ae33bdc714009a366330ab1dcb30fda1f96e40f30acf561d4abac5fb4686269ec6ad8762eb6fa311497b598be7577c5c91dce019c06853383189b9
+
+2026-08-17 02:19:53,126 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.8 rssi=-66 dump=01c20000000000003e4d040c5aa10c335ba93ff51feb3ff85c73fd3fe8bbfed1e25102879e8e000000f952e94646f2000000574542505a503820ee0050001009009d01292000200037d14ea14ca1e42325b77aa8010010096c009d32e4799f99f0e6b868804c7fe9407ea0f580397facc0fc81e400989b64e4c6a1546c427b6592e841d04e9ec004feed47b6541b4fe9bc9c228179762c9739d43ca607edb69800bb5fd0e3fa337f4666ffc2fd72f119ac97aadcf0eed7a07406c791c026d3ad60a2f0bd82fd824aa13ec8fef560fb3148de48681966fff037e178165f088610f20987a440bdf2900347d0bef3074d03501aa8bd6532b771502c91
+

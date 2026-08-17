@@ -97,3 +97,44 @@ counter.** Next steps, in order:
 - The cumulative (pre-campaign) identity residue was 78 across history vs
   9 in this leg — historical residue may contain the same drop class or
   past resets; not load-bearing either way.
+
+## 6. Addendum — the TX-pattern discriminators (legs E–F, same session)
+
+Both no-flash levers moved the phenomenon; the drain lever moved it most.
+All legs 3000 B / 902.5 MHz, counter-bracketed
+(`stats_pre_E/post_E/post_F.txt`; analyzer `tools/rs12_leg_report.py`):
+
+| leg | TX pattern | fw drops | penultimate lock | loss |
+|---|---|---:|---:|---:|
+| D | gap 40, depth 2 (baseline) | 88 | 28 % | 8.2 % |
+| E | **gap 120**, depth 2 | 37 | 26 % | 5.0 % |
+| F | gap 40, **depth 1** | 26 | **15 %** | 3.9 % |
+
+Reading, with the run-to-run depth variance (§3) kept in mind — the lock
+*share* is the robust metric, the drop *counts* are single samples:
+
+- **Tripling the gap left the lock intact** (26 %) — boundary-relative
+  timing is not the trigger. Its drops were purely single-penultimate
+  events (37 drops ≈ 37 penultimate-attributed losses), suggesting gap
+  width modulates event *depth*, not occurrence.
+- **Removing the depth-2 drain halved the lock** (15 %, below every prior
+  3000 B leg) and produced the lowest drop count of the series. The
+  two-stage mailbox drain that fingerprints every train's ending is
+  therefore a major component of the trigger — but not all of it: 16
+  penultimate losses remain, ~2× uniform, and at depth 1 the mailbox
+  still drains 1→0 at train end.
+- Instrument closure held in every leg (Δcrc_err vs crc_dumps: 126/126,
+  126/124, 94/94) — corruption and the silent drop remain fully separate
+  channels throughout.
+
+Sharpened hypothesis for the firmware instrumentation pass: the L072
+RX-URC path loses a pending frame when the *transmitter's end-of-train
+drain cadence* coincides with it; drain depth scales the probability,
+boundary gap scales how many neighbours the event takes. The
+`rx_urc_lost` counter (needs flash) remains the step that names the line;
+depth-1 legs give the low-rate control.
+
+Operational note: `-TxPipelineDepth 1` costs throughput (2262 frags
+offered vs ~2420 at depth 2, −6.5 %) but cut loss to 3.9 % in this
+sample — not a recommendation yet (n=1, variance §3), but worth the n=3
+A/B if the firmware fix stalls.
