@@ -56,6 +56,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("survey", type=pathlib.Path)
     ap.add_argument("--prev", type=pathlib.Path)
+    ap.add_argument("--history", type=pathlib.Path, nargs="*", default=[],
+                    help="additional past surveys; with these, a per-channel "
+                         "STABILITY ranking is printed (clean-in-N-of-M), "
+                         "which is what a long-lived pin should be chosen "
+                         "from once enough surveys accumulate")
     args = ap.parse_args()
 
     cur = load(args.survey)
@@ -100,6 +105,27 @@ def main() -> int:
         print(f"channels that flipped state: {moved}/{len(both)} "
               f"({100*moved/max(1,len(both)):.0f}%) — a high number means the "
               f"emitter moved, and any pinned channel needs re-validation")
+
+    if args.history:
+        surveys = [cur] + ([load(args.prev)] if args.prev else []) +                   [load(h) for h in args.history]
+        surveys = [sv for sv in surveys if sv]
+        shared = set(surveys[0])
+        for sv in surveys[1:]:
+            shared &= set(sv)
+        rows = []
+        for f in shared:
+            if not legal(f):
+                continue
+            cleans = sum(1 for sv in surveys if sv[f]["hot"] == 0)
+            worst = max(sv[f]["max_dbm"] for sv in surveys)
+            rows.append((f, cleans, worst))
+        rows.sort(key=lambda r: (-r[1], r[2]))
+        print(f"\n-- STABILITY across {len(surveys)} surveys "
+              f"({len(shared)} shared channels) --")
+        for f, cleans, worst in rows[:8]:
+            mark = " <== clean in every survey" if cleans == len(surveys) else ""
+            print(f"  {f/1e6:7.1f} MHz  clean {cleans}/{len(surveys)}  "
+                  f"worst max {worst:5d} dBm{mark}")
     return 0
 
 
