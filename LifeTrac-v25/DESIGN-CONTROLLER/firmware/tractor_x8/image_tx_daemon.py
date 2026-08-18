@@ -1306,15 +1306,15 @@ class ImageTxDaemon:
                     return                          # stop requested mid-frame
                 next_i += 1
 
-            if not inflight:
-                if NO_PARK_LAST and next_i < n and not aborted:
-                    # Holding the final fragment with nothing in flight:
-                    # take the same 50 ms poll the wait-loop uses, then
-                    # re-check the gate. Without this the plain
-                    # `if not inflight: break` would abandon the frame.
-                    link.read_frames(0.05)
-                    continue
+            if not inflight and not (NO_PARK_LAST and next_i < n
+                                     and not aborted):
                 break
+            # When holding the final fragment with nothing in flight, FALL
+            # THROUGH to the normal event body: it supplies the same 50 ms
+            # poll AND dispatches inbound RX_FRAME_URCs. The first strict-
+            # hold revision used a discard-poll here, silently swallowing
+            # any command arriving in the 80-130 ms hold window of every
+            # train (review catch, PR #108).
 
             events = link.read_frames(0.05)
             now = time.monotonic()

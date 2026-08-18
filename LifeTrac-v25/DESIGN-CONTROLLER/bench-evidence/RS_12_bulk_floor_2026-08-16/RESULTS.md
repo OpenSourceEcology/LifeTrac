@@ -88,6 +88,12 @@ counter.** Next steps, in order:
 
 ## 5. Caveats
 
+- **Log clocks are per-board and unsynchronized** (the tractor's is ~9
+  days behind the base's — tx_daemon.log wall stamps will not match the
+  archive folder timestamp or rx_daemon.log). Every timing analysis in
+  this campaign uses per-board internal deltas only; never correlate
+  wall timestamps across the two logs. (Review catch, PR #108.)
+
 - The 88-frame firmware-drop figure is one bracketed leg; the base's dead
   NRST makes counters cumulative, so brackets are cheap to repeat — do
   n=2 next session.
