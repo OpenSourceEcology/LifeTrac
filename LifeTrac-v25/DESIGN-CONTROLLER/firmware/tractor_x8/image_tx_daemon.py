@@ -247,6 +247,14 @@ LOG_TX_DONE = os.environ.get("LIFETRAC_LOG_TX_DONE", "0") == "1"
 # until the pipeline drains restores the paced spacing for that one pair
 # (~+75 ms per train, ~5%) while keeping the pipeline everywhere else.
 NO_PARK_LAST = os.environ.get("LIFETRAC_NO_PARK_LAST", "0") == "1"
+# Minimum delay between the penultimate's TX_DONE receipt and submitting the
+# final fragment. The plain hold releases on TX_DONE receipt, which can beat
+# the host pacer -- the n=3 A/B measured ~26% of last pairs still riding
+# <80 ms apart. 80 ms here puts the short fragment's demod-complete ~100 ms
+# behind the penultimate's, giving the URC path the same slack as any
+# mid-train pair. Only meaningful with LIFETRAC_NO_PARK_LAST=1.
+NO_PARK_LAST_GAP_S = int(os.environ.get(
+    "LIFETRAC_NO_PARK_LAST_GAP_MS", "80")) / 1000.0
 
 # LIFETRAC_TX_PIPELINE: 'v2' (default) = serial send->TX_DONE->send;
 # 'v3' = keep 2 TX_FRAME_REQs in flight against the firmware's depth-2
@@ -1250,6 +1258,7 @@ class ImageTxDaemon:
         """
         n = len(fragments)
         inflight: dict = {}          # tx_id -> state dict
+        last_txdone_at = 0.0         # RS-12: NO_PARK_LAST gap reference
         seq_to_txid: dict = {}       # host-link seq -> tx_id
         next_i = 0
         aborted = False
@@ -1283,16 +1292,28 @@ class ImageTxDaemon:
         while not self._stop.is_set() and (inflight or (next_i < n and not aborted)):
             while (not aborted and next_i < n
                    and len(inflight) < PIPELINE_DEPTH):
-                if NO_PARK_LAST and next_i == n - 1 and inflight:
+                if NO_PARK_LAST and next_i == n - 1:
                     # RS-12: hold the final (short) fragment until the
-                    # penultimate's TX_DONE is in, so it cannot ride the
-                    # firmware's fire-on-TX_DONE 42 ms behind it.
-                    break
+                    # penultimate's TX_DONE is in AND a minimum gap has
+                    # elapsed, so it can neither ride the firmware's
+                    # fire-on-TX_DONE nor beat the pacer (the plain hold
+                    # left ~26% of pairs riding; see NO_PARK_LAST_GAP_S).
+                    if inflight:
+                        break
+                    if time.monotonic() - last_txdone_at < NO_PARK_LAST_GAP_S:
+                        break     # outer read_frames(0.05) provides the wait
                 if not _submit(next_i, max_rf_retries, max_qos_retries):
                     return                          # stop requested mid-frame
                 next_i += 1
 
             if not inflight:
+                if NO_PARK_LAST and next_i < n and not aborted:
+                    # Holding the final fragment with nothing in flight:
+                    # take the same 50 ms poll the wait-loop uses, then
+                    # re-check the gate. Without this the plain
+                    # `if not inflight: break` would abandon the frame.
+                    link.read_frames(0.05)
+                    continue
                 break
 
             events = link.read_frames(0.05)
@@ -1323,6 +1344,7 @@ class ImageTxDaemon:
                     st = inflight.pop(done["tx_id"], None)
                     if st is None:
                         continue                    # stale URC from a past frame
+                    last_txdone_at = time.monotonic()
                     if LOG_TX_DONE:
                         LOG.info("txdone_arrival: seq=%d idx=%d status=%d "
                                  "toa_us=%s", frame.seq, st["idx"],

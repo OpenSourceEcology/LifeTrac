@@ -53,3 +53,32 @@ host-only; against — a workaround-as-default can mask the underlying
 firmware bug, whose proper fix (double-buffer or minimum inter-fire
 spacing) is specified and small. The flash session confirms with
 `rx_urc_lost` either way.
+
+## 5. Addendum — strict hold (leg K): the guarantee made unconditional
+
+The plain hold races the pacer on TX_DONE receipt (~26 % of pairs still
+rode). Leg K adds a timed gap: the final fragment submits no earlier than
+`LIFETRAC_NO_PARK_LAST_GAP_MS` (default 80) after the penultimate's
+TX_DONE. Archive `radio_monitor_20260817_190504_4b8c55be`, bracketed,
+channel clean:
+
+| metric | ctrl (n=3) | plain hold (n=3) | strict hold (n=1) |
+|---|---:|---:|---:|
+| last pairs <80 ms | 87 % | ~26 % | **0 % (min 130.9 ms)** |
+| penultimate lock | 42.6 % | 11.6 % | **6 % (≤ uniform)** |
+| loss | 3.3 % | 1.8 % | **1.5 %** |
+| timeouts | ~69 | ~40 | **32** |
+| frames published | ~90 | ~144 | 143 |
+| offered | 2374 | 2317 (−2.4 %) | 2227 (−6.2 %) |
+
+The stricter guarantee costs more offered throughput (the 80 ms gap plus
+the wait-loop's 50 ms poll quantization — median realized gap 161 ms vs
+the 117 ms target). Frame-level delivery matches the plain hold; loss and
+timeouts improve further. Tuning headroom exists (a 40–50 ms gap or finer
+poll would recover most of the offered cost) but correctness-first is the
+right default while the firmware fix is pending.
+
+**Final recommendation stands: `-NoParkLast 1` with the default 80 ms
+gap.** The flash-session confirmation becomes maximally crisp: a
+strict-hold leg predicts `rx_urc_lost == 0`; a control leg predicts
+`rx_urc_lost ≈ timeouts`.
