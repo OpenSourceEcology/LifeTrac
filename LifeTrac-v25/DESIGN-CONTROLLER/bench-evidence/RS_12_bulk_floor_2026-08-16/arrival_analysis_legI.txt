@@ -1,0 +1,14 @@
+fragments logged: 2351
+trains reconstructed: 192
+nominal inter-fragment slot (fw clock): 117.0 ms (n=2110)
+
+penultimate-drop trains (neighbours present): 2
+  fw gap (N-3 -> N-1) in units of the nominal slot:
+    med=1.638  min=1.267  max=2.008
+    (2.0 = the lost fragment's slot passed exactly on schedule)
+  URC delivery-latency jump across the drop (ms):
+    drop trains : med=-9.1  min=-11.2  max=-6.9
+    clean trains: med=-12.8  (n=153) — the control
+
+  VERDICT INPUTS: 1/2 drops have the missing slot passing on schedule (gap within 2.0+/-0.15);
+  a latency jump in drop trains >> clean trains indicates a stall; neither indicates pure emission loss.

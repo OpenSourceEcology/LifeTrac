@@ -1,0 +1,23 @@
+fragments logged: 2329
+trains reconstructed: 190
+nominal inter-fragment slot (fw clock): 116.9 ms (n=2094)
+
+penultimate-drop trains (neighbours present): 7
+  fw gap (N-3 -> N-1) in units of the nominal slot:
+    med=1.279  min=1.157  max=1.952
+    (2.0 = the lost fragment's slot passed exactly on schedule)
+  URC delivery-latency jump across the drop (ms):
+    drop trains : med=-12.5  min=-26.3  max=-7.2
+    clean trains: med=-12.2  (n=145) — the control
+
+  VERDICT INPUTS: 1/7 drops have the missing slot passing on schedule (gap within 2.0+/-0.15);
+  a latency jump in drop trains >> clean trains indicates a stall; neither indicates pure emission loss.
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=3000  force_frf_hz=927500000  git_sha=7b30e4ff  
+loss 79/2377 = 3.3%   crc_dumps=70  timeouts=69  published=117
+train length 13; attributed 81; penultimate idx 11 = 34 (42%)
+  0:1 1:2 2:3 3:4 4:4 5:3 6:6 7:2 8:8 9:3 10:6 11:34 12:5
+corrupt-capture idx (readable 8): penultimate 0 (0% vs uniform 8%)
+radio deltas: {'radio_dio0': 2439, 'radio_rx_ok': 2339, 'radio_crc_err': 70, 'radio_tx_ok': 17}
+FIRMWARE DROP (drx_ok - host URCs): 2339 - 2298 = 41
+identity residue: 13
+crc closure: dcrc_err=70 vs crc_dumps=70

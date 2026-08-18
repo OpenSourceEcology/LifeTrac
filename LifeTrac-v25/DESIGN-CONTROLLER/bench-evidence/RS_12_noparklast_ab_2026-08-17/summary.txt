@@ -1,0 +1,16 @@
+leg              depth   loss%   pen%  fwdrop  offered  goodput
+leg01_ctrl        ctrl     3.4     43      77     2374     1994
+leg02_fix          fix     1.9     11      43     2317     1932
+leg03_ctrl        ctrl     3.2     44      45     2374     1969
+leg04_fix          fix     1.5     11      60     2319     1926
+leg05_ctrl        ctrl     3.4     41      67     2374     1968
+leg06_fix          fix     1.9     13      48     2317     1900
+
+loss %           ctrl=    3.3 +/-  0.1   fix=    1.8 +/-  0.2   delta=   -1.6  perm p=0.10  favours fix
+penultimate %    ctrl=   42.6 +/-  1.7   fix=   11.6 +/-  1.3   delta=  -31.1  perm p=0.10  favours fix
+firmware drops   ctrl=   63.0 +/- 16.4   fix=   50.3 +/-  8.7   delta=  -12.7  perm p=0.30  favours fix
+goodput B/s      ctrl= 1976.8 +/- 14.7   fix= 1919.3 +/- 16.9   delta=  -57.5  perm p=0.10  favours ctrl
+
+Note: at n=3/arm the exact permutation floor is p=0.10, so p=0.10
+means 'the cleanest separation this design can produce', not
+'weakly significant'. Read alongside the effect size.

@@ -1,0 +1,910 @@
+﻿2026-08-17 16:17:01,502 INFO image_rx_daemon: ctrl MQTT connected (192.168.1.79)
+
+2026-08-17 16:17:01,515 INFO image_rx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-08-17 16:17:01,550 INFO image_rx_daemon: image_rx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-08-17 16:17:01,600 INFO image_rx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-08-17 16:17:01,608 INFO image_rx_daemon: MQTT connected; ready to publish lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:01,742 INFO image_rx_daemon: accepting first retained lifetrac/v25/control/radio_profile pin after start (restart convergence)
+
+2026-08-17 16:17:02,038 INFO image_rx_daemon: L072 VER warm-up ok (attempt 1)
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+CFG_SET_REQ(FHSS_FARM_ID) OK: 17000800
+
+CFG_SET_REQ(FHSS_NODE_ID) OK: 18000800
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 909.000 MHz (raw=0xE34000 -> Msb=0xE3 Mid=0x40 Lsb=0x00)
+
+2026-08-17 16:17:02,529 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+  FRF readback: 0xE34000 = 909.000 MHz (OK)
+
+2026-08-17 16:17:02,552 INFO image_rx_daemon: LBT_ENABLE=0 (command uplink shares the image channel)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-08-17 16:17:02,664 INFO image_rx_daemon: SX1276 RXCONT autowake: opmode 0x81 -> 0x85
+
+2026-08-17 16:17:02,666 INFO image_rx_daemon: RX worker ready; draining RX_FRAME_URC...
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:02,962 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:03,548 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:04,111 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:04,679 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:05,254 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-08-17 16:17:05,847 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:06,411 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:06,979 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:07,550 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:08,123 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:08,706 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:09,272 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:09,842 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:10,410 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:10,979 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-08-17 16:17:11,549 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-08-17 16:17:11,824 WARNING image_rx_daemon: cmd 0x63 GAVE UP after 16 attempts (10.1 s)
+
+2026-08-17 16:17:12,538 INFO image_rx_daemon: stats: rx_frames=5 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0
+
+2026-08-17 16:17:12,540 INFO image_rx_daemon: air_gap: n=4 dt_med=127173us dt_p95=127194us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:17:12,544 INFO image_rx_daemon: air_gap_hist(ms): <200:4
+
+2026-08-17 16:17:12,547 INFO image_rx_daemon: rx_rf: n_rssi=5 n_snr=5 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=6.0/6.0/6.0
+
+2026-08-17 16:17:12,551 INFO image_rx_daemon: phase_telemetry: valid=5 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:17:12,554 INFO image_rx_daemon: air_gap_by_class: seq: n=4 med=127.2ms
+
+2026-08-17 16:17:13,402 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:15,048 INFO image_rx_daemon: published frame_id=0 2980 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:16,697 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:17,289 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.2 rssi=-66 dump=0102000000000000fe04030b4542505650382058000000b003009d012a200020003ec15aa84e3425243228080280180964009d333442b5a00051bf373000fe83cf6096e82a7f395817d446f46b03fc84c1e7bd39fc62a6f4003461d23bed5af60c729acb7e61ac0ae1cc66d402c0008d524946468600000057454250565038207a000000f004009d012a200020003ec152a24ab424a3a30883b90020ce3555b05ad25d0d456df46b98ac20c46c40ab420528bccb5a2c4f54d6439864d5c8ed4cb5617db5fa93d86b419bc80a501b119f16dc9e1cfa36a33427da22fdac68933b97539383adb3d8a60d5b9e1f1ef7eb2e88b9e3ffbfccfd82a1f52f
+
+2026-08-17 16:17:19,888 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:21,478 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:22,572 INFO image_rx_daemon: stats: rx_frames=81 rx_decode_err=0 frames_published=5 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=1 parity_recon=0
+
+2026-08-17 16:17:22,576 INFO image_rx_daemon: air_gap: n=76 dt_med=127060us dt_p95=190641us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:17:22,591 INFO image_rx_daemon: air_gap_hist(ms): <80:4 <200:70 <400:2
+
+2026-08-17 16:17:22,595 INFO image_rx_daemon: rx_rf: n_rssi=76 n_snr=76 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-08-17 16:17:22,604 INFO image_rx_daemon: phase_telemetry: valid=76 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:17:22,609 INFO image_rx_daemon: air_gap_by_class: seq: n=68 med=127.0ms | boundary: n=6 med=189.4ms | post_loss: n=2 med=256.6ms
+
+2026-08-17 16:17:22,612 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.63%) verdict=not-clustered | top 3:1 7:1
+
+2026-08-17 16:17:23,102 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:24,297 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.0 rssi=-66 dump=0102000000000000fe11080bb3176848b5d0abfa3d9b80ff4468149f1bb9765d26c821fb974d34ab3d00e7cd2fd2d14a6502191312729f6b13fd89849d68d47502e7bc8e7cb2217b1dc1beec4f368000a752494646a00000005745425056503820940000001005009d012a200020003ec15aa74ea7a523b32808026018096600ae35a01e80039407e800703abc71266d37d0b5e89a9990f18ac562e64e34563ab61eaf649d7ec4fc65878c8831cafd79d2ceab2ca9d6d52d2d14f2337582ab0ae6d7767821b8bcd88f2ba6ba6bcf531519d7539c748cad20088a0e13b0fa96dd096f22b7aee3b025acff00907fb5900b1fc4bf6867cb7e4500684e
+
+2026-08-17 16:17:26,265 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:27,914 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:29,551 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:31,205 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=89 snr=-4.2 rssi=-51 dump=0102000000000000fe1b0c0c23b32808028018096400b11e8482b5a00042802a7e6d1a2d6b6000fee99d7e71ea9765ffc94fe29fa1c9e5ebc1545a96d5ed89ef3efff526ec6d26531ff7ac4eeaff007ca033caeeec1400600c
+
+2026-08-17 16:17:32,647 INFO image_rx_daemon: stats: rx_frames=158 rx_decode_err=0 frames_published=9 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=2 parity_recon=0
+
+2026-08-17 16:17:32,651 INFO image_rx_daemon: air_gap: n=77 dt_med=127043us dt_p95=202163us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:17:32,659 INFO image_rx_daemon: air_gap_hist(ms): <80:3 <120:1 <200:69 <400:4
+
+2026-08-17 16:17:32,669 INFO image_rx_daemon: rx_rf: n_rssi=77 n_snr=77 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-08-17 16:17:32,671 INFO image_rx_daemon: phase_telemetry: valid=77 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:17:32,676 INFO image_rx_daemon: air_gap_by_class: seq: n=70 med=127.0ms | boundary: n=6 med=202.2ms | post_loss: n=1 med=255.0ms
+
+2026-08-17 16:17:32,680 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.74%) verdict=not-clustered | top 8:1 12:1
+
+2026-08-17 16:17:32,826 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:34,435 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:37,703 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:38,435 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.5 rssi=-66 dump=0102000000000000fe2b040b6acb26a12620afbfdf263ebb120ad0224cbffbf6247f220ed256400827eb1b67e4945cc7e74e4fdf08e3ddd1ffbe5ae4e9617777f4aacc0000ff52494646f80000005745425056503820ec000000d007009d012a200020003ec150a24b27a4a322a80d50f018096c009d32d5384faaf0866d36e00f004f576be3d8cbcd1a0345f28c4b9e48316327ef1893ab3c8916bc57d418006d1e7b964f1ac717891c9175ce16c3710519994d17ab87319286707899b22c7fe8c3fbcd156fb8c91fcfbcd156fb8c91f86ffdf663274afb6fb7b90c949f09e8c9bd070a6aa390ca29ffd1c07e2ec9315f807a73a6d13a5d6c3ad5
+
+2026-08-17 16:17:38,788 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=0.0 rssi=-63 dump=79ac3a26c1e468c0824f0ebad679acb535a8595668550dd0f8aae1ba6d11a952ca2e3002401cc49116d683d9802730337ad4ef0bf04af8024b8be878067451f99e6a4de76d91335b428d8928cac603df8c580ba1660c0fa1acfd0e0415f0454598ae5b3e603fda0ccadfd2fe0638c0ca3bc9d70d3293f2bcf3822b603d7454773783a52121bf6e6386804d82d44a02bda355f81694f38830cc1d28a91d2b7688331524cae8b8e4e2ab1f8aadb80771267e681908a42eb84aea519f7b6a1d51f5b0d735fe6fa6993bcc182cf8e4021ed30874eb774bd6c0af2d11eff46c0b2f03e2b7f8947f1616100112c1e8bc4c1107ccfe1c2f98a9de75f67522
+
+2026-08-17 16:17:40,932 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:42,578 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:42,696 INFO image_rx_daemon: stats: rx_frames=234 rx_decode_err=0 frames_published=14 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=5 parity_recon=0
+
+2026-08-17 16:17:42,701 INFO image_rx_daemon: air_gap: n=76 dt_med=127092us dt_p95=209640us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:17:42,710 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:4 <200:66 <400:5
+
+2026-08-17 16:17:42,714 INFO image_rx_daemon: rx_rf: n_rssi=76 n_snr=76 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/7.0
+
+2026-08-17 16:17:42,716 INFO image_rx_daemon: phase_telemetry: valid=76 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:17:42,721 INFO image_rx_daemon: air_gap_by_class: seq: n=67 med=127.1ms | boundary: n=6 med=189.3ms | post_loss: n=3 med=254.0ms
+
+2026-08-17 16:17:42,725 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (4.11%) verdict=not-clustered | top 9:1 4:1 7:1
+
+2026-08-17 16:17:44,233 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:45,710 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.0 rssi=-65 dump=0102000000000000fe3b0a0c580000005003009d012a200020003ec15aa74e54274592340b9c0c2d783924bb293967b9154a9090ceafe035fbbfd77d089b586640538caba3844132ba7f9452d2636bb3d68ed2ac4549f2472de0b30fd9b970095e52e960706883a65b574f0616084c0000514d4253d65008e0583060006834041d01292c00100076c16c8a4eb42523b34b0202801e046403112fb1f6040181ce98fac0c91e672625a106dad7d3ceeb8c5c6bda6d67df5f65918bf0e7e11f2dbce8f6f1927faf75ee02ad92aee01932e4372607c7ee48a02c00c1544954266a0000c0d74742505e60f8244e00ac0880c600b562202030260036f924
+
+2026-08-17 16:17:47,470 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:49,048 INFO image_rx_daemon: published frame_id=0 2903 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:50,624 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:52,207 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:52,743 INFO image_rx_daemon: stats: rx_frames=311 rx_decode_err=0 frames_published=19 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=6 parity_recon=0
+
+2026-08-17 16:17:52,748 INFO image_rx_daemon: air_gap: n=77 dt_med=127073us dt_p95=186340us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:17:52,756 INFO image_rx_daemon: air_gap_hist(ms): <80:2 <120:2 <200:72 <400:1
+
+2026-08-17 16:17:52,760 INFO image_rx_daemon: rx_rf: n_rssi=77 n_snr=77 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/7.0
+
+2026-08-17 16:17:52,763 INFO image_rx_daemon: phase_telemetry: valid=77 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:17:52,767 INFO image_rx_daemon: air_gap_by_class: seq: n=69 med=127.1ms | boundary: n=7 med=179.8ms | post_loss: n=1 med=254.5ms
+
+2026-08-17 16:17:52,771 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (1.41%) verdict=not-clustered | top 10:1
+
+2026-08-17 16:17:53,126 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=5.8 rssi=-65 dump=0102000000000000fe48060c00d004009d012a200020003ec150a44c27b123b2b018080250180968009d331c8015a000a725f2d011baf2c389f5f22e00fed73977c585cab5420aff1be6bd0a643e3feca23d2a59bb24bc0fe5a5dbd2d470736b600d36f4f72ed564d8960ff2ab004e0cd27f3ef87dc888d85f3f224adc1dfaafa07ec2e3e6a000d552494646ce0000005745425056503820c20000001008009d012a200020003ea9449a4aa623a2a4b7e800a030cdccfdb087618ec15fc572504dd36c4636247c9ae76f02a6ed59ae1a5a373c37fc0aea138de097e5fecee5f78cca0b523713fc1e9c86ebaa52b3fbd4df4e9fb3230dbdb77a8153
+
+2026-08-17 16:17:55,410 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:17:57,033 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=193 snr=-12.0 rssi=-115 dump=b9ce9b99317f43f203fb2f4ed8c4a0fe4d213da30f6d86610b1157551150af9d1e5ff49b08a2153ace020b4de17e493623ff9e5e946ab9302ca7e328c6dbbdbcef28a0f2deee38dcd8ceea71446dd1a765291bda34965cd500ec2519784e77c227b453d0f1429e1594ec0b9c0f98caf932f2ceac1c337eb9c151f01d6bcfb511dca73da59dd8f1819d09e3d6f1de9aa8296d7da782e48e543fff1e6c2e305a9f9eaadb420777acd5c8cb92b9778d6e9fa84f981fb2a853cc25ec41a074871224ca
+
+2026-08-17 16:17:58,651 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:00,141 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.2 rssi=-66 dump=0102000000000000fe550a0cc1e7beabfb7fdbef5417cb65bfb56bd911a077df15a38bf70b0cecd6daa000006d524946466600000057454250565038205a000000f003009d012a200020003ec15aa84e3425243228080280180964009d39413affeab12000428eac3000fecaf26f470b9556ed647cecda6d93c3b91b00fb1b898ca26d24c15ab587fb56bd830db7df693d9a119312b39cc9472300d65b340539b440ae80ef199c2a51d36e6cf591d48ae7e9c1cc318a8e29f3651e8ff16bae6a5de64bace49159fad7fbc3ff5d85ca4b803700cc00dd00e000e919f225297678827001734371f22b739205f980392be8564326c000fef0c19bbd73
+
+2026-08-17 16:18:00,649 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=80 snr=4.5 rssi=-63 dump=e5511c2511584537f73e2cd6f1719e6d58ad5b7b5f0faeec66fe0ee9b6aa5c47b323063279baea0c15a7c8de30cd12c573174ddc08b9beec7604c096885ca23e06995250fa36ed4518a51f635d231195
+
+2026-08-17 16:18:01,543 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=90 snr=3.0 rssi=-63 dump=7ee6e8594be0db0654df69b398bce1e954422a4664cbcc8d81c70d0ce5a8f8be56b6428aaa884262d71af1e05cb8d0c75600341d5231d34d14eb9f47af13829a604fcb966be256a776209f7d853c3318a8c07bc776e112ab6e7b
+
+2026-08-17 16:18:01,905 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.0 rssi=-65 dump=01c20000000000003e5b0b0ca333300c02601f096c009d2d5ef95f0866c16e012c01bc31ff544681bb01a3e672e1b34c58742a99d7013c203000f6f21b70b735a2df8b2ffd9ddfee48dff1246fddc3fe321ce3030f88531f3ae04f68b567ab41c8733cee7c4d30c90962225c65ff8ebf2a09e3ca6dd16fcf27f9ccf40ba8af989f5d02e10031010286a6da3a21927dbc93b6ddd072ee4a5e38fbcde637f4e5e718ff2a0e63af24bba6b5b871af15349fa58b313369368c588717893cae6d21d0ffa69fd7ff1d58b7c03f8b92057f92444210ab950072a00a0041944146266a0000c05f4522505660f8205e502c0060a200d502262030260026c1dc
+
+2026-08-17 16:18:02,787 INFO image_rx_daemon: stats: rx_frames=382 rx_decode_err=0 frames_published=21 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=9 parity_recon=0
+
+2026-08-17 16:18:02,792 INFO image_rx_daemon: air_gap: n=71 dt_med=127019us dt_p95=253726us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:18:02,811 INFO image_rx_daemon: air_gap_hist(ms): <80:3 <200:62 <400:6
+
+2026-08-17 16:18:02,815 INFO image_rx_daemon: rx_rf: n_rssi=72 n_snr=72 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/7.0
+
+2026-08-17 16:18:02,818 INFO image_rx_daemon: phase_telemetry: valid=72 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:18:02,823 INFO image_rx_daemon: air_gap_by_class: seq: n=59 med=127.0ms | boundary: n=6 med=189.1ms | post_loss: n=6 med=253.9ms
+
+2026-08-17 16:18:02,828 INFO image_rx_daemon: lost_frag_idx: n=7 idx0=0 (0.00% of idx0 arrivals) other=7 (9.59%) verdict=not-clustered | top 10:2 6:1 12:1 2:1 9:1 11:1
+
+2026-08-17 16:18:03,559 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:05,129 INFO image_rx_daemon: published frame_id=0 2903 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:07,125 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=2.2 rssi=-62 dump=0102000000000000fe66020b421ffc99726dbad2b36d2a5a68c9d672fb58df23fe6bf3ffc28e001759f7e25d283fff295b04eb27cf84e7e269ceb2b3152a9f3cb71e31b2bb8390524878681b3e5d51775ff5949ff13e3631fc437783633b16f0d06932aafd5c252e79ea97b009cf26c1f2115fc196d935cf15881d2ddea163936fb608b56f48bc474a036d341a0a2eca821f6f72f8ccb593fa892a6e33ef4618a1365f8f08ae5b9575c000006b524946466400000057454250563c9820bf7fbfea5a4f66cfdcf4c30ae3df9277853631dfea6f08b8ca74ab6dfb7a14c64291813d5c58e12e99b046035c0eccb0d74d09dc61891c6feb8f597632b7
+
+2026-08-17 16:18:09,870 INFO image_rx_daemon: published frame_id=0 2986 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:11,489 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:12,862 INFO image_rx_daemon: stats: rx_frames=458 rx_decode_err=0 frames_published=25 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=12 parity_recon=0
+
+2026-08-17 16:18:12,866 INFO image_rx_daemon: air_gap: n=76 dt_med=126979us dt_p95=179740us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:18:12,875 INFO image_rx_daemon: air_gap_hist(ms): <80:1 <120:2 <200:71 <400:2
+
+2026-08-17 16:18:12,880 INFO image_rx_daemon: rx_rf: n_rssi=75 n_snr=75 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/7.0
+
+2026-08-17 16:18:12,882 INFO image_rx_daemon: phase_telemetry: valid=75 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:18:12,887 INFO image_rx_daemon: air_gap_by_class: seq: n=68 med=127.0ms | boundary: n=6 med=179.6ms | post_loss: n=2 med=254.1ms
+
+2026-08-17 16:18:12,901 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.82%) verdict=not-clustered | top 7:1 2:1
+
+2026-08-17 16:18:13,080 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:14,192 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-10.2 rssi=-42 dump=0102000000000000fe73070c90df8ae84f3ab714de8049235b8a6f5e0000b352494646ac0000005745425056503820a00000009004009d012a200020003ec15aa74e27a523b22808024018096c009d2fc11f2022000bce8d2e7b05ed95a0c20400fed34f175310d62a16c88180212dfecb4f600b2d6c00d6ba3f9117cd508d559621649c3dd9f37756a9e777b9104f5041fc35a09ea273fe0bbc7e3cb5bc5df51ef2186c2a2021f4192b56cf41dd6e6a7dcbeb22e68d3ac697f21815f8654fd79536f6cad9c04a7be7cf89cfd9f80cd638f45defda0d616064aa0393cd3e56294a1a2b78d004b017073a492d7dbab0c528fdf9ee54b4e8821587ee
+
+2026-08-17 16:18:15,986 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=100 snr=3.2 rssi=-62 dump=daf4bb9d8fd79252521ed83cf2f033c4eb578a67d7d9edcfb894f5dbf80bde87d08c29193fb2508b5284f84351fda7ac7d0d3466c70117c1656ea3cc307ce2a512c3d9c13cbc60f495413f160458c5f7d8511e5aba8b1bb8cfcaa84d3d3c5cf0fa3b05c4
+
+2026-08-17 16:18:17,981 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:19,598 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:20,690 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.0 rssi=-66 dump=0102000000000000fe7f070b45425056503820660000007004009d012a200020003ec15aa74e27a523b22808024018096400b11e847e30b074000427e9e06eaf3a4fc000feecd955e17acefa442bb78c0a2de7c8404ffa8e984ba7277d9b461c6e21c9c9291dfd9d50b716f306c138a5f7d34c1cc7b3ba402500f2dbcd42712f32460aa95fc271373643336c89b2e150cef3a01870bfc70d10abaf00cbf363a97eb426243328080280180964009d333442982a06c6845589907ae30000fc79b9129d99978a942bdfafa232ca5ef4db331f4b13f653c5bc7bc2ddcf269793fd2fe400deccf1f44b32217d0000f152494646ea000000574542505650
+
+2026-08-17 16:18:22,775 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:22,937 INFO image_rx_daemon: stats: rx_frames=533 rx_decode_err=0 frames_published=29 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=15 parity_recon=0
+
+2026-08-17 16:18:22,941 INFO image_rx_daemon: air_gap: n=75 dt_med=127019us dt_p95=202234us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:18:22,960 INFO image_rx_daemon: air_gap_hist(ms): <80:4 <120:1 <200:66 <400:4
+
+2026-08-17 16:18:22,971 INFO image_rx_daemon: rx_rf: n_rssi=76 n_snr=76 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/7.0
+
+2026-08-17 16:18:22,973 INFO image_rx_daemon: phase_telemetry: valid=76 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:18:22,978 INFO image_rx_daemon: air_gap_by_class: seq: n=66 med=127.0ms | boundary: n=6 med=186.4ms | post_loss: n=3 med=254.7ms
+
+2026-08-17 16:18:22,982 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (4.17%) verdict=not-clustered | top 7:2 9:1
+
+2026-08-17 16:18:24,345 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:25,942 INFO image_rx_daemon: published frame_id=0 2986 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:27,576 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:28,176 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.0 rssi=-66 dump=0102000000000000fe8f030c04009d012a200020003ec160ac4fb425a4b0a808028018096400bd551240fe0bf15bc12f05f34bd02821e8ea9ce629e8f6e2a519ccd2573a48f6d41c2e69474d9a40f7f12caf23fe60eb65ae9cf57e78b438def8de49ba936eb00232515748071019444d7b4fc95456503820ba0000009006009d012a200020003ec158a24da7a53232280aaa4018096c009d3334399fb371086c16e00fd80fd552080d00033561756f6935680b0f25cd3da80000feeea028ea33e5bf169ff9f99fc691f8d22e61fb440f7bfc7ac1e7baed20fee622aa76bf84a85a8522f6fef263ec73c541429fbe6cf3b66c8c18de6b86eb054791
+
+2026-08-17 16:18:30,849 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:32,520 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:32,999 INFO image_rx_daemon: stats: rx_frames=611 rx_decode_err=0 frames_published=34 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=16 parity_recon=0
+
+2026-08-17 16:18:33,003 INFO image_rx_daemon: air_gap: n=78 dt_med=126954us dt_p95=202307us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:18:33,012 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:4 <120:1 <200:67 <400:5
+
+2026-08-17 16:18:33,017 INFO image_rx_daemon: rx_rf: n_rssi=77 n_snr=77 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-08-17 16:18:33,020 INFO image_rx_daemon: phase_telemetry: valid=77 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:18:33,025 INFO image_rx_daemon: air_gap_by_class: seq: n=69 med=126.9ms | boundary: n=7 med=189.1ms | post_loss: n=2 med=253.8ms
+
+2026-08-17 16:18:33,028 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.74%) verdict=not-clustered | top 3:1 5:1
+
+2026-08-17 16:18:34,092 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=0.0 rssi=-62 dump=d742cad81995b1e8553ca39583381eb7cbba685d747662b46535e94c6086c14e0755e9488eebb3ea54411ba54a2552101b2b32169657f7deab1ed371056dd19e1ca8a2b115ed706763200e911963b1e5c873ddfb3ffbc4b133681dae729e07b4177403130831db0284d4895f2bee01492266ebaf2726920c29b9cd0cb888bf8651f36afe99146f8eb01eac80f4746198f91efc97bf773daee54fe9e588da0e951cd655aea0c15df1caf9dc1110e2a76762ad535b5edbf3f70c49ed359b212fb17628ed7f09983757551c990343d09707cb46b12f0d8ce73a6b03974dd97d228d89d949893624c57bda3ff2952e4f004da81b5f723a797add93594c
+
+2026-08-17 16:18:35,179 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-11.2 rssi=-44 dump=0102000000000000fe9d070c0240180966009d19a00033bff394d6f52286170cf56f9afe64c3bc00fdc4c8fccb58b468fc33412fd712f04370e45f1fa9d4df916faff1f7abff04bd8f63fda639277f1e7e05572c58490d2e313590b444e43ff21ff54835f1d3fd4d8000005f524946465800000057454250565038204c0000003003009d012a200020003ec148b05827b3252514026018096400ae4b8e85a148ae0000fc7ad0e4f54bb2fd1f62146e9fe2de39ed1d9cd45a3657e25ecb27da99afa2c24ff5cc49c4e7464000eb52494646e40000005745425056503820d80000001008009d012a200020003ec14ca9d5266b643afae3350ca42364
+
+2026-08-17 16:18:37,325 INFO image_rx_daemon: published frame_id=0 2903 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:38,893 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:39,292 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=1.2 rssi=-63 dump=e3bb9151ac92035861c3525edf81ac25e0225fae644fd4fa54570d1514cd6e009905be74cc4fdc79503d749c7b0f29d66cf13869342efc584421a746a3a34d8af1e64497b25502a8ad31ba3e64a63731023beb64a2fb26b05fbf61ae5a036c2361517d765ca5bbeea5f0ac28702a8fe8a7e518d584749f614f02bf1f310d0cae4d3488be773eaf11df04e16e305e371051d24e9e13017d6ff262f580720524ff21a97672b6e3ef5cc921c404c407b79c7cde5ef1bc992fffcc2b6eab17217d879d21e02c2c40a3b05d4371999bca102cf3898c4b26522e13ebcbdf47a7aa5be614915bbd6ee7ce549e7605e86dd5c05adf2832b6af95237ceefd1b
+
+2026-08-17 16:18:42,105 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-8.8 rssi=-46 dump=0102000000000000fea90b0c047906391b3d3af4186e0c3eadd000feea83449aa418a3b1a6f0d82ac639926296079fffa68a334de7ee3f45edbb2bc17855fee8ca8746a6c2edd1dba58f26688006d1a02aef40edffec20b057ee3f45edbb2bc17855c7afe807f4f56e13b5b42268ba92ce63a8b15649de3c6816cbfdc7e8bdb765782f0abff7adc77eec9dc276b7472d478e1290fb72db545ae7400073524946466c0000005745425056503820600000003004009d012a200020003ec15ca64eb42523b32808028018096400bb3325f4601ccf5ace60ed3172a10000feee885377585cab7ff3d33ec37d86e7bbc132b66eef66d89ef7fb2a9e76f3
+
+2026-08-17 16:18:43,079 INFO image_rx_daemon: stats: rx_frames=684 rx_decode_err=0 frames_published=36 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=19 parity_recon=0
+
+2026-08-17 16:18:43,083 INFO image_rx_daemon: air_gap: n=73 dt_med=126929us dt_p95=253762us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:18:43,096 INFO image_rx_daemon: air_gap_hist(ms): <80:2 <120:1 <200:66 <400:4
+
+2026-08-17 16:18:43,100 INFO image_rx_daemon: rx_rf: n_rssi=73 n_snr=73 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/7.0
+
+2026-08-17 16:18:43,103 INFO image_rx_daemon: phase_telemetry: valid=73 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:18:43,107 INFO image_rx_daemon: air_gap_by_class: seq: n=65 med=126.9ms | boundary: n=6 med=193.5ms | post_loss: n=2 med=254.1ms
+
+2026-08-17 16:18:43,111 INFO image_rx_daemon: lost_frag_idx: n=5 idx0=0 (0.00% of idx0 arrivals) other=5 (6.94%) verdict=not-clustered | top 11:2 7:1 2:1 12:1
+
+2026-08-17 16:18:43,765 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:44,551 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=164 snr=1.0 rssi=-63 dump=bea8016a851b4e81f9353b4af1a0266a04695b29d4f01c21a2e14693c673cffd964f0f5c8a20c3037e8b12480fa6ed084808ce23464d056c82c225e435df158a99184545ce9350c4e078815503150ad2ad43562154b6bb7e194cb2a16dee959510ec887129195cf291d451d7bdc089e604165a6828e8346b233c4022e19500ef1e31acb4943d5724f1d8f265916ab904599fec03d181cc91b25bbc16353760b2c816425f
+
+2026-08-17 16:18:47,057 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:47,892 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-0.8 rssi=-63 dump=0bae4d884c5b63ea588d91e4ab59e08c6c669e1609827fd1f8da2b053bd617b95ee67adfa80ac0d777c7da787ccfe098c0849a52352c12acb8ac15b134442bd1bb4f39adc330204d68dc55c3b3f196b865a8c7c7d9248f7d12fc47656f35ce3af90eebe483bb22bba995135696ca8823eb6da30f4394f12677430480ff738e233b8af6920f96435ff11ce50f7356f781151d5ba8b7245673a79712282dee9e194f3b1d6b063c6caf579878632018f578bb47640f5299d00b832e61b67eed9f7fd7610a2b4a40feaa4dbb5a27adec84e45940b9e620c5a502b41c1a9732b22f0fd13dc5ba84cc7cfc66bc8b56a41f1e5c71e851654928234a79fd2d
+
+2026-08-17 16:18:49,178 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-5.0 rssi=-50 dump=0102000000000000feb9020ca523b32808026018096600ac3284802fb37083e40005cff93da6070c767800fedeef8b9fb4e6eb168d1f86b8d5bbc6a347e0189f9afb97d437e8c888193fbf89da83d853bcff264a7bbc72b5aea1f9303454b10b1b2469e53c7dd9073eae3382d2cb548fa1f98128600000006952494646620000005745425056503820560000003004009d012a200020003ec15ca74eb42523b32808028018096400a5da804480010a00a9f9b4639943f000fedd0e3a0baa59ae24feefed4a20a4961c71c6bbc9fd1500e283ad4c50f0e262b3612d1da7a8c2efe002006f524946466800000057454250565038205c000000100400
+
+2026-08-17 16:18:50,791 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-0.2 rssi=-63 dump=75145f105e1fd32440c0bd57c2eec50bc7618042d013e0fba673ee86a3d188c5c87a4ef6058d9aad3c07018d60ccc0fba98d0983ec7a644f159352f5545d92f88e0931ecf805270d089783213ee599a596ccb23a2d183df9c91f873671d2809ea11bbd198f00d2da49058c57eda5f01e10194d43f01b363705fbd59b7a9dfdec111dee7d41255a9fb24f1f9d3ef14fc3807380ed1cdf64ee3515f06c583d9dd0405801d532076c34ea34a45b86d8cca388b85fd401f9a7f6d647754139f8b88db412424bad79c4395248f274cd98ca1462cccf5eef5e90a265728bf29dc5f4a0e8f59765461b96b32ff4509fec875e745aefc4e4aed6cf046194e3
+
+2026-08-17 16:18:53,140 INFO image_rx_daemon: stats: rx_frames=759 rx_decode_err=0 frames_published=38 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=23 parity_recon=0
+
+2026-08-17 16:18:53,150 INFO image_rx_daemon: air_gap: n=75 dt_med=126961us dt_p95=253724us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:18:53,164 INFO image_rx_daemon: air_gap_hist(ms): <80:5 <120:1 <200:62 <400:7
+
+2026-08-17 16:18:53,167 INFO image_rx_daemon: rx_rf: n_rssi=75 n_snr=75 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/7.0
+
+2026-08-17 16:18:53,170 INFO image_rx_daemon: phase_telemetry: valid=76 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:18:53,175 INFO image_rx_daemon: air_gap_by_class: seq: n=65 med=126.9ms | boundary: n=6 med=202.3ms | post_loss: n=4 med=254.0ms
+
+2026-08-17 16:18:53,178 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (5.41%) verdict=not-clustered | top 5:2 2:2
+
+2026-08-17 16:18:53,533 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:55,131 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:18:56,229 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.0 rssi=-66 dump=0102000000000000fec6070b7909a7fd6607f464877720576a20fae171076264590fe4de16b083cc0000fee72b421ffc99726dbad2b36d2a5a68c9d672fb58df23fe6bf3ffc28e001759f7e25d283fff295b04eb27cf84e7e269ceb2b3152a9f3cb71e31b2ab02b9ebc6a9c01a0b5a176c5cf5e7c9cbcf26f47af3643ac93912ba6ebce6f237357ebf03cc628a7d4e588f220e20a6309079f18a3804ee3854223e5bf9c0b26fcebc472a0b6934da028f0a021f6c7ef8cc7593c2892a6e032a0318c13a578e02ae4bc379c000a66f5b294a0e69a580083785da58f6503820500001c030045397011a208c20303ec96cc4cee42523b328a806804b89
+
+2026-08-17 16:18:57,190 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=78 snr=3.5 rssi=-63 dump=7a3a2e612dd457a4fbbe03be5c2259debeefe8d902c2da71b287e91cc9f57d7b7921e8dd17f2453b90ac2302fd44876a0e02ac40ff244dad5224404c75e8e651a37eee374254867ee566756af95f
+
+2026-08-17 16:18:59,974 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:01,614 INFO image_rx_daemon: published frame_id=0 2949 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:03,213 INFO image_rx_daemon: stats: rx_frames=836 rx_decode_err=0 frames_published=42 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=26 parity_recon=0
+
+2026-08-17 16:19:03,218 INFO image_rx_daemon: air_gap: n=77 dt_med=126932us dt_p95=203729us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:19:03,231 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:3 <120:1 <200:67 <400:5
+
+2026-08-17 16:19:03,235 INFO image_rx_daemon: rx_rf: n_rssi=77 n_snr=77 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-08-17 16:19:03,238 INFO image_rx_daemon: phase_telemetry: valid=76 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:19:03,243 INFO image_rx_daemon: air_gap_by_class: seq: n=69 med=126.9ms | boundary: n=6 med=202.2ms | post_loss: n=2 med=254.0ms
+
+2026-08-17 16:19:03,263 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.78%) verdict=not-clustered | top 7:1 3:1
+
+2026-08-17 16:19:03,268 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.2 rssi=-66 dump=0102000000000000fed30b0c343b5fa07083e403d003f57bd19099037407a007e802cc3c70b0e852265ad3a6d0a62f71d73ac9affe1d5f306068284b867e1cc2fd6b6608d663127e134e74dbd2874c6b1efb28c9f9bc365f32042ffd4696bdd20626f5e004a761eedc1c64ffa5904ac6d1cf69ad54774d2c296d7f1d5e3ffb39c45b3bdbb20aef82fc241c52050091aded73ec7534e6745fa21fc7d8e018cdf2e2c5926fd3182d757c960bfd3ee4bfdf4df274aebe3ddf3b9fdf663274aebe3ddfe01011419f9bc00073524946466c0000005745425056503820600000003004009d012a200020003ec15ca64eb42523b328080280180964009d2f
+
+2026-08-17 16:19:04,920 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:06,549 INFO image_rx_daemon: published frame_id=0 2974 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:09,816 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:10,227 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-10.8 rssi=-42 dump=0102000000000000fee3020c610d7e3ff1f43c7fb0326cc553ffe52b9f3206ce59464aed6765dc67a8e7e2335abffc9ce78bde5c30e0e62a061f79fc4fa1ed858347562cd44b409da1d5ae569a9987ae56acd0a4e01b6a238f36a160386ba9d506888db8d6c25e4258deb25ee271294c4ad33decedab2d173b763dc1b46eaa4e592cd8b71df5cad59a149c03815ad46f07dd63f9753a9de96cd5ac8c0ed9d2e470006d524946466600000057454250565038205a0000003004009d012a200020003ec15aa74e342523b228080280180964009d2fd5d600042802a7e5ce2d22a78000fe2b9c8dab95d031d7d8a7b7c555f07f9b775ed7a01b2d7235
+
+2026-08-17 16:19:13,012 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:13,287 INFO image_rx_daemon: stats: rx_frames=912 rx_decode_err=0 frames_published=46 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=29 parity_recon=0
+
+2026-08-17 16:19:13,291 INFO image_rx_daemon: air_gap: n=76 dt_med=126919us dt_p95=192048us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:19:13,306 INFO image_rx_daemon: air_gap_hist(ms): <80:4 <120:1 <200:69 <400:2
+
+2026-08-17 16:19:13,322 INFO image_rx_daemon: rx_rf: n_rssi=76 n_snr=76 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/7.0
+
+2026-08-17 16:19:13,324 INFO image_rx_daemon: phase_telemetry: valid=76 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:19:13,329 INFO image_rx_daemon: air_gap_by_class: seq: n=66 med=126.9ms | boundary: n=7 med=186.2ms | post_loss: n=3 med=253.8ms
+
+2026-08-17 16:19:13,332 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (4.17%) verdict=not-clustered | top 11:1 3:1 2:1
+
+2026-08-17 16:19:14,622 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:17,242 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-10.2 rssi=-42 dump=0102000000000000fef0060ce9f59d9002cd8000fee4e91d05d52eba309ff16d23a153abc54d9447a7048162fbd51584210a25fcbfcbc7ef91fe28ee9324010d6234a8702854e1d340fdbc8d7fc72e5b68b33bb98cf573f9edfb60522ba8d1bdd2abcdfa279fe133ce8d799bdcc5e4bdd40000a1524946469a00000057454250565038208e000000d004009d012a200020003ec154a14c27a4b1a2280d5230180968009d32833ff160039407e800703abc71281e5be58000fec38b34efdaa77588d2aefd166777319eeb5f91aff8e5db18706a1329f14fbe3c7674d89e155368d26ad6d77ac733058cfc82a5fd74cffb71f7a1cac3937e210be178
+
+2026-08-17 16:19:21,182 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:22,832 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:23,381 INFO image_rx_daemon: stats: rx_frames=989 rx_decode_err=0 frames_published=49 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=32 parity_recon=0
+
+2026-08-17 16:19:23,386 INFO image_rx_daemon: air_gap: n=77 dt_med=127023us dt_p95=216792us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:19:23,394 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:4 <200:65 <400:6
+
+2026-08-17 16:19:23,398 INFO image_rx_daemon: rx_rf: n_rssi=77 n_snr=77 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/7.0
+
+2026-08-17 16:19:23,400 INFO image_rx_daemon: phase_telemetry: valid=77 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:19:23,405 INFO image_rx_daemon: air_gap_by_class: seq: n=68 med=127.0ms | boundary: n=6 med=203.6ms | post_loss: n=3 med=253.9ms
+
+2026-08-17 16:19:23,415 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (4.05%) verdict=not-clustered | top 9:1 6:1 5:1
+
+2026-08-17 16:19:24,323 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.5 rssi=-66 dump=0102000000000000fefd0a0c34399fb37083e40008598e113d626420e5a000fedf54bc2742e55bf1b613f3ebfa8467ef3110b9cb6aaf87775111a4e20ae743e7e223f18abef2a8ffbc1c49755e8eecaec8aedfed2829cb575b4f76368a5cbd6f6dd8e06b2ac4c83a53fcd6ae7bfefe30122fe2c9a49a9c54247934517adac10903a3d0e03400ce80600379807a8bff0c7444b6443a0bf4313edd083f68742d8895883a580a6ccb125b6c80005374f3798441663bf375357963c33875be1b41cb502ec17300f9c9c7f32956e9ce8689ce736054d78d719942694ec16342a46fc677f87625d05aa8df7a50992575d0a5e1b0dab06585ee573e6e78fb
+
+2026-08-17 16:19:26,095 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:27,664 INFO image_rx_daemon: published frame_id=0 2905 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:29,247 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:30,902 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:31,235 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-10.5 rssi=-43 dump=0102000000000000fe0d010c7a4c3c0000a3524946469c0000005745425056503820900000005005009d012a200020003ec156a34d27a4b2b1280aaa5018096c009d32825804b006f0e8e30030ef3c221184492d76a8d4dd8000fee3dd787d7aa5d95acc3fdc7e2df896d6fdb1ccc7d38d42631537a03f552c2a44fc8c55bf3152db3edda60af4b78b06d91d65f74b785968ee89531c459aef4aa4af092474561dfc7d9374ca4d1991c9d2dc01991ca7e95473de5000c952494646c20000005745425056503820b60000005007009d012a204020403af19562e03c27c43c942d04a73dcdad811c0a84e87df560c43f8bcb0d64f720ce4a863c58e5
+
+2026-08-17 16:19:33,443 INFO image_rx_daemon: stats: rx_frames=1065 rx_decode_err=0 frames_published=53 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=33 parity_recon=0
+
+2026-08-17 16:19:33,447 INFO image_rx_daemon: air_gap: n=76 dt_med=126894us dt_p95=216461us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:19:33,456 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:3 <200:68 <400:4
+
+2026-08-17 16:19:33,461 INFO image_rx_daemon: rx_rf: n_rssi=76 n_snr=76 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-08-17 16:19:33,464 INFO image_rx_daemon: phase_telemetry: valid=76 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:19:33,469 INFO image_rx_daemon: air_gap_by_class: seq: n=65 med=126.9ms | boundary: n=6 med=189.1ms | post_loss: n=3 med=253.7ms
+
+2026-08-17 16:19:33,472 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (4.11%) verdict=not-clustered | top 10:1 1:1 8:1
+
+2026-08-17 16:19:33,482 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:19:34,142 INFO image_rx_daemon: published frame_id=0 2892 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:35,742 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:37,380 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:40,651 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:42,252 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:43,500 INFO image_rx_daemon: stats: rx_frames=1143 rx_decode_err=0 frames_published=58 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=35 parity_recon=0
+
+2026-08-17 16:19:43,505 INFO image_rx_daemon: air_gap: n=78 dt_med=126918us dt_p95=199343us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:19:43,513 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:3 <120:1 <200:70 <400:3
+
+2026-08-17 16:19:43,518 INFO image_rx_daemon: rx_rf: n_rssi=78 n_snr=78 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-08-17 16:19:43,520 INFO image_rx_daemon: phase_telemetry: valid=78 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:19:43,525 INFO image_rx_daemon: air_gap_by_class: seq: n=70 med=126.9ms | boundary: n=6 med=199.3ms | post_loss: n=1 med=253.9ms
+
+2026-08-17 16:19:43,528 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (1.37%) verdict=not-clustered | top 7:1
+
+2026-08-17 16:19:43,532 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:19:43,888 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:44,958 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=4.2 rssi=-62 dump=91da81f706736a7494e6d2ee3887fff93eb13b0641d7d96c1580da895ef29d9dcb4c200425ec5a6da44668713e92d26198996feaab115557e399c39abb83aa0e65113a60f91ced1598a526e95b22d297fd25f54ec0d2f583696793fd968f9c84e21a217f7adf16d4d8450f4d0c1f12f7596bacdb9720163b8fae9e5797a5a7a49c7cc555dff2f59e293ad60d69674db315a1d61bea9ef7454050a6d76a0c3c43554333f472a7a4fde6ad0b430b9b64d44c5daf5f0af307591d4bf83935f082570ed03bfb14ae7e73c7320027000d04e9c92859344d7d16d7681075ab90ee8edaa8fa8008d0dbb87503aa3b501c588b4ed2cfa1239eea3b93421fea
+
+2026-08-17 16:19:48,094 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=113 snr=4.0 rssi=-62 dump=a7ba98849670f733e0547bdcc86f94a5e10d8f316cf94775ed28042d29df41601945483b973eb65c7795115b42503d8093c210d18b3c71c36d33b57f083b4cdc09ce1e7639ec0b7ad58cc9b9eda8fd2d73b809443e3b0e88df55d98e82532fdb4a3ff9f4dbe72747528f4f5af678ca531d
+
+2026-08-17 16:19:50,295 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:51,944 INFO image_rx_daemon: published frame_id=0 2959 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:53,180 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.0 rssi=-66 dump=0102000000000000fe37080c49a76665f8f4e12beb3f005f923d6a1a7f7d26572b277fd328289832eb1af88d7612dad6c5b8007336ea25d6f1985e18ba9605a91cb26ca1b4e0a8d098bfb9166b0d2a284d5dbe8e0b4c1abafd01f90d58e9540a603c033808d23a4d30aabff9264c200a10cd800587f9a26abf6b71ebdfc617203d3e4c9e00009bed87a2b277f5d39f94cd6cda7ff87c3fa943fe382378ec07d7aa47479265ea8b1183398fcfbf76b19ea2475a8335e04520648dd4911eb434ba99cf8249859923f6b4c0f2fd360dadaedbf311da01220fc173ac79e323bfa965fc11fa9ca380a31b3fd5ad67c424f2cfad961c549c014a2ac75278
+
+2026-08-17 16:19:53,556 INFO image_rx_daemon: stats: rx_frames=1217 rx_decode_err=0 frames_published=61 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=38 parity_recon=0
+
+2026-08-17 16:19:53,566 INFO image_rx_daemon: air_gap: n=74 dt_med=126944us dt_p95=253612us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:19:53,574 INFO image_rx_daemon: air_gap_hist(ms): <80:4 <120:1 <200:64 <400:5
+
+2026-08-17 16:19:53,578 INFO image_rx_daemon: rx_rf: n_rssi=74 n_snr=74 rssi[min/med/max]=-67/-66/-64 snr[min/med/max]=5.0/6.0/7.0
+
+2026-08-17 16:19:53,581 INFO image_rx_daemon: phase_telemetry: valid=74 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:19:53,585 INFO image_rx_daemon: air_gap_by_class: seq: n=62 med=126.9ms | boundary: n=5 med=193.4ms | post_loss: n=4 med=254.1ms
+
+2026-08-17 16:19:53,589 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=1 (16.67% of idx0 arrivals) other=2 (2.82%) verdict=CLUSTERED-AT-0 | top 0:1 7:1 8:1
+
+2026-08-17 16:19:53,592 INFO image_rx_daemon: frag_reordered: 3 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:19:55,247 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:56,860 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:19:58,464 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:00,094 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=82 snr=-10.5 rssi=-42 dump=0102000000000000fe480c0c009d9bbf12ef0e407a11b3eb21b8058c190f66f6b6a03c34a6fb39ff3e1d7bacfef802d1b200ea643cb6881ab68d68e9681c4a94896d478db2d9d9c1c5684f8be0afb0ccf5f9
+
+2026-08-17 16:20:01,732 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:03,367 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:03,604 INFO image_rx_daemon: stats: rx_frames=1295 rx_decode_err=0 frames_published=66 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=40 parity_recon=0
+
+2026-08-17 16:20:03,608 INFO image_rx_daemon: air_gap: n=78 dt_med=126921us dt_p95=188992us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:20:03,618 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:3 <200:71 <400:3
+
+2026-08-17 16:20:03,622 INFO image_rx_daemon: rx_rf: n_rssi=78 n_snr=78 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-08-17 16:20:03,625 INFO image_rx_daemon: phase_telemetry: valid=78 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:20:03,636 INFO image_rx_daemon: air_gap_by_class: seq: n=68 med=126.9ms | boundary: n=7 med=189.0ms
+
+2026-08-17 16:20:03,645 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (1.39%) verdict=not-clustered | top 12:1
+
+2026-08-17 16:20:03,648 INFO image_rx_daemon: frag_reordered: 3 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:20:04,955 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:06,605 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:09,896 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:11,100 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=4.0 rssi=-63 dump=9c5fcfd20253ee972bb35ca3264e4785642007f742e946a56a0488ad18524ef1ddc6a312e2b12d11e1cea3854cb3c04fa6ab2f2ead194039bc67279bd89aba0665156292faa7616638d61c5136d55e79c5245165b8ec3ada2c77fa415c7ae1b90c138de60b0a5432883921513fc7b37c312a76c3c297cb95e8f42dc573e27155a79fcdee39de8c7dfdced5ff963087e3d1af9792915c0783d1705162ce0b2e7108a6c3a7165a84419979dcc4230ced594fec88c2b27b3a5f677c2c76019f64d4cb005db2349766f874e58f824b6b515698939742f99b74a61b0ede5ac4b98e9c10efa15ef2f6e096ab7810d9d33ed69f75f7046a4588b569fc3516
+
+2026-08-17 16:20:13,082 INFO image_rx_daemon: published frame_id=0 2903 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:13,676 INFO image_rx_daemon: stats: rx_frames=1372 rx_decode_err=0 frames_published=70 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=42 parity_recon=0
+
+2026-08-17 16:20:13,681 INFO image_rx_daemon: air_gap: n=77 dt_med=126893us dt_p95=191832us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:20:13,691 INFO image_rx_daemon: air_gap_hist(ms): <80:4 <120:1 <200:69 <400:3
+
+2026-08-17 16:20:13,694 INFO image_rx_daemon: rx_rf: n_rssi=77 n_snr=77 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-08-17 16:20:13,697 INFO image_rx_daemon: phase_telemetry: valid=77 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:20:13,702 INFO image_rx_daemon: air_gap_by_class: seq: n=65 med=126.9ms | boundary: n=6 med=186.4ms | post_loss: n=2 med=254.2ms
+
+2026-08-17 16:20:13,705 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.74%) verdict=not-clustered | top 3:1 8:1
+
+2026-08-17 16:20:13,714 INFO image_rx_daemon: frag_reordered: 4 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:20:14,258 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.0 rssi=-66 dump=0102000000000000fe65080b574542505650382074000000d004009d012a200020003ec150a24ab424a33330080280180964009d32848165a01e8000880a05ec23784815165eeb5a57c9b6cd7a2e117fcd7c5d24509fe324f8caf96f29f08c29cefd7e801fe40b30edc7c72f1ff7c800e52765fa9ba767c602da93d6b1dde041c14930ad6ac581746a400000e552494646de0000005745425056503820d2000000d007009d012a200020003eb94a9d4aa72422a2300c00e017096c00b11e84703795f1636d96e01b756ec0378a7f6c09a37e209e01fa00926ecf20474ed0a5eee53fb0d838444b2800fededaa81b2c267ef7991fab164818ef6a1c
+
+2026-08-17 16:20:16,212 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:17,811 INFO image_rx_daemon: published frame_id=0 2986 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:18,882 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-0.8 rssi=-62 dump=32b000ad85f28448a5de63ad3cdddaeb88aafe24a8c8d4d6e3a716e92325704babd4661c7c9f9177e697cd1047b75cfd97919a91c699b86e07b3f9a91e97bac56d51ab2cb0c006a06f4af41f94d86f621beed7915a3baf437e23c9b393cd41eadf9401f08fc8418494c40419eaeaac908e6faf9fe69926ab9b0ee8d1d10a2dbcc8eb06f6ca539c42001d1aed4d327fabcda89309c96a2ac7187e3f85ecda5efd6b4e4b607c2ffa95957e0c3cd7ea3cd60c8938bf6290f2748b9c0d0988a24b4c6a30c905d04ca5e9d7ecda54b307d33837a218499622af32e68e7dbf511ff158ba38c73a4858197846b572834107ce2ee57988db7f733919cd9ba0
+
+2026-08-17 16:20:20,710 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-0.2 rssi=-62 dump=d8f9f535ce9559755c23b0f3ff700b28edabd94ec73e817e600c370d08e5a18aae143733d045d3a5e4e386d790d240dc122805b881677b78a4bce3af7e0db8742f3de3536afe3e1e82d6d7524139cc527fd7ce0378ed049d15def4ed32383d9824b680953e9e4fc2a1844c0deee6070ae69b26ac57360683472e7a2d373430d4f244cc3a45fb161c92a6301b849cd608b77249cb83875b22dddf1b8f6c11fd37ff1fb21218779b29b79f7285b9c0fc60971934ebbd91702ea1808c02890821e905cbceff2c5375ace88f405b684ddd15f4e19f9ebbeecca6ee52838aa5ab986b5e2a9a4df1b4d7003a2c9f015ea916ca493fc13994cd16e7b43821
+
+2026-08-17 16:20:22,666 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:23,737 INFO image_rx_daemon: stats: rx_frames=1447 rx_decode_err=0 frames_published=73 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=45 parity_recon=0
+
+2026-08-17 16:20:23,741 INFO image_rx_daemon: air_gap: n=75 dt_med=126935us dt_p95=202083us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:20:23,755 INFO image_rx_daemon: air_gap_hist(ms): <80:3 <120:1 <200:67 <400:4
+
+2026-08-17 16:20:23,759 INFO image_rx_daemon: rx_rf: n_rssi=75 n_snr=75 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/7.0
+
+2026-08-17 16:20:23,761 INFO image_rx_daemon: phase_telemetry: valid=75 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:20:23,766 INFO image_rx_daemon: air_gap_by_class: seq: n=63 med=126.9ms | boundary: n=6 med=189.4ms | post_loss: n=3 med=253.7ms
+
+2026-08-17 16:20:23,769 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.82%) verdict=not-clustered | top 8:1 9:1
+
+2026-08-17 16:20:23,772 INFO image_rx_daemon: frag_reordered: 3 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:20:24,314 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:25,960 INFO image_rx_daemon: published frame_id=0 2993 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:27,562 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:28,236 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.2 rssi=-67 dump=0102000000000000fe7f040baf474a49c62567e0df273df567a88649bb4374bf449dc1ec05d7e6d04ed6647d3aa98e8184b752ca928c5c11009589f2522a025ee0a8e422edcf760ab5c497dabafe48b6a3ca07aeb057cf515710a219891d251f06f70b51dc825c9ff9b3e9087bfe28ceef448d60ce95240ff7ec009b2bc087bc00000081524946467a00000057454250565038206e0000003004009d012a200020003ec15ca74ea7a523b328080260180966009d33321800085004e090a2135cb00000feefc9b432853fb5eee62257243dc1b3dffa12bd8d97ff1fffd6de32f551143e4fc07c623f045d2a631537a045b564ad5a49f918be3b24bf
+
+2026-08-17 16:20:30,710 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:32,282 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:33,336 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=3.5 rssi=-66 dump=01c20000000000003e88070c1affc55aa1b7f448e4267bdebf09d8ab14d4cbdff2559160858c32e06fc55fabfec242fcea90a713ef0130a37a373a6bd01be337cafcc64be8b06de767171fc23c502ba6b6a5466c9f66bdf18d9c17be3e25491019a1d022964344e51780036f5249464668c00000574542505059382350083000500c301d412a20282063bec15ca34ab426a3b328c8228078806400983b6388252000220c2a3d56da23efc800fe7afebce142b55b7f04177b09984d75e32464c07ce041e7b4e6193e6c38a5c8923bbf9905ebc48dc6d301ce63d0a3008d51c5464316081063db4572f05650786a7a30a004d80489d5042a2400e340
+
+2026-08-17 16:20:33,811 INFO image_rx_daemon: stats: rx_frames=1523 rx_decode_err=0 frames_published=78 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=46 parity_recon=0
+
+2026-08-17 16:20:33,815 INFO image_rx_daemon: air_gap: n=76 dt_med=126915us dt_p95=186293us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:20:33,829 INFO image_rx_daemon: air_gap_hist(ms): <80:2 <120:2 <200:70 <400:2
+
+2026-08-17 16:20:33,833 INFO image_rx_daemon: rx_rf: n_rssi=76 n_snr=76 rssi[min/med/max]=-67/-66/-64 snr[min/med/max]=4.0/6.0/6.0
+
+2026-08-17 16:20:33,835 INFO image_rx_daemon: phase_telemetry: valid=76 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:20:33,840 INFO image_rx_daemon: air_gap_by_class: seq: n=66 med=126.9ms | boundary: n=6 med=179.4ms | post_loss: n=2 med=254.0ms
+
+2026-08-17 16:20:33,843 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.78%) verdict=not-clustered | top 4:1 7:1
+
+2026-08-17 16:20:33,846 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:20:34,189 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=0.0 rssi=-63 dump=7ed343292b5459dad33f1ea6c4982a6954c248b76dff5f5c8b6f8a4b40f799a75347114b2b81c5018439e419b3c8b4aa38e25952f2e23539b5ce83f40717dbf82b8d518d248d1afb848cc9cb46d42c2bbe0f78716668b5aecf3c9c62e6823959db70cc9b1dd0afc81cfeb8a94bc0f0d7c6a5a34ecf3e9202e500d1aaad5f43591dd3175cd59300eddf93ed4797c0fd200451defbe70eb1365386281363d8baba18f598224695ee5b29e7a31baf60ad2bbd7162ecff5f95902fffdb67405ac9f21fd836c2d59d4110ea4965b68b97333159dec6ac90e1de1a97bd181a74a46ea6ba7662daf93054e384fb9243122205f0628e8f92e994fb06c51377
+
+2026-08-17 16:20:35,238 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-10.5 rssi=-43 dump=0102000000000000fe8b090b52494646d60000005745425056503820ca0000001006009d012a200020003ec150a24ba7a4a322a80d50f018096c009d3284784faaf0823c03787c88002ff5c9e857defef92269a5257a17cb0000fec34443d2e2808f91dd641da15139e3d8a18992f070a41dc97904cf132ead37d2d062cee1ad04f30feb1acae04da77992f76917d7def8ee49ecc65c7eeec86f33fb0cad258597a23f713896c2ab470314b18ee42c3180165a3fd737b571607e8407fc6a7c3ad77de1638d2720ffa32f672ce33925103cd0cf501afae5fb13a5f639ff807c2d5877067d9d4c962bfedae30caabc08e00edeef982df80f935c0123
+
+2026-08-17 16:20:37,085 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:38,741 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:40,382 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:41,981 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:43,084 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=155 snr=0.0 rssi=-63 dump=337ead08f62d01cc99c76ba6a52f1d25ca4b9a4009c002c060318885c069272b89f5137996503da938a77394ffdfb1020f67a351fc4cf6646c9fb5480c92bf2bddc0cbc0907f74890e000e4cb6f2968056875f14ef2862acf76280188d87400131f54892e8f9b8e9f447eeafa447b176fe5fd8f5190a4295b75b267385ce2695bdfba4fc75e94d441f2ca5cfa5c960834e83137fa05e7a9fb7f1d9
+
+2026-08-17 16:20:43,860 INFO image_rx_daemon: stats: rx_frames=1598 rx_decode_err=0 frames_published=82 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=48 parity_recon=0
+
+2026-08-17 16:20:43,865 INFO image_rx_daemon: air_gap: n=75 dt_med=126931us dt_p95=252978us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:20:43,874 INFO image_rx_daemon: air_gap_hist(ms): <80:5 <120:1 <200:64 <400:5
+
+2026-08-17 16:20:43,878 INFO image_rx_daemon: rx_rf: n_rssi=75 n_snr=75 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=4.0/6.0/6.0
+
+2026-08-17 16:20:43,887 INFO image_rx_daemon: phase_telemetry: valid=75 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:20:43,891 INFO image_rx_daemon: air_gap_by_class: seq: n=63 med=126.9ms | boundary: n=7 med=186.5ms | post_loss: n=4 med=254.1ms
+
+2026-08-17 16:20:43,900 INFO image_rx_daemon: lost_frag_idx: n=4 idx0=0 (0.00% of idx0 arrivals) other=4 (5.56%) verdict=not-clustered | top 1:2 9:1 8:1
+
+2026-08-17 16:20:43,903 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:20:45,200 INFO image_rx_daemon: published frame_id=0 2903 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:46,763 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:48,332 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:49,264 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-10.2 rssi=-42 dump=0102000000000000fea8060c00d004009d012a200020003ec150a44c27b123b2b018080250180968009d331c8015a000a725f2d011baf2c389f5f22e00fed73977c585cab5420aff1be6bd0a643e3feca23d2a59bb24bc0fe5a5dbd2d470736b600d36f4f72ed564d8960ff2ab004e0cd27f3ef87dc888d85f3f224adc1dfaafa07ec2e3e6a000d552494646ce0000005745425056503820c20000001008009d012a200020003ea9449a4aa623a2a43fe008089101ac850d7be5e9e2e5ebd850de99cbf5bb66f24693ff0eb343192f024f2a9a852a54e28694873b102542884764bd05a3bf5122dcf6d09ee824f8f2711dccf35eba862133e1b36b
+
+2026-08-17 16:20:51,561 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:53,203 INFO image_rx_daemon: published frame_id=0 2949 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:53,935 INFO image_rx_daemon: stats: rx_frames=1675 rx_decode_err=0 frames_published=87 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=50 parity_recon=0
+
+2026-08-17 16:20:53,939 INFO image_rx_daemon: air_gap: n=77 dt_med=126972us dt_p95=189110us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:20:53,952 INFO image_rx_daemon: air_gap_hist(ms): <80:3 <120:1 <200:70 <400:3
+
+2026-08-17 16:20:53,955 INFO image_rx_daemon: rx_rf: n_rssi=78 n_snr=78 rssi[min/med/max]=-67/-66/-63 snr[min/med/max]=3.0/6.0/6.0
+
+2026-08-17 16:20:53,958 INFO image_rx_daemon: phase_telemetry: valid=78 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:20:53,963 INFO image_rx_daemon: air_gap_by_class: seq: n=69 med=127.0ms | boundary: n=6 med=189.1ms | post_loss: n=1 med=254.0ms
+
+2026-08-17 16:20:53,967 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (1.37%) verdict=not-clustered | top 6:1
+
+2026-08-17 16:20:53,970 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:20:54,850 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:20:58,110 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:01,318 INFO image_rx_daemon: published frame_id=0 2903 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:02,880 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:03,305 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.8 rssi=-67 dump=0102000000000000fec7020cfed384d2d794a3fa3f1e49a4f6bf889b095367a7e3fd2ea1f52db02e4a3629f6826f2c2ffe2cfde4137e7c0ae251b5c456619836ec68dec98fdbaa0f8756d40511df124a3682c10dd11a0ba6e8c1cbb6a1b05e887fe9d3f3cd2b75cb9d83c95e3e90872717b6fa4f256cc0dd2b436f5560d5229e38c5ab632ec896f27664cd5066fd485b45b7396fda30e9a826999a2c51d83e864af17f9972c3cf316565007604009d012a200020003ec15ca64eb42523b328080280180964009d2fa22414600042802a7e6d1a2d9dc60000feeafb9ed970b956a7a54fe8fe7aea3fbb9b98d7791b00cadf142c7a265ae9b50d4562
+
+2026-08-17 16:21:03,987 INFO image_rx_daemon: stats: rx_frames=1751 rx_decode_err=0 frames_published=91 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=52 parity_recon=0
+
+2026-08-17 16:21:03,992 INFO image_rx_daemon: air_gap: n=76 dt_med=126916us dt_p95=202043us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:21:04,001 INFO image_rx_daemon: air_gap_hist(ms): <80:3 <120:2 <200:67 <400:4
+
+2026-08-17 16:21:04,005 INFO image_rx_daemon: rx_rf: n_rssi=75 n_snr=75 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-08-17 16:21:04,007 INFO image_rx_daemon: phase_telemetry: valid=75 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:21:04,012 INFO image_rx_daemon: air_gap_by_class: seq: n=65 med=126.9ms | boundary: n=6 med=186.3ms | post_loss: n=3 med=253.8ms
+
+2026-08-17 16:21:04,015 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (4.17%) verdict=not-clustered | top 10:1 9:1 2:1
+
+2026-08-17 16:21:04,018 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:21:06,115 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:07,753 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:08,202 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=4.2 rssi=-63 dump=8ac59af504d65f7d6ea2ad48c04abe87d3930127ca646dfa07341117b304e09501c22fccfde4481fea8aa22ea786e0d3847e4a271a8b35e6a007a4c49155c3b20609e80374c1d0db73297d98a91e05fe79337a3cf841c6e60f0c74c93c1e7356e879482f6b7bd63a5a12a1ecb927876219287b17495522a6e31e6ea4fdd0cd0d67e4972ae209bc473c598e7ff7e8d99249bd7bbc3a5d14b9cc7094e762216e5c598bc82caa09ba54b10969283b4d27ffcfbc438c27e62c0c48daf2aa1dfd88a24103f87ff97bd556922a0f101c9c8d34b1e2afa75421b4ba2440a25bafc940942bec4341cb07cff3c2c8fe49d689d53ba0200ca14e78fb42e71dee
+
+2026-08-17 16:21:08,583 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=1.5 rssi=-63 dump=34b8681011888903a42fd7a9a9fa7aba0a2c0ef5f990f7c546a1175e438102671abbbb18a6049dd52ecef41917fa052254428a83328fc3943273653e1f07b8742f3cff1c26dd56f3b54ac4ff10582c2a898f08373f20b44784e98493cc2352f9653a6a28c768f4f2c9b672c66115363d745563068d63adf907aa329cbdf17f6a9600ee622f43454793f8993f2fe084aacc08154e8e0e2c3f856707baf606836bbc03316d79010911c85110e8978dab506d2088d3918b4aecfca162f2801ad598a2d12b9a341f7fef70825bab1be7ab6451d1a9ee9651fc1b810d17c5ae53a56d06a49860a7ff7e03d1c9ec5cc2d9cea416e73d761cce5de60ce9e6
+
+2026-08-17 16:21:10,631 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-10.2 rssi=-43 dump=0102000000000000fed2080c00bd52494646b60000005745425056503820aa0000007006009d012a200020003ec15aa64e27a523b22808024018096c00b11e8448020001a7fd6607f00474a0f723c89fc0261be1b65fbfdbdb289f1e5d0000fdcee7f0a6bfcfeea8370b2dbff8b42a8a69f5f751ea6d7874094c94979b840be24e2c49382484972d4d06076cf502ebb4446138b2cac687be319d49a00997d5362226760c14ef0716633a82262802f442cfc0decb6a606a46f53b63626ab5a84784e392662e4508f09fac0000a952494646a2000000574542505650382096000000f004209b01e2afc71f81fea8b52b476b69752ad2a2004aa0ea64
+
+2026-08-17 16:21:12,689 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:14,034 INFO image_rx_daemon: stats: rx_frames=1828 rx_decode_err=0 frames_published=94 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=55 parity_recon=0
+
+2026-08-17 16:21:14,039 INFO image_rx_daemon: air_gap: n=77 dt_med=126895us dt_p95=209487us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:21:14,047 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:5 <120:1 <200:63 <400:7
+
+2026-08-17 16:21:14,051 INFO image_rx_daemon: rx_rf: n_rssi=77 n_snr=77 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/7.0
+
+2026-08-17 16:21:14,053 INFO image_rx_daemon: phase_telemetry: valid=77 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:21:14,059 INFO image_rx_daemon: air_gap_by_class: seq: n=67 med=126.9ms | boundary: n=6 med=202.6ms | post_loss: n=3 med=253.7ms
+
+2026-08-17 16:21:14,062 INFO image_rx_daemon: lost_frag_idx: n=3 idx0=0 (0.00% of idx0 arrivals) other=3 (4.05%) verdict=not-clustered | top 2:1 5:1 8:1
+
+2026-08-17 16:21:14,065 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:21:14,316 INFO image_rx_daemon: published frame_id=0 2974 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:15,934 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:19,063 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:20,665 INFO image_rx_daemon: published frame_id=0 2975 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:22,301 INFO image_rx_daemon: published frame_id=0 2934 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:23,942 INFO image_rx_daemon: published frame_id=0 2953 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:24,083 INFO image_rx_daemon: stats: rx_frames=1905 rx_decode_err=0 frames_published=100 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=56 parity_recon=0
+
+2026-08-17 16:21:24,087 INFO image_rx_daemon: air_gap: n=77 dt_med=126902us dt_p95=193402us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:21:24,096 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:3 <120:2 <200:69 <400:2
+
+2026-08-17 16:21:24,100 INFO image_rx_daemon: rx_rf: n_rssi=77 n_snr=77 rssi[min/med/max]=-67/-66/-64 snr[min/med/max]=5.0/6.0/6.0
+
+2026-08-17 16:21:24,103 INFO image_rx_daemon: phase_telemetry: valid=77 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:21:24,107 INFO image_rx_daemon: air_gap_by_class: seq: n=71 med=126.9ms | boundary: n=6 med=193.5ms
+
+2026-08-17 16:21:24,111 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (1.39%) verdict=not-clustered | top 11:1
+
+2026-08-17 16:21:25,183 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.5 rssi=-66 dump=0102000000000000feef080ca600000057454250565038209a0000005005009d012a2034b39d3e48593b89eb65b6e6bd8482f9c60daa6c350a72285221e8a1f2d6ffd84a2640dda0ceb7a96d86be8ec4d899f967811c6752af79bafffee5ed56a0ff8a18a8e631ba9716addd0371e0e5f8cff9e1c3c5b210aa7bfc187a3453704137057e45923539817c87930af84906b109f22a6495009d29c2a44344d2e52d99c396dfeec3779de856c7d635034a2043c5d6b0008094924946267e0031055f45421a5650f820a26080003200009d012c28a9200836c1d2a84bc7aca321240d50f512090c00951284c00610022860ba2e9f1ee13de23ebe1edf0f
+
+2026-08-17 16:21:27,234 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:28,885 INFO image_rx_daemon: published frame_id=0 2991 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:30,519 INFO image_rx_daemon: published frame_id=0 2974 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:32,123 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-2.5 rssi=-58 dump=0102000000000000fefd0b0cce698415d783a0afebebd28b8753be335e733bdd7547c255065f5ce85be3455c95bb2dac5ab1c63a8b21141cf7ff39c96df5b4e565b3e037ab810e1e3100008f524946468800000057454250565038207c000000d004009d012a200020003ec15aa64e27a523b228080240180966009d32ecfa65a00033bff1b542fdd3e83696c95d2800fe4f9776c84b75596233f454324396ffe68b6faff37ff9ffeff33fe7627fa127ff04bf03f2759af5e948b91189c1322daefa1102b4b235acd58d5bff459153399b985a39ca0d92589a880ef04e50694472f7a839a36b73f4e8ec55bdbc978c55face653ac86bb0b09fd4ff
+
+2026-08-17 16:21:33,775 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:34,128 INFO image_rx_daemon: stats: rx_frames=1982 rx_decode_err=0 frames_published=104 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=58 parity_recon=0
+
+2026-08-17 16:21:34,132 INFO image_rx_daemon: air_gap: n=77 dt_med=126953us dt_p95=192726us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:21:34,142 INFO image_rx_daemon: air_gap_hist(ms): <80:4 <200:70 <400:3
+
+2026-08-17 16:21:34,146 INFO image_rx_daemon: rx_rf: n_rssi=77 n_snr=77 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-08-17 16:21:34,148 INFO image_rx_daemon: phase_telemetry: valid=77 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:21:34,152 INFO image_rx_daemon: air_gap_by_class: seq: n=66 med=126.9ms | boundary: n=7 med=192.0ms | post_loss: n=2 med=253.9ms
+
+2026-08-17 16:21:34,156 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.78%) verdict=not-clustered | top 8:1 11:1
+
+2026-08-17 16:21:34,159 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:21:35,371 INFO image_rx_daemon: published frame_id=0 2983 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:36,971 INFO image_rx_daemon: published frame_id=0 2897 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:38,578 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:39,168 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.2 rssi=-66 dump=0102000000000000fe0d030c465800000057454250565038204c000000d002009d012a200020002e9160b0583327a7a79300904b200538a44263ca0000fc7ad0e4f54bb2f88beb6fda3c687f333a547c99fa992cd6d3034000fb924a29099132d2c3c47a8a663ad0818bbe5f58f0b3eca449e0e95d371b60c53557f157f0f504151511fe4f389819a112fc0a352d04224b3a9fa79ef617f494182f87f206f436ea25401d423ecba7d000c1bce3f79bf52c0a58f26ed830f8ee02b7e43edd60f7f8b29fe987fd18760d751316b44060f9d65b7ad2f82b7d9f737e3aca891b9922c34c77face83f05767545126981e353f62123fae2bfc5a61c944ed
+
+2026-08-17 16:21:41,861 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:43,493 INFO image_rx_daemon: published frame_id=0 2979 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:44,205 INFO image_rx_daemon: stats: rx_frames=2060 rx_decode_err=0 frames_published=109 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=59 parity_recon=0
+
+2026-08-17 16:21:44,209 INFO image_rx_daemon: air_gap: n=78 dt_med=126893us dt_p95=189249us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:21:44,229 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:4 <120:1 <200:70 <400:2
+
+2026-08-17 16:21:44,233 INFO image_rx_daemon: rx_rf: n_rssi=78 n_snr=78 rssi[min/med/max]=-67/-66/-64 snr[min/med/max]=1.0/6.0/7.0
+
+2026-08-17 16:21:44,247 INFO image_rx_daemon: phase_telemetry: valid=79 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:21:44,251 INFO image_rx_daemon: air_gap_by_class: seq: n=69 med=126.9ms | boundary: n=6 med=189.2ms | post_loss: n=1 med=253.8ms
+
+2026-08-17 16:21:44,255 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (1.35%) verdict=not-clustered | top 3:1
+
+2026-08-17 16:21:44,258 INFO image_rx_daemon: frag_reordered: 2 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:21:45,128 INFO image_rx_daemon: published frame_id=0 2951 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:46,120 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=-10.5 rssi=-42 dump=0102000000000000fe1a060c45425056503820cc000000b007009d012a200020003eb9489f4aa7242333300c026017096c00aa95c0fe01f8817413c61a3ffa51dec00d3feb303f97b22d1a8e8539e067d13fc66ec5a31ca21ba56edd0000fec3fdb6f5f6ad57f77de7b6be5b4dc9a7659ffcbaffac64abe5afa12e39ff27bf1ca4180679422f9c21e56c81e4cd576e001986d541f920a0737de82e2f1349c7863b7e18e5f25ba273c2fe82237c1eac3f489721bd2f09202bdfe33f942a6021ea458699f7e49d463a37cd9f23862b5828ddde06df1086c225c3fc4d49c36125f9280988d123570442c8c6965cee4693dd50211a22785cf8c9a41281
+
+2026-08-17 16:21:48,428 INFO image_rx_daemon: published frame_id=0 2992 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:50,030 INFO image_rx_daemon: published frame_id=0 2910 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:51,589 INFO image_rx_daemon: published frame_id=0 2905 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:53,174 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=71 snr=-4.5 rssi=-55 dump=0102000000000006ad36931abba4e3d0ad4f6c16ba43dc6a83d117495906e15636d4442d8940db5ff2418cc6e414ee40c87d0c12b72c38c34ac9f78c24c03c92ff559526f7e700
+
+2026-08-17 16:21:54,279 INFO image_rx_daemon: stats: rx_frames=2137 rx_decode_err=0 frames_published=113 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=60 parity_recon=0
+
+2026-08-17 16:21:54,283 INFO image_rx_daemon: air_gap: n=77 dt_med=126957us dt_p95=203627us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:21:54,298 INFO image_rx_daemon: air_gap_hist(ms): <40:1 <80:2 <120:1 <200:69 <400:4
+
+2026-08-17 16:21:54,301 INFO image_rx_daemon: rx_rf: n_rssi=76 n_snr=76 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-08-17 16:21:54,304 INFO image_rx_daemon: phase_telemetry: valid=76 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:21:54,309 INFO image_rx_daemon: air_gap_by_class: seq: n=70 med=126.9ms | boundary: n=6 med=203.6ms
+
+2026-08-17 16:21:54,312 INFO image_rx_daemon: lost_frag_idx: n=1 idx0=0 (0.00% of idx0 arrivals) other=1 (1.41%) verdict=not-clustered | top 12:1
+
+2026-08-17 16:21:54,315 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:21:54,831 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:56,458 INFO image_rx_daemon: published frame_id=0 2919 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:21:58,113 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:22:00,226 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=255 snr=6.2 rssi=-65 dump=0102000000000000fe37020c382086000000b004009d012a200020003ec15aa74e27a523b228080240180968009d3282580081002de547d20c57552b94c06c0000fedebf3aa9f6b2976a430cd536f2b89139582a62b01ed8bd26f6872f73dccf291b6f782de10912a30df6a9dea7022e06f6c7c9d01fc17f073c7f6dc4c7dddf229254c2c9156b540cd996d6d0ca49e6ca7db0d5ef00000069528d52fa3730563508e67eef437e211154470442518f06a05bbc8299bdeb55163bd6e20d1a06fc0a66eea08a33cf4bfa3c250df6dbf76025f0844362516fe8bebc2742e2b7847f24bbf0f3581fe4260f3df399480eebff8450e11e146b0c9b41222f
+
+2026-08-17 16:22:03,031 INFO image_rx_daemon: published frame_id=0 2923 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:22:04,359 INFO image_rx_daemon: stats: rx_frames=2215 rx_decode_err=0 frames_published=117 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=63 parity_recon=0
+
+2026-08-17 16:22:04,363 INFO image_rx_daemon: air_gap: n=78 dt_med=126906us dt_p95=215228us len_med=247B cmd_tx_ok=16 cmd_tx_fail=0
+
+2026-08-17 16:22:04,387 INFO image_rx_daemon: air_gap_hist(ms): <40:2 <80:4 <200:67 <400:5
+
+2026-08-17 16:22:04,391 INFO image_rx_daemon: rx_rf: n_rssi=78 n_snr=78 rssi[min/med/max]=-67/-66/-65 snr[min/med/max]=5.0/6.0/7.0
+
+2026-08-17 16:22:04,394 INFO image_rx_daemon: phase_telemetry: valid=78 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-08-17 16:22:04,400 INFO image_rx_daemon: air_gap_by_class: seq: n=69 med=126.9ms | boundary: n=6 med=203.5ms | post_loss: n=2 med=253.7ms
+
+2026-08-17 16:22:04,403 INFO image_rx_daemon: lost_frag_idx: n=2 idx0=0 (0.00% of idx0 arrivals) other=2 (2.70%) verdict=not-clustered | top 10:1 2:1
+
+2026-08-17 16:22:04,411 INFO image_rx_daemon: frag_reordered: 1 late out-of-order arrivals had a provisional loss retracted (in-order assumption violated — see RS-11.4)
+
+2026-08-17 16:22:04,663 INFO image_rx_daemon: published frame_id=0 2915 B → lifetrac/v25/video/tile_delta
+
+2026-08-17 16:22:06,287 INFO image_rx_daemon: published frame_id=0 2985 B → lifetrac/v25/video/tile_delta
+
