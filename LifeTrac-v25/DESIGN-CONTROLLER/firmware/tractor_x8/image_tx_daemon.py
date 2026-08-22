@@ -253,8 +253,8 @@ NO_PARK_LAST = os.environ.get("LIFETRAC_NO_PARK_LAST", "0") == "1"
 # <80 ms apart. 80 ms here puts the short fragment's demod-complete ~100 ms
 # behind the penultimate's, giving the URC path the same slack as any
 # mid-train pair. Only meaningful with LIFETRAC_NO_PARK_LAST=1.
-NO_PARK_LAST_GAP_S = int(os.environ.get(
-    "LIFETRAC_NO_PARK_LAST_GAP_MS", "80")) / 1000.0
+NO_PARK_LAST_GAP_S = _env_int("LIFETRAC_NO_PARK_LAST_GAP_MS", 80,
+                              lo=0, hi=5_000) / 1000.0
 
 # LIFETRAC_TX_PIPELINE: 'v2' (default) = serial send->TX_DONE->send;
 # 'v3' = keep 2 TX_FRAME_REQs in flight against the firmware's depth-2
