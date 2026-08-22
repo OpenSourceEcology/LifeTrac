@@ -1,5 +1,29 @@
 # LifeTrac v25 — TODO
 
+> **🟢 Radio status (2026-08-17) — both loss-floor campaigns resolved.**
+> The bench LoRa link runs at **0.9 % fragment loss** (from 5.9 % two days
+> prior). RS-11.6: two external ISM emitters characterized (a ~7 s hopper
+> and an exact-10 s device at −30 dBm); escaped by carrier choice — the
+> band reshuffles in HOURS, so channel picks come from a same-day survey
+> (`channel_survey_sniff.py` + `survey_compare.py`; 927.5 MHz is the only
+> 3/3-clean channel so far). RS-12: the historic slot-(total−2) loss was
+> an L072 URC-overwrite race at the short-final-fragment ride; host-side
+> fix (`-NoParkLast 1`) validated n=3 + strict-hold. Remaining: one
+> confirmation-sized flash session (rx_urc_lost + firmware URC fix +
+> RS-3.6 gate) and the RS-3.3 camera first flight. Live campaign state:
+> [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) (RS-12 / RS-12.9
+> sequencing), issues #98/#107, evidence under
+> `DESIGN-CONTROLLER/bench-evidence/`.
+>
+> **Update 2026-08-22:** production power-down/wake design opened (PR
+> #110, [DESIGN-CONTROLLER/POWER_MANAGEMENT.md](DESIGN-CONTROLLER/POWER_MANAGEMENT.md)
+> — Opta I1 key-off sensing, battery-bridged clean halt, default-off
+> bench gating, base quiesce + hail-set rendezvous; tracked as PM-1).
+> Its review surfaced a survey gap now tracked as **RS-11.8**: all bench
+> stability data sits on the x.0/x.5 MHz grid, while the production FHSS
+> table's 50 centers sit on x.25/x.75 — no shared channel, so production
+> hop/hail picks need chantab-grid surveys.
+
 > **🟢 Milestone (2026-05-26) — image-over-LoRa air link proven end-to-end:**
 > Tractor camera → tile-delta encode → MQTT (intra-X8) → image_tx_daemon →
 > Murata L072 → 915 MHz LoRa → base L072 → image_rx_daemon → MQTT

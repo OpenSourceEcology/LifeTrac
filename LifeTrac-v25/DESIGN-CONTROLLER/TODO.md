@@ -911,6 +911,11 @@ No-regrets work, correct under every surviving architecture (do first):
   **Status 2026-07-25: implemented** — `SPI_CR1_BR_DIV64` → `DIV8` (2 MHz,
   5× margin to the SX1276's 10 MHz rating) in `sx1276_spi_init()`. Built +
   SIL green; pending the bench gate above.
+  **Status 2026-08-17: FLASHED and field-soaked** — the DIV8 build is what
+  both boards have run through the entire RS-11.5→RS-12 campaign
+  (thousands of TX/RX cycles, tx_fifo_rb_bad=0 throughout). Only the
+  FORMAL gate transcript remains (REG 0x42 readback + one TX/RX cycle,
+  ~2 min) — queued in the RS-12.9 flash session.
 - [ ] **RS-3.7 URC emission cost (added 2026-07-25)** — every URC busy-waits
   BOTH UART lanes (LPUART1 + USART1 mirror) synchronously with no timeout
   (`host_uart.c:564`); a max RX_FRAME_URC costs ~3 ms/lane at 921600, paid
@@ -2254,7 +2259,27 @@ Two consequences for what is worth doing next:
   ARTIFACT (a fold scan peaks at ~the mean inter-arrival with no clock
   present) and is retracted — the shuffled-interval null that catches it
   is now part of the tool.
-- [ ] **RS-12 — the clustered bulk loss floor (campaign opened 2026-08-16,
+- [x] **RS-12 CLOSED (search phase) 2026-08-17 — mechanism found, host fix
+  validated, bench floor 5.9% → 0.9%.** The penultimate-fragment loss was
+  an L072 URC-overwrite race: the SHORT final fragment (~36 B remainder,
+  ~20 ms ToA) rides fire-on-TX_DONE ~42 ms behind the penultimate, giving
+  its 255 B URC a 2.8× tighter emission deadline; misses are silently
+  overwritten (no counter). Fix: `-NoParkLast 1` +
+  `LIFETRAC_NO_PARK_LAST_GAP_MS=80` (strict hold, falls through to the
+  event body so commands keep flowing — PR #108 review catch). Confirmed
+  n=3 interleaved + strict-hold legs: penultimate → uniform, loss 0.9%,
+  timeouts 22, published 154 (all campaign bests); cost ~−6% offered
+  (tuning headroom recorded). ENV-GATED, not default: command-plane
+  interaction has zero bench exercise with live mid-train traffic.
+  REMAINING → flash session (see RS-12.9): rx_urc_lost counter
+  (prediction is binary: ==0 strict-hold, ≈timeouts control) + real fix
+  (double-buffer the URC path or firmware min inter-fire spacing).
+  Evidence: bench-evidence/RS_12_bulk_floor_2026-08-16 (full search
+  narrative incl. both recorded wrong turns),
+  RS_12_depth_ab_2026-08-17, RS_12_noparklast_ab_2026-08-17. Original
+  opening entry follows.
+- [ ] **RS-12 (original opening entry) — the clustered bulk loss floor
+  (campaign opened 2026-08-16,
   issue #107). ⚠️ WORDING SUPERSEDED (review catch, PR #108): the
   "NEVER-DEMODULATED" phrasing below reflects the opening desk finding
   and was overturned by the final mechanism — the radio DOES demodulate
@@ -2275,6 +2300,83 @@ Two consequences for what is worth doing next:
   (incl. the never-read tx_done_early counter) → software-only
   activity-modulation legs (ethernet flood on the gigabit-marginal base
   cable, USB, CPU) → hands only after the coupling path is named.
+#### RS-12.9 — next-session sequencing (written 2026-08-17 at shutdown)
+
+Boards were powered down cleanly 2026-08-17 night (containers stopped,
+`shutdown -h`). **Morning consequences (documented, expected):** `/tmp`
+wiped on both boards (harness re-pushes lifetrac_strict itself;
+`lifetrac_p0c` flash tooling must be re-pushed manually), and the
+production `tractor-camera` container returns holding `/dev/ttymxc3`
+(mimics an L072 wedge; the harness stops it at launch — check if probing
+manually). Recommended order:
+
+1. **Wake-up check**: `rs116_health_probe.py` both boards, then a
+   same-day channel spot-check (the hopper reshuffles in hours; 927.5 MHz
+   was the only 3/3-clean channel — verify before trusting).
+2. **RS-3.3 camera first flight** — `-TxFeed camera` at the current best
+   operating point (`-ForceFrfHz <today's pick> -NoParkLast 1`). The
+   encode-to-fit packer, carry fix, age-escalation and liveness valve
+   have NEVER been on air; flying them on a 0.9%-loss link attributes any
+   failure to the path, not the link.
+3. **Flash session** (bench presence): rx_urc_lost counter + firmware URC
+   fix (RS-12 above), RS-3.6 formal gate (REG 0x42 readback + one TX/RX
+   transcript — the DIV8 change has weeks of implicit soak), read
+   tx_done_early on the tractor across a leg.
+4. Optional: the emitter hunt (two targets, `hunt_sniff.ps1`, device B at
+   923.5 MHz / −30 dBm / exact 10 s tick is the easy one).
+5. Free while boards are idle (no air time): check whether the X8 kernel
+   exposes the Max Carrier charger under `/sys/class/power_supply/` —
+   adapter-present would give power management an Opta-independent rail
+   signal (see POWER_MANAGEMENT.md, PR #110).
+6. Optional if air time allows: first chantab-grid survey pass (RS-11.8
+   below) — the production hop table has zero bench stability data.
+
+**Bench ops ideas (2026-08-22):** (a) overnight **quiesce instead of
+halt** — stopping containers and leaving Linux up preserves `/tmp`
+tooling, keeps adb/SSH alive, and skips the tractor-camera container's
+post-reboot return; the whole morning checklist above exists to undo a
+full reboot. Cost: overnight power draw. Use halt when the bench sits
+for days. (b) A **smart plug / relay on the bench supplies** would make
+the morning power cycle remotely commandable — upstream of the boards,
+touches no bench constraint.
+
+- [ ] **RS-11.8 Chantab-grid channel survey (opened 2026-08-22, surfaced by
+  PR #110 review).** All bench survey/stability data to date sits on the
+  x.0/x.5 MHz grid, but the production FHSS table
+  (`sx1276_fhss_chantab.h`, 50 channels) has centers 902.75–927.25 MHz —
+  the x.25/x.75 grid. The grids are offset 250 kHz and share NO channel:
+  none of the RS-11.6 findings (927.5 = only 3/3-clean channel,
+  per-channel flip rates) map directly onto any channel production can
+  actually hop or hail on. Action: on survey days, run
+  `channel_survey_sniff.py --start-hz 902750000 --stop-hz 927250000
+  --step-hz 500000` (tool needs no changes) alongside the x.0/x.5 pass,
+  and accumulate `survey_compare.py --history` stability rankings on the
+  chantab grid. Consumers: the POWER_MANAGEMENT.md hail-set constants
+  (2–3 stable channels for wake rendezvous), and RS-11.7 v1's APPLY path
+  (a production recommendation must be table-constrained). Open question
+  recorded in PR #110: whether a band-edge table extension (e.g. adding
+  927.5) is worth the regulatory review vs. picking from the existing 50.
+- [ ] **PM-1 Production power-down / wake (design PR #110, opened
+  2026-08-22).** Design in POWER_MANAGEMENT.md (revised same day — all 8
+  review findings verified against source and addressed). Shape: Opta I1
+  + battery_mv sensing, H747-owned debounce, farewell-then-halt bridged
+  by the 18650, self-holding relay release with SHUTDOWN_REQ/ACK
+  handshake + 300 s fail-safe cap, DISARMED-by-default persisted
+  parameter (absence of the flag IS bench mode — no separate bench
+  variable), base quiesce + hail-set rendezvous. Implementation
+  prerequisites (none exist in firmware yet, verified 2026-08-22): Opta
+  publishes I1 into `digital_inputs` (currently E-stop+mode bits only);
+  H7 read block widened to cover 0x0101 (currently requests 0x0102×6
+  only); `battery_mv` calibrated (currently raw ADC codes);
+  SHUTDOWN_REQ/ACK opcodes on the X8↔H747 UART; farewell frame + ack in
+  LORA_PROTOCOL.md; parameter-service delivery of the enable flag to the
+  H747. Cheap bench checks (some radio-free): `/sys/class/power_supply/`
+  exposure, carrier-side VIN ADC availability, post-halt 18650 drain
+  (meter in series, an evening), harness confirmation that ignition
+  sense lands on I1. Hardware decisions gated before production:
+  supercap/LiFePO4 vs 18650 (outdoor cold-charging), crash-only rootfs
+  posture (hard prerequisite for the self-holding relay topology).
+
 - [ ] **RS-11.7 Operator spectrum survey in web_ui (proposed 2026-08-16).**
   Turn the channel-survey diagnostic into a field feature: a
   maintenance-mode button that pauses the RX daemon, sweeps 902–928 MHz
@@ -2294,7 +2396,11 @@ Two consequences for what is worth doing next:
   availability), persisted per-site config. Also add a site survey to the
   Phase 6 mast-install checklist — interferer populations are per-site
   and change over weeks, so at-install matters at least as much as
-  daily. Motivation and first field data: RS-11.6 (the bench's own
+  daily. **Update 2026-08-17: the hopper reshuffles in HOURS (three
+  surveys: 21%/19% of channels flip per interval), which promotes this
+  feature to a field-measurement prerequisite; and
+  `tools/survey_compare.py --history` already implements the v1
+  stability-ranking logic (clean-in-N-of-M).** Motivation and first field data: RS-11.6 (the bench's own
   915.000 MHz squatter, found by exactly this sweep).
 - [x] **RS-11.6 leg 2 DONE 2026-08-16 — the emitter is EXTERNAL, confirmed
   in raw energy with all radios silent.**
@@ -2321,7 +2427,7 @@ Two consequences for what is worth doing next:
   ISM sensor; use the sniffer as the live detector (line shows in ~70 s, so
   120 s sniffs per suspect removal — no 300 s loss runs needed). Original
   item follows.
-- [ ] **RS-11.6 leg 2+ (original) — separate the interferer (next session).**
+- [x] **RS-11.6 leg 2+ (original) — SUPERSEDED by legs 2/2c/3 and the day-2 surveys (emitters characterized, frequency escape validated, hunt now optional; see entries above).** Original text follows.
   **Re-ordered 2026-08-16 by item 1**: hunt the 7.085 s line directly
   rather than watching the loss rate (loss needs a 300 s run and carries
   ~0.5 pt run-to-run spread; the periodic line is unambiguous and shows
@@ -2367,7 +2473,7 @@ Two consequences for what is worth doing next:
   confirm both Taoglas blades are fully seated/finger-tight on SMA —
   received power did not move at all on the swap, which a loose
   connector would also explain.
-- [ ] **RS-11.6 (original) Antenna-position experiment + re-baseline (updated
+- [x] **RS-11.6 (original) — SUPERSEDED: the residual floor was two external emitters (escaped by carrier choice) plus the RS-12 URC race (fixed host-side); antenna repositioning no longer load-bearing.** Original text follows: Antenna-position experiment + re-baseline (updated
   2026-08-02 after the RF-switch fix).** The switch-mapping bug is
   FIXED (+33 dB verified, legs H–J); the residual ~4% floor (at
   17 dBm) is signal-proportional self-interference at bench geometry
@@ -2385,7 +2491,7 @@ Two consequences for what is worth doing next:
   `-TxPowerDbm 17` get a free ~1.4× loss reduction; and add
   healthy-frame RSSI/SNR logging (currently only corrupt packets carry
   it) before deep-modeling the tail.
-- [ ] **RS-11.5 (original, superseded) Fix the slot-(total−2) on-air corruption (diagnosis
+- [x] **RS-11.5 (original) — RESOLVED 2026-08-17 by RS-12: the slot-(total−2) loss was never on-air corruption; it was the L072 URC-overwrite race at the short-fragment ride (see RS-12). Kept for the diagnostic history.** Original: Fix the slot-(total−2) on-air corruption (diagnosis
   DONE 2026-08-02, RESULTS §6–§8; fix open).** The counter split and
   prepare-ahead A/B pinned it: **11–18% of trains lose per-frame slot
   total−2 to on-air CRC corruption at the base radio** (Δdio0 = Δrx_ok +
