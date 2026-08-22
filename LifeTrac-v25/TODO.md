@@ -14,6 +14,15 @@
 > [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) (RS-12 / RS-12.9
 > sequencing), issues #98/#107, evidence under
 > `DESIGN-CONTROLLER/bench-evidence/`.
+>
+> **Update 2026-08-22:** production power-down/wake design opened (PR
+> #110, [DESIGN-CONTROLLER/POWER_MANAGEMENT.md](DESIGN-CONTROLLER/POWER_MANAGEMENT.md)
+> — Opta I1 key-off sensing, battery-bridged clean halt, default-off
+> bench gating, base quiesce + hail-set rendezvous; tracked as PM-1).
+> Its review surfaced a survey gap now tracked as **RS-11.8**: all bench
+> stability data sits on the x.0/x.5 MHz grid, while the production FHSS
+> table's 50 centers sit on x.25/x.75 — no shared channel, so production
+> hop/hail picks need chantab-grid surveys.
 
 > **🟢 Milestone (2026-05-26) — image-over-LoRa air link proven end-to-end:**
 > Tractor camera → tile-delta encode → MQTT (intra-X8) → image_tx_daemon →

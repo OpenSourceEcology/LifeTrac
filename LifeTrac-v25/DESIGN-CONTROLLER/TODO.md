@@ -2324,6 +2324,58 @@ manually). Recommended order:
    tx_done_early on the tractor across a leg.
 4. Optional: the emitter hunt (two targets, `hunt_sniff.ps1`, device B at
    923.5 MHz / −30 dBm / exact 10 s tick is the easy one).
+5. Free while boards are idle (no air time): check whether the X8 kernel
+   exposes the Max Carrier charger under `/sys/class/power_supply/` —
+   adapter-present would give power management an Opta-independent rail
+   signal (see POWER_MANAGEMENT.md, PR #110).
+6. Optional if air time allows: first chantab-grid survey pass (RS-11.8
+   below) — the production hop table has zero bench stability data.
+
+**Bench ops ideas (2026-08-22):** (a) overnight **quiesce instead of
+halt** — stopping containers and leaving Linux up preserves `/tmp`
+tooling, keeps adb/SSH alive, and skips the tractor-camera container's
+post-reboot return; the whole morning checklist above exists to undo a
+full reboot. Cost: overnight power draw. Use halt when the bench sits
+for days. (b) A **smart plug / relay on the bench supplies** would make
+the morning power cycle remotely commandable — upstream of the boards,
+touches no bench constraint.
+
+- [ ] **RS-11.8 Chantab-grid channel survey (opened 2026-08-22, surfaced by
+  PR #110 review).** All bench survey/stability data to date sits on the
+  x.0/x.5 MHz grid, but the production FHSS table
+  (`sx1276_fhss_chantab.h`, 50 channels) has centers 902.75–927.25 MHz —
+  the x.25/x.75 grid. The grids are offset 250 kHz and share NO channel:
+  none of the RS-11.6 findings (927.5 = only 3/3-clean channel,
+  per-channel flip rates) map directly onto any channel production can
+  actually hop or hail on. Action: on survey days, run
+  `channel_survey_sniff.py --start-hz 902750000 --stop-hz 927250000
+  --step-hz 500000` (tool needs no changes) alongside the x.0/x.5 pass,
+  and accumulate `survey_compare.py --history` stability rankings on the
+  chantab grid. Consumers: the POWER_MANAGEMENT.md hail-set constants
+  (2–3 stable channels for wake rendezvous), and RS-11.7 v1's APPLY path
+  (a production recommendation must be table-constrained). Open question
+  recorded in PR #110: whether a band-edge table extension (e.g. adding
+  927.5) is worth the regulatory review vs. picking from the existing 50.
+- [ ] **PM-1 Production power-down / wake (design PR #110, opened
+  2026-08-22).** Design in POWER_MANAGEMENT.md (revised same day — all 8
+  review findings verified against source and addressed). Shape: Opta I1
+  + battery_mv sensing, H747-owned debounce, farewell-then-halt bridged
+  by the 18650, self-holding relay release with SHUTDOWN_REQ/ACK
+  handshake + 300 s fail-safe cap, DISARMED-by-default persisted
+  parameter (absence of the flag IS bench mode — no separate bench
+  variable), base quiesce + hail-set rendezvous. Implementation
+  prerequisites (none exist in firmware yet, verified 2026-08-22): Opta
+  publishes I1 into `digital_inputs` (currently E-stop+mode bits only);
+  H7 read block widened to cover 0x0101 (currently requests 0x0102×6
+  only); `battery_mv` calibrated (currently raw ADC codes);
+  SHUTDOWN_REQ/ACK opcodes on the X8↔H747 UART; farewell frame + ack in
+  LORA_PROTOCOL.md; parameter-service delivery of the enable flag to the
+  H747. Cheap bench checks (some radio-free): `/sys/class/power_supply/`
+  exposure, carrier-side VIN ADC availability, post-halt 18650 drain
+  (meter in series, an evening), harness confirmation that ignition
+  sense lands on I1. Hardware decisions gated before production:
+  supercap/LiFePO4 vs 18650 (outdoor cold-charging), crash-only rootfs
+  posture (hard prerequisite for the self-holding relay topology).
 
 - [ ] **RS-11.7 Operator spectrum survey in web_ui (proposed 2026-08-16).**
   Turn the channel-survey diagnostic into a field feature: a
