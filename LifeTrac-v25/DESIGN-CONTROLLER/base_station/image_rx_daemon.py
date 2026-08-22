@@ -475,7 +475,7 @@ class ImageRxDaemon:
             LOG.warning("SX1276 RXCONT autowake failed: %s (continuing)", exc)
         return link
 
-    def _publish(self, payload: bytes, frame_id: int) -> None:
+    def _publish(self, payload: bytes, frame_id: int, seq: int = -1) -> None:
         if self._client is None:
             with self._lock:
                 self.stats.publish_errors += 1
@@ -489,8 +489,10 @@ class ImageRxDaemon:
             # drain loop hot. paho-mqtt loops MQTT I/O on its own thread.
             with self._lock:
                 self.stats.reassembled_frames_published += 1
-            LOG.info("published frame_id=%d %d B → %s",
-                     frame_id, len(payload), MQTT_TOPIC_OUT)
+            # "published frame_id=" prefix is load-bearing:
+            # tools/bulk_loss_boundary.py regex-matches it.
+            LOG.info("published frame_id=%d seq=%d %d B → %s",
+                     frame_id, seq, len(payload), MQTT_TOPIC_OUT)
         except Exception as exc:
             with self._lock:
                 self.stats.publish_errors += 1
@@ -1287,6 +1289,13 @@ class ImageRxDaemon:
                                 f"reassembly timeout #{cur_timeout}")
 
                 if completed is not None:
+                    # The reassembled TileDeltaFrame carries no train id;
+                    # the completing fragment's header does (raw[1] for the
+                    # 0xFE/0xFD/0xFC layouts). Surfacing it on the publish
+                    # line is what makes TX-seq <-> RX-train joins possible
+                    # from standard logs.
+                    train_seq = (data[1] if len(data) >= 2 and
+                                 data[0] in (0xFE, 0xFD, 0xFC) else -1)
                     # RS-1.x: a COMPLETED frame means that was the train's
                     # LAST fragment — the tractor's ~44 ms host-turnaround
                     # window opens NOW (mid-train the RS-4.12 ring restarts
@@ -1329,7 +1338,7 @@ class ImageRxDaemon:
                                 CMD_OP_REQ_KEYFRAME,
                                 "keyframe received (UNVERIFIED delivery — "
                                 "keyframe may be encoder-initiated)")
-                        self._publish(payload_out, frame_id)
+                        self._publish(payload_out, frame_id, train_seq)
 
             # RS-1.x window-aligned command TX (2026-07-25): a fragment in
             # this pass means the tractor JUST finished a TX — its armed

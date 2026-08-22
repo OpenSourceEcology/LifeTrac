@@ -1,0 +1,1408 @@
+﻿2026-08-09 14:59:50,956 INFO image_tx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-08-09 14:59:50,959 INFO image_tx_daemon: image_tx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-08-09 14:59:50,969 INFO image_tx_daemon: MQTT connected; subscribing to lifetrac/v25/cmd/image_frame
+
+2026-08-09 14:59:50,977 INFO image_tx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-08-09 14:59:50,994 INFO image_tx_daemon: link_budget: published n_frag=1 profile_idx=6 (profile 2)
+
+INFO: post-VER drain queued type=0xF1 seq=0
+
+INFO: post-VER drain queued type=0xC1 seq=0
+
+INFO: post-VER drain queued type=0xF1 seq=0
+
+INFO: post-VER drain queued type=0xC1 seq=0
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+CFG_SET_REQ(FHSS_FARM_ID) OK: 17000800
+
+CFG_SET_REQ(FHSS_NODE_ID) OK: 18000800
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 927.500 MHz (raw=0xE7E000 -> Msb=0xE7 Mid=0xE0 Lsb=0x00)
+
+  FRF readback: 0xE7E000 = 927.500 MHz (OK)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-08-09 14:59:51,879 INFO image_tx_daemon: LBT_ENABLE=0 (matches W1-10b TX_BURST rationale)
+
+2026-08-09 14:59:51,901 INFO image_tx_daemon: RXCONT armed for command downlink (opmode 0x81 -> 0x85)
+
+2026-08-09 14:59:51,903 INFO image_tx_daemon: TX worker ready (inter_cycle_s=0.050, max 8 frags/dwell)
+
+2026-08-09 14:59:51,904 INFO image_tx_daemon: batching: 2 frames in 1 trains so far (this train: 2 frames, 434 B)
+
+2026-08-09 14:59:51,960 INFO image_tx_daemon: stats: goodput=0.0 B/s util=0% pipeline=v3 frames_in=2 ok=0 fail=0 drop_full=0 drop_stale=0 frags_ok=0 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 14:59:52,257 INFO image_tx_daemon: frame seq=1 done (pipelined): 2 fragments ok
+
+2026-08-09 14:59:52,420 INFO image_tx_daemon: frame seq=3 done (pipelined): 1 fragments ok
+
+2026-08-09 14:59:52,623 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 0
+
+2026-08-09 14:59:52,750 INFO image_tx_daemon: frame seq=4 done (pipelined): 1 fragments ok
+
+2026-08-09 14:59:53,023 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 0
+
+2026-08-09 14:59:53,245 INFO image_tx_daemon: frame seq=5 done (pipelined): 1 fragments ok
+
+2026-08-09 14:59:53,529 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 0
+
+2026-08-09 14:59:53,715 INFO image_tx_daemon: frame seq=6 done (pipelined): 1 fragments ok
+
+2026-08-09 14:59:53,998 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 0
+
+2026-08-09 14:59:54,258 INFO image_tx_daemon: frame seq=7 done (pipelined): 1 fragments ok
+
+2026-08-09 14:59:54,542 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 0
+
+2026-08-09 14:59:54,762 INFO image_tx_daemon: frame seq=8 done (pipelined): 1 fragments ok
+
+2026-08-09 14:59:55,035 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 0
+
+2026-08-09 14:59:55,613 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 0
+
+2026-08-09 14:59:56,190 INFO image_tx_daemon: LoRa cmd: ENCODE_MODE 0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=62784 legal_dwell_used_us_10s=0
+
+2026-08-09 14:59:59,065 INFO image_tx_daemon: frame seq=9 done (pipelined): 1 fragments ok
+
+2026-08-09 14:59:59,345 INFO image_tx_daemon: frame seq=10 done (pipelined): 1 fragments ok
+
+2026-08-09 14:59:59,951 INFO image_tx_daemon: frame seq=11 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:00,546 INFO image_tx_daemon: frame seq=12 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:01,156 INFO image_tx_daemon: frame seq=13 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:01,762 INFO image_tx_daemon: frame seq=14 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:01,971 INFO image_tx_daemon: stats: goodput=313.2 B/s util=13% pipeline=v3 frames_in=14 ok=13 fail=0 drop_full=0 drop_stale=0 frags_ok=14 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:00:02,366 INFO image_tx_daemon: frame seq=15 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:02,970 INFO image_tx_daemon: frame seq=16 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:03,581 INFO image_tx_daemon: frame seq=17 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:04,189 INFO image_tx_daemon: frame seq=18 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:04,759 INFO image_tx_daemon: frame seq=19 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:05,252 INFO image_tx_daemon: frame seq=20 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:05,771 INFO image_tx_daemon: frame seq=21 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:06,262 INFO image_tx_daemon: frame seq=22 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:06,716 INFO image_tx_daemon: frame seq=23 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:07,246 INFO image_tx_daemon: frame seq=24 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:07,737 INFO image_tx_daemon: frame seq=25 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:08,229 INFO image_tx_daemon: frame seq=26 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:08,730 INFO image_tx_daemon: frame seq=27 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:09,269 INFO image_tx_daemon: frame seq=28 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:09,751 INFO image_tx_daemon: frame seq=29 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:10,243 INFO image_tx_daemon: frame seq=30 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:10,741 INFO image_tx_daemon: frame seq=31 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:11,236 INFO image_tx_daemon: frame seq=32 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:11,746 INFO image_tx_daemon: frame seq=33 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:11,983 INFO image_tx_daemon: stats: goodput=437.0 B/s util=18% pipeline=v3 frames_in=33 ok=32 fail=0 drop_full=0 drop_stale=0 frags_ok=33 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:00:12,290 INFO image_tx_daemon: frame seq=34 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:12,784 INFO image_tx_daemon: frame seq=35 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:13,238 INFO image_tx_daemon: frame seq=36 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:13,730 INFO image_tx_daemon: frame seq=37 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:14,222 INFO image_tx_daemon: frame seq=38 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:14,755 INFO image_tx_daemon: frame seq=39 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:15,247 INFO image_tx_daemon: frame seq=40 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:15,739 INFO image_tx_daemon: frame seq=41 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:16,241 INFO image_tx_daemon: frame seq=42 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:16,769 INFO image_tx_daemon: frame seq=43 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:17,261 INFO image_tx_daemon: frame seq=44 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:17,758 INFO image_tx_daemon: frame seq=45 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:18,249 INFO image_tx_daemon: frame seq=46 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:18,743 INFO image_tx_daemon: frame seq=47 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:19,234 INFO image_tx_daemon: frame seq=48 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:19,766 INFO image_tx_daemon: frame seq=49 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:20,258 INFO image_tx_daemon: frame seq=50 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:20,775 INFO image_tx_daemon: frame seq=51 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:21,281 INFO image_tx_daemon: frame seq=52 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:21,774 INFO image_tx_daemon: frame seq=53 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:21,995 INFO image_tx_daemon: stats: goodput=452.5 B/s util=18% pipeline=v3 frames_in=53 ok=52 fail=0 drop_full=0 drop_stale=0 frags_ok=53 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:00:22,290 INFO image_tx_daemon: frame seq=54 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:22,771 INFO image_tx_daemon: frame seq=55 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:23,275 INFO image_tx_daemon: frame seq=56 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:23,734 INFO image_tx_daemon: frame seq=57 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:24,236 INFO image_tx_daemon: frame seq=58 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:24,750 INFO image_tx_daemon: frame seq=59 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:25,243 INFO image_tx_daemon: frame seq=60 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:25,777 INFO image_tx_daemon: frame seq=61 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:26,225 INFO image_tx_daemon: frame seq=62 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:26,740 INFO image_tx_daemon: frame seq=63 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:27,231 INFO image_tx_daemon: frame seq=64 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:27,762 INFO image_tx_daemon: frame seq=65 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:28,284 INFO image_tx_daemon: frame seq=66 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:28,794 INFO image_tx_daemon: frame seq=67 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:29,263 INFO image_tx_daemon: frame seq=68 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:29,771 INFO image_tx_daemon: frame seq=69 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:30,262 INFO image_tx_daemon: frame seq=70 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:30,707 INFO image_tx_daemon: frame seq=71 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:31,222 INFO image_tx_daemon: frame seq=72 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:31,732 INFO image_tx_daemon: frame seq=73 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:32,007 INFO image_tx_daemon: stats: goodput=421.9 B/s util=17% pipeline=v3 frames_in=73 ok=72 fail=0 drop_full=0 drop_stale=0 frags_ok=73 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:00:32,227 INFO image_tx_daemon: frame seq=74 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:32,730 INFO image_tx_daemon: frame seq=75 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:33,244 INFO image_tx_daemon: frame seq=76 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:33,738 INFO image_tx_daemon: frame seq=77 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:34,230 INFO image_tx_daemon: frame seq=78 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:34,704 INFO image_tx_daemon: frame seq=79 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:35,258 INFO image_tx_daemon: frame seq=80 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:35,781 INFO image_tx_daemon: frame seq=81 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:36,261 INFO image_tx_daemon: frame seq=82 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:36,758 INFO image_tx_daemon: frame seq=83 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:37,240 INFO image_tx_daemon: frame seq=84 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:37,746 INFO image_tx_daemon: frame seq=85 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:38,238 INFO image_tx_daemon: frame seq=86 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:38,730 INFO image_tx_daemon: frame seq=87 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:39,212 INFO image_tx_daemon: frame seq=88 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:39,748 INFO image_tx_daemon: frame seq=89 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:40,247 INFO image_tx_daemon: frame seq=90 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:40,735 INFO image_tx_daemon: frame seq=91 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:41,218 INFO image_tx_daemon: frame seq=92 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:41,746 INFO image_tx_daemon: frame seq=93 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:42,018 INFO image_tx_daemon: stats: goodput=444.6 B/s util=18% pipeline=v3 frames_in=93 ok=92 fail=0 drop_full=0 drop_stale=0 frags_ok=93 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:00:42,265 INFO image_tx_daemon: frame seq=94 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:42,774 INFO image_tx_daemon: frame seq=95 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:43,280 INFO image_tx_daemon: frame seq=96 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:43,786 INFO image_tx_daemon: frame seq=97 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:44,259 INFO image_tx_daemon: frame seq=98 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:44,738 INFO image_tx_daemon: frame seq=99 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:45,270 INFO image_tx_daemon: frame seq=100 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:45,740 INFO image_tx_daemon: frame seq=101 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:46,255 INFO image_tx_daemon: frame seq=102 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:46,749 INFO image_tx_daemon: frame seq=103 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:47,244 INFO image_tx_daemon: frame seq=104 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:47,776 INFO image_tx_daemon: frame seq=105 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:48,254 INFO image_tx_daemon: frame seq=106 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:48,758 INFO image_tx_daemon: frame seq=107 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:49,245 INFO image_tx_daemon: frame seq=108 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:49,736 INFO image_tx_daemon: frame seq=109 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:50,283 INFO image_tx_daemon: frame seq=110 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:50,764 INFO image_tx_daemon: frame seq=111 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:51,282 INFO image_tx_daemon: frame seq=112 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:51,800 INFO image_tx_daemon: frame seq=113 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:52,028 INFO image_tx_daemon: stats: goodput=446.0 B/s util=18% pipeline=v3 frames_in=113 ok=112 fail=0 drop_full=0 drop_stale=0 frags_ok=113 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:00:52,283 INFO image_tx_daemon: frame seq=114 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:52,817 INFO image_tx_daemon: frame seq=115 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:53,263 INFO image_tx_daemon: frame seq=116 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:53,793 INFO image_tx_daemon: frame seq=117 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:54,237 INFO image_tx_daemon: frame seq=118 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:54,763 INFO image_tx_daemon: frame seq=119 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:55,269 INFO image_tx_daemon: frame seq=120 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:55,780 INFO image_tx_daemon: frame seq=121 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:56,265 INFO image_tx_daemon: frame seq=122 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:56,787 INFO image_tx_daemon: frame seq=123 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:57,231 INFO image_tx_daemon: frame seq=124 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:57,723 INFO image_tx_daemon: frame seq=125 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:58,222 INFO image_tx_daemon: frame seq=126 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:58,733 INFO image_tx_daemon: frame seq=127 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:59,251 INFO image_tx_daemon: frame seq=128 done (pipelined): 1 fragments ok
+
+2026-08-09 15:00:59,744 INFO image_tx_daemon: frame seq=129 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:00,228 INFO image_tx_daemon: frame seq=130 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:00,724 INFO image_tx_daemon: frame seq=131 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:01,247 INFO image_tx_daemon: frame seq=132 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:01,745 INFO image_tx_daemon: frame seq=133 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:02,040 INFO image_tx_daemon: stats: goodput=447.9 B/s util=18% pipeline=v3 frames_in=133 ok=132 fail=0 drop_full=0 drop_stale=0 frags_ok=133 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:01:02,229 INFO image_tx_daemon: frame seq=134 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:02,727 INFO image_tx_daemon: frame seq=135 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:03,268 INFO image_tx_daemon: frame seq=136 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:03,778 INFO image_tx_daemon: frame seq=137 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:04,281 INFO image_tx_daemon: frame seq=138 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:04,777 INFO image_tx_daemon: frame seq=139 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:05,269 INFO image_tx_daemon: frame seq=140 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:05,770 INFO image_tx_daemon: frame seq=141 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:06,270 INFO image_tx_daemon: frame seq=142 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:06,760 INFO image_tx_daemon: frame seq=143 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:07,272 INFO image_tx_daemon: frame seq=144 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:07,764 INFO image_tx_daemon: frame seq=145 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:08,259 INFO image_tx_daemon: frame seq=146 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:08,759 INFO image_tx_daemon: frame seq=147 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:09,238 INFO image_tx_daemon: frame seq=148 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:09,742 INFO image_tx_daemon: frame seq=149 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:10,223 INFO image_tx_daemon: frame seq=150 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:10,770 INFO image_tx_daemon: frame seq=151 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:11,250 INFO image_tx_daemon: frame seq=152 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:11,719 INFO image_tx_daemon: frame seq=153 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:12,051 INFO image_tx_daemon: stats: goodput=451.3 B/s util=18% pipeline=v3 frames_in=153 ok=152 fail=0 drop_full=0 drop_stale=0 frags_ok=153 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:01:12,234 INFO image_tx_daemon: frame seq=154 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:12,773 INFO image_tx_daemon: frame seq=155 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:13,270 INFO image_tx_daemon: frame seq=156 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:13,768 INFO image_tx_daemon: frame seq=157 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:14,250 INFO image_tx_daemon: frame seq=158 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:14,767 INFO image_tx_daemon: frame seq=159 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:15,240 INFO image_tx_daemon: frame seq=160 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:15,769 INFO image_tx_daemon: frame seq=161 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:16,283 INFO image_tx_daemon: frame seq=162 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:16,765 INFO image_tx_daemon: frame seq=163 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:17,246 INFO image_tx_daemon: frame seq=164 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:17,761 INFO image_tx_daemon: frame seq=165 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:18,260 INFO image_tx_daemon: frame seq=166 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:18,764 INFO image_tx_daemon: frame seq=167 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:19,261 INFO image_tx_daemon: frame seq=168 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:19,744 INFO image_tx_daemon: frame seq=169 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:20,247 INFO image_tx_daemon: frame seq=170 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:20,747 INFO image_tx_daemon: frame seq=171 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:21,243 INFO image_tx_daemon: frame seq=172 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:21,731 INFO image_tx_daemon: frame seq=173 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:22,063 INFO image_tx_daemon: stats: goodput=447.8 B/s util=18% pipeline=v3 frames_in=173 ok=172 fail=0 drop_full=0 drop_stale=0 frags_ok=173 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:01:22,228 INFO image_tx_daemon: frame seq=174 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:22,737 INFO image_tx_daemon: frame seq=175 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:23,254 INFO image_tx_daemon: frame seq=176 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:23,747 INFO image_tx_daemon: frame seq=177 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:24,231 INFO image_tx_daemon: frame seq=178 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:24,736 INFO image_tx_daemon: frame seq=179 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:25,229 INFO image_tx_daemon: frame seq=180 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:25,762 INFO image_tx_daemon: frame seq=181 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:26,272 INFO image_tx_daemon: frame seq=182 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:26,744 INFO image_tx_daemon: frame seq=183 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:27,259 INFO image_tx_daemon: frame seq=184 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:27,750 INFO image_tx_daemon: frame seq=185 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:28,243 INFO image_tx_daemon: frame seq=186 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:28,770 INFO image_tx_daemon: frame seq=187 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:29,262 INFO image_tx_daemon: frame seq=188 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:29,759 INFO image_tx_daemon: frame seq=189 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:30,250 INFO image_tx_daemon: frame seq=190 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:30,730 INFO image_tx_daemon: frame seq=191 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:31,237 INFO image_tx_daemon: frame seq=192 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:31,768 INFO image_tx_daemon: frame seq=193 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:32,074 INFO image_tx_daemon: stats: goodput=443.5 B/s util=18% pipeline=v3 frames_in=193 ok=192 fail=0 drop_full=0 drop_stale=0 frags_ok=193 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:01:32,262 INFO image_tx_daemon: frame seq=194 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:32,747 INFO image_tx_daemon: frame seq=195 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:33,217 INFO image_tx_daemon: frame seq=196 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:33,722 INFO image_tx_daemon: frame seq=197 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:34,262 INFO image_tx_daemon: frame seq=198 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:34,733 INFO image_tx_daemon: frame seq=199 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:35,245 INFO image_tx_daemon: frame seq=200 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:35,725 INFO image_tx_daemon: frame seq=201 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:36,277 INFO image_tx_daemon: frame seq=202 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:36,749 INFO image_tx_daemon: frame seq=203 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:37,268 INFO image_tx_daemon: frame seq=204 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:37,777 INFO image_tx_daemon: frame seq=205 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:38,276 INFO image_tx_daemon: frame seq=206 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:38,763 INFO image_tx_daemon: frame seq=207 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:39,292 INFO image_tx_daemon: frame seq=208 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:39,778 INFO image_tx_daemon: frame seq=209 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:40,275 INFO image_tx_daemon: frame seq=210 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:40,768 INFO image_tx_daemon: frame seq=211 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:41,254 INFO image_tx_daemon: frame seq=212 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:41,763 INFO image_tx_daemon: frame seq=213 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:42,085 INFO image_tx_daemon: stats: goodput=439.5 B/s util=18% pipeline=v3 frames_in=213 ok=212 fail=0 drop_full=0 drop_stale=0 frags_ok=213 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:01:42,263 INFO image_tx_daemon: frame seq=214 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:42,754 INFO image_tx_daemon: frame seq=215 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:43,248 INFO image_tx_daemon: frame seq=216 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:43,731 INFO image_tx_daemon: frame seq=217 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:44,217 INFO image_tx_daemon: frame seq=218 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:44,703 INFO image_tx_daemon: frame seq=219 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:45,239 INFO image_tx_daemon: frame seq=220 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:45,741 INFO image_tx_daemon: frame seq=221 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:46,238 INFO image_tx_daemon: frame seq=222 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:46,732 INFO image_tx_daemon: frame seq=223 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:47,221 INFO image_tx_daemon: frame seq=224 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:47,739 INFO image_tx_daemon: frame seq=225 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:48,257 INFO image_tx_daemon: frame seq=226 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:48,775 INFO image_tx_daemon: frame seq=227 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:49,253 INFO image_tx_daemon: frame seq=228 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:49,767 INFO image_tx_daemon: frame seq=229 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:50,259 INFO image_tx_daemon: frame seq=230 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:50,752 INFO image_tx_daemon: frame seq=231 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:51,247 INFO image_tx_daemon: frame seq=232 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:51,728 INFO image_tx_daemon: frame seq=233 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:52,106 INFO image_tx_daemon: stats: goodput=455.0 B/s util=19% pipeline=v3 frames_in=234 ok=232 fail=0 drop_full=0 drop_stale=0 frags_ok=233 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:01:52,221 INFO image_tx_daemon: frame seq=234 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:52,768 INFO image_tx_daemon: frame seq=235 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:53,287 INFO image_tx_daemon: frame seq=236 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:53,794 INFO image_tx_daemon: frame seq=237 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:54,291 INFO image_tx_daemon: frame seq=238 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:54,761 INFO image_tx_daemon: frame seq=239 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:55,267 INFO image_tx_daemon: frame seq=240 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:55,762 INFO image_tx_daemon: frame seq=241 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:56,260 INFO image_tx_daemon: frame seq=242 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:56,738 INFO image_tx_daemon: frame seq=243 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:57,246 INFO image_tx_daemon: frame seq=244 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:57,715 INFO image_tx_daemon: frame seq=245 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:58,266 INFO image_tx_daemon: frame seq=246 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:58,765 INFO image_tx_daemon: frame seq=247 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:59,261 INFO image_tx_daemon: frame seq=248 done (pipelined): 1 fragments ok
+
+2026-08-09 15:01:59,729 INFO image_tx_daemon: frame seq=249 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:00,242 INFO image_tx_daemon: frame seq=250 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:00,738 INFO image_tx_daemon: frame seq=251 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:01,263 INFO image_tx_daemon: frame seq=252 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:01,755 INFO image_tx_daemon: frame seq=253 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:02,126 INFO image_tx_daemon: stats: goodput=445.9 B/s util=18% pipeline=v3 frames_in=254 ok=252 fail=0 drop_full=0 drop_stale=0 frags_ok=253 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:02:02,237 INFO image_tx_daemon: frame seq=254 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:02,781 INFO image_tx_daemon: frame seq=255 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:03,284 INFO image_tx_daemon: frame seq=0 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:03,789 INFO image_tx_daemon: frame seq=1 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:04,302 INFO image_tx_daemon: frame seq=2 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:04,800 INFO image_tx_daemon: frame seq=3 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:05,282 INFO image_tx_daemon: frame seq=4 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:05,732 INFO image_tx_daemon: frame seq=5 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:06,230 INFO image_tx_daemon: frame seq=6 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:06,731 INFO image_tx_daemon: frame seq=7 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:07,234 INFO image_tx_daemon: frame seq=8 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:07,719 INFO image_tx_daemon: frame seq=9 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:08,221 INFO image_tx_daemon: frame seq=10 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:08,752 INFO image_tx_daemon: frame seq=11 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:09,246 INFO image_tx_daemon: frame seq=12 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:09,738 INFO image_tx_daemon: frame seq=13 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:10,213 INFO image_tx_daemon: frame seq=14 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:10,734 INFO image_tx_daemon: frame seq=15 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:11,238 INFO image_tx_daemon: frame seq=16 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:11,746 INFO image_tx_daemon: frame seq=17 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:12,138 INFO image_tx_daemon: stats: goodput=456.9 B/s util=19% pipeline=v3 frames_in=273 ok=272 fail=0 drop_full=0 drop_stale=0 frags_ok=273 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:02:12,292 INFO image_tx_daemon: frame seq=18 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:12,776 INFO image_tx_daemon: frame seq=19 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:13,238 INFO image_tx_daemon: frame seq=20 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:13,722 INFO image_tx_daemon: frame seq=21 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:14,223 INFO image_tx_daemon: frame seq=22 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:14,758 INFO image_tx_daemon: frame seq=23 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:15,229 INFO image_tx_daemon: frame seq=24 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:15,746 INFO image_tx_daemon: frame seq=25 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:16,214 INFO image_tx_daemon: frame seq=26 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:16,694 INFO image_tx_daemon: frame seq=27 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:17,241 INFO image_tx_daemon: frame seq=28 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:17,722 INFO image_tx_daemon: frame seq=29 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:18,239 INFO image_tx_daemon: frame seq=30 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:18,758 INFO image_tx_daemon: frame seq=31 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:19,262 INFO image_tx_daemon: frame seq=32 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:19,752 INFO image_tx_daemon: frame seq=33 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:20,250 INFO image_tx_daemon: frame seq=34 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:20,720 INFO image_tx_daemon: frame seq=35 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:21,286 INFO image_tx_daemon: frame seq=36 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:21,782 INFO image_tx_daemon: frame seq=37 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:22,150 INFO image_tx_daemon: stats: goodput=438.5 B/s util=18% pipeline=v3 frames_in=293 ok=292 fail=0 drop_full=0 drop_stale=0 frags_ok=293 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:02:22,282 INFO image_tx_daemon: frame seq=38 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:22,796 INFO image_tx_daemon: frame seq=39 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:23,291 INFO image_tx_daemon: frame seq=40 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:23,809 INFO image_tx_daemon: frame seq=41 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:24,277 INFO image_tx_daemon: frame seq=42 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:24,770 INFO image_tx_daemon: frame seq=43 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:25,261 INFO image_tx_daemon: frame seq=44 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:25,763 INFO image_tx_daemon: frame seq=45 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:26,250 INFO image_tx_daemon: frame seq=46 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:26,790 INFO image_tx_daemon: frame seq=47 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:27,297 INFO image_tx_daemon: frame seq=48 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:27,816 INFO image_tx_daemon: frame seq=49 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:28,306 INFO image_tx_daemon: frame seq=50 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:28,761 INFO image_tx_daemon: frame seq=51 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:29,253 INFO image_tx_daemon: frame seq=52 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:29,744 INFO image_tx_daemon: frame seq=53 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:30,237 INFO image_tx_daemon: frame seq=54 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:30,510 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:02:30,730 INFO image_tx_daemon: frame seq=55 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:31,023 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:02:31,200 INFO image_tx_daemon: frame seq=56 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:31,720 INFO image_tx_daemon: frame seq=57 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:32,161 INFO image_tx_daemon: stats: goodput=455.0 B/s util=19% pipeline=v3 frames_in=314 ok=312 fail=0 drop_full=0 drop_stale=0 frags_ok=313 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:02:32,266 INFO image_tx_daemon: frame seq=58 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:32,762 INFO image_tx_daemon: frame seq=59 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:33,269 INFO image_tx_daemon: frame seq=60 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:33,766 INFO image_tx_daemon: frame seq=61 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:34,282 INFO image_tx_daemon: frame seq=62 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:34,766 INFO image_tx_daemon: frame seq=63 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:35,233 INFO image_tx_daemon: frame seq=64 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:35,727 INFO image_tx_daemon: frame seq=65 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:36,236 INFO image_tx_daemon: frame seq=66 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:36,739 INFO image_tx_daemon: frame seq=67 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:37,241 INFO image_tx_daemon: frame seq=68 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:37,716 INFO image_tx_daemon: frame seq=69 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:38,215 INFO image_tx_daemon: frame seq=70 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:38,724 INFO image_tx_daemon: frame seq=71 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:39,239 INFO image_tx_daemon: frame seq=72 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:39,713 INFO image_tx_daemon: frame seq=73 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:40,270 INFO image_tx_daemon: frame seq=74 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:40,763 INFO image_tx_daemon: frame seq=75 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:41,255 INFO image_tx_daemon: frame seq=76 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:41,725 INFO image_tx_daemon: frame seq=77 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:42,172 INFO image_tx_daemon: stats: goodput=442.5 B/s util=18% pipeline=v3 frames_in=334 ok=332 fail=0 drop_full=0 drop_stale=0 frags_ok=333 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:02:42,243 INFO image_tx_daemon: frame seq=78 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:42,729 INFO image_tx_daemon: frame seq=79 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:43,255 INFO image_tx_daemon: frame seq=80 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:43,747 INFO image_tx_daemon: frame seq=81 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:44,237 INFO image_tx_daemon: frame seq=82 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:44,778 INFO image_tx_daemon: frame seq=83 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:45,285 INFO image_tx_daemon: frame seq=84 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:45,558 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:02:45,794 INFO image_tx_daemon: frame seq=85 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:46,067 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:02:46,305 INFO image_tx_daemon: frame seq=86 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:46,815 INFO image_tx_daemon: frame seq=87 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:47,264 INFO image_tx_daemon: frame seq=88 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:47,755 INFO image_tx_daemon: frame seq=89 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:48,261 INFO image_tx_daemon: frame seq=90 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:48,769 INFO image_tx_daemon: frame seq=91 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:49,303 INFO image_tx_daemon: frame seq=92 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:49,797 INFO image_tx_daemon: frame seq=93 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:50,277 INFO image_tx_daemon: frame seq=94 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:50,742 INFO image_tx_daemon: frame seq=95 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:51,252 INFO image_tx_daemon: frame seq=96 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:51,767 INFO image_tx_daemon: frame seq=97 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:52,185 INFO image_tx_daemon: stats: goodput=439.2 B/s util=18% pipeline=v3 frames_in=354 ok=352 fail=0 drop_full=0 drop_stale=0 frags_ok=353 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:02:52,260 INFO image_tx_daemon: frame seq=98 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:52,732 INFO image_tx_daemon: frame seq=99 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:53,260 INFO image_tx_daemon: frame seq=100 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:53,767 INFO image_tx_daemon: frame seq=101 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:54,251 INFO image_tx_daemon: frame seq=102 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:54,745 INFO image_tx_daemon: frame seq=103 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:55,225 INFO image_tx_daemon: frame seq=104 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:55,728 INFO image_tx_daemon: frame seq=105 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:56,215 INFO image_tx_daemon: frame seq=106 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:56,759 INFO image_tx_daemon: frame seq=107 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:57,251 INFO image_tx_daemon: frame seq=108 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:57,720 INFO image_tx_daemon: frame seq=109 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:58,228 INFO image_tx_daemon: frame seq=110 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:58,719 INFO image_tx_daemon: frame seq=111 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:59,229 INFO image_tx_daemon: frame seq=112 done (pipelined): 1 fragments ok
+
+2026-08-09 15:02:59,754 INFO image_tx_daemon: frame seq=113 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:00,225 INFO image_tx_daemon: frame seq=114 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:00,529 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:03:00,736 INFO image_tx_daemon: frame seq=115 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:01,020 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:03:01,224 INFO image_tx_daemon: frame seq=116 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:01,731 INFO image_tx_daemon: frame seq=117 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:02,195 INFO image_tx_daemon: stats: goodput=445.0 B/s util=18% pipeline=v3 frames_in=374 ok=372 fail=0 drop_full=0 drop_stale=0 frags_ok=373 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:03:02,286 INFO image_tx_daemon: frame seq=118 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:02,794 INFO image_tx_daemon: frame seq=119 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:03,280 INFO image_tx_daemon: frame seq=120 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:03,759 INFO image_tx_daemon: frame seq=121 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:04,254 INFO image_tx_daemon: frame seq=122 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:04,745 INFO image_tx_daemon: frame seq=123 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:05,236 INFO image_tx_daemon: frame seq=124 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:05,759 INFO image_tx_daemon: frame seq=125 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:06,262 INFO image_tx_daemon: frame seq=126 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:06,758 INFO image_tx_daemon: frame seq=127 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:07,249 INFO image_tx_daemon: frame seq=128 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:07,741 INFO image_tx_daemon: frame seq=129 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:08,236 INFO image_tx_daemon: frame seq=130 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:08,762 INFO image_tx_daemon: frame seq=131 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:09,256 INFO image_tx_daemon: frame seq=132 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:09,727 INFO image_tx_daemon: frame seq=133 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:10,239 INFO image_tx_daemon: frame seq=134 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:10,739 INFO image_tx_daemon: frame seq=135 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:11,270 INFO image_tx_daemon: frame seq=136 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:11,762 INFO image_tx_daemon: frame seq=137 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:12,207 INFO image_tx_daemon: stats: goodput=455.0 B/s util=18% pipeline=v3 frames_in=394 ok=392 fail=0 drop_full=0 drop_stale=0 frags_ok=393 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:03:12,258 INFO image_tx_daemon: frame seq=138 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:12,757 INFO image_tx_daemon: frame seq=139 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:13,251 INFO image_tx_daemon: frame seq=140 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:13,772 INFO image_tx_daemon: frame seq=141 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:14,289 INFO image_tx_daemon: frame seq=142 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:14,786 INFO image_tx_daemon: frame seq=143 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:15,282 INFO image_tx_daemon: frame seq=144 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:15,566 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:03:15,772 INFO image_tx_daemon: frame seq=145 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:16,055 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:03:16,254 INFO image_tx_daemon: frame seq=146 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:16,761 INFO image_tx_daemon: frame seq=147 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:17,241 INFO image_tx_daemon: frame seq=148 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:17,745 INFO image_tx_daemon: frame seq=149 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:18,242 INFO image_tx_daemon: frame seq=150 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:18,713 INFO image_tx_daemon: frame seq=151 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:19,216 INFO image_tx_daemon: frame seq=152 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:19,721 INFO image_tx_daemon: frame seq=153 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:20,247 INFO image_tx_daemon: frame seq=154 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:20,739 INFO image_tx_daemon: frame seq=155 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:21,205 INFO image_tx_daemon: frame seq=156 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:21,726 INFO image_tx_daemon: frame seq=157 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:22,218 INFO image_tx_daemon: stats: goodput=448.9 B/s util=18% pipeline=v3 frames_in=414 ok=412 fail=0 drop_full=0 drop_stale=0 frags_ok=413 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:03:22,242 INFO image_tx_daemon: frame seq=158 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:22,735 INFO image_tx_daemon: frame seq=159 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:23,238 INFO image_tx_daemon: frame seq=160 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:23,745 INFO image_tx_daemon: frame seq=161 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:24,216 INFO image_tx_daemon: frame seq=162 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:24,771 INFO image_tx_daemon: frame seq=163 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:25,231 INFO image_tx_daemon: frame seq=164 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:25,757 INFO image_tx_daemon: frame seq=165 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:26,271 INFO image_tx_daemon: frame seq=166 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:26,743 INFO image_tx_daemon: frame seq=167 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:27,251 INFO image_tx_daemon: frame seq=168 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:27,742 INFO image_tx_daemon: frame seq=169 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:28,248 INFO image_tx_daemon: frame seq=170 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:28,794 INFO image_tx_daemon: frame seq=171 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:29,295 INFO image_tx_daemon: frame seq=172 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:29,744 INFO image_tx_daemon: frame seq=173 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:30,242 INFO image_tx_daemon: frame seq=174 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:30,526 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:03:30,713 INFO image_tx_daemon: frame seq=175 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:30,986 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:03:31,277 INFO image_tx_daemon: frame seq=176 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:31,795 INFO image_tx_daemon: frame seq=177 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:32,230 INFO image_tx_daemon: stats: goodput=451.9 B/s util=18% pipeline=v3 frames_in=434 ok=432 fail=0 drop_full=0 drop_stale=0 frags_ok=433 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:03:32,294 INFO image_tx_daemon: frame seq=178 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:32,794 INFO image_tx_daemon: frame seq=179 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:33,239 INFO image_tx_daemon: frame seq=180 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:33,744 INFO image_tx_daemon: frame seq=181 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:34,270 INFO image_tx_daemon: frame seq=182 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:34,768 INFO image_tx_daemon: frame seq=183 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:35,298 INFO image_tx_daemon: frame seq=184 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:35,790 INFO image_tx_daemon: frame seq=185 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:36,282 INFO image_tx_daemon: frame seq=186 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:36,736 INFO image_tx_daemon: frame seq=187 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:37,261 INFO image_tx_daemon: frame seq=188 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:37,777 INFO image_tx_daemon: frame seq=189 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:38,273 INFO image_tx_daemon: frame seq=190 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:38,791 INFO image_tx_daemon: frame seq=191 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:39,299 INFO image_tx_daemon: frame seq=192 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:39,768 INFO image_tx_daemon: frame seq=193 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:40,273 INFO image_tx_daemon: frame seq=194 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:40,731 INFO image_tx_daemon: frame seq=195 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:41,221 INFO image_tx_daemon: frame seq=196 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:41,722 INFO image_tx_daemon: frame seq=197 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:42,199 INFO image_tx_daemon: frame seq=198 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:42,242 INFO image_tx_daemon: stats: goodput=472.0 B/s util=19% pipeline=v3 frames_in=454 ok=453 fail=0 drop_full=0 drop_stale=0 frags_ok=454 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:03:42,742 INFO image_tx_daemon: frame seq=199 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:43,217 INFO image_tx_daemon: frame seq=200 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:43,731 INFO image_tx_daemon: frame seq=201 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:44,244 INFO image_tx_daemon: frame seq=202 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:44,793 INFO image_tx_daemon: frame seq=203 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:45,267 INFO image_tx_daemon: frame seq=204 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:45,551 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:03:45,741 INFO image_tx_daemon: frame seq=205 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:46,025 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:03:46,247 INFO image_tx_daemon: frame seq=206 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:46,728 INFO image_tx_daemon: frame seq=207 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:47,237 INFO image_tx_daemon: frame seq=208 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:47,757 INFO image_tx_daemon: frame seq=209 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:48,250 INFO image_tx_daemon: frame seq=210 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:48,746 INFO image_tx_daemon: frame seq=211 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:49,236 INFO image_tx_daemon: frame seq=212 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:49,744 INFO image_tx_daemon: frame seq=213 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:50,253 INFO image_tx_daemon: frame seq=214 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:50,791 INFO image_tx_daemon: frame seq=215 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:51,267 INFO image_tx_daemon: frame seq=216 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:51,752 INFO image_tx_daemon: frame seq=217 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:52,253 INFO image_tx_daemon: stats: goodput=427.6 B/s util=17% pipeline=v3 frames_in=474 ok=472 fail=0 drop_full=0 drop_stale=0 frags_ok=473 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:03:52,285 INFO image_tx_daemon: frame seq=218 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:52,786 INFO image_tx_daemon: frame seq=219 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:53,307 INFO image_tx_daemon: frame seq=220 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:53,802 INFO image_tx_daemon: frame seq=221 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:54,315 INFO image_tx_daemon: frame seq=222 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:54,792 INFO image_tx_daemon: frame seq=223 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:55,292 INFO image_tx_daemon: frame seq=224 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:55,786 INFO image_tx_daemon: frame seq=225 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:56,267 INFO image_tx_daemon: frame seq=226 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:56,780 INFO image_tx_daemon: frame seq=227 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:57,289 INFO image_tx_daemon: frame seq=228 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:57,802 INFO image_tx_daemon: frame seq=229 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:58,296 INFO image_tx_daemon: frame seq=230 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:58,830 INFO image_tx_daemon: frame seq=231 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:59,283 INFO image_tx_daemon: frame seq=232 done (pipelined): 1 fragments ok
+
+2026-08-09 15:03:59,792 INFO image_tx_daemon: frame seq=233 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:00,289 INFO image_tx_daemon: frame seq=234 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:00,583 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:04:00,760 INFO image_tx_daemon: frame seq=235 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:01,043 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:04:01,269 INFO image_tx_daemon: frame seq=236 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:01,773 INFO image_tx_daemon: frame seq=237 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:02,240 INFO image_tx_daemon: frame seq=238 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:02,265 INFO image_tx_daemon: stats: goodput=468.2 B/s util=19% pipeline=v3 frames_in=494 ok=493 fail=0 drop_full=0 drop_stale=0 frags_ok=494 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:04:02,757 INFO image_tx_daemon: frame seq=239 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:03,227 INFO image_tx_daemon: frame seq=240 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:03,782 INFO image_tx_daemon: frame seq=241 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:04,254 INFO image_tx_daemon: frame seq=242 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:04,722 INFO image_tx_daemon: frame seq=243 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:05,215 INFO image_tx_daemon: frame seq=244 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:05,747 INFO image_tx_daemon: frame seq=245 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:06,220 INFO image_tx_daemon: frame seq=246 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:06,734 INFO image_tx_daemon: frame seq=247 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:07,227 INFO image_tx_daemon: frame seq=248 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:07,718 INFO image_tx_daemon: frame seq=249 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:08,258 INFO image_tx_daemon: frame seq=250 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:08,746 INFO image_tx_daemon: frame seq=251 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:09,250 INFO image_tx_daemon: frame seq=252 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:09,743 INFO image_tx_daemon: frame seq=253 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:10,232 INFO image_tx_daemon: frame seq=254 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:10,725 INFO image_tx_daemon: frame seq=255 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:11,258 INFO image_tx_daemon: frame seq=0 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:11,754 INFO image_tx_daemon: frame seq=1 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:12,243 INFO image_tx_daemon: frame seq=2 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:12,277 INFO image_tx_daemon: stats: goodput=453.0 B/s util=18% pipeline=v3 frames_in=514 ok=513 fail=0 drop_full=0 drop_stale=0 frags_ok=514 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:04:12,727 INFO image_tx_daemon: frame seq=3 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:13,259 INFO image_tx_daemon: frame seq=4 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:13,759 INFO image_tx_daemon: frame seq=5 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:14,258 INFO image_tx_daemon: frame seq=6 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:14,748 INFO image_tx_daemon: frame seq=7 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:15,230 INFO image_tx_daemon: frame seq=8 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:15,514 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:04:15,723 INFO image_tx_daemon: frame seq=9 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:15,996 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:04:16,262 INFO image_tx_daemon: frame seq=10 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:16,753 INFO image_tx_daemon: frame seq=11 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:17,280 INFO image_tx_daemon: frame seq=12 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:17,793 INFO image_tx_daemon: frame seq=13 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:18,305 INFO image_tx_daemon: frame seq=14 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:18,818 INFO image_tx_daemon: frame seq=15 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:19,277 INFO image_tx_daemon: frame seq=16 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:19,796 INFO image_tx_daemon: frame seq=17 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:20,278 INFO image_tx_daemon: frame seq=18 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:20,769 INFO image_tx_daemon: frame seq=19 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:21,229 INFO image_tx_daemon: frame seq=20 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:21,736 INFO image_tx_daemon: frame seq=21 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:22,249 INFO image_tx_daemon: frame seq=22 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:22,288 INFO image_tx_daemon: stats: goodput=448.9 B/s util=18% pipeline=v3 frames_in=534 ok=533 fail=0 drop_full=0 drop_stale=0 frags_ok=534 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:04:22,742 INFO image_tx_daemon: frame seq=23 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:23,250 INFO image_tx_daemon: frame seq=24 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:23,766 INFO image_tx_daemon: frame seq=25 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:24,252 INFO image_tx_daemon: frame seq=26 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:24,785 INFO image_tx_daemon: frame seq=27 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:25,268 INFO image_tx_daemon: frame seq=28 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:25,807 INFO image_tx_daemon: frame seq=29 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:26,301 INFO image_tx_daemon: frame seq=30 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:26,798 INFO image_tx_daemon: frame seq=31 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:27,267 INFO image_tx_daemon: frame seq=32 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:27,745 INFO image_tx_daemon: frame seq=33 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:28,267 INFO image_tx_daemon: frame seq=34 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:28,719 INFO image_tx_daemon: frame seq=35 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:29,219 INFO image_tx_daemon: frame seq=36 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:29,738 INFO image_tx_daemon: frame seq=37 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:30,242 INFO image_tx_daemon: frame seq=38 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:30,526 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:04:30,737 INFO image_tx_daemon: frame seq=39 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:31,020 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:04:31,223 INFO image_tx_daemon: frame seq=40 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:31,715 INFO image_tx_daemon: frame seq=41 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:32,245 INFO image_tx_daemon: frame seq=42 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:32,300 INFO image_tx_daemon: stats: goodput=444.2 B/s util=18% pipeline=v3 frames_in=554 ok=553 fail=0 drop_full=0 drop_stale=0 frags_ok=554 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:04:32,749 INFO image_tx_daemon: frame seq=43 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:33,260 INFO image_tx_daemon: frame seq=44 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:33,732 INFO image_tx_daemon: frame seq=45 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:34,240 INFO image_tx_daemon: frame seq=46 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:34,756 INFO image_tx_daemon: frame seq=47 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:35,249 INFO image_tx_daemon: frame seq=48 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:35,735 INFO image_tx_daemon: frame seq=49 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:36,236 INFO image_tx_daemon: frame seq=50 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:36,734 INFO image_tx_daemon: frame seq=51 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:37,246 INFO image_tx_daemon: frame seq=52 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:37,723 INFO image_tx_daemon: frame seq=53 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:38,238 INFO image_tx_daemon: frame seq=54 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:38,734 INFO image_tx_daemon: frame seq=55 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:39,266 INFO image_tx_daemon: frame seq=56 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:39,759 INFO image_tx_daemon: frame seq=57 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:40,238 INFO image_tx_daemon: frame seq=58 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:40,740 INFO image_tx_daemon: frame seq=59 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:41,225 INFO image_tx_daemon: frame seq=60 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:41,767 INFO image_tx_daemon: frame seq=61 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:42,273 INFO image_tx_daemon: frame seq=62 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:42,311 INFO image_tx_daemon: stats: goodput=454.4 B/s util=19% pipeline=v3 frames_in=574 ok=573 fail=0 drop_full=0 drop_stale=0 frags_ok=574 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:04:42,755 INFO image_tx_daemon: frame seq=63 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:43,273 INFO image_tx_daemon: frame seq=64 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:43,778 INFO image_tx_daemon: frame seq=65 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:44,247 INFO image_tx_daemon: frame seq=66 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:44,762 INFO image_tx_daemon: frame seq=67 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:45,231 INFO image_tx_daemon: frame seq=68 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:45,504 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:04:45,761 INFO image_tx_daemon: frame seq=69 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:46,044 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:04:46,234 INFO image_tx_daemon: frame seq=70 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:46,785 INFO image_tx_daemon: frame seq=71 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:47,279 INFO image_tx_daemon: frame seq=72 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:47,760 INFO image_tx_daemon: frame seq=73 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:48,235 INFO image_tx_daemon: frame seq=74 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:48,752 INFO image_tx_daemon: frame seq=75 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:49,248 INFO image_tx_daemon: frame seq=76 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:49,762 INFO image_tx_daemon: frame seq=77 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:50,263 INFO image_tx_daemon: frame seq=78 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:50,744 INFO image_tx_daemon: frame seq=79 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:51,250 INFO image_tx_daemon: frame seq=80 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:51,783 INFO image_tx_daemon: frame seq=81 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:52,236 INFO image_tx_daemon: frame seq=82 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:52,323 INFO image_tx_daemon: stats: goodput=440.3 B/s util=18% pipeline=v3 frames_in=594 ok=593 fail=0 drop_full=0 drop_stale=0 frags_ok=594 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:04:52,728 INFO image_tx_daemon: frame seq=83 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:53,211 INFO image_tx_daemon: frame seq=84 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:53,737 INFO image_tx_daemon: frame seq=85 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:54,213 INFO image_tx_daemon: frame seq=86 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:54,716 INFO image_tx_daemon: frame seq=87 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:55,197 INFO image_tx_daemon: frame seq=88 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:55,767 INFO image_tx_daemon: frame seq=89 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:56,274 INFO image_tx_daemon: frame seq=90 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:56,770 INFO image_tx_daemon: frame seq=91 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:57,277 INFO image_tx_daemon: frame seq=92 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:57,767 INFO image_tx_daemon: frame seq=93 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:58,247 INFO image_tx_daemon: frame seq=94 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:58,726 INFO image_tx_daemon: frame seq=95 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:59,202 INFO image_tx_daemon: frame seq=96 done (pipelined): 1 fragments ok
+
+2026-08-09 15:04:59,718 INFO image_tx_daemon: frame seq=97 done (pipelined): 1 fragments ok
+
+2026-08-09 15:05:00,248 INFO image_tx_daemon: frame seq=98 done (pipelined): 1 fragments ok
+
+2026-08-09 15:05:00,532 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:05:00,742 INFO image_tx_daemon: frame seq=99 done (pipelined): 1 fragments ok
+
+2026-08-09 15:05:01,036 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-09 15:05:01,204 INFO image_tx_daemon: frame seq=100 done (pipelined): 1 fragments ok
+
+2026-08-09 15:05:01,758 INFO image_tx_daemon: frame seq=101 done (pipelined): 1 fragments ok
+
+2026-08-09 15:05:02,259 INFO image_tx_daemon: frame seq=102 done (pipelined): 1 fragments ok
+
+2026-08-09 15:05:02,335 INFO image_tx_daemon: stats: goodput=434.8 B/s util=18% pipeline=v3 frames_in=614 ok=613 fail=0 drop_full=0 drop_stale=0 frags_ok=614 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-09 15:05:02,743 INFO image_tx_daemon: frame seq=103 done (pipelined): 1 fragments ok
+
+2026-08-09 15:05:03,252 INFO image_tx_daemon: frame seq=104 done (pipelined): 1 fragments ok
+
+2026-08-09 15:05:03,749 INFO image_tx_daemon: frame seq=105 done (pipelined): 1 fragments ok
+
