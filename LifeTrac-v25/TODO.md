@@ -5,7 +5,10 @@
 > strict-hold verification leg L, archive
 > `radio_monitor_20260817_195107_dde2c8a7`; day-to-day strict-hold range
 > since: 0.9–1.6 %; from 5.9 % two days prior). RS-11.6: two external ISM emitters characterized (a ~7 s hopper
-> and an exact-10 s device at −30 dBm); escaped by carrier choice — the
+> and an exact-10 s device at −30 dBm — per the 2026-08-16 surveys; the
+> 2026-08-22 dwell found −30 dBm at 923.5 riding the ~7 s grid and did
+> NOT directly re-confirm the exact-10 s fingerprint); escaped by
+> carrier choice — the
 > band reshuffles in HOURS, so channel picks come from a same-day survey
 > (`channel_survey_sniff.py` + `survey_compare.py`; 927.5 MHz is the only
 > 3/3-clean channel so far). RS-12: the historic slot-(total−2) loss was
