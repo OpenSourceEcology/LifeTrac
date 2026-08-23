@@ -82,3 +82,24 @@ right default while the firmware fix is pending.
 gap.** The flash-session confirmation becomes maximally crisp: a
 strict-hold leg predicts `rx_urc_lost == 0`; a control leg predicts
 `rx_urc_lost ≈ timeouts`.
+
+## 6. Addendum — strict hold leg L (post-review-fix verification)
+
+*(Added 2026-08-23 — this record previously lived only in commit
+5cc4dd9b's message and its archive; the missing in-document citation
+was a review catch on PR #109.)*
+
+The PR #108 review found the leg-K strict hold's discard-poll swallowed
+inbound commands during the hold window; the fix falls through to the
+normal event body. **Leg L verified the fixed build** (archive
+`radio_monitor_20260817_195107_dde2c8a7`, SHA dde2c8a7, bracketed,
+channel clean): guarantee intact (0/175 last pairs <80 ms, min
+131.0 ms), penultimate 8 % = uniform, **loss 0.9 % / timeouts 22 /
+published 154 — campaign bests**.
+
+Precision note for anything citing these numbers: **n=3 applies to the
+control and plain-hold arms only.** The strict hold has n=1 per build —
+leg K 1.5 % (pre-fix), leg L 0.9 % (post-fix, the shipped code path).
+"Bench floor 0.9 %" therefore rests on a single leg of the shipped
+strict-hold build; the day-to-day strict-hold range observed since is
+0.9–1.6 % (see the 2026-08-22 synth control leg).

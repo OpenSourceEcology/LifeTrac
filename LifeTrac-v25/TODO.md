@@ -1,16 +1,19 @@
 # LifeTrac v25 — TODO
 
 > **🟢 Radio status (2026-08-17) — both loss-floor campaigns resolved.**
-> The bench LoRa link runs at **0.9 % fragment loss** (from 5.9 % two days
-> prior). RS-11.6: two external ISM emitters characterized (a ~7 s hopper
+> The bench LoRa link runs at **0.9 % fragment loss** (single post-fix
+> strict-hold verification leg L, archive
+> `radio_monitor_20260817_195107_dde2c8a7`; day-to-day strict-hold range
+> since: 0.9–1.6 %; from 5.9 % two days prior). RS-11.6: two external ISM emitters characterized (a ~7 s hopper
 > and an exact-10 s device at −30 dBm); escaped by carrier choice — the
 > band reshuffles in HOURS, so channel picks come from a same-day survey
 > (`channel_survey_sniff.py` + `survey_compare.py`; 927.5 MHz is the only
 > 3/3-clean channel so far). RS-12: the historic slot-(total−2) loss was
 > an L072 URC-overwrite race at the short-final-fragment ride; host-side
-> mitigation validated n=3: `-NoParkLast 1` **plus** the strict hold
-> `LIFETRAC_NO_PARK_LAST_GAP_MS=80` — env-gated, NOT a default (see the
-> RS-12 closed entry for the gating rationale). Remaining: one
+> mitigation: plain hold validated n=3 (1.8 %); the full strict hold
+> (`-NoParkLast 1` **plus** `LIFETRAC_NO_PARK_LAST_GAP_MS=80`) has one
+> leg per build — leg K 1.5 % pre-fix, leg L 0.9 % on the shipped code —
+> env-gated, NOT a default (see the RS-12 closed entry). Remaining: one
 > confirmation-sized flash session (rx_urc_lost + firmware URC fix +
 > RS-3.6 gate) and the RS-3.3 camera first flight. Live campaign state:
 > [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) (RS-12 / RS-12.9

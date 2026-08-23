@@ -2260,16 +2260,21 @@ Two consequences for what is worth doing next:
   present) and is retracted — the shuffled-interval null that catches it
   is now part of the tool.
 - [x] **RS-12 CLOSED (search phase) 2026-08-17 — mechanism found, host fix
-  validated, bench floor 5.9% → 0.9%.** The penultimate-fragment loss was
+  validated, bench floor 5.9% → 0.9% (leg L, single post-fix
+  strict-hold verification leg — see the precision note below).** The penultimate-fragment loss was
   an L072 URC-overwrite race: the SHORT final fragment (~36 B remainder,
   ~20 ms ToA) rides fire-on-TX_DONE ~42 ms behind the penultimate, giving
   its 255 B URC a 2.8× tighter emission deadline; misses are silently
   overwritten (no counter). Fix: `-NoParkLast 1` +
   `LIFETRAC_NO_PARK_LAST_GAP_MS=80` (strict hold, falls through to the
-  event body so commands keep flowing — PR #108 review catch). Confirmed
-  n=3 interleaved + strict-hold legs: penultimate → uniform, loss 0.9%,
-  timeouts 22, published 154 (all campaign bests); cost ~−6% offered
-  (tuning headroom recorded). ENV-GATED, not default: command-plane
+  event body so commands keep flowing — PR #108 review catch).
+  Confirmed, with the arms stated precisely (review catch, PR #109):
+  plain hold n=3 interleaved (1.8±0.2 vs ctrl 3.3±0.1); strict hold has
+  ONE leg per build — leg K 1.5%/32 timeouts pre-fix, post-fix
+  verification leg L **0.9% / timeouts 22 / published 154, campaign
+  bests** (archive `radio_monitor_20260817_195107_dde2c8a7`, recorded
+  in RS_12_noparklast_ab_2026-08-17/RESULTS.md §6 addendum); cost ~−6%
+  offered (tuning headroom recorded). ENV-GATED, not default: command-plane
   interaction has zero bench exercise with live mid-train traffic.
   **Update 2026-08-22 (RS-3.3 leg 3): first live-traffic exercise — 11
   injected REQ_KEYFRAME landed in-leg (22 ×2-copy receptions; the
@@ -2288,9 +2293,10 @@ Two consequences for what is worth doing next:
   narrative incl. both recorded wrong turns),
   RS_12_depth_ab_2026-08-17, RS_12_noparklast_ab_2026-08-17. Original
   opening entry follows.
-- [ ] **RS-12 (original opening entry) — the clustered bulk loss floor
+- [x] **RS-12 (original opening entry) — the clustered bulk loss floor
   (campaign opened 2026-08-16,
-  issue #107). ⚠️ WORDING SUPERSEDED (review catch, PR #108): the
+  issue #107). SUPERSEDED — kept for the record only; see the CLOSED
+  entry above. ⚠️ WORDING SUPERSEDED (review catch, PR #108): the
   "NEVER-DEMODULATED" phrasing below reflects the opening desk finding
   and was overturned by the final mechanism — the radio DOES demodulate
   the penultimate (full ToA at TX, rx_ok counts it); its URC is then
@@ -2348,8 +2354,9 @@ manually). Recommended order:
 2. **RS-3.3 camera first flight** — `-TxFeed camera` at the current best
    operating point (`-ForceFrfHz <today's pick> -NoParkLast 1`). The
    encode-to-fit packer, carry fix, age-escalation and liveness valve
-   have NEVER been on air; flying them on a 0.9%-loss link attributes any
-   failure to the path, not the link.
+   have NEVER been on air; flying them on the 0.9%-loss link (leg L,
+   `radio_monitor_20260817_195107_dde2c8a7`) attributes any failure to
+   the path, not the link.
 3. **Flash session** (bench presence): rx_urc_lost counter + firmware URC
    fix (RS-12 above), RS-3.6 formal gate (REG 0x42 readback + one TX/RX
    transcript — the DIV8 change has weeks of implicit soak), read
