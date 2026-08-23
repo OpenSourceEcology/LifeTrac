@@ -1,0 +1,23 @@
+﻿# PM-1 bench check: charger exposure under /sys/class/power_supply/
+# Session claim 2026-08-22; artifact captured 2026-08-23 on the SAME boot
+# (boards quiesced overnight, no reboot between claim and capture).
+# Host capture time: 2026-08-23T09:35:46.4006260-05:00
+
+## BASE (2D0A..., via SSH 192.168.1.117):
+portenta-x8-2d0a1209dabc240b
+ 14:35:46 up 16:14,  1 user,  load average: 0.06, 0.21, 0.24
+/sys/class/power_supply/bq24190-charger/online:1
+/sys/class/power_supply/bq24190-charger/status:Discharging
+/sys/class/power_supply/bq24190-charger/type:USB
+
+## TRACTOR (2E2C..., via adb):
+portenta-x8-2e2c1209dabc240b
+
+ 06:46:14 up 16:14,  1 user,  load average: 1.01, 1.23, 1.28
+
+/sys/class/power_supply/bq24195-charger/online:1
+
+/sys/class/power_supply/bq24195-charger/status:Discharging
+
+/sys/class/power_supply/bq24195-charger/type:USB
+

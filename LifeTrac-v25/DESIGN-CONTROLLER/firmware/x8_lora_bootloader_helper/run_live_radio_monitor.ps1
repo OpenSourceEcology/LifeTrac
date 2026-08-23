@@ -470,6 +470,7 @@ if ($Archive) {
         "tx_prepare_ahead=$TxPrepareAhead",
         "train_gap_ms=$TrainGapMs",
         "kf_request_disable=$KfRequestDisable",
+        "no_park_last=$NoParkLast",
         "parity_group=$ParityGroup",
         "aligned_pump=$AlignedPump",
         "reactive_fire=$ReactiveFire",
