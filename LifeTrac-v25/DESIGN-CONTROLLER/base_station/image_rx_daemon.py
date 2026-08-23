@@ -514,6 +514,47 @@ class ImageRxDaemon:
                 self.stats.publish_errors += 1
             LOG.warning("publish failed for frame_id=%d: %s", frame_id, exc)
 
+    def _publish_completed(self, completed, raw: bytes) -> None:
+        """Publish every frame completed by the fragment carried in ``raw``.
+
+        RS-3.1: a batched payload completes into a LIST of frames; bare
+        payloads stay a single frame. Publish each — stats and web_ui see
+        individual frames. All frames from one completion share the
+        completing fragment's train seq.
+        """
+        train_seq = train_seq_of(raw)
+        done_list = completed if isinstance(completed, list) else [completed]
+        for done in done_list:
+            try:
+                payload_out = encode_tile_delta_frame(done)
+            except Exception as exc:
+                LOG.warning("encode_tile_delta_frame failed: %s", exc)
+                continue
+            frame_id = getattr(done, "frame_id", 0) or 0
+            with self._lock:
+                # Implicit encoder-mode ACK: frames self-describe
+                # their codec; the base UI compares this against
+                # the operator's pin (keyframe-forced on every
+                # mode change, so it converges within one frame).
+                self._last_rx_codec = getattr(done, "codec", 0)
+                self._last_rx_frame_kind = getattr(done, "frame_kind", 0)
+            # RS-1.5: a keyframe arriving clears a pending
+            # req_keyframe. 2026-07-27 CAUTION: this is a
+            # CONTAMINATED delivery signal — the synth/encoder
+            # emits keyframes on its own cadence, so a keyframe
+            # arriving does NOT prove our request was delivered
+            # (this produced the retracted 171/1 result). The
+            # clear is logged as UNVERIFIED, and _clear_pending
+            # says so, so no future analysis mistakes it for a
+            # confirmed round trip. Use CMD_OP_PROBE for honest
+            # delivery measurement.
+            if getattr(done, "frame_kind", 0) == 1:
+                self._clear_pending(
+                    CMD_OP_REQ_KEYFRAME,
+                    "keyframe received (UNVERIFIED delivery — "
+                    "keyframe may be encoder-initiated)")
+            self._publish(payload_out, frame_id, train_seq)
+
     def _maybe_switch_profile(self, link: HostLink) -> None:
         """Drive the LoRa-only two-phase profile switch (RX worker thread).
 
@@ -1305,50 +1346,13 @@ class ImageRxDaemon:
                                 f"reassembly timeout #{cur_timeout}")
 
                 if completed is not None:
-                    train_seq = train_seq_of(data)
                     # RS-1.x: a COMPLETED frame means that was the train's
                     # LAST fragment — the tractor's ~44 ms host-turnaround
                     # window opens NOW (mid-train the RS-4.12 ring restarts
                     # TX within ~5 ms, so any-fragment alignment — Run E's
                     # mistake — is no better than chance).
                     frame_done = True
-                    # RS-3.1: a batched payload completes into a LIST of
-                    # frames; bare payloads stay a single frame. Publish
-                    # each — stats and web_ui see individual frames.
-                    done_list = (completed if isinstance(completed, list)
-                                 else [completed])
-                    for done in done_list:
-                        try:
-                            payload_out = encode_tile_delta_frame(done)
-                        except Exception as exc:
-                            LOG.warning("encode_tile_delta_frame failed: %s",
-                                        exc)
-                            continue
-                        frame_id = getattr(done, "frame_id", 0) or 0
-                        with self._lock:
-                            # Implicit encoder-mode ACK: frames self-describe
-                            # their codec; the base UI compares this against
-                            # the operator's pin (keyframe-forced on every
-                            # mode change, so it converges within one frame).
-                            self._last_rx_codec = getattr(done, "codec", 0)
-                            self._last_rx_frame_kind = getattr(
-                                done, "frame_kind", 0)
-                        # RS-1.5: a keyframe arriving clears a pending
-                        # req_keyframe. 2026-07-27 CAUTION: this is a
-                        # CONTAMINATED delivery signal — the synth/encoder
-                        # emits keyframes on its own cadence, so a keyframe
-                        # arriving does NOT prove our request was delivered
-                        # (this produced the retracted 171/1 result). The
-                        # clear is logged as UNVERIFIED, and _clear_pending
-                        # says so, so no future analysis mistakes it for a
-                        # confirmed round trip. Use CMD_OP_PROBE for honest
-                        # delivery measurement.
-                        if getattr(done, "frame_kind", 0) == 1:
-                            self._clear_pending(
-                                CMD_OP_REQ_KEYFRAME,
-                                "keyframe received (UNVERIFIED delivery — "
-                                "keyframe may be encoder-initiated)")
-                        self._publish(payload_out, frame_id, train_seq)
+                    self._publish_completed(completed, data)
 
             # RS-1.x window-aligned command TX (2026-07-25): a fragment in
             # this pass means the tractor JUST finished a TX — its armed
