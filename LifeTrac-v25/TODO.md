@@ -1,5 +1,63 @@
 # LifeTrac v25 — TODO
 
+> **🟢 Radio status (2026-08-17) — both loss-floor campaigns resolved.**
+> The bench LoRa link runs at **0.9 % fragment loss** (single post-fix
+> strict-hold verification leg L, archive
+> `radio_monitor_20260817_195107_dde2c8a7`; day-to-day strict-hold range
+> since: 0.9–1.6 %; from 5.9 % two days prior). RS-11.6: two external ISM emitters characterized (a ~7 s hopper
+> and an exact-10 s device at −30 dBm — per the 2026-08-16 surveys; the
+> 2026-08-22 dwell found −30 dBm at 923.5 riding the ~7 s grid and did
+> NOT directly re-confirm the exact-10 s fingerprint); escaped by
+> carrier choice — the
+> band reshuffles in HOURS, so channel picks come from a same-day survey
+> (`channel_survey_sniff.py` + `survey_compare.py`; 927.5 MHz was 3/3
+> clean at this writing — **now 4/4**, see the 2026-08-22 session block
+> below). RS-12: the historic slot-(total−2) loss was
+> an L072 URC-overwrite race at the short-final-fragment ride; host-side
+> mitigation: plain hold validated n=3 (1.8 %); the full strict hold
+> (`-NoParkLast 1` **plus** `LIFETRAC_NO_PARK_LAST_GAP_MS=80`) has one
+> leg per build — leg K 1.5 % pre-fix, leg L 0.9 % on the shipped code —
+> env-gated, NOT a default (see the RS-12 closed entry). Remaining: one
+> confirmation-sized flash session (rx_urc_lost + firmware URC fix —
+> the RS-3.6 formal gate is NOT part of it, it was cleared 2026-07-25
+> per `RS_firmware_patch_flash_2026-07-25/NOTES.md`, review catch) and
+> the instrumented camera MOTION leg (the camera legs themselves flew
+> 2026-08-22, see the session block below). Live campaign state:
+> [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) (RS-12 / RS-12.9
+> sequencing), issues #98/#107, evidence under
+> `DESIGN-CONTROLLER/bench-evidence/`.
+>
+> **Update 2026-08-22:** production power-down/wake design opened (PR
+> #110, [DESIGN-CONTROLLER/POWER_MANAGEMENT.md](DESIGN-CONTROLLER/POWER_MANAGEMENT.md)
+> — Opta I1 key-off sensing, battery-bridged clean halt, default-off
+> bench gating, base quiesce + hail-set rendezvous; tracked as PM-1).
+> Its review surfaced a survey gap now tracked as **RS-11.8**: all bench
+> stability data sits on the x.0/x.5 MHz grid, while the production FHSS
+> table's 50 centers sit on x.25/x.75 — no shared channel, so production
+> hop/hail picks need chantab-grid surveys.
+>
+> **Session 2026-08-22 (PR #111): camera legs at the RS-12 operating
+> point — first live-traffic NO_PARK_LAST exercise.** *(Framing
+> corrected in review: NOT the path's first flight — RS-3.3 flew
+> 2026-07-31 with 2.4 KB multi-fragment keyframes,
+> `RS_3_3_real_camera_2026-07-30/`; the 08-17 "never been on air" note
+> was wrong. What remains unexercised is multi-frag camera trains UNDER
+> the strict hold — the motion leg.)* *(Merge order: this TODO update
+> references evidence, code, and design docs that land with PRs #110
+> and #111 — merge those two first so nothing below dangles.)* Three 300 s legs at 927.5 MHz: 0.0 % (campaign-first zero
+> leg), 0.3 %, 0.2 % with 11 injected keyframe requests landing in-leg
+> (22 ×2-copy receptions; the injector emitted 12 of its 24 configured
+> before being stopped at teardown — 1 landed post-leg, 12 never sent)
+> dispatched during live traffic (first command-plane evidence for
+> NO_PARK_LAST; the hold setting is transcript-attested, not
+> archive-recorded — instrumented forward in PR #111). Residue: multi-fragment camera trains need
+> scene motion at the bench. Same day: 927.5 became clean **4/4** — the
+> sole stable channel across all surveys; the first chantab-grid pass
+> proved ticker-dominated (no valid single-survey pick, method fix in
+> RS-11.8); synth control 1.6 % with penultimate at 3 % (RS-12 fix
+> holds); main CI red-since-#108 healed by #111's `_env_int` fix. Boards
+> quiesced: Linux up, radios verified in LoRa SLEEP.
+
 > **🟢 Milestone (2026-05-26) — image-over-LoRa air link proven end-to-end:**
 > Tractor camera → tile-delta encode → MQTT (intra-X8) → image_tx_daemon →
 > Murata L072 → 915 MHz LoRa → base L072 → image_rx_daemon → MQTT
