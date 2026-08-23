@@ -50,6 +50,10 @@ The +$260 vs discrete is small relative to the $20 k+ machine and the engineerin
 
 ## Wiring overview
 
+Production power-down / wake behaviour (key-off sensing on Opta I1 + `battery_mv`,
+battery-bridged clean shutdown, bench gating, base-station quiesce) is specified in
+[POWER_MANAGEMENT.md](POWER_MANAGEMENT.md).
+
 ```
 Tractor 12 V battery
         │
