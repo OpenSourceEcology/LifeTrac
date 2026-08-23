@@ -8,7 +8,9 @@
 > (`channel_survey_sniff.py` + `survey_compare.py`; 927.5 MHz is the only
 > 3/3-clean channel so far). RS-12: the historic slot-(total−2) loss was
 > an L072 URC-overwrite race at the short-final-fragment ride; host-side
-> fix (`-NoParkLast 1`) validated n=3 + strict-hold. Remaining: one
+> mitigation validated n=3: `-NoParkLast 1` **plus** the strict hold
+> `LIFETRAC_NO_PARK_LAST_GAP_MS=80` — env-gated, NOT a default (see the
+> RS-12 closed entry for the gating rationale). Remaining: one
 > confirmation-sized flash session (rx_urc_lost + firmware URC fix +
 > RS-3.6 gate) and the RS-3.3 camera first flight. Live campaign state:
 > [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) (RS-12 / RS-12.9
@@ -25,7 +27,9 @@
 > hop/hail picks need chantab-grid surveys.
 >
 > **Session 2026-08-22 (PR #111): the camera path FLEW — RS-3.3 on air
-> at last.** Three 300 s legs at 927.5 MHz: 0.0 % (campaign-first zero
+> at last.** *(Merge order: this TODO update references evidence, code,
+> and design docs that land with PRs #110 and #111 — merge those two
+> first so nothing below dangles.)* Three 300 s legs at 927.5 MHz: 0.0 % (campaign-first zero
 > leg), 0.3 %, 0.2 % with 24 injected keyframe requests dispatched
 > during live traffic under the strict hold (first command-plane
 > evidence for NO_PARK_LAST). Residue: multi-fragment camera trains need
