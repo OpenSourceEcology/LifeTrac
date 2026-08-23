@@ -83,9 +83,25 @@ from lora_proto import (  # noqa: E402
 from image_pipeline.frame_format import encode_tile_delta_frame  # noqa: E402
 from image_pipeline.reassemble import (                           # noqa: E402
     FRAGMENT_MAGIC,
+    FRAGMENT_MAGIC_PARITY,
     FRAGMENT_MAGIC_V2,
     FragmentReassembler,
 )
+
+
+def train_seq_of(raw: bytes) -> int:
+    """Train seq from a fragment's header bytes, or -1 if there is none.
+
+    The reassembled TileDeltaFrame carries no train identifier; the
+    completing fragment's header does (raw[1] across the v1/v2/parity
+    layouts). Unfragmented passthrough payloads have no seq. The publish
+    log line surfaces this value — it is what makes TX-seq <-> RX-train
+    joins possible from standard logs.
+    """
+    if len(raw) >= 2 and raw[0] in (FRAGMENT_MAGIC, FRAGMENT_MAGIC_V2,
+                                    FRAGMENT_MAGIC_PARITY):
+        return raw[1]
+    return -1
 from method_h_stage2_tx_probe_v2 import (  # noqa: E402
     HostLink,
     HOST_TYPE_VER_REQ,
@@ -1289,13 +1305,7 @@ class ImageRxDaemon:
                                 f"reassembly timeout #{cur_timeout}")
 
                 if completed is not None:
-                    # The reassembled TileDeltaFrame carries no train id;
-                    # the completing fragment's header does (raw[1] for the
-                    # 0xFE/0xFD/0xFC layouts). Surfacing it on the publish
-                    # line is what makes TX-seq <-> RX-train joins possible
-                    # from standard logs.
-                    train_seq = (data[1] if len(data) >= 2 and
-                                 data[0] in (0xFE, 0xFD, 0xFC) else -1)
+                    train_seq = train_seq_of(data)
                     # RS-1.x: a COMPLETED frame means that was the train's
                     # LAST fragment — the tractor's ~44 ms host-turnaround
                     # window opens NOW (mid-train the RS-4.12 ring restarts

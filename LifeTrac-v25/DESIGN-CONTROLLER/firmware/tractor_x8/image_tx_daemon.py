@@ -1511,6 +1511,12 @@ class ImageTxDaemon:
 
         LOG.info("image_tx_daemon started; mqtt=%s:%d uart=%s",
                  self.mqtt_host, self.mqtt_port, self.uart)
+        # Bench-evidence audits reconstruct leg conditions from the archived
+        # daemon log; the effective hold setting must appear there, not only
+        # in the harness's params.txt.
+        LOG.info("no_park_last=%d gap_ms=%d pipeline_depth=%d",
+                 1 if NO_PARK_LAST else 0, int(NO_PARK_LAST_GAP_S * 1000),
+                 PIPELINE_DEPTH)
         client.loop_start()
         try:
             while not self._stop.is_set():
