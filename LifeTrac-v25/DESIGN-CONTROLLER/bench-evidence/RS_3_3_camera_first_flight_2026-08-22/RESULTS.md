@@ -11,9 +11,15 @@ The 2026-08-17 RS-12.9 note claiming the path had "NEVER been on air"
 was wrong, and these legs' original headline propagated it. What these
 legs actually are: **the first camera legs at the post-RS-12 operating
 point (927.5 MHz + NoParkLast strict hold) and the first live-traffic
-command-plane exercise for NO_PARK_LAST.** The still-unexercised
-combination is multi-fragment camera trains UNDER the strict hold —
-which is what the motion leg tests.
+command-plane exercise for NO_PARK_LAST.** The essentially-unexercised
+combination is multi-fragment camera trains UNDER the strict hold: the
+exposure is n=1 (leg 3's 2-fragment startup batch), **and that one
+train failed to complete** — its lost fragment is the leg's only loss
+and its reassembly timeout the leg's only timeout (first stats window;
+a 1-fragment train cannot time out). n=1 on a 0.2 %-loss leg supports
+no inference in either direction, but it is on the record. The gap the
+motion leg closes is *sustained* multi-fragment camera traffic under
+the hold.
 
 **Verdict: PASS at the transport level across all three legs — losses
 0.0 % / 0.3 % / 0.2 %, CRC closure exact every leg. Leg 3 additionally
@@ -98,6 +104,11 @@ link measured at 0.9 % the previous session, a clean leg attributes the
   an earlier revision called it "consistent with one keyframe"). Every
   keyframe the injection produced fit a single fragment: encode-to-fit
   is correct, but this run demonstrated NO multi-fragment keyframe.
+  **Outcome of the sole 2-frag train (review catch): it did NOT
+  complete** — `reassembler_timeouts` 0→1 in the first stats window,
+  and a 1-frag train cannot time out, so the startup batch's lost
+  fragment is the leg's only loss AND its only timeout. n=1 under the
+  commanded hold; no inference, on the record.
 - Brackets for both legs: `rs33kf_*` / `rs33l3_*` in this directory.
   **Leg-3 tractor bracket INVALID as a delta (review catch):** the
   tractor L072 reset between the pre and post snapshots (`radio_tx_ok`
@@ -111,10 +122,12 @@ link measured at 0.9 % the previous session, a clean leg attributes the
 
 ## What these legs did NOT test
 
-1. **Multi-fragment camera trains UNDER THE STRICT HOLD.** (Scope
-   corrected per the framing correction: multi-fragment camera trains
-   per se flew 2026-07-31 with 2.4 KB keyframes — what has never flown
-   is that combination with NoParkLast active.) Static scene → every
+1. **SUSTAINED multi-fragment camera trains UNDER THE STRICT HOLD.**
+   (Scope corrected twice per review: multi-fragment camera trains per
+   se flew 2026-07-31 with 2.4 KB keyframes; and under the commanded
+   hold the exposure is n=1 — leg 3's startup batch — which failed to
+   complete, see above. What has never flown is sustained multi-frag
+   camera traffic with NoParkLast active.) Static scene → every
    delta fit one fragment. No penultimate fragment exists in a
    1-fragment train, so the RS-12 mechanics and the NoParkLast hold
    were idle. To exercise:
