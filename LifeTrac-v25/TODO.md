@@ -10,15 +10,19 @@
 > NOT directly re-confirm the exact-10 s fingerprint); escaped by
 > carrier choice — the
 > band reshuffles in HOURS, so channel picks come from a same-day survey
-> (`channel_survey_sniff.py` + `survey_compare.py`; 927.5 MHz is the only
-> 3/3-clean channel so far). RS-12: the historic slot-(total−2) loss was
+> (`channel_survey_sniff.py` + `survey_compare.py`; 927.5 MHz was 3/3
+> clean at this writing — **now 4/4**, see the 2026-08-22 session block
+> below). RS-12: the historic slot-(total−2) loss was
 > an L072 URC-overwrite race at the short-final-fragment ride; host-side
 > mitigation: plain hold validated n=3 (1.8 %); the full strict hold
 > (`-NoParkLast 1` **plus** `LIFETRAC_NO_PARK_LAST_GAP_MS=80`) has one
 > leg per build — leg K 1.5 % pre-fix, leg L 0.9 % on the shipped code —
 > env-gated, NOT a default (see the RS-12 closed entry). Remaining: one
-> confirmation-sized flash session (rx_urc_lost + firmware URC fix +
-> RS-3.6 gate) and the RS-3.3 camera first flight. Live campaign state:
+> confirmation-sized flash session (rx_urc_lost + firmware URC fix —
+> the RS-3.6 formal gate is NOT part of it, it was cleared 2026-07-25
+> per `RS_firmware_patch_flash_2026-07-25/NOTES.md`, review catch) and
+> the instrumented camera MOTION leg (the camera legs themselves flew
+> 2026-08-22, see the session block below). Live campaign state:
 > [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) (RS-12 / RS-12.9
 > sequencing), issues #98/#107, evidence under
 > `DESIGN-CONTROLLER/bench-evidence/`.
@@ -32,10 +36,15 @@
 > table's 50 centers sit on x.25/x.75 — no shared channel, so production
 > hop/hail picks need chantab-grid surveys.
 >
-> **Session 2026-08-22 (PR #111): the camera path FLEW — RS-3.3 on air
-> at last.** *(Merge order: this TODO update references evidence, code,
-> and design docs that land with PRs #110 and #111 — merge those two
-> first so nothing below dangles.)* Three 300 s legs at 927.5 MHz: 0.0 % (campaign-first zero
+> **Session 2026-08-22 (PR #111): camera legs at the RS-12 operating
+> point — first live-traffic NO_PARK_LAST exercise.** *(Framing
+> corrected in review: NOT the path's first flight — RS-3.3 flew
+> 2026-07-31 with 2.4 KB multi-fragment keyframes,
+> `RS_3_3_real_camera_2026-07-30/`; the 08-17 "never been on air" note
+> was wrong. What remains unexercised is multi-frag camera trains UNDER
+> the strict hold — the motion leg.)* *(Merge order: this TODO update
+> references evidence, code, and design docs that land with PRs #110
+> and #111 — merge those two first so nothing below dangles.)* Three 300 s legs at 927.5 MHz: 0.0 % (campaign-first zero
 > leg), 0.3 %, 0.2 % with 11 injected keyframe requests landing in-leg
 > (22 ×2-copy receptions; the injector emitted 12 of its 24 configured
 > before being stopped at teardown — 1 landed post-leg, 12 never sent)

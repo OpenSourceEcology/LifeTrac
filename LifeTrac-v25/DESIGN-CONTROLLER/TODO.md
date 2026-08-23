@@ -900,7 +900,8 @@ No-regrets work, correct under every surviving architecture (do first):
   Phase-1 single-channel target superseded by DTS (recommended), or chase
   it via `LIFETRAC_FRAG_AIR_CAP_MS` 170→200 (486 B/s ceiling, 384 µs dwell
   margin — needs one RFCO sweep) + token-bucket pacing.
-- [ ] **RS-3.6 SPI prescaler 250 kHz → 2–4 MHz (added 2026-07-25)** —
+- [x] **RS-3.6 SPI prescaler 250 kHz → 2–4 MHz (added 2026-07-25;
+  CLOSED — gate cleared 2026-07-25, see correction below)** —
   `spi1_transfer` busy-waits per byte at PCLK2/64 (~250 kHz), so every 255 B
   FIFO load steals **~8 ms of main-loop time per fragment** (`sx1276.c:231`);
   the SX1276 SPI is rated to 10 MHz. A /8 or /4 prescaler cuts the load to
@@ -913,9 +914,14 @@ No-regrets work, correct under every surviving architecture (do first):
   SIL green; pending the bench gate above.
   **Status 2026-08-17: FLASHED and field-soaked** — the DIV8 build is what
   both boards have run through the entire RS-11.5→RS-12 campaign
-  (thousands of TX/RX cycles, tx_fifo_rb_bad=0 throughout). Only the
-  FORMAL gate transcript remains (REG 0x42 readback + one TX/RX cycle,
-  ~2 min) — queued in the RS-12.9 flash session.
+  (thousands of TX/RX cycles, tx_fifo_rb_bad=0 throughout).
+  **CORRECTION 2026-08-23 (review catch, PR #109): the formal gate was
+  already CLEARED on flash day** —
+  `RS_firmware_patch_flash_2026-07-25/NOTES.md` records REG 0x42 = 0x12
+  on both boards, Stage 1 3/3 PASS, Method G PASS, with RS-3.6
+  explicitly under "Gates cleared". The 08-17 "only the formal gate
+  transcript remains" line requeued done work; nothing remains for the
+  flash session on RS-3.6.
 - [ ] **RS-3.7 URC emission cost (added 2026-07-25)** — every URC busy-waits
   BOTH UART lanes (LPUART1 + USART1 mirror) synchronously with no timeout
   (`host_uart.c:564`); a max RX_FRAME_URC costs ~3 ms/lane at 921600, paid
@@ -2325,10 +2331,14 @@ rebooted collaterally, `/tmp` re-pushed). Item 2 flew THREE legs
 (0.0% / 0.3% / 0.2% — kf-off, kf-idle, kf + 11 injected REQ_KEYFRAME
 in-leg [22 ×2-copy receptions] dispatched during live traffic = first
 command-plane evidence for NO_PARK_LAST; hold setting
-transcript-attested, archive instrumentation added in PR #111). NEW RESIDUE: the static scene compresses so
-well that even keyframes fit 1–2 fragments — **multi-fragment camera
-trains need scene MOTION (operator's hand) during a leg**; injection
-recipe `kf_inject.py` is in the evidence dir. Item 5: CONFIRMED — both
+transcript-attested, archive instrumentation added in PR #111). NEW
+RESIDUE (scope corrected 2026-08-23: multi-frag camera trains per se
+flew 2026-07-31 with 2.4 KB keyframes — what has never flown is that
+combination WITH the strict hold): the static scene compresses so well
+that every keyframe fit a single fragment — **multi-fragment camera
+trains under the hold need scene MOTION (operator's hand) during a
+leg**; injection recipe `kf_inject.py` is in the evidence dir
+(insufficient alone on a static scene, demonstrated by leg 3 itself). Item 5: CONFIRMED — both
 carriers expose their charger (`bq24190`/`bq24195`) with `online` under
 `/sys/class/power_supply/`. Item 6: ran — ticker-dominated, see
 RS-11.8. Also: same-day synth control 1.6%/penultimate 3% (fix holds),
@@ -2351,15 +2361,20 @@ manually). Recommended order:
 1. **Wake-up check**: `rs116_health_probe.py` both boards, then a
    same-day channel spot-check (the hopper reshuffles in hours; 927.5 MHz
    was the only 3/3-clean channel — verify before trusting).
-2. **RS-3.3 camera first flight** — `-TxFeed camera` at the current best
-   operating point (`-ForceFrfHz <today's pick> -NoParkLast 1`). The
+2. **RS-3.3 camera legs** — `-TxFeed camera` at the current best
+   operating point (`-ForceFrfHz <today's pick> -NoParkLast 1`).
+   *(⚠️ "first flight" framing and the NEVER-been-on-air claim below
+   were WRONG — review catch 2026-08-23: RS-3.3 flew 2026-07-31 with
+   2.4 KB multi-fragment keyframes, `RS_3_3_real_camera_2026-07-30/`.
+   The correct value of this item was: first camera legs at the RS-12
+   operating point + first live-traffic NO_PARK_LAST exercise.)* The
    encode-to-fit packer, carry fix, age-escalation and liveness valve
-   have NEVER been on air; flying them on the 0.9%-loss link (leg L,
+   ~~have NEVER been on air~~; flying them on the 0.9%-loss link (leg L,
    `radio_monitor_20260817_195107_dde2c8a7`) attributes any failure to
    the path, not the link.
 3. **Flash session** (bench presence): rx_urc_lost counter + firmware URC
-   fix (RS-12 above), RS-3.6 formal gate (REG 0x42 readback + one TX/RX
-   transcript — the DIV8 change has weeks of implicit soak), read
+   fix (RS-12 above), ~~RS-3.6 formal gate~~ *(already cleared
+   2026-07-25 — review catch, see the RS-3.6 entry)*, read
    tx_done_early on the tractor across a leg.
 4. Optional: the emitter hunt (two targets, `hunt_sniff.ps1`, device B at
    923.5 MHz / −30 dBm / exact 10 s tick is the easy one).
