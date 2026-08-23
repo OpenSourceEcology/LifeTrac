@@ -30,9 +30,11 @@
 > at last.** *(Merge order: this TODO update references evidence, code,
 > and design docs that land with PRs #110 and #111 — merge those two
 > first so nothing below dangles.)* Three 300 s legs at 927.5 MHz: 0.0 % (campaign-first zero
-> leg), 0.3 %, 0.2 % with 24 injected keyframe requests dispatched
-> during live traffic under the strict hold (first command-plane
-> evidence for NO_PARK_LAST). Residue: multi-fragment camera trains need
+> leg), 0.3 %, 0.2 % with 11 injected keyframe requests (22 ×2-copy
+> receptions; the injector's other 13 fell outside the leg window)
+> dispatched during live traffic (first command-plane evidence for
+> NO_PARK_LAST; the hold setting is transcript-attested, not
+> archive-recorded — instrumented forward in PR #111). Residue: multi-fragment camera trains need
 > scene motion at the bench. Same day: 927.5 became clean **4/4** — the
 > sole stable channel across all surveys; the first chantab-grid pass
 > proved ticker-dominated (no valid single-survey pick, method fix in

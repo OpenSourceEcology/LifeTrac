@@ -2271,12 +2271,14 @@ Two consequences for what is worth doing next:
   timeouts 22, published 154 (all campaign bests); cost ~−6% offered
   (tuning headroom recorded). ENV-GATED, not default: command-plane
   interaction has zero bench exercise with live mid-train traffic.
-  **Update 2026-08-22 (RS-3.3 leg 3): first live-traffic exercise — 24
-  injected REQ_KEYFRAME received ×2 and dispatched during active image
-  TX under strict hold, loss 0.2%. Bounded: trains were 1–2 fragments,
-  so the strictly-MID-TRAIN arrival case is still thin; the motion leg
-  (multi-frag camera trains + injection) is the remaining gate before
-  any default-flip discussion.**
+  **Update 2026-08-22 (RS-3.3 leg 3): first live-traffic exercise — 11
+  injected REQ_KEYFRAME (22 ×2-copy receptions; 13 more fell outside
+  the leg window) dispatched during active image TX, loss 0.2%.
+  Bounded twice: trains were 1–2 fragments, so the strictly-MID-TRAIN
+  arrival case is still thin; and the hold setting is
+  transcript-attested, not archive-recorded (params/daemon-log
+  instrumentation added in PR #111). The motion leg on the instrumented
+  build is the remaining gate before any default-flip discussion.**
   REMAINING → flash session (see RS-12.9): rx_urc_lost counter
   (prediction is binary: ==0 strict-hold, ≈timeouts control) + real fix
   (double-buffer the URC path or firmware min inter-fire spacing).
@@ -2312,9 +2314,10 @@ Two consequences for what is worth doing next:
 plus one new residue.** Wake-up ran clean after two hardware wrinkles
 (base first boot hung pre-adbd/ethernet — one power cycle cured; tractor
 rebooted collaterally, `/tmp` re-pushed). Item 2 flew THREE legs
-(0.0% / 0.3% / 0.2% — kf-off, kf-idle, kf + 24 injected REQ_KEYFRAME
-dispatched during live traffic under strict hold = first command-plane
-evidence for NO_PARK_LAST). NEW RESIDUE: the static scene compresses so
+(0.0% / 0.3% / 0.2% — kf-off, kf-idle, kf + 11 injected REQ_KEYFRAME
+in-leg [22 ×2-copy receptions] dispatched during live traffic = first
+command-plane evidence for NO_PARK_LAST; hold setting
+transcript-attested, archive instrumentation added in PR #111). NEW RESIDUE: the static scene compresses so
 well that even keyframes fit 1–2 fragments — **multi-fragment camera
 trains need scene MOTION (operator's hand) during a leg**; injection
 recipe `kf_inject.py` is in the evidence dir. Item 5: CONFIRMED — both
@@ -2384,8 +2387,9 @@ touches no bench constraint.
   recorded in PR #110: whether a band-edge table extension (e.g. adding
   927.5) is worth the regulatory review vs. picking from the existing 50.
   **First chantab pass DONE 2026-08-22 (`RS_11_8_chantab_2026-08-22/`,
-  PR #111): ticker-dominated — 49/50 hot (2–7 hits, flat −46..−52 dBm)
-  because the band-wide ~7 s ticker lands in every 30 s dwell;
+  PR #111): ticker-dominated — 49/50 hot (1–7 hits; maxima mostly
+  −44..−58 dBm with outliers −30/−35/−38) because the band-wide ~7 s
+  ticker lands in nearly every 30 s dwell;
   single-survey discrimination on this grid is IMPOSSIBLE at the
   standard cut (the lone zero-hot 904.25 is a catch-probability fluke,
   flagged in RESULTS.md). Path forward: accumulate multi-survey history
