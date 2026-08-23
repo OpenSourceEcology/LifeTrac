@@ -11,9 +11,11 @@ started 170 s after harness *launch*, so only 11 landed inside the leg;
 the archive's 22 receptions and Δtx_ok=30 arithmetic confirm 11. Also
 note the strict-hold caveat under "Evidence limitations" below.)
 Bounding caveat: the static bench scene compresses so well that even
-keyframes fit in 1–2 fragments — multi-fragment train mechanics remain
-unexercised on the camera path; that residue now requires physical scene
-motion (operator's hand), not more software.
+keyframes fit in a **single fragment** (the day's sole 2-fragment train
+was leg 3's *startup batch* — 2 frames, 434 B, `seq=1`, before any
+injected request — not a keyframe; review catch). Multi-fragment train
+mechanics remain entirely unexercised on the camera path; that residue
+now requires physical scene motion (operator's hand), not more software.
 
 ## Leg
 
@@ -72,10 +74,13 @@ attributes the *path* as working; it does not stress it.
   dispatch under live traffic (bounded: trains were 1–2 fragments, so
   the specifically-mid-TRAIN arrival case is still thin; and see
   "Evidence limitations" for the strict-hold caveat). Train histogram:
-  615×1-frag, **1×2-frag** — the sole 2-frag train is consistent with
-  one keyframe; the static scene compresses so well that encode-to-fit
-  keeps even keyframes near one fragment (correct behavior, wrong scene
-  for a stress test).
+  615×1-frag, **1×2-frag** — the sole 2-frag train is the **startup
+  batch** (tx log: `batching: 2 frames … 434 B` immediately before
+  `frame seq=1 … 2 fragments ok`, minutes before the first injected
+  request), NOT a keyframe (⚠️ corrected attribution, review catch —
+  an earlier revision called it "consistent with one keyframe"). Every
+  keyframe the injection produced fit a single fragment: encode-to-fit
+  is correct, but this run demonstrated NO multi-fragment keyframe.
 - Brackets for both legs: `rs33kf_*` / `rs33l3_*` in this directory.
   **Leg-3 tractor bracket INVALID as a delta (review catch):** the
   tractor L072 reset between the pre and post snapshots (`radio_tx_ok`
