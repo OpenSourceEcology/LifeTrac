@@ -1,4 +1,19 @@
-# RS-3.3 — camera path first flight (2026-08-22, 3 legs)
+# RS-3.3 — camera legs at the RS-12 operating point (2026-08-22, 3 legs)
+
+**⚠️ FRAMING CORRECTION (review catch, PR #111 — the directory name is a
+misnomer kept for reference stability): this was NOT the camera path's
+first flight.** RS-3.3 flew on 2026-07-31
+(`radio_monitor_20260731_213152_9db14d4d`, recorded in
+`RS_3_3_real_camera_2026-07-30/RESULTS.md`): 240 s, real camera through
+encode-to-fit over LoRa, 472 complete frames delivered, keyframes
+2381–2430 B — i.e. **multi-fragment keyframe trains flew that day**.
+The 2026-08-17 RS-12.9 note claiming the path had "NEVER been on air"
+was wrong, and these legs' original headline propagated it. What these
+legs actually are: **the first camera legs at the post-RS-12 operating
+point (927.5 MHz + NoParkLast strict hold) and the first live-traffic
+command-plane exercise for NO_PARK_LAST.** The still-unexercised
+combination is multi-fragment camera trains UNDER the strict hold —
+which is what the motion leg tests.
 
 **Verdict: PASS at the transport level across all three legs — losses
 0.0 % / 0.3 % / 0.2 %, CRC closure exact every leg. Leg 3 additionally
@@ -42,13 +57,15 @@ now requires physical scene motion (operator's hand), not more software.
 | Identity residue | **6** (Δdio0 624 vs rx_ok+crc+tx 618) — small NEW anomaly; the identity closed exactly in all RS-12 legs. Unexplained; on the record. |
 | Frame shape | ~200–240 B tile deltas → **1 fragment per frame** (static scene; encode-to-fit never approached the 3000 B budget) |
 
-## Path features that flew for the first time
+## Path features exercised
 
 Camera capture (`/dev/video1`) → tile-delta encode-to-fit packer → carry
 fix → age-escalation → liveness valve → LoRa → base publish
 (`lifetrac/v25/video/tile_delta`). All ran for 300 s with zero transport
-loss. On a link measured at 0.9 % the previous session, a clean leg
-attributes the *path* as working; it does not stress it.
+loss — for the first time at this operating point (the path's actual
+first flight was 2026-07-31, see the framing correction above). On a
+link measured at 0.9 % the previous session, a clean leg attributes the
+*path* as working; it does not stress it.
 
 ## Legs 2 and 3 (same day)
 
@@ -94,9 +111,13 @@ attributes the *path* as working; it does not stress it.
 
 ## What these legs did NOT test
 
-1. **Multi-fragment camera trains.** Static scene → every delta fit one
-   fragment. No penultimate fragment exists in a 1-fragment train, so the
-   RS-12 mechanics and the NoParkLast hold were idle. To exercise:
+1. **Multi-fragment camera trains UNDER THE STRICT HOLD.** (Scope
+   corrected per the framing correction: multi-fragment camera trains
+   per se flew 2026-07-31 with 2.4 KB keyframes — what has never flown
+   is that combination with NoParkLast active.) Static scene → every
+   delta fit one fragment. No penultimate fragment exists in a
+   1-fragment train, so the RS-12 mechanics and the NoParkLast hold
+   were idle. To exercise:
    **physical motion / scene complexity in front of the camera during a
    leg — REQUIRED, not optional.** Keyframe enablement alone is
    demonstrated insufficient by this very evidence: leg 3 enabled AND

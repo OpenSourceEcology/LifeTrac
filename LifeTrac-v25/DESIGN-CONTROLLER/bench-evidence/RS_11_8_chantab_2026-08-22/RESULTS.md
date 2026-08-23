@@ -43,11 +43,19 @@ bracketing the survey — the top band edge remains protected.**
 ## Same-day synth control leg (post-survey)
 
 `radio_monitor_20260822_183240_375974be` — standard 13-frag synth leg at
-927.5, `-NoParkLast 1`, bracketed (`synth_*` files this directory):
-**loss 35/2204 = 1.6 %, penultimate idx-11 = 1/35 (3 %, ≤ uniform 7.7 %)**,
-crc closure 32=32, drops uniform across idx 1–10. The RS-12 fix holds on
-a fresh day; the 0.9–1.6 % band is the known uniform residual awaiting
-the flash session's `rx_urc_lost` counter. This leg also verified the
+927.5, *commanded* `-NoParkLast 1`, bracketed (`synth_*` files this
+directory): **loss 35/2204 = 1.6 %, penultimate idx-11 = 1/35 (3 %,
+≤ uniform 7.7 %)**, crc closure 32=32, drops uniform across idx 1–10.
+**Hold-setting evidence limitation (review catch):** this archive
+predates the instrumentation fix, so like the camera legs its
+`params.txt` and TX log do not record the effective setting — the flag
+is transcript-attested. The *internal* evidence is nonetheless strong:
+a penultimate share of 3 % is the strict-hold signature (control legs
+without the hold lock at ~42 %), so the leg behaved as a hold leg even
+though the knob's state cannot be independently reconstructed from the
+artifacts. Read "the fix holds on a fresh day" with that bound; the
+0.9–1.6 % band is the known uniform residual awaiting the flash
+session's `rx_urc_lost` counter. This leg also verified the
 new `seq=` publish-line logging on air (git 375974be): TX↔RX train joins
 now possible from standard logs. Against the same-day camera legs
 (0.0–0.3 %, 1-frag trains) it localizes the residual floor to
