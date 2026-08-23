@@ -97,9 +97,12 @@ attributes the *path* as working; it does not stress it.
 1. **Multi-fragment camera trains.** Static scene → every delta fit one
    fragment. No penultimate fragment exists in a 1-fragment train, so the
    RS-12 mechanics and the NoParkLast hold were idle. To exercise:
-   physical motion in front of the camera during a leg, and/or a
-   keyframe-enabled leg (`-KfRequestDisable 0` — keyframes are large) —
-   noting kf-enable also re-opens the RS-4.14 stale-web_ui interaction.
+   **physical motion / scene complexity in front of the camera during a
+   leg — REQUIRED, not optional.** Keyframe enablement alone is
+   demonstrated insufficient by this very evidence: leg 3 enabled AND
+   injected keyframes, and every one still fit a single fragment on the
+   static scene (review catch — an earlier revision offered kf-enable as
+   an alternative to motion).
 2. **frame_id observation — RESOLVED same day:** every publish line
    reads `frame_id=0` because `TileDeltaFrame` has no `frame_id`
    attribute and the daemon falls back to 0 (`getattr(done, "frame_id",

@@ -2,7 +2,11 @@
 
 Publishes to the base broker's cmd/req_keyframe topic on a fixed cadence,
 driving the rx daemon's real LoRa command path (CMD_OP_REQ_KEYFRAME ->
-tractor encoder keyframe -> multi-fragment train). Run on the BASE inside
+tractor encoder keyframe). NOTE: a keyframe is multi-fragment only if
+the scene demands it -- on this run's static bench scene every injected
+keyframe fit ONE fragment, so this injector alone does NOT exercise the
+RS-12 multi-fragment train mechanics; that requires scene
+complexity/motion at the camera. Run on the BASE inside
 lifetrac-v25:latest with --network=host while a harness leg is live.
 """
 import sys
