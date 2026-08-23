@@ -2272,8 +2272,10 @@ Two consequences for what is worth doing next:
   (tuning headroom recorded). ENV-GATED, not default: command-plane
   interaction has zero bench exercise with live mid-train traffic.
   **Update 2026-08-22 (RS-3.3 leg 3): first live-traffic exercise — 11
-  injected REQ_KEYFRAME (22 ×2-copy receptions; 13 more fell outside
-  the leg window) dispatched during active image TX, loss 0.2%.
+  injected REQ_KEYFRAME landed in-leg (22 ×2-copy receptions; the
+  injector emitted 12 of 24 configured before teardown stopped it — 1
+  post-leg, 12 never sent) dispatched during active image TX, loss
+  0.2%.
   Bounded twice: trains were 1–2 fragments, so the strictly-MID-TRAIN
   arrival case is still thin; and the hold setting is
   transcript-attested, not archive-recorded (params/daemon-log

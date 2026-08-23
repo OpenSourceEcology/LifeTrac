@@ -30,8 +30,9 @@
 > at last.** *(Merge order: this TODO update references evidence, code,
 > and design docs that land with PRs #110 and #111 — merge those two
 > first so nothing below dangles.)* Three 300 s legs at 927.5 MHz: 0.0 % (campaign-first zero
-> leg), 0.3 %, 0.2 % with 11 injected keyframe requests (22 ×2-copy
-> receptions; the injector's other 13 fell outside the leg window)
+> leg), 0.3 %, 0.2 % with 11 injected keyframe requests landing in-leg
+> (22 ×2-copy receptions; the injector emitted 12 of its 24 configured
+> before being stopped at teardown — 1 landed post-leg, 12 never sent)
 > dispatched during live traffic (first command-plane evidence for
 > NO_PARK_LAST; the hold setting is transcript-attested, not
 > archive-recorded — instrumented forward in PR #111). Residue: multi-fragment camera trains need
