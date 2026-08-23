@@ -1,6 +1,12 @@
 SURVEY_CH {"freq_hz": 923500000, "n": 9788, "hot": 49, "max_dbm": -30, "hot_ts": [1786289040.774, 1786289054.756, 1786289061.499, 1786289062.604, 1786289068.796, 1786289076.646, 1786289111.709, 1786289132.79, 1786289139.781, 1786289153.759, 1786289161.603, 1786289167.981, 1786289175.645, 1786289196.72, 1786289203.643, 1786289217.796, 1786289224.724, 1786289231.772, 1786289238.756, 1786289245.817, 1786289252.991, 1786289260.601, 1786289267.644, 1786289281.681, 1786289302.709, 1786289316.803, 1786289344.818, 1786289352.664, 1786289380.669, 1786289415.802, 1786289429.789, 1786289443.829, 1786289451.665, 1786289479.68, 1786289493.723, 1786289507.816, 1786289514.809, 1786289521.801, 1786289525.539, 1786289528.789]}
 # Context: 600 s single-channel dwell at 923.5 MHz, TRACTOR radio (2E2C...),
-# 2026-08-22, container devb_sniff, interval 0.05 s (n=9788 samples).
+# bench session date 2026-08-22 (host clock), container devb_sniff,
+# interval 0.05 s (n=9788 samples). CLOCK NOTE: the hot_ts epoch values
+# are stamped by the TRACTOR's clock, which is ~13 days stale (its logs
+# self-date to 2026-08-09 — the documented two-board clock skew). The
+# raw epochs therefore do NOT independently substantiate the session
+# date; only the inter-tick DIFFS are meaningful, and those are
+# clock-rate-accurate regardless of offset.
 # Read: diffs cluster ~7.0 s + multiples (14/21/28/35) = the RS-11.6 device-A
 # hopper currently ON 923.5; short gaps (1.11, 3.74+3.25, 6.19+~0.8) suggest a
 # second interleaved ticker (device B's 10.000 s not directly confirmable from

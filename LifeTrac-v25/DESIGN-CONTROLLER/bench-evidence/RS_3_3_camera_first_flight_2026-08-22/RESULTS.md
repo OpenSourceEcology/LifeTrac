@@ -77,6 +77,15 @@ attributes the *path* as working; it does not stress it.
   keeps even keyframes near one fragment (correct behavior, wrong scene
   for a stress test).
 - Brackets for both legs: `rs33kf_*` / `rs33l3_*` in this directory.
+  **Leg-3 tractor bracket INVALID as a delta (review catch):** the
+  tractor L072 reset between the pre and post snapshots (`radio_tx_ok`
+  1229 → 620; the ~1.02 M `host_uart_err_lpuart` counters cleared) —
+  cause of the mid-session reset unestablished. Post values are
+  absolute-since-reset and *consistent with* leg-3's own traffic
+  (620 ≈ 614 frags + session commands) but no tractor-side delta is
+  claimed for leg 3. All leg-3 numbers above use the BASE brackets,
+  which bracket cleanly. Leg-1/leg-2 tractor brackets are internally
+  consistent (cumulative 1229 at leg-3 pre = legs 1+2 exactly).
 
 ## What these legs did NOT test
 

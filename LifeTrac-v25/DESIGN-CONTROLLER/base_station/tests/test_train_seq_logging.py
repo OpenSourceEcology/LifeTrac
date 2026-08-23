@@ -114,12 +114,18 @@ class BatchedPublicationSeqTests(unittest.TestCase):
 class PublishLinePrefixContractTests(unittest.TestCase):
     def test_bulk_loss_boundary_regex_still_matches(self) -> None:
         # The publish line grew a seq= field; the "published frame_id="
-        # prefix is load-bearing for tools/bulk_loss_boundary.py. Build
-        # the line exactly as the daemon formats it and run the tool's
-        # own regex against it. The pattern is lifted from the tool's
-        # source text rather than importing the module — the tool pulls
-        # in numpy, which the protocol-gate CI env does not install.
+        # prefix is load-bearing for tools/bulk_loss_boundary.py. Drive
+        # the REAL ImageRxDaemon._publish with a stub MQTT client,
+        # capture the log record it actually emits, and run the tool's
+        # own regex against that emitted text — so a prefix/field-order
+        # change in production cannot leave this test green. The pattern
+        # is lifted from the tool's source text rather than importing
+        # the module — the tool pulls in numpy, which the protocol-gate
+        # CI env does not install.
         import re
+        import threading
+        import types
+
         tool_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(
                 os.path.abspath(__file__)))), "tools",
@@ -130,9 +136,23 @@ class PublishLinePrefixContractTests(unittest.TestCase):
         self.assertIsNotNone(
             m, "PUB_RE definition not found in bulk_loss_boundary.py — "
                "its publish-line contract moved; update this test")
-        line = "published frame_id=%d seq=%d %d B → %s" % (
-            0, 27, 239, "lifetrac/v25/video/tile_delta")
-        self.assertIsNotNone(re.compile(m.group(1)).search(line))
+
+        class _Client:
+            def publish(self, topic, payload, qos=0, retain=False):
+                return types.SimpleNamespace(rc=0)
+
+        stub = types.SimpleNamespace(
+            _client=_Client(),
+            _lock=threading.Lock(),
+            stats=types.SimpleNamespace(publish_errors=0,
+                                        reassembled_frames_published=0))
+        with self.assertLogs(rxd.LOG, level="INFO") as cm:
+            rxd.ImageRxDaemon._publish(stub, b"x" * 239, 0, 27)
+        emitted = [r.getMessage() for r in cm.records
+                   if "published" in r.getMessage()]
+        self.assertEqual(len(emitted), 1)
+        self.assertIsNotNone(re.compile(m.group(1)).search(emitted[0]))
+        self.assertIn("seq=27", emitted[0])
 
 
 if __name__ == "__main__":
