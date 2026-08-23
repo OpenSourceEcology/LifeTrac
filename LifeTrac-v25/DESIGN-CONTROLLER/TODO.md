@@ -2271,6 +2271,12 @@ Two consequences for what is worth doing next:
   timeouts 22, published 154 (all campaign bests); cost ~−6% offered
   (tuning headroom recorded). ENV-GATED, not default: command-plane
   interaction has zero bench exercise with live mid-train traffic.
+  **Update 2026-08-22 (RS-3.3 leg 3): first live-traffic exercise — 24
+  injected REQ_KEYFRAME received ×2 and dispatched during active image
+  TX under strict hold, loss 0.2%. Bounded: trains were 1–2 fragments,
+  so the strictly-MID-TRAIN arrival case is still thin; the motion leg
+  (multi-frag camera trains + injection) is the remaining gate before
+  any default-flip discussion.**
   REMAINING → flash session (see RS-12.9): rx_urc_lost counter
   (prediction is binary: ==0 strict-hold, ≈timeouts control) + real fix
   (double-buffer the URC path or firmware min inter-fire spacing).
@@ -2301,6 +2307,27 @@ Two consequences for what is worth doing next:
   activity-modulation legs (ethernet flood on the gigabit-marginal base
   cable, USB, CPU) → hands only after the coupling path is named.
 #### RS-12.9 — next-session sequencing (written 2026-08-17 at shutdown)
+
+**SESSION 2026-08-22 OUTCOME — items 1, 2, 5, 6 DONE; 3 and 4 remain,
+plus one new residue.** Wake-up ran clean after two hardware wrinkles
+(base first boot hung pre-adbd/ethernet — one power cycle cured; tractor
+rebooted collaterally, `/tmp` re-pushed). Item 2 flew THREE legs
+(0.0% / 0.3% / 0.2% — kf-off, kf-idle, kf + 24 injected REQ_KEYFRAME
+dispatched during live traffic under strict hold = first command-plane
+evidence for NO_PARK_LAST). NEW RESIDUE: the static scene compresses so
+well that even keyframes fit 1–2 fragments — **multi-fragment camera
+trains need scene MOTION (operator's hand) during a leg**; injection
+recipe `kf_inject.py` is in the evidence dir. Item 5: CONFIRMED — both
+carriers expose their charger (`bq24190`/`bq24195`) with `online` under
+`/sys/class/power_supply/`. Item 6: ran — ticker-dominated, see
+RS-11.8. Also: same-day synth control 1.6%/penultimate 3% (fix holds),
+`seq=` publish logging verified on air, 4th survey made 927.5 **clean
+4/4** (sole stable channel), main CI red-since-#108 healed. Evidence:
+`RS_3_3_camera_first_flight_2026-08-22/`, `RS_11_8_chantab_2026-08-22/`,
+`RS_11_6_channel_survey_2026-08-22/`; PR #111. Boards left QUIESCED
+2026-08-22 night: Linux up, radios verified in LoRa SLEEP (0x80
+readback both) — no reboot consequences apply on resume; harness
+re-inits the radio at launch, no unpark needed. Original block follows.
 
 Boards were powered down cleanly 2026-08-17 night (containers stopped,
 `shutdown -h`). **Morning consequences (documented, expected):** `/tmp`
@@ -2356,6 +2383,16 @@ touches no bench constraint.
   (a production recommendation must be table-constrained). Open question
   recorded in PR #110: whether a band-edge table extension (e.g. adding
   927.5) is worth the regulatory review vs. picking from the existing 50.
+  **First chantab pass DONE 2026-08-22 (`RS_11_8_chantab_2026-08-22/`,
+  PR #111): ticker-dominated — 49/50 hot (2–7 hits, flat −46..−52 dBm)
+  because the band-wide ~7 s ticker lands in every 30 s dwell;
+  single-survey discrimination on this grid is IMPOSSIBLE at the
+  standard cut (the lone zero-hot 904.25 is a catch-probability fluke,
+  flagged in RESULTS.md). Path forward: accumulate multi-survey history
+  (ticker catches should decorrelate across passes) or add a
+  ticker-aware metric. Same session, x.0/x.5 grid: 927.5 went clean
+  4/4 — the SOLE stable channel anywhere (runner-up 1/4) — which
+  strengthens the table-extension case considerably.**
 - [ ] **PM-1 Production power-down / wake (design PR #110, opened
   2026-08-22).** Design in POWER_MANAGEMENT.md (revised same day — all 8
   review findings verified against source and addressed). Shape: Opta I1
@@ -2371,9 +2408,12 @@ touches no bench constraint.
   SHUTDOWN_REQ/ACK opcodes on the X8↔H747 UART; farewell frame + ack in
   LORA_PROTOCOL.md; parameter-service delivery of the enable flag to the
   H747. Cheap bench checks (some radio-free): `/sys/class/power_supply/`
-  exposure, carrier-side VIN ADC availability, post-halt 18650 drain
-  (meter in series, an evening), harness confirmation that ignition
-  sense lands on I1. Hardware decisions gated before production:
+  exposure — **DONE 2026-08-22, CONFIRMED both carriers (base
+  `bq24190-charger`, tractor `bq24195-charger`, each exposing `online` +
+  `status`; whether `online` tracks VIN removal live still needs the
+  drain evening)** — carrier-side VIN ADC availability, post-halt 18650
+  drain (meter in series, an evening), harness confirmation that
+  ignition sense lands on I1. Hardware decisions gated before production:
   supercap/LiFePO4 vs 18650 (outdoor cold-charging), crash-only rootfs
   posture (hard prerequisite for the self-holding relay topology).
 
@@ -2400,7 +2440,12 @@ touches no bench constraint.
   surveys: 21%/19% of channels flip per interval), which promotes this
   feature to a field-measurement prerequisite; and
   `tools/survey_compare.py --history` already implements the v1
-  stability-ranking logic (clean-in-N-of-M).** Motivation and first field data: RS-11.6 (the bench's own
+  stability-ranking logic (clean-in-N-of-M).** **Update 2026-08-22
+  (4th survey, `RS_11_6_channel_survey_2026-08-22/`): 927.5 is now clean
+  4/4 — the sole stable channel (runner-up 1/4); same-day flip rate 9%
+  in ~4 h. The stability ranking, not the single-survey pick, is
+  demonstrably the only trustworthy output — the v1 design should lead
+  with it.** Motivation and first field data: RS-11.6 (the bench's own
   915.000 MHz squatter, found by exactly this sweep).
 - [x] **RS-11.6 leg 2 DONE 2026-08-16 — the emitter is EXTERNAL, confirmed
   in raw energy with all radios silent.**

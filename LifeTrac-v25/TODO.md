@@ -23,6 +23,18 @@
 > stability data sits on the x.0/x.5 MHz grid, while the production FHSS
 > table's 50 centers sit on x.25/x.75 — no shared channel, so production
 > hop/hail picks need chantab-grid surveys.
+>
+> **Session 2026-08-22 (PR #111): the camera path FLEW — RS-3.3 on air
+> at last.** Three 300 s legs at 927.5 MHz: 0.0 % (campaign-first zero
+> leg), 0.3 %, 0.2 % with 24 injected keyframe requests dispatched
+> during live traffic under the strict hold (first command-plane
+> evidence for NO_PARK_LAST). Residue: multi-fragment camera trains need
+> scene motion at the bench. Same day: 927.5 became clean **4/4** — the
+> sole stable channel across all surveys; the first chantab-grid pass
+> proved ticker-dominated (no valid single-survey pick, method fix in
+> RS-11.8); synth control 1.6 % with penultimate at 3 % (RS-12 fix
+> holds); main CI red-since-#108 healed by #111's `_env_int` fix. Boards
+> quiesced: Linux up, radios verified in LoRa SLEEP.
 
 > **🟢 Milestone (2026-05-26) — image-over-LoRa air link proven end-to-end:**
 > Tractor camera → tile-delta encode → MQTT (intra-X8) → image_tx_daemon →
