@@ -58,18 +58,23 @@ class PublishLinePrefixContractTests(unittest.TestCase):
         # The publish line grew a seq= field; the "published frame_id="
         # prefix is load-bearing for tools/bulk_loss_boundary.py. Build
         # the line exactly as the daemon formats it and run the tool's
-        # own regex against it.
-        tools_dir = os.path.join(
+        # own regex against it. The pattern is lifted from the tool's
+        # source text rather than importing the module — the tool pulls
+        # in numpy, which the protocol-gate CI env does not install.
+        import re
+        tool_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(
-                os.path.abspath(__file__)))), "tools")
-        sys.path.insert(0, tools_dir)
-        try:
-            import bulk_loss_boundary  # noqa: E402
-        finally:
-            sys.path.remove(tools_dir)
+                os.path.abspath(__file__)))), "tools",
+            "bulk_loss_boundary.py")
+        with open(tool_path, encoding="utf-8") as fh:
+            src = fh.read()
+        m = re.search(r'PUB_RE = re\.compile\(r"(.*?)"\)', src)
+        self.assertIsNotNone(
+            m, "PUB_RE definition not found in bulk_loss_boundary.py — "
+               "its publish-line contract moved; update this test")
         line = "published frame_id=%d seq=%d %d B → %s" % (
             0, 27, 239, "lifetrac/v25/video/tile_delta")
-        self.assertIsNotNone(bulk_loss_boundary.PUB_RE.search(line))
+        self.assertIsNotNone(re.compile(m.group(1)).search(line))
 
 
 if __name__ == "__main__":
