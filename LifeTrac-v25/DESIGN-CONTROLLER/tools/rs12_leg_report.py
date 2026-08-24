@@ -63,17 +63,44 @@ def main() -> int:
             idx[int(i)] += int(c)
     tot = sum(idx.values())
     if tot:
-        # train length from the most common `total` byte in dumps, fallback 13
-        totals = collections.Counter()
-        for m in re.finditer(r"dump=([0-9a-f]{24,})", rx):
-            d = bytes.fromhex(m.group(1)[:24])
-            if d[8] == 0xFE:
-                totals[d[11] + 1] += 1
-        tlen = totals.most_common(1)[0][0] if totals else 13
+        # Train length comes from the TX log's healthy "K fragments ok"
+        # lines, and the penultimate metric is scoped to the LONG-train
+        # population (>= MIN_LONG fragments).
+        #
+        # 2026-08-24, two bugs found in one leg:
+        #  (a) this used to read the `total` byte out of CORRUPT capture
+        #      headers — the one population whose bytes are unreliable —
+        #      with most_common(1) and no sanity bound. A control leg
+        #      with a single readable dump reported train length 208 off
+        #      that one garbage byte, moving "penultimate" to idx 206 and
+        #      printing 0 % while the real lock sat at 35 % on idx 11: a
+        #      false NEGATIVE on the campaign's headline metric.
+        #  (b) a plain modal over ALL trains is also wrong — these legs
+        #      carry a MIXTURE (e.g. 143x1, 45x2, 56x12, 115x13), so the
+        #      overall mode is 1 and "penultimate" collapses to idx -1.
+        #      Short trains have no penultimate to lock, so the metric is
+        #      only meaningful over long trains.
+        # The mixture is printed so a reader can never mistake a
+        # mixed-length leg for a uniform one.
+        MIN_LONG = 3
+        tx_lens = collections.Counter(
+            int(n) for n in re.findall(r"(\d+) fragments ok", tx))
+        long_lens = collections.Counter(
+            {k: v for k, v in tx_lens.items() if k >= MIN_LONG})
+        if long_lens:
+            tlen = long_lens.most_common(1)[0][0]
+            tlen_src = (f"tx log, modal of {sum(long_lens.values())} long "
+                        f"trains; mixture " +
+                        " ".join(f"{k}x{v}" for k, v in
+                                 sorted(tx_lens.items())))
+        else:
+            tlen = 13
+            tlen_src = "DEFAULT 13 — no long trains in tx log, treat with care"
         pen = tlen - 2
-        print(f"train length {tlen}; attributed {tot}; "
-              f"penultimate idx {pen} = {idx.get(pen, 0)} "
-              f"({100 * idx.get(pen, 0) / tot:.0f}%)")
+        print(f"train length {tlen} [{tlen_src}]")
+        print(f"attributed {tot}; penultimate idx {pen} = {idx.get(pen, 0)} "
+              f"({100 * idx.get(pen, 0) / tot:.0f}%, uniform "
+              f"{100 / tlen:.0f}%)")
         print("  " + " ".join(f"{i}:{idx.get(i, 0)}" for i in range(tlen)))
 
         # corrupt-capture indices
