@@ -101,6 +101,28 @@ def main() -> int:
         print(f"attributed {tot}; penultimate idx {pen} = {idx.get(pen, 0)} "
               f"({100 * idx.get(pen, 0) / tot:.0f}%, uniform "
               f"{100 / tlen:.0f}%)")
+
+        # MIXED-LENGTH AMBIGUITY (review catch, PR #112). The rx daemon's
+        # lost_frag_idx instrument reports an index with no train length,
+        # so this histogram aggregates every length present. When more
+        # than one long length occurs, a single index means different
+        # things per population: at lengths 12 and 13, idx 11 is the
+        # FINAL fragment of the 12s and the PENULTIMATE of the 13s. The
+        # share printed above is therefore mixture-weighted, not a clean
+        # per-population figure. Say so rather than letting the label
+        # imply a purity the instrument cannot deliver.
+        other_long = sorted(k for k in long_lens if k != tlen)
+        if other_long:
+            print(f"  !! MIXED LENGTHS {sorted(long_lens)} — idx {pen} is "
+                  f"penultimate for len {tlen}, but also "
+                  + ", ".join(
+                      f"{'final' if pen == k - 1 else f'idx {pen}'} of "
+                      f"len {k}" for k in other_long)
+                  + f"; each length's own penultimate: "
+                  + ", ".join(f"len {k}->idx {k - 2}={idx.get(k - 2, 0)}"
+                              for k in sorted(long_lens))
+                  + ". Shares are mixture-weighted; separating them needs "
+                    "lost_frag_idx to carry the train length.")
         print("  " + " ".join(f"{i}:{idx.get(i, 0)}" for i in range(tlen)))
 
         # corrupt-capture indices

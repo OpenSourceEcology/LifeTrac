@@ -34,6 +34,37 @@ Both loss figures land on the RS-12 arm values measured a week earlier
 (ctrl 3.3 ±0.1, fix 1.5–1.8) — an independent reproduction on a
 different day, different channel-day, and post-merge code.
 
+### Mixed-length caveat on the "penultimate" figures (review catch, #112)
+
+The rx daemon's `lost_frag_idx` instrument reports an index with **no
+train length**, and these legs are mixed (leg B: 12×56, 13×115 long
+trains). At those two lengths, **idx 11 is the penultimate of the 13s
+but the FINAL of the 12s**, so the shares above are mixture-weighted,
+not clean per-population figures. The tool now prints this ambiguity on
+every mixed leg.
+
+The A/B contrast is unaffected — both legs carry near-identical
+mixtures (A 50:105, B 56:115 twelve-to-thirteen), so the 6 % vs 35 %
+comparison is like-for-like.
+
+**And the split is informative rather than merely noisy.** Per-length
+penultimate indices in the control leg: len 13 → idx 11 = **27**, len 12
+→ idx 10 = **3**. If both populations locked proportionally, idx 10
+should hold ≈13 (56/115 of 27); it holds 3. Meanwhile final-fragment
+losses are rare (13-frag final, idx 12 = 1), so 12-frag finals landing
+on idx 11 cannot account for the spike either. The most economical
+reading: **the lock is specific to 13-fragment trains**, which is what
+the RS-12 mechanism predicts — it needs a SHORT final fragment to ride
+fire-on-TX_DONE, and a 12-fragment train's final is nearly full-length,
+so there is no fast ride and no overwritten penultimate. This is
+inference from an instrument that cannot separate the populations, not
+a measurement of them.
+
+**Follow-up (not done):** have `lost_frag_idx` carry the train length so
+per-population shares can be measured directly. That would convert the
+paragraph above from inference into evidence, and it is a host-side
+change — no flash required.
+
 **What this closes:** an archive from the instrumented build now proves
 its own hold state two ways — the declared setting, and the physics that
 setting produces. Future legs (starting with the motion leg) no longer
