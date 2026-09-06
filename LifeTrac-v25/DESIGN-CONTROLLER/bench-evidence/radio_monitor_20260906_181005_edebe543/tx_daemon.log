@@ -1,0 +1,2856 @@
+﻿2026-08-24 15:16:01,956 INFO image_tx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-08-24 15:16:01,958 INFO image_tx_daemon: image_tx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-08-24 15:16:01,959 INFO image_tx_daemon: no_park_last=1 gap_ms=80 pipeline_depth=2
+
+2026-08-24 15:16:01,969 INFO image_tx_daemon: MQTT connected; subscribing to lifetrac/v25/cmd/image_frame
+
+2026-08-24 15:16:01,974 INFO image_tx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-08-24 15:16:01,991 INFO image_tx_daemon: link_budget: published n_frag=1 profile_idx=6 (profile 2)
+
+INFO: post-VER drain queued type=0xF1 seq=0
+
+INFO: post-VER drain queued type=0xC1 seq=0
+
+INFO: post-VER drain queued type=0xF1 seq=0
+
+INFO: post-VER drain queued type=0xC1 seq=0
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+CFG_SET_REQ(FHSS_FARM_ID) OK: 17000800
+
+CFG_SET_REQ(FHSS_NODE_ID) OK: 18000800
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 927.500 MHz (raw=0xE7E000 -> Msb=0xE7 Mid=0xE0 Lsb=0x00)
+
+  FRF readback: 0xE7E000 = 927.500 MHz (OK)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-08-24 15:16:02,860 INFO image_tx_daemon: LBT_ENABLE=0 (matches W1-10b TX_BURST rationale)
+
+2026-08-24 15:16:02,882 INFO image_tx_daemon: RXCONT armed for command downlink (opmode 0x81 -> 0x85)
+
+2026-08-24 15:16:02,883 INFO image_tx_daemon: TX worker ready (inter_cycle_s=0.050, max 8 frags/dwell)
+
+2026-08-24 15:16:02,959 INFO image_tx_daemon: stats: goodput=0.0 B/s util=0% pipeline=v3 frames_in=0 ok=0 fail=0 drop_full=0 drop_stale=0 frags_ok=0 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:16:12,970 INFO image_tx_daemon: stats: goodput=0.0 B/s util=0% pipeline=v3 frames_in=0 ok=0 fail=0 drop_full=0 drop_stale=0 frags_ok=0 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:16:22,981 INFO image_tx_daemon: stats: goodput=0.0 B/s util=0% pipeline=v3 frames_in=0 ok=0 fail=0 drop_full=0 drop_stale=0 frags_ok=0 frags_fail=0 qdepth=0 parity_tx=0
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=61504 legal_dwell_used_us_10s=0
+
+2026-08-24 15:16:32,993 INFO image_tx_daemon: stats: goodput=0.0 B/s util=0% pipeline=v3 frames_in=0 ok=0 fail=0 drop_full=0 drop_stale=0 frags_ok=0 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:16:33,329 INFO image_tx_daemon: txdone_arrival: seq=1 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:16:33,341 INFO image_tx_daemon: frame seq=1 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:33,453 INFO image_tx_daemon: txdone_arrival: seq=2 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:16:33,466 INFO image_tx_daemon: frame seq=2 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:33,942 INFO image_tx_daemon: txdone_arrival: seq=3 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:16:33,955 INFO image_tx_daemon: frame seq=3 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:34,432 INFO image_tx_daemon: txdone_arrival: seq=4 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:16:34,444 INFO image_tx_daemon: frame seq=4 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:34,920 INFO image_tx_daemon: txdone_arrival: seq=5 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:16:34,932 INFO image_tx_daemon: frame seq=5 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:35,421 INFO image_tx_daemon: txdone_arrival: seq=6 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:16:35,433 INFO image_tx_daemon: frame seq=6 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:35,919 INFO image_tx_daemon: txdone_arrival: seq=7 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:16:35,931 INFO image_tx_daemon: frame seq=7 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:36,313 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-24 15:16:36,418 INFO image_tx_daemon: txdone_arrival: seq=8 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:16:36,430 INFO image_tx_daemon: frame seq=8 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:36,817 INFO image_tx_daemon: LoRa cmd: REQ_KEYFRAME
+
+2026-08-24 15:16:36,923 INFO image_tx_daemon: txdone_arrival: seq=9 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:16:36,934 INFO image_tx_daemon: frame seq=9 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:37,431 INFO image_tx_daemon: txdone_arrival: seq=10 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:16:37,443 INFO image_tx_daemon: frame seq=10 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:37,936 INFO image_tx_daemon: txdone_arrival: seq=11 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:16:37,947 INFO image_tx_daemon: frame seq=11 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:38,428 INFO image_tx_daemon: txdone_arrival: seq=12 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:16:38,440 INFO image_tx_daemon: frame seq=12 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:38,917 INFO image_tx_daemon: txdone_arrival: seq=13 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:16:38,929 INFO image_tx_daemon: frame seq=13 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:39,289 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:16:39,395 INFO image_tx_daemon: txdone_arrival: seq=14 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:16:39,407 INFO image_tx_daemon: frame seq=14 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:39,906 INFO image_tx_daemon: txdone_arrival: seq=15 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:16:39,918 INFO image_tx_daemon: frame seq=15 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:40,385 INFO image_tx_daemon: txdone_arrival: seq=16 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:16:40,397 INFO image_tx_daemon: frame seq=16 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:40,888 INFO image_tx_daemon: txdone_arrival: seq=17 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:16:40,900 INFO image_tx_daemon: frame seq=17 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:41,411 INFO image_tx_daemon: txdone_arrival: seq=18 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:16:41,423 INFO image_tx_daemon: frame seq=18 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:41,917 INFO image_tx_daemon: txdone_arrival: seq=19 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:16:41,929 INFO image_tx_daemon: frame seq=19 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:42,313 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:16:42,430 INFO image_tx_daemon: txdone_arrival: seq=20 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:16:42,641 INFO image_tx_daemon: txdone_arrival: seq=20 idx=1 status=0 toa_us=88384
+
+2026-08-24 15:16:42,653 INFO image_tx_daemon: frame seq=20 done (pipelined): 2 fragments ok
+
+2026-08-24 15:16:42,929 INFO image_tx_daemon: txdone_arrival: seq=21 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:16:43,004 INFO image_tx_daemon: stats: goodput=482.3 B/s util=20% pipeline=v3 frames_in=21 ok=20 fail=0 drop_full=0 drop_stale=0 frags_ok=22 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:16:43,141 INFO image_tx_daemon: txdone_arrival: seq=21 idx=1 status=0 toa_us=83264
+
+2026-08-24 15:16:43,153 INFO image_tx_daemon: frame seq=21 done (pipelined): 2 fragments ok
+
+2026-08-24 15:16:43,428 INFO image_tx_daemon: txdone_arrival: seq=22 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:16:43,640 INFO image_tx_daemon: txdone_arrival: seq=22 idx=1 status=0 toa_us=84544
+
+2026-08-24 15:16:43,652 INFO image_tx_daemon: frame seq=22 done (pipelined): 2 fragments ok
+
+2026-08-24 15:16:43,932 INFO image_tx_daemon: txdone_arrival: seq=23 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:16:43,944 INFO image_tx_daemon: frame seq=23 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:44,442 INFO image_tx_daemon: txdone_arrival: seq=24 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:16:44,453 INFO image_tx_daemon: frame seq=24 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:44,937 INFO image_tx_daemon: txdone_arrival: seq=25 idx=0 status=0 toa_us=81984
+
+2026-08-24 15:16:44,949 INFO image_tx_daemon: frame seq=25 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:45,335 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:16:45,451 INFO image_tx_daemon: txdone_arrival: seq=26 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:16:45,653 INFO image_tx_daemon: txdone_arrival: seq=26 idx=1 status=0 toa_us=76864
+
+2026-08-24 15:16:45,665 INFO image_tx_daemon: frame seq=26 done (pipelined): 2 fragments ok
+
+2026-08-24 15:16:45,950 INFO image_tx_daemon: txdone_arrival: seq=27 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:16:45,962 INFO image_tx_daemon: frame seq=27 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:46,422 INFO image_tx_daemon: txdone_arrival: seq=28 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:16:46,434 INFO image_tx_daemon: frame seq=28 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:46,942 INFO image_tx_daemon: txdone_arrival: seq=29 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:16:46,953 INFO image_tx_daemon: frame seq=29 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:47,450 INFO image_tx_daemon: txdone_arrival: seq=30 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:16:47,461 INFO image_tx_daemon: frame seq=30 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:47,955 INFO image_tx_daemon: txdone_arrival: seq=31 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:16:47,966 INFO image_tx_daemon: frame seq=31 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:48,358 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:16:48,474 INFO image_tx_daemon: txdone_arrival: seq=32 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:16:48,486 INFO image_tx_daemon: frame seq=32 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:48,971 INFO image_tx_daemon: txdone_arrival: seq=33 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:16:48,984 INFO image_tx_daemon: frame seq=33 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:49,484 INFO image_tx_daemon: txdone_arrival: seq=34 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:16:49,496 INFO image_tx_daemon: frame seq=34 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:49,986 INFO image_tx_daemon: txdone_arrival: seq=35 idx=0 status=0 toa_us=76864
+
+2026-08-24 15:16:49,998 INFO image_tx_daemon: frame seq=35 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:50,505 INFO image_tx_daemon: txdone_arrival: seq=36 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:16:50,516 INFO image_tx_daemon: frame seq=36 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:51,001 INFO image_tx_daemon: txdone_arrival: seq=37 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:16:51,012 INFO image_tx_daemon: frame seq=37 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:51,385 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:16:51,491 INFO image_tx_daemon: txdone_arrival: seq=38 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:16:51,503 INFO image_tx_daemon: frame seq=38 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:51,948 INFO image_tx_daemon: txdone_arrival: seq=39 idx=0 status=0 toa_us=47424
+
+2026-08-24 15:16:51,959 INFO image_tx_daemon: frame seq=39 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:52,498 INFO image_tx_daemon: txdone_arrival: seq=40 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:16:52,509 INFO image_tx_daemon: frame seq=40 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:52,983 INFO image_tx_daemon: txdone_arrival: seq=41 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:16:52,995 INFO image_tx_daemon: frame seq=41 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:53,016 INFO image_tx_daemon: stats: goodput=490.3 B/s util=20% pipeline=v3 frames_in=41 ok=41 fail=0 drop_full=0 drop_stale=0 frags_ok=45 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:16:53,495 INFO image_tx_daemon: txdone_arrival: seq=42 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:16:53,507 INFO image_tx_daemon: frame seq=42 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:53,989 INFO image_tx_daemon: txdone_arrival: seq=43 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:16:54,001 INFO image_tx_daemon: frame seq=43 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:54,371 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:16:54,477 INFO image_tx_daemon: txdone_arrival: seq=44 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:16:54,489 INFO image_tx_daemon: frame seq=44 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:54,979 INFO image_tx_daemon: txdone_arrival: seq=45 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:16:54,991 INFO image_tx_daemon: frame seq=45 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:55,467 INFO image_tx_daemon: txdone_arrival: seq=46 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:16:55,479 INFO image_tx_daemon: frame seq=46 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:55,975 INFO image_tx_daemon: txdone_arrival: seq=47 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:16:55,987 INFO image_tx_daemon: frame seq=47 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:56,471 INFO image_tx_daemon: txdone_arrival: seq=48 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:16:56,483 INFO image_tx_daemon: frame seq=48 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:56,960 INFO image_tx_daemon: txdone_arrival: seq=49 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:16:56,973 INFO image_tx_daemon: frame seq=49 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:57,345 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:16:57,462 INFO image_tx_daemon: txdone_arrival: seq=50 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:16:57,473 INFO image_tx_daemon: frame seq=50 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:57,943 INFO image_tx_daemon: txdone_arrival: seq=51 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:16:57,955 INFO image_tx_daemon: frame seq=51 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:58,428 INFO image_tx_daemon: txdone_arrival: seq=52 idx=0 status=0 toa_us=80704
+
+2026-08-24 15:16:58,439 INFO image_tx_daemon: frame seq=52 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:58,947 INFO image_tx_daemon: txdone_arrival: seq=53 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:16:58,959 INFO image_tx_daemon: frame seq=53 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:59,432 INFO image_tx_daemon: txdone_arrival: seq=54 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:16:59,444 INFO image_tx_daemon: frame seq=54 done (pipelined): 1 fragments ok
+
+2026-08-24 15:16:59,951 INFO image_tx_daemon: txdone_arrival: seq=55 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:00,176 INFO image_tx_daemon: txdone_arrival: seq=55 idx=1 status=0 toa_us=94784
+
+2026-08-24 15:17:00,187 INFO image_tx_daemon: frame seq=55 done (pipelined): 2 fragments ok
+
+2026-08-24 15:17:00,312 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:00,428 INFO image_tx_daemon: txdone_arrival: seq=56 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:00,640 INFO image_tx_daemon: txdone_arrival: seq=56 idx=1 status=0 toa_us=88384
+
+2026-08-24 15:17:00,652 INFO image_tx_daemon: frame seq=56 done (pipelined): 2 fragments ok
+
+2026-08-24 15:17:00,946 INFO image_tx_daemon: txdone_arrival: seq=57 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:17:00,957 INFO image_tx_daemon: frame seq=57 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:01,445 INFO image_tx_daemon: txdone_arrival: seq=58 idx=0 status=0 toa_us=81984
+
+2026-08-24 15:17:01,456 INFO image_tx_daemon: frame seq=58 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:01,953 INFO image_tx_daemon: txdone_arrival: seq=59 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:17:01,965 INFO image_tx_daemon: frame seq=59 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:02,437 INFO image_tx_daemon: txdone_arrival: seq=60 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:17:02,449 INFO image_tx_daemon: frame seq=60 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:02,934 INFO image_tx_daemon: txdone_arrival: seq=61 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:17:02,946 INFO image_tx_daemon: frame seq=61 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:03,028 INFO image_tx_daemon: stats: goodput=495.9 B/s util=20% pipeline=v3 frames_in=61 ok=61 fail=0 drop_full=0 drop_stale=0 frags_ok=67 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:17:03,325 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:03,431 INFO image_tx_daemon: txdone_arrival: seq=62 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:17:03,443 INFO image_tx_daemon: frame seq=62 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:03,936 INFO image_tx_daemon: txdone_arrival: seq=63 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:17:03,947 INFO image_tx_daemon: frame seq=63 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:04,432 INFO image_tx_daemon: txdone_arrival: seq=64 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:17:04,444 INFO image_tx_daemon: frame seq=64 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:04,918 INFO image_tx_daemon: txdone_arrival: seq=65 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:17:04,930 INFO image_tx_daemon: frame seq=65 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:05,419 INFO image_tx_daemon: txdone_arrival: seq=66 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:17:05,431 INFO image_tx_daemon: frame seq=66 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:05,929 INFO image_tx_daemon: txdone_arrival: seq=67 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:17:05,940 INFO image_tx_daemon: frame seq=67 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:06,311 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:06,427 INFO image_tx_daemon: txdone_arrival: seq=68 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:17:06,438 INFO image_tx_daemon: frame seq=68 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:06,899 INFO image_tx_daemon: txdone_arrival: seq=69 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:06,911 INFO image_tx_daemon: frame seq=69 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:07,408 INFO image_tx_daemon: txdone_arrival: seq=70 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:17:07,420 INFO image_tx_daemon: frame seq=70 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:07,920 INFO image_tx_daemon: txdone_arrival: seq=71 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:17:07,932 INFO image_tx_daemon: frame seq=71 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:08,407 INFO image_tx_daemon: txdone_arrival: seq=72 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:08,641 INFO image_tx_daemon: txdone_arrival: seq=72 idx=1 status=0 toa_us=99904
+
+2026-08-24 15:17:08,652 INFO image_tx_daemon: frame seq=72 done (pipelined): 2 fragments ok
+
+2026-08-24 15:17:08,896 INFO image_tx_daemon: txdone_arrival: seq=73 idx=0 status=0 toa_us=76864
+
+2026-08-24 15:17:08,908 INFO image_tx_daemon: frame seq=73 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:09,298 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:09,403 INFO image_tx_daemon: txdone_arrival: seq=74 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:17:09,414 INFO image_tx_daemon: frame seq=74 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:09,924 INFO image_tx_daemon: txdone_arrival: seq=75 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:10,050 INFO image_tx_daemon: txdone_arrival: seq=75 idx=1 status=0 toa_us=14144
+
+2026-08-24 15:17:10,062 INFO image_tx_daemon: frame seq=75 done (pipelined): 2 fragments ok
+
+2026-08-24 15:17:10,427 INFO image_tx_daemon: txdone_arrival: seq=76 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:17:10,439 INFO image_tx_daemon: frame seq=76 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:10,915 INFO image_tx_daemon: txdone_arrival: seq=77 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:17:10,927 INFO image_tx_daemon: frame seq=77 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:11,406 INFO image_tx_daemon: txdone_arrival: seq=78 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:17:11,418 INFO image_tx_daemon: frame seq=78 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:11,889 INFO image_tx_daemon: txdone_arrival: seq=79 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:17:11,901 INFO image_tx_daemon: frame seq=79 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:12,304 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:12,409 INFO image_tx_daemon: txdone_arrival: seq=80 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:17:12,421 INFO image_tx_daemon: frame seq=80 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:12,889 INFO image_tx_daemon: txdone_arrival: seq=81 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:17:12,901 INFO image_tx_daemon: frame seq=81 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:13,040 INFO image_tx_daemon: stats: goodput=465.0 B/s util=19% pipeline=v3 frames_in=81 ok=81 fail=0 drop_full=0 drop_stale=0 frags_ok=89 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:17:13,431 INFO image_tx_daemon: txdone_arrival: seq=82 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:17:13,442 INFO image_tx_daemon: frame seq=82 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:13,888 INFO image_tx_daemon: txdone_arrival: seq=83 idx=0 status=0 toa_us=69184
+
+2026-08-24 15:17:13,900 INFO image_tx_daemon: frame seq=83 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:14,417 INFO image_tx_daemon: txdone_arrival: seq=84 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:17:14,428 INFO image_tx_daemon: frame seq=84 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:14,910 INFO image_tx_daemon: txdone_arrival: seq=85 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:14,922 INFO image_tx_daemon: frame seq=85 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:15,303 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:15,409 INFO image_tx_daemon: txdone_arrival: seq=86 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:15,421 INFO image_tx_daemon: frame seq=86 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:15,909 INFO image_tx_daemon: txdone_arrival: seq=87 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:17:15,921 INFO image_tx_daemon: frame seq=87 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:16,416 INFO image_tx_daemon: txdone_arrival: seq=88 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:17:16,428 INFO image_tx_daemon: frame seq=88 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:16,914 INFO image_tx_daemon: txdone_arrival: seq=89 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:16,926 INFO image_tx_daemon: frame seq=89 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:17,424 INFO image_tx_daemon: txdone_arrival: seq=90 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:17:17,436 INFO image_tx_daemon: frame seq=90 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:17,911 INFO image_tx_daemon: txdone_arrival: seq=91 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:17:17,922 INFO image_tx_daemon: frame seq=91 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:18,307 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:18,401 INFO image_tx_daemon: txdone_arrival: seq=92 idx=0 status=0 toa_us=81984
+
+2026-08-24 15:17:18,413 INFO image_tx_daemon: frame seq=92 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:18,912 INFO image_tx_daemon: txdone_arrival: seq=93 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:17:18,923 INFO image_tx_daemon: frame seq=93 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:19,416 INFO image_tx_daemon: txdone_arrival: seq=94 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:17:19,428 INFO image_tx_daemon: frame seq=94 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:19,921 INFO image_tx_daemon: txdone_arrival: seq=95 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:17:19,933 INFO image_tx_daemon: frame seq=95 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:20,422 INFO image_tx_daemon: txdone_arrival: seq=96 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:17:20,434 INFO image_tx_daemon: frame seq=96 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:20,914 INFO image_tx_daemon: txdone_arrival: seq=97 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:17:20,926 INFO image_tx_daemon: frame seq=97 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:21,417 INFO image_tx_daemon: txdone_arrival: seq=98 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:17:21,429 INFO image_tx_daemon: frame seq=98 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:21,692 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:21,913 INFO image_tx_daemon: txdone_arrival: seq=99 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:17:21,925 INFO image_tx_daemon: frame seq=99 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:22,427 INFO image_tx_daemon: txdone_arrival: seq=100 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:17:22,439 INFO image_tx_daemon: frame seq=100 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:22,907 INFO image_tx_daemon: txdone_arrival: seq=101 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:17:22,919 INFO image_tx_daemon: frame seq=101 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:23,052 INFO image_tx_daemon: stats: goodput=439.9 B/s util=18% pipeline=v3 frames_in=101 ok=101 fail=0 drop_full=0 drop_stale=0 frags_ok=109 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:17:23,417 INFO image_tx_daemon: txdone_arrival: seq=102 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:17:23,429 INFO image_tx_daemon: frame seq=102 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:23,945 INFO image_tx_daemon: txdone_arrival: seq=103 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:24,156 INFO image_tx_daemon: txdone_arrival: seq=103 idx=1 status=0 toa_us=81984
+
+2026-08-24 15:17:24,168 INFO image_tx_daemon: frame seq=103 done (pipelined): 2 fragments ok
+
+2026-08-24 15:17:24,440 INFO image_tx_daemon: txdone_arrival: seq=104 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:24,652 INFO image_tx_daemon: txdone_arrival: seq=104 idx=1 status=0 toa_us=88384
+
+2026-08-24 15:17:24,663 INFO image_tx_daemon: frame seq=104 done (pipelined): 2 fragments ok
+
+2026-08-24 15:17:24,808 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:24,914 INFO image_tx_daemon: txdone_arrival: seq=105 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:17:24,926 INFO image_tx_daemon: frame seq=105 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:25,424 INFO image_tx_daemon: txdone_arrival: seq=106 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:17:25,436 INFO image_tx_daemon: frame seq=106 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:25,924 INFO image_tx_daemon: txdone_arrival: seq=107 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:17:25,937 INFO image_tx_daemon: frame seq=107 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:26,425 INFO image_tx_daemon: txdone_arrival: seq=108 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:17:26,437 INFO image_tx_daemon: frame seq=108 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:26,899 INFO image_tx_daemon: txdone_arrival: seq=109 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:17:26,910 INFO image_tx_daemon: frame seq=109 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:27,425 INFO image_tx_daemon: txdone_arrival: seq=110 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:17:27,436 INFO image_tx_daemon: frame seq=110 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:27,699 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:27,921 INFO image_tx_daemon: txdone_arrival: seq=111 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:17:27,933 INFO image_tx_daemon: frame seq=111 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:28,413 INFO image_tx_daemon: txdone_arrival: seq=112 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:28,424 INFO image_tx_daemon: frame seq=112 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:28,922 INFO image_tx_daemon: txdone_arrival: seq=113 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:17:28,934 INFO image_tx_daemon: frame seq=113 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:29,424 INFO image_tx_daemon: txdone_arrival: seq=114 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:17:29,436 INFO image_tx_daemon: frame seq=114 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:29,926 INFO image_tx_daemon: txdone_arrival: seq=115 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:17:29,938 INFO image_tx_daemon: frame seq=115 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:30,424 INFO image_tx_daemon: txdone_arrival: seq=116 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:17:30,435 INFO image_tx_daemon: frame seq=116 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:30,699 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:30,914 INFO image_tx_daemon: txdone_arrival: seq=117 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:17:30,926 INFO image_tx_daemon: frame seq=117 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:31,413 INFO image_tx_daemon: txdone_arrival: seq=118 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:31,425 INFO image_tx_daemon: frame seq=118 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:31,913 INFO image_tx_daemon: txdone_arrival: seq=119 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:31,925 INFO image_tx_daemon: frame seq=119 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:32,426 INFO image_tx_daemon: txdone_arrival: seq=120 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:17:32,437 INFO image_tx_daemon: frame seq=120 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:32,929 INFO image_tx_daemon: txdone_arrival: seq=121 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:17:32,941 INFO image_tx_daemon: frame seq=121 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:33,064 INFO image_tx_daemon: stats: goodput=491.1 B/s util=20% pipeline=v3 frames_in=121 ok=121 fail=0 drop_full=0 drop_stale=0 frags_ok=131 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:17:33,419 INFO image_tx_daemon: txdone_arrival: seq=122 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:33,430 INFO image_tx_daemon: frame seq=122 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:33,693 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:33,929 INFO image_tx_daemon: txdone_arrival: seq=123 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:17:33,941 INFO image_tx_daemon: frame seq=123 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:34,413 INFO image_tx_daemon: txdone_arrival: seq=124 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:34,425 INFO image_tx_daemon: frame seq=124 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:34,935 INFO image_tx_daemon: txdone_arrival: seq=125 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:35,157 INFO image_tx_daemon: txdone_arrival: seq=125 idx=1 status=0 toa_us=93504
+
+2026-08-24 15:17:35,168 INFO image_tx_daemon: frame seq=125 done (pipelined): 2 fragments ok
+
+2026-08-24 15:17:35,438 INFO image_tx_daemon: txdone_arrival: seq=126 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:35,660 INFO image_tx_daemon: txdone_arrival: seq=126 idx=1 status=0 toa_us=92224
+
+2026-08-24 15:17:35,672 INFO image_tx_daemon: frame seq=126 done (pipelined): 2 fragments ok
+
+2026-08-24 15:17:35,919 INFO image_tx_daemon: txdone_arrival: seq=127 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:35,931 INFO image_tx_daemon: frame seq=127 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:36,421 INFO image_tx_daemon: txdone_arrival: seq=128 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:17:36,433 INFO image_tx_daemon: frame seq=128 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:36,696 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:36,914 INFO image_tx_daemon: txdone_arrival: seq=129 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:17:36,926 INFO image_tx_daemon: frame seq=129 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:37,415 INFO image_tx_daemon: txdone_arrival: seq=130 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:17:37,426 INFO image_tx_daemon: frame seq=130 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:37,912 INFO image_tx_daemon: txdone_arrival: seq=131 idx=0 status=0 toa_us=76864
+
+2026-08-24 15:17:37,924 INFO image_tx_daemon: frame seq=131 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:38,436 INFO image_tx_daemon: txdone_arrival: seq=132 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:17:38,448 INFO image_tx_daemon: frame seq=132 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:38,903 INFO image_tx_daemon: txdone_arrival: seq=133 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:17:38,915 INFO image_tx_daemon: frame seq=133 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:39,420 INFO image_tx_daemon: txdone_arrival: seq=134 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:17:39,433 INFO image_tx_daemon: frame seq=134 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:39,698 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:39,920 INFO image_tx_daemon: txdone_arrival: seq=135 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:39,932 INFO image_tx_daemon: frame seq=135 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:40,421 INFO image_tx_daemon: txdone_arrival: seq=136 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:40,433 INFO image_tx_daemon: frame seq=136 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:40,935 INFO image_tx_daemon: txdone_arrival: seq=137 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:17:40,947 INFO image_tx_daemon: frame seq=137 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:41,441 INFO image_tx_daemon: txdone_arrival: seq=138 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:17:41,453 INFO image_tx_daemon: frame seq=138 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:41,898 INFO image_tx_daemon: txdone_arrival: seq=139 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:17:41,910 INFO image_tx_daemon: frame seq=139 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:42,399 INFO image_tx_daemon: txdone_arrival: seq=140 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:17:42,410 INFO image_tx_daemon: frame seq=140 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:42,673 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:42,893 INFO image_tx_daemon: txdone_arrival: seq=141 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:17:42,905 INFO image_tx_daemon: frame seq=141 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:43,076 INFO image_tx_daemon: stats: goodput=492.3 B/s util=20% pipeline=v3 frames_in=141 ok=141 fail=0 drop_full=0 drop_stale=0 frags_ok=153 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:17:43,414 INFO image_tx_daemon: txdone_arrival: seq=142 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:43,625 INFO image_tx_daemon: txdone_arrival: seq=142 idx=1 status=0 toa_us=87104
+
+2026-08-24 15:17:43,637 INFO image_tx_daemon: frame seq=142 done (pipelined): 2 fragments ok
+
+2026-08-24 15:17:43,893 INFO image_tx_daemon: txdone_arrival: seq=143 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:43,905 INFO image_tx_daemon: frame seq=143 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:44,374 INFO image_tx_daemon: txdone_arrival: seq=144 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:17:44,386 INFO image_tx_daemon: frame seq=144 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:44,897 INFO image_tx_daemon: txdone_arrival: seq=145 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:17:44,909 INFO image_tx_daemon: frame seq=145 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:45,389 INFO image_tx_daemon: txdone_arrival: seq=146 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:17:45,401 INFO image_tx_daemon: frame seq=146 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:45,664 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:45,880 INFO image_tx_daemon: txdone_arrival: seq=147 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:17:45,892 INFO image_tx_daemon: frame seq=147 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:46,402 INFO image_tx_daemon: txdone_arrival: seq=148 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:17:46,414 INFO image_tx_daemon: frame seq=148 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:46,896 INFO image_tx_daemon: txdone_arrival: seq=149 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:47,118 INFO image_tx_daemon: txdone_arrival: seq=149 idx=1 status=0 toa_us=96064
+
+2026-08-24 15:17:47,129 INFO image_tx_daemon: frame seq=149 done (pipelined): 2 fragments ok
+
+2026-08-24 15:17:47,399 INFO image_tx_daemon: txdone_arrival: seq=150 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:17:47,411 INFO image_tx_daemon: frame seq=150 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:47,904 INFO image_tx_daemon: txdone_arrival: seq=151 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:47,916 INFO image_tx_daemon: frame seq=151 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:48,391 INFO image_tx_daemon: txdone_arrival: seq=152 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:17:48,403 INFO image_tx_daemon: frame seq=152 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:48,666 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:48,909 INFO image_tx_daemon: txdone_arrival: seq=153 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:17:48,920 INFO image_tx_daemon: frame seq=153 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:49,391 INFO image_tx_daemon: txdone_arrival: seq=154 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:49,403 INFO image_tx_daemon: frame seq=154 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:49,885 INFO image_tx_daemon: txdone_arrival: seq=155 idx=0 status=0 toa_us=76864
+
+2026-08-24 15:17:49,896 INFO image_tx_daemon: frame seq=155 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:50,403 INFO image_tx_daemon: txdone_arrival: seq=156 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:17:50,415 INFO image_tx_daemon: frame seq=156 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:50,905 INFO image_tx_daemon: txdone_arrival: seq=157 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:17:50,917 INFO image_tx_daemon: frame seq=157 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:51,385 INFO image_tx_daemon: txdone_arrival: seq=158 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:17:51,397 INFO image_tx_daemon: frame seq=158 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:51,660 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:51,890 INFO image_tx_daemon: txdone_arrival: seq=159 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:51,901 INFO image_tx_daemon: frame seq=159 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:52,389 INFO image_tx_daemon: txdone_arrival: seq=160 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:17:52,401 INFO image_tx_daemon: frame seq=160 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:52,896 INFO image_tx_daemon: txdone_arrival: seq=161 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:17:52,908 INFO image_tx_daemon: frame seq=161 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:53,087 INFO image_tx_daemon: stats: goodput=481.7 B/s util=20% pipeline=v3 frames_in=161 ok=161 fail=0 drop_full=0 drop_stale=0 frags_ok=175 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:17:53,406 INFO image_tx_daemon: txdone_arrival: seq=162 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:17:53,418 INFO image_tx_daemon: frame seq=162 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:53,899 INFO image_tx_daemon: txdone_arrival: seq=163 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:17:53,911 INFO image_tx_daemon: frame seq=163 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:54,404 INFO image_tx_daemon: txdone_arrival: seq=164 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:17:54,416 INFO image_tx_daemon: frame seq=164 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:54,679 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:54,889 INFO image_tx_daemon: txdone_arrival: seq=165 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:17:54,901 INFO image_tx_daemon: frame seq=165 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:55,379 INFO image_tx_daemon: txdone_arrival: seq=166 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:17:55,390 INFO image_tx_daemon: frame seq=166 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:55,895 INFO image_tx_daemon: txdone_arrival: seq=167 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:17:55,907 INFO image_tx_daemon: frame seq=167 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:56,398 INFO image_tx_daemon: txdone_arrival: seq=168 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:17:56,411 INFO image_tx_daemon: frame seq=168 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:56,900 INFO image_tx_daemon: txdone_arrival: seq=169 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:17:56,912 INFO image_tx_daemon: frame seq=169 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:57,402 INFO image_tx_daemon: txdone_arrival: seq=170 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:17:57,413 INFO image_tx_daemon: frame seq=170 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:57,677 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:17:57,900 INFO image_tx_daemon: txdone_arrival: seq=171 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:17:57,911 INFO image_tx_daemon: frame seq=171 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:58,414 INFO image_tx_daemon: txdone_arrival: seq=172 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:17:58,425 INFO image_tx_daemon: frame seq=172 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:58,906 INFO image_tx_daemon: txdone_arrival: seq=173 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:17:58,918 INFO image_tx_daemon: frame seq=173 done (pipelined): 1 fragments ok
+
+2026-08-24 15:17:59,403 INFO image_tx_daemon: txdone_arrival: seq=174 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:17:59,615 INFO image_tx_daemon: txdone_arrival: seq=174 idx=1 status=0 toa_us=89664
+
+2026-08-24 15:17:59,626 INFO image_tx_daemon: frame seq=174 done (pipelined): 2 fragments ok
+
+2026-08-24 15:17:59,911 INFO image_tx_daemon: txdone_arrival: seq=175 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:17:59,923 INFO image_tx_daemon: frame seq=175 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:00,407 INFO image_tx_daemon: txdone_arrival: seq=176 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:18:00,418 INFO image_tx_daemon: frame seq=176 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:00,681 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:00,902 INFO image_tx_daemon: txdone_arrival: seq=177 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:18:00,913 INFO image_tx_daemon: frame seq=177 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:01,411 INFO image_tx_daemon: txdone_arrival: seq=178 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:18:01,423 INFO image_tx_daemon: frame seq=178 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:01,894 INFO image_tx_daemon: txdone_arrival: seq=179 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:18:01,906 INFO image_tx_daemon: frame seq=179 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:02,396 INFO image_tx_daemon: txdone_arrival: seq=180 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:18:02,408 INFO image_tx_daemon: frame seq=180 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:02,896 INFO image_tx_daemon: txdone_arrival: seq=181 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:18:02,907 INFO image_tx_daemon: frame seq=181 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:03,099 INFO image_tx_daemon: stats: goodput=476.6 B/s util=19% pipeline=v3 frames_in=181 ok=181 fail=0 drop_full=0 drop_stale=0 frags_ok=196 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:18:03,384 INFO image_tx_daemon: txdone_arrival: seq=182 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:18:03,396 INFO image_tx_daemon: frame seq=182 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:03,804 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:03,920 INFO image_tx_daemon: txdone_arrival: seq=183 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:18:03,932 INFO image_tx_daemon: frame seq=183 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:04,390 INFO image_tx_daemon: txdone_arrival: seq=184 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:18:04,402 INFO image_tx_daemon: frame seq=184 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:04,911 INFO image_tx_daemon: txdone_arrival: seq=185 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:18:04,923 INFO image_tx_daemon: frame seq=185 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:05,407 INFO image_tx_daemon: txdone_arrival: seq=186 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:18:05,419 INFO image_tx_daemon: frame seq=186 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:05,898 INFO image_tx_daemon: txdone_arrival: seq=187 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:18:05,910 INFO image_tx_daemon: frame seq=187 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:06,417 INFO image_tx_daemon: txdone_arrival: seq=188 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:18:06,428 INFO image_tx_daemon: frame seq=188 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:06,692 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:06,913 INFO image_tx_daemon: txdone_arrival: seq=189 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:18:06,925 INFO image_tx_daemon: frame seq=189 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:07,408 INFO image_tx_daemon: txdone_arrival: seq=190 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:18:07,420 INFO image_tx_daemon: frame seq=190 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:07,887 INFO image_tx_daemon: txdone_arrival: seq=191 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:18:07,900 INFO image_tx_daemon: frame seq=191 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:08,417 INFO image_tx_daemon: txdone_arrival: seq=192 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:18:08,429 INFO image_tx_daemon: frame seq=192 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:08,893 INFO image_tx_daemon: txdone_arrival: seq=193 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:18:08,905 INFO image_tx_daemon: frame seq=193 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:09,398 INFO image_tx_daemon: txdone_arrival: seq=194 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:18:09,410 INFO image_tx_daemon: frame seq=194 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:09,786 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:09,901 INFO image_tx_daemon: txdone_arrival: seq=195 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:10,091 INFO image_tx_daemon: txdone_arrival: seq=195 idx=1 status=0 toa_us=64064
+
+2026-08-24 15:18:10,103 INFO image_tx_daemon: frame seq=195 done (pipelined): 2 fragments ok
+
+2026-08-24 15:18:10,409 INFO image_tx_daemon: txdone_arrival: seq=196 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:18:10,421 INFO image_tx_daemon: frame seq=196 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:10,894 INFO image_tx_daemon: txdone_arrival: seq=197 idx=0 status=0 toa_us=76864
+
+2026-08-24 15:18:10,905 INFO image_tx_daemon: frame seq=197 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:11,413 INFO image_tx_daemon: txdone_arrival: seq=198 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:18:11,425 INFO image_tx_daemon: frame seq=198 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:11,913 INFO image_tx_daemon: txdone_arrival: seq=199 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:12,138 INFO image_tx_daemon: txdone_arrival: seq=199 idx=1 status=0 toa_us=97344
+
+2026-08-24 15:18:12,150 INFO image_tx_daemon: frame seq=199 done (pipelined): 2 fragments ok
+
+2026-08-24 15:18:12,397 INFO image_tx_daemon: txdone_arrival: seq=200 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:18:12,409 INFO image_tx_daemon: frame seq=200 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:12,792 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:12,908 INFO image_tx_daemon: txdone_arrival: seq=201 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:12,920 INFO image_tx_daemon: frame seq=201 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:13,111 INFO image_tx_daemon: stats: goodput=477.8 B/s util=20% pipeline=v3 frames_in=201 ok=201 fail=0 drop_full=0 drop_stale=0 frags_ok=218 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:18:13,412 INFO image_tx_daemon: txdone_arrival: seq=202 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:18:13,424 INFO image_tx_daemon: frame seq=202 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:13,912 INFO image_tx_daemon: txdone_arrival: seq=203 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:18:13,925 INFO image_tx_daemon: frame seq=203 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:14,413 INFO image_tx_daemon: txdone_arrival: seq=204 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:18:14,425 INFO image_tx_daemon: frame seq=204 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:14,910 INFO image_tx_daemon: txdone_arrival: seq=205 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:15,122 INFO image_tx_daemon: txdone_arrival: seq=205 idx=1 status=0 toa_us=89664
+
+2026-08-24 15:18:15,133 INFO image_tx_daemon: frame seq=205 done (pipelined): 2 fragments ok
+
+2026-08-24 15:18:15,404 INFO image_tx_daemon: txdone_arrival: seq=206 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:18:15,416 INFO image_tx_daemon: frame seq=206 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:15,802 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:15,918 INFO image_tx_daemon: txdone_arrival: seq=207 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:18:15,930 INFO image_tx_daemon: frame seq=207 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:16,399 INFO image_tx_daemon: txdone_arrival: seq=208 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:18:16,411 INFO image_tx_daemon: frame seq=208 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:16,915 INFO image_tx_daemon: txdone_arrival: seq=209 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:18:16,928 INFO image_tx_daemon: frame seq=209 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:17,417 INFO image_tx_daemon: txdone_arrival: seq=210 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:18:17,429 INFO image_tx_daemon: frame seq=210 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:17,912 INFO image_tx_daemon: txdone_arrival: seq=211 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:18:17,924 INFO image_tx_daemon: frame seq=211 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:18,427 INFO image_tx_daemon: txdone_arrival: seq=212 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:18,438 INFO image_tx_daemon: frame seq=212 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:18,813 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:18,918 INFO image_tx_daemon: txdone_arrival: seq=213 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:18:18,930 INFO image_tx_daemon: frame seq=213 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:19,424 INFO image_tx_daemon: txdone_arrival: seq=214 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:18:19,436 INFO image_tx_daemon: frame seq=214 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:19,905 INFO image_tx_daemon: txdone_arrival: seq=215 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:18:19,917 INFO image_tx_daemon: frame seq=215 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:20,416 INFO image_tx_daemon: txdone_arrival: seq=216 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:18:20,428 INFO image_tx_daemon: frame seq=216 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:20,920 INFO image_tx_daemon: txdone_arrival: seq=217 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:18:20,932 INFO image_tx_daemon: frame seq=217 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:21,417 INFO image_tx_daemon: txdone_arrival: seq=218 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:18:21,428 INFO image_tx_daemon: frame seq=218 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:21,807 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:21,903 INFO image_tx_daemon: txdone_arrival: seq=219 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:18:21,914 INFO image_tx_daemon: frame seq=219 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:22,407 INFO image_tx_daemon: txdone_arrival: seq=220 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:18:22,419 INFO image_tx_daemon: frame seq=220 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:22,915 INFO image_tx_daemon: txdone_arrival: seq=221 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:18:22,926 INFO image_tx_daemon: frame seq=221 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:23,122 INFO image_tx_daemon: stats: goodput=467.4 B/s util=19% pipeline=v3 frames_in=221 ok=221 fail=0 drop_full=0 drop_stale=0 frags_ok=239 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:18:23,416 INFO image_tx_daemon: txdone_arrival: seq=222 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:18:23,427 INFO image_tx_daemon: frame seq=222 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:23,918 INFO image_tx_daemon: txdone_arrival: seq=223 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:18:23,930 INFO image_tx_daemon: frame seq=223 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:24,421 INFO image_tx_daemon: txdone_arrival: seq=224 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:18:24,432 INFO image_tx_daemon: frame seq=224 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:24,805 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:24,921 INFO image_tx_daemon: txdone_arrival: seq=225 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:25,133 INFO image_tx_daemon: txdone_arrival: seq=225 idx=1 status=0 toa_us=87104
+
+2026-08-24 15:18:25,145 INFO image_tx_daemon: frame seq=225 done (pipelined): 2 fragments ok
+
+2026-08-24 15:18:25,436 INFO image_tx_daemon: txdone_arrival: seq=226 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:25,647 INFO image_tx_daemon: txdone_arrival: seq=226 idx=1 status=0 toa_us=85824
+
+2026-08-24 15:18:25,659 INFO image_tx_daemon: frame seq=226 done (pipelined): 2 fragments ok
+
+2026-08-24 15:18:25,914 INFO image_tx_daemon: txdone_arrival: seq=227 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:18:25,926 INFO image_tx_daemon: frame seq=227 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:26,428 INFO image_tx_daemon: txdone_arrival: seq=228 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:18:26,440 INFO image_tx_daemon: frame seq=228 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:26,921 INFO image_tx_daemon: txdone_arrival: seq=229 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:18:26,934 INFO image_tx_daemon: frame seq=229 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:27,402 INFO image_tx_daemon: txdone_arrival: seq=230 idx=0 status=0 toa_us=80704
+
+2026-08-24 15:18:27,413 INFO image_tx_daemon: frame seq=230 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:27,813 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:27,929 INFO image_tx_daemon: txdone_arrival: seq=231 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:28,151 INFO image_tx_daemon: txdone_arrival: seq=231 idx=1 status=0 toa_us=94784
+
+2026-08-24 15:18:28,163 INFO image_tx_daemon: frame seq=231 done (pipelined): 2 fragments ok
+
+2026-08-24 15:18:28,409 INFO image_tx_daemon: txdone_arrival: seq=232 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:18:28,421 INFO image_tx_daemon: frame seq=232 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:28,913 INFO image_tx_daemon: txdone_arrival: seq=233 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:18:28,925 INFO image_tx_daemon: frame seq=233 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:29,413 INFO image_tx_daemon: txdone_arrival: seq=234 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:18:29,425 INFO image_tx_daemon: frame seq=234 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:29,918 INFO image_tx_daemon: txdone_arrival: seq=235 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:18:29,930 INFO image_tx_daemon: frame seq=235 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:30,433 INFO image_tx_daemon: txdone_arrival: seq=236 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:18:30,445 INFO image_tx_daemon: frame seq=236 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:30,821 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:30,928 INFO image_tx_daemon: txdone_arrival: seq=237 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:18:30,940 INFO image_tx_daemon: frame seq=237 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:31,424 INFO image_tx_daemon: txdone_arrival: seq=238 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:18:31,436 INFO image_tx_daemon: frame seq=238 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:31,913 INFO image_tx_daemon: txdone_arrival: seq=239 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:18:31,925 INFO image_tx_daemon: frame seq=239 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:32,403 INFO image_tx_daemon: txdone_arrival: seq=240 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:18:32,414 INFO image_tx_daemon: frame seq=240 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:32,931 INFO image_tx_daemon: txdone_arrival: seq=241 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:32,943 INFO image_tx_daemon: frame seq=241 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:33,134 INFO image_tx_daemon: stats: goodput=517.8 B/s util=21% pipeline=v3 frames_in=241 ok=241 fail=0 drop_full=0 drop_stale=0 frags_ok=262 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:18:33,431 INFO image_tx_daemon: txdone_arrival: seq=242 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:18:33,443 INFO image_tx_daemon: frame seq=242 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:33,816 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:33,931 INFO image_tx_daemon: txdone_arrival: seq=243 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:34,132 INFO image_tx_daemon: txdone_arrival: seq=243 idx=1 status=0 toa_us=80704
+
+2026-08-24 15:18:34,143 INFO image_tx_daemon: frame seq=243 done (pipelined): 2 fragments ok
+
+2026-08-24 15:18:34,419 INFO image_tx_daemon: txdone_arrival: seq=244 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:18:34,431 INFO image_tx_daemon: frame seq=244 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:34,942 INFO image_tx_daemon: txdone_arrival: seq=245 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:35,165 INFO image_tx_daemon: txdone_arrival: seq=245 idx=1 status=0 toa_us=97344
+
+2026-08-24 15:18:35,176 INFO image_tx_daemon: frame seq=245 done (pipelined): 2 fragments ok
+
+2026-08-24 15:18:35,400 INFO image_tx_daemon: txdone_arrival: seq=246 idx=0 status=0 toa_us=74304
+
+2026-08-24 15:18:35,412 INFO image_tx_daemon: frame seq=246 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:35,929 INFO image_tx_daemon: txdone_arrival: seq=247 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:18:35,940 INFO image_tx_daemon: frame seq=247 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:36,426 INFO image_tx_daemon: txdone_arrival: seq=248 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:18:36,438 INFO image_tx_daemon: frame seq=248 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:36,813 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:36,908 INFO image_tx_daemon: txdone_arrival: seq=249 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:18:36,920 INFO image_tx_daemon: frame seq=249 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:37,436 INFO image_tx_daemon: txdone_arrival: seq=250 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:37,447 INFO image_tx_daemon: frame seq=250 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:37,903 INFO image_tx_daemon: txdone_arrival: seq=251 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:18:37,915 INFO image_tx_daemon: frame seq=251 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:38,428 INFO image_tx_daemon: txdone_arrival: seq=252 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:18:38,439 INFO image_tx_daemon: frame seq=252 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:38,941 INFO image_tx_daemon: txdone_arrival: seq=253 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:18:38,952 INFO image_tx_daemon: frame seq=253 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:39,433 INFO image_tx_daemon: txdone_arrival: seq=254 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:39,445 INFO image_tx_daemon: frame seq=254 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:39,811 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:39,917 INFO image_tx_daemon: txdone_arrival: seq=255 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:18:39,928 INFO image_tx_daemon: frame seq=255 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:40,433 INFO image_tx_daemon: txdone_arrival: seq=0 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:18:40,445 INFO image_tx_daemon: frame seq=0 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:40,921 INFO image_tx_daemon: txdone_arrival: seq=1 idx=0 status=0 toa_us=81984
+
+2026-08-24 15:18:40,933 INFO image_tx_daemon: frame seq=1 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:41,434 INFO image_tx_daemon: txdone_arrival: seq=2 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:18:41,447 INFO image_tx_daemon: frame seq=2 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:41,928 INFO image_tx_daemon: txdone_arrival: seq=3 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:18:41,940 INFO image_tx_daemon: frame seq=3 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:42,423 INFO image_tx_daemon: txdone_arrival: seq=4 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:18:42,435 INFO image_tx_daemon: frame seq=4 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:42,821 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:42,936 INFO image_tx_daemon: txdone_arrival: seq=5 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:18:42,948 INFO image_tx_daemon: frame seq=5 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:43,145 INFO image_tx_daemon: stats: goodput=492.8 B/s util=20% pipeline=v3 frames_in=261 ok=261 fail=0 drop_full=0 drop_stale=0 frags_ok=284 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:18:43,422 INFO image_tx_daemon: txdone_arrival: seq=6 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:18:43,433 INFO image_tx_daemon: frame seq=6 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:43,926 INFO image_tx_daemon: txdone_arrival: seq=7 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:18:43,937 INFO image_tx_daemon: frame seq=7 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:44,424 INFO image_tx_daemon: txdone_arrival: seq=8 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:18:44,436 INFO image_tx_daemon: frame seq=8 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:44,903 INFO image_tx_daemon: txdone_arrival: seq=9 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:18:44,915 INFO image_tx_daemon: frame seq=9 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:45,400 INFO image_tx_daemon: txdone_arrival: seq=10 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:18:45,411 INFO image_tx_daemon: frame seq=10 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:45,789 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:45,905 INFO image_tx_daemon: txdone_arrival: seq=11 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:18:45,917 INFO image_tx_daemon: frame seq=11 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:46,400 INFO image_tx_daemon: txdone_arrival: seq=12 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:18:46,412 INFO image_tx_daemon: frame seq=12 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:46,885 INFO image_tx_daemon: txdone_arrival: seq=13 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:18:46,897 INFO image_tx_daemon: frame seq=13 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:47,390 INFO image_tx_daemon: txdone_arrival: seq=14 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:18:47,402 INFO image_tx_daemon: frame seq=14 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:47,893 INFO image_tx_daemon: txdone_arrival: seq=15 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:18:47,905 INFO image_tx_daemon: frame seq=15 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:48,394 INFO image_tx_daemon: txdone_arrival: seq=16 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:48,406 INFO image_tx_daemon: frame seq=16 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:48,792 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:48,908 INFO image_tx_daemon: txdone_arrival: seq=17 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:18:48,919 INFO image_tx_daemon: frame seq=17 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:49,388 INFO image_tx_daemon: txdone_arrival: seq=18 idx=0 status=0 toa_us=81984
+
+2026-08-24 15:18:49,400 INFO image_tx_daemon: frame seq=18 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:49,889 INFO image_tx_daemon: txdone_arrival: seq=19 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:18:49,901 INFO image_tx_daemon: frame seq=19 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:50,402 INFO image_tx_daemon: txdone_arrival: seq=20 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:18:50,414 INFO image_tx_daemon: frame seq=20 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:50,909 INFO image_tx_daemon: txdone_arrival: seq=21 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:18:50,921 INFO image_tx_daemon: frame seq=21 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:51,404 INFO image_tx_daemon: txdone_arrival: seq=22 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:18:51,415 INFO image_tx_daemon: frame seq=22 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:51,791 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:51,906 INFO image_tx_daemon: txdone_arrival: seq=23 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:52,129 INFO image_tx_daemon: txdone_arrival: seq=23 idx=1 status=0 toa_us=92224
+
+2026-08-24 15:18:52,140 INFO image_tx_daemon: frame seq=23 done (pipelined): 2 fragments ok
+
+2026-08-24 15:18:52,407 INFO image_tx_daemon: txdone_arrival: seq=24 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:18:52,419 INFO image_tx_daemon: frame seq=24 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:52,890 INFO image_tx_daemon: txdone_arrival: seq=25 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:18:52,902 INFO image_tx_daemon: frame seq=25 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:53,157 INFO image_tx_daemon: stats: goodput=472.8 B/s util=19% pipeline=v3 frames_in=281 ok=281 fail=0 drop_full=0 drop_stale=0 frags_ok=305 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:18:53,405 INFO image_tx_daemon: txdone_arrival: seq=26 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:18:53,416 INFO image_tx_daemon: frame seq=26 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:53,901 INFO image_tx_daemon: txdone_arrival: seq=27 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:18:53,913 INFO image_tx_daemon: frame seq=27 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:54,391 INFO image_tx_daemon: txdone_arrival: seq=28 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:18:54,403 INFO image_tx_daemon: frame seq=28 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:54,790 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:54,885 INFO image_tx_daemon: txdone_arrival: seq=29 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:18:54,897 INFO image_tx_daemon: frame seq=29 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:55,408 INFO image_tx_daemon: txdone_arrival: seq=30 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:55,631 INFO image_tx_daemon: txdone_arrival: seq=30 idx=1 status=0 toa_us=92224
+
+2026-08-24 15:18:55,642 INFO image_tx_daemon: frame seq=30 done (pipelined): 2 fragments ok
+
+2026-08-24 15:18:55,901 INFO image_tx_daemon: txdone_arrival: seq=31 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:18:55,913 INFO image_tx_daemon: frame seq=31 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:56,409 INFO image_tx_daemon: txdone_arrival: seq=32 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:18:56,421 INFO image_tx_daemon: frame seq=32 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:56,899 INFO image_tx_daemon: txdone_arrival: seq=33 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:18:56,911 INFO image_tx_daemon: frame seq=33 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:57,392 INFO image_tx_daemon: txdone_arrival: seq=34 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:18:57,404 INFO image_tx_daemon: frame seq=34 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:57,902 INFO image_tx_daemon: txdone_arrival: seq=35 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:18:57,914 INFO image_tx_daemon: frame seq=35 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:58,170 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:18:58,419 INFO image_tx_daemon: txdone_arrival: seq=36 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:18:58,619 INFO image_tx_daemon: txdone_arrival: seq=36 idx=1 status=0 toa_us=78144
+
+2026-08-24 15:18:58,632 INFO image_tx_daemon: frame seq=36 done (pipelined): 2 fragments ok
+
+2026-08-24 15:18:58,906 INFO image_tx_daemon: txdone_arrival: seq=37 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:18:58,918 INFO image_tx_daemon: frame seq=37 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:59,404 INFO image_tx_daemon: txdone_arrival: seq=38 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:18:59,416 INFO image_tx_daemon: frame seq=38 done (pipelined): 1 fragments ok
+
+2026-08-24 15:18:59,885 INFO image_tx_daemon: txdone_arrival: seq=39 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:18:59,897 INFO image_tx_daemon: frame seq=39 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:00,396 INFO image_tx_daemon: txdone_arrival: seq=40 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:19:00,408 INFO image_tx_daemon: frame seq=40 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:00,887 INFO image_tx_daemon: txdone_arrival: seq=41 idx=0 status=0 toa_us=75584
+
+2026-08-24 15:19:00,899 INFO image_tx_daemon: frame seq=41 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:01,162 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:01,413 INFO image_tx_daemon: txdone_arrival: seq=42 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:19:01,425 INFO image_tx_daemon: frame seq=42 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:01,882 INFO image_tx_daemon: txdone_arrival: seq=43 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:19:01,894 INFO image_tx_daemon: frame seq=43 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:02,407 INFO image_tx_daemon: txdone_arrival: seq=44 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:19:02,419 INFO image_tx_daemon: frame seq=44 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:02,896 INFO image_tx_daemon: txdone_arrival: seq=45 idx=0 status=0 toa_us=81984
+
+2026-08-24 15:19:02,908 INFO image_tx_daemon: frame seq=45 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:03,167 INFO image_tx_daemon: stats: goodput=473.0 B/s util=19% pipeline=v3 frames_in=301 ok=301 fail=0 drop_full=0 drop_stale=0 frags_ok=327 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:19:03,410 INFO image_tx_daemon: txdone_arrival: seq=46 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:19:03,422 INFO image_tx_daemon: frame seq=46 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:03,898 INFO image_tx_daemon: txdone_arrival: seq=47 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:19:03,909 INFO image_tx_daemon: frame seq=47 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:04,172 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:04,394 INFO image_tx_daemon: txdone_arrival: seq=48 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:19:04,406 INFO image_tx_daemon: frame seq=48 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:04,909 INFO image_tx_daemon: txdone_arrival: seq=49 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:04,920 INFO image_tx_daemon: frame seq=49 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:05,408 INFO image_tx_daemon: txdone_arrival: seq=50 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:19:05,420 INFO image_tx_daemon: frame seq=50 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:05,912 INFO image_tx_daemon: txdone_arrival: seq=51 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:05,924 INFO image_tx_daemon: frame seq=51 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:06,415 INFO image_tx_daemon: txdone_arrival: seq=52 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:19:06,426 INFO image_tx_daemon: frame seq=52 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:06,887 INFO image_tx_daemon: txdone_arrival: seq=53 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:19:06,899 INFO image_tx_daemon: frame seq=53 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:07,162 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:07,391 INFO image_tx_daemon: txdone_arrival: seq=54 idx=0 status=0 toa_us=76864
+
+2026-08-24 15:19:07,403 INFO image_tx_daemon: frame seq=54 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:07,916 INFO image_tx_daemon: txdone_arrival: seq=55 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:19:07,928 INFO image_tx_daemon: frame seq=55 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:08,418 INFO image_tx_daemon: txdone_arrival: seq=56 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:08,430 INFO image_tx_daemon: frame seq=56 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:08,911 INFO image_tx_daemon: txdone_arrival: seq=57 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:08,923 INFO image_tx_daemon: frame seq=57 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:09,398 INFO image_tx_daemon: txdone_arrival: seq=58 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:19:09,410 INFO image_tx_daemon: frame seq=58 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:09,920 INFO image_tx_daemon: txdone_arrival: seq=59 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:19:09,931 INFO image_tx_daemon: frame seq=59 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:10,194 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:10,415 INFO image_tx_daemon: txdone_arrival: seq=60 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:19:10,427 INFO image_tx_daemon: frame seq=60 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:10,905 INFO image_tx_daemon: txdone_arrival: seq=61 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:19:10,917 INFO image_tx_daemon: frame seq=61 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:11,397 INFO image_tx_daemon: txdone_arrival: seq=62 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:19:11,409 INFO image_tx_daemon: frame seq=62 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:11,911 INFO image_tx_daemon: txdone_arrival: seq=63 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:19:11,922 INFO image_tx_daemon: frame seq=63 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:12,412 INFO image_tx_daemon: txdone_arrival: seq=64 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:19:12,424 INFO image_tx_daemon: frame seq=64 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:12,911 INFO image_tx_daemon: txdone_arrival: seq=65 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:19:12,923 INFO image_tx_daemon: frame seq=65 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:13,178 INFO image_tx_daemon: stats: goodput=444.7 B/s util=18% pipeline=v3 frames_in=321 ok=321 fail=0 drop_full=0 drop_stale=0 frags_ok=347 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:19:13,186 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:13,403 INFO image_tx_daemon: txdone_arrival: seq=66 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:19:13,414 INFO image_tx_daemon: frame seq=66 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:13,925 INFO image_tx_daemon: txdone_arrival: seq=67 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:19:14,137 INFO image_tx_daemon: txdone_arrival: seq=67 idx=1 status=0 toa_us=87104
+
+2026-08-24 15:19:14,148 INFO image_tx_daemon: frame seq=67 done (pipelined): 2 fragments ok
+
+2026-08-24 15:19:14,413 INFO image_tx_daemon: txdone_arrival: seq=68 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:19:14,425 INFO image_tx_daemon: frame seq=68 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:14,905 INFO image_tx_daemon: txdone_arrival: seq=69 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:19:14,917 INFO image_tx_daemon: frame seq=69 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:15,418 INFO image_tx_daemon: txdone_arrival: seq=70 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:19:15,430 INFO image_tx_daemon: frame seq=70 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:15,914 INFO image_tx_daemon: txdone_arrival: seq=71 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:19:15,926 INFO image_tx_daemon: frame seq=71 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:16,189 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:16,415 INFO image_tx_daemon: txdone_arrival: seq=72 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:16,427 INFO image_tx_daemon: frame seq=72 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:16,906 INFO image_tx_daemon: txdone_arrival: seq=73 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:19:16,918 INFO image_tx_daemon: frame seq=73 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:17,418 INFO image_tx_daemon: txdone_arrival: seq=74 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:19:17,429 INFO image_tx_daemon: frame seq=74 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:17,908 INFO image_tx_daemon: txdone_arrival: seq=75 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:19:17,921 INFO image_tx_daemon: frame seq=75 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:18,426 INFO image_tx_daemon: txdone_arrival: seq=76 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:19:18,439 INFO image_tx_daemon: frame seq=76 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:18,933 INFO image_tx_daemon: txdone_arrival: seq=77 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:19:19,155 INFO image_tx_daemon: txdone_arrival: seq=77 idx=1 status=0 toa_us=96064
+
+2026-08-24 15:19:19,166 INFO image_tx_daemon: frame seq=77 done (pipelined): 2 fragments ok
+
+2026-08-24 15:19:19,306 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:19,411 INFO image_tx_daemon: txdone_arrival: seq=78 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:19:19,423 INFO image_tx_daemon: frame seq=78 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:19,918 INFO image_tx_daemon: txdone_arrival: seq=79 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:19,930 INFO image_tx_daemon: frame seq=79 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:20,400 INFO image_tx_daemon: txdone_arrival: seq=80 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:19:20,412 INFO image_tx_daemon: frame seq=80 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:20,917 INFO image_tx_daemon: txdone_arrival: seq=81 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:20,929 INFO image_tx_daemon: frame seq=81 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:21,432 INFO image_tx_daemon: txdone_arrival: seq=82 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:19:21,655 INFO image_tx_daemon: txdone_arrival: seq=82 idx=1 status=0 toa_us=97344
+
+2026-08-24 15:19:21,666 INFO image_tx_daemon: frame seq=82 done (pipelined): 2 fragments ok
+
+2026-08-24 15:19:21,921 INFO image_tx_daemon: txdone_arrival: seq=83 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:19:21,933 INFO image_tx_daemon: frame seq=83 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:22,196 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:22,413 INFO image_tx_daemon: txdone_arrival: seq=84 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:19:22,625 INFO image_tx_daemon: txdone_arrival: seq=84 idx=1 status=0 toa_us=89664
+
+2026-08-24 15:19:22,636 INFO image_tx_daemon: frame seq=84 done (pipelined): 2 fragments ok
+
+2026-08-24 15:19:22,893 INFO image_tx_daemon: txdone_arrival: seq=85 idx=0 status=0 toa_us=76864
+
+2026-08-24 15:19:22,905 INFO image_tx_daemon: frame seq=85 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:23,189 INFO image_tx_daemon: stats: goodput=538.7 B/s util=22% pipeline=v3 frames_in=341 ok=341 fail=0 drop_full=0 drop_stale=0 frags_ok=371 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:19:23,422 INFO image_tx_daemon: txdone_arrival: seq=86 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:19:23,434 INFO image_tx_daemon: frame seq=86 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:23,909 INFO image_tx_daemon: txdone_arrival: seq=87 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:19:23,921 INFO image_tx_daemon: frame seq=87 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:24,429 INFO image_tx_daemon: txdone_arrival: seq=88 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:19:24,441 INFO image_tx_daemon: frame seq=88 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:24,912 INFO image_tx_daemon: txdone_arrival: seq=89 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:19:24,923 INFO image_tx_daemon: frame seq=89 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:25,187 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:25,399 INFO image_tx_daemon: txdone_arrival: seq=90 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:19:25,410 INFO image_tx_daemon: frame seq=90 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:25,910 INFO image_tx_daemon: txdone_arrival: seq=91 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:19:25,921 INFO image_tx_daemon: frame seq=91 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:26,419 INFO image_tx_daemon: txdone_arrival: seq=92 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:19:26,430 INFO image_tx_daemon: frame seq=92 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:26,923 INFO image_tx_daemon: txdone_arrival: seq=93 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:19:26,935 INFO image_tx_daemon: frame seq=93 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:27,399 INFO image_tx_daemon: txdone_arrival: seq=94 idx=0 status=0 toa_us=75584
+
+2026-08-24 15:19:27,410 INFO image_tx_daemon: frame seq=94 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:27,922 INFO image_tx_daemon: txdone_arrival: seq=95 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:19:27,934 INFO image_tx_daemon: frame seq=95 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:28,197 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:28,435 INFO image_tx_daemon: txdone_arrival: seq=96 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:19:28,447 INFO image_tx_daemon: frame seq=96 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:28,913 INFO image_tx_daemon: txdone_arrival: seq=97 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:19:28,925 INFO image_tx_daemon: frame seq=97 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:29,417 INFO image_tx_daemon: txdone_arrival: seq=98 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:19:29,429 INFO image_tx_daemon: frame seq=98 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:29,913 INFO image_tx_daemon: txdone_arrival: seq=99 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:19:29,925 INFO image_tx_daemon: frame seq=99 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:30,432 INFO image_tx_daemon: txdone_arrival: seq=100 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:19:30,633 INFO image_tx_daemon: txdone_arrival: seq=100 idx=1 status=0 toa_us=75584
+
+2026-08-24 15:19:30,645 INFO image_tx_daemon: frame seq=100 done (pipelined): 2 fragments ok
+
+2026-08-24 15:19:30,930 INFO image_tx_daemon: txdone_arrival: seq=101 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:19:30,942 INFO image_tx_daemon: frame seq=101 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:31,205 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:31,429 INFO image_tx_daemon: txdone_arrival: seq=102 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:19:31,441 INFO image_tx_daemon: frame seq=102 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:31,925 INFO image_tx_daemon: txdone_arrival: seq=103 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:19:31,937 INFO image_tx_daemon: frame seq=103 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:32,414 INFO image_tx_daemon: txdone_arrival: seq=104 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:19:32,427 INFO image_tx_daemon: frame seq=104 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:32,922 INFO image_tx_daemon: txdone_arrival: seq=105 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:19:32,936 INFO image_tx_daemon: frame seq=105 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:33,201 INFO image_tx_daemon: stats: goodput=462.5 B/s util=19% pipeline=v3 frames_in=361 ok=361 fail=0 drop_full=0 drop_stale=0 frags_ok=392 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:19:33,402 INFO image_tx_daemon: txdone_arrival: seq=106 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:19:33,414 INFO image_tx_daemon: frame seq=106 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:33,925 INFO image_tx_daemon: txdone_arrival: seq=107 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:19:33,937 INFO image_tx_daemon: frame seq=107 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:34,200 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:34,428 INFO image_tx_daemon: txdone_arrival: seq=108 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:19:34,439 INFO image_tx_daemon: frame seq=108 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:34,917 INFO image_tx_daemon: txdone_arrival: seq=109 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:19:34,929 INFO image_tx_daemon: frame seq=109 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:35,397 INFO image_tx_daemon: txdone_arrival: seq=110 idx=0 status=0 toa_us=76864
+
+2026-08-24 15:19:35,409 INFO image_tx_daemon: frame seq=110 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:35,922 INFO image_tx_daemon: txdone_arrival: seq=111 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:19:35,934 INFO image_tx_daemon: frame seq=111 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:36,429 INFO image_tx_daemon: txdone_arrival: seq=112 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:19:36,441 INFO image_tx_daemon: frame seq=112 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:36,914 INFO image_tx_daemon: txdone_arrival: seq=113 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:19:36,926 INFO image_tx_daemon: frame seq=113 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:37,189 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:37,415 INFO image_tx_daemon: txdone_arrival: seq=114 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:19:37,428 INFO image_tx_daemon: frame seq=114 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:37,928 INFO image_tx_daemon: txdone_arrival: seq=115 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:37,939 INFO image_tx_daemon: frame seq=115 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:38,418 INFO image_tx_daemon: txdone_arrival: seq=116 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:19:38,430 INFO image_tx_daemon: frame seq=116 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:38,938 INFO image_tx_daemon: txdone_arrival: seq=117 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:19:39,149 INFO image_tx_daemon: txdone_arrival: seq=117 idx=1 status=0 toa_us=81984
+
+2026-08-24 15:19:39,161 INFO image_tx_daemon: frame seq=117 done (pipelined): 2 fragments ok
+
+2026-08-24 15:19:39,433 INFO image_tx_daemon: txdone_arrival: seq=118 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:19:39,445 INFO image_tx_daemon: frame seq=118 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:39,916 INFO image_tx_daemon: txdone_arrival: seq=119 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:19:39,928 INFO image_tx_daemon: frame seq=119 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:40,191 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:40,430 INFO image_tx_daemon: txdone_arrival: seq=120 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:19:40,620 INFO image_tx_daemon: txdone_arrival: seq=120 idx=1 status=0 toa_us=65344
+
+2026-08-24 15:19:40,631 INFO image_tx_daemon: frame seq=120 done (pipelined): 2 fragments ok
+
+2026-08-24 15:19:40,919 INFO image_tx_daemon: txdone_arrival: seq=121 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:19:40,931 INFO image_tx_daemon: frame seq=121 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:41,411 INFO image_tx_daemon: txdone_arrival: seq=122 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:19:41,423 INFO image_tx_daemon: frame seq=122 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:41,924 INFO image_tx_daemon: txdone_arrival: seq=123 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:19:41,936 INFO image_tx_daemon: frame seq=123 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:42,417 INFO image_tx_daemon: txdone_arrival: seq=124 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:19:42,429 INFO image_tx_daemon: frame seq=124 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:42,930 INFO image_tx_daemon: txdone_arrival: seq=125 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:19:42,942 INFO image_tx_daemon: frame seq=125 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:43,205 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:43,211 INFO image_tx_daemon: stats: goodput=481.1 B/s util=20% pipeline=v3 frames_in=381 ok=381 fail=0 drop_full=0 drop_stale=0 frags_ok=414 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:19:43,406 INFO image_tx_daemon: txdone_arrival: seq=126 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:19:43,418 INFO image_tx_daemon: frame seq=126 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:43,927 INFO image_tx_daemon: txdone_arrival: seq=127 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:43,939 INFO image_tx_daemon: frame seq=127 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:44,441 INFO image_tx_daemon: txdone_arrival: seq=128 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:19:44,453 INFO image_tx_daemon: frame seq=128 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:44,937 INFO image_tx_daemon: txdone_arrival: seq=129 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:44,949 INFO image_tx_daemon: frame seq=129 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:45,444 INFO image_tx_daemon: txdone_arrival: seq=130 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:19:45,655 INFO image_tx_daemon: txdone_arrival: seq=130 idx=1 status=0 toa_us=85824
+
+2026-08-24 15:19:45,667 INFO image_tx_daemon: frame seq=130 done (pipelined): 2 fragments ok
+
+2026-08-24 15:19:45,944 INFO image_tx_daemon: txdone_arrival: seq=131 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:19:46,166 INFO image_tx_daemon: txdone_arrival: seq=131 idx=1 status=0 toa_us=97344
+
+2026-08-24 15:19:46,178 INFO image_tx_daemon: frame seq=131 done (pipelined): 2 fragments ok
+
+2026-08-24 15:19:46,316 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:46,431 INFO image_tx_daemon: txdone_arrival: seq=132 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:19:46,443 INFO image_tx_daemon: frame seq=132 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:46,940 INFO image_tx_daemon: txdone_arrival: seq=133 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:46,951 INFO image_tx_daemon: frame seq=133 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:47,391 INFO image_tx_daemon: txdone_arrival: seq=134 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:19:47,403 INFO image_tx_daemon: frame seq=134 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:47,877 INFO image_tx_daemon: txdone_arrival: seq=135 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:19:47,889 INFO image_tx_daemon: frame seq=135 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:48,403 INFO image_tx_daemon: txdone_arrival: seq=136 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:19:48,414 INFO image_tx_daemon: frame seq=136 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:48,894 INFO image_tx_daemon: txdone_arrival: seq=137 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:19:48,906 INFO image_tx_daemon: frame seq=137 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:49,283 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:49,399 INFO image_tx_daemon: txdone_arrival: seq=138 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:19:49,621 INFO image_tx_daemon: txdone_arrival: seq=138 idx=1 status=0 toa_us=93504
+
+2026-08-24 15:19:49,633 INFO image_tx_daemon: frame seq=138 done (pipelined): 2 fragments ok
+
+2026-08-24 15:19:49,874 INFO image_tx_daemon: txdone_arrival: seq=139 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:19:49,885 INFO image_tx_daemon: frame seq=139 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:50,400 INFO image_tx_daemon: txdone_arrival: seq=140 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:19:50,412 INFO image_tx_daemon: frame seq=140 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:50,908 INFO image_tx_daemon: txdone_arrival: seq=141 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:50,919 INFO image_tx_daemon: frame seq=141 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:51,396 INFO image_tx_daemon: txdone_arrival: seq=142 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:19:51,408 INFO image_tx_daemon: frame seq=142 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:51,902 INFO image_tx_daemon: txdone_arrival: seq=143 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:51,914 INFO image_tx_daemon: frame seq=143 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:52,288 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:52,393 INFO image_tx_daemon: txdone_arrival: seq=144 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:19:52,405 INFO image_tx_daemon: frame seq=144 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:52,879 INFO image_tx_daemon: txdone_arrival: seq=145 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:19:52,890 INFO image_tx_daemon: frame seq=145 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:53,222 INFO image_tx_daemon: stats: goodput=511.2 B/s util=21% pipeline=v3 frames_in=401 ok=401 fail=0 drop_full=0 drop_stale=0 frags_ok=437 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:19:53,406 INFO image_tx_daemon: txdone_arrival: seq=146 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:19:53,418 INFO image_tx_daemon: frame seq=146 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:53,907 INFO image_tx_daemon: txdone_arrival: seq=147 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:19:53,919 INFO image_tx_daemon: frame seq=147 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:54,395 INFO image_tx_daemon: txdone_arrival: seq=148 idx=0 status=0 toa_us=81984
+
+2026-08-24 15:19:54,407 INFO image_tx_daemon: frame seq=148 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:54,897 INFO image_tx_daemon: txdone_arrival: seq=149 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:19:54,909 INFO image_tx_daemon: frame seq=149 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:55,287 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:55,393 INFO image_tx_daemon: txdone_arrival: seq=150 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:19:55,404 INFO image_tx_daemon: frame seq=150 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:55,883 INFO image_tx_daemon: txdone_arrival: seq=151 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:19:55,895 INFO image_tx_daemon: frame seq=151 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:56,407 INFO image_tx_daemon: txdone_arrival: seq=152 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:19:56,419 INFO image_tx_daemon: frame seq=152 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:56,901 INFO image_tx_daemon: txdone_arrival: seq=153 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:19:56,912 INFO image_tx_daemon: frame seq=153 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:57,401 INFO image_tx_daemon: txdone_arrival: seq=154 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:19:57,413 INFO image_tx_daemon: frame seq=154 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:57,899 INFO image_tx_daemon: txdone_arrival: seq=155 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:19:57,911 INFO image_tx_daemon: frame seq=155 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:58,285 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:19:58,391 INFO image_tx_daemon: txdone_arrival: seq=156 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:19:58,403 INFO image_tx_daemon: frame seq=156 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:58,901 INFO image_tx_daemon: txdone_arrival: seq=157 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:19:58,913 INFO image_tx_daemon: frame seq=157 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:59,407 INFO image_tx_daemon: txdone_arrival: seq=158 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:19:59,418 INFO image_tx_daemon: frame seq=158 done (pipelined): 1 fragments ok
+
+2026-08-24 15:19:59,904 INFO image_tx_daemon: txdone_arrival: seq=159 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:19:59,916 INFO image_tx_daemon: frame seq=159 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:00,390 INFO image_tx_daemon: txdone_arrival: seq=160 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:20:00,402 INFO image_tx_daemon: frame seq=160 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:00,902 INFO image_tx_daemon: txdone_arrival: seq=161 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:20:00,913 INFO image_tx_daemon: frame seq=161 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:01,299 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:01,395 INFO image_tx_daemon: txdone_arrival: seq=162 idx=0 status=0 toa_us=80704
+
+2026-08-24 15:20:01,406 INFO image_tx_daemon: frame seq=162 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:01,909 INFO image_tx_daemon: txdone_arrival: seq=163 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:20:01,920 INFO image_tx_daemon: frame seq=163 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:02,420 INFO image_tx_daemon: txdone_arrival: seq=164 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:20:02,431 INFO image_tx_daemon: frame seq=164 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:02,911 INFO image_tx_daemon: txdone_arrival: seq=165 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:02,923 INFO image_tx_daemon: frame seq=165 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:03,233 INFO image_tx_daemon: stats: goodput=446.3 B/s util=18% pipeline=v3 frames_in=421 ok=421 fail=0 drop_full=0 drop_stale=0 frags_ok=457 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:20:03,397 INFO image_tx_daemon: txdone_arrival: seq=166 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:20:03,409 INFO image_tx_daemon: frame seq=166 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:03,911 INFO image_tx_daemon: txdone_arrival: seq=167 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:20:03,923 INFO image_tx_daemon: frame seq=167 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:04,294 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:04,401 INFO image_tx_daemon: txdone_arrival: seq=168 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:20:04,412 INFO image_tx_daemon: frame seq=168 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:04,901 INFO image_tx_daemon: txdone_arrival: seq=169 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:20:04,912 INFO image_tx_daemon: frame seq=169 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:05,401 INFO image_tx_daemon: txdone_arrival: seq=170 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:20:05,413 INFO image_tx_daemon: frame seq=170 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:05,908 INFO image_tx_daemon: txdone_arrival: seq=171 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:05,920 INFO image_tx_daemon: frame seq=171 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:06,403 INFO image_tx_daemon: txdone_arrival: seq=172 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:20:06,415 INFO image_tx_daemon: frame seq=172 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:06,910 INFO image_tx_daemon: txdone_arrival: seq=173 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:20:06,922 INFO image_tx_daemon: frame seq=173 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:07,296 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:07,402 INFO image_tx_daemon: txdone_arrival: seq=174 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:20:07,413 INFO image_tx_daemon: frame seq=174 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:07,902 INFO image_tx_daemon: txdone_arrival: seq=175 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:20:07,913 INFO image_tx_daemon: frame seq=175 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:08,410 INFO image_tx_daemon: txdone_arrival: seq=176 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:08,421 INFO image_tx_daemon: frame seq=176 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:08,898 INFO image_tx_daemon: txdone_arrival: seq=177 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:20:08,909 INFO image_tx_daemon: frame seq=177 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:09,388 INFO image_tx_daemon: txdone_arrival: seq=178 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:20:09,400 INFO image_tx_daemon: frame seq=178 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:09,904 INFO image_tx_daemon: txdone_arrival: seq=179 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:20:09,916 INFO image_tx_daemon: frame seq=179 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:10,295 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:10,411 INFO image_tx_daemon: txdone_arrival: seq=180 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:20:10,423 INFO image_tx_daemon: frame seq=180 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:10,928 INFO image_tx_daemon: txdone_arrival: seq=181 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:20:11,139 INFO image_tx_daemon: txdone_arrival: seq=181 idx=1 status=0 toa_us=89664
+
+2026-08-24 15:20:11,151 INFO image_tx_daemon: frame seq=181 done (pipelined): 2 fragments ok
+
+2026-08-24 15:20:11,413 INFO image_tx_daemon: txdone_arrival: seq=182 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:20:11,424 INFO image_tx_daemon: frame seq=182 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:11,902 INFO image_tx_daemon: txdone_arrival: seq=183 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:20:11,914 INFO image_tx_daemon: frame seq=183 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:12,414 INFO image_tx_daemon: txdone_arrival: seq=184 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:20:12,425 INFO image_tx_daemon: frame seq=184 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:12,899 INFO image_tx_daemon: txdone_arrival: seq=185 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:20:12,911 INFO image_tx_daemon: frame seq=185 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:13,244 INFO image_tx_daemon: stats: goodput=469.2 B/s util=19% pipeline=v3 frames_in=441 ok=441 fail=0 drop_full=0 drop_stale=0 frags_ok=478 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:20:13,301 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:13,407 INFO image_tx_daemon: txdone_arrival: seq=186 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:20:13,419 INFO image_tx_daemon: frame seq=186 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:13,906 INFO image_tx_daemon: txdone_arrival: seq=187 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:20:14,117 INFO image_tx_daemon: txdone_arrival: seq=187 idx=1 status=0 toa_us=84544
+
+2026-08-24 15:20:14,129 INFO image_tx_daemon: frame seq=187 done (pipelined): 2 fragments ok
+
+2026-08-24 15:20:14,408 INFO image_tx_daemon: txdone_arrival: seq=188 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:14,419 INFO image_tx_daemon: frame seq=188 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:14,899 INFO image_tx_daemon: txdone_arrival: seq=189 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:20:14,910 INFO image_tx_daemon: frame seq=189 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:15,397 INFO image_tx_daemon: txdone_arrival: seq=190 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:20:15,408 INFO image_tx_daemon: frame seq=190 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:15,909 INFO image_tx_daemon: txdone_arrival: seq=191 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:20:15,921 INFO image_tx_daemon: frame seq=191 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:16,311 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:16,417 INFO image_tx_daemon: txdone_arrival: seq=192 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:20:16,429 INFO image_tx_daemon: frame seq=192 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:16,916 INFO image_tx_daemon: txdone_arrival: seq=193 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:20:16,927 INFO image_tx_daemon: frame seq=193 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:17,425 INFO image_tx_daemon: txdone_arrival: seq=194 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:17,437 INFO image_tx_daemon: frame seq=194 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:17,919 INFO image_tx_daemon: txdone_arrival: seq=195 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:20:17,931 INFO image_tx_daemon: frame seq=195 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:18,404 INFO image_tx_daemon: txdone_arrival: seq=196 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:20:18,416 INFO image_tx_daemon: frame seq=196 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:18,896 INFO image_tx_daemon: txdone_arrival: seq=197 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:20:18,908 INFO image_tx_daemon: frame seq=197 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:19,301 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:19,418 INFO image_tx_daemon: txdone_arrival: seq=198 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:20:19,430 INFO image_tx_daemon: frame seq=198 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:19,916 INFO image_tx_daemon: txdone_arrival: seq=199 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:20:19,928 INFO image_tx_daemon: frame seq=199 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:20,405 INFO image_tx_daemon: txdone_arrival: seq=200 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:20:20,417 INFO image_tx_daemon: frame seq=200 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:20,905 INFO image_tx_daemon: txdone_arrival: seq=201 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:20:20,918 INFO image_tx_daemon: frame seq=201 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:21,419 INFO image_tx_daemon: txdone_arrival: seq=202 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:21,430 INFO image_tx_daemon: frame seq=202 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:21,902 INFO image_tx_daemon: txdone_arrival: seq=203 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:20:21,914 INFO image_tx_daemon: frame seq=203 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:22,300 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:22,416 INFO image_tx_daemon: txdone_arrival: seq=204 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:20:22,428 INFO image_tx_daemon: frame seq=204 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:22,918 INFO image_tx_daemon: txdone_arrival: seq=205 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:20:22,930 INFO image_tx_daemon: frame seq=205 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:23,257 INFO image_tx_daemon: stats: goodput=465.5 B/s util=19% pipeline=v3 frames_in=461 ok=461 fail=0 drop_full=0 drop_stale=0 frags_ok=499 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:20:23,420 INFO image_tx_daemon: txdone_arrival: seq=206 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:23,432 INFO image_tx_daemon: frame seq=206 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:23,908 INFO image_tx_daemon: txdone_arrival: seq=207 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:20:23,920 INFO image_tx_daemon: frame seq=207 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:24,435 INFO image_tx_daemon: txdone_arrival: seq=208 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:24,447 INFO image_tx_daemon: frame seq=208 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:24,907 INFO image_tx_daemon: txdone_arrival: seq=209 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:20:24,919 INFO image_tx_daemon: frame seq=209 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:25,313 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:25,428 INFO image_tx_daemon: txdone_arrival: seq=210 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:20:25,440 INFO image_tx_daemon: frame seq=210 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:25,921 INFO image_tx_daemon: txdone_arrival: seq=211 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:20:25,932 INFO image_tx_daemon: frame seq=211 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:26,400 INFO image_tx_daemon: txdone_arrival: seq=212 idx=0 status=0 toa_us=80704
+
+2026-08-24 15:20:26,412 INFO image_tx_daemon: frame seq=212 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:26,912 INFO image_tx_daemon: txdone_arrival: seq=213 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:20:26,923 INFO image_tx_daemon: frame seq=213 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:27,409 INFO image_tx_daemon: txdone_arrival: seq=214 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:20:27,421 INFO image_tx_daemon: frame seq=214 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:27,920 INFO image_tx_daemon: txdone_arrival: seq=215 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:20:27,931 INFO image_tx_daemon: frame seq=215 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:28,302 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:28,418 INFO image_tx_daemon: txdone_arrival: seq=216 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:20:28,431 INFO image_tx_daemon: frame seq=216 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:28,931 INFO image_tx_daemon: txdone_arrival: seq=217 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:20:29,143 INFO image_tx_daemon: txdone_arrival: seq=217 idx=1 status=0 toa_us=84544
+
+2026-08-24 15:20:29,154 INFO image_tx_daemon: frame seq=217 done (pipelined): 2 fragments ok
+
+2026-08-24 15:20:29,418 INFO image_tx_daemon: txdone_arrival: seq=218 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:20:29,430 INFO image_tx_daemon: frame seq=218 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:29,908 INFO image_tx_daemon: txdone_arrival: seq=219 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:20:29,920 INFO image_tx_daemon: frame seq=219 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:30,415 INFO image_tx_daemon: txdone_arrival: seq=220 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:30,426 INFO image_tx_daemon: frame seq=220 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:30,916 INFO image_tx_daemon: txdone_arrival: seq=221 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:20:30,928 INFO image_tx_daemon: frame seq=221 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:31,314 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:31,419 INFO image_tx_daemon: txdone_arrival: seq=222 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:31,431 INFO image_tx_daemon: frame seq=222 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:31,910 INFO image_tx_daemon: txdone_arrival: seq=223 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:20:31,921 INFO image_tx_daemon: frame seq=223 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:32,421 INFO image_tx_daemon: txdone_arrival: seq=224 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:20:32,432 INFO image_tx_daemon: frame seq=224 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:32,924 INFO image_tx_daemon: txdone_arrival: seq=225 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:20:32,936 INFO image_tx_daemon: frame seq=225 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:33,274 INFO image_tx_daemon: stats: goodput=469.9 B/s util=19% pipeline=v3 frames_in=481 ok=481 fail=0 drop_full=0 drop_stale=0 frags_ok=520 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:20:33,425 INFO image_tx_daemon: txdone_arrival: seq=226 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:20:33,437 INFO image_tx_daemon: frame seq=226 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:33,908 INFO image_tx_daemon: txdone_arrival: seq=227 idx=0 status=0 toa_us=76864
+
+2026-08-24 15:20:33,919 INFO image_tx_daemon: frame seq=227 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:34,309 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:34,415 INFO image_tx_daemon: txdone_arrival: seq=228 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:20:34,427 INFO image_tx_daemon: frame seq=228 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:34,932 INFO image_tx_daemon: txdone_arrival: seq=229 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:20:35,145 INFO image_tx_daemon: txdone_arrival: seq=229 idx=1 status=0 toa_us=87104
+
+2026-08-24 15:20:35,156 INFO image_tx_daemon: frame seq=229 done (pipelined): 2 fragments ok
+
+2026-08-24 15:20:35,412 INFO image_tx_daemon: txdone_arrival: seq=230 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:20:35,423 INFO image_tx_daemon: frame seq=230 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:35,926 INFO image_tx_daemon: txdone_arrival: seq=231 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:20:35,938 INFO image_tx_daemon: frame seq=231 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:36,417 INFO image_tx_daemon: txdone_arrival: seq=232 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:20:36,428 INFO image_tx_daemon: frame seq=232 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:36,914 INFO image_tx_daemon: txdone_arrival: seq=233 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:20:36,926 INFO image_tx_daemon: frame seq=233 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:37,427 INFO image_tx_daemon: txdone_arrival: seq=234 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:20:37,439 INFO image_tx_daemon: frame seq=234 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:37,703 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:37,936 INFO image_tx_daemon: txdone_arrival: seq=235 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:20:38,148 INFO image_tx_daemon: txdone_arrival: seq=235 idx=1 status=0 toa_us=85824
+
+2026-08-24 15:20:38,160 INFO image_tx_daemon: frame seq=235 done (pipelined): 2 fragments ok
+
+2026-08-24 15:20:38,430 INFO image_tx_daemon: txdone_arrival: seq=236 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:20:38,442 INFO image_tx_daemon: frame seq=236 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:38,925 INFO image_tx_daemon: txdone_arrival: seq=237 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:20:38,936 INFO image_tx_daemon: frame seq=237 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:39,431 INFO image_tx_daemon: txdone_arrival: seq=238 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:39,443 INFO image_tx_daemon: frame seq=238 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:39,899 INFO image_tx_daemon: txdone_arrival: seq=239 idx=0 status=0 toa_us=76864
+
+2026-08-24 15:20:39,911 INFO image_tx_daemon: frame seq=239 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:40,425 INFO image_tx_daemon: txdone_arrival: seq=240 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:20:40,436 INFO image_tx_daemon: frame seq=240 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:40,699 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:40,916 INFO image_tx_daemon: txdone_arrival: seq=241 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:20:40,928 INFO image_tx_daemon: frame seq=241 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:41,403 INFO image_tx_daemon: txdone_arrival: seq=242 idx=0 status=0 toa_us=80704
+
+2026-08-24 15:20:41,415 INFO image_tx_daemon: frame seq=242 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:41,931 INFO image_tx_daemon: txdone_arrival: seq=243 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:20:41,942 INFO image_tx_daemon: frame seq=243 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:42,430 INFO image_tx_daemon: txdone_arrival: seq=244 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:20:42,442 INFO image_tx_daemon: frame seq=244 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:42,933 INFO image_tx_daemon: txdone_arrival: seq=245 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:20:42,944 INFO image_tx_daemon: frame seq=245 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:43,286 INFO image_tx_daemon: stats: goodput=486.9 B/s util=20% pipeline=v3 frames_in=501 ok=501 fail=0 drop_full=0 drop_stale=0 frags_ok=542 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:20:43,312 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:43,417 INFO image_tx_daemon: txdone_arrival: seq=246 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:20:43,429 INFO image_tx_daemon: frame seq=246 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:43,924 INFO image_tx_daemon: txdone_arrival: seq=247 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:43,936 INFO image_tx_daemon: frame seq=247 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:44,434 INFO image_tx_daemon: txdone_arrival: seq=248 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:20:44,446 INFO image_tx_daemon: frame seq=248 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:44,907 INFO image_tx_daemon: txdone_arrival: seq=249 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:20:44,919 INFO image_tx_daemon: frame seq=249 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:45,415 INFO image_tx_daemon: txdone_arrival: seq=250 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:20:45,427 INFO image_tx_daemon: frame seq=250 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:45,923 INFO image_tx_daemon: txdone_arrival: seq=251 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:20:45,935 INFO image_tx_daemon: frame seq=251 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:46,423 INFO image_tx_daemon: txdone_arrival: seq=252 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:20:46,435 INFO image_tx_daemon: frame seq=252 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:46,698 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:46,916 INFO image_tx_daemon: txdone_arrival: seq=253 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:20:46,928 INFO image_tx_daemon: frame seq=253 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:47,425 INFO image_tx_daemon: txdone_arrival: seq=254 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:20:47,436 INFO image_tx_daemon: frame seq=254 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:47,907 INFO image_tx_daemon: txdone_arrival: seq=255 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:20:47,919 INFO image_tx_daemon: frame seq=255 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:48,434 INFO image_tx_daemon: txdone_arrival: seq=0 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:20:48,446 INFO image_tx_daemon: frame seq=0 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:48,928 INFO image_tx_daemon: txdone_arrival: seq=1 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:20:48,940 INFO image_tx_daemon: frame seq=1 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:49,429 INFO image_tx_daemon: txdone_arrival: seq=2 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:20:49,440 INFO image_tx_daemon: frame seq=2 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:49,703 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:49,932 INFO image_tx_daemon: txdone_arrival: seq=3 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:49,944 INFO image_tx_daemon: frame seq=3 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:50,386 INFO image_tx_daemon: txdone_arrival: seq=4 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:20:50,397 INFO image_tx_daemon: frame seq=4 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:50,890 INFO image_tx_daemon: txdone_arrival: seq=5 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:20:50,902 INFO image_tx_daemon: frame seq=5 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:51,409 INFO image_tx_daemon: txdone_arrival: seq=6 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:20:51,421 INFO image_tx_daemon: frame seq=6 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:51,889 INFO image_tx_daemon: txdone_arrival: seq=7 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:20:51,901 INFO image_tx_daemon: frame seq=7 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:52,396 INFO image_tx_daemon: txdone_arrival: seq=8 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:20:52,408 INFO image_tx_daemon: frame seq=8 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:52,671 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:52,905 INFO image_tx_daemon: txdone_arrival: seq=9 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:20:53,116 INFO image_tx_daemon: txdone_arrival: seq=9 idx=1 status=0 toa_us=83264
+
+2026-08-24 15:20:53,127 INFO image_tx_daemon: frame seq=9 done (pipelined): 2 fragments ok
+
+2026-08-24 15:20:53,298 INFO image_tx_daemon: stats: goodput=464.4 B/s util=19% pipeline=v3 frames_in=522 ok=521 fail=0 drop_full=0 drop_stale=0 frags_ok=563 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:20:53,384 INFO image_tx_daemon: txdone_arrival: seq=10 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:20:53,396 INFO image_tx_daemon: frame seq=10 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:53,900 INFO image_tx_daemon: txdone_arrival: seq=11 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:20:53,911 INFO image_tx_daemon: frame seq=11 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:54,399 INFO image_tx_daemon: txdone_arrival: seq=12 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:20:54,411 INFO image_tx_daemon: frame seq=12 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:54,899 INFO image_tx_daemon: txdone_arrival: seq=13 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:20:54,910 INFO image_tx_daemon: frame seq=13 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:55,389 INFO image_tx_daemon: txdone_arrival: seq=14 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:20:55,401 INFO image_tx_daemon: frame seq=14 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:55,664 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:55,891 INFO image_tx_daemon: txdone_arrival: seq=15 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:20:55,903 INFO image_tx_daemon: frame seq=15 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:56,404 INFO image_tx_daemon: txdone_arrival: seq=16 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:20:56,416 INFO image_tx_daemon: frame seq=16 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:56,894 INFO image_tx_daemon: txdone_arrival: seq=17 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:20:56,906 INFO image_tx_daemon: frame seq=17 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:57,397 INFO image_tx_daemon: txdone_arrival: seq=18 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:20:57,408 INFO image_tx_daemon: frame seq=18 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:57,904 INFO image_tx_daemon: txdone_arrival: seq=19 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:20:57,915 INFO image_tx_daemon: frame seq=19 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:58,400 INFO image_tx_daemon: txdone_arrival: seq=20 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:20:58,412 INFO image_tx_daemon: frame seq=20 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:58,675 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:20:58,902 INFO image_tx_daemon: txdone_arrival: seq=21 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:20:59,135 INFO image_tx_daemon: txdone_arrival: seq=21 idx=1 status=0 toa_us=99904
+
+2026-08-24 15:20:59,147 INFO image_tx_daemon: frame seq=21 done (pipelined): 2 fragments ok
+
+2026-08-24 15:20:59,402 INFO image_tx_daemon: txdone_arrival: seq=22 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:20:59,414 INFO image_tx_daemon: frame seq=22 done (pipelined): 1 fragments ok
+
+2026-08-24 15:20:59,903 INFO image_tx_daemon: txdone_arrival: seq=23 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:20:59,915 INFO image_tx_daemon: frame seq=23 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:00,394 INFO image_tx_daemon: txdone_arrival: seq=24 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:21:00,406 INFO image_tx_daemon: frame seq=24 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:00,883 INFO image_tx_daemon: txdone_arrival: seq=25 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:21:00,894 INFO image_tx_daemon: frame seq=25 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:01,414 INFO image_tx_daemon: txdone_arrival: seq=26 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:21:01,425 INFO image_tx_daemon: frame seq=26 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:01,689 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:21:01,910 INFO image_tx_daemon: txdone_arrival: seq=27 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:21:02,132 INFO image_tx_daemon: txdone_arrival: seq=27 idx=1 status=0 toa_us=96064
+
+2026-08-24 15:21:02,143 INFO image_tx_daemon: frame seq=27 done (pipelined): 2 fragments ok
+
+2026-08-24 15:21:02,392 INFO image_tx_daemon: txdone_arrival: seq=28 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:21:02,404 INFO image_tx_daemon: frame seq=28 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:02,894 INFO image_tx_daemon: txdone_arrival: seq=29 idx=0 status=0 toa_us=81984
+
+2026-08-24 15:21:02,907 INFO image_tx_daemon: frame seq=29 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:03,309 INFO image_tx_daemon: stats: goodput=498.3 B/s util=20% pipeline=v3 frames_in=542 ok=541 fail=0 drop_full=0 drop_stale=0 frags_ok=585 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:21:03,393 INFO image_tx_daemon: txdone_arrival: seq=30 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:21:03,405 INFO image_tx_daemon: frame seq=30 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:03,910 INFO image_tx_daemon: txdone_arrival: seq=31 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:21:03,922 INFO image_tx_daemon: frame seq=31 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:04,394 INFO image_tx_daemon: txdone_arrival: seq=32 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:21:04,405 INFO image_tx_daemon: frame seq=32 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:04,669 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:21:04,909 INFO image_tx_daemon: txdone_arrival: seq=33 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:21:04,921 INFO image_tx_daemon: frame seq=33 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:05,399 INFO image_tx_daemon: txdone_arrival: seq=34 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:21:05,411 INFO image_tx_daemon: frame seq=34 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:05,906 INFO image_tx_daemon: txdone_arrival: seq=35 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:21:05,918 INFO image_tx_daemon: frame seq=35 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:06,404 INFO image_tx_daemon: txdone_arrival: seq=36 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:21:06,415 INFO image_tx_daemon: frame seq=36 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:06,908 INFO image_tx_daemon: txdone_arrival: seq=37 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:21:06,920 INFO image_tx_daemon: frame seq=37 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:07,404 INFO image_tx_daemon: txdone_arrival: seq=38 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:21:07,416 INFO image_tx_daemon: frame seq=38 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:07,679 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:21:07,912 INFO image_tx_daemon: txdone_arrival: seq=39 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:21:07,924 INFO image_tx_daemon: frame seq=39 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:08,410 INFO image_tx_daemon: txdone_arrival: seq=40 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:21:08,423 INFO image_tx_daemon: frame seq=40 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:08,915 INFO image_tx_daemon: txdone_arrival: seq=41 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:21:08,927 INFO image_tx_daemon: frame seq=41 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:09,397 INFO image_tx_daemon: txdone_arrival: seq=42 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:21:09,408 INFO image_tx_daemon: frame seq=42 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:09,898 INFO image_tx_daemon: txdone_arrival: seq=43 idx=0 status=0 toa_us=83264
+
+2026-08-24 15:21:09,910 INFO image_tx_daemon: frame seq=43 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:10,394 INFO image_tx_daemon: txdone_arrival: seq=44 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:21:10,405 INFO image_tx_daemon: frame seq=44 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:10,669 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:21:10,885 INFO image_tx_daemon: txdone_arrival: seq=45 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:21:10,897 INFO image_tx_daemon: frame seq=45 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:11,417 INFO image_tx_daemon: txdone_arrival: seq=46 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:21:11,428 INFO image_tx_daemon: frame seq=46 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:11,928 INFO image_tx_daemon: txdone_arrival: seq=47 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:21:11,939 INFO image_tx_daemon: frame seq=47 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:12,407 INFO image_tx_daemon: txdone_arrival: seq=48 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:21:12,419 INFO image_tx_daemon: frame seq=48 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:12,903 INFO image_tx_daemon: txdone_arrival: seq=49 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:21:12,914 INFO image_tx_daemon: frame seq=49 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:13,320 INFO image_tx_daemon: stats: goodput=449.9 B/s util=18% pipeline=v3 frames_in=562 ok=561 fail=0 drop_full=0 drop_stale=0 frags_ok=605 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:21:13,398 INFO image_tx_daemon: txdone_arrival: seq=50 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:21:13,410 INFO image_tx_daemon: frame seq=50 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:13,673 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:21:13,901 INFO image_tx_daemon: txdone_arrival: seq=51 idx=0 status=0 toa_us=81984
+
+2026-08-24 15:21:13,912 INFO image_tx_daemon: frame seq=51 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:14,401 INFO image_tx_daemon: txdone_arrival: seq=52 idx=0 status=0 toa_us=84544
+
+2026-08-24 15:21:14,413 INFO image_tx_daemon: frame seq=52 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:14,909 INFO image_tx_daemon: txdone_arrival: seq=53 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:21:14,921 INFO image_tx_daemon: frame seq=53 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:15,402 INFO image_tx_daemon: txdone_arrival: seq=54 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:21:15,413 INFO image_tx_daemon: frame seq=54 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:15,913 INFO image_tx_daemon: txdone_arrival: seq=55 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:21:15,924 INFO image_tx_daemon: frame seq=55 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:16,421 INFO image_tx_daemon: txdone_arrival: seq=56 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:21:16,433 INFO image_tx_daemon: frame seq=56 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:16,805 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:21:16,920 INFO image_tx_daemon: txdone_arrival: seq=57 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:21:17,132 INFO image_tx_daemon: txdone_arrival: seq=57 idx=1 status=0 toa_us=84544
+
+2026-08-24 15:21:17,143 INFO image_tx_daemon: frame seq=57 done (pipelined): 2 fragments ok
+
+2026-08-24 15:21:17,408 INFO image_tx_daemon: txdone_arrival: seq=58 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:21:17,420 INFO image_tx_daemon: frame seq=58 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:17,901 INFO image_tx_daemon: txdone_arrival: seq=59 idx=0 status=0 toa_us=81984
+
+2026-08-24 15:21:17,913 INFO image_tx_daemon: frame seq=59 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:18,420 INFO image_tx_daemon: txdone_arrival: seq=60 idx=0 status=0 toa_us=96064
+
+2026-08-24 15:21:18,432 INFO image_tx_daemon: frame seq=60 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:18,906 INFO image_tx_daemon: txdone_arrival: seq=61 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:21:18,917 INFO image_tx_daemon: frame seq=61 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:19,403 INFO image_tx_daemon: txdone_arrival: seq=62 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:21:19,414 INFO image_tx_daemon: frame seq=62 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:19,803 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:21:19,919 INFO image_tx_daemon: txdone_arrival: seq=63 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:21:19,931 INFO image_tx_daemon: frame seq=63 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:20,420 INFO image_tx_daemon: txdone_arrival: seq=64 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:21:20,432 INFO image_tx_daemon: frame seq=64 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:20,925 INFO image_tx_daemon: txdone_arrival: seq=65 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:21:21,125 INFO image_tx_daemon: txdone_arrival: seq=65 idx=1 status=0 toa_us=79424
+
+2026-08-24 15:21:21,137 INFO image_tx_daemon: frame seq=65 done (pipelined): 2 fragments ok
+
+2026-08-24 15:21:21,397 INFO image_tx_daemon: txdone_arrival: seq=66 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:21:21,409 INFO image_tx_daemon: frame seq=66 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:21,906 INFO image_tx_daemon: txdone_arrival: seq=67 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:21:21,917 INFO image_tx_daemon: frame seq=67 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:22,408 INFO image_tx_daemon: txdone_arrival: seq=68 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:21:22,420 INFO image_tx_daemon: frame seq=68 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:22,803 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:21:22,919 INFO image_tx_daemon: txdone_arrival: seq=69 idx=0 status=0 toa_us=94784
+
+2026-08-24 15:21:22,931 INFO image_tx_daemon: frame seq=69 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:23,331 INFO image_tx_daemon: stats: goodput=484.9 B/s util=20% pipeline=v3 frames_in=582 ok=581 fail=0 drop_full=0 drop_stale=0 frags_ok=627 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:21:23,416 INFO image_tx_daemon: txdone_arrival: seq=70 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:21:23,428 INFO image_tx_daemon: frame seq=70 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:23,927 INFO image_tx_daemon: txdone_arrival: seq=71 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:21:24,149 INFO image_tx_daemon: txdone_arrival: seq=71 idx=1 status=0 toa_us=92224
+
+2026-08-24 15:21:24,161 INFO image_tx_daemon: frame seq=71 done (pipelined): 2 fragments ok
+
+2026-08-24 15:21:24,416 INFO image_tx_daemon: txdone_arrival: seq=72 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:21:24,428 INFO image_tx_daemon: frame seq=72 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:24,920 INFO image_tx_daemon: txdone_arrival: seq=73 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:21:24,931 INFO image_tx_daemon: frame seq=73 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:25,402 INFO image_tx_daemon: txdone_arrival: seq=74 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:21:25,414 INFO image_tx_daemon: frame seq=74 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:25,795 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:21:25,911 INFO image_tx_daemon: txdone_arrival: seq=75 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:21:26,037 INFO image_tx_daemon: txdone_arrival: seq=75 idx=1 status=0 toa_us=11584
+
+2026-08-24 15:21:26,049 INFO image_tx_daemon: frame seq=75 done (pipelined): 2 fragments ok
+
+2026-08-24 15:21:26,419 INFO image_tx_daemon: txdone_arrival: seq=76 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:21:26,641 INFO image_tx_daemon: txdone_arrival: seq=76 idx=1 status=0 toa_us=96064
+
+2026-08-24 15:21:26,653 INFO image_tx_daemon: frame seq=76 done (pipelined): 2 fragments ok
+
+2026-08-24 15:21:26,900 INFO image_tx_daemon: txdone_arrival: seq=77 idx=0 status=0 toa_us=76864
+
+2026-08-24 15:21:26,911 INFO image_tx_daemon: frame seq=77 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:27,402 INFO image_tx_daemon: txdone_arrival: seq=78 idx=0 status=0 toa_us=89664
+
+2026-08-24 15:21:27,414 INFO image_tx_daemon: frame seq=78 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:27,894 INFO image_tx_daemon: txdone_arrival: seq=79 idx=0 status=0 toa_us=79424
+
+2026-08-24 15:21:27,906 INFO image_tx_daemon: frame seq=79 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:28,420 INFO image_tx_daemon: txdone_arrival: seq=80 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:21:28,432 INFO image_tx_daemon: frame seq=80 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:28,806 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:21:28,912 INFO image_tx_daemon: txdone_arrival: seq=81 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:21:28,924 INFO image_tx_daemon: frame seq=81 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:29,416 INFO image_tx_daemon: txdone_arrival: seq=82 idx=0 status=0 toa_us=90944
+
+2026-08-24 15:21:29,428 INFO image_tx_daemon: frame seq=82 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:29,924 INFO image_tx_daemon: txdone_arrival: seq=83 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:21:29,936 INFO image_tx_daemon: frame seq=83 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:30,411 INFO image_tx_daemon: txdone_arrival: seq=84 idx=0 status=0 toa_us=81984
+
+2026-08-24 15:21:30,423 INFO image_tx_daemon: frame seq=84 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:30,905 INFO image_tx_daemon: txdone_arrival: seq=85 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:21:30,917 INFO image_tx_daemon: frame seq=85 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:31,395 INFO image_tx_daemon: txdone_arrival: seq=86 idx=0 status=0 toa_us=78144
+
+2026-08-24 15:21:31,407 INFO image_tx_daemon: frame seq=86 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:31,811 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:21:31,917 INFO image_tx_daemon: txdone_arrival: seq=87 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:21:31,928 INFO image_tx_daemon: frame seq=87 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:32,403 INFO image_tx_daemon: txdone_arrival: seq=88 idx=0 status=0 toa_us=87104
+
+2026-08-24 15:21:32,415 INFO image_tx_daemon: frame seq=88 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:32,919 INFO image_tx_daemon: txdone_arrival: seq=89 idx=0 status=0 toa_us=97344
+
+2026-08-24 15:21:32,931 INFO image_tx_daemon: frame seq=89 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:33,342 INFO image_tx_daemon: stats: goodput=495.7 B/s util=20% pipeline=v3 frames_in=602 ok=601 fail=0 drop_full=0 drop_stale=0 frags_ok=650 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-24 15:21:33,409 INFO image_tx_daemon: txdone_arrival: seq=90 idx=0 status=0 toa_us=81984
+
+2026-08-24 15:21:33,420 INFO image_tx_daemon: frame seq=90 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:33,916 INFO image_tx_daemon: txdone_arrival: seq=91 idx=0 status=0 toa_us=88384
+
+2026-08-24 15:21:33,927 INFO image_tx_daemon: frame seq=91 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:34,419 INFO image_tx_daemon: txdone_arrival: seq=92 idx=0 status=0 toa_us=93504
+
+2026-08-24 15:21:34,430 INFO image_tx_daemon: frame seq=92 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:34,809 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-24 15:21:34,925 INFO image_tx_daemon: txdone_arrival: seq=93 idx=0 status=0 toa_us=98624
+
+2026-08-24 15:21:34,937 INFO image_tx_daemon: frame seq=93 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:35,417 INFO image_tx_daemon: txdone_arrival: seq=94 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:21:35,429 INFO image_tx_daemon: frame seq=94 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:35,912 INFO image_tx_daemon: txdone_arrival: seq=95 idx=0 status=0 toa_us=85824
+
+2026-08-24 15:21:35,924 INFO image_tx_daemon: frame seq=95 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:36,426 INFO image_tx_daemon: txdone_arrival: seq=96 idx=0 status=0 toa_us=99904
+
+2026-08-24 15:21:36,438 INFO image_tx_daemon: frame seq=96 done (pipelined): 1 fragments ok
+
+2026-08-24 15:21:36,933 INFO image_tx_daemon: txdone_arrival: seq=97 idx=0 status=0 toa_us=92224
+
+2026-08-24 15:21:36,945 INFO image_tx_daemon: frame seq=97 done (pipelined): 1 fragments ok
+
