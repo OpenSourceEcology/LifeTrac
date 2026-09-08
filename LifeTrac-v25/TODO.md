@@ -57,6 +57,28 @@
 > RS-11.8); synth control 1.6 % with penultimate at 3 % (RS-12 fix
 > holds); main CI red-since-#108 healed by #111's `_env_int` fix. Boards
 > quiesced: Linux up, radios verified in LoRa SLEEP.
+>
+> **Sessions 2026-08-24 → 2026-09-07 (PRs #112, #114) — the hold is
+> verified on air, and its limit is found.** 08-24: the archive
+> instrumentation proved faithful (recorded `no_park_last` and the
+> mechanism signature flip together: 1.5 %/6 % vs 3.3 %/35 %); a
+> leg-report tool bug that could hide a 35 % lock behind one corrupt
+> byte was fixed; the survey-ranked production channel (927.25) was
+> **refuted by a link leg** (2.3× the loss of 927.5 — the ticker sits on
+> it), so no hail constant comes from passive ranking any more. 09-06:
+> the **motion leg flew** — camera + moving scene, 0.3 % loss, image
+> watched live on the base website. 09-07: the long-train attempt found
+> two things — camera keyframes are ~500 B at the current encoder
+> point regardless of scene (long camera trains are an encoder-config
+> axis, RS-3.11), and **under 145 live commands the strict hold is no
+> longer loss-free (4.1 %, penultimate-of-two losses 12/14, RF
+> unchanged): command/ack URCs are a second writer the hold cannot
+> stop → `NO_PARK_LAST` default: do NOT flip; the flash session's
+> `rx_urc_lost` + firmware URC fix is now the decisive item.** Also:
+> the harness SWD-resets the tractor L072 at launch (base brackets
+> only), quiesce held 13 days, stale scan floods under motion
+> (RS-4.15). *(Merge order: #112 and #114 carry the evidence this
+> references — merge them before this TODO update.)*
 
 > **🟢 Milestone (2026-05-26) — image-over-LoRa air link proven end-to-end:**
 > Tractor camera → tile-delta encode → MQTT (intra-X8) → image_tx_daemon →
