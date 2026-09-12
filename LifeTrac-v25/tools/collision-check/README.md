@@ -56,7 +56,10 @@ reports go to `out/` (git-ignored, `--out` or `COLLISION_OUT` to move it).
 
 Cost with OpenSCAD 2021.01 on 4 cores: about 85 s of export time per reachable pose
 (arms 67 s, hydraulics 12 s, bucket 6 s), the static groups once (frame 126 s, wheels
-20 s, platform 20 s), and well under a second per pose for the volume booleans.
+20 s, platform 20 s), and well under a second per pose for the volume booleans. The
+default 7 × 5 grid (35 poses plus the hard-stop probe) takes about 13 minutes end to end
+with 4 parallel exports. Exports are cached in `out/` by pose, so re-running with changed
+rules only redoes the analysis.
 
 ## Rules (`collision_rules.json`)
 
