@@ -174,8 +174,25 @@ brackets `legs/legF_pre_base.txt` → `legs/legF_post_base.txt`, report
 | lost within ±150 ms after a base TX | 12/70 | **2/75 (0.34×)** |
 | crc dumps / Δcrc_err | 41 / 41 | 61 / 62 |
 | `rx_urc_lost` / `rx_pretx_drained` | 5 / 0 | 1 / 0 |
-| **`rx_fifo_skip`** | — | **0** over 2,366 received packets |
-| **`tx_deaf_max_us` / `tx_deaf_sum_us` / `tx_done_to_rearm_max_us`** | — | **0 / 0 / 0** over 83 transmissions |
+| **`rx_fifo_skip`** | - | **0** over 2,366 received packets |
+| **`tx_deaf_sum_us` / mean per TX** | - | **1,513,000 us / 18.2 ms** over 83 commands |
+| **`tx_deaf_max_us`** | - | **19,551 us** (a `TILE_STALE`: ToA 16.7 ms + turnaround) |
+| **`tx_done_to_rearm_max_us`** | - | **1,901 us** |
+
+(`legs/legF_post2_base.txt` is the bracket with the labels present; it
+includes three extra probe transmissions made after the leg, about
+19.5 ms of deaf time each, subtracted above. Tractor side of the same
+leg, `legs/legF_post2_tractor.txt`: 2,441 fragment transmissions,
+`tx_deaf_sum` 248.8 s = 102 ms mean, max 111.5 ms, `tx_done_to_rearm`
+max 4.3 ms: the fragment airtime plus the FIFO readback.)
+
+A label trap first: the harness pushes its probe helpers from the
+branch it runs from, and the host branch did not carry the RS-12.10
+label patch, so every post-leg bracket taken by the harness-pushed
+`rs115` (legs D, E and the first leg F reading) parsed only up to
+`rx_pretx_drained` and the report printed "n/a". The L072 counters are
+cumulative, so the leg F values were still readable once the patched
+helpers were re-pushed; legs D and E ran on the slipped build anyway.
 
 Two clean answers:
 
@@ -183,27 +200,23 @@ Two clean answers:
    base.** With the address tracker live on every serviced packet, no
    packet ever started anywhere but where the previous one ended, so no
    packet completed unserviced. The RS-12.10 prediction
-   (`rx_fifo_skip ≈ penultimate losses`) fails outright: 0 vs 29. M1
-   is also not base-TX-coincident (2 of 75 lost near a base TX, below
-   the received baseline). It survives the RS-12.11 host change (it is a
-   synth-train, no-hold phenomenon) and the hold removes it (leg B).
-   Every lost fragment was transmitted (tractor TX_DONE). What is left:
-   a modem-level effect of the final fragment keying up 42 ms behind the
-   penultimate — the packet is on air and not demodulated — which needs
-   an RF-side instrument (RSSI/SNR during the penultimate, or a third
-   radio listening), not more host-side counters.
+   (`rx_fifo_skip` about equal to the penultimate losses) fails
+   outright: 0 vs 29. M1 is also not base-TX-coincident (2 of 75 lost
+   near a base TX, below the received baseline), it survives the
+   RS-12.11 host change (a synth-train, no-hold phenomenon), and the
+   hold removes it (leg B). Every lost fragment was transmitted (tractor
+   TX_DONE). What is left is a modem-level effect of the final fragment
+   keying up 42 ms behind the penultimate, the packet on air and not
+   demodulated, and that needs an RF-side instrument (RSSI/SNR during
+   the penultimate, or a third radio listening), not another host-side
+   counter.
 
-2. **The firmware never runs its own post-TX re-arm in daemon
-   operation.** `tx_deaf_*` are booked only on the `s_rearm_rx` branch
-   of `sx1276_tx_cleanup`, and they stayed at zero across 83
-   transmissions while the tracked state read RX_CONT before and after
-   the leg. So the radio is left in STANDBY after every TX_DONE and the
-   rx daemon's `_ensure_rxcont` (read RegOpMode, write 0x85) is what
-   re-arms it — the deaf window is the airtime plus a host round trip,
-   not the airtime plus a few hundred microseconds. That is why the
-   kill zone in the joins reaches 200 ms after the command's TX_DONE
-   log line. A direct single-transmit probe on the base
-   (`flash/tx_deaf_probe_base.txt`) pins which branch runs; the fix, if
-   the tracked state is the culprit, is a firmware one-liner and
-   worth the next flash.
-
+2. **The deaf window is the airtime, nothing more.** The firmware
+   re-arms RX within 1.9 ms of TX_DONE (4.3 ms on the tractor after a
+   255 B readback) and a command's deaf window is its ToA plus that:
+   18.2 ms mean, 19.6 ms max for `TILE_STALE`. So the kill zone for a
+   100 ms fragment is about 120 ms, which is what the joins show once
+   the arrival-estimate error is allowed for. There is no slow re-arm
+   to fix in firmware; the only lever is when the base transmits, which
+   is what RS-12.11 changed. The direct single-transmit probe that
+   established this is `flash/tx_deaf_probe_base.txt`.
