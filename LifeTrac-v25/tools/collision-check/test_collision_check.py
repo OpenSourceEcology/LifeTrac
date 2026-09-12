@@ -83,6 +83,18 @@ def test_pair_key_is_order_independent():
     assert cc.pair_key("frame", "arms") == "arms/frame" == cc.pair_key("arms", "frame")
 
 
+def test_suggest_budgets_from_results():
+    import suggest_budgets as sb
+    results = {"poses": [
+        {"reachable": True, "overlaps_mm3": {"arms/frame": 58.4, "arms/wheels": 0.0, "frame/hydraulics": 200267.9}},
+        {"reachable": True, "overlaps_mm3": {"arms/frame": 62.0, "arms/wheels": 0.0, "frame/hydraulics": 206600.0}},
+        {"reachable": False, "overlaps_mm3": {"arms/frame": 9999.0}},   # unreachable poses are ignored
+    ]}
+    assert sb.round_up_2sig(649.0) == 650.0 and sb.round_up_2sig(309882.0) == 310000.0
+    budgets = sb.suggest(results, margin=0.15, floor=50.0)
+    assert budgets == {"arms/frame": 72.0, "frame/hydraulics": 240000.0}
+
+
 def test_snap_volume_drops_boolean_noise():
     assert cc.snap_volume(1e-7) == 0.0
     assert cc.snap_volume(-1e-7) == 0.0

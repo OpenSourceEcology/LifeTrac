@@ -68,6 +68,10 @@ Cost with OpenSCAD 2021.01 on 4 cores: about 85 s of export time per reachable p
 - `ground_plane`: `arms` and `bucket` may not dip below ground (rule 2, crash prevention).
 - `cylinder_extension_tolerance_mm`: slack on the stroke limits for the reachability test.
 
+To recalibrate after a joint changes, run the check with `--json` and then
+`python3 suggest_budgets.py out/collision_results.json`: it prints the measured maximum per
+pair plus a margin, rounded up, ready to paste into `allowed_overlap_mm3`.
+
 ## Diagnostics
 
 `export_pair.sh <t> <groupA> <groupB>` renders the OpenSCAD `intersection()` of two groups
