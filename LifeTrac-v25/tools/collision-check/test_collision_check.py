@@ -54,6 +54,15 @@ def test_reachability_tolerance():
     assert not cc.cylinders_reachable([], tol_mm=1.0)
 
 
+def test_curl_inset_only_moves_the_curl_limit():
+    env = cc.Envelope(-27.7, 49.4, -45.0, 22.3)
+    inset = cc.apply_curl_inset(env, 1.0)
+    assert (inset.arm_min, inset.arm_max, inset.bucket_abs_min) == (-27.7, 49.4, -45.0)
+    assert abs(inset.bucket_abs_max - 21.3) < 1e-9
+    assert cc.apply_curl_inset(env, 0.0) == env
+    assert cc.apply_curl_inset(cc.Envelope(0, 1, -5.0, -4.5), 2.0).bucket_abs_max == -5.0  # never below the dump limit
+
+
 def test_grid_and_animation_poses():
     env = cc.Envelope(-27.0, 49.0, -45.0, 22.0)
     grid = cc.grid_poses(env, 3, 2)

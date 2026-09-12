@@ -65,7 +65,15 @@ Cost with OpenSCAD 2021.01 on 4 cores: about 85 s of export time per reachable p
   collision adds volume on top of the joint overlap, which is what the budget catches.
 - `min_clearance_mm`: `arms/wheels` 25.4 mm, rule 6 of `DESIGN-STRUCTURAL/DESIGN_RULES.md`
   (main arm at least 1" from the front wheels through the whole range of motion).
-- `ground_plane`: `arms` and `bucket` may not dip below ground (rule 2, crash prevention).
+- `ground_plane`: `groups` (the arms) may not dip below ground (rule 2, crash prevention);
+  `informational_groups` (the bucket) are only reported, because with the arms at ground
+  level the ground itself limits how far the bucket can dump (the lip would be up to
+  40 cm below grade at the dump limit). Such poses are marked ⛰ in the envelope grid.
+- `bucket_curl_inset_deg` (1°): the curl limit is a steel-on-steel hard stop by definition
+  (rule 5, back plate parallel to the drop leg), so the envelope is sampled 1° inside it.
+  Set it to 0 to include the stop pose itself; today that pose shows about 26 cm³ of
+  bucket/arm interpenetration with the arms at ground level, i.e. the stop angle is
+  computed slightly past the point where the plates meet.
 - `cylinder_extension_tolerance_mm`: slack on the stroke limits for the reachability test.
 
 To recalibrate after a joint changes, run the check with `--json` and then

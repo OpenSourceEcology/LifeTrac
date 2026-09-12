@@ -5,7 +5,13 @@
     "The non-default budgets below encode joint simplifications still in the model: pins and",
     "clevises drawn straight through their mating parts and the UWU hubs through the side",
     "panels. They were calibrated from the measured overlap over the pose envelope plus a",
-    "margin, and should shrink to the default as the joints get real clearance."
+    "margin (suggest_budgets.py), and should shrink to the default as the joints get real",
+    "clearance.",
+    "bucket_curl_inset_deg: the curl limit is a steel-on-steel hard stop by definition (rule 5),",
+    "so the envelope is sampled this far inside it. Set to 0 to include the stop pose itself,",
+    "which today shows about 26 cm3 of bucket/arm interpenetration with the arms at ground.",
+    "ground_plane.groups fail when they dip below ground (rule 2, crash prevention);",
+    "informational_groups are only reported (the bucket lip when dumping with the arms down)."
   ],
   "default_allowed_overlap_mm3": 50,
   "allowed_overlap_mm3": {
@@ -20,9 +26,11 @@
     "arms/wheels": 25.4
   },
   "ground_plane": {
-    "groups": ["arms", "bucket"],
+    "groups": ["arms"],
+    "informational_groups": ["bucket"],
     "min_z_mm": -1.0
   },
+  "bucket_curl_inset_deg": 1.0,
   "cylinder_extension_tolerance_mm": 1.0,
   "bucket_abs_default_range": [-45.0, 30.0]
 }

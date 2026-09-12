@@ -112,6 +112,7 @@ class PoseResult:
     checks: list = field(default_factory=list)        # list[Check]
     overlaps: dict = field(default_factory=dict)      # pair -> volume mm^3 (None = unmeasurable)
     clearances: dict = field(default_factory=dict)    # pair -> mm
+    ground_limited: dict = field(default_factory=dict)  # group -> lowest z (informational)
 
     @property
     def failed(self) -> bool:
@@ -168,6 +169,16 @@ def envelope_from_echo(parsed: dict, bucket_default=(-45.0, 30.0)) -> Envelope:
         return Envelope(parsed["fallback_arm_min"], parsed["fallback_arm_max"], *bucket_default)
     raise RuntimeError("could not read the pose envelope from the model's echo output "
                        "(expected a COLLISION_ENVELOPE line)")
+
+
+def apply_curl_inset(env: Envelope, inset_deg: float) -> Envelope:
+    """The bucket curl limit is a steel-on-steel hard stop by definition (rule 5 of
+    DESIGN_RULES.md: back plate parallel to the drop leg), so the envelope is sampled a
+    little inside it; the stop pose itself is a contact, not a clearance."""
+    if not inset_deg:
+        return env
+    new_max = max(env.bucket_abs_min, env.bucket_abs_max - inset_deg)
+    return Envelope(env.arm_min, env.arm_max, env.bucket_abs_min, new_max)
 
 
 def grid_poses(env: Envelope, arm_steps: int, bucket_steps: int) -> list[Pose]:
@@ -331,7 +342,9 @@ class Runner:
                                 for k, v in config.get("min_clearance_mm", {}).items()}
         ground = config.get("ground_plane", {})
         self.ground_groups = list(ground.get("groups", []))
+        self.ground_info_groups = list(ground.get("informational_groups", []))
         self.ground_min_z = float(ground.get("min_z_mm", -1.0))
+        self.curl_inset = float(config.get("bucket_curl_inset_deg", 0.0))
         self.cyl_tol = float(config.get("cylinder_extension_tolerance_mm", 1.0))
         self.timings: dict[str, float] = {}
         self.notes: list[str] = []
@@ -344,6 +357,7 @@ class Runner:
     def poses(self) -> tuple[Envelope, list[Pose]]:
         parsed = self.scad.echo("envelope", None)
         env = envelope_from_echo(parsed, tuple(self.config.get("bucket_abs_default_range", (-45.0, 30.0))))
+        env = apply_curl_inset(env, self.curl_inset)
         if self.args.poses:
             poses = parse_pose_list(self.args.poses)
         elif self.args.animation_frames:
@@ -454,6 +468,13 @@ class Runner:
                                             min_z >= self.ground_min_z,
                                             "lowest point of the group above ground" if min_z >= self.ground_min_z
                                             else "group dips below ground level"))
+            # Informational: the ground, not the machine, limits these poses (e.g. the bucket
+            # lip when dumping with the arms at ground level). Reported, not failed.
+            for g in self.ground_info_groups:
+                if g in meshes:
+                    min_z = float(meshes[g].bounds[0][2])
+                    if min_z < self.ground_min_z:
+                        res.ground_limited[g] = min_z
         self.timings["analysis_s"] = time.time() - t0
 
     def judge_pair(self, a: str, b: str, meshes: dict, manifolds: dict, pose_key: str):
@@ -504,8 +525,10 @@ def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
                  f"exports {runner.timings.get('export_s', 0):.0f}s, "
                  f"analysis {runner.timings.get('analysis_s', 0):.0f}s)")
     lines.append("")
-    lines.append(f"Envelope from the model: arm {env.arm_min:+.1f}° to {env.arm_max:+.1f}°, "
-                 f"bucket (absolute) {env.bucket_abs_min:+.1f}° to {env.bucket_abs_max:+.1f}°. "
+    inset_note = (f" The bucket curl limit is a hard stop (rule 5), so it is sampled {runner.curl_inset:g}° "
+                  "inside the stop." if runner.curl_inset else "")
+    lines.append(f"Envelope sampled: arm {env.arm_min:+.1f}° to {env.arm_max:+.1f}°, "
+                 f"bucket (absolute) {env.bucket_abs_min:+.1f}° to {env.bucket_abs_max:+.1f}°.{inset_note} "
                  "Poses whose cylinders would leave their stroke are marked unreachable and not judged.")
     lines.append("")
 
@@ -516,7 +539,8 @@ def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
         lines.append("## Envelope")
         lines.append("")
         lines.append("Rows: arm lift angle. Columns: absolute bucket angle (negative = dumping). "
-                     "✅ pass · ❌ fail · ⬜ unreachable · ➖ not sampled")
+                     "✅ pass · ❌ fail · ⬜ unreachable · ➖ not sampled · ⛰ bucket below ground "
+                     "(the ground limits this pose, informational)")
         lines.append("")
         lines.append("| arm \\ bucket | " + " | ".join(f"{b:+.1f}°" for b in buckets) + " |")
         lines.append("|---|" + "---|" * len(buckets))
@@ -525,7 +549,10 @@ def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
             cells = []
             for b in buckets:
                 r = lookup.get((a, b))
-                cells.append("➖" if r is None else "⬜" if not r.reachable else "❌" if r.failed else "✅")
+                cell = "➖" if r is None else "⬜" if not r.reachable else "❌" if r.failed else "✅"
+                if r is not None and r.ground_limited:
+                    cell += " ⛰"
+                cells.append(cell)
             lines.append(f"| {a:+.1f}° | " + " | ".join(cells) + " |")
         lines.append("")
 
@@ -574,6 +601,22 @@ def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
         lines.append(f"| {key} | {fmt_mm3(min(measurable)) if measurable else 'n/a'} | "
                      f"{fmt_mm3(max(measurable)) if measurable else 'n/a'} | {fmt_mm3(budget)} | {status} |")
     lines.append("")
+
+    # ground-limited poses (informational)
+    limited = [(p, results[p].ground_limited) for p in reachable if results[p].ground_limited]
+    if limited:
+        lines.append("## Ground-limited poses (informational)")
+        lines.append("")
+        lines.append("At these poses a group would be below ground level, so the ground, not the machine, "
+                     "limits the motion (typically the bucket lip when dumping with the arms down). "
+                     "They are still checked for interference but the depth is not a failure.")
+        lines.append("")
+        lines.append("| Pose | Group | Lowest point |")
+        lines.append("|---|---|---|")
+        for p, groups in limited:
+            for g, z in sorted(groups.items()):
+                lines.append(f"| {p.label()} | {g} | {z:.0f} mm |")
+        lines.append("")
 
     # clearance and cylinder usage
     if runner.clearance_rules:
@@ -638,6 +681,7 @@ def results_json(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
                 "reachable": r.reachable,
                 "cylinders": [{"name": n, "extension_mm": e, "stroke_mm": s} for n, e, s in r.cylinders],
                 "overlaps_mm3": r.overlaps, "clearances_mm": r.clearances,
+                "ground_limited_mm": r.ground_limited,
                 "checks": [c.__dict__ for c in r.checks],
             }
             for p, r in results.items()
