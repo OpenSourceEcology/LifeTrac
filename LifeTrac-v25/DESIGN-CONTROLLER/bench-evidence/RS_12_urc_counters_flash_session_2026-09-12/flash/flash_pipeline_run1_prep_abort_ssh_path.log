@@ -1,0 +1,47 @@
+kmsg logger pid=2530 uptime_s=1202.93
+1203.018 === T-1 Sat Sep 12 16:10:24 UTC 2026 wdt_pet start (HW WDT is 60s; flashes >60s reboot otherwise) ===
+1203.500 wdt_pet started pid=2543 log=/home/fio/wdt_pet.log
+1203.508 === T0 Sat Sep 12 16:10:24 UTC 2026 prep_bridge ===
+1203.517 === [1/4] unexport x8h7 gpios (160..193) ===
+1203.834 === [1.5/4] unexport x8h7 PWM channels ===
+1204.146 === [2/4] unbind in-kernel x8h7 gpio consumers ===
+1204.150   unbind cs42l52_regulator OK
+1204.458 === [3/4] rmmod x8h7 modules ===
+1204.486   rmmod x8h7_ui: /tmp/lifetrac_p0c/prep_bridge.sh: line 65: rmmod: command not found
+1204.509   rmmod x8h7_uart: /tmp/lifetrac_p0c/prep_bridge.sh: line 65: rmmod: command not found
+1204.530   rmmod x8h7_pwm: /tmp/lifetrac_p0c/prep_bridge.sh: line 65: rmmod: command not found
+1204.551   rmmod x8h7_rtc: /tmp/lifetrac_p0c/prep_bridge.sh: line 65: rmmod: command not found
+1204.573   rmmod x8h7_adc: /tmp/lifetrac_p0c/prep_bridge.sh: line 65: rmmod: command not found
+1204.595   rmmod x8h7_can: /tmp/lifetrac_p0c/prep_bridge.sh: line 65: rmmod: command not found
+1204.613   rmmod x8h7_gpio: /tmp/lifetrac_p0c/prep_bridge.sh: line 65: rmmod: command not found
+1204.641   rmmod x8h7_h7: /tmp/lifetrac_p0c/prep_bridge.sh: line 65: rmmod: command not found
+1204.659   rmmod x8h7_drv: /tmp/lifetrac_p0c/prep_bridge.sh: line 65: rmmod: command not found
+1204.661 === [4/4] verify ===
+1204.679   WARNING: 9 x8h7 modules still loaded:
+1204.696     x8h7_ui                16384  0
+1204.697     x8h7_uart              16384  0
+1204.698     x8h7_pwm               16384  0
+1204.699     x8h7_rtc               16384  0
+1204.701     x8h7_adc               16384  0
+1204.702     x8h7_gpio              16384  0
+1204.703     x8h7_can               16384  0
+1204.704     x8h7_h7                16384  0
+1204.706     x8h7_drv               16384  8 x8h7_ui,x8h7_h7,x8h7_can,x8h7_gpio,x8h7_rtc,x8h7_pwm,x8h7_adc,x8h7_uart
+1204.707 === PARTIAL: openocd halt may still wedge the bridge. Power-cycle if it does. ===
+1204.708 prep_rc=2
+1204.710 === ABORT: prep_bridge failed ===
+1205.035 wdt_pet stopped pid=2543 (1204.873 CLOSE-WITH-MAGIC after 1 pets)
+PIPELINE-EXIT=2 uptime_s=1205.06
+--- wdt_pet.log tail:
+1203.066 OPEN pid=2543 interval=10.0s
+1203.068 PET 1
+1204.873 CLOSE-WITH-MAGIC after 1 pets
+--- kmsg tail:
+ SUBSYSTEM=rtc
+ DEVICE=c252:0
+1204.722 3,2617,1204877908,-;rtc rtc0: Timeout waiting for LPSRT Counter to change
+ SUBSYSTEM=rtc
+ DEVICE=c252:0
+SSH-EXIT=2
+
+[exited with code 0]

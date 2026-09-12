@@ -34,6 +34,20 @@ echo "flash_rc=$FLASH_RC" | tee -a "$LOG"
 
 echo "" | tee -a "$LOG"
 echo "=== T2 $(date) revive_bridge ===" | tee -a "$LOG"
+# REVIVE_MODE=reboot (2026-09-12): skip the x8h7 module reload, which OOPSes
+# the base kernel (6.1.24-lmp) and power-cycles the board anyway. Bring the
+# H7 back with openocd reset run, hand the watchdog back, then reboot on
+# purpose. /tmp is lost either way; the caller re-pushes tooling.
+if [ "${REVIVE_MODE:-full}" = "reboot" ]; then
+  REVIVE_MODE=reset_run_only bash $TOOLDIR/revive_bridge.sh 2>&1 | tee -a "$LOG"
+  REVIVE_RC=${PIPESTATUS[0]}
+  echo "revive_rc=$REVIVE_RC (reset_run_only)" | tee -a "$LOG"
+  bash $TOOLDIR/wdt_pet.sh stop 2>&1 | tee -a "$LOG"
+  echo "=== T3 $(date) DONE: prep=$PREP_RC flash=$FLASH_RC revive=$REVIVE_RC; REBOOTING (REVIVE_MODE=reboot) ===" | tee -a "$LOG"
+  sync
+  systemctl reboot
+  exit "$FLASH_RC"
+fi
 bash $TOOLDIR/revive_bridge.sh 2>&1 | tee -a "$LOG"
 REVIVE_RC=${PIPESTATUS[0]}
 echo "revive_rc=$REVIVE_RC" | tee -a "$LOG"
