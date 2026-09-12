@@ -82,9 +82,50 @@ def test_grid_animation_and_hard_stop_poses():
 def test_pose_absolute_angle_and_key():
     pose = cc.Pose(30.0, -50.0)
     assert pose.bucket_abs == -20.0
-    assert pose.key == "arm+030.00_rel-050.00"
+    assert pose.key == "arm+030.0000_rel-050.0000"
     assert "-20.0° abs" in pose.label()
     assert cc.parse_pose_list("30:-50, -27.7:27.7") == [cc.Pose(30.0, -50.0), cc.Pose(-27.7, 27.7)]
+    # the key carries the same precision as the -D values, so close poses never share files
+    assert cc.Pose(10.001, 0.0).key != cc.Pose(10.002, 0.0).key
+    assert cc.OpenSCAD.pose_args(cc.Pose(10.001, 0.0)) != cc.OpenSCAD.pose_args(cc.Pose(10.002, 0.0))
+
+
+def test_model_dependencies_follow_includes_and_uses(tmp_path):
+    (tmp_path / "modules").mkdir()
+    (tmp_path / "parts").mkdir()
+    main = tmp_path / "main.scad"
+    main.write_text('include <params.scad>\nuse <modules/arm.scad>\nuse <MCAD/polyholes.scad>\ncube(1);\n')
+    (tmp_path / "params.scad").write_text("X = 1;\n")
+    (tmp_path / "modules" / "arm.scad").write_text("include <../params.scad>\nuse <../parts/plate.scad>\n")
+    (tmp_path / "parts" / "plate.scad").write_text("module plate() {}\n")
+    deps = cc.model_dependencies(str(main))
+    names = sorted(os.path.relpath(d, tmp_path) for d in deps)
+    assert names == ["main.scad", "modules/arm.scad", "params.scad", "parts/plate.scad"]
+    os.utime(tmp_path / "parts" / "plate.scad", (2_000_000_000, 2_000_000_000))
+    assert cc.newest_mtime(deps) == 2_000_000_000
+
+
+def test_verdict_counts_failures_on_unreachable_poses_too():
+    ok = cc.Pose(0.0, 0.0)
+    broken = cc.Pose(10.0, 0.0)
+    unreachable = cc.Pose(20.0, 0.0)
+    results = {
+        ok: cc.PoseResult(pose=ok, reachable=True,
+                          checks=[cc.Check(ok.key, "overlap", "arms/frame", 10.0, 50.0, True)]),
+        broken: cc.PoseResult(pose=broken, reachable=False,
+                              checks=[cc.Check(broken.key, "export", "echo", None, None, False, "exited 1")]),
+        unreachable: cc.PoseResult(pose=unreachable, reachable=False),
+    }
+    judged, reachable, failed, passed = cc.verdict(results, [])
+    assert judged == [ok, broken, unreachable] and reachable == [ok]
+    assert failed == [broken] and passed is False
+    del results[broken]
+    assert cc.verdict(results, [])[3] is True
+    # a failed static check (missing or empty static group, failed export) fails the run
+    static = [cc.Check("static", "mesh", "frame", None, None, False, "static group exported no geometry")]
+    assert cc.verdict(results, static)[3] is False
+    # nothing reachable at all is a failure, never a pass by vacuity
+    assert cc.verdict({unreachable: results[unreachable]}, [])[3] is False
 
 
 def test_overlap_verdict():

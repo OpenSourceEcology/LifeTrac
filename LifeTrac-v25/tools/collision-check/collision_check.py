@@ -67,6 +67,30 @@ FALLBACK_CYL_RE = re.compile(
     r'^ECHO:\s*"oriented_cylinder: len=",\s*(-?[\d.eE+-]+),\s*"extension=",\s*(-?[\d.eE+-]+),\s*"stroke=",\s*(-?[\d.eE+-]+)')
 
 VOLUME_NOISE_MM3 = 1e-3   # below this the boolean result is numerical noise, not geometry
+INCLUDE_RE = re.compile(r'^\s*(?:include|use)\s*<([^>]+)>', re.M)
+
+
+def model_dependencies(model: str) -> list[str]:
+    """The model file plus everything it includes or uses, recursively. Relative paths
+    resolve against the including file, as OpenSCAD does; library paths that do not exist
+    next to the model (e.g. <MCAD/...>) are ignored."""
+    seen: list[str] = []
+    stack = [os.path.abspath(model)]
+    while stack:
+        path = stack.pop()
+        if path in seen or not os.path.isfile(path):
+            continue
+        seen.append(path)
+        with open(path, errors="replace") as f:
+            text = f.read()
+        for rel in INCLUDE_RE.findall(text):
+            dep = rel if os.path.isabs(rel) else os.path.normpath(os.path.join(os.path.dirname(path), rel))
+            stack.append(dep)
+    return seen
+
+
+def newest_mtime(paths) -> float:
+    return max((os.path.getmtime(p) for p in paths if os.path.isfile(p)), default=0.0)
 
 
 # --------------------------------------------------------------------------- data types
@@ -82,7 +106,8 @@ class Pose:
 
     @property
     def key(self) -> str:
-        return f"arm{self.arm:+07.2f}_rel{self.bucket_rel:+07.2f}"
+        # Same precision as the -D values handed to OpenSCAD, so distinct poses never share files.
+        return f"arm{self.arm:+09.4f}_rel{self.bucket_rel:+09.4f}"
 
     def label(self) -> str:
         return f"arm {self.arm:+.1f}°, bucket {self.bucket_rel:+.1f}° rel ({self.bucket_abs:+.1f}° abs)"
@@ -251,6 +276,8 @@ def overlap_verdict(volume: float | None, allowed: float) -> tuple[bool, str]:
 class OpenSCAD:
     def __init__(self, binary: str, model: str, out_dir: str, timeout: float):
         self.binary, self.model, self.out_dir, self.timeout = binary, model, out_dir, timeout
+        # Cached exports are stale when the model or anything it includes/uses is newer.
+        self.model_mtime = newest_mtime(model_dependencies(model))
         os.makedirs(out_dir, exist_ok=True)
 
     def version(self) -> str:
@@ -300,7 +327,7 @@ class OpenSCAD:
         name = f"{group}_static" if pose is None else f"{group}_{pose.key}"
         out_path = os.path.join(self.out_dir, name + ".stl")
         if not force and os.path.exists(out_path) and os.path.getsize(out_path) > 0 \
-                and os.path.getmtime(out_path) >= os.path.getmtime(self.model):
+                and os.path.getmtime(out_path) >= self.model_mtime:
             return out_path, 0, 0.0, True
         wanted = GROUPS[group][0]
         toggles = []
@@ -433,7 +460,8 @@ class Runner:
                         results[pose].checks.append(Check(pose.key, "export", group, None, None, False,
                                                           f"OpenSCAD exited {rc}"))
                     else:
-                        self.notes.append(f"export of static group '{group}' failed (exit {rc})")
+                        self.static_checks.append(Check("static", "export", group, None, None, False,
+                                                        f"OpenSCAD exited {rc}"))
                     continue
                 self.log(f"  {'cached' if cached else 'done  '} {group:<10} {label}  ({seconds:.0f}s)")
                 paths[task] = path
@@ -448,7 +476,9 @@ class Runner:
             path = paths.get((g, None))
             mesh = load_mesh(path) if path else None
             if mesh is None:
-                self.notes.append(f"static group '{g}' has no geometry; skipped")
+                if path:   # exported fine but empty: every pair with this group would go unchecked
+                    self.static_checks.append(Check("static", "mesh", g, None, None, False,
+                                                    "static group exported no geometry"))
                 continue
             static_meshes[g] = mesh
             static_manifolds[g] = to_manifold(mesh)
@@ -530,15 +560,23 @@ def fmt_mm3(v: float | None) -> str:
     return f"{v:,.0f} mm³"
 
 
+def verdict(results: dict[Pose, PoseResult], static_checks: list[Check]) -> tuple[list, list, list, bool]:
+    """(judged poses, reachable poses, failed poses, passed). A pose fails on any failed check,
+    reachable or not (an echo or export error must never be skipped as 'unreachable'); a
+    pose the cylinders cannot reach and that has no failed check is simply not judged."""
+    judged = [p for p in results if not results[p].informational]
+    reachable = [p for p in judged if results[p].reachable]
+    failed = [p for p in judged if results[p].failed]
+    static_failed = [c for c in static_checks if not c.ok]
+    passed = not failed and not static_failed and bool(reachable)
+    return judged, reachable, failed, passed
+
+
 def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult], version: str,
                  elapsed: float) -> tuple[str, bool]:
-    judged = [p for p in results if not results[p].informational]
+    judged, reachable, failed, passed = verdict(results, runner.static_checks)
     probes = [p for p in results if results[p].informational]
-    reachable = [p for p in judged if results[p].reachable]
-    failed = [p for p in reachable if results[p].failed]
     static_failed_checks = [c for c in runner.static_checks if not c.ok]
-    static_failed = [n for n in runner.notes if "failed" in n]
-    passed = not failed and not static_failed_checks and not static_failed and bool(reachable)
     lines = []
     lines.append("# LifeTrac v25 collision check")
     lines.append("")
@@ -575,7 +613,7 @@ def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
             cells = []
             for r in rels:
                 res = lookup.get((a, r))
-                cell = "➖" if res is None else "⬜" if not res.reachable else "❌" if res.failed else "✅"
+                cell = "➖" if res is None else "❌" if res.failed else "⬜" if not res.reachable else "✅"
                 if res is not None and res.ground_limited:
                     cell += " ⛰"
                 cells.append(cell)
@@ -586,10 +624,11 @@ def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
     lines.append("## Failures")
     lines.append("")
     fail_rows = [("static (pose independent)", c) for c in static_failed_checks]
-    fail_rows += [(results[p].pose.label(), c) for p in reachable for c in results[p].checks if not c.ok]
+    fail_rows += [(results[p].pose.label(), c) for p in judged for c in results[p].checks if not c.ok]
     if not reachable:
         lines.append("No reachable pose was evaluated, so nothing was checked (this counts as a failure).")
-    if not fail_rows and not static_failed:
+        lines.append("")
+    if not fail_rows:
         lines.append("None.")
     else:
         lines.append("| Pose | Check | Subject | Value | Limit | Note |")
@@ -598,8 +637,6 @@ def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
             value = fmt_mm3(c.value) if c.kind == "overlap" else ("n/a" if c.value is None else f"{c.value:.1f} mm")
             limit = fmt_mm3(c.limit) if c.kind == "overlap" else ("n/a" if c.limit is None else f"{c.limit:.1f} mm")
             lines.append(f"| {label} | {c.kind} | {c.subject} | {value} | {limit} | {c.note} |")
-        for n in static_failed:
-            lines.append(f"| static | export | | | | {n} |")
     lines.append("")
 
     # overlap summary across poses

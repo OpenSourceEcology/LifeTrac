@@ -33,8 +33,8 @@ the job summary and as an artifact.
 ## Usage
 
 ```bash
-pip install -r requirements.txt
 cd LifeTrac-v25/tools/collision-check
+pip install -r requirements.txt
 
 # default 7x5 grid over the envelope (what CI runs)
 python3 collision_check.py --report out/collision_report.md --json out/collision_results.json
