@@ -2409,7 +2409,14 @@ evidence. Both boards on the RS-12.10 bench build; radios parked after.
   (PR #118, gate passed, see above).**
 - [x] **RS-4.15 — motion-aware stale-scan horizon: DONE 2026-09-12 (PR #118,
   measured-rotation horizon, 102 → 13 TILE_STALE per 300 s).**
-- [ ] **RS-12.12 — validate RS-12.11 under the production profile (opened
+- [x] **RS-12.12 — validated under the production FHSS profile 2026-09-12
+  (evidence RS_12_12_fhss_validation_2026-09-12; branch rs12-12-fhss-validation).**
+  Leg H (keyframe plane quiet): profile-1 healthy — 2.1 % loss, follower
+  locked all leg, stale scan 17 sends; RS-12.11/RS-4.15 run clean. Leg G
+  first attempt was CONTAMINATED by a retained `radio_profile=2` pin
+  (clear_retained.py didn't cover it; now fixed) + a keyframe storm.
+  → RS-12.14 below. (original entry:)
+- [ ] ~~**RS-12.12 — validate RS-12.11 under the production profile (opened
   2026-09-12).** Both gate legs ran on profile 2 (DTS, 927.5 pinned). Under
   profile 1 the aligned pump meets the FHSS slot clock (base command TX
   near a slot boundary → follower skip-under-tx-busy, RS-4.14). Fly one
@@ -2424,6 +2431,21 @@ evidence. Both boards on the RS-12.10 bench build; radios parked after.
   costs the camera path anything; long synth/keyframe trains get the
   3.2 % → 1.5 % benefit. `LIFETRAC_NO_PARK_LAST` default unchanged (0);
   flipping it is now a low-risk call once RS-3.11 decides on long trains.
+- [ ] **RS-12.14 — keyframe self-heal storm destroys the FHSS follower
+  (opened 2026-09-12, from RS-12.12 leg I).** With keyframe requests enabled
+  on profile 1, a few early misses trigger self-heal requests; each is a base
+  TX that skips the follower under tx-busy (RS-4.14); the follower loses lock
+  (64 s gap) and the leg collapses to 62.8 % loss / 226 published vs leg H's
+  2.1 % / 572 with the plane quiet. RS-12.11 does NOT cover this: the keyframe
+  retries ride the pending-command pump (frame-completion / train-end), not
+  the idle drain it gates (idle_drain_deferred=271 that leg, yet 281 sends went
+  out). Fix options: (a) rate-limit / back off the KeyframeRequester on a
+  marginal FHSS link (RS-4.14 successor); (b) gate the pending-command pump the
+  way RS-12.11 gated the idle drain; (c) lean harder on the 0x6C stale-tile
+  repair (RS-4.15) and drop per-gap keyframes on FHSS. INTERIM: run field
+  profile-1 with LIFETRAC_KF_REQUEST_DISABLE=1 or a heavy rate limit. Not a
+  regression from this session's work — pre-existing RS-4.14 loop, first
+  measured on the production profile here.
 - [x] **RS-12.10 — FLOWN 2026-09-12 evening (PR #117): `rx_fifo_skip` = 0 over
   2,366 packets with 29 penultimate losses in the same leg (F) → M1 is NOT
   FIFO coalescing at the base; base deaf window per command = ToA + ≤1.9 ms

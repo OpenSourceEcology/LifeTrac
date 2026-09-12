@@ -1,0 +1,3412 @@
+﻿2026-08-30 14:01:18,935 INFO image_tx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-08-30 14:01:18,944 INFO image_tx_daemon: image_tx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-08-30 14:01:18,947 INFO image_tx_daemon: no_park_last=0 gap_ms=80 min_frags=3 pipeline_depth=2
+
+2026-08-30 14:01:18,951 INFO image_tx_daemon: MQTT connected; subscribing to lifetrac/v25/cmd/image_frame
+
+2026-08-30 14:01:18,953 INFO image_tx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-08-30 14:01:18,974 INFO image_tx_daemon: link_budget: published n_frag=1 profile_idx=5 (profile 1)
+
+Initializing regulatory profile 1 on co-processor...
+
+  FHSS mask: WIDE (50 channels) [LIFETRAC_FHSS_WIDE_MASK=1]
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+CFG_SET_REQ(FHSS_FARM_ID) OK: 17000800
+
+CFG_SET_REQ(FHSS_NODE_ID) OK: 18000800
+
+CFG_SET_REQ(REG_PROFILE=1) OK: 14000100
+
+PHY contract OK: image_bw250 == {'sf': 7, 'bw_khz': 250, 'cr_den': 5, 'preamble': 8}
+
+2026-08-30 14:01:19,774 INFO image_tx_daemon: LBT_ENABLE=0 (matches W1-10b TX_BURST rationale)
+
+2026-08-30 14:01:19,786 INFO image_tx_daemon: TX worker ready (inter_cycle_s=0.050, max 8 frags/dwell)
+
+2026-08-30 14:01:19,787 INFO image_tx_daemon: batching: 2 frames in 1 trains so far (this train: 2 frames, 748 B)
+
+2026-08-30 14:01:19,940 INFO image_tx_daemon: stats: goodput=0.0 B/s util=0% pipeline=v3 frames_in=2 ok=0 fail=0 drop_full=0 drop_stale=0 frags_ok=0 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-30 14:01:20,008 INFO image_tx_daemon: txdone_arrival: seq=1 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:20,222 INFO image_tx_daemon: txdone_arrival: seq=1 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:01:20,591 INFO image_tx_daemon: txdone_arrival: seq=1 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:01:20,754 INFO image_tx_daemon: txdone_arrival: seq=1 idx=3 status=0 toa_us=128128
+
+2026-08-30 14:01:20,766 INFO image_tx_daemon: frame seq=1 done (pipelined): 4 fragments ok
+
+2026-08-30 14:01:21,198 INFO image_tx_daemon: txdone_arrival: seq=3 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:21,344 INFO image_tx_daemon: txdone_arrival: seq=3 idx=1 status=0 toa_us=123008
+
+2026-08-30 14:01:21,355 INFO image_tx_daemon: frame seq=3 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:21,595 INFO image_tx_daemon: txdone_arrival: seq=4 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:21,755 INFO image_tx_daemon: txdone_arrival: seq=4 idx=1 status=0 toa_us=135808
+
+2026-08-30 14:01:21,767 INFO image_tx_daemon: frame seq=4 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:22,193 INFO image_tx_daemon: txdone_arrival: seq=5 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:22,394 INFO image_tx_daemon: txdone_arrival: seq=5 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:01:22,405 INFO image_tx_daemon: frame seq=5 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:22,795 INFO image_tx_daemon: txdone_arrival: seq=6 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:22,807 INFO image_tx_daemon: frame seq=6 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:23,196 INFO image_tx_daemon: txdone_arrival: seq=7 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:23,374 INFO image_tx_daemon: txdone_arrival: seq=7 idx=1 status=0 toa_us=151168
+
+2026-08-30 14:01:23,386 INFO image_tx_daemon: frame seq=7 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:23,790 INFO image_tx_daemon: txdone_arrival: seq=8 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:23,966 INFO image_tx_daemon: txdone_arrival: seq=8 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:01:23,978 INFO image_tx_daemon: frame seq=8 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:24,393 INFO image_tx_daemon: txdone_arrival: seq=9 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:24,539 INFO image_tx_daemon: txdone_arrival: seq=9 idx=1 status=0 toa_us=120448
+
+2026-08-30 14:01:24,551 INFO image_tx_daemon: frame seq=9 done (pipelined): 2 fragments ok
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=27 channel_idx=9 epoch=0 freq_hz=907250000 pkt_toa_us=123008 legal_dwell_used_us_10s=123008
+
+2026-08-30 14:01:27,778 INFO image_tx_daemon: txdone_arrival: seq=10 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:27,790 INFO image_tx_daemon: frame seq=10 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:28,176 INFO image_tx_daemon: txdone_arrival: seq=11 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:28,188 INFO image_tx_daemon: frame seq=11 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:28,370 INFO image_tx_daemon: txdone_arrival: seq=12 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:01:28,381 INFO image_tx_daemon: frame seq=12 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:28,976 INFO image_tx_daemon: txdone_arrival: seq=13 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:28,988 INFO image_tx_daemon: frame seq=13 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:29,384 INFO image_tx_daemon: txdone_arrival: seq=14 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:29,396 INFO image_tx_daemon: frame seq=14 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:29,952 INFO image_tx_daemon: stats: goodput=413.1 B/s util=34% pipeline=v3 frames_in=15 ok=13 fail=0 drop_full=0 drop_stale=0 frags_ok=22 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-30 14:01:29,975 INFO image_tx_daemon: txdone_arrival: seq=15 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:01:29,987 INFO image_tx_daemon: frame seq=15 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:30,568 INFO image_tx_daemon: txdone_arrival: seq=16 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:01:30,580 INFO image_tx_daemon: frame seq=16 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:30,974 INFO image_tx_daemon: txdone_arrival: seq=17 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:30,986 INFO image_tx_daemon: frame seq=17 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:31,572 INFO image_tx_daemon: txdone_arrival: seq=18 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:31,584 INFO image_tx_daemon: frame seq=18 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:31,979 INFO image_tx_daemon: txdone_arrival: seq=19 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:31,991 INFO image_tx_daemon: frame seq=19 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:32,577 INFO image_tx_daemon: txdone_arrival: seq=20 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:01:32,589 INFO image_tx_daemon: frame seq=20 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:32,972 INFO image_tx_daemon: txdone_arrival: seq=21 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:32,984 INFO image_tx_daemon: frame seq=21 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:33,570 INFO image_tx_daemon: txdone_arrival: seq=22 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:01:33,582 INFO image_tx_daemon: frame seq=22 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:33,978 INFO image_tx_daemon: txdone_arrival: seq=23 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:33,991 INFO image_tx_daemon: frame seq=23 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:34,578 INFO image_tx_daemon: txdone_arrival: seq=24 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:34,590 INFO image_tx_daemon: frame seq=24 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:34,972 INFO image_tx_daemon: txdone_arrival: seq=25 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:34,983 INFO image_tx_daemon: frame seq=25 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:35,573 INFO image_tx_daemon: txdone_arrival: seq=26 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:01:35,585 INFO image_tx_daemon: frame seq=26 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:35,988 INFO image_tx_daemon: txdone_arrival: seq=27 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:36,000 INFO image_tx_daemon: frame seq=27 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:36,569 INFO image_tx_daemon: txdone_arrival: seq=28 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:01:36,580 INFO image_tx_daemon: frame seq=28 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:37,170 INFO image_tx_daemon: txdone_arrival: seq=29 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:01:37,181 INFO image_tx_daemon: frame seq=29 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:37,557 INFO image_tx_daemon: txdone_arrival: seq=30 idx=0 status=0 toa_us=133248
+
+2026-08-30 14:01:37,568 INFO image_tx_daemon: frame seq=30 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:38,176 INFO image_tx_daemon: txdone_arrival: seq=31 idx=0 status=0 toa_us=156288
+
+2026-08-30 14:01:38,187 INFO image_tx_daemon: frame seq=31 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:38,569 INFO image_tx_daemon: txdone_arrival: seq=32 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:38,581 INFO image_tx_daemon: frame seq=32 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:39,168 INFO image_tx_daemon: txdone_arrival: seq=33 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:39,180 INFO image_tx_daemon: frame seq=33 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:39,576 INFO image_tx_daemon: txdone_arrival: seq=34 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:39,588 INFO image_tx_daemon: frame seq=34 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:39,964 INFO image_tx_daemon: stats: goodput=364.7 B/s util=30% pipeline=v3 frames_in=35 ok=33 fail=0 drop_full=0 drop_stale=0 frags_ok=42 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-30 14:01:40,164 INFO image_tx_daemon: txdone_arrival: seq=35 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:01:40,175 INFO image_tx_daemon: frame seq=35 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:40,771 INFO image_tx_daemon: txdone_arrival: seq=36 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:40,783 INFO image_tx_daemon: frame seq=36 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:41,170 INFO image_tx_daemon: txdone_arrival: seq=37 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:01:41,182 INFO image_tx_daemon: frame seq=37 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:41,768 INFO image_tx_daemon: txdone_arrival: seq=38 idx=0 status=0 toa_us=156288
+
+2026-08-30 14:01:41,780 INFO image_tx_daemon: frame seq=38 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:42,170 INFO image_tx_daemon: txdone_arrival: seq=39 idx=0 status=0 toa_us=156288
+
+2026-08-30 14:01:42,182 INFO image_tx_daemon: frame seq=39 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:42,768 INFO image_tx_daemon: txdone_arrival: seq=40 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:42,780 INFO image_tx_daemon: frame seq=40 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:43,167 INFO image_tx_daemon: txdone_arrival: seq=41 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:43,180 INFO image_tx_daemon: frame seq=41 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:43,767 INFO image_tx_daemon: txdone_arrival: seq=42 idx=0 status=0 toa_us=156288
+
+2026-08-30 14:01:43,779 INFO image_tx_daemon: frame seq=42 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:44,171 INFO image_tx_daemon: txdone_arrival: seq=43 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:01:44,182 INFO image_tx_daemon: frame seq=43 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:44,772 INFO image_tx_daemon: txdone_arrival: seq=44 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:44,783 INFO image_tx_daemon: frame seq=44 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:45,360 INFO image_tx_daemon: txdone_arrival: seq=45 idx=0 status=0 toa_us=148608
+
+2026-08-30 14:01:45,372 INFO image_tx_daemon: frame seq=45 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:45,770 INFO image_tx_daemon: txdone_arrival: seq=46 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:45,782 INFO image_tx_daemon: frame seq=46 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:46,369 INFO image_tx_daemon: txdone_arrival: seq=47 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:01:46,380 INFO image_tx_daemon: frame seq=47 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:46,761 INFO image_tx_daemon: txdone_arrival: seq=48 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:01:46,773 INFO image_tx_daemon: frame seq=48 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:47,369 INFO image_tx_daemon: txdone_arrival: seq=49 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:01:47,381 INFO image_tx_daemon: frame seq=49 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:47,754 INFO image_tx_daemon: txdone_arrival: seq=50 idx=0 status=0 toa_us=140928
+
+2026-08-30 14:01:47,766 INFO image_tx_daemon: frame seq=50 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:48,380 INFO image_tx_daemon: txdone_arrival: seq=51 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:48,434 INFO image_tx_daemon: txdone_arrival: seq=51 idx=1 status=0 toa_us=28288
+
+2026-08-30 14:01:48,446 INFO image_tx_daemon: frame seq=51 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:48,781 INFO image_tx_daemon: txdone_arrival: seq=52 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:48,877 INFO image_tx_daemon: txdone_arrival: seq=52 idx=1 status=0 toa_us=69248
+
+2026-08-30 14:01:48,889 INFO image_tx_daemon: frame seq=52 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:49,380 INFO image_tx_daemon: txdone_arrival: seq=53 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:49,444 INFO image_tx_daemon: txdone_arrival: seq=53 idx=1 status=0 toa_us=35968
+
+2026-08-30 14:01:49,455 INFO image_tx_daemon: frame seq=53 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:49,691 WARNING image_tx_daemon: FAULT during pipelined TX: code=0x0D sub=0x40 raw=0d40000000000000000000000000000000000000fd510c00
+
+2026-08-30 14:01:49,976 INFO image_tx_daemon: stats: goodput=365.0 B/s util=31% pipeline=v3 frames_in=54 ok=52 fail=0 drop_full=0 drop_stale=0 frags_ok=64 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-30 14:01:49,982 INFO image_tx_daemon: txdone_arrival: seq=54 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:50,056 INFO image_tx_daemon: txdone_arrival: seq=54 idx=1 status=0 toa_us=41088
+
+2026-08-30 14:01:50,067 INFO image_tx_daemon: frame seq=54 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:50,378 INFO image_tx_daemon: txdone_arrival: seq=55 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:50,463 INFO image_tx_daemon: txdone_arrival: seq=55 idx=1 status=0 toa_us=56448
+
+2026-08-30 14:01:50,475 INFO image_tx_daemon: frame seq=55 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:50,697 INFO image_tx_daemon: LoRa cmd: TILE_STALE 14 B
+
+2026-08-30 14:01:50,988 INFO image_tx_daemon: txdone_arrival: seq=56 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:51,052 INFO image_tx_daemon: txdone_arrival: seq=56 idx=1 status=0 toa_us=41088
+
+2026-08-30 14:01:51,063 INFO image_tx_daemon: frame seq=56 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:51,382 INFO image_tx_daemon: txdone_arrival: seq=57 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:51,569 INFO image_tx_daemon: txdone_arrival: seq=57 idx=1 status=0 toa_us=156288
+
+2026-08-30 14:01:51,580 INFO image_tx_daemon: frame seq=57 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:51,989 INFO image_tx_daemon: txdone_arrival: seq=58 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:52,166 INFO image_tx_daemon: txdone_arrival: seq=58 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:01:52,180 INFO image_tx_daemon: frame seq=58 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:52,384 INFO image_tx_daemon: txdone_arrival: seq=59 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:52,571 INFO image_tx_daemon: txdone_arrival: seq=59 idx=1 status=0 toa_us=156288
+
+2026-08-30 14:01:52,582 INFO image_tx_daemon: frame seq=59 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:52,982 INFO image_tx_daemon: txdone_arrival: seq=60 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:53,139 INFO image_tx_daemon: txdone_arrival: seq=60 idx=1 status=0 toa_us=125568
+
+2026-08-30 14:01:53,150 INFO image_tx_daemon: frame seq=60 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:53,390 INFO image_tx_daemon: txdone_arrival: seq=61 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:53,566 INFO image_tx_daemon: txdone_arrival: seq=61 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:01:53,578 INFO image_tx_daemon: frame seq=61 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:53,987 INFO image_tx_daemon: txdone_arrival: seq=62 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:54,081 INFO image_tx_daemon: txdone_arrival: seq=62 idx=1 status=0 toa_us=66688
+
+2026-08-30 14:01:54,093 INFO image_tx_daemon: frame seq=62 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:54,581 INFO image_tx_daemon: txdone_arrival: seq=63 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:54,762 INFO image_tx_daemon: txdone_arrival: seq=63 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:01:54,774 INFO image_tx_daemon: frame seq=63 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:54,995 INFO image_tx_daemon: txdone_arrival: seq=64 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:55,188 INFO image_tx_daemon: txdone_arrival: seq=64 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:01:55,252 INFO image_tx_daemon: txdone_arrival: seq=64 idx=2 status=0 toa_us=41088
+
+2026-08-30 14:01:55,264 INFO image_tx_daemon: frame seq=64 done (pipelined): 3 fragments ok
+
+2026-08-30 14:01:55,785 INFO image_tx_daemon: txdone_arrival: seq=65 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:55,962 INFO image_tx_daemon: txdone_arrival: seq=65 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:01:55,975 INFO image_tx_daemon: frame seq=65 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:56,391 INFO image_tx_daemon: txdone_arrival: seq=66 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:56,557 INFO image_tx_daemon: txdone_arrival: seq=66 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:01:56,569 INFO image_tx_daemon: frame seq=66 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:56,989 INFO image_tx_daemon: txdone_arrival: seq=67 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:57,166 INFO image_tx_daemon: txdone_arrival: seq=67 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:01:57,178 INFO image_tx_daemon: frame seq=67 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:57,576 INFO image_tx_daemon: txdone_arrival: seq=68 idx=0 status=0 toa_us=166528
+
+2026-08-30 14:01:57,588 INFO image_tx_daemon: frame seq=68 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:57,984 INFO image_tx_daemon: txdone_arrival: seq=69 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:58,183 INFO image_tx_daemon: txdone_arrival: seq=69 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:01:58,257 INFO image_tx_daemon: txdone_arrival: seq=69 idx=2 status=0 toa_us=41088
+
+2026-08-30 14:01:58,269 INFO image_tx_daemon: frame seq=69 done (pipelined): 3 fragments ok
+
+2026-08-30 14:01:58,521 INFO image_tx_daemon: txdone_arrival: seq=70 idx=0 status=0 toa_us=112768
+
+2026-08-30 14:01:58,532 INFO image_tx_daemon: frame seq=70 done (pipelined): 1 fragments ok
+
+2026-08-30 14:01:58,794 INFO image_tx_daemon: txdone_arrival: seq=71 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:58,978 INFO image_tx_daemon: txdone_arrival: seq=71 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:01:59,032 INFO image_tx_daemon: txdone_arrival: seq=71 idx=2 status=0 toa_us=25728
+
+2026-08-30 14:01:59,044 INFO image_tx_daemon: frame seq=71 done (pipelined): 3 fragments ok
+
+2026-08-30 14:01:59,385 INFO image_tx_daemon: txdone_arrival: seq=72 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:01:59,582 INFO image_tx_daemon: txdone_arrival: seq=72 idx=1 status=0 toa_us=166528
+
+2026-08-30 14:01:59,593 INFO image_tx_daemon: frame seq=72 done (pipelined): 2 fragments ok
+
+2026-08-30 14:01:59,988 INFO image_tx_daemon: stats: goodput=649.3 B/s util=55% pipeline=v3 frames_in=74 ok=71 fail=0 drop_full=0 drop_stale=0 frags_ok=103 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:02:00,184 INFO image_tx_daemon: txdone_arrival: seq=73 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:00,334 INFO image_tx_daemon: txdone_arrival: seq=73 idx=1 status=0 toa_us=125568
+
+2026-08-30 14:02:00,345 INFO image_tx_daemon: frame seq=73 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:00,583 INFO image_tx_daemon: txdone_arrival: seq=74 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:00,668 INFO image_tx_daemon: txdone_arrival: seq=74 idx=1 status=0 toa_us=61568
+
+2026-08-30 14:02:00,679 INFO image_tx_daemon: frame seq=74 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:00,978 INFO image_tx_daemon: txdone_arrival: seq=75 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:01,083 INFO image_tx_daemon: txdone_arrival: seq=75 idx=1 status=0 toa_us=69248
+
+2026-08-30 14:02:01,094 INFO image_tx_daemon: frame seq=75 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:01,391 INFO image_tx_daemon: txdone_arrival: seq=76 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:01,569 INFO image_tx_daemon: txdone_arrival: seq=76 idx=1 status=0 toa_us=158848
+
+2026-08-30 14:02:01,581 INFO image_tx_daemon: frame seq=76 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:01,984 INFO image_tx_daemon: txdone_arrival: seq=77 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:02,181 INFO image_tx_daemon: txdone_arrival: seq=77 idx=1 status=0 toa_us=166528
+
+2026-08-30 14:02:02,194 INFO image_tx_daemon: frame seq=77 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:02,584 INFO image_tx_daemon: txdone_arrival: seq=78 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:02,730 INFO image_tx_daemon: txdone_arrival: seq=78 idx=1 status=0 toa_us=117888
+
+2026-08-30 14:02:02,742 INFO image_tx_daemon: frame seq=78 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:02,997 INFO image_tx_daemon: txdone_arrival: seq=79 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:03,184 INFO image_tx_daemon: txdone_arrival: seq=79 idx=1 status=0 toa_us=163968
+
+2026-08-30 14:02:03,195 INFO image_tx_daemon: frame seq=79 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:03,580 INFO image_tx_daemon: txdone_arrival: seq=80 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:03,778 INFO image_tx_daemon: txdone_arrival: seq=80 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:03,842 INFO image_tx_daemon: txdone_arrival: seq=80 idx=2 status=0 toa_us=28288
+
+2026-08-30 14:02:03,854 INFO image_tx_daemon: frame seq=80 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:04,148 INFO image_tx_daemon: txdone_arrival: seq=81 idx=0 status=0 toa_us=133248
+
+2026-08-30 14:02:04,160 INFO image_tx_daemon: frame seq=81 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:04,579 INFO image_tx_daemon: txdone_arrival: seq=82 idx=0 status=0 toa_us=166528
+
+2026-08-30 14:02:04,591 INFO image_tx_daemon: frame seq=82 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:04,979 INFO image_tx_daemon: txdone_arrival: seq=83 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:04,991 INFO image_tx_daemon: frame seq=83 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:05,377 INFO image_tx_daemon: txdone_arrival: seq=84 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:05,585 INFO image_tx_daemon: txdone_arrival: seq=84 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:05,597 INFO image_tx_daemon: frame seq=84 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:05,980 INFO image_tx_daemon: txdone_arrival: seq=85 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:05,992 INFO image_tx_daemon: frame seq=85 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:06,385 INFO image_tx_daemon: txdone_arrival: seq=86 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:06,553 INFO image_tx_daemon: txdone_arrival: seq=86 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:02:06,565 INFO image_tx_daemon: frame seq=86 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:06,778 INFO image_tx_daemon: txdone_arrival: seq=87 idx=0 status=0 toa_us=148608
+
+2026-08-30 14:02:06,790 INFO image_tx_daemon: frame seq=87 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:07,172 INFO image_tx_daemon: txdone_arrival: seq=88 idx=0 status=0 toa_us=161408
+
+2026-08-30 14:02:07,184 INFO image_tx_daemon: frame seq=88 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:07,784 INFO image_tx_daemon: txdone_arrival: seq=89 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:07,963 INFO image_tx_daemon: txdone_arrival: seq=89 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:02:07,975 INFO image_tx_daemon: frame seq=89 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:08,125 INFO image_tx_daemon: txdone_arrival: seq=90 idx=0 status=0 toa_us=117888
+
+2026-08-30 14:02:08,137 INFO image_tx_daemon: frame seq=90 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:08,774 INFO image_tx_daemon: txdone_arrival: seq=91 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:08,890 INFO image_tx_daemon: txdone_arrival: seq=91 idx=1 status=0 toa_us=87168
+
+2026-08-30 14:02:08,902 INFO image_tx_daemon: frame seq=91 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:09,180 INFO image_tx_daemon: txdone_arrival: seq=92 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:09,315 INFO image_tx_daemon: txdone_arrival: seq=92 idx=1 status=0 toa_us=110208
+
+2026-08-30 14:02:09,327 INFO image_tx_daemon: frame seq=92 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:09,752 INFO image_tx_daemon: txdone_arrival: seq=93 idx=0 status=0 toa_us=146048
+
+2026-08-30 14:02:09,764 INFO image_tx_daemon: frame seq=93 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:09,999 INFO image_tx_daemon: stats: goodput=612.8 B/s util=51% pipeline=v3 frames_in=94 ok=92 fail=0 drop_full=0 drop_stale=0 frags_ok=138 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:02:10,376 INFO image_tx_daemon: txdone_arrival: seq=94 idx=0 status=0 toa_us=163968
+
+2026-08-30 14:02:10,388 INFO image_tx_daemon: frame seq=94 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:10,763 INFO image_tx_daemon: txdone_arrival: seq=95 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:02:10,775 INFO image_tx_daemon: frame seq=95 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:11,361 INFO image_tx_daemon: txdone_arrival: seq=96 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:02:11,373 INFO image_tx_daemon: frame seq=96 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:11,728 INFO image_tx_daemon: txdone_arrival: seq=97 idx=0 status=0 toa_us=125568
+
+2026-08-30 14:02:11,740 INFO image_tx_daemon: frame seq=97 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:12,336 INFO image_tx_daemon: txdone_arrival: seq=98 idx=0 status=0 toa_us=130688
+
+2026-08-30 14:02:12,348 INFO image_tx_daemon: frame seq=98 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:12,774 INFO image_tx_daemon: txdone_arrival: seq=99 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:12,941 INFO image_tx_daemon: txdone_arrival: seq=99 idx=1 status=0 toa_us=135808
+
+2026-08-30 14:02:12,953 INFO image_tx_daemon: frame seq=99 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:13,377 INFO image_tx_daemon: txdone_arrival: seq=100 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:13,554 INFO image_tx_daemon: txdone_arrival: seq=100 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:02:13,566 INFO image_tx_daemon: frame seq=100 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:13,773 INFO image_tx_daemon: txdone_arrival: seq=101 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:13,940 INFO image_tx_daemon: txdone_arrival: seq=101 idx=1 status=0 toa_us=133248
+
+2026-08-30 14:02:13,951 INFO image_tx_daemon: frame seq=101 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:14,374 INFO image_tx_daemon: txdone_arrival: seq=102 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:14,531 INFO image_tx_daemon: txdone_arrival: seq=102 idx=1 status=0 toa_us=125568
+
+2026-08-30 14:02:14,543 INFO image_tx_daemon: frame seq=102 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:14,776 INFO image_tx_daemon: txdone_arrival: seq=103 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:14,975 INFO image_tx_daemon: txdone_arrival: seq=103 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:15,050 INFO image_tx_daemon: txdone_arrival: seq=103 idx=2 status=0 toa_us=43648
+
+2026-08-30 14:02:15,063 INFO image_tx_daemon: frame seq=103 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:15,379 INFO image_tx_daemon: txdone_arrival: seq=104 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:15,541 INFO image_tx_daemon: txdone_arrival: seq=104 idx=1 status=0 toa_us=138368
+
+2026-08-30 14:02:15,553 INFO image_tx_daemon: frame seq=104 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:15,781 INFO image_tx_daemon: txdone_arrival: seq=105 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:15,971 INFO image_tx_daemon: txdone_arrival: seq=105 idx=1 status=0 toa_us=161408
+
+2026-08-30 14:02:15,983 INFO image_tx_daemon: frame seq=105 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:16,379 INFO image_tx_daemon: txdone_arrival: seq=106 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:16,556 INFO image_tx_daemon: txdone_arrival: seq=106 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:02:16,567 INFO image_tx_daemon: frame seq=106 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:16,784 INFO image_tx_daemon: txdone_arrival: seq=107 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:16,961 INFO image_tx_daemon: txdone_arrival: seq=107 idx=1 status=0 toa_us=158848
+
+2026-08-30 14:02:16,973 INFO image_tx_daemon: frame seq=107 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:17,371 INFO image_tx_daemon: txdone_arrival: seq=108 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:17,527 INFO image_tx_daemon: txdone_arrival: seq=108 idx=1 status=0 toa_us=125568
+
+2026-08-30 14:02:17,539 INFO image_tx_daemon: frame seq=108 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:17,975 INFO image_tx_daemon: txdone_arrival: seq=109 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:18,152 INFO image_tx_daemon: txdone_arrival: seq=109 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:02:18,164 INFO image_tx_daemon: frame seq=109 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:18,572 INFO image_tx_daemon: txdone_arrival: seq=110 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:18,585 INFO image_tx_daemon: frame seq=110 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:18,968 INFO image_tx_daemon: txdone_arrival: seq=111 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:19,073 INFO image_tx_daemon: txdone_arrival: seq=111 idx=1 status=0 toa_us=69248
+
+2026-08-30 14:02:19,085 INFO image_tx_daemon: frame seq=111 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:19,368 INFO image_tx_daemon: txdone_arrival: seq=112 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:19,473 INFO image_tx_daemon: txdone_arrival: seq=112 idx=1 status=0 toa_us=69248
+
+2026-08-30 14:02:19,485 INFO image_tx_daemon: frame seq=112 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:19,968 INFO image_tx_daemon: txdone_arrival: seq=113 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:20,015 INFO image_tx_daemon: stats: goodput=603.2 B/s util=50% pipeline=v3 frames_in=113 ok=111 fail=0 drop_full=0 drop_stale=0 frags_ok=172 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-30 14:02:20,128 INFO image_tx_daemon: txdone_arrival: seq=113 idx=1 status=0 toa_us=128128
+
+2026-08-30 14:02:20,140 INFO image_tx_daemon: frame seq=113 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:20,371 INFO image_tx_daemon: txdone_arrival: seq=114 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:20,548 INFO image_tx_daemon: txdone_arrival: seq=114 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:02:20,560 INFO image_tx_daemon: frame seq=114 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:20,777 INFO image_tx_daemon: txdone_arrival: seq=115 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:20,943 INFO image_tx_daemon: txdone_arrival: seq=115 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:02:20,955 INFO image_tx_daemon: frame seq=115 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:21,373 INFO image_tx_daemon: txdone_arrival: seq=116 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:21,550 INFO image_tx_daemon: txdone_arrival: seq=116 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:02:21,562 INFO image_tx_daemon: frame seq=116 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:21,771 INFO image_tx_daemon: txdone_arrival: seq=117 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:21,784 INFO image_tx_daemon: frame seq=117 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:22,320 WARNING image_tx_daemon: FAULT during pipelined TX: code=0x0D sub=0x60 raw=0d60000000000000000000000000000000000000f1d00c00
+
+2026-08-30 14:02:22,374 INFO image_tx_daemon: txdone_arrival: seq=118 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:22,566 INFO image_tx_daemon: txdone_arrival: seq=118 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:22,630 INFO image_tx_daemon: txdone_arrival: seq=118 idx=2 status=0 toa_us=33408
+
+2026-08-30 14:02:22,641 INFO image_tx_daemon: frame seq=118 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:22,973 INFO image_tx_daemon: txdone_arrival: seq=119 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:23,146 INFO image_tx_daemon: txdone_arrival: seq=119 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:02:23,158 INFO image_tx_daemon: frame seq=119 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:23,568 INFO image_tx_daemon: txdone_arrival: seq=120 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:23,766 INFO image_tx_daemon: txdone_arrival: seq=120 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:23,829 INFO image_tx_daemon: txdone_arrival: seq=120 idx=2 status=0 toa_us=33408
+
+2026-08-30 14:02:23,841 INFO image_tx_daemon: frame seq=120 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:24,168 INFO image_tx_daemon: txdone_arrival: seq=121 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:24,365 INFO image_tx_daemon: txdone_arrival: seq=121 idx=1 status=0 toa_us=163968
+
+2026-08-30 14:02:24,377 INFO image_tx_daemon: frame seq=121 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:24,770 INFO image_tx_daemon: txdone_arrival: seq=122 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:24,926 INFO image_tx_daemon: txdone_arrival: seq=122 idx=1 status=0 toa_us=123008
+
+2026-08-30 14:02:24,937 INFO image_tx_daemon: frame seq=122 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:25,369 INFO image_tx_daemon: txdone_arrival: seq=123 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:25,463 INFO image_tx_daemon: txdone_arrival: seq=123 idx=1 status=0 toa_us=69248
+
+2026-08-30 14:02:25,475 INFO image_tx_daemon: frame seq=123 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:25,765 INFO image_tx_daemon: txdone_arrival: seq=124 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:25,942 INFO image_tx_daemon: txdone_arrival: seq=124 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:02:25,953 INFO image_tx_daemon: frame seq=124 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:26,369 INFO image_tx_daemon: txdone_arrival: seq=125 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:26,567 INFO image_tx_daemon: txdone_arrival: seq=125 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:26,621 INFO image_tx_daemon: txdone_arrival: seq=125 idx=2 status=0 toa_us=23168
+
+2026-08-30 14:02:26,632 INFO image_tx_daemon: frame seq=125 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:26,968 INFO image_tx_daemon: txdone_arrival: seq=126 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:27,124 INFO image_tx_daemon: txdone_arrival: seq=126 idx=1 status=0 toa_us=123008
+
+2026-08-30 14:02:27,137 INFO image_tx_daemon: frame seq=126 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:27,570 INFO image_tx_daemon: txdone_arrival: seq=127 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:27,767 INFO image_tx_daemon: txdone_arrival: seq=127 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:27,779 INFO image_tx_daemon: frame seq=127 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:28,164 INFO image_tx_daemon: txdone_arrival: seq=128 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:28,362 INFO image_tx_daemon: txdone_arrival: seq=128 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:28,425 INFO image_tx_daemon: txdone_arrival: seq=128 idx=2 status=0 toa_us=30848
+
+2026-08-30 14:02:28,437 INFO image_tx_daemon: frame seq=128 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:28,790 INFO image_tx_daemon: txdone_arrival: seq=129 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:29,170 INFO image_tx_daemon: txdone_arrival: seq=129 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:29,368 INFO image_tx_daemon: txdone_arrival: seq=129 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:02:29,421 INFO image_tx_daemon: txdone_arrival: seq=129 idx=3 status=0 toa_us=23168
+
+2026-08-30 14:02:29,433 INFO image_tx_daemon: frame seq=129 done (pipelined): 4 fragments ok
+
+2026-08-30 14:02:29,769 INFO image_tx_daemon: txdone_arrival: seq=131 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:29,781 INFO image_tx_daemon: frame seq=131 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:30,027 INFO image_tx_daemon: stats: goodput=658.8 B/s util=55% pipeline=v3 frames_in=133 ok=129 fail=0 drop_full=0 drop_stale=0 frags_ok=211 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:02:30,169 INFO image_tx_daemon: txdone_arrival: seq=132 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:30,335 INFO image_tx_daemon: txdone_arrival: seq=132 idx=1 status=0 toa_us=138368
+
+2026-08-30 14:02:30,347 INFO image_tx_daemon: frame seq=132 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:30,755 INFO image_tx_daemon: txdone_arrival: seq=133 idx=0 status=0 toa_us=158848
+
+2026-08-30 14:02:30,767 INFO image_tx_daemon: frame seq=133 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:30,958 INFO image_tx_daemon: txdone_arrival: seq=134 idx=0 status=0 toa_us=125568
+
+2026-08-30 14:02:30,970 INFO image_tx_daemon: frame seq=134 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:31,361 INFO image_tx_daemon: txdone_arrival: seq=135 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:31,528 INFO image_tx_daemon: txdone_arrival: seq=135 idx=1 status=0 toa_us=133248
+
+2026-08-30 14:02:31,541 INFO image_tx_daemon: frame seq=135 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:31,965 INFO image_tx_daemon: txdone_arrival: seq=136 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:32,135 INFO image_tx_daemon: txdone_arrival: seq=136 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:02:32,147 INFO image_tx_daemon: frame seq=136 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:32,565 INFO image_tx_daemon: txdone_arrival: seq=137 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:32,732 INFO image_tx_daemon: txdone_arrival: seq=137 idx=1 status=0 toa_us=138368
+
+2026-08-30 14:02:32,744 INFO image_tx_daemon: frame seq=137 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:32,967 INFO image_tx_daemon: txdone_arrival: seq=138 idx=0 status=0 toa_us=156288
+
+2026-08-30 14:02:32,979 INFO image_tx_daemon: frame seq=138 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:33,313 INFO image_tx_daemon: txdone_arrival: seq=139 idx=0 status=0 toa_us=120448
+
+2026-08-30 14:02:33,325 INFO image_tx_daemon: frame seq=139 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:33,553 INFO image_tx_daemon: txdone_arrival: seq=140 idx=0 status=0 toa_us=161408
+
+2026-08-30 14:02:33,566 INFO image_tx_daemon: frame seq=140 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:33,757 INFO image_tx_daemon: txdone_arrival: seq=141 idx=0 status=0 toa_us=146048
+
+2026-08-30 14:02:33,769 INFO image_tx_daemon: frame seq=141 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:34,352 INFO image_tx_daemon: txdone_arrival: seq=142 idx=0 status=0 toa_us=163968
+
+2026-08-30 14:02:34,364 INFO image_tx_daemon: frame seq=142 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:34,967 INFO image_tx_daemon: txdone_arrival: seq=143 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:35,152 INFO image_tx_daemon: txdone_arrival: seq=143 idx=1 status=0 toa_us=158848
+
+2026-08-30 14:02:35,164 INFO image_tx_daemon: frame seq=143 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:35,560 INFO image_tx_daemon: txdone_arrival: seq=144 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:35,758 INFO image_tx_daemon: txdone_arrival: seq=144 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:35,822 INFO image_tx_daemon: txdone_arrival: seq=144 idx=2 status=0 toa_us=30848
+
+2026-08-30 14:02:35,833 INFO image_tx_daemon: frame seq=144 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:36,161 INFO image_tx_daemon: txdone_arrival: seq=145 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:36,328 INFO image_tx_daemon: txdone_arrival: seq=145 idx=1 status=0 toa_us=140928
+
+2026-08-30 14:02:36,339 INFO image_tx_daemon: frame seq=145 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:36,535 INFO image_tx_daemon: txdone_arrival: seq=146 idx=0 status=0 toa_us=128128
+
+2026-08-30 14:02:36,546 INFO image_tx_daemon: frame seq=146 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:36,960 INFO image_tx_daemon: txdone_arrival: seq=147 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:37,106 INFO image_tx_daemon: txdone_arrival: seq=147 idx=1 status=0 toa_us=120448
+
+2026-08-30 14:02:37,118 INFO image_tx_daemon: frame seq=147 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:37,356 INFO image_tx_daemon: txdone_arrival: seq=148 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:37,368 INFO image_tx_daemon: frame seq=148 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:37,788 INFO image_tx_daemon: txdone_arrival: seq=149 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:38,157 INFO image_tx_daemon: txdone_arrival: seq=149 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:38,220 INFO image_tx_daemon: txdone_arrival: seq=149 idx=2 status=0 toa_us=28288
+
+2026-08-30 14:02:38,232 INFO image_tx_daemon: frame seq=149 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:38,556 INFO image_tx_daemon: txdone_arrival: seq=150 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:38,744 INFO image_tx_daemon: txdone_arrival: seq=150 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:02:38,755 INFO image_tx_daemon: frame seq=150 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:38,956 INFO image_tx_daemon: txdone_arrival: seq=151 idx=0 status=0 toa_us=140928
+
+2026-08-30 14:02:38,968 INFO image_tx_daemon: frame seq=151 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:39,354 INFO image_tx_daemon: txdone_arrival: seq=152 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:39,552 INFO image_tx_daemon: txdone_arrival: seq=152 idx=1 status=0 toa_us=163968
+
+2026-08-30 14:02:39,564 INFO image_tx_daemon: frame seq=152 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:39,956 INFO image_tx_daemon: txdone_arrival: seq=153 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:40,041 INFO image_tx_daemon: stats: goodput=620.4 B/s util=52% pipeline=v3 frames_in=153 ok=150 fail=0 drop_full=0 drop_stale=0 frags_ok=246 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-30 14:02:40,123 INFO image_tx_daemon: txdone_arrival: seq=153 idx=1 status=0 toa_us=138368
+
+2026-08-30 14:02:40,135 INFO image_tx_daemon: frame seq=153 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:40,561 INFO image_tx_daemon: txdone_arrival: seq=154 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:40,738 INFO image_tx_daemon: txdone_arrival: seq=154 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:02:40,750 INFO image_tx_daemon: frame seq=154 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:41,158 INFO image_tx_daemon: txdone_arrival: seq=155 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:41,315 INFO image_tx_daemon: txdone_arrival: seq=155 idx=1 status=0 toa_us=123008
+
+2026-08-30 14:02:41,326 INFO image_tx_daemon: frame seq=155 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:41,753 INFO image_tx_daemon: txdone_arrival: seq=156 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:41,939 INFO image_tx_daemon: txdone_arrival: seq=156 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:02:41,951 INFO image_tx_daemon: frame seq=156 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:42,358 INFO image_tx_daemon: txdone_arrival: seq=157 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:42,559 INFO image_tx_daemon: txdone_arrival: seq=157 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:42,645 INFO image_tx_daemon: txdone_arrival: seq=157 idx=2 status=0 toa_us=56448
+
+2026-08-30 14:02:42,657 INFO image_tx_daemon: frame seq=157 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:42,956 INFO image_tx_daemon: txdone_arrival: seq=158 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:43,053 INFO image_tx_daemon: txdone_arrival: seq=158 idx=1 status=0 toa_us=66688
+
+2026-08-30 14:02:43,065 INFO image_tx_daemon: frame seq=158 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:43,358 INFO image_tx_daemon: txdone_arrival: seq=159 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:43,475 INFO image_tx_daemon: txdone_arrival: seq=159 idx=1 status=0 toa_us=87168
+
+2026-08-30 14:02:43,487 INFO image_tx_daemon: frame seq=159 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:43,756 INFO image_tx_daemon: txdone_arrival: seq=160 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:43,933 INFO image_tx_daemon: txdone_arrival: seq=160 idx=1 status=0 toa_us=151168
+
+2026-08-30 14:02:43,945 INFO image_tx_daemon: frame seq=160 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:44,356 INFO image_tx_daemon: txdone_arrival: seq=161 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:44,523 INFO image_tx_daemon: txdone_arrival: seq=161 idx=1 status=0 toa_us=140928
+
+2026-08-30 14:02:44,535 INFO image_tx_daemon: frame seq=161 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:44,952 INFO image_tx_daemon: txdone_arrival: seq=162 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:45,129 INFO image_tx_daemon: txdone_arrival: seq=162 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:02:45,142 INFO image_tx_daemon: frame seq=162 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:45,550 INFO image_tx_daemon: txdone_arrival: seq=163 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:45,564 INFO image_tx_daemon: frame seq=163 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:45,949 INFO image_tx_daemon: txdone_arrival: seq=164 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:46,148 INFO image_tx_daemon: txdone_arrival: seq=164 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:46,211 INFO image_tx_daemon: txdone_arrival: seq=164 idx=2 status=0 toa_us=33408
+
+2026-08-30 14:02:46,223 INFO image_tx_daemon: frame seq=164 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:46,551 INFO image_tx_daemon: txdone_arrival: seq=165 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:46,738 INFO image_tx_daemon: txdone_arrival: seq=165 idx=1 status=0 toa_us=151168
+
+2026-08-30 14:02:46,750 INFO image_tx_daemon: frame seq=165 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:47,170 INFO image_tx_daemon: txdone_arrival: seq=166 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:47,552 INFO image_tx_daemon: txdone_arrival: seq=166 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:47,564 INFO image_tx_daemon: frame seq=166 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:47,951 INFO image_tx_daemon: txdone_arrival: seq=167 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:48,154 INFO image_tx_daemon: txdone_arrival: seq=167 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:48,350 INFO image_tx_daemon: txdone_arrival: seq=167 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:02:48,507 INFO image_tx_daemon: txdone_arrival: seq=167 idx=3 status=0 toa_us=123008
+
+2026-08-30 14:02:48,519 INFO image_tx_daemon: frame seq=167 done (pipelined): 4 fragments ok
+
+2026-08-30 14:02:48,946 INFO image_tx_daemon: txdone_arrival: seq=169 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:49,051 INFO image_tx_daemon: txdone_arrival: seq=169 idx=1 status=0 toa_us=69248
+
+2026-08-30 14:02:49,063 INFO image_tx_daemon: frame seq=169 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:49,348 INFO image_tx_daemon: txdone_arrival: seq=170 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:49,525 INFO image_tx_daemon: txdone_arrival: seq=170 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:02:49,537 INFO image_tx_daemon: frame seq=170 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:49,935 INFO image_tx_daemon: txdone_arrival: seq=171 idx=0 status=0 toa_us=151168
+
+2026-08-30 14:02:49,947 INFO image_tx_daemon: frame seq=171 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:50,051 INFO image_tx_daemon: stats: goodput=650.4 B/s util=54% pipeline=v3 frames_in=173 ok=168 fail=0 drop_full=0 drop_stale=0 frags_ok=283 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-30 14:02:50,353 INFO image_tx_daemon: txdone_arrival: seq=172 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:50,554 INFO image_tx_daemon: txdone_arrival: seq=172 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:50,751 INFO image_tx_daemon: txdone_arrival: seq=172 idx=2 status=0 toa_us=166528
+
+2026-08-30 14:02:50,763 INFO image_tx_daemon: frame seq=172 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:51,152 INFO image_tx_daemon: txdone_arrival: seq=174 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:51,339 INFO image_tx_daemon: txdone_arrival: seq=174 idx=1 status=0 toa_us=163968
+
+2026-08-30 14:02:51,352 INFO image_tx_daemon: frame seq=174 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:51,747 INFO image_tx_daemon: txdone_arrival: seq=175 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:51,945 INFO image_tx_daemon: txdone_arrival: seq=175 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:51,998 INFO image_tx_daemon: txdone_arrival: seq=175 idx=2 status=0 toa_us=25728
+
+2026-08-30 14:02:52,010 INFO image_tx_daemon: frame seq=175 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:52,373 WARNING image_tx_daemon: FAULT during pipelined TX: code=0x0D sub=0x41 raw=0d4100000000000000000000000000000000000021460d00
+
+2026-08-30 14:02:52,374 INFO image_tx_daemon: txdone_arrival: seq=176 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:52,743 INFO image_tx_daemon: txdone_arrival: seq=176 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:52,940 INFO image_tx_daemon: txdone_arrival: seq=176 idx=2 status=0 toa_us=161408
+
+2026-08-30 14:02:52,952 INFO image_tx_daemon: frame seq=176 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:53,349 INFO image_tx_daemon: txdone_arrival: seq=178 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:53,361 INFO image_tx_daemon: frame seq=178 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:53,751 INFO image_tx_daemon: txdone_arrival: seq=179 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:53,907 INFO image_tx_daemon: txdone_arrival: seq=179 idx=1 status=0 toa_us=133248
+
+2026-08-30 14:02:53,919 INFO image_tx_daemon: frame seq=179 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:54,342 INFO image_tx_daemon: txdone_arrival: seq=180 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:54,529 INFO image_tx_daemon: txdone_arrival: seq=180 idx=1 status=0 toa_us=151168
+
+2026-08-30 14:02:54,542 INFO image_tx_daemon: frame seq=180 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:54,947 INFO image_tx_daemon: txdone_arrival: seq=181 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:55,147 INFO image_tx_daemon: txdone_arrival: seq=181 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:55,314 INFO image_tx_daemon: txdone_arrival: seq=181 idx=2 status=0 toa_us=138368
+
+2026-08-30 14:02:55,326 INFO image_tx_daemon: frame seq=181 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:55,750 INFO image_tx_daemon: txdone_arrival: seq=183 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:55,793 INFO image_tx_daemon: txdone_arrival: seq=183 idx=1 status=0 toa_us=23168
+
+2026-08-30 14:02:55,805 INFO image_tx_daemon: frame seq=183 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:56,124 INFO image_tx_daemon: txdone_arrival: seq=184 idx=0 status=0 toa_us=148608
+
+2026-08-30 14:02:56,136 INFO image_tx_daemon: frame seq=184 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:56,529 INFO image_tx_daemon: txdone_arrival: seq=185 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:02:56,541 INFO image_tx_daemon: frame seq=185 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:56,943 INFO image_tx_daemon: txdone_arrival: seq=186 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:57,130 INFO image_tx_daemon: txdone_arrival: seq=186 idx=1 status=0 toa_us=151168
+
+2026-08-30 14:02:57,142 INFO image_tx_daemon: frame seq=186 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:57,546 INFO image_tx_daemon: txdone_arrival: seq=187 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:57,722 INFO image_tx_daemon: txdone_arrival: seq=187 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:02:57,734 INFO image_tx_daemon: frame seq=187 done (pipelined): 2 fragments ok
+
+2026-08-30 14:02:58,150 INFO image_tx_daemon: txdone_arrival: seq=188 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:58,347 INFO image_tx_daemon: txdone_arrival: seq=188 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:02:58,401 INFO image_tx_daemon: txdone_arrival: seq=188 idx=2 status=0 toa_us=23168
+
+2026-08-30 14:02:58,412 INFO image_tx_daemon: frame seq=188 done (pipelined): 3 fragments ok
+
+2026-08-30 14:02:58,716 INFO image_tx_daemon: txdone_arrival: seq=189 idx=0 status=0 toa_us=146048
+
+2026-08-30 14:02:58,728 INFO image_tx_daemon: frame seq=189 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:59,135 INFO image_tx_daemon: txdone_arrival: seq=190 idx=0 status=0 toa_us=163968
+
+2026-08-30 14:02:59,148 INFO image_tx_daemon: frame seq=190 done (pipelined): 1 fragments ok
+
+2026-08-30 14:02:59,541 INFO image_tx_daemon: txdone_arrival: seq=191 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:02:59,718 INFO image_tx_daemon: txdone_arrival: seq=191 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:02:59,730 INFO image_tx_daemon: frame seq=191 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:00,063 INFO image_tx_daemon: stats: goodput=609.9 B/s util=51% pipeline=v3 frames_in=193 ok=185 fail=0 drop_full=0 drop_stale=0 frags_ok=317 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-30 14:03:00,127 INFO image_tx_daemon: txdone_arrival: seq=192 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:03:00,139 INFO image_tx_daemon: frame seq=192 done (pipelined): 1 fragments ok
+
+2026-08-30 14:03:00,524 INFO image_tx_daemon: txdone_arrival: seq=193 idx=0 status=0 toa_us=148608
+
+2026-08-30 14:03:00,537 INFO image_tx_daemon: frame seq=193 done (pipelined): 1 fragments ok
+
+2026-08-30 14:03:00,939 INFO image_tx_daemon: txdone_arrival: seq=194 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:01,136 INFO image_tx_daemon: txdone_arrival: seq=194 idx=1 status=0 toa_us=166528
+
+2026-08-30 14:03:01,149 INFO image_tx_daemon: frame seq=194 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:01,543 INFO image_tx_daemon: txdone_arrival: seq=195 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:01,699 INFO image_tx_daemon: txdone_arrival: seq=195 idx=1 status=0 toa_us=128128
+
+2026-08-30 14:03:01,711 INFO image_tx_daemon: frame seq=195 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:02,144 INFO image_tx_daemon: txdone_arrival: seq=196 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:02,321 INFO image_tx_daemon: txdone_arrival: seq=196 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:03:02,332 INFO image_tx_daemon: frame seq=196 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:02,743 INFO image_tx_daemon: txdone_arrival: seq=197 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:02,919 INFO image_tx_daemon: txdone_arrival: seq=197 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:03:02,931 INFO image_tx_daemon: frame seq=197 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:03,337 INFO image_tx_daemon: txdone_arrival: seq=198 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:03,541 INFO image_tx_daemon: txdone_arrival: seq=198 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:03,938 INFO image_tx_daemon: txdone_arrival: seq=198 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:04,095 INFO image_tx_daemon: txdone_arrival: seq=198 idx=3 status=0 toa_us=120448
+
+2026-08-30 14:03:04,107 INFO image_tx_daemon: frame seq=198 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:04,368 INFO image_tx_daemon: txdone_arrival: seq=200 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:04,740 INFO image_tx_daemon: txdone_arrival: seq=200 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:04,794 INFO image_tx_daemon: txdone_arrival: seq=200 idx=2 status=0 toa_us=28288
+
+2026-08-30 14:03:04,806 INFO image_tx_daemon: frame seq=200 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:05,140 INFO image_tx_daemon: txdone_arrival: seq=201 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:05,327 INFO image_tx_daemon: txdone_arrival: seq=201 idx=1 status=0 toa_us=161408
+
+2026-08-30 14:03:05,339 INFO image_tx_daemon: frame seq=201 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:05,745 INFO image_tx_daemon: txdone_arrival: seq=202 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:05,943 INFO image_tx_daemon: txdone_arrival: seq=202 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:06,007 INFO image_tx_daemon: txdone_arrival: seq=202 idx=2 status=0 toa_us=35968
+
+2026-08-30 14:03:06,019 INFO image_tx_daemon: frame seq=202 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:06,361 INFO image_tx_daemon: txdone_arrival: seq=203 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:06,739 INFO image_tx_daemon: txdone_arrival: seq=203 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:06,939 INFO image_tx_daemon: txdone_arrival: seq=203 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:07,085 INFO image_tx_daemon: txdone_arrival: seq=203 idx=3 status=0 toa_us=115328
+
+2026-08-30 14:03:07,098 INFO image_tx_daemon: frame seq=203 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:07,360 INFO image_tx_daemon: txdone_arrival: seq=205 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:07,736 INFO image_tx_daemon: txdone_arrival: seq=205 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:07,892 INFO image_tx_daemon: txdone_arrival: seq=205 idx=2 status=0 toa_us=125568
+
+2026-08-30 14:03:07,904 INFO image_tx_daemon: frame seq=205 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:08,335 INFO image_tx_daemon: txdone_arrival: seq=207 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:08,547 INFO image_tx_daemon: txdone_arrival: seq=207 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:08,738 INFO image_tx_daemon: txdone_arrival: seq=207 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:08,894 INFO image_tx_daemon: txdone_arrival: seq=207 idx=3 status=0 toa_us=130688
+
+2026-08-30 14:03:08,905 INFO image_tx_daemon: frame seq=207 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:09,167 INFO image_tx_daemon: txdone_arrival: seq=209 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:09,541 INFO image_tx_daemon: txdone_arrival: seq=209 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:09,731 INFO image_tx_daemon: txdone_arrival: seq=209 idx=2 status=0 toa_us=163968
+
+2026-08-30 14:03:09,743 INFO image_tx_daemon: frame seq=209 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:10,074 INFO image_tx_daemon: stats: goodput=661.0 B/s util=55% pipeline=v3 frames_in=214 ok=199 fail=0 drop_full=0 drop_stale=0 frags_ok=353 frags_fail=0 qdepth=2 parity_tx=0
+
+2026-08-30 14:03:10,135 INFO image_tx_daemon: txdone_arrival: seq=211 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:10,336 INFO image_tx_daemon: txdone_arrival: seq=211 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:10,411 INFO image_tx_daemon: txdone_arrival: seq=211 idx=2 status=0 toa_us=41088
+
+2026-08-30 14:03:10,424 INFO image_tx_daemon: frame seq=211 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:10,686 INFO image_tx_daemon: txdone_arrival: seq=212 idx=0 status=0 toa_us=115328
+
+2026-08-30 14:03:10,697 INFO image_tx_daemon: frame seq=212 done (pipelined): 1 fragments ok
+
+2026-08-30 14:03:10,959 INFO image_tx_daemon: txdone_arrival: seq=213 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:11,332 INFO image_tx_daemon: txdone_arrival: seq=213 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:11,396 INFO image_tx_daemon: txdone_arrival: seq=213 idx=2 status=0 toa_us=28288
+
+2026-08-30 14:03:11,408 INFO image_tx_daemon: frame seq=213 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:11,742 INFO image_tx_daemon: txdone_arrival: seq=214 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:11,935 INFO image_tx_daemon: txdone_arrival: seq=214 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:12,138 INFO image_tx_daemon: txdone_arrival: seq=214 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:12,284 INFO image_tx_daemon: txdone_arrival: seq=214 idx=3 status=0 toa_us=120448
+
+2026-08-30 14:03:12,295 INFO image_tx_daemon: frame seq=214 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:12,538 INFO image_tx_daemon: txdone_arrival: seq=216 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:12,725 INFO image_tx_daemon: txdone_arrival: seq=216 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:03:12,737 INFO image_tx_daemon: frame seq=216 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:13,155 INFO image_tx_daemon: txdone_arrival: seq=217 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:13,531 INFO image_tx_daemon: txdone_arrival: seq=217 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:13,585 INFO image_tx_daemon: txdone_arrival: seq=217 idx=2 status=0 toa_us=23168
+
+2026-08-30 14:03:13,597 INFO image_tx_daemon: frame seq=217 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:13,940 INFO image_tx_daemon: txdone_arrival: seq=218 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:14,134 INFO image_tx_daemon: txdone_arrival: seq=218 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:14,340 INFO image_tx_daemon: txdone_arrival: seq=218 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:14,496 INFO image_tx_daemon: txdone_arrival: seq=218 idx=3 status=0 toa_us=130688
+
+2026-08-30 14:03:14,508 INFO image_tx_daemon: frame seq=218 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:14,935 INFO image_tx_daemon: txdone_arrival: seq=220 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:15,133 INFO image_tx_daemon: txdone_arrival: seq=220 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:15,196 INFO image_tx_daemon: txdone_arrival: seq=220 idx=2 status=0 toa_us=30848
+
+2026-08-30 14:03:15,209 INFO image_tx_daemon: frame seq=220 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:15,536 INFO image_tx_daemon: txdone_arrival: seq=221 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:15,733 INFO image_tx_daemon: txdone_arrival: seq=221 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:15,744 INFO image_tx_daemon: frame seq=221 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:16,155 INFO image_tx_daemon: txdone_arrival: seq=222 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:16,530 INFO image_tx_daemon: txdone_arrival: seq=222 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:16,728 INFO image_tx_daemon: txdone_arrival: seq=222 idx=2 status=0 toa_us=166528
+
+2026-08-30 14:03:16,739 INFO image_tx_daemon: frame seq=222 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:17,135 INFO image_tx_daemon: txdone_arrival: seq=224 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:17,338 INFO image_tx_daemon: txdone_arrival: seq=224 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:17,538 INFO image_tx_daemon: txdone_arrival: seq=224 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:17,674 INFO image_tx_daemon: txdone_arrival: seq=224 idx=3 status=0 toa_us=110208
+
+2026-08-30 14:03:17,686 INFO image_tx_daemon: frame seq=224 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:17,948 INFO image_tx_daemon: txdone_arrival: seq=226 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:18,139 INFO image_tx_daemon: txdone_arrival: seq=226 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:18,254 INFO image_tx_daemon: txdone_arrival: seq=226 idx=2 status=0 toa_us=92288
+
+2026-08-30 14:03:18,266 INFO image_tx_daemon: frame seq=226 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:18,739 INFO image_tx_daemon: txdone_arrival: seq=228 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:18,916 INFO image_tx_daemon: txdone_arrival: seq=228 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:03:18,927 INFO image_tx_daemon: frame seq=228 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:19,333 INFO image_tx_daemon: txdone_arrival: seq=229 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:19,530 INFO image_tx_daemon: txdone_arrival: seq=229 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:19,542 INFO image_tx_daemon: frame seq=229 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:19,936 INFO image_tx_daemon: txdone_arrival: seq=230 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:20,086 INFO image_tx_daemon: stats: goodput=707.9 B/s util=59% pipeline=v3 frames_in=234 ok=213 fail=0 drop_full=0 drop_stale=0 frags_ok=393 frags_fail=0 qdepth=2 parity_tx=0
+
+2026-08-30 14:03:20,136 INFO image_tx_daemon: txdone_arrival: seq=230 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:20,333 INFO image_tx_daemon: txdone_arrival: seq=230 idx=2 status=0 toa_us=166528
+
+2026-08-30 14:03:20,345 INFO image_tx_daemon: frame seq=230 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:20,721 INFO image_tx_daemon: txdone_arrival: seq=232 idx=0 status=0 toa_us=156288
+
+2026-08-30 14:03:20,732 INFO image_tx_daemon: frame seq=232 done (pipelined): 1 fragments ok
+
+2026-08-30 14:03:21,139 INFO image_tx_daemon: txdone_arrival: seq=233 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:21,333 INFO image_tx_daemon: txdone_arrival: seq=233 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:21,498 INFO image_tx_daemon: txdone_arrival: seq=233 idx=2 status=0 toa_us=138368
+
+2026-08-30 14:03:21,512 INFO image_tx_daemon: frame seq=233 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:21,740 INFO image_tx_daemon: txdone_arrival: seq=235 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:03:21,752 INFO image_tx_daemon: frame seq=235 done (pipelined): 1 fragments ok
+
+2026-08-30 14:03:22,138 INFO image_tx_daemon: txdone_arrival: seq=236 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:22,138 WARNING image_tx_daemon: FAULT during pipelined TX: code=0x0D sub=0x42 raw=0d4200000000000000000000000000000000000051bb0d00
+
+2026-08-30 14:03:22,330 INFO image_tx_daemon: txdone_arrival: seq=236 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:22,403 INFO image_tx_daemon: txdone_arrival: seq=236 idx=2 status=0 toa_us=41088
+
+2026-08-30 14:03:22,415 INFO image_tx_daemon: frame seq=236 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:22,727 INFO image_tx_daemon: txdone_arrival: seq=237 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:22,893 INFO image_tx_daemon: txdone_arrival: seq=237 idx=1 status=0 toa_us=128128
+
+2026-08-30 14:03:22,905 INFO image_tx_daemon: frame seq=237 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:23,331 INFO image_tx_daemon: txdone_arrival: seq=238 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:23,534 INFO image_tx_daemon: txdone_arrival: seq=238 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:23,597 INFO image_tx_daemon: txdone_arrival: seq=238 idx=2 status=0 toa_us=35968
+
+2026-08-30 14:03:23,609 INFO image_tx_daemon: frame seq=238 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:23,932 INFO image_tx_daemon: txdone_arrival: seq=239 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:24,135 INFO image_tx_daemon: txdone_arrival: seq=239 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:24,331 INFO image_tx_daemon: txdone_arrival: seq=239 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:24,481 INFO image_tx_daemon: txdone_arrival: seq=239 idx=3 status=0 toa_us=123008
+
+2026-08-30 14:03:24,492 INFO image_tx_daemon: frame seq=239 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:24,729 INFO image_tx_daemon: txdone_arrival: seq=241 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:24,895 INFO image_tx_daemon: txdone_arrival: seq=241 idx=1 status=0 toa_us=133248
+
+2026-08-30 14:03:24,906 INFO image_tx_daemon: frame seq=241 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:25,356 INFO image_tx_daemon: txdone_arrival: seq=242 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:25,734 INFO image_tx_daemon: txdone_arrival: seq=242 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:25,935 INFO image_tx_daemon: txdone_arrival: seq=242 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:26,081 INFO image_tx_daemon: txdone_arrival: seq=242 idx=3 status=0 toa_us=123008
+
+2026-08-30 14:03:26,093 INFO image_tx_daemon: frame seq=242 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:26,354 INFO image_tx_daemon: txdone_arrival: seq=244 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:26,729 INFO image_tx_daemon: txdone_arrival: seq=244 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:26,793 INFO image_tx_daemon: txdone_arrival: seq=244 idx=2 status=0 toa_us=30848
+
+2026-08-30 14:03:26,804 INFO image_tx_daemon: frame seq=244 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:27,128 INFO image_tx_daemon: txdone_arrival: seq=245 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:27,326 INFO image_tx_daemon: txdone_arrival: seq=245 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:27,379 INFO image_tx_daemon: txdone_arrival: seq=245 idx=2 status=0 toa_us=25728
+
+2026-08-30 14:03:27,391 INFO image_tx_daemon: frame seq=245 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:27,725 INFO image_tx_daemon: txdone_arrival: seq=246 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:27,926 INFO image_tx_daemon: txdone_arrival: seq=246 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:28,112 INFO image_tx_daemon: txdone_arrival: seq=246 idx=2 status=0 toa_us=151168
+
+2026-08-30 14:03:28,124 INFO image_tx_daemon: frame seq=246 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:28,530 INFO image_tx_daemon: txdone_arrival: seq=248 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:28,734 INFO image_tx_daemon: txdone_arrival: seq=248 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:28,910 INFO image_tx_daemon: txdone_arrival: seq=248 idx=2 status=0 toa_us=153728
+
+2026-08-30 14:03:28,922 INFO image_tx_daemon: frame seq=248 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:29,327 INFO image_tx_daemon: txdone_arrival: seq=250 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:29,472 INFO image_tx_daemon: txdone_arrival: seq=250 idx=1 status=0 toa_us=112768
+
+2026-08-30 14:03:29,485 INFO image_tx_daemon: frame seq=250 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:29,751 INFO image_tx_daemon: txdone_arrival: seq=251 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:30,098 INFO image_tx_daemon: stats: goodput=706.8 B/s util=59% pipeline=v3 frames_in=253 ok=228 fail=0 drop_full=0 drop_stale=0 frags_ok=433 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-30 14:03:30,130 INFO image_tx_daemon: txdone_arrival: seq=251 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:30,331 INFO image_tx_daemon: txdone_arrival: seq=251 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:30,487 INFO image_tx_daemon: txdone_arrival: seq=251 idx=3 status=0 toa_us=128128
+
+2026-08-30 14:03:30,499 INFO image_tx_daemon: frame seq=251 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:30,695 INFO image_tx_daemon: txdone_arrival: seq=253 idx=0 status=0 toa_us=128128
+
+2026-08-30 14:03:30,706 INFO image_tx_daemon: frame seq=253 done (pipelined): 1 fragments ok
+
+2026-08-30 14:03:31,126 INFO image_tx_daemon: txdone_arrival: seq=254 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:31,325 INFO image_tx_daemon: txdone_arrival: seq=254 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:31,399 INFO image_tx_daemon: txdone_arrival: seq=254 idx=2 status=0 toa_us=46208
+
+2026-08-30 14:03:31,411 INFO image_tx_daemon: frame seq=254 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:31,724 INFO image_tx_daemon: txdone_arrival: seq=255 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:31,933 INFO image_tx_daemon: txdone_arrival: seq=255 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:31,996 INFO image_tx_daemon: txdone_arrival: seq=255 idx=2 status=0 toa_us=41088
+
+2026-08-30 14:03:32,014 INFO image_tx_daemon: frame seq=255 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:32,324 INFO image_tx_daemon: txdone_arrival: seq=0 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:32,490 INFO image_tx_daemon: txdone_arrival: seq=0 idx=1 status=0 toa_us=135808
+
+2026-08-30 14:03:32,502 INFO image_tx_daemon: frame seq=0 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:32,929 INFO image_tx_daemon: txdone_arrival: seq=1 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:33,126 INFO image_tx_daemon: txdone_arrival: seq=1 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:33,190 INFO image_tx_daemon: txdone_arrival: seq=1 idx=2 status=0 toa_us=33408
+
+2026-08-30 14:03:33,202 INFO image_tx_daemon: frame seq=1 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:33,525 INFO image_tx_daemon: txdone_arrival: seq=2 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:33,732 INFO image_tx_daemon: txdone_arrival: seq=2 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:33,744 INFO image_tx_daemon: frame seq=2 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:34,149 INFO image_tx_daemon: txdone_arrival: seq=3 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:34,530 INFO image_tx_daemon: txdone_arrival: seq=3 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:34,604 INFO image_tx_daemon: txdone_arrival: seq=3 idx=2 status=0 toa_us=51328
+
+2026-08-30 14:03:34,615 INFO image_tx_daemon: frame seq=3 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:34,928 INFO image_tx_daemon: txdone_arrival: seq=4 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:35,127 INFO image_tx_daemon: txdone_arrival: seq=4 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:35,272 INFO image_tx_daemon: txdone_arrival: seq=4 idx=2 status=0 toa_us=117888
+
+2026-08-30 14:03:35,285 INFO image_tx_daemon: frame seq=4 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:35,547 INFO image_tx_daemon: txdone_arrival: seq=6 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:35,925 INFO image_tx_daemon: txdone_arrival: seq=6 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:36,131 INFO image_tx_daemon: txdone_arrival: seq=6 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:36,246 INFO image_tx_daemon: txdone_arrival: seq=6 idx=3 status=0 toa_us=89728
+
+2026-08-30 14:03:36,258 INFO image_tx_daemon: frame seq=6 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:36,526 INFO image_tx_daemon: batching: 52 frames in 26 trains so far (this train: 2 frames, 556 B)
+
+2026-08-30 14:03:36,527 INFO image_tx_daemon: txdone_arrival: seq=8 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:36,724 INFO image_tx_daemon: txdone_arrival: seq=8 idx=1 status=0 toa_us=166528
+
+2026-08-30 14:03:36,736 INFO image_tx_daemon: frame seq=8 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:37,146 INFO image_tx_daemon: txdone_arrival: seq=9 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:37,527 INFO image_tx_daemon: txdone_arrival: seq=9 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:37,696 INFO image_tx_daemon: txdone_arrival: seq=9 idx=2 status=0 toa_us=135808
+
+2026-08-30 14:03:37,708 INFO image_tx_daemon: frame seq=9 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:38,128 INFO image_tx_daemon: txdone_arrival: seq=11 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:38,327 INFO image_tx_daemon: txdone_arrival: seq=11 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:38,485 INFO image_tx_daemon: txdone_arrival: seq=11 idx=2 status=0 toa_us=133248
+
+2026-08-30 14:03:38,497 INFO image_tx_daemon: frame seq=11 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:38,926 INFO image_tx_daemon: txdone_arrival: seq=13 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:39,104 INFO image_tx_daemon: txdone_arrival: seq=13 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:03:39,115 INFO image_tx_daemon: frame seq=13 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:39,527 INFO image_tx_daemon: txdone_arrival: seq=14 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:39,724 INFO image_tx_daemon: txdone_arrival: seq=14 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:39,923 INFO image_tx_daemon: txdone_arrival: seq=14 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:40,057 INFO image_tx_daemon: txdone_arrival: seq=14 idx=3 status=0 toa_us=99968
+
+2026-08-30 14:03:40,069 INFO image_tx_daemon: frame seq=14 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:40,110 INFO image_tx_daemon: stats: goodput=719.5 B/s util=60% pipeline=v3 frames_in=274 ok=243 fail=0 drop_full=0 drop_stale=0 frags_ok=474 frags_fail=0 qdepth=2 parity_tx=0
+
+2026-08-30 14:03:40,331 INFO image_tx_daemon: txdone_arrival: seq=16 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:40,528 INFO image_tx_daemon: txdone_arrival: seq=16 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:40,539 INFO image_tx_daemon: frame seq=16 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:40,934 INFO image_tx_daemon: txdone_arrival: seq=17 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:41,121 INFO image_tx_daemon: txdone_arrival: seq=17 idx=1 status=0 toa_us=161408
+
+2026-08-30 14:03:41,133 INFO image_tx_daemon: frame seq=17 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:41,509 INFO image_tx_daemon: txdone_arrival: seq=18 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:03:41,521 INFO image_tx_daemon: frame seq=18 done (pipelined): 1 fragments ok
+
+2026-08-30 14:03:41,926 INFO image_tx_daemon: txdone_arrival: seq=19 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:42,125 INFO image_tx_daemon: txdone_arrival: seq=19 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:42,312 INFO image_tx_daemon: txdone_arrival: seq=19 idx=2 status=0 toa_us=153728
+
+2026-08-30 14:03:42,323 INFO image_tx_daemon: frame seq=19 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:42,699 INFO image_tx_daemon: txdone_arrival: seq=21 idx=0 status=0 toa_us=146048
+
+2026-08-30 14:03:42,711 INFO image_tx_daemon: frame seq=21 done (pipelined): 1 fragments ok
+
+2026-08-30 14:03:43,123 INFO image_tx_daemon: txdone_arrival: seq=22 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:43,322 INFO image_tx_daemon: txdone_arrival: seq=22 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:43,405 INFO image_tx_daemon: txdone_arrival: seq=22 idx=2 status=0 toa_us=51328
+
+2026-08-30 14:03:43,417 INFO image_tx_daemon: frame seq=22 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:43,721 INFO image_tx_daemon: txdone_arrival: seq=23 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:43,908 INFO image_tx_daemon: txdone_arrival: seq=23 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:03:43,919 INFO image_tx_daemon: frame seq=23 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:44,343 INFO image_tx_daemon: txdone_arrival: seq=24 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:44,729 INFO image_tx_daemon: txdone_arrival: seq=24 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:44,782 INFO image_tx_daemon: txdone_arrival: seq=24 idx=2 status=0 toa_us=30848
+
+2026-08-30 14:03:44,793 INFO image_tx_daemon: frame seq=24 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:45,127 INFO image_tx_daemon: txdone_arrival: seq=25 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:45,320 INFO image_tx_daemon: txdone_arrival: seq=25 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:45,521 INFO image_tx_daemon: txdone_arrival: seq=25 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:45,660 INFO image_tx_daemon: txdone_arrival: seq=25 idx=3 status=0 toa_us=102528
+
+2026-08-30 14:03:45,671 INFO image_tx_daemon: frame seq=25 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:45,949 INFO image_tx_daemon: txdone_arrival: seq=27 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:46,520 INFO image_tx_daemon: txdone_arrival: seq=27 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:46,707 INFO image_tx_daemon: txdone_arrival: seq=27 idx=2 status=0 toa_us=151168
+
+2026-08-30 14:03:46,719 INFO image_tx_daemon: frame seq=27 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:47,124 INFO image_tx_daemon: txdone_arrival: seq=29 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:47,321 INFO image_tx_daemon: txdone_arrival: seq=29 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:47,333 INFO image_tx_daemon: frame seq=29 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:47,728 INFO image_tx_daemon: txdone_arrival: seq=30 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:47,922 INFO image_tx_daemon: txdone_arrival: seq=30 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:48,120 INFO image_tx_daemon: txdone_arrival: seq=30 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:48,286 INFO image_tx_daemon: txdone_arrival: seq=30 idx=3 status=0 toa_us=133248
+
+2026-08-30 14:03:48,298 INFO image_tx_daemon: frame seq=30 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:48,726 INFO image_tx_daemon: txdone_arrival: seq=32 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:48,902 INFO image_tx_daemon: txdone_arrival: seq=32 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:03:48,914 INFO image_tx_daemon: frame seq=32 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:49,327 INFO image_tx_daemon: txdone_arrival: seq=33 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:49,525 INFO image_tx_daemon: txdone_arrival: seq=33 idx=1 status=0 toa_us=166528
+
+2026-08-30 14:03:49,538 INFO image_tx_daemon: frame seq=33 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:49,924 INFO image_tx_daemon: txdone_arrival: seq=34 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:50,124 INFO image_tx_daemon: stats: goodput=656.2 B/s util=54% pipeline=v3 frames_in=294 ok=257 fail=0 drop_full=0 drop_stale=0 frags_ok=509 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:03:50,127 INFO image_tx_daemon: txdone_arrival: seq=34 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:50,304 INFO image_tx_daemon: txdone_arrival: seq=34 idx=2 status=0 toa_us=151168
+
+2026-08-30 14:03:50,316 INFO image_tx_daemon: frame seq=34 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:50,728 INFO image_tx_daemon: txdone_arrival: seq=36 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:50,894 INFO image_tx_daemon: txdone_arrival: seq=36 idx=1 status=0 toa_us=138368
+
+2026-08-30 14:03:50,906 INFO image_tx_daemon: frame seq=36 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:51,322 INFO image_tx_daemon: txdone_arrival: seq=37 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:51,526 INFO image_tx_daemon: txdone_arrival: seq=37 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:51,724 INFO image_tx_daemon: txdone_arrival: seq=37 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:51,797 INFO image_tx_daemon: txdone_arrival: seq=37 idx=3 status=0 toa_us=46208
+
+2026-08-30 14:03:51,809 INFO image_tx_daemon: frame seq=37 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:52,113 INFO image_tx_daemon: txdone_arrival: seq=39 idx=0 status=0 toa_us=163968
+
+2026-08-30 14:03:52,126 INFO image_tx_daemon: frame seq=39 done (pipelined): 1 fragments ok
+
+2026-08-30 14:03:52,542 INFO image_tx_daemon: txdone_arrival: seq=40 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:52,920 INFO image_tx_daemon: txdone_arrival: seq=40 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:53,119 INFO image_tx_daemon: txdone_arrival: seq=40 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:53,204 INFO image_tx_daemon: txdone_arrival: seq=40 idx=3 status=0 toa_us=56448
+
+2026-08-30 14:03:53,228 INFO image_tx_daemon: frame seq=40 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:53,528 INFO image_tx_daemon: txdone_arrival: seq=42 idx=0 status=0 toa_us=166528
+
+2026-08-30 14:03:53,540 INFO image_tx_daemon: frame seq=42 done (pipelined): 1 fragments ok
+
+2026-08-30 14:03:53,925 INFO image_tx_daemon: txdone_arrival: seq=43 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:54,119 INFO image_tx_daemon: txdone_arrival: seq=43 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:54,323 INFO image_tx_daemon: txdone_arrival: seq=43 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:54,459 INFO image_tx_daemon: txdone_arrival: seq=43 idx=3 status=0 toa_us=105088
+
+2026-08-30 14:03:54,471 INFO image_tx_daemon: frame seq=43 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:54,749 INFO image_tx_daemon: txdone_arrival: seq=45 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:55,117 INFO image_tx_daemon: txdone_arrival: seq=45 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:55,181 INFO image_tx_daemon: txdone_arrival: seq=45 idx=2 status=0 toa_us=33408
+
+2026-08-30 14:03:55,192 INFO image_tx_daemon: frame seq=45 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:55,519 INFO image_tx_daemon: txdone_arrival: seq=46 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:55,716 INFO image_tx_daemon: txdone_arrival: seq=46 idx=1 status=0 toa_us=166528
+
+2026-08-30 14:03:55,728 INFO image_tx_daemon: frame seq=46 done (pipelined): 2 fragments ok
+
+2026-08-30 14:03:56,120 INFO image_tx_daemon: txdone_arrival: seq=47 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:56,318 INFO image_tx_daemon: txdone_arrival: seq=47 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:56,381 INFO image_tx_daemon: txdone_arrival: seq=47 idx=2 status=0 toa_us=35968
+
+2026-08-30 14:03:56,394 INFO image_tx_daemon: frame seq=47 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:56,743 INFO image_tx_daemon: txdone_arrival: seq=48 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:57,124 INFO image_tx_daemon: txdone_arrival: seq=48 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:57,269 INFO image_tx_daemon: txdone_arrival: seq=48 idx=2 status=0 toa_us=123008
+
+2026-08-30 14:03:57,281 INFO image_tx_daemon: frame seq=48 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:57,543 INFO image_tx_daemon: txdone_arrival: seq=50 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:57,921 INFO image_tx_daemon: txdone_arrival: seq=50 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:58,122 INFO image_tx_daemon: txdone_arrival: seq=50 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:03:58,227 INFO image_tx_daemon: txdone_arrival: seq=50 idx=3 status=0 toa_us=74368
+
+2026-08-30 14:03:58,238 INFO image_tx_daemon: frame seq=50 done (pipelined): 4 fragments ok
+
+2026-08-30 14:03:58,520 INFO image_tx_daemon: txdone_arrival: seq=52 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:58,725 INFO image_tx_daemon: txdone_arrival: seq=52 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:58,778 INFO image_tx_daemon: txdone_arrival: seq=52 idx=2 status=0 toa_us=25728
+
+2026-08-30 14:03:58,790 INFO image_tx_daemon: frame seq=52 done (pipelined): 3 fragments ok
+
+2026-08-30 14:03:59,141 INFO image_tx_daemon: txdone_arrival: seq=53 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:03:59,516 INFO image_tx_daemon: txdone_arrival: seq=53 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:03:59,682 INFO image_tx_daemon: txdone_arrival: seq=53 idx=2 status=0 toa_us=133248
+
+2026-08-30 14:03:59,694 INFO image_tx_daemon: frame seq=53 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:00,126 INFO image_tx_daemon: txdone_arrival: seq=55 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:00,135 INFO image_tx_daemon: stats: goodput=695.6 B/s util=58% pipeline=v3 frames_in=314 ok=271 fail=0 drop_full=0 drop_stale=0 frags_ok=549 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:04:00,317 INFO image_tx_daemon: txdone_arrival: seq=55 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:00,483 INFO image_tx_daemon: txdone_arrival: seq=55 idx=2 status=0 toa_us=133248
+
+2026-08-30 14:04:00,495 INFO image_tx_daemon: frame seq=55 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:00,923 INFO image_tx_daemon: txdone_arrival: seq=57 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:01,100 INFO image_tx_daemon: txdone_arrival: seq=57 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:04:01,111 INFO image_tx_daemon: frame seq=57 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:01,522 INFO image_tx_daemon: txdone_arrival: seq=58 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:01,578 INFO image_tx_daemon: txdone_arrival: seq=58 idx=1 status=0 toa_us=28288
+
+2026-08-30 14:04:01,590 INFO image_tx_daemon: frame seq=58 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:01,873 INFO image_tx_daemon: txdone_arrival: seq=59 idx=0 status=0 toa_us=125568
+
+2026-08-30 14:04:01,884 INFO image_tx_daemon: frame seq=59 done (pipelined): 1 fragments ok
+
+2026-08-30 14:04:02,145 INFO image_tx_daemon: txdone_arrival: seq=60 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:02,524 INFO image_tx_daemon: txdone_arrival: seq=60 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:02,722 INFO image_tx_daemon: txdone_arrival: seq=60 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:02,785 INFO image_tx_daemon: txdone_arrival: seq=60 idx=3 status=0 toa_us=41088
+
+2026-08-30 14:04:02,797 INFO image_tx_daemon: frame seq=60 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:03,122 INFO image_tx_daemon: txdone_arrival: seq=62 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:03,308 INFO image_tx_daemon: txdone_arrival: seq=62 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:04:03,320 INFO image_tx_daemon: frame seq=62 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:03,722 INFO image_tx_daemon: txdone_arrival: seq=63 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:03,889 INFO image_tx_daemon: txdone_arrival: seq=63 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:04:03,901 INFO image_tx_daemon: frame seq=63 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:04,317 INFO image_tx_daemon: txdone_arrival: seq=64 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:04,520 INFO image_tx_daemon: txdone_arrival: seq=64 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:04,719 INFO image_tx_daemon: txdone_arrival: seq=64 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:04,793 INFO image_tx_daemon: txdone_arrival: seq=64 idx=3 status=0 toa_us=46208
+
+2026-08-30 14:04:04,805 INFO image_tx_daemon: frame seq=64 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:05,120 INFO image_tx_daemon: txdone_arrival: seq=66 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:05,316 INFO image_tx_daemon: txdone_arrival: seq=66 idx=1 status=0 toa_us=161408
+
+2026-08-30 14:04:05,328 INFO image_tx_daemon: frame seq=66 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:05,728 INFO image_tx_daemon: txdone_arrival: seq=67 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:05,905 INFO image_tx_daemon: txdone_arrival: seq=67 idx=1 status=0 toa_us=158848
+
+2026-08-30 14:04:05,916 INFO image_tx_daemon: frame seq=67 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:06,322 INFO image_tx_daemon: txdone_arrival: seq=68 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:06,519 INFO image_tx_daemon: txdone_arrival: seq=68 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:06,573 INFO image_tx_daemon: txdone_arrival: seq=68 idx=2 status=0 toa_us=25728
+
+2026-08-30 14:04:06,584 INFO image_tx_daemon: frame seq=68 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:06,948 INFO image_tx_daemon: txdone_arrival: seq=69 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:07,327 INFO image_tx_daemon: txdone_arrival: seq=69 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:07,506 INFO image_tx_daemon: txdone_arrival: seq=69 idx=2 status=0 toa_us=151168
+
+2026-08-30 14:04:07,518 INFO image_tx_daemon: frame seq=69 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:07,712 INFO image_tx_daemon: txdone_arrival: seq=71 idx=0 status=0 toa_us=130688
+
+2026-08-30 14:04:07,724 INFO image_tx_daemon: frame seq=71 done (pipelined): 1 fragments ok
+
+2026-08-30 14:04:08,124 INFO image_tx_daemon: txdone_arrival: seq=72 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:08,323 INFO image_tx_daemon: txdone_arrival: seq=72 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:08,515 INFO image_tx_daemon: txdone_arrival: seq=72 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:08,661 INFO image_tx_daemon: txdone_arrival: seq=72 idx=3 status=0 toa_us=112768
+
+2026-08-30 14:04:08,673 INFO image_tx_daemon: frame seq=72 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:08,934 INFO image_tx_daemon: txdone_arrival: seq=74 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:09,127 INFO image_tx_daemon: txdone_arrival: seq=74 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:09,190 INFO image_tx_daemon: txdone_arrival: seq=74 idx=2 status=0 toa_us=41088
+
+2026-08-30 14:04:09,202 INFO image_tx_daemon: frame seq=74 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:09,543 INFO image_tx_daemon: txdone_arrival: seq=75 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:09,915 INFO image_tx_daemon: txdone_arrival: seq=75 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:09,927 INFO image_tx_daemon: frame seq=75 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:10,147 INFO image_tx_daemon: stats: goodput=676.3 B/s util=57% pipeline=v3 frames_in=334 ok=287 fail=0 drop_full=0 drop_stale=0 frags_ok=588 frags_fail=0 qdepth=2 parity_tx=0
+
+2026-08-30 14:04:10,323 INFO image_tx_daemon: txdone_arrival: seq=76 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:10,520 INFO image_tx_daemon: txdone_arrival: seq=76 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:10,574 INFO image_tx_daemon: txdone_arrival: seq=76 idx=2 status=0 toa_us=28288
+
+2026-08-30 14:04:10,587 INFO image_tx_daemon: frame seq=76 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:10,920 INFO image_tx_daemon: txdone_arrival: seq=77 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:11,118 INFO image_tx_daemon: txdone_arrival: seq=77 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:11,172 INFO image_tx_daemon: txdone_arrival: seq=77 idx=2 status=0 toa_us=25728
+
+2026-08-30 14:04:11,183 INFO image_tx_daemon: frame seq=77 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:11,543 INFO image_tx_daemon: txdone_arrival: seq=78 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:11,914 INFO image_tx_daemon: txdone_arrival: seq=78 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:11,978 INFO image_tx_daemon: txdone_arrival: seq=78 idx=2 status=0 toa_us=28288
+
+2026-08-30 14:04:11,989 INFO image_tx_daemon: frame seq=78 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:12,316 INFO image_tx_daemon: txdone_arrival: seq=79 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:12,503 INFO image_tx_daemon: txdone_arrival: seq=79 idx=1 status=0 toa_us=151168
+
+2026-08-30 14:04:12,515 INFO image_tx_daemon: frame seq=79 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:12,902 INFO image_tx_daemon: txdone_arrival: seq=80 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:04:12,914 INFO image_tx_daemon: frame seq=80 done (pipelined): 1 fragments ok
+
+2026-08-30 14:04:13,313 INFO image_tx_daemon: txdone_arrival: seq=81 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:13,501 INFO image_tx_daemon: txdone_arrival: seq=81 idx=1 status=0 toa_us=156288
+
+2026-08-30 14:04:13,512 INFO image_tx_daemon: frame seq=81 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:13,918 INFO image_tx_daemon: txdone_arrival: seq=82 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:14,122 INFO image_tx_daemon: txdone_arrival: seq=82 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:14,320 INFO image_tx_daemon: txdone_arrival: seq=82 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:14,404 INFO image_tx_daemon: txdone_arrival: seq=82 idx=3 status=0 toa_us=61568
+
+2026-08-30 14:04:14,416 INFO image_tx_daemon: frame seq=82 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:14,722 INFO image_tx_daemon: txdone_arrival: seq=84 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:14,889 INFO image_tx_daemon: txdone_arrival: seq=84 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:04:14,901 INFO image_tx_daemon: frame seq=84 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:15,342 INFO image_tx_daemon: txdone_arrival: seq=85 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:15,717 INFO image_tx_daemon: txdone_arrival: seq=85 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:15,791 INFO image_tx_daemon: txdone_arrival: seq=85 idx=2 status=0 toa_us=46208
+
+2026-08-30 14:04:15,802 INFO image_tx_daemon: frame seq=85 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:16,115 INFO image_tx_daemon: txdone_arrival: seq=86 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:16,319 INFO image_tx_daemon: txdone_arrival: seq=86 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:16,517 INFO image_tx_daemon: txdone_arrival: seq=86 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:16,632 INFO image_tx_daemon: txdone_arrival: seq=86 idx=3 status=0 toa_us=87168
+
+2026-08-30 14:04:16,644 INFO image_tx_daemon: frame seq=86 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:16,922 INFO image_tx_daemon: txdone_arrival: seq=88 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:17,099 INFO image_tx_daemon: txdone_arrival: seq=88 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:04:17,110 INFO image_tx_daemon: frame seq=88 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:17,539 INFO image_tx_daemon: txdone_arrival: seq=89 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:17,914 INFO image_tx_daemon: txdone_arrival: seq=89 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:17,977 INFO image_tx_daemon: txdone_arrival: seq=89 idx=2 status=0 toa_us=30848
+
+2026-08-30 14:04:17,989 INFO image_tx_daemon: frame seq=89 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:18,319 INFO image_tx_daemon: txdone_arrival: seq=90 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:18,506 INFO image_tx_daemon: txdone_arrival: seq=90 idx=1 status=0 toa_us=156288
+
+2026-08-30 14:04:18,518 INFO image_tx_daemon: frame seq=90 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:18,913 INFO image_tx_daemon: txdone_arrival: seq=91 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:19,117 INFO image_tx_daemon: txdone_arrival: seq=91 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:19,317 INFO image_tx_daemon: txdone_arrival: seq=91 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:19,452 INFO image_tx_daemon: txdone_arrival: seq=91 idx=3 status=0 toa_us=110208
+
+2026-08-30 14:04:19,464 INFO image_tx_daemon: frame seq=91 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:19,731 INFO image_tx_daemon: txdone_arrival: seq=93 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:20,113 INFO image_tx_daemon: txdone_arrival: seq=93 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:20,159 INFO image_tx_daemon: stats: goodput=684.1 B/s util=57% pipeline=v3 frames_in=354 ok=301 fail=0 drop_full=0 drop_stale=0 frags_ok=628 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:04:20,310 INFO image_tx_daemon: txdone_arrival: seq=93 idx=2 status=0 toa_us=163968
+
+2026-08-30 14:04:20,321 INFO image_tx_daemon: frame seq=93 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:20,716 INFO image_tx_daemon: txdone_arrival: seq=95 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:20,910 INFO image_tx_daemon: txdone_arrival: seq=95 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:21,119 INFO image_tx_daemon: txdone_arrival: seq=95 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:21,234 INFO image_tx_daemon: txdone_arrival: seq=95 idx=3 status=0 toa_us=89728
+
+2026-08-30 14:04:21,245 INFO image_tx_daemon: frame seq=95 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:21,529 INFO image_tx_daemon: txdone_arrival: seq=97 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:21,916 INFO image_tx_daemon: txdone_arrival: seq=97 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:22,073 INFO image_tx_daemon: txdone_arrival: seq=97 idx=2 status=0 toa_us=130688
+
+2026-08-30 14:04:22,087 INFO image_tx_daemon: frame seq=97 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:22,188 INFO image_tx_daemon: batching: 103 frames in 51 trains so far (this train: 2 frames, 584 B)
+
+2026-08-30 14:04:22,288 INFO image_tx_daemon: txdone_arrival: seq=100 idx=0 status=0 toa_us=135808
+
+2026-08-30 14:04:22,300 INFO image_tx_daemon: frame seq=100 done (pipelined): 1 fragments ok
+
+2026-08-30 14:04:22,711 INFO image_tx_daemon: txdone_arrival: seq=101 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:22,918 INFO image_tx_daemon: txdone_arrival: seq=101 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:23,097 INFO image_tx_daemon: txdone_arrival: seq=101 idx=2 status=0 toa_us=156288
+
+2026-08-30 14:04:23,109 INFO image_tx_daemon: frame seq=101 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:23,515 INFO image_tx_daemon: txdone_arrival: seq=103 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:23,569 INFO image_tx_daemon: txdone_arrival: seq=103 idx=1 status=0 toa_us=25728
+
+2026-08-30 14:04:23,582 INFO image_tx_daemon: frame seq=103 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:23,910 INFO image_tx_daemon: txdone_arrival: seq=104 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:24,077 INFO image_tx_daemon: txdone_arrival: seq=104 idx=1 status=0 toa_us=133248
+
+2026-08-30 14:04:24,088 INFO image_tx_daemon: frame seq=104 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:24,514 INFO image_tx_daemon: txdone_arrival: seq=105 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:24,594 INFO image_tx_daemon: txdone_arrival: seq=105 idx=1 status=0 toa_us=56448
+
+2026-08-30 14:04:24,606 INFO image_tx_daemon: frame seq=105 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:24,907 INFO image_tx_daemon: txdone_arrival: seq=106 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:25,094 INFO image_tx_daemon: txdone_arrival: seq=106 idx=1 status=0 toa_us=151168
+
+2026-08-30 14:04:25,106 INFO image_tx_daemon: frame seq=106 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:25,520 INFO image_tx_daemon: txdone_arrival: seq=107 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:25,676 INFO image_tx_daemon: txdone_arrival: seq=107 idx=1 status=0 toa_us=135808
+
+2026-08-30 14:04:25,688 INFO image_tx_daemon: frame seq=107 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:26,114 INFO image_tx_daemon: txdone_arrival: seq=108 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:26,312 INFO image_tx_daemon: txdone_arrival: seq=108 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:26,385 INFO image_tx_daemon: txdone_arrival: seq=108 idx=2 status=0 toa_us=41088
+
+2026-08-30 14:04:26,397 INFO image_tx_daemon: frame seq=108 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:26,707 INFO image_tx_daemon: txdone_arrival: seq=109 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:26,904 INFO image_tx_daemon: txdone_arrival: seq=109 idx=1 status=0 toa_us=158848
+
+2026-08-30 14:04:26,916 INFO image_tx_daemon: frame seq=109 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:27,304 INFO image_tx_daemon: txdone_arrival: seq=110 idx=0 status=0 toa_us=166528
+
+2026-08-30 14:04:27,316 INFO image_tx_daemon: frame seq=110 done (pipelined): 1 fragments ok
+
+2026-08-30 14:04:27,712 INFO image_tx_daemon: txdone_arrival: seq=111 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:27,910 INFO image_tx_daemon: txdone_arrival: seq=111 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:27,973 INFO image_tx_daemon: txdone_arrival: seq=111 idx=2 status=0 toa_us=30848
+
+2026-08-30 14:04:27,985 INFO image_tx_daemon: frame seq=111 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:28,309 INFO image_tx_daemon: txdone_arrival: seq=112 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:28,495 INFO image_tx_daemon: txdone_arrival: seq=112 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:04:28,507 INFO image_tx_daemon: frame seq=112 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:28,925 INFO image_tx_daemon: txdone_arrival: seq=113 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:29,104 INFO image_tx_daemon: txdone_arrival: seq=113 idx=1 status=0 toa_us=163968
+
+2026-08-30 14:04:29,116 INFO image_tx_daemon: frame seq=113 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:29,509 INFO image_tx_daemon: txdone_arrival: seq=114 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:29,687 INFO image_tx_daemon: txdone_arrival: seq=114 idx=1 status=0 toa_us=151168
+
+2026-08-30 14:04:29,699 INFO image_tx_daemon: frame seq=114 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:30,109 INFO image_tx_daemon: txdone_arrival: seq=115 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:30,170 INFO image_tx_daemon: stats: goodput=669.5 B/s util=56% pipeline=v3 frames_in=374 ok=318 fail=0 drop_full=0 drop_stale=0 frags_ok=666 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:04:30,308 INFO image_tx_daemon: txdone_arrival: seq=115 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:30,371 INFO image_tx_daemon: txdone_arrival: seq=115 idx=2 status=0 toa_us=35968
+
+2026-08-30 14:04:30,383 INFO image_tx_daemon: frame seq=115 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:30,729 INFO image_tx_daemon: txdone_arrival: seq=116 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:31,105 INFO image_tx_daemon: txdone_arrival: seq=116 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:31,159 INFO image_tx_daemon: txdone_arrival: seq=116 idx=2 status=0 toa_us=23168
+
+2026-08-30 14:04:31,171 INFO image_tx_daemon: frame seq=116 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:31,514 INFO image_tx_daemon: txdone_arrival: seq=117 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:31,708 INFO image_tx_daemon: txdone_arrival: seq=117 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:31,904 INFO image_tx_daemon: txdone_arrival: seq=117 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:32,055 INFO image_tx_daemon: txdone_arrival: seq=117 idx=3 status=0 toa_us=115328
+
+2026-08-30 14:04:32,066 INFO image_tx_daemon: frame seq=117 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:32,328 INFO image_tx_daemon: txdone_arrival: seq=119 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:32,707 INFO image_tx_daemon: txdone_arrival: seq=119 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:32,771 INFO image_tx_daemon: txdone_arrival: seq=119 idx=2 status=0 toa_us=33408
+
+2026-08-30 14:04:32,782 INFO image_tx_daemon: frame seq=119 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:33,111 INFO image_tx_daemon: txdone_arrival: seq=120 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:33,299 INFO image_tx_daemon: txdone_arrival: seq=120 idx=1 status=0 toa_us=158848
+
+2026-08-30 14:04:33,310 INFO image_tx_daemon: frame seq=120 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:33,511 INFO image_tx_daemon: txdone_arrival: seq=121 idx=0 status=0 toa_us=133248
+
+2026-08-30 14:04:33,523 INFO image_tx_daemon: frame seq=121 done (pipelined): 1 fragments ok
+
+2026-08-30 14:04:33,913 INFO image_tx_daemon: txdone_arrival: seq=122 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:34,100 INFO image_tx_daemon: txdone_arrival: seq=122 idx=1 status=0 toa_us=163968
+
+2026-08-30 14:04:34,112 INFO image_tx_daemon: frame seq=122 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:34,508 INFO image_tx_daemon: txdone_arrival: seq=123 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:34,705 INFO image_tx_daemon: txdone_arrival: seq=123 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:34,769 INFO image_tx_daemon: txdone_arrival: seq=123 idx=2 status=0 toa_us=35968
+
+2026-08-30 14:04:34,780 INFO image_tx_daemon: frame seq=123 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:35,133 INFO image_tx_daemon: txdone_arrival: seq=124 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:35,505 INFO image_tx_daemon: txdone_arrival: seq=124 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:35,702 INFO image_tx_daemon: txdone_arrival: seq=124 idx=2 status=0 toa_us=163968
+
+2026-08-30 14:04:35,714 INFO image_tx_daemon: frame seq=124 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:36,105 INFO image_tx_daemon: txdone_arrival: seq=126 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:36,310 INFO image_tx_daemon: txdone_arrival: seq=126 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:36,497 INFO image_tx_daemon: txdone_arrival: seq=126 idx=2 status=0 toa_us=158848
+
+2026-08-30 14:04:36,509 INFO image_tx_daemon: frame seq=126 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:36,904 INFO image_tx_daemon: txdone_arrival: seq=128 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:37,107 INFO image_tx_daemon: txdone_arrival: seq=128 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:37,305 INFO image_tx_daemon: txdone_arrival: seq=128 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:37,379 INFO image_tx_daemon: txdone_arrival: seq=128 idx=3 status=0 toa_us=46208
+
+2026-08-30 14:04:37,391 INFO image_tx_daemon: frame seq=128 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:37,717 INFO image_tx_daemon: txdone_arrival: seq=130 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:37,931 INFO image_tx_daemon: txdone_arrival: seq=130 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:38,312 INFO image_tx_daemon: txdone_arrival: seq=130 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:38,457 INFO image_tx_daemon: txdone_arrival: seq=130 idx=3 status=0 toa_us=123008
+
+2026-08-30 14:04:38,469 INFO image_tx_daemon: frame seq=130 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:38,731 INFO image_tx_daemon: txdone_arrival: seq=132 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:39,110 INFO image_tx_daemon: txdone_arrival: seq=132 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:39,296 INFO image_tx_daemon: txdone_arrival: seq=132 idx=2 status=0 toa_us=161408
+
+2026-08-30 14:04:39,308 INFO image_tx_daemon: frame seq=132 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:39,703 INFO image_tx_daemon: txdone_arrival: seq=134 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:39,907 INFO image_tx_daemon: txdone_arrival: seq=134 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:40,110 INFO image_tx_daemon: txdone_arrival: seq=134 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:40,182 INFO image_tx_daemon: stats: goodput=709.9 B/s util=59% pipeline=v3 frames_in=394 ok=331 fail=0 drop_full=0 drop_stale=0 frags_ok=706 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:04:40,245 INFO image_tx_daemon: txdone_arrival: seq=134 idx=3 status=0 toa_us=112768
+
+2026-08-30 14:04:40,257 INFO image_tx_daemon: frame seq=134 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:40,503 INFO image_tx_daemon: txdone_arrival: seq=136 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:40,674 INFO image_tx_daemon: txdone_arrival: seq=136 idx=1 status=0 toa_us=140928
+
+2026-08-30 14:04:40,686 INFO image_tx_daemon: frame seq=136 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:41,127 INFO image_tx_daemon: txdone_arrival: seq=137 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:41,505 INFO image_tx_daemon: txdone_arrival: seq=137 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:41,581 INFO image_tx_daemon: txdone_arrival: seq=137 idx=2 status=0 toa_us=48768
+
+2026-08-30 14:04:41,593 INFO image_tx_daemon: frame seq=137 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:41,906 INFO image_tx_daemon: txdone_arrival: seq=138 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:42,111 INFO image_tx_daemon: txdone_arrival: seq=138 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:42,297 INFO image_tx_daemon: txdone_arrival: seq=138 idx=2 status=0 toa_us=161408
+
+2026-08-30 14:04:42,309 INFO image_tx_daemon: frame seq=138 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:42,710 INFO image_tx_daemon: txdone_arrival: seq=140 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:42,856 INFO image_tx_daemon: txdone_arrival: seq=140 idx=1 status=0 toa_us=117888
+
+2026-08-30 14:04:42,867 INFO image_tx_daemon: frame seq=140 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:43,100 INFO image_tx_daemon: txdone_arrival: seq=141 idx=0 status=0 toa_us=161408
+
+2026-08-30 14:04:43,111 INFO image_tx_daemon: frame seq=141 done (pipelined): 1 fragments ok
+
+2026-08-30 14:04:43,476 INFO image_tx_daemon: txdone_arrival: seq=142 idx=0 status=0 toa_us=138368
+
+2026-08-30 14:04:43,488 INFO image_tx_daemon: frame seq=142 done (pipelined): 1 fragments ok
+
+2026-08-30 14:04:43,904 INFO image_tx_daemon: txdone_arrival: seq=143 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:44,104 INFO image_tx_daemon: txdone_arrival: seq=143 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:44,250 INFO image_tx_daemon: txdone_arrival: seq=143 idx=2 status=0 toa_us=112768
+
+2026-08-30 14:04:44,262 INFO image_tx_daemon: frame seq=143 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:44,483 INFO image_tx_daemon: txdone_arrival: seq=145 idx=0 status=0 toa_us=148608
+
+2026-08-30 14:04:44,495 INFO image_tx_daemon: frame seq=145 done (pipelined): 1 fragments ok
+
+2026-08-30 14:04:44,902 INFO image_tx_daemon: txdone_arrival: seq=146 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:45,069 INFO image_tx_daemon: txdone_arrival: seq=146 idx=1 status=0 toa_us=130688
+
+2026-08-30 14:04:45,080 INFO image_tx_daemon: frame seq=146 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:45,507 INFO image_tx_daemon: txdone_arrival: seq=147 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:45,631 INFO image_tx_daemon: txdone_arrival: seq=147 idx=1 status=0 toa_us=97408
+
+2026-08-30 14:04:45,643 INFO image_tx_daemon: frame seq=147 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:45,908 INFO image_tx_daemon: txdone_arrival: seq=148 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:45,972 INFO image_tx_daemon: txdone_arrival: seq=148 idx=1 status=0 toa_us=43648
+
+2026-08-30 14:04:45,983 INFO image_tx_daemon: frame seq=148 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:46,308 INFO image_tx_daemon: txdone_arrival: seq=149 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:46,484 INFO image_tx_daemon: txdone_arrival: seq=149 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:04:46,496 INFO image_tx_daemon: frame seq=149 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:46,905 INFO image_tx_daemon: txdone_arrival: seq=150 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:46,979 INFO image_tx_daemon: txdone_arrival: seq=150 idx=1 status=0 toa_us=43648
+
+2026-08-30 14:04:46,990 INFO image_tx_daemon: frame seq=150 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:47,308 INFO image_tx_daemon: txdone_arrival: seq=151 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:47,474 INFO image_tx_daemon: txdone_arrival: seq=151 idx=1 status=0 toa_us=140928
+
+2026-08-30 14:04:47,486 INFO image_tx_daemon: frame seq=151 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:47,905 INFO image_tx_daemon: txdone_arrival: seq=152 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:48,092 INFO image_tx_daemon: txdone_arrival: seq=152 idx=1 status=0 toa_us=156288
+
+2026-08-30 14:04:48,104 INFO image_tx_daemon: frame seq=152 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:48,504 INFO image_tx_daemon: txdone_arrival: seq=153 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:48,681 INFO image_tx_daemon: txdone_arrival: seq=153 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:04:48,693 INFO image_tx_daemon: frame seq=153 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:49,108 INFO image_tx_daemon: txdone_arrival: seq=154 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:49,306 INFO image_tx_daemon: txdone_arrival: seq=154 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:49,359 INFO image_tx_daemon: txdone_arrival: seq=154 idx=2 status=0 toa_us=25728
+
+2026-08-30 14:04:49,371 INFO image_tx_daemon: frame seq=154 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:49,705 INFO image_tx_daemon: txdone_arrival: seq=155 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:49,903 INFO image_tx_daemon: txdone_arrival: seq=155 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:49,956 INFO image_tx_daemon: txdone_arrival: seq=155 idx=2 status=0 toa_us=25728
+
+2026-08-30 14:04:49,968 INFO image_tx_daemon: frame seq=155 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:50,194 INFO image_tx_daemon: stats: goodput=652.0 B/s util=55% pipeline=v3 frames_in=414 ok=350 fail=0 drop_full=0 drop_stale=0 frags_ok=745 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:04:50,318 INFO image_tx_daemon: txdone_arrival: seq=156 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:50,495 INFO image_tx_daemon: txdone_arrival: seq=156 idx=1 status=0 toa_us=161408
+
+2026-08-30 14:04:50,507 INFO image_tx_daemon: frame seq=156 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:50,906 INFO image_tx_daemon: txdone_arrival: seq=157 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:51,072 INFO image_tx_daemon: txdone_arrival: seq=157 idx=1 status=0 toa_us=138368
+
+2026-08-30 14:04:51,084 INFO image_tx_daemon: frame seq=157 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:51,500 INFO image_tx_daemon: txdone_arrival: seq=158 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:51,708 INFO image_tx_daemon: txdone_arrival: seq=158 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:51,782 INFO image_tx_daemon: txdone_arrival: seq=158 idx=2 status=0 toa_us=46208
+
+2026-08-30 14:04:51,794 INFO image_tx_daemon: frame seq=158 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:52,126 INFO image_tx_daemon: txdone_arrival: seq=159 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:52,501 INFO image_tx_daemon: txdone_arrival: seq=159 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:52,574 INFO image_tx_daemon: txdone_arrival: seq=159 idx=2 status=0 toa_us=38528
+
+2026-08-30 14:04:52,586 INFO image_tx_daemon: frame seq=159 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:52,899 INFO image_tx_daemon: txdone_arrival: seq=160 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:53,108 INFO image_tx_daemon: txdone_arrival: seq=160 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:53,171 INFO image_tx_daemon: txdone_arrival: seq=160 idx=2 status=0 toa_us=41088
+
+2026-08-30 14:04:53,183 INFO image_tx_daemon: frame seq=160 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:53,467 INFO image_tx_daemon: txdone_arrival: seq=161 idx=0 status=0 toa_us=130688
+
+2026-08-30 14:04:53,478 INFO image_tx_daemon: frame seq=161 done (pipelined): 1 fragments ok
+
+2026-08-30 14:04:53,905 INFO image_tx_daemon: txdone_arrival: seq=162 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:54,098 INFO image_tx_daemon: txdone_arrival: seq=162 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:54,301 INFO image_tx_daemon: txdone_arrival: seq=162 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:54,458 INFO image_tx_daemon: txdone_arrival: seq=162 idx=3 status=0 toa_us=128128
+
+2026-08-30 14:04:54,469 INFO image_tx_daemon: frame seq=162 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:54,731 INFO image_tx_daemon: txdone_arrival: seq=164 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:55,108 INFO image_tx_daemon: txdone_arrival: seq=164 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:55,152 INFO image_tx_daemon: txdone_arrival: seq=164 idx=2 status=0 toa_us=23168
+
+2026-08-30 14:04:55,164 INFO image_tx_daemon: frame seq=164 done (pipelined): 3 fragments ok
+
+2026-08-30 14:04:55,506 INFO image_tx_daemon: txdone_arrival: seq=165 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:55,682 INFO image_tx_daemon: txdone_arrival: seq=165 idx=1 status=0 toa_us=151168
+
+2026-08-30 14:04:55,694 INFO image_tx_daemon: frame seq=165 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:56,104 INFO image_tx_daemon: txdone_arrival: seq=166 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:56,291 INFO image_tx_daemon: txdone_arrival: seq=166 idx=1 status=0 toa_us=158848
+
+2026-08-30 14:04:56,303 INFO image_tx_daemon: frame seq=166 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:56,698 INFO image_tx_daemon: txdone_arrival: seq=167 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:56,905 INFO image_tx_daemon: txdone_arrival: seq=167 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:56,917 INFO image_tx_daemon: frame seq=167 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:57,302 INFO image_tx_daemon: txdone_arrival: seq=168 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:57,512 INFO image_tx_daemon: txdone_arrival: seq=168 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:57,705 INFO image_tx_daemon: txdone_arrival: seq=168 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:57,860 INFO image_tx_daemon: txdone_arrival: seq=168 idx=3 status=0 toa_us=125568
+
+2026-08-30 14:04:57,872 INFO image_tx_daemon: frame seq=168 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:58,304 INFO image_tx_daemon: txdone_arrival: seq=171 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:58,460 INFO image_tx_daemon: txdone_arrival: seq=171 idx=1 status=0 toa_us=133248
+
+2026-08-30 14:04:58,472 INFO image_tx_daemon: frame seq=171 done (pipelined): 2 fragments ok
+
+2026-08-30 14:04:58,898 INFO image_tx_daemon: txdone_arrival: seq=173 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:59,107 INFO image_tx_daemon: txdone_arrival: seq=173 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:04:59,305 INFO image_tx_daemon: txdone_arrival: seq=173 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:04:59,379 INFO image_tx_daemon: txdone_arrival: seq=173 idx=3 status=0 toa_us=48768
+
+2026-08-30 14:04:59,391 INFO image_tx_daemon: frame seq=173 done (pipelined): 4 fragments ok
+
+2026-08-30 14:04:59,699 INFO image_tx_daemon: txdone_arrival: seq=175 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:04:59,875 INFO image_tx_daemon: txdone_arrival: seq=175 idx=1 status=0 toa_us=140928
+
+2026-08-30 14:04:59,887 INFO image_tx_daemon: frame seq=175 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:00,205 INFO image_tx_daemon: stats: goodput=680.7 B/s util=57% pipeline=v3 frames_in=434 ok=365 fail=0 drop_full=0 drop_stale=0 frags_ok=784 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:05:00,327 INFO image_tx_daemon: txdone_arrival: seq=176 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:00,700 INFO image_tx_daemon: txdone_arrival: seq=176 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:00,878 INFO image_tx_daemon: txdone_arrival: seq=176 idx=2 status=0 toa_us=148608
+
+2026-08-30 14:05:00,889 INFO image_tx_daemon: frame seq=176 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:01,302 INFO image_tx_daemon: txdone_arrival: seq=178 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:01,489 INFO image_tx_daemon: txdone_arrival: seq=178 idx=1 status=0 toa_us=158848
+
+2026-08-30 14:05:01,501 INFO image_tx_daemon: frame seq=178 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:01,899 INFO image_tx_daemon: txdone_arrival: seq=179 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:02,086 INFO image_tx_daemon: txdone_arrival: seq=179 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:05:02,099 INFO image_tx_daemon: frame seq=179 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:02,505 INFO image_tx_daemon: txdone_arrival: seq=180 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:02,699 INFO image_tx_daemon: txdone_arrival: seq=180 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:02,897 INFO image_tx_daemon: txdone_arrival: seq=180 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:05:03,053 INFO image_tx_daemon: txdone_arrival: seq=180 idx=3 status=0 toa_us=125568
+
+2026-08-30 14:05:03,065 INFO image_tx_daemon: frame seq=180 done (pipelined): 4 fragments ok
+
+2026-08-30 14:05:03,287 INFO image_tx_daemon: txdone_arrival: seq=182 idx=0 status=0 toa_us=153728
+
+2026-08-30 14:05:03,299 INFO image_tx_daemon: frame seq=182 done (pipelined): 1 fragments ok
+
+2026-08-30 14:05:03,725 INFO image_tx_daemon: txdone_arrival: seq=183 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:04,104 INFO image_tx_daemon: txdone_arrival: seq=183 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:04,302 INFO image_tx_daemon: txdone_arrival: seq=183 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:05:04,386 INFO image_tx_daemon: txdone_arrival: seq=183 idx=3 status=0 toa_us=56448
+
+2026-08-30 14:05:04,398 INFO image_tx_daemon: frame seq=183 done (pipelined): 4 fragments ok
+
+2026-08-30 14:05:04,696 INFO image_tx_daemon: txdone_arrival: seq=185 idx=0 status=0 toa_us=166528
+
+2026-08-30 14:05:04,708 INFO image_tx_daemon: frame seq=185 done (pipelined): 1 fragments ok
+
+2026-08-30 14:05:05,099 INFO image_tx_daemon: txdone_arrival: seq=186 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:05,255 INFO image_tx_daemon: txdone_arrival: seq=186 idx=1 status=0 toa_us=125568
+
+2026-08-30 14:05:05,267 INFO image_tx_daemon: frame seq=186 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:05,695 INFO image_tx_daemon: txdone_arrival: seq=187 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:05,882 INFO image_tx_daemon: txdone_arrival: seq=187 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:05:05,893 INFO image_tx_daemon: frame seq=187 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:06,099 INFO image_tx_daemon: txdone_arrival: seq=188 idx=0 status=0 toa_us=140928
+
+2026-08-30 14:05:06,112 INFO image_tx_daemon: frame seq=188 done (pipelined): 1 fragments ok
+
+2026-08-30 14:05:06,496 INFO image_tx_daemon: txdone_arrival: seq=189 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:06,652 INFO image_tx_daemon: txdone_arrival: seq=189 idx=1 status=0 toa_us=128128
+
+2026-08-30 14:05:06,664 INFO image_tx_daemon: frame seq=189 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:06,926 INFO image_tx_daemon: txdone_arrival: seq=190 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:07,298 INFO image_tx_daemon: txdone_arrival: seq=190 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:07,310 INFO image_tx_daemon: frame seq=190 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:07,694 INFO image_tx_daemon: txdone_arrival: seq=191 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:07,901 INFO image_tx_daemon: txdone_arrival: seq=191 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:07,913 INFO image_tx_daemon: frame seq=191 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:08,298 INFO image_tx_daemon: txdone_arrival: seq=192 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:08,492 INFO image_tx_daemon: txdone_arrival: seq=192 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:08,702 INFO image_tx_daemon: txdone_arrival: seq=192 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:05:08,806 INFO image_tx_daemon: txdone_arrival: seq=192 idx=3 status=0 toa_us=82048
+
+2026-08-30 14:05:08,818 INFO image_tx_daemon: frame seq=192 done (pipelined): 4 fragments ok
+
+2026-08-30 14:05:09,093 INFO image_tx_daemon: txdone_arrival: seq=194 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:09,238 INFO image_tx_daemon: txdone_arrival: seq=194 idx=1 status=0 toa_us=115328
+
+2026-08-30 14:05:09,250 INFO image_tx_daemon: frame seq=194 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:09,712 INFO image_tx_daemon: txdone_arrival: seq=195 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:10,093 INFO image_tx_daemon: txdone_arrival: seq=195 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:10,157 INFO image_tx_daemon: txdone_arrival: seq=195 idx=2 status=0 toa_us=35968
+
+2026-08-30 14:05:10,168 INFO image_tx_daemon: frame seq=195 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:10,216 INFO image_tx_daemon: stats: goodput=677.6 B/s util=56% pipeline=v3 frames_in=454 ok=381 fail=0 drop_full=0 drop_stale=0 frags_ok=821 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:05:10,492 INFO image_tx_daemon: txdone_arrival: seq=196 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:10,670 INFO image_tx_daemon: txdone_arrival: seq=196 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:05:10,681 INFO image_tx_daemon: frame seq=196 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:11,094 INFO image_tx_daemon: txdone_arrival: seq=197 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:11,291 INFO image_tx_daemon: txdone_arrival: seq=197 idx=1 status=0 toa_us=166528
+
+2026-08-30 14:05:11,303 INFO image_tx_daemon: frame seq=197 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:11,694 INFO image_tx_daemon: txdone_arrival: seq=198 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:11,891 INFO image_tx_daemon: txdone_arrival: seq=198 idx=1 status=0 toa_us=163968
+
+2026-08-30 14:05:11,903 INFO image_tx_daemon: frame seq=198 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:12,299 INFO image_tx_daemon: txdone_arrival: seq=199 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:12,487 INFO image_tx_daemon: txdone_arrival: seq=199 idx=1 status=0 toa_us=161408
+
+2026-08-30 14:05:12,498 INFO image_tx_daemon: frame seq=199 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:12,898 INFO image_tx_daemon: txdone_arrival: seq=200 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:13,085 INFO image_tx_daemon: txdone_arrival: seq=200 idx=1 status=0 toa_us=156288
+
+2026-08-30 14:05:13,096 INFO image_tx_daemon: frame seq=200 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:13,491 INFO image_tx_daemon: txdone_arrival: seq=201 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:13,694 INFO image_tx_daemon: txdone_arrival: seq=201 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:13,748 INFO image_tx_daemon: txdone_arrival: seq=201 idx=2 status=0 toa_us=28288
+
+2026-08-30 14:05:13,760 INFO image_tx_daemon: frame seq=201 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:14,118 INFO image_tx_daemon: txdone_arrival: seq=202 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:14,489 INFO image_tx_daemon: txdone_arrival: seq=202 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:14,575 INFO image_tx_daemon: txdone_arrival: seq=202 idx=2 status=0 toa_us=51328
+
+2026-08-30 14:05:14,588 INFO image_tx_daemon: frame seq=202 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:14,871 INFO image_tx_daemon: txdone_arrival: seq=203 idx=0 status=0 toa_us=148608
+
+2026-08-30 14:05:14,883 INFO image_tx_daemon: frame seq=203 done (pipelined): 1 fragments ok
+
+2026-08-30 14:05:15,288 INFO image_tx_daemon: txdone_arrival: seq=204 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:15,492 INFO image_tx_daemon: txdone_arrival: seq=204 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:15,692 INFO image_tx_daemon: txdone_arrival: seq=204 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:05:15,818 INFO image_tx_daemon: txdone_arrival: seq=204 idx=3 status=0 toa_us=99968
+
+2026-08-30 14:05:15,830 INFO image_tx_daemon: frame seq=204 done (pipelined): 4 fragments ok
+
+2026-08-30 14:05:16,092 INFO image_tx_daemon: txdone_arrival: seq=206 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:16,289 INFO image_tx_daemon: txdone_arrival: seq=206 idx=1 status=0 toa_us=161408
+
+2026-08-30 14:05:16,300 INFO image_tx_daemon: frame seq=206 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:16,699 INFO image_tx_daemon: txdone_arrival: seq=207 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:16,886 INFO image_tx_daemon: txdone_arrival: seq=207 idx=1 status=0 toa_us=158848
+
+2026-08-30 14:05:16,898 INFO image_tx_daemon: frame seq=207 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:17,290 INFO image_tx_daemon: txdone_arrival: seq=208 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:17,467 INFO image_tx_daemon: txdone_arrival: seq=208 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:05:17,478 INFO image_tx_daemon: frame seq=208 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:17,894 INFO image_tx_daemon: txdone_arrival: seq=209 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:18,092 INFO image_tx_daemon: txdone_arrival: seq=209 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:18,146 INFO image_tx_daemon: txdone_arrival: seq=209 idx=2 status=0 toa_us=25728
+
+2026-08-30 14:05:18,157 INFO image_tx_daemon: frame seq=209 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:18,491 INFO image_tx_daemon: txdone_arrival: seq=210 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:18,695 INFO image_tx_daemon: txdone_arrival: seq=210 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:18,890 INFO image_tx_daemon: txdone_arrival: seq=210 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:05:19,056 INFO image_tx_daemon: txdone_arrival: seq=210 idx=3 status=0 toa_us=130688
+
+2026-08-30 14:05:19,068 INFO image_tx_daemon: frame seq=210 done (pipelined): 4 fragments ok
+
+2026-08-30 14:05:19,495 INFO image_tx_daemon: txdone_arrival: seq=212 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:19,692 INFO image_tx_daemon: txdone_arrival: seq=212 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:19,807 INFO image_tx_daemon: txdone_arrival: seq=212 idx=2 status=0 toa_us=84608
+
+2026-08-30 14:05:19,819 INFO image_tx_daemon: frame seq=212 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:20,089 INFO image_tx_daemon: txdone_arrival: seq=215 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:20,227 INFO image_tx_daemon: stats: goodput=687.7 B/s util=57% pipeline=v3 frames_in=474 ok=396 fail=0 drop_full=0 drop_stale=0 frags_ok=859 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-30 14:05:20,245 INFO image_tx_daemon: txdone_arrival: seq=215 idx=1 status=0 toa_us=120448
+
+2026-08-30 14:05:20,256 INFO image_tx_daemon: frame seq=215 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:20,715 INFO image_tx_daemon: txdone_arrival: seq=217 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:21,091 INFO image_tx_daemon: txdone_arrival: seq=217 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:21,144 INFO image_tx_daemon: txdone_arrival: seq=217 idx=2 status=0 toa_us=23168
+
+2026-08-30 14:05:21,156 INFO image_tx_daemon: frame seq=217 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:21,496 INFO image_tx_daemon: txdone_arrival: seq=219 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:21,694 INFO image_tx_daemon: txdone_arrival: seq=219 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:21,758 INFO image_tx_daemon: txdone_arrival: seq=219 idx=2 status=0 toa_us=43648
+
+2026-08-30 14:05:21,769 INFO image_tx_daemon: frame seq=219 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:22,091 INFO image_tx_daemon: txdone_arrival: seq=220 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:22,260 INFO image_tx_daemon: txdone_arrival: seq=220 idx=1 status=0 toa_us=135808
+
+2026-08-30 14:05:22,272 INFO image_tx_daemon: frame seq=220 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:22,690 INFO image_tx_daemon: txdone_arrival: seq=221 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:22,866 INFO image_tx_daemon: txdone_arrival: seq=221 idx=1 status=0 toa_us=151168
+
+2026-08-30 14:05:22,878 INFO image_tx_daemon: frame seq=221 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:23,287 INFO image_tx_daemon: txdone_arrival: seq=222 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:23,340 INFO image_tx_daemon: txdone_arrival: seq=222 idx=1 status=0 toa_us=25728
+
+2026-08-30 14:05:23,351 INFO image_tx_daemon: frame seq=222 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:23,645 INFO image_tx_daemon: txdone_arrival: seq=223 idx=0 status=0 toa_us=125568
+
+2026-08-30 14:05:23,656 INFO image_tx_daemon: frame seq=223 done (pipelined): 1 fragments ok
+
+2026-08-30 14:05:23,889 INFO image_tx_daemon: txdone_arrival: seq=224 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:23,988 INFO image_tx_daemon: txdone_arrival: seq=224 idx=1 status=0 toa_us=66688
+
+2026-08-30 14:05:24,000 INFO image_tx_daemon: frame seq=224 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:24,284 INFO image_tx_daemon: txdone_arrival: seq=225 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:24,461 INFO image_tx_daemon: txdone_arrival: seq=225 idx=1 status=0 toa_us=138368
+
+2026-08-30 14:05:24,480 INFO image_tx_daemon: frame seq=225 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:24,892 INFO image_tx_daemon: txdone_arrival: seq=226 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:25,069 INFO image_tx_daemon: txdone_arrival: seq=226 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:05:25,081 INFO image_tx_daemon: frame seq=226 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:25,488 INFO image_tx_daemon: txdone_arrival: seq=227 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:25,655 INFO image_tx_daemon: txdone_arrival: seq=227 idx=1 status=0 toa_us=138368
+
+2026-08-30 14:05:25,667 INFO image_tx_daemon: frame seq=227 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:26,093 INFO image_tx_daemon: txdone_arrival: seq=228 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:26,292 INFO image_tx_daemon: txdone_arrival: seq=228 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:26,365 INFO image_tx_daemon: txdone_arrival: seq=228 idx=2 status=0 toa_us=46208
+
+2026-08-30 14:05:26,377 INFO image_tx_daemon: frame seq=228 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:26,692 INFO image_tx_daemon: txdone_arrival: seq=229 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:26,869 INFO image_tx_daemon: txdone_arrival: seq=229 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:05:26,881 INFO image_tx_daemon: frame seq=229 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:27,284 INFO image_tx_daemon: txdone_arrival: seq=230 idx=0 status=0 toa_us=166528
+
+2026-08-30 14:05:27,296 INFO image_tx_daemon: frame seq=230 done (pipelined): 1 fragments ok
+
+2026-08-30 14:05:27,691 INFO image_tx_daemon: txdone_arrival: seq=231 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:27,884 INFO image_tx_daemon: txdone_arrival: seq=231 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:28,088 INFO image_tx_daemon: txdone_arrival: seq=231 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:05:28,234 INFO image_tx_daemon: txdone_arrival: seq=231 idx=3 status=0 toa_us=112768
+
+2026-08-30 14:05:28,246 INFO image_tx_daemon: frame seq=231 done (pipelined): 4 fragments ok
+
+2026-08-30 14:05:28,489 INFO image_tx_daemon: txdone_arrival: seq=233 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:28,656 INFO image_tx_daemon: txdone_arrival: seq=233 idx=1 status=0 toa_us=138368
+
+2026-08-30 14:05:28,667 INFO image_tx_daemon: frame seq=233 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:29,085 INFO image_tx_daemon: txdone_arrival: seq=234 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:29,262 INFO image_tx_daemon: txdone_arrival: seq=234 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:05:29,273 INFO image_tx_daemon: frame seq=234 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:29,689 INFO image_tx_daemon: txdone_arrival: seq=235 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:29,888 INFO image_tx_daemon: txdone_arrival: seq=235 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:29,951 INFO image_tx_daemon: txdone_arrival: seq=235 idx=2 status=0 toa_us=30848
+
+2026-08-30 14:05:29,963 INFO image_tx_daemon: frame seq=235 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:30,238 INFO image_tx_daemon: stats: goodput=648.6 B/s util=54% pipeline=v3 frames_in=494 ok=414 fail=0 drop_full=0 drop_stale=0 frags_ok=898 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:05:30,286 INFO image_tx_daemon: txdone_arrival: seq=236 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:30,490 INFO image_tx_daemon: txdone_arrival: seq=236 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:30,689 INFO image_tx_daemon: txdone_arrival: seq=236 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:05:30,835 INFO image_tx_daemon: txdone_arrival: seq=236 idx=3 status=0 toa_us=117888
+
+2026-08-30 14:05:30,847 INFO image_tx_daemon: frame seq=236 done (pipelined): 4 fragments ok
+
+2026-08-30 14:05:31,088 INFO image_tx_daemon: txdone_arrival: seq=238 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:31,223 INFO image_tx_daemon: txdone_arrival: seq=238 idx=1 status=0 toa_us=105088
+
+2026-08-30 14:05:31,235 INFO image_tx_daemon: frame seq=238 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:31,694 INFO image_tx_daemon: txdone_arrival: seq=239 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:31,870 INFO image_tx_daemon: txdone_arrival: seq=239 idx=1 status=0 toa_us=156288
+
+2026-08-30 14:05:31,882 INFO image_tx_daemon: frame seq=239 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:32,285 INFO image_tx_daemon: txdone_arrival: seq=240 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:32,462 INFO image_tx_daemon: txdone_arrival: seq=240 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:05:32,473 INFO image_tx_daemon: frame seq=240 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:32,887 INFO image_tx_daemon: txdone_arrival: seq=241 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:33,084 INFO image_tx_daemon: txdone_arrival: seq=241 idx=1 status=0 toa_us=166528
+
+2026-08-30 14:05:33,097 INFO image_tx_daemon: frame seq=241 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:33,489 INFO image_tx_daemon: txdone_arrival: seq=242 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:33,675 INFO image_tx_daemon: txdone_arrival: seq=242 idx=1 status=0 toa_us=158848
+
+2026-08-30 14:05:33,687 INFO image_tx_daemon: frame seq=242 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:34,086 INFO image_tx_daemon: txdone_arrival: seq=243 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:34,284 INFO image_tx_daemon: txdone_arrival: seq=243 idx=1 status=0 toa_us=163968
+
+2026-08-30 14:05:34,295 INFO image_tx_daemon: frame seq=243 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:34,393 INFO image_tx_daemon: batching: 155 frames in 76 trains so far (this train: 2 frames, 658 B)
+
+2026-08-30 14:05:34,677 INFO image_tx_daemon: txdone_arrival: seq=244 idx=0 status=0 toa_us=163968
+
+2026-08-30 14:05:34,689 INFO image_tx_daemon: frame seq=244 done (pipelined): 1 fragments ok
+
+2026-08-30 14:05:35,084 INFO image_tx_daemon: txdone_arrival: seq=245 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:35,287 INFO image_tx_daemon: txdone_arrival: seq=245 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:35,486 INFO image_tx_daemon: txdone_arrival: seq=245 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:05:35,574 INFO image_tx_daemon: txdone_arrival: seq=245 idx=3 status=0 toa_us=61568
+
+2026-08-30 14:05:35,585 INFO image_tx_daemon: frame seq=245 done (pipelined): 4 fragments ok
+
+2026-08-30 14:05:35,897 INFO image_tx_daemon: txdone_arrival: seq=247 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:36,091 INFO image_tx_daemon: txdone_arrival: seq=247 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:36,144 INFO image_tx_daemon: txdone_arrival: seq=247 idx=2 status=0 toa_us=28288
+
+2026-08-30 14:05:36,156 INFO image_tx_daemon: frame seq=247 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:36,507 INFO image_tx_daemon: txdone_arrival: seq=248 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:36,884 INFO image_tx_daemon: txdone_arrival: seq=248 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:36,968 INFO image_tx_daemon: txdone_arrival: seq=248 idx=2 status=0 toa_us=56448
+
+2026-08-30 14:05:36,981 INFO image_tx_daemon: frame seq=248 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:37,288 INFO image_tx_daemon: txdone_arrival: seq=249 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:37,481 INFO image_tx_daemon: txdone_arrival: seq=249 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:37,549 INFO image_tx_daemon: txdone_arrival: seq=249 idx=2 status=0 toa_us=41088
+
+2026-08-30 14:05:37,561 INFO image_tx_daemon: frame seq=249 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:37,884 INFO image_tx_daemon: txdone_arrival: seq=250 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:38,081 INFO image_tx_daemon: txdone_arrival: seq=250 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:38,155 INFO image_tx_daemon: txdone_arrival: seq=250 idx=2 status=0 toa_us=41088
+
+2026-08-30 14:05:38,167 INFO image_tx_daemon: frame seq=250 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:38,495 INFO image_tx_daemon: txdone_arrival: seq=251 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:38,677 INFO image_tx_daemon: txdone_arrival: seq=251 idx=1 status=0 toa_us=158848
+
+2026-08-30 14:05:38,689 INFO image_tx_daemon: frame seq=251 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:39,081 INFO image_tx_daemon: txdone_arrival: seq=252 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:39,261 INFO image_tx_daemon: txdone_arrival: seq=252 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:05:39,273 INFO image_tx_daemon: frame seq=252 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:39,685 INFO image_tx_daemon: txdone_arrival: seq=253 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:39,882 INFO image_tx_daemon: txdone_arrival: seq=253 idx=1 status=0 toa_us=166528
+
+2026-08-30 14:05:39,894 INFO image_tx_daemon: frame seq=253 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:40,249 INFO image_tx_daemon: stats: goodput=690.8 B/s util=58% pipeline=v3 frames_in=514 ok=430 fail=0 drop_full=0 drop_stale=0 frags_ok=937 frags_fail=0 qdepth=0 parity_tx=0
+
+2026-08-30 14:05:40,279 INFO image_tx_daemon: txdone_arrival: seq=254 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:40,487 INFO image_tx_daemon: txdone_arrival: seq=254 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:40,540 INFO image_tx_daemon: txdone_arrival: seq=254 idx=2 status=0 toa_us=30848
+
+2026-08-30 14:05:40,552 INFO image_tx_daemon: frame seq=254 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:40,905 INFO image_tx_daemon: txdone_arrival: seq=255 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:41,284 INFO image_tx_daemon: txdone_arrival: seq=255 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:41,484 INFO image_tx_daemon: txdone_arrival: seq=255 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:05:41,623 INFO image_tx_daemon: txdone_arrival: seq=255 idx=3 status=0 toa_us=110208
+
+2026-08-30 14:05:41,635 INFO image_tx_daemon: frame seq=255 done (pipelined): 4 fragments ok
+
+2026-08-30 14:05:41,886 INFO image_tx_daemon: txdone_arrival: seq=2 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:42,021 INFO image_tx_daemon: txdone_arrival: seq=2 idx=1 status=0 toa_us=112768
+
+2026-08-30 14:05:42,032 INFO image_tx_daemon: frame seq=2 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:42,479 INFO image_tx_daemon: txdone_arrival: seq=4 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:42,635 INFO image_tx_daemon: txdone_arrival: seq=4 idx=1 status=0 toa_us=117888
+
+2026-08-30 14:05:42,647 INFO image_tx_daemon: frame seq=4 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:42,879 INFO image_tx_daemon: txdone_arrival: seq=6 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:42,891 INFO image_tx_daemon: frame seq=6 done (pipelined): 1 fragments ok
+
+2026-08-30 14:05:43,278 INFO image_tx_daemon: txdone_arrival: seq=7 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:43,290 INFO image_tx_daemon: frame seq=7 done (pipelined): 1 fragments ok
+
+2026-08-30 14:05:43,677 INFO image_tx_daemon: txdone_arrival: seq=8 idx=0 status=0 toa_us=163968
+
+2026-08-30 14:05:43,689 INFO image_tx_daemon: frame seq=8 done (pipelined): 1 fragments ok
+
+2026-08-30 14:05:44,080 INFO image_tx_daemon: txdone_arrival: seq=9 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:44,174 INFO image_tx_daemon: txdone_arrival: seq=9 idx=1 status=0 toa_us=59008
+
+2026-08-30 14:05:44,186 INFO image_tx_daemon: frame seq=9 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:44,483 INFO image_tx_daemon: txdone_arrival: seq=10 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:44,656 INFO image_tx_daemon: txdone_arrival: seq=10 idx=1 status=0 toa_us=140928
+
+2026-08-30 14:05:44,668 INFO image_tx_daemon: frame seq=10 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:45,090 INFO image_tx_daemon: txdone_arrival: seq=11 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:45,266 INFO image_tx_daemon: txdone_arrival: seq=11 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:05:45,278 INFO image_tx_daemon: frame seq=11 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:45,683 INFO image_tx_daemon: txdone_arrival: seq=12 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:45,882 INFO image_tx_daemon: txdone_arrival: seq=12 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:45,966 INFO image_tx_daemon: txdone_arrival: seq=12 idx=2 status=0 toa_us=56448
+
+2026-08-30 14:05:45,979 INFO image_tx_daemon: frame seq=12 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:46,290 INFO image_tx_daemon: txdone_arrival: seq=13 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:46,456 INFO image_tx_daemon: txdone_arrival: seq=13 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:05:46,468 INFO image_tx_daemon: frame seq=13 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:46,879 INFO image_tx_daemon: txdone_arrival: seq=14 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:47,025 INFO image_tx_daemon: txdone_arrival: seq=14 idx=1 status=0 toa_us=110208
+
+2026-08-30 14:05:47,036 INFO image_tx_daemon: frame seq=14 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:47,288 INFO image_tx_daemon: txdone_arrival: seq=15 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:47,465 INFO image_tx_daemon: txdone_arrival: seq=15 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:05:47,477 INFO image_tx_daemon: frame seq=15 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:47,882 INFO image_tx_daemon: txdone_arrival: seq=16 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:48,079 INFO image_tx_daemon: txdone_arrival: seq=16 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:48,091 INFO image_tx_daemon: frame seq=16 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:48,486 INFO image_tx_daemon: txdone_arrival: seq=17 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:48,684 INFO image_tx_daemon: txdone_arrival: seq=17 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:48,758 INFO image_tx_daemon: txdone_arrival: seq=17 idx=2 status=0 toa_us=43648
+
+2026-08-30 14:05:48,770 INFO image_tx_daemon: frame seq=17 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:49,088 INFO image_tx_daemon: txdone_arrival: seq=18 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:49,233 INFO image_tx_daemon: txdone_arrival: seq=18 idx=1 status=0 toa_us=117888
+
+2026-08-30 14:05:49,245 INFO image_tx_daemon: frame seq=18 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:49,487 INFO image_tx_daemon: txdone_arrival: seq=19 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:49,499 INFO image_tx_daemon: frame seq=19 done (pipelined): 1 fragments ok
+
+2026-08-30 14:05:49,881 INFO image_tx_daemon: txdone_arrival: seq=20 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:50,041 INFO image_tx_daemon: txdone_arrival: seq=20 idx=1 status=0 toa_us=123008
+
+2026-08-30 14:05:50,053 INFO image_tx_daemon: frame seq=20 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:50,261 INFO image_tx_daemon: stats: goodput=680.1 B/s util=57% pipeline=v3 frames_in=534 ok=449 fail=0 drop_full=0 drop_stale=0 frags_ok=976 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:05:50,480 INFO image_tx_daemon: txdone_arrival: seq=21 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:50,666 INFO image_tx_daemon: txdone_arrival: seq=21 idx=1 status=0 toa_us=151168
+
+2026-08-30 14:05:50,678 INFO image_tx_daemon: frame seq=21 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:51,084 INFO image_tx_daemon: txdone_arrival: seq=22 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:51,260 INFO image_tx_daemon: txdone_arrival: seq=22 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:05:51,272 INFO image_tx_daemon: frame seq=22 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:51,685 INFO image_tx_daemon: txdone_arrival: seq=23 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:51,872 INFO image_tx_daemon: txdone_arrival: seq=23 idx=1 status=0 toa_us=158848
+
+2026-08-30 14:05:51,883 INFO image_tx_daemon: frame seq=23 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:52,286 INFO image_tx_daemon: txdone_arrival: seq=24 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:52,484 INFO image_tx_daemon: txdone_arrival: seq=24 idx=1 status=0 toa_us=166528
+
+2026-08-30 14:05:52,495 INFO image_tx_daemon: frame seq=24 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:52,885 INFO image_tx_daemon: txdone_arrival: seq=25 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:53,089 INFO image_tx_daemon: txdone_arrival: seq=25 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:53,282 INFO image_tx_daemon: txdone_arrival: seq=25 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:05:53,417 INFO image_tx_daemon: txdone_arrival: seq=25 idx=3 status=0 toa_us=105088
+
+2026-08-30 14:05:53,429 INFO image_tx_daemon: frame seq=25 done (pipelined): 4 fragments ok
+
+2026-08-30 14:05:53,681 INFO image_tx_daemon: txdone_arrival: seq=27 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:53,857 INFO image_tx_daemon: txdone_arrival: seq=27 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:05:53,869 INFO image_tx_daemon: frame seq=27 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:54,284 INFO image_tx_daemon: txdone_arrival: seq=28 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:54,430 INFO image_tx_daemon: txdone_arrival: seq=28 idx=1 status=0 toa_us=117888
+
+2026-08-30 14:05:54,442 INFO image_tx_daemon: frame seq=28 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:54,653 INFO image_tx_daemon: txdone_arrival: seq=29 idx=0 status=0 toa_us=143488
+
+2026-08-30 14:05:54,666 INFO image_tx_daemon: frame seq=29 done (pipelined): 1 fragments ok
+
+2026-08-30 14:05:55,082 INFO image_tx_daemon: txdone_arrival: seq=30 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:55,167 INFO image_tx_daemon: txdone_arrival: seq=30 idx=1 status=0 toa_us=56448
+
+2026-08-30 14:05:55,178 INFO image_tx_daemon: frame seq=30 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:55,485 INFO image_tx_daemon: txdone_arrival: seq=31 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:55,683 INFO image_tx_daemon: txdone_arrival: seq=31 idx=1 status=0 toa_us=163968
+
+2026-08-30 14:05:55,695 INFO image_tx_daemon: frame seq=31 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:56,088 INFO image_tx_daemon: txdone_arrival: seq=32 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:56,265 INFO image_tx_daemon: txdone_arrival: seq=32 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:05:56,277 INFO image_tx_daemon: frame seq=32 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:56,683 INFO image_tx_daemon: txdone_arrival: seq=33 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:56,859 INFO image_tx_daemon: txdone_arrival: seq=33 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:05:56,871 INFO image_tx_daemon: frame seq=33 done (pipelined): 2 fragments ok
+
+2026-08-30 14:05:57,287 INFO image_tx_daemon: txdone_arrival: seq=34 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:57,485 INFO image_tx_daemon: txdone_arrival: seq=34 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:57,565 INFO image_tx_daemon: txdone_arrival: seq=34 idx=2 status=0 toa_us=53888
+
+2026-08-30 14:05:57,577 INFO image_tx_daemon: frame seq=34 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:57,903 INFO image_tx_daemon: txdone_arrival: seq=35 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:58,288 INFO image_tx_daemon: txdone_arrival: seq=35 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:58,362 INFO image_tx_daemon: txdone_arrival: seq=35 idx=2 status=0 toa_us=46208
+
+2026-08-30 14:05:58,373 INFO image_tx_daemon: frame seq=35 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:58,686 INFO image_tx_daemon: txdone_arrival: seq=36 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:58,884 INFO image_tx_daemon: txdone_arrival: seq=36 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:58,947 INFO image_tx_daemon: txdone_arrival: seq=36 idx=2 status=0 toa_us=30848
+
+2026-08-30 14:05:58,959 INFO image_tx_daemon: frame seq=36 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:59,283 INFO image_tx_daemon: txdone_arrival: seq=37 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:05:59,485 INFO image_tx_daemon: txdone_arrival: seq=37 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:05:59,569 INFO image_tx_daemon: txdone_arrival: seq=37 idx=2 status=0 toa_us=56448
+
+2026-08-30 14:05:59,581 INFO image_tx_daemon: frame seq=37 done (pipelined): 3 fragments ok
+
+2026-08-30 14:05:59,906 INFO image_tx_daemon: txdone_arrival: seq=38 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:00,272 INFO image_tx_daemon: stats: goodput=665.2 B/s util=56% pipeline=v3 frames_in=554 ok=465 fail=0 drop_full=0 drop_stale=0 frags_ok=1014 frags_fail=0 qdepth=2 parity_tx=0
+
+2026-08-30 14:06:00,285 INFO image_tx_daemon: txdone_arrival: seq=38 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:00,348 INFO image_tx_daemon: txdone_arrival: seq=38 idx=2 status=0 toa_us=38528
+
+2026-08-30 14:06:00,360 INFO image_tx_daemon: frame seq=38 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:00,684 INFO image_tx_daemon: txdone_arrival: seq=39 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:00,881 INFO image_tx_daemon: txdone_arrival: seq=39 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:00,945 INFO image_tx_daemon: txdone_arrival: seq=39 idx=2 status=0 toa_us=28288
+
+2026-08-30 14:06:00,956 INFO image_tx_daemon: frame seq=39 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:01,288 INFO image_tx_daemon: txdone_arrival: seq=40 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:01,464 INFO image_tx_daemon: txdone_arrival: seq=40 idx=1 status=0 toa_us=151168
+
+2026-08-30 14:06:01,476 INFO image_tx_daemon: frame seq=40 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:01,886 INFO image_tx_daemon: txdone_arrival: seq=41 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:02,083 INFO image_tx_daemon: txdone_arrival: seq=41 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:02,282 INFO image_tx_daemon: txdone_arrival: seq=41 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:06:02,418 INFO image_tx_daemon: txdone_arrival: seq=41 idx=3 status=0 toa_us=105088
+
+2026-08-30 14:06:02,430 INFO image_tx_daemon: frame seq=41 done (pipelined): 4 fragments ok
+
+2026-08-30 14:06:02,699 INFO image_tx_daemon: txdone_arrival: seq=43 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:03,088 INFO image_tx_daemon: txdone_arrival: seq=43 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:03,287 INFO image_tx_daemon: txdone_arrival: seq=43 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:06:03,423 INFO image_tx_daemon: txdone_arrival: seq=43 idx=3 status=0 toa_us=112768
+
+2026-08-30 14:06:03,435 INFO image_tx_daemon: frame seq=43 done (pipelined): 4 fragments ok
+
+2026-08-30 14:06:03,688 INFO image_tx_daemon: txdone_arrival: seq=46 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:03,834 INFO image_tx_daemon: txdone_arrival: seq=46 idx=1 status=0 toa_us=123008
+
+2026-08-30 14:06:03,846 INFO image_tx_daemon: frame seq=46 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:04,290 INFO image_tx_daemon: txdone_arrival: seq=48 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:04,436 INFO image_tx_daemon: txdone_arrival: seq=48 idx=1 status=0 toa_us=123008
+
+2026-08-30 14:06:04,448 INFO image_tx_daemon: frame seq=48 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:04,645 INFO image_tx_daemon: txdone_arrival: seq=50 idx=0 status=0 toa_us=130688
+
+2026-08-30 14:06:04,657 INFO image_tx_daemon: frame seq=50 done (pipelined): 1 fragments ok
+
+2026-08-30 14:06:05,080 INFO image_tx_daemon: txdone_arrival: seq=51 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:05,091 INFO image_tx_daemon: frame seq=51 done (pipelined): 1 fragments ok
+
+2026-08-30 14:06:05,283 INFO image_tx_daemon: txdone_arrival: seq=52 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:05,295 INFO image_tx_daemon: frame seq=52 done (pipelined): 1 fragments ok
+
+2026-08-30 14:06:05,879 INFO image_tx_daemon: txdone_arrival: seq=53 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:06,086 INFO image_tx_daemon: txdone_arrival: seq=53 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:06,160 INFO image_tx_daemon: txdone_arrival: seq=53 idx=2 status=0 toa_us=46208
+
+2026-08-30 14:06:06,172 INFO image_tx_daemon: frame seq=53 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:06,480 INFO image_tx_daemon: txdone_arrival: seq=54 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:06,651 INFO image_tx_daemon: txdone_arrival: seq=54 idx=1 status=0 toa_us=140928
+
+2026-08-30 14:06:06,664 INFO image_tx_daemon: frame seq=54 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:07,083 INFO image_tx_daemon: txdone_arrival: seq=55 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:07,260 INFO image_tx_daemon: txdone_arrival: seq=55 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:06:07,272 INFO image_tx_daemon: frame seq=55 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:07,688 INFO image_tx_daemon: txdone_arrival: seq=56 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:07,886 INFO image_tx_daemon: txdone_arrival: seq=56 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:07,960 INFO image_tx_daemon: txdone_arrival: seq=56 idx=2 status=0 toa_us=46208
+
+2026-08-30 14:06:07,972 INFO image_tx_daemon: frame seq=56 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:08,284 INFO image_tx_daemon: txdone_arrival: seq=57 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:08,470 INFO image_tx_daemon: txdone_arrival: seq=57 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:06:08,482 INFO image_tx_daemon: frame seq=57 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:08,880 INFO image_tx_daemon: txdone_arrival: seq=58 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:09,016 INFO image_tx_daemon: txdone_arrival: seq=58 idx=1 status=0 toa_us=107648
+
+2026-08-30 14:06:09,027 INFO image_tx_daemon: frame seq=58 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:09,279 INFO image_tx_daemon: txdone_arrival: seq=59 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:09,477 INFO image_tx_daemon: txdone_arrival: seq=59 idx=1 status=0 toa_us=161408
+
+2026-08-30 14:06:09,489 INFO image_tx_daemon: frame seq=59 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:09,884 INFO image_tx_daemon: txdone_arrival: seq=60 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:10,071 INFO image_tx_daemon: txdone_arrival: seq=60 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:06:10,083 INFO image_tx_daemon: frame seq=60 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:10,285 INFO image_tx_daemon: stats: goodput=696.3 B/s util=58% pipeline=v3 frames_in=574 ok=483 fail=0 drop_full=0 drop_stale=0 frags_ok=1054 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:06:10,478 INFO image_tx_daemon: txdone_arrival: seq=61 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:10,686 INFO image_tx_daemon: txdone_arrival: seq=61 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:10,749 INFO image_tx_daemon: txdone_arrival: seq=61 idx=2 status=0 toa_us=35968
+
+2026-08-30 14:06:10,761 INFO image_tx_daemon: frame seq=61 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:11,080 INFO image_tx_daemon: txdone_arrival: seq=62 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:11,236 INFO image_tx_daemon: txdone_arrival: seq=62 idx=1 status=0 toa_us=117888
+
+2026-08-30 14:06:11,248 INFO image_tx_daemon: frame seq=62 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:11,480 INFO image_tx_daemon: txdone_arrival: seq=63 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:11,491 INFO image_tx_daemon: frame seq=63 done (pipelined): 1 fragments ok
+
+2026-08-30 14:06:11,880 INFO image_tx_daemon: txdone_arrival: seq=64 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:12,036 INFO image_tx_daemon: txdone_arrival: seq=64 idx=1 status=0 toa_us=120448
+
+2026-08-30 14:06:12,049 INFO image_tx_daemon: frame seq=64 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:12,292 INFO image_tx_daemon: txdone_arrival: seq=65 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:12,468 INFO image_tx_daemon: txdone_arrival: seq=65 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:06:12,480 INFO image_tx_daemon: frame seq=65 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:12,882 INFO image_tx_daemon: txdone_arrival: seq=66 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:12,955 INFO image_tx_daemon: txdone_arrival: seq=66 idx=1 status=0 toa_us=43648
+
+2026-08-30 14:06:12,967 INFO image_tx_daemon: frame seq=66 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:13,287 INFO image_tx_daemon: txdone_arrival: seq=67 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:13,474 INFO image_tx_daemon: txdone_arrival: seq=67 idx=1 status=0 toa_us=158848
+
+2026-08-30 14:06:13,486 INFO image_tx_daemon: frame seq=67 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:13,879 INFO image_tx_daemon: txdone_arrival: seq=68 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:14,055 INFO image_tx_daemon: txdone_arrival: seq=68 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:06:14,067 INFO image_tx_daemon: frame seq=68 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:14,492 INFO image_tx_daemon: txdone_arrival: seq=69 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:14,659 INFO image_tx_daemon: txdone_arrival: seq=69 idx=1 status=0 toa_us=148608
+
+2026-08-30 14:06:14,670 INFO image_tx_daemon: frame seq=69 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:15,083 INFO image_tx_daemon: txdone_arrival: seq=70 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:15,259 INFO image_tx_daemon: txdone_arrival: seq=70 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:06:15,271 INFO image_tx_daemon: frame seq=70 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:15,471 INFO image_tx_daemon: txdone_arrival: seq=71 idx=0 status=0 toa_us=133248
+
+2026-08-30 14:06:15,483 INFO image_tx_daemon: frame seq=71 done (pipelined): 1 fragments ok
+
+2026-08-30 14:06:15,881 INFO image_tx_daemon: txdone_arrival: seq=72 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:15,975 INFO image_tx_daemon: txdone_arrival: seq=72 idx=1 status=0 toa_us=66688
+
+2026-08-30 14:06:15,987 INFO image_tx_daemon: frame seq=72 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:16,280 INFO image_tx_daemon: txdone_arrival: seq=73 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:16,415 INFO image_tx_daemon: txdone_arrival: seq=73 idx=1 status=0 toa_us=105088
+
+2026-08-30 14:06:16,427 INFO image_tx_daemon: frame seq=73 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:16,686 INFO image_tx_daemon: txdone_arrival: seq=74 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:16,853 INFO image_tx_daemon: txdone_arrival: seq=74 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:06:16,864 INFO image_tx_daemon: frame seq=74 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:17,289 INFO image_tx_daemon: txdone_arrival: seq=75 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:17,465 INFO image_tx_daemon: txdone_arrival: seq=75 idx=1 status=0 toa_us=151168
+
+2026-08-30 14:06:17,477 INFO image_tx_daemon: frame seq=75 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:17,883 INFO image_tx_daemon: txdone_arrival: seq=76 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:18,060 INFO image_tx_daemon: txdone_arrival: seq=76 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:06:18,072 INFO image_tx_daemon: frame seq=76 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:18,489 INFO image_tx_daemon: txdone_arrival: seq=77 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:18,656 INFO image_tx_daemon: txdone_arrival: seq=77 idx=1 status=0 toa_us=146048
+
+2026-08-30 14:06:18,668 INFO image_tx_daemon: frame seq=77 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:19,084 INFO image_tx_daemon: txdone_arrival: seq=78 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:19,282 INFO image_tx_daemon: txdone_arrival: seq=78 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:19,356 INFO image_tx_daemon: txdone_arrival: seq=78 idx=2 status=0 toa_us=41088
+
+2026-08-30 14:06:19,368 INFO image_tx_daemon: frame seq=78 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:19,709 INFO image_tx_daemon: txdone_arrival: seq=79 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:20,080 INFO image_tx_daemon: txdone_arrival: seq=79 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:20,154 INFO image_tx_daemon: txdone_arrival: seq=79 idx=2 status=0 toa_us=43648
+
+2026-08-30 14:06:20,166 INFO image_tx_daemon: frame seq=79 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:20,296 INFO image_tx_daemon: stats: goodput=667.7 B/s util=56% pipeline=v3 frames_in=594 ok=502 fail=0 drop_full=0 drop_stale=0 frags_ok=1093 frags_fail=0 qdepth=1 parity_tx=0
+
+2026-08-30 14:06:20,479 INFO image_tx_daemon: txdone_arrival: seq=80 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:20,684 INFO image_tx_daemon: txdone_arrival: seq=80 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:20,758 INFO image_tx_daemon: txdone_arrival: seq=80 idx=2 status=0 toa_us=46208
+
+2026-08-30 14:06:20,770 INFO image_tx_daemon: frame seq=80 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:21,083 INFO image_tx_daemon: txdone_arrival: seq=81 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:21,281 INFO image_tx_daemon: txdone_arrival: seq=81 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:21,293 INFO image_tx_daemon: frame seq=81 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:21,699 INFO image_tx_daemon: txdone_arrival: seq=82 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:22,080 INFO image_tx_daemon: txdone_arrival: seq=82 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:22,164 INFO image_tx_daemon: txdone_arrival: seq=82 idx=2 status=0 toa_us=51328
+
+2026-08-30 14:06:22,179 INFO image_tx_daemon: frame seq=82 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:22,483 INFO image_tx_daemon: txdone_arrival: seq=83 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:22,687 INFO image_tx_daemon: txdone_arrival: seq=83 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:22,740 INFO image_tx_daemon: txdone_arrival: seq=83 idx=2 status=0 toa_us=28288
+
+2026-08-30 14:06:22,752 INFO image_tx_daemon: frame seq=83 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:23,086 INFO image_tx_daemon: txdone_arrival: seq=84 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:23,285 INFO image_tx_daemon: txdone_arrival: seq=84 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:23,338 INFO image_tx_daemon: txdone_arrival: seq=84 idx=2 status=0 toa_us=25728
+
+2026-08-30 14:06:23,350 INFO image_tx_daemon: frame seq=84 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:23,703 INFO image_tx_daemon: txdone_arrival: seq=85 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:24,079 INFO image_tx_daemon: txdone_arrival: seq=85 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:24,132 INFO image_tx_daemon: txdone_arrival: seq=85 idx=2 status=0 toa_us=23168
+
+2026-08-30 14:06:24,144 INFO image_tx_daemon: frame seq=85 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:24,482 INFO image_tx_daemon: txdone_arrival: seq=86 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:24,666 INFO image_tx_daemon: txdone_arrival: seq=86 idx=1 status=0 toa_us=153728
+
+2026-08-30 14:06:24,677 INFO image_tx_daemon: frame seq=86 done (pipelined): 2 fragments ok
+
+2026-08-30 14:06:25,078 INFO image_tx_daemon: txdone_arrival: seq=87 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:25,287 INFO image_tx_daemon: txdone_arrival: seq=87 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:25,486 INFO image_tx_daemon: txdone_arrival: seq=87 idx=2 status=0 toa_us=169088
+
+2026-08-30 14:06:25,617 INFO image_tx_daemon: txdone_arrival: seq=87 idx=3 status=0 toa_us=99968
+
+2026-08-30 14:06:25,629 INFO image_tx_daemon: frame seq=87 done (pipelined): 4 fragments ok
+
+2026-08-30 14:06:25,850 INFO image_tx_daemon: txdone_arrival: seq=90 idx=0 status=0 toa_us=133248
+
+2026-08-30 14:06:25,862 INFO image_tx_daemon: frame seq=90 done (pipelined): 1 fragments ok
+
+2026-08-30 14:06:26,248 INFO image_tx_daemon: txdone_arrival: seq=91 idx=0 status=0 toa_us=138368
+
+2026-08-30 14:06:26,260 INFO image_tx_daemon: frame seq=91 done (pipelined): 1 fragments ok
+
+2026-08-30 14:06:26,686 INFO image_tx_daemon: txdone_arrival: seq=92 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:26,886 INFO image_tx_daemon: txdone_arrival: seq=92 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:27,011 INFO image_tx_daemon: txdone_arrival: seq=92 idx=2 status=0 toa_us=102528
+
+2026-08-30 14:06:27,023 INFO image_tx_daemon: frame seq=92 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:27,245 INFO image_tx_daemon: txdone_arrival: seq=95 idx=0 status=0 toa_us=130688
+
+2026-08-30 14:06:27,257 INFO image_tx_daemon: frame seq=95 done (pipelined): 1 fragments ok
+
+2026-08-30 14:06:27,685 INFO image_tx_daemon: txdone_arrival: seq=96 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:27,696 INFO image_tx_daemon: frame seq=96 done (pipelined): 1 fragments ok
+
+2026-08-30 14:06:28,084 INFO image_tx_daemon: txdone_arrival: seq=97 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:28,097 INFO image_tx_daemon: frame seq=97 done (pipelined): 1 fragments ok
+
+2026-08-30 14:06:28,482 INFO image_tx_daemon: txdone_arrival: seq=98 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:28,681 INFO image_tx_daemon: txdone_arrival: seq=98 idx=1 status=0 toa_us=169088
+
+2026-08-30 14:06:28,756 INFO image_tx_daemon: txdone_arrival: seq=98 idx=2 status=0 toa_us=43648
+
+2026-08-30 14:06:28,767 INFO image_tx_daemon: frame seq=98 done (pipelined): 3 fragments ok
+
+2026-08-30 14:06:29,084 INFO image_tx_daemon: txdone_arrival: seq=99 idx=0 status=0 toa_us=169088
+
+2026-08-30 14:06:29,262 INFO image_tx_daemon: txdone_arrival: seq=99 idx=1 status=0 toa_us=143488
+
+2026-08-30 14:06:29,274 INFO image_tx_daemon: frame seq=99 done (pipelined): 2 fragments ok
+
