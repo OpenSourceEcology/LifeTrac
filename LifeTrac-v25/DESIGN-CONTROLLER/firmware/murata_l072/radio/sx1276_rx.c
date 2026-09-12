@@ -1,4 +1,5 @@
 #include "sx1276_rx.h"
+#include "sx1276_rx_fifo_track.h"   /* RS-12.10 */
 
 #include "host_cmd.h"
 #include "host_stats.h"
@@ -76,10 +77,17 @@ _Static_assert(SX1276_FHSS_CLOCK_FRESH_MS == SX1276_RX_SCAN_LOCK_LOSS_MS,
 static void     rx_pll_settle_busy_wait(uint32_t delay_us);
 #endif
 
+/* RS-12.10 (2026-09-12): FIFO-address tracker, see sx1276_rx_fifo_track.h.
+ * Reset on every arm (here and on a host raw RXCONT/RXSINGLE write via
+ * sx1276_rx_note_external_arm) so the first packet after an arm only
+ * teaches the pointer. */
+static sx1276_rx_fifo_track_t s_rx_fifo_track;
+
 bool sx1276_rx_arm(void) {
     if (!sx1276_modes_to_rx_cont()) {
         return false;
     }
+    sx1276_rx_fifo_track_reset(&s_rx_fifo_track);
 
     if ((sx1276_read_reg(SX1276_REG_MODEM_CONFIG2) & (1U << 2)) == 0U) {
         host_cmd_emit_fault(HOST_FAULT_CODE_RX_CRC_DISABLED, 0U);
@@ -92,6 +100,10 @@ bool sx1276_rx_arm(void) {
 
 void sx1276_rx_disarm(void) {
     (void)sx1276_modes_to_standby();
+}
+
+void sx1276_rx_note_external_arm(void) {
+    sx1276_rx_fifo_track_reset(&s_rx_fifo_track);
 }
 
 bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
@@ -129,6 +141,10 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
             const uint8_t fifo_addr =
                 sx1276_read_reg(SX1276_REG_FIFO_RX_CURRENT_ADDR);
             const uint8_t dump_len = (rx_len > 251U) ? 251U : rx_len;
+            /* RS-12.10: a CRC-failed packet still advanced the buffer. */
+            if (sx1276_rx_fifo_track_note(&s_rx_fifo_track, fifo_addr, rx_len)) {
+                host_stats_rx_fifo_skip();
+            }
             uint8_t *buf = out_frame->payload;
             buf[0] = 1U;                                    /* ver */
             buf[1] = irq_flags;
@@ -162,6 +178,10 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
     if ((irq_flags & SX1276_IRQ_RX_DONE) != 0U) {
         const uint8_t rx_len = sx1276_read_reg(SX1276_REG_RX_NB_BYTES);
         const uint8_t fifo_addr = sx1276_read_reg(SX1276_REG_FIFO_RX_CURRENT_ADDR);
+        /* RS-12.10: did a packet complete unserviced before this one? */
+        if (sx1276_rx_fifo_track_note(&s_rx_fifo_track, fifo_addr, rx_len)) {
+            host_stats_rx_fifo_skip();
+        }
         const int8_t snr_q4 = (int8_t)sx1276_read_reg(SX1276_REG_PKT_SNR_VALUE);
         const uint8_t pkt_rssi = sx1276_read_reg(SX1276_REG_PKT_RSSI_VALUE);
 

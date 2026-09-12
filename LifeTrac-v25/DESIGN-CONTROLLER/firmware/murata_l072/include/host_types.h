@@ -180,7 +180,20 @@
  * Older host parsers tolerate the growth (offset-guarded label list). */
 #define HOST_STATS_OFFSET_RX_URC_LOST         144U
 #define HOST_STATS_OFFSET_RX_PRETX_DRAINED    148U
-#define HOST_STATS_PAYLOAD_LEN               152U
+/* RS-12.10 (2026-09-12) additive tail: where the loss actually is.
+ * rx_fifo_skip            = packets that completed while the previous one
+ *                           was still unserviced (FifoRxCurrentAddr jumped
+ *                           past a hole). DIO0 is level-held across such a
+ *                           pair, so rx_urc_lost above cannot see them.
+ * tx_deaf_max_us / sum_us = RX disarm -> RX re-arm around each TX: the
+ *                           receiver's deaf window (max, and total).
+ * tx_done_to_rearm_max_us = TX_DONE seen -> RX re-armed: the firmware's
+ *                           own turnaround, airtime excluded. */
+#define HOST_STATS_OFFSET_RX_FIFO_SKIP              152U
+#define HOST_STATS_OFFSET_TX_DEAF_MAX_US            156U
+#define HOST_STATS_OFFSET_TX_DEAF_SUM_US            160U
+#define HOST_STATS_OFFSET_TX_DONE_TO_REARM_MAX_US   164U
+#define HOST_STATS_PAYLOAD_LEN               168U
 
 #define HOST_TYPE_BOOT_URC                   0xF0U
 /* FAULT_URC payload: {u8 code, u8 sub, u16 reserved, u32 pc, u32 lr, u32 psr, u32 bfar, u32 uptime_ms} */

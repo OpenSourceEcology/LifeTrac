@@ -48,6 +48,11 @@ typedef struct host_stats_wire_s {
     /* RS-12 additive tail (2026-09-12): URC-path loss accounting. */
     uint32_t rx_urc_lost;
     uint32_t rx_pretx_drained;
+    /* RS-12.10 additive tail (2026-09-12): FIFO skip + TX deaf window. */
+    uint32_t rx_fifo_skip;
+    uint32_t tx_deaf_max_us;
+    uint32_t tx_deaf_sum_us;
+    uint32_t tx_done_to_rearm_max_us;
 } host_stats_wire_t;
 
 _Static_assert(sizeof(host_stats_wire_t) == HOST_STATS_PAYLOAD_LEN,
@@ -67,6 +72,10 @@ static uint32_t s_tx_fifo_rb_bad;
 static uint32_t s_tx_done_early;
 static uint32_t s_rx_urc_lost;
 static uint32_t s_rx_pretx_drained;
+static uint32_t s_rx_fifo_skip;
+static uint32_t s_tx_deaf_max_us;
+static uint32_t s_tx_deaf_sum_us;
+static uint32_t s_tx_done_to_rearm_max_us;
 
 static void put_u32_le(uint8_t *dst, uint32_t value) {
     dst[0] = (uint8_t)(value & 0xFFU);
@@ -90,6 +99,10 @@ void host_stats_reset(void) {
     s_tx_done_early = 0U;
     s_rx_urc_lost = 0U;
     s_rx_pretx_drained = 0U;
+    s_rx_fifo_skip = 0U;
+    s_tx_deaf_max_us = 0U;
+    s_tx_deaf_sum_us = 0U;
+    s_tx_done_to_rearm_max_us = 0U;
 
     host_uart_stats_reset();
 }
@@ -149,6 +162,24 @@ void host_stats_note_radio_events(uint32_t events) {
     }
 }
 
+void host_stats_rx_fifo_skip(void) {
+    if (s_rx_fifo_skip != UINT32_MAX) {
+        s_rx_fifo_skip++;
+    }
+}
+
+void host_stats_tx_deaf_note(uint32_t deaf_us, uint32_t done_to_rearm_us,
+                             bool done_valid) {
+    if (deaf_us > s_tx_deaf_max_us) {
+        s_tx_deaf_max_us = deaf_us;
+    }
+    s_tx_deaf_sum_us = (s_tx_deaf_sum_us > (UINT32_MAX - deaf_us))
+        ? UINT32_MAX : (s_tx_deaf_sum_us + deaf_us);
+    if (done_valid && done_to_rearm_us > s_tx_done_to_rearm_max_us) {
+        s_tx_done_to_rearm_max_us = done_to_rearm_us;
+    }
+}
+
 uint16_t host_stats_serialize(uint8_t *out, uint16_t out_cap) {
     uint16_t idx = 0U;
 
@@ -198,7 +229,11 @@ uint16_t host_stats_serialize(uint8_t *out, uint16_t out_cap) {
     put_u32_le(&out[idx], s_tx_fifo_rb_bad); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], s_tx_done_early); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], s_rx_urc_lost); idx = (uint16_t)(idx + 4U);
-    put_u32_le(&out[idx], s_rx_pretx_drained);
+    put_u32_le(&out[idx], s_rx_pretx_drained); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], s_rx_fifo_skip); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], s_tx_deaf_max_us); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], s_tx_deaf_sum_us); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], s_tx_done_to_rearm_max_us); idx = (uint16_t)(idx + 4U);
 
     return HOST_STATS_PAYLOAD_LEN;
 }

@@ -11,6 +11,7 @@
 #include "platform.h"
 #include "sx1276.h"
 #include "sx1276_modes.h"   /* RS-4.12: sync raw opmode writes */
+#include "sx1276_rx.h"      /* RS-12.10: FIFO-skip tracker reset on raw arm */
 #include "stm32l072_regs.h"
 #include "version.h"
 
@@ -574,6 +575,12 @@ static void handle_reg_write(const host_frame_t *frame) {
      * modem parking deaf in STANDBY after every fragment. */
     if (frame->payload[0] == 0x01U) {
         sx1276_modes_sync_external(frame->payload[1]);
+        /* RS-12.10: a raw RXCONT/RXSINGLE arm moves the modem's RX buffer
+         * pointer behind the FIFO-skip tracker's back — forgive the jump. */
+        if ((frame->payload[1] & 0x07U) == 0x05U ||
+            (frame->payload[1] & 0x07U) == 0x06U) {
+            sx1276_rx_note_external_arm();
+        }
     }
 
     host_uart_send_urc(HOST_TYPE_REG_WRITE_ACK_URC,

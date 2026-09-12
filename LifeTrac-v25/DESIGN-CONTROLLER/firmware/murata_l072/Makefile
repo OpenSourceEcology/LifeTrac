@@ -77,6 +77,7 @@ SRCS := \
 	radio/sx1276_legal_dwell.c \
 	radio/sx1276_modes.c \
 	radio/sx1276_rx.c \
+	radio/sx1276_rx_fifo_track.c \
 	radio/sx1276_rx_counters.c \
 	radio/sx1276_rx_retune_policy.c \
 	radio/sx1276_rx_retune_counters.c \
@@ -146,9 +147,19 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost help
+.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost help check-rx-fifo-track bench check-stats-layout
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
+
+# RS-12.10 (2026-09-12): the committed build/firmware.bin is the PRODUCTION
+# binary (HOST_ALLOW_REG_WRITE_DIAG=0) and refuses the bench carrier pin
+# (-ForceFrfHz, channel_survey_sniff.py: ERR_PROTO FORBIDDEN detail=6).
+# Bench boards need this build; it lands next to the production bin under a
+# name the flash pipeline can never pick up by accident.
+bench:
+	$(MAKE) CROSS="$(CROSS)" TARGET=$(TARGET) BUILD=build_bench EXTRA_CFLAGS="$(EXTRA_CFLAGS) -DHOST_ALLOW_REG_WRITE_DIAG=1" all
+	$(OBJCOPY) -O binary build_bench/$(TARGET).elf $(BUILD)/firmware_bench_diag.bin
+	@echo "[BENCH] $(BUILD)/firmware_bench_diag.bin (HOST_ALLOW_REG_WRITE_DIAG=1; NOT the production binary)"
 
 hello:
 	$(MAKE) CROSS="$(CROSS)" TARGET=$(HELLO_TARGET) BUILD=$(HELLO_BUILD) SRCS="$(HELLO_SRCS)" all
@@ -239,6 +250,8 @@ CFG_CLAMP_FUZZ_BIN := $(BUILD)/cfg_clamp_fuzz
 LORA_PKT_HDR_BIN   := $(BUILD)/lora_pkt_hdr
 RX_COUNTERS_BIN    := $(BUILD)/rx_counters
 RX_URC_LOST_BIN    := $(BUILD)/rx_urc_lost
+RX_FIFO_TRACK_BIN  := $(BUILD)/rx_fifo_track
+STATS_LAYOUT_BIN   := $(BUILD)/stats_layout
 RX_RETUNE_POLICY_BIN := $(BUILD)/rx_retune_policy
 RX_RETUNE_COUNTERS_BIN := $(BUILD)/rx_retune_counters
 RX_SCAN_POLICY_BIN := $(BUILD)/rx_scan_policy
@@ -249,7 +262,7 @@ FHSS_CLOCK_BIN     := $(BUILD)/fhss_clock_test
 AIRTIME_INVARIANT_BIN := $(BUILD)/airtime_invariant
 TX_LEN_GUARD_BIN   := $(BUILD)/tx_len_guard
 
-check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost
+check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost check-rx-fifo-track check-stats-layout
 	@echo "[OK] memory map invariants hold"
 
 check-cpp: $(BUILD)
@@ -481,6 +494,24 @@ check-rx-urc-lost: $(BUILD)
 	    -o $(RX_URC_LOST_BIN)
 	@echo "[RXURL] Running rx-urc-lost test ..."
 	@$(RX_URC_LOST_BIN)
+
+check-rx-fifo-track: $(BUILD)
+	@echo "[RXFIF] Building rx-fifo-track test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rx_fifo_track.c \
+	    radio/sx1276_rx_fifo_track.c \
+	    -o $(RX_FIFO_TRACK_BIN)
+	@echo "[RXFIF] Running rx-fifo-track test ..."
+	@$(RX_FIFO_TRACK_BIN)
+
+check-stats-layout: $(BUILD)
+	@echo "[STLAY] Building stats-layout test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/stats_layout.c \
+	    host/host_stats.c \
+	    -o $(STATS_LAYOUT_BIN)
+	@echo "[STLAY] Running stats-layout test ..."
+	@$(STATS_LAYOUT_BIN)
 
 check-rx-frame-urc: $(BUILD)
 	@echo "[RXURC] Building rx-frame-urc wire test ..."

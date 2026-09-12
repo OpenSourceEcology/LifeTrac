@@ -22,6 +22,8 @@ for key in ("radio_rx_ok", "radio_crc_err", "radio_dio0", "radio_tx_ok",
             "host_rx_ring_ovf", "host_dropped", "host_queue_full",
             "host_parse_ok", "host_parse_err", "radio_state",
             "tx_fifo_rb_ok", "tx_fifo_rb_bad", "tx_done_early",
-            "rx_urc_lost", "rx_pretx_drained"):
+            "rx_urc_lost", "rx_pretx_drained",
+            "rx_fifo_skip", "tx_deaf_max_us", "tx_deaf_sum_us",
+            "tx_done_to_rearm_max_us"):
     print(f"{key}={stats.get(key, 'ABSENT')}")
 print("ALL:", {k: v for k, v in stats.items() if v})
