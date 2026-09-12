@@ -259,7 +259,7 @@ LOG_FRAG_ARRIVALS = os.environ.get(
 # commands ride the completion-aligned pump, which fires right after a train
 # ends - the one instant no fragment can be due. 0 restores the old
 # behaviour for an A/B leg. Rules live in cmd_timing.py (SIL-pinned).
-IDLE_DRAIN_QUIET_S = float(os.environ.get("LIFETRAC_IDLE_DRAIN_QUIET_S", "1.5"))
+IDLE_DRAIN_QUIET_S = _env_float("LIFETRAC_IDLE_DRAIN_QUIET_S", 1.5, lo=0.0)
 
 
 class KeyframeRequester:
