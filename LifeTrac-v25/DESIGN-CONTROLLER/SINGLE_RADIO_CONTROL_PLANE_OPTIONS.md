@@ -33,7 +33,7 @@ or read from code, not estimated.
 | Fact | Value | Consequence |
 |---|---|---|
 | Inter-fragment dead air (DTS) | **4.98 ms** | Nothing fits. Not the 10.3 ms frame actually flown, not a 15.4 ms drive frame. |
-| …and it is **deaf by construction** | `sx1276_tx.c:259` | Re-arms RX only when the *firmware-tracked* state is RX_CONT; the host arms via a raw register write the firmware never sees, so the modem parks in STANDBY after every fragment. |
+| …and it is **deaf by construction** | `sx1276_tx.c:259` | Re-arms RX only when the *firmware-tracked* state is RX_CONT. **Corrected 2026-09-12:** since RS-4.12 the host's raw RegOpMode write is mirrored into the tracked state, and the RS-12.10 counters measured the firmware re-arming within 1.9 ms of TX_DONE on the base (4.3 ms on the tractor after a 255 B readback). The deaf window is the airtime plus that — 18 ms for a `TILE_STALE`, ~102 ms for a fragment — not a parked modem. The lever is *when* the base transmits (RS-12.11). |
 | Train-boundary window (armed) | **242.6 ms every 1850 ms** (record); 92.3 ms every 449 ms (soak) | The **only** listening window today. Restored once per train at `image_tx_daemon.py:1073`. |
 | Usable window cadence | **0.54 /s** | This is the binding constraint. |
 | Envelope cost at that window | bare 15.4 ms / D13 20.5 ms / GCM-128 25.7 ms | All fit **≥9× over**. Crypto choice buys **zero** extra delivery opportunities. |

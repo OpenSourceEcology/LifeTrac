@@ -255,6 +255,20 @@ NO_PARK_LAST = os.environ.get("LIFETRAC_NO_PARK_LAST", "0") == "1"
 # mid-train pair. Only meaningful with LIFETRAC_NO_PARK_LAST=1.
 NO_PARK_LAST_GAP_S = _env_int("LIFETRAC_NO_PARK_LAST_GAP_MS", 80,
                               lo=0, hi=5_000) / 1000.0
+# RS-12.13 (2026-09-12): the hold is worth its ~38 ms only on long trains.
+# The penultimate lock it removes is a synth/keyframe-train effect (13
+# fragments); camera trains are 1-2 fragments, where the "penultimate" is
+# the first fragment and the loss there was the base's own command timing
+# (RS-12.11), which the hold never touched. Holding a 2-fragment train
+# costs 16 % of its airtime for nothing, so the hold applies only to
+# trains of at least this many fragments.
+NO_PARK_LAST_MIN_FRAGS = _env_int("LIFETRAC_NO_PARK_LAST_MIN_FRAGS", 3,
+                                  lo=1, hi=64)
+
+
+def final_hold_applies(no_park_last: bool, n_frags: int, min_frags: int) -> bool:
+    """Pure (RS-12.13): does this train hold its final fragment?"""
+    return bool(no_park_last) and n_frags >= min_frags
 
 # LIFETRAC_TX_PIPELINE: 'v2' (default) = serial send->TX_DONE->send;
 # 'v3' = keep 2 TX_FRAME_REQs in flight against the firmware's depth-2
@@ -1292,7 +1306,8 @@ class ImageTxDaemon:
         while not self._stop.is_set() and (inflight or (next_i < n and not aborted)):
             while (not aborted and next_i < n
                    and len(inflight) < PIPELINE_DEPTH):
-                if NO_PARK_LAST and next_i == n - 1:
+                if (final_hold_applies(NO_PARK_LAST, n, NO_PARK_LAST_MIN_FRAGS)
+                        and next_i == n - 1):
                     # RS-12: hold the final (short) fragment until the
                     # penultimate's TX_DONE is in AND a minimum gap has
                     # elapsed, so it can neither ride the firmware's
@@ -1306,8 +1321,9 @@ class ImageTxDaemon:
                     return                          # stop requested mid-frame
                 next_i += 1
 
-            if not inflight and not (NO_PARK_LAST and next_i < n
-                                     and not aborted):
+            if not inflight and not (
+                    final_hold_applies(NO_PARK_LAST, n, NO_PARK_LAST_MIN_FRAGS)
+                    and next_i < n and not aborted):
                 break
             # When holding the final fragment with nothing in flight, FALL
             # THROUGH to the normal event body: it supplies the same 50 ms
@@ -1514,9 +1530,9 @@ class ImageTxDaemon:
         # Bench-evidence audits reconstruct leg conditions from the archived
         # daemon log; the effective hold setting must appear there, not only
         # in the harness's params.txt.
-        LOG.info("no_park_last=%d gap_ms=%d pipeline_depth=%d",
+        LOG.info("no_park_last=%d gap_ms=%d min_frags=%d pipeline_depth=%d",
                  1 if NO_PARK_LAST else 0, int(NO_PARK_LAST_GAP_S * 1000),
-                 PIPELINE_DEPTH)
+                 NO_PARK_LAST_MIN_FRAGS, PIPELINE_DEPTH)
         client.loop_start()
         try:
             while not self._stop.is_set():

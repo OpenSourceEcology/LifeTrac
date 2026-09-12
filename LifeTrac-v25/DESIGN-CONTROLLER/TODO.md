@@ -2315,6 +2315,18 @@ Two consequences for what is worth doing next:
   REMAINING → flash session (see RS-12.9): rx_urc_lost counter
   (prediction is binary: ==0 strict-hold, ≈timeouts control) + real fix
   (double-buffer the URC path or firmware min inter-fire spacing).
+  **CLOSURE 2026-09-12 (flash session + evening gate; see RS-12.9's two
+  session outcome blocks and RS-12.10/11/13):** the flash session found
+  NO second writer (`rx_urc_lost` 5/1/6, `rx_pretx_drained` 0 across three
+  legs) — the URC path was never the loss site and the double-buffer idea
+  is withdrawn. The camera-path loss (this entry's 09-07 4.1 %) was the
+  base deafening itself: the rx daemon's idle drain fired on its 0.25 s
+  poll timeout right where the next train's first fragment lands. Fixed on
+  the host (RS-12.11, PR #118): 3.1 % → 1.0 %, first-of-two losses 14 → 0.
+  The synth-train penultimate-of-13 lock remains a separate, no-hold-only
+  effect: not FIFO coalescing (`rx_fifo_skip` 0 vs 29, RS-12.10), not
+  base-TX-coincident; the hold removes it (RS-12.13 makes the hold
+  length-conditional so it costs the camera path nothing).
   Evidence: bench-evidence/RS_12_bulk_floor_2026-08-16 (full search
   narrative incl. both recorded wrong turns),
   RS_12_depth_ab_2026-08-17, RS_12_noparklast_ab_2026-08-17. Original
@@ -2397,6 +2409,21 @@ evidence. Both boards on the RS-12.10 bench build; radios parked after.
   (PR #118, gate passed, see above).**
 - [x] **RS-4.15 — motion-aware stale-scan horizon: DONE 2026-09-12 (PR #118,
   measured-rotation horizon, 102 → 13 TILE_STALE per 300 s).**
+- [ ] **RS-12.12 — validate RS-12.11 under the production profile (opened
+  2026-09-12).** Both gate legs ran on profile 2 (DTS, 927.5 pinned). Under
+  profile 1 the aligned pump meets the FHSS slot clock (base command TX
+  near a slot boundary → follower skip-under-tx-busy, RS-4.14). Fly one
+  camera + `kf_inject 15 20` leg with `-RegProfile 1` (no `-ForceFrfHz`),
+  hold off, defaults otherwise; expect loss at the profile-1 floor and no
+  first-of-two lock. Prepared 2026-09-12 evening; waits for the operator's
+  GO. Then redeploy the base's compose tree/image (still 2026-07-26 code).
+- [x] **RS-12.13 — length-conditional hold (PR #118, 2026-09-12).**
+  `LIFETRAC_NO_PARK_LAST_MIN_FRAGS` (default 3): with the hold enabled, only
+  trains of that many fragments or more hold their final fragment. Camera
+  trains (1–2 fragments) are never held, so enabling the hold no longer
+  costs the camera path anything; long synth/keyframe trains get the
+  3.2 % → 1.5 % benefit. `LIFETRAC_NO_PARK_LAST` default unchanged (0);
+  flipping it is now a low-risk call once RS-3.11 decides on long trains.
 - [x] **RS-12.10 — FLOWN 2026-09-12 evening (PR #117): `rx_fifo_skip` = 0 over
   2,366 packets with 29 penultimate losses in the same leg (F) → M1 is NOT
   FIFO coalescing at the base; base deaf window per command = ToA + ≤1.9 ms
@@ -2492,6 +2519,18 @@ production `tractor-camera` container returns holding `/dev/ttymxc3`
 (mimics an L072 wedge; the harness stops it at launch — check if probing
 manually). Recommended order:
 
+0. **Before anything (added 2026-09-12):** (a) on the tractor stop the
+   unit AND the container — `systemctl stop lifetrac-camera.service` then
+   `docker stop tractor-camera` — a bare `docker stop` is undone by the
+   unit within the same boot; (b) LF-normalize every `.sh`/`.cfg` before
+   pushing (git autocrlf rewrites them in the working tree; bash on the
+   board then sees `\r` in every path); (c) bench boards run the
+   `make bench` binary (`build/firmware_bench_diag.bin`), never the
+   committed production `build/firmware.bin`, which refuses the carrier
+   pin; (d) the harness pushes its probe helpers from the branch it runs
+   in — a firmware wire change must ride that branch or every post-leg
+   bracket parses only the old fields; (e) flash with
+   `REVIVE_MODE=reboot` (FLASH_RUNBOOK.md) and expect the /tmp re-push.
 1. **Wake-up check**: `rs116_health_probe.py` both boards, then a
    same-day channel spot-check (the hopper reshuffles in hours; 927.5 MHz
    was the only 3/3-clean channel — verify before trusting).

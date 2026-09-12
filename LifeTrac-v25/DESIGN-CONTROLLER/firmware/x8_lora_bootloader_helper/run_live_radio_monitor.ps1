@@ -82,6 +82,9 @@ param(
     # RS-12.11 (2026-09-12): idle-drain quiet gate on the base rx daemon
     # (LIFETRAC_IDLE_DRAIN_QUIET_S). "0" = pre-RS-12.11 behaviour (A/B control).
     [string]$IdleDrainQuietS = "1.5",
+    # RS-12.13 (2026-09-12): the hold applies only to trains of at least this
+    # many fragments (LIFETRAC_NO_PARK_LAST_MIN_FRAGS on the tx daemon).
+    [int]$NoParkLastMinFrags = 3,
     # RS-0.13b (2026-07-27): 1 = aligned command pump on (default), 0 =
     # idle-drain-only. The Run-J bisection toggles this + Batch + PrepareAhead
     # + ParityGroup one at a time to find which killed the 58% alignment.
@@ -172,7 +175,7 @@ $profEnv = "$profEnv -e LIFETRAC_FHSS_FARM_ID=$FhssFarmId -e LIFETRAC_FHSS_LINK_
 if ($AirtimeBudgetUs -gt 0) { $profEnv = "$profEnv -e LIFETRAC_AIRTIME_BUDGET_US=$AirtimeBudgetUs" }
 $profEnv = "$profEnv -e LIFETRAC_AIRTIME_PACING=$PacingMode"
 if ($PacingHeadroom -gt 0) { $profEnv = "$profEnv -e LIFETRAC_PACING_HEADROOM=$PacingHeadroom" }
-if ($NoParkLast -eq 1) { $profEnv = "$profEnv -e LIFETRAC_NO_PARK_LAST=1" }
+if ($NoParkLast -eq 1) { $profEnv = "$profEnv -e LIFETRAC_NO_PARK_LAST=1 -e LIFETRAC_NO_PARK_LAST_MIN_FRAGS=$NoParkLastMinFrags" }
 if ($LogFragArrivals -eq 1) {
     # One knob, both ends: RX logs frag_arrival (fw us + host wall), TX logs
     # txdone_arrival (host wall + toa_us). Routed via $profEnv so both
@@ -232,7 +235,11 @@ cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S docker rm -f rx_s
 # misdiagnosis after an unplanned reboot. `stop`, not `rm`: the
 # container stays defined so `docker start tractor-camera` restores the
 # production stack after bench work.
+# 2026-09-12: a bare `docker stop` is undone by the container's systemd unit
+# within the same boot (it came back mid-session twice). Stop the unit first;
+# it restarts at the next boot, so production is untouched long-term.
 foreach ($s in @($TxAdbSerial, $RxAdbSerial)) {
+    cmd /c "`"$adbExe`" -s $s shell `"echo fio | sudo -S -p '' systemctl stop lifetrac-camera.service 2>/dev/null`"" | Out-Null
     cmd /c "`"$adbExe`" -s $s shell `"echo fio | sudo -S -p '' docker stop -t 3 tractor-camera 2>/dev/null`"" | Out-Null
 }
 
@@ -475,6 +482,7 @@ if ($Archive) {
         "train_gap_ms=$TrainGapMs",
         "kf_request_disable=$KfRequestDisable",
         "no_park_last=$NoParkLast",
+        "no_park_last_min_frags=$NoParkLastMinFrags",
         "idle_drain_quiet_s=$IdleDrainQuietS",
         "parity_group=$ParityGroup",
         "aligned_pump=$AlignedPump",
