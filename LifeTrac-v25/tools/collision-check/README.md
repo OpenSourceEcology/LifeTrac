@@ -10,8 +10,10 @@ the job summary and as an artifact.
 ## How it works
 
 1. **Envelope.** An echo-only OpenSCAD run reads the model's `COLLISION_ENVELOPE` line
-   (arm min/max lift angle, bucket dump/curl angle) and a grid of poses is built:
-   arm angle × absolute bucket angle (0° = level, negative = dumping).
+   (arm min/max lift angle, bucket dump angle at full lift, curl angle at ground) and a
+   grid of poses is built in the machine's joint space: arm angle × bucket angle
+   *relative to the arm* (the bucket cylinder is mounted between arm and bucket, so the
+   relative angle is what it controls; absolute angle = arm + relative, 0° = level).
 2. **Reachability.** For each pose a second echo-only run (about 0.4 s) reports the four
    hydraulic cylinder extensions (`COLLISION_CYL` lines). Poses where a cylinder would be
    over-extended or bottomed are marked unreachable and not judged.
@@ -24,8 +26,9 @@ the job summary and as an artifact.
    `collision_rules.json`. Clearance rules use the FCL minimum distance (`python-fcl` via
    `trimesh`); the ground rule uses the mesh bounds.
 5. **Report.** Markdown report (`--report`, `--summary` for `$GITHUB_STEP_SUMMARY`) with
-   the envelope grid, failures, per-pair overlap range, clearance rules and cylinder stroke
-   usage, plus a JSON file (`--json`). Exit code 1 when any check fails.
+   the envelope grid, failures, per-pair overlap range, the curl hard-stop probe, ground-
+   limited poses, clearance rules and cylinder stroke usage, plus a JSON file (`--json`).
+   Exit code 1 when any check fails.
 
 ## Usage
 
@@ -36,8 +39,9 @@ cd LifeTrac-v25/tools/collision-check
 # default 7x5 grid over the envelope (what CI runs)
 python3 collision_check.py --report out/collision_report.md --json out/collision_results.json
 
-# explicit poses: arm angle : absolute bucket angle, degrees (use '=' when the list starts with '-')
-python3 collision_check.py --poses=-27.7:0,10:-20,49.4:-45
+# explicit poses: arm angle : bucket angle relative to the arm, degrees
+# (use '=' when the list starts with '-'; absolute bucket angle = arm + relative)
+python3 collision_check.py --poses=-27.7:27.7,10:-30,49.4:-94.4
 
 # the animation path (what the GIF shows), 36 frames
 python3 collision_check.py --animation-frames 36
@@ -69,11 +73,15 @@ Cost with OpenSCAD 2021.01 on 4 cores: about 85 s of export time per reachable p
   `informational_groups` (the bucket) are only reported, because with the arms at ground
   level the ground itself limits how far the bucket can dump (the lip would be up to
   40 cm below grade at the dump limit). Such poses are marked ⛰ in the envelope grid.
-- `bucket_curl_inset_deg` (1°): the curl limit is a steel-on-steel hard stop by definition
-  (rule 5, back plate parallel to the drop leg), so the envelope is sampled 1° inside it.
-  Set it to 0 to include the stop pose itself; today that pose shows about 26 cm³ of
-  bucket/arm interpenetration with the arms at ground level, i.e. the stop angle is
-  computed slightly past the point where the plates meet.
+- `bucket_curl_inset_deg` (10°): the curl limit is a plate-on-plate hard stop by definition
+  (rule 5, back plate parallel to the drop leg), so the grid stops short of it and
+  `hard_stop_probe` reports the stop pose itself informationally. Measured with the arms
+  down, the bucket/arm overlap is at sliver level up to +40° relative (0.6 cm³), then
+  12 cm³ at +44°, 18 cm³ at +46°, 22 cm³ at +48° and 26 cm³ at the defined +50° stop,
+  with 63 mm of bucket-cylinder retraction still available: the plates meet about 8°
+  before the angle the model calls full curl, and the cylinder can pull the bucket past
+  the contact. Reduce the inset once the curl definition or the cylinder placement is
+  corrected (rule 5 asks for the cylinder to bottom out at full curl).
 - `cylinder_extension_tolerance_mm`: slack on the stroke limits for the reachability test.
 
 To recalibrate after a joint changes, run the check with `--json` and then

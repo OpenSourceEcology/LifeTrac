@@ -26,7 +26,7 @@ def round_up_2sig(v: float) -> float:
 def suggest(results: dict, margin: float, floor: float) -> dict:
     worst: dict = {}
     for pose in results.get("poses", []):
-        if not pose.get("reachable"):
+        if not pose.get("reachable") or pose.get("informational"):
             continue
         for pair, vol in pose.get("overlaps_mm3", {}).items():
             if vol is None:

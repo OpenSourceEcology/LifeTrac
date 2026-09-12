@@ -6,9 +6,11 @@ Background and design: https://github.com/OpenSourceEcology/LifeTrac/issues/119
 What it does
 ------------
 1. Asks the model for its pose envelope (the ``COLLISION_ENVELOPE`` echo line) and builds a
-   grid of poses: arm lift angle x absolute bucket angle. Explicit poses or the animation
-   path can be used instead.
-2. Runs a fast echo-only evaluation per pose and keeps only the poses whose four hydraulic
+   grid of poses in the machine's joint space: arm lift angle x bucket angle relative to
+   the arm (the bucket cylinder is mounted between arm and bucket, so the relative angle is
+   what the cylinder controls; absolute angle = arm + relative). Explicit poses or the
+   animation path can be used instead.
+2. Runs a fast echo-only evaluation per pose and keeps only the poses whose hydraulic
    cylinders stay within their stroke (``COLLISION_CYL`` echo lines). Poses the cylinders
    cannot reach are reported but not judged.
 3. Exports every rigid group (frame, wheels, platform once; arms, bucket, hydraulics per
@@ -30,7 +32,6 @@ import argparse
 import concurrent.futures
 import itertools
 import json
-import math
 import os
 import re
 import subprocess
@@ -65,32 +66,35 @@ FALLBACK_ARM_MAX_RE = re.compile(r'^ECHO:\s*"_arm_max_for_animation:",\s*(-?[\d.
 FALLBACK_CYL_RE = re.compile(
     r'^ECHO:\s*"oriented_cylinder: len=",\s*(-?[\d.eE+-]+),\s*"extension=",\s*(-?[\d.eE+-]+),\s*"stroke=",\s*(-?[\d.eE+-]+)')
 
+VOLUME_NOISE_MM3 = 1e-3   # below this the boolean result is numerical noise, not geometry
+
 
 # --------------------------------------------------------------------------- data types
 @dataclass(frozen=True)
 class Pose:
     arm: float          # ARM_LIFT_ANGLE in degrees
-    bucket_abs: float   # absolute bucket angle in degrees (0 = level, negative = dumping)
+    bucket_rel: float   # BUCKET_TILT_ANGLE in degrees, relative to the arm (positive = curl)
 
     @property
-    def bucket_rel(self) -> float:
-        """BUCKET_TILT_ANGLE as the model defines it: relative to the arm."""
-        return self.bucket_abs - self.arm
+    def bucket_abs(self) -> float:
+        """Absolute bucket angle (0 = level, negative = dumping)."""
+        return self.arm + self.bucket_rel
 
     @property
     def key(self) -> str:
-        return f"arm{self.arm:+07.2f}_bucket{self.bucket_abs:+07.2f}"
+        return f"arm{self.arm:+07.2f}_rel{self.bucket_rel:+07.2f}"
 
     def label(self) -> str:
-        return f"arm {self.arm:+.1f}°, bucket {self.bucket_abs:+.1f}°"
+        return f"arm {self.arm:+.1f}°, bucket {self.bucket_rel:+.1f}° rel ({self.bucket_abs:+.1f}° abs)"
 
 
 @dataclass
 class Envelope:
     arm_min: float
     arm_max: float
-    bucket_abs_min: float   # dump limit
-    bucket_abs_max: float   # curl limit
+    rel_min: float     # dump limit: cylinder fully extended (dump angle reached with the arms at max lift)
+    rel_max: float     # curl limit sampled (hard stop minus inset)
+    curl_stop: float   # curl limit as the model defines it (back plate parallel to the drop leg)
 
 
 @dataclass
@@ -108,6 +112,7 @@ class Check:
 class PoseResult:
     pose: Pose
     reachable: bool
+    informational: bool = False                       # probe poses: reported, never judged
     cylinders: list = field(default_factory=list)     # (name, extension, stroke)
     checks: list = field(default_factory=list)        # list[Check]
     overlaps: dict = field(default_factory=dict)      # pair -> volume mm^3 (None = unmeasurable)
@@ -122,6 +127,10 @@ class PoseResult:
 # --------------------------------------------------------------------------- pure helpers
 def pair_key(a: str, b: str) -> str:
     return "/".join(sorted((a, b)))
+
+
+def snap_volume(v: float) -> float:
+    return 0.0 if abs(v) < VOLUME_NOISE_MM3 else float(abs(v))
 
 
 def parse_echo(text: str) -> dict:
@@ -161,12 +170,19 @@ def parse_echo(text: str) -> dict:
     return out
 
 
-def envelope_from_echo(parsed: dict, bucket_default=(-45.0, 30.0)) -> Envelope:
+def envelope_from_echo(parsed: dict, rel_default=(-95.0, 50.0)) -> Envelope:
+    """COLLISION_ENVELOPE carries arm min/max and the absolute bucket dump/curl angles at the
+    arm positions where the design defines them (dump at max lift, curl at ground level).
+    The relative limits follow: rel_min = dump - arm_max, rel_max = curl - arm_min."""
     env = parsed.get("ENVELOPE")
     if env and len(env) >= 4:
-        return Envelope(env[0], env[1], min(env[2], env[3]), max(env[2], env[3]))
+        arm_min, arm_max = env[0], env[1]
+        abs_dump, abs_curl = min(env[2], env[3]), max(env[2], env[3])
+        rel_min, rel_max = abs_dump - arm_max, abs_curl - arm_min
+        return Envelope(arm_min, arm_max, rel_min, rel_max, rel_max)
     if "fallback_arm_min" in parsed and "fallback_arm_max" in parsed:
-        return Envelope(parsed["fallback_arm_min"], parsed["fallback_arm_max"], *bucket_default)
+        return Envelope(parsed["fallback_arm_min"], parsed["fallback_arm_max"],
+                        rel_default[0], rel_default[1], rel_default[1])
     raise RuntimeError("could not read the pose envelope from the model's echo output "
                        "(expected a COLLISION_ENVELOPE line)")
 
@@ -174,39 +190,46 @@ def envelope_from_echo(parsed: dict, bucket_default=(-45.0, 30.0)) -> Envelope:
 def apply_curl_inset(env: Envelope, inset_deg: float) -> Envelope:
     """The bucket curl limit is a steel-on-steel hard stop by definition (rule 5 of
     DESIGN_RULES.md: back plate parallel to the drop leg), so the envelope is sampled a
-    little inside it; the stop pose itself is a contact, not a clearance."""
+    little inside it; the stop pose itself is probed separately."""
     if not inset_deg:
         return env
-    new_max = max(env.bucket_abs_min, env.bucket_abs_max - inset_deg)
-    return Envelope(env.arm_min, env.arm_max, env.bucket_abs_min, new_max)
+    new_max = max(env.rel_min, env.rel_max - inset_deg)
+    return Envelope(env.arm_min, env.arm_max, env.rel_min, new_max, env.curl_stop)
 
 
 def grid_poses(env: Envelope, arm_steps: int, bucket_steps: int) -> list[Pose]:
     arms = np.linspace(env.arm_min, env.arm_max, max(1, arm_steps))
-    buckets = np.linspace(env.bucket_abs_min, env.bucket_abs_max, max(1, bucket_steps))
-    return [Pose(round(float(a), 4), round(float(b), 4)) for a in arms for b in buckets]
+    rels = np.linspace(env.rel_min, env.rel_max, max(1, bucket_steps))
+    return [Pose(round(float(a), 4), round(float(r), 4)) for a in arms for r in rels]
 
 
 def animation_poses(env: Envelope, frames: int, dump_angle=-45.0) -> list[Pose]:
     """Poses along the animation path in lifetrac_v25.scad: arms rise from min to max while
-    the bucket goes from level (0°) to the dump angle."""
+    the absolute bucket angle goes from level (0°) to the dump angle."""
     out = []
     for i in range(max(1, frames)):
         phase = i / max(1, frames - 1)
         arm = env.arm_min + phase * (env.arm_max - env.arm_min)
-        out.append(Pose(round(arm, 4), round(phase * dump_angle, 4)))
+        abs_angle = phase * dump_angle
+        out.append(Pose(round(arm, 4), round(abs_angle - arm, 4)))
     return out
 
 
+def hard_stop_poses(env: Envelope, arm_angles=None) -> list[Pose]:
+    """The defined curl stop itself, probed informationally."""
+    arms = arm_angles if arm_angles is not None else [env.arm_min]
+    return [Pose(round(float(a), 4), round(env.curl_stop, 4)) for a in arms]
+
+
 def parse_pose_list(spec: str) -> list[Pose]:
-    """'arm:bucket_abs,arm:bucket_abs,...' in degrees."""
+    """'arm:bucket_rel,arm:bucket_rel,...' in degrees (bucket angle relative to the arm)."""
     poses = []
     for item in spec.split(","):
         item = item.strip()
         if not item:
             continue
-        a, b = item.split(":")
-        poses.append(Pose(float(a), float(b)))
+        a, r = item.split(":")
+        poses.append(Pose(float(a), float(r)))
     return poses
 
 
@@ -312,13 +335,6 @@ def to_manifold(mesh):
     return mm
 
 
-VOLUME_NOISE_MM3 = 1e-3   # below this the boolean result is numerical noise, not geometry
-
-
-def snap_volume(v: float) -> float:
-    return 0.0 if abs(v) < VOLUME_NOISE_MM3 else float(abs(v))
-
-
 def intersection_volume(ma, mb) -> float:
     return snap_volume((ma ^ mb).volume())
 
@@ -345,6 +361,7 @@ class Runner:
         self.ground_info_groups = list(ground.get("informational_groups", []))
         self.ground_min_z = float(ground.get("min_z_mm", -1.0))
         self.curl_inset = float(config.get("bucket_curl_inset_deg", 0.0))
+        self.hard_stop_probe = bool(config.get("hard_stop_probe", True))
         self.cyl_tol = float(config.get("cylinder_extension_tolerance_mm", 1.0))
         self.timings: dict[str, float] = {}
         self.notes: list[str] = []
@@ -354,21 +371,26 @@ class Runner:
         print(msg, flush=True)
 
     # ---- poses
-    def poses(self) -> tuple[Envelope, list[Pose]]:
+    def poses(self) -> tuple[Envelope, list[Pose], list[Pose]]:
+        """Returns the sampled envelope, the poses to judge and the informational probe poses."""
         parsed = self.scad.echo("envelope", None)
-        env = envelope_from_echo(parsed, tuple(self.config.get("bucket_abs_default_range", (-45.0, 30.0))))
+        env = envelope_from_echo(parsed, tuple(self.config.get("bucket_rel_default_range", (-95.0, 50.0))))
         env = apply_curl_inset(env, self.curl_inset)
+        probes: list[Pose] = []
         if self.args.poses:
             poses = parse_pose_list(self.args.poses)
         elif self.args.animation_frames:
             poses = animation_poses(env, self.args.animation_frames)
         else:
             poses = grid_poses(env, self.args.arm_steps, self.args.bucket_steps)
-        return env, poses
+            if self.hard_stop_probe and self.curl_inset:
+                probes = hard_stop_poses(env)
+        return env, poses, probes
 
-    def classify(self, poses: list[Pose]) -> dict[Pose, PoseResult]:
+    def classify(self, poses: list[Pose], probes: list[Pose]) -> dict[Pose, PoseResult]:
         results: dict[Pose, PoseResult] = {}
         t0 = time.time()
+        probe_set = set(probes)
 
         def one(pose: Pose):
             parsed = self.scad.echo(f"pose_{pose.key}", pose)
@@ -376,9 +398,10 @@ class Runner:
             return pose, cyls, parsed.get("rc", 1)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.args.jobs) as ex:
-            for pose, cyls, rc in ex.map(one, poses):
+            for pose, cyls, rc in ex.map(one, poses + [p for p in probes if p not in set(poses)]):
                 reachable = rc == 0 and cylinders_reachable(cyls, self.cyl_tol)
-                results[pose] = PoseResult(pose=pose, reachable=reachable, cylinders=cyls)
+                results[pose] = PoseResult(pose=pose, reachable=reachable, cylinders=cyls,
+                                           informational=pose in probe_set)
                 if rc != 0:
                     results[pose].checks.append(Check(pose.key, "export", "echo", None, None, False,
                                                       f"OpenSCAD exited {rc} on the echo run"))
@@ -509,8 +532,9 @@ def fmt_mm3(v: float | None) -> str:
 
 def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult], version: str,
                  elapsed: float) -> tuple[str, bool]:
-    poses = list(results)
-    reachable = [p for p in poses if results[p].reachable]
+    judged = [p for p in results if not results[p].informational]
+    probes = [p for p in results if results[p].informational]
+    reachable = [p for p in judged if results[p].reachable]
     failed = [p for p in reachable if results[p].failed]
     static_failed_checks = [c for c in runner.static_checks if not c.ok]
     static_failed = [n for n in runner.notes if "failed" in n]
@@ -519,38 +543,40 @@ def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
     lines.append("# LifeTrac v25 collision check")
     lines.append("")
     lines.append(f"**Result: {'PASS' if passed else 'FAIL'}**  ")
-    lines.append(f"OpenSCAD: `{version}` · poses: {len(poses)} in grid, {len(reachable)} reachable, "
+    lines.append(f"OpenSCAD: `{version}` · poses: {len(judged)} in grid, {len(reachable)} reachable, "
                  f"{len(failed)} failing, {len(static_failed_checks)} static failures · runtime {elapsed / 60:.1f} min "
                  f"(reachability {runner.timings.get('reachability_s', 0):.0f}s, "
                  f"exports {runner.timings.get('export_s', 0):.0f}s, "
                  f"analysis {runner.timings.get('analysis_s', 0):.0f}s)")
     lines.append("")
-    inset_note = (f" The bucket curl limit is a hard stop (rule 5), so it is sampled {runner.curl_inset:g}° "
-                  "inside the stop." if runner.curl_inset else "")
-    lines.append(f"Envelope sampled: arm {env.arm_min:+.1f}° to {env.arm_max:+.1f}°, "
-                 f"bucket (absolute) {env.bucket_abs_min:+.1f}° to {env.bucket_abs_max:+.1f}°.{inset_note} "
-                 "Poses whose cylinders would leave their stroke are marked unreachable and not judged.")
+    inset_note = (f" The curl limit ({env.curl_stop:+.1f}° rel) is a plate-on-plate hard stop by definition "
+                  f"(rule 5), so the grid stops {runner.curl_inset:g}° short of it; the stop itself is probed "
+                  "below." if runner.curl_inset else "")
+    lines.append(f"Envelope sampled: arm {env.arm_min:+.1f}° to {env.arm_max:+.1f}°, bucket {env.rel_min:+.1f}° "
+                 f"to {env.rel_max:+.1f}° relative to the arm (absolute angle = arm + relative; "
+                 f"{env.rel_min:+.1f}° rel is the dump angle at full lift, the cylinder's extension limit)."
+                 f"{inset_note} Poses whose cylinders would leave their stroke are marked unreachable and not judged.")
     lines.append("")
 
     # envelope grid
-    arms = sorted({p.arm for p in poses}, reverse=True)
-    buckets = sorted({p.bucket_abs for p in poses})
-    if len(arms) > 1 or len(buckets) > 1:
+    arms = sorted({p.arm for p in judged}, reverse=True)
+    rels = sorted({p.bucket_rel for p in judged})
+    if len(arms) > 1 or len(rels) > 1:
         lines.append("## Envelope")
         lines.append("")
-        lines.append("Rows: arm lift angle. Columns: absolute bucket angle (negative = dumping). "
-                     "✅ pass · ❌ fail · ⬜ unreachable · ➖ not sampled · ⛰ bucket below ground "
+        lines.append("Rows: arm lift angle. Columns: bucket angle relative to the arm (positive = curl, "
+                     "negative = dump). ✅ pass · ❌ fail · ⬜ unreachable · ➖ not sampled · ⛰ bucket below ground "
                      "(the ground limits this pose, informational)")
         lines.append("")
-        lines.append("| arm \\ bucket | " + " | ".join(f"{b:+.1f}°" for b in buckets) + " |")
-        lines.append("|---|" + "---|" * len(buckets))
-        lookup = {(p.arm, p.bucket_abs): results[p] for p in poses}
+        lines.append("| arm \\ bucket rel | " + " | ".join(f"{r:+.1f}°" for r in rels) + " |")
+        lines.append("|---|" + "---|" * len(rels))
+        lookup = {(p.arm, p.bucket_rel): results[p] for p in judged}
         for a in arms:
             cells = []
-            for b in buckets:
-                r = lookup.get((a, b))
-                cell = "➖" if r is None else "⬜" if not r.reachable else "❌" if r.failed else "✅"
-                if r is not None and r.ground_limited:
+            for r in rels:
+                res = lookup.get((a, r))
+                cell = "➖" if res is None else "⬜" if not res.reachable else "❌" if res.failed else "✅"
+                if res is not None and res.ground_limited:
                     cell += " ⛰"
                 cells.append(cell)
             lines.append(f"| {a:+.1f}° | " + " | ".join(cells) + " |")
@@ -602,6 +628,23 @@ def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
                      f"{fmt_mm3(max(measurable)) if measurable else 'n/a'} | {fmt_mm3(budget)} | {status} |")
     lines.append("")
 
+    # hard stop probe (informational)
+    probe_rows = [p for p in probes if results[p].reachable]
+    if probe_rows:
+        lines.append("## Curl hard stop (informational)")
+        lines.append("")
+        lines.append("Overlap at the curl limit as the model defines it (back plate parallel to the drop leg). "
+                     "The stop is a contact by definition, so this is reported, not judged; a volume well above "
+                     "the sliver level means the defined stop angle lies past the point where the plates meet.")
+        lines.append("")
+        lines.append("| Pose | arms/bucket overlap | Cylinders (extension / stroke) |")
+        lines.append("|---|---|---|")
+        for p in probe_rows:
+            r = results[p]
+            cyl = ", ".join(f"{n} {e:.0f}/{s:.0f}" for n, e, s in r.cylinders) or "n/a"
+            lines.append(f"| {p.label()} | {fmt_mm3(r.overlaps.get('arms/bucket'))} | {cyl} |")
+        lines.append("")
+
     # ground-limited poses (informational)
     limited = [(p, results[p].ground_limited) for p in reachable if results[p].ground_limited]
     if limited:
@@ -650,12 +693,13 @@ def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
     lines.append("")
     lines.append("| Pose | Reachable | Cylinders (extension / stroke) | Overlaps above zero | Clearances |")
     lines.append("|---|---|---|---|---|")
-    for p in poses:
+    for p in judged + probes:
         r = results[p]
         cyl = ", ".join(f"{n} {e:.0f}/{s:.0f}" for n, e, s in r.cylinders) or "n/a"
         ov = ", ".join(f"{k} {fmt_mm3(v)}" for k, v in sorted(r.overlaps.items()) if v is None or v > 0) or "none"
         cl = ", ".join(f"{k} {v:.0f} mm" for k, v in sorted(r.clearances.items())) or ""
-        lines.append(f"| {p.label()} | {'yes' if r.reachable else 'no'} | {cyl} | {ov} | {cl} |")
+        tag = " (probe)" if r.informational else ""
+        lines.append(f"| {p.label()}{tag} | {'yes' if r.reachable else 'no'} | {cyl} | {ov} | {cl} |")
     lines.append("")
     lines.append("</details>")
     lines.append("")
@@ -677,8 +721,8 @@ def results_json(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
         "notes": runner.notes,
         "poses": [
             {
-                "arm": p.arm, "bucket_abs": p.bucket_abs, "bucket_rel": p.bucket_rel,
-                "reachable": r.reachable,
+                "arm": p.arm, "bucket_rel": p.bucket_rel, "bucket_abs": p.bucket_abs,
+                "reachable": r.reachable, "informational": r.informational,
                 "cylinders": [{"name": n, "extension_mm": e, "stroke_mm": s} for n, e, s in r.cylinders],
                 "overlaps_mm3": r.overlaps, "clearances_mm": r.clearances,
                 "ground_limited_mm": r.ground_limited,
@@ -700,7 +744,8 @@ def parse_args(argv=None):
     ap.add_argument("--jobs", type=int, default=max(1, os.cpu_count() or 1), help="parallel OpenSCAD processes")
     ap.add_argument("--arm-steps", type=int, default=7, help="arm angles across the envelope (grid mode)")
     ap.add_argument("--bucket-steps", type=int, default=5, help="bucket angles across the envelope (grid mode)")
-    ap.add_argument("--poses", help="explicit poses 'arm:bucket_abs,...' in degrees instead of the grid")
+    ap.add_argument("--poses", help="explicit poses 'arm:bucket_rel,...' in degrees (bucket relative to the "
+                                    "arm) instead of the grid; use --poses=... when the list starts with '-'")
     ap.add_argument("--animation-frames", type=int, help="sample the animation path with N frames instead of the grid")
     ap.add_argument("--force", action="store_true", help="re-export meshes even when a fresh STL exists")
     ap.add_argument("--timeout", type=float, default=1800.0, help="seconds per OpenSCAD run")
@@ -720,11 +765,12 @@ def main(argv=None) -> int:
     runner.log(f"OpenSCAD: {version}")
     runner.log(f"model: {args.model}")
 
-    env, poses = runner.poses()
-    runner.log(f"envelope: arm {env.arm_min:+.1f}..{env.arm_max:+.1f}°, bucket {env.bucket_abs_min:+.1f}.."
-               f"{env.bucket_abs_max:+.1f}° (absolute); {len(poses)} poses")
-    results = runner.classify(poses)
-    reachable = sum(1 for r in results.values() if r.reachable)
+    env, poses, probes = runner.poses()
+    runner.log(f"envelope: arm {env.arm_min:+.1f}..{env.arm_max:+.1f}°, bucket {env.rel_min:+.1f}.."
+               f"{env.rel_max:+.1f}° relative (curl stop {env.curl_stop:+.1f}°); {len(poses)} poses, "
+               f"{len(probes)} probe(s)")
+    results = runner.classify(poses, probes)
+    reachable = sum(1 for r in results.values() if r.reachable and not r.informational)
     runner.log(f"reachable poses: {reachable}/{len(poses)} ({runner.timings['reachability_s']:.0f}s)")
 
     paths = runner.export_all(results)
