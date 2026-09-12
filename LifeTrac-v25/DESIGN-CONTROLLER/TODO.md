@@ -2292,6 +2292,26 @@ Two consequences for what is worth doing next:
   transcript-attested, not archive-recorded (params/daemon-log
   instrumentation added in PR #111). The motion leg on the instrumented
   build is the remaining gate before any default-flip discussion.**
+  **Update 2026-09-07 — DEFAULT-FLIP DECISION: DO NOT FLIP (for now).**
+  Three sessions of live evidence since: (a) 2026-08-24 paired legs
+  (`RS_12_instrumentation_verify_2026-08-24/`, PR #112) — the archive
+  now records the hold and the mechanism flips WITH it: no_park_last=1
+  → loss 1.5 %/penultimate 6 %; =0 → 3.3 %/35 %. Transcript attestation
+  retired. (b) 2026-09-06 motion leg (`RS_3_3_motion_leg_2026-09-06/`,
+  PR #114): camera + moving scene + 104 live commands, loss 0.3 %,
+  0 timeouts, 49 short-final trains all delivered. (c) 2026-09-07
+  long-train attempt (`RS_3_3_long_train_leg_2026-09-07/`, PR #114):
+  145 live commands (102 TILE_STALE + 43 kf) → **loss 4.1 %, 14
+  timeouts, lost index = penultimate-of-two in 12/14, RF corruption
+  unchanged (9 dumps), and 16 corrupt-capture URCs missing** — the
+  RS-12 overwrite signature reappearing DESPITE the hold's 206 ms
+  spacing. Reading: **URC-path contention from command/ack URCs — a
+  second writer to the single pending-URC slot that the hold cannot
+  address.** n=1, direction strong. The hold fixes the ride; only the
+  firmware fix (double-buffered URC path / min inter-fire spacing)
+  fixes both writers, and the flash session's `rx_urc_lost` counter
+  discriminates them. The flash session is therefore now the decisive
+  item, not a confirmation.
   REMAINING → flash session (see RS-12.9): rx_urc_lost counter
   (prediction is binary: ==0 strict-hold, ≈timeouts control) + real fix
   (double-buffer the URC path or firmware min inter-fire spacing).
@@ -2323,6 +2343,41 @@ Two consequences for what is worth doing next:
   activity-modulation legs (ethernet flood on the gigabit-marginal base
   cable, USB, CPU) → hands only after the coupling path is named.
 #### RS-12.9 — next-session sequencing (written 2026-08-17 at shutdown)
+
+**SESSIONS 2026-08-24 → 2026-09-07 OUTCOME (three sessions; PRs #112,
+#114).** 08-24: archive instrumentation VERIFIED on air (hold recorded
+in params + daemon log AND the mechanism signature flips with the
+flag); `rs12_leg_report.py` train-length bug found and fixed (it read
+train length from CORRUPT dump headers — one garbage byte hid a 35 %
+lock as 0 %; legs are MIXED-length, never assume uniform; mixed-length
+penultimate ambiguity now printed); 2nd chantab survey 50/50 hot and
+**the survey-ranked top pick (927.25) LOST 2.3× on a link leg** —
+device-A ticker sitting on it (5 hits/−55 dBm) while 927.5 read 0/−94.
+New RS-11.8 gate: no channel or hail constant from passive ranking;
+LINK LEG is the gate. 09-06: MOTION LEG flew — 0.3 %, 0 timeouts, image
+watched live on the base website, canvas archived; 49 2-frag trains
+under the hold all delivered; trains 560×1 + 49×2, none longer (dark
+room). 09-07: LONG-TRAIN ATTEMPT with bright scene + injector fixed to
+start on first published frame (39/40 kf in-leg) — **keyframes are
+~500 B at the current encoder point regardless of scene (max 497 B;
+trains 1×258 2×359 3×6)** → long camera trains are an ENCODER-CONFIG
+axis, see RS-3.11 below; and **loss 4.1 % / 14 timeouts under 145 live
+commands with penultimate-of-2 losses 12/14 = URC contention from
+command/ack traffic** → NO_PARK_LAST default: do NOT flip (RS-12 entry
+above). Bench facts learned: the HARNESS SWD-RESETS THE TRACTOR L072 AT
+LAUNCH (background, not always completing — explains the 08-22 tractor
+bracket; base brackets only); quiesce-instead-of-halt held 13 DAYS
+(only `/tmp` age-cleaned by tmpfiles); YouTube autoplay chains to
+unrelated videos between legs — re-navigate before every camera leg;
+stale-scan floods under motion (101/102 TILE_STALE per 300 s, RS-4.15
+below); 927.5 read its FIRST non-zero (1 hot/−72) on 09-07 after 6/6.
+**Remaining queue, reprioritised:** (1) FLASH SESSION — now decisive:
+`rx_urc_lost` + firmware URC double-buffer fix, discriminates the two
+writers; (2) RS-3.11 encoder-config decision if ≥10-frag camera trains
+are wanted as evidence; (3) RS-4.15 motion-aware stale-scan horizon;
+(4) link tests of hail candidates 926.75 / 925.25; (5) emitter hunt.
+Radios parked in LoRa SLEEP (0x80 both) after every leg; boards
+quiesced. Original 08-22 outcome block follows.
 
 **SESSION 2026-08-22 OUTCOME — items 1, 2, 5, 6 DONE; 3 and 4 remain,
 plus one new residue.** Wake-up ran clean after two hardware wrinkles
@@ -2421,6 +2476,41 @@ touches no bench constraint.
   ticker-aware metric. Same session, x.0/x.5 grid: 927.5 went clean
   4/4 — the SOLE stable channel anywhere (runner-up 1/4) — which
   strengthens the table-extension case considerably.**
+  **Second chantab pass 2026-08-24 (`RS_11_8_chantab_2026-08-24/`, PR
+  #112): 50/50 hot — the binary criterion is saturated on this grid.
+  Continuous-metric ranking across both passes put 927.25 first; a
+  link leg at 927.25 then lost 3.5 % vs 927.5's 1.5 % the same
+  session, flat drop profile (interference), and paired 60 s
+  spot-checks named the cause: 927.25 = 5 hits/−55 dBm on a clean
+  7.02 s grid (device-A ticker ON it), 927.5 = 0/−94. An in-document
+  recommendation of 927.25 was RETRACTED on the record. GATE: no hail
+  constant is adopted from passive ranking — every candidate must pass
+  a link leg (926.75 and 925.25 next). No production-table channel is
+  emitter-free today while off-grid 927.5 is; table extension gets
+  MORE attractive, not less. Do NOT fold hot-sum ranking into
+  survey_compare as an automatic picker; surface hit cadence, noise
+  floor, and an explicit no-clean-channel verdict instead.**
+- [ ] **RS-3.11 Long camera trains are an encoder-config axis (opened
+  2026-09-07).** The 09-07 long-train attempt — bright detailed moving
+  scene, 39 delivered keyframe requests — produced no frame over 600 B:
+  keyframes are ~500 B (2–3 fragments) at the current camera encoder
+  operating point regardless of scene. The 2026-07-31 2.4 KB keyframes
+  came from a different point (`byte_budget=2436`). If ≥10-fragment
+  camera trains under the hold are wanted as evidence, choose the
+  encoder axis to move (budget, quality, or resolution) and fly one leg
+  with the injector; otherwise accept the synth 13-frag legs as the
+  long-train record and close this. Evidence:
+  `RS_3_3_long_train_leg_2026-09-07/` (PR #114).
+- [ ] **RS-4.15 Motion-aware stale-scan horizon (opened 2026-09-07,
+  successor to RS-4.14).** The FRESH web_ui/daemon stale scan floods
+  TILE_STALE under a moving scene: 101 and 102 requests per 300 s on
+  consecutive days (one every ~3 s), each a live command mid-stream
+  costing image airtime and — per the 09-07 contention finding —
+  contributing to URC-path pressure. The horizon rule (memory: must
+  exceed the sweep rotation, ~30 s at the 2 fps bench point) is tuned
+  for a static scene. Define a motion-aware rule (rate-limit stale
+  requests under high tile churn, or suppress while the sweep is
+  already covering the stale set) before field use.
 - [ ] **PM-1 Production power-down / wake (design PR #110, opened
   2026-08-22).** Design in POWER_MANAGEMENT.md (revised same day — all 8
   review findings verified against source and addressed). Shape: Opta I1
@@ -2439,7 +2529,9 @@ touches no bench constraint.
   exposure — **DONE 2026-08-22, CONFIRMED both carriers (base
   `bq24190-charger`, tractor `bq24195-charger`, each exposing `online` +
   `status`; whether `online` tracks VIN removal live still needs the
-  drain evening)** — carrier-side VIN ADC availability, post-halt 18650
+  drain evening; artifact `pm1_charger_sysfs.txt` committed in PR #112
+  — `status` observed flipping Not-charging → Discharging overnight,
+  so it is a live property)** — carrier-side VIN ADC availability, post-halt 18650
   drain (meter in series, an evening), harness confirmation that
   ignition sense lands on I1. Hardware decisions gated before production:
   supercap/LiFePO4 vs 18650 (outdoor cold-charging), crash-only rootfs
