@@ -2397,7 +2397,17 @@ evidence. Both boards on the RS-12.10 bench build; radios parked after.
   (PR #118, gate passed, see above).**
 - [x] **RS-4.15 — motion-aware stale-scan horizon: DONE 2026-09-12 (PR #118,
   measured-rotation horizon, 102 → 13 TILE_STALE per 300 s).**
-- [ ] **RS-12.10 — instrument the invisible coalescing (next firmware
+- [x] **RS-12.10 — FLOWN 2026-09-12 evening (PR #117): `rx_fifo_skip` = 0 over
+  2,366 packets with 29 penultimate losses in the same leg (F) → M1 is NOT
+  FIFO coalescing at the base; base deaf window per command = ToA + ≤1.9 ms
+  (18.2 ms mean, 19.6 ms max), tractor per fragment 102 ms mean / 111.5 ms
+  max, re-arm ≤4.3 ms → no slow re-arm exists, the lever is WHEN the base
+  transmits (RS-12.11). M1 next instrument is RF-side (RSSI/SNR during the
+  penultimate, or a third radio), not another host counter. Two traps met:
+  an additive-tail serializer slip (now pinned by `check-stats-layout`) and
+  the harness pushing probe helpers from its own branch (labels must ride
+  the branch you fly). Original entry:**
+  **RS-12.10 — instrument the invisible coalescing (next firmware
   item, replaces the URC double-buffer idea).** (1) `rx_fifo_skip`: in
   `sx1276_rx_service` compare `FifoRxCurrentAddr` with previous
   `current+len (mod 256)`; a mismatch = a packet completed unserviced.

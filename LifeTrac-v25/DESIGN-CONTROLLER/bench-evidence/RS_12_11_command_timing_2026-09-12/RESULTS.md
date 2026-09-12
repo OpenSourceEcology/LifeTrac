@@ -156,3 +156,54 @@ corrected build below.
   hold; the hold was never the camera-path problem. The synth-train
   question (M1) stays with RS-12.10.
 
+## Leg F — synth 13-frag, `-NoParkLast 0`, new host defaults — the RS-12.10 counters on the corrected build
+
+Both boards re-flashed with the corrected bench build (md5
+`e8ad842489d5acfc09f204c7807e4661`; `flash/*_rs1210b*`), `check-stats-layout`
+green, `RS12-10-COUNTERS=YES` on both. Archive
+`radio_monitor_20260912_144645_6d9681d9` (`legs/legF_archive.txt`),
+brackets `legs/legF_pre_base.txt` → `legs/legF_post_base.txt`, report
+`legs/legF_report.txt`, join `legs/legF_deaf_join.txt`.
+
+| metric | leg A (flash session, old host) | **leg F** |
+|---|---:|---:|
+| loss | 76/2384 = 3.2 % | **72/2382 = 3.0 %** |
+| timeouts | 57 | 65 |
+| penultimate (idx 11 of 13) share | 27/78 = 35 % | **29/72 = 40 %** |
+| base command sends | 113 | 83 (all `TILE_STALE`; idle drain held 33×) |
+| lost within ±150 ms after a base TX | 12/70 | **2/75 (0.34×)** |
+| crc dumps / Δcrc_err | 41 / 41 | 61 / 62 |
+| `rx_urc_lost` / `rx_pretx_drained` | 5 / 0 | 1 / 0 |
+| **`rx_fifo_skip`** | — | **0** over 2,366 received packets |
+| **`tx_deaf_max_us` / `tx_deaf_sum_us` / `tx_done_to_rearm_max_us`** | — | **0 / 0 / 0** over 83 transmissions |
+
+Two clean answers:
+
+1. **The penultimate-of-13 lock (M1) is not FIFO coalescing at the
+   base.** With the address tracker live on every serviced packet, no
+   packet ever started anywhere but where the previous one ended, so no
+   packet completed unserviced. The RS-12.10 prediction
+   (`rx_fifo_skip ≈ penultimate losses`) fails outright: 0 vs 29. M1
+   is also not base-TX-coincident (2 of 75 lost near a base TX, below
+   the received baseline). It survives the RS-12.11 host change (it is a
+   synth-train, no-hold phenomenon) and the hold removes it (leg B).
+   Every lost fragment was transmitted (tractor TX_DONE). What is left:
+   a modem-level effect of the final fragment keying up 42 ms behind the
+   penultimate — the packet is on air and not demodulated — which needs
+   an RF-side instrument (RSSI/SNR during the penultimate, or a third
+   radio listening), not more host-side counters.
+
+2. **The firmware never runs its own post-TX re-arm in daemon
+   operation.** `tx_deaf_*` are booked only on the `s_rearm_rx` branch
+   of `sx1276_tx_cleanup`, and they stayed at zero across 83
+   transmissions while the tracked state read RX_CONT before and after
+   the leg. So the radio is left in STANDBY after every TX_DONE and the
+   rx daemon's `_ensure_rxcont` (read RegOpMode, write 0x85) is what
+   re-arms it — the deaf window is the airtime plus a host round trip,
+   not the airtime plus a few hundred microseconds. That is why the
+   kill zone in the joins reaches 200 ms after the command's TX_DONE
+   log line. A direct single-transmit probe on the base
+   (`flash/tx_deaf_probe_base.txt`) pins which branch runs; the fix, if
+   the tracked state is the culprit, is a firmware one-liner and
+   worth the next flash.
+

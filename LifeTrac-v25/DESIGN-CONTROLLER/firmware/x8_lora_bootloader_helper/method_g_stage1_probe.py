@@ -428,6 +428,11 @@ def parse_stats(payload: bytes) -> dict:
         # RS-12 (2026-09-12) additive: URC-path loss accounting.
         "rx_urc_lost",
         "rx_pretx_drained",
+        # RS-12.10 (2026-09-12) additive: FIFO skip + TX deaf window.
+        "rx_fifo_skip",
+        "tx_deaf_max_us",
+        "tx_deaf_sum_us",
+        "tx_done_to_rearm_max_us",
     ]
     stats = {}
     for index, label in enumerate(labels):
