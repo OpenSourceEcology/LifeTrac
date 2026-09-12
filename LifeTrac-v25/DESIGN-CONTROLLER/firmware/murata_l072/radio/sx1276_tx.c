@@ -57,6 +57,11 @@ static sx1276_tx_state_t s_tx_state = SX1276_TX_STATE_IDLE;
 static uint8_t s_tx_id;
 static uint8_t s_tx_power_dbm;
 static uint8_t s_rearm_rx;
+/* RS-12.10 (2026-09-12): deaf-window timers, see host_types.h tail. */
+static uint32_t s_deaf_start_us;
+static uint8_t  s_deaf_start_valid;
+static uint32_t s_tx_done_seen_us;
+static uint8_t  s_tx_done_seen_valid;
 
 /*
  * RS-11.5 (2026-08-02) TX-path discriminators for the slot-(total-2)
@@ -151,7 +156,19 @@ static void sx1276_tx_cleanup(void) {
     (void)sx1276_modes_to_standby();
     if (s_rearm_rx != 0U) {
         (void)sx1276_rx_arm();
+        /* RS-12.10: the receiver is listening again — book the deaf
+         * window (disarm -> here) and the TX_DONE -> re-arm turnaround. */
+        {
+            const uint32_t now_us = platform_now_us();
+            const uint32_t deaf_us = (s_deaf_start_valid != 0U)
+                ? (uint32_t)(now_us - s_deaf_start_us) : 0U;
+            const uint32_t turn_us = (s_tx_done_seen_valid != 0U)
+                ? (uint32_t)(now_us - s_tx_done_seen_us) : 0U;
+            host_stats_tx_deaf_note(deaf_us, turn_us, s_tx_done_seen_valid != 0U);
+        }
     }
+    s_deaf_start_valid = 0U;
+    s_tx_done_seen_valid = 0U;
 
     s_tx_state = SX1276_TX_STATE_IDLE;
     s_rearm_rx = 0U;
@@ -323,6 +340,9 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
     s_rearm_rx = (state_before == SX1276_STATE_RX_CONT || state_before == SX1276_STATE_RX_SINGLE) ? 1U : 0U;
     if (s_rearm_rx != 0U) {
         sx1276_rx_disarm();
+        /* RS-12.10: the receiver is deaf from here until tx_cleanup re-arms. */
+        s_deaf_start_us = platform_now_us();
+        s_deaf_start_valid = 1U;
     } else if (!sx1276_modes_to_standby()) {
         return false;
     }
@@ -557,6 +577,10 @@ bool sx1276_tx_poll(uint32_t events, sx1276_tx_result_t *out_result) {
         sx1276_write_reg(SX1276_REG_IRQ_FLAGS, irq_flags);
 
         if ((irq_flags & SX1276_IRQ_TX_DONE) != 0U) {
+            /* RS-12.10: stamp first — the readback below is SPI traffic that
+             * belongs to the turnaround we are measuring. */
+            s_tx_done_seen_us = platform_now_us();
+            s_tx_done_seen_valid = 1U;
             /* RS-11.5 duration check FIRST (before any SPI traffic adds
              * latency): TxDone earlier than ToA-5ms == truncated
              * radiation. Poll latency only ever makes `measured` larger,

@@ -57,6 +57,11 @@ void host_stats_radio_tx_abort_lbt_inc(void) {}
 void host_stats_tx_fifo_rb_ok(void) {}
 void host_stats_tx_fifo_rb_bad(void) {}
 void host_stats_tx_done_early(void) {}
+/* RS-12.10 (2026-09-12): deaf-window timers are booked from tx_cleanup. */
+void host_stats_tx_deaf_note(uint32_t deaf_us, uint32_t done_to_rearm_us,
+                             bool done_valid) {
+    (void)deaf_us; (void)done_to_rearm_us; (void)done_valid;
+}
 void host_cmd_emit_fault(uint8_t code, uint8_t sub) { (void)code; (void)sub; }
 const host_cfg_profile_req_t *host_cfg_profile_active(void) { return NULL; }
 /* sx1276_modes_to_standby / sx1276_set_sf_bw_cr / sx1276_set_tx_power_dbm

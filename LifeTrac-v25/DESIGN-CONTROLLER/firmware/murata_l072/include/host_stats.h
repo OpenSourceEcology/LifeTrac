@@ -3,6 +3,7 @@
 
 #include "host_types.h"
 
+#include <stdbool.h>
 #include <stdint.h>
 
 void host_stats_reset(void);
@@ -20,6 +21,10 @@ void host_stats_radio_tx_abort_airtime(void);
 /* RS-12 (2026-09-12) URC-path loss accounting; see host_types.h tail. */
 void host_stats_rx_urc_lost_add(uint32_t n);
 void host_stats_rx_pretx_drained_add(uint32_t n);
+/* RS-12.10 (2026-09-12): FIFO-skip detector + TX deaf-window timers. */
+void host_stats_rx_fifo_skip(void);
+void host_stats_tx_deaf_note(uint32_t deaf_us, uint32_t done_to_rearm_us,
+                             bool done_valid);
 uint16_t host_stats_serialize(uint8_t *out, uint16_t out_cap);
 
 #endif /* LIFETRAC_MURATA_L072_HOST_STATS_H */

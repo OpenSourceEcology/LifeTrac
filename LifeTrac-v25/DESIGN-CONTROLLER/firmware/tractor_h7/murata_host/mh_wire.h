@@ -84,7 +84,12 @@
  * murata_l072/include/host_types.h; check_mh_wire_sync.py enforces it). */
 #define HOST_STATS_OFFSET_RX_URC_LOST         144U
 #define HOST_STATS_OFFSET_RX_PRETX_DRAINED    148U
-#define HOST_STATS_PAYLOAD_LEN               152U
+/* RS-12.10 (2026-09-12) additive tail (mirror of host_types.h). */
+#define HOST_STATS_OFFSET_RX_FIFO_SKIP              152U
+#define HOST_STATS_OFFSET_TX_DEAF_MAX_US            156U
+#define HOST_STATS_OFFSET_TX_DEAF_SUM_US            160U
+#define HOST_STATS_OFFSET_TX_DONE_TO_REARM_MAX_US   164U
+#define HOST_STATS_PAYLOAD_LEN               168U
 
 /* Legacy v1 payload emitted before radio_tx_abort_airtime was appended. */
 #define HOST_STATS_LEGACY_OFFSET_RADIO_STATE 60U

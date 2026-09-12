@@ -157,4 +157,9 @@ void sx1276_rx_slot_follow(uint32_t now_ms);
  */
 void sx1276_rx_scan_reset(void);
 
+/* RS-12.10 (2026-09-12): the host raw-armed RX (RegOpMode 0x85/0x86) behind
+ * the mode tracker's back — reset the FIFO-skip tracker so the first packet
+ * after the re-arm is not scored as a hole. */
+void sx1276_rx_note_external_arm(void);
+
 #endif /* LIFETRAC_MURATA_L072_SX1276_RX_H */

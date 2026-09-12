@@ -160,6 +160,23 @@ def main() -> int:
                for k in ("rx_urc_lost", "rx_pretx_drained")}
         print(f"URC-path: rx_urc_lost={urc['rx_urc_lost']} "
               f"rx_pretx_drained={urc['rx_pretx_drained']}")
+        # RS-12.10 (2026-09-12): FIFO-skip detector (the coalescing the edge
+        # counter cannot see) and the TX deaf window. max fields are NOT
+        # deltas — the bracket max is the leg max only when the counters
+        # were reset at launch; sum is a true delta.
+        keys = ("rx_fifo_skip", "tx_deaf_sum_us")
+        maxk = ("tx_deaf_max_us", "tx_done_to_rearm_max_us")
+        if all(k in pre and k in post for k in keys + maxk):
+            tx_n = max(d.get("radio_tx_ok", 0), 1)
+            deaf_sum = post["tx_deaf_sum_us"] - pre["tx_deaf_sum_us"]
+            print(f"RS-12.10: rx_fifo_skip={post['rx_fifo_skip'] - pre['rx_fifo_skip']} "
+                  f"tx_deaf_sum={deaf_sum} us over {tx_n} TX "
+                  f"(mean {deaf_sum / tx_n / 1000.0:.1f} ms) "
+                  f"tx_deaf_max={post['tx_deaf_max_us'] / 1000.0:.1f} ms "
+                  f"tx_done_to_rearm_max={post['tx_done_to_rearm_max_us']} us "
+                  f"(max fields: post-bracket values)")
+        else:
+            print("RS-12.10: n/a (counters absent in a bracket)")
     return 0
 
 
