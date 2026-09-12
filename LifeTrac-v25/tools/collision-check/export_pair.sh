@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Render the OpenSCAD intersection() of two rigid groups at one animation time.
 #
-# This is the "pure OpenSCAD" probe from issue #119: the result is empty (OpenSCAD 2021.01
-# exits 1 and writes no file) when the two groups do not overlap, otherwise the STL is the
-# exact overlap volume, which analyze_pairs.py measures and locates.
+# Diagnostic companion to collision_check.py (issue #119): the result is empty (OpenSCAD
+# 2021.01 exits 1 and writes no file) when the two groups do not overlap, otherwise the STL
+# is the exact overlap solid, which analyze_pairs.py measures and locates. A sanitized copy
+# of the assembly is generated with absolute include paths and the top-level assembly call
+# replaced by the pair probe; the COG marker is left out with -D show_cog=false.
 #
 # Usage: export_pair.sh <t> <groupA> <groupB> [openscad-binary]
 set -u
@@ -18,7 +20,6 @@ PROBE="$OUT/_probe_pairs.scad"
 if [ ! -f "$PROBE" ] || [ "$SCAD_DIR/lifetrac_v25.scad" -nt "$PROBE" ]; then
   sed -e "s|^include <lifetrac_v25_params.scad>|include <$SCAD_DIR/lifetrac_v25_params.scad>|" \
       -e "s|^use <\(.*\)>|use <$SCAD_DIR/\1>|" \
-      -e "s|^calculate_cog();|// calculate_cog(); // removed: draws a 100mm COG marker sphere|" \
       -e "s|^lifetrac_v25_assembly();|// lifetrac_v25_assembly(); // replaced by the pair probe below|" \
       "$SCAD_DIR/lifetrac_v25.scad" > "$PROBE"
   cat >> "$PROBE" <<'EOF'
@@ -43,7 +44,7 @@ STL="$OUT/pair_${A}_${B}_t${T}.stl"
 LOG="$OUT/pair_${A}_${B}_t${T}.log"
 START=$(date +%s)
 timeout "${OPENSCAD_TIMEOUT:-1500}" "$BIN" -o "$STL" -D "pair_a=\"$A\"" -D "pair_b=\"$B\"" \
-    -D "animation_time=$T" -D "\$t=$T" "$PROBE" > "$LOG" 2>&1
+    -D show_cog=false -D "animation_time=$T" -D "\$t=$T" "$PROBE" > "$LOG" 2>&1
 RC=$?
 END=$(date +%s)
 FACETS=$(grep -c 'facet normal' "$STL" 2>/dev/null || echo 0)

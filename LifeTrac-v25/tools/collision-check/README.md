@@ -1,55 +1,88 @@
-# Collision check prototype (issue #119)
+# Collision check for the LifeTrac v25 assembly
 
-Prototype tooling for detecting part interference in the LifeTrac v25 OpenSCAD assembly
-across the loader-arm animation. Nothing here modifies the model; the scripts work from
-the existing `show_*` toggles in `DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad` and a
-sanitized copy of that file generated into the output directory.
+Automated interference check of `DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad` over the
+loader's pose envelope. Background, research and measurements are in
+[issue #119](https://github.com/OpenSourceEcology/LifeTrac/issues/119). The GitHub
+workflow `.github/workflows/openscad-collision-check.yml` runs it on every change under
+`DESIGN-STRUCTURAL/openscad/` and fails (red check) on interference; the report lands in
+the job summary and as an artifact.
 
-See the discussion on [issue #119](https://github.com/OpenSourceEcology/LifeTrac/issues/119)
-for the research behind this and the proposed CI design.
+## How it works
 
-## What it does
-
-1. `export_groups.sh <t> <group>` exports one rigid group (`frame`, `wheels`, `arms`,
-   `bucket`, `hydraulics`, `platform`) as STL at animation time `t` (0 = arms down,
-   0.5 = arms fully raised, 1 = back down).
-2. `check_collisions.py <t>` loads every group exported for that `t` (static groups fall
-   back to `t=0`) and runs an FCL collision query over all pairs. It prints contacts and the
-   maximum FCL contact depth per pair, and the nearest approach for pairs that are clear.
-   Exit code 1 when a non-whitelisted pair overlaps by more than the tolerance.
-3. `export_pair.sh <t> <groupA> <groupB>` renders the OpenSCAD `intersection()` of two
-   groups. With OpenSCAD 2021.01 an empty intersection exits 1 and writes no file; a
-   non-empty one is the exact overlap solid.
-4. `analyze_pairs.py <t>` measures the overlap solids from step 3 (volume, number of
-   bodies, centroid of the largest bodies) so the overlap can be located.
+1. **Envelope.** An echo-only OpenSCAD run reads the model's `COLLISION_ENVELOPE` line
+   (arm min/max lift angle, bucket dump/curl angle) and a grid of poses is built:
+   arm angle × absolute bucket angle (0° = level, negative = dumping).
+2. **Reachability.** For each pose a second echo-only run (about 0.4 s) reports the four
+   hydraulic cylinder extensions (`COLLISION_CYL` lines). Poses where a cylinder would be
+   over-extended or bottomed are marked unreachable and not judged.
+3. **Exports.** Every rigid group is exported as STL with the model's own `show_*`
+   toggles: `frame`, `wheels`, `platform` once (pose independent) and `arms`, `bucket`,
+   `hydraulics` per pose, in parallel. The pose is set with
+   `-D ARM_LIFT_ANGLE=… -D BUCKET_TILT_ANGLE=…` (both are top-level assignments).
+4. **Measurement.** The exact intersection volume of every pair of groups is computed with
+   the Manifold boolean engine (`manifold3d`) and compared with the per-pair budget in
+   `collision_rules.json`. Clearance rules use the FCL minimum distance (`python-fcl` via
+   `trimesh`); the ground rule uses the mesh bounds.
+5. **Report.** Markdown report (`--report`, `--summary` for `$GITHUB_STEP_SUMMARY`) with
+   the envelope grid, failures, per-pair overlap range, clearance rules and cylinder stroke
+   usage, plus a JSON file (`--json`). Exit code 1 when any check fails.
 
 ## Usage
 
 ```bash
-pip install -r requirements.txt          # trimesh, python-fcl, manifold3d, ...
+pip install -r requirements.txt
 cd LifeTrac-v25/tools/collision-check
-for g in frame wheels platform; do ./export_groups.sh 0 $g; done
-for t in 0 0.25 0.5; do for g in arms bucket hydraulics; do ./export_groups.sh $t $g; done; done
-python3 check_collisions.py 0.5
-./export_pair.sh 0.5 arms frame && python3 analyze_pairs.py 0.5
+
+# default 7x5 grid over the envelope (what CI runs)
+python3 collision_check.py --report out/collision_report.md --json out/collision_results.json
+
+# explicit poses: arm angle : absolute bucket angle, degrees (use '=' when the list starts with '-')
+python3 collision_check.py --poses=-27.7:0,10:-20,49.4:-45
+
+# the animation path (what the GIF shows), 36 frames
+python3 collision_check.py --animation-frames 36
+
+python3 collision_check.py --help
 ```
 
-`OPENSCAD=/path/to/openscad-nightly` selects a different binary; `COLLISION_OUT` moves the
-output directory (default `./out`, git-ignored).
+`OPENSCAD=/path/to/openscad-nightly` (or `--openscad`) selects another binary; a nightly
+build with the Manifold backend exports much faster than 2021.01. `--jobs` sets the number
+of parallel OpenSCAD processes, `--force` re-exports cached meshes. Meshes, logs and
+reports go to `out/` (git-ignored, `--out` or `COLLISION_OUT` to move it).
 
-## Caveats (measured with OpenSCAD 2021.01, CGAL backend)
+Cost with OpenSCAD 2021.01 on 4 cores: about 85 s of export time per reachable pose
+(arms 67 s, hydraulics 12 s, bucket 6 s), the static groups once (frame 126 s, wheels
+20 s, platform 20 s), and well under a second per pose for the volume booleans.
 
-- Export time per pose on a 4-core box: arms about 67 s, hydraulics 12 s, bucket 6 s;
-  static groups once: frame 126 s, wheels 20 s, platform 20 s. A Manifold-backed nightly
-  build is much faster.
-- 2021.01 writes STL with six significant digits, which breaks watertightness of small
-  features (weld beads, nuts), so the Manifold boolean volume inside `check_collisions.py`
-  is only attempted for watertight meshes. Use `export_pair.sh` for exact volumes, or a
-  nightly OpenSCAD which exports full precision.
-- FCL contact depth is a per-triangle number, not a penetration measurement: it reads
-  25.4 mm on the flush frame/platform faces (which do not overlap at all, the OpenSCAD
-  intersection is empty) and 210 mm on a clevis joint whose real overlap is 64 cm³. Use FCL
-  to find pairs in contact and decide pass/fail from the intersection volume.
-- Joint contacts that are intentional (pins in lugs, cylinder clevises on their mounts,
-  wheel hubs in the side panels, platform brackets on the frame) currently show up as
-  overlaps and need either real clearance in the model or an entry in `WHITELIST`.
+## Rules (`collision_rules.json`)
+
+- `default_allowed_overlap_mm3` (50 mm³): overlap tolerated for any pair, enough to absorb
+  polygon slivers where a pin and its hole share a nominal diameter.
+- `allowed_overlap_mm3`: per-pair budgets for the joint simplifications the model still
+  has: pins and clevises drawn straight through their mating parts, the UWU hubs through
+  the side panels. They were calibrated from the measured overlap across the envelope plus
+  a margin and should shrink to the default as those joints get real clearance. A motion
+  collision adds volume on top of the joint overlap, which is what the budget catches.
+- `min_clearance_mm`: `arms/wheels` 25.4 mm, rule 6 of `DESIGN-STRUCTURAL/DESIGN_RULES.md`
+  (main arm at least 1" from the front wheels through the whole range of motion).
+- `ground_plane`: `arms` and `bucket` may not dip below ground (rule 2, crash prevention).
+- `cylinder_extension_tolerance_mm`: slack on the stroke limits for the reachability test.
+
+## Diagnostics
+
+`export_pair.sh <t> <groupA> <groupB>` renders the OpenSCAD `intersection()` of two groups
+at animation time `t` (empty result = exit 1 and no file), and `analyze_pairs.py <t>`
+measures and locates the overlap solids. Useful to cross-check a reported overlap against
+OpenSCAD's own geometry.
+
+## Known limitations
+
+- OpenSCAD 2021.01 writes STL with six significant digits; trimesh reports the meshes as
+  not watertight but Manifold accepts them (`Manifold.status() == NoError`) and its volumes
+  agree with OpenSCAD-rendered intersections to within a few percent. If Manifold rejects
+  a mesh, the affected pairs are reported as unmeasurable and the run fails.
+- FCL contact depth is not used: it is a per-triangle number that reads 25.4 mm on flush
+  coplanar faces (frame/platform) that do not overlap at all.
+- `platform_fold_angle` is not swept (platform is treated as static, deployed).
+- Hydraulics are one group, so rod-in-barrel overlap is internal and not checked; splitting
+  barrel and rod per cylinder is a follow-up.

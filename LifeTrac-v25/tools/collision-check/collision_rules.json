@@ -1,0 +1,28 @@
+{
+  "_comment": [
+    "Rules for tools/collision-check/collision_check.py (issue #119).",
+    "allowed_overlap_mm3: per-pair intersection-volume budget. Anything above it fails.",
+    "The non-default budgets below encode joint simplifications still in the model: pins and",
+    "clevises drawn straight through their mating parts and the UWU hubs through the side",
+    "panels. They were calibrated from the measured overlap over the pose envelope plus a",
+    "margin, and should shrink to the default as the joints get real clearance."
+  ],
+  "default_allowed_overlap_mm3": 50,
+  "allowed_overlap_mm3": {
+    "arms/frame": 200,
+    "arms/bucket": 1500,
+    "arms/hydraulics": 400000,
+    "bucket/hydraulics": 80000,
+    "frame/hydraulics": 260000,
+    "frame/wheels": 600000
+  },
+  "min_clearance_mm": {
+    "arms/wheels": 25.4
+  },
+  "ground_plane": {
+    "groups": ["arms", "bucket"],
+    "min_z_mm": -1.0
+  },
+  "cylinder_extension_tolerance_mm": 1.0,
+  "bucket_abs_default_range": [-45.0, 30.0]
+}
