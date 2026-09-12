@@ -54,7 +54,9 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
-from cmd_timing import idle_drain_allowed, pump_window_open  # RS-12.11
+from cmd_timing import (  # RS-12.11 / RS-12.14
+    idle_drain_allowed, pump_window_open,
+    pending_retry_gap, giveup_cooldown_active, pump_min_gap)
 
 # ---- repo imports ----------------------------------------------------
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -260,6 +262,14 @@ LOG_FRAG_ARRIVALS = os.environ.get(
 # ends - the one instant no fragment can be due. 0 restores the old
 # behaviour for an A/B leg. Rules live in cmd_timing.py (SIL-pinned).
 IDLE_DRAIN_QUIET_S = _env_float("LIFETRAC_IDLE_DRAIN_QUIET_S", 1.5, lo=0.0)
+
+# RS-12.14 (2026-09-12): bound the pending-command retry storm (see
+# cmd_timing.py). Backoff factor 1.0 + cooldown 0 + stream gap 0.12 restore
+# the pre-RS-12.14 behaviour for an A/B leg.
+PENDING_RETRY_BACKOFF = _env_float("LIFETRAC_PENDING_RETRY_BACKOFF", 2.0, lo=1.0)
+PENDING_RETRY_MAX_GAP_S = _env_float("LIFETRAC_PENDING_RETRY_MAX_GAP_S", 8.0, lo=0.1)
+PENDING_GIVEUP_COOLDOWN_S = _env_float("LIFETRAC_PENDING_GIVEUP_COOLDOWN_S", 30.0, lo=0.0)
+CMD_STREAM_MIN_GAP_S = _env_float("LIFETRAC_CMD_STREAM_MIN_GAP_S", 1.0, lo=0.12)
 
 
 class KeyframeRequester:
@@ -665,6 +675,12 @@ class ImageRxDaemon:
         """
         now = time.monotonic()
         with self._lock:
+            # RS-12.14: a command that gave up stays refused for a cool-down;
+            # otherwise the self-heal re-trigger restarts the storm at once.
+            gave_up_at = getattr(self, "_giveup_at", {}).get(opcode, 0.0)
+            if giveup_cooldown_active(now, gave_up_at, PENDING_GIVEUP_COOLDOWN_S):
+                self._cooldown_drops = getattr(self, "_cooldown_drops", 0) + 1
+                return
             cur = self._pending_cmds.get(opcode)
             if cur is not None:
                 if cur["body"] == body:
@@ -700,10 +716,20 @@ class ImageRxDaemon:
                 cur = self._pending_cmds[opcode]
                 if cur["attempts"] >= cur["max_attempts"] or now > cur["deadline"]:
                     del self._pending_cmds[opcode]
-                    LOG.warning("cmd 0x%02x GAVE UP after %d attempts (%.1f s)",
-                                opcode, cur["attempts"], now - cur["t0"])
+                    # RS-12.14: remember when, so _set_pending can hold the
+                    # cool-down instead of restarting the retries.
+                    if not hasattr(self, "_giveup_at"):
+                        self._giveup_at = {}
+                    self._giveup_at[opcode] = now
+                    LOG.warning("cmd 0x%02x GAVE UP after %d attempts (%.1f s); "
+                                "cool-down %.0f s", opcode, cur["attempts"],
+                                now - cur["t0"], PENDING_GIVEUP_COOLDOWN_S)
                     continue
-                if now - cur.get("last_send", 0.0) < self.PENDING_RETRY_MIN_GAP_S:
+                # RS-12.14: exponential backoff between retries of one command
+                # (0.4, 0.8, 1.6, 3.2, 6.4, 8, 8 ... s at the defaults).
+                if now - cur.get("last_send", 0.0) < pending_retry_gap(
+                        cur["attempts"], self.PENDING_RETRY_MIN_GAP_S,
+                        PENDING_RETRY_BACKOFF, PENDING_RETRY_MAX_GAP_S):
                     continue
                 cur["attempts"] += 1
                 cur["last_send"] = now
@@ -1414,7 +1440,13 @@ class ImageRxDaemon:
                 # making the copies independent shots (expected per-command
                 # delivery 1-(1-p)^2 instead of p).
                 now_pump = time.monotonic()
-                if now_pump - getattr(self, "_last_pump_t", 0.0) >= 0.12:
+                # RS-12.14: while fragments are flowing every base TX costs the
+                # FHSS follower a slot, so space ALL pump sends by
+                # CMD_STREAM_MIN_GAP_S (the old 120 ms copy-spacing when idle).
+                stream_active = (now_pump - getattr(self, "_last_frag_t", 0.0)
+                                 < IDLE_DRAIN_QUIET_S)
+                if now_pump - getattr(self, "_last_pump_t", 0.0) >= pump_min_gap(
+                        stream_active, CMD_STREAM_MIN_GAP_S):
                     body = self._next_ctrl_body(now_pump)
                     if body is not None:
                         self._send_command_frame(link, body, copies=1)
@@ -1626,12 +1658,13 @@ class ImageRxDaemon:
                     "stats: rx_frames=%d rx_decode_err=%d "
                     "frames_published=%d publish_err=%d "
                     "reassembler_decode_err=%d reassembler_timeouts=%d "
-                    "parity_recon=%d idle_drain_deferred=%d",
+                    "parity_recon=%d idle_drain_deferred=%d cmd_cooldown_drops=%d",
                     s.rx_frames_seen, s.rx_decode_errors,
                     s.reassembled_frames_published, s.publish_errors,
                     s.reassembler_decode_errors, s.reassembler_timeouts,
                     self.reassembler.stats.parity_reconstructions,
-                    getattr(self, "_idle_drain_deferred", 0))
+                    getattr(self, "_idle_drain_deferred", 0),
+                    getattr(self, "_cooldown_drops", 0))
             # RS-2.3 forensics + RS-1.1 command counters (outside the lock;
             # the sample list is only touched from the ingest thread and a
             # briefly stale read here is fine for a log line).

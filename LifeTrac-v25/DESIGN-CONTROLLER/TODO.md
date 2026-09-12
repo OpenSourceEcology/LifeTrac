@@ -2431,6 +2431,21 @@ evidence. Both boards on the RS-12.10 bench build; radios parked after.
   costs the camera path anything; long synth/keyframe trains get the
   3.2 % → 1.5 % benefit. `LIFETRAC_NO_PARK_LAST` default unchanged (0);
   flipping it is now a low-risk call once RS-3.11 decides on long trains.
+- [ ] **RS-12.15 — reverse-path delivery on FHSS: the tractor's RX does not follow
+  the slot clock between trains (opened 2026-09-12 from RS-12.12/14 data).**
+  Base→tractor command delivery on profile 1 was 1/17 (leg H, healthy link)
+  and 49/281 (leg I) vs 56/58 on profile 2. The base DOES hop its command TX
+  with the tractor's grid (277 distinct hop/channel pairs in 281 sends), so
+  the miss is on the listening side: `sx1276_rx_slot_follow` runs only while
+  the scan SM is LOCKED, LOCK demotes 2 s (`SX1276_RX_SCAN_LOCK_LOSS_MS`)
+  after the last valid frame, and a node that mostly transmits rarely
+  receives one — so between trains the tractor listens on the SCAN WALKER's
+  channel, not the clock's. Receptions come in bursts right after a lucky
+  hit (10/5/1/6/1/13/10/3 per 30 s in leg I) — the LOCKED intervals. Fix
+  (firmware, next flash session): let the TX-self-anchored node's follower
+  run on its own valid clock without scan LOCK (or treat own TX as the anchor
+  event / lengthen LOCK_LOSS for the anchor). Until then every keyframe
+  request on profile 1 costs several retries, which is what RS-12.14 bounds.
 - [ ] **RS-12.14 — keyframe self-heal storm destroys the FHSS follower
   (opened 2026-09-12, from RS-12.12 leg I).** With keyframe requests enabled
   on profile 1, a few early misses trigger self-heal requests; each is a base
@@ -2445,7 +2460,13 @@ evidence. Both boards on the RS-12.10 bench build; radios parked after.
   repair (RS-4.15) and drop per-gap keyframes on FHSS. INTERIM: run field
   profile-1 with LIFETRAC_KF_REQUEST_DISABLE=1 or a heavy rate limit. Not a
   regression from this session's work — pre-existing RS-4.14 loop, first
-  measured on the production profile here.
+  measured on the production profile here. **MITIGATION LANDED 2026-09-12
+  (branch rs12-14-keyframe-storm): exponential retry backoff (0.4→8 s cap),
+  30 s give-up cool-down per opcode, and a 1 s minimum gap between ANY two
+  base commands while a stream is active (`cmd_timing.py`, env knobs in
+  SETTINGS_REFERENCE). Gate: re-fly leg I — expect forward loss back near
+  2 %, follower locked, sends < 100. Root cause of the missing acks is
+  RS-12.15 (firmware).**
 - [x] **RS-12.10 — FLOWN 2026-09-12 evening (PR #117): `rx_fifo_skip` = 0 over
   2,366 packets with 29 penultimate losses in the same leg (F) → M1 is NOT
   FIFO coalescing at the base; base deaf window per command = ToA + ≤1.9 ms
