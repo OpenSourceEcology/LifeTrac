@@ -15,6 +15,9 @@ void host_cmd_on_radio_events(uint32_t radio_events);
 void host_cmd_emit_rx_frame(const sx1276_rx_frame_t *frame);
 void host_cmd_emit_tx_done(const sx1276_tx_result_t *result);
 void host_cmd_service_tx_mailbox(void);
+/* RS-12: true when a parked TX_FRAME_REQ is waiting in the mailbox —
+ * the main loop drains a pending RX frame before letting it load. */
+bool host_cmd_tx_mailbox_pending(void);
 void host_cmd_emit_fault(uint8_t code, uint8_t sub);
 void host_cmd_emit_stats_snapshot(void);
 

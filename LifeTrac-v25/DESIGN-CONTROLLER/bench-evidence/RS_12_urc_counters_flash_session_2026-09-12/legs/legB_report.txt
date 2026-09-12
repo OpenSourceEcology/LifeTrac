@@ -1,0 +1,12 @@
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=3000  force_frf_hz=927500000  git_sha=6541c1ed  
+loss 34/2230 = 1.5%   crc_dumps=26  timeouts=33  published=143
+train length 13 [tx log, modal of 180 long trains; mixture 12x66 13x114]
+attributed 37; penultimate idx 11 = 1 (3%, uniform 8%)
+  !! MIXED LENGTHS [12, 13] — idx 11 is penultimate for len 13, but also final of len 12; each length's own penultimate: len 12->idx 10=2, len 13->idx 11=1. Shares are mixture-weighted; separating them needs lost_frag_idx to carry the train length.
+  0:1 1:5 2:2 3:4 4:7 5:3 6:4 7:3 8:2 9:2 10:2 11:1 12:1
+corrupt-capture idx (readable 1): penultimate 0 (0% vs uniform 8%)
+radio deltas: {'radio_dio0': 2413, 'radio_rx_ok': 2257, 'radio_crc_err': 26, 'radio_tx_ok': 120}
+FIRMWARE DROP (drx_ok - host URCs): 2257 - 2196 = 61
+identity residue: 10
+crc closure: dcrc_err=26 vs crc_dumps=26
+URC-path: rx_urc_lost=1 rx_pretx_drained=0

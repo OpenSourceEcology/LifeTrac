@@ -886,6 +886,10 @@ void host_cmd_emit_tx_done(const sx1276_tx_result_t *result) {
                        (uint16_t)sizeof(payload));
 }
 
+bool host_cmd_tx_mailbox_pending(void) {
+    return s_txq_count > 0U;
+}
+
 void host_cmd_service_tx_mailbox(void) {
     /* RS-2.3: drain the ring head-first. On a begin() refusal the failed
      * entry is popped (matching the old single-slot semantics) and the

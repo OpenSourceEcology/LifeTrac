@@ -1,0 +1,20 @@
+syntax ok
+bench bin on base: 67a4c0a492356792e73533b2976aa480 23784 B
+07_assert_pa11_pf4_long.cfg 08_boot_user_app.cfg 99_release_and_reset.cfg firmware_rs12.bin firmware_rs12_bench.bin full_flash_pipeline.sh prep_bridge.sh revive_bridge.sh run_flash_l072.sh stm32_an3155_flasher.py wdt_pet.log wdt_pet.sh 
+=== pre-flash health (prod-flag RS-12 build currently running):
+STATS-OK (attempt 1)
+  radio_state=2
+  radio_rx_ok=0
+  radio_crc_err=0
+  radio_dio0=0
+  radio_tx_ok=0
+  tx_fifo_rb_ok=0
+  tx_fifo_rb_bad=0
+  tx_done_early=0
+  rx_urc_lost=0
+  rx_pretx_drained=0
+  host_parse_ok=15
+  host_parse_err=0
+  host_rx_ring_ovf=0
+RS115-INSTRUMENTED-FIRMWARE=YES
+RS12-URC-COUNTERS=YES

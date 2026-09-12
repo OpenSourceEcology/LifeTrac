@@ -44,6 +44,18 @@ openocd -f /usr/arduino/extra/openocd_script-imx_gpio.cfg \
         -c "reset run" -c "shutdown" 2>&1 | tail -8
 sleep 1
 
+# 2026-09-12: on the base (kernel 6.1.24-lmp) re-inserting x8h7_drv after
+# an openocd session OOPSes in spi_probe -> of_irq_get ->
+# irq_find_matching_fwspec and the board goes down (WDOG_B -> PMIC power
+# cycle). Both 2026-09-12 base reboots were this, with the watchdog petter
+# alive to the end (see bench-evidence/RS_12_urc_counters_flash_session_
+# 2026-09-12/flash/). REVIVE_MODE=reset_run_only stops here, after the H7
+# is back in its firmware, and lets the caller do a controlled reboot
+# instead of the module reload.
+if [ "${REVIVE_MODE:-full}" = "reset_run_only" ]; then
+  echo "=== REVIVE_MODE=reset_run_only: H7 running, modules left unloaded; caller reboots ==="
+  exit 0
+fi
 echo "=== [3/5] unexport x8h7 gpios ($X8H7_GPIO_BASE..$X8H7_GPIO_LAST) ==="
 for g in $(seq $X8H7_GPIO_BASE $X8H7_GPIO_LAST); do
   if [ -d /sys/class/gpio/gpio$g ]; then

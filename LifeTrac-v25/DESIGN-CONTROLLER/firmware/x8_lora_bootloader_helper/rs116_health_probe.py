@@ -18,6 +18,7 @@ from method_h_stage2_tx_probe_v2 import HostLink, fetch_stats, drain_boot  # noq
 
 KEYS = ("radio_state", "radio_rx_ok", "radio_crc_err", "radio_dio0",
         "radio_tx_ok", "tx_fifo_rb_ok", "tx_fifo_rb_bad", "tx_done_early",
+        "rx_urc_lost", "rx_pretx_drained",
         "host_parse_ok", "host_parse_err", "host_rx_ring_ovf")
 
 link = HostLink("/dev/ttymxc3", "921600")
@@ -39,6 +40,8 @@ for attempt in range(1, 16):
         print(f"  {key}={stats.get(key, 'ABSENT')}")
     rs115 = "tx_fifo_rb_ok" in stats
     print(f"RS115-INSTRUMENTED-FIRMWARE={'YES' if rs115 else 'NO'}")
+    rs12 = "rx_urc_lost" in stats
+    print(f"RS12-URC-COUNTERS={'YES' if rs12 else 'NO'}")
     sys.exit(0)
 
 print(f"STATS-FAILED after retries: {last}")

@@ -4,6 +4,7 @@
 #include "sx1276.h"
 #include "sx1276_modes.h"
 
+#include <stdint.h>
 #include <string.h>
 
 typedef struct host_stats_wire_s {
@@ -44,6 +45,9 @@ typedef struct host_stats_wire_s {
     uint32_t tx_fifo_rb_ok;
     uint32_t tx_fifo_rb_bad;
     uint32_t tx_done_early;
+    /* RS-12 additive tail (2026-09-12): URC-path loss accounting. */
+    uint32_t rx_urc_lost;
+    uint32_t rx_pretx_drained;
 } host_stats_wire_t;
 
 _Static_assert(sizeof(host_stats_wire_t) == HOST_STATS_PAYLOAD_LEN,
@@ -61,6 +65,8 @@ static uint32_t s_radio_tx_abort_airtime;
 static uint32_t s_tx_fifo_rb_ok;
 static uint32_t s_tx_fifo_rb_bad;
 static uint32_t s_tx_done_early;
+static uint32_t s_rx_urc_lost;
+static uint32_t s_rx_pretx_drained;
 
 static void put_u32_le(uint8_t *dst, uint32_t value) {
     dst[0] = (uint8_t)(value & 0xFFU);
@@ -82,6 +88,8 @@ void host_stats_reset(void) {
     s_tx_fifo_rb_ok = 0U;
     s_tx_fifo_rb_bad = 0U;
     s_tx_done_early = 0U;
+    s_rx_urc_lost = 0U;
+    s_rx_pretx_drained = 0U;
 
     host_uart_stats_reset();
 }
@@ -116,6 +124,14 @@ void host_stats_radio_tx_abort_lbt(void) {
 
 void host_stats_radio_tx_abort_airtime(void) {
     s_radio_tx_abort_airtime++;
+}
+
+void host_stats_rx_urc_lost_add(uint32_t n) {
+    s_rx_urc_lost = (s_rx_urc_lost > UINT32_MAX - n) ? UINT32_MAX : (s_rx_urc_lost + n);
+}
+
+void host_stats_rx_pretx_drained_add(uint32_t n) {
+    s_rx_pretx_drained = (s_rx_pretx_drained > UINT32_MAX - n) ? UINT32_MAX : (s_rx_pretx_drained + n);
 }
 
 void host_stats_note_radio_events(uint32_t events) {
@@ -180,7 +196,9 @@ uint16_t host_stats_serialize(uint8_t *out, uint16_t out_cap) {
     put_u32_le(&out[idx], host_uart_stats_rx_ring_ovf()); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], s_tx_fifo_rb_ok); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], s_tx_fifo_rb_bad); idx = (uint16_t)(idx + 4U);
-    put_u32_le(&out[idx], s_tx_done_early);
+    put_u32_le(&out[idx], s_tx_done_early); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], s_rx_urc_lost); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], s_rx_pretx_drained);
 
     return HOST_STATS_PAYLOAD_LEN;
 }

@@ -11,6 +11,8 @@
 #include "config.h"
 #include "host_cfg_profile.h"
 #include "host_cmd.h"
+#include "host_rx_urc_lost.h"
+#include "host_stats.h"
 #include "host_rfco_summary.h"
 #include "host_uart.h"
 #include "platform.h"
@@ -139,14 +141,55 @@ int main(void) {
 
         {
             const uint32_t radio_events = sx1276_take_irq_events();
+            const uint32_t dio0_edges = sx1276_take_dio0_edges();
+            bool tx_done_consumed;
+            bool rx_opportunity;
+
             host_cmd_on_radio_events(radio_events);
 
-            if (sx1276_tx_poll(radio_events, &tx_result)) {
+            tx_done_consumed = sx1276_tx_poll(radio_events, &tx_result);
+            if (tx_done_consumed) {
                 host_cmd_emit_tx_done(&tx_result);
             }
 
-            if (!sx1276_tx_busy() && sx1276_rx_service(radio_events, &rx_frame)) {
+            rx_opportunity = ((radio_events & SX1276_EVT_DIO0) != 0U) &&
+                             !sx1276_tx_busy();
+            if (rx_opportunity && sx1276_rx_service(radio_events, &rx_frame)) {
                 host_cmd_emit_rx_frame(&rx_frame);
+            }
+
+            /* RS-12 (2026-09-12): score the DIO0 edges this pass could not
+             * service. Two RxDone edges before one pass coalesce into a
+             * single s_irq_events bit while the SX1276 FIFO keeps only the
+             * later packet; a frame demodulated and then clobbered by
+             * sx1276_tx_begin()'s FIFO rewind shows up the same way one
+             * pass later (DIO0 set, TX busy, no service). Neither leaves a
+             * trace in any other counter — this is the only place that
+             * can see them. */
+            host_stats_rx_urc_lost_add(
+                host_rx_urc_lost_eval(dio0_edges, tx_done_consumed,
+                                      rx_opportunity));
+
+            /* RS-12 (2026-09-12): a parked TX is about to be loaded into
+             * the FIFO that sx1276_tx_begin() rewinds to 0. If an RxDone
+             * edge landed since this pass's take, that packet is sitting
+             * in the FIFO right now and the load would overwrite it —
+             * read it out first. M1 below only protects the frame the
+             * pass already serviced. */
+            if (host_cmd_tx_mailbox_pending() && !sx1276_tx_busy() &&
+                sx1276_peek_dio0_edges() != 0U) {
+                const uint32_t late_events = sx1276_take_irq_events();
+                const uint32_t late_edges = sx1276_take_dio0_edges();
+
+                host_cmd_on_radio_events(late_events);
+                if ((late_events & SX1276_EVT_DIO0) != 0U &&
+                    sx1276_rx_service(late_events, &rx_frame)) {
+                    host_cmd_emit_rx_frame(&rx_frame);
+                }
+                host_stats_rx_pretx_drained_add(late_edges);
+                if (late_edges > 1U) {
+                    host_stats_rx_urc_lost_add(late_edges - 1U);
+                }
             }
 
             /* Drain the depth-2 TX mailbox AFTER the RX service window:

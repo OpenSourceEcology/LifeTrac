@@ -17,6 +17,9 @@ void host_stats_radio_crc_err(void);
 void host_stats_radio_tx_ok(void);
 void host_stats_radio_tx_abort_lbt(void);
 void host_stats_radio_tx_abort_airtime(void);
+/* RS-12 (2026-09-12) URC-path loss accounting; see host_types.h tail. */
+void host_stats_rx_urc_lost_add(uint32_t n);
+void host_stats_rx_pretx_drained_add(uint32_t n);
 uint16_t host_stats_serialize(uint8_t *out, uint16_t out_cap);
 
 #endif /* LIFETRAC_MURATA_L072_HOST_STATS_H */

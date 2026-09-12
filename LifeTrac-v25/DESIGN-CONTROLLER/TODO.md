@@ -2344,6 +2344,50 @@ Two consequences for what is worth doing next:
   cable, USB, CPU) → hands only after the coupling path is named.
 #### RS-12.9 — next-session sequencing (written 2026-08-17 at shutdown)
 
+**SESSION 2026-09-12 OUTCOME — FLASH SESSION FLOWN (PR #116 firmware on
+BOTH boards, bench build `-DHOST_ALLOW_REG_WRITE_DIAG=1`; evidence
+`bench-evidence/RS_12_urc_counters_flash_session_2026-09-12/`).** Three
+pre-registered legs, base brackets: A synth/no-hold 3.2 % loss, 57
+timeouts, penultimate-of-13 35 %, **`rx_urc_lost`=5, `rx_pretx_drained`=0**;
+B synth/hold 1.5 %, penultimate 3 %, **1 / 0**; C camera+injector/hold
+4.8 %, 25 losses all idx-0-of-2, **6 / 0**. Predictions A and C FAILED,
+B passed trivially: the two instrumented URC-path sites carry none of
+the loss and the drain-before-TX guard never fired. **New join
+(`tools/rs12_deaf_join.py`, lost fragment vs nearest base command TX,
+tractor TX_DONE confirmed for every lost fragment): leg C 21/25 lost
+within ±150 ms AFTER a base TX (10.7× baseline), 09-07 leg 12/16 (8.7×)
+→ the 09-07 4.1 % is BASE COMMAND-PLANE DEAFNESS (M2), not URC
+contention — reading withdrawn.** Leg A's penultimate-of-13 lock (M1) is
+NOT base-TX-coincident (0/10) and is removed by the hold; its site is
+still uninstrumented because the edge counter is structurally blind:
+`rx_service` clears RegIrqFlags AFTER the FIFO read, DIO0 is level-held,
+a second RxDone in the same pass makes no edge, and FifoRxCurrentAddr
+then yields the LAST packet (the final) — the penultimate vanishes. →
+RS-12.10 below. NO_PARK_LAST default: STILL do not flip. Bench facts:
+the committed production L072 binary refuses `-ForceFrfHz` /
+channel_survey (F9 gate, `HOST_ALLOW_REG_WRITE_DIAG=0`) — bench legs
+need the bench build on BOTH boards; the X8 WDOG is armed by u-boot
+(60 s, PMIC reset), closing /dev/watchdog0 without 'V' reboots the board
+(tractor, 5.10 kernel), and re-inserting x8h7_drv after openocd OOPSes
+the base 6.1 kernel — flash pipeline now `REVIVE_MODE=reboot` (reset
+run, magic close, deliberate reboot; /tmp re-push + tractor-camera stop
+afterwards). 927.5 clean again (0 hot / −94). Radios parked after.
+
+- [ ] **RS-12.10 — instrument the invisible coalescing (next firmware
+  item, replaces the URC double-buffer idea).** (1) `rx_fifo_skip`: in
+  `sx1276_rx_service` compare `FifoRxCurrentAddr` with previous
+  `current+len (mod 256)`; a mismatch = a packet completed unserviced.
+  (2) `loop_pass_max_us` (+ coarse histogram) on the base: what holds a
+  pass past ~80 ms right after a fragment. Additive stats tail as usual.
+  Then re-fly leg A: prediction `rx_fifo_skip` ≈ penultimate losses.
+- [ ] **RS-12.11 — base command scheduler vs fragment arrivals (M2, the
+  real camera-path loss).** Do not fire a command when a fragment is due
+  within (command ToA + TX→RX turnaround); measure the turnaround
+  (dt cluster says the base is deaf ~100–200 ms after a TX — far longer
+  than PLL settle). Gate: re-fly leg C, expect the idx-0 losses to go
+  with the commands, `rs12_deaf_join.py` enrichment → ~1×.
+
+
 **SESSIONS 2026-08-24 → 2026-09-07 OUTCOME (three sessions; PRs #112,
 #114).** 08-24: archive instrumentation VERIFIED on air (hold recorded
 in params + daemon log AND the mechanism signature flips with the
@@ -2427,7 +2471,7 @@ manually). Recommended order:
    ~~have NEVER been on air~~; flying them on the 0.9%-loss link (leg L,
    `radio_monitor_20260817_195107_dde2c8a7`) attributes any failure to
    the path, not the link.
-3. **Flash session** (bench presence): rx_urc_lost counter + firmware URC
+3. ~~**Flash session**~~ DONE 2026-09-12 (see outcome above): rx_urc_lost counter + firmware URC
    fix (RS-12 above), ~~RS-3.6 formal gate~~ *(already cleared
    2026-07-25 — review catch, see the RS-3.6 entry)*, read
    tx_done_early on the tractor across a leg.

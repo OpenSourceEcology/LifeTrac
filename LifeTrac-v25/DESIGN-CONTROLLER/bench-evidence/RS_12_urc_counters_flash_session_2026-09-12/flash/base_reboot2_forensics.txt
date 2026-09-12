@@ -1,0 +1,65 @@
+ 16:13:42 up 1 min,  1 user,  load average: 0.30, 0.12, 0.04
+--- wdt_pet.log:
+1252.517 OPEN pid=2661 interval=10.0s
+1252.518 PET 1
+1262.543 PET 2
+1272.560 PET 3
+1282.577 PET 4
+1292.595 PET 5
+1302.616 PET 6
+--- pipeline_stamped.log tail:
+1302.629 xPSR: 0x01000000 pc: 0x0800db4c msp: 0x24080000
+1302.630 shutdown command invoked
+1303.631 === [3/5] unexport x8h7 gpios (160..193) ===
+1303.951 === [4/5] rmmod by name + reload ===
+--- kmsg_flash.log tail (last 25 lines):
+1304.954 4,2742,1305096343,-;lr : irq_find_matching_fwspec+0x44/0x120
+1304.955 4,2743,1305101315,-;sp : ffffffc0141e37e0
+1304.956 4,2744,1305104630,-;x29: ffffffc0141e37e0 x28: ffffffc0141e3ce0 x27: 0000000000000000
+1304.956 4,2745,1305111772,-;x26: ffffffc0141e38a8 x25: ffffff8055bdc708 x24: 0000000000000001
+1304.957 4,2746,1305118922,-;x23: ffffff8055bdc6f0 x22: ffffffc009946850 x21: ffffffc00905d468
+1304.958 4,2747,1305126067,-;x20: ffffffc009946870 x19: ffffff8009ce0e00 x18: ffffffffffffffff
+1304.959 4,2748,1305133209,-;x17: 376838780000776f x16: 6e5f646e65735f74 x15: ffffff800b151e8a
+1304.959 4,2749,1305140352,-;x14: ffffffffffffffff x13: ffffff800b151e88 x12: 0101010101010101
+1304.960 4,2750,1305147497,-;x11: 0000000000000040 x10: 000000000004e480 x9 : ffffffc00811dae4
+1304.961 4,2751,1305154642,-;x8 : ffffffc0141e38f8 x7 : 0000000000000000 x6 : 070f1900f2f2f5f0
+1304.962 4,2752,1305161786,-;x5 : 7075727200190f07 x4 : 0000000000000000 x3 : ffffffc00111c530
+1304.962 4,2753,1305168927,-;x2 : ffffff801dd10f80 x1 : 0000000000000000 x0 : ffffffc009946850
+1304.963 4,2754,1305176075,-;Call trace:
+1304.964 4,2755,1305178523,-; irq_find_matching_fwspec+0x64/0x120
+1304.964 4,2756,1305183146,-; of_irq_get+0x88/0xd4
+1304.965 4,2757,1305186468,-; spi_probe+0x54/0xec
+1304.966 4,2758,1305189701,-; really_probe+0xd8/0x404
+1304.967 4,2759,1305193283,-; __driver_probe_device+0x94/0x18c
+1304.967 4,2760,1305197645,-; driver_probe_device+0x48/0xe4
+1304.968 4,2761,1305201747,-; __driver_attach+0x134/0x1f0
+1304.969 4,2762,1305205673,-; bus_for_each_dev+0x78/0xd0
+1304.969 4,2763,1305209515,-; driver_attach+0x2c/0x40
+1304.970 4,2764,1305213096,-; bus_add_driver+0x170/0x244
+1304.971 4,2765,1305216938,-; driver_register+0x80/0x13c
+1304.971 4,2766,1305220778,-; __spi_register_driver+0xb0/0xe4
+--- WRSR:
+WDOG1 WCR=0x773d WDE=1 WT=119 (60.0 s) WDT=1 WDZST=1 WDBG=0 | WSR=0xaaaa | WRSR=0x0010 SFTW=0 TOUT=0 POR=1 | WICR=0x0004 WMCR=0x0000
+--- load_modules scripts:
+MPATH="/lib/modules/$(uname -r)/extra"
+insmod $MPATH/x8h7_drv.ko
+insmod $MPATH/x8h7_h7.ko
+MPATH="/lib/modules/$(uname -r)/extra"
+modprobe industrialio
+insmod $MPATH/x8h7_can.ko
+insmod $MPATH/x8h7_gpio.ko
+insmod $MPATH/x8h7_adc.ko
+insmod $MPATH/x8h7_rtc.ko
+insmod $MPATH/x8h7_pwm.ko
+insmod $MPATH/x8h7_uart.ko
+insmod $MPATH/x8h7_ui.ko
+--- sysctl panic:
+sh: line 1: sysctl: command not found
+--- /tmp:
+systemd-private-f34b2db746994ad883293ffa67983581-ModemManager.service-yqjO2N
+systemd-private-f34b2db746994ad883293ffa67983581-bluetooth.service-IFQxaZ
+systemd-private-f34b2db746994ad883293ffa67983581-ninfod.service-mvOFsR
+systemd-private-f34b2db746994ad883293ffa67983581-rdisc.service-ucSniH
+systemd-private-f34b2db746994ad883293ffa67983581-systemd-logind.service-BCduO8
+systemd-private-f34b2db746994ad883293ffa67983581-systemd-resolved.service-xEzMpa
+systemd-private-f34b2db746994ad883293ffa67983581-systemd-timesyncd.service-4GKpw4
