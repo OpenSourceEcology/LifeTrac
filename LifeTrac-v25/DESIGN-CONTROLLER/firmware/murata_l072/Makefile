@@ -147,7 +147,7 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost help check-rx-fifo-track bench
+.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost help check-rx-fifo-track bench check-stats-layout
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
 
@@ -251,6 +251,7 @@ LORA_PKT_HDR_BIN   := $(BUILD)/lora_pkt_hdr
 RX_COUNTERS_BIN    := $(BUILD)/rx_counters
 RX_URC_LOST_BIN    := $(BUILD)/rx_urc_lost
 RX_FIFO_TRACK_BIN  := $(BUILD)/rx_fifo_track
+STATS_LAYOUT_BIN   := $(BUILD)/stats_layout
 RX_RETUNE_POLICY_BIN := $(BUILD)/rx_retune_policy
 RX_RETUNE_COUNTERS_BIN := $(BUILD)/rx_retune_counters
 RX_SCAN_POLICY_BIN := $(BUILD)/rx_scan_policy
@@ -261,7 +262,7 @@ FHSS_CLOCK_BIN     := $(BUILD)/fhss_clock_test
 AIRTIME_INVARIANT_BIN := $(BUILD)/airtime_invariant
 TX_LEN_GUARD_BIN   := $(BUILD)/tx_len_guard
 
-check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost check-rx-fifo-track
+check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost check-rx-fifo-track check-stats-layout
 	@echo "[OK] memory map invariants hold"
 
 check-cpp: $(BUILD)
@@ -502,6 +503,15 @@ check-rx-fifo-track: $(BUILD)
 	    -o $(RX_FIFO_TRACK_BIN)
 	@echo "[RXFIF] Running rx-fifo-track test ..."
 	@$(RX_FIFO_TRACK_BIN)
+
+check-stats-layout: $(BUILD)
+	@echo "[STLAY] Building stats-layout test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/stats_layout.c \
+	    host/host_stats.c \
+	    -o $(STATS_LAYOUT_BIN)
+	@echo "[STLAY] Running stats-layout test ..."
+	@$(STATS_LAYOUT_BIN)
 
 check-rx-frame-urc: $(BUILD)
 	@echo "[RXURC] Building rx-frame-urc wire test ..."

@@ -229,7 +229,7 @@ uint16_t host_stats_serialize(uint8_t *out, uint16_t out_cap) {
     put_u32_le(&out[idx], s_tx_fifo_rb_bad); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], s_tx_done_early); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], s_rx_urc_lost); idx = (uint16_t)(idx + 4U);
-    put_u32_le(&out[idx], s_rx_pretx_drained);
+    put_u32_le(&out[idx], s_rx_pretx_drained); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], s_rx_fifo_skip); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], s_tx_deaf_max_us); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], s_tx_deaf_sum_us); idx = (uint16_t)(idx + 4U);
