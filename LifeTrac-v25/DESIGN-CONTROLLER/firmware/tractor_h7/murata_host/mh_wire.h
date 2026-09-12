@@ -80,7 +80,11 @@
 #define HOST_STATS_OFFSET_TX_FIFO_RB_OK        132U
 #define HOST_STATS_OFFSET_TX_FIFO_RB_BAD       136U
 #define HOST_STATS_OFFSET_TX_DONE_EARLY        140U
-#define HOST_STATS_PAYLOAD_LEN               144U
+/* RS-12 (2026-09-12) additive tail: URC-path loss accounting (mirror of
+ * murata_l072/include/host_types.h; check_mh_wire_sync.py enforces it). */
+#define HOST_STATS_OFFSET_RX_URC_LOST         144U
+#define HOST_STATS_OFFSET_RX_PRETX_DRAINED    148U
+#define HOST_STATS_PAYLOAD_LEN               152U
 
 /* Legacy v1 payload emitted before radio_tx_abort_airtime was appended. */
 #define HOST_STATS_LEGACY_OFFSET_RADIO_STATE 60U
