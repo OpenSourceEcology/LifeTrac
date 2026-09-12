@@ -2373,6 +2373,30 @@ the base 6.1 kernel — flash pipeline now `REVIVE_MODE=reboot` (reset
 run, magic close, deliberate reboot; /tmp re-push + tractor-camera stop
 afterwards). 927.5 clean again (0 hot / −94). Radios parked after.
 
+**SESSION 2026-09-12 (evening) OUTCOME — RS-12.11 + RS-4.15 GATE PASSED, RS-12.10 FLOWN
+(PRs #117 firmware, #118 host; evidence `bench-evidence/RS_12_11_command_timing_2026-09-12/`).**
+The camera-path loss is the base deafening itself: the rx daemon's idle-link
+drain fired on its 0.25 s poll timeout, 250–300 ms after the last fragment,
+exactly where the next 2-frag train's first fragment is due (82 of 145
+commands in the control leg), and a 100 ms fragment overlapping the TX deaf
+window is not demodulated. Fix (RS-12.11, `cmd_timing.py`): idle drain only
+after 1.5 s of quiet (`LIFETRAC_IDLE_DRAIN_QUIET_S`), aligned pump also opens
+on a train's last-index fragment. RS-4.15: stale horizon = max(20 s, 1.5 × the
+slowest recent tile-refresh interval) capped 120 s + 10 s repeat guard.
+Gate legs (camera + kf_inject 15 20, hold): control D 3.1 % / 15 timeouts /
+14 of 15 losses first-of-two / 102 TILE_STALE; fix E **1.0 % / 2 timeouts / 0
+first-of-two / 13 TILE_STALE**, 609 vs 578 frames delivered, idle drain held
+603 times. NO_PARK_LAST default still not flipped (both legs under the hold;
+the hold was never the camera-path defect). RS-12.10 counters flown but the
+first bench build had a serializer slip (fields shifted one slot; fixed with
+a producer-side layout test `check-stats-layout`); the corrected build's
+`tx_deaf_*` / `rx_fifo_skip` readings are in the RS-12.10 section of the
+evidence. Both boards on the RS-12.10 bench build; radios parked after.
+
+- [x] **RS-12.11 — base command scheduler vs fragment arrivals: DONE 2026-09-12
+  (PR #118, gate passed, see above).**
+- [x] **RS-4.15 — motion-aware stale-scan horizon: DONE 2026-09-12 (PR #118,
+  measured-rotation horizon, 102 → 13 TILE_STALE per 300 s).**
 - [ ] **RS-12.10 — instrument the invisible coalescing (next firmware
   item, replaces the URC double-buffer idea).** (1) `rx_fifo_skip`: in
   `sx1276_rx_service` compare `FifoRxCurrentAddr` with previous
@@ -2380,7 +2404,8 @@ afterwards). 927.5 clean again (0 hot / −94). Radios parked after.
   (2) `loop_pass_max_us` (+ coarse histogram) on the base: what holds a
   pass past ~80 ms right after a fragment. Additive stats tail as usual.
   Then re-fly leg A: prediction `rx_fifo_skip` ≈ penultimate losses.
-- [ ] **RS-12.11 — base command scheduler vs fragment arrivals (M2, the
+- [x] ~~**RS-12.11 — base command scheduler vs fragment arrivals (M2, the~~ *(DONE 2026-09-12, see the evening outcome above; original text kept:)*
+  **RS-12.11 — base command scheduler vs fragment arrivals (M2, the
   real camera-path loss).** Do not fire a command when a fragment is due
   within (command ToA + TX→RX turnaround); measure the turnaround
   (dt cluster says the base is deaf ~100–200 ms after a TX — far longer
@@ -2545,7 +2570,7 @@ touches no bench constraint.
   with the injector; otherwise accept the synth 13-frag legs as the
   long-train record and close this. Evidence:
   `RS_3_3_long_train_leg_2026-09-07/` (PR #114).
-- [ ] **RS-4.15 Motion-aware stale-scan horizon (opened 2026-09-07,
+- [x] **RS-4.15 Motion-aware stale-scan horizon — DONE 2026-09-12 (PR #118, measured-rotation horizon; opened 2026-09-07,
   successor to RS-4.14).** The FRESH web_ui/daemon stale scan floods
   TILE_STALE under a moving scene: 101 and 102 requests per 300 s on
   consecutive days (one every ~3 s), each a live command mid-stream
