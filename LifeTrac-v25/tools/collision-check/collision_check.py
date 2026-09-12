@@ -301,8 +301,15 @@ def to_manifold(mesh):
     return mm
 
 
+VOLUME_NOISE_MM3 = 1e-3   # below this the boolean result is numerical noise, not geometry
+
+
+def snap_volume(v: float) -> float:
+    return 0.0 if abs(v) < VOLUME_NOISE_MM3 else float(abs(v))
+
+
 def intersection_volume(ma, mb) -> float:
-    return float(abs((ma ^ mb).volume()))
+    return snap_volume((ma ^ mb).volume())
 
 
 def min_distance(mesh_a, mesh_b) -> float:

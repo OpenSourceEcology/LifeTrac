@@ -81,3 +81,10 @@ def test_overlap_verdict():
 
 def test_pair_key_is_order_independent():
     assert cc.pair_key("frame", "arms") == "arms/frame" == cc.pair_key("arms", "frame")
+
+
+def test_snap_volume_drops_boolean_noise():
+    assert cc.snap_volume(1e-7) == 0.0
+    assert cc.snap_volume(-1e-7) == 0.0
+    assert cc.snap_volume(-58.4) == 58.4
+    assert cc.overlap_verdict(cc.snap_volume(1e-7), 50.0) == (True, "clear")
