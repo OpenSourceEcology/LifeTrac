@@ -173,7 +173,14 @@
 #define HOST_STATS_OFFSET_TX_FIFO_RB_OK        132U
 #define HOST_STATS_OFFSET_TX_FIFO_RB_BAD       136U
 #define HOST_STATS_OFFSET_TX_DONE_EARLY       140U
-#define HOST_STATS_PAYLOAD_LEN               144U
+/* RS-12 (2026-09-12) additive tail: URC-path loss accounting.
+ * rx_urc_lost      = DIO0 edges the main loop never serviced (coalesced
+ *                    RxDones, or a frame clobbered by the TX FIFO load).
+ * rx_pretx_drained = frames rescued by the drain-before-TX step.
+ * Older host parsers tolerate the growth (offset-guarded label list). */
+#define HOST_STATS_OFFSET_RX_URC_LOST         144U
+#define HOST_STATS_OFFSET_RX_PRETX_DRAINED    148U
+#define HOST_STATS_PAYLOAD_LEN               152U
 
 #define HOST_TYPE_BOOT_URC                   0xF0U
 /* FAULT_URC payload: {u8 code, u8 sub, u16 reserved, u32 pc, u32 lr, u32 psr, u32 bfar, u32 uptime_ms} */

@@ -64,6 +64,7 @@ SRCS := \
 	host/host_rfco_summary.c \
 	host/host_rfco_summary_emit.c \
 	host/host_stats.c \
+	host/host_rx_urc_lost.c \
 	host/host_uart.c \
 	radio/sx1276_airtime.c \
 	radio/sx1276_cad.c \
@@ -145,7 +146,7 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate help
+.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost help
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
 
@@ -237,6 +238,7 @@ CFG_PROFILE_WIRE_BIN := $(BUILD)/cfg_profile_wire
 CFG_CLAMP_FUZZ_BIN := $(BUILD)/cfg_clamp_fuzz
 LORA_PKT_HDR_BIN   := $(BUILD)/lora_pkt_hdr
 RX_COUNTERS_BIN    := $(BUILD)/rx_counters
+RX_URC_LOST_BIN    := $(BUILD)/rx_urc_lost
 RX_RETUNE_POLICY_BIN := $(BUILD)/rx_retune_policy
 RX_RETUNE_COUNTERS_BIN := $(BUILD)/rx_retune_counters
 RX_SCAN_POLICY_BIN := $(BUILD)/rx_scan_policy
@@ -247,7 +249,7 @@ FHSS_CLOCK_BIN     := $(BUILD)/fhss_clock_test
 AIRTIME_INVARIANT_BIN := $(BUILD)/airtime_invariant
 TX_LEN_GUARD_BIN   := $(BUILD)/tx_len_guard
 
-check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate
+check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost
 	@echo "[OK] memory map invariants hold"
 
 check-cpp: $(BUILD)
@@ -470,6 +472,15 @@ check-reg-write-gate: $(BUILD)
 	    -o $(REG_WRITE_GATE_BIN)
 	@echo "[RGATE] Running reg-write-gate test ..."
 	@$(REG_WRITE_GATE_BIN)
+
+check-rx-urc-lost: $(BUILD)
+	@echo "[RXURL] Building rx-urc-lost test ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rx_urc_lost.c \
+	    host/host_rx_urc_lost.c \
+	    -o $(RX_URC_LOST_BIN)
+	@echo "[RXURL] Running rx-urc-lost test ..."
+	@$(RX_URC_LOST_BIN)
 
 check-rx-frame-urc: $(BUILD)
 	@echo "[RXURC] Building rx-frame-urc wire test ..."

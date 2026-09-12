@@ -43,6 +43,11 @@
 #define SX1276_REG_VERSION            0x42U
 
 static volatile uint32_t s_irq_events;
+/* RS-12 (2026-09-12): DIO0 rising edges since the last take. s_irq_events
+ * coalesces repeated edges into one bit, so two RxDone edges before a
+ * main-loop pass are indistinguishable there; this counter is not.
+ * Read via sx1276_take_dio0_edges()/sx1276_peek_dio0_edges(). */
+static volatile uint32_t s_dio0_edges;
 
 static uint32_t exti_port_code(uint32_t port) {
     if (port == GPIOB_BASE) {
@@ -499,6 +504,18 @@ uint32_t sx1276_take_irq_events(void) {
     return events;
 }
 
+uint32_t sx1276_take_dio0_edges(void) {
+    uint32_t irq_state = cpu_irq_save();
+    uint32_t edges = s_dio0_edges;
+    s_dio0_edges = 0U;
+    cpu_irq_restore(irq_state);
+    return edges;
+}
+
+uint32_t sx1276_peek_dio0_edges(void) {
+    return s_dio0_edges;
+}
+
 bool sx1276_reg_dump(uint8_t *out_regs, size_t out_len) {
     if (out_regs == NULL || out_len < 0x43U) {
         return false;
@@ -541,6 +558,7 @@ void EXTI4_15_IRQHandler(void) {
 
     if ((pending & (1UL << SX1276_DIO0_PIN)) != 0U) {
         s_irq_events |= SX1276_EVT_DIO0;
+        s_dio0_edges++;
     }
     if ((pending & (1UL << SX1276_DIO3_PIN)) != 0U) {
         s_irq_events |= SX1276_EVT_DIO3;

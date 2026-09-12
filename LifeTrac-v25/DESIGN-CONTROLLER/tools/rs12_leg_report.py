@@ -153,6 +153,13 @@ def main() -> int:
         print(f"identity residue: {resid}")
         print(f"crc closure: dcrc_err={d.get('radio_crc_err', 0)} "
               f"vs crc_dumps={crc}")
+        # RS-12 (2026-09-12): URC-path loss counters, present only on the
+        # instrumented build; absent keys print as n/a so old brackets
+        # still analyse.
+        urc = {k: (post[k] - pre[k]) if (k in pre and k in post) else "n/a"
+               for k in ("rx_urc_lost", "rx_pretx_drained")}
+        print(f"URC-path: rx_urc_lost={urc['rx_urc_lost']} "
+              f"rx_pretx_drained={urc['rx_pretx_drained']}")
     return 0
 
 

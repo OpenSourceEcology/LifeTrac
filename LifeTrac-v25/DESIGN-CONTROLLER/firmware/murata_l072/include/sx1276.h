@@ -40,6 +40,10 @@ bool sx1276_set_sf_bw_cr_checked(uint8_t sf, uint16_t bw_khz, uint8_t cr_den);
 void sx1276_apply_profile_full(const sx1276_profile_t *profile);
 
 uint32_t sx1276_take_irq_events(void);
+/* RS-12: DIO0 edge count since last take (take clears, peek does not).
+ * See s_dio0_edges in sx1276.c. */
+uint32_t sx1276_take_dio0_edges(void);
+uint32_t sx1276_peek_dio0_edges(void);
 bool sx1276_reg_dump(uint8_t *out_regs, size_t out_len);
 
 #endif /* LIFETRAC_MURATA_L072_SX1276_H */
