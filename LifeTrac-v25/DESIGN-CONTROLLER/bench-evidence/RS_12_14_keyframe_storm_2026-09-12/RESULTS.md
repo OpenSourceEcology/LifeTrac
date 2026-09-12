@@ -109,3 +109,23 @@ drain too (cheap; not the driver of this leg).
   and accept that any base command the tractor hears may cost a
   20–30 s lock loss.
 - Radios parked (0x80 both) after the leg.
+
+## Bench state at quiesce (2026-09-12 23:55 UTC)
+
+Shut down for the night per the quiesce recipe (Linux up, radios in LoRa
+SLEEP, bench containers gone). Transcripts: `night_park_base.txt`,
+`night_park_tractor.txt`.
+
+| item | base (192.168.1.117) | tractor (adb 2E2C1209DABC240B) |
+|---|---|---|
+| radio park | `PARK_OK {"opmode_readback": "0x80"}` 23:55:11 UTC | `PARK_OK {"opmode_readback": "0x80"}` (board clock unsynced, reads 08-30) |
+| UART holders (`fuser /dev/ttymxc3`) | none | none |
+| bench containers | `bench_webui` stopped + removed, port 8090 closed | none running (harness removed its containers after leg J) |
+| production units | `lifetrac-base*.service` failed/inactive (as all session) | `lifetrac-camera.service` inactive/dead; `tractor-camera` container Exited (137) |
+| still running | `design-controller-mosquitto-1` (base broker, harmless) | Arduino OOTB containers (x8-devel/provisioning/webapp) |
+| firmware on the L072s | bench build e8ad842489d5acfc09f204c7807e4661 (RS-12.10 counters) | same |
+
+Resume = run the harness (it re-inits the radio; no unpark step). Nothing
+radio-side runs without a fresh GO. The park readback is the authoritative
+parked state; a probe connect would auto-wake the L072, so no state was read
+after parking.

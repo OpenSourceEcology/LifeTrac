@@ -2405,6 +2405,25 @@ a producer-side layout test `check-stats-layout`); the corrected build's
 `tx_deaf_*` / `rx_fifo_skip` readings are in the RS-12.10 section of the
 evidence. Both boards on the RS-12.10 bench build; radios parked after.
 
+**SESSION 2026-09-12 (night) OUTCOME — RS-12.14 GATE FLOWN (leg J), BENCH QUIESCED.**
+Leg J (profile 1, keyframes on + injector, mitigated daemon): sends 281 → 65,
+loss 62.8 → 38.8 %, published 226 → 365 — a strict improvement that does NOT
+meet the 2 % gate; the follower still lost lock 4× (7–29 s), each 1–2 s after
+a command the tractor received ⇒ RS-12.15 sharpened to FHSS clock authority
+(firmware, next flash session). PR #121 (host mitigation + evidence, CI
+green) open — merge decision with the operator. Evidence
+`bench-evidence/RS_12_14_keyframe_storm_2026-09-12/` (RESULTS.md carries the
+quiesce table). **Bench left QUIESCED 23:55 UTC:** Linux up on both boards,
+radios `PARK_OK 0x80` both (`night_park_*.txt`), no UART holders,
+`bench_webui` stopped and removed (8090 closed), tractor
+`lifetrac-camera.service` inactive, base mosquitto left up, /tmp tooling
+intact. Both L072s still carry the RS-12.10 BENCH build (e8ad8424…), not the
+production binary — reflash before any field use. Tractor clock is unsynced
+(reads Aug 30). Resume = run the harness (no unpark step); nothing radio-side
+without a fresh GO. Queue: (1) RS-12.15 firmware (clock authority + tractor
+RX slot follow) = flash session; (2) RS-3.11 encoder decision; (3) hail
+candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
+
 - [x] **RS-12.11 — base command scheduler vs fragment arrivals: DONE 2026-09-12
   (PR #118, gate passed, see above).**
 - [x] **RS-4.15 — motion-aware stale-scan horizon: DONE 2026-09-12 (PR #118,
