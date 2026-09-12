@@ -1,0 +1,21 @@
+archive=radio_monitor_20260912_184432_0a89d8aa  cmds=65  trains=323  pacing_ms=203.0  window=+/-150 ms
+received fragments :   687  within window of a base TX:   57 (8.3 %)
+lost fragments     :    10  within window of a base TX:    2 (20.0 %)
+lost penultimates  :     6  within window of a base TX:    2 (33.3 %)
+enrichment lost/received = 2.41x
+tractor tx log     : of 10 lost fragments, 10 have a TX_DONE status=0 at the tractor, 0 have no TX_DONE line at all (tx log keyed by wire seq; wrap collisions possible)
+  lost penultimates (seq, idx/T, dt_ms to nearest base TX):
+    seq=(65, 0) idx=2/4 dt=+684
+    seq=(170, 0) idx=0/2 dt=-140
+    seq=(32, 1) idx=0/2 dt=-126
+    seq=(163, 1) idx=2/4 dt=-1902
+    seq=(183, 1) idx=0/2 dt=-366
+    seq=(189, 1) idx=1/3 dt=-2030
+  LOST dt = t(base TX) - t(fragment) histogram, 50 ms bins from -500 ms (beyond +/-500: 7):
+   -500 -450 -400 -350 -300 -250 -200 -150 -100  -50   +0  +50 +100 +150 +200 +250 +300 +350 +400 +450
+      0    0    1    0    0    0    0    2    0    0    0    0    0    0    0    0    0    0    0    0
+  LOST PENULTIMATE dt = t(base TX) - t(fragment) histogram, 50 ms bins from -500 ms (beyond +/-500: 3):
+   -500 -450 -400 -350 -300 -250 -200 -150 -100  -50   +0  +50 +100 +150 +200 +250 +300 +350 +400 +450
+      0    0    1    0    0    0    0    2    0    0    0    0    0    0    0    0    0    0    0    0
+  RECEIVED baseline, same bins (% of received):
+    0.9  0.6  1.7  2.0  0.6  1.0  0.1  0.1  0.0  0.0  2.3  4.9  0.9  1.3  2.2  1.2  0.4  0.9  0.7  0.6
