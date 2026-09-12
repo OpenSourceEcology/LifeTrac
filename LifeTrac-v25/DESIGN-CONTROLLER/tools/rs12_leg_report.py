@@ -164,9 +164,14 @@ def main() -> int:
         # counter cannot see) and the TX deaf window. max fields are NOT
         # deltas — the bracket max is the leg max only when the counters
         # were reset at launch; sum is a true delta.
+        # The probe dump lists only NON-ZERO counters, so a zero reads as
+        # absent: treat any RS-12.10 key present in the post bracket as
+        # proof of the instrumented build and default the rest to 0.
         keys = ("rx_fifo_skip", "tx_deaf_sum_us")
         maxk = ("tx_deaf_max_us", "tx_done_to_rearm_max_us")
-        if all(k in pre and k in post for k in keys + maxk):
+        if any(k in post for k in keys + maxk):
+            pre = {**{k: 0 for k in keys + maxk}, **pre}
+            post = {**{k: 0 for k in keys + maxk}, **post}
             tx_n = max(d.get("radio_tx_ok", 0), 1)
             deaf_sum = post["tx_deaf_sum_us"] - pre["tx_deaf_sum_us"]
             print(f"RS-12.10: rx_fifo_skip={post['rx_fifo_skip'] - pre['rx_fifo_skip']} "
