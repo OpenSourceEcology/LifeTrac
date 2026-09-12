@@ -276,7 +276,7 @@ Opcodes:
 | `0x69` | `PROBE` | `u32le seq + u16le phase_ms` | RS-0.12 reactive-fire delivery instrument (no-op at the tractor beyond logging/echo). |
 | `0x6A` | `PROBE_ECHO` | `u32le seq` | Tractor → base. |
 | `0x6B` | `CTRL_DITTO` | `u16le ref_seq` | Referential control-repeat frame — see `CONTROL_PLANE_DESIGN.md §4a`; receiver applies only on exact last-applied-seq match. |
-| `0x6C` | `TILE_STALE` | `u16le base_seq + u8 bitmap[(n_tiles+7)/8]` | F10 (2026-08-01): base → tractor advisory stale-tile report, level-triggered, single-copy; tractor folds marks into age-escalation so repairs ride the next scheduled frame. 84× cheaper than the keyframe it replaced; verified on air. |
+| `0x6C` | `TILE_STALE` | `u16le base_seq + u8 bitmap[(n_tiles+7)/8]` | F10 (2026-08-01): base → tractor advisory stale-tile report, level-triggered, single-copy; tractor folds marks into age-escalation so repairs ride the next scheduled frame. 84× cheaper than the keyframe it replaced; verified on air. RS-4.15 (2026-09-12): the report horizon follows the measured sweep rotation and an identical report is not repeated inside 10 s (102 → 13 reports per 300 s on a moving scene). |
 
 The `CMD_CAMERA_SELECT` semantics:
 

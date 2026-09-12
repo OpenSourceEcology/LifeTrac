@@ -54,6 +54,8 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
+from cmd_timing import idle_drain_allowed, pump_window_open  # RS-12.11
+
 # ---- repo imports ----------------------------------------------------
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT_BASE = _HERE                                      # base_station/
@@ -245,6 +247,19 @@ ALIGNED_PUMP_ENABLE = os.environ.get("LIFETRAC_ALIGNED_PUMP", "1") != "0"
 # blockage). ~2300 lines per 300 s leg at the bench rate — diagnostic only.
 LOG_FRAG_ARRIVALS = os.environ.get(
     "LIFETRAC_LOG_FRAG_ARRIVALS", "0") == "1"
+
+# RS-12.11 (2026-09-12): the idle-link drain used to fire on every empty
+# 0.25 s poll. On a bursty camera stream (2-fragment trains at 2 fps, gaps of
+# 258-540 ms between a train's last fragment and the next train's first) that
+# is exactly where the next first fragment is due, and our own TX deafens the
+# base to it: flash-session leg C lost 21 of 25 fragments 30-200 ms after a
+# base command TX (10.7x the received baseline; the 09-07 leg 12 of 16), and
+# 82 of that leg's 171 commands went out 250-300 ms after the last fragment.
+# The drain now waits for TRUE quiet (no fragment for this long); in-stream
+# commands ride the completion-aligned pump, which fires right after a train
+# ends - the one instant no fragment can be due. 0 restores the old
+# behaviour for an A/B leg. Rules live in cmd_timing.py (SIL-pinned).
+IDLE_DRAIN_QUIET_S = _env_float("LIFETRAC_IDLE_DRAIN_QUIET_S", 1.5, lo=0.0)
 
 
 class KeyframeRequester:
@@ -1166,7 +1181,15 @@ class ImageRxDaemon:
                     last_timeouts = cur_timeout
                     if KF_ON_REASM_TIMEOUT:
                         self._kf_req.poke(f"reassembly timeout #{cur_timeout}")
-                self._drain_ctrl_idle(link)
+                # RS-12.11 (2026-09-12): only a truly quiet link drains here;
+                # see IDLE_DRAIN_QUIET_S / cmd_timing.py.
+                if idle_drain_allowed(time.monotonic(),
+                                      getattr(self, "_last_frag_t", 0.0),
+                                      IDLE_DRAIN_QUIET_S):
+                    self._drain_ctrl_idle(link)
+                else:
+                    self._idle_drain_deferred = (
+                        getattr(self, "_idle_drain_deferred", 0) + 1)
                 self._maybe_switch_profile(link)
                 # Defensive: heal a silently dropped RXCONT (throttled).
                 now_arm = time.monotonic()
@@ -1177,6 +1200,7 @@ class ImageRxDaemon:
 
             saw_rx = False       # (kept for logging/diagnostics)
             frame_done = False   # RS-1.x: did a frame COMPLETE this pass?
+            train_end = False    # RS-12.11: did a last-index fragment land?
             for frame in frames:
                 ftype = frame.get("type")
                 if ftype == HOST_TYPE_RX_CRC_DUMP_URC:
@@ -1249,6 +1273,11 @@ class ImageRxDaemon:
 
                 if frag_idx is not None:
                     self._note_frag_arrival(frag_seq, frag_idx, frag_total)
+                    # RS-12.11: stream liveness for the idle-drain gate, and
+                    # a pump window even when the frame will not complete.
+                    self._last_frag_t = time.monotonic()
+                    if frag_idx == frag_total - 1:
+                        train_end = True
 
                 # F8 (2026-07-30) acceptance telemetry: the firmware now
                 # appends {phase_valid, profile_id, hop_idx, slot_offset_ms,
@@ -1376,7 +1405,7 @@ class ImageRxDaemon:
             # (idle-drain-only) behavior for a clean A/B at the bench.
             with self._lock:
                 have_pending = bool(self._pending_cmds)
-            if (ALIGNED_PUMP_ENABLE and frame_done
+            if (ALIGNED_PUMP_ENABLE and pump_window_open(frame_done, train_end)
                     and (have_pending or not self._ctrl_out.empty())):
                 # Run H forensics (2026-07-26): without spacing, the two
                 # enqueued copies go out ~37 ms apart — both into the SAME
@@ -1597,11 +1626,12 @@ class ImageRxDaemon:
                     "stats: rx_frames=%d rx_decode_err=%d "
                     "frames_published=%d publish_err=%d "
                     "reassembler_decode_err=%d reassembler_timeouts=%d "
-                    "parity_recon=%d",
+                    "parity_recon=%d idle_drain_deferred=%d",
                     s.rx_frames_seen, s.rx_decode_errors,
                     s.reassembled_frames_published, s.publish_errors,
                     s.reassembler_decode_errors, s.reassembler_timeouts,
-                    self.reassembler.stats.parity_reconstructions)
+                    self.reassembler.stats.parity_reconstructions,
+                    getattr(self, "_idle_drain_deferred", 0))
             # RS-2.3 forensics + RS-1.1 command counters (outside the lock;
             # the sample list is only touched from the ingest thread and a
             # briefly stale read here is fine for a log line).

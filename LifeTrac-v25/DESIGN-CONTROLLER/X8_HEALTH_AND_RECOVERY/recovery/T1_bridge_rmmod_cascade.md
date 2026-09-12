@@ -6,9 +6,19 @@
 /sys/kernel/x8h7_firmware/version` blocks, `m4-proxy` shows as failed, or you
 need to flip H7 firmware without a physical reset.
 
-**Side effect:** Triggers the i.MX2+ HW watchdog (60 s, no MAGICCLOSE) **auto-
-reboot** of the X8. The reboot itself is the recovery; modules come back fresh
-on the other side.
+**Side effect:** Triggers the i.MX2+ HW watchdog (60 s) **auto-reboot** of the
+X8. The reboot itself is the recovery; modules come back fresh on the other
+side.
+
+> **Corrections 2026-09-12 (flash session, see FLASH_RUNBOOK.md):** the
+> watchdog is armed by u-boot on both boards and DOES honour magic close —
+> write `'V'` before closing `/dev/watchdog0`; closing without it leaves the
+> dog active with no petter and reboots the board 60 s later (tractor, kernel
+> 5.10.93). A timeout asserts WDOG_B into the PMIC, so WRSR always reads POR.
+> On the base (kernel 6.1.24) re-inserting `x8h7_drv.ko` after an openocd
+> session OOPSes in `spi_probe → of_irq_get`; the pipeline's
+> `REVIVE_MODE=reboot` (openocd `reset run`, magic-close, `systemctl reboot`)
+> replaces the module reload.
 
 ## Procedure
 

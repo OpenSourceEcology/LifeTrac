@@ -79,6 +79,12 @@ param(
     # RS-12 fix candidate (2026-08-17): 1 = TX daemon never parks the final
     # fragment (restores paced spacing for the last pair; see daemon comment).
     [int]$NoParkLast      = 0,
+    # RS-12.11 (2026-09-12): idle-drain quiet gate on the base rx daemon
+    # (LIFETRAC_IDLE_DRAIN_QUIET_S). "0" = pre-RS-12.11 behaviour (A/B control).
+    [string]$IdleDrainQuietS = "1.5",
+    # RS-12.13 (2026-09-12): the hold applies only to trains of at least this
+    # many fragments (LIFETRAC_NO_PARK_LAST_MIN_FRAGS on the tx daemon).
+    [int]$NoParkLastMinFrags = 3,
     # RS-0.13b (2026-07-27): 1 = aligned command pump on (default), 0 =
     # idle-drain-only. The Run-J bisection toggles this + Batch + PrepareAhead
     # + ParityGroup one at a time to find which killed the 58% alignment.
@@ -169,7 +175,7 @@ $profEnv = "$profEnv -e LIFETRAC_FHSS_FARM_ID=$FhssFarmId -e LIFETRAC_FHSS_LINK_
 if ($AirtimeBudgetUs -gt 0) { $profEnv = "$profEnv -e LIFETRAC_AIRTIME_BUDGET_US=$AirtimeBudgetUs" }
 $profEnv = "$profEnv -e LIFETRAC_AIRTIME_PACING=$PacingMode"
 if ($PacingHeadroom -gt 0) { $profEnv = "$profEnv -e LIFETRAC_PACING_HEADROOM=$PacingHeadroom" }
-if ($NoParkLast -eq 1) { $profEnv = "$profEnv -e LIFETRAC_NO_PARK_LAST=1" }
+if ($NoParkLast -eq 1) { $profEnv = "$profEnv -e LIFETRAC_NO_PARK_LAST=1 -e LIFETRAC_NO_PARK_LAST_MIN_FRAGS=$NoParkLastMinFrags" }
 if ($LogFragArrivals -eq 1) {
     # One knob, both ends: RX logs frag_arrival (fw us + host wall), TX logs
     # txdone_arrival (host wall + toa_us). Routed via $profEnv so both
@@ -229,7 +235,11 @@ cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S docker rm -f rx_s
 # misdiagnosis after an unplanned reboot. `stop`, not `rm`: the
 # container stays defined so `docker start tractor-camera` restores the
 # production stack after bench work.
+# 2026-09-12: a bare `docker stop` is undone by the container's systemd unit
+# within the same boot (it came back mid-session twice). Stop the unit first;
+# it restarts at the next boot, so production is untouched long-term.
 foreach ($s in @($TxAdbSerial, $RxAdbSerial)) {
+    cmd /c "`"$adbExe`" -s $s shell `"echo fio | sudo -S -p '' systemctl stop lifetrac-camera.service 2>/dev/null`"" | Out-Null
     cmd /c "`"$adbExe`" -s $s shell `"echo fio | sudo -S -p '' docker stop -t 3 tractor-camera 2>/dev/null`"" | Out-Null
 }
 
@@ -241,6 +251,7 @@ foreach ($s in @($TxAdbSerial, $RxAdbSerial)) {
     cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $helperDir 'method_h_stage2_tx_probe_v2.py')`" /tmp/lifetrac_strict/" | Out-Null
     cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $baseStation 'lora_proto.py')`" /tmp/lifetrac_strict/" | Out-Null
     cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $baseStation 'image_rx_daemon.py')`" /tmp/lifetrac_strict/" | Out-Null
+    cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $baseStation 'cmd_timing.py')`" /tmp/lifetrac_strict/" | Out-Null
     cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $tractorX8 'image_tx_daemon.py')`" /tmp/lifetrac_strict/" | Out-Null
     cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $tractorX8 'camera_service.py')`" /tmp/lifetrac_strict/" | Out-Null
     cmd /c "`"$adbExe`" -s $s push `"$(Join-Path $repoRoot 'publish_synthetic_frames.py')`" /tmp/lifetrac_strict/" | Out-Null
@@ -343,7 +354,7 @@ cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -
 # production topology has the base web_ui subscribed to the base
 # broker anyway — tile_delta + link_stats land where the web UI reads.
 # RS-0.13b/RS-0.12 (2026-07-27): aligned-pump A/B + reactive-fire probe env.
-$rxExtraEnv = "-e LIFETRAC_ALIGNED_PUMP=$AlignedPump -e LIFETRAC_REACTIVE_FIRE=$ReactiveFire"
+$rxExtraEnv = "-e LIFETRAC_ALIGNED_PUMP=$AlignedPump -e LIFETRAC_REACTIVE_FIRE=$ReactiveFire -e LIFETRAC_IDLE_DRAIN_QUIET_S=$IdleDrainQuietS"
 if ($ProbePhaseSweepMs -ne "") { $rxExtraEnv = "$rxExtraEnv -e LIFETRAC_PROBE_PHASE_SWEEP_MS=$ProbePhaseSweepMs" }
 if ($ProbeSizesB -ne "") { $rxExtraEnv = "$rxExtraEnv -e LIFETRAC_PROBE_SIZES_B=$ProbeSizesB" }
 Write-Host "[LAUNCH] Starting RX Daemon on Board $RxAdbSerial..." -ForegroundColor Yellow
@@ -471,6 +482,8 @@ if ($Archive) {
         "train_gap_ms=$TrainGapMs",
         "kf_request_disable=$KfRequestDisable",
         "no_park_last=$NoParkLast",
+        "no_park_last_min_frags=$NoParkLastMinFrags",
+        "idle_drain_quiet_s=$IdleDrainQuietS",
         "parity_group=$ParityGroup",
         "aligned_pump=$AlignedPump",
         "reactive_fire=$ReactiveFire",

@@ -155,3 +155,52 @@ class TileAgeSummaryTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MotionAwareHorizonTests(unittest.TestCase):
+    """RS-4.15: the horizon follows the measured sweep rotation."""
+
+    def setUp(self) -> None:
+        self.refresh_intervals = web_ui.refresh_intervals
+        self.rotation_estimate_ms = web_ui.rotation_estimate_ms
+        self.effective = web_ui.effective_stale_horizon_ms
+        self.due = web_ui.stale_report_due
+
+    def test_refresh_intervals_only_for_advanced_arrivals(self) -> None:
+        prev = [1000, 2000, 0, 5000, 7000]
+        cur = [1000, 2300, 900, 0, 6000]          # same, advanced, new, gone, backwards
+        self.assertEqual(self.refresh_intervals(prev, cur), [(1, 300)])
+
+    def test_refresh_intervals_tolerates_grid_growth(self) -> None:
+        self.assertEqual(self.refresh_intervals([100], [100, 200]), [])
+
+    def test_rotation_is_the_slowest_recent_refresh(self) -> None:
+        samples = [(1000, 30000), (50000, 500), (60000, 12000)]
+        self.assertEqual(self.rotation_estimate_ms(samples, 60000, 60000), 30000)
+        # the 30 s interval ages out of the window: motion tiles dominate
+        self.assertEqual(self.rotation_estimate_ms(samples, 62000, 60000), 12000)
+        self.assertIsNone(self.rotation_estimate_ms([], 0, 60000))
+
+    def test_lost_tiles_cannot_inflate_the_estimate(self) -> None:
+        # A tile that never refreshes produces no interval at all.
+        prev = [1000, 1000]
+        cur = [1000, 31000]                        # tile 0 lost, tile 1 swept
+        ivs = self.refresh_intervals(prev, cur)
+        self.assertEqual([iv for _, iv in ivs], [30000])
+
+    def test_effective_horizon(self) -> None:
+        self.assertEqual(self.effective(20000, None, 1.5, 120000), 20000)
+        self.assertEqual(self.effective(20000, 30000, 0.0, 120000), 20000)
+        self.assertEqual(self.effective(20000, 30000, 1.5, 120000), 45000)
+        self.assertEqual(self.effective(20000, 5000, 1.5, 120000), 20000)
+        self.assertEqual(self.effective(20000, 200000, 1.5, 120000), 120000)
+
+    def test_static_scene_keeps_repair_within_two_rotations(self) -> None:
+        # Bench static scene: ~30 s rotation -> 45 s horizon, well under the cap.
+        self.assertLessEqual(self.effective(20000, 30000, 1.5, 120000), 60000)
+
+    def test_report_due(self) -> None:
+        self.assertTrue(self.due(None, 0.0, b"a", 100.0, 10.0))
+        self.assertTrue(self.due(b"a", 95.0, b"b", 100.0, 10.0))
+        self.assertFalse(self.due(b"a", 95.0, b"a", 100.0, 10.0))
+        self.assertTrue(self.due(b"a", 89.0, b"a", 100.0, 10.0))

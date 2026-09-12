@@ -1076,6 +1076,27 @@ _TILE_STALE_PERIOD_S = float(os.environ.get("LIFETRAC_TILE_STALE_PERIOD_S",
                                             "3.0"))
 TILE_STALE_TOPIC = "lifetrac/v25/cmd/tile_stale"
 
+# RS-4.15 (2026-09-12): motion-aware horizon. STALE_AFTER_MS was tuned for a
+# static scene (sweep rotation ~30 s at the 2 fps bench point). Under motion
+# the fair-share sweep slows down because the byte budget goes to changing
+# tiles, and a fixed horizon then reports a stale set on EVERY 3 s tick
+# (101/102 TILE_STALE per 300 s on 09-06/09-07 - each a live command
+# mid-stream and, per RS-12.11, each a chance to deafen the base to the
+# next fragment). The canvas can measure the rotation itself: when a tile
+# refreshes, the time since its previous arrival is one sweep interval, and
+# a LOST tile never refreshes, so it cannot inflate the estimate. Horizon =
+# max(STALE_AFTER_MS, factor x the slowest refresh interval seen in the last
+# window), capped so a dead link still reports. A report identical to the
+# previous one is not repeated inside REPEAT_MIN_S (level-triggered
+# advisory; the tractor is already on it). Factor 0 restores F10 behaviour.
+_TILE_STALE_ROTATION_FACTOR = float(os.environ.get(
+    "LIFETRAC_TILE_STALE_ROTATION_FACTOR", "1.5"))
+_TILE_STALE_MAX_MS = int(os.environ.get("LIFETRAC_TILE_STALE_MAX_MS", "120000"))
+_TILE_STALE_ROTATION_WINDOW_MS = int(os.environ.get(
+    "LIFETRAC_TILE_STALE_ROTATION_WINDOW_MS", "60000"))
+_TILE_STALE_REPEAT_MIN_S = float(os.environ.get(
+    "LIFETRAC_TILE_STALE_REPEAT_MIN_S", "10.0"))
+
 # F11 (2026-08-01, from the F10 acceptance §5 observation): the gap-tolerant
 # canvas requests a keyframe on EVERY base_seq gap — including a single lost
 # delta frame — and each granted request costs a multi-frame keyframe train
@@ -1149,29 +1170,87 @@ def compute_stale_tiles(canvas, now_ms: int, stale_after_ms: int) -> list:
     return out
 
 
+def refresh_intervals(prev_arrived, cur_arrived) -> list:
+    """Pure (RS-4.15): (idx, interval_ms) for every tile whose arrival
+    advanced between two scans. Never-arrived tiles and a canvas that was
+    replaced (arrival went backwards) contribute nothing."""
+    out = []
+    for idx, cur in enumerate(cur_arrived):
+        prev = prev_arrived[idx] if idx < len(prev_arrived) else 0
+        if cur and prev and cur > prev:
+            out.append((idx, cur - prev))
+    return out
+
+
+def rotation_estimate_ms(samples, now_ms: int, window_ms: int):
+    """Pure (RS-4.15): the slowest refresh interval among (t_ms, interval_ms)
+    samples not older than window_ms — the sweep rotation as the canvas
+    actually experienced it. None when nothing refreshed in the window."""
+    recent = [iv for (t, iv) in samples if (now_ms - t) <= window_ms]
+    return max(recent) if recent else None
+
+
+def effective_stale_horizon_ms(base_ms: int, rotation_ms, factor: float,
+                               cap_ms: int) -> int:
+    """Pure (RS-4.15): max(base, factor x rotation), capped; base when there
+    is no estimate yet or the feature is off (factor <= 0)."""
+    if rotation_ms is None or factor <= 0:
+        return int(base_ms)
+    return int(min(cap_ms, max(base_ms, factor * rotation_ms)))
+
+
+def stale_report_due(prev_body, prev_t: float, body: bytes, now: float,
+                     repeat_min_s: float) -> bool:
+    """Pure (RS-4.15): publish when the stale set changed, or the same set
+    again once repeat_min_s has passed."""
+    if prev_body is None or body != prev_body:
+        return True
+    return (now - prev_t) >= repeat_min_s
+
+
 def _tile_stale_worker() -> None:
     from lora_proto import pack_tile_stale
+    prev_arrived: list = []
+    samples: list = []          # (t_ms, interval_ms) refresh observations
+    last_body = None
+    last_t = 0.0
     while True:
         time.sleep(_TILE_STALE_PERIOD_S)
         try:
             with _image_lock:
                 canvas = _image_canvas
                 now_ms = int(time.monotonic() * 1000)
-                stale = compute_stale_tiles(canvas, now_ms,
-                                            _TILE_STALE_AFTER_MS)
-                summary = summarize_tile_ages(canvas, now_ms,
-                                              _TILE_STALE_AFTER_MS)
+                arrived = [tile.arrived_ms for tile in canvas._tiles]
+                for _idx, interval in refresh_intervals(prev_arrived, arrived):
+                    samples.append((now_ms, interval))
+                prev_arrived = arrived
+                samples = [s for s in samples
+                           if (now_ms - s[0]) <= _TILE_STALE_ROTATION_WINDOW_MS]
+                rotation_ms = rotation_estimate_ms(
+                    samples, now_ms, _TILE_STALE_ROTATION_WINDOW_MS)
+                horizon_ms = effective_stale_horizon_ms(
+                    _TILE_STALE_AFTER_MS, rotation_ms,
+                    _TILE_STALE_ROTATION_FACTOR, _TILE_STALE_MAX_MS)
+                stale = compute_stale_tiles(canvas, now_ms, horizon_ms)
+                summary = summarize_tile_ages(canvas, now_ms, horizon_ms)
                 n_tiles = canvas.n_tiles
                 base_seq = getattr(canvas, "_last_base_seq", None) or 0
             if summary is not None:
                 # RS-6.1 aggregate — every tick, even when nothing is
                 # stale: a quiet link's p95 age IS the sweep-rotation
-                # measurement the K-phase exit tests need.
+                # measurement the K-phase exit tests need. RS-4.15 adds
+                # the measured rotation and the horizon actually applied.
+                summary["rotation_ms"] = rotation_ms
                 mqtt_client.publish(TILE_AGE_TOPIC,
                                     json.dumps(summary), qos=0)
             if not stale:
                 continue
             body = pack_tile_stale(base_seq, stale, n_tiles)
+            now_s = time.monotonic()
+            if not stale_report_due(last_body, last_t, body, now_s,
+                                    _TILE_STALE_REPEAT_MIN_S):
+                continue
+            last_body, last_t = body, now_s
             mqtt_client.publish(TILE_STALE_TOPIC, body, qos=0)
         except Exception:
             # Advisory path: never let a transient error kill the worker.

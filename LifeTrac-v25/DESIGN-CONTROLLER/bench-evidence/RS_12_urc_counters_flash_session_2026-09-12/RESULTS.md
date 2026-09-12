@@ -1,7 +1,12 @@
 # RS-12 flash session — `rx_urc_lost` / `rx_pretx_drained` on air (2026-09-12)
 
-**Status: base flashed with the PR #116 firmware (bench build), legs in
-progress — leg results are appended below as they complete.**
+**Status: complete. Predictions A and C failed; the loss site is upstream
+of the URC path. The same evening the follow-up
+(`../RS_12_11_command_timing_2026-09-12/`) fixed the camera-path loss on
+the host (RS-12.11: 3.1 % → 1.0 %) and refuted the FIFO-coalescing
+hypothesis proposed at the end of this document (`rx_fifo_skip` = 0 with
+29 penultimate losses, RS-12.10). Read that directory for the current
+state; this one is the morning's record.**
 
 ## Firmware on the boards
 
