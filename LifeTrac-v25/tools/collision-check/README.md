@@ -46,8 +46,10 @@ output directory (default `./out`, git-ignored).
   features (weld beads, nuts), so the Manifold boolean volume inside `check_collisions.py`
   is only attempted for watertight meshes. Use `export_pair.sh` for exact volumes, or a
   nightly OpenSCAD which exports full precision.
-- FCL contact depth is a per-triangle number: a good zero/non-zero filter, not the size of
-  the overlap.
+- FCL contact depth is a per-triangle number, not a penetration measurement: it reads
+  25.4 mm on the flush frame/platform faces (which do not overlap at all, the OpenSCAD
+  intersection is empty) and 210 mm on a clevis joint whose real overlap is 64 cm³. Use FCL
+  to find pairs in contact and decide pass/fail from the intersection volume.
 - Joint contacts that are intentional (pins in lugs, cylinder clevises on their mounts,
   wheel hubs in the side panels, platform brackets on the frame) currently show up as
   overlaps and need either real clearance in the model or an entry in `WHITELIST`.

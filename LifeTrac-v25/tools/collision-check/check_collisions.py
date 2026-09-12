@@ -9,9 +9,11 @@ approach for pairs that are clear.
 
 Notes
 -----
-* FCL's contact depth is a per-triangle-pair number. It is a reliable zero/non-zero
-  filter (flush faces and polygon slivers stay below a fraction of a millimetre) but it is
-  not the size of the overlap. Use export_pair.sh + analyze_pairs.py for real volumes.
+* FCL's contact depth is a per-triangle-pair number, not a penetration measurement: it
+  read 25.4 mm on the flush frame/platform faces that do not overlap at all, and 210 mm
+  for a clevis joint whose real overlap is 64 cm^3. Treat FCL as "in contact or not" and
+  decide pass/fail from the intersection volume (export_pair.sh + analyze_pairs.py, or the
+  Manifold boolean below when the meshes are watertight).
 * OpenSCAD 2021.01 writes STL with six significant digits, which breaks watertightness of
   small features, so the Manifold boolean volume is only attempted when both meshes are
   watertight. A nightly OpenSCAD (full-precision export, Manifold backend) fixes this.
