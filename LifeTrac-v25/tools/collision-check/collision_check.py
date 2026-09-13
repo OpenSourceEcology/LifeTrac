@@ -34,6 +34,7 @@ import itertools
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -145,8 +146,19 @@ class PoseResult:
     ground_limited: dict = field(default_factory=dict)  # group -> lowest z (informational)
 
     @property
+    def failures(self) -> list:
+        """Checks that count against the run. For an informational probe only operational
+        failures count (echo, export or mesh errors and an unmeasurable overlap), never the
+        interference it is expected to show at the hard stop."""
+        bad = [c for c in self.checks if not c.ok]
+        if not self.informational:
+            return bad
+        return [c for c in bad if c.kind in ("echo", "export", "mesh")
+                or (c.kind == "overlap" and c.value is None)]
+
+    @property
     def failed(self) -> bool:
-        return any(not c.ok for c in self.checks)
+        return bool(self.failures)
 
 
 # --------------------------------------------------------------------------- pure helpers
@@ -264,6 +276,35 @@ def cylinders_reachable(cyls: list, tol_mm: float) -> bool:
     return all(-tol_mm <= ext <= stroke + tol_mm for _, ext, stroke in cyls)
 
 
+def cylinder_problems(parsed: dict, required: list) -> list[str]:
+    """Why the cylinder data of an echo run cannot be trusted: a malformed COLLISION_CYL line
+    or a required cylinder that reported nothing. Any problem is a failed check, so a broken
+    or removed echo can never silently turn a pose into 'unreachable'."""
+    problems = []
+    for line in parsed.get("errors", []):
+        problems.append(f"malformed echo line: {line}")
+    names = {c[0] for c in parsed.get("CYL", [])}
+    missing = sorted(set(required) - names)
+    if missing:
+        problems.append("no COLLISION_CYL data for: " + ", ".join(missing))
+    return problems
+
+
+def cache_stamp_matches(stamp_path: str, stamp: dict) -> bool:
+    """Compare the cache stamp on disk with this run's and write the new one. Cached
+    exports may only be reused when the same OpenSCAD build produced them from the same
+    model file."""
+    try:
+        with open(stamp_path) as f:
+            previous = json.load(f)
+    except (OSError, ValueError):
+        previous = None
+    os.makedirs(os.path.dirname(os.path.abspath(stamp_path)), exist_ok=True)
+    with open(stamp_path, "w") as f:
+        json.dump(stamp, f, indent=1)
+    return previous == stamp
+
+
 def overlap_verdict(volume: float | None, allowed: float) -> tuple[bool, str]:
     if volume is None:
         return False, "unmeasurable (mesh rejected by Manifold)"
@@ -276,16 +317,26 @@ def overlap_verdict(volume: float | None, allowed: float) -> tuple[bool, str]:
 class OpenSCAD:
     def __init__(self, binary: str, model: str, out_dir: str, timeout: float):
         self.binary, self.model, self.out_dir, self.timeout = binary, model, out_dir, timeout
-        # Cached exports are stale when the model or anything it includes/uses is newer.
-        self.model_mtime = newest_mtime(model_dependencies(model))
         os.makedirs(out_dir, exist_ok=True)
+        # Cached exports are stale when the model or anything it includes/uses is newer ...
+        self.model_mtime = newest_mtime(model_dependencies(model))
+        # ... or when another OpenSCAD build or another model file produced them.
+        self.version_string = self._version()
+        self.cache_reusable = cache_stamp_matches(
+            os.path.join(out_dir, "cache_stamp.json"),
+            {"openscad": self.version_string,
+             "binary": os.path.abspath(shutil.which(binary) or binary),
+             "model": os.path.abspath(model)})
 
-    def version(self) -> str:
+    def _version(self) -> str:
         try:
             r = subprocess.run([self.binary, "--version"], capture_output=True, text=True, timeout=60)
             return (r.stdout + r.stderr).strip().splitlines()[0]
         except Exception as e:  # noqa: BLE001
             return f"unknown ({e})"
+
+    def version(self) -> str:
+        return self.version_string
 
     @staticmethod
     def pose_args(pose: Pose | None) -> list[str]:
@@ -326,7 +377,7 @@ class OpenSCAD:
         """Export one rigid group as STL. Returns (path, rc, seconds, cached)."""
         name = f"{group}_static" if pose is None else f"{group}_{pose.key}"
         out_path = os.path.join(self.out_dir, name + ".stl")
-        if not force and os.path.exists(out_path) and os.path.getsize(out_path) > 0 \
+        if not force and self.cache_reusable and os.path.exists(out_path) and os.path.getsize(out_path) > 0 \
                 and os.path.getmtime(out_path) >= self.model_mtime:
             return out_path, 0, 0.0, True
         wanted = GROUPS[group][0]
@@ -390,6 +441,7 @@ class Runner:
         self.curl_inset = float(config.get("bucket_curl_inset_deg", 0.0))
         self.hard_stop_probe = bool(config.get("hard_stop_probe", True))
         self.cyl_tol = float(config.get("cylinder_extension_tolerance_mm", 1.0))
+        self.required_cylinders = list(config.get("required_cylinders", ["lift", "bucket"]))
         self.timings: dict[str, float] = {}
         self.notes: list[str] = []
         self.static_checks: list[Check] = []   # pose-independent pairs, judged once
@@ -403,15 +455,15 @@ class Runner:
         parsed = self.scad.echo("envelope", None)
         env = envelope_from_echo(parsed, tuple(self.config.get("bucket_rel_default_range", (-95.0, 50.0))))
         env = apply_curl_inset(env, self.curl_inset)
-        probes: list[Pose] = []
         if self.args.poses:
             poses = parse_pose_list(self.args.poses)
         elif self.args.animation_frames:
             poses = animation_poses(env, self.args.animation_frames)
         else:
             poses = grid_poses(env, self.args.arm_steps, self.args.bucket_steps)
-            if self.hard_stop_probe and self.curl_inset:
-                probes = hard_stop_poses(env)
+        # The hard-stop probe is reported on every run, whatever the pose mode; a probe that
+        # coincides with a judged pose is dropped, the judged pose covers it.
+        probes = [p for p in hard_stop_poses(env) if p not in set(poses)] if self.hard_stop_probe else []
         return env, poses, probes
 
     def classify(self, poses: list[Pose], probes: list[Pose]) -> dict[Pose, PoseResult]:
@@ -421,17 +473,20 @@ class Runner:
 
         def one(pose: Pose):
             parsed = self.scad.echo(f"pose_{pose.key}", pose)
-            cyls = parsed.get("CYL", [])
-            return pose, cyls, parsed.get("rc", 1)
+            return pose, parsed
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.args.jobs) as ex:
-            for pose, cyls, rc in ex.map(one, poses + [p for p in probes if p not in set(poses)]):
-                reachable = rc == 0 and cylinders_reachable(cyls, self.cyl_tol)
+            for pose, parsed in ex.map(one, poses + probes):
+                cyls, rc = parsed.get("CYL", []), parsed.get("rc", 1)
+                problems = cylinder_problems(parsed, self.required_cylinders) if rc == 0 else []
+                reachable = rc == 0 and not problems and cylinders_reachable(cyls, self.cyl_tol)
                 results[pose] = PoseResult(pose=pose, reachable=reachable, cylinders=cyls,
                                            informational=pose in probe_set)
                 if rc != 0:
-                    results[pose].checks.append(Check(pose.key, "export", "echo", None, None, False,
+                    results[pose].checks.append(Check(pose.key, "echo", "openscad", None, None, False,
                                                       f"OpenSCAD exited {rc} on the echo run"))
+                for problem in problems:
+                    results[pose].checks.append(Check(pose.key, "echo", "cylinders", None, None, False, problem))
         self.timings["reachability_s"] = time.time() - t0
         return results
 
@@ -561,12 +616,14 @@ def fmt_mm3(v: float | None) -> str:
 
 
 def verdict(results: dict[Pose, PoseResult], static_checks: list[Check]) -> tuple[list, list, list, bool]:
-    """(judged poses, reachable poses, failed poses, passed). A pose fails on any failed check,
-    reachable or not (an echo or export error must never be skipped as 'unreachable'); a
-    pose the cylinders cannot reach and that has no failed check is simply not judged."""
+    """(judged poses, reachable judged poses, failed poses, passed). A pose fails on any
+    counted failure (PoseResult.failures), reachable or not: an echo or export error must
+    never be skipped as 'unreachable', and an informational probe fails the run on
+    operational errors even though its interference verdict is ignored. A pose the
+    cylinders cannot reach and that has no failed check is simply not judged."""
     judged = [p for p in results if not results[p].informational]
     reachable = [p for p in judged if results[p].reachable]
-    failed = [p for p in judged if results[p].failed]
+    failed = [p for p in results if results[p].failed]
     static_failed = [c for c in static_checks if not c.ok]
     passed = not failed and not static_failed and bool(reachable)
     return judged, reachable, failed, passed
@@ -624,7 +681,8 @@ def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
     lines.append("## Failures")
     lines.append("")
     fail_rows = [("static (pose independent)", c) for c in static_failed_checks]
-    fail_rows += [(results[p].pose.label(), c) for p in judged for c in results[p].checks if not c.ok]
+    fail_rows += [(results[p].pose.label() + (" (probe)" if results[p].informational else ""), c)
+                  for p in results for c in results[p].failures]
     if not reachable:
         lines.append("No reachable pose was evaluated, so nothing was checked (this counts as a failure).")
         lines.append("")

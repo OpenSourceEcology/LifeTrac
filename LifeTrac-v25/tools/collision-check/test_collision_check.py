@@ -113,7 +113,7 @@ def test_verdict_counts_failures_on_unreachable_poses_too():
         ok: cc.PoseResult(pose=ok, reachable=True,
                           checks=[cc.Check(ok.key, "overlap", "arms/frame", 10.0, 50.0, True)]),
         broken: cc.PoseResult(pose=broken, reachable=False,
-                              checks=[cc.Check(broken.key, "export", "echo", None, None, False, "exited 1")]),
+                              checks=[cc.Check(broken.key, "echo", "openscad", None, None, False, "exited 1")]),
         unreachable: cc.PoseResult(pose=unreachable, reachable=False),
     }
     judged, reachable, failed, passed = cc.verdict(results, [])
@@ -126,6 +126,48 @@ def test_verdict_counts_failures_on_unreachable_poses_too():
     assert cc.verdict(results, static)[3] is False
     # nothing reachable at all is a failure, never a pass by vacuity
     assert cc.verdict({unreachable: results[unreachable]}, [])[3] is False
+
+
+def test_probe_interference_is_ignored_but_probe_errors_fail_the_run():
+    ok = cc.Pose(0.0, 0.0)
+    stop = cc.Pose(-27.7, 50.0)
+    results = {
+        ok: cc.PoseResult(pose=ok, reachable=True,
+                          checks=[cc.Check(ok.key, "overlap", "arms/frame", 10.0, 50.0, True)]),
+        stop: cc.PoseResult(pose=stop, reachable=True, informational=True,
+                            checks=[cc.Check(stop.key, "overlap", "arms/bucket", 26500.0, 860.0, False, "interference")]),
+    }
+    judged, reachable, failed, passed = cc.verdict(results, [])
+    assert judged == [ok] and reachable == [ok] and failed == [] and passed is True
+    # an export failure, an empty mesh or an unmeasurable overlap on the probe does fail the run
+    for check in (cc.Check(stop.key, "export", "arms", None, None, False, "OpenSCAD exited 124"),
+                  cc.Check(stop.key, "mesh", "bucket", None, None, False, "no geometry exported"),
+                  cc.Check(stop.key, "overlap", "arms/frame", None, 70.0, False, "unmeasurable")):
+        results[stop].checks = [check]
+        assert results[stop].failures == [check]
+        assert cc.verdict(results, [])[2] == [stop]
+
+
+def test_cylinder_problems_flag_missing_or_malformed_data():
+    good = cc.parse_echo(SAMPLE_ECHO)
+    assert cc.cylinder_problems(good, ["lift", "bucket"]) == []
+    only_lift = cc.parse_echo('ECHO: "COLLISION_CYL", "lift", 26.9, 650\n')
+    assert cc.cylinder_problems(only_lift, ["lift", "bucket"]) == ["no COLLISION_CYL data for: bucket"]
+    malformed = cc.parse_echo('ECHO: "COLLISION_CYL", "lift", undef, 650\n')
+    problems = cc.cylinder_problems(malformed, ["lift", "bucket"])
+    assert any(p.startswith("malformed echo line") for p in problems)
+    assert "no COLLISION_CYL data for: bucket, lift" in problems
+    assert cc.cylinder_problems(cc.parse_echo(""), ["lift", "bucket"]) == ["no COLLISION_CYL data for: bucket, lift"]
+
+
+def test_cache_stamp_invalidates_on_other_binary_or_model(tmp_path):
+    stamp_path = str(tmp_path / "cache_stamp.json")
+    stamp = {"openscad": "OpenSCAD version 2021.01", "binary": "/usr/bin/openscad", "model": "/m/a.scad"}
+    assert cc.cache_stamp_matches(stamp_path, stamp) is False      # first run: nothing to reuse
+    assert cc.cache_stamp_matches(stamp_path, stamp) is True       # same build, same model
+    other = dict(stamp, binary="/opt/openscad-nightly", openscad="OpenSCAD version 2026.09.01")
+    assert cc.cache_stamp_matches(stamp_path, other) is False      # another build invalidates
+    assert cc.cache_stamp_matches(stamp_path, dict(other, model="/m/b.scad")) is False  # another model too
 
 
 def test_overlap_verdict():

@@ -52,7 +52,11 @@ python3 collision_check.py --help
 `OPENSCAD=/path/to/openscad-nightly` (or `--openscad`) selects another binary; a nightly
 build with the Manifold backend exports much faster than 2021.01. `--jobs` sets the number
 of parallel OpenSCAD processes, `--force` re-exports cached meshes. Meshes, logs and
-reports go to `out/` (git-ignored, `--out` or `COLLISION_OUT` to move it).
+reports go to `out/` (git-ignored, `--out` or `COLLISION_OUT` to move it). Cached meshes
+are reused only when the model and everything it includes are older than the mesh and the
+same OpenSCAD build produced them from the same model file (`out/cache_stamp.json`); a
+different binary or model invalidates the cache. The curl hard-stop probe runs in every
+pose mode.
 
 Cost with OpenSCAD 2021.01 on 4 cores: about 85 s of export time per reachable pose
 (arms 67 s, hydraulics 12 s, bucket 6 s), the static groups once (frame 126 s, wheels
@@ -75,7 +79,11 @@ rules only redoes the analysis.
 - `ground_plane`: `groups` (the arms) may not dip below ground (rule 2, crash prevention);
   `informational_groups` (the bucket) are only reported, because with the arms at ground
   level the ground itself limits how far the bucket can dump (the lip would be up to
-  40 cm below grade at the dump limit). Such poses are marked ⛰ in the envelope grid.
+  55 cm below grade at the extreme of the relative range). Such poses are marked ⛰ in the
+  envelope grid.
+- `required_cylinders` (`lift`, `bucket`): the cylinders every pose must report through
+  `COLLISION_CYL`; missing or malformed cylinder data is a failed check, never a silent
+  "unreachable".
 - `bucket_curl_inset_deg` (10°): the curl limit is a plate-on-plate hard stop by definition
   (rule 5, back plate parallel to the drop leg), so the grid stops short of it and
   `hard_stop_probe` reports the stop pose itself informationally. Measured with the arms
