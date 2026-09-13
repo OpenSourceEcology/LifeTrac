@@ -61,7 +61,7 @@ ALL_TOGGLES = [flag for flag, _ in GROUPS.values()] + ["show_cog"]
 STATIC_GROUPS = [g for g, (_, static) in GROUPS.items() if static]
 MOVING_GROUPS = [g for g, (_, static) in GROUPS.items() if not static]
 
-ECHO_RE = re.compile(r'^ECHO:\s*"COLLISION_(\w+)",\s*(.*)$')
+ECHO_RE = re.compile(r'^ECHO:\s*"COLLISION_(\w+)"(?:,\s*(.*))?$')   # values optional: a bare label is malformed
 # Fallback lines for a model that predates the COLLISION_* echoes.
 FALLBACK_ARM_MIN_RE = re.compile(r'^ECHO:\s*"ARM_MIN_ANGLE:",\s*(-?[\d.]+)')
 FALLBACK_ARM_MAX_RE = re.compile(r'^ECHO:\s*"_arm_max_for_animation:",\s*(-?[\d.]+)')
@@ -181,15 +181,15 @@ def _finite(value: str) -> float:
 
 def parse_echo(text: str) -> dict:
     """Extract the COLLISION_* lines (with fallbacks) from OpenSCAD echo output. Lines that
-    do not parse, carry non-finite numbers or a non-positive cylinder stroke are listed
-    under 'errors' so the caller turns them into a failed check."""
+    do not parse, carry non-finite numbers, a non-positive cylinder stroke or a truncated
+    envelope are listed under 'errors' so the caller turns them into a failed check."""
     out: dict = {"CYL": []}
     fallback_cyl = []
     for raw in text.splitlines():
         line = raw.strip()
         m = ECHO_RE.match(line)
         if m:
-            kind, rest = m.group(1), m.group(2)
+            kind, rest = m.group(1), m.group(2) or ""
             vals = [v.strip().strip('"') for v in rest.split(",")]
             try:
                 if kind == "CYL":
@@ -198,7 +198,10 @@ def parse_echo(text: str) -> dict:
                         raise ValueError("non-positive stroke")
                     out["CYL"].append((name, ext, stroke))
                 else:
-                    out[kind] = [_finite(v) for v in vals]
+                    values = [_finite(v) for v in vals]
+                    if kind == "ENVELOPE" and len(values) < 4:
+                        raise ValueError("expected arm min, arm max, dump and curl angles")
+                    out[kind] = values
             except (ValueError, IndexError):
                 out.setdefault("errors", []).append(line)
             continue
@@ -225,12 +228,15 @@ def envelope_from_echo(parsed: dict, rel_default=(-95.0, 50.0)) -> Envelope:
     """COLLISION_ENVELOPE carries arm min/max and the absolute bucket dump/curl angles at the
     arm positions where the design defines them (dump at max lift, curl at ground level).
     The relative limits follow: rel_min = dump - arm_max, rel_max = curl - arm_min."""
-    env = parsed.get("ENVELOPE")
-    if env and len(env) >= 4:
+    if "ENVELOPE" in parsed:
+        env = parsed["ENVELOPE"]
+        if len(env) < 4:   # present but truncated: malformed, never a case for the fallback
+            raise RuntimeError(f"malformed COLLISION_ENVELOPE line: expected 4 values, got {len(env)}")
         arm_min, arm_max = env[0], env[1]
         abs_dump, abs_curl = min(env[2], env[3]), max(env[2], env[3])
         rel_min, rel_max = abs_dump - arm_max, abs_curl - arm_min
         return Envelope(arm_min, arm_max, rel_min, rel_max, rel_max)
+    # The old arm lines only stand in for a model that emits no envelope line at all.
     if "fallback_arm_min" in parsed and "fallback_arm_max" in parsed:
         return Envelope(parsed["fallback_arm_min"], parsed["fallback_arm_max"],
                         rel_default[0], rel_default[1], rel_default[1])
@@ -331,6 +337,7 @@ def purge_cached_meshes(out_dir: str) -> int:
         return 0
     for name in os.listdir(out_dir):
         stem, ext = os.path.splitext(name)
+        stem = stem.removesuffix(".part")   # the temporary mesh of an interrupted export
         if ext in (".stl", ".log") and any(stem == f"{g}_static" or stem.startswith(f"{g}_arm") for g in GROUPS):
             os.remove(os.path.join(out_dir, name))
             removed += 1
@@ -397,12 +404,13 @@ class OpenSCAD:
             return []
         return ["-D", f"ARM_LIFT_ANGLE={pose.arm:.4f}", "-D", f"BUCKET_TILT_ANGLE={pose.bucket_rel:.4f}"]
 
-    def run(self, out_path: str, extra: list[str], export_format: str | None = None) -> tuple[int, float, str]:
+    def run(self, out_path: str, extra: list[str], export_format: str | None = None,
+            log_path: str | None = None) -> tuple[int, float, str]:
         cmd = [self.binary, "-o", out_path]
         if export_format:
             cmd += ["--export-format", export_format]
         cmd += extra + [self.model]
-        log_path = os.path.splitext(out_path)[0] + ".log"
+        log_path = log_path or os.path.splitext(out_path)[0] + ".log"
         t0 = time.time()
         with open(log_path, "w") as log:
             try:
@@ -439,13 +447,28 @@ class OpenSCAD:
         toggles = []
         for flag in ALL_TOGGLES:
             toggles += ["-D", f"{flag}={'true' if flag == wanted else 'false'}"]
-        rc, seconds, _ = self.run(out_path, toggles + self.pose_args(pose))
+        # Render to a temporary name and move the mesh into place only when OpenSCAD
+        # succeeded: a failed, timed-out or interrupted export must never leave a partial
+        # mesh behind that a later run could reuse as a cached export. Whatever a previous
+        # run left under either name goes first, so a failed export leaves no mesh at all.
+        part_path = os.path.join(self.out_dir, name + ".part.stl")
+        for stale in (out_path, part_path):
+            if os.path.exists(stale):
+                os.remove(stale)
+        rc, seconds, _ = self.run(part_path, toggles + self.pose_args(pose),
+                                  log_path=os.path.join(self.out_dir, name + ".log"))
+        if rc == 0 and os.path.exists(part_path):
+            os.replace(part_path, out_path)
+        elif os.path.exists(part_path):
+            os.remove(part_path)
         return out_path, rc, seconds, False
 
 
 # --------------------------------------------------------------------------- meshes
 def load_mesh(path: str):
     import trimesh
+    if not os.path.exists(path):   # e.g. an export that exited 0 without writing a file
+        return None
     m = trimesh.load(path, force="mesh", process=True)
     if m.is_empty or len(m.faces) == 0:
         return None

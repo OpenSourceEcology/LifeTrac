@@ -55,7 +55,9 @@ of parallel OpenSCAD processes, `--force` re-exports cached meshes. Meshes, logs
 reports go to `out/` (git-ignored, `--out` or `COLLISION_OUT` to move it). Cached meshes
 are reused only when the model and everything it includes are older than the mesh and the
 same OpenSCAD build produced them from the same model file (`out/cache_stamp.json`); a
-different binary or model invalidates the cache. The curl hard-stop probe runs in every
+different binary or model invalidates the cache. Meshes are rendered to a temporary name
+and moved into place only when OpenSCAD succeeded, so a failed, timed-out or interrupted
+export leaves no mesh that a later run could reuse. The curl hard-stop probe runs in every
 pose mode.
 
 Cost with OpenSCAD 2021.01 on 4 cores: about 85 s of export time per reachable pose

@@ -1,6 +1,9 @@
 """Unit tests for the pure helpers in collision_check.py (no OpenSCAD needed)."""
 import os
+import stat
 import sys
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -49,6 +52,22 @@ def test_parse_echo_falls_back_to_old_lines():
     assert env.rel_min == -95.0 and env.rel_max == 50.0 == env.curl_stop
     assert [c[0] for c in parsed["CYL"]] == ["lift", "lift", "bucket", "bucket"]
     assert not cc.cylinders_reachable(parsed["CYL"], tol_mm=1.0)  # one cylinder at -3 mm
+
+
+def test_truncated_envelope_is_malformed_not_a_fallback():
+    # a present but short envelope line is an error, even when the old arm lines are there too
+    parsed = cc.parse_echo('ECHO: "COLLISION_ENVELOPE", -27.7092, 49.4496\n' + OLD_MODEL_ECHO)
+    assert "ENVELOPE" not in parsed and len(parsed["errors"]) == 1    # the envelope probe fails on errors
+    with pytest.raises(RuntimeError, match="malformed COLLISION_ENVELOPE"):
+        cc.envelope_from_echo({"ENVELOPE": [-27.7092, 49.4496, -45.0],
+                               "fallback_arm_min": -27.7092, "fallback_arm_max": 49.4496})
+    with pytest.raises(RuntimeError):
+        cc.envelope_from_echo({})
+    # a label without values is malformed as well, not absent
+    bare = cc.parse_echo('ECHO: "COLLISION_ENVELOPE"\nECHO: "COLLISION_CYL"\n' + OLD_MODEL_ECHO)
+    assert "ENVELOPE" not in bare and len(bare["errors"]) == 2
+    # the fallback stays reserved for a model that emits no envelope line at all
+    assert cc.envelope_from_echo(cc.parse_echo(OLD_MODEL_ECHO)).rel_max == 50.0
 
 
 def test_reachability_tolerance():
@@ -195,7 +214,8 @@ def test_stamp_mismatch_purges_cached_group_meshes(tmp_path):
     out = tmp_path / "out"
     out.mkdir()
     cached = ["frame_static.stl", "frame_static.log", "arms_arm+030.0000_rel-050.0000.stl",
-              "hydraulics_arm-027.7092_rel+027.7092.log"]
+              "hydraulics_arm-027.7092_rel+027.7092.log", "frame_static.part.stl",
+              "bucket_arm+030.0000_rel-050.0000.part.stl"]
     kept = ["pair_arms_frame_t0.stl", "pose_arm+030.0000_rel-050.0000.echo", "collision_report.md"]
     for name in cached + kept:
         (out / name).write_text("x")
@@ -211,6 +231,55 @@ def test_stamp_mismatch_purges_cached_group_meshes(tmp_path):
     # another producer purges again, even when the mesh is newer than the model
     assert cc.cache_stamp_matches(stamp_path, dict(stamp, binary="/opt/openscad-nightly"), purge_dir=str(out)) is False
     assert not (out / "frame_static.stl").exists()
+
+
+FAKE_OPENSCAD = """\
+#!/bin/sh
+# Stand-in for openscad: writes the -o file according to FAKE_OPENSCAD_MODE.
+out=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --version) echo "OpenSCAD version 0.0-fake"; exit 0;;
+    -o) out="$2"; shift;;
+  esac
+  shift
+done
+case "$FAKE_OPENSCAD_MODE" in
+  ok) printf 'solid OpenSCAD_Model\\nendsolid OpenSCAD_Model\\n' > "$out"; exit 0;;
+  partial) printf 'solid OpenSCAD_Model\\n  facet normal 0 0 1\\n' > "$out"; echo "killed" >&2; exit 1;;
+  *) echo "no output" >&2; exit 1;;
+esac
+"""
+
+
+def test_failed_export_never_leaves_a_mesh_to_cache(tmp_path, monkeypatch):
+    fake = tmp_path / "openscad"
+    fake.write_text(FAKE_OPENSCAD)
+    fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+    model = tmp_path / "model.scad"
+    model.write_text("cube(1);\n")
+    out = tmp_path / "out"
+
+    def run(mode, force=False):
+        monkeypatch.setenv("FAKE_OPENSCAD_MODE", mode)
+        scad = cc.OpenSCAD(str(fake), str(model), str(out), timeout=30)   # one instance per run
+        return scad.export_group("frame", None, force)
+
+    # a failed export that wrote a partial mesh leaves no mesh behind ...
+    path, rc, _, cached = run("partial")
+    assert rc == 1 and not cached and not os.path.exists(path)
+    assert not [p.name for p in out.iterdir() if p.name.endswith(".part.stl")]
+    assert (out / "frame_static.log").read_text().strip() == "killed"
+    # ... so the next run renders again instead of reusing it, and a complete export is cached
+    path, rc, _, cached = run("ok")
+    assert rc == 0 and not cached and os.path.exists(path)
+    assert run("ok")[3] is True
+    # a forced re-export that fails removes the previous mesh rather than leave it to be reused
+    path, rc, _, cached = run("partial", force=True)
+    assert rc == 1 and not os.path.exists(path)
+    assert run("ok")[3] is False
+    # an export that exits 0 without writing anything is not a mesh either
+    assert cc.load_mesh(str(out / "missing.stl")) is None
 
 
 def test_overlap_verdict():
