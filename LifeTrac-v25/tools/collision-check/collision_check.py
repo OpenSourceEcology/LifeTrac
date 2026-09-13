@@ -32,6 +32,7 @@ import argparse
 import concurrent.futures
 import itertools
 import json
+import math
 import os
 import re
 import shutil
@@ -170,8 +171,18 @@ def snap_volume(v: float) -> float:
     return 0.0 if abs(v) < VOLUME_NOISE_MM3 else float(abs(v))
 
 
+def _finite(value: str) -> float:
+    """float() that rejects nan/inf, so a non-finite echo value is a malformed line."""
+    v = float(value)
+    if not math.isfinite(v):
+        raise ValueError(f"non-finite value {value!r}")
+    return v
+
+
 def parse_echo(text: str) -> dict:
-    """Extract the COLLISION_* lines (with fallbacks) from OpenSCAD echo output."""
+    """Extract the COLLISION_* lines (with fallbacks) from OpenSCAD echo output. Lines that
+    do not parse, carry non-finite numbers or a non-positive cylinder stroke are listed
+    under 'errors' so the caller turns them into a failed check."""
     out: dict = {"CYL": []}
     fallback_cyl = []
     for raw in text.splitlines():
@@ -182,9 +193,12 @@ def parse_echo(text: str) -> dict:
             vals = [v.strip().strip('"') for v in rest.split(",")]
             try:
                 if kind == "CYL":
-                    out["CYL"].append((vals[0], float(vals[1]), float(vals[2])))
+                    name, ext, stroke = vals[0], _finite(vals[1]), _finite(vals[2])
+                    if stroke <= 0.0:
+                        raise ValueError("non-positive stroke")
+                    out["CYL"].append((name, ext, stroke))
                 else:
-                    out[kind] = [float(v) for v in vals]
+                    out[kind] = [_finite(v) for v in vals]
             except (ValueError, IndexError):
                 out.setdefault("errors", []).append(line)
             continue
@@ -274,6 +288,24 @@ def cylinders_reachable(cyls: list, tol_mm: float) -> bool:
     if not cyls:
         return False
     return all(-tol_mm <= ext <= stroke + tol_mm for _, ext, stroke in cyls)
+
+
+POSE_TOLERANCE_DEG = 0.002   # the -D values carry four decimals; the echo prints six significant digits
+
+
+def pose_problems(parsed: dict, pose: Pose, tol_deg: float = POSE_TOLERANCE_DEG) -> list[str]:
+    """Why the echo run cannot be trusted to have rendered the requested pose: the
+    COLLISION_POSE line is missing, or it reports other angles than the -D overrides asked
+    for (which would mean the overrides no longer reach ARM_LIFT_ANGLE / BUCKET_TILT_ANGLE
+    and every grid point is exporting the same default pose)."""
+    reported = parsed.get("POSE")
+    if not reported or len(reported) < 2:
+        return ["no COLLISION_POSE data: the pose override cannot be verified"]
+    arm, rel = reported[0], reported[1]
+    if abs(arm - pose.arm) > tol_deg or abs(rel - pose.bucket_rel) > tol_deg:
+        return [f"pose override not applied: requested arm {pose.arm:+.4f}°, bucket {pose.bucket_rel:+.4f}° rel, "
+                f"the model rendered arm {arm:+.4f}°, bucket {rel:+.4f}° rel"]
+    return []
 
 
 def cylinder_problems(parsed: dict, required: list) -> list[str]:
@@ -382,6 +414,8 @@ class OpenSCAD:
     def echo(self, name: str, pose: Pose | None) -> dict:
         """Echo-only evaluation (no geometry); returns the parsed COLLISION_* lines."""
         out_path = os.path.join(self.out_dir, f"{name}.echo")
+        if os.path.exists(out_path):
+            os.remove(out_path)   # a failed run must never be read through a previous run's output
         rc, seconds, log_path = self.run(out_path, self.pose_args(pose), export_format="echo")
         text = ""
         if os.path.exists(out_path):
@@ -474,6 +508,11 @@ class Runner:
     def poses(self) -> tuple[Envelope, list[Pose], list[Pose]]:
         """Returns the sampled envelope, the poses to judge and the informational probe poses."""
         parsed = self.scad.echo("envelope", None)
+        if parsed.get("rc", 1) != 0:
+            raise RuntimeError(f"the envelope probe failed: OpenSCAD exited {parsed.get('rc')} "
+                               f"(see {os.path.join(self.args.out, 'envelope.log')})")
+        if parsed.get("errors"):
+            raise RuntimeError("the envelope probe emitted malformed collision data: " + "; ".join(parsed["errors"]))
         env = envelope_from_echo(parsed, tuple(self.config.get("bucket_rel_default_range", (-95.0, 50.0))))
         env = apply_curl_inset(env, self.curl_inset)
         if self.args.poses:
@@ -499,7 +538,8 @@ class Runner:
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.args.jobs) as ex:
             for pose, parsed in ex.map(one, poses + probes):
                 cyls, rc = parsed.get("CYL", []), parsed.get("rc", 1)
-                problems = cylinder_problems(parsed, self.required_cylinders) if rc == 0 else []
+                problems = (pose_problems(parsed, pose) + cylinder_problems(parsed, self.required_cylinders)
+                            if rc == 0 else [])
                 reachable = rc == 0 and not problems and cylinders_reachable(cyls, self.cyl_tol)
                 results[pose] = PoseResult(pose=pose, reachable=reachable, cylinders=cyls,
                                            informational=pose in probe_set)
@@ -507,7 +547,8 @@ class Runner:
                     results[pose].checks.append(Check(pose.key, "echo", "openscad", None, None, False,
                                                       f"OpenSCAD exited {rc} on the echo run"))
                 for problem in problems:
-                    results[pose].checks.append(Check(pose.key, "echo", "cylinders", None, None, False, problem))
+                    subject = "pose" if problem.startswith(("pose override", "no COLLISION_POSE")) else "cylinders"
+                    results[pose].checks.append(Check(pose.key, "echo", subject, None, None, False, problem))
         self.timings["reachability_s"] = time.time() - t0
         return results
 
@@ -881,7 +922,11 @@ def main(argv=None) -> int:
     runner.log(f"OpenSCAD: {version}")
     runner.log(f"model: {args.model}")
 
-    env, poses, probes = runner.poses()
+    try:
+        env, poses, probes = runner.poses()
+    except RuntimeError as e:
+        runner.log(f"ERROR: {e}")
+        return 2
     runner.log(f"envelope: arm {env.arm_min:+.1f}..{env.arm_max:+.1f}°, bucket {env.rel_min:+.1f}.."
                f"{env.rel_max:+.1f}° relative (curl stop {env.curl_stop:+.1f}°); {len(poses)} poses, "
                f"{len(probes)} probe(s)")

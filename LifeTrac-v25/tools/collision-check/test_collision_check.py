@@ -148,6 +148,27 @@ def test_probe_interference_is_ignored_but_probe_errors_fail_the_run():
         assert cc.verdict(results, [])[2] == [stop]
 
 
+def test_parse_echo_rejects_non_finite_values_and_bad_strokes():
+    parsed = cc.parse_echo('ECHO: "COLLISION_CYL", "lift", nan, 650\n'
+                           'ECHO: "COLLISION_CYL", "bucket", 10, 0\n'
+                           'ECHO: "COLLISION_CYL", "bucket", 10, inf\n'
+                           'ECHO: "COLLISION_ENVELOPE", -27.7, inf, -45, 22.3\n'
+                           'ECHO: "COLLISION_POSE", 30, -20\n')
+    assert parsed["CYL"] == []
+    assert "ENVELOPE" not in parsed and parsed["POSE"] == [30.0, -20.0]
+    assert len(parsed["errors"]) == 4
+    assert cc.cylinder_problems(parsed, ["lift", "bucket"])[0].startswith("malformed echo line")
+
+
+def test_pose_problems_detect_an_ignored_override():
+    pose = cc.Pose(30.0, -50.0)
+    assert cc.pose_problems({"POSE": [30.0, -50.0, 200.0, 1100.0]}, pose) == []
+    assert cc.pose_problems({"POSE": [30.0004, -49.9996]}, pose) == []        # echo prints six significant digits
+    assert cc.pose_problems({}, pose) == ["no COLLISION_POSE data: the pose override cannot be verified"]
+    problems = cc.pose_problems({"POSE": [-27.7092, 27.7092]}, pose)          # the model's default pose
+    assert len(problems) == 1 and problems[0].startswith("pose override not applied")
+
+
 def test_cylinder_problems_flag_missing_or_malformed_data():
     good = cc.parse_echo(SAMPLE_ECHO)
     assert cc.cylinder_problems(good, ["lift", "bucket"]) == []
