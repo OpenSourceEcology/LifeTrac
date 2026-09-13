@@ -170,6 +170,28 @@ def test_cache_stamp_invalidates_on_other_binary_or_model(tmp_path):
     assert cc.cache_stamp_matches(stamp_path, dict(other, model="/m/b.scad")) is False  # another model too
 
 
+def test_stamp_mismatch_purges_cached_group_meshes(tmp_path):
+    out = tmp_path / "out"
+    out.mkdir()
+    cached = ["frame_static.stl", "frame_static.log", "arms_arm+030.0000_rel-050.0000.stl",
+              "hydraulics_arm-027.7092_rel+027.7092.log"]
+    kept = ["pair_arms_frame_t0.stl", "pose_arm+030.0000_rel-050.0000.echo", "collision_report.md"]
+    for name in cached + kept:
+        (out / name).write_text("x")
+    stamp_path = str(out / "cache_stamp.json")
+    stamp = {"openscad": "OpenSCAD version 2021.01", "binary": "/usr/bin/openscad", "model": "/m/a.scad"}
+    # first stamp: mismatch (no stamp yet) purges the group meshes before the stamp is written
+    assert cc.cache_stamp_matches(stamp_path, stamp, purge_dir=str(out)) is False
+    assert sorted(p.name for p in out.iterdir()) == sorted(kept + ["cache_stamp.json"])
+    # a matching stamp leaves everything alone
+    (out / "frame_static.stl").write_text("x")
+    assert cc.cache_stamp_matches(stamp_path, stamp, purge_dir=str(out)) is True
+    assert (out / "frame_static.stl").exists()
+    # another producer purges again, even when the mesh is newer than the model
+    assert cc.cache_stamp_matches(stamp_path, dict(stamp, binary="/opt/openscad-nightly"), purge_dir=str(out)) is False
+    assert not (out / "frame_static.stl").exists()
+
+
 def test_overlap_verdict():
     assert cc.overlap_verdict(0.0, 50.0) == (True, "clear")
     assert cc.overlap_verdict(20.0, 50.0) == (True, "within budget")

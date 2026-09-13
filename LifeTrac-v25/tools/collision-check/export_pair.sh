@@ -17,7 +17,8 @@ OUT="${COLLISION_OUT:-$HERE/out}"
 mkdir -p "$OUT"
 
 PROBE="$OUT/_probe_pairs.scad"
-if [ ! -f "$PROBE" ] || [ "$SCAD_DIR/lifetrac_v25.scad" -nt "$PROBE" ]; then
+# Regenerate the probe when the model or this script (which appends the probe) is newer.
+if [ ! -f "$PROBE" ] || [ "$SCAD_DIR/lifetrac_v25.scad" -nt "$PROBE" ] || [ "$0" -nt "$PROBE" ]; then
   sed -e "s|^include <lifetrac_v25_params.scad>|include <$SCAD_DIR/lifetrac_v25_params.scad>|" \
       -e "s|^use <\(.*\)>|use <$SCAD_DIR/\1>|" \
       -e "s|^lifetrac_v25_assembly();|// lifetrac_v25_assembly(); // replaced by the pair probe below|" \
@@ -42,6 +43,9 @@ fi
 
 STL="$OUT/pair_${A}_${B}_t${T}.stl"
 LOG="$OUT/pair_${A}_${B}_t${T}.log"
+# Never leave a previous result behind: an empty intersection writes no file, and a failed
+# or timed-out run must not let analyze_pairs.py measure a stale overlap.
+rm -f "$STL"
 START=$(date +%s)
 timeout "${OPENSCAD_TIMEOUT:-1500}" "$BIN" -o "$STL" -D "pair_a=\"$A\"" -D "pair_b=\"$B\"" \
     -D show_cog=false -D "animation_time=$T" -D "\$t=$T" "$PROBE" > "$LOG" 2>&1

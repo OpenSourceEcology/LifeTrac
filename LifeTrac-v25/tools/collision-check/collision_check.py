@@ -290,19 +290,39 @@ def cylinder_problems(parsed: dict, required: list) -> list[str]:
     return problems
 
 
-def cache_stamp_matches(stamp_path: str, stamp: dict) -> bool:
+def purge_cached_meshes(out_dir: str) -> int:
+    """Delete every cached group export (and its log). Used when the cache stamp changes,
+    so that a mesh produced by another OpenSCAD build or from another model can never be
+    reused, even if the rebuild that follows is interrupted."""
+    removed = 0
+    if not os.path.isdir(out_dir):
+        return 0
+    for name in os.listdir(out_dir):
+        stem, ext = os.path.splitext(name)
+        if ext in (".stl", ".log") and any(stem == f"{g}_static" or stem.startswith(f"{g}_arm") for g in GROUPS):
+            os.remove(os.path.join(out_dir, name))
+            removed += 1
+    return removed
+
+
+def cache_stamp_matches(stamp_path: str, stamp: dict, purge_dir: str | None = None) -> bool:
     """Compare the cache stamp on disk with this run's and write the new one. Cached
     exports may only be reused when the same OpenSCAD build produced them from the same
-    model file."""
+    model file. On a mismatch the cached group meshes in ``purge_dir`` are deleted before
+    the new stamp is written, so an interrupted rebuild cannot leave stale meshes behind
+    that a later run would take for its own."""
     try:
         with open(stamp_path) as f:
             previous = json.load(f)
     except (OSError, ValueError):
         previous = None
+    matches = previous == stamp
+    if not matches and purge_dir:
+        purge_cached_meshes(purge_dir)
     os.makedirs(os.path.dirname(os.path.abspath(stamp_path)), exist_ok=True)
     with open(stamp_path, "w") as f:
         json.dump(stamp, f, indent=1)
-    return previous == stamp
+    return matches
 
 
 def overlap_verdict(volume: float | None, allowed: float) -> tuple[bool, str]:
@@ -326,7 +346,8 @@ class OpenSCAD:
             os.path.join(out_dir, "cache_stamp.json"),
             {"openscad": self.version_string,
              "binary": os.path.abspath(shutil.which(binary) or binary),
-             "model": os.path.abspath(model)})
+             "model": os.path.abspath(model)},
+            purge_dir=out_dir)
 
     def _version(self) -> str:
         try:
