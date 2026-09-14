@@ -60,8 +60,8 @@ jobs:
             exit 1
           fi
           
-          # Check module files
-          for module in modules/*.scad; do
+          # Check module files (they live under openscad/ since the DESIGN-* re-layout)
+          for module in openscad/modules/*.scad; do
             echo "Checking $module..."
             openscad -o /dev/null --export-format echo "$module"
             if [ $? -eq 0 ]; then

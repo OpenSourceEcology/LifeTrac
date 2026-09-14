@@ -1,0 +1,46 @@
+{
+  "_comment": [
+    "Rules for tools/collision-check/collision_check.py (issue #119).",
+    "allowed_overlap_mm3: per-pair intersection-volume budget. Anything above it fails.",
+    "The non-default budgets below encode joint simplifications still in the model: pins and",
+    "clevises drawn straight through their mating parts and the UWU hubs through the side",
+    "panels. They were calibrated from the measured overlap over the pose envelope plus a",
+    "margin (suggest_budgets.py), and should shrink to the default as the joints get real",
+    "clearance.",
+    "bucket_curl_inset_deg: the curl limit is a plate-on-plate hard stop by definition (rule 5).",
+    "Measured with the arms down, the bucket/arm overlap is sliver-level up to +40 deg relative,",
+    "12 cm3 at +44 deg and 26 cm3 at the defined +50 deg stop, with 63 mm of bucket-cylinder",
+    "retraction still available: the plates meet about 8 deg before the defined stop. The grid",
+    "therefore stops 10 deg short of it; hard_stop_probe reports the stop pose informationally.",
+    "ground_plane.groups fail when they dip below ground (rule 2, crash prevention);",
+    "informational_groups are only reported (the bucket lip when dumping with the arms down)."
+  ],
+  "default_allowed_overlap_mm3": 50,
+  "allowed_overlap_mm3": {
+    "arms/frame": 70,
+    "arms/bucket": 860,
+    "arms/hydraulics": 370000,
+    "bucket/hydraulics": 66000,
+    "frame/hydraulics": 250000,
+    "frame/wheels": 590000
+  },
+  "min_clearance_mm": {
+    "arms/wheels": 25.4
+  },
+  "ground_plane": {
+    "groups": [
+      "arms"
+    ],
+    "informational_groups": [
+      "bucket"
+    ],
+    "min_z_mm": -1.0
+  },
+  "bucket_curl_inset_deg": 10.0,
+  "cylinder_extension_tolerance_mm": 1.0,
+  "hard_stop_probe": true,
+  "bucket_rel_default_range": [
+    -95.0,
+    50.0
+  ]
+}

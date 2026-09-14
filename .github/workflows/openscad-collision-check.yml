@@ -1,0 +1,85 @@
+name: OpenSCAD Collision Check
+
+# Interference check of the LifeTrac v25 assembly over its pose envelope (issue #119).
+# Exports each rigid group as STL per pose, measures pairwise overlap volumes with the
+# Manifold boolean engine, checks the clearance and ground rules, writes the report to the
+# job summary and fails the job (red check on PRs) on interference.
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/**'
+      - 'LifeTrac-v25/tools/collision-check/**'
+      - '.github/workflows/openscad-collision-check.yml'
+  pull_request:
+    paths:
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/**'
+      - 'LifeTrac-v25/tools/collision-check/**'
+      - '.github/workflows/openscad-collision-check.yml'
+  workflow_dispatch:
+    inputs:
+      arm_steps:
+        description: 'Arm angles sampled across the envelope'
+        default: '7'
+      bucket_steps:
+        description: 'Bucket angles sampled across the envelope'
+        default: '5'
+
+concurrency:
+  group: collision-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  collision-check:
+    name: Interference check over the pose envelope
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install OpenSCAD
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends openscad
+          openscad --version
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: LifeTrac-v25/tools/collision-check/requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r LifeTrac-v25/tools/collision-check/requirements.txt pytest
+
+      - name: Unit tests
+        run: python -m pytest -q LifeTrac-v25/tools/collision-check
+
+      - name: Run collision check
+        run: |
+          cd LifeTrac-v25/tools/collision-check
+          python collision_check.py \
+            --jobs "$(nproc)" \
+            --arm-steps "${{ inputs.arm_steps || 7 }}" \
+            --bucket-steps "${{ inputs.bucket_steps || 5 }}" \
+            --report out/collision_report.md \
+            --json out/collision_results.json \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: collision-check
+          path: |
+            LifeTrac-v25/tools/collision-check/out/collision_report.md
+            LifeTrac-v25/tools/collision-check/out/collision_results.json
+            LifeTrac-v25/tools/collision-check/out/*.log
+          if-no-files-found: warn
+          retention-days: 30

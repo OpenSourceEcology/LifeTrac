@@ -44,6 +44,7 @@ show_frame = true;
 show_loader_arms = true;
 show_bucket = true;
 show_folding_platform = true;  // Folding standing platform
+show_cog = true;               // Magenta centre-of-gravity marker sphere (drawn by calculate_cog)
 platform_fold_angle = 90;      // 0 = stowed (vertical), 90 = deployed (horizontal)
 exploded_view = false;
 explode_distance = exploded_view ? 200 : 0;
@@ -254,6 +255,15 @@ _anim_abs_angle = ($t == 0) ? _bucket_abs_at_ground :
 
 // Convert absolute angle to relative tilt (subtract arm rotation)
 BUCKET_TILT_ANGLE = _anim_abs_angle - ARM_LIFT_ANGLE;
+
+// Pose interface for tooling (see tools/collision-check and issue #119).
+// ARM_LIFT_ANGLE and BUCKET_TILT_ANGLE are top-level assignments, so any pose can be
+// set from the command line without going through the animation:
+//   openscad -D ARM_LIFT_ANGLE=30 -D BUCKET_TILT_ANGLE=-20 -o pose.stl lifetrac_v25.scad
+// The two lines below are machine-readable: the reachable envelope (arm min/max, bucket
+// absolute dump/curl angles) and the pose plus pivot geometry actually rendered.
+echo("COLLISION_ENVELOPE", ARM_MIN_ANGLE, _arm_max_for_animation, BUCKET_ABS_DUMP_ANGLE, BUCKET_ABS_CURL_ANGLE);
+echo("COLLISION_POSE", ARM_LIFT_ANGLE, BUCKET_TILT_ANGLE, ARM_PIVOT_Y, ARM_PIVOT_Z, ARM_TIP_X, ARM_TIP_Z, BUCKET_PIVOT_Y_OFFSET);
 
 // Debug output for animation
 echo("=== BUCKET ANIMATION DEBUG ===");
@@ -3492,7 +3502,9 @@ module calculate_cog() {
     rated_load_kg = tipping_load_kg * 0.5; // 50% of tipping load is safe rating (ISO standard)
     
     // --- VISUALIZATION ---
-    // Draw CoG Sphere (Empty)
+    // Draw CoG Sphere (Empty). Optional so that mesh exports (tools/collision-check)
+    // can leave the marker out with -D show_cog=false.
+    if (show_cog)
     color("Magenta")
     translate([0, cog_y_empty, FRAME_Z_OFFSET + 400])
     sphere(d=100);
@@ -4205,6 +4217,9 @@ module lift_cylinders() {
         echo("current_cyl_length:", current_cyl_length);
         echo("LIFT_CYL_LEN_MIN:", LIFT_CYL_LEN_MIN);
         echo("lift_extension:", lift_extension);
+        // Machine-readable: cylinder name, extension, stroke (tools/collision-check uses it
+        // to tell reachable poses from ones that would over-extend or bottom the cylinder)
+        echo("COLLISION_CYL", "lift", lift_extension, LIFT_CYLINDER_STROKE);
         
         for (side = [-1, 1]) {
             // Base point on frame - mounted between sandwich plates on side wall
@@ -4260,6 +4275,7 @@ module bucket_cylinders() {
         echo("current_bucket_cyl_length:", current_bucket_cyl_length);
         echo("BUCKET_CYL_LEN_MIN:", BUCKET_CYL_LEN_MIN);
         echo("bucket_extension:", bucket_extension);
+        echo("COLLISION_CYL", "bucket", bucket_extension, BUCKET_CYLINDER_STROKE);
         echo("CROSS_BEAM_1_POS:", CROSS_BEAM_1_POS);
         echo("CROSS_BEAM_MOUNT_Z_OFFSET:", CROSS_BEAM_MOUNT_Z_OFFSET);
         

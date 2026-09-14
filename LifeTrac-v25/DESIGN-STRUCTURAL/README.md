@@ -53,6 +53,18 @@ A 2D vector layout of all plate steel parts organized for CNC plasma cutting. Pa
 
 This file can be imported into CAM software (SheetCAM, etc.) for generating G-code.
 
+### Collision check
+
+Every change under `openscad/` also runs the interference check in
+[`../tools/collision-check/`](../tools/collision-check/) (GitHub workflow
+`openscad-collision-check.yml`). It exports the rigid groups of the assembly over a grid of
+arm and bucket angles, measures the overlap volume of every pair of groups and checks the
+wheel-clearance and ground rules from [DESIGN_RULES.md](DESIGN_RULES.md). The report is in
+the workflow's job summary; interference turns the check red. Any pose can be rendered
+directly with `-D ARM_LIFT_ANGLE=<deg> -D BUCKET_TILT_ANGLE=<deg>` (tilt relative to the
+arm). See [issue #119](https://github.com/OpenSourceEcology/LifeTrac/issues/119) for the
+background.
+
 ## Quick Start
 
 ### Prerequisites
