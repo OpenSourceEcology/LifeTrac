@@ -2506,6 +2506,18 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   harness's new `-RxExtraEnv` was shadowed by a same-name local
   (PowerShell is case-insensitive) — fixed, it had never been flown, so
   no leg is affected.**
+  FLOWN 2026-09-14 (bench-evidence/RS_12_14_shared_gate_2026-09-14, legs K
+  and L, profile 1, synth feed): the merged daemon is healthy on air
+  (leg K 4.8 % loss, follower locked, rx_fifo_skip 0) and the spacing
+  invariant holds under a deliberate two-opcode storm (leg L: 401
+  injected commands, 73 on air, every pair >= 3.48 s, none under any gate
+  threshold -- the leg-J 60 ms idle-drain pair cannot recur). The
+  active-hold counters cmd_gate_held / cmd_copies_deferred stayed 0: on
+  the lossy profile-1 link dispatch is idle-drain-dominated (0.12 s gate
+  vs 0.25 s poll) and the pump opens too rarely to bind the 1.0 s stream
+  gate, and no multi-copy command fired -- those paths stay SIL-only
+  here. Secondary: loss scaled with commands the tractor RECEIVED (leg K
+  8 -> 4.8 %, leg L 49 -> 7.8 %), reinforcing RS-12.15.**
 - [x] **RS-12.10 — FLOWN 2026-09-12 evening (PR #117): `rx_fifo_skip` = 0 over
   2,366 packets with 29 penultimate losses in the same leg (F) → M1 is NOT
   FIFO coalescing at the base; base deaf window per command = ToA + ≤1.9 ms
