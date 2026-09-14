@@ -126,7 +126,7 @@ Legs K and L left `cmd_gate_held` at 0 because on the lossy profile-1 link
 the completion pump opens too rarely to bind the 1.0 s gate. Legs M and N
 move to profile 2 (DTS single carrier, pinned 927.5 MHz — a clean link) to
 raise the pump cadence, keeping the same two-opcode contention injector
-(`legs/dual_inject.py`, 356 encode + 45 keyframe = 401 publishes).
+(`legs/dual_inject.py`; the M and N injector logs each end at 357 encode + 45 keyframe = 402 publishes -- leg L's ended at 356 + 45 = 401).
 
 | | leg M (2 fps, 3000 B) | leg N (5 fps, 400 B) |
 |---|---:|---:|
@@ -145,7 +145,7 @@ raise the pump cadence, keeping the same two-opcode contention injector
 
 **Leg N: the gate is the binding constraint on a fast stream -- with a caveat on what the counter proves.** At 5 fps with
 small (2–4 fragment) trains the pump opens several times a second, so the
-pump wanted to send far more often than the 1.0 s gate allows; `cmd_gate_held` reached **524** (492 → 509 → 524 across the run) and every command was ≥ 1.122 s from the next. Caveat (PR #124 review): the daemon increments `cmd_gate_held` on every closed-gate check BEFORE `_next_ctrl_body()` decides whether a command is actually due, so 524 is a count of closed-gate checks while something was pending or queued -- it does not by itself show 524 deferred eligible sends. What IS established is the spacing floor: no pair under 1.0 s while the pump opened several times a second. A `cmd_gate_deferred` counter (closed gate AND a command due, PR #124 follow-up) plus a rerun is what would establish active arbitration. Contrast the progression as the pump cadence rises toward the
+pump wanted to send far more often than the 1.0 s gate allows; `cmd_gate_held` reached **524** (492 → 509 → 524 across the run) and every command was ≥ 1.122 s from the next. Caveat (PR #124 review): the daemon increments `cmd_gate_held` on every closed-gate check BEFORE `_next_ctrl_body()` decides whether a command is actually due, so 524 is a count of closed-gate checks while something was pending or queued -- it does not by itself show 524 deferred eligible sends. What IS established is the spacing floor: no pair under 1.0 s while the pump opened several times a second. A `cmd_gate_deferred` counter (closed gate AND a send due, scored on every gate path, PR #124 follow-up) plus a rerun is what would establish active arbitration. Contrast the progression as the pump cadence rises toward the
 gate:
 
 | leg | link / rate | pump cadence | min command gap | `cmd_gate_held` |

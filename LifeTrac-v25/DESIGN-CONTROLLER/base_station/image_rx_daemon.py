@@ -614,7 +614,7 @@ class ImageRxDaemon:
                 self._ack_profile(False, self._active_profile,
                                   error="no tractor ack")
             elif (now - self._await_ack_last_send > 1.5
-                  and self._cmd_gate_open(now)):
+                  and self._cmd_gate_open(now, True)):
                 self._await_ack_last_send = now
                 self._send_command_frame(link, pack_command_frame(
                     CMD_OP_RADIO_PROFILE,
@@ -637,7 +637,7 @@ class ImageRxDaemon:
         # target stays pending for the next pass, nothing is popped yet.
         with self._lock:
             wanted = self._pending_profile
-        if wanted is None or not self._cmd_gate_open(now):
+        if wanted is None or not self._cmd_gate_open(now, True):
             return
         with self._lock:
             target = self._pending_profile
@@ -752,17 +752,27 @@ class ImageRxDaemon:
         streaming and every base TX costs the FHSS follower a slot."""
         return (now - getattr(self, "_last_frag_t", 0.0)) < IDLE_DRAIN_QUIET_S
 
-    def _cmd_gate_open(self, now: float) -> bool:
+    def _cmd_gate_open(self, now: float, wants_send: bool = False) -> bool:
         """PR #121 review (2026-09-14): ONE shared send gate for every
         command path — aligned pump, idle drain, profile switch and CONF,
         reactive probe — measured from the previous dispatch's last on-air
-        copy (cmd_timing.send_gate_open). A closed gate is counted
-        (cmd_gate_held on the stats line) and asked again next pass; it is
-        never waited on, the RX loop must keep servicing the FIFO."""
+        copy (cmd_timing.send_gate_open). A closed gate is counted and
+        asked again next pass; it is never waited on, the RX loop must keep
+        servicing the FIFO.
+
+        Two counters (PR #124 review): cmd_gate_held counts EVERY closed-gate
+        check; cmd_gate_deferred counts a closed gate only when the caller
+        had a send actually due -- `wants_send`. The pump and the idle drain
+        pass _ctrl_due(now) (a pending retry past its gap, or a queued
+        legacy entry); the profile switch, its Phase-A resend, the CONF and
+        the reactive probe only ask when they are about to send, so they
+        pass True. Every gate path is covered, not just the pump."""
         if send_gate_open(now, getattr(self, "_last_cmd_send_t", 0.0),
                           self._stream_active(now), CMD_STREAM_MIN_GAP_S):
             return True
         self._cmd_gate_held = getattr(self, "_cmd_gate_held", 0) + 1
+        if wants_send:
+            self._cmd_gate_deferred = getattr(self, "_cmd_gate_deferred", 0) + 1
         return False
 
     def _ctrl_due(self, now: float) -> bool:
@@ -794,7 +804,7 @@ class ImageRxDaemon:
         tractor is idle", and each of those sends re-anchored the tractor.
         """
         now = time.monotonic()
-        if not self._cmd_gate_open(now):
+        if not self._cmd_gate_open(now, self._ctrl_due(now)):
             return
         # Pending (ack-driven) commands first, oldest first; then one
         # legacy entry — the loop's ~0.25 s read timeout is the cadence.
@@ -1037,7 +1047,7 @@ class ImageRxDaemon:
             return
         # PR #121 review: the CONF rides the shared send gate too; while the
         # gate is closed the next frame on the new profile asks again.
-        if not self._cmd_gate_open(time.monotonic()):
+        if not self._cmd_gate_open(time.monotonic(), True):
             return
         self._confirm_pending = False
         self._revert_to = None
@@ -1511,16 +1521,12 @@ class ImageRxDaemon:
                 # CMD_STREAM_MIN_GAP_S (the old 120 ms copy-spacing when idle).
                 # PR #121 review: the gate is shared with every other command
                 # path — see _cmd_gate_open.
-                if self._cmd_gate_open(now_pump):
+                # PR #124 review: the gate scores a real deferral
+                # (cmd_gate_deferred) only when a command is actually due.
+                if self._cmd_gate_open(now_pump, self._ctrl_due(now_pump)):
                     body = self._next_ctrl_body(now_pump)
                     if body is not None:
                         self._send_command_frame(link, body, copies=1)
-                elif self._ctrl_due(now_pump):
-                    # PR #124 review: a closed gate with a command actually
-                    # DUE is a real deferral. cmd_gate_held above counts
-                    # every closed-gate check; this one is the arbitration.
-                    self._cmd_gate_deferred = (
-                        getattr(self, "_cmd_gate_deferred", 0) + 1)
 
             # 2026-07-27 RS-0.12 reactive-fire: a fragment completed the tile
             # of the last train, so the tractor's RXCONT just re-armed. Fire
@@ -1684,7 +1690,7 @@ class ImageRxDaemon:
         if now - self._last_probe_t < self._probe_min_gap_s:
             return
         # PR #121 review: probes share the send gate with every other path.
-        if not self._cmd_gate_open(now):
+        if not self._cmd_gate_open(now, True):
             return
         self._last_probe_t = now
         # Round-robin the sweep offsets so each phase bin accumulates samples.
