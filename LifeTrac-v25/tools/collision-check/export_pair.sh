@@ -17,13 +17,12 @@ OUT="${COLLISION_OUT:-$HERE/out}"
 mkdir -p "$OUT"
 
 PROBE="$OUT/_probe_pairs.scad"
-# Regenerate the probe when the model or this script (which appends the probe) is newer.
-if [ ! -f "$PROBE" ] || [ "$SCAD_DIR/lifetrac_v25.scad" -nt "$PROBE" ] || [ "$0" -nt "$PROBE" ]; then
-  sed -e "s|^include <lifetrac_v25_params.scad>|include <$SCAD_DIR/lifetrac_v25_params.scad>|" \
-      -e "s|^use <\(.*\)>|use <$SCAD_DIR/\1>|" \
-      -e "s|^lifetrac_v25_assembly();|// lifetrac_v25_assembly(); // replaced by the pair probe below|" \
-      "$SCAD_DIR/lifetrac_v25.scad" > "$PROBE"
-  cat >> "$PROBE" <<'EOF'
+# Always rebuild the probe so edits in any included/used .scad file are picked up.
+sed -e "s|^include <lifetrac_v25_params.scad>|include <$SCAD_DIR/lifetrac_v25_params.scad>|" \
+    -e "s|^use <\(.*\)>|use <$SCAD_DIR/\1>|" \
+    -e "s|^lifetrac_v25_assembly();|// lifetrac_v25_assembly(); // replaced by the pair probe below|" \
+    "$SCAD_DIR/lifetrac_v25.scad" > "$PROBE"
+cat >> "$PROBE" <<'EOF'
 
 // ---- collision pair probe (appended by tools/collision-check/export_pair.sh) ----
 pair_a = "arms";
@@ -39,7 +38,6 @@ module collision_group(name) {
 }
 intersection() { collision_group(pair_a); collision_group(pair_b); }
 EOF
-fi
 
 STL="$OUT/pair_${A}_${B}_t${T}.stl"
 LOG="$OUT/pair_${A}_${B}_t${T}.log"
@@ -54,4 +52,4 @@ END=$(date +%s)
 FACETS=$(grep -c 'facet normal' "$STL" 2>/dev/null || echo 0)
 MSG=$(grep -i -E 'empty|ERROR' "$LOG" | head -1)
 echo "pair=$A/$B t=$T rc=$RC seconds=$((END-START)) facets=$FACETS msg=$MSG" | tee -a "$OUT/pair_timings.txt"
-exit 0
+exit "$RC"

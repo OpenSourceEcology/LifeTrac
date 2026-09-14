@@ -2,6 +2,7 @@
 import os
 import stat
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -304,6 +305,48 @@ def test_suggest_budgets_from_results():
     assert sb.round_up_2sig(649.0) == 650.0 and sb.round_up_2sig(309882.0) == 310000.0
     budgets = sb.suggest(results, margin=0.15, floor=50.0)
     assert budgets == {"arms/frame": 72.0, "frame/hydraulics": 240000.0}
+
+
+def test_classify_keeps_malformed_echo_problems_when_openscad_fails():
+    pose = cc.Pose(10.0, -5.0)
+
+    class FakeScad:
+        def echo(self, _name, _pose):
+            return {
+                "rc": 1,
+                "POSE": [10.0, -5.0],
+                "CYL": [("lift", 10.0, 650.0)],
+                "errors": ['malformed echo line: ECHO: "COLLISION_CYL", "bucket", undef, 508'],
+            }
+
+    runner = object.__new__(cc.Runner)
+    runner.args = SimpleNamespace(jobs=1)
+    runner.scad = FakeScad()
+    runner.required_cylinders = ["lift", "bucket"]
+    runner.cyl_tol = 1.0
+    runner.timings = {}
+
+    results = runner.classify([pose], [])
+    checks = results[pose].checks
+    assert any(c.subject == "openscad" and "exited 1" in c.note for c in checks)
+    assert any(c.subject == "cylinders" and c.note.startswith("malformed echo line") for c in checks)
+
+
+def test_results_json_emits_poses_in_sorted_order():
+    a = cc.Pose(30.0, -10.0)
+    b = cc.Pose(-20.0, 5.0)
+    c = cc.Pose(30.0, -20.0)
+    results = {
+        a: cc.PoseResult(pose=a, reachable=True),
+        b: cc.PoseResult(pose=b, reachable=True),
+        c: cc.PoseResult(pose=c, reachable=False),
+    }
+    runner = SimpleNamespace(static_checks=[], notes=[])
+    env = cc.Envelope(-30.0, 50.0, -90.0, 50.0, 50.0)
+
+    payload = cc.results_json(runner, env, results, "OpenSCAD fake", passed=True)
+    got = [(p["arm"], p["bucket_rel"]) for p in payload["poses"]]
+    assert got == [(-20.0, 5.0), (30.0, -20.0), (30.0, -10.0)]
 
 
 def test_snap_volume_drops_boolean_noise():

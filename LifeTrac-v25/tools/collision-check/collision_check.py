@@ -562,8 +562,7 @@ class Runner:
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.args.jobs) as ex:
             for pose, parsed in ex.map(one, sampled):
                 cyls, rc = parsed.get("CYL", []), parsed.get("rc", 1)
-                problems = (pose_problems(parsed, pose) + cylinder_problems(parsed, self.required_cylinders)
-                            if rc == 0 else [])
+                problems = pose_problems(parsed, pose) + cylinder_problems(parsed, self.required_cylinders)
                 reachable = rc == 0 and not problems and cylinders_reachable(cyls, self.cyl_tol)
                 results[pose] = PoseResult(pose=pose, reachable=reachable, cylinders=cyls,
                                            informational=pose in probe_set)
