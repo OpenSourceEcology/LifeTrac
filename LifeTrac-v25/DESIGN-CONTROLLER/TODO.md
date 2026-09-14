@@ -2450,7 +2450,26 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   costs the camera path anything; long synth/keyframe trains get the
   3.2 % → 1.5 % benefit. `LIFETRAC_NO_PARK_LAST` default unchanged (0);
   flipping it is now a low-risk call once RS-3.11 decides on long trains.
-- [ ] **RS-12.15 — reverse-path delivery on FHSS: the tractor's RX does not follow
+- [~] **RS-12.15 — FHSS clock authority: FIRMWARE IMPLEMENTED + FLASHED
+  2026-09-14 (commit 23ba5122, branch rs12-15-clock-authority, PR pending);
+  BEHAVIORAL A/B still PENDING. A self-anchored originator (own-TX clock,
+  no adopted grid) read as UNANCHORED, so it snapped/re-anchored to its
+  follower's lagged echo of its own grid and walked the shared grid a slot
+  off (the lock-loss mechanism). Fix: it now adopts a remote grid only when
+  that grid LEADS its own (sx1276_fhss_clock_rx_leads(), monotonic-earlier
+  = convergent + recovery-safe; follower/recovery paths unchanged; no wire
+  change). SIL green (rx_leads golden vectors), -Werror clean, both L072s
+  flashed (Verify OK, md5 2ee69f9c, 24328 B) and boot healthy (radio_state
+  4). Legs O/P (new fw, synth profile-1 storm): follower ROCK-SOLID (0 lock
+  losses, max frag gap 0.6 s), loss 0.3 % / 4.9 % vs old-fw leg L 7.8 % --
+  NO REGRESSION but NOT a fix A/B: the synth path does not reproduce the
+  break (leg L old-fw also had 0 lock losses; the break was only ever on
+  CAMERA legs I/J, un-reflyable on old fw now). Evidence
+  RS_12_15_clock_authority_2026-09-14. NEXT (needs GO): a camera-motion leg
+  on new fw, OR an RFCO_SUMMARY capture showing the originator now logs
+  consider_remote=LOCKED_OUT on received commands (feed-independent proof).
+  The reverse-delivery half below still stands.**
+- [ ] **RS-12.15 (reverse-delivery half) — the tractor's RX does not follow
   the slot clock between trains (opened 2026-09-12 from RS-12.12/14 data).**
   **SHARPENED 2026-09-12 (RS-12.14 gate leg J): the dominant mechanism is FHSS
   Base→tractor command delivery on profile 1 was 1/17 (leg H, healthy link)
