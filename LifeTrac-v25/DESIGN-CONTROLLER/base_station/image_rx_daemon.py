@@ -54,7 +54,9 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
-from cmd_timing import idle_drain_allowed, pump_window_open  # RS-12.11
+from cmd_timing import (  # RS-12.11 / RS-12.14
+    idle_drain_allowed, pump_window_open,
+    pending_retry_gap, giveup_cooldown_active, send_gate_open)
 
 # ---- repo imports ----------------------------------------------------
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -260,6 +262,14 @@ LOG_FRAG_ARRIVALS = os.environ.get(
 # ends - the one instant no fragment can be due. 0 restores the old
 # behaviour for an A/B leg. Rules live in cmd_timing.py (SIL-pinned).
 IDLE_DRAIN_QUIET_S = _env_float("LIFETRAC_IDLE_DRAIN_QUIET_S", 1.5, lo=0.0)
+
+# RS-12.14 (2026-09-12): bound the pending-command retry storm (see
+# cmd_timing.py). Backoff factor 1.0 + cooldown 0 + stream gap 0.12 restore
+# the pre-RS-12.14 behaviour for an A/B leg.
+PENDING_RETRY_BACKOFF = _env_float("LIFETRAC_PENDING_RETRY_BACKOFF", 2.0, lo=1.0)
+PENDING_RETRY_MAX_GAP_S = _env_float("LIFETRAC_PENDING_RETRY_MAX_GAP_S", 8.0, lo=0.1)
+PENDING_GIVEUP_COOLDOWN_S = _env_float("LIFETRAC_PENDING_GIVEUP_COOLDOWN_S", 30.0, lo=0.0)
+CMD_STREAM_MIN_GAP_S = _env_float("LIFETRAC_CMD_STREAM_MIN_GAP_S", 1.0, lo=0.12)
 
 
 class KeyframeRequester:
@@ -602,7 +612,8 @@ class ImageRxDaemon:
                 self._await_ack_profile = None
                 self._ack_profile(False, self._active_profile,
                                   error="no tractor ack")
-            elif now - self._await_ack_last_send > 1.5:
+            elif (now - self._await_ack_last_send > 1.5
+                  and self._cmd_gate_open(now)):
                 self._await_ack_last_send = now
                 self._send_command_frame(link, pack_command_frame(
                     CMD_OP_RADIO_PROFILE,
@@ -621,6 +632,12 @@ class ImageRxDaemon:
                 self._ack_profile(False, self._active_profile,
                                   error="reverted: link silent")
         # New operator/auto request → Phase A.
+        # PR #121 review: a new request waits for the shared send gate — the
+        # target stays pending for the next pass, nothing is popped yet.
+        with self._lock:
+            wanted = self._pending_profile
+        if wanted is None or not self._cmd_gate_open(now):
+            return
         with self._lock:
             target = self._pending_profile
             self._pending_profile = None
@@ -665,6 +682,12 @@ class ImageRxDaemon:
         """
         now = time.monotonic()
         with self._lock:
+            # RS-12.14: a command that gave up stays refused for a cool-down;
+            # otherwise the self-heal re-trigger restarts the storm at once.
+            gave_up_at = getattr(self, "_giveup_at", {}).get(opcode, 0.0)
+            if giveup_cooldown_active(now, gave_up_at, PENDING_GIVEUP_COOLDOWN_S):
+                self._cooldown_drops = getattr(self, "_cooldown_drops", 0) + 1
+                return
             cur = self._pending_cmds.get(opcode)
             if cur is not None:
                 if cur["body"] == body:
@@ -700,10 +723,20 @@ class ImageRxDaemon:
                 cur = self._pending_cmds[opcode]
                 if cur["attempts"] >= cur["max_attempts"] or now > cur["deadline"]:
                     del self._pending_cmds[opcode]
-                    LOG.warning("cmd 0x%02x GAVE UP after %d attempts (%.1f s)",
-                                opcode, cur["attempts"], now - cur["t0"])
+                    # RS-12.14: remember when, so _set_pending can hold the
+                    # cool-down instead of restarting the retries.
+                    if not hasattr(self, "_giveup_at"):
+                        self._giveup_at = {}
+                    self._giveup_at[opcode] = now
+                    LOG.warning("cmd 0x%02x GAVE UP after %d attempts (%.1f s); "
+                                "cool-down %.0f s", opcode, cur["attempts"],
+                                now - cur["t0"], PENDING_GIVEUP_COOLDOWN_S)
                     continue
-                if now - cur.get("last_send", 0.0) < self.PENDING_RETRY_MIN_GAP_S:
+                # RS-12.14: exponential backoff between retries of one command
+                # (0.4, 0.8, 1.6, 3.2, 6.4, 8, 8 ... s at the defaults).
+                if now - cur.get("last_send", 0.0) < pending_retry_gap(
+                        cur["attempts"], self.PENDING_RETRY_MIN_GAP_S,
+                        PENDING_RETRY_BACKOFF, PENDING_RETRY_MAX_GAP_S):
                     continue
                 cur["attempts"] += 1
                 cur["last_send"] = now
@@ -713,23 +746,43 @@ class ImageRxDaemon:
         except queue.Empty:
             return None
 
+    def _stream_active(self, now: float) -> bool:
+        """Fragments flowed within IDLE_DRAIN_QUIET_S: the tractor is
+        streaming and every base TX costs the FHSS follower a slot."""
+        return (now - getattr(self, "_last_frag_t", 0.0)) < IDLE_DRAIN_QUIET_S
+
+    def _cmd_gate_open(self, now: float) -> bool:
+        """PR #121 review (2026-09-14): ONE shared send gate for every
+        command path — aligned pump, idle drain, profile switch and CONF,
+        reactive probe — measured from the previous dispatch's last on-air
+        copy (cmd_timing.send_gate_open). A closed gate is counted
+        (cmd_gate_held on the stats line) and asked again next pass; it is
+        never waited on, the RX loop must keep servicing the FIFO."""
+        if send_gate_open(now, getattr(self, "_last_cmd_send_t", 0.0),
+                          self._stream_active(now), CMD_STREAM_MIN_GAP_S):
+            return True
+        self._cmd_gate_held = getattr(self, "_cmd_gate_held", 0) + 1
+        return False
+
     def _drain_ctrl_idle(self, link: HostLink) -> None:
         """Idle-link fallback: drain queued commands when no image stream
         is flowing (the tractor is listening continuously then, so timing
         does not matter). During a stream the ONLY drain is the aligned,
-        ≥120 ms-spaced pump in the RX loop."""
-        # Pending (ack-driven) commands: one retry per idle pass — the
-        # loop's ~0.25 s read timeout is the natural retry cadence, and
-        # an idle tractor listens continuously so timing is free.
-        body = self._next_ctrl_body(time.monotonic())
-        while body is not None:
+        gated pump in the RX loop.
+
+        PR #121 review: ONE dispatch per idle pass, behind the shared gate.
+        Leg J (RS_12_14) drained two legacy commands 60 ms apart during a
+        lock loss — on FHSS "quiet" can mean "the base is deaf", not "the
+        tractor is idle", and each of those sends re-anchored the tractor.
+        """
+        now = time.monotonic()
+        if not self._cmd_gate_open(now):
+            return
+        # Pending (ack-driven) commands first, oldest first; then one
+        # legacy entry — the loop's ~0.25 s read timeout is the cadence.
+        body = self._next_ctrl_body(now)
+        if body is not None:
             self._send_command_frame(link, body, copies=1)
-            # Only continue draining the LEGACY queue in one go; pending
-            # entries retry across passes, not in a tight loop.
-            try:
-                body = self._ctrl_out.get_nowait()
-            except queue.Empty:
-                return
 
     def _send_command_frame(self, link: HostLink, body: bytes,
                             copies: int = 2) -> None:
@@ -744,19 +797,36 @@ class ImageRxDaemon:
         op = body[1] if len(body) > 1 else 0
         n = max(1, copies)
         try:
-            for i in range(n):
+            try:
+                tx_frame = bytes([0xFD, len(body)]) + body
+                link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
+                wait_for_tx_done(link, 0xFD, timeout=2.0)
+                # PR #121 review: the shared send gate measures from HERE —
+                # the end of the deaf window, whichever path transmitted.
+                self._last_cmd_send_t = time.monotonic()
+                self._cmd_tx_ok = getattr(self, "_cmd_tx_ok", 0) + 1
+                LOG.info("command TX opcode=0x%02x copy=1/%d OK (on air)",
+                         op, n)
+            except Exception as exc:
+                self._cmd_tx_fail = getattr(self, "_cmd_tx_fail", 0) + 1
+                LOG.warning("command TX opcode=0x%02x copy=1/%d FAILED: %s",
+                            op, n, exc)
+                return
+            # PR #121 review: extra copies no longer go out back-to-back
+            # (Run H 2026-07-26: copies ~37 ms apart land in the same window
+            # and collapse into one attempt). They join the legacy queue and
+            # ride the shared gate, so copy 2 is an independent shot at a
+            # later train boundary — and it costs the FHSS follower a slot
+            # only once the gate allows it. Logged as copy=1/1 when sent.
+            for _ in range(n - 1):
                 try:
-                    tx_frame = bytes([0xFD, len(body)]) + body
-                    link.send(HOST_TYPE_TX_FRAME_REQ, tx_frame)
-                    wait_for_tx_done(link, 0xFD, timeout=2.0)
-                    self._cmd_tx_ok = getattr(self, "_cmd_tx_ok", 0) + 1
-                    LOG.info("command TX opcode=0x%02x copy=%d/%d OK (on air)",
-                             op, i + 1, n)
-                except Exception as exc:
-                    self._cmd_tx_fail = getattr(self, "_cmd_tx_fail", 0) + 1
-                    LOG.warning("command TX opcode=0x%02x copy=%d/%d FAILED: %s",
-                                op, i + 1, n, exc)
-                    return
+                    self._ctrl_out.put_nowait(body)
+                    self._cmd_copies_deferred = (
+                        getattr(self, "_cmd_copies_deferred", 0) + 1)
+                except queue.Full:
+                    LOG.warning("command TX opcode=0x%02x: extra copy dropped "
+                                "(command queue full)", op)
+                    break
         finally:
             # CRITICAL: our TX parks the modem in STANDBY (see
             # _ensure_rxcont docstring) — re-arm or go deaf.
@@ -946,6 +1016,10 @@ class ImageRxDaemon:
     def _note_proof_of_life(self, link: HostLink) -> None:
         """First frame on a freshly switched profile → confirm to tractor."""
         if not self._confirm_pending:
+            return
+        # PR #121 review: the CONF rides the shared send gate too; while the
+        # gate is closed the next frame on the new profile asks again.
+        if not self._cmd_gate_open(time.monotonic()):
             return
         self._confirm_pending = False
         self._revert_to = None
@@ -1414,11 +1488,15 @@ class ImageRxDaemon:
                 # making the copies independent shots (expected per-command
                 # delivery 1-(1-p)^2 instead of p).
                 now_pump = time.monotonic()
-                if now_pump - getattr(self, "_last_pump_t", 0.0) >= 0.12:
+                # RS-12.14: while fragments are flowing every base TX costs the
+                # FHSS follower a slot, so space ALL sends by
+                # CMD_STREAM_MIN_GAP_S (the old 120 ms copy-spacing when idle).
+                # PR #121 review: the gate is shared with every other command
+                # path — see _cmd_gate_open.
+                if self._cmd_gate_open(now_pump):
                     body = self._next_ctrl_body(now_pump)
                     if body is not None:
                         self._send_command_frame(link, body, copies=1)
-                        self._last_pump_t = now_pump
 
             # 2026-07-27 RS-0.12 reactive-fire: a fragment completed the tile
             # of the last train, so the tractor's RXCONT just re-armed. Fire
@@ -1581,6 +1659,9 @@ class ImageRxDaemon:
         now = time.monotonic()
         if now - self._last_probe_t < self._probe_min_gap_s:
             return
+        # PR #121 review: probes share the send gate with every other path.
+        if not self._cmd_gate_open(now):
+            return
         self._last_probe_t = now
         # Round-robin the sweep offsets so each phase bin accumulates samples.
         phase_ms = self._probe_sweep[self._probe_seq % len(self._probe_sweep)]
@@ -1626,12 +1707,16 @@ class ImageRxDaemon:
                     "stats: rx_frames=%d rx_decode_err=%d "
                     "frames_published=%d publish_err=%d "
                     "reassembler_decode_err=%d reassembler_timeouts=%d "
-                    "parity_recon=%d idle_drain_deferred=%d",
+                    "parity_recon=%d idle_drain_deferred=%d cmd_cooldown_drops=%d "
+                    "cmd_gate_held=%d cmd_copies_deferred=%d",
                     s.rx_frames_seen, s.rx_decode_errors,
                     s.reassembled_frames_published, s.publish_errors,
                     s.reassembler_decode_errors, s.reassembler_timeouts,
                     self.reassembler.stats.parity_reconstructions,
-                    getattr(self, "_idle_drain_deferred", 0))
+                    getattr(self, "_idle_drain_deferred", 0),
+                    getattr(self, "_cooldown_drops", 0),
+                    getattr(self, "_cmd_gate_held", 0),
+                    getattr(self, "_cmd_copies_deferred", 0))
             # RS-2.3 forensics + RS-1.1 command counters (outside the lock;
             # the sample list is only touched from the ingest thread and a
             # briefly stale read here is fine for a log line).

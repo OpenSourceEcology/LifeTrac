@@ -2405,6 +2405,25 @@ a producer-side layout test `check-stats-layout`); the corrected build's
 `tx_deaf_*` / `rx_fifo_skip` readings are in the RS-12.10 section of the
 evidence. Both boards on the RS-12.10 bench build; radios parked after.
 
+**SESSION 2026-09-12 (night) OUTCOME — RS-12.14 GATE FLOWN (leg J), BENCH QUIESCED.**
+Leg J (profile 1, keyframes on + injector, mitigated daemon): sends 281 → 65,
+loss 62.8 → 38.8 %, published 226 → 365 — a strict improvement that does NOT
+meet the 2 % gate; the follower still lost lock 4× (7–29 s), each 1–2 s after
+a command the tractor received ⇒ RS-12.15 sharpened to FHSS clock authority
+(firmware, next flash session). PR #121 (host mitigation + evidence, CI
+green) open — merge decision with the operator. Evidence
+`bench-evidence/RS_12_14_keyframe_storm_2026-09-12/` (RESULTS.md carries the
+quiesce table). **Bench left QUIESCED 23:55 UTC:** Linux up on both boards,
+radios `PARK_OK 0x80` both (`night_park_*.txt`), no UART holders,
+`bench_webui` stopped and removed (8090 closed), tractor
+`lifetrac-camera.service` inactive, base mosquitto left up, /tmp tooling
+intact. Both L072s still carry the RS-12.10 BENCH build (e8ad8424…), not the
+production binary — reflash before any field use. Tractor clock is unsynced
+(reads Aug 30). Resume = run the harness (no unpark step); nothing radio-side
+without a fresh GO. Queue: (1) RS-12.15 firmware (clock authority + tractor
+RX slot follow) = flash session; (2) RS-3.11 encoder decision; (3) hail
+candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
+
 - [x] **RS-12.11 — base command scheduler vs fragment arrivals: DONE 2026-09-12
   (PR #118, gate passed, see above).**
 - [x] **RS-4.15 — motion-aware stale-scan horizon: DONE 2026-09-12 (PR #118,
@@ -2431,7 +2450,35 @@ evidence. Both boards on the RS-12.10 bench build; radios parked after.
   costs the camera path anything; long synth/keyframe trains get the
   3.2 % → 1.5 % benefit. `LIFETRAC_NO_PARK_LAST` default unchanged (0);
   flipping it is now a low-risk call once RS-3.11 decides on long trains.
+- [ ] **RS-12.15 — reverse-path delivery on FHSS: the tractor's RX does not follow
+  the slot clock between trains (opened 2026-09-12 from RS-12.12/14 data).**
+  **SHARPENED 2026-09-12 (RS-12.14 gate leg J): the dominant mechanism is FHSS
+  Base→tractor command delivery on profile 1 was 1/17 (leg H, healthy link)
+  and 49/281 (leg I) vs 56/58 on profile 2. The base DOES hop its command TX
+  with the tractor's grid (277 distinct hop/channel pairs in 281 sends), so
+  the miss is on the listening side: `sx1276_rx_slot_follow` runs only while
+  the scan SM is LOCKED, LOCK demotes 2 s (`SX1276_RX_SCAN_LOCK_LOSS_MS`)
+  after the last valid frame, and a node that mostly transmits rarely
+  receives one — so between trains the tractor listens on the SCAN WALKER's
+  channel, not the clock's. Receptions come in bursts right after a lucky
+  hit (10/5/1/6/1/13/10/3 per 30 s in leg I) — the LOCKED intervals. Fix
+  (firmware, next flash session): let the TX-self-anchored node's follower
+  run on its own valid clock without scan LOCK (or treat own TX as the anchor
+  event / lengthen LOCK_LOSS for the anchor). Until then every keyframe
+  request on profile 1 costs several retries, which is what RS-12.14 bounds.
 - [ ] **RS-12.14 — keyframe self-heal storm destroys the FHSS follower
+  CLOCK AUTHORITY, not reverse delivery. Every follower lock loss in the three
+  profile-1 legs starts 1–2 s after a base command the TRACTOR RECEIVED (H: 1
+  received, 0 losses; I: 49, four up to 64 s; J: 15, four up to 29 s; unheard
+  sends cause nothing). Reading: the tractor (anchor) re-anchors its clock
+  from the base's command headers — the base's lagged follower copy (F6
+  2026-07-30: a self-anchored grid has no authority to refuse a remote one) —
+  its TX slots shift, the base's follower is a slot off within LOCK_LOSS_MS
+  (2 s) and re-acquires in 20–30 s. FIX (firmware, next flash): the streaming
+  node must not re-anchor from a follower's headers (mark follower-originated
+  frames non-anchoring, or let the anchor refuse remote grids while it
+  streams). Interim: profile-1 field operation with
+  LIFETRAC_KF_REQUEST_DISABLE=1. The reverse-delivery half below stands.**
   (opened 2026-09-12, from RS-12.12 leg I).** With keyframe requests enabled
   on profile 1, a few early misses trigger self-heal requests; each is a base
   TX that skips the follower under tx-busy (RS-4.14); the follower loses lock
@@ -2445,7 +2492,20 @@ evidence. Both boards on the RS-12.10 bench build; radios parked after.
   repair (RS-4.15) and drop per-gap keyframes on FHSS. INTERIM: run field
   profile-1 with LIFETRAC_KF_REQUEST_DISABLE=1 or a heavy rate limit. Not a
   regression from this session's work — pre-existing RS-4.14 loop, first
-  measured on the production profile here.
+  measured on the production profile here. **MITIGATION LANDED 2026-09-12
+  (branch rs12-14-keyframe-storm): exponential retry backoff (0.4→8 s cap),
+  30 s give-up cool-down per opcode, and a 1 s minimum gap between ANY two
+  base commands while a stream is active (`cmd_timing.py`, env knobs in
+  SETTINGS_REFERENCE). GATE FLOWN (leg J, RS_12_14_keyframe_storm_2026-09-12): sends 281 → 65,
+  loss 62.8 → 38.8 % — a strict improvement, NOT the 2 % target: the follower
+  still lost lock 4× (7–29 s), each 1–2 s after a command the tractor
+  received → RS-12.15 (clock authority) is the real fix.
+  Review round (PR #121, 2026-09-14): ONE shared send gate now covers
+  every command path incl. the idle drain (it had drained two commands
+  60 ms apart during a lock loss) and extra copies queue behind it; the
+  harness's new `-RxExtraEnv` was shadowed by a same-name local
+  (PowerShell is case-insensitive) — fixed, it had never been flown, so
+  no leg is affected.**
 - [x] **RS-12.10 — FLOWN 2026-09-12 evening (PR #117): `rx_fifo_skip` = 0 over
   2,366 packets with 29 penultimate losses in the same leg (F) → M1 is NOT
   FIFO coalescing at the base; base deaf window per command = ToA + ≤1.9 ms

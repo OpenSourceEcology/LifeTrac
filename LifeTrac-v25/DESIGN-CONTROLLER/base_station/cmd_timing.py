@@ -36,3 +36,54 @@ def idle_drain_allowed(now: float, last_frag_t: float, quiet_s: float) -> bool:
 def pump_window_open(frame_done: bool, train_end: bool) -> bool:
     """True when the completion-aligned pump may send one command copy."""
     return bool(frame_done or train_end)
+
+
+# RS-12.14 (2026-09-12): the keyframe self-heal storm on FHSS. A pending
+# (ack-driven) command retried every 0.4 s on every pump window until acked,
+# and every re-trigger extended its deadline; on profile 1 the acks mostly
+# do not come back (reverse-path delivery was 1 of 17 even on a healthy
+# leg), so one perpetually refreshed REQ_KEYFRAME fired 222 times in 300 s,
+# each a base TX that skips the FHSS follower under tx-busy, and the leg
+# collapsed from 2.1 % to 62.8 % loss (RS_12_12 legs H vs I). Three pure
+# rules bound that:
+#   pending_retry_gap  - exponential backoff between retries of one command
+#   giveup_cooldown_active - after a command gives up, the same opcode is
+#                        refused for a cool-down instead of restarting
+#   pump_min_gap       - while a stream is active, ANY two base commands
+#                        are at least CMD_STREAM_MIN_GAP_S apart
+
+def pending_retry_gap(attempts: int, base_gap_s: float, factor: float,
+                      cap_s: float) -> float:
+    """Gap to wait before retry number `attempts + 1` (attempts already made)."""
+    if attempts <= 0:
+        return 0.0
+    gap = base_gap_s * (max(factor, 1.0) ** (attempts - 1))
+    return min(gap, cap_s)
+
+
+def giveup_cooldown_active(now: float, giveup_at: float, cooldown_s: float) -> bool:
+    """True while a given-up opcode must not be re-registered."""
+    return cooldown_s > 0.0 and giveup_at > 0.0 and (now - giveup_at) < cooldown_s
+
+
+def pump_min_gap(stream_active: bool, stream_gap_s: float,
+                 idle_gap_s: float = 0.12) -> float:
+    """Minimum spacing between two pump sends: the stream gap while fragments
+    are flowing (each base TX costs the FHSS follower), the old 120 ms
+    copy-spacing otherwise."""
+    return max(stream_gap_s, idle_gap_s) if stream_active else idle_gap_s
+
+
+# PR #121 review (2026-09-14): the stream gap guarded only the aligned pump.
+# Profile switches (two immediate copies), the CONF, reactive probes and the
+# idle drain each sent on their own clock - leg J recorded two idle-drain
+# sends 60 ms apart during a lock loss. One shared gate now decides every
+# dispatch on every path, measured from the previous dispatch's last on-air
+# copy. A closed gate is counted and re-asked on the next pass, never waited
+# on: the RX loop must keep servicing the modem FIFO.
+
+def send_gate_open(now: float, last_send_t: float, stream_active: bool,
+                   stream_gap_s: float, idle_gap_s: float = 0.12) -> bool:
+    """True when ANY command path may dispatch one command copy."""
+    return (now - last_send_t) >= pump_min_gap(stream_active, stream_gap_s,
+                                               idle_gap_s)

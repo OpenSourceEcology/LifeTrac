@@ -82,6 +82,12 @@ param(
     # RS-12.11 (2026-09-12): idle-drain quiet gate on the base rx daemon
     # (LIFETRAC_IDLE_DRAIN_QUIET_S). "0" = pre-RS-12.11 behaviour (A/B control).
     [string]$IdleDrainQuietS = "1.5",
+    # RS-12.14 (2026-09-12): minimum spacing between base commands while a
+    # stream is active (LIFETRAC_CMD_STREAM_MIN_GAP_S); "0.12" = pre-RS-12.14.
+    # Backoff/cooldown ride LIFETRAC_PENDING_RETRY_BACKOFF=1 and
+    # LIFETRAC_PENDING_GIVEUP_COOLDOWN_S=0 for the A/B control (-RxExtraEnv).
+    [string]$CmdStreamMinGapS = "1.0",
+    [string]$RxExtraEnv = "",
     # RS-12.13 (2026-09-12): the hold applies only to trains of at least this
     # many fragments (LIFETRAC_NO_PARK_LAST_MIN_FRAGS on the tx daemon).
     [int]$NoParkLastMinFrags = 3,
@@ -354,11 +360,17 @@ cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -
 # production topology has the base web_ui subscribed to the base
 # broker anyway — tile_delta + link_stats land where the web UI reads.
 # RS-0.13b/RS-0.12 (2026-07-27): aligned-pump A/B + reactive-fire probe env.
-$rxExtraEnv = "-e LIFETRAC_ALIGNED_PUMP=$AlignedPump -e LIFETRAC_REACTIVE_FIRE=$ReactiveFire -e LIFETRAC_IDLE_DRAIN_QUIET_S=$IdleDrainQuietS"
-if ($ProbePhaseSweepMs -ne "") { $rxExtraEnv = "$rxExtraEnv -e LIFETRAC_PROBE_PHASE_SWEEP_MS=$ProbePhaseSweepMs" }
-if ($ProbeSizesB -ne "") { $rxExtraEnv = "$rxExtraEnv -e LIFETRAC_PROBE_SIZES_B=$ProbeSizesB" }
+# PR #121 review (2026-09-14): PowerShell names are case-INsensitive, so the
+# assembled docker args must not reuse the -RxExtraEnv parameter name in any
+# letter case: a same-name local overwrote the parameter (caller overrides
+# dropped, defaults appended to themselves; leg J params.txt shows the doubled
+# defaults). Never flown with an override, so no leg was affected.
+$rxEnvArgs = "-e LIFETRAC_ALIGNED_PUMP=$AlignedPump -e LIFETRAC_REACTIVE_FIRE=$ReactiveFire -e LIFETRAC_IDLE_DRAIN_QUIET_S=$IdleDrainQuietS -e LIFETRAC_CMD_STREAM_MIN_GAP_S=$CmdStreamMinGapS"
+if ($RxExtraEnv -ne "") { $rxEnvArgs = "$rxEnvArgs $RxExtraEnv" }
+if ($ProbePhaseSweepMs -ne "") { $rxEnvArgs = "$rxEnvArgs -e LIFETRAC_PROBE_PHASE_SWEEP_MS=$ProbePhaseSweepMs" }
+if ($ProbeSizesB -ne "") { $rxEnvArgs = "$rxEnvArgs -e LIFETRAC_PROBE_SIZES_B=$ProbeSizesB" }
 Write-Host "[LAUNCH] Starting RX Daemon on Board $RxAdbSerial..." -ForegroundColor Yellow
-cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f rx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name rx_smoke --network=host --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CTRL_MQTT_HOST=$HostIp -e LIFETRAC_SKIP_RESET_REQ=1 -e LIFETRAC_KF_REQUEST_DISABLE=$KfRequestDisable $rxExtraEnv $profEnv lifetrac-v25:latest python3 -u /work/image_rx_daemon.py --log-level INFO`""
+cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f rx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name rx_smoke --network=host --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CTRL_MQTT_HOST=$HostIp -e LIFETRAC_SKIP_RESET_REQ=1 -e LIFETRAC_KF_REQUEST_DISABLE=$KfRequestDisable $rxEnvArgs $profEnv lifetrac-v25:latest python3 -u /work/image_rx_daemon.py --log-level INFO`""
 
 Start-Sleep -Seconds 4
 
@@ -484,6 +496,9 @@ if ($Archive) {
         "no_park_last=$NoParkLast",
         "no_park_last_min_frags=$NoParkLastMinFrags",
         "idle_drain_quiet_s=$IdleDrainQuietS",
+        "cmd_stream_min_gap_s=$CmdStreamMinGapS",
+        "rx_extra_env=$RxExtraEnv",
+        "rx_env_args=$rxEnvArgs",
         "parity_group=$ParityGroup",
         "aligned_pump=$AlignedPump",
         "reactive_fire=$ReactiveFire",
