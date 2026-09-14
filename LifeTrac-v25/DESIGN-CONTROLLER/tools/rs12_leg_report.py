@@ -95,7 +95,7 @@ def main() -> int:
                                  sorted(tx_lens.items())))
         else:
             tlen = 13
-            tlen_src = "DEFAULT 13 — no long trains in tx log, treat with care"
+            tlen_src = "DEFAULT 13 -- no long trains in tx log, treat with care"
         pen = tlen - 2
         print(f"train length {tlen} [{tlen_src}]")
         print(f"attributed {tot}; penultimate idx {pen} = {idx.get(pen, 0)} "
@@ -113,7 +113,7 @@ def main() -> int:
         # imply a purity the instrument cannot deliver.
         other_long = sorted(k for k in long_lens if k != tlen)
         if other_long:
-            print(f"  !! MIXED LENGTHS {sorted(long_lens)} — idx {pen} is "
+            print(f"  !! MIXED LENGTHS {sorted(long_lens)} -- idx {pen} is "
                   f"penultimate for len {tlen}, but also "
                   + ", ".join(
                       f"{'final' if pen == k - 1 else f'idx {pen}'} of "

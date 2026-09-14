@@ -2451,20 +2451,8 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   3.2 % → 1.5 % benefit. `LIFETRAC_NO_PARK_LAST` default unchanged (0);
   flipping it is now a low-risk call once RS-3.11 decides on long trains.
 - [ ] **RS-12.15 — reverse-path delivery on FHSS: the tractor's RX does not follow
-  **SHARPENED 2026-09-12 (RS-12.14 gate leg J): the dominant mechanism is FHSS
-  CLOCK AUTHORITY, not reverse delivery. Every follower lock loss in the three
-  profile-1 legs starts 1–2 s after a base command the TRACTOR RECEIVED (H: 1
-  received, 0 losses; I: 49, four up to 64 s; J: 15, four up to 29 s; unheard
-  sends cause nothing). Reading: the tractor (anchor) re-anchors its clock
-  from the base's command headers — the base's lagged follower copy (F6
-  2026-07-30: a self-anchored grid has no authority to refuse a remote one) —
-  its TX slots shift, the base's follower is a slot off within LOCK_LOSS_MS
-  (2 s) and re-acquires in 20–30 s. FIX (firmware, next flash): the streaming
-  node must not re-anchor from a follower's headers (mark follower-originated
-  frames non-anchoring, or let the anchor refuse remote grids while it
-  streams). Interim: profile-1 field operation with
-  LIFETRAC_KF_REQUEST_DISABLE=1. The reverse-delivery half below stands.**
   the slot clock between trains (opened 2026-09-12 from RS-12.12/14 data).**
+  **SHARPENED 2026-09-12 (RS-12.14 gate leg J): the dominant mechanism is FHSS
   Base→tractor command delivery on profile 1 was 1/17 (leg H, healthy link)
   and 49/281 (leg I) vs 56/58 on profile 2. The base DOES hop its command TX
   with the tractor's grid (277 distinct hop/channel pairs in 281 sends), so
@@ -2479,6 +2467,18 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   event / lengthen LOCK_LOSS for the anchor). Until then every keyframe
   request on profile 1 costs several retries, which is what RS-12.14 bounds.
 - [ ] **RS-12.14 — keyframe self-heal storm destroys the FHSS follower
+  CLOCK AUTHORITY, not reverse delivery. Every follower lock loss in the three
+  profile-1 legs starts 1–2 s after a base command the TRACTOR RECEIVED (H: 1
+  received, 0 losses; I: 49, four up to 64 s; J: 15, four up to 29 s; unheard
+  sends cause nothing). Reading: the tractor (anchor) re-anchors its clock
+  from the base's command headers — the base's lagged follower copy (F6
+  2026-07-30: a self-anchored grid has no authority to refuse a remote one) —
+  its TX slots shift, the base's follower is a slot off within LOCK_LOSS_MS
+  (2 s) and re-acquires in 20–30 s. FIX (firmware, next flash): the streaming
+  node must not re-anchor from a follower's headers (mark follower-originated
+  frames non-anchoring, or let the anchor refuse remote grids while it
+  streams). Interim: profile-1 field operation with
+  LIFETRAC_KF_REQUEST_DISABLE=1. The reverse-delivery half below stands.**
   (opened 2026-09-12, from RS-12.12 leg I).** With keyframe requests enabled
   on profile 1, a few early misses trigger self-heal requests; each is a base
   TX that skips the follower under tx-busy (RS-4.14); the follower loses lock
@@ -2499,9 +2499,13 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   SETTINGS_REFERENCE). GATE FLOWN (leg J, RS_12_14_keyframe_storm_2026-09-12): sends 281 → 65,
   loss 62.8 → 38.8 % — a strict improvement, NOT the 2 % target: the follower
   still lost lock 4× (7–29 s), each 1–2 s after a command the tractor
-  received → RS-12.15 (clock authority) is the real fix. Small host
-  follow-up: apply the stream gap to the idle drain too (it drained two
-  commands 60 ms apart during a lock loss).**
+  received → RS-12.15 (clock authority) is the real fix.
+  Review round (PR #121, 2026-09-14): ONE shared send gate now covers
+  every command path incl. the idle drain (it had drained two commands
+  60 ms apart during a lock loss) and extra copies queue behind it; the
+  harness's new `-RxExtraEnv` was shadowed by a same-name local
+  (PowerShell is case-insensitive) — fixed, it had never been flown, so
+  no leg is affected.**
 - [x] **RS-12.10 — FLOWN 2026-09-12 evening (PR #117): `rx_fifo_skip` = 0 over
   2,366 packets with 29 penultimate losses in the same leg (F) → M1 is NOT
   FIFO coalescing at the base; base deaf window per command = ToA + ≤1.9 ms

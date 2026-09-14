@@ -16,7 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cmd_timing import (  # noqa: E402
     idle_drain_allowed, pump_window_open,
-    pending_retry_gap, giveup_cooldown_active, pump_min_gap)
+    pending_retry_gap, giveup_cooldown_active, pump_min_gap,
+    send_gate_open)
 
 
 class IdleDrainRule(unittest.TestCase):
@@ -89,17 +90,29 @@ class PendingRetryBackoff(unittest.TestCase):
         for n in range(1, 10):
             self.assertEqual(pending_retry_gap(n, 0.4, 1.0, 8.0), 0.4)
 
+    @staticmethod
+    def _sends_within(window_s: float, factor: float) -> int:
+        """Retries of ONE never-acked command that fit in `window_s`. The
+        time cutoff ends the loop — never an attempt bound — so the count
+        measures the backoff and nothing else (PR #121 review: the first
+        version capped the loop at 40 and passed with the old fixed gap)."""
+        t, sends, attempts = 0.0, 0, 0
+        while True:
+            t += pending_retry_gap(attempts, 0.4, factor, 8.0)
+            if t > window_s:
+                return sends
+            sends += 1
+            attempts += 1
+
     def test_leg_i_budget(self) -> None:
         """Leg I: a perpetually re-triggered REQ_KEYFRAME sent 222 times in
-        300 s. With the defaults, the retries of one episode fit under the
-        10 s pending deadline only ~5 times, then the 8 s cap holds."""
-        t, sends = 0.0, 0
-        for n in range(0, 40):
-            t += pending_retry_gap(n, 0.4, 2.0, 8.0)
-            if t > 300.0:
-                break
-            sends += 1
-        self.assertLess(sends, 45)                        # was ~222 at 0.4 s fixed
+        300 s at the fixed 0.4 s gap. With the defaults one episode fits
+        ~41 sends in 300 s (0.4, 0.8, 1.6, 3.2, 6.4, then 8 s steps)."""
+        fixed = self._sends_within(300.0, 1.0)
+        backed_off = self._sends_within(300.0, 2.0)
+        self.assertGreater(fixed, 700)            # the storm: 0.4 s forever
+        self.assertLess(backed_off, 45)
+        self.assertLess(backed_off, fixed // 10)  # an order of magnitude
 
 
 class GiveupCooldown(unittest.TestCase):
@@ -132,3 +145,39 @@ class PumpMinGap(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SharedSendGate(unittest.TestCase):
+    """PR #121 review (2026-09-14): every command path — pump, idle drain,
+    profile switch/CONF, probe — shares ONE gate, measured from the previous
+    dispatch's last on-air copy."""
+
+    def test_stream_gap_blocks_then_opens(self) -> None:
+        self.assertFalse(send_gate_open(now=10.5, last_send_t=10.0,
+                                        stream_active=True, stream_gap_s=1.0))
+        self.assertTrue(send_gate_open(now=11.0, last_send_t=10.0,
+                                       stream_active=True, stream_gap_s=1.0))
+
+    def test_leg_j_idle_drain_pair(self) -> None:
+        # Leg J: 0x60 then 0x6c 60 ms apart from the idle drain (RESULTS.md).
+        self.assertFalse(send_gate_open(now=50.96, last_send_t=50.90,
+                                        stream_active=False, stream_gap_s=1.0))
+        self.assertTrue(send_gate_open(now=51.02, last_send_t=50.90,
+                                       stream_active=False, stream_gap_s=1.0))
+
+    def test_paths_see_each_other(self) -> None:
+        # A pump send at t; a profile resend wanted 0.3 s later mid-stream
+        # is refused, the same request 1 s after the pump send goes.
+        t = 100.0
+        self.assertFalse(send_gate_open(t + 0.3, t, True, 1.0))
+        self.assertTrue(send_gate_open(t + 1.0, t, True, 1.0))
+
+    def test_fresh_daemon_is_open(self) -> None:
+        # No send yet (sentinel 0.0), well past any gap: nothing is held.
+        self.assertTrue(send_gate_open(now=5.0, last_send_t=0.0,
+                                       stream_active=True, stream_gap_s=1.0))
+
+    def test_idle_gap_floor_holds_for_the_ab_control(self) -> None:
+        # The A/B control (stream gap 0.12) still spaces copies by 120 ms.
+        self.assertFalse(send_gate_open(1.05, 1.0, True, 0.12))
+        self.assertTrue(send_gate_open(1.12, 1.0, True, 0.12))

@@ -72,3 +72,18 @@ def pump_min_gap(stream_active: bool, stream_gap_s: float,
     are flowing (each base TX costs the FHSS follower), the old 120 ms
     copy-spacing otherwise."""
     return max(stream_gap_s, idle_gap_s) if stream_active else idle_gap_s
+
+
+# PR #121 review (2026-09-14): the stream gap guarded only the aligned pump.
+# Profile switches (two immediate copies), the CONF, reactive probes and the
+# idle drain each sent on their own clock - leg J recorded two idle-drain
+# sends 60 ms apart during a lock loss. One shared gate now decides every
+# dispatch on every path, measured from the previous dispatch's last on-air
+# copy. A closed gate is counted and re-asked on the next pass, never waited
+# on: the RX loop must keep servicing the modem FIFO.
+
+def send_gate_open(now: float, last_send_t: float, stream_active: bool,
+                   stream_gap_s: float, idle_gap_s: float = 0.12) -> bool:
+    """True when ANY command path may dispatch one command copy."""
+    return (now - last_send_t) >= pump_min_gap(stream_active, stream_gap_s,
+                                               idle_gap_s)

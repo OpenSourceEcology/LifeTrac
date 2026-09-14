@@ -360,12 +360,17 @@ cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -
 # production topology has the base web_ui subscribed to the base
 # broker anyway — tile_delta + link_stats land where the web UI reads.
 # RS-0.13b/RS-0.12 (2026-07-27): aligned-pump A/B + reactive-fire probe env.
-$rxExtraEnv = "-e LIFETRAC_ALIGNED_PUMP=$AlignedPump -e LIFETRAC_REACTIVE_FIRE=$ReactiveFire -e LIFETRAC_IDLE_DRAIN_QUIET_S=$IdleDrainQuietS -e LIFETRAC_CMD_STREAM_MIN_GAP_S=$CmdStreamMinGapS"
-if ($RxExtraEnv -ne "") { $rxExtraEnv = "$rxExtraEnv $RxExtraEnv" }
-if ($ProbePhaseSweepMs -ne "") { $rxExtraEnv = "$rxExtraEnv -e LIFETRAC_PROBE_PHASE_SWEEP_MS=$ProbePhaseSweepMs" }
-if ($ProbeSizesB -ne "") { $rxExtraEnv = "$rxExtraEnv -e LIFETRAC_PROBE_SIZES_B=$ProbeSizesB" }
+# PR #121 review (2026-09-14): PowerShell names are case-INsensitive, so the
+# assembled docker args must not reuse the -RxExtraEnv parameter name in any
+# letter case: a same-name local overwrote the parameter (caller overrides
+# dropped, defaults appended to themselves; leg J params.txt shows the doubled
+# defaults). Never flown with an override, so no leg was affected.
+$rxEnvArgs = "-e LIFETRAC_ALIGNED_PUMP=$AlignedPump -e LIFETRAC_REACTIVE_FIRE=$ReactiveFire -e LIFETRAC_IDLE_DRAIN_QUIET_S=$IdleDrainQuietS -e LIFETRAC_CMD_STREAM_MIN_GAP_S=$CmdStreamMinGapS"
+if ($RxExtraEnv -ne "") { $rxEnvArgs = "$rxEnvArgs $RxExtraEnv" }
+if ($ProbePhaseSweepMs -ne "") { $rxEnvArgs = "$rxEnvArgs -e LIFETRAC_PROBE_PHASE_SWEEP_MS=$ProbePhaseSweepMs" }
+if ($ProbeSizesB -ne "") { $rxEnvArgs = "$rxEnvArgs -e LIFETRAC_PROBE_SIZES_B=$ProbeSizesB" }
 Write-Host "[LAUNCH] Starting RX Daemon on Board $RxAdbSerial..." -ForegroundColor Yellow
-cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f rx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name rx_smoke --network=host --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CTRL_MQTT_HOST=$HostIp -e LIFETRAC_SKIP_RESET_REQ=1 -e LIFETRAC_KF_REQUEST_DISABLE=$KfRequestDisable $rxExtraEnv $profEnv lifetrac-v25:latest python3 -u /work/image_rx_daemon.py --log-level INFO`""
+cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker rm -f rx_smoke 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name rx_smoke --network=host --device=/dev/ttymxc3 -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CTRL_MQTT_HOST=$HostIp -e LIFETRAC_SKIP_RESET_REQ=1 -e LIFETRAC_KF_REQUEST_DISABLE=$KfRequestDisable $rxEnvArgs $profEnv lifetrac-v25:latest python3 -u /work/image_rx_daemon.py --log-level INFO`""
 
 Start-Sleep -Seconds 4
 
@@ -493,6 +498,7 @@ if ($Archive) {
         "idle_drain_quiet_s=$IdleDrainQuietS",
         "cmd_stream_min_gap_s=$CmdStreamMinGapS",
         "rx_extra_env=$RxExtraEnv",
+        "rx_env_args=$rxEnvArgs",
         "parity_group=$ParityGroup",
         "aligned_pump=$AlignedPump",
         "reactive_fire=$ReactiveFire",

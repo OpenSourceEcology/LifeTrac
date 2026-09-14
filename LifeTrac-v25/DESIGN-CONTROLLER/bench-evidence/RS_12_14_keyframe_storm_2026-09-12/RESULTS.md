@@ -1,6 +1,6 @@
 # RS-12.14 — bounding the keyframe self-heal storm on FHSS (2026-09-12, late)
 
-**Status: gate leg in progress — appended when it completes.**
+**Status: gate leg J flown — a strict improvement (62.8 → 38.8 % loss, 281 → 65 sends) that does NOT meet the 2 % target; see the verdict, the quiesce table and the corrections below.**
 
 ## Why
 
@@ -129,3 +129,26 @@ Resume = run the harness (it re-inits the radio; no unpark step). Nothing
 radio-side runs without a fresh GO. The park readback is the authoritative
 parked state; a probe connect would auto-wake the L072, so no state was read
 after parking.
+
+## Corrections and follow-ups on the record (2026-09-14, PR #121 review)
+
+- **Harness parameter shadowed.** The `-RxExtraEnv` parameter added for the
+  A/B control was overwritten by the harness's own `$rxExtraEnv` local
+  (PowerShell variable names are case-insensitive), so a caller's override
+  would have been dropped and the defaults appended to themselves. Leg J did
+  not pass an override; its `params.txt` shows exactly the doubled defaults
+  (`rx_extra_env=-e LIFETRAC_ALIGNED_PUMP=1 … -e LIFETRAC_ALIGNED_PUMP=1 …`),
+  which is the signature of the bug and also the proof that the daemon ran
+  the intended defaults. No flown leg used the parameter. Fixed in the
+  review round (`$rxEnvArgs`); `params.txt` now records both the caller's
+  override (`rx_extra_env=`) and the assembled args (`rx_env_args=`).
+- **The "small host follow-up" above is implemented:** one shared send gate
+  now covers every command path (pump, idle drain, profile switch and CONF,
+  probe) and extra copies queue behind it (`cmd_timing.send_gate_open`;
+  counters `cmd_gate_held` / `cmd_copies_deferred` on the stats line). Not
+  flown yet — the next profile-1 leg carries it.
+- **`legs/legJ_report.txt` line 5** contained a Windows-1252 dash byte
+  (0x97, the tool's em dash written through a cp1252 stdout redirect);
+  repaired to UTF-8, and `tools/rs12_leg_report.py` now prints ASCII dashes.
+  The same byte sits in seven older leg reports on main (legs A, B, F, H, I
+  and the two RS_12_bulk_floor arrival analyses); those are untouched here.
