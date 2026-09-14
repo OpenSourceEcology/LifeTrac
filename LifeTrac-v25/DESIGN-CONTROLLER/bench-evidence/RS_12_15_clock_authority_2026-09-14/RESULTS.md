@@ -149,7 +149,20 @@ follower's echo) is real but secondary.
   (the LOCKED_OUT refusals), `clk_demotion_reset` / `clk_demotion_kept`,
   `tx_first_anchor` (phase restarts), `tx_stream_streak_max`.
 - Full host `check` green, H7 host vectors green, bench binary `-Werror`
-  clean: md5 `db7dd598e52154581d991c7b84db09a3`, 24724 B.
+  clean: md5 `5a160e4a8c9296c7d2e49727bdfb8880`, 24860 B.
+- **Round 3 (PR #125 review):** (a) the streak's chain test is STRICT
+  (`< 1000 ms`) so a sender spaced exactly at the RS-12.14 stream gate's
+  1.0 s never chains, and **authority decays** one gap after the last own
+  TX, so a post-demotion base that bursts a few queued commands and goes
+  quiet cannot sit on a stale self-anchored grid refusing the tractor;
+  (b) the RX adopt / demotion rules moved out of `sx1276_rx.c` into a
+  HW-free TU, `sx1276_rx_grid_policy.[ch]`, and **`check-rx-grid-policy`
+  drives the full adopt → demote → duplex-TX → remote-frame sequence
+  against the real `consider_remote()`**: the post-demotion single-TX node
+  is UNANCHORED and gets SNAPPED (never LOCKED_OUT); the streaming
+  originator refuses a lagging echo (LOCKED_OUT, clock untouched on
+  ALIGNED) and adopts a leading grid; its own demotion keeps its clock;
+  authority decays after 1 s of silence; exactly-1 s commands never earn it.
 
 **Staged on both boards (`/tmp/lifetrac_p0c`, flash tooling re-pushed
 LF-clean after the post-flash reboots):** v2 as `firmware_bench_diag.bin`
@@ -163,14 +176,16 @@ without GO.
 ### Validation plan for the next GO (reproducible instrument, firmware A/B)
 The synthetic path needs SPARSE trains to expose the demotion reset (the
 next TX after the 2 s demotion must land past the old slot boundary):
-`-SynthFps 1 -SynthBudgetB 400` (2-fragment trains one second apart) with
+`-SynthFps 1.5 -SynthBudgetB 400` (2-fragment trains ~667 ms apart — far
+past the 200 ms slot boundary, yet the ~627 ms gap between pairs stays
+under the 1 s authority chain limit so the tractor keeps its streak) with
 the plain keyframe injector, whose unacked REQ_KEYFRAME retries at 0.4 /
 0.8 s make the 2–3-command bursts that LOCK the tractor.
 
 | leg | firmware | expect |
 |---|---|---|
 | Q | RS-12.10 `e8ad8424` (re-flash) | lock-loss gaps > 3 s appear (reproduces I/J on synth); no counters (168-byte STATS, fly from `main` so the probe labels match) |
-| R | v2 `db7dd598` (re-flash) | tractor `clk_demotion_reset` = 0, `clk_demotion_kept` > 0, `fhss_dec_rej_locked_out` > 0, `tx_first_anchor` = 1, `tx_stream_streak_max` ≥ 8; zero lock-loss gaps; fly from `rs12-15-clock-authority` |
+| R | v2 `5a160e4a` (re-flash) | tractor `clk_demotion_reset` = 0, `clk_demotion_kept` > 0, `fhss_dec_rej_locked_out` > 0, `tx_first_anchor` = 1, `tx_stream_streak_max` ≥ 8; zero lock-loss gaps; fly from `rs12-15-clock-authority` |
 
 Each flash: `REVIVE_MODE=reboot bash /home/fio/run_flash_bench.sh
 /tmp/lifetrac_p0c/<bin>` (tractor: stop `lifetrac-camera.service` and the

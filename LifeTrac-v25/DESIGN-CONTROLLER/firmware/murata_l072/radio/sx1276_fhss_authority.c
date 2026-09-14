@@ -25,8 +25,10 @@ void sx1276_fhss_authority_reset(void) {
 void sx1276_fhss_authority_note_tx(uint32_t now_ms) {
     /* Wrap-safe u32 gap, same idiom as the clock TU. A gap wider than
      * the streaming cadence restarts the streak at this transmission. */
+    /* STRICT: a sender spaced exactly at the gap (the RS-12.14 stream
+     * gate admits commands at >= 1.0 s) must not chain (PR #125 review). */
     if (s_auth.have_tx != 0U &&
-        (now_ms - s_auth.last_tx_ms) <= SX1276_FHSS_AUTHORITY_STREAK_GAP_MS) {
+        (now_ms - s_auth.last_tx_ms) < SX1276_FHSS_AUTHORITY_STREAK_GAP_MS) {
         if (s_auth.streak != 0xFFFFFFFFU) {
             ++s_auth.streak;
         }
@@ -55,10 +57,19 @@ uint32_t sx1276_fhss_authority_streak_max(void) {
     return s_auth.streak_max;
 }
 
-uint8_t sx1276_fhss_authority_is_originator(uint8_t clock_valid,
+uint8_t sx1276_fhss_authority_is_originator(uint32_t now_ms,
+                                            uint8_t clock_valid,
                                             uint8_t grid_adopted) {
-    if (clock_valid == 0U || grid_adopted != 0U) {
+    if (clock_valid == 0U || grid_adopted != 0U || s_auth.have_tx == 0U) {
         return 0U;
     }
-    return (s_auth.streak >= SX1276_FHSS_AUTHORITY_MIN_STREAK) ? 1U : 0U;
+    if (s_auth.streak < SX1276_FHSS_AUTHORITY_MIN_STREAK) {
+        return 0U;
+    }
+    /* Authority DECAYS when streaming stops: a node that sent a burst and
+     * went quiet loses it one gap later, so a post-demotion base that
+     * drained a few queued commands cannot sit on a stale grid refusing
+     * the tractor (PR #125 review round 3). Wrap-safe u32 idiom. */
+    return ((now_ms - s_auth.last_tx_ms) < SX1276_FHSS_AUTHORITY_STREAK_GAP_MS)
+               ? 1U : 0U;
 }

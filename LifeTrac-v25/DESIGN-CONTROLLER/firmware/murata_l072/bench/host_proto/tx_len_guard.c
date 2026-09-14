@@ -101,7 +101,7 @@ int main(void) {
     }
     CHECK(sx1276_fhss_authority_streak() == 0U,
           "12 refused attempts must leave the streak at 0");
-    CHECK(sx1276_fhss_authority_is_originator(1U, 0U) == 0U,
+    CHECK(sx1276_fhss_authority_is_originator(1000U, 1U, 0U) == 0U,
           "refused attempts must not grant originator authority");
 
     req.length = 247U;                       /* 247+8 = 255: exactly legal */

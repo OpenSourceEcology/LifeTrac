@@ -2457,14 +2457,14 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   TX grid, the next TX re-anchors "slot k+1 starts now"; dense synth trains
   re-sync inside the slot (leg L: 0 losses), sparse camera trains renumber the
   grid (legs I/J: 20-30 s rescans). v2: originator authority = sustained own-TX
-  streaming (>= 8 TXs within 1 s each; sx1276_fhss_authority, check-fhss-
+  streaming (>= 8 on-air TXs each < 1 s apart, decaying 1 s after the last; round 3: adopt/demote policy in sx1276_rx_grid_policy with check-rx-grid-policy driving demote->TX->RX against the real consider_remote; sx1276_fhss_authority, check-fhss-
   authority incl. the demotion->TX->RX regression), the demotion edge resets
   only an ADOPTED clock, and STATS 168->208 adds the consider_remote histogram,
   clk_demotion_reset/kept, tx_first_anchor, tx_stream_streak_max so the next
-  leg MEASURES it. Bench bin db7dd598 (24724 B) + the byte-identical old
+  leg MEASURES it. Bench bin 5a160e4a (24860 B) + the byte-identical old
   RS-12.10 bin e8ad8424 are staged in /tmp/lifetrac_p0c on both boards; flash
   tooling re-pushed LF-clean. Boards still on v1 (2ee69f9c). Plan (needs GO):
-  leg Q old fw on SPARSE synth (-SynthFps 1 -SynthBudgetB 400 + kf_inject
+  leg Q old fw on SPARSE synth (-SynthFps 1.5 -SynthBudgetB 400 + kf_inject
   bursts, fly from main) to reproduce the lock losses; leg R v2 same setup
   (fly from the branch) expecting clk_demotion_reset=0 and zero lock-loss gaps.
   Evidence RS_12_15_clock_authority_2026-09-14/RESULTS.md (v2 section).**

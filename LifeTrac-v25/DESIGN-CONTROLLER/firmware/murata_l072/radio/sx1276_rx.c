@@ -12,7 +12,7 @@
 #include "sx1276_airtime.h"
 #include "sx1276_fhss.h"
 #include "sx1276_fhss_clock.h"
-#include "sx1276_fhss_authority.h"
+#include "sx1276_rx_grid_policy.h"   /* RS-12.15 v2: adopt/demote policy */
 #include "sx1276_rx_scan_fail.h"
 #include "sx1276_rx_scan_walker.h"
 #include "sx1276_tx.h"
@@ -61,15 +61,10 @@ static uint8_t  s_rx_last_retune_ms_valid;
  * the anchor path when a packet is received mid-slot). */
 static uint32_t s_rx_last_followed_abs;
 static uint8_t  s_rx_last_followed_abs_valid;
-/* F6 (2026-07-30): has ANY remote grid been accepted (ALIGNED/SNAPPED)
- * since the last acquisition reset? While 0 the health passed to
- * consider_remote() is UNANCHORED even if the clock is TX-self-anchored
- * -- a self-anchored grid has no authority to refuse a remote one.
- * Without this flag the TX lazy anchor re-validates the stale grid
- * immediately after every demotion and the recovery tier is
- * unreachable on duplex nodes (map correction C1). Cleared at boot
- * (bss), on the LOCKED->SCANNING demotion edge, and in scan_reset. */
-static uint8_t  s_grid_adopted;
+/* F6 (2026-07-30) s_grid_adopted -- has ANY remote grid been accepted
+ * since the last acquisition reset? -- now lives in the HW-free
+ * sx1276_rx_grid_policy.c together with the adopt/demotion rules, so the
+ * bench can drive the whole sequence (RS-12.15 v2, PR #125 round 3). */
 /* F6: the freshness horizon and the demotion horizon must move
  * together -- a clock is authoritative exactly as long as link loss
  * would not yet have demoted the lock. */
@@ -233,64 +228,28 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
                  * hop_idx (>= CHANNEL_COUNT), which the A6a header
                  * spec disallows; counting it surfaces a remote-side
                  * encoder bug rather than a transport problem. */
-                /* F6: compute local clock health for the snap gate.
-                 * UNANCHORED until a remote grid has been adopted --
-                 * see s_grid_adopted above. */
-                /* RS-12.15 (2026-09-14): a SELF-ANCHORED originator --
-                 * a node whose clock was set by its OWN TX and that has
-                 * not adopted a remote grid (valid clock + !adopted) --
-                 * must not be dragged by its own follower's lagged echo.
-                 * Today such a node reads UNANCHORED, so it SNAPS its
-                 * scheduler back to (or re-anchors its phase from) the
-                 * follower, walking the whole shared grid a slot off and
-                 * making the follower lose lock (RS-12.12/14 evidence).
-                 * It now adopts a remote ONLY when that remote's grid
-                 * LEADS its own -- monotonic-earlier, which is globally
-                 * convergent (never a deadlock between two self-anchored
-                 * grids) and leaves recovery intact, since a demoted node
-                 * has an INVALID clock and still takes the UNANCHORED
-                 * path below. Followers (adopted) and recovering nodes
-                 * (invalid clock) are unchanged. */
+                /* F6 + RS-12.15 v2: the health tier for the snap gate and
+                 * the adopt decision come from the HW-free grid policy
+                 * (sx1276_rx_grid_policy.h): a follower or a recovering
+                 * node adopts as before (UNANCHORED / FRESH / STALE by
+                 * age); a STREAMING originator adopts only a grid that
+                 * genuinely LEADS its own and hands FRESH to
+                 * consider_remote so a lagging follower's snap is refused
+                 * (LOCKED_OUT). check-rx-grid-policy pins the sequence,
+                 * including the post-demotion duplex-TX recovery. */
                 const uint32_t now_anchor_ms = platform_now_ms();
                 const uint32_t remote_abs = sx1276_fhss_clock_abs_of(
                     parsed.epoch, parsed.hop_idx);
                 const uint32_t remote_toa_us =
                     sx1276_airtime_estimate_toa_us((uint8_t)rx_len);
-                /* v2: authority needs SUSTAINED own-TX streaming
-                 * (sx1276_fhss_authority.h) -- a post-demotion duplex
-                 * node that just re-validated a stale grid with one
-                 * command is NOT an originator and keeps the UNANCHORED
-                 * recovery tier (PR #125 review). */
-                const uint8_t self_anchored_originator =
-                    sx1276_fhss_authority_is_originator(
-                        sx1276_fhss_clock_valid(), s_grid_adopted);
-                /* Follower / recovery always adopt (== 1); a self-anchored
-                 * originator adopts only a leading grid. */
-                const uint8_t adopt_remote_grid =
-                    (self_anchored_originator == 0U)
-                        ? 1U
-                        : sx1276_fhss_clock_rx_leads(now_anchor_ms,
-                                                     remote_toa_us,
-                                                     parsed.slot_offset_ms,
-                                                     remote_abs);
-                const sx1276_fhss_clock_health_t health =
-                    (sx1276_fhss_clock_valid() == 0U ||
-                     s_grid_adopted == 0U)
-                        ? ((self_anchored_originator != 0U &&
-                            adopt_remote_grid == 0U)
-                               /* Originator, remote does NOT lead: make the
-                                * grid authoritative so consider_remote
-                                * REFUSES a follower snap (LOCKED_OUT). */
-                               ? SX1276_FHSS_CLOCK_FRESH
-                               : SX1276_FHSS_CLOCK_UNANCHORED)
-                        : ((sx1276_fhss_clock_age_ms(now_anchor_ms)
-                                <= SX1276_FHSS_CLOCK_FRESH_MS)
-                               ? SX1276_FHSS_CLOCK_FRESH
-                               : SX1276_FHSS_CLOCK_STALE);
+                const sx1276_rx_grid_verdict_t grid =
+                    sx1276_rx_grid_consider(now_anchor_ms, remote_toa_us,
+                                            parsed.slot_offset_ms,
+                                            remote_abs);
                 const sx1276_fhss_snap_decision_t dec =
                     sx1276_fhss_consider_remote(parsed.epoch,
                                                 parsed.hop_idx,
-                                                health);
+                                                grid.health);
                 sx1276_rx_counter_record(dec);
                 host_stats_fhss_dec_note((uint8_t)dec);
                 /* v25.0.7 slot-clock (supersedes the 2026-07-24
@@ -320,20 +279,12 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
                      * run on the originator's own TX-maintained phase --
                      * no drag. now_anchor_ms / remote_abs / remote_toa_us
                      * were sampled once above. */
-                    if (adopt_remote_grid != 0U) {
-                        /* F7: round-not-truncate ToA (the old inline /1000
-                         * discarded up to 0.999 ms, one-sidedly LATE); the
-                         * arithmetic lives in the clock TU so the bench can
-                         * pin it. now_anchor_ms is main-loop service time,
-                         * not the DIO0 edge -- that residual lateness is
-                         * known and deliberately out of F7 scope. */
-                        sx1276_fhss_clock_anchor_rx(
-                            now_anchor_ms, remote_toa_us,
-                            parsed.slot_offset_ms, remote_abs);
-                        /* F6: a remote grid is now adopted -- the local
-                         * clock gains refusal authority (FRESH tier). */
-                        s_grid_adopted = 1U;
-                        sx1276_fhss_authority_note_adopt();
+                    if (grid.adopt != 0U) {
+                        /* Re-anchor from the header (F7 rounding in the
+                         * clock TU) and become a follower. */
+                        sx1276_rx_grid_adopt(now_anchor_ms, remote_toa_us,
+                                             parsed.slot_offset_ms,
+                                             remote_abs);
                     }
                     /* The follower must not re-arm mid-slot for the slot
                      * we just received in -- mark it followed regardless
@@ -786,19 +737,13 @@ static void scan_drive(sx1276_rx_scan_event_t event,
          * LOCKed the tractor, this 2 s demotion wiped its own TX clock,
          * and the next TX re-anchored "slot k+1 starts now", renumbering
          * the shared grid under the base's follower (RS-12.12/14). */
-        if (s_grid_adopted != 0U) {
-            sx1276_fhss_clock_reset();
-            sx1276_fhss_authority_reset();
-            host_stats_clk_demotion_note(true);
-        } else {
-            host_stats_clk_demotion_note(false);
-        }
+        host_stats_clk_demotion_note(sx1276_rx_grid_on_demotion() != 0U);
         s_rx_last_followed_abs_valid = 0U;
-        /* F6: the adopted grid is gone with the lock. Clearing this is
-         * what makes the UNANCHORED recovery tier reachable — the next
-         * TX will re-validate the clock on the stale grid, but without
-         * adoption it carries no refusal authority. */
-        s_grid_adopted = 0U;
+        /* F6: the adopted grid is gone with the lock -- the policy TU has
+         * cleared adoption, which is what keeps the UNANCHORED recovery
+         * tier reachable: the next TX re-validates the clock on the stale
+         * grid, but without adoption (and without a streaming streak) it
+         * carries no refusal authority. */
     }
 
     switch (dec.action) {
@@ -889,10 +834,8 @@ void sx1276_rx_scan_reset(void) {
     /* v25.0.7: fresh acquisition ⇒ fresh phase. The TX side re-anchors
      * its own grid lazily at its next transmission, so resetting here
      * is safe on both roles. */
-    sx1276_fhss_clock_reset();
-    sx1276_fhss_authority_reset();   /* RS-12.15 v2: no streaming history */
+    sx1276_rx_grid_reset();   /* clock + authority + adoption (F6, RS-12.15 v2) */
     s_rx_last_followed_abs_valid = 0U;
-    s_grid_adopted = 0U;   /* F6: fresh acquisition => no adopted grid */
 }
 
 /*

@@ -33,6 +33,13 @@
  * demotion starts at zero. Adopting a remote grid clears the streak.
  *
  *   originator := clock_valid && !grid_adopted && streak >= MIN_STREAK
+ *                 && (now - last_own_tx) < STREAK_GAP_MS
+ *
+ * Two boundary rules (PR #125 review round 3): the chain test is STRICT
+ * (a sender spaced exactly at the gap -- the RS-12.14 stream gate admits
+ * commands at >= 1.0 s -- never chains), and authority DECAYS one gap
+ * after the last own transmission, so a node that bursts a few queued
+ * commands and goes quiet cannot keep refusing a peer's grid.
  *
  * Consumers (sx1276_rx.c):
  *   - adoption gate: an originator adopts a remote grid only when it
@@ -70,8 +77,11 @@ void sx1276_fhss_authority_note_adopt(void);
 uint32_t sx1276_fhss_authority_streak(void);
 uint32_t sx1276_fhss_authority_streak_max(void);
 
-/* 1 when the node currently holds originator authority. */
-uint8_t sx1276_fhss_authority_is_originator(uint8_t clock_valid,
+/* 1 when the node holds originator authority AT now_ms: valid clock, no
+ * adopted grid, streak >= MIN_STREAK, and its last own TX less than
+ * STREAK_GAP_MS ago (authority decays when streaming stops). */
+uint8_t sx1276_fhss_authority_is_originator(uint32_t now_ms,
+                                            uint8_t clock_valid,
                                             uint8_t grid_adopted);
 
 #endif /* LIFETRAC_MURATA_L072_SX1276_FHSS_AUTHORITY_H */

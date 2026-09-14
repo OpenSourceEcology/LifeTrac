@@ -74,6 +74,7 @@ SRCS := \
 	radio/sx1276_fhss.c \
 	radio/sx1276_fhss_clock.c \
 	radio/sx1276_fhss_authority.c \
+	radio/sx1276_rx_grid_policy.c \
 	radio/sx1276_lbt.c \
 	radio/sx1276_legal_dwell.c \
 	radio/sx1276_modes.c \
@@ -148,7 +149,7 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-fhss-authority check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost help check-rx-fifo-track bench check-stats-layout
+.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-fhss-authority check-rx-grid-policy check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost help check-rx-fifo-track bench check-stats-layout
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
 
@@ -261,10 +262,11 @@ RX_SCAN_FAIL_BIN := $(BUILD)/rx_scan_fail
 RX_SCAN_WALKER_BIN := $(BUILD)/rx_scan_walker
 FHSS_CLOCK_BIN     := $(BUILD)/fhss_clock_test
 FHSS_AUTHORITY_BIN := $(BUILD)/fhss_authority_test
+RX_GRID_POLICY_BIN := $(BUILD)/rx_grid_policy_test
 AIRTIME_INVARIANT_BIN := $(BUILD)/airtime_invariant
 TX_LEN_GUARD_BIN   := $(BUILD)/tx_len_guard
 
-check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-fhss-authority check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost check-rx-fifo-track check-stats-layout
+check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-fhss-authority check-rx-grid-policy check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost check-rx-fifo-track check-stats-layout
 	@echo "[OK] memory map invariants hold"
 
 check-cpp: $(BUILD)
@@ -878,6 +880,19 @@ check-rx-scan-walker: $(BUILD)
 # semantics, grid geometry) that both the TX slot gate
 # (sx1276_tx_slot_wait_us) and the RX boundary follower
 # (sx1276_rx_slot_follow) derive channel decisions from.
+check-rx-grid-policy: $(BUILD)
+	@echo "[RXGRD] Building rx-grid-policy test (real consider_remote) ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    bench/host_proto/rx_grid_policy.c \
+	    radio/sx1276_rx_grid_policy.c \
+	    radio/sx1276_fhss_authority.c \
+	    radio/sx1276_fhss_clock.c \
+	    radio/sx1276_fhss.c \
+	    radio/sx1276_fhss_chantab.c \
+	    -o $(RX_GRID_POLICY_BIN)
+	@echo "[RXGRD] Running rx-grid-policy test ..."
+	@$(RX_GRID_POLICY_BIN)
+
 check-fhss-authority: $(BUILD)
 	@echo "[FHAUT] Building fhss-authority test ..."
 	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
