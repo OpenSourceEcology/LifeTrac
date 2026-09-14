@@ -167,6 +167,6 @@ one gate path remains covered by the SIL cases only.
 
 ## Verdict (updated)
 
-The PR #121 shared send gate is fully validated on air. The spacing floor holds in every regime, including leg N where the gate was closed at most pump windows (`cmd_gate_held` 524) and spacing clamped to the gate; whether due sends were actively deferred needs the `cmd_gate_deferred` instrumentation and a rerun. The copies-defer path is SIL-only (no profile switch flew); reactive firing was off. Leg M is consistent with the RS-12.15 follower hypothesis but its command load was not matched, so it does not isolate it. Field guidance unchanged: profile 1 with
+The PR #121 shared send gate is validated on air for the command-spacing floor on the pump and idle-drain dispatch paths; active deferral still needs the instrumented rerun, and the multi-copy and reactive paths remain SIL-only. The spacing floor holds in every regime, including leg N where the gate was closed at most pump windows (`cmd_gate_held` 524) and spacing clamped to the gate; whether due sends were actively deferred needs the `cmd_gate_deferred` instrumentation and a rerun. The copies-defer path is SIL-only (no profile switch flew); reactive firing was off. Leg M is consistent with the RS-12.15 follower hypothesis but its command load was not matched, so it does not isolate it. Field guidance unchanged: profile 1 with
 `LIFETRAC_KF_REQUEST_DISABLE=1` until RS-12.15 lands. Radios parked
 (0x80 both, `legs/legN_park_*.txt`) after leg N.

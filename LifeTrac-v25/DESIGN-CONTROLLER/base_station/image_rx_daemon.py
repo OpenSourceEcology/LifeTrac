@@ -637,6 +637,13 @@ class ImageRxDaemon:
         # target stays pending for the next pass, nothing is popped yet.
         with self._lock:
             wanted = self._pending_profile
+            # PR #124 review round 3: a request for the ALREADY-ACTIVE profile
+            # (e.g. a retained/current-profile pin) sends nothing, so it must
+            # be discarded BEFORE the gate is asked -- otherwise a closed gate
+            # would score a deferral (cmd_gate_deferred) for a no-op.
+            if wanted is not None and wanted == self._active_profile:
+                self._pending_profile = None
+                wanted = None
         if wanted is None or not self._cmd_gate_open(now, True):
             return
         with self._lock:
