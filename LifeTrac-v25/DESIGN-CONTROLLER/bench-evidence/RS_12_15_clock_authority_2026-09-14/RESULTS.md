@@ -191,3 +191,67 @@ Each flash: `REVIVE_MODE=reboot bash /home/fio/run_flash_bench.sh
 /tmp/lifetrac_p0c/<bin>` (tractor: stop `lifetrac-camera.service` and the
 `tractor-camera` container first), then re-push `/tmp/lifetrac_strict`
 (the reboot wipes it) and `rs116` both boards. Park (0x80 both) at the end.
+
+---
+
+## GO validation 2026-09-14 (late): legs Q, Q2, R -- the counter-level proof
+
+Flashed the old RS-12.10 build (`e8ad8424`) to reproduce the break on the
+reproducible synthetic instrument, then v2 (`5a160e4a`) to measure the fix.
+All flashes Verify OK / flash_rc=0. Radios parked 0x80 both after leg R.
+
+### Legs Q / Q2 -- the synthetic path cannot reproduce the break (old fw)
+
+| leg | fw | rate / budget | injector | loss | tractor cmds rx | lock-loss gaps > 3 s |
+|---|---|---|---|---:|---:|---:|
+| Q  | e8ad8424 | 1.5 fps / 400 B | kf 15x20 | 0.6 % | 0 | 0 |
+| Q2 | e8ad8424 | 2 fps / 400 B   | kf 15x20 | 6.5 % | 3 | 0 |
+
+Neither reproduced the lock loss. The mechanism needs the tractor BOTH to
+receive commands AND to pause its own TX for > 2 s so the LOCK_LOSS timer
+fires and demotes it. The steady synth publisher delivers neither: the
+tractor's near-continuous TX leaves almost no reverse-path window (0 and 3
+commands landed), and it never pauses, so even when it does demote the next
+TX re-syncs the base inside the slot. The break was only ever on the CAMERA
+keyframe workload (legs I/J), whose large multi-fragment keyframe trains
+create both the TX pauses and the reverse-path windows. The bench camera is
+not usable this session: `/dev/video1` exists but the `/tmp/ffmpeg` capture
+binary was wiped by the flash reboots, no moving content is playing, and the
+physical camera aim cannot be verified head-less.
+
+### Leg R -- v2, the fix measured directly (dual injector, 2 fps / 3000 B)
+
+Same setup as the old-fw leg L (7.8 % / 0 gaps / 49 cmds received), so this
+is a clean firmware A/B. The tractor's v2 STATS counters (pre -> post delta):
+
+| tractor counter | delta | meaning |
+|---|---:|---|
+| `radio_tx_ok` | 1246 | fragments transmitted (it was the streaming originator) |
+| `tx_stream_streak_max` | 1246 | held originator authority throughout |
+| `fhss_dec_aligned` | 19 | received 19 base command headers, all in-slot ALIGNED |
+| `fhss_dec_rej_locked_out` | 0 | none were disagreeing snap candidates, so none to refuse |
+| **`clk_demotion_kept`** | **19** | **demoted 19x and KEPT its self-anchored clock every time** |
+| **`clk_demotion_reset`** | **0** | **never reset its own clock (old fw would reset all 19)** |
+| **`tx_first_anchor`** | **1** | **anchored the grid phase ONCE for the whole leg** |
+
+This is the fix, feed-independent: on the streaming tractor every command it
+received LOCKed its scan machine and 2 s later demoted it -- 19 times -- and
+v2 KEPT the self-anchored clock across all 19, re-anchoring the grid phase
+exactly once (the boot lazy anchor). On the old firmware each of those 19
+demotions reset the clock and the next TX re-anchored "slot k+1 starts now"
+-- 19 grid renumberings, the RS-12.12/14 lock-loss mechanism. v2 has zero.
+The follower held (frag gaps: max 0.6 s, none > 3 s); no regression.
+
+The base-bracket loss line read negative (a bracket artifact: the base
+follower scan-reset once mid-leg, perturbing its radio_rx_ok pre/post
+delta), so follower health here is the frag-gap metric, not that number.
+
+### What remains
+
+The full behavioral A/B (a real lock-loss GAP on old fw, gone on v2) still
+cannot be shown on synth: the dense synth TX re-syncs the base within the
+slot even when the old-fw clock resets, so the reset never surfaces as a
+base gap -- it only surfaces as a gap under the sparse camera keyframe
+workload. The counter proof above is the feed-independent substitute and is
+unambiguous. A camera-motion leg (needs the ffmpeg binary re-pushed, moving
+content, and a verified camera aim) would add the behavioral half.

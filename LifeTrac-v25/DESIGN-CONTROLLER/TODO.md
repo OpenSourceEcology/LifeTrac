@@ -2467,7 +2467,19 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   leg Q old fw on SPARSE synth (-SynthFps 1.5 -SynthBudgetB 400 + kf_inject
   bursts, fly from main) to reproduce the lock losses; leg R v2 same setup
   (fly from the branch) expecting clk_demotion_reset=0 and zero lock-loss gaps.
-  Evidence RS_12_15_clock_authority_2026-09-14/RESULTS.md (v2 section).**
+  FLOWN 2026-09-14 (legs Q/Q2/R): v2 flashed both boards (5a160e4a, Verify
+  OK). The counter proof landed -- leg R (v2, dual injector, == old-fw leg L):
+  the streaming tractor demoted 19x and KEPT its self-anchored clock every
+  time (clk_demotion_kept=19, clk_demotion_reset=0, tx_first_anchor=1 for the
+  whole leg); old fw would have reset the clock on all 19 (the lock-loss
+  mechanism). Follower held (0 gaps). Legs Q/Q2 (old fw) did NOT reproduce a
+  lock-loss GAP on synth -- the steady publisher never pauses TX > 2 s nor
+  delivers enough reverse-path commands, so the dense TX re-syncs the base
+  through every clock reset; the behavioral gap only appears under the camera
+  keyframe workload (I/J), not drivable this session (ffmpeg wiped). So v2's
+  mechanism is proven feed-independently by the counters; the behavioral A/B
+  awaits a camera-motion leg. Radios parked 0x80.
+  Evidence RS_12_15_clock_authority_2026-09-14/RESULTS.md (GO-validation section).**
 - [~] **RS-12.15 v1 — FHSS clock authority: FIRMWARE IMPLEMENTED + FLASHED
   2026-09-14 (commit 23ba5122, branch rs12-15-clock-authority, PR pending);
   BEHAVIORAL A/B still PENDING. A self-anchored originator (own-TX clock,
