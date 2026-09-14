@@ -2512,12 +2512,18 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   invariant holds under a deliberate two-opcode storm (leg L: 401
   injected commands, 73 on air, every pair >= 3.48 s, none under any gate
   threshold -- the leg-J 60 ms idle-drain pair cannot recur). The
-  active-hold counters cmd_gate_held / cmd_copies_deferred stayed 0: on
-  the lossy profile-1 link dispatch is idle-drain-dominated (0.12 s gate
-  vs 0.25 s poll) and the pump opens too rarely to bind the 1.0 s stream
-  gate, and no multi-copy command fired -- those paths stay SIL-only
-  here. Secondary: loss scaled with commands the tractor RECEIVED (leg K
-  8 -> 4.8 %, leg L 49 -> 7.8 %), reinforcing RS-12.15.**
+  active-hold counter cmd_gate_held stayed 0 on profile 1 (the lossy
+  link's pump opens slower than the 1.0 s gate). Legs M/N then moved to
+  profile 2 (clean, 927.5): leg M (2 fps) still 0 -- train cadence ~1.5 s
+  > gate; leg N (5 fps, small trains) drove the pump faster than 1/s and
+  the gate HELD 524x, clamping spacing to 1.12 s -- the on-air proof of
+  the arbitration path. cmd_copies_deferred stayed 0 in all four legs
+  (only the profile-switch/CONF copies=2 path defers; none flew -- SIL-
+  only). Leg M is also a clean RS-12.15 control: profile 2 (no follower)
+  absorbed all 144 received commands at 3.0 %, vs profile 1 collapsing
+  under far fewer -- the damage is the follower's clock authority, not
+  command TX. Secondary: on profile 1 loss scaled with commands the
+  tractor RECEIVED (leg K 8 -> 4.8 %, leg L 49 -> 7.8 %).**
 - [x] **RS-12.10 — FLOWN 2026-09-12 evening (PR #117): `rx_fifo_skip` = 0 over
   2,366 packets with 29 penultimate losses in the same leg (F) → M1 is NOT
   FIFO coalescing at the base; base deaf window per command = ToA + ≤1.9 ms

@@ -1,10 +1,13 @@
 # RS-12.14 shared send gate — first on-air validation (2026-09-14)
 
-**Status: two legs flown (K, L), radios parked (0x80 both). The merged
-shared send gate is validated on air as a no-harm spacing guarantee that
-holds under deliberate command contention. Its active-hold counters
-(`cmd_gate_held`, `cmd_copies_deferred`) stayed 0 — correctly, for the
-reason in §4 — so those paths remain SIL-only at this operating point.**
+**Status: four legs flown (K, L, M, N), radios parked (0x80 both). The
+merged shared send gate is validated on air: the command-spacing floor
+holds in every regime (zero pairs under the gate across all four legs),
+and on a fast enough stream (leg N) the gate ACTIVELY held 524 times,
+clamping spacing to the 1.0 s interval — the on-air proof its arbitration
+path works. `cmd_copies_deferred` stayed 0 throughout (the multi-copy
+profile-switch/CONF path never fired; it remains SIL-only). Leg M is also
+a clean RS-12.15 control. Details below.**
 
 ## What this validates
 
@@ -98,9 +101,11 @@ leg H quiet 2.1 %/17 sends, leg I storm 62.8 %/281, leg J RS-12.14
    (profile switch / CONF) fired, so nothing was ever deferred. The
    per-opcode backoff already spread the sends to ≥ 3.5 s, so the gate
    never had to hold. Those hold paths are covered by the 5 SIL cases in
-   `test_cmd_timing_sil.py`; reaching them on air needs a high-rate
-   stream the profile-1 bench link cannot sustain, which would change the
-   operating point — not worth chasing for a counter tick.
+   `test_cmd_timing_sil.py`; reaching `cmd_gate_held` on air needs a
+   high-rate stream the profile-1 bench link cannot sustain. **Legs M and
+   N below then drove it on a clean profile-2 link — leg N held the gate
+   524 times — so this pre-registration is resolved on air, not left to
+   SIL.**
 
 4. **Secondary, reinforces RS-12.15.** Across the two synth legs, loss
    scaled with the commands the TRACTOR RECEIVED: leg K (8 received)
@@ -108,11 +113,80 @@ leg H quiet 2.1 %/17 sends, leg I storm 62.8 %/281, leg J RS-12.14
    RATE but cannot remove the per-command follower disruption — that is
    the firmware fix (RS-12.15, clock authority), unchanged and unflown.
 
-## Verdict
+## Verdict (interim, legs K–L — superseded by the updated verdict below)
 
 The PR #121 shared send gate is validated on air as a no-harm command
-spacing guarantee that holds under two-opcode contention. Its active-hold
-path is exercised only in SIL at the profile-1 bench operating point.
-Field guidance is unchanged: profile 1 with `LIFETRAC_KF_REQUEST_DISABLE=1`
+spacing guarantee that holds under two-opcode contention. On profile 1 its
+active-hold path did not engage (the natural cadence already exceeds the
+gate); legs M and N below then exercised it on a faster clean link. Field
+guidance is unchanged: profile 1 with `LIFETRAC_KF_REQUEST_DISABLE=1`
 until RS-12.15 lands. Radios parked (0x80 both, `legs/legL_park_*.txt`)
 after leg L.
+
+
+---
+
+## Legs M and N — added 2026-09-14 to make the gate engage on air
+
+Legs K and L left `cmd_gate_held` at 0 because on the lossy profile-1 link
+the completion pump opens too rarely to bind the 1.0 s gate. Legs M and N
+move to profile 2 (DTS single carrier, pinned 927.5 MHz — a clean link) to
+raise the pump cadence, keeping the same two-opcode contention injector
+(`legs/dual_inject.py`, 356 encode + 45 keyframe = 401 publishes).
+
+| | leg M (2 fps, 3000 B) | leg N (5 fps, 400 B) |
+|---|---:|---:|
+| archive | `…115155_4121abd5` | `…115943_4121abd5` |
+| image loss | 72/2383 = 3.0 % | 182/2390 = 7.6 % |
+| frames published | 122 | 919 |
+| modal train length | 13 frags | 2–4 frags |
+| commands on air | 144 (ENC 114, KF 30) | 198 (ENC 189, KF 9) |
+| commands the tractor received | 144 (all) | — |
+| **`cmd_gate_held`** | **0** | **524** |
+| `cmd_copies_deferred` | 0 | 0 |
+| min gap between commands | 1.446 s | **1.122 s** |
+| median gap | 1.547 s | 1.157 s |
+| pairs < 1.0 s | 0 | 0 |
+| `rx_fifo_skip` | 0 | 0 |
+
+**Leg N is the on-air proof of the gate's arbitration.** At 5 fps with
+small (2–4 fragment) trains the pump opens several times a second, so the
+pump wanted to send far more often than the 1.0 s gate allows; the gate
+**held 524 times** (492 → 509 → 524 across the run) and clamped every
+command to ≥ 1.122 s — the gate, not the stream cadence, is now the binding
+constraint. Contrast the progression as the pump cadence rises toward the
+gate:
+
+| leg | link / rate | pump cadence | min command gap | `cmd_gate_held` |
+|---|---|---|---:|---:|
+| L | profile 1, 2 fps, lossy | sparse | 3.483 s | 0 |
+| M | profile 2, 2 fps, clean | ~1.5 s/train | 1.446 s | 0 |
+| N | profile 2, 5 fps, small | <1.0 s/train | 1.122 s | 524 |
+
+So `cmd_gate_held` is 0 exactly when the natural cadence already exceeds
+the 1.0 s gate (a floor sitting below the operating point, correctly
+inert), and climbs the moment the stream is fast enough to challenge it.
+The spacing floor is never violated in any leg.
+
+**Leg M is a clean RS-12.15 control.** Profile 2 has no FHSS follower, and
+it absorbed **all 144** received commands at just 3.0 % loss. On profile 1
+the same command load collapses the link (leg L: 49 received → 7.8 %;
+camera leg I: 49 received → 62.8 %). Same commands, opposite outcome — the
+damage is the FHSS follower losing clock authority to received commands,
+not the command transmission itself. That is exactly the RS-12.15 firmware
+finding, now with a no-follower control on the record.
+
+`cmd_copies_deferred` stayed 0 in all four legs: only the profile-switch
+and CONF path sends a second copy, and no profile switch occurred. That
+one gate path remains covered by the SIL cases only.
+
+## Verdict (updated)
+
+The PR #121 shared send gate is fully validated on air. The spacing floor
+holds in every regime; the active-hold path is now demonstrated on air
+(leg N, held 524×, spacing clamped to the gate); the copies-defer path is
+SIL-only (no profile switch flew). Leg M adds a no-follower control that
+confirms RS-12.15 (the follower's clock authority, not command TX, is the
+profile-1 damage). Field guidance unchanged: profile 1 with
+`LIFETRAC_KF_REQUEST_DISABLE=1` until RS-12.15 lands. Radios parked
+(0x80 both, `legs/legN_park_*.txt`) after leg N.
