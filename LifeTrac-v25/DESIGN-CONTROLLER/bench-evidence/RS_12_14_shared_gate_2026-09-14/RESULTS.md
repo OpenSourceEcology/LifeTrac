@@ -3,11 +3,8 @@
 **Status: four legs flown (K, L, M, N), radios parked (0x80 both). The
 merged shared send gate is validated on air: the command-spacing floor
 holds in every regime (zero pairs under the gate across all four legs),
-and on a fast enough stream (leg N) the gate ACTIVELY held 524 times,
-clamping spacing to the 1.0 s interval — the on-air proof its arbitration
-path works. `cmd_copies_deferred` stayed 0 throughout (the multi-copy
-profile-switch/CONF path never fired; it remains SIL-only). Leg M is also
-a clean RS-12.15 control. Details below.**
+and on a fast enough stream (leg N) `cmd_gate_held` reached 524 with spacing clamped to the 1.0 s interval -- the spacing floor holds; the counter counts closed-gate checks, not proven deferrals of due sends (see §Legs M and N). `cmd_copies_deferred` stayed 0 throughout (the multi-copy
+profile-switch/CONF path never fired; it remains SIL-only). Leg M is consistent with, but does not isolate, the RS-12.15 follower hypothesis. Details below.**
 
 ## What this validates
 
@@ -24,8 +21,7 @@ wake check).
 **Feed caveat, stated up front:** these legs use the SYNTHETIC frame
 source (`-TxFeed local`), not the camera of legs H/I/J. The shared gate is
 a command-plane change, and the bench camera scene is not drivable
-head-less, so synth gives a reproducible stream that exercises every
-command path the gate governs. The consequence is that the LOSS numbers
+head-less, so synth gives a reproducible stream. Coverage caveat (PR #124 review): these legs exercise the aligned-pump and idle-drain dispatch paths only -- reactive firing was disabled and no profile-switch/CONF multi-copy command fired, so those gate paths remain SIL-covered, not flight-covered. The consequence is that the LOSS numbers
 here are NOT comparable to the camera legs H/I/J; those are quoted only
 for context, never as an A/B.
 
@@ -49,9 +45,7 @@ run_live_radio_monitor.ps1 -TxFeed local -RegProfile 1 -DurationS 300
 - **Leg L** (`radio_monitor_20260914_113052_3a0cb524`): a two-opcode
   contention injector (`legs/dual_inject.py`): `encode_mode_override`
   mode 0 (webp, no codec change) with the quality byte cycled 78–88 every
-  0.7 s, PLUS `req_keyframe` every 5 s — 356 + 45 = 401 publishes, built
-  to make two distinct pending opcodes compete for the pump so the shared
-  gate has to arbitrate.
+  0.7 s, PLUS `req_keyframe` every 5 s — 356 + 45 = 401 publishes, built with the GOAL of making two distinct pending opcodes compete for the pump; whether the gate actually had to arbitrate is a measured outcome (see the counters), not a property of running the injector.
 
 ## Results
 
@@ -149,12 +143,9 @@ raise the pump cadence, keeping the same two-opcode contention injector
 | pairs < 1.0 s | 0 | 0 |
 | `rx_fifo_skip` | 0 | 0 |
 
-**Leg N is the on-air proof of the gate's arbitration.** At 5 fps with
+**Leg N: the gate is the binding constraint on a fast stream -- with a caveat on what the counter proves.** At 5 fps with
 small (2–4 fragment) trains the pump opens several times a second, so the
-pump wanted to send far more often than the 1.0 s gate allows; the gate
-**held 524 times** (492 → 509 → 524 across the run) and clamped every
-command to ≥ 1.122 s — the gate, not the stream cadence, is now the binding
-constraint. Contrast the progression as the pump cadence rises toward the
+pump wanted to send far more often than the 1.0 s gate allows; `cmd_gate_held` reached **524** (492 → 509 → 524 across the run) and every command was ≥ 1.122 s from the next. Caveat (PR #124 review): the daemon increments `cmd_gate_held` on every closed-gate check BEFORE `_next_ctrl_body()` decides whether a command is actually due, so 524 is a count of closed-gate checks while something was pending or queued -- it does not by itself show 524 deferred eligible sends. What IS established is the spacing floor: no pair under 1.0 s while the pump opened several times a second. A `cmd_gate_deferred` counter (closed gate AND a command due, PR #124 follow-up) plus a rerun is what would establish active arbitration. Contrast the progression as the pump cadence rises toward the
 gate:
 
 | leg | link / rate | pump cadence | min command gap | `cmd_gate_held` |
@@ -163,18 +154,12 @@ gate:
 | M | profile 2, 2 fps, clean | ~1.5 s/train | 1.446 s | 0 |
 | N | profile 2, 5 fps, small | <1.0 s/train | 1.122 s | 524 |
 
-So `cmd_gate_held` is 0 exactly when the natural cadence already exceeds
-the 1.0 s gate (a floor sitting below the operating point, correctly
-inert), and climbs the moment the stream is fast enough to challenge it.
-The spacing floor is never violated in any leg.
+So `cmd_gate_held` is 0 exactly when the natural cadence already exceeds the 1.0 s gate and climbs once the stream is fast enough for the gate to be closed at pump time; the spacing floor is never violated in any leg. Active arbitration (a due send actually deferred) is not separately measured by this counter -- see the caveat above.
 
-**Leg M is a clean RS-12.15 control.** Profile 2 has no FHSS follower, and
+**Leg M is consistent with the RS-12.15 follower hypothesis (not an isolating control).** Profile 2 has no FHSS follower, and
 it absorbed **all 144** received commands at just 3.0 % loss. On profile 1
 the same command load collapses the link (leg L: 49 received → 7.8 %;
-camera leg I: 49 received → 62.8 %). Same commands, opposite outcome — the
-damage is the FHSS follower losing clock authority to received commands,
-not the command transmission itself. That is exactly the RS-12.15 firmware
-finding, now with a no-follower control on the record.
+camera leg I: 49 received → 62.8 %). The command loads are NOT matched (M received 144 vs L 49; camera leg I is a different operating point), so this supports but does not isolate the follower's clock authority from command-TX effects. It is consistent with RS-12.15; the isolating evidence is the RS-12.15 firmware legs with the demotion/decision counters.
 
 `cmd_copies_deferred` stayed 0 in all four legs: only the profile-switch
 and CONF path sends a second copy, and no profile switch occurred. That
@@ -182,11 +167,6 @@ one gate path remains covered by the SIL cases only.
 
 ## Verdict (updated)
 
-The PR #121 shared send gate is fully validated on air. The spacing floor
-holds in every regime; the active-hold path is now demonstrated on air
-(leg N, held 524×, spacing clamped to the gate); the copies-defer path is
-SIL-only (no profile switch flew). Leg M adds a no-follower control that
-confirms RS-12.15 (the follower's clock authority, not command TX, is the
-profile-1 damage). Field guidance unchanged: profile 1 with
+The PR #121 shared send gate is fully validated on air. The spacing floor holds in every regime, including leg N where the gate was closed at most pump windows (`cmd_gate_held` 524) and spacing clamped to the gate; whether due sends were actively deferred needs the `cmd_gate_deferred` instrumentation and a rerun. The copies-defer path is SIL-only (no profile switch flew); reactive firing was off. Leg M is consistent with the RS-12.15 follower hypothesis but its command load was not matched, so it does not isolate it. Field guidance unchanged: profile 1 with
 `LIFETRAC_KF_REQUEST_DISABLE=1` until RS-12.15 lands. Radios parked
 (0x80 both, `legs/legN_park_*.txt`) after leg N.

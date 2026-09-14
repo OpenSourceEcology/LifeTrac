@@ -17,7 +17,29 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from cmd_timing import (  # noqa: E402
     idle_drain_allowed, pump_window_open,
     pending_retry_gap, giveup_cooldown_active, pump_min_gap,
-    send_gate_open)
+    send_gate_open, pending_retry_due)
+
+
+class PendingRetryDue(unittest.TestCase):
+    """PR #124 review: the mutation-free look-ahead that lets a closed gate be
+    scored as a real deferral only when a command was actually due."""
+
+    def test_first_attempt_is_due_immediately(self) -> None:
+        self.assertTrue(pending_retry_due(now=5.0, last_send_t=0.0, attempts=0,
+                                          base_gap_s=0.4, factor=2.0, cap_s=8.0))
+
+    def test_due_around_the_backoff_gap(self) -> None:
+        # attempts=3 -> gap 1.6 s. Monotonic clocks never land exactly on
+        # the boundary; test one ms either side (float-safe).
+        self.assertFalse(pending_retry_due(10.0 + 1.599, 10.0, 3, 0.4, 2.0, 8.0))
+        self.assertTrue(pending_retry_due(10.0 + 1.601, 10.0, 3, 0.4, 2.0, 8.0))
+
+    def test_mirrors_pending_retry_gap(self) -> None:
+        for attempts in range(0, 12):
+            gap = pending_retry_gap(attempts, 0.4, 2.0, 8.0)
+            self.assertTrue(pending_retry_due(100.0 + gap + 0.001, 100.0, attempts, 0.4, 2.0, 8.0))
+            if gap > 0.0:
+                self.assertFalse(pending_retry_due(100.0 + gap - 0.01, 100.0, attempts, 0.4, 2.0, 8.0))
 
 
 class IdleDrainRule(unittest.TestCase):

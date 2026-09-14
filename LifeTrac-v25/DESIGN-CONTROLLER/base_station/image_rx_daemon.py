@@ -56,7 +56,8 @@ from typing import Optional
 
 from cmd_timing import (  # RS-12.11 / RS-12.14
     idle_drain_allowed, pump_window_open,
-    pending_retry_gap, giveup_cooldown_active, send_gate_open)
+    pending_retry_gap, giveup_cooldown_active, send_gate_open,
+    pending_retry_due)
 
 # ---- repo imports ----------------------------------------------------
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -763,6 +764,23 @@ class ImageRxDaemon:
             return True
         self._cmd_gate_held = getattr(self, "_cmd_gate_held", 0) + 1
         return False
+
+    def _ctrl_due(self, now: float) -> bool:
+        """PR #124 review (2026-09-14): is a command actually DUE now — a
+        pending entry inside its budget and past its retry gap, or a legacy
+        entry queued? A mutation-free look-ahead mirror of _next_ctrl_body,
+        so a closed gate can be scored as a REAL deferral (cmd_gate_deferred)
+        instead of the coarser cmd_gate_held, which counts every closed-gate
+        check whether or not anything was due."""
+        with self._lock:
+            for cur in self._pending_cmds.values():
+                if cur["attempts"] >= cur["max_attempts"] or now > cur["deadline"]:
+                    continue
+                if pending_retry_due(now, cur.get("last_send", 0.0),
+                                     cur["attempts"], self.PENDING_RETRY_MIN_GAP_S,
+                                     PENDING_RETRY_BACKOFF, PENDING_RETRY_MAX_GAP_S):
+                    return True
+        return not self._ctrl_out.empty()
 
     def _drain_ctrl_idle(self, link: HostLink) -> None:
         """Idle-link fallback: drain queued commands when no image stream
@@ -1497,6 +1515,12 @@ class ImageRxDaemon:
                     body = self._next_ctrl_body(now_pump)
                     if body is not None:
                         self._send_command_frame(link, body, copies=1)
+                elif self._ctrl_due(now_pump):
+                    # PR #124 review: a closed gate with a command actually
+                    # DUE is a real deferral. cmd_gate_held above counts
+                    # every closed-gate check; this one is the arbitration.
+                    self._cmd_gate_deferred = (
+                        getattr(self, "_cmd_gate_deferred", 0) + 1)
 
             # 2026-07-27 RS-0.12 reactive-fire: a fragment completed the tile
             # of the last train, so the tractor's RXCONT just re-armed. Fire
@@ -1708,7 +1732,7 @@ class ImageRxDaemon:
                     "frames_published=%d publish_err=%d "
                     "reassembler_decode_err=%d reassembler_timeouts=%d "
                     "parity_recon=%d idle_drain_deferred=%d cmd_cooldown_drops=%d "
-                    "cmd_gate_held=%d cmd_copies_deferred=%d",
+                    "cmd_gate_held=%d cmd_copies_deferred=%d cmd_gate_deferred=%d",
                     s.rx_frames_seen, s.rx_decode_errors,
                     s.reassembled_frames_published, s.publish_errors,
                     s.reassembler_decode_errors, s.reassembler_timeouts,
@@ -1716,7 +1740,8 @@ class ImageRxDaemon:
                     getattr(self, "_idle_drain_deferred", 0),
                     getattr(self, "_cooldown_drops", 0),
                     getattr(self, "_cmd_gate_held", 0),
-                    getattr(self, "_cmd_copies_deferred", 0))
+                    getattr(self, "_cmd_copies_deferred", 0),
+                    getattr(self, "_cmd_gate_deferred", 0))
             # RS-2.3 forensics + RS-1.1 command counters (outside the lock;
             # the sample list is only touched from the ingest thread and a
             # briefly stale read here is fine for a log line).

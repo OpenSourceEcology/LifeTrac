@@ -1,9 +1,6 @@
 """Two-opcode command-plane contention injector (PR #121 shared-gate leg L).
 
-Drives TWO distinct pending opcodes at the base rx daemon so the pump wants
-to send them faster than the 1.0 s stream gate allows, exercising the shared
-send gate (cmd_gate_held) and proving command spacing stays >= the gate
-interval under contention:
+GOAL: drive TWO distinct pending opcodes at the base rx daemon so the pump wants to send them faster than the 1.0 s stream gate allows. Whether the gate actually has to hold is an OUTCOME read from the counters after the leg, not a guarantee of running this: on the profile-1 legs the per-opcode backoff and the idle-drain cadence already separated the candidates and cmd_gate_held stayed 0. What the leg measures is command spacing under the injected load:
 
   * REQ_KEYFRAME  every 5 s  (lifetrac/v25/cmd/req_keyframe)
   * ENCODE_MODE   every 0.7 s, mode 0 (webp, the current default -> NO codec

@@ -2516,13 +2516,9 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   link's pump opens slower than the 1.0 s gate). Legs M/N then moved to
   profile 2 (clean, 927.5): leg M (2 fps) still 0 -- train cadence ~1.5 s
   > gate; leg N (5 fps, small trains) drove the pump faster than 1/s and
-  the gate HELD 524x, clamping spacing to 1.12 s -- the on-air proof of
-  the arbitration path. cmd_copies_deferred stayed 0 in all four legs
+  cmd_gate_held reached 524 with spacing clamped to 1.12 s -- the spacing floor holds; the counter counts closed-gate CHECKS (incremented before the due check), so active arbitration needs the new cmd_gate_deferred counter + a rerun (PR #124 review). cmd_copies_deferred stayed 0 in all four legs
   (only the profile-switch/CONF copies=2 path defers; none flew -- SIL-
-  only). Leg M is also a clean RS-12.15 control: profile 2 (no follower)
-  absorbed all 144 received commands at 3.0 %, vs profile 1 collapsing
-  under far fewer -- the damage is the follower's clock authority, not
-  command TX. Secondary: on profile 1 loss scaled with commands the
+  only). Leg M (profile 2, no follower) absorbed all 144 received commands at 3.0 % while profile 1 collapsed under fewer -- consistent with the follower-clock-authority hypothesis but NOT an isolating control (command loads unmatched: 144 vs 49; camera I is a different operating point). Secondary: on profile 1 loss scaled with commands the
   tractor RECEIVED (leg K 8 -> 4.8 %, leg L 49 -> 7.8 %).**
 - [x] **RS-12.10 — FLOWN 2026-09-12 evening (PR #117): `rx_fifo_skip` = 0 over
   2,366 packets with 29 penultimate losses in the same leg (F) → M1 is NOT

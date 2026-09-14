@@ -87,3 +87,17 @@ def send_gate_open(now: float, last_send_t: float, stream_active: bool,
     """True when ANY command path may dispatch one command copy."""
     return (now - last_send_t) >= pump_min_gap(stream_active, stream_gap_s,
                                                idle_gap_s)
+
+
+# PR #124 review (2026-09-14): `cmd_gate_held` counts every closed-gate
+# CHECK, before the daemon knows whether any command is actually due, so
+# it cannot by itself show the gate deferring a send. This look-ahead is
+# the mutation-free half of the pending retry rule: is retry number
+# `attempts + 1` due at `now`? The daemon uses it to score a closed gate
+# as a real deferral (`cmd_gate_deferred`) only when a command was due.
+
+def pending_retry_due(now: float, last_send_t: float, attempts: int,
+                      base_gap_s: float, factor: float, cap_s: float) -> bool:
+    """True when a pending command's next retry is due at `now`."""
+    return (now - last_send_t) >= pending_retry_gap(attempts, base_gap_s,
+                                                    factor, cap_s)
