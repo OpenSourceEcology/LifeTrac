@@ -8,11 +8,13 @@
   fix, because the synthetic path does not exhibit the break and the
   camera path cannot be re-flown on the old firmware. **Both boards still
   run v1.**
-- **v2 (commit f7d98f8b + follow-ups, the version this PR ships) — built,
-  unit-tested, staged on both boards, NOT flashed and NOT flown.** It
-  addresses the dominant mechanism (the demotion resetting the streaming
-  node's own clock) and adds the counters that let the next leg measure
-  it. See the v2 section at the end; nothing above it is evidence for v2.
+- **v2 (commit f7d98f8b + follow-ups, the version this PR ships) — flashed
+  to both L072s and VALIDATED on air 2026-09-14.** It addresses the dominant
+  mechanism (the demotion resetting the streaming node's own clock). The
+  behavioral A/B on the real camera workload is on the record: the
+  old-firmware break (75 s of lock-loss dead air) is GONE on v2 (0 gaps),
+  same workload — see "Camera behavioral A/B" at the end, plus the leg-R
+  counter proof. Boards left on v2, parked.
 
 Both radios parked (0x80).**
 
@@ -95,7 +97,11 @@ firmware, so leg L vs O/P is a clean firmware A/B.
    RFCO_SUMMARY URC, which the stats probe does not read. Capturing it
    needs a small RFCO_SUMMARY probe.
 
-## Next validation step (recommended, needs a fresh GO)
+## Next validation step (recommended, needs a fresh GO) — DONE 2026-09-14, see "Camera behavioral A/B" at the end
+
+**Superseded:** both halves below were completed the same day — the
+camera-motion A/B (legs S/T) and the counter capture (leg R). This section
+is kept for the reasoning; the result is at the end of this file.
 
 Either (a) a **camera-motion leg** on the new firmware, driving the
 bench camera scene so multi-fragment keyframe trains stress the follower
@@ -255,3 +261,47 @@ base gap -- it only surfaces as a gap under the sparse camera keyframe
 workload. The counter proof above is the feed-independent substitute and is
 unambiguous. A camera-motion leg (needs the ffmpeg binary re-pushed, moving
 content, and a verified camera aim) would add the behavioral half.
+
+
+---
+
+## Camera behavioral A/B 2026-09-14 (late): legs S and T -- the break, and the fix
+
+The operator confirmed the bench UVC camera (`/dev/video1`) is aimed at the
+computer screen, so the RS-12.15 break could finally be reproduced on the
+workload that caused it. The railroad reference video was played fullscreen
+in Firefox (kiosk mode, autoplay muted); two frames grabbed from
+`/dev/video1` 1.2 s apart differed and were ~210 KB each (a detailed, moving
+image -- not a static/black screen). Same harness invocation as camera legs
+I/J: `-TxFeed camera -RegProfile 1 -DurationS 300 -KfRequestDisable 0` plus
+the keyframe injector (15 s x 20). The ONLY difference between S and T is the
+L072 firmware -- a clean A/B.
+
+| | leg S (old fw `e8ad8424`) | leg T (v2 `5a160e4a`) |
+|---|---:|---:|
+| **lock-loss gaps > 3 s** | **2 (53.2 s, 21.9 s)** | **0** |
+| **total silent** | **75.2 s of 256 s** | **0 s** |
+| image loss | 39.0 % | 20.7 % |
+| max frag gap | 53.2 s | 0.8 s |
+| published frames | 362 | 462 |
+| tractor commands received | 4 | 2 |
+
+**Leg S reproduced the break** exactly as legs I/J: the follower lost lock
+twice, 53 s and 22 s, 75 s of dead air, 39 % loss. **Leg T eliminated it:**
+zero gaps over 3 s, max frag gap 0.8 s, on the identical camera +
+keyframe-storm workload; loss also nearly halved (39.0 -> 20.7 %).
+
+The remaining 20.7 % on v2 is the profile-1 keyframe-storm floor (fragment
+loss under the command load + the bench interference floor), NOT lock losses.
+RS-12.15 targets the multi-second lock-loss episodes, and those are gone.
+(Leg T's tractor happened to receive only 2 commands, so its demotion
+counters stayed near 0 this run; the mechanism was measured directly in leg
+R, where the tractor demoted 19x and KEPT its clock every time.
+`tx_first_anchor` was 1 in both v2 legs -- the grid phase anchored once and
+never reset.)
+
+### Verdict
+RS-12.15 v2 is validated on air, both mechanistically (leg R counters:
+`clk_demotion_kept`=19 / `reset`=0) and behaviorally (legs S->T on the
+camera: 75 s of lock-loss dead air -> 0). Boards left on v2 (`5a160e4a`),
+parked (0x80). Recommend v2 as the production FHSS clock-authority fix.

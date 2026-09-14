@@ -2479,7 +2479,14 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   keyframe workload (I/J), not drivable this session (ffmpeg wiped). So v2's
   mechanism is proven feed-independently by the counters; the behavioral A/B
   awaits a camera-motion leg. Radios parked 0x80.
-  Evidence RS_12_15_clock_authority_2026-09-14/RESULTS.md (GO-validation section).**
+  BEHAVIORAL A/B DONE 2026-09-14 on the CAMERA (operator aimed it at the
+  screen; railroad video via Firefox kiosk): leg S (old fw) reproduced the
+  break -- 39.0 % loss, 2 lock-loss gaps (53.2 s + 21.9 s = 75 s dead);
+  leg T (v2, same workload) ELIMINATED it -- 0 gaps, 20.7 % loss. Combined
+  with leg R's counters (clk_demotion_kept=19/reset=0) the fix is proven
+  mechanistically AND behaviorally. Boards on v2, parked. RS-12.15 v2
+  recommended for production. Evidence RS_12_15_clock_authority_2026-09-14
+  /RESULTS.md (GO-validation + Camera behavioral A/B sections).**
 - [~] **RS-12.15 v1 — FHSS clock authority: FIRMWARE IMPLEMENTED + FLASHED
   2026-09-14 (commit 23ba5122, branch rs12-15-clock-authority, PR pending);
   BEHAVIORAL A/B still PENDING. A self-anchored originator (own-TX clock,
