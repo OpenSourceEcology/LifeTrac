@@ -2450,7 +2450,25 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   costs the camera path anything; long synth/keyframe trains get the
   3.2 % → 1.5 % benefit. `LIFETRAC_NO_PARK_LAST` default unchanged (0);
   flipping it is now a low-risk call once RS-3.11 decides on long trains.
-- [~] **RS-12.15 — FHSS clock authority: FIRMWARE IMPLEMENTED + FLASHED
+- [~] **RS-12.15 v2 (2026-09-14, PR #125 f7d98f8b) — BUILT + STAGED, NOT FLASHED.
+  Review + legs O/P re-analysis: the DOMINANT mechanism is the LOCKED->SCANNING
+  demotion resetting the FHSS clock unconditionally -- one accepted command
+  LOCKs the streaming tractor, the 2 s loss timer demotes it and wipes its OWN
+  TX grid, the next TX re-anchors "slot k+1 starts now"; dense synth trains
+  re-sync inside the slot (leg L: 0 losses), sparse camera trains renumber the
+  grid (legs I/J: 20-30 s rescans). v2: originator authority = sustained own-TX
+  streaming (>= 8 TXs within 1 s each; sx1276_fhss_authority, check-fhss-
+  authority incl. the demotion->TX->RX regression), the demotion edge resets
+  only an ADOPTED clock, and STATS 168->208 adds the consider_remote histogram,
+  clk_demotion_reset/kept, tx_first_anchor, tx_stream_streak_max so the next
+  leg MEASURES it. Bench bin 2809d7e0 (24708 B) + the byte-identical old
+  RS-12.10 bin e8ad8424 are staged in /tmp/lifetrac_p0c on both boards; flash
+  tooling re-pushed LF-clean. Boards still on v1 (2ee69f9c). Plan (needs GO):
+  leg Q old fw on SPARSE synth (-SynthFps 1 -SynthBudgetB 400 + kf_inject
+  bursts, fly from main) to reproduce the lock losses; leg R v2 same setup
+  (fly from the branch) expecting clk_demotion_reset=0 and zero lock-loss gaps.
+  Evidence RS_12_15_clock_authority_2026-09-14/RESULTS.md (v2 section).**
+- [~] **RS-12.15 v1 — FHSS clock authority: FIRMWARE IMPLEMENTED + FLASHED
   2026-09-14 (commit 23ba5122, branch rs12-15-clock-authority, PR pending);
   BEHAVIORAL A/B still PENDING. A self-anchored originator (own-TX clock,
   no adopted grid) read as UNANCHORED, so it snapped/re-anchored to its

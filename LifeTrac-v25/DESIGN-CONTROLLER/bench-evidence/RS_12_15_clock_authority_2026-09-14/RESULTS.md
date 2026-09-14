@@ -97,3 +97,74 @@ LOCKED_OUT refusals on received commands — a feed-independent signature.
 Until one lands, RS-12.15 is code-complete and flashed but its on-air
 benefit is asserted from the SIL model, not measured. The firmware is
 safe to leave on the bench boards (healthy, no regression).
+
+---
+
+## v2 re-analysis (2026-09-14, after the PR #125 review and legs O/P)
+
+Copilot's review flagged that `clock_valid && !s_grid_adopted` is also
+the documented post-demotion recovery state, so v1's originator test
+could re-lock a recovering duplex node out. Re-reading the demotion edge
+with that in mind exposed the DOMINANT mechanism, which v1 did not touch:
+
+1. **A single accepted frame moves the scan machine SCANNING → LOCKED**
+   (`sx1276_rx_scan_policy.c`), and **2 s without another demotes it**
+   (`SX1276_RX_SCAN_LOCK_LOSS_MS`).
+2. **The demotion edge reset the FHSS clock UNCONDITIONALLY.** On the
+   streaming tractor that wiped its OWN TX grid; the next TX re-anchored
+   "slot k+1 starts now" (`sx1276_tx.c` first-TX branch).
+3. With dense synthetic trains the next TX lands before the old boundary,
+   the base still decodes a fragment in the overlap and re-syncs inside the
+   slot — leg L: 49 received commands, ZERO lock losses. With sparse camera
+   trains the next TX lands past the boundary, the grid renumbers, and the
+   base cannot decode anything until a 20–30 s rescan — legs I/J.
+4. The "1–2 s after a received command" timing IS the 2 s lock-loss timer.
+
+That explains every observation, including why the synthetic path never
+reproduced the break. The v1 mechanism (ms-level drag from adopting the
+follower's echo) is real but secondary.
+
+### v2 (commit f7d98f8b; PR #125) — built, staged, NOT flashed
+- `sx1276_fhss_authority.[ch]`: originator authority is earned only by
+  **sustained own-TX streaming** (≥ 8 consecutive TXs each within 1 s). A
+  command sender (≥ 1 s apart under the RS-12.14 gate, or two copies 37 ms
+  apart) never earns it; a node fresh from a demotion starts at zero;
+  adopting a remote clears it. `check-fhss-authority` pins it, including
+  the demotion → TX → RX regression the review asked for.
+- `sx1276_rx.c`: the adoption gate uses that authority (v1's lead-only
+  rule kept for a true originator; followers/recovery unchanged);
+  **the demotion edge resets the clock only when the grid was ADOPTED** —
+  a self-anchored clock survives its owner's demotion.
+- STATS additive tail 168 → 208 (mirrored in `mh_wire.h`,
+  `check_mh_wire_sync` PASS, `check-stats-layout` 29 cases, probe labels,
+  `rs12_leg_report.py` RS-12.15 block): `fhss_dec_*` decision histogram
+  (the LOCKED_OUT refusals), `clk_demotion_reset` / `clk_demotion_kept`,
+  `tx_first_anchor` (phase restarts), `tx_stream_streak_max`.
+- Full host `check` green, H7 host vectors green, bench binary `-Werror`
+  clean: md5 `2809d7e01e7caadbea88715bff5dde9a`, 24708 B.
+
+**Staged on both boards (`/tmp/lifetrac_p0c`, flash tooling re-pushed
+LF-clean after the post-flash reboots):** v2 as `firmware_bench_diag.bin`
+and the pre-RS-12.15 RS-12.10 build as
+`firmware_bench_rs1210_e8ad8424.bin` (rebuilt from main, byte-identical:
+md5 `e8ad842489d5acfc09f204c7807e4661`, 24196 B). **Boards still run v1
+(`2ee69f9c`).** Nothing is flashed: the L072 boot path arms RXCONT, so a
+flash brings the receiver up, and the operator asked for no radio activity
+without GO.
+
+### Validation plan for the next GO (reproducible instrument, firmware A/B)
+The synthetic path needs SPARSE trains to expose the demotion reset (the
+next TX after the 2 s demotion must land past the old slot boundary):
+`-SynthFps 1 -SynthBudgetB 400` (2-fragment trains one second apart) with
+the plain keyframe injector, whose unacked REQ_KEYFRAME retries at 0.4 /
+0.8 s make the 2–3-command bursts that LOCK the tractor.
+
+| leg | firmware | expect |
+|---|---|---|
+| Q | RS-12.10 `e8ad8424` (re-flash) | lock-loss gaps > 3 s appear (reproduces I/J on synth); no counters (168-byte STATS, fly from `main` so the probe labels match) |
+| R | v2 `2809d7e0` (re-flash) | tractor `clk_demotion_reset` = 0, `clk_demotion_kept` > 0, `fhss_dec_rej_locked_out` > 0, `tx_first_anchor` = 1, `tx_stream_streak_max` ≥ 8; zero lock-loss gaps; fly from `rs12-15-clock-authority` |
+
+Each flash: `REVIVE_MODE=reboot bash /home/fio/run_flash_bench.sh
+/tmp/lifetrac_p0c/<bin>` (tractor: stop `lifetrac-camera.service` and the
+`tractor-camera` container first), then re-push `/tmp/lifetrac_strict`
+(the reboot wipes it) and `rs116` both boards. Park (0x80 both) at the end.
