@@ -1,12 +1,20 @@
 # RS-12.15 — FHSS clock authority (firmware, 2026-09-14)
 
-**Status: fix implemented, unit-tested, flashed to both L072s, and healthy
-on air with no regression. The BEHAVIORAL A/B (does it stop the
-camera-motion lock losses?) is NOT demonstrated here — the reproducible
-synthetic path does not exhibit the RS-12.15 break, and the camera path
-that did cannot be re-flown on the old firmware. Both radios parked
-(0x80). Boards now carry the RS-12.15 bench build; keep it for the next
-validation session.**
+**Status — two versions, read them apart (PR #125 review):**
+
+- **v1 (commit 23ba5122, md5 `2ee69f9c…`) — flashed to both L072s and
+  flown (legs O/P below).** Healthy, no regression. It fixed only the
+  secondary ms-level drag; its on-air legs are NOT a validation of the
+  fix, because the synthetic path does not exhibit the break and the
+  camera path cannot be re-flown on the old firmware. **Both boards still
+  run v1.**
+- **v2 (commit f7d98f8b + follow-ups, the version this PR ships) — built,
+  unit-tested, staged on both boards, NOT flashed and NOT flown.** It
+  addresses the dominant mechanism (the demotion resetting the streaming
+  node's own clock) and adds the counters that let the next leg measure
+  it. See the v2 section at the end; nothing above it is evidence for v2.
+
+Both radios parked (0x80).**
 
 ## The fix
 
@@ -141,7 +149,7 @@ follower's echo) is real but secondary.
   (the LOCKED_OUT refusals), `clk_demotion_reset` / `clk_demotion_kept`,
   `tx_first_anchor` (phase restarts), `tx_stream_streak_max`.
 - Full host `check` green, H7 host vectors green, bench binary `-Werror`
-  clean: md5 `2809d7e01e7caadbea88715bff5dde9a`, 24708 B.
+  clean: md5 `db7dd598e52154581d991c7b84db09a3`, 24724 B.
 
 **Staged on both boards (`/tmp/lifetrac_p0c`, flash tooling re-pushed
 LF-clean after the post-flash reboots):** v2 as `firmware_bench_diag.bin`
@@ -162,7 +170,7 @@ the plain keyframe injector, whose unacked REQ_KEYFRAME retries at 0.4 /
 | leg | firmware | expect |
 |---|---|---|
 | Q | RS-12.10 `e8ad8424` (re-flash) | lock-loss gaps > 3 s appear (reproduces I/J on synth); no counters (168-byte STATS, fly from `main` so the probe labels match) |
-| R | v2 `2809d7e0` (re-flash) | tractor `clk_demotion_reset` = 0, `clk_demotion_kept` > 0, `fhss_dec_rej_locked_out` > 0, `tx_first_anchor` = 1, `tx_stream_streak_max` ≥ 8; zero lock-loss gaps; fly from `rs12-15-clock-authority` |
+| R | v2 `db7dd598` (re-flash) | tractor `clk_demotion_reset` = 0, `clk_demotion_kept` > 0, `fhss_dec_rej_locked_out` > 0, `tx_first_anchor` = 1, `tx_stream_streak_max` ≥ 8; zero lock-loss gaps; fly from `rs12-15-clock-authority` |
 
 Each flash: `REVIVE_MODE=reboot bash /home/fio/run_flash_bench.sh
 /tmp/lifetrac_p0c/<bin>` (tractor: stop `lifetrac-camera.service` and the

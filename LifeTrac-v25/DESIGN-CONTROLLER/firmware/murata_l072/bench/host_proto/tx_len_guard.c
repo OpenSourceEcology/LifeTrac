@@ -18,6 +18,8 @@
 #include <string.h>   /* RS-11.5 stub: memset in sx1276_read_burst */
 #include <stdint.h>
 
+#include "sx1276_fhss_authority.h"   /* RS-12.15 v2: abort-sequence pin */
+
 #define CHECK(cond, msg) \
     do { \
         if (!(cond)) { \
@@ -90,8 +92,25 @@ int main(void) {
     req.length = 248U;                       /* 248+8 = 256 > 255: refuse */
     CHECK(!sx1276_tx_begin(&req), "len=248 must be refused");
 
+    /* RS-12.15 v2 (PR #125 review): an ABORT SEQUENCE must not earn
+     * originator authority. Refused attempts never reach TX_DONE, so the
+     * own-TX streak must stay at zero however many are tried. */
+    sx1276_fhss_authority_reset();
+    for (int i = 0; i < 12; ++i) {
+        CHECK(!sx1276_tx_begin(&req), "abort sequence: refused again");
+    }
+    CHECK(sx1276_fhss_authority_streak() == 0U,
+          "12 refused attempts must leave the streak at 0");
+    CHECK(sx1276_fhss_authority_is_originator(1U, 0U) == 0U,
+          "refused attempts must not grant originator authority");
+
     req.length = 247U;                       /* 247+8 = 255: exactly legal */
     CHECK(sx1276_tx_begin(&req), "len=247 must be admitted");
+    /* Admission alone is not a transmission either: the streak advances
+     * only when sx1276_tx_poll() sees TX_DONE, which this harness never
+     * delivers. */
+    CHECK(sx1276_fhss_authority_streak() == 0U,
+          "an admitted-but-not-completed TX must not advance the streak");
     printf("PASS tx_len_guard\n");
     return 0;
 }

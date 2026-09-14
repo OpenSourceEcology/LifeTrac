@@ -57,7 +57,10 @@
 /* Forget all streaming history (boot, scan reset, follower demotion). */
 void sx1276_fhss_authority_reset(void);
 
-/* Note one own FHSS transmission admitted at local time now_ms. */
+/* Note one own FHSS transmission that actually went on air (called from
+ * the TX_DONE path in sx1276_tx_poll, NOT at admission -- PR #125 review:
+ * an aborted attempt must not count as streaming). now_ms = local time
+ * of the TX_DONE. */
 void sx1276_fhss_authority_note_tx(uint32_t now_ms);
 
 /* Note that a remote grid was adopted: the node is a follower now. */

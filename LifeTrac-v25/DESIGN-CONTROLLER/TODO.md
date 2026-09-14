@@ -2461,7 +2461,7 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   authority incl. the demotion->TX->RX regression), the demotion edge resets
   only an ADOPTED clock, and STATS 168->208 adds the consider_remote histogram,
   clk_demotion_reset/kept, tx_first_anchor, tx_stream_streak_max so the next
-  leg MEASURES it. Bench bin 2809d7e0 (24708 B) + the byte-identical old
+  leg MEASURES it. Bench bin db7dd598 (24724 B) + the byte-identical old
   RS-12.10 bin e8ad8424 are staged in /tmp/lifetrac_p0c on both boards; flash
   tooling re-pushed LF-clean. Boards still on v1 (2ee69f9c). Plan (needs GO):
   leg Q old fw on SPARSE synth (-SynthFps 1 -SynthBudgetB 400 + kf_inject
