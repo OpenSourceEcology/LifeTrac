@@ -235,11 +235,49 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
                 /* F6: compute local clock health for the snap gate.
                  * UNANCHORED until a remote grid has been adopted --
                  * see s_grid_adopted above. */
+                /* RS-12.15 (2026-09-14): a SELF-ANCHORED originator --
+                 * a node whose clock was set by its OWN TX and that has
+                 * not adopted a remote grid (valid clock + !adopted) --
+                 * must not be dragged by its own follower's lagged echo.
+                 * Today such a node reads UNANCHORED, so it SNAPS its
+                 * scheduler back to (or re-anchors its phase from) the
+                 * follower, walking the whole shared grid a slot off and
+                 * making the follower lose lock (RS-12.12/14 evidence).
+                 * It now adopts a remote ONLY when that remote's grid
+                 * LEADS its own -- monotonic-earlier, which is globally
+                 * convergent (never a deadlock between two self-anchored
+                 * grids) and leaves recovery intact, since a demoted node
+                 * has an INVALID clock and still takes the UNANCHORED
+                 * path below. Followers (adopted) and recovering nodes
+                 * (invalid clock) are unchanged. */
+                const uint32_t now_anchor_ms = platform_now_ms();
+                const uint32_t remote_abs = sx1276_fhss_clock_abs_of(
+                    parsed.epoch, parsed.hop_idx);
+                const uint32_t remote_toa_us =
+                    sx1276_airtime_estimate_toa_us((uint8_t)rx_len);
+                const uint8_t self_anchored_originator =
+                    (sx1276_fhss_clock_valid() != 0U && s_grid_adopted == 0U)
+                        ? 1U : 0U;
+                /* Follower / recovery always adopt (== 1); a self-anchored
+                 * originator adopts only a leading grid. */
+                const uint8_t adopt_remote_grid =
+                    (self_anchored_originator == 0U)
+                        ? 1U
+                        : sx1276_fhss_clock_rx_leads(now_anchor_ms,
+                                                     remote_toa_us,
+                                                     parsed.slot_offset_ms,
+                                                     remote_abs);
                 const sx1276_fhss_clock_health_t health =
                     (sx1276_fhss_clock_valid() == 0U ||
                      s_grid_adopted == 0U)
-                        ? SX1276_FHSS_CLOCK_UNANCHORED
-                        : ((sx1276_fhss_clock_age_ms(platform_now_ms())
+                        ? ((self_anchored_originator != 0U &&
+                            adopt_remote_grid == 0U)
+                               /* Originator, remote does NOT lead: make the
+                                * grid authoritative so consider_remote
+                                * REFUSES a follower snap (LOCKED_OUT). */
+                               ? SX1276_FHSS_CLOCK_FRESH
+                               : SX1276_FHSS_CLOCK_UNANCHORED)
+                        : ((sx1276_fhss_clock_age_ms(now_anchor_ms)
                                 <= SX1276_FHSS_CLOCK_FRESH_MS)
                                ? SX1276_FHSS_CLOCK_FRESH
                                : SX1276_FHSS_CLOCK_STALE);
@@ -268,27 +306,32 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
                  * (same trust gate as the scheduler snap). */
                 if (dec == SX1276_FHSS_SNAP_DEC_SNAPPED ||
                     dec == SX1276_FHSS_SNAP_DEC_ALIGNED) {
-                    const uint32_t now_anchor_ms = platform_now_ms();
-                    const uint32_t remote_abs = sx1276_fhss_clock_abs_of(
-                        parsed.epoch, parsed.hop_idx);
-                    /* F7: round-not-truncate ToA (the old inline /1000
-                     * discarded up to 0.999 ms, one-sidedly LATE). The
-                     * arithmetic lives in the clock TU so the bench can
-                     * pin it. now_anchor_ms is still main-loop service
-                     * time, not the DIO0 edge — that residual lateness
-                     * is known and deliberately out of F7 scope. */
-                    sx1276_fhss_clock_anchor_rx(
-                        now_anchor_ms,
-                        sx1276_airtime_estimate_toa_us((uint8_t)rx_len),
-                        parsed.slot_offset_ms,
-                        remote_abs);
-                    /* The follower must not re-arm mid-slot for the
-                     * slot we just received in — mark it followed. */
+                    /* RS-12.15: adopt (re-anchor phase + mark the grid
+                     * adopted) only when this node is a follower/recovering
+                     * OR the remote genuinely leads a self-anchored grid.
+                     * An ALIGNED echo from a lagging follower is left to
+                     * run on the originator's own TX-maintained phase --
+                     * no drag. now_anchor_ms / remote_abs / remote_toa_us
+                     * were sampled once above. */
+                    if (adopt_remote_grid != 0U) {
+                        /* F7: round-not-truncate ToA (the old inline /1000
+                         * discarded up to 0.999 ms, one-sidedly LATE); the
+                         * arithmetic lives in the clock TU so the bench can
+                         * pin it. now_anchor_ms is main-loop service time,
+                         * not the DIO0 edge -- that residual lateness is
+                         * known and deliberately out of F7 scope. */
+                        sx1276_fhss_clock_anchor_rx(
+                            now_anchor_ms, remote_toa_us,
+                            parsed.slot_offset_ms, remote_abs);
+                        /* F6: a remote grid is now adopted -- the local
+                         * clock gains refusal authority (FRESH tier). */
+                        s_grid_adopted = 1U;
+                    }
+                    /* The follower must not re-arm mid-slot for the slot
+                     * we just received in -- mark it followed regardless
+                     * of whether we re-anchored. */
                     s_rx_last_followed_abs = remote_abs;
                     s_rx_last_followed_abs_valid = 1U;
-                    /* F6: a remote grid is now adopted — the local
-                     * clock gains refusal authority (FRESH tier). */
-                    s_grid_adopted = 1U;
                 }
                 /* FCC-A6c-2-b-ii + F6: only an ACCEPTED header is
                  * FRAME_VALID to the scan SM. Pre-F6 this fed true

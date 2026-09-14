@@ -213,6 +213,47 @@ static void test_age_and_tx_refresh(void) {
     }
 }
 
+/* RS-12.15 (2026-09-14): rx_leads() -- does a received header's implied
+ * slot-start fall EARLIER than the current anchor's projection of the
+ * same absolute slot? A self-anchored originator adopts a remote grid
+ * only when it leads, so it ignores its follower's lagged echo (no
+ * drag / no backward snap) but still yields to a true earlier leader
+ * (monotonic-earlier convergence). Same ToA/offset math as anchor_rx. */
+static void test_rx_leads(void) {
+    sx1276_fhss_clock_reset();
+    sx1276_fhss_clock_anchor(10000U, 40U);   /* local slot 40 starts @10000 */
+
+    CHECK(sx1276_fhss_clock_rx_leads(10000U, 0U, 0U, 40U) == 0U,
+          "(10) equal slot-start does not lead");
+    CHECK(sx1276_fhss_clock_rx_leads(9995U, 0U, 0U, 40U) == 1U,
+          "(10) 5 ms earlier leads");
+    CHECK(sx1276_fhss_clock_rx_leads(10005U, 0U, 0U, 40U) == 0U,
+          "(10) 5 ms later (follower echo) does not lead");
+
+    /* ToA (F7 half-up) + slot_offset subtracted exactly as anchor_rx:
+     * 10100 - 100 ms - 0 = 10000 == local projection. */
+    CHECK(sx1276_fhss_clock_rx_leads(10100U, 99904U, 0U, 40U) == 0U,
+          "(10) ToA/offset math matches anchor_rx (equal)");
+    CHECK(sx1276_fhss_clock_rx_leads(10099U, 99904U, 0U, 40U) == 1U,
+          "(10) one ms earlier after ToA/offset leads");
+    CHECK(sx1276_fhss_clock_rx_leads(10120U, 99904U, 13U, 40U) == 0U,
+          "(10) 10120-100-13=10007 later does not lead");
+
+    /* A different absolute slot: projection scales by SLOT_MS. */
+    CHECK(sx1276_fhss_clock_rx_leads(10200U, 0U, 0U, 41U) == 0U,
+          "(10) abs 41 projects to 10200 (equal)");
+    CHECK(sx1276_fhss_clock_rx_leads(10195U, 0U, 0U, 41U) == 1U,
+          "(10) abs 41 earlier leads");
+
+    /* Wrap-safe across the u32 ms tick wrap. */
+    sx1276_fhss_clock_reset();
+    sx1276_fhss_clock_anchor(0xFFFFFF00U, 7U);
+    CHECK(sx1276_fhss_clock_rx_leads(0xFFFFFEF0U, 0U, 0U, 7U) == 1U,
+          "(10) 16 ms earlier across-wrap leads");
+    CHECK(sx1276_fhss_clock_rx_leads(0x00000050U, 0U, 0U, 7U) == 0U,
+          "(10) later across-wrap does not lead");
+}
+
 int main(void) {
     test_lifecycle();
     test_abs_slot();
@@ -223,11 +264,12 @@ int main(void) {
     test_geometry();
     test_anchor_rx();
     test_age_and_tx_refresh();
+    test_rx_leads();
 
     if (g_failures != 0) {
         fprintf(stderr, "[FAIL] fhss_clock: %d failure(s)\n", g_failures);
         return 1;
     }
-    printf("[PASS] fhss_clock: 34 base + F6 age/refresh cases\n");
+    printf("[PASS] fhss_clock: 34 base + F6 age/refresh + RS-12.15 leads\n");
     return 0;
 }

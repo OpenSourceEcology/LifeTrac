@@ -106,6 +106,26 @@ uint32_t sx1276_fhss_clock_age_ms(uint32_t now_ms);
 void sx1276_fhss_clock_anchor_rx(uint32_t rx_done_ms, uint32_t toa_us,
                                  uint8_t slot_offset_ms, uint32_t abs_slot);
 
+/*
+ * RS-12.15 (2026-09-14): does the grid implied by a received A6a header
+ * LEAD the current anchor -- i.e. does the remote's slot boundary fall
+ * EARLIER (in local ms) than where our own anchor projects that same
+ * absolute slot to start? Returns 1 if it leads, 0 if it is equal or
+ * later. Caller MUST gate on clock_valid(). Pure and wrap-safe (signed
+ * delta of two u32 ms times, the same idiom as the rest of this TU).
+ *
+ * A SELF-ANCHORED streaming node -- one whose clock was set by its own
+ * TX and that has not adopted a remote grid -- uses this to adopt ONLY
+ * a grid that genuinely leads its own. That makes it converge toward
+ * the earliest phase (a global minimum-consensus, so it can never
+ * deadlock two self-anchored grids) while never letting its own
+ * follower's lagged echo drag it late and walk the shared grid a slot
+ * off (the RS-12.12/14 lock-loss mechanism). Followers and recovering
+ * (clock-invalid) nodes do not consult it; their adoption is unchanged.
+ */
+uint8_t sx1276_fhss_clock_rx_leads(uint32_t rx_done_ms, uint32_t toa_us,
+                                   uint8_t slot_offset_ms, uint32_t abs_slot);
+
 /* 1 when an anchor is set. */
 uint8_t sx1276_fhss_clock_valid(void);
 
