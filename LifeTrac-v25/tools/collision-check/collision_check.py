@@ -553,13 +553,14 @@ class Runner:
         results: dict[Pose, PoseResult] = {}
         t0 = time.time()
         probe_set = set(probes)
+        sampled = list(dict.fromkeys(poses + probes))
 
         def one(pose: Pose):
             parsed = self.scad.echo(f"pose_{pose.key}", pose)
             return pose, parsed
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.args.jobs) as ex:
-            for pose, parsed in ex.map(one, poses + probes):
+            for pose, parsed in ex.map(one, sampled):
                 cyls, rc = parsed.get("CYL", []), parsed.get("rc", 1)
                 problems = (pose_problems(parsed, pose) + cylinder_problems(parsed, self.required_cylinders)
                             if rc == 0 else [])
@@ -719,11 +720,17 @@ def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
     judged, reachable, failed, passed = verdict(results, runner.static_checks)
     probes = [p for p in results if results[p].informational]
     static_failed_checks = [c for c in runner.static_checks if not c.ok]
+    if runner.args.poses:
+        pose_mode = "explicit pose list"
+    elif runner.args.animation_frames:
+        pose_mode = f"animation path ({runner.args.animation_frames} frame{'s' if runner.args.animation_frames != 1 else ''})"
+    else:
+        pose_mode = "grid"
     lines = []
     lines.append("# LifeTrac v25 collision check")
     lines.append("")
     lines.append(f"**Result: {'PASS' if passed else 'FAIL'}**  ")
-    lines.append(f"OpenSCAD: `{version}` · poses: {len(judged)} in grid, {len(reachable)} reachable, "
+    lines.append(f"OpenSCAD: `{version}` · poses: {len(judged)} in {pose_mode}, {len(reachable)} reachable, "
                  f"{len(failed)} failing, {len(static_failed_checks)} static failures · runtime {elapsed / 60:.1f} min "
                  f"(reachability {runner.timings.get('reachability_s', 0):.0f}s, "
                  f"exports {runner.timings.get('export_s', 0):.0f}s, "
@@ -893,6 +900,7 @@ def build_report(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
 
 def results_json(runner: Runner, env: Envelope, results: dict[Pose, PoseResult], version: str,
                  passed: bool) -> dict:
+    ordered = sorted(results, key=lambda p: (p.arm, p.bucket_rel))
     return {
         "openscad": version,
         "passed": passed,
@@ -908,7 +916,8 @@ def results_json(runner: Runner, env: Envelope, results: dict[Pose, PoseResult],
                 "ground_limited_mm": r.ground_limited,
                 "checks": [c.__dict__ for c in r.checks],
             }
-            for p, r in results.items()
+            for p in ordered
+            for r in [results[p]]
         ],
     }
 

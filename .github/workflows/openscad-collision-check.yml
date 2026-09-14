@@ -35,6 +35,8 @@ jobs:
     name: Interference check over the pose envelope
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
