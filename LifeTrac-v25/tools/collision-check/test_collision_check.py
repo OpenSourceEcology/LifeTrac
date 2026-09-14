@@ -246,7 +246,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 case "$FAKE_OPENSCAD_MODE" in
-  ok) printf 'solid OpenSCAD_Model\\nendsolid OpenSCAD_Model\\n' > "$out"; exit 0;;
+  ok) printf 'solid OpenSCAD_Model\\n  facet normal 0 0 1\\n    outer loop\\n      vertex 0 0 0\\n      vertex 1 0 0\\n      vertex 0 1 0\\n    endloop\\n  endfacet\\nendsolid OpenSCAD_Model\\n' > "$out"; exit 0;;
   partial) printf 'solid OpenSCAD_Model\\n  facet normal 0 0 1\\n' > "$out"; echo "killed" >&2; exit 1;;
   *) echo "no output" >&2; exit 1;;
 esac
@@ -281,6 +281,42 @@ def test_failed_export_never_leaves_a_mesh_to_cache(tmp_path, monkeypatch):
     assert run("ok")[3] is False
     # an export that exits 0 without writing anything is not a mesh either
     assert cc.load_mesh(str(out / "missing.stl")) is None
+
+
+def test_version_fallback_is_stable_when_version_output_is_empty(monkeypatch):
+    probe = object.__new__(cc.OpenSCAD)
+    probe.binary = "openscad"
+    monkeypatch.setattr(cc.shutil, "which", lambda _bin: "/usr/bin/openscad")
+    monkeypatch.setattr(cc.subprocess, "run", lambda *a, **k: SimpleNamespace(stdout="", stderr=""))
+    assert probe._version() == "unknown (/usr/bin/openscad)"
+
+
+def test_cached_non_mesh_file_is_not_reused(tmp_path):
+    out = tmp_path / "out"
+    out.mkdir()
+    stale = out / "frame_static.stl"
+    stale.write_text("not an stl mesh")
+    os.utime(stale, (2_000_000_000, 2_000_000_000))
+
+    scad = object.__new__(cc.OpenSCAD)
+    scad.out_dir = str(out)
+    scad.cache_reusable = True
+    scad.model_mtime = 1_000_000_000
+    calls = {"run": 0}
+
+    def fake_run(out_path, _extra, export_format=None, log_path=None):
+        del export_format, log_path
+        calls["run"] += 1
+        with open(out_path, "w") as f:
+            f.write("solid OpenSCAD_Model\nendsolid OpenSCAD_Model\n")
+        return 0, 0.1, str(out / "frame_static.log")
+
+    scad.run = fake_run
+
+    path, rc, _, cached = scad.export_group("frame", None, force=False)
+    assert path.endswith("frame_static.stl")
+    assert rc == 0 and cached is False
+    assert calls["run"] == 1
 
 
 def test_overlap_verdict():

@@ -389,11 +389,15 @@ class OpenSCAD:
             purge_dir=out_dir)
 
     def _version(self) -> str:
+        binary_id = os.path.abspath(shutil.which(self.binary) or self.binary)
         try:
             r = subprocess.run([self.binary, "--version"], capture_output=True, text=True, timeout=60)
-            return (r.stdout + r.stderr).strip().splitlines()[0]
-        except Exception as e:  # noqa: BLE001
-            return f"unknown ({e})"
+            banner = (r.stdout + r.stderr).strip()
+            if banner:
+                return banner.splitlines()[0]
+        except Exception:  # noqa: BLE001
+            pass
+        return f"unknown ({binary_id})"
 
     def version(self) -> str:
         return self.version_string
@@ -441,7 +445,7 @@ class OpenSCAD:
         name = f"{group}_static" if pose is None else f"{group}_{pose.key}"
         out_path = os.path.join(self.out_dir, name + ".stl")
         if not force and self.cache_reusable and os.path.exists(out_path) and os.path.getsize(out_path) > 0 \
-                and os.path.getmtime(out_path) >= self.model_mtime:
+                and os.path.getmtime(out_path) >= self.model_mtime and load_mesh(out_path) is not None:
             return out_path, 0, 0.0, True
         wanted = GROUPS[group][0]
         toggles = []
