@@ -16,6 +16,7 @@
 #include "lora_pkt_hdr.h"
 #include "sx1276_fhss.h"
 #include "sx1276_fhss_clock.h"
+#include "sx1276_fhss_authority.h"
 #include "sx1276_legal_dwell.h"
 #endif
 
@@ -270,6 +271,9 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
                     sx1276_fhss_current_epoch(),
                     sx1276_fhss_current_slot());
                 sx1276_fhss_clock_anchor(tx_now_ms, cur_abs);
+                /* RS-12.15 v2: count phase restarts -- exactly one per
+                 * session on a healthy originator (the boot anchor). */
+                host_stats_tx_first_anchor();
             }
             {
                 const uint32_t abs_now =
@@ -289,6 +293,11 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
                     tx_now_ms - sx1276_fhss_clock_in_slot_ms(tx_now_ms),
                     abs_now);
             }
+            /* RS-12.15 v2: originator authority is earned by SUSTAINED
+             * streaming (sx1276_fhss_authority.h), not by having a valid
+             * self-anchored clock -- see the RX health gate. */
+            sx1276_fhss_authority_note_tx(tx_now_ms);
+            host_stats_tx_stream_streak_note(sx1276_fhss_authority_streak());
             /* F7: record the admission slot's boundary instead of sampling
              * the phase here. The phase byte itself is computed at
              * header-pack time from this stored boundary — NOT by

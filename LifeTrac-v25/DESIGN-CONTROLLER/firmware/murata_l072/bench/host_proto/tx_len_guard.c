@@ -62,6 +62,10 @@ void host_stats_tx_deaf_note(uint32_t deaf_us, uint32_t done_to_rearm_us,
                              bool done_valid) {
     (void)deaf_us; (void)done_to_rearm_us; (void)done_valid;
 }
+/* RS-12.15 v2 stubs: the TX path notes phase restarts and the own-TX
+ * streak; this test only cares about length gating. */
+void host_stats_tx_first_anchor(void) {}
+void host_stats_tx_stream_streak_note(uint32_t streak) { (void)streak; }
 void host_cmd_emit_fault(uint8_t code, uint8_t sub) { (void)code; (void)sub; }
 const host_cfg_profile_req_t *host_cfg_profile_active(void) { return NULL; }
 /* sx1276_modes_to_standby / sx1276_set_sf_bw_cr / sx1276_set_tx_power_dbm

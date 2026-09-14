@@ -12,6 +12,7 @@
 #include "sx1276_airtime.h"
 #include "sx1276_fhss.h"
 #include "sx1276_fhss_clock.h"
+#include "sx1276_fhss_authority.h"
 #include "sx1276_rx_scan_fail.h"
 #include "sx1276_rx_scan_walker.h"
 #include "sx1276_tx.h"
@@ -255,9 +256,14 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
                     parsed.epoch, parsed.hop_idx);
                 const uint32_t remote_toa_us =
                     sx1276_airtime_estimate_toa_us((uint8_t)rx_len);
+                /* v2: authority needs SUSTAINED own-TX streaming
+                 * (sx1276_fhss_authority.h) -- a post-demotion duplex
+                 * node that just re-validated a stale grid with one
+                 * command is NOT an originator and keeps the UNANCHORED
+                 * recovery tier (PR #125 review). */
                 const uint8_t self_anchored_originator =
-                    (sx1276_fhss_clock_valid() != 0U && s_grid_adopted == 0U)
-                        ? 1U : 0U;
+                    sx1276_fhss_authority_is_originator(
+                        sx1276_fhss_clock_valid(), s_grid_adopted);
                 /* Follower / recovery always adopt (== 1); a self-anchored
                  * originator adopts only a leading grid. */
                 const uint8_t adopt_remote_grid =
@@ -286,6 +292,7 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
                                                 parsed.hop_idx,
                                                 health);
                 sx1276_rx_counter_record(dec);
+                host_stats_fhss_dec_note((uint8_t)dec);
                 /* v25.0.7 slot-clock (supersedes the 2026-07-24
                  * per-packet immediate-follow): instead of consuming
                  * a slot per received packet — which breaks lock-step
@@ -326,6 +333,7 @@ bool sx1276_rx_service(uint32_t events, sx1276_rx_frame_t *out_frame) {
                         /* F6: a remote grid is now adopted -- the local
                          * clock gains refusal authority (FRESH tier). */
                         s_grid_adopted = 1U;
+                        sx1276_fhss_authority_note_adopt();
                     }
                     /* The follower must not re-arm mid-slot for the slot
                      * we just received in -- mark it followed regardless
@@ -771,7 +779,20 @@ static void scan_drive(sx1276_rx_scan_event_t event,
      * must NOT clear a TX-side clock that activation just anchored. */
     if (s_scan_state == SX1276_RX_SCAN_STATE_LOCKED &&
         dec.action == SX1276_RX_SCAN_ACTION_BEGIN_SCAN) {
-        sx1276_fhss_clock_reset();
+        /* RS-12.15 v2 (2026-09-14): only an ADOPTED clock is reset here.
+         * A self-anchored clock survives its owner's scan demotion: the
+         * streaming node's grid never depended on hearing the base, and
+         * resetting it was the lock-loss mechanism -- a received command
+         * LOCKed the tractor, this 2 s demotion wiped its own TX clock,
+         * and the next TX re-anchored "slot k+1 starts now", renumbering
+         * the shared grid under the base's follower (RS-12.12/14). */
+        if (s_grid_adopted != 0U) {
+            sx1276_fhss_clock_reset();
+            sx1276_fhss_authority_reset();
+            host_stats_clk_demotion_note(true);
+        } else {
+            host_stats_clk_demotion_note(false);
+        }
         s_rx_last_followed_abs_valid = 0U;
         /* F6: the adopted grid is gone with the lock. Clearing this is
          * what makes the UNANCHORED recovery tier reachable — the next
@@ -869,6 +890,7 @@ void sx1276_rx_scan_reset(void) {
      * its own grid lazily at its next transmission, so resetting here
      * is safe on both roles. */
     sx1276_fhss_clock_reset();
+    sx1276_fhss_authority_reset();   /* RS-12.15 v2: no streaming history */
     s_rx_last_followed_abs_valid = 0U;
     s_grid_adopted = 0U;   /* F6: fresh acquisition => no adopted grid */
 }

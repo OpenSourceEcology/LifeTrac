@@ -182,6 +182,26 @@ def main() -> int:
                   f"(max fields: post-bracket values)")
         else:
             print("RS-12.10: n/a (counters absent in a bracket)")
+        # RS-12.15 v2 (2026-09-14): FHSS clock-authority counters. Deltas of
+        # the decision histogram and the demotion outcome; streak_max and
+        # first_anchor are post-bracket values (first_anchor is cumulative
+        # since firmware reset -- report the delta AND the post value).
+        rs15 = ("fhss_dec_aligned", "fhss_dec_snapped", "fhss_dec_rej_not_init",
+                "fhss_dec_rej_bad_hop", "fhss_dec_rej_epoch_drift",
+                "fhss_dec_rej_locked_out", "clk_demotion_reset",
+                "clk_demotion_kept", "tx_first_anchor", "tx_stream_streak_max")
+        if any(k in post for k in rs15):
+            pre15 = {**{k: 0 for k in rs15}, **pre}
+            post15 = {**{k: 0 for k in rs15}, **post}
+            d15 = {k: post15[k] - pre15[k] for k in rs15}
+            print(f"RS-12.15: consider_remote deltas aligned={d15['fhss_dec_aligned']} "
+                  f"snapped={d15['fhss_dec_snapped']} locked_out={d15['fhss_dec_rej_locked_out']} "
+                  f"epoch_drift={d15['fhss_dec_rej_epoch_drift']} bad_hop={d15['fhss_dec_rej_bad_hop']} "
+                  f"not_init={d15['fhss_dec_rej_not_init']} | demotion reset={d15['clk_demotion_reset']} "
+                  f"kept={d15['clk_demotion_kept']} | tx_first_anchor delta={d15['tx_first_anchor']} "
+                  f"(post {post15['tx_first_anchor']}) | streak_max post={post15['tx_stream_streak_max']}")
+        else:
+            print("RS-12.15: n/a (counters absent in a bracket)")
     return 0
 
 

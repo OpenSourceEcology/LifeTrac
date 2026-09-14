@@ -193,7 +193,31 @@
 #define HOST_STATS_OFFSET_TX_DEAF_MAX_US            156U
 #define HOST_STATS_OFFSET_TX_DEAF_SUM_US            160U
 #define HOST_STATS_OFFSET_TX_DONE_TO_REARM_MAX_US   164U
-#define HOST_STATS_PAYLOAD_LEN               168U
+/* RS-12.15 v2 (2026-09-14) additive tail: FHSS clock authority.
+ * fhss_dec_*              = consider_remote() decisions since reset, one
+ *                           counter per sx1276_fhss_snap_decision_t value
+ *                           (ALIGNED, SNAPPED, REJ_NOT_INIT, REJ_BAD_HOP,
+ *                           REJ_EPOCH_DRIFT, REJ_LOCKED_OUT). An originator
+ *                           refusing its follower's echo shows as LOCKED_OUT.
+ * clk_demotion_reset      = LOCKED->SCANNING demotions that reset an ADOPTED
+ *                           clock (follower re-acquisition, as before).
+ * clk_demotion_kept       = demotions where a self-anchored clock was KEPT
+ *                           (the streaming node's grid survives -- the fix).
+ * tx_first_anchor         = own-TX lazy clock anchors ("slot starts now");
+ *                           more than one per session = a phase restart.
+ * tx_stream_streak_max    = longest run of own FHSS TXs each within 1 s;
+ *                           >= 8 means the node held originator authority. */
+#define HOST_STATS_OFFSET_FHSS_DEC_ALIGNED          168U
+#define HOST_STATS_OFFSET_FHSS_DEC_SNAPPED          172U
+#define HOST_STATS_OFFSET_FHSS_DEC_REJ_NOT_INIT     176U
+#define HOST_STATS_OFFSET_FHSS_DEC_REJ_BAD_HOP      180U
+#define HOST_STATS_OFFSET_FHSS_DEC_REJ_EPOCH_DRIFT  184U
+#define HOST_STATS_OFFSET_FHSS_DEC_REJ_LOCKED_OUT   188U
+#define HOST_STATS_OFFSET_CLK_DEMOTION_RESET        192U
+#define HOST_STATS_OFFSET_CLK_DEMOTION_KEPT         196U
+#define HOST_STATS_OFFSET_TX_FIRST_ANCHOR           200U
+#define HOST_STATS_OFFSET_TX_STREAM_STREAK_MAX      204U
+#define HOST_STATS_PAYLOAD_LEN               208U
 
 #define HOST_TYPE_BOOT_URC                   0xF0U
 /* FAULT_URC payload: {u8 code, u8 sub, u16 reserved, u32 pc, u32 lr, u32 psr, u32 bfar, u32 uptime_ms} */

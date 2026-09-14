@@ -25,6 +25,12 @@ void host_stats_rx_pretx_drained_add(uint32_t n);
 void host_stats_rx_fifo_skip(void);
 void host_stats_tx_deaf_note(uint32_t deaf_us, uint32_t done_to_rearm_us,
                              bool done_valid);
+/* RS-12.15 v2 (2026-09-14): FHSS clock-authority counters (see the
+ * host_types.h tail). dec_idx is the sx1276_fhss_snap_decision_t value. */
+void host_stats_fhss_dec_note(uint8_t dec_idx);
+void host_stats_clk_demotion_note(bool reset);
+void host_stats_tx_first_anchor(void);
+void host_stats_tx_stream_streak_note(uint32_t streak);
 uint16_t host_stats_serialize(uint8_t *out, uint16_t out_cap);
 
 #endif /* LIFETRAC_MURATA_L072_HOST_STATS_H */
