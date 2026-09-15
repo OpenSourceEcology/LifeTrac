@@ -2487,6 +2487,12 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   mechanistically AND behaviorally. Boards on v2, parked. RS-12.15 v2
   recommended for production. Evidence RS_12_15_clock_authority_2026-09-14
   /RESULTS.md (GO-validation + Camera behavioral A/B sections).**
+  Round 4 review (after the legs): leading-grid originator now hands STALE
+  (epoch-drift barrier kept; forged epoch+2 host-pinned REJECTED); wire-sync
+  enforces the 10 new offsets; PRODUCTION build/firmware.bin rebuilt + committed
+  (589c1203). Boards run bench 5a160e4a (flown); PR-head bench = 0c1bb0a9 --
+  delta not exercised on air (0 SNAPPED on the originator), confirmation leg
+  optional at the next GO. Staged on both boards.
 - [~] **RS-12.15 v1 — FHSS clock authority: FIRMWARE IMPLEMENTED + FLASHED
   2026-09-14 (commit 23ba5122, branch rs12-15-clock-authority, PR pending);
   BEHAVIORAL A/B still PENDING. A self-anchored originator (own-TX clock,

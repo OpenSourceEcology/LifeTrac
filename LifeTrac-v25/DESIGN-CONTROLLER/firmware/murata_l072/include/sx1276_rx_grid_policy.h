@@ -19,13 +19,15 @@
  *   consider():  originator := authority(now, clock_valid, adopted)
  *                adopt      := originator ? rx_leads(...) : 1
  *                health     := (!clock_valid || !adopted)
- *                                ? ((originator && !adopt) ? FRESH
- *                                                          : UNANCHORED)
+ *                                ? (originator ? (adopt ? STALE : FRESH)
+ *                                              : UNANCHORED)
  *                                : (age <= FRESH_MS ? FRESH : STALE)
- *                An originator hands FRESH to consider_remote only to make
- *                it REFUSE a lagging follower's snap; a genuinely leading
- *                grid, a follower, or a recovering node get the pre-v2
- *                tiers unchanged.
+ *                An originator hands FRESH to consider_remote to make it
+ *                REFUSE a lagging follower's snap, and STALE (never
+ *                UNANCHORED) for a leading grid so the +/-1 epoch-drift
+ *                barrier -- the only spoof/replay guard on the
+ *                unauthenticated header -- stays in force. A follower or
+ *                a recovering node gets the pre-v2 tiers unchanged.
  *   adopt():     anchor_rx + adopted = 1 + authority cleared.
  *   demotion():  an ADOPTED clock is reset (fresh acquisition, as before);
  *                a self-anchored clock is KEPT -- the streaming node's grid

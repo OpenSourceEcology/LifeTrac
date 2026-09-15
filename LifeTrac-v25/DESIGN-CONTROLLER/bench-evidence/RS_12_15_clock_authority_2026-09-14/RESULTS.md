@@ -1,13 +1,14 @@
 # RS-12.15 — FHSS clock authority (firmware, 2026-09-14)
 
-**Status — two versions, read them apart (PR #125 review):**
+**Status — two versions, read them apart (PR #125 review). Current board
+state: both L072s run v2 (`5a160e4a`), parked.**
 
-- **v1 (commit 23ba5122, md5 `2ee69f9c…`) — flashed to both L072s and
-  flown (legs O/P below).** Healthy, no regression. It fixed only the
-  secondary ms-level drag; its on-air legs are NOT a validation of the
-  fix, because the synthetic path does not exhibit the break and the
-  camera path cannot be re-flown on the old firmware. **Both boards still
-  run v1.**
+- **v1 (commit 23ba5122, md5 `2ee69f9c…`) — the INTERIM result: flashed
+  and flown earlier the same day (legs O/P below), then superseded.**
+  Healthy, no regression, but it fixed only the secondary ms-level drag
+  and its synthetic legs did not exercise the break, so they are NOT a
+  validation of the fix. Nothing in the v1 sections describes the boards
+  as they are now.
 - **v2 (commit f7d98f8b + follow-ups, the version this PR ships) — flashed
   to both L072s and VALIDATED on air 2026-09-14.** It addresses the dominant
   mechanism (the demotion resetting the streaming node's own clock). The
@@ -16,7 +17,7 @@
   same workload — see "Camera behavioral A/B" at the end, plus the leg-R
   counter proof. Boards left on v2, parked.
 
-Both radios parked (0x80).**
+Both radios parked (0x80).
 
 ## The fix
 
@@ -138,7 +139,7 @@ That explains every observation, including why the synthetic path never
 reproduced the break. The v1 mechanism (ms-level drag from adopting the
 follower's echo) is real but secondary.
 
-### v2 (commit f7d98f8b; PR #125) — built, staged, NOT flashed
+### v2 (commit f7d98f8b + follow-ups; PR #125) — design (flashed and validated later the same day, see the two sections at the end)
 - `sx1276_fhss_authority.[ch]`: originator authority is earned only by
   **sustained own-TX streaming** (≥ 8 consecutive TXs each within 1 s). A
   command sender (≥ 1 s apart under the RS-12.14 gate, or two copies 37 ms
@@ -169,6 +170,25 @@ follower's echo) is real but secondary.
   originator refuses a lagging echo (LOCKED_OUT, clock untouched on
   ALIGNED) and adopts a leading grid; its own demotion keeps its clock;
   authority decays after 1 s of silence; exactly-1 s commands never earn it.
+- **Round 4 (PR #125 review, after the on-air legs):** a leading grid was
+  handed UNANCHORED, which makes `consider_remote` skip the ±1 epoch-drift
+  check — the unauthenticated header's only spoof/replay barrier — so a
+  forged "leading" epoch+2 could have teleported a streaming originator.
+  The originator now hands **STALE** for a leading grid (drift check kept)
+  and FRESH for a lagging one; `check-rx-grid-policy` sequence 9 pins
+  epoch+2 → REJECTED_EPOCH_DRIFT with the clock untouched, epoch+1 still
+  adopted. `tools/check_mh_wire_sync.py` now enforces the ten new STATS
+  offsets in the H7 mirror (57 constants). **Flown vs shipped:** legs R/S/T
+  flew bench build `5a160e4a`; the PR head's bench build is `0c1bb0a9`
+  (same 24860 B). The only behavioural delta is the tier handed to
+  `consider_remote` when a streaming originator sees a *leading* grid — a
+  case that never occurred on air (0 SNAPPED on the tractor across every
+  v2 leg), so the on-air evidence stands, and the case is host-pinned. A
+  short confirmation leg on `0c1bb0a9` at the next GO is recommended, not
+  required. The tracked **production** image `build/firmware.bin` was
+  rebuilt from the same sources (md5 `589c120323c2d5e7ef9f459d7a4ba42d`,
+  24860 B, no diag flag) and is committed with this PR — before it, the
+  committed production binary was still the RS-12.10 build.
 
 **Staged on both boards (`/tmp/lifetrac_p0c`, flash tooling re-pushed
 LF-clean after the post-flash reboots):** v2 as `firmware_bench_diag.bin`

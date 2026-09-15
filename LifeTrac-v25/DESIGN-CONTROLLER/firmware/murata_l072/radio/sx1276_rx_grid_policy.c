@@ -44,13 +44,23 @@ sx1276_rx_grid_verdict_t sx1276_rx_grid_consider(uint32_t now_ms,
                   : sx1276_fhss_clock_rx_leads(now_ms, toa_us,
                                                slot_offset_ms, remote_abs);
     if (clock_valid == 0U || s_grid_adopted == 0U) {
-        /* Unadopted grid: no refusal authority (UNANCHORED, accept any
-         * epoch) -- EXCEPT a streaming originator facing a remote that
-         * does not lead, which is handed FRESH purely so consider_remote
-         * REFUSES a follower snap (REJECTED_LOCKED_OUT). */
-        v.health = (v.originator != 0U && v.adopt == 0U)
-                       ? SX1276_FHSS_CLOCK_FRESH
-                       : SX1276_FHSS_CLOCK_UNANCHORED;
+        if (v.originator != 0U) {
+            /* A streaming originator: a remote that does NOT lead is
+             * handed FRESH purely so consider_remote REFUSES the snap
+             * (REJECTED_LOCKED_OUT). A remote that DOES lead is handed
+             * STALE -- not UNANCHORED -- so the +/-1 epoch-drift barrier,
+             * the unauthenticated A6a header's only spoof/replay guard
+             * (sx1276_fhss.h SNAP_MAX_EPOCH_DRIFT), still applies: a
+             * forged "leading" epoch+2 is REJECTED_EPOCH_DRIFT instead of
+             * teleporting the grid (PR #125 review round 4). A genuinely
+             * leading peer is always within the window. */
+            v.health = (v.adopt != 0U) ? SX1276_FHSS_CLOCK_STALE
+                                       : SX1276_FHSS_CLOCK_FRESH;
+        } else {
+            /* Follower cold start / post-demotion recovery: no refusal
+             * authority, accept any epoch (the pre-v2 behaviour). */
+            v.health = SX1276_FHSS_CLOCK_UNANCHORED;
+        }
     } else {
         v.health = (sx1276_fhss_clock_age_ms(now_ms)
                         <= SX1276_FHSS_CLOCK_FRESH_MS)

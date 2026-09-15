@@ -21,7 +21,10 @@
  *   5. a streaming originator adopts a LEADING grid (converges);
  *   6. an originator's own demotion KEEPS its clock;
  *   7. authority decays after the stream stops, so an echo is adopted;
- *   8. commands exactly 1 s apart never earn authority.
+ *   8. commands exactly 1 s apart never earn authority;
+ *   9. a forged "leading" epoch+2 is REJECTED_EPOCH_DRIFT (the originator
+ *      hands STALE, not UNANCHORED, so the drift barrier holds); epoch+1
+ *      is still adopted.
  */
 
 #include <stdio.h>
@@ -76,16 +79,19 @@ static void tx_step(uint32_t tx_now_ms) {
 }
 
 /* One received header as sx1276_rx.c handles it: verdict, real snap
- * decision, adopt when both agree. */
-static sx1276_fhss_snap_decision_t rx_frame(uint32_t now_ms, uint32_t toa_us,
-                                            uint8_t slot_offset_ms,
-                                            uint8_t remote_hop,
-                                            sx1276_rx_grid_verdict_t *out_v) {
-    const uint32_t remote_abs = sx1276_fhss_clock_abs_of(EPOCH, remote_hop);
+ * decision, adopt when both agree. The header's epoch is a parameter so
+ * the drift-barrier vectors can forge one. */
+static sx1276_fhss_snap_decision_t rx_frame_ep(uint32_t now_ms, uint32_t toa_us,
+                                               uint8_t slot_offset_ms,
+                                               uint32_t remote_epoch,
+                                               uint8_t remote_hop,
+                                               sx1276_rx_grid_verdict_t *out_v) {
+    const uint32_t remote_abs =
+        sx1276_fhss_clock_abs_of(remote_epoch, remote_hop);
     const sx1276_rx_grid_verdict_t v =
         sx1276_rx_grid_consider(now_ms, toa_us, slot_offset_ms, remote_abs);
     const sx1276_fhss_snap_decision_t dec =
-        sx1276_fhss_consider_remote(EPOCH, remote_hop, v.health);
+        sx1276_fhss_consider_remote(remote_epoch, remote_hop, v.health);
     if ((dec == SX1276_FHSS_SNAP_DEC_SNAPPED ||
          dec == SX1276_FHSS_SNAP_DEC_ALIGNED) && v.adopt != 0U) {
         sx1276_rx_grid_adopt(now_ms, toa_us, slot_offset_ms, remote_abs);
@@ -94,6 +100,13 @@ static sx1276_fhss_snap_decision_t rx_frame(uint32_t now_ms, uint32_t toa_us,
         *out_v = v;
     }
     return dec;
+}
+
+static sx1276_fhss_snap_decision_t rx_frame(uint32_t now_ms, uint32_t toa_us,
+                                            uint8_t slot_offset_ms,
+                                            uint8_t remote_hop,
+                                            sx1276_rx_grid_verdict_t *out_v) {
+    return rx_frame_ep(now_ms, toa_us, slot_offset_ms, EPOCH, remote_hop, out_v);
 }
 
 /* Stream 10 frames at 200 ms from t0; returns the time of the last one. */
@@ -192,8 +205,10 @@ static void test_originator_adopts_leading_grid(void) {
     const uint8_t next = (uint8_t)((consumed_hop() + 1U) % N);
     sx1276_fhss_snap_decision_t dec = rx_frame(now, 0U, 0U, next, &v);
     CHECK(v.originator == 1U, "(5) streaming: originator");
-    CHECK(v.adopt == 1U && v.health == SX1276_FHSS_CLOCK_UNANCHORED,
-          "(5) leading grid: adopt + UNANCHORED");
+    /* Round 4: a leading grid is handed STALE, not UNANCHORED, so the
+     * epoch-drift barrier stays in force (see test 9). */
+    CHECK(v.adopt == 1U && v.health == SX1276_FHSS_CLOCK_STALE,
+          "(5) leading grid: adopt + STALE (drift barrier kept)");
     CHECK(dec == SX1276_FHSS_SNAP_DEC_SNAPPED, "(5) leading: SNAPPED (got %d)", (int)dec);
     CHECK(sx1276_rx_grid_adopted() == 1U, "(5) leading grid adopted -> follower");
     CHECK(sx1276_fhss_authority_streak() == 0U, "(5) authority cleared on adopt");
@@ -248,6 +263,43 @@ static void test_exact_1s_commands_never_earn_authority(void) {
           "(8) it still adopts the peer (SNAPPED)");
 }
 
+static void test_forged_leading_epoch_is_drift_rejected(void) {
+    /* PR #125 review round 4: schema v1 has no MIC, so the +/-1
+     * epoch-drift rule is the only barrier against a forged header
+     * teleporting the scheduler. A frame claiming epoch+2 reads as
+     * "leading" (its slot start projects far in the future), so it must
+     * NOT be handed UNANCHORED -- STALE keeps the drift check and
+     * consider_remote rejects it, clock untouched. epoch+1 (a peer that
+     * legitimately rolled the epoch just before us) is still adopted. */
+    fresh_scheduler();
+    const uint32_t last = stream_from(90000U);        /* 91800 */
+    const uint32_t now = last + 100U;
+    const uint32_t abs_before = sx1276_fhss_clock_abs_slot(now);
+    const uint32_t phase_before = sx1276_fhss_clock_in_slot_ms(now);
+    const uint8_t next = (uint8_t)((consumed_hop() + 1U) % N);
+    sx1276_rx_grid_verdict_t v;
+    sx1276_fhss_snap_decision_t dec =
+        rx_frame_ep(now, 0U, 0U, EPOCH + 2U, next, &v);
+    CHECK(v.originator == 1U && v.adopt == 1U,
+          "(9) forged epoch+2 reads as leading (adopt verdict)");
+    CHECK(v.health == SX1276_FHSS_CLOCK_STALE,
+          "(9) ... but is handed STALE, not UNANCHORED (got %d)", (int)v.health);
+    CHECK(dec == SX1276_FHSS_SNAP_DEC_REJECTED_EPOCH_DRIFT,
+          "(9) drift barrier holds: REJECTED_EPOCH_DRIFT (got %d)", (int)dec);
+    CHECK(sx1276_rx_grid_adopted() == 0U, "(9) not adopted");
+    CHECK(sx1276_fhss_clock_abs_slot(now) == abs_before &&
+          sx1276_fhss_clock_in_slot_ms(now) == phase_before,
+          "(9) clock untouched by the forged frame");
+    CHECK(sx1276_fhss_authority_streak() >= SX1276_FHSS_AUTHORITY_MIN_STREAK,
+          "(9) authority intact after the rejection");
+    /* Within the window: epoch+1, same leading geometry -> SNAPPED + adopted. */
+    dec = rx_frame_ep(now, 0U, 0U, EPOCH + 1U, next, &v);
+    CHECK(v.adopt == 1U && v.health == SX1276_FHSS_CLOCK_STALE,
+          "(9b) epoch+1 leading: adopt + STALE");
+    CHECK(dec == SX1276_FHSS_SNAP_DEC_SNAPPED && sx1276_rx_grid_adopted() == 1U,
+          "(9b) epoch+1 within the drift window: SNAPPED + adopted (got %d)", (int)dec);
+}
+
 int main(void) {
     test_cold_follower_adopts();
     test_follower_demotion_resets();
@@ -257,10 +309,11 @@ int main(void) {
     test_originator_demotion_keeps_clock();
     test_authority_decays_then_echo_adopted();
     test_exact_1s_commands_never_earn_authority();
+    test_forged_leading_epoch_is_drift_rejected();
     if (g_failures != 0) {
         fprintf(stderr, "[FAIL] rx_grid_policy: %d failure(s)\n", g_failures);
         return 1;
     }
-    printf("[PASS] rx_grid_policy: 8 sequences incl. demotion->TX->RX recovery against the real consider_remote\n");
+    printf("[PASS] rx_grid_policy: 9 sequences incl. demotion->TX->RX recovery and the forged-epoch drift barrier, against the real consider_remote\n");
     return 0;
 }
