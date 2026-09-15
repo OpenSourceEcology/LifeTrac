@@ -383,6 +383,23 @@ class AutoRadioPolicy:
                        the RX daemon died; treat as unhealthy.
       * timeout rate — reassembler timeouts accumulating means frames
                        are being lost mid-flight (interference / range).
+      * dead air     — RS-12.16 (2026-09-15): fragments were flowing within
+                       STREAM_MEMORY_S but none has arrived for DEAD_AIR_S.
+                       This is the FHSS lock-loss signature: replayed
+                       against leg S (39 % loss, 53 s + 22 s blackouts) the
+                       two inputs above read the whole leg HEALTHY — the
+                       daemon keeps publishing zero-samples through dead
+                       air, and with parity + the stale horizon lost frames
+                       produce silence, not timeouts (peak 1.0/10 s vs the
+                       2.5 threshold). Silence longer than STREAM_MEMORY_S
+                       is an IDLE tractor, not a sick link, and must not
+                       flap the profile.
+      * loss rate    — RS-12.16: fragments missing / expected over the
+                       evaluation window (from the reassembler's monotonic
+                       counters in link_stats), judged only once the
+                       window holds LOSS_MIN_FRAGS expected fragments so a
+                       handful of fragments cannot trip it. Catches a
+                       degraded-but-alive link that never goes silent.
 
     Policy (v1, bench-calibrated):
       * Prefer DTS BW500 (profile 2) — measured 1.76 KB/s sustained,
@@ -403,18 +420,105 @@ class AutoRadioPolicy:
     TIMEOUT_RATE_MAX = 2.5     # timeouts per 10 s window
     PROMOTE_AFTER_S  = 60.0
     MIN_SWITCH_GAP_S = 60.0
+    # RS-12.16 (2026-09-15) — bench-calibrated from the RS-12.14/15 legs:
+    # healthy links never gap more than ~1 s between fragments, lock losses
+    # ran 20–53 s, and the profile-1 bench loss floor is 1–8 % of fragments
+    # (the broken old firmware ran 39 %). To be re-tuned in RS-1.4 (live).
+    DEAD_AIR_S       = 10.0    # no fragment for this long after streaming...
+    STREAM_MEMORY_S  = 60.0    # ...within this long => unhealthy; longer = idle
+    LOSS_RATE_MAX    = 0.25    # missing / expected fragments over the window
+    LOSS_MIN_FRAGS   = 20      # window must hold this many expected fragments
 
     def __init__(self, initial_profile: int = 2, now: float = 0.0):
         self.profile = 2 if initial_profile not in (1, 2) else initial_profile
         self._last_switch_t = now
         self._healthy_since: float | None = None
+        # RS-12.16 dead-air state: the last fragment counter seen and when
+        # it last ADVANCED. advance_t stays None until a second, different
+        # reading arrives, so a tractor idle from boot never starts the
+        # silence clock (only an observed stream can go dead).
+        self._last_frags_seen: int | None = None
+        self._last_frag_advance_t: float | None = None
+        self._mismatch_since: float | None = None      # RS-12.18
+
+    # RS-12.18 (leg V, 2026-09-15): the daemon reverts a switch on its own —
+    # no tractor ACK within 12 s, or no frames on the new profile within
+    # 45 s — and this policy never heard about it. In leg V it believed FHSS
+    # for 63 s while the link was back on DTS; a bad link in that window
+    # would have met no action ("already degraded"). The disagreement must
+    # PERSIST longer than the phase-A handshake before it is trusted, or a
+    # normal switch in flight (policy pinned 1, daemon still 2 until the
+    # tractor ACKs) would be mistaken for a revert.
+    RESYNC_AFTER_S   = 20.0
+
+    def observe_active(self, active_profile, now: float,
+                       fresh: bool = True) -> bool:
+        """Feed the profile the daemon is ACTUALLY on (link_stats.radio_profile).
+        Re-syncs after a sustained disagreement and treats the revert as a
+        switch for hysteresis (fresh min-gap, fresh dwell). Returns True on
+        a re-sync.
+
+        `fresh` (PR #127 review): the caller's link_stats cache keeps the
+        LAST sample forever. If the daemon dies, the stale-link rule commands
+        FHSS while the cached sample still says DTS -- trusting it would
+        re-sync back to DTS after 20 s, the stale rule would command FHSS
+        again after the gap, and so on while the daemon is down. A sample
+        older than STALE_LINK_S carries no opinion about the profile.
+        """
+        if not fresh:
+            active_profile = None
+        if active_profile not in (1, 2) or active_profile == self.profile:
+            self._mismatch_since = None
+            return False
+        if self._mismatch_since is None:
+            self._mismatch_since = now
+            return False
+        if now - self._mismatch_since < self.RESYNC_AFTER_S:
+            return False
+        self.profile = active_profile
+        self._last_switch_t = now
+        self._healthy_since = None
+        self._mismatch_since = None
+        return True
+
+    def _note_frags(self, now: float, frags_seen: int | None) -> bool:
+        """Dead-air detector. Returns True while the link is in the
+        DEAD_AIR_S..STREAM_MEMORY_S window of silence after streaming.
+        Any CHANGE of the counter (including a drop from a daemon
+        restart) counts as the stream being alive."""
+        if frags_seen is None:
+            return False
+        if self._last_frags_seen is None:
+            self._last_frags_seen = frags_seen
+            return False
+        if frags_seen != self._last_frags_seen:
+            self._last_frags_seen = frags_seen
+            self._last_frag_advance_t = now
+            return False
+        if self._last_frag_advance_t is None:
+            return False                          # never seen it stream
+        silent = now - self._last_frag_advance_t
+        return self.DEAD_AIR_S <= silent <= self.STREAM_MEMORY_S
 
     def evaluate(self, *, now: float, sample_age_s: float | None,
-                 timeouts_per_10s: float) -> int | None:
-        """Return a new profile to command, or None to hold."""
+                 timeouts_per_10s: float,
+                 frags_seen: int | None = None,
+                 loss_rate: float | None = None) -> int | None:
+        """Return a new profile to command, or None to hold.
+
+        frags_seen: the daemon's monotonic fragment counter
+        (link_stats.rx_frames_seen). loss_rate: fragments missing /
+        expected over the caller's window, or None when the window held
+        fewer than LOSS_MIN_FRAGS expected fragments. Both are optional so
+        pre-RS-12.16 callers and tests are unchanged.
+        """
+        dead_air = self._note_frags(now, frags_seen)
+        lossy = loss_rate is not None and loss_rate > self.LOSS_RATE_MAX
         healthy = (sample_age_s is not None
                    and sample_age_s <= self.STALE_LINK_S
-                   and timeouts_per_10s <= self.TIMEOUT_RATE_MAX)
+                   and timeouts_per_10s <= self.TIMEOUT_RATE_MAX
+                   and not dead_air
+                   and not lossy)
         if healthy:
             if self._healthy_since is None:
                 self._healthy_since = now
@@ -638,6 +742,9 @@ def _radio_auto_worker() -> None:
     """
     global _radio_auto_policy
     last_timeouts: int | None = None
+    # RS-12.16: the reassembler's monotonic counters as of the previous
+    # evaluation, so the loss rate is taken over exactly this window.
+    loss_win: dict[str, int | None] = {"expected": None, "missing": None}
     last_eval_t = time.monotonic()
     while True:
         time.sleep(5.0)
@@ -647,6 +754,7 @@ def _radio_auto_worker() -> None:
                 policy = _radio_auto_policy
             if mode != "auto":
                 last_timeouts = None
+                loss_win["expected"] = loss_win["missing"] = None
                 continue
             if policy is None:
                 # Don't seed until the broker session is up, or a slow
@@ -682,6 +790,7 @@ def _radio_auto_worker() -> None:
                                  "— seeding the link at profile %d", seed)
                     _publish_radio_profile(seed, "auto-seed")
                 last_timeouts = None
+                loss_win["expected"] = loss_win["missing"] = None
                 continue
             now = time.monotonic()
             stats = getattr(_image_publisher, "link_stats", None) or {}
@@ -697,13 +806,48 @@ def _radio_auto_worker() -> None:
             if isinstance(timeouts, int):
                 last_timeouts = timeouts
             last_eval_t = now
+            # RS-12.16: the dead-air input is the daemon's monotonic
+            # fragment counter; the loss rate is missing/expected over THIS
+            # window from the reassembler's monotonic counters, or None when
+            # the window holds too few expected fragments to judge (or the
+            # counters went backwards, i.e. the daemon restarted).
+            frags_seen = stats.get("rx_frames_seen")
+            if not isinstance(frags_seen, int):
+                frags_seen = None
+            expected = stats.get("frags_expected")
+            missing = stats.get("frags_missing")
+            loss_rate: float | None = None
+            if isinstance(expected, int) and isinstance(missing, int):
+                if loss_win["expected"] is not None:
+                    d_exp = expected - loss_win["expected"]
+                    d_mis = missing - loss_win["missing"]
+                    if d_exp >= policy.LOSS_MIN_FRAGS and 0 <= d_mis <= d_exp:
+                        loss_rate = d_mis / d_exp
+                loss_win["expected"] = expected
+                loss_win["missing"] = missing
+            # RS-12.18: the daemon's ACTUAL profile rides in every sample;
+            # a sustained disagreement means it reverted behind our back.
+            active = stats.get("radio_profile")
+            believed = policy.profile
+            fresh = (sample_age_s is not None
+                     and sample_age_s <= policy.STALE_LINK_S)
+            if policy.observe_active(active if isinstance(active, int) else None,
+                                     now, fresh=fresh):
+                logging.warning(
+                    "radio_profile[auto]: daemon reports profile %s but the "
+                    "policy believed %s for >= %.0f s -- re-synced (revert)",
+                    active, believed, policy.RESYNC_AFTER_S)
             new_profile = policy.evaluate(now=now,
                                           sample_age_s=sample_age_s,
-                                          timeouts_per_10s=rate_per_10s)
+                                          timeouts_per_10s=rate_per_10s,
+                                          frags_seen=frags_seen,
+                                          loss_rate=loss_rate)
             if new_profile is not None:
                 logging.info(
-                    "radio_profile[auto]: %s (sample_age=%s, rate=%.1f/10s)",
-                    new_profile, sample_age_s, rate_per_10s)
+                    "radio_profile[auto]: %s (sample_age=%s, rate=%.1f/10s, "
+                    "frags_seen=%s, loss=%s)",
+                    new_profile, sample_age_s, rate_per_10s, frags_seen,
+                    f"{loss_rate:.2f}" if loss_rate is not None else None)
                 _publish_radio_profile(new_profile, "auto")
         except Exception:                                     # pragma: no cover
             logging.exception("radio_profile auto worker crashed; continuing")

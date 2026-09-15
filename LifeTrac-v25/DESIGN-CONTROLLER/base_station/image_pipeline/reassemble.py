@@ -36,6 +36,7 @@ dropped and the caller is told to request a keyframe.
 """
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Callable
@@ -68,6 +69,11 @@ class _PartialFrame:
     copy_bitmasks: dict[int, int] = field(default_factory=dict)
     # v3 XOR-parity: (group_start, group_len) -> parity_body
     parities: dict[tuple[int, int], bytes] = field(default_factory=dict)
+    # RS-12.16 (PR #127 review): a v1 fragment arriving AFTER its frame
+    # completed reopens a slot (v1 has no completion guard, by design --
+    # see feed()). Such a slot is a late duplicate, not a new frame, and
+    # must not book loss when it times out.
+    reopened: bool = False
 
 
 @dataclass
@@ -83,12 +89,24 @@ class ReassemblyStats:
     v2_bad_header: int = 0              # copy_idx >= total_copies, or total_copies == 0
     # XOR parity counter
     parity_reconstructions: int = 0
+    # RS-12.16 (2026-09-15): what the link cost, in fragments, MONOTONIC so
+    # a consumer can take rates over any window. `expected` is booked when
+    # a frame is finalized (completed OR timed out); `missing` only on
+    # timeout, as total - fragments present. Parity-reconstructed
+    # fragments are present in `parts`, so this counts fragments that
+    # never arrived by the deadline -- the loss that actually cost a
+    # frame. Feeds link_stats and the web UI's auto-profile policy.
+    fragments_expected: int = 0
+    fragments_missing: int = 0
 
 
 class FragmentReassembler:
     """Collect TileDeltaFrame fragments keyed by ``frag_seq``.
 
-    Pure-Python, no MQTT/threading. Drive it from the bridge / a unit test.
+    Pure-Python, no MQTT, no threads of its own. Drive it from the bridge /
+    a unit test. The one concession to threads: the RS-12.16 loss-counter
+    pair is written under ``_loss_lock`` and read via ``snapshot_loss()``,
+    because the daemon's link_stats worker reads it from another thread.
     """
 
     # Bounded LRU cap for recently-completed frag_seqs. v2 redundancy
@@ -111,12 +129,31 @@ class FragmentReassembler:
         # and (worse) double-complete the same frame.
         self._completed_recent: dict[int, None] = {}
         self.stats = ReassemblyStats()
+        # RS-12.16 (PR #127 review): guards the (fragments_expected,
+        # fragments_missing) PAIR so a cross-thread reader never sees it
+        # torn. Every write to either field goes through this lock.
+        self._loss_lock = threading.Lock()
 
     def _mark_completed(self, frag_seq: int) -> None:
         self._completed_recent.pop(frag_seq, None)
         self._completed_recent[frag_seq] = None
         while len(self._completed_recent) > self._COMPLETED_LRU_CAP:
             self._completed_recent.pop(next(iter(self._completed_recent)))
+
+    def snapshot_loss(self) -> tuple[int, int]:
+        """(fragments_expected, fragments_missing) as ONE consistent pair.
+
+        RS-12.16 (PR #127 review): _gc() books the pair on the RX thread
+        while the daemon's link_stats worker reads it from another thread,
+        and the daemon's own lock does not cover this object. A read that
+        lands between the two writes sees +expected with +0 missing; the
+        consumer then baselines both counters and, on its next window,
+        discards the delayed missing increment because d_expected == 0 --
+        loss permanently under-reported for that frame. Readers must use
+        this, never the fields directly.
+        """
+        with self._loss_lock:
+            return (self.stats.fragments_expected, self.stats.fragments_missing)
 
     def _try_parity_reconstruct(self, partial: _PartialFrame) -> bool:
         if not partial.parities or partial.total == 0:
@@ -183,6 +220,9 @@ class FragmentReassembler:
             if partial.total > 0 and len(partial.parts) == partial.total:
                 del self._partials[frag_seq]
                 self._mark_completed(frag_seq)
+                if not partial.reopened:                         # RS-12.16
+                    with self._loss_lock:
+                        self.stats.fragments_expected += partial.total
                 full = b"".join(partial.parts[i] for i in range(partial.total))
                 return self._decode_or_record_error(full)
             return None
@@ -222,6 +262,11 @@ class FragmentReassembler:
         partial = self._partials.get(frag_seq)
         if partial is None:
             partial = _PartialFrame(total=total, first_seen_ms=now, last_seen_ms=now)
+            # RS-12.16: a v1 duplicate of an already-completed frame lands
+            # here (only v2 is guarded above). Mark it so the loss counters
+            # ignore the slot -- otherwise its timeout would book the whole
+            # declared total as missing: phantom loss (PR #127 review).
+            partial.reopened = frag_seq in self._completed_recent
             self._partials[frag_seq] = partial
         if partial.total != total and total > 0:
             # Producer changed its mind mid-frame. Restart this slot.
@@ -256,6 +301,9 @@ class FragmentReassembler:
         if partial.total > 0 and len(partial.parts) == partial.total:
             del self._partials[frag_seq]
             self._mark_completed(frag_seq)
+            if not partial.reopened:                             # RS-12.16
+                with self._loss_lock:
+                    self.stats.fragments_expected += partial.total
             full = b"".join(partial.parts[i] for i in range(partial.total))
             return self._decode_or_record_error(full)
         return None
@@ -278,8 +326,14 @@ class FragmentReassembler:
         cutoff = now_ms - self.timeout_ms
         stale = [seq for seq, p in self._partials.items() if p.last_seen_ms < cutoff]
         for seq in stale:
-            del self._partials[seq]
+            p = self._partials.pop(seq)
             self.stats.timeouts += 1
+            # RS-12.16: book what this frame cost the link. A parity-only
+            # partial (total == 0) has no known size and is skipped.
+            if p.total > 0 and not p.reopened:   # reopened = late v1 dup, not loss
+                with self._loss_lock:          # the pair must never be read torn
+                    self.stats.fragments_expected += p.total
+                    self.stats.fragments_missing += max(0, p.total - len(p.parts))
 
     def _decode_or_record_error(self, full: bytes):
         # RS-3.1 (2026-07-25): batched container — split and decode each

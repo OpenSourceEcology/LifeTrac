@@ -1964,6 +1964,11 @@ class ImageRxDaemon:
             with self._lock:
                 cur_bytes = self._air_bytes
                 cur_frames = self.stats.reassembled_frames_published
+                # RS-12.16 (PR #127 review): the loss pair is booked on the
+                # RX thread, which our _lock does not cover; take it as ONE
+                # snapshot under the reassembler's own lock so it can never
+                # be read torn (+expected, +0 missing).
+                loss_expected, loss_missing = self.reassembler.snapshot_loss()
                 sample = {
                     "bps": round((cur_bytes - last_bytes) / elapsed, 1),
                     "frames_per_s": round((cur_frames - last_frames) / elapsed, 2),
@@ -1975,6 +1980,13 @@ class ImageRxDaemon:
                         self.reassembler.stats.parity_reconstructions,
                     "timeouts": self.stats.reassembler_timeouts,
                     "decode_errors": self.stats.reassembler_decode_errors,
+                    # RS-12.16 (2026-09-15): monotonic fragment accounting
+                    # from the reassembler, so the web UI's auto-profile
+                    # policy can take a loss RATE over its own window. A
+                    # dead link shows as rx_frames_seen going flat; a
+                    # degraded one as frags_missing climbing.
+                    "frags_expected": loss_expected,
+                    "frags_missing": loss_missing,
                     # 2026-07-25 implicit encoder ACK + radio-profile state
                     # for the web UI selectors / auto-profile policy.
                     "rx_codec": self._last_rx_codec,
