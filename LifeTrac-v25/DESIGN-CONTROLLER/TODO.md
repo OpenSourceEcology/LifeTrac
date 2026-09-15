@@ -2714,6 +2714,20 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   harness's new `-RxExtraEnv` was shadowed by a same-name local
   (PowerShell is case-insensitive) — fixed, it had never been flown, so
   no leg is affected.**
+  FLOWN 2026-09-14 (bench-evidence/RS_12_14_shared_gate_2026-09-14, legs K
+  and L, profile 1, synth feed): the merged daemon is healthy on air
+  (leg K 4.8 % loss, follower locked, rx_fifo_skip 0) and the spacing
+  invariant holds under a deliberate two-opcode storm (leg L: 401
+  injected commands, 73 on air, every pair >= 3.48 s, none under any gate
+  threshold -- the leg-J 60 ms idle-drain pair cannot recur). The
+  active-hold counter cmd_gate_held stayed 0 on profile 1 (the lossy
+  link's pump opens slower than the 1.0 s gate). Legs M/N then moved to
+  profile 2 (clean, 927.5): leg M (2 fps) still 0 -- train cadence ~1.5 s
+  > gate; leg N (5 fps, small trains) drove the pump faster than 1/s and
+  cmd_gate_held reached 524 with spacing clamped to 1.12 s -- the spacing floor holds; the counter counts closed-gate CHECKS (incremented before the due check), so active arbitration needs the new cmd_gate_deferred counter + a rerun (PR #124 review). cmd_copies_deferred stayed 0 in all four legs
+  (only the profile-switch/CONF copies=2 path defers; none flew -- SIL-
+  only). Leg M (profile 2, no follower) absorbed all 144 received commands at 3.0 % while profile 1 collapsed under fewer -- consistent with the follower-clock-authority hypothesis but NOT an isolating control (command loads unmatched: 144 vs 49; camera I is a different operating point). Secondary: on profile 1 loss scaled with commands the
+  tractor RECEIVED (leg K 8 -> 4.8 %, leg L 49 -> 7.8 %).**
 - [x] **RS-12.10 — FLOWN 2026-09-12 evening (PR #117): `rx_fifo_skip` = 0 over
   2,366 packets with 29 penultimate losses in the same leg (F) → M1 is NOT
   FIFO coalescing at the base; base deaf window per command = ToA + ≤1.9 ms
