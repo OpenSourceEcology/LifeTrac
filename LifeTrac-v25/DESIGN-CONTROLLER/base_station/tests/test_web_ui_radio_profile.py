@@ -271,6 +271,24 @@ class RadioProfileTests(unittest.TestCase):
         self.assertFalse(p.observe_active("2", 70.0))
         self.assertEqual(p.profile, 2)
 
+    def test_policy_stale_sample_profile_cannot_resync(self):
+        """PR #127 review: the daemon died, the stale-link rule commanded
+        FHSS, but the cached link_stats still says DTS. A stale sample must
+        carry no opinion, or the policy oscillates 2->1->2->1 for as long
+        as the daemon is down."""
+        p = self._policy(profile=2)
+        p._last_switch_t = 0.0
+        self.assertEqual(p.evaluate(now=61.0, sample_age_s=None,
+                                    timeouts_per_10s=0.0), 1)
+        for t in range(62, 400, 5):
+            self.assertFalse(p.observe_active(2, float(t), fresh=False))
+        self.assertEqual(p.profile, 1)
+        self.assertIsNone(p._mismatch_since)
+        # a FRESH disagreement still re-syncs after RESYNC_AFTER_S
+        self.assertFalse(p.observe_active(2, 400.0, fresh=True))
+        self.assertTrue(p.observe_active(2, 421.0, fresh=True))
+        self.assertEqual(p.profile, 2)
+
     def test_policy_pre_rs1216_call_shape_unchanged(self):
         p = self._policy()
         self.assertIsNone(p.evaluate(now=10.0, sample_age_s=2.0,

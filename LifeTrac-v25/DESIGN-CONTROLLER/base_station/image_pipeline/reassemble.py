@@ -69,6 +69,11 @@ class _PartialFrame:
     copy_bitmasks: dict[int, int] = field(default_factory=dict)
     # v3 XOR-parity: (group_start, group_len) -> parity_body
     parities: dict[tuple[int, int], bytes] = field(default_factory=dict)
+    # RS-12.16 (PR #127 review): a v1 fragment arriving AFTER its frame
+    # completed reopens a slot (v1 has no completion guard, by design --
+    # see feed()). Such a slot is a late duplicate, not a new frame, and
+    # must not book loss when it times out.
+    reopened: bool = False
 
 
 @dataclass
@@ -215,8 +220,9 @@ class FragmentReassembler:
             if partial.total > 0 and len(partial.parts) == partial.total:
                 del self._partials[frag_seq]
                 self._mark_completed(frag_seq)
-                with self._loss_lock:                            # RS-12.16
-                    self.stats.fragments_expected += partial.total
+                if not partial.reopened:                         # RS-12.16
+                    with self._loss_lock:
+                        self.stats.fragments_expected += partial.total
                 full = b"".join(partial.parts[i] for i in range(partial.total))
                 return self._decode_or_record_error(full)
             return None
@@ -256,6 +262,11 @@ class FragmentReassembler:
         partial = self._partials.get(frag_seq)
         if partial is None:
             partial = _PartialFrame(total=total, first_seen_ms=now, last_seen_ms=now)
+            # RS-12.16: a v1 duplicate of an already-completed frame lands
+            # here (only v2 is guarded above). Mark it so the loss counters
+            # ignore the slot -- otherwise its timeout would book the whole
+            # declared total as missing: phantom loss (PR #127 review).
+            partial.reopened = frag_seq in self._completed_recent
             self._partials[frag_seq] = partial
         if partial.total != total and total > 0:
             # Producer changed its mind mid-frame. Restart this slot.
@@ -290,8 +301,9 @@ class FragmentReassembler:
         if partial.total > 0 and len(partial.parts) == partial.total:
             del self._partials[frag_seq]
             self._mark_completed(frag_seq)
-            with self._loss_lock:                                # RS-12.16
-                self.stats.fragments_expected += partial.total
+            if not partial.reopened:                             # RS-12.16
+                with self._loss_lock:
+                    self.stats.fragments_expected += partial.total
             full = b"".join(partial.parts[i] for i in range(partial.total))
             return self._decode_or_record_error(full)
         return None
@@ -318,7 +330,7 @@ class FragmentReassembler:
             self.stats.timeouts += 1
             # RS-12.16: book what this frame cost the link. A parity-only
             # partial (total == 0) has no known size and is skipped.
-            if p.total > 0:
+            if p.total > 0 and not p.reopened:   # reopened = late v1 dup, not loss
                 with self._loss_lock:          # the pair must never be read torn
                     self.stats.fragments_expected += p.total
                     self.stats.fragments_missing += max(0, p.total - len(p.parts))

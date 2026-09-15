@@ -451,11 +451,22 @@ class AutoRadioPolicy:
     # tractor ACKs) would be mistaken for a revert.
     RESYNC_AFTER_S   = 20.0
 
-    def observe_active(self, active_profile, now: float) -> bool:
+    def observe_active(self, active_profile, now: float,
+                       fresh: bool = True) -> bool:
         """Feed the profile the daemon is ACTUALLY on (link_stats.radio_profile).
         Re-syncs after a sustained disagreement and treats the revert as a
         switch for hysteresis (fresh min-gap, fresh dwell). Returns True on
-        a re-sync."""
+        a re-sync.
+
+        `fresh` (PR #127 review): the caller's link_stats cache keeps the
+        LAST sample forever. If the daemon dies, the stale-link rule commands
+        FHSS while the cached sample still says DTS -- trusting it would
+        re-sync back to DTS after 20 s, the stale rule would command FHSS
+        again after the gap, and so on while the daemon is down. A sample
+        older than STALE_LINK_S carries no opinion about the profile.
+        """
+        if not fresh:
+            active_profile = None
         if active_profile not in (1, 2) or active_profile == self.profile:
             self._mismatch_since = None
             return False
@@ -818,7 +829,10 @@ def _radio_auto_worker() -> None:
             # a sustained disagreement means it reverted behind our back.
             active = stats.get("radio_profile")
             believed = policy.profile
-            if policy.observe_active(active if isinstance(active, int) else None, now):
+            fresh = (sample_age_s is not None
+                     and sample_age_s <= policy.STALE_LINK_S)
+            if policy.observe_active(active if isinstance(active, int) else None,
+                                     now, fresh=fresh):
                 logging.warning(
                     "radio_profile[auto]: daemon reports profile %s but the "
                     "policy believed %s for >= %.0f s -- re-synced (revert)",

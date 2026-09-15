@@ -23,7 +23,9 @@ stamp() { echo "$(date -u +%H:%M:%S.%3N) $*" | tee -a "$TL"; }
 
 t0=$(date +%s)
 until grep -a -q 'published frame_id' "$OUT" 2>/dev/null; do
-  [ $(( $(date +%s) - t0 )) -gt 280 ] && { stamp "NO FRAME after 280 s"; grep -a -n -i -E "camera|error|Traceback|FATAL" "$OUT" | tail -6 | cut -c1-160; break; }
+  # PR #127 review: a startup failure must NOT fall through into the pause
+  # experiment and produce a mislabeled leg -- exit nonzero instead.
+  [ $(( $(date +%s) - t0 )) -gt 280 ] && { stamp "NO FRAME after 280 s -- aborting, no leg"; grep -a -n -i -E "camera|error|Traceback|FATAL" "$OUT" | tail -6 | cut -c1-160; exit 2; }
   sleep 2
 done
 tf=$(date +%s); stamp "FIRST_FRAME (+$((tf - t0))s after launch)"
@@ -32,12 +34,19 @@ stamp "policy state at first frame: $($SSH "echo fio | sudo -S -p '' docker logs
 sleep $(( PAUSE_AT - ( $(date +%s) - tf ) > 0 ? PAUSE_AT - ( $(date +%s) - tf ) : 0 ))
 stamp "PAUSE camera_svc (frame source) for ${PAUSE_LEN}s"
 adb -s 2E2C1209DABC240B shell "echo fio | sudo -S -p '' docker pause camera_svc" | tr -d '\r'
-for i in $(seq 1 $(( PAUSE_LEN / 5 ))); do
-  sleep 5
+# PR #127 review: the UNPAUSE is scheduled by DEADLINE in a background
+# subshell, independent of the sampling loop below -- each SSH sample costs
+# ~2.4 s, and in leg V that stretched a requested 30 s pause to 44.6 s.
+pause_t0=$(date +%s)
+( sleep "$PAUSE_LEN"; adb -s 2E2C1209DABC240B shell "echo fio | sudo -S -p '' docker unpause camera_svc" >/dev/null 2>&1; echo "$(date -u +%H:%M:%S.%3N) UNPAUSE camera_svc (scheduled; actual pause $(( $(date +%s) - pause_t0 ))s)" >> "$TL" ) &
+unpause_pid=$!
+i=0
+while [ $(( pause_t0 + PAUSE_LEN - $(date +%s) )) -gt 4 ]; do
+  sleep 5; i=$((i+1))
   stamp "  +$((i*5))s paused | $($SSH "echo fio | sudo -S -p '' docker logs bench_webui --since 6s 2>&1 | grep 'radio_profile\[auto\]:' | tail -1" | tr -d '\r' | cut -c1-150)"
 done
-stamp "UNPAUSE camera_svc"
-adb -s 2E2C1209DABC240B shell "echo fio | sudo -S -p '' docker unpause camera_svc" | tr -d '\r'
+wait "$unpause_pid"
+stamp "UNPAUSE confirmed (requested ${PAUSE_LEN}s; see the scheduled line above for the actual duration)"
 
 # keep sampling the policy until the archive lands
 t1=$(date +%s)

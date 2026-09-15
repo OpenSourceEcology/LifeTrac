@@ -121,6 +121,19 @@ class LossCounters(unittest.TestCase):
         # the leg-U style rate a consumer would take: 2 missing of 6
         self.assertAlmostEqual(self.st.fragments_missing / self.st.fragments_expected, 2 / 6)
 
+    def test_late_v1_duplicate_does_not_book_phantom_loss(self) -> None:
+        """PR #127 review: v1 has no completion guard, so a duplicate that
+        arrives after the frame completed reopens a slot. Its timeout used
+        to book the whole declared total as missing -- phantom loss that
+        could trip the auto policy."""
+        for f in _frags(11, [b"a" * 10, b"b" * 10]):
+            self.ras.feed(f)
+        self.assertEqual((self.st.fragments_expected, self.st.fragments_missing), (2, 0))
+        self.ras.feed(_frags(11, [b"a" * 10, b"b" * 10])[0])   # late duplicate, idx 0
+        self._tick_past_timeout()
+        self.assertEqual(self.st.timeouts, 1)                   # the slot still times out...
+        self.assertEqual((self.st.fragments_expected, self.st.fragments_missing), (2, 0))  # ...booking nothing
+
     # ---- PR #127 review: the pair must be read atomically ----
 
     def test_snapshot_is_the_pair(self) -> None:
