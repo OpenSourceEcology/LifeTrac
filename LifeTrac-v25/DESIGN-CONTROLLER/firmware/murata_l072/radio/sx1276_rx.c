@@ -722,9 +722,15 @@ static void scan_drive(sx1276_rx_scan_event_t event,
 
     sx1276_rx_scan_counter_record(s_scan_state, dec.action);
 
-    /* v25.0.7: a LOCKED→SCANNING loss-of-sync demotion invalidates the
-     * phase anchor — the sender may have rebooted or re-gridded, so a
-     * fresh acquisition must re-derive it. Detected here (prev state
+    /* v25.0.7 + RS-12.15 v2: a LOCKED→SCANNING loss-of-sync demotion
+     * invalidates an ADOPTED phase anchor — that sender may have rebooted
+     * or re-gridded, so a fresh acquisition must re-derive it. A
+     * SELF-ANCHORED clock (this node's own TX grid) is KEPT instead: it
+     * never depended on hearing the peer, and resetting it renumbered the
+     * streaming node's own grid — the RS-12.12/14 lock-loss mechanism.
+     * The split lives in sx1276_rx_grid_on_demotion()
+     * (sx1276_rx_grid_policy.c), which returns which of the two happened.
+     * Detected here (prev state
      * LOCKED + BEGIN_SCAN action) because scan_dispatch_action cannot
      * distinguish this from the cold-boot BEGIN_SCAN, and cold-boot
      * must NOT clear a TX-side clock that activation just anchored. */

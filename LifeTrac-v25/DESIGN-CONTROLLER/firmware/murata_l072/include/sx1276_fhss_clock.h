@@ -43,8 +43,13 @@
  *     unadopted or stale. TX also refreshes anchor RECENCY on every
  *     FHSS transmission (phase-identical re-anchor), so a busier node
  *     stays FRESH and is not dragged by an idler.
- *   - sx1276_rx_scan_reset() and a LOCKED→SCANNING loss demotion
- *     reset the clock (fresh acquisition ⇒ fresh phase).
+ *   - sx1276_rx_scan_reset() always resets the clock (fresh acquisition
+ *     ⇒ fresh phase). A LOCKED→SCANNING loss demotion resets it ONLY
+ *     when the grid was ADOPTED; a SELF-ANCHORED clock survives its
+ *     owner's demotion (RS-12.15 v2 — resetting it renumbered the
+ *     streaming node's own grid and was the lock-loss mechanism). That
+ *     decision lives in sx1276_rx_grid_on_demotion()
+ *     (sx1276_rx_grid_policy.c); do not restore an unconditional reset.
  *
  * This TU is HW-free (no register access, no platform calls) so it
  * links unchanged into the host-cc bench targets.

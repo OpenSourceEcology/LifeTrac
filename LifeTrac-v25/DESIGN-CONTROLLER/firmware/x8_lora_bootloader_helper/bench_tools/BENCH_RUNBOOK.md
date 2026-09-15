@@ -32,6 +32,15 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
   `/tmp/lifetrac_p0c` (flash tooling + staged bins) AND `/tmp/lifetrac_strict`
   (probes, injectors, park script).** Re-push both after any reboot.
   `/home/fio` persists (flash wrapper, logs).
+* **A reboot is not the only way staging disappears.** `systemd-tmpfiles`
+  ages `/tmp` at **5 days** (`/usr/lib/tmpfiles.d/tmp.conf`: `q /tmp 1777
+  root root 5d`), so files rot out with the boards up. Observed 2026-09-15:
+  19 h uptime, no reboot, yet `/tmp/lifetrac_p0c` held only the bin pushed
+  the night before — the flash scripts had aged out. A flash attempted then
+  fails as `run_flash_bench.sh: line 5: 1: image` (rc 127) and touches no
+  radio. **Count the staging before trusting a flash:**
+  `ls /tmp/lifetrac_p0c | wc -l` must be 11, and `ls /tmp/lifetrac_strict |
+  wc -l` ≥ 19.
 * The L072 boots into RXCONT (`sx1276_rx_arm()`), so a flash brings the
   receiver up — a flash IS a radio-on event. A probe HostLink connect also
   auto-wakes it.

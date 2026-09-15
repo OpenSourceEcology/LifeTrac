@@ -205,8 +205,17 @@
  *                           (the streaming node's grid survives -- the fix).
  * tx_first_anchor         = own-TX lazy clock anchors ("slot starts now");
  *                           more than one per session = a phase restart.
- * tx_stream_streak_max    = longest run of own FHSS TXs each within 1 s;
- *                           >= 8 means the node held originator authority. */
+ * tx_stream_streak_max    = longest run of own FHSS TXs each less than 1 s
+ *                           apart. A CADENCE measure only: the streak is
+ *                           advanced on every own TX_DONE, including on a
+ *                           node whose grid is ADOPTED (an ordinary
+ *                           follower streaming hard reaches 8 too), so
+ *                           >= 8 does NOT by itself mean authority was
+ *                           held. sx1276_fhss_authority_is_originator()
+ *                           additionally requires a VALID clock, an
+ *                           UNADOPTED grid, and a last own TX less than
+ *                           1 s ago. Read it alongside clk_demotion_kept
+ *                           (authority exercised) and tx_first_anchor. */
 #define HOST_STATS_OFFSET_FHSS_DEC_ALIGNED          168U
 #define HOST_STATS_OFFSET_FHSS_DEC_SNAPPED          172U
 #define HOST_STATS_OFFSET_FHSS_DEC_REJ_NOT_INIT     176U
