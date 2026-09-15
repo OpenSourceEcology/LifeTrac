@@ -628,6 +628,11 @@ No-regrets work, correct under every surviving architecture (do first):
   Auto, attenuate/detune to force timeouts, watch it degrade DTS→FHSS and
   promote back after the 60 s health dwell. Policy is unit-tested
   (`test_web_ui_radio_profile.py`); zero air evidence yet.
+  **2026-09-15 DONE (leg V, PR #127): with the RS-12.16 inputs the policy
+  pinned FHSS 13 s after the tractor's frame source went silent and promoted
+  back exactly 60 s after frames resumed. Evidence
+  bench-evidence/RS_1_4_auto_policy_2026-09-15/RESULTS.md. Findings ->
+  RS-12.18 (fixed), RS-12.19, RS-12.20.**
 - [ ] **RS-1.5 Ack-driven command convergence (added 2026-07-26, from the
   run C→I delivery investigation)** — fire-and-forget command copies can
   never be reliable at saturation: the tractor's armed window is ~44 ms
@@ -2424,6 +2429,145 @@ without a fresh GO. Queue: (1) RS-12.15 firmware (clock authority + tractor
 RX slot follow) = flash session; (2) RS-3.11 encoder decision; (3) hail
 candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
 
+**RADIO TESTING PLAN 2026-09-15 (written 2026-09-14 at shutdown).**
+State: both L072s run the FLOWN v2 bench build `5a160e4a`, radios `PARK_OK
+0x80`; the PR-head bench build `0c1bb0a9` and the old RS-12.10 `e8ad8424`
+are staged in `/tmp/lifetrac_p0c` on both boards (tmpfs — gone if a board
+reboots; re-push per `firmware/x8_lora_bootloader_helper/bench_tools/BENCH_RUNBOOK.md`);
+base image = main `3a0cb524` (behind both PRs). PRs #125 (firmware) and
+#124 (host) are green and mergeable — **merge first**, #125 then #124; both
+edit TODO.md, so merge main into the flight branch before #124 if it
+conflicts. Every leg needs GO; radios stay parked between legs.
+  1. ~~Confirmation leg on `0c1bb0a9`~~ **DONE 2026-09-15 (leg U).** Both
+     boards flashed to the shipped build, same camera workload as leg T:
+     **537 frames published over 268 s (2.00 fps) vs leg T's 477, ZERO
+     lock-loss gaps**, air loss 11.1 % (678 TX → 603 decoded), tractor
+     `clk_demotion_kept`=5 / `reset`=0 / `tx_first_anchor`=1, and the
+     **first `fhss_dec_rej_locked_out` ever captured on air (1)**. The
+     flown-vs-shipped gap is closed; no further leg needed for #125.
+     NOTE: the leg report first printed "99.8 % loss / published=1" — an
+     artifact of the daemon stats thread crashing 1 frame in (RS-12.17),
+     not a result. Evidence: RESULTS.md "Leg U" section.
+  2. **Deploy the merged base tree** (recipe in the runbook) so the base's
+     daemons carry the shared gate without the harness push.
+  3. **RS-12.16 items 1–3 implemented + SIL green before the bench**, then
+     RS-1.4 live: selector = Auto, force loss, watch DTS→FHSS inside the
+     dead-air window and the promote-back after 60 s healthy.
+  4. **Residual 20.7 % on the camera keyframe storm** (leg T): analysis
+     first — train length vs the profile-1 slot budget, command load — no
+     code until the mechanism is named.
+  Prep every session: camera aimed at the screen (two `/dev/video1` frames
+  1 s apart must differ), moving content via Firefox kiosk, stop
+  `lifetrac-camera.service` + `docker stop tractor-camera`, clear retained on
+  the base broker, `rs115` pre-brackets both boards, re-push
+  `/tmp/lifetrac_strict` + `/tmp/lifetrac_p0c` after ANY reboot.
+
+- [ ] **RS-12.16 — Auto radio-profile policy is blind to the failures we
+  measured (added 2026-09-14, from the RS-12.15 camera A/B).**
+  `web_ui.AutoRadioPolicy` judges the link from link_stats sample age
+  (≤ 20 s) and reassembler timeouts (≤ 2.5 per 10 s). Replayed against leg S
+  (old fw, camera, 39.0 % loss, lock-loss blackouts of 53.2 s + 21.9 s):
+  peak timeout rate 1.0 per 10 s, sample age never stale (the daemon
+  publishes zero-samples through dead air) → the policy would have read the
+  whole leg HEALTHY. Timeouts are a weak signal with parity + the 09-12 stale
+  horizon: lost frames produce silence, not timeouts. Also: before PR #125
+  the policy's fallback (DTS→FHSS) was the BROKEN profile; on v2 it is sound
+  (leg T: 0 gaps on the same workload). Own branch after #125/#124 merge;
+  SIL in `test_web_ui_radio_profile.py`.
+  1. **Dead-air input** (web_ui only): `rx_frames_seen` not advancing for
+     ~10 s AFTER the link was streaming within the last 60 s → unhealthy.
+     Normal fragment gaps < 1 s, lock losses 20–53 s; the "was streaming"
+     gate keeps an idle tractor from flapping the profile.
+  2. **Loss-rate input** (small daemon change): the reassembler knows
+     fragments expected per frame (header total) → publish a rolling
+     missing/expected in link_stats, so a 20 % link is visible, not just a
+     dead one.
+  3. **Keep the timeout input** — it still covers its own failure mode.
+  4. **RS-1.4 live validation** with the new inputs (plan item 3 above).
+  Manual selector: no change needed — ids, labels (FHSS 50ch BW250 / DTS
+  BW500 / bench 915) and the two-phase switch are unchanged; #124's gate
+  work is transparent to the UI.
+
+- [ ] **RS-12.17 — `_stats_worker` dies mid-leg on a `None` gap-sample list
+  (found 2026-09-15 during leg U).** `image_rx_daemon.py:1723` takes
+  `samples = getattr(self, "_gap_samples", None)` and guards the air-gap
+  block with `if samples:`, but the RS-11.1 `air_gap_by_class` block
+  (~:1798) reuses `samples` while sitting **inside the phase-telemetry
+  `if`** — so any window with phase telemetry and no gap samples raises
+  `TypeError: 'NoneType' object is not iterable` and kills the thread.
+  Leg U lost it one frame in: no further `stats:` lines for the rest of the
+  leg, and because `rs12_leg_report` reads every figure off the LAST
+  `stats:` line it reported "99.8 % loss, published=1" for a leg that
+  published 537 frames — a false catastrophe on the campaign's headline
+  metric. Blast radius is the stats line only: `_link_stats_worker` is a
+  separate thread, so link_stats (and the auto-profile input) kept flowing.
+  Fix: move the `by_class` block inside `if samples:` where its own comment
+  says it belongs, plus a SIL case driving `_stats_worker` with phase
+  telemetry and an empty/None sample list. Pre-existing (`base_station/` is
+  byte-identical between the leg T and leg U commits), so it is NOT a
+  regression from RS-12.15. `rs12_leg_report` already hardened: it detects
+  the dead thread and prints log-derived counts instead (2026-09-15).
+
+- [x] **RS-12.18 — Auto policy never learned the daemon reverted a switch
+  (leg V 2026-09-15; FIXED on PR #127).** The daemon reverts on its own (no
+  tractor ACK in 12 s, or no frames on the new profile in 45 s); the policy
+  believed FHSS for 63 s while the link was on DTS, so a bad link in that
+  window would have met no action. `AutoRadioPolicy.observe_active()` now
+  re-syncs from `link_stats.radio_profile` after a 20 s sustained
+  disagreement (longer than the phase-A handshake) and treats the revert as
+  a switch for hysteresis. 3 SIL cases.
+
+- [ ] **RS-12.19 — the 45 s profile-switch proof-of-life window races the
+  outage that triggered the switch (leg V).** Auto degrades to FHSS BECAUSE
+  frames stopped, and the base's follower needs 20–30 s of frames to lock —
+  so `PROFILE_REVERT_TIMEOUT_S` (45 s from the switch) can fire before FHSS
+  ever gets a frame. **Correction (PR #127 review):** the leg V pause was
+  requested as 30 s but actually lasted 44.6 s (20:51:15.4 → 20:52:00.0):
+  the watcher's sampling loop added ~2.4 s of SSH latency to every 5 s
+  tick. Only ~13.5 s of FHSS traffic fell inside the 45 s window; a true
+  30 s pause would have left ~28 s, and whether that suffices for follower
+  lock (20–30 s) is UNDETERMINED. On this leg the instrument artifact is
+  the dominant cause of the phase-B failure, so RS-12.19 is a hypothesis,
+  not a finding. Both sides still reverted within ~1 s of each other (the
+  base no-frames and tractor no-CONF timers both start at the switch), so
+  convergence was clean. Options: start the window from the first frame
+  ATTEMPT on the new profile, or lengthen it when the switch was
+  auto-triggered by dead air. Needs a leg with a DEADLINE-scheduled pause
+  (<= 15 s, unpause independent of any sampling loop) to separate the
+  artifact from the design limit.
+
+- [ ] **RS-12.20 — the loss-rate input is blind to whole-frame loss (leg V).**
+  The reassembler booked 0 missing of 385 expected while the harness measured
+  26.6 % fragment loss: a single-fragment frame that never arrives never opens
+  a partial, so nothing is booked. `frags_missing` measures unrecovered
+  INTRA-frame loss on multi-fragment traffic only. Complementary signal: a
+  `frag_seq` gap detector (missing sequence numbers between arrivals) — the
+  RS-11.1 `lost_frag_idx` instrument already does this per window but resets;
+  make a monotonic variant and feed it to the policy alongside frags_missing.
+  Operator note (also from leg V): selecting Auto with no daemon running
+  pins FHSS within 60 s under the existing stale-link rule — arm Auto after
+  the daemons are up, and disarm to a concrete profile at session end.
+
+- [ ] **RS-12.21 — the bench park is not a persistent off state without
+  firmware support (PR #125 review, 2026-09-15).** `radio_park.py` writes
+  STANDBY→SLEEP through the diag register path and reads back 0x80, but
+  the firmware's scan walker (`scan_dispatch_action` ADVANCE_CHANNEL), γ-1
+  retune (`sx1276_rx_tick`) and slot follower (`sx1276_rx_slot_follow`,
+  LOCKED only) all call `sx1276_rx_arm()` and re-arm RXCONT after the write
+  — receive-only, no emissions, but the readback is transient and the
+  runbook called it authoritative. Empirically the park has held (both
+  boards read 0x80 one hour after the post-leg-V park) because it is issued
+  after the daemons are down and the scan SM has exhausted into FAILED
+  (absorbing: 500 ms/channel, hard FAIL at 30 s per attempt, 3 retries ⇒
+  up to ~2 min). Done 2026-09-15: `radio_park.py` re-reads after a 1.5 s
+  settle and prints PARK_OK only if still asleep (else PARK_TRANSIENT,
+  exit 5); the runbook states the real contract and requires a read-only
+  `radio_state.py` re-check. TODO: a firmware park command — host opcode
+  setting a `host_parked` flag that gates every arm path, puts the modem
+  to SLEEP, cleared by a host RXCONT write (`sx1276_rx_note_external_arm`)
+  or reset; host-check pinned; flashed and verified at a GO. Until then
+  PARK_OK means "asleep now and nothing re-armed it", not "cannot wake".
+
 - [x] **RS-12.11 — base command scheduler vs fragment arrivals: DONE 2026-09-12
   (PR #118, gate passed, see above).**
 - [x] **RS-4.15 — motion-aware stale-scan horizon: DONE 2026-09-12 (PR #118,
@@ -2450,7 +2594,71 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   costs the camera path anything; long synth/keyframe trains get the
   3.2 % → 1.5 % benefit. `LIFETRAC_NO_PARK_LAST` default unchanged (0);
   flipping it is now a low-risk call once RS-3.11 decides on long trains.
-- [ ] **RS-12.15 — reverse-path delivery on FHSS: the tractor's RX does not follow
+- [x] **RS-12.15 v2 (2026-09-14, PR #125 f7d98f8b…efd69f7d) — FLASHED + VALIDATED ON AIR (leg R counters; camera A/B legs S→T). Merge pending.**
+  (Heading updated at shutdown 2026-09-14; the paragraph below is the design
+  record and the FLOWN/BEHAVIORAL notes at its end are the result.)
+  Review + legs O/P re-analysis: the DOMINANT mechanism is the LOCKED->SCANNING
+  demotion resetting the FHSS clock unconditionally -- one accepted command
+  LOCKs the streaming tractor, the 2 s loss timer demotes it and wipes its OWN
+  TX grid, the next TX re-anchors "slot k+1 starts now"; dense synth trains
+  re-sync inside the slot (leg L: 0 losses), sparse camera trains renumber the
+  grid (legs I/J: 20-30 s rescans). v2: originator authority = sustained own-TX
+  streaming (>= 8 on-air TXs each < 1 s apart, decaying 1 s after the last; round 3: adopt/demote policy in sx1276_rx_grid_policy with check-rx-grid-policy driving demote->TX->RX against the real consider_remote; sx1276_fhss_authority, check-fhss-
+  authority incl. the demotion->TX->RX regression), the demotion edge resets
+  only an ADOPTED clock, and STATS 168->208 adds the consider_remote histogram,
+  clk_demotion_reset/kept, tx_first_anchor, tx_stream_streak_max so the next
+  leg MEASURES it. Bench bin 5a160e4a (24860 B) + the byte-identical old
+  RS-12.10 bin e8ad8424 are staged in /tmp/lifetrac_p0c on both boards; flash
+  tooling re-pushed LF-clean. Boards still on v1 (2ee69f9c). Plan (needs GO):
+  leg Q old fw on SPARSE synth (-SynthFps 1.5 -SynthBudgetB 400 + kf_inject
+  bursts, fly from main) to reproduce the lock losses; leg R v2 same setup
+  (fly from the branch) expecting clk_demotion_reset=0 and zero lock-loss gaps.
+  FLOWN 2026-09-14 (legs Q/Q2/R): v2 flashed both boards (5a160e4a, Verify
+  OK). The counter proof landed -- leg R (v2, dual injector, == old-fw leg L):
+  the streaming tractor demoted 19x and KEPT its self-anchored clock every
+  time (clk_demotion_kept=19, clk_demotion_reset=0, tx_first_anchor=1 for the
+  whole leg); old fw would have reset the clock on all 19 (the lock-loss
+  mechanism). Follower held (0 gaps). Legs Q/Q2 (old fw) did NOT reproduce a
+  lock-loss GAP on synth -- the steady publisher never pauses TX > 2 s nor
+  delivers enough reverse-path commands, so the dense TX re-syncs the base
+  through every clock reset; the behavioral gap only appears under the camera
+  keyframe workload (I/J), not drivable this session (ffmpeg wiped). So v2's
+  mechanism is proven feed-independently by the counters; the behavioral A/B
+  awaits a camera-motion leg. Radios parked 0x80.
+  BEHAVIORAL A/B DONE 2026-09-14 on the CAMERA (operator aimed it at the
+  screen; railroad video via Firefox kiosk): leg S (old fw) reproduced the
+  break -- 39.0 % loss, 2 lock-loss gaps (53.2 s + 21.9 s = 75 s dead);
+  leg T (v2, same workload) ELIMINATED it -- 0 gaps, 20.7 % loss. Combined
+  with leg R's counters (clk_demotion_kept=19/reset=0) the fix is proven
+  mechanistically AND behaviorally. Boards on v2, parked. RS-12.15 v2
+  recommended for production. Evidence RS_12_15_clock_authority_2026-09-14
+  /RESULTS.md (GO-validation + Camera behavioral A/B sections).**
+  Round 4 review (after the legs): leading-grid originator now hands STALE
+  (epoch-drift barrier kept; forged epoch+2 host-pinned REJECTED); wire-sync
+  enforces the 10 new offsets; PRODUCTION build/firmware.bin rebuilt + committed
+  (589c1203). Boards run bench 5a160e4a (flown); PR-head bench = 0c1bb0a9 --
+  delta not exercised on air (0 SNAPPED on the originator), confirmation leg
+  optional at the next GO. Staged on both boards.
+- [~] **RS-12.15 v1 — FHSS clock authority: FIRMWARE IMPLEMENTED + FLASHED
+  2026-09-14 (commit 23ba5122, branch rs12-15-clock-authority, PR pending);
+  BEHAVIORAL A/B still PENDING. A self-anchored originator (own-TX clock,
+  no adopted grid) read as UNANCHORED, so it snapped/re-anchored to its
+  follower's lagged echo of its own grid and walked the shared grid a slot
+  off (the lock-loss mechanism). Fix: it now adopts a remote grid only when
+  that grid LEADS its own (sx1276_fhss_clock_rx_leads(), monotonic-earlier
+  = convergent + recovery-safe; follower/recovery paths unchanged; no wire
+  change). SIL green (rx_leads golden vectors), -Werror clean, both L072s
+  flashed (Verify OK, md5 2ee69f9c, 24328 B) and boot healthy (radio_state
+  4). Legs O/P (new fw, synth profile-1 storm): follower ROCK-SOLID (0 lock
+  losses, max frag gap 0.6 s), loss 0.3 % / 4.9 % vs old-fw leg L 7.8 % --
+  NO REGRESSION but NOT a fix A/B: the synth path does not reproduce the
+  break (leg L old-fw also had 0 lock losses; the break was only ever on
+  CAMERA legs I/J, un-reflyable on old fw now). Evidence
+  RS_12_15_clock_authority_2026-09-14. NEXT (needs GO): a camera-motion leg
+  on new fw, OR an RFCO_SUMMARY capture showing the originator now logs
+  consider_remote=LOCKED_OUT on received commands (feed-independent proof).
+  The reverse-delivery half below still stands.**
+- [ ] **RS-12.15 (reverse-delivery half) — the tractor's RX does not follow
   the slot clock between trains (opened 2026-09-12 from RS-12.12/14 data).**
   **SHARPENED 2026-09-12 (RS-12.14 gate leg J): the dominant mechanism is FHSS
   Base→tractor command delivery on profile 1 was 1/17 (leg H, healthy link)

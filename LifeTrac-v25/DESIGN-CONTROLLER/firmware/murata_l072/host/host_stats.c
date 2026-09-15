@@ -53,6 +53,17 @@ typedef struct host_stats_wire_s {
     uint32_t tx_deaf_max_us;
     uint32_t tx_deaf_sum_us;
     uint32_t tx_done_to_rearm_max_us;
+    /* RS-12.15 v2 additive tail (2026-09-14): FHSS clock authority. */
+    uint32_t fhss_dec_aligned;
+    uint32_t fhss_dec_snapped;
+    uint32_t fhss_dec_rej_not_init;
+    uint32_t fhss_dec_rej_bad_hop;
+    uint32_t fhss_dec_rej_epoch_drift;
+    uint32_t fhss_dec_rej_locked_out;
+    uint32_t clk_demotion_reset;
+    uint32_t clk_demotion_kept;
+    uint32_t tx_first_anchor;
+    uint32_t tx_stream_streak_max;
 } host_stats_wire_t;
 
 _Static_assert(sizeof(host_stats_wire_t) == HOST_STATS_PAYLOAD_LEN,
@@ -76,6 +87,12 @@ static uint32_t s_rx_fifo_skip;
 static uint32_t s_tx_deaf_max_us;
 static uint32_t s_tx_deaf_sum_us;
 static uint32_t s_tx_done_to_rearm_max_us;
+/* RS-12.15 v2 */
+static uint32_t s_fhss_dec[6];
+static uint32_t s_clk_demotion_reset;
+static uint32_t s_clk_demotion_kept;
+static uint32_t s_tx_first_anchor;
+static uint32_t s_tx_stream_streak_max;
 
 static void put_u32_le(uint8_t *dst, uint32_t value) {
     dst[0] = (uint8_t)(value & 0xFFU);
@@ -103,6 +120,13 @@ void host_stats_reset(void) {
     s_tx_deaf_max_us = 0U;
     s_tx_deaf_sum_us = 0U;
     s_tx_done_to_rearm_max_us = 0U;
+    for (uint8_t i = 0U; i < 6U; ++i) {
+        s_fhss_dec[i] = 0U;
+    }
+    s_clk_demotion_reset = 0U;
+    s_clk_demotion_kept = 0U;
+    s_tx_first_anchor = 0U;
+    s_tx_stream_streak_max = 0U;
 
     host_uart_stats_reset();
 }
@@ -180,6 +204,29 @@ void host_stats_tx_deaf_note(uint32_t deaf_us, uint32_t done_to_rearm_us,
     }
 }
 
+/* RS-12.15 v2 (2026-09-14): FHSS clock-authority counters. */
+void host_stats_fhss_dec_note(uint8_t dec_idx) {
+    if (dec_idx < 6U && s_fhss_dec[dec_idx] != 0xFFFFFFFFU) {
+        ++s_fhss_dec[dec_idx];
+    }
+}
+
+void host_stats_clk_demotion_note(bool reset) {
+    if (reset) {
+        if (s_clk_demotion_reset != 0xFFFFFFFFU) { ++s_clk_demotion_reset; }
+    } else {
+        if (s_clk_demotion_kept != 0xFFFFFFFFU) { ++s_clk_demotion_kept; }
+    }
+}
+
+void host_stats_tx_first_anchor(void) {
+    if (s_tx_first_anchor != 0xFFFFFFFFU) { ++s_tx_first_anchor; }
+}
+
+void host_stats_tx_stream_streak_note(uint32_t streak) {
+    if (streak > s_tx_stream_streak_max) { s_tx_stream_streak_max = streak; }
+}
+
 uint16_t host_stats_serialize(uint8_t *out, uint16_t out_cap) {
     uint16_t idx = 0U;
 
@@ -234,6 +281,14 @@ uint16_t host_stats_serialize(uint8_t *out, uint16_t out_cap) {
     put_u32_le(&out[idx], s_tx_deaf_max_us); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], s_tx_deaf_sum_us); idx = (uint16_t)(idx + 4U);
     put_u32_le(&out[idx], s_tx_done_to_rearm_max_us); idx = (uint16_t)(idx + 4U);
+    /* RS-12.15 v2 additive tail (offsets pinned by check-stats-layout). */
+    for (uint8_t i = 0U; i < 6U; ++i) {
+        put_u32_le(&out[idx], s_fhss_dec[i]); idx = (uint16_t)(idx + 4U);
+    }
+    put_u32_le(&out[idx], s_clk_demotion_reset); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], s_clk_demotion_kept); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], s_tx_first_anchor); idx = (uint16_t)(idx + 4U);
+    put_u32_le(&out[idx], s_tx_stream_streak_max); idx = (uint16_t)(idx + 4U);
 
     return HOST_STATS_PAYLOAD_LEN;
 }

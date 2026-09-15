@@ -16,6 +16,7 @@
 #include "lora_pkt_hdr.h"
 #include "sx1276_fhss.h"
 #include "sx1276_fhss_clock.h"
+#include "sx1276_fhss_authority.h"
 #include "sx1276_legal_dwell.h"
 #endif
 
@@ -270,6 +271,9 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
                     sx1276_fhss_current_epoch(),
                     sx1276_fhss_current_slot());
                 sx1276_fhss_clock_anchor(tx_now_ms, cur_abs);
+                /* RS-12.15 v2: count phase restarts -- exactly one per
+                 * session on a healthy originator (the boot anchor). */
+                host_stats_tx_first_anchor();
             }
             {
                 const uint32_t abs_now =
@@ -289,6 +293,12 @@ bool sx1276_tx_begin(const sx1276_tx_request_t *req) {
                     tx_now_ms - sx1276_fhss_clock_in_slot_ms(tx_now_ms),
                     abs_now);
             }
+            /* RS-12.15 v2: the own-TX streak that earns originator
+             * authority is noted on TX_DONE in sx1276_tx_poll(), NOT here
+             * at admission (PR #125 review): everything below can still
+             * abort this attempt -- scheduler fault, LBT, airtime/dwell,
+             * FIFO load, modes_to_tx -- and an aborted attempt must not
+             * count as streaming. */
             /* F7: record the admission slot's boundary instead of sampling
              * the phase here. The phase byte itself is computed at
              * header-pack time from this stored boundary — NOT by
@@ -607,6 +617,18 @@ bool sx1276_tx_poll(uint32_t events, sx1276_tx_result_t *out_result) {
             sx1276_legal_dwell_reconcile(s_legal_dwell_handle,
                                          s_expected_toa_us);
             tx_emit_rfco_pertx(HOST_RFCO_TX_STATUS_OK, s_expected_toa_us);
+            /* RS-12.15 v2 (PR #125 review): the own-TX streak that earns
+             * originator authority counts only frames that actually went
+             * on air (TX_DONE), and only FHSS ones -- s_slot_boundary_valid
+             * is set on the FHSS admission path and cleared on the
+             * single-carrier one, and nothing between admission and here
+             * touches it (TX is serialised by tx_busy). Noting at admission
+             * let aborted attempts earn authority after eight failures. */
+            if (s_slot_boundary_valid != 0U) {
+                sx1276_fhss_authority_note_tx(platform_now_ms());
+                host_stats_tx_stream_streak_note(
+                    sx1276_fhss_authority_streak());
+            }
 #endif
             sx1276_tx_cleanup();
             return true;

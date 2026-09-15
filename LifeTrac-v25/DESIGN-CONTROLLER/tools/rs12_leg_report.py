@@ -47,13 +47,54 @@ def main() -> int:
             print(f"{key}={m.group(1)}", end="  ")
     print()
 
-    sent = int(re.findall(r"frags_ok=(\d+)", tx)[-1])
+    # PR #125 review round 6 (2026-09-15): `frags_ok=` is the TX daemon's LAST
+    # periodic stats line and can be stale independently of the RX stats
+    # thread -- in leg U it read 652 while the per-frame completion events
+    # ("frame seq=N done ...: K fragments ok", one per train, logged as each
+    # train finishes) summed to 674. Those events are the fragments the L072
+    # reported on air (TX_DONE OK); aborted fragments never appear in them
+    # and were never on air, so they are the right air-loss denominator.
+    # Prefer the events; fall back to the counter only for a log without them.
+    sent_counter = int(re.findall(r"frags_ok=(\d+)", tx)[-1])
+    sent_events = sum(int(n) for n in re.findall(r"(\d+) fragments ok", tx))
+    sent = sent_events if sent_events else sent_counter
+    if sent_events and sent_events != sent_counter:
+        print(f"  (tx frags_ok counter {sent_counter} is stale; using "
+              f"{sent_events} fragments from per-frame TX events)")
     rcvd = int(re.findall(r"rx_frames=(\d+)", rx)[-1])
     crc = rx.count("crc_dump")
     timeouts = int(re.findall(r"reassembler_timeouts=(\d+)", rx)[-1])
     published = int(re.findall(r"frames_published=(\d+)", rx)[-1])
+
+    # 2026-09-15 (leg U): EVERY number on the loss line comes from the LAST
+    # "stats:" line in the rx log. If the daemon's stats thread dies mid-leg
+    # that line is whatever was true when it died, and this report then
+    # describes the first seconds as if they were the whole leg — silently,
+    # and in the direction of a false alarm. Leg U crashed that thread one
+    # frame in and this printed "loss 651/652 = 99.8% published=1" for a leg
+    # that actually published 537 frames with zero lock losses. Cross-check
+    # against events logged once per frame/fragment, which cannot go stale.
+    pub_log = rx.count("published frame_id")
+    frag_log = rx.count("frag_arrival")          # needs -LogFragArrivals 1
+    stats_dead = "Exception in thread image-rx-stats" in rx
+    counters_stale = stats_dead or (pub_log and published < pub_log * 0.9)
+    if counters_stale:
+        why = ("the stats thread CRASHED (traceback in rx_daemon.log)"
+               if stats_dead else
+               "the counter line disagrees with the per-frame log events")
+        print(f"  !! STALE COUNTERS: {why} — the loss line below describes "
+              f"only the window before it stopped updating. Trust these:")
+        if frag_log:
+            print(f"     log-derived: published={pub_log}  "
+                  f"fragments_arrived={frag_log}  "
+                  f"air_loss={100 * (sent - frag_log) / sent:.1f}% "
+                  f"({sent} sent -> {frag_log} decoded)")
+        else:
+            print(f"     log-derived: published={pub_log}  "
+                  f"(re-run with -LogFragArrivals 1 for fragment-level loss)")
     print(f"loss {sent - rcvd}/{sent} = {100 * (sent - rcvd) / sent:.1f}%   "
-          f"crc_dumps={crc}  timeouts={timeouts}  published={published}")
+          f"crc_dumps={crc}  timeouts={timeouts}  published={published}"
+          + ("   [STALE — see above]" if counters_stale else ""))
 
     # per-index loss histogram (attribution instrument)
     idx: collections.Counter = collections.Counter()
@@ -182,6 +223,26 @@ def main() -> int:
                   f"(max fields: post-bracket values)")
         else:
             print("RS-12.10: n/a (counters absent in a bracket)")
+        # RS-12.15 v2 (2026-09-14): FHSS clock-authority counters. Deltas of
+        # the decision histogram and the demotion outcome; streak_max and
+        # first_anchor are post-bracket values (first_anchor is cumulative
+        # since firmware reset -- report the delta AND the post value).
+        rs15 = ("fhss_dec_aligned", "fhss_dec_snapped", "fhss_dec_rej_not_init",
+                "fhss_dec_rej_bad_hop", "fhss_dec_rej_epoch_drift",
+                "fhss_dec_rej_locked_out", "clk_demotion_reset",
+                "clk_demotion_kept", "tx_first_anchor", "tx_stream_streak_max")
+        if any(k in post for k in rs15):
+            pre15 = {**{k: 0 for k in rs15}, **pre}
+            post15 = {**{k: 0 for k in rs15}, **post}
+            d15 = {k: post15[k] - pre15[k] for k in rs15}
+            print(f"RS-12.15: consider_remote deltas aligned={d15['fhss_dec_aligned']} "
+                  f"snapped={d15['fhss_dec_snapped']} locked_out={d15['fhss_dec_rej_locked_out']} "
+                  f"epoch_drift={d15['fhss_dec_rej_epoch_drift']} bad_hop={d15['fhss_dec_rej_bad_hop']} "
+                  f"not_init={d15['fhss_dec_rej_not_init']} | demotion reset={d15['clk_demotion_reset']} "
+                  f"kept={d15['clk_demotion_kept']} | tx_first_anchor delta={d15['tx_first_anchor']} "
+                  f"(post {post15['tx_first_anchor']}) | streak_max post={post15['tx_stream_streak_max']}")
+        else:
+            print("RS-12.15: n/a (counters absent in a bracket)")
     return 0
 
 

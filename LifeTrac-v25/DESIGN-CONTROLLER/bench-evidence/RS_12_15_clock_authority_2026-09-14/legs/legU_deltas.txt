@@ -1,0 +1,10 @@
+  fhss_dec_aligned           pre=0      post=6      delta=6      
+  fhss_dec_snapped           pre=0      post=0      delta=0      
+  fhss_dec_rej_locked_out    pre=0      post=1      delta=1      <== follower echoes refused
+  fhss_dec_rej_epoch_drift   pre=0      post=0      delta=0      
+  clk_demotion_reset         pre=0      post=0      delta=0      <== must stay 0 on the streaming originator
+  clk_demotion_kept          pre=0      post=5      delta=5      <== clock KEPT across demotion (the fix)
+  tx_first_anchor            pre=0      post=1      delta=1      <== 1 = grid phase anchored once, never re-derived
+  tx_stream_streak_max       pre=0      post=677    delta=677    
+  radio_tx_ok                pre=0      post=678    delta=678    
+  radio_rx_ok                pre=0      post=7      delta=7      

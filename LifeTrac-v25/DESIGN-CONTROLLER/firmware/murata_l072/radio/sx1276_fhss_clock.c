@@ -55,3 +55,19 @@ uint32_t sx1276_fhss_clock_age_ms(uint32_t now_ms) {
      * idiom the rest of this TU uses. */
     return now_ms - s_clk.anchor_ms;
 }
+
+uint8_t sx1276_fhss_clock_rx_leads(uint32_t rx_done_ms, uint32_t toa_us,
+                                   uint8_t slot_offset_ms, uint32_t abs_slot) {
+    /* RS-12.15: the remote's slot-START in local time, computed exactly
+     * as sx1276_fhss_clock_anchor_rx would place it (F7 half-up ToA
+     * rounding), versus where our current anchor projects that same
+     * absolute slot to start. "Leads" = strictly earlier. */
+    const uint32_t toa_ms = (toa_us + 500UL) / 1000UL;
+    const uint32_t remote_start =
+        rx_done_ms - toa_ms - (uint32_t)slot_offset_ms;
+    const uint32_t local_start =
+        s_clk.anchor_ms
+        + (abs_slot - s_clk.anchor_abs) * SX1276_FHSS_SLOT_MS;
+    /* Signed-wrap compare: remote leads iff (remote - local) < 0. */
+    return ((int32_t)(remote_start - local_start) < 0) ? 1U : 0U;
+}

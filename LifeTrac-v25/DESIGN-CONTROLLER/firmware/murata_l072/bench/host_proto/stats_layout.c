@@ -84,6 +84,15 @@ int main(void) {
     host_stats_tx_deaf_note(30000U, 900U, true);                /* max 30000, sum 30000, turn 900 */
     host_stats_tx_deaf_note(12000U, 1500U, true);               /* max 30000, sum 42000, turn 1500 */
     host_stats_tx_deaf_note(45000U, 99999U, false);             /* max 45000, sum 87000, turn stays 1500 */
+    /* RS-12.15 v2: decision histogram + clock-authority events */
+    host_stats_fhss_dec_note(0U); host_stats_fhss_dec_note(0U); host_stats_fhss_dec_note(0U); /* aligned 3 */
+    host_stats_fhss_dec_note(1U);                               /* snapped 1 */
+    host_stats_fhss_dec_note(5U); host_stats_fhss_dec_note(5U); /* locked_out 2 */
+    host_stats_fhss_dec_note(9U);                               /* out of range: ignored */
+    host_stats_clk_demotion_note(true); host_stats_clk_demotion_note(true); /* reset 2 */
+    host_stats_clk_demotion_note(false);                        /* kept 1 */
+    host_stats_tx_first_anchor();                               /* 1 */
+    host_stats_tx_stream_streak_note(7U); host_stats_tx_stream_streak_note(31U); host_stats_tx_stream_streak_note(9U); /* max 31 */
 
     memset(out, 0xEE, sizeof(out));
     n = host_stats_serialize(out, HOST_STATS_PAYLOAD_LEN);
@@ -114,11 +123,21 @@ int main(void) {
     expect_at(out, HOST_STATS_OFFSET_TX_DEAF_MAX_US,    45000U, "tx_deaf_max_us");
     expect_at(out, HOST_STATS_OFFSET_TX_DEAF_SUM_US,    87000U, "tx_deaf_sum_us");
     expect_at(out, HOST_STATS_OFFSET_TX_DONE_TO_REARM_MAX_US, 1500U, "tx_done_to_rearm_max_us");
+    expect_at(out, HOST_STATS_OFFSET_FHSS_DEC_ALIGNED,         3U, "fhss_dec_aligned");
+    expect_at(out, HOST_STATS_OFFSET_FHSS_DEC_SNAPPED,         1U, "fhss_dec_snapped");
+    expect_at(out, HOST_STATS_OFFSET_FHSS_DEC_REJ_NOT_INIT,    0U, "fhss_dec_rej_not_init");
+    expect_at(out, HOST_STATS_OFFSET_FHSS_DEC_REJ_BAD_HOP,     0U, "fhss_dec_rej_bad_hop");
+    expect_at(out, HOST_STATS_OFFSET_FHSS_DEC_REJ_EPOCH_DRIFT, 0U, "fhss_dec_rej_epoch_drift");
+    expect_at(out, HOST_STATS_OFFSET_FHSS_DEC_REJ_LOCKED_OUT,  2U, "fhss_dec_rej_locked_out");
+    expect_at(out, HOST_STATS_OFFSET_CLK_DEMOTION_RESET,       2U, "clk_demotion_reset");
+    expect_at(out, HOST_STATS_OFFSET_CLK_DEMOTION_KEPT,        1U, "clk_demotion_kept");
+    expect_at(out, HOST_STATS_OFFSET_TX_FIRST_ANCHOR,          1U, "tx_first_anchor");
+    expect_at(out, HOST_STATS_OFFSET_TX_STREAM_STREAK_MAX,    31U, "tx_stream_streak_max");
 
     /* The table above must end where the payload ends: a new additive
      * field without a line here is a contract change nobody pinned. */
     s_cases++;
-    if (HOST_STATS_OFFSET_TX_DONE_TO_REARM_MAX_US + 4U != HOST_STATS_PAYLOAD_LEN) {
+    if (HOST_STATS_OFFSET_TX_STREAM_STREAK_MAX + 4U != HOST_STATS_PAYLOAD_LEN) {
         s_fail++;
         printf("[FAIL] HOST_STATS_PAYLOAD_LEN (%u) is not the last pinned field + 4 -- extend this test\n",
                (unsigned)HOST_STATS_PAYLOAD_LEN);
