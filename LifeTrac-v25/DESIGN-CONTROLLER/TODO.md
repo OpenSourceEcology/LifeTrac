@@ -628,9 +628,11 @@ No-regrets work, correct under every surviving architecture (do first):
   Auto, attenuate/detune to force timeouts, watch it degrade DTS→FHSS and
   promote back after the 60 s health dwell. Policy is unit-tested
   (`test_web_ui_radio_profile.py`); zero air evidence yet.
-  **2026-09-14: do NOT fly this as-is — replayed against leg S (39 % loss,
-  53 s lock-loss blackout) the policy's inputs read the whole leg HEALTHY.
-  Land RS-12.16's inputs first, then validate.**
+  **2026-09-15 DONE (leg V, PR #127): with the RS-12.16 inputs the policy
+  pinned FHSS 13 s after the tractor's frame source went silent and promoted
+  back exactly 60 s after frames resumed. Evidence
+  bench-evidence/RS_1_4_auto_policy_2026-09-15/RESULTS.md. Findings ->
+  RS-12.18 (fixed), RS-12.19, RS-12.20.**
 - [ ] **RS-1.5 Ack-driven command convergence (added 2026-07-26, from the
   run C→I delivery investigation)** — fire-and-forget command copies can
   never be reliable at saturation: the tractor's armed window is ~44 ms
@@ -2505,6 +2507,39 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   byte-identical between the leg T and leg U commits), so it is NOT a
   regression from RS-12.15. `rs12_leg_report` already hardened: it detects
   the dead thread and prints log-derived counts instead (2026-09-15).
+
+- [x] **RS-12.18 — Auto policy never learned the daemon reverted a switch
+  (leg V 2026-09-15; FIXED on PR #127).** The daemon reverts on its own (no
+  tractor ACK in 12 s, or no frames on the new profile in 45 s); the policy
+  believed FHSS for 63 s while the link was on DTS, so a bad link in that
+  window would have met no action. `AutoRadioPolicy.observe_active()` now
+  re-syncs from `link_stats.radio_profile` after a 20 s sustained
+  disagreement (longer than the phase-A handshake) and treats the revert as
+  a switch for hysteresis. 3 SIL cases.
+
+- [ ] **RS-12.19 — the 45 s profile-switch proof-of-life window races the
+  outage that triggered the switch (leg V).** Auto degrades to FHSS BECAUSE
+  frames stopped, and the base's follower needs 20–30 s of frames to lock —
+  so `PROFILE_REVERT_TIMEOUT_S` (45 s from the switch) can fire before FHSS
+  ever gets a frame. In leg V the instrument's 30 s pause left ~14 s inside
+  the window; phase B failed and both sides reverted within ~1 s of each
+  other (the base no-frames and tractor no-CONF timers both start at the
+  switch), so convergence was clean. Options: start the window from the
+  first frame ATTEMPT on the new profile, or lengthen it when the switch was
+  auto-triggered by dead air. Needs a leg with a <= 15 s pause to separate
+  the instrument artifact from the design limit.
+
+- [ ] **RS-12.20 — the loss-rate input is blind to whole-frame loss (leg V).**
+  The reassembler booked 0 missing of 385 expected while the harness measured
+  26.6 % fragment loss: a single-fragment frame that never arrives never opens
+  a partial, so nothing is booked. `frags_missing` measures unrecovered
+  INTRA-frame loss on multi-fragment traffic only. Complementary signal: a
+  `frag_seq` gap detector (missing sequence numbers between arrivals) — the
+  RS-11.1 `lost_frag_idx` instrument already does this per window but resets;
+  make a monotonic variant and feed it to the policy alongside frags_missing.
+  Operator note (also from leg V): selecting Auto with no daemon running
+  pins FHSS within 60 s under the existing stale-link rule — arm Auto after
+  the daemons are up, and disarm to a concrete profile at session end.
 
 - [x] **RS-12.11 — base command scheduler vs fragment arrivals: DONE 2026-09-12
   (PR #118, gate passed, see above).**
