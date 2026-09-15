@@ -2521,13 +2521,20 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   outage that triggered the switch (leg V).** Auto degrades to FHSS BECAUSE
   frames stopped, and the base's follower needs 20–30 s of frames to lock —
   so `PROFILE_REVERT_TIMEOUT_S` (45 s from the switch) can fire before FHSS
-  ever gets a frame. In leg V the instrument's 30 s pause left ~14 s inside
-  the window; phase B failed and both sides reverted within ~1 s of each
-  other (the base no-frames and tractor no-CONF timers both start at the
-  switch), so convergence was clean. Options: start the window from the
-  first frame ATTEMPT on the new profile, or lengthen it when the switch was
-  auto-triggered by dead air. Needs a leg with a <= 15 s pause to separate
-  the instrument artifact from the design limit.
+  ever gets a frame. **Correction (PR #127 review):** the leg V pause was
+  requested as 30 s but actually lasted 44.6 s (20:51:15.4 → 20:52:00.0):
+  the watcher's sampling loop added ~2.4 s of SSH latency to every 5 s
+  tick. Only ~13.5 s of FHSS traffic fell inside the 45 s window; a true
+  30 s pause would have left ~28 s, and whether that suffices for follower
+  lock (20–30 s) is UNDETERMINED. On this leg the instrument artifact is
+  the dominant cause of the phase-B failure, so RS-12.19 is a hypothesis,
+  not a finding. Both sides still reverted within ~1 s of each other (the
+  base no-frames and tractor no-CONF timers both start at the switch), so
+  convergence was clean. Options: start the window from the first frame
+  ATTEMPT on the new profile, or lengthen it when the switch was
+  auto-triggered by dead air. Needs a leg with a DEADLINE-scheduled pause
+  (<= 15 s, unpause independent of any sampling loop) to separate the
+  artifact from the design limit.
 
 - [ ] **RS-12.20 — the loss-rate input is blind to whole-frame loss (leg V).**
   The reassembler booked 0 missing of 385 expected while the harness measured
@@ -2540,6 +2547,26 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   Operator note (also from leg V): selecting Auto with no daemon running
   pins FHSS within 60 s under the existing stale-link rule — arm Auto after
   the daemons are up, and disarm to a concrete profile at session end.
+
+- [ ] **RS-12.21 — the bench park is not a persistent off state without
+  firmware support (PR #125 review, 2026-09-15).** `radio_park.py` writes
+  STANDBY→SLEEP through the diag register path and reads back 0x80, but
+  the firmware's scan walker (`scan_dispatch_action` ADVANCE_CHANNEL), γ-1
+  retune (`sx1276_rx_tick`) and slot follower (`sx1276_rx_slot_follow`,
+  LOCKED only) all call `sx1276_rx_arm()` and re-arm RXCONT after the write
+  — receive-only, no emissions, but the readback is transient and the
+  runbook called it authoritative. Empirically the park has held (both
+  boards read 0x80 one hour after the post-leg-V park) because it is issued
+  after the daemons are down and the scan SM has exhausted into FAILED
+  (absorbing: 500 ms/channel, hard FAIL at 30 s per attempt, 3 retries ⇒
+  up to ~2 min). Done 2026-09-15: `radio_park.py` re-reads after a 1.5 s
+  settle and prints PARK_OK only if still asleep (else PARK_TRANSIENT,
+  exit 5); the runbook states the real contract and requires a read-only
+  `radio_state.py` re-check. TODO: a firmware park command — host opcode
+  setting a `host_parked` flag that gates every arm path, puts the modem
+  to SLEEP, cleared by a host RXCONT write (`sx1276_rx_note_external_arm`)
+  or reset; host-check pinned; flashed and verified at a GO. Until then
+  PARK_OK means "asleep now and nothing re-armed it", not "cannot wake".
 
 - [x] **RS-12.11 — base command scheduler vs fragment arrivals: DONE 2026-09-12
   (PR #118, gate passed, see above).**

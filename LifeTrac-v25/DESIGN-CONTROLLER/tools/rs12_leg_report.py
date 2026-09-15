@@ -47,7 +47,20 @@ def main() -> int:
             print(f"{key}={m.group(1)}", end="  ")
     print()
 
-    sent = int(re.findall(r"frags_ok=(\d+)", tx)[-1])
+    # PR #125 review round 6 (2026-09-15): `frags_ok=` is the TX daemon's LAST
+    # periodic stats line and can be stale independently of the RX stats
+    # thread -- in leg U it read 652 while the per-frame completion events
+    # ("frame seq=N done ...: K fragments ok", one per train, logged as each
+    # train finishes) summed to 674. Those events are the fragments the L072
+    # reported on air (TX_DONE OK); aborted fragments never appear in them
+    # and were never on air, so they are the right air-loss denominator.
+    # Prefer the events; fall back to the counter only for a log without them.
+    sent_counter = int(re.findall(r"frags_ok=(\d+)", tx)[-1])
+    sent_events = sum(int(n) for n in re.findall(r"(\d+) fragments ok", tx))
+    sent = sent_events if sent_events else sent_counter
+    if sent_events and sent_events != sent_counter:
+        print(f"  (tx frags_ok counter {sent_counter} is stale; using "
+              f"{sent_events} fragments from per-frame TX events)")
     rcvd = int(re.findall(r"rx_frames=(\d+)", rx)[-1])
     crc = rx.count("crc_dump")
     timeouts = int(re.findall(r"reassembler_timeouts=(\d+)", rx)[-1])

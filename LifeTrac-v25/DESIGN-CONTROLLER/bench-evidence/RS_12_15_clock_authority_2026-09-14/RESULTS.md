@@ -301,7 +301,14 @@ L072 firmware -- a clean A/B.
 |---|---:|---:|
 | **lock-loss gaps > 3 s** | **2 (53.2 s, 21.9 s)** | **0** |
 | **total silent** | **75.2 s of 256 s** | **0 s** |
-| image loss | 39.0 % | 20.7 % |
+| fragment loss (TX events → decoded) | **40.2 %** (762 → 456) | **20.9 %** (769 → 608) |
+
+*Correction (PR #125 review round 6): this row first read 39.0 % / 20.7 %,
+computed from the TX daemon's `frags_ok` counter (748 / 747), which is its
+last periodic stats line and was stale at the end of both legs. The
+per-frame TX completion events (762 / 769 fragments on air) against the
+base's `frag_arrival` decodes are the like-for-like figure;
+`rs12_leg_report` now uses the events. The conclusion is unchanged.*
 | max frag gap | 53.2 s | 0.8 s |
 | published frames | 362 | 462 |
 | tractor commands received | 4 | 2 |
@@ -309,9 +316,9 @@ L072 firmware -- a clean A/B.
 **Leg S reproduced the break** exactly as legs I/J: the follower lost lock
 twice, 53 s and 22 s, 75 s of dead air, 39 % loss. **Leg T eliminated it:**
 zero gaps over 3 s, max frag gap 0.8 s, on the identical camera +
-keyframe-storm workload; loss also nearly halved (39.0 -> 20.7 %).
+keyframe-storm workload; loss also nearly halved (40.2 -> 20.9 %, events-based).
 
-The remaining 20.7 % on v2 is the profile-1 keyframe-storm floor (fragment
+The remaining ~21 % on v2 is the profile-1 keyframe-storm floor (fragment
 loss under the command load + the bench interference floor), NOT lock losses.
 RS-12.15 targets the multi-second lock-loss episodes, and those are gone.
 (Leg T's tractor happened to receive only 2 commands, so its demotion
@@ -335,12 +342,18 @@ profile 1, 300 s, keyframe injector 15 s × 20.
 | fragments arrived | 608 | 603 |
 | **lock-loss gaps > 3 s** | **0** | **0** |
 | max fragment gap | 0.8 s | 1.0 s |
-| air loss (fragments sent → decoded) | — | 7.5 % (652 → 603) |
+| air loss (fragments sent → decoded) | — | **10.5 % (674 → 603)** |
 
-(The 7.5 % is the TX daemon's `frags_ok`=652 against 603 decoded, which is
-the like-for-like fragment figure. The tractor's firmware counter
-`radio_tx_ok`=678 is larger because it counts every transmission including
-the command plane, so it must not be used as the fragment denominator.)
+**Correction (PR #125 review round 6, 2026-09-15):** this row first read
+7.5 % (652 → 603). The 652 was the TX daemon's `frags_ok` counter from its
+LAST periodic stats line — stale by the end of the leg, the same class of
+artifact the round-5 review caught on the RX side. The per-frame TX
+completion events ("K fragments ok", one per train) sum to **674**
+fragments reported on air, giving 71 lost of 674 = **10.5 %**.
+`rs12_leg_report` now derives the denominator from those events. (The
+tractor's firmware counter `radio_tx_ok`=678 is larger still because it
+counts every transmission including the command plane, so it is not the
+fragment denominator either.)
 
 Tractor counter deltas — the fix signature, on the shipped build:
 

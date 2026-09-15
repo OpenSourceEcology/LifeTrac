@@ -10,7 +10,7 @@ keys a radio needs the operator's GO; radios are parked (LoRa SLEEP,
 | file | runs on | purpose |
 |---|---|---|
 | `run_flash_bench.sh` + `stamp.py` + `kmsg_log.py` | board, `/home/fio` (persistent) | instrumented wrapper around `full_flash_pipeline.sh`: monotonic-stamped pipeline log + kernel log, fsync'd so a PMIC power-cycle cannot lose them. `REVIVE_MODE=reboot bash /home/fio/run_flash_bench.sh <bin>`; success = `Verify OK` + `flash_rc=0` in `/home/fio/pipeline_stamped.log` (~2.5 min incl. reboot). |
-| `radio_park.py` | board, daemon container | STANDBY → SLEEP, reads RegOpMode back; prints `PARK_OK {"opmode_readback": "0x80"}`. The readback is the authoritative "radio is off". |
+| `radio_park.py` | board, daemon container | STANDBY → SLEEP, reads RegOpMode back, waits 1.5 s, reads again; prints `PARK_OK` only if still `0x80` (`PARK_TRANSIENT`, exit 5, if the firmware re-armed it). **The readback is NOT a persistent-off guarantee** (PR #125 review): the firmware's scan walker, γ-1 retune and slot follower all call `sx1276_rx_arm()` and will bring the modem back to RXCONT (receive-only) while any of them still has work. The park holds once the scan SM has exhausted into FAILED — up to ~2 min after the daemons stop (500 ms/channel, hard FAIL at 30 s per attempt, 3 retries). Park after that, and confirm later with `radio_state.py`. Firmware park command = TODO RS-12.21. |
 | `radio_state.py` | board, daemon container | read-only RegOpMode decode — answers "is it off?" without touching it. |
 | `clear_retained.py` / `clear_retained_host.py <host>` | base (container) / PC | clear the retained control topics (`encode_mode_override`, `req_keyframe`, `radio_profile`) on the base broker / on another broker. A stale retained pin has flipped the camera and re-commanded a profile mid-leg; clear before EVERY leg. |
 | `kf_inject.py <period_s> <count>` | base (container) | REQ_KEYFRAME storm; the unacked retries at 0.4/0.8 s make the 2–3-command bursts that LOCK the tractor's scan machine (the RS-12.15 trigger). |
@@ -89,8 +89,16 @@ On the first `published frame_id` line start the injector on the base
 (`kf_inject.py 15 20` or `dual_inject.py 250`). After `archived to ...`:
 post-brackets both boards, `rs12_leg_report.py`, `frag_gap_report.py`,
 copy brackets/injector/report transcripts into the evidence `legs/` dir.
-Then `radio_park.py` both → `PARK_OK 0x80` (the harness parks, the readback
-is the record).
+Then `radio_park.py` both → `PARK_OK` with both readbacks `0x80`. Do it
+after the post-brackets and reports, i.e. a couple of minutes after the
+daemons stopped, so the firmware's scan SM has already failed out and has
+nothing left to re-arm; a `PARK_TRANSIENT` means it was still walking —
+wait and repeat. Before claiming the bench is off for the night, re-check
+with the read-only `radio_state.py` (it writes nothing). Empirically the
+post-leg park has held for hours this way (both boards `0x80` an hour after
+leg V), but that is because of the timing above, not because the write is
+authoritative. RXCONT is receive-only — the TX path only fires on a host
+request, and there is none with the daemons down.
 
 ## Traps that cost time this campaign
 
