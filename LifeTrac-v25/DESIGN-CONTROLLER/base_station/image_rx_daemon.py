@@ -635,21 +635,26 @@ class ImageRxDaemon:
         # New operator/auto request → Phase A.
         # PR #121 review: a new request waits for the shared send gate — the
         # target stays pending for the next pass, nothing is popped yet.
+        # PR #124 review rounds 3+4: snapshot, no-op discard, gate check and
+        # consumption happen under ONE lock hold. The MQTT callback thread
+        # replaces _pending_profile at any time; a gate asked after the lock
+        # was released could score a deferral (cmd_gate_deferred) for a
+        # request that had meanwhile become a no-op (the already-active
+        # profile, e.g. a retained/current-profile pin), which sends nothing.
+        # _cmd_gate_open() takes no lock (pure timing + counters), so it is
+        # safe to call here; the send itself happens after release.
         with self._lock:
             wanted = self._pending_profile
-            # PR #124 review round 3: a request for the ALREADY-ACTIVE profile
-            # (e.g. a retained/current-profile pin) sends nothing, so it must
-            # be discarded BEFORE the gate is asked -- otherwise a closed gate
-            # would score a deferral (cmd_gate_deferred) for a no-op.
             if wanted is not None and wanted == self._active_profile:
                 self._pending_profile = None
                 wanted = None
-        if wanted is None or not self._cmd_gate_open(now, True):
-            return
-        with self._lock:
-            target = self._pending_profile
+            if wanted is None:
+                return
+            if not self._cmd_gate_open(now, True):
+                return
+            target = wanted
             self._pending_profile = None
-        if target is None or target == self._active_profile:
+        if target == self._active_profile:
             return
         LOG.info("radio_profile: commanding tractor %d -> %d (two-phase)",
                  self._active_profile, target)
