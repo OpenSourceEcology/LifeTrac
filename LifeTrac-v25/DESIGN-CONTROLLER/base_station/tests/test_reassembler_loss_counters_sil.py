@@ -121,6 +121,45 @@ class LossCounters(unittest.TestCase):
         # the leg-U style rate a consumer would take: 2 missing of 6
         self.assertAlmostEqual(self.st.fragments_missing / self.st.fragments_expected, 2 / 6)
 
+    # ---- PR #127 review: the pair must be read atomically ----
+
+    def test_snapshot_is_the_pair(self) -> None:
+        f = _frags(9, [b"a" * 10, b"b" * 10, b"c" * 10])
+        self.ras.feed(f[0])
+        self._tick_past_timeout()
+        self.assertEqual(self.ras.snapshot_loss(),
+                         (self.st.fragments_expected, self.st.fragments_missing))
+        self.assertEqual(self.ras.snapshot_loss(), (3, 2))
+
+    def test_snapshot_is_never_torn_under_a_concurrent_reader(self) -> None:
+        """The pair is booked on the RX thread and read by the link_stats
+        worker. Every finalization here loses exactly 3 of 4 fragments, so
+        ANY consistent snapshot satisfies missing * 4 == expected * 3; a
+        read landing between the two writes breaks it. The reader hammers
+        snapshot_loss() while the writer times frames out. Can only fail
+        on a genuinely torn read -- never a false positive."""
+        import threading
+        torn: list[tuple[int, int]] = []
+        done = threading.Event()
+
+        def reader() -> None:
+            while not done.is_set():
+                exp, mis = self.ras.snapshot_loss()
+                if mis * 4 != exp * 3:
+                    torn.append((exp, mis))
+                    return
+
+        t = threading.Thread(target=reader, daemon=True)
+        t.start()
+        for seq in range(3000):
+            self.clock.ms += 500
+            # opens a new 4-fragment partial AND times out the previous one
+            self.ras.feed(_frags(seq, [b"x" * 8] * 4)[0])
+        done.set()
+        t.join(timeout=5.0)
+        self.assertEqual(torn, [], f"torn snapshot observed: {torn[:3]}")
+        self.assertEqual(self.ras.snapshot_loss(), (2999 * 4, 2999 * 3))
+
 
 if __name__ == "__main__":
     unittest.main()

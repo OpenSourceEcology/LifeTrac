@@ -36,6 +36,7 @@ dropped and the caller is told to request a keyframe.
 """
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Callable
@@ -97,7 +98,10 @@ class ReassemblyStats:
 class FragmentReassembler:
     """Collect TileDeltaFrame fragments keyed by ``frag_seq``.
 
-    Pure-Python, no MQTT/threading. Drive it from the bridge / a unit test.
+    Pure-Python, no MQTT, no threads of its own. Drive it from the bridge /
+    a unit test. The one concession to threads: the RS-12.16 loss-counter
+    pair is written under ``_loss_lock`` and read via ``snapshot_loss()``,
+    because the daemon's link_stats worker reads it from another thread.
     """
 
     # Bounded LRU cap for recently-completed frag_seqs. v2 redundancy
@@ -120,12 +124,31 @@ class FragmentReassembler:
         # and (worse) double-complete the same frame.
         self._completed_recent: dict[int, None] = {}
         self.stats = ReassemblyStats()
+        # RS-12.16 (PR #127 review): guards the (fragments_expected,
+        # fragments_missing) PAIR so a cross-thread reader never sees it
+        # torn. Every write to either field goes through this lock.
+        self._loss_lock = threading.Lock()
 
     def _mark_completed(self, frag_seq: int) -> None:
         self._completed_recent.pop(frag_seq, None)
         self._completed_recent[frag_seq] = None
         while len(self._completed_recent) > self._COMPLETED_LRU_CAP:
             self._completed_recent.pop(next(iter(self._completed_recent)))
+
+    def snapshot_loss(self) -> tuple[int, int]:
+        """(fragments_expected, fragments_missing) as ONE consistent pair.
+
+        RS-12.16 (PR #127 review): _gc() books the pair on the RX thread
+        while the daemon's link_stats worker reads it from another thread,
+        and the daemon's own lock does not cover this object. A read that
+        lands between the two writes sees +expected with +0 missing; the
+        consumer then baselines both counters and, on its next window,
+        discards the delayed missing increment because d_expected == 0 --
+        loss permanently under-reported for that frame. Readers must use
+        this, never the fields directly.
+        """
+        with self._loss_lock:
+            return (self.stats.fragments_expected, self.stats.fragments_missing)
 
     def _try_parity_reconstruct(self, partial: _PartialFrame) -> bool:
         if not partial.parities or partial.total == 0:
@@ -192,7 +215,8 @@ class FragmentReassembler:
             if partial.total > 0 and len(partial.parts) == partial.total:
                 del self._partials[frag_seq]
                 self._mark_completed(frag_seq)
-                self.stats.fragments_expected += partial.total   # RS-12.16
+                with self._loss_lock:                            # RS-12.16
+                    self.stats.fragments_expected += partial.total
                 full = b"".join(partial.parts[i] for i in range(partial.total))
                 return self._decode_or_record_error(full)
             return None
@@ -266,7 +290,8 @@ class FragmentReassembler:
         if partial.total > 0 and len(partial.parts) == partial.total:
             del self._partials[frag_seq]
             self._mark_completed(frag_seq)
-            self.stats.fragments_expected += partial.total       # RS-12.16
+            with self._loss_lock:                                # RS-12.16
+                self.stats.fragments_expected += partial.total
             full = b"".join(partial.parts[i] for i in range(partial.total))
             return self._decode_or_record_error(full)
         return None
@@ -294,8 +319,9 @@ class FragmentReassembler:
             # RS-12.16: book what this frame cost the link. A parity-only
             # partial (total == 0) has no known size and is skipped.
             if p.total > 0:
-                self.stats.fragments_expected += p.total
-                self.stats.fragments_missing += max(0, p.total - len(p.parts))
+                with self._loss_lock:          # the pair must never be read torn
+                    self.stats.fragments_expected += p.total
+                    self.stats.fragments_missing += max(0, p.total - len(p.parts))
 
     def _decode_or_record_error(self, full: bytes):
         # RS-3.1 (2026-07-25): batched container — split and decode each
