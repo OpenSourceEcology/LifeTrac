@@ -628,6 +628,9 @@ No-regrets work, correct under every surviving architecture (do first):
   Auto, attenuate/detune to force timeouts, watch it degrade DTS→FHSS and
   promote back after the 60 s health dwell. Policy is unit-tested
   (`test_web_ui_radio_profile.py`); zero air evidence yet.
+  **2026-09-14: do NOT fly this as-is — replayed against leg S (39 % loss,
+  53 s lock-loss blackout) the policy's inputs read the whole leg HEALTHY.
+  Land RS-12.16's inputs first, then validate.**
 - [ ] **RS-1.5 Ack-driven command convergence (added 2026-07-26, from the
   run C→I delivery investigation)** — fire-and-forget command copies can
   never be reliable at saturation: the tractor's armed window is ~44 ms
@@ -2424,6 +2427,59 @@ without a fresh GO. Queue: (1) RS-12.15 firmware (clock authority + tractor
 RX slot follow) = flash session; (2) RS-3.11 encoder decision; (3) hail
 candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
 
+**RADIO TESTING PLAN 2026-09-15 (written 2026-09-14 at shutdown).**
+State: both L072s run the FLOWN v2 bench build `5a160e4a`, radios `PARK_OK
+0x80`; the PR-head bench build `0c1bb0a9` and the old RS-12.10 `e8ad8424`
+are staged in `/tmp/lifetrac_p0c` on both boards (tmpfs — gone if a board
+reboots; re-push per `firmware/x8_lora_bootloader_helper/bench_tools/BENCH_RUNBOOK.md`);
+base image = main `3a0cb524` (behind both PRs). PRs #125 (firmware) and
+#124 (host) are green and mergeable — **merge first**, #125 then #124; both
+edit TODO.md, so merge main into the flight branch before #124 if it
+conflicts. Every leg needs GO; radios stay parked between legs.
+  1. **Confirmation leg on `0c1bb0a9`** (flash both; profile 1 camera + kf
+     injector, == leg T): expect 0 lock-loss gaps, loss in the ~20 % storm
+     band, tractor `clk_demotion_reset` = 0. Optional but cheap (~15 min
+     with flashes) and closes the flown-vs-shipped note in RESULTS.md.
+  2. **Deploy the merged base tree** (recipe in the runbook) so the base's
+     daemons carry the shared gate without the harness push.
+  3. **RS-12.16 items 1–3 implemented + SIL green before the bench**, then
+     RS-1.4 live: selector = Auto, force loss, watch DTS→FHSS inside the
+     dead-air window and the promote-back after 60 s healthy.
+  4. **Residual 20.7 % on the camera keyframe storm** (leg T): analysis
+     first — train length vs the profile-1 slot budget, command load — no
+     code until the mechanism is named.
+  Prep every session: camera aimed at the screen (two `/dev/video1` frames
+  1 s apart must differ), moving content via Firefox kiosk, stop
+  `lifetrac-camera.service` + `docker stop tractor-camera`, clear retained on
+  the base broker, `rs115` pre-brackets both boards, re-push
+  `/tmp/lifetrac_strict` + `/tmp/lifetrac_p0c` after ANY reboot.
+
+- [ ] **RS-12.16 — Auto radio-profile policy is blind to the failures we
+  measured (added 2026-09-14, from the RS-12.15 camera A/B).**
+  `web_ui.AutoRadioPolicy` judges the link from link_stats sample age
+  (≤ 20 s) and reassembler timeouts (≤ 2.5 per 10 s). Replayed against leg S
+  (old fw, camera, 39.0 % loss, lock-loss blackouts of 53.2 s + 21.9 s):
+  peak timeout rate 1.0 per 10 s, sample age never stale (the daemon
+  publishes zero-samples through dead air) → the policy would have read the
+  whole leg HEALTHY. Timeouts are a weak signal with parity + the 09-12 stale
+  horizon: lost frames produce silence, not timeouts. Also: before PR #125
+  the policy's fallback (DTS→FHSS) was the BROKEN profile; on v2 it is sound
+  (leg T: 0 gaps on the same workload). Own branch after #125/#124 merge;
+  SIL in `test_web_ui_radio_profile.py`.
+  1. **Dead-air input** (web_ui only): `rx_frames_seen` not advancing for
+     ~10 s AFTER the link was streaming within the last 60 s → unhealthy.
+     Normal fragment gaps < 1 s, lock losses 20–53 s; the "was streaming"
+     gate keeps an idle tractor from flapping the profile.
+  2. **Loss-rate input** (small daemon change): the reassembler knows
+     fragments expected per frame (header total) → publish a rolling
+     missing/expected in link_stats, so a 20 % link is visible, not just a
+     dead one.
+  3. **Keep the timeout input** — it still covers its own failure mode.
+  4. **RS-1.4 live validation** with the new inputs (plan item 3 above).
+  Manual selector: no change needed — ids, labels (FHSS 50ch BW250 / DTS
+  BW500 / bench 915) and the two-phase switch are unchanged; #124's gate
+  work is transparent to the UI.
+
 - [x] **RS-12.11 — base command scheduler vs fragment arrivals: DONE 2026-09-12
   (PR #118, gate passed, see above).**
 - [x] **RS-4.15 — motion-aware stale-scan horizon: DONE 2026-09-12 (PR #118,
@@ -2450,7 +2506,9 @@ candidates 926.75 / 925.25; (4) emitter hunt; (5) PM-1.
   costs the camera path anything; long synth/keyframe trains get the
   3.2 % → 1.5 % benefit. `LIFETRAC_NO_PARK_LAST` default unchanged (0);
   flipping it is now a low-risk call once RS-3.11 decides on long trains.
-- [~] **RS-12.15 v2 (2026-09-14, PR #125 f7d98f8b) — BUILT + STAGED, NOT FLASHED.
+- [x] **RS-12.15 v2 (2026-09-14, PR #125 f7d98f8b…efd69f7d) — FLASHED + VALIDATED ON AIR (leg R counters; camera A/B legs S→T). Merge pending.**
+  (Heading updated at shutdown 2026-09-14; the paragraph below is the design
+  record and the FLOWN/BEHAVIORAL notes at its end are the result.)
   Review + legs O/P re-analysis: the DOMINANT mechanism is the LOCKED->SCANNING
   demotion resetting the FHSS clock unconditionally -- one accepted command
   LOCKs the streaming tractor, the 2 s loss timer demotes it and wipes its OWN
