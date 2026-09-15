@@ -320,6 +320,59 @@ R, where the tractor demoted 19x and KEPT its clock every time.
 `tx_first_anchor` was 1 in both v2 legs -- the grid phase anchored once and
 never reset.)
 
+### Leg U 2026-09-15 — confirmation on the SHIPPED build (`0c1bb0a9`)
+
+The legs above flew bench build `5a160e4a`; the PR head builds `0c1bb0a9`
+(round-4 leading-grid tier + round-5 doc/tooling work). Leg U closes that
+flown-vs-shipped gap: both L072s flashed to `0c1bb0a9` (Verify OK,
+`flash_rc=0`), same camera workload as leg T — moving railroad scene on the
+bench screen (two `/dev/video1` frames 1.2 s apart differed at ~215 KB),
+profile 1, 300 s, keyframe injector 15 s × 20.
+
+| | leg T (`5a160e4a`, flown) | **leg U (`0c1bb0a9`, shipped)** |
+|---|---:|---:|
+| frames published | 477 over 240 s (1.99 fps) | **537 over 268 s (2.00 fps)** |
+| fragments arrived | 608 | 603 |
+| **lock-loss gaps > 3 s** | **0** | **0** |
+| max fragment gap | 0.8 s | 1.0 s |
+| air loss (fragments sent → decoded) | — | 7.5 % (652 → 603) |
+
+(The 7.5 % is the TX daemon's `frags_ok`=652 against 603 decoded, which is
+the like-for-like fragment figure. The tractor's firmware counter
+`radio_tx_ok`=678 is larger because it counts every transmission including
+the command plane, so it must not be used as the fragment denominator.)
+
+Tractor counter deltas — the fix signature, on the shipped build:
+
+| counter | delta | reading |
+|---|---:|---|
+| `clk_demotion_kept` | 5 | demotions absorbed with the self-anchored clock KEPT |
+| `clk_demotion_reset` | **0** | never reset its own clock |
+| `tx_first_anchor` | 1 | grid phase anchored once for the whole leg |
+| **`fhss_dec_rej_locked_out`** | **1** | **first LOCKED_OUT refusal ever captured ON AIR** — the originator refusing a follower echo, previously only ever seen in the host tests |
+| `tx_stream_streak_max` / `radio_tx_ok` | 677 / 678 | sustained originator streaming |
+
+**Correction — the leg report's headline was wrong, and why.** `rs12_leg_report`
+first printed `loss 651/652 = 99.8% published=1` for this leg. That is an
+artifact, not a result: the daemon's stats thread crashed ~1 frame in
+(`_stats_worker`, `for smp in samples:` → `TypeError: 'NoneType' object is
+not iterable`), so the last `stats:` line in the log — which is where the
+report takes every number on that line — froze at the leg's first seconds.
+The per-frame log events, which cannot go stale, show 537 frames published
+and 603 fragments arrived. `base_station/` is **byte-identical** between the
+leg T and leg U commits (`git diff a75089c0 aa74cde2 -- base_station/` is
+empty), so this is a pre-existing latent bug that leg T happened not to hit,
+not a regression from the shipped firmware. The crash is in `_stats_worker`
+only; `_link_stats_worker` is a separate thread and kept publishing, so the
+web UI's link stats and the auto-profile policy input were unaffected. Fix
+tracked separately (RS-12.17); `rs12_leg_report` now detects the dead thread
+and prints the log-derived figures instead of a false catastrophe.
+
+**Reading:** the shipped build behaves like the flown build — zero lock
+losses on the workload that broke the old firmware, counters exactly as the
+host tests predict, and slightly better throughput (537 vs 477 published).
+The optional confirmation is done; no further leg is required for this PR.
+
 ### Verdict
 RS-12.15 v2 is validated on air, both mechanistically (leg R counters:
 `clk_demotion_kept`=19 / `reset`=0) and behaviorally (legs S->T on the

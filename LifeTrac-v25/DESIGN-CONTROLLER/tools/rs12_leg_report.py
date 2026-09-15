@@ -52,8 +52,36 @@ def main() -> int:
     crc = rx.count("crc_dump")
     timeouts = int(re.findall(r"reassembler_timeouts=(\d+)", rx)[-1])
     published = int(re.findall(r"frames_published=(\d+)", rx)[-1])
+
+    # 2026-09-15 (leg U): EVERY number on the loss line comes from the LAST
+    # "stats:" line in the rx log. If the daemon's stats thread dies mid-leg
+    # that line is whatever was true when it died, and this report then
+    # describes the first seconds as if they were the whole leg — silently,
+    # and in the direction of a false alarm. Leg U crashed that thread one
+    # frame in and this printed "loss 651/652 = 99.8% published=1" for a leg
+    # that actually published 537 frames with zero lock losses. Cross-check
+    # against events logged once per frame/fragment, which cannot go stale.
+    pub_log = rx.count("published frame_id")
+    frag_log = rx.count("frag_arrival")          # needs -LogFragArrivals 1
+    stats_dead = "Exception in thread image-rx-stats" in rx
+    counters_stale = stats_dead or (pub_log and published < pub_log * 0.9)
+    if counters_stale:
+        why = ("the stats thread CRASHED (traceback in rx_daemon.log)"
+               if stats_dead else
+               "the counter line disagrees with the per-frame log events")
+        print(f"  !! STALE COUNTERS: {why} — the loss line below describes "
+              f"only the window before it stopped updating. Trust these:")
+        if frag_log:
+            print(f"     log-derived: published={pub_log}  "
+                  f"fragments_arrived={frag_log}  "
+                  f"air_loss={100 * (sent - frag_log) / sent:.1f}% "
+                  f"({sent} sent -> {frag_log} decoded)")
+        else:
+            print(f"     log-derived: published={pub_log}  "
+                  f"(re-run with -LogFragArrivals 1 for fragment-level loss)")
     print(f"loss {sent - rcvd}/{sent} = {100 * (sent - rcvd) / sent:.1f}%   "
-          f"crc_dumps={crc}  timeouts={timeouts}  published={published}")
+          f"crc_dumps={crc}  timeouts={timeouts}  published={published}"
+          + ("   [STALE — see above]" if counters_stale else ""))
 
     # per-index loss histogram (attribution instrument)
     idx: collections.Counter = collections.Counter()

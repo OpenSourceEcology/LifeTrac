@@ -2436,10 +2436,16 @@ base image = main `3a0cb524` (behind both PRs). PRs #125 (firmware) and
 #124 (host) are green and mergeable — **merge first**, #125 then #124; both
 edit TODO.md, so merge main into the flight branch before #124 if it
 conflicts. Every leg needs GO; radios stay parked between legs.
-  1. **Confirmation leg on `0c1bb0a9`** (flash both; profile 1 camera + kf
-     injector, == leg T): expect 0 lock-loss gaps, loss in the ~20 % storm
-     band, tractor `clk_demotion_reset` = 0. Optional but cheap (~15 min
-     with flashes) and closes the flown-vs-shipped note in RESULTS.md.
+  1. ~~Confirmation leg on `0c1bb0a9`~~ **DONE 2026-09-15 (leg U).** Both
+     boards flashed to the shipped build, same camera workload as leg T:
+     **537 frames published over 268 s (2.00 fps) vs leg T's 477, ZERO
+     lock-loss gaps**, air loss 11.1 % (678 TX → 603 decoded), tractor
+     `clk_demotion_kept`=5 / `reset`=0 / `tx_first_anchor`=1, and the
+     **first `fhss_dec_rej_locked_out` ever captured on air (1)**. The
+     flown-vs-shipped gap is closed; no further leg needed for #125.
+     NOTE: the leg report first printed "99.8 % loss / published=1" — an
+     artifact of the daemon stats thread crashing 1 frame in (RS-12.17),
+     not a result. Evidence: RESULTS.md "Leg U" section.
   2. **Deploy the merged base tree** (recipe in the runbook) so the base's
      daemons carry the shared gate without the harness push.
   3. **RS-12.16 items 1–3 implemented + SIL green before the bench**, then
@@ -2479,6 +2485,26 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   Manual selector: no change needed — ids, labels (FHSS 50ch BW250 / DTS
   BW500 / bench 915) and the two-phase switch are unchanged; #124's gate
   work is transparent to the UI.
+
+- [ ] **RS-12.17 — `_stats_worker` dies mid-leg on a `None` gap-sample list
+  (found 2026-09-15 during leg U).** `image_rx_daemon.py:1723` takes
+  `samples = getattr(self, "_gap_samples", None)` and guards the air-gap
+  block with `if samples:`, but the RS-11.1 `air_gap_by_class` block
+  (~:1798) reuses `samples` while sitting **inside the phase-telemetry
+  `if`** — so any window with phase telemetry and no gap samples raises
+  `TypeError: 'NoneType' object is not iterable` and kills the thread.
+  Leg U lost it one frame in: no further `stats:` lines for the rest of the
+  leg, and because `rs12_leg_report` reads every figure off the LAST
+  `stats:` line it reported "99.8 % loss, published=1" for a leg that
+  published 537 frames — a false catastrophe on the campaign's headline
+  metric. Blast radius is the stats line only: `_link_stats_worker` is a
+  separate thread, so link_stats (and the auto-profile input) kept flowing.
+  Fix: move the `by_class` block inside `if samples:` where its own comment
+  says it belongs, plus a SIL case driving `_stats_worker` with phase
+  telemetry and an empty/None sample list. Pre-existing (`base_station/` is
+  byte-identical between the leg T and leg U commits), so it is NOT a
+  regression from RS-12.15. `rs12_leg_report` already hardened: it detects
+  the dead thread and prints log-derived counts instead (2026-09-15).
 
 - [x] **RS-12.11 — base command scheduler vs fragment arrivals: DONE 2026-09-12
   (PR #118, gate passed, see above).**
