@@ -1735,6 +1735,34 @@ class ImageRxDaemon:
         self._send_command_frame(
             link, pack_command_frame(CMD_OP_PROBE, args), copies=1)
 
+    @staticmethod
+    def _air_gap_by_class_parts(samples) -> "list[str]":
+        """RS-11.1 per-class air-gap medians, as formatted log parts.
+
+        RS-12.17 (2026-09-15): split out of _stats_worker and made TOTAL —
+        None or an empty sample list yields [] instead of raising. The
+        inline version sat inside the phase-telemetry branch while reusing
+        `samples` from the enclosing scope, so any window with phase
+        telemetry and no gap samples raised
+        `TypeError: 'NoneType' object is not iterable` and killed the stats
+        thread for the remainder of the leg. Only the three known classes
+        are reported; anything else is ignored, as before.
+        """
+        if not samples:
+            return []
+        by_class: "dict[str, list[int]]" = {}
+        for smp in samples:
+            cls = smp[2] if len(smp) > 2 else "seq"
+            by_class.setdefault(cls, []).append(smp[0])
+        parts = []
+        for cls in ("seq", "boundary", "post_loss"):
+            vals = sorted(by_class.get(cls, ()))
+            if not vals:
+                continue
+            parts.append(
+                f"{cls}: n={len(vals)} med={vals[len(vals) // 2] / 1000.0:.1f}ms")
+        return parts
+
     def _stats_worker(self, interval_s: float) -> None:
         last = 0.0
         while not self._stop.is_set():
@@ -1797,6 +1825,16 @@ class ImageRxDaemon:
                 hist = " ".join(f"{lab}:{cnt}" for lab, cnt in
                                 zip(labels, buckets) if cnt)
                 LOG.info("air_gap_hist(ms): %s", hist)
+                # 2026-07-29 RS-11.1: the same gaps, split by what actually
+                # caused them. The aggregate histogram above is bimodal and
+                # its upper mode mixes train boundaries with post-loss gaps,
+                # so neither could be sized. Per-class medians separate them.
+                # RS-12.17: computed HERE, inside the `if samples:` guard
+                # that owns the sample list — it used to sit inside the
+                # phase-telemetry block below, where `samples` could be None.
+                by_class_parts = self._air_gap_by_class_parts(samples)
+                if by_class_parts:
+                    LOG.info("air_gap_by_class: %s", " | ".join(by_class_parts))
 
             # RS-11.6 (2026-08-02): healthy-population RF distribution per
             # window. min/med/max on both axes; the corrupt population's
@@ -1837,24 +1875,6 @@ class ImageRxDaemon:
                                      "last_epoch": ps["last_epoch"],
                                      "last_hop": ps["last_hop"],
                                      "off_min": None, "off_max": None}
-
-                # 2026-07-29 RS-11.1: the same gaps, split by what actually
-                # caused them. The aggregate histogram above is bimodal and its
-                # upper mode mixes train boundaries with post-loss gaps, so
-                # neither could be sized. Per-class medians separate them.
-                by_class: "dict[str, list[int]]" = {}
-                for smp in samples:
-                    cls = smp[2] if len(smp) > 2 else "seq"
-                    by_class.setdefault(cls, []).append(smp[0])
-                parts = []
-                for cls in ("seq", "boundary", "post_loss"):
-                    vals = sorted(by_class.get(cls, ()))
-                    if not vals:
-                        continue
-                    parts.append(
-                        f"{cls}: n={len(vals)} med={vals[len(vals) // 2] / 1000.0:.1f}ms")
-                if parts:
-                    LOG.info("air_gap_by_class: %s", " | ".join(parts))
 
             # 2026-07-29 RS-11.1: WHICH fragment indices go missing. This is
             # the gate on firmware F4 (settable preamble) per TODO RS-10.1: if
