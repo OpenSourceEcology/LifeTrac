@@ -83,6 +83,15 @@ class ReassemblyStats:
     v2_bad_header: int = 0              # copy_idx >= total_copies, or total_copies == 0
     # XOR parity counter
     parity_reconstructions: int = 0
+    # RS-12.16 (2026-09-15): what the link cost, in fragments, MONOTONIC so
+    # a consumer can take rates over any window. `expected` is booked when
+    # a frame is finalized (completed OR timed out); `missing` only on
+    # timeout, as total - fragments present. Parity-reconstructed
+    # fragments are present in `parts`, so this counts fragments that
+    # never arrived by the deadline -- the loss that actually cost a
+    # frame. Feeds link_stats and the web UI's auto-profile policy.
+    fragments_expected: int = 0
+    fragments_missing: int = 0
 
 
 class FragmentReassembler:
@@ -183,6 +192,7 @@ class FragmentReassembler:
             if partial.total > 0 and len(partial.parts) == partial.total:
                 del self._partials[frag_seq]
                 self._mark_completed(frag_seq)
+                self.stats.fragments_expected += partial.total   # RS-12.16
                 full = b"".join(partial.parts[i] for i in range(partial.total))
                 return self._decode_or_record_error(full)
             return None
@@ -256,6 +266,7 @@ class FragmentReassembler:
         if partial.total > 0 and len(partial.parts) == partial.total:
             del self._partials[frag_seq]
             self._mark_completed(frag_seq)
+            self.stats.fragments_expected += partial.total       # RS-12.16
             full = b"".join(partial.parts[i] for i in range(partial.total))
             return self._decode_or_record_error(full)
         return None
@@ -278,8 +289,13 @@ class FragmentReassembler:
         cutoff = now_ms - self.timeout_ms
         stale = [seq for seq, p in self._partials.items() if p.last_seen_ms < cutoff]
         for seq in stale:
-            del self._partials[seq]
+            p = self._partials.pop(seq)
             self.stats.timeouts += 1
+            # RS-12.16: book what this frame cost the link. A parity-only
+            # partial (total == 0) has no known size and is skipped.
+            if p.total > 0:
+                self.stats.fragments_expected += p.total
+                self.stats.fragments_missing += max(0, p.total - len(p.parts))
 
     def _decode_or_record_error(self, full: bytes):
         # RS-3.1 (2026-07-25): batched container — split and decode each

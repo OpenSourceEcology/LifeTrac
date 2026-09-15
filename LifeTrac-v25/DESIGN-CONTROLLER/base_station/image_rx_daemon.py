@@ -1912,6 +1912,13 @@ class ImageRxDaemon:
                         self.reassembler.stats.parity_reconstructions,
                     "timeouts": self.stats.reassembler_timeouts,
                     "decode_errors": self.stats.reassembler_decode_errors,
+                    # RS-12.16 (2026-09-15): monotonic fragment accounting
+                    # from the reassembler, so the web UI's auto-profile
+                    # policy can take a loss RATE over its own window. A
+                    # dead link shows as rx_frames_seen going flat; a
+                    # degraded one as frags_missing climbing.
+                    "frags_expected": self.reassembler.stats.fragments_expected,
+                    "frags_missing": self.reassembler.stats.fragments_missing,
                     # 2026-07-25 implicit encoder ACK + radio-profile state
                     # for the web UI selectors / auto-profile policy.
                     "rx_codec": self._last_rx_codec,

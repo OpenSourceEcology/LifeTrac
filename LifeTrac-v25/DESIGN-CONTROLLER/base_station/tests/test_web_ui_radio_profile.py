@@ -130,6 +130,110 @@ class RadioProfileTests(unittest.TestCase):
         p = self._policy(profile=0)   # bad seed coerced to DTS
         self.assertEqual(p.profile, 2)
 
+    # ---- RS-12.16 (2026-09-15): dead-air + loss-rate inputs ----
+    # Leg S replay: 39 % loss with 53 s + 22 s lock-loss blackouts, yet the
+    # age/timeout inputs read the whole leg HEALTHY (peak 1.0 timeouts per
+    # 10 s; samples never stale because the daemon publishes zero-samples
+    # through dead air). Only the fragment counter going flat sees it.
+
+    def _healthy_kw(self, **extra):
+        kw = dict(sample_age_s=2.0, timeouts_per_10s=0.0)
+        kw.update(extra)
+        return kw
+
+    def test_policy_dead_air_after_streaming_degrades(self):
+        p = self._policy()
+        for t, n in ((0.0, 0), (5.0, 40), (10.0, 80), (15.0, 120)):
+            self.assertIsNone(p.evaluate(now=t, frags_seen=n,
+                                         **self._healthy_kw()))
+        # blackout: counter frozen at 120 while samples keep arriving
+        self.assertIsNone(p.evaluate(now=20.0, frags_seen=120,
+                                     **self._healthy_kw()))
+        # 10 s silent => unhealthy, but inside MIN_SWITCH_GAP => hold
+        self.assertIsNone(p.evaluate(now=25.0, frags_seen=120,
+                                     **self._healthy_kw()))
+        # past the gap, still silent => degrade DTS -> FHSS
+        self.assertEqual(p.evaluate(now=61.0, frags_seen=120,
+                                    **self._healthy_kw()), 1)
+
+    def test_policy_dead_air_resets_promote_dwell(self):
+        """On FHSS, a blackout mid-dwell must restart the 60 s health
+        clock exactly like a timeout blip does."""
+        p = self._policy(profile=1)
+        p.evaluate(now=0.0, frags_seen=0, **self._healthy_kw())
+        for t, n in ((5.0, 10), (30.0, 60), (55.0, 110)):
+            self.assertIsNone(p.evaluate(now=t, frags_seen=n,
+                                         **self._healthy_kw()))
+        # frozen from t=55: dead air at t=70 resets the dwell
+        self.assertIsNone(p.evaluate(now=70.0, frags_seen=110,
+                                     **self._healthy_kw()))
+        # stream resumes at t=75; promote only after a FULL fresh dwell
+        self.assertIsNone(p.evaluate(now=75.0, frags_seen=111,
+                                     **self._healthy_kw()))
+        self.assertIsNone(p.evaluate(now=130.0, frags_seen=200,
+                                     **self._healthy_kw()))
+        self.assertEqual(p.evaluate(now=136.0, frags_seen=210,
+                                    **self._healthy_kw()), 2)
+
+    def test_policy_idle_from_boot_is_not_dead_air(self):
+        """A counter that never advanced never started a silence clock:
+        an idle tractor must not degrade or flap the profile."""
+        p = self._policy()
+        for t in range(0, 300, 5):
+            self.assertIsNone(p.evaluate(now=float(t), frags_seen=0,
+                                         **self._healthy_kw()))
+        self.assertEqual(p.profile, 2)
+
+    def test_policy_long_silence_becomes_idle(self):
+        """Beyond STREAM_MEMORY_S the link is idle, not sick: an absent
+        tractor must not pin the policy unhealthy forever."""
+        p = self._policy()
+        p.evaluate(now=0.0, frags_seen=0, **self._healthy_kw())
+        p.evaluate(now=5.0, frags_seen=50, **self._healthy_kw())
+        self.assertTrue(p._note_frags(20.0, 50))      # 15 s: dead air
+        self.assertFalse(p._note_frags(75.0, 50))     # 70 s: idle
+        self.assertIsNone(p.evaluate(now=80.0, frags_seen=50,
+                                     **self._healthy_kw()))
+
+    def test_policy_stream_resuming_clears_dead_air(self):
+        p = self._policy()
+        p.evaluate(now=0.0, frags_seen=0, **self._healthy_kw())
+        p.evaluate(now=5.0, frags_seen=50, **self._healthy_kw())
+        self.assertTrue(p._note_frags(20.0, 50))      # silent 15 s
+        self.assertFalse(p._note_frags(21.0, 51))     # one fragment: alive
+        self.assertFalse(p._note_frags(25.0, 51))     # 4 s: under DEAD_AIR_S
+
+    def test_policy_counter_reset_counts_as_alive(self):
+        """A daemon restart drops rx_frames_seen; a CHANGE is a live
+        stream, not silence."""
+        p = self._policy()
+        p.evaluate(now=0.0, frags_seen=500, **self._healthy_kw())
+        p.evaluate(now=5.0, frags_seen=600, **self._healthy_kw())
+        self.assertFalse(p._note_frags(20.0, 3))
+
+    def test_policy_loss_rate_above_max_degrades(self):
+        p = self._policy()
+        self.assertEqual(p.evaluate(now=100.0, loss_rate=0.39,
+                                    **self._healthy_kw()), 1)
+
+    def test_policy_bench_floor_loss_holds(self):
+        """1-8 % fragment loss is the healthy profile-1 bench floor."""
+        p = self._policy()
+        for t in range(0, 300, 5):
+            self.assertIsNone(p.evaluate(now=float(t), loss_rate=0.08,
+                                         **self._healthy_kw()))
+        self.assertEqual(p.profile, 2)
+
+    def test_policy_loss_none_is_window_too_small(self):
+        p = self._policy()
+        self.assertIsNone(p.evaluate(now=100.0, loss_rate=None,
+                                     **self._healthy_kw()))
+
+    def test_policy_pre_rs1216_call_shape_unchanged(self):
+        p = self._policy()
+        self.assertIsNone(p.evaluate(now=10.0, sample_age_s=2.0,
+                                     timeouts_per_10s=0.0))
+
     # ---- endpoints ----
 
     def test_get_shape(self):
