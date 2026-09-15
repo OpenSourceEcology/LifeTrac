@@ -1,0 +1,2150 @@
+﻿2026-09-15 20:48:40,325 INFO image_rx_daemon: ctrl MQTT connected (192.168.1.79)
+
+2026-09-15 20:48:40,331 INFO image_rx_daemon: opening L072 HostLink on /dev/ttymxc3 @ 921600
+
+2026-09-15 20:48:40,371 INFO image_rx_daemon: image_rx_daemon started; mqtt=127.0.0.1:1883 uart=/dev/ttymxc3
+
+2026-09-15 20:48:40,420 INFO image_rx_daemon: MQTT connected; ready to publish lifetrac/v25/video/tile_delta
+
+2026-09-15 20:48:40,459 INFO image_rx_daemon: LIFETRAC_SKIP_RESET_REQ=1 — relying on external NRST; draining boot chatter only
+
+2026-09-15 20:48:40,561 INFO image_rx_daemon: accepting first retained lifetrac/v25/control/radio_profile pin after start (restart convergence)
+
+2026-09-15 20:48:40,898 INFO image_rx_daemon: L072 VER warm-up ok (attempt 1)
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+CFG_SET_REQ(FHSS_FARM_ID) OK: 17000800
+
+CFG_SET_REQ(FHSS_NODE_ID) OK: 18000800
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+
+2026-09-15 20:48:41,349 INFO image_rx_daemon: stats: rx_frames=0 rx_decode_err=0 frames_published=0 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=0 cmd_cooldown_drops=0 cmd_gate_held=0 cmd_copies_deferred=0
+
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+
+2026-09-15 20:48:41,435 INFO image_rx_daemon: LBT_ENABLE=0 (command uplink shares the image channel)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-09-15 20:48:41,548 INFO image_rx_daemon: SX1276 RXCONT autowake: opmode 0x81 -> 0x85
+
+2026-09-15 20:48:41,550 INFO image_rx_daemon: RX worker ready; draining RX_FRAME_URC...
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:41,844 INFO image_rx_daemon: command TX opcode=0x63 copy=1/1 OK (on air)
+
+2026-09-15 20:48:42,084 INFO image_rx_daemon: frag_arrival: seq=5 idx=0 total=1 fw_us=2020461195 len=243
+
+2026-09-15 20:48:42,141 INFO image_rx_daemon: published frame_id=0 seq=5 239 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:48:42,177 INFO image_rx_daemon: cmd 0x63 CONVERGED after 1 attempts (1.6 s): ENCODE_MODE_ACK {'mode': 6, 'quality': 55}
+
+2026-09-15 20:48:42,644 INFO image_rx_daemon: frag_arrival: seq=6 idx=0 total=1 fw_us=2021025245 len=204
+
+2026-09-15 20:48:42,655 INFO image_rx_daemon: published frame_id=0 seq=6 200 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:48:42,919 INFO image_rx_daemon: radio_profile: commanding tractor 2 -> 1 (two-phase)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:42,955 INFO image_rx_daemon: command TX opcode=0x65 copy=1/2 OK (on air)
+
+2026-09-15 20:48:43,206 INFO image_rx_daemon: frag_arrival: seq=7 idx=0 total=1 fw_us=2021594979 len=148
+
+2026-09-15 20:48:43,212 INFO image_rx_daemon: cmd 0x60 CONVERGED after 0 attempts (1.0 s): keyframe received (UNVERIFIED delivery — keyframe may be encoder-initiated)
+
+2026-09-15 20:48:43,217 INFO image_rx_daemon: published frame_id=0 seq=7 144 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:44,553 INFO image_rx_daemon: command TX opcode=0x65 copy=1/2 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:44,876 INFO image_rx_daemon: command TX opcode=0x65 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:45,193 INFO image_rx_daemon: command TX opcode=0x65 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:46,288 INFO image_rx_daemon: command TX opcode=0x65 copy=1/2 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:46,612 INFO image_rx_daemon: command TX opcode=0x65 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:47,456 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:48,033 INFO image_rx_daemon: command TX opcode=0x65 copy=1/2 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:48,342 INFO image_rx_daemon: command TX opcode=0x65 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:49,690 INFO image_rx_daemon: command TX opcode=0x65 copy=1/2 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:50,000 INFO image_rx_daemon: command TX opcode=0x65 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:51,347 INFO image_rx_daemon: command TX opcode=0x65 copy=1/2 OK (on air)
+
+2026-09-15 20:48:51,359 INFO image_rx_daemon: stats: rx_frames=3 rx_decode_err=0 frames_published=3 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=7 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=6
+
+2026-09-15 20:48:51,362 INFO image_rx_daemon: air_gap: n=2 dt_med=569734us dt_p95=569734us len_med=204B cmd_tx_ok=13 cmd_tx_fail=0
+
+2026-09-15 20:48:51,365 INFO image_rx_daemon: air_gap_hist(ms): <1000:2
+
+2026-09-15 20:48:51,369 INFO image_rx_daemon: rx_rf: n_rssi=3 n_snr=3 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=6.0/6.0/6.0
+
+2026-09-15 20:48:51,372 INFO image_rx_daemon: phase_telemetry: valid=3 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:48:51,375 INFO image_rx_daemon: air_gap_by_class: boundary: n=2 med=569.7ms
+
+INFO: unrelated frame during TX wait type=0xC4
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:51,685 INFO image_rx_daemon: command TX opcode=0x65 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:53,044 INFO image_rx_daemon: command TX opcode=0x65 copy=1/2 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:53,347 INFO image_rx_daemon: command TX opcode=0x65 copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:54,687 INFO image_rx_daemon: command TX opcode=0x65 copy=1/2 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:48:54,997 INFO image_rx_daemon: command TX opcode=0x65 copy=1/1 OK (on air)
+
+2026-09-15 20:48:55,016 WARNING image_rx_daemon: radio_profile: no tractor ACK within 12 s — staying on profile 2
+
+2026-09-15 20:48:59,466 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:01,381 INFO image_rx_daemon: stats: rx_frames=3 rx_decode_err=0 frames_published=3 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=7 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:05,477 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:49:11,388 INFO image_rx_daemon: stats: rx_frames=3 rx_decode_err=0 frames_published=3 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=7 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:17,453 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:49:21,396 INFO image_rx_daemon: stats: rx_frames=3 rx_decode_err=0 frames_published=3 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=7 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:29,457 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:49:29,944 INFO image_rx_daemon: frag_arrival: seq=99 idx=0 total=1 fw_us=2068360112 len=130
+
+2026-09-15 20:49:29,955 INFO image_rx_daemon: published frame_id=0 seq=99 126 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:30,190 INFO image_rx_daemon: frag_arrival: seq=100 idx=0 total=1 fw_us=2068605095 len=137
+
+2026-09-15 20:49:30,201 INFO image_rx_daemon: published frame_id=0 seq=100 133 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:30,780 INFO image_rx_daemon: frag_arrival: seq=101 idx=0 total=1 fw_us=2069175647 len=234
+
+2026-09-15 20:49:30,789 INFO image_rx_daemon: published frame_id=0 seq=101 230 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:31,284 INFO image_rx_daemon: frag_arrival: seq=102 idx=0 total=1 fw_us=2069683304 len=221
+
+2026-09-15 20:49:31,293 INFO image_rx_daemon: published frame_id=0 seq=102 217 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:31,403 INFO image_rx_daemon: stats: rx_frames=7 rx_decode_err=0 frames_published=7 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=10 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+2026-09-15 20:49:31,406 INFO image_rx_daemon: air_gap: n=3 dt_med=507657us dt_p95=570552us len_med=221B cmd_tx_ok=22 cmd_tx_fail=0
+
+2026-09-15 20:49:31,410 INFO image_rx_daemon: air_gap_hist(ms): <400:1 <1000:2
+
+2026-09-15 20:49:31,414 INFO image_rx_daemon: rx_rf: n_rssi=4 n_snr=4 rssi[min/med/max]=-65/-65/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:49:31,417 INFO image_rx_daemon: phase_telemetry: valid=4 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:49:31,420 INFO image_rx_daemon: air_gap_by_class: boundary: n=3 med=507.7ms
+
+2026-09-15 20:49:31,775 INFO image_rx_daemon: frag_arrival: seq=103 idx=0 total=1 fw_us=2070169437 len=236
+
+2026-09-15 20:49:31,784 INFO image_rx_daemon: published frame_id=0 seq=103 232 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:32,241 INFO image_rx_daemon: frag_arrival: seq=104 idx=0 total=1 fw_us=2070640166 len=244
+
+2026-09-15 20:49:32,250 INFO image_rx_daemon: published frame_id=0 seq=104 240 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:32,763 INFO image_rx_daemon: frag_arrival: seq=105 idx=0 total=1 fw_us=2071155421 len=241
+
+2026-09-15 20:49:32,776 INFO image_rx_daemon: published frame_id=0 seq=105 237 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:32,815 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:33,269 INFO image_rx_daemon: frag_arrival: seq=106 idx=0 total=1 fw_us=2071668851 len=238
+
+2026-09-15 20:49:33,278 INFO image_rx_daemon: published frame_id=0 seq=106 234 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:33,777 INFO image_rx_daemon: frag_arrival: seq=107 idx=0 total=1 fw_us=2072177615 len=226
+
+2026-09-15 20:49:33,786 INFO image_rx_daemon: published frame_id=0 seq=107 222 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:34,242 INFO image_rx_daemon: frag_arrival: seq=108 idx=0 total=1 fw_us=2072648995 len=215
+
+2026-09-15 20:49:34,250 INFO image_rx_daemon: published frame_id=0 seq=108 211 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:34,737 INFO image_rx_daemon: frag_arrival: seq=109 idx=0 total=1 fw_us=2073151703 len=191
+
+2026-09-15 20:49:34,745 INFO image_rx_daemon: published frame_id=0 seq=109 187 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:35,215 INFO image_rx_daemon: frag_arrival: seq=110 idx=0 total=1 fw_us=2073626148 len=188
+
+2026-09-15 20:49:35,223 INFO image_rx_daemon: published frame_id=0 seq=110 184 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:35,691 INFO image_rx_daemon: frag_arrival: seq=111 idx=0 total=1 fw_us=2074103096 len=188
+
+2026-09-15 20:49:35,700 INFO image_rx_daemon: published frame_id=0 seq=111 184 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:35,741 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:49:36,198 INFO image_rx_daemon: frag_arrival: seq=112 idx=0 total=1 fw_us=2074613647 len=176
+
+2026-09-15 20:49:36,207 INFO image_rx_daemon: published frame_id=0 seq=112 172 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:36,715 INFO image_rx_daemon: frag_arrival: seq=113 idx=0 total=1 fw_us=2075127833 len=185
+
+2026-09-15 20:49:36,723 INFO image_rx_daemon: published frame_id=0 seq=113 181 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:37,217 INFO image_rx_daemon: frag_arrival: seq=114 idx=0 total=1 fw_us=2075622060 len=224
+
+2026-09-15 20:49:37,225 INFO image_rx_daemon: published frame_id=0 seq=114 220 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:37,745 INFO image_rx_daemon: frag_arrival: seq=115 idx=0 total=1 fw_us=2076147076 len=244
+
+2026-09-15 20:49:37,754 INFO image_rx_daemon: published frame_id=0 seq=115 240 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:38,226 INFO image_rx_daemon: frag_arrival: seq=116 idx=0 total=1 fw_us=2076641835 len=152
+
+2026-09-15 20:49:38,234 INFO image_rx_daemon: published frame_id=0 seq=116 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:38,691 INFO image_rx_daemon: frag_arrival: seq=117 idx=0 total=1 fw_us=2077107078 len=149
+
+2026-09-15 20:49:38,702 INFO image_rx_daemon: published frame_id=0 seq=117 145 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:38,742 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:49:39,251 INFO image_rx_daemon: frag_arrival: seq=118 idx=0 total=1 fw_us=2077654495 len=231
+
+2026-09-15 20:49:39,262 INFO image_rx_daemon: published frame_id=0 seq=118 227 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:39,728 INFO image_rx_daemon: frag_arrival: seq=119 idx=0 total=1 fw_us=2078134939 len=245
+
+2026-09-15 20:49:39,740 INFO image_rx_daemon: published frame_id=0 seq=119 241 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:40,193 INFO image_rx_daemon: frag_arrival: seq=120 idx=0 total=1 fw_us=2078611957 len=150
+
+2026-09-15 20:49:40,201 INFO image_rx_daemon: published frame_id=0 seq=120 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:40,674 INFO image_rx_daemon: frag_arrival: seq=121 idx=0 total=1 fw_us=2079089227 len=150
+
+2026-09-15 20:49:40,682 INFO image_rx_daemon: published frame_id=0 seq=121 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:41,180 INFO image_rx_daemon: frag_arrival: seq=122 idx=0 total=1 fw_us=2079604053 len=150
+
+2026-09-15 20:49:41,189 INFO image_rx_daemon: published frame_id=0 seq=122 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:41,429 INFO image_rx_daemon: stats: rx_frames=27 rx_decode_err=0 frames_published=27 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=30 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+2026-09-15 20:49:41,432 INFO image_rx_daemon: air_gap: n=20 dt_med=494759us dt_p95=547417us len_med=215B cmd_tx_ok=25 cmd_tx_fail=0
+
+2026-09-15 20:49:41,437 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-09-15 20:49:41,441 INFO image_rx_daemon: rx_rf: n_rssi=20 n_snr=20 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/5.0/6.0
+
+2026-09-15 20:49:41,443 INFO image_rx_daemon: phase_telemetry: valid=20 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:49:41,449 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=494.8ms
+
+2026-09-15 20:49:41,759 INFO image_rx_daemon: frag_arrival: seq=123 idx=0 total=1 fw_us=2080157906 len=247
+
+2026-09-15 20:49:41,767 INFO image_rx_daemon: published frame_id=0 seq=123 243 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:41,806 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:49:42,177 INFO image_rx_daemon: frag_arrival: seq=124 idx=0 total=1 fw_us=2080596592 len=152
+
+2026-09-15 20:49:42,185 INFO image_rx_daemon: published frame_id=0 seq=124 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:42,702 INFO image_rx_daemon: frag_arrival: seq=125 idx=0 total=1 fw_us=2081123212 len=152
+
+2026-09-15 20:49:42,710 INFO image_rx_daemon: published frame_id=0 seq=125 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:43,224 INFO image_rx_daemon: frag_arrival: seq=126 idx=0 total=1 fw_us=2081647573 len=146
+
+2026-09-15 20:49:43,233 INFO image_rx_daemon: published frame_id=0 seq=126 142 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:43,761 INFO image_rx_daemon: frag_arrival: seq=127 idx=0 total=1 fw_us=2082171826 len=235
+
+2026-09-15 20:49:43,771 INFO image_rx_daemon: published frame_id=0 seq=127 231 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:44,263 INFO image_rx_daemon: frag_arrival: seq=128 idx=0 total=1 fw_us=2082667441 len=245
+
+2026-09-15 20:49:44,272 INFO image_rx_daemon: published frame_id=0 seq=128 241 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:45,244 INFO image_rx_daemon: frag_arrival: seq=130 idx=0 total=1 fw_us=2083649516 len=151
+
+2026-09-15 20:49:45,256 INFO image_rx_daemon: published frame_id=0 seq=130 147 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:45,297 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:49:45,716 INFO image_rx_daemon: frag_arrival: seq=131 idx=0 total=1 fw_us=2084139400 len=152
+
+2026-09-15 20:49:45,733 INFO image_rx_daemon: published frame_id=0 seq=131 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:46,299 INFO image_rx_daemon: frag_arrival: seq=132 idx=0 total=1 fw_us=2084704070 len=238
+
+2026-09-15 20:49:46,308 INFO image_rx_daemon: published frame_id=0 seq=132 234 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:46,741 INFO image_rx_daemon: frag_arrival: seq=133 idx=0 total=1 fw_us=2085158819 len=152
+
+2026-09-15 20:49:46,753 INFO image_rx_daemon: published frame_id=0 seq=133 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:47,228 INFO image_rx_daemon: frag_arrival: seq=134 idx=0 total=1 fw_us=2085648720 len=152
+
+2026-09-15 20:49:47,235 INFO image_rx_daemon: published frame_id=0 seq=134 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:47,708 INFO image_rx_daemon: frag_arrival: seq=135 idx=0 total=1 fw_us=2086127509 len=143
+
+2026-09-15 20:49:47,717 INFO image_rx_daemon: published frame_id=0 seq=135 139 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:47,758 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:49:48,289 INFO image_rx_daemon: frag_arrival: seq=136 idx=0 total=1 fw_us=2086697568 len=233
+
+2026-09-15 20:49:48,300 INFO image_rx_daemon: published frame_id=0 seq=136 229 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:48,718 INFO image_rx_daemon: frag_arrival: seq=137 idx=0 total=1 fw_us=2087139727 len=151
+
+2026-09-15 20:49:48,726 INFO image_rx_daemon: published frame_id=0 seq=137 147 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:49,248 INFO image_rx_daemon: frag_arrival: seq=138 idx=0 total=1 fw_us=2087654496 len=245
+
+2026-09-15 20:49:49,256 INFO image_rx_daemon: published frame_id=0 seq=138 241 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:49,758 INFO image_rx_daemon: frag_arrival: seq=139 idx=0 total=1 fw_us=2088168984 len=247
+
+2026-09-15 20:49:49,766 INFO image_rx_daemon: published frame_id=0 seq=139 243 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:50,178 INFO image_rx_daemon: frag_arrival: seq=140 idx=0 total=1 fw_us=2088606519 len=150
+
+2026-09-15 20:49:50,187 INFO image_rx_daemon: published frame_id=0 seq=140 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:50,697 INFO image_rx_daemon: frag_arrival: seq=141 idx=0 total=1 fw_us=2089122251 len=152
+
+2026-09-15 20:49:50,704 INFO image_rx_daemon: published frame_id=0 seq=141 148 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:50,743 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:49:51,279 INFO image_rx_daemon: frag_arrival: seq=142 idx=0 total=1 fw_us=2089687340 len=242
+
+2026-09-15 20:49:51,288 INFO image_rx_daemon: published frame_id=0 seq=142 238 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:51,455 INFO image_rx_daemon: stats: rx_frames=46 rx_decode_err=0 frames_published=46 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=53 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+2026-09-15 20:49:51,459 INFO image_rx_daemon: air_gap: n=19 dt_med=514769us dt_p95=982075us len_med=152B cmd_tx_ok=29 cmd_tx_fail=0
+
+2026-09-15 20:49:51,463 INFO image_rx_daemon: air_gap_hist(ms): <1000:19
+
+2026-09-15 20:49:51,466 INFO image_rx_daemon: rx_rf: n_rssi=19 n_snr=19 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:49:51,469 INFO image_rx_daemon: phase_telemetry: valid=19 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:49:51,473 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=514.8ms
+
+2026-09-15 20:49:51,719 INFO image_rx_daemon: frag_arrival: seq=143 idx=0 total=1 fw_us=2090141978 len=152
+
+2026-09-15 20:49:51,728 INFO image_rx_daemon: published frame_id=0 seq=143 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:52,277 INFO image_rx_daemon: frag_arrival: seq=144 idx=0 total=1 fw_us=2090691051 len=233
+
+2026-09-15 20:49:52,285 INFO image_rx_daemon: published frame_id=0 seq=144 229 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:52,763 INFO image_rx_daemon: frag_arrival: seq=145 idx=0 total=1 fw_us=2091175347 len=244
+
+2026-09-15 20:49:52,772 INFO image_rx_daemon: published frame_id=0 seq=145 240 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:53,281 INFO image_rx_daemon: frag_arrival: seq=146 idx=0 total=1 fw_us=2091689042 len=242
+
+2026-09-15 20:49:53,290 INFO image_rx_daemon: published frame_id=0 seq=146 238 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:53,697 INFO image_rx_daemon: frag_arrival: seq=147 idx=0 total=1 fw_us=2092129596 len=149
+
+2026-09-15 20:49:53,706 INFO image_rx_daemon: published frame_id=0 seq=147 145 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:53,747 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:49:54,225 INFO image_rx_daemon: frag_arrival: seq=148 idx=0 total=1 fw_us=2092651627 len=152
+
+2026-09-15 20:49:54,233 INFO image_rx_daemon: published frame_id=0 seq=148 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:54,719 INFO image_rx_daemon: frag_arrival: seq=149 idx=0 total=1 fw_us=2093140421 len=151
+
+2026-09-15 20:49:54,727 INFO image_rx_daemon: published frame_id=0 seq=149 147 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:55,306 INFO image_rx_daemon: frag_arrival: seq=150 idx=0 total=1 fw_us=2093713416 len=247
+
+2026-09-15 20:49:55,315 INFO image_rx_daemon: published frame_id=0 seq=150 243 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:55,735 INFO image_rx_daemon: frag_arrival: seq=151 idx=0 total=1 fw_us=2094165207 len=152
+
+2026-09-15 20:49:55,744 INFO image_rx_daemon: published frame_id=0 seq=151 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:56,313 INFO image_rx_daemon: frag_arrival: seq=152 idx=0 total=1 fw_us=2094726841 len=226
+
+2026-09-15 20:49:56,321 INFO image_rx_daemon: published frame_id=0 seq=152 222 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:56,808 INFO image_rx_daemon: frag_arrival: seq=153 idx=0 total=1 fw_us=2095222865 len=247
+
+2026-09-15 20:49:56,816 INFO image_rx_daemon: published frame_id=0 seq=153 243 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:56,857 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:49:57,290 INFO image_rx_daemon: frag_arrival: seq=154 idx=0 total=1 fw_us=2095706981 len=235
+
+2026-09-15 20:49:57,298 INFO image_rx_daemon: published frame_id=0 seq=154 231 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:57,726 INFO image_rx_daemon: frag_arrival: seq=155 idx=0 total=1 fw_us=2096159109 len=143
+
+2026-09-15 20:49:57,734 INFO image_rx_daemon: published frame_id=0 seq=155 139 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:58,258 INFO image_rx_daemon: frag_arrival: seq=156 idx=0 total=1 fw_us=2096689306 len=152
+
+2026-09-15 20:49:58,266 INFO image_rx_daemon: published frame_id=0 seq=156 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:58,748 INFO image_rx_daemon: frag_arrival: seq=157 idx=0 total=1 fw_us=2097176584 len=152
+
+2026-09-15 20:49:58,756 INFO image_rx_daemon: published frame_id=0 seq=157 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:59,203 INFO image_rx_daemon: frag_arrival: seq=158 idx=0 total=1 fw_us=2097628506 len=152
+
+2026-09-15 20:49:59,211 INFO image_rx_daemon: published frame_id=0 seq=158 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:49:59,778 INFO image_rx_daemon: frag_arrival: seq=159 idx=0 total=1 fw_us=2098187176 len=232
+
+2026-09-15 20:49:59,786 INFO image_rx_daemon: published frame_id=0 seq=159 228 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:49:59,828 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:50:00,254 INFO image_rx_daemon: frag_arrival: seq=160 idx=0 total=1 fw_us=2098674285 len=230
+
+2026-09-15 20:50:00,263 INFO image_rx_daemon: published frame_id=0 seq=160 226 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:00,752 INFO image_rx_daemon: frag_arrival: seq=161 idx=0 total=1 fw_us=2099162441 len=244
+
+2026-09-15 20:50:00,760 INFO image_rx_daemon: published frame_id=0 seq=161 240 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:01,228 INFO image_rx_daemon: frag_arrival: seq=162 idx=0 total=1 fw_us=2099652582 len=152
+
+2026-09-15 20:50:01,237 INFO image_rx_daemon: published frame_id=0 seq=162 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:01,482 INFO image_rx_daemon: stats: rx_frames=66 rx_decode_err=0 frames_published=66 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=76 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+2026-09-15 20:50:01,485 INFO image_rx_daemon: air_gap: n=20 dt_med=488794us dt_p95=572995us len_med=226B cmd_tx_ok=32 cmd_tx_fail=0
+
+2026-09-15 20:50:01,490 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-09-15 20:50:01,496 INFO image_rx_daemon: rx_rf: n_rssi=20 n_snr=20 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/5.0/6.0
+
+2026-09-15 20:50:01,500 INFO image_rx_daemon: phase_telemetry: valid=20 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:50:01,503 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=488.8ms
+
+2026-09-15 20:50:01,764 INFO image_rx_daemon: frag_arrival: seq=163 idx=0 total=1 fw_us=2100178035 len=245
+
+2026-09-15 20:50:01,772 INFO image_rx_daemon: published frame_id=0 seq=163 241 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:02,211 INFO image_rx_daemon: frag_arrival: seq=164 idx=0 total=1 fw_us=2100643546 len=147
+
+2026-09-15 20:50:02,220 INFO image_rx_daemon: published frame_id=0 seq=164 143 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:02,725 INFO image_rx_daemon: frag_arrival: seq=165 idx=0 total=1 fw_us=2101154168 len=140
+
+2026-09-15 20:50:02,733 INFO image_rx_daemon: published frame_id=0 seq=165 136 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:50:02,774 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:50:03,199 INFO image_rx_daemon: frag_arrival: seq=166 idx=0 total=1 fw_us=2101632303 len=141
+
+2026-09-15 20:50:03,207 INFO image_rx_daemon: published frame_id=0 seq=166 137 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:03,736 INFO image_rx_daemon: frag_arrival: seq=167 idx=0 total=1 fw_us=2102151598 len=239
+
+2026-09-15 20:50:03,745 INFO image_rx_daemon: published frame_id=0 seq=167 235 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:04,249 INFO image_rx_daemon: frag_arrival: seq=168 idx=0 total=1 fw_us=2102661682 len=229
+
+2026-09-15 20:50:04,257 INFO image_rx_daemon: published frame_id=0 seq=168 225 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:04,686 INFO image_rx_daemon: frag_arrival: seq=169 idx=0 total=1 fw_us=2103116414 len=143
+
+2026-09-15 20:50:04,693 INFO image_rx_daemon: published frame_id=0 seq=169 139 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:05,217 INFO image_rx_daemon: frag_arrival: seq=170 idx=0 total=1 fw_us=2103649901 len=152
+
+2026-09-15 20:50:05,225 INFO image_rx_daemon: published frame_id=0 seq=170 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:05,758 INFO image_rx_daemon: frag_arrival: seq=171 idx=0 total=1 fw_us=2104174179 len=244
+
+2026-09-15 20:50:05,766 INFO image_rx_daemon: published frame_id=0 seq=171 240 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:06,238 INFO image_rx_daemon: frag_arrival: seq=172 idx=0 total=1 fw_us=2104667499 len=152
+
+2026-09-15 20:50:06,246 INFO image_rx_daemon: published frame_id=0 seq=172 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:06,764 INFO image_rx_daemon: frag_arrival: seq=173 idx=0 total=1 fw_us=2105183664 len=246
+
+2026-09-15 20:50:06,773 INFO image_rx_daemon: published frame_id=0 seq=173 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:07,232 INFO image_rx_daemon: frag_arrival: seq=174 idx=0 total=1 fw_us=2105651828 len=247
+
+2026-09-15 20:50:07,242 INFO image_rx_daemon: published frame_id=0 seq=174 243 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:07,749 INFO image_rx_daemon: frag_arrival: seq=175 idx=0 total=1 fw_us=2106163327 len=244
+
+2026-09-15 20:50:07,759 INFO image_rx_daemon: published frame_id=0 seq=175 240 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:08,213 INFO image_rx_daemon: frag_arrival: seq=176 idx=0 total=1 fw_us=2106635581 len=231
+
+2026-09-15 20:50:08,221 INFO image_rx_daemon: published frame_id=0 seq=176 227 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:08,727 INFO image_rx_daemon: frag_arrival: seq=177 idx=0 total=1 fw_us=2107147423 len=228
+
+2026-09-15 20:50:08,736 INFO image_rx_daemon: published frame_id=0 seq=177 224 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:09,230 INFO image_rx_daemon: frag_arrival: seq=178 idx=0 total=1 fw_us=2107655831 len=211
+
+2026-09-15 20:50:09,239 INFO image_rx_daemon: published frame_id=0 seq=178 207 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:09,736 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=196 snr=6.0 rssi=-65 dump=0102000000000099ab3b95cc22e8e999241480c904a08e480c99039c100808118eeaae19714b25d03f72a332ed28111c11acd4dbbc18085b31d1b55afb7a668fcfeb71c6376248bc001bc3991a17e16889139db22020af21d2c06004a27bd62cfd5a30d007f70c6b5cd46afebddc5107b2510178da55cbb11180300885e11f8f829211324af4282c33122bb8b1c458280def1e1ff01f8d38fd5bc4e55badb73bb08006961864566202b149e491d6ba92a544d69f6a5d5c2b0df73ed89754366eaadf06e1
+
+2026-09-15 20:50:10,243 INFO image_rx_daemon: frag_arrival: seq=180 idx=0 total=1 fw_us=2108658033 len=232
+
+2026-09-15 20:50:10,250 INFO image_rx_daemon: published frame_id=0 seq=180 228 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:10,742 INFO image_rx_daemon: frag_arrival: seq=181 idx=0 total=1 fw_us=2109162757 len=214
+
+2026-09-15 20:50:10,751 INFO image_rx_daemon: published frame_id=0 seq=181 210 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:11,204 INFO image_rx_daemon: frag_arrival: seq=182 idx=0 total=1 fw_us=2109631348 len=188
+
+2026-09-15 20:50:11,213 INFO image_rx_daemon: published frame_id=0 seq=182 184 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:11,511 INFO image_rx_daemon: stats: rx_frames=85 rx_decode_err=0 frames_published=85 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=97 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+2026-09-15 20:50:11,515 INFO image_rx_daemon: air_gap: n=19 dt_med=510084us dt_p95=1002202us len_med=228B cmd_tx_ok=33 cmd_tx_fail=0
+
+2026-09-15 20:50:11,520 INFO image_rx_daemon: air_gap_hist(ms): <1000:18 >=1000:1
+
+2026-09-15 20:50:11,523 INFO image_rx_daemon: rx_rf: n_rssi=19 n_snr=19 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:50:11,526 INFO image_rx_daemon: phase_telemetry: valid=19 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:50:11,529 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=510.1ms
+
+2026-09-15 20:50:11,720 INFO image_rx_daemon: frag_arrival: seq=183 idx=0 total=1 fw_us=2110143885 len=185
+
+2026-09-15 20:50:11,727 INFO image_rx_daemon: published frame_id=0 seq=183 181 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:12,255 INFO image_rx_daemon: frag_arrival: seq=184 idx=0 total=1 fw_us=2110678189 len=229
+
+2026-09-15 20:50:12,263 INFO image_rx_daemon: published frame_id=0 seq=184 225 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:12,737 INFO image_rx_daemon: frag_arrival: seq=185 idx=0 total=1 fw_us=2111161190 len=235
+
+2026-09-15 20:50:12,746 INFO image_rx_daemon: published frame_id=0 seq=185 231 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:13,208 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=159 snr=2.8 rssi=-65 dump=0102000000000000feba000000ba0c082c011000000000000000000023007f0118df05c1b18a83301405d0ab10a899aea4bb060be17d43122a6ea747c9fb9f38048ab3dd3bda7c65cfb103fcb7d7cf681f481a5bc7d0e3a0bdfacc5844c91d5fbceb4dccebf3ca802615733c9db858341b4e6e536d4c270b6bab83ff792250688494504327300c8345d0a64b9fd157d30c0dcffad49e955f0ad31f3fb31ed4
+
+2026-09-15 20:50:13,762 INFO image_rx_daemon: frag_arrival: seq=187 idx=0 total=1 fw_us=2112185211 len=244
+
+2026-09-15 20:50:13,771 INFO image_rx_daemon: published frame_id=0 seq=187 240 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:14,190 INFO image_rx_daemon: frag_arrival: seq=188 idx=0 total=1 fw_us=2112626897 len=152
+
+2026-09-15 20:50:14,203 INFO image_rx_daemon: published frame_id=0 seq=188 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:14,697 INFO image_rx_daemon: frag_arrival: seq=189 idx=0 total=1 fw_us=2113137750 len=146
+
+2026-09-15 20:50:14,706 INFO image_rx_daemon: published frame_id=0 seq=189 142 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:15,212 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=154 snr=-10.2 rssi=-44 dump=0102000000000000febe000000be0c0820010001000000000000000000007a0178da0dcab10ac3201006e0dfc3823899807b09168a4f71950ca1535aeede47ba75cc1b385a9fb2f9e60f80515501b0dc54b700a2a27b77d55f4ae4166a8e6b469d30d49eeb756ebc81a71dc3ec80d89fe220a4e53e8cfb7e83c15f534f603a4f62f769ae1eb82b03e119acb7f1e9f49a0790ad06412dc0ef1ea9
+
+2026-09-15 20:50:15,750 INFO image_rx_daemon: frag_arrival: seq=191 idx=0 total=1 fw_us=2114168394 len=238
+
+2026-09-15 20:50:15,759 INFO image_rx_daemon: published frame_id=0 seq=191 234 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:16,212 INFO image_rx_daemon: frag_arrival: seq=192 idx=0 total=1 fw_us=2114648796 len=152
+
+2026-09-15 20:50:16,221 INFO image_rx_daemon: published frame_id=0 seq=192 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:16,740 INFO image_rx_daemon: frag_arrival: seq=193 idx=0 total=1 fw_us=2115162117 len=245
+
+2026-09-15 20:50:16,749 INFO image_rx_daemon: published frame_id=0 seq=193 241 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:17,204 INFO image_rx_daemon: frag_arrival: seq=194 idx=0 total=1 fw_us=2115636918 len=152
+
+2026-09-15 20:50:17,212 INFO image_rx_daemon: published frame_id=0 seq=194 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:17,701 INFO image_rx_daemon: frag_arrival: seq=195 idx=0 total=1 fw_us=2116145208 len=144
+
+2026-09-15 20:50:17,709 INFO image_rx_daemon: published frame_id=0 seq=195 140 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:18,190 INFO image_rx_daemon: frag_arrival: seq=196 idx=0 total=1 fw_us=2116624038 len=150
+
+2026-09-15 20:50:18,198 INFO image_rx_daemon: published frame_id=0 seq=196 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:18,703 INFO image_rx_daemon: frag_arrival: seq=197 idx=0 total=1 fw_us=2117137702 len=152
+
+2026-09-15 20:50:18,711 INFO image_rx_daemon: published frame_id=0 seq=197 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:19,261 INFO image_rx_daemon: frag_arrival: seq=198 idx=0 total=1 fw_us=2117685062 len=232
+
+2026-09-15 20:50:19,269 INFO image_rx_daemon: published frame_id=0 seq=198 228 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:19,743 INFO image_rx_daemon: frag_arrival: seq=199 idx=0 total=1 fw_us=2118161886 len=242
+
+2026-09-15 20:50:19,751 INFO image_rx_daemon: published frame_id=0 seq=199 238 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:20,194 INFO image_rx_daemon: frag_arrival: seq=200 idx=0 total=1 fw_us=2118633040 len=152
+
+2026-09-15 20:50:20,203 INFO image_rx_daemon: published frame_id=0 seq=200 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:20,762 INFO image_rx_daemon: frag_arrival: seq=201 idx=0 total=1 fw_us=2119185440 len=244
+
+2026-09-15 20:50:20,771 INFO image_rx_daemon: published frame_id=0 seq=201 240 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:21,282 INFO image_rx_daemon: frag_arrival: seq=202 idx=0 total=1 fw_us=2119703054 len=247
+
+2026-09-15 20:50:21,290 INFO image_rx_daemon: published frame_id=0 seq=202 243 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:21,537 INFO image_rx_daemon: stats: rx_frames=103 rx_decode_err=0 frames_published=103 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=117 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+2026-09-15 20:50:21,540 INFO image_rx_daemon: air_gap: n=18 dt_med=512537us dt_p95=1030644us len_med=229B cmd_tx_ok=33 cmd_tx_fail=0
+
+2026-09-15 20:50:21,544 INFO image_rx_daemon: air_gap_hist(ms): <1000:16 >=1000:2
+
+2026-09-15 20:50:21,549 INFO image_rx_daemon: rx_rf: n_rssi=18 n_snr=18 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/5.0/6.0
+
+2026-09-15 20:50:21,552 INFO image_rx_daemon: phase_telemetry: valid=18 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:50:21,555 INFO image_rx_daemon: air_gap_by_class: boundary: n=18 med=512.5ms
+
+2026-09-15 20:50:21,763 INFO image_rx_daemon: frag_arrival: seq=203 idx=0 total=1 fw_us=2120189723 len=247
+
+2026-09-15 20:50:21,772 INFO image_rx_daemon: published frame_id=0 seq=203 243 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:22,291 INFO image_rx_daemon: frag_arrival: seq=204 idx=0 total=1 fw_us=2120713730 len=238
+
+2026-09-15 20:50:22,299 INFO image_rx_daemon: published frame_id=0 seq=204 234 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:22,730 INFO image_rx_daemon: frag_arrival: seq=205 idx=0 total=1 fw_us=2121169916 len=152
+
+2026-09-15 20:50:22,738 INFO image_rx_daemon: published frame_id=0 seq=205 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:23,214 INFO image_rx_daemon: frag_arrival: seq=206 idx=0 total=1 fw_us=2121658745 len=152
+
+2026-09-15 20:50:23,222 INFO image_rx_daemon: published frame_id=0 seq=206 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:23,765 INFO image_rx_daemon: frag_arrival: seq=207 idx=0 total=1 fw_us=2122186165 len=240
+
+2026-09-15 20:50:23,774 INFO image_rx_daemon: published frame_id=0 seq=207 236 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:24,204 INFO image_rx_daemon: frag_arrival: seq=208 idx=0 total=1 fw_us=2122642384 len=152
+
+2026-09-15 20:50:24,212 INFO image_rx_daemon: published frame_id=0 seq=208 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:24,726 INFO image_rx_daemon: frag_arrival: seq=209 idx=0 total=1 fw_us=2123165955 len=147
+
+2026-09-15 20:50:24,734 INFO image_rx_daemon: published frame_id=0 seq=209 143 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:25,267 INFO image_rx_daemon: frag_arrival: seq=210 idx=0 total=1 fw_us=2123697506 len=239
+
+2026-09-15 20:50:25,275 INFO image_rx_daemon: published frame_id=0 seq=210 235 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:25,707 INFO image_rx_daemon: frag_arrival: seq=211 idx=0 total=1 fw_us=2124151438 len=151
+
+2026-09-15 20:50:25,714 INFO image_rx_daemon: published frame_id=0 seq=211 147 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:26,252 INFO image_rx_daemon: frag_arrival: seq=212 idx=0 total=1 fw_us=2124676885 len=236
+
+2026-09-15 20:50:26,261 INFO image_rx_daemon: published frame_id=0 seq=212 232 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:26,779 INFO image_rx_daemon: frag_arrival: seq=213 idx=0 total=1 fw_us=2125198754 len=244
+
+2026-09-15 20:50:26,788 INFO image_rx_daemon: published frame_id=0 seq=213 240 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:27,203 INFO image_rx_daemon: frag_arrival: seq=214 idx=0 total=1 fw_us=2125646961 len=145
+
+2026-09-15 20:50:27,212 INFO image_rx_daemon: published frame_id=0 seq=214 141 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:27,681 INFO image_rx_daemon: frag_arrival: seq=215 idx=0 total=1 fw_us=2126124729 len=136
+
+2026-09-15 20:50:27,690 INFO image_rx_daemon: published frame_id=0 seq=215 132 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:28,198 INFO image_rx_daemon: frag_arrival: seq=216 idx=0 total=1 fw_us=2126644500 len=150
+
+2026-09-15 20:50:28,206 INFO image_rx_daemon: published frame_id=0 seq=216 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:28,721 INFO image_rx_daemon: frag_arrival: seq=217 idx=0 total=1 fw_us=2127155239 len=226
+
+2026-09-15 20:50:28,729 INFO image_rx_daemon: published frame_id=0 seq=217 222 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:29,232 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=231 snr=6.2 rssi=-66 dump=0102000000000000feda000000da0c082001000000000000800000000008770178da0dc8410ac2301005dcaf5810431653b4863dabb0db20e47f51fc00b54a9dda1ffbec999358373cd5b3556223e25f813aa3ed2eb0b406fd09ad42a0a512bf1ae5baf5c892acb3947479939fabe885d8b7223a05f66117dd23537c49ed89215e2c1d8ced2e2d3dd9ad9368fbf0d56591c27fcded1b764e0178da636040051c1d1d1dc87c2115170f044f0028df2880e0313031b8b8383042b82c1c20211697060605060646883c9021c8c2c0c120c0a400e533a8383030343030b4303001d5730000d5d2075e
+
+2026-09-15 20:50:29,763 INFO image_rx_daemon: frag_arrival: seq=219 idx=0 total=1 fw_us=2128194051 len=237
+
+2026-09-15 20:50:29,772 INFO image_rx_daemon: published frame_id=0 seq=219 233 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:30,191 INFO image_rx_daemon: frag_arrival: seq=220 idx=0 total=1 fw_us=2128634902 len=152
+
+2026-09-15 20:50:30,199 INFO image_rx_daemon: published frame_id=0 seq=220 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:30,707 INFO image_rx_daemon: frag_arrival: seq=221 idx=0 total=1 fw_us=2129147441 len=152
+
+2026-09-15 20:50:30,715 INFO image_rx_daemon: published frame_id=0 seq=221 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:31,182 INFO image_rx_daemon: frag_arrival: seq=222 idx=0 total=1 fw_us=2129631169 len=152
+
+2026-09-15 20:50:31,190 INFO image_rx_daemon: published frame_id=0 seq=222 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:31,562 INFO image_rx_daemon: stats: rx_frames=122 rx_decode_err=0 frames_published=122 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=138 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+2026-09-15 20:50:31,565 INFO image_rx_daemon: air_gap: n=19 dt_med=510739us dt_p95=1038812us len_med=152B cmd_tx_ok=33 cmd_tx_fail=0
+
+2026-09-15 20:50:31,571 INFO image_rx_daemon: air_gap_hist(ms): <1000:18 >=1000:1
+
+2026-09-15 20:50:31,574 INFO image_rx_daemon: rx_rf: n_rssi=19 n_snr=19 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:50:31,577 INFO image_rx_daemon: phase_telemetry: valid=19 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:50:31,583 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=510.7ms
+
+2026-09-15 20:50:31,715 INFO image_rx_daemon: frag_arrival: seq=223 idx=0 total=1 fw_us=2130157843 len=152
+
+2026-09-15 20:50:31,723 INFO image_rx_daemon: published frame_id=0 seq=223 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:32,232 INFO image_rx_daemon: frag_arrival: seq=224 idx=0 total=1 fw_us=2130672772 len=152
+
+2026-09-15 20:50:32,240 INFO image_rx_daemon: published frame_id=0 seq=224 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:32,713 INFO image_rx_daemon: frag_arrival: seq=225 idx=0 total=1 fw_us=2131154998 len=152
+
+2026-09-15 20:50:32,721 INFO image_rx_daemon: published frame_id=0 seq=225 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:33,231 INFO image_rx_daemon: frag_arrival: seq=226 idx=0 total=1 fw_us=2131660441 len=240
+
+2026-09-15 20:50:33,240 INFO image_rx_daemon: published frame_id=0 seq=226 236 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:33,757 INFO image_rx_daemon: frag_arrival: seq=227 idx=0 total=1 fw_us=2132189103 len=240
+
+2026-09-15 20:50:33,766 INFO image_rx_daemon: published frame_id=0 seq=227 236 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:34,259 INFO image_rx_daemon: frag_arrival: seq=228 idx=0 total=1 fw_us=2132691897 len=209
+
+2026-09-15 20:50:34,268 INFO image_rx_daemon: published frame_id=0 seq=228 205 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:34,755 INFO image_rx_daemon: frag_arrival: seq=229 idx=0 total=1 fw_us=2133184438 len=239
+
+2026-09-15 20:50:34,764 INFO image_rx_daemon: published frame_id=0 seq=229 235 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:35,209 INFO image_rx_daemon: frag_arrival: seq=230 idx=0 total=1 fw_us=2133658497 len=146
+
+2026-09-15 20:50:35,220 INFO image_rx_daemon: published frame_id=0 seq=230 142 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:35,740 INFO image_rx_daemon: frag_arrival: seq=231 idx=0 total=1 fw_us=2134174843 len=247
+
+2026-09-15 20:50:35,748 INFO image_rx_daemon: published frame_id=0 seq=231 243 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:36,202 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=160 snr=5.8 rssi=-66 dump=0102000000000000fee8000000e80c08200100000000400000000000000080000000002212495549400000b50494927f100004fe012aa97ebbb88b8ea151ff0b0230c4cc62319ae5d053c237d209126b18dc0b7ba8362d5e0218af6c0db359501d4d934e7be8cef7c22de32c4f0882f400564f5ff4cd074a100004aa422aa11200800849120885244042208909100a240002a082492408280000228224928028
+
+2026-09-15 20:50:36,731 INFO image_rx_daemon: frag_arrival: seq=233 idx=0 total=1 fw_us=2135162951 len=234
+
+2026-09-15 20:50:36,739 INFO image_rx_daemon: published frame_id=0 seq=233 230 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:37,263 INFO image_rx_daemon: frag_arrival: seq=234 idx=0 total=1 fw_us=2135688891 len=245
+
+2026-09-15 20:50:37,271 INFO image_rx_daemon: published frame_id=0 seq=234 241 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:37,754 INFO image_rx_daemon: frag_arrival: seq=235 idx=0 total=1 fw_us=2136184493 len=224
+
+2026-09-15 20:50:37,763 INFO image_rx_daemon: published frame_id=0 seq=235 220 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:38,237 INFO image_rx_daemon: frag_arrival: seq=236 idx=0 total=1 fw_us=2136670106 len=245
+
+2026-09-15 20:50:38,245 INFO image_rx_daemon: published frame_id=0 seq=236 241 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:38,741 INFO image_rx_daemon: frag_arrival: seq=237 idx=0 total=1 fw_us=2137177568 len=227
+
+2026-09-15 20:50:38,749 INFO image_rx_daemon: published frame_id=0 seq=237 223 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:39,284 INFO image_rx_daemon: frag_arrival: seq=238 idx=0 total=1 fw_us=2137719926 len=235
+
+2026-09-15 20:50:39,294 INFO image_rx_daemon: published frame_id=0 seq=238 231 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:39,765 INFO image_rx_daemon: frag_arrival: seq=239 idx=0 total=1 fw_us=2138198551 len=247
+
+2026-09-15 20:50:39,775 INFO image_rx_daemon: published frame_id=0 seq=239 243 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:40,245 INFO image_rx_daemon: frag_arrival: seq=240 idx=0 total=1 fw_us=2138690966 len=192
+
+2026-09-15 20:50:40,254 INFO image_rx_daemon: published frame_id=0 seq=240 188 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:40,744 INFO image_rx_daemon: frag_arrival: seq=241 idx=0 total=1 fw_us=2139185025 len=228
+
+2026-09-15 20:50:40,752 INFO image_rx_daemon: published frame_id=0 seq=241 224 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:41,257 INFO image_rx_daemon: frag_arrival: seq=242 idx=0 total=1 fw_us=2139694414 len=215
+
+2026-09-15 20:50:41,265 INFO image_rx_daemon: published frame_id=0 seq=242 211 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:41,590 INFO image_rx_daemon: stats: rx_frames=141 rx_decode_err=0 frames_published=141 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=158 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+2026-09-15 20:50:41,593 INFO image_rx_daemon: air_gap: n=19 dt_med=505443us dt_p95=988108us len_med=228B cmd_tx_ok=33 cmd_tx_fail=0
+
+2026-09-15 20:50:41,597 INFO image_rx_daemon: air_gap_hist(ms): <1000:19
+
+2026-09-15 20:50:41,600 INFO image_rx_daemon: rx_rf: n_rssi=19 n_snr=19 rssi[min/med/max]=-66/-65/-64 snr[min/med/max]=5.0/5.0/6.0
+
+2026-09-15 20:50:41,603 INFO image_rx_daemon: phase_telemetry: valid=19 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:50:41,607 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=505.4ms
+
+2026-09-15 20:50:41,719 INFO image_rx_daemon: frag_arrival: seq=243 idx=0 total=1 fw_us=2140160156 len=186
+
+2026-09-15 20:50:41,728 INFO image_rx_daemon: published frame_id=0 seq=243 182 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:42,229 INFO image_rx_daemon: frag_arrival: seq=244 idx=0 total=1 fw_us=2140674792 len=187
+
+2026-09-15 20:50:42,237 INFO image_rx_daemon: published frame_id=0 seq=244 183 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:42,781 INFO image_rx_daemon: frag_arrival: seq=245 idx=0 total=1 fw_us=2141211731 len=236
+
+2026-09-15 20:50:42,790 INFO image_rx_daemon: published frame_id=0 seq=245 232 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:43,261 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=237 snr=6.2 rssi=-65 dump=0102000000000000fef6000000f60c0820010810000000000000000000007a0178da0dccc1090321100550c86d0f21e7237e3363c58f1d60e7291d476621c56dbfcf88d87fb0e2b822c93bc1091cc66b964c442ce54384895e55c72cab12b56a24614769963be90da1e084f0d4966e22a6aac2b4201dac0c533a095383ef8329ef84e7033c5e25ed633396a47fb58af62415e2bfed177e54296d510178da558cb10dc0300804cf88c225ce048c82220f66658378e26017510214c7091efea57d76fb8a1b570e795da3130d4d340224d1b3870e4d63b2af24b112a7afd5ca5275cdc5a0eebfa264683c98470702
+
+2026-09-15 20:50:43,723 INFO image_rx_daemon: frag_arrival: seq=247 idx=0 total=1 fw_us=2142169421 len=152
+
+2026-09-15 20:50:43,731 INFO image_rx_daemon: published frame_id=0 seq=247 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:44,249 INFO image_rx_daemon: frag_arrival: seq=248 idx=0 total=1 fw_us=2142685869 len=246
+
+2026-09-15 20:50:44,257 INFO image_rx_daemon: published frame_id=0 seq=248 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:44,765 INFO image_rx_daemon: frag_arrival: seq=249 idx=0 total=1 fw_us=2143197351 len=232
+
+2026-09-15 20:50:44,774 INFO image_rx_daemon: published frame_id=0 seq=249 228 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:45,283 INFO image_rx_daemon: frag_arrival: seq=250 idx=0 total=1 fw_us=2143711656 len=238
+
+2026-09-15 20:50:45,291 INFO image_rx_daemon: published frame_id=0 seq=250 234 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:45,708 INFO image_rx_daemon: frag_arrival: seq=251 idx=0 total=1 fw_us=2144160311 len=142
+
+2026-09-15 20:50:45,717 INFO image_rx_daemon: published frame_id=0 seq=251 138 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:46,227 INFO image_rx_daemon: frag_arrival: seq=252 idx=0 total=1 fw_us=2144673438 len=152
+
+2026-09-15 20:50:46,237 INFO image_rx_daemon: published frame_id=0 seq=252 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:46,692 INFO image_rx_daemon: frag_arrival: seq=253 idx=0 total=1 fw_us=2145147763 len=147
+
+2026-09-15 20:50:46,701 INFO image_rx_daemon: published frame_id=0 seq=253 143 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:47,229 INFO image_rx_daemon: frag_arrival: seq=254 idx=0 total=1 fw_us=2145663297 len=238
+
+2026-09-15 20:50:47,238 INFO image_rx_daemon: published frame_id=0 seq=254 234 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:47,686 INFO image_rx_daemon: frag_arrival: seq=255 idx=0 total=1 fw_us=2146143629 len=152
+
+2026-09-15 20:50:47,694 INFO image_rx_daemon: published frame_id=0 seq=255 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:48,165 INFO image_rx_daemon: frag_arrival: seq=0 idx=0 total=1 fw_us=2146621008 len=139
+
+2026-09-15 20:50:48,173 INFO image_rx_daemon: published frame_id=0 seq=0 135 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:48,689 INFO image_rx_daemon: frag_arrival: seq=1 idx=0 total=1 fw_us=2147146793 len=151
+
+2026-09-15 20:50:48,697 INFO image_rx_daemon: published frame_id=0 seq=1 147 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:49,269 INFO image_rx_daemon: frag_arrival: seq=2 idx=0 total=1 fw_us=2147701035 len=244
+
+2026-09-15 20:50:49,279 INFO image_rx_daemon: published frame_id=0 seq=2 240 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:49,687 INFO image_rx_daemon: frag_arrival: seq=3 idx=0 total=1 fw_us=2148139695 len=151
+
+2026-09-15 20:50:49,695 INFO image_rx_daemon: published frame_id=0 seq=3 147 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:50,674 INFO image_rx_daemon: frag_arrival: seq=5 idx=0 total=1 fw_us=2149132654 len=152
+
+2026-09-15 20:50:50,681 INFO image_rx_daemon: published frame_id=0 seq=5 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:51,241 INFO image_rx_daemon: frag_arrival: seq=6 idx=0 total=1 fw_us=2149684837 len=239
+
+2026-09-15 20:50:51,249 INFO image_rx_daemon: published frame_id=0 seq=6 235 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:51,614 INFO image_rx_daemon: stats: rx_frames=159 rx_decode_err=0 frames_published=159 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=181 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+2026-09-15 20:50:51,617 INFO image_rx_daemon: air_gap: n=18 dt_med=514636us dt_p95=992959us len_med=186B cmd_tx_ok=33 cmd_tx_fail=0
+
+2026-09-15 20:50:51,621 INFO image_rx_daemon: air_gap_hist(ms): <1000:18
+
+2026-09-15 20:50:51,624 INFO image_rx_daemon: rx_rf: n_rssi=18 n_snr=18 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:50:51,627 INFO image_rx_daemon: phase_telemetry: valid=18 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:50:51,632 INFO image_rx_daemon: air_gap_by_class: boundary: n=18 med=514.6ms
+
+2026-09-15 20:50:51,668 INFO image_rx_daemon: frag_arrival: seq=7 idx=0 total=1 fw_us=2150124847 len=151
+
+2026-09-15 20:50:51,675 INFO image_rx_daemon: published frame_id=0 seq=7 147 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:52,234 INFO image_rx_daemon: frag_arrival: seq=8 idx=0 total=1 fw_us=2150674348 len=226
+
+2026-09-15 20:50:52,245 INFO image_rx_daemon: published frame_id=0 seq=8 222 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:52,690 INFO image_rx_daemon: frag_arrival: seq=9 idx=0 total=1 fw_us=2151151261 len=145
+
+2026-09-15 20:50:52,698 INFO image_rx_daemon: published frame_id=0 seq=9 141 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:53,177 INFO image_rx_daemon: frag_arrival: seq=10 idx=0 total=1 fw_us=2151631374 len=152
+
+2026-09-15 20:50:53,186 INFO image_rx_daemon: published frame_id=0 seq=10 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:53,687 INFO image_rx_daemon: frag_arrival: seq=11 idx=0 total=1 fw_us=2152144952 len=149
+
+2026-09-15 20:50:53,696 INFO image_rx_daemon: published frame_id=0 seq=11 145 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:54,204 INFO image_rx_daemon: frag_arrival: seq=12 idx=0 total=1 fw_us=2152658564 len=149
+
+2026-09-15 20:50:54,213 INFO image_rx_daemon: published frame_id=0 seq=12 145 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:54,729 INFO image_rx_daemon: frag_arrival: seq=13 idx=0 total=1 fw_us=2153174530 len=238
+
+2026-09-15 20:50:54,738 INFO image_rx_daemon: published frame_id=0 seq=13 234 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:55,256 INFO image_rx_daemon: frag_arrival: seq=14 idx=0 total=1 fw_us=2153692732 len=247
+
+2026-09-15 20:50:55,264 INFO image_rx_daemon: published frame_id=0 seq=14 243 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:55,719 INFO image_rx_daemon: frag_arrival: seq=15 idx=0 total=1 fw_us=2154163035 len=233
+
+2026-09-15 20:50:55,727 INFO image_rx_daemon: published frame_id=0 seq=15 229 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:56,236 INFO image_rx_daemon: frag_arrival: seq=16 idx=0 total=1 fw_us=2154678207 len=236
+
+2026-09-15 20:50:56,245 INFO image_rx_daemon: published frame_id=0 seq=16 232 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:56,693 INFO image_rx_daemon: frag_arrival: seq=17 idx=0 total=1 fw_us=2155152511 len=138
+
+2026-09-15 20:50:56,702 INFO image_rx_daemon: published frame_id=0 seq=17 134 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:57,228 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=240 snr=5.8 rssi=-65 dump=0102000000000000fe12000000120c0820010000000000400000000000047e0178da0dc5310e83201400d00ff9532724bf3bfeb0d4534082093a4183f781a427307a0037ea29dbb73c0500f35676f3ffdcd6ce0032de6fa7a1ea703f61841a8f62258b21c5fe414657974c2f460ff15241d3ac420369ca54cf017a454ada25cd379f0f51b6c33fc2feb9a8ed2af5073d4e422d33cd4d2ca4d32753cce6263e99a4da772e4f52a47d21d08e8a6d0286b5e4f78ed9a59ae91248fe9068a4a98199079f4d32aa7b2be1ce56b859f17134f1e960f7aae8785999c8a7728795a0c50d5105537f148bd84a34178a3ec7a90709
+
+2026-09-15 20:50:57,737 INFO image_rx_daemon: frag_arrival: seq=19 idx=0 total=1 fw_us=2156182135 len=230
+
+2026-09-15 20:50:57,746 INFO image_rx_daemon: published frame_id=0 seq=19 226 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:58,280 INFO image_rx_daemon: frag_arrival: seq=20 idx=0 total=1 fw_us=2156720183 len=246
+
+2026-09-15 20:50:58,288 INFO image_rx_daemon: published frame_id=0 seq=20 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:58,765 INFO image_rx_daemon: frag_arrival: seq=21 idx=0 total=1 fw_us=2157200886 len=245
+
+2026-09-15 20:50:58,775 INFO image_rx_daemon: published frame_id=0 seq=21 241 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:59,219 INFO image_rx_daemon: frag_arrival: seq=22 idx=0 total=1 fw_us=2157676121 len=152
+
+2026-09-15 20:50:59,228 INFO image_rx_daemon: published frame_id=0 seq=22 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:50:59,692 INFO image_rx_daemon: frag_arrival: seq=23 idx=0 total=1 fw_us=2158150863 len=151
+
+2026-09-15 20:50:59,707 INFO image_rx_daemon: published frame_id=0 seq=23 147 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:00,202 INFO image_rx_daemon: frag_arrival: seq=24 idx=0 total=1 fw_us=2158666601 len=151
+
+2026-09-15 20:51:00,210 INFO image_rx_daemon: published frame_id=0 seq=24 147 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:00,681 INFO image_rx_daemon: frag_arrival: seq=25 idx=0 total=1 fw_us=2159144021 len=152
+
+2026-09-15 20:51:00,689 INFO image_rx_daemon: published frame_id=0 seq=25 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:01,194 INFO image_rx_daemon: frag_arrival: seq=26 idx=0 total=1 fw_us=2159658441 len=149
+
+2026-09-15 20:51:01,202 INFO image_rx_daemon: published frame_id=0 seq=26 145 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:01,639 INFO image_rx_daemon: stats: rx_frames=178 rx_decode_err=0 frames_published=178 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=202 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+2026-09-15 20:51:01,642 INFO image_rx_daemon: air_gap: n=19 dt_med=513578us dt_p95=1029624us len_med=152B cmd_tx_ok=33 cmd_tx_fail=0
+
+2026-09-15 20:51:01,647 INFO image_rx_daemon: air_gap_hist(ms): <1000:18 >=1000:1
+
+2026-09-15 20:51:01,650 INFO image_rx_daemon: rx_rf: n_rssi=19 n_snr=19 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:51:01,653 INFO image_rx_daemon: phase_telemetry: valid=19 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:51:01,656 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=513.6ms
+
+2026-09-15 20:51:01,708 INFO image_rx_daemon: frag_arrival: seq=27 idx=0 total=1 fw_us=2160169440 len=146
+
+2026-09-15 20:51:01,717 INFO image_rx_daemon: published frame_id=0 seq=27 142 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:02,196 INFO image_rx_daemon: frag_arrival: seq=28 idx=0 total=1 fw_us=2160650013 len=152
+
+2026-09-15 20:51:02,203 INFO image_rx_daemon: published frame_id=0 seq=28 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:02,758 INFO image_rx_daemon: frag_arrival: seq=29 idx=0 total=1 fw_us=2161204239 len=246
+
+2026-09-15 20:51:02,767 INFO image_rx_daemon: published frame_id=0 seq=29 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:03,235 INFO image_rx_daemon: frag_arrival: seq=30 idx=0 total=1 fw_us=2161684803 len=241
+
+2026-09-15 20:51:03,243 INFO image_rx_daemon: published frame_id=0 seq=30 237 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:03,752 INFO image_rx_daemon: frag_arrival: seq=31 idx=0 total=1 fw_us=2162198966 len=245
+
+2026-09-15 20:51:03,761 INFO image_rx_daemon: published frame_id=0 seq=31 241 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:04,266 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=241 snr=6.0 rssi=-65 dump=0102000000000000fe2090fa9c7a342a81202607060061dd0060060410814a488f3a34c5a619e43c6c8a7afc7f20559ad1fc7f2b100f4dc9e1816ef9a5fc668d746c3da194f45f7dce0700506b5de0bf3d2e80c4d5720360a9c7d2417fc7690525b6fe72c8fe6af9e691fc68d3f38e3438cbfa410eb89ccb4cbc77b9ac899bb492ba842683a69d46d4835a3c4514d2b9bc636052ddc62f067f189f540178da3d4d311280300c22b90e8cf883f8938efaab9e93735f6c623d73c700040060005ac20b9ce786ef94dc1437cc17eff9ecd472639099290d9704ae86d20207c78ebfc71a8caa5caf21457798bdde037dce05e7
+
+2026-09-15 20:51:04,692 INFO image_rx_daemon: frag_arrival: seq=33 idx=0 total=1 fw_us=2163153325 len=147
+
+2026-09-15 20:51:04,700 INFO image_rx_daemon: published frame_id=0 seq=33 143 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:05,216 INFO image_rx_daemon: frag_arrival: seq=34 idx=0 total=1 fw_us=2163672070 len=152
+
+2026-09-15 20:51:05,226 INFO image_rx_daemon: published frame_id=0 seq=34 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:05,736 INFO image_rx_daemon: frag_arrival: seq=35 idx=0 total=1 fw_us=2164184511 len=244
+
+2026-09-15 20:51:05,744 INFO image_rx_daemon: published frame_id=0 seq=35 240 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:06,256 INFO image_rx_daemon: frag_arrival: seq=36 idx=0 total=1 fw_us=2164697824 len=242
+
+2026-09-15 20:51:06,268 INFO image_rx_daemon: published frame_id=0 seq=36 238 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:06,762 INFO image_rx_daemon: frag_arrival: seq=37 idx=0 total=1 fw_us=2165214656 len=240
+
+2026-09-15 20:51:06,770 INFO image_rx_daemon: published frame_id=0 seq=37 236 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:07,245 INFO image_rx_daemon: frag_arrival: seq=38 idx=0 total=1 fw_us=2165693014 len=237
+
+2026-09-15 20:51:07,253 INFO image_rx_daemon: published frame_id=0 seq=38 233 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:07,763 INFO image_rx_daemon: frag_arrival: seq=39 idx=0 total=1 fw_us=2166207680 len=237
+
+2026-09-15 20:51:07,771 INFO image_rx_daemon: published frame_id=0 seq=39 233 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:08,267 INFO image_rx_daemon: frag_arrival: seq=40 idx=0 total=1 fw_us=2166716642 len=225
+
+2026-09-15 20:51:08,276 INFO image_rx_daemon: published frame_id=0 seq=40 221 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:08,754 INFO image_rx_daemon: frag_arrival: seq=41 idx=0 total=1 fw_us=2167201208 len=246
+
+2026-09-15 20:51:08,761 INFO image_rx_daemon: published frame_id=0 seq=41 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:09,257 INFO image_rx_daemon: frag_arrival: seq=42 idx=0 total=1 fw_us=2167712682 len=233
+
+2026-09-15 20:51:09,265 INFO image_rx_daemon: published frame_id=0 seq=42 229 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:09,740 INFO image_rx_daemon: frag_arrival: seq=43 idx=0 total=1 fw_us=2168188551 len=227
+
+2026-09-15 20:51:09,748 INFO image_rx_daemon: published frame_id=0 seq=43 223 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:10,212 INFO image_rx_daemon: frag_arrival: seq=44 idx=0 total=1 fw_us=2168662673 len=222
+
+2026-09-15 20:51:10,220 INFO image_rx_daemon: published frame_id=0 seq=44 218 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:10,729 INFO image_rx_daemon: frag_arrival: seq=45 idx=0 total=1 fw_us=2169183438 len=234
+
+2026-09-15 20:51:10,737 INFO image_rx_daemon: published frame_id=0 seq=45 230 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:11,197 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=231 snr=6.0 rssi=-65 dump=0102000000000000fe2e0000002e0c0820010000000000004000000000107d0178da0dc5410ac2301005d0b1b818bbfa09e9be0685e22926430a212b85f63e0db4e05af00076d9539ab77944447355a33ccf13163aa9fd4e1ceb3812565ae32b7b73c63b06ef8d6396a07b0bf0751c35016874cb093dd9cd1dd2278977d415a3501d3aac4cd49210ff4d97f62057944b33ff4fc610b08cfb6992c39f804067789e03376240b4666f451483f423015a83f2037b02b89de684130e0e30be10030b078392009ccf029412f0645242368f4941c84380116e000343830250539303d402060033f90591
+
+2026-09-15 20:51:11,663 INFO image_rx_daemon: stats: rx_frames=196 rx_decode_err=0 frames_published=196 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=222 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+2026-09-15 20:51:11,672 INFO image_rx_daemon: air_gap: n=18 dt_med=512441us dt_p95=954359us len_med=237B cmd_tx_ok=33 cmd_tx_fail=0
+
+2026-09-15 20:51:11,676 INFO image_rx_daemon: air_gap_hist(ms): <1000:18
+
+2026-09-15 20:51:11,680 INFO image_rx_daemon: rx_rf: n_rssi=18 n_snr=18 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:51:11,684 INFO image_rx_daemon: phase_telemetry: valid=18 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:51:11,689 INFO image_rx_daemon: air_gap_by_class: boundary: n=18 med=512.4ms
+
+2026-09-15 20:51:11,720 INFO image_rx_daemon: frag_arrival: seq=47 idx=0 total=1 fw_us=2170155407 len=179
+
+2026-09-15 20:51:11,728 INFO image_rx_daemon: published frame_id=0 seq=47 175 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:12,216 INFO image_rx_daemon: frag_arrival: seq=48 idx=0 total=1 fw_us=2170674947 len=187
+
+2026-09-15 20:51:12,226 INFO image_rx_daemon: published frame_id=0 seq=48 183 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:12,719 INFO image_rx_daemon: frag_arrival: seq=49 idx=0 total=1 fw_us=2171168704 len=228
+
+2026-09-15 20:51:12,728 INFO image_rx_daemon: published frame_id=0 seq=49 224 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:13,236 INFO image_rx_daemon: frag_arrival: seq=50 idx=0 total=1 fw_us=2171683823 len=232
+
+2026-09-15 20:51:13,244 INFO image_rx_daemon: published frame_id=0 seq=50 228 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:13,705 INFO image_rx_daemon: frag_arrival: seq=51 idx=0 total=1 fw_us=2172162044 len=235
+
+2026-09-15 20:51:13,713 INFO image_rx_daemon: published frame_id=0 seq=51 231 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:14,226 INFO image_rx_daemon: frag_arrival: seq=52 idx=0 total=1 fw_us=2172680278 len=242
+
+2026-09-15 20:51:14,234 INFO image_rx_daemon: published frame_id=0 seq=52 238 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:51:21,716 INFO image_rx_daemon: stats: rx_frames=202 rx_decode_err=0 frames_published=202 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=232 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=8
+
+2026-09-15 20:51:21,719 INFO image_rx_daemon: air_gap: n=6 dt_med=518234us dt_p95=971969us len_med=232B cmd_tx_ok=33 cmd_tx_fail=0
+
+2026-09-15 20:51:21,722 INFO image_rx_daemon: air_gap_hist(ms): <1000:6
+
+2026-09-15 20:51:21,726 INFO image_rx_daemon: rx_rf: n_rssi=6 n_snr=6 rssi[min/med/max]=-65/-65/-65 snr[min/med/max]=5.0/5.0/5.0
+
+2026-09-15 20:51:21,729 INFO image_rx_daemon: phase_telemetry: valid=6 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:51:21,734 INFO image_rx_daemon: air_gap_by_class: boundary: n=6 med=518.2ms
+
+2026-09-15 20:51:28,517 INFO image_rx_daemon: radio_profile: commanding tractor 2 -> 1 (two-phase)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=10304 legal_dwell_used_us_10s=0
+
+2026-09-15 20:51:28,553 INFO image_rx_daemon: command TX opcode=0x65 copy=1/2 OK (on air)
+
+2026-09-15 20:51:28,780 INFO image_rx_daemon: radio_profile: tractor ACK for 1 — switching locally
+
+INFO: post-VER drain wire   type=0x91 seq=0
+
+Initializing regulatory profile 1 on co-processor...
+
+  FHSS mask: WIDE (50 channels) [LIFETRAC_FHSS_WIDE_MASK=1]
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+CFG_SET_REQ(FHSS_FARM_ID) OK: 17000800
+
+CFG_SET_REQ(FHSS_NODE_ID) OK: 18000800
+
+CFG_SET_REQ(REG_PROFILE=1) OK: 14000100
+
+PHY contract OK: image_bw250 == {'sf': 7, 'bw_khz': 250, 'cr_den': 5, 'preamble': 8}
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=0 channel_idx=3 epoch=0 freq_hz=904250000 pkt_toa_us=20608 legal_dwell_used_us_10s=20608
+
+2026-09-15 20:51:29,524 INFO image_rx_daemon: command TX opcode=0x65 copy=1/1 OK (on air)
+
+2026-09-15 20:51:31,741 INFO image_rx_daemon: stats: rx_frames=202 rx_decode_err=0 frames_published=202 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=232 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+2026-09-15 20:51:41,748 INFO image_rx_daemon: stats: rx_frames=202 rx_decode_err=0 frames_published=202 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=232 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+2026-09-15 20:51:51,756 INFO image_rx_daemon: stats: rx_frames=202 rx_decode_err=0 frames_published=202 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=232 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=39 channel_idx=28 epoch=2 freq_hz=916750000 pkt_toa_us=30848 legal_dwell_used_us_10s=30848
+
+2026-09-15 20:51:57,326 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:52:01,763 INFO image_rx_daemon: stats: rx_frames=202 rx_decode_err=0 frames_published=202 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=232 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=19 channel_idx=2 epoch=3 freq_hz=903750000 pkt_toa_us=30848 legal_dwell_used_us_10s=30848
+
+2026-09-15 20:52:03,329 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=49 channel_idx=41 epoch=3 freq_hz=923250000 pkt_toa_us=30848 legal_dwell_used_us_10s=30848
+
+2026-09-15 20:52:09,351 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:52:11,770 INFO image_rx_daemon: stats: rx_frames=202 rx_decode_err=0 frames_published=202 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=232 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+RFCO_PERTX during TX wait: profile_id=1 tx_status=0x00(OK) hop_idx=14 channel_idx=8 epoch=4 freq_hz=906750000 pkt_toa_us=30848 legal_dwell_used_us_10s=30848
+
+2026-09-15 20:52:12,325 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:52:14,410 WARNING image_rx_daemon: radio_profile: no frames on new profile within 45 s — reverting to 2
+
+Initializing regulatory profile 2 on co-processor...
+
+  FHSS mask: single channel 0 (0100000000000000)
+
+CFG_SET_REQ(FHSS_CHANNEL_MASK) OK: 07000800
+
+CFG_SET_REQ(ANTENNA_GAIN_DBI) OK: 15000100
+
+CFG_SET_REQ(HW_CEILING_DBM) OK: 16000100
+
+  FHSS seed: (0,0) legacy shared permutation [set LIFETRAC_FHSS_FARM_ID / LIFETRAC_FHSS_LINK_ID to separate pairs]
+
+CFG_SET_REQ(FHSS_FARM_ID) OK: 17000800
+
+CFG_SET_REQ(FHSS_NODE_ID) OK: 18000800
+
+CFG_SET_REQ(REG_PROFILE=2) OK: 14000100
+
+  forcing FRF -> 915.000 MHz (raw=0xE4C000 -> Msb=0xE4 Mid=0xC0 Lsb=0x00)
+
+  FRF readback: 0xE4C000 = 915.000 MHz (OK)
+
+PHY contract OK: image_bw500 == {'sf': 7, 'bw_khz': 500, 'cr_den': 5, 'preamble': 8}
+
+2026-09-15 20:52:14,950 INFO image_rx_daemon: radio_profile: RXCONT re-armed (opmode 0x81 -> 0x85)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:52:15,259 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:52:15,444 INFO image_rx_daemon: frag_arrival: seq=86 idx=0 total=1 fw_us=2233950569 len=143
+
+2026-09-15 20:52:15,452 INFO image_rx_daemon: published frame_id=0 seq=86 139 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:15,772 INFO image_rx_daemon: frag_arrival: seq=87 idx=0 total=1 fw_us=2234270072 len=152
+
+2026-09-15 20:52:15,779 INFO image_rx_daemon: published frame_id=0 seq=87 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:16,342 INFO image_rx_daemon: frag_arrival: seq=88 idx=0 total=1 fw_us=2234826601 len=247
+
+2026-09-15 20:52:16,351 INFO image_rx_daemon: published frame_id=0 seq=88 243 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:16,773 INFO image_rx_daemon: frag_arrival: seq=89 idx=0 total=1 fw_us=2235278179 len=147
+
+2026-09-15 20:52:16,782 INFO image_rx_daemon: published frame_id=0 seq=89 143 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:17,272 INFO image_rx_daemon: frag_arrival: seq=90 idx=0 total=1 fw_us=2235777861 len=133
+
+2026-09-15 20:52:17,280 INFO image_rx_daemon: published frame_id=0 seq=90 129 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:17,775 INFO image_rx_daemon: frag_arrival: seq=91 idx=0 total=1 fw_us=2236263180 len=138
+
+2026-09-15 20:52:17,783 INFO image_rx_daemon: published frame_id=0 seq=91 134 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:18,266 INFO image_rx_daemon: frag_arrival: seq=92 idx=0 total=1 fw_us=2236767589 len=150
+
+2026-09-15 20:52:18,275 INFO image_rx_daemon: published frame_id=0 seq=92 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:18,768 INFO image_rx_daemon: frag_arrival: seq=93 idx=0 total=1 fw_us=2237269847 len=152
+
+2026-09-15 20:52:18,777 INFO image_rx_daemon: published frame_id=0 seq=93 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:19,259 INFO image_rx_daemon: frag_arrival: seq=94 idx=0 total=1 fw_us=2237766973 len=147
+
+2026-09-15 20:52:19,267 INFO image_rx_daemon: published frame_id=0 seq=94 143 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:19,767 INFO image_rx_daemon: frag_arrival: seq=95 idx=0 total=1 fw_us=2238270170 len=152
+
+2026-09-15 20:52:19,782 INFO image_rx_daemon: published frame_id=0 seq=95 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:20,322 INFO image_rx_daemon: frag_arrival: seq=96 idx=0 total=1 fw_us=2238805431 len=236
+
+2026-09-15 20:52:20,332 INFO image_rx_daemon: published frame_id=0 seq=96 232 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:20,770 INFO image_rx_daemon: frag_arrival: seq=97 idx=0 total=1 fw_us=2239270717 len=152
+
+2026-09-15 20:52:20,779 INFO image_rx_daemon: published frame_id=0 seq=97 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:21,269 INFO image_rx_daemon: frag_arrival: seq=98 idx=0 total=1 fw_us=2239770491 len=152
+
+2026-09-15 20:52:21,277 INFO image_rx_daemon: published frame_id=0 seq=98 148 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:52:21,316 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:52:21,791 INFO image_rx_daemon: stats: rx_frames=215 rx_decode_err=0 frames_published=215 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=246 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+2026-09-15 20:52:21,794 INFO image_rx_daemon: air_gap: n=12 dt_med=499774us dt_p95=556529us len_med=152B cmd_tx_ok=41 cmd_tx_fail=0
+
+2026-09-15 20:52:21,818 INFO image_rx_daemon: air_gap_hist(ms): <400:1 <1000:11
+
+2026-09-15 20:52:21,822 INFO image_rx_daemon: rx_rf: n_rssi=13 n_snr=13 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:52:21,824 INFO image_rx_daemon: phase_telemetry: valid=13 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:52:21,834 INFO image_rx_daemon: air_gap_by_class: boundary: n=12 med=499.8ms
+
+2026-09-15 20:52:21,836 INFO image_rx_daemon: frag_arrival: seq=99 idx=0 total=1 fw_us=2240300306 len=223
+
+2026-09-15 20:52:21,845 INFO image_rx_daemon: published frame_id=0 seq=99 219 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:22,264 INFO image_rx_daemon: frag_arrival: seq=100 idx=0 total=1 fw_us=2240769507 len=148
+
+2026-09-15 20:52:22,273 INFO image_rx_daemon: published frame_id=0 seq=100 144 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:22,778 INFO image_rx_daemon: frag_arrival: seq=101 idx=0 total=1 fw_us=2241283922 len=152
+
+2026-09-15 20:52:22,791 INFO image_rx_daemon: published frame_id=0 seq=101 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:23,312 INFO image_rx_daemon: frag_arrival: seq=102 idx=0 total=1 fw_us=2241806918 len=243
+
+2026-09-15 20:52:23,331 INFO image_rx_daemon: published frame_id=0 seq=102 239 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:23,763 INFO image_rx_daemon: frag_arrival: seq=103 idx=0 total=1 fw_us=2242270440 len=148
+
+2026-09-15 20:52:23,771 INFO image_rx_daemon: published frame_id=0 seq=103 144 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:24,260 INFO image_rx_daemon: frag_arrival: seq=104 idx=0 total=1 fw_us=2242768950 len=147
+
+2026-09-15 20:52:24,271 INFO image_rx_daemon: published frame_id=0 seq=104 143 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:24,310 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:52:24,821 INFO image_rx_daemon: frag_arrival: seq=105 idx=0 total=1 fw_us=2243311438 len=246
+
+2026-09-15 20:52:24,831 INFO image_rx_daemon: published frame_id=0 seq=105 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:25,322 INFO image_rx_daemon: frag_arrival: seq=106 idx=0 total=1 fw_us=2243808741 len=247
+
+2026-09-15 20:52:25,331 INFO image_rx_daemon: published frame_id=0 seq=106 243 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:25,823 INFO image_rx_daemon: frag_arrival: seq=107 idx=0 total=1 fw_us=2244308440 len=246
+
+2026-09-15 20:52:25,836 INFO image_rx_daemon: published frame_id=0 seq=107 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:26,302 INFO image_rx_daemon: frag_arrival: seq=108 idx=0 total=1 fw_us=2244799944 len=218
+
+2026-09-15 20:52:26,310 INFO image_rx_daemon: published frame_id=0 seq=108 214 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:26,815 INFO image_rx_daemon: frag_arrival: seq=109 idx=0 total=1 fw_us=2245306356 len=233
+
+2026-09-15 20:52:26,823 INFO image_rx_daemon: published frame_id=0 seq=109 229 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:27,319 INFO image_rx_daemon: frag_arrival: seq=110 idx=0 total=1 fw_us=2245807778 len=236
+
+2026-09-15 20:52:27,327 INFO image_rx_daemon: published frame_id=0 seq=110 232 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:52:27,367 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:52:27,810 INFO image_rx_daemon: frag_arrival: seq=111 idx=0 total=1 fw_us=2246307395 len=224
+
+2026-09-15 20:52:27,819 INFO image_rx_daemon: published frame_id=0 seq=111 220 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:28,309 INFO image_rx_daemon: frag_arrival: seq=112 idx=0 total=1 fw_us=2246802170 len=223
+
+2026-09-15 20:52:28,317 INFO image_rx_daemon: published frame_id=0 seq=112 219 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:28,814 INFO image_rx_daemon: frag_arrival: seq=113 idx=0 total=1 fw_us=2247310802 len=247
+
+2026-09-15 20:52:28,823 INFO image_rx_daemon: published frame_id=0 seq=113 243 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:29,322 INFO image_rx_daemon: frag_arrival: seq=114 idx=0 total=1 fw_us=2247817790 len=239
+
+2026-09-15 20:52:29,331 INFO image_rx_daemon: published frame_id=0 seq=114 235 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:29,822 INFO image_rx_daemon: frag_arrival: seq=115 idx=0 total=1 fw_us=2248311612 len=246
+
+2026-09-15 20:52:29,833 INFO image_rx_daemon: published frame_id=0 seq=115 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:30,294 INFO image_rx_daemon: frag_arrival: seq=116 idx=0 total=1 fw_us=2248796562 len=208
+
+2026-09-15 20:52:30,303 INFO image_rx_daemon: published frame_id=0 seq=116 204 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:30,818 INFO image_rx_daemon: frag_arrival: seq=117 idx=0 total=1 fw_us=2249317179 len=227
+
+2026-09-15 20:52:30,826 INFO image_rx_daemon: published frame_id=0 seq=117 223 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:52:30,865 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:52:31,288 INFO image_rx_daemon: frag_arrival: seq=118 idx=0 total=1 fw_us=2249788016 len=187
+
+2026-09-15 20:52:31,296 INFO image_rx_daemon: published frame_id=0 seq=118 183 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:31,783 INFO image_rx_daemon: frag_arrival: seq=119 idx=0 total=1 fw_us=2250288492 len=187
+
+2026-09-15 20:52:31,790 INFO image_rx_daemon: published frame_id=0 seq=119 183 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:31,848 INFO image_rx_daemon: stats: rx_frames=236 rx_decode_err=0 frames_published=236 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=266 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+2026-09-15 20:52:31,851 INFO image_rx_daemon: air_gap: n=21 dt_med=499699us dt_p95=529815us len_med=224B cmd_tx_ok=44 cmd_tx_fail=0
+
+2026-09-15 20:52:31,855 INFO image_rx_daemon: air_gap_hist(ms): <1000:21
+
+2026-09-15 20:52:31,858 INFO image_rx_daemon: rx_rf: n_rssi=21 n_snr=21 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:52:31,866 INFO image_rx_daemon: phase_telemetry: valid=20 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:52:31,870 INFO image_rx_daemon: air_gap_by_class: boundary: n=21 med=499.7ms
+
+2026-09-15 20:52:32,300 INFO image_rx_daemon: frag_arrival: seq=120 idx=0 total=1 fw_us=2250801689 len=220
+
+2026-09-15 20:52:32,308 INFO image_rx_daemon: published frame_id=0 seq=120 216 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:32,825 INFO image_rx_daemon: frag_arrival: seq=121 idx=0 total=1 fw_us=2251317193 len=232
+
+2026-09-15 20:52:32,834 INFO image_rx_daemon: published frame_id=0 seq=121 228 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:33,338 INFO image_rx_daemon: frag_arrival: seq=122 idx=0 total=1 fw_us=2251823050 len=247
+
+2026-09-15 20:52:33,345 INFO image_rx_daemon: published frame_id=0 seq=122 243 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:52:33,384 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:52:33,764 INFO image_rx_daemon: frag_arrival: seq=123 idx=0 total=1 fw_us=2252271640 len=149
+
+2026-09-15 20:52:33,772 INFO image_rx_daemon: published frame_id=0 seq=123 145 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:34,313 INFO image_rx_daemon: frag_arrival: seq=124 idx=0 total=1 fw_us=2252810786 len=246
+
+2026-09-15 20:52:34,321 INFO image_rx_daemon: published frame_id=0 seq=124 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:34,761 INFO image_rx_daemon: frag_arrival: seq=125 idx=0 total=1 fw_us=2253271402 len=151
+
+2026-09-15 20:52:34,778 INFO image_rx_daemon: published frame_id=0 seq=125 147 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:35,265 INFO image_rx_daemon: frag_arrival: seq=126 idx=0 total=1 fw_us=2253770911 len=149
+
+2026-09-15 20:52:35,274 INFO image_rx_daemon: published frame_id=0 seq=126 145 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:35,768 INFO image_rx_daemon: frag_arrival: seq=127 idx=0 total=1 fw_us=2254272261 len=152
+
+2026-09-15 20:52:35,789 INFO image_rx_daemon: published frame_id=0 seq=127 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:36,306 INFO image_rx_daemon: frag_arrival: seq=128 idx=0 total=1 fw_us=2254805723 len=237
+
+2026-09-15 20:52:36,318 INFO image_rx_daemon: published frame_id=0 seq=128 233 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:36,760 INFO image_rx_daemon: frag_arrival: seq=129 idx=0 total=1 fw_us=2255271187 len=152
+
+2026-09-15 20:52:36,774 INFO image_rx_daemon: published frame_id=0 seq=129 148 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:52:36,818 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:52:37,310 INFO image_rx_daemon: frag_arrival: seq=130 idx=0 total=1 fw_us=2255807270 len=239
+
+2026-09-15 20:52:37,319 INFO image_rx_daemon: published frame_id=0 seq=130 235 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:37,814 INFO image_rx_daemon: frag_arrival: seq=131 idx=0 total=1 fw_us=2256306839 len=242
+
+2026-09-15 20:52:37,822 INFO image_rx_daemon: published frame_id=0 seq=131 238 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:38,253 INFO image_rx_daemon: frag_arrival: seq=132 idx=0 total=1 fw_us=2256770291 len=150
+
+2026-09-15 20:52:38,261 INFO image_rx_daemon: published frame_id=0 seq=132 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:38,754 INFO image_rx_daemon: frag_arrival: seq=133 idx=0 total=1 fw_us=2257271539 len=150
+
+2026-09-15 20:52:38,762 INFO image_rx_daemon: published frame_id=0 seq=133 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:39,263 INFO image_rx_daemon: frag_arrival: seq=134 idx=0 total=1 fw_us=2257771137 len=149
+
+2026-09-15 20:52:39,271 INFO image_rx_daemon: published frame_id=0 seq=134 145 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:39,755 INFO image_rx_daemon: frag_arrival: seq=135 idx=0 total=1 fw_us=2258272917 len=152
+
+2026-09-15 20:52:39,764 INFO image_rx_daemon: published frame_id=0 seq=135 148 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:52:39,806 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:52:40,264 INFO image_rx_daemon: frag_arrival: seq=136 idx=0 total=1 fw_us=2258773533 len=152
+
+2026-09-15 20:52:40,273 INFO image_rx_daemon: published frame_id=0 seq=136 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:40,817 INFO image_rx_daemon: frag_arrival: seq=137 idx=0 total=1 fw_us=2259314441 len=236
+
+2026-09-15 20:52:40,825 INFO image_rx_daemon: published frame_id=0 seq=137 232 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:41,254 INFO image_rx_daemon: frag_arrival: seq=138 idx=0 total=1 fw_us=2259772656 len=150
+
+2026-09-15 20:52:41,265 INFO image_rx_daemon: published frame_id=0 seq=138 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:41,803 INFO image_rx_daemon: frag_arrival: seq=139 idx=0 total=1 fw_us=2260305105 len=229
+
+2026-09-15 20:52:41,812 INFO image_rx_daemon: published frame_id=0 seq=139 225 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:41,885 INFO image_rx_daemon: stats: rx_frames=256 rx_decode_err=0 frames_published=256 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=286 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+2026-09-15 20:52:41,888 INFO image_rx_daemon: air_gap: n=20 dt_med=501350us dt_p95=540908us len_med=152B cmd_tx_ok=47 cmd_tx_fail=0
+
+2026-09-15 20:52:41,892 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-09-15 20:52:41,896 INFO image_rx_daemon: rx_rf: n_rssi=20 n_snr=20 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:52:41,900 INFO image_rx_daemon: phase_telemetry: valid=20 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:52:41,903 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=501.4ms
+
+2026-09-15 20:52:42,257 INFO image_rx_daemon: frag_arrival: seq=140 idx=0 total=1 fw_us=2260772608 len=150
+
+2026-09-15 20:52:42,266 INFO image_rx_daemon: published frame_id=0 seq=140 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:42,765 INFO image_rx_daemon: frag_arrival: seq=141 idx=0 total=1 fw_us=2261274721 len=152
+
+2026-09-15 20:52:42,774 INFO image_rx_daemon: published frame_id=0 seq=141 148 B → lifetrac/v25/video/tile_delta
+
+RFCO_PERTX during TX wait: profile_id=2 tx_status=0x00(OK) hop_idx=0 channel_idx=0 epoch=0 freq_hz=0 pkt_toa_us=15424 legal_dwell_used_us_10s=0
+
+2026-09-15 20:52:42,818 INFO image_rx_daemon: command TX opcode=0x6c copy=1/1 OK (on air)
+
+2026-09-15 20:52:43,308 INFO image_rx_daemon: frag_arrival: seq=142 idx=0 total=1 fw_us=2261808058 len=236
+
+2026-09-15 20:52:43,317 INFO image_rx_daemon: published frame_id=0 seq=142 232 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:43,759 INFO image_rx_daemon: frag_arrival: seq=143 idx=0 total=1 fw_us=2262273554 len=152
+
+2026-09-15 20:52:43,767 INFO image_rx_daemon: published frame_id=0 seq=143 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:44,252 INFO image_rx_daemon: frag_arrival: seq=144 idx=0 total=1 fw_us=2262773191 len=148
+
+2026-09-15 20:52:44,261 INFO image_rx_daemon: published frame_id=0 seq=144 144 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:44,742 INFO image_rx_daemon: frag_arrival: seq=145 idx=0 total=1 fw_us=2263261933 len=122
+
+2026-09-15 20:52:44,751 INFO image_rx_daemon: published frame_id=0 seq=145 118 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:45,346 INFO image_rx_daemon: frag_arrival: seq=146 idx=0 total=1 fw_us=2263844945 len=239
+
+2026-09-15 20:52:45,354 INFO image_rx_daemon: published frame_id=0 seq=146 235 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:45,837 INFO image_rx_daemon: frag_arrival: seq=147 idx=0 total=1 fw_us=2264336716 len=240
+
+2026-09-15 20:52:45,846 INFO image_rx_daemon: published frame_id=0 seq=147 236 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:46,329 INFO image_rx_daemon: frag_arrival: seq=148 idx=0 total=1 fw_us=2264828190 len=243
+
+2026-09-15 20:52:46,338 INFO image_rx_daemon: published frame_id=0 seq=148 239 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:46,824 INFO image_rx_daemon: frag_arrival: seq=149 idx=0 total=1 fw_us=2265324939 len=225
+
+2026-09-15 20:52:46,847 INFO image_rx_daemon: published frame_id=0 seq=149 221 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:47,267 INFO image_rx_daemon: frag_arrival: seq=150 idx=0 total=1 fw_us=2265782909 len=152
+
+2026-09-15 20:52:47,275 INFO image_rx_daemon: published frame_id=0 seq=150 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:47,818 INFO image_rx_daemon: frag_arrival: seq=151 idx=0 total=1 fw_us=2266316640 len=235
+
+2026-09-15 20:52:47,827 INFO image_rx_daemon: published frame_id=0 seq=151 231 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:48,254 INFO image_rx_daemon: frag_arrival: seq=152 idx=0 total=1 fw_us=2266773204 len=130
+
+2026-09-15 20:52:48,265 INFO image_rx_daemon: published frame_id=0 seq=152 126 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:48,761 INFO image_rx_daemon: frag_arrival: seq=153 idx=0 total=1 fw_us=2267281796 len=148
+
+2026-09-15 20:52:48,775 INFO image_rx_daemon: published frame_id=0 seq=153 144 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:49,259 INFO image_rx_daemon: frag_arrival: seq=154 idx=0 total=1 fw_us=2267780727 len=147
+
+2026-09-15 20:52:49,268 INFO image_rx_daemon: published frame_id=0 seq=154 143 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:49,761 INFO image_rx_daemon: frag_arrival: seq=155 idx=0 total=1 fw_us=2268279666 len=144
+
+2026-09-15 20:52:49,770 INFO image_rx_daemon: published frame_id=0 seq=155 140 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:50,323 INFO image_rx_daemon: frag_arrival: seq=156 idx=0 total=1 fw_us=2268824438 len=229
+
+2026-09-15 20:52:50,334 INFO image_rx_daemon: published frame_id=0 seq=156 225 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:50,762 INFO image_rx_daemon: frag_arrival: seq=157 idx=0 total=1 fw_us=2269279948 len=146
+
+2026-09-15 20:52:50,770 INFO image_rx_daemon: published frame_id=0 seq=157 142 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:51,266 INFO image_rx_daemon: frag_arrival: seq=158 idx=0 total=1 fw_us=2269782857 len=152
+
+2026-09-15 20:52:51,274 INFO image_rx_daemon: published frame_id=0 seq=158 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:51,814 INFO image_rx_daemon: frag_arrival: seq=159 idx=0 total=1 fw_us=2270317254 len=235
+
+2026-09-15 20:52:51,822 INFO image_rx_daemon: published frame_id=0 seq=159 231 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:51,910 INFO image_rx_daemon: stats: rx_frames=276 rx_decode_err=0 frames_published=276 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=307 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+2026-09-15 20:52:51,913 INFO image_rx_daemon: air_gap: n=20 dt_med=498939us dt_p95=583012us len_med=152B cmd_tx_ok=48 cmd_tx_fail=0
+
+2026-09-15 20:52:51,919 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-09-15 20:52:51,923 INFO image_rx_daemon: rx_rf: n_rssi=20 n_snr=20 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:52:51,926 INFO image_rx_daemon: phase_telemetry: valid=20 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:52:51,933 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=498.9ms
+
+2026-09-15 20:52:52,261 INFO image_rx_daemon: frag_arrival: seq=160 idx=0 total=1 fw_us=2270783646 len=152
+
+2026-09-15 20:52:52,269 INFO image_rx_daemon: published frame_id=0 seq=160 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:52,768 INFO image_rx_daemon: frag_arrival: seq=161 idx=0 total=1 fw_us=2271282159 len=149
+
+2026-09-15 20:52:52,776 INFO image_rx_daemon: published frame_id=0 seq=161 145 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:53,260 INFO image_rx_daemon: frag_arrival: seq=162 idx=0 total=1 fw_us=2271783031 len=152
+
+2026-09-15 20:52:53,271 INFO image_rx_daemon: published frame_id=0 seq=162 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:53,765 INFO image_rx_daemon: frag_arrival: seq=163 idx=0 total=1 fw_us=2272283539 len=152
+
+2026-09-15 20:52:53,773 INFO image_rx_daemon: published frame_id=0 seq=163 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:54,257 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=155 snr=5.8 rssi=-65 dump=0102000000000000fea4000000a40c0820010000100000000000000000007b0178da25c5b10a8360d404cda2ec2024dc30e23640f047dd6286b8e2e820b9ff83fd2786e5b3c3caf2313614e395775bc4538c7bbf12f0dab1dbdf627168a6d99f1fe669a3a781bf28d83f222be178b2acdeb5ebfb727c8276c22e16832f57ab7409ef9286419bf85a5683b34bc29c237e652701d7078d3f8ed51e2d
+
+2026-09-15 20:52:54,764 INFO image_rx_daemon: frag_arrival: seq=165 idx=0 total=1 fw_us=2273284105 len=152
+
+2026-09-15 20:52:54,772 INFO image_rx_daemon: published frame_id=0 seq=165 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:55,269 INFO image_rx_daemon: frag_arrival: seq=166 idx=0 total=1 fw_us=2273784712 len=152
+
+2026-09-15 20:52:55,278 INFO image_rx_daemon: published frame_id=0 seq=166 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:55,828 INFO image_rx_daemon: frag_arrival: seq=167 idx=0 total=1 fw_us=2274333278 len=241
+
+2026-09-15 20:52:55,836 INFO image_rx_daemon: published frame_id=0 seq=167 237 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:56,261 INFO image_rx_daemon: frag_arrival: seq=168 idx=0 total=1 fw_us=2274783351 len=148
+
+2026-09-15 20:52:56,269 INFO image_rx_daemon: published frame_id=0 seq=168 144 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:56,762 INFO image_rx_daemon: frag_arrival: seq=169 idx=0 total=1 fw_us=2275283103 len=148
+
+2026-09-15 20:52:56,771 INFO image_rx_daemon: published frame_id=0 seq=169 144 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:57,263 INFO image_rx_daemon: frag_arrival: seq=170 idx=0 total=1 fw_us=2275784966 len=152
+
+2026-09-15 20:52:57,272 INFO image_rx_daemon: published frame_id=0 seq=170 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:57,816 INFO image_rx_daemon: frag_arrival: seq=171 idx=0 total=1 fw_us=2276321433 len=241
+
+2026-09-15 20:52:57,825 INFO image_rx_daemon: published frame_id=0 seq=171 237 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:58,315 INFO image_rx_daemon: frag_arrival: seq=172 idx=0 total=1 fw_us=2276821805 len=241
+
+2026-09-15 20:52:58,322 INFO image_rx_daemon: published frame_id=0 seq=172 237 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:58,805 INFO image_rx_daemon: frag_arrival: seq=173 idx=0 total=1 fw_us=2277315851 len=227
+
+2026-09-15 20:52:58,814 INFO image_rx_daemon: published frame_id=0 seq=173 223 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:59,324 INFO image_rx_daemon: frag_arrival: seq=174 idx=0 total=1 fw_us=2277822624 len=224
+
+2026-09-15 20:52:59,344 INFO image_rx_daemon: published frame_id=0 seq=174 220 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:52:59,827 INFO image_rx_daemon: frag_arrival: seq=175 idx=0 total=1 fw_us=2278332612 len=238
+
+2026-09-15 20:52:59,838 INFO image_rx_daemon: published frame_id=0 seq=175 234 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:00,309 INFO image_rx_daemon: frag_arrival: seq=176 idx=0 total=1 fw_us=2278819624 len=235
+
+2026-09-15 20:53:00,318 INFO image_rx_daemon: published frame_id=0 seq=176 231 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:00,815 INFO image_rx_daemon: frag_arrival: seq=177 idx=0 total=1 fw_us=2279322666 len=246
+
+2026-09-15 20:53:00,824 INFO image_rx_daemon: published frame_id=0 seq=177 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:01,296 INFO image_rx_daemon: frag_arrival: seq=178 idx=0 total=1 fw_us=2279807092 len=201
+
+2026-09-15 20:53:01,308 INFO image_rx_daemon: published frame_id=0 seq=178 197 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:01,808 INFO image_rx_daemon: frag_arrival: seq=179 idx=0 total=1 fw_us=2280313738 len=219
+
+2026-09-15 20:53:01,816 INFO image_rx_daemon: published frame_id=0 seq=179 215 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:01,940 INFO image_rx_daemon: stats: rx_frames=295 rx_decode_err=0 frames_published=295 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=327 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+2026-09-15 20:53:01,943 INFO image_rx_daemon: air_gap: n=19 dt_med=500607us dt_p95=1000566us len_med=201B cmd_tx_ok=48 cmd_tx_fail=0
+
+2026-09-15 20:53:01,948 INFO image_rx_daemon: air_gap_hist(ms): <1000:18 >=1000:1
+
+2026-09-15 20:53:01,951 INFO image_rx_daemon: rx_rf: n_rssi=19 n_snr=19 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:53:01,954 INFO image_rx_daemon: phase_telemetry: valid=19 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:53:01,958 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=500.6ms
+
+2026-09-15 20:53:02,316 INFO image_rx_daemon: frag_arrival: seq=180 idx=0 total=1 fw_us=2280819065 len=233
+
+2026-09-15 20:53:02,325 INFO image_rx_daemon: published frame_id=0 seq=180 229 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:02,818 INFO image_rx_daemon: frag_arrival: seq=181 idx=0 total=1 fw_us=2281321534 len=243
+
+2026-09-15 20:53:02,826 INFO image_rx_daemon: published frame_id=0 seq=181 239 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:02,912 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=251 snr=-11.8 rssi=-114 dump=e4aab90ecf90a1de961f47914215724c94ed32336c888a9722b4d0ced14ee216b8cba20f80d8180e68ecb56c349754bc549b0426b411df6098e6a235532ecc9231be45717716d01ab44d82a66633203a46c97e5e1db4902c5209bc4759588064c8d95e2f82ee224a7d54902822486798d3827702294be9c40393bb5d582ecd76c6d4b5f03870161330affea816f46c5438381428e201a65304b8894145d4e86dc0d95603d021ef5ad00b446d0b231943d472572070b11eee2e784118d7a7838cac86551ccc22c6c72790febaaaf0119367232a160911aab7e4bcfe7dc201302742fc4df04a2f922f3323e39f0c904bd89859b5822fb0c356906678
+
+2026-09-15 20:53:03,306 INFO image_rx_daemon: frag_arrival: seq=182 idx=0 total=1 fw_us=2281813096 len=217
+
+2026-09-15 20:53:03,314 INFO image_rx_daemon: published frame_id=0 seq=182 213 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:03,821 INFO image_rx_daemon: frag_arrival: seq=183 idx=0 total=1 fw_us=2282332074 len=234
+
+2026-09-15 20:53:03,829 INFO image_rx_daemon: published frame_id=0 seq=183 230 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:04,288 INFO image_rx_daemon: frag_arrival: seq=184 idx=0 total=1 fw_us=2282805667 len=197
+
+2026-09-15 20:53:04,296 INFO image_rx_daemon: published frame_id=0 seq=184 193 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:04,801 INFO image_rx_daemon: frag_arrival: seq=185 idx=0 total=1 fw_us=2283311244 len=213
+
+2026-09-15 20:53:04,810 INFO image_rx_daemon: published frame_id=0 seq=185 209 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:05,316 INFO image_rx_daemon: frag_arrival: seq=186 idx=0 total=1 fw_us=2283820531 len=236
+
+2026-09-15 20:53:05,324 INFO image_rx_daemon: published frame_id=0 seq=186 232 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:05,808 INFO image_rx_daemon: frag_arrival: seq=187 idx=0 total=1 fw_us=2284320989 len=236
+
+2026-09-15 20:53:05,817 INFO image_rx_daemon: published frame_id=0 seq=187 232 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:06,317 INFO image_rx_daemon: frag_arrival: seq=188 idx=0 total=1 fw_us=2284822248 len=241
+
+2026-09-15 20:53:06,325 INFO image_rx_daemon: published frame_id=0 seq=188 237 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:06,812 INFO image_rx_daemon: frag_arrival: seq=189 idx=0 total=1 fw_us=2285321571 len=245
+
+2026-09-15 20:53:06,821 INFO image_rx_daemon: published frame_id=0 seq=189 241 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:07,315 INFO image_rx_daemon: frag_arrival: seq=190 idx=0 total=1 fw_us=2285820255 len=233
+
+2026-09-15 20:53:07,323 INFO image_rx_daemon: published frame_id=0 seq=190 229 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:07,822 INFO image_rx_daemon: frag_arrival: seq=191 idx=0 total=1 fw_us=2286325305 len=246
+
+2026-09-15 20:53:07,830 INFO image_rx_daemon: published frame_id=0 seq=191 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:08,258 INFO image_rx_daemon: frag_arrival: seq=192 idx=0 total=1 fw_us=2286786769 len=152
+
+2026-09-15 20:53:08,267 INFO image_rx_daemon: published frame_id=0 seq=192 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:08,760 INFO image_rx_daemon: frag_arrival: seq=193 idx=0 total=1 fw_us=2287285402 len=150
+
+2026-09-15 20:53:08,769 INFO image_rx_daemon: published frame_id=0 seq=193 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:09,257 INFO image_rx_daemon: frag_arrival: seq=194 idx=0 total=1 fw_us=2287786805 len=152
+
+2026-09-15 20:53:09,266 INFO image_rx_daemon: published frame_id=0 seq=194 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:09,761 INFO image_rx_daemon: frag_arrival: seq=195 idx=0 total=1 fw_us=2288291236 len=152
+
+2026-09-15 20:53:09,769 INFO image_rx_daemon: published frame_id=0 seq=195 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:10,319 INFO image_rx_daemon: frag_arrival: seq=196 idx=0 total=1 fw_us=2288829292 len=234
+
+2026-09-15 20:53:10,327 INFO image_rx_daemon: published frame_id=0 seq=196 230 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:10,756 INFO image_rx_daemon: frag_arrival: seq=197 idx=0 total=1 fw_us=2289285556 len=150
+
+2026-09-15 20:53:10,764 INFO image_rx_daemon: published frame_id=0 seq=197 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:11,258 INFO image_rx_daemon: frag_arrival: seq=198 idx=0 total=1 fw_us=2289785658 len=148
+
+2026-09-15 20:53:11,267 INFO image_rx_daemon: published frame_id=0 seq=198 144 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:11,775 INFO image_rx_daemon: frag_arrival: seq=199 idx=0 total=1 fw_us=2290299137 len=152
+
+2026-09-15 20:53:11,785 INFO image_rx_daemon: published frame_id=0 seq=199 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:11,965 INFO image_rx_daemon: stats: rx_frames=315 rx_decode_err=0 frames_published=315 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=347 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+2026-09-15 20:53:11,968 INFO image_rx_daemon: air_gap: n=20 dt_med=501403us dt_p95=538056us len_med=233B cmd_tx_ok=48 cmd_tx_fail=0
+
+2026-09-15 20:53:11,973 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-09-15 20:53:11,979 INFO image_rx_daemon: rx_rf: n_rssi=20 n_snr=20 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/5.0/6.0
+
+2026-09-15 20:53:11,981 INFO image_rx_daemon: phase_telemetry: valid=20 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:53:11,989 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=501.4ms
+
+2026-09-15 20:53:12,267 INFO image_rx_daemon: frag_arrival: seq=200 idx=0 total=1 fw_us=2290787645 len=152
+
+2026-09-15 20:53:12,276 INFO image_rx_daemon: published frame_id=0 seq=200 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:12,762 INFO image_rx_daemon: frag_arrival: seq=201 idx=0 total=1 fw_us=2291287390 len=152
+
+2026-09-15 20:53:12,770 INFO image_rx_daemon: published frame_id=0 seq=201 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:13,298 INFO image_rx_daemon: frag_arrival: seq=202 idx=0 total=1 fw_us=2291817335 len=225
+
+2026-09-15 20:53:13,306 INFO image_rx_daemon: published frame_id=0 seq=202 221 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:13,817 INFO image_rx_daemon: frag_arrival: seq=203 idx=0 total=1 fw_us=2292327202 len=227
+
+2026-09-15 20:53:13,826 INFO image_rx_daemon: published frame_id=0 seq=203 223 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:14,316 INFO image_rx_daemon: frag_arrival: seq=204 idx=0 total=1 fw_us=2292825640 len=246
+
+2026-09-15 20:53:14,325 INFO image_rx_daemon: published frame_id=0 seq=204 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:14,821 INFO image_rx_daemon: frag_arrival: seq=205 idx=0 total=1 fw_us=2293330826 len=237
+
+2026-09-15 20:53:14,829 INFO image_rx_daemon: published frame_id=0 seq=205 233 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:15,315 INFO image_rx_daemon: frag_arrival: seq=206 idx=0 total=1 fw_us=2293826498 len=246
+
+2026-09-15 20:53:15,324 INFO image_rx_daemon: published frame_id=0 seq=206 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:15,766 INFO image_rx_daemon: frag_arrival: seq=207 idx=0 total=1 fw_us=2294295953 len=151
+
+2026-09-15 20:53:15,774 INFO image_rx_daemon: published frame_id=0 seq=207 147 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:16,320 INFO image_rx_daemon: frag_arrival: seq=208 idx=0 total=1 fw_us=2294826854 len=246
+
+2026-09-15 20:53:16,329 INFO image_rx_daemon: published frame_id=0 seq=208 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:16,817 INFO image_rx_daemon: frag_arrival: seq=209 idx=0 total=1 fw_us=2295319120 len=231
+
+2026-09-15 20:53:16,849 INFO image_rx_daemon: published frame_id=0 seq=209 227 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:17,263 INFO image_rx_daemon: frag_arrival: seq=210 idx=0 total=1 fw_us=2295787098 len=152
+
+2026-09-15 20:53:17,272 INFO image_rx_daemon: published frame_id=0 seq=210 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:17,754 INFO image_rx_daemon: frag_arrival: seq=211 idx=0 total=1 fw_us=2296281180 len=140
+
+2026-09-15 20:53:17,762 INFO image_rx_daemon: published frame_id=0 seq=211 136 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:18,260 INFO image_rx_daemon: frag_arrival: seq=212 idx=0 total=1 fw_us=2296783777 len=146
+
+2026-09-15 20:53:18,268 INFO image_rx_daemon: published frame_id=0 seq=212 142 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:18,762 INFO image_rx_daemon: frag_arrival: seq=213 idx=0 total=1 fw_us=2297286440 len=152
+
+2026-09-15 20:53:18,770 INFO image_rx_daemon: published frame_id=0 seq=213 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:19,306 INFO image_rx_daemon: frag_arrival: seq=214 idx=0 total=1 fw_us=2297818948 len=235
+
+2026-09-15 20:53:19,315 INFO image_rx_daemon: published frame_id=0 seq=214 231 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:19,740 INFO image_rx_daemon: frag_arrival: seq=215 idx=0 total=1 fw_us=2298276047 len=130
+
+2026-09-15 20:53:19,748 INFO image_rx_daemon: published frame_id=0 seq=215 126 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:20,253 INFO image_rx_daemon: frag_arrival: seq=216 idx=0 total=1 fw_us=2298785364 len=148
+
+2026-09-15 20:53:20,261 INFO image_rx_daemon: published frame_id=0 seq=216 144 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:20,756 INFO image_rx_daemon: frag_arrival: seq=217 idx=0 total=1 fw_us=2299283582 len=147
+
+2026-09-15 20:53:20,765 INFO image_rx_daemon: published frame_id=0 seq=217 143 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:21,251 INFO image_rx_daemon: frag_arrival: seq=218 idx=0 total=1 fw_us=2299783511 len=144
+
+2026-09-15 20:53:21,258 INFO image_rx_daemon: published frame_id=0 seq=218 140 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:21,808 INFO image_rx_daemon: frag_arrival: seq=219 idx=0 total=1 fw_us=2300325128 len=229
+
+2026-09-15 20:53:21,817 INFO image_rx_daemon: published frame_id=0 seq=219 225 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:21,997 INFO image_rx_daemon: stats: rx_frames=335 rx_decode_err=0 frames_published=335 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=367 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+2026-09-15 20:53:22,000 INFO image_rx_daemon: air_gap: n=20 dt_med=499929us dt_p95=541617us len_med=152B cmd_tx_ok=48 cmd_tx_fail=0
+
+2026-09-15 20:53:22,004 INFO image_rx_daemon: air_gap_hist(ms): <1000:20
+
+2026-09-15 20:53:22,008 INFO image_rx_daemon: rx_rf: n_rssi=20 n_snr=20 rssi[min/med/max]=-66/-65/-64 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:53:22,012 INFO image_rx_daemon: phase_telemetry: valid=20 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:53:22,016 INFO image_rx_daemon: air_gap_by_class: boundary: n=20 med=499.9ms
+
+2026-09-15 20:53:22,249 INFO image_rx_daemon: frag_arrival: seq=220 idx=0 total=1 fw_us=2300785232 len=146
+
+2026-09-15 20:53:22,258 INFO image_rx_daemon: published frame_id=0 seq=220 142 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:22,754 INFO image_rx_daemon: frag_arrival: seq=221 idx=0 total=1 fw_us=2301288010 len=152
+
+2026-09-15 20:53:22,762 INFO image_rx_daemon: published frame_id=0 seq=221 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:23,303 INFO image_rx_daemon: frag_arrival: seq=222 idx=0 total=1 fw_us=2301820560 len=235
+
+2026-09-15 20:53:23,311 INFO image_rx_daemon: published frame_id=0 seq=222 231 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:23,761 INFO image_rx_daemon: frag_arrival: seq=223 idx=0 total=1 fw_us=2302288034 len=152
+
+2026-09-15 20:53:23,769 INFO image_rx_daemon: published frame_id=0 seq=223 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:24,261 INFO image_rx_daemon: frag_arrival: seq=224 idx=0 total=1 fw_us=2302795898 len=149
+
+2026-09-15 20:53:24,278 INFO image_rx_daemon: published frame_id=0 seq=224 145 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:24,757 INFO image_rx_daemon: frag_arrival: seq=225 idx=0 total=1 fw_us=2303289357 len=152
+
+2026-09-15 20:53:24,768 INFO image_rx_daemon: published frame_id=0 seq=225 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:25,254 INFO image_rx_daemon: frag_arrival: seq=226 idx=0 total=1 fw_us=2303789802 len=152
+
+2026-09-15 20:53:25,265 INFO image_rx_daemon: published frame_id=0 seq=226 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:25,761 INFO image_rx_daemon: frag_arrival: seq=227 idx=0 total=1 fw_us=2304293827 len=147
+
+2026-09-15 20:53:25,770 INFO image_rx_daemon: published frame_id=0 seq=227 143 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:26,256 INFO image_rx_daemon: frag_arrival: seq=228 idx=0 total=1 fw_us=2304790260 len=152
+
+2026-09-15 20:53:26,264 INFO image_rx_daemon: published frame_id=0 seq=228 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:26,757 INFO image_rx_daemon: frag_arrival: seq=229 idx=0 total=1 fw_us=2305290229 len=152
+
+2026-09-15 20:53:26,765 INFO image_rx_daemon: published frame_id=0 seq=229 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:27,304 INFO image_rx_daemon: frag_arrival: seq=230 idx=0 total=1 fw_us=2305825622 len=241
+
+2026-09-15 20:53:27,313 INFO image_rx_daemon: published frame_id=0 seq=230 237 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:27,751 INFO image_rx_daemon: frag_arrival: seq=231 idx=0 total=1 fw_us=2306288275 len=148
+
+2026-09-15 20:53:27,759 INFO image_rx_daemon: published frame_id=0 seq=231 144 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:28,254 INFO image_rx_daemon: frag_arrival: seq=232 idx=0 total=1 fw_us=2306789530 len=148
+
+2026-09-15 20:53:28,263 INFO image_rx_daemon: published frame_id=0 seq=232 144 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:28,768 INFO image_rx_daemon: frag_arrival: seq=233 idx=0 total=1 fw_us=2307296802 len=152
+
+2026-09-15 20:53:28,776 INFO image_rx_daemon: published frame_id=0 seq=233 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:29,309 INFO image_rx_daemon: frag_arrival: seq=234 idx=0 total=1 fw_us=2307827037 len=241
+
+2026-09-15 20:53:29,318 INFO image_rx_daemon: published frame_id=0 seq=234 237 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:29,808 INFO image_rx_daemon: frag_arrival: seq=235 idx=0 total=1 fw_us=2308326367 len=241
+
+2026-09-15 20:53:29,817 INFO image_rx_daemon: published frame_id=0 seq=235 237 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:30,302 INFO image_rx_daemon: frag_arrival: seq=236 idx=0 total=1 fw_us=2308824284 len=220
+
+2026-09-15 20:53:30,311 INFO image_rx_daemon: published frame_id=0 seq=236 216 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:30,809 INFO image_rx_daemon: frag_arrival: seq=237 idx=0 total=1 fw_us=2309328535 len=213
+
+2026-09-15 20:53:30,817 INFO image_rx_daemon: published frame_id=0 seq=237 209 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:31,316 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=243 snr=6.2 rssi=-65 dump=0102000000000000feee000000ee0c082001000000004000000000004000804044002a7193e80a622d001840b98eb761896a78620e0ba075c098807839857fa981a2ce856e78901f1dd8482e16a947e965ea8d87e81f63795b1c9d31629aaf9fb0ada7d73a9c6b22647401ef496002bf00d7a94f24cc0215c0aa58ac2200038f489951684020a74a0104111109200c14290a212106480844341d22148194098e5101b8d855dfbd0d80850613eca32743d7b4b47e1ef49371523932ca0839dccc3e5b86bd36750c83de6d587c8bf79021198cb615c67141b73d7d97b91537537baf8a576bc07bc1244adac99f2cc71e57af931d
+
+2026-09-15 20:53:31,813 INFO image_rx_daemon: frag_arrival: seq=239 idx=0 total=1 fw_us=2310333379 len=237
+
+2026-09-15 20:53:31,822 INFO image_rx_daemon: published frame_id=0 seq=239 233 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:32,023 INFO image_rx_daemon: stats: rx_frames=354 rx_decode_err=0 frames_published=354 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=387 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+2026-09-15 20:53:32,026 INFO image_rx_daemon: air_gap: n=19 dt_med=501255us dt_p95=1004844us len_med=152B cmd_tx_ok=48 cmd_tx_fail=0
+
+2026-09-15 20:53:32,030 INFO image_rx_daemon: air_gap_hist(ms): <1000:18 >=1000:1
+
+2026-09-15 20:53:32,035 INFO image_rx_daemon: rx_rf: n_rssi=19 n_snr=19 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/5.0/6.0
+
+2026-09-15 20:53:32,037 INFO image_rx_daemon: phase_telemetry: valid=19 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:53:32,040 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=501.3ms
+
+2026-09-15 20:53:32,309 INFO image_rx_daemon: frag_arrival: seq=240 idx=0 total=1 fw_us=2310828911 len=224
+
+2026-09-15 20:53:32,318 INFO image_rx_daemon: published frame_id=0 seq=240 220 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:32,804 INFO image_rx_daemon: frag_arrival: seq=241 idx=0 total=1 fw_us=2311326268 len=215
+
+2026-09-15 20:53:32,812 INFO image_rx_daemon: published frame_id=0 seq=241 211 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:33,305 INFO image_rx_daemon: frag_arrival: seq=242 idx=0 total=1 fw_us=2311825782 len=215
+
+2026-09-15 20:53:33,313 INFO image_rx_daemon: published frame_id=0 seq=242 211 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:33,804 INFO image_rx_daemon: frag_arrival: seq=243 idx=0 total=1 fw_us=2312330217 len=225
+
+2026-09-15 20:53:33,818 INFO image_rx_daemon: published frame_id=0 seq=243 221 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:34,324 INFO image_rx_daemon: frag_arrival: seq=244 idx=0 total=1 fw_us=2312842012 len=233
+
+2026-09-15 20:53:34,332 INFO image_rx_daemon: published frame_id=0 seq=244 229 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:34,823 INFO image_rx_daemon: frag_arrival: seq=245 idx=0 total=1 fw_us=2313350339 len=236
+
+2026-09-15 20:53:34,839 INFO image_rx_daemon: published frame_id=0 seq=245 232 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:35,312 INFO image_rx_daemon: frag_arrival: seq=246 idx=0 total=1 fw_us=2313836378 len=241
+
+2026-09-15 20:53:35,320 INFO image_rx_daemon: published frame_id=0 seq=246 237 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:35,807 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=242 snr=3.8 rssi=-66 dump=01c2000000000000feff00000cf70c082c010000800000004000000000407e0118df0dc53106c3201806d04f55904c754ab26bc9309ec28842d2c986781f092d92cc3d40870e3da67dcb0380d2b4702b65278087effb476ae5295cb4eae36922b965171bd95bc311a73b36a7d828af2249642c4e16c63cf6ed58190eb16d36bac4c1af1f6d6b7786e16bc9c7fec6d7abdab940a87dda58245dffe2b92903310d7ada5083710a803008c1d5f1e3c5f382359790b14b725c6f5562358a420591df1de1f648642a64b9e44bbb1b76abba3cdbebe450fe2c6ccdd0911f043adaa74259206393d6b348c2c58f62e3210b75290e95
+
+2026-09-15 20:53:36,311 INFO image_rx_daemon: frag_arrival: seq=248 idx=0 total=1 fw_us=2314838640 len=217
+
+2026-09-15 20:53:36,319 INFO image_rx_daemon: published frame_id=0 seq=248 213 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:36,807 INFO image_rx_daemon: frag_arrival: seq=249 idx=0 total=1 fw_us=2315334515 len=235
+
+2026-09-15 20:53:36,817 INFO image_rx_daemon: published frame_id=0 seq=249 231 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:37,319 INFO image_rx_daemon: frag_arrival: seq=250 idx=0 total=1 fw_us=2315840729 len=237
+
+2026-09-15 20:53:37,330 INFO image_rx_daemon: published frame_id=0 seq=250 233 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:37,807 INFO image_rx_daemon: frag_arrival: seq=251 idx=0 total=1 fw_us=2316332165 len=231
+
+2026-09-15 20:53:37,818 INFO image_rx_daemon: published frame_id=0 seq=251 227 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:38,316 INFO image_rx_daemon: frag_arrival: seq=252 idx=0 total=1 fw_us=2316837396 len=246
+
+2026-09-15 20:53:38,324 INFO image_rx_daemon: published frame_id=0 seq=252 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:38,799 INFO image_rx_daemon: frag_arrival: seq=253 idx=0 total=1 fw_us=2317326410 len=217
+
+2026-09-15 20:53:38,808 INFO image_rx_daemon: published frame_id=0 seq=253 213 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:39,258 INFO image_rx_daemon: frag_arrival: seq=254 idx=0 total=1 fw_us=2317797753 len=145
+
+2026-09-15 20:53:39,266 INFO image_rx_daemon: published frame_id=0 seq=254 141 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:39,807 INFO image_rx_daemon: frag_arrival: seq=255 idx=0 total=1 fw_us=2318332655 len=231
+
+2026-09-15 20:53:39,816 INFO image_rx_daemon: published frame_id=0 seq=255 227 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:40,258 INFO image_rx_daemon: frag_arrival: seq=0 idx=0 total=1 fw_us=2318800945 len=152
+
+2026-09-15 20:53:40,267 INFO image_rx_daemon: published frame_id=0 seq=0 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:40,754 INFO image_rx_daemon: frag_arrival: seq=1 idx=0 total=1 fw_us=2319299714 len=148
+
+2026-09-15 20:53:40,762 INFO image_rx_daemon: published frame_id=0 seq=1 144 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:41,261 INFO image_rx_daemon: frag_arrival: seq=2 idx=0 total=1 fw_us=2319801723 len=152
+
+2026-09-15 20:53:41,269 INFO image_rx_daemon: published frame_id=0 seq=2 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:41,763 INFO image_rx_daemon: frag_arrival: seq=3 idx=0 total=1 fw_us=2320301762 len=152
+
+2026-09-15 20:53:41,772 INFO image_rx_daemon: published frame_id=0 seq=3 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:42,047 INFO image_rx_daemon: stats: rx_frames=373 rx_decode_err=0 frames_published=373 publish_err=0 reassembler_decode_err=0 reassembler_timeouts=0 parity_recon=0 idle_drain_deferred=408 cmd_cooldown_drops=0 cmd_gate_held=8 cmd_copies_deferred=9
+
+2026-09-15 20:53:42,050 INFO image_rx_daemon: air_gap: n=19 dt_med=499514us dt_p95=1002262us len_med=224B cmd_tx_ok=48 cmd_tx_fail=0
+
+2026-09-15 20:53:42,055 INFO image_rx_daemon: air_gap_hist(ms): <1000:18 >=1000:1
+
+2026-09-15 20:53:42,058 INFO image_rx_daemon: rx_rf: n_rssi=19 n_snr=19 rssi[min/med/max]=-66/-65/-65 snr[min/med/max]=5.0/6.0/6.0
+
+2026-09-15 20:53:42,060 INFO image_rx_daemon: phase_telemetry: valid=19 invalid=0 pre_f8=0 last_epoch=0 last_hop=0 slot_off=[0..0]
+
+2026-09-15 20:53:42,064 INFO image_rx_daemon: air_gap_by_class: boundary: n=19 med=499.5ms
+
+2026-09-15 20:53:42,270 INFO image_rx_daemon: frag_arrival: seq=4 idx=0 total=1 fw_us=2320800860 len=149
+
+2026-09-15 20:53:42,280 INFO image_rx_daemon: published frame_id=0 seq=4 145 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:42,805 INFO image_rx_daemon: frag_arrival: seq=5 idx=0 total=1 fw_us=2321330371 len=221
+
+2026-09-15 20:53:42,814 INFO image_rx_daemon: published frame_id=0 seq=5 217 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:43,263 INFO image_rx_daemon: frag_arrival: seq=6 idx=0 total=1 fw_us=2321800611 len=151
+
+2026-09-15 20:53:43,271 INFO image_rx_daemon: published frame_id=0 seq=6 147 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:43,757 INFO image_rx_daemon: frag_arrival: seq=7 idx=0 total=1 fw_us=2322300985 len=150
+
+2026-09-15 20:53:43,765 INFO image_rx_daemon: published frame_id=0 seq=7 146 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:44,273 INFO image_rx_daemon: frag_arrival: seq=8 idx=0 total=1 fw_us=2322803400 len=152
+
+2026-09-15 20:53:44,282 INFO image_rx_daemon: published frame_id=0 seq=8 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:44,769 INFO image_rx_daemon: frag_arrival: seq=9 idx=0 total=1 fw_us=2323309086 len=152
+
+2026-09-15 20:53:44,778 INFO image_rx_daemon: published frame_id=0 seq=9 148 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:45,313 INFO image_rx_daemon: frag_arrival: seq=10 idx=0 total=1 fw_us=2323840441 len=247
+
+2026-09-15 20:53:45,323 INFO image_rx_daemon: published frame_id=0 seq=10 243 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:45,804 INFO image_rx_daemon: frag_arrival: seq=11 idx=0 total=1 fw_us=2324336121 len=231
+
+2026-09-15 20:53:45,818 INFO image_rx_daemon: published frame_id=0 seq=11 227 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:46,823 INFO image_rx_daemon: frag_arrival: seq=13 idx=0 total=1 fw_us=2325343085 len=246
+
+2026-09-15 20:53:46,838 INFO image_rx_daemon: published frame_id=0 seq=13 242 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:46,925 WARNING image_rx_daemon: crc_dump: irq=0x70 rx_len=254 snr=-11.8 rssi=-115 dump=e6ff2c609817dc334899f6839ad9783401bf492a06b890d93a7a763929c22f26d5150c57b71c08926e239c6072b6b3a75d0712906ef2d4af3f872e28f5b2d4dd535e9e50367db576a3c3863737b09d0458cf5b6b2550a1ecd33f13d6db8ded51de3a539b44a62e10c76bfdfb09d26ea21b99e0103a86e22c90001e4868b45366a58f66968cd8ddd12d465d72ab07664d088b65ce44fe424cb185901ab3a0dad13f44cf3665b40575fb75cda07507e9d322adcb45d3a327482267457d31402d024f4c125bf94aef2ac7082213c4a211f56bcc0dd09215d8a7043610270b6346470654435fbf3e2c80abd4a85d00be418379a6fc0713b39a49342c1c
+
+2026-09-15 20:53:47,315 INFO image_rx_daemon: frag_arrival: seq=14 idx=0 total=1 fw_us=2325837106 len=229
+
+2026-09-15 20:53:47,326 INFO image_rx_daemon: published frame_id=0 seq=14 225 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:47,845 INFO image_rx_daemon: frag_arrival: seq=15 idx=0 total=1 fw_us=2326352257 len=243
+
+2026-09-15 20:53:47,869 INFO image_rx_daemon: published frame_id=0 seq=15 239 B → lifetrac/v25/video/tile_delta
+
+2026-09-15 20:53:48,279 INFO image_rx_daemon: frag_arrival: seq=16 idx=0 total=1 fw_us=2326804111 len=149
+
+2026-09-15 20:53:48,296 INFO image_rx_daemon: published frame_id=0 seq=16 145 B → lifetrac/v25/video/tile_delta
+

@@ -439,6 +439,36 @@ class AutoRadioPolicy:
         # silence clock (only an observed stream can go dead).
         self._last_frags_seen: int | None = None
         self._last_frag_advance_t: float | None = None
+        self._mismatch_since: float | None = None      # RS-12.18
+
+    # RS-12.18 (leg V, 2026-09-15): the daemon reverts a switch on its own —
+    # no tractor ACK within 12 s, or no frames on the new profile within
+    # 45 s — and this policy never heard about it. In leg V it believed FHSS
+    # for 63 s while the link was back on DTS; a bad link in that window
+    # would have met no action ("already degraded"). The disagreement must
+    # PERSIST longer than the phase-A handshake before it is trusted, or a
+    # normal switch in flight (policy pinned 1, daemon still 2 until the
+    # tractor ACKs) would be mistaken for a revert.
+    RESYNC_AFTER_S   = 20.0
+
+    def observe_active(self, active_profile, now: float) -> bool:
+        """Feed the profile the daemon is ACTUALLY on (link_stats.radio_profile).
+        Re-syncs after a sustained disagreement and treats the revert as a
+        switch for hysteresis (fresh min-gap, fresh dwell). Returns True on
+        a re-sync."""
+        if active_profile not in (1, 2) or active_profile == self.profile:
+            self._mismatch_since = None
+            return False
+        if self._mismatch_since is None:
+            self._mismatch_since = now
+            return False
+        if now - self._mismatch_since < self.RESYNC_AFTER_S:
+            return False
+        self.profile = active_profile
+        self._last_switch_t = now
+        self._healthy_since = None
+        self._mismatch_since = None
+        return True
 
     def _note_frags(self, now: float, frags_seen: int | None) -> bool:
         """Dead-air detector. Returns True while the link is in the
@@ -784,6 +814,15 @@ def _radio_auto_worker() -> None:
                         loss_rate = d_mis / d_exp
                 loss_win["expected"] = expected
                 loss_win["missing"] = missing
+            # RS-12.18: the daemon's ACTUAL profile rides in every sample;
+            # a sustained disagreement means it reverted behind our back.
+            active = stats.get("radio_profile")
+            believed = policy.profile
+            if policy.observe_active(active if isinstance(active, int) else None, now):
+                logging.warning(
+                    "radio_profile[auto]: daemon reports profile %s but the "
+                    "policy believed %s for >= %.0f s -- re-synced (revert)",
+                    active, believed, policy.RESYNC_AFTER_S)
             new_profile = policy.evaluate(now=now,
                                           sample_age_s=sample_age_s,
                                           timeouts_per_10s=rate_per_10s,

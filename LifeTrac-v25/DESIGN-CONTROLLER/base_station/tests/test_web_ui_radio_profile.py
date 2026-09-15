@@ -229,6 +229,48 @@ class RadioProfileTests(unittest.TestCase):
         self.assertIsNone(p.evaluate(now=100.0, loss_rate=None,
                                      **self._healthy_kw()))
 
+    # ---- RS-12.18 (leg V, 2026-09-15): re-sync to the daemon's actual profile ----
+
+    def test_policy_resyncs_after_sustained_daemon_revert(self):
+        """Leg V: policy degraded to 1 at t=0; the daemon reverted to 2 at
+        t=46 (no frames on the new profile). The policy must adopt 2 once
+        the disagreement has persisted RESYNC_AFTER_S, and treat it as a
+        switch: no further degrade until a fresh MIN_SWITCH_GAP."""
+        p = self._policy(profile=1)
+        p._last_switch_t = 0.0
+        self.assertFalse(p.observe_active(2, 46.0))     # first sighting
+        self.assertFalse(p.observe_active(2, 56.0))     # 10 s: still inside the handshake window
+        self.assertTrue(p.observe_active(2, 66.0))      # 20 s: re-sync
+        self.assertEqual(p.profile, 2)
+        # a revert is a switch: dead air right after it must NOT degrade
+        # until MIN_SWITCH_GAP has elapsed from the re-sync
+        p.evaluate(now=70.0, frags_seen=0, **self._healthy_kw())
+        p.evaluate(now=75.0, frags_seen=50, **self._healthy_kw())
+        self.assertIsNone(p.evaluate(now=100.0, frags_seen=50,
+                                     **self._healthy_kw()))   # dead air, gap not ok
+        self.assertEqual(p.evaluate(now=127.0, frags_seen=50,
+                                    **self._healthy_kw()), 1)  # gap ok -> degrade again
+
+    def test_policy_ignores_transient_mismatch_during_handshake(self):
+        """Policy pins 1; the daemon still reports 2 until the tractor ACKs
+        (up to 12 s). That is not a revert."""
+        p = self._policy(profile=2)
+        p._last_switch_t = 0.0
+        self.assertEqual(p.evaluate(now=61.0, sample_age_s=None,
+                                    timeouts_per_10s=0.0), 1)
+        self.assertFalse(p.observe_active(2, 62.0))     # daemon not switched yet
+        self.assertFalse(p.observe_active(2, 70.0))     # 8 s later, still handshaking
+        self.assertFalse(p.observe_active(1, 75.0))     # daemon switched: agreement
+        self.assertEqual(p.profile, 1)
+        self.assertIsNone(p._mismatch_since)
+
+    def test_policy_observe_none_or_bench_profile_is_noop(self):
+        p = self._policy(profile=2)
+        self.assertFalse(p.observe_active(None, 10.0))
+        self.assertFalse(p.observe_active(0, 40.0))     # bench 915 never adopted
+        self.assertFalse(p.observe_active("2", 70.0))
+        self.assertEqual(p.profile, 2)
+
     def test_policy_pre_rs1216_call_shape_unchanged(self):
         p = self._policy()
         self.assertIsNone(p.evaluate(now=10.0, sample_age_s=2.0,
