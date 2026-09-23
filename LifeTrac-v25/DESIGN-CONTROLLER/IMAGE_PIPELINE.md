@@ -87,6 +87,8 @@ The transport spine is already in [LORA_PROTOCOL.md](LORA_PROTOCOL.md). This sec
 | `0x29` | `video/wireframe` | tractor → base | PiDiNet edge map for extreme degraded mode (P). | 2 |
 | *(reserved)* | `0x2A` `video/semantic_map` | — | **Reserved for v26**, do not implement in v25. | — |
 
+> **Proposed (2026-09-23, pending D-VS1):** the vector scene mode in [VECTOR_SCENE.md](VECTOR_SCENE.md) uses no new topic. It is `TileDeltaFrame` codec `6` on the shipped strict path (`video/tile_delta`) with `EncodeMode.VECTOR = 9`. `0x28`/`0x29` stay unused by that path.
+
 ### 3.3 Badge enum (transmitted as a property of every reconstructed tile)
 
 Adopted from [analysis §15.6 / §16.5](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md). The base attaches the badge; the browser displays it; the browser **must refuse to render any tile whose badge is missing or malformed** (fail-closed per C5).
@@ -99,7 +101,7 @@ Adopted from [analysis §15.6 / §16.5](../AI%20NOTES/2026-04-27_Image_Transmiss
 | `Recolourised` | Y-only luma re-coloured from older colour reference. | teal badge |
 | `Predicted` | Optical-flow / RIFE pixel-pushed; no fresh data. | amber badge |
 | `Synthetic` | LaMa-inpainted or model-generated. | red badge |
-| `Wireframe` | PiDiNet edges only, not photographic pixels. | "WIREFRAME" overlay |
+| `Wireframe` | PiDiNet edges only, not photographic pixels. *(Today this badge is what `mono_g4` tiles carry. Proposed, D-VS2: new values 7 `Vector` and 8 `Model`; see [VECTOR_SCENE.md §6](VECTOR_SCENE.md#6-mode-and-policy-integration).)* | "WIREFRAME" overlay |
 
 Add to LORA_PROTOCOL.md alongside the existing topic table.
 
@@ -115,6 +117,8 @@ Let `T_refresh` = nominal P3 refresh window (default 1500 ms) and `t_air` = meas
 | `25 % ≤ U < 50 %` (375–750 ms) | Z Y-only luma + 30 s colour reference | Drop chroma; periodic colour ref every 30 s. `Recolourised` badge. | 150–400 B |
 | `50 % ≤ U < 80 %` (750–1200 ms) | Q optical-flow microframes (`0x28`) | No new tiles; push existing canvas with motion vectors. `Predicted` badge. | 50–150 B |
 | `U ≥ 80 %` (≥ 1200 ms) | P wireframe (`0x29`) | PiDiNet edges only. `Wireframe` overlay. | < 50 B |
+
+> **Status note (2026-09-23):** this ladder was never wired on the strict path. Mode selection is operator-only (`base_station/web_ui.py:91-104`), the operator-selectable modes are `full`, `y_only`, `motion_only` and `mono_g4`, fragments are 203/243 B under a 170 ms cap, and the 25 ms cap was retired for image traffic (RS-9.7). [VECTOR_SCENE.md §6](VECTOR_SCENE.md#6-mode-and-policy-integration) proposes VECTOR as the floor of an encode policy inside `AutoRadioPolicy`.
 
 The "byte-equivalent" column is the rough envelope at the default SF7/BW250/CR4-5 image profile; `link_monitor.py` does not key off bytes directly. If the image link transitions to SF8 (~1.8× airtime per byte), the same byte counts move into the next-degraded bucket automatically because the airtime % moves with PHY.
 
@@ -145,7 +149,7 @@ Lives in `firmware/tractor_x8/x8_image_pipeline/` on the X8 Linux side (not the 
 | `roi.py` | Read valve activity from H747 over IPC; classify mode (loading / driving / idle); produce ROI mask; honour `CMD_ROI_HINT`. | 1 |
 | `encode_tile_delta.py` | Per-tile WebP at q15/q40/q60 by ROI/detection. Honours `CMD_ENCODE_MODE` (`full` / `y_only` / `motion_only` / `wireframe`). Assembles `TileDeltaFrame`. | 1 (full + y_only), 2 (motion + wireframe) |
 | `encode_motion.py` | Optical-flow microframe encoder for `0x28`. | 2 |
-| `encode_wireframe.py` | PiDiNet edge encoder for `0x29`. | 2 |
+| `encode_wireframe.py` | PiDiNet edge encoder for `0x29`. *(Dead code on the strict path; the proposed vector encoder is `x8_image_pipeline/encode_vector.py`, [VECTOR_SCENE.md §7.1](VECTOR_SCENE.md#71-file-changes).)* | 2 |
 | `fragment.py` | Split into ≤25 ms airtime fragments. | 1 |
 | `ipc_to_h747.py` | Hand fragments to M7 firmware ring buffer at P3. | 1 |
 | `detect_nanodet.py` | NanoDet-Plus (Apache-2.0), 320×320 INT8, six classes; ≤50 ms p99 on A53s. | 2 |
@@ -179,7 +183,7 @@ Lives in `base_station/image_pipeline/` on the X8 Linux side. Browser-tier offlo
 | `superres_coral.py` | Edge-TPU port of Real-ESRGAN; only used iff `HAS_CORAL` and Phase-0 spike passed; ≤30 ms/frame. | 2 (gated) |
 | `detect_yolo.py` | Independent base-side safety detector (R6). CPU = YOLOv8-nano OR NanoDet-Plus per AGPL decision. Compares against `0x26` sidecar; logs disagreements. | 2 |
 | `motion_replay.py` | Apply `0x28` motion vectors to existing canvas; sets `Predicted` badge. | 2 |
-| `wireframe_render.py` | Render `0x29` wireframe over canvas; sets `Wireframe` overlay. | 2 |
+| `wireframe_render.py` | Render `0x29` wireframe over canvas; sets `Wireframe` overlay. *(Dead code; the proposed vector store is `vector_scene_store.py`, [VECTOR_SCENE.md §7.1](VECTOR_SCENE.md#71-file-changes).)* | 2 |
 | `audio_event.py` | YAMNet event subscriber for `0x27`; UI banner. | 2 |
 | `satellite_render.py` | Far-field render from cached satellite tiles, georeferenced to live GPS. | 2 |
 | `state_publisher.py` | WebSocket publisher: canvas tiles + per-tile age + per-tile badge enum + detection vectors + safety verdicts + accelerator status. | 1 |
@@ -309,7 +313,7 @@ From [TODO Phase 5D](TODO.md) and [analysis §14.3](../AI%20NOTES/2026-04-27_Ima
 | V3 | `CMD_PERSON_APPEARED` end-to-end (C3) | ≤250 ms p99 walk-the-person test |
 | V4 | `CMD_REQ_KEYFRAME` recovery | Fresh I within 1 refresh after induced loss |
 | V5 | Coral fallback | UI flips to "AI accelerator: offline" within 10 s; pipeline continues degraded |
-| V6 | Auto-fallback ladder | Encoder downshifts cleanly through all four modes without canvas loss or operator intervention |
+| V6 | Auto-fallback ladder | Encoder downshifts cleanly through all four modes without canvas loss or operator intervention. *(Proposed bench leg for the vector mode: [VECTOR_SCENE.md §8.6](VECTOR_SCENE.md#86-tests-and-bench).)* |
 | V7 | Browser test matrix | All four target browsers render canvas + fade + badges correctly |
 | V8 | Two-detector cross-check | Disagreements surface in UI within one refresh; logged to §8.10 |
 | V9 | Operator UX safety rules (§7) | All seven rules visible and functional — pre-condition for any live hydraulic test |
@@ -337,6 +341,7 @@ Files this plan touches; updates needed when this plan changes:
 - [BASE_STATION.md](BASE_STATION.md) — add `recolourise.py`, `bg_cache.py`, `link_monitor.py`, `motion_replay.py`, `wireframe_render.py`, `state_publisher.py`, `fallback_render.py`; add the §6.1 trust-boundary table.
 - [TODO.md](TODO.md) — phase-by-phase tasks (see additions appended in Phase 0 / Phase 5A / Phase 5B / Phase 5D).
 - [MASTER_PLAN.md](MASTER_PLAN.md) §8.19 — add reference back to this plan.
+- [VECTOR_SCENE.md](VECTOR_SCENE.md) — proposed vector scene mode (codec 6, `EncodeMode` 9, badges 7/8). If §3.3 or the mode list changes, check VECTOR_SCENE.md §6 and §7.
 
 ---
 
@@ -352,6 +357,7 @@ Files this plan touches; updates needed when this plan changes:
 | Compatibility matrix between schemes | [analysis §13](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md) |
 | Coral policy (no Coral on tractor; spike-gated on base) | [MASTER_PLAN.md §8.19](MASTER_PLAN.md) |
 | Hardware BOM Tier-2 Coral lines | [HARDWARE_BOM.md](HARDWARE_BOM.md) |
+| Vector scene mode (polygon + gradient layers in one fragment, CAD self-model, Vector Lab) | [VECTOR_SCENE.md](VECTOR_SCENE.md); research in [2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md](../AI%20NOTES/2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md) |
 
 ---
 

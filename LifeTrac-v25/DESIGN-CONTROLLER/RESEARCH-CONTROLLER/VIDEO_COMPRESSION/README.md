@@ -184,6 +184,16 @@ The most aggressive interpretation. Don't send pixels at all.
 - **Bitrate:** ~100 bps for pose; residuals event‑driven.
 - **Verdict:** Beautiful for fixed worksites (yard, shed, repeat fields). Useless on a new property until it has been mapped. Filed under "future work after Option 3 ships".
 
+### Option 7 — Layered vector scene with measured colours (VS1, added 2026-09-23)
+
+A middle path between Option 5 (a purely synthetic situation display) and the tile codecs that fly today: send the **real scene as geometry**, one fragment per frame.
+
+- **Encoder:** classical CV on the tractor X8 at 96×64 / 192×128, no neural net: a horizon with sky and ground gradients; large regions as polygons filled with their measured mean colour and a linear gradient; trees and shrubs as ellipses; edge polylines (ruts, fences, overhead lines).
+- **Bitstream:** a `TileDeltaFrame` with codec `6`, records ranked by error reduction per bit and packed into the live single-fragment budget (197 B at FHSS, 237 B at DTS). Shape IDs persist across frames; global motion is one group-shift record; there are no keyframe trains.
+- **Self-model:** the tractor's hood is never sent; the base draws it from the OpenSCAD model. The arm is drawn when a pivot sensor exists.
+- **Verdict:** a floor below `mono_g4` in coverage per fragment (the whole frame in one fragment instead of 16–45 tiles), and it sends no keyframe requests, the base commands that drove the FHSS storm. Colours and shapes are measured, not invented, but the picture is a lossy summary and is labelled "VECTOR — NOT CAMERA PIXELS".
+- **Documents:** [../../VECTOR_SCENE.md](../../VECTOR_SCENE.md); prior-art survey and review record in [../../../AI NOTES/2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md](../../../AI%20NOTES/2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md).
+
 ---
 
 ## 5. Recommendation
@@ -195,7 +205,7 @@ Build in this order:
 3. **Option 2 (SVT‑AV1 + ROI)** — best classical baseline; reuses comma.ai's published ffmpeg grid‑search results.
 4. **Option 3 (keyframe + neural inflate)** — the actually‑novel one and the answer to the user's framing of the question. Adapt comma.ai's `neural_inflate` (PR #49) or `mask2mask` (PR #53) to a tractor‑scene dataset, distill to fit ~50 MFLOPs/frame on the i.MX 8M Mini.
 
-Options 4 and 6 are filed for later.
+Options 4 and 6 are filed for later. Option 7 is appended out of rank order; it is proposed separately as a floor below `mono_g4` in [../../VECTOR_SCENE.md](../../VECTOR_SCENE.md), pending D-VS1.
 
 The header of [../../VIDEO_OPTIONS.md](../../VIDEO_OPTIONS.md) should eventually gain a row "LoRa (with v25 neural codec)" once Option 3 has been measured on a real link. Until then, keep its current line — *LoRa carries no live video* — as the honest design assumption.
 

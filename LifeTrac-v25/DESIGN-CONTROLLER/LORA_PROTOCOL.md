@@ -249,7 +249,7 @@ Opcodes:
 | `0x60` | `CMD_PERSON_APPEARED` | `class (1 B), confidence_pct (1 B), bbox_cx (1 B), bbox_cy (1 B)` | **Tractor → base**: tractor's on-X8 detector saw a *new* high-confidence person/animal/vehicle in the frame that wasn't there last refresh. P0-class so it preempts image fragments. `bbox_cx`/`bbox_cy` are 0–255 normalised across the frame so the base UI can highlight the region without waiting for the next image. Confidence threshold is high (≥0.7) by default to avoid alarm fatigue per [`../AI NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md`](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md) §4.4. Informational only — does *not* trigger a stop in v25 (operator-in-the-loop). Future revisions may chain to `CMD_OBSTACLE_STOP`. |
 | `0x61` | `CMD_ROI_HINT` | `roi_x (1 B), roi_y (1 B), ttl_refreshes (1 B)` | **Base → tractor**: operator tapped a region in the displayed image; bias the next `ttl_refreshes` image frames to spend most of the byte budget on tiles overlapping `(roi_x, roi_y)`. Coordinates are 0–255 normalised. P1-class. |
 | `0x62` | `CMD_REQ_KEYFRAME` | `(empty)` | **Base → tractor**: the persistent canvas is too stale or the base lost an I-frame; please send a full I-frame on the next image transmission instead of a P-frame. P1-class. |
-| `0x63` | `CMD_ENCODE_MODE` | `mode (1 B)` | **Base → tractor**: image-link auto-fallback ladder output from `base_station/link_monitor.py`, optionally clamped under an operator-selected ceiling via `POST /api/settings/encode_mode`. Values: `0=full`, `1=y_only`, `2=motion_only`, `3=wireframe`, `4=btc4_per_tile`, `5=btc4_per_frame`, `6=mono_g4`, `7=adaptive`, `8=rawstream` — see [`base_station/lora_proto.py::EncodeMode`](base_station/lora_proto.py) and [`AI NOTES/2026-05-25_Grayscale_Quantization_Encoding_Research_Copilot_v1_0.md`](../AI%20NOTES/2026-05-25_Grayscale_Quantization_Encoding_Research_Copilot_v1_0.md). Auto-fallback ladder = `{full, y_only, btc4_per_tile, btc4_per_frame, mono_g4}`; `motion_only`/`wireframe` are legacy slots, `adaptive` and `rawstream` (full colour, WebP RIFF container stripped — wire codec 5) are operator-pinnable only. Requires 3 consecutive bad 5 s windows before changing modes. P2-class; never blocks ControlFrame. Tractor receiver clamps unknown/unimplemented modes to `y_only` (see [`camera_service.py`](firmware/tractor_x8/camera_service.py)) rather than crashing. |
+| `0x63` | `CMD_ENCODE_MODE` | `mode (1 B)` | **Base → tractor**: image-link auto-fallback ladder output from `base_station/link_monitor.py`, optionally clamped under an operator-selected ceiling via `POST /api/settings/encode_mode`. Values: `0=full`, `1=y_only`, `2=motion_only`, `3=wireframe`, `4=btc4_per_tile`, `5=btc4_per_frame`, `6=mono_g4`, `7=adaptive`, `8=rawstream` — see [`base_station/lora_proto.py::EncodeMode`](base_station/lora_proto.py) and [`AI NOTES/2026-05-25_Grayscale_Quantization_Encoding_Research_Copilot_v1_0.md`](../AI%20NOTES/2026-05-25_Grayscale_Quantization_Encoding_Research_Copilot_v1_0.md). Auto-fallback ladder = `{full, y_only, btc4_per_tile, btc4_per_frame, mono_g4}`; `motion_only`/`wireframe` are legacy slots, `adaptive` and `rawstream` (full colour, WebP RIFF container stripped — wire codec 5) are operator-pinnable only. Requires 3 consecutive bad 5 s windows before changing modes. P2-class; never blocks ControlFrame. Tractor receiver clamps unknown/unimplemented modes to `y_only` (see [`camera_service.py`](firmware/tractor_x8/camera_service.py)) rather than crashing. *Proposed (D-VS1): `9=vector`; see [VECTOR_SCENE.md §6](VECTOR_SCENE.md#6-mode-and-policy-integration).* |
 
 ### Shipped 0xFB bench command set (`lora_proto.CMD_OP_*`) — and a numbering drift warning
 
@@ -268,7 +268,7 @@ Opcodes:
 | 0xFB opcode | Name (`CMD_OP_*`) | Args | Semantics |
 |------------|-------------------|------|-----------|
 | `0x60` | `REQ_KEYFRAME` | none | Base → tractor. Since F10/F11 (2026-08-01/02) fires only on cold start, grid mismatch, and tile-decode errors — the reassembly-timeout and per-seq-gap triggers are env-gated OFF (`LIFETRAC_KF_ON_REASM_TIMEOUT`, `LIFETRAC_KF_ON_SEQ_GAP`; both measured harmful/redundant on air). |
-| `0x63` | `ENCODE_MODE` | `u8 mode [, u8 quality 1-100]` | Base → tractor; quality byte additive (2026-07 increment). Pending-ack machinery retries then gives up after 17 attempts/~10 s. |
+| `0x63` | `ENCODE_MODE` | `u8 mode [, u8 quality 1-100]` | Base → tractor; quality byte additive (2026-07 increment). Pending-ack machinery retries then gives up after 17 attempts/~10 s. *Proposed: modes 8 and 9 accepted; for mode 9 the quality byte is the vector detail level.* |
 | `0x65` | `RADIO_PROFILE` | `u8 profile (0/1/2)` | Base → tractor: two-phase profile switch, step 1. |
 | `0x66` | `RADIO_PROFILE_ACK` | `u8 profile` | Tractor → base, on the OLD grid. |
 | `0x67` | `RADIO_PROFILE_CONF` | `u8 profile` | Base → tractor: confirm; tractor cancels its revert timer. |
@@ -312,7 +312,7 @@ Layout (after framing/AES-GCM unwrap, before fragmentation):
 | `grid_w` | 1 | Tile-grid width in tiles (default 12) |
 | `grid_h` | 1 | Tile-grid height in tiles (default 8) |
 | `tile_px` | 1 | Tile edge in pixels (default 32) |
-| `codec` | 1 | Per-frame codec id. `0`=WEBP (FULL/Y_ONLY), `1`=MONO_G4 (1-bit Floyd-Steinberg + zlib), `2`=BTC4_PER_TILE (4-level palette + 2 bpp), `3`=BTC4_PER_FRAME (palette in body prefix), `4..14` reserved, `15` reserved for per-tile-codec escape. Added 2026-05-25 — operator-cyclable from `/settings`. See [`../AI NOTES/2026-05-25_Encoder_Method_Cycle_Button_Implementation_Plan_Copilot_v1_0.md`](../AI%20NOTES/2026-05-25_Encoder_Method_Cycle_Button_Implementation_Plan_Copilot_v1_0.md). |
+| `codec` | 1 | Per-frame codec id. `0`=WEBP (FULL/Y_ONLY), `1`=MONO_G4 (1-bit Floyd-Steinberg + zlib), `2`=BTC4_PER_TILE (4-level palette + 2 bpp), `3`=BTC4_PER_FRAME (palette in body prefix), `4..14` reserved, `15` reserved for per-tile-codec escape. *(In code, `4`=WEBP_LUMA and `5`=WEBP_RAWSTREAM are also assigned, `frame_format.py:79-88`. Proposed, D-VS1: `6`=VECTOR, a whole-frame vector scene body in place of the bitmap and tiles — [VECTOR_SCENE.md §3](VECTOR_SCENE.md#3-wire-format-tiledeltaframe-codec-vector-vs1).)* Added 2026-05-25 — operator-cyclable from `/settings`. See [`../AI NOTES/2026-05-25_Encoder_Method_Cycle_Button_Implementation_Plan_Copilot_v1_0.md`](../AI%20NOTES/2026-05-25_Encoder_Method_Cycle_Button_Implementation_Plan_Copilot_v1_0.md). |
 | `flags` | 1 | bit0 = ROI-mode-loading, bit1 = ROI-mode-driving, bit2 = grayscale (chroma dropped, base may colorize), bit3 = optical-flow degraded mode (no pixels, vector field only — see image analysis §5.3) |
 | `changed_bitmap` | ⌈grid_w·grid_h/8⌉ | Default 12 B for 12×8 grid. One bit per tile (row-major). For I-frames every bit is 1. |
 | (per changed tile, in row-major order) | | |
@@ -320,6 +320,8 @@ Layout (after framing/AES-GCM unwrap, before fragmentation):
 | ↳ `tile_data` | n | WebP-compressed 32×32 sub-image |
 
 **On-air targets** at SF7/BW250/CR4-5 with ≤25 ms fragment cap are pending redesign. The shared estimator reports a 32 B fragment at ~36 ms; staying below 25 ms currently means roughly ≤15 B cleartext fragments, a wider image profile, or a changed cap. Do not treat the earlier 32 B fragment budget as implemented.
+
+> **Status note (2026-09-23):** the strict path sizes image fragments with `max_image_fragment_body()` under a 170 ms cap (`base_station/lora_proto.py:837-857`): 203 B bodies on profiles 0/1 (BW250) and 243 B on profile 2 (BW500), one per 200 ms FHSS slot or 99.9 ms on DTS, with no crypto envelope on air. The 25 ms cap in this section survives only for telemetry (RS-9.7). See [SETTINGS_REFERENCE.md §2.1](SETTINGS_REFERENCE.md) and [VECTOR_SCENE.md §1](VECTOR_SCENE.md#1-summary-and-design-principles).
 
 **Loss handling.** Each P-frame carries `base_seq` so the base knows whether it has the matching I. If `base_seq` does not match the base's current canvas I, base sends `CMD_REQ_KEYFRAME` (opcode `0x62`); tractor sends a fresh I on the next image transmission. Stale tiles in the canvas are tinted yellow with their age in seconds visible — never silently extrapolated — per the v1.1 LoRa analysis §5.4 mandatory operator-UX rules.
 
@@ -339,7 +341,9 @@ Every tile or derived visual update that reaches the browser carries one badge b
 | 3 | `Recolourised` | Luma-only tile recoloured from a recent colour reference. |
 | 4 | `Predicted` | Motion-vector extrapolation from topic `0x28`; not fresh pixels. |
 | 5 | `Synthetic` | AI-filled or hallucinated content. Disabled by default in v25. |
-| 6 | `Wireframe` | Edge/wireframe representation from topic `0x29`; not photographic. |
+| 6 | `Wireframe` | Edge/wireframe representation from topic `0x29`; not photographic. *(In practice: what `mono_g4` tiles carry, `base_station/image_pipeline/canvas.py:35-38`.)* |
+| *7* | *`Vector` (proposed, D-VS2)* | *Whole-frame vector scene from measured camera colours (codec 6); not photographic. [VECTOR_SCENE.md §6](VECTOR_SCENE.md#6-mode-and-policy-integration).* |
+| *8* | *`Model` (proposed, D-VS2)* | *CAD self-model pixels drawn by the base from calibration and pose; never opaque over transmitted pixels. Adding values is a protocol bump: `badge_renderer.js` rejects unknown badges.* |
 
 ## Multi-source arbitration
 
@@ -459,6 +463,8 @@ bool transmit(uint8_t* frame, size_t len, uint8_t max_attempts) {
 For `ControlFrame` and `HeartbeatFrame`, **`MAX_ATTEMPTS = 1`** — we only ever care about the *newest* control snapshot. Retrying a stale stick position consumes channel time the next-newer frame needs and can re-apply a deflection the operator already released. CSMA still applies (one polite channel-busy check), but if the channel is busy we drop and rely on the next 20 Hz tick. For telemetry, prefer queueing with `MAX_ATTEMPTS = 3`.
 
 ## Adaptive control-link SF
+
+> **Status note (2026-09-23):** the ladder below was written for the retired H7 RadioLib path. On the shipped L072 path SF is fixed at 7 in all three regulatory profiles and no CFG key exists (`SETTINGS_REFERENCE.md:50`). A coordinated modem-rung switch for the L072 (SF7/8/9 within each profile, `0xFB` opcodes `0x6D`–`0x70`, scheduled apply, per-side revert timers, rendezvous rung with a beacon) is proposed as D-VS8 and specified in [VECTOR_SCENE.md §4.6](VECTOR_SCENE.md#46-coordinated-modem-rung-change-the-d-vs8-protocol).
 
 The control link starts at **SF7 / BW 250 kHz / CR 4/5** (per [DECISIONS.md D-A2](DECISIONS.md)) and falls back to slower-but-more-sensitive rungs at **BW 125 kHz** when the link weakens. Originally pinned in [MASTER_PLAN.md §8.17](MASTER_PLAN.md); the BW 250 kHz revision discharges the `CONTROL_CADENCE_BLOCKER`.
 
