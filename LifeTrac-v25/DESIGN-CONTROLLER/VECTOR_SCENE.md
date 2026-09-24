@@ -1,6 +1,6 @@
 # LifeTrac v25: Vector Scene mode (VS1) design
 
-> **Status (2026-09-23): design proposal, not implemented.** Rebased on `origin/main` at `d3751286` (2026-09-15), the tree that carries the Murata L072 radio, the strict image path and the FHSS bench campaign. The decisions D-VS1 to D-VS7 are proposed and need OSE sign-off; they are listed in [DECISIONS.md](DECISIONS.md#vector-scene-mode--proposed-pending-ose-sign-off). The Vector Lab page ([§8](#8-vector-lab-base-website-live-canvas-input)) needs no radio and can be built first.
+> **Status (2026-09-23): design proposal, not implemented.** Rebased on `origin/main` at `d3751286` (2026-09-15), the tree that carries the Murata L072 radio, the strict image path and the FHSS bench campaign. The decisions D-VS1 to D-VS9 (D-VS3 and D-VS3a withdrawn) are proposed and need OSE sign-off; they are listed in [DECISIONS.md](DECISIONS.md#vector-scene-mode--proposed-pending-ose-sign-off). The Vector Lab page ([§8](#8-vector-lab-base-website-live-canvas-input)) needs no radio and can be built first.
 >
 > **Document roles.** This document is the source of truth for *what to build*. The research and review record, which covers *why*, is [../AI NOTES/2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md](../AI%20NOTES/2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md). It holds the prior-art survey with sources, the current-stack code findings, the FHSS campaign summary, the three competing proposals and how they were scored, and the adversarial-review record.
 >
@@ -36,8 +36,8 @@ The whole worked example scene of §3.6 (23 records, 129 B) fits in **one frame*
 
 | Radio profile | VS body per frame | Records per frame (est.) | Worked scene |
 |---|---|---|---|
-| p1 FHSS (BW250) | 197 B | 1,565 bits ≈ 25–35 records | 1 frame, 548 bits spare |
-| p2 DTS (BW500) | 237 B | 1,885 bits ≈ 30–40 records | 1 frame, 868 bits spare |
+| p1 FHSS (BW250) | 197 B | 1,563 bits ≈ 25–35 records | 1 frame, 546 bits spare |
+| p2 DTS (BW500) | 237 B | 1,883 bits ≈ 30–40 records | 1 frame, 866 bits spare |
 
 ### 0.3 How it flows
 
@@ -130,10 +130,10 @@ A new per-frame codec and encode mode on the shipped strict image path:
 
 The strict path sends image fragments in plaintext: an 8 B hop-sync header, a 4 B fragment header (`0xFE | frag_seq | frag_idx | total−1`, `bs/lora_proto.py:819-876`), and up to 243 B of payload (the 247 B `TX_FRAME_BODY_MAX` includes the fragment header, `bs/lora_proto.py:835-836`; the 170 ms cap trims it to 203 B at BW250). There is no KISS and no AES-GCM on this path (`x8/image_tx_daemon.py:36-42`, `bs/image_rx_daemon.py:12-14`). The per-fragment airtime cap is 170 ms (`LIFETRAC_FRAG_AIR_CAP_MS`, `bs/lora_proto.py:837`); the April 25 ms cap was dropped for image traffic (TODO.md RS-9.7).
 
-| Profile | Fragment body | On air | Airtime | VS body (body − 6 B `TileDeltaFrame` header) | Record bits (body × 8 − 11) |
+| Profile | Fragment body | On air | Airtime | VS body (body − 6 B `TileDeltaFrame` header) | Record bits (body × 8 − 13) |
 |---|---|---|---|---|---|
-| p1 `FCC_15_247_FHSS_50CH_BW250` | 203 B | 215 B | 169.1 ms, one per 200 ms slot | **197 B** | **1,565** |
-| p2 `FCC_15_247_DTS_BW500` | 243 B | 255 B | 99.9 ms | **237 B** | **1,885** |
+| p1 `FCC_15_247_FHSS_50CH_BW250` | 203 B | 215 B | 169.1 ms, one per 200 ms slot | **197 B** | **1,563** |
+| p2 `FCC_15_247_DTS_BW500` | 243 B | 255 B | 99.9 ms | **237 B** | **1,883** |
 
 Sources: `x8/image_tx_daemon.py:308` (`_FRAG_BODY_BY_PROFILE`), `SETTINGS_REFERENCE.md` §2.1, `CONTROL_PLANE_DESIGN.md:101`.
 
@@ -205,7 +205,7 @@ The target is an A53 at 1.8 GHz, numpy + OpenCV, single core. All times are est.
 | **T** temporal | Predict each live shape with GSHIFT and GZOOM, then match: regions by IoU on label maps, edges by chamfer distance. Choose UPD / UCOL / redefine / DEL / CONFIRM, whichever is cheapest. Maintain the mirror. | §4 | 96×64 | 5–12 | — |
 | **P** pack | CELF lazy greedy, ΔD per bit on a 48×32 flat-fill mirror, ≤ 64 candidates, packed into one F-byte frame | §2.9 | 48×32 | 5–15 | — |
 
-**Total M→P ≈ 32–83 ms per frame (est., sum of the rows above)**, which is 2–6 % of one core. The §2.1 pre-stage (resize, colour conversion, LK 2–4 ms) comes on top.
+**Total M→P ≈ 32–83 ms per frame (est., sum of the rows above)**, which at the 2 fps camera default is 6–17 % of one core. The §2.1 pre-stage (resize, colour conversion, LK 2–4 ms) comes on top.
 
 - WebP tile encoding (`x8/camera_service.py:644-700`) is skipped in VECTOR mode, so net tractor CPU falls from the roughly 140 % of one core in `DC/IMAGE_PIPELINE.md:60`.
 
@@ -336,7 +336,7 @@ Other points:
 
 ## 3. Wire format: `TileDeltaFrame` codec `VECTOR` (VS1)
 
-**Container.** A VS1 frame is a `TileDeltaFrame` whose `codec` byte is `CODEC_VECTOR = 6` (ids 5–14 are reserved for future codecs, `bs/image_pipeline/frame_format.py:79-88`; 5 is `CODEC_WEBP_RAWSTREAM`). The 6 B header is unchanged:
+**Container.** A VS1 frame is a `TileDeltaFrame` whose `codec` byte is `CODEC_VECTOR = 6` (ids 0–5 are assigned and 6–14 are free, `bs/image_pipeline/frame_format.py:79-88`; 5 is `CODEC_WEBP_RAWSTREAM`). The 6 B header is unchanged:
 
 ```
 u8  frame_kind   ; 1 = epoch start (VS "key"), 0 = update — reuses the tile I/P meaning
@@ -369,7 +369,7 @@ Why a codec id rather than a new top-level magic:
 - **Epoch start = `frame_kind` 1.** `image_tx_daemon` adds a second copy only when its cumulative local TX-failure ratio exceeds 0.5 % (`x8/image_tx_daemon.py:1103-1118`); air loss is invisible to it, so VS1 does its own repeat-once: the next frame carries HZN ABS + LAYER_CLEAR again (69 bits, §3.5). When the daemon's copy does fire it uses the 5 B `0xFD` header (`bs/lora_proto.py:878-897`), so epoch-start frames are capped at F − 1 (196 / 236 B): a full-F copy would be refused by the L072 at DTS (248 B > 247) and exceed the 170 ms cap at FHSS (171.6 ms). The same limit applies to today's full-budget tile keyframes.
 - **No crypto.** P3 image traffic is plaintext today; the planned D14 split-trust envelope (4 B seq + 2 B CRC32, `LORA_PROTOCOL.md` priority-class table) would cost 6 B of body when it is switched on. VS1 reserves nothing for it; F simply shrinks by 6.
 
-### 3.2 VS header: 11 bits, explicit in every frame
+### 3.2 VS header: 13 bits, explicit in every frame
 
 ```
 byte0: bit7   0      marker (kept for a future top-level-magic transport; harmless here)
@@ -378,18 +378,20 @@ byte0: bit7   0      marker (kept for a future top-level-magic transport; harmle
        bit4-1 AAAA   capture age, 200 ms units; 15 = saturated (>= 3.0 s, rendered stale)
        bit0   E3  ┐
 byte1: bit7-5 E2-0┘  EEEE epoch mod 16
-byte1 bit4 ..       records, MSB-first bitstream; records never cross frames
+byte1: bit4-3 LL     degradation level the encoder is running: 0 = V0 … 3 = V3 (§4.5.4)
+byte1 bit2 ..       records, MSB-first bitstream; records never cross frames
 ```
 
 - **Age.** `camera_service` writes its encode latency into AAAA at pack time. `image_tx_daemon` drops the oldest frame when its 4-deep queue is full (`x8/image_tx_daemon.py:559-574`), so a frame that waited in the queue is stale by that wait; the daemon records enqueue time but reports it nowhere, so the base computes capture time = rx_ms − 200·AAAA and treats it as a lower bound. VECTOR mode sets `LIFETRAC_FRAME_MAX_AGE_MS=1500` so the daemon drops frames older than 1.5 s when a fresher one is queued (`x8/image_tx_daemon.py:1136-1145`; default 10 s).
 - **K and `frame_kind` must agree**; the parser rejects a mismatch.
+- **LL** is the level the *encoder* is at, whether the base commanded it or the tractor self-selected it (§4.5.4). Frame size cannot carry this: a quiet V0 frame is smaller than a V2 frame.
 
-**Record bits per frame = F × 8 − 11**
+**Record bits per frame = F × 8 − 13**
 
 | Profile | F | Record bits |
 |---|---|---|
-| p1 FHSS | 197 | **1,565** |
-| p2 DTS | 237 | **1,885** |
+| p1 FHSS | 197 | **1,563** |
+| p2 DTS | 237 | **1,883** |
 
 ### 3.3 Records: canonical prefix code (Kraft sum exactly 1)
 
@@ -516,7 +518,7 @@ Otherwise the frame is dropped and `vs_epoch_behind` is counted.
 
 ### 3.6 Worked byte counts: typical field-edge scene, cold start, static
 
-**Scene content: 23 records, 1,017 record bits (a 129 B VS body with the 11-bit header; computed from the §3.3 sizes, INSERT taken as 31 bits est.)**
+**Scene content: 23 records, 1,017 record bits (a 129 B VS body with the 13-bit header; computed from the §3.3 sizes, INSERT taken as 31 bits est.)**
 
 | Records | Bits each | Total |
 |---|---|---|
@@ -534,7 +536,7 @@ Otherwise the frame is dropped and `vs_epoch_behind` is counted.
 
 The hood is masked (0 bits). The bucket is always encoded as ordinary scene shapes (§5).
 
-**Packing (computed).** The whole scene, key frame included, fits in **one frame** at either profile: 1,017 of 1,565 bits at FHSS (548 spare ≈ 17 more INSERTs) and 1,017 of 1,885 bits at DTS (868 spare). On air that first frame is 147 B (129 B VS body): 120.4 ms at FHSS, 60.2 ms at DTS. With the epoch-start duplicate that `image_tx_daemon` adds when loss exceeds 0.5 %, the cold start costs two frames.
+**Packing (computed).** The whole scene, key frame included, fits in **one frame** at either profile: 1,017 of 1,563 bits at FHSS (546 spare ≈ 17 more INSERTs) and 1,017 of 1,883 bits at DTS (866 spare). On air that first frame is 147 B (129 B VS body): 120.4 ms at FHSS, 60.2 ms at DTS. With the epoch-start duplicate that `image_tx_daemon` adds when loss exceeds 0.5 %, the cold start costs two frames.
 
 **Time to first picture:** one camera period (500 ms at 2 fps) plus the frame's airtime plus the base's reassembly and publish path. Compared with `mono_g4`, which needs several 243 B frames to rotate through 96 tiles, VS1 shows the full scene on the first frame.
 
@@ -566,7 +568,7 @@ The encoder takes F from the live `tractor/link_budget` value, so a profile swit
 ### 4.1 Refresh loop
 
 - The encoder runs once per camera capture (2 fps by default, `x8/camera_service.py:109`; the interval is a setting) on the **newest** frame and emits **one** `TileDeltaFrame` of codec 6 on MQTT `cmd/image_frame`, exactly where `_build_frame` publishes tile frames today (`x8/camera_service.py:1576-1617`).
-- `image_tx_daemon` paces by time-on-air with 0.92 headroom (`x8/image_tx_daemon.py:355-411`) and drops the oldest queued frame when its 4-deep queue is full (`:559-574`). VS1 therefore never queues more than one frame: if the previous frame is still waiting, the encoder skips this capture and folds its changes into the next one.
+- `image_tx_daemon` paces by time-on-air with 0.92 headroom (`x8/image_tx_daemon.py:355-411`) and drops the oldest queued frame when its 4-deep queue is full (`:559-574`). VS1 therefore never queues more than one frame: if the previous frame is still waiting (queue depth from the daemon's `tractor/link_rx` status topic, §7.1), the encoder skips this capture and folds its changes into the next one.
 - On FHSS each frame takes one 200 ms slot, so at 2 fps VS1 uses two of every five slots and base commands steal from the rest. On DTS a full frame is 99.9 ms, so two frames per second are 20 % of airtime.
 - Frames are sized to the retained `tractor/link_budget` (203 or 243 B). A quiet scene shrinks its frames to a few bytes rather than padding (§3.7).
 
@@ -582,13 +584,13 @@ The encoder takes F from the live `tractor/link_budget` value, so a profile swit
 8. CONFIRM and DIGEST.
 9. INSERT and L4, until the budget or the residual floor.
 
-With 1,565–1,885 record bits per frame, items 1–5 rarely exceed a third of the frame even while driving; the rest is repeat-once, carousel and detail. There are no frame templates: the packer is the CELF greedy of §2.9 with this priority order as a pre-sort.
+With 1,563–1,883 record bits per frame, items 1–5 rarely exceed a third of the frame even while driving; the rest is repeat-once, carousel and detail. There are no frame templates: the packer is the CELF greedy of §2.9 with this priority order as a pre-sort.
 
 **Static accumulation.** With `moving = 0`, change bits fall to about 0. Detail accumulates at roughly 40–50 INSERT/HOLE/L4 records per frame (est.) until the residual threshold, after which frames carry only the anchor, CONFIRM and the carousel (≈ 12 B, 18.0 ms at DTS) and the channel is effectively free for commands.
 
 ### 4.3 Loss tolerance and honest ages
 
-- **New epoch** on any of: a base keyframe request (`0xFB` `REQ_KEYFRAME`, `bs/lora_proto.py:955-1010`); a camera change; GSHIFT or GZOOM beyond its field; more than 40 % of the weighted area relabelled; ID exhaustion; entering VECTOR; 60 s (safety refresh).
+- **New epoch** on any of: a camera change; GSHIFT or GZOOM beyond its field; more than 40 % of the weighted area relabelled; ID exhaustion; entering VECTOR; 60 s (safety refresh).
 - **Repeat-once and carousel re-verify.**
   - Before re-sending a shape, the tractor re-matches it on the current capture: IoU ≥ 0.7 after motion prediction, and ΔE ≤ 6.
   - If it passes, the re-sent define (same define-hash) plus its current UPD/UCOL is a *real* confirmation at this capture time.
@@ -599,7 +601,7 @@ With 1,565–1,885 record bits per frame, items 1–5 rarely exceed a third of t
   - tag2 = the low 2 bits of crc8(define-hash, offset, colour, n_inserts), computed from the tractor's mirror.
   - The base resets a shape's age only when the tag matches its stored state **and** DIGEST is not in mismatch. Otherwise it counts an orphan.
   - A 2-bit tag passes a stale state 25 % of the time per CONFIRM. The DIGEST crc8 (1/256) bounds this: while it mismatches, CONFIRMs reset no ages.
-- **Orphans (implicit NACK).** More than 20 % orphan records in 10 s, or 3 consecutive DIGEST mismatches, makes the base send a `0xFB` `CMD_OP_REQ_KEYFRAME` (0x60, no args; logged as `vs_resync`), at most once per 10 s (`KEYFRAME_CMD_MIN_GAP_S`, `bs/image_rx_daemon.py:211`) and show a "RESYNC" chip.
+- **Orphans.** More than 20 % orphan records in 10 s, or 3 consecutive DIGEST mismatches, puts the store into a *resync* state: it shows a "RESYNC" chip, stops resetting ages, and waits for the tractor's next epoch start. VS1 sends no request. The tractor starts a new epoch at least every 60 s (the safety refresh above), so a desynchronised base recovers within one safety period with no uplink at all, and the picture shows its true age in the meantime.
 - **Shape TTL:** 20 frames without a verified define, CONFIRM or UPD.
 - **Age styling** (shape age = now − last *verified* capture time):
 
@@ -653,7 +655,7 @@ VS1 must handle both without any change to the radio, and it must be the image p
 
 The campaign measured the cost of acknowledgement traffic on this half-duplex link: suppressing the tractor's echo took in-stream command delivery from 56 % to 91 %, smooth pacing took it to 99.8 %, and the self-heal keyframe request *raised* fragment loss by 1.9 points because each request steals a slot and deafens its sender (`TODO.md:130-159, 136-140`). Retries that need feedback amplify the condition they respond to. VS1 therefore:
 
-- **Sends no acknowledgements** and never asks for a specific record again. The only feedback is the existing rate-limited keyframe request of §4.3 (one per 10 s at most).
+- **Sends no acknowledgements** and never asks for anything. There is no feedback path: resynchronisation is in-band through the tractor's periodic epoch start (§4.3).
 - **Repeats forward, on a dial.** The carousel share κ and the epoch-start repeat count rise with measured loss (§4.5.4). On FHSS each slot is a different channel, so a repeat in the next slot is also frequency diversity against the fixed-channel emitters the surveys found (`TODO.md:2874-2914`).
 - **Keeps every frame independently useful** (principle 1), so a lost repeat costs nothing but age.
 - **Measures loss from its own sequence numbers.** Every VS frame is one fragment and carries the `TileDeltaFrame` `seq`, so the base store counts frame loss from `seq` gaps directly. The auto radio policy's loss input is blind to single-fragment frames (RS-12.20); VS1 has the missing input from day one.
@@ -683,7 +685,7 @@ The base scores link health over a 10 s window from three inputs: VS frame loss 
 | **V3 dead air** | no VS frame for 10 s | 20 B beacon: HZN RESID + STATUS (+ ANOM) | — | — | nothing else | "NO VECTOR DATA" |
 
 - **How the level reaches the tractor.** Through the existing `0x63` mode command: mode 9 with the quality byte mapped to a level (≥ 60 → V0, 40–59 → V1, 20–39 → V2), so the settings slider and the ack matching of §6 work unchanged. In V3 the base repeats the command at the RS-12.14 rate limits.
-- **Tractor self-selection (D-VS6b).** Base → tractor commands are the weak direction on FHSS (1/17 and 49/281 delivered in legs H/I, `TODO.md:2661-2676`). The tractor therefore also scores its own downlink from the SNR margin of the base commands it *does* hear (the same `RX_FRAME_URC` field) and from command silence longer than a healthy FHSS link's, and steps its own level down when either says so. It steps up only on a received base command. The base learns the tractor's level from the frame size and the codec byte.
+- **Tractor self-selection (D-VS6b).** Base → tractor commands are the weak direction on FHSS (1/17 and 49/281 delivered in legs H/I, `TODO.md:2661-2676`). The tractor therefore also scores its own downlink from the SNR margin of the base commands it *does* hear (the same `RX_FRAME_URC` field, relayed by `image_tx_daemon` on `tractor/link_rx`, §7.1) and from command silence longer than a healthy FHSS link's, and steps its own level down when either says so. It steps up only on a received base command. The base reads the tractor's level from the LL field of every VS header (§3.2); frame size cannot carry it, because a quiet V0 frame is smaller than a V2 frame.
 - **Budget interaction.** F is the smaller of the level's body and the live `tractor/link_budget`, so a profile switch and a level change compose.
 - **What the operator sees.** Each level changes the chip, never the picture's honesty: ages, HOLE hatches, the "N detected / M shown" count and the minimum-object table all stay, and the minimum-object table is recomputed for the smaller frame.
 
@@ -735,10 +737,10 @@ Legal dwell is unaffected: on FHSS every rung still sends at most one packet of 
 
 1. **`CFG_KEY_MODEM_RUNG`** (new host CFG key): `u8 rung` within the active profile, applied through `sx1276_set_sf_bw_cr_checked()` (`DC/firmware/murata_l072/radio/sx1276.c:393`) so the airtime invariant and the legal-dwell accountant validate the tuple. Rejected tuples leave the radio untouched and answer with a status byte.
 2. **Scheduled apply.** The same key with an *apply-at* argument: on FHSS `{epoch, hop_idx}`; on DTS `delay_ms` from receipt. The firmware retunes at that instant, not at receipt, so both ends switch on the same slot boundary.
-3. **Rung in the hop header.** The 8 B header carries `profile_id` as a full byte with values 0–2 (`DC/firmware/murata_l072/include/lora_pkt_hdr.h`); carry the rung in its upper nibble (schema stays 1) or add a field in schema 2. A receiver that decodes a frame on the wrong rung cannot happen (it would not demodulate), but the field lets the host log which rung a frame arrived on and lets the base verify the switch from the first frame.
+3. **Rung in the hop header, as a schema-2 field.** The 8 B header carries `profile_id` as a full byte with values 0–2 (`DC/firmware/murata_l072/include/lora_pkt_hdr.h`). Do not overload its spare bits: schema-1 parsers treat the whole byte as the profile and would reject a value such as `0x11` as an unknown profile. Schema 2 is already planned for a MIC, so the rung rides that bump as an additive field. A receiver cannot decode a frame on the wrong rung (it would not demodulate), so until schema 2 lands the host infers the rung of a decoded frame from the SF it is tuned to; the field is for logging and for verifying a switch from the first frame.
 4. **Rendezvous beacon.** A firmware-timed 12 B frame on the rendezvous rung: on FHSS in hop slot 0 of every epoch (10 s), on DTS every 10 s. The transmitter retunes for that one frame and returns. Cost at F2: 72 ms per 10 s, 0.7 % of airtime; the peer that wants to hear it retunes its receiver for that slot, 200 ms per 10 s of deafness on the working rung, 2 %.
 5. **Rung-aware scan.** Cold-start acquisition (`SX1276_RX_SCAN_DWELL_MS` 500 ms per channel, 30 s abort, `include/sx1276_rx_scan_policy.h`) walks the rendezvous rung first, then the working rung the host last knew.
-6. **Bench vectors.** `bench/host_proto` gains vectors for the key, the header nibble, the scheduled apply and the legal-dwell check at F2, in the style of `cfg_profile_wire.c` and `legal_dwell.c`.
+6. **Bench vectors.** `bench/host_proto` gains vectors for the key, the schema-2 header field, the scheduled apply and the legal-dwell check at F2, in the style of `cfg_profile_wire.c` and `legal_dwell.c`.
 
 #### 4.6.3 Message flow (host, `0xFB` command frames)
 
@@ -746,16 +748,16 @@ New opcodes in the shipped `0xFB` namespace (`bs/lora_proto.py:956-995`), contin
 
 | Opcode | Name | Direction | Args | Sent on |
 |---|---|---|---|---|
-| `0x6D` | `RUNG_REQ` | base → tractor | `u8 rung, u32le apply_epoch, u8 apply_hop` (FHSS) or `u16le apply_delay_ms` (DTS), `u8 req_seq` | old rung, 3 copies in consecutive slots (the P1 sticky-state rule) |
+| `0x6D` | `RUNG_REQ` | base → tractor | `u8 rung, u8 req_seq` | old rung, 3 copies in consecutive slots (the P1 sticky-state rule) |
 | `0x6E` | `RUNG_ACK` | tractor → base | `u8 rung, u8 req_seq, u8 current_rung` | old rung |
-| `0x6F` | `RUNG_CONF` | base → tractor | `u8 rung, u8 req_seq` | old rung, 3 copies |
+| `0x6F` | `RUNG_CONF` | base → tractor | `u8 rung, u8 req_seq, u32le apply_epoch, u8 apply_hop` (FHSS) or `u16le apply_delay_ms` (DTS) | old rung, 3 copies; carries the apply instant, computed when it is sent |
 | `0x70` | `RUNG_HELLO` | both | `u8 rung, u8 req_seq, u32le epoch` | new rung, first slot after the switch; also the beacon body on the rendezvous rung |
 
 ```
 base                                   tractor
- |  RUNG_REQ(rung, apply_at)  ─────►     |   old rung
+ |  RUNG_REQ(rung)  ─────►               |   old rung
  |  ◄─────  RUNG_ACK(rung)               |   old rung
- |  RUNG_CONF(rung)  ─────►              |   old rung   (both arm the scheduled apply)
+ |  RUNG_CONF(rung, apply_at)  ─────►    |   old rung   (both arm the scheduled apply)
  |            … apply instant …          |
  |  ◄─────  RUNG_HELLO(rung)             |   new rung   (tractor's first slot)
  |  RUNG_HELLO(rung)  ─────►             |   new rung
@@ -765,8 +767,8 @@ base                                   tractor
 Rules:
 
 1. The base sends `RUNG_REQ` only on the idle drain or the completion-aligned pump, behind the shared 1.0 s command gate like every other command (`bs/image_rx_daemon.py:265-273`), and only while the tractor reports `moving = 0` in STATUS (before the drive plane: always allowed).
-2. `apply_at` is at least 3 slots after the `RUNG_CONF` copies (600 ms on FHSS), so all three copies can land first.
-3. The tractor arms the switch only on a `RUNG_CONF` whose `req_seq` matches its ACK. A `RUNG_REQ` without a matching `RUNG_CONF` within `T_conf` = 5 slots (1 s) is discarded, and the tractor stays put.
+2. `apply_at` travels in `RUNG_CONF`, not in the request, so it is computed after the ACK and the command gate; it is at least 3 slots (600 ms on FHSS) after the last `RUNG_CONF` copy, so all three copies can land first.
+3. The tractor arms the switch only on a `RUNG_CONF` whose `req_seq` matches its ACK. A `RUNG_REQ` without a matching `RUNG_CONF` within `T_conf` = 5 s is discarded, and the tractor stays put. `T_conf` covers the whole sequence: three `REQ` copies (600 ms), the ACK, the base's 1.0 s command gate, three `CONF` copies (600 ms) and one retry.
 4. After the apply instant each side sends `RUNG_HELLO` in its first opportunity and considers the switch **proven** on the first frame it decodes on the new rung (a HELLO, a VS frame or any command).
 5. `image_tx_daemon` and `image_rx_daemon` re-read the rung after the apply and update `tractor/link_budget` (§3.7), so the vector encoder sizes the next frame to the new body.
 
@@ -774,7 +776,7 @@ Rules:
 
 | Timer | Value | Purpose |
 |---|---|---|
-| `T_conf` | 1 s (5 slots) | Tractor discards an unconfirmed request |
+| `T_conf` | 5 s | Tractor discards a request not confirmed in time; the sequence takes about 2.5 s without retries (three REQ copies, the ACK, the 1.0 s gate, three CONF copies) |
 | `T_revert` (image only) | 5 s | Either side reverts to the previous rung if nothing is decoded on the new one |
 | `T_revert` (drive plane on air) | 600 ms (3 slots) | Same, at the control link's timescale; the April `CMD_LINK_TUNE` design used 500 ms |
 | `T_cool` | 60 s | No new `RUNG_REQ` after a revert |
@@ -824,10 +826,10 @@ Inputs, over 10 s windows: median SNR margin of decoded frames (`RX_FRAME_URC` `
 
 #### 4.6.9 Work list and tests
 
-- **L072:** items 1–6 of §4.6.2; `host_proto` vectors; `check-stats-layout`-style wire pin for the header nibble.
+- **L072:** items 1–6 of §4.6.2; `host_proto` vectors; `check-stats-layout`-style wire pin for the schema-2 header field.
 - **Base:** opcodes `0x6D`–`0x70` in `bs/lora_proto.py`; the flow, timers and rendezvous rule in `image_rx_daemon.py`; the policy in `AutoRadioPolicy` (`bs/web_ui.py:378-538`) with a "rung" chip beside the profile selector; audit events for every request, switch, revert and rendezvous.
-- **Tractor:** ACK/HELLO handling and the scheduled apply in `image_tx_daemon.py`; `tractor/link_budget` republished per rung; D-VS6b's rendezvous fallback in `camera_service.py`.
-- **SIL:** `test_rung_switch_sil.py` modelled on `test_link_tune_sil.py` (764 lines, the April ladder): every row of §4.6.8, timer arithmetic from the apply instant, hysteresis, no request while moving, budget update after a switch, header nibble round trip.
+- **Tractor:** ACK/HELLO handling and the scheduled apply in `image_tx_daemon.py`; `tractor/link_budget` republished per rung and `tractor/link_rx` (last command heard, SNR, rung, queue depth) published for `camera_service`; D-VS6b's rendezvous fallback in `camera_service.py`.
+- **SIL:** `test_rung_switch_sil.py` modelled on `test_link_tune_sil.py` (764 lines, the April ladder): every row of §4.6.8, timer arithmetic from the apply instant, hysteresis, no request while moving, budget update after a switch, schema-2 header field round trip.
 - **Bench:** (1) a switch leg on the two-board bench at each rung pair, scored on proven-switch time and frames lost during the switch; (2) a rendezvous leg where one board is parked mid-session and must be re-found within `T_deaf` + 10 s; (3) the range-edge attenuator walk-down of §8.6, now with rung changes allowed, which is also the campaign's first range data.
 
 ---
@@ -916,7 +918,7 @@ Inputs, over 10 s windows: median SNR margin of decoded frames (`RX_FRAME_URC` `
 | Item | Value | Where |
 |---|---|---|
 | Encode mode | `EncodeMode.VECTOR = 9` | `bs/lora_proto.py:80-91`, `x8/camera_service.py:489-516`. Prerequisite: add `RAWSTREAM = 8` to `bs/lora_proto.py`, which the tractor already uses (`x8/camera_service.py:501`) and the base currently rejects (`bs/image_rx_daemon.py:1175-1203`). |
-| Frame codec | `CODEC_VECTOR = 6` | `bs/image_pipeline/frame_format.py:79-88` (5–14 reserved; 5 is RAWSTREAM), mirrored in `x8/camera_service.py:560-565` and `_ENCODE_MODE_CODEC` (`:571-581`) |
+| Frame codec | `CODEC_VECTOR = 6` | `bs/image_pipeline/frame_format.py:79-88` (0–5 assigned, 6–14 free), mirrored in `x8/camera_service.py:560-565` and `_ENCODE_MODE_CODEC` (`:571-581`) |
 | Badges | `Badge.VECTOR = 7` (scene geometry from measured pixels, not photographic), `Badge.MODEL = 8` (CAD self-model) | `bs/lora_proto.py:71-77`, `bs/web/img/badge_renderer.js:20-30` (`VALID` becomes {0..8}). Badge 6 `Wireframe` stays as is: it is what `mono_g4` tiles carry today (`bs/image_pipeline/canvas.py:35-38`). |
 | Wire names | `_CODEC_NAMES[6] = "vector"`, `ENCODE_MODE_NAMES[9] = "vector"` | `bs/image_rx_daemon.py:223`, `x8/camera_service.py:502` |
 
@@ -949,7 +951,7 @@ VECTOR plugs into that path with four edits: add `"vector"` to `_ENCODE_MODE_UI_
 | Tractor | **new** `x8/x8_image_pipeline/encode_vector.py` | `VectorEncoder(mask).frame(rgb, budget_bytes, epoch_start, quality) -> bytes` returning a complete `TileDeltaFrame` (6 B header, codec 6) |
 | Tractor | `x8/camera_service.py` | `ENCODE_MODE_VECTOR = 9` + name (`:489-502`); add to `_ENCODE_MODE_IMPLEMENTED` (`:509-516`); `CODEC_VECTOR = 6` (`:560-565`) and `_ENCODE_MODE_CODEC[9] = 6` (`:571-581`); branch at the `_build_frame` call (`:1580`) to `encode_vector` when the mode is 9, publishing the result on `cmd/image_frame` exactly as tile frames are; quality byte → detail level in `_apply_encode_mode` (`:1229-1302`); mode change still forces an epoch start (`:1272-1280`); skip a capture while a frame is still queued |
 | Tractor | `x8/x8_image_pipeline/register.py` | B7: negate the numpy result (`:61-74` returns −d, while `cv2.phaseCorrelate` at `:57-59` returns +d); Hann window in both paths; parabolic subpixel; normalised confidence |
-| Tractor | `x8/image_tx_daemon.py` | **No change.** Epoch-start frames start with `0x01` and get the keyframe treatment (`:763`, `:1108-1118`); everything else is a single fragment. |
+| Tractor | `x8/image_tx_daemon.py` | Small addition: publish a retained local status topic `tractor/link_rx` beside `tractor/link_budget` (`:435`) with the last base command heard (time, `snr_db`, `rssi_dbm`, rung) and the TX queue depth, so `camera_service` can run the D-VS6b self-select and skip a capture while a frame is still queued. Otherwise unchanged: epoch-start frames start with `0x01` and get the keyframe treatment (`:763`, `:1108-1118`); everything else is a single fragment. |
 | L072 / H7 | — | **No change.** |
 | Base | `bs/lora_proto.py` | `EncodeMode.RAWSTREAM = 8`, `EncodeMode.VECTOR = 9` (`:80-91`); `Badge.VECTOR = 7`, `Badge.MODEL = 8` (`:71-77`); `ENCODE_MODE_LADDER` floor becomes VECTOR (`:100-106`) for any future controller |
 | Base | `bs/image_pipeline/frame_format.py` | `CODEC_VECTOR = 6` (`:79-88`); `parse_tile_delta_frame` (`:136-200`): when `codec == 6`, take the remainder as `vector_body` and no tiles (the trailing-bytes check at `:188-189` applies to tile frames only); `encode_tile_delta_frame` (`:203`) mirrors it, so `image_rx_daemon`'s re-encode (`bs/image_rx_daemon.py:543-557`) passes VS bodies through untouched |
@@ -978,7 +980,7 @@ The `/ws/state` snapshot has no version field today; its keys are `ts_ms`, `grid
 "vector_scene": null | {
   "v":1, "epoch":5, "badge":7, "lab":false, "anchor_age_ms":820, "digest_ok":true,
   "corr_detected":1, "corr_shown":1, "min_object":"1.1 m @ 10 m (outside corridor)",
-  "bits":{"last_frame":1017,"per_layer":{"hdr":11,"L0":57,"L1":327,"L2":126,"L3":144,"ctrl":55,"insert":248,"pad":49}},
+  "bits":{"last_frame":1017,"per_layer":{"hdr":13,"L0":57,"L1":327,"L2":126,"L3":144,"ctrl":55,"insert":248,"pad":49}},
   "horizon":{"mode":"abs","pts":[[0,101.5],[192,99],[384,96]],"sky":["#8fb3d9","#cfe0ef"],
              "ground":["#6b8f3a","#4f6b2b"],"skyline":[[0,96],[32,88]],"badge":7,"age_ms":820},
   "layers":[

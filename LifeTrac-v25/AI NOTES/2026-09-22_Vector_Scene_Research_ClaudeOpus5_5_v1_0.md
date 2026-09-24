@@ -85,7 +85,7 @@ camera_service.py → MQTT cmd/image_frame → image_tx_daemon.py → L072 → a
 | p1 FHSS BW250 | 203 B | 215 B | 169.1 ms, one per 200 ms slot | 197 B |
 | p2 DTS BW500 | 243 B | 255 B | 99.9 ms | 237 B |
 
-The worked vector scene (1,017 record bits, a 129 B body with its 11-bit header) is one fragment of 147 B: 120.4 ms at BW250, 60.2 ms at BW500. The bench measured 699–812 B/s on FHSS and 1.75–2.0 KB/s on DTS as tractor-side goodput (`TODO.md:209-210, 2153-2154`; `bench-evidence/FW_BATCH1_acceptance_2026-07-30/RESULTS.md:86`).
+The worked vector scene (1,017 record bits, a 129 B body with its 13-bit header) is one fragment of 147 B: 120.4 ms at BW250, 60.2 ms at BW500. The bench measured 699–812 B/s on FHSS and 1.75–2.0 KB/s on DTS as tractor-side goodput (`TODO.md:209-210, 2153-2154`; `bench-evidence/FW_BATCH1_acceptance_2026-07-30/RESULTS.md:86`).
 
 ### 3.3 Radio profiles and the FHSS design as tested
 
@@ -373,7 +373,7 @@ Three designs were written independently. The judge scored each from 1 to 10.
 Copied from design §11 (2026-09-23 revision).
 
 1. Frames published, loss and coverage for VECTOR vs `mono_g4` on the same camera workload, on p1 and p2 (the Phase 2 bench leg).
-2. Does the tractor self-select (D-VS6b) trigger correctly from `link_stats` alone, and does it ever flap?
+2. Does the tractor self-select (D-VS6b) trigger correctly from tractor-side signals alone (received-command SNR and command silence, relayed by `image_tx_daemon`), and does it ever flap?
 3. Which camera sees the loader, and at what zoom? This sets the minimum-object table.
 4. Buy the AI6 arm sensor, and a bucket sensor (which grows `0x04` from 12 to 14 B)? (D-VS5)
 5. Detail-level mapping of the quality byte: linear in INSERT budget, or in residual threshold?

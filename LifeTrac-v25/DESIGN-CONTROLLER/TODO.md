@@ -3181,13 +3181,13 @@ test; the `TxPipeline` v2/v3 default cost 38 points of command delivery across
 
 ### RS-13 — Vector scene mode (VS1) — *proposed 2026-09-23, not started*
 
-Design: [VECTOR_SCENE.md](VECTOR_SCENE.md). Research and review record: [2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md](../AI%20NOTES/2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md). Decisions D-VS1–D-VS7 in [DECISIONS.md](DECISIONS.md#vector-scene-mode--proposed-pending-ose-sign-off).
+Design: [VECTOR_SCENE.md](VECTOR_SCENE.md). Research and review record: [2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md](../AI%20NOTES/2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md). Decisions D-VS1–D-VS9 (D-VS3/D-VS3a withdrawn) in [DECISIONS.md](DECISIONS.md#vector-scene-mode--proposed-pending-ose-sign-off).
 
 **What it is.** A new `TileDeltaFrame` codec (`6`, VECTOR) and encode mode (`EncodeMode.VECTOR = 9`) that sends the whole camera frame as layered, gradient-filled vector shapes in **one fragment** per frame (197 B body at FHSS, 237 B at DTS): horizon + sky/ground gradients, polygons in measured colours, trees as ellipses, edge lines, persistent shape IDs, a CAD self-model of the hood at the base. It is a floor below `mono_g4` in coverage per fragment, with no keyframe trains, so it cannot feed the FHSS keyframe storm (RS-12.12/12.14). Blocker IDs match [VECTOR_SCENE.md §10](VECTOR_SCENE.md#10-prerequisites-and-blockers).
 
 **Phase 0 — decisions**
 
-- [ ] OSE sign-off on D-VS1 to D-VS7
+- [ ] OSE sign-off on D-VS1 to D-VS9 (D-VS3/D-VS3a withdrawn)
 
 **Phase 1 — SIL + Vector Lab on the base website** (needs no radio)
 
@@ -3224,10 +3224,10 @@ Design: [VECTOR_SCENE.md](VECTOR_SCENE.md). Research and review record: [2026-09
 
 **Radio — coordinated modem-rung switch (D-VS8; spec in [VECTOR_SCENE.md §4.6](VECTOR_SCENE.md#46-coordinated-modem-rung-change-the-d-vs8-protocol))**
 
-- [ ] **L072:** `CFG_KEY_MODEM_RUNG` (SF7/8/9 within the active profile) applied through `sx1276_set_sf_bw_cr_checked()` with the airtime invariant and the legal-dwell accountant; scheduled apply at `{epoch, hop_idx}` (FHSS) or `delay_ms` (DTS); rung in the hop header (`profile_id` upper nibble or schema 2); rendezvous beacon (12 B `RUNG_HELLO` on the slowest rung, hop slot 0 of every epoch / every 10 s on DTS); rung-aware cold-start scan (rendezvous rung first); `bench/host_proto` vectors for the key, the nibble, the scheduled apply and legal dwell at SF9
-- [ ] **Base (`lora_proto.py`, `image_rx_daemon.py`, `web_ui.py`):** opcodes `0x6D RUNG_REQ`, `0x6E RUNG_ACK`, `0x6F RUNG_CONF`, `0x70 RUNG_HELLO`; the flow, `T_conf` 1 s / `T_revert` 5 s (600 ms once the drive plane is on air) / `T_cool` 60 s / `T_deaf` 10 s; rendezvous listening and 2 s beacons when deaf; rung ladder in `AutoRadioPolicy` (down at < 3 dB margin for 2 windows with the vector ladder at V2 and the tractor stopped; up after 6 windows; profile switch resets the rung); "rung" chip beside the profile selector; audit events
-- [ ] **Tractor (`image_tx_daemon.py`, `camera_service.py`):** ACK/HELLO handling, scheduled apply, `tractor/link_budget` republished per rung, `T_deaf` 20 s rendezvous fallback (D-VS6b)
-- [ ] **SIL:** `test_rung_switch_sil.py` modelled on `test_link_tune_sil.py`: every failure row of §4.6.8, timers counted from the apply instant, hysteresis, no request while moving, budget update after a switch, header nibble round trip
+- [ ] **L072:** `CFG_KEY_MODEM_RUNG` (SF7/8/9 within the active profile) applied through `sx1276_set_sf_bw_cr_checked()` with the airtime invariant and the legal-dwell accountant; scheduled apply at `{epoch, hop_idx}` (FHSS) or `delay_ms` (DTS); rung as an additive schema-2 hop-header field (not in `profile_id`'s spare bits, which schema-1 parsers would reject); rendezvous beacon (12 B `RUNG_HELLO` on the slowest rung, hop slot 0 of every epoch / every 10 s on DTS); rung-aware cold-start scan (rendezvous rung first); `bench/host_proto` vectors for the key, the schema-2 field, the scheduled apply and legal dwell at SF9
+- [ ] **Base (`lora_proto.py`, `image_rx_daemon.py`, `web_ui.py`):** opcodes `0x6D RUNG_REQ`, `0x6E RUNG_ACK`, `0x6F RUNG_CONF`, `0x70 RUNG_HELLO`; the flow (apply instant carried in `RUNG_CONF`), `T_conf` 5 s / `T_revert` 5 s (600 ms once the drive plane is on air) / `T_cool` 60 s / `T_deaf` 10 s; rendezvous listening and 2 s beacons when deaf; rung ladder in `AutoRadioPolicy` (down at < 3 dB margin for 2 windows with the vector ladder at V2 and the tractor stopped; up after 6 windows; profile switch resets the rung); "rung" chip beside the profile selector; audit events
+- [ ] **Tractor (`image_tx_daemon.py`, `camera_service.py`):** ACK/HELLO handling, scheduled apply, `tractor/link_budget` republished per rung, retained `tractor/link_rx` status (last command heard, SNR, rung, queue depth) for `camera_service`, `T_deaf` 20 s rendezvous fallback (D-VS6b)
+- [ ] **SIL:** `test_rung_switch_sil.py` modelled on `test_link_tune_sil.py`: every failure row of §4.6.8, timers counted from the apply instant, hysteresis, no request while moving, budget update after a switch, schema-2 header field round trip
 - [ ] **Bench legs:** (1) switch leg at each rung pair, scored on proven-switch time and frames lost during the switch; (2) rendezvous leg (park one board mid-session; re-found within `T_deaf` + 10 s); (3) the range-edge attenuator walk-down with rung changes allowed
 
 **Control plane (D-VS9):** revive firmware Batch 2 (reserved control slot, mute gate, skip/ditto) sized per rung, and fix the FHSS reverse direction (reserved reverse slot or base clock authority) before the drive plane ships; see `VECTOR_SCENE.md` §7.4.

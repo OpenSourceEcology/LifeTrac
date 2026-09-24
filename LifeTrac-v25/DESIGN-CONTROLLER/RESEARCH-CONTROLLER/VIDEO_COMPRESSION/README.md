@@ -191,7 +191,7 @@ A middle path between Option 5 (a purely synthetic situation display) and the ti
 - **Encoder:** classical CV on the tractor X8 at 96×64 / 192×128, no neural net: a horizon with sky and ground gradients; large regions as polygons filled with their measured mean colour and a linear gradient; trees and shrubs as ellipses; edge polylines (ruts, fences, overhead lines).
 - **Bitstream:** a `TileDeltaFrame` with codec `6`, records ranked by error reduction per bit and packed into the live single-fragment budget (197 B at FHSS, 237 B at DTS). Shape IDs persist across frames; global motion is one group-shift record; there are no keyframe trains.
 - **Self-model:** the tractor's hood is never sent; the base draws it from the OpenSCAD model. The arm is drawn when a pivot sensor exists.
-- **Verdict:** a floor below `mono_g4` in coverage per fragment (the whole frame in one fragment instead of 16–45 tiles), and it sends no keyframe requests, the base commands that drove the FHSS storm. Colours and shapes are measured, not invented, but the picture is a lossy summary and is labelled "VECTOR — NOT CAMERA PIXELS".
+- **Verdict:** a floor below `mono_g4` in coverage per fragment (the whole frame in one fragment, where a 243 B `mono_g4` frame carries at most 16 of 96 tiles), and it sends no keyframe requests, the base commands that drove the FHSS storm. Colours and shapes are measured, not invented, but the picture is a lossy summary and is labelled "VECTOR — NOT CAMERA PIXELS".
 - **Documents:** [../../VECTOR_SCENE.md](../../VECTOR_SCENE.md); prior-art survey and review record in [../../../AI NOTES/2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md](../../../AI%20NOTES/2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md).
 
 ---

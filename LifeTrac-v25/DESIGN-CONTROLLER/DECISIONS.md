@@ -306,17 +306,17 @@ None of these decisions is implemented. Each one lists its options and a **RECOM
 | Option | Pros | Cons |
 |---|---|---|
 | A. Keep SF7 only | No firmware change | Range edge handled only by power, antenna and the vector mode's redundancy |
-| **B. Rungs inside each profile (DTS: SF7/8/9 at BW500; FHSS: SF7/8/9 at BW250), switched with a confirmed, scheduled handshake and a rendezvous rung** | +5 dB (DTS) / +8 dB (FHSS) at the slowest rung; the vector mode is designed to be the payload there; reuses the `0x65`–`0x67` profile-switch pattern and the April `CMD_LINK_TUNE` SIL model | Control frames slow too (38 B: 20.5 ms at SF7/BW500, 133.6 ms at SF9/BW250, about 5 Hz), so the reserved control slot must be sized per rung; new L072 key, header nibble and beacon; two bench legs |
+| **B. Rungs inside each profile (DTS: SF7/8/9 at BW500; FHSS: SF7/8/9 at BW250), switched with a confirmed, scheduled handshake and a rendezvous rung** | +5 dB (DTS) / +8 dB (FHSS) at the slowest rung; the vector mode is designed to be the payload there; reuses the `0x65`–`0x67` profile-switch pattern and the April `CMD_LINK_TUNE` SIL model | Control frames slow too (38 B: 20.5 ms at SF7/BW500, 133.6 ms at SF9/BW250, about 5 Hz), so the reserved control slot must be sized per rung; new L072 key, schema-2 header field and beacon; two bench legs; the `0xFB` command path is unauthenticated today, so arming a rung change over the air is deferred to the RS-7/RS-8 crypto runway |
 | C. Blind multi-SF reception | No handshake | Not possible on an SX1276; a rung-cycling scan costs seconds per attempt |
 
 **Protocol summary (B):**
 - **Rungs:** R0–R2 on DTS (SF7/8/9 at BW500), F0–F2 on FHSS (SF7/8/9 at BW250); coding rate 4/5; BW125 and SF10 excluded. The slowest rung of the active profile is the **rendezvous rung**.
-- **Flow:** `RUNG_REQ` (`0x6D`, base → tractor, 3 copies, carries the apply instant as `{epoch, hop_idx}` on FHSS or a delay on DTS) → `RUNG_ACK` (`0x6E`) → `RUNG_CONF` (`0x6F`, 3 copies) all on the old rung; both retune at the apply instant; `RUNG_HELLO` (`0x70`) on the new rung; the first decoded frame on the new rung proves the switch on each side. Requests go through the shared 1.0 s command gate and only while the tractor is stopped.
-- **Timers:** `T_conf` 1 s; `T_revert` 5 s (image only) or 600 ms (drive plane on air), counted from the apply instant on both sides; `T_cool` 60 s; `T_deaf` 10 s (base) / 20 s (tractor); hysteresis 2 windows down, 6 windows up.
+- **Flow:** `RUNG_REQ` (`0x6D`, base → tractor, 3 copies) → `RUNG_ACK` (`0x6E`) → `RUNG_CONF` (`0x6F`, 3 copies, carries the apply instant as `{epoch, hop_idx}` on FHSS or a delay on DTS, computed after the ACK and the command gate) all on the old rung; both retune at the apply instant; `RUNG_HELLO` (`0x70`) on the new rung; the first decoded frame on the new rung proves the switch on each side. Requests go through the shared 1.0 s command gate and only while the tractor is stopped.
+- **Timers:** `T_conf` 5 s (covers three REQ copies, the ACK, the 1.0 s command gate and three CONF copies); `T_revert` 5 s (image only) or 600 ms (drive plane on air), counted from the apply instant on both sides; `T_cool` 60 s; `T_deaf` 10 s (base) / 20 s (tractor); hysteresis 2 windows down, 6 windows up.
 - **Rendezvous:** a deaf side tunes to the rendezvous rung and beacons every 2 s; a healthy tractor beacons once per 10 s epoch on it (0.7 % of airtime); cold-start scan walks it first.
 - **Policy:** down one rung when the SNR margin is below 3 dB for 2 windows and the vector ladder is already at V2 and the tractor is stopped; up one rung after 6 healthy windows; a profile switch resets the rung to the profile's fastest.
 
-**RECOMMENDATION: B, after the range-edge leg of `VECTOR_SCENE.md` §8.6 shows where SF7 runs out.** Ship the L072 key, header nibble and beacon first (they are useful for diagnosis alone), then the handshake, then the policy.
+**RECOMMENDATION: B, after the range-edge leg of `VECTOR_SCENE.md` §8.6 shows where SF7 runs out.** Ship the L072 key, the schema-2 header field and the beacon first (they are useful for diagnosis alone), then the handshake, then the policy.
 
 ### D-VS9 — Control-plane resilience before the drive plane ships
 
