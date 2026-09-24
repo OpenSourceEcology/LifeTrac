@@ -77,7 +77,7 @@ Paint order, from bottom to top:
 |---|---|
 | Convert everything in the frame to polygons | L1 masses. POLY records with 3–10 vertices; detail is added by INSERT records (§2.5, §3.3). |
 | A simple colour gradient matching the average colour | FILL uses the measured mean colour (RGB444, or a palette slot only when within ΔE ≤ 4) plus an optional least-squares linear gradient (§3.3). Colours are never invented (principle 4). |
-| Sky and ground as the first layer | L0 HZN record: 41–57 bits, the first record of every new epoch. Later frames send a 15-bit residual (§2.4). |
+| Sky and ground as the first layer | L0 HZN record: 42–58 bits, the first record of every new epoch. Later frames send a 15-bit residual (§2.4). |
 | More detail as bandwidth allows | Records are ranked by error reduction per bit (CELF), so a frame cut short still holds the best picture for its bytes (§2.9). While the scene is static, spare bits add vertices and detail (§4.3). |
 | Trees and shrubs as basic shapes with varying detail | L2 TREE/SHRUB ellipses of 34–51 bits. A merged tree line becomes SKYLINE. Trunks are drawn only when the lens is zoomed in enough to resolve them (§2.6). |
 | A 3D model of the tractor's own parts at the base | §5. The OpenSCAD model is exported to a visualisation-only model, then calibrated. The hood is masked on the tractor and costs 0 bits. The arm is posed from a sensor (S1). Vision and valve estimates are Lab-only and clearly labelled. The bucket is never masked. |
@@ -165,7 +165,7 @@ Sources: `x8/image_tx_daemon.py:308` (`_FRAG_BODY_BY_PROFILE`), `SETTINGS_REFERE
 6. **Supervisory tier; no safety claim.**
    - VECTOR is a "look, then move" view. **v25 has no working person detector.** Both `x8/x8_image_pipeline/detect_nanodet.py` backends return `[]`, and no tractor code emits `CMD_PERSON_APPEARED`. The base R6 detector gets no fresh pixels in VECTOR.
    - The console therefore shows "SAFETY DETECTOR: NO PIXELS". The speed cap (§6) applies once the hydraulic drive plane is on air; today no ControlFrame has flown and the E-stop is the 200 ms deadman ("stop by absence").
-7. **No keyframe trains.** An epoch start is one frame (HZN ABS plus LAYER_CLEAR). Repair is level-triggered inside the next scheduled frame, never by a request that grows the load it responds to. This is the same conclusion the bench reached for tiles: the self-heal keyframe request was net harmful and was replaced by the `0x6C` stale-tile report (`TODO.md:136-140`).
+7. **No keyframe trains.** An epoch start is one frame (an absolute HZN — ABS, or NO_HORIZON — plus LAYER_CLEAR). Repair is level-triggered inside the next scheduled frame, never by a request that grows the load it responds to. This is the same conclusion the bench reached for tiles: the self-heal keyframe request was net harmful and was replaced by the `0x6C` stale-tile report (`TODO.md:136-140`).
 8. **Same radio profile as everything else.** Image frames and base commands share whichever profile is active; there is no per-frame PHY split. On FHSS a VS frame occupies one 200 ms slot and base commands steal slots; on DTS commands ride the ~17 ms pacing gaps (`CONTROL_PLANE_DESIGN.md:96-120`, `TODO.md:141-159`).
 9. **Degrade by shrinking, repeating and simplifying, never by asking.** Under measured loss the encoder sends shorter frames, repeats the important records more often and drops detail (§4.5). It never adds acknowledgement or retry traffic, because the bench showed that such traffic amplifies loss on this half-duplex link.
 
@@ -256,7 +256,7 @@ The console shows this row for the current zoom, for example "objects < 1.1 m at
 3. **Fit.**
    - Take the strongest sky→ground transition per remaining column.
    - With calibration: undistort those points (`cv2.undistortPoints`) and fit a line.
-   - Before calibration: fit y = a + bx + cx². At 2.8 mm / 130° a straight horizon 10–25° off-axis sags 11.5–27 px between centre and ±60° (computed), so a line fails. The curvature is sent as `curv3`.
+   - Before calibration: fit y = a + bx + cx². At 2.8 mm / 130° a straight horizon 10–25° off-axis sags 11.5–27 px between centre and ±60° (computed), so a line fails. The curvature is sent as `curv4` (4 px steps, −32..+28 px at the frame edge, which covers the 27 px case).
    - Two-pass trimmed least squares.
 4. **Accept** only if all of these hold:
    - ≥ 40 % of the non-excluded columns lie within 2 cells;
@@ -415,10 +415,10 @@ byte1 bit2 ..       records, MSB-first bitstream; records never cross frames
 
 | Mode | Fields | Size |
 |---|---|---|
-| 00 ABS | y8 (2 px, y = 2v − 128 at x = 192, so −128..+382 px, which covers a horizon above or below the frame), ang6 (0.5°, ±16°), curv3 (signed sag at the frame edge, 4 px steps; 0 after calibration), SKY vfill, GND vfill | 41–57 |
-| 01 RESID | dy5 (2 px), dang4 (0.5°). **Relative to the current epoch's ABS** (Phase 3: to the IMU prediction for that capture), never to a previous RESID | 15 |
+| 00 ABS | y8 (2 px, y = 2v − 128 at x = 192, so −128..+382 px, which covers a horizon above or below the frame), ang6 (0.5°, ±16°), curv4 (signed sag at the frame edge, 4 px steps, −32..+28 px; 0 after calibration), SKY vfill, GND vfill | 42–58 |
+| 01 RESID | dy5 (2 px), dang4 (0.5°). **Relative to the current epoch's ABS** (Phase 3: to the IMU prediction for that capture), never to a previous RESID; not sent while the epoch's anchor is NO_HORIZON | 15 |
 | 10 COLOURS | 2 × vfill | 24–40 |
-| 11 NO_HORIZON | top and bottom vfill | 24–40 |
+| 11 NO_HORIZON | top and bottom vfill. An absolute anchor like ABS: it starts an epoch and completes a hand-over (§4.3) | 24–40 |
 
 **EXT subtypes**
 
@@ -496,10 +496,13 @@ byte1 bit2 ..       records, MSB-first bitstream; records never cross frames
    | Field | Set by |
    |---|---|
    | geometry | define + INSERTs |
-   | offset | UPD, GSHIFT, GZOOM |
-   | colour | define fill, UCOL, GAIN |
+   | local offset | UPD (per shape) |
+   | group shift | GSHIFT (per group) |
+   | group zoom | GZOOM (per group) |
+   | base colour | define fill, UCOL (per shape) |
+   | gain | GAIN (per frame, all shapes) |
 
-   A define with an unchanged define-hash refreshes only the geometry age, and never resets offset or colour. A new define-hash is a redefine at the current position, so the offset is set to 0 at that define's capture time.
+   Each row is its own last-writer-wins state with its own clock, so a GSHIFT never discards a shape's UPD and a GAIN never replaces a UCOL. On screen: vertices → local offset → group shift → group zoom (about the ground anchor) → screen, and colour = gain × base colour. Group transforms are absolute values, not accumulated deltas; every define stores the group transform current at its capture time and the renderer applies (group now − group at define), so a redefine at the current position never double-shifts. A define with an unchanged define-hash refreshes only the geometry age and never resets the other four. A new define-hash is a redefine at the current position, so the local offset is set to 0 at that define's capture time.
 
 ### 3.5 Epochs (revised acceptance)
 
@@ -513,16 +516,16 @@ A frame is applied, or switches the base to its epoch, when any of these holds:
 
 Otherwise the frame is dropped and `vs_epoch_behind` is counted.
 
-- **Hand-over.** The old epoch stays visible as **CACHED (1)** (desaturated, outline-weighted) until the new epoch's HZN ABS has arrived and ≥ 50 % of its DIGEST `n_live` shapes are present. Only the DIGEST half of that condition times out (after 2 frames the store shows what it has); the HZN ABS half never does, because without an absolute horizon there is nothing to hand over to — if both epoch-start copies are lost, the cached picture stays until the tractor's next epoch start (the repeat-once copy, or the ≤ 60 s safety refresh). There is no black flash.
-- **Key frames.** The first frame of an epoch is HZN ABS, plus LAYER_CLEAR when it fits (57 + 12 = 69). `image_tx_daemon` sends it twice when its own cumulative TX-failure ratio exceeds 0.5 % (§3.1) — a local counter that cannot see air loss, which is why VS1 repeats the epoch start itself (§4.3).
+- **Hand-over.** The old epoch stays visible as **CACHED (1)** (desaturated, outline-weighted) until the new epoch's absolute HZN (ABS, or NO_HORIZON when the camera points down) has arrived and ≥ 50 % of its DIGEST `n_live` shapes are present. Only the DIGEST half of that condition times out (after 2 frames the store shows what it has); the absolute-HZN half never does, because without an anchor there is nothing to hand over to — if both epoch-start copies are lost, the cached picture stays until the tractor's next epoch start (the repeat-once copy, or the ≤ 60 s safety refresh). There is no black flash.
+- **Key frames.** The first frame of an epoch is an absolute HZN — ABS, or NO_HORIZON when the camera points down (§2.4) — plus LAYER_CLEAR when it fits (58 + 12 = 70; 40 + 12 = 52 for NO_HORIZON). `image_tx_daemon` sends it twice when its own cumulative TX-failure ratio exceeds 0.5 % (§3.1) — a local counter that cannot see air loss, which is why VS1 repeats the epoch start itself (§4.3).
 
 ### 3.6 Worked byte counts: typical field-edge scene, cold start, static
 
-**Scene content: 23 records, 1,017 record bits (a 129 B VS body with the 13-bit header; computed from the §3.3 sizes, INSERT taken as 31 bits est.)**
+**Scene content: 23 records, 1,018 record bits (a 129 B VS body with the 13-bit header; computed from the §3.3 sizes, INSERT taken as 31 bits est.)**
 
 | Records | Bits each | Total |
 |---|---|---|
-| HZN ABS (RGB vfills) | 57 | 57 |
+| HZN ABS (RGB vfills) | 58 | 58 |
 | STATUS | 30 | 30 |
 | Near and far fields (gradient triangles) | 69 | 138 |
 | 12-sample treeline SKYLINE | 60 | 60 |
@@ -536,7 +539,7 @@ Otherwise the frame is dropped and `vs_epoch_behind` is counted.
 
 The hood is masked (0 bits). The bucket is always encoded as ordinary scene shapes (§5).
 
-**Packing (computed).** The whole scene, key frame included, fits in **one frame** at either profile: 1,017 of 1,563 bits at FHSS (546 spare ≈ 17 more INSERTs) and 1,017 of 1,883 bits at DTS (866 spare). On air that first frame is 147 B (129 B VS body): 120.4 ms at FHSS, 60.2 ms at DTS. With the epoch-start duplicate that `image_tx_daemon` adds when its local TX-failure ratio exceeds 0.5 %, the cold start costs two frames.
+**Packing (computed).** The whole scene, key frame included, fits in **one frame** at either profile: 1,018 of 1,563 bits at FHSS (545 spare ≈ 17 more INSERTs) and 1,018 of 1,883 bits at DTS (865 spare). On air that first frame is 147 B (129 B VS body): 120.4 ms at FHSS, 60.2 ms at DTS. With the epoch-start duplicate that `image_tx_daemon` adds when its local TX-failure ratio exceeds 0.5 %, the cold start costs two frames.
 
 **Time to first picture:** one camera period (500 ms at 2 fps) plus the frame's airtime plus the base's reassembly and publish path. Compared with `mono_g4`, which needs several 243 B frames to rotate through 96 tiles, VS1 shows the full scene on the first frame.
 
@@ -574,7 +577,7 @@ The encoder takes F from the live `tractor/link_budget` value, so a profile swit
 
 ### 4.2 Budget order within a frame
 
-1. Epoch-start records when an epoch starts (§3.5): HZN ABS + LAYER_CLEAR.
+1. Epoch-start records when an epoch starts (§3.5): the absolute HZN (ABS or NO_HORIZON) + LAYER_CLEAR.
 2. ANOM, if corr_n > 0.
 3. HZN (RESID, or ABS when an epoch starts or a stop changes by ΔE > 6), GSHIFT, GZOOM, GAIN.
 4. STATUS (every frame while the arm moves or `mask_anom = 1`; otherwise every 4th frame or on change).
@@ -586,7 +589,7 @@ The encoder takes F from the live `tractor/link_budget` value, so a profile swit
 
 With 1,563–1,883 record bits per frame, items 1–5 rarely exceed a third of the frame even while driving; the rest is repeat-once, carousel and detail. There are no frame templates: the packer is the CELF greedy of §2.9 with this priority order as a pre-sort.
 
-**Static accumulation.** With `moving = 0`, change bits fall to about 0. Detail accumulates at roughly 40–50 INSERT/HOLE/L4 records per frame (est.) until the residual threshold, after which frames carry only the anchor, CONFIRM and the carousel (≈ 12 B, 18.0 ms at DTS) and the channel is effectively free for commands.
+**Static accumulation.** With `moving = 0`, change bits fall to about 0. Detail accumulates at roughly 40–50 INSERT/HOLE/L4 records per frame (est.) until the residual threshold. After it, most frames are the 12 B floor — anchor + CONFIRM, 83 record bits: room for the RESID anchor, one CONFIRM or DIGEST and at most one small record, so no carousel — and every fourth frame at V0 (κ = 25 %) is a ≈ 40 B carousel frame carrying about four defines. At 2 fps that is 3 × 18.0 + 28.2 ms per 2 s (4.1 % of DTS airtime; 3 × 36.0 + 56.4 ms, 8.2 %, on FHSS), which is what the carousel age bound of §4.1 costs; the channel is otherwise free for commands.
 
 ### 4.3 Loss tolerance and honest ages
 
@@ -662,14 +665,14 @@ The campaign measured the cost of acknowledgement traffic on this half-duplex li
 
 #### 4.5.3 Shorter frames under loss
 
-Per-frame loss rises with airtime (`TODO.md:1774-1775`). VS1 records are ≤ 69 bits, so a small frame still carries several of them:
+Per-frame loss rises with airtime (`TODO.md:1774-1775`). VS1 records are typically 30–75 bits (the worked scene of §3.6 averages 44 bits over 23 records); the largest are a 24-sample SKYLINE at 102 bits and a 10-vertex POLY with 11-bit EG2 steps at about 240, which the packer defers to a fuller frame. A small frame therefore still carries several typical records:
 
 | VS body | On air | p1 FHSS | p2 DTS | Records (est.) |
 |---|---|---|---|---|
 | 12 B (anchor + CONFIRM) | 30 B | 36.0 ms | 18.0 ms | 1–2 |
-| 40 B | 58 B | 56.4 ms | 28.2 ms | 4–5 |
-| 100 B | 118 B | 100.0 ms | 50.0 ms | 11–13 |
-| 197 / 237 B (full) | 215 / 255 B | 169.1 ms | 99.9 ms | 22–27 |
+| 40 B | 58 B | 56.4 ms | 28.2 ms | 4–7 |
+| 100 B | 118 B | 100.0 ms | 50.0 ms | 10–18 |
+| 197 / 237 B (full) | 215 / 255 B | 169.1 ms | 99.9 ms | 21–43 |
 
 Under loss the encoder trades one full frame for several short ones: the same bits in the same time, spread over more slots and channels, each exposed for a fraction of the time. At level V2 (below) a 2 fps stream of 58 B frames uses 11 % of FHSS airtime and 6 % of DTS airtime, leaving the channel to commands.
 
@@ -684,9 +687,9 @@ The base scores link health over a 10 s window from three inputs: VS frame loss 
 | **V2 poor** | loss > 25 % or margin < 3 dB | 40 B | 75 % | ×3, consecutive slots | INSERT + L4 off; STATUS and ANOM in every frame | "LINK POOR" chip, ages emphasised |
 | **V3 dead air** | no VS frame for 10 s | 20 B beacon: HZN RESID + STATUS (+ ANOM) | — | — | nothing else | "NO VECTOR DATA" |
 
-- **How the level reaches the tractor.** Through the existing `0x63` mode command: mode 9 with the quality byte mapped to a level (≥ 60 → V0, 40–59 → V1, 20–39 → V2), so the settings slider and the ack matching of §6 work unchanged. In V3 the base repeats the command at the RS-12.14 rate limits.
+- **How the level reaches the tractor: one mapping for the quality byte.** The existing `0x63` command carries mode 9 and a quality byte 1–100 with a single meaning: the byte is the **detail ceiling**. Its band selects the level — 60–100 → V0, 40–59 → V1, 20–39 → V2, 1–19 → V3 — and the value inside the band scales the INSERT/L4 budget and the residual threshold linearly, so the operator's slider (§6) chooses detail within V0 and the ladder chooses the band. Automatic degradation sends `min(operator value, band ceiling)` — 59 for V1, 39 for V2, 19 for V3 — the base remembers the operator's value and restores it as the ladder climbs, and the ack matching of §6 compares the byte actually sent. The tractor's self-selected level (D-VS6b) can only lower the effective band; the LL field reports the effective level either way. In V3 the base repeats the command at the RS-12.14 rate limits.
 - **Tractor self-selection (D-VS6b).** Base → tractor commands are the weak direction on FHSS (1/17 and 49/281 delivered in legs H/I, `TODO.md:2661-2676`). The tractor therefore also scores its own downlink from the SNR margin of the base frames it *does* hear (the same `RX_FRAME_URC` field, relayed by `image_tx_daemon` on `tractor/link_rx`, §7.1) and from base silence, and steps its own level down when either says so. It steps up only on a received base frame. The base reads the tractor's level from the LL field of every VS header (§3.2); frame size cannot carry it, because a quiet V0 frame is smaller than a V2 frame.
-- **Base heartbeat (the silence clock needs it).** On the shipped path base → tractor traffic is event-driven — `image_rx_daemon` only drains queued commands, and its periodic probe is bench-only (`LIFETRAC_REACTIVE_FIRE=0` in production, `bs/image_rx_daemon.py:354-359`) — so a healthy idle base is silent indefinitely, and silence alone would walk a healthy tractor down the ladder. VECTOR mode therefore adds `LINK_HB` (`0x71`, §4.6.3): whenever no command has left the gate for `T_hb` = 5 s, `image_rx_daemon` sends a 12 B heartbeat carrying the rung and the number of VS frames it decoded since the last one, two copies in consecutive slots on FHSS. Cost: 2 × 20.6 ms per 5 s at F0 (0.8 % of airtime), 2 × 72.2 ms at F2 (2.9 %). The tractor's silence clock counts commands and heartbeats alike: **one level down per 20 s of silence** (four heartbeats missed), never without the heartbeat in service, and the `frames_rx` field tells the tractor whether its own frames are getting through, which keeps it off the rendezvous path (§4.6.4) while the forward link is alive.
+- **Base heartbeat (the silence clock needs it).** On the shipped path base → tractor traffic is event-driven — `image_rx_daemon` only drains queued commands, and its periodic probe is bench-only (`LIFETRAC_REACTIVE_FIRE=0` in production, `bs/image_rx_daemon.py:354-359`) — so a healthy idle base is silent indefinitely, and silence alone would walk a healthy tractor down the ladder. VECTOR mode therefore adds `LINK_HB` (`0x71`, §4.6.3): whenever no command has left the gate for `T_hb` = 5 s, `image_rx_daemon` sends a 12 B heartbeat carrying the rung and the number of VS frames it decoded since the last one, two copies 1.0 s apart on FHSS (every base copy rides the shared command gate, §4.6.3). Cost: 2 × 20.6 ms per 5 s at F0 (0.8 % of airtime), 2 × 72.2 ms at F2 (2.9 %). The tractor's silence clock counts commands and heartbeats alike: **one level down per 20 s of silence** (four heartbeats missed), never without the heartbeat in service, and the `frames_rx` field tells the tractor whether its own frames are getting through, which keeps it off the rendezvous path (§4.6.4) while the forward link is alive.
 - **Budget interaction.** F is the smaller of the level's body and the live `tractor/link_budget`, so a profile switch and a level change compose.
 - **What the operator sees.** Each level changes the chip, never the picture's honesty: ages, HOLE hatches, the "N detected / M shown" count and the minimum-object table all stay, and the minimum-object table is recomputed for the smaller frame.
 
@@ -751,11 +754,11 @@ New opcodes in the shipped `0xFB` namespace (`bs/lora_proto.py:956-995`), contin
 
 | Opcode | Name | Direction | Args | Sent on |
 |---|---|---|---|---|
-| `0x6D` | `RUNG_REQ` | base → tractor | `u8 rung, u8 req_seq` | old rung, 3 copies in consecutive slots (the P1 sticky-state rule) |
+| `0x6D` | `RUNG_REQ` | base → tractor | `u8 rung, u8 req_seq` | old rung, 3 copies 1.0 s apart: every base copy rides the shared command gate (`CMD_STREAM_MIN_GAP_S`, `bs/image_rx_daemon.py:273, 827-865`; 120 ms only when no stream is active), never a burst — the RS-12.14 lesson |
 | `0x6E` | `RUNG_ACK` | tractor → base | `u8 rung, u8 req_seq, u8 current_rung, u8 status` (0 = accepted; 1 = moving; 2 = rung refused by the firmware; 3 = cooling down after a revert) | old rung; `status ≠ 0` is a NACK |
-| `0x6F` | `RUNG_CONF` | base → tractor | `u8 rung, u8 req_seq, u32le apply_epoch, u8 apply_hop` (FHSS) or `u16le apply_delay_ms` (DTS; each copy carries its *own* remaining delay, the apply instant minus that copy's transmit time) | old rung, 3 copies; carries the apply instant, computed when it is sent; the tractor latches the instant from the first copy it accepts and ignores later copies with the same `req_seq` |
-| `0x70` | `RUNG_HELLO` | both | `u8 rung, u8 req_seq, u32le epoch, u8 heard` (1 = I have decoded a peer frame on this rung) | new rung, every slot until committed (rule 4); also the beacon and sweep body on the rendezvous rung, with `heard = 0` |
-| `0x71` | `LINK_HB` | base → tractor | `u8 rung, u8 frames_rx` (VS frames decoded since the last heartbeat) | working rung, after every `T_hb` = 5 s of command silence, 2 copies in consecutive slots on FHSS (§4.5.4) |
+| `0x6F` | `RUNG_CONF` | base → tractor | `u8 rung, u8 req_seq, u32le apply_epoch, u8 apply_hop` (FHSS) or `u16le apply_delay_ms` (DTS; each copy carries its *own* remaining delay, the apply instant minus that copy's transmit time) | old rung, 3 copies 1.0 s apart; carries the apply instant, computed when it is sent; the tractor latches the instant from the first copy it accepts and ignores later copies with the same `req_seq` |
+| `0x70` | `RUNG_HELLO` | both | `u8 rung, u8 req_seq, u32le epoch` | new rung, in alternating slots (base: even hop slots, through the gate; tractor: odd slots; on DTS the base at the apply instant + k × 1.0 s and the tractor offset by 500 ms) until the first peer frame is decoded (rule 4); also the beacon and sweep body on the rendezvous rung |
+| `0x71` | `LINK_HB` | base → tractor | `u8 rung, u8 frames_rx` (VS frames decoded since the last heartbeat) | working rung, after every `T_hb` = 5 s of command silence, 2 copies 1.0 s apart on FHSS (§4.5.4) |
 
 ```
 base                                   tractor
@@ -771,17 +774,18 @@ base                                   tractor
 Rules:
 
 1. The base sends `RUNG_REQ` only on the idle drain or the completion-aligned pump, behind the shared 1.0 s command gate like every other command (`bs/image_rx_daemon.py:265-273`), and only while the tractor reports `moving = 0` in STATUS (before the drive plane: always allowed).
-2. `apply_at` travels in `RUNG_CONF`, not in the request, so it is computed after the ACK and the command gate; it is at least 3 slots (600 ms on FHSS) after the last `RUNG_CONF` copy, so all three copies can land first.
-3. The tractor arms the switch only on a `RUNG_CONF` whose `req_seq` matches its ACK. A `RUNG_REQ` without a matching `RUNG_CONF` within `T_conf` = 5 s is discarded, and the tractor stays put. `T_conf` covers the whole sequence: three `REQ` copies (600 ms), the ACK, the base's 1.0 s command gate, three `CONF` copies (600 ms) and one retry.
-4. After the apply instant each side sends `RUNG_HELLO` every slot, with `heard = 1` once it has decoded any peer frame on the new rung (a HELLO, a VS frame or any command). Decoding a peer frame is only local proof; a side **commits** — clears its `T_revert` — only on a peer HELLO with `heard = 1`, which proves the peer decodes *it*. After committing it keeps answering peer HELLOs with `heard = 1` for the rest of the `T_revert` window, so the peer gets many chances to commit too. A side that has not committed when `T_revert` expires reverts; because the peer cannot have committed without hearing it, a one-sided outcome always ends with both on the old rung.
+2. `apply_at` travels in `RUNG_CONF`, not in the request, so it is computed after the ACK and the command gate; it is at least 1.0 s (one gate interval, five FHSS slots) after the last `RUNG_CONF` copy, so all three copies can land first.
+3. The tractor arms the switch only on a `RUNG_CONF` whose `req_seq` matches its ACK. A `RUNG_REQ` without a matching `RUNG_CONF` within `T_conf` = 10 s is discarded, and the tractor stays put. `T_conf` covers the whole sequence at the gate's pace: three `REQ` copies over 2 s, the ACK, the base's 1.0 s command gate, three `CONF` copies over 2 s, and one retry of the CONF.
+4. After the apply instant each side sends `RUNG_HELLO` in its own slots — base even hop slots (through the gate), tractor odd slots, so the two half-duplex radios never key up together — until it decodes any peer frame on the new rung (a HELLO, a VS frame, a heartbeat or any command). There is no commit message: the new rung is held under a **lease**. The first peer frame must arrive within `T_revert`; after it, every decoded peer frame renews the lease for `T_lease` = 15 s (three heartbeat periods in the base → tractor direction, more than one V3 beacon period in the other). A side whose lease lapses reverts to the old rung and holds *that* under the same lease before the deaf rule of §4.6.5 applies. This is convergent after any loss pattern, including "first peer frame heard, then every reply lost": the silent side reverts at `T_revert`, the other side's lease lapses `T_lease` later, and both are on the old rung within `T_revert` + `T_lease` = 20 s with no acknowledgement of the acknowledgement.
 5. `image_tx_daemon` and `image_rx_daemon` re-read the rung after the apply and update `tractor/link_budget` (§3.7), so the vector encoder sizes the next frame to the new body.
 
 #### 4.6.4 Timers
 
 | Timer | Value | Purpose |
 |---|---|---|
-| `T_conf` | 5 s | Tractor discards a request not confirmed in time; the sequence takes about 2.5 s without retries (three REQ copies, the ACK, the 1.0 s gate, three CONF copies) |
-| `T_revert` (image only) | 5 s | Either side reverts to the previous rung unless it has committed (received a peer `RUNG_HELLO` with `heard = 1`) on the new one |
+| `T_conf` | 10 s | Tractor discards a request not confirmed in time; the sequence takes about 6 s without retries at the gate's pace (three REQ copies over 2 s, the ACK, the 1.0 s gate, three CONF copies over 2 s) |
+| `T_revert` (image only) | 5 s | Either side reverts to the previous rung unless it has decoded a peer frame on the new one; after that the lease below takes over |
+| `T_lease` | 15 s (image); 3 control periods on the drive plane | Renewed by every decoded peer frame; a side whose lease lapses reverts to the old rung, so a one-sided switch converges within `T_revert` + `T_lease` |
 | `T_revert` (drive plane on air) | 600 ms (3 slots) | Same, at the control link's timescale; the April `CMD_LINK_TUNE` design used 500 ms |
 | `T_cool` | 60 s | No new `RUNG_REQ` after a revert |
 | `T_deaf` (base) | 10 s without a VS frame (= level V3, §4.5.4) | Base goes to the rendezvous rung |
@@ -791,7 +795,7 @@ Rules:
 | Beacon while deaf | sweep: one channel per 200 ms slot on FHSS (the hop set in 10 s); every 2 s on DTS | Guarantees a parked listener hears it within 10 s |
 | Hysteresis (policy) | 2 windows down, 6 windows up (10 s windows) | Same shape as R-8 and `AutoRadioPolicy` |
 
-Both sides count `T_revert` from the apply instant, not from receipt, and neither clears it without the peer's `heard = 1`, so a one-sided switch ends with both on the old rung within one timer.
+Both sides count `T_revert` from the apply instant, not from receipt, and hold the new rung only under the lease, so a one-sided switch ends with both on the old rung within `T_revert` + `T_lease`.
 
 #### 4.6.5 Rendezvous rule
 
@@ -823,8 +827,8 @@ Inputs, over 10 s windows: median SNR margin of decoded frames (`RX_FRAME_URC` `
 | `RUNG_REQ` lost | Nothing changes | Base retries after the command gate |
 | `RUNG_ACK` lost | Base never confirms; tractor discards after `T_conf` | Base retries |
 | `RUNG_CONF` lost | Base switches, tractor stays; base hears nothing on the new rung | Base reverts after `T_revert`; `T_cool`; tractor never moved |
-| Apply-time skew (DTS) | One side keys up a slot early or late | `RUNG_HELLO` repeats each slot until committed, within `T_revert` |
-| Base HELLO heard, tractor HELLO never gets through | Tractor has local proof but no `heard = 1`; base has nothing | Neither commits; both revert after `T_revert`, then `T_cool` |
+| Apply-time skew (DTS) | One side keys up a slot early or late | `RUNG_HELLO` repeats in its own slots until the first peer frame, within `T_revert` |
+| Base HELLO heard, every tractor frame on the new rung lost | Tractor holds a lease; base hears nothing | Base reverts at `T_revert`; the base is then silent on the new rung, so the tractor's lease lapses `T_lease` later and it reverts too: both on the old rung within 20 s, then `T_cool` |
 | New rung too poor for both | Neither side decodes anything | Both revert after `T_revert` (counted from the apply instant on both sides), then `T_cool` |
 | Repeated failures | Link stays marginal on the old rung | After `T_deaf`, both go to the rendezvous rung and climb back one rung at a time |
 | Beacon collides with image traffic | One 12 B frame lost | Next epoch |
@@ -833,9 +837,9 @@ Inputs, over 10 s windows: median SNR margin of decoded frames (`RX_FRAME_URC` `
 #### 4.6.9 Work list and tests
 
 - **L072:** items 1–6 of §4.6.2; `host_proto` vectors; `check-stats-layout`-style wire pin for the schema-2 header field.
-- **Base:** opcodes `0x6D`–`0x71` in `bs/lora_proto.py`; the flow, the bilateral HELLO commit, the timers, the `LINK_HB` heartbeat and the parked rendezvous rule in `image_rx_daemon.py`; the policy in `AutoRadioPolicy` (`bs/web_ui.py:378-538`) with a "rung" chip beside the profile selector; audit events for every request, switch, revert and rendezvous.
-- **Tractor:** ACK (with `status`) and HELLO (with `heard`) handling, the per-copy DTS delay latch and the scheduled apply in `image_tx_daemon.py`; the beacon sweep when deaf; `tractor/link_budget` republished per rung and `tractor/link_rx` (last base frame heard, SNR, rung, `frames_rx`, queue depth) published for `camera_service`; D-VS6b's 60 s rendezvous fallback in `camera_service.py`, bench-only until D-VS9.
-- **SIL:** `test_rung_switch_sil.py` modelled on `test_link_tune_sil.py` (764 lines, the April ladder): every row of §4.6.8, the bilateral HELLO commit, timer arithmetic from the apply instant, the heartbeat silence clock (an idle but healthy base never causes a level step or a rendezvous), hysteresis, no request while moving, budget update after a switch, schema-2 header field round trip.
+- **Base:** opcodes `0x6D`–`0x71` in `bs/lora_proto.py`; the flow, the lease, the timers, the `LINK_HB` heartbeat and the parked rendezvous rule in `image_rx_daemon.py`; the policy in `AutoRadioPolicy` (`bs/web_ui.py:378-538`) with a "rung" chip beside the profile selector; audit events for every request, switch, revert and rendezvous.
+- **Tractor:** ACK (with `status`) and HELLO (own slots, lease) handling, the per-copy DTS delay latch and the scheduled apply in `image_tx_daemon.py`; the beacon sweep when deaf; `tractor/link_budget` republished per rung and `tractor/link_rx` (last base frame heard, SNR, rung, `frames_rx`, queue depth) published for `camera_service`; D-VS6b's 60 s rendezvous fallback in `camera_service.py`, bench-only until D-VS9.
+- **SIL:** `test_rung_switch_sil.py` modelled on `test_link_tune_sil.py` (764 lines, the April ladder): every row of §4.6.8 including "first peer frame heard, then every reply lost" (must converge within `T_revert` + `T_lease`), the lease renewals, timer arithmetic from the apply instant and the 1.0 s gate, the heartbeat silence clock (an idle but healthy base never causes a level step or a rendezvous), hysteresis, no request while moving, budget update after a switch, schema-2 header field round trip.
 - **Bench:** (1) a switch leg on the two-board bench at each rung pair, scored on proven-switch time and frames lost during the switch; (2) a rendezvous leg where one board is parked mid-session and must be re-found within `T_deaf` + 10.5 s (parked listener, one sweep); (3) the range-edge attenuator walk-down of §8.6, now with rung changes allowed, which is also the campaign's first range data.
 
 ---
@@ -930,7 +934,7 @@ Inputs, over 10 s windows: median SNR margin of decoded frames (`RX_FRAME_URC` `
 
 **How a mode is selected today (operator-only).** There is no automatic encode ladder in production: `EncodeModeController` is instantiated only by the unfinished `lora_bridge.py` (`:234`), which the strict path does not run, and `bs/web_ui.py:91-92` says the UI has no auto-ladder mode. The operator picks from `_ENCODE_MODE_UI_CHOICES` (`bs/web_ui.py:99-104`) or the gamepad cycle (`:2499`); the choice is persisted to `.encode_mode_override` and published retained on `control/encode_mode_override` (`:230-236`). `image_rx_daemon._on_encode_mode_msg` (`bs/image_rx_daemon.py:1175-1219`) sends `0xFB 0x63 [mode, quality]` behind the shared 1.0 s command gate with exponential retry (`:265-273`); `camera_service._apply_encode_mode` clamps and applies it (`x8/camera_service.py:1229-1302`) and acks with `0x68` carrying the codec id (`:1290`); the base clears the pending command on an exact mode + quality match (`bs/image_rx_daemon.py:958-985`), and the codec byte of every later frame is an implicit second ack (`:1993`).
 
-VECTOR plugs into that path with four edits: add `"vector"` to `_ENCODE_MODE_UI_CHOICES` and the cycle order; add mode 9 to `_ENCODE_MODE_IMPLEMENTED` (`x8/camera_service.py:509-516`, otherwise it clamps to `y_only`); map it to codec 6 in `_ENCODE_MODE_CODEC`; and interpret the existing **quality byte (20–100)** as the VS detail level (residual threshold and INSERT/L4 budget), so the settings slider works unchanged. A mode change already forces a keyframe (`x8/camera_service.py:1272-1280`), which for VS1 is an epoch start.
+VECTOR plugs into that path with four edits: add `"vector"` to `_ENCODE_MODE_UI_CHOICES` and the cycle order; add mode 9 to `_ENCODE_MODE_IMPLEMENTED` (`x8/camera_service.py:509-516`, otherwise it clamps to `y_only`); map it to codec 6 in `_ENCODE_MODE_CODEC`; and interpret the existing **quality byte (1–100)** with the single mapping of §4.5.4: its band is the level (60–100 V0, 40–59 V1, 20–39 V2, 1–19 V3) and the value inside the band is the detail (residual threshold and INSERT/L4 budget), so the settings slider works unchanged at V0 and the ladder clamps it below. A mode change already forces a keyframe (`x8/camera_service.py:1272-1280`), which for VS1 is an epoch start.
 
 **Automatic policy (D-VS6).** The only automatic policy on the strict path is `AutoRadioPolicy` (`bs/web_ui.py:378-538`): it demotes DTS → FHSS after 10 s of dead air or > 25 % loss and promotes back after 60 s healthy; dead air and promote-back were validated on air on 2026-09-15 (`BE/RS_1_4_auto_policy_2026-09-15/RESULTS.md`), while its loss input is blind to frames that arrive as a single fragment (RS-12.20). The proposal is an **encode floor** in the same policy rather than a separate ladder:
 
@@ -967,7 +971,7 @@ VECTOR plugs into that path with four edits: add `"vector"` to `_ENCODE_MODE_UI_
 | Base | `bs/web_ui.py` | In `_ingest_tile_delta` (`:1417-1462`), route `codec == 6` frames to the `VectorSceneStore` instead of `Canvas.apply`; gate `_tile_stale_worker` (`:1355-1401`) off while the received codec is 6; set `StatePublisher.encode_mode` from the received codec (today it is never updated, `bs/image_pipeline/state_publisher.py:45`); add `"vector"` to `_ENCODE_MODE_UI_CHOICES` (`:99-104`) and `_ENCODE_MODE_CYCLE_ORDER` (`:2499`); Lab routes (§8) |
 | Base | `bs/image_pipeline/state_publisher.py` | `vector_scene`, `self_model`, `safety_detector` keys in `snapshot()` (`:82-101`) |
 | Base | `bs/image_pipeline/canvas.py`, `codec_decode.py` | **No change.** VS frames never reach `Canvas.apply`; `_CODEC_BADGE` (`canvas.py:35-38`) and `_TRANSCODERS` (`codec_decode.py:118-121`) stay tile-only. |
-| Base | `bs/web/settings.html` | "vector" in the encode-mode selector; the quality slider label reads "detail" in that mode |
+| Base | `bs/web/settings.html` | "vector" in the encode-mode selector; the quality slider label reads "detail" in that mode and shows the band the ladder currently clamps it to (§4.5.4) |
 | Base | `docker-compose.yml` | New `vector_lab` worker service (§8.2) |
 | Browser | **new** `bs/web/img/vector_renderer.js` | Overlay canvas `#image-vector` styled like `#image-badges` (`bs/web/index.html:73-89`), never drawing on `#image-canvas` because `source_guard.js` samples it (`bs/web/img/source_guard.js:53-76`); loaded after `canvas_renderer.js` (`index.html:436`); listens to `lifetrac-state`; exports `renderVectorScene(ctx, scene, opts)` |
 | Browser | **new** `bs/web/img/self_model_overlay.js` | Canvas `#image-selfmodel` |
@@ -1046,7 +1050,7 @@ Up to 8 state subscribers are allowed (`MAX_STATE_SUBSCRIBERS`, `bs/web_ui.py:92
 2. **Shape-level faults.** A layer or shape badge not in {1, 4, 7}, or an unknown `k`: the shape is not painted; its bounding box is blacked out with "BADGE?".
 3. **Self-model faults.** A badge not in {8, 4}, or a `src` outside `console_sources`: not drawn.
 4. **Missing data.** `encode_mode` is `vector` but `vector_scene` is null: "NO VECTOR DATA". There is never a silent fallback to the old photo.
-5. **Old clients.** The script tags are cache-busted (`index.html:436-444`); an old `vector_renderer.js` that cannot parse the snapshot shows "VECTOR?" rather than nothing.
+5. **Old clients.** Cache-busted script tags (`index.html:436-444`) only help a page that reloads. A browser that connected before the deploy has no vector renderer at all, so the server fails it closed: clients that know the vector schema send `{"schema": 2}` as their first `/ws/state` message (the socket already reads client text, `bs/web_ui.py:1746`); to a connection that never does, web_ui withholds `vector_scene` while VECTOR is active and reports every tile as stale (`compute_stale_tiles`, `bs/web_ui.py:1305`), so the shipped `staleness_overlay.js` tints the whole photo and writes its age, and the badge slot reads "RELOAD". A new `vector_renderer.js` that cannot parse a newer snapshot shows "VECTOR?" rather than nothing.
 
 **Banner, raw mode and the safety chip**
 
@@ -1075,9 +1079,9 @@ All routes are session-gated with `Depends(_require_session)`, with the page red
 
 The job body is:
 
-`{source, budgets:[{profile:"p1"|"p2", body_bytes:12..237}] (<=4), frames:1..16, layers:{L0..L4,self,corridor}, loss:{model:"none"|"bernoulli"|"gilbert", p, burst, seed}, pose:{src, arm_deg}, imu_warp:bool}`
+`{source, budgets:[{profile:"p1"|"p2", body_bytes:12..197 on p1, 12..237 on p2}] (<=4), frames:1..16, layers:{L0..L4,self,corridor}, loss:{model:"none"|"bernoulli"|"gilbert", p, burst, seed}, pose:{src, arm_deg}, imu_warp:bool}`
 
-It is rejected unless budgets × frames ≤ 16.
+It is rejected unless budgets × frames ≤ 16 and every `body_bytes` is within its profile's limit (197 B on p1, 237 B on p2; a p1 budget of 237 B would report an impossible FHSS frame).
 
 ### 8.2 Isolation (resolves review blocker c1)
 
@@ -1134,14 +1138,14 @@ It is rejected unless budgets × frames ≤ 16.
 
 | File | What it covers |
 |---|---|
-| `test_vector_codec.py` | Golden vectors for every record; byte0 ≤ 0x7F; frames ≤ F for F ∈ {197, 237}; EG2 round-trip; Kraft completeness; **trailing padding of 0–16 bits at every leftover width**; key frame HZN ABS + LAYER_CLEAR = 69 |
+| `test_vector_codec.py` | Golden vectors for every record; byte0 ≤ 0x7F; frames ≤ F for F ∈ {197, 237}; EG2 round-trip; Kraft completeness; **trailing padding of 0–16 bits at every leftover width**; key frame = absolute HZN + LAYER_CLEAR (ABS 70, NO_HORIZON 52) |
 | `test_vector_codec_fuzz.py` | Random, truncated, `0xFE`-first input and reserved EXT/cls/version never raise and never apply partially |
 | `test_frame_format_vector.py` | Codec-6 parse/encode round trip; the VS body passes `image_rx_daemon`'s re-encode byte-for-byte; frames ≤ 203/243 B at both profiles (`max_image_fragment_body`); epoch-start frames at the F − 1 cap (196 / 236 B) stay one fragment through `pack_image_fragments_v2` with copies = 2 at both profiles, and every `0xFD` body is ≤ 207 / 247 B and ≤ 170 ms on air (the packer itself is pinned by `test_image_fragments_v2_sizing.py` since #132); the first byte never collides with `0xB5` or `0xFB`–`0xFE` |
-| `test_vector_encoder.py` (skipped without cv2) | Horizon within 1 cell, including a curved pre-calibration horizon; no horizon locked on a raised-bucket edge; **3 isolated green blobs become 3 TREE records**; pasture gives no TREE records; residual never increases on a static scene; no vertex inside the mask; **an object inside the bucket silhouette appears in the output**; the mask anomaly disables masking; GAIN absorbs a global exposure step with no UCOL flood |
+| `test_vector_encoder.py` (needs cv2: `opencv-python-headless` joins `bs/requirements-dev.txt` in Phase 1 so CI runs it; skipped only where cv2 is absent) | Horizon within 1 cell, including a curved pre-calibration horizon; no horizon locked on a raised-bucket edge; **3 isolated green blobs become 3 TREE records**; pasture gives no TREE records; residual never increases on a static scene; no vertex inside the mask; **an object inside the bucket silhouette appears in the output**; the mask anomaly disables masking; GAIN absorbs a global exposure step with no UCOL flood |
 | `test_register.py` | Sign and magnitude pinned for a known (+5, +3) shift in both the cv2 and numpy paths, plus wrap-around, sub-pixel and unrelated-frame cases; confidence ≈ 1 for a noiseless shift (written in #130) |
-| `test_vector_scene_store.py` | Epoch hand-over; **tractor reboot (epoch 3 → 0)**; **9-epoch jump after an outage**; per-field LWW with duplicates and reordering; **INSERTs in every permutation and subset give a ring that never self-intersects**; a lost UPD followed by CONFIRM **does not reset the age**; orphans → RESYNC with no uplink, recovered by the next epoch start; DIGEST; TTL; lossy ⊆ lossless; convergence at 12 % and 30 % i.i.d. and burst loss |
+| `test_vector_scene_store.py` | Epoch hand-over, including from a NO_HORIZON anchor; **tractor reboot (epoch 3 → 0)**; **9-epoch jump after an outage**; per-field LWW with duplicates and reordering; **INSERTs in every permutation and subset give a ring that never self-intersects**; a lost UPD followed by CONFIRM **does not reset the age**; orphans → RESYNC with no uplink, recovered by the next epoch start; DIGEST; TTL; lossy ⊆ lossless; convergence at 12 % and 30 % i.i.d. and burst loss |
 | `test_vector_policy_sil.py` | `AutoRadioPolicy` encode floor: pin VECTOR on FHSS on lock loss (and on > 25 % loss once the RS-12.20 gap detector exists); restore after 60 s healthy; ≤ 1 transition per 60 s; tractor self-select and return (D-VS6b) |
-| `test_vector_degradation_sil.py` | Ladder V0–V3 from `seq`-gap loss, SNR margin and dead air with 2-window down / 60 s up hysteresis; F, κ, repeat count and detail per level; no uplink traffic at any level; epoch-start repeats land in consecutive frames; tractor self-select from received-frame SNR and heartbeat silence (one level per 20 s; an idle but healthy base never causes a step), step-up only on a received base frame; heartbeat cadence and cost per rung; level ↔ quality-byte mapping round trip |
+| `test_vector_degradation_sil.py` | Ladder V0–V3 from `seq`-gap loss, SNR margin and dead air with 2-window down / 60 s up hysteresis; F, κ, repeat count and detail per level; no uplink traffic at any level; epoch-start repeats land in consecutive frames; tractor self-select from received-frame SNR and heartbeat silence (one level per 20 s; an idle but healthy base never causes a step), step-up only on a received base frame; heartbeat cadence and cost per rung; quality-byte band ↔ level mapping round trip, `min(operator, band ceiling)` on the way down and the operator value restored on the way up |
 | `test_self_model_sil.py` | Source → badge/style; S2/S3 absent from the console by default; dead-reckoned never filled; bucket never drawn with attachment "unknown"; golden projection ≤ 0.5 px; CAL MISMATCH |
 | `test_web_ui_vector.py` | Ingest → badged snapshot; invalid badge → refusal; codec-6 frames bypass `Canvas.apply` and the F11 keyframe gates; the stale-tile worker is gated off in VECTOR; Lab topics never reach the production store; script order and raw-mode CSS |
 | `test_vector_lab_routes.py` | 303 without a session; size and work caps; 202/poll; queued while sticks active; control-WebSocket latency during a job; tool refusal gating |
@@ -1177,7 +1181,7 @@ Follow the campaign convention: a `bench-evidence/RS_13_vector_scene_<date>/RESU
 | 1 | One fragment per frame, no trains | No penultimate-fragment loss (that index held 28–42 % of all losses on 13-fragment trains, `BE/RS_12_bulk_floor_2026-08-16/RESULTS.md:6-11, 207-211`); at the measured 4.3 % fragment loss a one-fragment frame survives 95.7 % of the time vs 56.5 % for 13 fragments (computed, `CONTROL_PLANE_DESIGN.md:264-265`) | None |
 | 2 | No keyframe trains and no keyframe requests; an epoch start is one frame | Removes the base request storm that broke the FHSS follower (222 `REQ_KEYFRAME` sends, 62.8 % loss, `BE/RS_12_12_fhss_validation_2026-09-12/RESULTS.md:109-135`) | None |
 | 3 | Shrink idle frames instead of padding | A converged static scene costs ≈ 12 B = 18.0 ms at DTS instead of 99.9 ms (computed) | Trivial |
-| 4 | Encoder repeat-once of the epoch start | HZN ABS + LAYER_CLEAR re-sent in the next frame; the daemon's own duplicate fires only on local TX failures, never on air loss | 69 bits per epoch |
+| 4 | Encoder repeat-once of the epoch start | The absolute HZN + LAYER_CLEAR re-sent in the next frame; the daemon's own duplicate fires only on local TX failures, never on air loss | 69 bits per epoch |
 | 5 | Re-verified carousel | Every shape re-confirmed against a fresh capture within 1–2 frames (est.) | Low |
 | 6 | VW triangle-first + order-independent INSERT | A useful polygon after 55–69 bits; detail follows | About +10 % total bits |
 | 7 | GSHIFT groups (21 bits) | 30-shape pan: 510 → 42 bits (−92 %, computed) | `register.py` fixes (B7) |
@@ -1244,7 +1248,7 @@ Housekeeping, not blockers: `encode_wireframe.py`, `encode_motion.py`, `wirefram
 2. Does the tractor self-select (D-VS6b) trigger correctly from tractor-side signals alone, and does it ever flap?
 3. Which camera sees the loader, and at what zoom? This sets the §2.3 table.
 4. Buy the AI6 arm sensor, and a bucket sensor (which grows `0x04` from 12 to 14 B)? (D-VS5)
-5. Detail-level mapping of the quality byte: linear in INSERT budget, or in residual threshold?
+5. Detail within a quality band (§4.5.4): linear in INSERT budget, or in residual threshold?
 6. Handheld vector view?
 7. Field range characterisation: at what attenuation (and therefore range) does each level of §4.5.4 engage on p1 and p2, and how does that compare with the tile modes? No campaign leg has run at the range edge.
 

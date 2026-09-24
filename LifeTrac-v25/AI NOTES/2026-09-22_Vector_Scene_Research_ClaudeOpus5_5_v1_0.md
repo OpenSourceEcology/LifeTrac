@@ -85,7 +85,7 @@ camera_service.py → MQTT cmd/image_frame → image_tx_daemon.py → L072 → a
 | p1 FHSS BW250 | 203 B | 215 B | 169.1 ms, one per 200 ms slot | 197 B |
 | p2 DTS BW500 | 243 B | 255 B | 99.9 ms | 237 B |
 
-The worked vector scene (1,017 record bits, a 129 B body with its 13-bit header) is one fragment of 147 B: 120.4 ms at BW250, 60.2 ms at BW500. The bench measured 699–812 B/s on FHSS and 1.75–2.0 KB/s on DTS as tractor-side goodput (`TODO.md:209-210, 2153-2154`; `bench-evidence/FW_BATCH1_acceptance_2026-07-30/RESULTS.md:86`).
+The worked vector scene (1,018 record bits, a 129 B body with its 13-bit header) is one fragment of 147 B: 120.4 ms at BW250, 60.2 ms at BW500. The bench measured 699–812 B/s on FHSS and 1.75–2.0 KB/s on DTS as tractor-side goodput (`TODO.md:209-210, 2153-2154`; `bench-evidence/FW_BATCH1_acceptance_2026-07-30/RESULTS.md:86`).
 
 ### 3.3 Radio profiles and the FHSS design as tested
 
