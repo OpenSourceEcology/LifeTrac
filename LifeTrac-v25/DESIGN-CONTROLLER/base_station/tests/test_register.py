@@ -35,19 +35,23 @@ except ImportError:                              # pragma: no cover
 W, H = 96, 64                       # small enough to keep the FFTs cheap
 CANVAS_W, CANVAS_H = 384, 256       # the X8's 12x8 grid of 32 px tiles
 
-# Measured on the NumPy path (numpy 2.4) for a Hann-windowed integer roll of
-# the ``_texture`` fixture: confidence 0.89..0.97 across ten seeds at 96x64
-# (0.91 and 0.95 for the seeds pinned below) and 0.99 at 384x256. The
-# shortfall from 1.0 is the fixed window's mismatch with the moved content,
-# of order |dx|/W + |dy|/H (~0.1 here). 0.85 leaves margin for cv2's
-# float32 rounding while staying far above an unrelated pair, which
-# measured <= 0.19 (and sometimes < 0, hence the clip).
-MIN_SHIFT_CONFIDENCE = 0.85
+# Measured for a windowed integer roll of the ``_texture`` fixture. The
+# window is the one ``cv2.createHanningWindow`` builds (the square root of
+# the separable Hann product), so the NumPy path (numpy 2.4/2.5) and the cv2
+# path (OpenCV 5.0) agree to three decimals: confidence 0.84..0.91 across
+# ten seeds at 96x64 (0.87 and 0.92 for the seeds pinned below) and 0.99 at
+# 384x256. The shortfall from 1.0 is the fixed window's mismatch with the
+# moved content, of order |dx|/W + |dy|/H (~0.1 here). 0.80 leaves margin
+# while staying far above an unrelated pair, which measured <= 0.25 (and
+# sometimes < 0, hence the clip).
+MIN_SHIFT_CONFIDENCE = 0.80
 MAX_UNRELATED_CONFIDENCE = 0.3
 SHIFT_TOL_PX = 0.1                  # integer truth; measured error < 0.01 px
+                                    # (NumPy parabola), < 0.07 px (cv2's 5x5
+                                    # weighted centroid)
 # A 3-point parabola through a sinc-shaped peak is biased at quarter-pixel
-# offsets: measured 0.10..0.11 px in y for the (2.5, -1.25) case below (x,
-# at a half-pixel offset, lands within 0.03 px). An un-refined integer
+# offsets: measured 0.10..0.12 px in y for the (2.5, -1.25) case below (x,
+# at a half-pixel offset, lands within 0.04 px). An un-refined integer
 # answer would be 0.25 px off in y, so 0.2 discriminates.
 FRACTIONAL_TOL_PX = 0.2
 

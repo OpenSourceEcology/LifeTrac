@@ -41,13 +41,17 @@ class Translation:
 
 
 def _hann_window(width: int, height: int) -> "_np.ndarray":
-    """Separable Hann window, identical to ``cv2.createHanningWindow``.
+    """The window ``cv2.createHanningWindow`` builds: the square root of
+    the separable Hann product (OpenCV takes the sqrt as its last step), so
+    the NumPy and cv2 paths taper the frames identically and report the
+    same confidence.
 
-    Without it the frame border is a second, stationary "image" whose
+    Without a window the frame border is a second, stationary "image" whose
     spectrum competes with the true peak as soon as the scene really moves
     (successive camera frames are not circular shifts of each other).
     """
-    return _np.outer(_np.hanning(height), _np.hanning(width)).astype(_np.float32)
+    hann = _np.outer(_np.hanning(height), _np.hanning(width))
+    return _np.sqrt(hann).astype(_np.float32)
 
 
 def _parabolic_peak_offset(left: float, centre: float, right: float) -> float:
