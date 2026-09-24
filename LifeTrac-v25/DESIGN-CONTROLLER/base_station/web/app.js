@@ -614,6 +614,7 @@
     y_only: { label: 'Y-only WebP', desc: 'luma only, recolor at base' },
     motion_only: { label: 'Motion-only gray', desc: 'pure grayscale with quality cap for bandwidth' },
     mono_g4: { label: 'Mono / G4', desc: '1-bit dither + Group-4 fax' },
+    rawstream: { label: 'Raw WebP stream', desc: 'full color, RIFF container stripped' },
   };
   const modeOverlay = (() => {
     const canvas = document.getElementById('image-canvas');
