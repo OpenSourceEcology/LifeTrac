@@ -268,7 +268,7 @@ Opcodes:
 | 0xFB opcode | Name (`CMD_OP_*`) | Args | Semantics |
 |------------|-------------------|------|-----------|
 | `0x60` | `REQ_KEYFRAME` | none | Base → tractor. Since F10/F11 (2026-08-01/02) fires only on cold start, grid mismatch, and tile-decode errors — the reassembly-timeout and per-seq-gap triggers are env-gated OFF (`LIFETRAC_KF_ON_REASM_TIMEOUT`, `LIFETRAC_KF_ON_SEQ_GAP`; both measured harmful/redundant on air). |
-| `0x63` | `ENCODE_MODE` | `u8 mode [, u8 quality 1-100]` | Base → tractor; quality byte additive (2026-07 increment). Pending-ack machinery retries then gives up after 17 attempts/~10 s. *Proposed: modes 8 and 9 accepted; for mode 9 the quality byte is the vector detail level.* |
+| `0x63` | `ENCODE_MODE` | `u8 mode [, u8 quality 1-100]` | Base → tractor; quality byte additive (2026-07 increment). Pending-ack machinery retries with exponential gaps under a 10 s deadline (at most five sends), then a 30 s cool-down for that opcode (RS-12.14, `base_station/image_rx_daemon.py:686-756`, `cmd_timing.py`). *Proposed: modes 8 and 9 accepted; for mode 9 the quality byte is the vector detail level.* |
 | `0x65` | `RADIO_PROFILE` | `u8 profile (0/1/2)` | Base → tractor: two-phase profile switch, step 1. |
 | `0x66` | `RADIO_PROFILE_ACK` | `u8 profile` | Tractor → base, on the OLD grid. |
 | `0x67` | `RADIO_PROFILE_CONF` | `u8 profile` | Base → tractor: confirm; tractor cancels its revert timer. |
