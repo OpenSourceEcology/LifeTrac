@@ -118,7 +118,7 @@ Let `T_refresh` = nominal P3 refresh window (default 1500 ms) and `t_air` = meas
 | `50 % ≤ U < 80 %` (750–1200 ms) | Q optical-flow microframes (`0x28`) | No new tiles; push existing canvas with motion vectors. `Predicted` badge. | 50–150 B |
 | `U ≥ 80 %` (≥ 1200 ms) | P wireframe (`0x29`) | PiDiNet edges only. `Wireframe` overlay. | < 50 B |
 
-> **Status note (2026-09-23):** this ladder was never wired on the strict path. Mode selection is operator-only (`base_station/web_ui.py:91-104`), the operator-selectable modes are `full`, `y_only`, `motion_only` and `mono_g4`, fragments are 203/243 B under a 170 ms cap, and the 25 ms cap was retired for image traffic (RS-9.7). [VECTOR_SCENE.md §6](VECTOR_SCENE.md#6-mode-and-policy-integration) proposes VECTOR as the floor of an encode policy inside `AutoRadioPolicy`.
+> **Status note (2026-09-23):** this ladder was never wired on the strict path. Mode selection is operator-only (`base_station/web_ui.py:103-109`), the operator-selectable modes are `full`, `y_only`, `motion_only`, `mono_g4` and, since #131, `rawstream`, fragments are 203/243 B under a 170 ms cap, and the 25 ms cap was retired for image traffic (RS-9.7). [VECTOR_SCENE.md §6](VECTOR_SCENE.md#6-mode-and-policy-integration) proposes VECTOR as the floor of an encode policy inside `AutoRadioPolicy`.
 
 The "byte-equivalent" column is the rough envelope at the default SF7/BW250/CR4-5 image profile; `link_monitor.py` does not key off bytes directly. If the image link transitions to SF8 (~1.8× airtime per byte), the same byte counts move into the next-degraded bucket automatically because the airtime % moves with PHY.
 

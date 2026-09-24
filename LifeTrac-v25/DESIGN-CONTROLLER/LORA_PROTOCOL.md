@@ -464,7 +464,7 @@ For `ControlFrame` and `HeartbeatFrame`, **`MAX_ATTEMPTS = 1`** — we only ever
 
 ## Adaptive control-link SF
 
-> **Status note (2026-09-23):** the ladder below was written for the retired H7 RadioLib path. On the shipped L072 path SF is fixed at 7 in all three regulatory profiles and no CFG key exists (`SETTINGS_REFERENCE.md:50`). A coordinated modem-rung switch for the L072 (SF7/8/9 within each profile, `0xFB` opcodes `0x6D`–`0x70`, scheduled apply, per-side revert timers, rendezvous rung with a beacon) is proposed as D-VS8 and specified in [VECTOR_SCENE.md §4.6](VECTOR_SCENE.md#46-coordinated-modem-rung-change-the-d-vs8-protocol).
+> **Status note (2026-09-23):** the ladder below was written for the retired H7 RadioLib path. On the shipped L072 path SF is fixed at 7 in all three regulatory profiles and no CFG key exists (`SETTINGS_REFERENCE.md:50`). A coordinated modem-rung switch for the L072 (SF7/8/9 within each profile, `0xFB` opcodes `0x6D`–`0x71` including a 5 s base heartbeat, scheduled apply, per-side revert timers with a bilateral HELLO commit, rendezvous rung with a beacon) is proposed as D-VS8 and specified in [VECTOR_SCENE.md §4.6](VECTOR_SCENE.md#46-coordinated-modem-rung-change-the-d-vs8-protocol).
 
 The control link starts at **SF7 / BW 250 kHz / CR 4/5** (per [DECISIONS.md D-A2](DECISIONS.md)) and falls back to slower-but-more-sensitive rungs at **BW 125 kHz** when the link weakens. Originally pinned in [MASTER_PLAN.md §8.17](MASTER_PLAN.md); the BW 250 kHz revision discharges the `CONTROL_CADENCE_BLOCKER`.
 

@@ -245,7 +245,7 @@ None of these decisions is implemented. Each one lists its options and a **RECOM
 
 ### D-VS1 — Where the vector scene lives on the wire
 
-**Context:** the strict image path carries `TileDeltaFrame`s in single plaintext fragments of 203 B (FHSS) or 243 B (DTS) (`firmware/tractor_x8/image_tx_daemon.py:308`). Codec ids 6–14 of the frame header are free (5 is `WEBP_RAWSTREAM`, `base_station/image_pipeline/frame_format.py:79-88`); `EncodeMode` runs 0–7 on the base while the tractor already implements 8 (`RAWSTREAM`, `firmware/tractor_x8/camera_service.py:501`).
+**Context:** the strict image path carries `TileDeltaFrame`s in single plaintext fragments of 203 B (FHSS) or 243 B (DTS) (`firmware/tractor_x8/image_tx_daemon.py:308`). Codec ids 6–14 of the frame header are free (5 is `WEBP_RAWSTREAM`, `base_station/image_pipeline/frame_format.py:79-88`); `EncodeMode` ran 0–7 on the base while the tractor already implemented 8 (`RAWSTREAM`, `firmware/tractor_x8/camera_service.py:501`) until #131 (2026-09-24) added it, so both ends now share 0–8 (`base_station/lora_proto.py:80-94`).
 
 | Option | Pros | Cons |
 |---|---|---|
@@ -289,7 +289,7 @@ None of these decisions is implemented. Each one lists its options and a **RECOM
 |---|---|---|
 | A. Operator-only, like `mono_g4` | Nothing new | The floor is not there when the operator is busy |
 | **B. Encode floor in `AutoRadioPolicy`**: pin VECTOR on FHSS on lock loss (and on > 25 % loss once the RS-12.20 `frag_seq` gap detector exists); restore after 60 s healthy | Same inputs, hysteresis and audit as the proven radio policy | The `0x63` command may not arrive on FHSS |
-| **B + D-VS6b tractor self-select**: `camera_service` drops to VECTOR when no base command has been heard for N s (a new tractor-side signal; the tractor has no `link_stats`), and returns when a base command arrives | Works without a downlink | Needs a bench leg to set N and prove no flapping |
+| **B + D-VS6b tractor self-select**: `camera_service` drops to VECTOR when no base frame has been heard for N s and returns when one arrives (a new tractor-side signal; the tractor has no `link_stats`). Because base traffic is event-driven and the production probe is off, this option includes a base heartbeat, `LINK_HB` (`0x71`) after every 5 s of command silence, so a healthy idle base is never silent for longer than 5 s ([VECTOR_SCENE.md §4.5.4](VECTOR_SCENE.md#454-the-degradation-ladder)) | Works without a downlink | Needs a bench leg to set N and prove no flapping; the heartbeat costs 0.8 % of airtime at SF7/BW250 |
 
 **RECOMMENDATION: B with D-VS6b, measured in the Phase 2 bench leg before either default is flipped.**
 
@@ -301,7 +301,7 @@ None of these decisions is implemented. Each one lists its options and a **RECOM
 
 ### D-VS8 — Coordinated modem-rung switch (spreading factor on the fly)
 
-**Context:** SF is fixed at 7 in all three regulatory profiles and there is no host CFG key (`SETTINGS_REFERENCE.md:50, 1247`), although the radio layer already validates any tuple through `sx1276_set_sf_bw_cr_checked()` (`firmware/murata_l072/radio/sx1276.c:393`). The only sensitivity lever today is the DTS → FHSS bandwidth switch (+3 dB). No bench leg has run at the range edge. Each SF step buys about 2.5 dB and doubles airtime; under the 170 ms fragment cap the body falls to 96 B at SF8/BW250 and 35 B at SF9/BW250 (computed), so tile modes stop fitting while the vector mode still carries about 4 records per frame. An SX1276 demodulates one SF at a time, so a switch one side misses leaves both deaf; the protocol must cover the rendezvous. Full specification: [VECTOR_SCENE.md §4.6](VECTOR_SCENE.md#46-coordinated-modem-rung-change-the-d-vs8-protocol).
+**Context:** SF is fixed at 7 in all three regulatory profiles and there is no host CFG key (`SETTINGS_REFERENCE.md:50, 1247`), although the radio layer already validates any tuple through `sx1276_set_sf_bw_cr_checked()` (`firmware/murata_l072/radio/sx1276.c:393`). The only sensitivity lever today is the DTS → FHSS bandwidth switch (+3 dB). No bench leg has run at the range edge. Each SF step buys about 2.5 dB and doubles airtime; under the 170 ms fragment cap the body falls to 96 B at SF8/BW250 and 35 B at SF9/BW250 (computed), so a tile frame is reduced to a single unusually compressible tile (a minimum one-tile `mono_g4` frame is about 31 B against a 41 B payload) while the vector mode still carries a whole-scene update of about 4 records per frame. An SX1276 demodulates one SF at a time, so a switch one side misses leaves both deaf; the protocol must cover the rendezvous. Full specification: [VECTOR_SCENE.md §4.6](VECTOR_SCENE.md#46-coordinated-modem-rung-change-the-d-vs8-protocol).
 
 | Option | Pros | Cons |
 |---|---|---|
@@ -311,9 +311,9 @@ None of these decisions is implemented. Each one lists its options and a **RECOM
 
 **Protocol summary (B):**
 - **Rungs:** R0–R2 on DTS (SF7/8/9 at BW500), F0–F2 on FHSS (SF7/8/9 at BW250); coding rate 4/5; BW125 and SF10 excluded. The slowest rung of the active profile is the **rendezvous rung**.
-- **Flow:** `RUNG_REQ` (`0x6D`, base → tractor, 3 copies) → `RUNG_ACK` (`0x6E`) → `RUNG_CONF` (`0x6F`, 3 copies, carries the apply instant as `{epoch, hop_idx}` on FHSS or a delay on DTS, computed after the ACK and the command gate) all on the old rung; both retune at the apply instant; `RUNG_HELLO` (`0x70`) on the new rung; the first decoded frame on the new rung proves the switch on each side. Requests go through the shared 1.0 s command gate and only while the tractor is stopped.
-- **Timers:** `T_conf` 5 s (covers three REQ copies, the ACK, the 1.0 s command gate and three CONF copies); `T_revert` 5 s (image only) or 600 ms (drive plane on air), counted from the apply instant on both sides; `T_cool` 60 s; `T_deaf` 10 s (base) / 20 s (tractor); hysteresis 2 windows down, 6 windows up.
-- **Rendezvous:** a deaf side tunes to the rendezvous rung and beacons every 2 s; a healthy tractor beacons once per 10 s epoch on it (0.7 % of airtime); cold-start scan walks it first.
+- **Flow:** `RUNG_REQ` (`0x6D`, base → tractor, 3 copies) → `RUNG_ACK` (`0x6E`) → `RUNG_CONF` (`0x6F`, 3 copies, carries the apply instant as `{epoch, hop_idx}` on FHSS or a delay on DTS, computed after the ACK and the command gate) all on the old rung; both retune at the apply instant; `RUNG_HELLO` (`0x70`) on the new rung every slot, carrying `heard = 1` once a peer frame has been decoded; each side commits only on a peer HELLO with `heard = 1`, so a one-sided switch reverts on both sides. Requests go through the shared 1.0 s command gate and only while the tractor is stopped.
+- **Timers:** `T_conf` 5 s (covers three REQ copies, the ACK, the 1.0 s command gate and three CONF copies); `T_revert` 5 s (image only) or 600 ms (drive plane on air), counted from the apply instant on both sides; `T_cool` 60 s; `T_hb` 5 s (base heartbeat on the working rung); `T_deaf` 10 s (base, no VS frame) / 60 s (tractor, no base frame = 12 heartbeats missed; bench-only until D-VS9 fixes FHSS reverse delivery); hysteresis 2 windows down, 6 windows up.
+- **Rendezvous:** a deaf base parks on the rendezvous channel; a deaf tractor sweeps `RUNG_HELLO` across the hop set (one channel per slot; every 2 s on DTS); a healthy tractor beacons once per 10 s on the rendezvous channel (0.7 % of airtime); the cold-start scan parks there first.
 - **Policy:** down one rung when the SNR margin is below 3 dB for 2 windows and the vector ladder is already at V2 and the tractor is stopped; up one rung after 6 healthy windows; a profile switch resets the rung to the profile's fastest.
 
 **RECOMMENDATION: B, after the range-edge leg of `VECTOR_SCENE.md` §8.6 shows where SF7 runs out.** Ship the L072 key, the schema-2 header field and the beacon first (they are useful for diagnosis alone), then the handshake, then the policy.
