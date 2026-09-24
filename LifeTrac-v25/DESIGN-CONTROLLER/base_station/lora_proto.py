@@ -891,15 +891,28 @@ def pack_image_fragments_v2(payload: bytes, frag_seq: int,
     repair AIR loss: P(fragment lost) = p^copies."""
     if not 1 <= copies <= 15:
         raise ValueError("copies must be 1..15 (4-bit nibble)")
-    base = pack_image_fragments(payload, frag_seq, profile, max_air_ms)
     if copies == 1:
-        return base
+        return pack_image_fragments(payload, frag_seq, profile, max_air_ms)
+    # Chunk for the 5 B 0xFD header — NOT by re-wrapping v1 fragments,
+    # which (until 2026-09-23) left every copy 1 B over the sizer: 248 B
+    # at BW500, which the L072 refuses (> 255 with the hop header), and
+    # 208 B = 171.6 ms at BW250, over IMAGE_FRAG_AIR_CAP_MS — on exactly
+    # the degraded-link keyframes _pack_for auto-promotes to copies=2.
+    chunk = max_image_fragment_body(profile, max_air_ms) - TELEMETRY_FRAGMENT_HEADER_LEN_V2
+    if chunk <= 0:
+        raise ValueError(f"{profile.name}: no fragment fits {max_air_ms} ms")
+    total = max(1, (len(payload) + chunk - 1) // chunk)
+    if total > 256:
+        raise ValueError(f"payload needs {total} fragments; max 256")
     out: list[bytes] = []
-    for body in base:                       # body = 0xFE hdr(4) + data
-        _, seq, idx, total_m1 = body[0], body[1], body[2], body[3]
+    for i in range(total):
+        body = payload[i * chunk:(i + 1) * chunk]
         for copy_idx in range(copies):
-            out.append(bytes([TELEMETRY_FRAGMENT_MAGIC_V2, seq, idx, total_m1,
-                              ((copies & 0x0F) << 4) | copy_idx]) + body[4:])
+            out.append(bytes([TELEMETRY_FRAGMENT_MAGIC_V2,
+                              frag_seq & 0xFF,
+                              i & 0xFF,
+                              (total - 1) & 0xFF,
+                              ((copies & 0x0F) << 4) | copy_idx]) + body)
     return out
 
 
