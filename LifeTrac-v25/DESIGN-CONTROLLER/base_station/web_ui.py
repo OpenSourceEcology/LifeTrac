@@ -96,11 +96,16 @@ class AccelToggleBody(BaseModel):
 # tractor has no BTC4 encoder and silently clamps both to y_only, so the
 # menu entries were placebos. Their EncodeMode wire values (4, 5) stay
 # reserved in lora_proto for when an encoder lands.
+# 2026-09-23: rawstream added — the tractor implements it (FULL colour
+# with the 20 B WebP RIFF container stripped, wire codec 5) and the base
+# decodes codec 5 (image_pipeline/codec_decode.py); until now EncodeMode
+# stopped at 7, so image_rx_daemon rejected the request outright.
 _ENCODE_MODE_UI_CHOICES = (
     "full",
     "y_only",
     "motion_only",
     "mono_g4",
+    "rawstream",
 )
 
 
@@ -112,7 +117,7 @@ class EncodeModeBody(BaseModel):
     # changed since (from the console pill, the gamepad, or another tab).
     # Omitted mode -> keep the current one. At least one is required.
     mode: str | None = Field(None,
-              pattern=r"^(full|y_only|motion_only|mono_g4)$")
+              pattern=r"^(full|y_only|motion_only|mono_g4|rawstream)$")
     # Optional WebP/codec quality (1-100) carried in the same 0x63 command
     # frame as the mode. Omitted -> keep the current quality override.
     quality: int | None = Field(None, ge=1, le=100)
@@ -2495,7 +2500,8 @@ async def api_encode_mode_set(body: EncodeModeBody,
 
 
 # Subset of `_ENCODE_MODE_UI_CHOICES` that the gamepad / pill cycle button
-# advances through. Order matches the on-screen pill rotation.
+# advances through. Order matches the on-screen pill rotation. ``rawstream``
+# is deliberately absent: a settings-page diagnostic pin, not a bench rung.
 _ENCODE_MODE_CYCLE_ORDER: tuple[str, ...] = (
     "full",
     "y_only",

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import sys
+import types
 import unittest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -30,6 +31,7 @@ from image_rx_daemon import ImageRxDaemon  # noqa: E402
 from lora_proto import (  # noqa: E402
     CMD_OP_ENCODE_MODE,
     COMMAND_FRAME_MAGIC,
+    EncodeMode,
     pack_command_frame,
 )
 
@@ -159,6 +161,48 @@ class SetPendingSupersedeTests(unittest.TestCase):
         self.d._set_pending(CMD_OP_ENCODE_MODE, q80)
         self.assertEqual(self._pending()["body"], q80)
         self.assertEqual(self._pending()["attempts"], 0)
+
+
+class EncodeModeOverrideAcceptsTractorModesTests(unittest.TestCase):
+    """control/encode_mode_override must put every tractor-implemented
+    mode on the air. RAWSTREAM (8) used to die here: EncodeMode stopped
+    at ADAPTIVE (7), so the daemon logged "outside EncodeMode" and the
+    operator could only reach the mode through tractor env vars."""
+
+    def setUp(self):
+        self.d = ImageRxDaemon.__new__(ImageRxDaemon)      # no I/O in __init__
+        import threading
+        self.d._lock = threading.Lock()
+        self.d._pending_cmds = {}
+
+    def _override(self, **body):
+        import json
+        self.d._pending_cmds.clear()
+        msg = types.SimpleNamespace(payload=json.dumps(body).encode("utf-8"))
+        self.d._on_encode_mode_msg(None, None, msg)
+        cur = self.d._pending_cmds.get(CMD_OP_ENCODE_MODE)
+        return None if cur is None else cur["body"]
+
+    def test_rawstream_by_name_and_by_value_goes_on_the_air(self):
+        # Wire byte 8 == camera_service.ENCODE_MODE_RAWSTREAM (parity is
+        # pinned by test_encode_mode_parity_sil).
+        want = pack_command_frame(CMD_OP_ENCODE_MODE, bytes([8]))
+        for requested in ("rawstream", "RAWSTREAM", 8):
+            self.assertEqual(self._override(mode=requested), want, requested)
+
+    def test_rawstream_ack_from_tractor_converges(self):
+        # Exact ack shape camera_service._apply_encode_mode publishes for
+        # an implemented mode: requested == effective, clamped False.
+        body = self._override(mode="rawstream", quality=55)
+        ack = ImageRxDaemon._parse_encode_ack(_ack(
+            requested=8, effective=8, effective_name="rawstream",
+            clamped=False, codec=5, quality=55, source="back_channel",
+            ts=1.0))
+        self.assertTrue(ImageRxDaemon._ack_matches_body(ack, body))
+
+    def test_values_outside_encode_mode_are_still_rejected(self):
+        for bad in (int(max(EncodeMode)) + 1, 99, 255):
+            self.assertIsNone(self._override(mode=bad), bad)
 
 
 if __name__ == "__main__":

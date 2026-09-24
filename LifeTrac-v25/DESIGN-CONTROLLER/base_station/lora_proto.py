@@ -81,6 +81,8 @@ class EncodeMode(IntEnum):
     # Stable wire values — DO NOT renumber. The first four are the original
     # auto-fallback ladder; values 4..7 are the bench-rotation candidates
     # from `AI NOTES/2026-05-25_Grayscale_Quantization_Encoding_Research_Copilot_v1_0.md`.
+    # Must mirror `firmware/tractor_x8/camera_service.py::ENCODE_MODE_*`
+    # name-for-name and value-for-value (tests/test_encode_mode_parity_sil.py).
     FULL = 0           # Plan A0 baseline: full color WebP per tile
     Y_ONLY = 1         # Plan A: luma-only WebP, chroma re-estimated at base
     MOTION_ONLY = 2    # legacy: luma-only WebP at MOTION_ONLY_QUALITY
@@ -89,6 +91,7 @@ class EncodeMode(IntEnum):
     BTC4_PER_FRAME = 5 # Plan C-2: one 4-level palette per frame + LZ4
     MONO_G4 = 6        # Plan D: 1-bit Floyd-Steinberg dither + Group-4 fax
     ADAPTIVE = 7       # Plan H: per-tile entropy heuristic picks among 1/4/256
+    RAWSTREAM = 8      # FULL colour, WebP RIFF container stripped (wire codec 5)
 
 
 # Resilience ladder — most bandwidth-hungry (least resilient) first.
@@ -97,6 +100,8 @@ class EncodeMode(IntEnum):
 # demotion order when the link degrades. ADAPTIVE is intentionally NOT
 # in the ladder — when the operator pins it the auto-fallback layer
 # leaves it alone unless the link goes critical, then jumps to the floor.
+# RAWSTREAM is not a rung either: it is a diagnostic/operator pin (FULL
+# minus the 20 B RIFF container), not a degraded mode.
 ENCODE_MODE_LADDER: tuple["EncodeMode", ...] = (
     EncodeMode.FULL,            # ceiling — best quality
     EncodeMode.Y_ONLY,

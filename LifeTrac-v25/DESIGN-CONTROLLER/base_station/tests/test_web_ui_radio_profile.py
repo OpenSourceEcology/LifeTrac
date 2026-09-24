@@ -353,6 +353,27 @@ class RadioProfileTests(unittest.TestCase):
         self.assertTrue(body["tractor"]["clamped"])
         self.assertEqual(body["rx_codec_name"], "webp_luma")
 
+    def test_encode_mode_post_accepts_rawstream(self):
+        # 2026-09-23: rawstream (tractor mode 8, wire codec 5) is operator-
+        # selectable. The daemon resolves the published NAME through
+        # EncodeMode[...], so what the UI offers must round-trip as-is.
+        r = self.client.post("/api/settings/encode_mode",
+                             json={"mode": "rawstream"})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["mode"], "rawstream")
+        calls = [c for c in self.mqtt.publish.call_args_list
+                 if c.args[0] == self.web_ui._ENCODE_MODE_TOPIC]
+        self.assertTrue(calls, "no publish on the override topic")
+        args, kwargs = calls[-1]
+        self.assertTrue(kwargs.get("retain"))
+        self.assertEqual(json.loads(args[1])["mode"], "rawstream")
+        self.assertEqual(self.web_ui._load_encode_mode_override(), "rawstream")
+        catalogue = self.client.get("/api/settings/encode_mode").json()
+        self.assertEqual(catalogue["current"], "rawstream")
+        self.assertIn("rawstream", catalogue["choices"])
+        # Leave the shared store as the other tests expect it.
+        self.client.post("/api/settings/encode_mode", json={"mode": "full"})
+
     # ---- MQTT ack caching ----
 
     def test_mqtt_ack_caching(self):
