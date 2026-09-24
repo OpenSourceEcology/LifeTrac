@@ -37,7 +37,31 @@ except ImportError:                              # pragma: no cover
 class Translation:
     dx: float
     dy: float
-    confidence: float                # 0..1; 1 = peak picks itself out of noise
+    confidence: float                # 0..1; 1 = pure translation, ~0 = unrelated frames
+
+
+def _hann_window(width: int, height: int) -> "_np.ndarray":
+    """The window ``cv2.createHanningWindow`` builds: the square root of
+    the separable Hann product (OpenCV takes the sqrt as its last step), so
+    the NumPy and cv2 paths taper the frames identically and report the
+    same confidence.
+
+    Without a window the frame border is a second, stationary "image" whose
+    spectrum competes with the true peak as soon as the scene really moves
+    (successive camera frames are not circular shifts of each other).
+    """
+    hann = _np.outer(_np.hanning(height), _np.hanning(width))
+    return _np.sqrt(hann).astype(_np.float32)
+
+
+def _parabolic_peak_offset(left: float, centre: float, right: float) -> float:
+    """Sub-pixel offset (-0.5..0.5) of the vertex of the parabola through
+    three equally spaced samples whose middle one is the integer maximum.
+    A flat neighbourhood (or one that is not a maximum) refines to 0."""
+    denom = left - 2.0 * centre + right
+    if denom >= 0.0:
+        return 0.0
+    return 0.5 * (left - right) / denom
 
 
 def register_phase_correlation(prev_y: bytes, curr_y: bytes,
@@ -45,33 +69,57 @@ def register_phase_correlation(prev_y: bytes, curr_y: bytes,
     """Estimate the global translation that maps `prev_y` onto `curr_y`.
 
     Inputs are single-channel luma byte strings (Y plane of YCbCr) of size
-    ``width * height``. Returns a :class:`Translation`. When neither NumPy
-    nor OpenCV are available the function returns a zero translation with
-    confidence 0.0 — the caller (tile_diff) should treat that as "no
-    registration data, diff the raw frames" rather than crashing.
+    ``width * height``. Returns a :class:`Translation` with the sign
+    convention of ``cv2.phaseCorrelate``: ``(+dx, +dy)`` when ``curr_y`` is
+    ``prev_y`` moved right by ``dx`` and down by ``dy`` pixels, so that
+    ``shift_canvas(prev_y, ..., round(dx), round(dy))`` lines up with
+    ``curr_y``. ``confidence`` is the share of the correlation energy in
+    the 5x5 neighbourhood of the peak (what OpenCV reports as ``response``)
+    clipped to 0..1: ~1.0 for a pure translation, near 0 for unrelated
+    frames. Both frames are Hann-windowed first so the frame border does
+    not register as a stationary image. When neither NumPy nor OpenCV are
+    available the function returns a zero translation with confidence 0.0
+    — the caller (tile_diff) should treat that as "no registration data,
+    diff the raw frames" rather than crashing.
     """
     if not _HAVE_NUMPY:
         return Translation(0.0, 0.0, 0.0)
     arr_prev = _np.frombuffer(prev_y, dtype=_np.uint8).reshape((height, width)).astype(_np.float32)
     arr_curr = _np.frombuffer(curr_y, dtype=_np.uint8).reshape((height, width)).astype(_np.float32)
     if _HAVE_CV2:                                 # pragma: no cover
-        (dx, dy), confidence = _cv2.phaseCorrelate(arr_prev, arr_curr)
-        return Translation(float(dx), float(dy), float(confidence))
-    # Pure-NumPy phase correlation.
-    fa = _np.fft.fft2(arr_prev)
-    fb = _np.fft.fft2(arr_curr)
-    cross = fa * _np.conj(fb)
+        window = _cv2.createHanningWindow((width, height), _cv2.CV_32F)
+        (dx, dy), confidence = _cv2.phaseCorrelate(arr_prev, arr_curr, window)
+        return Translation(float(dx), float(dy), min(1.0, max(0.0, float(confidence))))
+    # Pure-NumPy phase correlation with cv2's conventions: curr * conj(prev)
+    # puts the peak at (+dy, +dx) modulo the frame size, and the normalised
+    # inverse FFT makes the peak height 1.0 for a pure circular shift.
+    window = _hann_window(width, height)
+    fa = _np.fft.fft2(arr_prev * window)
+    fb = _np.fft.fft2(arr_curr * window)
+    cross = fb * _np.conj(fa)
     denom = _np.abs(cross)
     denom[denom == 0] = 1.0
     cps = cross / denom
     corr = _np.fft.ifft2(cps).real
     peak_y, peak_x = _np.unravel_index(_np.argmax(corr), corr.shape)
+    # Parabolic sub-pixel refinement through the peak and its (circular)
+    # neighbours on each axis.
+    sub_x = _parabolic_peak_offset(corr[peak_y, (peak_x - 1) % width],
+                                   corr[peak_y, peak_x],
+                                   corr[peak_y, (peak_x + 1) % width])
+    sub_y = _parabolic_peak_offset(corr[(peak_y - 1) % height, peak_x],
+                                   corr[peak_y, peak_x],
+                                   corr[(peak_y + 1) % height, peak_x])
+    # Same 5x5 window sum cv2's weightedCentroid reports as `response`.
+    ys = (peak_y + _np.arange(-2, 3)) % height
+    xs = (peak_x + _np.arange(-2, 3)) % width
+    confidence = float(corr[_np.ix_(ys, xs)].sum())
     if peak_y > height // 2:
         peak_y -= height
     if peak_x > width // 2:
         peak_x -= width
-    confidence = float(corr.max() / (corr.std() * corr.size + 1e-9))
-    return Translation(float(peak_x), float(peak_y), min(1.0, confidence))
+    return Translation(float(peak_x + sub_x), float(peak_y + sub_y),
+                       min(1.0, max(0.0, confidence)))
 
 
 def shift_canvas(plane: bytes, width: int, height: int, dx: int, dy: int) -> bytes:
