@@ -3196,7 +3196,7 @@ Design: [VECTOR_SCENE.md](VECTOR_SCENE.md). Research and review record: [2026-09
 - [ ] Snapshot keys `vector_scene`, `self_model`, `safety_detector`; populate `encode_mode` (never updated today, `state_publisher.py:45`)
 - [ ] `web/img/vector_renderer.js` + `self_model_overlay.js` on their own overlay canvases (never on `#image-canvas`: `source_guard.js` samples it); badges 7 `VECTOR` / 8 `MODEL` in `badge_renderer.js`
 - [ ] Vector Lab: `/vector_lab` page, `/api/vector_lab/*`, `vector_lab` sidecar worker, `tools/feed_canvas.py` on `lab/*` topics, bounded hand-drawn self-mask
-- [ ] **B2** `EncodeMode.RAWSTREAM = 8` and `VECTOR = 9` in `lora_proto.py`; **B3** codec-6 branch in `frame_format.parse_tile_delta_frame` / `encode_tile_delta_frame`; **B7** `x8_image_pipeline/register.py` sign and confidence
+- [ ] **B2** `EncodeMode.VECTOR = 9` in `lora_proto.py` (`RAWSTREAM = 8` landed in #131, 2026-09-24); **B3** codec-6 branch in `frame_format.parse_tile_delta_frame` / `encode_tile_delta_frame`; **B7** `x8_image_pipeline/register.py` sign and confidence (fix open in #130)
 - [ ] Degradation ladder V0–V3 (`VECTOR_SCENE.md` §4.5): frame-size / carousel / repeat / detail per level, loss from the VS frame `seq`, SNR margin from `RX_FRAME_URC`, level carried in the `0x63` quality byte, tractor self-select from received-command SNR and silence
 - [ ] Tests: `test_vector_codec.py`, `test_vector_codec_fuzz.py`, `test_frame_format_vector.py`, `test_vector_encoder.py`, `test_register.py`, `test_vector_scene_store.py`, `test_vector_policy_sil.py`, `test_vector_degradation_sil.py`, `test_self_model_sil.py`, `test_web_ui_vector.py`, `test_vector_lab_routes.py`
 

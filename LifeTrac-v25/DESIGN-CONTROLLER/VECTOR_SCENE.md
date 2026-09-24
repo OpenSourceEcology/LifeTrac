@@ -366,7 +366,7 @@ Why a codec id rather than a new top-level magic:
 | 237 B (full DTS frame) | 255 B | — (over the 170 ms cap) | 99.9 ms |
 
 - **Always one fragment.** The encoder sizes to the live `tractor/link_budget` (§1) and never emits a body over F. There are no trains, so the short-final-fragment "ride" loss found in RS-12 (`BE/RS_12_bulk_floor_2026-08-16/RESULTS.md:182-199`) cannot occur.
-- **Epoch start = `frame_kind` 1.** `image_tx_daemon` adds a second copy only when its cumulative local TX-failure ratio exceeds 0.5 % (`x8/image_tx_daemon.py:1103-1118`); air loss is invisible to it, so VS1 does its own repeat-once: the next frame carries HZN ABS + LAYER_CLEAR again (69 bits, §3.5). When the daemon's copy does fire it uses the 5 B `0xFD` header (`bs/lora_proto.py:878-897`), so epoch-start frames are capped at F − 1 (196 / 236 B): a full-F copy would be refused by the L072 at DTS (248 B > 247) and exceed the 170 ms cap at FHSS (171.6 ms). The same limit applies to today's full-budget tile keyframes.
+- **Epoch start = `frame_kind` 1.** `image_tx_daemon` adds a second copy only when its cumulative local TX-failure ratio exceeds 0.5 % (`x8/image_tx_daemon.py:1103-1118`); air loss is invisible to it, so VS1 does its own repeat-once: the next frame carries HZN ABS + LAYER_CLEAR again (69 bits, §3.5). When the daemon's copy does fire it uses the 5 B `0xFD` header, whose chunk is 1 B smaller than v1's (`pack_image_fragments_v2`, `bs/lora_proto.py:884`; until #132, merged 2026-09-24, the packer re-wrapped v1-sized chunks, so a full-F copy was 248 B at DTS and refused by the L072, or 171.6 ms at FHSS). VS1 therefore caps epoch-start frames at F − 1 (196 / 236 B) so that a copied epoch start stays one fragment instead of spilling a 1-byte runt into a second pair. The same arithmetic applies to today's full-budget tile keyframes.
 - **No crypto.** P3 image traffic is plaintext today; the planned D14 split-trust envelope (4 B seq + 2 B CRC32, `LORA_PROTOCOL.md` priority-class table) would cost 6 B of body when it is switched on. VS1 reserves nothing for it; F simply shrinks by 6.
 
 ### 3.2 VS header: 13 bits, explicit in every frame
@@ -917,7 +917,7 @@ Inputs, over 10 s windows: median SNR margin of decoded frames (`RX_FRAME_URC` `
 
 | Item | Value | Where |
 |---|---|---|
-| Encode mode | `EncodeMode.VECTOR = 9` | `bs/lora_proto.py:80-91`, `x8/camera_service.py:489-516`. Prerequisite: add `RAWSTREAM = 8` to `bs/lora_proto.py`, which the tractor already uses (`x8/camera_service.py:501`) and the base currently rejects (`bs/image_rx_daemon.py:1175-1203`). |
+| Encode mode | `EncodeMode.VECTOR = 9` | `bs/lora_proto.py:80-91`, `x8/camera_service.py:489-516`. Prerequisite met: `RAWSTREAM = 8` landed in `bs/lora_proto.py` with #131 (2026-09-24), and `bs/tests/test_encode_mode_parity_sil.py` now pins every tractor-implemented mode against the base enum, so `VECTOR = 9` is checked the same way once the tractor implements it. |
 | Frame codec | `CODEC_VECTOR = 6` | `bs/image_pipeline/frame_format.py:79-88` (0–5 assigned, 6–14 free), mirrored in `x8/camera_service.py:560-565` and `_ENCODE_MODE_CODEC` (`:571-581`) |
 | Badges | `Badge.VECTOR = 7` (scene geometry from measured pixels, not photographic), `Badge.MODEL = 8` (CAD self-model) | `bs/lora_proto.py:71-77`, `bs/web/img/badge_renderer.js:20-30` (`VALID` becomes {0..8}). Badge 6 `Wireframe` stays as is: it is what `mono_g4` tiles carry today (`bs/image_pipeline/canvas.py:35-38`). |
 | Wire names | `_CODEC_NAMES[6] = "vector"`, `ENCODE_MODE_NAMES[9] = "vector"` | `bs/image_rx_daemon.py:223`, `x8/camera_service.py:502` |
@@ -950,10 +950,10 @@ VECTOR plugs into that path with four edits: add `"vector"` to `_ENCODE_MODE_UI_
 | Shared | **new** `.../vector_scene/extract.py`, `selfmask.py`, `self_model_geom.py` | §2 extraction (numpy + OpenCV); structural mask test; FK and projection |
 | Tractor | **new** `x8/x8_image_pipeline/encode_vector.py` | `VectorEncoder(mask).frame(rgb, budget_bytes, epoch_start, quality) -> bytes` returning a complete `TileDeltaFrame` (6 B header, codec 6) |
 | Tractor | `x8/camera_service.py` | `ENCODE_MODE_VECTOR = 9` + name (`:489-502`); add to `_ENCODE_MODE_IMPLEMENTED` (`:509-516`); `CODEC_VECTOR = 6` (`:560-565`) and `_ENCODE_MODE_CODEC[9] = 6` (`:571-581`); branch at the `_build_frame` call (`:1580`) to `encode_vector` when the mode is 9, publishing the result on `cmd/image_frame` exactly as tile frames are; quality byte → detail level in `_apply_encode_mode` (`:1229-1302`); mode change still forces an epoch start (`:1272-1280`); skip a capture while a frame is still queued |
-| Tractor | `x8/x8_image_pipeline/register.py` | B7: negate the numpy result (`:61-74` returns −d, while `cv2.phaseCorrelate` at `:57-59` returns +d); Hann window in both paths; parabolic subpixel; normalised confidence |
+| Tractor | `x8/x8_image_pipeline/register.py` | B7: match the cv2 sign (the numpy path returned −d), Hann window in both paths, parabolic subpixel, normalised confidence — fix open in #130 |
 | Tractor | `x8/image_tx_daemon.py` | Small addition: publish a retained local status topic `tractor/link_rx` beside `tractor/link_budget` (`:435`) with the last base command heard (time, `snr_db`, `rssi_dbm`, rung) and the TX queue depth, so `camera_service` can run the D-VS6b self-select and skip a capture while a frame is still queued. Otherwise unchanged: epoch-start frames start with `0x01` and get the keyframe treatment (`:763`, `:1108-1118`); everything else is a single fragment. |
 | L072 / H7 | — | **No change.** |
-| Base | `bs/lora_proto.py` | `EncodeMode.RAWSTREAM = 8`, `EncodeMode.VECTOR = 9` (`:80-91`); `Badge.VECTOR = 7`, `Badge.MODEL = 8` (`:71-77`); `ENCODE_MODE_LADDER` floor becomes VECTOR (`:100-106`) for any future controller |
+| Base | `bs/lora_proto.py` | `EncodeMode.VECTOR = 9` (`:80-94`; `RAWSTREAM = 8` landed in #131); `Badge.VECTOR = 7`, `Badge.MODEL = 8` (`:71-77`); `ENCODE_MODE_LADDER` floor becomes VECTOR (`:100-106`) for any future controller |
 | Base | `bs/image_pipeline/frame_format.py` | `CODEC_VECTOR = 6` (`:79-88`); `parse_tile_delta_frame` (`:136-200`): when `codec == 6`, take the remainder as `vector_body` and no tiles (the trailing-bytes check at `:188-189` applies to tile frames only); `encode_tile_delta_frame` (`:203`) mirrors it, so `image_rx_daemon`'s re-encode (`bs/image_rx_daemon.py:543-557`) passes VS bodies through untouched |
 | Base | `bs/image_rx_daemon.py` | `_CODEC_NAMES[6] = "vector"` (`:223`); accept modes 8 and 9 in `_on_encode_mode_msg` (`:1175-1219`) |
 | Base | **new** `bs/image_pipeline/vector_scene_store.py` | `apply(frame, rx_ms)`: epochs (§3.5), per-field LWW, INSERT sets, orphans, CONFIRM tags, DIGEST, TTL, ages, warp, badges, `to_json()`. Fake-clock injectable. |
@@ -1204,12 +1204,12 @@ None of these blocks the Vector Lab (Phase 1). B1–B4 gate on-air use (Phase 2)
 | # | Blocker | Evidence |
 |---|---|---|
 | B1 | **The stock deploy does not run the strict path.** `x8/docker-compose.yml` starts `camera_service` without `LIFETRAC_USE_LORA_BRIDGE`, and neither stock compose file nor any systemd unit (only the `*video-test*.yml` bench files) starts `image_tx_daemon` or `image_rx_daemon`; every on-air result so far came from the bench harness. | `TODO.md` RS-4.8; `x8/camera_service.py:140-144` |
-| B2 | **`EncodeMode` mismatch.** The tractor implements mode 8 (`RAWSTREAM`), the base enum stops at 7 and rejects it; mode 9 needs both ends. | `x8/camera_service.py:501`; `bs/lora_proto.py:80-91`; `bs/image_rx_daemon.py:1175-1203` |
+| B2 | **`EncodeMode.VECTOR = 9` on both ends.** The `RAWSTREAM = 8` half (the tractor implemented it, the base enum stopped at 7 and rejected it) was fixed in #131 on 2026-09-24, with a tractor/base parity test. | `x8/camera_service.py:501`; `bs/lora_proto.py:80-94`; `bs/tests/test_encode_mode_parity_sil.py` |
 | B3 | **The frame parser knows no codec 6** and rejects trailing bytes; `image_rx_daemon` re-encodes every frame. | `bs/image_pipeline/frame_format.py:152-153, 188-189`; `bs/image_rx_daemon.py:543-557` |
 | B4 | **No automatic encode policy exists.** Mode selection is operator-only; `EncodeModeController` is instantiated only by `lora_bridge.py` (`:234`), which the strict path does not run. | `bs/web_ui.py:91-104`; `bs/link_monitor.py` |
 | B5 | **No AE/AWB lock** on the camera path. | `x8/camera_service.py:246-420` |
 | B6 | **Undeclared numpy/OpenCV on the tractor image.** The tractor container must carry `numpy` and `opencv-python-headless`; Pillow was only added to the base in July. | `x8/requirements.txt`; `TODO.md:182-185` |
-| B7 | **`register.py` numpy path has the wrong sign and a meaningless confidence**; no window; integer-only. | `x8/x8_image_pipeline/register.py:57-74` |
+| B7 | **`register.py` numpy path has the wrong sign and a meaningless confidence**; no window; integer-only. Fix open in #130 (cv2 sign verified against OpenCV 5.0). | `x8/x8_image_pipeline/register.py:57-74` |
 | B8 | **No working person detector.** Both backends return `[]`; no tractor emitter of `CMD_PERSON_APPEARED`. | `x8/x8_image_pipeline/detect_nanodet.py:44,60` |
 | B9 | **No camera calibration, no bracket, varifocal not locked; no arm/bucket pose sensor.** | `DC/CALIBRATION.md` §1–5 only; `HARDWARE_BOM.md` |
 | B10 | **Base → tractor command delivery on FHSS is unreliable** (1/17 and 49/281 in legs H/I), so any base-driven mode change may not arrive on the profile that needs it most. | `TODO.md:2661-2676` |
@@ -1246,7 +1246,7 @@ Housekeeping, not blockers: `encode_wireframe.py`, `encode_motion.py`, `wirefram
 
 | ID | Decision |
 |---|---|
-| D-VS1 | `CODEC_VECTOR = 6`, `EncodeMode.VECTOR = 9` (after `RAWSTREAM = 8` is added to the base enum). No new topic: VS1 rides `video/tile_delta`. |
+| D-VS1 | `CODEC_VECTOR = 6`, `EncodeMode.VECTOR = 9` (`RAWSTREAM = 8` landed in #131). No new topic: VS1 rides `video/tile_delta`. |
 | D-VS2 | `Badge.VECTOR = 7`, `Badge.MODEL = 8`; badge 6 keeps its current `mono_g4` meaning. |
 | D-VS4 | Speed-cap mechanism (one factor for all axes, tractor scales the shared flow set-point) recorded as a requirement on the RS-9 drive plane; values are OSE's call. |
 | D-VS5 | AI6 arm sensor (and a bucket sensor later). |

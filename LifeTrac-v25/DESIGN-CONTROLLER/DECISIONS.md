@@ -250,7 +250,7 @@ None of these decisions is implemented. Each one lists its options and a **RECOM
 | Option | Pros | Cons |
 |---|---|---|
 | A. New top-level frame magic on `video/tile_delta` | Independent of the tile parser | `image_rx_daemon` re-encodes every frame as a `TileDeltaFrame`; a new magic needs its own dispatch, topic and store plumbing |
-| **B. `TileDeltaFrame` codec `6` + `EncodeMode.VECTOR = 9`** | Reuses keyframe protection in `image_tx_daemon` (first byte `0x01`), reassembly, republish, the web UI route and the `0x63`/`0x68` mode handshake; one parser branch on the base | Requires adding `RAWSTREAM = 8` to the base enum first |
+| **B. `TileDeltaFrame` codec `6` + `EncodeMode.VECTOR = 9`** | Reuses keyframe protection in `image_tx_daemon` (first byte `0x01`), reassembly, republish, the web UI route and the `0x63`/`0x68` mode handshake; one parser branch on the base | Needed `RAWSTREAM = 8` on the base first — landed in #131 (2026-09-24) |
 | C. New MQTT topic and daemon | Clean separation | Duplicates the whole RX path |
 
 **RECOMMENDATION: B.** No new topic; `0x28`/`0x29` stay unused.
