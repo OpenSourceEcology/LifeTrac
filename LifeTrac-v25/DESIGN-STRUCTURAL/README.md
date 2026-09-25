@@ -314,13 +314,14 @@ For questions or issues:
 ### Combined Layout (All Parts)
 ![CNC Cutting Layout - All Parts](cnclayout.svg)
 
-The combined CNC layout includes all 23 sheet metal parts with complete manufacturing details:
+The combined CNC layout shows the plate parts with:
 - Mounting holes with proper clearances
 - Pivot holes for arm and cylinder connections
 - Arc slots for cross beam clearance (inner panels)
 - Lightening holes for weight reduction
 - Anti-slip hole patterns (standing deck)
-- All parts properly spaced for efficient cutting
+
+It is **not yet nested for cutting**: several parts overlap, the stiffener, motor and pivot-mount plates are missing, and there is no kerf compensation (see the warning at the top of this README).
 
 **Material Specifications:**
 - Half-inch (1/2") plate parts: 14 parts total

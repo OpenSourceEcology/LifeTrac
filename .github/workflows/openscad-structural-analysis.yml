@@ -156,31 +156,33 @@ jobs:
               echo "#### Detailed Failure Analysis" >> STRUCTURAL_ANALYSIS_LOG.md
               echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               
+              # Each section runs from its "=== ... ===" header to its "... CHECK:" line
+
               # Arm Bending
               if grep -q "Arm Bending.*FAIL" structural_analysis.log; then
                 echo "**1. Arm Bending Stress**" >> STRUCTURAL_ANALYSIS_LOG.md
-                grep -A 5 "=== ARM BENDING STRESS ANALYSIS ===" structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
+                sed -n '/=== ARM BENDING STRESS ANALYSIS ===/,/CHECK:/p' structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
                 echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               fi
               
               # Arm Deflection
               if grep -q "Arm Deflection.*FAIL" structural_analysis.log; then
                 echo "**2. Arm Deflection**" >> STRUCTURAL_ANALYSIS_LOG.md
-                grep -A 5 "=== ARM DEFLECTION ANALYSIS ===" structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
+                sed -n '/=== ARM DEFLECTION ANALYSIS ===/,/CHECK:/p' structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
                 echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               fi
               
               # Cross Beam
               if grep -q "Cross Beam.*FAIL" structural_analysis.log; then
                 echo "**3. Cross Beam Bending**" >> STRUCTURAL_ANALYSIS_LOG.md
-                grep -A 5 "=== CROSS BEAM STRESS ANALYSIS ===" structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
+                sed -n '/=== CROSS BEAM STRESS ANALYSIS ===/,/CHECK:/p' structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
                 echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               fi
               
               # Pivot Ring Welds
               if grep -q "Pivot Ring.*FAIL" structural_analysis.log; then
                 echo "**4. Pivot Ring Welds**" >> STRUCTURAL_ANALYSIS_LOG.md
-                grep -A 5 "=== PIVOT RING WELD ANALYSIS ===" structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
+                sed -n '/=== PIVOT RING WELD ANALYSIS ===/,/CHECK:/p' structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
                 echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               fi
               
