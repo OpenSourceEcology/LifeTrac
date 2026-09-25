@@ -77,8 +77,14 @@ jobs:
           echo "Running structural analysis on main design..."
           cd LifeTrac-v25/DESIGN-STRUCTURAL
           
-          # Run OpenSCAD with echo output to capture structural analysis
-          openscad -o /dev/null --export-format echo openscad/lifetrac_v25.scad 2>&1 | tee structural_analysis.log
+          # Write the ECHO output to the log file. (With "-o /dev/null" the ECHO
+          # lines went to /dev/null and every report said no summary was found.)
+          openscad -o structural_analysis.log --export-format echo openscad/lifetrac_v25.scad
+          echo "Captured $(grep -c '^ECHO:' structural_analysis.log) ECHO lines"
+          if ! grep -q "COMPLETE STRUCTURAL ANALYSIS SUMMARY" structural_analysis.log; then
+            echo "::error::No structural analysis summary in the OpenSCAD output"
+            exit 1
+          fi
           
           echo "Structural analysis complete. Check logs for results."
       
@@ -99,9 +105,8 @@ jobs:
             echo "## Structural Analysis Results" >> structural_report.md
             echo "" >> structural_report.md
             echo "\`\`\`" >> structural_report.md
-            # Extract from summary start to next delimiter or end of relevant section
-            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/========================================/{p;/========================================/q}' structural_analysis.log | tail -n +2 >> structural_report.md || \
-            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,$p' structural_analysis.log | tail -n +2 | head -n 20 >> structural_report.md
+            # Extract from the summary header to the overall assessment line
+            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/OVERALL STRUCTURAL ASSESSMENT/p' structural_analysis.log | tail -n +2 | sed 's/^ECHO: //' >> structural_report.md
             echo "\`\`\`" >> structural_report.md
           else
             echo "No structural analysis summary found in output." >> structural_report.md
@@ -133,8 +138,7 @@ jobs:
             echo "### Results Summary" >> STRUCTURAL_ANALYSIS_LOG.md
             echo "" >> STRUCTURAL_ANALYSIS_LOG.md
             echo "\`\`\`" >> STRUCTURAL_ANALYSIS_LOG.md
-            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/========================================/{p;/========================================/q}' structural_analysis.log | tail -n +2 >> STRUCTURAL_ANALYSIS_LOG.md || \
-            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,$p' structural_analysis.log | tail -n +2 | head -n 20 >> STRUCTURAL_ANALYSIS_LOG.md
+            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/OVERALL STRUCTURAL ASSESSMENT/p' structural_analysis.log | tail -n +2 | sed 's/^ECHO: //' >> STRUCTURAL_ANALYSIS_LOG.md
             echo "\`\`\`" >> STRUCTURAL_ANALYSIS_LOG.md
             echo "" >> STRUCTURAL_ANALYSIS_LOG.md
             
