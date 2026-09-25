@@ -23,14 +23,12 @@ module bucket_side() {
         // Bottom edge mounting holes
         for (y = [80, BUCKET_DEPTH*0.4, BUCKET_DEPTH*0.7, BUCKET_DEPTH-80]) {
             translate([10, y, plate_thickness/2])
-            rotate([0, 90, 0])
             cylinder(d=BOLT_DIA_1_2 + 2, h=plate_thickness+4, center=true, $fn=32);
         }
         
         // Top/front edge mounting holes
         for (z = [BUCKET_HEIGHT*0.25, BUCKET_HEIGHT*0.5, BUCKET_HEIGHT*0.75]) {
             translate([z, 10, plate_thickness/2])
-            rotate([90, 0, 0])
             cylinder(d=BOLT_DIA_1_2 + 2, h=plate_thickness+4, center=true, $fn=32);
         }
     }

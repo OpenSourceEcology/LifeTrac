@@ -22,7 +22,6 @@ module cylinder_lug() {
         
         // Center pivot hole for cylinder pin
         translate([0, lug_height - 40, PLATE_1_2_INCH/2])
-        rotate([0, 90, 0])
         cylinder(d=BOLT_DIA_1 + 2, h=PLATE_1_2_INCH+4, center=true, $fn=32);
         
         // Base mounting holes (4 holes)

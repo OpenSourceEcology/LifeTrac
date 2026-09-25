@@ -6,5 +6,4 @@ use <bucket_side.scad>
 
 // Create 2D projection for CNC cutting
 projection(cut=true)
-rotate([0, -90, 0])  // Rotate to lay flat
 bucket_side();
