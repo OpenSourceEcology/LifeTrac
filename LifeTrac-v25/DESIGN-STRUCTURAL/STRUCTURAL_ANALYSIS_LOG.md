@@ -6,10 +6,10 @@ This file tracks the history of structural analysis test results.
 
 ## Latest Analysis
 
-**Date:** 2026-09-25 15:42:42 UTC
-**Commit:** eec4063c1ef247ffa415de2b8b232755db8f6909
+**Date:** 2026-09-25 15:49:03 UTC
+**Commit:** 60e675a5cb2f1631be225bff6885a4d549a1d1ac
 **Branch:** claude/dreamy-mccarthy-lpn9af
-**Workflow Run:** https://github.com/OpenSourceEcology/LifeTrac/actions/runs/36155925400
+**Workflow Run:** https://github.com/OpenSourceEcology/LifeTrac/actions/runs/36156648445
 
 ### Results Summary
 
@@ -44,14 +44,16 @@ This file tracks the history of structural analysis test results.
 - "Section modulus:", 38179.6, "mm³"
 - "Load per arm:", 32429.3, "N"
 - "Max bending moment at pivot:", 5.37354e+7, "N·mm"
+- "Calculated bending stress:", 1407.44, "MPa"
+- "Allowable stress:", 125, "MPa"
+- "Stress ratio (should be < 1.0):", 11.2595
+- "ARM STRESS CHECK:", "FAIL ✗"
 
 **2. Arm Deflection**
 - "=== ARM DEFLECTION ANALYSIS ==="
 - "Calculated tip deflection:", 169.043, "mm"
 - "Allowable deflection (L/180):", 9.20556, "mm"
 - "ARM DEFLECTION CHECK:", "FAIL ✗"
-- "=== PIVOT PIN SHEAR ANALYSIS ==="
-- "Pivot pin diameter:", 38.1, "mm (", 1.5, "inches)"
 
 **3. Cross Beam Bending**
 - "=== CROSS BEAM STRESS ANALYSIS ==="
@@ -60,6 +62,10 @@ This file tracks the history of structural analysis test results.
 - "Section modulus:", 14936.1, "mm³"
 - "Bucket cylinder force:", 94327.8, "N per cylinder"
 - "Max bending moment:", 2.00258e+7, "N·mm"
+- "Bending stress:", 1340.76, "MPa"
+- "Allowable stress:", 125, "MPa"
+- "Stress ratio:", 10.7261
+- "CROSS BEAM CHECK:", "FAIL ✗"
 
 **4. Pivot Ring Welds**
 - "=== PIVOT RING WELD ANALYSIS ==="
@@ -68,6 +74,9 @@ This file tracks the history of structural analysis test results.
 - "Total weld length per arm:", 609.6, "mm"
 - "Weld section modulus:", 52135.4, "mm³"
 - "Weld bending stress:", 1030.69, "MPa"
+- "Allowable weld stress:", 72.5, "MPa"
+- "Weld stress ratio:", 14.2164
+- "PIVOT WELD CHECK:", "FAIL ✗"
 
 ### Recommended Actions
 
