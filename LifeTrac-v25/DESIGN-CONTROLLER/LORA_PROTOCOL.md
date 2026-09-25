@@ -300,6 +300,8 @@ Sent at **20 Hz** by the active control source. Used by the tractor's source-arb
 
 The image pipeline replaces the simple "send a whole WebP every N seconds" model from earlier drafts with hybrid I/P-frame tile-delta transmission, per [MASTER_PLAN.md §8.19](MASTER_PLAN.md) and [`../AI NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md`](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md) §2. Carried on TelemetryFrame topic `0x25` and fragmented across LoRa frames using the existing fragment scheme, with a per-fragment **25 ms airtime cap** so an in-flight image chunk cannot delay a P0 ControlFrame's TX-start (per the v1.1 LoRa analysis §3 / [v25 image analysis §2.6](../AI%20NOTES/2026-04-27_Image_Transmission_InDepth_Analysis_ClaudeOpus4_7_v1_0.md)).
 
+> **Status note (2026-09-25):** the layout below is the retired April design and is **not** on the wire. The shipped `TileDeltaFrame` (`base_station/image_pipeline/frame_format.py:6-17`, `firmware/tractor_x8/camera_service.py:1151-1159`) is a six-byte header — `frame_kind u8 (1 = key, 0 = delta), seq u8, grid_w u8, grid_h u8, tile_px u8, codec u8` — followed immediately by the changed-tile bitmap and, per set bit in row-major order, `tile_size_minus1 u8` + the tile blob. There is no `frame_type`, no 16-bit `seq`/`base_seq`, no `wall_seconds`, no `camera_id` and no `flags` byte. The `codec` values in the row below are the shipped ones, and a codec-6 (VECTOR) body follows the six-byte header directly ([VECTOR_SCENE.md](VECTOR_SCENE.md) §3.1).
+
 Layout (after framing/AES-GCM unwrap, before fragmentation):
 
 | Field | Bytes | Description |
