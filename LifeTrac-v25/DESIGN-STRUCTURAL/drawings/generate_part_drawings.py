@@ -48,7 +48,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 from partdrawings import sheet as S  # noqa: E402
-from partdrawings.drawing import render_part  # noqa: E402
+from partdrawings.drawing import draw_part, plan_part  # noqa: E402
 from partdrawings.hlr import detect_circles  # noqa: E402
 from partdrawings.mesh import Mesh, load_stl, normalize  # noqa: E402
 
@@ -242,7 +242,8 @@ def main():
     ap.add_argument("--openscad", default=os.environ.get("OPENSCAD", "openscad"))
     ap.add_argument("--paper", default="letter", choices=sorted(S.PAPERS))
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 2)
-    ap.add_argument("--strict", action="store_true", help="exit non-zero on quantity mismatches")
+    ap.add_argument("--strict", action="store_true",
+                    help="exit 2 if there are any warnings (unregistered markers, quantity mismatches, DXF failures)")
     args = ap.parse_args()
 
     if not shutil.which(args.openscad):
@@ -362,12 +363,19 @@ def main():
         res["info"]["summary"] = [(k, str(qty) if k == "QTY PER MACHINE" else (
             "%.2f kg" % (res["mass"] * qty) if k == "MASS PER MACHINE" else v)) for k, v in res["info"]["summary"]]
 
-    # ---- revision bookkeeping: bump the letter when the sheet content changes
+    # ---- plan every sheet (views, scale, holes ...) before deciding revisions
+    for res in results:
+        res["plan"] = plan_part(res["mesh"], res["opts"], args.paper, res["part"].category)
+
+    # ---- revision bookkeeping: the letter goes up when anything printed on
+    # the sheet changes - title block and notes (everything in `info` except
+    # the revision and date themselves) or the planned views, dimensions,
+    # holes, scale and paper.  Pure styling changes to the generator do not.
     for res in results:
         info = res["info"]
-        content = hashlib.sha1(json.dumps({k: info[k] for k in (
-            "name", "stock", "qty", "process", "finish", "size", "geom_id", "source", "used_in", "notes")},
-            sort_keys=True).encode()).hexdigest()[:12]
+        printed = {k: v for k, v in info.items() if k not in ("rev", "date")}
+        content = hashlib.sha1(json.dumps({"info": printed, "sheet": res["plan"]["fingerprint"]},
+                                          sort_keys=True).encode()).hexdigest()[:12]
         prev = revisions.get(info["id"])
         if prev and prev.get("content") == content:
             rev, date = prev["rev"], prev["date"]
@@ -396,7 +404,7 @@ def main():
         c.setTitle("%s %s" % (part.id, part.name))
         c.setAuthor(manifest.get("project", "LifeTrac"))
         c.setSubject("Part drawing, rev %s, geometry %s" % (res["info"]["rev"], res["info"]["geom_id"]))
-        r = render_part(c, res["mesh"], res["info"], res["opts"], paper=args.paper)
+        r = draw_part(c, res["mesh"], res["plan"], res["info"])
         c.save()
         res.update(sheets=r["sheets"], holes=r["holes"], scale=r["scale"])
         print("  %-6s %-42s qty %-4s scale %-6s holes %3d  sheets %d" % (
@@ -424,11 +432,14 @@ def main():
 
     for w in warnings:
         print("WARNING:", w)
+    # Exit codes: 0 clean; 2 finished with warnings (--strict only); 3 finished
+    # but some parts failed to render.  In every case all outputs were written
+    # (failed parts keep their previous drawing); a crash exits 1.
     if failures:
         print("%d part(s) failed to render" % len(failures))
-        return 1
+        return 3
     if args.strict and warnings:
-        return 1
+        return 2
     return 0
 
 
@@ -548,6 +559,16 @@ def write_checks(out, results, failures, warnings, counts, ignored):
     (out / "CHECKS.md").write_text("\n".join(lines) + "\n")
 
 
+def book_page_starts(index_pages, sheets):
+    """First page number of each part in the book, and the total page count.
+    Pages 1..index_pages are the index; the first drawing is the next page."""
+    starts, last = [], index_pages
+    for n in sheets:
+        starts.append(last + 1)
+        last += n
+    return starts, last
+
+
 def write_book(path, manifest, results, paper, head_sha, head_date):
     rows = _sorted(results)
     W, H = S.PAPERS[paper]
@@ -555,11 +576,7 @@ def write_book(path, manifest, results, paper, head_sha, head_date):
     c.setTitle("LifeTrac v25 part drawings")
     per_page = 34
     index_pages = max(1, -(-len(rows) // per_page))
-    page = 1 + index_pages
-    starts = []
-    for r in rows:
-        starts.append(page + 1)
-        page += r["sheets"]
+    starts, page = book_page_starts(index_pages, [r["sheets"] for r in rows])
     for k in range(index_pages):
         c.setFont("Helvetica-Bold", 20)
         c.drawString(50, H - 60, "LifeTrac v25 - Part Drawings")
@@ -584,7 +601,7 @@ def write_book(path, manifest, results, paper, head_sha, head_date):
         c.drawString(50, 30, "Generated from the OpenSCAD model by drawings/generate_part_drawings.py. Page %d." % (k + 1))
         c.showPage()
     for r in rows:
-        render_part(c, r["mesh"], r["info"], r["opts"], paper=paper)
+        draw_part(c, r["mesh"], r["plan"], r["info"])
     c.save()
     print("Book: %s (%d pages)" % (path, page))
 

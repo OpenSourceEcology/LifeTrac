@@ -9,12 +9,16 @@ DESIGN-STRUCTURAL/drawings/parts_manifest.yaml. Quantities per machine come
 from the generated BOM (drawings/generated/bom.csv), which counts them from
 the OpenSCAD model, so the checks follow the design.
 
-Errors (fail CI):  unknown part id, a part used more times than the machine
-                   has, duplicate step id, broken `after` / `uses` links, a jig
-                   listed as a machine part.
-Warnings:          parts not placed by any step (errors once `complete: true`),
-                   sub-assemblies built but never installed, hardware
-                   over-use (hardware counts are only estimates).
+A quantity is *exact* when the BOM says it was counted in the model
+(qty_source = model). Hand-entered and hole-count estimates (most bolts, nuts
+and washers today) are not exact.
+
+Errors (fail CI):  unknown part id, a part with an exact quantity used more
+                   times than the machine has, duplicate step id, broken
+                   `after` / `uses` links, a jig listed as a machine part.
+Warnings:          parts with an exact quantity not placed by any step
+                   (errors once `complete: true`), sub-assemblies built but
+                   never installed, over-use of an estimated quantity.
 """
 
 import argparse
@@ -27,25 +31,27 @@ import yaml
 
 HERE = Path(__file__).resolve().parent
 TOOLS_ONLY = {"printed"}     # 3D-printed jigs are tools, never installed
-ESTIMATED = {"fastener"}     # hardware quantities are estimates: never an error
 
 
 def load_quantities(base, seq, parts):
-    """Per-machine quantity and drawing path for every part id."""
-    qty, drawing = {}, {}
+    """Per-machine quantity, whether it is exact (counted in the model), and
+    drawing path for every part id."""
+    qty, exact, drawing = {}, set(), {}
     bom = base / seq.get("bom", "")
     if seq.get("bom") and bom.exists():
         with open(bom, newline="") as fh:
             for row in csv.DictReader(fh):
                 qty[row["id"]] = int(row["qty_per_machine"] or 0)
+                if row.get("qty_source") == "model":
+                    exact.add(row["id"])
                 drawing[row["id"]] = bom.parent / row["drawing"]
     for pid, p in parts.items():
         if pid not in qty and p.get("qty") is not None:
             qty[pid] = int(p["qty"])
-    return qty, drawing
+    return qty, exact, drawing
 
 
-def check(seq, parts, qty):
+def check(seq, parts, qty, exact):
     """Walk the steps in order. Return (steps, placed, errors, warnings)."""
     errors, warnings = [], []
     steps, index, placed = [], {}, {}
@@ -91,7 +97,7 @@ def check(seq, parts, qty):
                 total = qty.get(pid)
                 if total is not None and placed[pid] > total:
                     msg = "%s: %s placed %d times so far but the machine has %d" % (where, pid, placed[pid], total)
-                    (warnings if cat in ESTIMATED else errors).append(msg)
+                    (errors if pid in exact else warnings).append(msg)
                 rows.append((pid, q, placed[pid]))
             steps.append({"n": n, "phase": phase, "step": step, "rows": rows})
 
@@ -100,7 +106,7 @@ def check(seq, parts, qty):
             warnings.append("sub-assembly %s (step %d) is built but never installed (no later `uses`)" % (sid, n))
 
     for pid, p in parts.items():
-        if p["category"] in TOOLS_ONLY | ESTIMATED:
+        if p["category"] in TOOLS_ONLY or pid not in exact:
             continue
         total, done = qty.get(pid), placed.get(pid, 0)
         if total is not None and done < total:
@@ -109,7 +115,7 @@ def check(seq, parts, qty):
     return steps, placed, errors, warnings
 
 
-def write_markdown(path, seq, parts, qty, drawing, steps, placed, errors, warnings, source_name):
+def write_markdown(path, seq, parts, qty, exact, drawing, steps, placed, errors, warnings, source_name):
     def link(pid):
         d = drawing.get(pid)
         if d is None:
@@ -120,7 +126,7 @@ def write_markdown(path, seq, parts, qty, drawing, steps, placed, errors, warnin
     for s in steps:
         st = s["step"].get("status", "draft")
         status[st] = status.get(st, 0) + 1
-    machine = [pid for pid, p in parts.items() if p["category"] not in TOOLS_ONLY | ESTIMATED]
+    machine = [pid for pid, p in parts.items() if p["category"] not in TOOLS_ONLY and pid in exact]
     n_total = sum(qty.get(pid, 0) for pid in machine)
     n_placed = sum(min(placed.get(pid, 0), qty.get(pid, 0)) for pid in machine)
 
@@ -176,9 +182,11 @@ def write_markdown(path, seq, parts, qty, drawing, steps, placed, errors, warnin
         out += ["| %s | %s | %d | %d | %d |" % (link(pid), name, t, d, t - d) for pid, name, t, d in remaining]
     else:
         out.append("Every fabricated part is placed exactly as many times as the model uses it.")
-    hardware = [pid for pid, p in parts.items() if p["category"] in ESTIMATED and not placed.get(pid)]
-    if hardware:
-        out += ["", "Hardware not yet assigned to steps (counts are estimates): " + ", ".join(hardware) + "."]
+    estimated = [pid for pid, p in parts.items()
+                 if p["category"] not in TOOLS_ONLY and pid not in exact and not placed.get(pid)]
+    if estimated:
+        out += ["", "Not yet assigned to steps (quantities are estimates, not counted in the model): "
+                + ", ".join(estimated) + "."]
     out += ["", "## Checks", ""]
     out += ["- ERROR: %s" % e for e in errors] + ["- warning: %s" % w for w in warnings] or ["- all good"]
     path.write_text("\n".join(out) + "\n")
@@ -196,10 +204,10 @@ def main():
     base = seq_path.parent
     manifest = yaml.safe_load((base / seq["manifest"]).read_text())
     parts = {str(p["id"]): p for p in manifest["parts"]}
-    qty, drawing = load_quantities(base, seq, parts)
+    qty, exact, drawing = load_quantities(base, seq, parts)
 
-    steps, placed, errors, warnings = check(seq, parts, qty)
-    write_markdown(Path(args.out).resolve(), seq, parts, qty, drawing, steps, placed, errors, warnings,
+    steps, placed, errors, warnings = check(seq, parts, qty, exact)
+    write_markdown(Path(args.out).resolve(), seq, parts, qty, exact, drawing, steps, placed, errors, warnings,
                    seq_path.name)
 
     ci = os.environ.get("GITHUB_ACTIONS") == "true"

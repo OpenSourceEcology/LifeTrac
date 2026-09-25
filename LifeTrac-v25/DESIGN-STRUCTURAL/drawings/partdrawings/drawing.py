@@ -1,5 +1,8 @@
 """Compose a complete part drawing (one or more sheets) on a reportlab canvas."""
 
+import hashlib
+import json
+
 import numpy as np
 
 from . import sheet as S
@@ -51,6 +54,14 @@ ORD_SPACE = 58  # points reserved for a row of rotated ordinate labels
 def render_part(c, mesh, info, opts, paper="letter"):
     """Draw all sheets for one part.  ``mesh`` must already be normalised
     (canonical orientation, bounding-box min at the origin)."""
+    return draw_part(c, mesh, plan_part(mesh, opts, paper, info.get("category")), info)
+
+
+def plan_part(mesh, opts, paper="letter", category=None):
+    """Work out everything a sheet shows that comes from the geometry and the
+    drawing options - views, scale, dimensions, holes, number of sheets - and
+    a fingerprint of it.  The generator uses the fingerprint to decide
+    whether a part's revision letter has to go up."""
     g = S.SheetGeometry(paper)
     views = [v for v in opts.get("views", ["front", "top", "right", "iso"]) if v in ORTHO + ("iso",)]
     ortho = [v for v in ORTHO if v in views]
@@ -86,7 +97,6 @@ def render_part(c, mesh, info, opts, paper="letter"):
     if "right" in vds:
         placed["right"] = S.PlacedView(vds["right"], ox + X * s + gap, oy, s)
 
-    thick = opts.get("thickness")
     rows = S.collect_holes(placed, drill_below=opts.get("drill_below")) if opts.get("hole_table", True) else []
 
     # ------------------------------------------------------------------ pages
@@ -100,20 +110,49 @@ def render_part(c, mesh, info, opts, paper="letter"):
     cont_fit = cont_cols * max(1, int(((ay1 - ay0) - 30) // rh))
     n_sheets = 1 + (-(-rest // cont_fit) if rest else 0)
 
+    # Round outlines are polygons in the model, so a Ø38.1 pin measures 38.0
+    # across the flats.  Report such sizes as the true diameter.
+    diameters = sorted({round(2 * c["r"], 4) for vd in vds.values() for c in vd.circles if not c["hole"]})
+    show_hidden = {n: hidden or (n == "right" and category in ("angle", "tube")) for n in placed}
+
+    content = {
+        "paper": paper, "views": views, "hidden": show_hidden, "running": [ord_front, ord_top],
+        "thickness": bool(opts.get("thickness")), "scale": scale, "sheets": n_sheets, "diameters": diameters,
+        "extents": [round(float(v), 2) for v in (X, Y, Z)],
+        "lines": {n: hashlib.sha1((np.round(vd.segments, 2) + 0.0).tobytes() + vd.visible.tobytes()).hexdigest()
+                  for n, vd in sorted(vds.items())},
+        "holes": [[r["tag"], r["view"], round(float(r["x"]), 2), round(float(r["y"]), 2),
+                   round(float(r["d"]), 2), r["walls"], bool(r["drill"])] for r in rows],
+    }
+    fingerprint = hashlib.sha1(json.dumps(content, sort_keys=True).encode()).hexdigest()[:12]
+    return dict(g=g, views=views, placed=placed, vds=vds, rows=rows, scale=scale, extents=(X, Y, Z),
+                ord_front=ord_front, ord_top=ord_top, thick=opts.get("thickness"), diameters=diameters,
+                show_hidden=show_hidden, iso_h=iso_h, table_top=table_top, cont_cols=cont_cols,
+                n_sheets=n_sheets, origin=(ox, oy), shade_iso=opts.get("shade_iso", True),
+                fingerprint=fingerprint)
+
+
+def draw_part(c, mesh, plan, info):
+    """Draw the sheets planned by plan_part(), with the title block and notes from ``info``."""
+    P = plan
+    g, views, placed, rows, scale = P["g"], P["views"], P["placed"], P["rows"], P["scale"]
+    X, Y, Z = P["extents"]
+    ox, oy = P["origin"]
+    ord_front, ord_top, thick, n_sheets = P["ord_front"], P["ord_top"], P["thick"], P["n_sheets"]
+    iso_h, table_top, cont_cols = P["iso_h"], P["table_top"], P["cont_cols"]
+    ax0, ay0, ax1, ay1 = g.views_box
+    x0r, y0r, x1r, y1r = g.right_box
+
     # ------------------------------------------------------------------ sheet 1
     S.draw_frame(c, g)
     S.draw_notes(c, g, info["notes"])
     S.draw_title_block(c, g, dict(info, scale=S.scale_label(scale)), 1, n_sheets)
 
     for name, pv in placed.items():
-        S.draw_lines(c, pv, hidden=hidden or name == "right" and info.get("category") in ("angle", "tube"))
-
-    # Round outlines are polygons in the model, so a Ø38.1 pin measures 38.0
-    # across the flats.  Report such sizes as the true diameter.
-    diameters = sorted({round(2 * c["r"], 4) for vd in vds.values() for c in vd.circles if not c["hole"]})
+        S.draw_lines(c, pv, hidden=P["show_hidden"][name])
 
     def size_text(value, suffix=""):
-        for dia in diameters:
+        for dia in P["diameters"]:
             if abs(value - dia) <= 0.005 * dia:
                 return "Ø" + S.fmt_dual(dia) + suffix
         return S.fmt_dual(value) + suffix
@@ -151,7 +190,7 @@ def render_part(c, mesh, info, opts, paper="letter"):
     S.draw_hole_tags(c, rows)
 
     if "iso" in views:
-        S.draw_iso(c, mesh, (x0r, y1r - iso_h, x1r, y1r), shade=opts.get("shade_iso", True))
+        S.draw_iso(c, mesh, (x0r, y1r - iso_h, x1r, y1r), shade=P["shade_iso"])
         c.saveState()
         c.setLineWidth(0.4)
         c.line(x0r, y1r - iso_h, x1r, y1r - iso_h)
@@ -180,7 +219,7 @@ def render_part(c, mesh, info, opts, paper="letter"):
                 c, remaining, x0 + 6 + k * colw, y1 - 4, colw - 8, y0 + 6,
                 title="HOLE TABLE (CONT.)")
         c.showPage()
-    return {"scale": scale, "holes": rows, "sheets": n_sheets}
+    return {"scale": scale, "holes": rows, "sheets": n_sheets, "fingerprint": P["fingerprint"]}
 
 
 def _as_pv(vd):

@@ -3,6 +3,7 @@
 Run from DESIGN-STRUCTURAL/drawings:  python3 -m unittest discover -s tests -v
 """
 
+import importlib.util
 import io
 import math
 import sys
@@ -14,10 +15,15 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from partdrawings import sheet as S  # noqa: E402
-from partdrawings.drawing import render_part  # noqa: E402
+from partdrawings.drawing import plan_part, render_part  # noqa: E402
 from partdrawings.hlr import detect_circles, draw_view  # noqa: E402
-from partdrawings.mesh import Mesh, canonical_frame, normalize  # noqa: E402
+from partdrawings.mesh import Mesh, normalize  # noqa: E402
 import generate_part_drawings as G  # noqa: E402
+
+_seq_path = Path(__file__).resolve().parents[3] / "BUILD-STRUCTURE" / "assembly_sequence.py"
+_spec = importlib.util.spec_from_file_location("assembly_sequence", _seq_path)
+SEQ = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(SEQ)
 
 
 def box(lo, hi):
@@ -148,7 +154,6 @@ class OrientationTests(unittest.TestCase):
         # A flat square face split with a T-junction stitched by a zero-area
         # sliver (as CGAL sometimes emits): no line may appear across the face.
         tris = list(box((0, 0, 0), (10, 10, 2)))
-        top = [t for t in tris if np.allclose(np.array(t)[:, 2], 2)]
         rest = [t for t in tris if not np.allclose(np.array(t)[:, 2], 2)]
         a, b, c, d = (0, 0, 2), (10, 0, 2), (10, 10, 2), (0, 10, 2)
         mid = (5, 5, 2)  # on the diagonal a-c
@@ -209,6 +214,62 @@ class SheetTests(unittest.TestCase):
         self.assertAlmostEqual(res["holes"][0]["d"], 20, places=3)
         self.assertFalse(res["holes"][0]["drill"])  # Ø20 > 12.7 thick: plasma is fine
         self.assertTrue(buf.getvalue().startswith(b"%PDF"))
+
+
+class RevisionAndBookTests(unittest.TestCase):
+    def test_book_page_numbers(self):
+        # Two index pages, then parts of 1, 2 and 1 sheets: pages 3, 4-5, 6.
+        starts, total = G.book_page_starts(2, [1, 2, 1])
+        self.assertEqual(starts, [3, 4, 6])
+        self.assertEqual(total, 6)
+
+    def test_fingerprint_tracks_what_is_printed(self):
+        mesh, _, _ = normalize(Mesh(washer(R=50, r=10, t=12.7)))
+        opts = {"hidden_lines": False, "thickness": True}
+        base = plan_part(mesh, opts)["fingerprint"]
+        self.assertEqual(base, plan_part(mesh, dict(opts))["fingerprint"])
+        self.assertNotEqual(base, plan_part(mesh, opts, paper="a3")["fingerprint"])
+        self.assertNotEqual(base, plan_part(mesh, dict(opts, views=["front", "iso"]))["fingerprint"])
+        self.assertNotEqual(base, plan_part(mesh, dict(opts, hole_table=False))["fingerprint"])
+        moved, _, _ = normalize(Mesh(washer(R=50, r=12, t=12.7)))
+        self.assertNotEqual(base, plan_part(moved, opts)["fingerprint"])
+
+
+class SequenceCheckTests(unittest.TestCase):
+    PARTS = {
+        "P1": {"name": "Plate", "category": "plate"},
+        "F1": {"name": "Counted nut", "category": "fastener"},
+        "F3": {"name": "Estimated bolt", "category": "fastener"},
+        "J1": {"name": "Jig", "category": "printed"},
+    }
+    QTY = {"P1": 1, "F1": 4, "F3": 154, "J1": 2}
+    EXACT = {"P1", "F1"}  # counted in the model; F3 is a hole-count estimate
+
+    def run_check(self, steps, complete=False):
+        seq = {"complete": complete, "phases": [{"id": "p", "steps": steps}]}
+        return SEQ.check(seq, self.PARTS, self.QTY, self.EXACT)
+
+    def test_counted_hardware_is_enforced_and_estimates_are_not(self):
+        _, _, errors, warnings = self.run_check([
+            {"id": "a", "add": [{"part": "P1", "qty": 1}, {"part": "F1", "qty": 5}, {"part": "F3", "qty": 200}]}])
+        self.assertTrue(any("F1 placed 5" in e for e in errors), errors)
+        self.assertFalse(any("F3" in e for e in errors), errors)
+        self.assertTrue(any("F3 placed 200" in w for w in warnings), warnings)
+
+    def test_unplaced_counted_part_is_reported(self):
+        _, _, errors, warnings = self.run_check([{"id": "a", "add": [{"part": "P1", "qty": 1}]}])
+        self.assertTrue(any("F1" in w for w in warnings), warnings)          # counted: must be placed
+        self.assertFalse(any("F3" in w for w in warnings), warnings)         # estimate: not required
+        _, _, errors, _ = self.run_check([{"id": "a", "add": [{"part": "P1", "qty": 1}]}], complete=True)
+        self.assertTrue(any("F1" in e for e in errors), errors)
+
+    def test_structure_errors(self):
+        _, _, errors, _ = self.run_check([
+            {"id": "a", "after": ["b"], "add": [{"part": "J1", "qty": 1}, {"part": "X9", "qty": 1}]},
+            {"id": "a", "uses": ["nope"]}])
+        text = " | ".join(errors)
+        for needle in ("after: b", "J1 is a jig", "unknown part id X9", "also used by step 1", "uses: nope"):
+            self.assertIn(needle, text)
 
 
 if __name__ == "__main__":

@@ -53,10 +53,25 @@ runs whenever something under `openscad/` or `drawings/` changes, or
    `[skip ci]`.
 
 The output is byte-for-byte reproducible, so the commit contains only the
-drawings whose part really changed. Each changed drawing gets the next
-**revision letter** (A, B, C … skipping I, O, Q, S, X, Z). Its date is the date of
-the commit that changed it. Both are kept in
-[`generated/revisions.json`](generated/revisions.json).
+drawings that really changed. A drawing gets the next **revision letter**
+(A, B, C … skipping I, O, Q, S, X, Z) whenever anything printed on it changes:
+
+* the geometry, views, dimensions, hole table, scale or paper size;
+* the title block (material, quantity, mass, notes …).
+
+The date recorded is the date of the commit that changed it. A change to the
+generator's styling alone does not bump revisions. The letter and date are
+kept in [`generated/revisions.json`](generated/revisions.json).
+
+CI runs the generator with `--strict`. The job fails, after still uploading the
+artifact, when any of these happens:
+
+* the model has a `BOM_PART` marker no manifest part uses (a new part without a
+  drawing);
+* a manifest part's marker is never reached;
+* a quantity disagrees with the model;
+* a DXF export fails;
+* a part fails to render.
 
 Pull requests only get the artifact. Please **don't commit files in
 `generated/` by hand**; CI rewrites them after merge.

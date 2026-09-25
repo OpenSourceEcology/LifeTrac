@@ -58,8 +58,20 @@ jobs:
       - name: Unit tests
         run: python -m unittest discover -s tests -v
 
+      # --strict: an unregistered BOM_PART marker, a quantity mismatch or a
+      # failed DXF export fails the job (exit 2); a part that fails to render
+      # exits 3. Both still write every output, so the artifact is uploaded
+      # and main still gets the drawings that did regenerate; the last step
+      # then turns the job red. A crash (exit 1) commits nothing.
       - name: Generate drawings
-        run: python generate_part_drawings.py
+        id: generate
+        continue-on-error: true
+        run: |
+          set +e
+          python generate_part_drawings.py --strict
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit $code
 
       - name: Check the assembly sequence
         run: python ../../BUILD-STRUCTURE/assembly_sequence.py --check
@@ -81,7 +93,9 @@ jobs:
           retention-days: 90
 
       - name: Commit updated drawings to main
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        if: >-
+          !cancelled() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+          && contains(fromJSON('["0", "2", "3"]'), steps.generate.outputs.code)
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
@@ -96,4 +110,10 @@ jobs:
             sleep $((attempt * 5))
           done
           echo "Could not push the updated drawings; they are in the workflow artifact."
+          exit 1
+
+      - name: Fail if the drawings reported problems
+        if: steps.generate.outcome == 'failure'
+        run: |
+          echo "::error title=Part drawings::generate_part_drawings.py --strict reported warnings or failures - see the job summary (CHECKS.md)."
           exit 1

@@ -43,7 +43,7 @@ module part_a3_front_outer_vertical(show_holes=true) {
     _part_a3_front_outer_vertical(show_holes);
 }
 
-// A4: Frame Tube Mount Angles (16 pcs)
+// A4: Frame Tube Mount Angles (26 pcs: 16 frame tubes, 8 motor plates, 2 front stiffener)
 use <angle_iron_a4_frame_tube_mount.scad>
 module part_a4_frame_tube_mount(show_holes=true) {
     echo(BOM_PART = "A4");  // counted by drawings/generate_part_drawings.py
@@ -57,7 +57,7 @@ module part_a5_arm_crossbeam_mount(show_holes=true) {
     _part_a5_arm_crossbeam_mount(show_holes);
 }
 
-// A6: Bottom Stiffener Horizontal Angles - Split (24 pcs total)
+// A6: Bottom Stiffener Horizontal Angles - Split (30 pcs total: 3 segments x 10 runs)
 use <angle_iron_a6_bottom_horizontal.scad>
 module part_a6_bottom_segment_1(show_holes=true) { echo(BOM_PART = "A6-1"); _part_a6_bottom_segment_1(show_holes); }
 module part_a6_bottom_segment_2(show_holes=true) { echo(BOM_PART = "A6-2"); _part_a6_bottom_segment_2(show_holes); }
@@ -133,21 +133,25 @@ module part_t5_arm_leg_spacer_cut(show_holes=true) { echo(BOM_PART = "T5"); _par
 // INVENTORY SUMMARY
 // =============================================================================
 // Total unique parts: 15
-// Total pieces needed: 71
+// Total pieces needed: 93
+//
+// Authoritative per-machine quantities are counted from the BOM_PART markers
+// when the assembly is evaluated: see drawings/generated/INDEX.md. The A3,
+// A7, A8, A9, T4 and T5 wrappers are not currently called by lifetrac_v25.scad.
 //
 // ANGLE IRON (2"×2"×1/4"):
 //   A1:  2 pcs - Back stiffener outer walls
 //   A2:  4 pcs - Back stiffener inner walls
 //   A3:  6 pcs - Front stiffener outer (4.75")
-//   A4: 16 pcs - Frame tube mounts
+//   A4: 26 pcs - Frame tube mounts (16), motor plates (8), front stiffener (2)
 //   A5:  4 pcs - Arm crossbeam mounts
-//   A6: 24 pcs - Bottom stiffener (3 segments × 8 locations)
+//   A6: 30 pcs - Bottom stiffener (3 segments × 6 runs) + motor plates (3 × 4 runs)
 //   A7:  2 pcs - Platform side arms
 //   A8:  2 pcs - Platform transverse bracing
 //   A9:  2 pcs - Front stiffener center (5.75")
 //   A10: 8 pcs - Front stiffener outer motor plate sides
 //   -----------
-//   Subtotal: 70 angle iron pieces
+//   Subtotal: 86 angle iron pieces
 //
 // RECTANGULAR TUBING (2"×6"×1/4"):
 //   T1:  1 pc  - Front frame cross tube
