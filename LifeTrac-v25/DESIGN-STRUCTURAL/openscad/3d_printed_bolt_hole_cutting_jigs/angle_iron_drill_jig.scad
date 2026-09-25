@@ -1,4 +1,4 @@
-include <../../lifetrac_v25_params.scad>
+include <../lifetrac_v25_params.scad>
 
 module angle_iron_drill_jig() {
     leg = ANGLE_2X2_1_4[0];
