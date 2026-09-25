@@ -5,6 +5,25 @@
 **Scope:** every `.scad` file under [DESIGN-STRUCTURAL/](../../DESIGN-STRUCTURAL/) (57 files, about 13,700 lines), plus the CI workflows and helper scripts that drive them
 **Previous SCAD review:** [2026-04-25_SCAD_Review_ClaudeOpus4_7.md](2026-04-25_SCAD_Review_ClaudeOpus4_7.md). Its links point at the old `mechanical_design/` path; the tree now lives at `DESIGN-STRUCTURAL/openscad/`.
 
+### Status: fixed alongside this review
+
+The body of this review describes the tree as it was on 2026-09-25. The pull request that adds this document also fixes the following mechanical defects. Each fix was verified locally with OpenSCAD 2021.01; the details are in the commit messages.
+
+| Finding | Fix |
+|---|---|
+| B1a: clearance check reported double the distance | `dist_point_line_verify()` now returns `twice_area / base`. The solver prints −125.4 / −160.4 mm, and the difference is exactly the 35 mm `ARM_BALANCE_BIAS`. No other echo line or geometry changed |
+| P1: four export wrappers produced edge slices | The `rotate()` is removed from `export_side_panel_outer/inner`, `export_rear_crossmember` and `export_bucket_side`. They now export 1,392.6 × 1,000, 1,045.4 × 550 and 449.2 × 600 mm outlines |
+| P4: round holes exported as rectangles | The hole cylinders in `bucket_side.scad` and `cylinder_lug.scad` now go through the plate thickness. `cnclayout.svg` is regenerated; only its six lug pivot holes changed |
+| Jig includes (section 5.4) | `angle_iron_drill_jig.scad` and `tube_drill_jig.scad` include `../lifetrac_v25_params.scad` and compile with 0 warnings. Both are still placeholders |
+| `generate-part-svgs.yml` (section 5.5) | Watches and exports `openscad/parts/`, fails if an SVG is missing, and uploads the SVGs as an artifact (`output/` is git-ignored). The same path error is fixed in `README_EXPORTS.md` and `INDIVIDUAL_PARTS_GUIDE.md` |
+| `openscad-structural-analysis.yml` (section 5.5) | Writes the ECHO output to `structural_analysis.log` instead of `/dev/null`, fails if the summary is missing, and extracts the whole summary table |
+| Section 8, step 0 | `DESIGN-STRUCTURAL/README.md` now carries a "not yet ready for fabrication" warning that points here |
+
+**Not changed on purpose:**
+- **`pivot_welding_jig.scad`'s include.** Any change under `3d_printed_welding_jigs/` triggers `generate-jig-previews.yml`, whose push-event commit step has failed on both of its runs on main. The cause is that it `git add`s `renders/*.png` and `*.jpg`, which the root `.gitignore` ignores. Whether jig renders should be committed is a maintainer decision.
+- **The camera maths in the PNG/GIF workflows.** Fixing it would visibly change `assembly.png` and the animation.
+- **Everything that needs a design decision.** That covers wheel choice, DOM length, pivot boss, hole patterns, T5, deletions and the analysis rebuild.
+
 ---
 
 ## 0. How this review was done
@@ -54,14 +73,14 @@ The model is ambitious and, in places, excellent: the parametric arm solver, the
 
 **The fabrication outputs aren't usable yet**:
 
-- **The four 1/2" side panels export as 1,373 × 13 mm strips** (P1). Even a fixed export would be missing every hole the assembly adds (P2).
+- **The four 1/2" side panels export as 1,373 × 13 mm strips** (P1; the export is fixed in this PR). Even a fixed export would be missing every hole the assembly adds (P2).
 - **The arm-pivot hole in those panels has about 4 mm of edge distance** (P3).
 - **The CNC layout has 7 overlapping part pairs and leaves out all the stiffener, motor and pivot-mount plates** (N1, N2).
 - **The angle-iron cut-list parts drill holes that don't line up with the plates they bolt to** (P10, P11).
 - **The arm-leg spacer T5 is an empty solid** (P12).
-- **Three of five jigs fail to load params** (section 5.4).
+- **Three of five jigs fail to load params** (section 5.4; two are fixed in this PR).
 
-**Several CI jobs report green while doing nothing.** The structural-analysis job pipes its output to `/dev/null`. The part-SVG job points at a folder that doesn't exist. The assembly PNG is rendered with a mis-computed camera (section 5.5).
+**Several CI jobs report green while doing nothing.** The structural-analysis job pipes its output to `/dev/null`. The part-SVG job points at a folder that doesn't exist. (Both are fixed in this PR.) The assembly PNG is rendered with a mis-computed camera (section 5.5).
 
 **Of the 34 findings in the April review, none is fully fixed, 2 are partly fixed (#10, #25) and 32 are still open** (section 2). Several of the open ones have grown. The most useful next step is the same as it was then: make `lifetrac_v25_params.scad` (plus a new `derived.scad`) the only source of truth, and make CI fail on warnings, asserts and self-check failures. Also make **the assembly and every export call the same part modules** (C1.6).
 
@@ -116,7 +135,7 @@ Severity key: **Critical** means a wrong number that a fabricator or a buyer wou
 
 ### B1. The solver's self-checks report wrong or failing results, and nothing fails — **Critical**
 
-**B1a. The clearance verification reports double the true distance.** `dist_point_line_verify()` computes the shoelace term, which is already twice the triangle area, then multiplies by 2 again. The true distance is `area/base`:
+**B1a. The clearance verification reports double the true distance.** *(Fixed in this PR; see Status.)* `dist_point_line_verify()` computes the shoelace term, which is already twice the triangle area, then multiplies by 2 again. The true distance is `area/base`:
 
 ```scad
 // lifetrac_v25_params.scad:369-373
@@ -381,7 +400,7 @@ All 38 files under `parts/` evaluate without OpenSCAD warnings. I rendered all 1
 
 ### 5.1 Plate parts and CNC exports
 
-**P1. Four of the ten export wrappers output a thin strip, not the part — Critical.** Each one rotates a plate that already lies flat onto its edge, then takes `projection(cut=true)` at z = 0:
+**P1. Four of the ten export wrappers output a thin strip, not the part — Critical.** *(Fixed in this PR; see Status.)* Each one rotates a plate that already lies flat onto its edge, then takes `projection(cut=true)` at z = 0:
 
 ```scad
 // parts/export_side_panel_outer.scad (same pattern in _inner, _rear_crossmember, _bucket_side)
@@ -419,7 +438,7 @@ These four are the 1/2" side panels, the most important plates on the machine. `
 
 **Fix:** keep a flat "pivot boss" region in the profile around `ARM_PIVOT_Y` with radius ≥ `2 × PIVOT_PIN_DIA`, and `assert` the edge distance.
 
-**P4. Round holes come out as rectangles.** In `cylinder_lug.scad:25` and `bucket_side.scad:26,33` the hole cylinders are rotated into the plane of the plate, so the projection shows 16.7 × 24.1 and about 10 × 13 mm rectangles.
+**P4. Round holes come out as rectangles.** *(Fixed in this PR.)* In `cylinder_lug.scad:25` and `bucket_side.scad:26,33` the hole cylinders are rotated into the plane of the plate, so the projection shows 16.7 × 24.1 and about 10 × 13 mm rectangles.
 
 **P5. Hole-to-edge ligaments of 2.65 mm** on `bucket_bottom.scad` and `bucket_side.scad`: holes 10 mm from the edge ([bucket_bottom.scad:14,23](../../DESIGN-STRUCTURAL/openscad/parts/bucket_bottom.scad#L14-L23)). Note that the assembly and cnclayout don't use these bolt-hole bucket plates at all; they use the tab-and-slot plates drawn inline in main.
 
@@ -522,8 +541,8 @@ The causes:
 
 | Jig | State |
 |---|---|
-| `3d_printed_bolt_hole_cutting_jigs/angle_iron_drill_jig.scad` | **Broken include** (`../../lifetrac_v25_params.scad`; should be `../`). Even fixed, it is a placeholder: a 100 mm L-sleeve with one 5 mm pilot hole per leg that matches no real hole pattern (A4 needs 2 holes per leg at 4" and 2") |
-| `3d_printed_bolt_hole_cutting_jigs/tube_drill_jig.scad` | **Broken include.** Its hole cylinders run *along* the tube axis inside the cavity, so no holes are cut (the intersection with the shell is empty). The inner loop variable is unused, so each hole is drawn twice. Hard-coded 100/80 spacing matches nothing. Superseded by `3d_printed_welding_jigs/tube_drilling_jig.scad`; delete it |
+| `3d_printed_bolt_hole_cutting_jigs/angle_iron_drill_jig.scad` | **Broken include** (`../../lifetrac_v25_params.scad`; should be `../`; fixed in this PR). Even fixed, it is a placeholder: a 100 mm L-sleeve with one 5 mm pilot hole per leg that matches no real hole pattern (A4 needs 2 holes per leg at 4" and 2") |
+| `3d_printed_bolt_hole_cutting_jigs/tube_drill_jig.scad` | **Broken include** (fixed in this PR). Its hole cylinders run *along* the tube axis inside the cavity, so no holes are cut (the intersection with the shell is empty). The inner loop variable is unused, so each hole is drawn twice. Hard-coded 100/80 spacing matches nothing. Superseded by `3d_printed_welding_jigs/tube_drilling_jig.scad`; delete it |
 | `3d_printed_welding_jigs/pivot_welding_jig.scad` | **Broken include.** The DOM cutout lies inside the lightening cutout, so it cuts nothing. The plate gap is 50.8 mm but should be 38.1 mm (50.8 − 2 × 6.35). Contains "Add alignment tabs?". Placeholder |
 | `3d_printed_welding_jigs/pivot_mount_welding_jig.scad` | Compiles cleanly but can't be used as drawn: the 6" plates pass through the jig base (DOM centre at z = 48.4 mm, plate bottom at −27.8); the rings sit at the base height, not the DOM height; both rings get the same rotation, so the left one intersects its plate; it uses **6 bolts at 60°** where the part uses **5 bolts at non-uniform angles**; several unused parameters (`JIG_FINGER_*`, `DOM_CRADLE_ANGLE`) |
 | `3d_printed_welding_jigs/tube_drilling_jig.scad` | Hole pattern correct (matches the A4 tube leg). The body is off-centre (walls 10.2 / 14.2 mm) because the `minkowski` cube starts at 0. The engraved marks and text are buried or float over the slot, so none are visible. It redefines `JIG_CLEARANCE` (overriding params) and duplicates `JIG_WALL_THICKNESS` |
@@ -536,12 +555,12 @@ The jig README says all jigs "fall back to defaults" (the three broken ones don'
 
 | Workflow or script | Problem | Evidence |
 |---|---|---|
-| `openscad-structural-analysis.yml` | **Captures nothing.** `openscad -o /dev/null --export-format echo` writes the ECHO lines into `/dev/null` (locally: 0 lines captured). So every run records "No structural analysis summary found". The committed [STRUCTURAL_ANALYSIS_LOG.md](../../DESIGN-STRUCTURAL/STRUCTURAL_ANALYSIS_LOG.md) (commit `c409fa0`, 2026-09-14) says exactly that. The PR comment says ✅ unconditionally, and the job never fails on the model's `FAIL` results. **Fix:** `openscad -o structural_analysis.echo …` and parse that file | local run and committed log |
+| `openscad-structural-analysis.yml` | **Captures nothing** (fixed in this PR). `openscad -o /dev/null --export-format echo` writes the ECHO lines into `/dev/null` (locally: 0 lines captured). So every run records "No structural analysis summary found". The committed [STRUCTURAL_ANALYSIS_LOG.md](../../DESIGN-STRUCTURAL/STRUCTURAL_ANALYSIS_LOG.md) (commit `c409fa0`, 2026-09-14) says exactly that. The PR comment says ✅ unconditionally, and the job never fails on the model's `FAIL` results. **Fix:** `openscad -o structural_analysis.echo …` and parse that file | local run and committed log |
 | `generate-assembly-png.yml`, `generate-animation-gif.yml` | **Wrong camera.** The value extraction has no `head -1`, so `GROUND_CLEARANCE` comes out as `"150\n150"` (the trailing comment "150mm" also matches). The `$((…))` maths then errors, and the step carries on with empty values. The 2026-09-14 main-branch run rendered with `CAMERA_DISTANCE 4540`, `CENTER_Z 917`, instead of about 7,262 / 1,467. `ARM_MAX_ANGLE` isn't in the main file and silently defaults to 60 | job log of run 34865875850 |
-| `generate-part-svgs.yml` | **Wrong paths.** It watches and exports `DESIGN-STRUCTURAL/parts/…`, which doesn't exist (should be `openscad/parts/`). Failures are swallowed (`grep -v WARNING \|\| true`), so the job passes with no output. The outputs are git-ignored, so the README links point at files that are never committed. Even with fixed paths, 4 of the 8 outputs are the strips from P1 | |
+| `generate-part-svgs.yml` | **Wrong paths** (fixed in this PR, along with the missing-output check and an artifact upload). It watches and exports `DESIGN-STRUCTURAL/parts/…`, which doesn't exist (should be `openscad/parts/`). Failures are swallowed (`grep -v WARNING \|\| true`), so the job passes with no output. The outputs are git-ignored, so the README links point at files that are never committed. Even with fixed paths, 4 of the 8 outputs are the strips from P1 | |
 | `openscad-render.yml` | Greps `ARM_MAX_ANGLE` and `LIFT_CYLINDER_BORE` from `lifetrac_v25.scad`, where they don't exist (they are in params). So the README spec table is **never updated** (the script exits 0 on the missing value). The module-render step looks in `DESIGN-STRUCTURAL/modules` (doesn't exist) yet reports "5 modules". The quoted heredoc prints a literal `$(date)`. `ARM_LENGTH_APPROX=1600` and a 1,200 kg capacity are hard-coded | |
 | `generate-cnclayout-svg.yml` | `grep -v WARNING \|\| true`. The `-f cnclayout.svg` check always passes because the file is committed. The path-count check only warns. The triggers omit `lifetrac_v25.scad`, which supplies the bucket plates | |
-| `generate-jig-previews.yml` | Only covers the welding-jig folder. `\|\| echo "Warning…"` swallows failures (the broken `pivot_welding_jig` renders an almost blank image and exits 0). No `permissions:` block although it pushes | |
+| `generate-jig-previews.yml` | Only covers the welding-jig folder. `\|\| echo "Warning…"` swallows failures (the broken `pivot_welding_jig` renders an almost blank image and exits 0). **Its push-event "Commit and push renders" step has failed on both runs on main** (2026-02-03 and 2026-04-26): it `git add`s `renders/*.png` and `renders/*.jpg`, which the root `.gitignore` ignores (`*.png`, `*.jpg`), so `git add` exits non-zero. As a result the jig README's preview images are never committed | run 24945972952 job steps |
 | `openscad-collision-check.yml` | **Working.** The `COLLISION_*` echo interface and the `-D` pose overrides are present and behave as documented | |
 | `export_individual_svgs.sh` | Masks failures. Claims 4 outer and 4 inner side panels (the assembly has 2 of each). Runs the four broken wrappers | |
 | `verify_design.py` | Hard-coded Windows path; fails on Linux | |
