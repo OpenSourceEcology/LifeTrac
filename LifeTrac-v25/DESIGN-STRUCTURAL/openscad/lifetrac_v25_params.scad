@@ -366,11 +366,13 @@ _clearance_E = _dist_EC - _R_constraint;
 echo("DEBUG: Clearance at Elbow:", _clearance_E);
 
 // Calculate Exact Clearance to Main Arm (Segment P-E) and Drop Arm (Segment E-T)
-function dist_point_line_verify(pt, v1, v2) = 
+// The shoelace term is already twice the triangle area, so dividing it by the
+// base gives the perpendicular distance directly (no extra factor of 2).
+function dist_point_line_verify(pt, v1, v2) =
     let(
-        area = abs(v1[0]*(v2[1]-pt[1]) + v2[0]*(pt[1]-v1[1]) + pt[0]*(v1[1]-v2[1])),
+        twice_area = abs(v1[0]*(v2[1]-pt[1]) + v2[0]*(pt[1]-v1[1]) + pt[0]*(v1[1]-v2[1])),
         base = norm(v1 - v2)
-    ) (base == 0) ? norm(pt - v1) : (area / base * 2);
+    ) (base == 0) ? norm(pt - v1) : (twice_area / base);
 
 _clr_main_geometric = dist_point_line_verify(_C, _P, _E_solved) - _R_wheel - _tube_offset;
 _clr_drop_geometric = dist_point_line_verify(_C, _E_solved, _T) - _R_wheel - _tube_offset; // Use _T, not _T_solved (undefined)
