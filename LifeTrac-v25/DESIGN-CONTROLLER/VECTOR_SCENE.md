@@ -395,28 +395,30 @@ byte1 bit2 ..       records, MSB-first bitstream; records never cross frames
 
 ### 3.3 Records: canonical prefix code (Kraft sum exactly 1)
 
+**Field conventions.** Bits are MSB-first (§3.2). Every signed fixed-width field (`dx4`/`dy4`, `dx8`/`dy7`, `ang6`, `curv4`, `dy5`, `dang4`, `dl3`, `dl4`) is two's complement. Count fields are offset: `n3` = vertices − 3, `k2` = segments − 1, `cnt4` = count − 1, and every `(v+1)·unit` field is the code plus one. `grid1` selects the define's grid: 0 = 8 px (48 × 32 cells, `v0` 11 bits), 1 = 4 px (96 × 64 cells, `v0` 13 bits). A record's layer is its id range (§2.2, §3.4): masses 1–31, plants 32–55, edges 56–79, corridor 80–87, L4 88–127; within L2, L3 and L4 shapes are painted in ascending id order (L1 is area-descending, §2.2). A POLY ring is closed (the last vertex joins `v0`) and filled with the non-zero winding rule; INSERT and HOLE apply to POLY only (EDGE polylines are re-sent whole).
+
 | Prefix | Record | Fields (bits) | Size |
 |---|---|---|---|
 | `00` | **UPD** | id7 (≠ 0), dx4, dy4: 4 px units, signed −8..+7, so **−32..+28 px**, cumulative offset from the define anchor | 17 |
 | `010` | **POLY** define | id7, grid1, n3 (3..10 vertices), v0, (n−1) × EG2 zigzag (dx, dy) in grid cells, FILL | Gradient triangle 69; flat RGB triangle 63; palette triangle 55; flat quad about 75 (est.) |
-| `011` | **TREE / SHRUB** | id7, centre 11 (8 px grid, x6 y5), rx3, ry3 ((v+1)·4 px), FILL, trunk1 [+ h3 × 8 px; only if fx > 300] | 34–48 by FILL (42 with a flat RGB fill); +3 with a trunk |
-| `100` | **EDGE** | id7, cls3, v0 13 (4 px grid), k2 (1..4 segments), k × EG2 (dx, dy) | 1 segment 40; 3 segments 64 (est.) |
+| `011` | **TREE / SHRUB** | id7, centre 11 (8 px grid, x6 y5), rx3, ry3 ((v+1)·4 px, axis-aligned ellipse), FILL, trunk1 (1 ⇒ an `h3` field follows: a 4 px wide vertical bar of height (h3+1)·8 px below the ellipse, painted in palette slot 6; the encoder sets it only with a narrow lens, fx > 300 px, §2.6) | 34–48 by FILL (42 with a flat RGB fill); +3 with a trunk |
+| `100` | **EDGE** | id7, cls3 (§2.7 table; 5–7 reject), v0 13 (4 px grid), k2 (segments − 1, so 1..4), k × EG2 (dx, dy) each from the previous vertex; an open polyline | 1 segment 40; 3 segments 64 (est.) |
 | `1010` | **HZN** | mode2; see the HZN modes below | 15–57 |
 | `1011` | **DEL** | id7 | 11 |
 | `1100` | **UCOL** | id7, FILL | 17–31 |
-| `1101` | **GSHIFT** | grp2 (far / ground / all / L4), dx8, dy7: 2 px, **cumulative since epoch start**, ±256 / ±128 px | 21 |
-| `11100` | **STATUS** | arm_src2, arm7 (1°, −30..+97°), bkt_src2, bkt7 (1.5° relative), conf2, corr_n3 (corridor anomalies detected, 7 = ≥ 7, *even if not yet sent*), mask_anom1, moving1 | 30 |
-| `11101` | **ANOM** | slot3 (id 80+slot), x6 y5 (8 px), w3 h3 ((v+1)·8 px), RGB444 12. A box define that a later POLY with the same id may refine. | 37 |
-| `11110` | **BLOB** (L4) | id7, centre 13, rx3, ry3, rot3 (22.5°), FILL | 40–54 |
-| `111110` | **SKYLINE** | n2 (8 / 12 / 16 / 24 samples), sc2 (height unit ×4 / ×8 / ×16 / ×32 px), n × 3-bit heights above the horizon, FILL | 8 samples 48; 12 samples 60; 16 samples 72; 24 samples 96 |
+| `1101` | **GSHIFT** | grp2 (0 far, 1 ground, 2 all, 3 L4), dx8, dy7: 2 px, **cumulative since epoch start**, −256..+254 / −128..+126 px. Membership is fixed at define time: L4 ids are group 3; every other shape is *ground* if its `v0` lies below the epoch's horizon line, else *far*; a shape's effective shift is S_all + S_group | 21 |
+| `11100` | **STATUS** | arm_src2 and bkt_src2 (0 = none/S4, 1 = static/S0, 2 = sensed/S1, 3 = estimated/S2–S3, §5.3), arm7 (angle = code − 30°, so −30..+97°), bkt7 (bucket relative to the arm, (code − 64)·1.5°, so −96..+94.5°), conf2 (0 = unbounded, the S3 band; 1 low; 2 medium; 3 high), corr_n3 (corridor anomalies detected, 7 = ≥ 7, *even if not yet sent*), mask_anom1, moving1 (1 = true) | 30 |
+| `11101` | **ANOM** | slot3 (id 80+slot), x6 y5 (top-left corner, 8 px grid), w3 h3 ((v+1)·8 px), RGB444 12. A box define that a later POLY with the same id may refine. | 37 |
+| `11110` | **BLOB** (L4) | id7, centre 13 (4 px grid, x7 y6), rx3, ry3 ((v+1)·4 px), rot3 (rotation of the rx axis, 0..157.5° in 22.5° steps), FILL | 40–54 |
+| `111110` | **SKYLINE** | n2 (8 / 12 / 16 / 24 samples), sc2 (height unit ×4 / ×8 / ×16 / ×32 px), n × 3-bit heights h_i = code·unit above the horizon line at x_i = (i + 0.5)·384/n, joined by straight segments; FILL for the band between the horizon and the profile. A singleton of L0: a new SKYLINE replaces the old one, and it is never CONFIRMed | 8 samples 48; 12 samples 60; 16 samples 72; 24 samples 96 |
 | `111111` | **EXT** + sub4 | See the EXT subtypes below | 12–69 |
 
 **HZN modes**
 
 | Mode | Fields | Size |
 |---|---|---|
-| 00 ABS | y8 (2 px, y = 2v − 128 at x = 192, so −128..+382 px, which covers a horizon above or below the frame), ang6 (0.5°, ±16°), curv4 (signed sag at the frame edge, 4 px steps, −32..+28 px; 0 after calibration), SKY vfill, GND vfill | 42–58 |
-| 01 RESID | dy5 (2 px), dang4 (0.5°). **Relative to the current epoch's ABS** (Phase 3: to the IMU prediction for that capture), never to a previous RESID; not sent while the epoch's anchor is NO_HORIZON | 15 |
+| 00 ABS | y8 (2 px, y = 2v − 128 at x = 192, so −128..+382 px, which covers a horizon above or below the frame), ang6 (0.5° steps, −16..+15.5°), curv4 (signed sag at the frame edge, 4 px steps, −32..+28 px; 0 after calibration), SKY vfill, GND vfill | 42–58 |
+| 01 RESID | dy5 (2 px, −32..+30 px), dang4 (0.5°, −4..+3.5°). **Relative to the current epoch's ABS** (Phase 3: to the IMU prediction for that capture), never to a previous RESID; not sent while the epoch's anchor is NO_HORIZON | 15 |
 | 10 COLOURS | 2 × vfill | 24–40 |
 | 11 NO_HORIZON | top and bottom vfill. An absolute anchor like ABS: it starts an epoch and completes a hand-over (§4.3) | 24–40 |
 
@@ -424,8 +426,8 @@ byte1 bit2 ..       records, MSB-first bitstream; records never cross frames
 
 | Sub | Record | Fields | Size |
 |---|---|---|---|
-| 0 | INSERT | id7, edge4 (define edge 0..n−1), k2 (order within that edge), EG2 (dx, dy) from **the define-edge midpoint** in the define's grid | 29–35, typically 31 (est.) |
-| 1 | CONFIRM | base_id7, cnt4 (= count − 1, so 1..16), mask[cnt], then tag2 for each set bit | 21 + cnt + 2·set; 69 for 16 of 16 |
+| 0 | INSERT | id7 (a POLY), edge4 (define edge 0..n−1; edge e runs from define vertex e to e+1 mod n), k2 (order within that edge), EG2 (dx, dy) from **the define-edge midpoint** in the define's grid | 29–35, typically 31 (est.) |
+| 1 | CONFIRM | base_id7, cnt4 (= count − 1, so 1..16), mask[cnt] (bit i ↔ id base_id + i, first bit first), then tag2 for each set bit in that order | 21 + cnt + 2·set; 69 for 16 of 16 |
 | 2 | DIGEST | n_live7, crc8 over the live shapes sorted by id ascending, each serialised as `id u8, define-hash u16le, state-hash u16le`, followed by the epoch's render state — the four GSHIFT groups in grp2 order (far, ground, all, L4) as `dx s8, dy s8` (the record's 2 px codes), the GZOOM code `u8`, then the three GAIN codes `u8` — where state-hash is CRC-16/CCITT-FALSE over the shape's full live state: `local offset dx s8, dy s8 (grid cells), base colour RGB444 u16le, n_inserts u8, the INSERT records' packed bytes in canonical (edge, k) order, then the four HOLE slots as (present u8, centre u16le, r u8)`. The input is canonical (arrival order never matters) and complete (a lost GSHIFT, GZOOM or GAIN mismatches it), so a stale state changes the DIGEST input with probability 1 − 2⁻¹⁶ and the aggregate CRC-8 bounds a false pass at 1/256. CRC-8 is poly 0x07, init 0x00, no reflection, xorout 0x00 (check value of "123456789" = 0xF4); golden vector: one shape with define-hash 0x1234 and state-hash 0x5678 and a neutral render state (no shifts, GZOOM 0x80, GAIN 0x10 × 3), `2A 34 12 78 56 00 00 00 00 00 00 00 00 80 10 10 10` → 0xD2. define-hash is CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF, no reflection) over the define record's packed bytes, prefix code through FILL, zero-padded to a byte | 25 |
 | 3 | LAYER_CLEAR | range2: 0 = L1–L4, 1 = L2–L4, 2 = L3–L4, 3 = L4 only (M and L0 are never cleared). It is idempotent per (epoch, range): the store remembers the last pair it applied and ignores a repeat of it, so the repeat-once of §3.1 re-sends the anchor and the clear without erasing what the first epoch frame already defined; a *different* range in the same epoch empties those layers of the current epoch at once. In an epoch-start frame it names the layers the new epoch rebuilds from scratch: at hand-over (§4.3) the previous epoch's cached shapes in those layers are dropped and shapes in the other layers are carried into the new epoch with their IDs and ages until redefined or TTL'd — a camera change, ID exhaustion or entering VECTOR sends 0; the 60 s safety refresh of a static scene sends 2 or 3 and re-anchors without re-sending the masses | 12 |
 | 4 | CAL_REV | cal16, mask16 (low 16 bits of the SHA-256 hashes) | 42 |
@@ -450,9 +452,9 @@ byte1 bit2 ..       records, MSB-first bitstream; records never cross frames
   - Slots 0–7 are a static farm palette pinned in the codec as RGB444: 0 sky `0x6BE`, 1 overcast `0xBBC`, 2 dark foliage `0x252`, 3 light foliage `0x693`, 4 straw `0xDB6`, 5 soil `0x753`, 6 shadow `0x223`, 7 white `0xFFF` (a golden vector renders all eight).
   - Slots 8–15 are set adaptively by PAL.
   - Use `m = 0` only if the slot is within ΔE76 ≤ 4 of the measured mean.
-- **Gradient.** The renderer sets c0/c1 = mean ∓ dl/2 in luma, along `dir` through the centroid, spanning the shape's projected extent. Colours are multiplied by the epoch GAIN.
+- **Gradient.** The renderer sets the endpoint colours to base ± ΔL (the `dl3` rule above) along `dir` through the centroid, spanning the shape's projected extent. Colours are multiplied by the epoch GAIN.
 
-**Vertex coding: EG2 zigzag per axis**
+**Vertex coding: EG2 zigzag per axis.** Each delta d (grid cells) is zigzag-mapped to v = 2d for d ≥ 0 and v = −2d − 1 for d < 0, then written as order-2 Exp-Golomb: with w = v + 4, emit ⌊log₂ w⌋ − 2 zero bits followed by w in binary. The encoder never emits more than four leading zeros (v ≤ 123); a decoder that reads five rejects the frame (§3.4).
 
 | Zigzag value | Bits |
 |---|---|
@@ -491,7 +493,7 @@ byte1 bit2 ..       records, MSB-first bitstream; records never cross frames
 
    The fragment has already passed the L072's payload CRC and the reassembler, so a parse error means version skew or a bug. Rejecting the whole frame keeps the store deterministic.
 4. UPD, UCOL, INSERT, DEL, CONFIRM or HOLE naming an unknown id is an *orphan*: ignore it and count it.
-5. **Per-field last writer wins by capture time.** Each shape has three fields, each with its own capture time:
+5. **Per-field last writer wins by capture time.** Each shape has five fields, each with its own capture time:
 
    | Field | Set by |
    |---|---|
