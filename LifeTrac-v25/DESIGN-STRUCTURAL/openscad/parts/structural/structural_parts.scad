@@ -25,61 +25,70 @@ include <../../lifetrac_v25_params.scad>
 // A1: Back Stiffener - Outer Wall Vertical (2 pcs)
 use <angle_iron_a1_back_outer_vertical.scad>
 module part_a1_back_outer_vertical(show_holes=true) {
+    echo(BOM_PART = "A1");  // counted by drawings/generate_part_drawings.py
     _part_a1_back_outer_vertical(show_holes);
 }
 
 // A2: Back Stiffener - Inner Wall Vertical (4 pcs)
 use <angle_iron_a2_back_inner_vertical.scad>
 module part_a2_back_inner_vertical(show_holes=true) {
+    echo(BOM_PART = "A2");  // counted by drawings/generate_part_drawings.py
     _part_a2_back_inner_vertical(show_holes);
 }
 
 // A3: Front Stiffener - Outer Section Vertical (6 pcs)
 use <angle_iron_a3_front_outer_vertical.scad>
 module part_a3_front_outer_vertical(show_holes=true) {
+    echo(BOM_PART = "A3");  // counted by drawings/generate_part_drawings.py
     _part_a3_front_outer_vertical(show_holes);
 }
 
 // A4: Frame Tube Mount Angles (16 pcs)
 use <angle_iron_a4_frame_tube_mount.scad>
 module part_a4_frame_tube_mount(show_holes=true) {
+    echo(BOM_PART = "A4");  // counted by drawings/generate_part_drawings.py
     _part_a4_frame_tube_mount(show_holes);
 }
 
 // A5: Arm Crossbeam Mount Angles (4 pcs)
 use <angle_iron_a5_arm_crossbeam_mount.scad>
 module part_a5_arm_crossbeam_mount(show_holes=true) {
+    echo(BOM_PART = "A5");  // counted by drawings/generate_part_drawings.py
     _part_a5_arm_crossbeam_mount(show_holes);
 }
 
 // A6: Bottom Stiffener Horizontal Angles - Split (24 pcs total)
 use <angle_iron_a6_bottom_horizontal.scad>
-module part_a6_bottom_segment_1(show_holes=true) { _part_a6_bottom_segment_1(show_holes); }
-module part_a6_bottom_segment_2(show_holes=true) { _part_a6_bottom_segment_2(show_holes); }
-module part_a6_bottom_segment_3(show_holes=true) { _part_a6_bottom_segment_3(show_holes); }
-module part_a6_split_horizontal_angle_iron(show_holes=true) { _part_a6_split_horizontal_angle_iron(show_holes); }
+module part_a6_bottom_segment_1(show_holes=true) { echo(BOM_PART = "A6-1"); _part_a6_bottom_segment_1(show_holes); }
+module part_a6_bottom_segment_2(show_holes=true) { echo(BOM_PART = "A6-2"); _part_a6_bottom_segment_2(show_holes); }
+module part_a6_bottom_segment_3(show_holes=true) { echo(BOM_PART = "A6-3"); _part_a6_bottom_segment_3(show_holes); }
+module part_a6_split_horizontal_angle_iron(show_holes=true) { echo(BOM_PART = "A6-1"); echo(BOM_PART = "A6-2"); echo(BOM_PART = "A6-3"); _part_a6_split_horizontal_angle_iron(show_holes); }
 
 // A7: Platform Side Angle Irons (2 pcs)
 use <angle_iron_a7_platform_side.scad>
 module part_a7_platform_side_angle(show_holes=true) {
+    echo(BOM_PART = "A7");  // counted by drawings/generate_part_drawings.py
     _part_a7_platform_side_angle(show_holes);
 }
 
 // A8: Platform Transverse Angle Irons (2 pcs)
 use <angle_iron_a8_platform_transverse.scad>
 module part_a8_platform_transverse_angle(show_holes=true) {
+    echo(BOM_PART = "A8");  // counted by drawings/generate_part_drawings.py
     _part_a8_platform_transverse_angle(show_holes);
 }
 
 // A9: Front Stiffener Center Section Angles (2 pcs)
 use <angle_iron_a9_front_center.scad>
 module part_a9_front_center_angle(show_holes=true) {
+    echo(BOM_PART = "A9");  // counted by drawings/generate_part_drawings.py
     _part_a9_front_center_angle(show_holes);
 }
 
 // A10: Front Stiffener Outer Section Angles (8 pcs)
 use <angle_iron_a10_front_outer.scad>
 module part_a10_front_outer_angle(show_holes=true) {
+    echo(BOM_PART = "A10");  // counted by drawings/generate_part_drawings.py
     _part_a10_front_outer_angle(show_holes);
 }
 
@@ -90,31 +99,35 @@ module part_a10_front_outer_angle(show_holes=true) {
 // T1: Front Cross Frame Tube (1 pc)
 use <tube_t1_front_frame.scad>
 module part_t1_front_frame_tube(show_cutaway=false, show_holes=true) {
+    echo(BOM_PART = "T1");  // counted by drawings/generate_part_drawings.py
     _part_t1_front_frame_tube(show_cutaway, show_holes);
 }
 
 // T2: Rear Cross Frame Tube (1 pc)
 use <tube_t2_rear_frame.scad>
 module part_t2_rear_frame_tube(show_cutaway=false, show_holes=true) {
+    echo(BOM_PART = "T2");  // counted by drawings/generate_part_drawings.py
     _part_t2_rear_frame_tube(show_cutaway, show_holes);
 }
 
 // T3: Arm Crossbeam Tube (1 pc)
 use <tube_t3_arm_crossbeam.scad>
 module part_t3_arm_crossbeam(show_holes=true) {
+    echo(BOM_PART = "T3");  // counted by drawings/generate_part_drawings.py
     _part_t3_arm_crossbeam(show_holes);
 }
 
 // T4: Main Arm Tubes (2 pcs)
 use <tube_t4_arm_main.scad>
 module part_t4_arm_main(show_holes=true) {
+    echo(BOM_PART = "T4");  // counted by drawings/generate_part_drawings.py
     _part_t4_arm_main(show_holes);
 }
 
 // T5: Arm Leg Spacer Tubes (2 pcs)
 use <tube_t5_arm_leg_spacer.scad>
-module part_t5_arm_leg_spacer_raw() { _part_t5_arm_leg_spacer_raw(); }
-module part_t5_arm_leg_spacer_cut(show_holes=true) { _part_t5_arm_leg_spacer_cut(show_holes); }
+module part_t5_arm_leg_spacer_raw() { echo(BOM_PART = "T5"); _part_t5_arm_leg_spacer_raw(); }
+module part_t5_arm_leg_spacer_cut(show_holes=true) { echo(BOM_PART = "T5"); _part_t5_arm_leg_spacer_cut(show_holes); }
 
 // =============================================================================
 // INVENTORY SUMMARY

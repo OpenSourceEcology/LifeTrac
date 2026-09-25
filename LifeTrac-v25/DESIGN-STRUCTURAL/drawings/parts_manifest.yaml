@@ -1,0 +1,737 @@
+# LifeTrac v25 - part drawing manifest
+# =============================================================================
+# One entry per UNIQUE part.  generate_part_drawings.py renders each entry with
+# OpenSCAD and draws a PDF sheet for it.  See README.md for the full field list.
+#
+#   id        part number printed on the drawing and used in assembly steps
+#   name      title on the drawing
+#   category  plate | angle | tube | bar | lug | ring | printed | fastener
+#   source    .scad file (relative to DESIGN-STRUCTURAL/) that defines the part
+#   call      OpenSCAD statement that draws exactly ONE part (the file is
+#             `use`d, so only its modules are visible; the params file is
+#             `include`d, so parameters such as PLATE_1_2_INCH can be used)
+#   clip_box  [[x0,y0,z0],[x1,y1,z1]] keep only this box of the call's output
+#             (for modules that draw a part together with its neighbours)
+#   count     BOM_PART marker key(s) counted in the assembly -> QTY PER MACHINE
+#   qty       hand-entered quantity; used when there is no marker, otherwise
+#             only cross-checked against the model count (see generated/CHECKS.md)
+#   rotate    [[axis, degrees], ...] turn the part after auto-orientation
+#   options   per-part drawing options (see categories below)
+# =============================================================================
+
+project: LIFETRAC v25 - OPEN SOURCE ECOLOGY
+assembly: openscad/lifetrac_v25.scad        # evaluated to count BOM_PART markers
+params: openscad/lifetrac_v25_params.scad   # included in every wrapper
+
+# BOM_PART markers that are modelled but intentionally have no drawing.  Listed
+# in generated/CHECKS.md; anything else unregistered is reported as a warning.
+ignore_markers:
+  "NUT 22.86": Hydraulic cylinder base-pin nuts - hardware supplied with the cylinders (modelled size is not a standard nut)
+  "NUT 18.288": Hydraulic cylinder rod-pin nuts - hardware supplied with the cylinders (modelled size is not a standard nut)
+
+defaults:
+  notes:
+    - DIMENSIONS IN MILLIMETRES [INCHES]. DO NOT SCALE DRAWING.
+    - GENERATED FROM THE OPENSCAD MODEL. IF THIS SHEET AND THE MODEL DISAGREE, THE MODEL GOVERNS. THE GEOMETRY ID IDENTIFIES THE MODEL VERSION.
+
+categories:
+  plate:
+    label: CNC-cut plate
+    process: CNC PLASMA CUT
+    finish: REMOVE DROSS, DEBURR; PRIME + PAINT
+    density: 7.85
+    options: {hidden_lines: false, thickness: true, dxf: true, views: [front, top, iso]}
+    notes:
+      - "CUT THE PROFILE FROM generated/dxf/{dxf} AT 1:1. THIS SHEET IS FOR INSPECTION AND HOLE CHECKING."
+      - "TOLERANCES: PROFILE AND HOLE POSITION ±0.8 [±.03]; HOLE Ø +0.5/-0 [+.02/-0]."
+      - "HOLES MARKED DRILL* ARE SMALLER THAN THE PLATE THICKNESS: PLASMA-MARK THE CENTRE ONLY, THEN DRILL TO SIZE."
+      - EDGES SQUARE UNLESS NOTED. BREAK SHARP EDGES. MARK THE PART NUMBER ON EACH PIECE.
+  angle:
+    label: Angle iron (cut and drill)
+    process: SAW CUT + DRILL
+    finish: DEBURR; PRIME + PAINT
+    density: 7.85
+    options: {hidden_lines: true, running_dims: true}
+    notes:
+      - "SQUARE CUT BOTH ENDS. CUT LENGTH ±1.5 [±1/16]."
+      - "HOLE POSITION ±0.8 [±1/32]. RUNNING DIMENSIONS ARE MEASURED FROM THE LEFT END (0) AS DRAWN."
+      - DEBURR HOLES AND CUT ENDS. MARK THE PART NUMBER ON EACH PIECE WITH A PAINT PEN.
+  tube:
+    label: Rectangular / square tube (cut and drill)
+    process: SAW CUT + DRILL
+    finish: DEBURR; PRIME + PAINT
+    density: 7.85
+    options: {hidden_lines: true, running_dims: true}
+    notes:
+      - "SQUARE CUT BOTH ENDS UNLESS SHOWN. CUT LENGTH ±1.5 [±1/16]."
+      - "HOLE POSITION ±0.8 [±1/32]. RUNNING DIMENSIONS ARE MEASURED FROM THE LEFT END (0) AS DRAWN."
+      - "'THRU 2X WALLS' = DRILL THROUGH BOTH WALLS ON ONE AXIS (DRILL PRESS OR JIG)."
+      - DEBURR HOLES AND CUT ENDS. MARK THE PART NUMBER ON EACH PIECE WITH A PAINT PEN.
+  bar:
+    label: Round bar and pins (cut and drill)
+    process: SAW CUT + DRILL (LATHE FACE IF AVAILABLE)
+    finish: DEBURR; GREASE AT ASSEMBLY
+    density: 7.85
+    options: {hidden_lines: true, running_dims: true, views: [front, top, right, iso]}
+    notes:
+      - "CUT LENGTH ±0.8 [±1/32]. FACE BOTH ENDS SQUARE, BREAK EDGES."
+      - CROSS HOLES SQUARE TO THE AXIS AND THROUGH THE CENTRE LINE.
+  lug:
+    label: Lugs and brackets cut from tube
+    process: SAW CUT + TORCH/PLASMA TRIM + DRILL
+    finish: DEBURR; PRIME + PAINT
+    density: 7.85
+    options: {hidden_lines: true}
+    notes:
+      - "OVERALL SIZE ±1.5 [±1/16]. PIVOT HOLE POSITION ±0.5 [±.02]; DRILL PIVOT HOLES THROUGH BOTH WALLS IN ONE PASS."
+      - DEBURR ALL EDGES. MARK THE PART NUMBER ON EACH PIECE.
+  ring:
+    label: Rings and bosses (CNC-cut plate)
+    process: CNC PLASMA CUT, BORE DRILLED/REAMED
+    finish: REMOVE DROSS, DEBURR
+    density: 7.85
+    options: {hidden_lines: false, thickness: true, dxf: true}
+    notes:
+      - "CUT THE PROFILE FROM generated/dxf/{dxf} AT 1:1 WITH THE BORE UNDERSIZE, THEN DRILL/REAM THE BORE TO THE SIZE SHOWN."
+      - "OD ±0.8 [±.03]. BORE Ø +0.2/-0 [+.008/-0]."
+  printed:
+    label: 3D-printed jigs
+    process: FFF 3D PRINT
+    finish: AS PRINTED
+    density: 1.24
+    options: {hidden_lines: true, views: [front, top, right, iso]}
+    notes:
+      - "PRINT FROM THE SOURCE .SCAD (EXPORT STL). PLA OR PETG, 0.2 LAYER, 3+ PERIMETERS, 20-30% INFILL, SUPPORTS AS NEEDED."
+      - "TOLERANCE ±0.3 [±.012]. FIT-CRITICAL FEATURES: TEST-FIT ON THE REAL STOCK AND SCALE THE MODEL IF NEEDED."
+  fastener:
+    label: Purchased hardware (reference)
+    process: PURCHASED - DO NOT FABRICATE
+    finish: ZINC PLATED
+    density: 7.85
+    options: {hidden_lines: true, hole_table: false, views: [front, right, iso]}
+    notes:
+      - "PURCHASED PART - REFERENCE ONLY. BUY TO THE DESIGNATION IN MATERIAL / STOCK; SHAPE AND SIZE SHOWN ARE NOMINAL (ASME B18.2.1 / B18.2.2 / SAE WASHER)."
+      - "THREADS SHOWN SIMPLIFIED (ASME Y14.6)."
+
+parts:
+
+  # ---------------------------------------------------------------------------
+  # CNC-cut plate - frame
+  # ---------------------------------------------------------------------------
+  - id: P1
+    name: Side panel, outer, left
+    category: plate
+    stock: PL 1/2 [12.7] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'side_panel_left_outer();'
+    count: "P1"
+    used_in: Base frame, left side
+    notes:
+      - "LEFT HAND. NOT INTERCHANGEABLE WITH P2: THE BACK-PLATE ANGLE HOLES ARE AT DIFFERENT HEIGHTS."
+    issues:
+      - "THE UWU BEARING BOLT HOLES ARE MODELLED BLIND (8.35 DEEP IN 12.7 PLATE, uwu_bearing_holes_3d USES center=true). THEY ARE BOLT HOLES: CUT THEM THROUGH."
+  - id: P2
+    name: Side panel, outer, right
+    category: plate
+    stock: PL 1/2 [12.7] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'side_panel_right_outer();'
+    count: "P2"
+    used_in: Base frame, right side
+    notes:
+      - "RIGHT HAND. NOT INTERCHANGEABLE WITH P1: THE BACK-PLATE ANGLE HOLES ARE AT DIFFERENT HEIGHTS."
+    issues:
+      - "THE UWU BEARING BOLT HOLES ARE MODELLED BLIND (8.35 DEEP IN 12.7 PLATE, uwu_bearing_holes_3d USES center=true). THEY ARE BOLT HOLES: CUT THEM THROUGH."
+  - id: P3
+    name: Side panel, inner
+    category: plate
+    stock: PL 1/2 [12.7] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'side_panel_left_inner();'
+    count: "P3"
+    used_in: Base frame, both sides (arm pivot sandwich)
+    notes:
+      - "SAME PART FOR THE LEFT AND RIGHT INNER PANELS."
+    issues:
+      - "THE UWU BEARING BOLT HOLES ARE MODELLED BLIND (8.35 DEEP IN 12.7 PLATE, uwu_bearing_holes_3d USES center=true). THEY ARE BOLT HOLES: CUT THEM THROUGH."
+  - id: P4
+    name: Back stiffener plate
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'back_stiffener_plate(only="plate");'
+    count: "P4"
+    used_in: Base frame, rear
+    issues:
+      - "IN THE MODEL THIS PLATE PASSES THROUGH BOTH INNER SIDE PANELS (NO SLOT OR NOTCH). CONFIRM THE FIT BEFORE CUTTING."
+  - id: P5
+    name: Front stiffener plate, centre
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'front_stiffener_plate(only="center");'
+    count: "P5"
+    used_in: Base frame, front between motor plates
+  - id: P6
+    name: Front stiffener plate, outer
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'front_stiffener_plate(only="outer_left");'
+    count: "P6"
+    used_in: Base frame, front outer sections
+    notes:
+      - "SAME PART FOR THE LEFT AND RIGHT OUTER SECTIONS (FLIP FOR THE RIGHT SIDE)."
+  - id: P7
+    name: Bottom stiffener plate
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'bottom_stiffener_plate(only="plate");'
+    count: "P7"
+    used_in: Base frame, floor
+    issues:
+      - "THE A6 ANGLE SEGMENTS THAT BOLT TO THIS PLATE ARE DRAWN 200 / 300 / 250 LONG (THEIR PART FILE CANNOT SEE ANGLE_SEGMENT_* IN lifetrac_v25.scad) BUT THIS PLATE'S HOLES ASSUME 146 / 546.8 / 97.6. MATCH-DRILL OR FIX THE MODEL FIRST."
+  - id: P8
+    name: Motor mounting plate
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'motor_mounting_plate(only="left");'
+    count: "P8"
+    used_in: Base frame, UWU motor mounts (left and right)
+    notes:
+      - "SAME PART FOR THE LEFT AND RIGHT MOTOR PLATES."
+    issues:
+      - "THE 4 UWU MOTOR BOLT HOLES (12.7 ON 209.55 BCD) ARE NOT CUT IN THE MODEL: uwu_motor_mount_holes ROTATES THEM OFF THE PLATE. ONLY THE 50.8 CENTRE HOLE IS SHOWN."
+
+  # ---------------------------------------------------------------------------
+  # CNC-cut plate - loader arms
+  # ---------------------------------------------------------------------------
+  - id: P9
+    name: Arm side plate, inner
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/parts/arm_plate.scad
+    call: 'arm_plate(is_inner_plate=true);'
+    count: "P9"
+    used_in: Loader arms (inner plate, one per arm)
+  - id: P10
+    name: Arm side plate, outer
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/parts/arm_plate.scad
+    call: 'arm_plate(is_inner_plate=false);'
+    count: "P10"
+    used_in: Loader arms (outer plate, one per arm)
+  - id: P11
+    name: Arm pivot mount plate
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/modules/loader_arm_v2.scad
+    call: 'loader_arm_v2(0, "left", only="pivot_plate");'
+    count: "P11"
+    used_in: Arm pivot mounts (2 per arm, welded to T6)
+
+  # ---------------------------------------------------------------------------
+  # CNC-cut plate - bucket
+  # ---------------------------------------------------------------------------
+  - id: P12
+    name: Bucket back plate
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'bucket_back_plate();'
+    count: "P12"
+    used_in: Bucket
+  - id: P13
+    name: Bucket bottom plate
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'bucket_bottom_plate();'
+    count: "P13"
+    used_in: Bucket
+  - id: P14
+    name: Bucket side plate
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'bucket_side_plate(is_left=true);'
+    count: "P14"
+    used_in: Bucket, left and right
+    notes:
+      - "SAME PART FOR THE LEFT AND RIGHT SIDES."
+    issues:
+      - "bucket_side_plate() IS OFFSET 6.35 FROM ITS INTENDED POSITION, SO THE TAB SLOTS ARE ONLY MODELLED 1 MM DEEP. SLOTS FOR THE BACK/BOTTOM TABS MUST BE CUT THROUGH."
+  - id: P19
+    name: Bucket cutting edge
+    category: plate
+    stock: PL 3/4 [19.05] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'bucket(only="cutting_edge");'
+    count: "P19"
+    used_in: Bucket, front edge
+
+  # ---------------------------------------------------------------------------
+  # CNC-cut plate - folding platform and wheel hubs
+  # ---------------------------------------------------------------------------
+  - id: P15
+    name: Platform deck
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/parts/platform_deck.scad
+    call: 'platform_deck();'
+    count: "P15"
+    used_in: Folding operator platform
+  - id: P16
+    name: Platform pivot bracket
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/parts/platform_pivot_bracket.scad
+    call: 'platform_pivot_bracket();'
+    count: "P16"
+    used_in: Folding operator platform
+  - id: P17
+    name: Wheel hub lug plate
+    category: plate
+    stock: PL 1/2 [12.7] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'uwu_hub_lug_plate();'
+    count: "P17"
+    used_in: UWU wheel units (DIY hub)
+  - id: P18
+    name: Wheel hub gusset
+    category: plate
+    stock: PL 1/4 [6.35] ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'uwu_hub_gusset();'
+    count: "P18"
+    used_in: UWU wheel units (DIY hub), 4 per hub
+
+  # ---------------------------------------------------------------------------
+  # Angle iron - structural wrappers in openscad/parts/structural/structural_parts.scad
+  # ---------------------------------------------------------------------------
+  - id: A1
+    name: Back stiffener outer vertical angle
+    category: angle
+    stock: L2x2x1/4 ANGLE (2" x 2" x 1/4"), ASTM A36
+    source: openscad/parts/structural/structural_parts.scad
+    call: 'part_a1_back_outer_vertical();'
+    count: "A1"
+    used_in: Back stiffener plate (outer walls)
+  - id: A2
+    name: Back stiffener inner vertical angle
+    category: angle
+    stock: L2x2x1/4 ANGLE (2" x 2" x 1/4"), ASTM A36
+    source: openscad/parts/structural/structural_parts.scad
+    call: 'part_a2_back_inner_vertical();'
+    count: "A2"
+    used_in: Back stiffener plate (inner walls)
+  - id: A4
+    name: Frame tube mount angle
+    category: angle
+    stock: L2x2x1/4 ANGLE (2" x 2" x 1/4"), ASTM A36
+    source: openscad/parts/structural/structural_parts.scad
+    call: 'part_a4_frame_tube_mount();'
+    count: "A4"
+    used_in: Frame tubes, motor plates, front stiffener
+    issues:
+      - "SIX A4 PLACEMENTS IN lifetrac_v25.scad USE mirror([1,1,0]), WHICH SWAPS THE WALL-LEG AND TUBE-LEG HOLE PATTERNS. CHECK THOSE JOINTS (LIKELY MEANT rotate([0,0,180]))."
+  - id: A5
+    name: Arm crossbeam mount angle
+    category: angle
+    stock: L2x2x1/4 ANGLE (2" x 2" x 1/4"), ASTM A36
+    source: openscad/parts/structural/structural_parts.scad
+    call: 'part_a5_arm_crossbeam_mount();'
+    count: "A5"
+    used_in: Loader arms / arm crossbeam
+  - id: A6-1
+    name: Bottom stiffener angle, rear segment
+    category: angle
+    stock: L2x2x1/4 ANGLE (2" x 2" x 1/4"), ASTM A36
+    source: openscad/parts/structural/structural_parts.scad
+    call: 'part_a6_bottom_segment_1();'
+    count: "A6-1"
+    used_in: Bottom stiffener plate, motor plates
+    issues:
+      - "SEGMENT LENGTH AND HOLES COME FROM angle_iron_a6_bottom_horizontal.scad DEFAULTS (200 / 300 / 250), WHICH DO NOT MATCH THE PLATE HOLES IN lifetrac_v25.scad (146 / 546.8 / 97.6). 5 OF THE 10 RUNS ARE ALSO MIRRORED (OPPOSITE HAND). CONFIRM BEFORE CUTTING."
+  - id: A6-2
+    name: Bottom stiffener angle, middle segment
+    category: angle
+    stock: L2x2x1/4 ANGLE (2" x 2" x 1/4"), ASTM A36
+    source: openscad/parts/structural/structural_parts.scad
+    call: 'part_a6_bottom_segment_2();'
+    count: "A6-2"
+    used_in: Bottom stiffener plate, motor plates
+    issues:
+      - "SEGMENT LENGTH AND HOLES COME FROM angle_iron_a6_bottom_horizontal.scad DEFAULTS (200 / 300 / 250), WHICH DO NOT MATCH THE PLATE HOLES IN lifetrac_v25.scad (146 / 546.8 / 97.6). 5 OF THE 10 RUNS ARE ALSO MIRRORED (OPPOSITE HAND). CONFIRM BEFORE CUTTING."
+  - id: A6-3
+    name: Bottom stiffener angle, front segment
+    category: angle
+    stock: L2x2x1/4 ANGLE (2" x 2" x 1/4"), ASTM A36
+    source: openscad/parts/structural/structural_parts.scad
+    call: 'part_a6_bottom_segment_3();'
+    count: "A6-3"
+    used_in: Bottom stiffener plate, motor plates
+    issues:
+      - "SEGMENT LENGTH AND HOLES COME FROM angle_iron_a6_bottom_horizontal.scad DEFAULTS (200 / 300 / 250), WHICH DO NOT MATCH THE PLATE HOLES IN lifetrac_v25.scad (146 / 546.8 / 97.6). 5 OF THE 10 RUNS ARE ALSO MIRRORED (OPPOSITE HAND). CONFIRM BEFORE CUTTING."
+  - id: A10
+    name: Front stiffener outer angle
+    category: angle
+    stock: L2x2x1/4 ANGLE (2" x 2" x 1/4"), ASTM A36
+    source: openscad/parts/structural/structural_parts.scad
+    call: 'part_a10_front_outer_angle();'
+    count: "A10"
+    used_in: Front stiffener plates
+
+  # ---------------------------------------------------------------------------
+  # Angle iron - folding platform (modules in lifetrac_v25.scad)
+  # ---------------------------------------------------------------------------
+  - id: A7
+    name: Platform side angle arm
+    category: angle
+    stock: L2x2x1/4 ANGLE (2" x 2" x 1/4"), ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'platform_angle_iron(length=247.6, is_side=true);'
+    count: "A7 L247.6"
+    used_in: Folding operator platform
+    notes:
+      - "SAME PART FOR LEFT AND RIGHT (HOLE PATTERN IS SYMMETRIC END TO END)."
+  - id: A8
+    name: Platform transverse angle
+    category: angle
+    stock: L2x2x1/4 ANGLE (2" x 2" x 1/4"), ASTM A36
+    source: openscad/lifetrac_v25.scad
+    call: 'platform_transverse_angle(729.2);'
+    count: "A8 L729.2"
+    used_in: Folding operator platform, front and rear
+
+  # ---------------------------------------------------------------------------
+  # Tube
+  # ---------------------------------------------------------------------------
+  - id: T1
+    name: Front frame cross tube
+    category: tube
+    stock: HSS 6x2x1/4 RECT TUBE (2" x 6" x 1/4"), ASTM A500
+    source: openscad/parts/structural/structural_parts.scad
+    call: 'part_t1_front_frame_tube();'
+    count: "T1"
+    used_in: Base frame
+  - id: T2
+    name: Rear frame cross tube
+    category: tube
+    stock: HSS 6x2x1/4 RECT TUBE (2" x 6" x 1/4"), ASTM A500
+    source: openscad/parts/structural/structural_parts.scad
+    call: 'part_t2_rear_frame_tube();'
+    count: "T2"
+    used_in: Base frame
+  - id: T3
+    name: Arm crossbeam tube
+    category: tube
+    stock: HSS 6x2x1/4 RECT TUBE (2" x 6" x 1/4"), ASTM A500
+    source: openscad/parts/structural/structural_parts.scad
+    call: 'part_t3_arm_crossbeam();'
+    count: "T3"
+    used_in: Loader arms
+  - id: T4
+    name: Arm main tube
+    category: tube
+    stock: HSS 6x2x1/4 RECT TUBE (2" x 6" x 1/4"), ASTM A500
+    source: openscad/modules/loader_arm_v2.scad
+    call: 'loader_arm_v2(0, "left", only="main_tube");'
+    count: "T4"
+    used_in: Loader arms (one per arm)
+  - id: T6
+    name: Arm pivot DOM tube
+    category: tube
+    stock: DOM TUBE 2.000 OD x .250 WALL [50.8 x 6.35]
+    source: openscad/modules/loader_arm_v2.scad
+    call: 'loader_arm_v2(0, "left", only="dom_tube");'
+    count: "T6"
+    used_in: Arm pivot mounts (welded to 2x P11)
+  - id: T7
+    name: Wheel hub DOM tube
+    category: tube
+    stock: DOM TUBE 2.000 OD [50.8], BORED TO THE ID SHOWN
+    source: openscad/lifetrac_v25.scad
+    call: 'uwu_hub_dom_tube();'
+    count: "T7"
+    used_in: UWU wheel units (DIY hub)
+
+  # ---------------------------------------------------------------------------
+  # Lugs cut from 3x3 tube (u_channel_lug in lifetrac_v25.scad)
+  # ---------------------------------------------------------------------------
+  - id: U1
+    name: Arm crossbeam cylinder lug
+    category: lug
+    stock: HSS 3x3x1/4 SQUARE TUBE, ASTM A500
+    source: openscad/lifetrac_v25.scad
+    call: 'u_channel_lug(TUBE_3X3_1_4, 80, BOLT_DIA_3_4 + 2);'
+    count: "U-LUG 76.2x80 D21.05"
+    used_in: Arm crossbeam (bucket cylinder base)
+    issues:
+      - "u_channel_lug() ROTATES ITS SIDE PROFILE WITH rotate([0,90,0]), SO THE LUG IS CUT TO THE TUBE SIZE (76.2) INSTEAD OF ITS LENGTH ARGUMENT (80 / 100). U2 AND U3 LOSE THEIR 4 BASE BOLT HOLES AS A RESULT. CONFIRM THE LENGTH BEFORE CUTTING."
+  - id: U2
+    name: Bucket pivot lug
+    category: lug
+    stock: HSS 3x3x1/4 SQUARE TUBE, ASTM A500
+    source: openscad/lifetrac_v25.scad
+    call: 'u_channel_lug(TUBE_3X3_1_4, 100, BUCKET_PIVOT_PIN_DIA + 2);'
+    count: "U-LUG 76.2x100 D27.4"
+    used_in: Bucket attachment (arm tip pivot)
+    issues:
+      - "u_channel_lug() ROTATES ITS SIDE PROFILE WITH rotate([0,90,0]), SO THE LUG IS CUT TO THE TUBE SIZE (76.2) INSTEAD OF ITS LENGTH ARGUMENT (80 / 100). U2 AND U3 LOSE THEIR 4 BASE BOLT HOLES AS A RESULT. CONFIRM THE LENGTH BEFORE CUTTING."
+  - id: U3
+    name: Bucket cylinder lug
+    category: lug
+    stock: HSS 3x3x1/4 SQUARE TUBE, ASTM A500
+    source: openscad/lifetrac_v25.scad
+    call: 'u_channel_lug(TUBE_3X3_1_4, 100, BOLT_DIA_3_4 + 2);'
+    count: "U-LUG 76.2x100 D21.05"
+    used_in: Bucket attachment (bucket cylinder rod end)
+    issues:
+      - "u_channel_lug() ROTATES ITS SIDE PROFILE WITH rotate([0,90,0]), SO THE LUG IS CUT TO THE TUBE SIZE (76.2) INSTEAD OF ITS LENGTH ARGUMENT (80 / 100). U2 AND U3 LOSE THEIR 4 BASE BOLT HOLES AS A RESULT. CONFIRM THE LENGTH BEFORE CUTTING."
+
+  # ---------------------------------------------------------------------------
+  # Pins and shafts (round bar)
+  # ---------------------------------------------------------------------------
+  - id: R1
+    name: Lift cylinder base pin
+    category: bar
+    stock: Ø1 [25.4] ROUND BAR, 4140 OR EQUIVALENT
+    source: openscad/lifetrac_v25.scad
+    call: 'clevis_pin(BOLT_DIA_1, SANDWICH_SPACING + 40, with_cotters=false);'
+    count: "PIN 25.4x160"
+    used_in: Lift cylinder base mounts (through both inner panels)
+    notes:
+      - "TWO COTTER PINS PER PIN (NOT DRAWN)."
+  - id: R2
+    name: Arm pivot pin
+    category: bar
+    stock: Ø1-1/2 [38.1] ROUND BAR, 4140 OR EQUIVALENT
+    source: openscad/lifetrac_v25.scad
+    call: 'arm_pivot_pin();'
+    count: "R2"
+    used_in: Loader arm pivots
+    notes:
+      - "HELD BY A 1-1/2 HEX NUT EACH END (F1): THREAD BOTH ENDS TO SUIT (THREAD NOT MODELLED)."
+  - id: R3
+    name: Clevis pin 3/4
+    category: bar
+    stock: Ø3/4 [19.05] ROUND BAR, 4140 OR EQUIVALENT
+    source: openscad/lifetrac_v25.scad
+    call: 'clevis_pin(19.05, 106.2, with_cotters=false);'
+    count: "PIN 19.05x106.2"
+    used_in: Cylinder lugs U1 and U3
+    notes:
+      - "TWO COTTER PINS PER PIN (NOT DRAWN)."
+  - id: R4
+    name: Bucket pivot pin
+    category: bar
+    stock: Ø1 [25.4] ROUND BAR, 4140 OR EQUIVALENT
+    source: openscad/lifetrac_v25.scad
+    call: 'clevis_pin(25.4, 106.2, with_cotters=false);'
+    count: "PIN 25.4x106.2"
+    used_in: Bucket pivot lugs U2
+    notes:
+      - "TWO COTTER PINS PER PIN (NOT DRAWN)."
+  - id: R5
+    name: Platform pivot pin
+    category: bar
+    stock: Ø1 [25.4] ROUND BAR, 4140 OR EQUIVALENT
+    source: drawings/hardware.scad
+    call: 'pin_ref(PLATFORM_PIVOT_PIN_DIA, PANEL_THICKNESS * 2 + 30);'
+    count: "PIN 25.4x55.4"
+    used_in: Folding platform pivots
+  - id: R6
+    name: Wheel shaft
+    category: bar
+    stock: Ø1-1/4 [31.75] ROUND SHAFTING
+    source: openscad/lifetrac_v25.scad
+    call: 'uwu_main_shaft(474);'
+    count: "SHAFT 31.75x474"
+    used_in: UWU wheel units
+    notes:
+      - "KEYWAYS / FLATS FOR THE MOTOR COUPLING ARE NOT MODELLED: MATCH THE COUPLING."
+
+  # ---------------------------------------------------------------------------
+  # 3D-printed jigs (quantities from openscad/3d_printed_welding_jigs/README.md)
+  # ---------------------------------------------------------------------------
+  - id: J1
+    name: Tube drilling jig
+    category: printed
+    stock: PLA OR PETG FILAMENT
+    source: openscad/3d_printed_welding_jigs/tube_drilling_jig.scad
+    call: tube_drilling_jig();
+    qty: 4
+    used_in: Marking holes on 2x6 tube (T1-T3)
+    notes: ["PRINT WITH THE OPENING FACING UP (STANDING ON THE 7 IN FACE). README SUGGESTS 4-6 COPIES."]
+
+  - id: J2
+    name: Pivot mount welding jig base
+    category: printed
+    stock: PLA OR PETG FILAMENT
+    source: openscad/3d_printed_welding_jigs/pivot_mount_welding_jig.scad
+    call: jig_base_printable();
+    qty: 1
+    used_in: Welding the arm pivot mounts
+    notes: ["PRINT FLAT SIDE DOWN. ONE SET = 1 BASE + 2 ALIGNMENT RINGS (J3)."]
+
+  - id: J3
+    name: Pivot mount welding jig ring
+    category: printed
+    stock: PLA OR PETG FILAMENT
+    source: openscad/3d_printed_welding_jigs/pivot_mount_welding_jig.scad
+    call: jig_ring_printable();
+    qty: 2
+    used_in: Welding the arm pivot mounts
+    notes: ["PRINT FLAT SIDE DOWN."]
+
+  - id: J4
+    name: Pivot welding spacer jig
+    category: printed
+    stock: PLA OR PETG FILAMENT
+    source: openscad/3d_printed_welding_jigs/pivot_welding_jig.scad
+    call: pivot_welding_jig();
+    qty: 2
+    used_in: Holding pivot plates 2 in apart while welding
+    notes: ["PRINT FLAT SIDE DOWN."]
+
+  - id: J5
+    name: Angle iron drill jig
+    category: printed
+    stock: PLA OR PETG FILAMENT
+    source: openscad/3d_printed_bolt_hole_cutting_jigs/angle_iron_drill_jig.scad
+    call: angle_iron_drill_jig();
+    qty: 2
+    used_in: Centre-marking holes in 2x2 angle (A-parts)
+
+  - id: J6
+    name: Tube drill jig
+    category: printed
+    stock: PLA OR PETG FILAMENT
+    source: openscad/3d_printed_bolt_hole_cutting_jigs/tube_drill_jig.scad
+    call: tube_drill_jig();
+    qty: 2
+    used_in: Centre-marking holes in tube
+
+  # ---------------------------------------------------------------------------
+  # Purchased hardware (reference sheets, drawings/hardware.scad)
+  # ---------------------------------------------------------------------------
+  - id: F1
+    name: Hex nut 1-1/2-6
+    category: fastener
+    stock: HEX NUT 1-1/2-6 UNC-2B, GRADE 8, ASME B18.2.2
+    source: drawings/hardware.scad
+    call: 'hex_nut_ref(1.5);'
+    count: "NUT 38.1"
+    size: "1-1/2-6 UNC"
+    size_label: THREAD
+    used_in: Arm pivot pins R2 (2 per pin)
+  - id: F2
+    name: Platform lock pin 5/8
+    category: fastener
+    stock: HITCH / CLEVIS PIN Ø5/8 [15.875] x 1-5/16 USABLE, ZINC
+    source: drawings/hardware.scad
+    call: 'pin_ref(PLATFORM_LOCK_PIN_DIA, PANEL_THICKNESS + 20);'
+    count: "PIN 15.875x32.7"
+    size: "Ø5/8 x 1-5/16"
+    size_label: SIZE
+    used_in: Folding platform lock
+  - id: F3
+    name: Hex bolt 1/2-13
+    category: fastener
+    stock: HEX BOLT 1/2-13 UNC-2A x L, SAE J429 GR 8, YELLOW ZINC, ASME B18.2.1
+    source: drawings/hardware.scad
+    call: 'hex_bolt_ref(0.5, 2);'
+    size: "1/2-13 x L (2 TO 6 IN)"
+    size_label: THREAD x LENGTH
+    qty_from_holes: {diameters: [12.7, 14.7], parts: [A4, A5, A7, A8, T4, T7], per_hole: 1}
+    used_in: Angle-to-plate and angle-to-tube joints
+    notes:
+      - "LENGTH PER JOINT: GRIP + WASHERS + NUT + 2 THREADS. DRAWN AT L = 2 IN."
+      - "QUANTITY IS ESTIMATED FROM HOLE COUNTS IN THE MODEL (ONE PER HOLE IN THE LISTED PARTS) - AN UPPER BOUND: A BOLT THROUGH A TUBE BETWEEN TWO ANGLES IS COUNTED TWICE. BOLTS ARE NOT IN THE MODEL YET."
+  - id: F4
+    name: Hex nut 1/2-13
+    category: fastener
+    stock: HEX NUT 1/2-13 UNC-2B, GRADE 8, YELLOW ZINC, ASME B18.2.2
+    source: drawings/hardware.scad
+    call: 'hex_nut_ref(0.5);'
+    size: "1/2-13 UNC"
+    size_label: THREAD
+    qty_from_holes: {diameters: [12.7, 14.7], parts: [A4, A5, A7, A8, T4, T7], per_hole: 1}
+    used_in: With F3
+    notes:
+      - "QUANTITY IS ESTIMATED FROM HOLE COUNTS IN THE MODEL (ONE PER HOLE IN THE LISTED PARTS) - AN UPPER BOUND: A BOLT THROUGH A TUBE BETWEEN TWO ANGLES IS COUNTED TWICE. BOLTS ARE NOT IN THE MODEL YET."
+  - id: F5
+    name: Flat washer 1/2 SAE
+    category: fastener
+    stock: FLAT WASHER 1/2 SAE (17/32 ID x 1-1/16 OD), HARDENED, ZINC
+    source: drawings/hardware.scad
+    call: 'flat_washer_ref(0.5);'
+    size: "1/2 SAE"
+    size_label: SIZE
+    qty_from_holes: {diameters: [12.7, 14.7], parts: [A4, A5, A7, A8, T4, T7], per_hole: 2}
+    used_in: With F3 (one under head, one under nut)
+    notes:
+      - "QUANTITY IS ESTIMATED FROM HOLE COUNTS IN THE MODEL (ONE PER HOLE IN THE LISTED PARTS) - AN UPPER BOUND: A BOLT THROUGH A TUBE BETWEEN TWO ANGLES IS COUNTED TWICE. BOLTS ARE NOT IN THE MODEL YET."
+  - id: F6
+    name: Hex bolt 3/8-16
+    category: fastener
+    stock: HEX BOLT 3/8-16 UNC-2A x L, SAE J429 GR 8, YELLOW ZINC, ASME B18.2.1
+    source: drawings/hardware.scad
+    call: 'hex_bolt_ref(0.375, 1.25);'
+    size: "3/8-16 x L"
+    size_label: THREAD x LENGTH
+    qty_from_holes: {diameters: [9.525], parts: [A1, A2, A10, A6-1, A6-2, A6-3], per_hole: 1}
+    used_in: Stiffener angle-to-plate joints (9.5 mm holes)
+    notes:
+      - "LENGTH PER JOINT. DRAWN AT L = 1-1/4 IN."
+      - "QUANTITY IS ESTIMATED FROM HOLE COUNTS IN THE MODEL (ONE PER HOLE IN THE LISTED PARTS) - AN UPPER BOUND: A BOLT THROUGH A TUBE BETWEEN TWO ANGLES IS COUNTED TWICE. BOLTS ARE NOT IN THE MODEL YET."
+  - id: F7
+    name: Hex nut 3/8-16
+    category: fastener
+    stock: HEX NUT 3/8-16 UNC-2B, GRADE 8, YELLOW ZINC, ASME B18.2.2
+    source: drawings/hardware.scad
+    call: 'hex_nut_ref(0.375);'
+    size: "3/8-16 UNC"
+    size_label: THREAD
+    qty_from_holes: {diameters: [9.525], parts: [A1, A2, A10, A6-1, A6-2, A6-3], per_hole: 1}
+    used_in: With F6
+    notes:
+      - "QUANTITY IS ESTIMATED FROM HOLE COUNTS IN THE MODEL (ONE PER HOLE IN THE LISTED PARTS) - AN UPPER BOUND: A BOLT THROUGH A TUBE BETWEEN TWO ANGLES IS COUNTED TWICE. BOLTS ARE NOT IN THE MODEL YET."
+  - id: F8
+    name: Flat washer 3/8 SAE
+    category: fastener
+    stock: FLAT WASHER 3/8 SAE (13/32 ID x 13/16 OD), HARDENED, ZINC
+    source: drawings/hardware.scad
+    call: 'flat_washer_ref(0.375);'
+    size: "3/8 SAE"
+    size_label: SIZE
+    qty_from_holes: {diameters: [9.525], parts: [A1, A2, A10, A6-1, A6-2, A6-3], per_hole: 2}
+    used_in: With F6
+    notes:
+      - "QUANTITY IS ESTIMATED FROM HOLE COUNTS IN THE MODEL (ONE PER HOLE IN THE LISTED PARTS) - AN UPPER BOUND: A BOLT THROUGH A TUBE BETWEEN TWO ANGLES IS COUNTED TWICE. BOLTS ARE NOT IN THE MODEL YET."
+  - id: F9
+    name: Hex bolt 1/4-20
+    category: fastener
+    stock: HEX BOLT 1/4-20 UNC-2A x 1, SAE J429 GR 5, ZINC, ASME B18.2.1
+    source: drawings/hardware.scad
+    call: 'hex_bolt_ref(0.25, 1);'
+    qty: 24
+    size: "1/4-20 x 1"
+    size_label: THREAD x LENGTH
+    used_in: U-lug base holes (4 per lug, U1-U3)
+    notes:
+      - "4 PER LUG x 6 LUGS. THE MODEL SHOWS 6.35 LUG HOLES (NO CLEARANCE): DRILL 17/64 OR 9/32 FOR CLEARANCE."
+  - id: F10
+    name: Hex nut 1/4-20
+    category: fastener
+    stock: HEX NUT 1/4-20 UNC-2B, GRADE 5, ZINC, ASME B18.2.2
+    source: drawings/hardware.scad
+    call: 'hex_nut_ref(0.25);'
+    qty: 24
+    size: "1/4-20 UNC"
+    size_label: THREAD
+    used_in: With F9

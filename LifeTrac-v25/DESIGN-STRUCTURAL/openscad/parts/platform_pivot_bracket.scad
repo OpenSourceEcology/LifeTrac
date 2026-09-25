@@ -24,6 +24,7 @@ include <../lifetrac_v25_params.scad>
  *   - Designed to be oriented vertically when installed
  */
 module platform_pivot_bracket() {
+    echo(BOM_PART = "P16");  // counted by drawings/generate_part_drawings.py
     // Local variables
     thickness = PLATFORM_THICKNESS;
     width = PLATFORM_BRACKET_WIDTH;

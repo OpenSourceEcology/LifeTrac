@@ -2,7 +2,7 @@ include <../lifetrac_v25_params.scad>
 use <../parts/arm_plate.scad>
 use <../parts/structural/structural_parts.scad>
 
-module loader_arm_v2(angle=0, side="left") {
+module loader_arm_v2(angle=0, side="left", only="") {  // only = "main_tube" | "dom_tube" | "pivot_plate": one part (part drawings)
     main_tube_len = ARM_MAIN_LEN; 
     drop_len = ARM_DROP_LEN;
     overlap = ARM_OVERLAP;
@@ -41,6 +41,8 @@ module loader_arm_v2(angle=0, side="left") {
     rotate([0, -angle, 0]) {
         // 1. Main Tube
         // Tube starts at 'overlap' from pivot center (1" clearance from 6" plate)
+        if (only == "" || only == "main_tube") echo(BOM_PART = "T4");  // counted by drawings/generate_part_drawings.py
+        if (only == "" || only == "main_tube")
         translate([overlap, 0, 0])
         difference() {
             // Hollow Rounded Tube
@@ -74,6 +76,7 @@ module loader_arm_v2(angle=0, side="left") {
                  translate([x, tube_w/2, z]) rotate([90,0,0]) cylinder(d=BOLT_DIA_1_2, h=tube_w+10, center=true, $fn=32);
         }
 
+        if (only == "") {  // plates, angles and leg spacer are left out when drawing a single part
         // 2. Continuous Side Plates
         
         // Instantiate Plates
@@ -168,12 +171,16 @@ module loader_arm_v2(angle=0, side="left") {
             }
         }
         
+        }  // if (only == "")
+
         // PIVOT MOUNT ASSEMBLY
         // Replaceable assembly with DOM tube welded between two 6" circular plates
         // Slides into arm from below and bolts to arm plates
         // See parts/pivot_mount_assembly.scad for full assembly
         translate([0, tube_w/2, tube_h/2]) {
             // DOM Pipe (Through everything)
+            if (only == "" || only == "dom_tube") echo(BOM_PART = "T6");  // counted by drawings/generate_part_drawings.py
+            if (only == "" || only == "dom_tube")
             rotate([90, 0, 0]) 
             difference() {
                 cylinder(d=DOM_PIPE_OD, h=SANDWICH_SPACING, center=true, $fn=64);
@@ -194,6 +201,8 @@ module loader_arm_v2(angle=0, side="left") {
             color("DarkSlateGray")
             rotate([90, 0, 0]) {
                 // Front plate with bolt holes
+                if (only == "" || only == "pivot_plate") echo(BOM_PART = "P11");  // counted by drawings/generate_part_drawings.py
+                if (only == "" || only == "pivot_plate")
                 translate([0, 0, tube_w/2 - _plate_thick])
                 difference() {
                     cylinder(d=_plate_dia, h=_plate_thick, $fn=64);
@@ -209,7 +218,9 @@ module loader_arm_v2(angle=0, side="left") {
                     }
                 }
                 
-                // Rear plate with bolt holes
+                // Rear plate with bolt holes (same part as the front plate)
+                if (only == "") echo(BOM_PART = "P11");  // counted by drawings/generate_part_drawings.py
+                if (only == "")
                 translate([0, 0, -tube_w/2])
                 difference() {
                     cylinder(d=_plate_dia, h=_plate_thick, $fn=64);
@@ -231,6 +242,7 @@ module loader_arm_v2(angle=0, side="left") {
             // Torus is created by rotating a circle around the DOM centerline
             // 4 welds per plate: inside and outside face of each plate
             _weld_dia = is_undef(PIVOT_MOUNT_WELD_DIA) ? 6.35 : PIVOT_MOUNT_WELD_DIA;  // 0.25" weld bead diameter
+            if (only == "")
             color("Red", 0.8)
             rotate([90, 0, 0]) {
                 // FRONT PLATE WELDS
