@@ -293,17 +293,26 @@ def _load_encode_mode_override() -> str:
     return _load_encode_mode_state()[0]
 
 
-def _persist_encode_mode_override(mode: str, quality: int | None) -> None:
-    """Write mode+quality to ``ENCODE_MODE_STORE_PATH`` atomically."""
+def _persist_encode_mode_override(mode: str, quality: int | None, *,
+                                  tile_quality: "int | None | object" = ...,
+                                  vector_detail: "int | object" = ...) -> None:
+    """Write mode+quality (and both dials) to ``ENCODE_MODE_STORE_PATH``
+    atomically. The dials default to the current globals; a caller that is
+    about to change them passes the prospective values so the store is
+    written before the globals move."""
+    if tile_quality is ...:
+        tile_quality = _tile_quality
+    if vector_detail is ...:
+        vector_detail = _vector_detail
     ENCODE_MODE_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp = ENCODE_MODE_STORE_PATH.with_suffix(
         ENCODE_MODE_STORE_PATH.suffix + ".tmp")
     body: dict[str, Any] = {"mode": mode}
     if quality is not None:
         body["quality"] = quality
-    if _tile_quality is not None:
-        body["tile_quality"] = _tile_quality
-    body["vector_detail"] = _vector_detail
+    if tile_quality is not None:
+        body["tile_quality"] = tile_quality
+    body["vector_detail"] = vector_detail
     tmp.write_text(json.dumps(body) + "\n", encoding="utf-8")
     os.replace(tmp, ENCODE_MODE_STORE_PATH)
 
@@ -2596,27 +2605,34 @@ def _set_encode_mode_override(mode: str, *, persist: bool,
     # the runtime override, the store, and the wire all agreeing on the
     # old value rather than stranding a change only this process knows.
     eff_mode = mode
+    # Prospective dial values: the store is written with them first and the
+    # globals move only once that succeeded, so a failed persist (HTTP 500)
+    # leaves nothing changed in memory that a later switch could publish.
+    new_vector_detail, new_tile_quality = _vector_detail, _tile_quality
     if mode == "vector":
         # The vector detail is its own dial (VECTOR_SCENE.md §4.5.4, §6):
         # 60-100 keeps the operator inside band V0; the ladder, not the
         # operator, produces the lower bands. The tile dial is untouched.
         if quality is not None:
-            _vector_detail = max(60, min(100, int(quality)))
-        eff_quality = _vector_detail
+            new_vector_detail = max(60, min(100, int(quality)))
+        eff_quality = new_vector_detail
     else:
         # A tile mode sends the tile dial, never the vector detail that may
         # be sitting in the runtime quality after a VECTOR session.
         if quality is not None:
-            _tile_quality = int(quality)
-        eff_quality = _tile_quality
+            new_tile_quality = int(quality)
+        eff_quality = new_tile_quality
     if persist:
         try:
-            _persist_encode_mode_override(eff_mode, eff_quality)
+            _persist_encode_mode_override(eff_mode, eff_quality,
+                                          tile_quality=new_tile_quality,
+                                          vector_detail=new_vector_detail)
         except OSError as exc:
             logging.error("failed to persist encode_mode override to %s: %s",
                           ENCODE_MODE_STORE_PATH, exc)
             raise HTTPException(status_code=500,
                                 detail=f"could not persist override: {exc}")
+    _vector_detail, _tile_quality = new_vector_detail, new_tile_quality
     _set_runtime_encode_mode_override(eff_mode, eff_quality)
     body: dict[str, Any] = {"mode": eff_mode, "ts": time.time()}
     if eff_quality is not None:

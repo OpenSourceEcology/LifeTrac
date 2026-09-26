@@ -454,6 +454,86 @@ class TemporalTests(unittest.TestCase):
         self.assertEqual(records_of(fourth, vs.HznAbs), [])
         self.assertEqual(records_of(fourth, vs.HznResid), [vs.HznResid(0, 0)])
 
+    def test_epoch_start_waits_for_a_budget_that_fits_its_anchor(self):
+        # §3.5: an epoch exists only once its anchor went out. Frame 1 at 8 B
+        # (F − 1 = 1 B: not even the 13-bit VS header fits, so the body is
+        # empty) is a failed attempt: frame_kind stays 1 and the epoch does
+        # not advance; frame 2 at 203 B is the epoch start, K = 1 with the
+        # anchor + LAYER_CLEAR, and a fresh store fed both ends up anchored.
+        from image_pipeline.frame_format import parse_tile_delta_frame
+        from image_pipeline.vector_scene_store import VectorSceneStore
+        img = scene(blobs=[(20, 44, 4, GREEN), (50, 40, 4, GREEN), (80, 48, 4, GREEN)])
+        enc = ev.VectorEncoder()
+        f1 = enc.frame(img, 8, seq=0)
+        self.assertEqual(f1[0], 1)
+        self.assertEqual(len(f1), 6)                                 # the header only
+        self.assertFalse(enc.last_stats["epoch_committed"])
+        self.assertEqual(enc.last_stats["epoch_pending"], 0)
+        self.assertEqual(enc.epoch, 0)
+        f2 = enc.frame(img, BUDGET, seq=1)
+        self.assertEqual(f2[0], 1)
+        d2 = decode(f2)
+        self.assertTrue(d2.header.key)
+        self.assertEqual(d2.header.epoch, 0)
+        self.assertIsInstance(d2.records[0], vs.HznAbs)
+        self.assertEqual(d2.records[1], vs.LayerClear(0))
+        self.assertEqual(len(records_of(d2, vs.Tree)), 3)
+        self.assertTrue(enc.last_stats["epoch_committed"])
+        self.assertIsNone(enc.last_stats["epoch_pending"])
+        self.assertEqual(enc.epoch, 0)
+        f3 = enc.frame(img, BUDGET, seq=2)
+        self.assertEqual(f3[0], 0)                                   # committed once: an update follows
+        self.assertEqual(decode(f3).header.epoch, 0)
+        store = VectorSceneStore(CW, CH)
+        try:
+            p1 = parse_tile_delta_frame(f1)
+            self.assertFalse(store.ingest(p1.vector_body, p1.frame_kind, 1000, 0.0).applied)
+        except ValueError:
+            pass                                                     # the parser refuses the empty body: rejected too
+        self.assertIsNone(store.snapshot(1100))
+        p2 = parse_tile_delta_frame(f2)
+        self.assertTrue(store.ingest(p2.vector_body, p2.frame_kind, 1500, 0.0).applied)
+        snap = store.snapshot(1600)
+        self.assertIsNotNone(snap)
+        self.assertEqual(snap["horizon"]["mode"], "abs")
+        self.assertEqual(store.stats["orphans"], 0)
+
+    def test_failed_epoch_attempt_leaves_the_mirror_and_the_counter_alone(self):
+        # A running encoder: force_epoch, then two budgets too small for the
+        # anchor. Each attempt is a key frame numbered for the epoch to come
+        # (STATUS may ride, nothing of the new epoch does), the counter and
+        # the live mirror are untouched, and the first budget that fits the
+        # anchor commits the epoch exactly once.
+        img = scene(blobs=[(20, 44, 4, GREEN), (50, 40, 4, GREEN), (80, 48, 4, GREEN)])
+        enc = ev.VectorEncoder()
+        decode(enc.frame(img, BUDGET, seq=0))
+        decode(enc.frame(img, BUDGET, seq=1))
+        self.assertEqual(enc.epoch, 0)
+        enc.force_epoch()
+        f = enc.frame(img, 8, seq=2)
+        self.assertEqual(f[0], 1)
+        self.assertEqual(enc.epoch, 0)
+        self.assertEqual(enc.last_stats["n_live"], 3)               # the mirror survived the failed attempt
+        self.assertEqual(enc.last_stats["epoch_pending"], 0)
+        d = decode(enc.frame(img, 14, seq=3))                        # 43 record bits: STATUS fits, the anchor not
+        self.assertTrue(d.header.key)
+        self.assertEqual(d.header.epoch, 1)                          # the number the epoch will have
+        self.assertEqual([type(r) for r in d.records], [vs.Status])
+        self.assertEqual(enc.epoch, 0)
+        self.assertEqual(enc.last_stats["n_live"], 3)
+        self.assertFalse(enc.last_stats["epoch_committed"])
+        d = decode(enc.frame(img, BUDGET, seq=4))                    # commits: advanced exactly once
+        self.assertTrue(d.header.key)
+        self.assertEqual(d.header.epoch, 1)
+        self.assertEqual(enc.epoch, 1)
+        self.assertEqual(d.records[1], vs.LayerClear(0))
+        self.assertEqual(len(records_of(d, vs.Tree)), 3)             # redefined under the new epoch
+        self.assertEqual(records_of(d, vs.Digest)[0].n_live, 3)
+        d = decode(enc.frame(img, BUDGET, seq=5))
+        self.assertFalse(d.header.key)
+        self.assertEqual(d.header.epoch, 1)
+        self.assertEqual(enc.epoch, 1)
+
     def test_carousel_frame_every_fourth_at_v0(self):
         enc = ev.VectorEncoder()
         sizes = []

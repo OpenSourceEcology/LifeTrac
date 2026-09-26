@@ -153,6 +153,17 @@ class WebUiVectorTests(unittest.TestCase):
         self.assertEqual(self.web_ui._load_encode_mode_state(), ("full", 40))
         self.assertEqual((self.web_ui._vector_detail, self.web_ui._tile_quality), (60, 40))
 
+    def test_failed_persist_leaves_both_dials_untouched(self) -> None:
+        self.client.post("/api/settings/encode_mode", json={"mode": "full", "quality": 45})
+        before = (self.web_ui._vector_detail, self.web_ui._tile_quality)
+        with mock.patch.object(self.web_ui, "_persist_encode_mode_override", side_effect=OSError("disk")):
+            r = self.client.post("/api/settings/encode_mode", json={"mode": "vector", "quality": 95})
+            self.assertEqual(r.status_code, 500, r.text)
+            r = self.client.post("/api/settings/encode_mode", json={"mode": "full", "quality": 70})
+            self.assertEqual(r.status_code, 500, r.text)
+        self.assertEqual((self.web_ui._vector_detail, self.web_ui._tile_quality), before)
+        self.assertEqual(self.web_ui._get_runtime_encode_state(), ("full", 45))
+
 
 if __name__ == "__main__":
     unittest.main()

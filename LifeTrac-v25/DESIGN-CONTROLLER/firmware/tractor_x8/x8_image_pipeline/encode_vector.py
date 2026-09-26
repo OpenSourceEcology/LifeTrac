@@ -27,10 +27,14 @@ Epochs (§3.5, §4.3). A new epoch starts on the first frame, on
 ``force_epoch()`` / ``epoch_start=True``, when the horizon state flips
 between found and NO_HORIZON, on id exhaustion, when more than 40 % of the
 valid area is relabelled between captures, and every 60 s (safety refresh,
-LAYER_CLEAR range 2, which keeps the masses). The epoch-start records are
-repeated in the following frame(s) per the level (§4.5.4), and a static
-scene converges to RESID + STATUS + CONFIRM + DIGEST with a carousel frame
-every 1/κ frames.
+LAYER_CLEAR range 2, which keeps the masses). An epoch start is a
+transaction: the frame is built as the new epoch's key frame, but the
+counter, the mirror and the GAIN reset are committed only when the anchor
+is actually packed; until then every frame is another attempt with the key
+bit set, so a receiver is never left waiting for an epoch that never
+anchored. The epoch-start records are repeated in the following frame(s)
+per the level (§4.5.4), and a static scene converges to RESID + STATUS +
+CONFIRM + DIGEST with a carousel frame every 1/κ frames.
 
 Quality byte (§4.5.4): its band is the level (60–100 V0, 40–59 V1, 20–39 V2,
 1–19 V3), which sets the frame body cap, κ and the repeat count; V3 sends
@@ -161,6 +165,18 @@ class _Shape:
 
 
 @dataclass
+class _L0State:
+    """The L0 the base holds; set only by the apply of the HZN record that carries it."""
+    top_vf: object
+    bot_vf: object
+    top_lab: np.ndarray
+    bot_lab: np.ndarray
+    found: bool
+    codes: Optional[tuple]          # (y8, ang6, curv4) of the epoch's ABS; None under NO_HORIZON
+    shown_hz: object                # vx.Horizon the base draws
+
+
+@dataclass
 class _Cand:
     slot: int                       # §4.2 priority slot
     order: tuple                    # ascending within the slot
@@ -252,7 +268,7 @@ class VectorEncoder:
         self._gain = GAIN_NEUTRAL                     # the epoch's GAIN codes as the base holds them
         self._gain_next = GAIN_NEUTRAL                # this capture's estimate
         self._frame_no = 0
-        self._epoch_started_frame = -1
+        self._committed = False                       # this attempt's epoch start was packed
         self._carousel_acc = 0.0
         self._last_stats: dict = {}
 
@@ -366,64 +382,87 @@ class VectorEncoder:
         curv = max(-8, min(7, int(round(hz.sag / 4.0))))
         return y8, ang, curv
 
-    def _anchor_record(self, hz: vx.Horizon):
-        """A fresh absolute anchor (ABS or NO_HORIZON) from this capture; it
-        re-anchors the mirror's L0 state."""
+    def _anchor_record(self, hz: vx.Horizon) -> tuple:
+        """A fresh absolute anchor (ABS or NO_HORIZON) from this capture and the
+        L0 state it re-anchors; the state is committed by the record's apply."""
         top_vf = vx.make_vfill(hz.top, int(round(hz.top_dl / 8.0)))
         bot_vf = vx.make_vfill(hz.bottom, int(round(hz.bottom_dl / 8.0)))
-        self._top_vf, self._bot_vf = top_vf, bot_vf
-        self._top_lab, self._bot_lab = vx.rgb_to_lab(hz.top), vx.rgb_to_lab(hz.bottom)
-        self._anchor_found = hz.found
+        top_lab, bot_lab = vx.rgb_to_lab(hz.top), vx.rgb_to_lab(hz.bottom)
         if hz.found:
             codes = self._abs_codes(hz)
-            self._anchor_codes = codes
-            self._shown_hz = vx.horizon_from_codes(*codes)
-            return vs.HznAbs(codes[0], codes[1], codes[2], top_vf, bot_vf)
-        self._anchor_codes = None
-        self._shown_hz = vx.Horizon(False)
-        return vs.HznNoHorizon(top_vf, bot_vf)
+            state = _L0State(top_vf, bot_vf, top_lab, bot_lab, True, codes, vx.horizon_from_codes(*codes))
+            return vs.HznAbs(codes[0], codes[1], codes[2], top_vf, bot_vf), state
+        state = _L0State(top_vf, bot_vf, top_lab, bot_lab, False, None, vx.Horizon(False))
+        return vs.HznNoHorizon(top_vf, bot_vf), state
 
-    def _horizon_records(self, hz: vx.Horizon, key: bool, level: int) -> list:
-        """Slot 1 on an epoch start or its repeat (anchor + LAYER_CLEAR), else
-        slot 3: RESID when the change fits its fields, ABS on a larger move
-        or a colour stop change of ΔE > 6, nothing in a NO_HORIZON epoch. At
-        V3 every frame is a beacon carrying the absolute anchor (§4.5.4)."""
+    def _l0_state(self) -> Optional[_L0State]:
+        if self._top_vf is None:
+            return None                                  # no anchor has gone out yet
+        return _L0State(self._top_vf, self._bot_vf, self._top_lab, self._bot_lab, bool(self._anchor_found),
+                        self._anchor_codes, self._shown_hz)
+
+    def _set_l0(self, state: _L0State) -> None:
+        self._top_vf, self._bot_vf = state.top_vf, state.bot_vf
+        self._top_lab, self._bot_lab = state.top_lab, state.bot_lab
+        self._anchor_found = state.found
+        self._anchor_codes = state.codes
+        self._shown_hz = state.shown_hz
+
+    def _horizon_records(self, hz: vx.Horizon, key: bool, level: int, clear: Optional[int]) -> tuple:
+        """(records, the L0 state they leave at the base). Slot 1 on an
+        epoch-start attempt or its repeat (anchor + LAYER_CLEAR), else slot 3:
+        RESID when the change fits its fields, ABS on a larger move or a colour
+        stop change of ΔE > 6, nothing in a NO_HORIZON epoch. At V3 every frame
+        is a beacon carrying the absolute anchor (§4.5.4). The state is
+        committed only by the packed record's apply, so a dropped ABS never
+        becomes the reference of later RESIDs and a dropped epoch start
+        leaves the old anchor in place."""
         if key or self._anchor_repeat_left > 0 or self._anchor_found is None:
-            # The repeat is spent by the anchor candidate's apply (when it is
-            # packed), never here: a repeat that missed the budget is still owed.
-            return [self._anchor_record(hz), vs.LayerClear(self._clear_range)]
+            rec, state = self._anchor_record(hz)
+            return [rec, vs.LayerClear(clear if key else self._clear_range)], state
         if level >= 3:
-            return [self._anchor_record(hz)]
+            rec, state = self._anchor_record(hz)
+            return [rec], state
+        current = self._l0_state()
         colour_jump = (vx.delta_e76(vx.rgb_to_lab(hz.top), self._top_lab) > VERIFY_DE
                        or vx.delta_e76(vx.rgb_to_lab(hz.bottom), self._bot_lab) > VERIFY_DE)
         if not hz.found:
-            return [self._anchor_record(hz)] if colour_jump else []
+            if colour_jump:
+                rec, state = self._anchor_record(hz)
+                return [rec], state
+            return [], current
         y8, ang, curv = self._abs_codes(hz)
         ay, aa, ac = self._anchor_codes
         dy, dang = y8 - ay, ang - aa
         if colour_jump or curv != ac or not (-16 <= dy <= 15) or not (-8 <= dang <= 7):
-            return [self._anchor_record(hz)]
-        self._shown_hz = vx.horizon_from_codes(ay + dy, aa + dang, ac)
-        return [vs.HznResid(dy, dang)]
+            rec, state = self._anchor_record(hz)
+            return [rec], state
+        state = _L0State(current.top_vf, current.bot_vf, current.top_lab, current.bot_lab, True, current.codes,
+                         vx.horizon_from_codes(ay + dy, aa + dang, ac))
+        return [vs.HznResid(dy, dang)], state
 
     # ------------------------------------------------------------ epochs
 
     def _epoch_trigger(self, epoch_start: bool, hz: vx.Horizon, region_map: np.ndarray, regions: list,
                        now: float) -> Optional[int]:
-        """LAYER_CLEAR range of the epoch this frame starts, or None (§4.3)."""
+        """LAYER_CLEAR range of the epoch this frame starts, or None (§4.3). A
+        trigger stays pending until an attempt's anchor is packed; a stronger
+        trigger (a lower range) joins a pending weaker one."""
+        clear = None
         if self._epoch < 0 or epoch_start:
-            return 0
-        if self._pending_epoch is not None:
-            return self._pending_epoch
-        if self._anchor_found is not None and hz.found != self._anchor_found:
-            return 0
-        if now - self._epoch_t0 >= SAFETY_REFRESH_S:
-            return 2
-        prev = self._prev_region_map
-        if prev is not None and self._relabelled_fraction(prev, self._prev_region_lab, region_map,
-                                                          regions) > RELABEL_EPOCH_FRACTION:
-            return 0
-        return None
+            clear = 0
+        elif self._anchor_found is not None and hz.found != self._anchor_found:
+            clear = 0
+        elif now - self._epoch_t0 >= SAFETY_REFRESH_S:
+            clear = 2
+        elif self._pending_epoch != 0:
+            prev = self._prev_region_map
+            if prev is not None and self._relabelled_fraction(prev, self._prev_region_lab, region_map,
+                                                              regions) > RELABEL_EPOCH_FRACTION:
+                clear = 0
+        if clear is not None:
+            self._pending_epoch = clear if self._pending_epoch is None else min(self._pending_epoch, clear)
+        return self._pending_epoch
 
     @staticmethod
     def _gain_lin(codes: tuple) -> np.ndarray:
@@ -499,20 +538,19 @@ class VectorEncoder:
                 relabelled += float(area_c[c])
         return relabelled / total
 
-    def _start_epoch(self, clear_range: int, level: int, now: float) -> None:
-        if self._epoch_started_frame != self._frame_no:   # an id-exhaustion rebuild keeps the number
-            self._epoch = (self._epoch + 1) & 15
-            self._epoch_started_frame = self._frame_no
+    def _commit_epoch(self, clear: int, level: int, now: float) -> None:
+        """The epoch start went out: advance the counter and start the epoch's
+        clocks. The cleared layers were removed from the mirror when the
+        attempt was built (``_build``), and a failed attempt puts the old
+        mirror back, so only the counters live here."""
+        self._epoch = (self._epoch + 1) & 15
         self._epoch_t0 = now
-        self._clear_range = clear_range
+        self._clear_range = clear
         self._pending_epoch = None
-        self._anchor_found = None
         self._anchor_repeat_left = LEVEL_REPEATS[level]
-        if clear_range == 0:                          # every mass is redefined: a fresh reference exposure
+        if clear == 0:                                # every mass is redefined: a fresh reference exposure
             self._gain = self._gain_next = GAIN_NEUTRAL
-        dropped = {0: ("mass", "plant", "edge"), 1: ("plant", "edge"), 2: ("edge",), 3: ()}[clear_range]
-        for id_ in [i for i, s in self._shapes.items() if s.layer in dropped]:
-            del self._shapes[id_]
+        self._committed = True
 
     def _alloc_id(self, layer: str, taken: set) -> int:
         rng = {"plant": vs.ID_PLANT, "edge": vs.ID_EDGE}.get(layer, vs.ID_MASS)
@@ -529,11 +567,51 @@ class VectorEncoder:
     def _build(self, work: np.ndarray, hz: vx.Horizon, regions: list, region_map: np.ndarray, edges: list,
                clear: Optional[int], level: int, moving: bool, budget_bytes: int, age_units: int,
                now: float) -> tuple:
+        """One frame. An epoch start is a transaction (§3.5): the attempt is
+        built on the mirror the new epoch would have (the cleared layers
+        gone, their ids free) with the key bit set, the F − 1 cap, the anchor
+        + LAYER_CLEAR at the head and every other record but STATUS needing
+        the anchor; the epoch — counter, clocks, clear range, repeats, GAIN
+        reset, mirror — is committed by the anchor candidate's apply, so an
+        attempt whose anchor did not fit leaves nothing behind and is made
+        again next frame, key bit still set, until it fits."""
         key = clear is not None
+        saved_shapes = self._shapes
+        self._committed = False
         if key:
-            self._start_epoch(clear, level, now)
-            if clear == 0:
-                self._normalise(regions, GAIN_NEUTRAL)
+            self._pending_epoch = clear if self._pending_epoch is None else min(self._pending_epoch, clear)
+            dropped = {0: ("mass", "plant", "edge"), 1: ("plant", "edge"), 2: ("edge",), 3: ()}[clear]
+            self._shapes = {i: s for i, s in saved_shapes.items() if s.layer not in dropped}
+        try:
+            body, records, stats = self._build_attempt(work, hz, regions, region_map, edges, clear, level,
+                                                       moving, budget_bytes, age_units, now)
+        finally:
+            if key and not self._committed:
+                self._shapes = saved_shapes                  # the attempt failed: the old epoch stands
+        # The residual is measured against what the base holds after this frame.
+        h, w = self._valid.shape
+        if self._top_vf is not None:
+            mirror = vx.render_l0(self._shown_hz, self._top_vf, self._bot_vf, (h, w))
+        else:
+            mirror = np.zeros((h, w, 3), np.float32)         # no anchor has gone out yet
+        gain = self._gain_lin(self._gain)
+        for s in sorted(self._masses(), key=lambda s: -s.area):
+            mirror[s.raster] = np.clip(s.shown * gain, 0.0, 255.0)
+        err = ((work.astype(np.float32) - mirror) ** 2).sum(axis=2)
+        stats["residual"] = float(err[self._valid].mean()) if self._valid.any() else 0.0
+        stats["n_live"] = len(self._shapes)
+        stats["epoch_committed"] = self._committed
+        stats["epoch_pending"] = self._pending_epoch
+        return body, records, stats
+
+    def _build_attempt(self, work: np.ndarray, hz: vx.Horizon, regions: list, region_map: np.ndarray,
+                       edges: list, clear: Optional[int], level: int, moving: bool, budget_bytes: int,
+                       age_units: int, now: float) -> tuple:
+        key = clear is not None
+        if key and clear == 0:
+            self._gain_next = GAIN_NEUTRAL               # the new epoch's reference exposure is this capture
+            self._normalise(regions, GAIN_NEUTRAL)
+        base_gain = GAIN_NEUTRAL if (key and clear == 0) else self._gain   # the base's GAIN once this frame applies
         f_bytes = max(0, int(budget_bytes) - HEADER_LEN)
         if LEVEL_BODY[level] is not None:
             f_bytes = min(f_bytes, LEVEL_BODY[level])
@@ -542,23 +620,45 @@ class VectorEncoder:
         f_bytes = max(f_bytes, 0)
         total_bits = max(f_bytes * 8 - vs.HEADER_BITS, 0)
         h, w = self._valid.shape
+        epoch_no = ((self._epoch + 1) & 15) if key else self._epoch    # the number the header carries
         cands: list = []
-        hzn = self._horizon_records(hz, key, level)
+        hzn, l0_state = self._horizon_records(hz, key, level, clear)
+        anchor_cand = None
         for i, rec in enumerate(hzn):                        # anchor + LAYER_CLEAR: slot 1; RESID/ABS: slot 3
-            apply = self._spend_anchor_repeat if (len(hzn) == 2 and not key and i == 0) else (lambda: None)
+            if i > 0:
+                apply = lambda: None
+            elif key:                                        # the epoch start commits the epoch
+                apply = lambda: (self._commit_epoch(clear, level, now), self._set_l0(l0_state))
+            elif len(hzn) == 2:                              # its repeat
+                apply = lambda: (self._spend_anchor_repeat(), self._set_l0(l0_state))
+            else:
+                apply = lambda: self._set_l0(l0_state)
             # LAYER_CLEAR rides with its anchor: if the anchor does not fit, neither goes.
             needs = cands[-1] if (len(hzn) == 2 and i == 1) else None
             cands.append(_Cand(1 if len(hzn) == 2 else 3, (i,), rec, vs.record_bits(rec), apply, needs=needs))
-        if self._gain_next != self._gain or (key and self._gain_next != GAIN_NEUTRAL):
+            if i == 0 and key:
+                anchor_cand = cands[-1]
+        if self._gain_next != base_gain or (key and self._gain_next != GAIN_NEUTRAL):
             gain = vs.Gain(*self._gain_next)             # absolute since the epoch start (§3.3)
             cands.append(_Cand(3, (9,), gain, vs.record_bits(gain), lambda: setattr(self, "_gain", self._gain_next)))
         status = vs.Status(moving=bool(moving), **STATUS_NONE)
         cands.append(_Cand(4, (0,), status, vs.record_bits(status), lambda: None))
-        l0 = vx.render_l0(self._shown_hz, self._top_vf, self._bot_vf, (h, w))
+        # ΔD is scored against the L0 this frame's HZN record leaves (it precedes every define).
+        if l0_state is not None:
+            l0 = vx.render_l0(l0_state.shown_hz, l0_state.top_vf, l0_state.bot_vf, (h, w))
+        else:
+            l0 = np.zeros((h, w, 3), np.float32)
         verified: set = set()
         if level < 3:                                        # V3 is the anchor + STATUS beacon only
             self._temporal_candidates(work, l0, regions, region_map, level, key, cands, verified)
             self._edge_candidates(edges, level, cands, verified)
+        if anchor_cand is not None:
+            # Nothing of the new epoch goes out ahead of its anchor: a define,
+            # GAIN or CONFIRM in a frame whose anchor was dropped would name an
+            # epoch the base cannot hand over to. STATUS is epoch-free and rides.
+            for c in cands:
+                if c is not anchor_cand and c.needs is None and not isinstance(c.record, vs.Status):
+                    c.needs = anchor_cand
         carousel_bits = int(LEVEL_KAPPA[level] * total_bits) if self._carousel_due(level) else 0
         reserve = self._confirm_bits(sorted(verified)) + vs.record_bits(vs.Digest(0, 0))
         packed, used = self._pack(cands, total_bits, reserve, carousel_bits)
@@ -566,7 +666,7 @@ class VectorEncoder:
             c.apply()
         mentioned = {id_ for c in packed for id_ in c.mentions}
         records = [c.record for c in packed]
-        if level < 3:
+        if level < 3 and (not key or self._committed):       # CONFIRM and DIGEST describe the epoch's mirror
             unmentioned = [i for i in sorted(verified) if i not in mentioned and i in self._shapes]
             for rec in self._confirm_records(unmentioned):
                 if used + vs.record_bits(rec) <= total_bits:
@@ -578,14 +678,8 @@ class VectorEncoder:
             if used + vs.record_bits(digest) <= total_bits:
                 records.append(digest)
                 used += vs.record_bits(digest)
-        header = vs.Header(key=key, age=max(0, min(15, int(age_units))), epoch=self._epoch, level=level)
+        header = vs.Header(key=key, age=max(0, min(15, int(age_units))), epoch=epoch_no, level=level)
         body = vs.encode_frame(header, records, f_bytes) if f_bytes >= 2 else b""
-        mirror = l0.copy()
-        gain = self._gain_lin(self._gain)
-        for s in sorted(self._masses(), key=lambda s: -s.area):
-            mirror[s.raster] = np.clip(s.shown * gain, 0.0, 255.0)
-        err = ((work.astype(np.float32) - mirror) ** 2).sum(axis=2)
-        residual = float(err[self._valid].mean()) if self._valid.any() else 0.0
         bits = {"hdr": vs.HEADER_BITS, "L0": 0, "L1": 0, "L2": 0, "L3": 0, "L4": 0, "ctrl": 0}
         counts: dict = {}
         for rec in records:
@@ -593,10 +687,9 @@ class VectorEncoder:
             counts[type(rec).__name__] = counts.get(type(rec).__name__, 0) + 1
         bits["pad"] = len(body) * 8 - sum(bits.values()) if body else 0
         packed_ids = {id(c) for c in packed}
-        stats = {"epoch": self._epoch, "epoch_start": key, "f_bytes": f_bytes, "body_bytes": len(body),
+        stats = {"epoch": epoch_no, "epoch_start": key, "f_bytes": f_bytes, "body_bytes": len(body),
                  "record_bits": used + vs.HEADER_BITS, "bits": bits, "records": counts,
-                 "n_live": len(self._shapes), "n_candidates": len(cands), "n_packed": len(packed),
-                 "residual": residual, "carousel_bits": carousel_bits,
+                 "n_candidates": len(cands), "n_packed": len(packed), "carousel_bits": carousel_bits,
                  "candidates": [(c.slot, type(c.record).__name__, c.bits, c.order, id(c) in packed_ids)
                                 for c in cands]}
         return body, records, stats

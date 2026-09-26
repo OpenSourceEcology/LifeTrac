@@ -219,7 +219,7 @@
     <button id="encq-send">Apply quality</button>
     <span id="encq-status" class="meta"></span>
   </div>
-  <p class="meta">
+  <p class="meta" id="encq-help">
     Codec quality (20–100) rides the same 0x63 LoRa command as the mode;
     the tractor echoes the effective value in its ack. Lower = smaller
     frames = faster link.
@@ -269,6 +269,29 @@
     const encqValue  = document.getElementById('encq-value');
     const encqSend   = document.getElementById('encq-send');
     const encqStatus = document.getElementById('encq-status');
+    const encqHelp   = document.getElementById('encq-help');
+    // Two dials share one slider (VECTOR_SCENE.md §6): the tile modes' WebP
+    // quality (20–100) and VECTOR's detail (60–100, band V0). The server
+    // keeps them apart and returns the selected mode's value with every
+    // response, so the slider is re-ranged and re-valued from that reply
+    // rather than carrying the previous mode's number across.
+    const DIALS = {
+      tile:   {min: 20, label: 'Apply quality', help: 'Codec quality (20–100) rides the same 0x63 LoRa command as the mode; the tractor echoes the effective value in its ack. Lower = smaller frames = faster link.'},
+      vector: {min: 60, label: 'Apply detail',  help: 'Vector detail (60–100) rides the same 0x63 command; it sets how much INSERT/L4 detail the tractor spends within band V0. The degradation ladder, not this dial, produces the lower bands.'},
+    };
+    function paintQuality(mode, quality) {
+      const dial = mode === 'vector' ? DIALS.vector : DIALS.tile;
+      encqSlider.min = dial.min;
+      encqSend.textContent = dial.label;
+      encqHelp.textContent = dial.help;
+      if (quality != null) {
+        encqSlider.value = quality;
+        encqValue.textContent = quality;
+      } else if (parseInt(encqSlider.value, 10) < dial.min) {
+        encqSlider.value = dial.min;
+        encqValue.textContent = dial.min;
+      }
+    }
     encqSlider.addEventListener('input', () => {
       encqValue.textContent = encqSlider.value;
     });
@@ -288,7 +311,7 @@
         if (!r.ok) { encqStatus.textContent = 'set failed: HTTP ' + r.status; return; }
         const data = await r.json();
         encqValue.textContent = data.quality != null ? data.quality : '—';
-        if (data.mode) paintCurrent(data.mode);   // server is authoritative
+        if (data.mode) { paintCurrent(data.mode); paintQuality(data.mode, data.quality); }   // server is authoritative
         encqStatus.textContent = data.delivered
           ? 'pinned — tractor ack will confirm the effective value'
           : 'persisted (broker offline)';
@@ -316,10 +339,7 @@
         encWrap.appendChild(btn);
       }
       paintCurrent(data.current);
-      if (data.quality != null) {
-        encqSlider.value = data.quality;
-        encqValue.textContent = data.quality;
-      }
+      paintQuality(data.current, data.quality);
     }
 
     async function setEncodeMode(mode) {
@@ -338,6 +358,7 @@
         }
         const data = await r.json();
         paintCurrent(data.mode);
+        paintQuality(data.mode, data.quality);   // each mode shows its own dial
         encStatus.textContent = data.delivered
           ? 'pinned (bridge will apply within ~1 s)'
           : 'persisted (broker offline — will apply when bridge reconnects)';
