@@ -2,7 +2,10 @@
 
 ## Overview
 
-Each flat plate steel part in the LifeTrac v25 design has been extracted into its own .scad file with complete manufacturing details. Individual 2D SVG cutouts can be generated for each part for CNC plasma cutting.
+Each flat plate steel part in the LifeTrac v25 design has been extracted into its own .scad file. Individual 2D SVG cutouts can be generated for each part for CNC plasma cutting.
+
+> [!WARNING]
+> These parts are not yet ready for fabrication. Read the warning at the top of [README.md](README.md) before cutting anything.
 
 ## Quick Start
 
@@ -19,7 +22,8 @@ SVG files will be created in `output/svg/parts/`
 
 ```bash
 cd LifeTrac-v25/DESIGN-STRUCTURAL
-openscad -o output/svg/parts/wheel_mount.svg --export-format=svg parts/export_wheel_mount.scad
+mkdir -p output/svg/parts
+openscad -o output/svg/parts/wheel_mount.svg --export-format=svg openscad/parts/export_wheel_mount.scad
 ```
 
 ## Part List
@@ -117,14 +121,15 @@ All individual SVG exports include:
 
 ```
 DESIGN-STRUCTURAL/
-├── parts/
-│   ├── side_panel.scad                    # Part definition
-│   ├── export_side_panel_outer.scad       # 2D export wrapper
-│   ├── export_side_panel_inner.scad       # 2D export wrapper
-│   ├── wheel_mount.scad                   # Part definition
-│   ├── export_wheel_mount.scad            # 2D export wrapper
-│   └── ... (other parts)
-├── output/
+├── openscad/
+│   └── parts/
+│       ├── side_panel.scad                # Part definition
+│       ├── export_side_panel_outer.scad   # 2D export wrapper
+│       ├── export_side_panel_inner.scad   # 2D export wrapper
+│       ├── wheel_mount.scad               # Part definition
+│       ├── export_wheel_mount.scad        # 2D export wrapper
+│       └── ... (other parts)
+├── output/                                # Generated locally, git-ignored
 │   └── svg/
 │       └── parts/
 │           ├── side_panel_outer.svg       # Generated SVG
@@ -136,10 +141,12 @@ DESIGN-STRUCTURAL/
 
 ## Automated Generation
 
-The GitHub Actions workflow `.github/workflows/generate-part-svgs.yml` automatically:
-- Regenerates all individual part SVGs when part files are modified
-- Commits the updated SVG files back to the repository
-- Updates README with links to SVG files
+The GitHub Actions workflow `.github/workflows/generate-part-svgs.yml` runs on pull requests and pushes to `main` that change `openscad/parts/*.scad` or `openscad/lifetrac_v25_params.scad`. It:
+- Regenerates the 8 individual part SVGs listed above
+- Fails if any SVG is missing or empty
+- Uploads the SVGs as the `part-svgs` workflow artifact, kept for 90 days
+
+It does not commit the SVGs or edit the README, because `output/` is git-ignored.
 
 ## Troubleshooting
 
@@ -162,15 +169,15 @@ The GitHub Actions workflow `.github/workflows/generate-part-svgs.yml` automatic
 
 When adding new plate parts:
 
-1. Create the part file: `parts/new_part.scad`
-2. Create export wrapper: `parts/export_new_part.scad`
-3. Add to export script: `export_individual_svgs.sh`
+1. Create the part file: `openscad/parts/new_part.scad`
+2. Create export wrapper: `openscad/parts/export_new_part.scad`
+3. Add it to the export script `export_individual_svgs.sh` and to the export list in `.github/workflows/generate-part-svgs.yml`
 4. Update this guide with part specifications
 5. Test SVG generation before committing
 
 ## See Also
 
-- `parts/README_EXPORTS.md` - Detailed export file documentation
-- `cnclayout.scad` - Combined layout of all parts
+- `openscad/parts/README_EXPORTS.md` - Detailed export file documentation
+- `openscad/cnclayout.scad` - Combined layout of all parts
 - `openscad/lifetrac_v25.scad` - Full assembly model
 - `openscad/lifetrac_v25_params.scad` - Shared parameters

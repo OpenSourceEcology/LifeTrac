@@ -4,13 +4,15 @@ on:
   push:
     branches: [ main, master ]
     paths: 
-      - 'LifeTrac-v25/DESIGN-STRUCTURAL/parts/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/parts/*.scad'
       - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad'
+      - '.github/workflows/generate-part-svgs.yml'
   pull_request:
     branches: [ main, master ]
     paths: 
-      - 'LifeTrac-v25/DESIGN-STRUCTURAL/parts/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/parts/*.scad'
       - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad'
+      - '.github/workflows/generate-part-svgs.yml'
   workflow_dispatch:
 
 jobs:
@@ -18,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     
     permissions:
-      contents: write
+      contents: read
     
     steps:
     - uses: actions/checkout@v4
@@ -41,118 +43,68 @@ jobs:
         echo "========================================="
         
         # Function to export a part
+        failed=0
         export_part() {
           local name=$1
           local scad=$2
           local svg=$3
           echo "Exporting ${name}..."
           xvfb-run -a openscad --render --export-format=svg -o "${svg}" "${scad}" 2>&1 | grep -v "WARNING" || true
-          if [ -f "${svg}" ]; then
+          if [ -s "${svg}" ]; then
             echo "  ✓ ${name} exported"
             ls -lh "${svg}"
           else
-            echo "  ✗ Failed to export ${name}"
+            echo "::error::Failed to export ${name} (${scad})"
+            failed=1
           fi
         }
         
         # Export all parts
         export_part "Side Panel Outer" \
-          "parts/export_side_panel_outer.scad" \
+          "openscad/parts/export_side_panel_outer.scad" \
           "output/svg/parts/side_panel_outer.svg"
         
         export_part "Side Panel Inner" \
-          "parts/export_side_panel_inner.scad" \
+          "openscad/parts/export_side_panel_inner.scad" \
           "output/svg/parts/side_panel_inner.svg"
         
         export_part "Wheel Mount" \
-          "parts/export_wheel_mount.scad" \
+          "openscad/parts/export_wheel_mount.scad" \
           "output/svg/parts/wheel_mount.svg"
         
         export_part "Cylinder Lug" \
-          "parts/export_cylinder_lug.scad" \
+          "openscad/parts/export_cylinder_lug.scad" \
           "output/svg/parts/cylinder_lug.svg"
         
         export_part "Rear Crossmember" \
-          "parts/export_rear_crossmember.scad" \
+          "openscad/parts/export_rear_crossmember.scad" \
           "output/svg/parts/rear_crossmember.svg"
         
         export_part "Standing Deck" \
-          "parts/export_standing_deck.scad" \
+          "openscad/parts/export_standing_deck.scad" \
           "output/svg/parts/standing_deck.svg"
         
         export_part "Bucket Bottom" \
-          "parts/export_bucket_bottom.scad" \
+          "openscad/parts/export_bucket_bottom.scad" \
           "output/svg/parts/bucket_bottom.svg"
         
         export_part "Bucket Side" \
-          "parts/export_bucket_side.scad" \
+          "openscad/parts/export_bucket_side.scad" \
           "output/svg/parts/bucket_side.svg"
         
         echo "========================================="
         echo "Export Complete!"
         echo "========================================="
         ls -lh output/svg/parts/
-    
-    - name: Update README with part SVG links
-      run: |
-        cd LifeTrac-v25/DESIGN-STRUCTURAL
-        
-        # Check if README already has part SVG section
-        if ! grep -q "Individual Part SVGs" README.md; then
-          echo "Adding Individual Part SVG section to README..."
-          
-          {
-            echo ""
-            echo "## Individual Part SVGs"
-            echo ""
-            echo "2D CNC cutting layouts for each individual plate part:"
-            echo ""
-            echo '### Half-Inch (1/2") Plate Parts'
-            echo "- [Side Panel Outer](output/svg/parts/side_panel_outer.svg) - 2× needed"
-            echo "- [Side Panel Inner](output/svg/parts/side_panel_inner.svg) - 2× needed"
-            echo "- [Wheel Mount](output/svg/parts/wheel_mount.svg) - 4× needed"
-            echo "- [Cylinder Lug](output/svg/parts/cylinder_lug.svg) - 6× needed"
-            echo "- [Rear Crossmember](output/svg/parts/rear_crossmember.svg) - 1× needed"
-            echo ""
-            echo '### Quarter-Inch (1/4") Plate Parts'
-            echo "- [Standing Deck](output/svg/parts/standing_deck.svg) - 1× needed"
-            echo "- [Bucket Bottom](output/svg/parts/bucket_bottom.svg) - 1× needed"
-            echo "- [Bucket Side](output/svg/parts/bucket_side.svg) - 2× needed (mirror for opposite)"
-            echo ""
-            echo "Total: 23 parts from 8 unique designs"
-          } >> README.md
-          echo "✓ README updated with part SVG links"
-        else
-          echo "ℹ️  README already has part SVG section"
+        if [ "$failed" -ne 0 ]; then
+          exit 1
         fi
     
-    - name: Commit and push if changed
-      run: |
-        cd LifeTrac-v25/DESIGN-STRUCTURAL
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add output/svg/parts/*.svg README.md || true
-        
-        if git diff --staged --quiet; then
-          echo "ℹ️  No changes to commit"
-        else
-          echo "📝 Committing changes..."
-          git commit -m "Update individual part SVG cutouts [skip ci]"
-          
-          # Fetch and rebase to incorporate any remote changes
-          BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
-          echo "🔄 Fetching latest changes from branch: ${BRANCH_NAME}..."
-          git fetch origin "${BRANCH_NAME}"
-          
-          echo "🔄 Rebasing on latest changes..."
-          if ! git rebase "origin/${BRANCH_NAME}"; then
-            echo "❌ Failed to rebase. There may be conflicts."
-            echo "Aborting rebase and exiting..."
-            git rebase --abort
-            exit 1
-          fi
-          
-          echo "📤 Pushing changes..."
-          git push
-          echo "✅ Changes pushed successfully"
-        fi
+    # output/ is git-ignored, so the SVGs are only available as an artifact
+    - name: Upload part SVGs
+      uses: actions/upload-artifact@v4
+      with:
+        name: part-svgs
+        path: LifeTrac-v25/DESIGN-STRUCTURAL/output/svg/parts/
+        if-no-files-found: error
+        retention-days: 90

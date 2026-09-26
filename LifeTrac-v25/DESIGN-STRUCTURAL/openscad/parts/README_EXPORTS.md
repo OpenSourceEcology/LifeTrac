@@ -65,7 +65,8 @@ To export a single part:
 
 ```bash
 cd DESIGN-STRUCTURAL
-openscad -o output/svg/parts/part_name.svg --export-format=svg parts/export_part_name.scad
+mkdir -p output/svg/parts
+openscad -o output/svg/parts/part_name.svg --export-format=svg openscad/parts/export_part_name.scad
 ```
 
 ### Batch Export (All Parts)

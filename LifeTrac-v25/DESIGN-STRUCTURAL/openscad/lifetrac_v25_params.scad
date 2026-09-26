@@ -366,11 +366,13 @@ _clearance_E = _dist_EC - _R_constraint;
 echo("DEBUG: Clearance at Elbow:", _clearance_E);
 
 // Calculate Exact Clearance to Main Arm (Segment P-E) and Drop Arm (Segment E-T)
-function dist_point_line_verify(pt, v1, v2) = 
+// The shoelace term is already twice the triangle area, so dividing it by the
+// base gives the perpendicular distance directly (no extra factor of 2).
+function dist_point_line_verify(pt, v1, v2) =
     let(
-        area = abs(v1[0]*(v2[1]-pt[1]) + v2[0]*(pt[1]-v1[1]) + pt[0]*(v1[1]-v2[1])),
+        twice_area = abs(v1[0]*(v2[1]-pt[1]) + v2[0]*(pt[1]-v1[1]) + pt[0]*(v1[1]-v2[1])),
         base = norm(v1 - v2)
-    ) (base == 0) ? norm(pt - v1) : (area / base * 2);
+    ) (base == 0) ? norm(pt - v1) : (twice_area / base);
 
 _clr_main_geometric = dist_point_line_verify(_C, _P, _E_solved) - _R_wheel - _tube_offset;
 _clr_drop_geometric = dist_point_line_verify(_C, _E_solved, _T) - _R_wheel - _tube_offset; // Use _T, not _T_solved (undefined)
@@ -517,6 +519,11 @@ ARM_MAX_ANGLE = 60 + ARM_V2_OFFSET_ANGLE;   // Maximum raised position
 // Pivot position in panel coordinates (for arc slot calculations)
 PIVOT_PANEL_X = ARM_PIVOT_Y;                          // Pivot X in panel coords
 PIVOT_PANEL_Y = ARM_PIVOT_Z - FRAME_Z_OFFSET;         // Pivot Y in panel coords
+
+// Radius of steel kept around the arm pivot hole in the side panels. Without it the
+// sloped edge in front of the pivot passes 24 mm from the hole centre and leaves
+// about 4 mm of steel beside a 40 mm hole (finding P3 of the 2026-09-25 review).
+SIDE_PANEL_PIVOT_BOSS_R = 2 * PIVOT_PIN_DIA;
 
 // =============================================================================
 // HYDRAULIC CYLINDER MOUNTING POINTS

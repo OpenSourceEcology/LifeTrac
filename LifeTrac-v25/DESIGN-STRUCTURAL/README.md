@@ -2,6 +2,16 @@
 
 This directory contains the complete mechanical design for the LifeTrac v25 compact utility loader, created using OpenSCAD for parametric, open-source CAD.
 
+> [!WARNING]
+> **Not yet ready for fabrication (as of 2026-09-25).** A full review of the OpenSCAD model ([2026-09-25_v25_OpenSCAD_Full_Review_Claude_v1_0.md](../AI%20NOTES/CODE%20REVIEWS/2026-09-25_v25_OpenSCAD_Full_Review_Claude_v1_0.md)) found problems that would produce wrong steel parts. Don't cut steel from these outputs until they are fixed:
+>
+> - **Side panels:** `side_panel()` and its SVG exports lack most of the holes the assembly cuts (cross-tube cutouts, UWU bearing holes, stiffener bolt holes, inner-panel trims).
+> - **Bucket pivot joint:** the arm tips, the bucket's pivot and cylinder lugs, and the 1/4" bolts that hold those lugs are too weak for the 3" bucket cylinders at relief pressure (review finding P14).
+> - **`cnclayout.svg`:** several parts overlap, the stiffener, motor and pivot-mount plates are missing, and there is no kerf compensation.
+> - **Cut-list parts in `openscad/parts/structural/`:** the A1/A2 and A6 hole patterns don't line up with the plates they bolt to, the A6 segment lengths are wrong, and the T5 spacer is an empty solid.
+>
+> Sections 5 and 8 of the review give the details and the recommended order of fixes.
+
 ## Overview
 
 The LifeTrac v25 is a remotely-operated compact utility loader designed to be sized between a Toro Dingo and a Bobcat. It features:
@@ -305,13 +315,14 @@ For questions or issues:
 ### Combined Layout (All Parts)
 ![CNC Cutting Layout - All Parts](cnclayout.svg)
 
-The combined CNC layout includes all 23 sheet metal parts with complete manufacturing details:
+The combined CNC layout shows the plate parts with:
 - Mounting holes with proper clearances
 - Pivot holes for arm and cylinder connections
 - Arc slots for cross beam clearance (inner panels)
 - Lightening holes for weight reduction
 - Anti-slip hole patterns (standing deck)
-- All parts properly spaced for efficient cutting
+
+It is **not yet nested for cutting**: several parts overlap, the stiffener, motor and pivot-mount plates are missing, and there is no kerf compensation (see the warning at the top of this README).
 
 **Material Specifications:**
 - Half-inch (1/2") plate parts: 14 parts total
@@ -320,18 +331,18 @@ The combined CNC layout includes all 23 sheet metal parts with complete manufact
 
 ## Individual Part SVGs
 
-2D CNC cutting layouts for each individual plate part:
+2D CNC cutting outlines for each individual plate part. The SVGs are not committed, because `output/` is git-ignored. Download them from the `part-svgs` artifact of the latest **Generate Individual Part SVGs** workflow run, or generate them locally by running `./export_individual_svgs.sh` from this directory. Read the warning at the top of this README before cutting anything.
 
 ### Half-Inch (1/2") Plate Parts
-- [Side Panel Outer](output/svg/parts/side_panel_outer.svg) - 2× needed
-- [Side Panel Inner](output/svg/parts/side_panel_inner.svg) - 2× needed
-- [Wheel Mount](output/svg/parts/wheel_mount.svg) - 4× needed
-- [Cylinder Lug](output/svg/parts/cylinder_lug.svg) - 6× needed
-- [Rear Crossmember](output/svg/parts/rear_crossmember.svg) - 1× needed
+- Side Panel Outer (`side_panel_outer.svg`) - 2× needed
+- Side Panel Inner (`side_panel_inner.svg`) - 2× needed
+- Wheel Mount (`wheel_mount.svg`) - 4× needed
+- Cylinder Lug (`cylinder_lug.svg`) - 6× needed
+- Rear Crossmember (`rear_crossmember.svg`) - 1× needed
 
 ### Quarter-Inch (1/4") Plate Parts
-- [Standing Deck](output/svg/parts/standing_deck.svg) - 1× needed
-- [Bucket Bottom](output/svg/parts/bucket_bottom.svg) - 1× needed
-- [Bucket Side](output/svg/parts/bucket_side.svg) - 2× needed (mirror for opposite)
+- Standing Deck (`standing_deck.svg`) - 1× needed
+- Bucket Bottom (`bucket_bottom.svg`) - 1× needed
+- Bucket Side (`bucket_side.svg`) - 2× needed (mirror for opposite)
 
 Total: 23 parts from 8 unique designs
