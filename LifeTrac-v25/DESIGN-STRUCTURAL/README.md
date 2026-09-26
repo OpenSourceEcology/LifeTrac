@@ -5,7 +5,8 @@ This directory contains the complete mechanical design for the LifeTrac v25 comp
 > [!WARNING]
 > **Not yet ready for fabrication (as of 2026-09-25).** A full review of the OpenSCAD model ([2026-09-25_v25_OpenSCAD_Full_Review_Claude_v1_0.md](../AI%20NOTES/CODE%20REVIEWS/2026-09-25_v25_OpenSCAD_Full_Review_Claude_v1_0.md)) found problems that would produce wrong steel parts. Don't cut steel from these outputs until they are fixed:
 >
-> - **Side panels:** `side_panel()` and its SVG exports lack most of the holes the assembly cuts (cross-tube cutouts, UWU bearing holes, stiffener bolt holes, inner-panel trims). The arm-pivot hole also sits only about 4 mm from the plate edge.
+> - **Side panels:** `side_panel()` and its SVG exports lack most of the holes the assembly cuts (cross-tube cutouts, UWU bearing holes, stiffener bolt holes, inner-panel trims).
+> - **Bucket pivot joint:** the arm tips, the bucket's pivot and cylinder lugs, and the 1/4" bolts that hold those lugs are too weak for the 3" bucket cylinders at relief pressure (review finding P14).
 > - **`cnclayout.svg`:** several parts overlap, the stiffener, motor and pivot-mount plates are missing, and there is no kerf compensation.
 > - **Cut-list parts in `openscad/parts/structural/`:** the A1/A2 and A6 hole patterns don't line up with the plates they bolt to, the A6 segment lengths are wrong, and the T5 spacer is an empty solid.
 >

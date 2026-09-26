@@ -13,6 +13,7 @@ The body of this review describes the tree as it was on 2026-09-25. A closer loo
 |---|---|
 | B1a: clearance check reported double the distance | `dist_point_line_verify()` now returns `twice_area / base`. The solver prints −125.4 / −160.4 mm, and the difference is exactly the 35 mm `ARM_BALANCE_BIAS`. No other echo line or geometry changed |
 | P1: four export wrappers produced edge slices | The `rotate()` is removed from `export_side_panel_outer/inner`, `export_rear_crossmember` and `export_bucket_side`. They now export 1,392.6 × 1,000, 1,045.4 × 550 and 449.2 × 600 mm outlines |
+| P3: pivot hole 4 mm from the edge | `parts/side_panel.scad` (used by the assembly, the exports and `cnclayout.svg`) now adds a boss of radius `SIDE_PANEL_PIVOT_BOSS_R = 2 × PIVOT_PIN_DIA` (76.2 mm) around the pivot hole. Measured on the exported outline, there is now 46–56 mm of steel ahead of the hole in the directions the pin pushes (it was 5.6 mm). The nearest edge is now the top edge, 30 mm away. `assert`s guard both distances. The profile's inside corners now have 10 mm fillets. In the regenerated `cnclayout.svg`, only the four side-panel outlines changed |
 | P4: round holes exported as rectangles | The hole cylinders in `bucket_side.scad` and `cylinder_lug.scad` now go through the plate thickness. `cnclayout.svg` is regenerated; only its six lug pivot holes changed |
 | Jig includes (section 5.4) | `angle_iron_drill_jig.scad` and `tube_drill_jig.scad` include `../lifetrac_v25_params.scad` and compile with 0 warnings. Both are still placeholders |
 | `generate-part-svgs.yml` (section 5.5) | Watches and exports `openscad/parts/`, fails if an SVG is missing, and uploads the SVGs as an artifact (`output/` is git-ignored). Its steps that wrote README links to never-committed files, and tried to commit them, are removed; the README now lists the SVGs by file name and says where to get them. The same path error is fixed in `README_EXPORTS.md` and `INDIVIDUAL_PARTS_GUIDE.md`, whose commands now also create the output folder first. The guide now describes what the workflow actually does |
@@ -23,7 +24,8 @@ The body of this review describes the tree as it was on 2026-09-25. A closer loo
 **Not changed on purpose:**
 - **`pivot_welding_jig.scad`'s include.** Any change under `3d_printed_welding_jigs/` triggers `generate-jig-previews.yml`, whose push-event commit step has failed on both of its runs on main. The cause is that it `git add`s `renders/*.png` and `*.jpg`, which the root `.gitignore` ignores. Whether jig renders should be committed is a maintainer decision.
 - **The camera maths in the PNG/GIF workflows.** Fixing it would visibly change `assembly.png` and the animation.
-- **Everything that needs a design decision.** That covers wheel choice, DOM length, pivot boss, hole patterns, T5, deletions and the analysis rebuild.
+- **The bucket pivot joint (P14).** It can't be fixed at the arm tip alone: the bucket's lug sits just beyond the tip and is no stronger. The fix changes the bucket lugs and depends on which bucket cylinder is chosen.
+- **Everything else that needs a design decision.** That covers wheel choice, DOM length, hole patterns, T5, deletions and the analysis rebuild.
 
 ---
 
@@ -75,7 +77,7 @@ The model is ambitious and, in places, excellent: the parametric arm solver, the
 **The fabrication outputs aren't usable yet**:
 
 - **The four 1/2" side panels export as 1,373 × 13 mm strips** (P1; the export is fixed in this PR). Even a fixed export would be missing every hole the assembly adds (P2).
-- **The arm-pivot hole in those panels has about 4 mm of edge distance** (P3). At relief pressure the pin load on that edge is about equal to its tear-out strength.
+- **The arm-pivot hole in those panels has about 4 mm of edge distance** (P3; fixed in this PR). At relief pressure the pin load on that edge was about equal to its tear-out strength.
 - **The bucket pivot joint is weaker than the bucket cylinders that load it** (P14). At relief pressure the 3" bucket cylinder can tear the 1" pin out of the arm tip, and the bucket's own lug and its four 1/4" bolts are no stronger.
 - **The CNC layout has 7 overlapping part pairs and leaves out all the stiffener, motor and pivot-mount plates** (N1, N2).
 - **The angle-iron cut-list parts drill holes that don't line up with the plates they bolt to** (P10, P11).
@@ -455,7 +457,7 @@ These four are the 1/2" side panels, the most important plates on the machine. `
 
 **Fix:** move *all* panel features into `side_panel(is_inner, side)` so that the assembly and the export call exactly the same module. Export with `projection()` of the flat part (no rotate), and add a CI check that each exported SVG's bounding box matches the expected plate size.
 
-**P3. The arm-pivot hole in the side panels leaves about 4 mm of steel to the edge — Critical.** The Ø40.1 mm pivot hole at panel (200, 950) ([side_panel.scad:213](../../DESIGN-STRUCTURAL/openscad/parts/side_panel.scad#L213)) sits 24.0 mm from the steep edge running from (200, 1,000) to (300, 817.5) ([:31-49](../../DESIGN-STRUCTURAL/openscad/parts/side_panel.scad#L31-L49)). That leaves a **4.0 mm ligament** (computed, and measured on the rendered outline as 4.2 mm after corner rounding). This pin carries the whole loader arm reaction. Edge distance for a loaded pin hole should be roughly 1.5–2 × the hole diameter, i.e. 60–80 mm.
+**P3. The arm-pivot hole in the side panels leaves about 4 mm of steel to the edge — Critical.** *(Fixed in this PR; see Status.)* The Ø40.1 mm pivot hole at panel (200, 950) ([side_panel.scad:213](../../DESIGN-STRUCTURAL/openscad/parts/side_panel.scad#L213)) sits 24.0 mm from the steep edge running from (200, 1,000) to (300, 817.5) ([:31-49](../../DESIGN-STRUCTURAL/openscad/parts/side_panel.scad#L31-L49)). That leaves a **4.0 mm ligament** (computed, and measured on the rendered outline as 4.2 mm after corner rounding). This pin carries the whole loader arm reaction. Edge distance for a loaded pin hole should be roughly 1.5–2 × the hole diameter, i.e. 60–80 mm.
 
 **Load check** *(added 2026-09-26; Appendix C)*. With both lift cylinders at the 3,000 psi relief pressure, the pin pushes on each pair of panels with 59–69 kN. With the arms level or raised, that force points forward and up, toward this thin edge. The steel in that direction is only 5.5–5.7 mm. The nominal AISC tear-out strength of the two 1/2" panels (1.2 × l_c × t × F_u, before any safety factor) is 67–69 kN. So the hole has essentially no margin at relief pressure. At the 2,000–2,500 psi working pressure the load is still above what AISC ASD allows (Ω = 2).
 
@@ -531,7 +533,7 @@ This is a direct consequence of the missing `derived.scad` layer (C1).
 | Bucket pivot lug | A 3×3×1/4 U-channel ([main:1226-1291](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1226-L1291)) with the hole in the middle. The channel's open side faces the arm and ends 28.6 mm from the hole centre ([main:1256](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1256)), leaving 14.9 mm of steel in each 1/4" wall. The pin pushes toward that side | Tear-out: **91 kN** |
 | Lug-to-bucket bolts | 4 × 1/4" bolts ([main:1277-1288](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1277-L1288), M8), which the pin pulls in tension | **68 kN** (Grade 5) or **85 kN** (Grade 8), before prying |
 
-The tip can't simply be made bigger. The lug's base sits 31.75 mm from the pin, only 6.35 mm beyond the current tip, and it swings around the pin as the bucket tilts. The same U-lug with four 1/4" bolts also holds both ends of each bucket cylinder. On T3 those bolts are in shear and hold about 52 kN (Grade 5), against the cylinder's 94 kN push.
+The tip can't simply be made bigger. The lug's base sits 31.75 mm from the pin, only 6.35 mm beyond the current tip, and it swings around the pin as the bucket tilts. The same U-lug with four 1/4" bolts also holds both ends of each bucket cylinder. On T3 those bolts are in shear and hold about 47 kN (Grade 5, threads in the shear plane), against the cylinder's 94 kN push.
 
 **Fix:** redesign the joint and the cylinder lugs together, sized for the bucket cylinder that is actually chosen. For example: welded 1/2" clevis plates on a reinforced bucket back, an arm-tip boss with a radius of at least 2 × the pin diameter, and larger pins with bushings (M9). The model's 3" bucket cylinders push more than twice as hard as the 2" ones in the BOM ([BILL_OF_MATERIALS.md:71](../../DESIGN-STRUCTURAL/documentation/BILL_OF_MATERIALS.md); 41.9 kN at 3,000 psi). So choosing the cylinder (section 8, step 2) sets these loads.
 

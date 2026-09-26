@@ -520,6 +520,11 @@ ARM_MAX_ANGLE = 60 + ARM_V2_OFFSET_ANGLE;   // Maximum raised position
 PIVOT_PANEL_X = ARM_PIVOT_Y;                          // Pivot X in panel coords
 PIVOT_PANEL_Y = ARM_PIVOT_Z - FRAME_Z_OFFSET;         // Pivot Y in panel coords
 
+// Radius of steel kept around the arm pivot hole in the side panels. Without it the
+// sloped edge in front of the pivot passes 24 mm from the hole centre and leaves
+// about 4 mm of steel beside a 40 mm hole (finding P3 of the 2026-09-25 review).
+SIDE_PANEL_PIVOT_BOSS_R = 2 * PIVOT_PIN_DIA;
+
 // =============================================================================
 // HYDRAULIC CYLINDER MOUNTING POINTS
 // =============================================================================

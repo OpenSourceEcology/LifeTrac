@@ -38,17 +38,37 @@ module side_panel_profile() {
     // Calculate Z heights
     z_pivot_end = wall_height(y_pivot_end);
     z_front_slope = wall_height(y_front - 200); // Point before final drop
-    
+
+    // The arm pivot pin pushes forward and up on this plate, toward the sloped edge.
+    // The boss keeps 2 x the pin diameter of steel around the hole in that direction.
+    // Above the hole, the top edge must be at least 1.25 x the pin diameter away
+    // (the AISC minimum edge distance).
+    assert(SIDE_PANEL_PIVOT_BOSS_R >= 2 * PIVOT_PIN_DIA,
+           "SIDE_PANEL_PIVOT_BOSS_R must be at least 2 x PIVOT_PIN_DIA");
+    assert(MACHINE_HEIGHT - pivot_z_panel >= 1.25 * PIVOT_PIN_DIA,
+           "Arm pivot hole is too close to the top edge of the side panel");
+
     offset(r=10) offset(r=-10)  // Rounded corners
-    polygon([
-        [0, 0],                              // Rear bottom
-        [WHEEL_BASE, 0],                     // Front bottom
-        [WHEEL_BASE, 0],                     // Front top (drop to corner)
-        [WHEEL_BASE - 200, z_front_slope],   // End of arm slope
-        [y_pivot_end, z_pivot_end],          // Start of arm slope
-        [pivot_y_panel, MACHINE_HEIGHT],     // Pivot high point
-        [0, MACHINE_HEIGHT]                  // Rear top (full height)
-    ]);
+    offset(r=-10) offset(r=10)  // Fillets in the inside corners, e.g. where the boss meets the slope
+    union() {
+        polygon([
+            [0, 0],                              // Rear bottom
+            [WHEEL_BASE, 0],                     // Front bottom
+            [WHEEL_BASE, 0],                     // Front top (drop to corner)
+            [WHEEL_BASE - 200, z_front_slope],   // End of arm slope
+            [y_pivot_end, z_pivot_end],          // Start of arm slope
+            [pivot_y_panel, MACHINE_HEIGHT],     // Pivot high point
+            [0, MACHINE_HEIGHT]                  // Rear top (full height)
+        ]);
+
+        // Pivot boss, trimmed to the top edge
+        intersection() {
+            translate([pivot_y_panel, pivot_z_panel])
+                circle(r=SIDE_PANEL_PIVOT_BOSS_R, $fn=96);
+            translate([pivot_y_panel - SIDE_PANEL_PIVOT_BOSS_R, 0])
+                square([2 * SIDE_PANEL_PIVOT_BOSS_R, MACHINE_HEIGHT]);
+        }
+    }
 }
 
 // Arc slot cutout for cross beam clearance
