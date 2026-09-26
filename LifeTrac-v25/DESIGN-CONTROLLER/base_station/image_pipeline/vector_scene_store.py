@@ -793,13 +793,15 @@ class VectorSceneStore:
                 "g": [_r2(cx + dx * lo), _r2(cy + dy * lo), _r2(cx + dx * hi), _r2(cy + dy * hi)]}
 
     def _vfill_pair(self, vf: vs.VFill, above: bool) -> list[str]:
-        """Band colours in screen order (top → bottom): base + ΔL at the frame
-        edge and base − ΔL at the horizon (§3.3 vfill)."""
+        """Band colours in screen order (top → bottom): base + ΔL at the band's
+        top edge and base − ΔL at its bottom edge, for either band (§3.3 vfill:
+        sky +ΔL at the frame top, −ΔL at the horizon; ground +ΔL at the
+        horizon, −ΔL at the frame bottom) — the same reading the encoder fits."""
         base = self._gained(_rgb8(self._rgb444(vs.Fill(palette=vf.palette, rgb444=vf.rgb444))))
         dL = 8 * vf.dl
-        edge = _hex(tuple(_clip8(c + dL) for c in base))
-        hz = _hex(tuple(_clip8(c - dL) for c in base))
-        return [edge, hz] if above else [hz, edge]
+        top = _hex(tuple(_clip8(c + dL) for c in base))
+        bottom = _hex(tuple(_clip8(c - dL) for c in base))
+        return [top, bottom]
 
     def _shape_json(self, sh: _Shape, badge: int, now: int, cached: bool) -> tuple[dict, list[dict]]:
         d = sh.define

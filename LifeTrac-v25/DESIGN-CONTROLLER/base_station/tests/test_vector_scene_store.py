@@ -703,7 +703,7 @@ class SnapshotGoldenTests(StoreCase):
         h = self.snap()["horizon"]
         self.assertEqual((h["mode"], h["pts"]), ("abs", [[0.0, 0.0], [192.0, 0.0], [384.0, 0.0]]))
         self.assertEqual(h["sky"], ["#56abde", "#76cbfe"])         # base −16 at the top, +16 at the horizon
-        self.assertEqual(h["ground"], ["#6f4d2b", "#7f5d3b"])      # base −8 at the horizon, +8 at the bottom
+        self.assertEqual(h["ground"], ["#7f5d3b", "#6f4d2b"])      # base +8 at the horizon (band top), −8 at the bottom
         self.feed([vs.HznAbs(96, 2, 1, SKY, GND)], epoch=0)        # y 64 px, 1°, 4 px sag
         pts = self.snap()["horizon"]["pts"]
         t = math.tan(math.radians(1))
