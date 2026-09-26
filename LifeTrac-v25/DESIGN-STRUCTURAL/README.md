@@ -159,6 +159,16 @@ Wheel and axle components:
 
 ## Manufacturing Outputs
 
+### Part Drawings (PDF) - one per part
+
+[`drawings/generated/INDEX.md`](drawings/generated/INDEX.md) has a printable
+third-angle engineering drawing for every fabricated part and every hardware item:
+views, dimensions, hole table, material and **quantity per machine counted from
+the model**. It also links 1:1 DXF flat patterns, in millimetres, for every plate. The drawings
+regenerate automatically when the model changes (see [`drawings/README.md`](drawings/README.md)),
+and [`drawings/generated/CHECKS.md`](drawings/generated/CHECKS.md) lists model
+problems found along the way.
+
 ### DXF Export (CNC Cutting)
 
 For 2D parts (plates), export individual parts:
@@ -207,6 +217,12 @@ See `.github/workflows/openscad-render.yml` for details.
 - **G** - Electronics Housing (G1)
 
 See `documentation/PARTS_LIST.md` for complete details.
+
+These are assembly-level codes. The part drawings in `drawings/` use **piece marks**
+for individual fabricated pieces instead: **P** plate, **A** angle iron, **T** tube,
+**U** lug cut from tube, **R** round bar/pin, **J** 3D-printed jig, **F** purchased
+hardware (e.g. `A4` = frame tube mount angle). See
+[`drawings/parts_manifest.yaml`](drawings/parts_manifest.yaml).
 
 ## Materials
 

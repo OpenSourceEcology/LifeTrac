@@ -1,4 +1,4 @@
-include <../../lifetrac_v25_params.scad>
+include <../lifetrac_v25_params.scad>
 
 module pivot_welding_jig() {
     // Holds two plates apart at TUBE_2X6_1_4[0] (2 inches)

@@ -15,6 +15,12 @@ The canonical structural design lives in [`../DESIGN-STRUCTURAL/`](../DESIGN-STR
 
 > **Status:** Design is in active iteration. Build guide drafting is **not yet started**. If you want to help, open an issue.
 
+## Assembly sequence and part drawings
+
+* [`ASSEMBLY_SEQUENCE.md`](ASSEMBLY_SEQUENCE.md): the numbered, step-by-step list of which part goes on next (**draft**). It is generated from [`assembly_sequence.yaml`](assembly_sequence.yaml), which is the file to edit when the order needs changing. Step numbers renumber themselves; step `id`s never change. Check an edit with `python3 assembly_sequence.py --check`.
+* [`ASSEMBLY_MANUAL_AUTOGEN.md`](ASSEMBLY_MANUAL_AUTOGEN.md): the plan for turning that list into a LEGO/IKEA-style picture manual.
+* [`../DESIGN-STRUCTURAL/drawings/generated/INDEX.md`](../DESIGN-STRUCTURAL/drawings/generated/INDEX.md): a PDF engineering drawing for every part, with quantities counted from the model.
+
 ## Related
 
 - [`../BUILD-CONTROLLER/`](../BUILD-CONTROLLER/) — controller build guide.

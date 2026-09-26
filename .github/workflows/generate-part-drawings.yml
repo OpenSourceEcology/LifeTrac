@@ -1,0 +1,156 @@
+name: Generate Part Drawings (PDF)
+
+# One PDF engineering drawing per LifeTrac v25 part, regenerated whenever the
+# OpenSCAD model, the parts manifest, the generator or the assembly sequence
+# (or its checker) changes.
+#   * pull requests: build everything, run the checks, upload the PDFs as an
+#     artifact (nothing is committed to the PR branch)
+#   * main: also commit the updated drawings back to main with [skip ci]
+# Output is deterministic, so only drawings whose part really changed show up
+# in the commit; each changed part gets the next revision letter.
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/**'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/drawings/**'
+      - '!LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated/**'
+      - 'LifeTrac-v25/BUILD-STRUCTURE/assembly_sequence.yaml'
+      - 'LifeTrac-v25/BUILD-STRUCTURE/assembly_sequence.py'
+      - '.github/workflows/generate-part-drawings.yml'
+  pull_request:
+    paths:
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/**'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/drawings/**'
+      - '!LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated/**'
+      - 'LifeTrac-v25/BUILD-STRUCTURE/assembly_sequence.yaml'
+      - 'LifeTrac-v25/BUILD-STRUCTURE/assembly_sequence.py'
+      - '.github/workflows/generate-part-drawings.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: part-drawings-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only by default. Pull requests run code from the PR (tests, the
+# generator, OpenSCAD), so that job never gets a token that can write to the
+# repository; only the push-only `commit` job below does, and it runs no
+# project code - it just commits the drawings the first job uploaded.
+permissions:
+  contents: read
+
+jobs:
+  drawings:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.generate.outputs.code }}
+      sequence: ${{ steps.sequence.outcome }}
+    defaults:
+      run:
+        working-directory: LifeTrac-v25/DESIGN-STRUCTURAL/drawings
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: LifeTrac-v25/DESIGN-STRUCTURAL/drawings/requirements.txt
+
+      - name: Install OpenSCAD and Python packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openscad
+          openscad --version
+          pip install -r requirements.txt
+
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+
+      # --strict: an unregistered BOM_PART marker, a quantity mismatch or a
+      # failed DXF export fails the job (exit 2); a part that fails to render
+      # exits 3. Both still write every output, so the artifact is uploaded
+      # and main still gets the drawings that did regenerate; the last step
+      # then turns the job red. A crash (exit 1) commits nothing.
+      - name: Generate drawings
+        id: generate
+        continue-on-error: true
+        run: |
+          set +e
+          python generate_part_drawings.py --strict
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          exit $code
+
+      - name: Check the assembly sequence
+        id: sequence
+        run: python ../../BUILD-STRUCTURE/assembly_sequence.py --check
+
+      - name: Job summary
+        if: always()
+        run: |
+          if [ -f generated/CHECKS.md ]; then cat generated/CHECKS.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload drawings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: part-drawings
+          path: |
+            LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated/
+            LifeTrac-v25/DESIGN-STRUCTURAL/drawings/build/LifeTrac_v25_Part_Drawings.pdf
+            LifeTrac-v25/BUILD-STRUCTURE/ASSEMBLY_SEQUENCE.md
+          retention-days: 90
+
+      - name: Fail if the drawings reported problems
+        if: steps.generate.outcome == 'failure'
+        run: |
+          echo "::error title=Part drawings::generate_part_drawings.py --strict reported warnings or failures - see the job summary (CHECKS.md)."
+          exit 1
+
+  # Main only: commit the drawings from the artifact back to main. Generator
+  # warnings (exit 2) and render failures (exit 3) still commit what did
+  # regenerate; an invalid assembly sequence commits nothing.
+  commit:
+    needs: drawings
+    if: >-
+      !cancelled() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+      && contains(fromJSON('["0", "2", "3"]'), needs.drawings.outputs.code)
+      && needs.drawings.outputs.sequence == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # The artifact's root is LifeTrac-v25/ (the common parent of its paths).
+      # Clear generated/ first so drawings the generator removed stay removed.
+      - name: Replace generated files with the new drawings
+        run: rm -rf LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: part-drawings
+          path: LifeTrac-v25
+
+      - name: Commit updated drawings to main
+        run: |
+          test -f LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated/INDEX.md
+          test -f LifeTrac-v25/BUILD-STRUCTURE/ASSEMBLY_SEQUENCE.md
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add -A LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated LifeTrac-v25/BUILD-STRUCTURE/ASSEMBLY_SEQUENCE.md
+          if git diff --staged --quiet; then
+            echo "Drawings unchanged."
+            exit 0
+          fi
+          git commit -m "Update part drawings [skip ci]"
+          for attempt in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep $((attempt * 5))
+          done
+          echo "Could not push the updated drawings; they are in the workflow artifact."
+          exit 1

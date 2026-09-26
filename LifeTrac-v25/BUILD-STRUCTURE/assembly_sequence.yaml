@@ -1,0 +1,296 @@
+# LifeTrac v25 - structural assembly sequence                       *** DRAFT ***
+# =============================================================================
+# The single, editable list of which part goes on next. It is the source for:
+#   * ASSEMBLY_SEQUENCE.md, the numbered, human-readable list (generated)
+#   * the future LEGO/IKEA-style picture manual (see ASSEMBLY_MANUAL_AUTOGEN.md)
+#
+# HOW TO EDIT
+#   * Step NUMBERS are not stored here. They come from the order of the list,
+#     so you can insert, move or delete steps and everything renumbers itself.
+#   * Every step has a stable `id`. Never rename or reuse an id once it has been
+#     merged: issues, photos, comments and the manual refer to steps by id.
+#   * Found a problem building it this way? Fix or move the step, set its
+#     `status` back to draft, say why in `notes`, and open a PR.
+#   * Check your edit locally:
+#       python3 LifeTrac-v25/BUILD-STRUCTURE/assembly_sequence.py --check
+#     CI runs the same check whenever this file or the model changes. It fails on
+#     unknown part ids, a part used more times than the machine has, broken
+#     `after` / `uses` links, or a sub-assembly installed twice.
+#
+# STEP FIELDS
+#   id           stable slug, unique
+#   title        one imperative line ("Bolt the rear wall to the inner panels")
+#   add          parts installed in this step: [{part: A4, qty: 16}, ...]
+#                (ids from DESIGN-STRUCTURAL/drawings/parts_manifest.yaml; a new
+#                part that is drawn but has no manifest entry yet is in bom.csv)
+#   subassembly  name: this step builds a sub-assembly off the machine
+#                (drawn in a framed "callout" box, LEGO-style)
+#   make         how many copies of the sub-assembly (shown as "x2")
+#   uses         ids of earlier sub-assembly steps that are installed here
+#                (all `make` copies at once; each can be installed only once)
+#   after        ids of steps that must come earlier (checked)
+#   tools        tools and 3D-printed jigs (J-parts) needed
+#   notes        anything the builder should know
+#   status       draft | checked (desk-checked against the model) |
+#                verified (someone built it this way and it worked)
+#
+# Bolts, nuts and washers (F3-F10) are not listed per step yet. Their counts
+# are estimates until the model places a bolt at every joint.
+# =============================================================================
+
+version: 1
+manifest: ../DESIGN-STRUCTURAL/drawings/parts_manifest.yaml
+bom: ../DESIGN-STRUCTURAL/drawings/generated/bom.csv   # model-counted quantities
+# When every step has been checked, set complete: true. After that, an unused
+# fabricated part becomes a CI error instead of a warning.
+complete: false
+
+phases:
+  # ---------------------------------------------------------------------------
+  - id: prep
+    title: Prepare the parts
+    steps:
+      - id: prep-cut-drill-mark
+        title: Cut, drill and deburr every part from its drawing and paint-pen its part number on it
+        tools: [J1, J5, J6, drill press, chop saw or bandsaw, CNC plasma]
+        notes: >
+          Drawings: DESIGN-STRUCTURAL/drawings/generated/INDEX.md. Read each
+          sheet's CHECK BEFORE MAKING notes first; they list known model problems.
+          Lay the parts out by phase.
+        status: draft
+
+  # ---------------------------------------------------------------------------
+  - id: frame
+    title: Base frame
+    steps:
+      - id: floor-angles
+        title: Bolt the bottom angle runs to the floor plate
+        subassembly: Floor
+        add:
+          - {part: P7, qty: 1}
+          - {part: A6-1, qty: 6}
+          - {part: A6-2, qty: 6}
+          - {part: A6-3, qty: 6}
+        notes: >
+          Six runs of three segments, vertical leg up, one run along each side panel
+          line. Check the A6 lengths against the plate holes first: the drawings
+          flag a mismatch.
+        status: draft
+
+      - id: rear-wall
+        title: Bolt the vertical angles to the back stiffener plate
+        subassembly: Rear wall
+        add:
+          - {part: P4, qty: 1}
+          - {part: A1, qty: 2}
+          - {part: A2, qty: 4}
+        status: draft
+
+      - id: front-wall
+        title: Bolt the angles to the three front stiffener plates
+        subassembly: Front wall
+        add:
+          - {part: P5, qty: 1}
+          - {part: P6, qty: 2}
+          - {part: A10, qty: 8}
+          - {part: A4, qty: 2}
+        status: draft
+
+      - id: motor-plates
+        title: Bolt the bottom angle runs and tube angles to each motor plate
+        subassembly: Motor plate
+        make: 2
+        add:
+          - {part: P8, qty: 2}
+          - {part: A6-1, qty: 4}
+          - {part: A6-2, qty: 4}
+          - {part: A6-3, qty: 4}
+          - {part: A4, qty: 8}
+        status: draft
+
+      - id: inner-panels
+        title: Stand both inner side panels on the floor and bolt them to its angles
+        uses: [floor-angles]
+        add:
+          - {part: P3, qty: 2}
+        notes: Brace the panels square and plumb before tightening.
+        status: draft
+
+      - id: motor-plates-install
+        title: Bolt the motor plates to the floor between the inner panels
+        uses: [motor-plates]
+        after: [inner-panels]
+        status: draft
+
+      - id: cross-tubes
+        title: Slide the front and rear cross tubes through the panel windows and bolt on the tube angles
+        after: [inner-panels, motor-plates-install]
+        add:
+          - {part: T1, qty: 1}
+          - {part: T2, qty: 1}
+          - {part: A4, qty: 16}
+        tools: [J1]
+        status: draft
+
+      - id: outer-panels
+        title: Fit the left and right outer side panels
+        after: [cross-tubes]
+        add:
+          - {part: P1, qty: 1}
+          - {part: P2, qty: 1}
+        notes: P1 goes on the left and P2 on the right. They are not interchangeable.
+        status: draft
+
+      - id: rear-wall-install
+        title: Bolt the rear wall between the side panels
+        uses: [rear-wall]
+        after: [outer-panels]
+        notes: The drawing flags an interference with the inner panels. Check the fit first.
+        status: draft
+
+      - id: front-wall-install
+        title: Bolt the front wall to the panels and motor plates
+        uses: [front-wall]
+        after: [outer-panels, motor-plates-install]
+        status: draft
+
+  # ---------------------------------------------------------------------------
+  - id: wheels
+    title: Wheel units (UWU)
+    steps:
+      - id: hub-weldment
+        title: Weld each wheel hub (DOM tube, lug plate and four gussets)
+        subassembly: Wheel hub
+        make: 4
+        add:
+          - {part: T7, qty: 4}
+          - {part: P17, qty: 4}
+          - {part: P18, qty: 16}
+        status: draft
+
+      - id: wheel-drives
+        title: Fit the shafts, bearings, motors and hubs on the motor plates
+        uses: [hub-weldment]
+        after: [motor-plates-install, outer-panels]
+        add:
+          - {part: R6, qty: 4}
+        notes: >
+          Bearings, couplings, hydraulic motors, rims and tyres are purchased and
+          not in the parts manifest yet.
+        status: draft
+
+  # ---------------------------------------------------------------------------
+  - id: arms
+    title: Loader arms
+    steps:
+      - id: pivot-mounts
+        title: Weld the pivot plates to each pivot DOM tube
+        subassembly: Arm pivot mount
+        make: 2
+        add:
+          - {part: T6, qty: 2}
+          - {part: P11, qty: 4}
+        tools: [J2, J3, J4]
+        status: draft
+
+      - id: arms
+        title: Bolt each arm together (main tube between inner and outer plates, pivot mount, crossbeam angles)
+        subassembly: Loader arm
+        make: 2
+        uses: [pivot-mounts]
+        add:
+          - {part: T4, qty: 2}
+          - {part: P9, qty: 2}
+          - {part: P10, qty: 2}
+          - {part: A5, qty: 4}
+        status: draft
+
+      - id: crossbeam
+        title: Join the arms with the crossbeam and pin on the bucket-cylinder base lugs
+        uses: [arms]
+        add:
+          - {part: T3, qty: 1}
+          - {part: U1, qty: 2}
+          - {part: R3, qty: 2}
+        status: draft
+
+      - id: hang-arms
+        title: Hang the arm frame on the machine with the pivot pins
+        after: [crossbeam, outer-panels]
+        add:
+          - {part: R2, qty: 2}
+          - {part: F1, qty: 4}
+        notes: One 1-1/2 nut on each end of each pin.
+        status: draft
+
+  # ---------------------------------------------------------------------------
+  - id: bucket
+    title: Bucket
+    steps:
+      - id: bucket-weldment
+        title: Tack and weld the bucket (back, bottom, sides, cutting edge)
+        subassembly: Bucket
+        add:
+          - {part: P12, qty: 1}
+          - {part: P13, qty: 1}
+          - {part: P14, qty: 2}
+          - {part: P19, qty: 1}
+        notes: The drawing flags that the side plates' tab slots are modelled only 1 mm deep. Cut them through.
+        status: draft
+
+      - id: bucket-lugs
+        title: Weld the pivot and cylinder lugs to the bucket back
+        uses: [bucket-weldment]
+        add:
+          - {part: U2, qty: 2}
+          - {part: U3, qty: 2}
+        status: draft
+
+      - id: bucket-mount
+        title: Pin the bucket to the arm tips
+        after: [hang-arms, bucket-lugs]
+        add:
+          - {part: R4, qty: 2}
+        status: draft
+
+  # ---------------------------------------------------------------------------
+  - id: hydraulics
+    title: Cylinders
+    steps:
+      - id: lift-cylinders
+        title: Pin the lift cylinders between the inner panels and the arms
+        after: [hang-arms]
+        add:
+          - {part: R1, qty: 2}
+        notes: Hydraulic cylinders are purchased and not in the parts manifest yet.
+        status: draft
+
+      - id: bucket-cylinders
+        title: Pin the bucket cylinders between the crossbeam lugs and the bucket lugs
+        after: [bucket-mount, crossbeam]
+        add:
+          - {part: R3, qty: 2}
+        status: draft
+
+  # ---------------------------------------------------------------------------
+  - id: platform
+    title: Folding operator platform
+    steps:
+      - id: platform-weldment
+        title: Bolt the side and transverse angles to the deck
+        subassembly: Platform
+        add:
+          - {part: P15, qty: 1}
+          - {part: A7, qty: 2}
+          - {part: A8, qty: 2}
+        status: draft
+
+      - id: platform-install
+        title: Hinge the platform to the inner panels and fit the lock pins
+        uses: [platform-weldment]
+        after: [outer-panels]
+        add:
+          - {part: P16, qty: 2}
+          - {part: R5, qty: 2}
+          - {part: F2, qty: 2}
+        status: draft

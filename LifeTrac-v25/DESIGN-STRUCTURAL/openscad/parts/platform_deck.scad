@@ -19,6 +19,7 @@ include <../lifetrac_v25_params.scad>
  *   - Rear edge (angle iron attachment) at +Y
  */
 module platform_deck() {
+    echo(BOM_PART = "P15");  // counted by drawings/generate_part_drawings.py
     // Local variables for clarity
     width = PLATFORM_WIDTH;
     depth = PLATFORM_DEPTH;
