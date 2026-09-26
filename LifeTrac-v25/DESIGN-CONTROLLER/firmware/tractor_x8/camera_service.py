@@ -499,9 +499,13 @@ ENCODE_MODE_BTC4_PER_FRAME = 5
 ENCODE_MODE_MONO_G4        = 6
 ENCODE_MODE_ADAPTIVE       = 7
 ENCODE_MODE_RAWSTREAM      = 8
+# VS1 vector scene (VECTOR_SCENE.md): the whole frame as shapes in one
+# fragment; encoder in x8_image_pipeline/encode_vector.py, wire codec 6.
+ENCODE_MODE_VECTOR         = 9
 ENCODE_MODE_NAMES = (
     "full", "y_only", "motion_only", "wireframe",
     "btc4_per_tile", "btc4_per_frame", "mono_g4", "adaptive", "rawstream",
+    "vector",
 )
 # Modes whose encoder is actually implemented today. Anything outside
 # this set is silently clamped to ENCODE_MODE_Y_ONLY at the receive
@@ -513,6 +517,7 @@ _ENCODE_MODE_IMPLEMENTED = frozenset({
     ENCODE_MODE_WIREFRAME,
     ENCODE_MODE_MONO_G4,
     ENCODE_MODE_RAWSTREAM,
+    ENCODE_MODE_VECTOR,
 })
 
 
@@ -563,6 +568,7 @@ CODEC_BTC4_PER_TILE   = 2
 CODEC_BTC4_PER_FRAME  = 3
 CODEC_WEBP_LUMA       = 4   # grayscale WebP; base routes through Recolouriser
 CODEC_WEBP_RAWSTREAM  = 5   # raw WebP VP8/VP8L bitstream (container-stripped)
+CODEC_VECTOR          = 6   # VS1 vector-scene body after the 6-byte header
 
 # Map operator-selected EncodeMode -> wire codec for the frame header.
 # Modes whose encoders are not implemented yet still use CODEC_WEBP
@@ -578,6 +584,7 @@ _ENCODE_MODE_CODEC: dict[int, int] = {
     ENCODE_MODE_MONO_G4:         CODEC_MONO_G4,
     ENCODE_MODE_ADAPTIVE:        CODEC_WEBP_LUMA,   # placeholder; clamped to Y_ONLY
     ENCODE_MODE_RAWSTREAM:       CODEC_WEBP_RAWSTREAM,
+    ENCODE_MODE_VECTOR:          CODEC_VECTOR,
 }
 
 # Deployment knob: strip WebP containers for FULL-mode tiles without a
@@ -852,6 +859,27 @@ class LinkBudget:
         return True
 
 
+_VECTOR_ENCODER = None
+_VECTOR_SEQ = 0
+
+
+def _build_vector_frame(canvas: bytes, force_epoch: bool,
+                        byte_budget: "int | None") -> bytes:
+    """VECTOR (mode 9): hand the capture to the VS1 encoder and return its
+    complete TileDeltaFrame (codec 6). The encoder sizes its body to the wire
+    budget minus the 6-byte header itself (VECTOR_SCENE.md §3.7), and a mode
+    change's forced keyframe becomes an epoch start (§7.1)."""
+    global _VECTOR_ENCODER, _VECTOR_SEQ  # noqa: PLW0603
+    if _VECTOR_ENCODER is None:
+        from x8_image_pipeline.encode_vector import VectorEncoder
+        _VECTOR_ENCODER = VectorEncoder(canvas=(CANVAS_W, CANVAS_H))
+    rgb = _np.frombuffer(canvas, dtype=_np.uint8).reshape(CANVAS_H, CANVAS_W, 3)
+    budget = byte_budget if (byte_budget is not None and byte_budget > 0) else 203
+    _VECTOR_SEQ = (_VECTOR_SEQ + 1) & 0xFF
+    return _VECTOR_ENCODER.frame(rgb, budget, epoch_start=force_epoch,
+                                 quality=WEBP_QUALITY, seq=_VECTOR_SEQ)
+
+
 def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
                  *,
                  roi_planner=None,
@@ -885,6 +913,8 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
         is folded into the hash key (different quality → different blob).
     """
     canvas = cam.grab_rgb()
+    if ENCODE_MODE == ENCODE_MODE_VECTOR and _HAS_NUMPY:
+        return _build_vector_frame(canvas, force_keyframe, byte_budget)
     now = time.monotonic()
     is_key = (force_keyframe or accum.last_canvas is None or
               (now - accum.last_keyframe_t) >= KEYFRAME_PERIOD_S)
@@ -1249,7 +1279,11 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
     ENCODE_MODE = effective
     if quality is not None:
         try:
-            q = max(20, min(100, int(quality)))
+            # VECTOR takes the whole 1..100 byte: its bands are the V0..V3
+            # levels (VECTOR_SCENE.md §4.5.4). The base's ack matcher clamps
+            # the same way (image_rx_daemon._ack_matches_body).
+            lo = 1 if effective == ENCODE_MODE_VECTOR else 20
+            q = max(lo, min(100, int(quality)))
         except (TypeError, ValueError):
             q = None
         if q is not None:

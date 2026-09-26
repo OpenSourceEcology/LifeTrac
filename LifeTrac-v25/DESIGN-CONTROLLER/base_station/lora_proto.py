@@ -75,6 +75,8 @@ class Badge(IntEnum):
     PREDICTED = 4
     SYNTHETIC = 5
     WIREFRAME = 6
+    VECTOR = 7         # VS1 vector scene drawn from records (VECTOR_SCENE.md §7.5)
+    MODEL = 8          # self-model overlay drawn from CAD at the base (§5)
 
 
 class EncodeMode(IntEnum):
@@ -92,6 +94,7 @@ class EncodeMode(IntEnum):
     MONO_G4 = 6        # Plan D: 1-bit Floyd-Steinberg dither + Group-4 fax
     ADAPTIVE = 7       # Plan H: per-tile entropy heuristic picks among 1/4/256
     RAWSTREAM = 8      # FULL colour, WebP RIFF container stripped (wire codec 5)
+    VECTOR = 9         # VS1 vector scene: shapes, not pixels (wire codec 6, VECTOR_SCENE.md)
 
 
 # Resilience ladder — most bandwidth-hungry (least resilient) first.

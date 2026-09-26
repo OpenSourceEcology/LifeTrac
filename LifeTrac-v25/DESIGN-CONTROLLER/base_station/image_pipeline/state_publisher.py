@@ -63,6 +63,13 @@ class StatePublisher:
     #    rssi_dbm, snr_db, parity_reconstructions, timeouts,
     #    decode_errors, ts}``. ``None`` until the first sample lands.
     link_stats: dict[str, Any] | None = None
+    # VS1 vector scene (VECTOR_SCENE.md §7.2). ``vector_store`` is any object
+    # with ``snapshot(now_ms) -> dict | None`` (image_pipeline.vector_scene_store);
+    # the scene is serialised at publish time so shape ages keep counting
+    # between frames. ``safety_detector`` is "no_pixels" while VECTOR runs.
+    vector_store: Any = None
+    self_model: dict[str, Any] | None = None
+    safety_detector: str = "pixels"
     clock_ms: Callable[[], int] = field(default=lambda: int(time.monotonic() * 1000))
 
     def snapshot(self) -> dict[str, Any]:
@@ -99,4 +106,8 @@ class StatePublisher:
                 "downlink": self.link_power.get("downlink"),
             },
             "link_stats": self.link_stats,
+            "safety_detector": self.safety_detector,
+            "vector_scene": (self.vector_store.snapshot(self.clock_ms())
+                             if self.vector_store is not None else None),
+            "self_model": self.self_model,
         }

@@ -221,7 +221,7 @@ KF_ON_REASM_TIMEOUT = os.environ.get(
 
 # codec-id -> short name for link_stats (mirrors frame_format CODEC_*).
 _CODEC_NAMES = {0: "webp", 1: "mono_g4", 2: "btc4_tile", 3: "btc4_frame",
-                4: "webp_luma", 5: "webp_rawstream"}
+                4: "webp_luma", 5: "webp_rawstream", 6: "vector"}
 
 _PROFILE_TO_PHY = {0: PHY_IMAGE_BW250, 1: PHY_IMAGE_BW250, 2: PHY_IMAGE_BW500}
 
@@ -1043,8 +1043,12 @@ class ImageRxDaemon:
             return False
         if len(body) < 4:
             return True                    # mode-only command: no q to check
-        want = max(cls.TRACTOR_QUALITY_MIN,
-                   min(cls.TRACTOR_QUALITY_MAX, body[3]))
+        # VECTOR (mode 9) takes the whole 1..100 byte: its bands 60-100 /
+        # 40-59 / 20-39 / 1-19 are the V0..V3 levels (VECTOR_SCENE.md §4.5.4),
+        # so the tractor lifts its 20 floor for that mode and the base must
+        # clamp identically or a V3 ack never matches and we retry to cool-down.
+        lo = 1 if body[2] == int(EncodeMode.VECTOR) else cls.TRACTOR_QUALITY_MIN
+        want = max(lo, min(cls.TRACTOR_QUALITY_MAX, body[3]))
         got = ack.get("quality")
         if got is None:
             # Old tractor build with no quality in its ack: it cannot

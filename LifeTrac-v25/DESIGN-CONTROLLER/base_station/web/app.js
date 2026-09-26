@@ -615,6 +615,7 @@
     motion_only: { label: 'Motion-only gray', desc: 'pure grayscale with quality cap for bandwidth' },
     mono_g4: { label: 'Mono / G4', desc: '1-bit dither + Group-4 fax' },
     rawstream: { label: 'Raw WebP stream', desc: 'full color, RIFF container stripped' },
+    vector: { label: 'Vector scene', desc: 'shapes, not pixels: one fragment per frame (VS1)' },
   };
   const modeOverlay = (() => {
     const canvas = document.getElementById('image-canvas');
