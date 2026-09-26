@@ -39,8 +39,9 @@ conventions (ASME Y14.x, AISC detailing, plasma-cutting practice).
 
 The GitHub Action
 [`.github/workflows/generate-part-drawings.yml`](../../../.github/workflows/generate-part-drawings.yml)
-runs whenever something under `openscad/` or `drawings/` changes, or
-`BUILD-STRUCTURE/assembly_sequence.yaml` changes:
+runs whenever something under `openscad/` or `drawings/` changes, or the
+assembly sequence (`BUILD-STRUCTURE/assembly_sequence.yaml`) or its checker
+(`assembly_sequence.py`) changes:
 
 1. It runs the unit tests (`tests/`).
 2. It renders every part in [`parts_manifest.yaml`](parts_manifest.yaml) and redraws

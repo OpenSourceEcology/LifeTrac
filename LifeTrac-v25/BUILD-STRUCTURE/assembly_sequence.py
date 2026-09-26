@@ -31,6 +31,7 @@ import yaml
 
 HERE = Path(__file__).resolve().parent
 TOOLS_ONLY = {"printed"}     # 3D-printed jigs are tools, never installed
+PURCHASED = {"fastener"}     # bought, not fabricated: checked, but left out of the fabricated tally
 
 
 def load_quantities(base, seq, parts):
@@ -127,8 +128,9 @@ def write_markdown(path, seq, parts, qty, exact, drawing, steps, placed, errors,
         st = s["step"].get("status", "draft")
         status[st] = status.get(st, 0) + 1
     machine = [pid for pid, p in parts.items() if p["category"] not in TOOLS_ONLY and pid in exact]
-    n_total = sum(qty.get(pid, 0) for pid in machine)
-    n_placed = sum(min(placed.get(pid, 0), qty.get(pid, 0)) for pid in machine)
+    fabricated = [pid for pid in machine if parts[pid]["category"] not in PURCHASED]
+    n_total = sum(qty.get(pid, 0) for pid in fabricated)
+    n_placed = sum(min(placed.get(pid, 0), qty.get(pid, 0)) for pid in fabricated)
 
     out = [
         "# LifeTrac v25 - Structural Assembly Sequence",

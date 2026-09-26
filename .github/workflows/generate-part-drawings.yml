@@ -1,7 +1,8 @@
 name: Generate Part Drawings (PDF)
 
 # One PDF engineering drawing per LifeTrac v25 part, regenerated whenever the
-# OpenSCAD model, the parts manifest or the generator changes.
+# OpenSCAD model, the parts manifest, the generator or the assembly sequence
+# (or its checker) changes.
 #   * pull requests: build everything, run the checks, upload the PDFs as an
 #     artifact (nothing is committed to the PR branch)
 #   * main: also commit the updated drawings back to main with [skip ci]
@@ -16,6 +17,7 @@ on:
       - 'LifeTrac-v25/DESIGN-STRUCTURAL/drawings/**'
       - '!LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated/**'
       - 'LifeTrac-v25/BUILD-STRUCTURE/assembly_sequence.yaml'
+      - 'LifeTrac-v25/BUILD-STRUCTURE/assembly_sequence.py'
       - '.github/workflows/generate-part-drawings.yml'
   pull_request:
     paths:
@@ -23,6 +25,7 @@ on:
       - 'LifeTrac-v25/DESIGN-STRUCTURAL/drawings/**'
       - '!LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated/**'
       - 'LifeTrac-v25/BUILD-STRUCTURE/assembly_sequence.yaml'
+      - 'LifeTrac-v25/BUILD-STRUCTURE/assembly_sequence.py'
       - '.github/workflows/generate-part-drawings.yml'
   workflow_dispatch:
 

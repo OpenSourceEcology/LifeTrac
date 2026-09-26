@@ -7,6 +7,7 @@ import importlib.util
 import io
 import math
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -262,6 +263,16 @@ class SequenceCheckTests(unittest.TestCase):
         self.assertFalse(any("F3" in w for w in warnings), warnings)         # estimate: not required
         _, _, errors, _ = self.run_check([{"id": "a", "add": [{"part": "P1", "qty": 1}]}], complete=True)
         self.assertTrue(any("F1" in e for e in errors), errors)
+
+    def test_fabricated_tally_leaves_out_purchased_hardware(self):
+        steps, placed, errors, warnings = self.run_check([
+            {"id": "a", "add": [{"part": "P1", "qty": 1}, {"part": "F1", "qty": 4}]}])
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "seq.md"
+            SEQ.write_markdown(out, {"phases": []}, self.PARTS, self.QTY, self.EXACT, {}, steps, placed,
+                               errors, warnings, "seq.yaml")
+            text = out.read_text()
+        self.assertIn("1 of 1 fabricated pieces placed", text)   # P1 only; F1 is bought, not made
 
     def test_structure_errors(self):
         _, _, errors, _ = self.run_check([

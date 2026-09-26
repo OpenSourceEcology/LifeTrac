@@ -2,7 +2,7 @@
 
 > **Generated from [`assembly_sequence.yaml`](assembly_sequence.yaml). Edit that file, not this one.** Step numbers come from the order of the steps, so inserting or moving a step renumbers everything after it. Refer to steps by their `id`, which never changes. See [`ASSEMBLY_MANUAL_AUTOGEN.md`](ASSEMBLY_MANUAL_AUTOGEN.md) for how this list will drive a picture manual.
 
-**DRAFT** - 24 steps (24 draft) - 164 of 164 fabricated pieces placed.
+**DRAFT** - 24 steps (24 draft) - 158 of 158 fabricated pieces placed.
 
 ## Prepare the parts
 
