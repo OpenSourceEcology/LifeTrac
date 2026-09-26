@@ -47,6 +47,7 @@ jobs:
       contents: read
     outputs:
       code: ${{ steps.generate.outputs.code }}
+      sequence: ${{ steps.sequence.outcome }}
     defaults:
       run:
         working-directory: LifeTrac-v25/DESIGN-STRUCTURAL/drawings
@@ -85,6 +86,7 @@ jobs:
           exit $code
 
       - name: Check the assembly sequence
+        id: sequence
         run: python ../../BUILD-STRUCTURE/assembly_sequence.py --check
 
       - name: Job summary
@@ -109,12 +111,15 @@ jobs:
           echo "::error title=Part drawings::generate_part_drawings.py --strict reported warnings or failures - see the job summary (CHECKS.md)."
           exit 1
 
-  # Main only: commit the drawings from the artifact back to main.
+  # Main only: commit the drawings from the artifact back to main. Generator
+  # warnings (exit 2) and render failures (exit 3) still commit what did
+  # regenerate; an invalid assembly sequence commits nothing.
   commit:
     needs: drawings
     if: >-
       !cancelled() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
       && contains(fromJSON('["0", "2", "3"]'), needs.drawings.outputs.code)
+      && needs.drawings.outputs.sequence == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

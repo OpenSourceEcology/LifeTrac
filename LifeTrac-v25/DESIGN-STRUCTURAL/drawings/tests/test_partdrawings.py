@@ -269,17 +269,34 @@ class RevisionAndBookTests(unittest.TestCase):
         moved, _, _ = normalize(Mesh(washer(R=50, r=12, t=12.7)))
         self.assertNotEqual(base, plan_part(moved, opts)["fingerprint"])
 
-    def test_dxf_declares_millimetres(self):
+    def test_dxf_is_r2000_in_millimetres(self):
+        import ezdxf
+        # What OpenSCAD writes: no HEADER, so no units.
+        raw = ("  0\nSECTION\n  2\nENTITIES\n  0\nLINE\n  8\n0\n 10\n0\n 20\n0\n 11\n1100\n 21\n0\n"
+               "  0\nENDSEC\n  0\nEOF\n")
         with tempfile.TemporaryDirectory() as tmp:
-            dxf = Path(tmp) / "p.dxf"
-            dxf.write_text("  0\nSECTION\n  2\nENTITIES\n  0\nENDSEC\n  0\nEOF\n")
-            G.add_dxf_units(dxf)
-            G.add_dxf_units(dxf)  # idempotent
-            text = dxf.read_text()
-        self.assertTrue(text.startswith("  0\nSECTION\n  2\nHEADER\n"))
-        self.assertIn("$INSUNITS\n 70\n4\n", text)
-        self.assertEqual(text.count("$INSUNITS"), 1)
-        self.assertTrue(text.endswith("ENTITIES\n  0\nENDSEC\n  0\nEOF\n"))
+            src, a, b = Path(tmp) / "raw.dxf", Path(tmp) / "a.dxf", Path(tmp) / "b.dxf"
+            src.write_text(raw)
+            G.write_mm_dxf(src, a)
+            G.write_mm_dxf(src, b)
+            self.assertEqual(a.read_bytes(), b.read_bytes())  # reproducible
+            doc = ezdxf.readfile(str(a))
+        self.assertEqual(doc.dxfversion, "AC1015")  # $INSUNITS is defined from R2000 on
+        self.assertEqual((doc.header["$INSUNITS"], doc.header["$MEASUREMENT"]), (4, 1))  # mm, metric
+        (line,) = doc.modelspace()
+        self.assertEqual((line.dxftype(), tuple(line.dxf.end)), ("LINE", (1100, 0, 0)))
+
+    def test_failed_dxf_export_removes_the_old_flat_pattern(self):
+        part = G.Part(dict(id="P9", name="Plate", category="plate", source="x.scad"), {}, {})
+        manifest = {"params": "openscad/lifetrac_v25_params.scad"}
+        with tempfile.TemporaryDirectory() as tmp:
+            build = Path(tmp)
+            (build / "scad").mkdir()
+            old = build / "P9.dxf"
+            old.write_text("previous flat pattern")
+            ok = G.render_dxf("false", manifest, part, np.eye(4), 12.7, old, build)  # `false` exits 1
+            self.assertFalse(ok)
+            self.assertFalse(old.exists())
 
     def test_only_renders_hole_count_sources(self):
         def part(pid, cat="angle", **extra):

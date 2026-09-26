@@ -40,8 +40,10 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import ezdxf
 import numpy as np
 import yaml
+from ezdxf.addons import Importer
 from reportlab.pdfgen import canvas
 
 HERE = Path(__file__).resolve().parent
@@ -208,31 +210,43 @@ def render_stl(openscad, manifest, part, build):
 
 
 def render_dxf(openscad, manifest, part, M, thickness, out_path, build):
+    # A failed export must not leave the previous flat pattern next to a
+    # drawing that may have changed, so remove it first and on any failure.
+    out_path.unlink(missing_ok=True)
     m = ",".join("[%s]" % ",".join("%.9g" % x for x in row) for row in M)
     transform = "projection(cut=true) translate([0, 0, %.6f]) multmatrix([%s])" % (-thickness / 2, m)
     scad = build / "scad" / (part.id + "_flat.scad")
+    raw = build / "scad" / (part.id + "_flat.dxf")
+    raw.unlink(missing_ok=True)
     scad.write_text(wrapper_source(manifest, part, transform))
-    r = run([openscad, "-o", str(out_path), str(scad)], cwd=scad.parent)
-    if r.returncode != 0 or not out_path.exists():
+    r = run([openscad, "-o", str(raw), str(scad)], cwd=scad.parent)
+    if r.returncode != 0 or not raw.exists():
         return False
-    add_dxf_units(out_path)
+    try:
+        write_mm_dxf(raw, out_path)
+    except Exception:
+        out_path.unlink(missing_ok=True)
+        return False
     return True
 
 
-# OpenSCAD writes DXF with no HEADER, so CAM software has to guess the units
-# and some default to inches.  Declare millimetres ($INSUNITS 4 = mm,
-# $MEASUREMENT 1 = metric).
-DXF_MM_HEADER = ("  0\nSECTION\n  2\nHEADER\n"
-                 "  9\n$ACADVER\n  1\nAC1009\n"
-                 "  9\n$INSUNITS\n 70\n4\n"
-                 "  9\n$MEASUREMENT\n 70\n1\n"
-                 "  0\nENDSEC\n")
+# No timestamps or GUIDs in the files ezdxf writes, so a DXF only changes
+# when its geometry does.
+ezdxf.options.write_fixed_meta_data_for_testing = True
 
 
-def add_dxf_units(path):
-    text = path.read_text()
-    if "$INSUNITS" not in text:
-        path.write_text(DXF_MM_HEADER + text)
+def write_mm_dxf(src, dst):
+    """Rewrite OpenSCAD's unitless R12 DXF as an R2000 DXF in millimetres.
+
+    CAM software that has to guess the units may assume inches.  The units
+    header ($INSUNITS 4 = mm, $MEASUREMENT 1 = metric) only exists from R2000
+    on, and an R2000 file needs handles, tables and objects that OpenSCAD does
+    not write, so ezdxf builds a complete one around the same entities."""
+    doc = ezdxf.new("R2000", units=ezdxf.units.MM)
+    importer = Importer(ezdxf.readfile(str(src)), doc)
+    importer.import_modelspace()
+    importer.finalize()
+    doc.saveas(str(dst))
 
 
 def select_parts(parts, only):
