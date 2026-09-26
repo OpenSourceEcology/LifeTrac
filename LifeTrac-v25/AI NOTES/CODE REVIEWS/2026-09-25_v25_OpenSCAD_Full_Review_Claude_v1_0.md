@@ -24,8 +24,14 @@ The body of this review describes the tree as it was on 2026-09-25. A closer loo
 **Not changed on purpose:**
 - **`pivot_welding_jig.scad`'s include.** Any change under `3d_printed_welding_jigs/` triggers `generate-jig-previews.yml`, whose push-event commit step has failed on both of its runs on main. The cause is that it `git add`s `renders/*.png` and `*.jpg`, which the root `.gitignore` ignores. Whether jig renders should be committed is a maintainer decision.
 - **The camera maths in the PNG/GIF workflows.** Fixing it would visibly change `assembly.png` and the animation.
-- **The bucket pivot joint (P14).** It can't be fixed at the arm tip alone: the bucket's lug sits just beyond the tip and is no stronger. The fix changes the bucket lugs and depends on which bucket cylinder is chosen.
-- **Everything else that needs a design decision.** That covers wheel choice, DOM length, hole patterns, T5, deletions and the analysis rebuild.
+- **The bucket pivot joint (P14).** It can't be fixed at the arm tip alone: the bucket's lug sits just beyond the tip and is no stronger. The fix changes the bucket lugs and the arms, and depends on which bucket cylinder is chosen.
+- **Everything else that needs a design decision.** That covers wheel choice, DOM length, hole patterns, T5 and deletions. The analysis was rebuilt in a follow-up pull request (below).
+
+### Status: fixed in follow-up pull requests
+
+| Finding | Fix |
+|---|---|
+| B4, B5: structural and stability analysis | [#136](https://github.com/OpenSourceEcology/LifeTrac/pull/136) replaces both with `openscad/analysis/structural_analysis.scad`, which checks the current parts. `DESIGN-STRUCTURAL/STRUCTURAL_ANALYSIS.md` describes the method. It also removes the stale-analysis warning described above. With the estimated masses, the rated operating capacity is 92 kg, because the tipping load is only 184 kg at full reach. Its bucket case also found that the bucket cylinders overload the front of the arms, which is now part of P14. Eight checks still fail, and each is listed as a known issue with its finding (B4, P14, M8) |
 
 ---
 
@@ -78,7 +84,7 @@ The model is ambitious and, in places, excellent: the parametric arm solver, the
 
 - **The four 1/2" side panels export as 1,373 × 13 mm strips** (P1; the export is fixed in this PR). Even a fixed export would be missing every hole the assembly adds (P2).
 - **The arm-pivot hole in those panels has about 4 mm of edge distance** (P3; fixed in this PR). At relief pressure the pin load on that edge was about equal to its tear-out strength.
-- **The bucket pivot joint is weaker than the bucket cylinders that load it** (P14). At relief pressure the 3" bucket cylinder can tear the 1" pin out of the arm tip, and the bucket's own lug and its four 1/4" bolts are no stronger.
+- **The bucket pivot joint and the front of the arms are weaker than the bucket cylinders that load them** (P14). At relief pressure the 3" bucket cylinder can tear the 1" pin out of the arm tip, and the bucket's own lug and its four 1/4" bolts are no stronger. The same force bends each arm ahead of the lift bracket well past yield.
 - **The CNC layout has 7 overlapping part pairs and leaves out all the stiffener, motor and pivot-mount plates** (N1, N2).
 - **The angle-iron cut-list parts drill holes that don't line up with the plates they bolt to** (P10, P11).
 - **The arm-leg spacer T5 is an empty solid** (P12).
@@ -212,7 +218,7 @@ Knock-on effects:
 
 ### B4. The structural analysis checks components that no longer exist, and misses the ones that do — **Critical**
 
-*(Not fixed. This PR only adds a warning to the analysis log and its PR comment; see Status.)*
+*(Rebuilt in a follow-up pull request; see Status.)*
 
 The summary block ([main:784-1104](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L784-L1104)) reports 4 FAILs with ratios of 11.3, 18.4, 10.7 and 14.2. Almost every input describes the v1/v2-era machine:
 
@@ -242,7 +248,7 @@ Appendix C gives the hand check behind these numbers. At the 3,000 psi relief pr
 - **Arm at the lift bracket:** about 100 MPa if the 2×6 tube and the two 1/4" side plates share the moment. It rises to about 280 MPa, above the 250 MPa yield, if the plates carry it alone. The tube is bolted to the plates only near each end ([loader_arm_v2.scad:65-74](../../DESIGN-STRUCTURAL/openscad/modules/loader_arm_v2.scad#L65-L74)), so either that needs checking or the plates should be welded to the tube.
 - **T3:** about 150 MPa in bending plus about 70 MPa of torsional shear near the lugs.
 - **Comfortable:** the pivot pin (about 30 MPa in shear), the 1" clevis pins and the pivot-mount bolts.
-- **Not checked, and weak:** the side-panel pivot hole (P3) and the bucket pivot joint (P14).
+- **Not checked, and weak:** the side-panel pivot hole (P3), and the bucket pivot joint and the front of the arms under the bucket cylinders' force (P14).
 
 **Fix:** rebuild the analysis block against the real parts, preferably in its own `analysis/` file that reads `derived.scad`:
 
@@ -260,6 +266,7 @@ Appendix C gives the hand check behind these numbers. At the 3,000 psi relief pr
 - The stability result is computed only at the current animation pose. With the default `$t = 0` that is arms-down, which is not the worst case.
 - `LIFT_CYL_ARM_OFFSET = ARM_LENGTH * 0.50` ([params:552](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad#L552)) is 50 % of the *legacy straight-arm length* (1,657 mm → 828.5 mm), not of `ARM_MAIN_LEN`. The main file's comment still says `ARM_LENGTH * 0.35` ([main:375](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L375)).
 - `_theta_max_lift_estimate = 50` while the comment says 60 ([params:556-560](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad#L556-L560)).
+- *(Added 2026-09-26.)* The rebuilt analysis uses the L-arm geometry, puts the load inside the bucket and covers the whole arm range. With the same estimated masses, it puts the tipping load at about 184 kg at full reach, with the arms near level. That makes the rated operating capacity about 92 kg. The short 750 mm wheelbase and the long reach need counterweight or a longer wheelbase.
 
 **Fix:** compute the stability envelope over the whole arm/bucket range (the collision tool already sweeps poses, and it could emit CoG too). Derive masses from geometry where possible, and pick the lift-cylinder attachment relative to `ARM_MAIN_LEN`.
 
@@ -525,17 +532,19 @@ This is a direct consequence of the missing `derived.scad` layer (C1).
 - **Duplicate part numbers:** A1 ≡ A2, A3 ≡ A10, A4 ≈ A5.
 - **Piece count:** `structural_parts.scad:122-123` claims 71 pieces, but its own subtotals add to 77.
 
-**P14. The bucket pivot joint is weaker than the bucket cylinders that load it — Critical.** *(Added 2026-09-26; see Appendix C.)* Each 3" bucket cylinder pushes with 94.3 kN at the 3,000 psi relief pressure. When the dump stroke is resisted, for example when prying or pushing down with the bucket, that push goes through the bucket pivot pin at each arm tip. Three parts of that joint have no margin at relief pressure. All three are also below what AISC ASD allows (Ω = 2) at the 2,000–2,500 psi working pressure:
+**P14. The bucket pivot joint and the front of the arms are weaker than the bucket cylinders that load them — Critical.** *(Added 2026-09-26; see Appendix C.)* Each 3" bucket cylinder pushes with 94.3 kN and pulls with 70.7 kN at the 3,000 psi relief pressure. When an obstacle stalls the bucket at its cutting edge, as in a breakout, the bucket pivot pin at each arm tip carries the cylinder's force plus the obstacle's force on the edge. The rebuilt analysis ([#136](https://github.com/OpenSourceEcology/LifeTrac/pull/136)) puts that at up to 87 kN when curling and 116 kN when dumping. Three parts of the joint have essentially no margin against these forces, even before any safety factor. All three also fail AISC ASD (Ω = 2) at the 2,000–2,500 psi working pressure:
 
 | Part | Geometry | Nominal strength, before any safety factor |
 |---|---|---|
 | Arm tip | The 1" pin hole is centred 25.4 mm from the end of the two 1/4" arm plates (`PIVOT_HOLE_X_FROM_FRONT = BUCKET_PIVOT_PIN_DIA`, [params:409](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad#L409); tip radius, [arm_plate.scad:160](../../DESIGN-STRUCTURAL/openscad/parts/arm_plate.scad#L160)). That leaves 12.7 mm of steel. The drop-leg tube stops short of the tip, so the plates carry the pin alone | Tear-out: **77 kN** |
-| Bucket pivot lug | A 3×3×1/4 U-channel ([main:1226-1291](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1226-L1291)) with the hole in the middle. The channel's open side faces the arm and ends 28.6 mm from the hole centre ([main:1256](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1256)), leaving 14.9 mm of steel in each 1/4" wall. The pin pushes toward that side | Tear-out: **91 kN** |
-| Lug-to-bucket bolts | 4 × 1/4" bolts ([main:1277-1288](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1277-L1288), M8), which the pin pulls in tension | **68 kN** (Grade 5) or **85 kN** (Grade 8), before prying |
+| Bucket pivot lug | A 3×3×1/4 U-channel ([main:1226-1291](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1226-L1291)) with the hole in the middle. The channel's open side faces the arm and ends 28.6 mm from the hole centre ([main:1256](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1256)), leaving 14.9 mm of steel in each 1/4" wall. When dumping, the pin pushes toward that side | Tear-out: **91 kN** |
+| Lug-to-bucket bolts | 4 × 1/4" bolts ([main:1277-1288](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1277-L1288), M8), which the pin loads in tension and shear | Tension **68 kN**, shear **47 kN** (Grade 5), before prying |
 
 The tip can't simply be made bigger. The lug's base sits 31.75 mm from the pin, only 6.35 mm beyond the current tip, and it swings around the pin as the bucket tilts. The same U-lug with four 1/4" bolts also holds both ends of each bucket cylinder. On T3 those bolts are in shear and hold about 47 kN (Grade 5, threads in the shear plane), against the cylinder's 94 kN push.
 
-**Fix:** redesign the joint and the cylinder lugs together, sized for the bucket cylinder that is actually chosen. For example: welded 1/2" clevis plates on a reinforced bucket back, an arm-tip boss with a radius of at least 2 × the pin diameter, and larger pins with bushings (M9). The model's 3" bucket cylinders push more than twice as hard as the 2" ones in the BOM ([BILL_OF_MATERIALS.md:71](../../DESIGN-STRUCTURAL/documentation/BILL_OF_MATERIALS.md); 41.9 kN at 3,000 psi). So choosing the cylinder (section 8, step 2) sets these loads.
+**The front of the arms.** T3 holds the other end of each bucket cylinder, so ahead of T3 each arm carries the bucket pin's whole force. Just outboard of the lift-bracket gusset, that is up to 57 kN·m when dumping and 43 kN·m when curling, against 17.5 kN·m in the lift case. With the 2×6 tube and both side plates sharing the moment, the stress is 431 and 323 MPa, well above the 250 MPa yield (`ARM_BENDING_BUCKET` in the analysis).
+
+**Fix:** redesign the joint, the cylinder lugs and the front of the arms together, sized for the bucket cylinder that is actually chosen. For example: welded 1/2" clevis plates on a reinforced bucket back, an arm-tip boss with a radius of at least 2 × the pin diameter, larger pins with bushings (M9), and a stronger arm section between the lift bracket and the drop leg. The model's 3" bucket cylinders push more than twice as hard as the 2" × 1" ones in the BOM ([BILL_OF_MATERIALS.md:71](../../DESIGN-STRUCTURAL/documentation/BILL_OF_MATERIALS.md); 41.9 kN at 3,000 psi). So choosing the cylinder (section 8, step 2) sets these loads. Even with the 2" cylinders, every force here only falls to 44 %: the arm tip, the lug bolts and the arm when dumping would still be over their allowables.
 
 ### 5.3 CNC layout (`cnclayout.scad`, `export_for_cnc.scad`, backup)
 
@@ -754,7 +763,7 @@ These were each checked with a minimal test file; the UTU architecture depends o
 
 ## Appendix C: Hand check of the loader statics *(added 2026-09-26)*
 
-This is a rough static check, not a substitute for the rebuilt analysis. It supports the numbers in B4, P3 and P14.
+This is a rough static check, not a substitute for the rebuilt analysis. It supports the numbers in B4, P3 and P14. The rebuilt analysis puts the load at the bucket's load centre rather than on the pin, which raises the arm moment by about 20–30 %. Its figures therefore differ a little from these.
 
 **Inputs:**
 - **Geometry:** the model's own echo output: pivot (200, 1,100), lift-cylinder base (50, 600), bracket at arm-local (828.5, −114.3), and bucket pin at arm-local (1,697.4, −249.3).
@@ -787,4 +796,4 @@ Where the model prints these values (arms down, level and 45°), the "analysis" 
 - **Arm:** the bracket gusset deepens the plates for 76 mm on either side of the bracket, so the critical section is at its outboard end. With the arms down the moment there is 13.8 kN·m. That gives 104 MPa if the tube and plates share it, and 280 MPa if the plates carry it alone.
 - **T3:** the two cylinders sit 134.6 mm in from the arms, so the moment is 94.3 kN × 134.6 mm = 12.7 kN·m, or 153 MPa about the 6" axis. Each lug pin is 63.5 mm below the beam axis, which adds 6.0 kN·m of torque per lug. That is about 73 MPa of shear between each lug and its arm (closed-section formula).
 - **Pivot pin:** 69.2 kN over 2 × 1,140 mm² gives 30 MPa of shear.
-- **Side-panel pivot hole and bucket pivot joint:** see P3 and P14.
+- **Side-panel pivot hole, bucket pivot joint, and the arm under the bucket cylinders:** see P3 and P14.
