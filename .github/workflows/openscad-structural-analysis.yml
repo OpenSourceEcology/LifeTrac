@@ -73,6 +73,7 @@ jobs:
           done
       
       - name: Run structural analysis
+        id: analysis
         run: |
           echo "Running structural analysis on main design..."
           cd LifeTrac-v25/DESIGN-STRUCTURAL
@@ -142,7 +143,24 @@ jobs:
           echo "_This file is automatically updated by the OpenSCAD Structural Analysis workflow._" >> STRUCTURAL_ANALYSIS_LOG.md
           
           cat STRUCTURAL_ANALYSIS_LOG.md
-      
+
+      # Runs before the log is committed, so a new failure fails the pushed commit itself
+      # instead of being committed as a [skip ci] log update. The steps after it that
+      # must still run on a failure are marked !cancelled().
+      - name: Fail on new structural failures
+        id: gate
+        run: |
+          cd LifeTrac-v25/DESIGN-STRUCTURAL
+          if grep -q "remove from STRUCT_KNOWN_ISSUES" structural_summary.md; then
+            echo "::warning::A check listed in STRUCT_KNOWN_ISSUES now passes. Remove it from the list in openscad/analysis/structural_analysis.scad."
+          fi
+          if grep -q "NEW FAIL" structural_summary.md; then
+            echo "::error::A structural check fails that isn't listed as a known issue:"
+            grep "NEW FAIL" structural_summary.md
+            exit 1
+          fi
+          echo "No new structural failures"
+
       - name: Commit structural analysis log
         run: |
           cd LifeTrac-v25/DESIGN-STRUCTURAL
@@ -166,6 +184,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Upload structural analysis artifacts
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: structural-analysis
@@ -196,12 +215,18 @@ jobs:
           fi
       
       - name: Comment on PR with structural analysis
-        if: github.event_name == 'pull_request'
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.analysis.outcome == 'success' }}
         uses: actions/github-script@v7
+        env:
+          GATE_OUTCOME: ${{ steps.gate.outcome }}
         with:
           script: |
             const fs = require('fs');
-            
+            const status = {
+              success: '✅ No new structural failures.',
+              failure: "❌ A check fails that isn't listed in `STRUCT_KNOWN_ISSUES`; see the table.",
+            }[process.env.GATE_OUTCOME] || "⚠️ The pass/fail step didn't run; see the workflow run.";
+
             // Read the structural report
             let reportContent = 'Structural analysis completed. Check artifacts for detailed results.';
             try {
@@ -217,14 +242,13 @@ jobs:
             
             const comment = `## OpenSCAD Structural Analysis Results 🔧
             
-            ✅ Structural analysis completed!
-            
+            ${status}
+
             ${reportContent}
-            
+
             ### Persistent Log
-            A detailed log with failure descriptions has been committed to:
-            - \`LifeTrac-v25/DESIGN-STRUCTURAL/STRUCTURAL_ANALYSIS_LOG.md\`
-            
+            The summary and the detail tables also go to \`LifeTrac-v25/DESIGN-STRUCTURAL/STRUCTURAL_ANALYSIS_LOG.md\`. A run triggered by a push commits that file when no new check fails.
+
             ### Artifacts
             Download the detailed analysis from the workflow artifacts:
             - \`structural-analysis\` - Complete logs and report
@@ -238,17 +262,3 @@ jobs:
               issue_number: context.issue.number,
               body: comment
             });
-      
-      # Runs last, so the report, the persistent log and the PR comment are still produced
-      - name: Fail on new structural failures
-        run: |
-          cd LifeTrac-v25/DESIGN-STRUCTURAL
-          if grep -q "remove from STRUCT_KNOWN_ISSUES" structural_summary.md; then
-            echo "::warning::A check listed in STRUCT_KNOWN_ISSUES now passes. Remove it from the list in openscad/analysis/structural_analysis.scad."
-          fi
-          if grep -q "NEW FAIL" structural_summary.md; then
-            echo "::error::A structural check fails that isn't listed as a known issue:"
-            grep "NEW FAIL" structural_summary.md
-            exit 1
-          fi
-          echo "No new structural failures"

@@ -12,9 +12,13 @@
 //   LIFT    Both lift cylinders push at relief. The load sits at the bucket's load centre,
 //           with the bucket level, and the case is repeated at arm angles across the
 //           working range. The arm hangs on its pivot pin and the lift cylinder props it.
-//   BUCKET  Both bucket cylinders push at relief with the dump stroke resisted (prying, or
-//           pushing down with the bucket). Each bucket pivot pin then carries at least the
-//           cylinder's push, and the cross beam T3 carries both cylinders.
+//   BUCKET  Both bucket cylinders push or pull at relief, stalled by an obstacle that holds
+//           the bucket's cutting edge (a dump pressed against the ground, or a breakout
+//           when curling). The edge force is the smallest that balances the cylinder about
+//           the bucket pin, so it acts at right angles to the line from the pin to the
+//           edge. Each bucket pivot pin carries its cylinder's force plus that edge force,
+//           and so does the arm ahead of T3. T3 carries both cylinders. The case is
+//           repeated across the bucket's tilt range, from full dump to full curl.
 //
 // CRITERIA (AISC 360, allowable stress design)
 //   Bending 0.6 Fy, pin shear 0.4 Fy of the pin steel, fillet welds 0.3 F_EXX, bolts and
@@ -116,12 +120,63 @@ function an_pin_force(a) = AN_LIFT_PUSH_N * an_lift_dir(a) + [0, -an_tip_load(a)
 // 3 x the tube width along the arm (parts/arm_plate.scad). The pin carries no moment,
 // so the arm's largest moment is here, not at the pivot (N mm).
 AN_GUSSET_HALF = 1.5 * TUBE_2X6_1_4[0];
+AN_ARM_SECTION = [HYD_BRACKET_ARM_POS + AN_GUSSET_HALF, 0];
 function an_arm_moment(a) =
-    let(section = an_world([HYD_BRACKET_ARM_POS + AN_GUSSET_HALF, 0], a))
+    let(section = an_world(AN_ARM_SECTION, a))
     an_tip_load(a) * (an_load_point(a)[0] - section[0]);
 
 AN_PIN_FORCE_MAX = max([for (a = AN_ANGLES) norm(an_pin_force(a))]);
 AN_ARM_MOMENT_MAX = max([for (a = AN_ANGLES) an_arm_moment(a)]);
+
+// =============================================================================
+// BUCKET CASE: ONE BUCKET CYLINDER AT RELIEF, STALLED AT THE CUTTING EDGE
+// =============================================================================
+// Bucket points have the bucket pivot pin at the origin, as in bucket_attachment() in
+// lifetrac_v25.scad, and turn with the bucket's tilt t relative to the arm (negative
+// toward dump). The forces are worked out in the arm's frame. They turn with the arm, so
+// their size doesn't depend on the arm angle.
+
+AN_BUCKET_CYL_BASE = [CROSS_BEAM_1_POS, CROSS_BEAM_MOUNT_Z_OFFSET];   // Lug under T3, arm's frame
+AN_BUCKET_CYL_LUG = [0, BUCKET_CYL_MOUNT_Z_OFFSET + BUCKET_HEIGHT - BUCKET_PIVOT_HEIGHT_FROM_BOTTOM];
+AN_BUCKET_EDGE = [BUCKET_LUG_OFFSET + BUCKET_DEPTH, -BUCKET_PIVOT_HEIGHT_FROM_BOTTOM];
+
+// Tilts checked: from full dump with the arms raised to full curl with the arms down
+AN_TILT_DUMP = BUCKET_ABS_DUMP_ANGLE - ARM_MAX_ANGLE_LIMITED;
+AN_TILT_CURL = BUCKET_ABS_CURL_ANGLE - ARM_MIN_ANGLE;
+function an_tilts(steps) = [for (i = [0:steps]) AN_TILT_DUMP + i * (AN_TILT_CURL - AN_TILT_DUMP) / steps];
+AN_TILTS = an_tilts(AN_STEPS);   // Rows of the report's table
+AN_TILTS_FINE = an_tilts(144);   // About 1 degree apart, for the largest values
+
+// Cylinder force at relief: positive pushes (dump), negative pulls (curl)
+AN_BUCKET_STROKES = [AN_BUCKET_PUSH_N, -AN_BUCKET_PULL_N];
+
+function an_cross(p, q) = p[0] * q[1] - p[1] * q[0];
+
+// From the cylinder's lug on T3 to its lug on the bucket; its length is the cylinder's
+function an_bucket_cyl_vec(t) = AN_BUCKET_PIN + an_rot(AN_BUCKET_CYL_LUG, t) - AN_BUCKET_CYL_BASE;
+
+// Force of one bucket cylinder on the bucket (N)
+function an_bucket_cyl_force(t, f) = let(d = an_bucket_cyl_vec(t)) f * d / norm(d);
+
+// Force of the obstacle on the cutting edge (N): the smallest that balances the cylinder
+// about the bucket pin, so at right angles to the line from the pin to the edge
+function an_bucket_edge_force(t, f) =
+    let(m = an_cross(an_rot(AN_BUCKET_CYL_LUG, t), an_bucket_cyl_force(t, f)),
+        r = an_rot(AN_BUCKET_EDGE, t))
+    -m / (r * r) * [-r[1], r[0]];
+
+// Force the bucket puts on one bucket pivot pin, and so on the arm tip (N)
+function an_bucket_pin_force(t, f) = an_bucket_cyl_force(t, f) + an_bucket_edge_force(t, f);
+
+// Bending moment in the arm at the lift case's section. Only the bucket pin's force acts
+// ahead of it; T3, which takes the cylinder's other end, is behind it (N mm).
+function an_arm_moment_bucket(t, f) =
+    abs(an_cross(AN_BUCKET_PIN - AN_ARM_SECTION, an_bucket_pin_force(t, f)));
+
+AN_BUCKET_PIN_DUMP_MAX = max([for (t = AN_TILTS_FINE) norm(an_bucket_pin_force(t, AN_BUCKET_PUSH_N))]);
+AN_BUCKET_PIN_CURL_MAX = max([for (t = AN_TILTS_FINE) norm(an_bucket_pin_force(t, -AN_BUCKET_PULL_N))]);
+AN_BUCKET_PIN_FORCE_MAX = max(AN_BUCKET_PIN_DUMP_MAX, AN_BUCKET_PIN_CURL_MAX);
+AN_ARM_MOMENT_BUCKET_MAX = max([for (t = AN_TILTS_FINE, f = AN_BUCKET_STROKES) an_arm_moment_bucket(t, f)]);
 
 // =============================================================================
 // STABILITY AND RATED OPERATING CAPACITY
@@ -224,6 +279,29 @@ AN_T3_TAU = AN_BUCKET_PUSH_N * abs(CROSS_BEAM_MOUNT_Z_OFFSET)
 // hole in the middle (u_channel_lug() in lifetrac_v25.scad)
 AN_LUG_LC = TUBE_3X3_1_4[0] / 2 - 1.5 * TUBE_3X3_1_4[1] - (BUCKET_PIVOT_PIN_DIA + 2) / 2;
 
+// Bolts that hold a U-lug's base to the bucket's back plate. The part of the force on the
+// lug that pulls it off the plate puts them in tension, and the part along the plate puts
+// them in shear. The two combine by the elliptical interaction in the commentary to AISC
+// J3.7. Prying of the lug's 1/4in base, which would add tension, isn't included.
+AN_LUG_BOLTS_TENSION = AN_LUG_BOLT_COUNT * AN_LUG_BOLT_AT * AN_BOLT_FU / AN_OMEGA;
+AN_LUG_BOLTS_SHEAR = AN_LUG_BOLT_COUNT * 0.45 * AN_BOLT_FU * an_area(AN_LUG_BOLT_DIA) / AN_OMEGA;
+
+// Demand over capacity for a force on a bucket lug, given in the arm's frame at tilt t.
+// In the bucket's frame, +Y points from the lugs into the bucket.
+function an_lug_bolt_ratio(force, t) =
+    let(l = an_rot(force, -t))
+    sqrt(pow(max(0, -l[0]) / AN_LUG_BOLTS_TENSION, 2) + pow(l[1] / AN_LUG_BOLTS_SHEAR, 2));
+
+// The [ratio, force] pair with the highest ratio
+function an_worst(pairs) = let(m = max([for (p = pairs) p[0]])) [for (p = pairs) if (p[0] == m) p][0];
+
+// The pivot pin pushes on the pivot lug with the opposite of the force the bucket puts
+// on the pin; the cylinder pushes or pulls on its own lug directly
+AN_PIVOT_LUG_BOLTS = an_worst([for (t = AN_TILTS_FINE, f = AN_BUCKET_STROKES)
+    let(force = -an_bucket_pin_force(t, f)) [an_lug_bolt_ratio(force, t), norm(force)]]);
+AN_CYL_LUG_BOLTS = an_worst([for (t = AN_TILTS_FINE, f = AN_BUCKET_STROKES)
+    let(force = an_bucket_cyl_force(t, f)) [an_lug_bolt_ratio(force, t), norm(force)]]);
+
 // [id, description, demand, capacity, unit]; forces are in N and reported in kN
 AN_CHECKS = [
     ["PIVOT_PIN_SHEAR", "Arm pivot pin, double shear",
@@ -240,6 +318,8 @@ AN_CHECKS = [
         AN_ARM_MOMENT_MAX / (AN_S_ARM_TUBE + AN_S_ARM_PLATES), AN_ALLOW_BENDING, "MPa"],
     ["ARM_BENDING_PLATES_ONLY", "Arm at the lift bracket, side plates alone",
         AN_ARM_MOMENT_MAX / AN_S_ARM_PLATES, AN_ALLOW_BENDING, "MPa"],
+    ["ARM_BENDING_BUCKET", "Arm at the lift bracket, bucket cylinder stalled, tube and side plates together",
+        AN_ARM_MOMENT_BUCKET_MAX / (AN_S_ARM_TUBE + AN_S_ARM_PLATES), AN_ALLOW_BENDING, "MPa"],
     ["LIFT_CYL_PINS", "Lift-cylinder pins, double shear",
         AN_LIFT_PUSH_N / (2 * an_area(min(HYD_BRACKET_BOLT_DIA, BOLT_DIA_1))),
         AN_ALLOW_PIN_SHEAR, "MPa"],
@@ -258,26 +338,27 @@ AN_CHECKS = [
     ["BUCKET_CYL_LUG_BOLTS", "Bucket-cylinder lug bolts on T3, 4 x 1/4in, shear",
         AN_BUCKET_PUSH_N,
         AN_LUG_BOLT_COUNT * 0.45 * AN_BOLT_FU * an_area(AN_LUG_BOLT_DIA) / AN_OMEGA, "kN"],
-    ["BUCKET_CYL_LUG_BOLTS_BUCKET", "Bucket-cylinder lug bolts on the bucket, 4 x 1/4in, tension",
-        AN_BUCKET_PULL_N,
-        AN_LUG_BOLT_COUNT * AN_LUG_BOLT_AT * AN_BOLT_FU / AN_OMEGA, "kN"],
+    // For the lug bolts on the bucket, the capacity is the bolt group's strength in the
+    // direction of the worst force
+    ["BUCKET_CYL_LUG_BOLTS_BUCKET", "Bucket-cylinder lug bolts on the bucket, 4 x 1/4in, tension and shear",
+        AN_CYL_LUG_BOLTS[1], AN_CYL_LUG_BOLTS[1] / AN_CYL_LUG_BOLTS[0], "kN"],
     ["BUCKET_PIN_SHEAR", "Bucket pivot pin, 1in, double shear",
-        AN_BUCKET_PUSH_N / (2 * an_area(BUCKET_PIVOT_PIN_DIA)), AN_ALLOW_PIN_SHEAR, "MPa"],
+        AN_BUCKET_PIN_FORCE_MAX / (2 * an_area(BUCKET_PIVOT_PIN_DIA)), AN_ALLOW_PIN_SHEAR, "MPa"],
     ["BUCKET_PIN_ARM_TIP", "Bucket pivot hole in the two arm-tip plates",
-        AN_BUCKET_PUSH_N,
+        AN_BUCKET_PIN_FORCE_MAX,
         an_hole_rn(2, PIVOT_HOLE_X_FROM_FRONT - BUCKET_PIVOT_PIN_DIA / 2,
                    ARM_PLATE_THICKNESS, BUCKET_PIVOT_PIN_DIA) / AN_OMEGA, "kN"],
     ["BUCKET_PIVOT_LUG", "Bucket pivot hole in the U-lug's two walls",
-        AN_BUCKET_PUSH_N,
+        AN_BUCKET_PIN_FORCE_MAX,
         an_hole_rn(2, AN_LUG_LC, TUBE_3X3_1_4[1], BUCKET_PIVOT_PIN_DIA) / AN_OMEGA, "kN"],
-    ["BUCKET_LUG_BOLTS", "Bucket pivot lug bolts, 4 x 1/4in, tension",
-        AN_BUCKET_PUSH_N,
-        AN_LUG_BOLT_COUNT * AN_LUG_BOLT_AT * AN_BOLT_FU / AN_OMEGA, "kN"],
+    ["BUCKET_LUG_BOLTS", "Bucket pivot lug bolts, 4 x 1/4in, tension and shear",
+        AN_PIVOT_LUG_BOLTS[1], AN_PIVOT_LUG_BOLTS[1] / AN_PIVOT_LUG_BOLTS[0], "kN"],
 ];
 
 // Failing checks that need a design decision, with the review finding that covers each
 STRUCT_KNOWN_ISSUES = [
     ["ARM_BENDING_PLATES_ONLY", "B4: the tube is bolted to the side plates only near its ends"],
+    ["ARM_BENDING_BUCKET", "P14: the bucket cylinders bend the front of the arm"],
     ["T3_COMBINED", "B4: the bucket-cylinder lugs hang below T3 and twist it"],
     ["BUCKET_CYL_LUG_BOLTS", "P14, M8"],
     ["BUCKET_CYL_LUG_BOLTS_BUCKET", "P14, M8"],
@@ -297,6 +378,7 @@ function an_fmt(x, digits) = str(round(x * pow(10, digits)) / pow(10, digits));
 // Two decimals, keeping trailing zeros (0.30, not 0.3), for x >= 0
 function an_fmt2(x) = let(r = round(x * 100), f = r % 100) str(floor(r / 100), ".", f < 10 ? "0" : "", f);
 function an_value(c, v) = c[4] == "kN" ? an_fmt(v / 1000, 1) : an_fmt(v, 0);
+function an_pair(dump, curl, scale) = str(an_fmt(dump / scale, 1), " / ", an_fmt(curl / scale, 1));
 
 AN_NEW_FAILS = [for (c = AN_CHECKS) if (an_status(c) == "NEW FAIL") c[0]];
 AN_KNOWN_FAILS = [for (c = AN_CHECKS) if (an_ratio(c) > 1 && len(an_known(c[0])) > 0) c[0]];
@@ -319,13 +401,27 @@ for (a = AN_ANGLES)
              an_fmt(norm(an_pin_force(a)) / 1000, 1), " kN | ",
              an_fmt(an_arm_moment(a) / 1e6, 1), " kN m | ",
              an_fmt(an_tipping_load(a), 0), " kg | ", an_fmt(an_hydraulic_capacity(a), 0), " kg |"));
+echo("");
+echo("Bucket case, per side, with one bucket cylinder at relief stalled against the cutting edge. The tilt is the bucket's angle to the arm, negative toward dump:");
+echo("");
+echo("| Bucket tilt | Cylinder length | Edge force, dump / curl | Bucket-pin force, dump / curl | Arm moment at bracket, dump / curl |");
+echo("|---|---|---|---|---|");
+for (t = AN_TILTS)
+    echo(str("| ", an_fmt(t, 1), " deg | ", an_fmt(norm(an_bucket_cyl_vec(t)), 0), " mm | ",
+             an_pair(norm(an_bucket_edge_force(t, AN_BUCKET_PUSH_N)),
+                     norm(an_bucket_edge_force(t, -AN_BUCKET_PULL_N)), 1000), " kN | ",
+             an_pair(norm(an_bucket_pin_force(t, AN_BUCKET_PUSH_N)),
+                     norm(an_bucket_pin_force(t, -AN_BUCKET_PULL_N)), 1000), " kN | ",
+             an_pair(an_arm_moment_bucket(t, AN_BUCKET_PUSH_N),
+                     an_arm_moment_bucket(t, -AN_BUCKET_PULL_N), 1e6), " kN m |"));
 
 echo("STRUCTURAL ANALYSIS SUMMARY");
 echo(str("Static checks at the ", HYDRAULIC_PRESSURE_PSI, " psi relief pressure: each lift cylinder pushes ",
-         an_fmt(AN_LIFT_PUSH_N / 1000, 1), " kN and each bucket cylinder ",
-         an_fmt(AN_BUCKET_PUSH_N / 1000, 1), " kN. Arm angles ", an_fmt(ARM_MIN_ANGLE, 1),
-         " to ", an_fmt(ARM_MAX_ANGLE_LIMITED, 1), " deg. Method and assumptions: ",
-         "`openscad/analysis/structural_analysis.scad`."));
+         an_fmt(AN_LIFT_PUSH_N / 1000, 1), " kN, and each bucket cylinder pushes ",
+         an_fmt(AN_BUCKET_PUSH_N / 1000, 1), " kN and pulls ", an_fmt(AN_BUCKET_PULL_N / 1000, 1),
+         " kN. Arm angles ", an_fmt(ARM_MIN_ANGLE, 1), " to ", an_fmt(ARM_MAX_ANGLE_LIMITED, 1),
+         " deg; bucket tilts ", an_fmt(AN_TILT_DUMP, 1), " to ", an_fmt(AN_TILT_CURL, 1),
+         " deg from the arm. Method and assumptions: `openscad/analysis/structural_analysis.scad`."));
 echo("");
 echo(str("**Rated operating capacity: ", an_fmt(AN_RATED_CAPACITY_KG, 0), " kg (",
          an_fmt(AN_RATED_CAPACITY_KG * 2.20462, 0), " lb)**, half the lowest tipping load of ",
@@ -333,6 +429,12 @@ echo(str("**Rated operating capacity: ", an_fmt(AN_RATED_CAPACITY_KG, 0), " kg (
          " kg with an operator on the platform). The lowest hydraulic lift capacity is ",
          an_fmt(AN_HYDRAULIC_MIN, 0), " kg. The masses are estimates (",
          an_fmt(AN_MASS_EMPTY, 0), " kg empty)."));
+echo("");
+echo(str("**Bucket case:** with a bucket cylinder stalled against the cutting edge, each bucket pivot pin carries up to ",
+         an_fmt(AN_BUCKET_PIN_DUMP_MAX / 1000, 1), " kN when dumping and ",
+         an_fmt(AN_BUCKET_PIN_CURL_MAX / 1000, 1), " kN when curling. The arm at the lift bracket carries up to ",
+         an_fmt(AN_ARM_MOMENT_BUCKET_MAX / 1e6, 1), " kN m, against ",
+         an_fmt(AN_ARM_MOMENT_MAX / 1e6, 1), " kN m in the lift case."));
 echo("");
 echo("| Check | Demand | Capacity | Ratio | Status |");
 echo("|---|---|---|---|---|");
