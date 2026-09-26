@@ -2448,11 +2448,12 @@ conflicts. Every leg needs GO; radios stay parked between legs.
      NOTE: the leg report first printed "99.8 % loss / published=1" — an
      artifact of the daemon stats thread crashing 1 frame in (RS-12.17),
      not a result. Evidence: RESULTS.md "Leg U" section.
-  2. **Deploy the merged base tree** (recipe in the runbook) so the base's
-     daemons carry the shared gate without the harness push.
-  3. **RS-12.16 items 1–3 implemented + SIL green before the bench**, then
-     RS-1.4 live: selector = Auto, force loss, watch DTS→FHSS inside the
-     dead-air window and the promote-back after 60 s healthy.
+  2. ~~Deploy the merged base tree~~ **DONE 2026-09-15 22:28Z:** base tree
+     and image rebuilt from main d3751286 (image 4623980c2dac; marker
+     `DEPLOYED_FROM.txt`); all four merged changes verified present.
+  3. ~~RS-12.16 + RS-1.4 live~~ **DONE 2026-09-15 (leg V):** Auto pinned FHSS
+     13 s after the frame source went silent and promoted back after the 60 s
+     dwell. See RS-12.16 / RS-1.4 and bench-evidence/RS_1_4_auto_policy_2026-09-15.
   4. **Residual 20.7 % on the camera keyframe storm** (leg T): analysis
      first — train length vs the profile-1 slot budget, command load — no
      code until the mechanism is named.
@@ -2462,8 +2463,11 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   the base broker, `rs115` pre-brackets both boards, re-push
   `/tmp/lifetrac_strict` + `/tmp/lifetrac_p0c` after ANY reboot.
 
-- [ ] **RS-12.16 — Auto radio-profile policy is blind to the failures we
-  measured (added 2026-09-14, from the RS-12.15 camera A/B).**
+- [x] **RS-12.16 — Auto radio-profile policy is blind to the failures we
+  measured (added 2026-09-14, from the RS-12.15 camera A/B). DONE 2026-09-15:
+  implemented on PR #127 (dead-air + loss-rate inputs, atomic loss-counter
+  snapshot, RS-12.18 re-sync), merged to main d3751286, validated on air in
+  leg V (RS-1.4). Open follow-ups: RS-12.19 (hypothesis), RS-12.20, RS-12.21.**
   `web_ui.AutoRadioPolicy` judges the link from link_stats sample age
   (≤ 20 s) and reassembler timeouts (≤ 2.5 per 10 s). Replayed against leg S
   (old fw, camera, 39.0 % loss, lock-loss blackouts of 53.2 s + 21.9 s):
