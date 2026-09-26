@@ -77,46 +77,37 @@ jobs:
           echo "Running structural analysis on main design..."
           cd LifeTrac-v25/DESIGN-STRUCTURAL
           
-          # Write the ECHO output to the log file. (With "-o /dev/null" the ECHO
-          # lines went to /dev/null and every report said no summary was found.)
+          # Write the ECHO output to the log file. The checks themselves are in
+          # openscad/analysis/structural_analysis.scad, which the main file includes.
           openscad -o structural_analysis.log --export-format echo openscad/lifetrac_v25.scad
           echo "Captured $(grep -c '^ECHO:' structural_analysis.log) ECHO lines"
-          if ! grep -q "COMPLETE STRUCTURAL ANALYSIS SUMMARY" structural_analysis.log; then
+          if ! grep -q '^ECHO: "STRUCTURAL ANALYSIS SUMMARY"$' structural_analysis.log; then
             echo "::error::No structural analysis summary in the OpenSCAD output"
             exit 1
           fi
-          
-          echo "Structural analysis complete. Check logs for results."
-      
+
+          # The summary and detail blocks are Markdown; strip the ECHO wrapper once for
+          # the report, the persistent log and the pass/fail step
+          sed -n '/^ECHO: "STRUCTURAL ANALYSIS SUMMARY"$/,/^ECHO: "OVERALL: /p' structural_analysis.log \
+            | tail -n +2 | sed 's/^ECHO: "//; s/"$//' > structural_summary.md
+          sed -n '/^ECHO: "STRUCTURAL ANALYSIS DETAIL"$/,/^ECHO: "STRUCTURAL ANALYSIS SUMMARY"$/p' structural_analysis.log \
+            | sed '1d;$d' | sed 's/^ECHO: "//; s/"$//' > structural_detail.md
+          cat structural_summary.md
+
       - name: Generate structural analysis report
         run: |
           cd LifeTrac-v25/DESIGN-STRUCTURAL
-          
-          # Extract key metrics from the log
+
           echo "# Structural Analysis Report" > structural_report.md
           echo "" >> structural_report.md
           echo "**Generated:** $(date)" >> structural_report.md
           echo "**Commit:** ${{ github.sha }}" >> structural_report.md
           echo "**Branch:** ${{ github.ref_name }}" >> structural_report.md
           echo "" >> structural_report.md
-          
-          # Extract structural summary if present
-          if grep -q "COMPLETE STRUCTURAL ANALYSIS SUMMARY" structural_analysis.log; then
-            echo "## Structural Analysis Results" >> structural_report.md
-            echo "" >> structural_report.md
-            # Remove this warning (and the one in the persistent log) once the analysis is
-            # rebuilt against the current design (finding B4 of the 2026-09-25 OpenSCAD review)
-            echo '> [!WARNING]' >> structural_report.md
-            echo '> These checks still model an earlier design (a straight 3" x 3" arm, a 2" x 2" cross beam and 3/4" pivot rings), so the capacity and stress ratios below are not valid for the current model. Do not use them as a rated or safe working load. See finding B4 in the [2026-09-25 OpenSCAD review](${{ github.server_url }}/${{ github.repository }}/blob/${{ github.event.pull_request.head.sha || github.sha }}/LifeTrac-v25/AI%20NOTES/CODE%20REVIEWS/2026-09-25_v25_OpenSCAD_Full_Review_Claude_v1_0.md).' >> structural_report.md
-            echo "" >> structural_report.md
-            echo "\`\`\`" >> structural_report.md
-            # Extract from the summary header to the overall assessment line
-            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/OVERALL STRUCTURAL ASSESSMENT/p' structural_analysis.log | tail -n +2 | sed 's/^ECHO: //' >> structural_report.md
-            echo "\`\`\`" >> structural_report.md
-          else
-            echo "No structural analysis summary found in output." >> structural_report.md
-          fi
-          
+          echo "## Structural Analysis Results" >> structural_report.md
+          echo "" >> structural_report.md
+          cat structural_summary.md >> structural_report.md
+
           cat structural_report.md
       
       - name: Create persistent structural analysis log
@@ -137,80 +128,15 @@ jobs:
           echo "**Branch:** ${{ github.ref_name }}" >> STRUCTURAL_ANALYSIS_LOG.md
           echo "**Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> STRUCTURAL_ANALYSIS_LOG.md
           echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-          echo '> [!WARNING]' >> STRUCTURAL_ANALYSIS_LOG.md
-          echo '> These checks still model an earlier design (a straight 3" x 3" arm, a 2" x 2" cross beam and 3/4" pivot rings), so the capacity and stress ratios below are not valid for the current model. Do not use them as a rated or safe working load. See finding B4 in the [2026-09-25 OpenSCAD review](../AI%20NOTES/CODE%20REVIEWS/2026-09-25_v25_OpenSCAD_Full_Review_Claude_v1_0.md).' >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "### Summary" >> STRUCTURAL_ANALYSIS_LOG.md
           echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-          
-          # Extract and format the structural analysis results
-          if grep -q "COMPLETE STRUCTURAL ANALYSIS SUMMARY" structural_analysis.log; then
-            echo "### Results Summary" >> STRUCTURAL_ANALYSIS_LOG.md
-            echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-            echo "\`\`\`" >> STRUCTURAL_ANALYSIS_LOG.md
-            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/OVERALL STRUCTURAL ASSESSMENT/p' structural_analysis.log | tail -n +2 | sed 's/^ECHO: //' >> STRUCTURAL_ANALYSIS_LOG.md
-            echo "\`\`\`" >> STRUCTURAL_ANALYSIS_LOG.md
-            echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-            
-            # Extract detailed failure information if any tests failed
-            if grep -q "FAIL" structural_analysis.log; then
-              echo "### ⚠️ Failed Components" >> STRUCTURAL_ANALYSIS_LOG.md
-              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-              
-              # The model's "RATED LIFT CAPACITY" is the hydraulic lift capacity it uses as the design load
-              CAPACITY=$(grep "RATED LIFT CAPACITY:" structural_analysis.log | head -1 | sed 's/ECHO: "RATED LIFT CAPACITY:", //')
-              echo "**Hydraulic lift capacity used as the design load (not a rated capacity):** $CAPACITY" >> STRUCTURAL_ANALYSIS_LOG.md
-              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-              
-              # List each failed component with details
-              echo "#### Detailed Failure Analysis" >> STRUCTURAL_ANALYSIS_LOG.md
-              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-              
-              # Each section runs from its "=== ... ===" header to its "... CHECK:" line
+          cat structural_summary.md >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "### Detail" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+          cat structural_detail.md >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "" >> STRUCTURAL_ANALYSIS_LOG.md
 
-              # Arm Bending
-              if grep -q "Arm Bending.*FAIL" structural_analysis.log; then
-                echo "**1. Arm Bending Stress**" >> STRUCTURAL_ANALYSIS_LOG.md
-                sed -n '/=== ARM BENDING STRESS ANALYSIS ===/,/CHECK:/p' structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
-                echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-              fi
-              
-              # Arm Deflection
-              if grep -q "Arm Deflection.*FAIL" structural_analysis.log; then
-                echo "**2. Arm Deflection**" >> STRUCTURAL_ANALYSIS_LOG.md
-                sed -n '/=== ARM DEFLECTION ANALYSIS ===/,/CHECK:/p' structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
-                echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-              fi
-              
-              # Cross Beam
-              if grep -q "Cross Beam.*FAIL" structural_analysis.log; then
-                echo "**3. Cross Beam Bending**" >> STRUCTURAL_ANALYSIS_LOG.md
-                sed -n '/=== CROSS BEAM STRESS ANALYSIS ===/,/CHECK:/p' structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
-                echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-              fi
-              
-              # Pivot Ring Welds
-              if grep -q "Pivot Ring.*FAIL" structural_analysis.log; then
-                echo "**4. Pivot Ring Welds**" >> STRUCTURAL_ANALYSIS_LOG.md
-                sed -n '/=== PIVOT RING WELD ANALYSIS ===/,/CHECK:/p' structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
-                echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-              fi
-              
-              echo "### Recommended Actions" >> STRUCTURAL_ANALYSIS_LOG.md
-              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-              echo "See [STRUCTURAL_ANALYSIS.md](STRUCTURAL_ANALYSIS.md) for design modification recommendations." >> STRUCTURAL_ANALYSIS_LOG.md
-              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-            else
-              echo "### ✅ All Tests Passed" >> STRUCTURAL_ANALYSIS_LOG.md
-              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-              echo "All structural analysis checks passed successfully." >> STRUCTURAL_ANALYSIS_LOG.md
-              echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-            fi
-          else
-            echo "### Error" >> STRUCTURAL_ANALYSIS_LOG.md
-            echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-            echo "No structural analysis summary found in output. Check the workflow logs for errors." >> STRUCTURAL_ANALYSIS_LOG.md
-            echo "" >> STRUCTURAL_ANALYSIS_LOG.md
-          fi
-          
           echo "---" >> STRUCTURAL_ANALYSIS_LOG.md
           echo "" >> STRUCTURAL_ANALYSIS_LOG.md
           echo "_This file is automatically updated by the OpenSCAD Structural Analysis workflow._" >> STRUCTURAL_ANALYSIS_LOG.md
@@ -312,3 +238,17 @@ jobs:
               issue_number: context.issue.number,
               body: comment
             });
+      
+      # Runs last, so the report, the persistent log and the PR comment are still produced
+      - name: Fail on new structural failures
+        run: |
+          cd LifeTrac-v25/DESIGN-STRUCTURAL
+          if grep -q "remove from STRUCT_KNOWN_ISSUES" structural_summary.md; then
+            echo "::warning::A check listed in STRUCT_KNOWN_ISSUES now passes. Remove it from the list in openscad/analysis/structural_analysis.scad."
+          fi
+          if grep -q "NEW FAIL" structural_summary.md; then
+            echo "::error::A structural check fails that isn't listed as a known issue:"
+            grep "NEW FAIL" structural_summary.md
+            exit 1
+          fi
+          echo "No new structural failures"

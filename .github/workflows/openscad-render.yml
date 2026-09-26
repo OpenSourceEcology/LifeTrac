@@ -308,13 +308,9 @@ jobs:
               print("If OpenSCAD file structure changed, update the regex patterns in this workflow", file=sys.stderr)
               sys.exit(0)  # Exit gracefully without updating
           
-          # Conservative lift capacity estimate based on typical loader geometry
-          # NOTE: This is a simplified estimate. The actual lift capacity calculation in the 
-          # OpenSCAD file uses complex lever arm geometry and moment calculations which would
-          # require additional extraction logic. For now, we use a conservative estimate.
-          # If design changes significantly, this value should be reviewed and updated.
-          ESTIMATED_LIFT_CAPACITY_KG = 1200
-          ESTIMATED_LIFT_CAPACITY_LBS = ESTIMATED_LIFT_CAPACITY_KG * 2.205
+          # The rated operating capacity comes from the structural analysis
+          # (openscad/analysis/structural_analysis.scad), which the structural-analysis
+          # workflow writes to STRUCTURAL_ANALYSIS_LOG.md, so the table links there.
           
           # Read current README
           with open('README.md', 'r') as f:
@@ -332,7 +328,7 @@ jobs:
           perf_table = f"""| Specification | Value |
           |--------------|-------|
           | **Hydraulic System Pressure** | {int(HYDRAULIC_PRESSURE_PSI):,} PSI |
-          | **Estimated Lift Capacity** | ~{int(ESTIMATED_LIFT_CAPACITY_KG):,} kg (~{int(ESTIMATED_LIFT_CAPACITY_LBS):,} lbs) |
+          | **Rated Operating Capacity** | See the structural analysis in [STRUCTURAL_ANALYSIS_LOG.md](DESIGN-STRUCTURAL/STRUCTURAL_ANALYSIS_LOG.md) |
           | **Drive Configuration** | All-wheel drive (4 hydraulic motors) |
           | **Cylinder Bore (Lift)** | {LIFT_CYLINDER_BORE} mm ({LIFT_CYLINDER_BORE/25.4:.1f}") |"""
           
@@ -395,7 +391,6 @@ jobs:
           print(f"  Width: {int(MACHINE_WIDTH)} mm")
           print(f"  Length: {int(MACHINE_LENGTH)} mm")
           print(f"  Height: {int(MACHINE_HEIGHT)} mm")
-          print(f"  Lift Capacity: ~{int(ESTIMATED_LIFT_CAPACITY_KG)} kg")
           PYTHON_EOF
           
           python3 /tmp/extract_specs.py
