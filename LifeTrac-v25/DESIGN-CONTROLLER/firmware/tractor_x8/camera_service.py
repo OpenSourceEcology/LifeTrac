@@ -881,6 +881,24 @@ _VECTOR_ENCODER = None
 _VECTOR_SEQ = 0
 
 
+def _log_vector_stats(st: dict) -> None:
+    """RS-13 bench evidence: one INFO line per health period while in VECTOR
+    mode with the encoder's ``last_stats`` (ms per stage, wire bytes, level,
+    epoch state). ``tools/vector_dry_run.py tractor-log`` parses the
+    ``key=value`` shape, so keep it stable."""
+    if not st:
+        return
+    import json as _json
+    ms = {k: round(float(v), 1) for k, v in (st.get("ms") or {}).items()}
+    LOG.info("camera_service: vector_stats ms_total=%.1f ms=%s bytes=%d level=%d "
+             "detail=%d epoch=%d n_live=%d residual=%.3f epoch_pending=%d",
+             ms.get("total", 0.0), _json.dumps(ms, separators=(",", ":")),
+             int(st.get("frame_bytes", 0)), int(st.get("level", 0)),
+             int(st.get("detail", 0)), int(st.get("epoch", 0)),
+             int(st.get("n_live", 0)), float(st.get("residual", 0.0)),
+             int(bool(st.get("epoch_pending"))))
+
+
 def _build_vector_frame(canvas: bytes, force_epoch: bool,
                         byte_budget: "int | None") -> bytes:
     """VECTOR (mode 9): hand the capture to the VS1 encoder and return its
@@ -1636,6 +1654,7 @@ def main() -> None:
     frame_health_log = os.environ.get("LIFETRAC_CAMERA_HEALTH_LOG", "").strip() == "1"
     frame_health_every_s = _env_float("LIFETRAC_CAMERA_HEALTH_EVERY_S", 2.0, lo=1.0)
     _last_health_t = 0.0
+    _last_vstats_t = 0.0
     _last_canvas_sig: int | None = None
     _same_canvas_run = 0
     while True:
@@ -1658,6 +1677,13 @@ def main() -> None:
                              _same_canvas_run, sig, TARGET_FPS)
                     _last_health_t = now_h
                 _last_canvas_sig = sig
+            if ENCODE_MODE == ENCODE_MODE_VECTOR and _VECTOR_ENCODER is not None:
+                # RS-13 bench line at the health cadence (no env needed): the
+                # encoder's per-stage ms, parsed by tools/vector_dry_run.py.
+                now_v = time.monotonic()
+                if (now_v - _last_vstats_t) >= frame_health_every_s:
+                    _last_vstats_t = now_v
+                    _log_vector_stats(_VECTOR_ENCODER.last_stats)
             # Primary: UART to the M7 (length-framed). Skipped under the
             # LoRa-bridge path; image_tx_daemon picks up the same payload
             # over MQTT and feeds the L072 HostLink directly.
