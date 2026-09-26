@@ -15,7 +15,7 @@ The body of this review describes the tree as it was on 2026-09-25. The pull req
 | P1: four export wrappers produced edge slices | The `rotate()` is removed from `export_side_panel_outer/inner`, `export_rear_crossmember` and `export_bucket_side`. They now export 1,392.6 × 1,000, 1,045.4 × 550 and 449.2 × 600 mm outlines |
 | P4: round holes exported as rectangles | The hole cylinders in `bucket_side.scad` and `cylinder_lug.scad` now go through the plate thickness. `cnclayout.svg` is regenerated; only its six lug pivot holes changed |
 | Jig includes (section 5.4) | `angle_iron_drill_jig.scad` and `tube_drill_jig.scad` include `../lifetrac_v25_params.scad` and compile with 0 warnings. Both are still placeholders |
-| `generate-part-svgs.yml` (section 5.5) | Watches and exports `openscad/parts/`, fails if an SVG is missing, and uploads the SVGs as an artifact (`output/` is git-ignored). Its steps that wrote README links to never-committed files, and tried to commit them, are removed; the README now lists the SVGs by file name and says where to get them. The same path error is fixed in `README_EXPORTS.md` and `INDIVIDUAL_PARTS_GUIDE.md`, whose commands now also create the output folder first |
+| `generate-part-svgs.yml` (section 5.5) | Watches and exports `openscad/parts/`, fails if an SVG is missing, and uploads the SVGs as an artifact (`output/` is git-ignored). Its steps that wrote README links to never-committed files, and tried to commit them, are removed; the README now lists the SVGs by file name and says where to get them. The same path error is fixed in `README_EXPORTS.md` and `INDIVIDUAL_PARTS_GUIDE.md`, whose commands now also create the output folder first. The guide now describes what the workflow actually does |
 | `openscad-structural-analysis.yml` (section 5.5) | Writes the ECHO output to `structural_analysis.log` instead of `/dev/null`, fails if the summary is missing, and extracts the whole summary table |
 | B4: stale capacity now published | The analysis log and its PR comment carry a warning that the checks model an earlier design and are not ratings. The log's "Current Rated Capacity" line is relabelled as the hydraulic lift capacity used as the design load |
 | Section 8, step 0 | `DESIGN-STRUCTURAL/README.md` now carries a "not yet ready for fabrication" warning that points here |
@@ -53,7 +53,7 @@ This review didn't rely on reading alone. Every file was run through OpenSCAD 20
 | `lifetrac_v25_UTU.scad` | Evaluates with 0 warnings and 228 echo lines |
 | `lifetrac_v25_params.scad` | Evaluates with 0 warnings; its 128 echo lines are printed again by every part file that includes it |
 | `modules/*.scad` (6 files) | Evaluate with 0 warnings |
-| `parts/**/*.scad` (32 files) | Evaluate with 0 warnings (see section 5 for content issues) |
+| `parts/**/*.scad` (38 files) | Evaluate with 0 warnings (see section 5 for content issues) |
 | `3d_printed_bolt_hole_cutting_jigs/angle_iron_drill_jig.scad` | **18 warnings**: broken include path, so the jig renders with undefined sizes |
 | `3d_printed_bolt_hole_cutting_jigs/tube_drill_jig.scad` | **26 warnings**: broken include path and an unknown variable |
 | `3d_printed_welding_jigs/pivot_welding_jig.scad` | **9 warnings**: broken include path |
