@@ -125,7 +125,7 @@
       for (const [x, y] of h.skyline) sp.lineTo(x, y);
       sp.lineTo(h.skyline[h.skyline.length - 1][0], pts[pts.length - 1][1]);
       sp.closePath();
-      ctx.fillStyle = h.skyline_colour || '#2f4a26';
+      ctx.fillStyle = (h.skyline_fill && h.skyline_fill.c0) || '#2f4a26';
       ctx.fill(sp);
     }
     ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1;
@@ -176,12 +176,14 @@
       case 'tree':
       case 'blob': {
         ctx.beginPath();
-        ctx.ellipse(s.cx, s.cy, Math.max(1, s.rx), Math.max(1, s.ry), ((s.rot || 0) * Math.PI) / 180, 0, 2 * Math.PI);
+        ctx.ellipse(s.cx, s.cy, Math.max(1, s.rx), Math.max(1, s.ry), ((s.rot_deg || 0) * Math.PI) / 180, 0, 2 * Math.PI);
         if (!outlineOnly) { ctx.fillStyle = fillStyleFor(s.fill, opts); ctx.fill(); }
         ctx.strokeStyle = strokeCol; ctx.lineWidth = 0.75; ctx.stroke();
-        if (s.k === 'tree' && typeof s.trunk_h === 'number' && s.trunk_h > 0) {
-          ctx.fillStyle = '#223';
-          ctx.fillRect(s.cx - 2, s.cy + s.ry, 4, s.trunk_h);
+        if (s.k === 'tree' && s.trunk && typeof s.trunk.h === 'number' && s.trunk.h > 0) {
+          // store emits {w, h, c0}: a bar of w px below the ellipse in the shadow slot
+          const tw = s.trunk.w || 4;
+          ctx.fillStyle = desaturate ? desat(s.trunk.c0 || '#223') : (s.trunk.c0 || '#223');
+          ctx.fillRect(s.cx - tw / 2, s.cy + s.ry, tw, s.trunk.h);
         }
         break;
       }
