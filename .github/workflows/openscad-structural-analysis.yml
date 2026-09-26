@@ -104,6 +104,11 @@ jobs:
           if grep -q "COMPLETE STRUCTURAL ANALYSIS SUMMARY" structural_analysis.log; then
             echo "## Structural Analysis Results" >> structural_report.md
             echo "" >> structural_report.md
+            # Remove this warning (and the one in the persistent log) once the analysis is
+            # rebuilt against the current design (finding B4 of the 2026-09-25 OpenSCAD review)
+            echo '> [!WARNING]' >> structural_report.md
+            echo '> These checks still model an earlier design (a straight 3" x 3" arm, a 2" x 2" cross beam and 3/4" pivot rings), so the capacity and stress ratios below are not valid for the current model. Do not use them as a rated or safe working load. See finding B4 in `LifeTrac-v25/AI NOTES/CODE REVIEWS/2026-09-25_v25_OpenSCAD_Full_Review_Claude_v1_0.md`.' >> structural_report.md
+            echo "" >> structural_report.md
             echo "\`\`\`" >> structural_report.md
             # Extract from the summary header to the overall assessment line
             sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/OVERALL STRUCTURAL ASSESSMENT/p' structural_analysis.log | tail -n +2 | sed 's/^ECHO: //' >> structural_report.md
@@ -132,6 +137,9 @@ jobs:
           echo "**Branch:** ${{ github.ref_name }}" >> STRUCTURAL_ANALYSIS_LOG.md
           echo "**Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> STRUCTURAL_ANALYSIS_LOG.md
           echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo '> [!WARNING]' >> STRUCTURAL_ANALYSIS_LOG.md
+          echo '> These checks still model an earlier design (a straight 3" x 3" arm, a 2" x 2" cross beam and 3/4" pivot rings), so the capacity and stress ratios below are not valid for the current model. Do not use them as a rated or safe working load. See finding B4 in the [2026-09-25 OpenSCAD review](../AI%20NOTES/CODE%20REVIEWS/2026-09-25_v25_OpenSCAD_Full_Review_Claude_v1_0.md).' >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "" >> STRUCTURAL_ANALYSIS_LOG.md
           
           # Extract and format the structural analysis results
           if grep -q "COMPLETE STRUCTURAL ANALYSIS SUMMARY" structural_analysis.log; then
@@ -147,9 +155,9 @@ jobs:
               echo "### ⚠️ Failed Components" >> STRUCTURAL_ANALYSIS_LOG.md
               echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               
-              # Extract rated capacity
+              # The model's "RATED LIFT CAPACITY" is the hydraulic lift capacity it uses as the design load
               CAPACITY=$(grep "RATED LIFT CAPACITY:" structural_analysis.log | head -1 | sed 's/ECHO: "RATED LIFT CAPACITY:", //')
-              echo "**Current Rated Capacity:** $CAPACITY" >> STRUCTURAL_ANALYSIS_LOG.md
+              echo "**Hydraulic lift capacity used as the design load (not a rated capacity):** $CAPACITY" >> STRUCTURAL_ANALYSIS_LOG.md
               echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               
               # List each failed component with details

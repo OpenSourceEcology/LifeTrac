@@ -330,18 +330,18 @@ It is **not yet nested for cutting**: several parts overlap, the stiffener, moto
 
 ## Individual Part SVGs
 
-2D CNC cutting layouts for each individual plate part:
+2D CNC cutting outlines for each individual plate part. The SVGs are not committed, because `output/` is git-ignored. Download them from the `part-svgs` artifact of the latest **Generate Individual Part SVGs** workflow run, or generate them locally by running `./export_individual_svgs.sh` from this directory. Read the warning at the top of this README before cutting anything.
 
 ### Half-Inch (1/2") Plate Parts
-- [Side Panel Outer](output/svg/parts/side_panel_outer.svg) - 2× needed
-- [Side Panel Inner](output/svg/parts/side_panel_inner.svg) - 2× needed
-- [Wheel Mount](output/svg/parts/wheel_mount.svg) - 4× needed
-- [Cylinder Lug](output/svg/parts/cylinder_lug.svg) - 6× needed
-- [Rear Crossmember](output/svg/parts/rear_crossmember.svg) - 1× needed
+- Side Panel Outer (`side_panel_outer.svg`) - 2× needed
+- Side Panel Inner (`side_panel_inner.svg`) - 2× needed
+- Wheel Mount (`wheel_mount.svg`) - 4× needed
+- Cylinder Lug (`cylinder_lug.svg`) - 6× needed
+- Rear Crossmember (`rear_crossmember.svg`) - 1× needed
 
 ### Quarter-Inch (1/4") Plate Parts
-- [Standing Deck](output/svg/parts/standing_deck.svg) - 1× needed
-- [Bucket Bottom](output/svg/parts/bucket_bottom.svg) - 1× needed
-- [Bucket Side](output/svg/parts/bucket_side.svg) - 2× needed (mirror for opposite)
+- Standing Deck (`standing_deck.svg`) - 1× needed
+- Bucket Bottom (`bucket_bottom.svg`) - 1× needed
+- Bucket Side (`bucket_side.svg`) - 2× needed (mirror for opposite)
 
 Total: 23 parts from 8 unique designs

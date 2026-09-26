@@ -19,6 +19,7 @@ SVG files will be created in `output/svg/parts/`
 
 ```bash
 cd LifeTrac-v25/DESIGN-STRUCTURAL
+mkdir -p output/svg/parts
 openscad -o output/svg/parts/wheel_mount.svg --export-format=svg openscad/parts/export_wheel_mount.scad
 ```
 
