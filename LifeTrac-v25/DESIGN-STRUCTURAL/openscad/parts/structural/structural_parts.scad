@@ -192,6 +192,6 @@ module show_all_structural_parts() {
 // show_all_structural_parts();
 
 echo("=== STRUCTURAL PARTS LOADED ===");
-echo("Angle iron parts: A1-A10 (70 pieces total)");
+echo("Angle iron parts: A1-A10 (86 pieces total)");
 echo("Tubing parts: T1-T5 (7 pieces total)");
 echo("See STRUCTURAL_PARTS_CATALOG.md for details");
