@@ -521,6 +521,14 @@ _ENCODE_MODE_IMPLEMENTED = frozenset({
 })
 
 
+def _vector_encoder_available() -> bool:
+    """numpy and OpenCV are both needed by x8_image_pipeline.encode_vector."""
+    if not _HAS_NUMPY:
+        return False
+    import importlib.util
+    return importlib.util.find_spec("cv2") is not None
+
+
 def _clamp_encode_mode(requested: int) -> int:
     """Clamp ``requested`` to an implemented encoder mode.
 
@@ -531,6 +539,12 @@ def _clamp_encode_mode(requested: int) -> int:
     try:
         m = int(requested)
     except (TypeError, ValueError):
+        return ENCODE_MODE_Y_ONLY
+    if m == ENCODE_MODE_VECTOR and not _vector_encoder_available():
+        # Fail closed: without numpy + OpenCV the VS1 encoder cannot run, and
+        # falling through to the tile encoder would stamp codec 6 on a tile
+        # payload the base then rejects frame after frame. The ack carries
+        # requested 9 / effective 1 (clamped), which the base UI renders.
         return ENCODE_MODE_Y_ONLY
     if m in _ENCODE_MODE_IMPLEMENTED:
         return m
@@ -870,6 +884,10 @@ def _build_vector_frame(canvas: bytes, force_epoch: bool,
     budget minus the 6-byte header itself (VECTOR_SCENE.md §3.7), and a mode
     change's forced keyframe becomes an epoch start (§7.1)."""
     global _VECTOR_ENCODER, _VECTOR_SEQ  # noqa: PLW0603
+    if not _HAS_NUMPY:
+        # _clamp_encode_mode refuses VECTOR without numpy; never emit a tile
+        # payload under codec 6, fail the frame build loudly instead.
+        raise RuntimeError("VECTOR mode needs numpy")
     if _VECTOR_ENCODER is None:
         from x8_image_pipeline.encode_vector import VectorEncoder
         _VECTOR_ENCODER = VectorEncoder(canvas=(CANVAS_W, CANVAS_H))
@@ -913,7 +931,7 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
         is folded into the hash key (different quality → different blob).
     """
     canvas = cam.grab_rgb()
-    if ENCODE_MODE == ENCODE_MODE_VECTOR and _HAS_NUMPY:
+    if ENCODE_MODE == ENCODE_MODE_VECTOR:
         return _build_vector_frame(canvas, force_keyframe, byte_budget)
     now = time.monotonic()
     is_key = (force_keyframe or accum.last_canvas is None or

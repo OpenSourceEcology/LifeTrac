@@ -17,6 +17,8 @@ import math
 import os
 import random
 import sys
+import threading
+import time
 import unittest
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -374,6 +376,28 @@ class LwwTests(StoreCase):
                 (9, vs.define_hash(tri(9, y=20)), shash(tri(9, y=20)))]
         self.feed([digest(rows, [(7, 0), (4, 0), (0, 0), (0, 0)])], epoch=0)   # far shift was absent: filled
         self.assertTrue(self.snap()["digest_ok"])
+
+    def test_del_follows_the_same_lww_predicate_as_every_other_field(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True)
+        t_def = self.rx - 200
+        r = self.feed([vs.Del(1)], epoch=0, age=15)                 # a bound never supersedes known state
+        self.assertTrue(r.applied)
+        self.assertIn(1, self.shapes())
+        self.feed([vs.Del(1)], epoch=0, rx=t_def + 100, age=1)      # known but older than the define: ignored
+        self.assertIn(1, self.shapes())
+        self.feed([vs.Del(1)], epoch=0, rx=t_def + 200, age=1)      # known and equal to the geometry clock
+        self.assertNotIn(1, self.shapes())
+        self.feed([tri(1)], epoch=0, rx=t_def + 200)                # not resurrected by an equal-time define
+        self.assertNotIn(1, self.shapes())
+        self.feed([tri(1)], epoch=0)                                # a newer define is
+        self.assertIn(1, self.shapes())
+        self.feed([vs.Del(1)], epoch=0)                             # known and newer: deletes
+        self.assertNotIn(1, self.shapes())
+        self.feed([tri(2)], epoch=0, age=15)                        # a shape whose own clock is a bound ...
+        self.assertIn(2, self.shapes())
+        self.feed([vs.Del(2)], epoch=0, age=15)                     # ... is removed by a later bound
+        self.assertNotIn(2, self.shapes())
+        self.assertEqual(self.st.stats["orphans"], 0)
 
     def test_group_transform_at_define_never_double_shifts(self):
         self.feed(key() + [tri(1)], epoch=0, key_=True)             # defined at shift 0
@@ -810,6 +834,59 @@ class RobustnessTests(unittest.TestCase):
         st.reset()
         self.assertIsNone(st.snapshot(10_000))
         self.assertEqual(st.stats["frames_rx"], 0)
+
+
+# ---------------------------------------------------------------- thread safety (state_publisher)
+
+class ThreadSafetyTests(unittest.TestCase):
+    def test_ingest_and_snapshot_from_two_threads(self):
+        """ingest runs on the MQTT thread while snapshot/stats run on the
+        websocket loop: no exception, and every snapshot serialises."""
+        _, frames = scenario(5)
+        st = VectorSceneStore()
+        errors: list = []
+        counts = [0, 0]
+        stop = threading.Event()
+
+        def producer():
+            n = 0
+            try:
+                while not stop.is_set():
+                    k, epoch, recs = frames[n % len(frames)]
+                    st.ingest(body(k, epoch, recs), 1 if k else 0, 20_000 + 500 * n + 250, 50.0)
+                    n += 1
+            except Exception as e:                    # noqa: BLE001 - the test reports it
+                errors.append(e)
+            counts[0] = n
+
+        def consumer():
+            n = 0
+            try:
+                while not stop.is_set():
+                    json.dumps(st.snapshot(20_000 + 500 * n + 300))
+                    json.dumps(st.stats)
+                    n += 1
+            except Exception as e:                    # noqa: BLE001
+                errors.append(e)
+            counts[1] = n
+
+        old = sys.getswitchinterval()
+        sys.setswitchinterval(1e-5)                   # frequent switches expose an unlocked iteration
+        threads = [threading.Thread(target=producer), threading.Thread(target=consumer)]
+        try:
+            for t in threads:
+                t.start()
+            time.sleep(0.5)
+        finally:
+            stop.set()
+            for t in threads:
+                t.join(10)
+            sys.setswitchinterval(old)
+        self.assertEqual(errors, [])
+        self.assertFalse(any(t.is_alive() for t in threads))
+        self.assertGreater(counts[0], 10)
+        self.assertGreater(counts[1], 10)
+        json.dumps(st.snapshot(0))
 
 
 # ---------------------------------------------------------------- loss (§4.3, §8.6): a simulated tractor

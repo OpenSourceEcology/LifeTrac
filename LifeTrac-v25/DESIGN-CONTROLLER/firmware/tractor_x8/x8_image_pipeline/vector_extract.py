@@ -36,14 +36,19 @@ try:                                             # pragma: no cover
 except ImportError:                              # pragma: no cover
     cv2 = None                                   # type: ignore
 
+# The tractor's mirror of the base codec first (see encode_vector.py); the
+# base tree only for a source checkout whose mirror is missing.
 try:
-    from image_pipeline.vector_scene import codec as vs
-except ImportError:                              # camera_service has no base_station on sys.path (§7.1)
-    _BS_DIR = os.path.normpath(os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "base_station"))
-    if _BS_DIR not in sys.path:
-        sys.path.insert(0, _BS_DIR)
-    from image_pipeline.vector_scene import codec as vs  # noqa: E402
+    from . import vs1_codec as vs
+except ImportError:                              # loaded as a bare module, or no mirror beside us
+    try:
+        import vs1_codec as vs                   # type: ignore
+    except ImportError:
+        _BS_DIR = os.path.normpath(os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "base_station"))
+        if _BS_DIR not in sys.path:
+            sys.path.insert(0, _BS_DIR)
+        from image_pipeline.vector_scene import codec as vs  # noqa: E402
 
 CANVAS_W, CANVAS_H = 384, 256
 WORK_W, WORK_H = 96, 64
@@ -861,16 +866,19 @@ def extract_edges(rgb192: np.ndarray, mask: Optional[np.ndarray], regions: list,
 
 def raster_of(record, dx: int = 0, dy: int = 0, shape=(WORK_H, WORK_W)) -> np.ndarray:
     """What the base paints for a define at a cumulative UPD offset (4 px units
-    = working px), as a bool mask at working resolution."""
+    = working px), as a bool mask at working resolution. Dispatch is on the
+    record's class name: a record decoded with the base codec and one built
+    from the tractor mirror are distinct classes with the same fields."""
     out = np.zeros(shape, np.uint8)
-    if isinstance(record, vs.Poly):
+    kind = type(record).__name__
+    if kind == "Poly":
         scale = CELL8 if record.grid == 0 else 1
         pts = np.array([(x * scale + dx, y * scale + dy) for x, y in record.vertices], np.int32)
         cv2.fillPoly(out, [pts.reshape(-1, 1, 2)], 1)
-    elif isinstance(record, vs.Tree):
+    elif kind == "Tree":
         cv2.ellipse(out, (record.cx * CELL8 + dx, record.cy * CELL8 + dy),
                     (record.rx + 1, record.ry + 1), 0, 0, 360, 1, -1)
-    elif isinstance(record, vs.Edge):
+    elif kind == "Edge":
         pts = np.array([(x + dx, y + dy) for x, y in record.points], np.int32)
         cv2.polylines(out, [pts.reshape(-1, 1, 2)], False, 1, 1)
     return out.astype(bool)

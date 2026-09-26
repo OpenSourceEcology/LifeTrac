@@ -64,8 +64,14 @@ class EncodeModeDispatchTests(unittest.TestCase):
                 self.evt)
             expected = camera_service._clamp_encode_mode(mode)
             if mode in camera_service._ENCODE_MODE_IMPLEMENTED:
-                self.assertEqual(expected, mode,
-                                 f"implemented mode {mode} must clamp to itself")
+                if (mode == camera_service.ENCODE_MODE_VECTOR
+                        and not camera_service._vector_encoder_available()):
+                    # VECTOR fails closed without numpy + OpenCV (PR #135):
+                    # the ack shows requested 9 / effective 1 (clamped).
+                    self.assertEqual(expected, camera_service.ENCODE_MODE_Y_ONLY)
+                else:
+                    self.assertEqual(expected, mode,
+                                     f"implemented mode {mode} must clamp to itself")
             self.assertEqual(camera_service.ENCODE_MODE, expected,
                              f"mode {mode} ({name}) not committed as {expected}")
             self.assertTrue(self.evt.is_set(),
@@ -278,6 +284,20 @@ class EncodeCacheInvalidatesOnModeChangeTests(unittest.TestCase):
                              f"{len(calls)} encodes (want {n_tiles})")
         finally:
             camera_service._encode_tile = original
+
+
+
+
+class VectorFailsClosedTests(unittest.TestCase):
+    def test_vector_clamps_to_y_only_without_numpy(self) -> None:
+        saved = camera_service._HAS_NUMPY
+        camera_service._HAS_NUMPY = False
+        try:
+            self.assertEqual(camera_service._clamp_encode_mode(camera_service.ENCODE_MODE_VECTOR),
+                             camera_service.ENCODE_MODE_Y_ONLY)
+        finally:
+            camera_service._HAS_NUMPY = saved
+        self.assertIn(camera_service.ENCODE_MODE_VECTOR, camera_service._ENCODE_MODE_IMPLEMENTED)
 
 
 if __name__ == "__main__":

@@ -62,14 +62,23 @@ try:                                             # pragma: no cover
 except ImportError:                              # pragma: no cover
     cv2 = None                                   # type: ignore
 
+# The codec: the tractor image is built from firmware/tractor_x8 alone
+# (README-DEPLOY.md step 1), so it carries its own copy, vs1_codec.py, pinned
+# byte-identical to base_station/image_pipeline/vector_scene/codec.py by
+# tests/test_vs1_codec_parity_sil.py (the same arrangement as the codec-id
+# table camera_service duplicates). The base tree is only a fallback for a
+# source checkout whose mirror is missing.
 try:
-    from image_pipeline.vector_scene import codec as vs
-except ImportError:                              # camera_service has no base_station on sys.path (§7.1)
-    _BS_DIR = os.path.normpath(os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "base_station"))
-    if _BS_DIR not in sys.path:
-        sys.path.insert(0, _BS_DIR)
-    from image_pipeline.vector_scene import codec as vs  # noqa: E402
+    from . import vs1_codec as vs
+except ImportError:                              # loaded as a bare module, or no mirror beside us
+    try:
+        import vs1_codec as vs                   # type: ignore
+    except ImportError:
+        _BS_DIR = os.path.normpath(os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "base_station"))
+        if _BS_DIR not in sys.path:
+            sys.path.insert(0, _BS_DIR)
+        from image_pipeline.vector_scene import codec as vs  # noqa: E402
 
 try:
     from . import vector_extract as vx
@@ -159,6 +168,7 @@ class _Cand:
     bits: int
     apply: Callable[[], None]       # mutates the mirror when the record is packed
     mentions: tuple = ()            # ids the record names (no CONFIRM for those)
+    needs: object = None            # a candidate that must be packed before this one
 
 
 def _shift_mask(m: np.ndarray, sx: int, sy: int) -> np.ndarray:
@@ -379,8 +389,8 @@ class VectorEncoder:
         or a colour stop change of ΔE > 6, nothing in a NO_HORIZON epoch. At
         V3 every frame is a beacon carrying the absolute anchor (§4.5.4)."""
         if key or self._anchor_repeat_left > 0 or self._anchor_found is None:
-            if not key:
-                self._anchor_repeat_left -= 1
+            # The repeat is spent by the anchor candidate's apply (when it is
+            # packed), never here: a repeat that missed the budget is still owed.
             return [self._anchor_record(hz), vs.LayerClear(self._clear_range)]
         if level >= 3:
             return [self._anchor_record(hz)]
@@ -535,7 +545,10 @@ class VectorEncoder:
         cands: list = []
         hzn = self._horizon_records(hz, key, level)
         for i, rec in enumerate(hzn):                        # anchor + LAYER_CLEAR: slot 1; RESID/ABS: slot 3
-            cands.append(_Cand(1 if len(hzn) == 2 else 3, (i,), rec, vs.record_bits(rec), lambda: None))
+            apply = self._spend_anchor_repeat if (len(hzn) == 2 and not key and i == 0) else (lambda: None)
+            # LAYER_CLEAR rides with its anchor: if the anchor does not fit, neither goes.
+            needs = cands[-1] if (len(hzn) == 2 and i == 1) else None
+            cands.append(_Cand(1 if len(hzn) == 2 else 3, (i,), rec, vs.record_bits(rec), apply, needs=needs))
         if self._gain_next != self._gain or (key and self._gain_next != GAIN_NEUTRAL):
             gain = vs.Gain(*self._gain_next)             # absolute since the epoch start (§3.3)
             cands.append(_Cand(3, (9,), gain, vs.record_bits(gain), lambda: setattr(self, "_gain", self._gain_next)))
@@ -681,9 +694,8 @@ class VectorEncoder:
                     if upd is None and de <= VERIFY_DE:
                         verified.add(s.id)
                     if s.repeat_left > 0:                 # repeat-once, re-verified on this capture
-                        s.repeat_left -= 1
                         cands.append(_Cand(6, (-r.area,), s.define, vs.record_bits(s.define),
-                                           lambda s=s: self._apply_repeat(s), (s.id,)))
+                                           lambda s=s: self._apply_repeat(s, spend=True), (s.id,)))
                     elif de <= VERIFY_DE and upd is None:
                         cands.append(_Cand(7, (s.define_frame, s.id), s.define, vs.record_bits(s.define),
                                            lambda s=s: self._apply_repeat(s), (s.id,)))
@@ -762,9 +774,8 @@ class VectorEncoder:
                 s = self._shapes[matched[i]]
                 verified.add(s.id)
                 if s.repeat_left > 0:
-                    s.repeat_left -= 1
                     cands.append(_Cand(6, (-e.score,), s.define, vs.record_bits(s.define),
-                                       lambda s=s: self._apply_repeat(s), (s.id,)))
+                                       lambda s=s: self._apply_repeat(s, spend=True), (s.id,)))
                 else:
                     cands.append(_Cand(7, (s.define_frame, s.id), s.define, vs.record_bits(s.define),
                                        lambda s=s: self._apply_repeat(s), (s.id,)))
@@ -850,8 +861,18 @@ class VectorEncoder:
                                       float(xs.mean()), float(ys.mean()), region.lab, self._frame_no,
                                       repeat_left=LEVEL_REPEATS[level])
 
-    def _apply_repeat(self, s: _Shape) -> None:
+    def _apply_repeat(self, s: _Shape, spend: bool = False) -> None:
+        """A define went out again. ``spend`` charges one repeat-once (§4.3)
+        only now, when the packer really selected it: a repeat that missed
+        the budget behind higher slots and the CONFIRM/DIGEST reserve is
+        still owed and is offered again next frame."""
         s.define_frame = self._frame_no
+        if spend and s.repeat_left > 0:
+            s.repeat_left -= 1
+
+    def _spend_anchor_repeat(self) -> None:
+        if self._anchor_repeat_left > 0:
+            self._anchor_repeat_left -= 1
 
     def _apply_upd(self, s: _Shape, upd: tuple, region) -> None:
         ndx, ndy, shifted = upd
@@ -886,21 +907,24 @@ class VectorEncoder:
 
     @staticmethod
     def _pack(cands: list, total_bits: int, reserve: int, carousel_bits: int) -> tuple:
-        """Greedy fill in §4.2 order; never splits a record. The CONFIRM +
-        DIGEST reserve binds slots ≥ 5 only, so the anchor and STATUS always
-        go first; the carousel (slot 7) has its own cap."""
+        """Greedy fill in §4.2 order; never splits a record, and never packs a
+        candidate whose ``needs`` (LAYER_CLEAR's anchor) was not packed. The
+        CONFIRM + DIGEST reserve binds slots ≥ 5 only, so the anchor and
+        STATUS always go first; the carousel (slot 7) has its own cap."""
         cands.sort(key=lambda c: (c.slot, c.order))
         used = 0
         car_used = 0
         packed = []
+        packed_ids: set = set()
         for c in cands:
             limit = total_bits if c.slot < 5 else total_bits - reserve
-            if used + c.bits > limit:
+            if used + c.bits > limit or (c.needs is not None and id(c.needs) not in packed_ids):
                 continue
             if c.slot == 7:
                 if car_used + c.bits > carousel_bits:
                     continue
                 car_used += c.bits
             packed.append(c)
+            packed_ids.add(id(c))
             used += c.bits
         return packed, used

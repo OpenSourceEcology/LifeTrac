@@ -109,11 +109,6 @@ _ENCODE_MODE_UI_CHOICES = (
     "vector",
 )
 
-# VECTOR_SCENE.md §6: the vector detail dial (60-100; default 80 = band V0)
-# is kept apart from the tile-mode quality so entering VECTOR never inherits
-# the tile quality's 55 default, which would be the V1 band.
-_vector_detail = 80
-
 
 class EncodeModeBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -248,6 +243,14 @@ _ENCODE_MODE_TOPIC = "lifetrac/v25/control/encode_mode_override"
 _encode_mode_runtime_lock = threading.Lock()
 _encode_mode_runtime_override = "full"
 _encode_mode_runtime_quality: int | None = None   # None = tractor default
+# VECTOR_SCENE.md §6: two independent quality dials. The tile modes share a
+# WebP quality (``_tile_quality``, None = tractor default); VECTOR carries
+# its own detail (``_vector_detail``, 60-100, default 80 = band V0). The
+# selected mode sends its own dial as the 0x63 quality byte, so leaving
+# VECTOR never reuses the vector detail as a WebP quality and vice versa.
+# Both are persisted beside the mode in the override store.
+_tile_quality: int | None = None
+_vector_detail = 80
 
 
 def _load_encode_mode_state() -> tuple[str, int | None]:
@@ -267,6 +270,13 @@ def _load_encode_mode_state() -> tuple[str, int | None]:
                     q = body.get("quality")
                     if isinstance(q, int) and 1 <= q <= 100:
                         quality = q
+                    global _tile_quality, _vector_detail
+                    tq = body.get("tile_quality", q if mode != "vector" else None)
+                    if isinstance(tq, int) and 1 <= tq <= 100:
+                        _tile_quality = tq
+                    vd = body.get("vector_detail", q if mode == "vector" else None)
+                    if isinstance(vd, int) and 60 <= vd <= 100:
+                        _vector_detail = vd
             except json.JSONDecodeError:
                 mode = raw           # legacy single-line store
             if mode == "auto":
@@ -291,6 +301,9 @@ def _persist_encode_mode_override(mode: str, quality: int | None) -> None:
     body: dict[str, Any] = {"mode": mode}
     if quality is not None:
         body["quality"] = quality
+    if _tile_quality is not None:
+        body["tile_quality"] = _tile_quality
+    body["vector_detail"] = _vector_detail
     tmp.write_text(json.dumps(body) + "\n", encoding="utf-8")
     os.replace(tmp, ENCODE_MODE_STORE_PATH)
 
@@ -1384,12 +1397,14 @@ def _tile_stale_worker() -> None:
     last_t = 0.0
     while True:
         time.sleep(_TILE_STALE_PERIOD_S)
-        if _vector_active:
-            # VECTOR mode: the photo canvas is frozen by design; reporting its
-            # tiles stale would only fire 0x6C commands at the tractor.
-            continue
         try:
             with _image_lock:
+                if _vector_active:
+                    # VECTOR mode: the photo canvas is frozen by design;
+                    # reporting its tiles stale would only fire 0x6C commands
+                    # at the tractor. Read under the same lock that
+                    # _ingest_tile_delta flips it under.
+                    continue
                 canvas = _image_canvas
                 now_ms = int(time.monotonic() * 1000)
                 arrived = [tile.arrived_ms for tile in canvas._tiles]
@@ -1407,6 +1422,9 @@ def _tile_stale_worker() -> None:
                 summary = summarize_tile_ages(canvas, now_ms, horizon_ms)
                 n_tiles = canvas.n_tiles
                 base_seq = getattr(canvas, "_last_base_seq", None) or 0
+            with _image_lock:
+                if _vector_active:
+                    continue    # a vector frame arrived while we computed
             if summary is not None:
                 # RS-6.1 aggregate — every tick, even when nothing is
                 # stale: a quiet link's p95 age IS the sweep-rotation
@@ -2570,7 +2588,7 @@ def _set_encode_mode_override(mode: str, *, persist: bool,
     ``POST /api/encode_mode/cycle``. ``quality=None`` keeps the current
     quality override. Returns the JSON body the endpoints surface.
     """
-    global _vector_detail
+    global _vector_detail, _tile_quality
     if mode not in _ENCODE_MODE_UI_CHOICES:
         raise HTTPException(status_code=400,
                             detail=f"unknown encode mode: {mode!r}")
@@ -2581,12 +2599,16 @@ def _set_encode_mode_override(mode: str, *, persist: bool,
     if mode == "vector":
         # The vector detail is its own dial (VECTOR_SCENE.md §4.5.4, §6):
         # 60-100 keeps the operator inside band V0; the ladder, not the
-        # operator, produces the lower bands.
+        # operator, produces the lower bands. The tile dial is untouched.
         if quality is not None:
             _vector_detail = max(60, min(100, int(quality)))
         eff_quality = _vector_detail
     else:
-        eff_quality = quality if quality is not None else _get_runtime_encode_state()[1]
+        # A tile mode sends the tile dial, never the vector detail that may
+        # be sitting in the runtime quality after a VECTOR session.
+        if quality is not None:
+            _tile_quality = int(quality)
+        eff_quality = _tile_quality
     if persist:
         try:
             _persist_encode_mode_override(eff_mode, eff_quality)

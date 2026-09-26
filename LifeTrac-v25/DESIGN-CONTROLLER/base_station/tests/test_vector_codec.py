@@ -278,6 +278,12 @@ class FrameTests(unittest.TestCase):
         self.assertEqual(len(body), 2)
         self.assertEqual(vs.decode_frame(body), vs.Frame(vs.Header(False, 3, 9, 2), ()))
 
+    def test_header_alone_must_fit_f(self):
+        for f in (0, 1):
+            with self.assertRaises(vs.FrameTooLarge):
+                vs.encode_frame(vs.Header(False, 0, 0), [], f)
+        self.assertEqual(len(vs.encode_frame(vs.Header(False, 0, 0), [], 2)), 2)
+
 
 class RejectionTests(unittest.TestCase):
     def reason(self, body: bytes, frame_kind=None) -> str:

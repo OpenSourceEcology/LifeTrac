@@ -22,6 +22,7 @@ from __future__ import annotations
 import bisect
 import copy
 import math
+import threading
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
@@ -55,12 +56,13 @@ _EDGE_FILL = vs.Fill(rgb444=0)      # EDGE carries no FILL (§3.3); its state-ha
 def _wins(new: tuple[int, bool], old: tuple[int, bool] | None) -> bool:
     """Per-field last-writer-wins (§3.4 rule 5). A known capture beats an
     older or equal one (a duplicate re-applies the same value); a saturated
-    bound only fills absent state (§3.2)."""
+    bound fills absent state, or replaces state that is itself only a bound,
+    but never supersedes state with a known capture time (§3.2)."""
     if old is None:
         return True
-    if not new[1]:
-        return False
-    return (not old[1]) or new[0] >= old[0]
+    if new[1]:
+        return (not old[1]) or new[0] >= old[0]
+    return (not old[1]) and new[0] >= old[0]
 
 
 def _layer_of(id_: int) -> int:
@@ -138,9 +140,9 @@ class _History:
 
     def put(self, clk: tuple[int, bool], val) -> None:
         if not clk[1]:
-            if self.caps:
+            if self.caps and (self.known or clk[0] < self.caps[-1]):
                 return                      # a bound never supersedes known state
-            self.known = False
+            self.caps, self.vals, self.known = [], [], False
         elif not self.known:
             self.caps, self.vals, self.known = [], [], True
         i = bisect.bisect_left(self.caps, clk[0])
@@ -211,9 +213,17 @@ class VectorSceneStore:
 
     def __init__(self, canvas_w: int = CANVAS_W, canvas_h: int = CANVAS_H) -> None:
         self.canvas_w, self.canvas_h = canvas_w, canvas_h
+        # ingest runs on the MQTT thread while snapshot/stats run on the
+        # websocket loop (state_publisher), so every public entry point holds
+        # this lock; re-entrant because snapshot reads stats.
+        self._lock = threading.RLock()
         self.reset()
 
     def reset(self) -> None:
+        with self._lock:
+            self._reset()
+
+    def _reset(self) -> None:
         self._epoch: int | None = None
         self._last_cap: int | None = None       # last applied known capture time (§3.5 rule 2)
         self._last_rx: int | None = None        # rx time of the last applied frame (§3.5 rule 4)
@@ -258,6 +268,10 @@ class VectorSceneStore:
 
     @property
     def stats(self) -> dict:
+        with self._lock:
+            return self._stats()
+
+    def _stats(self) -> dict:
         st = dict(self._st)
         st["resync"] = self._resync
         st["bad_reasons"] = dict(self._bad_reasons)
@@ -268,6 +282,10 @@ class VectorSceneStore:
 
     def ingest(self, body: bytes, frame_kind: int, rx_ms: int, airtime_ms: float = 0.0) -> IngestResult:
         """Apply one VS body. Never raises: a bad frame is counted per reason."""
+        with self._lock:
+            return self._ingest(body, frame_kind, rx_ms, airtime_ms)
+
+    def _ingest(self, body, frame_kind: int, rx_ms: int, airtime_ms: float) -> IngestResult:
         self._st["frames_rx"] += 1
         if not isinstance(body, (bytes, bytearray, memoryview)):
             return self._bad("not_bytes")           # garbage types, not just garbage bytes
@@ -472,8 +490,8 @@ class VectorSceneStore:
             if sh is None:
                 self._orphan()
                 return
-            if clk[1] and clk[0] < sh.define_clk[0]:
-                return                              # older than the live define (reordered)
+            if not _wins(clk, sh.geom_clk):
+                return                              # older than the live define, or a bound against known state
             self._shapes.pop(rec.id, None)
             self._cached.pop(rec.id, None)
             self._tomb[rec.id] = clk
@@ -872,6 +890,10 @@ class VectorSceneStore:
     def snapshot(self, now_ms: int) -> dict | None:
         """The ``vector_scene`` object, or None until a frame has been applied.
         During a pending hand-over the previous epoch is shown as CACHED (1)."""
+        with self._lock:
+            return self._snapshot(now_ms)
+
+    def _snapshot(self, now_ms: int) -> dict | None:
         if self._epoch is None:
             return None
         cached = bool(self._cached)

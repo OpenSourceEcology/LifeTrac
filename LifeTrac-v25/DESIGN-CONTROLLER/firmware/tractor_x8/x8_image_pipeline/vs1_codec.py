@@ -1,3 +1,5 @@
+# Mirror of base_station/image_pipeline/vector_scene/codec.py for the tractor image, which cannot import the base tree.
+# tests/test_vs1_codec_parity_sil.py pins the two byte-identical below this header: re-copy, never edit here.
 """VS1 wire format: ``TileDeltaFrame`` codec 6 (``VECTOR_SCENE.md`` §3.2–3.4).
 
 Pure stdlib, shared by the tractor encoder and the base store. Records are

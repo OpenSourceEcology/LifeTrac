@@ -128,17 +128,30 @@ class WebUiVectorTests(unittest.TestCase):
     def test_settings_accepts_vector_with_its_own_detail_dial(self) -> None:
         self.assertIn("vector", self.web_ui._ENCODE_MODE_UI_CHOICES)
         self.assertIn("vector", self.web_ui._ENCODE_MODE_CYCLE_ORDER)
+
+        def last_published():
+            return [json.loads(c.args[1]) for c in self.mqtt.publish.call_args_list
+                    if c.args and c.args[0] == self.web_ui._ENCODE_MODE_TOPIC][-1]
+
+        r = self.client.post("/api/settings/encode_mode", json={"mode": "full", "quality": 40})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(last_published()["quality"], 40)
         r = self.client.post("/api/settings/encode_mode", json={"mode": "vector"})
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(r.json()["mode"], "vector")
-        self.assertEqual(r.json()["quality"], 80)          # default detail = band V0, not the tile 55
+        self.assertEqual((r.json()["mode"], r.json()["quality"]), ("vector", 80))   # default detail = band V0, not the tile 40
         r = self.client.post("/api/settings/encode_mode", json={"mode": "vector", "quality": 30})
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(r.json()["quality"], 60)          # operator detail is clamped into 60..100
+        self.assertEqual((last_published()["mode"], last_published()["quality"]), ("vector", 60))
+        # leaving VECTOR sends the tile dial again, never the vector detail
+        r = self.client.post("/api/settings/encode_mode", json={"mode": "full"})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual((last_published()["mode"], last_published()["quality"]), ("full", 40))
         self.assertEqual(self.web_ui._vector_detail, 60)
-        published = [json.loads(c.args[1]) for c in self.mqtt.publish.call_args_list
-                     if c.args and c.args[0] == self.web_ui._ENCODE_MODE_TOPIC]
-        self.assertTrue(published and published[-1]["mode"] == "vector" and published[-1]["quality"] == 60)
+        # both dials survive a restart: the loader repopulates them from the store
+        self.web_ui._vector_detail, self.web_ui._tile_quality = 80, None
+        self.assertEqual(self.web_ui._load_encode_mode_state(), ("full", 40))
+        self.assertEqual((self.web_ui._vector_detail, self.web_ui._tile_quality), (60, 40))
 
 
 if __name__ == "__main__":

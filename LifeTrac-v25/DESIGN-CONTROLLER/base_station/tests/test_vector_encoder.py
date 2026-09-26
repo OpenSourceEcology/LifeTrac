@@ -405,6 +405,55 @@ class TemporalTests(unittest.TestCase):
                     rec = defines1[c.base_id + i]
                     self.assertEqual(tag, vs.state_hash(0, 0, vx.fill_base_rgb444(rec.fill), [], []) & 3)
 
+    def test_repeat_skipped_by_the_budget_is_sent_in_the_next_frame(self):
+        # §4.3 repeat-once is owed until it is really sent. Frame 2's budget
+        # holds exactly the anchor repeat + STATUS + the CONFIRM/DIGEST reserve
+        # (28 B whole payload: 22 B body = 163 record bits, 100 used by slots
+        # 1–4, 55 reserved, so no 42-bit TREE fits), so the three defines are
+        # not repeated there; they must go out in frame 3, not never.
+        img = scene(blobs=[(20, 44, 4, GREEN), (50, 40, 4, GREEN), (80, 48, 4, GREEN)])
+        enc = ev.VectorEncoder()
+        first = decode(enc.frame(img, BUDGET, seq=0))
+        ids = {t.id for t in records_of(first, vs.Tree)}
+        self.assertEqual(len(ids), 3)
+        second = decode(enc.frame(img, 28, seq=1))
+        self.assertEqual(records_of(second, vs.Tree), [])
+        self.assertEqual(len(records_of(second, vs.HznAbs)), 1)          # the anchor repeat did fit
+        offered = [c for c in enc.last_stats["candidates"] if c[0] == 6]
+        self.assertEqual(len(offered), 3)
+        self.assertFalse(any(c[4] for c in offered), offered)              # offered, not packed
+        third = decode(enc.frame(img, BUDGET, seq=2))
+        self.assertEqual({t.id for t in records_of(third, vs.Tree)}, ids)
+        packed = [c for c in enc.last_stats["candidates"] if c[0] == 6]
+        self.assertEqual(len(packed), 3)
+        self.assertTrue(all(c[4] for c in packed), packed)
+        self.assertEqual(records_of(third, vs.HznAbs), [])                # the anchor repeat was spent in frame 2
+        self.assertEqual(records_of(third, vs.HznResid), [vs.HznResid(0, 0)])
+        decode(enc.frame(img, BUDGET, seq=3))                              # the κ = 25 % carousel frame
+        fifth = decode(enc.frame(img, BUDGET, seq=4))
+        self.assertEqual(records_of(fifth, vs.Tree), [])                  # repeated once, not forever
+        confirmed = {c.base_id + i for c in records_of(fifth, vs.Confirm) for i, t in enumerate(c.tags) if t is not None}
+        self.assertEqual(confirmed, ids)
+
+    def test_anchor_repeat_skipped_by_the_budget_is_sent_in_the_next_frame(self):
+        # The same rule for the epoch-start repeat of §3.1: at 12 B the body
+        # (6 B = 35 record bits) holds STATUS but not the 70-bit anchor +
+        # LAYER_CLEAR, so frame 3 carries the repeat and frame 4 the RESID.
+        img = scene(blobs=[(20, 44, 4, GREEN), (50, 40, 4, GREEN), (80, 48, 4, GREEN)])
+        enc = ev.VectorEncoder()
+        decode(enc.frame(img, BUDGET, seq=0))
+        second = decode(enc.frame(img, 12, seq=1))
+        self.assertEqual(records_of(second, vs.HznAbs) + records_of(second, vs.LayerClear), [])
+        self.assertEqual(len(records_of(second, vs.Status)), 1)
+        third = decode(enc.frame(img, BUDGET, seq=2))
+        self.assertFalse(third.header.key)
+        self.assertEqual(len(records_of(third, vs.HznAbs)), 1)
+        self.assertEqual(records_of(third, vs.LayerClear), [vs.LayerClear(0)])
+        self.assertEqual(len(records_of(third, vs.Tree)), 3)              # the define repeats too
+        fourth = decode(enc.frame(img, BUDGET, seq=3))
+        self.assertEqual(records_of(fourth, vs.HznAbs), [])
+        self.assertEqual(records_of(fourth, vs.HznResid), [vs.HznResid(0, 0)])
+
     def test_carousel_frame_every_fourth_at_v0(self):
         enc = ev.VectorEncoder()
         sizes = []

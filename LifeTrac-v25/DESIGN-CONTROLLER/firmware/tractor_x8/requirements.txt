@@ -22,6 +22,13 @@ pyserial>=3.5
 # Camera image processing:
 Pillow>=10.0.0
 
+# Vector scene encoder (VECTOR encode mode 9, VECTOR_SCENE.md section 2,
+# x8_image_pipeline/encode_vector.py): numpy for the layer extraction and
+# OpenCV for k-means, contours and Canny. The headless build has no GUI
+# libraries, which the slim image does not carry.
+numpy>=1.26.0
+opencv-python-headless>=4.9.0
+
 # MQTT client:
 paho-mqtt>=1.6.1
 

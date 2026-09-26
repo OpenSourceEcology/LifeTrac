@@ -35,7 +35,11 @@ fastapi==0.136.1
 # 2026-09-24 (#130): tests/test_register.py exercises the tractor_x8
 # x8_image_pipeline/register.py NumPy path. Without NumPy here those tests
 # skip in CI and the gate says nothing about them. Same version the local
-# 1245-passing run was verified against. cv2 is deliberately NOT installed
-# in CI: the OpenCV path is checked by hand with opencv-python-headless
-# (5.0.0) and its test class skips without it.
+# 1245-passing run was verified against.
 numpy==2.4.4
+
+# 2026-09-26 (#135): the VS1 encoder (firmware/tractor_x8/x8_image_pipeline/
+# encode_vector.py) and the encoder<->store interop test run on OpenCV;
+# without it 37 tests skip in CI and the gate says nothing about the tractor
+# half of the vector mode. Same version the local venv verified them with.
+opencv-python-headless==5.0.0
