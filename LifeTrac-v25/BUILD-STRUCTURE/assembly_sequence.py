@@ -15,7 +15,9 @@ and washers today) are not exact.
 
 Errors (fail CI):  unknown part id, a part with an exact quantity used more
                    times than the machine has, duplicate step id, broken
-                   `after` / `uses` links, a jig listed as a machine part.
+                   `after` / `uses` links, a sub-assembly installed twice (its
+                   parts are counted when it is built, so the quantity check
+                   cannot see this), a jig listed as a machine part.
 Warnings:          parts with an exact quantity not placed by any step
                    (errors once `complete: true`), sub-assemblies built but
                    never installed, over-use of an estimated quantity.
@@ -77,8 +79,8 @@ def check(seq, parts, qty, exact):
                 if ref not in subassemblies:
                     errors.append("%s: `uses: %s` must name an earlier sub-assembly step" % (where, ref))
                 elif ref in used_subs:
-                    warnings.append("%s: sub-assembly %s is already installed in step %d"
-                                    % (where, ref, used_subs[ref]))
+                    errors.append("%s: sub-assembly %s is already installed in step %d"
+                                  % (where, ref, used_subs[ref]))
                 else:
                     used_subs[ref] = n
             rows = []

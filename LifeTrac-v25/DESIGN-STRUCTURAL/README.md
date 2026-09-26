@@ -164,7 +164,7 @@ Wheel and axle components:
 [`drawings/generated/INDEX.md`](drawings/generated/INDEX.md) has a printable
 third-angle engineering drawing for every fabricated part and every hardware item:
 views, dimensions, hole table, material and **quantity per machine counted from
-the model**. It also links 1:1 DXF flat patterns for every plate. The drawings
+the model**. It also links 1:1 DXF flat patterns, in millimetres, for every plate. The drawings
 regenerate automatically when the model changes (see [`drawings/README.md`](drawings/README.md)),
 and [`drawings/generated/CHECKS.md`](drawings/generated/CHECKS.md) lists model
 problems found along the way.

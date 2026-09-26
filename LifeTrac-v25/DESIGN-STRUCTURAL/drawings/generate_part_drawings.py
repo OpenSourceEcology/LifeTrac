@@ -213,7 +213,42 @@ def render_dxf(openscad, manifest, part, M, thickness, out_path, build):
     scad = build / "scad" / (part.id + "_flat.scad")
     scad.write_text(wrapper_source(manifest, part, transform))
     r = run([openscad, "-o", str(out_path), str(scad)], cwd=scad.parent)
-    return r.returncode == 0 and out_path.exists()
+    if r.returncode != 0 or not out_path.exists():
+        return False
+    add_dxf_units(out_path)
+    return True
+
+
+# OpenSCAD writes DXF with no HEADER, so CAM software has to guess the units
+# and some default to inches.  Declare millimetres ($INSUNITS 4 = mm,
+# $MEASUREMENT 1 = metric).
+DXF_MM_HEADER = ("  0\nSECTION\n  2\nHEADER\n"
+                 "  9\n$ACADVER\n  1\nAC1009\n"
+                 "  9\n$INSUNITS\n 70\n4\n"
+                 "  9\n$MEASUREMENT\n 70\n1\n"
+                 "  0\nENDSEC\n")
+
+
+def add_dxf_units(path):
+    text = path.read_text()
+    if "$INSUNITS" not in text:
+        path.write_text(DXF_MM_HEADER + text)
+
+
+def select_parts(parts, only):
+    """Parts to render for ``--only``: the requested ones, plus the parts a
+    requested hardware item counts its holes in (``qty_from_holes``).  Those
+    are rendered only for their hole counts; nothing is written for them.
+    Returns (to_render, wanted ids)."""
+    wanted = set(only)
+    unknown = wanted - {p.id for p in parts}
+    if unknown:
+        raise SystemExit("unknown part id(s): %s" % ", ".join(sorted(unknown)))
+    needed = set(wanted)
+    for p in parts:
+        if p.id in wanted and p.qty_from_holes:
+            needed.update(str(x) for x in p.qty_from_holes["parts"])
+    return [p for p in parts if p.id in needed], wanted
 
 
 def count_markers(openscad, manifest, build):
@@ -250,12 +285,9 @@ def main():
         raise SystemExit("OpenSCAD not found (install it or pass --openscad PATH)")
 
     manifest, parts = load_manifest(args.manifest)
+    wanted = None
     if args.only:
-        wanted = set(args.only)
-        unknown = wanted - {p.id for p in parts}
-        if unknown:
-            raise SystemExit("unknown part id(s): %s" % ", ".join(sorted(unknown)))
-        parts = [p for p in parts if p.id in wanted]
+        parts, wanted = select_parts(parts, args.only)
 
     out, build = Path(args.out), Path(args.build)
     for d in (out / "pdf", out / "dxf", build / "scad", build / "stl"):
@@ -362,6 +394,10 @@ def main():
         res["info"].update(qty=str(qty), qty_note=" (EST. FROM HOLE COUNT)")
         res["info"]["summary"] = [(k, str(qty) if k == "QTY PER MACHINE" else (
             "%.2f kg" % (res["mass"] * qty) if k == "MASS PER MACHINE" else v)) for k, v in res["info"]["summary"]]
+
+    if wanted is not None:  # --only: the extra parts were rendered just for their hole counts
+        results = [r for r in results if r["part"].id in wanted]
+        dxf_jobs = [j for j in dxf_jobs if j[0].id in wanted]
 
     # ---- plan every sheet (views, scale, holes ...) before deciding revisions
     for res in results:

@@ -105,7 +105,8 @@ phases:
   so nothing that points at them breaks.
 * **The checker runs in CI.** It uses the same workflow as the part drawings.
   * It **fails** on an unknown part number, on a part used more times than the
-    model has it, on a duplicate id, or on an `after`/`uses` that points forward.
+    model has it, on a duplicate id, on an `after`/`uses` that points forward,
+    or on a sub-assembly installed twice.
   * It **warns** about parts no step places. That becomes an error once the file
     is marked `complete: true`.
   * It regenerates [`ASSEMBLY_SEQUENCE.md`](ASSEMBLY_SEQUENCE.md). That file is

@@ -232,8 +232,35 @@ class RevisionAndBookTests(unittest.TestCase):
         self.assertNotEqual(base, plan_part(mesh, opts, paper="a3")["fingerprint"])
         self.assertNotEqual(base, plan_part(mesh, dict(opts, views=["front", "iso"]))["fingerprint"])
         self.assertNotEqual(base, plan_part(mesh, dict(opts, hole_table=False))["fingerprint"])
+        self.assertNotEqual(base, plan_part(mesh, dict(opts, shade_iso=False))["fingerprint"])
+        self.assertEqual(base, plan_part(mesh, dict(opts, shade_iso=True))["fingerprint"])  # default
         moved, _, _ = normalize(Mesh(washer(R=50, r=12, t=12.7)))
         self.assertNotEqual(base, plan_part(moved, opts)["fingerprint"])
+
+    def test_dxf_declares_millimetres(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dxf = Path(tmp) / "p.dxf"
+            dxf.write_text("  0\nSECTION\n  2\nENTITIES\n  0\nENDSEC\n  0\nEOF\n")
+            G.add_dxf_units(dxf)
+            G.add_dxf_units(dxf)  # idempotent
+            text = dxf.read_text()
+        self.assertTrue(text.startswith("  0\nSECTION\n  2\nHEADER\n"))
+        self.assertIn("$INSUNITS\n 70\n4\n", text)
+        self.assertEqual(text.count("$INSUNITS"), 1)
+        self.assertTrue(text.endswith("ENTITIES\n  0\nENDSEC\n  0\nEOF\n"))
+
+    def test_only_renders_hole_count_sources(self):
+        def part(pid, cat="angle", **extra):
+            return G.Part(dict(id=pid, name=pid, category=cat, source="x.scad", **extra), {}, {})
+        parts = [part("A4"), part("A5"), part("P1", "plate"),
+                 part("F3", "fastener", qty_from_holes={"diameters": [12.7], "parts": ["A4", "A5"]})]
+        render, wanted = G.select_parts(parts, ["F3"])
+        self.assertEqual(wanted, {"F3"})
+        self.assertEqual([p.id for p in render], ["A4", "A5", "F3"])
+        render, _ = G.select_parts(parts, ["P1"])
+        self.assertEqual([p.id for p in render], ["P1"])
+        with self.assertRaises(SystemExit):
+            G.select_parts(parts, ["X9"])
 
 
 class SequenceCheckTests(unittest.TestCase):
@@ -273,6 +300,13 @@ class SequenceCheckTests(unittest.TestCase):
                                errors, warnings, "seq.yaml")
             text = out.read_text()
         self.assertIn("1 of 1 fabricated pieces placed", text)   # P1 only; F1 is bought, not made
+
+    def test_subassembly_installed_twice_is_an_error(self):
+        _, _, errors, _ = self.run_check([
+            {"id": "sub", "subassembly": "Frame", "add": [{"part": "P1", "qty": 1}]},
+            {"id": "b", "uses": ["sub"]},
+            {"id": "c", "uses": ["sub"]}])
+        self.assertTrue(any("sub-assembly sub is already installed in step 2" in e for e in errors), errors)
 
     def test_structure_errors(self):
         _, _, errors, _ = self.run_check([

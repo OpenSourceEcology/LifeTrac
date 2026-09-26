@@ -9,7 +9,7 @@ hand.
 **Browse the drawings:** [`generated/INDEX.md`](generated/INDEX.md) (bill of
 materials with a PDF link per part) · **Warnings and quantity checks:**
 [`generated/CHECKS.md`](generated/CHECKS.md) · **Plate cutting files:**
-[`generated/dxf/`](generated/dxf/)
+[`generated/dxf/`](generated/dxf/) (1:1, units declared as millimetres)
 
 ## What a sheet looks like
 

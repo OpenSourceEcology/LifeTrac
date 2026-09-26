@@ -14,8 +14,8 @@
 #   * Check your edit locally:
 #       python3 LifeTrac-v25/BUILD-STRUCTURE/assembly_sequence.py --check
 #     CI runs the same check whenever this file or the model changes. It fails on
-#     unknown part ids, a part used more times than the machine has, or broken
-#     `after` / `uses` links.
+#     unknown part ids, a part used more times than the machine has, broken
+#     `after` / `uses` links, or a sub-assembly installed twice.
 #
 # STEP FIELDS
 #   id           stable slug, unique
@@ -26,6 +26,7 @@
 #                (drawn in a framed "callout" box, LEGO-style)
 #   make         how many copies of the sub-assembly (shown as "x2")
 #   uses         ids of earlier sub-assembly steps that are installed here
+#                (all `make` copies at once; each can be installed only once)
 #   after        ids of steps that must come earlier (checked)
 #   tools        tools and 3D-printed jigs (J-parts) needed
 #   notes        anything the builder should know

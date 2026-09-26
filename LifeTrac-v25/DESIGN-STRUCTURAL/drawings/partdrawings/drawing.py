@@ -124,6 +124,8 @@ def plan_part(mesh, opts, paper="letter", category=None):
         "holes": [[r["tag"], r["view"], round(float(r["x"]), 2), round(float(r["y"]), 2),
                    round(float(r["d"]), 2), r["walls"], bool(r["drill"])] for r in rows],
     }
+    if not opts.get("shade_iso", True):  # only when off, so existing fingerprints stay the same
+        content["shade_iso"] = False
     fingerprint = hashlib.sha1(json.dumps(content, sort_keys=True).encode()).hexdigest()[:12]
     return dict(g=g, views=views, placed=placed, vds=vds, rows=rows, scale=scale, extents=(X, Y, Z),
                 ord_front=ord_front, ord_top=ord_top, thick=opts.get("thickness"), diameters=diameters,
