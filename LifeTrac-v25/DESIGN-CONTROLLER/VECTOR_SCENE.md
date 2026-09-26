@@ -1213,7 +1213,7 @@ Follow the campaign convention: a `bench-evidence/RS_13_vector_scene_<date>/RESU
 
 ## 10. Prerequisites and blockers
 
-None of these blocks the Vector Lab (Phase 1). B1–B4 gate on-air use (Phase 2); B5–B7 gate quality; B8–B11 gate field use.
+None of these blocks the Vector Lab (Phase 1). B1–B4 gate on-air use (Phase 2); B5–B7 gate quality; B8–B12 gate field use, and B12 alone gates the D-VS8 rung switch.
 
 | # | Blocker | Evidence |
 |---|---|---|
@@ -1228,6 +1228,7 @@ None of these blocks the Vector Lab (Phase 1). B1–B4 gate on-air use (Phase 2)
 | B9 | **No camera calibration, no bracket, varifocal not locked; no arm/bucket pose sensor.** | `DC/CALIBRATION.md` §1–5 only; `HARDWARE_BOM.md` |
 | B10 | **Base → tractor command delivery on FHSS is unreliable** (1/17 and 49/281 in legs H/I), so any base-driven mode change may not arrive on the profile that needs it most. | `TODO.md:2661-2676` |
 | B11 | **Hydraulic control is not on air.** No ControlFrame has flown; the speed cap of §6 cannot be enforced until RS-9 / Route B lands. | `TODO.md` RS-9; `CONTROL_PLANE_DESIGN.md` §7 |
+| B12 | **The `0xFB` command path is unauthenticated.** `RUNG_REQ`/`RUNG_CONF` retune the receiver, so over the air they are a link-disruption command until RS-7/RS-8 command authentication lands; D-VS8 stays **bench-only** until then (DECISIONS D-VS8 cons; the gate line of the RS-13 radio checklist). The shipped `0x63` and `0x65`–`0x67` commands share the exposure but only change the encoding or the profile. | `bs/lora_proto.py:953-1030`; `TODO.md` RS-7 / RS-8 |
 
 Housekeeping, not blockers: `encode_wireframe.py`, `encode_motion.py`, `wireframe_render.py`, `motion_replay.py` and `fallback_render.py` are dead code with test-only importers; the `0x28`/`0x29` topics and the `Wireframe` badge name in `LORA_PROTOCOL.md` describe the April design; `LORA_PROTOCOL.md:322` still carries the 25 ms-cap text that RS-9.7 retired.
 
