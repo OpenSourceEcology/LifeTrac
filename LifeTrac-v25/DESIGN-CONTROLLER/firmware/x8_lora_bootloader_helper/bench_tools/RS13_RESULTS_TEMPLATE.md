@@ -77,10 +77,10 @@ Radios parked between legs: <`PARK_OK` × 2 per leg, or the transient noted>.
 
 | # | criterion | 2a | 2b | 2c (baseline) | 2d | pass? |
 |---|---|---|---|---|---|---|
-| P1 | dry-run checks on the base capture (`RESULT:` line; failing check names) | | | n/a | window checks | |
+| P1 | dry-run checks on the base capture (`RESULT:` line as written; failing check names; `store:` line orphans / digest mismatched / resync; final `digest_ok`) | | | n/a | window checks | |
 | P2 | frames published / s (`published frame_id` lines ÷ 300) | | | | n/a | |
 | P3 | fragment loss: raw loss (`rs12_leg_report.py`), Δtx_ok ↔ Δrx_ok | | | | n/a | |
-| P4 | max fragments per frame (`done: K fragments ok`, max K) | | | n/a | window | |
+| P4 | max fragments per frame (`done (pipelined): K fragments ok`: max K, count of K = 1 lines, ABORTED lines) | | | n/a | window | |
 | P5 | lock-loss gaps > 3 s (`frag_gap_report.py`) | n/a | | n/a | n/a | |
 | P6 | switch: first ack JSON; publish stamp → first codec-6 payload (s); return ack JSON; codec-1 resumed after (s) | n/a | n/a | n/a | | |
 | P7 | link_stats `rx_codec_name` | | | n/a | | |
@@ -105,7 +105,7 @@ of each base capture):
 
 - [ ] codec-6 TileDeltaFrame over the strict path as a single 0xFE fragment, profile 2 and profile 1
 - [ ] epoch start (K = 1) as the first frame: anchor + LAYER_CLEAR in one frame, F−1 body
-- [ ] CONFIRM / DIGEST carousel over 5 min (digest checks > 0, 0 mismatches)
+- [ ] CONFIRM / DIGEST carousel over 5 min (digest checks > 0; mismatches recorded — resync 0, or each resync ended by the next epoch start)
 - [ ] 0x63 mode switch into and out of VECTOR; the ack's quality byte reports the dial of the acked mode
 - [ ] base `link_stats` codec reporting for codec 6
 - [ ] 0xFD copies path for an epoch start (`LIFETRAC_KEYFRAME_COPIES` > 1 or the tx daemon's auto-copies) — <not exercised | exercised by accident, see Anomalies>
