@@ -25,7 +25,13 @@ The body of this review describes the tree as it was on 2026-09-25. A closer loo
 - **`pivot_welding_jig.scad`'s include.** Any change under `3d_printed_welding_jigs/` triggers `generate-jig-previews.yml`, whose push-event commit step has failed on both of its runs on main. The cause is that it `git add`s `renders/*.png` and `*.jpg`, which the root `.gitignore` ignores. Whether jig renders should be committed is a maintainer decision.
 - **The camera maths in the PNG/GIF workflows.** Fixing it would visibly change `assembly.png` and the animation.
 - **The bucket pivot joint (P14).** It can't be fixed at the arm tip alone: the bucket's lug sits just beyond the tip and is no stronger. The fix changes the bucket lugs and depends on which bucket cylinder is chosen.
-- **Everything else that needs a design decision.** That covers wheel choice, DOM length, hole patterns, T5, deletions and the analysis rebuild.
+- **Everything else that needs a design decision.** That covers wheel choice, DOM length, hole patterns, T5 and deletions. The analysis was rebuilt in a follow-up pull request (below).
+
+### Status: fixed in follow-up pull requests
+
+| Finding | Fix |
+|---|---|
+| B4, B5: structural and stability analysis | [#136](https://github.com/OpenSourceEcology/LifeTrac/pull/136) replaces both with `openscad/analysis/structural_analysis.scad`, which checks the current parts. `DESIGN-STRUCTURAL/STRUCTURAL_ANALYSIS.md` describes the method. It also removes the stale-analysis warning described above. With the estimated masses, the rated operating capacity is 92 kg, because the tipping load is only 184 kg at full reach. Seven checks still fail, and each is listed as a known issue with its finding (B4, P14, M8) |
 
 ---
 
@@ -212,7 +218,7 @@ Knock-on effects:
 
 ### B4. The structural analysis checks components that no longer exist, and misses the ones that do — **Critical**
 
-*(Not fixed. This PR only adds a warning to the analysis log and its PR comment; see Status.)*
+*(Rebuilt in a follow-up pull request; see Status.)*
 
 The summary block ([main:784-1104](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L784-L1104)) reports 4 FAILs with ratios of 11.3, 18.4, 10.7 and 14.2. Almost every input describes the v1/v2-era machine:
 
@@ -260,6 +266,7 @@ Appendix C gives the hand check behind these numbers. At the 3,000 psi relief pr
 - The stability result is computed only at the current animation pose. With the default `$t = 0` that is arms-down, which is not the worst case.
 - `LIFT_CYL_ARM_OFFSET = ARM_LENGTH * 0.50` ([params:552](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad#L552)) is 50 % of the *legacy straight-arm length* (1,657 mm → 828.5 mm), not of `ARM_MAIN_LEN`. The main file's comment still says `ARM_LENGTH * 0.35` ([main:375](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L375)).
 - `_theta_max_lift_estimate = 50` while the comment says 60 ([params:556-560](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad#L556-L560)).
+- *(Added 2026-09-26.)* The rebuilt analysis uses the L-arm geometry, puts the load inside the bucket and covers the whole arm range. With the same estimated masses, it puts the tipping load at about 184 kg at full reach, with the arms near level. That makes the rated operating capacity about 92 kg. The short 750 mm wheelbase and the long reach need counterweight or a longer wheelbase.
 
 **Fix:** compute the stability envelope over the whole arm/bucket range (the collision tool already sweeps poses, and it could emit CoG too). Derive masses from geometry where possible, and pick the lift-cylinder attachment relative to `ARM_MAIN_LEN`.
 
@@ -754,7 +761,7 @@ These were each checked with a minimal test file; the UTU architecture depends o
 
 ## Appendix C: Hand check of the loader statics *(added 2026-09-26)*
 
-This is a rough static check, not a substitute for the rebuilt analysis. It supports the numbers in B4, P3 and P14.
+This is a rough static check, not a substitute for the rebuilt analysis. It supports the numbers in B4, P3 and P14. The rebuilt analysis puts the load at the bucket's load centre rather than on the pin, which raises the arm moment by about 20–30 %. Its figures therefore differ a little from these.
 
 **Inputs:**
 - **Geometry:** the model's own echo output: pivot (200, 1,100), lift-cylinder base (50, 600), bracket at arm-local (828.5, −114.3), and bucket pin at arm-local (1,697.4, −249.3).
