@@ -406,7 +406,7 @@ byte1 bit2 ..       records, MSB-first bitstream; records never cross frames
 | `1010` | **HZN** | mode2; see the HZN modes below | 15–57 |
 | `1011` | **DEL** | id7 | 11 |
 | `1100` | **UCOL** | id7, FILL | 17–31 |
-| `1101` | **GSHIFT** | grp2 (0 far, 1 ground, 2 all, 3 L4), dx8, dy7: 2 px, **cumulative since epoch start**, −256..+254 / −128..+126 px. Membership is fixed at define time: L4 ids are group 3; every other shape is *ground* if its `v0` lies below the epoch's horizon line, else *far*; a shape's effective shift is S_all + S_group | 21 |
+| `1101` | **GSHIFT** | grp2 (0 far, 1 ground, 2 all, 3 L4), dx8, dy7: 2 px, **cumulative since epoch start**, −256..+254 / −128..+126 px. Membership is fixed at define time: L4 ids are group 3; every other shape is *ground* if its `v0` lies below the epoch's horizon line, else *far* (in a NO_HORIZON epoch nothing is above a horizon that does not exist, so every non-L4 shape is ground); a shape's effective shift is S_all + S_group | 21 |
 | `11100` | **STATUS** | arm_src2 and bkt_src2 (0 = none/S4, 1 = static/S0, 2 = sensed/S1, 3 = estimated/S2–S3, §5.3), arm7 (angle = code − 30°, so −30..+97°), bkt7 (bucket relative to the arm, (code − 64)·1.5°, so −96..+94.5°), conf2 (0 = unbounded, the S3 band; 1 low; 2 medium; 3 high), corr_n3 (corridor anomalies detected, 7 = ≥ 7, *even if not yet sent*), mask_anom1, moving1 (1 = true) | 30 |
 | `11101` | **ANOM** | slot3 (id 80+slot), x6 y5 (top-left corner, 8 px grid), w3 h3 ((v+1)·8 px), RGB444 12. A box define that a later POLY with the same id may refine. | 37 |
 | `11110` | **BLOB** (L4) | id7, centre 13 (4 px grid, x7 y6), rx3, ry3 ((v+1)·4 px), rot3 (rotation of the rx axis, 0..157.5° in 22.5° steps), FILL | 40–54 |
@@ -446,7 +446,7 @@ byte1 bit2 ..       records, MSB-first bitstream; records never cross frames
 | RGB, flat | 14 |
 | RGB, gradient | 20 |
 
-**vfill** (HZN only) = `m1 | pal4 or rgb12 | dl4 (vertical)`, 9 or 17 bits; `dl4` is a two's-complement code c ∈ −8..+7 with ΔL = 8·c (−64..+56): base + ΔL at the top of the band and base − ΔL at the horizon, clipped the same way.
+**vfill** (HZN only) = `m1 | pal4 or rgb12 | dl4 (vertical)`, 9 or 17 bits; `dl4` is a two's-complement code c ∈ −8..+7 with ΔL = 8·c (−64..+56): for either band, base + ΔL at the band's top edge and base − ΔL at its bottom edge — the sky band is +ΔL at the frame top and −ΔL at the horizon, the ground band +ΔL at the horizon and −ΔL at the frame bottom — clipped the same way.
 
 - **Palette.**
   - Slots 0–7 are a static farm palette pinned in the codec as RGB444: 0 sky `0x6BE`, 1 overcast `0xBBC`, 2 dark foliage `0x252`, 3 light foliage `0x693`, 4 straw `0xDB6`, 5 soil `0x753`, 6 shadow `0x223`, 7 white `0xFFF` (a golden vector renders all eight).
@@ -595,7 +595,7 @@ With 1,563–1,883 record bits per frame, items 1–5 rarely exceed a third of t
 
 ### 4.3 Loss tolerance and honest ages
 
-- **New epoch** on any of: a camera change; GSHIFT or GZOOM beyond its field; more than 40 % of the weighted area relabelled; ID exhaustion; entering VECTOR; 60 s (safety refresh).
+- **New epoch** on any of: a camera change; GSHIFT or GZOOM beyond its field; more than 40 % of the weighted area relabelled (a region is relabelled when no region of the previous capture matches it with IoU ≥ 0.5 and ΔE ≤ 6; without the colour clause a whole-field recolour never triggers); ID exhaustion; entering VECTOR; 60 s (safety refresh).
 - **Repeat-once and carousel re-verify.**
   - Before re-sending a shape, the tractor re-matches it on the current capture: IoU ≥ 0.7 after motion prediction, and ΔE ≤ 6.
   - If it passes, the re-sent define (same define-hash) plus its current UPD/UCOL is a *real* confirmation at this capture time.
@@ -606,7 +606,7 @@ With 1,563–1,883 record bits per frame, items 1–5 rarely exceed a third of t
   - tag2 = the low 2 bits of the shape's state-hash (§3.3: CRC-16 over offset, colour, inserts and hole slots), computed from the tractor's mirror.
   - The base resets a shape's age only when the tag matches its stored state **and** DIGEST is not in mismatch. Otherwise it counts an orphan.
   - A 2-bit tag passes a stale state 25 % of the time per CONFIRM. The DIGEST bounds this at 1/256 because it hashes the full 16-bit state-hashes, not the tags: while it mismatches, CONFIRMs reset no ages.
-- **Orphans.** More than 20 % orphan records in 10 s, or 3 consecutive DIGEST mismatches, puts the store into a *resync* state: it shows a "RESYNC" chip, stops resetting ages, and waits for the tractor's next epoch start. VS1 sends no request. The tractor starts a new epoch at least every 60 s (the safety refresh above), so a desynchronised base recovers within one safety period with no uplink at all, and the picture shows its true age in the meantime.
+- **Orphans.** More than 20 % orphan records in 10 s (evaluated over at least 8 records; a ratio over fewer is noise), or 3 consecutive DIGEST mismatches, puts the store into a *resync* state. A CONFIRM refused only because the DIGEST is in mismatch is not an orphan — it carries no contradiction of its own, and counting it made one lost UPD trip the 20 % rule. Resync it shows a "RESYNC" chip, stops resetting ages, and waits for the tractor's next epoch start. VS1 sends no request. The tractor starts a new epoch at least every 60 s (the safety refresh above), so a desynchronised base recovers within one safety period with no uplink at all, and the picture shows its true age in the meantime.
 - **Shape TTL:** 20 frames without a verified define, CONFIRM or UPD.
 - **Age styling** (shape age = now − last *verified* capture time):
 
