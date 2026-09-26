@@ -69,7 +69,7 @@ Every step page shows:
 
 | Piece | Where | Used by the manual for |
 |---|---|---|
-| Part numbers, names, stock | `DESIGN-STRUCTURAL/drawings/parts_manifest.yaml` | Callout labels, links to drawings |
+| Part numbers, names, stock | `DESIGN-STRUCTURAL/drawings/parts_manifest.yaml` (a new part is drawn and in `generated/bom.csv` before it has an entry) | Callout labels, links to drawings |
 | Quantities counted from the model | `echo(BOM_PART = …)` markers → `generated/bom.csv` | Checking every part is placed exactly once |
 | Per-part isometric renders | The part-drawing generator (`partdrawings/`) | Callout-box thumbnails |
 | Hidden-line line-art engine | `partdrawings/hlr.py` | IKEA-style vector step drawings |

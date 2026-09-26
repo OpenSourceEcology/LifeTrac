@@ -6,6 +6,12 @@
 
 - none
 
+## New parts drawn automatically
+
+These parts have a `BOM_PART` marker in the model but no entry in parts_manifest.yaml yet. They are drawn and counted like any other part, but the name comes from the module name, and the stock and USED IN are placeholders, so each sheet says CHECK BEFORE MAKING. Paste the entries below under `parts:` in the manifest, fill in the `<...>` fields, and the next run gives the drawings a proper title block.
+
+- none
+
 ## Known model issues (from `issues:` in parts_manifest.yaml)
 
 These are printed on the affected drawings as CHECK BEFORE MAKING notes. Fix the model, then delete the issue from the manifest.

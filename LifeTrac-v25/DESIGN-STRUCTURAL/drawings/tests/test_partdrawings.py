@@ -13,6 +13,7 @@ from unittest import mock
 from pathlib import Path
 
 import numpy as np
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -312,6 +313,135 @@ class RevisionAndBookTests(unittest.TestCase):
             G.select_parts(parts, ["X9"])
 
 
+class NewPartTests(unittest.TestCase):
+    MANIFEST = {"params": "openscad/params.scad",
+                "categories": {"angle": {"label": "Angle iron"}, "plate": {"label": "Plate"}},
+                "auto_categories": {"A": "angle", "P": "plate"},
+                "ignore_markers": {"NUT 1": "comes with the cylinder"}}
+    SCAD = """
+        // module part_a90_commented_out() { echo(BOM_PART = "A90"); }
+        label = "module part_a91_in_a_string() { echo(BOM_PART = \\"A91\\"); }";
+        module part_a11_seat_bracket(show_holes=true, len=[1, 2]) {
+            echo(BOM_PART = "A11");  // one part, callable with no arguments
+            cube([100, 50, 6]);
+        }
+        module part_a12_one_statement() echo(BOM_PART = "A12") cube(5);
+        module part_a13_needs_length(length, show_holes=true) { echo(BOM_PART = "A13"); cube(length); }
+        module pair() { echo(BOM_PART = "A14"); echo(BOM_PART = "A15"); }
+        module twice_a() { echo(BOM_PART = "A17"); }
+        module twice_b() { echo(BOM_PART = "A17"); }
+        module old_plate() { echo(BOM_PART = "P1 OLD"); }
+        echo(BOM_PART = "A16");
+    """
+
+    def discover(self, counts, parts=(), **kw):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "openscad" / "parts").mkdir(parents=True)
+            (Path(tmp) / "openscad" / "parts" / "new.scad").write_text(self.SCAD)
+            return G.discover_new_parts(self.MANIFEST, list(parts), counts, design=tmp, **kw)
+
+    def test_scanner_skips_comments_and_strings(self):
+        src = self.SCAD
+        mask = G.scad_code_mask(src)
+        mods = {m.name: m for m in G.scad_modules(src, mask)}
+        self.assertNotIn("part_a90_commented_out", mods)
+        self.assertNotIn("part_a91_in_a_string", mods)
+        body = src[mods["part_a11_seat_bracket"].start:mods["part_a11_seat_bracket"].end]
+        self.assertTrue(body.endswith("}") and "cube([100, 50, 6]);" in body)
+        self.assertTrue(src[:mods["part_a12_one_statement"].end].endswith("cube(5);"))
+
+    def test_params_have_defaults(self):
+        for params, ok in (("", True), ("show_holes=true", True), ("a=[1, 2], b=f(3, 4)", True),
+                           ("a=1,", True), ("length", False), ("a=1, b", False), ('s="x, y", t', False)):
+            src = "module m(%s) {}" % params
+            mask = G.scad_code_mask(src)
+            (m,) = G.scad_modules(src, mask)
+            self.assertEqual(G.params_have_defaults(src, mask, m.params_start, m.params_end), ok, params)
+
+    def test_new_part_is_drawn_from_its_module(self):
+        new, why = self.discover({"A11": 4})
+        self.assertEqual(why, {})
+        (p,) = new
+        self.assertEqual((p.id, p.name, p.category, p.call, p.count_keys, p.source),
+                         ("A11", "Seat bracket", "angle", "part_a11_seat_bracket();", ["A11"],
+                          "openscad/parts/new.scad"))
+        self.assertTrue(p.auto)
+        self.assertIn("CHECK BEFORE MAKING: NEW PART", " ".join(p.notes))
+        new, _ = self.discover({"A12": 1})
+        self.assertEqual([p.call for p in new], ["part_a12_one_statement();"])
+
+    def test_markers_that_cannot_be_drawn_say_why(self):
+        claimed = G.Part(dict(id="P1", name="Side panel", category="plate", source="x.scad", count="P1 SIDE"),
+                         {}, {})
+        counts = {k: 1 for k in ("A13", "A14", "A15", "A16", "A17", "A90", "Q5", "PIN 25x160", "P1",
+                                 "P1 SIDE", "NUT 1")}
+        new, why = self.discover(counts, [claimed])
+        self.assertEqual(new, [])
+        self.assertEqual(set(why), set(counts) - {"P1 SIDE", "NUT 1"})  # claimed and ignored markers are fine
+        for key, needle in (("A13", "needs arguments"), ("A14", "more than one marker"),
+                            ("A16", "outside a module"), ("A17", "echoed in 2 places"),
+                            ("A90", "no `echo(BOM_PART"), ("Q5", "prefix Q"), ("PIN 25x160", "plain part number"),
+                            ("P1", "already has a part P1")):
+            self.assertIn(needle, why[key], key)
+
+    def test_the_call_must_echo_just_its_own_marker(self):
+        with tempfile.TemporaryDirectory() as build:
+            (Path(build) / "scad").mkdir()
+            for echoed, needle in ((({"A11": 1, "A1": 2}, ""), "echoes A1 x2, A11 x1"),
+                                   ((None, "ERROR"), "fails when it is called on its own")):
+                with mock.patch.object(G, "echo_markers", return_value=echoed):
+                    new, why = self.discover({"A11": 4}, openscad="openscad", build=build)
+                self.assertEqual(new, [])
+                self.assertIn(needle, why["A11"])
+            with mock.patch.object(G, "echo_markers", return_value=({"A11": 1}, "")) as run:
+                new, why = self.discover({"A11": 4}, openscad="openscad", build=build)
+            self.assertEqual(([p.id for p in new], why), (["A11"], {}))
+            self.assertIn("part_a11_seat_bracket();", (Path(build) / "scad" / "A11_markers.scad").read_text())
+            run.assert_called_once()
+
+
+class IndexTests(unittest.TestCase):
+    CATS = {"plate": {"label": "Plate"}, "angle": {"label": "Angle iron"}, "fastener": {"label": "Hardware"}}
+
+    def row(self, pid, cat, stock, qty, extents, mass=1.0, src="model", **extra):
+        part = G.Part(dict(id=pid, name="Part " + pid, category=cat, source="openscad/x.scad", call="x();",
+                           stock=stock, **extra), self.CATS[cat], {})
+        return {"part": part, "qty": qty, "qty_src": src, "mass": mass, "extents": extents, "holes": [],
+                "bolt_holes": [], "info": {"size": "-", "rev": "A", "geom_id": "0"}}
+
+    def rows(self):
+        return [self.row("P1", "plate", "PL 1/4", 2, (1000, 500, 6.35), mass=25),
+                self.row("A1", "angle", "L2x2x1/4", 2, (650, 50.8, 50.8), mass=3),
+                self.row("A4", "angle", "L2x2x1/4", 26, (146.1, 50.8, 50.8), mass=0.67),
+                self.row("F3", "fastener", "HEX BOLT", 154, (60, 20, 20), mass=0.07, src="holes")]
+
+    def test_totals_follow_the_counted_quantities(self):
+        text = "\n".join(G.totals_lines({"categories": self.CATS}, self.rows()))
+        self.assertIn("| Plate | 1 | 2 | 50.0 kg |", text)
+        self.assertIn("| Angle iron | 2 | 28 | 23.4 kg |", text)
+        self.assertIn("| Hardware | 1 | 154 † | 10.8 kg |", text)  # estimated from holes
+        self.assertIn("| **All parts** | **4** | **184** † | **84 kg** |", text)
+        self.assertIn("| L2x2x1/4 | A1, A4 | 28 | 5.10 m [16.7 ft] |  | 23.4 kg |", text)  # 2 x 650 + 26 x 146.1
+        self.assertIn("| PL 1/4 | P1 | 2 |  | 1.00 m² [10.8 ft²] | 50.0 kg |", text)
+        self.assertNotIn("HEX BOLT", text)  # bought ready-made, not cut from stock
+
+    def test_new_part_is_flagged_with_an_entry_to_paste(self):
+        rows = self.rows() + [self.row("A11", "angle", "NOT SPECIFIED YET", 4, (300, 50.8, 50.8), auto=True,
+                                       count="A11")]
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            G.write_index(out, {"categories": self.CATS}, rows, [])
+            G.write_checks(out, rows, [], [], {"A11": 4}, {})
+            index, checks = (out / "INDEX.md").read_text(), (out / "CHECKS.md").read_text()
+        self.assertIn("| **A11** | Part A11 *(new - not in the manifest yet)* |", index)
+        self.assertNotIn("Part A1 *(new", index)
+        block = checks.split("```yaml\n", 1)[1].split("```", 1)[0]
+        (entry,) = yaml.safe_load("parts:\n" + block)["parts"]
+        self.assertEqual({k: entry[k] for k in ("id", "category", "source", "call", "count")},
+                         {"id": "A11", "category": "angle", "source": "openscad/x.scad", "call": "x();",
+                          "count": "A11"})
+
+
 class SequenceCheckTests(unittest.TestCase):
     PARTS = {
         "P1": {"name": "Plate", "category": "plate"},
@@ -363,6 +493,21 @@ class SequenceCheckTests(unittest.TestCase):
                 SEQ.load_quantities(Path(tmp), {"bom": "missing.csv"}, self.PARTS)
             qty, exact, _ = SEQ.load_quantities(Path(tmp), {}, {"P1": {"qty": 2}})  # no `bom:` key: optional
         self.assertEqual((qty, exact), ({"P1": 2}, set()))
+
+    def test_new_part_in_the_bom_is_checked(self):
+        # Drawn automatically and in the BOM, but not in the manifest yet.
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "bom.csv").write_text("id,name,category,qty_per_machine,qty_source,drawing\n"
+                                               "P1,Plate,plate,1,model,pdf/P1.pdf\n"
+                                               "A11,Seat bracket,angle,4,model,pdf/A11.pdf\n")
+            parts = dict(self.PARTS)
+            qty, exact, _ = SEQ.load_quantities(Path(tmp), {"bom": "bom.csv"}, parts)
+        self.assertEqual(parts["A11"], {"name": "Seat bracket", "category": "angle"})
+        self.assertEqual((qty["A11"], "A11" in exact), (4, True))
+        seq = {"phases": [{"id": "p", "steps": [{"id": "a", "add": [{"part": "A11", "qty": 3}]}]}]}
+        _, _, errors, warnings = SEQ.check(seq, parts, qty, exact)
+        self.assertEqual(errors, [])
+        self.assertIn("not placed by any step: A11 (Seat bracket): 3 of 4 placed", warnings)
 
     def test_structure_errors(self):
         _, _, errors, _ = self.run_check([

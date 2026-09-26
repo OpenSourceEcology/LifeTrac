@@ -13,11 +13,15 @@ For every part listed in parts_manifest.yaml this script
 Quantities come from the model itself: part modules call
 ``echo(BOM_PART = "<key>")`` and this script counts those echoes when the
 full assembly is evaluated, so the "QTY PER MACHINE" box follows the design.
+A marker that no manifest entry claims yet is drawn anyway when it names a
+part number and one no-argument module draws just that part (see
+discover_new_parts); CHECKS.md then suggests its manifest entry.
 
 Outputs (committed by CI on main - see .github/workflows/generate-part-drawings.yml):
   generated/pdf/<ID>_<name>.pdf   one drawing per part
   generated/dxf/<ID>_<name>.dxf   1:1 flat pattern of every plate part (CNC input)
-  generated/INDEX.md, bom.csv     bill of materials with links
+  generated/INDEX.md, bom.csv     bill of materials with links; INDEX.md starts with
+                                  totals per category and per stock size
   generated/CHECKS.md             quantity cross-checks and warnings
   generated/revisions.json        revision letter + date per part
 and, not committed: build/LifeTrac_v25_Part_Drawings.pdf (all sheets in one book).
@@ -28,6 +32,7 @@ Usage:
 """
 
 import argparse
+import collections
 import csv
 import datetime as dt
 import hashlib
@@ -145,6 +150,7 @@ class Part:
         self.options = dict(cat.get("options", {}))
         self.options.update(d.get("options", {}))
         self.aliases = d.get("aliases", [])
+        self.auto = bool(d.get("auto"))  # found in the model, not in the manifest yet
         self.filename = "%s_%s" % (self.id, slug(self.name))
 
     @property
@@ -265,17 +271,210 @@ def select_parts(parts, only):
     return [p for p in parts if p.id in needed], wanted
 
 
-def count_markers(openscad, manifest, build):
-    assembly = (DESIGN / manifest["assembly"]).resolve()
-    out = build / "assembly.echo"
-    r = run([openscad, "-o", str(out), str(assembly)], cwd=assembly.parent)
+def echo_markers(openscad, scad, out):
+    """Evaluate a .scad file without rendering any geometry and count the
+    BOM_PART markers it echoes.  Returns (counts, stderr); counts is None if
+    OpenSCAD fails."""
+    out.unlink(missing_ok=True)
+    r = run([openscad, "-o", str(out), str(scad)], cwd=scad.parent)
     if r.returncode != 0 or not out.exists():
-        raise SystemExit("could not evaluate %s:\n%s" % (assembly, r.stderr[-2000:]))
+        return None, r.stderr
     counts = {}
     for line in out.read_text().splitlines():
         for key in BOM_RE.findall(line):
             counts[key] = counts.get(key, 0) + 1
+    return counts, r.stderr
+
+
+def count_markers(openscad, manifest, build):
+    assembly = (DESIGN / manifest["assembly"]).resolve()
+    counts, err = echo_markers(openscad, assembly, build / "assembly.echo")
+    if counts is None:
+        raise SystemExit("could not evaluate %s:\n%s" % (assembly, err[-2000:]))
     return counts
+
+
+# ----------------------------------------------------------------------------
+# New parts: draw markers that no manifest entry claims yet
+# ----------------------------------------------------------------------------
+
+PART_ID_RE = re.compile(r"^([A-Z]+)\d+(?:-\d+)?$")  # P20, A11, A6-4
+MODULE_RE = re.compile(r"\bmodule\s+([A-Za-z_]\w*)\s*\(")
+ANY_MARKER_RE = re.compile(r"\bBOM_PART\s*=")
+NEW_PART_ISSUE = ("NEW PART, DRAWN AUTOMATICALLY BY CALLING %s WITH ITS DEFAULT ARGUMENTS. NAME, STOCK AND "
+                  "USED IN ARE PLACEHOLDERS UNTIL THE PART HAS AN ENTRY IN parts_manifest.yaml "
+                  "(generated/CHECKS.md HAS ONE READY TO PASTE).")
+ScadModule = collections.namedtuple("ScadModule", "name params_start params_end start end")
+
+
+def scad_code_mask(src):
+    """For each character of an OpenSCAD source: True if it is code, False
+    if it is inside a comment or a string."""
+    mask = [True] * len(src)
+    i, n = 0, len(src)
+    while i < n:
+        if src.startswith("//", i):
+            j = src.find("\n", i)
+            j = n if j < 0 else j
+        elif src.startswith("/*", i):
+            j = src.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+        elif src[i] == '"':
+            j = i + 1
+            while j < n and src[j] != '"':
+                j += 2 if src[j] == "\\" else 1
+            j = min(j + 1, n)
+        else:
+            i += 1
+            continue
+        mask[i:j] = [False] * (j - i)
+        i = j
+    return mask
+
+
+def _close(src, mask, i):
+    """Index just past the bracket that closes the one at src[i]."""
+    pairs = {"(": ")", "[": "]", "{": "}"}
+    stack = []
+    for j in range(i, len(src)):
+        if mask[j] and src[j] in pairs:
+            stack.append(pairs[src[j]])
+        elif mask[j] and stack and src[j] == stack[-1]:
+            stack.pop()
+            if not stack:
+                return j + 1
+    return len(src)
+
+
+def scad_modules(src, mask):
+    """Every module definition in an OpenSCAD source.  start..end spans the
+    whole definition: its { block } or single statement."""
+    mods = []
+    for m in MODULE_RE.finditer(src):
+        if not mask[m.start()]:
+            continue
+        params_end = _close(src, mask, m.end() - 1)
+        j = params_end
+        while j < len(src):
+            if mask[j] and src[j] == "{":
+                j = _close(src, mask, j)
+                break
+            if mask[j] and src[j] == ";":
+                j += 1
+                break
+            j += 1
+        mods.append(ScadModule(m.group(1), m.end(), params_end - 1, m.start(), j))
+    return mods
+
+
+def params_have_defaults(src, mask, start, end):
+    """True if every parameter in src[start:end] has a default value, so the
+    module can be called with no arguments."""
+    depth, text, default = 0, False, False
+    for j in range(start, end):
+        c = src[j]
+        if not mask[j] or c.isspace():
+            continue
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        elif depth == 0 and c == ",":
+            if text and not default:
+                return False
+            text = default = False
+            continue
+        elif depth == 0 and c == "=":
+            default = True
+        text = True
+    return default or not text
+
+
+def part_name(module, part_id):
+    """Readable name from a module name: part_a11_seat_bracket -> Seat bracket."""
+    words = re.sub(r"^part_", "", module)
+    words = re.sub(r"^%s_" % re.escape(part_id.lower().replace("-", "_")), "", words)
+    words = words.replace("_", " ").strip()
+    return words[:1].upper() + words[1:] if words else part_id
+
+
+def discover_new_parts(manifest, parts, counts, openscad=None, build=None, design=DESIGN):
+    """Draw BOM_PART markers that no manifest part claims yet.
+
+    A marker becomes a new, provisional part when its key is a part number
+    whose letter prefix has a category in the manifest's `auto_categories`
+    (A11 -> angle), and exactly one module under openscad/ echoes it, as its
+    only marker, and can be called with no arguments.  With `openscad`, that
+    call is also evaluated on its own and must echo the marker exactly once
+    and no other marker, so it draws one part and nothing else.  Returns
+    (new parts, {marker: reason}) where the reasons explain the markers left
+    undrawn."""
+    cats = manifest.get("categories", {})
+    prefixes = manifest.get("auto_categories") or {}
+    ignored = manifest.get("ignore_markers") or {}
+    claimed = {k for p in parts for k in p.count_keys}
+    ids = {p.id for p in parts}
+    todo = sorted(k for k in counts if k not in claimed and k not in ignored)
+    new, why = [], {}
+    if not todo:
+        return new, why
+    files = []
+    for f in sorted((Path(design) / "openscad").rglob("*.scad")):
+        src = f.read_text(errors="replace")
+        mask = scad_code_mask(src)
+        files.append((f, src, mask, scad_modules(src, mask)))
+    for key in todo:
+        m = PART_ID_RE.match(key)
+        cat = prefixes.get(m.group(1)) if m else None
+        if not m:
+            why[key] = "it is not a plain part number, so it needs a manifest entry with a `call`"
+            continue
+        if key in ids:
+            why[key] = "the manifest already has a part %s that counts a different marker" % key
+            continue
+        if cat not in cats:
+            why[key] = "there is no category for the prefix %s (`auto_categories` in the manifest)" % m.group(1)
+            continue
+        pattern = re.compile(r'echo\s*\(\s*BOM_PART\s*=\s*"%s"\s*\)' % re.escape(key))
+        hits = []
+        for f, src, mask, mods in files:
+            for h in pattern.finditer(src):
+                if mask[h.start()]:
+                    inside = [md for md in mods if md.start <= h.start() < md.end]
+                    hits.append((f, src, mask, max(inside, key=lambda md: md.start) if inside else None))
+        if len(hits) != 1:
+            why[key] = ('no `echo(BOM_PART = "%s");` statement was found under openscad/' % key if not hits
+                        else "it is echoed in %d places" % len(hits))
+            continue
+        f, src, mask, mod = hits[0]
+        if mod is None:
+            why[key] = "it is echoed outside a module"
+            continue
+        markers = [h for h in ANY_MARKER_RE.finditer(src, mod.start, mod.end) if mask[h.start()]]
+        if len(markers) > 1:
+            why[key] = "module %s() echoes more than one marker, so it draws more than one part" % mod.name
+            continue
+        if not params_have_defaults(src, mask, mod.params_start, mod.params_end):
+            why[key] = "module %s() needs arguments" % mod.name
+            continue
+        d = {"id": key, "name": part_name(mod.name, key), "category": cat, "stock": "NOT SPECIFIED YET",
+             "source": os.path.relpath(f, design).replace(os.sep, "/"), "call": "%s();" % mod.name,
+             "count": key, "used_in": "NOT SPECIFIED YET", "issues": [NEW_PART_ISSUE % (mod.name + "()")],
+             "auto": True}
+        part = Part(d, cats[cat], manifest.get("defaults", {}))
+        if openscad:
+            scad = Path(build) / "scad" / (key + "_markers.scad")
+            scad.write_text(wrapper_source(manifest, part))
+            echoed, _ = echo_markers(openscad, scad, scad.with_suffix(".echo"))
+            if echoed is None:
+                why[key] = "%s() fails when it is called on its own" % mod.name
+                continue
+            if echoed != {key: 1}:
+                why[key] = "calling %s() on its own echoes %s, so it does not draw exactly one part" % (
+                    mod.name, ", ".join("%s x%d" % kv for kv in sorted(echoed.items())) or "no marker")
+                continue
+        new.append(part)
+    return new, why
 
 
 # ----------------------------------------------------------------------------
@@ -299,16 +498,23 @@ def main():
         raise SystemExit("OpenSCAD not found (install it or pass --openscad PATH)")
 
     manifest, parts = load_manifest(args.manifest)
-    wanted = None
-    if args.only:
-        parts, wanted = select_parts(parts, args.only)
-
     out, build = Path(args.out), Path(args.build)
     for d in (out / "pdf", out / "dxf", build / "scad", build / "stl"):
         d.mkdir(parents=True, exist_ok=True)
 
     print("Counting BOM_PART markers in %s ..." % manifest["assembly"])
     counts = count_markers(args.openscad, manifest, build)
+    new_parts, not_drawn = discover_new_parts(manifest, parts, counts, args.openscad, build)
+    ci = os.environ.get("GITHUB_ACTIONS") == "true"
+    for p in new_parts:
+        print("%s%s (%s) is not in the manifest yet: drawn automatically with %s from %s. generated/CHECKS.md "
+              "has a manifest entry to paste." % ("::notice title=New part::" if ci else "  NEW    ", p.id,
+                                                  p.name, p.call.rstrip(";"), p.source))
+    parts += new_parts
+
+    wanted = None
+    if args.only:
+        parts, wanted = select_parts(parts, args.only)
 
     print("Rendering %d parts with OpenSCAD (%d jobs) ..." % (len(parts), args.jobs))
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
@@ -474,8 +680,9 @@ def main():
         registered = {k for p in parts for k in p.count_keys}
         ignored = manifest.get("ignore_markers", {}) or {}
         for key in sorted(set(counts) - registered - set(ignored)):
-            warnings.append("marker %r appears %d time(s) in the assembly but no manifest part uses it"
-                            % (key, counts[key]))
+            warnings.append("marker %r appears %d time(s) in the assembly but no manifest part uses it%s" % (
+                key, counts[key], ", and it could not be drawn automatically: " + not_drawn[key]
+                if key in not_drawn else ""))
         write_index(out, manifest, results, failures)
         write_checks(out, results, failures, warnings, counts, ignored)
         write_book(build / "LifeTrac_v25_Part_Drawings.pdf", manifest, results, args.paper, head_sha, head_date)
@@ -498,6 +705,9 @@ def main():
 # ----------------------------------------------------------------------------
 
 CATEGORY_ORDER = ["plate", "angle", "tube", "bar", "lug", "ring", "printed", "fastener", "purchased"]
+LINEAR = ("angle", "tube", "bar")   # bought by length; the cut length is the part's X extent
+FLAT = ("plate", "ring")            # cut from sheet; the blank is X by Y
+BOUGHT = ("fastener", "purchased")  # bought ready-made, not cut from stock
 
 
 def _sorted(results):
@@ -506,6 +716,53 @@ def _sorted(results):
         num = [int(x) if x.isdigit() else x for x in re.split(r"(\d+)", r["part"].id)]
         return (CATEGORY_ORDER.index(cat) if cat in CATEGORY_ORDER else 99, num)
     return sorted(results, key=key)
+
+
+def totals_lines(manifest, rows):
+    """INDEX.md totals: per category, then per stock for the parts cut from
+    stock.  Everything is added up from the per-part quantities, so it
+    follows the model like they do."""
+    cats = manifest.get("categories", {})
+    lines = ["## Totals", "",
+             "| Category | Unique parts | Pieces per machine | Mass per machine |", "|---|---:|---:|---:|"]
+    rough = False
+    for cat in dict.fromkeys(r["part"].category for r in rows):
+        rs = [r for r in rows if r["part"].category == cat]
+        est = any(r["qty_src"] != "model" for r in rs)
+        rough = rough or est
+        lines.append("| %s | %d | %d%s | %.1f kg |" % (
+            cats.get(cat, {}).get("label", cat), len(rs), sum(r["qty"] for r in rs), " †" if est else "",
+            sum(r["mass"] * r["qty"] for r in rs)))
+    lines.append("| **All parts** | **%d** | **%d**%s | **%.0f kg** |" % (
+        len(rows), sum(r["qty"] for r in rows), " †" if rough else "", sum(r["mass"] * r["qty"] for r in rows)))
+    if rough:
+        lines += ["", "† Includes quantities typed into the manifest or estimated from hole counts; the "
+                  "tables below mark which."]
+
+    groups = {}
+    for r in rows:
+        p = r["part"]
+        if p.category in BOUGHT:
+            continue
+        g = groups.setdefault((p.category, p.stock), {"ids": [], "qty": 0, "length": 0.0, "area": 0.0, "mass": 0.0})
+        X, Y, _ = r["extents"]
+        g["ids"].append(p.id)
+        g["qty"] += r["qty"]
+        g["length"] += X * r["qty"] if p.category in LINEAR else 0.0
+        g["area"] += X * Y * r["qty"] if p.category in FLAT else 0.0
+        g["mass"] += r["mass"] * r["qty"]
+    lines += ["", "### Stock", "",
+              "Material for the parts cut from stock, added up per stock size. Lengths and blank areas are net: "
+              "allow for saw kerf, offcuts and plate nesting when ordering.", "",
+              "| Stock | Parts | Pieces | Total cut length | Total blank area | Mass |",
+              "|---|---|---:|---:|---:|---:|"]
+    for (cat, stock), g in groups.items():
+        lines.append("| %s | %s | %d | %s | %s | %.1f kg |" % (
+            stock, ", ".join(g["ids"]), g["qty"],
+            "%.2f m [%.1f ft]" % (g["length"] / 1000, g["length"] / 304.8) if cat in LINEAR else "",
+            "%.2f m² [%.1f ft²]" % (g["area"] / 1e6, g["area"] / 92903.04) if cat in FLAT else "",
+            g["mass"]))
+    return lines
 
 
 def write_index(out, manifest, results, failures):
@@ -521,8 +778,6 @@ def write_index(out, manifest, results, failures):
                         "%.2f" % r["mass"], "%.2f" % (r["mass"] * r["qty"]), len(r["holes"]),
                         i["rev"], i["geom_id"], "pdf/%s.pdf" % p.filename, dxf])
 
-    total_mass = sum(r["mass"] * r["qty"] for r in rows)
-    total_pieces = sum(r["qty"] for r in rows)
     lines = [
         "# LifeTrac v25 - Part Drawings Index",
         "",
@@ -533,12 +788,9 @@ def write_index(out, manifest, results, failures):
         "",
         "Plain quantities are counted from `BOM_PART` markers in the assembly. Quantities marked "
         "*(manifest)* are typed in by hand; *(est. from holes)* are estimated from hole counts "
-        "(`qty_from_holes`). Check both before ordering.",
+        "(`qty_from_holes`). Check both before ordering. Masses are calculated from the model.",
         "",
-        "**%d unique parts, %d pieces, %.0f kg of fabricated/purchased parts (calculated).**" % (
-            len(rows), total_pieces, total_mass),
-        "",
-    ]
+    ] + totals_lines(manifest, rows)
     current = None
     for r in rows:
         p, i = r["part"], r["info"]
@@ -549,8 +801,10 @@ def write_index(out, manifest, results, failures):
                       "| Part | Name | Stock | Qty | Size | Mass each | Rev | Drawing | CNC |",
                       "|---|---|---|---:|---|---:|:-:|---|---|"]
         dxf = (out / "dxf" / (p.filename + ".dxf")).exists()
+        name = p.name + (" *(new - not in the manifest yet)*" if p.auto else "")
+        qty_note = {"model": "", "holes": " *(est. from holes)*"}.get(r["qty_src"], " *(manifest)*")
         lines.append("| **%s** | %s | %s | %s%s | %s | %.2f kg | %s | [PDF](pdf/%s.pdf) | %s |" % (
-            p.id, p.name, p.stock, r["qty"], {"model": "", "holes": " *(est. from holes)*"}.get(r["qty_src"], " *(manifest)*"),
+            p.id, name, p.stock, r["qty"], qty_note,
             i["size"], r["mass"], i["rev"], p.filename,
             "[DXF](dxf/%s.dxf)" % p.filename if dxf else ""))
     if failures:
@@ -564,10 +818,27 @@ def write_checks(out, results, failures, warnings, counts, ignored):
              "> Generated file - do not edit. Regenerated with the drawings on every design change.", ""]
     lines += ["## Warnings", ""]
     lines += ["- %s" % w for w in warnings] or ["- none"]
+    lines += ["", "## New parts drawn automatically", "",
+              "These parts have a `BOM_PART` marker in the model but no entry in parts_manifest.yaml yet. "
+              "They are drawn and counted like any other part, but the name comes from the module name, "
+              "and the stock and USED IN are placeholders, so each sheet says CHECK BEFORE MAKING. Paste "
+              "the entries below under `parts:` in the manifest, fill in the `<...>` fields, and the next "
+              "run gives the drawings a proper title block.", ""]
+    new = [r for r in _sorted(results) if r["part"].auto]
+    lines += ["- **%s** %s: `%s` in `%s`, %d per machine" % (r["part"].id, r["part"].name, r["part"].call,
+                                                           r["part"].source, r["qty"]) for r in new] or ["- none"]
+    if new:
+        lines += ["", "```yaml"]
+        for r in new:
+            p = r["part"]
+            lines += ["  - id: %s" % p.id, "    name: %s" % p.name, "    category: %s" % p.category,
+                      "    stock: <material and size>", "    source: %s" % p.source, "    call: '%s'" % p.call,
+                      '    count: "%s"' % p.id, "    used_in: <where it goes>"]
+        lines.append("```")
     lines += ["", "## Known model issues (from `issues:` in parts_manifest.yaml)", "",
               "These are printed on the affected drawings as CHECK BEFORE MAKING notes. "
               "Fix the model, then delete the issue from the manifest.", ""]
-    issues = [(r["part"].id, i) for r in _sorted(results) for i in r["part"].issues]
+    issues = [(r["part"].id, i) for r in _sorted(results) if not r["part"].auto for i in r["part"].issues]
     lines += ["- **%s**: %s" % (pid, i) for pid, i in issues] or ["- none"]
     lines += ["", "## Modelled but deliberately not drawn (`ignore_markers`)", ""]
     lines += ["- `%s` x%d: %s" % (k, counts.get(k, 0), ignored[k]) for k in sorted(ignored)] or ["- none"]

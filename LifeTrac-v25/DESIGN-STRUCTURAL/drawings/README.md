@@ -69,8 +69,8 @@ kept in [`generated/revisions.json`](generated/revisions.json).
 CI runs the generator with `--strict`. The job fails, after still uploading the
 artifact, when any of these happens:
 
-* the model has a `BOM_PART` marker no manifest part uses (a new part without a
-  drawing);
+* the model has a `BOM_PART` marker that no manifest part uses and that could not
+  be drawn automatically (see [Adding or changing a part](#adding-or-changing-a-part));
 * a manifest part's marker is never reached;
 * a quantity disagrees with the model;
 * a DXF export fails;
@@ -95,9 +95,17 @@ The generator evaluates `openscad/lifetrac_v25.scad` (about half a second, with 
 geometry rendered) and counts the `BOM_PART` echoes. When the design adds a
 fifth motor-plate angle, every A4 drawing and the BOM show the new number.
 
+`generated/INDEX.md` opens with totals added up from the same counts: unique parts,
+pieces and mass per category, and per stock size the total cut length (angle, tube,
+bar) or blank area (plate). Nothing else in the repository types piece counts. The
+structural parts catalogue and `structural_parts.scad` used to, and their totals
+drifted away from the model, so they now point to the index.
+
 `generated/CHECKS.md` lists:
 
-* markers in the model that no manifest part uses: a new part nobody has drawn yet;
+* new parts that were drawn automatically, with a manifest entry for each to paste in;
+* markers in the model that no manifest part uses and that could not be drawn
+  automatically, with the reason;
 * manifest parts whose marker is never reached: a part the assembly no longer uses;
 * differences between a model count and a hand-entered `qty`.
 
@@ -123,6 +131,42 @@ there, fix the model, then delete the issue.
 
 ## Adding or changing a part
 
+**A new part needs only a marker.** Write a module that draws one copy of the part
+and echoes its part number, then call it in the assembly wherever the part goes:
+
+```openscad
+module part_a11_seat_bracket(show_holes=true) {
+    echo(BOM_PART = "A11");  // counted by drawings/generate_part_drawings.py
+    // ... geometry ...
+}
+```
+
+On the next run the generator finds the `A11` marker, sees that no manifest entry
+uses it, and draws the part anyway:
+
+* the letter prefix picks the category, from `auto_categories` in the manifest
+  (`A` angle, `P` plate, `T` tube, `R` bar, `U` lug, `F` fastener);
+* the title comes from the module name (`part_a11_seat_bracket` → "Seat bracket");
+* the quantity is counted like any other part's, and the part shows up in the index,
+  the totals, `bom.csv` and the assembly-sequence check.
+
+The stock and USED IN are placeholders, so the sheet carries a CHECK BEFORE MAKING
+note. `generated/CHECKS.md` lists the part with a manifest entry, ready to paste in.
+A marker is drawn automatically only when all of these hold:
+
+* it is a plain part number (`A11`, `P20`, `A6-4`) whose prefix is in `auto_categories`;
+* exactly one module under `openscad/` echoes it, and that module echoes no other marker;
+* the module can be called with no arguments (it is drawn with its defaults);
+* the module, called on its own, echoes that one marker and no other (so it draws one
+  part, not a sub-assembly).
+
+If any rule fails, CHECKS.md says which one and `--strict` fails, as it does for any
+other marker that no manifest part uses. Parametric modules such as
+`clevis_pin(d, l)` always need a manifest entry, and so do modules that draw a part
+together with its neighbours.
+
+**To finish a new part, or to add one by hand**, give it a manifest entry:
+
 1. Make sure one OpenSCAD statement draws exactly **one** copy of the part.
    * Standalone part files (`openscad/parts/*.scad`) and the structural wrappers
      already do this.
@@ -130,7 +174,8 @@ there, fix the model, then delete the issue.
      neighbours, use `clip_box` in the manifest to keep just the part.
 2. Add `echo(BOM_PART = "<ID>");` inside the module that the assembly calls once
    per part.
-3. Add an entry to [`parts_manifest.yaml`](parts_manifest.yaml):
+3. Add an entry to [`parts_manifest.yaml`](parts_manifest.yaml), or paste the one
+   CHECKS.md suggests and fill in the `<...>` fields:
 
    ```yaml
    - id: P07                       # part number (unique; used in assembly steps)

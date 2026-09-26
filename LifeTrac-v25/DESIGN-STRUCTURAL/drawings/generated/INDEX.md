@@ -2,10 +2,42 @@
 
 > **Generated file - do not edit.** Produced by [`../generate_part_drawings.py`](../generate_part_drawings.py) from [`../parts_manifest.yaml`](../parts_manifest.yaml) and the OpenSCAD model. See [`../README.md`](../README.md).
 
-Plain quantities are counted from `BOM_PART` markers in the assembly. Quantities marked *(manifest)* are typed in by hand; *(est. from holes)* are estimated from hole counts (`qty_from_holes`). Check both before ordering.
+Plain quantities are counted from `BOM_PART` markers in the assembly. Quantities marked *(manifest)* are typed in by hand; *(est. from holes)* are estimated from hole counts (`qty_from_holes`). Check both before ordering. Masses are calculated from the model.
 
-**60 unique parts, 1521 pieces, 881 kg of fabricated/purchased parts (calculated).**
+## Totals
 
+| Category | Unique parts | Pieces per machine | Mass per machine |
+|---|---:|---:|---:|
+| CNC-cut plate | 19 | 47 | 628.7 kg |
+| Angle iron (cut and drill) | 10 | 78 | 87.3 kg |
+| Rectangular / square tube (cut and drill) | 6 | 11 | 112.9 kg |
+| Round bar and pins (cut and drill) | 6 | 16 | 19.2 kg |
+| Lugs and brackets cut from tube | 3 | 6 | 4.0 kg |
+| 3D-printed jigs | 6 | 13 † | 4.4 kg |
+| Purchased hardware (reference) | 10 | 1350 † | 24.2 kg |
+| **All parts** | **60** | **1521** † | **881 kg** |
+
+† Includes quantities typed into the manifest or estimated from hole counts; the tables below mark which.
+
+### Stock
+
+Material for the parts cut from stock, added up per stock size. Lengths and blank areas are net: allow for saw kerf, offcuts and plate nesting when ordering.
+
+| Stock | Parts | Pieces | Total cut length | Total blank area | Mass |
+|---|---|---:|---:|---:|---:|
+| PL 1/2 [12.7] ASTM A36 | P1, P2, P3, P17 | 8 |  | 5.61 m² [60.4 ft²] | 330.2 kg |
+| PL 1/4 [6.35] ASTM A36 | P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15, P16, P18 | 38 |  | 7.59 m² [81.7 ft²] | 285.3 kg |
+| PL 3/4 [19.05] ASTM A36 | P19 | 1 |  | 0.09 m² [0.9 ft²] | 13.2 kg |
+| L2x2x1/4 ANGLE (2" x 2" x 1/4"), ASTM A36 | A1, A2, A4, A5, A6-1, A6-2, A6-3, A7, A8, A10 | 78 | 18.70 m [61.4 ft] |  | 87.3 kg |
+| HSS 6x2x1/4 RECT TUBE (2" x 6" x 1/4"), ASTM A500 | T1, T2, T3, T4 | 5 | 5.70 m [18.7 ft] |  | 106.0 kg |
+| DOM TUBE 2.000 OD x .250 WALL [50.8 x 6.35] | T6 | 2 | 0.24 m [0.8 ft] |  | 1.7 kg |
+| DOM TUBE 2.000 OD [50.8], BORED TO THE ID SHOWN | T7 | 4 | 0.56 m [1.8 ft] |  | 5.2 kg |
+| Ø1 [25.4] ROUND BAR, 4140 OR EQUIVALENT | R1, R4, R5 | 6 | 0.64 m [2.1 ft] |  | 2.5 kg |
+| Ø1-1/2 [38.1] ROUND BAR, 4140 OR EQUIVALENT | R2 | 2 | 0.45 m [1.5 ft] |  | 4.0 kg |
+| Ø3/4 [19.05] ROUND BAR, 4140 OR EQUIVALENT | R3 | 4 | 0.42 m [1.4 ft] |  | 0.9 kg |
+| Ø1-1/4 [31.75] ROUND SHAFTING | R6 | 4 | 1.90 m [6.2 ft] |  | 11.7 kg |
+| HSS 3x3x1/4 SQUARE TUBE, ASTM A500 | U1, U2, U3 | 6 |  |  | 4.0 kg |
+| PLA OR PETG FILAMENT | J1, J2, J3, J4, J5, J6 | 13 |  |  | 4.4 kg |
 
 ## CNC-cut plate
 

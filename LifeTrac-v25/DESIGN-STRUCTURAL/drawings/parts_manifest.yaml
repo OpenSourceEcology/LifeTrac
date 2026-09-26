@@ -29,6 +29,14 @@ ignore_markers:
   "NUT 22.86": Hydraulic cylinder base-pin nuts - hardware supplied with the cylinders (modelled size is not a standard nut)
   "NUT 18.288": Hydraulic cylinder rod-pin nuts - hardware supplied with the cylinders (modelled size is not a standard nut)
 
+# New parts are drawn before anyone writes their entry below.  A BOM_PART
+# marker that no entry claims is drawn automatically when its key is a part
+# number whose letter prefix is listed here (A11 -> angle), exactly one module
+# under openscad/ echoes it, and that module draws just this one part with its
+# default arguments.  The sheet then has a placeholder name and stock, and
+# generated/CHECKS.md shows an entry to paste in here.
+auto_categories: {P: plate, A: angle, T: tube, R: bar, U: lug, F: fastener}
+
 defaults:
   notes:
     - DIMENSIONS IN MILLIMETRES [INCHES]. DO NOT SCALE DRAWING.

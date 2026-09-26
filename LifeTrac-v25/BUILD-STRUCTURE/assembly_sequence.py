@@ -7,7 +7,9 @@
 The sequence lives in assembly_sequence.yaml. Part ids and names come from
 DESIGN-STRUCTURAL/drawings/parts_manifest.yaml. Quantities per machine come
 from the generated BOM (drawings/generated/bom.csv), which counts them from
-the OpenSCAD model, so the checks follow the design.
+the OpenSCAD model, so the checks follow the design. A new part that is in the
+BOM but not in the manifest yet (the drawing generator draws those
+automatically) is checked too, under its BOM name.
 
 A quantity is *exact* when the BOM says it was counted in the model
 (qty_source = model). Hand-entered and hole-count estimates (most bolts, nuts
@@ -38,7 +40,8 @@ PURCHASED = {"fastener"}     # bought, not fabricated: checked, but left out of 
 
 def load_quantities(base, seq, parts):
     """Per-machine quantity, whether it is exact (counted in the model), and
-    drawing path for every part id."""
+    drawing path for every part id.  BOM rows for parts that are not in the
+    manifest yet are added to `parts`."""
     qty, exact, drawing = {}, set(), {}
     if seq.get("bom"):
         bom = base / seq["bom"]
@@ -48,6 +51,7 @@ def load_quantities(base, seq, parts):
                              "first, or remove `bom:` from the sequence file" % bom)
         with open(bom, newline="") as fh:
             for row in csv.DictReader(fh):
+                parts.setdefault(row["id"], {"name": row["name"], "category": row["category"]})
                 qty[row["id"]] = int(row["qty_per_machine"] or 0)
                 if row.get("qty_source") == "model":
                     exact.add(row["id"])
