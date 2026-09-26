@@ -3179,6 +3179,65 @@ test; the `TxPipeline` v2/v3 default cost 38 points of command delivery across
 
 ---
 
+### RS-13 — Vector scene mode (VS1) — *proposed 2026-09-23, not started*
+
+Design: [VECTOR_SCENE.md](VECTOR_SCENE.md). Research and review record: [2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md](../AI%20NOTES/2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md). Decisions D-VS1–D-VS9 (D-VS3/D-VS3a withdrawn) in [DECISIONS.md](DECISIONS.md#vector-scene-mode--proposed-pending-ose-sign-off).
+
+**What it is.** A new `TileDeltaFrame` codec (`6`, VECTOR) and encode mode (`EncodeMode.VECTOR = 9`) that sends the whole camera frame as layered, gradient-filled vector shapes in **one fragment** per frame (197 B body at FHSS, 237 B at DTS): horizon + sky/ground gradients, polygons in measured colours, trees as ellipses, edge lines, persistent shape IDs, a CAD self-model of the hood at the base. It is a floor below `mono_g4` in coverage per fragment, with no keyframe trains, so it cannot feed the FHSS keyframe storm (RS-12.12/12.14). Blocker IDs match [VECTOR_SCENE.md §10](VECTOR_SCENE.md#10-prerequisites-and-blockers).
+
+**Phase 0 — decisions**
+
+- [ ] OSE sign-off on D-VS1 to D-VS9 (D-VS3/D-VS3a withdrawn)
+
+**Phase 1 — SIL + Vector Lab on the base website** (needs no radio)
+
+- [ ] Shared pure-stdlib codec `base_station/image_pipeline/vector_scene/` (`codec.py`, `scene_state.py`, `extract.py`, `selfmask.py`, `self_model_geom.py`)
+- [ ] `opencv-python-headless` in `base_station/requirements-dev.txt` (numpy landed with #130) so CI runs `test_vector_encoder.py` and the Lab tests instead of skipping them
+- [ ] `base_station/image_pipeline/vector_scene_store.py` and `self_model.py`
+- [ ] Snapshot keys `vector_scene`, `self_model`, `safety_detector`; populate `encode_mode` (never updated today, `state_publisher.py:45`)
+- [ ] `web/img/vector_renderer.js` + `self_model_overlay.js` on their own overlay canvases (never on `#image-canvas`: `source_guard.js` samples it); badges 7 `VECTOR` / 8 `MODEL` in `badge_renderer.js`
+- [ ] Vector Lab: `/vector_lab` page, `/api/vector_lab/*`, `vector_lab` sidecar worker, `tools/feed_canvas.py` on `lab/*` topics, bounded hand-drawn self-mask
+- [ ] **B2** `EncodeMode.VECTOR = 9` in `lora_proto.py` (`RAWSTREAM = 8` landed in #131, 2026-09-24); **B3** codec-6 branch in `frame_format.parse_tile_delta_frame` / `encode_tile_delta_frame`; **B7** `x8_image_pipeline/register.py` sign and confidence (fix open in #130)
+- [ ] Degradation ladder V0–V3 (`VECTOR_SCENE.md` §4.5): frame-size / carousel / repeat / detail per level, loss from the VS frame `seq`, SNR margin from `RX_FRAME_URC`, level carried as the band of the `0x63` quality byte (one mapping, §4.5.4), tractor self-select from received-frame SNR and heartbeat silence (`LINK_HB` every 5 s of command silence; no silence-based step without it)
+- [ ] Tests: `test_vector_codec.py`, `test_vector_codec_fuzz.py`, `test_frame_format_vector.py`, `test_vector_encoder.py`, `test_register.py`, `test_vector_scene_store.py`, `test_vector_policy_sil.py`, `test_vector_degradation_sil.py`, `test_self_model_sil.py`, `test_web_ui_vector.py`, `test_vector_lab_routes.py`
+
+**Phase 2 — strict-path integration + bench legs**
+
+- [ ] `camera_service.py`: mode 9 in `_ENCODE_MODE_IMPLEMENTED`, `_ENCODE_MODE_CODEC[9] = 6`, branch at the `_build_frame` call to `x8_image_pipeline/encode_vector.py`, quality byte → detail level
+- [ ] `image_rx_daemon.py`: `_CODEC_NAMES[6]`, accept modes 8/9
+- [ ] `web_ui.py`: route codec-6 frames to the store; gate `_tile_stale_worker` off while the received codec is 6; `"vector"` in `_ENCODE_MODE_UI_CHOICES` and the cycle order; `settings.html`
+- [ ] **B1** deploy the daemons in the stock compose/systemd config (RS-4.8); **B6** declare numpy/OpenCV in the tractor image
+- [ ] **B4** D-VS6 encode floor in `AutoRadioPolicy` (lock loss now; loss-driven once the RS-12.20 gap detector lands); D-VS6b tractor self-select; **B5** AE/AWB lock
+- [ ] Bench legs `bench-evidence/RS_13_vector_scene_<date>/RESULTS.md`: camera workload, p2 then p1, scored on frames published, fragment loss, command delivery and time-to-first-picture against `mono_g4`; storm signature on FHSS must be absent
+- [ ] Range-edge leg with the RF attenuator (3 dB steps): level reached, VS frames/s and command delivery per step, against `mono_g4`; first field-range data for the campaign (`VECTOR_SCENE.md` §8.6)
+
+**Phase 3 — self-model**
+
+- [ ] `DESIGN-STRUCTURAL/openscad/export_viz_bodies.scad` + `tools/build_self_model.py` → `web/models/self_model_v25.json` (visualisation only)
+- [ ] Camera bracket in CAD; lock the varifocal zoom; `CALIBRATION.md` §6 intrinsics/extrinsics (ChArUco + `solvePnP`, ≤ 2 px); **B9**
+- [ ] Arm pivot hall sensor on Opta AI6 (D-VS5), polled at ≥ 20 Hz and forwarded to the X8
+- [ ] Structural self-mask anomaly test; arm-only dynamic mask; bucket never masked
+
+**Phase 4 — optimise**
+
+- [ ] Ground-plane homography, EDPF edges, closed-form L4 / Delaunay detail, diffusion-curve rendering, range coding, optional `.glb` + vendored three.js
+- [ ] Cross-frame XOR parity for VS frames (§4.5.5), after a bench leg shows it earns its airtime
+
+**Radio — coordinated modem-rung switch (D-VS8; spec in [VECTOR_SCENE.md §4.6](VECTOR_SCENE.md#46-coordinated-modem-rung-change-the-d-vs8-protocol))**
+
+- [ ] **Gate:** RS-7/RS-8 authentication of the `0xFB` command path before `RUNG_REQ`/`RUNG_CONF` are honoured over the air — a rung change moves the receiver, so an unauthenticated one is a link-disruption command (D-VS8 cons); until then this whole checklist is bench-only
+
+- [ ] **L072:** `CFG_KEY_MODEM_RUNG` (SF7/8/9 within the active profile) applied through `sx1276_set_sf_bw_cr_checked()` with the airtime invariant and the legal-dwell accountant; scheduled apply at `{epoch, hop_idx}` (FHSS) or `delay_ms` (DTS); rung as an additive schema-2 hop-header field (not in `profile_id`'s spare bits, which schema-1 parsers would reject); rendezvous beacon (12 B `RUNG_HELLO` on the slowest rung's fixed rendezvous channel every 10 s; a full-hop-set sweep when deaf); rung-aware cold-start scan (park on the rendezvous channel first); `bench/host_proto` vectors for the key, the schema-2 field, the scheduled apply and legal dwell at SF9
+- [ ] **Base (`lora_proto.py`, `image_rx_daemon.py`, `web_ui.py`):** opcodes `0x6D RUNG_REQ`, `0x6E RUNG_ACK` (with `status`), `0x6F RUNG_CONF`, `0x70 RUNG_HELLO` (alternating slots), `0x71 LINK_HB`; every base copy 1.0 s apart through the shared command gate; the flow (apply instant carried in `RUNG_CONF`, per-copy DTS delay, lease on the new rung), `T_conf` 10 s / `T_revert` 5 s (600 ms once the drive plane is on air) / `T_lease` 15 s / `T_cool` 60 s / `T_hb` 5 s / `T_deaf` 10 s; parked rendezvous listening when deaf; rung ladder in `AutoRadioPolicy` (down at < 3 dB margin for 2 windows with the vector ladder at V2 and the tractor stopped; up after 6 windows; profile switch resets the rung); "rung" chip beside the profile selector; audit events
+- [ ] **Tractor (`image_tx_daemon.py`, `camera_service.py`):** ACK/HELLO handling (own slots, lease), scheduled apply, `tractor/link_budget` republished per rung, retained `tractor/link_rx` status (last command heard, SNR, rung, queue depth) for `camera_service`, the beacon sweep when deaf, `T_deaf` 60 s rendezvous fallback (12 missed heartbeats; bench-only until D-VS9)
+- [ ] **SIL:** `test_rung_switch_sil.py` modelled on `test_link_tune_sil.py`: every failure row of §4.6.8 including the lost-reply sequence (converges within `T_revert` + `T_lease`), timers counted from the apply instant and the 1.0 s gate, hysteresis, no request while moving, budget update after a switch, schema-2 header field round trip
+- [ ] **Bench legs:** (1) switch leg at each rung pair, scored on proven-switch time and frames lost during the switch; (2) rendezvous leg (park one board mid-session; re-found within `T_deaf` + 10.5 s); (3) the range-edge attenuator walk-down with rung changes allowed
+
+**Control plane (D-VS9):** revive firmware Batch 2 (reserved control slot, mute gate, skip/ditto) sized per rung, and fix the FHSS reverse direction (reserved reverse slot or base clock authority) before the drive plane ships; see `VECTOR_SCENE.md` §7.4.
+
+**Field-use preconditions carried from the design:** **B8** a tractor-side person detector (both NanoDet backends return `[]`); **B11** the hydraulic drive plane (RS-9) with the D-VS4 speed cap; **B10** base → tractor command delivery on FHSS.
+
+
 ## Phase 0 — Hardware procurement & shop setup
 
 ### Tractor node hardware
@@ -3762,9 +3821,9 @@ Lives in `base_station/web_ui/static/img/`. Capability floor = WebGL 2 + Canvas 
 - [ ] `image_pipeline/detect_yolo.py` — **independent base-side safety detector (R6, two-detector pattern)**; CPU path = YOLOv8-nano OR NanoDet-Plus per AGPL decision, Coral path = YOLOv8-medium. **Two-detector disagreement banner in UI** when tractor `0x26` and base detectors disagree on a high-confidence object; log to §8.10 logger for v26 retraining
   - [ ] **OPEN SCOPE DECISION O1 — AGPL stance** on Ultralytics YOLOv8 (AGPL-3.0) vs. NanoDet-Plus (Apache-2.0). **Deadline: before week 6.** Default if undecided: NanoDet-Plus, accept ~5 % accuracy reduction. See [IMAGE_PIPELINE.md §10](IMAGE_PIPELINE.md)
 - [ ] **`image_pipeline/motion_replay.py`** — apply `0x28` motion vectors to existing canvas; sets `Predicted` badge (Q degraded mode)
-- [ ] **`image_pipeline/wireframe_render.py`** — render `0x29` wireframe over canvas; sets `Wireframe` overlay (P extreme degraded mode)
+- [ ] **`image_pipeline/wireframe_render.py`** — render `0x29` wireframe over canvas; sets `Wireframe` overlay (P extreme degraded mode). *Dead code on the strict path; the proposed replacement is the vector scene mode, RS-13.*
 - [ ] **Tractor-side `encode_motion.py`** — optical-flow microframe encoder for topic `0x28`
-- [ ] **Tractor-side `encode_wireframe.py`** — PiDiNet edge encoder for topic `0x29`
+- [ ] **Tractor-side `encode_wireframe.py`** — PiDiNet edge encoder for topic `0x29`. *Dead code; see RS-13.*
 - [ ] **OPEN SCOPE DECISION O2 — Coral on the v25 BOM** — order it for the spike, or skip entirely? **Deadline: before week 5** (Phase-0 spike must complete by then). Default if undecided: ship CPU-only Stack-NoCoral as primary; Coral added in v25.5 if a later spike succeeds. See [IMAGE_PIPELINE.md §10](IMAGE_PIPELINE.md)
 - [ ] `image_pipeline/interp_rife.py` *(optional, Coral-only)* — RIFE frame interpolation between thumbnail arrivals; under `Enhanced` badge
 - [ ] `image_pipeline/inpaint_lama.py` *(optional, Coral-only)* — LaMa-Fourier fill of stale tiles; under `Synthetic` badge; opt-in only
