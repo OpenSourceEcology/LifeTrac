@@ -282,7 +282,13 @@ def _write_v0(w: BitWriter, x: int, y: int, grid: int) -> None:
 
 def _read_v0(r: BitReader, grid: int) -> tuple[int, int]:
     if grid == 0:
-        return r.read(6), r.read(5)
+        x, y = r.read(6), r.read(5)
+        if x > 47:
+            # x6 codes 48..63 are outside the 48-cell grid (§3.3); the
+            # writer refuses them, so a reader must too rather than hand
+            # the store an off-canvas anchor.
+            raise VsDecodeError("bad_coord", f"x={x} on the 8 px grid")
+        return x, y
     return r.read(7) - 16, r.read(6)
 
 

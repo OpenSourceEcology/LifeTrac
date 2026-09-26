@@ -89,6 +89,13 @@
     #image-fade {
       pointer-events: none !important;
     }
+    /* The vector scene stacks above the pixel-only overlays (fade, staleness,
+       badges, detections), which are created later and would otherwise paint
+       their frozen-tile ages and RAW badges over the fail-closed black scene
+       and its banner (VECTOR_SCENE.md §7.5). */
+    #image-vector {
+      z-index: 5 !important;
+    }
     #image-meta {
       position: absolute;
       top: 12px; left: 50%; transform: translateX(-50%);

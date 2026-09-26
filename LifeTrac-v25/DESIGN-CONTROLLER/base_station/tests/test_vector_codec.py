@@ -319,6 +319,8 @@ class RejectionTests(unittest.TestCase):
         self.assertEqual(self.reason(bits(hdr + "1011 0000000 1")), "id_zero")
         # EG2 with five leading zeros inside an INSERT
         self.assertEqual(self.reason(bits(hdr + "111111 0000 0000111 0010 01 000001000000 100")), "eg2_overflow")
+        # TREE with an 8 px-grid x code of 48 (reserved: the grid is 0..47)
+        self.assertEqual(self.reason(bits(hdr + "011 0101000 110000 00011 001 010 0 0011 0 0")), "bad_coord")
         # CONFIRM range running past id 127
         self.assertEqual(self.reason(bits(hdr + "111111 0001 1111111 0001 11 00 00")), "bad_id")
 

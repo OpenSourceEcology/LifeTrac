@@ -180,7 +180,7 @@ class _L0State:
 class _Cand:
     slot: int                       # §4.2 priority slot
     order: tuple                    # ascending within the slot
-    record: object
+    record: object                  # a codec record, or the (anchor, LAYER_CLEAR) tuple of an epoch start
     bits: int
     apply: Callable[[], None]       # mutates the mirror when the record is packed
     mentions: tuple = ()            # ids the record names (no CONFIRM for those)
@@ -222,6 +222,11 @@ def _bits_layer(rec) -> str:
     if isinstance(rec, vs.Blob):
         return "L4"
     return "ctrl"
+
+
+def _records_of(c: "_Cand") -> tuple:
+    """A candidate's records: one, or the indivisible anchor + LAYER_CLEAR pair."""
+    return c.record if isinstance(c.record, tuple) else (c.record,)
 
 
 class VectorEncoder:
@@ -624,20 +629,21 @@ class VectorEncoder:
         cands: list = []
         hzn, l0_state = self._horizon_records(hz, key, level, clear)
         anchor_cand = None
-        for i, rec in enumerate(hzn):                        # anchor + LAYER_CLEAR: slot 1; RESID/ABS: slot 3
-            if i > 0:
-                apply = lambda: None
-            elif key:                                        # the epoch start commits the epoch
+        if len(hzn) == 2:
+            # An epoch start, or its repeat-once, is the anchor + LAYER_CLEAR as
+            # ONE candidate: the base switches epochs on the anchor and drops
+            # the cleared layers at hand-over by the clear range (§3.3, §3.5),
+            # so a frame carrying one without the other would switch without
+            # the clear. Both go, or neither and the attempt stays pending.
+            if key:                                          # the epoch start commits the epoch
                 apply = lambda: (self._commit_epoch(clear, level, now), self._set_l0(l0_state))
-            elif len(hzn) == 2:                              # its repeat
+            else:                                            # its repeat
                 apply = lambda: (self._spend_anchor_repeat(), self._set_l0(l0_state))
-            else:
-                apply = lambda: self._set_l0(l0_state)
-            # LAYER_CLEAR rides with its anchor: if the anchor does not fit, neither goes.
-            needs = cands[-1] if (len(hzn) == 2 and i == 1) else None
-            cands.append(_Cand(1 if len(hzn) == 2 else 3, (i,), rec, vs.record_bits(rec), apply, needs=needs))
-            if i == 0 and key:
+            cands.append(_Cand(1, (0,), tuple(hzn), sum(vs.record_bits(r) for r in hzn), apply))
+            if key:
                 anchor_cand = cands[-1]
+        elif hzn:                                            # RESID / mid-epoch ABS, or the V3 beacon: slot 3
+            cands.append(_Cand(3, (0,), hzn[0], vs.record_bits(hzn[0]), lambda: self._set_l0(l0_state)))
         if self._gain_next != base_gain or (key and self._gain_next != GAIN_NEUTRAL):
             gain = vs.Gain(*self._gain_next)             # absolute since the epoch start (§3.3)
             cands.append(_Cand(3, (9,), gain, vs.record_bits(gain), lambda: setattr(self, "_gain", self._gain_next)))
@@ -665,7 +671,7 @@ class VectorEncoder:
         for c in packed:
             c.apply()
         mentioned = {id_ for c in packed for id_ in c.mentions}
-        records = [c.record for c in packed]
+        records = [r for c in packed for r in _records_of(c)]
         if level < 3 and (not key or self._committed):       # CONFIRM and DIGEST describe the epoch's mirror
             unmentioned = [i for i in sorted(verified) if i not in mentioned and i in self._shapes]
             for rec in self._confirm_records(unmentioned):
@@ -690,7 +696,8 @@ class VectorEncoder:
         stats = {"epoch": epoch_no, "epoch_start": key, "f_bytes": f_bytes, "body_bytes": len(body),
                  "record_bits": used + vs.HEADER_BITS, "bits": bits, "records": counts,
                  "n_candidates": len(cands), "n_packed": len(packed), "carousel_bits": carousel_bits,
-                 "candidates": [(c.slot, type(c.record).__name__, c.bits, c.order, id(c) in packed_ids)
+                 "candidates": [(c.slot, "+".join(type(r).__name__ for r in _records_of(c)), c.bits, c.order,
+                                 id(c) in packed_ids)
                                 for c in cands]}
         return body, records, stats
 
@@ -1000,10 +1007,12 @@ class VectorEncoder:
 
     @staticmethod
     def _pack(cands: list, total_bits: int, reserve: int, carousel_bits: int) -> tuple:
-        """Greedy fill in §4.2 order; never splits a record, and never packs a
-        candidate whose ``needs`` (LAYER_CLEAR's anchor) was not packed. The
-        CONFIRM + DIGEST reserve binds slots ≥ 5 only, so the anchor and
-        STATUS always go first; the carousel (slot 7) has its own cap."""
+        """Greedy fill in §4.2 order; never splits a candidate (a record, or
+        the indivisible anchor + LAYER_CLEAR pair of an epoch start), and
+        never packs one whose ``needs`` (the epoch start, on a key attempt)
+        was not packed. The CONFIRM + DIGEST reserve binds slots ≥ 5 only, so
+        the anchor and STATUS always go first; the carousel (slot 7) has its
+        own cap."""
         cands.sort(key=lambda c: (c.slot, c.order))
         used = 0
         car_used = 0

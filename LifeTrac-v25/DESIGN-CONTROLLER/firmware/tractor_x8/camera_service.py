@@ -110,6 +110,10 @@ TARGET_FPS        = _env_float("LIFETRAC_CAMERA_FPS", 2.0, lo=0.1)
 # IP-208: clamp WEBP quality to a sensible range so a typo can't disable
 # the encoder entirely (1 would skip the in-loop guard) or push past lossless.
 WEBP_QUALITY      = _env_int("LIFETRAC_WEBP_QUALITY", 55, lo=20, hi=100)
+# VECTOR mode's own dial (VECTOR_SCENE.md §6): the 0x63 quality byte of a
+# mode-9 command lands here, never in WEBP_QUALITY, so leaving VECTOR gets
+# the tile quality back without a quality byte. 1..100; 60-100 is band V0.
+VECTOR_DETAIL     = _env_int("LIFETRAC_VECTOR_DETAIL", 80, lo=1, hi=100)
 SOURCE            = os.environ.get("LIFETRAC_CAMERA_SOURCE", "libcamera")
 MQTT_HOST         = os.environ.get("LIFETRAC_MQTT_HOST", "localhost")
 
@@ -895,7 +899,7 @@ def _build_vector_frame(canvas: bytes, force_epoch: bool,
     budget = byte_budget if (byte_budget is not None and byte_budget > 0) else 203
     _VECTOR_SEQ = (_VECTOR_SEQ + 1) & 0xFF
     return _VECTOR_ENCODER.frame(rgb, budget, epoch_start=force_epoch,
-                                 quality=WEBP_QUALITY, seq=_VECTOR_SEQ)
+                                 quality=VECTOR_DETAIL, seq=_VECTOR_SEQ)
 
 
 def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
@@ -1292,7 +1296,7 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
     on the very next frame). ``None`` keeps the current quality.
     """
     effective = _clamp_encode_mode(raw_mode)
-    global ENCODE_MODE, WEBP_QUALITY  # noqa: PLW0603
+    global ENCODE_MODE, WEBP_QUALITY, VECTOR_DETAIL  # noqa: PLW0603
     mode_changed = (effective != ENCODE_MODE)
     ENCODE_MODE = effective
     if quality is not None:
@@ -1304,7 +1308,14 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
             q = max(lo, min(100, int(quality)))
         except (TypeError, ValueError):
             q = None
-        if q is not None:
+        if q is not None and effective == ENCODE_MODE_VECTOR:
+            # The vector detail is its own dial (VECTOR_SCENE.md §6): a mode-9
+            # command never touches the tile modes' WebP quality.
+            if q != VECTOR_DETAIL:
+                LOG.info("camera_service: vector detail %s -> %d [%s]",
+                         VECTOR_DETAIL, q, source)
+            VECTOR_DETAIL = q
+        elif q is not None:
             if q != WEBP_QUALITY:
                 LOG.info("camera_service: quality %s -> %d [%s]",
                          WEBP_QUALITY, q, source)
@@ -1342,8 +1353,10 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
                 "codec": _ENCODE_MODE_CODEC.get(effective, 0),
                 # Effective quality after clamping — lets the base UI show
                 # what the encoder is actually running, and diverges from
-                # the request when the [20,100] clamp bites.
-                "quality": WEBP_QUALITY,
+                # the request when the clamp bites. VECTOR reports its own
+                # dial (the base's ack matcher compares the byte it sent).
+                "quality": (VECTOR_DETAIL if effective == ENCODE_MODE_VECTOR
+                            else WEBP_QUALITY),
                 "source": source,
                 "ts": round(time.time(), 1),
             }

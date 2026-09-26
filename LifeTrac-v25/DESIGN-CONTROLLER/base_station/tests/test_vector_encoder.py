@@ -534,6 +534,125 @@ class TemporalTests(unittest.TestCase):
         self.assertEqual(d.header.epoch, 1)
         self.assertEqual(enc.epoch, 1)
 
+    def test_no_horizon_epoch_start_is_anchor_and_clear_or_nothing(self):
+        # A NO_HORIZON epoch start whose two palette vfills make the anchor 24
+        # bits: at 12 B (F − 1 = 5 B = 27 record bits) the anchor alone would
+        # fit and LAYER_CLEAR(0) (12 bits) would not. They are one candidate,
+        # so neither goes, nothing commits and K stays 1; at 13 B (35 bits)
+        # only STATUS rides; the first frame that fits both commits once, and
+        # a fresh store gets the clear range together with the switch.
+        from image_pipeline.frame_format import parse_tile_delta_frame
+        from image_pipeline.vector_scene_store import VectorSceneStore
+        soil = tuple(int(v) for v in vx.rgb444_to_rgb8(vs.STATIC_PALETTE[5]))   # (119, 85, 51): slot 5 exactly
+        img = scene(y0=-40.0, ground=soil)
+        enc = ev.VectorEncoder()
+        f1 = enc.frame(img, 12, seq=0)
+        self.assertEqual(f1[0], 1)
+        d1 = decode(f1)
+        self.assertTrue(d1.header.key)
+        self.assertEqual(d1.records, ())
+        st = enc.last_stats
+        self.assertFalse(st["epoch_committed"])
+        self.assertEqual(st["epoch_pending"], 0)
+        self.assertEqual(enc.epoch, 0)
+        group = [c for c in st["candidates"] if c[0] == 1]
+        self.assertEqual(len(group), 1)
+        self.assertEqual(group[0][1], "HznNoHorizon+LayerClear")
+        record_bits = st["f_bytes"] * 8 - vs.HEADER_BITS
+        self.assertEqual(record_bits, 27)
+        self.assertGreater(group[0][2], record_bits)                              # the pair does not fit ...
+        self.assertLessEqual(group[0][2] - vs.record_bits(vs.LayerClear(0)), record_bits)   # ... the anchor alone would
+        self.assertFalse(group[0][4])
+        f2 = enc.frame(img, 13, seq=1)
+        d2 = decode(f2)
+        self.assertTrue(d2.header.key)
+        self.assertEqual([type(r) for r in d2.records], [vs.Status])
+        self.assertFalse(enc.last_stats["epoch_committed"])
+        self.assertEqual(enc.epoch, 0)
+        f3 = enc.frame(img, BUDGET, seq=2)
+        d3 = decode(f3)
+        self.assertTrue(d3.header.key)
+        self.assertEqual(d3.header.epoch, 0)
+        self.assertIsInstance(d3.records[0], vs.HznNoHorizon)
+        self.assertEqual(d3.records[1], vs.LayerClear(0))
+        self.assertTrue(enc.last_stats["epoch_committed"])
+        self.assertEqual(enc.epoch, 0)
+        f4 = enc.frame(img, BUDGET, seq=3)
+        self.assertEqual(f4[0], 0)
+        self.assertEqual(decode(f4).header.epoch, 0)
+        store = VectorSceneStore(CW, CH)
+        for i, fb in enumerate((f1, f2, f3)):
+            p = parse_tile_delta_frame(fb)
+            store.ingest(p.vector_body, p.frame_kind, 1000 + 500 * i, 0.0)
+            if i < 2:
+                snap = store.snapshot(1100 + 500 * i)
+                self.assertTrue(snap is None or snap["anchor_age_ms"] is None)   # nothing to anchor to yet
+        snap = store.snapshot(2100)
+        self.assertIsNotNone(snap)
+        self.assertEqual(snap["horizon"]["mode"], "none")                     # NO_HORIZON ...
+        self.assertIsNotNone(snap["anchor_age_ms"])                           # ... but anchored
+        self.assertEqual(snap["epoch"], 0)
+        self.assertTrue(snap["digest_ok"])
+        self.assertEqual(store.stats["frames_bad"], 0)
+        # The store keeps the epoch start's clear range for the hand-over (§3.3).
+        self.assertEqual(store._epoch_clear, 0)
+
+    def test_atomic_epoch_start_drops_the_cached_shapes_at_the_store(self):
+        # The consequence at the base: epoch 0 holds three trees; the camera
+        # tilts down (NO_HORIZON) and a new epoch is forced while the budget
+        # is 12 B. Attempt B (the flip still unconfirmed: an ABS anchor, too
+        # big) and attempt C (NO_HORIZON: the 24-bit anchor alone would have
+        # fit) both stay pending; D commits with LAYER_CLEAR(0), so the
+        # store's hand-over drops the cached trees instead of carrying them
+        # into an epoch whose DIGEST says n_live = 0.
+        from image_pipeline.frame_format import parse_tile_delta_frame
+        from image_pipeline.vector_scene_store import VectorSceneStore
+        soil = tuple(int(v) for v in vx.rgb444_to_rgb8(vs.STATIC_PALETTE[5]))
+        trees = scene(blobs=[(20, 44, 4, GREEN), (50, 40, 4, GREEN), (80, 48, 4, GREEN)])
+        down = scene(y0=-40.0, ground=soil)
+        enc = ev.VectorEncoder()
+        store = VectorSceneStore(CW, CH)
+
+        def send(fb, t):
+            p = parse_tile_delta_frame(fb)
+            return store.ingest(p.vector_body, p.frame_kind, t, 0.0)
+
+        fa = enc.frame(trees, BUDGET, seq=0)
+        self.assertTrue(send(fa, 1000).applied)
+        self.assertEqual(sum(len(l["shapes"]) for l in store.snapshot(1100)["layers"]), 3)
+        enc.force_epoch()
+        fb = enc.frame(down, 12, seq=1)                       # B: flip unconfirmed, ABS anchor: too big
+        self.assertEqual(fb[0], 1)
+        self.assertEqual(enc.epoch, 0)
+        self.assertFalse(enc.last_stats["epoch_committed"])
+        send(fb, 1500)
+        fc = enc.frame(down, 12, seq=2)                       # C: NO_HORIZON, the anchor alone would fit
+        self.assertEqual(fc[0], 1)
+        self.assertEqual(enc.epoch, 0)
+        self.assertFalse(enc.last_stats["epoch_committed"])
+        group = [c for c in enc.last_stats["candidates"] if c[0] == 1]
+        self.assertEqual(group[0][1], "HznNoHorizon+LayerClear")
+        self.assertLessEqual(group[0][2] - vs.record_bits(vs.LayerClear(0)), 27)
+        self.assertEqual(decode(fc).records, ())
+        send(fc, 2000)
+        self.assertTrue(store.snapshot(2100)["handover"])     # the old epoch waits as CACHED
+        fd = enc.frame(down, BUDGET, seq=3)                   # D: anchor + LAYER_CLEAR(0) commit
+        dd = decode(fd)
+        self.assertTrue(dd.header.key)
+        self.assertEqual(dd.header.epoch, 1)
+        self.assertIsInstance(dd.records[0], vs.HznNoHorizon)
+        self.assertEqual(dd.records[1], vs.LayerClear(0))
+        self.assertEqual(records_of(dd, vs.Digest)[0].n_live, 0)
+        self.assertEqual(enc.epoch, 1)
+        self.assertTrue(send(fd, 2500).applied)
+        snap = store.snapshot(2600)
+        self.assertFalse(snap["handover"])
+        self.assertEqual(snap["epoch"], 1)
+        self.assertEqual(sum(len(l["shapes"]) for l in snap["layers"]), 0)   # dropped by the clear, not carried
+        self.assertTrue(snap["digest_ok"])
+        self.assertEqual(store.stats["handovers"], 1)
+        self.assertEqual(store.stats["orphans"], 0)
+
     def test_carousel_frame_every_fourth_at_v0(self):
         enc = ev.VectorEncoder()
         sizes = []

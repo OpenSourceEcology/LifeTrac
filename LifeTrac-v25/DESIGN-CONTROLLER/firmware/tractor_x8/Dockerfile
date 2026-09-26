@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     mosquitto-clients \
     libusb-1.0-0 \
     ffmpeg \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies

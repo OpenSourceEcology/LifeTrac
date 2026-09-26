@@ -180,10 +180,17 @@
         if (!outlineOnly) { ctx.fillStyle = fillStyleFor(s.fill, opts); ctx.fill(); }
         ctx.strokeStyle = strokeCol; ctx.lineWidth = 0.75; ctx.stroke();
         if (s.k === 'tree' && s.trunk && typeof s.trunk.h === 'number' && s.trunk.h > 0) {
-          // store emits {w, h, c0}: a bar of w px below the ellipse in the shadow slot
+          // store emits {w, h, c0}: a bar of w px below the ellipse in the shadow slot;
+          // it follows the same age rule as the ellipse (outline only past 10 s)
           const tw = s.trunk.w || 4;
-          ctx.fillStyle = desaturate ? desat(s.trunk.c0 || '#223') : (s.trunk.c0 || '#223');
-          ctx.fillRect(s.cx - tw / 2, s.cy + s.ry, tw, s.trunk.h);
+          const tc = desaturate ? desat(s.trunk.c0 || '#223') : (s.trunk.c0 || '#223');
+          if (outlineOnly) {
+            ctx.strokeStyle = strokeCol; ctx.lineWidth = 0.75;
+            ctx.strokeRect(s.cx - tw / 2, s.cy + s.ry, tw, s.trunk.h);
+          } else {
+            ctx.fillStyle = tc;
+            ctx.fillRect(s.cx - tw / 2, s.cy + s.ry, tw, s.trunk.h);
+          }
         }
         break;
       }
