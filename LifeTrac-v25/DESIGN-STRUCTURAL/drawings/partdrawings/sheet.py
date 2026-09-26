@@ -302,9 +302,18 @@ def draw_hole_tags(c, rows):
     c.restoreState()
 
 
+HOLE_ROW_H = 8.4
+
+
+def hole_table_capacity(y_top, y_min, rh=HOLE_ROW_H):
+    """Rows draw_hole_table() fits between y_top and y_min, below its title
+    (12) and header row.  plan_part() counts sheets with the same rule."""
+    return max(0, int(math.floor((y_top - 12 - rh - y_min) / rh + 1e-9)))
+
+
 def draw_hole_table(c, rows, x, y_top, w, y_min, title="HOLE TABLE"):
     """Draw as many rows as fit; return the rows that did not fit."""
-    rh, fs = 8.4, 6.0
+    rh, fs = HOLE_ROW_H, 6.0
     cols = [("TAG", 0.10), ("VIEW", 0.12), ("X", 0.21), ("Y", 0.21), ("SIZE", 0.36)]
     c.saveState()
     c.setFont("Helvetica-Bold", 7)
@@ -324,9 +333,7 @@ def draw_hole_table(c, rows, x, y_top, w, y_min, title="HOLE TABLE"):
     c.setFont("Helvetica", fs)
     c.setLineWidth(0.25)
     shown = 0
-    for r in rows:
-        if y - rh < y_min:
-            break
+    for r in rows[:hole_table_capacity(y_top, y_min, rh)]:
         vals = [r["tag"], r["view"].upper(), fmt_dual(r["x"]), fmt_dual(r["y"]), hole_size_text(r)]
         cx = x
         for (name, frac), val in zip(cols, vals):

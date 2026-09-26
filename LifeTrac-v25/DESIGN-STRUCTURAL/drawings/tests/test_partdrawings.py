@@ -9,6 +9,7 @@ import math
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import numpy as np
@@ -16,7 +17,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from partdrawings import sheet as S  # noqa: E402
-from partdrawings.drawing import plan_part, render_part  # noqa: E402
+from partdrawings.drawing import draw_part, plan_part, render_part  # noqa: E402
 from partdrawings.hlr import detect_circles, draw_view  # noqa: E402
 from partdrawings.mesh import Mesh, normalize  # noqa: E402
 import generate_part_drawings as G  # noqa: E402
@@ -216,6 +217,37 @@ class SheetTests(unittest.TestCase):
         self.assertFalse(res["holes"][0]["drill"])  # Ø20 > 12.7 thick: plasma is fine
         self.assertTrue(buf.getvalue().startswith(b"%PDF"))
 
+    def test_sheet_count_matches_pages_drawn(self):
+        # Fill the hole table to just below, at and just above a full first
+        # sheet and a full continuation sheet; "SHEET n OF m" must match the
+        # pages actually drawn.
+        from reportlab.pdfgen import canvas
+
+        mesh, _, _ = normalize(Mesh(washer(R=50, r=10, t=12.7)))
+        opts = {"hidden_lines": False}
+        info = dict(project="TEST", id="P99", name="Many holes", stock="PL", category="plate", qty="1",
+                    qty_note="", process="-", finish="-", size_label="SIZE", size="-", mass="-",
+                    geom_id="-", source="-", used_in="-", notes=[], rev="A", date="2026-01-01")
+        real = S.collect_holes
+
+        def plan_with(n):
+            def many(placed, **kw):
+                one = real(placed, **kw)
+                return [dict(one[0], tag="A%d" % (i + 1)) for i in range(n)]
+            with mock.patch.object(S, "collect_holes", many):
+                return plan_part(mesh, opts)
+
+        P = plan_with(1)
+        g = P["g"]
+        first = S.hole_table_capacity(P["table_top"], g.right_box[1] + 6)
+        per_sheet = P["cont_cols"] * S.hole_table_capacity(g.views_box[3] - 4, g.views_box[1] + 6)
+        for n in (first, first + 1, first + per_sheet, first + per_sheet + 1):
+            P = plan_with(n)
+            c = canvas.Canvas(io.BytesIO(), pagesize=S.PAPERS["letter"], invariant=1)
+            draw_part(c, mesh, P, info)
+            self.assertEqual(c.getPageNumber() - 1, P["n_sheets"], "rows=%d" % n)
+        self.assertEqual(P["n_sheets"], 3)
+
 
 class RevisionAndBookTests(unittest.TestCase):
     def test_book_page_numbers(self):
@@ -307,6 +339,13 @@ class SequenceCheckTests(unittest.TestCase):
             {"id": "b", "uses": ["sub"]},
             {"id": "c", "uses": ["sub"]}])
         self.assertTrue(any("sub-assembly sub is already installed in step 2" in e for e in errors), errors)
+
+    def test_missing_bom_is_an_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit):
+                SEQ.load_quantities(Path(tmp), {"bom": "missing.csv"}, self.PARTS)
+            qty, exact, _ = SEQ.load_quantities(Path(tmp), {}, {"P1": {"qty": 2}})  # no `bom:` key: optional
+        self.assertEqual((qty, exact), ({"P1": 2}, set()))
 
     def test_structure_errors(self):
         _, _, errors, _ = self.run_check([

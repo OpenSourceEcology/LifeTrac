@@ -40,8 +40,12 @@ def load_quantities(base, seq, parts):
     """Per-machine quantity, whether it is exact (counted in the model), and
     drawing path for every part id."""
     qty, exact, drawing = {}, set(), {}
-    bom = base / seq.get("bom", "")
-    if seq.get("bom") and bom.exists():
+    if seq.get("bom"):
+        bom = base / seq["bom"]
+        if not bom.exists():
+            # Without it no quantity counts as exact and over-use goes unchecked.
+            raise SystemExit("BOM %s not found - run DESIGN-STRUCTURAL/drawings/generate_part_drawings.py "
+                             "first, or remove `bom:` from the sequence file" % bom)
         with open(bom, newline="") as fh:
             for row in csv.DictReader(fh):
                 qty[row["id"]] = int(row["qty_per_machine"] or 0)

@@ -103,11 +103,12 @@ def plan_part(mesh, opts, paper="letter", category=None):
     x0r, y0r, x1r, y1r = g.right_box
     iso_h = (y1r - y0r) * (0.42 if rows else 0.62) if "iso" in views else 0
     table_top = y1r - iso_h - 4
-    rh = 8.4
-    first_fit = max(0, int((table_top - 12 - rh - (y0r + 6)) // rh))
+    # Same rule and the same boxes as draw_part() uses, so the "SHEET n OF m"
+    # count matches the pages actually drawn.
+    first_fit = S.hole_table_capacity(table_top, y0r + 6)
     rest = max(0, len(rows) - first_fit)
     cont_cols = 3
-    cont_fit = cont_cols * max(1, int(((ay1 - ay0) - 30) // rh))
+    cont_fit = cont_cols * max(1, S.hole_table_capacity(ay1 - 4, ay0 + 6))
     n_sheets = 1 + (-(-rest // cont_fit) if rest else 0)
 
     # Round outlines are polygons in the model, so a Ø38.1 pin measures 38.0

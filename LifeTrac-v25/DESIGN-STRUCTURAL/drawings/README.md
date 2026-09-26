@@ -50,8 +50,10 @@ assembly sequence (`BUILD-STRUCTURE/assembly_sequence.yaml`) or its checker
    ([`../../BUILD-STRUCTURE/assembly_sequence.py`](../../BUILD-STRUCTURE/assembly_sequence.py)).
 4. It uploads everything as the **`part-drawings` artifact**. That includes the
    one-file book `LifeTrac_v25_Part_Drawings.pdf`.
-5. **On `main` only**, it commits the updated `generated/` folder back with
-   `[skip ci]`.
+5. **On `main` only**, a separate job commits the updated `generated/` folder
+   back with `[skip ci]`. It takes the files from the artifact. The job that
+   runs the tests and the generator has read-only repository access, so code
+   in a pull request never gets a token that can push.
 
 The output is byte-for-byte reproducible, so the commit contains only the
 drawings that really changed. A drawing gets the next **revision letter**

@@ -33,12 +33,20 @@ concurrency:
   group: part-drawings-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only by default. Pull requests run code from the PR (tests, the
+# generator, OpenSCAD), so that job never gets a token that can write to the
+# repository; only the push-only `commit` job below does, and it runs no
+# project code - it just commits the drawings the first job uploaded.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   drawings:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.generate.outputs.code }}
     defaults:
       run:
         working-directory: LifeTrac-v25/DESIGN-STRUCTURAL/drawings
@@ -95,14 +103,41 @@ jobs:
             LifeTrac-v25/BUILD-STRUCTURE/ASSEMBLY_SEQUENCE.md
           retention-days: 90
 
-      - name: Commit updated drawings to main
-        if: >-
-          !cancelled() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-          && contains(fromJSON('["0", "2", "3"]'), steps.generate.outputs.code)
+      - name: Fail if the drawings reported problems
+        if: steps.generate.outcome == 'failure'
         run: |
+          echo "::error title=Part drawings::generate_part_drawings.py --strict reported warnings or failures - see the job summary (CHECKS.md)."
+          exit 1
+
+  # Main only: commit the drawings from the artifact back to main.
+  commit:
+    needs: drawings
+    if: >-
+      !cancelled() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+      && contains(fromJSON('["0", "2", "3"]'), needs.drawings.outputs.code)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # The artifact's root is LifeTrac-v25/ (the common parent of its paths).
+      # Clear generated/ first so drawings the generator removed stay removed.
+      - name: Replace generated files with the new drawings
+        run: rm -rf LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: part-drawings
+          path: LifeTrac-v25
+
+      - name: Commit updated drawings to main
+        run: |
+          test -f LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated/INDEX.md
+          test -f LifeTrac-v25/BUILD-STRUCTURE/ASSEMBLY_SEQUENCE.md
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add generated ../../BUILD-STRUCTURE/ASSEMBLY_SEQUENCE.md
+          git add -A LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated LifeTrac-v25/BUILD-STRUCTURE/ASSEMBLY_SEQUENCE.md
           if git diff --staged --quiet; then
             echo "Drawings unchanged."
             exit 0
@@ -113,10 +148,4 @@ jobs:
             sleep $((attempt * 5))
           done
           echo "Could not push the updated drawings; they are in the workflow artifact."
-          exit 1
-
-      - name: Fail if the drawings reported problems
-        if: steps.generate.outcome == 'failure'
-        run: |
-          echo "::error title=Part drawings::generate_part_drawings.py --strict reported warnings or failures - see the job summary (CHECKS.md)."
           exit 1
