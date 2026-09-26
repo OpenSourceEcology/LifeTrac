@@ -6,10 +6,13 @@ This file tracks the history of structural analysis test results.
 
 ## Latest Analysis
 
-**Date:** 2026-09-25 15:49:03 UTC
-**Commit:** 60e675a5cb2f1631be225bff6885a4d549a1d1ac
+**Date:** 2026-09-26 16:18:26 UTC
+**Commit:** 5585879db26717d658be34e356a99d6ed6b2dba1
 **Branch:** claude/dreamy-mccarthy-lpn9af
-**Workflow Run:** https://github.com/OpenSourceEcology/LifeTrac/actions/runs/36156648445
+**Workflow Run:** https://github.com/OpenSourceEcology/LifeTrac/actions/runs/36254945609
+
+> [!WARNING]
+> These checks still model an earlier design (a straight 3" x 3" arm, a 2" x 2" cross beam and 3/4" pivot rings), so the capacity and stress ratios below are not valid for the current model. Do not use them as a rated or safe working load. See finding B4 in the [2026-09-25 OpenSCAD review](../AI%20NOTES/CODE%20REVIEWS/2026-09-25_v25_OpenSCAD_Full_Review_Claude_v1_0.md).
 
 ### Results Summary
 
@@ -33,7 +36,7 @@ This file tracks the history of structural analysis test results.
 
 ### ⚠️ Failed Components
 
-**Current Rated Capacity:** 3305.74, "kg (", 7289.16, "lbs)"
+**Hydraulic lift capacity used as the design load (not a rated capacity):** 3305.74, "kg (", 7289.16, "lbs)"
 
 #### Detailed Failure Analysis
 
