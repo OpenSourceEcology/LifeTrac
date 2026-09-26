@@ -7,7 +7,7 @@
 
 ### Status: fixed alongside this review
 
-The body of this review describes the tree as it was on 2026-09-25. The pull request that adds this document also fixes the following mechanical defects. Each fix was verified locally with OpenSCAD 2021.01; the details are in the commit messages.
+The body of this review describes the tree as it was on 2026-09-25. A closer look at the structural analysis on 2026-09-26 added the method errors in B4, the load check in P3, the new finding P14 and Appendix C; those passages are marked *(added 2026-09-26)*. The pull request that adds this document also fixes the following mechanical defects. Each fix was verified locally with OpenSCAD 2021.01; the details are in the commit messages.
 
 | Finding | Fix |
 |---|---|
@@ -68,14 +68,15 @@ CI either never compiles these files or swallows their warnings (`generate-jig-p
 
 The model is ambitious and, in places, excellent: the parametric arm solver, the bucket-cylinder parallelism limiter, the UTU chain-pitch snapping (which closes to 0.00 mm pitch error) and the new collision-check tooling (issue #119) are all strong work. But the code has three structural problems that now produce wrong numbers, not just messy code:
 
-1. **The analysis layer has drifted away from the geometry.** The solvers and the structural/stability checks still use the parameters of an earlier machine: a straight 3"×3" arm, a 500 mm wheel on a 1,400 mm wheelbase, 3/4" pivot rings, and a 2"×2" cross beam. The rendered machine has an L-shaped 2"×6" arm, a 617 mm tyre on a 750 mm wheelbase, a bolted pivot mount, and a 2"×6" cross beam. So the printed "RATED LIFT CAPACITY 3,305 kg" and the four structural `FAIL`s describe a machine that isn't the one being drawn (B3, B4, B5).
+1. **The analysis layer has drifted away from the geometry.** The solvers and the structural/stability checks still use the parameters of an earlier machine: a straight 3"×3" arm, a 500 mm wheel on a 1,400 mm wheelbase, 3/4" pivot rings, and a 2"×2" cross beam. The rendered machine has an L-shaped 2"×6" arm, a 617 mm tyre on a 750 mm wheelbase, a bolted pivot mount, and a 2"×6" cross beam. So the printed "RATED LIFT CAPACITY 3,305 kg" and the four structural `FAIL`s describe a machine that isn't the one being drawn (B3, B4, B5). The analysis also has method errors of its own: it applies the safety factor twice, treats the pinned arm as a cantilever, and leaves the cylinder force out of the pivot-pin load (B4).
 2. **The same quantity is defined in several places, and some copies now disagree.** Examples: `CROSS_BEAM_2_POS` is 1,457 mm in the assembly but 1,674 mm in the CNC side-panel part (B2); the lift cylinder's closed length is 803.5 mm in params but 831.5 mm in the cylinder module (B6); pivot DOM length is 120 mm vs 50.8 mm (B8); four different clevis-pin diameters are used for the same joints (B7); the UTU angle irons don't match the holes drilled for them (B9).
 3. **Self-checks print failures but nothing fails.** The model's own output says `SAFE? NO` (bucket-cylinder parallelism, B1b), `WARNING: Wheels will NOT touch ground`, and `REVIEW REQUIRED ✗`, and CI stays green. One verification function (`dist_point_line_verify`) reports double the true distance, so the "arm clears the wheel by +75 mm / +5 mm" output is really −125 mm / −160 mm in its own 2D model (B1a).
 
 **The fabrication outputs aren't usable yet**:
 
 - **The four 1/2" side panels export as 1,373 × 13 mm strips** (P1; the export is fixed in this PR). Even a fixed export would be missing every hole the assembly adds (P2).
-- **The arm-pivot hole in those panels has about 4 mm of edge distance** (P3).
+- **The arm-pivot hole in those panels has about 4 mm of edge distance** (P3). At relief pressure the pin load on that edge is about equal to its tear-out strength.
+- **The bucket pivot joint is weaker than the bucket cylinders that load it** (P14). At relief pressure the 3" bucket cylinder can tear the 1" pin out of the arm tip, and the bucket's own lug and its four 1/4" bolts are no stronger.
 - **The CNC layout has 7 overlapping part pairs and leaves out all the stiffener, motor and pivot-mount plates** (N1, N2).
 - **The angle-iron cut-list parts drill holes that don't line up with the plates they bolt to** (P10, P11).
 - **The arm-leg spacer T5 is an empty solid** (P12).
@@ -225,11 +226,28 @@ The "RATED LIFT CAPACITY 3,305 kg (7,289 lb)" is the **hydraulic** lift force at
 
 As a rough, static, order-of-magnitude check (not a substitute for a proper analysis): swapping in the real 2×6 section and designing to the tipping-limited load brings the arm bending ratio from 11.3 to about 0.5. So the FAILs are mostly an artefact of the stale inputs. **But** a loader also sees hydraulic-limited loads when the bucket is caught or prying (breakout), so both load cases need checking.
 
+**Method errors** *(added 2026-09-26)*. Even with the right parts, the block would give wrong answers:
+
+1. **The safety factor is applied twice.** The load is doubled (`DESIGN_LOAD_N = … × SAFETY_FACTOR_STATIC`, [main:808](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L808)) and the allowable stresses are halved ([main:841](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L841), [:887](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L887), [:911](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L911)), so the arm, pin and bearing checks run at a factor of 4. The weld allowable of 145 MPa is already the AISC ASD value (0.3 × F_EXX, which includes Ω = 2), and it is halved again ([main:1036](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1036)), so the pivot-weld check runs at 8.
+2. **The arm is treated as a cantilever built into the pivot** (`M = P·L`, [main:835](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L835); `δ = PL³/3EI`, [main:860](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L860)). The arm hangs on a pin, which carries no moment, and the lift cylinder props it 828.5 mm out. The peak moment is at the lift bracket and is 40–55 % of `P·L` over the working range. The cantilever deflection is about 3.5× too large, and the deflection check also uses the doubled load.
+3. **The pivot-pin load is the tip load** ([main:881](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L881)). The pin also takes the lift-cylinder force. At relief pressure it carries 59–69 kN per arm, 3–7 times the 9–24 kN tip load.
+4. **The "pivot ring weld" check passes the cantilever moment through the pivot** ([main:1033](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1033)). A pin joint has no moment to pass, and the rings don't exist.
+5. **The cross beam is loaded by one bucket cylinder at mid-span** (`PL/4`, [main:987](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L987)). There are two cylinders, each 135 mm in from an arm, so the moment is `P × 135 mm`. Their lugs hang 63.5 mm below the beam, which also twists it; that isn't checked. The "cross beam welds" check covers welds that don't exist: T3 is bolted to the arms through A5 angle clips.
+6. **The "rated" capacity is the lower of two hydraulic values** (arms down and arms level, [main:778](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L778)), with the load on a straight 1,657 mm arm. At the L-arm's actual bucket pin, the hydraulic capacity falls from about 4,800 kg with the arms down to about 1,800 kg at the 49.4° working limit. That is before the arm and bucket weights and the load's position inside the bucket are counted. The machine tips long before either figure (the stability check gives 330 kg).
+
+Appendix C gives the hand check behind these numbers. At the 3,000 psi relief pressure, with the real sections, it gives:
+
+- **Arm at the lift bracket:** about 100 MPa if the 2×6 tube and the two 1/4" side plates share the moment. It rises to about 280 MPa, above the 250 MPa yield, if the plates carry it alone. The tube is bolted to the plates only near each end ([loader_arm_v2.scad:65-74](../../DESIGN-STRUCTURAL/openscad/modules/loader_arm_v2.scad#L65-L74)), so either that needs checking or the plates should be welded to the tube.
+- **T3:** about 150 MPa in bending plus about 70 MPa of torsional shear near the lugs.
+- **Comfortable:** the pivot pin (about 30 MPa in shear), the 1" clevis pins and the pivot-mount bolts.
+- **Not checked, and weak:** the side-panel pivot hole (P3) and the bucket pivot joint (P14).
+
 **Fix:** rebuild the analysis block against the real parts, preferably in its own `analysis/` file that reads `derived.scad`:
 
 - (a) ROC load case: `min(hydraulic, 0.5 × tipping)` times a dynamic factor of about 2 to 2.5.
 - (b) Relief-pressure breakout case: full cylinder force, checked against yield with a lower safety factor.
 - Add checks for the 5-bolt pivot-mount bolt group, the DOM-to-plate welds, the T3 cross beam as 2×6, the 1/4" arm side plates, the 1/2" side panels at the pivot and cylinder pins, and the platform pivot.
+- *(Added 2026-09-26.)* Model the arm as pinned at the pivot and propped by the lift cylinder, and take pin loads from the cylinder force as well as the tip load. Apply one safety factor. Check T3 in torsion, the tear-out of every pin hole, and the bucket pivot joint with every cylinder lug and its bolts (P14).
 - Report *one* capacity figure, and have the README workflow read it instead of hard-coding 1,200 kg.
 
 ### B5. The stability and lift-cylinder maths use legacy geometry — **High**
@@ -439,6 +457,8 @@ These four are the 1/2" side panels, the most important plates on the machine. `
 
 **P3. The arm-pivot hole in the side panels leaves about 4 mm of steel to the edge — Critical.** The Ø40.1 mm pivot hole at panel (200, 950) ([side_panel.scad:213](../../DESIGN-STRUCTURAL/openscad/parts/side_panel.scad#L213)) sits 24.0 mm from the steep edge running from (200, 1,000) to (300, 817.5) ([:31-49](../../DESIGN-STRUCTURAL/openscad/parts/side_panel.scad#L31-L49)). That leaves a **4.0 mm ligament** (computed, and measured on the rendered outline as 4.2 mm after corner rounding). This pin carries the whole loader arm reaction. Edge distance for a loaded pin hole should be roughly 1.5–2 × the hole diameter, i.e. 60–80 mm.
 
+**Load check** *(added 2026-09-26; Appendix C)*. With both lift cylinders at the 3,000 psi relief pressure, the pin pushes on each pair of panels with 59–69 kN. With the arms level or raised, that force points forward and up, toward this thin edge. The steel in that direction is only 5.5–5.7 mm. The nominal AISC tear-out strength of the two 1/2" panels (1.2 × l_c × t × F_u, before any safety factor) is 67–69 kN. So the hole has essentially no margin at relief pressure. At the 2,000–2,500 psi working pressure the load is still above what AISC ASD allows (Ω = 2).
+
 **Fix:** keep a flat "pivot boss" region in the profile around `ARM_PIVOT_Y` with radius ≥ `2 × PIVOT_PIN_DIA`, and `assert` the edge distance.
 
 **P4. Round holes come out as rectangles.** *(Fixed in this PR.)* In `cylinder_lug.scad:25` and `bucket_side.scad:26,33` the hole cylinders are rotated into the plane of the plate, so the projection shows 16.7 × 24.1 and about 10 × 13 mm rectangles.
@@ -502,6 +522,18 @@ This is a direct consequence of the missing `derived.scad` layer (C1).
 - **Parts never instantiated:** A3, A7, A8, A9, T4, T5 (A7/A8/T4/T5 are drawn inline instead).
 - **Duplicate part numbers:** A1 ≡ A2, A3 ≡ A10, A4 ≈ A5.
 - **Piece count:** `structural_parts.scad:122-123` claims 71 pieces, but its own subtotals add to 77.
+
+**P14. The bucket pivot joint is weaker than the bucket cylinders that load it — Critical.** *(Added 2026-09-26; see Appendix C.)* Each 3" bucket cylinder pushes with 94.3 kN at the 3,000 psi relief pressure. When the dump stroke is resisted, for example when prying or pushing down with the bucket, that push goes through the bucket pivot pin at each arm tip. Three parts of that joint have no margin at relief pressure. All three are also below what AISC ASD allows (Ω = 2) at the 2,000–2,500 psi working pressure:
+
+| Part | Geometry | Nominal strength, before any safety factor |
+|---|---|---|
+| Arm tip | The 1" pin hole is centred 25.4 mm from the end of the two 1/4" arm plates (`PIVOT_HOLE_X_FROM_FRONT = BUCKET_PIVOT_PIN_DIA`, [params:409](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad#L409); tip radius, [arm_plate.scad:160](../../DESIGN-STRUCTURAL/openscad/parts/arm_plate.scad#L160)). That leaves 12.7 mm of steel. The drop-leg tube stops short of the tip, so the plates carry the pin alone | Tear-out: **77 kN** |
+| Bucket pivot lug | A 3×3×1/4 U-channel ([main:1226-1291](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1226-L1291)) with the hole in the middle. The channel's open side faces the arm and ends 28.6 mm from the hole centre ([main:1256](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1256)), leaving 14.9 mm of steel in each 1/4" wall. The pin pushes toward that side | Tear-out: **91 kN** |
+| Lug-to-bucket bolts | 4 × 1/4" bolts ([main:1277-1288](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1277-L1288), M8), which the pin pulls in tension | **68 kN** (Grade 5) or **85 kN** (Grade 8), before prying |
+
+The tip can't simply be made bigger. The lug's base sits 31.75 mm from the pin, only 6.35 mm beyond the current tip, and it swings around the pin as the bucket tilts. The same U-lug with four 1/4" bolts also holds both ends of each bucket cylinder. On T3 those bolts are in shear and hold about 52 kN (Grade 5), against the cylinder's 94 kN push.
+
+**Fix:** redesign the joint and the cylinder lugs together, sized for the bucket cylinder that is actually chosen. For example: welded 1/2" clevis plates on a reinforced bucket back, an arm-tip boss with a radius of at least 2 × the pin diameter, and larger pins with bushings (M9). The model's 3" bucket cylinders push more than twice as hard as the 2" ones in the BOM ([BILL_OF_MATERIALS.md:71](../../DESIGN-STRUCTURAL/documentation/BILL_OF_MATERIALS.md); 41.9 kN at 3,000 psi). So choosing the cylinder (section 8, step 2) sets these loads.
 
 ### 5.3 CNC layout (`cnclayout.scad`, `export_for_cnc.scad`, backup)
 
@@ -599,7 +631,7 @@ These are things a buildable v25 needs that have **no SCAD geometry at all**, or
 | # | Missing element | Notes |
 |---|---|---|
 | M7 | **Bobcat-style quick-attach plate** | Section header only ([main:4006-4011](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L4006-L4011)). `BOBCAT_QA_*` parameters exist but are unused. The bucket pins straight to the arm tips, so the "universal skid-steer attachment" goal isn't met |
-| M8 | **Bucket structure** | No top back rail, no side-edge reinforcement, no wear strips, no gussets behind the lugs. The pivot and cylinder lugs are "bolted to bucket back plate" with **4 × 1/4" bolts** ([main:1277-1288](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1277-L1288)), which is far too small for the bucket-cylinder force of about 94 kN per cylinder that the model itself computes |
+| M8 | **Bucket structure** | No top back rail, no side-edge reinforcement, no wear strips, no gussets behind the lugs. The pivot and cylinder lugs are "bolted to bucket back plate" with **4 × 1/4" bolts** ([main:1277-1288](../../DESIGN-STRUCTURAL/openscad/lifetrac_v25.scad#L1277-L1288)), which is far too small for the bucket-cylinder force of about 94 kN per cylinder that the model itself computes (see P14) |
 | M9 | **Pivot spacers / thrust washers / bushings** | For the 63.5 mm-wide arm in the 120 mm sandwich gap (see B8). Also for the bucket pivot and the cylinder clevises. No greasing provision (zerks, grease grooves) anywhere |
 | M10 | **Pin retention** | Pins are drawn with nuts, but there are no retaining plates, roll pins or cotter pins on the main pivots, and no lock-collar design for the 1.5" arm pivot pin |
 | M11 | **Second cross beam** | Referenced by `CROSS_BEAM_2_POS` and the second arc slot, but never drawn (B2). Decide whether it exists |
@@ -678,7 +710,7 @@ These are things a buildable v25 needs that have **no SCAD geometry at all**, or
    - Fix the structural-analysis `/dev/null` capture and the `parts/` path in `generate-part-svgs.yml` (section 5.5).
    - Fix the three jig include paths, and delete the stray files (section 5.6).
    - Add a CI check that each exported SVG's bounding box matches the expected plate size.
-2. **Choose the real wheel and the real cylinders (a decision, not code).** Tyre and rim, frame height, and catalogue lift/bucket cylinders with their pin sizes. Everything in B3, B6 and B7 flows from this.
+2. **Choose the real wheel and the real cylinders (a decision, not code).** Tyre and rim, frame height, and catalogue lift/bucket cylinders with their pin sizes. Everything in B3, B6 and B7 flows from this, and the bucket-cylinder bore sets the loads in P14.
 3. **Single source of truth (2–3 days).**
    - Layer the files: `params` → `derived` → `toggles`.
    - Delete the re-declarations and `is_undef` fallbacks.
@@ -688,7 +720,7 @@ These are things a buildable v25 needs that have **no SCAD geometry at all**, or
    This removes B2, B8, B9, B11, P2 and P10 by construction. Then fix P3 (pivot boss), P11 (A1/A2 holes) and P12 (T5 hollow), and regenerate `cnclayout.scad` from the part list with real extents and kerf (N1–N3).
 4. **Re-run the solvers against the real geometry.** Arm (U1), bucket-cylinder fixed point (B1b/U2), lift cylinder (U3). Then rebuild the structural and stability analysis (B4, B5) and publish one capacity figure.
 5. **Clean-up pass (1 day).** Delete the pasted working notes and commented-out code (C4), the dead modules and variables (C2), the debug echoes and library `$fn` (C3).
-6. **Fill the gaps** in section 6, in this order: QA plate (M7), bucket reinforcement and lug attachment (M8), pivot spacers and greasing (M9–M10), power unit and hydraulic layout (M1–M4), controller enclosure (M6), UTU panel variant (M13), BOM export (M18).
+6. **Fill the gaps** in section 6, in this order: QA plate (M7), bucket reinforcement and lug attachment together with the bucket pivot joint (M8, P14), pivot spacers and greasing (M9–M10), power unit and hydraulic layout (M1–M4), controller enclosure (M6), UTU panel variant (M13), BOM export (M18).
 
 ---
 
@@ -717,3 +749,40 @@ These were each checked with a minimal test file; the UTU architecture depends o
 2. A variable defined only in the caller is `undef` inside a used module.
 3. `-D X=3` on the command line overrides both the top-level file and the used library.
 4. When a variable is assigned twice in the same scope (including via `include`), the **last** value wins everywhere in that scope. That is why the main file's `CROSS_BEAM_2_POS` silently replaces the params value inside the assembly but not inside parts that only include params (B2).
+
+## Appendix C: Hand check of the loader statics *(added 2026-09-26)*
+
+This is a rough static check, not a substitute for the rebuilt analysis. It supports the numbers in B4, P3 and P14.
+
+**Inputs:**
+- **Geometry:** the model's own echo output: pivot (200, 1,100), lift-cylinder base (50, 600), bracket at arm-local (828.5, −114.3), and bucket pin at arm-local (1,697.4, −249.3).
+- **Hydraulics:** 3,000 psi, the relief setting in [HYDRAULIC_BOM.md](../../DESIGN-HYDRAULIC/HYDRAULIC_BOM.md). That gives 65.5 kN per 2.5" lift cylinder and 94.3 kN per 3" bucket cylinder, pushing.
+- **Steel:** A36 with F_y = 250 MPa and F_u = 400 MPa (the model's constants).
+- **Sections:** sharp corners, as in the model.
+- **Loads:** no dynamic factor. Tear-out is the AISC nominal value, 1.2 × l_c × t × F_u.
+
+**Lift cylinders at relief, load on the bucket pin:**
+
+| Arm angle | Cylinder moment arm | Load moment arm: analysis / real pin | Hydraulic capacity, both cylinders: analysis / real pin | Pivot-pin force per arm | Arm moment at the lift bracket, vs the analysis's `P·L` for the same load |
+|---|---|---|---|---|---|
+| −27.7° (down) | 497.5 mm | 1,467 / 1,387 mm | 4,529 / 4,791 kg | 69.2 kN, pointing −19° | 15.4 vs 38.9 kN·m |
+| 0° (level) | 410.2 mm | 1,657 / 1,697 mm | 3,306 / 3,227 kg | 61.5 kN, pointing +8° | 13.8 vs 26.2 kN·m |
+| 45° | 198.9 mm | 1,172 / 1,377 mm | 2,267 / 1,930 kg | 58.5 kN, pointing +45° | 7.5 vs 15.7 kN·m |
+| 49.4° (working limit) | 175.2 mm | 1,077 / 1,293 mm | 2,172 / 1,810 kg | 58.6 kN, pointing +49° | 6.7 vs 14.7 kN·m |
+
+Where the model prints these values (arms down, level and 45°), the "analysis" columns reproduce them exactly. The pin force is the force the arm puts on the pin and the side panels; its direction is measured from horizontal, with forward and up positive.
+
+**Section moduli about the bending axis:**
+
+| Section | Modulus |
+|---|---|
+| 3×3×1/4 tube (what the analysis uses) | 38,180 mm³ |
+| 2×6×1/4 tube | 83,045 mm³ |
+| Two 1/4" × 6" side plates | 49,161 mm³ |
+| Tube and plates together | 132,206 mm³ |
+
+**Results at relief:**
+- **Arm:** the bracket gusset deepens the plates for 76 mm on either side of the bracket, so the critical section is at its outboard end. With the arms down the moment there is 13.8 kN·m. That gives 104 MPa if the tube and plates share it, and 280 MPa if the plates carry it alone.
+- **T3:** the two cylinders sit 134.6 mm in from the arms, so the moment is 94.3 kN × 134.6 mm = 12.7 kN·m, or 153 MPa about the 6" axis. Each lug pin is 63.5 mm below the beam axis, which adds 6.0 kN·m of torque per lug. That is about 73 MPa of shear between each lug and its arm (closed-section formula).
+- **Pivot pin:** 69.2 kN over 2 × 1,140 mm² gives 30 MPa of shear.
+- **Side-panel pivot hole and bucket pivot joint:** see P3 and P14.
