@@ -35,3 +35,4 @@ Runs the camera encoder pipeline on the tractor X8, publishing TileDeltaFrames t
 - `/dev/ttymxc3` is the UART to the M7 co-MCU.
 - No LAN ports are exposed; all MQTT/image traffic is internal and routed through the M7/LoRa only.
 - If you need to debug, you can override `LIFETRAC_MQTT_HOST` to point to the base for bench testing, but **production path is LoRa only**.
+- VECTOR mode (encode mode 9, `x8_image_pipeline/encode_vector.py`) runs on numpy and `opencv-python-headless`, both in `requirements.txt` since Phase 1, so the image build pulls them (aarch64 wheels) and the deploy steps above are unchanged; the codec it needs is the in-tree mirror `x8_image_pipeline/vs1_codec.py`, not the base tree.

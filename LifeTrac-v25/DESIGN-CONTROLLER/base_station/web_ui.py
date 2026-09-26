@@ -106,6 +106,7 @@ _ENCODE_MODE_UI_CHOICES = (
     "motion_only",
     "mono_g4",
     "rawstream",
+    "vector",
 )
 
 
@@ -117,7 +118,7 @@ class EncodeModeBody(BaseModel):
     # changed since (from the console pill, the gamepad, or another tab).
     # Omitted mode -> keep the current one. At least one is required.
     mode: str | None = Field(None,
-              pattern=r"^(full|y_only|motion_only|mono_g4|rawstream)$")
+              pattern=r"^(full|y_only|motion_only|mono_g4|rawstream|vector)$")
     # Optional WebP/codec quality (1-100) carried in the same 0x63 command
     # frame as the mode. Omitted -> keep the current quality override.
     quality: int | None = Field(None, ge=1, le=100)
@@ -242,6 +243,14 @@ _ENCODE_MODE_TOPIC = "lifetrac/v25/control/encode_mode_override"
 _encode_mode_runtime_lock = threading.Lock()
 _encode_mode_runtime_override = "full"
 _encode_mode_runtime_quality: int | None = None   # None = tractor default
+# VECTOR_SCENE.md §6: two independent quality dials. The tile modes share a
+# WebP quality (``_tile_quality``, None = tractor default); VECTOR carries
+# its own detail (``_vector_detail``, 60-100, default 80 = band V0). The
+# selected mode sends its own dial as the 0x63 quality byte, so leaving
+# VECTOR never reuses the vector detail as a WebP quality and vice versa.
+# Both are persisted beside the mode in the override store.
+_tile_quality: int | None = None
+_vector_detail = 80
 
 
 def _load_encode_mode_state() -> tuple[str, int | None]:
@@ -261,6 +270,13 @@ def _load_encode_mode_state() -> tuple[str, int | None]:
                     q = body.get("quality")
                     if isinstance(q, int) and 1 <= q <= 100:
                         quality = q
+                    global _tile_quality, _vector_detail
+                    tq = body.get("tile_quality", q if mode != "vector" else None)
+                    if isinstance(tq, int) and 1 <= tq <= 100:
+                        _tile_quality = tq
+                    vd = body.get("vector_detail", q if mode == "vector" else None)
+                    if isinstance(vd, int) and 60 <= vd <= 100:
+                        _vector_detail = vd
             except json.JSONDecodeError:
                 mode = raw           # legacy single-line store
             if mode == "auto":
@@ -277,14 +293,26 @@ def _load_encode_mode_override() -> str:
     return _load_encode_mode_state()[0]
 
 
-def _persist_encode_mode_override(mode: str, quality: int | None) -> None:
-    """Write mode+quality to ``ENCODE_MODE_STORE_PATH`` atomically."""
+def _persist_encode_mode_override(mode: str, quality: int | None, *,
+                                  tile_quality: "int | None | object" = ...,
+                                  vector_detail: "int | object" = ...) -> None:
+    """Write mode+quality (and both dials) to ``ENCODE_MODE_STORE_PATH``
+    atomically. The dials default to the current globals; a caller that is
+    about to change them passes the prospective values so the store is
+    written before the globals move."""
+    if tile_quality is ...:
+        tile_quality = _tile_quality
+    if vector_detail is ...:
+        vector_detail = _vector_detail
     ENCODE_MODE_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp = ENCODE_MODE_STORE_PATH.with_suffix(
         ENCODE_MODE_STORE_PATH.suffix + ".tmp")
     body: dict[str, Any] = {"mode": mode}
     if quality is not None:
         body["quality"] = quality
+    if tile_quality is not None:
+        body["tile_quality"] = tile_quality
+    body["vector_detail"] = vector_detail
     tmp.write_text(json.dumps(body) + "\n", encoding="utf-8")
     os.replace(tmp, ENCODE_MODE_STORE_PATH)
 
@@ -1200,10 +1228,23 @@ _subscribe_mqtt_topics()
 from image_pipeline.canvas import Canvas               # noqa: E402
 from image_pipeline.reassemble import FragmentReassembler  # noqa: E402
 from image_pipeline.state_publisher import StatePublisher  # noqa: E402
+from image_pipeline.frame_format import CODEC_VECTOR  # noqa: E402
+try:                                                  # noqa: E402
+    from image_pipeline.vector_scene_store import VectorSceneStore
+except ImportError:                                   # pragma: no cover
+    VectorSceneStore = None  # type: ignore[assignment,misc]
 
 _image_canvas = Canvas()
 _image_reassembler = FragmentReassembler()
 _image_publisher = StatePublisher(canvas=_image_canvas)
+# VS1 (VECTOR_SCENE.md §7.1): codec-6 frames go to the vector store instead
+# of Canvas.apply, the snapshot carries "vector_scene" (§7.2), and while the
+# last frame was a vector frame the stale-tile worker stays quiet (the photo
+# canvas is frozen by design) and no keyframe is ever requested.
+_vector_store = VectorSceneStore() if VectorSceneStore is not None else None
+_image_publisher.vector_store = _vector_store
+_vector_active = False
+_CODEC_TO_MODE = {0: "full", 1: "mono_g4", 4: "y_only", 5: "rawstream", 6: "vector"}
 _image_lock = threading.Lock()
 
 # F10 (2026-08-01): receiver-driven stale-tile reporting. The canvas is
@@ -1367,6 +1408,12 @@ def _tile_stale_worker() -> None:
         time.sleep(_TILE_STALE_PERIOD_S)
         try:
             with _image_lock:
+                if _vector_active:
+                    # VECTOR mode: the photo canvas is frozen by design;
+                    # reporting its tiles stale would only fire 0x6C commands
+                    # at the tractor. Read under the same lock that
+                    # _ingest_tile_delta flips it under.
+                    continue
                 canvas = _image_canvas
                 now_ms = int(time.monotonic() * 1000)
                 arrived = [tile.arrived_ms for tile in canvas._tiles]
@@ -1384,6 +1431,9 @@ def _tile_stale_worker() -> None:
                 summary = summarize_tile_ages(canvas, now_ms, horizon_ms)
                 n_tiles = canvas.n_tiles
                 base_seq = getattr(canvas, "_last_base_seq", None) or 0
+            with _image_lock:
+                if _vector_active:
+                    continue    # a vector frame arrived while we computed
             if summary is not None:
                 # RS-6.1 aggregate — every tick, even when nothing is
                 # stale: a quiet link's p95 age IS the sweep-rotation
@@ -1419,12 +1469,40 @@ def _publish_state_snapshot() -> None:
         fut.add_done_callback(_ws_send_done("state"))
 
 
+def _ingest_vector_frame(frame) -> None:
+    """VECTOR_SCENE.md §7.1: a codec-6 frame goes to the vector store, never
+    to Canvas.apply, and never requests a keyframe. Called under _image_lock.
+    Airtime is unknown here (image_rx_daemon knows the profile); 0 keeps the
+    capture-time estimate conservative by at most one slot."""
+    global _vector_active
+    if _vector_store is not None:
+        _vector_store.ingest(frame.vector_body, frame.frame_kind,
+                             int(time.monotonic() * 1000), 0.0)
+    _vector_active = True
+    _image_publisher.encode_mode = "vector"
+    _image_publisher.safety_detector = "no_pixels"
+    _image_publisher.needs_keyframe = False
+    _image_publisher.last_keyframe_reason = ""
+
+
 def _ingest_tile_delta(payload: bytes) -> None:
-    global _image_canvas
+    global _image_canvas, _vector_active
     with _image_lock:
         frame = _image_reassembler.feed(payload)
         if frame is None:
             return
+        vector = (frame.codec == CODEC_VECTOR)
+        if vector:
+            _ingest_vector_frame(frame)
+    if vector:
+        _publish_state_snapshot()
+        return
+    with _image_lock:
+        if _vector_active:
+            _vector_active = False
+            _image_publisher.safety_detector = "pixels"
+            _image_publisher.encode_mode = _CODEC_TO_MODE.get(
+                frame.codec, _image_publisher.encode_mode)
         # 2026-05-27: auto-adopt the upstream camera's grid on the first
         # keyframe whose layout differs from our current Canvas. Before
         # this, _image_canvas was hardcoded 12x8@32px and any camera with
@@ -2507,6 +2585,7 @@ _ENCODE_MODE_CYCLE_ORDER: tuple[str, ...] = (
     "y_only",
     "motion_only",
     "mono_g4",
+    "vector",
 )
 
 
@@ -2518,22 +2597,42 @@ def _set_encode_mode_override(mode: str, *, persist: bool,
     ``POST /api/encode_mode/cycle``. ``quality=None`` keeps the current
     quality override. Returns the JSON body the endpoints surface.
     """
+    global _vector_detail, _tile_quality
     if mode not in _ENCODE_MODE_UI_CHOICES:
         raise HTTPException(status_code=400,
                             detail=f"unknown encode mode: {mode!r}")
     # Persist BEFORE mutating runtime state: an OSError here must leave
     # the runtime override, the store, and the wire all agreeing on the
     # old value rather than stranding a change only this process knows.
-    eff_quality = quality if quality is not None else _get_runtime_encode_state()[1]
     eff_mode = mode
+    # Prospective dial values: the store is written with them first and the
+    # globals move only once that succeeded, so a failed persist (HTTP 500)
+    # leaves nothing changed in memory that a later switch could publish.
+    new_vector_detail, new_tile_quality = _vector_detail, _tile_quality
+    if mode == "vector":
+        # The vector detail is its own dial (VECTOR_SCENE.md §4.5.4, §6):
+        # 60-100 keeps the operator inside band V0; the ladder, not the
+        # operator, produces the lower bands. The tile dial is untouched.
+        if quality is not None:
+            new_vector_detail = max(60, min(100, int(quality)))
+        eff_quality = new_vector_detail
+    else:
+        # A tile mode sends the tile dial, never the vector detail that may
+        # be sitting in the runtime quality after a VECTOR session.
+        if quality is not None:
+            new_tile_quality = int(quality)
+        eff_quality = new_tile_quality
     if persist:
         try:
-            _persist_encode_mode_override(eff_mode, eff_quality)
+            _persist_encode_mode_override(eff_mode, eff_quality,
+                                          tile_quality=new_tile_quality,
+                                          vector_detail=new_vector_detail)
         except OSError as exc:
             logging.error("failed to persist encode_mode override to %s: %s",
                           ENCODE_MODE_STORE_PATH, exc)
             raise HTTPException(status_code=500,
                                 detail=f"could not persist override: {exc}")
+    _vector_detail, _tile_quality = new_vector_detail, new_tile_quality
     _set_runtime_encode_mode_override(eff_mode, eff_quality)
     body: dict[str, Any] = {"mode": eff_mode, "ts": time.time()}
     if eff_quality is not None:

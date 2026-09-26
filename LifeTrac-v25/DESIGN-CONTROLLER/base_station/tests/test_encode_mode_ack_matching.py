@@ -111,6 +111,20 @@ class AckMatchesBodyTests(unittest.TestCase):
         self.assertFalse(ImageRxDaemon._ack_matches_body(
             {"mode": 1, "quality": 5}, body))
 
+    def test_vector_quality_uses_the_1_to_100_clamp(self):
+        # VECTOR (9) takes the whole byte: bands 60-100/40-59/20-39/1-19 are
+        # the V0..V3 levels (VECTOR_SCENE.md s4.5.4), and camera_service lifts
+        # its 20 floor for that mode; the base must clamp identically or a
+        # V3 request (1-19) would retry until cool-down.
+        body = self._body(int(EncodeMode.VECTOR), 12)
+        self.assertTrue(ImageRxDaemon._ack_matches_body(
+            {"mode": int(EncodeMode.VECTOR), "quality": 12}, body))
+        self.assertFalse(ImageRxDaemon._ack_matches_body(
+            {"mode": int(EncodeMode.VECTOR), "quality": 20}, body))
+        # tile modes keep the 20 floor
+        self.assertFalse(ImageRxDaemon._ack_matches_body(
+            {"mode": 1, "quality": 12}, self._body(1, 12)))
+
     def test_old_tractor_without_quality_field_does_not_confirm(self):
         # A build that cannot report quality cannot prove it applied one;
         # keep retrying (and eventually GAVE UP) rather than claim it did.
@@ -197,6 +211,22 @@ class EncodeModeOverrideAcceptsTractorModesTests(unittest.TestCase):
         ack = ImageRxDaemon._parse_encode_ack(_ack(
             requested=8, effective=8, effective_name="rawstream",
             clamped=False, codec=5, quality=55, source="back_channel",
+            ts=1.0))
+        self.assertTrue(ImageRxDaemon._ack_matches_body(ack, body))
+
+    def test_vector_by_name_and_by_value_goes_on_the_air(self):
+        # Wire byte 9 == camera_service.ENCODE_MODE_VECTOR (parity is pinned
+        # by test_encode_mode_parity_sil).
+        want = pack_command_frame(CMD_OP_ENCODE_MODE, bytes([9]))
+        for requested in ("vector", "VECTOR", 9):
+            self.assertEqual(self._override(mode=requested), want, requested)
+
+    def test_vector_v3_ack_from_tractor_converges(self):
+        # A V3 request (quality 12) is acked unclamped by a mode-9 tractor.
+        body = self._override(mode="vector", quality=12)
+        ack = ImageRxDaemon._parse_encode_ack(_ack(
+            requested=9, effective=9, effective_name="vector",
+            clamped=False, codec=6, quality=12, source="back_channel",
             ts=1.0))
         self.assertTrue(ImageRxDaemon._ack_matches_body(ack, body))
 
