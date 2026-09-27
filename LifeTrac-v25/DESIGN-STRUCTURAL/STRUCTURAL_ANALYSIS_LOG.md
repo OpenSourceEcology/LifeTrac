@@ -6,10 +6,10 @@ This file tracks the history of structural analysis test results.
 
 ## Latest Analysis
 
-**Date:** 2026-09-26 22:15:59 UTC
-**Commit:** 8f24bfc4158201591d2e5e1ec4ffb3b226144f4e
+**Date:** 2026-09-27 01:42:03 UTC
+**Commit:** cbebe79c302b54947f31210300362b8be02e011d
 **Branch:** claude/dreamy-mccarthy-lpn9af-analysis
-**Workflow Run:** https://github.com/OpenSourceEcology/LifeTrac/actions/runs/36275675174
+**Workflow Run:** https://github.com/OpenSourceEcology/LifeTrac/actions/runs/36286299455
 
 ### Summary
 
@@ -31,7 +31,7 @@ Static checks at the 3000 psi relief pressure: each lift cylinder pushes 65.5 kN
 | Lift-cylinder pins, double shear (`LIFT_CYL_PINS`) | 65 MPa | 212 MPa | 0.30 | PASS |
 | Lift-cylinder hole in the two arm plates (`LIFT_BRACKET_HOLE`) | 65.5 kN | 74.4 kN | 0.88 | PASS |
 | Lift-cylinder base hole in the two side panels (`LIFT_BASE_HOLE`) | 65.5 kN | 221.3 kN | 0.30 | PASS |
-| Cross beam T3, bending and twist (von Mises) (`T3_COMBINED`) | 198 MPa | 150 MPa | 1.32 | known fail (B4: the bucket-cylinder lugs hang below T3 and twist it) |
+| Cross beam T3, bending about both axes and twist (von Mises) (`T3_COMBINED`) | 238 MPa | 150 MPa | 1.59 | known fail (B4: the bucket-cylinder lugs hang below T3 and twist it) |
 | Bucket-cylinder pins, 3/4in, double shear (`BUCKET_CYL_PINS`) | 165 MPa | 212 MPa | 0.78 | PASS |
 | Bucket-cylinder lug bolts on T3, 4 x 1/4in, shear (`BUCKET_CYL_LUG_BOLTS`) | 94.3 kN | 23.6 kN | 4.00 | known fail (P14, M8) |
 | Bucket-cylinder lug bolts on the bucket, 4 x 1/4in, tension and shear (`BUCKET_CYL_LUG_BOLTS_BUCKET`) | 94.3 kN | 23.7 kN | 3.99 | known fail (P14, M8) |
