@@ -35,7 +35,7 @@ The criteria follow AISC 360 allowable-stress design (ASD):
 **Materials:**
 - Plate, tube and angle: A36 (F_y 250 MPa, F_u 400 MPa).
 - Pins: AISI 1045 cold drawn (F_y 530 MPa). This is an assumption until the pins are specified.
-- Bolts: SAE Grade 5.
+- Bolts: SAE Grade 5. Tension uses the thread's tensile stress area A_t with the full F_u. AISC's F_nt = 0.75 F_u applies to the nominal area instead, and its 0.75 stands in for the thread. For a 1/4" bolt A_t is only 0.65 of the nominal area, so A_t F_u is the lower value. Shear uses AISC's 0.45 F_u (threads in the shear plane) on the nominal area.
 - Welds: E70 electrode.
 
 ## Checks
@@ -49,7 +49,7 @@ The criteria follow AISC 360 allowable-stress design (ASD):
 | `ARM_BENDING_PLATES_ONLY` | The same section with the side plates alone, because the tube is bolted to them only near its ends |
 | `ARM_BENDING_BUCKET` | The same section, tube and plates together, in the bucket case. T3 is behind the section, so the section carries the bucket pin's whole force. The moment keeps rising toward T3, but the gusset deepens the arm there |
 | `LIFT_CYL_PINS`, `LIFT_BRACKET_HOLE`, `LIFT_BASE_HOLE` | Lift-cylinder pins, and their holes in the arm plates and the side panels |
-| `T3_COMBINED` | Cross beam T3 in bending and twist (von Mises) |
+| `T3_COMBINED` | Cross beam T3 in bending about both axes and twist (von Mises). T3's 6" side runs along the arm, so the part of the cylinder's force along the arm bends it about its strong axis and the vertical part about its weak axis. The cylinder's direction changes with the bucket's tilt, so the check takes the worst tilt and stroke |
 | `BUCKET_CYL_PINS`, `BUCKET_CYL_LUG_BOLTS`, `BUCKET_CYL_LUG_BOLTS_BUCKET` | Bucket-cylinder pins, and the 1/4" bolts that hold their lugs to T3 (shear) and to the bucket (tension and shear) |
 | `BUCKET_PIN_SHEAR`, `BUCKET_PIN_ARM_TIP`, `BUCKET_PIVOT_LUG`, `BUCKET_LUG_BOLTS` | The bucket pivot joint: the 1" pin, the arm tip, the bucket's U-lug and its bolts (tension and shear) |
 

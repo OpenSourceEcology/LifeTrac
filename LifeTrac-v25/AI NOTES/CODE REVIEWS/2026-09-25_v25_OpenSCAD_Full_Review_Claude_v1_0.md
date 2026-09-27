@@ -794,6 +794,6 @@ Where the model prints these values (arms down, level and 45°), the "analysis" 
 
 **Results at relief:**
 - **Arm:** the bracket gusset deepens the plates for 76 mm on either side of the bracket, so the critical section is at its outboard end. With the arms down the moment there is 13.8 kN·m. That gives 104 MPa if the tube and plates share it, and 280 MPa if the plates carry it alone.
-- **T3:** the two cylinders sit 134.6 mm in from the arms, so the moment is 94.3 kN × 134.6 mm = 12.7 kN·m, or 153 MPa about the 6" axis. Each lug pin is 63.5 mm below the beam axis, which adds 6.0 kN·m of torque per lug. That is about 73 MPa of shear between each lug and its arm (closed-section formula).
+- **T3:** the two cylinders sit 134.6 mm in from the arms, so the moment is 94.3 kN × 134.6 mm = 12.7 kN·m, or 153 MPa about the 6" axis. Each lug pin is 63.5 mm below the beam axis, which adds 6.0 kN·m of torque per lug. That is about 73 MPa of shear between each lug and its arm (closed-section formula). This hand check takes the push as horizontal. The rebuilt analysis also counts its vertical part, which bends T3 about its 2" weak axis. That brings the combined stress to about 238 MPa at full dump.
 - **Pivot pin:** 69.2 kN over 2 × 1,140 mm² gives 30 MPa of shear.
 - **Side-panel pivot hole, bucket pivot joint, and the arm under the bucket cylinders:** see P3 and P14.

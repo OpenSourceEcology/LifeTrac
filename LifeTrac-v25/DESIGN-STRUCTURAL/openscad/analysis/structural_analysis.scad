@@ -266,14 +266,27 @@ AN_PIVOT_BOLT_RN = min(0.45 * AN_BOLT_FU * an_area(PIVOT_MOUNT_BOLT_DIA),
                        an_hole_rn(1, AN_PIVOT_BOLT_LC, PIVOT_MOUNT_PLATE_THICK, PIVOT_MOUNT_BOLT_DIA));
 
 // T3 cross beam: each bucket cylinder sits BUCKET_CYL_X_SPACING from the centre, and the
-// beam ends at the arm tubes. Its lug pins hang below the beam's axis, so the push also
-// twists the beam; closed-section shear stress is T / (2 A_m t).
+// beam ends at the arm tubes. T3's 6in side runs along the arm and its 2in side is
+// vertical (parts/structural/tube_t3_arm_crossbeam.scad). So the part of the cylinder's
+// force along the arm bends it about its strong axis, and the vertical part about its weak
+// axis; the stresses add at a corner. The lug pins hang below the beam's axis, so the part
+// along the arm also twists the beam; closed-section shear stress is T / (2 A_m t). The
+// cylinder's direction changes with the bucket's tilt, so the check takes the worst tilt
+// and stroke.
 AN_T3_A = (ARM_SPACING - TUBE_2X6_1_4[0]) / 2 - BUCKET_CYL_X_SPACING;
-AN_T3_SIGMA = AN_BUCKET_PUSH_N * AN_T3_A
-              / an_box_s(TUBE_2X6_1_4[0], TUBE_2X6_1_4[1], TUBE_2X6_1_4[2]);
-AN_T3_TAU = AN_BUCKET_PUSH_N * abs(CROSS_BEAM_MOUNT_Z_OFFSET)
-            / (2 * (TUBE_2X6_1_4[0] - TUBE_2X6_1_4[2]) * (TUBE_2X6_1_4[1] - TUBE_2X6_1_4[2])
-               * TUBE_2X6_1_4[2]);
+AN_T3_S_ALONG = an_box_s(TUBE_2X6_1_4[0], TUBE_2X6_1_4[1], TUBE_2X6_1_4[2]);
+AN_T3_S_VERTICAL = an_box_s(TUBE_2X6_1_4[1], TUBE_2X6_1_4[0], TUBE_2X6_1_4[2]);
+AN_T3_2AMT = 2 * (TUBE_2X6_1_4[0] - TUBE_2X6_1_4[2]) * (TUBE_2X6_1_4[1] - TUBE_2X6_1_4[2])
+             * TUBE_2X6_1_4[2];
+
+// Von Mises stress in T3 for one cylinder's force, given in the arm's frame (MPa)
+function an_t3_stress(force) =
+    let(sigma = AN_T3_A * (abs(force[0]) / AN_T3_S_ALONG + abs(force[1]) / AN_T3_S_VERTICAL),
+        tau = abs(force[0]) * abs(CROSS_BEAM_MOUNT_Z_OFFSET) / AN_T3_2AMT)
+    sqrt(sigma * sigma + 3 * tau * tau);
+
+AN_T3_STRESS = max([for (t = AN_TILTS_FINE, f = AN_BUCKET_STROKES)
+    an_t3_stress(an_bucket_cyl_force(t, f))]);
 
 // Bucket pivot lug: a U-channel cut from 3x3x1/4 tube, open toward the arm, with the pin
 // hole in the middle (u_channel_lug() in lifetrac_v25.scad)
@@ -283,6 +296,11 @@ AN_LUG_LC = TUBE_3X3_1_4[0] / 2 - 1.5 * TUBE_3X3_1_4[1] - (BUCKET_PIVOT_PIN_DIA 
 // lug that pulls it off the plate puts them in tension, and the part along the plate puts
 // them in shear. The two combine by the elliptical interaction in the commentary to AISC
 // J3.7. Prying of the lug's 1/4in base, which would add tension, isn't included.
+// Tension uses the thread's tensile stress area A_t with the full F_u. AISC's
+// F_nt = 0.75 F_u is for the bolt's nominal area instead: its 0.75 stands in for the
+// thread's area. For a 1/4-20 bolt A_t is only 0.65 of the nominal area, so A_t F_u is the
+// lower of the two. Don't apply the 0.75 on top of A_t. Shear uses AISC's 0.45 F_u
+// (threads in the shear plane) on the nominal area.
 AN_LUG_BOLTS_TENSION = AN_LUG_BOLT_COUNT * AN_LUG_BOLT_AT * AN_BOLT_FU / AN_OMEGA;
 AN_LUG_BOLTS_SHEAR = AN_LUG_BOLT_COUNT * 0.45 * AN_BOLT_FU * an_area(AN_LUG_BOLT_DIA) / AN_OMEGA;
 
@@ -331,8 +349,8 @@ AN_CHECKS = [
         AN_LIFT_PUSH_N,
         an_hole_rn(2, LIFT_CYL_BASE_Y - (BOLT_DIA_1 + 2) / 2, PANEL_THICKNESS, BOLT_DIA_1)
             / AN_OMEGA, "kN"],
-    ["T3_COMBINED", "Cross beam T3, bending and twist (von Mises)",
-        sqrt(pow(AN_T3_SIGMA, 2) + 3 * pow(AN_T3_TAU, 2)), AN_ALLOW_BENDING, "MPa"],
+    ["T3_COMBINED", "Cross beam T3, bending about both axes and twist (von Mises)",
+        AN_T3_STRESS, AN_ALLOW_BENDING, "MPa"],
     ["BUCKET_CYL_PINS", "Bucket-cylinder pins, 3/4in, double shear",
         AN_BUCKET_PUSH_N / (2 * an_area(BOLT_DIA_3_4)), AN_ALLOW_PIN_SHEAR, "MPa"],
     ["BUCKET_CYL_LUG_BOLTS", "Bucket-cylinder lug bolts on T3, 4 x 1/4in, shear",
