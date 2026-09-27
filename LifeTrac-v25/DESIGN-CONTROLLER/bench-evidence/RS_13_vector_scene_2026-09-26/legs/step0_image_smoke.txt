@@ -1,0 +1,5 @@
+# RS-13.1 step 0.2 image smoke test, tractor 2E2C1209DABC240B, 2026-09-26T20:03:47Z (PC clock)
+# image: lifetrac-tractor-x8:latest 2727dfd36f9f 2026-09-26 19:55:38 +0000 UTC
+# cmd (procedure step 0.2, verbatim): echo fio | sudo -S -p '' docker run --rm -w /app --entrypoint python3 lifetrac-tractor-x8:latest -c "import numpy, cv2; import x8_image_pipeline.encode_vector as e; print('numpy', numpy.__version__, 'cv2', cv2.__version__, 'encoder', e.VectorEncoder.__name__)"
+numpy 2.4.6 cv2 5.0.0 encoder VectorEncoder
+exit=0

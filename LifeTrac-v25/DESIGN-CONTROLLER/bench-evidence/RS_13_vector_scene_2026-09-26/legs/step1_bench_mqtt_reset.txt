@@ -1,0 +1,10 @@
+# RS-13.1 step 1 prep: tractor bench_mqtt retained state BEFORE the reset (left from the 2026-09-15 legs)
+lifetrac/v25/status/encode_mode {"requested": 6, "effective": 6, "effective_name": "mono_g4", "clamped": false, "codec": 1, "quality": 55, "source": "lora_cmd", "ts": 1788353530.5}
+lifetrac/v25/status/radio_profile/tx {"ok": false, "profile": 2, "ts": 1788353743.9}
+lifetrac/v25/tractor/encode_mode_override {"mode": 6}
+lifetrac/v25/tractor/link_budget {"n_fragments": 1, "profile_index": 6, "ts": 1788353743.9}
+# reset exactly as run_live_radio_monitor.ps1 does at every launch (rm -f + run; the conf has no persistence):
+1578400233ce
+bench_mqtt: Up 3 seconds
+# retained state AFTER the reset:
+(end of list)

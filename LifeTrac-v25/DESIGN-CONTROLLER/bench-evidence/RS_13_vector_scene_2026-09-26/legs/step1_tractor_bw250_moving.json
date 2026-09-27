@@ -1,0 +1,120 @@
+{
+  "profile": "image_bw250",
+  "one_fragment_limit": 203,
+  "frames": {
+    "total": 247,
+    "vector": 247,
+    "other": 0,
+    "parse_errors": 0,
+    "by_codec": {
+      "vector": 247
+    }
+  },
+  "wire": {
+    "min": 160,
+    "p50": 201.0,
+    "p95": 202.0,
+    "max": 203,
+    "over_limit": 0
+  },
+  "epoch_starts": 202,
+  "epoch_starts_applied": 202,
+  "arrival": {
+    "span_s": 124.12096047401428,
+    "fps_mean": 1.9819376119918286,
+    "gap_p50_s": 0.5028533935546875,
+    "gap_p95_s": 0.571279764175415,
+    "gap_max_s": 0.6232538223266602,
+    "first_applied_t_rel_s": 0.0,
+    "frames_before_first_apply": 0
+  },
+  "store": {
+    "frames_rx": 247,
+    "frames_bad": 0,
+    "frames_applied": 247,
+    "epoch_behind": 0,
+    "orphans": 0,
+    "digest_checks": 247,
+    "digest_mismatch": 2,
+    "bad_version": 0,
+    "epochs": 202,
+    "handovers": 201,
+    "ttl_dropped": 0,
+    "resync_events": 0,
+    "records_applied": 5662,
+    "resync": false,
+    "bad_reasons": {},
+    "epoch": 9,
+    "shapes": 16,
+    "cached_shapes": 0
+  },
+  "scene": {
+    "epoch": 9,
+    "level": 0,
+    "badge": 7,
+    "digest_ok": true,
+    "horizon_mode": "none",
+    "layers": {
+      "L1": 16,
+      "L2": 0,
+      "L3": 0,
+      "L4": 0
+    },
+    "cal_rev": null,
+    "anchor_age_ms": 169,
+    "handover": false
+  },
+  "checks": [
+    [
+      "parse_ok",
+      true,
+      "0 unparseable payload(s)"
+    ],
+    [
+      "all_vector",
+      true,
+      "0 non-vector frame(s): {'vector': 247}"
+    ],
+    [
+      "one_fragment",
+      true,
+      "0 over 203 B (epoch starts 202 B); max 203 B"
+    ],
+    [
+      "store_clean",
+      true,
+      "frames_bad=0 "
+    ],
+    [
+      "no_orphans",
+      true,
+      "orphans=0"
+    ],
+    [
+      "digest",
+      false,
+      "247 checked, 2 mismatched, scene digest_ok=True"
+    ],
+    [
+      "epoch_seen",
+      true,
+      "202 epoch start(s) applied of 202 received"
+    ],
+    [
+      "first_apply",
+      true,
+      "0 frame(s) before the first apply"
+    ],
+    [
+      "applied_ratio",
+      true,
+      "247/247 applied = 100.0% (need >= 90%)"
+    ],
+    [
+      "min_frames",
+      true,
+      "247 vector frame(s), need >= 200"
+    ]
+  ],
+  "pass": false
+}

@@ -1,0 +1,57 @@
+# RS-13.1 step 0 extra: the Phase 1 encoder test suites run INSIDE the tractor image built for this campaign
+# image lifetrac-tractor-x8:rs13-65869517 (id 2727dfd36f9f), on the base X8 (aarch64), 2026-09-26
+# cmd: docker run --rm -v <repo@65869517>:/r -w /r/DESIGN-CONTROLLER/base_station --entrypoint python3 lifetrac-tractor-x8:rs13-65869517 -m unittest tests.test_vector_encoder tests.test_vector_interop tests.test_vs1_codec_parity_sil -v
+
+runtime: python 3.11.16 aarch64 numpy 2.4.6 cv2 5.0.0
+
+test_age_and_moving_and_status_codes (tests.test_vector_encoder.ContainerTests.test_age_and_moving_and_status_codes) ... ok
+test_any_input_size_is_resized_to_the_working_image (tests.test_vector_encoder.ContainerTests.test_any_input_size_is_resized_to_the_working_image) ... ok
+test_first_frame_is_an_epoch_start_with_anchor_and_layer_clear (tests.test_vector_encoder.ContainerTests.test_first_frame_is_an_epoch_start_with_anchor_and_layer_clear) ... ok
+test_header_budget_and_key_bit (tests.test_vector_encoder.ContainerTests.test_header_budget_and_key_bit) ... ok
+test_last_stats_reports_timings_and_layers (tests.test_vector_encoder.ContainerTests.test_last_stats_reports_timings_and_layers) ... ok
+test_level_follows_the_quality_band (tests.test_vector_encoder.ContainerTests.test_level_follows_the_quality_band) ... ok
+test_small_budgets_never_exceed_the_body (tests.test_vector_encoder.ContainerTests.test_small_budgets_never_exceed_the_body) ... ok
+test_v3_is_a_beacon_of_anchor_and_status_only (tests.test_vector_encoder.ContainerTests.test_v3_is_a_beacon_of_anchor_and_status_only) ... ok
+test_polygon_outlines_are_not_edges (tests.test_vector_encoder.EdgeTests.test_polygon_outlines_are_not_edges) ... ok
+test_rut_and_wire_become_edges_with_classes (tests.test_vector_encoder.EdgeTests.test_rut_and_wire_become_edges_with_classes) ... ok
+test_static_edges_are_repeated_then_confirmed (tests.test_vector_encoder.EdgeTests.test_static_edges_are_repeated_then_confirmed) ... ok
+test_band_colours_are_measured (tests.test_vector_encoder.HorizonTests.test_band_colours_are_measured) ... ok
+test_curved_pre_calibration_horizon (tests.test_vector_encoder.HorizonTests.test_curved_pre_calibration_horizon) ... ok
+test_horizon_within_one_cell_at_several_tilts (tests.test_vector_encoder.HorizonTests.test_horizon_within_one_cell_at_several_tilts) ... ok
+test_no_horizon_when_the_view_is_all_ground (tests.test_vector_encoder.HorizonTests.test_no_horizon_when_the_view_is_all_ground) ... ok
+test_raised_bucket_edge_does_not_capture_the_horizon (tests.test_vector_encoder.HorizonTests.test_raised_bucket_edge_does_not_capture_the_horizon) ... ok
+test_resid_follows_a_small_move_and_abs_a_large_one (tests.test_vector_encoder.HorizonTests.test_resid_follows_a_small_move_and_abs_a_large_one) ... ok
+test_gradient_is_sent_for_a_shaded_region (tests.test_vector_encoder.LayerTests.test_gradient_is_sent_for_a_shaded_region) ... ok
+test_pasture_gives_no_shapes (tests.test_vector_encoder.LayerTests.test_pasture_gives_no_shapes) ... ok
+test_rectangles_become_polygons_with_measured_fills (tests.test_vector_encoder.LayerTests.test_rectangles_become_polygons_with_measured_fills) ... ok
+test_three_isolated_green_blobs_become_three_trees (tests.test_vector_encoder.LayerTests.test_three_isolated_green_blobs_become_three_trees) ... ok
+test_mask_shape_is_checked (tests.test_vector_encoder.MaskTests.test_mask_shape_is_checked) ... ok
+test_masked_pixels_are_never_sampled (tests.test_vector_encoder.MaskTests.test_masked_pixels_are_never_sampled) ... ok
+test_no_vertex_inside_the_mask_and_bucket_object_appears (tests.test_vector_encoder.MaskTests.test_no_vertex_inside_the_mask_and_bucket_object_appears) ... ok
+test_anchor_repeat_skipped_by_the_budget_is_sent_in_the_next_frame (tests.test_vector_encoder.TemporalTests.test_anchor_repeat_skipped_by_the_budget_is_sent_in_the_next_frame) ... ok
+test_atomic_epoch_start_drops_the_cached_shapes_at_the_store (tests.test_vector_encoder.TemporalTests.test_atomic_epoch_start_drops_the_cached_shapes_at_the_store) ... ok
+test_carousel_frame_every_fourth_at_v0 (tests.test_vector_encoder.TemporalTests.test_carousel_frame_every_fourth_at_v0) ... ok
+test_epoch_start_waits_for_a_budget_that_fits_its_anchor (tests.test_vector_encoder.TemporalTests.test_epoch_start_waits_for_a_budget_that_fits_its_anchor) ... ok
+test_failed_epoch_attempt_leaves_the_mirror_and_the_counter_alone (tests.test_vector_encoder.TemporalTests.test_failed_epoch_attempt_leaves_the_mirror_and_the_counter_alone) ... ok
+test_force_epoch_and_epoch_start_argument (tests.test_vector_encoder.TemporalTests.test_force_epoch_and_epoch_start_argument) ... ok
+test_gain_absorbs_a_global_exposure_step_without_a_ucol_flood (tests.test_vector_encoder.TemporalTests.test_gain_absorbs_a_global_exposure_step_without_a_ucol_flood) ... ok
+test_id_exhaustion_starts_a_new_epoch (tests.test_vector_encoder.TemporalTests.test_id_exhaustion_starts_a_new_epoch) ... ok
+test_no_horizon_epoch_start_is_anchor_and_clear_or_nothing (tests.test_vector_encoder.TemporalTests.test_no_horizon_epoch_start_is_anchor_and_clear_or_nothing) ... ok
+test_relabelled_scene_starts_a_new_epoch (tests.test_vector_encoder.TemporalTests.test_relabelled_scene_starts_a_new_epoch) ... ok
+test_repeat_skipped_by_the_budget_is_sent_in_the_next_frame (tests.test_vector_encoder.TemporalTests.test_repeat_skipped_by_the_budget_is_sent_in_the_next_frame) ... ok
+test_residual_never_increases_on_a_static_scene (tests.test_vector_encoder.TemporalTests.test_residual_never_increases_on_a_static_scene) ... ok
+test_safety_refresh_after_60_s_keeps_the_masses (tests.test_vector_encoder.TemporalTests.test_safety_refresh_after_60_s_keeps_the_masses) ... ok
+test_static_scene_repeats_then_confirms (tests.test_vector_encoder.TemporalTests.test_static_scene_repeats_then_confirms) ... ok
+test_upd_ucol_and_del (tests.test_vector_encoder.TemporalTests.test_upd_ucol_and_del) ... ok
+test_epoch_start_fits_the_budget_and_anchors_the_store (tests.test_vector_interop.EncoderStoreInteropTests.test_epoch_start_fits_the_budget_and_anchors_the_store) ... ok
+test_pan_keeps_the_two_ends_in_sync (tests.test_vector_interop.EncoderStoreInteropTests.test_pan_keeps_the_two_ends_in_sync) ... ok
+test_quality_band_sets_the_level_bit (tests.test_vector_interop.EncoderStoreInteropTests.test_quality_band_sets_the_level_bit) ... ok
+test_static_second_frame_agrees_on_digest_and_confirm (tests.test_vector_interop.EncoderStoreInteropTests.test_static_second_frame_agrees_on_digest_and_confirm) ... ok
+test_both_files_exist (tests.test_vs1_codec_parity_sil.Vs1CodecMirrorParityTests.test_both_files_exist) ... ok
+test_mirror_header_is_two_comment_lines_naming_the_base_and_this_test (tests.test_vs1_codec_parity_sil.Vs1CodecMirrorParityTests.test_mirror_header_is_two_comment_lines_naming_the_base_and_this_test) ... ok
+test_mirror_is_identical_to_the_base_below_the_header (tests.test_vs1_codec_parity_sil.Vs1CodecMirrorParityTests.test_mirror_is_identical_to_the_base_below_the_header) ... ok
+
+----------------------------------------------------------------------
+Ran 46 tests in 107.426s
+
+OK
