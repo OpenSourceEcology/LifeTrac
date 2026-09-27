@@ -3985,6 +3985,18 @@ the next round of code lands against a clear contract.
 
 ---
 
+### L. Vector scene mode and coordinated modem-rung switch (proposed 2026-09-23)
+
+Design proposals, not started; sign-off items D-VS1–D-VS9 in
+[DESIGN-CONTROLLER/DECISIONS.md](DESIGN-CONTROLLER/DECISIONS.md#vector-scene-mode--proposed-pending-ose-sign-off),
+task list in [DESIGN-CONTROLLER/TODO.md § RS-13](DESIGN-CONTROLLER/TODO.md),
+specification in [DESIGN-CONTROLLER/VECTOR_SCENE.md](DESIGN-CONTROLLER/VECTOR_SCENE.md).
+
+- [ ] **Vector scene mode (RS-13):** a `TileDeltaFrame` codec `6` / `EncodeMode.VECTOR = 9` that sends the whole camera frame as layered vector shapes in one fragment (197 B FHSS / 237 B DTS), with persistent shape IDs, no keyframe trains and no keyframe requests; the floor below `mono_g4` when the signal is degraded and the tile modes are failing. Phases: SIL + Vector Lab → strict-path integration + bench legs → self-model → optimisations.
+- [ ] **Degradation ladder V0–V3** (`VECTOR_SCENE.md` §4.5): shorter frames, more repeats and less detail as measured loss and SNR margin worsen; no acknowledgement or retry traffic; level carried as the band of the `0x63` quality byte (one mapping, value inside the band = detail); tractor self-select from received-frame SNR and heartbeat silence (a 5 s base heartbeat is part of the design).
+- [ ] **Coordinated modem-rung switch (D-VS8, `VECTOR_SCENE.md` §4.6):** SF7/8/9 rungs inside each regulatory profile on the L072, switched with a confirmed and scheduled handshake (`0x6D`–`0x71`), a lease on the new rung, per-side revert timers and a rendezvous rung with a beacon; +5 dB (DTS) / +8 dB (FHSS) at the slowest rung, where only the vector mode keeps whole-scene coverage (a tile frame carries at most one minimal `mono_g4` tile). Needs a new L072 CFG key, a schema-2 header field, a SIL model and two bench legs; the range-edge attenuator leg would be the campaign's first field-range data.
+- [ ] **Control-plane resilience before the drive plane (D-VS9):** reserved control slot sized per rung (revive firmware Batch 2) and a fix for base → tractor delivery on FHSS (1/17 and 49/281 in the RS-12.12 legs).
+
 ## Recently completed (running log — newest first)
 
 **2026-05-18 — IP-W2-09b base_station test runner with process isolation

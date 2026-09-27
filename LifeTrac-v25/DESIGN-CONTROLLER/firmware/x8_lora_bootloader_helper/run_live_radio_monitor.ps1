@@ -88,6 +88,12 @@ param(
     # LIFETRAC_PENDING_GIVEUP_COOLDOWN_S=0 for the A/B control (-RxExtraEnv).
     [string]$CmdStreamMinGapS = "1.0",
     [string]$RxExtraEnv = "",
+    # RS-13.1 (2026-09-26): extra `-e K=V` pairs for the camera_service
+    # container of -TxFeed camera. "-e LIFETRAC_ENCODE_MODE=9" boots the
+    # tractor in VECTOR (codec 6); "-e LIFETRAC_VECTOR_DETAIL=80" is its dial.
+    # Same PR #121 rule as -RxExtraEnv: the assembled local below is named
+    # differently from this parameter in every letter case.
+    [string]$CamExtraEnv = "",
     # RS-12.13 (2026-09-12): the hold applies only to trains of at least this
     # many fragments (LIFETRAC_NO_PARK_LAST_MIN_FRAGS on the tx daemon).
     [int]$NoParkLastMinFrags = 3,
@@ -408,7 +414,9 @@ if ($TxFeed -eq "camera") {
     # Omitting it makes camera_service look broken in three unrelated-looking
     # ways at once. It is not broken; the flag declares which transport owns
     # the frames.
-    $camRun = "echo fio | sudo -S -p '' docker rm -f camera_svc 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name camera_svc --network=host --entrypoint python3 --device=$CameraDevice -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CAMERA_SOURCE=v4l2 -e LIFETRAC_CAMERA_DEVICE=$CameraDevice -e LIFETRAC_CAMERA_FPS=$SynthFps -e LIFETRAC_USE_LORA_BRIDGE=1 $profEnv lifetrac-tractor-x8:latest -u /work/camera_service.py"
+    $camEnvArgs = ""
+    if ($CamExtraEnv -ne "") { $camEnvArgs = $CamExtraEnv }
+    $camRun = "echo fio | sudo -S -p '' docker rm -f camera_svc 2>/dev/null ; echo fio | sudo -S -p '' docker run -d --name camera_svc --network=host --entrypoint python3 --device=$CameraDevice -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CAMERA_SOURCE=v4l2 -e LIFETRAC_CAMERA_DEVICE=$CameraDevice -e LIFETRAC_CAMERA_FPS=$SynthFps -e LIFETRAC_USE_LORA_BRIDGE=1 $profEnv $camEnvArgs lifetrac-tractor-x8:latest -u /work/camera_service.py"
     cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"$camRun`"" | Out-Null
     Start-Sleep -Seconds 4
     Write-Host "  [CAMERA] camera_service launched on $CameraDevice - encode-to-fit IS in the loop" -ForegroundColor Green
@@ -452,6 +460,16 @@ Write-Host "`n=== FINAL LOG SUMMARY ===" -ForegroundColor Cyan
 $txFinal = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker logs tx_smoke 2>&1`""
 $rxFinal = cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"echo fio | sudo -S -p '' docker logs rx_smoke 2>&1`""
 $synthFinal = ""
+$camFinal = $null
+if ($TxFeed -eq "camera") {
+    # RS-13.1: keep camera_service's log (encoder `vector_stats` lines, mode
+    # acks) in the evidence bundle and stop the container like tx_smoke, so
+    # the camera is free for the next leg's launch (which rm -f's it anyway).
+    $camFinal = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker logs camera_svc 2>&1`""
+    cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' docker stop -t 1 camera_svc 2>&1`"" | Out-Null
+    Write-Host "--- CAMERA SERVICE LOGS (last 8) ---" -ForegroundColor Yellow
+    Write-Host (($camFinal | Select-Object -Last 8) -join "`n")
+}
 if ($TxFeed -eq "local") {
     # Capture the publisher's OFFERED line for the evidence bundle, then
     # remove it (it self-exits after DurationS+10). bench_mqtt stays up
@@ -482,6 +500,9 @@ if ($Archive) {
     if ($synthFinal) {
         $synthFinal | Out-File -FilePath (Join-Path $dir "synth_pub.log") -Encoding utf8
     }
+    if ($camFinal) {
+        $camFinal | Out-File -FilePath (Join-Path $dir "camera_service.log") -Encoding utf8
+    }
     @(
         "git_sha=$sha",
         "duration_s=$DurationS",
@@ -499,6 +520,7 @@ if ($Archive) {
         "cmd_stream_min_gap_s=$CmdStreamMinGapS",
         "rx_extra_env=$RxExtraEnv",
         "rx_env_args=$rxEnvArgs",
+        "cam_extra_env=$CamExtraEnv",
         "parity_group=$ParityGroup",
         "aligned_pump=$AlignedPump",
         "reactive_fire=$ReactiveFire",

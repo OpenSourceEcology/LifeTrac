@@ -23,6 +23,7 @@ _PIVOT_MOUNT_BOLT_ANGLES = is_undef(PIVOT_MOUNT_BOLT_ANGLES) ?
 arm_plate();
 
 module arm_plate(is_inner_plate=false) {
+    echo(BOM_PART = is_inner_plate ? "P9" : "P10");  // counted by drawings/generate_part_drawings.py
     // Local parameters derived from globals
     main_tube_len = ARM_MAIN_LEN; 
     drop_len = ARM_DROP_LEN;

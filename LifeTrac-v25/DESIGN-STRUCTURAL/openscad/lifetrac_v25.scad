@@ -1224,6 +1224,7 @@ module bolt_hole(diameter, depth) {
 // Made by torch-cutting top and bottom of square tube to create U-shape
 // Parameters: tube_size = source tube dimensions [size, wall], length, hole_dia
 module u_channel_lug(tube_size, length, hole_dia) {
+    echo(BOM_PART = str("U-LUG ", tube_size[0], "x", length, " D", hole_dia));  // counted by drawings/generate_part_drawings.py
     size = tube_size[0];
     wall = tube_size[1];
     rad = 12.7; // 1/2 inch radius
@@ -1359,6 +1360,7 @@ module hex_bolt_head(bolt_dia) {
 
 // Hex nut
 module hex_nut(bolt_dia) {
+    echo(BOM_PART = str("NUT ", bolt_dia));  // counted by drawings/generate_part_drawings.py
     nut_width = hex_head_width(bolt_dia);
     nut_h = nut_height(bolt_dia);
     
@@ -1394,7 +1396,8 @@ module hex_bolt_assembly(bolt_dia, length, show_nut=true) {
 }
 
 // Clevis pin with cotter pin holes
-module clevis_pin(pin_dia, length) {
+module clevis_pin(pin_dia, length, with_cotters=true) {
+    echo(BOM_PART = str("PIN ", pin_dia, "x", length));  // counted by drawings/generate_part_drawings.py
     color("Silver")
     difference() {
         cylinder(d=pin_dia, h=length, center=true, $fn=48);
@@ -1408,6 +1411,7 @@ module clevis_pin(pin_dia, length) {
     }
     
     // Cotter pins (simple representation)
+    if (with_cotters)
     color("Gold")
     for (z = [-length/2 + pin_dia/2, length/2 - pin_dia/2]) {
         translate([0, -pin_dia/2, z])
@@ -1552,6 +1556,7 @@ module side_panel_with_holes(is_inner = false) {
 
 // Left outer panel
 module side_panel_left_outer() {
+    echo(BOM_PART = "P1");  // counted by drawings/generate_part_drawings.py
     color("DarkSlateGray")
     translate([-(TRACK_WIDTH/2 + SANDWICH_SPACING/2 + PANEL_THICKNESS), 0, FRAME_Z_OFFSET])
     rotate([90, 0, 90])
@@ -1576,6 +1581,7 @@ module side_panel_left_outer() {
 
 // Left inner panel
 module side_panel_left_inner() {
+    echo(BOM_PART = "P3");  // counted by drawings/generate_part_drawings.py
     // Front stiffener interface parameters
     flat_section_height = 127.0;  // 5" flat section at front
     flat_section_top = BOTTOM_PLATE_INNER_TRIM + flat_section_height;  // Top of 5" section
@@ -1634,6 +1640,7 @@ module side_panel_left_inner() {
 
 // Right inner panel
 module side_panel_right_inner() {
+    echo(BOM_PART = "P3");  // counted by drawings/generate_part_drawings.py
     // Front stiffener interface parameters
     flat_section_height = 127.0;  // 5" flat section at front
     flat_section_top = BOTTOM_PLATE_INNER_TRIM + flat_section_height;  // Top of 5" section
@@ -1680,6 +1687,7 @@ module side_panel_right_inner() {
 
 // Right outer panel
 module side_panel_right_outer() {
+    echo(BOM_PART = "P2");  // counted by drawings/generate_part_drawings.py
     color("DarkSlateGray")
     translate([(TRACK_WIDTH/2 + SANDWICH_SPACING/2), 0, FRAME_Z_OFFSET])
     rotate([90, 0, 90])
@@ -1738,6 +1746,16 @@ module cylinder_mounting_lugs() {
 // ARM PIVOT BOSSES
 // =============================================================================
 
+// Arm pivot pin length: through the sandwich, with room for a nut each side
+function arm_pivot_pin_length() = SANDWICH_SPACING + PANEL_THICKNESS * 2 + 2 * nut_height(PIVOT_PIN_DIA) + 20;
+
+module arm_pivot_pin() {
+    echo(BOM_PART = "R2");  // counted by drawings/generate_part_drawings.py
+    color("Silver")
+    rotate([0, 90, 0])
+    cylinder(d=PIVOT_PIN_DIA, h=arm_pivot_pin_length(), center=true, $fn=48);
+}
+
 module arm_pivot_assembly() {
     // Pivot pins that go through the sandwich and arm
     nut_h = nut_height(PIVOT_PIN_DIA);  // Use function for nut height
@@ -1745,14 +1763,12 @@ module arm_pivot_assembly() {
     // Plates are at +/- (SANDWICH_SPACING/2 + PANEL_THICKNESS) from center of sandwich
     // Total width of assembly = SANDWICH_SPACING + 2*PANEL_THICKNESS
     // Add 2*nut_h + extra clearance
-    pivot_length = SANDWICH_SPACING + PANEL_THICKNESS * 2 + 2 * nut_h + 20;
+    pivot_length = arm_pivot_pin_length();
     
     // Left pivot (at rear where tall section is)
     translate([-(TRACK_WIDTH/2), ARM_PIVOT_Y, ARM_PIVOT_Z]) {
         // Pin
-        color("Silver")
-        rotate([0, 90, 0])
-        cylinder(d=PIVOT_PIN_DIA, h=pivot_length, center=true, $fn=48);
+        arm_pivot_pin();
         
         // Inner nut (machine side)
         translate([pivot_length/2 - nut_h/2, 0, 0])
@@ -1768,9 +1784,7 @@ module arm_pivot_assembly() {
     // Right pivot (at rear where tall section is)
     translate([(TRACK_WIDTH/2), ARM_PIVOT_Y, ARM_PIVOT_Z]) {
         // Pin
-        color("Silver")
-        rotate([0, 90, 0])
-        cylinder(d=PIVOT_PIN_DIA, h=pivot_length, center=true, $fn=48);
+        arm_pivot_pin();
         
         // Inner nut (machine side)
         translate([-pivot_length/2 + nut_h/2, 0, 0])
@@ -2400,7 +2414,7 @@ module mid_stiffener_plate(y_pos, z_start, z_end) {
     vertical_angle_iron_smart(plate_height, angle_size);
 }
 
-module back_stiffener_plate() {
+module back_stiffener_plate(only = "") {  // only = "plate": the plate alone (part drawings)
     plate_width = TRACK_WIDTH + SANDWICH_SPACING; 
     plate_thickness = PLATE_1_4_INCH;
     y_pos = 25.4; 
@@ -2414,6 +2428,8 @@ module back_stiffener_plate() {
     
     inner_offset = TRACK_WIDTH/2 - SANDWICH_SPACING/2;
     
+    if (only == "" || only == "plate") echo(BOM_PART = "P4");  // counted by drawings/generate_part_drawings.py
+    if (only == "" || only == "plate")
     difference() {
         // Plate
         color("Silver")
@@ -2464,6 +2480,7 @@ module back_stiffener_plate() {
         }
     }
     
+    if (only == "") {  // left out when drawing a single part
     // Angles - Using structural part modules from parts/structural/
     // Part A1: Back stiffener outer wall vertical angles (2 pcs)
     // Part A2: Back stiffener inner wall vertical angles (4 pcs)
@@ -2497,6 +2514,7 @@ module back_stiffener_plate() {
     // Right Side (Legs +X, +Y)
     translate([inner_offset, y_pos + plate_thickness, z_start])
     part_a2_back_inner_vertical(show_holes=true);
+    }  // if (only == "")
 }
 
 // =============================================================================
@@ -2507,7 +2525,7 @@ module back_stiffener_plate() {
 // Center section (between motor plates): 10" + bottom plate thickness
 // Outer sections (motor plate to outer wall): 5" tall
 
-module front_stiffener_plate() {
+module front_stiffener_plate(only = "") {  // only = "center" | "outer_left" | "outer_right": one plate (part drawings)
     plate_width = TRACK_WIDTH + SANDWICH_SPACING; 
     plate_thickness = PLATE_1_4_INCH;
     y_pos = BOTTOM_PLATE_Y_END;  // Flush with front of motor mount plates
@@ -2549,6 +2567,8 @@ module front_stiffener_plate() {
     // Center section width - from outer edge of left motor plate to outer edge of right motor plate
     center_half_width = MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2;
     
+    if (only == "" || only == "center") echo(BOM_PART = "P5");  // counted by drawings/generate_part_drawings.py
+    if (only == "" || only == "center")
     difference() {
         color("Silver")
         translate([-center_half_width, y_pos, z_start])
@@ -2573,6 +2593,8 @@ module front_stiffener_plate() {
     }
     
     // Left outer section plate (outer wall to outer edge of motor plate)
+    if (only == "" || only == "outer_left") echo(BOM_PART = "P6");  // counted by drawings/generate_part_drawings.py
+    if (only == "" || only == "outer_left")
     difference() {
         color("Silver")
         translate([-plate_width/2, y_pos, z_start])
@@ -2612,6 +2634,8 @@ module front_stiffener_plate() {
     }
     
     // Right outer section plate (outer edge of motor plate to outer wall)
+    if (only == "" || only == "outer_right") echo(BOM_PART = "P6");  // counted by drawings/generate_part_drawings.py
+    if (only == "" || only == "outer_right")
     difference() {
         color("Silver")
         translate([center_half_width, y_pos, z_start])
@@ -2650,6 +2674,7 @@ module front_stiffener_plate() {
         cylinder(d=outer_bolt_dia, h=20, center=true, $fn=16);
     }
     
+    if (only == "") {  // left out when drawing a single part
     // Angle Irons - Outer sections use shorter angles (~4.75"), center uses frame tube angles (5.75")
     // NOTE: Using part_a10 for outer sections (4.75") and part_a9/frame_tube_angle_iron for center (5.75")
     
@@ -2706,6 +2731,7 @@ module front_stiffener_plate() {
     translate([MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2, y_pos, z_start + outer_angle_z_offset])
     rotate([0, 0, -90])
     part_a10_front_outer_angle(show_holes=true);
+    }  // if (only == "")
 }
 
 // =============================================================================
@@ -2725,7 +2751,7 @@ module _plate_segment_holes(seg_start, seg_length, x_pos, y_start, z_pos, plate_
     }
 }
 
-module bottom_stiffener_plate() {
+module bottom_stiffener_plate(only = "") {  // only = "plate": the plate alone (part drawings)
     // Plate spans full width like back_stiffener_plate
     plate_width = TRACK_WIDTH + SANDWICH_SPACING;
     plate_thickness = PLATE_1_4_INCH;
@@ -2742,6 +2768,8 @@ module bottom_stiffener_plate() {
     
     inner_offset = TRACK_WIDTH/2 - SANDWICH_SPACING/2;
     
+    if (only == "" || only == "plate") echo(BOM_PART = "P7");  // counted by drawings/generate_part_drawings.py
+    if (only == "" || only == "plate")
     difference() {
         // Plate (horizontal, in XY plane)
         color("Silver")
@@ -2801,6 +2829,7 @@ module bottom_stiffener_plate() {
         _plate_segment_holes(ANGLE_SEGMENT_3_START, ANGLE_SEGMENT_3_LENGTH, MOTOR_PLATE_X + MOTOR_PLATE_THICKNESS/2 + hole_offset, y_start, z_pos, plate_thickness, bolt_dia);
     }
     
+    if (only == "") {  // left out when drawing a single part
     // Angle Irons - horizontal along Y axis, X-leg flat on plate, Z-leg vertical against wall
     // Split into 3 segments with 8" gaps centered on wheel axes
     // Part A6: Bottom stiffener horizontal angle iron (24 pieces total)
@@ -2833,6 +2862,7 @@ module bottom_stiffener_plate() {
     // Right side (OUTSIDE - X-leg extends +X into sandwich gap, Z-leg goes up) -> NO mirror
     translate([inner_offset, y_start, z_pos + plate_thickness])
     part_a6_split_horizontal_angle_iron(show_holes=true);
+    }  // if (only == "")
 }
 
 // =============================================================================
@@ -2900,7 +2930,7 @@ module uwu_motor_mount_holes(wheel_axis_y, y_start, plate_thickness) {
     }
 }
 
-module motor_mounting_plate() {
+module motor_mounting_plate(only = "") {  // only = "left" | "right": one plate (part drawings)
     plate_height = MOTOR_PLATE_HEIGHT;
     plate_length = BOTTOM_PLATE_LENGTH;  // Same as bottom stiffener plate
     plate_thickness = MOTOR_PLATE_THICKNESS;
@@ -2927,6 +2957,8 @@ module motor_mounting_plate() {
     
     // Left motor plate (negative X side)
     // Plate is in YZ plane with 2x6 tube cutouts
+    if (only == "" || only == "left") echo(BOM_PART = "P8");  // counted by drawings/generate_part_drawings.py
+    if (only == "" || only == "left")
     color("Silver")
     translate([-MOTOR_PLATE_X - plate_thickness/2, y_start, z_bottom])
     difference() {
@@ -2977,6 +3009,8 @@ module motor_mounting_plate() {
     }
     
     // Right motor plate (positive X side)
+    if (only == "" || only == "right") echo(BOM_PART = "P8");  // counted by drawings/generate_part_drawings.py
+    if (only == "" || only == "right")
     color("Silver")
     translate([MOTOR_PLATE_X - plate_thickness/2, y_start, z_bottom])
     difference() {
@@ -3025,6 +3059,7 @@ module motor_mounting_plate() {
         uwu_motor_mount_holes(_REAR_WHEEL_AXIS_Y, y_start, plate_thickness);
     }
     
+    if (only == "") {  // left out when drawing a single part
     // ==========================================================================
     // HORIZONTAL ANGLE IRONS - Bottom edge (connecting to bottom stiffener plate)
     // Part A6: Bottom stiffener horizontal angle iron
@@ -3097,6 +3132,7 @@ module motor_mounting_plate() {
     translate([MOTOR_PLATE_X - plate_thickness/2, REAR_FRAME_TUBE_Y, angle_z])
     mirror([1, 1, 0])
     frame_tube_angle_iron();
+    }  // if (only == "")
 }
 
 // =============================================================================
@@ -3673,8 +3709,50 @@ module uwu_hydraulic_motor() {
     }
 }
 
+// DIY wheel hub parts (DOM tube + lug plate + gussets), one module per part so
+// drawings/generate_part_drawings.py can draw each on its own
+module uwu_hub_dom_tube() {
+    echo(BOM_PART = "T7");  // counted by drawings/generate_part_drawings.py
+    _dom_total = HUB_DOM_LENGTH + HUB_PLATE_THICKNESS + 25.4;  // through plate + 1"
+    difference() {
+        cylinder(d=HUB_DOM_OD, h=_dom_total, center=false, $fn=48);
+        translate([0, 0, -1])
+        cylinder(d=HUB_DOM_ID, h=_dom_total + 2, center=false, $fn=48);
+        // Cross-drill hole for retention bolt (centered between gussets)
+        translate([0, 0, HUB_CROSS_BOLT_POS])
+        rotate([0, 0, 67.5])
+        rotate([0, 90, 0])
+        cylinder(d=HUB_CROSS_BOLT_DIAM, h=HUB_DOM_OD + 2, center=true, $fn=24);
+    }
+}
+
+module uwu_hub_lug_plate() {
+    echo(BOM_PART = "P17");  // counted by drawings/generate_part_drawings.py
+    difference() {
+        cylinder(d=HUB_PLATE_DIAM, h=HUB_PLATE_THICKNESS, $fn=64);
+        translate([0, 0, -1])
+        cylinder(d=HUB_PLATE_CENTER_BORE, h=HUB_PLATE_THICKNESS + 2, $fn=48);
+        for (i = [0 : BOBCAT_LUG_COUNT - 1]) {
+            rotate([0, 0, i * (360 / BOBCAT_LUG_COUNT)])
+            translate([BOBCAT_BOLT_CIRCLE_DIAM / 2, 0, -1])
+            cylinder(d=BOBCAT_LUG_HOLE_DIAM, h=HUB_PLATE_THICKNESS + 2, $fn=24);
+        }
+    }
+}
+
+module uwu_hub_gusset() {
+    echo(BOM_PART = "P18");  // counted by drawings/generate_part_drawings.py
+    linear_extrude(height=HUB_GUSSET_THICKNESS, center=true)
+    polygon(points=[
+        [0, 0],                                              // Inner at plate face
+        [HUB_PLATE_DIAM / 2 - HUB_DOM_OD / 2 - 5, 0],      // Outer at plate face
+        [0, HUB_GUSSET_HEIGHT]                               // Inner, inboard along DOM
+    ]);
+}
+
 // UWU Main shaft module
 module uwu_main_shaft(length) {
+    echo(BOM_PART = str("SHAFT ", UWU_SHAFT_DIAM, "x", length));  // counted by drawings/generate_part_drawings.py
     color("Silver")
     cylinder(h=length, d=UWU_SHAFT_DIAM, $fn=32);
 }
@@ -3857,19 +3935,9 @@ module uwu_assembly_positioned(side="left") {
             // === DIY HUB (DOM tube + gussets + lug plate) ===
             // DOM tube (2" OD x 0.25" wall) - extends inboard over shaft
             // and 1" past the outer face of the bolt plate
-            _dom_total = HUB_DOM_LENGTH + HUB_PLATE_THICKNESS + 25.4;  // through plate + 1"
             color("DimGray")
             translate([0, 0, -HUB_DOM_LENGTH])
-            difference() {
-                cylinder(d=HUB_DOM_OD, h=_dom_total, center=false, $fn=48);
-                translate([0, 0, -1])
-                cylinder(d=HUB_DOM_ID, h=_dom_total + 2, center=false, $fn=48);
-                // Cross-drill hole for retention bolt (centered between gussets)
-                translate([0, 0, HUB_CROSS_BOLT_POS])
-                rotate([0, 0, 67.5])
-                rotate([0, 90, 0])
-                cylinder(d=HUB_CROSS_BOLT_DIAM, h=HUB_DOM_OD + 2, center=true, $fn=24);
-            }
+            uwu_hub_dom_tube();
 
             // Cross-bolt visualization
             color("DarkRed")
@@ -3880,16 +3948,7 @@ module uwu_assembly_positioned(side="left") {
 
             // Lug bolt plate (circular, at Z=0 facing +Z toward rim/tire)
             color("Silver")
-            difference() {
-                cylinder(d=HUB_PLATE_DIAM, h=HUB_PLATE_THICKNESS, $fn=64);
-                translate([0, 0, -1])
-                cylinder(d=HUB_PLATE_CENTER_BORE, h=HUB_PLATE_THICKNESS + 2, $fn=48);
-                for (i = [0 : BOBCAT_LUG_COUNT - 1]) {
-                    rotate([0, 0, i * (360 / BOBCAT_LUG_COUNT)])
-                    translate([BOBCAT_BOLT_CIRCLE_DIAM / 2, 0, -1])
-                    cylinder(d=BOBCAT_LUG_HOLE_DIAM, h=HUB_PLATE_THICKNESS + 2, $fn=24);
-                }
-            }
+            uwu_hub_lug_plate();
 
             // Triangular gusset plates (welded between DOM and lug plate)
             // Base flush with lug plate face (Z=0), apex extends inboard along DOM (-Z)
@@ -3899,12 +3958,7 @@ module uwu_assembly_positioned(side="left") {
                 color("DarkGray")
                 translate([HUB_DOM_OD / 2, 0, 0])
                 rotate([-90, 0, 0])
-                linear_extrude(height=HUB_GUSSET_THICKNESS, center=true)
-                polygon(points=[
-                    [0, 0],                                              // Inner at plate face
-                    [HUB_PLATE_DIAM / 2 - HUB_DOM_OD / 2 - 5, 0],      // Outer at plate face
-                    [0, HUB_GUSSET_HEIGHT]                               // Inner, inboard along DOM
-                ]);
+                uwu_hub_gusset();
             }
         }
 
@@ -4018,6 +4072,7 @@ module loader_arms() {
 // =============================================================================
 
 module bucket_back_plate() {
+    echo(BOM_PART = "P12");  // counted by drawings/generate_part_drawings.py
     tab_len = 50;
     difference() {
         union() {
@@ -4047,6 +4102,7 @@ module bucket_back_plate() {
 }
 
 module bucket_bottom_plate() {
+    echo(BOM_PART = "P13");  // counted by drawings/generate_part_drawings.py
     tab_len = 50;
     difference() {
         union() {
@@ -4076,6 +4132,7 @@ module bucket_bottom_plate() {
 }
 
 module bucket_side_plate(is_left=true) {
+    echo(BOM_PART = "P14");  // counted by drawings/generate_part_drawings.py
     tab_len = 50;
     side = is_left ? -1 : 1;
     x_pos = (side == -1) ? -BUCKET_WIDTH/2 - PLATE_1_4_INCH : BUCKET_WIDTH/2;
@@ -4108,22 +4165,27 @@ module bucket_side_plate(is_left=true) {
     }
 }
 
-module bucket() {
+module bucket(only = "") {  // only = "cutting_edge": that bar alone (part drawings)
     // Standard bucket with Tab & Slot construction for welding
     
+    if (only == "") {
     bucket_back_plate();
     bucket_bottom_plate();
     bucket_side_plate(is_left=true);
     bucket_side_plate(is_left=false);
+    }
     
     // Cylinder Lugs are now handled in bucket_attachment() to ensure correct alignment with arm
     // See bucket_attachment() module for lug placement.
     
     // Cutting edge
+    if (only == "" || only == "cutting_edge") echo(BOM_PART = "P19");  // counted by drawings/generate_part_drawings.py
+    if (only == "" || only == "cutting_edge")
     color("DarkSlateGray")
     translate([-BUCKET_WIDTH/2, BUCKET_DEPTH - PLATE_3_4_INCH, -BUCKET_HEIGHT])
     cube([BUCKET_WIDTH, PLATE_3_4_INCH, 80]);
     
+    if (only == "") {  // left out when drawing a single part
     // Weld Beads
     // 1. Bottom-Back Corner (Inside)
     translate([0, PLATE_1_4_INCH, -BUCKET_HEIGHT + PLATE_1_4_INCH])
@@ -4142,6 +4204,7 @@ module bucket() {
         rotate([90, 0, 0])
         weld_bead(length=BUCKET_HEIGHT - 20, diameter=8);
     }
+    }  // if (only == "")
 }
 
 // =============================================================================
@@ -4346,6 +4409,7 @@ module bucket_cylinders() {
 // Transverse angle iron for platform deck - Part A8 geometry
 // This module is kept for the complex hole placement logic
 module platform_transverse_angle(length) {
+    echo(BOM_PART = str("A8 L", length));  // counted by drawings/generate_part_drawings.py
     angle_bolt_hole_dia = PLATFORM_BOLT_DIA + PLATFORM_BOLT_CLEARANCE;
     leg = PLATFORM_ANGLE_LEG;
     thick = PLATFORM_ANGLE_THICK;
@@ -4379,6 +4443,7 @@ module platform_transverse_angle(length) {
 // Side angle iron for platform arms - Part A7 geometry
 // This module is kept for the complex hole placement logic
 module platform_angle_iron(length=0, is_side=false) {
+    if (is_side) echo(BOM_PART = str("A7 L", length));  // counted by drawings/generate_part_drawings.py
     angle_bolt_hole_dia = PLATFORM_BOLT_DIA + PLATFORM_BOLT_CLEARANCE;
     // Use provided length or default
     height = (length > 0) ? length : (PLATFORM_ARM_LENGTH - PLATFORM_BRACKET_WIDTH/2);
@@ -4816,6 +4881,7 @@ module folding_platform_assembly(fold_angle=90) {
         color("Silver")
         for (side = [-1, 1]) {
             // Pin at the inner panel location
+            echo(BOM_PART = str("PIN ", PLATFORM_PIVOT_PIN_DIA, "x", PANEL_THICKNESS * 2 + 30));  // counted by drawings/generate_part_drawings.py
             translate([side * PLATFORM_PIVOT_X, pivot_y, pivot_z])
             rotate([0, 90, 0])
             cylinder(d=PLATFORM_PIVOT_PIN_DIA, h=PANEL_THICKNESS * 2 + 30, center=true, $fn=32);
@@ -4829,11 +4895,13 @@ module folding_platform_assembly(fold_angle=90) {
         for (side = [-1, 1]) {
             if (fold_angle > 45) {
                 // Deployed position - lock pin below pivot
+                echo(BOM_PART = str("PIN ", PLATFORM_LOCK_PIN_DIA, "x", PANEL_THICKNESS + 20));  // counted by drawings/generate_part_drawings.py
                 translate([side * PLATFORM_PIVOT_X, pivot_y, pivot_z - PLATFORM_LOCK_OFFSET])
                 rotate([0, 90, 0])
                 cylinder(d=PLATFORM_LOCK_PIN_DIA, h=PANEL_THICKNESS + 20, center=true, $fn=24);
             } else {
                 // Stowed position - lock pin at arm end position
+                echo(BOM_PART = str("PIN ", PLATFORM_LOCK_PIN_DIA, "x", PANEL_THICKNESS + 20));  // counted by drawings/generate_part_drawings.py
                 lock_y = pivot_y - PLATFORM_ARM_LENGTH * sin(fold_angle);
                 lock_z = pivot_z + PLATFORM_ARM_LENGTH * cos(fold_angle);
                 translate([side * PLATFORM_PIVOT_X, lock_y, lock_z])

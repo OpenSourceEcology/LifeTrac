@@ -85,6 +85,7 @@ CODEC_BTC4_PER_TILE   = 2   # 4-level palette + 2 bpp index plane, per tile.
 CODEC_BTC4_PER_FRAME  = 3   # 4 × RGB palette in body prefix + 2 bpp tiles.
 CODEC_WEBP_LUMA       = 4   # Y_ONLY: grayscale WebP per tile (luma-only).
 CODEC_WEBP_RAWSTREAM  = 5   # RAWSTREAM: container-stripped WebP bitstream per tile.
+CODEC_VECTOR          = 6   # VECTOR: VS1 vector-scene body after the header, no tiles (VECTOR_SCENE.md §3).
 CODEC_RESERVED_MAX    = 15  # parser rejects codec > this
 
 
@@ -111,6 +112,9 @@ class TileDeltaFrame:
     # caller that constructs a TileDeltaFrame the old way keeps shipping
     # WebP tiles. ``parse_tile_delta_frame`` always populates this.
     codec: int = CODEC_WEBP
+    # CODEC_VECTOR only: the VS1 bitstream that follows the 6-byte header.
+    # Parsed by image_pipeline.vector_scene, never by Canvas.apply.
+    vector_body: bytes = b""
 
     @property
     def is_keyframe(self) -> bool:
@@ -151,6 +155,14 @@ def parse_tile_delta_frame(payload: bytes) -> TileDeltaFrame:
         raise FrameDecodeError("tile_px must be > 0")
     if codec > CODEC_RESERVED_MAX:
         raise FrameDecodeError(f"codec id {codec} > reserved max {CODEC_RESERVED_MAX}")
+    if codec == CODEC_VECTOR:
+        # VECTOR_SCENE.md §3: after the 6-byte header comes the vector-scene
+        # bitstream, not a changed-tile bitmap. The vector store parses it,
+        # so the trailing bytes are the payload rather than an error.
+        return TileDeltaFrame(
+            frame_kind=frame_kind, base_seq=base_seq, grid_w=grid_w,
+            grid_h=grid_h, tile_px=tile_px, changed_indices=[], tiles=[],
+            codec=codec, vector_body=bytes(payload[HEADER_FIXED_LEN:]))
 
     n_tiles = grid_w * grid_h
     bitmap_len = (n_tiles + 7) // 8
@@ -207,6 +219,11 @@ def encode_tile_delta_frame(frame: TileDeltaFrame) -> bytes:
     if not 0 <= frame.codec <= CODEC_RESERVED_MAX:
         raise FrameDecodeError(
             f"codec id {frame.codec} out of [0,{CODEC_RESERVED_MAX}]")
+    if frame.codec == CODEC_VECTOR:
+        return struct.pack("BBBBBB",
+                           frame.frame_kind, frame.base_seq,
+                           frame.grid_w, frame.grid_h, frame.tile_px,
+                           frame.codec) + bytes(frame.vector_body)
     n_tiles = frame.grid_w * frame.grid_h
     bitmap = bytearray((n_tiles + 7) // 8)
     seen = set()
