@@ -8,14 +8,14 @@ Plain quantities are counted from `BOM_PART` markers in the assembly. Quantities
 
 | Category | Unique parts | Pieces per machine | Mass per machine |
 |---|---:|---:|---:|
-| CNC-cut plate | 19 | 47 | 628.7 kg |
+| CNC-cut plate | 19 | 47 | 630.5 kg |
 | Angle iron (cut and drill) | 10 | 78 | 87.3 kg |
 | Rectangular / square tube (cut and drill) | 6 | 11 | 112.9 kg |
 | Round bar and pins (cut and drill) | 6 | 16 | 19.2 kg |
 | Lugs and brackets cut from tube | 3 | 6 | 4.0 kg |
 | 3D-printed jigs | 6 | 13 † | 4.4 kg |
 | Purchased hardware (reference) | 10 | 1350 † | 24.2 kg |
-| **All parts** | **60** | **1521** † | **881 kg** |
+| **All parts** | **60** | **1521** † | **882 kg** |
 
 † Includes quantities typed into the manifest or estimated from hole counts; the tables below mark which.
 
@@ -25,7 +25,7 @@ Material for the parts cut from stock, added up per stock size. Lengths and blan
 
 | Stock | Parts | Pieces | Total cut length | Total blank area | Mass |
 |---|---|---:|---:|---:|---:|
-| PL 1/2 [12.7] ASTM A36 | P1, P2, P3, P17 | 8 |  | 5.61 m² [60.4 ft²] | 330.2 kg |
+| PL 1/2 [12.7] ASTM A36 | P1, P2, P3, P17 | 8 |  | 5.61 m² [60.4 ft²] | 331.9 kg |
 | PL 1/4 [6.35] ASTM A36 | P4, P5, P6, P7, P8, P9, P10, P11, P12, P13, P14, P15, P16, P18 | 38 |  | 7.59 m² [81.7 ft²] | 285.3 kg |
 | PL 3/4 [19.05] ASTM A36 | P19 | 1 |  | 0.09 m² [0.9 ft²] | 13.2 kg |
 | L2x2x1/4 ANGLE (2" x 2" x 1/4"), ASTM A36 | A1, A2, A4, A5, A6-1, A6-2, A6-3, A7, A8, A10 | 78 | 18.70 m [61.4 ft] |  | 87.3 kg |
@@ -43,9 +43,9 @@ Material for the parts cut from stock, added up per stock size. Lengths and blan
 
 | Part | Name | Stock | Qty | Size | Mass each | Rev | Drawing | CNC |
 |---|---|---|---:|---|---:|:-:|---|---|
-| **P1** | Side panel, outer, left | PL 1/2 [12.7] ASTM A36 | 1 | 1392.6 x 1000 | 82.41 kg | A | [PDF](pdf/P1_side-panel-outer-left.pdf) | [DXF](dxf/P1_side-panel-outer-left.dxf) |
-| **P2** | Side panel, outer, right | PL 1/2 [12.7] ASTM A36 | 1 | 1392.6 x 1000 | 82.41 kg | A | [PDF](pdf/P2_side-panel-outer-right.pdf) | [DXF](dxf/P2_side-panel-outer-right.dxf) |
-| **P3** | Side panel, inner | PL 1/2 [12.7] ASTM A36 | 2 | 1349.2 x 968.2 | 75.28 kg | A | [PDF](pdf/P3_side-panel-inner.pdf) | [DXF](dxf/P3_side-panel-inner.dxf) |
+| **P1** | Side panel, outer, left | PL 1/2 [12.7] ASTM A36 | 1 | 1392.6 x 1000 | 82.84 kg | B | [PDF](pdf/P1_side-panel-outer-left.pdf) | [DXF](dxf/P1_side-panel-outer-left.dxf) |
+| **P2** | Side panel, outer, right | PL 1/2 [12.7] ASTM A36 | 1 | 1392.6 x 1000 | 82.84 kg | B | [PDF](pdf/P2_side-panel-outer-right.pdf) | [DXF](dxf/P2_side-panel-outer-right.dxf) |
+| **P3** | Side panel, inner | PL 1/2 [12.7] ASTM A36 | 2 | 1349.2 x 968.2 | 75.70 kg | B | [PDF](pdf/P3_side-panel-inner.pdf) | [DXF](dxf/P3_side-panel-inner.dxf) |
 | **P4** | Back stiffener plate | PL 1/4 [6.35] ASTM A36 | 1 | 1020 x 650 | 32.97 kg | A | [PDF](pdf/P4_back-stiffener-plate.pdf) | [DXF](dxf/P4_back-stiffener-plate.dxf) |
 | **P5** | Front stiffener plate, centre | PL 1/4 [6.35] ASTM A36 | 1 | 481.6 x 260.4 | 6.22 kg | B | [PDF](pdf/P5_front-stiffener-plate-centre.pdf) | [DXF](dxf/P5_front-stiffener-plate-centre.dxf) |
 | **P6** | Front stiffener plate, outer | PL 1/4 [6.35] ASTM A36 | 2 | 269.2 x 127 | 1.68 kg | A | [PDF](pdf/P6_front-stiffener-plate-outer.pdf) | [DXF](dxf/P6_front-stiffener-plate-outer.dxf) |
