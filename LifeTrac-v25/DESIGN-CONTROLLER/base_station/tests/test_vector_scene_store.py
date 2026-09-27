@@ -537,6 +537,19 @@ class ConfirmDigestTests(StoreCase):
         self.assertEqual(self.shapes()[1]["age_ms"], 300)
         self.assertEqual(self.st.stats["digest_mismatch"], 1)
 
+    def test_digest_with_a_wrong_n_live_is_a_mismatch(self):
+        # The crc8 passes a wrong live set 1 in 256 times; the record's n_live
+        # is the same mirror's size, so a count that differs mismatches
+        # whatever the crc says (RS-13.1 anomaly A1d).
+        self.feed(key() + [tri(1)], epoch=0, key_=True)
+        crc = vs.digest_crc([(1, self.DH1, self.SH1)], *NEUTRAL)
+        self.feed([vs.Digest(2, crc)], epoch=0)
+        self.assertFalse(self.snap()["digest_ok"])
+        self.assertEqual(self.st.stats["digest_mismatch"], 1)
+        self.feed([vs.Digest(1, crc)], epoch=0)
+        self.assertTrue(self.snap()["digest_ok"])
+        self.assertEqual(self.st.stats["digest_mismatch"], 1)
+
     def test_digest_covers_the_render_state(self):
         self.feed(key() + [tri(1)], epoch=0, key_=True)
         self.feed([vs.Gshift(1, 3, -2), vs.Gzoom(140), vs.Gain(10, 16, 20),

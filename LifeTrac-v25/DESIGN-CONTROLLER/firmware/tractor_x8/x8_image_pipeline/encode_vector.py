@@ -23,11 +23,52 @@ regions first (IoU ≥ 0.7 and ΔE76 ≤ 6, §4.3), and a verification also pass
 when the capture yields the identical define record, so a small shape whose
 raster IoU is quantisation-limited still confirms deterministically.
 
+Staying in step with the base (§3.4 rule 5, §4.3; the RS-13.1 bench found
+the mirror drifting from the store on a loss-free path, anomalies A1/A2):
+
+* the base drops a shape after ``TTL_FRAMES`` applied frames without a
+  verifying record (a define, an UPD or a CONFIRM), so the mirror expires a
+  shape on exactly that count, and every matched shape leaves the temporal
+  pass with a record or a CONFIRM — kept, redefined or deleted, never silent;
+* a same-hash define is a repeat that keeps the base's offset and colour,
+  so an identical outline at a non-zero offset returns to 0 by an UPD and
+  the mirror applies a same-hash define as a repeat;
+* a repeat-once or carousel re-send carries the shape's current UPD and
+  UCOL (once a shape has had either, always: a lost UPD back to 0 or a
+  lost UCOL back to the define's fill would otherwise never heal), so a
+  base that lost either, or dropped the shape, recovers at the next visit;
+  after a range-1/2 epoch start every kept shape owes its re-statement —
+  one slot-5 record carrying the define with the UPD and UCOL the shape
+  has after that capture, in place of any bare UPD, UCOL or CONFIRM — and
+  until it has gone out the shape is not counted by a DIGEST, CONFIRMs are
+  reserved only for shapes half-way to their TTL and no DIGEST goes, so a
+  base with stale state is repaired rather than tripped into resync and
+  the repeats are never starved by the frame's own changes or its reserve;
+* within a frame a shape's UPD / UCOL follow its define, so the repeat of
+  a define the base missed lands before this frame's change to it;
+* an id a DEL or a TTL drop freed cools down for TTL_FRAMES frames, and a
+  fresh define that re-uses it inside that window states its offset and
+  colour, because a base that missed the DEL still holds the old shape;
+* a same-id redefine competes with the live outline over the union of both
+  rasters, not with itself over its own pixels: when the new outline is not
+  worth its bits the live one is confirmed instead.
+
 Epochs (§3.5, §4.3). A new epoch starts on the first frame, on
 ``force_epoch()`` / ``epoch_start=True``, when the horizon state flips
-between found and NO_HORIZON, on id exhaustion, when more than 40 % of the
-valid area is relabelled between captures, and every 60 s (safety refresh,
-LAYER_CLEAR range 2, which keeps the masses). An epoch start is a
+between found and NO_HORIZON, when more than 40 % of the valid area is
+relabelled between captures, and every 60 s (safety refresh, LAYER_CLEAR
+range 2, which keeps the masses). The id space is not a trigger: fresh
+defines are scored first and get ids in score order, and a layer whose ids
+run out keeps its best candidates while the rest wait for a DEL to free an
+id (§4.3 lists ID exhaustion as a trigger; restarting the epoch on every
+frame of a busy scene cost a key frame per frame on the bench and drew no
+more shapes). A newcomer worth at least EVICT_VALUE_RATIO times the least
+valuable live shape of its layer, on EVICT_STRIKES consecutive frames,
+evicts that shape (a DEL, then its id) so the picture never freezes on
+stale low-value shapes while a new object waits; a shape's value is the
+error it removes over the region it describes after this capture, against
+the mirror without it, the same measure a newcomer is scored by, and one
+eviction runs at a time per layer. An epoch start is a
 transaction: the frame is built as the new epoch's key frame, but the
 counter, the mirror and the GAIN reset are committed only when the anchor
 is actually packed; until then every frame is another attempt with the key
@@ -108,6 +149,8 @@ HZN_JUMP_DEG = 3.0                               # §2.4 temporal consistency
 HZN_JUMP_PX = 32.0
 MIN_DD_PER_PX = 48.0                             # squared 8-bit RGB error a define must remove per px
 MAX_NEW_DEFINES = 24                             # per frame; the rest wait (disclosed omission)
+EVICT_VALUE_RATIO = 2.0                          # a waiting newcomer must be worth this × the weakest holder
+EVICT_STRIKES = 2                                # ... on this many consecutive frames before the holder goes
 MAX_NEW_EDGES = 8
 EDGE_MATCH_CELLS = 1.5                           # §2.7 item 5: keep the id up to 1.5 cells of chamfer
 GAIN_NEUTRAL = (16, 16, 16)                      # §3.3 GAIN: gain = 2^((code − 16) / 32)
@@ -132,10 +175,6 @@ def detail_of_quality(quality: int) -> float:
     return (q - lo) / float(max(hi - lo, 1))
 
 
-class _IdExhausted(Exception):
-    """No free id in the layer: the frame is rebuilt as an epoch start (§4.3)."""
-
-
 @dataclass
 class _Shape:
     """One live shape as the base holds it (the mirror)."""
@@ -153,6 +192,9 @@ class _Shape:
     dx: int = 0                     # cumulative UPD, 4 px units (= working px)
     dy: int = 0
     repeat_left: int = 0
+    frames_since_verify: int = 0    # the base's TTL clock, mirrored (§4.3)
+    ever_upd: bool = False          # a re-send states the offset from now on, even at 0
+    ever_ucol: bool = False         # a re-send states the colour from now on, even the define's
 
     @property
     def shown(self) -> np.ndarray:
@@ -225,8 +267,31 @@ def _bits_layer(rec) -> str:
 
 
 def _records_of(c: "_Cand") -> tuple:
-    """A candidate's records: one, or the indivisible anchor + LAYER_CLEAR pair."""
+    """A candidate's records: one, or the indivisible anchor + LAYER_CLEAR pair,
+    or a define with the UPD / UCOL that re-state it."""
     return c.record if isinstance(c.record, tuple) else (c.record,)
+
+
+def _defines_first(records: list) -> list:
+    """The wire order of a frame with a shape's UPD / UCOL moved to just after
+    its define when the define comes later (a slot-5 change to a shape whose
+    define is this frame's slot-6 repeat of a lost frame): the base applies
+    records in order and orphans an UPD naming an id it does not hold yet
+    (§3.4 rule 4). Everything else keeps the packer's order."""
+    define_at: dict = {}
+    for i, rec in enumerate(records):
+        if isinstance(rec, (vs.Poly, vs.Tree, vs.Edge)):
+            define_at.setdefault(rec.id, i)
+    held: dict = {}
+    out: list = []
+    for i, rec in enumerate(records):
+        if isinstance(rec, (vs.Upd, vs.Ucol)) and define_at.get(rec.id, -1) > i:
+            held.setdefault(rec.id, []).append(rec)
+            continue
+        out.append(rec)
+        if isinstance(rec, (vs.Poly, vs.Tree, vs.Edge)) and rec.id in held:
+            out.extend(held.pop(rec.id))
+    return out
 
 
 class VectorEncoder:
@@ -256,6 +321,9 @@ class VectorEncoder:
         self._epoch = -1
         self._epoch_t0 = clock()
         self._pending_epoch: Optional[int] = 0        # LAYER_CLEAR range of the next epoch start
+        self._pending_reason: Optional[str] = "first"  # what asked for it (last_stats['epoch_trigger'])
+        self._last_trigger: Optional[str] = None
+        self._epochs_committed = 0
         self._clear_range = 0
         self._anchor_repeat_left = 0
         self._anchor_found: Optional[bool] = None     # the epoch anchor's state (ABS vs NO_HORIZON)
@@ -275,6 +343,14 @@ class VectorEncoder:
         self._frame_no = 0
         self._committed = False                       # this attempt's epoch start was packed
         self._carousel_acc = 0.0
+        self._verified_now: set = set()               # ids this frame's packed records verify at the base
+        self._id_freed: dict = {}                     # id -> (frame, dhash, offset, fill) at its DEL / expiry
+        self._ttl_dropped = 0
+        self._restate_owed: set = set()               # kept shapes not yet re-stated after a range-1/2 start
+        self._restate_all = False                     # the key frame of a range-1/2 attempt: every kept shape owes
+        self._evict_strikes: dict = {}                # layer -> consecutive frames a newcomer beat its weakest holder
+        self._evict_next: set = set()                 # ids DEL'd next frame to free their id
+        self._waiting = 0                             # fresh defines refused an id in the last frame
         self._last_stats: dict = {}
 
     # ------------------------------------------------------------ public API
@@ -290,6 +366,7 @@ class VectorEncoder:
     def force_epoch(self) -> None:
         """The next frame starts a new epoch (LAYER_CLEAR 0)."""
         self._pending_epoch = 0
+        self._pending_reason = "forced"
 
     def frame(self, rgb: np.ndarray, budget_bytes: int, *, epoch_start: bool = False, quality: int = 80,
               moving: bool = False, age_units: int = 0, seq: int = 0) -> bytes:
@@ -325,12 +402,8 @@ class VectorEncoder:
         level = level_of_quality(quality)
         now = self._clock()
         clear = self._epoch_trigger(epoch_start, hz, region_map, regions, now)
-        try:
-            body, records, stats = self._build(work, hz, regions, region_map, edges, clear, level, moving,
-                                               budget_bytes, age_units, now)
-        except _IdExhausted:
-            body, records, stats = self._build(work, hz, regions, region_map, edges, 0, level, moving,
-                                               budget_bytes, age_units, now)
+        body, records, stats = self._build(work, hz, regions, region_map, edges, clear, level, moving,
+                                           budget_bytes, age_units, now)
         t4 = time.perf_counter()
         ms["temporal_pack"] = (t4 - t3b) * 1000.0
         self._prev_region_map = region_map
@@ -346,6 +419,11 @@ class VectorEncoder:
                             "support": hz.support}
         stats["n_regions"] = len(regions)
         stats["frame_bytes"] = HEADER_LEN + len(body)
+        stats["epochs"] = self._epochs_committed
+        stats["epoch_trigger"] = (self._last_trigger if stats["epoch_committed"]
+                                  else (self._pending_reason if stats["epoch_start"] else None))
+        stats["last_epoch_trigger"] = self._last_trigger       # the last committed start's cause
+        stats["waiting"] = self._waiting
         self._last_stats = stats
         return header + body
 
@@ -452,20 +530,25 @@ class VectorEncoder:
                        now: float) -> Optional[int]:
         """LAYER_CLEAR range of the epoch this frame starts, or None (§4.3). A
         trigger stays pending until an attempt's anchor is packed; a stronger
-        trigger (a lower range) joins a pending weaker one."""
-        clear = None
-        if self._epoch < 0 or epoch_start:
-            clear = 0
+        trigger (a lower range) joins a pending weaker one. The trigger's
+        name is reported as ``last_stats['epoch_trigger']``."""
+        clear = reason = None
+        if self._epoch < 0:
+            clear, reason = 0, "first"
+        elif epoch_start:
+            clear, reason = 0, "forced"
         elif self._anchor_found is not None and hz.found != self._anchor_found:
-            clear = 0
+            clear, reason = 0, "horizon"
         elif now - self._epoch_t0 >= SAFETY_REFRESH_S:
-            clear = 2
+            clear, reason = 2, "safety"
         elif self._pending_epoch != 0:
             prev = self._prev_region_map
             if prev is not None and self._relabelled_fraction(prev, self._prev_region_lab, region_map,
                                                               regions) > RELABEL_EPOCH_FRACTION:
-                clear = 0
+                clear, reason = 0, "relabel"
         if clear is not None:
+            if self._pending_epoch is None or clear < self._pending_epoch:
+                self._pending_reason = reason
             self._pending_epoch = clear if self._pending_epoch is None else min(self._pending_epoch, clear)
         return self._pending_epoch
 
@@ -552,17 +635,76 @@ class VectorEncoder:
         self._epoch_t0 = now
         self._clear_range = clear
         self._pending_epoch = None
+        self._last_trigger, self._pending_reason = self._pending_reason, None
+        self._epochs_committed += 1
         self._anchor_repeat_left = LEVEL_REPEATS[level]
         if clear == 0:                                # every mass is redefined: a fresh reference exposure
             self._gain = self._gain_next = GAIN_NEUTRAL
+            self._restate_owed = set()
+        else:
+            # The kept layers are re-stated in the following frames like the
+            # epoch-start records (§3.5): every live shape owes a repeat-once
+            # that carries its current UPD and UCOL, so a base that lost
+            # state, or sat in resync, holds the epoch's mirror within the
+            # safety period with no uplink (§4.3). Until a shape's repeat has
+            # gone out it is neither CONFIRMed nor counted by a DIGEST: the
+            # base may hold stale state from before the refresh, and a tag
+            # or crc that contradicts it would count orphans and mismatches
+            # against a base that is about to be repaired.
+            for s in self._shapes.values():
+                s.repeat_left = max(s.repeat_left, LEVEL_REPEATS[level])
+            self._restate_owed = set(self._shapes)
         self._committed = True
 
-    def _alloc_id(self, layer: str, taken: set) -> int:
+    def _alloc_id(self, layer: str, taken: set) -> Optional[int]:
+        """The lowest free id of the layer, or None when every id is live so
+        the region waits. An id a DEL or a TTL drop freed is passed over for
+        TTL_FRAMES frames unless nothing else is free: a base that missed the
+        DEL still holds the old shape until its own TTL, and a same-hash
+        define for that id would keep the old shape's offset (§3.4 rule 5)."""
         rng = {"plant": vs.ID_PLANT, "edge": vs.ID_EDGE}.get(layer, vs.ID_MASS)
+        cooling = None                                       # (frame freed, id): the oldest as last resort
         for id_ in rng:
-            if id_ not in self._shapes and id_ not in taken:
-                return id_
-        raise _IdExhausted(layer)
+            if id_ in self._shapes or id_ in taken:
+                continue
+            freed = self._id_freed.get(id_)
+            if freed is not None and self._frame_no - freed[0] <= vs.TTL_FRAMES:
+                if cooling is None or freed[0] < cooling[0]:
+                    cooling = (freed[0], id_)
+                continue
+            return id_
+        return cooling[1] if cooling is not None else None
+
+    def _release_id(self, id_: int) -> None:
+        """A DEL went out, or the shape expired: the id starts its reuse
+        cooldown, remembering the state a base that missed the DEL still
+        holds under it (``_fresh_define_records``)."""
+        s = self._shapes.pop(id_, None)
+        if s is not None:
+            self._id_freed[id_] = (self._frame_no, s.dhash, (s.dx, s.dy), s.fill, s.ever_upd, s.ever_ucol)
+        self._restate_owed.discard(id_)
+        self._evict_next.discard(id_)
+
+    def _fresh_define_records(self, rec) -> tuple:
+        """(records, ever_upd, ever_ucol) for a fresh define. When the id was
+        freed within the cooldown, a base that missed the DEL still holds
+        the old shape, and a define it reads as same-hash would keep that
+        shape's offset and colour (§3.4 rule 5) — whether this define's hash
+        equals the mirror's last one or an earlier one the base never saw
+        replaced. So the define states the fresh shape's offset and colour
+        whenever the old shape ever had an UPD or a UCOL."""
+        freed = self._id_freed.get(rec.id)
+        if freed is None or self._frame_no - freed[0] > vs.TTL_FRAMES:
+            return (rec,), False, False
+        _, _, off, fill, had_upd, had_ucol = freed
+        recs, ever_upd, ever_ucol = [rec], False, False
+        if off != (0, 0) or had_upd:
+            recs.append(vs.Upd(rec.id, 0, 0))
+            ever_upd = True
+        if fill is not None and getattr(rec, "fill", None) is not None and (fill != rec.fill or had_ucol):
+            recs.append(vs.Ucol(rec.id, rec.fill))
+            ever_ucol = True
+        return tuple(recs), ever_upd, ever_ucol
 
     # ------------------------------------------------------------ T + P
 
@@ -593,6 +735,9 @@ class VectorEncoder:
         finally:
             if key and not self._committed:
                 self._shapes = saved_shapes                  # the attempt failed: the old epoch stands
+        # The base ages every shape this frame did not verify, after checking
+        # the frame's DIGEST, and drops it at TTL_FRAMES; so does the mirror.
+        self._tick_ttl()
         # The residual is measured against what the base holds after this frame.
         h, w = self._valid.shape
         if self._top_vf is not None:
@@ -605,6 +750,7 @@ class VectorEncoder:
         err = ((work.astype(np.float32) - mirror) ** 2).sum(axis=2)
         stats["residual"] = float(err[self._valid].mean()) if self._valid.any() else 0.0
         stats["n_live"] = len(self._shapes)
+        stats["ttl_dropped"] = self._ttl_dropped
         stats["epoch_committed"] = self._committed
         stats["epoch_pending"] = self._pending_epoch
         return body, records, stats
@@ -655,9 +801,17 @@ class VectorEncoder:
         else:
             l0 = np.zeros((h, w, 3), np.float32)
         verified: set = set()
-        if level < 3:                                        # V3 is the anchor + STATUS beacon only
-            self._temporal_candidates(work, l0, regions, region_map, level, key, cands, verified)
-            self._edge_candidates(edges, level, cands, verified)
+        self._waiting = 0
+        # The key frame of a range-1/2 start: every kept shape owes its
+        # re-statement from this frame on (the commit that records the owed
+        # set happens inside _pack, after the candidates are built).
+        self._restate_all = key and clear is not None and clear >= 1
+        try:
+            if level < 3:                                    # V3 is the anchor + STATUS beacon only
+                self._temporal_candidates(work, l0, regions, region_map, level, key, cands, verified)
+                self._edge_candidates(edges, level, cands, verified)
+        finally:
+            self._restate_all = False
         if anchor_cand is not None:
             # Nothing of the new epoch goes out ahead of its anchor: a define,
             # GAIN or CONFIRM in a frame whose anchor was dropped would name an
@@ -666,24 +820,50 @@ class VectorEncoder:
                 if c is not anchor_cand and c.needs is None and not isinstance(c.record, vs.Status):
                     c.needs = anchor_cand
         carousel_bits = int(LEVEL_KAPPA[level] * total_bits) if self._carousel_due(level) else 0
-        reserve = self._confirm_bits(sorted(verified)) + vs.record_bits(vs.Digest(0, 0))
+        # While kept shapes owe their re-statement (the key frame of a
+        # range-1/2 start and the frames after it until every repeat went
+        # out) the budget goes to the repeats: CONFIRMs are reserved and sent
+        # only for shapes half-way to their TTL, and no DIGEST is reserved
+        # or sent, so at a small budget the reserve cannot starve the
+        # repeats until the kept layer expires (§3.5, §4.3).
+        restating = bool(self._restate_owed) or (key and clear is not None and clear >= 1)
+        eligible = [i for i in sorted(verified)
+                    if not restating or self._shapes[i].frames_since_verify >= vs.TTL_FRAMES // 2]
+        reserve = self._confirm_bits(eligible) + (0 if restating else vs.record_bits(vs.Digest(0, 0)))
         packed, used = self._pack(cands, total_bits, reserve, carousel_bits)
         for c in packed:
             c.apply()
         mentioned = {id_ for c in packed for id_ in c.mentions}
-        records = [r for c in packed for r in _records_of(c)]
+        records = _defines_first([r for c in packed for r in _records_of(c)])
+        for rec in records:
+            if isinstance(rec, (vs.Poly, vs.Tree, vs.Edge)):
+                self._restate_owed.discard(rec.id)           # re-stated: the base holds the mirror's shape
         if level < 3 and (not key or self._committed):       # CONFIRM and DIGEST describe the epoch's mirror
-            unmentioned = [i for i in sorted(verified) if i not in mentioned and i in self._shapes]
+            unmentioned = [i for i in eligible if i not in mentioned and i in self._shapes
+                           and i not in self._restate_owed]
             for rec in self._confirm_records(unmentioned):
                 if used + vs.record_bits(rec) <= total_bits:
                     records.append(rec)
                     used += vs.record_bits(rec)
-            digest = vs.Digest(len(self._shapes), vs.digest_crc(
-                [(s.id, s.dhash, s.state_hash()) for s in self._shapes.values()],
-                [(0, 0)] * 4, 128, self._gain))
-            if used + vs.record_bits(digest) <= total_bits:
-                records.append(digest)
-                used += vs.record_bits(digest)
+            if not self._restate_owed:                       # see _commit_epoch: not while a repeat is owed
+                digest = vs.Digest(len(self._shapes), vs.digest_crc(
+                    [(s.id, s.dhash, s.state_hash()) for s in self._shapes.values()],
+                    [(0, 0)] * 4, 128, self._gain))
+                if used + vs.record_bits(digest) <= total_bits:
+                    records.append(digest)
+                    used += vs.record_bits(digest)
+        # What this frame verifies at the base (§4.3): a define (new, repeat
+        # or carousel), an UPD, or a CONFIRM tag that went out. A UCOL does
+        # not, and a DEL removes. The mirror's TTL clock runs on this set.
+        verified_now: set = set()
+        for c in packed:
+            for rec in _records_of(c):
+                if isinstance(rec, (vs.Poly, vs.Tree, vs.Edge, vs.Upd)):
+                    verified_now.add(rec.id)
+        for rec in records:
+            if isinstance(rec, vs.Confirm):
+                verified_now.update(rec.base_id + i for i, t in enumerate(rec.tags) if t is not None)
+        self._verified_now = verified_now
         header = vs.Header(key=key, age=max(0, min(15, int(age_units))), epoch=epoch_no, level=level)
         body = vs.encode_frame(header, records, f_bytes) if f_bytes >= 2 else b""
         bits = {"hdr": vs.HEADER_BITS, "L0": 0, "L1": 0, "L2": 0, "L3": 0, "L4": 0, "ctrl": 0}
@@ -714,7 +894,10 @@ class VectorEncoder:
     def _temporal_candidates(self, work: np.ndarray, l0: np.ndarray, regions: list, region_map: np.ndarray,
                              level: int, key: bool, cands: list, verified: set) -> None:
         """Slots 5–7: match regions to live shapes, then Del / Upd / Ucol /
-        redefine / new define, repeat-once and carousel candidates."""
+        redefine / new define, repeat-once and carousel candidates. Every
+        matched shape leaves with a record or a CONFIRM — kept, redefined or
+        deleted, never silent (§4.3) — because the base drops a shape that
+        goes TTL_FRAMES applied frames without one."""
         h, w = self._valid.shape
         n_reg = len(regions)
         masses = self._masses()
@@ -752,9 +935,10 @@ class VectorEncoder:
         pairs.sort(reverse=True)
         matched_shape: dict = {}
         matched_region: dict = {}
+        self._evict_next &= set(self._shapes)                # an evictee already gone owes nothing
         for iou, id_, ri in pairs:
-            if id_ in matched_shape or ri in matched_region:
-                continue
+            if id_ in matched_shape or ri in matched_region or id_ in self._evict_next:
+                continue                                     # an evictee leaves; its region is a newcomer
             matched_shape[id_] = (ri, iou)
             matched_region[ri] = id_
         taken: set = set()
@@ -763,7 +947,7 @@ class VectorEncoder:
         def add_del(s: _Shape) -> None:
             rec = vs.Del(s.id)
             cands.append(_Cand(5, (0, -s.area), rec, vs.record_bits(rec),
-                               lambda id_=s.id: self._shapes.pop(id_, None), (s.id,)))
+                               lambda id_=s.id: self._release_id(id_), (s.id,)))
             taken.add(s.id)
             deleted.add(s.id)
 
@@ -773,7 +957,8 @@ class VectorEncoder:
         for s in masses:
             if s.id not in matched_shape:
                 add_del(s)
-        defines: list = []                                   # (region, id or None for a fresh one)
+        redefines: list = []                                 # (shape, region, ΔE): same layer, geometry failed
+        fresh: list = []                                     # regions no live shape describes
         for r in regions:
             rec_geo = self._region_record(1, r)              # geometry probe; the id is assigned below
             if r.index in matched_region:
@@ -783,55 +968,111 @@ class VectorEncoder:
                                                          region_map, same_layer)
                 de = float(vx.delta_e76(r.lab, s.lab))
                 if geometry_ok and same_layer:
-                    if upd is not None:
-                        rec = vs.Upd(s.id, upd[0], upd[1])
-                        cands.append(_Cand(5, (1, -r.area), rec, vs.record_bits(rec),
-                                           lambda s=s, u=upd, r=r: self._apply_upd(s, u, r), (s.id,)))
-                    if de > VERIFY_DE and r.fill != s.fill:
-                        rec = vs.Ucol(s.id, r.fill)
-                        cands.append(_Cand(5, (2, -r.area), rec, vs.record_bits(rec),
-                                           lambda s=s, r=r: self._apply_ucol(s, r), (s.id,)))
-                    if upd is None and de <= VERIFY_DE:
-                        verified.add(s.id)
-                    if s.repeat_left > 0:                 # repeat-once, re-verified on this capture
-                        cands.append(_Cand(6, (-r.area,), s.define, vs.record_bits(s.define),
-                                           lambda s=s: self._apply_repeat(s, spend=True), (s.id,)))
-                    elif de <= VERIFY_DE and upd is None:
-                        cands.append(_Cand(7, (s.define_frame, s.id), s.define, vs.record_bits(s.define),
-                                           lambda s=s: self._apply_repeat(s), (s.id,)))
+                    self._keep_candidates(s, r, upd, de, cands, verified)
                     continue
                 if same_layer:
-                    defines.append((r, s.id))                # redefine under the same id
+                    redefines.append((s, r, de))             # redefine under the same id, or keep (pass 2)
                     continue
                 add_del(s)                                   # layer change: DEL + a fresh id
             if rec_geo is not None:
-                defines.append((r, None))
+                fresh.append(r)
         # Pass 2: ΔD on the mirror with this frame's deletions already applied
         # (their pixels show L0), so no candidate is credited for painting
         # over a shape another record of this frame removes.
         mirror = l0.copy()
         gain = self._gain_lin(self._gain_next)
+        under: dict = {}                                     # id -> the mirror under the shape, on its raster
+        top = np.zeros((h, w), np.int32)                     # which shape the mirror shows per pixel
         for s in sorted(masses, key=lambda s: -s.area):
             if s.id not in deleted:
+                under[s.id] = mirror[s.raster].copy()
                 mirror[s.raster] = np.clip(s.shown * gain, 0.0, 255.0)
+                top[s.raster] = s.id
         f = work.astype(np.float32)
         err_before = ((f - mirror) ** 2).sum(axis=2)
+        for s, r, de in redefines:
+            if not self._add_redefine(cands, s, r, level, err_before, f, l0, masses, deleted):
+                # The live outline describes the region at least as well as
+                # a new one would, so neither a redefine nor a DEL is
+                # warranted: the shape is kept and confirmed like a verified one.
+                self._keep_candidates(s, r, None, de, cands, verified)
+        # Fresh defines are scored first and get ids in score order: a layer
+        # whose ids run out keeps its best candidates and the rest wait for a
+        # DEL to free an id (never an epoch trigger, see the module doc).
+        scored = []
+        for r in fresh:
+            sc = self._score_define(r, err_before, f)
+            if sc is not None:
+                scored.append((sc, r))
+        scored.sort(key=lambda t: -t[0][0])
         new_defines = 0
-        for r, id_ in defines:
+        refused: dict = {}                                   # layer -> best ΔD refused an id this frame
+        self._waiting = 0
+        for (per_bit, dd, bits, raster, area), r in scored:
+            if new_defines >= MAX_NEW_DEFINES:
+                break
+            layer = "plant" if r.tree is not None else "mass"
+            id_ = self._alloc_id(layer, taken)
             if id_ is None:
-                if new_defines >= MAX_NEW_DEFINES:
-                    continue
-                try:
-                    id_ = self._alloc_id("plant" if r.tree is not None else "mass", taken)
-                except _IdExhausted:
-                    if key:                                  # already an epoch start: the rest waits
-                        break
-                    raise
-                taken.add(id_)
-                if self._add_define(cands, id_, r, level, err_before, f):
-                    new_defines += 1
-            else:
-                self._add_define(cands, id_, r, level, err_before, f)
+                refused[layer] = max(refused.get(layer, 0.0), dd)
+                continue
+            taken.add(id_)
+            rec = self._region_record(id_, r)
+            recs, ever_upd, ever_ucol = self._fresh_define_records(rec)
+            cands.append(_Cand(5, (3, -per_bit), recs if len(recs) > 1 else rec,
+                               sum(vs.record_bits(x) for x in recs),
+                               lambda rec=rec, raster=raster, area=area, r=r, eu=ever_upd, ec=ever_ucol:
+                               self._apply_define(rec, raster, area, r, level, eu, ec),
+                               (id_,)))
+            new_defines += 1
+        self._waiting = len(scored) - new_defines
+        # Eviction under id pressure: the best refused newcomer of a layer
+        # against the least valuable live holder of that layer, both measured
+        # the same way — the error a shape removes over the region it
+        # describes after this capture, against the mirror without it.
+        # Beating the weakest EVICT_VALUE_RATIO-fold on EVICT_STRIKES
+        # consecutive frames DELs it next frame; its id cools down and
+        # _alloc_id hands it to the newcomer as the last resort. One eviction
+        # runs at a time per layer, and the evictee's own region then waits
+        # like any other.
+        by_index = {r.index: r for r in regions}
+        strikes: dict = {}
+        for layer, best_dd in refused.items():
+            if any(o.layer == layer for o in self._shapes.values() if o.id in self._evict_next):
+                continue
+            holders = [o for o in masses if o.layer == layer and o.id not in deleted]
+            if not holders:
+                continue
+            value = self._holder_values(holders, matched_shape, by_index, region_map, mirror, under, top, f, gain)
+            weak = min(value, key=value.get)
+            if best_dd >= EVICT_VALUE_RATIO * max(value[weak], 0.0):
+                n = self._evict_strikes.get(layer, 0) + 1
+                strikes[layer] = n
+                if n >= EVICT_STRIKES:
+                    self._evict_next.add(weak)
+        self._evict_strikes = strikes
+
+    @staticmethod
+    def _holder_values(holders: list, matched_shape: dict, by_index: dict, region_map: np.ndarray,
+                       mirror: np.ndarray, under: dict, top: np.ndarray, f: np.ndarray, gain) -> dict:
+        """Per live holder, the error it removes from the picture it will be in
+        after this frame: over the region it now describes (its own raster
+        when unmatched), the region's colour against the mirror with the
+        holder taken out (what lies under it where it is on top, the mirror
+        itself where a smaller shape covers it) — the measure a newcomer's
+        ΔD uses, so the two compare."""
+        values: dict = {}
+        for o in holders:
+            m = matched_shape.get(o.id)
+            r = by_index.get(m[0]) if m is not None else None
+            rast = (region_map == r.index) if r is not None else o.raster
+            colour = np.clip(vx.fill_shown_rgb8(r.fill if r is not None else o.fill) * gain, 0.0, 255.0)
+            without = mirror.copy()
+            if o.id in under:
+                mine = (top == o.id)
+                without[o.raster & mine] = under[o.id][mine[o.raster]]
+            values[o.id] = float(((f[rast] - without[rast]) ** 2).sum() - ((f[rast] - colour) ** 2).sum())
+        return values
 
     def _edge_candidates(self, edges: list, level: int, cands: list, verified: set) -> None:
         """L3 (§2.7 item 5): each new polyline is scored by its mean chamfer
@@ -866,7 +1107,7 @@ class VectorEncoder:
             if s.id not in matched.values():
                 rec = vs.Del(s.id)
                 cands.append(_Cand(5, (0, -s.area), rec, vs.record_bits(rec),
-                                   lambda id_=s.id: self._shapes.pop(id_, None), (s.id,)))
+                                   lambda id_=s.id: self._release_id(id_), (s.id,)))
         new_edges = 0
         taken: set = set(matched.values())
         for i, e in enumerate(edges):
@@ -882,9 +1123,8 @@ class VectorEncoder:
                 continue
             if new_edges >= MAX_NEW_EDGES:
                 continue
-            try:
-                id_ = self._alloc_id("edge", taken)
-            except _IdExhausted:
+            id_ = self._alloc_id("edge", taken)
+            if id_ is None:
                 break
             rec = vs.Edge(id_, e.cls, e.points)
             try:
@@ -902,15 +1142,19 @@ class VectorEncoder:
                                       float(xs.mean()) if len(xs) else 0.0, float(ys.mean()) if len(ys) else 0.0,
                                       None, self._frame_no, repeat_left=LEVEL_REPEATS[level])
 
-    @staticmethod
-    def _verify_geometry(s: _Shape, r, rec_geo, iou: float, region_map: np.ndarray,
+    def _verify_geometry(self, s: _Shape, r, rec_geo, iou: float, region_map: np.ndarray,
                          same_layer: bool) -> tuple:
         """(geometry_ok, upd): the live shape still describes the region when
         the capture yields the identical define, or the raster IoU is ≥ 0.7,
         possibly after a local shift within the UPD field (then ``upd`` is
-        (dx, dy, shifted raster))."""
-        if same_layer and s.dx == 0 and s.dy == 0 and _geometry_key(rec_geo) == _geometry_key(s.define):
-            return True, None
+        (dx, dy, shifted raster)). The identical define at a non-zero offset
+        means the region is back at the define's own position: the offset
+        returns to 0 by an UPD, never by re-sending the define, which the
+        base reads as a repeat that keeps the offset (§3.4 rule 5)."""
+        if same_layer and _geometry_key(rec_geo) == _geometry_key(s.define):
+            if s.dx == 0 and s.dy == 0:
+                return True, None
+            return True, (0, 0, vx.raster_of(s.define, 0, 0, self._valid.shape) & self._valid)
         ddx, ddy = r.centroid[0] - s.cx, r.centroid[1] - s.cy
         if abs(ddx) >= UPD_MIN_SHIFT_WORK or abs(ddy) >= UPD_MIN_SHIFT_WORK:
             ndx, ndy = s.dx + int(round(ddx)), s.dy + int(round(ddy))
@@ -931,35 +1175,174 @@ class VectorEncoder:
             return vs.Poly(id_, 0, region.poly, region.fill)
         return None
 
-    def _add_define(self, cands: list, id_: int, region, level: int, err_before: np.ndarray,
-                    f: np.ndarray) -> bool:
-        """A define candidate when painting it reduces the mirror error by more
-        than MIN_DD_PER_PX per painted pixel; ordered by ΔD per bit."""
-        rec = self._region_record(id_, region)
-        if rec is None:
+    def _define_raster(self, rec, region) -> np.ndarray:
+        raster = region.raster if region.raster is not None else vx.raster_of(rec, 0, 0, self._valid.shape)
+        return raster & self._valid
+
+    def _score_define(self, region, err_before: np.ndarray, f: np.ndarray) -> Optional[tuple]:
+        """(ΔD per bit, ΔD, bits, raster, area) of a fresh define, or None when
+        painting it removes no more than MIN_DD_PER_PX per painted pixel.
+        Scored with a placeholder id: neither the bits nor ΔD depend on the
+        id, which is handed out afterwards in score order."""
+        probe = self._region_record(vs.ID_PLANT[0] if region.tree is not None else vs.ID_MASS[0], region)
+        if probe is None:
+            return None
+        try:
+            bits = vs.record_bits(probe)
+        except ValueError:                                   # a delta the EG2 field cannot carry
+            return None
+        raster = self._define_raster(probe, region)
+        area = int(raster.sum())
+        if area == 0:
+            return None
+        c = np.clip(vx.fill_shown_rgb8(probe.fill) * self._gain_lin(self._gain_next), 0.0, 255.0)
+        dd = float(err_before[raster].sum() - ((f[raster] - c) ** 2).sum())
+        if dd <= MIN_DD_PER_PX * area:
+            return None
+        return dd / bits, dd, bits, raster, area
+
+    def _add_redefine(self, cands: list, s: _Shape, region, level: int, err_before: np.ndarray,
+                      f: np.ndarray, l0: np.ndarray, masses: list, deleted: set) -> bool:
+        """A same-id redefine when the new outline beats the live one. ΔD is
+        measured over the union of the two rasters with the live shape gone
+        from the "after" mirror, so the shape competes with the alternative
+        and not with itself over its own pixels (scoring it against a mirror
+        that still shows it rejected every redefine of a jittering outline
+        and left the shape silent). A record identical to the live define is
+        not a redefine (§3.4 rule 5) and is refused like one not worth its
+        bits; the caller then keeps and confirms the live shape."""
+        rec = self._region_record(s.id, region)
+        if rec is None or vs.define_hash(rec) == s.dhash:
             return False
         try:
             bits = vs.record_bits(rec)
         except ValueError:                                   # a delta the EG2 field cannot carry
             return False
-        raster = (region.raster if region.raster is not None else vx.raster_of(rec, 0, 0, self._valid.shape)) \
-            & self._valid
+        raster = self._define_raster(rec, region)
         area = int(raster.sum())
         if area == 0:
             return False
-        c = np.clip(vx.fill_shown_rgb8(rec.fill) * self._gain_lin(self._gain_next), 0.0, 255.0)
-        dd = float(err_before[raster].sum() - ((f[raster] - c) ** 2).sum())
+        gain = self._gain_lin(self._gain_next)
+        uy, ux = np.nonzero(s.raster | raster)               # the union of the two outlines, as pixel lists
+        fu = f[uy, ux]
+        under = l0[uy, ux].copy()                            # the mirror without this shape, on the union
+        for o in sorted(masses, key=lambda o: -o.area):
+            if o.id not in deleted and o.id != s.id:
+                m = o.raster[uy, ux]
+                if m.any():
+                    under[m] = np.clip(o.shown * gain, 0.0, 255.0)
+        c = np.clip(vx.fill_shown_rgb8(rec.fill) * gain, 0.0, 255.0)
+        after = ((fu - under) ** 2).sum(axis=1)
+        new = raster[uy, ux]
+        after[new] = ((fu[new] - c) ** 2).sum(axis=1)
+        dd = float(err_before[uy, ux].sum() - after.sum())
         if dd <= MIN_DD_PER_PX * area:
             return False
         cands.append(_Cand(5, (3, -dd / bits), rec, bits,
-                           lambda: self._apply_define(rec, raster, area, region, level), (id_,)))
+                           lambda: self._apply_define(rec, raster, area, region, level), (s.id,)))
         return True
 
-    def _apply_define(self, rec, raster: np.ndarray, area: int, region, level: int) -> None:
+    def _apply_define(self, rec, raster: np.ndarray, area: int, region, level: int,
+                      ever_upd: bool = False, ever_ucol: bool = False) -> None:
+        dh = vs.define_hash(rec)
+        s = self._shapes.get(rec.id)
+        if s is not None and s.dhash == dh:
+            self._apply_repeat(s)                            # §3.4 rule 5: a same-hash define is a repeat
+            return
         ys, xs = np.nonzero(raster)
-        self._shapes[rec.id] = _Shape(rec.id, rec, vs.define_hash(rec), rec.fill, _layer_of(rec), raster, area,
+        self._shapes[rec.id] = _Shape(rec.id, rec, dh, rec.fill, _layer_of(rec), raster, area,
                                       float(xs.mean()), float(ys.mean()), region.lab, self._frame_no,
-                                      repeat_left=LEVEL_REPEATS[level])
+                                      repeat_left=LEVEL_REPEATS[level], ever_upd=ever_upd, ever_ucol=ever_ucol)
+
+    def _keep_candidates(self, s: _Shape, region, upd: Optional[tuple], de: float, cands: list,
+                         verified: set) -> None:
+        """Slots 5–7 for a live shape that still describes its region: UPD when
+        it moved; UCOL when its colour moved by more than ΔE 6 *and* the FILL
+        it would send differs (below the FILL's resolution the base already
+        shows what this capture would send); CONFIRM when neither applies;
+        and the repeat-once or carousel re-send, which carries the current
+        UPD and UCOL (§4.3) unless this frame offers that record itself. A
+        shape that owes its re-statement after a range-1/2 epoch start gets
+        that instead (``_restate_candidate``)."""
+        r = region
+        if s.id in self._restate_owed or self._restate_all:
+            self._restate_candidate(s, r, upd, de, cands)
+            return
+        if upd is not None:
+            rec = vs.Upd(s.id, upd[0], upd[1])
+            cands.append(_Cand(5, (1, -r.area), rec, vs.record_bits(rec),
+                               lambda s=s, u=upd, r=r: self._apply_upd(s, u, r), (s.id,)))
+        recolour = de > VERIFY_DE and r.fill != s.fill
+        if recolour:
+            rec = vs.Ucol(s.id, r.fill)
+            cands.append(_Cand(5, (2, -r.area), rec, vs.record_bits(rec),
+                               lambda s=s, r=r: self._apply_ucol(s, r), (s.id,)))
+        if upd is None and not recolour:
+            verified.add(s.id)
+        if s.repeat_left > 0:                                # repeat-once, re-verified on this capture
+            recs = self._resend_records(s, with_upd=upd is None, with_ucol=not recolour)
+            cands.append(_Cand(6, (-r.area,), recs, sum(vs.record_bits(x) for x in recs),
+                               lambda s=s: self._apply_repeat(s, spend=True), (s.id,)))
+        elif upd is None and not recolour:
+            recs = self._resend_records(s, with_upd=True, with_ucol=True)
+            cands.append(_Cand(7, (s.define_frame, s.id), recs, sum(vs.record_bits(x) for x in recs),
+                               lambda s=s: self._apply_repeat(s), (s.id,)))
+
+    def _restate_candidate(self, s: _Shape, r, upd: Optional[tuple], de: float, cands: list) -> None:
+        """The re-statement a kept shape owes after a range-1/2 epoch start
+        (§3.5, §4.3): ONE slot-5 candidate, ahead of the frame's other
+        changes (order 0.5, behind the DELs), carrying the define with the
+        UPD and UCOL the shape has after this capture, applied as a repeat
+        plus this frame's change. It replaces the bare UPD / UCOL / CONFIRM
+        the shape would otherwise get: a base that dropped the shape would
+        orphan the UPD, and a CONFIRM would contradict its stale state; and
+        a repeat left to slot 6 is starved by those UPDs at a small budget."""
+        recolour = de > VERIFY_DE and r.fill != s.fill
+        recs = [s.define]
+        if upd is not None:
+            recs.append(vs.Upd(s.id, upd[0], upd[1]))
+        elif (s.dx, s.dy) != (0, 0) or s.ever_upd:
+            recs.append(vs.Upd(s.id, s.dx, s.dy))
+        if recolour:
+            recs.append(vs.Ucol(s.id, r.fill))
+        elif s.fill is not None and (s.fill != s.define.fill or s.ever_ucol):
+            recs.append(vs.Ucol(s.id, s.fill))
+
+        def apply(s=s, u=upd, r=r, recolour=recolour):
+            self._apply_repeat(s, spend=True)
+            if u is not None:
+                self._apply_upd(s, u, r)
+            if recolour:
+                self._apply_ucol(s, r)
+        cands.append(_Cand(5, (0.5, -r.area), tuple(recs), sum(vs.record_bits(x) for x in recs), apply, (s.id,)))
+
+    @staticmethod
+    def _resend_records(s: _Shape, with_upd: bool, with_ucol: bool) -> tuple:
+        """The define as sent, plus the UPD and UCOL that bring a base which
+        lost either, or dropped the shape, to the mirror's state (§4.3).
+        Once a shape has had an UPD or a UCOL they are stated on every
+        re-send, at the define's own value too: the base's copy is not the
+        define's value just because the mirror's is (a lost UPD back to 0,
+        a lost UCOL back to the define's fill)."""
+        recs = [s.define]
+        if with_upd and ((s.dx, s.dy) != (0, 0) or s.ever_upd):
+            recs.append(vs.Upd(s.id, s.dx, s.dy))
+        if with_ucol and s.fill is not None and (s.fill != s.define.fill or s.ever_ucol):
+            recs.append(vs.Ucol(s.id, s.fill))
+        return tuple(recs)
+
+    def _tick_ttl(self) -> None:
+        """The base's shape TTL, mirrored: a shape this frame did not verify
+        ages by one applied frame and is dropped at TTL_FRAMES (§4.3)."""
+        for id_ in list(self._shapes):
+            s = self._shapes[id_]
+            if id_ in self._verified_now:
+                s.frames_since_verify = 0
+                continue
+            s.frames_since_verify += 1
+            if s.frames_since_verify >= vs.TTL_FRAMES:
+                self._release_id(id_)
+                self._ttl_dropped += 1
 
     def _apply_repeat(self, s: _Shape, spend: bool = False) -> None:
         """A define went out again. ``spend`` charges one repeat-once (§4.3)
@@ -981,10 +1364,12 @@ class VectorEncoder:
         s.dx, s.dy = ndx, ndy
         s.raster = shifted
         s.area = int(shifted.sum())
+        s.ever_upd = True
 
     def _apply_ucol(self, s: _Shape, region) -> None:
         s.fill = region.fill
         s.lab = region.lab
+        s.ever_ucol = True
 
     def _confirm_records(self, ids: list) -> list:
         """CONFIRM runs of up to 16 consecutive ids (§3.3); each tag is the low
