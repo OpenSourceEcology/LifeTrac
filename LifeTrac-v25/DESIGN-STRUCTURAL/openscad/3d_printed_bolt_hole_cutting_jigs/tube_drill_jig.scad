@@ -1,4 +1,4 @@
-include <../../lifetrac_v25_params.scad>
+include <../lifetrac_v25_params.scad>
 
 module tube_drill_jig() {
     // Fits over 2x6 tube
