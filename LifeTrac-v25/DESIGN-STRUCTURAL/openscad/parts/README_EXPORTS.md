@@ -1,5 +1,8 @@
 # Individual Part SVG Exports
 
+> [!WARNING]
+> These parts are not yet ready for fabrication. Read the warning at the top of [DESIGN-STRUCTURAL/README.md](../../README.md) before cutting anything.
+
 This directory contains export scripts for generating individual 2D SVG cutouts of each plate part.
 
 ## Export Files
@@ -100,7 +103,7 @@ The SVG files can be viewed in web browsers or vector graphics software for:
 ## Part Features
 
 All exported SVGs include:
-- **Mounting holes** with proper clearances
+- **Mounting holes**, whose positions and edge distances haven't been checked yet (review findings P2 and P5)
 - **Pivot holes** for arm and cylinder connections
 - **Bolt patterns** for motor and structural mounting
 - **Lightening holes** where applicable

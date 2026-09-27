@@ -42,20 +42,24 @@ jobs:
         echo "Generating Individual Part SVG Cutouts"
         echo "========================================="
         
-        # Function to export a part
+        # Export a part. --hardwarnings makes OpenSCAD stop with an error on the first
+        # warning, so a part that exports with undefined values fails the job too.
         failed=0
         export_part() {
           local name=$1
           local scad=$2
           local svg=$3
           echo "Exporting ${name}..."
-          xvfb-run -a openscad --render --export-format=svg -o "${svg}" "${scad}" 2>&1 | grep -v "WARNING" || true
-          if [ -s "${svg}" ]; then
+          rm -f "${svg}"
+          if ! xvfb-run -a openscad --hardwarnings --render --export-format=svg -o "${svg}" "${scad}"; then
+            echo "::error::OpenSCAD failed to export ${name} (${scad})"
+            failed=1
+          elif [ ! -s "${svg}" ]; then
+            echo "::error::${name} (${scad}) exported an empty SVG"
+            failed=1
+          else
             echo "  ✓ ${name} exported"
             ls -lh "${svg}"
-          else
-            echo "::error::Failed to export ${name} (${scad})"
-            failed=1
           fi
         }
         

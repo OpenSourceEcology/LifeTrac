@@ -316,7 +316,7 @@ For questions or issues:
 ![CNC Cutting Layout - All Parts](cnclayout.svg)
 
 The combined CNC layout shows the plate parts with:
-- Mounting holes with proper clearances
+- Mounting holes, whose positions and clearances haven't been checked yet (review findings P2 and P6)
 - Pivot holes for arm and cylinder connections
 - Arc slots for cross beam clearance (inner panels)
 - Lightening holes for weight reduction
@@ -345,4 +345,4 @@ It is **not yet nested for cutting**: several parts overlap, the stiffener, moto
 - Bucket Bottom (`bucket_bottom.svg`) - 1× needed
 - Bucket Side (`bucket_side.svg`) - 2× needed (mirror for opposite)
 
-Total: 23 parts from 8 unique designs
+Total: 19 parts from 8 unique designs

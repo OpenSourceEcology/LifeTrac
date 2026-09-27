@@ -2,7 +2,7 @@
 
 ## Overview
 
-Each flat plate steel part in the LifeTrac v25 design has been extracted into its own .scad file. Individual 2D SVG cutouts can be generated for each part for CNC plasma cutting.
+Eight of the LifeTrac v25 flat plate designs have their own export file, and this guide generates a 2D SVG cutout of each for CNC plasma cutting. They are not every plate in the machine: the bucket back, the stiffener plates and the motor plates are only drawn inside the main assembly, and the arm plates and pivot-mount plates have no export file yet (review finding M21).
 
 > [!WARNING]
 > These parts are not yet ready for fabrication. Read the warning at the top of [README.md](README.md) before cutting anything.
@@ -46,7 +46,7 @@ openscad -o output/svg/parts/wheel_mount.svg --export-format=svg openscad/parts/
 | Bucket Bottom | `export_bucket_bottom.scad` | `bucket_bottom.svg` | 1 | 1100×600mm |
 | Bucket Side | `export_bucket_side.scad` | `bucket_side.svg` | 2 | ~450×600mm |
 
-**Total: 23 parts from 8 unique designs**
+**Total: 19 parts from 8 unique designs**
 
 ## Part Features Included
 
