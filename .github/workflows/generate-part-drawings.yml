@@ -113,7 +113,9 @@ jobs:
 
   # Main only: commit the drawings from the artifact back to main. Generator
   # warnings (exit 2) and render failures (exit 3) still commit what did
-  # regenerate; an invalid assembly sequence commits nothing.
+  # regenerate; an invalid assembly sequence commits nothing. Drawings built
+  # from a commit that main has since moved past with other input changes are
+  # not pushed: that newer commit's own run publishes the drawings.
   commit:
     needs: drawings
     if: >-
@@ -137,19 +139,41 @@ jobs:
           path: LifeTrac-v25
 
       - name: Commit updated drawings to main
+        env:
+          # Everything the drawings are built from (the trigger paths above).
+          INPUTS: >-
+            LifeTrac-v25/DESIGN-STRUCTURAL/openscad
+            LifeTrac-v25/DESIGN-STRUCTURAL/drawings
+            :(exclude)LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated
+            LifeTrac-v25/BUILD-STRUCTURE/assembly_sequence.yaml
+            LifeTrac-v25/BUILD-STRUCTURE/assembly_sequence.py
+            .github/workflows/generate-part-drawings.yml
         run: |
           test -f LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated/INDEX.md
           test -f LifeTrac-v25/BUILD-STRUCTURE/ASSEMBLY_SEQUENCE.md
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add -A LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated LifeTrac-v25/BUILD-STRUCTURE/ASSEMBLY_SEQUENCE.md
-          if git diff --staged --quiet; then
-            echo "Drawings unchanged."
-            exit 0
-          fi
-          git commit -m "Update part drawings [skip ci]"
           for attempt in 1 2 3; do
-            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            git fetch origin main || { sleep $((attempt * 5)); continue; }
+            # Other bots' [skip ci] commits (logs) may land on main meanwhile;
+            # that is fine. A newer change to the inputs is not: these drawings
+            # would be stale. $INPUTS is unquoted on purpose, one pathspec per word.
+            if ! git diff --quiet "$GITHUB_SHA" FETCH_HEAD -- $INPUTS; then
+              echo "main has newer model or drawing-code changes than $GITHUB_SHA."
+              echo "Not pushing these drawings; the workflow run for that commit publishes them."
+              exit 0
+            fi
+            # Commit on top of the current main, staging only the generated
+            # files, so everything else main has is kept. No rebase: the
+            # checkout is shallow, so there is no shared history to replay onto.
+            git reset -q FETCH_HEAD
+            git add -A LifeTrac-v25/DESIGN-STRUCTURAL/drawings/generated LifeTrac-v25/BUILD-STRUCTURE/ASSEMBLY_SEQUENCE.md
+            if git diff --staged --quiet; then
+              echo "Drawings unchanged."
+              exit 0
+            fi
+            git commit -q -m "Update part drawings [skip ci]"
+            git push origin HEAD:main && exit 0
             sleep $((attempt * 5))
           done
           echo "Could not push the updated drawings; they are in the workflow artifact."

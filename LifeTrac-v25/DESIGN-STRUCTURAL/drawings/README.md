@@ -53,7 +53,10 @@ assembly sequence (`BUILD-STRUCTURE/assembly_sequence.yaml`) or its checker
 5. **On `main` only**, a separate job commits the updated `generated/` folder
    back with `[skip ci]`. It takes the files from the artifact. The job that
    runs the tests and the generator has read-only repository access, so code
-   in a pull request never gets a token that can push.
+   in a pull request never gets a token that can push. The commit goes on top
+   of the current `main`. If `main` has meanwhile received another change to
+   the model or the drawing code, nothing is pushed: the run for that newer
+   commit publishes drawings that match it.
 
 The output is byte-for-byte reproducible, so the commit contains only the
 drawings that really changed. A drawing gets the next **revision letter**
