@@ -77,8 +77,14 @@ jobs:
           echo "Running structural analysis on main design..."
           cd LifeTrac-v25/DESIGN-STRUCTURAL
           
-          # Run OpenSCAD with echo output to capture structural analysis
-          openscad -o /dev/null --export-format echo openscad/lifetrac_v25.scad 2>&1 | tee structural_analysis.log
+          # Write the ECHO output to the log file. (With "-o /dev/null" the ECHO
+          # lines went to /dev/null and every report said no summary was found.)
+          openscad -o structural_analysis.log --export-format echo openscad/lifetrac_v25.scad
+          echo "Captured $(grep -c '^ECHO:' structural_analysis.log) ECHO lines"
+          if ! grep -q "COMPLETE STRUCTURAL ANALYSIS SUMMARY" structural_analysis.log; then
+            echo "::error::No structural analysis summary in the OpenSCAD output"
+            exit 1
+          fi
           
           echo "Structural analysis complete. Check logs for results."
       
@@ -98,10 +104,14 @@ jobs:
           if grep -q "COMPLETE STRUCTURAL ANALYSIS SUMMARY" structural_analysis.log; then
             echo "## Structural Analysis Results" >> structural_report.md
             echo "" >> structural_report.md
+            # Remove this warning (and the one in the persistent log) once the analysis is
+            # rebuilt against the current design (finding B4 of the 2026-09-25 OpenSCAD review)
+            echo '> [!WARNING]' >> structural_report.md
+            echo '> These checks still model an earlier design (a straight 3" x 3" arm, a 2" x 2" cross beam and 3/4" pivot rings), so the capacity and stress ratios below are not valid for the current model. Do not use them as a rated or safe working load. See finding B4 in the [2026-09-25 OpenSCAD review](${{ github.server_url }}/${{ github.repository }}/blob/${{ github.event.pull_request.head.sha || github.sha }}/LifeTrac-v25/AI%20NOTES/CODE%20REVIEWS/2026-09-25_v25_OpenSCAD_Full_Review_Claude_v1_0.md).' >> structural_report.md
+            echo "" >> structural_report.md
             echo "\`\`\`" >> structural_report.md
-            # Extract from summary start to next delimiter or end of relevant section
-            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/========================================/{p;/========================================/q}' structural_analysis.log | tail -n +2 >> structural_report.md || \
-            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,$p' structural_analysis.log | tail -n +2 | head -n 20 >> structural_report.md
+            # Extract from the summary header to the overall assessment line
+            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/OVERALL STRUCTURAL ASSESSMENT/p' structural_analysis.log | tail -n +2 | sed 's/^ECHO: //' >> structural_report.md
             echo "\`\`\`" >> structural_report.md
           else
             echo "No structural analysis summary found in output." >> structural_report.md
@@ -127,14 +137,16 @@ jobs:
           echo "**Branch:** ${{ github.ref_name }}" >> STRUCTURAL_ANALYSIS_LOG.md
           echo "**Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> STRUCTURAL_ANALYSIS_LOG.md
           echo "" >> STRUCTURAL_ANALYSIS_LOG.md
+          echo '> [!WARNING]' >> STRUCTURAL_ANALYSIS_LOG.md
+          echo '> These checks still model an earlier design (a straight 3" x 3" arm, a 2" x 2" cross beam and 3/4" pivot rings), so the capacity and stress ratios below are not valid for the current model. Do not use them as a rated or safe working load. See finding B4 in the [2026-09-25 OpenSCAD review](../AI%20NOTES/CODE%20REVIEWS/2026-09-25_v25_OpenSCAD_Full_Review_Claude_v1_0.md).' >> STRUCTURAL_ANALYSIS_LOG.md
+          echo "" >> STRUCTURAL_ANALYSIS_LOG.md
           
           # Extract and format the structural analysis results
           if grep -q "COMPLETE STRUCTURAL ANALYSIS SUMMARY" structural_analysis.log; then
             echo "### Results Summary" >> STRUCTURAL_ANALYSIS_LOG.md
             echo "" >> STRUCTURAL_ANALYSIS_LOG.md
             echo "\`\`\`" >> STRUCTURAL_ANALYSIS_LOG.md
-            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/========================================/{p;/========================================/q}' structural_analysis.log | tail -n +2 >> STRUCTURAL_ANALYSIS_LOG.md || \
-            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,$p' structural_analysis.log | tail -n +2 | head -n 20 >> STRUCTURAL_ANALYSIS_LOG.md
+            sed -n '/COMPLETE STRUCTURAL ANALYSIS SUMMARY/,/OVERALL STRUCTURAL ASSESSMENT/p' structural_analysis.log | tail -n +2 | sed 's/^ECHO: //' >> STRUCTURAL_ANALYSIS_LOG.md
             echo "\`\`\`" >> STRUCTURAL_ANALYSIS_LOG.md
             echo "" >> STRUCTURAL_ANALYSIS_LOG.md
             
@@ -143,40 +155,42 @@ jobs:
               echo "### ⚠️ Failed Components" >> STRUCTURAL_ANALYSIS_LOG.md
               echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               
-              # Extract rated capacity
+              # The model's "RATED LIFT CAPACITY" is the hydraulic lift capacity it uses as the design load
               CAPACITY=$(grep "RATED LIFT CAPACITY:" structural_analysis.log | head -1 | sed 's/ECHO: "RATED LIFT CAPACITY:", //')
-              echo "**Current Rated Capacity:** $CAPACITY" >> STRUCTURAL_ANALYSIS_LOG.md
+              echo "**Hydraulic lift capacity used as the design load (not a rated capacity):** $CAPACITY" >> STRUCTURAL_ANALYSIS_LOG.md
               echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               
               # List each failed component with details
               echo "#### Detailed Failure Analysis" >> STRUCTURAL_ANALYSIS_LOG.md
               echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               
+              # Each section runs from its "=== ... ===" header to its "... CHECK:" line
+
               # Arm Bending
               if grep -q "Arm Bending.*FAIL" structural_analysis.log; then
                 echo "**1. Arm Bending Stress**" >> STRUCTURAL_ANALYSIS_LOG.md
-                grep -A 5 "=== ARM BENDING STRESS ANALYSIS ===" structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
+                sed -n '/=== ARM BENDING STRESS ANALYSIS ===/,/CHECK:/p' structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
                 echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               fi
               
               # Arm Deflection
               if grep -q "Arm Deflection.*FAIL" structural_analysis.log; then
                 echo "**2. Arm Deflection**" >> STRUCTURAL_ANALYSIS_LOG.md
-                grep -A 5 "=== ARM DEFLECTION ANALYSIS ===" structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
+                sed -n '/=== ARM DEFLECTION ANALYSIS ===/,/CHECK:/p' structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
                 echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               fi
               
               # Cross Beam
               if grep -q "Cross Beam.*FAIL" structural_analysis.log; then
                 echo "**3. Cross Beam Bending**" >> STRUCTURAL_ANALYSIS_LOG.md
-                grep -A 5 "=== CROSS BEAM STRESS ANALYSIS ===" structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
+                sed -n '/=== CROSS BEAM STRESS ANALYSIS ===/,/CHECK:/p' structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
                 echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               fi
               
               # Pivot Ring Welds
               if grep -q "Pivot Ring.*FAIL" structural_analysis.log; then
                 echo "**4. Pivot Ring Welds**" >> STRUCTURAL_ANALYSIS_LOG.md
-                grep -A 5 "=== PIVOT RING WELD ANALYSIS ===" structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
+                sed -n '/=== PIVOT RING WELD ANALYSIS ===/,/CHECK:/p' structural_analysis.log | grep "ECHO:" | sed 's/ECHO: /- /' >> STRUCTURAL_ANALYSIS_LOG.md
                 echo "" >> STRUCTURAL_ANALYSIS_LOG.md
               fi
               
