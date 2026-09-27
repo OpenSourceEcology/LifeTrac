@@ -25,11 +25,11 @@ export_part() {
     local output_file=$3
     
     echo "Exporting ${part_name}..."
-    openscad -o "${output_file}" \
+    rm -f "${output_file}"
+    # --hardwarnings makes OpenSCAD stop with an error on the first warning
+    if openscad --hardwarnings -o "${output_file}" \
         --export-format=svg \
-        "${scad_file}" 2>&1 | grep -v "WARNING" || true
-    
-    if [ -f "${output_file}" ]; then
+        "${scad_file}" && [ -s "${output_file}" ]; then
         echo "  ✓ ${part_name} exported successfully"
         ls -lh "${output_file}" | awk '{print "    Size: " $5}'
     else
@@ -86,8 +86,8 @@ echo ""
 echo "SVG files saved to: output/svg/parts/"
 echo ""
 echo "Part Count Summary:"
-echo "  - 4x Side Panel Outer (use side_panel_outer.svg)"
-echo "  - 4x Side Panel Inner (use side_panel_inner.svg)"
+echo "  - 2x Side Panel Outer (use side_panel_outer.svg)"
+echo "  - 2x Side Panel Inner (use side_panel_inner.svg)"
 echo "  - 4x Wheel Mount (use wheel_mount.svg)"
 echo "  - 6x Cylinder Lug (use cylinder_lug.svg)"
 echo "  - 1x Rear Crossmember"
@@ -95,5 +95,5 @@ echo "  - 1x Standing Deck"
 echo "  - 1x Bucket Bottom"
 echo "  - 2x Bucket Side (use bucket_side.svg, mirror for other side)"
 echo ""
-echo "Total: 23 parts from 8 unique designs"
+echo "Total: 19 parts from 8 unique designs"
 echo ""
