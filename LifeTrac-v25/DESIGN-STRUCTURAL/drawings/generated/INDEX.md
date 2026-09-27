@@ -47,7 +47,7 @@ Material for the parts cut from stock, added up per stock size. Lengths and blan
 | **P2** | Side panel, outer, right | PL 1/2 [12.7] ASTM A36 | 1 | 1392.6 x 1000 | 82.41 kg | A | [PDF](pdf/P2_side-panel-outer-right.pdf) | [DXF](dxf/P2_side-panel-outer-right.dxf) |
 | **P3** | Side panel, inner | PL 1/2 [12.7] ASTM A36 | 2 | 1349.2 x 968.2 | 75.28 kg | A | [PDF](pdf/P3_side-panel-inner.pdf) | [DXF](dxf/P3_side-panel-inner.dxf) |
 | **P4** | Back stiffener plate | PL 1/4 [6.35] ASTM A36 | 1 | 1020 x 650 | 32.97 kg | A | [PDF](pdf/P4_back-stiffener-plate.pdf) | [DXF](dxf/P4_back-stiffener-plate.dxf) |
-| **P5** | Front stiffener plate, centre | PL 1/4 [6.35] ASTM A36 | 1 | 481.6 x 260.4 | 6.22 kg | A | [PDF](pdf/P5_front-stiffener-plate-centre.pdf) | [DXF](dxf/P5_front-stiffener-plate-centre.dxf) |
+| **P5** | Front stiffener plate, centre | PL 1/4 [6.35] ASTM A36 | 1 | 481.6 x 260.4 | 6.22 kg | B | [PDF](pdf/P5_front-stiffener-plate-centre.pdf) | [DXF](dxf/P5_front-stiffener-plate-centre.dxf) |
 | **P6** | Front stiffener plate, outer | PL 1/4 [6.35] ASTM A36 | 2 | 269.2 x 127 | 1.68 kg | A | [PDF](pdf/P6_front-stiffener-plate-outer.pdf) | [DXF](dxf/P6_front-stiffener-plate-outer.dxf) |
 | **P7** | Bottom stiffener plate | PL 1/4 [6.35] ASTM A36 | 1 | 1196.8 x 1020 | 60.57 kg | A | [PDF](pdf/P7_bottom-stiffener-plate.pdf) | [DXF](dxf/P7_bottom-stiffener-plate.dxf) |
 | **P8** | Motor mounting plate | PL 1/4 [6.35] ASTM A36 | 2 | 1196.8 x 254 | 14.13 kg | A | [PDF](pdf/P8_motor-mounting-plate.pdf) | [DXF](dxf/P8_motor-mounting-plate.dxf) |
