@@ -4,7 +4,7 @@ This folder contains OpenSCAD designs for 3D printable jigs used during LifeTrac
 
 ## Jig Renders
 
-The **Generate Jig Previews** workflow renders an isometric and a front view of each jig whenever a jig file changes. The images aren't committed, because the root `.gitignore` excludes PNG and JPG files. Download them from the `jig-renders` artifact of the workflow's latest run on `main`, listed on the [Generate Jig Previews page](https://github.com/OpenSourceEcology/LifeTrac/actions/workflows/generate-jig-previews.yml). Artifacts are kept for 90 days; to make a fresh set, choose **Run workflow** on that page. Or open a jig in OpenSCAD to see it.
+The **Generate Jig Previews** workflow renders an isometric and a front view of each jig whenever a jig file or `lifetrac_v25_params.scad` changes. The images aren't committed, because the root `.gitignore` excludes PNG and JPG files. To get them, sign in to GitHub and download the `jig-renders` artifact from the [latest successful run on `main`](https://github.com/OpenSourceEcology/LifeTrac/actions/workflows/generate-jig-previews.yml?query=branch%3Amain+is%3Asuccess). Artifacts are kept for 90 days; a maintainer can make a fresh set with **Run workflow** on the [workflow's page](https://github.com/OpenSourceEcology/LifeTrac/actions/workflows/generate-jig-previews.yml). Or open a jig in OpenSCAD to see it.
 
 | Jig | Renders |
 |---|---|

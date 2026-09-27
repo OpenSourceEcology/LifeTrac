@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs/**/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad'  # every jig includes it
       - '.github/workflows/generate-jig-previews.yml'
   pull_request:
     paths:
       - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs/**/*.scad'
+      - 'LifeTrac-v25/DESIGN-STRUCTURAL/openscad/lifetrac_v25_params.scad'  # every jig includes it
       - '.github/workflows/generate-jig-previews.yml'
   workflow_dispatch:
 
@@ -20,7 +22,7 @@ jobs:
     # .gitignore excludes *.png and *.jpg. So the job only reads the repo.
     permissions:
       contents: read
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -70,6 +72,8 @@ jobs:
           for scad in *.scad; do
             echo_file="${RUNNER_TEMP}/${scad%.scad}.echo"
             if ! openscad -o "${echo_file}" "${scad}"; then
+              # A parse error goes only into the echo file, so print it
+              cat "${echo_file}" 2>/dev/null || true
               echo "::error::OpenSCAD failed to evaluate ${scad}"
               failed=1
             elif grep -E "^(WARNING|ERROR)" "${echo_file}"; then
@@ -81,73 +85,45 @@ jobs:
           done
           exit ${failed}
 
-      - name: Render Tube Drilling Jig
+      - name: Render the jig previews
         run: |
           cd LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs
           
-          # Jig is approximately 76mm x 102mm x 178mm (3" x 4" x 7")
-          # Camera distance for good framing
-          CAM_DIST=400
-          
-          echo "Rendering tube_drilling_jig isometric view..."
-          openscad -o renders/tube_drilling_jig_iso.png \
-            --camera=$CAM_DIST,$CAM_DIST,$CAM_DIST,0,0,0 \
-            --imgsize=800,800 \
-            --projection=p \
-            --colorscheme=Tomorrow \
-            tube_drilling_jig.scad
-          
-          echo "Rendering tube_drilling_jig front view..."
-          openscad -o renders/tube_drilling_jig_front.png \
-            --camera=0,$CAM_DIST,0,0,0,0 \
-            --imgsize=800,800 \
-            --projection=p \
-            --colorscheme=Tomorrow \
-            tube_drilling_jig.scad
+          # render JIG DISTANCE: an isometric and a front view of JIG.scad.
+          # --camera sets the view direction, and --viewall --autocenter fit
+          # the whole jig in the image. OpenSCAD also exits 0 on warnings it
+          # raises while building the geometry (for example when 2D and 3D
+          # objects are mixed), which the check above can't see, so fail on
+          # any WARNING or ERROR line printed during the render too.
+          render() {
+            local jig=$1 dist=$2 view eye log
+            for view in iso front; do
+              if [ "${view}" = iso ]; then
+                eye="${dist},${dist},${dist}"
+              else
+                eye="0,${dist},0"
+              fi
+              log="${RUNNER_TEMP}/${jig}_${view}.log"
+              echo "Rendering ${jig} ${view} view..."
+              if ! openscad -o "renders/${jig}_${view}.png" \
+                  --camera="${eye},0,0,0" --viewall --autocenter \
+                  --imgsize=800,800 --projection=p --colorscheme=Tomorrow \
+                  "${jig}.scad" 2> "${log}"; then
+                cat "${log}"
+                echo "::error::OpenSCAD failed to render ${jig} (${view} view)"
+                exit 1
+              fi
+              cat "${log}"
+              if grep -E "^(WARNING|ERROR)" "${log}" > /dev/null; then
+                echo "::error::OpenSCAD warnings while rendering ${jig} (${view} view)"
+                exit 1
+              fi
+            done
+          }
 
-      - name: Render Pivot Mount Welding Jig
-        run: |
-          cd LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs
-          
-          CAM_DIST=500
-          
-          echo "Rendering pivot_mount_welding_jig isometric view..."
-          openscad -o renders/pivot_mount_welding_jig_iso.png \
-            --camera=$CAM_DIST,$CAM_DIST,$CAM_DIST,0,0,0 \
-            --imgsize=800,800 \
-            --projection=p \
-            --colorscheme=Tomorrow \
-            pivot_mount_welding_jig.scad
-          
-          echo "Rendering pivot_mount_welding_jig front view..."
-          openscad -o renders/pivot_mount_welding_jig_front.png \
-            --camera=0,$CAM_DIST,0,0,0,0 \
-            --imgsize=800,800 \
-            --projection=p \
-            --colorscheme=Tomorrow \
-            pivot_mount_welding_jig.scad
-
-      - name: Render Pivot Welding Jig
-        run: |
-          cd LifeTrac-v25/DESIGN-STRUCTURAL/openscad/3d_printed_welding_jigs
-          
-          CAM_DIST=300
-          
-          echo "Rendering pivot_welding_jig isometric view..."
-          openscad -o renders/pivot_welding_jig_iso.png \
-            --camera=$CAM_DIST,$CAM_DIST,$CAM_DIST,0,0,0 \
-            --imgsize=800,800 \
-            --projection=p \
-            --colorscheme=Tomorrow \
-            pivot_welding_jig.scad
-          
-          echo "Rendering pivot_welding_jig front view..."
-          openscad -o renders/pivot_welding_jig_front.png \
-            --camera=0,$CAM_DIST,0,0,0,0 \
-            --imgsize=800,800 \
-            --projection=p \
-            --colorscheme=Tomorrow \
-            pivot_welding_jig.scad
+          render tube_drilling_jig 400
+          render pivot_mount_welding_jig 500
+          render pivot_welding_jig 300
 
       - name: Convert PNG to JPG (smaller file size)
         run: |

@@ -22,7 +22,7 @@ The body of this review describes the tree as it was on 2026-09-25. A closer loo
 | Section 8, step 0 | `DESIGN-STRUCTURAL/README.md` now carries a "not yet ready for fabrication" warning that points here |
 
 **Not changed on purpose:**
-- **`pivot_welding_jig.scad`'s include.** Any change under `3d_printed_welding_jigs/` triggers `generate-jig-previews.yml`, whose push-event commit step has failed on both of its runs on main. The cause is that it `git add`s `renders/*.png` and `*.jpg`, which the root `.gitignore` ignores. Whether jig renders should be committed is a maintainer decision.
+- **`pivot_welding_jig.scad`'s include.** Any change under `3d_printed_welding_jigs/` triggered `generate-jig-previews.yml`, whose push-event commit step failed on every run on main, because it `git add`ed renders that the root `.gitignore` ignores. [#134](https://github.com/OpenSourceEcology/LifeTrac/pull/134) has since fixed the include, and the workflow was fixed in a follow-up pull request (below).
 - **The camera maths in the PNG/GIF workflows.** Fixing it would visibly change `assembly.png` and the animation.
 - **The bucket pivot joint (P14).** It can't be fixed at the arm tip alone: the bucket's lug sits just beyond the tip and is no stronger. The fix changes the bucket lugs and the arms, and depends on which bucket cylinder is chosen.
 - **Everything else that needs a design decision.** That covers wheel choice, DOM length, hole patterns, T5 and deletions. The analysis was rebuilt in a follow-up pull request (below).
@@ -32,6 +32,7 @@ The body of this review describes the tree as it was on 2026-09-25. A closer loo
 | Finding | Fix |
 |---|---|
 | B4, B5: structural and stability analysis | [#136](https://github.com/OpenSourceEcology/LifeTrac/pull/136) replaces both with `openscad/analysis/structural_analysis.scad`, which checks the current parts. `DESIGN-STRUCTURAL/STRUCTURAL_ANALYSIS.md` describes the method. It also removes the stale-analysis warning described above. With the estimated masses, the rated operating capacity is 92 kg, because the tipping load is only 184 kg at full reach. Its bucket case also found that the bucket cylinders overload the front of the arms, which is now part of P14. Eight checks still fail, and each is listed as a known issue with its finding (B4, P14, M8) |
+| `generate-jig-previews.yml` (section 5.5) | [#137](https://github.com/OpenSourceEcology/LifeTrac/pull/137) uploads the renders as the `jig-renders` artifact instead of committing them, since the root `.gitignore` excludes PNG and JPG files. It removes the `\|\| echo` masks and fails on any OpenSCAD warning or error in a jig, frames each view so the whole jig shows, and also runs when `lifetrac_v25_params.scad` changes. The same PR records the known issues in `TODO.md` (ST-0 to ST-11) |
 
 ---
 
