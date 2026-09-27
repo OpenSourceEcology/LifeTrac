@@ -74,6 +74,7 @@
     #image-badges,
     #image-staleness,
     #image-detections,
+    #image-vector,
     #image-fade {
       position: absolute !important;
       top: 0 !important; left: 0 !important;
@@ -84,8 +85,16 @@
     #image-badges,
     #image-staleness,
     #image-detections,
+    #image-vector,
     #image-fade {
       pointer-events: none !important;
+    }
+    /* The vector scene stacks above the pixel-only overlays (fade, staleness,
+       badges, detections), which are created later and would otherwise paint
+       their frozen-tile ages and RAW badges over the fail-closed black scene
+       and its banner (VECTOR_SCENE.md §7.5). */
+    #image-vector {
+      z-index: 5 !important;
     }
     #image-meta {
       position: absolute;
@@ -434,6 +443,7 @@
     body.raw-mode #image-detections { display: none !important; }
   </style>
   <script src="/static/img/canvas_renderer.js?v=3"></script>
+  <script src="/static/img/vector_renderer.js?v=1"></script>
   <script src="/static/img/fade_shader.js"></script>
   <script src="/static/img/staleness_overlay.js?v=2"></script>
   <script src="/static/img/badge_renderer.js?v=2"></script>

@@ -13,12 +13,14 @@
 //   4 PREDICTED      — motion-vector replay
 //   5 SYNTHETIC      — LaMa-inpainted (Coral-only, off in v25)
 //   6 WIREFRAME      — PiDiNet edge overlay only
+//   7 VECTOR         — VS1 vector scene drawn from records (VECTOR_SCENE.md)
+//   8 MODEL          — self-model overlay drawn from CAD at the base
 
 (function () {
   'use strict';
 
-  const VALID = new Set([0, 1, 2, 3, 4, 5, 6]);
-  const LABEL = ['RAW', 'CACHED', 'ENHANCED', 'RECOLOURISED', 'PREDICTED', 'SYNTHETIC', 'WIREFRAME'];
+  const VALID = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  const LABEL = ['RAW', 'CACHED', 'ENHANCED', 'RECOLOURISED', 'PREDICTED', 'SYNTHETIC', 'WIREFRAME', 'VECTOR', 'MODEL'];
   const TINT = [
     null,                          // RAW: no overlay
     'rgba(120, 120, 120, 0.18)',   // CACHED — grey
@@ -27,6 +29,8 @@
     'rgba(255, 165, 0,  0.20)',    // PREDICTED — orange
     'rgba(200, 0, 0,    0.30)',    // SYNTHETIC — red (visible operator warning)
     'rgba(0, 200, 100,  0.20)',    // WIREFRAME — green
+    'rgba(80, 160, 255,  0.14)',   // VECTOR — blue (shapes, not pixels)
+    'rgba(200, 200, 200, 0.10)',   // MODEL — neutral (self-model overlay)
   ];
 
   function init() {

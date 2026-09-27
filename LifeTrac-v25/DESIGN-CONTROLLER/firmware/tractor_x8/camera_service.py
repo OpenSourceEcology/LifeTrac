@@ -110,6 +110,10 @@ TARGET_FPS        = _env_float("LIFETRAC_CAMERA_FPS", 2.0, lo=0.1)
 # IP-208: clamp WEBP quality to a sensible range so a typo can't disable
 # the encoder entirely (1 would skip the in-loop guard) or push past lossless.
 WEBP_QUALITY      = _env_int("LIFETRAC_WEBP_QUALITY", 55, lo=20, hi=100)
+# VECTOR mode's own dial (VECTOR_SCENE.md §6): the 0x63 quality byte of a
+# mode-9 command lands here, never in WEBP_QUALITY, so leaving VECTOR gets
+# the tile quality back without a quality byte. 1..100; 60-100 is band V0.
+VECTOR_DETAIL     = _env_int("LIFETRAC_VECTOR_DETAIL", 80, lo=1, hi=100)
 SOURCE            = os.environ.get("LIFETRAC_CAMERA_SOURCE", "libcamera")
 MQTT_HOST         = os.environ.get("LIFETRAC_MQTT_HOST", "localhost")
 
@@ -499,9 +503,13 @@ ENCODE_MODE_BTC4_PER_FRAME = 5
 ENCODE_MODE_MONO_G4        = 6
 ENCODE_MODE_ADAPTIVE       = 7
 ENCODE_MODE_RAWSTREAM      = 8
+# VS1 vector scene (VECTOR_SCENE.md): the whole frame as shapes in one
+# fragment; encoder in x8_image_pipeline/encode_vector.py, wire codec 6.
+ENCODE_MODE_VECTOR         = 9
 ENCODE_MODE_NAMES = (
     "full", "y_only", "motion_only", "wireframe",
     "btc4_per_tile", "btc4_per_frame", "mono_g4", "adaptive", "rawstream",
+    "vector",
 )
 # Modes whose encoder is actually implemented today. Anything outside
 # this set is silently clamped to ENCODE_MODE_Y_ONLY at the receive
@@ -513,7 +521,16 @@ _ENCODE_MODE_IMPLEMENTED = frozenset({
     ENCODE_MODE_WIREFRAME,
     ENCODE_MODE_MONO_G4,
     ENCODE_MODE_RAWSTREAM,
+    ENCODE_MODE_VECTOR,
 })
+
+
+def _vector_encoder_available() -> bool:
+    """numpy and OpenCV are both needed by x8_image_pipeline.encode_vector."""
+    if not _HAS_NUMPY:
+        return False
+    import importlib.util
+    return importlib.util.find_spec("cv2") is not None
 
 
 def _clamp_encode_mode(requested: int) -> int:
@@ -526,6 +543,12 @@ def _clamp_encode_mode(requested: int) -> int:
     try:
         m = int(requested)
     except (TypeError, ValueError):
+        return ENCODE_MODE_Y_ONLY
+    if m == ENCODE_MODE_VECTOR and not _vector_encoder_available():
+        # Fail closed: without numpy + OpenCV the VS1 encoder cannot run, and
+        # falling through to the tile encoder would stamp codec 6 on a tile
+        # payload the base then rejects frame after frame. The ack carries
+        # requested 9 / effective 1 (clamped), which the base UI renders.
         return ENCODE_MODE_Y_ONLY
     if m in _ENCODE_MODE_IMPLEMENTED:
         return m
@@ -563,6 +586,7 @@ CODEC_BTC4_PER_TILE   = 2
 CODEC_BTC4_PER_FRAME  = 3
 CODEC_WEBP_LUMA       = 4   # grayscale WebP; base routes through Recolouriser
 CODEC_WEBP_RAWSTREAM  = 5   # raw WebP VP8/VP8L bitstream (container-stripped)
+CODEC_VECTOR          = 6   # VS1 vector-scene body after the 6-byte header
 
 # Map operator-selected EncodeMode -> wire codec for the frame header.
 # Modes whose encoders are not implemented yet still use CODEC_WEBP
@@ -578,6 +602,7 @@ _ENCODE_MODE_CODEC: dict[int, int] = {
     ENCODE_MODE_MONO_G4:         CODEC_MONO_G4,
     ENCODE_MODE_ADAPTIVE:        CODEC_WEBP_LUMA,   # placeholder; clamped to Y_ONLY
     ENCODE_MODE_RAWSTREAM:       CODEC_WEBP_RAWSTREAM,
+    ENCODE_MODE_VECTOR:          CODEC_VECTOR,
 }
 
 # Deployment knob: strip WebP containers for FULL-mode tiles without a
@@ -852,6 +877,49 @@ class LinkBudget:
         return True
 
 
+_VECTOR_ENCODER = None
+_VECTOR_SEQ = 0
+
+
+def _log_vector_stats(st: dict) -> None:
+    """RS-13 bench evidence: one INFO line per health period while in VECTOR
+    mode with the encoder's ``last_stats`` (ms per stage, wire bytes, level,
+    epoch state). ``tools/vector_dry_run.py tractor-log`` parses the
+    ``key=value`` shape, so keep it stable."""
+    if not st:
+        return
+    import json as _json
+    ms = {k: round(float(v), 1) for k, v in (st.get("ms") or {}).items()}
+    LOG.info("camera_service: vector_stats ms_total=%.1f ms=%s bytes=%d level=%d "
+             "detail=%d epoch=%d n_live=%d residual=%.3f epoch_pending=%d",
+             ms.get("total", 0.0), _json.dumps(ms, separators=(",", ":")),
+             int(st.get("frame_bytes", 0)), int(st.get("level", 0)),
+             int(st.get("detail", 0)), int(st.get("epoch", 0)),
+             int(st.get("n_live", 0)), float(st.get("residual", 0.0)),
+             int(bool(st.get("epoch_pending"))))
+
+
+def _build_vector_frame(canvas: bytes, force_epoch: bool,
+                        byte_budget: "int | None") -> bytes:
+    """VECTOR (mode 9): hand the capture to the VS1 encoder and return its
+    complete TileDeltaFrame (codec 6). The encoder sizes its body to the wire
+    budget minus the 6-byte header itself (VECTOR_SCENE.md §3.7), and a mode
+    change's forced keyframe becomes an epoch start (§7.1)."""
+    global _VECTOR_ENCODER, _VECTOR_SEQ  # noqa: PLW0603
+    if not _HAS_NUMPY:
+        # _clamp_encode_mode refuses VECTOR without numpy; never emit a tile
+        # payload under codec 6, fail the frame build loudly instead.
+        raise RuntimeError("VECTOR mode needs numpy")
+    if _VECTOR_ENCODER is None:
+        from x8_image_pipeline.encode_vector import VectorEncoder
+        _VECTOR_ENCODER = VectorEncoder(canvas=(CANVAS_W, CANVAS_H))
+    rgb = _np.frombuffer(canvas, dtype=_np.uint8).reshape(CANVAS_H, CANVAS_W, 3)
+    budget = byte_budget if (byte_budget is not None and byte_budget > 0) else 203
+    _VECTOR_SEQ = (_VECTOR_SEQ + 1) & 0xFF
+    return _VECTOR_ENCODER.frame(rgb, budget, epoch_start=force_epoch,
+                                 quality=VECTOR_DETAIL, seq=_VECTOR_SEQ)
+
+
 def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
                  *,
                  roi_planner=None,
@@ -885,6 +953,8 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
         is folded into the hash key (different quality → different blob).
     """
     canvas = cam.grab_rgb()
+    if ENCODE_MODE == ENCODE_MODE_VECTOR:
+        return _build_vector_frame(canvas, force_keyframe, byte_budget)
     now = time.monotonic()
     is_key = (force_keyframe or accum.last_canvas is None or
               (now - accum.last_keyframe_t) >= KEYFRAME_PERIOD_S)
@@ -1244,15 +1314,26 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
     on the very next frame). ``None`` keeps the current quality.
     """
     effective = _clamp_encode_mode(raw_mode)
-    global ENCODE_MODE, WEBP_QUALITY  # noqa: PLW0603
+    global ENCODE_MODE, WEBP_QUALITY, VECTOR_DETAIL  # noqa: PLW0603
     mode_changed = (effective != ENCODE_MODE)
     ENCODE_MODE = effective
     if quality is not None:
         try:
-            q = max(20, min(100, int(quality)))
+            # VECTOR takes the whole 1..100 byte: its bands are the V0..V3
+            # levels (VECTOR_SCENE.md §4.5.4). The base's ack matcher clamps
+            # the same way (image_rx_daemon._ack_matches_body).
+            lo = 1 if effective == ENCODE_MODE_VECTOR else 20
+            q = max(lo, min(100, int(quality)))
         except (TypeError, ValueError):
             q = None
-        if q is not None:
+        if q is not None and effective == ENCODE_MODE_VECTOR:
+            # The vector detail is its own dial (VECTOR_SCENE.md §6): a mode-9
+            # command never touches the tile modes' WebP quality.
+            if q != VECTOR_DETAIL:
+                LOG.info("camera_service: vector detail %s -> %d [%s]",
+                         VECTOR_DETAIL, q, source)
+            VECTOR_DETAIL = q
+        elif q is not None:
             if q != WEBP_QUALITY:
                 LOG.info("camera_service: quality %s -> %d [%s]",
                          WEBP_QUALITY, q, source)
@@ -1290,8 +1371,10 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
                 "codec": _ENCODE_MODE_CODEC.get(effective, 0),
                 # Effective quality after clamping — lets the base UI show
                 # what the encoder is actually running, and diverges from
-                # the request when the [20,100] clamp bites.
-                "quality": WEBP_QUALITY,
+                # the request when the clamp bites. VECTOR reports its own
+                # dial (the base's ack matcher compares the byte it sent).
+                "quality": (VECTOR_DETAIL if effective == ENCODE_MODE_VECTOR
+                            else WEBP_QUALITY),
                 "source": source,
                 "ts": round(time.time(), 1),
             }
@@ -1571,6 +1654,7 @@ def main() -> None:
     frame_health_log = os.environ.get("LIFETRAC_CAMERA_HEALTH_LOG", "").strip() == "1"
     frame_health_every_s = _env_float("LIFETRAC_CAMERA_HEALTH_EVERY_S", 2.0, lo=1.0)
     _last_health_t = 0.0
+    _last_vstats_t = 0.0
     _last_canvas_sig: int | None = None
     _same_canvas_run = 0
     while True:
@@ -1593,6 +1677,13 @@ def main() -> None:
                              _same_canvas_run, sig, TARGET_FPS)
                     _last_health_t = now_h
                 _last_canvas_sig = sig
+            if ENCODE_MODE == ENCODE_MODE_VECTOR and _VECTOR_ENCODER is not None:
+                # RS-13 bench line at the health cadence (no env needed): the
+                # encoder's per-stage ms, parsed by tools/vector_dry_run.py.
+                now_v = time.monotonic()
+                if (now_v - _last_vstats_t) >= frame_health_every_s:
+                    _last_vstats_t = now_v
+                    _log_vector_stats(_VECTOR_ENCODER.last_stats)
             # Primary: UART to the M7 (length-framed). Skipped under the
             # LoRa-bridge path; image_tx_daemon picks up the same payload
             # over MQTT and feeds the L072 HostLink directly.
