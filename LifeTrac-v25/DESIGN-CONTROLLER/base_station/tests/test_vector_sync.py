@@ -674,8 +674,10 @@ class SyncTests(unittest.TestCase):
         self.assertTrue(link.store.stats["resync"])
         orphans_before = link.store.stats["orphans"]
         t[0] += 61.0
-        refresh = link.step(scene(y0=8.0, rects=frames[0]), budget=80)
+        refresh = link.step(scene(y0=8.0, rects=frames[1]), budget=80)   # the grid moves ON the key frame
         self.assertTrue(refresh.header.key)
+        self.assertGreater(len(records_of(refresh, vs.Upd)), 0, "no motion on the key frame")
+        self.assertGreater(len(records_of(refresh, vs.Poly)), 0, "the key frame re-stated nothing")
         for u in records_of(refresh, vs.Upd):                          # every UPD rides behind its define
             self.assertTrue(any(p.id == u.id for p in records_of(refresh, vs.Poly)), refresh.records)
         self.assertEqual(link.store.stats["orphans"], orphans_before)
@@ -683,7 +685,7 @@ class SyncTests(unittest.TestCase):
         healed = None
         for i in range(TTL_FRAMES):
             t[0] += 0.5
-            frame = link.step(scene(y0=8.0, rects=frames[(i + 1) % 2]), budget=80)
+            frame = link.step(scene(y0=8.0, rects=frames[i % 2]), budget=80)
             self.assertEqual(link.store.stats["orphans"], orphans_before, f"post {i + 1}: {frame.records}")
             if link.in_step()[:2] == (True, False):
                 healed = i
@@ -695,16 +697,16 @@ class SyncTests(unittest.TestCase):
         # 1.2: with the CONFIRM/DIGEST reserve counted over the kept shapes,
         # a 40 B body (or V2's F = 40) left no room for a single repeat and
         # the whole kept layer expired on both ends at every refresh.
-        for label, budget, quality in (("40 B", 40, 80), ("V2", 203, 30)):
+        for label, budget, quality, rects in (("40 B", 40, 80, self.grid31()), ("V2", 203, 30, self.grid31()),
+                                             ("26 B, 12 masses", 26, 80, self.grid31()[:12])):
             with self.subTest(label):
                 t = [1000.0]
                 link = Link(clock=lambda: t[0])
-                rects = self.grid31()
                 for _ in range(6):
                     link.step(scene(y0=8.0, rects=rects), quality=quality)
                     t[0] += 0.5
                 n_live = records_of(link.frames[-1], vs.Digest)[0].n_live
-                self.assertGreaterEqual(n_live, 13)
+                self.assertGreaterEqual(n_live, min(13, len(rects)))
                 t[0] += 61.0
                 refresh = link.step(scene(y0=8.0, rects=rects), budget=budget, quality=quality)
                 self.assertTrue(refresh.header.key)
@@ -737,9 +739,9 @@ class SyncTests(unittest.TestCase):
             if i >= 3:
                 dels_after_settle += len([d for d in records_of(frame, vs.Del) if d.id in vs.ID_MASS])
             self.assertEqual(link.in_step()[:2], (True, False), f"frame {i + 1}")
+        self.assertEqual(dels_after_settle, 0, "an eviction cascade on a static scene")
         self.assertTrue(any(o.area > 1000 for o in link.enc._shapes.values()), "no large mass under the grid")
         self.assertGreater(link.enc.last_stats["waiting"], 0)          # the mass ids are all in use
-        self.assertEqual(dels_after_settle, 0, "an eviction cascade on a static scene")
         self.assertEqual(link.enc.last_stats["epochs"], 1)
 
     def test_jittering_holder_is_not_evicted_for_a_weaker_newcomer(self):
@@ -747,7 +749,7 @@ class SyncTests(unittest.TestCase):
         # frame's UPD) looked worthless and a weaker newcomer evicted it
         # every few frames. Value the region it will describe.
         rects = self.grid31()
-        newcomer = [(40, 52, 49, 57, RED)]                              # 10×6: below the 2× bar
+        newcomer = [(50, 56, 59, 61, RED)]                              # 10×6, ≥ 3 px from every square: below the 2× bar
         link = Link()
         for _ in range(3):
             link.step(scene(y0=8.0, rects=rects))
@@ -758,6 +760,7 @@ class SyncTests(unittest.TestCase):
             moving = rects[:]
             moving[10] = (rects[10][0] + dx, rects[10][1], rects[10][2] + dx, rects[10][3], RED)
             frame = link.step(scene(y0=8.0, rects=moving + newcomer))
+            self.assertGreater(link.enc.last_stats["waiting"], 0, f"frame {i + 4}: nothing waits")
             for u in records_of(frame, vs.Upd):
                 jid = u.id
             dels += [d.id for d in records_of(frame, vs.Del)]
@@ -878,6 +881,95 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(enc._alloc_id("plant", taken - {vs.ID_PLANT[-1]}), vs.ID_PLANT[-1])   # a free id wins
         enc._frame_no = 100 + TTL_FRAMES + 1
         self.assertEqual(enc._alloc_id("plant", taken), a)               # a's cooldown is over
+
+    # ---------------------------------------------------------------- review round 4
+
+    def test_lost_del_before_a_refresh_does_not_trip_resync(self):
+        # C1: the base missed a DEL and still holds the ghost for its own 20
+        # applied frames. The first DIGEST after the refresh must not name
+        # the live set without it, or three mismatches put a healthy base
+        # into resync for the rest of the epoch.
+        for budget in (80, 203):
+            with self.subTest(f"{budget} B"):
+                t = [1000.0]
+                link = Link(clock=lambda: t[0])
+                rects = self.grid31()
+                for _ in range(3):
+                    link.step(scene(y0=8.0, rects=rects), budget=budget)
+                    t[0] += 0.5
+                gone = link.step(scene(y0=8.0, rects=rects[1:]), budget=budget, lose=True)
+                t[0] += 0.5
+                self.assertEqual(len(records_of(gone, vs.Del)), 1, gone.records)
+                for _ in range(8):
+                    link.step(scene(y0=8.0, rects=rects[1:]), budget=budget)
+                    t[0] += 0.5
+                orphans_before = link.store.stats["orphans"]
+                t[0] += 61.0
+                refresh = link.step(scene(y0=8.0, rects=rects[1:]), budget=budget)
+                self.assertTrue(refresh.header.key)
+                for i in range(TTL_FRAMES + 8):
+                    t[0] += 0.5
+                    link.step(scene(y0=8.0, rects=rects[1:]), budget=budget)
+                    self.assertFalse(link.store.stats["resync"], f"post {i + 1}")
+                    self.assertEqual(link.store.stats["orphans"], orphans_before, f"post {i + 1}")
+                self.assertEqual(len(link.store._live()), len(link.enc._shapes))
+                self.assertEqual(*link.ttl_clocks())
+                self.assertEqual(link.in_step()[:2], (True, False))
+
+    def test_lost_del_then_reuse_after_the_cooldown_states_the_offset(self):
+        # C2: the base ages the ghost in APPLIED frames; another lost frame
+        # keeps it past the encoder's cooldown, so a same-hash re-use of the
+        # id must state the offset whenever it was ever moved — no window.
+        link = Link()
+        rects = self.grid31()
+        for _ in range(3):
+            link.step(scene(y0=8.0, rects=rects))
+        moved = rects[:]
+        moved[0] = (rects[0][0] + 3, rects[0][1], rects[0][2] + 3, rects[0][3], RED)
+        frame = link.step(scene(y0=8.0, rects=moved))
+        upds = records_of(frame, vs.Upd)
+        self.assertEqual(len(upds), 1, frame.records)
+        xid, off = upds[0].id, (upds[0].dx, upds[0].dy)
+        gone = link.step(scene(y0=8.0, rects=moved[1:]), lose=True)            # the DEL is lost
+        self.assertEqual(records_of(gone, vs.Del), [vs.Del(xid)])
+        for i in range(TTL_FRAMES):                                            # one more frame lost meanwhile
+            link.step(scene(y0=8.0, rects=moved[1:]), lose=(i == 4))
+        self.assertIn(xid, [sh.id for sh in link.store._live()], "the base should still hold the ghost")
+        back = link.step(scene(y0=8.0, rects=rects))                           # past the cooldown, same outline
+        polys = [p for p in records_of(back, vs.Poly) if p.id == xid]
+        self.assertEqual(len(polys), 1, back.records)
+        recs = list(back.records)
+        self.assertEqual(recs[recs.index(polys[0]) + 1], vs.Upd(xid, 0, 0), recs)
+        self.assertEqual(link.store._shapes[xid].off, (0, 0))
+        # The ghost's 20 frames of mismatching DIGESTs put the base into
+        # resync, which only the next epoch start ends (§4.3); what the
+        # re-use must get right is the state: every DIGEST from here matches.
+        for _ in range(3):
+            link.step(scene(y0=8.0, rects=rects))
+            self.assertTrue(link.in_step()[0])
+        # (No TTL-clock equality here: in resync the base refuses CONFIRMs by
+        # design, so its clocks run ahead of the mirror until the epoch start.)
+
+    def test_on_off_newcomer_does_not_rotate_evictions(self):
+        # C6: a newcomer present two frames in four evicts the weakest holder,
+        # whose region then takes its id straight back; without a hold the
+        # next appearance evicts the next holder, and so on round the grid.
+        low = (150, 96, 60)
+        small = [(2 + 9 * i, 30 + 9 * j, 7 + 9 * i, 35 + 9 * j, low) for i in range(10) for j in range(3)]
+        fill = [(20, 10, 33, 19, RED)]                                         # takes the one free id
+        big = [(50, 10, 63, 19, RED)]                                          # the on/off newcomer
+        link = Link()
+        for _ in range(4):
+            link.step(scene(y0=8.0, rects=small + fill))
+        dels: list = []
+        for i in range(60):
+            on = (i % 4) in (0, 1)
+            frame = link.step(scene(y0=8.0, rects=small + fill + (big if on else [])))
+            dels += [d.id for d in records_of(frame, vs.Del) if d.id in vs.ID_MASS]
+            self.assertEqual(link.in_step()[:2], (True, False), f"frame {i + 5}")
+        self.assertLessEqual(len(dels), 1 + 60 // (TTL_FRAMES + 4), f"evictions rotated: {dels}")
+        self.assertEqual(len(dels), len(set(dels)), f"a holder was evicted twice: {dels}")
+        self.assertEqual(link.enc.last_stats["epochs"], 1)
 
 
 if __name__ == "__main__":

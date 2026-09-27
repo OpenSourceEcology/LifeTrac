@@ -47,8 +47,12 @@ the mirror drifting from the store on a loss-free path, anomalies A1/A2):
 * within a frame a shape's UPD / UCOL follow its define, so the repeat of
   a define the base missed lands before this frame's change to it;
 * an id a DEL or a TTL drop freed cools down for TTL_FRAMES frames, and a
-  fresh define that re-uses it inside that window states its offset and
-  colour, because a base that missed the DEL still holds the old shape;
+  fresh define that ever re-uses it states its offset and colour, because a
+  base that missed the DEL still holds the old shape — for TTL_FRAMES of
+  *applied* frames, which loss stretches beyond any window the encoder
+  could count; after a range-1/2 start no DIGEST goes until such a ghost
+  has certainly expired at the base, or the DIGEST itself would put a
+  healthy base into resync;
 * a same-id redefine competes with the live outline over the union of both
   rasters, not with itself over its own pixels: when the new outline is not
   worth its bits the live one is confirmed instead.
@@ -349,6 +353,9 @@ class VectorEncoder:
         self._restate_owed: set = set()               # kept shapes not yet re-stated after a range-1/2 start
         self._restate_all = False                     # the key frame of a range-1/2 attempt: every kept shape owes
         self._evict_strikes: dict = {}                # layer -> consecutive frames a newcomer beat its weakest holder
+        self._evict_hold: dict = {}                   # layer -> frame until which no eviction runs (an evictee took its id back)
+        self._evicted: dict = {}                      # id -> raster of the shape evicted from it
+        self._digest_quiet_until = -1                 # after a range-1/2 start: no DIGEST while a base may hold a missed-DEL ghost
         self._evict_next: set = set()                 # ids DEL'd next frame to free their id
         self._waiting = 0                             # fresh defines refused an id in the last frame
         self._last_stats: dict = {}
@@ -641,6 +648,7 @@ class VectorEncoder:
         if clear == 0:                                # every mass is redefined: a fresh reference exposure
             self._gain = self._gain_next = GAIN_NEUTRAL
             self._restate_owed = set()
+            self._digest_quiet_until = -1
         else:
             # The kept layers are re-stated in the following frames like the
             # epoch-start records (§3.5): every live shape owes a repeat-once
@@ -654,6 +662,15 @@ class VectorEncoder:
             for s in self._shapes.values():
                 s.repeat_left = max(s.repeat_left, LEVEL_REPEATS[level])
             self._restate_owed = set(self._shapes)
+            # A base that missed a DEL still holds that shape for TTL_FRAMES
+            # of its own applied frames; a DIGEST naming the live set without
+            # it mismatches there and, three in a row, puts a healthy base
+            # into resync (§4.3), which only the next epoch start ends. So no
+            # DIGEST goes until every id freed inside the last TTL_FRAMES
+            # frames has certainly expired at the base.
+            young = [fr[0] for i, fr in self._id_freed.items()
+                     if i not in self._shapes and self._frame_no - fr[0] <= vs.TTL_FRAMES]
+            self._digest_quiet_until = (max(young) + vs.TTL_FRAMES + 3) if young else -1
         self._committed = True
 
     def _alloc_id(self, layer: str, taken: set) -> Optional[int]:
@@ -686,15 +703,18 @@ class VectorEncoder:
         self._evict_next.discard(id_)
 
     def _fresh_define_records(self, rec) -> tuple:
-        """(records, ever_upd, ever_ucol) for a fresh define. When the id was
-        freed within the cooldown, a base that missed the DEL still holds
-        the old shape, and a define it reads as same-hash would keep that
-        shape's offset and colour (§3.4 rule 5) — whether this define's hash
-        equals the mirror's last one or an earlier one the base never saw
-        replaced. So the define states the fresh shape's offset and colour
-        whenever the old shape ever had an UPD or a UCOL."""
+        """(records, ever_upd, ever_ucol) for a fresh define. A base that
+        missed the DEL that freed this id still holds the old shape, and a
+        define it reads as same-hash would keep that shape's offset and
+        colour (§3.4 rule 5) — whether this define's hash equals the
+        mirror's last one or an earlier one the base never saw replaced. So
+        a define that re-uses a freed id states the fresh shape's offset and
+        colour whenever the old shape ever had an UPD or a UCOL. There is no
+        time window: the base keeps the ghost for TTL_FRAMES of *applied*
+        frames, which loss stretches past any count the encoder could keep,
+        and the price is one UPD / UCOL per re-use."""
         freed = self._id_freed.get(rec.id)
-        if freed is None or self._frame_no - freed[0] > vs.TTL_FRAMES:
+        if freed is None:
             return (rec,), False, False
         _, _, off, fill, had_upd, had_ucol = freed
         recs, ever_upd, ever_ucol = [rec], False, False
@@ -826,7 +846,8 @@ class VectorEncoder:
         # only for shapes half-way to their TTL, and no DIGEST is reserved
         # or sent, so at a small budget the reserve cannot starve the
         # repeats until the kept layer expires (§3.5, §4.3).
-        restating = bool(self._restate_owed) or (key and clear is not None and clear >= 1)
+        restating = (bool(self._restate_owed) or (key and clear is not None and clear >= 1)
+                     or self._frame_no <= self._digest_quiet_until)
         eligible = [i for i in sorted(verified)
                     if not restating or self._shapes[i].frames_since_verify >= vs.TTL_FRAMES // 2]
         reserve = self._confirm_bits(eligible) + (0 if restating else vs.record_bits(vs.Digest(0, 0)))
@@ -845,7 +866,7 @@ class VectorEncoder:
                 if used + vs.record_bits(rec) <= total_bits:
                     records.append(rec)
                     used += vs.record_bits(rec)
-            if not self._restate_owed:                       # see _commit_epoch: not while a repeat is owed
+            if not self._restate_owed and self._frame_no > self._digest_quiet_until:   # see _commit_epoch
                 digest = vs.Digest(len(self._shapes), vs.digest_crc(
                     [(s.id, s.dhash, s.state_hash()) for s in self._shapes.values()],
                     [(0, 0)] * 4, 128, self._gain))
@@ -1017,6 +1038,15 @@ class VectorEncoder:
                 refused[layer] = max(refused.get(layer, 0.0), dd)
                 continue
             taken.add(id_)
+            old = self._evicted.pop(id_, None)
+            if old is not None:
+                inter, union = int((old & raster).sum()), int((old | raster).sum())
+                if union and inter / union >= MATCH_IOU:
+                    # The evictee's own region took its id straight back: the
+                    # newcomer that beat it is gone again. Hold this layer's
+                    # evictions for a TTL so an on/off newcomer cannot rotate
+                    # a wasted DEL + define through every holder.
+                    self._evict_hold[layer] = self._frame_no + vs.TTL_FRAMES
             rec = self._region_record(id_, r)
             recs, ever_upd, ever_ucol = self._fresh_define_records(rec)
             cands.append(_Cand(5, (3, -per_bit), recs if len(recs) > 1 else rec,
@@ -1040,32 +1070,46 @@ class VectorEncoder:
         for layer, best_dd in refused.items():
             if any(o.layer == layer for o in self._shapes.values() if o.id in self._evict_next):
                 continue
+            if self._evict_hold.get(layer, -1) >= self._frame_no:
+                continue
             holders = [o for o in masses if o.layer == layer and o.id not in deleted]
             if not holders:
                 continue
-            value = self._holder_values(holders, matched_shape, by_index, region_map, mirror, under, top, f, gain)
+            value = self._holder_values(holders, [o for o in masses if o.id not in deleted], matched_shape,
+                                        by_index, region_map, mirror, under, top, f, gain, self._valid)
             weak = min(value, key=value.get)
             if best_dd >= EVICT_VALUE_RATIO * max(value[weak], 0.0):
                 n = self._evict_strikes.get(layer, 0) + 1
                 strikes[layer] = n
                 if n >= EVICT_STRIKES:
                     self._evict_next.add(weak)
+                    self._evicted[weak] = self._shapes[weak].raster
         self._evict_strikes = strikes
 
     @staticmethod
-    def _holder_values(holders: list, matched_shape: dict, by_index: dict, region_map: np.ndarray,
-                       mirror: np.ndarray, under: dict, top: np.ndarray, f: np.ndarray, gain) -> dict:
+    def _holder_values(holders: list, shapes: list, matched_shape: dict, by_index: dict, region_map: np.ndarray,
+                       mirror: np.ndarray, under: dict, top: np.ndarray, f: np.ndarray, gain,
+                       valid: np.ndarray) -> dict:
         """Per live holder, the error it removes from the picture it will be in
-        after this frame: over the region it now describes (its own raster
-        when unmatched), the region's colour against the mirror with the
-        holder taken out (what lies under it where it is on top, the mirror
-        itself where a smaller shape covers it) — the measure a newcomer's
-        ΔD uses, so the two compare."""
+        after this frame: over the raster its define would paint for the
+        region it now describes (what ``_score_define`` scores a newcomer
+        on; its own raster when unmatched), less the pixels a smaller live
+        shape shows on top of it, the region's colour against the mirror
+        with the holder taken out (what lies under it where it is on top,
+        the mirror itself elsewhere) — so holder and newcomer compare."""
+        area_of = np.zeros(128, np.int64)
+        for o in shapes:
+            area_of[o.id] = o.area
+        top_area = area_of[top]
         values: dict = {}
         for o in holders:
             m = matched_shape.get(o.id)
             r = by_index.get(m[0]) if m is not None else None
-            rast = (region_map == r.index) if r is not None else o.raster
+            if r is not None:
+                rast = (r.raster & valid) if r.raster is not None else (region_map == r.index)
+            else:
+                rast = o.raster
+            rast = rast & ~((top != 0) & (top != o.id) & (top_area < o.area))
             colour = np.clip(vx.fill_shown_rgb8(r.fill if r is not None else o.fill) * gain, 0.0, 255.0)
             without = mirror.copy()
             if o.id in under:
@@ -1296,7 +1340,9 @@ class VectorEncoder:
         plus this frame's change. It replaces the bare UPD / UCOL / CONFIRM
         the shape would otherwise get: a base that dropped the shape would
         orphan the UPD, and a CONFIRM would contradict its stale state; and
-        a repeat left to slot 6 is starved by those UPDs at a small budget."""
+        a repeat left to slot 6 is starved by those UPDs at a small budget.
+        The shape's repeat-once is not spent by it, so a lost re-statement
+        frame is covered by the slot-6 copy that follows (§4.3)."""
         recolour = de > VERIFY_DE and r.fill != s.fill
         recs = [s.define]
         if upd is not None:
@@ -1309,7 +1355,7 @@ class VectorEncoder:
             recs.append(vs.Ucol(s.id, s.fill))
 
         def apply(s=s, u=upd, r=r, recolour=recolour):
-            self._apply_repeat(s, spend=True)
+            self._apply_repeat(s)                            # not spent: the repeat-once follows as a second copy
             if u is not None:
                 self._apply_upd(s, u, r)
             if recolour:
