@@ -3826,6 +3826,9 @@ outside DESIGN-CONTROLLER but block field deployment equally.
 - [ ] 🟥 Frame fabrication —
   [DESIGN-STRUCTURAL/](DESIGN-STRUCTURAL/) and
   [BUILD-STRUCTURE/](BUILD-STRUCTURE/).
+- [ ] 🟥 Structural known issues ST-0 … ST-11 (the analysis fails 8
+  checks; not ready for fabrication) — see
+  [§ Structural known issues](#structural-known-issues) below.
 - [ ] 🟥 Hydraulic plumbing + valve manifold —
   [DESIGN-HYDRAULIC/](DESIGN-HYDRAULIC/) and
   [BUILD-HYDRAULIC/](BUILD-HYDRAULIC/).
@@ -6388,6 +6391,191 @@ Execute from the runbook; the bullets below are the index.
 — Round 4 deferred items + Round 5 candidate queue.
 
 ---
+
+## Structural known issues
+
+🟥 **Not ready for fabrication** (see the "Not yet ready for fabrication"
+warning at the top of [DESIGN-STRUCTURAL/README.md](DESIGN-STRUCTURAL/README.md),
+which also lists side-panel, CNC-layout and cut-list problems). The
+rebuilt structural analysis (PR #136, method in
+[DESIGN-STRUCTURAL/STRUCTURAL_ANALYSIS.md](DESIGN-STRUCTURAL/STRUCTURAL_ANALYSIS.md))
+fails 8 checks on the current design. Each one is listed in
+`STRUCT_KNOWN_ISSUES` in
+[`structural_analysis.scad`](DESIGN-STRUCTURAL/openscad/analysis/structural_analysis.scad)
+with the review finding that covers it, so CI reports it as "known fail"
+instead of failing the build. Each needs a design decision. Finding IDs
+(B3, B4, B5, P14, M7, M8, M9, M17) refer to the
+[2026-09-25 OpenSCAD review](AI%20NOTES/CODE%20REVIEWS/2026-09-25_v25_OpenSCAD_Full_Review_Claude_v1_0.md).
+
+The check results are from
+[STRUCTURAL_ANALYSIS_LOG.md](DESIGN-STRUCTURAL/STRUCTURAL_ANALYSIS_LOG.md)
+on 2026-09-27, and the dimensions from the model and the review. They
+are static checks with the cylinders at the 3,000 psi relief pressure,
+to AISC allowable-stress design (bending allowable 150 MPa; A36 yield
+250 MPa). "Capacity" is the allowable, i.e. already divided by the
+safety factor. When a fix makes a check pass, remove it from
+`STRUCT_KNOWN_ISSUES` in the same change; CI warns when a listed check
+passes. 🟥 and 🟨 follow the status legend of the pre-field-deployment
+checklist above (🟥 blocker before the Phase 8 field tests, 🟨 required
+for the Phase 9 release).
+
+### Decide first
+
+- [ ] 🟥 **ST-0 Choose the bucket cylinders.** Every bucket-case load is
+  proportional to the cylinder's force, which goes with the square of the
+  bore, so this choice sets ST-2 to ST-8. Part of the review's section 8,
+  step 2 (choose the real wheel and cylinders).
+  - **Model and BOM disagree.** The model draws 3" bore cylinders, which
+    push 94.3 kN and pull 70.7 kN each at relief. The BOM lists 2" × 1"
+    cylinders with a 12" stroke
+    ([BILL_OF_MATERIALS.md § Hydraulic Cylinders](DESIGN-STRUCTURAL/documentation/BILL_OF_MATERIALS.md#hydraulic-cylinders)),
+    which push 41.9 kN. Their stroke is also too short: the model's
+    cylinder lengthens from 776 mm at full curl to 1,220 mm at full dump,
+    445 mm of travel, so the geometry would change too.
+  - **The 2" cylinders aren't enough on their own.** They bring the loads
+    down to 44 % (P14). A run of the model with them (2026-09-27) passes
+    T3 (ST-3, 0.71), but the arm when dumping (ST-2, 1.28), the arm tip
+    (ST-4, 1.33), the U-lug (ST-5, 1.14) and all three lug-bolt groups
+    (ST-6 to ST-8, 1.77 to 1.98) still fail.
+
+### Arms and cross beam
+
+- [ ] 🟥 **ST-1 Arm side plates alone** (`ARM_BENDING_PLATES_ONLY`):
+  355 MPa against 150 MPa (ratio 2.37), in the lift case, just outboard of
+  the lift-bracket gusset. The 2×6 tube is bolted to the two 1/4" side
+  plates only near its ends
+  ([loader_arm_v2.scad:67-76](DESIGN-STRUCTURAL/openscad/modules/loader_arm_v2.scad#L67-L76)),
+  so the plates may carry the moment alone. With tube and plates sharing
+  it, the same section passes (`ARM_BENDING`, 132 MPa, 0.88). Decide how
+  the plates and tube are joined (e.g. welded along the tube) so that they
+  act together; then retire this check. (B4)
+- [ ] 🟥 **ST-2 Front of the arms in the bucket case**
+  (`ARM_BENDING_BUCKET`): 431 MPa against 150 MPa (2.87), with tube and
+  plates together. T3 holds the other end of each bucket cylinder, so
+  ahead of T3 each arm carries the bucket pin's whole force. Just outboard
+  of the lift-bracket gusset, that is up to 57 kN·m when dumping and
+  43 kN·m when curling, against 17.5 kN·m in the lift case. Needs a
+  stronger arm section between the lift bracket and the drop leg, sized
+  for the cylinder chosen in ST-0 and redesigned together with the bucket
+  pivot joint below. (P14)
+- [ ] 🟥 **ST-3 Cross beam T3 in bending and twist** (`T3_COMBINED`):
+  238 MPa against 150 MPa (1.59, von Mises). The bucket-cylinder lugs hang
+  under T3, with their pins 63.5 mm below its centre line, so the
+  cylinders' force twists it as well as bending it about both axes.
+  Decide where the cylinder lugs sit on T3 and how they are attached.
+  T3's bolted angle-clip end connections to the arms aren't modelled.
+  (B4)
+
+### Bucket pivot joint and cylinder lugs (redesign with ST-2)
+
+The pin at each arm tip carries the cylinder's force plus the obstacle's
+force at the cutting edge, taken as the smallest force that stalls the
+bucket: up to 116.2 kN when dumping and 87.1 kN when curling. A push
+along the line from the pin to the edge, such as driving the edge into a
+pile, adds to this and isn't checked (the machine's traction limits it);
+the method treats the dump case as an upper bound and the breakout when
+curling as the usual design case.
+
+P14 recommends redesigning the joint, the cylinder lugs and the front of
+the arms (ST-2) together, sized for the cylinder chosen in ST-0. Its
+suggested direction: welded 1/2" clevis plates on a reinforced bucket
+back, an arm-tip boss with a radius of at least 2 × the pin diameter,
+larger pins with bushings (M9) and a stronger arm section. The bucket's
+own structure (M8: no top back rail, side-edge reinforcement, wear strips
+or gussets behind the lugs) belongs in the same redesign. The review's
+section 8, step 6 puts this after the quick-attach plate (M7); today the
+bucket pins straight to the arm tips.
+
+The model's `u_channel_lug()` also cuts every lug to the tube's 76.2 mm
+instead of its 80 or 100 mm length. So the bucket pivot lugs and the
+bucket-cylinder lugs on the bucket lose their 4 base bolt holes
+([drawings/generated/CHECKS.md](DESIGN-STRUCTURAL/drawings/generated/CHECKS.md)):
+the modelled lugs have no holes for the bolts that ST-6 and ST-8 check.
+
+- [ ] 🟥 **ST-4 Bucket pivot hole in the arm tip** (`BUCKET_PIN_ARM_TIP`):
+  116.2 kN against 38.7 kN (3.00). The 1" pin hole is centred 25.4 mm
+  from the end of the two 1/4" arm plates, leaving 12.7 mm of steel, and
+  the drop-leg tube stops short of the tip. The tip can't simply be
+  enlarged: the bucket lug's base sits only 6.35 mm beyond it and swings
+  around the pin as the bucket tilts. (P14)
+- [ ] 🟥 **ST-5 Bucket pivot hole in the U-lug** (`BUCKET_PIVOT_LUG`):
+  116.2 kN against 45.3 kN (2.56). The lug is a 3×3×1/4 U-channel whose
+  open side faces the arm, leaving 14.9 mm of steel beyond the hole in
+  each wall. (P14)
+- [ ] 🟥 **ST-6 Bucket pivot lug bolts** (`BUCKET_LUG_BOLTS`): 112.1 kN
+  against 25.1 kN (4.46), 4 × 1/4" bolts in tension and shear together;
+  prying isn't included. (P14, M8)
+- [ ] 🟥 **ST-7 Bucket-cylinder lug bolts on T3** (`BUCKET_CYL_LUG_BOLTS`):
+  94.3 kN against 23.6 kN (4.00), 4 × 1/4" bolts in shear. (P14, M8)
+- [ ] 🟥 **ST-8 Bucket-cylinder lug bolts on the bucket**
+  (`BUCKET_CYL_LUG_BOLTS_BUCKET`): 94.3 kN against 23.7 kN (3.99),
+  4 × 1/4" bolts checked for tension and shear together. At the worst
+  tilt, full dump, the cylinder presses the lug onto the bucket, so they
+  are in shear alone; prying isn't included. (P14, M8)
+
+### Stability
+
+- [ ] 🟥 **ST-9 Rated operating capacity is only 92 kg (202 lb).** (B5)
+  That is half the lowest tipping load, 184 kg, at full reach with the
+  arms near level (294 kg with an operator on the rear platform). The
+  hydraulics could lift far more: 1,258 kg even with the arms fully raised
+  to 49.4°, where it is lowest. This isn't a CI check.
+  - **Why.** Tipping is taken about the front axle. At full reach the load
+    centre is about 1,100 mm ahead of it, while the empty machine's centre
+    of mass is only about 220 mm behind it.
+  - **Options.** Counterweight at the rear, moving mass back, or moving the
+    front axle forward (100 mm forward gives a tipping load of about
+    285 kg). Moving only the rear axle back barely helps. Decide together
+    with the wheel choice (B3; review section 8, step 2).
+  - **Masses.** The 910 kg empty mass is an estimate. The part drawings
+    already compute masses from the model
+    ([drawings/generated/INDEX.md](DESIGN-STRUCTURAL/drawings/generated/INDEX.md)):
+    the four 1/2" side panels alone weigh 317 kg, against 350 kg estimated
+    for the whole frame, and the bucket's plates, cutting edge and lugs
+    91 kg, against 120 kg. Using computed masses in the check (M17) would
+    firm up the figure.
+  - **Assembly guide.**
+    [ASSEMBLY.md](DESIGN-STRUCTURAL/documentation/ASSEMBLY.md) Step 8.4
+    still starts the lift test with a 100 kg load, above this rating.
+
+### Related tooling issues
+
+- [ ] 🟨 **ST-10 Part-drawing revision letters go up without a change.**
+  The drawing of part P5 (front stiffener plate, centre; not review
+  finding P5) went from revision A to B to C with identical sheets.
+  - **Cause.** `plan_part()` in
+    [`drawings/partdrawings/drawing.py`](DESIGN-STRUCTURAL/drawings/partdrawings/drawing.py)
+    fingerprints each part's drawing from, among other things, its hole
+    positions and diameters rounded to 0.01 mm. P5's hole A2 is centred
+    180.975 mm (7⅛") above the lower-left corner of the front view,
+    exactly on a rounding tie, and hole centres come from a least-squares
+    circle fit. Last-bit floating-point differences between CI machines
+    (OpenBLAS picks a different kernel for each CPU type) put A2 at 180.97
+    on some runners and 180.98 on others.
+  - **Fix.** Snap each fitted hole centre and diameter to a fine grid
+    (e.g. 1e-6 mm, as `merge_segments()` in `hlr.py` already does for line
+    coordinates) before it is rounded for the fingerprint or the sheet.
+  - **Scope.** 10 of the 60 parts have hole centres on such ties (P5, P7,
+    P15, A4, A5, A8, A10, T1, T2, R3), though so far only P5 has flipped.
+    Expect a one-time revision bump on some of them when the fix lands.
+- [ ] 🟥 **ST-11 The part drawings don't carry the fabrication warning.**
+  The "Not yet ready for fabrication" warning is at the top of
+  [DESIGN-STRUCTURAL/README.md](DESIGN-STRUCTURAL/README.md), but the PDF
+  sheets, the [drawings index](DESIGN-STRUCTURAL/drawings/generated/INDEX.md)
+  and [drawings/README.md](DESIGN-STRUCTURAL/drawings/README.md) say
+  nothing about it.
+  - **Fix.** Add it to `defaults: notes:` in `drawings/parts_manifest.yaml`
+    (printed on every sheet), to the header that `write_index()` in
+    `drawings/generate_part_drawings.py` writes (INDEX.md is generated, so
+    a hand edit would be overwritten) and to `drawings/README.md`. Every
+    drawing goes up one revision letter when the note is added.
+  - **For how long.** As long as the README's warning stands. That warning
+    also covers the side panels, `cnclayout.svg` and the cut-list parts,
+    not only the issues above.
+  - **Update the README's warning too.** It is dated 2026-09-25, before
+    PR #136, and names only the bucket pivot joint among these problems.
+    It doesn't mention the arms (ST-1, ST-2), T3 (ST-3) or the 92 kg rated
+    operating capacity (ST-9).
 
 ## Mechanical / UTU integration
 
