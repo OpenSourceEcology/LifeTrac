@@ -1,24 +1,31 @@
 # RS-13.1 — VECTOR (codec 6) first bench legs (2026-09-26)
 
-**Status: paused after step 1 at the operator's request (2026-09-27 ~00:55 UTC);
-radio legs 2a–2d not run; radios parked, `0x80` on both, re-checked read-only
-(`legs/session_end_park.txt`). Verdict: NO-GO for RS-13.2. Step 1 failed on a
-loss-free path: the encoder-time criterion (p95 395–515 ms against ≤ 350) and the
-base/encoder sync checks (`digest` on all three passes, `no_orphans` on both
-landscape passes; two encoder-side defects, Anomalies A1 and A2). The radio legs
-that GO requires were not run.**
+**Status: complete (2026-09-27). Verdict: GO for RS-13.2 (desk check), with
+one row to re-fly.** Step 1 (loss-free, camera only) failed on 2026-09-26 with
+the shipped encoder; the encoder was fixed on branch
+`rs13-vector-encoder-sync-fix` (commit `291fc90e`, PR below), step 1 was
+re-run with the fix and **passed 10/10 on all three passes**, and legs
+2a–2d were flown with it at 1 fps (the encoder-time miss stands, A4). 2a
+(DTS, VECTOR) and 2d (the over-the-air switch) pass every criterion; 2c's
+baseline is on record; 2b (FHSS) passes every VECTOR criterion (P1, P4, P5,
+P7, P8) but misses P2/P3 by the letter because the base spent the first 57 s
+acquiring the FHSS hop sequence after the harness's RX reset (at 1 fps on a
+50-channel mask that is the expected acquisition time, A7) — after lock it
+delivered 247 of 247 frames. Radios parked `0x80` on both boards at the end.
 
 ## Software under test
 
 | item | value |
 |---|---|
 | PR / branch / SHA | #135 `rs13-vector-phase1` @ `ebd9204b` (merged as `dd70cda7`), design PR #129 @ `f32a9ed2` (merged as `65869517`); everything on the bench is from `main` `65869517` |
+| encoder fix (re-run + legs) | branch `rs13-vector-encoder-sync-fix` @ `291fc90e` (`fix(vector): keep the encoder mirror in step with the base store (RS-13.1 A1-A5)`), on `main` `65869517`. On the bench it ran **from the pushed `/tmp/lifetrac_strict` tree** on both boards (`push_fix_to_board.sh`: `camera_service.py`, `x8_image_pipeline/` incl. `vs1_codec.py`, `image_pipeline/` incl. the store, `vector_dry_run.py`, md5-verified against the working tree; import smoke inside the image: `encoder from /work/x8_image_pipeline/encode_vector.py … TTL_FRAMES 20`). The harness's camera path launches `/work/camera_service.py`, so the tractor image `2727dfd36f9f` was **not** rebuilt; leg 2a's archive carries `git_sha=65869517` because the fix was committed (`291fc90e`) between 2a and 2b — the tree was identical (the push script's md5 lines in `legs/step1_bw250_moving_fix.capture.out` and the harness pushes the same files at every launch). |
 | tractor image | `lifetrac-tractor-x8:latest` id `2727dfd36f9f` (755 MB), built 2026-09-26 19:49–19:55 UTC from `65869517` `firmware/tractor_x8/` — **built natively on the base X8 (aarch64), not on the PC** (the PC has no Docker; the tractor is offline and cannot pip-install), then `docker save` → PC → `adb push` → `docker load -i` on the tractor. The tractor's previous image (`9bfbbc8d06cb`, 2026-05-26, no numpy/OpenCV/encoder) is kept as `lifetrac-tractor-x8:pre-rs13`. Resolved wheels: numpy 2.4.6, **opencv-python-headless 5.0.0.93** (`requirements.txt` allows `>=4.9.0`; CI pins 4.14.0.94 in `base_station/requirements-dev.txt`), Pillow 12.3.0, paho-mqtt 2.1.0. Step 0 smoke: `<numpy x cv2 y encoder VectorEncoder>` (`legs/step0_image_smoke.txt`) |
 | encoder tests in this image | `test_vector_encoder` + `test_vector_interop` + `test_vs1_codec_parity_sil` run inside `2727dfd36f9f` on the base: **46 tests, OK, 0 skipped** (python 3.11.16 aarch64, numpy 2.4.6, cv2 5.0.0) — `legs/step0_encoder_tests_in_image.txt`. The cv2-gated classes ran, so the Phase 1 encoder is exercised under OpenCV 5.0, not only the CI's 4.14. |
 | base image | `lifetrac-v25:latest` id `4623980c2dac` (deployed from `main` `d3751286`, 2026-09-15; the harness pushes the current `base_station/` code at every launch) |
 | bench files | harness push at launch (`camera_service.py`, `image_pipeline/`, `x8_image_pipeline/`, `lora_proto.py`, `paho/`) + `vector_dry_run.py` @ `65869517` (md5 `cda4620a…` on both boards) |
 | dials | `LIFETRAC_VECTOR_DETAIL=80` (band V0), camera 2 fps, `LIFETRAC_KEYFRAME_COPIES` default (1), `LIFETRAC_WEBP_QUALITY` default (55) |
-| scene | **moving**: video content on the PC screen, started by the operator (scene check `legs/step1_scene_check_moving.txt`: two frames 1.2 s apart differ); **landscape still**: Windows 11 "Sunrise" wallpaper `C:\Windows\Web\Wallpaper\ThemeC\img29.jpg` (3840×2400; sky, snowy mountains, conifer treeline, lake, rocky shore), fullscreen in a separate Firefox kiosk instance (`--no-remote`, throwaway profile, `object-fit: cover`), put up by Claude at the operator's request; after AE settled two frames 1.88 s apart differ in 2.0 % of pixels (moving content: 20 %) — `legs/step1_scene_check_landscape.txt`, camera's view `legs/step1_scene_landscape_camera_frame.jpg` |
+| scene (re-run + legs) | **moving**: `moving_scene.html` in a Firefox kiosk — the Sunrise wallpaper panning/zooming over a 24 s cycle with three posts passing every 7–11 s and a drifting rock (Claude put it up at the operator's GO; scene check `legs/step1fix_scene_check_moving.txt`: 28.8 % of pixels changed in 1.9 s); **landscape**: the same still as 2026-09-26 (`legs/step1fix_scene_check_landscape.txt`: 1.9 %). The same moving page was on screen for every radio leg. |
+| scene (2026-09-26) | **moving**: video content on the PC screen, started by the operator (scene check `legs/step1_scene_check_moving.txt`: two frames 1.2 s apart differ); **landscape still**: Windows 11 "Sunrise" wallpaper `C:\Windows\Web\Wallpaper\ThemeC\img29.jpg` (3840×2400; sky, snowy mountains, conifer treeline, lake, rocky shore), fullscreen in a separate Firefox kiosk instance (`--no-remote`, throwaway profile, `object-fit: cover`), put up by Claude at the operator's request; after AE settled two frames 1.88 s apart differ in 2.0 % of pixels (moving content: 20 %) — `legs/step1_scene_check_landscape.txt`, camera's view `legs/step1_scene_landscape_camera_frame.jpg` |
 
 ## Firmware on the boards
 
@@ -27,12 +34,18 @@ the counters in the brackets are attributable.
 
 | board | build | md5 | flashed |
 |---|---|---|---|
-| base 2D0A1209DABC240B | not re-read: no radio leg was run, and nothing was flashed this session (the brief forbids flashing) | — | — |
-| tractor 2E2C1209DABC240B | same | — | — |
+| base 2D0A1209DABC240B | as left by the RS-12.15 campaign (production `589c1203` build family; nothing was flashed in this campaign — the brief forbids it) | not re-read | 2026-09-15 |
+| tractor 2E2C1209DABC240B | same | not re-read | 2026-09-15 |
 
-Health probes at bracket time: not taken (no radio leg). The only radio contact this
-session was the session-end `radio_state.py` / `radio_park.py` in `legs/session_end_park.txt`
-(both boards were already `0x80 SLEEP` before the park).
+Health probes before every leg (`rs116_health_probe.py`, both boards,
+`legs/leg<X>_health_{base,tractor}.txt`): counter families
+`RS115-INSTRUMENTED-FIRMWARE=YES RS12-URC-COUNTERS=YES RS12-10-COUNTERS=YES`
+on both boards for all four legs; the collection script kept only the probe's
+last 12 lines, so the `STATS-OK (attempt n)` / `radio_state=` lines are not in
+the files (the pre-brackets that followed read the counters over the same
+UART, which is the same evidence). Radios parked (`PARK_OK`, readback and
+settle `0x80`) after every leg (`legs/leg<X>_park.txt`) and re-checked
+read-only at the end (`legs/session_end_park_2026-09-27.txt`).
 
 ## Step 0 — image smoke
 
@@ -107,56 +120,154 @@ path, and it was not obtained on any pass. Step 1 was finished as the operator
 instructed ("finish the step, record it, and ask me whether to continue").
 Diagnosis: Anomalies A1–A3.
 
+## Step 1 — re-run with the encoder fix (2026-09-27)
+
+After the operator's "proceed with fixing", the A1–A5 defects were fixed on
+branch `rs13-vector-encoder-sync-fix` (PR: see the verdict section) and
+step 1 was run again, camera only, with the fixed encoder loaded from the
+pushed `/work` tree (`step1_pass_fix.sh`: `camera_service.py` run from
+`/work`, so `/work/x8_image_pipeline` — the fix — shadows the image's `/app`
+copy; the container's `encoder module in use` line in each `.capture.out`
+confirms `/work/x8_image_pipeline/encode_vector.py True`). Same camera, same
+budgets, same dial (80); the moving content this time was
+`moving_scene.html` in a Firefox kiosk (the Sunrise wallpaper panning and
+zooming with passing posts; scene check 28.8 % of pixels changed in 1.9 s,
+`legs/step1fix_scene_check_moving.txt`), the landscape the same still as
+before (1.9 % changed, `legs/step1fix_scene_check_landscape.txt`).
+
+| profile | scene | frames | fps_mean | wire p50 / p95 / max | over limit | epoch starts (applied), trigger | store bad / orphans / digest checked-mismatched / ttl_dropped / resync | encoder ms p50 / p95 / max | checks | verdict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| image_bw250 | moving | 251 | 2.00 | 201 / 203 / 203 | 0 | 3 (3), all `safety` | 0 / 0 / 250-**0** / 0 / 0 | 400.6 / **448.7** / 518.1 | **10/10** | **RESULT: PASS**; encoder time still > 350 |
+| image_bw250 | landscape | 250 | 2.00 | 158 / 200 / 203 | 0 | 3 (3), all `safety` | 0 / 0 / 247-**0** / 0 / 0 | 441.9 / **466.1** / 501.2 | **10/10** | **RESULT: PASS**; encoder time still > 350 |
+| image_bw500 | landscape | 250 | 2.00 | 160 / 237 / 242 | 0 | 3 (3), all `safety` | 0 / 0 / 248-**0** / 0 / 0 | 422.5 / **455.5** / 504.3 | **10/10** | **RESULT: PASS**; encoder time still > 350 |
+
+Final `scene:` lines (`legs/step1_tractor_*_fix.txt`):
+
+```
+bw250 moving    scene: epoch 2, level 0, badge 7, digest_ok True, horizon abs, L1=19 L2=1 L3=1 L4=0, cal_rev None, anchor age 169 ms
+bw250 landscape scene: epoch 2, level 0, badge 7, digest_ok True, horizon resid, L1=22 L2=0 L3=5 L4=0, cal_rev None, anchor age 123 ms
+bw500 landscape scene: epoch 2, level 0, badge 7, digest_ok True, horizon resid, L1=21 L2=0 L3=6 L4=0, cal_rev None, anchor age 69 ms
+```
+
+`tractor-log` last lines (the new fields): moving `epochs 3 trigger safety
+ttl_dropped 0 waiting 5`; bw250 landscape `epochs 3 trigger safety
+ttl_dropped 0 waiting 0`; bw500 landscape `epochs 3 trigger safety
+ttl_dropped 0 waiting 0`. Stage p50 ms: moving `resize=0.5 l0=18.5 l1=170.6
+l3=48.2 temporal_pack=146.0`; bw250 landscape `l1=188.3 l3=57.7
+temporal_pack=170.2`; bw500 landscape `l1=187.4 l3=60.3 temporal_pack=153.2`.
+
+Against the first run: digest mismatches 2 / 97 / 217 → **0 / 0 / 0**,
+orphans 0 / 33 / 33 → **0 / 0 / 0**, epoch starts on moving content 202 →
+**3** (the three 60 s safety refreshes), `ttl_dropped` 0 / 8 / 23 → **0**,
+`resync` 0 / 2 / 3 → **0**; the moving pass's `temporal_pack` p50 fell from
+203.6 to 146.0 ms with the per-frame double build gone, but `ms_total` p95
+(449 / 466 / 456 ms) still misses the 350 ms criterion (A4), so per the
+operator's rule the radio legs below ran at **1 fps** (`-SynthFps 1`, base
+capture `--min-frames 250`, P2 ≥ 0.9). Step 1 with the fix: **PASS on the
+sync criteria, encoder-time miss recorded.**
+
 ## Step 2 — radio legs
 
 ### Legs
 
 | leg | profile | boot mode | harness archive | base capture | brackets | duration | verdict |
 |---|---|---|---|---|---|---|---|
-| 2a | 2 (DTS) | vector | `radio_monitor_<stamp>_<sha>` | `legs/leg2a_base.jsonl` | `legs/leg2a_pre_*`, `legs/leg2a_post_*` | 300 s | |
-| 2b | 1 (FHSS) | vector | | | | 300 s | |
-| 2c | 2 (DTS) | mono_g4 (control) | | | | 300 s | |
-| 2d | 2 (DTS) | mono_g4 → vector @ T+60 s → mono_g4 @ T+180 s | | | | 300 s | |
+| 2a | 2 (DTS) | vector | `radio_monitor_20260927_112218_65869517` | `legs/leg2a_base.jsonl` | `legs/leg2a_pre_*`, `legs/leg2a_post_*` | 300 s (tx 303 frames, base published 300, capture 302) | **PASS** |
+| 2b | 1 (FHSS) | vector | `radio_monitor_20260927_113144_291fc90e` | `legs/leg2b_base.jsonl` | `legs/leg2b_pre_*`, `legs/leg2b_post_*` | 300 s (tx 302, published 245, capture 247; FHSS lock at seq 58) | VECTOR criteria PASS; **P2/P3 missed by the letter** (A7) |
+| 2c | 2 (DTS) | mono_g4 (control) | `radio_monitor_20260927_114053_291fc90e` | `legs/leg2c_base.jsonl` | `legs/leg2c_pre_*`, `legs/leg2c_post_*` | 300 s (tx 304, published 284, capture 286) | baseline on record |
+| 2d | 2 (DTS) | mono_g4 → vector @ T+60 s → mono_g4 @ T+180 s | `radio_monitor_20260927_114959_291fc90e` | `legs/leg2d_base.jsonl` | `legs/leg2d_pre_*`, `legs/leg2d_post_*` | 300 s (tx 305, published 297, capture 299: 179 mono_g4 + 120 vector) | **PASS** |
 
-**Not run.** After step 1 the operator chose to turn the radios off and regroup
-rather than run the legs at 1 fps. The tables below are left unfilled on purpose.
+All four legs flown 2026-09-27 16:16–16:52 UTC with the operator's GO, at
+**1 fps** (`-SynthFps 1`, the procedure's fallback for the encoder-time
+miss; base capture `--min-frames 250`). Leg prep per leg
+(`leg<X>_prep.txt` in the session scratchpad; the products are the
+`legs/leg<X>_*` files): production camera unit inactive, no `/dev/ttymxc3`
+holder on either board, `rs116` both boards, `clear_retained.py` on the base
+broker (`RETAINED-CLEARED …` in `legs/leg<X>_clear_retained.txt`),
+`rs115` pre-brackets, then the base-side `vector_dry_run.py capture
+--duration 480` started detached before the harness. Post: `docker wait` on
+the capture, `rs115` post-brackets, `rs12_leg_report.py`,
+`frag_gap_report.py`, `radio_park.py` both boards.
+
+Harness line per leg (PowerShell, from `firmware/x8_lora_bootloader_helper/`):
+
+```
+2a: .\run_live_radio_monitor.ps1 -TxFeed camera -RegProfile 2 -DurationS 300 -SynthFps 1 -KfRequestDisable 1 -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 -CamExtraEnv "-e LIFETRAC_ENCODE_MODE=9 -e LIFETRAC_VECTOR_DETAIL=80" -Archive
+2b: the same with -RegProfile 1
+2c: .\run_live_radio_monitor.ps1 -TxFeed camera -RegProfile 2 -DurationS 300 -SynthFps 1 -KfRequestDisable 1 -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 -CamExtraEnv "-e LIFETRAC_ENCODE_MODE=6" -Archive
+2d: the same as 2c, plus the switch script (legs/leg2d_switch_times.txt, legs/leg2d_acks.txt)
+```
+
+`params.txt` of every archive: `synth_fps=1 tx_batch=0 kf_request_disable=1
+probe_echo=0 tx_feed=camera` and the profile above. Channel / spot-check: no
+survey was run before the legs (bench distance, same antennas as RS-12.15).
+Radios parked between legs: `PARK_OK` × 2 after each of 2a, 2b, 2c, 2d
+(`legs/leg<X>_park.txt`), no transient.
 
 ### Numbers
 
 | # | criterion | 2a | 2b | 2c (baseline) | 2d | pass? |
 |---|---|---|---|---|---|---|
-| P1 | dry-run checks on the base capture (`RESULT:` line; failing check names) | | | n/a | window checks | |
-| P2 | frames published / s (`published frame_id` lines ÷ 300) | | | | n/a | |
-| P3 | fragment loss: raw loss (`rs12_leg_report.py`), Δtx_ok ↔ Δrx_ok | | | | n/a | |
-| P4 | max fragments per frame (`done: K fragments ok`, max K) | | | n/a | window | |
-| P5 | lock-loss gaps > 3 s (`frag_gap_report.py`) | n/a | | n/a | n/a | |
-| P6 | switch: first ack JSON; publish stamp → first codec-6 payload (s); return ack JSON; codec-1 resumed after (s) | n/a | n/a | n/a | | |
-| P7 | link_stats `rx_codec_name` | | | n/a | | |
-| P8 | on-air encoder ms p95 vs step 1 | | | n/a | | |
+| P1 | dry-run checks on the base capture (`RESULT:` line; failing check names) | raw `RESULT: FAIL` (`no_orphans`, `digest`); `store: applied 302, bad 0, epoch_behind 0, orphans 44, digest 301 checked / 30 mismatched, epochs 12, handovers 11, ttl_dropped 1, resync 2`; resync episodes rows 4→59 and 296→299, **both ended by the next epoch start** (key rows 59, 299); final `scene: … digest_ok True`; the other 8 checks PASS | raw `RESULT: FAIL` (`no_orphans`, `digest`, `min_frames` 247 < 250); `store: applied 247, bad 0, epoch_behind 0, orphans 56, digest 244 checked / 19 mismatched, epochs 8, handovers 7, ttl_dropped 0, resync 1`; one resync episode rows 0→19 (the base joined mid-epoch after acquisition), **ended by the key at row 19**; final `digest_ok True`; 0 frames lost after lock | n/a (286 mono_g4 frames, `store_clean` PASS, 0 unparseable) | VECTOR window: `store: applied 120, bad 0, epoch_behind 0, orphans 0, digest 120 checked / 0 mismatched, epochs 7, handovers 6, ttl_dropped 0, resync 0`; `[PASS] store_clean`, `[PASS] no_orphans`, `[PASS] digest`, `[PASS] epoch_seen 7/7`; final `digest_ok True` | **PASS** (loss rule) 2a, 2b, 2d |
+| P2 | frames published / s (`published frame_id` lines ÷ 300) | 300 ÷ 300 = **1.00** | 245 ÷ 300 = **0.82** (1.00 over the 245 s after lock; 57 frames sent before the base locked) | 284 ÷ 300 = 0.95 (baseline) | n/a | 2a PASS; **2b FAIL by the letter** (A7) |
+| P3 | fragment loss: raw loss (`rs12_leg_report.py`), Δtx_ok ↔ Δrx_ok | `loss 3/303 = 1.0%   crc_dumps=10`; brackets base Δrx_ok +303, Δcrc_err +11; tractor tx 303 frames (per-frame TX events; tx counter 535→841 = +306, not reset for this leg) | `loss 66/302 = 21.9%` — inflated: it takes `rx_frames=236` from the base's last `stats:` line, 9 s before the log ends (the RS-12.17 stale-counter pattern; 245 were published). Per-frame events: 304 sent (tx `done` events + the capture's two tail frames), **247 received = 57 lost = 18.8 %, all before the FHSS lock**; after lock `seq gaps … 0 in 0 gaps` = **0 %**; brackets base Δrx_ok +247, Δcrc_err 0 | `loss 20/304 = 6.6%   crc_dumps=19`; base Δrx_ok +287, Δcrc_err +20 | `loss 9/305 = 3.0%   crc_dumps=5`; base Δrx_ok +302, Δcrc_err +5, Δtx_ok +2 (the two switch commands) | 2a 1.0 % ≤ 6.6 % PASS; 2b raw 18.8 % (report: 21.9 %) > 6.6 % **FAIL by the letter**, 0 % after lock |
+| P4 | max fragments per frame (`done (pipelined): K fragments ok`, max K) | K=1 lines 303, K≥2 0, ABORTED 0, **max K 1** | 302 / 0 / 0, **max K 1** | (304 / 0 / 0, max K 1 — the encode-to-fit packer also kept mono_g4 to one fragment at 243 B) | 305 / 0 / 0, **max K 1** (whole leg, so the window too) | **PASS** |
+| P5 | lock-loss gaps > 3 s (`frag_gap_report.py`) | n/a (`gaps>3s=0`, max 2.0 s) | `n_frag=245 span=244s max_gap=1.2s gaps>3s=0 total_silent=0.0s` | n/a (`gaps>3s=0`) | n/a (`gaps>3s=0`) | **PASS** |
+| P6 | switch: first ack JSON; publish stamp → first codec-6 payload (s); return ack JSON; codec-1 resumed after (s) | n/a | n/a | n/a | first `lora_cmd` ack **+1.40 s** after the vector stamp: `{"requested": 9, "effective": 9, "effective_name": "vector", "clamped": false, "codec": 6, "quality": 80, "source": "lora_cmd"}`; first codec-6 payload **+2.55 s** (seq 1, 240 B; the last codec-1 frame −0.26 s); return ack **+1.31 s**: `{"requested": 6, "effective": 6, "effective_name": "mono_g4", "clamped": false, "codec": 1, "quality": 55, "source": "lora_cmd"}`; last codec-6 +0.63 s, first codec-1 **+1.22 s** after the mono_g4 stamp; codec runs 60 × codec-1, 120 × codec-6, 119 × codec-1 | **PASS** — acks exact; 2.55 s = 1.40 s delivery + one 1 s period + the encode (0.42 s p50) + airtime; the procedure's bound omits the encode time (A9) |
+| P7 | link_stats `rx_codec_name` | `"rx_codec": 6, "rx_codec_name": "vector", "radio_profile": 2` (126/126 frames, 0 missing) | `"rx_codec_name": "vector", "radio_profile": 1` (after lock) | `"rx_codec_name": "mono_g4"` | `"mono_g4"` (2 frames seen) → `"vector"` (64 frames seen) after the T+60 override | **PASS** |
+| P8 | on-air encoder ms p95 vs step 1 | `p50 421.4 / p95 470.5 / max 524.7` vs step-1 bw500 landscape 455.5 (+3 %) | `p50 411.4 / p95 463.9 / max 555.1` vs bw250 moving 448.7 (+3 %) | n/a | `p50 418.5 / p95 464.3 / max 495.4` (window) vs 455.5 (+2 %) | **PASS** (within ±20 %) |
 
 `vector_dry_run.py` summaries (paste the `== vector dry run summary ==` block
 of each base capture):
 
 ```
-<2a>
+== vector dry run summary ==   (2a, legs/leg2a_base.txt)
+profile image_bw500: one-fragment limit 243 B (epoch starts 242 B)
+frames: 302 total, 302 vector, 0 other, 0 unparseable; by codec {'vector': 302}
+wire bytes (vector): min 215 / p50 241 / p95 243 / max 243; over limit: 0
+epoch starts: 12 received, 12 applied
+arrival: 0.99 fps mean over 303.6 s; gap p50 1.00 s, p95 1.08 s, max 2.03 s; first applied at +0.00 s (0 frame(s) before it)
+store: applied 302, bad 0 , epoch_behind 0, orphans 44, digest 301 checked / 30 mismatched, epochs 12, handovers 11, ttl_dropped 1, resync 2, records 13661
+scene: epoch 11, level 0, badge 7, digest_ok True, horizon abs, L1=18 L2=0 L3=0 L4=0, cal_rev None, anchor age 99 ms
+RESULT: FAIL   (no_orphans, digest — the loss rule applies; see P1)
 ```
 
 ```
-<2b>
+== vector dry run summary ==   (2b, legs/leg2b_base.txt)
+profile image_bw250: one-fragment limit 203 B (epoch starts 202 B)
+frames: 247 total, 247 vector, 0 other, 0 unparseable; by codec {'vector': 247}
+wire bytes (vector): min 197 / p50 202 / p95 203 / max 203; over limit: 0
+epoch starts: 7 received, 7 applied
+arrival: 1.00 fps mean over 246.1 s; gap p50 1.00 s, p95 1.01 s, max 1.21 s; first applied at +0.00 s (0 frame(s) before it)
+store: applied 247, bad 0 , epoch_behind 0, orphans 56, digest 244 checked / 19 mismatched, epochs 8, handovers 7, ttl_dropped 0, resync 1, records 9626
+scene: epoch 8, level 0, badge 7, digest_ok True, horizon abs, L1=17 L2=0 L3=1 L4=0, cal_rev None, anchor age 167 ms
+RESULT: FAIL   (no_orphans, digest, min_frames 247 < 250 — see P1/P2)
 ```
 
 ```
-<2d>
+== vector dry run summary ==   (2d, legs/leg2d_base.txt; capture without --strict)
+profile image_bw500: one-fragment limit 243 B (epoch starts 242 B)
+frames: 299 total, 120 vector, 179 other, 0 unparseable; by codec {'mono_g4': 179, 'vector': 120}
+wire bytes (vector): min 231 / p50 241 / p95 243 / max 243; over limit: 0
+epoch starts: 7 received, 7 applied
+arrival: 1.00 fps mean over 118.6 s; gap p50 1.00 s, p95 1.08 s, max 1.09 s; first applied at +62.76 s (0 frame(s) before it)
+store: applied 120, bad 0 , epoch_behind 0, orphans 0, digest 120 checked / 0 mismatched, epochs 7, handovers 6, ttl_dropped 0, resync 0, records 5415
+scene: epoch 6, level 0, badge 7, digest_ok True, horizon abs, L1=20 L2=0 L3=0 L4=0, cal_rev None, anchor age 100 ms
+RESULT: FAIL   (all_vector, min_frames — by design on the switch leg; the window checks all PASS)
 ```
+
+2c (control, `legs/leg2c_base.txt`): `frames: 286 total, 0 vector, 286 other …
+by codec {'mono_g4': 286}`; mono_g4 wire bytes from the JSONL payload lengths:
+min 121 / p50 199 / p95 241 / max 243, 0 over 243 B.
 
 ### Path features exercised
 
-- [ ] codec-6 TileDeltaFrame over the strict path as a single 0xFE fragment, profile 2 and profile 1
-- [ ] epoch start (K = 1) as the first frame: anchor + LAYER_CLEAR in one frame, F−1 body
-- [ ] CONFIRM / DIGEST carousel over 5 min (digest checks > 0, 0 mismatches)
-- [ ] 0x63 mode switch into and out of VECTOR; the ack's quality byte reports the dial of the acked mode
-- [ ] base `link_stats` codec reporting for codec 6
-- [ ] 0xFD copies path for an epoch start (`LIFETRAC_KEYFRAME_COPIES` > 1 or the tx daemon's auto-copies) — <not exercised | exercised by accident, see Anomalies>
+- [x] codec-6 TileDeltaFrame over the strict path as a single 0xFE fragment, profile 2 (2a, 2d: max K 1, max 243 B) and profile 1 (2b: max K 1, max 203 B)
+- [x] epoch start (K = 1) as the first frame: anchor + LAYER_CLEAR in one frame, F−1 body (2a: 12 received / 12 applied at 242 B max; 2b 7/7; 2d 7/7)
+- [x] CONFIRM / DIGEST carousel over 5 min: digest checks 301 (2a) / 244 (2b) / 120 (2d); 0 mismatches only on 2d's window — 2a/2b had 30 / 19 after lost frames, each run ended by the next epoch start (the designed recovery; A8)
+- [x] 0x63 mode switch into and out of VECTOR; the ack's quality byte reports the dial of the acked mode (80 in, 55 back)
+- [x] base `link_stats` codec reporting for codec 6 (`rx_codec 6 / rx_codec_name vector`)
+- [ ] 0xFD copies path for an epoch start — not exercised (`LIFETRAC_KEYFRAME_COPIES` default 1; no `ABORTED` / copies lines in any `tx_daemon.log`)
 
 ### What these legs did NOT test
 
@@ -164,7 +275,9 @@ of each base capture):
 - self-model, Vector Lab, browser rendering (RS-13.2 desk check)
 - range edge / attenuator sweep
 - AE/AWB lock (B5), tractor self-select (D-VS6b), the ladder's loss-driven floor (B4)
-- <anything else cut on the day>
+- 2 fps on air (all legs at 1 fps because of the encoder-time miss, A4)
+- the first run's video as moving content (the re-run and the legs used `moving_scene.html`; comparability of the moving scene between 2026-09-26 and 09-27 is by scene-check numbers only)
+- a channel survey / spot-check before the legs
 
 ### Evidence limitations
 
@@ -180,6 +293,48 @@ of each base capture):
 - **No per-candidate log on the tractor.** The *path* that silenced each A1
   shape, and the reason for the A2 geometry rejection, are inferred from the
   wire and the code, not observed in the encoder.
+- **Radio legs.** P6 timing rests on the base clock alone (publish stamps
+  `date +%s.%N` on the base, ack arrival `%U` from `mosquitto_sub` on the
+  base, capture `ts` on the base): no cross-board clock is involved. The
+  tractor's clock is still ~13 d behind (its `tx_daemon.log` / `camera_service.log`
+  timestamps). Leg 2a's tractor `radio_tx_ok` bracket ran on from the previous
+  session's count (535 → 841) while 2b–2d's start from 0 after the harness's
+  TX reset — the per-frame TX events (`rs12_leg_report.py`'s "using N
+  fragments from per-frame TX events") are the loss denominator in all four.
+  The `rs116` health files hold the counter-family lines only (the collection
+  kept the last 12 lines). n = 1 per leg; the FHSS acquisition delay (A7) was
+  seen once.
+- **Scene during the legs.** The moving page was put up in a Firefox **kiosk**
+  window at 16:16 UTC and the camera view was checked once before the step-1
+  re-run (16:07, 28.8 % changed) but **not before each leg**; no camera frame
+  was captured during 2a–2d. The operator did not use the PC during the legs —
+  because the kiosk left no way to close it or reach the desktop (reported by
+  the operator afterwards), which is also why nothing brought the Claude app in
+  front of it; still, that each leg saw the page is inferred, not measured.
+  Kiosk windows are no longer used on this bench (next section). `legs/leg2b_link_stats.txt` holds several pre-lock samples with
+  `rx_codec_name: null` before the post-lock `vector` one.
+
+### Next round (prepared 2026-09-28, not flown — radios parked, waiting for GO)
+
+- **Moving content:** the railroad reference video
+  `https://www.youtube.com/watch?v=B1yUQwpNhJA` (the one RS-12.11–12.15 used) in
+  a **normal** Firefox window of a separate profile (audio scaled to 0,
+  autoplay allowed), with the **player's own fullscreen** (`f`, the expand
+  button) so the operator can leave it with Esc — never a kiosk. The
+  `youtube-nocookie.com/embed/…` URL the earlier campaigns used now fails with
+  "Video player configuration error / Error 153"; two pre-roll ads (~40 s)
+  play first. Tried 2026-09-27 23:53–23:58 UTC (in a kiosk, before the rule):
+  the camera sees sky, clouds, trees, mountains and track; once the train rolls
+  12.4 % / 19.4 % / 23.1 % of pixels change over 1.9 / 5 / 9.7 s
+  (`legs/youtube_scene_check.txt`, `legs/youtube_scene_camera_frame.jpg`).
+- **Before every camera run** the prep brings that window to the front and
+  runs a scene check (≥ 8 % change over 10 s, frame saved as
+  `legs/<leg>_scene.jpg`), aborting the leg otherwise; the `rs116` health
+  output is now kept whole.
+- **Proposed order at GO:** step-1 bw250 moving on the video (camera only), then
+  2b re-flown on the video (the row this record still owes), then 2a/2c/2d on
+  the video for like-for-like numbers, all at 1 fps with the final encoder
+  (`ac199b1a`, review rounds 3–4, already pushed to both boards' `/work`).
 
 ### Anomalies for the record
 
@@ -316,6 +471,41 @@ Every repro command below was re-run by hand on the PC.
   Cosmetic, but tractor-log's `detail` column and its docstring expectation
   (`detail=80`) are wrong.
 
+- **A7 — FHSS acquisition after the harness's RX reset took 57 s at 1 fps
+  (leg 2b).** The harness resets the base's L072 (`[RESET] RX L072 via
+  gpio163 NRST`) and the follower re-acquires the tractor's hop sequence by
+  scanning; the base's first received frame was `seq 58` (`legs/leg2b_base.txt`
+  row 0: `seq= 58 … EPOCH-SWITCH`), i.e. the tractor's first 57 frames went
+  unheard, and `rx_smoke` logged `rx_frames=0` until 16:27:40 (leg start
+  16:26:5x). With a 500 ms dwell per channel on a 50-channel mask and one
+  frame per second the expected time for a frame to land on the listened
+  channel is of that order; the RS-12.15 legs (2 fps and denser synth feeds)
+  locked in seconds. Consequence: 2b's P2 (0.82 fps over 300 s) and raw P3
+  (18.8 % from per-frame events; `rs12_leg_report.py` prints 21.9 % because it
+  reads a stale `rx_frames` counter) miss by the letter while after lock the link delivered 247/247
+  (0 seq gaps, `max_gap=1.2s`). Not a VECTOR defect; re-fly 2b at 2 fps once
+  A4 is addressed, or start the base capture window at lock.
+- **A8 — Epoch starts on the moving page are `relabel` triggers.** With the
+  fix the moving passes no longer restart on id exhaustion (3 starts in
+  2 min, all `safety`), but on air the pan/zoom page tripped the 40 %
+  relabel rule: 2a 12 epoch starts in 300 s (`trigger=` counts in
+  `camera_service.log`: 94 lines `relabel`, 3 `safety`), 2b 7 (97 `relabel`,
+  14 `safety`), 2d's window 7 (41 `relabel`, 5 `forced`). Every start was
+  applied at the base and each ended the running resync, which is the
+  designed recovery — but a start costs a 242 B key frame and re-defines
+  the masses, so the relabel rule's sensitivity (its denominator is the
+  labelled area, review follow-up C9) is worth a look before range legs.
+- **A9 — The P6 bound omits the encoder's own time.** Measured: ack +1.40 s,
+  first codec-6 payload +2.55 s after the publish stamp. The procedure's
+  bound "1 camera period + 1 fragment airtime + one command gate" gives
+  ≈ 1 + 0.1 + 1.4 = 2.5 s; the tractor also spends 0.42 s (p50) encoding the
+  first VECTOR frame after the switch. The switch is prompt; the bound should
+  add the encode time.
+- **A10 — mono_g4 also rode as single fragments.** In 2c and 2d the
+  encode-to-fit packer kept every mono_g4 frame within the 243 B budget
+  (2c: max 243 B, `tx done K=1` 304, K≥2 0), so P4's "one fragment" is not a
+  VECTOR-only property at 1 fps on this scene; the control's value is the
+  loss baseline (6.6 %), not a fragment-count contrast.
 - **A6 — Operational.**
   - **Aborted first attempt.** The first bw250-moving attempt was aborted:
     `| tr -d '\r'` on the PC block-buffered the capture's "subscribing" line,
@@ -334,22 +524,37 @@ Every repro command below was re-run by hand on the PC.
     in-memory retained state (`legs/step1_bench_mqtt_reset.txt`).
   - **Landscape still.** It was put up by Claude (Firefox kiosk, separate
     profile) at the operator's request and closed after the bw500 pass.
+  - **Re-run and legs (2026-09-27).** The post-leg collection script's first
+    version handed MSYS `/c/…` paths to `adb pull` and to the Python report
+    tools; leg 2a's three base files and reports were re-collected by hand
+    with Windows paths before the script was fixed for 2b–2d (`legs/leg2a_*`
+    are complete). The `rs116` health files hold only the last 12 probe
+    lines (see Evidence limitations).
 
 ### GO / NO-GO
 
-**NO-GO**. Deciding rows:
-- Step 1 `digest` failed on every pass: 2/247, 97/250 and 217/250
-  mismatched on a loss-free path.
-- `no_orphans` failed on both landscape passes (33 each).
-- Encoder-time p95 was 514.7 / 432.5 / 395.3 ms, against ≤ 350.
-- The loss-free sync failures are encoder-side (A1 dead zone vs the store's
-  20-frame TTL; A2 same-hash redefine resets the mirror offset); the store
-  follows the spec.
-- Step 2 was not run.
+**GO for RS-13.2 (desk check), with 2b to re-fly.** Deciding rows:
+- Step 1 with the fix: **RESULT: PASS** on all three passes (0 mismatches,
+  0 orphans, 0 TTL drops, 3 epoch starts each) — the loss-free sync defects
+  A1/A2/A3 are gone; encoder time still misses 350 ms (A4), so the legs ran
+  at 1 fps.
+- 2a (DTS, VECTOR): P1 loss rule PASS (2 resyncs, both ended by the next
+  epoch start, final `digest_ok True`), P2 1.00 fps, P3 1.0 % ≤ control 6.6 %,
+  P4 max K 1, P7 `vector`, P8 +3 % — **PASS**.
+- 2d (switch): window `orphans 0, digest 120/0, resync 0`; acks exactly as
+  specified (+1.40 s / +1.31 s); first codec-6 frame +2.55 s (A9); codec-1
+  back +1.22 s — **PASS**.
+- 2c baseline on record (6.6 % raw loss, 284 published, mono_g4 max 243 B).
+- 2b (FHSS): P1 PASS, P4 max K 1, **P5 no gap > 3 s**, P7 `vector`, P8 +3 %;
+  **P2 0.82 fps and raw P3 18.8 % miss by the letter** because of the 57 s
+  FHSS acquisition after the RX reset (A7); after lock 247/247 delivered.
+- The procedure's GO rule wants 2b to pass: it passes every VECTOR-specific
+  row and misses the two rate/loss rows for a radio-acquisition reason that
+  the re-fly (2 fps, or a capture window starting at lock) settles.
 
-Next steps:
-1. Fix A1/A1b/A1c/A2 in the encoder, with the three step-1 captures as
-   replay fixtures (each must replay `RESULT: PASS`).
-2. Address A3/A4 (encoder time).
-3. Re-run step 1.
-4. Run legs 2a–2d.
+Next: RS-13.2 desk check on the production compose; re-fly 2b behind the A4
+encoder-time work; VECTOR_SCENE.md amendments per the fix PR; A8's relabel
+sensitivity before the attenuator range-edge leg.
+
+Fix PR: `rs13-vector-encoder-sync-fix` — "fix(vector): keep the encoder mirror
+in step with the base store (RS-13.1 A1-A5)" (branch @ `291fc90e`).
