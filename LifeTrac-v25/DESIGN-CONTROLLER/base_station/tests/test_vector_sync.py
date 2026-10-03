@@ -52,8 +52,8 @@ def scene(y0=112.0, blobs=(), rects=(), noise=0.0, seed=0):
     masses, in working pixels. ``noise`` adds ±noise per pixel *at canvas
     size* (384×256), the way sensor noise reaches the encoder, which averages
     each 4×4 block down to the working image; noise added per working pixel
-    would fragment the scene into MAX_REGIONS specks and trip the 40 %
-    relabel trigger on every frame."""
+    would fragment the scene into MAX_REGIONS specks (and, at ±24, trip the
+    relabel trigger on most frames)."""
     img = np.zeros((H, W, 3), np.uint8)
     line = y0 / (CW / W)
     ys = np.arange(H)[:, None] + 0.5
@@ -135,11 +135,10 @@ class SyncTests(unittest.TestCase):
 
     def test_static_noisy_scene_stays_in_step_and_never_churns(self):
         # The invariant, on camera-like noise: every frame agrees, nothing
-        # expires, the epoch stands. (±12 at canvas size: above ±20 the 40 %
-        # relabel trigger of §4.3 restarts the epoch now and then on a scene
-        # this sparse, which is its own subject, not this one.) The A1
-        # mechanisms themselves are pinned by the drift, silence and
-        # starvation tests below.
+        # expires, the epoch stands. (±12 at canvas size; the relabel trigger
+        # under heavier noise, pans and splits is pinned by the A8 tests at
+        # the end.) The A1 mechanisms themselves are pinned by the drift,
+        # silence and starvation tests below.
         link = Link()
         n = 3 * TTL_FRAMES + 5
         for i in range(n):
@@ -982,6 +981,103 @@ class SyncTests(unittest.TestCase):
         self.assertLessEqual(len(dels), 1 + 60 // (TTL_FRAMES + 4), f"evictions rotated: {dels}")
         self.assertEqual(len(dels), len(set(dels)), f"a holder was evicted twice: {dels}")
         self.assertEqual(link.enc.last_stats["epochs"], 1)
+
+    # ---------------------------------------------------------------- A8: the relabel trigger
+
+    GREY, YELLOW, BLUE, PURPLE, FIELD = (150, 150, 150), (200, 200, 40), (40, 60, 180), (130, 50, 150), (70, 110, 70)
+    # A sky-heavy view: the horizon at canvas row 200 (working row 50), so L0
+    # owns 78 % of the frame and the regions cover about a fifth of it. B is
+    # another place: a different field with different masses.
+    SKY_A = dict(y0=200.0, rects=[(10, 52, 25, 60, RED), (60, 54, 80, 62, GREY)], blobs=[(45, 57, 4, GREEN)])
+    SKY_B = dict(y0=200.0, rects=[(0, 50, 95, 63, FIELD), (30, 53, 50, 62, YELLOW), (70, 52, 90, 58, BLUE)],
+                 blobs=[(15, 58, 4, PURPLE)])
+
+    def test_relabelled_fraction_counts_pixels_not_regions(self):
+        # §4.3 as built: the share of the labelled area whose description
+        # changed — a pixel no region described before, or whose region's
+        # colour moved by ΔE76 > 6. A split keeps every pixel's colour.
+        from types import SimpleNamespace
+        frac = ev.VectorEncoder._relabelled_fraction
+        reg = lambda *lab: SimpleNamespace(lab=np.array(lab, np.float32))     # noqa: E731
+        prev = np.full((4, 4), -1, np.int32)
+        prev[:, :2] = 0                                                       # one region, the left half
+        prev_lab = np.array([[50.0, 0.0, 0.0]], np.float32)
+        split = prev.copy()
+        split[:, 1] = 1                                                       # two regions, same colour
+        self.assertEqual(frac(prev, prev_lab, split, [reg(50, 0, 0), reg(51, 0, 0)]), 0.0)
+        self.assertEqual(frac(prev, prev_lab, prev, [reg(56, 0, 0)]), 0.0)    # ΔE 6: kept
+        self.assertEqual(frac(prev, prev_lab, prev, [reg(57, 0, 0)]), 1.0)    # ΔE 7: recoloured
+        grown = np.zeros((4, 4), np.int32)                                    # into pixels L0 owned
+        self.assertEqual(frac(prev, prev_lab, grown, [reg(50, 0, 0)]), 0.5)   # of the labelled area
+        self.assertEqual(frac(prev, prev_lab, np.full((4, 4), -1, np.int32), []), 0.0)
+
+    def test_camera_change_in_a_sky_heavy_view_starts_an_epoch_and_noise_does_not(self):
+        # A8 / review C9 on a sky-heavy view at ±24 canvas noise. The per-region
+        # IoU rule restarted the epoch on 8 of the 19 frames before the cut
+        # (the noise splits the ground mass differently every capture); per
+        # pixel the epoch holds until the camera change and starts on the cut
+        # frame itself. The regions cover about a fifth of the valid area, so
+        # a valid-area denominator could never reach the threshold.
+        t = [1000.0]
+        link = Link(clock=lambda: t[0])
+        for i in range(30):
+            frame = link.step(scene(**(self.SKY_A if i < 20 else self.SKY_B), noise=24, seed=i))
+            t[0] += 0.5
+            st = link.enc.last_stats
+            if i >= 1:
+                self.assertEqual(link.in_step(), (True, False, 0, 0), f"frame {i + 1}")
+            if i == 19:
+                self.assertLess(float((link.enc._prev_region_map >= 0).mean()), 0.3)
+            if i < 20:
+                self.assertEqual(st["epochs"], 1, f"frame {i + 1}: churn ({st['epoch_trigger']})")
+            elif i == 20:
+                self.assertTrue(frame.header.key)
+                self.assertEqual(st["epoch_trigger"], "relabel")
+                self.assertEqual(records_of(frame, vs.LayerClear), [vs.LayerClear(0)])
+            else:
+                self.assertEqual(st["epochs"], 2, f"frame {i + 1}: churn after the cut")
+
+    def test_a_mass_that_splits_or_merges_keeps_the_epoch(self):
+        # A8 mechanism: a 3 px bridge opens and closes inside a mass. Each half
+        # has IoU 0.49 with the whole, so the per-region rule read 86 % of the
+        # labelled area as relabelled and restarted the epoch on the split
+        # and again on the merge; per pixel only the bridge changed colour.
+        whole = [(0, 32, 95, 63, RED)]
+        split = [(0, 32, 46, 63, RED), (50, 32, 95, 63, RED)]
+        t = [1000.0]
+        link = Link(clock=lambda: t[0])
+        for i, rects in enumerate((whole, whole, whole, split, split, whole, whole, split, whole)):
+            link.step(scene(rects=rects))
+            t[0] += 0.5
+            self.assertEqual(link.enc.last_stats["epochs"], 1, f"frame {i + 1}")
+            if i >= 1:
+                self.assertEqual(link.in_step(), (True, False, 0, 0), f"frame {i + 1}")
+
+    def test_noisy_pan_keeps_the_epoch(self):
+        # A8: a 4 px/frame pan over small masses at ±24 canvas noise. The
+        # per-region rule restarted the epoch 7 times in 30 frames (the
+        # ground mass fragments under the noise, so its IoU with the last
+        # capture's ground fell under 0.5); per pixel the pan and the noise
+        # change at most about a quarter of the labelled area.
+        P, Y, B, G, D = self.PURPLE, self.YELLOW, self.BLUE, self.GREY, (30, 80, 40)
+        rects = [(3, 32, 10, 41, P), (39, 43, 54, 49, G), (70, 55, 79, 61, B), (78, 52, 93, 56, B),
+                 (128, 35, 142, 39, D), (160, 44, 170, 53, G), (214, 51, 221, 55, Y)]
+        blobs = [(12, 53, 4, RED), (64, 37, 4, G), (70, 48, 5, B), (115, 43, 4, D), (140, 34, 4, G),
+                 (176, 56, 5, Y), (190, 44, 4, Y)]
+
+        def view(off: int, seed: int):
+            inside = [(max(0, x0 - off), y0, min(W - 1, x1 - off), y1, c) for x0, y0, x1, y1, c in rects
+                      if x1 - off >= 0 and x0 - off <= W - 1]
+            return scene(blobs=[(cx - off, cy, r, c) for cx, cy, r, c in blobs], rects=inside, noise=24, seed=seed)
+
+        t = [1000.0]
+        link = Link(clock=lambda: t[0])
+        for i in range(30):
+            link.step(view(4 * i, i))
+            t[0] += 0.5
+            self.assertEqual(link.enc.last_stats["epochs"], 1, f"frame {i + 1}")
+            if i >= 1:
+                self.assertEqual(link.in_step(), (True, False, 0, 0), f"frame {i + 1}")
 
 
 if __name__ == "__main__":

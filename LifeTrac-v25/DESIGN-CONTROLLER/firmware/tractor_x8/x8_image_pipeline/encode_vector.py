@@ -59,9 +59,10 @@ the mirror drifting from the store on a loss-free path, anomalies A1/A2):
 
 Epochs (§3.5, §4.3). A new epoch starts on the first frame, on
 ``force_epoch()`` / ``epoch_start=True``, when the horizon state flips
-between found and NO_HORIZON, when more than 40 % of the valid area is
-relabelled between captures, and every 60 s (safety refresh, LAYER_CLEAR
-range 2, which keeps the masses). The id space is not a trigger: fresh
+between found and NO_HORIZON, when more than half of the labelled area
+changed its description since the last capture (``_relabelled_fraction``,
+per pixel), and every 60 s (safety refresh, LAYER_CLEAR range 2, which
+keeps the masses). The id space is not a trigger: fresh
 defines are scored first and get ids in score order, and a layer whose ids
 run out keeps its best candidates while the rest wait for a DEL to free an
 id (§4.3 lists ID exhaustion as a trigger; restarting the epoch on every
@@ -144,7 +145,7 @@ LEVEL_REPEATS = (1, 2, 3, 0)                     # epoch-start / define repeats
 LEVEL_BANDS = ((60, 100), (40, 59), (20, 39), (1, 19))
 
 SAFETY_REFRESH_S = 60.0                          # §4.3 new-epoch trigger
-RELABEL_EPOCH_FRACTION = 0.40
+RELABEL_EPOCH_FRACTION = 0.50                    # of the labelled area, per pixel (_relabelled_fraction)
 MATCH_IOU = 0.5                                  # same id (§4 T)
 VERIFY_IOU = 0.7                                 # re-verification (§4.3)
 VERIFY_DE = 6.0
@@ -610,28 +611,31 @@ class VectorEncoder:
 
     @staticmethod
     def _relabelled_fraction(prev: np.ndarray, prev_lab: np.ndarray, cur: np.ndarray, regions: list) -> float:
-        """Share of the labelled area whose region has no partner in the
-        previous capture with IoU ≥ 0.5 and ΔE76 ≤ 6 (the "40 % relabelled"
-        trigger of §4.3)."""
-        np_, nc = int(prev.max()) + 2, int(cur.max()) + 2
-        pair = np.bincount((prev.ravel() + 1) * nc + (cur.ravel() + 1), minlength=np_ * nc).reshape(np_, nc)
-        area_c = pair.sum(axis=0)
-        area_p = pair.sum(axis=1)
-        total = float(area_c[1:].sum())
-        if total <= 0 or np_ < 2:
-            return 1.0 if total > 0 else 0.0
-        relabelled = 0.0
-        for r in regions:
-            c = r.index + 1
-            if c >= nc or area_c[c] == 0:
-                continue
-            p = int(np.argmax(pair[1:, c])) + 1
-            inter = pair[p, c]
-            union = area_c[c] + area_p[p] - inter
-            if union <= 0 or inter / union < MATCH_IOU \
-                    or float(vx.delta_e76(r.lab, prev_lab[p - 1])) > VERIFY_DE:
-                relabelled += float(area_c[c])
-        return relabelled / total
+        """The relabel trigger of §4.3: the share of the labelled area — the
+        pixels an L1 region describes in this capture — whose description
+        changed since the previous capture, i.e. the pixel lay in no region
+        then (sky L0 owned, a speck, a region past MAX_REGIONS) or its
+        region's colour then and now differ by ΔE76 > VERIFY_DE.
+
+        Per pixel, not per region (RS-13.1 A8): a region-level IoU ≥ 0.5 test
+        counted a mass that split in two, or merged along a bridge that
+        noise opened or closed, as wholly relabelled although every pixel
+        kept its colour, so a static noisy view or a slow pan restarted the
+        epoch on most frames. A camera change recolours most pixels at once.
+        The denominator is the labelled area, not the valid area (review C9):
+        in a sky-heavy view L0 owns most of the valid area, and a full
+        relabel of the regions stays under any valid-area threshold."""
+        now = cur >= 0
+        total = int(now.sum())
+        if total == 0 or not regions:
+            return 0.0
+        was = prev >= 0
+        both = now & was
+        changed = total - int(both.sum())                  # newly labelled pixels
+        if both.any() and len(prev_lab):
+            cur_lab = np.stack([r.lab for r in regions])     # regions are in index order
+            changed += int((vx.delta_e76(cur_lab[cur[both]], prev_lab[prev[both]]) > VERIFY_DE).sum())
+        return changed / total
 
     def _commit_epoch(self, clear: int, level: int, now: float) -> None:
         """The epoch start went out: advance the counter and start the epoch's
