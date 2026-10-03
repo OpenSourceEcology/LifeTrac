@@ -162,6 +162,33 @@ class ReplayTests(unittest.TestCase):
         self.assertEqual(row.digest, "BAD")
         self.assertFalse(_checks(dr)["digest"])
 
+    def test_resync_is_shown_per_row_and_as_episodes(self) -> None:
+        orphans = [vs.Upd(30, 1, 1)] * 4                              # id 30 was never defined
+
+        def delta(ts: float, seq: int, epoch: int = 1) -> tuple:
+            return ts, _wire(vs.encode_frame(vs.Header(False, 0, epoch), orphans, 197), False, seq)
+        frames = [(1000.0, _wire(vs.encode_frame(vs.Header(True, 0, 1), _scene(), 196), True, 1)),
+                  delta(1000.5, 2), delta(1001.0, 3), delta(1001.5, 4),
+                  (1002.5, _wire(vs.encode_frame(vs.Header(True, 0, 2), _scene(), 196), True, 5))]
+        dr = vdr.DryRun()
+        rows = [dr.feed(p, ts) for ts, p in frames]
+        self.assertEqual([r.resync for r in rows], [False, False, True, True, False])   # 8 of 8 orphans
+        self.assertTrue(vdr.format_row(rows[2]).endswith(" RESYNC"))
+        self.assertNotIn("RESYNC", vdr.format_row(rows[4]))           # the epoch start ended it
+        s = dr.summary()
+        self.assertEqual([(e["start"], e["end"], e["frames"]) for e in s["resync_episodes"]], [(2, 4, 2)])
+        self.assertIn("resync: 1 episode(s), 2 frame(s): #2-#4 (2, 1.5 s)", vdr.format_summary(s))
+        json.dumps(s)
+        # still in resync when the capture ends
+        dr = vdr.DryRun()
+        anchor = vs.encode_frame(vs.Header(True, 0, 1), [_scene()[0], vs.LayerClear(0)], 196)
+        for ts, p in [(1000.0, _wire(anchor, True, 1)), delta(1000.5, 2), delta(1001.0, 3), delta(1001.5, 4)]:
+            dr.feed(p, ts)
+        s = dr.summary()
+        self.assertEqual([(e["start"], e["end"], e["frames"]) for e in s["resync_episodes"]], [(2, None, 2)])
+        self.assertIn("#2-end (2)", vdr.format_summary(s))
+        self.assertIn("resync: none", vdr.format_summary(vdr.DryRun().summary()))
+
     def test_rejected_first_frame_fails_first_apply_and_store_clean(self) -> None:
         dr = vdr.DryRun()
         frames = _clean_frames()
