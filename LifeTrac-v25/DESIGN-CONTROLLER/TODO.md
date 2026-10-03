@@ -2639,6 +2639,33 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   (589c1203). Boards run bench 5a160e4a (flown); PR-head bench = 0c1bb0a9 --
   delta not exercised on air (0 SNAPPED on the originator), confirmation leg
   optional at the next GO. Staged on both boards.
+- [~] **RS-12.15 v3 / RS-13.1 A11 (2026-10-03, branch imp/fhss-authority) --
+  FHSS time authority at 1 fps: FIRMWARE + SIL DONE, NOT FLASHED, needs a GO.**
+  RS-13.1 found the 1 fps tractor never became originator: authority needed 8
+  own TXs each STRICTLY < 1000 ms apart and the 1 fps cadence sits on 1000 ms
+  (on-air gaps 993/999/1005 ms p10/p50/p90; tx_stream_streak_max 2 and 3), so
+  every base command the tractor heard was adopted and its next demotion would
+  reset that adopted clock -- the RS-12.12/14 exposure open again at 1 fps.
+  Fix: SX1276_FHSS_AUTHORITY_STREAK_GAP_MS 1000 -> 1500 (1.5 x the 1 fps
+  cadence; one constant for both the chain test and the decay, documented why),
+  new SLOWEST_STREAM_MS = 1000 design bound, _Static_asserts (gap > 1 fps + one
+  200 ms slot of TX deferral; gap < 2 s so a skipped frame / 2 s silence ends
+  authority; gap < FRESH_MS). MIN_STREAK stays 8 (7 s to earn at 1 fps, 3.5 s at
+  2 fps). Trade-off, analysed in sx1276_fhss_authority.h: 1 Hz base commands
+  now chain on cadence; adoption (every accepted header clears the streak, and
+  the 1.0 s gate only applies while fragments flow) keeps the base out, and the
+  deaf case decays -- both host-pinned. check-fhss-authority 12 fns (1 fps
+  +/-10 ms, constant 990/1010, 1200/800 slot deferrals, 2 fps, 2 s silence,
+  skipped frame), check-rx-grid-policy 11 sequences (8b: 1 Hz commands between
+  heard frames never earn it; 10: a 1 fps originator REFUSES a lagging echo
+  1005 ms after its last frame, keeps its clock through a demotion, hands over
+  after 2 s silence). Both new suites FAIL against the old 1000 ms gap
+  (mutation run). Full `check` green. Production build/firmware.bin c6b659ca
+  (24864 B, +4 B: one literal); bench firmware_bench_diag.bin 43f0a74c (24864 B,
+  not committed). NEXT (needs GO): re-fly an FHSS 1 fps leg with base commands;
+  expect tractor tx_stream_streak_max >> 8, clk_demotion_reset = 0 with
+  clk_demotion_kept > 0, tx_first_anchor delta 0 over the leg, zero lock-loss
+  gaps.
 - [~] **RS-12.15 v1 — FHSS clock authority: FIRMWARE IMPLEMENTED + FLASHED
   2026-09-14 (commit 23ba5122, branch rs12-15-clock-authority, PR pending);
   BEHAVIORAL A/B still PENDING. A self-anchored originator (own-TX clock,

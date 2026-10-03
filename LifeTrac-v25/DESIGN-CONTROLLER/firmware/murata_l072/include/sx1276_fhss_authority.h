@@ -27,19 +27,55 @@
  * The discriminator is SUSTAINED STREAMING: a node earns originator
  * authority only after MIN_STREAK consecutive own FHSS transmissions
  * each within STREAK_GAP_MS of the previous one. An image stream (a
- * fragment every ~40-200 ms) clears that inside one train; a command
- * sender (>= 1 s apart under the RS-12.14 gate, or two copies 37 ms
- * apart at most) never does, and a node that just recovered from a
- * demotion starts at zero. Adopting a remote grid clears the streak.
+ * fragment every ~40-200 ms, or one frame per second at the slowest
+ * rate) clears that within MIN_STREAK frames; a node that just
+ * recovered from a demotion starts at zero. Adopting a remote grid
+ * clears the streak.
  *
  *   originator := clock_valid && !grid_adopted && streak >= MIN_STREAK
  *                 && (now - last_own_tx) < STREAK_GAP_MS
  *
  * Two boundary rules (PR #125 review round 3): the chain test is STRICT
- * (a sender spaced exactly at the gap -- the RS-12.14 stream gate admits
- * commands at >= 1.0 s -- never chains), and authority DECAYS one gap
- * after the last own transmission, so a node that bursts a few queued
- * commands and goes quiet cannot keep refusing a peer's grid.
+ * (a sender spaced exactly at the gap never chains), and authority DECAYS
+ * one gap after the last own transmission, so a node that bursts a few
+ * queued commands and goes quiet cannot keep refusing a peer's grid.
+ *
+ * RS-13.1 A11 (2026-10-03) -- the gap is 1500 ms, not 1000. With 1000 and
+ * the strict test, a ONE-FRAME-PER-SECOND stream never chained: on air the
+ * tractor's 1 fps VECTOR legs logged TX gaps of 993/999/1005 ms
+ * (p10/p50/p90) and tx_stream_streak_max 2 and 3, so the tractor never
+ * held authority, adopted every base command it heard (an ALIGNED echo of
+ * its own grid sets grid_adopted), and its next scan demotion reset that
+ * adopted clock -- the RS-12.12/14 lock-loss exposure RS-12.15 closed was
+ * open again at 1 fps. 1500 = 1.5 x the slowest supported stream cadence
+ * (SX1276_FHSS_AUTHORITY_SLOWEST_STREAM_MS): a 1 fps stream chains with
+ * ~490 ms of headroom for host jitter, ToA spread and a one-slot (200 ms)
+ * TX deferral; a skipped frame (a 2 s gap) does not chain; and 2 s of
+ * silence always ends authority (pinned < SX1276_FHSS_CLOCK_FRESH_MS in
+ * sx1276_rx_grid_policy.c: an originator never refuses a peer for longer
+ * than a fresh follower would).
+ *
+ * ONE constant does both jobs on purpose. Decay shorter than the chain gap
+ * would let a live streak flicker out of authority between two frames, and
+ * a base command heard in that window is ADOPTED -- grid_adopted is set and
+ * the streak cleared, i.e. the streamer becomes a follower and its next
+ * demotion resets its clock (the exposure above). Decay longer than the
+ * chain gap would let authority outlive a broken streak.
+ *
+ * What the wider gap gives up, and why that is safe: base commands under
+ * the RS-12.14 stream gate (>= 1.0 s apart) now chain ON CADENCE -- a 1 Hz
+ * command sender and a 1 fps stream are indistinguishable by spacing, and
+ * the stream is the one that must win. A command sender is kept out by
+ * ADOPTION, not by the gap: every header a non-originator accepts
+ * (SNAPPED/ALIGNED) clears its streak (note_adopt), and the base's gate is
+ * >= 1.0 s only while fragments are flowing (IDLE_DRAIN_QUIET_S = 1.5 s
+ * after the last one), i.e. while it is adopting the tractor's headers
+ * between its own sends. A base that has heard nothing for 1.5 s drops to
+ * the 0.12 s idle gate, which chained under the old 1000 ms rule as well;
+ * there the decay above is the bound, unchanged in kind (1.5 s instead of
+ * 1 s after its last TX). Bench-pinned in check-fhss-authority (1 fps /
+ * 2 fps / silence / command-sender fns) and check-rx-grid-policy
+ * (sequences 8b and 10).
  *
  * Consumers (sx1276_rx.c):
  *   - adoption gate: an originator adopts a remote grid only when it
@@ -55,10 +91,18 @@
 
 #include <stdint.h>
 
-/* Two own transmissions further apart than this end the streak. */
-#define SX1276_FHSS_AUTHORITY_STREAK_GAP_MS 1000U
+/* The slowest own-TX cadence that must earn and KEEP authority: the 1 fps
+ * image stream (RS-13.1 A11). A design bound, not consulted at run time --
+ * it pins STREAK_GAP_MS through the _Static_asserts in
+ * sx1276_fhss_authority.c. */
+#define SX1276_FHSS_AUTHORITY_SLOWEST_STREAM_MS 1000U
+/* Two own transmissions this far apart or further end the streak (strict
+ * chain test), and authority decays this long after the last own TX.
+ * 1.5 x SLOWEST_STREAM_MS; see the RS-13.1 A11 note above. */
+#define SX1276_FHSS_AUTHORITY_STREAK_GAP_MS 1500U
 /* Consecutive own transmissions (each within the gap) that make a node
- * an originator. 8 x 200 ms slots = 1.6 s of streaming. */
+ * an originator. 8 x 200 ms slots = 1.6 s of dense streaming; 8 frames =
+ * 7 s at 1 fps, 3.5 s at 2 fps. */
 #define SX1276_FHSS_AUTHORITY_MIN_STREAK    8U
 
 /* Forget all streaming history (boot, scan reset, follower demotion). */

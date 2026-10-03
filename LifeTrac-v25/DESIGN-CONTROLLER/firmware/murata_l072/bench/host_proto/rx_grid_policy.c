@@ -20,11 +20,20 @@
  *      on a snap candidate; ALIGNED leaves the clock untouched);
  *   5. a streaming originator adopts a LEADING grid (converges);
  *   6. an originator's own demotion KEEPS its clock;
- *   7. authority decays after the stream stops, so an echo is adopted;
- *   8. commands exactly 1 s apart never earn authority;
+ *   7. authority decays one gap (1.5 s) after the stream stops, so an echo
+ *      is adopted;
+ *   8. sends exactly one gap apart never earn authority; 8b. a 1 Hz
+ *      command sender that hears its peer between commands never does
+ *      either (every adopted header clears its streak);
  *   9. a forged "leading" epoch+2 is REJECTED_EPOCH_DRIFT (the originator
  *      hands STALE, not UNANCHORED, so the drift barrier holds); epoch+1
- *      is still adopted.
+ *      is still adopted;
+ *  10. RS-13.1 A11: a ONE-FRAME-PER-SECOND originator (+/-10 ms jitter)
+ *      holds authority across the whole inter-frame interval -- a lagging
+ *      echo 1005 ms after its last frame is REFUSED (the 1 s gap had
+ *      decayed by then and adopted it, making the streamer a follower) --
+ *      its demotion keeps its clock, and 2 s of silence hands the echo
+ *      over (UNANCHORED -> SNAPPED).
  */
 
 #include <stdio.h>
@@ -107,6 +116,43 @@ static sx1276_fhss_snap_decision_t rx_frame(uint32_t now_ms, uint32_t toa_us,
                                             uint8_t remote_hop,
                                             sx1276_rx_grid_verdict_t *out_v) {
     return rx_frame_ep(now_ms, toa_us, slot_offset_ms, EPOCH, remote_hop, out_v);
+}
+
+/* A received header named by its ABSOLUTE slot (the 1 fps sequences span
+ * more than one 50-slot epoch, so the fixed-EPOCH helper does not fit). */
+static sx1276_fhss_snap_decision_t rx_frame_abs(uint32_t now_ms, uint32_t toa_us,
+                                                uint8_t slot_offset_ms,
+                                                uint32_t remote_abs,
+                                                sx1276_rx_grid_verdict_t *out_v) {
+    return rx_frame_ep(now_ms, toa_us, slot_offset_ms,
+                       sx1276_fhss_clock_epoch_of(remote_abs),
+                       sx1276_fhss_clock_hop_of(remote_abs), out_v);
+}
+
+/* The follower's boundary retune (sx1276_rx_slot_follow) reduced to what
+ * consider_remote() sees: the scheduler's "slot just consumed" becomes the
+ * clock's slot at now_ms. Same snap + consume pair as tx_step(), minus the
+ * anchor and the TX_DONE note. */
+static void follow_slot(uint32_t now_ms) {
+    const uint32_t abs_now = sx1276_fhss_clock_abs_slot(now_ms);
+    (void)sx1276_fhss_snap_to(sx1276_fhss_clock_epoch_of(abs_now),
+                              sx1276_fhss_clock_hop_of(abs_now));
+    uint8_t idx = 0U; uint32_t hz = 0U;
+    (void)sx1276_fhss_next_channel(&idx, &hz);
+}
+
+/* n own TXs at one frame per second with +/-10 ms jitter from t0; returns
+ * the time of the last one. */
+static uint32_t stream_1fps(uint32_t t0, uint32_t n) {
+    static const int32_t jitter[10] = { 0, 10, -10, 5, -7, 10, -10, 3, 0, -5 };
+    uint32_t t = t0;
+    for (uint32_t i = 0U; i < n; ++i) {
+        if (i != 0U) {
+            t = (uint32_t)((int32_t)t + 1000 + jitter[i % 10U]);
+        }
+        tx_step(t);
+    }
+    return t;
 }
 
 /* Stream 10 frames at 200 ms from t0; returns the time of the last one. */
@@ -236,18 +282,18 @@ static void test_authority_decays_then_echo_adopted(void) {
     fresh_scheduler();
     const uint32_t last = stream_from(70000U);        /* 71800 */
     sx1276_rx_grid_verdict_t v;
-    /* 1 s of silence: authority gone -> the same kind of lagging echo that
-     * (4) refused is now adopted (UNANCHORED, SNAPPED). */
+    /* One gap (1.5 s) of silence: authority gone -> the same kind of
+     * lagging echo that (4) refused is now adopted (UNANCHORED, SNAPPED). */
     const uint32_t now = last + SX1276_FHSS_AUTHORITY_STREAK_GAP_MS + 5U;
     const uint8_t prev = (uint8_t)((consumed_hop() + N - 1U) % N);
     const sx1276_fhss_snap_decision_t dec = rx_frame(now, 0U, 0U, prev, &v);
-    CHECK(v.originator == 0U, "(7) silent 1 s: not an originator");
+    CHECK(v.originator == 0U, "(7) silent one gap: not an originator");
     CHECK(v.health == SX1276_FHSS_CLOCK_UNANCHORED && v.adopt == 1U, "(7) UNANCHORED + adopt");
     CHECK(dec == SX1276_FHSS_SNAP_DEC_SNAPPED, "(7) SNAPPED (got %d)", (int)dec);
     CHECK(sx1276_rx_grid_adopted() == 1U, "(7) adopted after decay");
 }
 
-static void test_exact_1s_commands_never_earn_authority(void) {
+static void test_exact_gap_sends_never_earn_authority(void) {
     fresh_scheduler();
     uint32_t t = 80000U;
     tx_step(t);
@@ -258,9 +304,86 @@ static void test_exact_1s_commands_never_earn_authority(void) {
     sx1276_rx_grid_verdict_t v;
     const uint8_t prev = (uint8_t)((consumed_hop() + N - 1U) % N);
     const sx1276_fhss_snap_decision_t dec = rx_frame(t + 10U, 0U, 0U, prev, &v);
-    CHECK(v.originator == 0U, "(8) exactly-1 s sender: no authority");
+    CHECK(v.originator == 0U, "(8) exactly-one-gap sender: no authority");
     CHECK(dec == SX1276_FHSS_SNAP_DEC_SNAPPED && sx1276_rx_grid_adopted() == 1U,
           "(8) it still adopts the peer (SNAPPED)");
+}
+
+static void test_1hz_commands_hearing_peer_never_earn_authority(void) {
+    /* RS-13.1 A11 trade-off, policy level: base commands under the RS-12.14
+     * stream gate (1.0 s) are inside the 1.5 s gap, so what keeps the base
+     * a follower is that it hears the tractor between its sends -- every
+     * accepted header re-adopts and clears the streak. */
+    fresh_scheduler();
+    sx1276_rx_grid_verdict_t v;
+    const uint8_t hop = (uint8_t)((consumed_hop() + 1U) % N);
+    (void)rx_frame(110000U, 0U, 0U, hop, &v);          /* cold adopt */
+    CHECK(sx1276_rx_grid_adopted() == 1U, "(8b) precondition: following the tractor");
+    uint32_t t = 110300U;
+    uint8_t all_ok = 1U;
+    for (uint32_t i = 0U; i < 20U; ++i) {
+        tx_step(t);                                      /* base command */
+        if (sx1276_fhss_authority_streak() > 1U) { all_ok = 0U; }
+        /* The tractor's next frame, 500 ms later, on the shared grid. */
+        const uint32_t now = t + 500U;
+        follow_slot(now);
+        const uint32_t abs_now = sx1276_fhss_clock_abs_slot(now);
+        const sx1276_fhss_snap_decision_t dec =
+            rx_frame_abs(now, 0U, (uint8_t)sx1276_fhss_clock_in_slot_ms(now),
+                         abs_now, &v);
+        if (v.originator != 0U || dec != SX1276_FHSS_SNAP_DEC_ALIGNED ||
+            sx1276_fhss_authority_streak() != 0U) {
+            all_ok = 0U;
+            fprintf(stderr, "  (8b) i=%u originator=%u dec=%d streak=%u\n",
+                    i, (unsigned)v.originator, (int)dec,
+                    sx1276_fhss_authority_streak());
+        }
+        t += 1000U;                                      /* the 1.0 s gate */
+    }
+    CHECK(all_ok == 1U,
+          "(8b) 20 commands at 1.0 s, each between heard frames: never an "
+          "originator, every frame ALIGNED + adopted, streak never above 1");
+    CHECK(sx1276_fhss_authority_streak_max() == 1U, "(8b) streak_max 1");
+}
+
+static void test_1fps_originator_holds_authority(void) {
+    /* RS-13.1 A11: the 1 fps tractor. */
+    fresh_scheduler();
+    const uint32_t last = stream_1fps(120000U, 10U);
+    CHECK(sx1276_fhss_authority_streak() == 10U,
+          "(10) 1 fps x 10: streak 10 (on air the 1 s gap gave 2-3; got %u)",
+          sx1276_fhss_authority_streak());
+    /* 1005 ms after its last frame -- past the old 1 s decay, before a
+     * late next frame -- a lagging echo of the slot before ours arrives. */
+    const uint32_t now = last + 1005U;
+    const uint32_t abs_before = sx1276_fhss_clock_abs_slot(now);
+    const uint32_t phase_before = sx1276_fhss_clock_in_slot_ms(now);
+    sx1276_rx_grid_verdict_t v;
+    sx1276_fhss_snap_decision_t dec =
+        rx_frame_abs(now, 0U, 0U, abs_before - 1U, &v);
+    CHECK(v.originator == 1U, "(10) 1 fps, 1005 ms after the last frame: originator");
+    CHECK(v.adopt == 0U && v.health == SX1276_FHSS_CLOCK_FRESH,
+          "(10) lagging echo: no adopt, FRESH handed to consider_remote");
+    CHECK(dec == SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT,
+          "(10) lagging echo REFUSED: LOCKED_OUT (got %d)", (int)dec);
+    CHECK(sx1276_rx_grid_adopted() == 0U &&
+          sx1276_fhss_clock_abs_slot(now) == abs_before &&
+          sx1276_fhss_clock_in_slot_ms(now) == phase_before,
+          "(10) still unadopted, clock untouched");
+    /* The 2 s scan demotion a received command triggers keeps the clock
+     * and the streak; streaming on, it is still the originator. */
+    CHECK(sx1276_rx_grid_on_demotion() == 0U && sx1276_fhss_clock_valid() == 1U,
+          "(10) 1 fps originator demoted: self-anchored clock KEPT");
+    const uint32_t last2 = stream_1fps(last + 1010U, 5U);   /* a late frame */
+    CHECK(sx1276_fhss_authority_streak() == 15U,
+          "(10) streak survives the demotion (got %u)", sx1276_fhss_authority_streak());
+    /* 2 s of silence: authority gone, the same kind of echo is adopted. */
+    const uint32_t quiet = last2 + 2000U;
+    dec = rx_frame_abs(quiet, 0U, 0U, sx1276_fhss_clock_abs_slot(quiet) - 1U, &v);
+    CHECK(v.originator == 0U && v.health == SX1276_FHSS_CLOCK_UNANCHORED,
+          "(10) 2 s silent: not an originator, UNANCHORED");
+    CHECK(dec == SX1276_FHSS_SNAP_DEC_SNAPPED && sx1276_rx_grid_adopted() == 1U,
+          "(10) 2 s silent: the echo is SNAPPED + adopted (got %d)", (int)dec);
 }
 
 static void test_forged_leading_epoch_is_drift_rejected(void) {
@@ -308,12 +431,14 @@ int main(void) {
     test_originator_adopts_leading_grid();
     test_originator_demotion_keeps_clock();
     test_authority_decays_then_echo_adopted();
-    test_exact_1s_commands_never_earn_authority();
+    test_exact_gap_sends_never_earn_authority();
+    test_1hz_commands_hearing_peer_never_earn_authority();
     test_forged_leading_epoch_is_drift_rejected();
+    test_1fps_originator_holds_authority();
     if (g_failures != 0) {
         fprintf(stderr, "[FAIL] rx_grid_policy: %d failure(s)\n", g_failures);
         return 1;
     }
-    printf("[PASS] rx_grid_policy: 9 sequences incl. demotion->TX->RX recovery and the forged-epoch drift barrier, against the real consider_remote\n");
+    printf("[PASS] rx_grid_policy: 11 sequences incl. demotion->TX->RX recovery, the forged-epoch drift barrier, 1 Hz commands kept out by adoption and the 1 fps originator (A11), against the real consider_remote\n");
     return 0;
 }

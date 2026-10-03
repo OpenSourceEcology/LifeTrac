@@ -9,6 +9,14 @@
 #include "sx1276_fhss_authority.h"
 #include "sx1276_fhss_clock.h"
 
+/* RS-13.1 A11 coherence rule: an originator's refusal authority (FRESH
+ * handed for a lagging echo) decays STREAK_GAP_MS after its last own TX; a
+ * follower's lasts FRESH_MS after its last accepted header. A silent
+ * originator must never out-refuse a fresh follower -- so two seconds of
+ * silence (the LOCK_LOSS horizon, == FRESH_MS) always ends authority. */
+_Static_assert(SX1276_FHSS_AUTHORITY_STREAK_GAP_MS < SX1276_FHSS_CLOCK_FRESH_MS,
+               "A11: authority must decay inside the FRESH / lock-loss horizon");
+
 /* F6: has ANY remote grid been accepted since the last acquisition
  * reset? While 0 (and the node is not a streaming originator) the health
  * handed to consider_remote() is UNANCHORED even if the clock is

@@ -6,6 +6,20 @@
 
 #include "sx1276_fhss_authority.h"
 
+#include "sx1276_fhss_clock.h"   /* SX1276_FHSS_SLOT_MS (bounds only) */
+
+/* RS-13.1 A11 (2026-10-03): the gap must chain the slowest supported
+ * stream (1 fps) even when one frame's key-up slips a whole FHSS slot
+ * (the slot-fit guard defers a TX that would straddle a boundary), and it
+ * must NOT chain across a skipped frame -- so two seconds of silence
+ * always ends both the streak and the authority it earned. */
+_Static_assert(SX1276_FHSS_AUTHORITY_STREAK_GAP_MS >
+                   SX1276_FHSS_AUTHORITY_SLOWEST_STREAM_MS + SX1276_FHSS_SLOT_MS,
+               "A11: a 1 fps stream with a one-slot TX deferral must chain");
+_Static_assert(SX1276_FHSS_AUTHORITY_STREAK_GAP_MS <
+                   2U * SX1276_FHSS_AUTHORITY_SLOWEST_STREAM_MS,
+               "A11: a skipped 1 fps frame (2 s of silence) must end authority");
+
 typedef struct {
     uint32_t last_tx_ms;
     uint32_t streak;
@@ -24,9 +38,12 @@ void sx1276_fhss_authority_reset(void) {
 
 void sx1276_fhss_authority_note_tx(uint32_t now_ms) {
     /* Wrap-safe u32 gap, same idiom as the clock TU. A gap wider than
-     * the streaming cadence restarts the streak at this transmission. */
-    /* STRICT: a sender spaced exactly at the gap (the RS-12.14 stream
-     * gate admits commands at >= 1.0 s) must not chain (PR #125 review). */
+     * the streaming cadence restarts the streak at this transmission.
+     * STRICT: a sender spaced exactly at the gap must not chain (PR #125
+     * review round 3). Since RS-13.1 A11 the gap is 1.5 s, so a 1 fps
+     * stream chains -- and so would 1 Hz commands on cadence alone; the
+     * adoption rule (note_adopt) is what keeps a command sender out, see
+     * the header. */
     if (s_auth.have_tx != 0U &&
         (now_ms - s_auth.last_tx_ms) < SX1276_FHSS_AUTHORITY_STREAK_GAP_MS) {
         if (s_auth.streak != 0xFFFFFFFFU) {
