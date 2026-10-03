@@ -607,7 +607,7 @@ With 1,563–1,883 record bits per frame, items 1–5 rarely exceed a third of t
   - The base resets a shape's age only when the tag matches its stored state **and** DIGEST is not in mismatch. Otherwise it counts an orphan.
   - A 2-bit tag passes a stale state 25 % of the time per CONFIRM. The DIGEST bounds this at 1/256 because it hashes the full 16-bit state-hashes, not the tags: while it mismatches, CONFIRMs reset no ages.
 - **Orphans.** More than 20 % orphan records in 10 s (evaluated over at least 8 records; a ratio over fewer is noise), or 3 consecutive DIGEST mismatches, puts the store into a *resync* state. A CONFIRM refused only because the DIGEST is in mismatch is not an orphan — it carries no contradiction of its own, and counting it made one lost UPD trip the 20 % rule. Resync it shows a "RESYNC" chip, stops resetting ages, and waits for the tractor's next epoch start. VS1 sends no request. The tractor starts a new epoch at least every 60 s (the safety refresh above), so a desynchronised base recovers within one safety period with no uplink at all, and the picture shows its true age in the meantime.
-- **Shape TTL:** 20 frames without a verified define, CONFIRM or UPD.
+- **Shape TTL:** 20 frames without a verified define, CONFIRM or UPD. The clock runs on the live set the DIGEST covers, one shape per ID like the tractor's mirror. During a pending hand-over (§3.5), a carried shape that the new epoch has already named keeps its clock in the new epoch's copy, and the cached original leaves with that copy rather than expiring on its own; a cached shape outside the epoch start's LAYER_CLEAR range is cleared at the hand-over, not expired.
 - **Age styling** (shape age = now − last *verified* capture time):
 
   | Age | Style |
