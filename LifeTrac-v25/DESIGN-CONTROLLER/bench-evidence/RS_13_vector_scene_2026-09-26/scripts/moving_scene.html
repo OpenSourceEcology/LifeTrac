@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><title>RS-13.1 moving content</title>
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}
+#stage{position:absolute;inset:0;overflow:hidden}
+#pan{position:absolute;left:-15vw;top:-15vh;width:130vw;height:130vh;
+  background:url("file:///C:/Windows/Web/Wallpaper/ThemeC/img29.jpg") center/cover no-repeat;
+  animation:drive 24s ease-in-out infinite alternate}
+@keyframes drive{0%{transform:translate(0,0) scale(1)}35%{transform:translate(-9vw,2vh) scale(1.12)}
+  70%{transform:translate(4vw,-3vh) scale(1.05)}100%{transform:translate(10vw,1vh) scale(1.18)}}
+.post{position:absolute;bottom:0;width:2.2vw;height:38vh;background:#3a2a1a;box-shadow:0 0 0 2px #1c140c;
+  animation:pass linear infinite}
+.post:nth-child(2){left:-5vw;animation-duration:7s}
+.post:nth-child(3){left:-5vw;animation-duration:11s;animation-delay:-4s;height:30vh;width:1.6vw}
+.post:nth-child(4){left:-5vw;animation-duration:9s;animation-delay:-7s;height:44vh}
+@keyframes pass{from{transform:translateX(0)}to{transform:translateX(110vw)}}
+#rock{position:absolute;left:60vw;top:64vh;width:9vw;height:6vh;border-radius:45%;background:#4e4a44;
+  animation:rock 13s ease-in-out infinite alternate}
+@keyframes rock{from{transform:translate(0,0) scale(.8)}to{transform:translate(-22vw,7vh) scale(1.35)}}
+</style></head>
+<body><div id="stage"><div id="pan"></div><div class="post"></div><div class="post"></div><div class="post"></div><div id="rock"></div></div></body></html>

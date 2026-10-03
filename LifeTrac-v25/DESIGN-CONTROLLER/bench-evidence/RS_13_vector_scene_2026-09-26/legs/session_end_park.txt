@@ -1,0 +1,10 @@
+# RS-13.1 radios off at the operator's request after step 1 (no radio leg was run this session), 2026-09-27T00:57:35Z PC clock
+## before (read-only radio_state.py)
+base:    RADIO_STATE {"reg_op_mode": "0x80", "mode": "SLEEP", "lora": true, "transmitting_or_listening": false}
+tractor: RADIO_STATE {"reg_op_mode": "0x80", "mode": "SLEEP", "lora": true, "transmitting_or_listening": false}
+## radio_park.py
+base:    PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+tractor: PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+## re-check 2026-09-27T01:00:40Z PC clock (read-only radio_state.py)
+base:    RADIO_STATE {"reg_op_mode": "0x80", "mode": "SLEEP", "lora": true, "transmitting_or_listening": false}
+tractor: RADIO_STATE {"reg_op_mode": "0x80", "mode": "SLEEP", "lora": true, "transmitting_or_listening": false}

@@ -1,0 +1,105 @@
+{
+  "profile": "image_bw500",
+  "one_fragment_limit": 243,
+  "frames": {
+    "total": 303,
+    "vector": 0,
+    "other": 303,
+    "parse_errors": 0,
+    "by_codec": {
+      "mono_g4": 303
+    }
+  },
+  "wire": {
+    "min": 0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "max": 0,
+    "over_limit": 0
+  },
+  "epoch_starts": 0,
+  "epoch_starts_applied": 0,
+  "arrival": {
+    "span_s": 0.0,
+    "fps_mean": 0.0,
+    "gap_p50_s": 0.0,
+    "gap_p95_s": 0.0,
+    "gap_max_s": 0.0,
+    "first_applied_t_rel_s": null,
+    "frames_before_first_apply": 0
+  },
+  "store": {
+    "frames_rx": 0,
+    "frames_bad": 0,
+    "frames_applied": 0,
+    "epoch_behind": 0,
+    "orphans": 0,
+    "digest_checks": 0,
+    "digest_mismatch": 0,
+    "bad_version": 0,
+    "epochs": 0,
+    "handovers": 0,
+    "ttl_dropped": 0,
+    "resync_events": 0,
+    "records_applied": 0,
+    "resync": false,
+    "bad_reasons": {},
+    "epoch": null,
+    "shapes": 0,
+    "cached_shapes": 0
+  },
+  "scene": null,
+  "checks": [
+    [
+      "parse_ok",
+      true,
+      "0 unparseable payload(s)"
+    ],
+    [
+      "all_vector",
+      false,
+      "303 non-vector frame(s): {'mono_g4': 303}"
+    ],
+    [
+      "one_fragment",
+      true,
+      "0 over 243 B (epoch starts 242 B); max 0 B"
+    ],
+    [
+      "store_clean",
+      true,
+      "frames_bad=0 "
+    ],
+    [
+      "no_orphans",
+      true,
+      "orphans=0"
+    ],
+    [
+      "digest",
+      true,
+      "0 checked, 0 mismatched, scene digest_ok=None"
+    ],
+    [
+      "epoch_seen",
+      false,
+      "0 epoch start(s) applied of 0 received"
+    ],
+    [
+      "first_apply",
+      false,
+      "0 frame(s) before the first apply"
+    ],
+    [
+      "applied_ratio",
+      false,
+      "0/0 applied = 0.0% (need >= 90%)"
+    ],
+    [
+      "min_frames",
+      false,
+      "0 vector frame(s), need >= 250"
+    ]
+  ],
+  "pass": false
+}
