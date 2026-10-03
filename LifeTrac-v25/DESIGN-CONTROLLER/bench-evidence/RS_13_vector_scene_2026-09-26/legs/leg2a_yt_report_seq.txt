@@ -1,0 +1,15 @@
+# leg 2a_yt report re-run with --capture (RS-13.1 A14 follow-up), 2026-10-03T22:38:17Z PC clock, PC only (archive + capture files; no board touched)
+# tool: tools/rs12_leg_report.py blob d44dc4913587be12389a49841bc0fbfb1ee126d6
+# py -3 tools/rs12_leg_report.py bench-evidence/radio_monitor_20261003_164601_ac199b1a --pre bench-evidence/RS_13_vector_scene_2026-09-26/legs/leg2a_yt_pre_base.txt --post bench-evidence/RS_13_vector_scene_2026-09-26/legs/leg2a_yt_post_base.txt --capture bench-evidence/RS_13_vector_scene_2026-09-26/legs/leg2a_yt_base.jsonl
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=250  force_frf_hz=0  git_sha=ac199b1a  
+  (tx frags_ok counter 292 is stale; using 301 fragments from per-frame TX events)
+  (rx rx_frames counter 288 is stale; using 297 frames from 'published frame_id' events)
+loss 4/301 = 1.3%   crc_dumps=8  timeouts=0  published=297
+capture seq gaps (leg2a_yt_base.jsonl): lost 4/303 = 1.3%  (received 299, 4 gaps, longest 1; 1 codec run; period 1.00 s)
+radio deltas: {'radio_dio0': 308, 'radio_rx_ok': 300, 'radio_crc_err': 8, 'radio_tx_ok': 0}
+FIRMWARE DROP (drx_ok - host URCs): 300 - 297 = 3
+identity residue: 0
+crc closure: dcrc_err=8 vs crc_dumps=8
+URC-path: rx_urc_lost=0 rx_pretx_drained=0
+RS-12.10: rx_fifo_skip=0 tx_deaf_sum=0 us over 1 TX (mean 0.0 ms) tx_deaf_max=34.9 ms tx_done_to_rearm_max=1886 us (max fields: post-bracket values)
+RS-12.15: consider_remote deltas aligned=0 snapped=0 locked_out=0 epoch_drift=0 bad_hop=0 not_init=300 | demotion reset=0 kept=0 | tx_first_anchor delta=0 (post 1) | streak_max post=1

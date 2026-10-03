@@ -633,9 +633,20 @@ Round-3 anomalies:
   the log ends — RS-12.17 class): 4.3 / 22.2 / 3.3 / 5.0 % printed against
   1.3 / 18.8 (0.4 after lock) / 0.3 / ≈2 % from sequence gaps. Loss in this
   record is from sequence gaps.
+  *Follow-up (2026-10-03, after the round, PC only):* the report now floors
+  `rx_frames` with the per-frame `published frame_id` / `frag_arrival`
+  events (with a `(rx rx_frames counter N is stale; …)` note) and, given
+  `--capture legs/leg<X>_base.jsonl`, prints the loss from the TileDeltaFrame
+  sequence gaps per codec run. Re-run on the four round-3 archives with their
+  captures (`legs/leg<X>_yt_report_seq.txt`): counter line 1.3 / 18.9 / 0.0 /
+  2.0 %, seq gaps **1.3 / 0.4 from lock / 0.3 / 2.0 %** (2d: 6 / 304 over three
+  codec runs, no switch counted). For 2b_yt the frames before the first heard
+  (seq 58) count to 58 / 305 = 19.0 % from seq 1; the 18.8 % above is round 2's
+  57 / 304. The procedure now takes loss from the seq-gap line
+  (`RS13_VECTOR_LEG.md`, Step 2).
 - **A15 — Control loss varies more than the effect P3 tests.** The same
   control leg lost 6.5 % on 2026-09-27 and 0.3 % on 2026-10-03; 2a's 4 lost
-  frames against the control's 1 (Fisher p ≈ 0.4) is within that spread.
+  frames against the control's 1 (two-sided Fisher exact on lost / received, 4 / 299 vs 1 / 303: p = 0.22) is within that spread.
   VECTOR frames also ride fuller (p50 242 B vs mono_g4 148 B on this video),
   i.e. longer on air per frame. A P3 that compares single legs needs either
   interleaved control/VECTOR legs or a margin.

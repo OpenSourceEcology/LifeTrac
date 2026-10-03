@@ -4,10 +4,14 @@ Reports, for a radio-monitor archive: raw loss, the per-index loss
 histogram with the penultimate share, the corrupt-capture index
 distribution (read out of the crc_dump payload headers), and — when given
 bracketing stats-probe snapshots — the radio-counter deltas and the
-firmware-drop count (drx_ok - host URCs).
+firmware-drop count (drx_ok - host URCs). With ``--capture`` (the base-side
+``vector_dry_run.py capture`` JSONL of an RS-13 leg) it also prints the
+frame loss read from the TileDeltaFrame sequence numbers, which no
+periodic counter line can make stale.
 
 Usage:
     py -3 rs12_leg_report.py <archive_dir> [--pre stats_pre.txt --post stats_post.txt]
+                             [--capture legs/leg<X>_base.jsonl]
 """
 
 from __future__ import annotations
@@ -16,6 +20,11 @@ import argparse
 import collections
 import pathlib
 import re
+import statistics
+import sys
+
+# TileDeltaFrame header byte 1 (LORA_PROTOCOL.md § TileDeltaFrame) is a u8.
+SEQ_MOD = 256
 
 
 def parse_stats(path: pathlib.Path) -> dict[str, int]:
@@ -26,12 +35,146 @@ def parse_stats(path: pathlib.Path) -> dict[str, int]:
     return out
 
 
-def main() -> int:
+def _last_int(pattern: str, text: str, default: int = 0) -> int:
+    found = re.findall(pattern, text)
+    return int(found[-1]) if found else default
+
+
+def seq_gap_loss(frames) -> dict:
+    """Frame loss from TileDeltaFrame sequence numbers (RS-13.1 A14).
+
+    ``frames``: one ``(ts, codec, seq)`` per captured payload, in arrival
+    order; ``codec`` and ``seq`` are None for a payload that did not parse.
+
+    The header seq is a u8 and each encoder path numbers its own frames
+    (camera_service: ``_VECTOR_SEQ`` for codec 6, the tile accumulator's
+    ``accum.seq`` for the tile codecs), so a codec switch restarts or resumes
+    a different counter. The stream is therefore cut into runs of one codec
+    and nothing is counted across a cut — a frame lost right at a switch is
+    not seen. Inside a run a step of d (mod 256) means d - 1 frames never
+    arrived; when the arrival times say more than 256 frames elapsed (an
+    outage longer than the seq space) the whole wraps are added back from
+    the nominal period (median arrival gap over clean +1 steps). A step of
+    more than half the seq space that the elapsed time cannot explain is a
+    counter restart or a reorder: reported as a jump, not counted as loss.
+    d = 0 is a duplicate.
+    """
+    frames = list(frames)
+    parsed = [(float(t), c, s) for t, c, s in frames
+              if c is not None and s is not None]
+    steps = [b[0] - a[0] for a, b in zip(parsed, parsed[1:])
+             if a[1] == b[1] and (b[2] - a[2]) % SEQ_MOD == 1]
+    period = statistics.median(steps) if steps else None
+    runs: list[dict] = []
+    for ts, codec, seq in parsed:
+        run = runs[-1] if runs else None
+        if run is None or run["codec"] != codec:
+            runs.append({"codec": codec, "first_seq": seq, "last_seq": seq,
+                         "last_ts": ts, "received": 1, "lost": 0, "gaps": 0,
+                         "longest": 0, "duplicates": 0, "jumps": 0})
+            continue
+        d = (seq - run["last_seq"]) % SEQ_MOD
+        if d == 0:
+            run["duplicates"] += 1
+            continue
+        if period:
+            elapsed = (ts - run["last_ts"]) / period
+            jump = d > SEQ_MOD // 2 and elapsed < d / 2
+            wraps = max(0, round((elapsed - d) / SEQ_MOD))
+        else:   # no clean step to time the cadence by: no wrap correction
+            jump, wraps = d > SEQ_MOD // 2, 0
+        if jump:
+            run["jumps"] += 1
+        else:
+            missing = d - 1 + SEQ_MOD * wraps
+            if missing:
+                run["lost"] += missing
+                run["gaps"] += 1
+                run["longest"] = max(run["longest"], missing)
+        run["last_seq"], run["last_ts"] = seq, ts
+        run["received"] += 1
+    received = sum(r["received"] for r in runs)
+    lost = sum(r["lost"] for r in runs)
+    return {"runs": runs, "received": received, "lost": lost,
+            "expected": received + lost, "period_s": period,
+            "gaps": sum(r["gaps"] for r in runs),
+            "longest": max((r["longest"] for r in runs), default=0),
+            "duplicates": sum(r["duplicates"] for r in runs),
+            "jumps": sum(r["jumps"] for r in runs),
+            "unparseable": len(frames) - len(parsed),
+            "first_seq": runs[0]["first_seq"] if runs else None}
+
+
+def format_seq_loss(res: dict, label: str,
+                    names: dict | None = None) -> list[str]:
+    """Report lines for :func:`seq_gap_loss`."""
+    names = names or {}
+    if not res["runs"]:
+        return [f"capture seq gaps ({label}): no parseable frames "
+                f"({res['unparseable']} unparseable)"]
+    exp, lost = res["expected"], res["lost"]
+    n_runs = len(res["runs"])
+    period = f"; period {res['period_s']:.2f} s" if res["period_s"] else ""
+    out = [f"capture seq gaps ({label}): lost {lost}/{exp} = "
+           f"{100 * lost / exp:.1f}%  (received {res['received']}, "
+           f"{res['gaps']} gap{'' if res['gaps'] == 1 else 's'}, "
+           f"longest {res['longest']}; "
+           f"{n_runs} codec run{'s' if n_runs > 1 else ''}{period})"]
+    head = res["first_seq"] - 1
+    if head > 0:
+        out.append(
+            f"  first frame heard at seq {res['first_seq']}: the {head} "
+            f"frame(s) numbered before it are not in the figure above (the "
+            f"camera numbers from seq 1 at start-up — an acquisition delay "
+            f"or a late capture, RS-13.1 A7); counting from seq 1: "
+            f"{lost + head}/{exp + head} = "
+            f"{100 * (lost + head) / (exp + head):.1f}%")
+    if n_runs > 1:
+        out.append(
+            "  codec runs: " + " | ".join(
+                f"{names.get(r['codec'], r['codec'])} seq "
+                f"{r['first_seq']}..{r['last_seq']} ({r['received']} rx, "
+                f"{r['lost']} lost)" for r in res["runs"])
+            + " — each codec path numbers its own frames, so nothing is "
+              "counted across a switch")
+    odd = {k: res[k] for k in ("duplicates", "jumps", "unparseable")
+           if res[k]}
+    if odd:
+        out.append("  !! " + ", ".join(f"{k} {v}" for k, v in odd.items())
+                   + " (jumps = a counter restart or a reorder; none of "
+                     "these is counted as loss)")
+    return out
+
+
+def capture_frames(path) -> tuple[list, dict]:
+    """``(ts, codec, seq)`` per payload of a ``vector_dry_run.py capture``
+    JSONL, plus the codec-name map. Imported lazily, so the archive report
+    keeps working where the base_station tree is not importable."""
+    tools = str(pathlib.Path(__file__).resolve().parent)
+    if tools not in sys.path:
+        sys.path.insert(0, tools)
+    import vector_dry_run as vdr                 # puts base_station/ on sys.path
+    from image_pipeline.frame_format import parse_tile_delta_frame
+    out = []
+    for ts, _topic, payload in vdr.iter_capture(path):
+        try:
+            frame = parse_tile_delta_frame(payload)
+        except Exception:                        # noqa: BLE001 -- counted
+            out.append((ts, None, None))
+        else:
+            out.append((ts, frame.codec, frame.base_seq))
+    return out, vdr.CODEC_NAMES
+
+
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("archive", type=pathlib.Path)
     ap.add_argument("--pre", type=pathlib.Path)
     ap.add_argument("--post", type=pathlib.Path)
-    args = ap.parse_args()
+    ap.add_argument("--capture", type=pathlib.Path,
+                    help="base-side vector_dry_run capture JSONL: adds the "
+                         "frame loss from TileDeltaFrame sequence gaps")
+    args = ap.parse_args(argv)
 
     rx = (args.archive / "rx_daemon.log").read_text(encoding="utf-8",
                                                     errors="replace")
@@ -61,10 +204,10 @@ def main() -> int:
     if sent_events and sent_events != sent_counter:
         print(f"  (tx frags_ok counter {sent_counter} is stale; using "
               f"{sent_events} fragments from per-frame TX events)")
-    rcvd = int(re.findall(r"rx_frames=(\d+)", rx)[-1])
+    rcvd = _last_int(r"rx_frames=(\d+)", rx)
     crc = rx.count("crc_dump")
-    timeouts = int(re.findall(r"reassembler_timeouts=(\d+)", rx)[-1])
-    published = int(re.findall(r"frames_published=(\d+)", rx)[-1])
+    timeouts = _last_int(r"reassembler_timeouts=(\d+)", rx)
+    published = _last_int(r"frames_published=(\d+)", rx)
 
     # 2026-09-15 (leg U): EVERY number on the loss line comes from the LAST
     # "stats:" line in the rx log. If the daemon's stats thread dies mid-leg
@@ -82,8 +225,10 @@ def main() -> int:
         why = ("the stats thread CRASHED (traceback in rx_daemon.log)"
                if stats_dead else
                "the counter line disagrees with the per-frame log events")
-        print(f"  !! STALE COUNTERS: {why} — the loss line below describes "
-              f"only the window before it stopped updating. Trust these:")
+        print(f"  !! STALE COUNTERS: {why} — the stats-line figures below "
+              f"(timeouts) describe only the window before it stopped "
+              f"updating; rx and published are floored by the log events "
+              f"(A14). Trust these:")
         if frag_log:
             print(f"     log-derived: published={pub_log}  "
                   f"fragments_arrived={frag_log}  "
@@ -92,9 +237,34 @@ def main() -> int:
         else:
             print(f"     log-derived: published={pub_log}  "
                   f"(re-run with -LogFragArrivals 1 for fragment-level loss)")
+
+    # RS-13.1 A14 (2026-10-03): even with a healthy stats thread the
+    # counters above come from the LAST periodic "stats:" line (every 10 s),
+    # so they miss whatever arrived between that line and the end of the
+    # log. On every leg of RS-13.1 round 3 that inflated the loss line
+    # (2a_yt: rx_frames=288 against 297 published -> 4.3 % printed, 1.3 %
+    # from sequence gaps). Every published frame and every logged
+    # frag_arrival is a fragment the base received, so both event counts
+    # are floors on the true rx count: the counter is used only when it is
+    # not below them. frag_arrival (-LogFragArrivals 1) is fragment-level,
+    # the same unit as `sent`; the published count is the fallback and the
+    # same number on one-fragment legs.
+    floor, floor_src = ((frag_log, "fragments from frag_arrival events")
+                        if frag_log > pub_log else
+                        (pub_log, "frames from 'published frame_id' events"))
+    if floor > rcvd:
+        print(f"  (rx rx_frames counter {rcvd} is stale; using {floor} "
+              f"{floor_src})")
+        rcvd = floor
+    published = max(published, pub_log)
     print(f"loss {sent - rcvd}/{sent} = {100 * (sent - rcvd) / sent:.1f}%   "
           f"crc_dumps={crc}  timeouts={timeouts}  published={published}"
           + ("   [STALE — see above]" if counters_stale else ""))
+    if args.capture:
+        frames, names = capture_frames(args.capture)
+        for line in format_seq_loss(seq_gap_loss(frames), args.capture.name,
+                                    names):
+            print(line)
 
     # per-index loss histogram (attribution instrument)
     idx: collections.Counter = collections.Counter()
