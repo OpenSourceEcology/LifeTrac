@@ -18,6 +18,11 @@ if [ "$($T "ls $L/step1_tractor_$TAG.jsonl 2>/dev/null | wc -l" | tr -d '\r ')" 
   stamp "ABORT: $L/step1_tractor_$TAG.jsonl already exists (would append)"; exit 2
 fi
 $T "$S docker rm -f camera_svc rs13_cap >/dev/null 2>&1" >/dev/null 2>&1
+# a fresh bench broker: a retained encode_mode_override / link_budget left by a radio
+# leg (the tractor daemon republishes the base's 0x63 commands here) would flip the
+# camera off VECTOR or onto another profile's budget (2026-10-03 ABORTED1)
+$T "$S docker rm -f bench_mqtt >/dev/null 2>&1; $S docker run -d --name bench_mqtt --network=host -v /tmp/lifetrac_strict/bench_mqtt.conf:/mosquitto/config/mosquitto.conf eclipse-mosquitto:2 >/dev/null; sleep 2" >/dev/null 2>&1
+echo -n "retained on the tractor broker (must be empty): "; $T "$S docker exec bench_mqtt timeout 2 mosquitto_sub -h 127.0.0.1 -t 'lifetrac/#' -v --retained-only 2>/dev/null | wc -l" | tr -d ''
 
 # 1. capture first (the base-station store from /work too: same tree as the encoder)
 $T "$S docker run --rm --name rs13_cap --network=host -v /tmp/lifetrac_strict:/work -w /work \

@@ -6,6 +6,7 @@
 # on the base clock. T = the base capture's first received frame (its first
 # per-frame row), so the switch lands 60 s into the flowing leg.
 set -u
+LEG=${1:-2d}                                                    # file tag: leg${LEG}_acks.txt, leg${LEG}_switch_times.txt
 export MSYS_NO_PATHCONV=1
 DC="/c/Users/dorkm/Documents/GitHub/LifeTrac/LifeTrac-v25/DESIGN-CONTROLLER"
 E="$DC/bench-evidence/RS_13_vector_scene_2026-09-26/legs"
@@ -23,14 +24,14 @@ until [ "$($B "$S docker logs rs13_cap_base 2>&1 | grep -c '^# *0 '" | tr -d '\r
 done
 stamp "T = first frame at the base capture"
 sleep 60
-{ echo -n "vector "; $B "date +%s.%N" | tr -d '\r'; } | tee -a "$E/leg2d_switch_times.txt"
-$B "$S $M mosquitto_pub -h 127.0.0.1 -t lifetrac/v25/control/encode_mode_override -r -m '{\"mode\":\"vector\",\"quality\":80}'" | tr -d '\r'
+# Stamp and publish in ONE board call: as two adb calls the return publish once started
+# 16.6 s after its stamp (2026-10-03 leg 2d_yt), which read as a 17 s switch delay.
+{ echo -n "vector "; $B "date +%s.%N; $S $M mosquitto_pub -h 127.0.0.1 -t lifetrac/v25/control/encode_mode_override -r -m '{\"mode\":\"vector\",\"quality\":80}' >/dev/null" | tr -d '\r'; } | tee -a "$E/leg${LEG}_switch_times.txt"
 stamp "published vector override (T+60)"
 sleep 120
-{ echo -n "mono_g4 "; $B "date +%s.%N" | tr -d '\r'; } | tee -a "$E/leg2d_switch_times.txt"
-$B "$S $M mosquitto_pub -h 127.0.0.1 -t lifetrac/v25/control/encode_mode_override -r -m '{\"mode\":\"mono_g4\"}'" | tr -d '\r'
+{ echo -n "mono_g4 "; $B "date +%s.%N; $S $M mosquitto_pub -h 127.0.0.1 -t lifetrac/v25/control/encode_mode_override -r -m '{\"mode\":\"mono_g4\"}' >/dev/null" | tr -d '\r'; } | tee -a "$E/leg${LEG}_switch_times.txt"
 stamp "published mono_g4 override (T+180)"
 sleep 130
-$B "$S $M sh -c 'cat /tmp/leg2d_acks.txt'" | tr -d '\r' > "$E/leg2d_acks.txt"
-stamp "acks collected: $(wc -l < "$E/leg2d_acks.txt") lines -> legs/leg2d_acks.txt"
+$B "$S $M sh -c 'cat /tmp/leg2d_acks.txt'" | tr -d '\r' > "$E/leg${LEG}_acks.txt"
+stamp "acks collected: $(wc -l < "$E/leg${LEG}_acks.txt") lines -> legs/leg${LEG}_acks.txt"
 $B "$S $M sh -c 'pkill mosquitto_sub' 2>/dev/null" >/dev/null 2>&1

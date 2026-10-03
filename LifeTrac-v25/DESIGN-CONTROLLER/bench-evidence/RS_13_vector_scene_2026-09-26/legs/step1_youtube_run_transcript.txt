@@ -1,0 +1,49 @@
+1.9 s apart: mean abs diff 16.90  pct pixels diff>25: 25.09 %
+5.0 s apart: mean abs diff 22.18  pct pixels diff>25: 31.99 %
+9.7 s apart: mean abs diff 29.74  pct pixels diff>25: 38.09 %
+mean luma 74.4
+frame -> legs/step1yt_scene.jpg
+SCENE-CHECK-OK: 10 s change 38.09 %
+21:26:06Z == step-1 pass bw250_youtube_fix (profile image_bw250, encoder from /work)
+retained on the tractor broker (must be empty): 0
+21:26:13Z capture subscribed after 1 s
+camera_svc id 73dc0cebf20e
+21:26:14Z camera_svc launched
+21:26:29Z boot-log check (+15 s):
+2026-09-20 13:31:19,438 INFO camera_service: byte_budget=203 B/frame (LIFETRAC_FRAGMENT_BUDGET, phy=image_bw250)
+2026-09-20 13:31:19,645 INFO camera_service: encode_mode -> 9 (vector) [boot]
+vector_stats lines so far: 6
+encoder module in use: /work/x8_image_pipeline/encode_vector.py True
+21:28:24Z capture finished
+21:28:28Z == capture summary (/tmp/lifetrac_strict/legs/step1_tractor_bw250_youtube_fix.txt, from '== vector dry run summary ==')
+== vector dry run summary ==
+profile image_bw250: one-fragment limit 203 B (epoch starts 202 B)
+frames: 253 total, 253 vector, 0 other, 0 unparseable; by codec {'vector': 253}
+wire bytes (vector): min 33 / p50 201 / p95 203 / max 203; over limit: 0
+epoch starts: 40 received, 40 applied
+arrival: 2.00 fps mean over 125.9 s; gap p50 0.50 s, p95 0.55 s, max 0.83 s; first applied at +0.00 s (0 frame(s) before it)
+store: applied 253, bad 0 , epoch_behind 0, orphans 0, digest 253 checked / 0 mismatched, epochs 40, handovers 39, ttl_dropped 0, resync 0, records 8909
+scene: epoch 7, level 0, badge 7, digest_ok True, horizon none, L1=18 L2=0 L3=2 L4=0, cal_rev None, anchor age 673 ms
+checks:
+  [PASS] parse_ok       0 unparseable payload(s)
+  [PASS] all_vector     0 non-vector frame(s): {'vector': 253}
+  [PASS] one_fragment   0 over 203 B (epoch starts 202 B); max 203 B
+  [PASS] store_clean    frames_bad=0 
+  [PASS] no_orphans     orphans=0
+  [PASS] digest         253 checked, 0 mismatched, scene digest_ok=True
+  [PASS] epoch_seen     40 epoch start(s) applied of 40 received
+  [PASS] first_apply    0 frame(s) before the first apply
+  [PASS] applied_ratio  253/253 applied = 100.0% (need >= 90%)
+  [PASS] min_frames     253 vector frame(s), need >= 200
+RESULT: PASS
+json report -> /work/legs/step1_tractor_bw250_youtube_fix.json
+21:28:28Z == tractor-log (/tmp/lifetrac_strict/legs/step1_tractor_log_bw250_youtube_fix.txt)
+vector_stats lines: 57
+encoder ms_total: p50 432.7 / p95 477.7 / max 491.5
+stage p50 ms: resize=0.5 l0=16.1 l1=189.0 l3=66.9 temporal_pack=153.1
+frame bytes: p50 201 / max 203
+levels seen: {'0': 57}; lines with a pending epoch start: 0
+last: epoch 7 n_live 18 residual 4946.508 detail 80 epochs 40 trigger relabel ttl_dropped 0 waiting 0
+21:28:28Z == pass bw250_youtube_fix done
+
+[exited with code 0]
