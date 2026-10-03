@@ -72,6 +72,7 @@ SKY_PURITY_BELOW = 0.3                   # ... and below it, for a usable column
 # --- L1 / L2 (§2.5, §2.6) ---------------------------------------------------
 MIN_REGION_AREA = 6                      # cells at 96×64 outside the corridor (§2.3)
 MAX_REGIONS = 40
+KMEANS_SEED = 0x5653                      # fixed k-means++ seed: the encoder is a function of its input
 POLY_EPSILON_WORK = 2.0                  # approxPolyDP ε = 1 cell of the 8 px grid
 POLY_MAX_VERTICES = 10
 PALETTE_DE_MAX = 4.0                     # ΔE76 for a palette slot (§3.3)
@@ -424,6 +425,10 @@ class Segmenter:
             init = np.argmin(d, axis=1).astype(np.int32).reshape(-1, 1)
             _, lbl, centres = cv2.kmeans(data, k, init, criteria, 1, cv2.KMEANS_USE_INITIAL_LABELS)
         else:
+            # k-means++ draws its first centres from OpenCV's process-global RNG;
+            # a fixed seed makes the encoder a function of its input, so a
+            # capture replays to the same records (bench evidence, tests).
+            cv2.setRNGSeed(KMEANS_SEED)
             _, lbl, centres = cv2.kmeans(data, k, None, criteria, 1, cv2.KMEANS_PP_CENTERS)
         lbl = lbl.reshape(-1)
         # Merge clusters whose centres are indistinguishable (ΔE76 ≤ 4): a flat

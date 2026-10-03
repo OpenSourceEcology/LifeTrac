@@ -394,6 +394,18 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(link.enc.last_stats["epoch_trigger"], "forced")
         self.assertEqual(link.enc.last_stats["epochs"], 3)
 
+    def test_encoder_is_deterministic_for_identical_input(self):
+        # The segmenter's k-means++ init is seeded, so two fresh encoders fed
+        # the same captures emit byte-identical frames (replays reproduce).
+        import cv2
+        frames = [scene(blobs=self.BLOBS, rects=self.RECTS, noise=12, seed=i) for i in range(6)]
+        outs = []
+        for trial in range(2):
+            cv2.setRNGSeed(1234 + 77 * trial)               # whatever the global RNG state was
+            enc = ev.VectorEncoder()
+            outs.append([enc.frame(img, BUDGET, seq=i) for i, img in enumerate(frames)])
+        self.assertEqual(outs[0], outs[1])
+
     # ---------------------------------------------------------------- review round 2 (C1-C7)
 
     @staticmethod
