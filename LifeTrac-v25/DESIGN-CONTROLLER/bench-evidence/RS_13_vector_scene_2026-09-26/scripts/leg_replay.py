@@ -16,9 +16,13 @@ for ts, topic, payload in v.iter_capture(f"{E}/leg{leg}_base.jsonl"):
     if prev and not st["resync"]: episodes.append((start, row.idx, row.frame_kind == 1)); start = None
     prev = st["resync"]
 if prev: episodes.append((start, None, False))
-gaps = [(i, (b - a) % 256 - 1) for i, (a, b) in enumerate(zip(seqs, seqs[1:]), start=1) if (b - a) % 256 > 1]
+# seq is a u8 per codec, and each codec keeps its own counter (a mono_g4 <-> VECTOR
+# switch restarts it), so only consecutive frames of the SAME codec are compared.
+gaps = [(i, (b - a) % 256 - 1) for i, ((a, ca), (b, cb)) in enumerate(zip(zip(seqs, codecs), zip(seqs[1:], codecs[1:])), start=1)
+        if ca == cb and (b - a) % 256 > 1]
+switches = sum(1 for ca, cb in zip(codecs, codecs[1:]) if ca != cb)
 lost = sum(g for _, g in gaps)
-print(f"leg {leg}: {len(seqs)} frames received; seq gaps (row, lost): {gaps} -> {lost} lost of {len(seqs) + lost} = {100.0 * lost / (len(seqs) + lost):.1f} % after the first received frame")
+print(f"leg {leg}: {len(seqs)} frames received; seq gaps within same-codec runs (row, lost): {gaps} -> {lost} lost of {len(seqs) + lost} = {100.0 * lost / (len(seqs) + lost):.1f} % after the first received frame ({switches} codec switch(es) not counted)")
 print(f"  resync episodes (start, end, ended by key): {episodes}")
 print(f"  all ended by an epoch start: {all(e[2] for e in episodes)}; final resync {dr.store.stats['resync']}, digest_ok {dr.store.snapshot(int(dr.last_ts * 1000) + 100)['digest_ok']}")
 print(f"  key rows ({len(keys)}): {keys[:50]}")

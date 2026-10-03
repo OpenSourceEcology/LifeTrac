@@ -564,7 +564,7 @@ was recreated and the step-1 script now recreates it itself (A12).
 | archive | | `radio_monitor_20261003_164601_ac199b1a` | `radio_monitor_20261003_163532_ac199b1a` | `radio_monitor_20261003_165432_ac199b1a` | `radio_monitor_20261003_170327_ac199b1a` | |
 | P1 | dry-run checks, loss rule | raw `RESULT: FAIL` (`no_orphans` 101, `digest` 297/60); `ttl_dropped 2, resync 3`; resync episodes rows 106→120, 199→213, 236→272, **each ended by the next epoch start**, each opened by one of the 4 lost frames; final `digest_ok True`; other 8 checks PASS | raw `RESULT: FAIL` (`no_orphans` 148, `digest` 190/47, `min_frames` 247); `ttl_dropped 3, resync 2`; episodes rows 0→28 (joined mid-epoch after acquisition) and 107→124 (the one post-lock loss), **both ended by an epoch start**; final `digest_ok True`; 190 DIGESTs in 247 frames (the round-4 rule withholds the DIGEST after a range-2 refresh while freed ids are young) | n/a (303 mono_g4) | window: `store: applied 135, bad 0, orphans 12, digest 135 checked / 1 mismatched, ttl_dropped 0, resync 0`, epoch starts 35/35; the 12 orphans and 1 BAD come from the one lost frame (row 108); final `digest_ok True` | **PASS** 2a, 2b, 2d |
 | P2 | `published frame_id` ÷ 300 | 297 → **0.99** | 245 → **0.82** (seq 58 first heard again, A7) | 302 → 1.01 | n/a (296) | 2a PASS; **2b by the letter FAIL** |
-| P3 | loss vs control | report `13/301 = 4.3%` reads a stale `rx_frames` (288 vs 297 published); **seq gaps 4 / 303 = 1.3 %** | report `67/302 = 22.2%` (stale); 57 frames before lock, then **1 / 248 = 0.4 %** after lock | report `10/302 = 3.3%` (stale); **seq gaps 1 / 304 = 0.3 %** | report `15/302 = 5.0%` (stale); seq gaps ≈ 6 / 304 ≈ 2 % (the 193/183 "gaps" are the per-codec seq counters restarting at each switch) | 2a 1.3 % > 0.3 % and 2b 18.8 % raw: **by the letter FAIL** (see A15) |
+| P3 | loss vs control | report `13/301 = 4.3%` reads a stale `rx_frames` (288 vs 297 published); **seq gaps 4 / 303 = 1.3 %** | report `67/302 = 22.2%` (stale); raw **58 / 305 = 19.0 %** = 57 frames before lock + 1 after; after lock **1 / 248 = 0.4 %** | report `10/302 = 3.3%` (stale); **seq gaps 1 / 304 = 0.3 %** | report `15/302 = 5.0%` (stale); seq gaps within same-codec runs **6 / 304 = 2.0 %** (the 193/183 "gaps" across the two switches are the per-codec seq counters restarting, not loss) | 2a 1.3 % > 0.3 % and 2b 19.0 % raw (acquisition 57 + 1 post-lock): **by the letter FAIL** (see A7, A15) |
 | P4 | max K, `-TxBatch 0` | K=1 301, K≥2 0, ABORTED 0, **max 1** | 302 / 0 / 0, **max 1** | (302 / 0 / 0, max 1) | 302 / 0 / 0, **max 1**; every VECTOR frame within its limit (the one `over limit` row is #254, a **mono_g4** key frame at 243 B vs 242) | **PASS** |
 | P5 | gaps > 3 s | n/a (`gaps>3s=0`, max 2.1 s) | `n_frag=245 span=245s max_gap=2.0s gaps>3s=0` | n/a (`gaps>3s=0`) | n/a (`gaps>3s=0`) | **PASS** |
 | P6 | switch | n/a | n/a | n/a | vector ack **+1.55 s** `{"requested": 9, "effective": 9, "effective_name": "vector", "clamped": false, "codec": 6, "quality": 80, "source": "lora_cmd"}`; first codec-6 **+2.68 s** (seq 1, 242 B, K=1); return: command on air 22:01:39.344 (base log), ack **+0.64 s** later `{"requested": 6, "effective": 6, "effective_name": "mono_g4", "clamped": false, "codec": 1, "quality": 55, "source": "lora_cmd"}`, codec-1 resumed +0.55 s after on-air — the script's stamp was 16.6 s early (A13); runs 62 × codec-1, 135 × codec-6, 101 × codec-1 | **PASS** |
@@ -575,6 +575,14 @@ Parks: `PARK_OK` × 2 after every leg except 2b_yt, where the base read
 `PARK_TRANSIENT` (`opmode_after_settle 0x85`: its scan was still walking);
 re-parked 75 s later `PARK_OK` (`legs/leg2b_yt_park.txt`). End of round:
 both `RADIO_STATE 0x80 SLEEP`, no UART holder (`legs/session_end_park_2026-10-03.txt`).
+
+P1 under the stricter reading (review of #139): every mismatch run in every
+leg of both rounds starts at a recorded sequence gap (a lost frame) or at the
+base joining mid-epoch after FHSS acquisition, and recovers by the end
+(final `digest_ok True`) — round 3: 2a's three runs open at its 4 lost frames,
+2b's at the join and at its one post-lock loss, 2d's single BAD at its lost
+frame; round 2 likewise (`scripts/leg_replay.py`). No mismatch occurred
+without a preceding loss, so the verdicts hold.
 
 **Round 3 verdict:** the VECTOR-specific rows (P1 by the loss rule, P4, P5,
 P6, P7, P8) pass on every leg on real footage with the final encoder. The
@@ -593,9 +601,14 @@ Round-3 anomalies:
   transmissions; `fhss_dec_snapped` +1, `fhss_dec_aligned` +246), so it is
   not the acquisition delay, but the RS-12.15 clock-authority protection is
   inactive at 1 fps on FHSS — a leg carrying base commands would be exposed
-  to the lock-loss mechanism it fixed. Firmware matter (no flashing this
-  campaign); options: `<=` in the gap test, a gap of 1.5 × the cadence, or
-  2 fps once A4 is done.
+  to the lock-loss mechanism it fixed. The strict `< 1000 ms` chain test is
+  deliberate (`sx1276_fhss_authority.h:38-42`, PR #125 review round 3): the
+  RS-12.14 gate admits commands at ≥ 1.0 s, and a command sender must never
+  chain into authority — by timing alone a 1 fps image stream is
+  indistinguishable from it, so `<=` or a wider gap would undo that
+  discriminator. Options that keep it: fly at 2 fps once A4 is done (500 ms
+  gaps chain), or an explicit stream discriminator (only image-stream
+  transmissions count toward the streak) before any change to the gap.
 - **A7 (update) — the FHSS acquisition point is deterministic.** Both 2b
   flights (2026-09-27 synthetic page, 2026-10-03 video) heard their first
   frame at **seq 58** after the harness's resets — a fixed meeting point of

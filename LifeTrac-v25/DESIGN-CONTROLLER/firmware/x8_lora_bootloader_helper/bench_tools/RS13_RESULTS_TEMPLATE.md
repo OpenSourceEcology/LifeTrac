@@ -105,7 +105,7 @@ of each base capture):
 
 - [ ] codec-6 TileDeltaFrame over the strict path as a single 0xFE fragment, profile 2 and profile 1
 - [ ] epoch start (K = 1) as the first frame: anchor + LAYER_CLEAR in one frame, F−1 body
-- [ ] CONFIRM / DIGEST carousel over 5 min (digest checks > 0; mismatches recorded — resync 0, or each resync ended by the next epoch start)
+- [ ] CONFIRM / DIGEST carousel over 5 min: digest checks > 0 and **zero mismatches unless each mismatch run starts at a recorded frame loss** (a sequence gap in the base capture, `scripts/leg_replay.py`) or at the base joining mid-epoch, and every run recovers (final `digest_ok True`). A mismatch with no loss before it is an encoder/store defect even if a later epoch start ends the resync (RS-13.1 A1 would have passed the bare loss rule on bw250)
 - [ ] 0x63 mode switch into and out of VECTOR; the ack's quality byte reports the dial of the acked mode
 - [ ] base `link_stats` codec reporting for codec 6
 - [ ] 0xFD copies path for an epoch start (`LIFETRAC_KEYFRAME_COPIES` > 1 or the tx daemon's auto-copies) — <not exercised | exercised by accident, see Anomalies>
