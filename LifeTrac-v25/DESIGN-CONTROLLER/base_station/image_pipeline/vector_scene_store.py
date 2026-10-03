@@ -39,7 +39,7 @@ HANDOVER_DIGEST_TIMEOUT_FRAMES = 2  # only the DIGEST half of the hand-over time
 RESYNC_ORPHAN_WINDOW_MS = 10_000
 RESYNC_ORPHAN_RATIO = 0.20
 RESYNC_ORPHAN_MIN_ITEMS = 8         # a ratio over fewer records is noise, not desync
-RESYNC_DIGEST_RUN = 3
+RESYNC_DIGEST_RUN = 3               # consecutive DIGEST mismatches enter a resync, matches end it (§4.3)
 ZOOM_DROP_RATIO = 2.0               # r'/r above this is dropped as PREDICTED (§4.4)
 BADGE_CACHED, BADGE_PREDICTED, BADGE_VECTOR = 1, 4, 7
 MIN_OBJECT_PLACEHOLDER = "n/a (no calibration)"
@@ -245,7 +245,7 @@ class VectorSceneStore:
         self._st = {k: 0 for k in ("frames_rx", "frames_bad", "frames_applied", "epoch_behind",
                                    "orphans", "digest_checks", "digest_mismatch", "bad_version",
                                    "epochs", "handovers", "ttl_dropped", "resync_events",
-                                   "records_applied")}
+                                   "resync_digest_ends", "records_applied")}
         self._epoch_reset()
 
     def _epoch_reset(self) -> None:
@@ -260,7 +260,8 @@ class VectorSceneStore:
         self._epoch_clear: int | None = None    # the epoch start's LAYER_CLEAR range
         self._digest_ok: bool | None = None
         self._digest_n_live: int | None = None
-        self._digest_run = 0
+        self._digest_run = 0                    # consecutive mismatching DIGESTs
+        self._digest_ok_run = 0                 # consecutive matching DIGESTs since the resync began
         self._frames_in_epoch = 0
         self._orphan_win: deque = deque()       # (rx_ms, items, orphans) per applied frame
 
@@ -308,7 +309,7 @@ class VectorSceneStore:
         if switched:
             self._switch_epoch(hdr.epoch)
         if hdr.key:
-            self._resync = False                    # an accepted epoch start ends a resync (§4.3)
+            self._end_resync()                      # an accepted epoch start ends a resync (§4.3)
         self._apply_frame(frame, clk, rx_ms, len(body) * 8)
         return IngestResult(True, None, switched, len(frame.records))
 
@@ -479,7 +480,17 @@ class VectorSceneStore:
     def _enter_resync(self) -> None:
         if not self._resync:
             self._resync = True
+            self._digest_ok_run = 0                 # the exit needs a fresh run of matches
             self._st["resync_events"] += 1
+
+    def _end_resync(self) -> None:
+        """Leave a resync (§4.3): on an accepted epoch start, or after
+        RESYNC_DIGEST_RUN consecutive matching DIGESTs. The orphans that
+        led here describe the state just repaired, so the 10 s window
+        starts afresh; otherwise the >20 % rule would re-enter at once."""
+        if self._resync:
+            self._resync = False
+            self._orphan_win.clear()
 
     def _verify(self, sh: _Shape, clk: tuple[int, bool]) -> None:
         if _wins(clk, sh.verified):
@@ -648,7 +659,7 @@ class VectorSceneStore:
             # The new epoch's anchor is the epoch start as far as the store can
             # see it (the key frame or its repeat-once copy): it ends a resync
             # and fixes the membership of shapes defined before it arrived.
-            self._resync = False
+            self._end_resync()
             for sh in self._shapes.values():
                 if sh.group is None:
                     sh.group = self._membership(sh)
@@ -666,8 +677,19 @@ class VectorSceneStore:
         ok = self._digest() == rec.crc and rec.n_live == len(self._live())
         self._digest_ok = ok
         if ok:
+            # RESYNC_DIGEST_RUN matches in a row (crc and n_live) show the
+            # carousel has repaired the live set, so the resync ends without
+            # waiting for the next epoch start, and this frame's CONFIRMs
+            # count again (§4.3). The run is the same hysteresis as the way
+            # in; it debounces a passing match, not the crc's 1-in-256: on a
+            # static scene a collision repeats, which the epoch start mends.
             self._digest_run = 0
+            self._digest_ok_run += 1
+            if self._resync and self._digest_ok_run >= RESYNC_DIGEST_RUN:
+                self._end_resync()
+                self._st["resync_digest_ends"] += 1
             return
+        self._digest_ok_run = 0
         self._digest_run += 1
         self._st["digest_mismatch"] += 1
         if self._digest_run >= RESYNC_DIGEST_RUN:

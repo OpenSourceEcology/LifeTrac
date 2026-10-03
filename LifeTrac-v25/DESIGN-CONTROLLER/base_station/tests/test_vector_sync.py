@@ -91,13 +91,17 @@ class Link:
         self.seq = 0
         self.frames: list = []
 
-    def step(self, img, *, lose: bool = False, budget: int = BUDGET, **kw):
+    def step(self, img, *, lose=False, budget: int = BUDGET, **kw):
+        """``lose`` is a bool, or a predicate on the decoded frame (lose the
+        frames that carry a given record, say)."""
         self.seq += 1
         self.rx += PERIOD_MS
         payload = self.enc.frame(img, budget, seq=self.seq, **kw)
         frame = parse_tile_delta_frame(payload)
         assert frame.codec == CODEC_VECTOR
         decoded = vs.decode_frame(frame.vector_body, frame.frame_kind)
+        if callable(lose):
+            lose = lose(decoded)
         if not lose:
             res = self.store.ingest(frame.vector_body, frame.frame_kind, self.rx, 0.0)
             assert res.applied, res
@@ -582,11 +586,15 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(*link.ttl_clocks())
 
     def test_refresh_recovers_a_busy_scene_after_a_lost_frame(self):
-        # C1: 31 masses, one lost UPD → resync at the base; its CONFIRMs stop
-        # verifying and the carousel cannot revisit every shape within the
-        # TTL, so the base drops shapes. The safety refresh must re-state
-        # every kept shape before any CONFIRM or DIGEST names it, and both
-        # ends must be in step within a few frames — no orphans on the key.
+        # C1: 31 masses, one lost UPD, and every re-send that would repair it
+        # is lost too → the DIGEST mismatches on, the base sits in resync,
+        # its CONFIRMs stop verifying and the carousel cannot revisit every
+        # shape within the TTL, so the base drops shapes. (A carousel visit
+        # that lands repairs the lost UPD and ends the resync by itself:
+        # test_lost_upd_resync_ends_when_the_carousel_repairs_it.) The safety
+        # refresh must re-state every kept shape before any CONFIRM or DIGEST
+        # names it, and both ends must be in step within a few frames — no
+        # orphans on the key.
         t = [1000.0]
         link = Link(clock=lambda: t[0])
         rects = self.grid31()
@@ -598,13 +606,19 @@ class SyncTests(unittest.TestCase):
         lost = link.step(scene(y0=8.0, rects=moved), lose=True)
         t[0] += 0.5
         self.assertEqual(len(records_of(lost, vs.Upd)), 1, lost.records)
+        xid = records_of(lost, vs.Upd)[0].id
+
+        def repair_lost(frame):                                        # the re-sends of xid never land
+            return any(isinstance(r, (vs.Poly, vs.Upd)) and r.id == xid for r in frame.records)
         for _ in range(3):
-            link.step(scene(y0=8.0, rects=moved))
+            link.step(scene(y0=8.0, rects=moved), lose=repair_lost)
             t[0] += 0.5
         self.assertTrue(link.store.stats["resync"])
         for _ in range(TTL_FRAMES + 4):                                # the base drops shapes meanwhile
-            link.step(scene(y0=8.0, rects=moved))
+            link.step(scene(y0=8.0, rects=moved), lose=repair_lost)
             t[0] += 0.5
+        self.assertTrue(link.store.stats["resync"])
+        self.assertEqual(link.store.stats["resync_digest_ends"], 0)
         self.assertGreater(link.store.stats["ttl_dropped"], 0)
         self.assertEqual(link.enc.last_stats["ttl_dropped"], 0)
         orphans_before = link.store.stats["orphans"]
@@ -900,7 +914,7 @@ class SyncTests(unittest.TestCase):
         # C1: the base missed a DEL and still holds the ghost for its own 20
         # applied frames. The first DIGEST after the refresh must not name
         # the live set without it, or three mismatches put a healthy base
-        # into resync for the rest of the epoch.
+        # into resync (until the ghost expires and three DIGESTs match).
         for budget in (80, 203):
             with self.subTest(f"{budget} B"):
                 t = [1000.0]
@@ -954,13 +968,18 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(recs[recs.index(polys[0]) + 1], vs.Upd(xid, 0, 0), recs)
         self.assertEqual(link.store._shapes[xid].off, (0, 0))
         # The ghost's 20 frames of mismatching DIGESTs put the base into
-        # resync, which only the next epoch start ends (§4.3); what the
-        # re-use must get right is the state: every DIGEST from here matches.
+        # resync; what the re-use must get right is the state: every DIGEST
+        # from here matches, so three of them end the resync (§4.3) and the
+        # next CONFIRMs bring the base's TTL clocks back to the mirror's (in
+        # resync it refuses CONFIRMs, so its clocks ran ahead meanwhile).
         for _ in range(3):
             link.step(scene(y0=8.0, rects=rects))
             self.assertTrue(link.in_step()[0])
-        # (No TTL-clock equality here: in resync the base refuses CONFIRMs by
-        # design, so its clocks run ahead of the mirror until the epoch start.)
+        self.assertFalse(link.store.stats["resync"])
+        self.assertGreaterEqual(link.store.stats["resync_digest_ends"], 1)
+        link.step(scene(y0=8.0, rects=rects))
+        self.assertEqual(link.in_step()[:2], (True, False))
+        self.assertEqual(*link.ttl_clocks())
 
     def test_on_off_newcomer_does_not_rotate_evictions(self):
         # C6: a newcomer present two frames in four evicts the weakest holder,
@@ -982,6 +1001,92 @@ class SyncTests(unittest.TestCase):
         self.assertLessEqual(len(dels), 1 + 60 // (TTL_FRAMES + 4), f"evictions rotated: {dels}")
         self.assertEqual(len(dels), len(set(dels)), f"a holder was evicted twice: {dels}")
         self.assertEqual(link.enc.last_stats["epochs"], 1)
+
+    # ---------------------------------------------------------------- the resync ends on a DIGEST run (§4.3)
+
+    def test_lost_upd_resync_ends_when_the_carousel_repairs_it(self):
+        # One lost UPD on a 31-mass grid: three mismatching DIGESTs put the
+        # base into resync; the carousel's next visit re-sends the define
+        # with its UPD and the DIGEST matches again; three matches end the
+        # resync with no epoch start, and the CONFIRMs verify again. When
+        # only the next epoch start ended a resync, the base sat in it with
+        # the DIGEST matching again from frame 4, refusing CONFIRMs, and from
+        # frame 20 TTL-dropped 2 masses every 4 frames (12 by frame 40,
+        # orphans 3 → 33) while the tractor dropped none.
+        t = [1000.0]
+        link = Link(clock=lambda: t[0])
+        rects = self.grid31()
+        for _ in range(3):
+            link.step(scene(y0=8.0, rects=rects))
+            t[0] += 0.5
+        moved = rects[:]
+        moved[0] = (rects[0][0] + 3, rects[0][1], rects[0][2] + 3, rects[0][3], RED)
+        lost = link.step(scene(y0=8.0, rects=moved), lose=True)
+        t[0] += 0.5
+        self.assertEqual(len(records_of(lost, vs.Upd)), 1, lost.records)
+        entered = ended = None
+        for i in range(1, 13):
+            frame = link.step(scene(y0=8.0, rects=moved))
+            t[0] += 0.5
+            self.assertFalse(frame.header.key, f"frame {i}")
+            if link.store.stats["resync"]:
+                entered = entered or i
+            elif entered:
+                ended = i
+                break
+        self.assertIsNotNone(entered, "the lost UPD never put the base into resync")
+        self.assertIsNotNone(ended, "the repaired base stayed in resync")
+        self.assertLessEqual(ended - entered, 3 + 3, "more than a carousel period plus 3 DIGESTs")
+        st = link.store.stats
+        self.assertEqual((st["resync_events"], st["resync_digest_ends"]), (1, 1))
+        self.assertEqual(link.enc.last_stats["epochs"], 1)                         # no epoch start
+        self.assertEqual(*link.ttl_clocks())                                       # the CONFIRMs count again
+        orphans = st["orphans"]
+        for i in range(2 * TTL_FRAMES):                                            # no TTL cascade, no re-entry
+            link.step(scene(y0=8.0, rects=moved))
+            t[0] += 0.5
+            self.assertEqual(link.in_step(), (True, False, orphans, 0), f"post {i + 1}")
+            self.assertEqual(*link.ttl_clocks(), f"post {i + 1}")
+        self.assertEqual(link.enc.last_stats["ttl_dropped"], 0)
+        self.assertEqual(link.store.stats["resync_events"], 1)
+
+    def test_a_stale_base_stays_in_resync_until_the_epoch_start(self):
+        # The DIGEST run ends a resync only when the base really holds the
+        # mirror again. Make the base stale in a way no re-send repairs:
+        # shift its copy of a shape the tractor never moved, so no re-send
+        # carries an UPD and a same-hash define keeps the base's offset
+        # (§3.4 rule 5). Every DIGEST mismatches, the base stays in resync
+        # through 2 × TTL frames of carousel visits, and only the tractor's
+        # next epoch start (forced here, range 0) ends it.
+        t = [1000.0]
+        link = Link(clock=lambda: t[0])
+        img = scene(blobs=self.BLOBS, rects=self.RECTS)
+        for _ in range(3):
+            link.step(img)
+            t[0] += 0.5
+        self.assertEqual(link.in_step()[:2], (True, False))
+        victim = next(sh for sh in link.enc._shapes.values() if not sh.ever_upd and sh.id in vs.ID_MASS)
+        link.store._shapes[victim.id].off = (2, 0)
+        for i in range(1, 2 * TTL_FRAMES + 1):
+            frame = link.step(img)
+            t[0] += 0.5
+            self.assertFalse(frame.header.key, f"frame {i}")
+            ok, resync = link.in_step()[:2]
+            self.assertFalse(ok, f"frame {i}: the stale offset was repaired")
+            if i >= 3:
+                self.assertTrue(resync, f"frame {i}")
+        self.assertEqual(link.store.stats["resync_digest_ends"], 0)
+        self.assertEqual(link.store._shapes[victim.id].off, (2, 0))
+        link.enc.force_epoch()
+        key = link.step(img)
+        t[0] += 0.5
+        self.assertTrue(key.header.key)
+        self.assertFalse(link.store.stats["resync"])                               # the epoch start ended it
+        for _ in range(3):
+            link.step(img)
+            t[0] += 0.5
+        self.assertEqual(link.in_step()[:2], (True, False))
+        self.assertEqual(link.store.stats["resync_digest_ends"], 0)
 
 
 if __name__ == "__main__":

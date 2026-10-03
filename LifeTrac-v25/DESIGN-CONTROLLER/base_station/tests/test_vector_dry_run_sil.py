@@ -176,8 +176,9 @@ class ReplayTests(unittest.TestCase):
         self.assertTrue(vdr.format_row(rows[2]).endswith(" RESYNC"))
         self.assertNotIn("RESYNC", vdr.format_row(rows[4]))           # the epoch start ended it
         s = dr.summary()
-        self.assertEqual([(e["start"], e["end"], e["frames"]) for e in s["resync_episodes"]], [(2, 4, 2)])
-        self.assertIn("resync: 1 episode(s), 2 frame(s): #2-#4 (2, 1.5 s)", vdr.format_summary(s))
+        self.assertEqual([(e["start"], e["end"], e["frames"], e["ended_by"]) for e in s["resync_episodes"]],
+                         [(2, 4, 2, "epoch start")])
+        self.assertIn("resync: 1 episode(s), 2 frame(s): #2-#4 (2, 1.5 s, epoch start)", vdr.format_summary(s))
         json.dumps(s)
         # still in resync when the capture ends
         dr = vdr.DryRun()
@@ -188,6 +189,23 @@ class ReplayTests(unittest.TestCase):
         self.assertEqual([(e["start"], e["end"], e["frames"]) for e in s["resync_episodes"]], [(2, None, 2)])
         self.assertIn("#2-end (2)", vdr.format_summary(s))
         self.assertIn("resync: none", vdr.format_summary(vdr.DryRun().summary()))
+
+    def test_an_episode_ended_by_a_digest_run_is_labelled(self) -> None:
+        from tests.test_vector_scene_store import ABS, digest, shash, tri
+        good = digest([(1, vs.define_hash(tri(1)), shash(tri(1)))])
+        bad = vs.Digest(1, (good.crc + 1) & 0xFF)
+        bodies = [(True, [ABS, vs.LayerClear(0), tri(1)])] + [(False, [bad])] * 3 + [(False, [good])] * 3
+        dr = vdr.DryRun()
+        rows = [dr.feed(_wire(vs.encode_frame(vs.Header(k, 0, 1), recs, 196), k, i + 1), 1000.0 + 0.5 * i)
+                for i, (k, recs) in enumerate(bodies)]
+        self.assertEqual([r.resync for r in rows], [False, False, False, True, True, True, False])
+        self.assertEqual([r.resync_digest_end for r in rows], [False] * 6 + [True])
+        s = dr.summary()
+        self.assertEqual([(e["start"], e["end"], e["frames"], e["ended_by"]) for e in s["resync_episodes"]],
+                         [(3, 6, 3, "digest")])
+        text = vdr.format_summary(s)
+        self.assertIn("resync 1 (1 ended by DIGEST)", text)
+        self.assertIn("#3-#6 (3, 1.5 s, digest)", text)
 
     def test_rejected_first_frame_fails_first_apply_and_store_clean(self) -> None:
         dr = vdr.DryRun()
