@@ -431,15 +431,37 @@ class VectorSceneStore:
         self._check_handover()
 
     def _tick_ttl(self) -> None:
-        for shapes in (self._shapes, self._cached):
-            for id_ in list(shapes):
-                sh = shapes[id_]
-                if id_ in self._verified_now and sh.frames_since_verify == 0:
-                    continue
-                sh.frames_since_verify += 1
-                if sh.frames_since_verify >= TTL_FRAMES:
-                    del shapes[id_]
-                    self._st["ttl_dropped"] += 1
+        """Age every live shape by one applied frame; drop it at TTL_FRAMES (§4.3).
+
+        The clock runs on the live set the DIGEST covers (``_live``), one
+        shape per id like the encoder's mirror: the epoch's own shapes, and
+        the cached originals that carry over and have no copy yet. During a
+        pending hand-over a cached original whose id already has a copy in
+        ``_shapes`` is superseded by it — the copy carries the clock — so it
+        is neither aged nor dropped nor counted on its own, and when the copy
+        expires the original goes with it (one drop), or the hand-over would
+        carry a dead shape back in. A cached original outside the epoch
+        start's LAYER_CLEAR range is only shown until the hand-over discards
+        it; it is cleared, not expired."""
+        for id_ in list(self._shapes):
+            sh = self._shapes[id_]
+            if self._tick(sh):
+                del self._shapes[id_]
+                self._cached.pop(id_, None)
+                self._st["ttl_dropped"] += 1
+        for id_ in list(self._cached):
+            if id_ in self._shapes or not self._carriable(id_):
+                continue
+            if self._tick(self._cached[id_]):
+                del self._cached[id_]
+                self._st["ttl_dropped"] += 1
+
+    def _tick(self, sh: _Shape) -> bool:
+        """One applied frame for ``sh``; True when it reaches the TTL."""
+        if sh.id in self._verified_now and sh.frames_since_verify == 0:
+            return False
+        sh.frames_since_verify += 1
+        return sh.frames_since_verify >= TTL_FRAMES
 
     def _orphan(self, n: int = 1) -> None:
         self._frame_orphans += n

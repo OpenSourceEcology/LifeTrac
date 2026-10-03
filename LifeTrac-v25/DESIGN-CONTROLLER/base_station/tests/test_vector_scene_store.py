@@ -654,6 +654,59 @@ class TtlTests(StoreCase):
         self.feed([], epoch=0)
         self.assertEqual(set(self.shapes()), set())
 
+    # During a pending hand-over (the epoch start was lost, so no anchor yet)
+    # a define of a carried id makes the new epoch's copy, and the copy
+    # carries the TTL clock. The superseded cached original used to age as
+    # well: it expired although its copy was verified every frame, counted
+    # a TTL drop the encoder's mirror never made, and emptied the CACHED
+    # picture into a hand-over that had not happened.
+
+    def test_a_cached_original_with_a_copy_is_not_aged_or_counted_on_its_own(self):
+        self.feed(key() + [tri(1), tri(2, y=20)], epoch=0, key_=True)
+        self.feed([], epoch=0)                                       # both ages at 1 when the epoch ends
+        for _ in range(TTL_FRAMES + 2):
+            self.feed([tri(1)], epoch=1)                             # 1 re-sent every frame, 2 silent
+        st, s = self.st.stats, self.snap()
+        self.assertEqual(st["ttl_dropped"], 1)                       # 2 only (was 2: 1's original too)
+        self.assertTrue(s["handover"])                               # the anchor half never times out (was False)
+        self.assertEqual(st["cached_shapes"], 1)                     # was 0
+        self.assertEqual(set(self.shapes_of(s)), {1})
+        self.assertEqual(self.shapes_of(s)[1]["badge"], BADGE_CACHED)
+        self.assertEqual([sh.id for sh in self.st._live()], [1])     # what the DIGEST covers: one shape per id
+        self.feed(key(3) + [digest([(1, vs.define_hash(tri(1)), shash(tri(1)))])], epoch=1)
+        self.assertFalse(self.snap()["handover"])
+        self.assertEqual(set(self.shapes()), {1})
+        self.assertTrue(self.snap()["digest_ok"])
+        self.assertEqual(self.st.stats["ttl_dropped"], 1)
+
+    def test_a_copy_that_expires_takes_its_cached_original_with_it_once(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True)
+        self.feed([], epoch=0)
+        self.feed([tri(1)], epoch=1)                                 # the copy; hand-over pending
+        for _ in range(TTL_FRAMES - 1):
+            self.feed([], epoch=1)
+        self.assertEqual(self.st.stats["ttl_dropped"], 0)            # (the original used to expire here, counted)
+        self.assertEqual(set(self.shapes()), {1})                    # still in the CACHED picture
+        self.feed([], epoch=1)                                       # the copy's 20th unverified frame
+        self.assertEqual(self.st.stats["ttl_dropped"], 1)            # one drop (was 2)
+        self.assertEqual((self.st.stats["shapes"], self.st.stats["cached_shapes"]), (0, 0))
+        self.feed(key(3) + [digest([])], epoch=1)                    # the anchor: nothing to carry back in
+        self.assertEqual(set(self.shapes()), set())
+        self.assertTrue(self.snap()["digest_ok"])
+
+    def test_a_cached_original_outside_the_clear_range_is_cleared_not_expired(self):
+        self.feed(key() + [tri(1), vs.Edge(56, 2, ((0, 20), (2, 26)))], epoch=0, key_=True)
+        for _ in range(TTL_FRAMES - 2):
+            self.feed([vs.Confirm(1, (shash(tri(1)) & 3,))], epoch=0)  # 56 nears its TTL, 1 stays verified
+        self.feed([vs.LayerClear(1), tri(1)], epoch=1)               # the range arrives before the anchor
+        for _ in range(3):
+            self.feed([tri(1)], epoch=1)
+        self.assertEqual(self.st.stats["ttl_dropped"], 0)            # 56 is cleared at the hand-over, not expired
+        self.assertIn(56, self.shapes())                             # shown CACHED until then
+        self.feed([ABS, digest([(1, vs.define_hash(tri(1)), shash(tri(1)))])], epoch=1)
+        self.assertEqual(set(self.shapes()), {1})
+        self.assertEqual(self.st.stats["ttl_dropped"], 0)
+
 
 # ---------------------------------------------------------------- HOLE slots (§3.3)
 
