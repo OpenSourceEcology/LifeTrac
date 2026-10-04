@@ -53,8 +53,14 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
   `hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44` for probes,
   `lifetrac-tractor-x8:latest` for the camera feed (it ships `/usr/bin/ffmpeg`;
   the host has none — a wiped `/tmp/ffmpeg` does not matter).
-* Old RS-12.10 firmware is byte-reproducible: `mingw32-make bench` on `main`
-  → `e8ad8424`. Keep it staged for A/Bs.
+* Bench firmware is byte-reproducible.
+  - `mingw32-make bench` on `main` gives `0c1bb0a9` (re-checked 2026-10-04).
+    That is the RS-12.15 v2 build on both boards since 09-15.
+  - The old RS-12.10 build `e8ad8424` comes from `main` `3a0cb524` (`e02ab86e`).
+  - Copies of these and of the other surviving bench builds (`5a160e4a`,
+    `8c112e6f`) are in `bench-evidence/RS_13_vector_scene_2026-09-26/firmware/`,
+    along with the inventory of every flashed build.
+  - Stage `e8ad8424` for A/Bs against the pre-clock-authority firmware.
 
 ## Prep — every session, and again after every flash
 
