@@ -18,6 +18,11 @@ from typing import Union
 VS_VERSION = 0
 HEADER_BITS = 13
 CODEC_VECTOR = 6            # TileDeltaFrame codec byte for a VS body
+# Shape TTL (§4.3): applied frames without a verifying define, UPD or CONFIRM
+# before the base drops the shape. Shared here because the tractor's mirror
+# must expire a shape on exactly the same count, or its DIGEST names a shape
+# the base no longer holds (RS-13.1 anomaly A1).
+TTL_FRAMES = 20
 
 # Static palette slots 0–7 (RGB444), §3.3. Slots 8–15 are set by PAL.
 STATIC_PALETTE = (0x6BE, 0xBBC, 0x252, 0x693, 0xDB6, 0x753, 0x223, 0xFFF)

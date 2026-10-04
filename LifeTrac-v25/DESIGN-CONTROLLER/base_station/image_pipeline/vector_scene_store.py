@@ -32,7 +32,7 @@ from .vector_scene import codec as vs
 CANVAS_W, CANVAS_H = 384, 256
 SATURATED_AGE = 15                  # AAAA = 15: >= 3.0 s, a bound (§3.2)
 SATURATED_AGE_MS = 3000
-TTL_FRAMES = 20                     # applied frames without a verification (§4.3)
+TTL_FRAMES = vs.TTL_FRAMES          # applied frames without a verification (§4.3); the encoder mirrors it
 EPOCH_OUTAGE_MS = 3000              # §3.5 rule 4
 BEHIND_SELF_HEAL = 3                # §3.5 rule 5
 HANDOVER_DIGEST_TIMEOUT_FRAMES = 2  # only the DIGEST half of the hand-over times out (§3.5)
@@ -638,7 +638,10 @@ class VectorSceneStore:
     def _check_digest(self, rec: vs.Digest) -> None:
         self._st["digest_checks"] += 1
         self._digest_n_live = rec.n_live
-        ok = self._digest() == rec.crc
+        # The crc8 alone passes a wrong live set 1 in 256 times; the record's
+        # n_live is the same mirror's size, so a count that differs is a
+        # mismatch whatever the crc says (RS-13.1 anomaly A1d).
+        ok = self._digest() == rec.crc and rec.n_live == len(self._live())
         self._digest_ok = ok
         if ok:
             self._digest_run = 0

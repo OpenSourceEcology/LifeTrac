@@ -214,16 +214,25 @@ class TractorLogTests(unittest.TestCase):
         spec.loader.exec_module(cls.cs)  # type: ignore[union-attr]
 
     def test_camera_service_line_round_trips(self) -> None:
+        # ``detail`` on the line is the dial camera_service holds, not the
+        # encoder's 0..1 band position (which ``%d`` printed as 0, RS-13.1 A5).
         st = {"ms": {"resize": 3.14159, "l0": 8.0, "l1": 20.49, "total": 41.26},
-              "frame_bytes": 203, "level": 0, "detail": 80, "epoch": 3, "n_live": 17,
-              "residual": 0.0312, "epoch_pending": False}
-        with self.assertLogs(self.cs.LOG, level="INFO") as cm:
-            self.cs._log_vector_stats(st)
+              "frame_bytes": 203, "level": 0, "detail": 0.5, "epoch": 3, "n_live": 17,
+              "residual": 0.0312, "epoch_pending": False, "epochs": 4, "epoch_trigger": None,
+              "last_epoch_trigger": "safety", "ttl_dropped": 1, "waiting": 2}
+        saved = self.cs.VECTOR_DETAIL
+        self.cs.VECTOR_DETAIL = 80
+        try:
+            with self.assertLogs(self.cs.LOG, level="INFO") as cm:
+                self.cs._log_vector_stats(st)
+        finally:
+            self.cs.VECTOR_DETAIL = saved
         line = cm.output[-1]
         d = vdr.parse_vector_stats_line(line)
         self.assertIsNotNone(d)
         self.assertEqual((d["bytes"], d["level"], d["detail"], d["epoch"], d["n_live"]),
                          (203, 0, 80, 3, 17))
+        self.assertEqual((d["epochs"], d["trigger"], d["ttl_dropped"], d["waiting"]), (4, "safety", 1, 2))
         self.assertEqual(d["ms"]["resize"], 3.1)
         self.assertEqual(d["ms_total"], 41.3)
         self.assertEqual(d["residual"], 0.031)
@@ -235,6 +244,7 @@ class TractorLogTests(unittest.TestCase):
         self.assertEqual(summ["levels"], {"0": 2})
         self.assertEqual(summ["epoch_pending_lines"], 0)
         self.assertIn("ms_total: p50 41.3 / p95 55.0", vdr.format_tractor_summary(summ))
+        self.assertIn("epochs 4 trigger safety ttl_dropped 1 waiting 2", vdr.format_tractor_summary(summ))
         self.assertIn("no vector_stats lines", vdr.format_tractor_summary(vdr.summarise_tractor_log([])))
 
     def test_empty_stats_log_nothing(self) -> None:

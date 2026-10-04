@@ -417,7 +417,8 @@ def format_tractor_summary(d: dict) -> str:
         f"frame bytes: p50 {d['bytes']['p50']:.0f} / max {d['bytes']['max']}",
         f"levels seen: {d['levels']}; lines with a pending epoch start: {d['epoch_pending_lines']}",
         f"last: epoch {last.get('epoch')} n_live {last.get('n_live')} residual {last.get('residual')} "
-        f"detail {last.get('detail')}",
+        f"detail {last.get('detail')} epochs {last.get('epochs', 'n/a')} trigger {last.get('trigger', 'n/a')} "
+        f"ttl_dropped {last.get('ttl_dropped', 'n/a')} waiting {last.get('waiting', 'n/a')}",
     ])
 
 
