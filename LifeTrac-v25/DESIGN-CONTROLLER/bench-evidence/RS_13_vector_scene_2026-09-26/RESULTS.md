@@ -55,6 +55,11 @@ the counters in the brackets are attributable.
 | base 2D0A1209DABC240B | as left by the RS-12.15 campaign: the **bench (register-write diag) build** of that family. On every DTS leg both boards accepted the host's carrier-register writes (`forcing FRF -> 915.000 MHz` … `FRF readback: … (OK)`, no `FRF force-write failed`), which the production binary refuses (`HOST_ALLOW_REG_WRITE_DIAG=0`, `firmware/murata_l072/Makefile`). Nothing was flashed in this campaign — the brief forbids it | not re-read | 2026-09-15 |
 | tractor 2E2C1209DABC240B | same | not re-read | 2026-09-15 |
 
+The exact bench binary on both boards (md5 `0c1bb0a9…`) is kept in
+[`firmware/`](firmware/README.md), together with the rejected A11 gap-1500
+variant. The offline harnesses from the encoder work are in
+[`tools_offline/`](tools_offline/README.md).
+
 Health probes before every leg (`rs116_health_probe.py`, both boards,
 `legs/leg<X>_health_{base,tractor}.txt`): counter families
 `RS115-INSTRUMENTED-FIRMWARE=YES RS12-URC-COUNTERS=YES RS12-10-COUNTERS=YES`
