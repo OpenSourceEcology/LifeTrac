@@ -42,6 +42,11 @@ stamp "-- P2 / P4 from the archive"
   echo -n "tx ABORTED lines: "; grep -cE "ABORTED( \(pipelined\))?" "$ARCHU/tx_daemon.log"
   echo "max K: $(grep -oE 'done( \(pipelined\))?: [0-9]+ fragments ok' "$ARCHU/tx_daemon.log" | grep -oE '[0-9]+ fragments' | sort -n | tail -1)"
   echo -n "camera_service vector_stats lines: "; grep -c vector_stats "$ARCHU/camera_service.log" 2>/dev/null
+  echo "tx drops before air (last tx stats line): $(grep -oE 'drop_(full|stale)=[0-9]+' "$ARCHU/tx_daemon.log" | tail -2 | tr '
+' ' ')"
+  echo "tractor FHSS authority (post bracket): $(grep -hoE '(tx_stream_streak_max|tx_first_anchor)=[0-9]+' "$E/leg${LEG}_post_tractor.txt" | tr '
+' ' ')"
+  echo -n "seq-gap loss (per codec run): "; ( cd "$DC" && PYTHONIOENCODING=utf-8 py -3 "$(cygpath -m "$SP")/leg_replay.py" "$LEG" "$(grep -oE 'reg_profile=[12]' "$ARCHU/params.txt" | grep -q 1 && echo image_bw250 || echo image_bw500)" 2>&1 | head -1 )
 } | tee "$E/leg${LEG}_p2p4.txt"
 ( cd "$DC" && PYTHONIOENCODING=utf-8 py -3 tools/vector_dry_run.py tractor-log "$ARCHW/camera_service.log" 2>&1 ) | tee "$E/leg${LEG}_tractor_log.txt"
 cp "$ARCHU/params.txt" "$E/leg${LEG}_params.txt" 2>/dev/null

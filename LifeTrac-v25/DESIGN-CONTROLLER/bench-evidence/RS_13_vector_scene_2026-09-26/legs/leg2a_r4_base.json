@@ -1,0 +1,219 @@
+{
+  "profile": "image_bw500",
+  "one_fragment_limit": 243,
+  "frames": {
+    "total": 596,
+    "vector": 596,
+    "other": 0,
+    "parse_errors": 0,
+    "by_codec": {
+      "vector": 596
+    }
+  },
+  "wire": {
+    "min": 72,
+    "p50": 241.0,
+    "p95": 243.0,
+    "max": 243,
+    "over_limit": 0
+  },
+  "epoch_starts": 29,
+  "epoch_starts_applied": 29,
+  "arrival": {
+    "span_s": 305.36235547065735,
+    "fps_mean": 1.9485047496536432,
+    "gap_p50_s": 0.4996974468231201,
+    "gap_p95_s": 0.5608029365539551,
+    "gap_max_s": 1.060455083847046,
+    "first_applied_t_rel_s": 0.0,
+    "frames_before_first_apply": 0
+  },
+  "store": {
+    "frames_rx": 596,
+    "frames_bad": 0,
+    "frames_applied": 596,
+    "epoch_behind": 0,
+    "orphans": 295,
+    "digest_checks": 521,
+    "digest_mismatch": 137,
+    "bad_version": 0,
+    "epochs": 29,
+    "handovers": 28,
+    "ttl_dropped": 6,
+    "resync_events": 12,
+    "resync_digest_ends": 11,
+    "records_applied": 25121,
+    "resync": false,
+    "bad_reasons": {},
+    "epoch": 12,
+    "shapes": 23,
+    "cached_shapes": 0
+  },
+  "resync_episodes": [
+    {
+      "start": 1,
+      "end": 8,
+      "frames": 7,
+      "t_start_s": 0.710289478302002,
+      "t_end_s": 4.2337305545806885,
+      "ended_by": "digest"
+    },
+    {
+      "start": 16,
+      "end": 21,
+      "frames": 5,
+      "t_start_s": 8.711775779724121,
+      "t_end_s": 11.2369065284729,
+      "ended_by": "digest"
+    },
+    {
+      "start": 31,
+      "end": 38,
+      "frames": 7,
+      "t_start_s": 16.747255086898804,
+      "t_end_s": 20.21860933303833,
+      "ended_by": "digest"
+    },
+    {
+      "start": 44,
+      "end": 48,
+      "frames": 4,
+      "t_start_s": 23.7225124835968,
+      "t_end_s": 25.71877694129944,
+      "ended_by": "digest"
+    },
+    {
+      "start": 71,
+      "end": 74,
+      "frames": 3,
+      "t_start_s": 37.715789794921875,
+      "t_end_s": 39.21834993362427,
+      "ended_by": "digest"
+    },
+    {
+      "start": 151,
+      "end": 171,
+      "frames": 20,
+      "t_start_s": 78.22630596160889,
+      "t_end_s": 88.21879935264587,
+      "ended_by": "digest"
+    },
+    {
+      "start": 183,
+      "end": 187,
+      "frames": 4,
+      "t_start_s": 94.70852708816528,
+      "t_end_s": 96.69392371177673,
+      "ended_by": "digest"
+    },
+    {
+      "start": 196,
+      "end": 203,
+      "frames": 7,
+      "t_start_s": 101.69289755821228,
+      "t_end_s": 105.20252561569214,
+      "ended_by": "digest"
+    },
+    {
+      "start": 263,
+      "end": 268,
+      "frames": 5,
+      "t_start_s": 136.8646378517151,
+      "t_end_s": 139.29761815071106,
+      "ended_by": "digest"
+    },
+    {
+      "start": 501,
+      "end": 505,
+      "frames": 4,
+      "t_start_s": 256.81427812576294,
+      "t_end_s": 258.8380835056305,
+      "ended_by": "digest"
+    },
+    {
+      "start": 514,
+      "end": 523,
+      "frames": 9,
+      "t_start_s": 263.8118562698364,
+      "t_end_s": 268.35031056404114,
+      "ended_by": "digest"
+    },
+    {
+      "start": 527,
+      "end": 589,
+      "frames": 62,
+      "t_start_s": 270.8142626285553,
+      "t_end_s": 302.3294687271118,
+      "ended_by": "epoch start"
+    }
+  ],
+  "scene": {
+    "epoch": 12,
+    "level": 0,
+    "badge": 7,
+    "digest_ok": null,
+    "horizon_mode": "none",
+    "layers": {
+      "L1": 20,
+      "L2": 0,
+      "L3": 3,
+      "L4": 0
+    },
+    "cal_rev": null,
+    "anchor_age_ms": 2604,
+    "handover": false
+  },
+  "checks": [
+    [
+      "parse_ok",
+      true,
+      "0 unparseable payload(s)"
+    ],
+    [
+      "all_vector",
+      true,
+      "0 non-vector frame(s): {'vector': 596}"
+    ],
+    [
+      "one_fragment",
+      true,
+      "0 over 243 B (epoch starts 242 B); max 243 B"
+    ],
+    [
+      "store_clean",
+      true,
+      "frames_bad=0 "
+    ],
+    [
+      "no_orphans",
+      false,
+      "orphans=295"
+    ],
+    [
+      "digest",
+      false,
+      "521 checked, 137 mismatched, scene digest_ok=None"
+    ],
+    [
+      "epoch_seen",
+      true,
+      "29 epoch start(s) applied of 29 received"
+    ],
+    [
+      "first_apply",
+      true,
+      "0 frame(s) before the first apply"
+    ],
+    [
+      "applied_ratio",
+      true,
+      "596/596 applied = 100.0% (need >= 90%)"
+    ],
+    [
+      "min_frames",
+      true,
+      "596 vector frame(s), need >= 500"
+    ]
+  ],
+  "pass": false
+}

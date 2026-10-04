@@ -18,6 +18,8 @@ for b in 2E2C1209DABC240B 2D0A1209DABC240B; do
            "$H/bench_tools/dual_inject.py" "$DC/base_station/image_rx_daemon.py" "$DC/base_station/cmd_timing.py"; do
     adb -s $b push "$f" /tmp/lifetrac_strict/ >/dev/null || { echo "PUSH FAILED $f"; exit 1; }
   done
+  # root-owned __pycache__ (python in the containers runs as root) blocks an overwrite
+  adb -s $b shell "$S rm -rf /tmp/lifetrac_strict/paho" >/dev/null
   adb -s $b push "C:/Users/dorkm/Documents/GitHub/LifeTrac/_paho_pull/paho" /tmp/lifetrac_strict/ >/dev/null
   echo "=== $b: fix tree"
   BOARD=$b bash "$SP/push_fix_to_board.sh" 2>&1 | grep -E "== push|encode_vector.py|encoder from|has _tick" || true

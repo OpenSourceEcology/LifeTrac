@@ -1,0 +1,148 @@
+{
+  "profile": "image_bw500",
+  "one_fragment_limit": 243,
+  "frames": {
+    "total": 600,
+    "vector": 235,
+    "other": 365,
+    "parse_errors": 0,
+    "by_codec": {
+      "mono_g4": 365,
+      "vector": 235
+    }
+  },
+  "wire": {
+    "min": 103,
+    "p50": 242.0,
+    "p95": 243.0,
+    "max": 243,
+    "over_limit": 2
+  },
+  "epoch_starts": 32,
+  "epoch_starts_applied": 32,
+  "arrival": {
+    "span_s": 120.19546556472778,
+    "fps_mean": 1.9468288499950615,
+    "gap_p50_s": 0.5035083293914795,
+    "gap_p95_s": 0.5908718109130859,
+    "gap_max_s": 1.0055785179138184,
+    "first_applied_t_rel_s": 62.46906304359436,
+    "frames_before_first_apply": 0
+  },
+  "store": {
+    "frames_rx": 235,
+    "frames_bad": 0,
+    "frames_applied": 235,
+    "epoch_behind": 0,
+    "orphans": 87,
+    "digest_checks": 235,
+    "digest_mismatch": 77,
+    "bad_version": 0,
+    "epochs": 33,
+    "handovers": 32,
+    "ttl_dropped": 1,
+    "resync_events": 3,
+    "resync_digest_ends": 1,
+    "records_applied": 9790,
+    "resync": false,
+    "bad_reasons": {},
+    "epoch": 0,
+    "shapes": 19,
+    "cached_shapes": 0
+  },
+  "resync_episodes": [
+    {
+      "start": 139,
+      "end": 158,
+      "frames": 19,
+      "t_start_s": 70.16575503349304,
+      "t_end_s": 79.67003607749939,
+      "ended_by": "digest"
+    },
+    {
+      "start": 176,
+      "end": 231,
+      "frames": 55,
+      "t_start_s": 89.17485046386719,
+      "t_end_s": 117.51427721977234,
+      "ended_by": "epoch start"
+    },
+    {
+      "start": 347,
+      "end": 348,
+      "frames": 1,
+      "t_start_s": 177.15043783187866,
+      "t_end_s": 177.645414352417,
+      "ended_by": "epoch start"
+    }
+  ],
+  "scene": {
+    "epoch": 0,
+    "level": 0,
+    "badge": 7,
+    "digest_ok": true,
+    "horizon_mode": "abs",
+    "layers": {
+      "L1": 19,
+      "L2": 0,
+      "L3": 0,
+      "L4": 0
+    },
+    "cal_rev": null,
+    "anchor_age_ms": 100,
+    "handover": false
+  },
+  "checks": [
+    [
+      "parse_ok",
+      true,
+      "0 unparseable payload(s)"
+    ],
+    [
+      "all_vector",
+      false,
+      "365 non-vector frame(s): {'mono_g4': 365, 'vector': 235}"
+    ],
+    [
+      "one_fragment",
+      false,
+      "2 over 243 B (epoch starts 242 B); max 243 B"
+    ],
+    [
+      "store_clean",
+      true,
+      "frames_bad=0 "
+    ],
+    [
+      "no_orphans",
+      false,
+      "orphans=87"
+    ],
+    [
+      "digest",
+      false,
+      "235 checked, 77 mismatched, scene digest_ok=True"
+    ],
+    [
+      "epoch_seen",
+      true,
+      "32 epoch start(s) applied of 32 received"
+    ],
+    [
+      "first_apply",
+      true,
+      "0 frame(s) before the first apply"
+    ],
+    [
+      "applied_ratio",
+      true,
+      "235/235 applied = 100.0% (need >= 90%)"
+    ],
+    [
+      "min_frames",
+      false,
+      "235 vector frame(s), need >= 500"
+    ]
+  ],
+  "pass": false
+}

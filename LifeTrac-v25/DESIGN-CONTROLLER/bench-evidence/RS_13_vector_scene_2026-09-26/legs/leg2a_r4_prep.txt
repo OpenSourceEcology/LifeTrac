@@ -1,0 +1,32 @@
+15:38:32Z == leg 2a_r4 prep (profile image_bw500)
+15:38:32Z -- scene: bench YouTube window to the front + camera check (camera only)
+window pid 57316 'Front view of Colorado's STUNNING Royal Gorge Route Railroad - YouTube - Mozilla Firefox' player fullscreen: True
+# leg2a_r4 scene check, 2026-10-04T15:38:33Z PC clock (railroad video, normal Firefox window, player fullscreen)
+camera holders: 0
+1.9 s apart: mean abs diff 27.80  pct pixels diff>25: 40.99 %
+5.0 s apart: mean abs diff 31.88  pct pixels diff>25: 45.54 %
+9.7 s apart: mean abs diff 33.29  pct pixels diff>25: 46.83 %
+mean luma 120.1
+frame -> legs/leg2a_r4_scene.jpg
+SCENE-CHECK-OK: 10 s change 46.83 %
+15:38:47Z -- production camera unit / UART holders
+failed
+tractor ttymxc3: 
+base ttymxc3: 
+15:38:48Z -- health probes (rs116) both boards
+STATS-OK (attempt 1)
+  radio_state=1
+RS12-URC-COUNTERS=YES
+STATS-OK (attempt 1)
+  radio_state=1
+RS12-URC-COUNTERS=YES
+15:38:51Z -- clear retained control topics on the base broker
+RETAINED-CLEARED lifetrac/v25/control/encode_mode_override lifetrac/v25/cmd/req_keyframe lifetrac/v25/control/radio_profile
+15:38:53Z -- pre-brackets (rs115) both boards
+radio_rx_ok=3842 radio_crc_err=67 radio_tx_ok=101  (base)
+radio_rx_ok=0 radio_crc_err=0 radio_tx_ok=608  (tractor)
+15:38:57Z -- base-side capture, detached (docker rs13_cap_base): profile image_bw500, 480 s, min-frames 500 --strict
+rs13_cap_base id 779bef406193
+capture -> /work/legs/leg2a_r4_base.jsonl (profile image_bw500, limit 243 B); 480 sconnected to 127.0.0.1:1883 (rc=0); subscribing lifetrac/v25/video/tile_delta
+
+15:39:01Z == leg 2a_r4 prep done -> launch the harness now

@@ -1,19 +1,31 @@
 # RS-13.1 — VECTOR (codec 6) first bench legs (2026-09-26)
 
-**Status: complete (2026-10-03). Verdict: GO for RS-13.2 (desk check).**
-Step 1 failed on 2026-09-26 with the shipped encoder (loss-free sync
-defects A1–A5); the encoder was fixed on `rs13-vector-encoder-sync-fix`
-(`291fc90e`, review rounds 3–4 `ac199b1a`) and step 1 now **passes 10/10**
-on the moving page, the landscape still (both profiles) and the railroad
-video. The radio legs were flown twice at 1 fps (encoder time still misses
-350 ms, A4): on 2026-09-27 on a synthetic moving page, and on 2026-10-03 on
-the railroad video with the final encoder (Round 3). In both rounds the
-VECTOR-specific rows pass on every leg — P1 by the loss rule, one fragment
-per frame (P4), no lock-loss gap (P5), the over-the-air switch (P6), codec
-reporting (P7), encoder time on air (P8). The rows that miss by the letter
-are radio-side and explained: 2b's P2/P3 from a deterministic 57 s FHSS
-acquisition at 1 fps (A7, A11), and in round 3 2a's P3 against an unusually
-clean control (A15). Radios parked `0x80` on both boards.
+**Status: complete (2026-10-04). Verdict: GO for RS-13.2 (desk check).**
+
+Step 1 failed on 2026-09-26 with the shipped encoder (loss-free sync defects
+A1–A5). The encoder was fixed on `rs13-vector-encoder-sync-fix` (`291fc90e`;
+review rounds 3–4 `ac199b1a`; perf, relabel trigger and store DIGEST exit
+`4ab58b8d`). Step 1 now **passes 10/10** on the moving page, the landscape
+still (both profiles) and the railroad video. With `4ab58b8d` the encoder
+meets its 350 ms budget (step 1 p95 223 ms).
+
+The radio legs were flown three times:
+- at 1 fps on 2026-09-27, on a synthetic moving page;
+- at 1 fps on 2026-10-03, on the railroad video (Round 3);
+- **at 2 fps on 2026-10-04, on the railroad video (Round 4)**.
+
+In every round the VECTOR-specific rows pass on every leg: P1 by the loss
+rule, one fragment per frame (P4), no lock-loss gap (P5), the over-the-air
+switch and acks (P6), and codec reporting (P7). At 2 fps P2 and P3 also pass,
+and the tractor holds FHSS authority (A11 closed).
+
+What remains is by the letter or a robustness item:
+- round 4's P8 band on 2a and 2b (A17);
+- P6's return clause at 2 fps (A18);
+- A16: after a lost frame on a saturated bw500 stream, the base can stay one
+  shape short until the next epoch start.
+
+Radios are parked `0x80` on both boards.
 
 ## Software under test
 
@@ -651,22 +663,193 @@ Round-3 anomalies:
   i.e. longer on air per frame. A P3 that compares single legs needs either
   interleaved control/VECTOR legs or a margin.
 
+## Round 4 — 2 fps with the faster encoder (2026-10-04)
+
+Operator GO 2026-10-04. Flown 15:22–16:07 UTC with the integrated encoder,
+`rs13-vector-encoder-sync-fix` @ `4ab58b8d`. That head merges three changes:
+- the perf rewrite (`c7f3926e`, byte-identical payloads);
+- the per-pixel relabel trigger (`2d800ef7`, A8);
+- the store's DIGEST exit from resync (`c922efbb`).
+
+Staging and scene:
+- The tree was re-staged on both boards' `/work` (`stage_boards.sh`):
+  `encode_vector.py` md5 `381733b8…` on both boards, equal to the working tree.
+- Content was the same railroad video as round 3, in a normal Firefox window
+  with the player's fullscreen. It was checked on the camera before every run
+  (`legs/<run>_scene.{txt,jpg}`: 37–67 % of pixels changed over 10 s).
+
+Run settings:
+- Camera at **2 fps** (A4 closed, see step 1); 300 s legs.
+- `-TxBatch 0 -KfRequestDisable 1`, same procedure as round 3.
+- File tags `*_r4` / `*_r4video_fix`.
+- Order flown: 2b, 2a, 2c, 2d. These legs are not interleaved, so P3 is
+  judged by the Fisher rule.
+
+**Step 1 on the video (bw250, camera only, 2 fps): RESULT: PASS.**
+- Before the run the tractor's bench broker was recreated and held 0
+  retained topics (`legs/step1_r4video_run_transcript.txt`).
+- Capture: `frames: 252 total, 252 vector`; `wire bytes (vector): min 85 / p50
+  200 / p95 203 / max 203; over limit: 0`; `epoch starts: 3 received, 3
+  applied` (`trigger=first`, then `safety` × 2; round 3's step 1 had 40, all
+  `relabel`); `arrival: 2.00 fps`.
+- Store: `store: applied 252, bad 0, epoch_behind 0, orphans 0, digest 218
+  checked / 0 mismatched, … ttl_dropped 0, resync 0`.
+- **Encoder `p50 204.9 / p95 223.4 / max 267.9` ms against the 350 ms budget:
+  A4 is closed.** Round 3's p95 was 477.7 ms.
+- The final `digest_ok None` is expected. The capture ended inside the
+  DIGEST-quiet window after the last safety refresh (218 DIGESTs in 252
+  frames), and the dry run's own `digest` check passes it.
+
+| # | criterion | 2a_r4 (DTS, VECTOR) | 2b_r4 (FHSS, VECTOR) | 2c_r4 (control) | 2d_r4 (switch) | pass? |
+|---|---|---|---|---|---|---|
+| archive | | `radio_monitor_20261004_104440_4ab58b8d` | `radio_monitor_20261004_103105_4ab58b8d` | `radio_monitor_20261004_105531_4ab58b8d` | `radio_monitor_20261004_110423_4ab58b8d` | |
+| P1 | dry-run checks, loss rule | raw `RESULT: FAIL` (`no_orphans` 295, `digest` 521/137); `store: applied 596, bad 0, epoch_behind 0, orphans 295, digest 521 checked / 137 mismatched, epochs 29, handovers 28, ttl_dropped 6, resync 12 (11 ended by DIGEST)`. **12 episodes, each opened by a lost frame** (seq gaps at rows 1, 14, 29, 42, 69, 149, 181, 194, 261, 499, 512, 525; the losses at 486 and 538 opened none). 11 ended by 3 matching DIGESTs after 1.5–10 s. The last (#527–#589, 31.5 s, with a second loss at 538 inside it) ended at the 60 s safety refresh, row 589. `last DIGEST checked (row, result): (588, 'BAD')`; final `digest_ok None`, 6 frames after that epoch start. So that run was **ended by the store's rule but not confirmed by a DIGEST** inside the capture (A16). The other 8 checks PASS | raw `RESULT: FAIL` (`no_orphans` 103, `digest` 519/41); `store: applied 558, bad 0, epoch_behind 0, orphans 103, digest 519 checked / 41 mismatched, epochs 32, handovers 31, ttl_dropped 2, resync 3 (2 ended by DIGEST)`; `resync: 2 episode(s), 42 frame(s): #0-#34 (34, 17.0 s, digest), #393-#401 (8, 4.0 s, digest)`. These are the join after acquisition and the lost frame at row 391; BAD rows 0–31 (join), 194 (lost frame, no resync), 391–398. `last DIGEST checked (row, result): (541, 'ok')`; final `digest_ok None`, 15 frames after the epoch start at row 542. The other 8 checks PASS | n/a (591 mono_g4) | window: `store: applied 235, bad 0, orphans 87, digest 235 checked / 77 mismatched, ttl_dropped 1, resync 3 (1 ended by DIGEST)`; epoch starts 32/32. Episodes #139–#158 (9.5 s, digest), #176–#231 (28.3 s, epoch start, A16) and #347–#348 (epoch start), opened by the lost frames at rows 137, 174 (plus 185) and 347. `last DIGEST checked (row, result): (358, 'ok')`; final `digest_ok True` | **PASS** 2a, 2b, 2d by the loss rule (A16 on 2a and 2d) |
+| P2 | `published frame_id` ÷ 300 | 593 → **1.98** | 554 → **1.85**, the whole leg including the FHSS acquisition (first frame heard at seq 48, ≈ 24 s) | 588 → 1.96 | n/a (597 → 1.99) | **PASS** |
+| P3 | loss vs control | `capture seq gaps (leg2a_r4_base.jsonl): lost 14/610 = 2.3%`; counter line `loss 13/606 = 2.1%`. Against the control 21/612: two-sided Fisher exact p = 0.30, with VECTOR the lower | `capture seq gaps (leg2b_r4_base.jsonl): lost 2/560 = 0.4%` from the first frame heard; `counting from seq 1: 49/607 = 8.1%` (acquisition, A7); counter line `loss 49/603 = 8.1%` | `capture seq gaps (leg2c_r4_base.jsonl): lost 21/612 = 3.4%`; counter line `loss 20/608 = 3.3%` | seq gaps within same-codec runs: 13 lost of 613 = 2.1 % (2 codec switches not counted); counter line `loss 15/609 = 2.5%` | **PASS** (2a and 2b below the control) |
+| P3 radio | tractor `radio_tx_ok` (post; the harness's L072 reset restarts it) vs base Δ`radio_rx_ok` | 611 vs 597 | 608 vs 558 | 613 vs 592 | 616 vs 603 | consistent with the seq gaps |
+| P4 | max K, `-TxBatch 0` | K=1 606, K≥2 0, ABORTED 0, **max 1** | 603 / 0 / 0, **max 1** | (608 / 0 / 0, max 1) | 609 / 0 / 0, **max 1**. Every VECTOR frame is within its limit; the 2 `over limit` rows (#359, #577) are **mono_g4** key frames at 243 B against 242 | **PASS** |
+| P5 | gaps > 3 s | n/a (`gaps>3s=0`, max 1.1 s) | `n_frag=554 span=277s max_gap=1.0s gaps>3s=0` | n/a (`gaps>3s=0`) | n/a (`gaps>3s=0`) | **PASS** |
+| P6 | switch | n/a | n/a | n/a | Forward: publish stamp 16:00:12.741 (base clock, one board call); `command TX … (on air)` 16:00:13.069. Ack **+0.97 s** after the stamp: `{"requested": 9, "effective": 9, "effective_name": "vector", "clamped": false, "codec": 6, "quality": 80, "source": "lora_cmd"}`. First codec-6 frame **+1.35 s** after the stamp (row 124, seq 1, 241 B, K=1, epoch start); the bound is 0.5 period + 0.263 encoder p95 + ≈ 0.1 airtime + 1.0 gate ≈ 1.86 s. Return: stamp 16:02:13.163, on air 16:02:13.792. Ack +1.22 s after the stamp (+0.59 s after on air): `{"requested": 6, "effective": 6, "effective_name": "mono_g4", "clamped": false, "codec": 1, "quality": 55, "source": "lora_cmd"}`. **Codec-1 resumed +0.77 s after on air** (row 359), behind one VECTOR frame already in flight (row 358, +0.49 s); that is over one camera period (0.5 s at 2 fps) by the letter (A18). Runs: 124 × codec-1, 235 × codec-6, 241 × codec-1 | forward and acks **PASS**; return-resume **by the letter MISS** (0.77 s vs 0.5 s) |
+| P7 | `rx_codec_name` | `"vector"` (`rx_codec 6`, profile 2, SNR 6 dB) | `"vector"` (profile 1, SNR 10 dB) | `"mono_g4"` | `"mono_g4"` (3 frames), then `"vector"` inside the window (242 frames seen, 1.99 fps, SNR 5 dB, `legs/leg2d_r4_link_stats.txt`) | **PASS** |
+| P8 | encoder p95 vs step 1 (223.4; ± 20 % = 178.7–268.1) | `p50 221.1 / p95 268.4 / max 317.4` (**+20.1 %**) | `p50 245.3 / p95 278.0 / max 311.7` (**+24.4 %**) | n/a | `p50 236.1 / p95 262.9 / max 273.6` (+17.7 %) | 2d PASS; **2a (by 0.3 ms) and 2b by the letter MISS**. All are under the 350 ms budget and the 500 ms camera period, with `drop_full=0 drop_stale=0` on every leg (A17) |
+| — | FHSS authority (A11) | n/a | tractor post-bracket `tx_first_anchor=1 tx_stream_streak_max=607` (round 3: 3) | n/a | n/a | **A11 closed at 2 fps** |
+
+Parks:
+- `PARK_OK` × 2 after every leg.
+- End of round, 16:08:28Z, four minutes after the last daemon stopped: both
+  radios read `RADIO_STATE {"reg_op_mode": "0x80", "mode": "SLEEP", …}`, and
+  no container holds the UART (`legs/session_end_park_2026-10-04.txt`).
+- The video window was closed.
+
+**Round 4 verdict.** At 2 fps the encoder keeps up: step 1 p95 223 ms, and on
+air 263–278 ms. Every leg passes P1 by the loss rule and P2, P3, P4, P5 and P7.
+The tractor now holds FHSS authority (A11). Three items miss by the letter or
+need recording:
+- **P8 on 2a and 2b.** The ±20 % band around a 2-minute step-1 sample: 2a is
+  over by 0.3 ms and 2b sits at +24 %. Absolute times are well inside the
+  budget (A17).
+- **P6's return clause.** Written for 1 fps, it counts no frame in flight
+  (A18).
+- **A16, a repair weakness.** On the saturated bw500 stream a lost frame
+  twice left the base out of step for about 30 s. The run ended only at the
+  next epoch start.
+
+Round-4 anomalies:
+
+- **A4 (closed).** Encoder p95 223.4 ms in step 1, 262.9–278.0 ms on air,
+  against a 350 ms budget. The legs ran at 2 fps.
+- **A11 (closed at 2 fps).** The 2b post-bracket reads
+  `tx_stream_streak_max=607`, against 8 needed and 3 in round 3: at a 500 ms
+  cadence the tractor's own transmissions chain into authority. The strict
+  `< 1000 ms` discriminator is unchanged; `imp/fhss-authority`, which widened
+  the gap to 1500 ms, is dropped.
+- **A7 (update).** At 2 fps the first frame was heard at seq 48, about 24 s
+  after the harness reset (seq 58 at 1 fps). This counts against P2 (1.85,
+  still a pass) and against the seq-1 loss figure (8.1 %). It does not count
+  against the seq-gap figure.
+- **A8 (update).** The per-pixel relabel trigger left step 1 with 3 epoch
+  starts in 126 s (round 3: 40 relabels). On air, relabel still fires 12–14
+  times per 5-minute leg on this video. These counts come from the triggers
+  seen in the 2-second `vector_stats` samples, so they are lower bounds. 2a
+  showed `relabel` 14 and `safety` 4; 2b `relabel` 12, `horizon` 5 and
+  `safety` 2; 2d's 120 s window `relabel` 14 and `horizon` 3. All epoch
+  starts were applied.
+- **A16 — a lost frame on a saturated stream can keep the base out of step
+  until the next epoch start.**
+  - Leg 2a, rows 525–589: 31.5 s, ended by the 60 s safety refresh.
+  - Leg 2d, rows 174–231: 28.3 s, ended by the next epoch start (row 231).
+  - In both runs the base first held one or two shapes more than the DIGEST's
+    `n_live` (a ghost). After its 20-frame TTL drop it held **one fewer**,
+    with 1–2 orphan records every frame. Traces: `legs/leg2a_r4_digest_trace.txt`
+    rows 544–588, where the encoder's count is the base's + 1 throughout;
+    `legs/leg2d_r4_digest_trace.txt` rows 208–230.
+  - The base TTL-dropped shapes the encoder still counted live: the base's
+    `ttl_dropped` is 6 against the encoder's cumulative 0 on 2a. So a refresh for that
+    shape went out in a frame the base lost, and the encoder never re-defined
+    it.
+  - Elsewhere the carousel repaired single losses within 1.5–10 s: 14 of the
+    round's 17 episodes ended by DIGEST.
+  - Likely mechanism (from the code, not measured): the carousel is slot 7,
+    packed last (`encode_vector.py` `_pack`), and on bw500 video every frame
+    was full (236–243 B against 243). The re-send that would repair the
+    missing shape therefore got no room until an epoch start.
+  - P1's loss rule passes these runs: each starts at a loss, and an epoch
+    start ends it. A shape missing for 30 s after one lost frame is still the
+    first item for RS-13.2. Options are a reserved carousel floor, or a
+    re-define once the encoder's mirror and the DIGEST disagree for several
+    frames. Logging `carousel_bits` / carousel records packed in
+    `vector_stats` would test the mechanism.
+- **A17 — P8's band is relative to a short step-1 sample.** On air the
+  encoder ran +18 to +24 %, mostly in L1/L3 extraction: 2b at L1 93.3 / L3
+  50.1 ms against step 1's 77.9 / 40.5. Likely causes are the video segment
+  and the TX daemon sharing the CPU; this round does not separate the two. The
+  criterion's purpose, that the encoder keeps up on air, holds on every leg:
+  P2 ≥ 1.85, no TX drops, every p95 ≤ 278 ms. The letter does not hold on 2a
+  and 2b. An absolute bound (p95 ≤ the 350 ms budget) would test the purpose
+  directly. This record judges round 4 by the band as written.
+- **A18 — P6's return clause at 2 fps.** "Codec-1 resumes within one camera
+  period of the return command going on air" was written at 1 fps (round 3:
+  +0.55 s). The TX pipeline (`tx_pipeline_depth=2`, `tx_prepare_ahead=1`)
+  already held a VECTOR frame when the command landed. That frame went out at
+  +0.49 s, and the first mono_g4 frame followed at +0.77 s, 0.17 s after the
+  ack reached the base. The resume was the very next frame. The forward bound
+  already includes the encoder's time and one airtime (A9); the return clause
+  should get the same treatment. Round 4 is judged by the clause as written.
+- **A19 — the DTS legs' loss tracks CRC errors.** Per leg, CRC errors against
+  lost frames:
+
+  | leg | crc_dumps | lost frames | CRC errors at RSSI ≥ −55 dBm |
+  |---|---|---|---|
+  | 2a | 13 | 14 | 3 |
+  | 2c | 22 | 21 | 5 |
+  | 2d | 13 | 13 | 3 |
+  | 2b (FHSS) | 1 | 2 | 0 |
+
+  The errors came in bursts about 7 s apart. Those at RSSI ≥ −55 dBm arrived
+  18–20 dB above the tractor's −64 dBm (`rssi=-46 snr=-10.5`), which marks a
+  stronger foreign transmitter. The FHSS leg 2b hopped clear: 1 CRC error,
+  0.4 % loss. VECTOR and mono_g4 suffered alike (2.3 % against 3.4 %).
+
 ### GO / NO-GO
 
 **GO for RS-13.2 (desk check).** Deciding rows:
-- Step 1 with the fix: **RESULT: PASS** on all four passes (moving page,
-  landscape bw250 and bw500, railroad video): 0 mismatches, 0 orphans,
-  0 TTL drops, 0 resyncs on a loss-free path.
-- Both rounds of legs: P1 (loss rule), P4, P5, P6, P7 and P8 pass on every
-  leg; the switch acks are exact (+1.40 / +1.55 s in, +1.31 / +0.64 s back).
-- Misses by the letter, explained, not VECTOR defects: 2b's P2 (0.82 fps
-  both rounds) and P3 from the FHSS acquisition at seq 58 (A7); 2a's P3 in
-  round 3 (1.3 % vs a 0.3 % control; the same control lost 6.5 % a week
-  earlier, A15).
+- **Step 1 with the fix: RESULT: PASS on all five passes.**
+  - The passes: moving page, landscape bw250 and bw500, the railroad video at
+    `ac199b1a`, and the video again at `4ab58b8d`.
+  - Each had 0 mismatches, 0 orphans, 0 TTL drops and 0 resyncs on a
+    loss-free path.
+  - With `4ab58b8d` the encoder meets its budget: p95 223.4 ms against
+    350 ms (A4 closed).
+- **Round 4, at 2 fps on the railroad video.**
+  - P1 passes by the loss rule on every VECTOR leg.
+  - P2 (1.85–1.98 fps), P3 (VECTOR 2.3 % and 0.4 % against a 3.4 %
+    control), P4 (max K 1), P5 and P7 pass on every leg.
+  - P6's forward switch and both acks pass: +0.97 s in (first codec-6 frame
+    +1.35 s), +1.22 s back.
+  - The tractor holds FHSS authority (`tx_stream_streak_max=607`, A11 closed).
+- **Rounds 2 and 3 (1 fps):** P1, P4, P5, P6, P7 and P8 pass on every leg.
 
-Before range-edge legs: A11 (FHSS authority inactive at 1 fps — firmware),
-A4 (encoder time → 2 fps, which also removes A7/A11 on the bench), A8 (relabel
-sensitivity on real footage), and the VECTOR_SCENE.md amendments listed in
-the fix PR.
+Misses by the letter, explained, not VECTOR decode defects:
+- **Round 4.**
+  - P8 on 2a (+20.1 %, over the ±20 % band by 0.3 ms) and on 2b (+24.4 %).
+    The absolute p95 of 268 and 278 ms is inside the 350 ms budget, with no
+    TX drops (A17).
+  - P6's return clause: codec-1 resumed 0.77 s after the command went on air.
+    The limit is one camera period of 0.5 s, and one frame was already in
+    flight (A18).
+- **Rounds 2 and 3.**
+  - 2b's P2 and P3 were hit by the FHSS acquisition (A7); at 2 fps P2 passes.
+  - Round 3's 2a P3 (A15).
 
-Fix PR: `rs13-vector-encoder-sync-fix` @ `ac199b1a`.
+Inputs for the RS-13.2 desk check, in order:
+1. **A16:** a lost frame on a saturated bw500 stream left the base one shape
+   short for about 30 s, until the next epoch start (2a, 2d). The likely
+   cause is that the carousel gets no room. Change: a carousel floor, or a
+   re-define when DIGESTs keep disagreeing.
+2. **A8:** relabel still fires 12–14 times per 5-minute leg on air.
+3. **Procedure:** P8 as an absolute bound (A17) and P6's return clause with
+   the in-flight frame (A18). Both stay as written for this record.
+4. The VECTOR_SCENE.md amendments listed in the fix PR.
+
+Fix PR: `rs13-vector-encoder-sync-fix` @ `4ab58b8d` (perf, relabel trigger
+and store DIGEST-exit merged).

@@ -1,0 +1,17 @@
+# leg 2a_r4 P2/P4 greps on /c/Users/dorkm/Documents/GitHub/LifeTrac/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261004_104440_4ab58b8d
+published frame_id lines (rx_daemon.log): 593
+tx done K=1 lines: 606
+tx done K>=2 lines: 0
+tx ABORTED lines: 0
+max K: 1 fragments
+camera_service vector_stats lines: 135
+tx drops before air (last tx stats line): drop_full=0 drop_stale=0 
+tractor FHSS authority (post bracket): tx_first_anchor=0 tx_stream_streak_max=0 
+seq-gap loss (per codec run): leg 2a_r4: 596 frames received; seq gaps within same-codec runs (row, lost): [(1, 1), (14, 1), (29, 1), (42, 1), (69, 1), (149, 1), (181, 1), (194, 1), (261, 1), (486, 1), (499, 1), (512, 1), (525, 1), (538, 1)] -> 14 lost of 610 = 2.3 % after the first received frame (0 codec switch(es) not counted)
+leg 2a_r4: 596 frames received; seq gaps within same-codec runs (row, lost): [(1, 1), (14, 1), (29, 1), (42, 1), (69, 1), (149, 1), (181, 1), (194, 1), (261, 1), (486, 1), (499, 1), (512, 1), (525, 1), (538, 1)] -> 14 lost of 610 = 2.3 % after the first received frame (0 codec switch(es) not counted)
+  resync episodes (start, end, ended by key): [(1, 8, False), (16, 21, False), (31, 38, False), (44, 48, False), (71, 74, False), (151, 171, False), (183, 187, False), (196, 203, False), (263, 268, False), (501, 505, False), (514, 523, False), (527, 589, True)]
+  all ended by an epoch start: False; final resync False, digest_ok None
+  last DIGEST checked (row, result): (588, 'BAD'); last epoch start row 589, 6 frame(s) before the end (no DIGEST inside TTL_FRAMES+3 of a range-1/2 start, encode_vector.py)
+  key rows (29): [0, 116, 233, 284, 285, 286, 295, 296, 297, 299, 305, 306, 307, 308, 313, 315, 319, 322, 323, 326, 330, 337, 338, 339, 351, 352, 353, 473, 589]
+  BAD rows (137): [1, 2, 3, 4, 5, 14, 15, 16, 17, 18, 29, 30, 31, 32, 33, 34, 35, 42, 43, 44, 45, 69, 70, 71, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 181, 182, 183, 184, 194, 195, 196, 197, 198, 199, 200, 261, 262, 263, 264, 265, 499, 500, 501, 502, 512, 513, 514, 515, 516, 517, 518, 519, 520, 525, 526, 527, 528, 529, 530, 531]
+  orphan bursts top: [(1, 20), (181, 14), (525, 14), (149, 13), (261, 13), (512, 13), (29, 12), (69, 12)]; orphans 295, ttl_dropped 6
