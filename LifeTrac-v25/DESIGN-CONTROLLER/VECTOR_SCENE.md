@@ -595,7 +595,10 @@ With 1,563–1,883 record bits per frame, items 1–5 rarely exceed a third of t
 
 ### 4.3 Loss tolerance and honest ages
 
-- **New epoch** on any of: a camera change; GSHIFT or GZOOM beyond its field; more than 40 % of the weighted area relabelled (a region is relabelled when no region of the previous capture matches it with IoU ≥ 0.5 and ΔE ≤ 6; without the colour clause a whole-field recolour never triggers); ID exhaustion; entering VECTOR; 60 s (safety refresh).
+- **New epoch** on any of: a camera change; GSHIFT or GZOOM beyond its field; more than 50 % of the labelled area relabelled (below); ID exhaustion; entering VECTOR; 60 s (safety refresh).
+  - **Relabelled** is counted per pixel: a pixel an L1 region describes is relabelled when no region described it in the previous capture, or its region's colour moved by ΔE > 6. Without the colour clause a whole-field recolour never triggers.
+  - Per pixel, not per region: a per-region test (no region of the previous capture with IoU ≥ 0.5) reads a mass that noise splits in two, or merges along a bridge, as wholly relabelled. On photographs with camera-level noise that restarted the epoch on most frames of a static or slowly panning view; RS-13.1 saw the same storms on real footage (A8).
+  - The denominator is the labelled area, not the frame: in a sky-heavy view L0 owns most of the frame, so a full relabel of the regions would stay under any frame-area threshold. Once the weight map W exists, the pixels are weighted by it.
 - **Repeat-once and carousel re-verify.**
   - Before re-sending a shape, the tractor re-matches it on the current capture: IoU ≥ 0.7 after motion prediction, and ΔE ≤ 6.
   - If it passes, the re-sent define (same define-hash) plus its current UPD/UCOL is a *real* confirmation at this capture time.

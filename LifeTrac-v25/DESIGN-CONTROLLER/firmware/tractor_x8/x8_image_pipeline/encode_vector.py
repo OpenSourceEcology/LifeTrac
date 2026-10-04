@@ -59,9 +59,10 @@ the mirror drifting from the store on a loss-free path, anomalies A1/A2):
 
 Epochs (§3.5, §4.3). A new epoch starts on the first frame, on
 ``force_epoch()`` / ``epoch_start=True``, when the horizon state flips
-between found and NO_HORIZON, when more than 40 % of the valid area is
-relabelled between captures, and every 60 s (safety refresh, LAYER_CLEAR
-range 2, which keeps the masses). The id space is not a trigger: fresh
+between found and NO_HORIZON, when more than half of the labelled area
+changed its description since the last capture (``_relabelled_fraction``,
+per pixel), and every 60 s (safety refresh, LAYER_CLEAR range 2, which
+keeps the masses). The id space is not a trigger: fresh
 defines are scored first and get ids in score order, and a layer whose ids
 run out keeps its best candidates while the rest wait for a DEL to free an
 id (§4.3 lists ID exhaustion as a trigger; restarting the epoch on every
@@ -144,7 +145,7 @@ LEVEL_REPEATS = (1, 2, 3, 0)                     # epoch-start / define repeats
 LEVEL_BANDS = ((60, 100), (40, 59), (20, 39), (1, 19))
 
 SAFETY_REFRESH_S = 60.0                          # §4.3 new-epoch trigger
-RELABEL_EPOCH_FRACTION = 0.40
+RELABEL_EPOCH_FRACTION = 0.50                    # of the labelled area, per pixel (_relabelled_fraction)
 MATCH_IOU = 0.5                                  # same id (§4 T)
 VERIFY_IOU = 0.7                                 # re-verification (§4.3)
 VERIFY_DE = 6.0
@@ -718,19 +719,31 @@ class VectorEncoder:
 
     @staticmethod
     def _relabelled_fraction(prev: np.ndarray, prev_lab: np.ndarray, cur: np.ndarray, regions: list) -> float:
-        """Share of the labelled area whose region has no partner in the
-        previous capture with IoU ≥ 0.5 and ΔE76 ≤ 6 (the "40 % relabelled"
-        trigger of §4.3)."""
-        if int(prev.max()) < 0:                              # the last capture had no region
-            return 1.0 if (cur >= 0).any() else 0.0
-        at, p, iou, area_c = VectorEncoder._partners(prev, cur, regions)
-        total = float(area_c[1:].sum())
-        if total <= 0 or not len(at):
+        """The relabel trigger of §4.3: the share of the labelled area — the
+        pixels an L1 region describes in this capture — whose description
+        changed since the previous capture, i.e. the pixel lay in no region
+        then (sky L0 owned, a speck, a region past MAX_REGIONS) or its
+        region's colour then and now differ by ΔE76 > VERIFY_DE.
+
+        Per pixel, not per region (RS-13.1 A8): a region-level IoU ≥ 0.5 test
+        counted a mass that split in two, or merged along a bridge that
+        noise opened or closed, as wholly relabelled although every pixel
+        kept its colour, so a static noisy view or a slow pan restarted the
+        epoch on most frames. A camera change recolours most pixels at once.
+        The denominator is the labelled area, not the valid area (review C9):
+        in a sky-heavy view L0 owns most of the valid area, and a full
+        relabel of the regions stays under any valid-area threshold."""
+        now = cur >= 0
+        total = int(now.sum())
+        if total == 0 or not regions:
             return 0.0
-        lab = np.stack([regions[i].lab for i in at])
-        bad = (iou < MATCH_IOU) | (vx.delta_e76(lab, prev_lab[p - 1]) > VERIFY_DE)
-        cols = np.array([regions[i].index + 1 for i in at], np.intp)
-        return float(area_c[cols[bad]].sum()) / total
+        was = prev >= 0
+        both = now & was
+        changed = total - int(both.sum())                  # newly labelled pixels
+        if both.any() and len(prev_lab):
+            cur_lab = np.stack([r.lab for r in regions])     # regions are in index order
+            changed += int((vx.delta_e76(cur_lab[cur[both]], prev_lab[prev[both]]) > VERIFY_DE).sum())
+        return changed / total
 
     def _commit_epoch(self, clear: int, level: int, now: float) -> None:
         """The epoch start went out: advance the counter and start the epoch's
@@ -764,7 +777,7 @@ class VectorEncoder:
             # A base that missed a DEL still holds that shape for TTL_FRAMES
             # of its own applied frames; a DIGEST naming the live set without
             # it mismatches there and, three in a row, puts a healthy base
-            # into resync (§4.3), which only the next epoch start ends. So no
+            # into resync (§4.3) until the base matches again. So no
             # DIGEST goes until every id freed inside the last TTL_FRAMES
             # frames has certainly expired at the base.
             young = [fr[0] for i, fr in self._id_freed.items()
