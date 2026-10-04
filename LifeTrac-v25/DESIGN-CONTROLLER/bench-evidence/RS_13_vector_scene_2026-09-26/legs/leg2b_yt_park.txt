@@ -1,0 +1,7 @@
+# leg 2b_yt park, 2026-10-03T21:37:24Z PC clock
+base:    PARK_TRANSIENT {"opmode_readback": "0x80", "opmode_after_settle": "0x85", "settle_s": 1.5}
+tractor: PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+# leg 2b_yt base re-park after PARK_TRANSIENT (scan SM still walking), 2026-10-03T21:39:06Z PC clock
+base:    PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+base state (read-only): RADIO_STATE {"reg_op_mode": "0x80", "mode": "SLEEP", "lora": true, "transmitting_or_listening": false}
+tractor state (read-only): RADIO_STATE {"reg_op_mode": "0x80", "mode": "SLEEP", "lora": true, "transmitting_or_listening": false}

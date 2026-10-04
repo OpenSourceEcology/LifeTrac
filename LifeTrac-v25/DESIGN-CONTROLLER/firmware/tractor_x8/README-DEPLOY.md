@@ -5,11 +5,23 @@ Runs the camera encoder pipeline on the tractor X8, publishing TileDeltaFrames t
 
 ## Steps (bench, production path)
 
-1. **Build the image**
+1. **Build the image — for linux/arm64 — and get it onto the tractor**
    ```sh
    cd LifeTrac-v25/DESIGN-CONTROLLER/firmware/tractor_x8
+   # on an amd64 PC with Docker (buildx):
+   docker buildx build --platform linux/arm64 -t lifetrac-tractor-x8:latest --load .
+   # or natively on an aarch64 board with internet (for example the base X8):
    docker build -t lifetrac-tractor-x8:latest .
+   docker save lifetrac-tractor-x8:latest | gzip > lifetrac-tractor-x8.tgz
    ```
+   The compose file (`docker-compose.yml`) runs `image: lifetrac-tractor-x8:latest`
+   and has no `build:`, so step 3 never builds: the image must already be on the
+   tractor. A tractor without internet cannot build it (pip needs the numpy and
+   OpenCV wheels), so copy the tarball to its disk (`/home/fio`, not the tmpfs
+   `/tmp`), keep the old image (`docker tag lifetrac-tractor-x8:latest
+   lifetrac-tractor-x8:pre-<change>`) and load the new one with
+   `sudo docker load -i /home/fio/lifetrac-tractor-x8.tgz` (`-i`, not stdin:
+   `sudo -S` would eat it).
 2. **Deploy to tractor X8**
    - Tar up the tractor_x8 directory (excluding __pycache__, .logs, etc.)
    - `adb push` to `/tmp/lifetrac-tractor_x8.tgz`
@@ -19,7 +31,10 @@ Runs the camera encoder pipeline on the tractor X8, publishing TileDeltaFrames t
      tar -xzf /tmp/lifetrac-tractor_x8.tgz -C /opt/lifetrac/compose-apps/lifetrac-camera --strip-components=1
      chown -R fio:fio /opt/lifetrac/compose-apps/lifetrac-camera
      ```
-3. **Restart the systemd unit**
+3. **Restart the systemd unit** (production only — on the radio bench
+   `/dev/ttymxc3` is the L072 radio UART, and the compose file maps it as the
+   M7 port; the bench harness stops this unit, see
+   `x8_lora_bootloader_helper/bench_tools/RS13_VECTOR_LEG.md` step 0)
    ```sh
    sudo systemctl restart lifetrac-camera
    sudo systemctl status lifetrac-camera

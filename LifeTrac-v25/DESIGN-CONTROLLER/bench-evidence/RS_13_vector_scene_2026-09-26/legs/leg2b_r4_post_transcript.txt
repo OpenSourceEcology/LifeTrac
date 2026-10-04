@@ -1,0 +1,62 @@
+15:32:15Z == leg 2b_r4 post (archive /c/Users/dorkm/Documents/GitHub/LifeTrac/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261004_103105_4ab58b8d)
+15:32:15Z -- waiting for the base capture (rs13_cap_base) to finish its 480 s
+== vector dry run summary ==
+profile image_bw250: one-fragment limit 203 B (epoch starts 202 B)
+frames: 558 total, 558 vector, 0 other, 0 unparseable; by codec {'vector': 558}
+wire bytes (vector): min 35 / p50 201 / p95 203 / max 203; over limit: 0
+epoch starts: 31 received, 31 applied
+arrival: 1.99 fps mean over 279.5 s; gap p50 0.55 s, p95 0.61 s, max 1.00 s; first applied at +0.00 s (0 frame(s) before it)
+store: applied 558, bad 0 , epoch_behind 0, orphans 103, digest 519 checked / 41 mismatched, epochs 32, handovers 31, ttl_dropped 2, resync 3 (2 ended by DIGEST), records 19991
+resync: 2 episode(s), 42 frame(s): #0-#34 (34, 17.0 s, digest), #393-#401 (8, 4.0 s, digest)
+scene: epoch 15, level 0, badge 7, digest_ok None, horizon none, L1=24 L2=0 L3=1 L4=0, cal_rev None, anchor age 7158 ms
+checks:
+  [PASS] parse_ok       0 unparseable payload(s)
+  [PASS] all_vector     0 non-vector frame(s): {'vector': 558}
+  [PASS] one_fragment   0 over 203 B (epoch starts 202 B); max 203 B
+  [PASS] store_clean    frames_bad=0 
+  [FAIL] no_orphans     orphans=103
+  [FAIL] digest         519 checked, 41 mismatched, scene digest_ok=None
+  [PASS] epoch_seen     31 epoch start(s) applied of 31 received
+  [PASS] first_apply    0 frame(s) before the first apply
+  [PASS] applied_ratio  558/558 applied = 100.0% (need >= 90%)
+  [PASS] min_frames     558 vector frame(s), need >= 500
+RESULT: FAIL
+json report -> /work/legs/leg2b_r4_base.json
+/tmp/lifetrac_strict/legs/leg2b_r4_base.txt: 1 file pulled, 0 skipped. 3.3 MB/s (49041 bytes in 0.014s)
+/tmp/lifetrac_strict/legs/leg2b_r4_base.jsonl: 1 file pulled, 0 skipped. 6.0 MB/s (264280 bytes in 0.042s)
+/tmp/lifetrac_strict/legs/leg2b_r4_base.json: 1 file pulled, 0 skipped. 0.7 MB/s (2600 bytes in 0.004s)
+15:33:19Z -- post-brackets (rs115) both boards
+radio_rx_ok=3842 radio_crc_err=67 radio_tx_ok=101  (base)
+radio_rx_ok=0 radio_crc_err=0 radio_tx_ok=608  (tractor)
+15:33:23Z -- rs12_leg_report + frag_gap_report
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=250  force_frf_hz=0  git_sha=4ab58b8d  
+  (tx frags_ok counter 587 is stale; using 603 fragments from per-frame TX events)
+loss 65/603 = 10.8%   crc_dumps=1  timeouts=0  published=538
+radio deltas: {'radio_dio0': 560, 'radio_rx_ok': 558, 'radio_crc_err': 1, 'radio_tx_ok': 0}
+FIRMWARE DROP (drx_ok - host URCs): 558 - 538 = 20
+identity residue: 1
+n_frag=554 span=277s max_gap=1.0s gaps>3s=0 total_silent=0.0s
+episodes (start s from first frag, +length): NONE
+base sends on air=0 | tractor decoded cmds=0
+15:33:23Z -- P2 / P4 from the archive
+# leg 2b_r4 P2/P4 greps on /c/Users/dorkm/Documents/GitHub/LifeTrac/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261004_103105_4ab58b8d
+published frame_id lines (rx_daemon.log): 554
+tx done K=1 lines: 603
+tx done K>=2 lines: 0
+tx ABORTED lines: 0
+max K: 1 fragments
+camera_service vector_stats lines: 133
+tx drops before air (last tx stats line): drop_full=0 drop_stale=0 
+tractor FHSS authority (post bracket): tx_first_anchor=1 tx_stream_streak_max=607 
+seq-gap loss (per codec run): C:\Users\dorkm\AppData\Local\Python\pythoncore-3.14-64\python.exe: can't open file 'C:\\c\\Users\\dorkm\\AppData\\Local\\Temp\\claude\\C--Users-dorkm-Documents-GitHub-LifeTrac\\5eaec8c2-12ac-4272-80af-b19d1a563f48\\scratchpad\\leg_replay.py': [Errno 2] No such file or directory
+vector_stats lines: 133
+encoder ms_total: p50 245.3 / p95 278.0 / max 311.7
+stage p50 ms: resize=0.5 l0=17.7 l1=93.3 l3=50.1 temporal_pack=81.8
+frame bytes: p50 202 / max 203
+levels seen: {'0': 133}; lines with a pending epoch start: 0
+last: epoch 15 n_live 31 residual 2915.771 detail 80 epochs 32 trigger safety ttl_dropped 0 waiting 6
+15:33:24Z -- park both radios
+# leg 2b_r4 park, 2026-10-04T15:33:24Z PC clock
+base:    PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+tractor: PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+15:33:31Z == leg 2b_r4 post done

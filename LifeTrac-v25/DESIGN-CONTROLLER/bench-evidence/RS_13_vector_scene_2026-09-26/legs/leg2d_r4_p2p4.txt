@@ -1,0 +1,16 @@
+# leg 2d_r4 P2/P4 greps on /c/Users/dorkm/Documents/GitHub/LifeTrac/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261004_110423_4ab58b8d
+published frame_id lines (rx_daemon.log): 597
+tx done K=1 lines: 609
+tx done K>=2 lines: 0
+tx ABORTED lines: 0
+max K: 1 fragments
+camera_service vector_stats lines: 54
+tx drops before air (last tx stats line): drop_full=0 drop_stale=0 
+tractor FHSS authority (post bracket): tx_first_anchor=0 tx_stream_streak_max=0 
+seq-gap loss (per codec run): leg 2d_r4: 600 frames received; seq gaps within same-codec runs (row, lost): [(137, 1), (174, 1), (185, 1), (235, 1), (347, 1), (374, 1), (429, 1), (500, 1), (513, 1), (526, 1), (539, 1), (552, 1), (593, 1)] -> 13 lost of 613 = 2.1 % after the first received frame (2 codec switch(es) not counted)
+  resync episodes (start, end, ended by key): [(139, 158, False), (176, 231, True), (347, 348, True)]
+  all ended by an epoch start: False; final resync False, digest_ok True
+  last DIGEST checked (row, result): (358, 'ok'); last epoch start row 350, 249 frame(s) before the end (no DIGEST inside TTL_FRAMES+3 of a range-1/2 start, encode_vector.py)
+  key rows (32): [124, 125, 231, 232, 234, 235, 236, 238, 239, 241, 247, 250, 252, 256, 257, 260, 263, 265, 270, 274, 278, 281, 291, 292, 293, 307, 308, 323, 345, 346, 348, 350]
+  BAD rows (77): [137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 347]
+  orphan bursts top: [(347, 13), (174, 9), (185, 9), (137, 6), (138, 2), (175, 2), (176, 2), (177, 2)]; orphans 87, ttl_dropped 1

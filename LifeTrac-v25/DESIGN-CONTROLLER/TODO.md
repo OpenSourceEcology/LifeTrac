@@ -3179,11 +3179,101 @@ test; the `TxPipeline` v2/v3 default cost 38 points of command delivery across
 
 ---
 
-### RS-13 — Vector scene mode (VS1) — *proposed 2026-09-23, not started*
+### RS-13 — Vector scene mode (VS1) — *Phase 1 prototype merged 2026-09-26 (#135); RS-13.1 bench campaign complete 2026-10-04 (#138 encoder fix, #139 evidence): GO for the RS-13.2 desk check*
 
 Design: [VECTOR_SCENE.md](VECTOR_SCENE.md). Research and review record: [2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md](../AI%20NOTES/2026-09-22_Vector_Scene_Research_ClaudeOpus5_5_v1_0.md). Decisions D-VS1–D-VS9 (D-VS3/D-VS3a withdrawn) in [DECISIONS.md](DECISIONS.md#vector-scene-mode--proposed-pending-ose-sign-off).
 
 **What it is.** A new `TileDeltaFrame` codec (`6`, VECTOR) and encode mode (`EncodeMode.VECTOR = 9`) that sends the whole camera frame as layered, gradient-filled vector shapes in **one fragment** per frame (197 B body at FHSS, 237 B at DTS): horizon + sky/ground gradients, polygons in measured colours, trees as ellipses, edge lines, persistent shape IDs, a CAD self-model of the hood at the base. It is a floor below `mono_g4` in coverage per fragment, with no keyframe trains, so it cannot feed the FHSS keyframe storm (RS-12.12/12.14). Blocker IDs match [VECTOR_SCENE.md §10](VECTOR_SCENE.md#10-prerequisites-and-blockers).
+
+**Status 2026-10-04 — RS-13.1 done.** Record:
+[`bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md`](bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md)
+(procedure [`RS13_VECTOR_LEG.md`](firmware/x8_lora_bootloader_helper/bench_tools/RS13_VECTOR_LEG.md)).
+- On 09-26, step 1 (camera only, loss-free) failed with the shipped encoder:
+  its DIGEST mirror drifted from the base store (A1–A5).
+- #138 fixed the mirror and added several follow-on changes:
+  - deterministic k-means;
+  - store TTL hand-over fix;
+  - a resync now also ends on 3 matching DIGESTs;
+  - per-pixel relabel trigger;
+  - perf rewrite, encoder p95 ≈ 478 → 223 ms on the X8.
+- Step 1 now passes on every scene.
+- Radio legs were flown in three rounds: 1 fps on 09-27 and 10-03, **2 fps on
+  10-04**.
+- At 2 fps, P1 (loss rule), P2, P3, P4, P5 and P7 pass on every leg. The
+  tractor holds FHSS time authority (streak 607), and the forward switch and
+  acks pass.
+- Missed by the letter: P8's ±20 % band on 2a/2b (A17), and P6's return clause
+  at 2 fps (A18).
+- Review after the round: **no further radio test is needed now** (RESULTS,
+  "Remaining radio tests").
+- Every DTS leg flew on 915.000 MHz, the channel of the RS-11.6 emitter (A19).
+  The procedure now pins a spot-checked carrier.
+
+**RS-13.2 and the follow-ups from RS-13.1** (in order; radios only on an
+explicit GO)
+
+- [ ] **A16 — loss repair on a saturated stream (first item).**
+  - A lost DEL leaves a ghost, which holds the base store in resync for
+    ≥ 20 frames.
+  - The store refuses CONFIRMs in resync, so CONFIRM-only shapes TTL-expire at
+    the base while the encoder still counts them live.
+  - The slot-7 carousel, packed last, never re-sends them, so the base stays
+    shapes short until the next epoch start (~30 s, twice on air).
+  - Reproduced off air: `bench-evidence/RS_13_vector_scene_2026-09-26/scripts/a16_sil.py`
+    (shipped encoder 33/100 at bw500, 60/100 at bw250).
+  - Fix both paths:
+    - a guaranteed repair share that also covers repeat-pending shapes, which
+      a plain κ floor misses;
+    - and shorten the ghost resync, or keep CONFIRM-only shapes alive through
+      it. Accepting a matching CONFIRM in resync is the cleanest SIL result,
+      but it contradicts §4.3's tag guard, so it is a design decision.
+  - Add SIL tests in `test_vector_sync.py`.
+  - Acceptance: `a16_sil.py` 0/100 at both budgets, recovery ≤ ≈ 25 frames.
+  - Add carousel counters to `vector_stats`.
+- [ ] **Code guards (no radio).**
+  - Never batch codec-6 frames. The `-TxBatch 1` guard prices a frame with the
+    4 B batch header, so near-full 243 B frames would go out as 2 fragments.
+  - Clamp the VECTOR byte budget to one fragment until `link_budget` arrives
+    (2a_r4 started at `byte_budget=2436`).
+  - Fix the double epoch start on each VECTOR entry (`first`, then `forced`).
+  - Pre-build the encoder so a mode switch never leaves a ≥ 1 s TX gap. 2d_r4
+    had 1.038 s; on FHSS that breaks the strict authority streak. Add a
+    `check-rx-grid-policy` SIL case.
+- [ ] **A8 — relabel on air:** 12–14 relabels per 5-minute leg on the railroad
+  video. Count exact triggers camera-only, and state a target rate before
+  tuning.
+- [ ] **Procedure:**
+  - P8 as an absolute bound, p95 ≤ the 350 ms budget (A17);
+  - P6's return clause to count the in-flight frame (A18);
+  - write the FHSS P6 bound on paper.
+- [ ] **Images.**
+  - Rebuild the tractor image from the SHA that carries the A16 fix, then run
+    step 0/1 camera-only from `/app`. Add a bw500 video pass as the P8
+    reference for bw500 legs.
+  - Rebuild the base image too. The deployed `4623980c2dac` (d3751286)
+    predates all VECTOR web_ui/store code, and its stale-tile worker would put
+    a `0x6C` on air every ≥ 10 s during VECTOR. Never start `lora_bridge`.
+- [ ] **RS-13.2 desk check:** the browser on the production compose (base:
+  `mosquitto` + rebuilt `web_ui` only), replaying the round-4 captures.
+- [ ] VECTOR_SCENE.md amendments listed in #138 (design owner), plus #138's
+  DIGEST exit from resync (§4.3).
+- [ ] **Next radio session = the range-edge session** (on GO, after the items
+  above):
+  - a receive-only channel spot-check, then `-ForceFrfHz <pick>` on every DTS
+    leg;
+  - a 0 dB step with VECTOR and mono_g4 interleaved (2c, 2a, 2c′, 2a′) and
+    `-ReactiveFire 1 -ProbeEcho 0`, which gives the §8.6 command-delivery row
+    (never measured in RS-13.1) and the A16-fix confirmation;
+  - the 3 dB attenuator steps at V0 over a conducted, shielded path;
+  - `-TxBatch 0` throughout.
+- [ ] FHSS command-delivery and switch legs ("2d on profile 1"), after the
+  RS-12.15 reverse-delivery firmware fix. Before it they would measure that
+  defect, not VECTOR.
+- [ ] A live web_ui leg (UI-driven switch, web_ui as an uplink actor), after the
+  base image rebuild.
+- [ ] Production-stack VECTOR legs, after B1, RS-9.2/9.4 and a production-legal
+  DTS carrier (RS-11.7). The boards run the bench (register-write diag) L072
+  build.
 
 **Phase 0 — decisions**
 
@@ -3191,24 +3281,24 @@ Design: [VECTOR_SCENE.md](VECTOR_SCENE.md). Research and review record: [2026-09
 
 **Phase 1 — SIL + Vector Lab on the base website** (needs no radio)
 
-- [ ] Shared pure-stdlib codec `base_station/image_pipeline/vector_scene/` (`codec.py`, `scene_state.py`, `extract.py`, `selfmask.py`, `self_model_geom.py`)
-- [ ] `opencv-python-headless` in `base_station/requirements-dev.txt` (numpy landed with #130) so CI runs `test_vector_encoder.py` and the Lab tests instead of skipping them
-- [ ] `base_station/image_pipeline/vector_scene_store.py` and `self_model.py`
-- [ ] Snapshot keys `vector_scene`, `self_model`, `safety_detector`; populate `encode_mode` (never updated today, `state_publisher.py:45`)
-- [ ] `web/img/vector_renderer.js` + `self_model_overlay.js` on their own overlay canvases (never on `#image-canvas`: `source_guard.js` samples it); badges 7 `VECTOR` / 8 `MODEL` in `badge_renderer.js`
+- [~] Shared pure-stdlib codec `base_station/image_pipeline/vector_scene/` — `codec.py` landed (#135; mirrored on the tractor as `vs1_codec.py`, parity test); `scene_state.py`, `extract.py`, `selfmask.py`, `self_model_geom.py` not written
+- [x] `opencv-python-headless` in `base_station/requirements-dev.txt` (`4.14.0.94`, the CI pin; numpy landed with #130)
+- [~] `base_station/image_pipeline/vector_scene_store.py` landed (#135, fixed in #138); `self_model.py` not written
+- [~] Snapshot keys `vector_scene`, `self_model`, `safety_detector` landed (#135); populating `encode_mode` (`state_publisher.py:45`) not verified
+- [~] `web/img/vector_renderer.js` on its own overlay canvas and badges 7 `VECTOR` / 8 `MODEL` in `badge_renderer.js` landed (#135); `self_model_overlay.js` not written
 - [ ] Vector Lab: `/vector_lab` page, `/api/vector_lab/*`, `vector_lab` sidecar worker, `tools/feed_canvas.py` on `lab/*` topics, bounded hand-drawn self-mask
-- [ ] **B2** `EncodeMode.VECTOR = 9` in `lora_proto.py` (`RAWSTREAM = 8` landed in #131, 2026-09-24); **B3** codec-6 branch in `frame_format.parse_tile_delta_frame` / `encode_tile_delta_frame`; **B7** `x8_image_pipeline/register.py` sign and confidence (fix open in #130)
-- [ ] Degradation ladder V0–V3 (`VECTOR_SCENE.md` §4.5): frame-size / carousel / repeat / detail per level, loss from the VS frame `seq`, SNR margin from `RX_FRAME_URC`, level carried as the band of the `0x63` quality byte (one mapping, §4.5.4), tractor self-select from received-frame SNR and heartbeat silence (`LINK_HB` every 5 s of command silence; no silence-based step without it)
-- [ ] Tests: `test_vector_codec.py`, `test_vector_codec_fuzz.py`, `test_frame_format_vector.py`, `test_vector_encoder.py`, `test_register.py`, `test_vector_scene_store.py`, `test_vector_policy_sil.py`, `test_vector_degradation_sil.py`, `test_self_model_sil.py`, `test_web_ui_vector.py`, `test_vector_lab_routes.py`
+- [x] **B2** `EncodeMode.VECTOR = 9` in `lora_proto.py` and **B3** the codec-6 branch in `frame_format` (#135); **B7** `register.py` sign and confidence (#130, merged)
+- [ ] Degradation ladder V0–V3 (the encoder has per-level frame/carousel/repeat parameters; only V0 has ever been seen on air, and nothing selects a level yet) (`VECTOR_SCENE.md` §4.5): frame-size / carousel / repeat / detail per level, loss from the VS frame `seq`, SNR margin from `RX_FRAME_URC`, level carried as the band of the `0x63` quality byte (one mapping, §4.5.4), tractor self-select from received-frame SNR and heartbeat silence (`LINK_HB` every 5 s of command silence; no silence-based step without it)
+- [~] Tests — landed: `test_vector_codec.py`, `test_frame_format_vector.py`, `test_vector_encoder.py`, `test_register.py`, `test_vector_scene_store.py`, `test_web_ui_vector.py`, `test_vector_interop.py`, `test_vector_sync.py` (#138), `test_vector_fastpaths.py`, `test_vector_dry_run_sil.py`; still to write: `test_vector_codec_fuzz.py` (fuzz cases live in `test_vector_codec.py` for now), `test_vector_policy_sil.py`, `test_vector_degradation_sil.py`, `test_self_model_sil.py`, `test_vector_lab_routes.py`
 
 **Phase 2 — strict-path integration + bench legs**
 
-- [ ] `camera_service.py`: mode 9 in `_ENCODE_MODE_IMPLEMENTED`, `_ENCODE_MODE_CODEC[9] = 6`, branch at the `_build_frame` call to `x8_image_pipeline/encode_vector.py`, quality byte → detail level
-- [ ] `image_rx_daemon.py`: `_CODEC_NAMES[6]`, accept modes 8/9
-- [ ] `web_ui.py`: route codec-6 frames to the store; gate `_tile_stale_worker` off while the received codec is 6; `"vector"` in `_ENCODE_MODE_UI_CHOICES` and the cycle order; `settings.html`
-- [ ] **B1** deploy the daemons in the stock compose/systemd config (RS-4.8); **B6** declare numpy/OpenCV in the tractor image
+- [x] `camera_service.py`: mode 9, codec 6, the encoder branch, quality byte → detail level (#135; on air in RS-13.1)
+- [x] `image_rx_daemon.py`: `_CODEC_NAMES[6] = "vector"`, mode-aware ack clamp (#135; `rx_codec_name: vector` on air)
+- [x] `web_ui.py`: codec-6 frames to the store, `_tile_stale_worker` gated off in VECTOR, `"vector"` choice with its 60–100 detail dial, `settings.html` (#135). The deployed base image predates it (RS-13.2 item above)
+- [~] **B1** deploy the daemons in the stock compose/systemd config (RS-4.8): not done, every on-air result is from the bench harness. **B6** numpy/OpenCV declared in `firmware/tractor_x8/requirements.txt`; image `2727dfd36f9f` built with them on the base X8 (cv2 5.0)
 - [ ] **B4** D-VS6 encode floor in `AutoRadioPolicy` (lock loss now; loss-driven once the RS-12.20 gap detector lands); D-VS6b tractor self-select; **B5** AE/AWB lock
-- [ ] Bench legs `bench-evidence/RS_13_vector_scene_<date>/RESULTS.md`: camera workload, p2 then p1, scored on frames published, fragment loss, command delivery and time-to-first-picture against `mono_g4`; storm signature on FHSS must be absent
+- [x] Bench legs `bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md` (RS-13.1, #139): camera workload, p2 and p1, 1 fps and 2 fps, frames published, fragment loss and the switch against `mono_g4`; no storm signature on FHSS. **Command delivery was not measured** (no base commands on 2a/2b/2c) — it moves to the range-edge session's 0 dB step above
 - [ ] Range-edge leg with the RF attenuator (3 dB steps): level reached, VS frames/s and command delivery per step, against `mono_g4`; first field-range data for the campaign (`VECTOR_SCENE.md` §8.6)
 
 **Phase 3 — self-model**

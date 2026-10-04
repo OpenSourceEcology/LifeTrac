@@ -1,0 +1,63 @@
+16:04:35Z == leg 2d_r4 post (archive /c/Users/dorkm/Documents/GitHub/LifeTrac/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261004_110423_4ab58b8d)
+16:04:35Z -- waiting for the base capture (rs13_cap_base) to finish its 480 s
+== vector dry run summary ==
+profile image_bw500: one-fragment limit 243 B (epoch starts 242 B)
+frames: 600 total, 235 vector, 365 other, 0 unparseable; by codec {'mono_g4': 365, 'vector': 235}
+wire bytes (vector): min 103 / p50 242 / p95 243 / max 243; over limit: 2
+epoch starts: 32 received, 32 applied
+arrival: 1.95 fps mean over 120.2 s; gap p50 0.50 s, p95 0.59 s, max 1.01 s; first applied at +62.47 s (0 frame(s) before it)
+store: applied 235, bad 0 , epoch_behind 0, orphans 87, digest 235 checked / 77 mismatched, epochs 33, handovers 32, ttl_dropped 1, resync 3 (1 ended by DIGEST), records 9790
+resync: 3 episode(s), 75 frame(s): #139-#158 (19, 9.5 s, digest), #176-#231 (55, 28.3 s, epoch start), #347-#348 (1, 0.5 s, epoch start)
+scene: epoch 0, level 0, badge 7, digest_ok True, horizon abs, L1=19 L2=0 L3=0 L4=0, cal_rev None, anchor age 100 ms
+checks:
+  [PASS] parse_ok       0 unparseable payload(s)
+  [FAIL] all_vector     365 non-vector frame(s): {'mono_g4': 365, 'vector': 235}
+  [FAIL] one_fragment   2 over 243 B (epoch starts 242 B); max 243 B
+  [PASS] store_clean    frames_bad=0 
+  [FAIL] no_orphans     orphans=87
+  [FAIL] digest         235 checked, 77 mismatched, scene digest_ok=True
+  [PASS] epoch_seen     32 epoch start(s) applied of 32 received
+  [PASS] first_apply    0 frame(s) before the first apply
+  [PASS] applied_ratio  235/235 applied = 100.0% (need >= 90%)
+  [FAIL] min_frames     235 vector frame(s), need >= 500
+RESULT: FAIL
+json report -> /work/legs/leg2d_r4_base.json
+/tmp/lifetrac_strict/legs/leg2d_r4_base.txt: 1 file pulled, 0 skipped. 3.0 MB/s (45863 bytes in 0.015s)
+/tmp/lifetrac_strict/legs/leg2d_r4_base.jsonl: 1 file pulled, 0 skipped. 6.0 MB/s (297386 bytes in 0.047s)
+/tmp/lifetrac_strict/legs/leg2d_r4_base.json: 1 file pulled, 0 skipped. 0.9 MB/s (2852 bytes in 0.003s)
+16:06:40Z -- post-brackets (rs115) both boards
+radio_rx_ok=5634 radio_crc_err=115 radio_tx_ok=103  (base)
+radio_rx_ok=2 radio_crc_err=1 radio_tx_ok=616  (tractor)
+16:06:44Z -- rs12_leg_report + frag_gap_report
+train_gap_ms=40  tx_pipeline_depth=2  synth_budget_b=250  force_frf_hz=0  git_sha=4ab58b8d  
+  (tx frags_ok counter 606 is stale; using 609 fragments from per-frame TX events)
+loss 15/609 = 2.5%   crc_dumps=13  timeouts=0  published=594
+radio deltas: {'radio_dio0': 620, 'radio_rx_ok': 603, 'radio_crc_err': 13, 'radio_tx_ok': 2}
+FIRMWARE DROP (drx_ok - host URCs): 603 - 594 = 9
+identity residue: 2
+n_frag=597 span=306s max_gap=1.0s gaps>3s=0 total_silent=0.0s
+episodes (start s from first frag, +length): NONE
+base sends on air=2 | tractor decoded cmds=2
+tractor cmd offsets (s from its first): 0.0, 120.7
+16:06:45Z -- P2 / P4 from the archive
+# leg 2d_r4 P2/P4 greps on /c/Users/dorkm/Documents/GitHub/LifeTrac/LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/radio_monitor_20261004_110423_4ab58b8d
+published frame_id lines (rx_daemon.log): 597
+tx done K=1 lines: 609
+tx done K>=2 lines: 0
+tx ABORTED lines: 0
+max K: 1 fragments
+camera_service vector_stats lines: 54
+tx drops before air (last tx stats line): drop_full=0 drop_stale=0 
+tractor FHSS authority (post bracket): tx_first_anchor=0 tx_stream_streak_max=0 
+seq-gap loss (per codec run): leg 2d_r4: 600 frames received; seq gaps within same-codec runs (row, lost): [(137, 1), (174, 1), (185, 1), (235, 1), (347, 1), (374, 1), (429, 1), (500, 1), (513, 1), (526, 1), (539, 1), (552, 1), (593, 1)] -> 13 lost of 613 = 2.1 % after the first received frame (2 codec switch(es) not counted)
+vector_stats lines: 54
+encoder ms_total: p50 236.1 / p95 262.9 / max 273.6
+stage p50 ms: resize=0.5 l0=17.7 l1=91.7 l3=44.7 temporal_pack=74.1
+frame bytes: p50 241 / max 243
+levels seen: {'0': 54}; lines with a pending epoch start: 0
+last: epoch 0 n_live 17 residual 5193.08 detail 80 epochs 33 trigger horizon ttl_dropped 0 waiting 15
+16:06:46Z -- park both radios
+# leg 2d_r4 park, 2026-10-04T16:06:46Z PC clock
+base:    PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+tractor: PARK_OK {"opmode_readback": "0x80", "opmode_after_settle": "0x80", "settle_s": 1.5}
+16:06:53Z == leg 2d_r4 post done

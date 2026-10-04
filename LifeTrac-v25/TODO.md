@@ -3985,19 +3985,51 @@ the next round of code lands against a clear contract.
 
 ---
 
-### L. Vector scene mode and coordinated modem-rung switch (proposed 2026-09-23)
+### L. Vector scene mode and coordinated modem-rung switch (proposed 2026-09-23; vector mode prototyped and bench-tested 2026-09-26 → 10-04)
 
-Design proposals, not started; sign-off items D-VS1–D-VS9 in
+The vector scene mode has a working prototype (#135) with an encoder fix
+(#138), and finished its first bench campaign, RS-13.1 (#139): GO for the
+RS-13.2 desk check. The rung switch is still a proposal. Sign-off items D-VS1–D-VS9 in
 [DESIGN-CONTROLLER/DECISIONS.md](DESIGN-CONTROLLER/DECISIONS.md#vector-scene-mode--proposed-pending-ose-sign-off),
 task list in [DESIGN-CONTROLLER/TODO.md § RS-13](DESIGN-CONTROLLER/TODO.md),
 specification in [DESIGN-CONTROLLER/VECTOR_SCENE.md](DESIGN-CONTROLLER/VECTOR_SCENE.md).
 
 - [ ] **Vector scene mode (RS-13):** a `TileDeltaFrame` codec `6` / `EncodeMode.VECTOR = 9` that sends the whole camera frame as layered vector shapes in one fragment (197 B FHSS / 237 B DTS), with persistent shape IDs, no keyframe trains and no keyframe requests; the floor below `mono_g4` when the signal is degraded and the tile modes are failing. Phases: SIL + Vector Lab → strict-path integration + bench legs → self-model → optimisations.
+  - **Status 2026-10-04.** Codec, store, renderer, strict-path integration and encoder landed (#135, #138). The Vector Lab, the self-model and the degradation ladder are not built yet.
+  - RS-13.1 flew on the bench at 1 and 2 fps ([RESULTS](DESIGN-CONTROLLER/bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md)):
+    - one fragment per frame;
+    - no FHSS storm;
+    - over-the-air switch;
+    - encoder p95 223 ms on the X8.
+  - Next: the RS-13.2 desk check and the A16 loss-repair fix. Then the range-edge session, which is the next radio work ([DESIGN-CONTROLLER/TODO.md § RS-13](DESIGN-CONTROLLER/TODO.md)).
 - [ ] **Degradation ladder V0–V3** (`VECTOR_SCENE.md` §4.5): shorter frames, more repeats and less detail as measured loss and SNR margin worsen; no acknowledgement or retry traffic; level carried as the band of the `0x63` quality byte (one mapping, value inside the band = detail); tractor self-select from received-frame SNR and heartbeat silence (a 5 s base heartbeat is part of the design).
 - [ ] **Coordinated modem-rung switch (D-VS8, `VECTOR_SCENE.md` §4.6):** SF7/8/9 rungs inside each regulatory profile on the L072, switched with a confirmed and scheduled handshake (`0x6D`–`0x71`), a lease on the new rung, per-side revert timers and a rendezvous rung with a beacon; +5 dB (DTS) / +8 dB (FHSS) at the slowest rung, where only the vector mode keeps whole-scene coverage (a tile frame carries at most one minimal `mono_g4` tile). Needs a new L072 CFG key, a schema-2 header field, a SIL model and two bench legs; the range-edge attenuator leg would be the campaign's first field-range data.
 - [ ] **Control-plane resilience before the drive plane (D-VS9):** reserved control slot sized per rung (revive firmware Batch 2) and a fix for base → tractor delivery on FHSS (1/17 and 49/281 in the RS-12.12 legs).
 
 ## Recently completed (running log — newest first)
+
+**2026-10-04 — RS-13.1 VECTOR bench campaign complete (#138, #139).**
+Record: [RESULTS](DESIGN-CONTROLLER/bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md).
+- **Encoder fix.** The first camera-only run on 09-26 found the shipped
+  encoder's DIGEST mirror drifting from the base store (A1–A5); #138 fixed it.
+  Follow-on changes:
+  - a deterministic segmenter;
+  - a store TTL fix;
+  - resync exit on matching DIGESTs;
+  - a per-pixel relabel trigger;
+  - a perf rewrite that halved encode time to p95 223 ms.
+- **Radio legs**, flown in three rounds (the last at 2 fps):
+  - VECTOR keeps every frame in one LoRa fragment;
+  - it loses no more than the `mono_g4` control;
+  - the tractor holds FHSS time authority at 2 fps;
+  - the operator switch works over the air.
+- **Open findings:**
+  - A16: after a lost frame on a saturated stream the base can stay a shape
+    short until the next epoch start. Reproduced off air; the code fix comes
+    next.
+  - The DTS legs flew on the 915.0 MHz channel of the known bench emitter.
+    Later legs pin a spot-checked carrier.
+- No further radio test is needed before the RS-13.2 desk check.
 
 **2026-05-18 — IP-W2-09b base_station test runner with process isolation
 ([`run_tests.ps1`](DESIGN-CONTROLLER/base_station/run_tests.ps1)).**
