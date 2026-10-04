@@ -5,7 +5,8 @@ Captures TileDeltaFrame payloads from a broker, replays them through the
 base station's own parser and ``VectorSceneStore``, and reports what the
 operator's browser would have shown: wire size against the one-fragment
 limit, epoch starts, the store's verdict per frame (applied / bad /
-behind), orphans, DIGEST agreement, arrival timing and the final scene.
+behind), orphans, DIGEST agreement, the RESYNC state (per frame and as
+episodes), arrival timing and the final scene.
 
 Subcommands::
 
@@ -121,6 +122,8 @@ class FrameRow:
     vs_level: Optional[int] = None
     vs_age: Optional[int] = None
     digest: str = "-"          # "ok" | "BAD" | "-" (no DIGEST in this frame)
+    resync: bool = False       # the store is in resync after this frame (the browser's RESYNC chip)
+    resync_digest_end: bool = False   # this frame's DIGEST run ended a resync (§4.3)
 
 
 def _pct(xs: list, q: float) -> float:
@@ -185,12 +188,40 @@ class DryRun:
             row.digest = "BAD"
         elif st["digest_checks"] > self._prev["digest_checks"]:
             row.digest = "ok"
+        row.resync = bool(st["resync"])
+        # .get: a board may still run a store older than this tool (no DIGEST exit)
+        row.resync_digest_end = st.get("resync_digest_ends", 0) > self._prev.get("resync_digest_ends", 0)
         self._prev = st
         self.last_ts = ts
         self.rows.append(row)
         return row
 
     # -- report --------------------------------------------------------------
+    def resync_episodes(self) -> list:
+        """Runs of vector rows with the store in resync: ``start`` is the row
+        that entered it, ``end`` the row that left it (None: still in resync
+        when the capture ends), ``frames`` the vector rows in resync, and
+        ``ended_by`` "digest" (a run of matching DIGESTs) or "epoch start"
+        (a key frame or the epoch's first anchor), §4.3."""
+        out: list = []
+        cur: Optional[dict] = None
+        for r in self.rows:
+            if not r.vector:
+                continue
+            if r.resync and cur is None:
+                cur = {"start": r.idx, "end": None, "frames": 0, "t_start_s": r.t_rel, "t_end_s": None,
+                       "ended_by": None}
+            elif not r.resync and cur is not None:
+                cur.update(end=r.idx, t_end_s=r.t_rel,
+                           ended_by="digest" if r.resync_digest_end else "epoch start")
+                out.append(cur)
+                cur = None
+            if cur is not None:
+                cur["frames"] += 1
+        if cur is not None:
+            out.append(cur)
+        return out
+
     def summary(self) -> dict:
         vec = [r for r in self.rows if r.vector]
         parsed = [r for r in self.rows if r.parsed]
@@ -234,6 +265,7 @@ class DryRun:
                 "frames_before_first_apply": (vec.index(first_applied) if first_applied else len(vec)),
             },
             "store": st,
+            "resync_episodes": self.resync_episodes(),
             "scene": scene,
         }
         s["checks"] = self.checks(s)
@@ -286,7 +318,21 @@ def format_row(r: FrameRow) -> str:
         verdict = f"BAD:{r.reason}"
     return (f"{head}/{r.limit}{'' if r.fits else ' OVER'} K={r.frame_kind} seq={r.seq:3d} "
             f"body={r.body:3d} ep={r.vs_epoch} L{r.vs_level} age={r.vs_age} rec={r.records:2d} "
-            f"{verdict} dig={r.digest}{' EPOCH-SWITCH' if r.epoch_switched else ''}")
+            f"{verdict} dig={r.digest}{' EPOCH-SWITCH' if r.epoch_switched else ''}"
+            f"{' RESYNC' if r.resync else ''}")
+
+
+def format_episodes(eps: list) -> str:
+    """``resync: 2 episode(s), 58 frame(s): #4-#59 (55, 56.0 s, epoch start), #296-end (3)``"""
+    if not eps:
+        return "resync: none"
+    parts = []
+    for e in eps:
+        span = f"#{e['start']}-#{e['end']}" if e["end"] is not None else f"#{e['start']}-end"
+        end = f", {e['t_end_s'] - e['t_start_s']:.1f} s, {e['ended_by']}" if e["end"] is not None else ""
+        parts.append(f"{span} ({e['frames']}{end})")
+    return (f"resync: {len(eps)} episode(s), {sum(e['frames'] for e in eps)} frame(s): "
+            + ", ".join(parts))
 
 
 def format_summary(s: dict) -> str:
@@ -308,7 +354,10 @@ def format_summary(s: dict) -> str:
         f"store: applied {st['frames_applied']}, bad {st['frames_bad']} {st.get('bad_reasons') or ''}, "
         f"epoch_behind {st['epoch_behind']}, orphans {st['orphans']}, digest {st['digest_checks']} checked / "
         f"{st['digest_mismatch']} mismatched, epochs {st['epochs']}, handovers {st['handovers']}, "
-        f"ttl_dropped {st['ttl_dropped']}, resync {st['resync_events']}, records {st['records_applied']}",
+        f"ttl_dropped {st['ttl_dropped']}, resync {st['resync_events']}"
+        + (f" ({st['resync_digest_ends']} ended by DIGEST)" if "resync_digest_ends" in st else "")
+        + f", records {st['records_applied']}",
+        format_episodes(s.get("resync_episodes") or []),
     ]
     sc = s["scene"]
     if sc is None:
@@ -417,7 +466,8 @@ def format_tractor_summary(d: dict) -> str:
         f"frame bytes: p50 {d['bytes']['p50']:.0f} / max {d['bytes']['max']}",
         f"levels seen: {d['levels']}; lines with a pending epoch start: {d['epoch_pending_lines']}",
         f"last: epoch {last.get('epoch')} n_live {last.get('n_live')} residual {last.get('residual')} "
-        f"detail {last.get('detail')}",
+        f"detail {last.get('detail')} epochs {last.get('epochs', 'n/a')} trigger {last.get('trigger', 'n/a')} "
+        f"ttl_dropped {last.get('ttl_dropped', 'n/a')} waiting {last.get('waiting', 'n/a')}",
     ])
 
 

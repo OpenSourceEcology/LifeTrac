@@ -890,13 +890,22 @@ def _log_vector_stats(st: dict) -> None:
         return
     import json as _json
     ms = {k: round(float(v), 1) for k, v in (st.get("ms") or {}).items()}
+    # ``detail`` is the dial (the quality byte the encoder was given), not the
+    # encoder's 0..1 position inside the band, which ``%d`` printed as 0
+    # (RS-13.1 anomaly A5). ``epochs`` counts committed epoch starts since
+    # boot (a 2 s sample of this line still shows the rate, RS-13.1 anomaly
+    # A3), ``trigger`` names the cause of the last committed one, and
+    # ``waiting`` is how many fresh defines were refused an id last frame.
     LOG.info("camera_service: vector_stats ms_total=%.1f ms=%s bytes=%d level=%d "
-             "detail=%d epoch=%d n_live=%d residual=%.3f epoch_pending=%d",
+             "detail=%d epoch=%d n_live=%d residual=%.3f epoch_pending=%d "
+             "epochs=%d trigger=%s ttl_dropped=%d waiting=%d",
              ms.get("total", 0.0), _json.dumps(ms, separators=(",", ":")),
              int(st.get("frame_bytes", 0)), int(st.get("level", 0)),
-             int(st.get("detail", 0)), int(st.get("epoch", 0)),
+             int(VECTOR_DETAIL), int(st.get("epoch", 0)),
              int(st.get("n_live", 0)), float(st.get("residual", 0.0)),
-             int(bool(st.get("epoch_pending"))))
+             int(bool(st.get("epoch_pending"))),
+             int(st.get("epochs", 0)), st.get("last_epoch_trigger") or "none",
+             int(st.get("ttl_dropped", 0)), int(st.get("waiting", 0)))
 
 
 def _build_vector_frame(canvas: bytes, force_epoch: bool,

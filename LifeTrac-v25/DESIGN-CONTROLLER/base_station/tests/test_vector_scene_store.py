@@ -537,6 +537,19 @@ class ConfirmDigestTests(StoreCase):
         self.assertEqual(self.shapes()[1]["age_ms"], 300)
         self.assertEqual(self.st.stats["digest_mismatch"], 1)
 
+    def test_digest_with_a_wrong_n_live_is_a_mismatch(self):
+        # The crc8 passes a wrong live set 1 in 256 times; the record's n_live
+        # is the same mirror's size, so a count that differs mismatches
+        # whatever the crc says (RS-13.1 anomaly A1d).
+        self.feed(key() + [tri(1)], epoch=0, key_=True)
+        crc = vs.digest_crc([(1, self.DH1, self.SH1)], *NEUTRAL)
+        self.feed([vs.Digest(2, crc)], epoch=0)
+        self.assertFalse(self.snap()["digest_ok"])
+        self.assertEqual(self.st.stats["digest_mismatch"], 1)
+        self.feed([vs.Digest(1, crc)], epoch=0)
+        self.assertTrue(self.snap()["digest_ok"])
+        self.assertEqual(self.st.stats["digest_mismatch"], 1)
+
     def test_digest_covers_the_render_state(self):
         self.feed(key() + [tri(1)], epoch=0, key_=True)
         self.feed([vs.Gshift(1, 3, -2), vs.Gzoom(140), vs.Gain(10, 16, 20),
@@ -546,9 +559,20 @@ class ConfirmDigestTests(StoreCase):
                   epoch=0)
         self.assertTrue(self.snap()["digest_ok"])
 
-    def test_three_consecutive_mismatches_resync_until_the_next_epoch_start(self):
+    WRONG = (vs.digest_crc([(1, DH1, SH1)], *NEUTRAL) + 1) & 0xFF
+
+    def enter_resync(self) -> None:
         self.feed(key() + [tri(1)], epoch=0, key_=True)
-        wrong = (vs.digest_crc([(1, self.DH1, self.SH1)], *NEUTRAL) + 1) & 0xFF
+        for _ in range(3):
+            self.feed([vs.Digest(1, self.WRONG)], epoch=0)
+        self.assertTrue(self.st.stats["resync"])
+
+    def confirm_and_digest(self) -> list:
+        return [vs.Confirm(1, (self.SH1 & 3,)), digest([(1, self.DH1, self.SH1)])]
+
+    def test_three_consecutive_mismatches_resync_and_an_epoch_start_ends_it(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True)
+        wrong = self.WRONG
         self.feed([vs.Digest(1, wrong)], epoch=0)
         self.feed([digest([(1, self.DH1, self.SH1)])], epoch=0)      # a match resets the run
         self.feed([vs.Digest(1, wrong)], epoch=0)
@@ -558,11 +582,55 @@ class ConfirmDigestTests(StoreCase):
         self.assertTrue(self.st.stats["resync"])
         self.assertTrue(self.snap()["resync"])
         self.assertEqual(self.shapes()[1]["age_ms"], 2800)           # ages are not reset
-        self.feed([vs.Confirm(1, (self.SH1 & 3,)), digest([(1, self.DH1, self.SH1)])], epoch=0)
+        self.feed(self.confirm_and_digest(), epoch=0)
         self.assertEqual(self.shapes()[1]["age_ms"], 3300)           # nor by a matching CONFIRM in resync
+        self.assertTrue(self.st.stats["resync"])                     # one match does not end it
         self.feed(key() + [tri(1), digest([(1, self.DH1, self.SH1)])], epoch=1, key_=True)
         self.assertFalse(self.st.stats["resync"])
         self.assertEqual(self.shapes()[1]["age_ms"], 300)
+        self.assertEqual(self.st.stats["resync_digest_ends"], 0)     # the epoch start ended it
+
+    def test_three_consecutive_matches_end_a_resync_without_an_epoch_start(self):
+        self.enter_resync()
+        self.feed(self.confirm_and_digest(), epoch=0)
+        self.feed(self.confirm_and_digest(), epoch=0)
+        self.assertTrue(self.st.stats["resync"])                     # two matches: still in resync
+        self.assertEqual(self.shapes()[1]["age_ms"], 2800)           # and the CONFIRMs still reset nothing
+        self.feed(self.confirm_and_digest(), epoch=0)                # the third match ends it ...
+        self.assertFalse(self.st.stats["resync"])
+        self.assertFalse(self.snap()["resync"])
+        self.assertTrue(self.snap()["digest_ok"])
+        self.assertEqual(self.shapes()[1]["age_ms"], 300)            # ... and that frame's CONFIRM counts
+        st = self.st.stats
+        self.assertEqual((st["resync_events"], st["resync_digest_ends"], st["epochs"]), (1, 1, 1))
+        for _ in range(3):                                           # a later mismatch run re-enters
+            self.feed([vs.Digest(1, self.WRONG)], epoch=0)
+        self.assertTrue(self.st.stats["resync"])
+        self.assertEqual(self.st.stats["resync_events"], 2)
+
+    def test_a_mismatch_or_a_wrong_n_live_restarts_the_exit_run(self):
+        self.enter_resync()
+        crc = vs.digest_crc([(1, self.DH1, self.SH1)], *NEUTRAL)
+        for interrupt in (vs.Digest(1, self.WRONG), vs.Digest(2, crc)):   # wrong crc; right crc, wrong n_live
+            self.feed(self.confirm_and_digest(), epoch=0)
+            self.feed(self.confirm_and_digest(), epoch=0)
+            self.feed([interrupt], epoch=0)
+            self.assertTrue(self.st.stats["resync"], interrupt)
+        self.feed(self.confirm_and_digest(), epoch=0)
+        self.feed(self.confirm_and_digest(), epoch=0)
+        self.assertTrue(self.st.stats["resync"])
+        self.feed(self.confirm_and_digest(), epoch=0)
+        self.assertFalse(self.st.stats["resync"])
+
+    def test_frames_without_a_digest_neither_count_nor_break_the_exit_run(self):
+        self.enter_resync()
+        self.feed(self.confirm_and_digest(), epoch=0)
+        self.feed([vs.Confirm(1, (self.SH1 & 3,))], epoch=0)         # no DIGEST: refused, run unchanged
+        self.feed(self.confirm_and_digest(), epoch=0)
+        self.feed([], epoch=0)
+        self.assertTrue(self.st.stats["resync"])
+        self.feed(self.confirm_and_digest(), epoch=0)
+        self.assertFalse(self.st.stats["resync"])
 
 
 # ---------------------------------------------------------------- orphans → RESYNC (§3.4 rule 4, §4.3)
@@ -594,6 +662,26 @@ class OrphanResyncTests(StoreCase):
         self.assertTrue(self.st.stats["resync"])
         self.feed(key() + [tri(2)], epoch=1)                         # ... its repeat carries the anchor
         self.assertFalse(self.st.stats["resync"])
+
+    def test_digest_matches_end_an_orphan_resync_and_clear_the_orphan_window(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True)
+        dh, sh = vs.define_hash(tri(1)), shash(tri(1))
+        self.feed([digest([(1, dh, sh)])], epoch=0)
+        self.feed([digest([(1, dh, sh)])], epoch=0)                  # matches before the resync ...
+        for _ in range(3):                                           # 9 orphans in 9 items
+            self.feed([vs.Upd(9, 1, 1), vs.Ucol(9, FLAT), vs.Del(9)], epoch=0)
+        self.assertTrue(self.st.stats["resync"])
+        self.feed([digest([(1, dh, sh)])], epoch=0)                  # ... do not count towards its end
+        self.feed([digest([(1, dh, sh)])], epoch=0)
+        self.assertTrue(self.st.stats["resync"])
+        self.feed([vs.Confirm(1, (sh & 3,)), digest([(1, dh, sh)])], epoch=0)
+        # The 9 orphans are still inside the 10 s window: had it not been
+        # cleared, this very frame (10 items, 9 orphans) would re-enter.
+        self.assertFalse(self.st.stats["resync"])
+        self.assertEqual(self.shapes()[1]["age_ms"], 300)
+        self.feed([vs.Upd(1, 0, 0), vs.Upd(9, 1, 1)], epoch=0)       # one new orphan: below the item floor
+        self.assertFalse(self.st.stats["resync"])
+        self.assertEqual((self.st.stats["resync_events"], self.st.stats["resync_digest_ends"]), (1, 1))
 
     def test_orphan_rate_at_or_below_20_percent_is_tolerated(self):
         self.feed(key() + [tri(i) for i in range(1, 10)], epoch=0, key_=True)
@@ -640,6 +728,59 @@ class TtlTests(StoreCase):
         self.assertEqual(set(self.shapes()), {1})
         self.feed([], epoch=0)
         self.assertEqual(set(self.shapes()), set())
+
+    # During a pending hand-over (the epoch start was lost, so no anchor yet)
+    # a define of a carried id makes the new epoch's copy, and the copy
+    # carries the TTL clock. The superseded cached original used to age as
+    # well: it expired although its copy was verified every frame, counted
+    # a TTL drop the encoder's mirror never made, and emptied the CACHED
+    # picture into a hand-over that had not happened.
+
+    def test_a_cached_original_with_a_copy_is_not_aged_or_counted_on_its_own(self):
+        self.feed(key() + [tri(1), tri(2, y=20)], epoch=0, key_=True)
+        self.feed([], epoch=0)                                       # both ages at 1 when the epoch ends
+        for _ in range(TTL_FRAMES + 2):
+            self.feed([tri(1)], epoch=1)                             # 1 re-sent every frame, 2 silent
+        st, s = self.st.stats, self.snap()
+        self.assertEqual(st["ttl_dropped"], 1)                       # 2 only (was 2: 1's original too)
+        self.assertTrue(s["handover"])                               # the anchor half never times out (was False)
+        self.assertEqual(st["cached_shapes"], 1)                     # was 0
+        self.assertEqual(set(self.shapes_of(s)), {1})
+        self.assertEqual(self.shapes_of(s)[1]["badge"], BADGE_CACHED)
+        self.assertEqual([sh.id for sh in self.st._live()], [1])     # what the DIGEST covers: one shape per id
+        self.feed(key(3) + [digest([(1, vs.define_hash(tri(1)), shash(tri(1)))])], epoch=1)
+        self.assertFalse(self.snap()["handover"])
+        self.assertEqual(set(self.shapes()), {1})
+        self.assertTrue(self.snap()["digest_ok"])
+        self.assertEqual(self.st.stats["ttl_dropped"], 1)
+
+    def test_a_copy_that_expires_takes_its_cached_original_with_it_once(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True)
+        self.feed([], epoch=0)
+        self.feed([tri(1)], epoch=1)                                 # the copy; hand-over pending
+        for _ in range(TTL_FRAMES - 1):
+            self.feed([], epoch=1)
+        self.assertEqual(self.st.stats["ttl_dropped"], 0)            # (the original used to expire here, counted)
+        self.assertEqual(set(self.shapes()), {1})                    # still in the CACHED picture
+        self.feed([], epoch=1)                                       # the copy's 20th unverified frame
+        self.assertEqual(self.st.stats["ttl_dropped"], 1)            # one drop (was 2)
+        self.assertEqual((self.st.stats["shapes"], self.st.stats["cached_shapes"]), (0, 0))
+        self.feed(key(3) + [digest([])], epoch=1)                    # the anchor: nothing to carry back in
+        self.assertEqual(set(self.shapes()), set())
+        self.assertTrue(self.snap()["digest_ok"])
+
+    def test_a_cached_original_outside_the_clear_range_is_cleared_not_expired(self):
+        self.feed(key() + [tri(1), vs.Edge(56, 2, ((0, 20), (2, 26)))], epoch=0, key_=True)
+        for _ in range(TTL_FRAMES - 2):
+            self.feed([vs.Confirm(1, (shash(tri(1)) & 3,))], epoch=0)  # 56 nears its TTL, 1 stays verified
+        self.feed([vs.LayerClear(1), tri(1)], epoch=1)               # the range arrives before the anchor
+        for _ in range(3):
+            self.feed([tri(1)], epoch=1)
+        self.assertEqual(self.st.stats["ttl_dropped"], 0)            # 56 is cleared at the hand-over, not expired
+        self.assertIn(56, self.shapes())                             # shown CACHED until then
+        self.feed([ABS, digest([(1, vs.define_hash(tri(1)), shash(tri(1)))])], epoch=1)
+        self.assertEqual(set(self.shapes()), {1})
+        self.assertEqual(self.st.stats["ttl_dropped"], 0)
 
 
 # ---------------------------------------------------------------- HOLE slots (§3.3)
@@ -1107,7 +1248,8 @@ class LossTests(unittest.TestCase):
     def run_lossy(self, seed: int, kappa: float, drop, label) -> VectorSceneStore:
         """Drive a lossy run. The state must converge on the mirror by the end
         of the quiet tail, and the RESYNC chip after the last epoch start must
-        follow the 3-consecutive-DIGEST-mismatch rule exactly (§4.3)."""
+        follow the DIGEST-run rules exactly: 3 consecutive mismatches enter a
+        resync, 3 consecutive matches counted from its start end it (§4.3)."""
         tr, frames = scenario(seed, kappa=kappa)
         keep = keep_mask(len(frames), drop)
         st = feed_scenario(frames, keep, stop=46)
@@ -1119,11 +1261,15 @@ class LossTests(unittest.TestCase):
         self.assertTrue(snap["digest_ok"], label)                # converged on the mirror
         self.assertFalse(snap["handover"], label)
         self.assertEqual(set(StoreCase.shapes_of(snap)), set(tr.shapes), label)
-        run = best = 0
+        resync, bad, good = False, 0, 0             # every frame of the scenario carries a DIGEST
         for ok in log:
-            run = run + 1 if ok is False else 0
-            best = max(best, run)
-        self.assertEqual(snap["resync"], best >= 3, (label, log))
+            if ok is False:
+                bad, good = bad + 1, 0
+                resync = resync or bad >= 3
+            elif ok:
+                bad, good = 0, good + 1
+                resync = resync and good < 3
+        self.assertEqual(snap["resync"], resync, (label, log))
         return st
 
     def test_convergence_at_12_and_30_percent_iid_loss(self):

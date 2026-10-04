@@ -162,6 +162,51 @@ class ReplayTests(unittest.TestCase):
         self.assertEqual(row.digest, "BAD")
         self.assertFalse(_checks(dr)["digest"])
 
+    def test_resync_is_shown_per_row_and_as_episodes(self) -> None:
+        orphans = [vs.Upd(30, 1, 1)] * 4                              # id 30 was never defined
+
+        def delta(ts: float, seq: int, epoch: int = 1) -> tuple:
+            return ts, _wire(vs.encode_frame(vs.Header(False, 0, epoch), orphans, 197), False, seq)
+        frames = [(1000.0, _wire(vs.encode_frame(vs.Header(True, 0, 1), _scene(), 196), True, 1)),
+                  delta(1000.5, 2), delta(1001.0, 3), delta(1001.5, 4),
+                  (1002.5, _wire(vs.encode_frame(vs.Header(True, 0, 2), _scene(), 196), True, 5))]
+        dr = vdr.DryRun()
+        rows = [dr.feed(p, ts) for ts, p in frames]
+        self.assertEqual([r.resync for r in rows], [False, False, True, True, False])   # 8 of 8 orphans
+        self.assertTrue(vdr.format_row(rows[2]).endswith(" RESYNC"))
+        self.assertNotIn("RESYNC", vdr.format_row(rows[4]))           # the epoch start ended it
+        s = dr.summary()
+        self.assertEqual([(e["start"], e["end"], e["frames"], e["ended_by"]) for e in s["resync_episodes"]],
+                         [(2, 4, 2, "epoch start")])
+        self.assertIn("resync: 1 episode(s), 2 frame(s): #2-#4 (2, 1.5 s, epoch start)", vdr.format_summary(s))
+        json.dumps(s)
+        # still in resync when the capture ends
+        dr = vdr.DryRun()
+        anchor = vs.encode_frame(vs.Header(True, 0, 1), [_scene()[0], vs.LayerClear(0)], 196)
+        for ts, p in [(1000.0, _wire(anchor, True, 1)), delta(1000.5, 2), delta(1001.0, 3), delta(1001.5, 4)]:
+            dr.feed(p, ts)
+        s = dr.summary()
+        self.assertEqual([(e["start"], e["end"], e["frames"]) for e in s["resync_episodes"]], [(2, None, 2)])
+        self.assertIn("#2-end (2)", vdr.format_summary(s))
+        self.assertIn("resync: none", vdr.format_summary(vdr.DryRun().summary()))
+
+    def test_an_episode_ended_by_a_digest_run_is_labelled(self) -> None:
+        from tests.test_vector_scene_store import ABS, digest, shash, tri
+        good = digest([(1, vs.define_hash(tri(1)), shash(tri(1)))])
+        bad = vs.Digest(1, (good.crc + 1) & 0xFF)
+        bodies = [(True, [ABS, vs.LayerClear(0), tri(1)])] + [(False, [bad])] * 3 + [(False, [good])] * 3
+        dr = vdr.DryRun()
+        rows = [dr.feed(_wire(vs.encode_frame(vs.Header(k, 0, 1), recs, 196), k, i + 1), 1000.0 + 0.5 * i)
+                for i, (k, recs) in enumerate(bodies)]
+        self.assertEqual([r.resync for r in rows], [False, False, False, True, True, True, False])
+        self.assertEqual([r.resync_digest_end for r in rows], [False] * 6 + [True])
+        s = dr.summary()
+        self.assertEqual([(e["start"], e["end"], e["frames"], e["ended_by"]) for e in s["resync_episodes"]],
+                         [(3, 6, 3, "digest")])
+        text = vdr.format_summary(s)
+        self.assertIn("resync 1 (1 ended by DIGEST)", text)
+        self.assertIn("#3-#6 (3, 1.5 s, digest)", text)
+
     def test_rejected_first_frame_fails_first_apply_and_store_clean(self) -> None:
         dr = vdr.DryRun()
         frames = _clean_frames()
@@ -214,16 +259,25 @@ class TractorLogTests(unittest.TestCase):
         spec.loader.exec_module(cls.cs)  # type: ignore[union-attr]
 
     def test_camera_service_line_round_trips(self) -> None:
+        # ``detail`` on the line is the dial camera_service holds, not the
+        # encoder's 0..1 band position (which ``%d`` printed as 0, RS-13.1 A5).
         st = {"ms": {"resize": 3.14159, "l0": 8.0, "l1": 20.49, "total": 41.26},
-              "frame_bytes": 203, "level": 0, "detail": 80, "epoch": 3, "n_live": 17,
-              "residual": 0.0312, "epoch_pending": False}
-        with self.assertLogs(self.cs.LOG, level="INFO") as cm:
-            self.cs._log_vector_stats(st)
+              "frame_bytes": 203, "level": 0, "detail": 0.5, "epoch": 3, "n_live": 17,
+              "residual": 0.0312, "epoch_pending": False, "epochs": 4, "epoch_trigger": None,
+              "last_epoch_trigger": "safety", "ttl_dropped": 1, "waiting": 2}
+        saved = self.cs.VECTOR_DETAIL
+        self.cs.VECTOR_DETAIL = 80
+        try:
+            with self.assertLogs(self.cs.LOG, level="INFO") as cm:
+                self.cs._log_vector_stats(st)
+        finally:
+            self.cs.VECTOR_DETAIL = saved
         line = cm.output[-1]
         d = vdr.parse_vector_stats_line(line)
         self.assertIsNotNone(d)
         self.assertEqual((d["bytes"], d["level"], d["detail"], d["epoch"], d["n_live"]),
                          (203, 0, 80, 3, 17))
+        self.assertEqual((d["epochs"], d["trigger"], d["ttl_dropped"], d["waiting"]), (4, "safety", 1, 2))
         self.assertEqual(d["ms"]["resize"], 3.1)
         self.assertEqual(d["ms_total"], 41.3)
         self.assertEqual(d["residual"], 0.031)
@@ -235,6 +289,7 @@ class TractorLogTests(unittest.TestCase):
         self.assertEqual(summ["levels"], {"0": 2})
         self.assertEqual(summ["epoch_pending_lines"], 0)
         self.assertIn("ms_total: p50 41.3 / p95 55.0", vdr.format_tractor_summary(summ))
+        self.assertIn("epochs 4 trigger safety ttl_dropped 1 waiting 2", vdr.format_tractor_summary(summ))
         self.assertIn("no vector_stats lines", vdr.format_tractor_summary(vdr.summarise_tractor_log([])))
 
     def test_empty_stats_log_nothing(self) -> None:

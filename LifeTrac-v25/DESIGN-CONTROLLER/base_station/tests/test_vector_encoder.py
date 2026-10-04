@@ -774,24 +774,28 @@ class TemporalTests(unittest.TestCase):
         self.assertTrue(frame.header.key)
         self.assertEqual(enc.epoch, 1)
 
-    def test_id_exhaustion_starts_a_new_epoch(self):
+    def test_id_exhaustion_lets_the_rest_wait(self):
         rects = [(2 + 9 * i, 34 + 12 * j, 7 + 9 * i, 40 + 12 * j, (200, 60, 60))
                  for i in range(10) for j in range(2)]
         enc = ev.VectorEncoder()
         first = decode(enc.frame(scene(rects=rects[:10]), BUDGET))
         self.assertEqual(len(records_of(first, vs.Poly)), 10)
         decode(enc.frame(scene(rects=rects[:10]), BUDGET))
-        # 10 live + many new → the mass range 1–31 runs out → epoch start. (Two
-        # rows of gap between rectangles: the 3×3 mode filter bridges one.)
+        # 10 live + many new: the mass range 1–31 runs out. The id space is not
+        # an epoch trigger (a new epoch would hand the same 31 ids to the same
+        # regions): the best-scoring regions get the free ids, the rest wait
+        # for a DEL, and the epoch stands. (Two rows of gap between rectangles:
+        # the 3×3 mode filter bridges one.)
         many = rects + [(2 + 9 * i, 8 + 7 * j, 7 + 9 * i, 12 + 7 * j, (200, 60, 60))
                         for i in range(10) for j in range(2)]
         frame = decode(enc.frame(scene(y0=8.0, rects=many), BUDGET))
-        self.assertTrue(frame.header.key)
-        self.assertEqual(enc.epoch, 1)
+        self.assertFalse(frame.header.key)
+        self.assertEqual(enc.epoch, 0)
         ids = [r.id for r in records_of(frame, vs.Poly)]
         self.assertEqual(len(ids), len(set(ids)))
         self.assertTrue(all(i in vs.ID_MASS for i in ids))
-
+        self.assertEqual(records_of(frame, vs.Digest)[0].n_live, len(vs.ID_MASS))
+        self.assertIsNone(enc.last_stats["epoch_trigger"])
 
 @unittest.skipUnless(_HAVE_CV2, "opencv-python-headless not installed")
 class MaskTests(unittest.TestCase):
