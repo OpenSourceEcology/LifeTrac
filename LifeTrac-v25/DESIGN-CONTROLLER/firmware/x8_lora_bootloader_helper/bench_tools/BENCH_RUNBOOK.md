@@ -87,6 +87,14 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
    `/dev/video1` (RS-13.1 `scripts/scene_check.sh`: ≥ 8 % of pixels change
    over 10 s, frame saved). A static scene makes every keyframe fit one
    fragment and does not exercise the break.
+8. DTS (profile 2) legs: run a same-day receive-only channel spot-check with
+   the tractor parked (`../channel_survey_sniff.py` or `../hunt_sniff.ps1`,
+   then `tools/survey_compare.py`). Pass `-ForceFrfHz <the pick>` on every
+   profile-2 leg. `-ForceFrfHz 0` pins 915.000 MHz, where the RS-11.6
+   external emitter sends ~25 ms bursts at −43 to −45 dBm every ~7.08 s. All
+   RS-13.1 DTS legs flew there by accident and their losses fold on its
+   period (RS-13.1 A19). The band changes from day to day, so re-check rather
+   than reuse a pick.
 
 ## A leg
 

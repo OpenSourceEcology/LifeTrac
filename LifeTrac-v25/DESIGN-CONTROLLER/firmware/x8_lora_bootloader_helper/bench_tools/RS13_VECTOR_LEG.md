@@ -469,6 +469,18 @@ frame's seq, which P4 would read as K = 2 although no frame exceeded one
 fragment (2c keeps it too, so the control stays like-for-like). `-ProbeEcho 0`
 as in the RS-3.3 legs.
 
+**Pin the DTS carrier on every profile-2 leg.** Before the first DTS leg of the
+day, run a receive-only channel spot-check with the tractor parked
+([`channel_survey_sniff.py`](../channel_survey_sniff.py) or
+[`hunt_sniff.ps1`](../hunt_sniff.ps1), then `tools/survey_compare.py`). Add
+`-ForceFrfHz <the pick>` to every 2a/2c/2d line below, and record the pick in
+RESULTS. Without it, `-ForceFrfHz 0` pins the profile-2 default of
+915.000 MHz. That is the channel of the RS-11.6 external emitter (about 25 ms
+bursts at −43 to −45 dBm on a hard 7.07–7.09 s grid). All nine RS-13.1 DTS legs
+flew there, and their losses fold on its period (RESULTS A19). The RS-12 legs
+used `-ForceFrfHz 927500000` after a same-day spot-check; the band changes
+from day to day, so re-check rather than reuse a pick.
+
 - **2a — DTS (profile 2), VECTOR at boot:**
 
   ```powershell
@@ -490,8 +502,13 @@ as in the RS-3.3 legs.
   while the `wire bytes (vector)` and `arrival:` lines cover vector frames only
   — zeros on 2c — and `over limit` counts every multi-fragment mono_g4 frame;
   take mono_g4 sizes from the per-frame rows or the JSONL `hex` lengths). This
-  leg is the loss and command-delivery baseline the §8 table compares against;
-  for P3 fly it interleaved with the VECTOR legs (P3, A15).
+  leg is the loss baseline the §8 table compares against; for P3 fly it
+  interleaved with the VECTOR legs (P3, A15). It carries no base commands, so it
+  is **not** a command-delivery baseline. The §8.6 command-delivery row needs
+  legs flown with `-ReactiveFire 1 -ProbeEcho 0`, scored as tractor
+  `LoRa cmd: PROBE … (rx#N)` lines over base `PROBE TX … (tx#N)` lines, and kept
+  out of the image-loss record. RS-13.1 left that row unmeasured (RESULTS,
+  "Remaining radio tests").
 - **2d — switch leg, DTS, boots `mono_g4`** (same command as 2c). At T+60 s
   and T+180 s, on the base board, publish the operator override the way
   `web_ui` does (`rx_smoke` relays it as a 0x63 command and republishes the

@@ -22,10 +22,14 @@ and the tractor holds FHSS authority (A11 closed).
 What remains is by the letter or a robustness item:
 - round 4's P8 band on 2a and 2b (A17);
 - P6's return clause at 2 fps (A18);
-- A16: after a lost frame on a saturated bw500 stream, the base can stay one
-  shape short until the next epoch start.
+- A16: after a lost frame on a saturated stream, the base can stay one shape
+  short until the next epoch start. Reproduced off air afterwards (a lost
+  DEL, CONFIRMs refused in resync, a starved carousel); a code fix comes next.
 
-Radios are parked `0x80` on both boards.
+A review after the round found **no further radio test needed now**
+("Remaining radio tests"). It also found that every DTS leg flew on
+915.000 MHz, the RS-11.6 emitter's channel (A19); the verdict stands because
+VECTOR and the control shared it. Radios are parked `0x80` on both boards.
 
 ## Software under test
 
@@ -48,7 +52,7 @@ the counters in the brackets are attributable.
 
 | board | build | md5 | flashed |
 |---|---|---|---|
-| base 2D0A1209DABC240B | as left by the RS-12.15 campaign (production `589c1203` build family; nothing was flashed in this campaign — the brief forbids it) | not re-read | 2026-09-15 |
+| base 2D0A1209DABC240B | as left by the RS-12.15 campaign: the **bench (register-write diag) build** of that family. On every DTS leg both boards accepted the host's carrier-register writes (`forcing FRF -> 915.000 MHz` … `FRF readback: … (OK)`, no `FRF force-write failed`), which the production binary refuses (`HOST_ALLOW_REG_WRITE_DIAG=0`, `firmware/murata_l072/Makefile`). Nothing was flashed in this campaign — the brief forbids it | not re-read | 2026-09-15 |
 | tractor 2E2C1209DABC240B | same | not re-read | 2026-09-15 |
 
 Health probes before every leg (`rs116_health_probe.py`, both boards,
@@ -775,10 +779,51 @@ Round-4 anomalies:
     missing shape therefore got no room until an epoch start.
   - P1's loss rule passes these runs: each starts at a loss, and an epoch
     start ends it. A shape missing for 30 s after one lost frame is still the
-    first item for RS-13.2. Options are a reserved carousel floor, or a
-    re-define once the encoder's mirror and the DIGEST disagree for several
-    frames. Logging `carousel_bits` / carousel records packed in
-    `vector_stats` would test the mechanism.
+    first item for RS-13.2.
+  - **Reproduced off air (2026-10-04, after the round; no radio).**
+    `scripts/a16_sil.py` drives the real encoder (`4ab58b8d`) into the real
+    store through the TileDeltaFrame container, on a busy synthetic scene,
+    with 100 single-frame drops per case. VS1 has no uplink, so the stream
+    does not depend on what the base receives. Output:
+    `legs/a16_sil_summary.json`, `legs/a16_sil_run.log`.
+
+    | case (A16-like / 100 drops) | bw500 (243 B) | bw250 (203 B) |
+    |---|---|---|
+    | encoder as shipped (60 s refresh) | **33** | **60** |
+    | no safety refresh | 39, none recovered | 81, none recovered |
+    | the lost frame's DELs still arrive | 0 (recovery p50 2 frames) | 2 |
+    | store accepts a matching CONFIRM in resync | 0 (recovery max 23) | 0 (max 31) |
+    | carousel floor on carousel-due frames | 0 (max 23) | 7 |
+    | carousel floor on every frame | 82 | 61 |
+
+    The mechanism is refined from the code reading above:
+    1. **The trigger is a lost DEL.** The base keeps the deleted shape as a
+       ghost until its 20-frame TTL, so DIGESTs mismatch on `n_live` and the
+       store sits in resync for at least 20 frames.
+    2. **In resync the store refuses CONFIRMs** (`vector_scene_store.py:725`).
+       Shapes kept alive only by CONFIRMs age on the base but not in the
+       encoder's mirror, so the base TTL-drops them when the ghost expires:
+       402 base drops against the encoder's 0 at bw500.
+    3. **Then nothing re-sends them.** In 94 % of the frames where the base
+       lacked a live shape, that shape was offered to the slot-7 carousel and
+       not packed; carousel-due frames packed zero carousel records 54/99
+       (bw500) and 93/99 (bw250).
+    4. **A second gap:** a shape with a pending repeat-once is offered only at
+       slot 6, never to the carousel. That is why a floor taking room from
+       slot 6 moves the starvation there (bw250 floor: 7/100, all
+       repeat-pending; floor on every frame: worse).
+  - The synthetic scene has more CONFIRM-only shapes than the railroad video,
+    so its rates overstate the bench's (2 of 17 episodes). A sensitivity case
+    with 6 static shapes at bw250 reproduces the bench's magnitude: 1 shape
+    short, about 1 orphan per frame (`legs/a16_sensitivity_run.log`).
+  - **So A16 needs a code fix and SIL tests, not radio time.** A fix must
+    close both paths: a guaranteed repair share that also covers
+    repeat-pending shapes, and either shorten the ghost resync or keep
+    CONFIRM-only shapes alive through it. The cleanest SIL result, a matching
+    CONFIRM verifying in resync, contradicts the 2-bit-tag guard in
+    VECTOR_SCENE.md §4.3, so it is a design decision for the desk check.
+    Acceptance: `a16_sil.py` at 0/100 on both budgets, recovery ≤ ≈ 25 frames.
+    One confirming bw500 leg afterwards, folded into the next radio session.
 - **A17 — P8's band is relative to a short step-1 sample.** On air the
   encoder ran +18 to +24 %, mostly in L1/L3 extraction: 2b at L1 93.3 / L3
   50.1 ms against step 1's 77.9 / 40.5. Likely causes are the video segment
@@ -809,6 +854,30 @@ Round-4 anomalies:
   18–20 dB above the tractor's −64 dBm (`rssi=-46 snr=-10.5`), which marks a
   stronger foreign transmitter. The FHSS leg 2b hopped clear: 1 CRC error,
   0.4 % loss. VECTOR and mono_g4 suffered alike (2.3 % against 3.4 %).
+
+  *Update (review after the round): the transmitter is the RS-11.6 bench
+  emitter, and every RS-13.1 DTS leg flew on its channel.*
+  - All nine profile-2 archives (2a/2c/2d in rounds 2–4) carry
+    `force_frf_hz=0`, so the helper pinned the profile-2 default:
+    `forcing FRF -> 915.000 MHz` … `FRF readback: 0xE4C000 = 915.000 MHz (OK)`
+    on both boards.
+  - 915.000 MHz is where RS-11.6 found an external ~915 MHz ISM emitter in
+    August: about 25 ms bursts at −43 to −45 dBm, SNR about −10.5, on a hard
+    7.07–7.09 s grid (`bench-evidence/RS_11_6_idle_sniff_2026-08-16/`). Since
+    then the RS-12 DTS legs ran at `-ForceFrfHz 927500000` after a same-day
+    spot-check. This procedure never named the carrier.
+  - Round-4 losses fold on that period (`scripts/fold_emitter.py`,
+    `legs/r4_emitter_fold.txt`):
+    - 2a: R = 0.891 at 7.0725 s, 0 of 2000 random-frame shuffles as strong;
+    - 2d: R = 0.670, null p ≈ 0.001–0.005 (the shuffle is unseeded, so the
+      figure varies slightly between runs);
+    - 2c: R = 0.400, null p ≈ 0.04.
+  - The verdict is unaffected, because VECTOR and the control shared the
+    channel. But the absolute DTS losses (2.1–3.4 %) and A15's control spread
+    mostly measure where the emitter's phase falls against the frame cadence.
+    They are not comparable with the RS-12 floor at 927.5 MHz, and a
+    range-edge walk on 915.0 MHz would measure the emitter, not the margin.
+    The procedure now pins a spot-checked carrier (Step 2).
 
 ### GO / NO-GO
 
@@ -842,14 +911,79 @@ Misses by the letter, explained, not VECTOR decode defects:
   - Round 3's 2a P3 (A15).
 
 Inputs for the RS-13.2 desk check, in order:
-1. **A16:** a lost frame on a saturated bw500 stream left the base one shape
-   short for about 30 s, until the next epoch start (2a, 2d). The likely
-   cause is that the carousel gets no room. Change: a carousel floor, or a
-   re-define when DIGESTs keep disagreeing.
+1. **A16:** a lost frame on a saturated stream left the base one shape short
+   for about 30 s, until the next epoch start (2a, 2d). Reproduced off air:
+   a lost DEL's ghost holds the store in resync, CONFIRM-only shapes expire
+   at the base, and the starved carousel never re-sends them. The fix
+   options and the acceptance sweep are in A16.
 2. **A8:** relabel still fires 12–14 times per 5-minute leg on air.
 3. **Procedure:** P8 as an absolute bound (A17) and P6's return clause with
    the in-flight frame (A18). Both stay as written for this record.
 4. The VECTOR_SCENE.md amendments listed in the fix PR.
+5. The DTS carrier (A19): pin a spot-checked channel for every later DTS leg.
+
+### Remaining radio tests (review 2026-10-04, after the round)
+
+The operator asked whether any other radio tests are needed. A read-only
+review answered that, with a skeptic pass and a completeness pass over the
+results. It covered the procedure and roadmap, the code paths the legs never
+exercised, an off-air A16 reproduction, and the FHSS and command risks. No
+board was touched.
+
+**Answer: no further radio test is needed now.** RS-13.1 is complete, its GO
+rests on misses by the letter that a re-fly cannot change, and RS-13.2 is a
+desk check.
+
+Each candidate radio leg failed to justify radio time now:
+- **A16 reproduces off air** (above).
+- **Code first.** Several items are code, SIL or camera-only work:
+  - never batch codec-6 frames. The `-TxBatch 1` guard prices a single
+    frame with the 4 B batch header, so near-full 243 B frames would batch
+    into two fragments. Every leg ran `-TxBatch 0`; the harness default is 1;
+  - clamp the VECTOR byte budget to one fragment at cold start. 2a_r4 began
+    at `byte_budget=2436` until the retained `link_budget` arrived;
+  - the double epoch start on each VECTOR entry;
+  - carousel counters in `vector_stats`.
+- **Blocked by firmware.** FHSS command delivery and an FHSS switch leg
+  ("2d on profile 1") would measure the open RS-12.15 reverse-delivery defect
+  (1/17, 49/281), not VECTOR.
+  - In 2d_r4 the forward switch left the leg's only TX gap ≥ 1 s (1.038 s,
+    the first frame's lazy encoder build). On FHSS that gap would break the
+    strict authority streak. Pin it in the grid-policy SIL, and keep the
+    switch gap under 1 s, before that leg flies.
+- **Already computable.** DTS commands ride the completion-aligned pump.
+  VECTOR's longer frames cost the tractor 64.05 s of deaf time per 300 s
+  against 50.72 s for mono_g4 (post-brackets).
+
+**Not measured, and recorded as such:**
+- **The command-delivery row of VECTOR_SCENE.md §8.6** ("not worse than
+  during `mono_g4`"). Legs 2a/2b/2c carried no base commands, and 2d carried
+  two (both acked). The procedure called 2c the command-delivery baseline;
+  that is corrected.
+- **The real operator path, with the base web UI in the loop.** The deployed
+  base image `4623980c2dac` (d3751286) predates every VECTOR web_ui and store
+  commit. During VECTOR its stale-tile worker would put a `0x6C` on air at
+  least every 10 s, and `-KfRequestDisable` does not stop that. Rebuild it
+  before any production-compose check.
+
+**The next radio session is the range-edge session itself**, on an explicit
+GO, after the A16 fix and the code guards. Prerequisites:
+- tractor and base images rebuilt from the merged SHA;
+- step 0/1 camera-only from the image, adding a bw500 video pass as the P8
+  reference for bw500 legs.
+
+Session content:
+1. A receive-only channel spot-check with the tractor parked
+   (`channel_survey_sniff.py` / `hunt_sniff.ps1`), then `-ForceFrfHz` at the
+   pick.
+2. A 0 dB step with VECTOR and mono_g4 interleaved (2c, 2a, 2c′, 2a′) and
+   `-ReactiveFire 1 -ProbeEcho 0`. This gives the command-delivery row and
+   the A16-fix confirmation.
+3. The 3 dB attenuator steps at V0, over a conducted, shielded path.
+
+FHSS command and switch legs follow the RS-12.15 reverse-delivery fix.
+Production-stack legs follow B1 and RS-9.2/9.4, plus a production-legal DTS
+carrier (RS-11.7).
 
 Fix PR: `rs13-vector-encoder-sync-fix` @ `4ab58b8d` (perf, relabel trigger
 and store DIGEST-exit merged).

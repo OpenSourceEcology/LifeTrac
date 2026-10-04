@@ -84,7 +84,7 @@ legs if P3 compares them leg-for-leg (A15)>.
 Harness line per leg: <paste each `.\run_live_radio_monitor.ps1 ...` command>.
 Scene check per leg: <leg: x % over 10 s> (`legs/leg<X>_scene.{txt,jpg}`; a leg
 below 8 % is aborted, not flown).
-Channel / spot-check: <frequency, survey result, time before the leg>.
+Channel / spot-check: <frequency, survey result, time before the leg; the `-ForceFrfHz` on every DTS line and the `FRF readback:` line from both daemon logs. `-ForceFrfHz 0` means 915.000 MHz, the RS-11.6 emitter's channel (RS-13.1 A19)>.
 Radios parked between legs: <`PARK_OK` × 2 per leg after the post-brackets and
 reports; every `PARK_TRANSIENT` and its re-park ~60 s later
 (`legs/leg<X>_park.txt`); end of session `radio_state.py` both boards>.
