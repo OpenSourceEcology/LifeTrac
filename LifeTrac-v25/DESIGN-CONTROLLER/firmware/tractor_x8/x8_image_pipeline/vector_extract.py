@@ -85,10 +85,21 @@ VEG_TREE_MARGIN = 8.0                    # mean G exceeds R and B by this: veget
 
 # ---------------------------------------------------------------- colour
 
+def _srgb_linear(c: np.ndarray) -> np.ndarray:
+    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+
+
+# An 8-bit image has 256 channel values: their linearisation, element by
+# element the very float32 numbers the formula gives, is looked up.
+_SRGB_LINEAR_U8 = _srgb_linear(np.arange(256, dtype=np.float32) / 255.0)
+
+
 def rgb_to_lab(rgb: np.ndarray) -> np.ndarray:
     """sRGB 0..255 (…×3) → CIELAB (D65), float32."""
-    c = np.asarray(rgb, dtype=np.float32) / 255.0
-    lin = np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+    if isinstance(rgb, np.ndarray) and rgb.dtype == np.uint8:
+        lin = _SRGB_LINEAR_U8[rgb]
+    else:
+        lin = _srgb_linear(np.asarray(rgb, dtype=np.float32) / 255.0)
     r, g, b = lin[..., 0], lin[..., 1], lin[..., 2]
     x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047
     y = 0.2126 * r + 0.7152 * g + 0.0722 * b
@@ -122,6 +133,10 @@ def rgb444_to_rgb8(code: int) -> np.ndarray:
 PALETTE_RGB8 = np.stack([rgb444_to_rgb8(c) for c in vs.STATIC_PALETTE])
 PALETTE_LAB = rgb_to_lab(PALETTE_RGB8)
 
+# The per-frame hot paths ask for the same few shown colours over and over;
+# the 4096 RGB444 codes are cached as read-only arrays.
+_SHOWN_RGB8: dict = {}
+
 
 def choose_colour(mean_rgb8) -> tuple:
     """(palette slot or None, rgb444 code, shown 8-bit colour) for a measured mean.
@@ -135,13 +150,41 @@ def choose_colour(mean_rgb8) -> tuple:
     return None, code, rgb444_to_rgb8(code)
 
 
+def choose_colours(means: np.ndarray, labs: Optional[np.ndarray] = None) -> list:
+    """``choose_colour`` for an (n, 3) stack of means at once: [(slot or None,
+    rgb444 code)]. Every step is elementwise or a per-row reduction, so each
+    row's answer is bit-identical to ``choose_colour`` on that mean alone;
+    ``labs`` (``rgb_to_lab(means)``) saves converting twice."""
+    means = np.asarray(means, dtype=np.float32).reshape(-1, 3)
+    if labs is None:
+        labs = rgb_to_lab(means)
+    de = delta_e76(PALETTE_LAB[None, :, :], np.asarray(labs, np.float32).reshape(-1, 3)[:, None, :])
+    slots = np.argmin(de, axis=1)
+    q = np.clip(np.round(means / 17.0), 0, 15).astype(int)
+    codes = ((q[:, 0] << 8) | (q[:, 1] << 4) | q[:, 2]).tolist()
+    out = []
+    for i, slot in enumerate(slots.tolist()):
+        if de[i, slot] <= PALETTE_DE_MAX:
+            out.append((slot, vs.STATIC_PALETTE[slot]))
+        else:
+            out.append((None, codes[i]))
+    return out
+
+
 def fill_base_rgb444(f) -> int:
     """The base colour of a FILL/vfill as RGB444 (palette slots expanded)."""
     return f.rgb444 if f.rgb444 is not None else vs.STATIC_PALETTE[f.palette]
 
 
 def fill_shown_rgb8(f) -> np.ndarray:
-    return rgb444_to_rgb8(fill_base_rgb444(f))
+    """The 8-bit colour the base shows for a FILL/vfill (read-only, cached)."""
+    code = fill_base_rgb444(f)
+    shown = _SHOWN_RGB8.get(code)
+    if shown is None:
+        shown = rgb444_to_rgb8(code)
+        shown.setflags(write=False)
+        _SHOWN_RGB8[code] = shown
+    return shown
 
 
 def make_fill(mean_rgb8, grad=None):
@@ -149,6 +192,12 @@ def make_fill(mean_rgb8, grad=None):
     if slot is not None:
         return vs.Fill(palette=slot, grad=grad)
     return vs.Fill(rgb444=code, grad=grad)
+
+
+def make_fills(means: np.ndarray, grads: list, labs: Optional[np.ndarray] = None) -> list:
+    """``make_fill`` for an (n, 3) stack of means and their gradients."""
+    return [vs.Fill(palette=slot, grad=g) if slot is not None else vs.Fill(rgb444=code, grad=g)
+            for (slot, code), g in zip(choose_colours(means, labs), grads)]
 
 
 def make_vfill(mean_rgb8, dl: int):
@@ -398,6 +447,18 @@ class Region:
     raster: Optional[np.ndarray] = None           # what the define would paint (bool H×W)
 
 
+def _sq_dist(data: np.ndarray, centres: np.ndarray) -> np.ndarray:
+    """Squared distance of every (n, 3) float32 point to every (k, 3) centre,
+    (n, k): ``((data[:, None] - centres[None]) ** 2).sum(axis=2)`` without the
+    n × k × 3 temporary, its three terms added in the order numpy's float32
+    reduction over a length-3 axis adds them, (d0² + d1²) + d2² (the same
+    bits on the PC and the X8 builds; pinned by tests/test_vector_fastpaths.py)."""
+    d0 = data[:, 0, None] - centres[None, :, 0]
+    d1 = data[:, 1, None] - centres[None, :, 1]
+    d2 = data[:, 2, None] - centres[None, :, 2]
+    return d0 * d0 + d1 * d1 + d2 * d2
+
+
 class Segmenter:
     """k-means in Lab with the previous centres as the initial labels, so the
     cluster indices stay stable between captures (§2.5 item 1)."""
@@ -421,8 +482,7 @@ class Segmenter:
         k = min(self.k, n)
         criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_MAX_ITER, self.iterations, 1.0)
         if self._centres is not None and len(self._centres) == k:
-            d = ((data[:, None, :] - self._centres[None, :, :]) ** 2).sum(axis=2)
-            init = np.argmin(d, axis=1).astype(np.int32).reshape(-1, 1)
+            init = np.argmin(_sq_dist(data, self._centres), axis=1).astype(np.int32).reshape(-1, 1)
             _, lbl, centres = cv2.kmeans(data, k, init, criteria, 1, cv2.KMEANS_USE_INITIAL_LABELS)
         else:
             # k-means++ draws its first centres from OpenCV's process-global RNG;
@@ -446,30 +506,48 @@ class Segmenter:
 
 
 def mode_filter(labels: np.ndarray, k: int) -> np.ndarray:
-    """3×3 mode filter on a label map (§2.5 item 3); −1 pixels vote for nothing."""
-    votes = []
-    for j in range(k):
-        ind = (labels == j).astype(np.float32)
-        votes.append(cv2.boxFilter(ind, -1, (3, 3), normalize=False, borderType=cv2.BORDER_CONSTANT))
-    if not votes:
+    """3×3 mode filter on a label map (§2.5 item 3); −1 pixels vote for nothing.
+    The votes are exact counts (≤ 9), so they are summed in uint8."""
+    if k <= 0:
         return labels
-    stack = np.stack(votes, axis=0)
+    ind = (labels[None, :, :] == np.arange(k, dtype=labels.dtype)[:, None, None]).astype(np.uint8)
+    stack = np.stack([cv2.boxFilter(ind[j], -1, (3, 3), normalize=False, borderType=cv2.BORDER_CONSTANT)
+                      for j in range(k)], axis=0)
     best = np.argmax(stack, axis=0).astype(np.int32)
     return np.where(labels >= 0, best, -1)
 
 
+def _grid_points(pts, max_n: int) -> list:
+    """The vertices as a list for the Visvalingam–Whyatt loops. Pixel and
+    cell coordinates (small integers) become plain floats: every triangle
+    area of them is an integer below 2^23, exact in float32 and in float, so
+    the loop drops the same vertices as on the float32 values, only faster.
+    Anything else keeps its float32 elements."""
+    arr = np.asarray(pts, dtype=np.float32)
+    if len(arr) > max_n and float(np.abs(arr).max()) < 1024.0 and np.array_equal(arr, np.round(arr)):
+        return arr.tolist()
+    return [tuple(p) for p in pts]
+
+
+def _triangle(p0, p1, p2):
+    (x0, y0), (x1, y1), (x2, y2) = p0, p1, p2
+    return abs((x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0))
+
+
 def _vw_simplify(pts: np.ndarray, max_n: int) -> np.ndarray:
-    """Visvalingam–Whyatt: drop the vertex of least triangle area until max_n."""
-    pts = [tuple(p) for p in pts]
-    while len(pts) > max_n:
+    """Visvalingam–Whyatt: drop the vertex of least triangle area (the first
+    one on a tie) until max_n. Dropping a vertex changes only its two
+    neighbours' triangles, so only those are measured again."""
+    pts = _grid_points(pts, max_n)
+    if len(pts) > max_n:
         n = len(pts)
-        best, best_area = 0, None
-        for i in range(n):
-            (x0, y0), (x1, y1), (x2, y2) = pts[i - 1], pts[i], pts[(i + 1) % n]
-            area = abs((x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0))
-            if best_area is None or area < best_area:
-                best, best_area = i, area
-        del pts[best]
+        area = [_triangle(pts[i - 1], pts[i], pts[(i + 1) % n]) for i in range(n)]
+        while len(pts) > max_n:
+            best = min(range(len(pts)), key=area.__getitem__)
+            del pts[best], area[best]
+            n = len(pts)
+            for i in ((best - 1) % n, best % n):
+                area[i] = _triangle(pts[i - 1], pts[i], pts[(i + 1) % n])
     return np.array(pts, dtype=np.float32)
 
 
@@ -492,12 +570,15 @@ def _vertex_touches_mask(mask: np.ndarray, cx: int, cy: int) -> bool:
     return bool(mask[y0:y1 + 1, x0:x1 + 1].any())
 
 
-def polygon_of(component: np.ndarray, mask: Optional[np.ndarray]) -> Optional[tuple]:
+def polygon_of(component: np.ndarray, mask: Optional[np.ndarray], offset: tuple = (0, 0)) -> Optional[tuple]:
     """Outer contour → Douglas–Peucker (ε = 1 cell) → VW to ≤ 10 vertices →
     8 px grid cells. Vertices that would fall inside the self-mask are moved
-    to a clean neighbouring cell or dropped (no vertex may lie in the mask)."""
+    to a clean neighbouring cell or dropped (no vertex may lie in the mask).
+    ``component`` may be a crop of the working image whose top-left pixel is
+    ``offset`` (x, y): the contour comes back in working px either way (see
+    ``_crop``)."""
     contours, _ = cv2.findContours(component.astype(np.uint8), cv2.RETR_EXTERNAL,
-                                   cv2.CHAIN_APPROX_SIMPLE)
+                                   cv2.CHAIN_APPROX_SIMPLE, offset=tuple(int(v) for v in offset))
     if not contours:
         return None
     contour = max(contours, key=cv2.contourArea)
@@ -511,11 +592,10 @@ def polygon_of(component: np.ndarray, mask: Optional[np.ndarray]) -> Optional[tu
     # Contour points are boundary-pixel centres; +0.5 puts the ring on the
     # pixel edge so a region spanning px 10..19 becomes cells 5..10.
     cells = np.round((approx + 0.5) / CELL8).astype(int)
-    cells[:, 0] = np.clip(cells[:, 0], 0, WORK_W // CELL8)      # the far edge (cell 48 / 32)
-    cells[:, 1] = np.clip(cells[:, 1], 0, WORK_H // CELL8)      # is legal after v0 (§3.3)
     ring: list = []
-    for cx, cy in cells:
-        cx, cy = int(cx), int(cy)
+    for cx, cy in cells.tolist():
+        cx = min(max(cx, 0), WORK_W // CELL8)                   # the far edge (cell 48 / 32)
+        cy = min(max(cy, 0), WORK_H // CELL8)                   # is legal after v0 (§3.3)
         if mask is not None and _vertex_touches_mask(mask, cx, cy):
             moved = None
             for ddx, ddy in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)):
@@ -566,6 +646,38 @@ def gradient_of(coef: tuple, bbox: tuple) -> Optional[tuple]:
     return int(round(theta / 22.5)) % 8, max(-4, min(3, code))
 
 
+_GRIDS: dict = {}
+
+
+def _grid(shape: tuple, dtype=None) -> tuple:
+    """(yy, xx) pixel-index grids of ``shape`` as ``np.mgrid`` makes them (or
+    cast to ``dtype``), built once per shape and read-only."""
+    key = (tuple(shape), dtype)
+    g = _GRIDS.get(key)
+    if g is None:
+        yy, xx = np.mgrid[0:shape[0], 0:shape[1]]
+        if dtype is not None:
+            yy, xx = yy.astype(dtype), xx.astype(dtype)
+        yy.setflags(write=False)
+        xx.setflags(write=False)
+        g = _GRIDS[key] = (yy, xx)
+    return g
+
+
+def _crop(labels: np.ndarray, index: int, stats_row: np.ndarray) -> tuple:
+    """(component, (x, y)): one connected component of ``labels`` as a bool
+    crop of its bounding box grown by one pixel (clipped to the image), and
+    the crop's top-left pixel. The component's pixels keep their raster order
+    and every pixel around its outline is in the crop, so a contour traced on
+    the crop with ``offset=(x, y)`` is the one traced on the whole image."""
+    h, w = labels.shape
+    x0, y0 = int(stats_row[cv2.CC_STAT_LEFT]), int(stats_row[cv2.CC_STAT_TOP])
+    x1 = x0 + int(stats_row[cv2.CC_STAT_WIDTH])
+    y1 = y0 + int(stats_row[cv2.CC_STAT_HEIGHT])
+    x0, y0, x1, y1 = max(x0 - 1, 0), max(y0 - 1, 0), min(x1 + 1, w), min(y1 + 1, h)
+    return labels[y0:y1, x0:x1] == index, (x0, y0)
+
+
 def ellipse_raster(cx: float, cy: float, rx: float, ry: float, shape=(WORK_H, WORK_W)) -> np.ndarray:
     out = np.zeros(shape, np.uint8)
     cv2.ellipse(out, (int(round(cx)), int(round(cy))), (max(1, int(round(rx))), max(1, int(round(ry)))),
@@ -573,25 +685,32 @@ def ellipse_raster(cx: float, cy: float, rx: float, ry: float, shape=(WORK_H, WO
     return out.astype(bool)
 
 
-def tree_codes_of(component: np.ndarray, region: "Region", horizon_line: Optional[np.ndarray]) -> Optional[tuple]:
-    """§2.6 tree/shrub test: a vegetation region that is compact (solidity ≥ 0.8,
-    ellipse IoU ≥ 0.8), small enough for the rx/ry codes, and either reaches
-    the horizon (tree) or is under 60 cells below it (shrub); a region that
-    touches the bottom edge is the ground itself and stays L1."""
+def _tree_candidate(region: "Region", horizon_line: Optional[np.ndarray]) -> bool:
+    """The cheap part of the §2.6 test, on the region's mean, box and area
+    alone: vegetation colour, small enough for the rx/ry codes, clear of the
+    bottom edge, and reaching the horizon or under SHRUB_MAX_AREA."""
     r, g, b = (float(v) for v in region.mean)
     if not (g > r + VEG_TREE_MARGIN and g > b + VEG_TREE_MARGIN):
-        return None
+        return False
     x0, y0, x1, y1 = region.bbox
     half_w = (x1 - x0 + 1) / 2.0
     half_h = (y1 - y0 + 1) / 2.0
     if half_w > TREE_MAX_HALF_WORK or half_h > TREE_MAX_HALF_WORK or y1 >= WORK_H - 1:
-        return None
+        return False
     if horizon_line is not None:
         cx = int(round((x0 + x1) / 2.0))
         reaches = y0 <= horizon_line[min(max(cx, 0), len(horizon_line) - 1)]
     else:
         reaches = False
-    if not reaches and region.area >= SHRUB_MAX_AREA:
+    return bool(reaches or region.area < SHRUB_MAX_AREA)
+
+
+def tree_codes_of(component: np.ndarray, region: "Region", horizon_line: Optional[np.ndarray]) -> Optional[tuple]:
+    """§2.6 tree/shrub test: a vegetation region that is compact (solidity ≥ 0.8,
+    ellipse IoU ≥ 0.8), small enough for the rx/ry codes, and either reaches
+    the horizon (tree) or is under 60 cells below it (shrub); a region that
+    touches the bottom edge is the ground itself and stays L1."""
+    if not _tree_candidate(region, horizon_line):
         return None
     contours, _ = cv2.findContours(component.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
@@ -613,7 +732,7 @@ def tree_codes_of(component: np.ndarray, region: "Region", horizon_line: Optiona
     ay = max(2.0 * math.sqrt(max(m["mu02"] / m["m00"], 0.0)), 0.5)
     if ax > TREE_MAX_HALF_WORK or ay > TREE_MAX_HALF_WORK:
         return None
-    yy, xx = np.mgrid[0:component.shape[0], 0:component.shape[1]]
+    yy, xx = _grid(component.shape)
     ell = (((xx + 0.5 - (cx + 0.5)) / ax) ** 2 + ((yy + 0.5 - (cy + 0.5)) / ay) ** 2) <= 1.0
     inter = float((ell & component).sum())
     union = float((ell | component).sum())
@@ -650,50 +769,65 @@ def extract_regions(rgb: np.ndarray, lab: np.ndarray, valid: np.ndarray, mask: O
         if not ind.any():
             continue
         n, cc, stats, _ = cv2.connectedComponentsWithStats(ind, connectivity=4)
-        for i in range(1, n):
-            area = int(stats[i, cv2.CC_STAT_AREA])
-            if area >= MIN_REGION_AREA:
-                comps.append((area, j, i, cc, stats[i]))
+        for i in (np.nonzero(stats[1:n, cv2.CC_STAT_AREA] >= MIN_REGION_AREA)[0] + 1).tolist():
+            comps.append((int(stats[i, cv2.CC_STAT_AREA]), j, i, cc, stats[i]))
     comps.sort(key=lambda c: -c[0])
     comps = comps[:MAX_REGIONS]
     regions: list = []
     hline = horizon.line_work(w) if horizon.found else None
     f = rgb.astype(np.float32)
-    lum = luma(f)
-    yy, xx = np.mgrid[0:h, 0:w]
-    xx = xx.astype(np.float32)
-    yy = yy.astype(np.float32)
+    yy, xx = _grid((h, w), np.float32)
+    # Per pixel: R, G, B, x, y and luma. Every per-region measurement works on
+    # the component's bounding box, whose pixels come out in the same raster
+    # order as from the whole image. The first five columns are integers whose
+    # sums stay below 2^24, exact in float32 in any order, so one mean over
+    # them is the colour mean and the centroid np.mean gives column by column.
+    feats = np.dstack([f, xx, yy, luma(f)])
+    grads: list = []
+    crops: list = []
     for idx, (area, _, i, cc, st) in enumerate(comps):
-        comp = cc == i
-        region_map[comp] = idx
-        px = f[comp]
-        mean = px.mean(axis=0)
         x0, y0 = int(st[cv2.CC_STAT_LEFT]), int(st[cv2.CC_STAT_TOP])
         x1, y1 = x0 + int(st[cv2.CC_STAT_WIDTH]) - 1, y0 + int(st[cv2.CC_STAT_HEIGHT]) - 1
-        cx, cy = float(xx[comp].mean()), float(yy[comp].mean())
+        box = (slice(y0, y1 + 1), slice(x0, x1 + 1))
+        piece, (ox, oy) = _crop(cc, i, st)                 # the box grown by a pixel, for the contour
+        comp = piece[y0 - oy:y1 + 1 - oy, x0 - ox:x1 + 1 - ox]
+        region_map[box][comp] = idx
+        px = feats[box][comp]
+        m = px[:, :5].mean(axis=0)
+        cx, cy = float(m[3]), float(m[4])
         # Luma plane by least squares over the region (§2.5 item 6).
-        a = np.stack([np.ones(area, np.float32), xx[comp] - cx, yy[comp] - cy], axis=1)
-        coef, *_ = np.linalg.lstsq(a, lum[comp], rcond=None)
-        region = Region(idx, area, mean.astype(np.float32), (cx, cy), (x0, y0, x1, y1))
-        region.lab = rgb_to_lab(mean)
-        region.fill = make_fill(mean, gradient_of(tuple(float(c) for c in coef), region.bbox))
+        a = np.ones((area, 3), np.float32)
+        a[:, 1] = px[:, 3] - cx
+        a[:, 2] = px[:, 4] - cy
+        coef, *_ = np.linalg.lstsq(a, px[:, 5], rcond=None)
+        region = Region(idx, area, m[:3].astype(np.float32), (cx, cy), (x0, y0, x1, y1))
+        grads.append(gradient_of(tuple(float(c) for c in coef), region.bbox))
+        crops.append((box, comp, piece, (ox, oy)))
+        regions.append(region)
+    if regions:                                         # one colour pass for every region
+        means = np.stack([r.mean for r in regions])
+        labs = rgb_to_lab(means)
+        for region, lab_r, fill in zip(regions, labs, make_fills(means, grads, labs)):
+            region.lab, region.fill = lab_r, fill
+    for region, (area, _, i, cc, st), (box, comp, piece, origin) in zip(regions, comps, crops):
+        cx, cy = region.centroid
         region.above_horizon = bool(hline is not None and cy < hline[min(max(int(cx), 0), w - 1)])
-        region.tree = tree_codes_of(comp, region, hline)
+        if _tree_candidate(region, hline):
+            region.tree = tree_codes_of(cc == i, region, hline)
         if region.tree is None:
-            region.poly = polygon_of(comp, mask)
+            region.poly = polygon_of(piece, mask, origin)
         if region.tree is not None:
             cx8, cy8, rx, ry = region.tree
             region.raster = raster_of(vs.Tree(32, cx8, cy8, rx, ry, region.fill), 0, 0, (h, w))
         elif region.poly is not None:
             region.raster = raster_of(vs.Poly(1, 0, region.poly, region.fill), 0, 0, (h, w))
         if region.raster is not None:
-            inter = int((region.raster & comp).sum())
-            union = int((region.raster | comp).sum())
+            inter = int(region.raster[box][comp].sum())
+            union = int(region.raster.sum()) + area - inter
             if union == 0 or inter / union < 0.5:
                 # A wire, post or rut is thinner than a cell: its polygon would
                 # not cover it. It stays a region for L3 to describe as an edge.
                 region.raster = region.poly = region.tree = None
-        regions.append(region)
     return regions, region_map
 
 
@@ -721,7 +855,7 @@ class EdgeCand:
 
 
 def _open_polyline_vw(pts: np.ndarray, max_n: int) -> np.ndarray:
-    pts = [tuple(p) for p in pts]
+    pts = _grid_points(pts, max_n)
     while len(pts) > max_n:
         best, best_area = 1, None
         for i in range(1, len(pts) - 1):              # the endpoints stay
@@ -745,11 +879,16 @@ def _trim_corner(pts: np.ndarray, max_len: float = 8.0) -> np.ndarray:
     return pts
 
 
-def polyline_of_component(component: np.ndarray) -> Optional[np.ndarray]:
+def polyline_of_component(component: np.ndarray, offset: tuple = (0, 0),
+                          shape: Optional[tuple] = None) -> Optional[np.ndarray]:
     """Open polyline (≤ 5 points, 192×128 px) through a thin edge component:
     the outer contour of a 1 px curve runs out and back, so the arc between
-    its two farthest points is one traverse of the curve."""
-    contours, _ = cv2.findContours(component.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    its two farthest points is one traverse of the curve. ``component`` may
+    be a crop (``_crop``) whose top-left pixel is ``offset`` (x, y) in an
+    image of ``shape``; the polyline is in that image's pixels either way."""
+    ox, oy = (int(v) for v in offset)
+    contours, _ = cv2.findContours(component.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE,
+                                   offset=(ox, oy))
     if not contours:
         return None
     c = max(contours, key=len).reshape(-1, 2).astype(np.float32)
@@ -757,7 +896,9 @@ def polyline_of_component(component: np.ndarray) -> Optional[np.ndarray]:
         return None
     step = max(1, len(c) // 120)                      # the farthest pair on ≤ ~120 samples
     sub = c[::step]
-    d = ((sub[:, None, :] - sub[None, :, :]) ** 2).sum(axis=2)
+    dx = sub[:, None, 0] - sub[None, :, 0]            # dx² + dy²: a two-term sum has one order
+    dy = sub[:, None, 1] - sub[None, :, 1]
+    d = dx * dx + dy * dy
     i, j = (int(v) * step for v in np.unravel_index(int(np.argmax(d)), d.shape))
     if i > j:
         i, j = j, i
@@ -776,13 +917,21 @@ def polyline_of_component(component: np.ndarray) -> Optional[np.ndarray]:
         approx = _open_polyline_vw(approx, EDGE_MAX_POINTS)
     # The arc runs along one side of the band; pull each vertex to the band's
     # local centre so the polyline sits on the edge, not beside it.
-    h, w = component.shape
+    h, w = shape if shape is not None else component.shape
     snapped = []
     for x, y in approx:
         x0, x1 = max(0, int(x) - 3), min(w, int(x) + 4)
         y0, y1 = max(0, int(y) - 3), min(h, int(y) + 4)
-        ys, xs = np.nonzero(component[y0:y1, x0:x1])
-        snapped.append((x0 + xs.mean(), y0 + ys.mean()) if len(xs) else (x, y))
+        # The window in crop pixels (the component is empty outside its crop),
+        # its hits counted from the window's own corner as on the whole image.
+        cx0, cy0 = max(x0 - ox, 0), max(y0 - oy, 0)
+        ys, xs = np.nonzero(component[cy0:max(y1 - oy, 0), cx0:max(x1 - ox, 0)])
+        n = len(xs)
+        if n:   # integer sums, divided once: the float64 means np.mean gives
+            snapped.append((x0 + (int(xs.sum()) + n * (cx0 + ox - x0)) / n,
+                            y0 + (int(ys.sum()) + n * (cy0 + oy - y0)) / n))
+        else:
+            snapped.append((x, y))
     return np.array(snapped, np.float32)
 
 
@@ -835,13 +984,14 @@ def extract_edges(rgb192: np.ndarray, mask: Optional[np.ndarray], regions: list,
     hline = horizon.line_work(w) if horizon.found else None
     out: list = []
     for _, i in comps[:EDGE_TOP_K]:
-        poly = polyline_of_component(cc == i)
+        piece, origin = _crop(cc, i, stats[i])
+        poly = polyline_of_component(piece, origin, cc.shape)
         if poly is None:
             continue
         cells = np.round(poly / (EDGE_W // w)).astype(int)
         pts: list = []
-        for x, y in cells:
-            p = (int(min(max(x, 0), w - 1)), int(min(max(y, 0), h - 1)))
+        for x, y in cells.tolist():
+            p = (min(max(x, 0), w - 1), min(max(y, 0), h - 1))
             if not pts or pts[-1] != p:
                 pts.append(p)
         if len(pts) < 2:
@@ -850,8 +1000,8 @@ def extract_edges(rgb192: np.ndarray, mask: Optional[np.ndarray], regions: list,
         length = float(np.hypot(seg[:, 0], seg[:, 1]).sum())
         if length < EDGE_MIN_LENGTH_CELLS:
             continue
-        mx = int(np.mean([p[0] for p in pts]))
-        my = float(np.mean([p[1] for p in pts]))
+        mx = int(sum(p[0] for p in pts) / len(pts))         # integer sums: np.mean's float64 means
+        my = sum(p[1] for p in pts) / len(pts)
         above = hline is not None and my < hline[mx]
         cls = CLS_STRUCTURE if above else CLS_RUT
         if above and length >= OVERHEAD_MIN_CELLS:
