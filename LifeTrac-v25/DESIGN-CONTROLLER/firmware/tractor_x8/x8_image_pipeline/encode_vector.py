@@ -162,6 +162,50 @@ GAIN_MIN_AREA_SHARE = 0.25                       # of the labelled area, from re
 
 STATUS_NONE = dict(arm_src=0, arm=30, bkt_src=0, bkt=64, conf=0, corr_n=0, mask_anom=False)
 
+# The temporal pass asks for the bit count, define-hash and state-hash of the
+# same few records and shapes many times per frame, and the codec computes
+# each by packing bits (CRCs bit by bit). They are pure functions of a record
+# (the codec's records are frozen dataclasses, hashed by value) or of
+# (dx, dy, colour), so they are memoised here; the caches are bounded.
+_MEMO_MAX = 4096
+_BITS_MEMO: dict = {}
+_DHASH_MEMO: dict = {}
+_SHASH_MEMO: dict = {}
+_DIGEST_MEMO: dict = {}
+_GAIN_MEMO: dict = {}
+
+
+def _memo(cache: dict, key, compute: Callable):
+    try:
+        return cache[key]
+    except KeyError:
+        pass
+    except TypeError:                            # an unhashable record: no memo
+        return compute()
+    value = compute()                            # an unencodable record raises; nothing is stored
+    if len(cache) >= _MEMO_MAX:
+        cache.clear()
+    cache[key] = value
+    return value
+
+
+def _record_bits(rec) -> int:
+    return _memo(_BITS_MEMO, rec, lambda: vs.record_bits(rec))
+
+
+def _define_hash(rec) -> int:
+    return _memo(_DHASH_MEMO, rec, lambda: vs.define_hash(rec))
+
+
+def _state_hash(dx: int, dy: int, base_rgb444: int) -> int:
+    return _memo(_SHASH_MEMO, (dx, dy, base_rgb444), lambda: vs.state_hash(dx, dy, base_rgb444, [], []))
+
+
+def _digest_crc(shapes: tuple, gain: tuple) -> int:
+    """The DIGEST crc of the live set (id-sorted (id, define-hash, state-hash)
+    triples) with no GSHIFT/GZOOM; a static scene repeats it frame after frame."""
+    return _memo(_DIGEST_MEMO, (shapes, tuple(gain)), lambda: vs.digest_crc(list(shapes), [(0, 0)] * 4, 128, gain))
+
 
 def level_of_quality(quality: int) -> int:
     """Quality byte band → level (§4.5.4): 60–100 V0, 40–59 V1, 20–39 V2, 1–19 V3."""
@@ -207,7 +251,7 @@ class _Shape:
     def state_hash(self) -> int:
         # An EDGE has no colour: its base colour field hashes as 0.
         base = vx.fill_base_rgb444(self.fill) if self.fill is not None else 0
-        return vs.state_hash(self.dx, self.dy, base, [], [])
+        return _state_hash(self.dx, self.dy, base)
 
 
 @dataclass
@@ -231,6 +275,52 @@ class _Cand:
     apply: Callable[[], None]       # mutates the mirror when the record is packed
     mentions: tuple = ()            # ids the record names (no CONFIRM for those)
     needs: object = None            # a candidate that must be packed before this one
+
+
+def _paint_labels(shapes: list, shape: tuple, with_second: bool = False) -> tuple:
+    """(shapes in paint order, top, second) for ``shapes`` painted largest
+    first, so a later, smaller shape lies on top: ``top`` is the id each
+    pixel shows and ``second`` (only ``with_second``) the id it showed before
+    that shape was painted, 0 for none."""
+    order = sorted(shapes, key=lambda s: -s.area)
+    top = np.zeros(shape, np.int32)
+    second = np.zeros(shape, np.int32) if with_second else None
+    for s in order:
+        if with_second:
+            second[s.raster] = top[s.raster]
+        top[s.raster] = s.id
+    return order, top, second
+
+
+class _Painting:
+    """The picture the base shows: ``base`` (H×W×3 float32, the L0 layer)
+    with the masses painted largest first, so a smaller shape lies on top.
+    Paints label maps, not colours — ``top`` is the id each pixel shows and
+    ``second`` the id it showed before that shape was painted (0 = base) —
+    and gathers the colours once, so the pixels hold the very values one
+    assignment per shape would leave. ``under`` gives the picture with one
+    shape taken out: where it is on top, what it covers."""
+
+    def __init__(self, base: np.ndarray, shapes: list, gain: np.ndarray, with_second: bool = True):
+        self.base = base
+        order, self.top, self.second = _paint_labels(shapes, base.shape[:2], with_second)
+        self.colour = np.zeros((128, 3), np.float32)    # id -> the colour it shows
+        if order:                                       # elementwise: each row is that shape's own clip
+            self.colour[[s.id for s in order]] = np.clip(np.stack([s.shown for s in order]) * gain, 0.0, 255.0)
+        shown = self.top > 0
+        self.picture = base.copy()
+        self.picture[shown] = self.colour[self.top[shown]]
+
+    def under(self, id_: int, ys: np.ndarray, xs: np.ndarray) -> np.ndarray:
+        """The picture with shape ``id_`` taken out, at the pixels (ys, xs)
+        (a new array): where it is on top, the shape painted before it, or
+        the base."""
+        pic = self.picture[ys, xs]
+        mine = self.top[ys, xs] == id_
+        if mine.any():
+            below = self.second[ys, xs][mine]
+            pic[mine] = np.where((below > 0)[:, None], self.colour[below], self.base[ys, xs][mine])
+        return pic
 
 
 def _shift_mask(m: np.ndarray, sx: int, sy: int) -> np.ndarray:
@@ -358,6 +448,8 @@ class VectorEncoder:
         self._digest_quiet_until = -1                 # after a range-1/2 start: no DIGEST while a base may hold a missed-DEL ghost
         self._evict_next: set = set()                 # ids DEL'd next frame to free their id
         self._waiting = 0                             # fresh defines refused an id in the last frame
+        self._mask_cache: tuple = (None, {})          # (region_map, index -> region_map == index), per capture
+        self._l0_cache: tuple = (None, None)          # (key, render_l0 picture), the last L0 drawn
         self._last_stats: dict = {}
 
     # ------------------------------------------------------------ public API
@@ -561,7 +653,11 @@ class VectorEncoder:
 
     @staticmethod
     def _gain_lin(codes: tuple) -> np.ndarray:
-        return np.array([2.0 ** ((c - 16) / 32.0) for c in codes], np.float32)
+        def compute() -> np.ndarray:
+            g = np.array([2.0 ** ((c - 16) / 32.0) for c in codes], np.float32)
+            g.setflags(write=False)
+            return g
+        return _memo(_GAIN_MEMO, tuple(codes), compute)
 
     def _gain_codes(self, regions: list, region_map: np.ndarray) -> tuple:
         """GAIN codes for this capture: the current codes plus the per-channel
@@ -571,27 +667,16 @@ class VectorEncoder:
         prev = self._prev_region_map
         if prev is None or not regions or len(self._prev_region_raw) == 0:
             return self._gain
-        np_, nc = int(prev.max()) + 2, int(region_map.max()) + 2
-        pair = np.bincount((prev.ravel() + 1) * nc + (region_map.ravel() + 1), minlength=np_ * nc).reshape(np_, nc)
-        area_c, area_p = pair.sum(axis=0), pair.sum(axis=1)
-        steps, weights = [], []
-        for r in regions:
-            c = r.index + 1
-            if c >= nc or area_c[c] == 0:
-                continue
-            p = int(np.argmax(pair[1:, c])) + 1
-            inter = pair[p, c]
-            union = area_c[c] + area_p[p] - inter
-            old = self._prev_region_raw[p - 1]
-            if union <= 0 or inter / union < MATCH_IOU or old.min() < 8 or r.mean.min() < 8 \
-                    or old.max() > 245 or r.mean.max() > 245:                # clipping breaks the ratio
-                continue
-            steps.append(np.log2(r.mean / old))
-            weights.append(float(area_c[c]))
+        at, p, iou, area_c = self._partners(prev, region_map, regions)
+        old = self._prev_region_raw[p - 1]
+        mean = np.stack([regions[i].mean for i in at]) if len(at) else np.zeros((0, 3), np.float32)
+        ok = ((iou >= MATCH_IOU) & (old.min(axis=1) >= 8) & (mean.min(axis=1) >= 8)
+              & (old.max(axis=1) <= 245) & (mean.max(axis=1) <= 245))            # clipping breaks the ratio
         total = float(area_c[1:].sum())
-        if not steps or total <= 0 or sum(weights) < GAIN_MIN_AREA_SHARE * total:
+        w = area_c[np.array([regions[i].index + 1 for i in at], np.intp)[ok]].astype(np.float64)
+        if not ok.any() or total <= 0 or float(w.sum()) < GAIN_MIN_AREA_SHARE * total:
             return self._gain
-        steps_a, w = np.array(steps), np.array(weights)
+        steps_a = np.log2(mean[ok] / old[ok])
         order = np.argsort(steps_a, axis=0)
         med = []
         for ch in range(3):
@@ -600,38 +685,52 @@ class VectorEncoder:
         cur = np.log2(self._gain_lin(self._gain))
         return tuple(int(max(0, min(31, round(16 + 32.0 * (cur[ch] + med[ch]))))) for ch in range(3))
 
+    @staticmethod
+    def _partners(prev: np.ndarray, cur: np.ndarray, regions: list) -> tuple:
+        """Each region's best partner in the previous capture by overlap, for
+        every region at once: (positions in ``regions`` of the regions with
+        pixels in ``cur``, the partner's label + 1 in ``prev``, the IoU with
+        it (−1 for an empty union), and the pixel count of every ``cur``
+        label + 1). ``prev`` must hold at least one region."""
+        np_, nc = int(prev.max()) + 2, int(cur.max()) + 2
+        pair = np.bincount((prev.ravel() + 1) * nc + (cur.ravel() + 1), minlength=np_ * nc).reshape(np_, nc)
+        area_c, area_p = pair.sum(axis=0), pair.sum(axis=1)
+        cols = np.array([r.index + 1 for r in regions], np.intp)
+        at = np.nonzero(cols < nc)[0]
+        at = at[area_c[cols[at]] > 0]
+        c = cols[at]
+        p = np.argmax(pair[1:, c], axis=0) + 1              # the first best, as one argmax per column
+        inter = pair[p, c]
+        union = area_c[c] + area_p[p] - inter
+        iou = np.where(union > 0, inter / np.where(union > 0, union, 1), -1.0)
+        return at, p, iou, area_c
+
     def _normalise(self, regions: list, codes: tuple) -> None:
-        """Express every region's colour in the epoch's reference exposure."""
-        g = self._gain_lin(codes)
-        for r in regions:
-            norm = np.clip(r.mean / g, 0.0, 255.0)
-            r.lab = vx.rgb_to_lab(norm)
-            r.fill = vx.make_fill(norm, r.fill.grad if r.fill is not None else None)
+        """Express every region's colour in the epoch's reference exposure (one
+        elementwise pass over all regions: each row is what the region alone gives)."""
+        if not regions:
+            return
+        norm = np.clip(np.stack([r.mean for r in regions]) / self._gain_lin(codes), 0.0, 255.0)
+        labs = vx.rgb_to_lab(norm)
+        fills = vx.make_fills(norm, [r.fill.grad if r.fill is not None else None for r in regions], labs)
+        for r, lab, fill in zip(regions, labs, fills):
+            r.lab, r.fill = lab, fill
 
     @staticmethod
     def _relabelled_fraction(prev: np.ndarray, prev_lab: np.ndarray, cur: np.ndarray, regions: list) -> float:
         """Share of the labelled area whose region has no partner in the
         previous capture with IoU ≥ 0.5 and ΔE76 ≤ 6 (the "40 % relabelled"
         trigger of §4.3)."""
-        np_, nc = int(prev.max()) + 2, int(cur.max()) + 2
-        pair = np.bincount((prev.ravel() + 1) * nc + (cur.ravel() + 1), minlength=np_ * nc).reshape(np_, nc)
-        area_c = pair.sum(axis=0)
-        area_p = pair.sum(axis=1)
+        if int(prev.max()) < 0:                              # the last capture had no region
+            return 1.0 if (cur >= 0).any() else 0.0
+        at, p, iou, area_c = VectorEncoder._partners(prev, cur, regions)
         total = float(area_c[1:].sum())
-        if total <= 0 or np_ < 2:
-            return 1.0 if total > 0 else 0.0
-        relabelled = 0.0
-        for r in regions:
-            c = r.index + 1
-            if c >= nc or area_c[c] == 0:
-                continue
-            p = int(np.argmax(pair[1:, c])) + 1
-            inter = pair[p, c]
-            union = area_c[c] + area_p[p] - inter
-            if union <= 0 or inter / union < MATCH_IOU \
-                    or float(vx.delta_e76(r.lab, prev_lab[p - 1])) > VERIFY_DE:
-                relabelled += float(area_c[c])
-        return relabelled / total
+        if total <= 0 or not len(at):
+            return 0.0
+        lab = np.stack([regions[i].lab for i in at])
+        bad = (iou < MATCH_IOU) | (vx.delta_e76(lab, prev_lab[p - 1]) > VERIFY_DE)
+        cols = np.array([regions[i].index + 1 for i in at], np.intp)
+        return float(area_c[cols[bad]].sum()) / total
 
     def _commit_epoch(self, clear: int, level: int, now: float) -> None:
         """The epoch start went out: advance the counter and start the epoch's
@@ -731,6 +830,34 @@ class VectorEncoder:
     def _masses(self) -> list:
         return [s for s in self._shapes.values() if s.layer != "edge"]
 
+    def _render_l0(self, hz: vx.Horizon, top_vf, bot_vf) -> np.ndarray:
+        """``vx.render_l0`` at working resolution (read-only). A frame draws the
+        L0 it scores against and then the L0 the base holds after it, mostly
+        the same one, so the last picture is kept."""
+        key = (hz.found, hz.y0, hz.slope, hz.sag, top_vf, bot_vf)
+        held, pic = self._l0_cache
+        if held != key:
+            pic = vx.render_l0(hz, top_vf, bot_vf, self._valid.shape)
+            pic.setflags(write=False)
+            self._l0_cache = (key, pic)
+        return pic
+
+    def _no_l0(self) -> np.ndarray:
+        h, w = self._valid.shape
+        return np.zeros((h, w, 3), np.float32)
+
+    def _region_mask(self, region_map: np.ndarray, index: int) -> np.ndarray:
+        """``region_map == index`` (read-only), built once per capture and region."""
+        held, masks = self._mask_cache
+        if held is not region_map:
+            masks = {}
+            self._mask_cache = (region_map, masks)
+        m = masks.get(index)
+        if m is None:
+            m = masks[index] = region_map == index
+            m.setflags(write=False)
+        return m
+
     def _build(self, work: np.ndarray, hz: vx.Horizon, regions: list, region_map: np.ndarray, edges: list,
                clear: Optional[int], level: int, moving: bool, budget_bytes: int, age_units: int,
                now: float) -> tuple:
@@ -759,14 +886,11 @@ class VectorEncoder:
         # the frame's DIGEST, and drops it at TTL_FRAMES; so does the mirror.
         self._tick_ttl()
         # The residual is measured against what the base holds after this frame.
-        h, w = self._valid.shape
         if self._top_vf is not None:
-            mirror = vx.render_l0(self._shown_hz, self._top_vf, self._bot_vf, (h, w))
+            l0 = self._render_l0(self._shown_hz, self._top_vf, self._bot_vf)
         else:
-            mirror = np.zeros((h, w, 3), np.float32)         # no anchor has gone out yet
-        gain = self._gain_lin(self._gain)
-        for s in sorted(self._masses(), key=lambda s: -s.area):
-            mirror[s.raster] = np.clip(s.shown * gain, 0.0, 255.0)
+            l0 = self._no_l0()                               # no anchor has gone out yet
+        mirror = _Painting(l0, self._masses(), self._gain_lin(self._gain), with_second=False).picture
         err = ((work.astype(np.float32) - mirror) ** 2).sum(axis=2)
         stats["residual"] = float(err[self._valid].mean()) if self._valid.any() else 0.0
         stats["n_live"] = len(self._shapes)
@@ -805,21 +929,21 @@ class VectorEncoder:
                 apply = lambda: (self._commit_epoch(clear, level, now), self._set_l0(l0_state))
             else:                                            # its repeat
                 apply = lambda: (self._spend_anchor_repeat(), self._set_l0(l0_state))
-            cands.append(_Cand(1, (0,), tuple(hzn), sum(vs.record_bits(r) for r in hzn), apply))
+            cands.append(_Cand(1, (0,), tuple(hzn), sum(_record_bits(r) for r in hzn), apply))
             if key:
                 anchor_cand = cands[-1]
         elif hzn:                                            # RESID / mid-epoch ABS, or the V3 beacon: slot 3
-            cands.append(_Cand(3, (0,), hzn[0], vs.record_bits(hzn[0]), lambda: self._set_l0(l0_state)))
+            cands.append(_Cand(3, (0,), hzn[0], _record_bits(hzn[0]), lambda: self._set_l0(l0_state)))
         if self._gain_next != base_gain or (key and self._gain_next != GAIN_NEUTRAL):
             gain = vs.Gain(*self._gain_next)             # absolute since the epoch start (§3.3)
-            cands.append(_Cand(3, (9,), gain, vs.record_bits(gain), lambda: setattr(self, "_gain", self._gain_next)))
+            cands.append(_Cand(3, (9,), gain, _record_bits(gain), lambda: setattr(self, "_gain", self._gain_next)))
         status = vs.Status(moving=bool(moving), **STATUS_NONE)
-        cands.append(_Cand(4, (0,), status, vs.record_bits(status), lambda: None))
+        cands.append(_Cand(4, (0,), status, _record_bits(status), lambda: None))
         # ΔD is scored against the L0 this frame's HZN record leaves (it precedes every define).
         if l0_state is not None:
-            l0 = vx.render_l0(l0_state.shown_hz, l0_state.top_vf, l0_state.bot_vf, (h, w))
+            l0 = self._render_l0(l0_state.shown_hz, l0_state.top_vf, l0_state.bot_vf)
         else:
-            l0 = np.zeros((h, w, 3), np.float32)
+            l0 = self._no_l0()
         verified: set = set()
         self._waiting = 0
         # The key frame of a range-1/2 start: every kept shape owes its
@@ -850,7 +974,7 @@ class VectorEncoder:
                      or self._frame_no <= self._digest_quiet_until)
         eligible = [i for i in sorted(verified)
                     if not restating or self._shapes[i].frames_since_verify >= vs.TTL_FRAMES // 2]
-        reserve = self._confirm_bits(eligible) + (0 if restating else vs.record_bits(vs.Digest(0, 0)))
+        reserve = self._confirm_bits(eligible) + (0 if restating else _record_bits(vs.Digest(0, 0)))
         packed, used = self._pack(cands, total_bits, reserve, carousel_bits)
         for c in packed:
             c.apply()
@@ -863,16 +987,15 @@ class VectorEncoder:
             unmentioned = [i for i in eligible if i not in mentioned and i in self._shapes
                            and i not in self._restate_owed]
             for rec in self._confirm_records(unmentioned):
-                if used + vs.record_bits(rec) <= total_bits:
+                if used + _record_bits(rec) <= total_bits:
                     records.append(rec)
-                    used += vs.record_bits(rec)
+                    used += _record_bits(rec)
             if not self._restate_owed and self._frame_no > self._digest_quiet_until:   # see _commit_epoch
-                digest = vs.Digest(len(self._shapes), vs.digest_crc(
-                    [(s.id, s.dhash, s.state_hash()) for s in self._shapes.values()],
-                    [(0, 0)] * 4, 128, self._gain))
-                if used + vs.record_bits(digest) <= total_bits:
+                digest = vs.Digest(len(self._shapes), _digest_crc(
+                    tuple(sorted((s.id, s.dhash, s.state_hash()) for s in self._shapes.values())), self._gain))
+                if used + _record_bits(digest) <= total_bits:
                     records.append(digest)
-                    used += vs.record_bits(digest)
+                    used += _record_bits(digest)
         # What this frame verifies at the base (§4.3): a define (new, repeat
         # or carousel), an UPD, or a CONFIRM tag that went out. A UCOL does
         # not, and a DEL removes. The mirror's TTL clock runs on this set.
@@ -890,7 +1013,7 @@ class VectorEncoder:
         bits = {"hdr": vs.HEADER_BITS, "L0": 0, "L1": 0, "L2": 0, "L3": 0, "L4": 0, "ctrl": 0}
         counts: dict = {}
         for rec in records:
-            bits[_bits_layer(rec)] += vs.record_bits(rec)
+            bits[_bits_layer(rec)] += _record_bits(rec)
             counts[type(rec).__name__] = counts.get(type(rec).__name__, 0) + 1
         bits["pad"] = len(body) * 8 - sum(bits.values()) if body else 0
         packed_ids = {id(c) for c in packed}
@@ -922,37 +1045,43 @@ class VectorEncoder:
         h, w = self._valid.shape
         n_reg = len(regions)
         masses = self._masses()
-        live_lbl = np.zeros((h, w), np.int32)
-        for s in sorted(masses, key=lambda s: -s.area):
-            live_lbl[s.raster] = s.id
+        _, live_lbl, _ = _paint_labels(masses, (h, w))
         pair = np.bincount(live_lbl.ravel() * (n_reg + 1) + (region_map.ravel() + 1),
                            minlength=128 * (n_reg + 1)).reshape(128, n_reg + 1)
         # Greedy IoU matching, best pairs first. A shape that moved locally by
         # up to the UPD range is matched on the IoU after shifting its raster
         # to the region's centroid (there is no ego-motion prediction yet).
+        # Every shape × region IoU, ΔE, centroid step and layer test is one
+        # array operation; only the few shift candidates are tested one by one.
         pairs = []
-        region_masks: dict = {}
-        for s in masses:
-            row = pair[s.id]
-            for r in regions:
-                inter = int(row[r.index + 1])
-                union = s.area + r.area - inter
-                iou = inter / union if union > 0 else 0.0
-                if iou >= MATCH_IOU:
-                    pairs.append((iou, s.id, r.index))
-                    continue
-                ddx, ddy = int(round(r.centroid[0] - s.cx)), int(round(r.centroid[1] - s.cy))
-                if max(abs(ddx), abs(ddy)) > 8 or max(abs(ddx), abs(ddy)) == 0 \
-                        or float(vx.delta_e76(r.lab, s.lab)) > VERIFY_DE \
-                        or (r.tree is None) != (s.layer == "mass"):
-                    continue
-                if r.index not in region_masks:
-                    region_masks[r.index] = region_map == r.index
-                shifted = _shift_mask(s.raster, ddx, ddy)
-                inter = int((shifted & region_masks[r.index]).sum())
-                union = int(shifted.sum()) + r.area - inter
-                if union > 0 and inter / union >= MATCH_IOU:
-                    pairs.append((inter / union * 0.99, s.id, r.index))   # behind a direct match
+        de76 = np.zeros((0, 0), np.float32)                  # ΔE76 per (shape in masses, region in regions)
+        if masses and regions:
+            s_id = np.array([s.id for s in masses], np.intp)
+            r_ix = np.array([r.index for r in regions], np.intp)
+            inter = pair[s_id][:, r_ix + 1]
+            union = np.array([s.area for s in masses])[:, None] + np.array([r.area for r in regions])[None, :] - inter
+            iou = np.where(union > 0, inter / np.where(union > 0, union, 1), 0.0)
+            direct = iou >= MATCH_IOU
+            for si, ri in zip(*np.nonzero(direct)):
+                pairs.append((float(iou[si, ri]), masses[si].id, regions[ri].index))
+            # round() and np.round() both round half to even on these float64 steps.
+            ddx = np.round(np.array([r.centroid[0] for r in regions])[None, :]
+                           - np.array([s.cx for s in masses])[:, None]).astype(int)
+            ddy = np.round(np.array([r.centroid[1] for r in regions])[None, :]
+                           - np.array([s.cy for s in masses])[:, None]).astype(int)
+            step = np.maximum(np.abs(ddx), np.abs(ddy))
+            same_kind = (np.array([r.tree is None for r in regions])[None, :]
+                         == np.array([s.layer == "mass" for s in masses])[:, None])
+            # ΔE per pair, each the number delta_e76(r.lab, s.lab) gives alone
+            de76 = vx.delta_e76(np.stack([s.lab for s in masses])[:, None, :],
+                                np.stack([r.lab for r in regions])[None, :, :])
+            for si, ri in zip(*np.nonzero(~direct & (step <= 8) & (step != 0) & same_kind & (de76 <= VERIFY_DE))):
+                s, r = masses[si], regions[ri]
+                shifted = _shift_mask(s.raster, int(ddx[si, ri]), int(ddy[si, ri]))
+                inter_s = int((shifted & self._region_mask(region_map, r.index)).sum())
+                union_s = int(shifted.sum()) + r.area - inter_s
+                if union_s > 0 and inter_s / union_s >= MATCH_IOU:
+                    pairs.append((inter_s / union_s * 0.99, s.id, r.index))   # behind a direct match
         pairs.sort(reverse=True)
         matched_shape: dict = {}
         matched_region: dict = {}
@@ -967,7 +1096,7 @@ class VectorEncoder:
 
         def add_del(s: _Shape) -> None:
             rec = vs.Del(s.id)
-            cands.append(_Cand(5, (0, -s.area), rec, vs.record_bits(rec),
+            cands.append(_Cand(5, (0, -s.area), rec, _record_bits(rec),
                                lambda id_=s.id: self._release_id(id_), (s.id,)))
             taken.add(s.id)
             deleted.add(s.id)
@@ -980,6 +1109,8 @@ class VectorEncoder:
                 add_del(s)
         redefines: list = []                                 # (shape, region, ΔE): same layer, geometry failed
         fresh: list = []                                     # regions no live shape describes
+        at_mass = {s.id: i for i, s in enumerate(masses)}
+        at_region = {r.index: j for j, r in enumerate(regions)}
         for r in regions:
             rec_geo = self._region_record(1, r)              # geometry probe; the id is assigned below
             if r.index in matched_region:
@@ -987,7 +1118,7 @@ class VectorEncoder:
                 same_layer = rec_geo is not None and _layer_of(rec_geo) == s.layer
                 geometry_ok, upd = self._verify_geometry(s, r, rec_geo, matched_shape[s.id][1],
                                                          region_map, same_layer)
-                de = float(vx.delta_e76(r.lab, s.lab))
+                de = float(de76[at_mass[s.id], at_region[r.index]])
                 if geometry_ok and same_layer:
                     self._keep_candidates(s, r, upd, de, cands, verified)
                     continue
@@ -1000,19 +1131,13 @@ class VectorEncoder:
         # Pass 2: ΔD on the mirror with this frame's deletions already applied
         # (their pixels show L0), so no candidate is credited for painting
         # over a shape another record of this frame removes.
-        mirror = l0.copy()
         gain = self._gain_lin(self._gain_next)
-        under: dict = {}                                     # id -> the mirror under the shape, on its raster
-        top = np.zeros((h, w), np.int32)                     # which shape the mirror shows per pixel
-        for s in sorted(masses, key=lambda s: -s.area):
-            if s.id not in deleted:
-                under[s.id] = mirror[s.raster].copy()
-                mirror[s.raster] = np.clip(s.shown * gain, 0.0, 255.0)
-                top[s.raster] = s.id
+        paint = _Painting(l0, [s for s in masses if s.id not in deleted], gain)
+        mirror = paint.picture
         f = work.astype(np.float32)
         err_before = ((f - mirror) ** 2).sum(axis=2)
         for s, r, de in redefines:
-            if not self._add_redefine(cands, s, r, level, err_before, f, l0, masses, deleted):
+            if not self._add_redefine(cands, s, r, level, err_before, f, paint):
                 # The live outline describes the region at least as well as
                 # a new one would, so neither a redefine nor a DEL is
                 # warranted: the shape is kept and confirmed like a verified one.
@@ -1050,7 +1175,7 @@ class VectorEncoder:
             rec = self._region_record(id_, r)
             recs, ever_upd, ever_ucol = self._fresh_define_records(rec)
             cands.append(_Cand(5, (3, -per_bit), recs if len(recs) > 1 else rec,
-                               sum(vs.record_bits(x) for x in recs),
+                               bits + sum(_record_bits(x) for x in recs[1:]),   # recs[0] is rec: the scored bits
                                lambda rec=rec, raster=raster, area=area, r=r, eu=ever_upd, ec=ever_ucol:
                                self._apply_define(rec, raster, area, r, level, eu, ec),
                                (id_,)))
@@ -1076,7 +1201,8 @@ class VectorEncoder:
             if not holders:
                 continue
             value = self._holder_values(holders, [o for o in masses if o.id not in deleted], matched_shape,
-                                        by_index, region_map, mirror, under, top, f, gain, self._valid)
+                                        by_index, lambda i: self._region_mask(region_map, i), paint, f, gain,
+                                        self._valid)
             weak = min(value, key=value.get)
             if best_dd >= EVICT_VALUE_RATIO * max(value[weak], 0.0):
                 n = self._evict_strikes.get(layer, 0) + 1
@@ -1087,9 +1213,8 @@ class VectorEncoder:
         self._evict_strikes = strikes
 
     @staticmethod
-    def _holder_values(holders: list, shapes: list, matched_shape: dict, by_index: dict, region_map: np.ndarray,
-                       mirror: np.ndarray, under: dict, top: np.ndarray, f: np.ndarray, gain,
-                       valid: np.ndarray) -> dict:
+    def _holder_values(holders: list, shapes: list, matched_shape: dict, by_index: dict, region_mask: Callable,
+                       paint: "_Painting", f: np.ndarray, gain, valid: np.ndarray) -> dict:
         """Per live holder, the error it removes from the picture it will be in
         after this frame: over the raster its define would paint for the
         region it now describes (what ``_score_define`` scores a newcomer
@@ -1100,22 +1225,22 @@ class VectorEncoder:
         area_of = np.zeros(128, np.int64)
         for o in shapes:
             area_of[o.id] = o.area
+        top = paint.top
         top_area = area_of[top]
+        covered = top != 0
         values: dict = {}
         for o in holders:
             m = matched_shape.get(o.id)
             r = by_index.get(m[0]) if m is not None else None
             if r is not None:
-                rast = (r.raster & valid) if r.raster is not None else (region_map == r.index)
+                rast = (r.raster & valid) if r.raster is not None else region_mask(r.index)
             else:
                 rast = o.raster
-            rast = rast & ~((top != 0) & (top != o.id) & (top_area < o.area))
+            rast = rast & ~(covered & (top != o.id) & (top_area < o.area))
             colour = np.clip(vx.fill_shown_rgb8(r.fill if r is not None else o.fill) * gain, 0.0, 255.0)
-            without = mirror.copy()
-            if o.id in under:
-                mine = (top == o.id)
-                without[o.raster & mine] = under[o.id][mine[o.raster]]
-            values[o.id] = float(((f[rast] - without[rast]) ** 2).sum() - ((f[rast] - colour) ** 2).sum())
+            ys, xs = np.nonzero(rast)                        # the same pixels, in the same order, as f[rast]
+            fr = f[ys, xs]
+            values[o.id] = float(((fr - paint.under(o.id, ys, xs)) ** 2).sum() - ((fr - colour) ** 2).sum())
         return values
 
     def _edge_candidates(self, edges: list, level: int, cands: list, verified: set) -> None:
@@ -1150,7 +1275,7 @@ class VectorEncoder:
         for s in live:
             if s.id not in matched.values():
                 rec = vs.Del(s.id)
-                cands.append(_Cand(5, (0, -s.area), rec, vs.record_bits(rec),
+                cands.append(_Cand(5, (0, -s.area), rec, _record_bits(rec),
                                    lambda id_=s.id: self._release_id(id_), (s.id,)))
         new_edges = 0
         taken: set = set(matched.values())
@@ -1159,10 +1284,10 @@ class VectorEncoder:
                 s = self._shapes[matched[i]]
                 verified.add(s.id)
                 if s.repeat_left > 0:
-                    cands.append(_Cand(6, (-e.score,), s.define, vs.record_bits(s.define),
+                    cands.append(_Cand(6, (-e.score,), s.define, _record_bits(s.define),
                                        lambda s=s: self._apply_repeat(s, spend=True), (s.id,)))
                 else:
-                    cands.append(_Cand(7, (s.define_frame, s.id), s.define, vs.record_bits(s.define),
+                    cands.append(_Cand(7, (s.define_frame, s.id), s.define, _record_bits(s.define),
                                        lambda s=s: self._apply_repeat(s), (s.id,)))
                 continue
             if new_edges >= MAX_NEW_EDGES:
@@ -1172,7 +1297,7 @@ class VectorEncoder:
                 break
             rec = vs.Edge(id_, e.cls, e.points)
             try:
-                bits = vs.record_bits(rec)
+                bits = _record_bits(rec)
             except ValueError:                               # a delta the EG2 field cannot carry
                 continue
             taken.add(id_)
@@ -1182,7 +1307,7 @@ class VectorEncoder:
 
     def _apply_edge(self, rec, e, level: int) -> None:
         ys, xs = np.nonzero(e.raster)
-        self._shapes[rec.id] = _Shape(rec.id, rec, vs.define_hash(rec), None, "edge", e.raster, int(e.raster.sum()),
+        self._shapes[rec.id] = _Shape(rec.id, rec, _define_hash(rec), None, "edge", e.raster, int(e.raster.sum()),
                                       float(xs.mean()) if len(xs) else 0.0, float(ys.mean()) if len(ys) else 0.0,
                                       None, self._frame_no, repeat_left=LEVEL_REPEATS[level])
 
@@ -1204,7 +1329,7 @@ class VectorEncoder:
             ndx, ndy = s.dx + int(round(ddx)), s.dy + int(round(ddy))
             if -8 <= ndx <= 7 and -8 <= ndy <= 7:
                 shifted = _shift_mask(s.raster, ndx - s.dx, ndy - s.dy)
-                inter = int((shifted & (region_map == r.index)).sum())
+                inter = int((shifted & self._region_mask(region_map, r.index)).sum())
                 union = int(shifted.sum()) + r.area - inter
                 if union > 0 and inter / union >= VERIFY_IOU:
                     return True, (ndx, ndy, shifted)
@@ -1231,10 +1356,6 @@ class VectorEncoder:
         probe = self._region_record(vs.ID_PLANT[0] if region.tree is not None else vs.ID_MASS[0], region)
         if probe is None:
             return None
-        try:
-            bits = vs.record_bits(probe)
-        except ValueError:                                   # a delta the EG2 field cannot carry
-            return None
         raster = self._define_raster(probe, region)
         area = int(raster.sum())
         if area == 0:
@@ -1243,10 +1364,14 @@ class VectorEncoder:
         dd = float(err_before[raster].sum() - ((f[raster] - c) ** 2).sum())
         if dd <= MIN_DD_PER_PX * area:
             return None
+        try:                                                 # packed only for a define worth its pixels
+            bits = _record_bits(probe)
+        except ValueError:                                   # a delta the EG2 field cannot carry
+            return None
         return dd / bits, dd, bits, raster, area
 
     def _add_redefine(self, cands: list, s: _Shape, region, level: int, err_before: np.ndarray,
-                      f: np.ndarray, l0: np.ndarray, masses: list, deleted: set) -> bool:
+                      f: np.ndarray, paint: "_Painting") -> bool:
         """A same-id redefine when the new outline beats the live one. ΔD is
         measured over the union of the two rasters with the live shape gone
         from the "after" mirror, so the shape competes with the alternative
@@ -1256,11 +1381,7 @@ class VectorEncoder:
         not a redefine (§3.4 rule 5) and is refused like one not worth its
         bits; the caller then keeps and confirms the live shape."""
         rec = self._region_record(s.id, region)
-        if rec is None or vs.define_hash(rec) == s.dhash:
-            return False
-        try:
-            bits = vs.record_bits(rec)
-        except ValueError:                                   # a delta the EG2 field cannot carry
+        if rec is None or _define_hash(rec) == s.dhash:
             return False
         raster = self._define_raster(rec, region)
         area = int(raster.sum())
@@ -1269,12 +1390,7 @@ class VectorEncoder:
         gain = self._gain_lin(self._gain_next)
         uy, ux = np.nonzero(s.raster | raster)               # the union of the two outlines, as pixel lists
         fu = f[uy, ux]
-        under = l0[uy, ux].copy()                            # the mirror without this shape, on the union
-        for o in sorted(masses, key=lambda o: -o.area):
-            if o.id not in deleted and o.id != s.id:
-                m = o.raster[uy, ux]
-                if m.any():
-                    under[m] = np.clip(o.shown * gain, 0.0, 255.0)
+        under = paint.under(s.id, uy, ux)                    # the mirror without this shape, on the union
         c = np.clip(vx.fill_shown_rgb8(rec.fill) * gain, 0.0, 255.0)
         after = ((fu - under) ** 2).sum(axis=1)
         new = raster[uy, ux]
@@ -1282,13 +1398,17 @@ class VectorEncoder:
         dd = float(err_before[uy, ux].sum() - after.sum())
         if dd <= MIN_DD_PER_PX * area:
             return False
+        try:                                                 # packed only for a redefine worth its pixels
+            bits = _record_bits(rec)
+        except ValueError:                                   # a delta the EG2 field cannot carry
+            return False
         cands.append(_Cand(5, (3, -dd / bits), rec, bits,
                            lambda: self._apply_define(rec, raster, area, region, level), (s.id,)))
         return True
 
     def _apply_define(self, rec, raster: np.ndarray, area: int, region, level: int,
                       ever_upd: bool = False, ever_ucol: bool = False) -> None:
-        dh = vs.define_hash(rec)
+        dh = _define_hash(rec)
         s = self._shapes.get(rec.id)
         if s is not None and s.dhash == dh:
             self._apply_repeat(s)                            # §3.4 rule 5: a same-hash define is a repeat
@@ -1314,22 +1434,22 @@ class VectorEncoder:
             return
         if upd is not None:
             rec = vs.Upd(s.id, upd[0], upd[1])
-            cands.append(_Cand(5, (1, -r.area), rec, vs.record_bits(rec),
+            cands.append(_Cand(5, (1, -r.area), rec, _record_bits(rec),
                                lambda s=s, u=upd, r=r: self._apply_upd(s, u, r), (s.id,)))
         recolour = de > VERIFY_DE and r.fill != s.fill
         if recolour:
             rec = vs.Ucol(s.id, r.fill)
-            cands.append(_Cand(5, (2, -r.area), rec, vs.record_bits(rec),
+            cands.append(_Cand(5, (2, -r.area), rec, _record_bits(rec),
                                lambda s=s, r=r: self._apply_ucol(s, r), (s.id,)))
         if upd is None and not recolour:
             verified.add(s.id)
         if s.repeat_left > 0:                                # repeat-once, re-verified on this capture
             recs = self._resend_records(s, with_upd=upd is None, with_ucol=not recolour)
-            cands.append(_Cand(6, (-r.area,), recs, sum(vs.record_bits(x) for x in recs),
+            cands.append(_Cand(6, (-r.area,), recs, sum(_record_bits(x) for x in recs),
                                lambda s=s: self._apply_repeat(s, spend=True), (s.id,)))
         elif upd is None and not recolour:
             recs = self._resend_records(s, with_upd=True, with_ucol=True)
-            cands.append(_Cand(7, (s.define_frame, s.id), recs, sum(vs.record_bits(x) for x in recs),
+            cands.append(_Cand(7, (s.define_frame, s.id), recs, sum(_record_bits(x) for x in recs),
                                lambda s=s: self._apply_repeat(s), (s.id,)))
 
     def _restate_candidate(self, s: _Shape, r, upd: Optional[tuple], de: float, cands: list) -> None:
@@ -1360,7 +1480,7 @@ class VectorEncoder:
                 self._apply_upd(s, u, r)
             if recolour:
                 self._apply_ucol(s, r)
-        cands.append(_Cand(5, (0.5, -r.area), tuple(recs), sum(vs.record_bits(x) for x in recs), apply, (s.id,)))
+        cands.append(_Cand(5, (0.5, -r.area), tuple(recs), sum(_record_bits(x) for x in recs), apply, (s.id,)))
 
     @staticmethod
     def _resend_records(s: _Shape, with_upd: bool, with_ucol: bool) -> tuple:
@@ -1434,7 +1554,7 @@ class VectorEncoder:
         return recs
 
     def _confirm_bits(self, ids: list) -> int:
-        return sum(vs.record_bits(rec) for rec in self._confirm_records(ids))
+        return sum(_record_bits(rec) for rec in self._confirm_records(ids))
 
     @staticmethod
     def _pack(cands: list, total_bits: int, reserve: int, carousel_bits: int) -> tuple:
