@@ -1,0 +1,56 @@
+$ systemctl is-enabled 'lifetrac-*'; systemctl is-active 'lifetrac-*'
+Glob pattern passed to check, but globs are not supported for this.
+Invalid unit name "lifetrac-*" escaped as "lifetrac-\x2a".
+Failed to get unit file state for lifetrac-\x2a.service: No such file or directory
+failed
+failed
+[rc=3]
+$ systemctl is-enabled 'stm32h7-program.service'; systemctl is-active 'stm32h7-program.service'
+enabled
+active
+[rc=0]
+$ systemctl is-enabled 'm4-proxy.service'; systemctl is-active 'm4-proxy.service'
+enabled
+active
+[rc=0]
+$ systemctl is-enabled 'monitor-m4-elf-file.path'; systemctl is-active 'monitor-m4-elf-file.path'
+enabled
+active
+[rc=0]
+$ systemctl is-enabled 'monitor-m4-elf-file.service'; systemctl is-active 'monitor-m4-elf-file.service'
+static
+inactive
+[rc=3]
+$ systemctl is-enabled 'compose-apps-early-start*'; systemctl is-active 'compose-apps-early-start*'
+Glob pattern passed to check, but globs are not supported for this.
+Invalid unit name "compose-apps-early-start*" escaped as "compose-apps-early-start\x2a".
+Failed to get unit file state for compose-apps-early-start\x2a.service: No such file or directory
+[rc=3]
+$ systemctl is-enabled 'aktualizr-lite.service'; systemctl is-active 'aktualizr-lite.service'
+enabled
+inactive
+[rc=3]
+$ systemctl is-enabled 'wpa_supplicant.service'; systemctl is-active 'wpa_supplicant.service'
+disabled
+active
+[rc=0]
+$ systemctl is-enabled 'disable-wifi.service'; systemctl is-active 'disable-wifi.service'
+Failed to get unit file state for disable-wifi.service: No such file or directory
+inactive
+[rc=3]
+$ systemctl is-enabled 'docker.service'; systemctl is-active 'docker.service'
+enabled
+active
+[rc=0]
+$ systemctl is-enabled 'NetworkManager.service'; systemctl is-active 'NetworkManager.service'
+enabled
+active
+[rc=0]
+$ systemctl is-enabled 'adbd.service'; systemctl is-active 'adbd.service'
+Failed to get unit file state for adbd.service: No such file or directory
+inactive
+[rc=3]
+$ systemctl is-enabled 'systemd-tmpfiles-clean.timer'; systemctl is-active 'systemd-tmpfiles-clean.timer'
+static
+active
+[rc=0]

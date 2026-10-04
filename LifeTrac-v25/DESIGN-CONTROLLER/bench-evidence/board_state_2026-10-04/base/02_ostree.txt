@@ -1,0 +1,30 @@
+$ ostree admin status
+* lmp 1c498d6c55ed8c0014e8a9cd3921d3c881cebc424fffc0d91e34441c13ed91fe.0
+    Version: 4.0.11-934-91
+    origin refspec: lmp:portenta-x8-lmp
+[rc=0]
+$ ostree admin config-diff
+M    hostname
+M    hosts
+M    machine-id
+M    mtab
+D    ipk-postinsts/000-alsa-state
+D    systemd/system/basic.target.wants/resize-helper.service
+D    systemd/system/multi-user.target.wants/lmp-auto-hostname.service
+D    systemd/system/sysinit.target.wants/run-postinsts.service
+A    NetworkManager/system-connections/Wired connection 1.nmconnection
+A    dropbear/dropbear_ecdsa_host_key
+A    sudoers.d/99-lifetrac-bench-nopasswd
+A    systemd/system/multi-user.target.wants/lifetrac-base-compose.service
+A    systemd/system/multi-user.target.wants/lifetrac-base.service
+A    systemd/system/compose-apps-early-start-recovery.service
+A    systemd/system/compose-apps-early-start.service
+A    systemd/system/lifetrac-base-compose.service
+A    systemd/system/lifetrac-base.service
+A    systemd/system/lifetrac-base.service.d
+A    systemd/system/lifetrac-base.service.d/timeout.conf
+A    .updated
+A    .pwd.lock
+A    cni
+A    cni/net.d
+[rc=0]

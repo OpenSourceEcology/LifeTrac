@@ -1,0 +1,25 @@
+$ systemctl is-enabled aktualizr-lite 2>/dev/null; systemctl is-active aktualizr-lite 2>/dev/null
+enabled
+inactive
+[rc=3]
+$ ls -la /var/sota /var/sota/compose-apps /var/sota/reset-apps 2>/dev/null
+/var/sota:
+total 20
+drwx------  5 root root 4096 Aug 11  2025 .
+drwxr-xr-x 13 root root 4096 Apr 28  2022 ..
+drwxr-xr-x  2 root root 4096 May 26 17:48 compose-apps
+drwxr-xr-x  2 root root 4096 Aug 11  2025 import
+drwxr-xr-x  4 root root 4096 Aug 11  2025 reset-apps
+
+/var/sota/compose-apps:
+total 8
+drwxr-xr-x 2 root root 4096 May 26 17:48 .
+drwx------ 5 root root 4096 Aug 11  2025 ..
+
+/var/sota/reset-apps:
+total 16
+drwxr-xr-x 4 root root 4096 Aug 11  2025 .
+drwx------ 5 root root 4096 Aug 11  2025 ..
+drwxr-xr-x 3 root root 4096 Aug 11  2025 apps
+drwxr-xr-x 3 root root 4096 Aug 11  2025 blobs
+[rc=0]

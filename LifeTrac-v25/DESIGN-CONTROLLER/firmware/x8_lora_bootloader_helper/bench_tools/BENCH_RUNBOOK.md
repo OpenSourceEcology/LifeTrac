@@ -25,6 +25,19 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
 
 ## Board facts
 
+* **What is on each chip and board** (custom firmware, OS customizations,
+  images, and where each is saved): [BENCH_BOARDS.md](BENCH_BOARDS.md).
+  Capture a board read-only with `bash pull_board_state.sh <base|tractor>`.
+* **Powering down.** `systemctl poweroff` keeps the tractor off, but the
+  base booted again about 4.5 min later (2026-10-04). Remove power to keep the
+  base down.
+* **Powering up.** The L072 boots into RXCONT (listening). Park it with
+  `radio_park.py` if the radios must stay off.
+* **PC toolchain.** arm-none-eabi-gcc 12.2.1 (Arm GNU Toolchain
+  12.2.MPACBTI-Rel1) gives byte-identical L072 builds. Also: WinLibs
+  `mingw32-make` (PowerShell only), arduino-cli with
+  `arduino:mbed_portenta` 4.5.0, `py -3`. The PC has no Docker; images are
+  built on the base X8.
 * Base `192.168.1.117` via ssh key `~/.ssh/lifetrac_base_ed25519`; tractor
   ONLY via `adb -s 2E2C1209DABC240B` (WiFi stays off); base adb
   `2D0A1209DABC240B`. Password `fio` → `echo fio | sudo -S -p ''`.

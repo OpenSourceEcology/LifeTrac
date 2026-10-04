@@ -1,0 +1,63 @@
+$ python3 --version; openocd --version; docker version; docker compose version
+Python 3.10.9
+Open On-Chip Debugger 0.11.0-dirty (2025-07-14-18:35)
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Client:
+ Version:           24.0.2-ce
+ API version:       1.43
+ Go version:        go1.20.5
+ Git commit:        cb74dfcd85
+ Built:             Thu May 25 21:22:22 2023
+ OS/Arch:           linux/arm64
+ Context:           default
+
+Server:
+ Engine:
+  Version:          24.0.2-ce
+  API version:      1.43 (minimum version 1.12)
+  Go version:       go1.20.5
+  Git commit:       659604f9ee60f147020bdd444b26e4b5c636dc28
+  Built:            Thu May 25 21:22:22 2023
+  OS/Arch:          linux/arm64
+  Experimental:     false
+ containerd:
+  Version:          v1.7.1.m
+  GitCommit:        1677a17964311325ed1c31e2c0a3589ce6d5c30d.m
+ runc:
+  Version:          1.1.7
+  GitCommit:        v1.1.7-0-g860f061b-dirty
+ docker-init:
+  Version:          0.19.0
+  GitCommit:        b9f42a0-dirty
+Docker Compose version 2.18.1
+[rc=0]
+$ df -h; free -m; cat /usr/lib/tmpfiles.d/tmp.conf 2>/dev/null
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           976M   15M  962M   2% /run
+devtmpfs        650M     0  650M   0% /dev
+/dev/mmcblk2p2   14G  3.7G  9.3G  29% /sysroot
+tmpfs           976M     0  976M   0% /dev/shm
+tmpfs           4.0M     0  4.0M   0% /sys/fs/cgroup
+tmpfs           976M  1.1M  975M   1% /tmp
+tmpfs           976M  4.0K  976M   1% /var/volatile
+/dev/mmcblk2p1   84M   34K   83M   1% /var/rootdirs/mnt/boot
+tmpfs           196M     0  196M   0% /run/user/63
+overlay          14G  3.7G  9.3G  29% /var/lib/docker/overlay2/b9688a57e05be39e54abb1c236c3eea173aba58be47837b3ff2eda3866d610e0/merged
+               total        used        free      shared  buff/cache   available
+Mem:            1951         310        1052          16         588        1600
+Swap:           1905           0        1905
+#  This file is part of systemd.
+#
+#  systemd is free software; you can redistribute it and/or modify it
+#  under the terms of the GNU Lesser General Public License as published by
+#  the Free Software Foundation; either version 2.1 of the License, or
+#  (at your option) any later version.
+
+# See tmpfiles.d(5) for details
+
+# Clear tmp directories separately, to make them easier to override
+q /tmp 1777 root root 5d
+q /var/tmp 1777 root root 15d
+[rc=0]
