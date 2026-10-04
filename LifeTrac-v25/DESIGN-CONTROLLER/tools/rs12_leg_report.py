@@ -249,13 +249,28 @@ def main(argv: list[str] | None = None) -> int:
     # not below them. frag_arrival (-LogFragArrivals 1) is fragment-level,
     # the same unit as `sent`; the published count is the fallback and the
     # same number on one-fragment legs.
-    floor, floor_src = ((frag_log, "fragments from frag_arrival events")
-                        if frag_log > pub_log else
-                        (pub_log, "frames from 'published frame_id' events"))
+    # A published frame is one fragment only when every train carried one
+    # (the RS-13 legs run -TxBatch 0): with batching a train of K fragments
+    # can publish several frames, and a frame count is no floor on a
+    # fragment count (it once printed a negative loss). frag_arrival is
+    # fragment-level and always comparable.
+    one_frag_per_frame = bool(sent_events) and not re.search(
+        r"done(?: \(pipelined\))?: (?:[02-9]|[1-9][0-9]+) fragments ok", tx)
+    candidates = [(frag_log, "fragments from frag_arrival events")]
+    if one_frag_per_frame:
+        candidates.append((pub_log, "frames from 'published frame_id' events"))
+    floor, floor_src = max(candidates, key=lambda c: c[0])
     if floor > rcvd:
         print(f"  (rx rx_frames counter {rcvd} is stale; using {floor} "
               f"{floor_src})")
         rcvd = floor
+    if rcvd > sent:
+        # More received than sent: the logs or counters disagree (a capture
+        # window longer than the TX log, a restarted daemon). Never print a
+        # negative loss; say so instead.
+        print(f"  !! received {rcvd} > sent {sent}: the TX and RX logs disagree "
+              f"on the window; loss shown as 0 — check the seq-gap figure")
+        rcvd = sent
     published = max(published, pub_log)
     print(f"loss {sent - rcvd}/{sent} = {100 * (sent - rcvd) / sent:.1f}%   "
           f"crc_dumps={crc}  timeouts={timeouts}  published={published}"

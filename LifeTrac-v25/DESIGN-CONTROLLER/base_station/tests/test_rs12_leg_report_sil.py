@@ -174,13 +174,14 @@ class CaptureFile(unittest.TestCase):
 
 
 def _archive(d: Path, *, sent: int, rx_counter: int, published_lines: int,
-             frag_lines: int = 0) -> Path:
+             frag_lines: int = 0, frags_per_train: int = 1) -> Path:
     a = d / "radio_monitor_test"
     a.mkdir()
     (a / "params.txt").write_text("git_sha=0000000\nsynth_fps=1\n",
                                   encoding="utf-8")
+    trains = sent // frags_per_train
     tx = [f"2026-10-03 21:40:{i % 60:02d},000 INFO image_tx_daemon: frame "
-          f"seq={i + 1} done (pipelined): 1 fragments ok" for i in range(sent)]
+          f"seq={i + 1} done (pipelined): {frags_per_train} fragments ok" for i in range(trains)]
     tx.append("2026-10-03 21:45:00,000 INFO image_tx_daemon: stats: "
               f"frags_ok={sent} frags_fail=0")
     (a / "tx_daemon.log").write_text("\n".join(tx) + "\n", encoding="utf-8")
@@ -215,6 +216,23 @@ class StaleRxCounter(unittest.TestCase):
                       "from 'published frame_id' events)", out)
         self.assertIn("loss 0/10 = 0.0%", out)
         self.assertIn("published=10", out)
+
+    def test_batched_trains_do_not_floor_with_frame_counts(self) -> None:
+        # -TxBatch 1: 5 trains of 2 fragments = 10 sent; 12 frames published
+        # (several per train) must not be read as 12 fragments received.
+        with tempfile.TemporaryDirectory() as d:
+            out = _run([_archive(Path(d), sent=10, rx_counter=10,
+                                 published_lines=12, frags_per_train=2)])
+        self.assertNotIn("rx_frames counter", out)
+        self.assertIn("loss 0/10 = 0.0%", out)
+
+    def test_received_above_sent_is_clamped_with_a_warning(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            out = _run([_archive(Path(d), sent=10, rx_counter=12,
+                                 published_lines=12)])
+        self.assertIn("received 12 > sent 10", out)
+        self.assertIn("loss 0/10 = 0.0%", out)
+        self.assertNotIn("loss -", out)
 
     def test_fresh_counter_is_kept(self) -> None:
         with tempfile.TemporaryDirectory() as d:
