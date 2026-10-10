@@ -701,10 +701,10 @@
 			"group": "test"
 		},
 		{
-			"label": "Connect WiFi 5 star LAN",
-			"detail": "Needs LIFETRAC_WIFI_SSID and LIFETRAC_WIFI_PSK set in the PC environment (never commit them).",
+			"label": "WiFi connect: run by hand (no PSK in tasks)",
+			"detail": "The WiFi tasks that carried LIFETRAC_WIFI_PSK were removed: VS Code echoes the resolved command line, and the PSK also showed in the adb and sudo argv and in sudo's log. Run the repo-root WiFi script by hand instead (header of wifi_persist_and_reboot.sh). The bench tractor keeps WiFi off.",
 			"type": "shell",
-			"command": "adb -s 2D0A1209DABC240B push wifi_connect.sh /tmp/wifi_connect.sh ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/wifi_connect.sh ; echo fio | sudo -S env LIFETRAC_WIFI_SSID=\\\\\\\"${env:LIFETRAC_WIFI_SSID}\\\\\\\" LIFETRAC_WIFI_PSK=\\\\\\\"${env:LIFETRAC_WIFI_PSK}\\\\\\\" /tmp/wifi_connect.sh 2>&1\\\"",
+			"command": "echo 'WiFi tasks removed (they put the PSK on a command line). By hand: adb -s SERIAL push wifi_persist_and_reboot.sh /tmp/wpr.sh, then in an interactive adb shell set LIFETRAC_WIFI_SSID / LIFETRAC_WIFI_PSK (read -r, no echo) and run: sudo --preserve-env=LIFETRAC_WIFI_SSID,LIFETRAC_WIFI_PSK sh /tmp/wpr.sh -- see the script header.'",
 			"isBackground": false,
 			"problemMatcher": [],
 			"group": "test"
@@ -721,51 +721,6 @@
 			"label": "Reboot then connect",
 			"type": "shell",
 			"command": "adb -s 2D0A1209DABC240B push wifi_connect_fast.sh /tmp/wifi_connect_fast.sh ; adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S reboot\\\"",
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "test"
-		},
-		{
-			"label": "Wait and connect WiFi",
-			"detail": "Needs LIFETRAC_WIFI_SSID and LIFETRAC_WIFI_PSK set in the PC environment (never commit them).",
-			"type": "shell",
-			"command": "adb -s 2D0A1209DABC240B wait-for-device ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/wifi_connect_fast.sh ; echo fio | sudo -S env LIFETRAC_WIFI_SSID=\\\\\\\"${env:LIFETRAC_WIFI_SSID}\\\\\\\" LIFETRAC_WIFI_PSK=\\\\\\\"${env:LIFETRAC_WIFI_PSK}\\\\\\\" /tmp/wifi_connect_fast.sh 2>&1\\\"",
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "test"
-		},
-		{
-			"label": "Push and connect WiFi v2",
-			"detail": "Needs LIFETRAC_WIFI_SSID and LIFETRAC_WIFI_PSK set in the PC environment (never commit them).",
-			"type": "shell",
-			"command": "adb -s 2D0A1209DABC240B wait-for-device ; adb -s 2D0A1209DABC240B push wifi_connect_fast.sh /tmp/wifi_connect_fast.sh ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/wifi_connect_fast.sh ; echo fio | sudo -S env LIFETRAC_WIFI_SSID=\\\\\\\"${env:LIFETRAC_WIFI_SSID}\\\\\\\" LIFETRAC_WIFI_PSK=\\\\\\\"${env:LIFETRAC_WIFI_PSK}\\\\\\\" /tmp/wifi_connect_fast.sh 2>&1\\\"",
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "test"
-		},
-		{
-			"label": "Rescan then connect",
-			"detail": "Needs LIFETRAC_WIFI_SSID and LIFETRAC_WIFI_PSK set in the PC environment (never commit them).",
-			"type": "shell",
-			"command": "adb -s 2D0A1209DABC240B shell \\\"echo fio | sudo -S nmcli dev wifi rescan ifname wlan0 ; sleep 6 ; echo '--- visible nets ---' ; echo fio | sudo -S nmcli -t -f SSID,SIGNAL dev wifi list ifname wlan0 | head -n 15 ; echo '--- connect ---' ; echo fio | sudo -S nmcli dev wifi connect \\\\\\\"${env:LIFETRAC_WIFI_SSID}\\\\\\\" password \\\\\\\"${env:LIFETRAC_WIFI_PSK}\\\\\\\" ifname wlan0 ; sleep 3 ; echo '--- status ---' ; nmcli -t -f NAME,DEVICE,STATE con show --active ; ip -4 addr show wlan0\\\"",
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "test"
-		},
-		{
-			"label": "Rescan connect via script",
-			"detail": "Needs LIFETRAC_WIFI_SSID and LIFETRAC_WIFI_PSK set in the PC environment (never commit them).",
-			"type": "shell",
-			"command": "adb -s 2D0A1209DABC240B push wifi_rescan_connect.sh /tmp/wrc.sh ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/wrc.sh ; echo fio | sudo -S env LIFETRAC_WIFI_SSID=\\\\\\\"${env:LIFETRAC_WIFI_SSID}\\\\\\\" LIFETRAC_WIFI_PSK=\\\\\\\"${env:LIFETRAC_WIFI_PSK}\\\\\\\" /tmp/wrc.sh 2>&1\\\"",
-			"isBackground": false,
-			"problemMatcher": [],
-			"group": "test"
-		},
-		{
-			"label": "Persist profile and reboot",
-			"detail": "Needs LIFETRAC_WIFI_SSID and LIFETRAC_WIFI_PSK set in the PC environment (never commit them).",
-			"type": "shell",
-			"command": "adb -s 2D0A1209DABC240B push wifi_persist_and_reboot.sh /tmp/wpr.sh ; adb -s 2D0A1209DABC240B shell \\\"chmod +x /tmp/wpr.sh ; echo fio | sudo -S env LIFETRAC_WIFI_SSID=\\\\\\\"${env:LIFETRAC_WIFI_SSID}\\\\\\\" LIFETRAC_WIFI_PSK=\\\\\\\"${env:LIFETRAC_WIFI_PSK}\\\\\\\" /tmp/wpr.sh 2>&1\\\"",
 			"isBackground": false,
 			"problemMatcher": [],
 			"group": "test"
