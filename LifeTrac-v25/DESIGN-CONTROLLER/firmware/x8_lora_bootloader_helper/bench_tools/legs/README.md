@@ -49,8 +49,14 @@ bash -c '. lib/bench_env.sh && bench_show_env'   # what the scripts will use
 
 `PC_HOST` is **required** for a leg: this PC's LAN IPv4 address as the
 boards see it. The harness gets it as `-HostIp`, and the base rx daemon uses
-it as its control broker. Left empty, the harness falls back to the original
-bench PC's address and the leg runs with a dead control plane.
+it as its control broker. If it is empty, `leg_prep.sh` auto-detects this
+PC's LAN IPv4 and prints it, or refuses (exit 6) when that is ambiguous;
+it never lets the harness fall back to the original bench PC's address.
+
+Other refusals: leg, scene and suffix tags must match `^[A-Za-z0-9_.-]+$`;
+`leg_post.sh` exits 3 if a board is not radio-quiet when it finishes (park
+with `power_up_guard.sh --stop-leg-daemons`); `leg2d_switch.sh` clears its
+retained `encode_mode_override` when it exits.
 
 Every script sources [`../lib/bench_env.sh`](../lib/bench_env.sh). It works
 out the repo root from its own location, so you can call the scripts from any

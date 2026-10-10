@@ -390,10 +390,10 @@ ARCHIVE=$ARCHIVE_DIR bash "$BT/pull_board_state.sh" base
 ```
 
 `ARCHIVE_DIR` comes from `bench.env` through the block in step 1, already in
-the `C:/...` form adb needs. To write somewhere else, give `ARCHIVE` a
-`C:/...` folder outside git, never `~/...` or `/c/...`: the script hands the
-path to adb unconverted. The capture is adb-only, so the base must be on
-USB.
+the `C:/...` form adb needs. To write somewhere else, set `ARCHIVE` to any
+folder outside git (`C:/...`, `~/...` or `/c/...` all work: the script
+converts it with `cygpath -m`). The capture is adb-only, so the base must be
+on USB.
 
 The capture is read-only and withholds secrets. First stop the tractor's
 camera unit (step 5.1). Review the reports before you copy text into

@@ -50,7 +50,8 @@ Related: [BENCH_QUICKSTART.md](BENCH_QUICKSTART.md) (the order of everything),
 
 Both scripts read `bench_tools/bench.env` when it exists (copy
 [`bench.env.example`](bench.env.example); `BENCH_ENV=<path>` points at another
-file); otherwise the environment, then these defaults:
+file). A non-empty variable already in the environment wins over
+`bench.env`, and `bench.env` wins over these defaults:
 
 | variable | default | used for |
 |---|---|---|

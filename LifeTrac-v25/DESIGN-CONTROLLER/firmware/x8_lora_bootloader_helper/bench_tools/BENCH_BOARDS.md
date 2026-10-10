@@ -192,10 +192,9 @@ Repo L072 binaries that are on no board:
    `radio_state.py`. At boot the L072 sits in **RXCONT**, listening only;
    `radio_park.py` puts it to `0x80` SLEEP.
 3. Run `bash pull_board_state.sh <base|tractor> [--images]` (adb only). It
-   writes to `ARCHIVE`, else `ARCHIVE_DIR` from `bench.env`; give either one
-   as a Windows-style `C:/...` folder outside git, because the script hands
-   the path to adb unconverted ([BENCH_QUICKSTART.md](BENCH_QUICKSTART.md)
-   step 9). `power_up_guard.sh --capture` passes it in that form. Review the
+   writes to `ARCHIVE`, else `ARCHIVE_DIR` from `bench.env`: any folder
+   outside git, in any path form (the script converts it for adb;
+   [BENCH_QUICKSTART.md](BENCH_QUICKSTART.md) step 9). Review the
    reports for secrets before copying them into `bench-evidence/`; the
    2026-10-04 run caught a Dropbear host key, and the filter now excludes it.
 
@@ -209,8 +208,9 @@ Repo L072 binaries that are on no board:
   enabled and fails at every boot, like the base's units.
 - [ ] Delete the stored `5star` WiFi profile on the tractor once the password
   is rotated (`nmcli con delete 5star`). `provision_bench_board.sh tractor`
-  deletes every stored WiFi profile and prints only their names. Pass
-  `--keep-wifi-profiles` to keep it until then.
+  backs up the stored WiFi profiles to a root-only directory on the board,
+  then deletes them and prints only their names. Pass `--keep-wifi-profiles`
+  to keep them until then.
 - [ ] **H747 M4 bank 2: identify, then decide.** An openocd
   `dump_image` of banks 1 and 2 halts the H7 and drops the x8h7 bridge, and
   needs a deliberate reboot (FLASH_RUNBOOK precautions; never re-insmod x8h7
@@ -222,8 +222,9 @@ Repo L072 binaries that are on no board:
   `wifi_persist_and_reboot.sh`, `wifi_rescan_connect.sh`) and in
   `.vscode/tasks.json`.
   - [x] ~~Replace the literal with an environment variable.~~ Done in the
-    bench kit (2026-10-10): the scripts and tasks take the SSID and
-    passphrase from `LIFETRAC_WIFI_SSID` / `LIFETRAC_WIFI_PSK`.
+    bench kit (2026-10-10): the scripts take the SSID and passphrase from
+    `LIFETRAC_WIFI_SSID` / `LIFETRAC_WIFI_PSK`, and the VS Code tasks that
+    carried the passphrase were removed (it would appear in the task echo).
   - [ ] **Change the passphrase on the access point.** The old value is
     still in the public git history, so treat it as compromised. Rewriting a
     public history with forks is not practical; rotation is the fix.
