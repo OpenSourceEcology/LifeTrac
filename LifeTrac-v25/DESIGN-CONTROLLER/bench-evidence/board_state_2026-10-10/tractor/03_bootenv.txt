@@ -1,0 +1,207 @@
+$ cat /etc/fw_env.config; fw_printenv
+/mnt/boot/uboot.env     0x0000          0x4000
+arch=arm
+baudrate=115200
+board=portenta-x8
+board_name=portenta-x8
+board_rev=iMX8MM
+boot_fit=no
+bootargs=console=tty1 console=ttymxc2,115200 earlycon=ec_imx6q,0x30880000,115200 root=/dev/mmcblk2p2 rootfstype=ext4 ostree=/ostree/boot.1/lmp/edd88b28fad148b3096157052e4434582f63b7bbe09489086203ddb56fddd279/0
+bootcmd=setenv verify 1; source 0x44800000; reset
+bootcmd_bootenv=setenv bootfirmware_version; if test "${ostree_deploy_usr}" = "1"; then ext4load ${devtype} ${devnum}:${ostree_bootpart} ${loadaddr} ${bootdir}/version.txt; else ext4load ${devtype} ${devnum}:${rootpart} ${loadaddr} ${ostree_root}/usr/lib/firmware/version.txt; fi; env import -t ${loadaddr} ${filesize} bootfirmware_version
+bootcmd_dtb=imxtract ${fit_addr}#conf-${fdt_file_final} fdt-${fdt_file_final} ${fdt_addr}; fdt addr ${fdt_addr}
+bootcmd_getroot=setexpr ostree_root gsub "^.*ostree=([^ ]*).*$" "\\\\1" "${bootargs}"
+bootcmd_load_f=ext4load ${devtype} ${devnum}:${ostree_bootpart} ${fit_addr} "/boot"${kernel_image}
+bootcmd_load_fw= 
+  run bootcmd_dtb; 
+  run bootcmd_ovl_auto_detect; 
+  run bootcmd_overlay; 
+  run bootcmd_saveenv; 
+  setenv bootcmd_run 
+    bootm ${fit_addr}#conf-${fdt_file_final} ${fit_addr}#conf-${fdt_file_final} ${fdt_addr}
+bootcmd_mfg=run mfgtool_args;echo "Run fastboot ..."; fastboot 0; 
+bootcmd_ostree_bootpart=if test "${ostree_split_boot}" = "1"; then setenv ostree_bootpart "${bootpart}"; else setenv ostree_bootpart "${rootpart}"; fi
+bootcmd_otenv=run bootcmd_resetvars; ext4load ${devtype} ${devnum}:${ostree_bootpart} ${loadaddr} /boot/loader/uEnv.txt; env import -t ${loadaddr} ${filesize} kernel_image bootdir bootargs kernel_image2 bootdir2 bootargs2
+bootcmd_overlay= 
+  for ov in ${overlays}; do; 
+    if imxtract ${fit_addr}#conf-${fdt_file_final} fdt-${ov}.dtbo ${ovl_addr}; then 
+      fdt resize 0x${filesize}; 
+      fdt apply ${ovl_addr}; 
+      echo "Applied ${ov}.dtbo to DTB"; 
+    else 
+      echo "WARN: ${ov}.dtbo not found!"; 
+    fi; 
+  done
+bootcmd_ovl_auto_detect= 
+  if env exist carrier_custom; then true; 
+  else 
+    if test "${is_on_carrier}" = "yes"; then 
+      if test "${carrier_name}" = "breakout"; then 
+        setenv overlays $som_ovl $breakout_ovl 
+      fi 
+      if test "${carrier_name}" = "max"; then 
+        setenv overlays $som_ovl $max_ovl 
+      fi 
+      if test "${carrier_name}" = "rasptenta"; then 
+        setenv overlays $som_ovl $rasp_base_ovl 
+      fi 
+      run ovl_set_envsave 
+    else 
+      setenv overlays $som_ovl 
+    fi 
+  fi
+bootcmd_resetvars=setenv kernel_image; setenv bootdir; setenv bootargs; setenv kernel_image2; setenv bootdir2; setenv bootargs2
+bootcmd_rollback=if test -n "${kernel_image2}" && test "${fiovb.is_secondary_boot}" = "0" && test "${fiovb.rollback}" = "1"; then setenv kernel_image "${kernel_image2}"; setenv bootdir "${bootdir2}"; setenv bootargs "${bootargs2}"; fi;
+bootcmd_run=if test -n ${optee_ovl_addr}; then bootm ${fit_addr}#conf-${fdt_file_final} ${fit_addr}#conf-${fdt_file_final} ${fdt_addr}; else echo "${fio_msg} loading ${fdt_file_final}"; bootm ${fit_addr}#conf-${fdt_file_final}; fi
+bootcmd_saveenv=if test "${envsave}" = "1"; then run saveenv_mmc; fi
+bootcmd_tee_ovy=if test -n ${optee_ovl_addr}; then imxtract ${fit_addr}#conf-${fdt_file_final} fdt-${fdt_file_final} ${fdt_addr}; fdt addr ${fdt_addr}; fdt resize 0x1000; fdt apply ${optee_ovl_addr}; fi
+bootcount=0
+bootdelay=5
+bootdir=/boot/ostree/lmp-edd88b28fad148b3096157052e4434582f63b7bbe09489086203ddb56fddd279/
+bootfirmware_version=dd3543d359bc492f948262edbc8aab69-f1a3b6c4d6ecf407d485993af4b1b2ce
+bootlimit=5
+bootloader=42
+bootloader2=300
+bootloader2_image=u-boot.itb
+bootloader2_s=1300
+bootloader2_s_image=u-boot.itb
+bootloader_image=imx-boot
+bootloader_s=1042
+bootloader_s_image=imx-boot
+bootm_size=0x10000000
+bootpart=1
+bootscript=echo Running bootscript from mmc ...; source
+bootupgrade_available=0
+breakout_ovl= 
+  ov_carrier_breakout_gpio 
+  ov_carrier_breakout_i2s 
+  ov_carrier_breakout_sai 
+  ov_carrier_breakout_pdm 
+  ov_carrier_breakout_pwm 
+  ov_carrier_breakout_sdc 
+  ov_carrier_breakout_spdif 
+  ov_carrier_breakout_spi0 
+  ov_carrier_breakout_spi1 
+  ov_carrier_breakout_uart1 
+  ov_carrier_breakout_uart3 
+  ov_carrier_breakout_usbfs
+bsp_bootcmd=echo Running BSP bootcmd ...; mmc dev ${mmcdev}; if mmc rescan; then if run loadbootscript; then run bootscript; else if run loadimage; then run mmcboot; else run netboot; fi; fi; fi;
+bsp_script=boot.scr
+carrier_name=max
+check_board_closed=imx_is_closed
+check_secondary_boot=imx_secondary_boot
+console=ttymxc2,115200 earlycon=ec_imx6q,0x30880000,115200
+cpu=armv8
+debug=0
+devnum=2
+devtype=mmc
+dfu_alt_info=mmc 2=imx-boot raw 0x42 0x250 mmcpart 1;u-boot-itb raw 0x300 0xD00 mmcpart 1
+do_reboot=reset
+emmc_dev=2
+fdt_addr=0x43000000
+fdt_addr_r=0x43000000
+fdt_file=portenta-x8.dtb
+fdt_file_final=arduino_portenta-x8.dtb
+fdt_high=0xffffffffffffffff
+fdtaddr=43000000
+fdtcontroladdr=b5f61210
+fdtfile=portenta-x8.dtb
+fileaddr=40800000
+filesize=22c
+fio_msg=FIO:
+fiovb.bootcount=0
+fiovb.bootupgrade_available=0
+fiovb.debug=0
+fiovb.is_secondary_boot=0
+fiovb.rollback=0
+fiovb.upgrade_available=0
+fit_addr=0x43800000
+image=Image
+initrd_addr=0x43800000
+initrd_high=0xffffffffffffffff
+is_on_carrier=yes
+jh_clk= 
+jh_mmcboot=mw 0x303d0518 0xff; setenv fdtfile imx8mm-evk-root.dtb;setenv jh_clk clk_ignore_unused; if run loadimage; then run mmcboot; else run jh_netboot; fi; 
+jh_netboot=mw 0x303d0518 0xff; setenv fdtfile imx8mm-evk-root.dtb; setenv jh_clk clk_ignore_unused; run netboot; 
+kernel_addr_r=0x40800000
+kernel_image=/boot/ostree/lmp-edd88b28fad148b3096157052e4434582f63b7bbe09489086203ddb56fddd279/vmlinuz-5.10.93-lmp-standard
+load_image=if ext4load ${devtype} ${devnum}:${ostree_bootpart} ${loadaddr} ${image_path}; then echo "${fio_msg} loaded ${image_path}"; else echo "${fio_msg} error occured while loading ${image_path}, scheduling rollback after reset ..."; run rollback_setup; run saveenv_mmc; run set_primary_boot; reset; fi;
+loadaddr=0x40800000
+loadbootscript=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${bsp_script};
+loadfdt=fatload mmc ${mmcdev}:${mmcpart} ${fdt_addr_r} ${fdtfile}
+loadimage=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${image}
+max_ovl= 
+  ov_carrier_enuc_bq24195 
+  ov_carrier_max_usbfs 
+  ov_carrier_max_sdc 
+  ov_carrier_max_cs42l52 
+  ov_carrier_max_sara-r4 
+  ov_carrier_max_ov5647_camera_mipi 
+  ov_carrier_enuc_lora
+mfgtool_args=setenv bootargs console=${console},${baudrate} rdinit=/linuxrc clk_ignore_unused 
+mmcargs=setenv bootargs ${jh_clk} console=${console} root=${mmcroot}
+mmcautodetect=yes
+mmcboot=echo Booting from mmc ...; run mmcargs; if test ${boot_fit} = yes || test ${boot_fit} = try; then bootm ${loadaddr}; else if run loadfdt; then booti ${loadaddr} - ${fdt_addr_r}; else echo WARN: Cannot load the DT; fi; fi;
+mmcdev=2
+mmcpart=1
+mmcroot=/dev/mmcblk2p2 rootwait rw
+nandfit_part=yes
+netargs=setenv bootargs ${jh_clk} console=${console} root=/dev/nfs ip=dhcp nfsroot=${serverip}:${nfsroot},v3,tcp
+netboot=echo Booting from net ...; run netargs;  if test ${ip_dyn} = yes; then setenv get_cmd dhcp; else setenv get_cmd tftp; fi; ${get_cmd} ${loadaddr} ${image}; if test ${boot_fit} = yes || test ${boot_fit} = try; then bootm ${loadaddr}; else if ${get_cmd} ${fdt_addr_r} ${fdtfile}; then booti ${loadaddr} - ${fdt_addr_r}; else echo WARN: Cannot load the DT; fi; fi;
+old_carrier_name=max
+ostree_bootpart=2
+ostree_deploy_usr=0
+ostree_root=/ostree/boot.1/lmp/edd88b28fad148b3096157052e4434582f63b7bbe09489086203ddb56fddd279/0
+ostree_split_boot=0
+overlays=ov_som_lbee5kl1dx ov_som_x8h7 ov_carrier_enuc_bq24195 ov_carrier_max_usbfs ov_carrier_max_sdc ov_carrier_max_cs42l52 ov_carrier_max_sara-r4 ov_carrier_max_ov5647_camera_mipi ov_carrier_enuc_lora
+ovl_addr=0x43600000
+ovl_set_envsave= 
+  if test "${is_on_carrier}" = "yes"; then 
+    if env exist old_carrier_name; then 
+      if test "${carrier_name}" = "${old_carrier_name}"; then 
+        setenv envsave 0 
+      fi 
+    else 
+      setenv envsave 1 
+      setenv old_carrier_name $carrier_name 
+    fi 
+  else 
+    setenv envsave 0 
+  fi
+rasp_base_ovl= 
+  ov_carrier_rasptenta_base 
+  ov_carrier_rasptenta_ov5647_camera_mipi
+rollback=0
+rollback_setup=if test -n "${fiovb_rpmb}"; then fiovb write_pvalue rollback 1; fiovb write_pvalue upgrade_available 0; fiovb write_pvalue bootupgrade_available 0; else setenv rollback 1; setenv upgrade_available 0; setenv bootupgrade_available 0; setenv fiovb.rollback "${rollback}"; setenv fiovb.upgrade_available "${upgrade_available}"; setenv fiovb.bootupgrade_available "${bootupgrade_available}"; fi;
+rootpart=2
+saveenv_mmc=if test -z "${fiovb_rpmb}"; then saveenv; fi;
+scriptaddr=0x43500000
+sd_dev=1
+set_blkcnt=setexpr blkcnt ${filesize} + 0x1ff && setexpr blkcnt ${blkcnt} / 0x200
+set_primary_boot=imx_secondary_boot 0
+set_secondary_boot=imx_secondary_boot 1
+soc=imx8m
+som_ovl= 
+  ov_som_lbee5kl1dx 
+  ov_som_x8h7
+uboot_hwpart=1
+update_image=echo "${fio_msg} writing ${image_path} ..."; run set_blkcnt && mmc dev ${devnum} ${uboot_hwpart} && mmc write ${loadaddr} ${start_blk} ${blkcnt}
+update_primary_image=run update_image
+update_primary_image2=run update_image
+update_secondary_image=run update_image
+update_secondary_image2=run update_image
+upgrade_available=0
+vendor=arduino
+verify=1
+[rc=0]
+$ ls -la /boot/loader/entries 2>/dev/null; cat /boot/loader/entries/*.conf 2>/dev/null
+total 12
+drwxr-xr-x 2 root root 4096 Mar  8  2023 .
+drwxr-xr-x 3 root root 4096 Mar  8  2023 ..
+-rw-r--r-- 1 root root  509 Mar  8  2023 ostree-1-lmp.conf
+title Linux-microPlatform XWayland 4.0.3-674-88 (ostree:0)
+version 1
+options console=tty1 console=ttymxc2,115200 earlycon=ec_imx6q,0x30880000,115200 root=/dev/mmcblk2p2 rootfstype=ext4 ostree=/ostree/boot.1/lmp/edd88b28fad148b3096157052e4434582f63b7bbe09489086203ddb56fddd279/0
+linux /ostree/lmp-edd88b28fad148b3096157052e4434582f63b7bbe09489086203ddb56fddd279/vmlinuz-5.10.93-lmp-standard
+initrd /ostree/lmp-edd88b28fad148b3096157052e4434582f63b7bbe09489086203ddb56fddd279/initramfs-5.10.93-lmp-standard.img
+[rc=0]

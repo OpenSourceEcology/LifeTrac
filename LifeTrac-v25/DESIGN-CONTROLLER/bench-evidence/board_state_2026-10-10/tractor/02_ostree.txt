@@ -1,0 +1,32 @@
+$ ostree admin status
+* lmp 85654f4f56a2f4d58e0701ffbc4da029dd759437e8da16fa3b4a53f92aca38f9.0
+    Version: 4.0.3-674-88
+    origin refspec: lmp:portenta-x8-lmp
+[rc=0]
+$ ostree admin config-diff
+M    group
+M    gshadow
+M    hostname
+M    hosts
+M    machine-id
+M    mtab
+D    systemd/system/basic.target.wants/resize-helper.service
+A    NetworkManager/system-connections/5star.nmconnection
+A    docker/key.json
+A    dropbear/dropbear_ecdsa_host_key
+A    modprobe.d/lifetrac-no-usb-audio.conf
+A    sudoers.d/99-lifetrac-bench-nopasswd
+A    systemd/system/multi-user.target.wants/disable-wifi.service
+A    systemd/system/multi-user.target.wants/lifetrac-tractor-compose.service
+A    systemd/system/wpa_supplicant.service
+A    systemd/system/lifetrac-camera.service
+A    systemd/system/lifetrac-tractor-compose.service
+A    systemd/system/disable-wifi.service
+A    udev/rules.d/99-w2-01-c2.rules
+A    gshadow-
+A    group-
+A    .pwd.lock
+A    .updated
+A    cni
+A    cni/net.d
+[rc=0]

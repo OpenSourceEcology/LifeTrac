@@ -1,0 +1,14 @@
+$ rfkill list; nmcli radio all; ls -la /etc/NetworkManager/system-connections 2>/dev/null
+0: hci0: Bluetooth
+	Soft blocked: no
+	Hard blocked: no
+1: phy0: Wireless LAN
+	Soft blocked: yes
+	Hard blocked: no
+WIFI-HW  WIFI      WWAN-HW  WWAN    
+enabled  disabled  enabled  enabled 
+total 12
+drwxr-xr-x 2 root root 4096 Jun 17 00:05 .
+drwxr-xr-x 7 root root 4096 Mar  8  2023 ..
+-rw------- 1 root root  273 Jun 17 00:05 5star.nmconnection
+[rc=0]

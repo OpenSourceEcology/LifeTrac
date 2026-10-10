@@ -1,10 +1,12 @@
 # Bench boards: chips, firmware and board-resident software
 
-State as of **2026-10-04**. The base is measured from its capture
-([`bench-evidence/board_state_2026-10-04/base/`](../../../bench-evidence/board_state_2026-10-04/base/)).
-The tractor is from records only: it was powered off and is not captured yet
-(see *Open items*). The record review behind this page covered AI NOTES,
-bench-evidence, X8_HEALTH_AND_RECOVERY and git history.
+State as of **2026-10-10**. Both boards are measured from read-only
+captures:
+- base: [`bench-evidence/board_state_2026-10-04/base/`](../../../bench-evidence/board_state_2026-10-04/base/);
+- tractor: [`bench-evidence/board_state_2026-10-10/tractor/`](../../../bench-evidence/board_state_2026-10-10/tractor/).
+
+The rest comes from a review of AI NOTES, bench-evidence,
+X8_HEALTH_AND_RECOVERY and git history.
 
 ## The two boards
 
@@ -13,7 +15,7 @@ bench-evidence, X8_HEALTH_AND_RECOVERY and git history.
 | serial (adb) | `2D0A1209DABC240B` | `2E2C1209DABC240B` |
 | hardware | Portenta X8 on a Portenta Max Carrier | same |
 | OS (LmP) | **4.0.11-934-91**, kernel 6.1.24-lmp-standard (uuu reflash 2026-05-13 and 05-24; bundle sha256 in the private archive) | **4.0.3-674-88**, kernel 5.10.93-lmp-standard (factory, never reflashed). **No copy of the 674 image exists.** A reflash would move it to 934/6.1.24. |
-| access | adb; ethernet 192.168.1.117 with eth0 pinned to 100BASE-TX full (marginal cable); ssh key `lifetrac-bench-pc` | adb only (WiFi off by policy) |
+| access | adb; ethernet 192.168.1.117 with eth0 pinned to 100BASE-TX full (marginal cable); ssh key `~/.ssh/lifetrac_base_ed25519`. On 2026-10-10 it did not enumerate on USB after a power cycle, but ssh worked. | adb only (WiFi off by policy) |
 | power-down | `systemctl poweroff` did **not** keep it off: it booted again about 4.5 min later (2026-10-04). Remove power to keep it down. | stayed off after `systemctl poweroff` |
 | clock | NTP | no time source; it lags by hours to days |
 
@@ -27,7 +29,7 @@ goes with which module is not recorded.
 | chip | where | runs | LifeTrac-custom? | saved | notes |
 |---|---|---|---|---|---|
 | STM32L072 in the Murata CMWX1ZZABZ (+ SX1276, no firmware) | carrier | `firmware/murata_l072` bench build **`0c1bb0a9`** since 2026-09-15 | **yes** | Source on `main`. Binaries and the full flashed-build inventory in [`RS_13…/firmware/`](../../../bench-evidence/RS_13_vector_scene_2026-09-26/firmware/README.md). `0c1bb0a9` rebuilds byte-identically from `main` with arm-none-eabi-gcc **12.2.1 (Arm GNU Toolchain 12.2.MPACBTI-Rel1)**. | The firmware never writes its own flash or EEPROM. Its option bytes were never recorded. The only proof of what is on the chip is the 09-15 flash logs (base copy now in the capture; `run_flash_bench.sh` deletes them at the next flash). |
-| STM32H747 Cortex-M7 (flash bank 1) | X8 module | **stock Arduino x8h7** SPI bridge, programmed at boot by `stm32h7-program.service` from `/usr/arduino/extra/STM32H747AII6_CM7.bin` (base: sha256 `d81eaa81…`) | no | Part of the LmP image | LifeTrac overwrote it with `tractor_h7` at `0x08040000` on both boards on 2026-05-04. It has been stock again since at least 05-13. The version string cannot be read: `/sys/kernel/x8h7_firmware/version` times out, so `program-h7.sh`'s "matches, No Update" is not proof. |
+| STM32H747 Cortex-M7 (flash bank 1) | X8 module | **stock Arduino x8h7** SPI bridge, programmed at boot by `stm32h7-program.service` from `/usr/arduino/extra/STM32H747AII6_CM7.bin`. The image differs per board: base sha256 `d81eaa81…`, tractor `0b03cd9c…`. | no | Part of each LmP image | **The tractor reflashes it at every boot.** Its `program-h7.sh` cannot read the version (the sysfs read times out), so it reprograms bank 1, `0x08000000`–`0x080709a4`, ending "Programming Finished … Verified OK"; bank 2 is not touched. The base's newer script prints "matches, No Update" after the same failed read, so on the base it is not proof. LifeTrac overwrote this bank with `tractor_h7` on 2026-05-04; it is stock again. |
 | STM32H747 Cortex-M4 (flash bank 2, `0x08100000`) | X8 module | **unknown, probably a May 2026 LifeTrac bench sketch**, started at every boot by x8h7 | probably | Sources only: `firmware/x8_uart_route_probe`, `x8_lora_bootloader_helper`, `portenta_m7_l072_passthrough_ping`, `tractor_h7`. The flashed ELFs were never kept. | Last recorded uploads: x8_uart_route_probe → 2D0A, x8_lora_bootloader_helper → 2E2C (the May notes mix up COM ports, so the per-board mapping is uncertain). No erase is recorded. No visible effect, since both L072s boot normally, but it is undocumented code. Identify it with the openocd dump in *Open items*, then decide whether to blank the slot. |
 | i.MX8M Mini boot chain, kernel, device tree | X8 module | stock LmP (U-Boot arms the 60 s WDOG) | no (two May bootargs/BLS experiments were removed by later reflashes) | 934 bundle on the PC (private archive, sha256) | The i.MX's own Cortex-M4 is unused. |
 | SARA-R412M, SE050, Murata 1DX WiFi/BT, ANX7625, PMIC, CS42L52, USB2514, BQ24195, CAN/RS-485 transceivers; J-Link OB (STM32F405) on the carrier; Kurokesu C2 camera (tractor) | — | vendor firmware or none | no | n/a | The SE050 is unused by LifeTrac (ARCHITECTURE.md describes intent only); never export it. Do not accept J-Link OB update prompts. |
@@ -93,42 +95,50 @@ Repo L072 binaries that are on no board:
   `rs13_build/`, `rs13_tests/` and `dc_deploy.tar.gz` are copies of git
   trees.
 
-### Tractor (from records; capture pending)
+### Tractor (measured 2026-10-10)
 
-- **`provision_x8.sh`** (2026-05-15) installed:
-  - `/etc/udev/rules.d/99-w2-01-c2.rules`, which starts
-    `lifetrac-camera.service` on camera hotplug;
-  - `/etc/modprobe.d/lifetrac-no-usb-audio.conf`;
-  - `/etc/systemd/system/lifetrac-camera.service`. This is the helper
-    version, `firmware/x8_lora_bootloader_helper/lifetrac-camera.service`,
-    not `tractor_x8/systemd/`.
+- **`/etc` changes** (`ostree admin config-diff`):
+  - `sudoers.d/99-lifetrac-bench-nopasswd`;
+  - `modprobe.d/lifetrac-no-usb-audio.conf`;
+  - `udev/rules.d/99-w2-01-c2.rules`, which starts `lifetrac-camera.service`
+    on camera hotplug;
+  - `systemd/system/lifetrac-camera.service`. This is the helper version,
+    `firmware/x8_lora_bootloader_helper/lifetrac-camera.service`, not
+    `tractor_x8/systemd/`. It reads "disabled", but udev starts it anyway.
+    **It grabs `/dev/ttymxc3`, the radio UART, at every boot.** Stop it
+    before any probe.
+  - `lifetrac-tractor-compose.service`, **enabled, failing at boot**;
+  - `disable-wifi.service`, enabled: an rfkill block at boot;
+  - `wpa_supplicant.service` masked;
+  - `fio` added to `video` / `docker`;
+  - `docker/key.json`.
 
-  **It grabs `/dev/ttymxc3`, the radio UART, at every boot.** Stop it before
-  any probe.
-- **WiFi off:**
-  - `nmcli radio wifi off` plus rfkill;
-  - `99-disable-wifi.conf`;
-  - a masked `wpa_supplicant` and a oneshot `disable-wifi.service`, neither
-    in git;
-  - possibly a stored WiFi profile with its password.
+  All of these were installed by `provision_x8.sh` (2026-05-15) and the May
+  WiFi-off steps. The `disable-wifi.service` unit and the wpa mask are not in
+  git.
+- **WiFi:** soft-blocked and disabled in NetworkManager. **A stored
+  `5star.nmconnection` holds the WiFi password** (not copied).
 - **`/var/rootdirs/opt/lifetrac`:**
   - `compose-apps/lifetrac-camera`, which runs `lifetrac-tractor-x8:latest`
     with `/dev/video1` and `/dev/ttymxc3`;
   - the hand-edited May `video-test` stack;
   - `bin/ffmpeg`.
 - **Images:**
-  - `lifetrac-tractor-x8:latest` `2727dfd36f9f` (archived);
-  - **`lifetrac-tractor-x8:pre-rs13` `9bfbbc8d06cb`, on the board only**;
-  - the Arduino OOTB `x8-devel`, `x8-provisioning` and `x8-webapp`;
-  - `eclipse-mosquitto:2`.
+  - `lifetrac-tractor-x8:latest` / `:rs13-65869517` `2727dfd36f9f`;
+  - `lifetrac-tractor-x8:pre-rs13` `9bfbbc8d06cb` (594 MB);
+  - `python:3.11-slim-bookworm`;
+  - `eclipse-mosquitto:2`;
+  - the Arduino OOTB images `arduino-ootb-python-devel:738bc44` (= the
+    repo-root `foundries_python.tar`), `arduino-ootb-webapp`,
+    `arduino-iot-cloud-provisioning`.
 
-  The probe image `arduino-ootb-python-devel:738bc44` is the repo-root
-  `foundries_python.tar`.
-- **`/home/fio`.** Unique files:
-  - `wdog_regs.py`;
-  - `lifetrac_compact_at_probe.sh`;
-  - `base_station/` (contents unknown);
-  - the 09-15 flash logs.
+  Both LifeTrac images are now in the private archive; `pre-rs13`'s only
+  off-board copy is there.
+- **`/home/fio`.**
+  - Unique, now in the repo capture: `wdog_regs.py`,
+    `lifetrac_compact_at_probe.sh`, `at_probe.sh`, and the 09-15 flash logs.
+  - `base_station/` is an old copy of the repo's `base_station` (with a
+    `.pytest_cache`); `lifetrac_p0c/` is old flash staging.
 
 ## Where everything is saved
 
@@ -140,7 +150,10 @@ Repo L072 binaries that are on no board:
   - the capture tools [`capture_board_state.sh`](capture_board_state.sh)
     (read-only, secrets withheld) and [`pull_board_state.sh`](pull_board_state.sh).
 - **Private archive, outside git, on this PC only:**
-  `C:\Users\dorkm\Documents\LifeTrac-bench-archive\board_state_2026-10-04\`.
+  `C:\Users\dorkm\Documents\LifeTrac-bench-archive\board_state_2026-10-04\`
+  and `…\board_state_2026-10-10\` (the tractor capture, its
+  `opt_lifetrac_no_secrets.tgz`, and image `pre-rs13` `9bfbbc8d06cb`, the
+  only off-board copy).
   - `images/`: base `lifetrac-v25` `4623980c2dac` and tractor
     `2727dfd36f9f` (docker save).
   - `base/`: the full capture tarball and the deployed tree without
@@ -170,8 +183,14 @@ Repo L072 binaries that are on no board:
 
 ## Open items
 
-- [ ] **Tractor capture.** It needs a power cycle, then step 3 with
-  `--images` (for `pre-rs13`, which exists only on the board).
+- [x] **Tractor capture.** Done 2026-10-10 with images, `pre-rs13`
+  included (`board_state_2026-10-10/`).
+- [ ] The base did not enumerate on USB/adb after the 2026-10-10 power cycle
+  (ssh works). Check its USB cable and port.
+- [ ] **Decide on the tractor's `lifetrac-tractor-compose.service`.** It is
+  enabled and fails at every boot, like the base's units.
+- [ ] Delete the stored `5star` WiFi profile on the tractor once the password
+  is rotated (`nmcli con delete 5star`).
 - [ ] **H747 M4 bank 2: identify, then decide.** An openocd
   `dump_image` of banks 1 and 2 halts the H7 and drops the x8h7 bridge, and
   needs a deliberate reboot (FLASH_RUNBOOK precautions; never re-insmod x8h7

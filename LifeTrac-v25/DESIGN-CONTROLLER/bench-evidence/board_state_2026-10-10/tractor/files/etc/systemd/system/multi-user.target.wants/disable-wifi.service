@@ -1,0 +1,12 @@
+[Unit]
+Description=Force wifi rfkill block at boot
+After=systemd-rfkill.service
+Before=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/rfkill block wifi
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,65 @@
+$ ip -br addr; ip route; ss -tlnp 2>/dev/null || netstat -tlnp
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+sit0@NONE        DOWN           
+eth0             DOWN           
+wlan0            DOWN           
+can0             DOWN           
+can1             DOWN           
+docker0          DOWN           172.17.0.1/16 
+br-b4c5f2c3c8ed  UP             172.18.0.1/16 fe80::42:ddff:fe19:978/64 
+br-b61f3734beb9  DOWN           172.19.0.1/16 
+br-ea5355d3f4db  DOWN           172.22.0.1/16 
+br-f0b0aacb35e0  DOWN           172.20.0.1/16 
+veth14f5b6e@if12 UP             fe80::4c40:14ff:fe6d:c897/64 
+veth9a089e8@if14 UP             fe80::cbc:a0ff:fe85:69d5/64 
+veth4a76520@if16 UP             fe80::94f4:8aff:fe89:991c/64 
+172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1 linkdown 
+172.18.0.0/16 dev br-b4c5f2c3c8ed proto kernel scope link src 172.18.0.1 
+172.19.0.0/16 dev br-b61f3734beb9 proto kernel scope link src 172.19.0.1 linkdown 
+172.20.0.0/16 dev br-f0b0aacb35e0 proto kernel scope link src 172.20.0.1 linkdown 
+172.22.0.0/16 dev br-ea5355d3f4db proto kernel scope link src 172.22.0.1 linkdown 
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 0.0.0.0:5001            0.0.0.0:*               LISTEN      830/m4_proxy        
+tcp        0      0 0.0.0.0:5355            0.0.0.0:*               LISTEN      613/systemd-resolve 
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      1092/docker-proxy   
+tcp        0      0 127.0.0.1:36529         0.0.0.0:*               LISTEN      720/containerd      
+tcp6       0      0 :::22                   :::*                    LISTEN      1/init              
+tcp6       0      0 :::5000                 :::*                    LISTEN      830/m4_proxy        
+tcp6       0      0 :::5355                 :::*                    LISTEN      613/systemd-resolve 
+tcp6       0      0 :::80                   :::*                    LISTEN      1101/docker-proxy   
+[rc=0]
+$ cat /sys/class/net/eth0/speed /sys/class/net/eth0/duplex 2>/dev/null; ethtool eth0 2>/dev/null
+-1
+unknown
+[rc=127]
+$ nmcli -t general status; nmcli -t device status; nmcli -t -f NAME,UUID,TYPE,DEVICE,AUTOCONNECT con show
+disconnected:none:enabled:disabled:enabled:enabled
+eth0:ethernet:unavailable:
+wlan0:wifi:unavailable:
+br-b4c5f2c3c8ed:bridge:unmanaged:
+br-b61f3734beb9:bridge:unmanaged:
+br-ea5355d3f4db:bridge:unmanaged:
+br-f0b0aacb35e0:bridge:unmanaged:
+docker0:bridge:unmanaged:
+can0:can:unmanaged:
+can1:can:unmanaged:
+veth14f5b6e:ethernet:unmanaged:
+veth4a76520:ethernet:unmanaged:
+veth9a089e8:ethernet:unmanaged:
+sit0:iptunnel:unmanaged:
+lo:loopback:unmanaged:
+5star:55847871-11be-4805-b0d3-e44390aeee33:802-11-wireless::yes
+Wired connection 1:ebaf3772-03f7-31df-8c69-384f65cb9929:802-3-ethernet::yes
+[rc=0]
+$ nmcli -g connection.id,connection.autoconnect,802-11-wireless.ssid con show '5star'
+5star
+yes
+I'm a 5 star LAN!
+[rc=0]
+$ nmcli -g connection.id,802-3-ethernet.speed,802-3-ethernet.duplex,802-3-ethernet.auto-negotiate con show 'Wired connection 1'
+Wired connection 1
+0
+
+no
+[rc=0]

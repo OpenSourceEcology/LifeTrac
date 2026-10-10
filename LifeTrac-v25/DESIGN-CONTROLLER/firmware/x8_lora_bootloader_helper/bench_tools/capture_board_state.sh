@@ -40,7 +40,7 @@ keep() {
   done
 }
 REDACT='s/\(\(KEY\|PASS\|PASSWORD\|TOKEN\|SECRET\|PIN\|PSK\)[A-Za-z0-9_]*=\)[^",]*/\1<redacted>/g'
-DENY='shadow|gshadow|ssh_host_|_host_key|/dropbear/|machine-id|system-connections|wpa_supplicant.*\.conf|/sota/|\.pem$|\.key$|/secrets/|/\.env$|/\.ssh/'
+DENY='shadow|gshadow|ssh_host_|_host_key|/dropbear/|machine-id|docker/key.json|bash_history|system-connections|wpa_supplicant.*\.conf|/sota/|\.pem$|\.key$|/secrets/|/\.env$|/\.ssh/'
 
 echo "capture start $TS tag=$TAG" > "$OUT/00_meta.txt"
 
