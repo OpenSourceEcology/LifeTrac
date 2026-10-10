@@ -52,10 +52,16 @@ sleep 1
 # 2026-09-12/flash/). REVIVE_MODE=reset_run_only stops here, after the H7
 # is back in its firmware, and lets the caller do a controlled reboot
 # instead of the module reload.
-if [ "${REVIVE_MODE:-full}" = "reset_run_only" ]; then
-  echo "=== REVIVE_MODE=reset_run_only: H7 running, modules left unloaded; caller reboots ==="
+# 2026-10-10: `reboot` (the flash pipeline's own name for this path, exported
+# by run_flash_bench.sh) is accepted as an alias, so a standalone call with
+# that environment cannot fall through to the module reload below.
+if [ "${REVIVE_MODE:-full}" = "reset_run_only" ] || [ "${REVIVE_MODE:-full}" = "reboot" ]; then
+  echo "=== REVIVE_MODE=${REVIVE_MODE}: H7 running, modules left unloaded; caller reboots ==="
   exit 0
 fi
+case "$(uname -r)" in
+  6.*) echo "=== WARNING: kernel $(uname -r): the x8h7 module reload below OOPSed the 6.1.24 base kernel twice (2026-09-12); expect a PMIC power-cycle. Prefer REVIVE_MODE=reset_run_only + reboot. ===" ;;
+esac
 echo "=== [3/5] unexport x8h7 gpios ($X8H7_GPIO_BASE..$X8H7_GPIO_LAST) ==="
 for g in $(seq $X8H7_GPIO_BASE $X8H7_GPIO_LAST); do
   if [ -d /sys/class/gpio/gpio$g ]; then
