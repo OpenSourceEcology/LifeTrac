@@ -1,0 +1,45 @@
+# RS-13.2 desk check: override for the production docker-compose.yml.
+# Procedure: RS13_2_DESK_CHECK.md (same directory).
+#
+#   cd /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER
+#   docker compose -p lifetrac-desk -f docker-compose.yml -f /tmp/rs13_2/rs13_2_desk.compose.yml config --services
+#   docker compose -p lifetrac-desk -f docker-compose.yml -f /tmp/rs13_2/rs13_2_desk.compose.yml up -d --no-build mosquitto web_ui
+#   ...
+#   docker compose -p lifetrac-desk -f docker-compose.yml -f /tmp/rs13_2/rs13_2_desk.compose.yml down -v
+#
+# What it changes, and why:
+# - lora_bridge sits behind a profile nobody enables, so even a bare `up`
+#   cannot start it: it would open the LoRa device. The desk check puts
+#   nothing on air and never opens /dev/ttymxc3.
+# - web_ui runs with the bench radio endpoint off (/api/bench/radio shells
+#   out to the L072 helpers) and nothing restarts on its own after a base
+#   reboot (the base comes back up by itself after a poweroff).
+# - The secrets come from the desk-check staging directory, so the deployed
+#   tree's ./secrets is neither needed nor touched. The fleet key is only
+#   referenced by lora_bridge, which cannot start; a throwaway file satisfies
+#   compose. Never copy a real fleet key here.
+# - The project name (-p lifetrac-desk) gives the broker its own volumes;
+#   `down -v` removes them, and with them the retained control topics that
+#   web_ui publishes at every start (encode_mode_override, radio_profile).
+
+services:
+  lora_bridge:
+    profiles: ["rs13-2-never"]
+    restart: "no"
+
+  mosquitto:
+    restart: "no"
+
+  web_ui:
+    restart: "no"
+    environment:
+      LIFETRAC_ENABLE_BENCH_RADIO: "0"
+
+  audit_tail:
+    restart: "no"
+
+secrets:
+  lifetrac_pin:
+    file: ${RS13_2_DIR:-/tmp/rs13_2}/lifetrac_pin
+  lifetrac_fleet_key:
+    file: ${RS13_2_DIR:-/tmp/rs13_2}/unused_fleet_key
