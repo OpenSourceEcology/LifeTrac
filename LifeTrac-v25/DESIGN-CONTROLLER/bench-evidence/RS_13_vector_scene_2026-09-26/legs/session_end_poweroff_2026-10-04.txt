@@ -1,0 +1,14 @@
+# end of the RS-13.1 campaign: read-only radio check before power-down, 2026-10-04T17:46:04Z PC clock
+base:    RADIO_STATE {"reg_op_mode": "0x80", "mode": "SLEEP", "lora": true, "transmitting_or_listening": false}
+tractor: RADIO_STATE {"reg_op_mode": "0x80", "mode": "SLEEP", "lora": true, "transmitting_or_listening": false}
+base containers: design-controller-mosquitto-1 
+base ttymxc3 holders: 
+base lifetrac units active: 
+base uptime:  17:46:07 up 18 days, 23:54,  1 user,  load average: 0.07, 0.15, 0.20
+tractor containers: bench_mqtt x8-devel x8-provisioning x8-webapp 
+tractor ttymxc3 holders: 
+tractor lifetrac units active: 
+tractor uptime:  09:51:17 up 18 days, 23:51,  1 user,  load average: 0.03, 0.02, 0.00
+power-down: 17:46:17Z `sync; systemctl poweroff` sent over adb to the tractor (2E2C1209DABC240B), then the base (2D0A1209DABC240B)
+watch (adb devices every 10 s, 17:46:42Z-17:50:02Z, 200 s): no device ever re-appeared -> neither board was power-cycled back up by the u-boot-armed 60 s WDOG; both stayed down
+next power-up: /tmp/lifetrac_strict is gone (tmpfs) -> run scripts/stage_boards.sh; the tractor's lifetrac-camera unit comes back holding /dev/ttymxc3 (systemctl stop lifetrac-camera.service; docker stop tractor-camera); radios stay off until an explicit GO

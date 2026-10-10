@@ -1,0 +1,79 @@
+$ ls -la /usr/arduino /usr/arduino/extra /usr/arduino/m4 /tmp/arduino 2>/dev/null
+/usr/arduino:
+total 12
+drwxr-xr-x  3 root root 4096 Jan  1  1970 .
+drwxr-xr-x 13 root root 4096 Jan  1  1970 ..
+drwxr-xr-x  2 root root 4096 Jan  1  1970 extra
+
+/usr/arduino/extra:
+total 40
+drwxr-xr-x 2 root root 4096 Jan  1  1970 .
+drwxr-xr-x 3 root root 4096 Jan  1  1970 ..
+lrwxrwxrwx 1 root root   66 Mar  8  2023 STM32H747AII6_CM7.bin -> ../../../usr/lib/firmware/arduino/stm32h7-fw/STM32H747AII6_CM7.bin
+-rwxr--r-- 2 root root  445 Jan  1  1970 load_modules_post.sh
+-rwxr--r-- 2 root root  363 Jan  1  1970 load_modules_pre.sh
+-rw-r--r-- 2 root root  864 Jan  1  1970 openocd_script-imx_gpio.cfg
+-rwxr--r-- 2 root root 1030 Jan  1  1970 program-h7.sh
+-rwxr--r-- 2 root root  721 Jan  1  1970 program.sh
+-rwxr--r-- 2 root root  331 Jan  1  1970 reset.sh
+-rwxr--r-- 2 root root  555 Jan  1  1970 unload_modules.sh
+[rc=2]
+$ sha256sum /usr/arduino/extra/* 2>/dev/null
+0b03cd9c0340ba8fd1eeaf490f3c98a333340774035357a7e31f51e15d2b8165  /usr/arduino/extra/STM32H747AII6_CM7.bin
+0dacfeeed2cfebf16dd631615a0e7d3b6e745e5f758b6279c28dae87b0e08b89  /usr/arduino/extra/load_modules_post.sh
+bb13ab24f770a879a9fe7b48bdfc4a71f249126f503a7841b7531d3891351a28  /usr/arduino/extra/load_modules_pre.sh
+6681808426f4ad73d1e456af6b7ed98be519ee577b2653ec560dc0736f899088  /usr/arduino/extra/openocd_script-imx_gpio.cfg
+c3c3755631edd4207223378f8281b01ec17b69544abfe38a26e231c4ddb0e5bf  /usr/arduino/extra/program-h7.sh
+8c6743e5cbe5a0a33e555edd1f2052101366843a4efae260c477283884e5f79d  /usr/arduino/extra/program.sh
+4e48b13bf2118c0f65ee600561d9dfd8c64281c1e9806cfb17705f6542b34f1f  /usr/arduino/extra/reset.sh
+a90ef6ca68a5b6ffcea77cf8f24955372de04dbcb3d26762313983b4bed53179  /usr/arduino/extra/unload_modules.sh
+[rc=0]
+$ timeout 5 cat /sys/kernel/x8h7_firmware/version
+0.0.2-next-0980463-20221013[rc=0]
+$ journalctl -u stm32h7-program.service -u monitor-m4-elf-file.service -u m4-proxy.service --no-pager 2>/dev/null | tail -200
+Sep 21 09:51:38 portenta-x8-2e2c1209dabc240b systemd[1]: Starting Program stm32h7 on Portenta-X8 boards...
+Sep 21 09:51:38 portenta-x8-2e2c1209dabc240b sh[662]: cat: /sys/kernel/x8h7_firmware/version: Connection timed out
+Sep 21 09:51:38 portenta-x8-2e2c1209dabc240b sh[659]: Failed to read h7 firmware version
+Sep 21 09:51:38 portenta-x8-2e2c1209dabc240b sh[687]: cat: /sys/kernel/x8h7_firmware/version: Connection timed out
+Sep 21 09:51:38 portenta-x8-2e2c1209dabc240b sh[659]: Failed to read h7 firmware version
+Sep 21 09:51:38 portenta-x8-2e2c1209dabc240b sh[691]: cat: /sys/kernel/x8h7_firmware/version: Connection timed out
+Sep 21 09:51:38 portenta-x8-2e2c1209dabc240b sh[659]: Failed to read h7 firmware version
+Sep 21 09:51:38 portenta-x8-2e2c1209dabc240b sudo[703]:     root : PWD=/ ; USER=fio ; COMMAND=/usr/bin/dd if=/usr/arduino/extra/STM32H747AII6_CM7.bin of=/tmp/version bs=1 count=40 skip=262144
+Sep 21 09:51:38 portenta-x8-2e2c1209dabc240b sh[704]: 40+0 records in
+Sep 21 09:51:38 portenta-x8-2e2c1209dabc240b sh[704]: 40+0 records out
+Sep 21 09:51:38 portenta-x8-2e2c1209dabc240b sh[704]: 40 bytes copied, 0.00057825 s, 69.2 kB/s
+Sep 21 09:51:38 portenta-x8-2e2c1209dabc240b sudo[709]:     root : PWD=/ ; USER=fio ; COMMAND=/usr/bin/rm /tmp/version
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[659]: Firmware on H7 does not match firmware stored on M8. Performing Update.
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[659]: Version(H7)=
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[659]: Version(M8)=0.0.2-next-0980463-20221013
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Open On-Chip Debugger 0.11.0-dirty (2022-10-19-16:13)
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Licensed under GNU GPL v2
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: For bug reports, read
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]:         http://openocd.org/doc/doxygen/bugs.html
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Info : imx_gpio GPIO JTAG/SWD bitbang driver
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Info : imx_gpio mmap: pagesize: 4096, regionsize: 131072
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Info : clock speed 1805 kHz
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Info : SWD DPIDR 0x6ba02477
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Info : stm32h7x.cpu0: hardware has 8 breakpoints, 4 watchpoints
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Info : starting gdb server for stm32h7x.cpu0 on 3333
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Info : Listening on port 3333 for gdb connections
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: target halted due to debug-request, current mode: Thread
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: xPSR: 0x01000000 pc: 0x08002dec msp: 0x24080000
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: target halted due to debug-request, current mode: Thread
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: xPSR: 0x01000000 pc: 0x08002dec msp: 0x24080000
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: ** Programming Started **
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Info : Device: STM32H74x/75x
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Info : flash size probed value 2048
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Info : STM32H7 flash has dual banks
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Info : Bank (0) size is 1024 kb, base address is 0x08000000
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Info : Padding image section 0 at 0x080709a4 with 28 bytes (bank write end alignment)
+Sep 21 09:51:39 portenta-x8-2e2c1209dabc240b sh[715]: Warn : Adding extra erase range, 0x080709c0 .. 0x0807ffff
+Sep 21 09:51:51 portenta-x8-2e2c1209dabc240b sh[715]: ** Programming Finished **
+Sep 21 09:51:51 portenta-x8-2e2c1209dabc240b sh[715]: ** Verify Started **
+Sep 21 09:51:52 portenta-x8-2e2c1209dabc240b sh[715]: ** Verified OK **
+Sep 21 09:51:52 portenta-x8-2e2c1209dabc240b sh[715]: ** Resetting Target **
+Sep 21 09:51:52 portenta-x8-2e2c1209dabc240b sh[715]: shutdown command invoked
+Sep 21 09:51:52 portenta-x8-2e2c1209dabc240b systemd[1]: Finished Program stm32h7 on Portenta-X8 boards.
+Sep 21 09:51:52 portenta-x8-2e2c1209dabc240b systemd[1]: Started M4 builtin led forwarder.
+Sep 21 09:51:53 portenta-x8-2e2c1209dabc240b m4_proxy[830]: charDevListener
+[rc=0]

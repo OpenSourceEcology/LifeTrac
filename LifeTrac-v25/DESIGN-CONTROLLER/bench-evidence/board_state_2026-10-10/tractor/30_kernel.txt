@@ -1,0 +1,487 @@
+$ lsmod; cat /sys/module/usbcore/parameters/autosuspend
+Module                  Size  Used by
+xt_nat                 16384  13
+xt_tcpudp              16384  15
+xt_conntrack           16384  5
+xt_MASQUERADE          16384  6
+nf_conntrack_netlink    40960  0
+nfnetlink              20480  2 nf_conntrack_netlink
+xfrm_user              36864  1
+xt_addrtype            16384  2
+iptable_filter         16384  1
+iptable_nat            16384  4
+nf_nat                 36864  3 xt_nat,iptable_nat,xt_MASQUERADE
+nf_conntrack          131072  5 xt_conntrack,nf_nat,xt_nat,nf_conntrack_netlink,xt_MASQUERADE
+nf_defrag_ipv6         20480  1 nf_conntrack
+nf_defrag_ipv4         16384  1 nf_conntrack
+ip_tables              28672  2 iptable_filter,iptable_nat
+x_tables               32768  7 xt_conntrack,iptable_filter,xt_tcpudp,xt_addrtype,xt_nat,ip_tables,xt_MASQUERADE
+x8h7_ui                16384  0
+x8h7_uart              16384  0
+x8h7_pwm               16384  0
+x8h7_rtc               16384  0
+x8h7_adc               16384  0
+x8h7_gpio              20480  1
+x8h7_can               20480  0
+industrialio           65536  1 x8h7_adc
+bnep                   24576  2
+x8h7_h7                16384  0
+x8h7_drv               16384  8 x8h7_ui,x8h7_h7,x8h7_can,x8h7_gpio,x8h7_rtc,x8h7_pwm,x8h7_adc,x8h7_uart
+snd_usbmidi_lib        28672  0
+uvcvideo               98304  0
+snd_hwdep              20480  0
+videobuf2_vmalloc      16384  1 uvcvideo
+brcmfmac              270336  0
+brcmutil               16384  1 brcmfmac
+bq24195                28672  0
+cs42l52                53248  0
+mx6s_capture           32768  0
+gpio_keys              20480  0
+videobuf2_dma_contig    20480  1 mx6s_capture
+hci_uart              106496  0
+videobuf2_memops       16384  2 videobuf2_vmalloc,videobuf2_dma_contig
+btqca                  20480  1 hci_uart
+videobuf2_v4l2         24576  2 mx6s_capture,uvcvideo
+mxc_mipi_csi           24576  1
+btbcm                  20480  1 hci_uart
+videobuf2_common       53248  3 videobuf2_v4l2,mx6s_capture,uvcvideo
+btintel                24576  1 hci_uart
+fsl_jr_uio             16384  0
+imx_sdma               32768  10
+videodev              258048  5 videobuf2_v4l2,mx6s_capture,uvcvideo,mxc_mipi_csi,videobuf2_common
+snd_soc_simple_card    20480  0
+snd_soc_simple_card_utils    20480  1 snd_soc_simple_card
+sch_fq_codel           20480  4
+lz4                    16384  4
+lz4_compress           40960  1 lz4
+zram                   24576  1
+moal                  684032  0
+mlan                  516096  1 moal
+cfg80211              729088  2 moal,brcmfmac
+i2c_dev                20480  0
+anx7625                45056  0
+fuse                  114688  1
+2
+[rc=0]
+$ ls -la /dev/ttymxc* /dev/video* /dev/lifetrac-c2 /dev/watchdog* 2>/dev/null
+lrwxrwxrwx  1 root root           6 Apr 28  2022 /dev/lifetrac-c2 -> video1
+crw-rw----  1 root dialout 207,  17 Apr 28  2022 /dev/ttymxc1
+crw-rw----  1 root dialout 207,  18 Sep 21 09:51 /dev/ttymxc2
+crw-rw----  1 root dialout 207,  19 Apr 28  2022 /dev/ttymxc3
+crw-rw----+ 1 root video    81,   0 Apr 28  2022 /dev/video0
+crw-rw----+ 1 root video    81,   1 Apr 28  2022 /dev/video1
+crw-rw----+ 1 root video    81,   2 Apr 28  2022 /dev/video2
+crw-rw----+ 1 root video    81,   3 Apr 28  2022 /dev/video3
+crw-rw----+ 1 root video    81,   4 Apr 28  2022 /dev/video4
+crw-------  1 root root     10, 130 Apr 28  2022 /dev/watchdog
+crw-------  1 root root    246,   0 Apr 28  2022 /dev/watchdog0
+[rc=0]
+$ for d in /sys/bus/usb/devices/*/idVendor; do p=$(dirname $d); echo "$(basename $p) $(cat $d):$(cat $p/idProduct) $(cat $p/product 2>/dev/null)"; done
+1-1.2.3 16d0:0ed4 C2
+1-1.2.4 2109:2817 USB2.0 Hub             
+1-1.2 2109:2817 USB2.0 Hub             
+1-1 0424:2514 
+usb1 1d6b:0002 EHCI Host Controller
+[rc=0]
+$ dmesg -T 2>/dev/null | tail -400
+[Mon Sep 21 09:51:28 2026] Advanced Linux Sound Architecture Driver Initialized.
+[Mon Sep 21 09:51:28 2026] Bluetooth: Core ver 2.22
+[Mon Sep 21 09:51:28 2026] NET: Registered protocol family 31
+[Mon Sep 21 09:51:28 2026] Bluetooth: HCI device and connection manager initialized
+[Mon Sep 21 09:51:28 2026] Bluetooth: HCI socket layer initialized
+[Mon Sep 21 09:51:28 2026] Bluetooth: L2CAP socket layer initialized
+[Mon Sep 21 09:51:28 2026] Bluetooth: SCO socket layer initialized
+[Mon Sep 21 09:51:28 2026] clocksource: Switched to clocksource arch_sys_counter
+[Mon Sep 21 09:51:29 2026] NET: Registered protocol family 2
+[Mon Sep 21 09:51:29 2026] IP idents hash table entries: 32768 (order: 6, 262144 bytes, linear)
+[Mon Sep 21 09:51:29 2026] tcp_listen_portaddr_hash hash table entries: 1024 (order: 2, 16384 bytes, linear)
+[Mon Sep 21 09:51:29 2026] TCP established hash table entries: 16384 (order: 5, 131072 bytes, linear)
+[Mon Sep 21 09:51:29 2026] TCP bind hash table entries: 16384 (order: 6, 262144 bytes, linear)
+[Mon Sep 21 09:51:29 2026] TCP: Hash tables configured (established 16384 bind 16384)
+[Mon Sep 21 09:51:29 2026] UDP hash table entries: 1024 (order: 3, 32768 bytes, linear)
+[Mon Sep 21 09:51:29 2026] UDP-Lite hash table entries: 1024 (order: 3, 32768 bytes, linear)
+[Mon Sep 21 09:51:29 2026] NET: Registered protocol family 1
+[Mon Sep 21 09:51:29 2026] RPC: Registered named UNIX socket transport module.
+[Mon Sep 21 09:51:29 2026] RPC: Registered udp transport module.
+[Mon Sep 21 09:51:29 2026] RPC: Registered tcp transport module.
+[Mon Sep 21 09:51:29 2026] RPC: Registered tcp NFSv4.1 backchannel transport module.
+[Mon Sep 21 09:51:29 2026] PCI: CLS 0 bytes, default 64
+[Mon Sep 21 09:51:29 2026] Trying to unpack rootfs image as initramfs...
+[Mon Sep 21 09:51:29 2026] Freeing initrd memory: 5468K
+[Mon Sep 21 09:51:29 2026] hw perfevents: enabled with armv8_pmuv3 PMU driver, 7 counters available
+[Mon Sep 21 09:51:29 2026] kvm [1]: IPA Size Limit: 40 bits
+[Mon Sep 21 09:51:29 2026] kvm [1]: GICv3: no GICV resource entry
+[Mon Sep 21 09:51:29 2026] kvm [1]: disabling GICv2 emulation
+[Mon Sep 21 09:51:29 2026] kvm [1]: GIC system register CPU interface enabled
+[Mon Sep 21 09:51:29 2026] kvm [1]: vgic interrupt IRQ9
+[Mon Sep 21 09:51:29 2026] kvm [1]: Hyp mode initialized successfully
+[Mon Sep 21 09:51:29 2026] Initialise system trusted keyrings
+[Mon Sep 21 09:51:29 2026] workingset: timestamp_bits=46 max_order=19 bucket_order=0
+[Mon Sep 21 09:51:29 2026] NFS: Registering the id_resolver key type
+[Mon Sep 21 09:51:29 2026] Key type id_resolver registered
+[Mon Sep 21 09:51:29 2026] Key type id_legacy registered
+[Mon Sep 21 09:51:29 2026] nfs4filelayout_init: NFSv4 File Layout Driver Registering...
+[Mon Sep 21 09:51:29 2026] nfs4flexfilelayout_init: NFSv4 Flexfile Layout Driver Registering...
+[Mon Sep 21 09:51:29 2026] NET: Registered protocol family 38
+[Mon Sep 21 09:51:29 2026] Key type asymmetric registered
+[Mon Sep 21 09:51:29 2026] Asymmetric key parser 'x509' registered
+[Mon Sep 21 09:51:29 2026] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 245)
+[Mon Sep 21 09:51:29 2026] io scheduler mq-deadline registered
+[Mon Sep 21 09:51:29 2026] io scheduler kyber registered
+[Mon Sep 21 09:51:29 2026] mxs-dma 33000000.dma-controller: initialized
+[Mon Sep 21 09:51:29 2026] Bus freq driver module loaded
+[Mon Sep 21 09:51:29 2026] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+[Mon Sep 21 09:51:29 2026] 30860000.serial: ttymxc0 at MMIO 0x30860000 (irq = 41, base_baud = 5000000) is a IMX
+[Mon Sep 21 09:51:29 2026] serial serial0: tty port ttymxc0 registered
+[Mon Sep 21 09:51:29 2026] 30880000.serial: ttymxc2 at MMIO 0x30880000 (irq = 42, base_baud = 1500000) is a IMX
+[Mon Sep 21 09:51:29 2026] printk: console [ttymxc2] enabled
+[Mon Sep 21 09:51:29 2026] printk: bootconsole [ec_imx6q0] disabled
+[Mon Sep 21 09:51:29 2026] 30890000.serial: ttymxc1 at MMIO 0x30890000 (irq = 43, base_baud = 5000000) is a IMX
+[Mon Sep 21 09:51:29 2026] 30a60000.serial: ttymxc3 at MMIO 0x30a60000 (irq = 49, base_baud = 5000000) is a IMX
+[Mon Sep 21 09:51:29 2026] imx-drm 32c00000.bus:display-subsystem: bound imx-lcdif-crtc.0 (ops 0xffffffc0110026d0)
+[Mon Sep 21 09:51:29 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: version number is 0x1060200
+[Mon Sep 21 09:51:29 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: Failed to attach bridge: 32e10000.mipi_dsi
+[Mon Sep 21 09:51:29 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: failed to bind sec dsim bridge: -517
+[Mon Sep 21 09:51:30 2026] brd: module loaded
+[Mon Sep 21 09:51:30 2026] loop: module loaded
+[Mon Sep 21 09:51:30 2026] of_reserved_mem_lookup() returned NULL
+[Mon Sep 21 09:51:30 2026] imx ahci driver is registered.
+[Mon Sep 21 09:51:30 2026] libphy: Fixed MDIO Bus: probed
+[Mon Sep 21 09:51:30 2026] tun: Universal TUN/TAP device driver, 1.6
+[Mon Sep 21 09:51:30 2026] CAN device driver interface
+[Mon Sep 21 09:51:30 2026] pps pps0: new PPS source ptp0
+[Mon Sep 21 09:51:30 2026] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+[Mon Sep 21 09:51:30 2026] ehci-pci: EHCI PCI platform driver
+[Mon Sep 21 09:51:30 2026] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+[Mon Sep 21 09:51:30 2026] ohci-pci: OHCI PCI platform driver
+[Mon Sep 21 09:51:30 2026] usbcore: registered new interface driver usb-storage
+[Mon Sep 21 09:51:30 2026] usbcore: registered new interface driver usbserial_generic
+[Mon Sep 21 09:51:30 2026] usbserial: USB Serial support registered for generic
+[Mon Sep 21 09:51:30 2026] input: 30370000.snvs:snvs-powerkey as /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/input/input0
+[Mon Sep 21 09:51:30 2026] snvs_rtc 30370000.snvs:snvs-rtc-lp: registered as rtc0
+[Mon Sep 21 09:51:30 2026] snvs_rtc 30370000.snvs:snvs-rtc-lp: setting system clock to 1970-01-01T00:00:00 UTC (0)
+[Mon Sep 21 09:51:30 2026] device-mapper: ioctl: 4.43.0-ioctl (2020-10-01) initialised: dm-devel@redhat.com
+[Mon Sep 21 09:51:30 2026] sdhci: Secure Digital Host Controller Interface driver
+[Mon Sep 21 09:51:30 2026] sdhci: Copyright(c) Pierre Ossman
+[Mon Sep 21 09:51:30 2026] sdhci-pltfm: SDHCI platform and OF driver helper
+[Mon Sep 21 09:51:30 2026] sdhci-esdhc-imx 30b40000.mmc: voltage-ranges unspecified
+[Mon Sep 21 09:51:30 2026] sdhci-esdhc-imx 30b50000.mmc: voltage-ranges unspecified
+[Mon Sep 21 09:51:30 2026] sdhci-esdhc-imx 30b60000.mmc: voltage-ranges unspecified
+[Mon Sep 21 09:51:30 2026] ledtrig-cpu: registered to indicate activity on CPUs
+[Mon Sep 21 09:51:30 2026] SMCCC: SOC_ID: ARCH_SOC_ID not implemented, skipping ....
+[Mon Sep 21 09:51:30 2026] caam-snvs 30370000.caam-snvs: violation handlers armed - init state
+[Mon Sep 21 09:51:30 2026] usbcore: registered new interface driver usbhid
+[Mon Sep 21 09:51:30 2026] usbhid: USB HID core driver
+[Mon Sep 21 09:51:30 2026] mmc2: SDHCI controller on 30b60000.mmc [30b60000.mmc] using ADMA
+[Mon Sep 21 09:51:30 2026] optee: probing for conduit method.
+[Mon Sep 21 09:51:30 2026] optee: revision 3.18 (6467bb29)
+[Mon Sep 21 09:51:30 2026] optee: dynamic shared memory is enabled
+[Mon Sep 21 09:51:30 2026] optee: initialized driver
+[Mon Sep 21 09:51:30 2026] random: fast init done
+[Mon Sep 21 09:51:30 2026] galcore: clk_get vg clock failed, disable vg!
+[Mon Sep 21 09:51:30 2026] random: crng init done
+[Mon Sep 21 09:51:30 2026] Galcore version 6.4.3.p2.336687
+[Mon Sep 21 09:51:30 2026] [drm] Initialized vivante 1.0.0 20170808 for 38000000.gpu on minor 0
+[Mon Sep 21 09:51:30 2026] hantrodec 0 : module inserted. Major = 237
+[Mon Sep 21 09:51:30 2026] hantrodec 1 : module inserted. Major = 237
+[Mon Sep 21 09:51:30 2026] hx280enc: module inserted. Major <236>
+[Mon Sep 21 09:51:30 2026] u32 classifier
+[Mon Sep 21 09:51:30 2026]     input device check on
+[Mon Sep 21 09:51:30 2026]     Actions configured
+[Mon Sep 21 09:51:30 2026] NET: Registered protocol family 10
+[Mon Sep 21 09:51:30 2026] Segment Routing with IPv6
+[Mon Sep 21 09:51:30 2026] sit: IPv6, IPv4 and MPLS over IPv4 tunneling driver
+[Mon Sep 21 09:51:30 2026] mmc2: new HS400 Enhanced strobe MMC card at address 0001
+[Mon Sep 21 09:51:30 2026] NET: Registered protocol family 17
+[Mon Sep 21 09:51:30 2026] mmcblk2: mmc2:0001 88A43A 14.6 GiB 
+[Mon Sep 21 09:51:30 2026] Bridge firewalling registered
+[Mon Sep 21 09:51:30 2026] mmcblk2boot0: mmc2:0001 88A43A partition 1 4.00 MiB
+[Mon Sep 21 09:51:30 2026] can: controller area network core
+[Mon Sep 21 09:51:30 2026] mmcblk2boot1: mmc2:0001 88A43A partition 2 4.00 MiB
+[Mon Sep 21 09:51:30 2026] NET: Registered protocol family 29
+[Mon Sep 21 09:51:30 2026] mmcblk2rpmb: mmc2:0001 88A43A partition 3 4.00 MiB, chardev (238:0)
+[Mon Sep 21 09:51:30 2026] can: raw protocol
+[Mon Sep 21 09:51:30 2026]  mmcblk2: p1 p2
+[Mon Sep 21 09:51:30 2026] can: broadcast manager protocol
+[Mon Sep 21 09:51:30 2026] can: netlink gateway - max_hops=1
+[Mon Sep 21 09:51:30 2026] Key type dns_resolver registered
+[Mon Sep 21 09:51:30 2026] registered taskstats version 1
+[Mon Sep 21 09:51:30 2026] Loading compiled-in X.509 certificates
+[Mon Sep 21 09:51:30 2026] Loaded X.509 cert 'Default insecure key from Factory II: 1b2327c0b75d0bc1e4914c8195bbf053629b8abb'
+[Mon Sep 21 09:51:30 2026] usb_phy_generic usbphynop1: supply vcc not found, using dummy regulator
+[Mon Sep 21 09:51:30 2026] usb_phy_generic usbphynop2: supply vcc not found, using dummy regulator
+[Mon Sep 21 09:51:30 2026] i2c i2c-0: IMX I2C adapter registered
+[Mon Sep 21 09:51:30 2026] LDO6: supplied by regulator-dummy
+[Mon Sep 21 09:51:30 2026] i2c i2c-1: IMX I2C adapter registered
+[Mon Sep 21 09:51:30 2026] i2c i2c-2: IMX I2C adapter registered
+[Mon Sep 21 09:51:30 2026] i2c i2c-3: IMX I2C adapter registered
+[Mon Sep 21 09:51:30 2026] SoC: i.MX8MM revision 1.0
+[Mon Sep 21 09:51:30 2026] imx6q-pcie 33800000.pcie: supply epdev_on not found, using dummy regulator
+[Mon Sep 21 09:51:30 2026] imx-cpufreq-dt imx-cpufreq-dt: cpu speed grade 2 mkt segment 2 supported-hw 0x4 0x4
+[Mon Sep 21 09:51:30 2026] imx6q-pcie 33800000.pcie: PLL REF_CLK is used!.
+[Mon Sep 21 09:51:30 2026] imx-drm 32c00000.bus:display-subsystem: bound imx-lcdif-crtc.0 (ops 0xffffffc0110026d0)
+[Mon Sep 21 09:51:30 2026] imx6q-pcie 33800000.pcie: PCIe PLL locked after 20 us.
+[Mon Sep 21 09:51:30 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: version number is 0x1060200
+[Mon Sep 21 09:51:30 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: Failed to attach bridge: 32e10000.mipi_dsi
+[Mon Sep 21 09:51:30 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: failed to bind sec dsim bridge: -517
+[Mon Sep 21 09:51:30 2026] pps pps0: new PPS source ptp0
+[Mon Sep 21 09:51:30 2026] fec 30be0000.ethernet: Invalid MAC address: 00:00:00:00:00:00
+[Mon Sep 21 09:51:30 2026] fec 30be0000.ethernet: Using random MAC address: ba:39:6d:10:5b:c4
+[Mon Sep 21 09:51:30 2026] libphy: fec_enet_mii_bus: probed
+[Mon Sep 21 09:51:30 2026] imx6q-pcie 33800000.pcie: host bridge /soc@0/pcie@33800000 ranges:
+[Mon Sep 21 09:51:30 2026] imx6q-pcie 33800000.pcie:       IO 0x001ff80000..0x001ff8ffff -> 0x0000000000
+[Mon Sep 21 09:51:30 2026] imx6q-pcie 33800000.pcie:      MEM 0x0018000000..0x001fefffff -> 0x0018000000
+[Mon Sep 21 09:51:30 2026] imx6q-pcie 33800000.pcie: invalid resource
+[Mon Sep 21 09:51:30 2026] fec 30be0000.ethernet eth0: registered PHC device 0
+[Mon Sep 21 09:51:30 2026] imx_usb 32e50000.usb: No over current polarity defined
+[Mon Sep 21 09:51:30 2026] ci_hdrc ci_hdrc.1: EHCI Host Controller
+[Mon Sep 21 09:51:30 2026] ci_hdrc ci_hdrc.1: new USB bus registered, assigned bus number 1
+[Mon Sep 21 09:51:30 2026] ci_hdrc ci_hdrc.1: USB 2.0 started, EHCI 1.00
+[Mon Sep 21 09:51:30 2026] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002, bcdDevice= 5.10
+[Mon Sep 21 09:51:30 2026] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[Mon Sep 21 09:51:30 2026] usb usb1: Product: EHCI Host Controller
+[Mon Sep 21 09:51:30 2026] usb usb1: Manufacturer: Linux 5.10.93-lmp-standard ehci_hcd
+[Mon Sep 21 09:51:30 2026] usb usb1: SerialNumber: ci_hdrc.1
+[Mon Sep 21 09:51:30 2026] hub 1-0:1.0: USB hub found
+[Mon Sep 21 09:51:30 2026] hub 1-0:1.0: 1 port detected
+[Mon Sep 21 09:51:30 2026] sdhci-esdhc-imx 30b40000.mmc: voltage-ranges unspecified
+[Mon Sep 21 09:51:30 2026] sdhci-esdhc-imx 30b50000.mmc: voltage-ranges unspecified
+[Mon Sep 21 09:51:30 2026] caam 30900000.crypto: device ID = 0x0a16040100000000 (Era 9)
+[Mon Sep 21 09:51:30 2026] sdhci-esdhc-imx 30b50000.mmc: Got CD GPIO
+[Mon Sep 21 09:51:30 2026] caam 30900000.crypto: job rings = 2, qi = 0
+[Mon Sep 21 09:51:30 2026] caam algorithms registered in /proc/crypto
+[Mon Sep 21 09:51:30 2026] caam 30900000.crypto: caam pkc algorithms registered in /proc/crypto
+[Mon Sep 21 09:51:30 2026] mmc0: SDHCI controller on 30b40000.mmc [30b40000.mmc] using ADMA
+[Mon Sep 21 09:51:30 2026] caam 30900000.crypto: registering rng-caam
+[Mon Sep 21 09:51:31 2026] mmc1: SDHCI controller on 30b50000.mmc [30b50000.mmc] using ADMA
+[Mon Sep 21 09:51:31 2026] Device caam-keygen registered
+[Mon Sep 21 09:51:31 2026] mmc0: queuing unknown CIS tuple 0x80 (2 bytes)
+[Mon Sep 21 09:51:31 2026] mmc0: queuing unknown CIS tuple 0x80 (3 bytes)
+[Mon Sep 21 09:51:31 2026] imx-drm 32c00000.bus:display-subsystem: bound imx-lcdif-crtc.0 (ops 0xffffffc0110026d0)
+[Mon Sep 21 09:51:31 2026] mmc0: queuing unknown CIS tuple 0x80 (3 bytes)
+[Mon Sep 21 09:51:31 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: version number is 0x1060200
+[Mon Sep 21 09:51:31 2026] mmc0: queuing unknown CIS tuple 0x80 (7 bytes)
+[Mon Sep 21 09:51:31 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: Failed to attach bridge: 32e10000.mipi_dsi
+[Mon Sep 21 09:51:31 2026] mmc0: queuing unknown CIS tuple 0x80 (3 bytes)
+[Mon Sep 21 09:51:31 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: failed to bind sec dsim bridge: -517
+[Mon Sep 21 09:51:31 2026] mmc0: queuing unknown CIS tuple 0x80 (6 bytes)
+[Mon Sep 21 09:51:31 2026] imx-drm 32c00000.bus:display-subsystem: bound imx-lcdif-crtc.0 (ops 0xffffffc0110026d0)
+[Mon Sep 21 09:51:31 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: version number is 0x1060200
+[Mon Sep 21 09:51:31 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: Failed to attach bridge: 32e10000.mipi_dsi
+[Mon Sep 21 09:51:31 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: failed to bind sec dsim bridge: -517
+[Mon Sep 21 09:51:31 2026] ALSA device list:
+[Mon Sep 21 09:51:31 2026]   No soundcards found.
+[Mon Sep 21 09:51:31 2026] mmc0: new high speed SDIO card at address 0001
+[Mon Sep 21 09:51:31 2026] usb 1-1: new high-speed USB device number 2 using ci_hdrc
+[Mon Sep 21 09:51:31 2026] usb 1-1: New USB device found, idVendor=0424, idProduct=2514, bcdDevice= 0.00
+[Mon Sep 21 09:51:31 2026] usb 1-1: New USB device strings: Mfr=0, Product=0, SerialNumber=0
+[Mon Sep 21 09:51:31 2026] hub 1-1:1.0: USB hub found
+[Mon Sep 21 09:51:31 2026] hub 1-1:1.0: 4 ports detected
+[Mon Sep 21 09:51:31 2026] imx-drm 32c00000.bus:display-subsystem: bound imx-lcdif-crtc.0 (ops 0xffffffc0110026d0)
+[Mon Sep 21 09:51:31 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: version number is 0x1060200
+[Mon Sep 21 09:51:31 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: Failed to attach bridge: 32e10000.mipi_dsi
+[Mon Sep 21 09:51:31 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: failed to bind sec dsim bridge: -517
+[Mon Sep 21 09:51:31 2026] usb 1-1.2: new high-speed USB device number 3 using ci_hdrc
+[Mon Sep 21 09:51:31 2026] usb 1-1.2: New USB device found, idVendor=2109, idProduct=2817, bcdDevice= 7.64
+[Mon Sep 21 09:51:31 2026] imx6q-pcie 33800000.pcie: Phy link never came up
+[Mon Sep 21 09:51:31 2026] usb 1-1.2: New USB device strings: Mfr=1, Product=2, SerialNumber=0
+[Mon Sep 21 09:51:31 2026] imx6q-pcie 33800000.pcie: failed to initialize host
+[Mon Sep 21 09:51:31 2026] usb 1-1.2: Product: USB2.0 Hub             
+[Mon Sep 21 09:51:31 2026] usb 1-1.2: Manufacturer: VIA Labs, Inc.         
+[Mon Sep 21 09:51:31 2026] hub 1-1.2:1.0: USB hub found
+[Mon Sep 21 09:51:31 2026] imx6q-pcie 33800000.pcie: unable to add pcie port.
+[Mon Sep 21 09:51:31 2026] Freeing unused kernel memory: 5184K
+[Mon Sep 21 09:51:31 2026] hub 1-1.2:1.0: 4 ports detected
+[Mon Sep 21 09:51:31 2026] Run /init as init process
+[Mon Sep 21 09:51:31 2026]   with arguments:
+[Mon Sep 21 09:51:31 2026]     /init
+[Mon Sep 21 09:51:31 2026]   with environment:
+[Mon Sep 21 09:51:31 2026]     HOME=/
+[Mon Sep 21 09:51:31 2026]     TERM=linux
+[Mon Sep 21 09:51:31 2026]     ostree=/ostree/boot.1/lmp/edd88b28fad148b3096157052e4434582f63b7bbe09489086203ddb56fddd279/0
+[Mon Sep 21 09:51:32 2026] imx-drm 32c00000.bus:display-subsystem: bound imx-lcdif-crtc.0 (ops 0xffffffc0110026d0)
+[Mon Sep 21 09:51:32 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: version number is 0x1060200
+[Mon Sep 21 09:51:32 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: Failed to attach bridge: 32e10000.mipi_dsi
+[Mon Sep 21 09:51:32 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: failed to bind sec dsim bridge: -517
+[Mon Sep 21 09:51:32 2026] e2fsck: otaroot: clean, 88606/3678592 files, 1537227/3799552 blocks
+[Mon Sep 21 09:51:32 2026] EXT4-fs (mmcblk2p2): mounted filesystem with ordered data mode. Opts: (null)
+[Mon Sep 21 09:51:32 2026] systemd[1]: System time before build time, advancing clock.
+[Mon Sep 21 09:51:32 2026] systemd[1]: systemd 250.5+ running in system mode (+PAM -AUDIT -SELINUX -APPARMOR +IMA -SMACK +SECCOMP -GCRYPT -GNUTLS +OPENSSL +ACL +BLKID +CURL -ELFUTILS -FIDO2 -IDN2 -IDN -IPTC +KMOD +LIBCRYPTSETUP +LIBFDISK -PCRE2 -PWQUALITY +P11KIT -QRENCODE -BZIP2 -LZ4 +XZ -ZLIB +ZSTD -BPF_FRAMEWORK +XKBCOMMON +UTMP +SYSVINIT default-hierarchy=hybrid)
+[Mon Sep 21 09:51:32 2026] systemd[1]: Detected architecture arm64.
+[Mon Sep 21 09:51:32 2026] systemd[1]: Hostname set to <portenta-x8-2e2c1209dabc240b>.
+[Mon Sep 21 09:51:32 2026] usb 1-1.2.3: new high-speed USB device number 4 using ci_hdrc
+[Mon Sep 21 09:51:33 2026] usb 1-1.2.3: New USB device found, idVendor=16d0, idProduct=0ed4, bcdDevice= 1.00
+[Mon Sep 21 09:51:33 2026] usb 1-1.2.3: New USB device strings: Mfr=2, Product=1, SerialNumber=3
+[Mon Sep 21 09:51:33 2026] usb 1-1.2.3: Product: C2
+[Mon Sep 21 09:51:33 2026] usb 1-1.2.3: Manufacturer: Kurokesu
+[Mon Sep 21 09:51:33 2026] usb 1-1.2.3: SerialNumber: KTM-QGFST
+[Mon Sep 21 09:51:33 2026] imx-drm 32c00000.bus:display-subsystem: bound imx-lcdif-crtc.0 (ops 0xffffffc0110026d0)
+[Mon Sep 21 09:51:33 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: version number is 0x1060200
+[Mon Sep 21 09:51:33 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: Failed to attach bridge: 32e10000.mipi_dsi
+[Mon Sep 21 09:51:33 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: failed to bind sec dsim bridge: -517
+[Mon Sep 21 09:51:33 2026] systemd[1]: Queued start job for default target Graphical Interface.
+[Mon Sep 21 09:51:33 2026] usb 1-1.2.4: new high-speed USB device number 5 using ci_hdrc
+[Mon Sep 21 09:51:33 2026] systemd[1]: Created slice Slice /system/getty.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Created slice Slice /system/modprobe.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Created slice Slice /system/serial-getty.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Created slice User and Session Slice.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Started Dispatch Password Requests to Console Directory Watch.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Started Forward Password Requests to Wall Directory Watch.
+[Mon Sep 21 09:51:33 2026] usb 1-1.2.4: New USB device found, idVendor=2109, idProduct=2817, bcdDevice= 7.63
+[Mon Sep 21 09:51:33 2026] usb 1-1.2.4: New USB device strings: Mfr=1, Product=2, SerialNumber=0
+[Mon Sep 21 09:51:33 2026] usb 1-1.2.4: Product: USB2.0 Hub             
+[Mon Sep 21 09:51:33 2026] usb 1-1.2.4: Manufacturer: VIA Labs, Inc.         
+[Mon Sep 21 09:51:33 2026] systemd[1]: Reached target Local Encrypted Volumes.
+[Mon Sep 21 09:51:33 2026] hub 1-1.2.4:1.0: USB hub found
+[Mon Sep 21 09:51:33 2026] hub 1-1.2.4:1.0: 4 ports detected
+[Mon Sep 21 09:51:33 2026] systemd[1]: Reached target Local Integrity Protected Volumes.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Reached target Remote Encrypted Volumes.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Reached target Remote File Systems.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Reached target Slice Units.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Reached target Local Verity Protected Volumes.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Listening on initctl Compatibility Named Pipe.
+[Mon Sep 21 09:51:33 2026] imx-drm 32c00000.bus:display-subsystem: bound imx-lcdif-crtc.0 (ops 0xffffffc0110026d0)
+[Mon Sep 21 09:51:33 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: version number is 0x1060200
+[Mon Sep 21 09:51:33 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: Failed to attach bridge: 32e10000.mipi_dsi
+[Mon Sep 21 09:51:33 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: failed to bind sec dsim bridge: -517
+[Mon Sep 21 09:51:33 2026] systemd[1]: Journal Audit Socket was skipped because of a failed condition check (ConditionSecurity=audit).
+[Mon Sep 21 09:51:33 2026] systemd[1]: Listening on Journal Socket (/dev/log).
+[Mon Sep 21 09:51:33 2026] systemd[1]: Listening on Journal Socket.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Listening on udev Control Socket.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Listening on udev Kernel Socket.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Listening on User Database Manager Socket.
+[Mon Sep 21 09:51:33 2026] systemd[1]: Mounting Huge Pages File System...
+[Mon Sep 21 09:51:33 2026] systemd[1]: Mounting POSIX Message Queue File System...
+[Mon Sep 21 09:51:33 2026] systemd[1]: Mounting Kernel Debug File System...
+[Mon Sep 21 09:51:33 2026] systemd[1]: Mounting Kernel Trace File System...
+[Mon Sep 21 09:51:33 2026] systemd[1]: Starting Create List of Static Device Nodes...
+[Mon Sep 21 09:51:33 2026] systemd[1]: Starting Load Kernel Module configfs...
+[Mon Sep 21 09:51:33 2026] systemd[1]: Starting Load Kernel Module drm...
+[Mon Sep 21 09:51:34 2026] systemd[1]: Starting Load Kernel Module fuse...
+[Mon Sep 21 09:51:34 2026] systemd[1]: Starting Start psplash boot splash screen...
+[Mon Sep 21 09:51:34 2026] fuse: init (API version 7.32)
+[Mon Sep 21 09:51:34 2026] systemd[1]: File System Check on Root Device was skipped because of a failed condition check (ConditionPathIsReadWrite=!/).
+[Mon Sep 21 09:51:34 2026] systemd[1]: Starting Journal Service...
+[Mon Sep 21 09:51:34 2026] systemd[1]: Starting Load Kernel Modules...
+[Mon Sep 21 09:51:34 2026] systemd[1]: Starting Generate network units from Kernel command line...
+[Mon Sep 21 09:51:34 2026] anx7625: loading out-of-tree module taints kernel.
+[Mon Sep 21 09:51:34 2026] imx-drm 32c00000.bus:display-subsystem: bound imx-lcdif-crtc.0 (ops 0xffffffc0110026d0)
+[Mon Sep 21 09:51:34 2026] imx_sec_dsim_drv 32e10000.mipi_dsi: version number is 0x1060200
+[Mon Sep 21 09:51:34 2026] i2c /dev entries driver
+[Mon Sep 21 09:51:34 2026] imx-drm 32c00000.bus:display-subsystem: bound 32e10000.mipi_dsi (ops 0xffffffc010ff0908)
+[Mon Sep 21 09:51:34 2026] systemd[1]: Starting Remount Root and Kernel File Systems...
+[Mon Sep 21 09:51:34 2026] [drm] Initialized imx-drm 1.0.0 20120507 for 32c00000.bus:display-subsystem on minor 1
+[Mon Sep 21 09:51:34 2026] imx-drm 32c00000.bus:display-subsystem: [drm] Cannot find any crtc or sizes
+[Mon Sep 21 09:51:34 2026] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+[Mon Sep 21 09:51:34 2026] EXT4-fs (mmcblk2p2): re-mounted. Opts: (null)
+[Mon Sep 21 09:51:34 2026] imx-drm 32c00000.bus:display-subsystem: [drm] Cannot find any crtc or sizes
+[Mon Sep 21 09:51:34 2026] cfg80211: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+[Mon Sep 21 09:51:34 2026] systemd[1]: Starting Coldplug All udev Devices...
+[Mon Sep 21 09:51:34 2026] systemd[1]: Starting Create compressed swap in memory using zram...
+[Mon Sep 21 09:51:34 2026] systemd[1]: Started Journal Service.
+[Mon Sep 21 09:51:34 2026] zram: Added device: zram0
+[Mon Sep 21 09:51:34 2026] zram0: detected capacity change from 0 to 2001518592
+[Mon Sep 21 09:51:34 2026] systemd-journald[519]: Received client request to flush runtime journal.
+[Mon Sep 21 09:51:35 2026] Adding 1954604k swap on /dev/zram0.  Priority:-2 extents:1 across:1954604k SS
+[Mon Sep 21 09:51:35 2026] imx-sdma 302c0000.dma-controller: firmware found.
+[Mon Sep 21 09:51:35 2026] imx-sdma 302c0000.dma-controller: loaded firmware 4.5
+[Mon Sep 21 09:51:35 2026] videodev: Linux video capture interface: v2.00
+[Mon Sep 21 09:51:35 2026] imx-sdma 302b0000.dma-controller: firmware found.
+[Mon Sep 21 09:51:35 2026] imx-sdma 30bd0000.dma-controller: firmware found.
+[Mon Sep 21 09:51:35 2026] mxc_mipi-csi 32e30000.mipi_csi: supply mipi-phy not found, using dummy regulator
+[Mon Sep 21 09:51:35 2026] mxc_mipi-csi 32e30000.mipi_csi: mipi csi v4l2 device registered
+[Mon Sep 21 09:51:35 2026] Bluetooth: HCI UART driver ver 2.3
+[Mon Sep 21 09:51:35 2026] Bluetooth: HCI UART protocol H4 registered
+[Mon Sep 21 09:51:35 2026] Bluetooth: HCI UART protocol BCSP registered
+[Mon Sep 21 09:51:35 2026] mx6s-csi 32e20000.csi1_bridge: initialising
+[Mon Sep 21 09:51:35 2026] Bluetooth: HCI UART protocol LL registered
+[Mon Sep 21 09:51:35 2026] input: bd718xx-pwrkey as /devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-004b/gpio-keys.1.auto/input/input1
+[Mon Sep 21 09:51:35 2026] Bluetooth: HCI UART protocol ATH3K registered
+[Mon Sep 21 09:51:35 2026] Bluetooth: HCI UART protocol Three-wire (H5) registered
+[Mon Sep 21 09:51:35 2026] CSI: Registered sensor subdevice: mxc_mipi-csi.0
+[Mon Sep 21 09:51:35 2026] Bluetooth: HCI UART protocol Intel registered
+[Mon Sep 21 09:51:35 2026] hci_uart_bcm serial0-0: supply vbat not found, using dummy regulator
+[Mon Sep 21 09:51:35 2026] hci_uart_bcm serial0-0: supply vddio not found, using dummy regulator
+[Mon Sep 21 09:51:35 2026] Bluetooth: HCI UART protocol Broadcom registered
+[Mon Sep 21 09:51:35 2026] mxc_mipi-csi 32e30000.mipi_csi: lanes: 2, hs_settle: 0, clk_settle: 0, wclk: 0, freq: 333000000
+[Mon Sep 21 09:51:35 2026] hci_uart_bcm serial0-0: No reset resource, using default baud rate
+[Mon Sep 21 09:51:35 2026] Bluetooth: HCI UART protocol QCA registered
+[Mon Sep 21 09:51:35 2026] cs42l52 2-004a: cs42l52_i2c_probe 1160 cannot obtain reset-gpio
+[Mon Sep 21 09:51:35 2026] cs42l52 2-004a: cs42l52_i2c_probe 1160 cannot obtain reset-gpio
+[Mon Sep 21 09:51:35 2026] cs42l52 2-004a: cs42l52_i2c_probe 1160 cannot obtain reset-gpio
+[Mon Sep 21 09:51:35 2026] brcmfmac: brcmf_fw_alloc_request: using brcm/brcmfmac43430-sdio for chip BCM43430/1
+[Mon Sep 21 09:51:35 2026] cs42l52 2-004a: cs42l52_i2c_probe 1160 cannot obtain reset-gpio
+[Mon Sep 21 09:51:35 2026] uvcvideo: Found UVC 1.00 device C2 (16d0:0ed4)
+[Mon Sep 21 09:51:35 2026] cs42l52 2-004a: cs42l52_i2c_probe 1160 cannot obtain reset-gpio
+[Mon Sep 21 09:51:35 2026] brcmfmac mmc0:0001:1: Direct firmware load for brcm/brcmfmac43430-sdio.fsl,imx8mm-evk.txt failed with error -2
+[Mon Sep 21 09:51:35 2026] cs42l52 2-004a: cs42l52_i2c_probe 1160 cannot obtain reset-gpio
+[Mon Sep 21 09:51:35 2026] FAT-fs (mmcblk2p1): Volume was not properly unmounted. Some data may be corrupt. Please run fsck.
+[Mon Sep 21 09:51:35 2026] input: C2: C2 KTM-QGFST as /devices/platform/soc@0/32c00000.bus/32e50000.usb/ci_hdrc.1/usb1/1-1/1-1.2/1-1.2.3/1-1.2.3:1.0/input/input2
+[Mon Sep 21 09:51:35 2026] usbcore: registered new interface driver uvcvideo
+[Mon Sep 21 09:51:35 2026] cs42l52 2-004a: cs42l52_i2c_probe 1160 cannot obtain reset-gpio
+[Mon Sep 21 09:51:35 2026] USB Video Class driver (1.1.1)
+[Mon Sep 21 09:51:35 2026] cs42l52 2-004a: cs42l52_i2c_probe 1160 cannot obtain reset-gpio
+[Mon Sep 21 09:51:35 2026] brcmfmac: brcmf_fw_alloc_request: using brcm/brcmfmac43430-sdio for chip BCM43430/1
+[Mon Sep 21 09:51:35 2026] brcmfmac: brcmf_c_preinit_dcmds: Firmware: BCM43430/1 wl0: Feb 16 2020 22:39:24 version 7.45.98.97 (r724416 CY) FWID 01-bf41ed64
+[Mon Sep 21 09:51:36 2026] Bluetooth: hci0: BCM: chip id 94
+[Mon Sep 21 09:51:36 2026] Bluetooth: hci0: BCM: features 0x2e
+[Mon Sep 21 09:51:36 2026] Bluetooth: hci0: BCM43430A1
+[Mon Sep 21 09:51:36 2026] Bluetooth: hci0: BCM43430A1 (001.002.009) build 0000
+[Mon Sep 21 09:51:36 2026] Bluetooth: hci0: BCM43430A1 'brcm/BCM43430A1.hcd' Patch
+[Mon Sep 21 09:51:36 2026] systemd-journald[519]: Oldest entry in /run/log/journal/06ae348f1136489abb0a705694a60b88/system.journal is older than the configured file retention duration (1month), suggesting rotation.
+[Mon Sep 21 09:51:36 2026] systemd-journald[519]: /run/log/journal/06ae348f1136489abb0a705694a60b88/system.journal: Journal header limits reached or header out-of-date, rotating.
+[Mon Sep 21 09:51:37 2026] cs42l52 2-004a: cs42l52_i2c_probe 1160 cannot obtain reset-gpio
+[Mon Sep 21 09:51:37 2026] cs42l52 2-004a: cs42l52_i2c_probe 1160 cannot obtain reset-gpio
+[Mon Sep 21 09:51:37 2026] Bluetooth: BNEP (Ethernet Emulation) ver 1.3
+[Mon Sep 21 09:51:37 2026] Bluetooth: BNEP filters: protocol multicast
+[Mon Sep 21 09:51:37 2026] Bluetooth: BNEP socket layer initialized
+[Mon Sep 21 09:51:38 2026] Microchip KSZ9131 Gigabit PHY 30be0000.ethernet-1:01: attached PHY driver [Microchip KSZ9131 Gigabit PHY] (mii_bus:phy_addr=30be0000.ethernet-1:01, irq=144)
+[Mon Sep 21 09:51:39 2026] Bluetooth: hci0: BCM4343WA1 37.4MHz Murata Type-1DX BT4.2-0093
+[Mon Sep 21 09:51:39 2026] Bluetooth: hci0: BCM43430A1 (001.002.009) build 0000
+[Mon Sep 21 09:51:44 2026] file system registered
+[Mon Sep 21 09:51:45 2026] read descriptors
+[Mon Sep 21 09:51:45 2026] read strings
+[Mon Sep 21 09:51:51 2026] x8h7_can can@2 can0: X8H7 CAN successfully initialized.
+[Mon Sep 21 09:51:51 2026] cs42l52 2-004a: cs42l52_i2c_probe 1160 cannot obtain reset-gpio
+[Mon Sep 21 09:51:51 2026] x8h7_can can@1 can1: X8H7 CAN successfully initialized.
+[Mon Sep 21 09:51:51 2026] cs42l52 2-004a: cs42l52_i2c_probe 1160 cannot obtain reset-gpio
+[Mon Sep 21 09:51:51 2026] cs42l52 2-004a: Failed to apply regmap patch: -6
+[Mon Sep 21 09:51:51 2026] cs42l52 2-004a: CS42L52 Device ID (80). Expected E0
+[Mon Sep 21 09:51:51 2026] x8h7_rtc x8h7rtc: registered as rtc1
+[Mon Sep 21 09:51:52 2026] Serial: X8H7 UART driver
+[Mon Sep 21 09:51:52 2026] x8h7uart: ttyX0 at I/O 0x0 (irq = 0, base_baud = 1500000) is a unknown
+[Mon Sep 21 09:51:53 2026] Initializing XFRM netlink socket
+[Mon Sep 21 09:51:53 2026] br-b4c5f2c3c8ed: port 1(veth14f5b6e) entered blocking state
+[Mon Sep 21 09:51:53 2026] br-b4c5f2c3c8ed: port 1(veth14f5b6e) entered disabled state
+[Mon Sep 21 09:51:53 2026] device veth14f5b6e entered promiscuous mode
+[Mon Sep 21 09:51:53 2026] br-b4c5f2c3c8ed: port 1(veth14f5b6e) entered blocking state
+[Mon Sep 21 09:51:53 2026] br-b4c5f2c3c8ed: port 1(veth14f5b6e) entered forwarding state
+[Mon Sep 21 09:51:54 2026] IPv6: ADDRCONF(NETDEV_CHANGE): br-b4c5f2c3c8ed: link becomes ready
+[Mon Sep 21 09:51:54 2026] br-b4c5f2c3c8ed: port 1(veth14f5b6e) entered disabled state
+[Mon Sep 21 09:51:54 2026] br-b4c5f2c3c8ed: port 2(veth9a089e8) entered blocking state
+[Mon Sep 21 09:51:54 2026] br-b4c5f2c3c8ed: port 2(veth9a089e8) entered disabled state
+[Mon Sep 21 09:51:54 2026] device veth9a089e8 entered promiscuous mode
+[Mon Sep 21 09:51:54 2026] br-b4c5f2c3c8ed: port 2(veth9a089e8) entered blocking state
+[Mon Sep 21 09:51:54 2026] br-b4c5f2c3c8ed: port 2(veth9a089e8) entered forwarding state
+[Mon Sep 21 09:51:54 2026] br-b4c5f2c3c8ed: port 3(veth4a76520) entered blocking state
+[Mon Sep 21 09:51:54 2026] br-b4c5f2c3c8ed: port 3(veth4a76520) entered disabled state
+[Mon Sep 21 09:51:54 2026] device veth4a76520 entered promiscuous mode
+[Mon Sep 21 09:51:54 2026] br-b4c5f2c3c8ed: port 2(veth9a089e8) entered disabled state
+[Mon Sep 21 09:51:54 2026] cgroup: cgroup: disabling cgroup2 socket matching due to net_prio or net_cls activation
+[Mon Sep 21 09:51:55 2026] eth0: renamed from veth233eff3
+[Mon Sep 21 09:51:55 2026] IPv6: ADDRCONF(NETDEV_CHANGE): veth9a089e8: link becomes ready
+[Mon Sep 21 09:51:55 2026] br-b4c5f2c3c8ed: port 2(veth9a089e8) entered blocking state
+[Mon Sep 21 09:51:55 2026] br-b4c5f2c3c8ed: port 2(veth9a089e8) entered forwarding state
+[Mon Sep 21 09:51:55 2026] eth0: renamed from vetheba3542
+[Mon Sep 21 09:51:55 2026] IPv6: ADDRCONF(NETDEV_CHANGE): veth4a76520: link becomes ready
+[Mon Sep 21 09:51:55 2026] br-b4c5f2c3c8ed: port 3(veth4a76520) entered blocking state
+[Mon Sep 21 09:51:55 2026] br-b4c5f2c3c8ed: port 3(veth4a76520) entered forwarding state
+[Mon Sep 21 09:51:55 2026] eth0: renamed from vethf80d9ae
+[Mon Sep 21 09:51:55 2026] IPv6: ADDRCONF(NETDEV_CHANGE): veth14f5b6e: link becomes ready
+[Mon Sep 21 09:51:55 2026] br-b4c5f2c3c8ed: port 1(veth14f5b6e) entered blocking state
+[Mon Sep 21 09:51:55 2026] br-b4c5f2c3c8ed: port 1(veth14f5b6e) entered forwarding state
+[Mon Sep 21 09:52:01 2026] camera_dvdd: disabling
+[Mon Sep 21 09:52:01 2026] camera_avdd: disabling
+[Mon Sep 21 09:52:01 2026] camera_dovdd: disabling
+[Mon Sep 21 09:52:01 2026] VSD_3V3: disabling
+[rc=0]

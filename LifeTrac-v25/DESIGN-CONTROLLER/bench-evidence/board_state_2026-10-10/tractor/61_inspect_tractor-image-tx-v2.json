@@ -1,0 +1,279 @@
+[
+    {
+        "Id": "bf1cd3990abe7aecb0cc3dc95857d19f1e78fd5fc25b591002c2e7095b64d38e",
+        "Created": "2026-05-28T14:43:56.277336Z",
+        "Path": "python3",
+        "Args": [
+            "/app/image_tx_daemon.py",
+            "--mqtt-host",
+            "mosquitto"
+        ],
+        "State": {
+            "Status": "exited",
+            "Running": false,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 0,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-05-30T15:22:41.558884875Z",
+            "FinishedAt": "2026-05-31T02:51:09.85879425Z"
+        },
+        "Image": "sha256:9bfbbc8d06cb65c4ecea5ed1131527a02dd7e34c2a148b7f1115cf5de3701125",
+        "ResolvConfPath": "/var/lib/docker/containers/bf1cd3990abe7aecb0cc3dc95857d19f1e78fd5fc25b591002c2e7095b64d38e/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/bf1cd3990abe7aecb0cc3dc95857d19f1e78fd5fc25b591002c2e7095b64d38e/hostname",
+        "HostsPath": "/var/lib/docker/containers/bf1cd3990abe7aecb0cc3dc95857d19f1e78fd5fc25b591002c2e7095b64d38e/hosts",
+        "LogPath": "",
+        "Name": "/tractor-image-tx-v2",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "/opt/lifetrac/video-test/src/image_tx_daemon.py:/app/image_tx_daemon.py:ro",
+                "/opt/lifetrac/video-test/src/lora_proto.py:/app/lora_proto.py:ro",
+                "/opt/lifetrac/video-test/src/method_h_stage2_tx_probe_v2.py:/app/method_h_stage2_tx_probe_v2.py:ro",
+                "/opt/lifetrac/video-test/src/method_g_stage1_probe.py:/app/method_g_stage1_probe.py:ro"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "journald",
+                "Config": {}
+            },
+            "NetworkMode": "video-test_default",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "unless-stopped",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "host",
+            "Dns": [],
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": [],
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": null,
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 0,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": null,
+            "BlkioDeviceReadBps": null,
+            "BlkioDeviceWriteBps": null,
+            "BlkioDeviceReadIOps": null,
+            "BlkioDeviceWriteIOps": null,
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": [
+                {
+                    "PathOnHost": "/dev/ttymxc3",
+                    "PathInContainer": "/dev/ttymxc3",
+                    "CgroupPermissions": "rwm"
+                }
+            ],
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "KernelMemory": 0,
+            "KernelMemoryTCP": 0,
+            "MemoryReservation": 0,
+            "MemorySwap": 0,
+            "MemorySwappiness": null,
+            "OomKillDisable": false,
+            "PidsLimit": null,
+            "Ulimits": null,
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/asound",
+                "/proc/acpi",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/4702c5484698445338a66b0a02a2e509fadfb78a07b554c1607b16a0b04d625f-init/diff:/var/lib/docker/overlay2/86ce7b605a51159b097838195ee95c88e2aff9151c00f358f830caa63c438deb/diff:/var/lib/docker/overlay2/bbe945cdb687a08c5062ce0916f4a1e838f77d4cfd2b11b501559fb11e10219b/diff:/var/lib/docker/overlay2/79bc3c02728c40f714e41c91b038b6eac79f75be4076c1442edb0e256e5bc7fd/diff:/var/lib/docker/overlay2/f1ed9e165c2e96817a2c4f38cac1a252f02809393df6f0bbd150a5d84d6954e0/diff:/var/lib/docker/overlay2/988d22fc25aa13246156eafb269a22ef4f94a19837ab02c8be9efc0599e6daae/diff:/var/lib/docker/overlay2/cc3e87860f2c9dcb50ed851de5cfc8b5acd2759dbc7abca205746c3cdbdab658/diff:/var/lib/docker/overlay2/2537464e299632b1f1711254c8d135fb8cba50bd1ec83b1533f9fa6f94502744/diff:/var/lib/docker/overlay2/bca81aab07808f0db2ec81980716f27e76426d913dab9019a2df91ec317e2b26/diff",
+                "MergedDir": "/var/lib/docker/overlay2/4702c5484698445338a66b0a02a2e509fadfb78a07b554c1607b16a0b04d625f/merged",
+                "UpperDir": "/var/lib/docker/overlay2/4702c5484698445338a66b0a02a2e509fadfb78a07b554c1607b16a0b04d625f/diff",
+                "WorkDir": "/var/lib/docker/overlay2/4702c5484698445338a66b0a02a2e509fadfb78a07b554c1607b16a0b04d625f/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/opt/lifetrac/video-test/src/method_g_stage1_probe.py",
+                "Destination": "/app/method_g_stage1_probe.py",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/opt/lifetrac/video-test/src/method_h_stage2_tx_probe_v2.py",
+                "Destination": "/app/method_h_stage2_tx_probe_v2.py",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/opt/lifetrac/video-test/src/image_tx_daemon.py",
+                "Destination": "/app/image_tx_daemon.py",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/opt/lifetrac/video-test/src/lora_proto.py",
+                "Destination": "/app/lora_proto.py",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            }
+        ],
+        "Config": {
+            "Hostname": "bf1cd3990abe",
+            "Domainname": "",
+            "User": "0:0",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "LIFETRAC_LORA_INTER_CYCLE_S=0.15",
+                "LIFETRAC_L072_UART=/dev/ttymxc3",
+                "LIFETRAC_L072_BAUD=921600",
+                "LIFETRAC_MQTT_HOST=mosquitto",
+                "LIFETRAC_MQTT_PORT=1883",
+                "LIFETRAC_REG_PROFILE=0",
+                "LIFETRAC_IMAGE_TX_LOG_LEVEL=INFO",
+                "LIFETRAC_IMAGE_TX_QUEUE_DEPTH=4",
+                "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "LANG=C.UTF-8",
+                "GPG_KEY=<redacted>",
+                "PYTHON_VERSION=3.11.15",
+                "PYTHON_SHA256=272179ddd9a2e41a0fc8e42e33dfbdca0b3711aa5abf372d3f2d51543d09b625"
+            ],
+            "Cmd": [
+                "python3",
+                "/app/image_tx_daemon.py",
+                "--mqtt-host",
+                "mosquitto"
+            ],
+            "Image": "lifetrac-tractor-x8:latest",
+            "Volumes": {
+                "/app/image_tx_daemon.py": {},
+                "/app/lora_proto.py": {},
+                "/app/method_g_stage1_probe.py": {},
+                "/app/method_h_stage2_tx_probe_v2.py": {}
+            },
+            "WorkingDir": "/app",
+            "Entrypoint": null,
+            "OnBuild": null,
+            "Labels": {
+                "com.docker.compose.config-hash": "92755603c72f9771423bc2ca408422c517b2a9434b9fc57e611a7285c28ec08d",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "mosquitto:service_started",
+                "com.docker.compose.image": "sha256:9bfbbc8d06cb65c4ecea5ed1131527a02dd7e34c2a148b7f1115cf5de3701125",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "video-test",
+                "com.docker.compose.project.config_files": "/opt/lifetrac/video-test/docker-compose.yml",
+                "com.docker.compose.project.working_dir": "/opt/lifetrac/video-test",
+                "com.docker.compose.service": "image_tx",
+                "com.docker.compose.version": "2.6.0"
+            }
+        },
+        "NetworkSettings": {
+            "Bridge": "",
+            "SandboxID": "571bd8c03c9412f5d53880034e08cea5bf81e771bc7d6c9088b62943ccd72da1",
+            "HairpinMode": false,
+            "LinkLocalIPv6Address": "",
+            "LinkLocalIPv6PrefixLen": 0,
+            "Ports": {},
+            "SandboxKey": "/var/run/docker/netns/571bd8c03c94",
+            "SecondaryIPAddresses": null,
+            "SecondaryIPv6Addresses": null,
+            "EndpointID": "",
+            "Gateway": "",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "IPAddress": "",
+            "IPPrefixLen": 0,
+            "IPv6Gateway": "",
+            "MacAddress": "",
+            "Networks": {
+                "video-test_default": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "tractor-image-tx-v2",
+                        "image_tx",
+                        "bf1cd3990abe"
+                    ],
+                    "NetworkID": "b61f3734beb9694b353603a35b4c9a7e14d112aef9aa2a48ab531f702ca6843e",
+                    "EndpointID": "",
+                    "Gateway": "",
+                    "IPAddress": "",
+                    "IPPrefixLen": 0,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "MacAddress": "",
+                    "DriverOpts": null
+                }
+            }
+        }
+    }
+]

@@ -1,0 +1,37 @@
+# Arduino custom device names to make them easier to find in /dev/arduino/
+#
+# %n the "kernel number" of the device.
+#    For example, 'sda3' has a "kernel number" of '3'
+# %e the smallest number for that name which does not matches an existing node
+# %k the kernel name for the device
+# %M the kernel major number for the device
+# %m the kernel minor number for the device
+# %b the bus id for the device
+# %c the string returned by the PROGRAM
+# %s{filename} the content of a sysfs attribute
+# %% the '%' char itself
+#
+
+# I2C
+SUBSYSTEM=="i2c-dev", KERNEL=="i2c-2", SYMLINK+="arduino/i2c0"
+SUBSYSTEM=="i2c-dev", KERNEL=="i2c-1", SYMLINK+="arduino/i2c1"
+SUBSYSTEM=="i2c-dev", KERNEL=="i2c-3", SYMLINK+="arduino/i2c2"
+
+# Uart
+SUBSYSTEM=="tty", KERNEL=="ttyX0", SYMLINK+="arduino/uart0"
+SUBSYSTEM=="tty", KERNEL=="ttymxc1", SYMLINK+="arduino/uart1"
+SUBSYSTEM=="tty", KERNEL=="ttymxc2", SYMLINK+="arduino/uart2"
+SUBSYSTEM=="tty", KERNEL=="ttymxc3", SYMLINK+="arduino/uart3"
+
+# Spi
+SUBSYSTEM=="spidev", KERNEL=="spidev0.0", SYMLINK+="arduino/spi0"
+SUBSYSTEM=="spidev", KERNEL=="spidev1.0", SYMLINK+="arduino/spi1"
+
+# Gpio
+SUBSYSTEM=="gpio", KERNEL=="gpiochip5", SYMLINK+="arduino/gpio"
+
+# Storage
+SUBSYSTEM=="block", KERNEL=="mmcblk2", SYMLINK+="arduino/mmc"
+SUBSYSTEM=="block", KERNEL=="mmcblk2p[1-9]", SYMLINK+="arduino/mmc%n"
+SUBSYSTEM=="block", KERNEL=="mmcblk1", SYMLINK+="arduino/sdcard"
+SUBSYSTEM=="block", KERNEL=="mmcblk1p[1-9]", SYMLINK+="arduino/sdcard%n"

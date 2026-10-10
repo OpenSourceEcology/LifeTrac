@@ -1,0 +1,147 @@
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+time="2026-09-12T20:40:42Z" level=warning msg="Failed to get credentials for registry: hub.foundries.io" error="error getting credentials - err: exit status 1, out: `ERROR: Device does not appear to be registered under /var/sota`"
+Sending build context to Docker daemon  105.5MB
+Step 1/10 : FROM python:3.11-slim
+ ---> 2fe5ff938d2b
+Step 2/10 : RUN apt-get update && apt-get install -y --no-install-recommends         mosquitto-clients         ca-certificates         libusb-1.0-0     && rm -rf /var/lib/apt/lists/*
+ ---> Using cache
+ ---> 6739649c7148
+Step 3/10 : WORKDIR /app
+ ---> Using cache
+ ---> 60a68289b7d8
+Step 4/10 : COPY base_station/requirements.txt /app/base_station/requirements.txt
+ ---> 1d0767921ca1
+Step 5/10 : RUN pip install --no-cache-dir -r /app/base_station/requirements.txt
+ ---> Running in 4c3936438871
+Collecting fastapi>=0.110 (from -r /app/base_station/requirements.txt (line 2))
+  Downloading fastapi-0.141.1-py3-none-any.whl.metadata (27 kB)
+Collecting uvicorn>=0.27 (from uvicorn[standard]>=0.27->-r /app/base_station/requirements.txt (line 3))
+  Downloading uvicorn-0.52.4-py3-none-any.whl.metadata (6.6 kB)
+Collecting pyserial>=3.5 (from -r /app/base_station/requirements.txt (line 4))
+  Downloading pyserial-3.5-py2.py3-none-any.whl.metadata (1.6 kB)
+Collecting paho-mqtt>=2.0 (from -r /app/base_station/requirements.txt (line 5))
+  Downloading paho_mqtt-2.1.0-py3-none-any.whl.metadata (23 kB)
+Collecting cryptography>=42 (from -r /app/base_station/requirements.txt (line 6))
+  Downloading cryptography-50.0.1-cp311-abi3-manylinux_2_34_aarch64.whl.metadata (4.3 kB)
+Collecting jinja2>=3.1 (from -r /app/base_station/requirements.txt (line 7))
+  Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+Collecting Pillow>=10.0.0 (from -r /app/base_station/requirements.txt (line 14))
+  Downloading pillow-12.3.0-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl.metadata (9.1 kB)
+Collecting starlette>=0.46.0 (from fastapi>=0.110->-r /app/base_station/requirements.txt (line 2))
+  Downloading starlette-1.6.0-py3-none-any.whl.metadata (6.4 kB)
+Collecting pydantic>=2.9.0 (from fastapi>=0.110->-r /app/base_station/requirements.txt (line 2))
+  Downloading pydantic-2.13.5-py3-none-any.whl.metadata (110 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 110.2/110.2 kB 36.1 MB/s eta 0:00:00
+Collecting typing-extensions>=4.8.0 (from fastapi>=0.110->-r /app/base_station/requirements.txt (line 2))
+  Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting typing-inspection>=0.4.2 (from fastapi>=0.110->-r /app/base_station/requirements.txt (line 2))
+  Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+Collecting annotated-doc>=0.0.2 (from fastapi>=0.110->-r /app/base_station/requirements.txt (line 2))
+  Downloading annotated_doc-0.0.5-py3-none-any.whl.metadata (6.5 kB)
+Collecting click>=7.0 (from uvicorn>=0.27->uvicorn[standard]>=0.27->-r /app/base_station/requirements.txt (line 3))
+  Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+Collecting h11>=0.8 (from uvicorn>=0.27->uvicorn[standard]>=0.27->-r /app/base_station/requirements.txt (line 3))
+  Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Collecting cffi>=2.0.0 (from cryptography>=42->-r /app/base_station/requirements.txt (line 6))
+  Downloading cffi-2.1.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (2.5 kB)
+Collecting MarkupSafe>=2.0 (from jinja2>=3.1->-r /app/base_station/requirements.txt (line 7))
+  Downloading markupsafe-3.0.3-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (2.7 kB)
+Collecting httptools>=0.8.0 (from uvicorn[standard]>=0.27->-r /app/base_station/requirements.txt (line 3))
+  Downloading httptools-0.8.0-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (3.5 kB)
+Collecting python-dotenv>=0.13 (from uvicorn[standard]>=0.27->-r /app/base_station/requirements.txt (line 3))
+  Downloading python_dotenv-1.2.3-py3-none-any.whl.metadata (29 kB)
+Collecting pyyaml>=5.1 (from uvicorn[standard]>=0.27->-r /app/base_station/requirements.txt (line 3))
+  Downloading pyyaml-6.0.3-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (2.4 kB)
+Collecting uvloop>=0.15.1 (from uvicorn[standard]>=0.27->-r /app/base_station/requirements.txt (line 3))
+  Downloading uvloop-0.22.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (4.9 kB)
+Collecting watchfiles>=0.20 (from uvicorn[standard]>=0.27->-r /app/base_station/requirements.txt (line 3))
+  Downloading watchfiles-1.2.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (4.9 kB)
+Collecting websockets>=13.0 (from uvicorn[standard]>=0.27->-r /app/base_station/requirements.txt (line 3))
+  Downloading websockets-17.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (6.3 kB)
+Collecting pycparser (from cffi>=2.0.0->cryptography>=42->-r /app/base_station/requirements.txt (line 6))
+  Downloading pycparser-3.0-py3-none-any.whl.metadata (8.2 kB)
+Collecting annotated-types>=0.6.0 (from pydantic>=2.9.0->fastapi>=0.110->-r /app/base_station/requirements.txt (line 2))
+  Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.46.5 (from pydantic>=2.9.0->fastapi>=0.110->-r /app/base_station/requirements.txt (line 2))
+  Downloading pydantic_core-2.46.5-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (6.6 kB)
+Collecting anyio<5,>=3.6.2 (from starlette>=0.46.0->fastapi>=0.110->-r /app/base_station/requirements.txt (line 2))
+  Downloading anyio-4.15.1-py3-none-any.whl.metadata (4.7 kB)
+Collecting idna>=2.8 (from anyio<5,>=3.6.2->starlette>=0.46.0->fastapi>=0.110->-r /app/base_station/requirements.txt (line 2))
+  Downloading idna-3.19-py3-none-any.whl.metadata (9.2 kB)
+Downloading fastapi-0.141.1-py3-none-any.whl (131 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 132.0/132.0 kB 13.9 MB/s eta 0:00:00
+Downloading uvicorn-0.52.4-py3-none-any.whl (79 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 79.9/79.9 kB 14.4 MB/s eta 0:00:00
+Downloading pyserial-3.5-py2.py3-none-any.whl (90 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 90.6/90.6 kB 14.4 MB/s eta 0:00:00
+Downloading paho_mqtt-2.1.0-py3-none-any.whl (67 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 67.2/67.2 kB 13.0 MB/s eta 0:00:00
+Downloading cryptography-50.0.1-cp311-abi3-manylinux_2_34_aarch64.whl (4.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.7/4.7 MB 8.4 MB/s eta 0:00:00
+Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 134.9/134.9 kB 13.3 MB/s eta 0:00:00
+Downloading pillow-12.3.0-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl (6.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.3/6.3 MB 8.5 MB/s eta 0:00:00
+Downloading annotated_doc-0.0.5-py3-none-any.whl (5.3 kB)
+Downloading cffi-2.1.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (218 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 218.7/218.7 kB 14.4 MB/s eta 0:00:00
+Downloading click-8.5.0-py3-none-any.whl (125 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 125.3/125.3 kB 13.8 MB/s eta 0:00:00
+Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+Downloading httptools-0.8.0-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (464 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 464.2/464.2 kB 12.4 MB/s eta 0:00:00
+Downloading markupsafe-3.0.3-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (24 kB)
+Downloading pydantic-2.13.5-py3-none-any.whl (472 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 472.6/472.6 kB 11.4 MB/s eta 0:00:00
+Downloading pydantic_core-2.46.5-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (1.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.9/1.9 MB 11.6 MB/s eta 0:00:00
+Downloading python_dotenv-1.2.3-py3-none-any.whl (22 kB)
+Downloading pyyaml-6.0.3-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (775 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 775.6/775.6 kB 12.4 MB/s eta 0:00:00
+Downloading starlette-1.6.0-py3-none-any.whl (75 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 76.0/76.0 kB 16.1 MB/s eta 0:00:00
+Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 45.6/45.6 kB 14.9 MB/s eta 0:00:00
+Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Downloading uvloop-0.22.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (3.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.8/3.8 MB 12.0 MB/s eta 0:00:00
+Downloading watchfiles-1.2.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (456 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 456.6/456.6 kB 14.0 MB/s eta 0:00:00
+Downloading websockets-17.1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (225 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 225.5/225.5 kB 13.9 MB/s eta 0:00:00
+Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Downloading anyio-4.15.1-py3-none-any.whl (132 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 132.1/132.1 kB 17.0 MB/s eta 0:00:00
+Downloading pycparser-3.0-py3-none-any.whl (48 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 48.2/48.2 kB 16.9 MB/s eta 0:00:00
+Downloading idna-3.19-py3-none-any.whl (68 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 68.5/68.5 kB 16.2 MB/s eta 0:00:00
+Installing collected packages: pyserial, websockets, uvloop, typing-extensions, pyyaml, python-dotenv, pycparser, Pillow, paho-mqtt, MarkupSafe, idna, httptools, h11, click, annotated-types, annotated-doc, uvicorn, typing-inspection, pydantic-core, jinja2, cffi, anyio, watchfiles, starlette, pydantic, cryptography, fastapi
+Successfully installed MarkupSafe-3.0.3 Pillow-12.3.0 annotated-doc-0.0.5 annotated-types-0.8.0 anyio-4.15.1 cffi-2.1.1 click-8.5.0 cryptography-50.0.1 fastapi-0.141.1 h11-0.16.0 httptools-0.8.0 idna-3.19 jinja2-3.1.6 paho-mqtt-2.1.0 pycparser-3.0 pydantic-2.13.5 pydantic-core-2.46.5 pyserial-3.5 python-dotenv-1.2.3 pyyaml-6.0.3 starlette-1.6.0 typing-extensions-4.16.0 typing-inspection-0.4.4 uvicorn-0.52.4 uvloop-0.22.1 watchfiles-1.2.0 websockets-17.1
+[91mWARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+[0m[91m
+[notice] A new release of pip is available: 24.0 -> 26.2.1
+[notice] To update, run: pip install --upgrade pip
+[0mRemoving intermediate container 4c3936438871
+ ---> 9e3efb0b5438
+Step 6/10 : COPY base_station/  /app/base_station/
+ ---> 53d1baa36b8a
+Step 7/10 : COPY firmware/      /app/firmware/
+ ---> a518ab12143f
+Step 8/10 : ENV PYTHONUNBUFFERED=1
+ ---> Running in 6111fbc610b1
+Removing intermediate container 6111fbc610b1
+ ---> 72376391f11a
+Step 9/10 : ENV PYTHONPATH=/app/base_station:/app
+ ---> Running in d64686300cd5
+Removing intermediate container d64686300cd5
+ ---> b272e763e2f5
+Step 10/10 : CMD ["uvicorn", "web_ui:app", "--host", "0.0.0.0", "--port", "8080"]
+ ---> Running in c41c18c7a1bc
+Removing intermediate container c41c18c7a1bc
+ ---> 12fe97dece57
+Successfully built 12fe97dece57
+Successfully tagged lifetrac-v25:latest

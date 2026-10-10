@@ -1,0 +1,282 @@
+[
+    {
+        "Id": "727045c536d17fd23f525bf9ee84b4a009ae1405164648cc8b79eba939d80d96",
+        "Created": "2026-05-26T17:12:24.537058316Z",
+        "Path": "/docker-entrypoint.sh",
+        "Args": [
+            "/usr/sbin/mosquitto",
+            "-c",
+            "/mosquitto/config/mosquitto.conf"
+        ],
+        "State": {
+            "Status": "exited",
+            "Running": false,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 0,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-09-02T09:59:58.156171125Z",
+            "FinishedAt": "2026-09-02T10:00:24.55441875Z"
+        },
+        "Image": "sha256:2a23a3e427e44bcc2f028580afcd6232979ff859116eeb899d19dc78e3cabf1c",
+        "ResolvConfPath": "/var/lib/docker/containers/727045c536d17fd23f525bf9ee84b4a009ae1405164648cc8b79eba939d80d96/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/727045c536d17fd23f525bf9ee84b4a009ae1405164648cc8b79eba939d80d96/hostname",
+        "HostsPath": "/var/lib/docker/containers/727045c536d17fd23f525bf9ee84b4a009ae1405164648cc8b79eba939d80d96/hosts",
+        "LogPath": "",
+        "Name": "/tractor-mosquitto",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "journald",
+                "Config": {}
+            },
+            "NetworkMode": "lifetrac-camera_default",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "unless-stopped",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "host",
+            "Dns": [],
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": [],
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": null,
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 0,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": null,
+            "BlkioDeviceReadBps": null,
+            "BlkioDeviceWriteBps": null,
+            "BlkioDeviceReadIOps": null,
+            "BlkioDeviceWriteIOps": null,
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": null,
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "KernelMemory": 0,
+            "KernelMemoryTCP": 0,
+            "MemoryReservation": 0,
+            "MemorySwap": 0,
+            "MemorySwappiness": null,
+            "OomKillDisable": false,
+            "PidsLimit": null,
+            "Ulimits": null,
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "Mounts": [
+                {
+                    "Type": "volume",
+                    "Source": "lifetrac-camera_mosquitto_data",
+                    "Target": "/mosquitto/data",
+                    "VolumeOptions": {}
+                },
+                {
+                    "Type": "volume",
+                    "Source": "lifetrac-camera_mosquitto_config",
+                    "Target": "/mosquitto/config",
+                    "VolumeOptions": {}
+                }
+            ],
+            "MaskedPaths": [
+                "/proc/asound",
+                "/proc/acpi",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/624200165edee44eae8cb008dad056f49da464eedb0172687fcec0c33a383d75-init/diff:/var/lib/docker/overlay2/8c6ddd94781fcfacd5a139c6957d98e38ffae31b7fb08ab267cea519f3de7f58/diff:/var/lib/docker/overlay2/293ccb8b5d0432a0cd273e3d3a2b67cfe81a6c0ad5409e258c5b28914445b488/diff:/var/lib/docker/overlay2/79cc32f3e3bf5e7de41c8791b3ac4ca1a1ec2dd30dd922d28d715291056193b3/diff",
+                "MergedDir": "/var/lib/docker/overlay2/624200165edee44eae8cb008dad056f49da464eedb0172687fcec0c33a383d75/merged",
+                "UpperDir": "/var/lib/docker/overlay2/624200165edee44eae8cb008dad056f49da464eedb0172687fcec0c33a383d75/diff",
+                "WorkDir": "/var/lib/docker/overlay2/624200165edee44eae8cb008dad056f49da464eedb0172687fcec0c33a383d75/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "volume",
+                "Name": "lifetrac-camera_mosquitto_config",
+                "Source": "/var/lib/docker/volumes/lifetrac-camera_mosquitto_config/_data",
+                "Destination": "/mosquitto/config",
+                "Driver": "local",
+                "Mode": "z",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "volume",
+                "Name": "lifetrac-camera_mosquitto_data",
+                "Source": "/var/lib/docker/volumes/lifetrac-camera_mosquitto_data/_data",
+                "Destination": "/mosquitto/data",
+                "Driver": "local",
+                "Mode": "z",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "volume",
+                "Name": "58c10e162f05c411075f07ce468c56bc91d074b908fb1c21c6be3ef1837404f2",
+                "Source": "/var/lib/docker/volumes/58c10e162f05c411075f07ce468c56bc91d074b908fb1c21c6be3ef1837404f2/_data",
+                "Destination": "/mosquitto/log",
+                "Driver": "local",
+                "Mode": "",
+                "RW": true,
+                "Propagation": ""
+            }
+        ],
+        "Config": {
+            "Hostname": "727045c536d1",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "ExposedPorts": {
+                "1883/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "VERSION=2.1.2",
+                "DOWNLOAD_SHA256=fd905380691ac65ea5a93779e8214941829e3d6e038d5edff9eac5fd74cbed02",
+                "GPG_KEYS=<redacted>"
+            ],
+            "Cmd": [
+                "/usr/sbin/mosquitto",
+                "-c",
+                "/mosquitto/config/mosquitto.conf"
+            ],
+            "Image": "eclipse-mosquitto:2",
+            "Volumes": {
+                "/mosquitto/config": {},
+                "/mosquitto/data": {},
+                "/mosquitto/log": {}
+            },
+            "WorkingDir": "/",
+            "Entrypoint": [
+                "/docker-entrypoint.sh"
+            ],
+            "OnBuild": null,
+            "Labels": {
+                "com.docker.compose.config-hash": "3a48ed020fac9ef1cf6cb78a7e52bba1080b7f37afd791a4d305a3579252589c",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "",
+                "com.docker.compose.image": "sha256:2a23a3e427e44bcc2f028580afcd6232979ff859116eeb899d19dc78e3cabf1c",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "lifetrac-camera",
+                "com.docker.compose.project.config_files": "/opt/lifetrac/compose-apps/lifetrac-camera/docker-compose.yml",
+                "com.docker.compose.project.working_dir": "/opt/lifetrac/compose-apps/lifetrac-camera",
+                "com.docker.compose.service": "mosquitto",
+                "com.docker.compose.version": "2.6.0",
+                "org.opencontainers.image.authors": "Roger Light <roger@atchoo.org>",
+                "org.opencontainers.image.description": "Eclipse Mosquitto MQTT Broker",
+                "org.opencontainers.image.documentation": "https://mosquitto.org/documentation/",
+                "org.opencontainers.image.licenses": "EPL-2.0 OR BSD-3-Clause",
+                "org.opencontainers.image.source": "https://github.com/eclipse-mosquitto/mosquitto",
+                "org.opencontainers.image.title": "eclipse-mosquitto",
+                "org.opencontainers.image.url": "https://mosquitto.org/",
+                "org.opencontainers.image.version": "2.1.2"
+            }
+        },
+        "NetworkSettings": {
+            "Bridge": "",
+            "SandboxID": "c1c2b19d4ba37b7e074d149717aafb800c57c64db63d4219e1747051e17c748b",
+            "HairpinMode": false,
+            "LinkLocalIPv6Address": "",
+            "LinkLocalIPv6PrefixLen": 0,
+            "Ports": {},
+            "SandboxKey": "/var/run/docker/netns/c1c2b19d4ba3",
+            "SecondaryIPAddresses": null,
+            "SecondaryIPv6Addresses": null,
+            "EndpointID": "",
+            "Gateway": "",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "IPAddress": "",
+            "IPPrefixLen": 0,
+            "IPv6Gateway": "",
+            "MacAddress": "",
+            "Networks": {
+                "lifetrac-camera_default": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "tractor-mosquitto",
+                        "mosquitto",
+                        "727045c536d1"
+                    ],
+                    "NetworkID": "f0b0aacb35e0d13f04b5115b540b7b0921860bd766917703551948b504f7e40b",
+                    "EndpointID": "",
+                    "Gateway": "",
+                    "IPAddress": "",
+                    "IPPrefixLen": 0,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "MacAddress": "",
+                    "DriverOpts": null
+                }
+            }
+        }
+    }
+]

@@ -1,0 +1,482 @@
+$ lsmod; cat /sys/module/usbcore/parameters/autosuspend
+Module                  Size  Used by
+xt_nat                 16384  5
+xt_tcpudp              16384  7
+xt_conntrack           16384  3
+xt_MASQUERADE          16384  4
+nf_conntrack_netlink    40960  0
+nfnetlink              20480  2 nf_conntrack_netlink
+xfrm_user              45056  1
+iptable_nat            16384  2
+nf_nat                 36864  3 xt_nat,iptable_nat,xt_MASQUERADE
+nf_conntrack          118784  5 xt_conntrack,nf_nat,xt_nat,nf_conntrack_netlink,xt_MASQUERADE
+nf_defrag_ipv6         20480  1 nf_conntrack
+nf_defrag_ipv4         16384  1 nf_conntrack
+xt_addrtype            16384  2
+iptable_filter         16384  1
+ip_tables              28672  2 iptable_filter,iptable_nat
+x_tables               32768  8 xt_conntrack,iptable_filter,xt_tcpudp,xt_addrtype,xt_nat,ip_tables,iptable_nat,xt_MASQUERADE
+algif_hash             16384  1
+algif_skcipher         16384  1
+x8h7_ui                16384  0
+x8h7_uart              16384  0
+x8h7_pwm               16384  0
+x8h7_rtc               16384  0
+x8h7_adc               16384  0
+x8h7_gpio              16384  1
+x8h7_can               16384  0
+industrialio           73728  1 x8h7_adc
+bnep                   24576  2
+x8h7_h7                16384  0
+x8h7_drv               16384  8 x8h7_ui,x8h7_h7,x8h7_can,x8h7_gpio,x8h7_rtc,x8h7_pwm,x8h7_adc,x8h7_uart
+imx7_media_csi         28672  0
+mx6s_capture           32768  0
+videobuf2_dma_contig    20480  2 mx6s_capture,imx7_media_csi
+videobuf2_memops       16384  1 videobuf2_dma_contig
+mxc_mipi_csi           24576  0
+brcmfmac              270336  0
+videobuf2_v4l2         24576  2 mx6s_capture,imx7_media_csi
+v4l2_async             20480  3 mx6s_capture,mxc_mipi_csi,imx7_media_csi
+brcmutil               16384  1 brcmfmac
+videobuf2_common       53248  5 videobuf2_dma_contig,videobuf2_v4l2,mx6s_capture,imx7_media_csi,videobuf2_memops
+videodev              221184  6 v4l2_async,videobuf2_v4l2,mx6s_capture,mxc_mipi_csi,videobuf2_common,imx7_media_csi
+cfg80211              790528  1 brcmfmac
+gpio_keys              20480  0
+hci_uart              114688  0
+cs42l52                53248  0
+bq24190_charger        28672  0
+btqca                  20480  1 hci_uart
+btbcm                  24576  1 hci_uart
+btintel                36864  1 hci_uart
+fsl_jr_uio             16384  0
+snd_soc_fsl_sai        32768  2
+snd_soc_fsl_utils      16384  1 snd_soc_fsl_sai
+imx_pcm_dma            16384  1 snd_soc_fsl_sai
+imx_sdma               36864  8
+snd_soc_simple_card    20480  0
+snd_soc_simple_card_utils    24576  1 snd_soc_simple_card
+snd_soc_hdmi_codec     20480  1
+sch_fq_codel           20480  5
+lz4                    16384  4
+lz4_compress           40960  1 lz4
+zram                   24576  2
+zsmalloc               24576  1 zram
+spidev                 20480  0
+i2c_dev                20480  0
+anx7625                36864  0
+fuse                  118784  1
+2
+[rc=0]
+$ ls -la /dev/ttymxc* /dev/video* /dev/lifetrac-c2 /dev/watchdog* 2>/dev/null
+crw-rw----  1 root dialout 207,  18 Oct  4 17:47 /dev/ttymxc2
+crw-rw----  1 root dialout 207,  19 Sep 15 17:52 /dev/ttymxc3
+crw-rw----+ 1 root video    81,   0 Sep 15 17:52 /dev/video0
+crw-------  1 root root     10, 130 Sep 15 17:52 /dev/watchdog
+crw-------  1 root root    246,   0 Sep 15 17:52 /dev/watchdog0
+[rc=2]
+$ for d in /sys/bus/usb/devices/*/idVendor; do p=$(dirname $d); echo "$(basename $p) $(cat $d):$(cat $p/idProduct) $(cat $p/product 2>/dev/null)"; done
+1-1 0424:2514 
+usb1 1d6b:0002 EHCI Host Controller
+[rc=0]
+$ dmesg -T 2>/dev/null | tail -400
+[Sun Oct  4 19:48:00 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:00 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:01 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:02 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:02 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:03 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:03 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:04 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:04 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:05 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:06 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:07 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:07 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:08 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:09 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:09 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:10 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:10 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:11 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:11 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:12 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:12 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:13 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:13 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:14 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:14 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:15 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:15 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:16 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:17 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:17 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:18 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:19 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:20 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:20 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:21 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:21 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:22 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:23 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:23 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:24 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:24 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:25 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:25 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:26 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:26 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:27 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:28 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:29 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:30 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:30 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:31 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:31 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:32 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:32 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:32 2026] ieee80211 phy0: _brcmf_set_multicast_list: Setting mcast_list failed, -110
+[Sun Oct  4 19:48:33 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:33 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:34 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:34 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:34 2026] ieee80211 phy0: brcmf_c_set_cur_etheraddr: Setting cur_etheraddr failed, -110
+[Sun Oct  4 19:48:35 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:35 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:36 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:36 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:37 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:37 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:37 2026] ieee80211 phy0: _brcmf_set_multicast_list: Setting allmulti failed, -110
+[Sun Oct  4 19:48:38 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:38 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:39 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:39 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:40 2026] ieee80211 phy0: brcmf_proto_bcdc_query_dcmd: brcmf_proto_bcdc_msg failed w/status -110
+[Sun Oct  4 19:48:40 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:40 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:41 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:41 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:42 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:42 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:42 2026] ieee80211 phy0: _brcmf_set_multicast_list: Setting BRCMF_C_SET_PROMISC failed, err=-110
+[Sun Oct  4 19:48:43 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:44 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:44 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:45 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:45 2026] ieee80211 phy0: brcmf_cfg80211_set_power_mgmt: error (-110)
+[Sun Oct  4 19:48:46 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:47 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:47 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:48 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:49 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:49 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:50 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:51 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:51 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:52 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:52 2026] ieee80211 phy0: brcmf_cfg80211_set_power_mgmt: Unable to set pm timeout, (-110)
+[Sun Oct  4 19:48:53 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:54 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:54 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:55 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:55 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:55 2026] ieee80211 phy0: _brcmf_set_multicast_list: Setting mcast_list failed, -110
+[Sun Oct  4 19:48:56 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:56 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:57 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:57 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:57 2026] ieee80211 phy0: brcmf_run_escan: error (-110)
+[Sun Oct  4 19:48:57 2026] ieee80211 phy0: brcmf_cfg80211_scan: scan error (-110)
+[Sun Oct  4 19:48:58 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:59 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:48:59 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:00 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:00 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:00 2026] ieee80211 phy0: _brcmf_set_multicast_list: Setting allmulti failed, -110
+[Sun Oct  4 19:49:01 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:02 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:02 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:03 2026] ieee80211 phy0: brcmf_run_escan: error (-110)
+[Sun Oct  4 19:49:03 2026] ieee80211 phy0: brcmf_cfg80211_scan: scan error (-110)
+[Sun Oct  4 19:49:03 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:03 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:04 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:04 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:05 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:05 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:05 2026] ieee80211 phy0: _brcmf_set_multicast_list: Setting BRCMF_C_SET_PROMISC failed, err=-110
+[Sun Oct  4 19:49:06 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:07 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:08 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:08 2026] ieee80211 phy0: brcmf_run_escan: error (-110)
+[Sun Oct  4 19:49:08 2026] ieee80211 phy0: brcmf_cfg80211_scan: scan error (-110)
+[Sun Oct  4 19:49:09 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:09 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:10 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:10 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:11 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:12 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:12 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:13 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:14 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:15 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:15 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:15 2026] ieee80211 phy0: brcmf_run_escan: error (-110)
+[Sun Oct  4 19:49:15 2026] ieee80211 phy0: brcmf_cfg80211_scan: scan error (-110)
+[Sun Oct  4 19:49:16 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:16 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:17 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:17 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:18 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:18 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:18 2026] ieee80211 phy0: brcmf_run_escan: error (-110)
+[Sun Oct  4 19:49:18 2026] ieee80211 phy0: brcmf_cfg80211_scan: scan error (-110)
+[Sun Oct  4 19:49:19 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:20 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:21 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:21 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:22 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:22 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:23 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:23 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:23 2026] ieee80211 phy0: brcmf_run_escan: error (-110)
+[Sun Oct  4 19:49:23 2026] ieee80211 phy0: brcmf_cfg80211_scan: scan error (-110)
+[Sun Oct  4 19:49:24 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:24 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:25 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:25 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:26 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:27 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:27 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:28 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:28 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:29 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:30 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:30 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:31 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:32 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:32 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:33 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:34 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:35 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:35 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:36 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:36 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:37 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:37 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:37 2026] ieee80211 phy0: brcmf_run_escan: error (-110)
+[Sun Oct  4 19:49:37 2026] ieee80211 phy0: brcmf_cfg80211_scan: scan error (-110)
+[Sun Oct  4 19:49:38 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:38 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:39 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:39 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:40 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:40 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:41 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:42 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:42 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:43 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:44 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:44 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:45 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:45 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:46 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:46 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:47 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:47 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:48 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:48 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:49 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:49 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:50 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:50 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:51 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:52 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:52 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:53 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:53 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:54 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:54 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:55 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:55 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:56 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:56 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:57 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:57 2026] ieee80211 phy0: brcmf_run_escan: error (-110)
+[Sun Oct  4 19:49:57 2026] ieee80211 phy0: brcmf_cfg80211_scan: scan error (-110)
+[Sun Oct  4 19:49:58 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:58 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:59 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:49:59 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:00 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:01 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:01 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:02 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:02 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:03 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:03 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:04 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:04 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:05 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:05 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:06 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:07 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:07 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:08 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:08 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:09 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:09 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:10 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:11 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:11 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:12 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:12 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:13 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:13 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:13 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:14 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:14 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:15 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:15 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:16 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:16 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:17 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:17 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:18 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:19 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:19 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:20 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:20 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:21 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:22 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:23 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:23 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:24 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:24 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:25 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:25 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:26 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:26 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:26 2026] ieee80211 phy0: brcmf_run_escan: error (-110)
+[Sun Oct  4 19:50:26 2026] ieee80211 phy0: brcmf_cfg80211_scan: scan error (-110)
+[Sun Oct  4 19:50:27 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:27 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:28 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:28 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:29 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:29 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:30 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:31 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:31 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:32 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:32 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:33 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:34 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:35 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:35 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:36 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:36 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:36 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:37 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:37 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:38 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:39 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:39 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:40 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:41 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:41 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:42 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:42 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:43 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:44 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:44 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:45 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:46 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:46 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:47 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:47 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:48 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:48 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:49 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:49 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:50 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:51 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:51 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:52 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:52 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:53 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:53 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:54 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:54 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:55 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:55 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:56 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:56 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:57 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:57 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:58 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:58 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:59 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:50:59 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:00 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:00 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:01 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:02 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:02 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:03 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:03 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:04 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:04 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:05 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:05 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:06 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:06 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:07 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:08 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:08 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:09 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:09 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:09 2026] ieee80211 phy0: brcmf_run_escan: error (-110)
+[Sun Oct  4 19:51:09 2026] ieee80211 phy0: brcmf_cfg80211_scan: scan error (-110)
+[Sun Oct  4 19:51:10 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:10 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:11 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:12 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:13 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:13 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:14 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:15 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:15 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:16 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:17 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:18 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:19 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:20 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:20 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:21 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:22 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:22 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:22 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:23 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:23 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:24 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:25 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:26 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:26 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:27 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:27 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:28 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:28 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:28 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:29 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:29 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:29 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:30 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:30 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:31 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:31 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:32 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:32 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:33 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[Sun Oct  4 19:51:33 2026] rtc rtc0: Timeout waiting for LPSRT Counter to change
+[rc=0]

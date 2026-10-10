@@ -1,0 +1,295 @@
+[
+    {
+        "Id": "935589cbb99c211be1273acb8d645aef831524c0b8dcdb6ec17633cb40092f6d",
+        "Created": "2026-10-04T17:47:25.525005625Z",
+        "Path": "uvicorn",
+        "Args": [
+            "web_ui:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8080",
+            "--proxy-headers"
+        ],
+        "State": {
+            "Status": "created",
+            "Running": false,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 0,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "0001-01-01T00:00:00Z",
+            "FinishedAt": "0001-01-01T00:00:00Z"
+        },
+        "Image": "sha256:4623980c2daca116eb68a80fc18285fa273b43545aac498557bcc349871161a6",
+        "ResolvConfPath": "",
+        "HostnamePath": "",
+        "HostsPath": "",
+        "LogPath": "",
+        "Name": "/lifetrac-vtest-web_ui-1",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": null,
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "journald",
+                "Config": {
+                    "tag": "{{.Name}}"
+                }
+            },
+            "NetworkMode": "lifetrac-vtest_default",
+            "PortBindings": {
+                "8080/tcp": [
+                    {
+                        "HostIp": "",
+                        "HostPort": "8080"
+                    }
+                ]
+            },
+            "RestartPolicy": {
+                "Name": "unless-stopped",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "host",
+            "Dns": null,
+            "DnsOptions": null,
+            "DnsSearch": null,
+            "ExtraHosts": [],
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": null,
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 0,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": null,
+            "BlkioDeviceReadBps": null,
+            "BlkioDeviceWriteBps": null,
+            "BlkioDeviceReadIOps": null,
+            "BlkioDeviceWriteIOps": null,
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": null,
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 0,
+            "MemorySwap": 0,
+            "MemorySwappiness": null,
+            "OomKillDisable": false,
+            "PidsLimit": null,
+            "Ulimits": null,
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "Mounts": [
+                {
+                    "Type": "volume",
+                    "Source": "lifetrac-vtest_lifetrac_logs",
+                    "Target": "/var/log/lifetrac",
+                    "VolumeOptions": {}
+                },
+                {
+                    "Type": "bind",
+                    "Source": "/var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER/secrets/lifetrac_pin",
+                    "Target": "/run/secrets/lifetrac_pin",
+                    "ReadOnly": true
+                },
+                {
+                    "Type": "volume",
+                    "Source": "lifetrac-vtest_lifetrac_state",
+                    "Target": "/var/lib/lifetrac",
+                    "VolumeOptions": {}
+                }
+            ],
+            "MaskedPaths": [
+                "/proc/asound",
+                "/proc/acpi",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/c75293f2908c74e82e2c5fa62ba2f23599483e9d80d801103ae048173db571bf-init/diff:/var/lib/docker/overlay2/4477246402f37830b06a032f888cf0a2e8aad34cead7d9e4e2f035e06371fd43/diff:/var/lib/docker/overlay2/4634953f9d41165b51dd6a24a11ce24a7cfec9c7b0732b77f389231b4c664094/diff:/var/lib/docker/overlay2/d4daafa8b943a7ceecd3c5dfd2d652eb667e88875b6a72ff69ec18119686cb35/diff:/var/lib/docker/overlay2/15c0a7060d38e4fb9b7bd9fc33d2e1a54a17fcc20df18390351e8ee6ada99179/diff:/var/lib/docker/overlay2/40138499a6910df41a6000e0c78e689e18d46c3b345ec55cf0a3fc9930d1c796/diff:/var/lib/docker/overlay2/187be71a18c311dc2291201c277b2a1d52cb24d2a895d19350bc3016453a965b/diff:/var/lib/docker/overlay2/414827f501d7da16975705053f717e2985a97c3f09bffd6f048edc691b349c38/diff:/var/lib/docker/overlay2/ba63cdc1908444bfbfe45e6c0a88fe4b472ce3d9d985d1346f12666287273e60/diff:/var/lib/docker/overlay2/fc79e03a9a2898a891f687775243ec61ebfb3feb65a0185b93ad50f095ec1afe/diff:/var/lib/docker/overlay2/92eec4bafb1e1cdf0feee9dfffaaa70108866bbbaeae51d0f447648a402148c1/diff",
+                "MergedDir": "/var/lib/docker/overlay2/c75293f2908c74e82e2c5fa62ba2f23599483e9d80d801103ae048173db571bf/merged",
+                "UpperDir": "/var/lib/docker/overlay2/c75293f2908c74e82e2c5fa62ba2f23599483e9d80d801103ae048173db571bf/diff",
+                "WorkDir": "/var/lib/docker/overlay2/c75293f2908c74e82e2c5fa62ba2f23599483e9d80d801103ae048173db571bf/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "volume",
+                "Name": "lifetrac-vtest_lifetrac_logs",
+                "Source": "/var/lib/docker/volumes/lifetrac-vtest_lifetrac_logs/_data",
+                "Destination": "/var/log/lifetrac",
+                "Driver": "local",
+                "Mode": "z",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "bind",
+                "Source": "/var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER/secrets/lifetrac_pin",
+                "Destination": "/run/secrets/lifetrac_pin",
+                "Mode": "",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "volume",
+                "Name": "lifetrac-vtest_lifetrac_state",
+                "Source": "/var/lib/docker/volumes/lifetrac-vtest_lifetrac_state/_data",
+                "Destination": "/var/lib/lifetrac",
+                "Driver": "local",
+                "Mode": "z",
+                "RW": true,
+                "Propagation": ""
+            }
+        ],
+        "Config": {
+            "Hostname": "935589cbb99c",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "ExposedPorts": {
+                "8080/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "LIFETRAC_PIN=<redacted>",
+                "LIFETRAC_SETTINGS_PATH=/var/lib/lifetrac/settings.json",
+                "LIFETRAC_TRUSTED_PROXIES=",
+                "LIFETRAC_MQTT_HOST=mosquitto",
+                "LIFETRAC_PIN_FILE=<redacted>",
+                "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "LANG=C.UTF-8",
+                "GPG_KEY=<redacted>",
+                "PYTHON_VERSION=3.11.15",
+                "PYTHON_SHA256=272179ddd9a2e41a0fc8e42e33dfbdca0b3711aa5abf372d3f2d51543d09b625",
+                "PYTHONUNBUFFERED=1",
+                "PYTHONPATH=/app/base_station:/app"
+            ],
+            "Cmd": [
+                "uvicorn",
+                "web_ui:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8080",
+                "--proxy-headers"
+            ],
+            "Image": "lifetrac-v25:latest",
+            "Volumes": null,
+            "WorkingDir": "/app",
+            "Entrypoint": null,
+            "OnBuild": null,
+            "Labels": {
+                "com.docker.compose.config-hash": "df2ee912b512717dfe36465a7c6c1e1a13769b948962d5b6bc3dfbeae873e3af",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "mosquitto:service_started:false",
+                "com.docker.compose.image": "sha256:4623980c2daca116eb68a80fc18285fa273b43545aac498557bcc349871161a6",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "lifetrac-vtest",
+                "com.docker.compose.project.config_files": "/var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER/docker-compose.video-test.yml",
+                "com.docker.compose.project.working_dir": "/var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER",
+                "com.docker.compose.replace": "252605598c4b1230ad2b420fbdc081655a5056a63260bd63a121566afd4b6145",
+                "com.docker.compose.service": "web_ui",
+                "com.docker.compose.version": "2.18.1"
+            }
+        },
+        "NetworkSettings": {
+            "Bridge": "",
+            "SandboxID": "",
+            "HairpinMode": false,
+            "LinkLocalIPv6Address": "",
+            "LinkLocalIPv6PrefixLen": 0,
+            "Ports": {},
+            "SandboxKey": "",
+            "SecondaryIPAddresses": null,
+            "SecondaryIPv6Addresses": null,
+            "EndpointID": "",
+            "Gateway": "",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "IPAddress": "",
+            "IPPrefixLen": 0,
+            "IPv6Gateway": "",
+            "MacAddress": "",
+            "Networks": {
+                "lifetrac-vtest_default": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "lifetrac-vtest-web_ui-1",
+                        "web_ui",
+                        "935589cbb99c"
+                    ],
+                    "NetworkID": "",
+                    "EndpointID": "",
+                    "Gateway": "",
+                    "IPAddress": "",
+                    "IPPrefixLen": 0,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "MacAddress": "",
+                    "DriverOpts": null
+                }
+            }
+        }
+    }
+]
