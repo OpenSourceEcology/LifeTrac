@@ -42,16 +42,19 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
 * **Powering down.** `systemctl poweroff` keeps the tractor off, but the
   base booted again about 4.5 min later (2026-10-04). Remove power to keep the
   base down.
-* **Powering up.** The L072 boots into RXCONT (listening). Park it with
-  `radio_park.py` if the radios must stay off.
+* **Powering up.** The L072 boots into RXCONT (listening).
+  `legs/power_up_guard.sh` reads each radio with `radio_state.py` and parks
+  any that is listening with `radio_park.py` ([legs/README.md](legs/README.md)).
 * **PC toolchain.** arm-none-eabi-gcc 12.2.1 (Arm GNU Toolchain
   12.2.MPACBTI-Rel1) gives byte-identical L072 builds. Also: WinLibs
   `mingw32-make` (PowerShell only), arduino-cli with
   `arduino:mbed_portenta` 4.5.0, `py -3`. The PC has no Docker; images are
   built on the base X8. Installation steps: [PC_SETUP.md](PC_SETUP.md).
-* Base `192.168.1.117` via ssh key `~/.ssh/lifetrac_base_ed25519`; tractor
+* Original bench (the `bench.env.example` values; yours are in `bench.env`):
+  base `192.168.1.117` via ssh key `~/.ssh/lifetrac_base_ed25519`; tractor
   ONLY via `adb -s 2E2C1209DABC240B` (WiFi stays off); base adb
-  `2D0A1209DABC240B`. Password `fio` → `echo fio | sudo -S -p ''`.
+  `2D0A1209DABC240B`. Password `fio` (LmP default) → `echo fio | sudo -S -p ''`;
+  after provisioning, the sudoers drop-in makes `sudo -n` work without it.
 * USB is for programming and debug logs only. Never run the harness or
   `mingw32-make` from bash — PowerShell only.
 * `/tmp` is tmpfs on both boards: **every reboot (every flash) wipes
@@ -71,6 +74,10 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
 * The L072 boots into RXCONT (`sx1276_rx_arm()`), so a flash brings the
   receiver up — a flash IS a radio-on event. A probe HostLink connect also
   auto-wakes it.
+* The HC-02 health check (`../x8_max_carrier_healthcheck.sh`) touches the
+  radio UART too: its L072 GET probe sets `/dev/ttymxc3` to 19200 8E1 and
+  writes two bytes (`00 FF`) to it. Run it only with the UART free, and on a
+  GO like any probe ([BENCH_SETUP.md](BENCH_SETUP.md) §7).
 * The tractor's camera unit/container come back on reboot and steal the
   radio UART: `systemctl stop lifetrac-camera.service; docker stop tractor-camera`
   before any probe. Confirm `fuser /dev/ttymxc3` is empty.
@@ -121,8 +128,10 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
    fragment and does not exercise the break.
 8. DTS (profile 2) legs: run a same-day receive-only channel spot-check with
    the tractor parked (`../channel_survey_sniff.py` or `../hunt_sniff.ps1`,
-   then `tools/survey_compare.py`). Pass `-ForceFrfHz <the pick>` on every
-   profile-2 leg. `-ForceFrfHz 0` pins 915.000 MHz, where the RS-11.6
+   then `tools/survey_compare.py`). Put the pick in `bench.env`
+   (`DTS_CARRIER_HZ`, `DTS_CARRIER_DATE`) and pass `-ForceFrfHz <the pick>`
+   on every profile-2 leg; the harness refuses a profile-2 leg without it.
+   `-ForceFrfHz 0` pins 915.000 MHz, where the RS-11.6
    external emitter sends ~25 ms bursts at −43 to −45 dBm every ~7.08 s. All
    RS-13.1 DTS legs flew there by accident and their losses fold on its
    period (RS-13.1 A19). The band changes from day to day, so re-check rather
@@ -131,10 +140,18 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
 ## A leg
 
 ```
-.\run_live_radio_monitor.ps1 -TxFeed camera|local -RegProfile 1|2 -DurationS 300 `
+.\run_live_radio_monitor.ps1 -TxAdbSerial <TRACTOR_SERIAL> -RxAdbSerial <BASE_SERIAL> -HostIp <PC_HOST> `
+   -TxFeed camera|local -RegProfile 1|2 [-ForceFrfHz <DTS_CARRIER_HZ>] -DurationS 300 `
    [-SynthFps 2 -SynthBudgetB 3000] -KfRequestDisable 0 -ProbeEcho 0 `
    -NoParkLast 0 -LogFragArrivals 1 -IdleDrainQuietS 1.5 -CmdStreamMinGapS 1.0 -Archive
 ```
+The `<...>` values come from `bench.env`; without them the harness falls
+back to the original bench's serials and PC address. `-ForceFrfHz <the pick>`
+is **required with `-RegProfile 2`** (prep 8): the harness refuses a
+profile-2 leg without it, and `-AllowDefaultCarrier` is only for a deliberate
+915 MHz control. Leave it out with `-RegProfile 1`. For an RS-13 leg,
+`legs/leg_prep.sh` writes the complete line ([legs/README.md](legs/README.md)).
+
 On the first `published frame_id` line start the injector on the base
 (`kf_inject.py 15 20` or `dual_inject.py 250`). After `archived to ...`:
 post-brackets both boards, `rs12_leg_report.py`, `frag_gap_report.py`,

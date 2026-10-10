@@ -36,7 +36,8 @@ Before you start, read:
   - It also refuses 915.000 MHz, the channel of the RS-11.6 external emitter
     (RS-13.1 A19).
 - **Shells.** Run the `.sh` scripts in Git Bash. Run the harness only in
-  PowerShell.
+  PowerShell, with an execution policy that lets local scripts run
+  ([PC_SETUP.md](../PC_SETUP.md#powershell-execution-policy)).
 
 ## Setup (once per PC)
 
@@ -46,12 +47,19 @@ cp bench.env.example bench.env        # gitignored; edit serials, BASE_TRANSPORT
 bash -c '. lib/bench_env.sh && bench_show_env'   # what the scripts will use
 ```
 
+`PC_HOST` is **required** for a leg: this PC's LAN IPv4 address as the
+boards see it. The harness gets it as `-HostIp`, and the base rx daemon uses
+it as its control broker. Left empty, the harness falls back to the original
+bench PC's address and the leg runs with a dead control plane.
+
 Every script sources [`../lib/bench_env.sh`](../lib/bench_env.sh). It works
 out the repo root from its own location, so you can call the scripts from any
-directory. It loads `bench.env`, or `bench.env.example` when there is none.
-A non-empty variable in your environment overrides the file for one run, for
-example `TRACTOR_SERIAL=... bash leg_prep.sh ...`. Each script prints its
-usage with `-h`.
+directory. It loads `bench.env`, or `bench.env.example` when there is none;
+the example holds the original bench's serials and addresses, so create
+`bench.env` before the first run. A non-empty variable in your environment
+overrides the file for one run of these `legs/` scripts, for example
+`TRACTOR_SERIAL=... bash leg_prep.sh ...`. Each script prints its usage with
+`-h`.
 
 ## The scripts
 
@@ -67,7 +75,7 @@ usage with `-h`.
 | `link_sample.sh` | During a leg: the first `link_stats` message that has frames (P7). | base broker | none |
 | `leg2d_switch.sh` | Leg 2d only: the override publishes at T+60 s and T+180 s, plus the acks. | base broker | **the base transmits** (0x63 commands) |
 | `leg_post.sh` | Collects the capture, post-brackets, `rs12_leg_report --capture`, `frag_gap_report`, P2/P4 and the tractor-log, then **parks** (with retries). | both | parks; never transmits |
-| `leg_replay.py` | PC only: replays a base capture (seq gaps per codec run, resync episodes, last DIGEST). | none | none |
+| `leg_replay.py` | PC only: replays a base capture (seq gaps per codec run, resync episodes, last DIGEST). `py -3 leg_replay.py <leg> <image_bw500\|image_bw250> [--evidence-dir DIR \| --capture FILE]`; it reads `<DIR>/leg<leg>_base.jsonl` (default DIR: `$EVIDENCE_DIR`, which only the scripts export, so pass `--evidence-dir` from a plain shell). `leg_post.sh` runs it for you. | none | none |
 
 ## A session
 
@@ -98,7 +106,9 @@ usage with `-h`.
      [`../../hunt_sniff.ps1`](../../hunt_sniff.ps1), then
      `tools/survey_compare.py`.
    - Put the pick in `bench.env` as `DTS_CARRIER_HZ=<Hz>` with
-     `DTS_CARRIER_DATE=<today>`.
+     `DTS_CARRIER_DATE=<today, YYYY-MM-DD>`. `leg_prep.sh` refuses a DTS leg
+     without it or on another day, and writes it into the harness command as
+     `-ForceFrfHz`.
    - Record the pick in RESULTS.
 
 ## One leg: prep, harness, link sample, post, park
@@ -140,12 +150,20 @@ bash leg_post.sh 2a          # or: bash leg_post.sh 2a <archive dir>
   any board that is not in `0x80`.
 - At the end of the session, run `bash power_up_guard.sh --check-only`.
 
+**Not flying after the prep after all** (no GO, the harness refused, the
+round was aborted)? `leg_prep.sh` has woken both receivers (RXCONT) and left
+the detached base capture `rs13_cap_base` running, and nothing else will park
+them. Run `bash power_up_guard.sh --stop-leg-daemons`: it stops the leftover
+leg containers and parks both radios.
+
 A few cautions about the harness command:
-- Do not drop `-ForceFrfHz` on a profile-2 leg. Without it the harness tunes
-  915.000 MHz.
-- Leave out `-HostIp` when `PC_HOST` is empty.
-- The current harness silently ignores a misspelled parameter (for example
-  `-DurationSeconds`). Copy the generated command rather than typing it.
+- Do not drop `-ForceFrfHz` on a profile-2 leg. The harness refuses such a
+  leg (its default carrier is 915.000 MHz); `-AllowDefaultCarrier` is only for
+  a deliberate 915 MHz control.
+- Always pass `-HostIp <PC_HOST>`; `PC_HOST` is required (Setup, above).
+- The harness refuses unknown parameter names at launch (it used to ignore a
+  misspelling such as `-DurationSeconds`). Still copy the generated command
+  rather than typing it.
 
 ### The four RS-13 legs
 
@@ -245,9 +263,10 @@ bash step1_pass.sh bw500 landscape --from-work
   over adb. With `BASE_TRANSPORT=ssh` you can stage, guard and check, but you
   cannot fly a leg.
 - **The harness pushes its own copy of the reset cfg.** At every launch it
-  pushes `08_boot_user_app.cfg` from the working tree, and with
-  `core.autocrlf=true` that copy has CRLF line endings. `stage_boards.sh`
-  stages an LF copy, which the harness then overwrites.
+  pushes `08_boot_user_app.cfg` from the working tree. The repo's
+  `.gitattributes` keeps `*.cfg` LF, so this matters only on a checkout made
+  before `.gitattributes` landed: there, with `core.autocrlf=true`, the copy
+  has CRLF line endings and overwrites the LF copy `stage_boards.sh` staged.
 - **`--capture` is adb-only.** `power_up_guard.sh --capture` calls
-  `pull_board_state.sh`, which is adb-only and has the OSE bench serials built
-  in.
+  `pull_board_state.sh`, which is adb-only; it reads `BASE_SERIAL` and
+  `TRACTOR_SERIAL` from `bench.env`.

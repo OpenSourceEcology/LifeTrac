@@ -191,7 +191,11 @@ Repo L072 binaries that are on no board:
 2. Stage only the probe tools (no `push_fix_to_board.sh`). Then run
    `radio_state.py`. At boot the L072 sits in **RXCONT**, listening only;
    `radio_park.py` puts it to `0x80` SLEEP.
-3. Run `bash pull_board_state.sh <base|tractor> [--images]`. Review the
+3. Run `bash pull_board_state.sh <base|tractor> [--images]` (adb only). It
+   writes to `ARCHIVE`, else `ARCHIVE_DIR` from `bench.env`; give either one
+   as a Windows-style `C:/...` folder outside git, because the script hands
+   the path to adb unconverted ([BENCH_QUICKSTART.md](BENCH_QUICKSTART.md)
+   step 9). `power_up_guard.sh --capture` passes it in that form. Review the
    reports for secrets before copying them into `bench-evidence/`; the
    2026-10-04 run caught a Dropbear host key, and the filter now excludes it.
 
@@ -212,11 +216,17 @@ Repo L072 binaries that are on no board:
   needs a deliberate reboot (FLASH_RUNBOOK precautions; never re-insmod x8h7
   on the base). **Explicit GO only.** Then upload an empty M4 sketch or erase
   bank 2, and record which.
-- [ ] **Rotate the WiFi password.** It is committed in seven repo-root
+- [ ] **Rotate the WiFi password.** It was committed in seven repo-root
   scripts on the public `main` (`connect_wpa.sh`, `do_wifi.sh`,
   `setup_5star_wifi.sh`, `wifi_connect.sh`, `wifi_connect_fast.sh`,
-  `wifi_persist_and_reboot.sh`, `wifi_rescan_connect.sh`). Then replace the
-  literal with an environment variable.
+  `wifi_persist_and_reboot.sh`, `wifi_rescan_connect.sh`) and in
+  `.vscode/tasks.json`.
+  - [x] ~~Replace the literal with an environment variable.~~ Done in the
+    bench kit (2026-10-10): the scripts and tasks take the SSID and
+    passphrase from `LIFETRAC_WIFI_SSID` / `LIFETRAC_WIFI_PSK`.
+  - [ ] **Change the passphrase on the access point.** The old value is
+    still in the public git history, so treat it as compromised. Rewriting a
+    public history with forks is not practical; rotation is the fix.
 - [ ] **Decide on the base's `lifetrac-base.service` /
   `lifetrac-base-compose.service`.** Both are enabled and fail at every boot;
   they would start `lora_bridge` on the radio UART if they ever succeeded.

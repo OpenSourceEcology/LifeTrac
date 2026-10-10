@@ -54,7 +54,7 @@ file); otherwise the environment, then these defaults:
 
 | variable | default | used for |
 |---|---|---|
-| `BASE_TRANSPORT` | `ssh` if `BASE_HOST` is set, else `adb` if `BASE_SERIAL` is set, else `ssh` | how to reach the base (`--ssh` / `--adb` override) |
+| `BASE_TRANSPORT` | `bench.env.example` sets `adb`. Unset: `ssh` if `BASE_HOST` is set, else `adb` if `BASE_SERIAL` is set, else `ssh` | how to reach the base (`--ssh` / `--adb` override) |
 | `BASE_HOST` | `192.168.1.117` | the base's DHCP lease on the bench; check it after a router change |
 | `BASE_USER` / `TRACTOR_USER` | `fio` | login and file owner on the base / the tractor |
 | `BASE_SSH_KEY` | `~/.ssh/lifetrac_base_ed25519` | ssh/scp key (omitted if the file is missing) |
@@ -62,10 +62,13 @@ file); otherwise the environment, then these defaults:
 | `TRACTOR_SERIAL` | `2E2C1209DABC240B` | adb serial of the tractor (the tractor is adb-only) |
 | `BENCH_SUDO_PW` | `fio` (LmP factory default) | used only when the passwordless sudoers drop-in is missing |
 | `BASE_DEPLOY_DIR` | `/var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER` | the base tree (`/opt` is a symlink to `/var/rootdirs/opt` on LmP) |
-| `BENCH_ARCHIVE_DIR` | `$HOME/LifeTrac-bench-archive` | PC folder **outside git**: `deploy/` keeps every deploy tarball, `images/` every tractor image. On the original bench PC the private archive is `C:\Users\dorkm\Documents\LifeTrac-bench-archive`. |
+| `ARCHIVE_DIR` (old name `BENCH_ARCHIVE_DIR`, still read; set only one) | `$HOME/Documents/LifeTrac-bench-archive` | PC folder **outside git** (the same private archive the board captures use): `deploy/` keeps every deploy tarball, `images/` every tractor image. |
 
-The base has been reachable only over ssh since the 2026-10-10 power cycle (it
-did not enumerate on USB), so ssh is the default.
+`bench.env.example` sets `BASE_TRANSPORT=adb`, which radio legs need anyway:
+the harness drives both boards over adb. When the base is not on USB, set
+`BASE_TRANSPORT=ssh` in `bench.env` or pass `--ssh`. The original base, for
+example, did not enumerate on USB after the 2026-10-10 power cycle, while ssh
+kept working.
 
 ## `deploy_base.sh [options] [<commit>]`
 
@@ -85,7 +88,7 @@ On the PC:
    Dockerfile COPYs `base_station/` and `firmware/`; compose needs the yml files
    and `base_station/mosquitto.conf`). Docs, `bench-evidence/`, `hil/` and
    `tools/` stay on the PC. The tarball (about 2 MB) is kept as
-   `$BENCH_ARCHIVE_DIR/deploy/dc_deploy_<sha8>.tar.gz`.
+   `$ARCHIVE_DIR/deploy/dc_deploy_<sha8>.tar.gz`.
 2. It refuses a tarball whose text files hold more CR bytes than the commit's
    blobs (the [CRLF trap](#traps)).
 3. It writes the board-side script and `DEPLOYED_FROM_<sha8>.txt`, copies the
@@ -126,7 +129,7 @@ leg prep's `clear_retained.py` does (BENCH_RUNBOOK prep 5).
 bash build_tractor_image.sh --dry-run
 bash build_tractor_image.sh                       # build HEAD, archive, load on the tractor
 bash build_tractor_image.sh --no-tractor          # build + archive only
-bash build_tractor_image.sh --push-only ~/LifeTrac-bench-archive/images/lifetrac-tractor-x8_<sha8>.tar.gz
+bash build_tractor_image.sh --push-only ~/Documents/LifeTrac-bench-archive/images/lifetrac-tractor-x8_<sha8>.tar.gz
 ```
 
 Options: `--ssh | --adb` (base transport), `--unlocked`, `--with-mosquitto`,
@@ -142,7 +145,7 @@ Options: `--ssh | --adb` (base transport), `--unlocked`, `--with-mosquitto`,
    `pip freeze`, and `docker save -o … && gzip`. With `--with-mosquitto`,
    `eclipse-mosquitto:2` is saved too.
 3. PC: the tarball, md5, manifest, pip freeze, smoke output and build log go to
-   `$BENCH_ARCHIVE_DIR/images/`. Once the md5 matches, the tarball is deleted
+   `$ARCHIVE_DIR/images/`. Once the md5 matches, the tarball is deleted
    on the base; the image stays there.
 4. Tractor, over adb: push to `/home/fio/lifetrac_images/` (on disk; `/tmp` is a
    RAM tmpfs), check the md5, then as root `docker load -i`. The image `:latest`
@@ -150,10 +153,12 @@ Options: `--ssh | --adb` (base transport), `--unlocked`, `--with-mosquitto`,
    test runs on the tractor, and the tarball is deleted (keep it with
    `--keep-tarball`). It refuses a board that carries the base's deploy tree.
 
-The tractor also needs two images it cannot pull, which this script does not
-cover: `hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44` (the
-repo-root `foundries_python.tar`, `docker load -i`) and `eclipse-mosquitto:2`
-(`--with-mosquitto` here). See [BENCH_SETUP.md](BENCH_SETUP.md).
+The tractor also needs two images it cannot pull. Provisioning loads both
+([BENCH_SETUP.md](BENCH_SETUP.md) §6): `provision_bench_board.sh tractor`
+loads `hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44` from the
+repo-root `foundries_python.tar`, and `eclipse-mosquitto:2` with
+`--mosquitto-from-base` (or `--mosquitto-tar FILE`). This script never
+touches the probe image; `--with-mosquitto` here can reload mosquitto.
 
 ## Lock files: the flown wheel versions
 
@@ -195,7 +200,7 @@ file the script saved and update the header.
 |---|---|---|
 | base | `BASE_DEPLOY_DIR` tree, `DEPLOYED_FROM.txt`, `.env` + `secrets/` if missing, `lifetrac-v25:latest/:<sha8>/:previous`, broker container, files in `/home/fio/lifetrac_deploy/`, `/home/fio/docker_build_<sha8>.log`, `/home/fio/pip_freeze_lifetrac-v25_<sha8>.txt` | `lifetrac-tractor-x8:<sha8>/:latest` (a build product; the base does not run it), `/home/fio/lifetrac_build/`, `/home/fio/docker_build_tractor_<sha8>.log` |
 | tractor | nothing | loaded image, `:latest`, `:previous`; `/home/fio/lifetrac_images/` while loading |
-| PC | `$BENCH_ARCHIVE_DIR/deploy/` | `$BENCH_ARCHIVE_DIR/images/`, `$BENCH_ARCHIVE_DIR/build/` |
+| PC | `$ARCHIVE_DIR/deploy/` | `$ARCHIVE_DIR/images/`, `$ARCHIVE_DIR/build/` |
 | never | `/etc`, systemd units, the radios, the L072 firmware, `/tmp/lifetrac_strict`, any container other than the broker | `/etc`, systemd units, the radios, any running container |
 
 ## Rollback
@@ -203,10 +208,12 @@ file the script saved and update the header.
 - **Base tree:** deploy the older commit: `bash deploy_base.sh <old-sha>`. Or
   restore the backup by hand:
   ```sh
-  cd /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER
-  sudo rm -rf base_station firmware deploy
-  sudo tar -xzf /home/fio/lifetrac_deploy/prev_tree_<oldsha>_<time>.tgz
+  cd /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER && sudo rm -rf base_station firmware deploy \
+    && sudo tar -xzf /home/fio/lifetrac_deploy/prev_tree_<oldsha>_<time>.tgz
   ```
+
+  Keep the `cd` and the `rm` on one line joined by `&&`: if the `cd` fails,
+  the `rm` must not run in whatever directory you are in.
 - **Base image:** `docker tag lifetrac-v25:previous lifetrac-v25:latest`, or any
   `lifetrac-v25:<sha8>`. The broker runs `eclipse-mosquitto:2`, so nothing
   needs a restart; the next leg's daemon containers start from the new

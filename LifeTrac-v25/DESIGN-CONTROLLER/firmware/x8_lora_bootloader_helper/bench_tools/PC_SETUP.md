@@ -44,6 +44,42 @@ git clone -c core.longpaths=true https://github.com/OpenSourceEcology/LifeTrac.g
   ssh-keygen -t ed25519 -f ~/.ssh/lifetrac_base_ed25519 -C lifetrac-bench-pc
   ```
 
+## PowerShell execution policy
+
+The harness (`run_live_radio_monitor.ps1`), `legs/youtube_window.ps1` and the
+leg wrappers that `legs/leg_prep.sh` writes (`leg<X>_harness.ps1`) are
+PowerShell scripts. On a fresh Windows 11 PC, Windows PowerShell 5.1's
+effective policy is usually `Restricted`, and every one of them stops with
+"running scripts is disabled on this system". Check it with
+`Get-ExecutionPolicy -List`. Then pick one of these:
+
+- **Once per Windows user (recommended).** In PowerShell:
+
+  ```powershell
+  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+  ```
+
+  `RemoteSigned` runs local scripts and asks for a signature only on files
+  marked as downloaded from the internet. A `git clone` and the wrappers
+  `leg_prep.sh` writes carry no such mark, so the kit runs as is.
+- **Only for one PowerShell window.** Nothing persists after you close it:
+
+  ```powershell
+  Set-ExecutionPolicy -Scope Process Bypass
+  ```
+
+- **Only for one script.** Start it through a new PowerShell process:
+
+  ```powershell
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\run_live_radio_monitor.ps1 <arguments>
+  ```
+
+  `legs/scene_check.sh` already calls `youtube_window.ps1` this way.
+
+If `Get-ExecutionPolicy -List` shows `MachinePolicy` or `UserPolicy` set, a
+group policy decides and the commands above cannot override it; ask whoever
+manages the PC.
+
 ## Python
 
 Install Python 3.11 or newer from python.org; it comes with the `py`
@@ -130,7 +166,7 @@ arguments into Windows paths:
 
 ```bash
 export MSYS_NO_PATHCONV=1
-adb -s 2E2C1209DABC240B push C:/path/to/file.py /tmp/lifetrac_strict/
+adb -s <serial> push C:/path/to/file.py /tmp/lifetrac_strict/
 ```
 
 Plug each board straight into a PC port, not a hub. Do not reach for
@@ -141,10 +177,16 @@ then did not come back ([ADB_TIPS_AND_TRICKS.md](../../../X8_HEALTH_AND_RECOVERY
 
 You need `uuu` only to reflash an X8's eMMC over SDP
 ([T3a](../../../X8_HEALTH_AND_RECOVERY/recovery/T3a_sdp_uuu_reflash.md);
-[BENCH_SETUP.md](BENCH_SETUP.md) pins the image). The LmP bundle ships its own
-`uuu.exe` in `mfgtool-files-portenta-x8/`; NXP publishes the same version
-under `github.com/nxp-imx/mfgtools/releases` (tag `uuu_1.5.243`). SDP needs
-USB-C **and** 12 V on the carrier, plus a direct USB port.
+[BENCH_SETUP.md](BENCH_SETUP.md) pins the image).
+
+- Download **uuu 1.5.243** from NXP's mfgtools releases
+  (`github.com/nxp-imx/mfgtools/releases`, tag `uuu_1.5.243`) and check its
+  sha256 against the one in T3a ("`uuu` version: 1.5.243").
+- **Do not use the `uuu.exe` inside the LmP bundle's
+  `mfgtool-files-portenta-x8/`.** That one is 1.5.109, and it was unstable on
+  Windows 11 with this image (T3a). Both bench reflashes ran 1.5.243.
+- SDP needs the USB-C cable **and** 12 V on the carrier, plus a direct USB
+  port (no hub).
 
 ## Optional
 
@@ -185,4 +227,5 @@ py -3 --version                    # 3.11 or newer
 arm-none-eabi-gcc --version        # ... 12.2.MPACBTI-Rel1 ... 12.2.1 20230214
 mingw32-make --version             # GNU Make 4.4.x
 adb version
+Get-ExecutionPolicy                # RemoteSigned (or Bypass in this window), not Restricted
 ```

@@ -9,8 +9,10 @@ and are pushed to `/tmp/lifetrac_p0c` on the board.
 - **Scripted form (2026-10-10):** [`bench_tools/flash_l072.sh`](bench_tools/flash_l072.sh)
   does sections 1–2 from the PC. It reads the serials, base address, ssh key
   and sudo password from `bench_tools/bench.env` (template
-  `bench_tools/bench.env.example`); the defaults are the current bench.
-  Without `--go` it only stages and preflights; `--go` flashes.
+  `bench_tools/bench.env.example`); without that file it falls back to the
+  original bench's serials and base address, so create it first.
+  Without `--go` it only stages and preflights; `--go` flashes. The manual
+  commands in sections 1–2 are what the script does, for reference.
 - **A board that has never been flashed** (stock MKRWAN AT firmware on the
   L072): read [section 5](#5-first-flash-from-a-factory-board) first.
 - **A flash is a radio-on event.** The L072 boots into RXCONT. Flash only on
@@ -54,18 +56,45 @@ builds are listed in
 
 ## 1. Push the tooling (LF!)
 
-git autocrlf rewrites `*.sh`/`*.cfg` to CRLF in the working tree whenever
-git touches them (a pull that changed them, a fresh worktree). Bash on the
-board then sees `\r` in every path (`/tmp/lifetrac_p0c\r/pipeline.log: No
-such file`). Normalize before pushing:
+**Use the script.** From this directory, in Git Bash:
 
 ```bash
-mkdir -p /tmp/p0c_lf && for f in full_flash_pipeline.sh run_flash_l072.sh prep_bridge.sh revive_bridge.sh wdt_pet.sh stm32_an3155_flasher.py 07_assert_pa11_pf4_long.cfg 08_boot_user_app.cfg 99_release_and_reset.cfg; do sed 's/\r$//' "$f" > /tmp/p0c_lf/$f; done
+bash bench_tools/flash_l072.sh <base|tractor> ../murata_l072/build/firmware_bench_diag.bin
 ```
 
-Base (ethernet): `scp /tmp/p0c_lf/* firmware_bench_diag.bin fio@192.168.1.117:/tmp/lifetrac_p0c/`
-Tractor (adb, Windows-style local paths with `MSYS_NO_PATHCONV=1`):
-`adb -s 2E2C1209DABC240B push C:/…/firmware_bench_diag.bin /tmp/lifetrac_p0c/`
+It does all of this section: LF-clean copies of the nine pipeline files
+below plus the bin to `/tmp/lifetrac_p0c`, the three wrapper files to
+`/home/fio`, then the wrapper's preflight (`FLASH_PREFLIGHT_ONLY=1`).
+`PREFLIGHT-OK` means the staging is complete. The serials, base address,
+ssh key and sudo password come from `bench_tools/bench.env`. The wrapper
+itself refuses to start — before touching openocd, the UART or the
+watchdog — when a pipeline file or the image is missing or a `.sh`/`.cfg`
+has CRLF (`PREFLIGHT-FAIL`, exit 3).
+
+Why LF matters: git autocrlf rewrites `*.sh`/`*.cfg` to CRLF in the working
+tree whenever git touches them (a pull that changed them, a fresh worktree,
+a checkout made before the repo's `.gitattributes` landed). Bash on the
+board then sees `\r` in every path (`/tmp/lifetrac_p0c\r/pipeline.log: No
+such file`).
+
+**By hand** (what the script does; the `<...>` values are the ones in your
+`bench.env`):
+
+```bash
+rm -rf /tmp/p0c_lf && mkdir -p /tmp/p0c_lf/p0c /tmp/p0c_lf/home
+for f in full_flash_pipeline.sh run_flash_l072.sh prep_bridge.sh revive_bridge.sh wdt_pet.sh stm32_an3155_flasher.py 07_assert_pa11_pf4_long.cfg 08_boot_user_app.cfg 99_release_and_reset.cfg; do sed 's/\r$//' "$f" > /tmp/p0c_lf/p0c/$f; done
+for f in run_flash_bench.sh stamp.py kmsg_log.py; do sed 's/\r$//' "bench_tools/$f" > /tmp/p0c_lf/home/$f; done
+cp ../murata_l072/build/firmware_bench_diag.bin /tmp/p0c_lf/p0c/      # binary: copy, never sed
+# base (ethernet)
+ssh -i <BASE_SSH_KEY> fio@<BASE_HOST> "mkdir -p /tmp/lifetrac_p0c"
+scp -i <BASE_SSH_KEY> /tmp/p0c_lf/p0c/* fio@<BASE_HOST>:/tmp/lifetrac_p0c/
+scp -i <BASE_SSH_KEY> /tmp/p0c_lf/home/* fio@<BASE_HOST>:/home/fio/
+# tractor (adb: MSYS_NO_PATHCONV=1 and Windows-style local paths)
+export MSYS_NO_PATHCONV=1
+for f in /tmp/p0c_lf/p0c/*; do adb -s <TRACTOR_SERIAL> push "$(cygpath -m "$f")" /tmp/lifetrac_p0c/; done
+for f in /tmp/p0c_lf/home/*; do adb -s <TRACTOR_SERIAL> push "$(cygpath -m "$f")" /home/fio/; done
+```
+
 Verify on the board: `grep -l $'\r' /tmp/lifetrac_p0c/*.sh | wc -l` → 0.
 
 The instrumented wrapper `run_flash_bench.sh` plus `stamp.py` and
@@ -73,23 +102,26 @@ The instrumented wrapper `run_flash_bench.sh` plus `stamp.py` and
 pipeline, pet and kernel logs under `/home/fio` so a reboot cannot eat the
 evidence.
 
-`flash_l072.sh <base|tractor> <bin>` does all of this section (LF-clean
-copies of the same nine pipeline files plus the bin, the three wrapper files
-to `/home/fio`) and then runs the wrapper's preflight
-(`FLASH_PREFLIGHT_ONLY=1`). The wrapper itself now refuses to start — before
-touching openocd, the UART or the watchdog — when a pipeline file or the
-image is missing or a `.sh`/`.cfg` has CRLF (`PREFLIGHT-FAIL`, exit 3).
-
 ## 2. Flash
+
+**Only on the operator's GO.** From the PC, one board at a time; each run
+stages, preflights, then flashes (on the tractor it stops the camera unit
+and container first):
+
+```bash
+bash bench_tools/flash_l072.sh tractor ../murata_l072/build/firmware_bench_diag.bin --go
+bash bench_tools/flash_l072.sh base    ../murata_l072/build/firmware_bench_diag.bin --go
+```
+
+**By hand**, after the by-hand staging of section 1 (`<...>` from your
+`bench.env`; `sudo -n` relies on the sudoers drop-in that provisioning
+installs, see `bench_tools/BENCH_SETUP.md`):
 
 ```bash
 # tractor (adb) — stop the unit AND the container first, or the UART is stolen
-adb -s 2E2C1209DABC240B shell "echo fio | sudo -S -p '' systemctl stop lifetrac-camera.service; echo fio | sudo -S -p '' docker stop tractor-camera; echo fio | sudo -S -p '' env REVIVE_MODE=reboot bash /home/fio/run_flash_bench.sh /tmp/lifetrac_p0c/firmware_bench_diag.bin"
+adb -s <TRACTOR_SERIAL> shell "sudo -n systemctl stop lifetrac-camera.service; sudo -n docker stop tractor-camera; sudo -n env REVIVE_MODE=reboot bash /home/fio/run_flash_bench.sh /tmp/lifetrac_p0c/firmware_bench_diag.bin"
 # base (ssh) — root's SSH shell has no sbin on PATH; the wrapper exports it
-ssh -i ~/.ssh/lifetrac_base_ed25519 fio@192.168.1.117 "REVIVE_MODE=reboot bash /home/fio/run_flash_bench.sh /tmp/lifetrac_p0c/firmware_bench_diag.bin"
-# the same from the PC, one board at a time (stages, preflights, then flashes)
-bash bench_tools/flash_l072.sh tractor ../murata_l072/build/firmware_bench_diag.bin --go
-bash bench_tools/flash_l072.sh base    ../murata_l072/build/firmware_bench_diag.bin --go
+ssh -i <BASE_SSH_KEY> fio@<BASE_HOST> "REVIVE_MODE=reboot bash /home/fio/run_flash_bench.sh /tmp/lifetrac_p0c/firmware_bench_diag.bin"
 ```
 
 **`REVIVE_MODE` now defaults to `reboot`** (2026-10-10) in both

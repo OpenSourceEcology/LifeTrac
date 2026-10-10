@@ -156,7 +156,10 @@ batch. A reflash erases the whole eMMC (OS, `/etc`, docker images,
    USB-C ([ADB_TIPS_AND_TRICKS.md](../../../X8_HEALTH_AND_RECOVERY/recovery/ADB_TIPS_AND_TRICKS.md)).
 3. **Record the serials.** Copy [`bench.env.example`](bench.env.example) to
    `bench.env` in this directory and set `BASE_SERIAL`, `TRACTOR_SERIAL`
-   and `BASE_HOST`, plus `BENCH_SUDO_PW` if you change the password.
+   and `BASE_HOST`, plus `BENCH_SUDO_PW` if you change the password, and
+   `PC_HOST` (this PC's LAN IPv4 address; radio legs need it). Do this
+   before any kit script runs: without `bench.env` the scripts fall back to
+   the original bench's serials and base address.
    `bench.env` is your local file: keep it out of git.
 4. **Password.** The image's user is `fio` with password `fio`; adb opens a
    shell as `fio` without asking for it. Changing it is recommended on the
@@ -232,8 +235,13 @@ board unreachable, 3 `--check` found work to do. Run
 `bash provision_bench_board.sh --help` for all options.
 
 It does not touch the L072 firmware or option bytes, the H747, the deployed
-tree or the production units. It does not rotate the WiFi password
-committed in the old repo-root scripts.
+tree or the production units. It does not rotate the WiFi password either.
+**That password must be treated as compromised:** it was committed in seven
+repo-root WiFi scripts, and although the bench kit replaced the literals
+with the `LIFETRAC_WIFI_SSID` / `LIFETRAC_WIFI_PSK` environment variables, it
+is still readable in the public git history. Rewriting a public history with
+forks is not practical, so change the passphrase on the access point; see
+the open items in [BENCH_BOARDS.md](BENCH_BOARDS.md).
 
 ## 7. Verify
 
@@ -252,10 +260,15 @@ committed in the old repo-root scripts.
    adb -s <serial> shell "sh /tmp/x8_max_carrier_healthcheck.sh"
    ```
 
-   Its L072 section resets the UART's line settings and sends a two-byte
-   ROM-bootloader probe (`00 FF` at 19200 8E1). That does not reach the
-   radio, and a running firmware ignores it, but do not run it while
-   anything else is using `/dev/ttymxc3`. Expected on a fresh board: the x8h7
+   **Its L072 section touches the radio UART.** The "L072 GET probe" sets
+   `/dev/ttymxc3` to 19200 8E1 and writes two bytes to it (`00 FF`, the
+   AN3155 GET command), then listens for 0.4 s to see whether the L072 sits
+   in its ROM bootloader. A running LifeTrac firmware talks HostLink at
+   921600 baud in COBS frames with a CRC-16, so it should discard the two
+   bytes, and the probe sends nothing over the air. It is still a write to
+   the radio UART: run it only when nothing else holds `/dev/ttymxc3`
+   (`sudo -n fuser /dev/ttymxc3` prints nothing), and on a shared bench
+   treat it like a probe, on the operator's GO. Expected on a fresh board: the x8h7
    modules load (934 lists 10), `m4-proxy` and `stm32h7-program` are active,
    and `/dev/ttymxc3` and `/dev/watchdog0` exist. A
    `/sys/kernel/x8h7_firmware/version` timeout is normal. `gpio8/10/15` are
@@ -280,10 +293,16 @@ until you flash the LifeTrac build.
    committed `build/firmware.bin` (md5 `589c120323c2d5e7ef9f459d7a4ba42d`)
    is the production image. Do not put it on a bench board: it refuses the
    bench's diagnostic register writes.
-2. **Flash** with [FLASH_RUNBOOK.md](../FLASH_RUNBOOK.md), which uses
-   `run_flash_bench.sh` with `REVIVE_MODE=reboot`. U-Boot arms the X8 watchdog
-   (60 s, then a PMIC power-cycle); the runbook says why the scripts pet it
-   and reboot. **Flashing turns the receiver on** (rule 3).
+2. **Flash** with [`flash_l072.sh`](flash_l072.sh), which does
+   [FLASH_RUNBOOK.md](../FLASH_RUNBOOK.md) §1–§2 from the PC and reads
+   `bench.env`: without `--go` it stages and preflights, with `--go` it runs
+   `run_flash_bench.sh` (`REVIVE_MODE=reboot`). On a new carrier that still
+   runs the stock firmware, start with FLASH_RUNBOOK §5,
+   [First flash from a factory board](../FLASH_RUNBOOK.md#5-first-flash-from-a-factory-board):
+   a read-only `--go --verify-only` first contact against
+   `LifeTrac-v25/tools/mlm32l07x01.bin`, then the bench build. U-Boot arms
+   the X8 watchdog (60 s, then a PMIC power-cycle); the runbook says why the
+   scripts pet it and reboot. **Flashing turns the receiver on** (rule 3).
 3. **Health probe and park.** Stage the probe files to
    `/tmp/lifetrac_strict` and run them in the probe image. The scripts in
    [`legs/`](legs/README.md) automate this; by hand, for the tractor:
@@ -326,6 +345,11 @@ staging, a first leg and parking. The other leg docs are:
 
 ## After every power-up
 
+[`legs/power_up_guard.sh`](legs/README.md) does the tractor and radio steps
+for you and stages the probe tools it needs; arm it with
+`--wait-power-cycle` before you switch the boards on. `legs/stage_boards.sh`
+does the full staging.
+
 - **Tractor:** stop `lifetrac-camera.service` and `tractor-camera`, then
   check that `sudo -n fuser /dev/ttymxc3` prints nothing.
 - **Both:** `/tmp` staging is gone; stage again before any probe or flash.
@@ -340,7 +364,7 @@ staging, a first leg and parking. The other leg docs are:
 |---|---|---|
 | Docker images disappear about every minute on a 934 board | The compose-apps recovery unit deletes `/var/lib/docker` | `provision_bench_board.sh <role>` masks it |
 | A probe prints `timeout waiting for response` on the tractor | The camera unit or container holds `/dev/ttymxc3` | Rule 4 |
-| A flash fails with `1: image` (rc 127) | A CRLF script, or staging that aged out of `/tmp` | Strip CR (`sed 's/\r$//'`) and stage again ([FLASH_RUNBOOK.md](../FLASH_RUNBOOK.md) §1) |
+| A flash stops with `PREFLIGHT-FAIL: missing or empty` or `PREFLIGHT-FAIL: CRLF line endings in:` (older wrappers: `1: image`, rc 127) | Staging that aged out of `/tmp` or was wiped by a reboot, or a script pushed with CRLF | Re-run `flash_l072.sh <board> <bin>` without `--go`: it re-stages LF-clean and repeats the preflight; `PREFLIGHT-OK` means the staging is complete ([FLASH_RUNBOOK.md](../FLASH_RUNBOOK.md) §1) |
 | `adb devices` is empty right after a first boot | adbd is fragile on first boot | Wait, then replug the USB-C; do not `adb kill-server` ([T0](../../../X8_HEALTH_AND_RECOVERY/recovery/T0_adb_daemon_kick.md)) |
 | `provision_bench_board.sh` stops at the sudoers step | Wrong `BENCH_SUDO_PW` | Fix it in `bench.env` |
 | `$'\r': command not found` when you start a kit script on the PC | git `core.autocrlf` checked the script out with CRLF | The repo's `.gitattributes` keeps `*.sh` LF. On an older checkout, run `git add --renormalize .` or `sed -i 's/\r$//' <script>` |
