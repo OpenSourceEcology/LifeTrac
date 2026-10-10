@@ -1,8 +1,12 @@
 #!/bin/bash
 # pull_board_state.sh <base|tractor> [--images] -- PC side (Git Bash). Runs the read-only
 # capture_board_state.sh on one bench X8 over adb and pulls the result into the private
-# archive OUTSIDE git (default C:/Users/dorkm/Documents/LifeTrac-bench-archive/<date>/).
+# archive OUTSIDE git: $ARCHIVE, else ARCHIVE_DIR (bench.env), else
+# $HOME/Documents/LifeTrac-bench-archive, in its board_state_<UTC date>/ folder. adb and
+# py get that path in C:/... form (cygpath -m), so ARCHIVE=~/somewhere works too.
 # Copy only the reviewed text reports into bench-evidence/ (see BENCH_BOARDS.md).
+# Settings: BASE_SERIAL / TRACTOR_SERIAL / ARCHIVE_DIR from bench.env, loaded by
+# lib/env_file.sh (a non-empty environment variable wins over the file).
 #
 #   --images   also stream the board's LifeTrac docker images to the archive (docker save,
 #              nothing is written on the board). Large; never commit them.
@@ -14,11 +18,17 @@
 set -u
 export MSYS_NO_PATHCONV=1
 ROLE=${1:?base|tractor}; IMAGES=0; [ "${2:-}" = --images ] && IMAGES=1
-_BT=$(dirname "$0")
-[ -f "$_BT/bench.env" ] && eval "$(tr -d '\r' < "$_BT/bench.env")"   # BASE_SERIAL / TRACTOR_SERIAL / ARCHIVE_DIR
+_BT=$(cd "$(dirname "$0")" && pwd)
+. "$_BT/lib/env_file.sh" || exit 1
+_ENVF=${BENCH_ENV:-${BENCH_ENV_FILE:-$_BT/bench.env}}
+if [ -f "$_ENVF" ]; then bench_load_env_file "$_ENVF" || exit 1
+else echo "pull_board_state: WARN: no $_ENVF -- the original bench's serials apply unless BASE_SERIAL / TRACTOR_SERIAL are set" >&2; fi
 case $ROLE in base) SER=${BASE_SERIAL:-2D0A1209DABC240B};; tractor) SER=${TRACTOR_SERIAL:-2E2C1209DABC240B};; *) echo "base|tractor"; exit 2;; esac
-HERE=$(cygpath -m "$(dirname "$0")")
-ARC=${ARCHIVE:-${ARCHIVE_DIR:-$HOME/Documents/LifeTrac-bench-archive}}/board_state_$(date -u +%Y-%m-%d)
+mpath() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s\n' "$1"; fi; }
+HERE=$(mpath "$_BT")
+# MSYS_NO_PATHCONV=1 above: a /c/... path (Git Bash's $HOME) would reach adb.exe and
+# py unconverted and fail, so the archive path is put in C:/... form here.
+ARC=$(mpath "${ARCHIVE:-${ARCHIVE_DIR:-$HOME/Documents/LifeTrac-bench-archive}}")/board_state_$(date -u +%Y-%m-%d)
 mkdir -p "$ARC/$ROLE" "$ARC/images"
 strip_to_gzip() { py -3 -c "import sys;p=sys.argv[1];d=open(p,'rb').read();i=d.find(b'\x1f\x8b\x08');assert 0<=i<64,i;open(p,'wb').write(d[i:])" "$1"; }
 

@@ -15,37 +15,51 @@
 # --verify-only: read back and compare against <firmware.bin>, write nothing
 # (still enters the ROM bootloader and reboots; needs --go too).
 #
-# Configuration: sources $BENCH_ENV (default: bench.env next to this script;
-# template bench.env.example) when it exists. Each variable can also come from
-# the environment; the defaults are the 2026 bench:
-#   BASE_SERIAL     2D0A1209DABC240B  base adb serial (the base is flashed over ssh)
+# Configuration: $BENCH_ENV (default: bench.env next to this script; template
+# bench.env.example), loaded by lib/env_file.sh like every bench script: CRLF is
+# tolerated, and a NON-EMPTY variable already in the environment wins over the
+# file (`TRACTOR_SERIAL=<serial> bash flash_l072.sh tractor ...` flashes that
+# board). Defaults (the 2026 bench) for anything still unset:
+#   BASE_SERIAL     2D0A1209DABC240B  base adb serial (shown only; see BASE_HOST)
 #   TRACTOR_SERIAL  2E2C1209DABC240B  tractor adb serial (adb only, WiFi off)
-#   BASE_HOST       192.168.1.117     base ethernet address (DHCP lease)
-#   BASE_USER       fio
+#   BASE_HOST       192.168.1.117     base ethernet address (DHCP lease). The base
+#                                     is ALWAYS flashed over ssh: BASE_TRANSPORT is
+#                                     not used here.
+#   BASE_SSH_USER   fio               (old name BASE_USER)
 #   BASE_SSH_KEY    ~/.ssh/lifetrac_base_ed25519
-#   BENCH_SUDO_PW   fio               LmP default; both boards have NOPASSWD sudo
+#   BENCH_SUDO_PW   fio               LmP default; both boards have NOPASSWD sudo.
+#                                     Must not contain a single quote.
 #   BOARD_HOME      /home/fio         persistent home for the wrapper and logs
-#   REVIVE_MODE     reboot            or full (5.10 kernels only; see FLASH_RUNBOOK)
+#   REVIVE_MODE     reboot            or full (5.10 kernels only; refused on a 6.x
+#                                     kernel, which OOPSes on the module reload)
+#   ADB             adb               adb executable (tractor)
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 HELPER=$(cd "$HERE/.." && pwd)
 BENCH_ENV=${BENCH_ENV:-${BENCH_ENV_FILE:-$HERE/bench.env}}
+# shellcheck source=lib/env_file.sh
+. "$HERE/lib/env_file.sh"
 if [ -f "$BENCH_ENV" ]; then
-  # shellcheck disable=SC1090
-  . "$BENCH_ENV"
+  bench_load_env_file "$BENCH_ENV" || exit 2
+  ENV_NOTE="$BENCH_ENV (non-empty environment variables win)"
+else
+  ENV_NOTE="none ($BENCH_ENV missing): environment + the original bench's defaults"
+  echo "flash_l072: WARN: no $BENCH_ENV -- the original bench's serials and address apply unless set in the environment (cp bench.env.example bench.env)" >&2
 fi
 BASE_SERIAL=${BASE_SERIAL:-2D0A1209DABC240B}
 TRACTOR_SERIAL=${TRACTOR_SERIAL:-2E2C1209DABC240B}
 BASE_HOST=${BASE_HOST:-192.168.1.117}
-BASE_USER=${BASE_USER:-${BASE_SSH_USER:-fio}}
+BASE_USER=${BASE_SSH_USER:-${BASE_USER:-fio}}
 BASE_SSH_KEY=${BASE_SSH_KEY:-$HOME/.ssh/lifetrac_base_ed25519}
 BASE_SSH_KEY=${BASE_SSH_KEY/#\~/$HOME}
 BENCH_SUDO_PW=${BENCH_SUDO_PW:-fio}
 BOARD_HOME=${BOARD_HOME:-/home/fio}
 REVIVE_MODE=${REVIVE_MODE:-reboot}
+ADB_EXE=${ADB:-adb}
 
 die() { echo "flash_l072: $*" >&2; exit 2; }
+case $BENCH_SUDO_PW in *"'"*) die "BENCH_SUDO_PW must not contain a single quote" ;; esac
 usage() { awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; exit 2; }
 
 [ $# -ge 2 ] || usage
@@ -81,6 +95,7 @@ case "$MD5" in
 esac
 echo "image: $IMGNAME  $SIZE B  md5 $MD5"
 echo "       $KIND"
+echo "settings: $ENV_NOTE"
 
 # --- LF-clean staging -------------------------------------------------------
 PIPE="full_flash_pipeline.sh run_flash_l072.sh prep_bridge.sh revive_bridge.sh wdt_pet.sh
@@ -100,12 +115,20 @@ ENVS="REVIVE_MODE=$REVIVE_MODE FLASH_VERIFY_ONLY=$VERIFY_ONLY BENCH_HOME=$BOARD_
 RUN="bash $BOARD_HOME/run_flash_bench.sh /tmp/lifetrac_p0c/$IMGNAME"
 
 winpath() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s\n' "$1"; fi; }
+# REVIVE_MODE=full re-inserts x8h7_drv, which OOPSes the 6.x kernel (the base's
+# 6.1): refuse it there before anything is staged (FLASH_RUNBOOK).
+check_kernel() {   # check_kernel <uname -r output>
+  echo "kernel: ${1:-unknown}"
+  case "$REVIVE_MODE:$1" in full:6.*) die "REVIVE_MODE=full on kernel $1: the x8h7_drv re-insert OOPSes 6.x kernels. Use --revive reboot." ;; esac
+  return 0
+}
 
 if [ "$BOARD" = "base" ]; then
   command -v ssh >/dev/null && command -v scp >/dev/null || die "ssh/scp not found"
   SSHO=(-i "$BASE_SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10)
   TGT="$BASE_USER@$BASE_HOST"
-  echo "=== base $TGT (adb serial $BASE_SERIAL): staging"
+  echo "=== base $TGT (adb serial $BASE_SERIAL; the base is flashed over ssh): staging"
+  check_kernel "$(ssh "${SSHO[@]}" "$TGT" "uname -r" | tr -d '\r')"
   ssh "${SSHO[@]}" "$TGT" "$S mkdir -p /tmp/lifetrac_p0c && $S chmod 0777 /tmp/lifetrac_p0c"
   scp -q "${SSHO[@]}" "$STAGE"/p0c/* "$TGT:/tmp/lifetrac_p0c/"
   scp -q "${SSHO[@]}" "$STAGE"/home/* "$TGT:$BOARD_HOME/"
@@ -119,21 +142,22 @@ if [ "$BOARD" = "base" ]; then
     set -e
   fi
 else
-  command -v adb >/dev/null || die "adb not found"
+  command -v "$ADB_EXE" >/dev/null || die "adb not found ('$ADB_EXE'; install platform-tools, PC_SETUP.md, or set ADB)"
   export MSYS_NO_PATHCONV=1
-  ADB=(adb -s "$TRACTOR_SERIAL")
+  ADBC=("$ADB_EXE" -s "$TRACTOR_SERIAL")
   echo "=== tractor $TRACTOR_SERIAL: staging"
-  "${ADB[@]}" shell "$S mkdir -p /tmp/lifetrac_p0c; $S chmod 0777 /tmp/lifetrac_p0c" >/dev/null
-  for f in "$STAGE"/p0c/*; do "${ADB[@]}" push "$(winpath "$f")" /tmp/lifetrac_p0c/ >/dev/null; done
-  for f in "$STAGE"/home/*; do "${ADB[@]}" push "$(winpath "$f")" "$BOARD_HOME/" >/dev/null; done
+  check_kernel "$("${ADBC[@]}" shell "uname -r" < /dev/null | tr -d '\r')"
+  "${ADBC[@]}" shell "$S mkdir -p /tmp/lifetrac_p0c; $S chmod 0777 /tmp/lifetrac_p0c" >/dev/null
+  for f in "$STAGE"/p0c/*; do "${ADBC[@]}" push "$(winpath "$f")" /tmp/lifetrac_p0c/ >/dev/null; done
+  for f in "$STAGE"/home/*; do "${ADBC[@]}" push "$(winpath "$f")" "$BOARD_HOME/" >/dev/null; done
   echo "=== tractor: preflight"
-  "${ADB[@]}" shell "$S env FLASH_PREFLIGHT_ONLY=1 $ENVS $RUN" | tr -d '\r'
+  "${ADBC[@]}" shell "$S env FLASH_PREFLIGHT_ONLY=1 $ENVS $RUN" | tr -d '\r'
   if [ "$GO" = "1" ]; then
     echo "=== tractor: stopping lifetrac-camera.service + tractor-camera (they hold /dev/ttymxc3)"
-    "${ADB[@]}" shell "$S systemctl stop lifetrac-camera.service; $S docker stop -t 3 tractor-camera" >/dev/null 2>&1 || true
+    "${ADBC[@]}" shell "$S systemctl stop lifetrac-camera.service; $S docker stop -t 3 tractor-camera" >/dev/null 2>&1 || true
     echo "=== tractor: FLASHING (radio-on event; REVIVE_MODE=$REVIVE_MODE)"
     set +e
-    "${ADB[@]}" shell "$S env $ENVS $RUN" | tr -d '\r'
+    "${ADBC[@]}" shell "$S env $ENVS $RUN" | tr -d '\r'
     RC=${PIPESTATUS[0]}
     set -e
   fi
