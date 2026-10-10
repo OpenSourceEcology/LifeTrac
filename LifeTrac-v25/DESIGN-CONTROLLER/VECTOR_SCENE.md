@@ -492,7 +492,7 @@ byte1 bit2 ..       records, MSB-first bitstream; records never cross frames
    - id 0;
 
    The fragment has already passed the L072's payload CRC and the reassembler, so a parse error means version skew or a bug. Rejecting the whole frame keeps the store deterministic.
-4. UPD, UCOL, INSERT, DEL, CONFIRM or HOLE naming an unknown id is an *orphan*: ignore it and count it.
+4. UPD, UCOL, INSERT, CONFIRM or HOLE naming an unknown id is an *orphan*: ignore it and count it. A DEL naming an id the base does not hold is not an orphan: the id is absent either way, and the tractor sends every DEL twice (§4.3), so a base that applied the first copy sees the second name an unknown id. Such a DEL leaves a tombstone at its capture time, unless the id already has one, so an older define of the id is still refused.
 5. **Per-field last writer wins by capture time.** Each shape has five fields, each with its own capture time:
 
    | Field | Set by |
