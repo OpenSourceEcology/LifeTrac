@@ -21,7 +21,8 @@
 #            optional eth0 100BASE-TX full pin (--nic-100)
 #   tractor  WiFi off for good (units/disable-wifi.service enabled,
 #            wpa_supplicant masked, nmcli radio wifi off, stored WiFi profiles
-#            deleted), camera USB provisioning (../provision_x8.sh),
+#            deleted after a root-only backup tarball in /root on the board),
+#            camera USB provisioning (../provision_x8.sh),
 #            eclipse-mosquitto:2 loaded from the base or a tarball; the
 #            compose-apps mask too, unless the board still runs the factory
 #            674 image (where that unit succeeds)
@@ -32,12 +33,15 @@
 # lifetrac-camera.service and the tractor-camera container stopped (both map
 # /dev/ttymxc3; they come back at the next boot).
 #
-# Settings come from bench.env next to this script when it exists (copy
-# bench.env.example), else these defaults (the original bench pair):
+# Settings come from bench.env next to this script ($BENCH_ENV; copy
+# bench.env.example), loaded by lib/env_file.sh like every bench script: CRLF is
+# tolerated and a NON-EMPTY variable already in the environment wins over the
+# file. Anything still unset gets these defaults (the original bench pair):
 #   BASE_SERIAL=2D0A1209DABC240B  TRACTOR_SERIAL=2E2C1209DABC240B
 #   BASE_HOST=192.168.1.117       BENCH_SUDO_PW=fio (used once, to install sudoers)
-#   BASE_SSH_KEY=~/.ssh/lifetrac_base_ed25519  BASE_USER=fio  ADB=adb
-# Values already in bench.env win over the defaults. The password is never printed.
+#   BASE_SSH_KEY=~/.ssh/lifetrac_base_ed25519  BASE_SSH_USER=fio (old name
+#   BASE_USER)  ADB=adb
+# The password is never printed.
 
 set -u
 
@@ -55,6 +59,7 @@ Options:
   --mosquitto-tar FILE    tractor only: docker load eclipse-mosquitto:2 from FILE (a docker save tarball)
   --mask-compose          tractor only: mask compose-apps-early-start{,-recovery} even on the 674 image
   --keep-wifi-profiles    tractor only: do not delete stored NetworkManager WiFi profiles
+                          (without it they are deleted after a root-only backup on the board)
   --allow-camera-restart  tractor only: allow provision_x8.sh to run although a camera compose
                           app is installed (it restarts lifetrac-camera.service, which maps the
                           radio UART; this script stops it again right after)
@@ -69,17 +74,20 @@ HELPER_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/../../../../.." && pwd)
 
 BENCH_ENV=${BENCH_ENV:-${BENCH_ENV_FILE:-$SCRIPT_DIR/bench.env}}
+# shellcheck source=lib/env_file.sh
+. "$SCRIPT_DIR/lib/env_file.sh" || exit 2
 if [ -f "$BENCH_ENV" ]; then
-  # strip CR so a bench.env saved by a Windows editor does not put \r into serials
-  # shellcheck disable=SC1090
-  . <(sed 's/\r$//' "$BENCH_ENV")
+  # CR stripped (a bench.env saved by a Windows editor); the environment wins
+  bench_load_env_file "$BENCH_ENV" || exit 2
+else
+  echo "WARN: no $BENCH_ENV -- the original bench's serials and address apply unless set in the environment (cp bench.env.example bench.env; BENCH_SETUP.md 5.3)" >&2
 fi
 BASE_SERIAL=${BASE_SERIAL:-2D0A1209DABC240B}
 TRACTOR_SERIAL=${TRACTOR_SERIAL:-2E2C1209DABC240B}
 BASE_HOST=${BASE_HOST:-192.168.1.117}
 BENCH_SUDO_PW=${BENCH_SUDO_PW:-fio}
 BASE_SSH_KEY=${BASE_SSH_KEY:-$HOME/.ssh/lifetrac_base_ed25519}
-BASE_USER=${BASE_USER:-${BASE_SSH_USER:-fio}}
+BASE_USER=${BASE_SSH_USER:-${BASE_USER:-fio}}
 ADB=${ADB:-adb}
 
 FOUNDRIES_IMG=hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44
@@ -136,6 +144,9 @@ indent() { sed 's/^/      /'; }
 winpath() {  # adb.exe wants C:/... paths; elsewhere the path is used as is
   if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi
 }
+unixpath() {  # scp reads C:/... as host "C": give it /c/... (e.g. --mosquitto-tar C:/x.tar)
+  if command -v cygpath >/dev/null 2>&1; then cygpath -u "$1"; else printf '%s' "$1"; fi
+}
 
 # on <adb|ssh> <serial|host> <command>: run a shell command on a board, CR stripped
 on() {
@@ -147,14 +158,14 @@ on() {
 }
 push_to() {    # push_to <adb|ssh> <serial|host> <local file> <remote path>
   if [ "$1" = ssh ]; then
-    scp -q -i "$BASE_SSH_KEY" -o BatchMode=yes "$3" "$BASE_USER@$2:$4"
+    scp -q -i "$BASE_SSH_KEY" -o BatchMode=yes "$(unixpath "$3")" "$BASE_USER@$2:$4"
   else
     MSYS_NO_PATHCONV=1 "$ADB" -s "$2" push "$(winpath "$3")" "$4" >/dev/null
   fi
 }
 pull_from() {  # pull_from <adb|ssh> <serial|host> <remote path> <local file>
   if [ "$1" = ssh ]; then
-    scp -q -i "$BASE_SSH_KEY" -o BatchMode=yes "$BASE_USER@$2:$3" "$4"
+    scp -q -i "$BASE_SSH_KEY" -o BatchMode=yes "$BASE_USER@$2:$3" "$(unixpath "$4")"
   else
     MSYS_NO_PATHCONV=1 "$ADB" -s "$2" pull "$3" "$(winpath "$4")" >/dev/null
   fi
@@ -313,6 +324,19 @@ list_wifi_profiles() {  # profile names only; secrets are never requested
   rsh "for u in \$($WIFI_UUIDS); do nmcli -g connection.id connection show uuid \$u 2>/dev/null; done"
 }
 app_wifi_profiles() {
+  local bk
+  # Back the stored profiles up first, root-only (0600): the board may hold the only
+  # copy of a WiFi credential. Nothing from the backup is printed.
+  bk=$(rval "sudo -n sh -c 'umask 077; d=/etc/NetworkManager/system-connections; f=/root/lifetrac_nm_profiles_\$(date -u +%Y%m%dT%H%M%SZ).tgz; if [ -d \$d ] && tar -czf \$f -C \$d . && chmod 600 \$f; then echo \$f; else echo NONE; fi' 2>/dev/null")
+  case "$bk" in
+    /root/lifetrac_nm_profiles_*.tgz)
+      say "      stored profiles backed up on the board (root-only): $bk"
+      say "      restore: sudo tar -xzf $bk -C /etc/NetworkManager/system-connections && sudo nmcli connection reload" ;;
+    *)
+      say "      could not back up /etc/NetworkManager/system-connections, so the WiFi profiles were NOT deleted"
+      say "      (re-run with --keep-wifi-profiles to skip this step)"
+      return 1 ;;
+  esac
   rsh "for u in \$($WIFI_UUIDS); do n=\$(nmcli -g connection.id connection show uuid \$u 2>/dev/null); if sudo -n nmcli connection delete uuid \$u >/dev/null 2>&1; then echo deleted WiFi profile: \$n; else echo FAILED to delete WiFi profile: \$n; fi; done" | indent
 }
 

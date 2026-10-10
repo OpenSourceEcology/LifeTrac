@@ -90,6 +90,9 @@ handle() {   # $1 role; returns 0 when the radio reads SLEEP (or was left as ask
   fi
   holders=$(board_uart_holders "$who")
   stamp "$who /dev/ttymxc3 holders (pids): [$holders]"
+  case $holders in
+    unknown*) stamp "$who: cannot tell whether anything holds the radio UART ($holders) -- not probing"; return 1 ;;
+  esac
   if [ -n "$holders" ]; then
     stamp "$who: radio UART busy -- not probing. Identify the holder (ps -p $holders) and stop it."
     return 1

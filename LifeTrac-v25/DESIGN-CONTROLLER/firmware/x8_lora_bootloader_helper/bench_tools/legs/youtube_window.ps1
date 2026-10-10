@@ -11,7 +11,14 @@
 #           operator clicks) and re-enter the player's fullscreen only if the
 #           window shows YouTube and is not already fullscreen.
 #   -Close  close that instance only (the operator's own Firefox is untouched:
-#           the bench instance is found by its -ProfileDir on the command line).
+#           the bench instance is found by its exact `-profile "<ProfileDir>"`
+#           argument on the command line, not by a substring).
+#
+# The "f" key goes out only when the bench window is confirmed to be the
+# foreground window (Windows may refuse SetForegroundWindow); otherwise the
+# script says so and the operator clicks the window and presses f.
+# -ProfileDir must be a dedicated folder: a drive root or a path shorter than
+# 10 characters is refused (it is matched against firefox.exe command lines).
 #
 # Parameters (each falls back to the environment that lib/bench_env.sh exports,
 # then to a built-in default):
@@ -48,6 +55,12 @@ if (-not $ProfileDir) { $ProfileDir = $env:FIREFOX_PROFILE_DIR }
 if (-not $ProfileDir) { $ProfileDir = Join-Path $env:TEMP "lifetrac-bench\ff_bench_youtube" }
 # one canonical spelling (backslashes, absolute) so the command-line match below is exact
 $prof = [System.IO.Path]::GetFullPath(($ProfileDir -replace '/', '\')).TrimEnd('\')
+if ($prof.Length -lt 10 -or $prof -match '^[A-Za-z]:\\?$' -or $prof -match '^\\\\[^\\]+\\[^\\]+$') {
+  "refusing -ProfileDir '$prof': use a dedicated folder (not a drive root or share root, at least 10 characters)"
+  exit 4
+}
+# the exact argument the bench instance was started with: -profile "<prof>" (or unquoted)
+$profArg = '-profile\s+"?' + [regex]::Escape($prof) + '"?(\s|$)'
 
 function Find-Firefox {
   if ($FirefoxExe) { return $FirefoxExe }
@@ -67,12 +80,13 @@ public class BenchWin {
   [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   public struct RECT { public int Left, Top, Right, Bottom; }
 }
 "@
 function Get-BenchProcs {
   Get-CimInstance Win32_Process -Filter "Name='firefox.exe'" | Where-Object {
-    $_.CommandLine -and $_.CommandLine.IndexOf($prof, [StringComparison]::OrdinalIgnoreCase) -ge 0
+    $_.CommandLine -and ($_.CommandLine -imatch $profArg)
   }
 }
 function Get-BenchWindow {
@@ -129,8 +143,14 @@ if ($Front) {
   Start-Sleep -Milliseconds 600
   $isYouTube = ($w.MainWindowTitle -match 'YouTube')
   if ((-not $NoPlayerFullscreen) -and $isYouTube -and -not (Is-PlayerFullscreen $w)) {
-    (New-Object -ComObject WScript.Shell).SendKeys("f")               # the player's fullscreen button; Esc leaves it
-    Start-Sleep -Milliseconds 800
+    # SendKeys types into whatever has focus: send "f" only when the bench window
+    # really is the foreground window, never into the operator's terminal or editor.
+    if ([BenchWin]::GetForegroundWindow() -eq $w.MainWindowHandle) {
+      (New-Object -ComObject WScript.Shell).SendKeys("f")             # the player's fullscreen button; Esc leaves it
+      Start-Sleep -Milliseconds 800
+    } else {
+      "bench window is not in the foreground (Windows refused the focus change); 'f' NOT sent -- click the video window and press f"
+    }
   }
   $w = Get-BenchWindow
   "window pid $($w.Id) '$($w.MainWindowTitle)' player fullscreen: $(Is-PlayerFullscreen $w)"

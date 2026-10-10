@@ -21,19 +21,22 @@
 #                   plan and stop. Never contacts a board.
 #   -h | --help
 #
-# Settings come from bench_tools/bench.env when it exists (see
-# bench.env.example), else from the environment, else the defaults below:
+# Settings: bench_tools/bench.env ($BENCH_ENV; see bench.env.example), loaded by
+# lib/env_file.sh like every bench script -- CRLF is tolerated and a NON-EMPTY
+# variable already in the environment wins over the file -- then the defaults
+# below for anything still unset:
 #   BASE_TRANSPORT  ssh | adb
 #   BASE_HOST       192.168.1.117 (the bench base's DHCP lease)
-#   BASE_USER       fio
+#   BASE_SSH_USER   fio (old name BASE_USER)
 #   BASE_SSH_KEY    ~/.ssh/lifetrac_base_ed25519
 #   BASE_SERIAL     2D0A1209DABC240B (adb serial of the bench base)
 #   TRACTOR_SERIAL  2E2C1209DABC240B (only used to refuse deploying to the tractor)
 #   BENCH_SUDO_PW   fio, the LmP factory default; only used when passwordless
 #                   sudo is not installed on the base
 #   BASE_DEPLOY_DIR /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER (= /opt/lifetrac/...)
-#   BENCH_ARCHIVE_DIR $HOME/LifeTrac-bench-archive (outside git; the deploy
-#                   tarballs are kept in its deploy/ folder)
+#   ARCHIVE_DIR     $HOME/Documents/LifeTrac-bench-archive (old name
+#                   BENCH_ARCHIVE_DIR; outside git; the deploy tarballs are kept
+#                   in its deploy/ folder)
 #
 # What it changes on the base: the tree in BASE_DEPLOY_DIR (backup first),
 # DEPLOYED_FROM.txt, .env and secrets/ ONLY when missing (random PIN and fleet
@@ -53,11 +56,14 @@ DC_REL=LifeTrac-v25/DESIGN-CONTROLLER
 
 # ---------------------------------------------------------------- settings --
 BENCH_ENV=${BENCH_ENV:-${BENCH_ENV_FILE:-$BT/bench.env}}
+# shellcheck source=lib/env_file.sh
+. "$BT/lib/env_file.sh"
 if [ -f "$BENCH_ENV" ]; then
-    set -a
-    # tr: a bench.env saved with CRLF endings would otherwise put \r in values
-    eval "$(tr -d '\r' < "$BENCH_ENV")"
-    set +a
+    # CR stripped; the environment wins; nothing is exported (the password stays
+    # out of every child process's environment)
+    bench_load_env_file "$BENCH_ENV" || exit 2
+else
+    echo "deploy_base: WARN: no $BENCH_ENV -- the original bench's address and serials apply unless set in the environment (cp bench.env.example bench.env)" >&2
 fi
 
 COMMIT=HEAD
@@ -96,13 +102,13 @@ elif [ -z "${BASE_TRANSPORT:-}" ]; then
 fi
 case $BASE_TRANSPORT in ssh|adb) ;; *) echo "deploy_base: BASE_TRANSPORT must be ssh or adb" >&2; exit 2 ;; esac
 BASE_HOST=${BASE_HOST:-192.168.1.117}
-BASE_USER=${BASE_USER:-${BASE_SSH_USER:-fio}}
+BASE_USER=${BASE_SSH_USER:-${BASE_USER:-fio}}
 BASE_SSH_KEY=${BASE_SSH_KEY:-$HOME/.ssh/lifetrac_base_ed25519}
 BASE_SERIAL=${BASE_SERIAL:-2D0A1209DABC240B}
 TRACTOR_SERIAL=${TRACTOR_SERIAL:-2E2C1209DABC240B}
 BENCH_SUDO_PW=${BENCH_SUDO_PW-fio}
 BASE_DEPLOY_DIR=${BASE_DEPLOY_DIR:-/var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER}
-BENCH_ARCHIVE_DIR=${BENCH_ARCHIVE_DIR:-${ARCHIVE_DIR:-$HOME/Documents/LifeTrac-bench-archive}}
+BENCH_ARCHIVE_DIR=${ARCHIVE_DIR:-${BENCH_ARCHIVE_DIR:-$HOME/Documents/LifeTrac-bench-archive}}
 COMPOSE_PROJECT=design-controller   # the running broker is design-controller-mosquitto-1
 REMOTE_WORK=/home/$BASE_USER/lifetrac_deploy
 

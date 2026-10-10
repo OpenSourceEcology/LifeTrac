@@ -250,11 +250,12 @@ if ($ForceFrfHz -gt 0) {
     $profEnv = "$profEnv -e LIFETRAC_FORCE_FRF_HZ=$ForceFrfHz"
 }
 
-# Resolve adb dynamically (the winget package dir name varies per
-# machine/source); fall back to the historical hardcoded path.
+# Resolve adb from PATH (the winget package dir name varies per machine/source).
+# No per-user fallback path: on another PC it only produced a confusing
+# "not found" later. Nothing has touched a board yet at this point.
 $adbExe = (Get-Command adb -ErrorAction SilentlyContinue).Source
 if (-not $adbExe) {
-    $adbExe = "C:\Users\dorkm\AppData\Local\Microsoft\WinGet\Packages\Google.PlatformTools_8wekyb3d8bbwe\platform-tools\adb.exe"
+    throw "adb not on PATH. Install Android platform-tools (bench_tools/PC_SETUP.md: winget install Google.PlatformTools), open a new shell, and check 'adb version'."
 }
 $repoRoot = (Resolve-Path "$PSScriptRoot\..\..\..\..").Path
 $baseStation = Join-Path $repoRoot "LifeTrac-v25\DESIGN-CONTROLLER\base_station"

@@ -7,7 +7,8 @@
 # Ends by printing (and saving) the harness command for this leg.
 #
 # Usage:   bash leg_prep.sh <leg> <image_bw500|image_bw250> [options]
-#   <leg>          tag used in every file name, e.g. 2a, 2b_yt, 2c_r5
+#   <leg>          tag used in every file name, e.g. 2a, 2b_yt, 2c_r5 (letters,
+#                  digits, '_', '.', '-' only)
 #   image_bw500    DTS profile 2 (refused unless DTS_CARRIER_HZ is set, see below)
 #   image_bw250    FHSS profile 1
 # Options:
@@ -21,7 +22,9 @@
 #   --print-harness    only write and print the harness command (after the DTS
 #                  gate); touches no board, starts no capture -- a preview
 # Inputs:  lib/bench_env.sh settings; DTS_CARRIER_HZ / DTS_CARRIER_DATE for profile 2;
-#          the boards staged by stage_boards.sh.
+#          PC_HOST (the harness -HostIp; when empty, this PC's only IPv4 address on
+#          BASE_HOST's /24, or its only IPv4 address at all, is used and printed --
+#          refused when ambiguous); the boards staged by stage_boards.sh.
 # Writes:  $EVIDENCE_DIR/leg<leg>_{prep,scene,health_base,health_tractor,clear_retained,
 #          pre_base,pre_tractor}.txt (+ _scene.jpg); $BENCH_SCRATCH/leg<leg>_harness.ps1;
 #          base: /tmp/lifetrac_strict/legs/leg<leg>_base.{jsonl,json} (capture, running).
@@ -53,6 +56,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 [ -n "$LEG" ] && [ -n "$PROFILE" ] || { bench_usage; exit 2; }
+bench_check_name "leg tag" "$LEG"
 case $PROFILE in
   image_bw500) REGP=2 ;;
   image_bw250) REGP=1 ;;
@@ -74,9 +78,45 @@ fi
 if [ $REGP = 2 ]; then bench_require_dts_carrier || exit 5; fi
 [ "$BASE_TRANSPORT" = ssh ] && echo "NOTE: BASE_TRANSPORT=ssh -- run_live_radio_monitor.ps1 drives the base over adb ($BASE_SERIAL); it must be on USB too."
 
+# --- the PC's address for the harness (-HostIp) -----------------------------------
+# Without -HostIp the harness falls back to the original bench PC's lease, and the
+# base rx daemon's control plane is dead on any other PC. Never omit it.
+pc_ipv4s() {   # this PC's IPv4 addresses, minus loopback and link-local
+  if command -v powershell.exe > /dev/null 2>&1; then
+    powershell.exe -NoProfile -NonInteractive -Command \
+      "Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | ForEach-Object { \$_.IPAddress }" 2>/dev/null
+  elif command -v ip > /dev/null 2>&1; then
+    ip -4 -o addr show scope global 2>/dev/null | awk '{ sub(/\/.*/, "", $4); print $4 }'
+  fi | tr -d '\r' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | grep -vE '^(127\.|169\.254\.)' | sort -u
+}
+if [ -z "$PC_HOST" ]; then
+  cands=$(pc_ipv4s)
+  pick=""
+  same=""
+  case $BASE_HOST in
+    *[!0-9.]*|'') ;;
+    *.*.*.*) same=$(printf '%s\n' "$cands" | awk -v p="${BASE_HOST%.*}." 'NF && index($0, p) == 1') ;;
+  esac
+  n_same=$(printf '%s\n' "$same" | grep -c .)
+  n_all=$(printf '%s\n' "$cands" | grep -c .)
+  if [ "$n_same" = 1 ]; then pick=$same; why="the only one on BASE_HOST $BASE_HOST's /24"
+  elif [ "$n_same" = 0 ] && [ "$n_all" = 1 ]; then pick=$cands; why="this PC's only IPv4 address"
+  fi
+  if [ -z "$pick" ]; then
+    echo "REFUSED: PC_HOST is empty and this PC's LAN address is ambiguous (IPv4 candidates: $(printf '%s ' $cands | sed 's/ $//'))." >&2
+    echo "         Set PC_HOST in $BT_DIR/bench.env to the address the boards reach this PC on." >&2
+    exit 6
+  fi
+  PC_HOST=$pick
+  echo "NOTE: PC_HOST is empty -- using $PC_HOST ($why) as the harness -HostIp; set PC_HOST in bench.env to pin it."
+fi
+case $PC_HOST in
+  *[!A-Za-z0-9.:-]*) die "PC_HOST '$PC_HOST' is not a plain address or host name" ;;
+esac
+
 # --- the harness command for this leg ---------------------------------------------
 FRF=""; [ $REGP = 2 ] && FRF=" -ForceFrfHz $DTS_CARRIER_HZ"
-HIP=""; [ -n "$PC_HOST" ] && HIP=" -HostIp $PC_HOST"
+HIP=" -HostIp $PC_HOST"
 LOGW=$(win_path "$BENCH_SCRATCH/leg${LEG}_harness.txt")
 ARCW=$(win_path "$BENCH_SCRATCH/leg${LEG}_archive.txt")
 PS1="$BENCH_SCRATCH/leg${LEG}_harness.ps1"
@@ -103,6 +143,11 @@ print_next() {
   case $LEG in 2d*) echo "   then, right after the launch, in Git Bash: bash \"$(win_path "$LEGS_DIR/leg2d_switch.sh")\" $LEG";; esac
   echo "   while frames flow:            bash \"$(win_path "$LEGS_DIR/link_sample.sh")\" $LEG"
   echo "   after '[EVIDENCE] archived to':  bash \"$(win_path "$LEGS_DIR/leg_post.sh")\" $LEG"
+  if [ "${1:-}" = probed ]; then
+    echo "   NOT flying after all (no GO, harness refused, round aborted)? The probes left both L072s"
+    echo "   listening (RXCONT) and rs13_cap_base is running. Stop the capture and park both radios:"
+    echo "                                 bash \"$(win_path "$LEGS_DIR/power_up_guard.sh")\" --stop-leg-daemons"
+  fi
 }
 if [ $PRINT_ONLY = 1 ]; then
   write_harness
@@ -163,4 +208,4 @@ board_sh base "$SUDO docker logs rs13_cap_base 2>&1 | head -3"
 
 write_harness
 stamp "== leg $LEG prep done -> launch the harness NOW (the capture is already listening), in PowerShell:"
-print_next
+print_next probed

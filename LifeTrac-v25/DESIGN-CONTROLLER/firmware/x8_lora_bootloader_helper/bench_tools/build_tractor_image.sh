@@ -29,20 +29,27 @@
 #                      locally, print the plan and stop. Never contacts a board.
 #   -h | --help
 #
-# Settings: bench_tools/bench.env when it exists, else the environment, else
-# the same defaults as deploy_base.sh (BASE_TRANSPORT, BASE_HOST, BASE_USER,
-# BASE_SSH_KEY, BASE_SERIAL, TRACTOR_SERIAL, BENCH_SUDO_PW, BENCH_ARCHIVE_DIR).
-# Image tarballs land in $BENCH_ARCHIVE_DIR/images (default
-# $HOME/LifeTrac-bench-archive/images), which must be outside git.
+# Settings: bench_tools/bench.env ($BENCH_ENV), loaded by lib/env_file.sh like
+# every bench script (CRLF tolerated; a NON-EMPTY variable already in the
+# environment wins over the file), then the same defaults as deploy_base.sh
+# (BASE_TRANSPORT, BASE_HOST, BASE_SSH_USER, BASE_SSH_KEY, BASE_SERIAL,
+# TRACTOR_SERIAL, BENCH_SUDO_PW, ARCHIVE_DIR). Also:
+#   TRACTOR_USER  fio
+#   BASE_WORK     /home/<BASE_SSH_USER>/lifetrac_build    work dir on the base
+#   TRACTOR_WORK  /home/<TRACTOR_USER>/lifetrac_images    work dir on the tractor
+#                 (both: an absolute path whose last part starts with "lifetrac",
+#                 because the board scripts chown -R / clean inside it)
+# Image tarballs land in $ARCHIVE_DIR/images (default
+# $HOME/Documents/LifeTrac-bench-archive/images), which must be outside git.
 #
 # What it changes:
-#   base:    /home/<user>/lifetrac_build/ (context + tarball, the tarball is
+#   base:    $BASE_WORK = /home/<user>/lifetrac_build/ (context + tarball, the tarball is
 #            removed once the PC copy is verified), image tags
 #            lifetrac-tractor-x8:<sha> and :latest, log
 #            /home/<user>/docker_build_tractor_<sha>.log.
 #   PC:      lifetrac-tractor-x8_<sha>.tar.gz + .manifest.txt + .pip-freeze.txt
 #            + build log in the images folder.
-#   tractor: /home/<user>/lifetrac_images/ (temporary), the loaded image, its
+#   tractor: $TRACTOR_WORK = /home/<user>/lifetrac_images/ (temporary), the loaded image, its
 #            :latest tag, and lifetrac-tractor-x8:previous = the image :latest
 #            pointed at before.
 #
@@ -61,10 +68,14 @@ IMAGE=lifetrac-tractor-x8
 
 # ---------------------------------------------------------------- settings --
 BENCH_ENV=${BENCH_ENV:-${BENCH_ENV_FILE:-$BT/bench.env}}
+# shellcheck source=lib/env_file.sh
+. "$BT/lib/env_file.sh"
 if [ -f "$BENCH_ENV" ]; then
-    set -a
-    eval "$(tr -d '\r' < "$BENCH_ENV")"
-    set +a
+    # CR stripped; the environment wins; nothing is exported (the password stays
+    # out of every child process's environment)
+    bench_load_env_file "$BENCH_ENV" || exit 2
+else
+    echo "build_tractor_image: WARN: no $BENCH_ENV -- the original bench's address and serials apply unless set in the environment (cp bench.env.example bench.env)" >&2
 fi
 
 COMMIT=HEAD
@@ -105,15 +116,32 @@ elif [ -z "${BASE_TRANSPORT:-}" ]; then
 fi
 case $BASE_TRANSPORT in ssh|adb) ;; *) echo "build_tractor_image: BASE_TRANSPORT must be ssh or adb" >&2; exit 2 ;; esac
 BASE_HOST=${BASE_HOST:-192.168.1.117}
-BASE_USER=${BASE_USER:-${BASE_SSH_USER:-fio}}
+BASE_USER=${BASE_SSH_USER:-${BASE_USER:-fio}}
 BASE_SSH_KEY=${BASE_SSH_KEY:-$HOME/.ssh/lifetrac_base_ed25519}
 BASE_SERIAL=${BASE_SERIAL:-2D0A1209DABC240B}
 TRACTOR_SERIAL=${TRACTOR_SERIAL:-2E2C1209DABC240B}
 TRACTOR_USER=${TRACTOR_USER:-fio}
 BENCH_SUDO_PW=${BENCH_SUDO_PW-fio}
-BENCH_ARCHIVE_DIR=${BENCH_ARCHIVE_DIR:-${ARCHIVE_DIR:-$HOME/Documents/LifeTrac-bench-archive}}
-BASE_WORK=/home/$BASE_USER/lifetrac_build
-TRACTOR_WORK=/home/$TRACTOR_USER/lifetrac_images   # on disk: /tmp is a RAM tmpfs aged at 5 d
+BENCH_ARCHIVE_DIR=${ARCHIVE_DIR:-${BENCH_ARCHIVE_DIR:-$HOME/Documents/LifeTrac-bench-archive}}
+BASE_WORK=${BASE_WORK:-/home/$BASE_USER/lifetrac_build}
+TRACTOR_WORK=${TRACTOR_WORK:-/home/$TRACTOR_USER/lifetrac_images}   # on disk: /tmp is a RAM tmpfs aged at 5 d
+# The board-side scripts run `chown -R` on these as root: allow only a dedicated
+# directory (absolute, no '..', no blanks or quotes, last part lifetrac*).
+for _wd in "BASE_WORK=$BASE_WORK" "TRACTOR_WORK=$TRACTOR_WORK"; do
+    _wv=${_wd#*=}
+    case $_wv in
+        /*/*) ;;
+        *) echo "build_tractor_image: ${_wd%%=*} must be an absolute path below / (got '$_wv')" >&2; exit 2 ;;
+    esac
+    case $_wv in
+        *..*|*[[:space:]\'\"\\]*) echo "build_tractor_image: ${_wd%%=*} must not contain '..', blanks, quotes or backslashes (got '$_wv')" >&2; exit 2 ;;
+    esac
+    case ${_wv##*/} in
+        lifetrac*) ;;
+        *) echo "build_tractor_image: ${_wd%%=*}='$_wv' must end in a directory named lifetrac* (it is chown -R'd as root)" >&2; exit 2 ;;
+    esac
+done
+unset _wd _wv
 
 # ----------------------------------------------------------------- helpers --
 say() { printf '[build_tractor_image %s] %s\n' "$(date -u +%H:%M:%SZ)" "$*"; }

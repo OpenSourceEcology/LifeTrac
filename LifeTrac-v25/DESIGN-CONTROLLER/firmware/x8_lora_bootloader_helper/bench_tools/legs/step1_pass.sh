@@ -8,7 +8,8 @@
 # Usage:   bash step1_pass.sh <bw250|bw500> <scene> [--from-work] [--suffix S]
 #                             [--scene-min PCT] [--no-scene-check]
 #   bw250|bw500     one-fragment budget/profile (image_bw250 = 203 B, image_bw500 = 243 B)
-#   <scene>         name in the file tag, e.g. moving, landscape
+#   <scene>         name in the file tag, e.g. moving, landscape (scene and suffix:
+#                   letters, digits, '_', '.', '-' only)
 #   --from-work     run camera_service.py and x8_image_pipeline from the pushed
 #                   /tmp/lifetrac_strict tree (push_fix_to_board.sh) instead of the
 #                   image's /app copy; the tag gets the suffix _work (was
@@ -26,7 +27,8 @@
 #          step1_tractor_log_<tag>.txt, step1_<tag>_bootcheck.txt.
 # Boards:  tractor only: recreates the bench_mqtt container (127.0.0.1:1883, no
 #          persistence), runs the capture (rs13_cap) and camera_svc (/dev/video1)
-#          containers, removes them at the end.
+#          containers, removes them at the end -- and, through an EXIT trap, also
+#          when the pass aborts or is interrupted (only the ones it started).
 # Radio:   camera only. Refuses to start while anything holds /dev/ttymxc3 or a
 #          leg daemon (tx_smoke / rx_smoke / synth_pub) runs on the tractor: a
 #          running tx daemon would put the camera frames on the air.
@@ -51,7 +53,9 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$BW" ] && [ -n "$SCENE" ] || { bench_usage; exit 2; }
 case $BW in bw250|bw500) ;; *) die "first argument must be bw250 or bw500" ;; esac
+bench_check_name "scene name" "$SCENE"
 [ "$SUFFIX" = unset ] && { [ $FROM_WORK = 1 ] && SUFFIX=_work || SUFFIX=""; }
+[ -z "$SUFFIX" ] || bench_check_name "--suffix" "$SUFFIX"
 PROFILE="image_${BW}"; TAG="${BW}_${SCENE}${SUFFIX}"
 if [ -z "$SMIN" ]; then case $SCENE in *moving*|*yt*|*youtube*) SMIN=8 ;; *) SMIN=0 ;; esac; fi
 if [ $FROM_WORK = 1 ]; then WDIR=/work; SCRIPT=/work/camera_service.py; else WDIR=/app; SCRIPT=camera_service.py; fi
@@ -73,6 +77,23 @@ if [ -n "$holders" ] || echo " $running " | grep -qE ' (tx_smoke|rx_smoke|synth_
 fi
 board_sh tractor "$SUDO docker rm -f camera_svc rs13_cap >/dev/null 2>&1" > /dev/null 2>&1
 
+# On an abort ("never subscribed", an error, Ctrl+C) remove the tractor containers
+# this pass started -- a leftover camera_svc would keep publishing frames that a
+# later tx daemon puts on the air. Names are added just before each launch and
+# dropped once the normal teardown has removed them.
+CAP_PID=""; STARTED=""
+step1_cleanup() {
+  if [ -n "$CAP_PID" ]; then kill "$CAP_PID" 2>/dev/null; fi
+  if [ -n "$STARTED" ]; then
+    stamp "cleanup: removing the tractor container(s) this pass started:$STARTED"
+    board_sh tractor "$SUDO docker rm -f$STARTED >/dev/null 2>&1" > /dev/null 2>&1
+    STARTED=""
+  fi
+}
+trap step1_cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 if [ $DO_SCENE = 1 ]; then
   bash "$LEGS_DIR/scene_check.sh" "step1_${TAG}" "$SMIN" || { stamp "ABORT: scene check failed"; exit 4; }
 fi
@@ -87,6 +108,7 @@ fi
 } | tee -a "$E/step1_bench_mqtt_reset.txt" | tail -1
 
 # 1. capture first
+STARTED="$STARTED rs13_cap"
 board_sh tractor "$SUDO docker run --rm --name rs13_cap --network=host -v $BOARD_STAGE:/work -w /work \
   -e PYTHONPATH=/work:/work/paho -e PYTHONUNBUFFERED=1 --entrypoint python3 $TRACTOR_APP_IMAGE \
   /work/vector_dry_run.py capture --topic lifetrac/v25/cmd/image_frame --profile $PROFILE \
@@ -102,6 +124,7 @@ done
 stamp "capture subscribed after $(( $(date +%s) - t0 )) s"
 
 # 2. then the camera
+STARTED="$STARTED camera_svc"
 board_sh tractor "$SUDO docker run -d --name camera_svc --network=host --device=/dev/video1 \
   -v $BOARD_STAGE:/work -w $WDIR -e PYTHONPATH=/work:/work/paho --entrypoint python3 \
   -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_CAMERA_SOURCE=v4l2 -e LIFETRAC_CAMERA_DEVICE=/dev/video1 \
@@ -122,11 +145,13 @@ board_sh tractor "$SUDO docker exec camera_svc python3 -c \"import x8_image_pipe
 
 # 3. wait for the capture, then encoder timing and teardown
 wait $CAP_PID
+CAP_PID=""
 stamp "capture finished"
 board_sh tractor "$SUDO docker logs camera_svc > $L/step1_camera_service_$TAG.log 2>&1; \
   $SUDO docker run --rm -v $BOARD_STAGE:/work -w /work -e PYTHONPATH=/work --entrypoint python3 \
   $TRACTOR_APP_IMAGE /work/vector_dry_run.py tractor-log /work/legs/step1_camera_service_$TAG.log \
   2>&1 | tee $L/step1_tractor_log_$TAG.txt; $SUDO docker rm -f camera_svc >/dev/null 2>&1" > "$OUT.tractorlog.out"
+STARTED=""                               # torn down: rs13_cap ended (--rm), camera_svc removed
 stamp "== capture summary ($L/step1_tractor_$TAG.txt, from '== vector dry run summary ==')"
 board_sh tractor "sed -n '/== vector dry run summary ==/,\$p' $L/step1_tractor_$TAG.txt"
 stamp "== tractor-log ($L/step1_tractor_log_$TAG.txt)"

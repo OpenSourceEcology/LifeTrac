@@ -9,16 +9,19 @@
 #     falling back to the fixed depth below bench_tools/), so the scripts work from
 #     any checkout and any working directory;
 #   * loads bench_tools/bench.env if it exists, else bench_tools/bench.env.example
-#     (or $BENCH_ENV_FILE); a NON-EMPTY variable already in the environment wins
-#     over the file; empty values get the computed defaults documented in the
-#     example file;
+#     with a one-line WARN on stderr (or $BENCH_ENV_FILE), through lib/env_file.sh,
+#     the loader every bench script shares: a NON-EMPTY variable already in the
+#     environment wins over the file; empty values get the computed defaults
+#     documented in the example file;
 #   * exports MSYS_NO_PATHCONV=1 so Git Bash does not rewrite /tmp/... board paths;
 #   * defines the helpers listed below.
 # Sourcing it touches nothing on the boards; it only creates $BENCH_SCRATCH.
 #
 # Paths: on Windows every PC-side path it sets is in mixed form (C:/Users/...),
 # which Git Bash, adb, py and PowerShell all accept. Hand Python tools and
-# `adb pull` that form, never /c/... (RS-13.1 A6).
+# `adb pull` that form, never /c/... (RS-13.1 A6). The one exception is scp
+# (BASE_TRANSPORT=ssh), which reads "C:/..." as host "C": board_push and
+# board_pull hand it the /c/... form themselves.
 #
 # Helpers:
 #   win_path P                 P in C:/... form (cygpath -m); unchanged off Windows
@@ -37,12 +40,18 @@
 #   board_push WHO SRC DST     copy a file/dir to the board (adb push / scp -r)
 #   board_push_lf WHO SRC DST  copy a text file LF-clean (shell, openocd cfg, conf)
 #   board_pull WHO SRC DST     copy a board file to the PC (adb pull / scp)
+#                              (scp gets the PC path in /c/... form: it reads C:/... as host C)
 #   board_image WHO            the probe image for WHO (BASE_IMAGE / TRACTOR_PROBE_IMAGE)
 #   board_has_image WHO IMG    true when IMG exists on the board
-#   board_uart_holders WHO     pids holding /dev/ttymxc3 (the L072 radio UART), or nothing
+#   board_uart_holders WHO     pids holding /dev/ttymxc3 (the L072 radio UART), nothing when
+#                              free, or "unknown(...)" when the check could not run (no
+#                              fuser, sudo or transport failure) -- callers treat any
+#                              non-empty answer as busy, so the gate fails closed
 #   board_containers WHO       names of the running containers, space separated
 #   strip_to_gzip FILE         drop the login-shell preamble adb exec-out puts before a gzip
 #   bench_require_dts_carrier  return 1 (with the reason) unless DTS_CARRIER_HZ may be flown
+#   bench_check_name WHAT VAL  die unless VAL matches ^[A-Za-z0-9_.-]+$ (leg tags, scene
+#                              names: they end up in file names and board shell commands)
 #   bench_evidence_dir         mkdir -p $EVIDENCE_DIR and print it
 #   bench_git_desc             "<branch> @ <short sha>[ +dirty]" of this checkout
 #   bench_show_env             print the effective settings (password masked)
@@ -101,20 +110,24 @@ unset _bench_bt
 _BENCH_VARS="BASE_SERIAL TRACTOR_SERIAL BASE_TRANSPORT BASE_HOST BASE_SSH_USER BASE_SSH_KEY BENCH_SUDO_PW
 PC_HOST BENCH_SCRATCH EVIDENCE_DIR ARCHIVE_DIR DTS_CARRIER_HZ DTS_CARRIER_DATE YOUTUBE_URL
 FIREFOX_PROFILE_DIR FIREFOX_EXE BASE_IMAGE TRACTOR_PROBE_IMAGE TRACTOR_APP_IMAGE BASE_BROKER_CONTAINER"
-declare -A _bench_pre=()
-for _v in $_BENCH_VARS; do
-  if [ -n "${!_v:-}" ]; then _bench_pre[$_v]=${!_v}; fi
-done
 # BENCH_ENV is the name provision_bench_board.sh, deploy_base.sh, build_tractor_image.sh
 # and flash_l072.sh use for the same thing; accept either.
 if [ -z "${BENCH_ENV_FILE:-}" ] && [ -n "${BENCH_ENV:-}" ]; then BENCH_ENV_FILE=$BENCH_ENV; fi
 if [ -z "${BENCH_ENV_FILE:-}" ]; then
-  if [ -f "$BT_DIR/bench.env" ]; then BENCH_ENV_FILE="$BT_DIR/bench.env"; else BENCH_ENV_FILE="$BT_DIR/bench.env.example"; fi
+  if [ -f "$BT_DIR/bench.env" ]; then
+    BENCH_ENV_FILE="$BT_DIR/bench.env"
+  else
+    BENCH_ENV_FILE="$BT_DIR/bench.env.example"
+    if [ -z "${BENCH_ENV_EXAMPLE_WARNED:-}" ]; then        # once per process tree
+      echo "bench_env: WARN: no bench_tools/bench.env -- using bench.env.example (the original OSE bench's serials and addresses); cp bench.env.example bench.env and edit it (BENCH_SETUP.md 5.3)" >&2
+      export BENCH_ENV_EXAMPLE_WARNED=1
+    fi
+  fi
 fi
 [ -f "$BENCH_ENV_FILE" ] || { echo "bench_env: settings file not found: $BENCH_ENV_FILE" >&2; return 1 2>/dev/null || exit 1; }
-eval "$(tr -d '\r' < "$BENCH_ENV_FILE")"                     # CRLF-tolerant
-for _v in "${!_bench_pre[@]}"; do printf -v "$_v" '%s' "${_bench_pre[$_v]}"; done
-unset _v _bench_pre
+# shellcheck source=env_file.sh
+. "$BENCH_LIB_DIR/env_file.sh" || { echo "bench_env: cannot load $BENCH_LIB_DIR/env_file.sh" >&2; return 1 2>/dev/null || exit 1; }
+bench_load_env_file "$BENCH_ENV_FILE" || { return 1 2>/dev/null || exit 1; }   # CRLF-tolerant; the environment wins
 
 : "${BASE_SERIAL:=2D0A1209DABC240B}"
 : "${TRACTOR_SERIAL:=2E2C1209DABC240B}"
@@ -161,7 +174,9 @@ BOARD_FLASH_STAGE=/tmp/lifetrac_p0c       # flash tooling + the harness's openoc
 SUDO="echo '$BENCH_SUDO_PW' | sudo -S -p ''"
 PROBE_RUN="docker run --rm --network=host --entrypoint python3 --device=/dev/ttymxc3 -v $BOARD_STAGE:/work -w /work -e PYTHONPATH=/work:/work/paho"
 WORK_RUN="docker run --rm --network=host --entrypoint python3 -v $BOARD_STAGE:/work -w /work -e PYTHONPATH=/work:/work/paho"
-BENCH_SSH_OPTS=(-i "$BASE_SSH_KEY" -o BatchMode=yes -o ConnectTimeout=8)
+# accept-new: a PC without a known_hosts entry for the base would otherwise fail every
+# BatchMode call (deploy_base.sh does the same); a CHANGED host key still fails.
+BENCH_SSH_OPTS=(-i "$BASE_SSH_KEY" -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new)
 
 # --- board helpers ----------------------------------------------------------------
 board_role() {
@@ -219,6 +234,7 @@ board_push() {
   ser=$(board_serial "$who")
   [ -e "$src" ] || { echo "board_push: no such file: $src" >&2; return 1; }
   if [ "$(board_via "$who")" = ssh ]; then
+    if command -v cygpath >/dev/null 2>&1; then src=$(cygpath -u "$src"); fi   # not C:/... (host "C")
     scp -q -r "${BENCH_SSH_OPTS[@]}" "$src" "$BASE_SSH_USER@$BASE_HOST:$dst" < /dev/null
   else
     adb -s "$ser" push "$src" "$dst" < /dev/null > /dev/null
@@ -238,6 +254,7 @@ board_pull() {
   dst=$(win_path "$3")
   ser=$(board_serial "$who")
   if [ "$(board_via "$who")" = ssh ]; then
+    if command -v cygpath >/dev/null 2>&1; then dst=$(cygpath -u "$dst"); fi   # not C:/... (host "C")
     scp -q -r "${BENCH_SSH_OPTS[@]}" "$BASE_SSH_USER@$BASE_HOST:$src" "$dst" < /dev/null
   else
     adb -s "$ser" pull "$src" "$dst" < /dev/null > /dev/null
@@ -256,7 +273,16 @@ board_has_image() {
 }
 
 board_uart_holders() {
-  board_sh "$1" "$SUDO fuser /dev/ttymxc3 2>/dev/null" | tr -s ' \n' ' ' | sed 's/^ //; s/ $//'
+  # The markers tell "nobody holds it" apart from "the check never ran" (fuser missing,
+  # sudo refused, transport down): the latter answers unknown(...), never "free".
+  local out
+  out=$(board_sh "$1" "$SUDO sh -c 'if command -v fuser >/dev/null 2>&1; then fuser /dev/ttymxc3 2>/dev/null; echo; echo __UART_CHK_DONE__; else echo __UART_NO_FUSER__; fi'")
+  case $out in
+    *__UART_NO_FUSER__*) echo "unknown(no fuser on the board)"; return 0 ;;
+    *__UART_CHK_DONE__*) ;;
+    *) echo "unknown(check failed: sudo or transport)"; return 0 ;;
+  esac
+  printf '%s\n' "$out" | grep -v '__UART_CHK_DONE__' | tr -s ' \n' ' ' | sed 's/^ //; s/ $//'
 }
 
 board_containers() {
@@ -293,6 +319,12 @@ bench_require_dts_carrier() {
     echo "WARN: DTS_CARRIER_DATE is empty -- make sure the spot-check for $f Hz was made today." >&2
   fi
   return 0
+}
+
+bench_check_name() {                     # bench_check_name WHAT VALUE
+  case $2 in
+    ''|*[!A-Za-z0-9_.-]*) die "$1 '$2' is not allowed: use only letters, digits, '_', '.' and '-' (it goes into file names and board shell commands)" ;;
+  esac
 }
 
 bench_evidence_dir() {
