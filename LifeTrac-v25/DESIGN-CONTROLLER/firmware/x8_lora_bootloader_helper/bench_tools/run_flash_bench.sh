@@ -49,10 +49,13 @@ if [ -n "$missing" ]; then
   exit 3
 fi
 # CRLF breaks bash and the openocd cfg; python tolerates it, so only .sh/.cfg.
-# (tr|cmp rather than grep $'\r': same answer on busybox, GNU and Git Bash.)
+# Byte counts with and without CR: only tr and wc, which the board scripts
+# already rely on (no cmp; grep $'\r' misbehaves under Git Bash).
 crlf=""
 for f in $need; do
-  case "$f" in *.sh|*.cfg) tr -d '\r' < "$f" | cmp -s - "$f" || crlf="$crlf $f" ;; esac
+  case "$f" in
+    *.sh|*.cfg) [ "$(tr -d '\r' < "$f" | wc -c)" = "$(wc -c < "$f")" ] || crlf="$crlf $f" ;;
+  esac
 done
 if [ -n "$crlf" ]; then
   echo "PREFLIGHT-FAIL: CRLF line endings in:" $crlf
