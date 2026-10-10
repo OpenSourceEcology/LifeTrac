@@ -1,9 +1,19 @@
 #!/bin/sh
 # Pre-create the NetworkManager profile so auto-connect fires during the
 # brief healthy window right after boot.
+# WiFi credentials come ONLY from the environment -- never commit an SSID or
+# password to this repo:
+#   LIFETRAC_WIFI_SSID  network name    LIFETRAC_WIFI_PSK  WPA passphrase
+# sudo drops the caller's environment, so pass them through, e.g. on the board:
+#   sudo env LIFETRAC_WIFI_SSID="<ssid>" LIFETRAC_WIFI_PSK="<psk>" sh /tmp/wifi_persist_and_reboot.sh
+# Bench note: the bench tractor runs with WiFi disabled on purpose
+# (LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/
+# bench_tools/BENCH_BOARDS.md); do not re-enable it during radio legs.
 set -e
-SSID="I'm a 5 star LAN!"
-PSK="9182603083"
+: "${LIFETRAC_WIFI_SSID:?set LIFETRAC_WIFI_SSID (WiFi network name; never commit it)}"
+: "${LIFETRAC_WIFI_PSK:?set LIFETRAC_WIFI_PSK (WiFi passphrase; never commit it)}"
+SSID="$LIFETRAC_WIFI_SSID"
+PSK="$LIFETRAC_WIFI_PSK"
 NAME="5star"
 
 # Delete any prior profile with same name
