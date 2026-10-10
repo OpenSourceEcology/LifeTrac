@@ -1,0 +1,67 @@
+# LifeTrac v25 base station: the wheels in the FLOWN bench image.
+#
+# Image:   lifetrac-v25:latest 4623980c2dac
+#          (sha256:4623980c2daca116eb68a80fc18285fa273b43545aac498557bcc349871161a6),
+#          built natively (linux/arm64) on the bench base X8 from main d3751286
+#          on 2026-09-15. It is the image the RS-13 legs flew with.
+# Evidence (LifeTrac-v25/DESIGN-CONTROLLER/bench-evidence/board_state_2026-10-04/base/files/home_fio/):
+#   - docker_build_d3751286.log, the build of 4623980c2dac, does NOT list the
+#     wheels: its pip step is "Using cache ---> 9e3efb0b5438".
+#   - docker_build.log (2026-09-12, image 12fe97dece57) is the build that
+#     CREATED layer 9e3efb0b5438, on top of the same requirements.txt layer
+#     1d0767921ca1. docker_build_3a0cb524.log (ed7c058774f4) reuses it too.
+#   - The list below is docker_build.log's "Successfully installed" line,
+#     which is every package that pip step installed. pip, setuptools and
+#     wheel come from the python image and are not listed.
+# Python:  FROM python:3.11-slim = image 2fe5ff938d2b,
+#          python@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93
+#          (pip 24.0). The apt step was cached before 2026-09-12, so its
+#          Debian package versions were never logged.
+#
+# Use:     docker build --build-arg LOCKED=1 -t lifetrac-v25:latest .
+#          The Dockerfile then applies this file as a pip CONSTRAINTS file on
+#          top of requirements.txt. A dependency added to requirements.txt
+#          later still installs, unpinned. A floor above a pin here fails the
+#          build loudly; then refresh this file or build without LOCKED.
+#          To pin the base image as well, add:
+#          --build-arg PYTHON_IMAGE=python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93
+#          Without LOCKED (the default, as in plain `docker compose build`)
+#          this file is ignored and pip resolves requirements.txt unpinned.
+#          CI does not build the image; it installs requirements-dev.txt,
+#          which pins fastapi 0.136.1 (the flown image has 0.141.1).
+#          The bench deploy (firmware/x8_lora_bootloader_helper/bench_tools/
+#          deploy_base.sh, see DEPLOY.md there) builds with LOCKED=1 by default.
+# Format:  name==version only. Constraints files cannot carry extras, so
+#          uvicorn[standard]'s extras appear as their own packages
+#          (httptools, python-dotenv, pyyaml, uvloop, watchfiles, websockets).
+# Refresh: after a deliberate unlocked rebuild, regenerate from
+#          `docker run --rm --entrypoint python3 lifetrac-v25:latest -m pip freeze`
+#          (deploy_base.sh saves this as /home/fio/pip_freeze_lifetrac-v25_<sha>.txt)
+#          and update the header.
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.15.1
+cffi==2.1.1
+click==8.5.0
+cryptography==50.0.1
+fastapi==0.141.1
+h11==0.16.0
+httptools==0.8.0
+idna==3.19
+jinja2==3.1.6
+MarkupSafe==3.0.3
+paho-mqtt==2.1.0
+Pillow==12.3.0
+pycparser==3.0
+pydantic==2.13.5
+pydantic-core==2.46.5
+pyserial==3.5
+python-dotenv==1.2.3
+pyyaml==6.0.3
+starlette==1.6.0
+typing-extensions==4.16.0
+typing-inspection==0.4.4
+uvicorn==0.52.4
+uvloop==0.22.1
+watchfiles==1.2.0
+websockets==17.1
