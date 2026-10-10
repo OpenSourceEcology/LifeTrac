@@ -6,7 +6,21 @@
     Launches image_rx_daemon on 2D0A and image_tx_daemon on 2E2C, streams
     synthetic frames from host, and logs real-time throughput / goodput (B/s),
     fragment counts, and demodulation metrics (RSSI, SNR).
+
+    PC requirements (bench kit, 2026-10-10): adb on PATH, the Python launcher
+    `py` (or -PythonExe), and the packages in bench_tools/requirements-pc.txt.
+    The PC MQTT broker this script starts when none answers on -HostIp:1883
+    is start_mqtt_broker.py at the repo root, which needs `amqtt`
+    (`py -3 -m pip install -r bench_tools/requirements-pc.txt`).
+
+    Parameter names are checked ([CmdletBinding()]): a misspelled name such as
+    -DurationSeconds is an error, not a silently ignored argument.
+
+    Profile-2 (DTS) legs must pin a spot-checked carrier with -ForceFrfHz; the
+    profile default is 915.000 MHz, the channel of the RS-11.6 external
+    emitter. -AllowDefaultCarrier overrides the refusal.
 #>
+[CmdletBinding()]
 param(
     [string]$TxAdbSerial = "2E2C1209DABC240B",
     [string]$RxAdbSerial = "2D0A1209DABC240B",
@@ -72,6 +86,21 @@ param(
     # the same argument as FhssLinkId. The known bench interferer sits in the
     # 915.0 MHz channel; e.g. -ForceFrfHz 917000000 moves the link off it.
     [int]$ForceFrfHz      = 0,
+    # Bench kit (2026-10-10): a profile-2 (DTS) leg with -ForceFrfHz 0 is
+    # REFUSED unless this switch is given. Profile 2's default carrier is
+    # 915.000 MHz, where the RS-11.6 external emitter bursts (~25 ms at -43 to
+    # -45 dBm every ~7.08 s); every RS-13.1 DTS leg flew there by accident and
+    # its losses fold on the emitter's period (RS-13.1 A19). Pin the carrier
+    # picked by a same-day receive-only spot-check instead (BENCH_RUNBOOK prep
+    # step 8). Use this switch only for a deliberate 915.000 MHz control leg.
+    [switch]$AllowDefaultCarrier,
+    # Bench kit (2026-10-10): Python used for the two PC-side processes this
+    # script may start -- the PC MQTT broker (start_mqtt_broker.py, needs the
+    # `amqtt` package) and the -TxFeed host synthetic publisher. Default `py`
+    # (the Windows Python launcher, run as `py -3`); pass a full python.exe
+    # path to use a specific interpreter or venv. Replaces a hardcoded
+    # per-user interpreter path. See bench_tools/requirements-pc.txt.
+    [string]$PythonExe    = "py",
     # RS-12 (2026-08-17): 1 = RX daemon logs one line per data fragment with
     # the firmware us RX timestamp (frag_arrival:). Diagnostic instrument for
     # the silent URC-drop timing shape; adds ~2300 log lines per 300 s leg.
@@ -178,6 +207,22 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Continue"
 
+# Bench kit (2026-10-10): refuse a DTS leg on the default carrier BEFORE
+# anything touches a board. Legs that pass -ForceFrfHz are unaffected.
+if ($RegProfile -eq 2 -and $ForceFrfHz -eq 0 -and -not $AllowDefaultCarrier) {
+    throw ("Refusing a profile-2 (DTS) leg with -ForceFrfHz 0: the profile default " +
+        "carrier is 915.000 MHz, the channel of the known RS-11.6 external emitter " +
+        "(~25 ms bursts at -43 to -45 dBm every ~7.08 s; RS-13.1 DTS losses folded on " +
+        "its period). Run a same-day receive-only channel spot-check with the tractor " +
+        "parked (channel_survey_sniff.py or hunt_sniff.ps1, then tools/survey_compare.py; " +
+        "BENCH_RUNBOOK prep step 8) and pass -ForceFrfHz <the pick>, e.g. -ForceFrfHz " +
+        "927500000 if that channel is clean today. For a deliberate 915.000 MHz control " +
+        "leg add -AllowDefaultCarrier.")
+}
+if ($RegProfile -eq 2 -and $ForceFrfHz -eq 0) {
+    Write-Warning "-AllowDefaultCarrier: this DTS leg flies on 915.000 MHz, the RS-11.6 emitter channel."
+}
+
 # Profile env for both daemons; profile 1 needs the 50-ch wide mask.
 $profEnv = "-e LIFETRAC_REG_PROFILE=$RegProfile"
 if ($RegProfile -eq 1) { $profEnv = "$profEnv -e LIFETRAC_FHSS_WIDE_MASK=1" }
@@ -216,22 +261,50 @@ $baseStation = Join-Path $repoRoot "LifeTrac-v25\DESIGN-CONTROLLER\base_station"
 $tractorX8   = Join-Path $repoRoot "LifeTrac-v25\DESIGN-CONTROLLER\firmware\tractor_x8"
 $helperDir   = $PSScriptRoot
 
+# PC-side Python (broker + -TxFeed host publisher). `py` is the Windows Python
+# launcher and takes `-3` to pick the newest Python 3; any other value is used
+# as the interpreter itself. The broker needs `amqtt`
+# (bench_tools/requirements-pc.txt).
+$pyPrefixArgs = @()
+if ([System.IO.Path]::GetFileNameWithoutExtension($PythonExe) -ieq "py") { $pyPrefixArgs = @("-3") }
+if (-not (Get-Command $PythonExe -ErrorAction SilentlyContinue)) {
+    Write-Warning "PythonExe '$PythonExe' not found; the PC broker / host publisher cannot start. Install Python 3 (py launcher) or pass -PythonExe <path\to\python.exe>."
+}
+
 Write-Host "=== STARTING LIVE LORA RADIO MONITOR ($DurationS s) ===" -ForegroundColor Cyan
 Write-Host "TX Serial: $TxAdbSerial"
 Write-Host "RX Serial: $RxAdbSerial"
 Write-Host "MQTT Host: $HostIp"
+# -HostIp must be THIS PC's LAN address (the boards dial it for the control
+# broker). The default is the original bench PC's DHCP lease; warn, do not
+# change it, when it is not one of this machine's addresses.
+try {
+    $localIps = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop | ForEach-Object { $_.IPAddress })
+    if ($localIps.Count -gt 0 -and $localIps -notcontains $HostIp) {
+        Write-Warning "HostIp $HostIp is not an address of this PC ($($localIps -join ', ')). Pass -HostIp <this PC's LAN IPv4>."
+    }
+} catch { }
 
 # 1. Ensure Host MQTT Broker is running
 $socket = New-Object System.Net.Sockets.TcpClient
 $asyncResult = $socket.BeginConnect($HostIp, 1883, $null, $null)
 $waitResult = $asyncResult.AsyncWaitHandle.WaitOne(1000, $false)
 if (-not $waitResult -or -not $socket.Connected) {
-    Write-Host "[MQTT] Starting host broker on $HostIp:1883..." -ForegroundColor Yellow
-    Start-Process -FilePath "C:\Users\dorkm\AppData\Local\Python\pythoncore-3.14-64\python.exe" -ArgumentList "start_mqtt_broker.py" -WorkingDirectory $repoRoot -PassThru -NoNewWindow
+    Write-Host "[MQTT] Starting host broker on $($HostIp):1883 ($PythonExe $($pyPrefixArgs -join ' ') start_mqtt_broker.py; needs amqtt)..." -ForegroundColor Yellow
+    Start-Process -FilePath $PythonExe -ArgumentList (@($pyPrefixArgs) + @("start_mqtt_broker.py")) -WorkingDirectory $repoRoot -PassThru -NoNewWindow
     Start-Sleep -Seconds 2
+    # Advisory re-probe only (the leg continues either way, as before): a
+    # broker that did not come up is almost always a missing `amqtt`.
+    $probe2 = New-Object System.Net.Sockets.TcpClient
+    try {
+        $ar2 = $probe2.BeginConnect($HostIp, 1883, $null, $null)
+        if (-not $ar2.AsyncWaitHandle.WaitOne(1000, $false) -or -not $probe2.Connected) {
+            Write-Warning "PC broker not answering on $($HostIp):1883 after start. Check: $PythonExe $($pyPrefixArgs -join ' ') -c `"import amqtt`" (install with: py -3 -m pip install -r bench_tools\requirements-pc.txt)."
+        }
+    } catch { } finally { $probe2.Close() }
 } else {
     $socket.Close()
-    Write-Host "[MQTT] Host broker active at $HostIp:1883" -ForegroundColor Green
+    Write-Host "[MQTT] Host broker active at $($HostIp):1883" -ForegroundColor Green
 }
 
 # 2. Clean up previous containers
@@ -333,7 +406,16 @@ foreach ($pair in $warmPairs) {
 Write-Host "[RESET] RX L072 via gpio163 NRST..."
 $nrstCmd = "echo fio | sudo -S -p '' sh -c '[ -d /sys/class/gpio/gpio163 ] || echo 163 > /sys/class/gpio/export; echo out > /sys/class/gpio/gpio163/direction; echo 1 > /sys/class/gpio/gpio163/value; sleep 0.02; echo 0 > /sys/class/gpio/gpio163/value; sleep 0.10; echo 1 > /sys/class/gpio/gpio163/value'"
 cmd /c "`"$adbExe`" -s $RxAdbSerial shell `"$nrstCmd`"" | Out-Null
+# Bench kit (2026-10-10): /tmp is tmpfs (wiped by every reboot/flash, aged at
+# 5 d) and the flash pipeline may have left /tmp/lifetrac_p0c root-owned, so
+# make the directory writable before the push and check the cfg landed -- the
+# SWD reset below needs it and its push used to fail silently.
+cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"echo fio | sudo -S -p '' mkdir -p /tmp/lifetrac_p0c ; echo fio | sudo -S -p '' chmod 0777 /tmp/lifetrac_p0c`"" | Out-Null
 cmd /c "`"$adbExe`" -s $TxAdbSerial push `"$(Join-Path $helperDir '08_boot_user_app.cfg')`" /tmp/lifetrac_p0c/08_boot_user_app.cfg" | Out-Null
+$cfgCheck = cmd /c "`"$adbExe`" -s $TxAdbSerial shell `"test -s /tmp/lifetrac_p0c/08_boot_user_app.cfg && echo CFG-OK || echo CFG-MISSING`"" 2>$null
+if ("$cfgCheck" -notmatch "CFG-OK") {
+    Write-Warning "/tmp/lifetrac_p0c/08_boot_user_app.cfg is not on the tractor ($TxAdbSerial); the SWD reset of the TX L072 will fail."
+}
 
 # 5. Fire the tractor SWD reset in the BACKGROUND, then launch the TX daemon
 # immediately. openocd needs ~7-10 s to reach its NRST pulse; the daemon needs
@@ -436,7 +518,7 @@ if ($TxFeed -eq "camera") {
     $env:LIFETRAC_SYNTH_DURATION_S = "$($DurationS + 10)"
     $env:LIFETRAC_SYNTH_BYTE_BUDGET = "$SynthBudgetB"
     $pubScript = Join-Path $repoRoot "publish_synthetic_frames.py"
-    $pubProc = Start-Process -FilePath "C:\Users\dorkm\AppData\Local\Python\pythoncore-3.14-64\python.exe" -ArgumentList "`"$pubScript`"" -PassThru -NoNewWindow -WorkingDirectory $repoRoot
+    $pubProc = Start-Process -FilePath $PythonExe -ArgumentList (@($pyPrefixArgs) + @("`"$pubScript`"")) -PassThru -NoNewWindow -WorkingDirectory $repoRoot
 }
 
 Write-Host "=== MONITORING RADIO TRANSMISSIONS FOR $DurationS SECONDS ===" -ForegroundColor Green
@@ -538,6 +620,7 @@ if ($Archive) {
         "tx_feed=$TxFeed",
         "reg_profile=$RegProfile",
         "force_frf_hz=$ForceFrfHz",
+        "allow_default_carrier=$([bool]$AllowDefaultCarrier)",
         "tx_serial=$TxAdbSerial",
         "rx_serial=$RxAdbSerial",
         "host_ip=$HostIp",

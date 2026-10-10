@@ -1,0 +1,123 @@
+# L072 bench md5 -- NON-BLOCKING reproducibility check (bench kit, 2026-10-10).
+#
+# Rebuilds the Murata L072 firmware with the exact toolchain the bench PC uses
+# (Arm GNU Toolchain 12.2.MPACBTI-Rel1, arm-none-eabi-gcc 12.2.1 20230214) and
+# prints the md5s of the bench and production images next to the reference
+# values in LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/README.md
+# ("Expected md5s") and the committed build/firmware.bin. Mismatches are
+# warnings, never failures: the job is continue-on-error and the md5 step
+# always exits 0. The blocking link/size gate stays in arduino-ci.yml.
+name: L072 bench md5 (non-blocking)
+
+on:
+  push:
+    paths:
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/**'
+      - '.github/workflows/l072-bench-md5.yml'
+  pull_request:
+    paths:
+      - 'LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072/**'
+      - '.github/workflows/l072-bench-md5.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Linux x86_64 host build of the release the bench PC uses. URL and sha256
+  # checked 2026-10-10 against Arm's published .sha256asc (170 644 784 B).
+  ARM_TOOLCHAIN_URL: https://developer.arm.com/-/media/Files/downloads/gnu/12.2.mpacbti-rel1/binrel/arm-gnu-toolchain-12.2.mpacbti-rel1-x86_64-arm-none-eabi.tar.xz
+  ARM_TOOLCHAIN_SHA256: 17455a06c816031cc2c66243c117cba48463cd6a3a3fdfac7275b4e9c40eb314
+  # murata_l072/README.md "Expected md5s" (main bb4a2071). Update both when the
+  # firmware source changes and the new pair is recorded.
+  EXPECTED_BENCH_MD5: 0c1bb0a9573f813137f941dfa47177d0
+  EXPECTED_PROD_MD5: 589c120323c2d5e7ef9f459d7a4ba42d
+  L072_DIR: LifeTrac-v25/DESIGN-CONTROLLER/firmware/murata_l072
+
+jobs:
+  l072-bench-md5:
+    name: L072 bench md5 (Arm 12.2.MPACBTI-Rel1)
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache the Arm toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/arm-gnu-toolchain-12.2.mpacbti-rel1
+          key: arm-gnu-toolchain-12.2.mpacbti-rel1-x86_64-${{ env.ARM_TOOLCHAIN_SHA256 }}
+
+      - name: Install Arm GNU Toolchain 12.2.MPACBTI-Rel1
+        run: |
+          set -euo pipefail
+          TC="$HOME/arm-gnu-toolchain-12.2.mpacbti-rel1"
+          if [ ! -x "$TC/bin/arm-none-eabi-gcc" ]; then
+            curl -fsSL --retry 3 -o "$RUNNER_TEMP/tc.tar.xz" "$ARM_TOOLCHAIN_URL"
+            echo "$ARM_TOOLCHAIN_SHA256  $RUNNER_TEMP/tc.tar.xz" | sha256sum -c -
+            mkdir -p "$TC"
+            tar -xJf "$RUNNER_TEMP/tc.tar.xz" -C "$TC" --strip-components=1
+            rm -f "$RUNNER_TEMP/tc.tar.xz"
+          fi
+          echo "$TC/bin" >> "$GITHUB_PATH"
+          "$TC/bin/arm-none-eabi-gcc" --version | head -1
+
+      - name: Record the committed production md5
+        working-directory: ${{ env.L072_DIR }}
+        run: md5sum build/firmware.bin | cut -d' ' -f1 | tee "$RUNNER_TEMP/committed_prod.md5"
+
+      - name: make bench
+        working-directory: ${{ env.L072_DIR }}
+        run: |
+          arm-none-eabi-gcc --version | head -1
+          mkdir -p build   # `bench` writes build/firmware_bench_diag.bin but does not create build/
+          make bench
+
+      - name: make (production)
+        working-directory: ${{ env.L072_DIR }}
+        run: make
+
+      - name: Compare md5s with the README (warn only)
+        working-directory: ${{ env.L072_DIR }}
+        run: |
+          bench=$(md5sum build/firmware_bench_diag.bin | cut -d' ' -f1)
+          prod=$(md5sum build/firmware.bin | cut -d' ' -f1)
+          committed=$(cat "$RUNNER_TEMP/committed_prod.md5")
+          verdict() { [ "$1" = "$2" ] && echo "match" || echo "**differs**"; }
+          {
+            echo "## L072 md5 -- Arm GNU Toolchain 12.2.MPACBTI-Rel1 on Linux"
+            echo
+            echo "| image | built here | reference | |"
+            echo "|---|---|---|---|"
+            echo "| bench \`firmware_bench_diag.bin\` | \`$bench\` | README \`$EXPECTED_BENCH_MD5\` | $(verdict "$bench" "$EXPECTED_BENCH_MD5") |"
+            echo "| production \`firmware.bin\` | \`$prod\` | README \`$EXPECTED_PROD_MD5\` | $(verdict "$prod" "$EXPECTED_PROD_MD5") |"
+            echo "| production \`firmware.bin\` | \`$prod\` | committed \`$committed\` | $(verdict "$prod" "$committed") |"
+            echo
+            echo "A source change since bb4a2071 moves both README md5s; record the new"
+            echo "pair in murata_l072/README.md and in this workflow's env."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "bench      built=$bench expected=$EXPECTED_BENCH_MD5"
+          echo "production built=$prod expected=$EXPECTED_PROD_MD5 committed=$committed"
+          if [ "$bench" != "$EXPECTED_BENCH_MD5" ]; then
+            echo "::warning title=L072 bench md5 differs::firmware_bench_diag.bin md5 $bench != README $EXPECTED_BENCH_MD5 (source changed since bb4a2071, or this Linux build of 12.2.MPACBTI-Rel1 is not byte-identical to the bench PC build)"
+          fi
+          if [ "$prod" != "$EXPECTED_PROD_MD5" ]; then
+            echo "::warning title=L072 production md5 differs::firmware.bin md5 $prod != README $EXPECTED_PROD_MD5"
+          fi
+          if [ "$prod" != "$committed" ]; then
+            echo "::warning title=Committed firmware.bin not reproduced::the committed build/firmware.bin ($committed) differs from this build ($prod): rebuild and commit it with the firmware change, using the exact toolchain"
+          fi
+          exit 0
+
+      - name: Upload the built images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l072-bench-md5-${{ github.sha }}
+          path: |
+            ${{ env.L072_DIR }}/build/firmware_bench_diag.bin
+            ${{ env.L072_DIR }}/build/firmware.bin
+            ${{ env.L072_DIR }}/build/firmware.map
+          if-no-files-found: warn
+          retention-days: 14
