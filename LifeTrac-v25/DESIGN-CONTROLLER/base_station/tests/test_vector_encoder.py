@@ -701,13 +701,22 @@ class TemporalTests(unittest.TestCase):
         # Recolour it out of the vegetation class: it leaves the plant layer, so DEL + a mass define.
         frame = decode(enc.frame(scene(blobs=[(20, 44, 4, (200, 60, 60)), (53, 40, 4, GREEN)]), BUDGET))
         self.assertEqual(len(records_of(frame, vs.Del)), 1)
+        plant_del = records_of(frame, vs.Del)[0]
+        self.assertIn(plant_del.id, vs.ID_PLANT)
         self.assertEqual(len(records_of(frame, vs.Poly)), 1)
         self.assertIn(records_of(frame, vs.Poly)[0].id, vs.ID_MASS)
-        # Remove it: a DEL.
+        # Remove it: a DEL, behind the repeat of the last frame's DEL (§4.3).
         frame = decode(enc.frame(scene(blobs=[(53, 40, 4, GREEN)]), BUDGET))
         dels = records_of(frame, vs.Del)
-        self.assertEqual(len(dels), 1)
+        self.assertEqual(len(dels), 2)
+        self.assertEqual(dels[0], plant_del)
+        self.assertIn(dels[1].id, vs.ID_MASS)
         self.assertEqual(records_of(frame, vs.Digest)[0].n_live, 1)
+        # The mass's DEL is repeated in the next frame, and then no DEL goes.
+        frame = decode(enc.frame(scene(blobs=[(53, 40, 4, GREEN)]), BUDGET))
+        self.assertEqual(records_of(frame, vs.Del), [dels[1]])
+        frame = decode(enc.frame(scene(blobs=[(53, 40, 4, GREEN)]), BUDGET))
+        self.assertEqual(records_of(frame, vs.Del), [])
 
     def test_gain_absorbs_a_global_exposure_step_without_a_ucol_flood(self):
         img = scene(blobs=[(24, 56, 4, GREEN), (50, 40, 4, GREEN)],

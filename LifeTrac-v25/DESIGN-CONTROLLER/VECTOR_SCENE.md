@@ -492,7 +492,7 @@ byte1 bit2 ..       records, MSB-first bitstream; records never cross frames
    - id 0;
 
    The fragment has already passed the L072's payload CRC and the reassembler, so a parse error means version skew or a bug. Rejecting the whole frame keeps the store deterministic.
-4. UPD, UCOL, INSERT, DEL, CONFIRM or HOLE naming an unknown id is an *orphan*: ignore it and count it.
+4. UPD, UCOL, INSERT, CONFIRM or HOLE naming an unknown id is an *orphan*: ignore it and count it. A DEL naming an id the base does not hold is not an orphan: the id is absent either way, and the tractor sends every DEL twice (§4.3), so a base that applied the first copy sees the second name an unknown id. Such a DEL leaves a tombstone at its capture time, unless the id already has one, so an older define of the id is still refused.
 5. **Per-field last writer wins by capture time.** Each shape has five fields, each with its own capture time:
 
    | Field | Set by |
@@ -583,9 +583,9 @@ The encoder takes F from the live `tractor/link_budget` value minus the 6 B `Til
 2. ANOM, if corr_n > 0.
 3. HZN (RESID, or ABS when an epoch starts or a stop changes by ΔE > 6), GSHIFT, GZOOM, GAIN.
 4. STATUS (every frame while the arm moves or `mask_anom = 1`; otherwise every 4th frame or on change).
-5. Changes (new, UPD, UCOL, DEL, HOLE), by ΔD/bit.
+5. Changes (new, UPD, UCOL, DEL, HOLE), by ΔD/bit, behind the repeat of the previous frame's DELs (§4.3), which the CONFIRM and DIGEST reserve does not bind.
 6. Repeat-once of the previous frame's defines, **re-verified**.
-7. Carousel (κ = 25 % of the remaining budget), **re-verified**.
+7. Carousel (κ = 25 % of the remaining budget), **re-verified**. Every fourth frame (V0's κ as a duty cycle, at every level; at V0 the carousel frame itself) the first 25 % of the frame is the **repair share**, taken *before* items 5–6: carousel re-sends and repeat-once copies alike, the oldest (re)statement first (§4.3).
 8. CONFIRM and DIGEST.
 9. INSERT and L4, until the budget or the residual floor.
 
@@ -605,6 +605,8 @@ With 1,563–1,883 record bits per frame, items 1–5 rarely exceed a third of t
   - If it fails, the tractor redefines or deletes it.
   - Repeat-once: at 12 % independent loss, lost defines fall to 1.44 % (computed).
   - Carousel period ≈ Σ define bits / (κ × spare bits per frame): about 2 frames for the worked scene (est.).
+- **DEL repeat.** Every DEL goes out twice: in its frame and in the next, ahead of that frame's changes and outside the CONFIRM/DIGEST reserve, so one lost frame never loses a DEL. A base that missed a DEL keeps the shape as a ghost for 20 of its applied frames; meanwhile every DIGEST mismatches on `n_live`, and the resync that follows refuses the CONFIRMs that keep static shapes alive (RS-13.1 A16). When the next frame re-uses the id for a fresh define, that define replaces the repeat (it states its offset and colour for a base that missed the DEL, §3.4 rule 5); a DEL and a define of one id never share a frame, because they would share a capture time and the tombstone would refuse the define. Until a repeat or a define of the id has gone out, the repeat stays owed. Cost: 11 bits per DEL.
+- **Repair share.** Packed last, the carousel got no room on a saturated stream, and a repeat-once crowded out of item 6 was never offered to it. After one lost frame nothing re-sent what the base had lost, so CONFIRM-only shapes expired at a base in resync until the next epoch start (A16). So every fourth frame the first 25 % of the frame goes to re-sends, the oldest (re)statement first: the shape whose define last went out longest ago, alone or with its UPD and UCOL. For an unchanged shape this is its risk of TTL expiry at a base in resync, which refuses CONFIRMs and so ages the shape from its last define or re-send; the tractor's own TTL clock is no guide, because a CONFIRM resets it. A shape with an UPD or UCOL since its last statement sorts by the same old frame, so a change a lost frame took is re-stated early, which ends the DIGEST mismatch. Repeat-once copies are eligible on the same clock, so a define a lost frame took is re-sent even when item 5 crowds item 6 out. A share on every frame starved the frame's own changes and the repeats behind them (SIL: worse than none), so it runs one frame in four. On the A16 SIL scene the longest any live shape then goes without a define, re-send or UPD is 7–8 frames, against 67 (243 B) and 114 (203 B) before, so a base in resync no longer TTL-drops live shapes.
 - **CONFIRM tag.**
   - tag2 = the low 2 bits of the shape's state-hash (§3.3: CRC-16 over offset, colour, inserts and hole slots), computed from the tractor's mirror.
   - The base resets a shape's age only when the tag matches its stored state **and** DIGEST is not in mismatch. Otherwise it counts an orphan.
