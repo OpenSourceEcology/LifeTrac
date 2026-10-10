@@ -13,7 +13,12 @@ needs. Results go into `bench-evidence/RS_13_vector_scene_<date>/RESULTS.md`,
 started from [RS13_RESULTS_TEMPLATE.md](RS13_RESULTS_TEMPLATE.md). The RS-13.1
 session scripts that did each step below are kept in
 [`bench-evidence/RS_13_vector_scene_2026-09-26/scripts/`](../../../bench-evidence/RS_13_vector_scene_2026-09-26/scripts/)
-(they carry that session's paths).*
+(they carry that session's paths). **Amended 2026-10-10** — P8 as an absolute
+bound, P6's return clause with the in-flight frame(s), and the spot-checked
+DTS carrier in the literal leg command (RESULTS A17, A18, A19; see
+[Amendments 2026-10-10](#amendments-2026-10-10)). The amendments apply from the
+next round; RS-13.1 (rounds 1–4) stays judged by the text it flew under, which
+that section quotes.*
 
 **No firmware change.** VECTOR rides the strict image path as ordinary
 one-fragment 0xFE trains (a 0xFD copies train only if `LIFETRAC_KEYFRAME_COPIES`
@@ -36,7 +41,8 @@ Does not prove: the `VECTOR_SCENE.md` §8 field criteria beyond a same-day
 `mono_g4` control leg; the V1–V3 degradation ladder (no policy is built — every
 frame is V0 at the requested detail); the self-model and the Vector Lab; the
 browser rendering (web_ui is not in the harness loop — a desk check with the
-production compose follows as RS-13.2); the range edge.
+production compose follows as RS-13.2); the range edge (its procedure is
+[RS13_RANGE_EDGE_LEG.md](RS13_RANGE_EDGE_LEG.md)).
 
 ## Numbers to hold in mind
 
@@ -82,7 +88,60 @@ Each row is spelled out in the step it belongs to; this is the checklist.
 | after every leg | park last, after the post-brackets and reports; `PARK_TRANSIENT` → wait ~60 s and park again until `PARK_OK` (Step 2) | after 2b_yt the base still read `PARK_TRANSIENT` (`opmode_after_settle 0x85`, its scan walking) 2 min after the daemons stopped; the second attempt parked |
 | FHSS legs at 1 fps | read P2/P3 from lock, or fly at 2 fps (Step 2, P2/P3) | acquisition is deterministic (first frame at seq 58 on both 1-fps flights, A7); no FHSS time authority at 1 fps (A11) |
 | P3 | compare single legs only interleaved with the control, or against a margin stated before the flight | the same control lost 6.5 % and 0.3 % a week apart (A15) |
-| P6 | the bound includes the encoder's own time; stamp and publish in **one** board call | A9; a two-call stamp once ran 16.6 s early (A13) |
+| P6 | the bound includes the encoder's own time; stamp and publish in **one** board call; the return clause counts the frame(s) already in flight (amended 2026-10-10) | A9; a two-call stamp once ran 16.6 s early (A13); round 4's return resumed on the very next frame, behind one in-flight VECTOR frame, and missed the old one-period clause (A18) |
+| P8 | judge the on-air encoder p95 against the absolute budget at the leg's camera rate; the step-1 ratio is recorded for information (amended 2026-10-10) | round 4's 2a / 2b missed a ±20 % band around a 2-minute step-1 sample while staying 72–82 ms inside the 350 ms budget (A17) |
+| every profile-2 leg | a same-day receive-only spot-check, then `-ForceFrfHz <spot-checked carrier>` on the harness line; check `FRF readback: … (OK)` at that carrier on both boards in the archive | all nine RS-13.1 DTS legs flew on 915.000 MHz, the RS-11.6 emitter's channel, and their losses fold on its 7.08 s period (A19) |
+
+## Amendments 2026-10-10
+
+Three changes from the RS-13.1 review (RESULTS A17, A18, A19). They apply
+from the **next** round. RS-13.1 — rounds 1–4, 2026-09-26 to 2026-10-04 — stays
+judged by the text it flew under, quoted here as "was", so its record and its
+GO do not move. The criteria table in Step 2 carries the amended text.
+
+1. **P8 becomes an absolute bound (A17).** The on-air encoder p95
+   (`vector_stats` `ms_total`, `tractor-log` on the archived
+   `camera_service.log`) must be ≤ the encoder budget **at the leg's camera
+   rate**: 350 ms at 2 fps, the step-1 encoder-time row (70 % of the 500 ms
+   period). A leg flown at another camera rate states its budget in RESULTS
+   before it flies, at the same 70 % of its period (700 ms at 1 fps). The p95
+   relative to the step-1 figure of the same profile is recorded beside it
+   **for information only**, with the tractor tx daemon's `drop_full` /
+   `drop_stale` counters (`tx_daemon.log`). Why: the band was relative to a
+   2-minute step-1 sample, and on air the encoder ran +18 to +24 % (the video
+   segment and the tx daemon sharing the CPU — round 4 does not separate the
+   two) while every p95 stayed ≤ 278 ms with no TX drop; the budget tests the
+   criterion's purpose, that the encoder keeps up on air, directly.
+   *Was:* "`vector_stats` p95 in the archived `camera_service.log` within the
+   step-1 figure ± 20 %" (round 4: 2a +20.1 %, 2b +24.4 %, misses by the
+   letter).
+2. **P6's return clause counts the frame(s) already in the TX pipeline
+   (A18).** Codec-1 resumes within **one camera period + the in-flight
+   frame(s) + one fragment airtime** of the return command going on air:
+   the first codec-1 payload in the base capture follows the return command's
+   `command TX … (on air)` line (base clock) by at most
+   (1 + n) camera periods + 1 fragment airtime. n is the number of codec-6
+   frames the base receives between that line and the first codec-1 payload:
+   the frames captured or already queued when the command landed, which the
+   pipeline sends first (`tx_pipeline_depth=2`, `tx_prepare_ahead=1` on the
+   harness defaults, both in `params.txt`). Each in-flight frame is worth up to
+   one camera period, because the first codec-1 frame is captured only after
+   the last of them and leaves after it. n may not exceed
+   `tx_pipeline_depth` + `tx_prepare_ahead` (3 on the defaults); a larger n is
+   a stall, and the clause fails. Round 4 for scale: n = 1, so the bound is
+   2 × 0.5 + 0.1 = 1.10 s at 2 fps on DTS, against the measured 0.77 s. The
+   forward clause is unchanged (it already counts the encoder's time and one
+   airtime, A9). *Was:* "codec-1 frames resume within one camera period of the
+   return command going on air" (written at 1 fps; round 4: 0.77 s against
+   0.5 s, a miss by the letter).
+3. **Every literal profile-2 leg command carries
+   `-ForceFrfHz <spot-checked carrier>` (A19).** The prose already required a
+   same-day receive-only spot-check and the pick on every 2a/2c/2d line; the
+   literal 2a command below now carries it, and 2c and 2d are 2a's line. 2b
+   (profile 1) does **not** take it: the FHSS hop scheduler owns the
+   synthesizer there. *Was:* the literal 2a line had no `-ForceFrfHz`, so
+   `-ForceFrfHz 0` pinned the profile-2 default, 915.000 MHz (`force_frf_hz=0`
+   in all nine RS-13.1 DTS archives).
 
 ## Step 0 — image and staging (tractor)
 
@@ -357,9 +416,12 @@ If only the encoder time fails, run the radio legs at `-SynthFps 1` and record
 the miss: it is a Phase 4 optimisation item, not a blocker for the radio
 evidence. At 1 fps a 300 s leg carries at most ~300 frames, so use
 `--min-frames 250` on the base capture and read P2 as ≥ 0.9 frames/s (90 % of
-1 fps); P8 still compares against the step-1 figure measured at 2 fps — say so
-in RESULTS. (RS-13.1: p95 449–478 ms on the i.MX8 against 350 ms, A4, so both
-radio rounds flew at 1 fps.)
+1 fps); P8 then holds the leg to the 1-fps budget stated in RESULTS before the
+leg (700 ms, Amendments 2026-10-10 item 1), with the ratio to the step-1
+figure measured at 2 fps recorded for information — say so in RESULTS. (Under
+the text RS-13.1 flew, P8 compared against the step-1 figure measured at
+2 fps. RS-13.1: p95 449–478 ms on the i.MX8 against 350 ms, A4, so radio
+rounds 2 and 3 flew at 1 fps.)
 
 1 fps costs the FHSS leg (2b) twice, and neither is a VECTOR defect:
 
@@ -472,9 +534,14 @@ as in the RS-3.3 legs.
 **Pin the DTS carrier on every profile-2 leg.** Before the first DTS leg of the
 day, run a receive-only channel spot-check with the tractor parked
 ([`channel_survey_sniff.py`](../channel_survey_sniff.py) or
-[`hunt_sniff.ps1`](../hunt_sniff.ps1), then `tools/survey_compare.py`). Add
-`-ForceFrfHz <the pick>` to every 2a/2c/2d line below, and record the pick in
-RESULTS. Without it, `-ForceFrfHz 0` pins the profile-2 default of
+[`hunt_sniff.ps1`](../hunt_sniff.ps1), then `tools/survey_compare.py`). Every
+2a/2c/2d line carries `-ForceFrfHz <the pick>` (an integer in Hz, e.g.
+`927500000`; the harness refuses a centre outside 902.25–927.75 MHz): since the
+2026-10-10 amendment the literal 2a command below has it, and 2c and 2d are
+2a's line with another `-CamExtraEnv`. Record the pick in RESULTS, and check
+`forcing FRF -> <pick>` … `FRF readback: … (OK)` on both boards in the
+archive's daemon logs (the bench diag L072 build accepts the write; the
+production build refuses it). Without it, `-ForceFrfHz 0` pins the profile-2 default of
 915.000 MHz. That is the channel of the RS-11.6 external emitter (about 25 ms
 bursts at −43 to −45 dBm on a hard 7.07–7.09 s grid). All nine RS-13.1 DTS legs
 flew there, and their losses fold on its period (RESULTS A19). The RS-12 legs
@@ -484,13 +551,17 @@ from day to day, so re-check rather than reuse a pick.
 - **2a — DTS (profile 2), VECTOR at boot:**
 
   ```powershell
-  .\run_live_radio_monitor.ps1 -TxFeed camera -RegProfile 2 -DurationS 300 -SynthFps 2 `
-     -KfRequestDisable 1 -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 `
+  .\run_live_radio_monitor.ps1 -TxFeed camera -RegProfile 2 -ForceFrfHz <spot-checked carrier> `
+     -DurationS 300 -SynthFps 2 -KfRequestDisable 1 -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 `
      -CamExtraEnv "-e LIFETRAC_ENCODE_MODE=9 -e LIFETRAC_VECTOR_DETAIL=80" -Archive
   ```
 
-- **2b — FHSS (profile 1), VECTOR at boot:** the same with `-RegProfile 1`;
-  base capture with `--profile image_bw250`. At `-SynthFps 1` expect the first
+  (`-ForceFrfHz` added 2026-10-10, from the next round; RS-13.1 flew this line
+  without it, i.e. on 915.000 MHz — Amendments 2026-10-10 item 3.)
+
+- **2b — FHSS (profile 1), VECTOR at boot:** the same with `-RegProfile 1` and
+  **without** `-ForceFrfHz` (the hop scheduler owns the synthesizer at
+  profile 1); base capture with `--profile image_bw250`. At `-SynthFps 1` expect the first
   frame at the base near seq 58 (A7) and no time authority on the tractor
   (A11, `tx_stream_streak_max` < 8): read P2/P3 from lock and record the
   streak; no base commands on this leg. Its base capture takes
@@ -508,7 +579,8 @@ from day to day, so re-check rather than reuse a pick.
   legs flown with `-ReactiveFire 1 -ProbeEcho 0`, scored as tractor
   `LoRa cmd: PROBE … (rx#N)` lines over base `PROBE TX … (tx#N)` lines, and kept
   out of the image-loss record. RS-13.1 left that row unmeasured (RESULTS,
-  "Remaining radio tests").
+  "Remaining radio tests"); the range-edge session measures it at its 0 dB
+  step ([RS13_RANGE_EDGE_LEG.md](RS13_RANGE_EDGE_LEG.md), Round A).
 - **2d — switch leg, DTS, boots `mono_g4`** (same command as 2c). At T+60 s
   and T+180 s, on the base board, publish the operator override the way
   `web_ui` does (`rx_smoke` relays it as a 0x63 command and republishes the
@@ -558,13 +630,14 @@ Also record, once per leg while VECTOR frames flow:
 | P3 | frame loss not worse than the control: the `capture seq gaps` loss of `rs12_leg_report.py --capture` (A14; on a 1-fps FHSS leg this is the loss from lock — record the `counting from seq 1` figure too, A7), the report's counter `loss` line, and radio Δtx_ok ↔ Δrx_ok from the brackets. **Single legs compare only** (a) **interleaved** — control and VECTOR legs alternated in one session (e.g. 2c, 2a, 2c′, 2a′) and their pooled seq-gap losses compared — or (b) against a **margin stated in RESULTS before the legs**; absent another statement, "not worse" means not significantly worse: two-sided Fisher exact test on lost / received of the VECTOR leg against the control, p ≥ 0.05 (round 3's 2a: 4 / 303 against 1 / 304, p ≈ 0.2). The same control lost 6.5 % on 2026-09-27 and 0.3 % on 2026-10-03, more than the effect P3 tests, and VECTOR frames ride fuller than mono_g4 (p50 242 B vs 148 B on the video), i.e. longer on air per frame (A15) | required | baseline | n/a | `leg*_report.txt`, brackets |
 | P4 | one fragment per VECTOR frame: every per-frame completion line in `tx_daemon.log` has K = 1. The harness runs `-TxPipeline v3`, which logs `frame seq=N done (pipelined): K fragments ok` (only v2 logs `done: K`): `grep -cE "done( \(pipelined\))?: 1 fragments ok"` > 0, so an empty grep cannot pass; `grep -cE "done( \(pipelined\))?: ([2-9]\|[1-9][0-9]+) fragments ok"` = 0; `ABORTED( \(pipelined\))?` lines listed. The legs run `-TxBatch 0`, so K counts one frame's fragments, not a batched train. At 1 fps the encode-to-fit packer kept mono_g4 to one fragment as well, so P4 is not a contrast with 2c (A10) | required | n/a | inside the VECTOR window | harness archive |
 | P5 | keyframe-storm signature absent on FHSS: `frag_gap_report.py` shows no gap > 3 s during image traffic | 2b required | n/a | n/a | `leg2b_gaps.txt` |
-| P6 | over-the-air switch: first `"source": "lora_cmd"` ack after the publish stamp `requested 9, effective 9, effective_name vector, codec 6, clamped false, quality 80`; first codec-6 payload in the base capture ≤ 1 camera period + the **encoder's own time** (`ms_total` p95, the leg's P8 figure) + 1 fragment airtime + one command gate after the publish stamp (both on the base clock; A9 — without the encode time the bound is ≈ 2.5 s at 1 fps and RS-13.1 measured 2.55 / 2.68 s, with it ≈ 3.0 s); the stamp taken in the **same board call** as the publish and checked against the base's `command TX … (on air)` line (A13); return ack `effective 6, quality 55` (tile dial untouched, §6) and codec-1 frames resume within one camera period of the return command going on air | n/a | n/a | required | `leg2d_acks.txt`, `leg2d_switch_times.txt`, `leg2d_base.jsonl`, archive `rx_daemon.log` |
+| P6 | over-the-air switch: first `"source": "lora_cmd"` ack after the publish stamp `requested 9, effective 9, effective_name vector, codec 6, clamped false, quality 80`; first codec-6 payload in the base capture ≤ 1 camera period + the **encoder's own time** (`ms_total` p95, the leg's P8 figure) + 1 fragment airtime + one command gate after the publish stamp (both on the base clock; A9 — without the encode time the bound is ≈ 2.5 s at 1 fps and RS-13.1 measured 2.55 / 2.68 s, with it ≈ 3.0 s); the stamp taken in the **same board call** as the publish and checked against the base's `command TX … (on air)` line (A13); return ack `effective 6, quality 55` (tile dial untouched, §6) and — **amended 2026-10-10 (A18), from the next round** — codec-1 resumes within one camera period + the in-flight frame(s) + one fragment airtime of the return command going on air: first codec-1 payload ≤ (1 + n) camera periods + 1 fragment airtime after the return command's `command TX … (on air)` line, n = the codec-6 frames the base receives between that line and the first codec-1 payload, n ≤ `tx_pipeline_depth` + `tx_prepare_ahead` (3 on the harness defaults, `params.txt`; a larger n fails); round 4: n = 1, bound 1.10 s, measured 0.77 s. RS-13.1 was judged by "codec-1 frames resume within one camera period of the return command going on air" (Amendments 2026-10-10 item 2) | n/a | n/a | required | `leg2d_acks.txt`, `leg2d_switch_times.txt`, `leg2d_base.jsonl`, archive `rx_daemon.log` |
 | P7 | link_stats `rx_codec_name` = `vector` during VECTOR | required | n/a | required | `mosquitto_sub` line |
-| P8 | encoder keeps up on air: `vector_stats` p95 in the archived `camera_service.log` within the step-1 figure ± 20 % | required | n/a | window | `tractor-log` on the archive's `camera_service.log` |
+| P8 | encoder keeps up on air — **amended 2026-10-10 (A17), from the next round:** `vector_stats` `ms_total` p95 in the archived `camera_service.log` ≤ the encoder budget at the leg's camera rate, 350 ms at 2 fps (a leg at another rate states its budget, 70 % of its period, in RESULTS before it flies); the p95 relative to the step-1 figure of the same profile, and the tx daemon's `drop_full` / `drop_stale`, recorded for information. RS-13.1 was judged by "within the step-1 figure ± 20 %" (Amendments 2026-10-10 item 1) | required | n/a | window | `tractor-log` on the archive's `camera_service.log`; `tx_daemon.log` |
 
 GO for RS-13.2 (browser desk check on the production compose, then the
-attenuator range-edge leg) when 2a, 2b and 2d pass and 2c's baseline is on
-record. NO-GO otherwise, with the failing row named in the RESULTS verdict.
+attenuator range-edge leg, [RS13_RANGE_EDGE_LEG.md](RS13_RANGE_EDGE_LEG.md))
+when 2a, 2b and 2d pass and 2c's baseline is on record. NO-GO otherwise, with
+the failing row named in the RESULTS verdict.
 
 ## Evidence layout
 
