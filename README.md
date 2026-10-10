@@ -42,3 +42,7 @@ Each version folder contains:
 - **bill_of_materials.md** - Bill of materials information (where available)
 
 The documentation has been extracted and compiled from the [Open Source Ecology wiki](https://wiki.opensourceecology.org) to provide a comprehensive reference for each LifeTrac version.
+
+## LifeTrac v25 radio bench
+
+To reproduce the v25 LoRa radio bench (two Portenta X8 boards on Max Carriers, as in the RS-12/RS-13 test campaigns), start at the [radio bench quickstart](LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/bench_tools/BENCH_QUICKSTART.md).
