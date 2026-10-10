@@ -68,7 +68,7 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 HELPER_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/../../../../.." && pwd)
 
-BENCH_ENV=${BENCH_ENV:-$SCRIPT_DIR/bench.env}
+BENCH_ENV=${BENCH_ENV:-${BENCH_ENV_FILE:-$SCRIPT_DIR/bench.env}}
 if [ -f "$BENCH_ENV" ]; then
   # strip CR so a bench.env saved by a Windows editor does not put \r into serials
   # shellcheck disable=SC1090
@@ -79,7 +79,7 @@ TRACTOR_SERIAL=${TRACTOR_SERIAL:-2E2C1209DABC240B}
 BASE_HOST=${BASE_HOST:-192.168.1.117}
 BENCH_SUDO_PW=${BENCH_SUDO_PW:-fio}
 BASE_SSH_KEY=${BASE_SSH_KEY:-$HOME/.ssh/lifetrac_base_ed25519}
-BASE_USER=${BASE_USER:-fio}
+BASE_USER=${BASE_USER:-${BASE_SSH_USER:-fio}}
 ADB=${ADB:-adb}
 
 FOUNDRIES_IMG=hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44

@@ -105,6 +105,9 @@ declare -A _bench_pre=()
 for _v in $_BENCH_VARS; do
   if [ -n "${!_v:-}" ]; then _bench_pre[$_v]=${!_v}; fi
 done
+# BENCH_ENV is the name provision_bench_board.sh, deploy_base.sh, build_tractor_image.sh
+# and flash_l072.sh use for the same thing; accept either.
+if [ -z "${BENCH_ENV_FILE:-}" ] && [ -n "${BENCH_ENV:-}" ]; then BENCH_ENV_FILE=$BENCH_ENV; fi
 if [ -z "${BENCH_ENV_FILE:-}" ]; then
   if [ -f "$BT_DIR/bench.env" ]; then BENCH_ENV_FILE="$BT_DIR/bench.env"; else BENCH_ENV_FILE="$BT_DIR/bench.env.example"; fi
 fi
@@ -117,13 +120,15 @@ unset _v _bench_pre
 : "${TRACTOR_SERIAL:=2E2C1209DABC240B}"
 : "${BASE_TRANSPORT:=adb}"
 : "${BASE_HOST:=192.168.1.117}"
-: "${BASE_SSH_USER:=fio}"
+: "${BASE_SSH_USER:=${BASE_USER:-fio}}"          # BASE_USER: the name the setup/deploy scripts use
+BASE_USER=$BASE_SSH_USER
 : "${BASE_SSH_KEY:=$HOME/.ssh/lifetrac_base_ed25519}"
 : "${BENCH_SUDO_PW:=fio}"
 : "${PC_HOST:=}"
 : "${BENCH_SCRATCH:=$(win_path "${TMPDIR:-${TEMP:-/tmp}}")/lifetrac-bench}"
 : "${EVIDENCE_DIR:=$DC/bench-evidence/RS_13_vector_scene_$(date -u +%Y-%m-%d)/legs}"
-: "${ARCHIVE_DIR:=$HOME/Documents/LifeTrac-bench-archive}"
+: "${ARCHIVE_DIR:=${BENCH_ARCHIVE_DIR:-$HOME/Documents/LifeTrac-bench-archive}}"
+BENCH_ARCHIVE_DIR=$ARCHIVE_DIR
 : "${DTS_CARRIER_HZ:=}"
 : "${DTS_CARRIER_DATE:=}"
 : "${YOUTUBE_URL:=https://www.youtube.com/watch?v=B1yUQwpNhJA}"

@@ -30,7 +30,7 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 HELPER=$(cd "$HERE/.." && pwd)
-BENCH_ENV=${BENCH_ENV:-$HERE/bench.env}
+BENCH_ENV=${BENCH_ENV:-${BENCH_ENV_FILE:-$HERE/bench.env}}
 if [ -f "$BENCH_ENV" ]; then
   # shellcheck disable=SC1090
   . "$BENCH_ENV"
@@ -38,7 +38,7 @@ fi
 BASE_SERIAL=${BASE_SERIAL:-2D0A1209DABC240B}
 TRACTOR_SERIAL=${TRACTOR_SERIAL:-2E2C1209DABC240B}
 BASE_HOST=${BASE_HOST:-192.168.1.117}
-BASE_USER=${BASE_USER:-fio}
+BASE_USER=${BASE_USER:-${BASE_SSH_USER:-fio}}
 BASE_SSH_KEY=${BASE_SSH_KEY:-$HOME/.ssh/lifetrac_base_ed25519}
 BASE_SSH_KEY=${BASE_SSH_KEY/#\~/$HOME}
 BENCH_SUDO_PW=${BENCH_SUDO_PW:-fio}

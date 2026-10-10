@@ -154,7 +154,7 @@ read it through [`lib/bench_env.sh`](lib/bench_env.sh). Do not commit
    where the known emitter is about 20 dB hotter:
 
    ```bash
-   scp -i $HOME/.ssh/lifetrac_base_ed25519 $DC/firmware/x8_lora_bootloader_helper/channel_survey_sniff.py fio@192.168.1.117:/tmp/lifetrac_strict/
+   scp -i "${BASE_SSH_KEY:-$HOME/.ssh/lifetrac_base_ed25519}" $DC/firmware/x8_lora_bootloader_helper/channel_survey_sniff.py "${BASE_SSH_USER:-fio}@${BASE_HOST:-192.168.1.117}:/tmp/lifetrac_strict/"
    $BASE "sudo docker rm -f rx_smoke 2>/dev/null; sudo $R -e LIFETRAC_REG_PROFILE=2 $BI -u /work/channel_survey_sniff.py --start-hz 927500000 --stop-hz 927500000 --step-hz 500000 --dwell-s 45 --interval-s 0.05" | tee spot_$(date +%F).txt
    py -3 $DC/tools/survey_compare.py spot_$(date +%F).txt
    ```

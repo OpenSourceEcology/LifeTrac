@@ -60,7 +60,7 @@ CTX_REL=$DC_REL/firmware/tractor_x8
 IMAGE=lifetrac-tractor-x8
 
 # ---------------------------------------------------------------- settings --
-BENCH_ENV=${BENCH_ENV:-$BT/bench.env}
+BENCH_ENV=${BENCH_ENV:-${BENCH_ENV_FILE:-$BT/bench.env}}
 if [ -f "$BENCH_ENV" ]; then
     set -a
     eval "$(tr -d '\r' < "$BENCH_ENV")"
@@ -105,13 +105,13 @@ elif [ -z "${BASE_TRANSPORT:-}" ]; then
 fi
 case $BASE_TRANSPORT in ssh|adb) ;; *) echo "build_tractor_image: BASE_TRANSPORT must be ssh or adb" >&2; exit 2 ;; esac
 BASE_HOST=${BASE_HOST:-192.168.1.117}
-BASE_USER=${BASE_USER:-fio}
+BASE_USER=${BASE_USER:-${BASE_SSH_USER:-fio}}
 BASE_SSH_KEY=${BASE_SSH_KEY:-$HOME/.ssh/lifetrac_base_ed25519}
 BASE_SERIAL=${BASE_SERIAL:-2D0A1209DABC240B}
 TRACTOR_SERIAL=${TRACTOR_SERIAL:-2E2C1209DABC240B}
 TRACTOR_USER=${TRACTOR_USER:-fio}
 BENCH_SUDO_PW=${BENCH_SUDO_PW-fio}
-BENCH_ARCHIVE_DIR=${BENCH_ARCHIVE_DIR:-$HOME/LifeTrac-bench-archive}
+BENCH_ARCHIVE_DIR=${BENCH_ARCHIVE_DIR:-${ARCHIVE_DIR:-$HOME/Documents/LifeTrac-bench-archive}}
 BASE_WORK=/home/$BASE_USER/lifetrac_build
 TRACTOR_WORK=/home/$TRACTOR_USER/lifetrac_images   # on disk: /tmp is a RAM tmpfs aged at 5 d
 

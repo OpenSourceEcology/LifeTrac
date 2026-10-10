@@ -14,9 +14,11 @@
 set -u
 export MSYS_NO_PATHCONV=1
 ROLE=${1:?base|tractor}; IMAGES=0; [ "${2:-}" = --images ] && IMAGES=1
-case $ROLE in base) SER=2D0A1209DABC240B;; tractor) SER=2E2C1209DABC240B;; *) echo "base|tractor"; exit 2;; esac
+_BT=$(dirname "$0")
+[ -f "$_BT/bench.env" ] && eval "$(tr -d '\r' < "$_BT/bench.env")"   # BASE_SERIAL / TRACTOR_SERIAL / ARCHIVE_DIR
+case $ROLE in base) SER=${BASE_SERIAL:-2D0A1209DABC240B};; tractor) SER=${TRACTOR_SERIAL:-2E2C1209DABC240B};; *) echo "base|tractor"; exit 2;; esac
 HERE=$(cygpath -m "$(dirname "$0")")
-ARC=${ARCHIVE:-C:/Users/dorkm/Documents/LifeTrac-bench-archive}/board_state_$(date -u +%Y-%m-%d)
+ARC=${ARCHIVE:-${ARCHIVE_DIR:-$HOME/Documents/LifeTrac-bench-archive}}/board_state_$(date -u +%Y-%m-%d)
 mkdir -p "$ARC/$ROLE" "$ARC/images"
 strip_to_gzip() { py -3 -c "import sys;p=sys.argv[1];d=open(p,'rb').read();i=d.find(b'\x1f\x8b\x08');assert 0<=i<64,i;open(p,'wb').write(d[i:])" "$1"; }
 

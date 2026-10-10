@@ -64,9 +64,10 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
   19 h uptime, no reboot, yet `/tmp/lifetrac_p0c` held only the bin pushed
   the night before — the flash scripts had aged out. A flash attempted then
   fails as `run_flash_bench.sh: line 5: 1: image` (rc 127) and touches no
-  radio. **Count the staging before trusting a flash:**
-  `ls /tmp/lifetrac_p0c | wc -l` must be 11, and `ls /tmp/lifetrac_strict |
-  wc -l` ≥ 19.
+  radio. **Check the staging before trusting a flash:** `flash_l072.sh`
+  re-stages the pipeline and `run_flash_bench.sh` now refuses to run on an
+  incomplete `/tmp/lifetrac_p0c` (preflight); for legs, `ls /tmp/lifetrac_strict |
+  wc -l` ≥ 19 (`legs/stage_boards.sh` re-stages it).
 * The L072 boots into RXCONT (`sx1276_rx_arm()`), so a flash brings the
   receiver up — a flash IS a radio-on event. A probe HostLink connect also
   auto-wakes it.
