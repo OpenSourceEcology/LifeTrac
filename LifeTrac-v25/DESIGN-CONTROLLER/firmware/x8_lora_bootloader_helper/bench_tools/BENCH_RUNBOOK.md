@@ -17,7 +17,10 @@ keys a radio needs the operator's GO; radios are parked (LoRa SLEEP,
 | `dual_inject.py <duration_s>` | base (container) | two-opcode contention (encode_mode every 0.7 s + req_keyframe every 5 s) for the shared-gate legs; gets ~50 commands into the tractor per 5-min leg vs ~3 for kf_inject alone. |
 | `frag_gap_report.py <archive>` | PC | lock-loss episodes from the base's fragment-arrival timeline (needs `-LogFragArrivals 1`). Gaps > 3 s are lock losses; healthy links never exceed ~1 s. |
 | [`RS13_VECTOR_LEG.md`](RS13_VECTOR_LEG.md) + [`RS13_RESULTS_TEMPLATE.md`](RS13_RESULTS_TEMPLATE.md) | PC | RS-13.1 VECTOR (codec 6) legs: image smoke, camera-only dry run, radio legs with pass criteria, and the `RESULTS.md` skeleton. Adds `-CamExtraEnv` to the harness (env for the `camera_svc` container) and archives `camera_service.log`. |
+| [`RS13_RANGE_EDGE_LEG.md`](RS13_RANGE_EDGE_LEG.md) | PC | the next radio session after RS-13.1 (not flown; radios only on an explicit GO per round): conducted SMA-attenuator path, leakage check, 0 dB step with VECTOR / mono_g4 interleaved and `-ReactiveFire 1 -ProbeEcho 0` (the `VECTOR_SCENE.md` §8.6 command-delivery row, the A16-fix confirmation), then the 3 dB walk-down at both profiles, stop rules and its own RESULTS template. |
 | `../../../tools/vector_dry_run.py capture\|replay\|tractor-log` | both boards (daemon container) / PC | captures `cmd/image_frame` (tractor) or `video/tile_delta` (base) payloads to JSONL, replays them through the base station's own parser + `VectorSceneStore`, and prints per-frame size vs the one-fragment limit, store verdict, orphans, DIGEST, arrival timing and PASS/FAIL checks (`--strict` exits 1). `tractor-log` summarises camera_service's `vector_stats` lines (encoder ms per stage). |
+| [`RS13_2_DESK_CHECK.md`](RS13_2_DESK_CHECK.md) + [`rs13_2_desk.compose.yml`](rs13_2_desk.compose.yml) | base (compose) + PC browser | RS-13.2 desk check: the rebuilt web_ui on the production compose (mosquitto + web_ui only; the override fences off `lora_bridge` and the bench radio endpoint), the round-4 captures replayed into it, and the §7.5 checklist. No radio. |
+| `../../../tools/vector_replay_publish.py <capture>` | base (in `lifetrac-v25:latest`) / PC | publishes a `vector_dry_run.py` capture to a broker at its recorded timing (`--speed`, `--loop`, row windows, `--drop-rows` / `--drop-every` to inject seq-gap losses, `--log`, `--dry-run`). Never retains. |
 
 The probes (`rs115_stats_probe.py`, `rs116_health_probe.py`, `method_g/h_*`) and
 the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
@@ -99,7 +102,7 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
 ## A leg
 
 ```
-.\run_live_radio_monitor.ps1 -TxFeed camera|local -RegProfile 1|2 -DurationS 300 `
+.\run_live_radio_monitor.ps1 -TxFeed camera|local -RegProfile 1|2 [-ForceFrfHz <spot-checked carrier>: profile 2 only, prep 8] -DurationS 300 `
    [-SynthFps 2 -SynthBudgetB 3000] -KfRequestDisable 0 -ProbeEcho 0 `
    -NoParkLast 0 -LogFragArrivals 1 -IdleDrainQuietS 1.5 -CmdStreamMinGapS 1.0 -Archive
 ```
