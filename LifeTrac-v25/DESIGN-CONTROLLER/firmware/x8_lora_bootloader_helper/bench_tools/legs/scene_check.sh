@@ -32,6 +32,7 @@ for a in "$@"; do
   esac
 done
 [ -n "$TAG" ] || { bench_usage; exit 2; }
+bench_check_name "tag" "$TAG"
 case $MIN in ''|*[!0-9.]*) die "min_pct must be a number, not '$MIN'" ;; esac
 E=$(bench_evidence_dir) || die "cannot create $EVIDENCE_DIR"
 board_present tractor || die "tractor ($TRACTOR_SERIAL) is not reachable via adb"
