@@ -5,6 +5,17 @@ next session starts from a checklist instead of memory. Everything that
 keys a radio needs the operator's GO; radios are parked (LoRa SLEEP,
 `0x80` readback) whenever a session ends.
 
+**New to the bench?** Start at [BENCH_QUICKSTART.md](BENCH_QUICKSTART.md).
+It walks through PC and board setup, radio firmware, deploy, a first leg,
+analysis and park, in order, with the commands. This runbook is the
+per-session reference and the trap list. The rest of the bench kit:
+
+- [PC_SETUP.md](PC_SETUP.md)
+- [BENCH_SETUP.md](BENCH_SETUP.md)
+- [DEPLOY.md](DEPLOY.md)
+- [`bench.env.example`](bench.env.example)
+- [legs/README.md](legs/README.md)
+
 ## What is here
 
 | file | runs on | purpose |
@@ -37,7 +48,7 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
   12.2.MPACBTI-Rel1) gives byte-identical L072 builds. Also: WinLibs
   `mingw32-make` (PowerShell only), arduino-cli with
   `arduino:mbed_portenta` 4.5.0, `py -3`. The PC has no Docker; images are
-  built on the base X8.
+  built on the base X8. Installation steps: [PC_SETUP.md](PC_SETUP.md).
 * Base `192.168.1.117` via ssh key `~/.ssh/lifetrac_base_ed25519`; tractor
   ONLY via `adb -s 2E2C1209DABC240B` (WiFi stays off); base adb
   `2D0A1209DABC240B`. Password `fio` → `echo fio | sudo -S -p ''`.
@@ -80,7 +91,8 @@ the harness (`run_live_radio_monitor.ps1`) live one directory up. Leg reports:
 1. `git archive` the helper tooling to `/tmp/lifetrac_strict` on both boards
    (probes, `lora_proto.py`, and everything in this directory except the
    `/home/fio` files). `adb push` needs `MSYS_NO_PATHCONV=1` and a
-   Windows-style `C:/...` source path.
+   Windows-style `C:/...` source path. `legs/stage_boards.sh` does this
+   step from `bench.env` ([legs/README.md](legs/README.md)).
 2. Flash staging: push the helper `.sh`/`.cfg`/`.py` pipeline files plus the
    bins to `/tmp/lifetrac_p0c` on both boards **LF-clean** (`tr -d '\r'`);
    a CRLF script fails silently as `1: image` from the wrapper. `scp` to the
@@ -137,9 +149,72 @@ leg V), but that is because of the timing above, not because the write is
 authoritative. RXCONT is receive-only — the TX path only fires on a host
 request, and there is none with the daemons down.
 
+## Bench web UI on the base (optional)
+
+The operator console (`base_station/web_ui.py`) is not part of the harness
+loop. Run it on the base only when a leg needs it, for example the RS-1.4
+Auto selector (leg V) or a look at the tiles. While it runs it adds base
+commands to the control plane (TILE_STALE scans, profile switches), so say in
+RESULTS that it ran. This recipe comes from the F10/F11 sessions and leg V.
+
+1. **Push** `web_ui.py`, `lora_proto.py`, `image_pipeline/` and `web/` from
+   the checkout to `/tmp/lifetrac_strict` on the base. The harness pushes
+   `lora_proto.py` and `image_pipeline/` at every launch, but after a reboot
+   nothing is there until you push it. If `scp` cannot overwrite
+   `image_pipeline/`, remove its root-owned `__pycache__` first.
+
+   ```bash
+   K="-i $HOME/.ssh/lifetrac_base_ed25519"; B=fio@192.168.1.117
+   S=LifeTrac-v25/DESIGN-CONTROLLER/base_station
+   ssh $K $B "sudo rm -rf /tmp/lifetrac_strict/image_pipeline/__pycache__"
+   scp $K -r $S/web_ui.py $S/lora_proto.py $S/image_pipeline $S/web $B:/tmp/lifetrac_strict/
+   ```
+
+2. **Run** it in `lifetrac-v25:latest` with host networking: uvicorn on port
+   **8090**, away from the production compose's 8080,
+   MQTT to the base broker at `127.0.0.1`, and PIN **2525**. That PIN is for
+   the bench only and is never a field PIN; production reads its PIN from
+   `secrets/lifetrac_pin`.
+
+   ```bash
+   ssh $K $B "sudo docker rm -f bench_webui 2>/dev/null; sudo docker run -d --name bench_webui --network=host \
+     -v /tmp/lifetrac_strict:/work -w /work -e PYTHONPATH=/work:/work/paho \
+     -e LIFETRAC_MQTT_HOST=127.0.0.1 -e LIFETRAC_PIN=2525 \
+     --entrypoint python3 lifetrac-v25:latest -m uvicorn web_ui:app --host 0.0.0.0 --port 8090"
+   ```
+
+   Browse to `http://<base IP>:8090`. Some modules, such as `audit_log`,
+   `build_config` and `settings_store`, are imported lazily, and web_ui only
+   degrades when they are missing. If a feature needs one, append
+   `:/app/base_station` to `PYTHONPATH` so the image's deployed copy fills
+   the gap.
+
+3. **Record what it did** with an MQTT tap. web_ui has no root logger, so its
+   info lines never reach `docker logs`:
+
+   ```bash
+   ssh $K $B "sudo docker exec design-controller-mosquitto-1 mosquitto_sub -h 127.0.0.1 -F '%U %t %p' \
+     -t lifetrac/v25/control/radio_profile -t 'lifetrac/v25/status/radio_profile/#' -t lifetrac/v25/video/link_stats" | tee webui_tap.txt
+   ```
+
+4. **Auto selector.** Arm Auto only **after** the daemons are up. With no
+   daemon running, Auto pins FHSS within 60 s (the stale-link rule). At the
+   end of the session, set a concrete profile (e.g. 2) before you stop. A
+   retained `auto` otherwise re-commands the tractor at the next start. Then
+   run `clear_retained.py`.
+
+5. **Stop it** at the end of the session:
+   `ssh $K $B "sudo docker rm -f bench_webui"`. Port 8090 then closes.
+
 ## Traps that cost time this campaign
 
 * Bash-tool heredocs mangle backslashes — write patch scripts to files.
+* **Misspelled harness parameters were ignored without a warning.**
+  `run_live_radio_monitor.ps1` used to put an unknown name into `$args`, so
+  `-DurationSeconds 300` ran the 30 s default of `-DurationS`. The harness
+  now refuses unknown names at launch. Even so, read the archive's
+  `params.txt` for the values that actually ran (`duration_s`,
+  `force_frf_hz`, `reg_profile`, ...) before you quote a leg.
 * `git add <directory>` sweeps the untracked bench binary
   (`build/firmware_bench_diag.bin`) into the commit; add firmware by path.
 * The committed `build/firmware.bin` is the PRODUCTION image (no diag flag);
