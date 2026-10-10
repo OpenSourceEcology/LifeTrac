@@ -123,7 +123,8 @@ record it in the evidence. The 934 differences that matter for the tractor
 are known and handled:
 
 - The flash wrapper must reboot instead of re-inserting `x8h7`, which crashes
-  the 6.1 kernel: `REVIVE_MODE=reboot`, already the documented default.
+  the 6.1 kernel. FLASH_RUNBOOK already uses `REVIVE_MODE=reboot` on both
+  boards.
 - The compose-apps recovery unit wipes `/var/lib/docker`.
   `provision_bench_board.sh` masks it.
 - The factory docker images differ. The probe image comes from the repo's
