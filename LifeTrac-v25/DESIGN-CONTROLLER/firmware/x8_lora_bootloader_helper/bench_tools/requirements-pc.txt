@@ -1,0 +1,47 @@
+# Bench PC (Windows) Python packages for the radio-bench tooling.
+#
+#   py -3 -m pip install -r LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/bench_tools/requirements-pc.txt
+#
+# Scope: the tools that run ON THE PC during a bench session -- the harness's
+# PC MQTT broker, leg reports, the VECTOR dry-run/replay, the channel-survey
+# and periodicity analysers, and the -TxFeed host synthetic publisher. The
+# board-side code runs inside the X8 docker images (lifetrac-v25,
+# lifetrac-tractor-x8, arduino-ootb-python-devel) and needs nothing from this
+# file; the boards' paho copy is the tracked repo-root _paho_pull/paho/.
+#
+# Versions are the ones installed on the bench PC that flew RS-12/RS-13
+# (Python 3.14.4, checked 2026-10-10). numpy/opencv match
+# base_station/requirements-dev.txt. numpy 2.4 needs Python >= 3.11.
+# To run the base-station SIL suite, install base_station/requirements-dev.txt
+# instead (it is a superset for that purpose).
+#
+# Who needs what (import survey of the PC-side scripts):
+
+# start_mqtt_broker.py (repo root) -- the PC broker run_live_radio_monitor.ps1
+# starts on <HostIp>:1883 when none answers. Not declared anywhere else.
+amqtt==0.11.3
+
+# bench_tools/clear_retained_host.py, tools/vector_dry_run.py (capture/live),
+# tools/lora_rtt.py, publish_synthetic_frames.py (-TxFeed host).
+paho-mqtt==2.1.0
+
+# tools/crc_dump_temporal.py, tools/rssi_sniff_periodicity.py (hunt_sniff.ps1),
+# tools/bulk_loss_boundary.py; camera_service (imported by
+# publish_synthetic_frames.py) and the RS-13 a16_* SIL scripts.
+numpy==2.4.4
+
+# RS-13 a16_* SIL scripts and the VECTOR encoder (x8_image_pipeline
+# encode_vector.py / vector_extract.py) when run on the PC.
+opencv-python-headless==4.14.0.94
+
+# camera_service (publish_synthetic_frames.py -TxFeed host) and
+# base_station/image_pipeline codec_decode / fallback_render.
+Pillow==12.2.0
+
+# base_station/lora_proto.py AES-GCM (imported lazily; needed by anything that
+# builds or opens encrypted frames on the PC).
+cryptography==48.0.0
+
+# Not needed for the radio bench: pyserial (tools/provision.py,
+# tools/pair_handheld.py -- handheld/USB provisioning) and pymodbus
+# (tools/modbus_bench.py). Install them only for those tools.

@@ -61,6 +61,27 @@ This prints something like `9f3a8c4e2b1d7506a8e3f4c5b9d2e1f0`. Copy it into a fi
 
 This is the radio + arbitration + Modbus master firmware that runs on the X8's onboard STM32H747.
 
+> [!WARNING]
+> **On a Portenta X8 this step overwrites the stock x8h7 firmware.** The
+> H747's M7 core (flash bank 1) normally runs Arduino's stock **x8h7**
+> firmware: the bridge through which X8 Linux reaches the H7-side peripherals
+> (the `x8h7_*` kernel modules for GPIO, ADC, CAN, UART, PWM and RTC, and
+> `m4-proxy` for M4 sketches). Arduino's own X8 workflow only uploads user
+> sketches to the M4 core for this reason. Uploading `tractor_h7` as
+> *Portenta H7 (M7 core)* replaces the bridge, and everything Linux does
+> through it stops working until the stock image is back.
+> `stm32h7-program.service` can restore it from
+> `/usr/arduino/extra/STM32H747AII6_CM7.bin`, but whether it does so on its
+> own depends on the LmP image.
+>
+> LifeTrac did this to both bench X8s on 2026-05-04; both have run stock
+> x8h7 again since 2026-05-13. The current radio bench does **not** use
+> `tractor_h7` at all: the LoRa radio is the Max Carrier's Murata L072,
+> driven from X8 Linux over `/dev/ttymxc3`. See
+> [`BENCH_BOARDS.md`](../DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/bench_tools/BENCH_BOARDS.md)
+> before flashing anything on an X8, and skip this step unless you mean to
+> replace the bridge and know how to put the stock image back.
+
 1. Open `firmware/tractor_h7/tractor_h7.ino` in Arduino IDE 2.
 2. Select **Tools → Board → Arduino Mbed OS Portenta Boards → Portenta H7 (M7 core)**. (The X8's onboard H747 enumerates the same way as a standalone H7 for the toolchain — same M7 binary.)
 3. Select **Tools → Port** → the X8's USB-C serial port.

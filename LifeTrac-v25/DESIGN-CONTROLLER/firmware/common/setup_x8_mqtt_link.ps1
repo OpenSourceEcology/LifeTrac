@@ -5,8 +5,9 @@
 
 .DESCRIPTION
     The historical recipe used 'adb -s <serial> reverse tcp:1883 tcp:1883' to
-    expose the host broker as 127.0.0.1:1883 on the device. On LmP factory
-    image 934-91 (verified 2026-05-24 on board 2E2C1209DABC240B) that command
+    expose the host broker as 127.0.0.1:1883 on the device. On LmP image
+    4.0.11-934-91 (verified 2026-05-24 on board 2D0A1209DABC240B, the base;
+    the tractor 2E2C runs the as-shipped 4.0.3-674-88 image) that command
     returns exit=0 but does NOT actually install the tunnel:
 
         adb reverse tcp:1883 tcp:1883   -> exit=0  (silent failure)
