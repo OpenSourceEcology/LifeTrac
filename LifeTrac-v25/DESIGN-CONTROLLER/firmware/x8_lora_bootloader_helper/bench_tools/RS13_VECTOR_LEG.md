@@ -14,6 +14,7 @@ started from [RS13_RESULTS_TEMPLATE.md](RS13_RESULTS_TEMPLATE.md). The RS-13.1
 session scripts that did each step below are kept in
 [`bench-evidence/RS_13_vector_scene_2026-09-26/scripts/`](../../../bench-evidence/RS_13_vector_scene_2026-09-26/scripts/)
 (they carry that session's paths).*
+Parameterised copies that run from any checkout (settings in `bench.env`) are in [`legs/`](legs/README.md).
 
 **No firmware change.** VECTOR rides the strict image path as ordinary
 one-fragment 0xFE trains (a 0xFD copies train only if `LIFETRAC_KEYFRAME_COPIES`
