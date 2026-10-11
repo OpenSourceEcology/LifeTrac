@@ -55,7 +55,16 @@ the mirror drifting from the store on a loss-free path, anomalies A1/A2):
   healthy base into resync;
 * a same-id redefine competes with the live outline over the union of both
   rasters, not with itself over its own pixels: when the new outline is not
-  worth its bits the live one is confirmed instead.
+  worth its bits the live one is confirmed instead;
+* every DEL goes out twice, in its frame and the next (outside the
+  CONFIRM/DIGEST reserve), so one lost frame never leaves the base a ghost
+  whose mismatching DIGESTs put it into resync (RS-13.1 A16); a fresh
+  define that re-uses the id in the next frame replaces the repeat;
+* every fourth frame the first quarter of the frame is a repair share,
+  taken before the changes: the re-sends (carousel and repeat-once alike)
+  whose define last went out longest ago — what a base in resync, which
+  refuses CONFIRMs, ages an unchanged shape by — so a saturated stream
+  still re-sends what a lost frame took before the base's TTL drops it.
 
 Epochs (§3.5, §4.3). A new epoch starts on the first frame, on
 ``force_epoch()`` / ``epoch_start=True``, when the horizon state flips
@@ -276,6 +285,9 @@ class _Cand:
     apply: Callable[[], None]       # mutates the mirror when the record is packed
     mentions: tuple = ()            # ids the record names (no CONFIRM for those)
     needs: object = None            # a candidate that must be packed before this one
+    repair: object = None           # sort key in the repair share (_pack_frame; None: not eligible)
+    exempt: bool = False            # not bound by the CONFIRM/DIGEST reserve (a DEL's repeat)
+    unless: object = None           # packed only if this candidate is not (a DEL's repeat vs a re-use define)
 
 
 def _paint_labels(shapes: list, shape: tuple, with_second: bool = False) -> tuple:
@@ -342,6 +354,17 @@ def _geometry_key(rec) -> tuple:
 
 def _layer_of(rec) -> str:
     return "plant" if isinstance(rec, vs.Tree) else "mass"
+
+
+_CLEARED_LAYERS = {0: ("mass", "plant", "edge"), 1: ("plant", "edge"), 2: ("edge",), 3: ()}
+
+
+def _cleared(id_: int, clear: Optional[int]) -> bool:
+    """Whether a LAYER_CLEAR of range ``clear`` (None: no epoch start) drops the layer of ``id_``."""
+    if clear is None:
+        return False
+    layer = "plant" if id_ in vs.ID_PLANT else "edge" if id_ in vs.ID_EDGE else "mass"
+    return layer in _CLEARED_LAYERS[clear]
 
 
 def _bits_layer(rec) -> str:
@@ -438,8 +461,11 @@ class VectorEncoder:
         self._frame_no = 0
         self._committed = False                       # this attempt's epoch start was packed
         self._carousel_acc = 0.0
+        self._share_acc = 0.0                         # the repair share's duty cycle (_share_due)
+        self._share_bits = 0                          # this frame's repair share (_pack_frame)
         self._verified_now: set = set()               # ids this frame's packed records verify at the base
         self._id_freed: dict = {}                     # id -> (frame, dhash, offset, fill) at its DEL / expiry
+        self._del_owed: dict = {}                     # id -> frame its DEL went out: repeated once (§4.3)
         self._ttl_dropped = 0
         self._restate_owed: set = set()               # kept shapes not yet re-stated after a range-1/2 start
         self._restate_all = False                     # the key frame of a range-1/2 attempt: every kept shape owes
@@ -757,6 +783,9 @@ class VectorEncoder:
         self._last_trigger, self._pending_reason = self._pending_reason, None
         self._epochs_committed += 1
         self._anchor_repeat_left = LEVEL_REPEATS[level]
+        # A DEL's repeat is moot for a layer the epoch start clears: the base
+        # drops that layer's old shapes at the hand-over (§3.5).
+        self._del_owed = {i: fr for i, fr in self._del_owed.items() if not _cleared(i, clear)}
         if clear == 0:                                # every mass is redefined: a fresh reference exposure
             self._gain = self._gain_next = GAIN_NEUTRAL
             self._restate_owed = set()
@@ -813,6 +842,45 @@ class VectorEncoder:
             self._id_freed[id_] = (self._frame_no, s.dhash, (s.dx, s.dy), s.fill, s.ever_upd, s.ever_ucol)
         self._restate_owed.discard(id_)
         self._evict_next.discard(id_)
+
+    def _apply_del(self, id_: int) -> None:
+        """A DEL went out: release the id and owe the DEL's repeat (§4.3)."""
+        self._release_id(id_)
+        self._del_owed[id_] = self._frame_no
+
+    def _del_repeat_candidates(self, cands: list, clear: Optional[int]) -> None:
+        """Every DEL goes out twice, in its frame and the next (§4.3): a base
+        that lost the first copy would otherwise hold the deleted shape as a
+        ghost for TTL_FRAMES of its applied frames, every DIGEST meanwhile
+        mismatches on n_live, and the resync that follows refuses the
+        CONFIRMs that keep the static shapes alive (RS-13.1 A16). The repeat
+        is not bound by the CONFIRM/DIGEST reserve, so a full frame never
+        crowds it out. A base that applied the first copy ignores the second
+        (a DEL naming an id it does not hold is no orphan, §3.4 rule 4).
+        When this frame re-uses the id for a fresh define, that define
+        (which states its offset and colour for a base that missed the DEL)
+        replaces the repeat: a DEL and a define of one id in one frame share
+        a capture time, and the base's tombstone would refuse the define.
+        So the repeat goes only if that define is not packed, and it stays
+        owed until a repeat or a define of the id has gone out (a ghost
+        expires at the base after TTL_FRAMES applied frames at the latest)."""
+        if not self._del_owed:
+            return
+        defines: dict = {}
+        for c in cands:
+            for rec in _records_of(c):
+                if isinstance(rec, (vs.Poly, vs.Tree, vs.Edge)):
+                    defines.setdefault(rec.id, c)
+        for id_, freed in sorted(self._del_owed.items()):
+            if id_ in self._shapes or self._frame_no - freed > vs.TTL_FRAMES:
+                del self._del_owed[id_]
+                continue
+            if _cleared(id_, clear):
+                continue                                     # this attempt's epoch start clears the layer
+            rec = vs.Del(id_)
+            cands.append(_Cand(5, (-1, id_), rec, _record_bits(rec),
+                               lambda id_=id_: self._del_owed.pop(id_, None), (id_,),
+                               exempt=True, unless=defines.get(id_)))
 
     def _fresh_define_records(self, rec) -> tuple:
         """(records, ever_upd, ever_ucol) for a fresh define. A base that
@@ -887,7 +955,7 @@ class VectorEncoder:
         self._committed = False
         if key:
             self._pending_epoch = clear if self._pending_epoch is None else min(self._pending_epoch, clear)
-            dropped = {0: ("mass", "plant", "edge"), 1: ("plant", "edge"), 2: ("edge",), 3: ()}[clear]
+            dropped = _CLEARED_LAYERS[clear]
             self._shapes = {i: s for i, s in saved_shapes.items() if s.layer not in dropped}
         try:
             body, records, stats = self._build_attempt(work, hz, regions, region_map, edges, clear, level,
@@ -969,6 +1037,8 @@ class VectorEncoder:
                 self._edge_candidates(edges, level, cands, verified)
         finally:
             self._restate_all = False
+        if level < 3:
+            self._del_repeat_candidates(cands, clear)
         if anchor_cand is not None:
             # Nothing of the new epoch goes out ahead of its anchor: a define,
             # GAIN or CONFIRM in a frame whose anchor was dropped would name an
@@ -977,6 +1047,7 @@ class VectorEncoder:
                 if c is not anchor_cand and c.needs is None and not isinstance(c.record, vs.Status):
                     c.needs = anchor_cand
         carousel_bits = int(LEVEL_KAPPA[level] * total_bits) if self._carousel_due(level) else 0
+        self._share_bits = int(LEVEL_KAPPA[0] * total_bits) if level < 3 and self._share_due() else 0
         # While kept shapes owe their re-statement (the key frame of a
         # range-1/2 start and the frames after it until every repeat went
         # out) the budget goes to the repeats: CONFIRMs are reserved and sent
@@ -1048,6 +1119,16 @@ class VectorEncoder:
             return True
         return False
 
+    def _share_due(self) -> bool:
+        """The repair share's duty cycle (``_pack``): V0's κ at every level, one
+        frame in 1/κ_V0 = 4, so at V0 it is the carousel frame itself and at
+        V1/V2 it costs the frame's own changes no more than at V0."""
+        self._share_acc += LEVEL_KAPPA[0]
+        if self._share_acc >= 1.0:
+            self._share_acc -= 1.0
+            return True
+        return False
+
     def _temporal_candidates(self, work: np.ndarray, l0: np.ndarray, regions: list, region_map: np.ndarray,
                              level: int, key: bool, cands: list, verified: set) -> None:
         """Slots 5–7: match regions to live shapes, then Del / Upd / Ucol /
@@ -1110,7 +1191,7 @@ class VectorEncoder:
         def add_del(s: _Shape) -> None:
             rec = vs.Del(s.id)
             cands.append(_Cand(5, (0, -s.area), rec, _record_bits(rec),
-                               lambda id_=s.id: self._release_id(id_), (s.id,)))
+                               lambda id_=s.id: self._apply_del(id_), (s.id,)))
             taken.add(s.id)
             deleted.add(s.id)
 
@@ -1289,7 +1370,7 @@ class VectorEncoder:
             if s.id not in matched.values():
                 rec = vs.Del(s.id)
                 cands.append(_Cand(5, (0, -s.area), rec, _record_bits(rec),
-                                   lambda id_=s.id: self._release_id(id_), (s.id,)))
+                                   lambda id_=s.id: self._apply_del(id_), (s.id,)))
         new_edges = 0
         taken: set = set(matched.values())
         for i, e in enumerate(edges):
@@ -1298,10 +1379,12 @@ class VectorEncoder:
                 verified.add(s.id)
                 if s.repeat_left > 0:
                     cands.append(_Cand(6, (-e.score,), s.define, _record_bits(s.define),
-                                       lambda s=s: self._apply_repeat(s, spend=True), (s.id,)))
+                                       lambda s=s: self._apply_repeat(s, spend=True), (s.id,),
+                                       repair=self._repair_key(s)))
                 else:
                     cands.append(_Cand(7, (s.define_frame, s.id), s.define, _record_bits(s.define),
-                                       lambda s=s: self._apply_repeat(s), (s.id,)))
+                                       lambda s=s: self._apply_repeat(s), (s.id,),
+                                       repair=self._repair_key(s)))
                 continue
             if new_edges >= MAX_NEW_EDGES:
                 continue
@@ -1319,6 +1402,7 @@ class VectorEncoder:
                                lambda rec=rec, e=e: self._apply_edge(rec, e, level), (id_,)))
 
     def _apply_edge(self, rec, e, level: int) -> None:
+        self._del_owed.pop(rec.id, None)                     # a re-use define replaces the DEL's repeat
         ys, xs = np.nonzero(e.raster)
         self._shapes[rec.id] = _Shape(rec.id, rec, _define_hash(rec), None, "edge", e.raster, int(e.raster.sum()),
                                       float(xs.mean()) if len(xs) else 0.0, float(ys.mean()) if len(ys) else 0.0,
@@ -1422,6 +1506,7 @@ class VectorEncoder:
     def _apply_define(self, rec, raster: np.ndarray, area: int, region, level: int,
                       ever_upd: bool = False, ever_ucol: bool = False) -> None:
         dh = _define_hash(rec)
+        self._del_owed.pop(rec.id, None)                     # a re-use define replaces the DEL's repeat
         s = self._shapes.get(rec.id)
         if s is not None and s.dhash == dh:
             self._apply_repeat(s)                            # §3.4 rule 5: a same-hash define is a repeat
@@ -1459,11 +1544,13 @@ class VectorEncoder:
         if s.repeat_left > 0:                                # repeat-once, re-verified on this capture
             recs = self._resend_records(s, with_upd=upd is None, with_ucol=not recolour)
             cands.append(_Cand(6, (-r.area,), recs, sum(_record_bits(x) for x in recs),
-                               lambda s=s: self._apply_repeat(s, spend=True), (s.id,)))
+                               lambda s=s: self._apply_repeat(s, spend=True), (s.id,),
+                               repair=self._repair_key(s)))
         elif upd is None and not recolour:
             recs = self._resend_records(s, with_upd=True, with_ucol=True)
             cands.append(_Cand(7, (s.define_frame, s.id), recs, sum(_record_bits(x) for x in recs),
-                               lambda s=s: self._apply_repeat(s), (s.id,)))
+                               lambda s=s: self._apply_repeat(s), (s.id,),
+                               repair=self._repair_key(s)))
 
     def _restate_candidate(self, s: _Shape, r, upd: Optional[tuple], de: float, cands: list) -> None:
         """The re-statement a kept shape owes after a range-1/2 epoch start
@@ -1494,6 +1581,21 @@ class VectorEncoder:
             if recolour:
                 self._apply_ucol(s, r)
         cands.append(_Cand(5, (0.5, -r.area), tuple(recs), sum(_record_bits(x) for x in recs), apply, (s.id,)))
+
+    @staticmethod
+    def _repair_key(s: _Shape) -> tuple:
+        """Order of a re-send in the repair share (``_pack_frame``): the oldest
+        (re)statement first — the define as last sent, alone or with its
+        UPD/UCOL. For an unchanged shape that is its risk of TTL expiry at a
+        base in resync, which refuses CONFIRMs (§4.3) and so ages a shape
+        from its last define or re-send (the mirror's own TTL clock is no
+        guide: a CONFIRM resets it, and the CONFIRM-only shapes are the ones
+        at risk). A shape with an UPD or UCOL since then sorts by the same
+        old frame, so the change a lost frame may have taken is re-stated
+        early: until it is, the base's DIGESTs mismatch. A repeat-once copy
+        competes on the same clock, so a define a lost frame took is still
+        re-sent when slot 5 crowds slot 6 out."""
+        return (s.define_frame, s.id)
 
     @staticmethod
     def _resend_records(s: _Shape, with_upd: bool, with_ucol: bool) -> tuple:
@@ -1569,28 +1671,63 @@ class VectorEncoder:
     def _confirm_bits(self, ids: list) -> int:
         return sum(_record_bits(rec) for rec in self._confirm_records(ids))
 
+    def _pack(self, cands: list, total_bits: int, reserve: int, carousel_bits: int) -> tuple:
+        """``_pack_frame`` with this frame's repair share (``_share_due``)."""
+        return self._pack_frame(cands, total_bits, reserve, carousel_bits, self._share_bits)
+
     @staticmethod
-    def _pack(cands: list, total_bits: int, reserve: int, carousel_bits: int) -> tuple:
+    def _pack_frame(cands: list, total_bits: int, reserve: int, carousel_bits: int, share_bits: int = 0) -> tuple:
         """Greedy fill in §4.2 order; never splits a candidate (a record, or
         the indivisible anchor + LAYER_CLEAR pair of an epoch start), and
         never packs one whose ``needs`` (the epoch start, on a key attempt)
-        was not packed. The CONFIRM + DIGEST reserve binds slots ≥ 5 only, so
-        the anchor and STATUS always go first; the carousel (slot 7) has its
-        own cap."""
+        was not packed. The CONFIRM + DIGEST reserve binds slots ≥ 5 only
+        (and not a DEL's repeat, ``exempt``), so the anchor and STATUS always
+        go first; the carousel (slot 7) has its own cap.
+
+        The repair share (§4.2 item 7, §4.3): on a share frame (one in four,
+        ``_share_due``; at V0 the carousel frame) up to ``share_bits`` (V0's
+        κ of the frame, 25 %) are taken *before* slots 5–6 fill, from the
+        re-sends — the carousel and the repeat-once copies alike — in
+        ``repair`` order; they count against the carousel's cap. Packed
+        last, the carousel got nothing on a saturated stream, and a
+        repeat-once that slot 5 crowded out was never offered to it, so
+        after one lost frame nothing re-sent what the base had lost until
+        the next epoch start (RS-13.1 A16). Not on every frame: the share
+        would then starve the frame's own changes and the repeats behind
+        them.
+
+        A candidate with ``unless`` (a DEL's repeat whose id this frame
+        re-uses) is packed after everything else, and only when that other
+        candidate was not. The packed list keeps the §4.2 order."""
         cands.sort(key=lambda c: (c.slot, c.order))
         used = 0
         car_used = 0
-        packed = []
         packed_ids: set = set()
+
+        def fits(c, limit: int) -> bool:
+            return used + c.bits <= limit and (c.needs is None or id(c.needs) in packed_ids)
+
+        share_due = share_bits > 0
         for c in cands:
-            limit = total_bits if c.slot < 5 else total_bits - reserve
-            if used + c.bits > limit or (c.needs is not None and id(c.needs) not in packed_ids):
+            if share_due and c.slot >= 5:
+                share_due = False
+                for x in sorted((x for x in cands if x.repair is not None), key=lambda x: x.repair):
+                    if car_used + x.bits <= share_bits and fits(x, total_bits - reserve):
+                        packed_ids.add(id(x))
+                        used += x.bits
+                        car_used += x.bits
+            if id(c) in packed_ids or c.unless is not None:
+                continue
+            if not fits(c, total_bits if (c.slot < 5 or c.exempt) else total_bits - reserve):
                 continue
             if c.slot == 7:
                 if car_used + c.bits > carousel_bits:
                     continue
                 car_used += c.bits
-            packed.append(c)
             packed_ids.add(id(c))
             used += c.bits
-        return packed, used
+        for c in cands:
+            if c.unless is not None and id(c.unless) not in packed_ids and fits(c, total_bits):
+                packed_ids.add(id(c))
+                used += c.bits
+        return [c for c in cands if id(c) in packed_ids], used

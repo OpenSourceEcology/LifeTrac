@@ -3,9 +3,11 @@
 <!-- Copy to bench-evidence/RS_13_vector_scene_<date>/RESULTS.md and fill every
      <placeholder>. Procedure and pass criteria: firmware/x8_lora_bootloader_helper/
      bench_tools/RS13_VECTOR_LEG.md — run its "Every session, every run"
-     checklist (the RS-13.1 lessons, anomaly ids A1-A15 of
-     bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md). Keep the section
-     order: readers of the other RS_* records expect it. -->
+     checklist (the RS-13.1 lessons, anomaly ids A1-A19 of
+     bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md) and use P6 / P8
+     as amended 2026-10-10 (its "Amendments 2026-10-10" section). Keep the
+     section order: readers of the other RS_* records expect it. The range-edge
+     session has its own template, at the end of RS13_RANGE_EDGE_LEG.md. -->
 
 **Status: <in progress | complete>. Verdict: <GO | NO-GO> for RS-13.2 —
 <one sentence: which legs passed, which criterion failed if any>.**
@@ -98,9 +100,9 @@ reports; every `PARK_TRANSIENT` and its re-park ~60 s later
 | P3 | loss: `capture seq gaps` line of `rs12_leg_report.py --capture` (the loss of record, A14; 1-fps FHSS: from lock + the `counting from seq 1` figure, A7); the report's counter `loss` line; Δtx_ok ↔ Δrx_ok; comparison basis (interleaved legs or the margin stated before the legs, A15) | | | | n/a | |
 | P4 | max fragments per frame (`done (pipelined): K fragments ok`: max K, count of K = 1 lines, ABORTED lines) | | | n/a | window | |
 | P5 | lock-loss gaps > 3 s (`frag_gap_report.py`) | n/a | | n/a | n/a | |
-| P6 | switch: first ack JSON; publish stamp → first codec-6 payload (s) vs the bound incl. the encoder p95 (A9); return ack JSON; return command on air (`command TX … (on air)`, base log) and codec-1 resumed after (s); stamp and publish in one board call (A13) | n/a | n/a | n/a | | |
+| P6 | switch: first ack JSON; publish stamp → first codec-6 payload (s) vs the bound incl. the encoder p95 (A9); return ack JSON; return command on air (`command TX … (on air)`, base log) and codec-1 resumed after (s) vs (1 + n) camera periods + 1 fragment airtime, n = codec-6 frames received after the on-air line (amended 2026-10-10, A18); stamp and publish in one board call (A13) | n/a | n/a | n/a | | |
 | P7 | link_stats `rx_codec_name` | | | n/a | | |
-| P8 | on-air encoder ms p95 vs step 1 | | | n/a | | |
+| P8 | on-air encoder ms p95 vs the budget at the leg's camera rate (350 ms at 2 fps; amended 2026-10-10, A17); vs step 1 (%) and tx daemon `drop_full` / `drop_stale` for information | | | n/a | | |
 
 FHSS time authority (A11): tractor `tx_stream_streak_max` in the 2b
 post-bracket: <n> (≥ 8 = authority reached; < 8 expected at 1 fps).

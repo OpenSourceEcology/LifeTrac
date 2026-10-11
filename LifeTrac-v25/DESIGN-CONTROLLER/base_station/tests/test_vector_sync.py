@@ -570,11 +570,13 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(len(polys), 1, back.records)
         recs = list(back.records)
         self.assertEqual(recs[recs.index(polys[0]) + 1], vs.Upd(xid, 0, 0), recs)
+        self.assertNotIn(vs.Del(xid), recs)                            # the re-use define replaces the DEL's repeat
         self.assertEqual(link.store._shapes[xid].off, (0, 0))
         self.assertEqual(link.in_step()[:2], (True, False))
         for _ in range(3):
-            link.step(scene(y0=8.0, rects=rects))
+            frame = link.step(scene(y0=8.0, rects=rects))
             t[0] += 0.5
+            self.assertNotIn(vs.Del(xid), frame.records)               # and no repeat follows later
             self.assertEqual(link.in_step()[:2], (True, False))
         t[0] += 61.0
         link.step(scene(y0=8.0, rects=rects))                          # the safety refresh
@@ -583,6 +585,38 @@ class SyncTests(unittest.TestCase):
             link.step(scene(y0=8.0, rects=rects))
         self.assertEqual(link.in_step()[:2], (True, False))
         self.assertEqual(*link.ttl_clocks())
+
+    def test_del_repeat_yields_to_an_immediate_reuse_and_never_deletes_it(self):
+        # §4.3 DEL repeat on a loss-free path under id pressure: the DEL goes,
+        # the next frame re-uses the id for the returning region, so that
+        # define replaces the repeat (a DEL and a define of one id share a
+        # capture time in one frame, and the tombstone would refuse the
+        # define); no later frame names the id in a DEL, the base holds the
+        # new shape and counts no orphan. Without re-use the repeat goes once.
+        link = Link()
+        rects = self.grid31()
+        for _ in range(3):
+            link.step(scene(y0=8.0, rects=rects))
+        gone = link.step(scene(y0=8.0, rects=rects[1:]))
+        dels = records_of(gone, vs.Del)
+        self.assertEqual(len(dels), 1, gone.records)
+        xid = dels[0].id
+        back = link.step(scene(y0=8.0, rects=rects))
+        self.assertTrue(any(p.id == xid for p in records_of(back, vs.Poly)), back.records)
+        self.assertNotIn(vs.Del(xid), back.records)
+        for i in range(4):
+            frame = link.step(scene(y0=8.0, rects=rects))
+            self.assertNotIn(vs.Del(xid), frame.records, f"frame {i + 1} after the re-use")
+            self.assertIn(xid, link.store._shapes)
+            self.assertEqual(link.in_step(), (True, False, 0, 0))
+        gone = link.step(scene(y0=8.0, rects=rects[1:]))               # gone again, and stays gone
+        self.assertEqual(records_of(gone, vs.Del), [vs.Del(xid)])
+        frame = link.step(scene(y0=8.0, rects=rects[1:]))
+        self.assertEqual(records_of(frame, vs.Del), [vs.Del(xid)])      # the repeat, once
+        self.assertEqual(link.in_step(), (True, False, 0, 0))           # a no-op at this base, no orphan
+        frame = link.step(scene(y0=8.0, rects=rects[1:]))
+        self.assertEqual(records_of(frame, vs.Del), [])
+        self.assertEqual(link.in_step(), (True, False, 0, 0))
 
     def test_refresh_recovers_a_busy_scene_after_a_lost_frame(self):
         # C1: 31 masses, one lost UPD, and every re-send that would repair it
@@ -727,9 +761,9 @@ class SyncTests(unittest.TestCase):
             with self.subTest(label):
                 t = [1000.0]
                 link = Link(clock=lambda: t[0])
-                for _ in range(6):
-                    link.step(scene(y0=8.0, rects=rects), quality=quality)
-                    t[0] += 0.5
+                for _ in range(7):                                     # V2 fills 2–3 defines a frame; the
+                    link.step(scene(y0=8.0, rects=rects), quality=quality)   # repair share (§4.2 item 7) re-sends
+                    t[0] += 0.5                                        # the oldest one on the 4th frame
                 n_live = records_of(link.frames[-1], vs.Digest)[0].n_live
                 self.assertGreaterEqual(n_live, min(13, len(rects)))
                 t[0] += 61.0
@@ -957,8 +991,10 @@ class SyncTests(unittest.TestCase):
         xid, off = upds[0].id, (upds[0].dx, upds[0].dy)
         gone = link.step(scene(y0=8.0, rects=moved[1:]), lose=True)            # the DEL is lost
         self.assertEqual(records_of(gone, vs.Del), [vs.Del(xid)])
-        for i in range(TTL_FRAMES):                                            # one more frame lost meanwhile
-            link.step(scene(y0=8.0, rects=moved[1:]), lose=(i == 4))
+        for i in range(TTL_FRAMES):                                            # its repeat too (§4.3), and
+            frame = link.step(scene(y0=8.0, rects=moved[1:]), lose=(i in (0, 4)))   # one more frame meanwhile
+            if i == 0:
+                self.assertEqual(records_of(frame, vs.Del), [vs.Del(xid)])
         self.assertIn(xid, [sh.id for sh in link.store._live()], "the base should still hold the ghost")
         back = link.step(scene(y0=8.0, rects=rects))                           # past the cooldown, same outline
         polys = [p for p in records_of(back, vs.Poly) if p.id == xid]
@@ -1183,6 +1219,208 @@ class SyncTests(unittest.TestCase):
             self.assertEqual(link.enc.last_stats["epochs"], 1, f"frame {i + 1}")
             if i >= 1:
                 self.assertEqual(link.in_step(), (True, False, 0, 0), f"frame {i + 1}")
+
+
+def busy_scene(i: int, seed: int = 0) -> "np.ndarray":
+    """Frame ``i`` of the saturating synthetic scene of the RS-13.1 A16 SIL
+    (``bench-evidence/RS_13_vector_scene_2026-09-26/scripts/a16_common.py``,
+    ``busy_scene`` with ``n_star=8, n_static=12, n_static_trees=5``): 12 static
+    red squares and 5 static trees (the CONFIRM-only shapes A16 starves), 8
+    rects on sinusoidal paths (UPDs and redefines), 5 blue rects blinking out
+    of phase (a DEL and a fresh define nearly every frame), 5 drifting trees
+    and 8 rotating, drifting stars (a Poly redefine each per frame), with
+    ±8 canvas noise. It fills every frame at 243 B and at 203 B."""
+    import math
+    import cv2
+    img = np.zeros((H, W, 3), np.uint8)
+    line = 8.0 / (CW / W)
+    ys = np.arange(H)[:, None] + 0.5
+    above = np.broadcast_to(ys < line, (H, W))
+    img[above] = SKY
+    img[~above] = GROUND
+    yy, xx = np.mgrid[0:H, 0:W]
+    for k in range(12):
+        x0, y0 = 2 + 10 * (k % 5), 30 + 8 * (k // 5)
+        img[y0:y0 + 5, x0:x0 + 6] = RED
+    for m in range(8):
+        per, ax = 9 + 3 * (m % 4), 6 + 2 * (m % 3)
+        cx = 8 + 11 * m + ax * math.sin(2 * math.pi * (i + 3 * m) / per)
+        cy = 12 + 4 * (m % 3) + 2 * math.cos(2 * math.pi * (i + m) / (per + 2))
+        x0, y0 = max(0, min(W - 7, int(round(cx)) - 3)), int(round(cy)) - 3
+        img[y0:y0 + 6, x0:x0 + 7] = (150, 150, 150) if m % 2 == 0 else (200, 200, 40)
+    for b in range(5):
+        if (i + 2 * b) % 9 < 5:
+            x0, y0, size = 58 + 7 * (b % 5), 34 + 9 * (b // 5), 4 + (b % 2)
+            img[y0:y0 + size, x0:x0 + size + 1] = (40, 60, 180)
+    for t in range(5):
+        cx, cy = 60 + 7 * t + 4 * math.sin(2 * math.pi * (i + 5 * t) / 17.0), 54 + 3 * (t % 2)
+        img[((xx - cx) ** 2 + (yy - cy) ** 2) <= 9] = GREEN
+    for t in range(5):
+        img[((xx - (5 + 9 * t)) ** 2 + (yy - 60) ** 2) <= 5] = (30, 110, 50)
+    for e in range(8):
+        cx = 12 + 18 * (e % 5) + 3 * math.sin(2 * math.pi * (i + 2 * e) / 11.0)
+        cy = 22 + 14 * (e // 5) + 2 * math.cos(2 * math.pi * (i + e) / 13.0)
+        rot = 2 * math.pi * ((i * (0.07 + 0.02 * e)) % 1.0)
+        pts = [(int(round(cx + (7.0 if v % 2 == 0 else 3.0) * math.cos(rot + math.pi * v / 5))),
+                int(round(cy + (7.0 if v % 2 == 0 else 3.0) * math.sin(rot + math.pi * v / 5)))) for v in range(10)]
+        cv2.fillPoly(img, [np.array(pts, np.int32)], (210, 120, 40) if e % 2 == 0 else (60, 170, 200))
+    big = cv2.resize(img, (CW, CH), interpolation=cv2.INTER_NEAREST)
+    rng = np.random.default_rng(seed + i)
+    return np.clip(big.astype(np.int16) + rng.integers(-8, 9, big.shape), 0, 255).astype(np.uint8)
+
+
+@unittest.skipUnless(_HAVE_CV, "numpy + cv2 required for the encoder")
+class SaturatedLossTests(unittest.TestCase):
+    """RS-13.1 A16 on a saturated stream: one lost frame that carries a DEL
+    left the base a ghost for TTL_FRAMES applied frames, the DIGESTs
+    mismatched on n_live, the resync refused the CONFIRMs that keep the
+    static shapes alive, the base TTL-dropped them while the mirror still
+    counted them, and the carousel — packed last on full frames — never
+    re-sent them until the next epoch start. VS1 has no uplink, so each
+    stream is encoded once and replayed into fresh stores with one frame lost."""
+
+    WARMUP = 30
+    CAROUSEL_PERIOD = round(1 / ev.LEVEL_KAPPA[0]) if _HAVE_CV else 4
+    WINDOW = TTL_FRAMES + 3 + 4 + 12     # the bound below, plus frames to show it holds
+
+    _streams: dict = {}
+
+    @classmethod
+    def stream(cls, budget: int) -> list:
+        """Encode once per budget: per frame the payload and the mirror after it."""
+        if budget not in cls._streams:
+            import cv2
+            cv2.setRNGSeed(0)
+            t = [1000.0]
+            enc = ev.VectorEncoder(clock=lambda: t[0])
+            out = []
+            for i in range(cls.WARMUP + 8 + cls.WINDOW):
+                payload = enc.frame(busy_scene(i), budget, seq=(i + 1) & 0xFF)
+                t[0] += 0.5
+                frame = parse_tile_delta_frame(payload)
+                out.append(dict(
+                    frame=frame, decoded=vs.decode_frame(frame.vector_body, frame.frame_kind),
+                    mirror={sid: (s.dhash, s.state_hash()) for sid, s in enc._shapes.items()},
+                    ttl=enc.last_stats["ttl_dropped"], epochs=enc.last_stats["epochs"],
+                    bytes=len(payload), stats=enc.last_stats))
+            cls._streams[budget] = out
+        return cls._streams[budget]
+
+    @staticmethod
+    def replay(stream: list, lost: set, upto: int) -> list:
+        """Feed frames 0..upto-1 into a fresh store, losing ``lost``; per frame
+        (in_step, resync, base n_live, base ttl_dropped, orphans)."""
+        store = VectorSceneStore(CW, CH)
+        rx, rows = 10_000, []
+        for i, fr in enumerate(stream[:upto]):
+            rx += PERIOD_MS
+            if i not in lost:
+                res = store.ingest(fr["frame"].vector_body, fr["frame"].frame_kind, rx, 0.0)
+                assert res.applied, (i, res)
+            st = store.stats
+            base = {sh.id: (sh.dhash, store._state_hash(sh)) for sh in store._live()}
+            rows.append(dict(in_step=base == fr["mirror"] and not st["resync"], resync=st["resync"],
+                             base_n=len(base), enc_n=len(fr["mirror"]), ttl=st["ttl_dropped"],
+                             orphans=st["orphans"]))
+        return rows
+
+    def del_drops(self, stream: list, n: int = 3) -> list:
+        """The first ``n`` frames from WARMUP on that carry a DEL of a shape the
+        base held (so that losing the frame would leave a ghost)."""
+        out = []
+        for i in range(self.WARMUP, self.WARMUP + 8):
+            dels = {r.id for r in stream[i]["decoded"].records if isinstance(r, vs.Del)}
+            if dels & set(stream[i - 1]["mirror"]):
+                out.append(i)
+            if len(out) == n:
+                break
+        return out
+
+    def test_the_stream_is_saturated_and_in_step_without_loss(self):
+        for budget in (243, 203):
+            with self.subTest(f"{budget} B"):
+                stream = self.stream(budget)
+                full = sum(1 for fr in stream[5:] if fr["bytes"] >= budget - 7)
+                self.assertGreaterEqual(full, 0.6 * len(stream[5:]), "the scene no longer fills the frames")
+                rows = self.replay(stream, set(), len(stream))
+                self.assertEqual([i for i, r in enumerate(rows) if i and not r["in_step"]], [])
+                self.assertEqual(rows[-1]["orphans"], 0)              # the DEL repeats are no orphans
+                self.assertEqual(rows[-1]["ttl"], stream[-1]["ttl"])
+                self.assertEqual(stream[-1]["epochs"], 1)
+                self.assertFalse(any(fr["decoded"].header.key for fr in stream[1:]))
+
+    def test_a_lost_frame_carrying_a_del_is_repaired_without_an_epoch_start(self):
+        # Acceptance for the A16 fix: back in step (ids, define-hash and
+        # state-hash equal to the mirror, not in resync) within TTL_FRAMES + 3
+        # frames plus one carousel period, and staying there; the base drops
+        # no shape the tractor still counts; never fewer shapes than the
+        # mirror once a ghost would have expired; no epoch start.
+        bound = TTL_FRAMES + 3 + self.CAROUSEL_PERIOD
+        for budget in (243, 203):
+            stream = self.stream(budget)
+            drops = self.del_drops(stream)
+            self.assertGreaterEqual(len(drops), 2, f"{budget} B: too few DEL frames to test")
+            for d in drops:
+                with self.subTest(f"{budget} B, frame {d} lost"):
+                    end = d + 1 + self.WINDOW
+                    rows = self.replay(stream, {d}, end)
+                    after = rows[d + 1:]
+                    back = next((k for k in range(len(after) - 2)
+                                 if all(r["in_step"] for r in after[k:])), None)
+                    self.assertIsNotNone(back, "never back in step")
+                    self.assertLessEqual(back + 1, bound, f"back in step only {back + 1} frames after the loss")
+                    self.assertEqual(rows[-1]["ttl"], stream[end - 1]["ttl"], "the base dropped live shapes")
+                    late = [d + 1 + k for k, r in enumerate(after) if k >= TTL_FRAMES and r["enc_n"] > r["base_n"]]
+                    self.assertEqual(late, [], "the base is shapes short after the ghost expiry")
+                    self.assertEqual(stream[end - 1]["epochs"], stream[d - 1]["epochs"])
+                    self.assertFalse(any(fr["decoded"].header.key for fr in stream[d:end]))
+
+    def test_every_del_is_repeated_once_in_the_next_frame(self):
+        # One lost frame never loses a DEL (§4.3): each DEL goes again in the
+        # next frame unless that frame re-uses the id for a fresh define,
+        # never a third time, and never for an id the mirror holds again.
+        for budget in (243, 203):
+            with self.subTest(f"{budget} B"):
+                stream = self.stream(budget)
+                n = 0
+                for i in range(1, len(stream) - 1):
+                    new = [r.id for r in stream[i]["decoded"].records if isinstance(r, vs.Del)
+                           and r.id in stream[i - 1]["mirror"]]
+                    for x in new:
+                        nxt = stream[i + 1]["decoded"].records
+                        dels = [r.id for r in nxt if isinstance(r, vs.Del)]
+                        reused = any(isinstance(r, (vs.Poly, vs.Tree, vs.Edge)) and r.id == x for r in nxt)
+                        self.assertEqual(dels.count(x), 0 if reused else 1, f"frame {i + 1}: {nxt}")
+                        if i + 2 < len(stream) and x not in stream[i + 1]["mirror"]:
+                            self.assertNotIn(vs.Del(x), stream[i + 2]["decoded"].records, f"frame {i + 2}: a 3rd copy")
+                        n += 1
+                    for r in stream[i]["decoded"].records:
+                        if isinstance(r, vs.Del):
+                            self.assertNotIn(r.id, stream[i]["mirror"], f"frame {i}: a DEL of a live id")
+                self.assertGreater(n, 20)
+
+    def test_the_repair_share_keeps_every_shape_within_its_ttl(self):
+        # The share frame takes V0's κ before slots 5–6, from the re-sends,
+        # the oldest (re)statement first, so even on full frames no live
+        # shape goes TTL_FRAMES frames without a define, a re-send or an UPD
+        # — the records a base in resync still verifies on. Without it the
+        # static trees went 67–69 frames between re-sends (both budgets).
+        for budget in (243, 203):
+            with self.subTest(f"{budget} B"):
+                stream = self.stream(budget)
+                last: dict = {}
+                worst = (0, None)
+                for i, fr in enumerate(stream):
+                    for r in fr["decoded"].records:
+                        if isinstance(r, (vs.Poly, vs.Tree, vs.Edge, vs.Upd)):
+                            last[r.id] = i
+                    for sid in fr["mirror"]:
+                        if i >= self.WARMUP and sid in last and i - last[sid] > worst[0]:
+                            worst = (i - last[sid], (i, sid))
+                    for sid in list(last):
+                        if sid not in fr["mirror"]:
+                            del last[sid]
+                self.assertLess(worst[0], TTL_FRAMES - 2, f"hard-verify gap {worst}")
 
 
 if __name__ == "__main__":

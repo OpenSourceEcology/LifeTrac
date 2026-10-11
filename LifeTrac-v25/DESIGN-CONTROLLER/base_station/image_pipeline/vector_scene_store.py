@@ -521,7 +521,13 @@ class VectorSceneStore:
         elif isinstance(rec, vs.Del):
             sh = self._lookup(rec.id)
             if sh is None:
-                self._orphan()
+                # Not an orphan (§3.4 rule 4): the id is absent either way.
+                # VS1 sends every DEL twice, in its frame and the next (§4.3),
+                # so a base that applied the first copy sees the second name
+                # an id it no longer holds; counting it would put an orphan on
+                # every DEL of a loss-free stream. The tombstone still refuses
+                # an older define of the id (an existing one is kept).
+                self._tomb.setdefault(rec.id, clk)
                 return
             if not _wins(clk, sh.geom_clk):
                 return                              # older than the live define, or a bound against known state

@@ -559,6 +559,34 @@ MOTION_ONLY_QUALITY = _env_int("LIFETRAC_MOTION_ONLY_QUALITY", 30, lo=5, hi=100)
 WIREFRAME_QUALITY   = _env_int("LIFETRAC_WIREFRAME_QUALITY", 20, lo=5, hi=100)
 ENCODE_MODE = _clamp_encode_mode(_env_int("LIFETRAC_ENCODE_MODE", 0))
 
+# RS-13 (2026-10-10): one lock makes "commit a new ENCODE_MODE + raise the
+# keyframe it forces" (_apply_encode_mode / dispatch_back_channel, MQTT or
+# back-channel thread) atomic against "sample the mode + consume the request"
+# (_sample_mode_and_force, encode loop). Before it, the loop read the request
+# BEFORE the capture (cam.grab_rgb() blocks up to a frame period on the
+# ffmpeg pipe) and the mode AFTER it, so a switch landing in that window was
+# built in the new mode without its force and forced again one frame later:
+# on every VECTOR entry the fresh encoder's "first" epoch start was followed
+# by a redundant "forced" one (2026-10-04 2d_r4 camera_service.log), and a
+# RE-entry's first frame was a delta against the stale scene mirror of the
+# previous VECTOR session. Re-entrant: dispatch_back_channel holds it around
+# its call into _apply_encode_mode.
+_MODE_LOCK = threading.RLock()
+
+
+def _sample_mode_and_force(force_evt, force_keyframe: bool = False) -> tuple:
+    """Return ``(mode, force)`` for the frame being built: the current
+    ENCODE_MODE and whether a keyframe was requested, consuming the request.
+    With ``force_evt`` None (direct callers, unit tests) only the mode is
+    read and ``force_keyframe`` passes through."""
+    if force_evt is None:
+        return ENCODE_MODE, bool(force_keyframe)
+    with _MODE_LOCK:
+        if force_evt.is_set():
+            force_evt.clear()
+            force_keyframe = True
+        return ENCODE_MODE, bool(force_keyframe)
+
 # 2026-07-27 encode-to-fit starvation guard: a tile whose age (frames since
 # it last shipped) EXCEEDS this jumps to the front of the pack order, oldest
 # first. Guarantees rolling-refresh convergence under sustained motion at
@@ -738,6 +766,11 @@ class FrameAccum:
     # FrameAccum() construction signature unchanged.
     tile_last_seq: list[int] | None = None
     sweep_seq: int = 0
+    # RS-13 (2026-10-10): whether the last _build_frame was built as a forced
+    # keyframe / epoch start (the request it consumed from ``force_evt``, or
+    # the caller's ``force_keyframe``). The encode loop reports it to the M7
+    # IpcWriter, since the request is now sampled inside _build_frame.
+    last_forced: bool = False
 
 
 # IP-PlanRev: image-pipeline plan revision selector. Letter scheme parallel
@@ -877,8 +910,113 @@ class LinkBudget:
         return True
 
 
+# ---- VECTOR cold-start budget (RS-13 guard, 2026-10-10) ---------------
+# In bridge mode the boot budget is LIFETRAC_FRAGMENT_BUDGET_BRIDGE_DEFAULT
+# (12 fragments = 2436 B, seen on air 2026-10-04) until image_tx_daemon's
+# retained ``tractor/link_budget`` arrives. The tile modes are built for
+# multi-fragment frames, but VECTOR is a one-fragment codec (VECTOR_SCENE.md
+# §3.7): a 2.4 KB scene frame is a 12-fragment train whose loss drops the
+# whole frame. Until the radio owner has spoken, VECTOR is held to ONE
+# fragment of the active radio profile, or of the most conservative image
+# profile when camera_service does not know the profile.
+#
+# LIFETRAC_REG_PROFILE -> LINK_PHY_NAMES entry; the same map image_tx_daemon
+# publishes as ``profile_index`` (_PROFILE_TO_LINK_PHY_IDX: 0/1 -> 5, 2 -> 6).
+_REG_PROFILE_LINK_PHY = {0: "image_bw250", 1: "image_bw250", 2: "image_bw500"}
+# _build_vector_frame's floor when no budget is known at all (one BW250 body).
+VECTOR_FALLBACK_BUDGET_B = 203
+
+
+def _vector_cold_budget() -> int:
+    """One fragment of the active radio profile (``LIFETRAC_REG_PROFILE``,
+    which the bench harness passes to camera_service as well), else the
+    smallest one-fragment payload over the image profiles."""
+    raw = os.environ.get("LIFETRAC_REG_PROFILE", "").strip()
+    prof = int(raw) if raw.isdigit() else None
+    if prof in _REG_PROFILE_LINK_PHY:
+        names = (_REG_PROFILE_LINK_PHY[prof],)
+    else:
+        names = tuple(sorted(set(_REG_PROFILE_LINK_PHY.values())))
+    sizes = [b for b in (_compute_link_bytes(1, n) for n in names) if b]
+    return min(sizes) if sizes else VECTOR_FALLBACK_BUDGET_B
+
+
+def _link_budget_known(link_budget: "LinkBudget | None") -> bool:
+    """True once the radio owner reported a budget (``LinkBudget.update`` is
+    the only writer of ``n_fragments``: retained link_budget / CMD_LINK_PROFILE)."""
+    return (link_budget is not None and link_budget.n_fragments is not None
+            and bool(link_budget.bytes))
+
+
+def _vector_byte_budget(link_budget: "LinkBudget | None") -> int:
+    """VECTOR's per-frame wire budget: the live link_budget once known, else
+    ``min(provisional budget, one fragment)`` (see the block comment above)."""
+    if _link_budget_known(link_budget):
+        return int(link_budget.bytes)
+    cold = _vector_cold_budget()
+    provisional = link_budget.bytes if link_budget is not None else None
+    if provisional is not None and provisional > 0:
+        return min(int(provisional), cold)
+    return cold
+
+
 _VECTOR_ENCODER = None
 _VECTOR_SEQ = 0
+# RS-13 guard (2026-10-10): build the VS1 encoder at boot instead of on the
+# first VECTOR capture. The lazy build imported OpenCV + encode_vector inside
+# the first VECTOR frame, and its first frame() paid the process's numpy/cv2
+# first-call costs (l0 79.6 ms vs ~15 ms steady on the 2026-10-04 2d_r4 leg):
+# the switch left a 1.038 s TX gap, which on FHSS breaks the strict < 1000 ms
+# clock-authority TX streak. 0 restores the lazy build.
+VECTOR_PREBUILD = os.environ.get("LIFETRAC_VECTOR_PREBUILD", "1").strip() != "0"
+
+
+def _vector_warmup_canvas():
+    """A small synthetic scene (sky, ground, a few blocks) that exercises the
+    encoder's horizon, region and edge stages once. H×W×3 uint8."""
+    img = _np.zeros((CANVAS_H, CANVAS_W, 3), _np.uint8)
+    img[: CANVAS_H * 2 // 5] = (120, 160, 220)
+    img[CANVAS_H * 2 // 5:] = (60, 120, 40)
+    for i in range(6):
+        x0 = 20 + i * (CANVAS_W // 7)
+        img[CANVAS_H * 3 // 5: CANVAS_H * 4 // 5, x0: x0 + CANVAS_W // 13] = (
+            200, 50 + 20 * i, 30)
+    return img
+
+
+def _prebuild_vector_encoder(warm: bool = True) -> bool:
+    """Construct ``_VECTOR_ENCODER`` now, before any VECTOR capture.
+
+    ``warm`` also runs ONE frame through a throwaway encoder so the process's
+    first-call costs (OpenCV/numpy code paths, memo tables) are paid at boot;
+    measured off air they are per process, not per encoder: a fresh encoder in
+    a warm process encodes its first frame at steady-state speed. The kept
+    encoder is untouched by the warm-up, so its first frame is still the
+    "first" epoch start. Returns True when an encoder is ready. Never raises:
+    a failure leaves the lazy build in _build_vector_frame as the fallback."""
+    global _VECTOR_ENCODER  # noqa: PLW0603
+    if _VECTOR_ENCODER is not None:
+        return True
+    if not _vector_encoder_available():
+        return False
+    t0 = time.perf_counter()
+    try:
+        from x8_image_pipeline.encode_vector import VectorEncoder
+        enc = VectorEncoder(canvas=(CANVAS_W, CANVAS_H))
+        t1 = time.perf_counter()
+        if warm:
+            VectorEncoder(canvas=(CANVAS_W, CANVAS_H)).frame(
+                _vector_warmup_canvas(), VECTOR_FALLBACK_BUDGET_B,
+                quality=VECTOR_DETAIL)
+    except Exception as exc:                                  # pragma: no cover
+        LOG.warning("camera_service: vector encoder prebuild failed (%s); "
+                    "the first VECTOR frame will build it lazily", exc)
+        return False
+    _VECTOR_ENCODER = enc
+    t2 = time.perf_counter()
+    LOG.info("camera_service: vector encoder prebuilt (import+build %.0f ms, "
+             "warm-up %.0f ms)", (t1 - t0) * 1000.0, (t2 - t1) * 1000.0)
+    return True
 
 
 def _log_vector_stats(st: dict) -> None:
@@ -920,10 +1058,15 @@ def _build_vector_frame(canvas: bytes, force_epoch: bool,
         # payload under codec 6, fail the frame build loudly instead.
         raise RuntimeError("VECTOR mode needs numpy")
     if _VECTOR_ENCODER is None:
+        # Fallback only: main() prebuilds it (_prebuild_vector_encoder), so
+        # this path means LIFETRAC_VECTOR_PREBUILD=0 or a failed prebuild,
+        # and this frame pays the import + first-call costs on air.
+        LOG.info("camera_service: building the vector encoder lazily")
         from x8_image_pipeline.encode_vector import VectorEncoder
         _VECTOR_ENCODER = VectorEncoder(canvas=(CANVAS_W, CANVAS_H))
     rgb = _np.frombuffer(canvas, dtype=_np.uint8).reshape(CANVAS_H, CANVAS_W, 3)
-    budget = byte_budget if (byte_budget is not None and byte_budget > 0) else 203
+    budget = (byte_budget if (byte_budget is not None and byte_budget > 0)
+              else VECTOR_FALLBACK_BUDGET_B)
     _VECTOR_SEQ = (_VECTOR_SEQ + 1) & 0xFF
     return _VECTOR_ENCODER.frame(rgb, budget, epoch_start=force_epoch,
                                  quality=VECTOR_DETAIL, seq=_VECTOR_SEQ)
@@ -933,7 +1076,9 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
                  *,
                  roi_planner=None,
                  byte_budget: int | None = None,
-                 encode_cache=None) -> bytes:
+                 encode_cache=None,
+                 force_evt=None,
+                 vector_byte_budget: int | None = None) -> bytes:
     """Capture, diff, encode, return the wire payload (header + tiles).
     Wire format mirrors LORA_PROTOCOL.md § TileDeltaFrame so the M7 can
     forward it byte-for-byte after fragmentation.
@@ -960,10 +1105,23 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
         WebP. Pure CPU saver; wire payload is unchanged. Quality changes
         invalidate the cache for the affected tile because ``quality``
         is folded into the hash key (different quality → different blob).
+      * ``force_evt`` — the encode loop's keyframe-request ``threading.Event``
+        (RS-13, 2026-10-10). When given, the request is consumed HERE, after
+        the capture and together with the encode mode under ``_MODE_LOCK``,
+        so a mode switch and the keyframe it forces always land in the same
+        frame (see ``_sample_mode_and_force``). The frame is then built in
+        that one sampled mode end to end.
+      * ``vector_byte_budget`` — VECTOR's budget when it differs from
+        ``byte_budget`` (the cold-start one-fragment clamp,
+        :func:`_vector_byte_budget`); ``None`` uses ``byte_budget``.
     """
     canvas = cam.grab_rgb()
-    if ENCODE_MODE == ENCODE_MODE_VECTOR:
-        return _build_vector_frame(canvas, force_keyframe, byte_budget)
+    mode, force_keyframe = _sample_mode_and_force(force_evt, force_keyframe)
+    accum.last_forced = bool(force_keyframe)
+    if mode == ENCODE_MODE_VECTOR:
+        return _build_vector_frame(
+            canvas, force_keyframe,
+            vector_byte_budget if vector_byte_budget is not None else byte_budget)
     now = time.monotonic()
     is_key = (force_keyframe or accum.last_canvas is None or
               (now - accum.last_keyframe_t) >= KEYFRAME_PERIOD_S)
@@ -1179,14 +1337,16 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
             # so a re-encode at the same settings returns byte-identical blobs
             # from cache, and a CMD_ENCODE_MODE flip invalidates automatically.
             raw = _slice_tile_rgb(canvas, tx, ty)
-            key_input = raw + bytes([q & 0xFF, ENCODE_MODE & 0xFF])
+            key_input = raw + bytes([q & 0xFF, mode & 0xFF])
             blob = encode_cache.lookup(i, key_input)
             if blob is None:
-                blob = _encode_tile(canvas, tx, ty, quality=q, is_key=is_key)
+                blob = _encode_tile(canvas, tx, ty, quality=q,
+                                    encode_mode=mode, is_key=is_key)
                 if blob is not None:
                     encode_cache.store(i, key_input, blob)
         else:
-            blob = _encode_tile(canvas, tx, ty, quality=q, is_key=is_key)
+            blob = _encode_tile(canvas, tx, ty, quality=q,
+                                encode_mode=mode, is_key=is_key)
         if blob is None:
             continue
         cost = min(len(blob), TILE_BYTES_MAX) + 1   # +1 for size prefix
@@ -1231,7 +1391,7 @@ def _build_frame(cam, accum: FrameAccum, force_keyframe: bool,
     #   frame_kind (1) | seq (1) | grid_w (1) | grid_h (1) | tile_px (1)
     #   | codec (1) | changed_bitmap (bitmap_bytes)
     accum.seq = (accum.seq + 1) & 0xFF
-    codec = _codec_for_mode(ENCODE_MODE)
+    codec = _codec_for_mode(mode)      # the sampled mode, as the tiles above
     header = struct.pack("BBBBBB",
                          1 if is_key else 0,
                          accum.seq, GRID_W, GRID_H, TILE_PX,
@@ -1324,8 +1484,7 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
     """
     effective = _clamp_encode_mode(raw_mode)
     global ENCODE_MODE, WEBP_QUALITY, VECTOR_DETAIL  # noqa: PLW0603
-    mode_changed = (effective != ENCODE_MODE)
-    ENCODE_MODE = effective
+    q = None
     if quality is not None:
         try:
             # VECTOR takes the whole 1..100 byte: its bands are the V0..V3
@@ -1335,6 +1494,13 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
             q = max(lo, min(100, int(quality)))
         except (TypeError, ValueError):
             q = None
+    # RS-13 (2026-10-10): mode, dial and the keyframe the switch forces are
+    # committed as ONE step for the encode loop (see _MODE_LOCK), so the
+    # frame that first sees the new mode is also the one that consumes its
+    # keyframe / epoch start — never a second, redundant one a frame later.
+    with _MODE_LOCK:
+        mode_changed = (effective != ENCODE_MODE)
+        ENCODE_MODE = effective
         if q is not None and effective == ENCODE_MODE_VECTOR:
             # The vector detail is its own dial (VECTOR_SCENE.md §6): a mode-9
             # command never touches the tile modes' WebP quality.
@@ -1347,6 +1513,16 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
                 LOG.info("camera_service: quality %s -> %d [%s]",
                          WEBP_QUALITY, q, source)
             WEBP_QUALITY = q
+        # 2026-07-27: force a keyframe only when the MODE actually changed
+        # (the codec byte in every frame header makes the switch
+        # decode-safe, but a full repaint is the right UX) or at boot
+        # (initial paint). A quality-only change needs NO keyframe: quality
+        # is not on the wire, tiles are self-describing, and the encode cache
+        # keys include quality — the old unconditional force cost ~1-2 s of
+        # air per slider move and re-fired on every retained-message replay
+        # at MQTT reconnect.
+        if mode_changed or source == "boot":
+            force_key_evt.set()
     if effective == raw_mode:
         LOG.info("camera_service: encode_mode -> %d (%s) [%s]",
                  effective, ENCODE_MODE_NAMES[effective], source)
@@ -1359,15 +1535,6 @@ def _apply_encode_mode(raw_mode: int, source: str, force_key_evt,
             "clamping to %d (%s) [%s]",
             raw_mode, req_name, effective, ENCODE_MODE_NAMES[effective],
             source)
-    # 2026-07-27: force a keyframe only when the MODE actually changed (the
-    # codec byte in every frame header makes the switch decode-safe, but a
-    # full repaint is the right UX) or at boot (initial paint). A
-    # quality-only change needs NO keyframe: quality is not on the wire,
-    # tiles are self-describing, and the encode cache keys include quality
-    # — the old unconditional force cost ~1-2 s of air per slider move and
-    # re-fired on every retained-message replay at MQTT reconnect.
-    if mode_changed or source == "boot":
-        force_key_evt.set()
     client = _MQTT_CLIENT
     if client is not None:
         try:
@@ -1406,7 +1573,19 @@ def dispatch_back_channel(frame: bytes, force_key_evt, *,
     an optional :class:`LinkBudget` mutated by ``CMD_LINK_PROFILE``.
     Returning early on malformed input keeps the reader thread tolerant
     of a noisy UART.
+
+    Runs under ``_MODE_LOCK`` (RS-13): a CMD_ENCODE_MODE commits its mode in
+    _apply_encode_mode and then raises the generic reconfiguration keyframe
+    below; one critical section keeps the encode loop from consuming the
+    first force between the two and acting on the second one a frame later.
     """
+    with _MODE_LOCK:
+        _dispatch_back_channel(frame, force_key_evt, roi_planner=roi_planner,
+                               link_budget=link_budget)
+
+
+def _dispatch_back_channel(frame: bytes, force_key_evt, *, roi_planner=None,
+                           link_budget: "LinkBudget | None" = None) -> None:
     # Frame layout: <topic_id:1> <opcode:1> <args:N>
     if len(frame) < 2 or frame[0] != X8_CMD_TOPIC:
         return
@@ -1513,6 +1692,13 @@ def main() -> None:
         except Exception as exc:                              # pragma: no cover
             LOG.warning("camera_service: tile encode cache unavailable (%s)", exc)
             encode_cache = None
+
+    # RS-13 guard (2026-10-10): the VS1 encoder exists (and the process is
+    # warm) before the first capture and before any control traffic can
+    # switch to VECTOR, so a mode switch costs one frame build, not an
+    # OpenCV import plus first-call warm-up inside the TX schedule.
+    if VECTOR_PREBUILD:
+        _prebuild_vector_encoder()
 
     def _back_channel_reader() -> None:
         try:
@@ -1666,14 +1852,30 @@ def main() -> None:
     _last_vstats_t = 0.0
     _last_canvas_sig: int | None = None
     _same_canvas_run = 0
+    _vector_clamp_logged = False
     while True:
-        force = force_key_evt.is_set()
-        force_key_evt.clear()
         try:
-            payload = _build_frame(cam, accum, force_keyframe=force,
+            # RS-13 guard: VECTOR is held to one fragment until the radio
+            # owner's link_budget arrives (the bridge cold-start default is
+            # 12 fragments); the tile modes keep the provisional budget.
+            vector_budget = _vector_byte_budget(link_budget)
+            if (not _vector_clamp_logged and not _link_budget_known(link_budget)
+                    and vector_budget != link_budget.bytes):
+                LOG.info("camera_service: VECTOR budget %d B (one fragment) "
+                         "until link_budget arrives (provisional %s B)",
+                         vector_budget, link_budget.bytes)
+                _vector_clamp_logged = True
+            # The keyframe request is consumed INSIDE _build_frame, after the
+            # capture and atomically with the mode (RS-13, see _MODE_LOCK);
+            # sampling it here, before the blocking grab, double-started
+            # every VECTOR entry.
+            payload = _build_frame(cam, accum, force_keyframe=False,
+                                   force_evt=force_key_evt,
                                    roi_planner=roi_planner,
                                    byte_budget=link_budget.bytes,
+                                   vector_byte_budget=vector_budget,
                                    encode_cache=encode_cache)
+            force = accum.last_forced
             if frame_health_log and accum.last_canvas is not None:
                 sig = hash(accum.last_canvas[:4096])
                 if _last_canvas_sig is not None and sig == _last_canvas_sig:

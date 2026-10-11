@@ -399,6 +399,31 @@ class LwwTests(StoreCase):
         self.assertNotIn(2, self.shapes())
         self.assertEqual(self.st.stats["orphans"], 0)
 
+    def test_a_del_naming_an_absent_id_is_no_orphan(self):
+        # §3.4 rule 4, §4.3: VS1 sends every DEL twice (its frame and the
+        # next), so a base that applied the first copy sees the second name
+        # an id it no longer holds. The id is absent either way: no orphan,
+        # and the tombstone still refuses an older define of it.
+        self.feed(key() + [tri(1), tri(2)], epoch=0, key_=True)
+        self.feed([vs.Del(1)], epoch=0)                             # the DEL ...
+        self.feed([vs.Del(1)], epoch=0)                             # ... and its repeat: a no-op
+        self.assertEqual(set(self.shapes()), {2})
+        self.assertEqual(self.st.stats["orphans"], 0)
+        self.feed([tri(1, y=12)], epoch=0)                          # a later define re-uses the id
+        self.assertEqual(set(self.shapes()), {1, 2})
+        t_reuse = self.rx
+        self.feed([vs.Del(1)], epoch=0, rx=t_reuse - 100)           # a DEL older than that define: ignored
+        self.assertEqual(set(self.shapes()), {1, 2})
+        self.feed([vs.Del(3)], epoch=0, rx=t_reuse + 500)           # an id never held: no orphan either ...
+        self.feed([tri(3)], epoch=0, rx=t_reuse + 400)              # ... and an older define of it is refused
+        self.assertNotIn(3, self.shapes())
+        self.feed([tri(3)], epoch=0, rx=t_reuse + 1000)             # a newer one is not
+        self.assertIn(3, self.shapes())
+        self.feed([vs.Del(2)], epoch=0, rx=t_reuse + 1500)
+        self.feed(key(2) + [vs.Del(2)], epoch=1, key_=True)         # the repeat in the next epoch's start
+        self.assertEqual(set(self.shapes()), {1, 3})
+        self.assertEqual(self.st.stats["orphans"], 0)
+
     def test_group_transform_at_define_never_double_shifts(self):
         self.feed(key() + [tri(1)], epoch=0, key_=True)             # defined at shift 0
         self.feed([vs.Gshift(1, 10, 0)], epoch=0)                   # ground +20 px
@@ -640,7 +665,8 @@ class OrphanResyncTests(StoreCase):
         self.feed(key() + [tri(1)], epoch=0, key_=True)
         t_def = self.rx - 200
         for _ in range(3):                                           # 12 orphans in 12 items
-            self.feed([vs.Upd(9, 1, 1), vs.Ucol(9, FLAT), vs.Del(9), vs.Hole(9, 0, False, 1, 1, 1)], epoch=0)
+            self.feed([vs.Upd(9, 1, 1), vs.Ucol(9, FLAT), vs.Insert(9, 0, 0, 0, -2),
+                       vs.Hole(9, 0, False, 1, 1, 1)], epoch=0)
         self.assertEqual(self.st.stats["orphans"], 12)
         self.assertTrue(self.st.stats["resync"])
         self.assertTrue(self.snap()["resync"])
@@ -656,7 +682,7 @@ class OrphanResyncTests(StoreCase):
     def test_the_repeat_once_anchor_of_a_lost_epoch_start_also_clears_it(self):
         self.feed(key() + [tri(1)], epoch=0, key_=True)
         for _ in range(3):
-            self.feed([vs.Upd(9, 1, 1), vs.Ucol(9, FLAT), vs.Del(9)], epoch=0)
+            self.feed([vs.Upd(9, 1, 1), vs.Ucol(9, FLAT), vs.Insert(9, 0, 0, 0, -2)], epoch=0)
         self.assertTrue(self.st.stats["resync"])
         self.feed([tri(2)], epoch=1)                                 # the K = 1 copy was lost ...
         self.assertTrue(self.st.stats["resync"])
@@ -669,7 +695,7 @@ class OrphanResyncTests(StoreCase):
         self.feed([digest([(1, dh, sh)])], epoch=0)
         self.feed([digest([(1, dh, sh)])], epoch=0)                  # matches before the resync ...
         for _ in range(3):                                           # 9 orphans in 9 items
-            self.feed([vs.Upd(9, 1, 1), vs.Ucol(9, FLAT), vs.Del(9)], epoch=0)
+            self.feed([vs.Upd(9, 1, 1), vs.Ucol(9, FLAT), vs.Insert(9, 0, 0, 0, -2)], epoch=0)
         self.assertTrue(self.st.stats["resync"])
         self.feed([digest([(1, dh, sh)])], epoch=0)                  # ... do not count towards its end
         self.feed([digest([(1, dh, sh)])], epoch=0)

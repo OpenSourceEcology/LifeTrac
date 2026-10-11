@@ -312,6 +312,25 @@ def _frag_body_b(profile: int) -> int:
     return _FRAG_BODY_BY_PROFILE.get(int(profile), 203)
 
 
+def _frags(n_bytes: int, body_b: int) -> int:
+    """Fragments a payload of ``n_bytes`` needs at ``body_b`` bytes/fragment."""
+    return -(-int(n_bytes) // int(body_b))
+
+
+# RS-13 guard (2026-10-10): wire codec id of a VECTOR frame (VS1 scene,
+# VECTOR_SCENE.md §3), byte 5 of the 6-byte TileDeltaFrame header. Mirrors
+# image_pipeline.frame_format.CODEC_VECTOR, kept local so the guard holds
+# on a deployment whose frame_format import fails (pack_frame_batch None).
+_TDF_CODEC_OFFSET = 5
+_CODEC_VECTOR = 6
+
+
+def _is_vector_frame(payload: bytes) -> bool:
+    """True for a codec-6 (VECTOR) TileDeltaFrame: frame_kind 0/1 + codec 6."""
+    return (len(payload) > _TDF_CODEC_OFFSET and payload[0] in (0, 1)
+            and payload[_TDF_CODEC_OFFSET] == _CODEC_VECTOR)
+
+
 BATCH_MAX_FRAMES = _env_int("LIFETRAC_BATCH_MAX_FRAMES", 4, lo=1)
 # 2026-07-29 ack-cost experiment: 0 suppresses the probe echo entirely so a
 # run measures the IMAGE cost of carrying acks. Tractor-side "LoRa cmd: PROBE"
@@ -757,13 +776,23 @@ class ImageTxDaemon:
         payload (length-prefixed container, FRAME_BATCH_MAGIC). A frame
         that does not fit is CARRIED to the next loop pass — never pushed
         back to the queue tail, so air order == submit order. Keyframes
-        are never batched (they keep the copies/parity paths)."""
+        are never batched (they keep the copies/parity paths).
+
+        RS-13 guard (2026-10-10): VECTOR (codec 6) frames are never batched
+        either, as the first frame or as a follower. The VS1 encoder sizes
+        every frame to exactly one fragment body (VECTOR_SCENE.md §3.7), so a
+        batch can only lengthen the train (two 243 B frames = a 492 B batch =
+        3 fragments instead of 2) and couple the loss of consecutive scene
+        frames (one lost fragment drops both, with their DELs — RS-13 A16)."""
         if TX_BATCH == 0 or pack_frame_batch is None:
             return first
         if first.payload[:1] == b"\x01":       # keyframe: never batch
             return first
+        if _is_vector_frame(first.payload):    # VECTOR: never batch
+            return first
         batch = [first]
         total = 2 + 2 + len(first.payload)     # magic+count + len+seg
+        body_b = _frag_body_b(self._active_profile)
         while len(batch) < BATCH_MAX_FRAMES:
             try:
                 nxt = self._q.get_nowait()
@@ -776,12 +805,25 @@ class ImageTxDaemon:
             # and a triple (4/3 = 1.33) beats the pair; but a fit that
             # would spill a near-empty extra fragment for a tiny frame
             # is rejected and carried to the next train.
-            body_b = _frag_body_b(self._active_profile)
-            frags_with = -(-cand // body_b)
-            frags_without = -(-total // body_b)
+            #
+            # RS-13 pricing fix (2026-10-10): a batch of ONE goes out
+            # unbatched (``return first`` below), so its real cost is its own
+            # payload, not payload + the 4 B container overhead. Pricing it
+            # with the overhead made every encode-to-fit frame of 240..243 B
+            # (BW500; 200..203 B at BW250) look like 2 fragments, so a pair of
+            # full single-fragment frames was "improved" into a 3-fragment
+            # train. And the batch must never cost more fragments than sending
+            # the follower on its own (a 486 B + 243 B pair is 4 fragments
+            # batched against 2 + 1 separately, yet passes per-frame parity).
+            frags_with = _frags(cand, body_b)
+            frags_without = _frags(len(first.payload) if len(batch) == 1
+                                   else total, body_b)
             eff_ok = (frags_with * len(batch)
-                      <= frags_without * (len(batch) + 1))
+                      <= frags_without * (len(batch) + 1)
+                      and frags_with
+                      <= frags_without + _frags(len(nxt.payload), body_b))
             if (nxt.payload[:1] == b"\x01"
+                    or _is_vector_frame(nxt.payload)
                     or cand > BATCH_BUDGET_B
                     or not eff_ok):
                 self._carry = nxt
