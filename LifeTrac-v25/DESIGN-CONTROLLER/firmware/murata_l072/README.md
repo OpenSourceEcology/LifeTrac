@@ -63,16 +63,79 @@ Future A/B layout (Phase 6, N-26) splits APP:
 
 Stack is reserved at the top (size set in [include/memory_map.h](include/memory_map.h) as `MM_STACK_SIZE`, default 2.5 KB per Claude review §2.3 recommendation).
 
-## Build
+## Building
+
+### Toolchain (byte-identical builds need exactly this)
+
+| tool | version | notes |
+|---|---|---|
+| cross compiler | **Arm GNU Toolchain 12.2.MPACBTI-Rel1**: `arm-none-eabi-gcc --version` prints `arm-none-eabi-gcc (Arm GNU Toolchain 12.2.MPACBTI-Rel1 (Build arm-12-mpacbti.34)) 12.2.1 20230214` | From developer.arm.com, *Arm GNU Toolchain Downloads*, release 12.2.MPACBTI-Rel1, "AArch32 bare-metal target (arm-none-eabi)". Bench PC install: `C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\12.2 mpacbti-rel1\bin` on `PATH`. Linux x86_64 tarball: `https://developer.arm.com/-/media/Files/downloads/gnu/12.2.mpacbti-rel1/binrel/arm-gnu-toolchain-12.2.mpacbti-rel1-x86_64-arm-none-eabi.tar.xz` (170 644 784 B, sha256 `17455a06c816031cc2c66243c117cba48463cd6a3a3fdfac7275b4e9c40eb314`, as published in Arm's `.sha256asc`). |
+| make | Windows: WinLibs `mingw32-make` (winget `BrechtSanders.WinLibs.POSIX.UCRT`), **run from PowerShell only**. Linux: GNU make. | On Windows the Makefile uses `cmd` syntax for `mkdir`/`rmdir`, so it fails from Git Bash. |
+| host compiler (`make check` only) | any gcc/cc (WinLibs `gcc` on Windows) | `HOST_CC` overrides. |
+
+Other compilers build **working firmware with different bytes**:
+- Arduino's bundled `arm-none-eabi-gcc` 7-2017q4. [`build.ps1`](build.ps1)
+  picks it first when it is installed, so do not use `build.ps1` for a build
+  you will compare.
+- Ubuntu's `gcc-arm-none-eabi`. The `L072 cross-compile` job in
+  `arduino-ci.yml` uses it for its link + size-budget gate.
+
+A matching md5 therefore proves both the source and the toolchain.
+
+### Targets
 
 ```
-make            # build firmware.elf, firmware.bin, firmware.hex
-make size       # show region usage against the budget
+mingw32-make            # = all: build/firmware.elf/.bin/.hex + region sizes   (Linux: make)
+mingw32-make bench      # build_bench/ with -DHOST_ALLOW_REG_WRITE_DIAG=1, copied to build/firmware_bench_diag.bin
+mingw32-make check      # host-compiler unit vectors + memory-map static asserts (no cross toolchain)
+mingw32-make size       # region usage against the budget
+mingw32-make clean      # removes build/ (including the committed production bin; restore it with `mingw32-make`)
 python3 tools/check_size_budget.py build/firmware.elf
-make clean
 ```
 
-A real toolchain (`arm-none-eabi-gcc`) is required to link. CI now runs a full cross-compile gate on pinned `ubuntu-24.04` with Ubuntu's `gcc-arm-none-eabi` package, publishes the ELF/BIN/HEX/MAP artifacts, and enforces APP/RAM budgets via [tools/check_size_budget.py](tools/check_size_budget.py) using constants from [include/memory_map.h](include/memory_map.h).
+- `all` makes the **production** image `build/firmware.bin`, which is
+  committed (`HOST_ALLOW_REG_WRITE_DIAG=0`). It refuses the bench's
+  diagnostic register writes, such as the DTS carrier pin `-ForceFrfHz`.
+  Rebuild and commit it with every firmware PR.
+- `bench` makes `build/firmware_bench_diag.bin`, the image **both bench
+  boards** run. It is untracked: add firmware files to commits by path, never
+  with `git add <dir>`.
+- `bench` writes into `build/` but does not create it. After a `clean`, run
+  `mingw32-make` (or create `build/`) before `mingw32-make bench`.
+- Run `check` before flashing anything. Flashing is covered in
+  [`../x8_lora_bootloader_helper/FLASH_RUNBOOK.md`](../x8_lora_bootloader_helper/FLASH_RUNBOOK.md).
+
+### Expected md5s
+
+At `main` `bb4a2071` (re-checked 2026-10-04; `firmware/murata_l072` unchanged
+since), built with the toolchain above and the default flags:
+
+| image | md5 | size |
+|---|---|---|
+| `build/firmware_bench_diag.bin` (bench, on both boards since 2026-09-15) | `0c1bb0a9573f813137f941dfa47177d0` | 24 860 B |
+| `build/firmware.bin` (production, committed) | `589c120323c2d5e7ef9f459d7a4ba42d` | 24 860 B |
+
+Check with `certutil -hashfile build\firmware_bench_diag.bin MD5`
+(PowerShell) or `md5sum build/firmware_bench_diag.bin`.
+- Any source change moves both md5s. Record the new pair in the PR.
+- Older flashed builds and their md5s are listed in
+  [`bench-evidence/RS_13_vector_scene_2026-09-26/firmware/README.md`](../../bench-evidence/RS_13_vector_scene_2026-09-26/firmware/README.md).
+
+### CI
+
+- `arduino-ci.yml` → `L072 cross-compile` (blocking): links with Ubuntu's
+  `gcc-arm-none-eabi`. It publishes the ELF/BIN/HEX/MAP artifacts and
+  enforces the APP/RAM budgets through
+  [tools/check_size_budget.py](tools/check_size_budget.py), using constants
+  from [include/memory_map.h](include/memory_map.h). Its bytes differ from
+  the bench build by design.
+- `l072-bench-md5.yml` → `L072 bench md5 (Arm 12.2.MPACBTI-Rel1)`
+  (**non-blocking**): downloads the exact Arm release above for Linux, runs
+  `make bench` and `make`, and prints both md5s against this table and
+  against the committed `build/firmware.bin`, with a warning on mismatch.
+  The Windows bench PC builds are the reference. Whether a Linux build of
+  the same release is byte-identical is what this job tests; it has not been
+  checked by hand.
 
 ## Not yet present
 

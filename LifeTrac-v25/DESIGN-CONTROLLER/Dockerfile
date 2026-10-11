@@ -9,7 +9,10 @@
 # (time/params/logger) — the firmware/tractor_x8 sources are mounted in
 # from the host so the image stays node-agnostic.
 
-FROM python:3.11-slim
+# PYTHON_IMAGE is overridable only to pin the flown base image by digest
+# (see base_station/requirements.lock.txt). The default is unchanged.
+ARG PYTHON_IMAGE=python:3.11-slim
+FROM ${PYTHON_IMAGE}
 
 # Mosquitto client + a few diagnostic tools so an operator shell-in is
 # useful (mosquitto_pub/sub for poking topics by hand).
@@ -22,8 +25,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Layer the deps separately so source edits do not invalidate the pip cache.
-COPY base_station/requirements.txt /app/base_station/requirements.txt
-RUN pip install --no-cache-dir -r /app/base_station/requirements.txt
+#
+# Optional LOCKED=1 (`docker build --build-arg LOCKED=1 ...`) installs the
+# wheel versions of the flown bench image: base_station/requirements.lock.txt
+# is applied as a pip constraints file on top of requirements.txt. The
+# default (LOCKED unset or 0) is the unpinned resolve this file always did.
+# The bench deploy script passes LOCKED=1
+# (firmware/x8_lora_bootloader_helper/bench_tools/deploy_base.sh).
+ARG LOCKED=0
+COPY base_station/requirements.txt base_station/requirements.lock.txt /app/base_station/
+RUN if [ "$LOCKED" = "1" ]; then \
+        pip install --no-cache-dir -r /app/base_station/requirements.txt \
+            -c /app/base_station/requirements.lock.txt; \
+    else \
+        pip install --no-cache-dir -r /app/base_station/requirements.txt; \
+    fi
 
 # Application code. firmware/common/lora_proto/ is also copied so
 # lora_bridge.py can import the shared protocol header constants in the

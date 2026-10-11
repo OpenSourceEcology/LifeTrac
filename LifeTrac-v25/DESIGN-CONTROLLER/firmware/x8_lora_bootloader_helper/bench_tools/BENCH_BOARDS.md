@@ -8,13 +8,21 @@ captures:
 The rest comes from a review of AI NOTES, bench-evidence,
 X8_HEALTH_AND_RECOVERY and git history.
 
+**To bring up a new pair to this state, see [BENCH_SETUP.md](BENCH_SETUP.md).**
+It covers hardware, the OS image pinned by URL and sha256, the reflash,
+first boot, verification and the L072 firmware.
+[`provision_bench_board.sh`](provision_bench_board.sh) applies the `/etc`
+and docker changes listed under *LifeTrac software living in the X8 Linux*
+below, except the production units, which it never installs. `--check`
+reports how far a board is from that state.
+
 ## The two boards
 
 | | base | tractor |
 |---|---|---|
 | serial (adb) | `2D0A1209DABC240B` | `2E2C1209DABC240B` |
 | hardware | Portenta X8 on a Portenta Max Carrier | same |
-| OS (LmP) | **4.0.11-934-91**, kernel 6.1.24-lmp-standard (uuu reflash 2026-05-13 and 05-24; bundle sha256 in the private archive) | **4.0.3-674-88**, kernel 5.10.93-lmp-standard (factory, never reflashed). **No copy of the 674 image exists.** A reflash would move it to 934/6.1.24. |
+| OS (LmP) | **4.0.11-934-91**, kernel 6.1.24-lmp-standard (uuu reflash 2026-05-13 and 05-24). The bundle is `https://downloads.arduino.cc/portentax8image/934.tar.gz`; its sha256 list is in [T3a](../../../X8_HEALTH_AND_RECOVERY/recovery/T3a_sdp_uuu_reflash.md). | **4.0.3-674-88**, kernel 5.10.93-lmp-standard (factory, never reflashed). Arduino still hosts the image at `https://downloads.arduino.cc/portentax8image/674.tar.gz` (854,998,055 B). Nobody here has downloaded or byte-verified it, so there is no sha256 on record. Reflashing to 934 would move it to 6.1.24; BENCH_SETUP §3 compares the two. |
 | access | adb; ethernet 192.168.1.117 with eth0 pinned to 100BASE-TX full (marginal cable); ssh key `~/.ssh/lifetrac_base_ed25519`. On 2026-10-10 it did not enumerate on USB after a power cycle, but ssh worked. | adb only (WiFi off by policy) |
 | power-down | `systemctl poweroff` did **not** keep it off: it booted again about 4.5 min later (2026-10-04). Remove power to keep it down. | stayed off after `systemctl poweroff` |
 | clock | NTP | no time source; it lags by hours to days |
@@ -114,8 +122,11 @@ Repo L072 binaries that are on no board:
   - `docker/key.json`.
 
   All of these were installed by `provision_x8.sh` (2026-05-15) and the May
-  WiFi-off steps. The `disable-wifi.service` unit and the wpa mask are not in
-  git.
+  WiFi-off steps. The `disable-wifi.service` unit is now in git as
+  [`units/disable-wifi.service`](units/disable-wifi.service), copied from
+  the capture. `provision_bench_board.sh tractor` installs and enables it,
+  masks `wpa_supplicant`, and reruns `provision_x8.sh` when the camera
+  files differ.
 - **WiFi:** soft-blocked and disabled in NetworkManager. **A stored
   `5star.nmconnection` holds the WiFi password** (not copied).
 - **`/var/rootdirs/opt/lifetrac`:**
@@ -144,7 +155,9 @@ Repo L072 binaries that are on no board:
 
 - **Repo:**
   - L072 source and bench binaries (PR #140);
-  - provisioning scripts, unit files and the sudoers installer;
+  - provisioning scripts, unit files and the sudoers installer, now driven
+    by [`provision_bench_board.sh`](provision_bench_board.sh) and
+    [BENCH_SETUP.md](BENCH_SETUP.md);
   - every sketch source;
   - the base capture (this folder's sibling);
   - the capture tools [`capture_board_state.sh`](capture_board_state.sh)
@@ -159,8 +172,9 @@ Repo L072 binaries that are on no board:
   - `base/`: the full capture tarball and the deployed tree without
     secrets.
   - `pc_only/`: the patched `libmbed_x8.a`, the LmP 934 bundle's sha256
-    list, and copies of the Claude and Copilot memory notes, which are the
-    only written record of several provisioning steps.
+    list (now also in T3a), and copies of the Claude and Copilot memory
+    notes. Those notes were the only written record of several provisioning
+    steps, which are now in BENCH_SETUP.md.
   - `scripts/`.
 
   **Make a second copy on an external disk or NAS.**
@@ -177,7 +191,10 @@ Repo L072 binaries that are on no board:
 2. Stage only the probe tools (no `push_fix_to_board.sh`). Then run
    `radio_state.py`. At boot the L072 sits in **RXCONT**, listening only;
    `radio_park.py` puts it to `0x80` SLEEP.
-3. Run `bash pull_board_state.sh <base|tractor> [--images]`. Review the
+3. Run `bash pull_board_state.sh <base|tractor> [--images]` (adb only). It
+   writes to `ARCHIVE`, else `ARCHIVE_DIR` from `bench.env`: any folder
+   outside git, in any path form (the script converts it for adb;
+   [BENCH_QUICKSTART.md](BENCH_QUICKSTART.md) step 9). Review the
    reports for secrets before copying them into `bench-evidence/`; the
    2026-10-04 run caught a Dropbear host key, and the filter now excludes it.
 
@@ -190,17 +207,27 @@ Repo L072 binaries that are on no board:
 - [ ] **Decide on the tractor's `lifetrac-tractor-compose.service`.** It is
   enabled and fails at every boot, like the base's units.
 - [ ] Delete the stored `5star` WiFi profile on the tractor once the password
-  is rotated (`nmcli con delete 5star`).
+  is rotated (`nmcli con delete 5star`). `provision_bench_board.sh tractor`
+  backs up the stored WiFi profiles to a root-only directory on the board,
+  then deletes them and prints only their names. Pass `--keep-wifi-profiles`
+  to keep them until then.
 - [ ] **H747 M4 bank 2: identify, then decide.** An openocd
   `dump_image` of banks 1 and 2 halts the H7 and drops the x8h7 bridge, and
   needs a deliberate reboot (FLASH_RUNBOOK precautions; never re-insmod x8h7
   on the base). **Explicit GO only.** Then upload an empty M4 sketch or erase
   bank 2, and record which.
-- [ ] **Rotate the WiFi password.** It is committed in seven repo-root
+- [ ] **Rotate the WiFi password.** It was committed in seven repo-root
   scripts on the public `main` (`connect_wpa.sh`, `do_wifi.sh`,
   `setup_5star_wifi.sh`, `wifi_connect.sh`, `wifi_connect_fast.sh`,
-  `wifi_persist_and_reboot.sh`, `wifi_rescan_connect.sh`). Then replace the
-  literal with an environment variable.
+  `wifi_persist_and_reboot.sh`, `wifi_rescan_connect.sh`) and in
+  `.vscode/tasks.json`.
+  - [x] ~~Replace the literal with an environment variable.~~ Done in the
+    bench kit (2026-10-10): the scripts take the SSID and passphrase from
+    `LIFETRAC_WIFI_SSID` / `LIFETRAC_WIFI_PSK`, and the VS Code tasks that
+    carried the passphrase were removed (it would appear in the task echo).
+  - [ ] **Change the passphrase on the access point.** The old value is
+    still in the public git history, so treat it as compromised. Rewriting a
+    public history with forks is not practical; rotation is the fix.
 - [ ] **Decide on the base's `lifetrac-base.service` /
   `lifetrac-base-compose.service`.** Both are enabled and fail at every boot;
   they would start `lora_bridge` on the radio UART if they ever succeeded.
@@ -209,7 +236,9 @@ Repo L072 binaries that are on no board:
 - [ ] Record the carrier ↔ module pairing, both carriers' DIP switch
   positions and the J-Link OB serials (1078222309 / 1078180658).
 - [ ] Fix the doc errors the review found:
-  - T3a verdict row :66 says 2E2C for the 05-13 reflash; it was 2D0A.
+  - ~~T3a verdict row :66 says 2E2C for the 05-13 reflash; it was 2D0A.~~
+    Fixed 2026-10-10. The row now matches the session log: `BOOT SEL` only,
+    USB-C only, PID 0134.
   - `setup_x8_mqtt_link.ps1:9` names the wrong board.
   - HC-02:13 uses the old name `board1_healthcheck.sh`.
   - FIRMWARE_UPDATES.md:53 calls the handheld a Portenta H747.

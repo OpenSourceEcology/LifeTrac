@@ -137,7 +137,8 @@ Each of these has been documented as actively destabilizing the bench.
 & $adb -s <serial> reverse --list
 ```
 
-- Observed (2026-05-24, board 2E2C): `reverse tcp:1883 tcp:1883` returns
+- Observed (2026-05-24, board 2D0A -- the base, the board that runs 934-91;
+  2E2C runs the factory 674-88 image): `reverse tcp:1883 tcp:1883` returns
   exit 0 but the tunnel is never installed. From the X8,
   `exec 9<>/dev/tcp/127.0.0.1/1883` returns "Connection refused".
 - `reverse --list` returns `error: protocol fault (couldn't read status

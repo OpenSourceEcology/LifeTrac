@@ -14,6 +14,7 @@ started from [RS13_RESULTS_TEMPLATE.md](RS13_RESULTS_TEMPLATE.md). The RS-13.1
 session scripts that did each step below are kept in
 [`bench-evidence/RS_13_vector_scene_2026-09-26/scripts/`](../../../bench-evidence/RS_13_vector_scene_2026-09-26/scripts/)
 (they carry that session's paths).*
+Parameterised copies that run from any checkout (settings in `bench.env`) are in [`legs/`](legs/README.md).
 
 **No firmware change.** VECTOR rides the strict image path as ordinary
 one-fragment 0xFE trains (a 0xFD copies train only if `LIFETRAC_KEYFRAME_COPIES`
@@ -472,25 +473,35 @@ as in the RS-3.3 legs.
 **Pin the DTS carrier on every profile-2 leg.** Before the first DTS leg of the
 day, run a receive-only channel spot-check with the tractor parked
 ([`channel_survey_sniff.py`](../channel_survey_sniff.py) or
-[`hunt_sniff.ps1`](../hunt_sniff.ps1), then `tools/survey_compare.py`). Add
-`-ForceFrfHz <the pick>` to every 2a/2c/2d line below, and record the pick in
-RESULTS. Without it, `-ForceFrfHz 0` pins the profile-2 default of
-915.000 MHz. That is the channel of the RS-11.6 external emitter (about 25 ms
+[`hunt_sniff.ps1`](../hunt_sniff.ps1), then `tools/survey_compare.py`). Every
+2a/2c/2d line below carries `-ForceFrfHz <the pick>`; put the pick in
+`bench.env` as `DTS_CARRIER_HZ` / `DTS_CARRIER_DATE`, and record it in
+RESULTS. Without the pin, profile 2 flies on its default carrier,
+915.000 MHz (`-ForceFrfHz 0`). That is the channel of the RS-11.6 external emitter (about 25 ms
 bursts at −43 to −45 dBm on a hard 7.07–7.09 s grid). All nine RS-13.1 DTS legs
 flew there, and their losses fold on its period (RESULTS A19). The RS-12 legs
 used `-ForceFrfHz 927500000` after a same-day spot-check; the band changes
 from day to day, so re-check rather than reuse a pick.
 
+The harness now refuses a profile-2 line without `-ForceFrfHz` (bench kit
+2026-10-10; `-AllowDefaultCarrier` is only for a deliberate 915 MHz control).
+The `<...>` values come from `bench.env`: without
+`-TxAdbSerial` / `-RxAdbSerial` / `-HostIp` the harness falls back to the
+original bench's serials and PC address. [`legs/leg_prep.sh`](legs/README.md)
+writes the complete line for each leg, with these values filled in, as a
+wrapper you run in PowerShell; prefer it to typing the lines below.
+
 - **2a — DTS (profile 2), VECTOR at boot:**
 
   ```powershell
-  .\run_live_radio_monitor.ps1 -TxFeed camera -RegProfile 2 -DurationS 300 -SynthFps 2 `
+  .\run_live_radio_monitor.ps1 -TxAdbSerial <TRACTOR_SERIAL> -RxAdbSerial <BASE_SERIAL> -HostIp <PC_HOST> `
+     -TxFeed camera -RegProfile 2 -ForceFrfHz <the pick> -DurationS 300 -SynthFps 2 `
      -KfRequestDisable 1 -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 `
      -CamExtraEnv "-e LIFETRAC_ENCODE_MODE=9 -e LIFETRAC_VECTOR_DETAIL=80" -Archive
   ```
 
-- **2b — FHSS (profile 1), VECTOR at boot:** the same with `-RegProfile 1`;
-  base capture with `--profile image_bw250`. At `-SynthFps 1` expect the first
+- **2b — FHSS (profile 1), VECTOR at boot:** the same with `-RegProfile 1`
+  and no `-ForceFrfHz`; base capture with `--profile image_bw250`. At `-SynthFps 1` expect the first
   frame at the base near seq 58 (A7) and no time authority on the tractor
   (A11, `tx_stream_streak_max` < 8): read P2/P3 from lock and record the
   streak; no base commands on this leg. Its base capture takes

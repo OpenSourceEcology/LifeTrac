@@ -10,18 +10,20 @@ SWD work.
 ## Procedure
 
 ```powershell
-$script = "LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/board1_healthcheck.sh"
+$script = "LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/x8_max_carrier_healthcheck.sh"
 foreach ($s in '2D0A1209DABC240B','2E2C1209DABC240B') {
   $tag = if ($s -like '2D0A*') {'board1'} else {'board2'}
   $log = "LifeTrac-v25/AI NOTES/$(Get-Date -Format yyyy-MM-dd)_${tag}_healthcheck_v1_0.log"
-  adb -s $s push $script /tmp/board1_healthcheck.sh 2>&1 | Out-Null
-  adb -s $s exec-out "sh /tmp/board1_healthcheck.sh" 2>&1 |
+  adb -s $s push $script /tmp/x8_max_carrier_healthcheck.sh 2>&1 | Out-Null
+  adb -s $s exec-out "sh /tmp/x8_max_carrier_healthcheck.sh" 2>&1 |
     Out-File -FilePath $log -Encoding utf8
   Get-Content $log
 }
 ```
 
-Helper: [board1_healthcheck.sh](../../firmware/x8_lora_bootloader_helper/board1_healthcheck.sh)
+Helper: [x8_max_carrier_healthcheck.sh](../../firmware/x8_lora_bootloader_helper/x8_max_carrier_healthcheck.sh)
+(renamed from `board1_healthcheck.sh` on 2026-05-15; older notes and the
+2026-05-13 logs still use the old name).
 
 ## Pass criteria
 

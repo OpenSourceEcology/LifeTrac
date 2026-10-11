@@ -1,0 +1,70 @@
+# Line-ending and binary rules for the LifeTrac repo.
+#
+# Why: this repo is mostly edited on Windows (core.autocrlf=true), but many
+# files run on the Portenta X8 boards or inside Linux containers, where a CRLF
+# breaks them ("/bin/bash^M: bad interpreter", systemd/udev/mosquitto parse
+# errors, `source`d env files with a trailing \r in every value). The rules
+# below make Git check those files out with LF on every OS and make
+# `git archive` emit LF for them even when core.autocrlf=true.
+#
+# The index already stores these files with LF, so this file changes checkout
+# behaviour only. An EXISTING working tree keeps its old copies until the files
+# are checked out again. With a clean tree (commit or set aside your work
+# first -- this rewrites every tracked file):
+#     git rm --cached -r -q . && git reset --hard
+# On a Windows checkout made with core.autocrlf=true that refresh also repairs
+# binaries that autocrlf had mangled on checkout (some *.pdf, *.hex, *.zip and
+# bench-evidence *.bin files whose content Git guessed was text).
+# Board-side deploys should still pass `-c core.autocrlf=false` to
+# `git archive`, because files not listed here (.txt, .md, .json, .html, ...)
+# follow core.autocrlf.
+#
+# Files not matched below keep the default behaviour (core.autocrlf).
+
+# --- Runs on the boards / in containers: always LF -------------------------
+*.sh            text eol=lf
+*.bash          text eol=lf
+*.py            text eol=lf
+*.service       text eol=lf
+*.timer         text eol=lf
+*.socket        text eol=lf
+*.rules         text eol=lf
+*.conf          text eol=lf
+*.cfg           text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.toml          text eol=lf
+Dockerfile      text eol=lf
+Dockerfile.*    text eol=lf
+*.dockerfile    text eol=lf
+.env.example    text eol=lf
+*.env           text eol=lf
+*.env.example   text eol=lf
+requirements*.txt text eol=lf
+
+# --- Windows scripts: CRLF in the working tree ------------------------------
+# text=auto leaves anything Git detects as binary (e.g. a UTF-16 file) alone.
+*.ps1           text=auto eol=crlf
+*.bat           text=auto eol=crlf
+
+# --- Binary: never convert, never text-diff/merge ---------------------------
+*.bin           binary
+*.elf           binary
+*.hex           binary
+*.o             binary
+*.a             binary
+*.exe           binary
+*.dll           binary
+*.so            binary
+*.whl           binary
+*.tar           binary
+*.tgz           binary
+*.gz            binary
+*.xz            binary
+*.zip           binary
+*.jpg           binary
+*.jpeg          binary
+*.png           binary
+*.gif           binary
+*.pdf           binary
+*.rgb           binary
