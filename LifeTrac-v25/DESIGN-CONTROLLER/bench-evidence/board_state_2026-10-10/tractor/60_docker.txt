@@ -1,0 +1,430 @@
+$ docker info 2>/dev/null | head -40
+Client:
+ Context:    default
+ Debug Mode: false
+ Plugins:
+  compose: Docker Compose (Docker Inc., 2.6.0)
+
+Server:
+ Containers: 12
+  Running: 3
+  Paused: 0
+  Stopped: 9
+ Images: 12
+ Server Version: 20.10.14-ce
+ Storage Driver: overlay2
+  Backing Filesystem: extfs
+  Supports d_type: true
+  Native Overlay Diff: true
+  userxattr: false
+ Logging Driver: journald
+ Cgroup Driver: cgroupfs
+ Cgroup Version: 1
+ Plugins:
+  Volume: local
+  Network: bridge host ipvlan macvlan null overlay
+  Log: awslogs fluentd gcplogs gelf journald json-file local logentries splunk syslog
+ Swarm: inactive
+ Runtimes: io.containerd.runc.v2 io.containerd.runtime.v1.linux runc
+ Default Runtime: runc
+ Init Binary: docker-init
+ containerd version: 3df54a852345ae127d1fa3092b95168e4a88e2f8.m
+ runc version: v1.0.3-2-ge0124d56-dirty
+ init version: b9f42a0-dirty
+ Security Options:
+  seccomp
+   Profile: default
+ Kernel Version: 5.10.93-lmp-standard
+ Operating System: Linux-microPlatform XWayland 4.0.3-674-88
+ OSType: linux
+ Architecture: aarch64
+ CPUs: 4
+[rc=0]
+$ docker images --digests --no-trunc
+REPOSITORY                                                TAG                  DIGEST                                                                    IMAGE ID                                                                  CREATED                  SIZE
+lifetrac-tractor-x8                                       latest               <none>                                                                    sha256:2727dfd36f9fb2dd58af00694fd6010e2dd8404643470dff3be6ff06aaf01d77   Less than a second ago   755MB
+lifetrac-tractor-x8                                       rs13-65869517        <none>                                                                    sha256:2727dfd36f9fb2dd58af00694fd6010e2dd8404643470dff3be6ff06aaf01d77   Less than a second ago   755MB
+lifetrac-tractor-x8                                       pre-rs13             <none>                                                                    sha256:9bfbbc8d06cb65c4ecea5ed1131527a02dd7e34c2a148b7f1115cf5de3701125   3 months ago             594MB
+python                                                    3.11-slim-bookworm   sha256:8dca233de9f3d9bb410665f00a4da6dd06f331083137e0e98ccf227236fcc438   sha256:d9c8998514b4afbe5517a7cca405ddf59c33b9240a21c029feab133d8beaa8a4   4 months ago             155MB
+eclipse-mosquitto                                         2                    sha256:a908c65cc8e67ec9d292ef27c2c0360dbaaee7eb1b935cdd194e67697f15dea1   sha256:2a23a3e427e44bcc2f028580afcd6232979ff859116eeb899d19dc78e3cabf1c   5 months ago             23.3MB
+hub.foundries.io/arduino/arduino-ootb-python-devel        738bc44              sha256:738bc44b2ed836efd49f2a5d23bdcafa4b7994352117f0db723ee62ce68a13cc   sha256:9a454afe48f76cfafb2a67425ead4b2ed96ed86eda96e9ca3da46f0d2aab400f   3 years ago              76.3MB
+hub.foundries.io/arduino/arduino-ootb-webapp              3a66e0c              sha256:3a66e0ceee4a297884b5825ed4f650952356c864ba0e0d232592e2ff8d6cf488   sha256:76db100d08e4999833f54b54ba56247e573fc2c5e4a2796f0514b97bc6a688de   3 years ago              118MB
+hub.foundries.io/arduino/arduino-iot-cloud-provisioning   6cdb56d              sha256:6cdb56d6e9354d5b204c2d6e9149fec63af15be82baf9ac27f50082526834174   sha256:6ee1d6b69ba37756035323a61bbeac4b463adbc7336d89fa3e582a9b810c142c   3 years ago              99.2MB
+[rc=0]
+$ docker image inspect --format "{{.Id}} tags={{.RepoTags}} digests={{.RepoDigests}} created={{.Created}} size={{.Size}}" $(docker images -q | sort -u)
+sha256:2727dfd36f9fb2dd58af00694fd6010e2dd8404643470dff3be6ff06aaf01d77 tags=[lifetrac-tractor-x8:latest lifetrac-tractor-x8:rs13-65869517] digests=[] created=2026-09-26T19:55:38.098771045Z size=755178676
+sha256:2a23a3e427e44bcc2f028580afcd6232979ff859116eeb899d19dc78e3cabf1c tags=[eclipse-mosquitto:2] digests=[eclipse-mosquitto@sha256:a908c65cc8e67ec9d292ef27c2c0360dbaaee7eb1b935cdd194e67697f15dea1] created=2026-04-15T20:14:40.691509492Z size=23321561
+sha256:6ee1d6b69ba37756035323a61bbeac4b463adbc7336d89fa3e582a9b810c142c tags=[hub.foundries.io/arduino/arduino-iot-cloud-provisioning:6cdb56d] digests=[hub.foundries.io/arduino/arduino-iot-cloud-provisioning@sha256:6cdb56d6e9354d5b204c2d6e9149fec63af15be82baf9ac27f50082526834174] created=2023-03-08T17:59:19.82662071Z size=99158088
+sha256:76db100d08e4999833f54b54ba56247e573fc2c5e4a2796f0514b97bc6a688de tags=[hub.foundries.io/arduino/arduino-ootb-webapp:3a66e0c] digests=[hub.foundries.io/arduino/arduino-ootb-webapp@sha256:3a66e0ceee4a297884b5825ed4f650952356c864ba0e0d232592e2ff8d6cf488] created=2023-03-08T18:07:30.456590886Z size=117687942
+sha256:9a454afe48f76cfafb2a67425ead4b2ed96ed86eda96e9ca3da46f0d2aab400f tags=[hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44] digests=[hub.foundries.io/arduino/arduino-ootb-python-devel@sha256:738bc44b2ed836efd49f2a5d23bdcafa4b7994352117f0db723ee62ce68a13cc] created=2023-03-08T18:09:55.774572631Z size=76291944
+sha256:9bfbbc8d06cb65c4ecea5ed1131527a02dd7e34c2a148b7f1115cf5de3701125 tags=[lifetrac-tractor-x8:pre-rs13] digests=[] created=2026-05-26T19:00:48.867696026Z size=593671099
+sha256:d9c8998514b4afbe5517a7cca405ddf59c33b9240a21c029feab133d8beaa8a4 tags=[python:3.11-slim-bookworm] digests=[python@sha256:8dca233de9f3d9bb410665f00a4da6dd06f331083137e0e98ccf227236fcc438] created=2026-05-19T23:59:12.56088491Z size=155411979
+[rc=0]
+$ docker ps -a --no-trunc --format "{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Command}}"
+camera_svc	lifetrac-tractor-x8:latest	Exited (137) 2 hours ago	"python3 -u /work/camera_service.py"
+tx_smoke	hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44	Exited (137) 2 hours ago	"python3 -u /work/image_tx_daemon.py --log-level INFO"
+bench_mqtt	eclipse-mosquitto:2	Exited (0) About a minute ago	"/docker-entrypoint.sh /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
+tractor-camera	sha256:9bfbbc8d06cb65c4ecea5ed1131527a02dd7e34c2a148b7f1115cf5de3701125	Exited (137) 2 weeks ago	"python camera_service.py"
+tractor-camera-v2	sha256:9bfbbc8d06cb65c4ecea5ed1131527a02dd7e34c2a148b7f1115cf5de3701125	Exited (137) 8 weeks ago	"python3 /app/camera_service.py"
+tractor-image-tx-v2	sha256:9bfbbc8d06cb65c4ecea5ed1131527a02dd7e34c2a148b7f1115cf5de3701125	Exited (0) 3 months ago	"python3 /app/image_tx_daemon.py --mqtt-host mosquitto"
+tractor-mosquitto-v2	eclipse-mosquitto:2	Exited (0) 8 weeks ago	"/docker-entrypoint.sh /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
+tractor-mosquitto	eclipse-mosquitto:2	Exited (0) 2 weeks ago	"/docker-entrypoint.sh /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
+lifetrac-camera-x8	hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44	Exited (127) 3 months ago	"/bin/sh -c 'python3 -m pip install --no-cache-dir pillow paho-mqtt pyserial numpy >/tmp/lifetrac_pip.log 2>&1 && exec python3 /opt/lifetrac_camera/camera_service.py'"
+x8-devel	hub.foundries.io/arduino/arduino-ootb-python-devel@sha256:738bc44b2ed836efd49f2a5d23bdcafa4b7994352117f0db723ee62ce68a13cc	Up 37 seconds	"/entrypoint.sh"
+x8-provisioning	hub.foundries.io/arduino/arduino-iot-cloud-provisioning@sha256:6cdb56d6e9354d5b204c2d6e9149fec63af15be82baf9ac27f50082526834174	Up 37 seconds	"/entrypoint.sh"
+x8-webapp	hub.foundries.io/arduino/arduino-ootb-webapp@sha256:3a66e0ceee4a297884b5825ed4f650952356c864ba0e0d232592e2ff8d6cf488	Up 37 seconds	"/entrypoint.sh"
+[rc=0]
+$ docker compose ls -a; docker volume ls; docker network ls
+NAME                STATUS              CONFIG FILES
+arduino-ootb        running(3)          /var/sota/compose-apps/arduino-ootb/docker-compose.yml
+lifetrac-camera     exited(2)           /var/rootdirs/opt/lifetrac/compose-apps/lifetrac-camera/docker-compose.yml,/opt/lifetrac/compose-apps/lifetrac-camera/docker-compose.yml
+video-test          exited(3)           /opt/lifetrac/video-test/docker-compose.yml
+DRIVER    VOLUME NAME
+local     0aed31589203a6ce65ed87775b19077733434e104bd31e2591e9c6c6c24b3cf2
+local     0bf27cf193086fd5f89b191e4b7c0602a71a9e4daa723150d388bbb57c658d61
+local     0c0c1fbb799d4f394bece0269d118a9a9fada3a6c45011fb0a87cf330adcdaa6
+local     0c3ef083ef9f9694c2d5a0152039b5a03a5a0141da0340335ec4e4a360449008
+local     0cf2de15a66d8833fede12e3c7637befdbbb3a76a4585343d113a4f32792f9e1
+local     0fcefc189c8ec09180b1eba3846c5f07a33a4f665edaa3e4ce2429e635f18a98
+local     1b59f0970e355c14e12d90d664fb889bc0bd0b2a8032a9513b752445db5238f4
+local     1b986e44cdd7cb4894f22a936a9397035da0c050aaf986d94e27a0a043969525
+local     1bc099804b6ef012fa9984eb9e4221684faaef635be47d352f17fa65ee16b882
+local     1da909163328849f968933ac48d431375705c478024141c9ca16a29838009fe0
+local     1f386631db424a70b9315a974a075738e8cd8cae21420dcaa746bbde78619658
+local     2aa585704cc9e2a4be4a34ee1b9564adf037b2b4d58ff9b1a6803b48ca3222fe
+local     2c88e92de20dfe18a2bce6c6f7bf59036a525e36869d7721a25cb4d76e939d71
+local     2c22158d19bcb024fb0dcc87ab2fbb26c58ad82c7a1f3561aac09292dd85e9af
+local     2d30064e28c5953a7671cb6ae368d6197930c63703ca801cd466628e9412cec7
+local     2e6feba53d7d927637222ff744acc84d9bc3e4622b766d619b04ccd8b42c52e0
+local     2efc36a8d53275af81cfc2a4b1caad722ed83ad9b6847bb2df83bb06bda07b40
+local     02cb53b2e963112633e43c0588c5875030444cef548b172e8bd114010cc31715
+local     02deefd8d7676d07291cbb33961c314be43e62ccd0a9a8d8ac63d67ee32d3376
+local     02e10addd6eb92f39d4e9d8b7aeec58e2e2bfb1e98ce0ffe812b6d5f9c36ea8e
+local     3a3526fbeb330622463765aa3886fbcffa274c34397d62e241fd81719a0ed71d
+local     3b42d87004c4d25a97f0643f8261ddd2e030287e7d96a92749a560a7c56c8f26
+local     3c3d6938ca0ec9217f0f41fa26156485d664c35e758e1539d76fa4468a50a66b
+local     3e85b36d6fe7c4c4b4e478453f0169383bca8efd6969f618e485d056c3dd9ffe
+local     3e05454b8309e5b8af34ae3b84ebd26892156198f0b094fb31451c6fabe22d9a
+local     3efe9ff70b9ddef0be7fecee3ecc66e816dfdcc0cca28d8214f664033535de3c
+local     3f0a84252cd45ebed7c86f67a6116f5f8faf6a74cc16212c5c07df4550971e7b
+local     3fe21f5c8cd7f42080eb05da25223741fb051a2197457a68237a0c15553998d5
+local     4ad965391096d6267b1a0e97fccbcc31eee478f3ed3d2c08bd5b6d4920e887f3
+local     4bbe40bcafa88d9d52f4f6bee78cd31c795cca5deb861c96d94ed5dca6995005
+local     4c369f89d1f3a8fbc66c71826a6ee0a5d5b178b618600668ca047701fe7aecb3
+local     4d47c515525ed4e6cd6c97a46b7eeb7a17c2a89517085377492cb97236abbd4f
+local     4d1349b8f1782b96dfffd665f9e02609877c9c91f9eb34bb9f0153bf988b3142
+local     4da2d15c1ffbc98121e6742d6b396de3ba97f42850fcb7475b23433061de3d00
+local     4f1e6e9a3593940c9757a7438d84712017b72752595cf54490da8b54565f9a38
+local     5b3d17081a9cc5eba939145cee20a935d79bdeb0fa0a93308ac2574cb75ef366
+local     5c014d14cf8b971ef2205b4148a9287f8cfe2e220b84e3e20eaabc2a16fcd5b6
+local     5c991acf35bfd80d10976a55116fc0d1ac980ff1def544c06a21146d5423e335
+local     5c28176cc320eb4fa48f85434191942e12727deee5d4643ae36c7fb5cfeedd50
+local     5d6f1bca6e41a2008865b78e7936c17bb2c9a3fc91f2ac582e59b4f429303683
+local     5d02096e52ed2aa402276f520e0f85692a4978a774d2e8e8efe7f03cc5193836
+local     5df9a05efc01550d09204c65e3b3a955c6c30b15eee8f1e51668c34d3b2b2770
+local     5e217e68f9770bf082cd546557a6a5134de65c5c02b2f6c4a14271358ee4d23c
+local     5e930a2b6f250fa4b21fdc89ba4f827c20bb50ec71180fe2d85ffd5fa94bc39b
+local     5edb01242f5854d55825d95e3fde14d58db384cef0ab4664e465657d218022e2
+local     5f6a6d209422d9e91dce08a559c672183c8c4a384da3ad04b7bb6fa18362d4da
+local     5fa5a853bbb8b5bed82a4ea28ccd559ac09406d337f3a26fea013e7eb3ddee5c
+local     6b46b3f5d6814cb61b48591da9c46b471ab52e54de97cc5e96d91c28d584d7a6
+local     6c1bfef59c32649b6a9f53c7fcf7cf0defd9b2683c2cdce2f587ab57bae49fb4
+local     6d92974b9166211a1d389fd374fe2a88ab2a78248005617d30733916ca6c97e9
+local     6dda97833ad94e5f2aa2adc64ccf8828aecd8010fa5580ef004cb29444e5ef37
+local     6e0c5fdf1f9b0722274ee66883a17e3ef18b789d2feeba7cf03b86bbfc7fe4e6
+local     6e748594bbaab099153fbb0415cd1c54065f8aa2b37ad4f15c17d906511d7b27
+local     6f06f9d5ae28ab5b5fa1da1f680aa91dfcf14b8bf44932dedb953c333b0d2444
+local     6f7b70f2eebc96abe943e0d0897c94ffa83fd53185c4f6221f6a9179eac4e0bc
+local     6f27b7c926e166558bd590b322ee8c0c950a3f7ecdff652703efda335abd02aa
+local     6f984d90f91b3364fcb340a783a3533ceff7e8922f837f7171971e30c9da1710
+local     6f9868c5c43bb5d26f6a8ee7984053bb09362fa988a126d37d0c285c15187e00
+local     7b091e30bf20986b5e0df5c9ac8e0501767ed41b733128b8a01906a0d8266340
+local     7bd8fb7d16b4cd4cf14fe7d30f5e947474c5cea2f8731a5a978c34513b9c2655
+local     7bd57e756120f29a773ab1d6844cc5b91292d7d27291928de7081d3d33cb9e36
+local     7d19bed2d13beaf4c4731cfc20a9afacb6d7d307731f004911710faf850cbc46
+local     7db9188e4ce84d9d00506c52b96556eda1c8c2c4c5cd2f6ba295cec9b3b91de7
+local     7dedb0cc95995c859f5d7684942a6bc227448016f0041b68aefc33427a529423
+local     7ea0d75e3a7f163a612aabcec4bd77ff39ac3afd0238a6b42e2ddc5d84f9309b
+local     7ea4d186de3a9781ef49e0abfedf09ea9d9c5235186db72f267ff76cc2b4a587
+local     7ed6a7ebccdc4804fb4e48b15948251f2ce3d4b5cc1002d8cb451748235ad65f
+local     7f8c3c6d978a344715a0c4fd65888b8b5658454704c1217b9bd0ada1b357ea2b
+local     8aa2e292fe36675c93b7bdb7b900eb986af3123e0e42fa6ccf330df97fa00a88
+local     8b95dac79dd77833c17958899cc9c5ca3fe77a1bd96743054c2bae226882f56c
+local     8e7a10c8a6aa3cfa1b0528ca8ad2c9bc986f49efb225aacb963d82726d6492db
+local     8e489114183b35622dc9763037950a783acc99501da365c3b2e56957e13c3f18
+local     8f2cd08f64b813e4ac3a32653be51cc8fca170598380a956404a6568cb94a1ef
+local     8f095e72cc000d8fce48e6cac4dc7945cec24c15080e4192547b41dbd2c10da0
+local     08e3e916192a01a02260c141677e9ba0f9365f32939b2ab77b83d055902ea465
+local     9ac14d526d95fdcd095f9007163e6c34756385160c03bb97be36a3dd383fbad0
+local     9ac19064e84ba78136dccfc4d797a7fa8f502a29b8310374fc6c39e0b54a3088
+local     9b65bc7c419f7121281e493476524961455d5ddc420a35a42311baf6d2a23d00
+local     9c1b81df75d46515a321066a434277df5593c49b378c58742c205dcb2a96effd
+local     9cbecaeac1bd372c8c46f6ba35a1df5242b8e983d4ea026c7fae8a4a1d783b6d
+local     9d806dda963dfcc64654efb358255bf8e219f4365baf37b4ab8ad90cafc03840
+local     9d41765bdef812ab78bb37bf00588ce28a77299c8334f9598146376c54de3bbe
+local     9d5821206e4154039c2100ea3e57c3a99d4defb350b03adb0bf56ea71a533ae7
+local     10f54d7d636124751679fbdd7ac30fcd13129db3e14fb63e483d81c8865d92b8
+local     12ed62aa5e851410122ac12f05e39e93b230d31a373e4e0402c4269c5988be64
+local     17dc8bc0086a2844d60b9c2633dc46c1ea6a713d84d36945d632f76909672083
+local     19bcf42e041b39bfc3d632a21c25e726f6d00e0f86ed868411bcf227ef67a73c
+local     26f08e3e99cd2ce55a2afb9d627e69a115c9772ad68e3d844a957bd57ae42c84
+local     27f1324310737aedc3f5bda898950a5dbe3c82b4c731cd585fb6ec82764b576b
+local     32c8aeafcd1fe902bf231f772080febd9c68dccfc0838335337755f81a1cd92c
+local     32d202ee45dd5d08320e680ed93a970fa3c6c61b0d2e8b3d0ce8b126bd910fea
+local     33ca5b0bba4e5187f43f4c1f42df9bf7d2ea7a6c7ffc10da4d3ad7c3c4949ccb
+local     36f07cddacd8920f5063a936ba70338c403502cf7e8edd1024d7b01e020d984f
+local     38f6a4e271d6053fecc6f62a4ac38c9f9d9d70736c43bccc14bb51e8a41b946c
+local     39b6eac75fa76806e3e9f464bd473238928ef5ea049fbc67976f2e6328abc592
+local     40e85cbaadfc60a03cf981e903bab2a4aa5d72a830213d5aa252e367693730cd
+local     41bc7ca42c917909fc3904e3e55d473dc8dc3290f6030999a674102b1e73f69a
+local     42e85e2ab04f0acc68826b4ce5c71baa8fc602a4234cbb741377e90dc0be6f36
+local     44a0cda71d88b5f9125abcb61c0dec1b3a11c1923d100bdd1a998ef82b4852a6
+local     45e4d3249708fb241b36a8b5e0039adadbe7d73426634594783dc0e97eb63af8
+local     46d87ee6e8ab19230d153dd529c2b797bac949c42a742320f947f3002883f4dd
+local     48d7eaa422809547bce64f2763711fa64ce2a437841033200aaa223482338b1a
+local     50a4d79b0d0f3d4238c27200218d56c426cab040076898137362506f60df8b10
+local     51a08302ef3de0ac311c5eb1942945fd61cabce50cd41c585fd8247a3dbff7bc
+local     51f5c143b68d904355e5a0d17dc1a67c5a373db17ef4c3ff36d6b210c2b4194b
+local     54e38f73fac4f486614d1975c545c71cab2a9c0758eed31ea682fe137672d653
+local     57d7dd95af84524729460f2e4ed134458e5455c7b856d79b1fb8e11e595a94ed
+local     57fbb05c386e74e0901fdcb424e15279fdbf99f2d170722fbf329470b360c057
+local     58a47adb21e62eda228ad1ff41aa25ccd7423b8d86caf7803e76d1c2da520fc0
+local     58c10e162f05c411075f07ce468c56bc91d074b908fb1c21c6be3ef1837404f2
+local     61bb23f24ea95c7b4a3e33bc44ada427c6337adeef9e73450bc14d67245ba244
+local     061b8dc1561726b6d60f550af5ca6eaf48a4b0f61f4c28fa91768bbc4d77da6c
+local     67fd6863eaa84d58ab7095c98bd8be7354e580cf86739f17ad817283fc936f5d
+local     70f8a17cf30abf599a56004f1920204c5098bd8734a103846498b4ed002aef65
+local     71b2d0433293f2d85946714cd616798997a239b76bcebbd0c444591c479c5c55
+local     72d29861778f36f65db6a39cc0611d6d35aea9284abd39f39dd61d2a07d8a79a
+local     72f8519a221bfe22084bb0c698524cc00c0357330983c89a8965c36d118501ca
+local     73c8db4363a7e00592b96c451ce19dea12a1f0e769b962e1147b3fff0a43ba3e
+local     075a4db73dc96bec09b6909de107a0e05234cf176563eb869ca9579451db4d41
+local     76dd528731d84bc1cfde7b554ef4d43c90979f201018f8ce5e4c994ebf9aefb0
+local     77d2d9f9278fbee64ad50e422df8447fc92f35294fb4749ffbbbd789db8fccf3
+local     90dea44e1906295e882620e2f568cfe25c1bd9a77b60ee89b77e12c9d1aa6c45
+local     91d821629b4f29199ebd42ded85222f9f9c5f767cd172d8efdf9199481feb453
+local     93acfaa14d2d3741534792e21110fc8fb5f27505c601fa4d032c3326a4b2a03d
+local     119c7ff79cd221215442680eb2ec2d6d33ebc054321c61d859a2b3c3e2e34e47
+local     132e6b7584de8f74261c8da0d9079d3d56fc5f378993a6922ab6b8272a48186d
+local     145c5c7b0a1ba1ff1feac4f1a3cd48cfc046ac29259bd12eedcb027fb4cbe48c
+local     154e9e82b3af65b44e6143a7152cc3f4f0d64781bf631ad85b734353c0563e21
+local     168e3682541cf215bd7b26766721fe4822065a4e830b155b3d067d58dfe0c3d7
+local     169da6fbd3e92dd656791b53201f77f95bcb7e90f8eb058b394b7769bd56ab2f
+local     189d09791f836759eb3079516a66a02a9e21292c422c333655baae4d53cd7dab
+local     249d5babcf43b58c7bfd742752007143ffce34029268392ef13aee8231454aee
+local     260a2cb913b12567ffd343e28362e01f06fa9fcee5dfd424512ed30def5ca2dc
+local     285a9dc6341fc9233b0682da67de8c95c8fee8c61141cea4f1e8bf1a8e680934
+local     286afe33345f96bfc01f8a64f00c744e452e2813dee5be49e398a9b5ba3ddd4b
+local     325bbd0cef80d773a4c33959d7110848dec52363a12bf5ba884049ddf326ecb9
+local     425a23d1b415617a518aeff3ffc5b49330a0322fbe0a81dcc095606ec485384e
+local     451fcba530fc489fd0994aa235ec7b437e5d58b8570fcc25dee0fdfcded7beb5
+local     473a76b61eabecbeaa8e7a00a707ccb0d1bac1ed3adbf9a67a3b0d1bd188a0ec
+local     0493fc15882ae248a53008949b6e5034a60a25fff6b6915119482bd1a4613760
+local     494fb0b23df6295112fa373dc8d7b6d6336f5b4107796de434a5e4f5ef4cf702
+local     570f9075b7e48a2eccac1109ea85dd7782d3fc0b5e34c0a6c0fd1238a28a63eb
+local     585b88f8f7e55713bb13033be9a2a1c7d8ddb822d87fe988f6bdf7732708731e
+local     588f4621518180fe562e50f571548627f989fcc93fba6f72ba4e95825d5f1471
+local     598c8c00237a5fa5ca72c354265a0440dc01a873948d3e6bd1a8ef68236af9c9
+local     614f7e962d72fdd2bd89f70b15f28346452cc01ddf194d6eec70ee3286bbc011
+local     627b8e4b2fb69e7fc79020198fa2c643a453a3f37ef3c9634ed2d2a9f9ade281
+local     642ac0a0c1117f8060a0df6e0f18c268f154fa61fbc134461dc5c3a24cf35c5b
+local     661cf31280b59a0020d606f9d7f8e12c0360c0e8f26a7df87552b37363c1742b
+local     819c482a1eb24d5acc06eab4e725baef38597eef48fe4dacf5e5dede3a05a7f4
+local     844cdfe54214651199b5fedd0b41f3dd631b37c4ad87fd42559440f92a0fe591
+local     866e324c8b1fc1d6c64a80a19b29a245cf1bf8bb4074818cfae10c0e42b67695
+local     929e984256a38ae2c37fc18ce65bcd73ec57b1d0eb12476798bccc4040e30fd6
+local     941c227f5e9400a72f587760500912d284e4d6c9906d534de72b0e01757c454b
+local     945f46404299e621c344a18d695f629206ff257eadaffe82ef696d8353a88e65
+local     1019fbd0e734f249fa314ee16e52adb19b178c537408d5f8031d4e09b87aa6f8
+local     1083cb63784c70f8d2270e24a7d2c2e9b537c1395c88423b443643e5d6bc31a0
+local     1437a09a7b9a9db8639900f3926704b636db875b9ac44f8d3dc43f9b7ba55f3a
+local     01586b764a793e4565975a4d0d4fc63d732a445b2bfd84b52fa75dba07783b5b
+local     3212bb49cc8a8753b217054bf4d4721d4183bc2cd09ed022a1d66d1596419220
+local     3290d2563cf9d81244d7acdf0ee87b56ef053d1782df785f6289ad2b4e26db51
+local     4568ef6c04edb0ec25365f96172c15f80a36ae8f7c660d97bf18c3f3c895bb4c
+local     5636e85facdf34a0759c6517b8f84623f6167f90aa9eb3df0767aba0bd368539
+local     6199f082faaa2764b85c7617306969bc0b62e906677f43cb70573664cb66e454
+local     6744fa3aa1760e35c97a3f856e7cb6ec0944c05c6052be4a44cacbbdc6aa70a5
+local     7659d0093313ec4ba9a57d72b299c75ec3ef232ddc605910bd47cd7d768e3c8b
+local     7787af3657098529c81f76695dbaf5f507c759557a8f848cd3268745ba65660d
+local     8948f407a692406769db64abfea53a9506a5e0837f9597186c05373c02e95a25
+local     9514f9a2282f510cd6aa26e98afbff705460444a830921ce15b8198232c5f2b2
+local     9690ac6edbd5cd0db47c05a9d259e1ed5f81d36a272b47f9e2239fd2b568a9d6
+local     9927c14d5178ac5b313ec65b7b42a73e938060f4be52faf4b3b9fda6ffc73dc9
+local     31038e0516976cfe6ef9a73e8fa6354605578d8d0e8b826596d387a24dc1056d
+local     37918efd84918def985c7cc116a40e74c04c273d673f55e4606c49780461d9d6
+local     039085d53f167f79448ba5e26808a4bad468481f889abbc291fd0a26555aa4ab
+local     46521b93f984c222d0003dfb2581230542cd7bc575eaf9ecf8062118eeea8c91
+local     59967aef4f8856b59d33c1a2f8bc1c7a0ecbdecffd13bf9fb842b8c540e4b94d
+local     75163a985cd8ac742ef180b3a045f7fa36f65e534fd108fe66911cb37713daa3
+local     366246cc5b13b633e50171f4fd92b441bc43d4e0fe43b78fe12cb8f30961a3ce
+local     632336e60e3322588482094285430a5700463da548b082ad69488f8d666bcce3
+local     904483a705cfc639e79d87630fdb49ad3fb017f78624fc22d78fae055894d3d3
+local     2522792b1625edd6ef3ab8fffbe535807a398b136ccf116824befca919f91202
+local     3791849e51efbf47085c6d22d71f34d834f5e9ba2cc007e80f749b1f9415f76e
+local     5597439a06ff4501b2a9d8b65c1508fe3d312ed5c7cd2ac62dceee771eed5b25
+local     6898911c8aedb7e1bdccb74320178ce3c275fb6d87ffe213d85bbc10ab264a04
+local     8570813b048b64dcb98a18f7bec5961806f216aab678404e8059058565ace322
+local     153739732b1de30d94685faf19f4370357bdad6217003959d741e3f8f0088b39
+local     4893275187e5bafbcdef9711ed3fabcc4a7901d3cb25aee6043e6ccb71313f25
+local     6740300220f7485a45a12674e77880270d33f11cc02e14d3d886becfa616aabc
+local     92678120091d7b5ccfbcba12aeff3a88f76a80a41a3744e299b66d92b7b4aeca
+local     a0c486f2a3f5dc82c2c8c147d4d2a2e7df7a1d7e0e079fc8190717ef5092cf44
+local     a4d62e71ddcc3ed6204adb49bef63d8822564cb31db38d5fe9bce16c839a8c55
+local     a9ea0c93e51e2af3760919ab5ff628449e1e73ccba3be334255a9d32de6e736a
+local     a9f40fdea8245212231135af09f6f9625cbafb4fe7d45ea52c3facb596c8111d
+local     a09c1ab65a91c13ac864ea98ab410215dcd19a1b0fba28ba7d3d4c6b13902244
+local     a020e5563ac9ec0e857f8a42ca7d90b0b5d57acb52cb54212f43c4d26d7b2698
+local     a31db3d519db86a58e2dfc5a147dc7b7c59e66b185945e76d010b326f8b820b6
+local     a68b1c32c7d3e7fac7d99eb68309f37cf36c38fb152162267b418a6a38330220
+local     a68b27530361afeebfdb6e9460e88bcb884871750be7ca00a555f9df42346bd5
+local     a81cb1393a2a91d4e4e524c0d1d853c331f0eca057da3650b4bb908516cd1994
+local     a117e17abf65bfe2df9f4486df61121f2c8bd2ec6181893877fafbe243dfb1e9
+local     a353f36c5a8c57f4a840a1d1b88046fad53f8e6395eebdabe7f79fc59e1b8330
+local     a357d7ea0c2cd60556b57c74a357e7280bdc121b6c71b061b5402dda1cf9cefc
+local     a384d3da84db14677e90496e2852ab6018f9a5afd8c99ddd0cbca3439b117984
+local     a410ee7180377cf101ece349155386aa03e8375a6359901984f11cbc3d29749c
+local     a599e330bcb6787918ff108ceb46280529ff0cbdf4b340df3d7b2e500092a35d
+local     a662bce01988d3412298f6d0b75727f15a704372f988726e5151c2ab84de756c
+local     a0837e4e6fd649aaa2812984f87e38a6f76e4670c070ec6973090e6b8da70973
+local     a9826d511bb591be21ea07f6b919b1058d558cfb7fa9fb27bd61a705bba5b0e6
+local     a43255319d19efa84f9c66a774bad86b9fe38acf7bebf7d15bdd60737fb928b5
+local     a59303014ddffd7fdd2c9cbb648ac268d72d23da76c2234face6dc0fb7c747d8
+local     aabc59a39b4cfb206c146ff5e05dc9ec3bb4ed2d73ec5b22959652962386578c
+local     ab1152c2067489bc0ec385f89f76bf842d84619166e5917d12c515764d36e4f2
+local     abaabd91a23e1a2df7d33063a7d9530bf989945362ce921f85f68dedefb7025f
+local     abe14855ed1b3db5a826d03b9e5ff245b06ec9c5a5c06dec0cb2665352ac96d0
+local     acee68f938925cb997e8e55a83bbc6b81701fea820496f98e59c03fa8ea1a356
+local     ae7338aa9c867ef93be55e75df2e30d84d46eaf3c2fe33c6cdfc15b8b404b44b
+local     ae476222603a1583288fb841f9a6c8b14f996cc1f3850076058ae474a6c7f97b
+local     aeb5d96d37ecea4d4a23d23f0e02f671392076ffadece2f9e83f3e000cddac3e
+local     aee054f8a63541e95454b21e6e548e484c6c0ea45db0d4e868a66cd2c39975d3
+local     af883b65d5eb31914e8f082d678715d0449a72d5a0932858415efdd5ba606bd5
+local     afa7bd4f1bf5934a42c283b66906c7e150a8dce092a61fdbcf1998abfd58005c
+local     b0c094ee5824a559f5a6093390b97cd4c39cf9d8c1a7dad9e85ba6caec680af8
+local     b0fdc6fd5b2b0678b5aa48f3d4d9fb5e278b6020d36d0439acfb47ef82ac8c80
+local     b8c8c70aa59d4465e4d676223384b564c74a7c133a7ceb5055b61a51b5098a89
+local     b9c41e68d8fea242189452eea3b3e43119f3ce6b0b7fcc9eac8f7e8414a89b63
+local     b71a8ecc6d99e47a004545e5f19848e50637fbd3e9e11ebd8062a7fbcf237e09
+local     b86a4bb9791177242df784b52bc7f2ddc608072d1984d6a9a641a507611bdcb8
+local     b98ed6751873416ac93da1d347e5f5b69a80865c36c3cdfff12301a63bfe4c79
+local     b00201a2268fdf9b5a0496078268d3cc173967c52a986d2e098936273c7bf083
+local     b0921f5685f6f920d452bd063d88f96f5fc966ddeaf3a9f4c72092541b36dc84
+local     b938f7189a81e558bfe4b813e7dca39c76226c443b8acab3b1b5bf473b181220
+local     b8552e5d7ed8ec9e2dfe1908efe10f1dcbc834138abc74975a67940d5160acd5
+local     b93436ed11826f2506bfc58090fcc4de96cb8efdcd8ff6c7e9ca8f7bd625aff9
+local     b775349419dd6a41d22f42c09b7f608b541228d136b8b143e9cd154cf1e83a79
+local     ba0477ca781b7f0cdd3febcd90c1bcca8ae882042cb12e7dcd9b5d03faa5db93
+local     baf837cbd5baa3230442a7231a124b52cdc7860e54401b1da4adb7f0b946ddaa
+local     bb826520d4ca552cb5a05e3bad7dc6109a8e8d775f300c7e99a724d28711db3c
+local     bbe444dedc867142c92930d85a35cdee5147e58a980d9d48fabe7e7c66baf352
+local     bc0c4d8a1a5d965c0b75009db7d8ead0cdda27336eb4178c96f03b6be1bf4366
+local     bc17149f7ae984f75e8f50a1faf3a7861eea19950197e9fbad03ca4914797700
+local     bc52180c41c940e3c52765e7fc38043d0090f77ff61732eb66123410b78136f8
+local     bd37a43cffd80a07c3962538ff3463f64b03deeb8061f2060b18169bb6776e2b
+local     beea11655a91a99fe5481a7fb19ebf5604794d3e9973b527a9311af95bccbe5f
+local     bfa961d9cb7c42787a439758cff78875e5bc6245ab0986cc7e326f0553333d13
+local     bfe3d28da0fd881a806ac54395594ebfa0349671d4187505088a33619668b3b8
+local     c2bdd2a11d333df4c171fd7f14f6d5136db859e9097c3d3b7fd944d117cadf5d
+local     c2d1d7ab620ba0a5e52c289e691575d4f0fcff74af3cf62369f12f0491be0326
+local     c4e84f23f197baab84893e64d723223a9db98d2aef9c971ac030c24230e8d1e9
+local     c6a99f8794f444e37c4327f978e767548b28fcb19ae0b42935b8a2aa62b740a6
+local     c6b17332d476c4561c4505c3714dafd1ebe4fef7e84990b1c750d4bdfa2da5be
+local     c7f6a107141f51f88c16e6148cbfd9fd4e8250b4e65142e1112cd6f9f667028c
+local     c27be8f87205e601e15500ea6b4d6e551573f5d4ef2b6588d3b31a53d7e621f6
+local     c88dd19d53348bcad4b577b8f6e97013eaddea68ae7d7653de725521edc541b9
+local     c93a0ed30f628d9d38ebf35460e09be6ba49bd66b13a3da89b53a671350f4629
+local     c174ddc1d911090d75fda48de2c759fb2f424e69d1631a0148b619ef46a4862d
+local     c618d997c1c8a2c9274b510c06da7086c30aabc42fbffe19ae79902cf007d589
+local     c884e5984c51189a344d21c6b85c438272d4069ebb9447bbcf6924a2c20743cc
+local     c3039262d6629b430bdd8c67565f594a014e157855e10ea9e17be42f6c838588
+local     caebbd6ca6e67db0404588c49bd70130ed662bb8a8ca7f48bae4827bf57f76a2
+local     caf41bb0fdfb8099d33c00c795b3254ed0a1ddfc8c1e8f0281be01557ed1aefb
+local     cafeeff9986d50134012f34151aa4922e249562e18121de7f3f9b738d2d9fecf
+local     cb1956ea58652e27fe177403ba0bd3caace792cc706de9ed9de7a6beff56716c
+local     cc5224b0846dd6a80c9cf1b06960198895bda97a378badda200a74581d8d5eec
+local     cc905899093acabbbef80a0714e1b6756659f4bac8be211942d6f645b2cea412
+local     ccb02b2cae4b123260ae03d1fa8d60fc37fc9c8d37b149595a477af0034b4fae
+local     cd6a29ab268f45b6c9cd166198dc6759e92eb05d870febf3b0fdf410c9c59b8e
+local     cd044bcbe197f07664685da47a9e5ff033112deca35072b17e47f325f1182cbd
+local     cd283e88466912578892b6b86522719d4ba5c038fabeb27bde852ee27962c46d
+local     cdead7bddff2d041b1fb144780c905b96e345d40ccf278093838056c585c6c02
+local     ce6c74bde0be42fbc8ecf1ed3f4db9a1abcd6e7f51482e23bc4a2f1d0b276829
+local     cec6ecde05bacc473102ff6c36ee7c01e74a701b94e642461ad0f94f49a88ee5
+local     cee75717471730bf4d4fe20de6de4d3cbad4ad667b1fd333cb188ed118876f91
+local     cef4e5a8b1fa839656480f3b3047417d228e6a7d35e5863dd4bce5feb3bd314e
+local     cfbfaa021e6d20ad074683855f98f3a525beaec0d4a768a8ded967aeed222ed0
+local     d1fa0e40d45057797c0c211363ed4232e0806f15146350220e8792f31cf7392b
+local     d2aba968076ad78a071c16976adc271872c534aae572d32c8aa802be0e3bdbd8
+local     d8e2a5c7c4bb6ad7c361ed604c529a0a901892334dd714e0f7a1fb4199371568
+local     d60a88da0c758dab3dd3d0efc54734b024cd97b5c4e99a4ff14891606295112c
+local     d64af7fae5caafe96e649807b04ad91863bfd1beaf943083e5666d0a91fc3099
+local     d68e58ccb5967ad2ee719510d8f759a1787a1505f3005f29f1bffdf767c4b05f
+local     d87afed501908fca955ba2915142e490166a98ba3193e68dad866564435fc00b
+local     d418aee0605e0cd8e4a9f656c8b50aa1ea7910f9063350b05d5e39bfbcd2ea3d
+local     d540c3a8852d5efbab953cb5ef9b5fcdb0ff90b6f531fd3b5685d45e45943ea0
+local     d825a1c1ae5f1db5b95dcad38ab3a342021ed85b7c9f8bf9cb2aed0601d24796
+local     d940bf557a00f37804ccc5586c5c494de1abb61ea24a9a8fd9377dcacce9ef61
+local     d1480d1efc59abef20703e7f36a66cef5e41cfb4eb1ef4520143c41a5b30b224
+local     d43133dfe75c04a5b88bbcb3d284b6f91e6f862f189fb9e66c93732d17386b31
+local     d84684a990dc9f98fbaa2e1b4987e345e34c9ded183a10bd2ec338e2a1f880d2
+local     d5487217d20f3b7909ce63bf37bbf0ae8397ea3269bc6fe3a630c23894d5360b
+local     d70533980843f52507007266a825aaabaffe7c398252765d9bde6faa000460a1
+local     da751158663be3fe866505cfc130a4ca121c6128151ef6680fd31391a7905304
+local     db4c56fd60f3f7cbd339842ea6afda3507534e93b9063b20ae247f84ad2d6f84
+local     db89e537f564bccea63000f1da709638affb75bceaed5b94fb93ebf62f742ff1
+local     dc74443185dea7150f9a24fe91ac5d193d7b90dc3220fceca1f7ebbe380fae82
+local     dd75e85ac2ba2a16a60b52bfb29fb5afdf2ebafe94660006d70e309c615670c8
+local     ddb680b620b6886c6ff650981a913fea12a2b05cb187bf1dc94baec5bb466471
+local     ddf634665f9e074dd987e5bf4f996853ce1389c25eb43e5246625500f04427ac
+local     df02d30c444a25b429ac765a28c53fd48e9af1bb7d666a9b2bee32a400c5aac5
+local     e1c6c2a253a19523bb621f05e6cbc826e362887cd769be6034a66712b8f625cc
+local     e3f00a956a344a61bb43f10ea3826048b106f7288111f46b2f57fd33425d79bf
+local     e5fa678aa858974e46b61ed9b837697a85a2b957906e9099cfab8c73f3cb6460
+local     e33c2723f73fc93826ef2544ac0f6e030affbebedb114f578dd87c1a41503443
+local     e091f893888206c410f5d167d748ece938c86a3c4fdbe4ee09e383005f0c5b22
+local     e791bb8ae56284e54389d51a0abe420f6eb6f4bb491ed06d0e7660864bcafa4e
+local     e05475bcb4e00357168981d6c07490d6749e7ded0d9307997b45e22e4a8bb048
+local     e3585118fa9252d81582cff9c78b4dec63e3ab86f5fa8eb75d8b8a5a6b1be188
+local     e5789689a440ed233c935ed0306c35d7c99df4e208686111af71289928eb39d4
+local     ea0d5bb7bfed1421af83badfc7676a6461209013a438ff9fec816b3953819629
+local     ea56b39fa2f3a377110c1889939a4903104e060d321795fdfa60b8d64204d201
+local     ecd8042dc1691ebe85792915271f407b0c19aa9efa09f6aad9f3daa8f9ac086a
+local     ecedd489fc595e3a1577e407066351688b7d3beb63441af3a49fcb1f317b1ce4
+local     ed2ca427ab25a7af0552ecd61988707b0eee2417f4b6e4f9314475f8471e7c75
+local     ede8d7ce55754fc9686684733702c2a006ae3b98a76ddeec6ec50fdbdadbe179
+local     ef1e3c2ef10d9fa72a99b159163aa4df9e946e99c4b6db8a9417afb2d77f5599
+local     ef631b4ce0950c59fe7a40e5d733ad47fa308d3d36d01cc784c3825c2bffb70f
+local     ef7176cd66b223a4eb6ba4237dd46e884a9d079af1e8387728f745e466d261f4
+local     efab08d87ee637fbb5ac396f4d2cd51ce6909f92cafd85440bfbb85d574cbdc5
+local     f0cfa4f5127e3683e8d0aa4b8eeb9a45283e5d71e8d115f71a0a27e9df178571
+local     f3d8375373b31e4f850c90b701c1d90a11f15d4649891fca1fcaba64ad2cd51e
+local     f6c663254516b0d553a7749ad0bb493745db9dea879202d3c81a44b49540bfbe
+local     f7f8d8e33f28805d0c869e9455194434b35ed5a7fd7eccf86abe2cc1860ed1f9
+local     f15da229a1b4f2f48235aa68bb9bb67a98b98a14404ac11fb5cc8f0a1cf2c951
+local     f23a920e9da23bc4371de8886188483ce91bc59ebd849014679c5553ba271f81
+local     f25addbe824f9b30b7f409c6e1cb0e68f0f0f0ea6ab0d3d03c1b9907974ce82c
+local     f77fc6d35bbf3d58bdb28ff4df5e973d1ac85ea77bfafe4db54e481587c57de3
+local     f9052b536239ca69a8c2481693c4224436a1655cac0dce458ed4aec452e5d377
+local     f516465a41abd5b928e3f0c4699b7fbfa9d8b98eb64ae67a564ddfcf13f57f1c
+local     fa8fe1075fec5793e4f37efd59192cbfd3cfdab9dd184e8e99358fe6515d6669
+local     fa779ecfd12527e219104e91e8fa14977ebecf18a59220cd15cb36cd1697000a
+local     fb149730387e8c2ce289d934d87d45aedaf952a08e62b4097686618cec3b5a01
+local     fde3a287841a4b802a66c57468c9301b55c87d0e0edd7d8f68a68c0e6506104d
+local     ff5d0c2ddda9864458eec746ca175682bd503da2353da59f12a695893ac0ca18
+local     ffa6ec710a9ac9b0d54bef4fe4e6757a72adb09d53fda260abdb94bfb8360c0f
+local     ffaaf6c2db21ad623842219a1336cca6d3cb43f759e80f269ffb18c08034956d
+local     fff15550406084d2c183b7d0e37580df8461bce21990c89a757387a3eb900c1f
+local     lifetrac-camera_mosquitto_config
+local     lifetrac-camera_mosquitto_data
+local     tractor-vtest_mosquitto_data
+local     video-test_mosquitto_data
+NETWORK ID     NAME                      DRIVER    SCOPE
+b4c5f2c3c8ed   arduino-ootb_default      bridge    local
+608b0a231883   bridge                    bridge    local
+777502ba6e2e   host                      host      local
+f0b0aacb35e0   lifetrac-camera_default   bridge    local
+ecfbfccbe163   none                      null      local
+ea5355d3f4db   tractor-vtest_default     bridge    local
+b61f3734beb9   video-test_default        bridge    local
+[rc=0]

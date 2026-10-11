@@ -3598,6 +3598,9 @@ remains open.
   reached `loop()`, advanced SRAM4 liveness for roughly 60 s, and had
   CFSR/HFSR = 0. Formal USB-CDC, rail, blink/echo, and stock
   dual-core handshake captures are still open.
+  *Superseded 2026-10-04:* the M7 runs stock x8h7 again, and `tractor_h7`
+  runs nowhere (the radio path is X8 Linux). The M4 slot may still hold a
+  May bench sketch. See [BENCH_BOARDS.md](DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/bench_tools/BENCH_BOARDS.md).
 - [ ] 🟥 RadioLib + SX1276 (or Murata SiP) hello-world: send a packet
   base ↔ tractor at 1 m, decode RSSI/SNR.
   **2026-05-04 update:** The physical architecture has been definitively confirmed. The Murata `CMWX1ZZABZ-078` on the Max Carrier acts as a standalone AT modem and its raw SPI pins are **not** routed to the Portenta high-density connectors. Raw SPI communication (i.e. `RadioLib` P2P) is physically impossible. All LoRa control MUST be rewritten to use AT commands over a serial port (`Serial3` on H7, or `/dev/ttymxc3` on X8 Linux).

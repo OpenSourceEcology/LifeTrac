@@ -1,0 +1,96 @@
+$ docker info 2>/dev/null | head -40
+Client:
+ Version:    24.0.2-ce
+ Context:    default
+ Debug Mode: false
+ Plugins:
+  compose: Docker Compose (Docker Inc.)
+    Version:  2.18.1
+    Path:     /usr/lib/docker/cli-plugins/docker-compose
+
+Server:
+ Containers: 8
+  Running: 1
+  Paused: 0
+  Stopped: 7
+ Images: 35
+ Server Version: 24.0.2-ce
+ Storage Driver: overlay2
+  Backing Filesystem: extfs
+  Supports d_type: true
+  Using metacopy: false
+  Native Overlay Diff: true
+  userxattr: false
+ Logging Driver: journald
+ Cgroup Driver: cgroupfs
+ Cgroup Version: 1
+ Plugins:
+  Volume: local
+  Network: bridge host ipvlan macvlan null overlay
+  Log: awslogs fluentd gcplogs gelf journald json-file local logentries splunk syslog
+ Swarm: inactive
+ Runtimes: io.containerd.runc.v2 runc
+ Default Runtime: runc
+ Init Binary: docker-init
+ containerd version: 1677a17964311325ed1c31e2c0a3589ce6d5c30d.m
+ runc version: v1.1.7-0-g860f061b-dirty
+ init version: b9f42a0-dirty
+ Security Options:
+  seccomp
+   Profile: builtin
+ Kernel Version: 6.1.24-lmp-standard
+[rc=0]
+$ docker images --digests --no-trunc
+REPOSITORY            TAG                  DIGEST                                                                    IMAGE ID                                                                  CREATED        SIZE
+lifetrac-tractor-x8   latest               <none>                                                                    sha256:2727dfd36f9fb2dd58af00694fd6010e2dd8404643470dff3be6ff06aaf01d77   8 days ago     755MB
+lifetrac-tractor-x8   rs13-65869517        <none>                                                                    sha256:2727dfd36f9fb2dd58af00694fd6010e2dd8404643470dff3be6ff06aaf01d77   8 days ago     755MB
+python                3.11-slim-bookworm   sha256:a36c24f9cbdf4fd0f52d67f0823eeac19c2028c637cecc392d97f980d4fec56b   sha256:aad78d4fecb530bd8126abd508e0a8e1c13b3034ac352aa40ccd0f922f9f1b3c   2 weeks ago    156MB
+lifetrac-v25          latest               <none>                                                                    sha256:4623980c2daca116eb68a80fc18285fa273b43545aac498557bcc349871161a6   2 weeks ago    262MB
+<none>                <none>               <none>                                                                    sha256:ed7c058774f42eb2ead2f42fac637a6ff7848446b2869ce1d9374e48f477882d   2 weeks ago    262MB
+<none>                <none>               <none>                                                                    sha256:12fe97dece5795daa340dd6e978c11823494526470ba7ae6850bac89c1fb234f   3 weeks ago    262MB
+<none>                <none>               <none>                                                                    sha256:c6ded786130c6d272784bdb0da7c3cee86959bc4ba3a40caffd874234a9c7109   2 months ago   235MB
+python                3.11-slim            sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93   sha256:2fe5ff938d2b3a868d6c0965db79b196337fec351105efae446fe31774b396f6   2 months ago   150MB
+eclipse-mosquitto     2                    sha256:6f8d8a947c506f8a2290ec65cd4bd2bc7cb4d43fb5f6271f861cb013e2ef9797   sha256:0db28dca6f113dc87797b9249d12841dc7877d1b31e8557d227785d9b832ff14   3 months ago   23.3MB
+[rc=0]
+$ docker image inspect --format "{{.Id}} tags={{.RepoTags}} digests={{.RepoDigests}} created={{.Created}} size={{.Size}}" $(docker images -q | sort -u)
+sha256:0db28dca6f113dc87797b9249d12841dc7877d1b31e8557d227785d9b832ff14 tags=[eclipse-mosquitto:2] digests=[eclipse-mosquitto@sha256:6f8d8a947c506f8a2290ec65cd4bd2bc7cb4d43fb5f6271f861cb013e2ef9797] created=2026-06-22T19:46:48.832835167Z size=23266200
+sha256:12fe97dece5795daa340dd6e978c11823494526470ba7ae6850bac89c1fb234f tags=[] digests=[] created=2026-09-12T20:42:36.232499015Z size=261631798
+sha256:2727dfd36f9fb2dd58af00694fd6010e2dd8404643470dff3be6ff06aaf01d77 tags=[lifetrac-tractor-x8:latest lifetrac-tractor-x8:rs13-65869517] digests=[] created=2026-09-26T19:55:38.098771045Z size=755178676
+sha256:2fe5ff938d2b3a868d6c0965db79b196337fec351105efae446fe31774b396f6 tags=[python:3.11-slim] digests=[python@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93] created=2026-07-14T02:19:19.497264071Z size=149914304
+sha256:4623980c2daca116eb68a80fc18285fa273b43545aac498557bcc349871161a6 tags=[lifetrac-v25:latest] digests=[] created=2026-09-15T22:30:19.432805481Z size=261788195
+sha256:aad78d4fecb530bd8126abd508e0a8e1c13b3034ac352aa40ccd0f922f9f1b3c tags=[python:3.11-slim-bookworm] digests=[python@sha256:a36c24f9cbdf4fd0f52d67f0823eeac19c2028c637cecc392d97f980d4fec56b] created=2026-09-19T01:14:33.429130165Z size=155819245
+sha256:c6ded786130c6d272784bdb0da7c3cee86959bc4ba3a40caffd874234a9c7109 tags=[] digests=[] created=2026-07-29T14:22:11.560950496Z size=235462448
+sha256:ed7c058774f42eb2ead2f42fac637a6ff7848446b2869ce1d9374e48f477882d tags=[] digests=[] created=2026-09-14T19:09:09.165167004Z size=261645710
+[rc=0]
+$ docker ps -a --no-trunc --format "{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Command}}"
+lifetrac-vtest-audit_tail-1	lifetrac-v25:latest	Created	"python -m audit_log --tail-mqtt"
+lifetrac-vtest-web_ui-1	lifetrac-v25:latest	Created	"uvicorn web_ui:app --host 0.0.0.0 --port 8080 --proxy-headers"
+lifetrac-vtest-image_rx-1	lifetrac-v25:latest	Created	"python /app/base_station/image_rx_daemon.py --mqtt-host mosquitto"
+rx_smoke	lifetrac-v25:latest	Exited (137) 4 hours ago	"python3 -u /work/image_rx_daemon.py --log-level INFO"
+lifetrac-vtest-mosquitto-1	eclipse-mosquitto:2	Created	"/docker-entrypoint.sh /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
+bench_mqtt	eclipse-mosquitto:2	Exited (1) 2 months ago	"/docker-entrypoint.sh /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
+f11_webui	sha256:c6ded786130c6d272784bdb0da7c3cee86959bc4ba3a40caffd874234a9c7109	Exited (0) 2 months ago	"python3 -m uvicorn web_ui:app --host 0.0.0.0 --port 8090"
+design-controller-mosquitto-1	sha256:2a23a3e427e44bcc2f028580afcd6232979ff859116eeb899d19dc78e3cabf1c	Up 2 hours	"/docker-entrypoint.sh /usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
+[rc=0]
+$ docker compose ls -a; docker volume ls; docker network ls
+NAME                STATUS              CONFIG FILES
+design-controller   running(1)          /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER/docker-compose.yml
+lifetrac-vtest      created(4)          /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER/docker-compose.video-test.yml
+DRIVER    VOLUME NAME
+local     7da27d3d69fcd68b0b2d11f1a6b1213526811f94f798277a742f000c174d4b3d
+local     7f36a739688e1f97e0a2c9a9a90a0a4dbb7038c83d79ac2b2928952987b83f47
+local     design-controller_lifetrac_logs
+local     design-controller_lifetrac_state
+local     design-controller_mosquitto_data
+local     design-controller_mosquitto_logs
+local     lifetrac-vtest_lifetrac_logs
+local     lifetrac-vtest_lifetrac_state
+local     lifetrac-vtest_mosquitto_data
+local     lifetrac-vtest_mosquitto_logs
+NETWORK ID     NAME                        DRIVER    SCOPE
+dc64bc577592   bridge                      bridge    local
+cd414564124a   design-controller_default   bridge    local
+5149a7d141b1   host                        host      local
+03603d415f53   lifetrac-vtest_default      bridge    local
+ece130b28d40   none                        null      local
+[rc=0]

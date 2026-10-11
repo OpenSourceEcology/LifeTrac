@@ -1,0 +1,20 @@
+[Unit]
+Description=LifeTrac base-station video stack (lifetrac-vtest compose project)
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/lifetrac/DESIGN-CONTROLLER
+# NEVER add --build here. Rebuilding in a boot path is a destructive-loop hazard
+# (see /memories/repo/lifetrac-base-backend-recovery.md). Build manually with
+# `docker compose build` after pulling new code; this unit only brings up
+# already-built images.
+ExecStart=/usr/bin/docker compose -p lifetrac-vtest -f docker-compose.video-test.yml up -d
+ExecStop=/usr/bin/docker compose -p lifetrac-vtest -f docker-compose.video-test.yml down
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

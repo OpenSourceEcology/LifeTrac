@@ -1,0 +1,50 @@
+$ ip -br addr; ip route; ss -tlnp 2>/dev/null || netstat -tlnp
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+sit0@NONE        DOWN           
+eth0             UP             192.168.1.117/24 2600:1700:68a0:8ca0::2e/128 2600:1700:68a0:8ca0:cad9:79bb:b1de:6926/64 fe80::8323:f37a:2998:25e6/64 
+wlan0            DOWN           
+can0             DOWN           
+can1             DOWN           
+br-03603d415f53  DOWN           172.20.0.1/16 
+docker0          DOWN           172.17.0.1/16 
+br-cd414564124a  UP             172.19.0.1/16 fe80::42:8cff:fe82:a9b0/64 
+vethcf29546@if10 UP             fe80::d081:73ff:fea0:946a/64 
+default via 192.168.1.254 dev eth0 proto dhcp metric 100 
+172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1 linkdown 
+172.19.0.0/16 dev br-cd414564124a proto kernel scope link src 172.19.0.1 
+172.20.0.0/16 dev br-03603d415f53 proto kernel scope link src 172.20.0.1 linkdown 
+192.168.1.0/24 dev eth0 proto kernel scope link src 192.168.1.117 metric 100 
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 0.0.0.0:5001            0.0.0.0:*               LISTEN      721/m4_proxy        
+tcp        0      0 127.0.0.1:39019         0.0.0.0:*               LISTEN      653/containerd      
+tcp        0      0 127.0.0.1:1883          0.0.0.0:*               LISTEN      965/docker-proxy    
+tcp        0      0 0.0.0.0:5355            0.0.0.0:*               LISTEN      551/systemd-resolve 
+tcp6       0      0 :::5000                 :::*                    LISTEN      721/m4_proxy        
+tcp6       0      0 :::5355                 :::*                    LISTEN      551/systemd-resolve 
+tcp6       0      0 :::22                   :::*                    LISTEN      1/init              
+[rc=0]
+$ cat /sys/class/net/eth0/speed /sys/class/net/eth0/duplex 2>/dev/null; ethtool eth0 2>/dev/null
+100
+full
+[rc=127]
+$ nmcli -t general status; nmcli -t device status; nmcli -t -f NAME,UUID,TYPE,DEVICE,AUTOCONNECT con show
+connected:full:enabled:enabled:enabled:enabled
+eth0:ethernet:connected:Wired connection 1
+wlan0:wifi:disconnected:
+br-03603d415f53:bridge:unmanaged:
+br-cd414564124a:bridge:unmanaged:
+docker0:bridge:unmanaged:
+can0:can:unmanaged:
+can1:can:unmanaged:
+vethcf29546:ethernet:unmanaged:
+sit0:iptunnel:unmanaged:
+lo:loopback:unmanaged:
+Wired connection 1:1556c775-d694-3006-8eeb-dc33fe5a0b67:802-3-ethernet:eth0:yes
+[rc=0]
+$ nmcli -g connection.id,802-3-ethernet.speed,802-3-ethernet.duplex,802-3-ethernet.auto-negotiate con show 'Wired connection 1'
+Wired connection 1
+100
+full
+yes
+[rc=0]

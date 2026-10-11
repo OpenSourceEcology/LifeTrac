@@ -1,0 +1,38 @@
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+time="2026-09-14T19:07:41Z" level=warning msg="Failed to get credentials for registry: hub.foundries.io" error="error getting credentials - err: exit status 1, out: `ERROR: Device does not appear to be registered under /var/sota`"
+Sending build context to Docker daemon  105.6MB
+Step 1/10 : FROM python:3.11-slim
+ ---> 2fe5ff938d2b
+Step 2/10 : RUN apt-get update && apt-get install -y --no-install-recommends         mosquitto-clients         ca-certificates         libusb-1.0-0     && rm -rf /var/lib/apt/lists/*
+ ---> Using cache
+ ---> 6739649c7148
+Step 3/10 : WORKDIR /app
+ ---> Using cache
+ ---> 60a68289b7d8
+Step 4/10 : COPY base_station/requirements.txt /app/base_station/requirements.txt
+ ---> Using cache
+ ---> 1d0767921ca1
+Step 5/10 : RUN pip install --no-cache-dir -r /app/base_station/requirements.txt
+ ---> Using cache
+ ---> 9e3efb0b5438
+Step 6/10 : COPY base_station/  /app/base_station/
+ ---> 64a1a16bcbd1
+Step 7/10 : COPY firmware/      /app/firmware/
+ ---> 905b1b6b5814
+Step 8/10 : ENV PYTHONUNBUFFERED=1
+ ---> Running in 073f18dc3f24
+Removing intermediate container 073f18dc3f24
+ ---> 109287a9a5eb
+Step 9/10 : ENV PYTHONPATH=/app/base_station:/app
+ ---> Running in f76f0bbef32a
+Removing intermediate container f76f0bbef32a
+ ---> 66abf683eb9a
+Step 10/10 : CMD ["uvicorn", "web_ui:app", "--host", "0.0.0.0", "--port", "8080"]
+ ---> Running in bd5fbdf7b28d
+Removing intermediate container bd5fbdf7b28d
+ ---> ed7c058774f4
+Successfully built ed7c058774f4
+Successfully tagged lifetrac-v25:latest

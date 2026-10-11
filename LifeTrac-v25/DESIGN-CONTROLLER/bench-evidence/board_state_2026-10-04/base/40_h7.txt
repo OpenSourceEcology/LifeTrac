@@ -1,0 +1,51 @@
+$ ls -la /usr/arduino /usr/arduino/extra /usr/arduino/m4 /tmp/arduino 2>/dev/null
+/usr/arduino:
+total 12
+drwxr-xr-x  3 root root 4096 Jan  1  1970 .
+drwxr-xr-x 13 root root 4096 Jan  1  1970 ..
+drwxr-xr-x  2 root root 4096 Jan  1  1970 extra
+
+/usr/arduino/extra:
+total 40
+drwxr-xr-x 2 root root 4096 Jan  1  1970 .
+drwxr-xr-x 3 root root 4096 Jan  1  1970 ..
+lrwxrwxrwx 1 root root   66 Aug 11  2025 STM32H747AII6_CM7.bin -> ../../../usr/lib/firmware/arduino/stm32h7-fw/STM32H747AII6_CM7.bin
+-rwxr--r-- 2 root root  445 Jan  1  1970 load_modules_post.sh
+-rwxr--r-- 2 root root  363 Jan  1  1970 load_modules_pre.sh
+-rw-r--r-- 2 root root  864 Jan  1  1970 openocd_script-imx_gpio.cfg
+-rwxr--r-- 2 root root 1115 Jan  1  1970 program-h7.sh
+-rwxr--r-- 2 root root  721 Jan  1  1970 program.sh
+-rwxr--r-- 2 root root  331 Jan  1  1970 reset.sh
+-rwxr--r-- 2 root root  572 Jan  1  1970 unload_modules.sh
+[rc=2]
+$ sha256sum /usr/arduino/extra/* 2>/dev/null
+d81eaa816c6c4a485ec33d1b43241bde965525ad7c14b16b969920335fc004d4  /usr/arduino/extra/STM32H747AII6_CM7.bin
+0dacfeeed2cfebf16dd631615a0e7d3b6e745e5f758b6279c28dae87b0e08b89  /usr/arduino/extra/load_modules_post.sh
+bb13ab24f770a879a9fe7b48bdfc4a71f249126f503a7841b7531d3891351a28  /usr/arduino/extra/load_modules_pre.sh
+6681808426f4ad73d1e456af6b7ed98be519ee577b2653ec560dc0736f899088  /usr/arduino/extra/openocd_script-imx_gpio.cfg
+392a6384fa08f13fb368a7c852600ba41c55e0625caad5a722c3a4b8b5b92593  /usr/arduino/extra/program-h7.sh
+8c6743e5cbe5a0a33e555edd1f2052101366843a4efae260c477283884e5f79d  /usr/arduino/extra/program.sh
+4e48b13bf2118c0f65ee600561d9dfd8c64281c1e9806cfb17705f6542b34f1f  /usr/arduino/extra/reset.sh
+2d6b1204dc0825b5ded1da9f8091f0ad8427f85fa43f6fd701321037f89c0ffd  /usr/arduino/extra/unload_modules.sh
+[rc=0]
+$ timeout 5 cat /sys/kernel/x8h7_firmware/version
+0.0.5-next-53df799-20250314:072359[rc=0]
+$ journalctl -u stm32h7-program.service -u monitor-m4-elf-file.service -u m4-proxy.service --no-pager 2>/dev/null | tail -200
+Oct 04 17:46:58 portenta-x8-2d0a1209dabc240b systemd[1]: Starting Program stm32h7 on Portenta-X8 boards...
+Oct 04 17:46:58 portenta-x8-2d0a1209dabc240b sh[611]: cat: /sys/kernel/x8h7_firmware/version: Connection timed out
+Oct 04 17:46:58 portenta-x8-2d0a1209dabc240b sh[605]: Failed to read h7 firmware version
+Oct 04 17:46:58 portenta-x8-2d0a1209dabc240b sh[641]: cat: /sys/kernel/x8h7_firmware/version: Connection timed out
+Oct 04 17:46:58 portenta-x8-2d0a1209dabc240b sh[605]: Failed to read h7 firmware version
+Oct 04 17:46:58 portenta-x8-2d0a1209dabc240b sh[652]: cat: /sys/kernel/x8h7_firmware/version: Connection timed out
+Oct 04 17:46:58 portenta-x8-2d0a1209dabc240b sh[605]: Failed to read h7 firmware version
+Oct 04 17:46:59 portenta-x8-2d0a1209dabc240b sh[665]: cat: /sys/kernel/x8h7_firmware/version: Connection timed out
+Oct 04 17:46:59 portenta-x8-2d0a1209dabc240b sh[605]: Failed to read h7 firmware version
+Oct 04 17:46:59 portenta-x8-2d0a1209dabc240b sudo[673]:     root : PWD=/ ; USER=fio ; COMMAND=/usr/bin/dd if=/usr/arduino/extra/STM32H747AII6_CM7.bin of=/tmp/version bs=1 count=40 skip=262144
+Oct 04 17:46:59 portenta-x8-2d0a1209dabc240b sh[678]: 40+0 records in
+Oct 04 17:46:59 portenta-x8-2d0a1209dabc240b sh[678]: 40+0 records out
+Oct 04 17:46:59 portenta-x8-2d0a1209dabc240b sh[678]: 40 bytes copied, 0.0042205 s, 9.5 kB/s
+Oct 04 17:46:59 portenta-x8-2d0a1209dabc240b sudo[684]:     root : PWD=/ ; USER=fio ; COMMAND=/usr/bin/rm /tmp/version
+Oct 04 17:46:59 portenta-x8-2d0a1209dabc240b sh[605]: Firmware on H7 matches firmware stored on X8. No Update.
+Oct 04 17:47:00 portenta-x8-2d0a1209dabc240b systemd[1]: Finished Program stm32h7 on Portenta-X8 boards.
+Oct 04 17:47:00 portenta-x8-2d0a1209dabc240b systemd[1]: Started M4 Proxy.
+[rc=0]

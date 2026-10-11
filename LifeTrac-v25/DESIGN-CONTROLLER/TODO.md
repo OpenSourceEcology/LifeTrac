@@ -3441,6 +3441,14 @@ diagnostics enqueue frames but fail before TX start (`stageMode(TX)`
 returns `-16`; direct SX127x register snapshots are zero), so the Max
 Carrier LoRa interface must be revalidated before W4-00. Details:
 [`../AI NOTES/2026-05-04_Portenta_X8_M7_W4_Pre_Bringup_Status.md`](../AI%20NOTES/2026-05-04_Portenta_X8_M7_W4_Pre_Bringup_Status.md).
+*Superseded (2026-10-04):*
+- The M7 runs stock Arduino x8h7 again. `stm32h7-program.service` reprograms
+  it from `/usr/arduino/extra`, and the bridge has worked since 05-13.
+- The radio path moved to X8 Linux on `/dev/ttymxc3`, so `tractor_h7` runs
+  nowhere.
+- The M4 slot (H747 bank 2) may still hold a May bench sketch.
+
+See [BENCH_BOARDS.md](firmware/x8_lora_bootloader_helper/bench_tools/BENCH_BOARDS.md).
 
 - [ ] Set up shared Git repo with subfolders for `firmware/handheld_mkr`, `firmware/tractor_h7` (runs on the X8's onboard STM32H747 co-MCU), `firmware/tractor_opta`, `firmware/tractor_x8` (Linux services), `firmware/common`, `base_station/` (Docker compose root). Per [MASTER_PLAN.md §8.2](MASTER_PLAN.md), there is **no `firmware/base_*/` target**. 2026-05-04 interface update: revalidate the original "Linux drives SX1276 directly over SPI" assumption for the Max Carrier; Arduino's X8 gateway example drives the onboard Murata LPWAN module as an AT modem on `/dev/ttymxc3` with reset on `/dev/gpiochip5` line 3.
 - [ ] Set up PlatformIO with Portenta X8 + MKR WAN 1310 + Opta board support

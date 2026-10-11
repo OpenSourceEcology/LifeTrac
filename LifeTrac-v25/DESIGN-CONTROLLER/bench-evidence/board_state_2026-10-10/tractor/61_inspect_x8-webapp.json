@@ -1,0 +1,302 @@
+[
+    {
+        "Id": "5969befb36b316450c6157e4d803686938f749a019a74a390c92d4e9e47ba48a",
+        "Created": "2022-05-03T00:43:16.954362Z",
+        "Path": "/entrypoint.sh",
+        "Args": [],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 1234,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-09-21T09:51:56.886102625Z",
+            "FinishedAt": "2026-09-21T09:51:36.1485705Z"
+        },
+        "Image": "sha256:76db100d08e4999833f54b54ba56247e573fc2c5e4a2796f0514b97bc6a688de",
+        "ResolvConfPath": "/var/lib/docker/containers/5969befb36b316450c6157e4d803686938f749a019a74a390c92d4e9e47ba48a/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/5969befb36b316450c6157e4d803686938f749a019a74a390c92d4e9e47ba48a/hostname",
+        "HostsPath": "/var/lib/docker/containers/5969befb36b316450c6157e4d803686938f749a019a74a390c92d4e9e47ba48a/hosts",
+        "LogPath": "",
+        "Name": "/x8-webapp",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "/run/dbus/system_bus_socket:/run/dbus/system_bus_socket:rw",
+                "/run/arduino_hw_info.env:/run/arduino_hw_info.env:ro",
+                "/var/sota:/var/sota:rw",
+                "/etc/os-release:/etc/os-release:ro",
+                "/var/sota/compose-apps/arduino-ootb/keys:/tmp/keys:ro"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "journald",
+                "Config": {}
+            },
+            "NetworkMode": "arduino-ootb_default",
+            "PortBindings": {
+                "1323/tcp": [
+                    {
+                        "HostIp": "",
+                        "HostPort": "80"
+                    }
+                ]
+            },
+            "RestartPolicy": {
+                "Name": "unless-stopped",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "CapAdd": [
+                "NET_ADMIN"
+            ],
+            "CapDrop": null,
+            "CgroupnsMode": "host",
+            "Dns": [],
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": [],
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": null,
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 0,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": null,
+            "BlkioDeviceReadBps": null,
+            "BlkioDeviceWriteBps": null,
+            "BlkioDeviceReadIOps": null,
+            "BlkioDeviceWriteIOps": null,
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": null,
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "KernelMemory": 0,
+            "KernelMemoryTCP": 0,
+            "MemoryReservation": 0,
+            "MemorySwap": 0,
+            "MemorySwappiness": null,
+            "OomKillDisable": false,
+            "PidsLimit": null,
+            "Ulimits": null,
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/asound",
+                "/proc/acpi",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/a7e497ea76066b7c38d0047593c0337b1308783a84fb81a871dbac32e604b9a7-init/diff:/var/lib/docker/overlay2/af84c3b661f7bb684c2e09833076811c9e28cb0018c9a47e152e862d66ed86d4/diff:/var/lib/docker/overlay2/a01b765965dfac5e5c23d6889763c02d179035ac52a0374867c5642ec957bf24/diff:/var/lib/docker/overlay2/9f6411eca61375c2fb960d707728b4610de8d8e52820a4c24138cab4f5ff525e/diff:/var/lib/docker/overlay2/f68390b386094f0772fa31bb10ee3d5c34fff3af27ae5f1bd653d1e3359ce440/diff:/var/lib/docker/overlay2/5b027dcbb7d48ad05f9b9d54995c6d2791527edd9d34a8ae41f45970e512f55d/diff:/var/lib/docker/overlay2/0bcb353094250fb7db6be56cc23424f92a8d8b93b69fb49a0e1832948958e46b/diff:/var/lib/docker/overlay2/8f636fcdadce1e4cb2132efe75ff41e7669a7b07c139bf52aaaa6e2bb836c25a/diff",
+                "MergedDir": "/var/lib/docker/overlay2/a7e497ea76066b7c38d0047593c0337b1308783a84fb81a871dbac32e604b9a7/merged",
+                "UpperDir": "/var/lib/docker/overlay2/a7e497ea76066b7c38d0047593c0337b1308783a84fb81a871dbac32e604b9a7/diff",
+                "WorkDir": "/var/lib/docker/overlay2/a7e497ea76066b7c38d0047593c0337b1308783a84fb81a871dbac32e604b9a7/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/etc/os-release",
+                "Destination": "/etc/os-release",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/run/arduino_hw_info.env",
+                "Destination": "/run/arduino_hw_info.env",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/run/dbus/system_bus_socket",
+                "Destination": "/run/dbus/system_bus_socket",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/var/sota/compose-apps/arduino-ootb/keys",
+                "Destination": "/tmp/keys",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/var/sota",
+                "Destination": "/var/sota",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": "rprivate"
+            }
+        ],
+        "Config": {
+            "Hostname": "5969befb36b3",
+            "Domainname": "",
+            "User": "0",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "ExposedPorts": {
+                "1323/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "SSH_KEY_PUB=<redacted>",
+                "SSH_KEY=<redacted>",
+                "IOT_SECRETS_PATH=<redacted>",
+                "DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket",
+                "SSH_HOST=devel:22",
+                "PROVISIONING_URL=x8-provisioning:1324",
+                "FACTORY_HARDWARE_ID=portenta-x8",
+                "LOG_LEVEL=1",
+                "SSH_USER=root",
+                "UPDATE_JSON_URI=https://downloads.arduino.cc/portentax8image/info.json",
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "FACTORY_OTA_TAG=devel",
+                "OOTB_GIT_SHA_VERS=491a2d2d7eca17c51fce5f9bf3c2d22c39f3bbb6",
+                "VITE_OOTB_GIT_SHA_VERS=491a2d2d7eca17c51fce5f9bf3c2d22c39f3bbb6"
+            ],
+            "Cmd": null,
+            "Image": "hub.foundries.io/arduino/arduino-ootb-webapp@sha256:3a66e0ceee4a297884b5825ed4f650952356c864ba0e0d232592e2ff8d6cf488",
+            "Volumes": {
+                "/etc/os-release": {},
+                "/run/arduino_hw_info.env": {},
+                "/run/dbus/system_bus_socket": {},
+                "/tmp/keys": {},
+                "/var/sota": {}
+            },
+            "WorkingDir": "",
+            "Entrypoint": [
+                "/entrypoint.sh"
+            ],
+            "OnBuild": null,
+            "Labels": {
+                "com.docker.compose.config-hash": "8ca756bf14bc362fa26fee8f8be42102b02282866d43b6dec7b6972ce4c7ce5d",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "",
+                "com.docker.compose.image": "sha256:76db100d08e4999833f54b54ba56247e573fc2c5e4a2796f0514b97bc6a688de",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "arduino-ootb",
+                "com.docker.compose.project.config_files": "/var/sota/compose-apps/arduino-ootb/docker-compose.yml",
+                "com.docker.compose.project.working_dir": "/var/sota/compose-apps/arduino-ootb",
+                "com.docker.compose.service": "webapp",
+                "com.docker.compose.version": "2.6.0",
+                "io.compose-spec.config-hash": "db6be00b2bebca7b6ce8080a2d9f899995b2b1ec0728320848817e687f896f74",
+                "maintainer": "Massimo Pennazio <maxipenna@libero.it>"
+            }
+        },
+        "NetworkSettings": {
+            "Bridge": "",
+            "SandboxID": "4e79fe8b7ef2bdbd92e8bdbb4a87ed85126690ab459a2b51eba658719fb29c89",
+            "HairpinMode": false,
+            "LinkLocalIPv6Address": "",
+            "LinkLocalIPv6PrefixLen": 0,
+            "Ports": {
+                "1323/tcp": [
+                    {
+                        "HostIp": "0.0.0.0",
+                        "HostPort": "80"
+                    },
+                    {
+                        "HostIp": "::",
+                        "HostPort": "80"
+                    }
+                ]
+            },
+            "SandboxKey": "/var/run/docker/netns/4e79fe8b7ef2",
+            "SecondaryIPAddresses": null,
+            "SecondaryIPv6Addresses": null,
+            "EndpointID": "",
+            "Gateway": "",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "IPAddress": "",
+            "IPPrefixLen": 0,
+            "IPv6Gateway": "",
+            "MacAddress": "",
+            "Networks": {
+                "arduino-ootb_default": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "x8-webapp",
+                        "webapp",
+                        "5969befb36b3"
+                    ],
+                    "NetworkID": "b4c5f2c3c8edf6bb4c673f7e4a9510c0cd5b2fe6e8608666fcfe24e44536ff3a",
+                    "EndpointID": "438f2ee55a9c6c23f5d324f70ed1ecf5447d171852134fb798cd43decd509ff0",
+                    "Gateway": "172.18.0.1",
+                    "IPAddress": "172.18.0.2",
+                    "IPPrefixLen": 16,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "MacAddress": "02:42:ac:12:00:02",
+                    "DriverOpts": null
+                }
+            }
+        }
+    }
+]

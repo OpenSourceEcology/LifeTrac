@@ -1,0 +1,17 @@
+[Unit]
+Description=LifeTrac tractor video stack (tractor-vtest compose project)
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/lifetrac/video-test
+# NEVER add --build here. See note in lifetrac-base-compose.service.
+ExecStart=/usr/bin/docker compose -p tractor-vtest up -d
+ExecStop=/usr/bin/docker compose -p tractor-vtest down
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target
