@@ -1,0 +1,27 @@
+$ systemctl is-enabled aktualizr-lite 2>/dev/null; systemctl is-active aktualizr-lite 2>/dev/null
+enabled
+inactive
+[rc=3]
+$ ls -la /var/sota /var/sota/compose-apps /var/sota/reset-apps 2>/dev/null
+/var/sota:
+total 24
+drwx------  5 root root 4096 May 23 02:09 .
+drwxr-xr-x 11 root root 4096 Apr 28  2022 ..
+drwxr-xr-x  3 root root 4096 May  3  2022 compose-apps
+drwxr-xr-x  2 root root 4096 Mar  8  2023 import
+-rw-r--r--  1 root root  178 May 23 02:09 iot-config.json
+drwxr-xr-x  4 root root 4096 Mar  8  2023 reset-apps
+
+/var/sota/compose-apps:
+total 12
+drwxr-xr-x 3 root root 4096 May  3  2022 .
+drwx------ 5 root root 4096 May 23 02:09 ..
+drwxr-xr-x 3 root root 4096 May  3  2022 arduino-ootb
+
+/var/sota/reset-apps:
+total 16
+drwxr-xr-x 4 root root 4096 Mar  8  2023 .
+drwx------ 5 root root 4096 May 23 02:09 ..
+drwxr-xr-x 3 root root 4096 Mar  8  2023 apps
+drwxr-xr-x 3 root root 4096 Mar  8  2023 blobs
+[rc=0]

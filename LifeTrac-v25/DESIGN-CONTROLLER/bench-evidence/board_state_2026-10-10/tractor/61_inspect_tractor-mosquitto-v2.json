@@ -1,0 +1,281 @@
+[
+    {
+        "Id": "f3fa26b00073dc5da8efbdefece9b63fe15840bde1066d00e7eb6f4c7a9281e6",
+        "Created": "2026-05-28T14:43:56.146336375Z",
+        "Path": "/docker-entrypoint.sh",
+        "Args": [
+            "/usr/sbin/mosquitto",
+            "-c",
+            "/mosquitto/config/mosquitto.conf"
+        ],
+        "State": {
+            "Status": "exited",
+            "Running": false,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 0,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-07-26T23:59:25.749065625Z",
+            "FinishedAt": "2026-07-27T00:09:25.7641395Z"
+        },
+        "Image": "sha256:2a23a3e427e44bcc2f028580afcd6232979ff859116eeb899d19dc78e3cabf1c",
+        "ResolvConfPath": "/var/lib/docker/containers/f3fa26b00073dc5da8efbdefece9b63fe15840bde1066d00e7eb6f4c7a9281e6/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/f3fa26b00073dc5da8efbdefece9b63fe15840bde1066d00e7eb6f4c7a9281e6/hostname",
+        "HostsPath": "/var/lib/docker/containers/f3fa26b00073dc5da8efbdefece9b63fe15840bde1066d00e7eb6f4c7a9281e6/hosts",
+        "LogPath": "",
+        "Name": "/tractor-mosquitto-v2",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "/opt/lifetrac/video-test/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "journald",
+                "Config": {}
+            },
+            "NetworkMode": "video-test_default",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "unless-stopped",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "host",
+            "Dns": [],
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": [],
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": null,
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 0,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": null,
+            "BlkioDeviceReadBps": null,
+            "BlkioDeviceWriteBps": null,
+            "BlkioDeviceReadIOps": null,
+            "BlkioDeviceWriteIOps": null,
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": null,
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "KernelMemory": 0,
+            "KernelMemoryTCP": 0,
+            "MemoryReservation": 0,
+            "MemorySwap": 0,
+            "MemorySwappiness": null,
+            "OomKillDisable": false,
+            "PidsLimit": null,
+            "Ulimits": null,
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "Mounts": [
+                {
+                    "Type": "volume",
+                    "Source": "video-test_mosquitto_data",
+                    "Target": "/mosquitto/data",
+                    "VolumeOptions": {}
+                },
+                {
+                    "Type": "volume",
+                    "Source": "fde3a287841a4b802a66c57468c9301b55c87d0e0edd7d8f68a68c0e6506104d",
+                    "Target": "/mosquitto/log"
+                }
+            ],
+            "MaskedPaths": [
+                "/proc/asound",
+                "/proc/acpi",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/f3deb8a4bfd96821c56bf8f76c56e0897f37228884475d951a46614fa40a6a89-init/diff:/var/lib/docker/overlay2/8c6ddd94781fcfacd5a139c6957d98e38ffae31b7fb08ab267cea519f3de7f58/diff:/var/lib/docker/overlay2/293ccb8b5d0432a0cd273e3d3a2b67cfe81a6c0ad5409e258c5b28914445b488/diff:/var/lib/docker/overlay2/79cc32f3e3bf5e7de41c8791b3ac4ca1a1ec2dd30dd922d28d715291056193b3/diff",
+                "MergedDir": "/var/lib/docker/overlay2/f3deb8a4bfd96821c56bf8f76c56e0897f37228884475d951a46614fa40a6a89/merged",
+                "UpperDir": "/var/lib/docker/overlay2/f3deb8a4bfd96821c56bf8f76c56e0897f37228884475d951a46614fa40a6a89/diff",
+                "WorkDir": "/var/lib/docker/overlay2/f3deb8a4bfd96821c56bf8f76c56e0897f37228884475d951a46614fa40a6a89/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "volume",
+                "Name": "video-test_mosquitto_data",
+                "Source": "/var/lib/docker/volumes/video-test_mosquitto_data/_data",
+                "Destination": "/mosquitto/data",
+                "Driver": "local",
+                "Mode": "z",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "volume",
+                "Name": "fde3a287841a4b802a66c57468c9301b55c87d0e0edd7d8f68a68c0e6506104d",
+                "Source": "/var/lib/docker/volumes/fde3a287841a4b802a66c57468c9301b55c87d0e0edd7d8f68a68c0e6506104d/_data",
+                "Destination": "/mosquitto/log",
+                "Driver": "local",
+                "Mode": "z",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "bind",
+                "Source": "/opt/lifetrac/video-test/mosquitto/mosquitto.conf",
+                "Destination": "/mosquitto/config/mosquitto.conf",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            }
+        ],
+        "Config": {
+            "Hostname": "f3fa26b00073",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "ExposedPorts": {
+                "1883/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "VERSION=2.1.2",
+                "DOWNLOAD_SHA256=fd905380691ac65ea5a93779e8214941829e3d6e038d5edff9eac5fd74cbed02",
+                "GPG_KEYS=<redacted>"
+            ],
+            "Cmd": [
+                "/usr/sbin/mosquitto",
+                "-c",
+                "/mosquitto/config/mosquitto.conf"
+            ],
+            "Image": "eclipse-mosquitto:2",
+            "Volumes": {
+                "/mosquitto/config/mosquitto.conf": {},
+                "/mosquitto/data": {},
+                "/mosquitto/log": {}
+            },
+            "WorkingDir": "/",
+            "Entrypoint": [
+                "/docker-entrypoint.sh"
+            ],
+            "OnBuild": null,
+            "Labels": {
+                "com.docker.compose.config-hash": "d79bd929bc80bb1784301b6d3e879ddf651928bd6be7aa400dbcc7d897bcca3d",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "",
+                "com.docker.compose.image": "sha256:2a23a3e427e44bcc2f028580afcd6232979ff859116eeb899d19dc78e3cabf1c",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "video-test",
+                "com.docker.compose.project.config_files": "/opt/lifetrac/video-test/docker-compose.yml",
+                "com.docker.compose.project.working_dir": "/opt/lifetrac/video-test",
+                "com.docker.compose.service": "mosquitto",
+                "com.docker.compose.version": "2.6.0",
+                "org.opencontainers.image.authors": "Roger Light <roger@atchoo.org>",
+                "org.opencontainers.image.description": "Eclipse Mosquitto MQTT Broker",
+                "org.opencontainers.image.documentation": "https://mosquitto.org/documentation/",
+                "org.opencontainers.image.licenses": "EPL-2.0 OR BSD-3-Clause",
+                "org.opencontainers.image.source": "https://github.com/eclipse-mosquitto/mosquitto",
+                "org.opencontainers.image.title": "eclipse-mosquitto",
+                "org.opencontainers.image.url": "https://mosquitto.org/",
+                "org.opencontainers.image.version": "2.1.2"
+            }
+        },
+        "NetworkSettings": {
+            "Bridge": "",
+            "SandboxID": "b07952f239d24f08bd27ac4be44c2a09ebbcde85e6a878fd903e622df5233e42",
+            "HairpinMode": false,
+            "LinkLocalIPv6Address": "",
+            "LinkLocalIPv6PrefixLen": 0,
+            "Ports": {},
+            "SandboxKey": "/var/run/docker/netns/b07952f239d2",
+            "SecondaryIPAddresses": null,
+            "SecondaryIPv6Addresses": null,
+            "EndpointID": "",
+            "Gateway": "",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "IPAddress": "",
+            "IPPrefixLen": 0,
+            "IPv6Gateway": "",
+            "MacAddress": "",
+            "Networks": {
+                "video-test_default": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "tractor-mosquitto-v2",
+                        "mosquitto",
+                        "f3fa26b00073"
+                    ],
+                    "NetworkID": "b61f3734beb9694b353603a35b4c9a7e14d112aef9aa2a48ab531f702ca6843e",
+                    "EndpointID": "",
+                    "Gateway": "",
+                    "IPAddress": "",
+                    "IPPrefixLen": 0,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "MacAddress": "",
+                    "DriverOpts": null
+                }
+            }
+        }
+    }
+]

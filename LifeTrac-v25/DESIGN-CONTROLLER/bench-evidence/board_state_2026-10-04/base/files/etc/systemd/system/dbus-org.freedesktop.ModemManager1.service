@@ -1,0 +1,25 @@
+[Unit]
+Description=Modem Manager
+After= stm32h7-program.service create-docker-envfile.service
+Requires= stm32h7-program.service create-docker-envfile.service
+ConditionVirtualization=!container
+
+[Service]
+Type=dbus
+BusName=org.freedesktop.ModemManager1
+ExecStartPre=/usr/sbin/modem_on.sh
+ExecStart=/usr/sbin/ModemManager
+ExecStopPost=/usr/sbin/modem_off.sh
+StandardError=null
+Restart=on-abort
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_ADMIN
+ProtectSystem=true
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_NETLINK AF_UNIX AF_QIPCRTR
+NoNewPrivileges=true
+User=root
+
+[Install]
+WantedBy=multi-user.target
+Alias=dbus-org.freedesktop.ModemManager1.service

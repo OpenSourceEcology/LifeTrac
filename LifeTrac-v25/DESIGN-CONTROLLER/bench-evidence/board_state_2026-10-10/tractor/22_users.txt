@@ -1,0 +1,8 @@
+$ id fio; getent group docker video dialout sudo wheel
+uid=1000(fio) gid=1000(fio) groups=1000(fio),27(sudo),44(video),46(plugdev),100(users),982(docker)
+sh: line 1: getent: command not found
+[rc=127]
+$ ls -la /home/fio/.ssh 2>/dev/null; ssh-keygen -lf /home/fio/.ssh/authorized_keys 2>/dev/null
+[rc=127]
+$ crontab -l -u fio 2>/dev/null; crontab -l 2>/dev/null; ls -la /etc/cron* 2>/dev/null
+[rc=2]

@@ -5,6 +5,16 @@
 #
 # Default image is hello.bin in /tmp/lifetrac_p0c/.
 # Logs to /tmp/lifetrac_p0c/pipeline.log
+#
+# REVIVE_MODE (2026-10-10: default is now `reboot`; was `full`):
+#   reboot  openocd `reset run`, hand the watchdog back ('V'), systemctl reboot.
+#           Required on the 6.1.24 base kernel; works on 5.10 too. Every flash
+#           since 2026-09-12 used it.
+#   full    re-insert the x8h7 modules instead of rebooting. OOPSes the base's
+#           6.1 kernel (spi_probe -> of_irq_get) and power-cycles it; kept only
+#           for a 5.10 board where a reboot is unwanted.
+# Note: `sudo` drops the caller's environment, so pass it explicitly:
+#   sudo -S -p '' env REVIVE_MODE=full bash .../full_flash_pipeline.sh img.bin
 
 set -u
 TOOLDIR=/tmp/lifetrac_p0c
@@ -38,7 +48,9 @@ echo "=== T2 $(date) revive_bridge ===" | tee -a "$LOG"
 # the base kernel (6.1.24-lmp) and power-cycles the board anyway. Bring the
 # H7 back with openocd reset run, hand the watchdog back, then reboot on
 # purpose. /tmp is lost either way; the caller re-pushes tooling.
-if [ "${REVIVE_MODE:-full}" = "reboot" ]; then
+REVIVE_MODE=${REVIVE_MODE:-reboot}
+echo "REVIVE_MODE=$REVIVE_MODE" | tee -a "$LOG"
+if [ "$REVIVE_MODE" = "reboot" ]; then
   REVIVE_MODE=reset_run_only bash $TOOLDIR/revive_bridge.sh 2>&1 | tee -a "$LOG"
   REVIVE_RC=${PIPESTATUS[0]}
   echo "revive_rc=$REVIVE_RC (reset_run_only)" | tee -a "$LOG"

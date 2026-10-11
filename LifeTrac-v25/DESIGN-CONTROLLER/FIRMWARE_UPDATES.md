@@ -50,13 +50,18 @@ The release-key public half is baked into each node's boot loader at manufacture
   3. Watch `journalctl -fu lifetrac-base` for ≥1 minute to confirm the new bridge handshakes with the tractor.
 - **Rollback:** `sudo /usr/local/bin/lifetrac-update vX.Y.<Z-1>` — same wrapper, previous tag.
 
-### Handheld — Portenta H747 (M7 firmware) + secure element
+### Handheld — Arduino MKR WAN 1310 (SAMD21 firmware, `firmware/handheld_mkr`)
 
-- **Artifact:** `lifetrac-handheld-h747-vX.Y.Z.bin` for application code; secure-element provisioning is **separate** and only happens at manufacture or pair.
+> The handheld is an MKR WAN 1310 (SAMD21 MCU + Murata LoRa module), not a
+> Portenta H747 — see [HANDHELD_REMOTE.md](HANDHELD_REMOTE.md) and
+> [firmware/handheld_mkr/](firmware/handheld_mkr/) (FQBN
+> `arduino:samd:mkrwan1310`, [ARDUINO_CI.md](ARDUINO_CI.md)).
+
+- **Artifact:** `lifetrac-handheld-mkr-vX.Y.Z.bin` for application code; key provisioning (secure element or key store) is **separate** and only happens at manufacture or pair.
 - **Channel:** USB-C from the base-station laptop. **Never OTA** — handheld is the operator's safety-critical surface.
 - **Procedure:**
-  1. Connect handheld via USB-C while it is **powered off**. The bootloader enumerates as `Arduino_Bootloader` on USB.
-  2. `python tools/flash_handheld.py --image lifetrac-handheld-h747-vX.Y.Z.bin --port COM7`.
+  1. Connect the handheld via USB-C and double-tap the MKR's RESET button: the SAMD21 bootloader starts (LED pulses) and enumerates as its own COM port.
+  2. `python tools/flash_handheld.py --image lifetrac-handheld-mkr-vX.Y.Z.bin --port COM7` (planned tool; until it exists, compile the sketch as in [ARDUINO_CI.md](ARDUINO_CI.md) and flash it with `arduino-cli upload --fqbn arduino:samd:mkrwan1310 -p <port>`).
   3. Tool verifies signature, flashes, reboots. Power up the handheld and confirm the OLED displays the new firmware version on the splash screen.
   4. **Re-run pairing** — the secure-element key is preserved across firmware updates by design, but verify pairing still works (cf. [OPERATIONS_MANUAL.md § 2](OPERATIONS_MANUAL.md)).
 - **Rollback:** keep the previous `.bin` on the maintenance laptop; reflash with the previous version via the same procedure.

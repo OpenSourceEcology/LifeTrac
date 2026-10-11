@@ -1,0 +1,261 @@
+[
+    {
+        "Id": "3fb9b73526fdc96eb5269dd801e211430a6d1d251bb0f338099871540d323cf9",
+        "Created": "2022-05-03T00:43:16.955137875Z",
+        "Path": "/entrypoint.sh",
+        "Args": [],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 1222,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-09-21T09:51:56.84497725Z",
+            "FinishedAt": "2026-09-21T09:51:36.1603285Z"
+        },
+        "Image": "sha256:6ee1d6b69ba37756035323a61bbeac4b463adbc7336d89fa3e582a9b810c142c",
+        "ResolvConfPath": "/var/lib/docker/containers/3fb9b73526fdc96eb5269dd801e211430a6d1d251bb0f338099871540d323cf9/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/3fb9b73526fdc96eb5269dd801e211430a6d1d251bb0f338099871540d323cf9/hostname",
+        "HostsPath": "/var/lib/docker/containers/3fb9b73526fdc96eb5269dd801e211430a6d1d251bb0f338099871540d323cf9/hosts",
+        "LogPath": "",
+        "Name": "/x8-provisioning",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "/run/dbus/system_bus_socket:/run/dbus/system_bus_socket:rw",
+                "/run/arduino_hw_info.env:/run/arduino_hw_info.env:ro",
+                "/var/sota:/var/sota:rw"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "journald",
+                "Config": {}
+            },
+            "NetworkMode": "arduino-ootb_default",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "unless-stopped",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "host",
+            "Dns": [],
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": [],
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": null,
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 0,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": null,
+            "BlkioDeviceReadBps": null,
+            "BlkioDeviceWriteBps": null,
+            "BlkioDeviceReadIOps": null,
+            "BlkioDeviceWriteIOps": null,
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": [
+                {
+                    "PathOnHost": "/dev/tee0",
+                    "PathInContainer": "/dev/tee0",
+                    "CgroupPermissions": "rwm"
+                }
+            ],
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "KernelMemory": 0,
+            "KernelMemoryTCP": 0,
+            "MemoryReservation": 0,
+            "MemorySwap": 0,
+            "MemorySwappiness": null,
+            "OomKillDisable": false,
+            "PidsLimit": null,
+            "Ulimits": null,
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/asound",
+                "/proc/acpi",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": {
+                "LowerDir": "/var/lib/docker/overlay2/15ec1593f93b1656571782d631d623ecc2161faa2858e9ae6db0d6028cbd948f-init/diff:/var/lib/docker/overlay2/414ff3be9ee9f0f6d67a445c7796879f0822b71d61a44333882e8e83c033a7c8/diff:/var/lib/docker/overlay2/4d8adc32983683f8781a2cd80526479fab4d1a670989f818747f9138c610d857/diff:/var/lib/docker/overlay2/9a0870a70e4274c725fba3633d09f38c91b49b3799fe7d1476b03eda9d291282/diff:/var/lib/docker/overlay2/a6e20943fc66262d5446219f126850b1818aa13979a7fe99a2d34884a000687a/diff:/var/lib/docker/overlay2/e93101a4305fef679e874f7a2c8cac366403d7fe6734a49d111e7e7ab17a79eb/diff:/var/lib/docker/overlay2/ebf1038ac67aab1e79e6b135ba0964ec50c4111c4cf9979a53ffe71bb975016a/diff:/var/lib/docker/overlay2/ae125e98052c2d2dd7f84028b870d57b2aa310bee309caeed4e0a15e9dc542df/diff:/var/lib/docker/overlay2/d274f2ca7f21d1ecf8473fc2f59cb2987b57faec9a36c267798d903e0efe7f98/diff:/var/lib/docker/overlay2/9423cfbd16956061064a52721446f9797c4c4592d24fabd4679207c31fb5ba58/diff:/var/lib/docker/overlay2/ca087b9e0fb4ad0053a5f46d2ff7d114758ded2f8e9ad8932853e43d725ec89f/diff:/var/lib/docker/overlay2/e81fe0577236091669aef2cb2acc7a63f3f85e7546610e49f8468e224fa1fd0c/diff:/var/lib/docker/overlay2/334d38051beef1aaea1e9b5b72caaddc09da608eae961b2c1c1890a26a807202/diff:/var/lib/docker/overlay2/410845e30987f7f5b1be8dcc6602cc27ff354f67ff0d4357c1269bcef71e3db2/diff:/var/lib/docker/overlay2/2876032657f46daed5cbcf77377e5a0e1473b8d77959c5cc7d40943fb240efbf/diff:/var/lib/docker/overlay2/e3c09eb5d4ebf5c88d59b61131045cab27f8d0248411e6d19a2eb7421052ddad/diff:/var/lib/docker/overlay2/30926d95ac0875f5af8463b36e916d73b9109b48663ec4dfb10cba55a5b8231e/diff:/var/lib/docker/overlay2/6da3742fbdce0afd50a43ea32ff23b0e9219b773b32547deaf206e8fa78c27fb/diff:/var/lib/docker/overlay2/0989427a00e1db10c79ade1cf417bebdf94b214d681b2d7ace893e7fe85b5ad7/diff:/var/lib/docker/overlay2/124b9de2ae37204fda83dbea7c2adb7d9a22947b58f4c47cd82d54373059135c/diff:/var/lib/docker/overlay2/82e61b32ba320b00086754eaadb3bdeb3bb617842ed6a2fa8fad8eb1691a749b/diff:/var/lib/docker/overlay2/14c67dc61501308452ce7b4a7a8f0e6635a3aee0472a79b1c938442ac8b564ea/diff:/var/lib/docker/overlay2/fb4ad1ffc0cd2aae7c4f1946f2c513272f2856e7d89db5081ecc84a7fb19e266/diff:/var/lib/docker/overlay2/7d7584beafd655b48e086d37475df16506b31a4218d6cbb497a01851c0912a74/diff:/var/lib/docker/overlay2/20f3b41b7b40a9d8bb1fa6c0c40b4f65cd2c7735f94bb75e3d46f0ca26664f97/diff:/var/lib/docker/overlay2/8c89b66815425cf9fcca6f0754682773162bc5b9f34428495f8bf6fc194ed16a/diff:/var/lib/docker/overlay2/e5be3469e59d4f70e1774c107fd1f6daec6c387fff2d57442f44a4c338860a41/diff:/var/lib/docker/overlay2/4e802a00d1c04c21bb2f9f4170349ab4bd6ca8d906fb6c60c60e7ada448ec8b3/diff:/var/lib/docker/overlay2/a6a5d2878b30f6885d4dff4995251d264bf5a0a57a7fead1633f1009a2ed8baa/diff",
+                "MergedDir": "/var/lib/docker/overlay2/15ec1593f93b1656571782d631d623ecc2161faa2858e9ae6db0d6028cbd948f/merged",
+                "UpperDir": "/var/lib/docker/overlay2/15ec1593f93b1656571782d631d623ecc2161faa2858e9ae6db0d6028cbd948f/diff",
+                "WorkDir": "/var/lib/docker/overlay2/15ec1593f93b1656571782d631d623ecc2161faa2858e9ae6db0d6028cbd948f/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/run/arduino_hw_info.env",
+                "Destination": "/run/arduino_hw_info.env",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/run/dbus/system_bus_socket",
+                "Destination": "/run/dbus/system_bus_socket",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/var/sota",
+                "Destination": "/var/sota",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": "rprivate"
+            }
+        ],
+        "Config": {
+            "Hostname": "3fb9b73526fd",
+            "Domainname": "",
+            "User": "0",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "Tty": true,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket",
+                "IOT_API_URL=https://api2.arduino.cc",
+                "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "LANG=C.UTF-8",
+                "GPG_KEY=<redacted>",
+                "PYTHON_VERSION=3.9.16",
+                "PYTHON_PIP_VERSION=22.0.4",
+                "PYTHON_SETUPTOOLS_VERSION=58.1.0",
+                "PYTHON_GET_PIP_URL=https://github.com/pypa/get-pip/raw/d5cb0afaf23b8520f1bbcfed521017b4a95f5c01/public/get-pip.py",
+                "PYTHON_GET_PIP_SHA256=394be00f13fa1b9aaa47e911bdb59a09c3b2986472130f30aa0bfaf7f3980637"
+            ],
+            "Cmd": null,
+            "Image": "hub.foundries.io/arduino/arduino-iot-cloud-provisioning@sha256:6cdb56d6e9354d5b204c2d6e9149fec63af15be82baf9ac27f50082526834174",
+            "Volumes": {
+                "/run/arduino_hw_info.env": {},
+                "/run/dbus/system_bus_socket": {},
+                "/var/sota": {}
+            },
+            "WorkingDir": "",
+            "Entrypoint": [
+                "/entrypoint.sh"
+            ],
+            "OnBuild": null,
+            "Labels": {
+                "com.docker.compose.config-hash": "51a87d05b6ef92a1c671e7816e1933dff255d1792b057d9b20b70c06f7e3e6c0",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "",
+                "com.docker.compose.image": "sha256:6ee1d6b69ba37756035323a61bbeac4b463adbc7336d89fa3e582a9b810c142c",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "arduino-ootb",
+                "com.docker.compose.project.config_files": "/var/sota/compose-apps/arduino-ootb/docker-compose.yml",
+                "com.docker.compose.project.working_dir": "/var/sota/compose-apps/arduino-ootb",
+                "com.docker.compose.service": "provisioning",
+                "com.docker.compose.version": "2.6.0",
+                "io.compose-spec.config-hash": "ccdf5d287185a59d42cdca61b0c2abb1dc3e079d935819eb56d3f908621e9356",
+                "maintainer": "Mattia Pennasilico <m.pennasilico@arduino.cc>"
+            }
+        },
+        "NetworkSettings": {
+            "Bridge": "",
+            "SandboxID": "a68cd7d4d1b8e15010b65945326589b9530b01dd66d96f6e1909cdfc3f620844",
+            "HairpinMode": false,
+            "LinkLocalIPv6Address": "",
+            "LinkLocalIPv6PrefixLen": 0,
+            "Ports": {},
+            "SandboxKey": "/var/run/docker/netns/a68cd7d4d1b8",
+            "SecondaryIPAddresses": null,
+            "SecondaryIPv6Addresses": null,
+            "EndpointID": "",
+            "Gateway": "",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "IPAddress": "",
+            "IPPrefixLen": 0,
+            "IPv6Gateway": "",
+            "MacAddress": "",
+            "Networks": {
+                "arduino-ootb_default": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "x8-provisioning",
+                        "provisioning",
+                        "3fb9b73526fd"
+                    ],
+                    "NetworkID": "b4c5f2c3c8edf6bb4c673f7e4a9510c0cd5b2fe6e8608666fcfe24e44536ff3a",
+                    "EndpointID": "f27d3faa8e2c0ea4eb6e7b95a429b598804a509a446fac4cfb51909d9ee97f46",
+                    "Gateway": "172.18.0.1",
+                    "IPAddress": "172.18.0.4",
+                    "IPPrefixLen": 16,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "MacAddress": "02:42:ac:12:00:04",
+                    "DriverOpts": null
+                }
+            }
+        }
+    }
+]

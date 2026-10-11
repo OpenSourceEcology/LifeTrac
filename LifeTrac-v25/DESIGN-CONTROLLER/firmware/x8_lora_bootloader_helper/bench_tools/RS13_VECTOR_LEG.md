@@ -19,6 +19,7 @@ DTS carrier in the literal leg command (RESULTS A17, A18, A19; see
 [Amendments 2026-10-10](#amendments-2026-10-10)). The amendments apply from the
 next round; RS-13.1 (rounds 1–4) stays judged by the text it flew under, which
 that section quotes.*
+Parameterised copies that run from any checkout (settings in `bench.env`) are in [`legs/`](legs/README.md).
 
 **No firmware change.** VECTOR rides the strict image path as ordinary
 one-fragment 0xFE trains (a 0xFD copies train only if `LIFETRAC_KEYFRAME_COPIES`
@@ -538,7 +539,8 @@ day, run a receive-only channel spot-check with the tractor parked
 2a/2c/2d line carries `-ForceFrfHz <the pick>` (an integer in Hz, e.g.
 `927500000`; the harness refuses a centre outside 902.25–927.75 MHz): since the
 2026-10-10 amendment the literal 2a command below has it, and 2c and 2d are
-2a's line with another `-CamExtraEnv`. Record the pick in RESULTS, and check
+2a's line with another `-CamExtraEnv`. Put the pick in `bench.env` as
+`DTS_CARRIER_HZ` / `DTS_CARRIER_DATE`, record it in RESULTS, and check
 `forcing FRF -> <pick>` … `FRF readback: … (OK)` on both boards in the
 archive's daemon logs (the bench diag L072 build accepts the write; the
 production build refuses it). Without it, `-ForceFrfHz 0` pins the profile-2 default of
@@ -548,11 +550,20 @@ flew there, and their losses fold on its period (RESULTS A19). The RS-12 legs
 used `-ForceFrfHz 927500000` after a same-day spot-check; the band changes
 from day to day, so re-check rather than reuse a pick.
 
+The harness now refuses a profile-2 line without `-ForceFrfHz` (bench kit
+2026-10-10; `-AllowDefaultCarrier` is only for a deliberate 915 MHz control).
+The `<...>` values come from `bench.env`: without
+`-TxAdbSerial` / `-RxAdbSerial` / `-HostIp` the harness falls back to the
+original bench's serials and PC address. [`legs/leg_prep.sh`](legs/README.md)
+writes the complete line for each leg, with these values filled in, as a
+wrapper you run in PowerShell; prefer it to typing the lines below.
+
 - **2a — DTS (profile 2), VECTOR at boot:**
 
   ```powershell
-  .\run_live_radio_monitor.ps1 -TxFeed camera -RegProfile 2 -ForceFrfHz <spot-checked carrier> `
-     -DurationS 300 -SynthFps 2 -KfRequestDisable 1 -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 `
+  .\run_live_radio_monitor.ps1 -TxAdbSerial <TRACTOR_SERIAL> -RxAdbSerial <BASE_SERIAL> -HostIp <PC_HOST> `
+     -TxFeed camera -RegProfile 2 -ForceFrfHz <the pick> -DurationS 300 -SynthFps 2 `
+     -KfRequestDisable 1 -ProbeEcho 0 -LogFragArrivals 1 -TxBatch 0 `
      -CamExtraEnv "-e LIFETRAC_ENCODE_MODE=9 -e LIFETRAC_VECTOR_DETAIL=80" -Archive
   ```
 

@@ -1,0 +1,2 @@
+SUBSYSTEM=="net", ACTION=="add", ATTRS{idVendor}=="2c7c", ATTRS{idProduct}=="6005", NAME="ec200aeu"
+ACTION=="add", SUBSYSTEM=="net", KERNEL=="ec200aeu", TAG+="systemd", ENV{SYSTEMD_WANTS}="ec200a-eu.service"

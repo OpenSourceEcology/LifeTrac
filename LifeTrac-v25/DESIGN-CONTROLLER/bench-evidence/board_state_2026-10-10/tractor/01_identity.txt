@@ -1,0 +1,30 @@
+$ hostname; cat /etc/hostname; uname -a; uptime; date -u
+portenta-x8-2e2c1209dabc240b
+portenta-x8-2e2c1209dabc240b
+Linux portenta-x8-2e2c1209dabc240b 5.10.93-lmp-standard #1 SMP PREEMPT Thu Jan 20 20:01:30 UTC 2022 aarch64 aarch64 aarch64 GNU/Linux
+ 09:52:27 up 0 min,  1 user,  load average: 0.96, 0.30, 0.10
+Mon Sep 21 09:52:27 UTC 2026
+[rc=0]
+$ cat /etc/os-release
+ID=lmp-xwayland
+NAME="Linux-microPlatform XWayland"
+VERSION="4.0.3-674-88"
+VERSION_ID=4.0.3-674-88
+PRETTY_NAME="Linux-microPlatform XWayland 4.0.3-674-88"
+HOME_URL="https://foundries.io/"
+SUPPORT_URL="https://support.foundries.io/"
+DEFAULT_HOSTNAME="portenta-x8"
+LMP_MACHINE="portenta-x8"
+LMP_FACTORY="arduino"
+LMP_FACTORY_TAG="devel"
+IMAGE_ID=lmp-factory-image
+IMAGE_VERSION=674
+[rc=0]
+$ cat /proc/cmdline
+console=tty1 console=ttymxc2,115200 earlycon=ec_imx6q,0x30880000,115200 root=/dev/mmcblk2p2 rootfstype=ext4 ostree=/ostree/boot.1/lmp/edd88b28fad148b3096157052e4434582f63b7bbe09489086203ddb56fddd279/0
+[rc=0]
+$ cat /sys/devices/soc0/soc_id /sys/devices/soc0/revision /sys/devices/soc0/serial_number 2>/dev/null
+i.MX8MM
+1.0
+2E2C1209DABC240B
+[rc=0]

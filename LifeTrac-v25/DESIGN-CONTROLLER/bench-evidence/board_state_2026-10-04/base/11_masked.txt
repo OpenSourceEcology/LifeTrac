@@ -1,0 +1,158 @@
+$ find /etc/systemd/system -maxdepth 2 -lname /dev/null -printf "%p -> %l\n"
+/etc/systemd/system/compose-apps-early-start-recovery.service -> /dev/null
+/etc/systemd/system/compose-apps-early-start.service -> /dev/null
+[rc=0]
+$ ls -laR /etc/systemd/system
+/etc/systemd/system:
+total 72
+drwxr-xr-x 16 root root 4096 May 27 06:38 .
+drwxr-xr-x  5 root root 4096 Aug 11  2025 ..
+drwxr-xr-x  2 root root 4096 Apr 28  2022 basic.target.wants
+drwxr-xr-x  2 root root 4096 Aug 11  2025 bluetooth.target.wants
+drwxr-xr-x  2 root root 4096 Aug 11  2025 boot-complete.target.wants
+lrwxrwxrwx  1 root root    9 May 26 23:10 compose-apps-early-start-recovery.service -> /dev/null
+lrwxrwxrwx  1 root root    9 May 26 23:10 compose-apps-early-start.service -> /dev/null
+lrwxrwxrwx  1 root root   37 Aug 11  2025 ctrl-alt-del.target -> /usr/lib/systemd/system/reboot.target
+lrwxrwxrwx  1 root root   41 Aug 11  2025 dbus-org.bluez.service -> /usr/lib/systemd/system/bluetooth.service
+lrwxrwxrwx  1 root root   44 Aug 11  2025 dbus-org.freedesktop.Avahi.service -> /usr/lib/systemd/system/avahi-daemon.service
+lrwxrwxrwx  1 root root   44 Aug 11  2025 dbus-org.freedesktop.ModemManager1.service -> /usr/lib/systemd/system/ModemManager.service
+lrwxrwxrwx  1 root root   57 Aug 11  2025 dbus-org.freedesktop.nm-dispatcher.service -> /usr/lib/systemd/system/NetworkManager-dispatcher.service
+lrwxrwxrwx  1 root root   48 Aug 11  2025 dbus-org.freedesktop.resolve1.service -> /usr/lib/systemd/system/systemd-resolved.service
+lrwxrwxrwx  1 root root   49 Aug 11  2025 dbus-org.freedesktop.timesync1.service -> /usr/lib/systemd/system/systemd-timesyncd.service
+lrwxrwxrwx  1 root root   40 Aug 11  2025 default.target -> /usr/lib/systemd/system/graphical.target
+drwxr-xr-x  2 root root 4096 Aug 11  2025 getty.target.wants
+drwxr-xr-x  2 root root 4096 Aug 11  2025 graphical.target.wants
+-rw-r--r--  1 root root  789 May 27 06:38 lifetrac-base-compose.service
+-rw-r--r--  1 root root  480 May 26 15:05 lifetrac-base.service
+drwxr-xr-x  2 root root 4096 May 26 23:04 lifetrac-base.service.d
+drwxr-xr-x  2 root root 4096 Aug 11  2025 local-fs.target.wants
+drwxr-xr-x  2 root root 4096 May 27 06:38 multi-user.target.wants
+drwxr-xr-x  2 root root 4096 Aug 11  2025 network-online.target.wants
+drwxr-xr-x  2 root root 4096 Aug 11  2025 sockets.target.wants
+drwxr-xr-x  2 root root 4096 Aug 11  2025 swap.target.wants
+drwxr-xr-x  2 root root 4096 Apr 28  2022 sysinit.target.wants
+drwxr-xr-x  2 root root 4096 Aug 11  2025 timers.target.wants
+drwxr-xr-x  2 root root 4096 Aug 11  2025 usb-gadget.target.wants
+
+/etc/systemd/system/basic.target.wants:
+total 8
+drwxr-xr-x  2 root root 4096 Apr 28  2022 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+lrwxrwxrwx  1 root root   53 Aug 11  2025 create-docker-envfile.service -> /usr/lib/systemd/system/create-docker-envfile.service
+lrwxrwxrwx  1 root root   48 Aug 11  2025 m4-led-forwarder.service -> /usr/lib/systemd/system/m4-led-forwarder.service
+lrwxrwxrwx  1 root root   40 Aug 11  2025 m4-proxy.service -> /usr/lib/systemd/system/m4-proxy.service
+lrwxrwxrwx  1 root root   48 Aug 11  2025 monitor-m4-elf-file.path -> /usr/lib/systemd/system/monitor-m4-elf-file.path
+lrwxrwxrwx  1 root root   46 Aug 11  2025 tee-supplicant.service -> /usr/lib/systemd/system/tee-supplicant.service
+
+/etc/systemd/system/bluetooth.target.wants:
+total 8
+drwxr-xr-x  2 root root 4096 Aug 11  2025 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+lrwxrwxrwx  1 root root   41 Aug 11  2025 bluetooth.service -> /usr/lib/systemd/system/bluetooth.service
+
+/etc/systemd/system/boot-complete.target.wants:
+total 8
+drwxr-xr-x  2 root root 4096 Aug 11  2025 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+lrwxrwxrwx  1 root root   38 Aug 11  2025 docker.service -> /usr/lib/systemd/system/docker.service
+
+/etc/systemd/system/getty.target.wants:
+total 8
+drwxr-xr-x  2 root root 4096 Aug 11  2025 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+lrwxrwxrwx  1 root root   38 Aug 11  2025 getty@tty1.service -> /usr/lib/systemd/system/getty@.service
+
+/etc/systemd/system/graphical.target.wants:
+total 8
+drwxr-xr-x  2 root root 4096 Aug 11  2025 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+lrwxrwxrwx  1 root root   38 Aug 11  2025 weston.service -> /usr/lib/systemd/system/weston.service
+
+/etc/systemd/system/lifetrac-base.service.d:
+total 12
+drwxr-xr-x  2 root root 4096 May 26 23:04 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+-rw-r--r--  1 root root   31 May 26 23:04 timeout.conf
+
+/etc/systemd/system/local-fs.target.wants:
+total 8
+drwxr-xr-x  2 root root 4096 Aug 11  2025 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+lrwxrwxrwx  1 root root   46 Aug 11  2025 ostree-remount.service -> /usr/lib/systemd/system/ostree-remount.service
+
+/etc/systemd/system/multi-user.target.wants:
+total 16
+drwxr-xr-x  2 root root 4096 May 27 06:38 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+lrwxrwxrwx  1 root root   44 Aug 11  2025 ModemManager.service -> /usr/lib/systemd/system/ModemManager.service
+lrwxrwxrwx  1 root root   46 Aug 11  2025 NetworkManager.service -> /usr/lib/systemd/system/NetworkManager.service
+lrwxrwxrwx  1 root root   46 Aug 11  2025 aktualizr-lite.service -> /usr/lib/systemd/system/aktualizr-lite.service
+lrwxrwxrwx  1 root root   44 Aug 11  2025 avahi-daemon.service -> /usr/lib/systemd/system/avahi-daemon.service
+lrwxrwxrwx  1 root root   63 Aug 11  2025 compose-apps-aklite-offline-run.service -> /usr/lib/systemd/system/compose-apps-aklite-offline-run.service
+lrwxrwxrwx  1 root root   56 Aug 11  2025 compose-apps-early-start.service -> /usr/lib/systemd/system/compose-apps-early-start.service
+lrwxrwxrwx  1 root root   60 Aug 11  2025 compose-apps-register-images.service -> /usr/lib/systemd/system/compose-apps-register-images.service
+lrwxrwxrwx  1 root root   42 Aug 11  2025 containerd.service -> /usr/lib/systemd/system/containerd.service
+lrwxrwxrwx  1 root root   38 Aug 11  2025 docker.service -> /usr/lib/systemd/system/docker.service
+lrwxrwxrwx  1 root root   47 Aug 11  2025 fio-docker-fsck.service -> /usr/lib/systemd/system/fio-docker-fsck.service
+lrwxrwxrwx  1 root root   49 Aug 11  2025 fioconfig-extract.service -> /usr/lib/systemd/system/fioconfig-extract.service
+lrwxrwxrwx  1 root root   38 Aug 11  2025 fioconfig.path -> /usr/lib/systemd/system/fioconfig.path
+lrwxrwxrwx  1 root root   41 Aug 11  2025 fioconfig.service -> /usr/lib/systemd/system/fioconfig.service
+lrwxrwxrwx  1 root root   41 Aug 11  2025 firmwared.service -> /usr/lib/systemd/system/firmwared.service
+lrwxrwxrwx  1 root root   41 Aug 11  2025 ip6tables.service -> /usr/lib/systemd/system/ip6tables.service
+lrwxrwxrwx  1 root root   40 Aug 11  2025 iptables.service -> /usr/lib/systemd/system/iptables.service
+lrwxrwxrwx  1 root root   49 May 27 06:38 lifetrac-base-compose.service -> /etc/systemd/system/lifetrac-base-compose.service
+lrwxrwxrwx  1 root root   41 May 26 15:05 lifetrac-base.service -> /etc/systemd/system/lifetrac-base.service
+lrwxrwxrwx  1 root root   38 Aug 11  2025 ninfod.service -> /usr/lib/systemd/system/ninfod.service
+lrwxrwxrwx  1 root root   51 Aug 11  2025 ostree-finalize-staged.path -> /usr/lib/systemd/system/ostree-finalize-staged.path
+lrwxrwxrwx  1 root root   37 Aug 11  2025 rdisc.service -> /usr/lib/systemd/system/rdisc.service
+lrwxrwxrwx  1 root root   48 Aug 11  2025 remote-cryptsetup.target -> /usr/lib/systemd/system/remote-cryptsetup.target
+lrwxrwxrwx  1 root root   40 Aug 11  2025 remote-fs.target -> /usr/lib/systemd/system/remote-fs.target
+lrwxrwxrwx  1 root root   48 Aug 11  2025 systemd-resolved.service -> /usr/lib/systemd/system/systemd-resolved.service
+
+/etc/systemd/system/network-online.target.wants:
+total 8
+drwxr-xr-x  2 root root 4096 Aug 11  2025 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+lrwxrwxrwx  1 root root   58 Aug 11  2025 NetworkManager-wait-online.service -> /usr/lib/systemd/system/NetworkManager-wait-online.service
+
+/etc/systemd/system/sockets.target.wants:
+total 8
+drwxr-xr-x  2 root root 4096 Aug 11  2025 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+lrwxrwxrwx  1 root root   43 Aug 11  2025 avahi-daemon.socket -> /usr/lib/systemd/system/avahi-daemon.socket
+lrwxrwxrwx  1 root root   39 Aug 11  2025 dropbear.socket -> /usr/lib/systemd/system/dropbear.socket
+lrwxrwxrwx  1 root root   36 Aug 11  2025 pcscd.socket -> /usr/lib/systemd/system/pcscd.socket
+lrwxrwxrwx  1 root root   46 Aug 11  2025 systemd-userdbd.socket -> /usr/lib/systemd/system/systemd-userdbd.socket
+lrwxrwxrwx  1 root root   37 Aug 11  2025 weston.socket -> /usr/lib/systemd/system/weston.socket
+
+/etc/systemd/system/swap.target.wants:
+total 8
+drwxr-xr-x  2 root root 4096 Aug 11  2025 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+lrwxrwxrwx  1 root root   38 Aug 11  2025 dev-zram0.swap -> /usr/lib/systemd/system/dev-zram0.swap
+
+/etc/systemd/system/sysinit.target.wants:
+total 8
+drwxr-xr-x  2 root root 4096 Apr 28  2022 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+lrwxrwxrwx  1 root root   45 Aug 11  2025 psplash-start.service -> /usr/lib/systemd/system/psplash-start.service
+lrwxrwxrwx  1 root root   47 Aug 11  2025 psplash-systemd.service -> /usr/lib/systemd/system/psplash-systemd.service
+lrwxrwxrwx  1 root root   47 Aug 11  2025 stm32h7-program.service -> /usr/lib/systemd/system/stm32h7-program.service
+lrwxrwxrwx  1 root root   51 Aug 11  2025 systemd-boot-update.service -> /usr/lib/systemd/system/systemd-boot-update.service
+lrwxrwxrwx  1 root root   57 Aug 11  2025 systemd-network-generator.service -> /usr/lib/systemd/system/systemd-network-generator.service
+lrwxrwxrwx  1 root root   46 Aug 11  2025 systemd-pstore.service -> /usr/lib/systemd/system/systemd-pstore.service
+lrwxrwxrwx  1 root root   49 Aug 11  2025 systemd-timesyncd.service -> /usr/lib/systemd/system/systemd-timesyncd.service
+
+/etc/systemd/system/timers.target.wants:
+total 8
+drwxr-xr-x  2 root root 4096 Aug 11  2025 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+lrwxrwxrwx  1 root root   51 Aug 11  2025 connection-status-led.timer -> /usr/lib/systemd/system/connection-status-led.timer
+
+/etc/systemd/system/usb-gadget.target.wants:
+total 8
+drwxr-xr-x  2 root root 4096 Aug 11  2025 .
+drwxr-xr-x 16 root root 4096 May 27 06:38 ..
+lrwxrwxrwx  1 root root   50 Aug 11  2025 android-tools-adbd.service -> /usr/lib/systemd/system/android-tools-adbd.service
+lrwxrwxrwx  1 root root   43 Aug 11  2025 ncm-network.service -> /usr/lib/systemd/system/ncm-network.service
+[rc=0]
