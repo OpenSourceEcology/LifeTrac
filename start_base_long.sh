@@ -1,9 +1,9 @@
 #!/bin/sh
-# DO NOT RUN on the bench without an explicit radio GO: re-creates the 1800 s
+# DO NOT RUN on a bench board, not even with a radio GO: re-creates the 1800 s
 # TimeoutStartSec drop-in and starts lifetrac-base.service (both retired on the
 # bench base 2026-10-12), which builds on the board, retags lifetrac-v25:latest
 # and starts web_ui and lora_bridge.
-# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units".
+# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units", rule 1.
 set -e
 mkdir -p /etc/systemd/system/lifetrac-base.service.d
 cat > /etc/systemd/system/lifetrac-base.service.d/timeout.conf <<'EOF'

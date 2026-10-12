@@ -1,9 +1,9 @@
 #!/bin/sh
-# DO NOT RUN on the bench without an explicit radio GO: edits
+# DO NOT RUN on a bench board, not even with a radio GO: edits
 # /opt/lifetrac/video-test/docker-compose.yml in place (keyframe period) and
 # re-creates the tractor-vtest camera, which publishes the frames that image_tx
 # sends from /dev/ttymxc3.
-# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units".
+# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units", rule 6.
 set -eu
 cd /opt/lifetrac/video-test
 grep -nE 'KEYFRAME_PERIOD_S|FPS' docker-compose.yml || true

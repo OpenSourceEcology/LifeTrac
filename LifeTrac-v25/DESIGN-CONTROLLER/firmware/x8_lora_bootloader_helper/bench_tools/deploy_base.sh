@@ -47,8 +47,9 @@
 #
 # RADIO SAFETY: nothing here opens /dev/ttymxc3 (the L072 radio UART) or starts
 # a radio daemon. The board-side script refuses to run while a container maps
-# /dev/ttymxc3 or a lifetrac-base* unit is active, and it never starts
-# lora_bridge (see the comment at the broker step). See DEPLOY.md.
+# /dev/ttymxc3, or while a lifetrac-base* unit is anything but failed or
+# inactive or has a job queued, and it never starts lora_bridge (see the
+# comment at the broker step). See DEPLOY.md.
 set -euo pipefail
 
 BT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -286,13 +287,18 @@ case $st in masked*|"") ;; *) say "WARNING: compose-apps-early-start.service is 
 # systemd runs a unit's ExecStop only after a successful start, so a failed or
 # still-starting unit needs no stop. An ACTIVE unit does, and the ExecStop of
 # lifetrac-base.service is a bare `docker compose down`: it also removes the
-# broker container, which step 4 recreates.
+# broker container, which step 4 recreates. Only failed or inactive passes,
+# and only with no job queued: a deactivating unit is running that ExecStop
+# right now, and early in a boot an enabled unit reads inactive while its
+# start job still waits.
 for u in lifetrac-base.service lifetrac-base-compose.service; do
     en=$(systemctl is-enabled "$u" 2>/dev/null || true)
     ac=$(systemctl is-active "$u" 2>/dev/null || true)
+    job=$(systemctl show -p Job --value "$u" 2>/dev/null || echo unknown)
     case $ac in
-        activating|reloading)
-            die "$u is $ac: its start job is still running. Wait until it has failed, then deploy again. Do not stop it and do not interrupt a build." ;;
+        inactive|failed) ;;
+        activating|reloading|deactivating)
+            die "$u is $ac: a start or stop job is still running. Wait until it has failed or is inactive, then deploy again. Do not stop it and do not interrupt a build." ;;
         active)
             if [ "$u" = lifetrac-base.service ]; then
                 svc="lora_bridge and web_ui"
@@ -302,9 +308,18 @@ for u in lifetrac-base.service lifetrac-base-compose.service; do
                 note="That stop removes only the containers and network of its own compose project, lifetrac-vtest."
             fi
             die "$u is active: its start succeeded, so its compose services were started and may be running ($svc; /dev/ttymxc3 is mapped). Stop those containers by name (docker stop <container>), then 'systemctl stop $u' and deploy again. $note Retire the unit afterwards (BENCH_BOARDS.md)." ;;
+        *)
+            die "$u: 'systemctl is-active' returned '$ac' (expected inactive or failed). Look at the unit by hand before deploying." ;;
+    esac
+    case $job in
+        "") ;;
+        unknown)
+            die "$u: could not read whether systemd has a job queued for it ('systemctl show -p Job --value $u' failed)." ;;
+        *)
+            die "$u reads $ac, but systemd has a job queued for it (job $job): the base is still booting, or the unit has just been started or stopped. Wait until 'systemctl list-jobs' no longer lists it, then deploy again." ;;
     esac
     case $en in
-        enabled*) say "WARNING: $u is $en ($ac). If it ever succeeds at boot it starts compose services that map /dev/ttymxc3, without a GO. Retire it: BENCH_BOARDS.md has the procedure, and 'provision_bench_board.sh base' applies it. A failed or inactive unit is disabled WITHOUT --now and needs no stop." ;;
+        enabled*) say "WARNING: $u is $en ($ac). If it ever succeeds at boot it starts compose services that map /dev/ttymxc3, without a GO. Retire it: BENCH_BOARDS.md has the rules, and 'provision_bench_board.sh base' (with --ssh when the base is not on adb) does the disable and the move. A failed or inactive unit is disabled WITHOUT --now and needs no stop." ;;
     esac
 done
 busy=$(radio_containers)
@@ -416,9 +431,13 @@ if [ "$DO_BROKER" = 1 ]; then
     # NEVER run `docker compose up` without a service name here, and never name
     # lora_bridge (or web_ui / audit_tail, which depend on nothing radio but are
     # not needed by the bench). lora_bridge maps ${LIFETRAC_LORA_DEVICE}, which is
-    # /dev/ttymxc3 on this bench: the L072 radio UART. It would open the port and
-    # drive the radio with a framing the Method-G firmware does not speak. Radio
-    # daemons are started only by the leg scripts, on an explicit GO.
+    # /dev/ttymxc3 on this bench: the L072 radio UART, /dev/ttyACM0 inside the
+    # container. As deployed it is told to open /dev/ttymxc3 there (the single
+    # `$` at docker-compose.yml:54), so it would probably crash-loop; with that
+    # `$` fixed it would drive the L072 with KISS framing at 115200 baud, which
+    # the Method-G firmware does not speak. Never start it either way
+    # (DEPLOY.md). Radio daemons are started only by the leg scripts, on an
+    # explicit GO.
     # --no-deps keeps compose from starting anything mosquitto might depend on.
     # shellcheck disable=SC2086
     docker compose -p "$PROJECT" -f "$DEST/docker-compose.yml" up -d --no-deps $recreate mosquitto

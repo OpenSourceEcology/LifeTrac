@@ -1,7 +1,7 @@
 #!/bin/sh
-# DO NOT RUN on the bench without an explicit radio GO: re-creates the
+# DO NOT RUN on a bench board, not even with a radio GO: re-creates the
 # tractor-vtest image_tx, which opens /dev/ttymxc3 = transmits.
-# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units".
+# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units", rule 6.
 set -eu
 cd /opt/lifetrac/video-test
 docker compose -p tractor-vtest up -d --force-recreate image_tx

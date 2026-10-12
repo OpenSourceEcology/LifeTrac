@@ -8,10 +8,10 @@
 # with LIFETRAC_SKIP_RESET_REQ=0 (a soft RESET_REQ on open, which un-parks the
 # L072) at LIFETRAC_REG_PROFILE 0 (fixed 915 MHz).
 #
-# Retired on the bench base 2026-10-12. Until then it failed at every boot only
-# because its mosquitto wants 127.0.0.1:1883, which the bench broker
-# design-controller-mosquitto-1 holds. Stop that broker with this unit enabled
-# and the next boot starts image_rx on the radio.
+# Retired on the bench base 2026-10-12. At both boots that were captured it
+# failed or hung on its mosquitto, which wants 127.0.0.1:1883: the bench broker
+# design-controller-mosquitto-1 holds it. Stop that broker with this unit
+# enabled and the next boot starts image_rx on the radio.
 #
 # Rules: firmware/x8_lora_bootloader_helper/bench_tools/BENCH_BOARDS.md
 # ("Retired boot units"). Record:

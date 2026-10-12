@@ -69,11 +69,12 @@ radio test.
    and `lifetrac-tractor-compose.service` are May-2026 video-test demo
    units; they would start `image_rx` (base) and `image_tx` (tractor) on
    the radio UART at boot. This kit does not install any of them. On the
-   original pair all three were enabled and failed at every boot, and all
-   three were retired on 2026-10-12
+   original pair all three were enabled and failed at every boot that was
+   captured, and all three were retired on 2026-10-12
    ([BENCH_BOARDS.md](BENCH_BOARDS.md#retired-boot-units-2026-10-12)).
-   `provision_bench_board.sh` enforces that state on a re-provisioned
-   board (step 6).
+   `provision_bench_board.sh` retires them on a re-provisioned board
+   (step 6). It does so only while they are failed or inactive; if one is
+   active or starting, its step fails and changes nothing.
 7. **Radio tests need a GO.** On a shared bench, every round of radio
    tests needs the operator's explicit GO, and both radios are parked
    after it.
@@ -233,8 +234,8 @@ What it applies, and why:
 | camera USB provisioning: runs the repo's [`provision_x8.sh`](../provision_x8.sh) unchanged | tractor | Installs the `snd_usb_audio` blacklist, the C2 udev rules (autosuspend off, `/dev/lifetrac-c2`) and `lifetrac-camera.service`, and adds `fio` to `video`. The script skips this when all three files already match. It refuses when a camera compose app is installed and the C2 is attached, because `provision_x8.sh` would restart the camera, whose container maps the radio UART; pass `--allow-camera-restart` to accept that. |
 | docker running; probe image `hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44` loaded from the repo-root `foundries_python.tar` (image id `9a454afe48f7`) | both | `radio_park.py`, `radio_state.py` and `rs116_health_probe.py` run in it. The tractor cannot pull images, and the base's own `lifetrac-v25` image exists only after step 9. |
 | `eclipse-mosquitto:2` | base: `docker pull`. Tractor: `--mosquitto-from-base` (docker save on the base, then through the PC) or `--mosquitto-tar FILE` | The base broker and the tractor's local broker. The tag moves, so note the image id the script prints. |
+| the old boot units retired: `lifetrac-base.service` and `lifetrac-base-compose.service` on the base, `lifetrac-tractor-compose.service` on the tractor. A unit that is failed or inactive is disabled without `--now`, and its unit file and `<unit>.d` directory are moved to a new `/etc/lifetrac-retired/<PC UTC time>/`. A unit that is already disabled but still has its file in `/etc/systemd/system` is moved the same way. If a unit is active, starting or stopping, or systemd has a job queued for it, the step fails and changes nothing | both | Rule 6. A freshly flashed board has none of them, so this step changes nothing there. On the tractor it runs before the next step, because its `daemon-reload` makes systemd re-read the units. [BENCH_BOARDS.md](BENCH_BOARDS.md#retired-boot-units-2026-10-12) has the details. |
 | `lifetrac-camera.service` and `tractor-camera` stopped | tractor | Keeps the radio UART free (rule 4). Both come back at the next boot. |
-| the old boot units not enabled: `lifetrac-base.service` and `lifetrac-base-compose.service` on the base, `lifetrac-tractor-compose.service` on the tractor. A unit it finds is disabled without `--now` and its file moved aside under `/etc/lifetrac-retired/` | both | Rule 6. A freshly flashed board has none of them, so this step changes nothing there. |
 
 It never opens `/dev/ttymxc3` and never starts the old boot units. It
 reports leftover video-test containers but never removes them: on the
@@ -368,6 +369,10 @@ does the full staging.
   the readback is not `0x80`, run `radio_park.py`.
 - **Base:** if it does not show up on USB, use ssh
   (`provision_bench_board.sh base --ssh --check` works over ssh).
+- **Original pair, at the first power-up after 2026-10-12:** the boot-unit
+  retirement has not been seen across a boot yet. Do the checks in
+  [BENCH_BOARDS.md](BENCH_BOARDS.md#not-yet-observed-the-next-boot) first,
+  before any probe.
 
 ## Troubleshooting
 

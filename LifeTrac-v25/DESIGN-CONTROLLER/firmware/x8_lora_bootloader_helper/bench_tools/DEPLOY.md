@@ -98,11 +98,12 @@ On the PC:
 
 On the base, the script runs as root and:
 1. **refuses** to run if `compose-apps-early-start-recovery.service` is not
-   masked, if a `lifetrac-base*` unit is active or activating, if any running
-   container maps `/dev/ttymxc3`, or if the board looks like the tractor. It
-   warns when a `lifetrac-base*` unit is enabled. On the original base both
-   units are retired since 2026-10-12, so neither check fires there
-   ([Radio safety](#radio-safety)).
+   masked, if a `lifetrac-base*` unit is anything but `failed` or `inactive`
+   (active, activating, deactivating, reloading) or has a systemd job queued
+   (early in a boot), if any running container maps `/dev/ttymxc3`, or if the
+   board looks like the tractor. It warns when a `lifetrac-base*` unit is
+   enabled. On the original base both units are retired since 2026-10-12, so
+   neither check fires there ([Radio safety](#radio-safety)).
 2. saves the old tree as `/home/fio/lifetrac_deploy/prev_tree_<oldsha>_<time>.tgz`,
    deletes `base_station/ firmware/ deploy/` (skip with `--no-clean`; stale files
    would otherwise end up in the image), and extracts the new tree.
@@ -260,7 +261,13 @@ file the script saved and update the header.
 - **A bare `docker compose down`** in `BASE_DEPLOY_DIR` removes the bench
   broker container `design-controller-mosquitto-1` (compose project
   `design-controller`; its volume survives). Never run it on a bench base.
-  If it happened, `deploy_base.sh` recreates the broker.
+  If it happened, `deploy_base.sh` recreates the broker. To recreate the
+  broker alone, without deploying a tree, run its broker line as root in
+  `BASE_DEPLOY_DIR`:
+  `docker compose -p design-controller -f docker-compose.yml up -d --no-deps mosquitto`.
+- **`docker-compose.video-test.yml` is shipped too** (the archive takes
+  `docker-compose*.yml`), and it is armed: see
+  [Radio safety](#radio-safety). Never bring it up on the bench.
 - **A moved `:latest` does not restart anything.** A container already running
   the old image keeps it until it is recreated.
 - **`/tmp` is a RAM tmpfs** on both boards, aged at 5 days and emptied at
@@ -301,10 +308,11 @@ file the script saved and update the header.
 - **Three boot units are retired on the bench and must stay retired:**
   `lifetrac-base.service` and `lifetrac-base-compose.service` on the base,
   and `lifetrac-tractor-compose.service` on the tractor. All three were
-  enabled and failed at every boot (captures
+  enabled and failed at every boot that was captured (captures
   [`board_state_2026-10-04/base/10_systemd.txt`](../../../bench-evidence/board_state_2026-10-04/base/10_systemd.txt)
   and
-  [`board_state_2026-10-10/tractor/10_systemd.txt`](../../../bench-evidence/board_state_2026-10-10/tractor/10_systemd.txt)).
+  [`board_state_2026-10-10/tractor/10_systemd.txt`](../../../bench-evidence/board_state_2026-10-10/tractor/10_systemd.txt),
+  and the journals of the 10-10 boot in the record below).
   Each failure was the only thing keeping a radio daemon from starting at
   boot without a GO, so the units were not repaired. On 2026-10-12, with the
   operator's approval, they were disabled and their files moved to
@@ -329,19 +337,13 @@ file the script saved and update the header.
     work either: the real unit files sit in `/etc/systemd/system`, where
     `mask` wants to put its symlink ("File exists"). Disable, then move the
     files out.
-  - **Stop rule.** systemd runs `ExecStop` only if the start succeeded, so
-    the unit's state decides:
-    - `failed` or `inactive`: `systemctl disable` without `--now`;
-    - `activating`: wait for it to fail; do not interrupt the build;
-    - `active`: radio daemons may be up. Stop them: `docker stop` the
-      `lora_bridge` / `web_ui` / `image_rx` containers by name, or stop the
-      unit and accept that the broker container is removed, then recreate it
-      with `deploy_base.sh` (`--no-build` skips the image build).
-
-    The reason is `lifetrac-base.service`'s `ExecStop`: a bare
-    `docker compose down` in `BASE_DEPLOY_DIR`, which is compose project
-    `design-controller`. It removes `design-controller-mosquitto-1`; the
-    broker's volume survives.
+  - **Stop rule.** systemd runs `ExecStop` only if the start succeeded, and
+    `lifetrac-base.service`'s `ExecStop` is a bare `docker compose down` in
+    `BASE_DEPLOY_DIR`, which removes the bench broker container. So what to
+    do depends on the unit's state. The rule, with the one route for an
+    `active` unit (stop its radio containers by name, then stop the unit,
+    then retire it), is rule 3 in
+    [BENCH_BOARDS.md](BENCH_BOARDS.md#rules); it is kept there only.
   - **Order on the tractor.** Never remove the old `tractor-*-v2` containers,
     and never "fix" the unit's `-p`, while the unit is enabled. The name
     clash with those containers was the only barrier, and without it the
@@ -350,11 +352,29 @@ file the script saved and update the header.
     which disarms the May scripts that run `docker compose up` in that
     folder; do not rename it back.
 
-  `deploy_base.sh` warns while a `lifetrac-base*` unit is enabled and refuses
-  to run while one is active or activating. It never installs, enables or
-  starts them, and the bench kit does not install the unit files in
-  `deploy/`. `provision_bench_board.sh` disables and moves aside any of the
-  three it finds; it reports leftover containers and never removes them.
+  `deploy_base.sh` warns while a `lifetrac-base*` unit is enabled. It refuses
+  to run while one is anything but `failed` or `inactive`, or has a systemd
+  job queued. It never installs, enables or starts them, and the bench kit
+  does not install the unit files in `deploy/`.
+  `provision_bench_board.sh` retires the units of the board's role while
+  they are `failed` or `inactive`: `systemctl disable` without `--now`, then
+  the unit files and `.d` directories moved to
+  `/etc/lifetrac-retired/<PC UTC time>/`. A unit that is already disabled
+  but still has its file in `/etc/systemd/system` is moved the same way. If
+  a unit is active, starting or stopping, or has a job queued, that step
+  fails and changes nothing. It reports leftover containers and never
+  removes them.
+- **The base's video-test compose file is still armed.**
+  `docker-compose.video-test.yml` is in the deployed tree, and every deploy
+  ships it again. Its `image_rx` maps `/dev/ttymxc3`, sends a soft RESET_REQ
+  that un-parks the L072, and has `restart: unless-stopped`, so after one
+  successful `up` it comes back at every boot until the container is
+  removed. The only thing that makes a manual `up` of it fail is the bench
+  broker holding `127.0.0.1:1883`. While that broker is stopped (Step 3 to
+  Step 8 of [RS13_2_DESK_CHECK.md](RS13_2_DESK_CHECK.md), or after a base
+  reboot in between), nothing stops it. Never bring it up on the bench;
+  rule 7 in [BENCH_BOARDS.md](BENCH_BOARDS.md#rules) lists the repo-root May
+  scripts that do.
 - On the tractor, `lifetrac-camera.service` (started by udev at boot) runs
   `lifetrac-tractor-x8:latest` with `/dev/ttymxc3` mapped as its M7 port. Loading
   a new `:latest` does not start it. The next time it starts, it runs the new

@@ -1371,7 +1371,8 @@ No-regrets work, correct under every surviving architecture (do first):
   2026-07-29 with the ERP + FHSS-seed fixes).
 
 - [x] **RS-5.10 Failing boot units on the bench boards — RETIRED 2026-10-12
-  (operator decision).** Three units were enabled and failed at every boot:
+  (operator decision).** Three units were enabled and failed at every boot
+  that was captured (base: 10-04 and 10-10; tractor: 10-10):
   `lifetrac-base.service` (with its 1800 s drop-in) and
   `lifetrac-base-compose.service` on the base, and
   `lifetrac-tractor-compose.service` on the tractor. Each failed for an
@@ -1383,7 +1384,7 @@ No-regrets work, correct under every surviving architecture (do first):
   board was rebooted, so the next boot is not yet observed. Record:
   [`bench-evidence/board_state_2026-10-12_unit_retirement/README.md`](bench-evidence/board_state_2026-10-12_unit_retirement/README.md);
   rules: [BENCH_BOARDS.md](firmware/x8_lora_bootloader_helper/bench_tools/BENCH_BOARDS.md),
-  "Retired boot units". Follow-ups RS-5.11 – RS-5.17; none needs a radio GO.
+  "Retired boot units". Follow-ups RS-5.11 – RS-5.19; none needs a radio GO.
 - [ ] **RS-5.11 Redesign the production base unit before it is installed
   anywhere** —
   [`base_station/systemd/lifetrac-base.service`](base_station/systemd/lifetrac-base.service)
@@ -1416,15 +1417,17 @@ No-regrets work, correct under every surviving architecture (do first):
 - [ ] **RS-5.14 Tractor: 335 anonymous docker volumes** — counted in the 10-12
   preflight. Probably leftovers of repeated mosquitto `docker run`s (cause
   unverified). Cleanup candidate; deleting them needs the operator's OK.
-- [ ] **RS-5.15 Delete or archive the May one-off scripts** — 19 scripts in the
+- [ ] **RS-5.15 Delete or archive the May one-off scripts** — 24 scripts in the
   repo root and
   `firmware/x8_lora_bootloader_helper/tractor_restart_video_test.sh` install
-  these units or start a radio daemon. Each now opens with a "DO NOT RUN on
-  the bench without an explicit radio GO" comment. Remove them once no doc
-  points at them. Not labelled: the build-only one-offs (`base_build_bg.sh`,
-  `tmp_base_build.sh`, `tmp_base_prune_build.sh`, `_bench_build3.ps1`,
-  `_bench_build4.ps1`), which would retag `lifetrac-v25:latest` on the base;
-  `tmp_base_prune_build.sh` also runs `docker image prune -af`.
+  these units, start a radio daemon, remove the bench broker, or (the five
+  build one-offs `base_build_bg.sh`, `tmp_base_build.sh`,
+  `tmp_base_prune_build.sh`, `_bench_build3.ps1`, `_bench_build4.ps1`) build
+  on the base and move `lifetrac-v25:latest` off the flown image. Each now
+  opens with a "DO NOT RUN on a bench board" (or "bench base") comment that
+  names its rule in BENCH_BOARDS.md, "Retired boot units" (rules 1, 4, 6, 7
+  and 8). Delete or archive them, and in the same change reduce those rules
+  to a list of the removed names.
 - [ ] **RS-5.16 `firmware/tractor_x8/systemd/*.service` are installed on
   neither bench board** — four April sketches (camera, logger, params, time;
   `a90ae759`, 2026-04-27). They run host `python3` from
@@ -1436,8 +1439,31 @@ No-regrets work, correct under every surviving architecture (do first):
   Mark them obsolete or delete them; `SETTINGS_REFERENCE.md:588-590` lists
   them as `live`.
 - [ ] **RS-5.17 Runbooks still assume `lifetrac-base` is installed** —
-  `HIL_RUNBOOK.md:45`, `:815` and `FIRMWARE_UPDATES.md:50` tell the reader to
-  watch `journalctl -u lifetrac-base`. Rewrite them when RS-5.11 lands.
+  `HIL_RUNBOOK.md:45`, `:815`, `hil/_common.ps1:100` and
+  `FIRMWARE_UPDATES.md:50` tell the reader to watch
+  `journalctl -u lifetrac-base`. Rewrite them when RS-5.11 lands.
+- [ ] **RS-5.18 Disarm the base's video-test compose file (needs the
+  operator's OK)** — `docker-compose.video-test.yml` is still in the base's
+  deployed tree, and `deploy_base.sh` ships it again with every deploy
+  (`docker-compose*.yml`, plus `deploy/` with the retired unit files). A
+  manual `up` of it starts `image_rx` on `/dev/ttymxc3` with
+  `restart: unless-stopped`; only the bench broker on `127.0.0.1:1883`
+  blocks it, and RS13_2_DESK_CHECK Step 3 stops that broker. Proposed:
+  `deploy_base.sh` ships only `docker-compose.yml` and no `deploy/`, and
+  the copy on the base is renamed `…RETIRED-<date>`, as on the tractor.
+  Until then: BENCH_BOARDS.md "Retired boot units", rule 7.
+- [ ] **RS-5.19 First run of the 10-12 guards on the real boards** — the
+  retire step of `provision_bench_board.sh` and the unit guard of
+  `deploy_base.sh` were tested only against a fake board. Two of their
+  queries have never run on the boards' systemd 250: the `is-enabled` words
+  after a `disable`, and `systemctl show -p Job --value <unit>`, which must
+  print an empty line and return 0 when no job is queued, also for a unit
+  that is not installed. Both fail closed: if the job query answers
+  differently, the retire step changes nothing and `deploy_base.sh` refuses
+  to deploy. So check first, read-only, on each board:
+  `systemctl show -p Job --value lifetrac-base.service; echo "rc=$?"`, then
+  `provision_bench_board.sh <role> --check` (on the retired pair the item
+  must read `ok` with no info line; `--check` does not run the job query).
 
 ### RS-6 — Keyframe elimination (K-phases, now LoRa-only)
 

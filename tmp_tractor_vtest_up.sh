@@ -1,8 +1,8 @@
 #!/bin/sh
-# DO NOT RUN on the bench without an explicit radio GO: stops the
+# DO NOT RUN on a bench board, not even with a radio GO: stops the
 # lifetrac-camera compose services, then starts the tractor-vtest stack, whose
 # image_tx opens /dev/ttymxc3 = transmits.
-# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units".
+# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units", rule 6.
 set -eu
 cd /opt/lifetrac/compose-apps/lifetrac-camera
 echo '--- BEFORE ---'
