@@ -1,0 +1,159 @@
+## uptime
+ 20:17:41 up 10:26,  1 user,  load average: 0.05, 0.03, 0.00
+6a71475f-47a3-45fc-8d5a-aefd357bfb2f
+  0 6a71475f47a345fc8d5aaefd357bfb2f Thu 2022-04-28 17:42:26 UTC—Mon 2026-09-21 20:17:41 UTC
+## status lifetrac-tractor-compose.service
+x lifetrac-tractor-compose.service - LifeTrac tractor video stack (tractor-vtest compose project)
+     Loaded: loaded (/etc/systemd/system/lifetrac-tractor-compose.service; enabled; vendor preset: disabled)
+     Active: failed (Result: exit-code) since Mon 2026-09-21 09:51:57 UTC; 10h ago
+    Process: 1450 ExecStart=/usr/bin/docker compose -p tractor-vtest up -d (code=exited, status=1/FAILURE)
+   Main PID: 1450 (code=exited, status=1/FAILURE)
+
+Sep 21 09:51:57 portenta-x8-2e2c1209dabc240b systemd[1]: Starting LifeTrac tractor video stack (tractor-vtest compose project)...
+Sep 21 09:51:57 portenta-x8-2e2c1209dabc240b docker[1495]: Container tractor-mosquitto-v2  Creating
+Sep 21 09:51:57 portenta-x8-2e2c1209dabc240b docker[1495]: Error response from daemon: Conflict. The container name "/tractor-mosquitto-v2" is already in use by container "f3fa26b00073dc5da8efbdefece9b63fe15840bde1066d00e7eb6f4c7a9281e6". You have to remove (or rename) that container to be able to reuse that name.
+Sep 21 09:51:57 portenta-x8-2e2c1209dabc240b systemd[1]: lifetrac-tractor-compose.service: Main process exited, code=exited, status=1/FAILURE
+Sep 21 09:51:57 portenta-x8-2e2c1209dabc240b systemd[1]: lifetrac-tractor-compose.service: Failed with result 'exit-code'.
+Sep 21 09:51:57 portenta-x8-2e2c1209dabc240b systemd[1]: Failed to start LifeTrac tractor video stack (tractor-vtest compose project).
+## journal -b lifetrac-tractor-compose.service
+2026-09-21T09:51:57+0000 portenta-x8-2e2c1209dabc240b systemd[1]: Starting LifeTrac tractor video stack (tractor-vtest compose project)...
+2026-09-21T09:51:57+0000 portenta-x8-2e2c1209dabc240b docker[1495]: Container tractor-mosquitto-v2  Creating
+2026-09-21T09:51:57+0000 portenta-x8-2e2c1209dabc240b docker[1495]: Error response from daemon: Conflict. The container name "/tractor-mosquitto-v2" is already in use by container "f3fa26b00073dc5da8efbdefece9b63fe15840bde1066d00e7eb6f4c7a9281e6". You have to remove (or rename) that container to be able to reuse that name.
+2026-09-21T09:51:57+0000 portenta-x8-2e2c1209dabc240b systemd[1]: lifetrac-tractor-compose.service: Main process exited, code=exited, status=1/FAILURE
+2026-09-21T09:51:57+0000 portenta-x8-2e2c1209dabc240b systemd[1]: lifetrac-tractor-compose.service: Failed with result 'exit-code'.
+2026-09-21T09:51:57+0000 portenta-x8-2e2c1209dabc240b systemd[1]: Failed to start LifeTrac tractor video stack (tractor-vtest compose project).
+## show lifetrac-tractor-compose.service
+Result=exit-code
+ExecMainStartTimestamp=Mon 2026-09-21 09:51:57 UTC
+ExecMainExitTimestamp=Mon 2026-09-21 09:51:57 UTC
+ExecMainStatus=1
+## status lifetrac-camera.service
+* lifetrac-camera.service - LifeTrac C2 camera service
+     Loaded: loaded (/etc/systemd/system/lifetrac-camera.service; disabled; vendor preset: disabled)
+     Active: inactive (dead) since Mon 2026-09-21 09:51:50 UTC; 10h ago
+    Process: 645 ExecStart=/bin/sh -lc if [ -f "$LIFETRAC_CAMERA_COMPOSE" ] && command -v docker >/dev/null 2>&1; then exec docker compose -f "$LIFETRAC_CAMERA_COMPOSE" up --remove-orphans; fi; echo "lifetrac-camera: compose app not installed; holding C2 device sentinel"; while [ -e /dev/lifetrac-c2 ]; do sleep 5; done; exit 1 (code=killed, signal=TERM)
+   Main PID: 645 (code=killed, signal=TERM)
+
+Sep 21 09:51:38 portenta-x8-2e2c1209dabc240b systemd[1]: Started LifeTrac C2 camera service.
+Sep 21 09:51:50 portenta-x8-2e2c1209dabc240b systemd[1]: Stopping LifeTrac C2 camera service...
+Sep 21 09:51:50 portenta-x8-2e2c1209dabc240b systemd[1]: lifetrac-camera.service: Deactivated successfully.
+Sep 21 09:51:50 portenta-x8-2e2c1209dabc240b systemd[1]: Stopped LifeTrac C2 camera service.
+## journal -b lifetrac-camera.service
+2026-09-21T09:51:38+0000 portenta-x8-2e2c1209dabc240b systemd[1]: Started LifeTrac C2 camera service.
+2026-09-21T09:51:50+0000 portenta-x8-2e2c1209dabc240b systemd[1]: Stopping LifeTrac C2 camera service...
+2026-09-21T09:51:50+0000 portenta-x8-2e2c1209dabc240b systemd[1]: lifetrac-camera.service: Deactivated successfully.
+2026-09-21T09:51:50+0000 portenta-x8-2e2c1209dabc240b systemd[1]: Stopped LifeTrac C2 camera service.
+## show lifetrac-camera.service
+Result=success
+ExecMainStartTimestamp=Mon 2026-09-21 09:51:38 UTC
+ExecMainExitTimestamp=Mon 2026-09-21 09:51:50 UTC
+ExecMainStatus=15
+## workdir
+/opt/lifetrac/:
+total 20
+drwxr-xr-x 5 root root 4096 May 27 18:22 .
+drwxr-xr-x 4 root root 4096 May 26 15:34 ..
+drwxr-xr-x 2 root root 4096 May 27 18:25 bin
+drwxr-xr-x 3 root root 4096 May 26 15:34 compose-apps
+drwxr-xr-x 4 fio  fio  4096 May 30 15:24 video-test
+
+/opt/lifetrac/video-test/:
+total 48
+drwxr-xr-x 4 fio  fio  4096 May 30 15:24 .
+drwxr-xr-x 5 root root 4096 May 27 18:22 ..
+-rw-rw-rw- 1 fio  fio  5177 May 30 16:23 docker-compose.yml
+-rw-r--r-- 1 root root 5002 May 27 18:26 docker-compose.yml.bak-1779906398
+-rw-r--r-- 1 root root 5146 May 30 15:23 docker-compose.yml.bak_
+-rw-r--r-- 1 root root 5111 May 27 20:20 docker-compose.yml.bak_20260527_152255
+drwxr-xr-x 2 fio  fio  4096 May 27 00:12 mosquitto
+drwxr-xr-x 2 fio  fio  4096 May 29 23:53 src
+## compose services (video-test)
+mosquitto
+camera
+image_tx
+## vtest config
+    container_name: tractor-camera-v2
+    - /dev/video1:/dev/video1
+      LIFETRAC_CAMERA_DESHAKE: "0"
+      LIFETRAC_CAMERA_DEVICE: /dev/video1
+      LIFETRAC_CAMERA_FPS: "1.0"
+      LIFETRAC_CAMERA_SOURCE: v4l2
+      LIFETRAC_ENCODE_MODE: "1"
+      LIFETRAC_FRAGMENT_BUDGET: "12"
+      LIFETRAC_FRAGMENT_PROFILE: image
+      LIFETRAC_GRID_H: "4"
+      LIFETRAC_GRID_W: "6"
+      LIFETRAC_KEYFRAME_PERIOD_S: "30"
+      LIFETRAC_MQTT_HOST: mosquitto
+      LIFETRAC_MQTT_PORT: "1883"
+      LIFETRAC_TILE_PX: "32"
+      LIFETRAC_USE_LORA_BRIDGE: "1"
+      LIFETRAC_V4L2_INPUT_FORMAT: mjpeg
+      LIFETRAC_V4L2_INPUT_FPS: "5"
+      LIFETRAC_V4L2_INPUT_SIZE: 640x480
+      LIFETRAC_WEBP_QUALITY: "30"
+    image: lifetrac-tractor-x8:latest
+    restart: unless-stopped
+    container_name: tractor-image-tx-v2
+    - /dev/ttymxc3:/dev/ttymxc3
+      LIFETRAC_IMAGE_TX_LOG_LEVEL: INFO
+      LIFETRAC_IMAGE_TX_QUEUE_DEPTH: "4"
+      LIFETRAC_L072_BAUD: "921600"
+      LIFETRAC_L072_UART: /dev/ttymxc3
+      LIFETRAC_LORA_INTER_CYCLE_S: "0.15"
+      LIFETRAC_MQTT_HOST: mosquitto
+      LIFETRAC_MQTT_PORT: "1883"
+      LIFETRAC_REG_PROFILE: "0"
+    image: lifetrac-tractor-x8:latest
+    restart: unless-stopped
+    container_name: tractor-mosquitto-v2
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+## camera compose app
+    container_name: tractor-camera
+    - /dev/video1:/dev/video1
+    - /dev/ttymxc3:/dev/ttymxc3
+      LIFETRAC_CAMERA_DEVICE: /dev/video1
+      LIFETRAC_M7_UART: /dev/ttymxc3
+    image: lifetrac-tractor-x8:latest
+    restart: unless-stopped
+    container_name: tractor-mosquitto
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+## docker ps -a
+camera_svc	lifetrac-tractor-x8:latest	Exited (137) 12 hours ago
+tx_smoke	hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44	Exited (137) 12 hours ago
+bench_mqtt	eclipse-mosquitto:2	Exited (0) 10 hours ago
+tractor-camera	9bfbbc8d06cb	Exited (137) 2 weeks ago
+tractor-camera-v2	9bfbbc8d06cb	Exited (137) 8 weeks ago
+tractor-image-tx-v2	9bfbbc8d06cb	Exited (0) 3 months ago
+tractor-mosquitto-v2	eclipse-mosquitto:2	Exited (0) 8 weeks ago
+tractor-mosquitto	eclipse-mosquitto:2	Exited (0) 2 weeks ago
+lifetrac-camera-x8	hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44	Exited (127) 3 months ago
+x8-devel	hub.foundries.io/arduino/arduino-ootb-python-devel	Up 10 hours
+x8-provisioning	hub.foundries.io/arduino/arduino-iot-cloud-provisioning	Up 10 hours
+x8-webapp	hub.foundries.io/arduino/arduino-ootb-webapp	Up 10 hours
+## docker compose ls
+NAME                STATUS              CONFIG FILES
+arduino-ootb        running(3)          /var/sota/compose-apps/arduino-ootb/docker-compose.yml
+lifetrac-camera     exited(2)           /var/rootdirs/opt/lifetrac/compose-apps/lifetrac-camera/docker-compose.yml,/opt/lifetrac/compose-apps/lifetrac-camera/docker-compose.yml
+video-test          exited(3)           /opt/lifetrac/video-test/docker-compose.yml
+## images
+lifetrac-tractor-x8:latest 2727dfd36f9f Less than a second ago
+lifetrac-tractor-x8:rs13-65869517 2727dfd36f9f Less than a second ago
+lifetrac-tractor-x8:pre-rs13 9bfbbc8d06cb 3 months ago
+python:3.11-slim-bookworm d9c8998514b4 4 months ago
+eclipse-mosquitto:2 2a23a3e427e4 5 months ago
+hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44 9a454afe48f7 3 years ago
+hub.foundries.io/arduino/arduino-ootb-webapp:3a66e0c 76db100d08e4 3 years ago
+hub.foundries.io/arduino/arduino-iot-cloud-provisioning:6cdb56d 6ee1d6b69ba3 3 years ago
+## ttymxc3 holders
+## failed
+  UNIT                             LOAD   ACTIVE SUB    DESCRIPTION
+* lifetrac-tractor-compose.service loaded failed failed LifeTrac tractor video stack (tractor-vtest compose project)
+* psplash-start.service            loaded failed failed Start psplash boot splash screen
+
+LOAD   = Reflects whether the unit definition was properly loaded.
+ACTIVE = The high-level unit activation state, i.e. generalization of SUB.
+SUB    = The low-level unit activation state, values depend on unit type.
+2 loaded units listed.

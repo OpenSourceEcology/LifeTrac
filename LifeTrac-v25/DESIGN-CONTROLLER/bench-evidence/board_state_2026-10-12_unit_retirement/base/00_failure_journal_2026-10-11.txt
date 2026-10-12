@@ -1,0 +1,265 @@
+## uptime
+ 03:24:01 up 10:25,  1 user,  load average: 0.17, 0.33, 0.29
+95ac984e-8ba7-4713-ba7f-c339094e29f2
+## journald storage
+[Journal]
+  0 95ac984e8ba74713ba7fc339094e29f2 Thu 2022-04-28 17:42:26 UTC—Sun 2026-10-11 03:24:01 UTC
+## status lifetrac-base.service
+× lifetrac-base.service - LifeTrac v25 base station (compose stack)
+     Loaded: loaded (/etc/systemd/system/lifetrac-base.service; enabled; vendor preset: disabled)
+    Drop-In: /etc/systemd/system/lifetrac-base.service.d
+             └─timeout.conf
+     Active: failed (Result: exit-code) since Sat 2026-10-10 16:59:04 UTC; 10h ago
+    Process: 1104 ExecStart=/usr/bin/docker compose up -d --build --remove-orphans (code=exited, status=17)
+   Main PID: 1104 (code=exited, status=17)
+
+Oct 10 16:59:04 portenta-x8-2d0a1209dabc240b docker[1134]: ------
+Oct 10 16:59:04 portenta-x8-2d0a1209dabc240b docker[1134]:  > [audit_tail] exporting to image:
+Oct 10 16:59:04 portenta-x8-2d0a1209dabc240b docker[1134]: ------
+Oct 10 16:59:04 portenta-x8-2d0a1209dabc240b docker[1134]: ------
+Oct 10 16:59:04 portenta-x8-2d0a1209dabc240b docker[1134]:  > [web_ui] exporting to image:
+Oct 10 16:59:04 portenta-x8-2d0a1209dabc240b docker[1134]: ------
+Oct 10 16:59:04 portenta-x8-2d0a1209dabc240b docker[1134]: failed to solve: layer does not exist
+Oct 10 16:59:04 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base.service: Main process exited, code=exited, status=17/n/a
+Oct 10 16:59:04 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base.service: Failed with result 'exit-code'.
+Oct 10 16:59:04 portenta-x8-2d0a1209dabc240b systemd[1]: Failed to start LifeTrac v25 base station (compose stack).
+## journal -b lifetrac-base.service
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #3 [web_ui internal] load metadata for docker.io/library/python:3.11-slim
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #3 DONE 0.0s
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #7 [lora_bridge internal] load build context
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #7 transferring context: 92.11kB 0.4s done
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #7 DONE 0.4s
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #10 [lora_bridge 5/7] RUN pip install --no-cache-dir -r /app/base_station/requirements.txt
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #10 CACHED
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #11 [lora_bridge 6/7] COPY base_station/  /app/base_station/
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #11 CACHED
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #12 [lora_bridge 3/7] WORKDIR /app
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #12 CACHED
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #13 [lora_bridge 4/7] COPY base_station/requirements.txt /app/base_station/requirements.txt
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #13 CACHED
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #14 [lora_bridge 2/7] RUN apt-get update && apt-get install -y --no-install-recommends         mosquitto-clients         ca-certificates         libusb-1.0-0     && rm -rf /var/lib/apt/lists/*
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #14 CACHED
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #15 [lora_bridge 7/7] COPY firmware/      /app/firmware/
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #15 CACHED
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #16 [audit_tail internal] load build context
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #16 transferring context: 92.11kB 0.4s done
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #16 DONE 0.5s
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #17 [audit_tail] exporting to image
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #17 exporting layers
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #17 ...
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #18 [web_ui internal] load build context
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #18 transferring context: 92.11kB 0.3s done
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #18 DONE 0.4s
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #12 [web_ui 3/7] WORKDIR /app
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #12 CACHED
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #19 [web_ui 4/7] COPY base_station/requirements.txt /app/base_station/requirements.txt
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #19 CACHED
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #20 [web_ui 5/7] RUN pip install --no-cache-dir -r /app/base_station/requirements.txt
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #20 CACHED
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #21 [web_ui 6/7] COPY base_station/  /app/base_station/
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #21 CACHED
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #14 [web_ui 2/7] RUN apt-get update && apt-get install -y --no-install-recommends         mosquitto-clients         ca-certificates         libusb-1.0-0     && rm -rf /var/lib/apt/lists/*
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #14 CACHED
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #22 [web_ui 7/7] COPY firmware/      /app/firmware/
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #22 CACHED
+2026-10-10T16:55:00+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #23 [web_ui] exporting to image
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #23 exporting layers 243.4s done
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #23 ERROR: layer does not exist
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #24 [lora_bridge] exporting to image
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #24 exporting layers 243.5s done
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #24 ERROR: layer does not exist
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #17 [audit_tail] exporting to image
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #17 exporting layers 243.5s done
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: #17 ERROR: layer does not exist
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: ------
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]:  > [lora_bridge] exporting to image:
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: ------
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: ------
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]:  > [audit_tail] exporting to image:
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: ------
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: ------
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]:  > [web_ui] exporting to image:
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: ------
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b docker[1134]: failed to solve: layer does not exist
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base.service: Main process exited, code=exited, status=17/n/a
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base.service: Failed with result 'exit-code'.
+2026-10-10T16:59:04+0000 portenta-x8-2d0a1209dabc240b systemd[1]: Failed to start LifeTrac v25 base station (compose stack).
+## show lifetrac-base.service
+Result=exit-code
+ExecMainStartTimestamp=Sat 2026-10-10 16:54:58 UTC
+ExecMainExitTimestamp=Sat 2026-10-10 16:59:04 UTC
+ExecMainStatus=17
+ActiveEnterTimestamp=
+InactiveEnterTimestamp=Sat 2026-10-10 16:59:04 UTC
+## status lifetrac-base-compose.service
+× lifetrac-base-compose.service - LifeTrac base-station video stack (lifetrac-vtest compose project)
+     Loaded: loaded (/etc/systemd/system/lifetrac-base-compose.service; enabled; vendor preset: disabled)
+     Active: failed (Result: timeout) since Sat 2026-10-10 17:03:27 UTC; 10h ago
+    Process: 1103 ExecStart=/usr/bin/docker compose -p lifetrac-vtest -f docker-compose.video-test.yml up -d (code=killed, signal=KILL)
+   Main PID: 1103 (code=killed, signal=KILL)
+
+Oct 10 17:03:27 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1103 (docker) with signal SIGKILL.
+Oct 10 17:03:27 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1129 (docker-compose) with signal SIGKILL.
+Oct 10 17:03:27 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1132 (docker) with signal SIGKILL.
+Oct 10 17:03:27 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1138 (docker-compose) with signal SIGKILL.
+Oct 10 17:03:27 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1140 (n/a) with signal SIGKILL.
+Oct 10 17:03:27 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1149 (docker-compose) with signal SIGKILL.
+Oct 10 17:03:27 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Main process exited, code=killed, status=9/KILL
+Oct 10 17:03:27 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1149 (docker-compose) with signal SIGKILL.
+Oct 10 17:03:27 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Failed with result 'timeout'.
+Oct 10 17:03:27 portenta-x8-2d0a1209dabc240b systemd[1]: Failed to start LifeTrac base-station video stack (lifetrac-vtest compose project).
+## journal -b lifetrac-base-compose.service
+2026-10-10T16:54:58+0000 portenta-x8-2d0a1209dabc240b systemd[1]: Starting LifeTrac base-station video stack (lifetrac-vtest compose project)...
+2026-10-10T16:54:59+0000 portenta-x8-2d0a1209dabc240b docker[1129]:  Container lifetrac-vtest-mosquitto-1  Starting
+2026-10-10T17:01:57+0000 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: start operation timed out. Terminating.
+2026-10-10T17:03:27+0000 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: State 'stop-sigterm' timed out. Killing.
+2026-10-10T17:03:27+0000 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1103 (docker) with signal SIGKILL.
+2026-10-10T17:03:27+0000 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1129 (docker-compose) with signal SIGKILL.
+2026-10-10T17:03:27+0000 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1132 (docker) with signal SIGKILL.
+2026-10-10T17:03:27+0000 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1138 (docker-compose) with signal SIGKILL.
+2026-10-10T17:03:27+0000 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1140 (n/a) with signal SIGKILL.
+2026-10-10T17:03:27+0000 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1149 (docker-compose) with signal SIGKILL.
+2026-10-10T17:03:27+0000 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Main process exited, code=killed, status=9/KILL
+2026-10-10T17:03:27+0000 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Killing process 1149 (docker-compose) with signal SIGKILL.
+2026-10-10T17:03:27+0000 portenta-x8-2d0a1209dabc240b systemd[1]: lifetrac-base-compose.service: Failed with result 'timeout'.
+2026-10-10T17:03:27+0000 portenta-x8-2d0a1209dabc240b systemd[1]: Failed to start LifeTrac base-station video stack (lifetrac-vtest compose project).
+## show lifetrac-base-compose.service
+Result=timeout
+ExecMainStartTimestamp=Sat 2026-10-10 16:54:58 UTC
+ExecMainExitTimestamp=Sat 2026-10-10 17:03:27 UTC
+ExecMainStatus=9
+ActiveEnterTimestamp=
+InactiveEnterTimestamp=Sat 2026-10-10 17:03:27 UTC
+## workdir
+total 808
+drwxrwxrwx   12 fio  fio    4096 Sep 15 22:28 .
+drwxr-xr-x    3 fio  fio    4096 May 26 14:53 ..
+-rw-rw-rw-    1 fio  fio      78 May 26 14:53 .env
+-rw-rw-rw-    1 fio  fio     119 Apr 28 20:40 .env.example
+-rw-rw-rw-    1 fio  fio     104 Apr 30 11:25 .gitignore
+-rw-rw-rw-    1 fio  fio   14309 May  6 03:56 ARCHITECTURE.md
+-rw-rw-rw-    1 fio  fio    5866 May  6 03:56 ARDUINO_CI.md
+-rw-rw-rw-    1 fio  fio   26208 Apr 28 20:40 BASE_STATION.md
+-rw-rw-rw-    1 fio  fio   15158 May  6 03:56 BUILD_CONFIG.md
+-rw-rw-rw-    1 fio  fio    4806 Apr 28 20:40 CALIBRATION.md
+-rw-rw-rw-    1 fio  fio   14056 Apr 30 11:25 CAPABILITY_INVENTORY.md
+-rw-rw-rw-    1 fio  fio    5702 Apr 28 20:40 CORAL.md
+-rw-rw-rw-    1 fio  fio   10687 Apr 30 11:25 CYBERSECURITY_CASE.md
+-rw-rw-rw-    1 fio  fio   19822 Apr 30 11:25 DECISIONS.md
+-rw-r--r--    1 root root     41 Sep 15 22:28 DEPLOYED_FROM.txt
+drwxrwxrwx    4 fio  fio    4096 May 26 14:53 DESIGN-LORAFIRMWARE
+-rw-rw-r--    1 root root   1551 Sep 15 22:28 Dockerfile
+-rw-rw-rw-    1 fio  fio    5368 Apr 28 20:40 FIELD_SERVICE.md
+-rw-rw-rw-    1 fio  fio    6688 Apr 28 20:40 FIRMWARE_UPDATES.md
+-rw-rw-rw-    1 fio  fio   11378 Apr 27 03:41 HANDHELD_REMOTE.md
+-rw-rw-rw-    1 fio  fio   30137 Apr 30 11:25 HARDWARE_BOM.md
+-rw-rw-rw-    1 fio  fio   38739 May  4 22:40 HIL_RUNBOOK.md
+-rw-rw-rw-    1 fio  fio   31326 Apr 28 20:40 IMAGE_PIPELINE.md
+-rw-rw-rw-    1 fio  fio    6698 May 25 19:01 IMAGE_PIPELINE_METHODS.md
+-rw-rw-rw-    1 fio  fio    4985 Apr 28 20:40 KEY_ROTATION.md
+-rw-rw-rw-    1 fio  fio   27856 May  8 20:38 LORA_IMPLEMENTATION.md
+-rw-rw-rw-    1 fio  fio   45228 May 26 03:56 LORA_PROTOCOL.md
+-rw-rw-rw-    1 fio  fio   54725 May 19 02:09 MASTER_PLAN.md
+-rw-rw-rw-    1 fio  fio    5196 Apr 28 20:40 NON_ARDUINO_BOM.md
+-rw-rw-rw-    1 fio  fio    5572 Apr 28 20:40 OPERATIONS_MANUAL.md
+-rw-rw-rw-    1 fio  fio    4658 Apr 28 20:40 OTA_STRATEGY.md
+-rw-rw-rw-    1 fio  fio    3839 Apr 28 20:40 PAIRING_PROCEDURE.md
+-rw-rw-rw-    1 fio  fio    6111 May  5 21:26 README.md
+drwxrwxrwx   10 fio  fio    4096 May 26 14:53 RESEARCH-CONTROLLER
+-rw-rw-rw-    1 fio  fio    6932 Apr 28 20:40 SAFETY_CASE.md
+-rw-rw-rw-    1 fio  fio  149980 May 15 05:21 TODO.md
+-rw-rw-rw-    1 fio  fio   25520 Apr 27 16:35 TRACTOR_NODE.md
+-rw-rw-rw-    1 fio  fio   19109 Apr 27 16:35 VIDEO_OPTIONS.md
+drwxrwxrwx    5 fio  fio    4096 May 13 14:32 X8_HEALTH_AND_RECOVERY
+-rw-rw-rw-    1 fio  fio    2946 Apr 30 11:25 arduino_libraries.txt
+drwxrwxr-x   11 root root   4096 Sep 15 22:28 base_station
+drwxrwxrwx 1010 fio  fio   69632 May 26 14:53 bench-evidence
+drwxrwxr-x    2 root root   4096 Sep 15 22:28 deploy
+-rw-rw-r--    1 root root   3919 Sep 15 22:28 docker-compose.video-test.yml
+-rw-r--r--    1 root root   3919 May 27 20:22 docker-compose.video-test.yml.bak_20260527_152255
+-rw-rw-r--    1 root root   3621 Sep 15 22:28 docker-compose.yml
+drwxrwxr-x   15 root root   4096 Sep 15 22:28 firmware
+drwxrwxrwx    2 fio  fio    4096 May 26 14:53 hil
+drwxrwxrwx    2 fio  fio    4096 May 26 14:53 secrets
+-rw-rw-rw-    1 fio  fio    3758 May 10 20:38 test_manual_probe.py
+drwxrwxrwx    2 fio  fio    4096 May 26 14:53 tools
+## env keys
+LIFETRAC_PIN=<set>
+LIFETRAC_LORA_DEVICE=<set>
+LIFETRAC_TRUSTED_PROXIES=<set>
+## compose services (main)
+time="2026-10-11T03:24:02Z" level=warning msg="The \"LIFETRAC_MQTT_HOST\" variable is not set. Defaulting to a blank string."
+mosquitto
+audit_tail
+lora_bridge
+web_ui
+## compose services (video-test)
+mosquitto
+audit_tail
+image_rx
+web_ui
+## compose images
+    build:
+    image: lifetrac-v25:latest
+    restart: unless-stopped
+    build:
+    - exec python /app/base_station/lora_bridge.py "/dev/ttymxc3" --mqtt ""
+    devices:
+    - /dev/ttymxc3:/dev/ttyACM0
+      LIFETRAC_LORA_DEVICE: /dev/ttyACM0
+    image: lifetrac-v25:latest
+    restart: unless-stopped
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    build:
+    image: lifetrac-v25:latest
+    restart: unless-stopped
+## vtest images
+    image: lifetrac-v25:latest
+    restart: unless-stopped
+    - /dev/ttymxc3:/dev/ttymxc3
+      LIFETRAC_L072_UART: /dev/ttymxc3
+    image: lifetrac-v25:latest
+    restart: unless-stopped
+    image: eclipse-mosquitto:2
+    ports:
+      published: "1883"
+    restart: unless-stopped
+    image: lifetrac-v25:latest
+    ports:
+      published: "8080"
+    restart: unless-stopped
+## docker ps -a
+lifetrac-vtest-audit_tail-1	lifetrac-v25:latest	Created
+lifetrac-vtest-web_ui-1	lifetrac-v25:latest	Created
+lifetrac-vtest-image_rx-1	lifetrac-v25:latest	Created
+rx_smoke	lifetrac-v25:latest	Exited (137) 6 days ago
+lifetrac-vtest-mosquitto-1	eclipse-mosquitto:2	Created
+bench_mqtt	eclipse-mosquitto:2	Exited (1) 2 months ago
+f11_webui	c6ded786130c	Exited (0) 2 months ago
+design-controller-mosquitto-1	2a23a3e427e4	Up 10 hours
+## docker compose ls
+NAME                STATUS              CONFIG FILES
+design-controller   running(1)          /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER/docker-compose.yml
+lifetrac-vtest      created(4)          /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER/docker-compose.video-test.yml
+## images
+lifetrac-tractor-x8:latest 2727dfd36f9f 2 weeks ago
+lifetrac-tractor-x8:rs13-65869517 2727dfd36f9f 2 weeks ago
+python:3.11-slim-bookworm aad78d4fecb5 3 weeks ago
+lifetrac-v25:latest 4623980c2dac 3 weeks ago
+<none>:<none> ed7c058774f4 3 weeks ago
+<none>:<none> 12fe97dece57 4 weeks ago
+<none>:<none> c6ded786130c 2 months ago
+python:3.11-slim 2fe5ff938d2b 2 months ago
+eclipse-mosquitto:2 0db28dca6f11 3 months ago
+## ttymxc3 holders
+## failed
+  UNIT                          LOAD   ACTIVE SUB    DESCRIPTION
+● lifetrac-base-compose.service loaded failed failed LifeTrac base-station video stack (lifetrac-vtest compose project)
+● lifetrac-base.service         loaded failed failed LifeTrac v25 base station (compose stack)
+● psplash-start.service         loaded failed failed Start psplash boot splash screen
+
+LOAD   = Reflects whether the unit definition was properly loaded.
+ACTIVE = The high-level unit activation state, i.e. generalization of SUB.
+SUB    = The low-level unit activation state, values depend on unit type.
+3 loaded units listed.

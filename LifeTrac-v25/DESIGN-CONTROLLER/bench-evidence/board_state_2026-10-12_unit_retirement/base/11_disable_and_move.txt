@@ -1,0 +1,41 @@
+## guard: units must be failed or inactive (never stop an active one: ExecStop = compose down)
+lifetrac-base.service is-active=failed
+lifetrac-base-compose.service is-active=failed
+## step 1: disable (no --now) + reset-failed
+Removed /etc/systemd/system/multi-user.target.wants/lifetrac-base.service.
+Removed /etc/systemd/system/multi-user.target.wants/lifetrac-base-compose.service.
+lifetrac-base.service is-enabled=disabled is-active=inactive
+lifetrac-base-compose.service is-enabled=disabled is-active=inactive
+## step 2: move the unit files aside
+## after
+UNIT FILE STATE VENDOR PRESET
+
+0 unit files listed.
+/etc/lifetrac-retired:
+total 12
+drwxr-xr-x  3 root root 4096 Oct 12 21:25 .
+drwxr-xr-x 46 root root 4096 Oct 12 21:25 ..
+drwxr-xr-x  3 root root 4096 Oct 12 21:25 20261012T212515Z
+
+/etc/lifetrac-retired/20261012T212515Z:
+total 24
+drwxr-xr-x 3 root root 4096 Oct 12 21:25 .
+drwxr-xr-x 3 root root 4096 Oct 12 21:25 ..
+-rw-r--r-- 1 root root  388 Oct 12 21:25 README.txt
+-rw-r--r-- 1 root root  789 May 27 06:38 lifetrac-base-compose.service
+-rw-r--r-- 1 root root  480 May 26 15:05 lifetrac-base.service
+drwxr-xr-x 2 root root 4096 May 26 23:04 lifetrac-base.service.d
+
+/etc/lifetrac-retired/20261012T212515Z/lifetrac-base.service.d:
+total 12
+drwxr-xr-x 2 root root 4096 May 26 23:04 .
+drwxr-xr-x 3 root root 4096 Oct 12 21:25 ..
+-rw-r--r-- 1 root root   31 May 26 23:04 timeout.conf
+no lifetrac wants links
+## failed units
+● psplash-start.service loaded failed failed Start psplash boot splash screen
+## broker
+design-controller-mosquitto-1	Up 2 days
+## uart holders
+
+__UART_CHK_DONE__
