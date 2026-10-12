@@ -1,4 +1,8 @@
 #!/bin/sh
+# DO NOT RUN on the bench without an explicit radio GO: starts the
+# tractor-vtest mosquitto, camera and image_tx; image_tx opens /dev/ttymxc3 =
+# transmits.
+# May-2026 one-off; see bench_tools/BENCH_BOARDS.md "Retired boot units".
 # Restart tractor video-test services and show image_tx logs.
 
 set -u

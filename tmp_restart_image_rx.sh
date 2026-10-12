@@ -1,4 +1,8 @@
 #!/bin/sh
+# DO NOT RUN on the bench without an explicit radio GO: removes and re-creates
+# the lifetrac-vtest image_rx container, which opens /dev/ttymxc3 with a
+# RESET_REQ that un-parks the L072 (REG_PROFILE 0, fixed 915 MHz).
+# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units".
 echo fio | sudo -S docker inspect lifetrac-vtest-image_rx-1 --format '{{.State.StartedAt}}'
 echo ---env---
 echo fio | sudo -S docker inspect lifetrac-vtest-image_rx-1 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep LIFETRAC

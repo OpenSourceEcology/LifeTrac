@@ -1370,6 +1370,75 @@ No-regrets work, correct under every surviving architecture (do first):
   eye (`mingw32-make all` prints Total; it was 37890 → 38326 bytes on
   2026-07-29 with the ERP + FHSS-seed fixes).
 
+- [x] **RS-5.10 Failing boot units on the bench boards — RETIRED 2026-10-12
+  (operator decision).** Three units were enabled and failed at every boot:
+  `lifetrac-base.service` (with its 1800 s drop-in) and
+  `lifetrac-base-compose.service` on the base, and
+  `lifetrac-tractor-compose.service` on the tractor. Each failed for an
+  incidental reason, and that failure was the only thing keeping a radio
+  daemon from starting at boot without a GO. So they were retired, not
+  repaired: `disable` without `--now`, `reset-failed`, unit files moved to
+  `/etc/lifetrac-retired/20261012T212515Z/`; then the dead video-test
+  containers removed and the tractor's video-test compose file renamed. No
+  board was rebooted, so the next boot is not yet observed. Record:
+  [`bench-evidence/board_state_2026-10-12_unit_retirement/README.md`](bench-evidence/board_state_2026-10-12_unit_retirement/README.md);
+  rules: [BENCH_BOARDS.md](firmware/x8_lora_bootloader_helper/bench_tools/BENCH_BOARDS.md),
+  "Retired boot units". Follow-ups RS-5.11 – RS-5.17; none needs a radio GO.
+- [ ] **RS-5.11 Redesign the production base unit before it is installed
+  anywhere** —
+  [`base_station/systemd/lifetrac-base.service`](base_station/systemd/lifetrac-base.service)
+  is not installable as written.
+  - No build on the boot path:
+    `docker compose -p design-controller up -d --no-build --remove-orphans`,
+    a pinned prebuilt tag built once by `deploy_base.sh`, `pull_policy: never`,
+    and at most one `build:` service (today three export
+    `lifetrac-v25:latest`).
+  - `-p design-controller` on ExecStop too (today a bare `docker compose down`).
+  - A positive opt-in such as `ConditionPathExists=/etc/lifetrac/production`,
+    so a bench board shows "skipped", not "failed".
+  - Drop the 1800 s `TimeoutStartSec` drop-in.
+  - **Blocked on** a Method-G base radio daemon replacing `lora_bridge` (KISS
+    at 115200 baud, which the L072 firmware does not implement), and on
+    deciding where E-stop / control TX lives.
+- [ ] **RS-5.12 `docker-compose.yml:54` uses a single `$`** — so compose fills
+  in `LIFETRAC_LORA_DEVICE` / `LIFETRAC_MQTT_HOST` from the host `.env` when it
+  parses the file. The base's config resolved to
+  `lora_bridge.py "/dev/ttymxc3" --mqtt ""`, while the device is mapped into
+  the container as `/dev/ttyACM0`
+  ([capture](bench-evidence/board_state_2026-10-12_unit_retirement/base/00_failure_journal_2026-10-11.txt),
+  "compose images"). A real bug, but fix it (`$$`) **only together with
+  RS-5.11's `lora_bridge` replacement**: today it is what keeps `lora_bridge`
+  off the radio.
+- [ ] **RS-5.13 Decide on the tractor's `lifetrac-camera.service`** — a fourth
+  path that maps `/dev/ttymxc3` at boot. It reads "disabled", but a udev
+  `SYSTEMD_WANTS` rule starts it, and it `BindsTo` the C2 camera device. Not
+  touched on 10-12; it needs its own operator decision.
+- [ ] **RS-5.14 Tractor: 335 anonymous docker volumes** — counted in the 10-12
+  preflight. Probably leftovers of repeated mosquitto `docker run`s (cause
+  unverified). Cleanup candidate; deleting them needs the operator's OK.
+- [ ] **RS-5.15 Delete or archive the May one-off scripts** — 19 scripts in the
+  repo root and
+  `firmware/x8_lora_bootloader_helper/tractor_restart_video_test.sh` install
+  these units or start a radio daemon. Each now opens with a "DO NOT RUN on
+  the bench without an explicit radio GO" comment. Remove them once no doc
+  points at them. Not labelled: the build-only one-offs (`base_build_bg.sh`,
+  `tmp_base_build.sh`, `tmp_base_prune_build.sh`, `_bench_build3.ps1`,
+  `_bench_build4.ps1`), which would retag `lifetrac-v25:latest` on the base;
+  `tmp_base_prune_build.sh` also runs `docker image prune -af`.
+- [ ] **RS-5.16 `firmware/tractor_x8/systemd/*.service` are installed on
+  neither bench board** — four April sketches (camera, logger, params, time;
+  `a90ae759`, 2026-04-27). They run host `python3` from
+  `/opt/lifetrac/firmware/tractor_x8/`, which does not exist on the tractor,
+  and three want a host `mosquitto.service`. The tractor's installed
+  `lifetrac-camera.service` is a different file,
+  `firmware/x8_lora_bootloader_helper/lifetrac-camera.service`
+  ([10-10 capture](bench-evidence/board_state_2026-10-10/tractor/12_unit_cat.txt)).
+  Mark them obsolete or delete them; `SETTINGS_REFERENCE.md:588-590` lists
+  them as `live`.
+- [ ] **RS-5.17 Runbooks still assume `lifetrac-base` is installed** —
+  `HIL_RUNBOOK.md:45`, `:815` and `FIRMWARE_UPDATES.md:50` tell the reader to
+  watch `journalctl -u lifetrac-base`. Rewrite them when RS-5.11 lands.
+
 ### RS-6 — Keyframe elimination (K-phases, now LoRa-only)
 
 > Per the 2026-07-25 architecture rule (**base→tractor strictly over LoRa**),

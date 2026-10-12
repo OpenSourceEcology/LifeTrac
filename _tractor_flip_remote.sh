@@ -1,4 +1,9 @@
 #!/bin/bash
+# DO NOT RUN on the bench without an explicit radio GO: runs
+# /tmp/_flip_tractor.py on /opt/lifetrac/video-test/docker-compose.yml, then
+# re-creates image_tx (compose project video-test), which opens /dev/ttymxc3 =
+# transmits.
+# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units".
 set -e
 echo "=== current state ==="
 grep -nE "LIFETRAC_REG_PROFILE|LIFETRAC_FHSS_WIDE_MASK|LIFETRAC_FORCE_FRF_HZ" /opt/lifetrac/video-test/docker-compose.yml || true

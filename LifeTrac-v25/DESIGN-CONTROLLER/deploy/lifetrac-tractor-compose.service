@@ -1,3 +1,24 @@
+# OBSOLETE - DO NOT INSTALL.
+#
+# May-2026 video-test demo unit (commit 03998936, 2026-05-27). It was installed
+# and enabled on the bench tractor by the repo-root tmp_install_tractor_unit.sh
+# (not by provision_x8.sh).
+#
+# What it starts at every boot, without a radio GO: the compose file in the
+# non-git /opt/lifetrac/video-test. Its image_tx (tractor-image-tx-v2) opens
+# /dev/ttymxc3 at LIFETRAC_REG_PROFILE 0 (fixed 915 MHz) and its camera
+# (tractor-camera-v2) runs with LIFETRAC_USE_LORA_BRIDGE=1, so the tractor
+# transmits images.
+#
+# Retired on the bench tractor 2026-10-12. Until then it failed at every boot
+# only because the fixed container names were held by Exited containers of
+# compose project "video-test". Those containers are now removed and the
+# compose file is renamed docker-compose.yml.RETIRED-2026-10-12. Once that file
+# is restored, nothing stops this unit from transmitting.
+#
+# Rules: firmware/x8_lora_bootloader_helper/bench_tools/BENCH_BOARDS.md
+# ("Retired boot units"). Record:
+# bench-evidence/board_state_2026-10-12_unit_retirement/README.md
 [Unit]
 Description=LifeTrac tractor video stack (tractor-vtest compose project)
 After=docker.service network-online.target

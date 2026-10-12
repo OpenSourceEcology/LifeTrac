@@ -5948,6 +5948,9 @@ Tracked in detail in [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) and
   [systemd units](DESIGN-CONTROLLER/base_station/systemd/) for the
   base + tractor X8 services. `audit_log.py` gained a `--tail-mqtt`
   CLI mode used by the `audit_tail` compose service.
+  *Note 2026-10-12:* `lifetrac-base.service` is installed on neither bench
+  board (retired on the base that day) and needs the redesign in
+  [DESIGN-CONTROLLER/TODO.md](DESIGN-CONTROLLER/TODO.md) (RS-5.11) before use.
 - [x] **Tractor M4 core hardened**:
   [firmware/common/shared_mem.h](DESIGN-CONTROLLER/firmware/common/shared_mem.h)
   formalises the M7↔M4 SRAM4 layout (version + alive_tick + loop_counter

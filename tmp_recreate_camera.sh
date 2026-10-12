@@ -1,4 +1,8 @@
 #!/bin/sh
+# DO NOT RUN on the bench without an explicit radio GO: re-creates the
+# tractor-vtest camera and starts the services it depends on. The camera
+# publishes the frames that image_tx sends from /dev/ttymxc3.
+# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units".
 set -eu
 cd /opt/lifetrac/video-test
 docker compose -p tractor-vtest up -d --force-recreate camera
