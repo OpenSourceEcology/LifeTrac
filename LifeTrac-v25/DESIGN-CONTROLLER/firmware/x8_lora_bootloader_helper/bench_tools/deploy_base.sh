@@ -283,15 +283,28 @@ case $st in
 esac
 st=$(systemctl is-enabled compose-apps-early-start.service 2>/dev/null || true)
 case $st in masked*|"") ;; *) say "WARNING: compose-apps-early-start.service is '$st' (the bench masks it)" ;; esac
+# systemd runs a unit's ExecStop only after a successful start, so a failed or
+# still-starting unit needs no stop. An ACTIVE unit does, and the ExecStop of
+# lifetrac-base.service is a bare `docker compose down`: it also removes the
+# broker container, which step 4 recreates.
 for u in lifetrac-base.service lifetrac-base-compose.service; do
     en=$(systemctl is-enabled "$u" 2>/dev/null || true)
     ac=$(systemctl is-active "$u" 2>/dev/null || true)
     case $ac in
-        active|activating|reloading)
-            die "$u is $ac. It brings up compose services that open /dev/ttymxc3 (lora_bridge or image_rx). Stop and disable it first (DEPLOY.md)." ;;
+        activating|reloading)
+            die "$u is $ac: its start job is still running. Wait until it has failed, then deploy again. Do not stop it and do not interrupt a build." ;;
+        active)
+            if [ "$u" = lifetrac-base.service ]; then
+                svc="lora_bridge and web_ui"
+                note="That stop runs a bare 'docker compose down', which also removes the broker container $PROJECT-mosquitto-1 (its volume stays); this deploy recreates it unless --no-broker is given."
+            else
+                svc="image_rx and web_ui"
+                note="That stop removes only the containers and network of its own compose project, lifetrac-vtest."
+            fi
+            die "$u is active: its start succeeded, so its compose services were started and may be running ($svc; /dev/ttymxc3 is mapped). Stop those containers by name (docker stop <container>), then 'systemctl stop $u' and deploy again. $note Retire the unit afterwards (BENCH_BOARDS.md)." ;;
     esac
     case $en in
-        enabled*) say "WARNING: $u is $en ($ac). If it ever succeeds at boot it opens /dev/ttymxc3. Recommended: systemctl disable $u (DEPLOY.md)." ;;
+        enabled*) say "WARNING: $u is $en ($ac). If it ever succeeds at boot it starts compose services that map /dev/ttymxc3, without a GO. Retire it: BENCH_BOARDS.md has the procedure, and 'provision_bench_board.sh base' applies it. A failed or inactive unit is disabled WITHOUT --now and needs no stop." ;;
     esac
 done
 busy=$(radio_containers)
