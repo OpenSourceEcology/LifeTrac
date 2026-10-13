@@ -184,7 +184,7 @@ the bound.
 **What already exists**
 
 - The normative P0–P3 policy ([LORA_PROTOCOL.md § Priority class policy](LORA_PROTOCOL.md#priority-class-policy-canonical)): strict priority with FIFO tiebreak, P0 depth-1 latest-wins, P3 refresh-cancelable, a new keyframe cancels stale fragments.
-- The L072 firmware keeps a 4-deep **FIFO** TX ring that answers `QUEUE_FULL` once full, and its config notes that at FHSS the host must keep at most 3 image frames in flight ([firmware/murata_l072/config.h](firmware/murata_l072/config.h), `HOST_TXQ_DEPTH`). **It does not reserve a slot for P0:** `HOST_TXQ_P0_RESERVED` is defined but referenced by no C code ([SETTINGS_REFERENCE.md](SETTINGS_REFERENCE.md) marks it dead; tracked as RS-10.12 in [TODO.md](TODO.md) and F5 in [CONTROL_PLANE_DESIGN.md](CONTROL_PLANE_DESIGN.md)). P0 priority is therefore entirely the host's job, which the design below has to enforce.
+- The L072 firmware keeps a 4-deep **FIFO** TX ring that answers `QUEUE_FULL` once full, and its config notes that at FHSS the host must keep at most 3 frames in flight to stay inside a 700 ms P0 budget (RS-9.7 adds that holding §8.15's 500 ms gate needs at most 2) ([firmware/murata_l072/config.h](firmware/murata_l072/config.h), `HOST_TXQ_DEPTH`). **It does not reserve a slot for P0:** `HOST_TXQ_P0_RESERVED` is defined but referenced by no C code ([SETTINGS_REFERENCE.md](SETTINGS_REFERENCE.md) marks it dead; tracked as RS-10.12 in [TODO.md](TODO.md) and F5 in [CONTROL_PLANE_DESIGN.md](CONTROL_PLANE_DESIGN.md)). P0 priority is therefore entirely the host's job, which the design below has to enforce.
 - The M7's IP-107 async TX queue in `tractor_h7.ino` (two classes today) and its SIL model `base_station/tests/test_m7_tx_queue_sil.py`.
 - The camera back-channel over `Serial1` in `tractor_h7.ino`.
 
@@ -192,9 +192,11 @@ the bound.
 
 1. The tractor M7 sends `REQ_FRAME(budget_bytes, now_ms)` only when the P3 mailbox has room and the airtime ledger allows another frame. The camera answers with at most one frame, or "none".
 2. **Bounded, not strict, P0 priority at the radio.** The M7's own queue drains strictly by priority, as LORA_PROTOCOL.md specifies. But once a frame is handed to the L072 it joins a FIFO ring and goes out in submit order (`host_cmd.c`: append at the tail, drain from the head), so a P0 can wait behind non-P0 frames already parked there. Until RS-10.12 / CONTROL_PLANE_DESIGN F5 adds a firmware control lane, the M7 enforces a bounded policy instead:
-   - At most `K` non-P0 frames in flight at the L072 (parked or on air), with `K = 3`, the FHSS ceiling in `murata_l072/config.h`. Lowering `K` while a control source is active trades image throughput for P0 latency.
-   - At most one P0 parked in the ring. A newer P0 replaces the older one in the M7's depth-1 latest-wins mailbox and is submitted when `TX_DONE_URC` frees the parked one. The parked P0 cannot be recalled (the L072 has no cancel), so the newest P0 goes out one frame later.
-   - Together these keep the ring at most `K + 1 = HOST_TXQ_DEPTH` deep, so a P0 submit is never refused with `QUEUE_FULL`, and they bound a P0's wait to the `K` image frames ahead of it. `config.h` puts that worst case at no more than about 560 ms at FHSS and 390 ms at DTS, inside the 700 ms operator P0 budget (RS-9.7).
+   - At most `K` non-P0 frames in flight at the L072 (parked or on air).
+   - At most one P0 parked in the ring. A newer P0 replaces the older one in the M7's depth-1 latest-wins mailbox and is submitted when `TX_DONE_URC` frees the parked one. The parked P0 cannot be recalled (the L072 has no cancel).
+   - No new non-P0 frame is submitted while a P0 is waiting in the M7 mailbox, so nothing can join the ring ahead of it.
+   - Together these keep the ring at most `K + 1` deep (≤ `HOST_TXQ_DEPTH`), so a P0 submit is never refused with `QUEUE_FULL`. **The worst case** is a P0 that arrives just after an earlier P0 was parked behind `K` image frames: it waits for those `K` frames and the earlier P0, then its own transmission. That is `K + 1` frames in flight ahead of it, which is what the "host in-flight" figures in RS-9.7 and `config.h` count: about 400 ms at FHSS with 2 in flight, about 560 ms at FHSS with 3, about 390 ms at DTS with 4.
+   - **Defaults, held to the §8.15 field gate** (E-stop <500 ms p99, [MASTER_PLAN.md §8.15](MASTER_PLAN.md#815-field-test-gate--500-m-line-of-sight-1-frame-loss-10-min)): `K = 1` at FHSS (2 in flight, ~400 ms) and `K = 3` at DTS (4 in flight, ~390 ms). `K = 2` at FHSS (~560 ms) fits only the 700 ms operator budget, and RS-9.7 records that tension with §8.15 as open: use it only if §8.15 is formally revised. The SIL model must assert this arrival sequence, not just the image frames.
    - Strict priority (P0 starts before any parked image frame) needs RS-10.12. When it lands, keep this bound as a second layer.
 3. Each frame carries `capture_ms` on the tractor clock. The camera does not use the request's `now_ms` as the capture time (the frame may have been captured before the request). Instead it records its own tick when each request arrives, keeps `offset = now_ms − local_rx_tick`, and stamps `capture_ms = local_capture_tick + offset`. Link latency over SPI or point-to-point Ethernet is well under a millisecond, so this keeps VS1's last-writer-wins capture times consistent without a separate time-sync protocol. A frame captured before the camera has seen any request is discarded.
 4. The M7 fragments (a C port of `pack_telemetry_fragments`; fragmenting exists only in Python today), queues the fragments as P3, and lets a new keyframe cancel stale ones.
@@ -206,8 +208,8 @@ the bound.
 **What actually needs writing:** extend the IP-107 queue from two classes to
 P0–P3 with the P3 mailbox, the bounded ring admission of rule 2, the C
 fragmenter, an airtime ledger, and the camera-link driver. VS1 frames are single-fragment, which makes them the easy
-case. Multi-fragment tile keyframes are where the "≤3 frames in flight at
-FHSS" rule matters.
+case. Multi-fragment tile keyframes are where the in-flight limit `K` of
+rule 2 matters.
 
 ## 7. Base station on a Portenta H7 plus a PC
 
