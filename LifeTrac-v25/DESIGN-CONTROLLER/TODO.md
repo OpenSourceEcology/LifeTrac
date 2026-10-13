@@ -4130,18 +4130,24 @@ marked *(both)* also improve the X8's onboard H747.
   IP-107 queue to the four classes of
   [LORA_PROTOCOL.md](LORA_PROTOCOL.md#priority-class-policy-canonical), add the
   refresh-cancelable P3 mailbox, an airtime ledger, and the "≤3 image frames
-  in flight at FHSS" rule from `murata_l072/config.h`; port
+  in flight at FHSS" rule from `murata_l072/config.h`. The L072 ring is pure
+  FIFO with no P0 slot (RS-10.12), so non-P0 frames must never fill more
+  than `HOST_TXQ_DEPTH − 1` slots, keeping one free for P0. Port
   `pack_telemetry_fragments` to C. Extend `test_m7_tx_queue_sil.py` to four
-  classes first.
+  classes and the ring limit first.
 - [ ] **H7-8 Pull-model camera protocol** — `REQ_FRAME(budget, now_ms)` from
   the tractor, one frame or "none" back, `capture_ms` on the tractor clock,
-  downlink `CMD_CAMERA_SELECT` / `CMD_REQ_KEYFRAME` / `CMD_ENCODE_MODE` /
+  mapped from the camera's own capture tick through an offset learned from
+  each request (never the request time itself), downlink
+  `CMD_CAMERA_SELECT` / `CMD_REQ_KEYFRAME` / `CMD_ENCODE_MODE` /
   `CMD_ROI_HINT`, and rate-limited `CMD_PERSON_APPEARED` raised only by the
   tractor M7.
 - [ ] **H7-9 `firmware/camera_h7/`** — Portenta H7 + Vision Shield (mono)
   first; Nicla Vision as the colour option. Port the VS1 encoder (OpenMV
-  MicroPython + `ulab` first, C where profiling says so), check the C/Python
-  bitstream against the golden vectors in `test_vs1_codec_parity_sil.py`, and
+  MicroPython + `ulab` first, C where profiling says so). Build a harness that
+  runs the golden vectors from `base_station/tests/test_vector_codec.py`
+  against the ported codec (`test_vs1_codec_parity_sil.py` only checks that
+  the two Python codec copies are identical, so it cannot cover a port), and
   measure fps against the A53 estimate in VECTOR_SCENE.md §2. Add a small
   on-device person detector; the safety case must not depend on it.
 - [ ] **H7-10 Mono VS1 behaviour** — define how VS1 behaves without colour

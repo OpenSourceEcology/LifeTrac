@@ -17,7 +17,7 @@ both builds.
 | Base station | **Easy** | The base H7 becomes a USB radio gateway. All of `base_station/` runs on an ordinary PC. The compose file already expects the radio on `/dev/ttyACM0`. |
 | Tractor control | **Moderate, and safer than today** | `tractor_h7` already compiles for a standalone Portenta H7 in CI, and on an H7 the realtime MCU owns the LoRa UART directly. The control application still has to be joined to the Method G radio transport (§4.1), which the X8 build needs too. |
 | Tractor video | **The hard part** | An H7 cannot host the UVC camera or the Python/OpenCV pipeline. The recommended answer is a second H7 with a camera (§5). |
-| Message scheduling | **Straightforward** | The P0–P3 policy is already specified, the image stream is tiny (a VS1 frame is one ≤237 B fragment), and a pull model keeps the camera from ever pushing the control MCU (§6). |
+| Message scheduling | **Straightforward** | The P0–P3 policy is already specified, the image stream is tiny (a VS1 frame is one fragment: a `TileDeltaFrame` of at most 203 B at FHSS or 243 B at DTS), and a pull model keeps the camera from ever pushing the control MCU (§6). |
 | Repository | **One tree, two profiles** | Protocol, crypto and base code stay shared. H7 is a build profile plus two new sketches (§9). |
 
 Export classification has **not** been verified here. Confirm the ECCN of the
@@ -97,8 +97,11 @@ designing key storage.
 ## 5. Tractor video: the options
 
 The image work is small by design. VS1 works on a 192×128 copy of each frame
-([VECTOR_SCENE.md §2.1](VECTOR_SCENE.md)), sends one ≤237 B fragment per
-frame, and runs at 2 fps by default. The tile modes send bigger keyframes
+([VECTOR_SCENE.md §2.1](VECTOR_SCENE.md)), sends one fragment per frame, and
+runs at 2 fps by default. That fragment carries a `TileDeltaFrame` of at most
+203 B at FHSS or 243 B at DTS (a 6 B header plus a VS1 body of ≤197 or ≤237 B);
+on air the 4 B fragment header and 8 B hop header come on top
+([VECTOR_SCENE.md §3.1](VECTOR_SCENE.md)). The tile modes send bigger keyframes
 (about 2.4 KB on the RS-3.3 bench) but are still bounded by LoRa airtime. So
 whatever produces the frames needs very little bandwidth to the radio MCU, a
 few kB/s at most.
@@ -122,7 +125,7 @@ and §3 rules out a spare UART, so the choices are:
 What you get and give up with the Vision Shield:
 
 - **Monochrome sensor** (Himax: 320×320 HM01B0 on early boards, VGA HM0360 on current ones; check the board you buy). `mono_g4` works unchanged in concept. VS1 loses its colour: fills become grey, and the L2 plants layer, which relies on ExG−ExR vegetation colour, does not work.
-- **Compute:** the M7 at 480 MHz with 1 MB SRAM and 8 MB SDRAM holds a VGA frame easily. VS1's A53 estimate is 32–83 ms per frame with NumPy/OpenCV ([VECTOR_SCENE.md §2](VECTOR_SCENE.md)). A C port on the M7 is plausibly 5–15× slower, so 0.5–1 fps instead of 2 fps. That is an estimate to measure, not a result.
+- **Compute:** the M7 at 480 MHz with 1 MB SRAM and 8 MB SDRAM holds a VGA frame easily. VS1's A53 estimate is 32–83 ms per frame with NumPy/OpenCV ([VECTOR_SCENE.md §2](VECTOR_SCENE.md)). A C port on the M7 is plausibly 5–15× slower, which puts the encode alone at roughly 0.16–1.25 s per frame (about 0.8–6 fps). Capture and the §2.1 pre-stage come on top, so the 2 fps default holds at the fast end of that range and drops below 1 fps at the slow end. That is an estimate to measure, not a result.
 - **Person detection:** NanoDet does not fit. A small 96×96 detector (Edge Impulse FOMO-class) does, with lower recall. The safety story must not depend on it, which is already the rule (§8.19).
 - **Port path:** the Portenta H7 + Vision Shield is an OpenMV-supported target, so the encoder can be ported to MicroPython with `ulab` first (closer to today's NumPy code) and moved to C where profiling says so.
 
@@ -177,23 +180,24 @@ one MCU owns the radio and the policy is already written down.
 **What already exists**
 
 - The normative P0–P3 policy ([LORA_PROTOCOL.md § Priority class policy](LORA_PROTOCOL.md#priority-class-policy-canonical)): strict priority with FIFO tiebreak, P0 depth-1 latest-wins, P3 refresh-cancelable, a new keyframe cancels stale fragments.
-- The L072 firmware keeps a 4-deep TX ring with one slot reserved for P0, and its config notes that at FHSS the host must keep at most 3 image frames in flight ([firmware/murata_l072/config.h](firmware/murata_l072/config.h), `HOST_TXQ_DEPTH`, `HOST_TXQ_P0_RESERVED`).
+- The L072 firmware keeps a 4-deep **FIFO** TX ring that answers `QUEUE_FULL` once full, and its config notes that at FHSS the host must keep at most 3 image frames in flight ([firmware/murata_l072/config.h](firmware/murata_l072/config.h), `HOST_TXQ_DEPTH`). **It does not reserve a slot for P0:** `HOST_TXQ_P0_RESERVED` is defined but referenced by no C code ([SETTINGS_REFERENCE.md](SETTINGS_REFERENCE.md) marks it dead; tracked as RS-10.12 in [TODO.md](TODO.md) and F5 in [CONTROL_PLANE_DESIGN.md](CONTROL_PLANE_DESIGN.md)). P0 priority is therefore entirely the host's job, which the design below has to enforce.
 - The M7's IP-107 async TX queue in `tractor_h7.ino` (two classes today) and its SIL model `base_station/tests/test_m7_tx_queue_sil.py`.
 - The camera back-channel over `Serial1` in `tractor_h7.ino`.
 
 **Recommended design: the tractor pulls, the camera never pushes**
 
 1. The tractor M7 sends `REQ_FRAME(budget_bytes, now_ms)` only when the P3 mailbox has room and the airtime ledger allows another frame. The camera answers with at most one frame, or "none".
-2. Each frame carries `capture_ms` on the tractor clock, taken from the `now_ms` in the request, so VS1's last-writer-wins capture times stay consistent without a separate time sync.
-3. The M7 fragments (a C port of `pack_telemetry_fragments`; fragmenting exists only in Python today), queues the fragments as P3, and lets a new keyframe cancel stale ones.
-4. Downlink commands (`CMD_CAMERA_SELECT`, `CMD_REQ_KEYFRAME`, `CMD_ENCODE_MODE`, `CMD_ROI_HINT`) ride the same link to the camera.
-5. A camera-side person alert becomes `CMD_PERSON_APPEARED` (P0) only through the M7, which rate-limits it, so a faulty camera cannot flood P0.
-6. Every camera-link read is bounded per loop iteration. A missing, slow or corrupt camera means "no frame this cycle" and a stale flag in telemetry, never a wait.
-7. Replace `ipc_to_h747.py`'s CRC-8 with CRC-16 or CRC-32 for the H7 link: CRC-8 is weak for multi-kilobyte keyframes.
+2. **Non-P0 frames never fill more than `HOST_TXQ_DEPTH − 1` slots of the L072 ring**, so a P0 frame always has a free slot even though the firmware does not reserve one. If RS-10.12 later adds the firmware reservation, this rule stays as a second layer.
+3. Each frame carries `capture_ms` on the tractor clock. The camera does not use the request's `now_ms` as the capture time (the frame may have been captured before the request). Instead it records its own tick when each request arrives, keeps `offset = now_ms − local_rx_tick`, and stamps `capture_ms = local_capture_tick + offset`. Link latency over SPI or point-to-point Ethernet is well under a millisecond, so this keeps VS1's last-writer-wins capture times consistent without a separate time-sync protocol. A frame captured before the camera has seen any request is discarded.
+4. The M7 fragments (a C port of `pack_telemetry_fragments`; fragmenting exists only in Python today), queues the fragments as P3, and lets a new keyframe cancel stale ones.
+5. Downlink commands (`CMD_CAMERA_SELECT`, `CMD_REQ_KEYFRAME`, `CMD_ENCODE_MODE`, `CMD_ROI_HINT`) ride the same link to the camera.
+6. A camera-side person alert becomes `CMD_PERSON_APPEARED` (P0) only through the M7, which rate-limits it, so a faulty camera cannot flood P0.
+7. Every camera-link read is bounded per loop iteration. A missing, slow or corrupt camera means "no frame this cycle" and a stale flag in telemetry, never a wait.
+8. Replace `ipc_to_h747.py`'s CRC-8 with CRC-16 or CRC-32 for the H7 link: CRC-8 is weak for multi-kilobyte keyframes.
 
 **What actually needs writing:** extend the IP-107 queue from two classes to
-P0–P3 with the P3 mailbox, the C fragmenter, an airtime ledger, and the
-camera-link driver. VS1 frames are single-fragment, which makes them the easy
+P0–P3 with the P3 mailbox, the ring-occupancy limit of rule 2, the C
+fragmenter, an airtime ledger, and the camera-link driver. VS1 frames are single-fragment, which makes them the easy
 case. Multi-fragment tile keyframes are where the "≤3 frames in flight at
 FHSS" rule matters.
 
