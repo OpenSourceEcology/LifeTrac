@@ -4133,8 +4133,9 @@ marked *(both)* also improve the X8's onboard H747.
   FIFO with no P0 lane, so until RS-10.12 lands this is a **bounded,
   non-strict** policy ([PLATFORM_H7.md §6](PLATFORM_H7.md#6-scheduling-messages-between-the-two-h7s)
   rule 2): at most `K` non-P0 frames in flight at the L072, at most one P0
-  parked (a newer P0 waits latest-wins in the M7 mailbox), and no new non-P0
-  submits while a P0 waits. Defaults hold the §8.15 E-stop gate (<500 ms
+  in flight there (parked or on air, so its `TX_DONE_URC` gates the next P0,
+  which waits latest-wins in the M7 mailbox), and no new non-P0 submits
+  while a P0 waits. Defaults hold the §8.15 E-stop gate (<500 ms
   p99): `K = 1` at FHSS (~400 ms worst case) and `K = 3` at DTS (~390 ms).
   `K = 2` at FHSS (~560 ms) needs §8.15 formally revised first (the open
   tension in RS-9.7). Strict P0 priority depends on RS-10.12. Port
