@@ -1447,23 +1447,23 @@ No-regrets work, correct under every surviving architecture (do first):
   deployed tree, and `deploy_base.sh` ships it again with every deploy
   (`docker-compose*.yml`, plus `deploy/` with the retired unit files). A
   manual `up` of it starts `image_rx` on `/dev/ttymxc3` with
-  `restart: unless-stopped`; only the bench broker on `127.0.0.1:1883`
-  blocks it, and RS13_2_DESK_CHECK Step 3 stops that broker. Proposed:
+  `restart: unless-stopped`; only a broker on `127.0.0.1:1883` blocks it
+  (the bench broker, or the desk broker during RS13_2_DESK_CHECK). Proposed:
   `deploy_base.sh` ships only `docker-compose.yml` and no `deploy/`, and
   the copy on the base is renamed `…RETIRED-<date>`, as on the tractor.
   Until then: BENCH_BOARDS.md "Retired boot units", rule 7.
-- [ ] **RS-5.19 First run of the 10-12 guards on the real boards** — the
-  retire step of `provision_bench_board.sh` and the unit guard of
-  `deploy_base.sh` were tested only against a fake board. Two of their
-  queries have never run on the boards' systemd 250: the `is-enabled` words
-  after a `disable`, and `systemctl show -p Job --value <unit>`, which must
-  print an empty line and return 0 when no job is queued, also for a unit
-  that is not installed. Both fail closed: if the job query answers
-  differently, the retire step changes nothing and `deploy_base.sh` refuses
-  to deploy. So check first, read-only, on each board:
-  `systemctl show -p Job --value lifetrac-base.service; echo "rc=$?"`, then
-  `provision_bench_board.sh <role> --check` (on the retired pair the item
-  must read `ok` with no info line; `--check` does not run the job query).
+- [~] **RS-5.19 First run of the 10-12 guards on the real boards** — checked
+  read-only on both boards on 2026-10-12
+  ([base](bench-evidence/board_state_2026-10-12_unit_retirement/base/20_provision_check.txt),
+  [tractor](bench-evidence/board_state_2026-10-12_unit_retirement/tractor/20_provision_check.txt)):
+  `systemctl show -p Job --value <unit>` prints an empty line and returns 0
+  for the retired (not installed) units, and
+  `provision_bench_board.sh <role> --check` reads `ok` for the retire item.
+  That run also found the script reading an ssh client warning as UART
+  holders on the base; fixed (`LogLevel=ERROR`, marker-form check).
+  **Still unrun on a board:** the apply path (the `is-enabled` words after a
+  real `disable`) and `deploy_base.sh` itself. Both fail closed; they first
+  run at the next deploy, or on a second board pair.
 
 ### RS-6 — Keyframe elimination (K-phases, now LoRa-only)
 

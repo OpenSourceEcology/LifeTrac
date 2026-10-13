@@ -172,10 +172,13 @@ unixpath() {  # scp reads C:/... as host "C": give it /c/... (e.g. --mosquitto-t
   if command -v cygpath >/dev/null 2>&1; then cygpath -u "$1"; else printf '%s' "$1"; fi
 }
 
-# on <adb|ssh> <serial|host> <command>: run a shell command on a board, CR stripped
+# on <adb|ssh> <serial|host> <command>: run a shell command on a board, CR stripped.
+# LogLevel=ERROR: stderr is merged into the output, and a client warning (OpenSSH 10
+# prints three "post-quantum key exchange" lines per connection) would otherwise be
+# read as command output. Connection errors still print.
 on() {
   if [ "$1" = ssh ]; then
-    ssh -i "$BASE_SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 "$BASE_USER@$2" "$3" 2>&1 | tr -d '\r'
+    ssh -i "$BASE_SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 -o LogLevel=ERROR "$BASE_USER@$2" "$3" 2>&1 | tr -d '\r'
   else
     MSYS_NO_PATHCONV=1 "$ADB" -s "$2" shell "$3" 2>&1 | tr -d '\r'
   fi
@@ -644,9 +647,15 @@ image_report() {  # image ids for the session record
   return 0
 }
 uart_report() {
-  local h
+  local out h
   if ! rtest 'command -v fuser'; then info "/dev/ttymxc3 holders: fuser not available on this image"; return; fi
-  h=$(rsh 'sudo -n fuser /dev/ttymxc3 2>/dev/null' | tr -s ' \n' ' ' | sed 's/^ //; s/ $//')
+  # The marker tells "nobody holds it" from "the query never ran" (as lib/bench_env.sh does).
+  out=$(rsh 'sudo -n fuser /dev/ttymxc3 2>/dev/null; echo; echo __UART_CHK_DONE__')
+  case $out in
+    *__UART_CHK_DONE__*) ;;
+    *) info "WARNING: /dev/ttymxc3 (radio UART) holders could not be read (sudo or transport)"; return ;;
+  esac
+  h=$(printf '%s\n' "$out" | grep -v '__UART_CHK_DONE__' | tr -s ' \n' ' ' | sed 's/^ //; s/ $//')
   if [ -z "$h" ]; then info "/dev/ttymxc3 (radio UART) is free"
   else info "WARNING: /dev/ttymxc3 (radio UART) is held by pid(s) $h"; fi
 }

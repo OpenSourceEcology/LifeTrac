@@ -92,6 +92,12 @@ boot.
 - `systemctl --failed` lists only the stock `psplash-start.service` on both
   boards.
 - `fuser /dev/ttymxc3` shows no holder on either board, before and after.
+- `provision_bench_board.sh <role> --check` (read-only), run against both
+  boards after the retirement, reads `ok` for "old boot units retired"
+  (`base/20_provision_check.txt`, `tractor/20_provision_check.txt`). The other
+  TODO lines there (the probe image on the base; the NetworkManager WiFi flag,
+  the stored WiFi profile and the camera provisioning on the tractor) are
+  older and not part of this change.
 - Not yet observed: the next boot. Expect the same failed list, and the base
   broker back Up through its own `unless-stopped` restart policy. The checks
   to run at that boot are in BENCH_BOARDS.md, "Not yet observed: the next

@@ -230,11 +230,14 @@ removes the bench broker container. A container stopped by hand stays down,
 across a reboot too, until Step 8 starts it. If the bench broker was not
 running in the `docker ps -a` above, record that and skip the stop.
 
-While the bench broker is stopped, nothing holds `127.0.0.1:1883`. That port
-is the only thing that keeps the video-test compose file in this directory
-from coming up by hand
-([BENCH_BOARDS](BENCH_BOARDS.md#rules), rule 7), so Rule 2 matters most
-between here and Step 8.
+`127.0.0.1:1883` being taken is the only thing that keeps the video-test
+compose file in this directory from coming up by hand
+([BENCH_BOARDS](BENCH_BOARDS.md#rules), rule 7). While the desk stack is up,
+its broker holds the port and blocks that file just as the bench broker does.
+The port is free only in the gaps: between the `docker stop` above and the
+desk `up`, between the desk `down` and the bench broker's start in Step 8,
+and after a base reboot in between, until the bench broker is started again.
+Rule 2 matters most in those gaps.
 
 If 1883 or 8080 is still taken after the stop, find out what holds it before
 going on; do not stop any other container you did not start without

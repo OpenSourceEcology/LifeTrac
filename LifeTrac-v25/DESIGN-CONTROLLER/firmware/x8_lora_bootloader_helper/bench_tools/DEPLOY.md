@@ -370,9 +370,12 @@ file the script saved and update the header.
   that un-parks the L072, and has `restart: unless-stopped`, so after one
   successful `up` it comes back at every boot until the container is
   removed. The only thing that makes a manual `up` of it fail is the bench
-  broker holding `127.0.0.1:1883`. While that broker is stopped (Step 3 to
-  Step 8 of [RS13_2_DESK_CHECK.md](RS13_2_DESK_CHECK.md), or after a base
-  reboot in between), nothing stops it. Never bring it up on the bench;
+  broker holding `127.0.0.1:1883`. Whenever nothing holds that port, nothing
+  stops it: in [RS13_2_DESK_CHECK.md](RS13_2_DESK_CHECK.md) that is the gap
+  between the bench broker's stop and the desk `up`, the gap between the desk
+  `down` and the bench broker's start, and after a base reboot in between
+  (while the desk stack is up, its broker holds the port). Never bring it up
+  on the bench;
   rule 7 in [BENCH_BOARDS.md](BENCH_BOARDS.md#rules) lists the repo-root May
   scripts that do.
 - On the tractor, `lifetrac-camera.service` (started by udev at boot) runs

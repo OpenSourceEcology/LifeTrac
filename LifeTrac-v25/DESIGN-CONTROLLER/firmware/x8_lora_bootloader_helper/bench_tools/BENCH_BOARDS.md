@@ -341,11 +341,12 @@ state on a re-provisioned board, in its item "old boot units retired":
    the container is removed. What makes a manual
    `docker compose -p lifetrac-vtest -f docker-compose.video-test.yml up`
    fail today is incidental again: its mosquitto wants `127.0.0.1:1883`,
-   which the bench broker holds. While that broker is stopped, nothing
-   stops it. That is the case between Step 3 and Step 8 of
-   [RS13_2_DESK_CHECK.md](RS13_2_DESK_CHECK.md), and after a base reboot in
-   between. The repo-root May scripts on this path, and what still blocks
-   each one:
+   which the bench broker holds. Whenever nothing holds that port, nothing
+   stops it. During [RS13_2_DESK_CHECK.md](RS13_2_DESK_CHECK.md) the desk
+   broker holds the port while the desk stack is up; the port is free only
+   between the bench broker's stop and the desk `up`, between the desk `down`
+   and the bench broker's start, and after a base reboot in between. The
+   repo-root May scripts on this path, and what still blocks each one:
    - `tmp_base_up.sh` (the whole stack) and `tmp_restart_image_rx.sh`
      (`image_rx` and, through `depends_on`, its mosquitto): port 1883, while
      the bench broker runs.
