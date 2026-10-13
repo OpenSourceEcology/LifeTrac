@@ -3661,6 +3661,38 @@ base-station X8.
   list. No new script; reuse `w2_01_camera_usb_guard.sh` with an extra
   VID:PID.
 
+### X8 Linux OS image — improvements (X8OS)
+
+From the 2026-10-13 analysis of a custom Gentoo build for the X8: **stay on
+LmP; Gentoo is not worth it** (no measurable speedup, since the hot code runs
+in Debian containers, and no effect on the H747). Rationale, current state and
+"done when" criteria for each item: [X8_OS_IMPROVEMENTS.md](X8_OS_IMPROVEMENTS.md).
+
+- [ ] **X8OS-1 Put the tractor on LmP 934** — it is the only board still on
+  674 / kernel 5.10 ([BENCH_SETUP.md §3](firmware/x8_lora_bootloader_helper/bench_tools/BENCH_SETUP.md)
+  already recommends 934 on both). Capture board state first, reflash per
+  [T3a](X8_HEALTH_AND_RECOVERY/recovery/T3a_sdp_uuu_reflash.md), and log the
+  first tractor-on-934 legs as a new configuration.
+- [ ] **X8OS-2 Baseline CPU, boot time and RAM on the tractor** — run
+  `tools_offline/encoder_perf` with the live pipeline up, time power-on to
+  services-ready and to first LoRa frame (`systemd-analyze blame`), record
+  per-container RSS. Then A/B a container with NumPy/OpenCV/libwebp built for
+  `-mcpu=cortex-a53`; adopt only if it moves a number that matters. Evidence
+  goes in a dated `bench-evidence/` folder.
+- [ ] **X8OS-3 Settle H747 flash ownership** — Linux reflashes stock x8h7
+  into bank 1 at every tractor boot, which would overwrite any LifeTrac M7
+  image. Decide x8h7 vs `tractor_h7` for the M7; if `tractor_h7`, fix its
+  linker overlap (starts at `0x08040000`, inside x8h7), choose the
+  Linux↔H747 link that replaces the bridge, and override
+  `stm32h7-program.service` in `/etc`. Identify or blank the unknown M4
+  sketch in bank 2. Record the pick in [DECISIONS.md](DECISIONS.md).
+- [ ] **X8OS-4 One custom LmP image when an item forces it** — build from
+  Arduino's LmP manifest, pinned and sha256-recorded like 934. Carry
+  `usbcore.autosuspend=-1` (W2-01.D3), the MIPI CSI overlay, the Coral
+  `gasket`/`apex` driver (base), a full host Python (`termios`), and drop
+  unused services (aktualizr-lite, compose-apps units) measured against
+  X8OS-2. Keeps OSTree rollback and the uuu recovery path.
+
 ---
 
 ## Phase 2 — Common firmware (shared by all three nodes)
