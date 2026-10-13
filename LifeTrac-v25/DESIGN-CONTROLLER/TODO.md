@@ -4129,12 +4129,29 @@ marked *(both)* also improve the X8's onboard H747.
 - [ ] **H7-7 P0–P3 TX scheduler on the M7** *(both)* — extend the two-class
   IP-107 queue to the four classes of
   [LORA_PROTOCOL.md](LORA_PROTOCOL.md#priority-class-policy-canonical), add the
-  refresh-cancelable P3 mailbox, an airtime ledger, and the "≤3 image frames
-  in flight at FHSS" rule from `murata_l072/config.h`. The L072 ring is pure
-  FIFO with no P0 slot (RS-10.12), so non-P0 frames must never fill more
-  than `HOST_TXQ_DEPTH − 1` slots, keeping one free for P0. Port
+  refresh-cancelable P3 mailbox and an airtime ledger. The L072 ring is pure
+  FIFO with no P0 lane, so until RS-10.12 lands this is a **bounded,
+  non-strict** policy ([PLATFORM_H7.md §6](PLATFORM_H7.md#6-scheduling-messages-between-the-two-h7s)
+  rule 2): at most `K` non-P0 frames in flight at the L072, at most one P0
+  in flight there (parked or on air), and no new non-P0 submits while a P0
+  waits. The gate and the `K` count are released by any terminal event:
+  `TX_DONE_URC`, an `ERR_PROTO_URC` with the frame's seq (including the
+  drain-time `FORBIDDEN` from `host_cmd_service_tx_mailbox()`), `BOOT_URC`
+  (clears everything), or a timeout from submit that allows one ToA ceiling
+  plus one slot for each frame ahead and for itself (lost URCs). A
+  `FAULT_URC` is not terminal: `main.c` emits diagnostic faults with the TX
+  ring intact, so it releases nothing. Waiting P0s keep LORA_PROTOCOL's
+  depth-1 latest-wins slot per source and kind, and `CMD_ESTOP` has its own
+  never-replaced slot that goes first. Defaults hold the §8.15 E-stop gate
+  (<500 ms p99): `K = 1` at FHSS (~400 ms worst case) and `K = 3` at DTS
+  (~390 ms). `K = 2` at FHSS (~560 ms) needs §8.15 formally revised first
+  (the open tension in RS-9.7). Strict P0 priority depends on RS-10.12. Port
   `pack_telemetry_fragments` to C. Extend `test_m7_tx_queue_sil.py` to four
-  classes and the ring limit first.
+  classes with a model of the FIFO ring before writing the C. Assert the
+  worst-case first-ESTOP wait for an ESTOP arriving behind an already-parked
+  P0, that every terminal event (including a drain-time error, a reset and a
+  lost URC) reopens the gate, that a `FAULT_URC` alone releases nothing, and
+  that no P0 of one source or kind ever replaces another's.
 - [ ] **H7-8 Pull-model camera protocol** — `REQ_FRAME(budget, now_ms)` from
   the tractor, one frame or "none" back, `capture_ms` on the tractor clock,
   mapped from the camera's own capture tick through an offset learned from

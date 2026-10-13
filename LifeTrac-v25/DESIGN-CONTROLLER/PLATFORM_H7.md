@@ -17,7 +17,7 @@ both builds.
 | Base station | **Easy** | The base H7 becomes a USB radio gateway. All of `base_station/` runs on an ordinary PC. The compose file already expects the radio on `/dev/ttyACM0`. |
 | Tractor control | **Moderate, and safer than today** | `tractor_h7` already compiles for a standalone Portenta H7 in CI, and on an H7 the realtime MCU owns the LoRa UART directly. The control application still has to be joined to the Method G radio transport (§4.1), which the X8 build needs too. |
 | Tractor video | **The hard part** | An H7 cannot host the UVC camera or the Python/OpenCV pipeline. The recommended answer is a second H7 with a camera (§5). |
-| Message scheduling | **Straightforward** | The P0–P3 policy is already specified, the image stream is tiny (a VS1 frame is one fragment: a `TileDeltaFrame` of at most 203 B at FHSS or 243 B at DTS), and a pull model keeps the camera from ever pushing the control MCU (§6). |
+| Message scheduling | **Straightforward** | The P0–P3 policy is already specified, the image stream is tiny (a VS1 frame is one fragment: a `TileDeltaFrame` of at most 203 B at FHSS or 243 B at DTS), and a pull model keeps the camera from ever pushing the control MCU. One caveat: the L072's TX ring is FIFO, so until it gets a priority lane (RS-10.12) a P0 frame's wait is bounded, not zero (§6). |
 | Repository | **One tree, two profiles** | Protocol, crypto and base code stay shared. H7 is a build profile plus two new sketches (§9). |
 
 Export classification has **not** been verified here. Confirm the ECCN of the
@@ -175,19 +175,36 @@ side: reassembly, canvas, VS1 decoder, renderer and web UI.
 ## 6. Scheduling messages between the two H7s
 
 Short answer: yes, it is straightforward, and simpler than on the X8, because
-one MCU owns the radio and the policy is already written down.
+one MCU owns the radio and the policy is already written down. The one limit
+is in the L072 firmware: its TX ring is FIFO, so the M7 can bound how long a
+P0 frame waits behind image frames but cannot make that wait zero until the
+firmware gets a priority-aware control lane (RS-10.12). Rule 2 below states
+the bound.
 
 **What already exists**
 
 - The normative P0–P3 policy ([LORA_PROTOCOL.md § Priority class policy](LORA_PROTOCOL.md#priority-class-policy-canonical)): strict priority with FIFO tiebreak, P0 depth-1 latest-wins, P3 refresh-cancelable, a new keyframe cancels stale fragments.
-- The L072 firmware keeps a 4-deep **FIFO** TX ring that answers `QUEUE_FULL` once full, and its config notes that at FHSS the host must keep at most 3 image frames in flight ([firmware/murata_l072/config.h](firmware/murata_l072/config.h), `HOST_TXQ_DEPTH`). **It does not reserve a slot for P0:** `HOST_TXQ_P0_RESERVED` is defined but referenced by no C code ([SETTINGS_REFERENCE.md](SETTINGS_REFERENCE.md) marks it dead; tracked as RS-10.12 in [TODO.md](TODO.md) and F5 in [CONTROL_PLANE_DESIGN.md](CONTROL_PLANE_DESIGN.md)). P0 priority is therefore entirely the host's job, which the design below has to enforce.
+- The L072 firmware keeps a 4-deep **FIFO** TX ring that answers `QUEUE_FULL` once full, and its config notes that at FHSS the host must keep at most 3 frames in flight to stay inside a 700 ms P0 budget (RS-9.7 adds that holding §8.15's 500 ms gate needs at most 2) ([firmware/murata_l072/config.h](firmware/murata_l072/config.h), `HOST_TXQ_DEPTH`). **It does not reserve a slot for P0:** `HOST_TXQ_P0_RESERVED` is defined but referenced by no C code ([SETTINGS_REFERENCE.md](SETTINGS_REFERENCE.md) marks it dead; tracked as RS-10.12 in [TODO.md](TODO.md) and F5 in [CONTROL_PLANE_DESIGN.md](CONTROL_PLANE_DESIGN.md)). P0 priority is therefore entirely the host's job, which the design below has to enforce.
 - The M7's IP-107 async TX queue in `tractor_h7.ino` (two classes today) and its SIL model `base_station/tests/test_m7_tx_queue_sil.py`.
 - The camera back-channel over `Serial1` in `tractor_h7.ino`.
 
 **Recommended design: the tractor pulls, the camera never pushes**
 
 1. The tractor M7 sends `REQ_FRAME(budget_bytes, now_ms)` only when the P3 mailbox has room and the airtime ledger allows another frame. The camera answers with at most one frame, or "none".
-2. **Non-P0 frames never fill more than `HOST_TXQ_DEPTH − 1` slots of the L072 ring**, so a P0 frame always has a free slot even though the firmware does not reserve one. If RS-10.12 later adds the firmware reservation, this rule stays as a second layer.
+2. **Bounded, not strict, P0 priority at the radio.** The M7's own queue drains strictly by priority, as LORA_PROTOCOL.md specifies. But once a frame is handed to the L072 it joins a FIFO ring and goes out in submit order (`host_cmd.c`: append at the tail, drain from the head), so a P0 can wait behind non-P0 frames already parked there. Until RS-10.12 / CONTROL_PLANE_DESIGN F5 adds a firmware control lane, the M7 enforces a bounded policy instead:
+   - At most `K` non-P0 frames in flight at the L072 (parked or on air).
+   - At most one P0 in flight at the L072, counting both a parked P0 and one on air. A submitted P0 cannot be recalled (the L072 has no cancel). The gate reopens on that P0's **terminal event**, whichever comes first:
+     - its `TX_DONE_URC`;
+     - an `ERR_PROTO_URC` carrying its seq: `QUEUE_FULL` at submit, or `FORBIDDEN` when `sx1276_tx_begin()` refuses the parked frame at drain time (`host_cmd_service_tx_mailbox()` in `host_cmd.c` pops it and emits no `TX_DONE`);
+     - a `BOOT_URC`, meaning the L072 reset and everything in flight is gone (the only event that clears all state at once). A `FAULT_URC` is not terminal: the firmware emits diagnostic faults from its running main loop (`main.c`) with the TX ring intact, so a fault releases nothing and the frame still waits for its own completion, error or timeout;
+     - a timeout, counted from submit, of one ToA ceiling plus one slot for each frame ahead of it and for itself, plus margin. It cannot fire while the frame is still legitimately queued, and it covers a lost URC (the RS-12 URC-overwrite race).
+
+     The same terminal events release the `K` count for non-P0 frames. After an error or timeout the M7 does not resend the old frame; the newest pending P0 goes next.
+   - P0 waiting keeps the disciplines in [LORA_PROTOCOL.md](LORA_PROTOCOL.md#priority-class-policy-canonical): one depth-1 latest-wins slot **per source and kind**, not one shared mailbox. `CMD_ESTOP` has its own slot that is never replaced and goes first whenever the gate opens. Its D4 burst (5 copies, ≥50 ms apart) passes through the gate one copy at a time.
+   - No new non-P0 frame is submitted while a P0 is waiting in the M7 mailbox, so nothing can join the ring ahead of it.
+   - Together these keep the ring at most `K + 1` deep (≤ `HOST_TXQ_DEPTH`), so a P0 submit is never refused with `QUEUE_FULL`. **The worst case for the first `CMD_ESTOP` copy** (the §8.15 metric) is an ESTOP that arrives just after another P0 was submitted behind `K` image frames: it waits for those `K` frames and the earlier P0, then its own transmission. Because the earlier P0 must finish before the next is submitted, at most `K` image frames can sit ahead of any submitted P0, so no sequence puts more than `K + 1` frames ahead of a waiting ESTOP. That is `K + 1` frames in flight ahead of it, which is what the "host in-flight" figures in RS-9.7 and `config.h` count: about 400 ms at FHSS with 2 in flight, about 560 ms at FHSS with 3, about 390 ms at DTS with 4. Any other P0 can additionally wait behind an ESTOP burst and at most one pending P0 of each other source and kind.
+   - **Defaults, held to the §8.15 field gate** (E-stop <500 ms p99, [MASTER_PLAN.md §8.15](MASTER_PLAN.md#815-field-test-gate--500-m-line-of-sight-1-frame-loss-10-min)): `K = 1` at FHSS (2 in flight, ~400 ms) and `K = 3` at DTS (4 in flight, ~390 ms). `K = 2` at FHSS (~560 ms) fits only the 700 ms operator budget, and RS-9.7 records that tension with §8.15 as open: use it only if §8.15 is formally revised. The SIL model must assert this arrival sequence, not just the image frames.
+   - Strict priority (P0 starts before any parked image frame) needs RS-10.12. When it lands, keep this bound as a second layer.
 3. Each frame carries `capture_ms` on the tractor clock. The camera does not use the request's `now_ms` as the capture time (the frame may have been captured before the request). Instead it records its own tick when each request arrives, keeps `offset = now_ms − local_rx_tick`, and stamps `capture_ms = local_capture_tick + offset`. Link latency over SPI or point-to-point Ethernet is well under a millisecond, so this keeps VS1's last-writer-wins capture times consistent without a separate time-sync protocol. A frame captured before the camera has seen any request is discarded.
 4. The M7 fragments (a C port of `pack_telemetry_fragments`; fragmenting exists only in Python today), queues the fragments as P3, and lets a new keyframe cancel stale ones.
 5. Downlink commands (`CMD_CAMERA_SELECT`, `CMD_REQ_KEYFRAME`, `CMD_ENCODE_MODE`, `CMD_ROI_HINT`) ride the same link to the camera.
@@ -196,10 +213,10 @@ one MCU owns the radio and the policy is already written down.
 8. Replace `ipc_to_h747.py`'s CRC-8 with CRC-16 or CRC-32 for the H7 link: CRC-8 is weak for multi-kilobyte keyframes.
 
 **What actually needs writing:** extend the IP-107 queue from two classes to
-P0–P3 with the P3 mailbox, the ring-occupancy limit of rule 2, the C
+P0–P3 with the P3 mailbox, the bounded ring admission of rule 2, the C
 fragmenter, an airtime ledger, and the camera-link driver. VS1 frames are single-fragment, which makes them the easy
-case. Multi-fragment tile keyframes are where the "≤3 frames in flight at
-FHSS" rule matters.
+case. Multi-fragment tile keyframes are where the in-flight limit `K` of
+rule 2 matters.
 
 ## 7. Base station on a Portenta H7 plus a PC
 
