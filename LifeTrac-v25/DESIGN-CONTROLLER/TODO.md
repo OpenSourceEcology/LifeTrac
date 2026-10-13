@@ -4131,10 +4131,14 @@ marked *(both)* also improve the X8's onboard H747.
   [LORA_PROTOCOL.md](LORA_PROTOCOL.md#priority-class-policy-canonical), add the
   refresh-cancelable P3 mailbox, an airtime ledger, and the "≤3 image frames
   in flight at FHSS" rule from `murata_l072/config.h`. The L072 ring is pure
-  FIFO with no P0 slot (RS-10.12), so non-P0 frames must never fill more
-  than `HOST_TXQ_DEPTH − 1` slots, keeping one free for P0. Port
-  `pack_telemetry_fragments` to C. Extend `test_m7_tx_queue_sil.py` to four
-  classes and the ring limit first.
+  FIFO with no P0 lane, so until RS-10.12 lands this is a **bounded,
+  non-strict** policy ([PLATFORM_H7.md §6](PLATFORM_H7.md#6-scheduling-messages-between-the-two-h7s)
+  rule 2): at most 3 non-P0 frames in flight at the L072, at most one P0
+  parked (a newer P0 waits latest-wins in the M7 mailbox), so a P0 submit
+  never hits `QUEUE_FULL` and its wait stays inside the 700 ms P0 budget.
+  Strict P0 priority depends on RS-10.12. Port `pack_telemetry_fragments` to
+  C. Extend `test_m7_tx_queue_sil.py` to four classes with a model of the
+  FIFO ring, and assert the worst-case P0 wait, before writing the C.
 - [ ] **H7-8 Pull-model camera protocol** — `REQ_FRAME(budget, now_ms)` from
   the tractor, one frame or "none" back, `capture_ms` on the tractor clock,
   mapped from the camera's own capture tick through an offset learned from

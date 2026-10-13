@@ -17,7 +17,7 @@ both builds.
 | Base station | **Easy** | The base H7 becomes a USB radio gateway. All of `base_station/` runs on an ordinary PC. The compose file already expects the radio on `/dev/ttyACM0`. |
 | Tractor control | **Moderate, and safer than today** | `tractor_h7` already compiles for a standalone Portenta H7 in CI, and on an H7 the realtime MCU owns the LoRa UART directly. The control application still has to be joined to the Method G radio transport (§4.1), which the X8 build needs too. |
 | Tractor video | **The hard part** | An H7 cannot host the UVC camera or the Python/OpenCV pipeline. The recommended answer is a second H7 with a camera (§5). |
-| Message scheduling | **Straightforward** | The P0–P3 policy is already specified, the image stream is tiny (a VS1 frame is one fragment: a `TileDeltaFrame` of at most 203 B at FHSS or 243 B at DTS), and a pull model keeps the camera from ever pushing the control MCU (§6). |
+| Message scheduling | **Straightforward** | The P0–P3 policy is already specified, the image stream is tiny (a VS1 frame is one fragment: a `TileDeltaFrame` of at most 203 B at FHSS or 243 B at DTS), and a pull model keeps the camera from ever pushing the control MCU. One caveat: the L072's TX ring is FIFO, so until it gets a priority lane (RS-10.12) a P0 frame's wait is bounded, not zero (§6). |
 | Repository | **One tree, two profiles** | Protocol, crypto and base code stay shared. H7 is a build profile plus two new sketches (§9). |
 
 Export classification has **not** been verified here. Confirm the ECCN of the
@@ -175,7 +175,11 @@ side: reassembly, canvas, VS1 decoder, renderer and web UI.
 ## 6. Scheduling messages between the two H7s
 
 Short answer: yes, it is straightforward, and simpler than on the X8, because
-one MCU owns the radio and the policy is already written down.
+one MCU owns the radio and the policy is already written down. The one limit
+is in the L072 firmware: its TX ring is FIFO, so the M7 can bound how long a
+P0 frame waits behind image frames but cannot make that wait zero until the
+firmware gets a priority-aware control lane (RS-10.12). Rule 2 below states
+the bound.
 
 **What already exists**
 
@@ -187,7 +191,11 @@ one MCU owns the radio and the policy is already written down.
 **Recommended design: the tractor pulls, the camera never pushes**
 
 1. The tractor M7 sends `REQ_FRAME(budget_bytes, now_ms)` only when the P3 mailbox has room and the airtime ledger allows another frame. The camera answers with at most one frame, or "none".
-2. **Non-P0 frames never fill more than `HOST_TXQ_DEPTH − 1` slots of the L072 ring**, so a P0 frame always has a free slot even though the firmware does not reserve one. If RS-10.12 later adds the firmware reservation, this rule stays as a second layer.
+2. **Bounded, not strict, P0 priority at the radio.** The M7's own queue drains strictly by priority, as LORA_PROTOCOL.md specifies. But once a frame is handed to the L072 it joins a FIFO ring and goes out in submit order (`host_cmd.c`: append at the tail, drain from the head), so a P0 can wait behind non-P0 frames already parked there. Until RS-10.12 / CONTROL_PLANE_DESIGN F5 adds a firmware control lane, the M7 enforces a bounded policy instead:
+   - At most `K` non-P0 frames in flight at the L072 (parked or on air), with `K = 3`, the FHSS ceiling in `murata_l072/config.h`. Lowering `K` while a control source is active trades image throughput for P0 latency.
+   - At most one P0 parked in the ring. A newer P0 replaces the older one in the M7's depth-1 latest-wins mailbox and is submitted when `TX_DONE_URC` frees the parked one. The parked P0 cannot be recalled (the L072 has no cancel), so the newest P0 goes out one frame later.
+   - Together these keep the ring at most `K + 1 = HOST_TXQ_DEPTH` deep, so a P0 submit is never refused with `QUEUE_FULL`, and they bound a P0's wait to the `K` image frames ahead of it. `config.h` puts that worst case at no more than about 560 ms at FHSS and 390 ms at DTS, inside the 700 ms operator P0 budget (RS-9.7).
+   - Strict priority (P0 starts before any parked image frame) needs RS-10.12. When it lands, keep this bound as a second layer.
 3. Each frame carries `capture_ms` on the tractor clock. The camera does not use the request's `now_ms` as the capture time (the frame may have been captured before the request). Instead it records its own tick when each request arrives, keeps `offset = now_ms − local_rx_tick`, and stamps `capture_ms = local_capture_tick + offset`. Link latency over SPI or point-to-point Ethernet is well under a millisecond, so this keeps VS1's last-writer-wins capture times consistent without a separate time-sync protocol. A frame captured before the camera has seen any request is discarded.
 4. The M7 fragments (a C port of `pack_telemetry_fragments`; fragmenting exists only in Python today), queues the fragments as P3, and lets a new keyframe cancel stale ones.
 5. Downlink commands (`CMD_CAMERA_SELECT`, `CMD_REQ_KEYFRAME`, `CMD_ENCODE_MODE`, `CMD_ROI_HINT`) ride the same link to the camera.
@@ -196,7 +204,7 @@ one MCU owns the radio and the policy is already written down.
 8. Replace `ipc_to_h747.py`'s CRC-8 with CRC-16 or CRC-32 for the H7 link: CRC-8 is weak for multi-kilobyte keyframes.
 
 **What actually needs writing:** extend the IP-107 queue from two classes to
-P0–P3 with the P3 mailbox, the ring-occupancy limit of rule 2, the C
+P0–P3 with the P3 mailbox, the bounded ring admission of rule 2, the C
 fragmenter, an airtime ledger, and the camera-link driver. VS1 frames are single-fragment, which makes them the easy
 case. Multi-fragment tile keyframes are where the "≤3 frames in flight at
 FHSS" rule matters.
