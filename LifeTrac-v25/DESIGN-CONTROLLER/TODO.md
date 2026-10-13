@@ -4082,6 +4082,101 @@ Lives in `base_station/web_ui/static/img/`. Capability floor = WebGL 2 + Canvas 
 
 ---
 
+## Portenta H7-only platform profile (H7)
+
+From the 2026-10-13 analysis for [issue #141](https://github.com/OpenSourceEcology/LifeTrac/issues/141)
+(the X8 may be export-restricted): an H7-only build is practical. The base
+becomes an H7 USB radio gateway plus a PC, the tractor H7 owns the radio
+directly, and video comes from a second H7 with a camera. Options, wiring
+facts and the scheduling design: [PLATFORM_H7.md](PLATFORM_H7.md). Items
+marked *(both)* also improve the X8's onboard H747.
+
+**Platform bring-up**
+
+- [ ] **H7-1 Confirm the Murata UART on Max Carrier + H7** — the ABX00043
+  pinout puts the L072 on HD SERIAL3 (J2-25/27) and the cell modem on HD
+  SERIAL1, so `Serial3` should be the radio. Verify the mbed
+  `PORTENTA_H7_M7` variant maps `Serial3` to those pins, ping the L072 with
+  `portenta_m7_l072_passthrough_ping`, then correct the "Serial3 is the
+  modem" exclusion in [BRINGUP_MAX_CARRIER.md §1.1](firmware/murata_l072/BRINGUP_MAX_CARRIER.md).
+- [ ] **H7-2 `firmware/base_h7_gateway/`** — USB-CDC ↔ L072 HostLink
+  passthrough plus L072 RESET/BOOT0 control, built from the
+  `LIFETRAC_MH_SOFT_BRIDGE` mode. Add an L072 flash path through the gateway
+  to `bench_tools/flash_l072.sh`.
+- [ ] **H7-3 Base stack on a PC** — run `base_station/` against the gateway
+  on `/dev/ttyACM0`; add a PC compose file and native-run notes (Docker
+  Desktop on Windows cannot pass a USB serial port through).
+- [ ] **H7-4 Join the control application to Method G** *(both)* — today the
+  Method G build runs only `mh_runtime`, while arbitration, Modbus master,
+  AES-GCM and the IP-107 queue exist only in the legacy RadioLib build, which
+  needs SX1276 SPI access the Max Carrier does not route. Drive them from
+  `TX_FRAME_REQ` / `RX_FRAME_URC` instead, behind a small radio-transport
+  interface so RadioLib remains a bench option.
+- [ ] **H7-5 Standalone tractor H7 milestone** — control and telemetry only
+  (no video): Method G link to the base gateway, Modbus to the bench Opta,
+  M4 100 Hz loop, failsafe timings re-measured on the H7.
+
+**Camera H7 and scheduling**
+
+- [ ] **H7-6 Camera link driver** — tractor H7 as SPI controller on J5 SPI1
+  with a data-ready line (in-enclosure camera), or UDP over Ethernet J17
+  (remote camera housing). Framing from `ipc_to_h747.py` with CRC-16/32 in
+  place of CRC-8, bounded reads per loop, stale flag in telemetry.
+- [ ] **H7-7 P0–P3 TX scheduler on the M7** *(both)* — extend the two-class
+  IP-107 queue to the four classes of
+  [LORA_PROTOCOL.md](LORA_PROTOCOL.md#priority-class-policy-canonical), add the
+  refresh-cancelable P3 mailbox, an airtime ledger, and the "≤3 image frames
+  in flight at FHSS" rule from `murata_l072/config.h`; port
+  `pack_telemetry_fragments` to C. Extend `test_m7_tx_queue_sil.py` to four
+  classes first.
+- [ ] **H7-8 Pull-model camera protocol** — `REQ_FRAME(budget, now_ms)` from
+  the tractor, one frame or "none" back, `capture_ms` on the tractor clock,
+  downlink `CMD_CAMERA_SELECT` / `CMD_REQ_KEYFRAME` / `CMD_ENCODE_MODE` /
+  `CMD_ROI_HINT`, and rate-limited `CMD_PERSON_APPEARED` raised only by the
+  tractor M7.
+- [ ] **H7-9 `firmware/camera_h7/`** — Portenta H7 + Vision Shield (mono)
+  first; Nicla Vision as the colour option. Port the VS1 encoder (OpenMV
+  MicroPython + `ulab` first, C where profiling says so), check the C/Python
+  bitstream against the golden vectors in `test_vs1_codec_parity_sil.py`, and
+  measure fps against the A53 estimate in VECTOR_SCENE.md §2. Add a small
+  on-device person detector; the safety case must not depend on it.
+- [ ] **H7-10 Mono VS1 behaviour** — define how VS1 behaves without colour
+  (grey fills, no L2 plants layer) and surface it in the UI badge.
+
+**Making better use of the H747** *(both)*
+
+- [ ] **H7-11 Sensors on the H7** — GPS and IMU on J5 I²C with timeouts and
+  bus recovery on the M7 (never the M4), PPS on a GPIO, logging to SDRAM ring
+  plus microSD, params in KVStore. Record the §8.10 rule change in
+  [DECISIONS.md](DECISIONS.md).
+- [ ] **H7-12 Hardware watchdog and fault capture** — independent watchdog
+  on each core, a reset-cause and HardFault record kept across reset in
+  backup SRAM, reported in the next telemetry frame.
+- [ ] **H7-13 Use the hardware RNG** for nonce seeds and key generation.
+- [ ] **H7-14 Dual-bank A/B firmware images** — use the H747's two flash
+  banks for a verified update with rollback (USB-only per MASTER_PLAN §8.16).
+- [ ] **H7-15 M7/M4 isolation** — MPU regions so the M7 cannot write the M4's
+  control state except through the shared-memory mailbox, with hardware
+  semaphores on that mailbox.
+- [ ] **H7-16 Loop-timing telemetry** — M4 loop jitter, M7 loop period and
+  queue depths in the health counters, so H7-5 and later changes are
+  measured, not assumed.
+
+**Docs, CI and procurement**
+
+- [ ] **H7-17 Platform profile switch** — `LIFETRAC_PLATFORM_X8` /
+  `LIFETRAC_PLATFORM_H7` in `lifetrac_build_config.h`; move the X8-only
+  units into `tractor_h7/platform_x8/`; CI jobs for the H7 profile with
+  `LIFETRAC_MH_SERIAL=Serial3`, `base_h7_gateway` and `camera_h7`.
+- [ ] **H7-18 Docs** — MASTER_PLAN §8.9 amendment listing both profiles, a
+  profile column in HARDWARE_BOM, and H7 variants of TRACTOR_NODE,
+  BASE_STATION, POWER_MANAGEMENT, FIRMWARE_UPDATES and the bench quickstart.
+- [ ] **H7-19 Export classification** — confirm the ECCN of the exact H7 SKU
+  and of the camera board (Vision Shield or Nicla Vision) with Arduino before
+  buying, and record it in the BOM.
+
+---
+
 ## Cross-cutting concerns (must address before Phase 7 integration)
 
 These items cut across all three nodes and don't fit neatly into a single phase. Address each before end-to-end integration testing.

@@ -43,6 +43,7 @@ This folder contains the **primary controller design** for the LifeTrac v25 trac
 
 ## Cross-cutting reference docs
 
+- **[PLATFORM_H7.md](PLATFORM_H7.md)** — H7-only platform profile (issue #141): base H7 radio gateway + PC, tractor H7 owning the radio, second-H7 camera options, P0–P3 scheduling
 - **[X8_OS_IMPROVEMENTS.md](X8_OS_IMPROVEMENTS.md)** — X8 Linux image plan: stay on LmP (not Gentoo), align both boards on 934, H747 flash ownership, custom LmP triggers
 - **[VIDEO_OPTIONS.md](VIDEO_OPTIONS.md)** — wireless video streaming analysis (LoRa thumbnails on the air; WiFi/cellular alternatives are archived)
 - **[ARDUINO_CI.md](ARDUINO_CI.md)** — Arduino-CLI continuous integration setup
