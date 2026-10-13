@@ -97,8 +97,12 @@ Get numbers for the three things a different OS could change.
 Then test the Gentoo performance claim without changing the OS: rebuild the
 tractor container with NumPy, OpenCV and libwebp compiled for
 `-mcpu=cortex-a53`, and run the same encoder bench. Adopt it only if it moves
-a number that matters, and pin it in `requirements.lock.txt` like any other
-build input.
+a number that matters. `requirements.lock.txt` alone cannot pin it: it holds
+only `name==version`, which a stock PyPI wheel and a locally tuned wheel of
+the same version both satisfy. Commit the build recipe instead (the
+Dockerfile stage or script, with compiler, toolchain version and flags), and
+record the tuned wheels' sha256 and the resulting image digest beside it, as
+the bench already pins the flown base image by digest.
 
 **Done when:** a dated `bench-evidence/` folder holds the baseline and the
 tuned-container A/B.
@@ -115,12 +119,27 @@ stock x8h7 at boot, so any LifeTrac M7 image would be lost on the next reboot.
    replaces the x8h7 bridge (a UART or an RPMsg-style shared-memory channel),
    and override `stm32h7-program.service` in `/etc` so it no longer reflashes
    bank 1. `/etc` is writable under OSTree, so this needs no new image.
+   **Do not mask the unit or let it fail.** On LmP 934, `m4-proxy.service`
+   and ModemManager (`dbus-org.freedesktop.ModemManager1.service`) both
+   declare `Requires=stm32h7-program.service`
+   ([base capture](bench-evidence/board_state_2026-10-04/base/12_unit_cat.txt),
+   [ModemManager unit](bench-evidence/board_state_2026-10-04/base/files/etc/systemd/system/dbus-org.freedesktop.ModemManager1.service)),
+   so a masked or failing unit stops them too. Use a drop-in that replaces
+   `ExecStart` with a step that exits 0, ideally after a read-only check that
+   bank 1 holds the expected LifeTrac image. The unit's `ExecStartPre` and
+   `ExecStartPost` load the x8h7 kernel modules, which have nothing to talk
+   to once x8h7 is gone, so the drop-in clears those too. Then decide each
+   dependent on purpose: `m4-proxy` serves only Arduino M4 sketches, and the
+   cellular modem is out of scope for v25 ([MASTER_PLAN.md](MASTER_PLAN.md),
+   "Out of scope"), so disabling them is a choice to record, not a side effect.
 3. Identify and either document or blank the unknown M4 sketch in bank 2
    (the openocd dump in BENCH_BOARDS *Open items*).
 4. Record the decision in [DECISIONS.md](DECISIONS.md).
 
 **Done when:** a reboot leaves the chosen M7 and M4 images in place, verified
-by readback, and the decision is in DECISIONS.md.
+by readback; `stm32h7-program.service` is `active` and `systemctl --failed`
+is empty; every unit that requires it (`m4-proxy`, ModemManager) is either
+running or deliberately disabled; and the decision is in DECISIONS.md.
 
 ### X8OS-4 Build a custom LmP image when an item forces it
 

@@ -3677,15 +3677,19 @@ in Debian containers, and no effect on the H747). Rationale, current state and
   `tools_offline/encoder_perf` with the live pipeline up, time power-on to
   services-ready and to first LoRa frame (`systemd-analyze blame`), record
   per-container RSS. Then A/B a container with NumPy/OpenCV/libwebp built for
-  `-mcpu=cortex-a53`; adopt only if it moves a number that matters. Evidence
-  goes in a dated `bench-evidence/` folder.
+  `-mcpu=cortex-a53`; adopt only if it moves a number that matters, and pin
+  it by build recipe, wheel sha256 and image digest (`requirements.lock.txt`
+  holds only versions). Evidence goes in a dated `bench-evidence/` folder.
 - [ ] **X8OS-3 Settle H747 flash ownership** — Linux reflashes stock x8h7
   into bank 1 at every tractor boot, which would overwrite any LifeTrac M7
   image. Decide x8h7 vs `tractor_h7` for the M7; if `tractor_h7`, fix its
   linker overlap (starts at `0x08040000`, inside x8h7), choose the
   Linux↔H747 link that replaces the bridge, and override
-  `stm32h7-program.service` in `/etc`. Identify or blank the unknown M4
-  sketch in bank 2. Record the pick in [DECISIONS.md](DECISIONS.md).
+  `stm32h7-program.service` in `/etc` with a drop-in that still exits 0
+  (never mask it: `m4-proxy` and ModemManager `Requires=` it on 934). Accept
+  only with the unit `active`, `systemctl --failed` empty, and each dependent
+  running or deliberately disabled. Identify or blank the unknown M4 sketch
+  in bank 2. Record the pick in [DECISIONS.md](DECISIONS.md).
 - [ ] **X8OS-4 One custom LmP image when an item forces it** — build from
   Arduino's LmP manifest, pinned and sha256-recorded like 934. Carry
   `usbcore.autosuspend=-1` (W2-01.D3), the MIPI CSI overlay, the Coral
