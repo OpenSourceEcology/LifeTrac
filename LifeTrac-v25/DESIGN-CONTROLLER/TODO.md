@@ -4133,15 +4133,24 @@ marked *(both)* also improve the X8's onboard H747.
   FIFO with no P0 lane, so until RS-10.12 lands this is a **bounded,
   non-strict** policy ([PLATFORM_H7.md §6](PLATFORM_H7.md#6-scheduling-messages-between-the-two-h7s)
   rule 2): at most `K` non-P0 frames in flight at the L072, at most one P0
-  in flight there (parked or on air, so its `TX_DONE_URC` gates the next P0,
-  which waits latest-wins in the M7 mailbox), and no new non-P0 submits
-  while a P0 waits. Defaults hold the §8.15 E-stop gate (<500 ms
-  p99): `K = 1` at FHSS (~400 ms worst case) and `K = 3` at DTS (~390 ms).
+  in flight there (parked or on air), and no new non-P0 submits while a P0
+  waits. The gate and the `K` count are released by any terminal event:
+  `TX_DONE_URC`, an `ERR_PROTO_URC` with the frame's seq (including the
+  drain-time `FORBIDDEN` from `host_cmd_service_tx_mailbox()`), `BOOT_URC` /
+  `FAULT_URC`, or a timeout from submit that allows one ToA ceiling plus one
+  slot for each frame ahead and for itself (lost URCs). Waiting P0s keep
+  LORA_PROTOCOL's depth-1 latest-wins slot per source and kind, and
+  `CMD_ESTOP` has its own never-replaced slot that goes first. Defaults hold
+  the §8.15 E-stop gate (<500 ms p99): `K = 1` at FHSS (~400 ms worst case)
+  and `K = 3` at DTS (~390 ms).
   `K = 2` at FHSS (~560 ms) needs §8.15 formally revised first (the open
   tension in RS-9.7). Strict P0 priority depends on RS-10.12. Port
   `pack_telemetry_fragments` to C. Extend `test_m7_tx_queue_sil.py` to four
-  classes with a model of the FIFO ring, and assert the worst-case P0 wait
-  for a P0 arriving behind an already-parked P0, before writing the C.
+  classes with a model of the FIFO ring before writing the C. Assert the
+  worst-case first-ESTOP wait for an ESTOP arriving behind an already-parked
+  P0, that every terminal event (including a drain-time error, a reset and a
+  lost URC) reopens the gate, and that no P0 of one source or kind ever
+  replaces another's.
 - [ ] **H7-8 Pull-model camera protocol** — `REQ_FRAME(budget, now_ms)` from
   the tractor, one frame or "none" back, `capture_ms` on the tractor clock,
   mapped from the camera's own capture tick through an offset learned from
