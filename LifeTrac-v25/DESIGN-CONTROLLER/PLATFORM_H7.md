@@ -196,7 +196,7 @@ the bound.
    - At most one P0 in flight at the L072, counting both a parked P0 and one on air. A submitted P0 cannot be recalled (the L072 has no cancel). The gate reopens on that P0's **terminal event**, whichever comes first:
      - its `TX_DONE_URC`;
      - an `ERR_PROTO_URC` carrying its seq: `QUEUE_FULL` at submit, or `FORBIDDEN` when `sx1276_tx_begin()` refuses the parked frame at drain time (`host_cmd_service_tx_mailbox()` in `host_cmd.c` pops it and emits no `TX_DONE`);
-     - a `BOOT_URC` or `FAULT_URC`, meaning the L072 reset and everything in flight is gone;
+     - a `BOOT_URC`, meaning the L072 reset and everything in flight is gone (the only event that clears all state at once). A `FAULT_URC` is not terminal: the firmware emits diagnostic faults from its running main loop (`main.c`) with the TX ring intact, so a fault releases nothing and the frame still waits for its own completion, error or timeout;
      - a timeout, counted from submit, of one ToA ceiling plus one slot for each frame ahead of it and for itself, plus margin. It cannot fire while the frame is still legitimately queued, and it covers a lost URC (the RS-12 URC-overwrite race).
 
      The same terminal events release the `K` count for non-P0 frames. After an error or timeout the M7 does not resend the old frame; the newest pending P0 goes next.
