@@ -1384,7 +1384,7 @@ No-regrets work, correct under every surviving architecture (do first):
   board was rebooted, so the next boot is not yet observed. Record:
   [`bench-evidence/board_state_2026-10-12_unit_retirement/README.md`](bench-evidence/board_state_2026-10-12_unit_retirement/README.md);
   rules: [BENCH_BOARDS.md](firmware/x8_lora_bootloader_helper/bench_tools/BENCH_BOARDS.md),
-  "Retired boot units". Follow-ups RS-5.11 – RS-5.19; none needs a radio GO.
+  "Retired boot units". Follow-ups RS-5.11 – RS-5.20; none needs a radio GO.
 - [ ] **RS-5.11 Redesign the production base unit before it is installed
   anywhere** —
   [`base_station/systemd/lifetrac-base.service`](base_station/systemd/lifetrac-base.service)
