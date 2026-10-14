@@ -1417,41 +1417,39 @@ No-regrets work, correct under every surviving architecture (do first):
 - [ ] **RS-5.14 Tractor: 335 anonymous docker volumes** — counted in the 10-12
   preflight. Probably leftovers of repeated mosquitto `docker run`s (cause
   unverified). Cleanup candidate; deleting them needs the operator's OK.
-- [ ] **RS-5.15 Delete or archive the May one-off scripts** — 24 scripts in the
-  repo root and
-  `firmware/x8_lora_bootloader_helper/tractor_restart_video_test.sh` install
-  these units, start a radio daemon, remove the bench broker, or (the five
-  build one-offs `base_build_bg.sh`, `tmp_base_build.sh`,
-  `tmp_base_prune_build.sh`, `_bench_build3.ps1`, `_bench_build4.ps1`) build
-  on the base and move `lifetrac-v25:latest` off the flown image. Each now
-  opens with a "DO NOT RUN on a bench board" (or "bench base") comment that
-  names its rule in BENCH_BOARDS.md, "Retired boot units" (rules 1, 4, 6, 7
-  and 8). Delete or archive them, and in the same change reduce those rules
-  to a list of the removed names.
-- [ ] **RS-5.16 `firmware/tractor_x8/systemd/*.service` are installed on
-  neither bench board** — four April sketches (camera, logger, params, time;
-  `a90ae759`, 2026-04-27). They run host `python3` from
-  `/opt/lifetrac/firmware/tractor_x8/`, which does not exist on the tractor,
-  and three want a host `mosquitto.service`. The tractor's installed
-  `lifetrac-camera.service` is a different file,
-  `firmware/x8_lora_bootloader_helper/lifetrac-camera.service`
-  ([10-10 capture](bench-evidence/board_state_2026-10-10/tractor/12_unit_cat.txt)).
-  Mark them obsolete or delete them; `SETTINGS_REFERENCE.md:588-590` lists
-  them as `live`.
+- [x] **RS-5.15 Delete the May one-off scripts — DONE 2026-10-14.** The 24
+  repo-root scripts and
+  `firmware/x8_lora_bootloader_helper/tractor_restart_video_test.sh` are
+  deleted: each opened with "DO NOT RUN on a bench board" (or "bench base")
+  and installed the retired units, started a radio daemon, removed the bench
+  broker, or built on the base over the flown image. The last commit that has
+  them is `cfb93d8`. BENCH_BOARDS.md "Retired boot units" rules 1, 4, 6, 7
+  and 8 now only list the removed names.
+- [x] **RS-5.16 `firmware/tractor_x8/systemd/*.service` marked obsolete —
+  DONE 2026-10-14.** The four April sketches (camera, logger, params, time;
+  `a90ae759`, 2026-04-27) are installed on neither bench board. Each now
+  opens with an "OBSOLETE - DO NOT INSTALL." header, like the `deploy/`
+  units, and `SETTINGS_REFERENCE.md:588-590` read `deprecated`. The tractor's
+  installed camera unit is still
+  `firmware/x8_lora_bootloader_helper/lifetrac-camera.service` (RS-5.13).
+  Rows 580-584 (`logger_service`, `params_service`) still read `live`
+  although nothing else runs them; check them with RS-5.11.
 - [ ] **RS-5.17 Runbooks still assume `lifetrac-base` is installed** —
   `HIL_RUNBOOK.md:45`, `:815`, `hil/_common.ps1:100` and
   `FIRMWARE_UPDATES.md:50` tell the reader to watch
   `journalctl -u lifetrac-base`. Rewrite them when RS-5.11 lands.
-- [ ] **RS-5.18 Disarm the base's video-test compose file (needs the
-  operator's OK)** — `docker-compose.video-test.yml` is still in the base's
-  deployed tree, and `deploy_base.sh` ships it again with every deploy
-  (`docker-compose*.yml`, plus `deploy/` with the retired unit files). A
-  manual `up` of it starts `image_rx` on `/dev/ttymxc3` with
-  `restart: unless-stopped`; only a broker on `127.0.0.1:1883` blocks it
-  (the bench broker, or the desk broker during RS13_2_DESK_CHECK). Proposed:
-  `deploy_base.sh` ships only `docker-compose.yml` and no `deploy/`, and
-  the copy on the base is renamed `…RETIRED-<date>`, as on the tractor.
-  Until then: BENCH_BOARDS.md "Retired boot units", rule 7.
+- [~] **RS-5.18 Disarm the base's video-test compose file — done in the bench
+  kit 2026-10-14 (operator OK); not yet run on the base.**
+  - `deploy_base.sh` ships only `base_station/ firmware/ Dockerfile
+    docker-compose.yml`: no `docker-compose.video-test.yml`, no `deploy/`
+    (an old `deploy/` goes with the clean; the backup keeps it).
+  - Before the backup it renames an old `docker-compose.video-test.yml` in
+    the deployed tree to `docker-compose.video-test.yml.RETIRED-<PC UTC
+    date>`, only while every container made from that file is exited, and
+    never runs `docker compose` on it.
+  - Until the next `deploy_base.sh` run the copy on the base stays armed
+    (BENCH_BOARDS.md "Retired boot units", rule 7). Close this item when that
+    run's log shows the rename.
 - [~] **RS-5.19 First run of the 10-12 guards on the real boards** — checked
   read-only on both boards on 2026-10-12
   ([base](bench-evidence/board_state_2026-10-12_unit_retirement/base/20_provision_check.txt),
@@ -1461,9 +1459,32 @@ No-regrets work, correct under every surviving architecture (do first):
   `provision_bench_board.sh <role> --check` reads `ok` for the retire item.
   That run also found the script reading an ssh client warning as UART
   holders on the base; fixed (`LogLevel=ERROR`, marker-form check).
-  **Still unrun on a board:** the apply path (the `is-enabled` words after a
-  real `disable`) and `deploy_base.sh` itself. Both fail closed; they first
-  run at the next deploy, or on a second board pair.
+  **Since 2026-10-14** (Copilot review of #144) the retire check passes only
+  units systemd cannot load (no unit file, or a mask that is a symlink to
+  `/dev/null`) and requires `job=` exactly; `alias`, `indirect`,
+  `generated`, `transient` and the `-runtime` forms are refused with a
+  message, never changed.
+  **Still unrun on a board:**
+  - the apply path (the `is-enabled` words after a real `disable`), and the
+    new refusals, so far exercised only against a fake board;
+  - `deploy_base.sh` itself, now with the video-test guard and rename
+    (RS-5.18).
+
+  At the first run, capture `systemctl --version` on the base (only the
+  tractor's, 250, is on record), each retired unit's `is-enabled` reply, and
+  `ls -l docker-compose.video-test.yml*` in the deployed tree before and
+  after. All of these fail closed; they first run at the next deploy, or on a
+  second board pair. Not checked by the retire item: units moved by hand
+  without a `daemon-reload`, and dangling `multi-user.target.wants` links
+  (the `units_gone` guard in BENCH_BOARDS.md catches those).
+- [ ] **RS-5.20 The tractor's video-test compose files reach the base**
+  (found 2026-10-14) — `firmware/tractor_x8/docker-compose.video-test.yml`,
+  `docker-compose.video-test.v2.yml` and `mosquitto.video-test.conf` ship to
+  the base inside `firmware/`, which the base Dockerfile COPYs in full. Both
+  compose files run `image_tx` on `/dev/ttymxc3` with
+  `restart: unless-stopped` and publish no ports, so no broker blocks a
+  manual `up` of them on the base. Decide: keep them out of the base archive
+  and image, or rename or delete them in git.
 
 ### RS-6 — Keyframe elimination (K-phases, now LoRa-only)
 
