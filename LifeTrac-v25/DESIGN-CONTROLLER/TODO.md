@@ -2791,8 +2791,8 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   The reverse-delivery half below still stands.**
 - [~] **RS-12.15 (reverse-delivery half) — the tractor's RX does not follow
   the slot clock between trains (opened 2026-09-12 from RS-12.12/14 data).**
-  **FIX CODED 2026-10-14 (de2ae16 + f9cc98b, final-FAIL guard 65963c1), SIL
-  green. NOT built for the boards, NOT flashed (needs the GO).** On v2 the
+  **FIX CODED 2026-10-14 (de2ae16 + f9cc98b; review fixes 65963c1, 1b45cfa),
+  SIL green. NOT built for the boards, NOT flashed (needs the GO).** On v2 the
   self-anchored TX clock survives demotion, but `sx1276_rx_slot_follow` still
   ran only while LOCKED, so between trains the tractor listened on its last TX
   channel or the scan walker's (v2 legs R/T/U: 19/72, 2/43, 7/49 commands
@@ -2804,12 +2804,14 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   grid without authority (the RS-13 decay window) no longer follows. The final
   scan FAIL still commits FAILED and sends its fault, but it no longer parks
   the receiver under authority (the follower would re-arm only at the next
-  slot boundary).
-  `check-rx-reverse-delivery` (9 SIL sequences, real sx1276_rx.c/tx.c): 17/59
+  slot boundary). A walker step skipped under authority still starts a fresh
+  window for the FAIL sub-byte's IRQ and CRC flags.
+  `check-rx-reverse-delivery` (10 SIL sequences, real sx1276_rx.c/tx.c): 17/59
   -> 59/59 between trains, 15/28 -> 28/28 (leg H shape), 159/182 -> 182/182
   (leg I shape), 10/33 -> 33/33 in scan FAILED, 0/1 -> 1/1 with a command on
-  air at the final FAIL; the follower's radio calls are identical to pre-fix;
-  the remaining misses are half-duplex collisions.
+  air at the final FAIL; FAIL sub-bytes after a CRC error match main's; the
+  follower's radio calls are identical to pre-fix; the remaining misses are
+  half-duplex collisions.
   Limit: authority only, so at 1 fps, or ~3.5 s after a >= 1 s stall, it is
   the old behaviour.
   **BENCH (no radio):** build both images on the bench PC with the reference
