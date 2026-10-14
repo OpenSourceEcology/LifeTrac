@@ -356,14 +356,21 @@ file the script saved and update the header.
   to run while one is anything but `failed` or `inactive`, or has a systemd
   job queued. It never installs, enables or starts them, and the bench kit
   does not install the unit files in `deploy/`.
-  `provision_bench_board.sh` retires the units of the board's role while
-  they are `failed` or `inactive`: `systemctl disable` without `--now`, then
-  the unit files and `.d` directories moved to
-  `/etc/lifetrac-retired/<PC UTC time>/`. A unit that is already disabled
-  but still has its file in `/etc/systemd/system` is moved the same way. If
-  a unit is active, starting or stopping, or has a job queued, that step
-  fails and changes nothing. It reports leftover containers and never
-  removes them.
+  `provision_bench_board.sh` reads its item "old boot units retired" as `ok`
+  only when systemd cannot load the units of the board's role from a file:
+  `is-enabled` finds no unit file and nothing of that name is left in
+  `/etc/systemd/system`, or the unit is masked by a symlink to `/dev/null`
+  there; and each is `inactive` or `failed` with no job queued. Otherwise it
+  retires them while they are `failed` or `inactive`: `systemctl disable`
+  without `--now`, then the unit files, `.d` directories and any symlink
+  there that is not a mask moved to `/etc/lifetrac-retired/<PC UTC time>/`.
+  A unit that is already disabled but still has its file in
+  `/etc/systemd/system` is moved the same way. If a unit is active, starting
+  or stopping, has a job queued, or is in a state a disable and a move cannot
+  retire (a `-runtime` form, `alias`, `indirect`, `generated`, `transient`),
+  that step fails and changes nothing. It reports leftover containers and
+  never removes them. The full rule is in
+  [BENCH_BOARDS.md](BENCH_BOARDS.md#retired-boot-units-2026-10-12).
 - **The base's video-test compose file is still armed.**
   `docker-compose.video-test.yml` is in the deployed tree, and every deploy
   ships it again. Its `image_rx` maps `/dev/ttymxc3`, sends a soft RESET_REQ

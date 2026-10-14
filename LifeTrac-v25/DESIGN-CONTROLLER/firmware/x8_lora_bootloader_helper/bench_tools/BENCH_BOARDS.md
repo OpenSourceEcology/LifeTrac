@@ -238,24 +238,44 @@ harness containers, the `x8-*` containers, all volumes and all images.
 [`provision_bench_board.sh`](provision_bench_board.sh) now enforces this
 state on a re-provisioned board, in its item "old boot units retired":
 
-- The item is `ok` when each unit of the board's role is neither enabled nor
-  active, and neither its unit file nor its `<unit>.d` directory is left in
-  `/etc/systemd/system` (a symlink there, such as a mask, passes). A board
-  that never had the units passes.
-- Otherwise, and only while every listed unit is `failed` or `inactive` and
-  systemd has no start or stop job queued for it, the script runs
-  `systemctl disable` without `--now` and `systemctl reset-failed`, moves the
-  unit files and `.d` directories into a new
+- The item is `ok` only when systemd cannot load any unit of the board's
+  role from a file. For each unit, either `systemctl is-enabled` finds no
+  unit file and nothing named `<unit>` is left in `/etc/systemd/system`, or
+  it reads `masked` and `/etc/systemd/system/<unit>` is a symlink to
+  `/dev/null`. The unit must also be `inactive` or `failed`, with no
+  `<unit>.d` left there and no job queued. On both boards (systemd 250 on the
+  tractor) "no unit file" is no word at all, only `Failed to get unit file
+  state for <unit>: No such file or directory`; later systemd versions print
+  `not-found`. "No job" is an empty line from
+  `systemctl show -p Job --value <unit>`, as both boards answered on
+  2026-10-12. Every other `is-enabled` word names a unit file that systemd
+  can still load, and start by hand, from udev or as another unit's
+  dependency: `enabled`, `linked` (a `systemctl link` symlink), `alias`,
+  `static`, `indirect`, `disabled`, `generated`, `transient` and the
+  `-runtime` forms (systemctl(1), `is-enabled`). A board that never had the
+  units passes.
+- Otherwise the script retires them, but only while every listed unit is
+  `failed` or `inactive`, has no start or stop job queued, and reads
+  `enabled`, `disabled`, `static`, `linked`, `masked` or no unit file, with
+  `/etc/systemd/system/<unit>` matching that word (a file or a symlink, a
+  symlink to `/dev/null` for `masked`, nothing or a dangling symlink for no
+  unit file). It runs `systemctl disable` without `--now` and
+  `systemctl reset-failed` (not for a masked unit), moves the unit files,
+  the `.d` directories and any symlink there that is not a mask into a new
   `/etc/lifetrac-retired/<PC UTC time>/`, writes a `README.txt` there, and
-  runs `systemctl daemon-reload`. A unit that is already disabled but still
-  has its file there is moved the same way.
+  runs `systemctl daemon-reload`. A mask stays. A unit that is already
+  disabled but still has its file there is moved the same way.
 - If a listed unit is `active`, `activating`, `deactivating` or `reloading`,
-  or has a job queued (early in a boot an enabled unit reads `inactive` while
-  its start job waits), the item is `FAILED`, nothing is changed, and the
-  script prints what to do (rule 3). The board reads the state once more
-  right before each unit's `disable`. If a unit has changed by then, it is
-  refused there: units handled before it stay disabled, no file is moved,
-  and the item is `FAILED`.
+  has a job queued (early in a boot an enabled unit reads `inactive` while
+  its start job waits), or reads any other `is-enabled` word or one that
+  does not match its path, the item is `FAILED`, nothing is changed, and the
+  script prints what to do (rule 3 for a unit that runs). A `-runtime` form
+  lives in `/run` until the next boot and a plain `disable` does not touch
+  it; `alias` and `indirect` would make `disable` act on other units;
+  `generated` and `transient` units have no file in `/etc/systemd/system`.
+  The board reads the state once more right before each unit's `disable`.
+  If a unit has changed by then, it is refused there: units handled before
+  it stay disabled, no file is moved, and the item is `FAILED`.
 - With `--check` nothing is changed: the item reads `TODO` (exit 3), and
   info lines name the unit or the leftover file that is the reason.
 - A query to the board that does not answer never reads as `ok`: the item
@@ -399,21 +419,26 @@ a tool for another pair.
 **Step 2: remove the leftover containers by hand.** Run these as `fio` on
 the board, the base over ssh and the tractor in `adb shell`. Each cleanup is
 a shell function, so a guard that fails returns before anything is removed.
-The commands and guards are those of the 10-12 scripts; wrapped in functions
-like this they have not been run on a board. The container lists and the
-states the guards expect are those of the original pair; if a guard aborts
-on another pair, stop and look.
+The commands and guards are those of the 10-12 scripts, except that
+`units_gone` now accepts only the `is-enabled` replies the script's item
+accepts (2026-10-14); wrapped in functions like this they have not been run
+on a board. The container lists and the states the guards expect are those
+of the original pair; if a guard aborts on another pair, stop and look.
 
 On both boards, first:
 
 ```sh
 export PATH=$PATH:/usr/sbin:/sbin
 uart_chk() { sudo -n sh -c 'if command -v fuser >/dev/null; then fuser /dev/ttymxc3; echo; echo __UART_CHK_DONE__; else echo __UART_NO_FUSER__; fi' 2>&1; }
-units_gone() {   # units_gone <unit>...: fails unless every unit is not enabled, not active and has no wants link left
+units_gone() {   # units_gone <unit>...: fails unless systemd finds no unit file for each unit (or a /dev/null mask), each is inactive or failed, and no wants link is left
   for u in "$@"; do
     e=$(systemctl is-enabled "$u" 2>&1); a=$(systemctl is-active "$u" 2>/dev/null)
     echo "$u: is-enabled=[$e] is-active=[$a]"
-    case $e in enabled*) echo "ABORT: $u is still enabled"; return 1 ;; esac
+    case $e in
+      "Failed to get unit file state for $u: No such file or directory"|not-found) ;;
+      masked) [ "$(readlink "/etc/systemd/system/$u")" = /dev/null ] || { echo "ABORT: $u is masked, but not by a symlink to /dev/null"; return 1; } ;;
+      *) echo "ABORT: systemd can still load $u"; return 1 ;;
+    esac
     case $a in inactive|failed) ;; *) echo "ABORT: $u is not inactive or failed"; return 1 ;; esac
     if [ -L "/etc/systemd/system/multi-user.target.wants/$u" ]; then echo "ABORT: $u still has a wants link"; return 1; fi
   done
