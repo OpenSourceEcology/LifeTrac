@@ -3377,8 +3377,30 @@ explicit GO)
   Running it needs the rebuilt base image. A rehearsal already found renderer
   gaps F1–F10: the RESYNC chip is clipped, the buttons cover the banner, and
   fail-closed rules 1 and 5 are missing.
-- [ ] VECTOR_SCENE.md amendments listed in #138 (design owner), plus #138's
-  DIGEST exit from resync (§4.3).
+- [~] **VECTOR_SCENE.md amendments** listed in #138, #138's DIGEST exit from
+  resync (§4.3) and the A16 fix (#143): written 2026-10-14 as dated
+  "Amended:" notes in the sections they change (§3.3, §3.4 rule 4, §4.2,
+  §4.3; index in the status block), each checked against the code.
+  - **Still open:** the design owner's sign-off, `c922efbb` (the DIGEST exit)
+    in particular, since #138 kept it in its own commit so it can be dropped.
+  - **Older spec text that disagrees with the code** (predates #138 and
+    #143; left for the design owner):
+    - §4.3 CONFIRM tag: "Otherwise it counts an orphan" contradicts the
+      *Orphans and resync* bullet and the store, where only a tag that
+      contradicts the stored state is an orphan;
+    - §4.2 item 7: "κ = 25 % of the remaining budget"; the encoder treats κ
+      as a duty cycle (one carousel frame in 1/κ, each up to κ of the frame);
+    - §3.3: "the safety refresh of a static scene sends 2 or 3"; the encoder
+      always sends 2;
+    - §4.2 item 5: "by ΔD/bit"; the encoder orders item 5 by record kind and
+      only new defines and redefines by ΔD/bit;
+    - §4.3 new-epoch list: it omits the found / NO_HORIZON horizon flip, which
+      also starts a range-0 epoch;
+    - §3.5 key frames: "plus LAYER_CLEAR when it fits"; the encoder sends the
+      anchor and LAYER_CLEAR as one unit;
+    - the status line ("design proposal, not implemented"), DECISIONS.md's
+      "None of these decisions is implemented", and §8.6's test table (no
+      `test_vector_sync.py`) are out of date.
 - [ ] **Next radio session = the range-edge session** (on GO, after the items
   above). The procedure merged in #143:
   `bench_tools/RS13_RANGE_EDGE_LEG.md`.
