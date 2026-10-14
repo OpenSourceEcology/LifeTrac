@@ -149,7 +149,7 @@ LDFLAGS := \
 # --------------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------------
-.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-fhss-authority check-rx-grid-policy check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost help check-rx-fifo-track bench check-stats-layout
+.PHONY: all hello lora_ping_tx lora_ping_rx lora_ping_tx_active lora_ping_rx_active clean size check check-cpp check-asserts check-opmode-owner check-cfg-contract check-cfg-contract-unit check-cfg-contract-wire check-cfg-wire-owner check-rx-counter-owner check-tx-counter-owner check-lbt-owner check-airtime-counter-owner check-airtime-invariant check-fhss-scheduler check-fhss-clock check-fhss-authority check-rx-grid-policy check-rx-reverse-delivery check-legal-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost help check-rx-fifo-track bench check-stats-layout
 
 all: $(BUILD)/$(TARGET).bin $(BUILD)/$(TARGET).hex size
 
@@ -265,8 +265,9 @@ FHSS_AUTHORITY_BIN := $(BUILD)/fhss_authority_test
 RX_GRID_POLICY_BIN := $(BUILD)/rx_grid_policy_test
 AIRTIME_INVARIANT_BIN := $(BUILD)/airtime_invariant
 TX_LEN_GUARD_BIN   := $(BUILD)/tx_len_guard
+RX_REVERSE_DELIVERY_BIN := $(BUILD)/rx_reverse_delivery
 
-check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-fhss-authority check-rx-grid-policy check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost check-rx-fifo-track check-stats-layout
+check: check-cpp check-asserts check-fhss-chantab check-fhss-scheduler check-fhss-clock check-fhss-authority check-rx-grid-policy check-rx-reverse-delivery check-airtime-invariant check-tx-len-guard check-legal-dwell check-frames-per-dwell check-rfco-pertx check-rfco-summary-counters check-rfco-summary check-rfco-summary-emit check-rfco-summary-integration check-cfg-profile check-cfg-profile-wire check-cfg-clamp-fuzz check-lora-pkt-hdr check-rx-counters check-rx-retune-policy check-rx-retune-counters check-rx-scan-policy check-rx-scan-counters check-rx-scan-fail check-rx-scan-walker check-rx-frame-urc check-reg-write-gate check-rx-urc-lost check-rx-fifo-track check-stats-layout
 	@echo "[OK] memory map invariants hold"
 
 check-cpp: $(BUILD)
@@ -910,6 +911,45 @@ check-fhss-clock: $(BUILD)
 	    -o $(FHSS_CLOCK_BIN)
 	@echo "[FHCLK] Running fhss-clock test ..."
 	@$(FHSS_CLOCK_BIN)
+
+# RS-12.15 reverse delivery (2026-10-14): system-in-the-loop pin for
+# base -> tractor command delivery on the FHSS profile. Links the REAL
+# sx1276_rx.c / sx1276_tx.c and their HW-free collaborators against the
+# simulated SX1276 (registers, FIFO, IRQs, modes, synthesiser), clock and
+# air in bench/host_proto/rx_reverse_delivery.c, driven in main.c's loop
+# order: a streaming tractor with an ideal follower base (between-trains
+# and camera+pump command planes, and a scan machine parked in FAILED), a
+# base-role node following an ideal originator (follower path unchanged),
+# a base burst (self-follow bounded by authority) and camera stalls (no
+# self-follow in the decay window). Fails 16 checks against the pre-fix
+# sx1276_rx.c. sx1276_rx_scan_counters.c is NOT linked: the harness
+# provides sx1276_rx_scan_counter_record() to mirror the scan state machine.
+check-rx-reverse-delivery: $(BUILD)
+	@echo "[RXREV] Building rx-reverse-delivery SIL test (real sx1276_rx.c/sx1276_tx.c) ..."
+	@$(HOST_CC) -std=gnu11 -Wall -Wextra -Werror -Iinclude -I. -Ibench/host_proto \
+	    -DLIFETRAC_FHSS_TX_ROUTED=1 \
+	    bench/host_proto/rx_reverse_delivery.c \
+	    radio/sx1276_rx.c \
+	    radio/sx1276_tx.c \
+	    radio/sx1276_airtime.c \
+	    radio/lora_pkt_hdr.c \
+	    radio/sx1276_legal_dwell.c \
+	    host/host_rfco.c \
+	    radio/sx1276_rx_counters.c \
+	    radio/sx1276_rx_retune_policy.c \
+	    radio/sx1276_rx_retune_counters.c \
+	    radio/sx1276_rx_scan_policy.c \
+	    radio/sx1276_rx_scan_fail.c \
+	    radio/sx1276_rx_scan_walker.c \
+	    radio/sx1276_rx_fifo_track.c \
+	    radio/sx1276_rx_grid_policy.c \
+	    radio/sx1276_fhss_authority.c \
+	    radio/sx1276_fhss_clock.c \
+	    radio/sx1276_fhss.c \
+	    radio/sx1276_fhss_chantab.c \
+	    -o $(RX_REVERSE_DELIVERY_BIN)
+	@echo "[RXREV] Running rx-reverse-delivery SIL test ..."
+	@$(RX_REVERSE_DELIVERY_BIN)
 
 $(BUILD):
 	@$(call MKDIR_P,$(BUILD))
