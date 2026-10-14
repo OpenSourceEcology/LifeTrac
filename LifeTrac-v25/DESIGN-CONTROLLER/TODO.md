@@ -3307,8 +3307,8 @@ Design: [VECTOR_SCENE.md](VECTOR_SCENE.md). Research and review record: [2026-09
 **RS-13.2 and the follow-ups from RS-13.1** (in order; radios only on an
 explicit GO)
 
-- [~] **A16 — loss repair on a saturated stream (first item). Fix prepared
-  2026-10-10 on branch `rs13-a16-fix-2026-10-10` (not merged; SIL only):**
+- [~] **A16 — loss repair on a saturated stream (first item). Fix merged
+  2026-10-11 (#143; SIL only, not yet on air):**
   - **What it does.** Every DEL is repeated once in the next frame. Every
     fourth frame a 25 % repair share goes to re-sends (repeat-pending shapes
     included, oldest statement first). In the store, a DEL naming an absent id
@@ -3341,8 +3341,8 @@ explicit GO)
   - Add SIL tests in `test_vector_sync.py`.
   - Acceptance: `a16_sil.py` 0/100 at both budgets, recovery ≤ ≈ 25 frames.
   - Add carousel counters to `vector_stats`.
-- [~] **Code guards (no radio).** (a)–(d) fixed with 32 unit tests on the same
-  branch. The `check-rx-grid-policy` firmware SIL case is still open.
+- [~] **Code guards (no radio).** (a)–(d) fixed with 32 unit tests, merged in
+  #143. The `check-rx-grid-policy` firmware SIL case is still open.
   - Never batch codec-6 frames. The `-TxBatch 1` guard prices a frame with the
     4 B batch header, so near-full 243 B frames would go out as 2 fragments.
   - Clamp the VECTOR byte budget to one fragment until `link_budget` arrives
@@ -3354,7 +3354,7 @@ explicit GO)
 - [ ] **A8 — relabel on air:** 12–14 relabels per 5-minute leg on the railroad
   video. Count exact triggers camera-only, and state a target rate before
   tuning.
-- [~] **Procedure:** amendments written on the same branch
+- [~] **Procedure:** amendments merged in #143
   (`RS13_VECTOR_LEG.md`, "Amendments 2026-10-10"; they apply from the next
   round). The P6 cap and P8 bound need the design owner's sign-off:
   - P8 as an absolute bound, p95 ≤ the 350 ms budget (A17);
@@ -3368,8 +3368,8 @@ explicit GO)
     predates all VECTOR web_ui/store code, and its stale-tile worker would put
     a `0x6C` on air every ≥ 10 s during VECTOR. Never start `lora_bridge`.
 - [ ] **RS-13.2 desk check:** the browser on the production compose (base:
-  `mosquitto` + rebuilt `web_ui` only), replaying the round-4 captures. Prepared
-  on the same branch:
+  `mosquitto` + rebuilt `web_ui` only), replaying the round-4 captures. Merged in
+  #143:
   - the `tools/vector_replay_publish.py` replay tool (23 tests);
   - `bench_tools/RS13_2_DESK_CHECK.md`;
   - a compose override.
@@ -3380,7 +3380,7 @@ explicit GO)
 - [ ] VECTOR_SCENE.md amendments listed in #138 (design owner), plus #138's
   DIGEST exit from resync (§4.3).
 - [ ] **Next radio session = the range-edge session** (on GO, after the items
-  above). The procedure is written on the same branch:
+  above). The procedure merged in #143:
   `bench_tools/RS13_RANGE_EDGE_LEG.md`.
   - a receive-only channel spot-check, then `-ForceFrfHz <pick>` on every DTS
     leg;
