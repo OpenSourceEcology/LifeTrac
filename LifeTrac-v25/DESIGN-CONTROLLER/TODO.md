@@ -3319,9 +3319,18 @@ explicit GO)
     - residual +0.3 / +0.8 %.
   - **Judge's adversarial SIL:** 0/40 at 2- and 3-frame bursts; under 5–12 %
     random loss, missing-shape runs are at most 7–14 frames.
+  - **Re-run 2026-10-14 on the merged code** (`a16_sil.py`, summary
+    `legs/a16_sil_summary_fix.json`; `legs/a16_sil_summary.json` stays the
+    pre-fix record): A16-like 0/100 at bw500 and at bw250, recovery max
+    10 / 11 frames, no unrecovered episode, `lossfree_out_of_step_frames` 0.
+  - **Counters (done 2026-10-14):** `vector_stats` now carries cumulative
+    `frames`, `epochs_by` (committed epoch starts per cause), `share_frames`,
+    `share_resends`, `share_repeats`, `carousel_resends` and `del_repeats`;
+    `tools/vector_dry_run.py tractor-log` totals them on a `counters` line.
+    The payloads are byte-identical with and without them (encoder A/B over
+    3,300 photo frames plus 1,280 A16, trigger-sweep and masked frames).
   - **Still open:**
     - the repair share at V2 (VECTOR_SCENE.md §4.5.4 open item);
-    - carousel counters in `vector_stats`;
     - on-air confirmation at the range-edge 0 dB step (radio GO).
   - The original analysis:
   - A lost DEL leaves a ghost, which holds the base store in resync for
@@ -3340,20 +3349,31 @@ explicit GO)
       but it contradicts §4.3's tag guard, so it is a design decision.
   - Add SIL tests in `test_vector_sync.py`.
   - Acceptance: `a16_sil.py` 0/100 at both budgets, recovery ≤ ≈ 25 frames.
-  - Add carousel counters to `vector_stats`.
-- [~] **Code guards (no radio).** (a)–(d) fixed with 32 unit tests, merged in
-  #143. The `check-rx-grid-policy` firmware SIL case is still open.
+- [x] **Code guards (no radio).** (a)–(d) fixed with 32 unit tests, merged in
+  #143. `make check-rx-grid-policy` sequences 10–11 (2026-10-14) pin the
+  switch gap on the L072: at 2 fps a 1.038 s gap lets a base frame in the
+  gap, or before the 8th frame after it (≈ 3.5 s), be adopted, and the next
+  demotion then resets the tractor's clock; at 0.99 s the frame is refused.
   - Never batch codec-6 frames. The `-TxBatch 1` guard prices a frame with the
     4 B batch header, so near-full 243 B frames would go out as 2 fragments.
   - Clamp the VECTOR byte budget to one fragment until `link_budget` arrives
     (2a_r4 started at `byte_budget=2436`).
   - Fix the double epoch start on each VECTOR entry (`first`, then `forced`).
   - Pre-build the encoder so a mode switch never leaves a ≥ 1 s TX gap. 2d_r4
-    had 1.038 s; on FHSS that breaks the strict authority streak. Add a
-    `check-rx-grid-policy` SIL case.
+    had 1.038 s; on FHSS that breaks the strict authority streak. SIL case
+    added (sequences 10–11 above).
+  - **Found by that SIL case (design call for RS-12.15):** the guard covers
+    the mode switch only. At 2 fps any own-TX gap of 1 s or more (a camera
+    stall, a daemon restart) opens the same ≈ 3.5 s window, and an adopted
+    tractor stays a follower until a demotion resets its clock. At 1 fps
+    (`-SynthFps 1`) the tractor never holds authority. Whether the streak
+    should resume rather than restart, or a recent originator get a grace
+    period, is an RS-12.15 firmware decision.
 - [ ] **A8 — relabel on air:** 12–14 relabels per 5-minute leg on the railroad
   video. Count exact triggers camera-only, and state a target rate before
-  tuning.
+  tuning. Exact counts now come from `vector_stats` `epochs_by` (the
+  `tractor-log` `counters` line); still to do: the camera-only pass on the
+  video (with the step 0/1 pass below), and the target rate.
 - [~] **Procedure:** amendments merged in #143
   (`RS13_VECTOR_LEG.md`, "Amendments 2026-10-10"; they apply from the next
   round). The P6 cap and P8 bound need the design owner's sign-off:
@@ -3361,9 +3381,9 @@ explicit GO)
   - P6's return clause to count the in-flight frame (A18);
   - write the FHSS P6 bound on paper.
 - [ ] **Images.**
-  - Rebuild the tractor image from the SHA that carries the A16 fix, then run
-    step 0/1 camera-only from `/app`. Add a bw500 video pass as the P8
-    reference for bw500 legs.
+  - Rebuild the tractor image from the SHA that carries the A16 fix and the
+    `vector_stats` counters, then run step 0/1 camera-only from `/app`. Add a
+    bw500 video pass as the P8 reference for bw500 legs.
   - Rebuild the base image too. The deployed `4623980c2dac` (d3751286)
     predates all VECTOR web_ui/store code, and its stale-tile worker would put
     a `0x6C` on air every ≥ 10 s during VECTOR. Never start `lora_bridge`.
