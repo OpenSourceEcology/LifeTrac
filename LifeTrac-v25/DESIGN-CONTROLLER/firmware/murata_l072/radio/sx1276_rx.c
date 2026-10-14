@@ -666,8 +666,19 @@ static void scan_dispatch_action(sx1276_rx_scan_action_t action,
                  * provably is not on. Leave s_scan_state at FAILED
                  * (the policy already committed it); external
                  * recovery (host reset / profile renegotiation)
-                 * is the only way out. */
-                (void)sx1276_modes_to_standby();
+                 * is the only way out.
+                 *
+                 * RS-12.15 reverse delivery (2026-10-14): not while
+                 * the node holds originator authority. Its peer hops
+                 * onto its OWN clock, which sx1276_rx_slot_follow()
+                 * keeps the receiver on in FAILED too -- but the
+                 * follower re-arms only at the next slot boundary, so
+                 * a park here would abort a peer frame already on air
+                 * and miss the rest of the slot. The FAILED commit and
+                 * the fault URC above are unchanged. */
+                if (rx_follow_own_now() == 0U) {
+                    (void)sx1276_modes_to_standby();
+                }
                 return;
             }
 

@@ -54,17 +54,23 @@
  *       is handed UNANCHORED and adopted; closing the window itself is a
  *       grid-policy matter, sx1276_rx_grid_policy.c, not this harness's);
  *   8   scan FAILED: with no command for 150 s the tractor's scan machine
- *       parks in the absorbing FAILED state (it can never LOCK again); its
- *       own clock still drives the receiver and every clean, covered
- *       command is received.
+ *       runs out of retries into the absorbing FAILED state (it can never
+ *       LOCK again); its own clock still drives the receiver and every
+ *       clean, covered command is received;
+ *   9   final FAIL mid-command: the streaming tractor's final scan FAIL
+ *       fires while a clean command is on air. The fault is reported and
+ *       FAILED committed, but the receiver is not parked: the slot
+ *       follower would re-arm it only at the next boundary, so the
+ *       command must still be received.
  * In EVERY scenario, per main-loop pass: the walker retunes exactly when
  * the scan machine dispatches BEGIN_SCAN / ADVANCE (or a non-final FAIL)
- * unless the node holds originator authority; every slot-follow retune is
- * onto the clock's channel and allowed by the follow rule (LOCKED on an
- * adopted grid, or originator authority); and every own transmission is
- * keyed on the hop channel of the slot its header claims. In the tractor
- * scenarios 1-4 and 8 the tractor's grid never moves: one phase anchor, no
- * adoption, no clock reset, no SNAP.
+ * unless the node holds originator authority; no scan action takes the
+ * receiver out of RX while the node holds authority; every slot-follow
+ * retune is onto the clock's channel and allowed by the follow rule
+ * (LOCKED on an adopted grid, or originator authority); and every own
+ * transmission is keyed on the hop channel of the slot its header claims.
+ * In the tractor scenarios 1-4 and 8 the tractor's grid never moves: one
+ * phase anchor, no adoption, no clock reset, no SNAP.
  *
  * `rx_reverse_delivery -v` also prints per-scenario counters (misses by
  * cause, consider_remote decisions, adoptions by what had tuned the
@@ -238,6 +244,7 @@ typedef struct {
     uint32_t fail_final;
     /* loop-structure checks */
     uint32_t walker_retunes, walker_suppressed, viol_walker;
+    uint32_t viol_scan_park;          /* scan action left RX under authority */
     uint32_t follow_locked, follow_own, viol_follow_gate, viol_follow_chan;
     uint32_t viol_tx_chan;            /* own TX off its header slot's channel */
     uint32_t window_follow;           /* follow retune: LOCKED, !adopted, !auth */
@@ -503,6 +510,9 @@ uint32_t platform_now_ms(void) {
 static uint8_t g_last_dec = 0xFFU;
 static uint8_t g_last_fail_sub;
 static uint8_t g_fail_seen;
+static uint32_t g_pass_now_ms;     /* the current pass's now_ms */
+static uint32_t g_fail_ms[4];      /* pass now_ms of the first four FAILs */
+static uint64_t g_final_fail_us;   /* when the final FAIL fired (0 = not yet) */
 
 void host_stats_radio_rx_ok(void) {}
 void host_stats_radio_crc_err(void) {}
@@ -525,6 +535,12 @@ void host_stats_tx_stream_streak_note(uint32_t streak) { (void)streak; }
 
 void host_cmd_emit_fault(uint8_t code, uint8_t sub) {
     if (code == HOST_FAULT_CODE_RX_SCAN_FAILED) {
+        if (g_sc.scan_fail_urc < 4U) {
+            g_fail_ms[g_sc.scan_fail_urc] = g_pass_now_ms;
+        }
+        if ((sub & (1U << SX1276_RX_SCAN_FAIL_SUB_BIT_FINAL)) != 0U) {
+            g_final_fail_us = g_now_us;
+        }
         ++g_sc.scan_fail_urc;
         g_last_fail_sub = sub;
         g_fail_seen = 1U;
@@ -666,25 +682,11 @@ static void base_model_init(void) {
     g_base.t0_us = g_now_us;
 }
 
-/* The base's L072 admits a command at t: its own slot rule on its copy of
- * the tractor's grid (sx1276_tx_slot_wait_us + the mailbox), then key-up. */
-static void base_send_cmd(uint64_t t_us) {
+/* Key-up of a command the base's L072 admitted at t (inside the slot rule)
+ * in `slot` of its copy of the tractor's grid. */
+static void base_key_cmd(uint64_t t, uint64_t slot) {
     uint8_t payload[CMD_PAYLOAD_LEN];
-    if (g_base.have_grid == 0U || g_base.next_id >= MAX_CMDS) {
-        return;
-    }
-    uint64_t t = ((t_us > g_base.busy_until_us) ? t_us : g_base.busy_until_us)
-                 + BASE_ADMIT_US;
     const uint32_t toa = toa_us((uint8_t)(LORA_PKT_HDR_LEN + CMD_PAYLOAD_LEN));
-    uint64_t el      = t - g_base.anchor_us;
-    uint64_t slot    = el / SLOT_US;
-    uint64_t in_slot = el % SLOT_US;
-    if (in_slot < HEADSTART_US) {
-        t += HEADSTART_US - in_slot;
-    } else if (in_slot + toa + SX1276_FHSS_SLOT_TX_GUARD_US > SLOT_US) {
-        t += (SLOT_US - in_slot) + HEADSTART_US;
-        ++slot;
-    }
     /* Phase byte: base ms clock at the stamp minus the slot's boundary in
      * base ms (sx1276_tx.c F7: stamped after the PLL settle). */
     const uint64_t stamp = t + BASE_STAMP_US;
@@ -700,6 +702,47 @@ static void base_send_cmd(uint64_t t_us) {
                  (uint8_t)off_ms, payload, CMD_PAYLOAD_LEN);
     g_base.busy_until_us = key + toa + 2000ULL;
     ++g_sc.sent;
+}
+
+/* The base's L072 admits a command at t: its own slot rule on its copy of
+ * the tractor's grid (sx1276_tx_slot_wait_us + the mailbox), then key-up. */
+static void base_send_cmd(uint64_t t_us) {
+    if (g_base.have_grid == 0U || g_base.next_id >= MAX_CMDS) {
+        return;
+    }
+    uint64_t t = ((t_us > g_base.busy_until_us) ? t_us : g_base.busy_until_us)
+                 + BASE_ADMIT_US;
+    const uint32_t toa = toa_us((uint8_t)(LORA_PKT_HDR_LEN + CMD_PAYLOAD_LEN));
+    uint64_t el      = t - g_base.anchor_us;
+    uint64_t slot    = el / SLOT_US;
+    uint64_t in_slot = el % SLOT_US;
+    if (in_slot < HEADSTART_US) {
+        t += HEADSTART_US - in_slot;
+    } else if (in_slot + toa + SX1276_FHSS_SLOT_TX_GUARD_US > SLOT_US) {
+        t += (SLOT_US - in_slot) + HEADSTART_US;
+        ++slot;
+    }
+    base_key_cmd(t, slot);
+}
+
+/* A command whose first preamble symbol is on air at key_us, if the base's
+ * slot rule admits one there. Returns its id, or -1. */
+static int base_cmd_at_key(uint64_t key_us) {
+    const uint32_t toa = toa_us((uint8_t)(LORA_PKT_HDR_LEN + CMD_PAYLOAD_LEN));
+    const uint64_t t = key_us - BASE_KEY_US - BASE_STAMP_US;
+    if (g_base.have_grid == 0U || g_base.next_id >= MAX_CMDS ||
+        t < g_base.anchor_us) {
+        return -1;
+    }
+    const uint64_t el      = t - g_base.anchor_us;
+    const uint64_t in_slot = el % SLOT_US;
+    if (in_slot < HEADSTART_US ||
+        in_slot + toa + SX1276_FHSS_SLOT_TX_GUARD_US > SLOT_US) {
+        return -1;
+    }
+    const int id = (int)g_base.next_id;
+    base_key_cmd(t, el / SLOT_US);
+    return id;
 }
 
 /* The tractor's TX left the air: the ideal follower decodes it. */
@@ -1095,6 +1138,7 @@ static void fw_pass(void) {
     uint32_t events;
     bool done;
 
+    g_pass_now_ms = now_ms;
     g_ctx = CTX_HOST;
     if (g_role == ROLE_TRACTOR) { tractor_host_tick(); } else { base_host_tick(); }
 
@@ -1117,16 +1161,23 @@ static void fw_pass(void) {
     fw_service_mailbox();
 
     /* Scan tick: the walker retunes on every BEGIN_SCAN / ADVANCE (and a
-     * non-final FAIL) unless the node follows its own clock. */
+     * non-final FAIL) unless the node follows its own clock, and no scan
+     * action takes the receiver out of RX while it does (the slot
+     * follower re-arms only at the next boundary). */
     {
         /* Authority as the firmware evaluates it: at a fresh time (the
          * pass's now_ms can be a tick older than the last TX_DONE note). */
         const uint8_t auth = auth_now_ms(platform_now_ms());
+        const sx1276_state_t mode_before = g_radio.mode;
         g_tick_recorded = 0U;
         g_fail_seen = 0U;
         g_freq_calls = 0U;
         g_ctx = CTX_SCAN;
         sx1276_rx_scan_tick(now_ms);
+        if (auth != 0U && mode_before == SX1276_STATE_RX_CONT &&
+            g_radio.mode != SX1276_STATE_RX_CONT) {
+            ++g_sc.viol_scan_park;
+        }
         if (g_tick_recorded != 0U) {
             uint32_t expect = 0U;
             switch (g_tick_action) {
@@ -1293,6 +1344,8 @@ static void scenario_begin(const char *name, role_t role, uint32_t seed) {
     g_prev_adopted = 0U;
     g_prev_auth = 0U;
     g_decay_at_us = 0U;
+    memset(g_fail_ms, 0, sizeof(g_fail_ms));
+    g_final_fail_us = 0U;
     (void)sx1276_rx_arm();
     g_ctx = CTX_NONE;
     g_role = role;
@@ -1327,10 +1380,11 @@ static void print_scenario(void) {
            g_sc.adoptions, g_sc.adopt_via_follow, g_sc.adopt_via_walker,
            g_sc.adopt_via_tx, g_sc.locks, g_sc.demotions, g_sc.scan_fail_urc,
            g_sc.fail_final, g_sc.auth_passes, g_sc.passes);
-    printf("    walker retunes=%u suppressed=%u viol=%u | follow locked=%u own=%u"
-           " gate_viol=%u (window=%u) chan_viol=%u | tx_chan_viol=%u"
+    printf("    walker retunes=%u suppressed=%u viol=%u scan_park_viol=%u | follow"
+           " locked=%u own=%u gate_viol=%u (window=%u) chan_viol=%u | tx_chan_viol=%u"
            " mirror_mismatch=%u submit_fail=%u trace=%08x\n",
            g_sc.walker_retunes, g_sc.walker_suppressed, g_sc.viol_walker,
+           g_sc.viol_scan_park,
            g_sc.follow_locked, g_sc.follow_own, g_sc.viol_follow_gate,
            g_sc.window_follow, g_sc.viol_follow_chan, g_sc.viol_tx_chan,
            g_sc.mirror_mismatch, g_submit_fail, g_sc.trace);
@@ -1341,6 +1395,9 @@ static void check_structure(void) {
     CHECK(g_sc.viol_walker == 0U,
           "[%s] walker retunes must match the dispatched scan actions (%u violations)",
           g_sc.name, g_sc.viol_walker);
+    CHECK(g_sc.viol_scan_park == 0U,
+          "[%s] the scan machine took the receiver out of RX while the node held"
+          " authority (%u times)", g_sc.name, g_sc.viol_scan_park);
     CHECK(g_sc.viol_follow_gate == 0U,
           "[%s] slot follow retuned outside (LOCKED on an adopted grid) or authority"
           " (%u times, %u in the decay window)",
@@ -1483,6 +1540,73 @@ static void test_scan_failed(void) {
     expect_reverse_delivery(20U);
 }
 
+static void test_final_fail_mid_command(void) {
+    /* (9) the stream of (8), no command plane. After the third FAIL the
+     * final one is due at a known ms: the third's pass ms + the 30 s
+     * budget, unless a TX defers it. The base keys one command straddling
+     * that ms. A seed whose stream is busy around it, or whose grid puts
+     * that key outside the base's slot rule, is skipped. */
+    static const uint32_t seeds[] = {
+        0x9ABCDEFU, 0xA1B2C3DU, 0xB2C3D4EU, 0xC3D4E5FU,
+        0xD4E5F61U, 0xE5F6172U, 0xF617283U, 0x1728394U,
+    };
+    const uint32_t toa = toa_us((uint8_t)(LORA_PKT_HDR_LEN + CMD_PAYLOAD_LEN));
+    uint64_t key_us = 0U;
+    uint32_t seed = 0U;
+    int id = -1;
+    for (unsigned s = 0U; s < sizeof(seeds) / sizeof(seeds[0]) && id < 0; ++s) {
+        seed = seeds[s];
+        tractor_setup("9 final FAIL mid-command", seed, 600U, 40U,
+                      k_short_trains, CMD_IN_GAP, 2500U, 3500U, 5U, 60U);
+        g_base.next_allowed_us = 0xFFFFFFFFFFFFFFFFULL;
+        const uint64_t t0 = g_now_us;
+        while (g_sc.scan_fail_urc < 3U && g_now_us - t0 < 200000000ULL) {
+            fw_pass();
+        }
+        if (g_sc.scan_fail_urc != 3U) {
+            break;
+        }
+        const uint64_t due_us =
+            ((uint64_t)g_fail_ms[2] + SX1276_RX_SCAN_REDESIGN_MS) * 1000ULL;
+        key_us = due_us - toa / 2U;
+        while (g_now_us < key_us - 50000ULL) {
+            fw_pass();
+        }
+        /* Nothing on air, queued or due from the tractor until 50 ms past
+         * the FAIL. */
+        if (!sx1276_tx_busy() && g_txq_count == 0U && g_th.train_active == 0U &&
+            g_th.frames_waiting == 0U && g_th.outstanding == 0U &&
+            g_th.next_frame_us > due_us + 50000ULL) {
+            id = base_cmd_at_key(key_us);
+        }
+    }
+    if (id < 0) {
+        CHECK(0, "[%s] no seed left the tractor quiet at its final FAIL"
+              " (FAILs=%u)", g_sc.name, g_sc.scan_fail_urc);
+        return;
+    }
+    run_for_ms(2000U);
+    print_scenario();
+    if (g_verbose != 0) {
+        printf("    seed %08x: final FAIL %lld us after the command's first"
+               " symbol (ToA %u us)\n", seed,
+               (long long)(g_final_fail_us - key_us), toa);
+    }
+    check_structure();
+    CHECK(g_sc.fail_final == 1U && g_sc.locks == 0U &&
+          g_final_fail_us > key_us && g_final_fail_us < key_us + toa,
+          "[%s] the final FAIL did not fire while the command was on air"
+          " (final FAILs=%u, locks=%u, %lld us after its first symbol)",
+          g_sc.name, g_sc.fail_final, g_sc.locks,
+          (long long)(g_final_fail_us - key_us));
+    CHECK(g_cmd_covered_clean[id] != 0U,
+          "[%s] the command was not clean and covered by authority", g_sc.name);
+    CHECK(g_cmd_recv[id] != 0U,
+          "[%s] the command on air at the final FAIL was lost (misses not_rx=%u"
+          " late_arm=%u wrong_ch=%u coll=%u)", g_sc.name, g_sc.miss_not_rx,
+          g_sc.miss_late_arm, g_sc.miss_wrong_ch, g_sc.miss_coll);
+}
+
 /* Base role: the firmware follows an ideal originator. */
 static void orig_start(uint64_t first_boundary_us, uint32_t first_abs) {
     g_orig.on = 1U;
@@ -1603,11 +1727,12 @@ int main(int argc, char **argv) {
     test_authority_bound();
     test_decay_window();
     test_scan_failed();
+    test_final_fail_mid_command();
     if (g_failures != 0) {
         fprintf(stderr, "[FAIL] rx_reverse_delivery: %d failure(s)\n", g_failures);
         return 1;
     }
-    printf("[PASS] rx_reverse_delivery: 8 SIL sequences against the real"
+    printf("[PASS] rx_reverse_delivery: 9 SIL sequences against the real"
            " sx1276_rx.c/sx1276_tx.c -- reverse delivery between trains,"
            " follower path unchanged, self-follow bounded by authority\n");
     return 0;
