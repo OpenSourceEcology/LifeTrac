@@ -332,8 +332,12 @@
       </div>
     </div>
 
-    <!-- Top button bar: primary buttons + gear icon for settings drawer. -->
-    <div class="top-bar">
+    <!-- Top button bar: primary buttons + gear icon for settings drawer.
+         data-vector-avoid: vector_renderer.js lays the VECTOR banner and
+         chips out below this bar and beside the drawer and the telemetry
+         panel while they are open, so the console's own chrome never
+         covers them (RS-13.2 F1). -->
+    <div class="top-bar" data-vector-avoid="below">
       <button data-btn="0">CURL</button>
       <button data-btn="1">DUMP</button>
       <button data-btn="7" class="takectl">REQ CTRL</button>
@@ -354,7 +358,7 @@
     </div>
 
     <!-- Gear-toggled drawer: AUX, camera switch, radio bench, telemetry helpers. -->
-    <div id="settings-drawer" class="settings-drawer overlay-panel">
+    <div id="settings-drawer" class="settings-drawer overlay-panel" data-vector-avoid="beside">
       <div>
         <div class="group-label">Aux outputs</div>
         <div class="grid">
@@ -382,7 +386,7 @@
     </div>
 
     <!-- Telemetry sidebar (overlay on right edge, bar-chart-button toggled). -->
-    <aside id="telemetry-panel" class="overlay-panel">
+    <aside id="telemetry-panel" class="overlay-panel" data-vector-avoid="beside">
       <h3>Telemetry</h3>
       <div class="row"><span>Engine RPM</span><span id="t-rpm">—</span></div>
       <div class="row"><span>Oil temp</span><span id="t-oil">—</span></div>
@@ -443,7 +447,7 @@
     body.raw-mode #image-detections { display: none !important; }
   </style>
   <script src="/static/img/canvas_renderer.js?v=3"></script>
-  <script src="/static/img/vector_renderer.js?v=1"></script>
+  <script src="/static/img/vector_renderer.js?v=2"></script>
   <script src="/static/img/fade_shader.js"></script>
   <script src="/static/img/staleness_overlay.js?v=2"></script>
   <script src="/static/img/badge_renderer.js?v=2"></script>
@@ -451,7 +455,7 @@
   <script src="/static/img/source_guard.js"></script>
   <script src="/static/img/accel_status.js"></script>
   <script src="/static/img/raw_mode_toggle.js"></script>
-  <script src="/static/app.js?v=8"></script>
+  <script src="/static/app.js?v=9"></script>
   <script>
     // Gear-icon toggle for the settings drawer (AUX / camera / radio bench).
     // Bar-chart-icon toggle for the telemetry sidebar.

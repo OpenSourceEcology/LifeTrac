@@ -5,13 +5,25 @@
 // event that canvas_renderer.js dispatches with every /ws/state snapshot and
 // draws `snap.vector_scene` whenever `snap.encode_mode === 'vector'`.
 //
-// Fail-closed rules (§7.5): the banner "VECTOR — NOT CAMERA PIXELS" is
-// inside this canvas, so raw mode cannot hide it (the overlay is deliberately
-// NOT in the raw-mode hide list); "NO VECTOR DATA" when the mode is vector
-// but no scene has arrived; a shape with an unknown kind or badge is not
-// painted, its bounding box is blacked out with "BADGE?"; age styling per
-// §4.3 (tint > 1.5 s, desaturate + age > 5 s, outline only > 10 s); previous-
-// epoch shapes (badge 1 CACHED) are desaturated and outline-weighted.
+// Fail-closed rules (§7.5): the banner "VECTOR — NOT CAMERA PIXELS · age ·
+// loss" is inside this canvas, so raw mode cannot hide it (the overlay is
+// deliberately NOT in the raw-mode hide list); a scene fault (rule 1: v ≠ 1,
+// scene badge ≠ 7, no anchor_age_ms, or a scene this file cannot draw) gives
+// a black "VECTOR?" panel and one POST to /api/health/refusal per fault
+// episode; "NO VECTOR DATA" when the mode is vector but no scene has arrived;
+// a shape with an unknown kind or badge is not painted, its bounding box is
+// blacked out with "BADGE?"; age styling per §4.3 (tint > 1.5 s, desaturate
+// + age > 5 s, outline only > 10 s); previous-epoch shapes (badge 1 CACHED)
+// are desaturated and outline-weighted; "SAFETY DETECTOR: NO PIXELS" whenever
+// the snapshot says the base detector has no pixels.
+//
+// Layout (RS-13.2 desk check, F1/F2): the backing store follows the element's
+// CSS size. The scene is drawn in its own grid pixels through a transform,
+// stretched with the panel as before; the banner and the chips are drawn in
+// CSS pixels below the console's top bar and beside the settings drawer and
+// the telemetry panel while those are open (`data-vector-avoid` in
+// index.html), and wrap onto another row rather than run off the edge, so
+// every chip stays whole and readable at any window size.
 //
 // Snapshot geometry is already in canvas pixels (the store applies offsets,
 // group shifts and GZOOM), so this file only draws what it is given.
@@ -24,8 +36,12 @@
   const EDGE_COLOUR = { rut: '#c8b090', structure: '#e0e0e0', fence: '#d8c060',
                         contact: '#ff6060', overhead: '#ffe040' };
   const EDGE_CLS = ['rut', 'structure', 'fence', 'contact', 'overhead'];
+  const BANNER = 'VECTOR — NOT CAMERA PIXELS';
+  const SAFETY_CHIP = ['SAFETY DETECTOR: NO PIXELS', '#ff6a50'];
+  const REFUSAL_MIN_MS = 10000;   // a fault that flaps still posts at most once per 10 s
 
-  let overlay = null, ctx = null;
+  let overlay = null, ctx = null, lastSnap = null;
+  let faultOpen = false, faultPosted = false, lastRefusalMs = -Infinity;
 
   function init() {
     const base = document.getElementById('image-canvas');
@@ -40,15 +56,40 @@
       overlay.style.top = base.offsetTop + 'px';
       base.parentNode.appendChild(overlay);
     }
-    overlay.width = base.width;
-    overlay.height = base.height;
     ctx = overlay.getContext('2d');
     return true;
   }
 
-  function sizeTo(snap) {
-    const w = snap.grid.w * snap.grid.tile_px, h = snap.grid.h * snap.grid.tile_px;
-    if (overlay.width !== w || overlay.height !== h) { overlay.width = w; overlay.height = h; }
+  // Sizes the backing store to the element (own overlay only; the Lab's canvas
+  // keeps its size) and returns the two scales: scene grid px (W×H) to backing
+  // px, and CSS px to backing px. The console's chrome is marked in index.html
+  // (F1): `top`, where the chips may start, is below a `data-vector-avoid=
+  // "below"` bar over the panel's top half; `blocks` are the `"beside"` panels
+  // that are open, for the chips to step around. Both in CSS px. An element
+  // with no layout box is treated as W×H CSS px and left as it is.
+  function fit(W, H, own) {
+    const r = overlay.getBoundingClientRect ? overlay.getBoundingClientRect() : { width: 0, height: 0, top: 0, left: 0 };
+    const laidOut = r.width > 0 && r.height > 0;
+    const cssW = laidOut ? r.width : W, cssH = laidOut ? r.height : H;
+    if (own && laidOut) {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const bw = Math.max(1, Math.round(cssW * dpr)), bh = Math.max(1, Math.round(cssH * dpr));
+      if (overlay.width !== bw || overlay.height !== bh) { overlay.width = bw; overlay.height = bh; }
+    }
+    let top = 6;
+    const blocks = [];
+    if (own && laidOut) {
+      for (const el of document.querySelectorAll('[data-vector-avoid]')) {
+        const e = el.getBoundingClientRect();
+        if (!(e.width > 0 && e.height > 0)) continue;                    // a closed panel
+        if (el.dataset.vectorAvoid === 'beside') {
+          blocks.push([e.left - r.left, e.top - r.top, e.right - r.left, e.bottom - r.top]);
+        } else if (e.bottom > r.top && e.top < r.top + cssH / 2) {
+          top = Math.max(top, e.bottom - r.top + 6);
+        }
+      }
+    }
+    return { sx: overlay.width / W, sy: overlay.height / H, k: overlay.width / cssW, w: cssW, h: cssH, top, blocks };
   }
 
   function ageStyle(age) {
@@ -93,7 +134,10 @@
   function drawHorizon(h, W, H) {
     if (!h) return;
     const pts = h.pts || [];
-    const sky = h.sky || ['#8fb3d9', '#cfe0ef'], ground = h.ground || ['#6b8f3a', '#4f6b2b'];
+    const sky = h.sky, ground = h.ground;
+    // No measured colours yet (an epoch joined before its anchor): the panel
+    // stays black rather than show an invented sky (principle 4).
+    if (!Array.isArray(sky) || !Array.isArray(ground)) return;
     if (h.mode === 'none' || pts.length < 2) {
       // NO_HORIZON: top and bottom bands only (§2.4)
       const g1 = ctx.createLinearGradient(0, 0, 0, H / 2); g1.addColorStop(0, sky[0]); g1.addColorStop(1, sky[1]);
@@ -244,49 +288,191 @@
     ctx.restore();
   }
 
-  function chip(text, x, y, colour) {
-    ctx.save();
-    ctx.font = 'bold 11px ui-monospace, monospace';
-    const w = ctx.measureText(text).width + 10;
-    ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(x, y, w, 16);
-    ctx.fillStyle = colour; ctx.fillText(text, x + 5, y + 12);
-    ctx.restore();
-    return w;
+  function chipFont(px) { return 'bold ' + px + 'px ui-monospace, monospace'; }
+
+  // Chips in CSS px, left to right from `L.top`, stepping past the `blocks`
+  // and wrapping to a new row before one would cross the right edge (F1, F2);
+  // a chip wider than the panel alone shrinks its font to fit. The size
+  // follows the panel width, 12–18 px. Returns [text, colour, font px, x, y,
+  // w] per chip, the chip height and the bottom of the last row.
+  function layChips(L, chips, blocks) {
+    const pad = 6, gap = 6, fs = Math.round(Math.max(12, Math.min(18, L.w / 90))), ch = fs + 8;
+    const out = [];
+    let x = pad, y = L.top;
+    for (const [text, colour] of chips) {
+      let f = fs;
+      ctx.font = chipFont(f);
+      let w = ctx.measureText(text).width + 12;
+      while (w > L.w - 2 * pad && f > 9) { f--; ctx.font = chipFont(f); w = ctx.measureText(text).width + 12; }
+      for (let n = 0; n < 64; n++) {                 // bounded: rows move down past every block
+        const b = blocks.find((b) => y < b[3] && y + ch > b[1] && x < b[2] + gap && x + w > b[0] - gap);
+        if (b) x = b[2] + gap;
+        else if (x > pad && x + w > L.w - pad) { x = pad; y += ch + 4; }
+        else break;
+      }
+      out.push([text, colour, f, x, y, w]);
+      x += w + gap;
+    }
+    return { out, ch, bottom: y + ch };
   }
 
-  function render(snap) {
+  // Beside the open side panels while that keeps the chips in the panel's top
+  // half (clear of the joysticks); with no room there, laid out as if the
+  // panels were closed, which then cover part of the row as they cover the
+  // scene.
+  function drawChips(L, chips) {
+    ctx.save();
+    ctx.setTransform(L.k, 0, 0, L.k, 0, 0);
+    ctx.textBaseline = 'middle';
+    let lay = layChips(L, chips, L.blocks);
+    if (L.blocks.length && lay.bottom > L.h / 2) lay = layChips(L, chips, []);
+    for (const [text, colour, f, x, y, w] of lay.out) {
+      ctx.font = chipFont(f);
+      ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(x, y, w, lay.ch);
+      ctx.fillStyle = colour; ctx.fillText(text, x + 6, y + lay.ch / 2 + 1);
+    }
+    ctx.restore();
+  }
+
+  function panelText(L, text, colour) {
+    ctx.save();
+    ctx.setTransform(L.k, 0, 0, L.k, 0, 0);
+    ctx.font = chipFont(Math.round(Math.max(18, Math.min(40, L.w / 30))));
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = colour; ctx.fillText(text, L.w / 2, L.h / 2);
+    ctx.restore();
+  }
+
+  // "VECTOR — NOT CAMERA PIXELS · age · loss" (§0.2, §7.5): the capture age of
+  // the newest frame the store applied and the share of frames that seq gaps
+  // show lost in the last 10 s, both from the store (F5). "?" when unknown.
+  function bannerText(scene) {
+    const age = scene && typeof scene.frame_age_ms === 'number'
+      ? 'age ' + (scene.frame_age_ms / 1000).toFixed(1) + ' s' : 'age ?';
+    const loss = scene && scene.loss && typeof scene.loss.ratio === 'number'
+      ? 'loss ' + Math.round(100 * scene.loss.ratio) + ' %' : 'loss ?';
+    return BANNER + ' · ' + age + ' · ' + loss;
+  }
+
+  // Banner first, then the safety chip (F6), the store's state, epoch/anchor and
+  // anomalies. A scene that is null or refused contributes nothing it states.
+  function chipsFor(snap, scene) {
+    const chips = [[bannerText(scene), '#9fd0ff']];
+    if (snap.safety_detector === 'no_pixels') chips.push(SAFETY_CHIP);
+    if (!scene) return chips;
+    if (scene.resync) chips.push(['RESYNC', '#ff8040']);
+    else if (scene.digest_ok === false) chips.push(['DIGEST MISMATCH', '#ffb040']);
+    const aa = typeof scene.anchor_age_ms === 'number' ? (scene.anchor_age_ms / 1000).toFixed(1) + 's' : 'none yet';
+    chips.push(['epoch ' + scene.epoch + ' · anchor ' + aa, '#dddddd']);
+    if (typeof scene.corr_detected === 'number') {
+      chips.push([scene.corr_shown + ' / ' + scene.corr_detected + ' anomalies shown',
+                  scene.corr_shown < scene.corr_detected ? '#ff8040' : '#a0e0a0']);
+    }
+    return chips;
+  }
+
+  // §7.5 rule 1. The store sends anchor_age_ms = null until the epoch has an
+  // absolute anchor (a mid-epoch join): that is drawn ("anchor none yet"), a
+  // missing or non-numeric one is refused.
+  function sceneFault(scene) {
+    if (typeof scene !== 'object' || Array.isArray(scene)) return 'not_object';
+    if (scene.v !== 1) return 'v';
+    if (scene.badge !== BADGE_VECTOR) return 'badge';
+    const a = scene.anchor_age_ms;
+    if (a === undefined || (a !== null && typeof a !== 'number')) return 'anchor_age_ms';
+    return null;
+  }
+
+  // One POST per fault episode (the episode ends with the next scene drawn, or
+  // a snapshot outside VECTOR), and at most one per REFUSAL_MIN_MS: an episode
+  // that opens sooner posts when the interval has passed, if it is still open.
+  // A fault that persists or flaps never turns the 2 Hz snapshots into a POST
+  // storm.
+  function reportFault(fault, scene, err) {
+    if (!faultOpen) { faultOpen = true; faultPosted = false; }
+    const now = Date.now();
+    if (faultPosted || now - lastRefusalMs < REFUSAL_MIN_MS) return;
+    faultPosted = true;
+    lastRefusalMs = now;
+    const s = (scene && typeof scene === 'object') ? scene : {};
+    const num = (v) => (typeof v === 'number' ? v : null);
+    const body = { reason: 'vector_scene_fault', fault: fault, v: num(s.v), badge: num(s.badge),
+                   epoch: num(s.epoch), ts_ms: now };
+    if (err) body.error = String((err && err.message) || err).slice(0, 120);
+    try {
+      fetch('/api/health/refusal', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'same-origin',
+      }).catch(() => {});
+    } catch (_) { /* health endpoint optional in tests */ }
+  }
+
+  function refuseScene(L, snap, fault, own, err) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, overlay.width, overlay.height);
+    panelText(L, 'VECTOR?', '#ff4040');
+    drawChips(L, chipsFor(snap, null));
+    if (own) reportFault(fault, snap.vector_scene, err);
+  }
+
+  function gridOf(snap) {
+    const g = snap.grid || {};
+    return [(g.w * g.tile_px) || 384, (g.h * g.tile_px) || 256];
+  }
+
+  // `own`: the console overlay. The Lab export draws on its canvas as sized
+  // and never posts refusals.
+  function render(snap, own) {
     if (!ctx && !init()) return;
-    sizeTo(snap);
-    const W = overlay.width, H = overlay.height;
-    ctx.clearRect(0, 0, W, H);
-    if (snap.encode_mode !== 'vector') return;      // photo modes: overlay stays clear
-    const scene = snap.vector_scene;
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);   // never a silent fallback to the old photo
-    if (!scene) {
-      ctx.fillStyle = '#ffd050'; ctx.font = 'bold 18px ui-monospace, monospace';
-      ctx.textAlign = 'center'; ctx.fillText('NO VECTOR DATA', W / 2, H / 2); ctx.textAlign = 'start';
-      chip('VECTOR — NOT CAMERA PIXELS', 6, 6, '#9fd0ff');
+    const [W, H] = gridOf(snap);
+    const L = fit(W, H, own);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    if (snap.encode_mode !== 'vector') {            // photo modes: overlay stays clear
+      if (own) faultOpen = false;
+      if (snap.safety_detector === 'no_pixels') drawChips(L, [SAFETY_CHIP]);
       return;
     }
+    const scene = snap.vector_scene;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, overlay.width, overlay.height);   // never a silent fallback to the old photo
+    if (!scene) {
+      if (own) faultOpen = false;
+      panelText(L, 'NO VECTOR DATA', '#ffd050');
+      drawChips(L, chipsFor(snap, null));
+      return;
+    }
+    const fault = sceneFault(scene);
+    if (fault) { refuseScene(L, snap, fault, own); return; }
+    ctx.setTransform(L.sx, 0, 0, L.sy, 0, 0);       // the scene in its grid px, stretched with the panel
     drawHorizon(scene.horizon, W, H);
     for (const layer of scene.layers || []) {
       for (const s of layer.shapes || []) drawShape(s);
     }
-    // chips: banner, epoch/anchor age, resync/digest state
-    let x = 6;
-    x += chip('VECTOR — NOT CAMERA PIXELS', x, 6, '#9fd0ff') + 4;
-    const aa = typeof scene.anchor_age_ms === 'number' ? (scene.anchor_age_ms / 1000).toFixed(1) + 's' : '?';
-    x += chip('epoch ' + scene.epoch + ' · anchor ' + aa, x, 6, '#dddddd') + 4;
-    if (scene.resync) x += chip('RESYNC', x, 6, '#ff8040') + 4;
-    else if (scene.digest_ok === false) x += chip('DIGEST MISMATCH', x, 6, '#ffb040') + 4;
-    if (typeof scene.corr_detected === 'number') {
-      chip(scene.corr_shown + ' / ' + scene.corr_detected + ' anomalies shown', x, 6, scene.corr_shown < scene.corr_detected ? '#ff8040' : '#a0e0a0');
+    drawChips(L, chipsFor(snap, scene));
+    if (own) faultOpen = false;
+  }
+
+  function paint(snap) {
+    lastSnap = snap;
+    try {
+      render(snap, true);
+    } catch (e) {
+      // A scene this file cannot draw is refused like rule 1 (§7.5 rule 5: a
+      // renderer that cannot parse a newer snapshot shows "VECTOR?").
+      try {
+        if (ctx && snap && snap.encode_mode === 'vector') {
+          overlay.width = overlay.width;            // drops a save() the throw left open (alpha, clip)
+          const [W, H] = gridOf(snap);
+          refuseScene(fit(W, H, true), snap, 'render_error', true, e);
+        }
+      } catch (_) { /* nothing more to draw with */ }
     }
   }
 
-  window.addEventListener('lifetrac-state', (ev) => {
-    try { render(ev.detail); } catch (e) { /* surfaced by badge_renderer's health log path */ }
-  });
+  window.addEventListener('lifetrac-state', (ev) => { if (ev.detail) paint(ev.detail); });
+  window.addEventListener('resize', () => { if (lastSnap) paint(lastSnap); });   // re-lay the chips at once
   window.addEventListener('lifetrac-tile-painted', () => { /* photo tiles: nothing to do here */ });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 
@@ -294,7 +480,7 @@
     // exported for the Vector Lab page (§8), which renders a Lab store on its own canvas
     const saved = ctx, savedOverlay = overlay;
     ctx = context; overlay = context.canvas;
-    try { render({ encode_mode: 'vector', vector_scene: scene, grid: (opts && opts.grid) || { w: 12, h: 8, tile_px: 32 } }); }
+    try { render({ encode_mode: 'vector', vector_scene: scene, grid: (opts && opts.grid) || { w: 12, h: 8, tile_px: 32 } }, false); }
     finally { ctx = saved; overlay = savedOverlay; }
   };
 })();

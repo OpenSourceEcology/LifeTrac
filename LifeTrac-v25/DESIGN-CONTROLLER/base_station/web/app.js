@@ -323,11 +323,26 @@
     if (!cvs) return;
     let stateFrames = 0;
     let stateLastTs = performance.now();
+    let vectorRx = null;   // vector_scene.stats.frames_rx at the last 1 s mark
     window.addEventListener('lifetrac-state', (ev) => {
       stateFrames++;
       const now = performance.now();
       if (now - stateLastTs > 1000) {
-        meta.textContent = `${stateFrames} Hz · tile stream`;
+        // In VECTOR the snapshots keep their 2 Hz keepalive whatever arrives,
+        // so the line counts the VS frames the store received instead
+        // (RS-13.2 desk check F8).
+        const snap = ev.detail || {};
+        if (snap.encode_mode === 'vector') {
+          const st = snap.vector_scene && snap.vector_scene.stats;
+          const rx = (st && typeof st.frames_rx === 'number') ? st.frames_rx : null;
+          const rate = (rx !== null && vectorRx !== null && rx >= vectorRx)
+            ? `${((rx - vectorRx) * 1000 / (now - stateLastTs)).toFixed(1)} frames/s · ` : '';
+          meta.textContent = `${rate}vector stream`;
+          vectorRx = rx;
+        } else {
+          meta.textContent = `${stateFrames} Hz · tile stream`;
+          vectorRx = null;
+        }
         stateFrames = 0;
         stateLastTs = now;
       }
@@ -647,6 +662,20 @@
   // surface through /api/encode_mode/current; render a mismatch instead
   // of trusting the optimistic POST response forever.
   let encTractorAck = null;   // {effective_name, clamped, quality?, ...} | null
+  // The mode /ws/state says is arriving (snapshot encode_mode names the
+  // codec of the last frame web_ui ingested); null until a tile or a vector
+  // frame has arrived, as encode_mode is only a default before that. Every
+  // frame self-describes its codec, so a codec the pin cannot produce
+  // outranks the ack; one it can still leaves the ack to tell motion_only
+  // from y_only (one codec) and to show a clamp.
+  let encRxMode = null;
+  // Received mode names each pin can produce: motion_only rides the luma
+  // codec like y_only, and full arrives as rawstream with the container strip
+  // on (camera_service _ENCODE_MODE_CODEC).
+  const encRxFamily = {
+    full: ['full', 'rawstream'], y_only: ['y_only'], motion_only: ['y_only'],
+    mono_g4: ['mono_g4'], rawstream: ['rawstream'], vector: ['vector'],
+  };
   let encQuality = null;      // operator-pinned quality (1-100) | null
   let safeModeActive = false; // link_monitor safe-mode override (bridge plane)
   let lastAirtimeMs = 0;      // performance.now() of last control/link_airtime
@@ -677,7 +706,12 @@
     const meta = encMeta[encCurrentMode] || { label: encCurrentMode, desc: '' };
     let text = `enc: ${meta.label} \u25b8`;
     let mismatch = false;
-    if (encTractorAck && encTractorAck.effective_name) {
+    if (encRxMode && !(encRxFamily[encCurrentMode] || [encCurrentMode]).includes(encRxMode)) {
+      // RS-13.2 F8: the pin alone read "Full color" through a VECTOR replay.
+      const rxMeta = encMeta[encRxMode] || { label: encRxMode };
+      text = `enc: ${meta.label} \u2192 ${rxMeta.label} \u25b8`;
+      mismatch = true;
+    } else if (encTractorAck && encTractorAck.effective_name) {
       const eff = encTractorAck.effective_name;
       if (encTractorAck.clamped || (eff !== encCurrentMode)) {
         const effMeta = encMeta[eff] || { label: eff };
@@ -695,6 +729,7 @@
       : (meta.desc ? `${meta.label} - ${meta.desc}`
                    : `Current encode mode: ${encCurrentMode}`)
         + (encQuality != null ? ` \u00b7 q${encQuality} pinned` : '');
+    if (encRxMode) encPill.title += ` \u00b7 receiving: ${encRxMode}`;
     if (safeModeActive) {
       encPill.title = 'Link monitor engaged SAFE MODE \u2014 the bridge floor-clamps '
         + 'the encode mode regardless of the operator pin. ' + encPill.title;
@@ -712,6 +747,12 @@
     encCurrentMode = (typeof mode === 'string' && mode) ? mode : 'full';
     _renderEncPill();
   }
+  window.addEventListener('lifetrac-state', (ev) => {
+    const snap = ev.detail || {};
+    const got = snap.encode_mode === 'vector' || (Array.isArray(snap.tiles) && snap.tiles.length > 0);
+    const rx = (got && typeof snap.encode_mode === 'string') ? snap.encode_mode : null;
+    if (rx !== encRxMode) { encRxMode = rx; _renderEncPill(); }
+  });
   // Seed from the runtime endpoint so pill cycling is session-only, then
   // keep polling: the tractor ack and rx codec arrive asynchronously, and
   // another tab / the gamepad / safe-mode can change the pin under us.

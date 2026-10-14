@@ -79,12 +79,12 @@ class StoreCase(unittest.TestCase):
         self.rx = 10_000
 
     def feed(self, recs, epoch: int = 0, key_: bool = False, rx: int | None = None,
-             age: int = 1, airtime: float = 0.0) -> IngestResult:
+             age: int = 1, airtime: float = 0.0, seq: int | None = None) -> IngestResult:
         if rx is None:
             self.rx += 500
         else:
             self.rx = rx
-        return self.st.ingest(body(key_, epoch, recs, age), 1 if key_ else 0, self.rx, airtime)
+        return self.st.ingest(body(key_, epoch, recs, age), 1 if key_ else 0, self.rx, airtime, seq=seq)
 
     def snap(self, now: int | None = None) -> dict:
         return self.st.snapshot(self.rx + 100 if now is None else now)
@@ -855,11 +855,13 @@ class SnapshotGoldenTests(StoreCase):
         s = self.snap(10_100)
         json.dumps(s)
         for k in ("v", "epoch", "badge", "lab", "level", "anchor_age_ms", "digest_ok", "resync", "corr_detected",
-                  "corr_shown", "min_object", "bits", "horizon", "layers", "masked", "warp", "stats", "status"):
+                  "corr_shown", "min_object", "bits", "horizon", "layers", "masked", "warp", "stats", "status",
+                  "frame_age_ms", "loss"):
             self.assertIn(k, s)
         self.assertEqual((s["v"], s["badge"], s["lab"], s["level"], s["masked"]), (1, 7, False, 0, []))
         self.assertEqual(s["warp"], {"applied": False, "source": None, "since_capture_ms": 0})
         self.assertEqual(s["anchor_age_ms"], 10_100 - (10_000 - 60 - 600))    # rx − airtime − 200·AAAA
+        self.assertEqual((s["frame_age_ms"], s["loss"]), (760, None))          # the same capture; no seq given
         self.assertEqual((s["corr_detected"], s["corr_shown"]), (2, 1))
         self.assertEqual([layer["id"] for layer in s["layers"]], ["L1", "L2", "L3", "L4"])
         self.assertEqual(s["status"]["arm_deg"], 0)
@@ -968,6 +970,66 @@ class SnapshotGoldenTests(StoreCase):
                            vs.Anom(0, 1, 1, 1, 1, 0xFFF), vs.Hole(1, 0, False, 30, 47, 1)], epoch=0, key_=True)
         kinds = [(s["id"], s["k"]) for s in self.snap()["layers"][0]["shapes"]]
         self.assertEqual(kinds, [(2, "poly"), (1, "poly"), (1, "hole"), (80, "anom")])
+
+
+# ---------------------------------------------------------------- the banner's age and loss (§7.5)
+
+class BannerAgeLossTests(StoreCase):
+    """"VECTOR — NOT CAMERA PIXELS · age · loss" (§0.2, §7.5): ``frame_age_ms``
+    is the capture age of the newest applied frame, ``loss`` the frames that
+    seq gaps show missing in the last 10 s (§4.5.2)."""
+
+    def test_frame_age_is_the_newest_applied_capture(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000)        # capture 9_800
+        self.assertEqual(self.snap(10_100)["frame_age_ms"], 300)
+        self.feed([tri(1)], epoch=0, rx=10_500, age=4)                    # capture 9_700: older
+        self.assertEqual(self.snap(10_600)["frame_age_ms"], 800)
+        self.feed([tri(1)], epoch=0, rx=11_000)                           # capture 10_800
+        self.assertEqual(self.snap(11_100)["frame_age_ms"], 300)
+        self.assertEqual(self.feed([tri(1)], epoch=15, rx=11_500).reason, "epoch_behind")
+        self.st.ingest(b"\xff" * 10, 0, 11_500)                           # undecodable
+        self.assertEqual(self.snap(11_600)["frame_age_ms"], 800)          # neither is on screen
+
+    def test_loss_counts_seq_gaps_over_ten_seconds(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=1)
+        for rx, seq in ((10_500, 2), (11_000, 3), (11_500, 5), (12_000, 6)):     # 4 never arrived
+            self.feed([tri(1)], epoch=0, rx=rx, seq=seq)
+        self.assertEqual(self.snap(12_100)["loss"],
+                         {"window_ms": 10_000, "frames": 5, "lost": 1, "ratio": 0.167})
+        self.assertEqual(self.snap(21_600)["loss"],                       # the gap left the window
+                         {"window_ms": 10_000, "frames": 1, "lost": 0, "ratio": 0.0})
+        self.assertEqual(self.snap(22_100)["loss"]["ratio"], None)       # nothing in the window
+        json.dumps(self.snap(12_100))
+
+    def test_undecodable_frames_arrived_and_the_same_seq_is_one_frame(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=7)
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=7)    # an epoch-start copy
+        self.st.ingest(b"\xff" * 10, 0, 10_500, seq=8)
+        self.feed([tri(1)], epoch=0, rx=11_000, seq=10)
+        loss = self.snap(11_100)["loss"]
+        self.assertEqual((loss["frames"], loss["lost"]), (3, 1))
+
+    def test_wrap_restarts_and_silences(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=254)
+        self.feed([tri(1)], epoch=0, rx=10_500, seq=1)                    # 255 and 0 lost across the wrap
+        self.assertEqual(self.snap(10_600)["loss"]["lost"], 2)
+        self.feed([tri(1)], epoch=0, rx=11_000, seq=150)                  # a jump past 128: a restart
+        self.st.break_seq()
+        self.feed([tri(1)], epoch=0, rx=11_500, seq=1)                    # a new chain after another codec
+        self.assertEqual(self.snap(11_600)["loss"]["lost"], 2)
+        self.feed([tri(1)], epoch=0, rx=22_000, seq=3)                    # after > 10 s of silence
+        self.assertEqual(self.snap(22_100)["loss"], {"window_ms": 10_000, "frames": 1, "lost": 0, "ratio": 0.0})
+        self.assertEqual(self.snap(22_100)["frame_age_ms"], 300)
+
+    def test_no_seq_means_unknown_loss(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True)
+        self.assertIsNone(self.snap()["loss"])
+        self.st.reset()
+        self.feed(key() + [tri(1)], epoch=0, key_=True, seq=1)
+        self.assertEqual(self.snap()["loss"]["frames"], 1)
+        self.st.reset()
+        self.feed(key() + [tri(1)], epoch=0, key_=True)
+        self.assertIsNone(self.snap()["loss"])
 
 
 # ---------------------------------------------------------------- robustness (§3.4)
