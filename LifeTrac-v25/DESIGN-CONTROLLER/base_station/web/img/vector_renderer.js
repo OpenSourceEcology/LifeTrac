@@ -22,8 +22,10 @@
 // stretched with the panel as before; the banner and the chips are drawn in
 // CSS pixels below the console's top bar and beside the settings drawer and
 // the telemetry panel while those are open (`data-vector-avoid` in
-// index.html), and wrap onto another row rather than run off the edge, so
-// every chip stays whole and readable at any window size.
+// index.html), and wrap onto another row rather than run off the edge. Where
+// the gap beside open panels is too narrow, the chips split at " · " and
+// shrink first; only a gap too narrow even for that lets the panels cover
+// them (drawChips).
 //
 // Snapshot geometry is already in canvas pixels (the store applies offsets,
 // group shifts and GZOOM), so this file only draws what it is given.
@@ -293,10 +295,11 @@
   // Chips in CSS px, left to right from `L.top`, stepping past the `blocks`
   // and wrapping to a new row before one would cross the right edge (F1, F2);
   // a chip wider than the panel alone shrinks its font to fit. The size
-  // follows the panel width, 12–18 px. Returns [text, colour, font px, x, y,
-  // w] per chip, the chip height and the bottom of the last row.
-  function layChips(L, chips, blocks) {
-    const pad = 6, gap = 6, fs = Math.round(Math.max(12, Math.min(18, L.w / 90))), ch = fs + 8;
+  // follows the panel width, 12–18 px, unless `size` sets it. Returns [text,
+  // colour, font px, x, y, w] per chip, the chip height, the size and the
+  // bottom of the last row.
+  function layChips(L, chips, blocks, size) {
+    const pad = 6, gap = 6, fs = size || Math.round(Math.max(12, Math.min(18, L.w / 90))), ch = fs + 8;
     const out = [];
     let x = pad, y = L.top;
     for (const [text, colour] of chips) {
@@ -313,19 +316,25 @@
       out.push([text, colour, f, x, y, w]);
       x += w + gap;
     }
-    return { out, ch, bottom: y + ch };
+    return { out, ch, fs, bottom: y + ch };
   }
 
   // Beside the open side panels while that keeps the chips in the panel's top
-  // half (clear of the joysticks); with no room there, laid out as if the
-  // panels were closed, which then cover part of the row as they cover the
-  // scene.
+  // half (clear of the joysticks). Without room there, each chip is split at
+  // its " · " (the banner into "VECTOR — NOT CAMERA PIXELS", "age …" and
+  // "loss …") and the font steps down to 9 px. Only when even that does not
+  // fit are they laid out as if the panels were closed, which then cover part
+  // of the chips as they cover the scene.
   function drawChips(L, chips) {
     ctx.save();
     ctx.setTransform(L.k, 0, 0, L.k, 0, 0);
     ctx.textBaseline = 'middle';
     let lay = layChips(L, chips, L.blocks);
-    if (L.blocks.length && lay.bottom > L.h / 2) lay = layChips(L, chips, []);
+    if (L.blocks.length && lay.bottom > L.h / 2) {
+      const parts = chips.flatMap(([text, colour]) => text.split(' · ').map((t) => [t, colour]));
+      for (let f = lay.fs; f >= 9 && lay.bottom > L.h / 2; f--) lay = layChips(L, parts, L.blocks, f);
+      if (lay.bottom > L.h / 2) lay = layChips(L, chips, []);
+    }
     for (const [text, colour, f, x, y, w] of lay.out) {
       ctx.font = chipFont(f);
       ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(x, y, w, lay.ch);

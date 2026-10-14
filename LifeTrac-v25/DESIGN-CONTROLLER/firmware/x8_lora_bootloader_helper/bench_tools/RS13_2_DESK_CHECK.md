@@ -659,10 +659,15 @@ Playwright, the 2a window replayed with the command above, once at
   that throws while drawn gives the same opaque black panel
   (`"fault": "render_error"`). The full chip set wraps at 640×480,
   800×600 and 1024×600 and is sharp at devicePixelRatio 2.
-- Not covered: with both side panels open in a window too narrow for the
-  chips between them (800×600), the chips go back to the top row under
-  the panels. Shapes and their age labels in the panel's top ~50 px sit
-  under the button bar, as the photo does.
+- Both side panels open (Copilot on #150): the chips split at " · " and
+  shrink to fit between the panels, at 12 px at 800×600 and 900×700, 11 px
+  at 760×560 and 9 px at 730×540. With one panel open no chip sits under
+  it at 640×480 to 1920×1080.
+- Not covered: below about 730 px wide with both panels open, even
+  "VECTOR — NOT CAMERA PIXELS" at 9 px does not fit between them, so the
+  chips go back to the top rows under the panels, which then cover most
+  of the scene too. Shapes and their age labels in the panel's top ~50 px
+  sit under the button bar, as the photo does.
 
 F4 needs a design decision before any code. A page loaded before #135 runs
 a `badge_renderer.js` that accepts badges 0–6 only and posts one refusal
