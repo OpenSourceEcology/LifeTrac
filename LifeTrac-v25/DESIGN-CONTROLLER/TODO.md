@@ -2789,9 +2789,62 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   on new fw, OR an RFCO_SUMMARY capture showing the originator now logs
   consider_remote=LOCKED_OUT on received commands (feed-independent proof).
   The reverse-delivery half below still stands.**
-- [ ] **RS-12.15 (reverse-delivery half) — the tractor's RX does not follow
+- [~] **RS-12.15 (reverse-delivery half) — the tractor's RX does not follow
   the slot clock between trains (opened 2026-09-12 from RS-12.12/14 data).**
+  **FIX CODED 2026-10-14 (de2ae16 + f9cc98b), SIL green. NOT built for the
+  boards, NOT flashed (needs the GO).** On v2 the self-anchored TX clock
+  survives demotion, but `sx1276_rx_slot_follow` still ran only while LOCKED,
+  so between trains the tractor listened on its last TX channel or the scan
+  walker's (v2 legs R/T/U: 19/72, 2/43, 7/49 commands heard). Fix: follow =
+  (LOCKED && adopted) || originator authority. While streaming (>= 8 own TX
+  each < 1 s apart) the tractor's own clock drives its receiver in any scan
+  state and the walker leaves the synth alone. Followers are unchanged (they
+  never hold authority). The rule reads a fresh ms clock. LOCKED on the own
+  grid without authority (the RS-13 decay window) no longer follows.
+  `check-rx-reverse-delivery` (8 SIL sequences, real sx1276_rx.c/tx.c): 17/59
+  -> 59/59 between trains, 15/28 -> 28/28 (leg H shape), 159/182 -> 182/182
+  (leg I shape), 10/33 -> 33/33 in scan FAILED; the follower's radio calls are
+  identical to pre-fix; the remaining misses are half-duplex collisions.
+  Limit: authority only, so at 1 fps, or ~3.5 s after a >= 1 s stall, it is
+  the old behaviour.
+  **BENCH (no radio):** build both images on the bench PC with the reference
+  toolchain (`murata_l072/README.md`, "Building"), record the new md5 pair in
+  the README and `l072-bench-md5.yml`, and commit `build/firmware.bin`.
+  **ON-AIR (needs GO):** flash BOTH L072s with the bench image (Verify OK,
+  radio_state 4); profile 1, 300 s legs, STATS pre/post on both nodes.
+  (V) camera A/B vs legs T/U: -TxFeed camera -RegProfile 1 -DurationS 300
+      -KfRequestDisable 0 + keyframe injector 15 s x 20, moving scene, aim verified.
+  (W) synth A/B vs leg R: dual injector 2 fps / 3000 B.
+  (X) FAILED: synth 2 fps, command plane silent >= 150 s (KF requests off, no
+      injector) until the tractor emits the final RX_SCAN_FAILED fault, then the
+      injector for 120 s (if base background traffic keeps LOCKing it, FAILED is
+      unreachable: record that).
+  PASS: tractor radio_rx_ok / base radio_tx_ok >= 60 % on V, W and post-FAILED X
+  (v2: 26 / 4.7 / 14 %; SIL 81-95 % on an ideal channel); tractor
+  clk_demotion_reset = 0, tx_first_anchor = 1, fhss_dec_snapped = 0,
+  fhss_dec_rej_epoch_drift = 0; base tx_stream_streak_max < 8; 0 base
+  lock-loss gaps > 3 s, max frag gap <= 1 s, fragment loss not worse than leg U
+  (10.5 %) / leg R. Tractor clk_demotion_reset > 0 or tx_first_anchor > 1 means
+  it adopted an echo (apparent lead or decay window): stop.
+  Open for the design owner: closing the decay window (a grid-policy change
+  that touches the F6 recovery tier; the 1 fps gap is the same question); a
+  lead tolerance in the originator's leading-grid test if validation shows the
+  tractor adopting (the SIL margin is ~0.5 ms); whether self-follow should also
+  run in scan FAILED, as it does now; and the half-duplex collisions that
+  remain (D-VS9's reserved control slot).
   **SHARPENED 2026-09-12 (RS-12.14 gate leg J): the dominant mechanism is FHSS
+  CLOCK AUTHORITY, not reverse delivery. Every follower lock loss in the three
+  profile-1 legs starts 1–2 s after a base command the TRACTOR RECEIVED (H: 1
+  received, 0 losses; I: 49, four up to 64 s; J: 15, four up to 29 s; unheard
+  sends cause nothing). Reading: the tractor (anchor) re-anchors its clock
+  from the base's command headers — the base's lagged follower copy (F6
+  2026-07-30: a self-anchored grid has no authority to refuse a remote one) —
+  its TX slots shift, the base's follower is a slot off within LOCK_LOSS_MS
+  (2 s) and re-acquires in 20–30 s. FIX (firmware, next flash): the streaming
+  node must not re-anchor from a follower's headers (mark follower-originated
+  frames non-anchoring, or let the anchor refuse remote grids while it
+  streams). Interim: profile-1 field operation with
+  LIFETRAC_KF_REQUEST_DISABLE=1. The reverse-delivery half below stands.**
   Base→tractor command delivery on profile 1 was 1/17 (leg H, healthy link)
   and 49/281 (leg I) vs 56/58 on profile 2. The base DOES hop its command TX
   with the tractor's grid (277 distinct hop/channel pairs in 281 sends), so
@@ -2806,18 +2859,6 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   event / lengthen LOCK_LOSS for the anchor). Until then every keyframe
   request on profile 1 costs several retries, which is what RS-12.14 bounds.
 - [ ] **RS-12.14 — keyframe self-heal storm destroys the FHSS follower
-  CLOCK AUTHORITY, not reverse delivery. Every follower lock loss in the three
-  profile-1 legs starts 1–2 s after a base command the TRACTOR RECEIVED (H: 1
-  received, 0 losses; I: 49, four up to 64 s; J: 15, four up to 29 s; unheard
-  sends cause nothing). Reading: the tractor (anchor) re-anchors its clock
-  from the base's command headers — the base's lagged follower copy (F6
-  2026-07-30: a self-anchored grid has no authority to refuse a remote one) —
-  its TX slots shift, the base's follower is a slot off within LOCK_LOSS_MS
-  (2 s) and re-acquires in 20–30 s. FIX (firmware, next flash): the streaming
-  node must not re-anchor from a follower's headers (mark follower-originated
-  frames non-anchoring, or let the anchor refuse remote grids while it
-  streams). Interim: profile-1 field operation with
-  LIFETRAC_KF_REQUEST_DISABLE=1. The reverse-delivery half below stands.**
   (opened 2026-09-12, from RS-12.12 leg I).** With keyframe requests enabled
   on profile 1, a few early misses trigger self-heal requests; each is a base
   TX that skips the follower under tx-busy (RS-4.14); the follower loses lock

@@ -115,6 +115,11 @@ since), built with the toolchain above and the default flags:
 | `build/firmware_bench_diag.bin` (bench, on both boards since 2026-09-15) | `0c1bb0a9573f813137f941dfa47177d0` | 24 860 B |
 | `build/firmware.bin` (production, committed) | `589c120323c2d5e7ef9f459d7a4ba42d` | 24 860 B |
 
+**Stale since the RS-12.15 reverse-delivery fix** (`de2ae16`, 2026-10-14): the
+source changed and was not built with this toolchain. Build both images on
+the bench PC, then replace this pair, the md5s in `l072-bench-md5.yml` and
+the committed `build/firmware.bin` before flashing.
+
 Check with `certutil -hashfile build\firmware_bench_diag.bin MD5`
 (PowerShell) or `md5sum build/firmware_bench_diag.bin`.
 - Any source change moves both md5s. Record the new pair in the PR.
@@ -134,8 +139,11 @@ Check with `certutil -hashfile build\firmware_bench_diag.bin MD5`
   `make bench` and `make`, and prints both md5s against this table and
   against the committed `build/firmware.bin`, with a warning on mismatch.
   The Windows bench PC builds are the reference. Whether a Linux build of
-  the same release is byte-identical is what this job tests; it has not been
-  checked by hand.
+  the same release is byte-identical is what this job tests. So far it is
+  not: on a source unchanged since `bb4a2071`, the runs on 2026-10-11 (main)
+  and 2026-10-14 (#150) both built bench `6f5073c0…` and production
+  `7983744b…`. Take md5s from the bench PC, and read this job's warnings as
+  that difference unless a bench PC build disagrees too.
 
 ## Not yet present
 
