@@ -94,8 +94,11 @@ On the PC:
    `firmware/tractor_x8/docker-compose*.yml` and `mosquitto.video-test.conf`
    stay on the PC too (RS-5.20): each of those compose files maps
    `/dev/ttymxc3` with `restart: unless-stopped`, and the base uses none of
-   them. The script stops before anything is copied if a compose file in the
-   tarball maps `/dev/ttymxc3`. Docs, `bench-evidence/`, `hil/` and
+   them. The script stops before anything is copied if a YAML file in the
+   tarball, other than the base's own `docker-compose.yml`, names `ttymxc3`
+   or `LIFETRAC_LORA_DEVICE` outside a comment (a device entry, a
+   `${VAR:-/dev/ttymxc3}` default, an environment value) or runs
+   privileged. Docs, `bench-evidence/`, `hil/` and
    `tools/` stay on the PC. The tarball (about 2 MB) is kept as
    `$ARCHIVE_DIR/deploy/dc_deploy_<sha8>.tar.gz`.
 2. It refuses a tarball whose text files hold more CR bytes than the commit's

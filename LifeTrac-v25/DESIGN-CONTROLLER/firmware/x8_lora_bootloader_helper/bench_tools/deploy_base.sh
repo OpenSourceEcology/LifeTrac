@@ -217,10 +217,17 @@ RSCRIPT=$STAGE/deploy_base_remote.sh
 # and config on the board then breaks. Force LF.
 say "archive $SHORT ($SUBJECT): ${PATHS[*]}"
 git -C "$REPO" -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz -o "$TGZ" "$SHA:$DC_REL" -- "${PATHS[@]}" "${NO_SHIP[@]}"
-# Check: no compose file in the tarball maps the radio UART as a device.
+# Check: no YAML file in the tarball but the base's own docker-compose.yml
+# (whose lora_bridge maps the radio by design; only its broker is started
+# here) can reach the radio UART. Outside comments, none may name ttymxc3 or
+# LIFETRAC_LORA_DEVICE (the base's .env sets it to /dev/ttymxc3), in any form
+# (a device entry, "${VAR:-/dev/ttymxc3}", an environment value), or run
+# privileged.
 while IFS= read -r f; do
-    if (set +o pipefail; tar -xzOf "$TGZ" "$f" | grep -qE "^[[:space:]]*-[[:space:]]*[\"']?/dev/ttymxc3"); then
-        die "the tarball would ship $f, which maps /dev/ttymxc3; nothing was copied"
+    [ "$f" != docker-compose.yml ] || continue
+    if (set +o pipefail; tar -xzOf "$TGZ" "$f" | grep -v '^[[:space:]]*#' \
+            | grep -qiE 'ttymxc3|LIFETRAC_LORA_DEVICE|privileged:[[:space:]]*["'"'"']?true'); then
+        die "the tarball would ship $f, which can reach the radio UART (ttymxc3, LIFETRAC_LORA_DEVICE or privileged); nothing was copied"
     fi
 done < <(tar -tzf "$TGZ" | grep -E '\.ya?ml$')
 # Check: the text files in the tarball must hold no more CR bytes than the same

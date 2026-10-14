@@ -1036,6 +1036,17 @@ class BannerAgeLossTests(StoreCase):
                 loss = self.snap(10_000 + 500 * len(seqs))["loss"]
                 self.assertEqual((loss["frames"], loss["lost"], loss["ratio"]), (frames, 0, 0.0))
 
+    def test_a_new_chain_does_not_take_the_old_chains_seqs_as_copies(self):
+        # Copilot review of #150: 1, 2, another codec, then 1, 3, 2 read one
+        # lost of five, because the old chain's 2 hid the new chain's late 2.
+        for rx, seq in ((10_000, 1), (10_500, 2)):
+            self.feed(key() + [tri(1)], epoch=0, key_=True, rx=rx, seq=seq)
+        self.st.break_seq()
+        for rx, seq in ((11_000, 1), (11_500, 3), (12_000, 2)):
+            self.feed([tri(1)], epoch=0, rx=rx, seq=seq)
+        loss = self.snap(12_100)["loss"]
+        self.assertEqual((loss["frames"], loss["lost"]), (5, 0))
+
     def test_a_gap_left_open_stays_lost_and_a_long_step_back_is_a_restart(self):
         self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=40)
         for rx, seq in ((10_500, 43), (11_000, 41), (11_500, 44)):        # 42 never arrives

@@ -1490,7 +1490,9 @@ No-regrets work, correct under every surviving architecture (do first):
   `mosquitto.video-test.conf` out of the tarball, so they are in neither the
   tree nor the image, and removes an old copy from the deployed tree (also
   with `--no-clean`; the backup keeps it). It stops before copying anything
-  if a compose file in the tarball maps `/dev/ttymxc3`. The files stay in
+  if a YAML file in the tarball, other than the base's own
+  `docker-compose.yml`, names `ttymxc3` or `LIFETRAC_LORA_DEVICE` outside a
+  comment or runs privileged. The files stay in
   git: the tractor image is built from its own archive. Close this item when
   the next deploy's tree has none of them. Renaming or deleting them in git
   is left to the design owner. Still on the base for a while:
