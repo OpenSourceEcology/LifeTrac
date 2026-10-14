@@ -521,6 +521,27 @@ void sx1276_rx_tick(uint32_t now_ms) {
 #ifdef LIFETRAC_FHSS_TX_ROUTED
 
 /*
+ * RS-12.15 reverse delivery (2026-10-14): the RX follow rule
+ * (sx1276_rx_grid_follow*, see sx1276_rx_grid_policy.h) evaluated at a
+ * FRESH time, not the pass's now_ms. main.c samples now_ms once at the top
+ * of the pass; sx1276_tx_poll(), earlier in the same pass, notes the own
+ * TX that sustains originator authority (sx1276_fhss_authority_note_tx)
+ * at its own, later clock read. The wrap-safe gap test would read the
+ * older now_ms as a ~49-day gap and drop authority for the rest of the
+ * pass -- enough for a walker step to park the receiver off the grid for
+ * the rest of the slot (the SIL caught it: check-rx-reverse-delivery).
+ */
+static uint8_t rx_follow_own_now(void) {
+    return sx1276_rx_grid_follow_own(platform_now_ms());
+}
+
+static uint8_t rx_follow_now(void) {
+    return sx1276_rx_grid_follow(
+        platform_now_ms(),
+        (uint8_t)(s_scan_state == SX1276_RX_SCAN_STATE_LOCKED));
+}
+
+/*
  * FCC-A6c-2-c-i: HW dispatch for scan SM actions BEGIN_SCAN and
  * ADVANCE_CHANNEL. Sequence mirrors γ-2 RX retune (and TX retune):
  * standby → sx1276_fhss_next_channel() → set_frequency → PLL settle
@@ -550,6 +571,19 @@ static void scan_dispatch_action(sx1276_rx_scan_action_t action,
             sx1276_rx_scan_walker_reset();
             /* fallthrough */
         case SX1276_RX_SCAN_ACTION_ADVANCE_CHANNEL: {
+            /* RS-12.15 reverse delivery (2026-10-14): a node holding
+             * originator authority hears its peer on its OWN clock's
+             * channel, which sx1276_rx_slot_follow() now tracks in every
+             * scan state -- the walker must not park the receiver off the
+             * grid every peer frame is hopped onto. Only the HW retune is
+             * skipped: state, anchors and counters were committed by
+             * scan_drive, so a SCANNING walker resumes within one dwell
+             * of the authority decaying. An adopted follower holds no
+             * authority (sx1276_rx_grid_policy.h), so its walk is
+             * unchanged. */
+            if (rx_follow_own_now() != 0U) {
+                return;
+            }
             /* FCC-A6c-2-c-i-α' (2026-05-27): walk the chantab DIRECTLY
              * via the dedicated walker TU. The previous implementation
              * called sx1276_fhss_next_channel(), which mutates the
@@ -743,8 +777,18 @@ static void scan_drive(sx1276_rx_scan_event_t event,
          * LOCKed the tractor, this 2 s demotion wiped its own TX clock,
          * and the next TX re-anchored "slot k+1 starts now", renumbering
          * the shared grid under the base's follower (RS-12.12/14). */
-        host_stats_clk_demotion_note(sx1276_rx_grid_on_demotion() != 0U);
-        s_rx_last_followed_abs_valid = 0U;
+        const uint8_t clock_reset = sx1276_rx_grid_on_demotion();
+        host_stats_clk_demotion_note(clock_reset != 0U);
+        /* RS-12.15 reverse delivery (2026-10-14): forget the followed slot
+         * only with the clock it was derived from. A KEPT clock may be
+         * driving the receiver right now (an originator follows its own
+         * grid in any scan state); forgetting would re-tune it to the same
+         * channel mid-slot and clip a frame on air. Before the fix nothing
+         * followed a kept clock until a received frame re-marked the slot,
+         * so this is unobservable on the follower and recovery paths. */
+        if (clock_reset != 0U) {
+            s_rx_last_followed_abs_valid = 0U;
+        }
         /* F6: the adopted grid is gone with the lock -- the policy TU has
          * cleared adoption, which is what keeps the UNANCHORED recovery
          * tier reachable: the next TX re-validates the clock on the stale
@@ -789,6 +833,15 @@ void sx1276_rx_scan_tick(uint32_t now_ms) {
  * not the previous slot's packet was decoded. This is what makes one
  * air loss cost exactly one packet instead of a re-acquisition.
  *
+ * RS-12.15 reverse delivery (2026-10-14): WHICH clock it follows is the
+ * grid policy's call (sx1276_rx_grid_follow): LOCKED on an ADOPTED grid
+ * -- the follower, unchanged -- or, in ANY scan state, the node's OWN
+ * clock while it holds originator authority. A streaming node is rarely
+ * LOCKED (it mostly transmits), so LOCKED-only following left the
+ * tractor deaf between trains to the commands the base hops onto the
+ * tractor's own grid. LOCKED on the node's own grid without authority
+ * (the decay window) no longer follows -- see the policy header.
+ *
  * Interlocks:
  *   - tx_busy: never yank the modem out of an in-flight TX (the TX
  *     path re-derives its own channel from the same clock anyway).
@@ -798,8 +851,8 @@ void sx1276_rx_scan_tick(uint32_t now_ms) {
  */
 void sx1276_rx_slot_follow(uint32_t now_ms) {
     if (sx1276_fhss_clock_valid() == 0U ||
-        s_scan_state != SX1276_RX_SCAN_STATE_LOCKED ||
-        sx1276_tx_busy()) {
+        sx1276_tx_busy() ||
+        rx_follow_now() == 0U) {
         return;
     }
     const uint32_t abs_now = sx1276_fhss_clock_abs_slot(now_ms);
