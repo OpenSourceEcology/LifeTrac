@@ -6,7 +6,7 @@
 >
 > **Relationship to the shipped pipeline.** VS1 is a new per-frame **codec** inside the existing `TileDeltaFrame` (`codec = 6`) and a new **encode mode** (`EncodeMode.VECTOR = 9`), selected exactly like `mono_g4` is today. It rides the strict image path unchanged: `camera_service.py` → MQTT `cmd/image_frame` → `image_tx_daemon.py` → L072 → air → base L072 → `image_rx_daemon.py` → MQTT `video/tile_delta` → `web_ui.py` → `/ws/state`. Nothing in the L072 firmware changes for the codec itself (Phases 1–3); the optional rung switch of D-VS8 (§4.6) is the one part of this proposal that needs L072 work, and the H7 changes only for the optional S1/S3 pose sources (§5.3). The April plan in [IMAGE_PIPELINE.md](IMAGE_PIPELINE.md) (topic `0x29`, wireframe bitmap, 25 ms fragment cap) is superseded by the shipped path; see [§1](#1-summary-and-design-principles).
 >
-> **Amendments (October 2026).** PR #138 (merged 2026-10-04) and PR #143 (merged 2026-10-11; its commits are dated 2026-10-10) changed the encoder and the base store against this design. Each change is written into the section it changes and marked **Amended: … (PR, anomaly or commit, date)**, with the reason and the text it replaced (*Was:*): [§3.3](#33-records-canonical-prefix-code-kraft-sum-exactly-1) (DIGEST, LAYER_CLEAR), [§3.4](#34-parser-rules-base-fuzz-tested) rule 4, [§4.2](#42-budget-order-within-a-frame) (items 5, 7 and 8, wire order) and [§4.3](#43-loss-tolerance-and-honest-ages) (new-epoch triggers, ids under pressure, re-verification, the re-statement of the kept layers, the DEL repeat, the repair share, the resync exit, the TTL). Anomaly numbers are those of the [RS-13.1 bench record](bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md). The amendments describe the merged code and need the design owner's sign-off; the DIGEST exit from resync (`c922efbb`) is a design change that #138 kept in its own commit so that it can be dropped.
+> **Amendments (October 2026).** PR #138 (merged 2026-10-04) and PR #143 (merged 2026-10-11; its commits are dated 2026-10-10) changed the encoder and the base store against this design. Each change is written into the section it changes and marked **Amended: … (PR, anomaly or commit, date)**, with the reason and the text it replaced (*Was:*): [§3.3](#33-records-canonical-prefix-code-kraft-sum-exactly-1) (DIGEST, LAYER_CLEAR), [§3.4](#34-parser-rules-base-fuzz-tested) rule 4, [§4.2](#42-budget-order-within-a-frame) (items 5, 7 and 8, wire order) and [§4.3](#43-loss-tolerance-and-honest-ages) (new-epoch triggers, ids under pressure, re-verification, the re-statement of the kept layers, the DEL repeat, the repair share, the resync exit, the TTL). The renderer fixes from the RS-13.2 desk-check rehearsal (2026-10-14, `firmware/x8_lora_bootloader_helper/bench_tools/RS13_2_DESK_CHECK.md` Appendix A) amend [§7.2](#72-snapshot-additions-est-38-kb) (`frame_age_ms`, `loss`) and [§7.5](#75-renderer-and-fail-closed-rules) (rule 1, the banner and its layout, the horizon's colours), and leave the safety chip's trigger open there. Anomaly numbers are those of the [RS-13.1 bench record](bench-evidence/RS_13_vector_scene_2026-09-26/RESULTS.md). The amendments describe the merged code and need the design owner's sign-off; the DIGEST exit from resync (`c922efbb`) is a design change that #138 kept in its own commit so that it can be dropped.
 
 ---
 
@@ -1039,6 +1039,7 @@ The `/ws/state` snapshot has no version field today; its keys are `ts_ms`, `grid
 "safety_detector": "no_pixels",
 "vector_scene": null | {
   "v":1, "epoch":5, "badge":7, "lab":false, "anchor_age_ms":820, "digest_ok":true,
+  "frame_age_ms":640, "loss":{"window_ms":10000,"frames":20,"lost":1,"ratio":0.048},
   "corr_detected":1, "corr_shown":1, "min_object":"1.1 m @ 10 m (outside corridor)",
   "bits":{"last_frame":1017,"per_layer":{"hdr":13,"L0":57,"L1":327,"L2":126,"L3":144,"ctrl":55,"insert":248,"pad":49}},
   "horizon":{"mode":"abs","pts":[[0,101.5],[192,99],[384,96]],"sky":["#8fb3d9","#cfe0ef"],
@@ -1059,6 +1060,8 @@ The `/ws/state` snapshot has no version field today; its keys are `ts_ms`, `grid
 ```
 
 Up to 8 state subscribers are allowed (`MAX_STATE_SUBSCRIBERS`, `bs/web_ui.py:929`); the Lab uses REST and does not take one.
+
+**Amended: `frame_age_ms` and `loss` (RS-13.2 desk-check rehearsal F5, 2026-10-14).** The banner's "age · loss" (§7.5) needs both, and the snapshot carried neither. `frame_age_ms` is now minus the capture time of the newest frame the store applied, whatever its records (`anchor_age_ms` ages only the absolute L0 record). `loss` counts VS frames lost to `base_seq` gaps over the last `LOSS_WINDOW_MS` = 10 s (`bs/image_pipeline/vector_scene_store.py`): every VS frame is one fragment, so a gap of n is n frames that never arrived; the same seq again (an epoch-start copy) is not a new frame; a jump of more than `SEQ_GAP_MAX` = 128 is a restart, not loss; a gap after more than 10 s of silence is not counted (it shows in `frame_age_ms`); and web_ui restarts the chain on the first VS frame after a frame of another codec, because the VS seq is its own counter. `loss` is null until a frame has carried a seq, and its `ratio` is null while the window is empty. `encode_mode` names the codec of every received frame, not only the first after a VECTOR run.
 
 ### 7.3 What the two daemons do with a VS frame (no code change)
 
@@ -1096,7 +1099,7 @@ Up to 8 state subscribers are allowed (`MAX_STATE_SUBSCRIBERS`, `bs/web_ui.py:92
 
 **Fail-closed rules** (in `vector_renderer.js`; `badge_renderer.js` only walks `snap.tiles`)
 
-1. **Scene-level faults.** `v` ≠ 1, scene badge ≠ 7, or a missing `anchor_age_ms` gives a black panel "VECTOR?" and a POST to `/api/health/refusal` (`bs/web_ui.py:1683-1692`).
+1. **Scene-level faults.** `v` ≠ 1, scene badge ≠ 7, or a missing `anchor_age_ms` gives a black panel "VECTOR?" and a POST to `/api/health/refusal` (`bs/web_ui.py:1683-1692`). **Amended: what counts as missing, render errors, and the POST cadence (RS-13.2 desk-check rehearsal F3, 2026-10-14).** `anchor_age_ms` absent or not a number is a fault; `null` is not: the store sends it until the epoch has an absolute anchor (a page that joins mid-epoch), and the scene is drawn with the chip "anchor none yet". A scene that throws while it is drawn is refused the same way (fault `render_error`). The POST body is `{reason: "vector_scene_fault", fault, v, badge, epoch, ts_ms}`, sent once per fault episode (an episode ends with the next scene drawn, or a snapshot outside VECTOR) and at most once per 10 s, so a fault that persists or flaps at the 2 Hz snapshot rate never becomes a POST storm. Before, the rule was not implemented: a faulty scene was drawn with "anchor ?".
 2. **Shape-level faults.** A layer or shape badge not in {1, 4, 7}, or an unknown `k`: the shape is not painted; its bounding box is blacked out with "BADGE?".
 3. **Self-model faults.** A badge not in {8, 4}, or a `src` outside `console_sources`: not drawn.
 4. **Missing data.** `encode_mode` is `vector` but `vector_scene` is null: "NO VECTOR DATA". There is never a silent fallback to the old photo.
@@ -1104,10 +1107,12 @@ Up to 8 state subscribers are allowed (`MAX_STATE_SUBSCRIBERS`, `bs/web_ui.py:92
 
 **Banner, raw mode and the safety chip**
 
-- The banner "VECTOR — NOT CAMERA PIXELS · age · loss" is drawn inside `#image-vector`, so raw mode cannot hide it (raw mode hides only the overlay canvases listed at `bs/web/index.html:433`).
+- The banner "VECTOR — NOT CAMERA PIXELS · age · loss" is drawn inside `#image-vector`, so raw mode cannot hide it (raw mode hides only the overlay canvases listed at `bs/web/index.html:433`). Age is `frame_age_ms` and loss is `loss.ratio` (§7.2); either reads "?" when unknown.
+- The banner and the chips must also stay clear of the console's own chrome. They are drawn in CSS pixels below the top button bar and beside the settings drawer and the telemetry panel while those are open (`data-vector-avoid` in `bs/web/index.html`), and wrap onto another row rather than run past the panel's edge. **Amended: the banner text and its layout (RS-13.2 desk-check rehearsal F1, F2 and F5, 2026-10-14).** At 1280×720 the CURL / DUMP / REQ CTRL buttons covered the banner, and the chips, laid out left to right in the overlay's 384 px, put RESYNC past the edge: during the 31.5 s A16 run the operator could not see the resync. The banner was the fixed text without "· age · loss".
+- A horizon record without measured sky and ground colours (an epoch joined before its anchor) leaves the panel black. **Amended (2026-10-14):** the renderer used to fill it with built-in blue and green, which principle 4 rules out.
 - **Raw mode** (rule 4, `DC/IMAGE_PIPELINE.md` §7): shapes are shown exactly as received with their true ages, no warp, no blur. **The self-model is hidden, and masked regions are hatched "NOT TRANSMITTED".**
 - "Show last photo" is an explicit, audit-logged toggle.
-- The chip **"SAFETY DETECTOR: NO PIXELS"** is shown whenever the base R6 detector has no pixels younger than 3 s. The two-detector disagreement banner (`DC/IMAGE_PIPELINE.md` §7 rule 7) is marked unavailable.
+- The chip **"SAFETY DETECTOR: NO PIXELS"** is shown whenever the base R6 detector has no pixels younger than 3 s. The two-detector disagreement banner (`DC/IMAGE_PIPELINE.md` §7 rule 7) is marked unavailable. **Open (RS-13.2 desk-check rehearsal F6, 2026-10-14):** the chip is now drawn, in the photo modes too, whenever the snapshot's `safety_detector` is `no_pixels`; web_ui sets that from the first VS frame until the next tile frame, not from the detector's input age. Either this rule follows the code, or web_ui needs the age of the detector's last pixels.
 
 ---
 
