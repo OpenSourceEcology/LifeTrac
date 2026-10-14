@@ -38,6 +38,8 @@ import logging
 import os
 import re
 import sys
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -99,17 +101,35 @@ def _capture_loader_body(src: str) -> str:
     return "".join(out)
 
 
+_REAL_MONOTONIC = time.monotonic
+_REAL_SLEEP = time.sleep
+
+
 class _FakeClock:
-    """Monotonic-clock stand-in that advances ONLY on ``sleep()``."""
+    """Monotonic-clock stand-in that advances ONLY on ``sleep()``.
+
+    The tests patch ``sleep`` and ``monotonic`` on the ``time`` module,
+    which every thread shares, and each ``web_ui`` import starts another
+    ``radio-auto`` daemon that loops on ``time.sleep(5.0)``. Only the
+    thread that made the clock sees fake time. Any other thread gets the
+    real functions, so a worker that wakes during a test neither spins on
+    the fake ``sleep`` nor lands in ``sleeps``.
+    """
 
     def __init__(self, start: float = 100.0) -> None:
         self.now = start
         self.sleeps: list[float] = []
+        self._owner = threading.get_ident()
 
     def monotonic(self) -> float:
+        if threading.get_ident() != self._owner:
+            return _REAL_MONOTONIC()
         return self.now
 
     def sleep(self, seconds: float) -> None:
+        if threading.get_ident() != self._owner:
+            _REAL_SLEEP(seconds)
+            return
         self.sleeps.append(seconds)
         self.now += seconds
 
@@ -308,6 +328,37 @@ class MR_D_SourceContractTripwire(unittest.TestCase):
             r"except\s*\(\s*OSError\s*,\s*ConnectionError\s*\)",
             "IP-201 contract: catch (OSError, ConnectionError). Anything "
             "narrower lets a paho-mqtt error category crash the UI on boot.")
+
+
+# ---------------------------------------------------------------------------
+# MR-E: the fake clock is the test thread's alone.
+# ---------------------------------------------------------------------------
+
+class MR_E_FakeClockThreadIsolation(unittest.TestCase):
+
+    def test_MR_E_other_threads_keep_real_time(self) -> None:
+        # A radio-auto worker that wakes while the fake clock is patched in
+        # used to spin on the fake sleep and flood clock.sleeps (MR-C once
+        # saw 13355 entries in CI). Other threads must keep real time.
+        web_ui = _fresh_web_ui()
+        clock = _FakeClock(start=0.0)
+        seen: list[float] = []
+
+        def other() -> None:
+            for _ in range(3):
+                time.sleep(0.01)
+            seen.append(time.monotonic())
+
+        with mock.patch.object(web_ui.time, "monotonic", clock.monotonic), \
+             mock.patch.object(web_ui.time, "sleep", clock.sleep):
+            worker = threading.Thread(target=other)
+            worker.start()
+            worker.join(5.0)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(clock.sleeps, [])
+        self.assertEqual(clock.now, 0.0)
+        self.assertEqual(len(seen), 1)
+        self.assertNotEqual(seen[0], 0.0, "the other thread read the fake clock")
 
 
 def setUpModule() -> None:  # noqa: D401
