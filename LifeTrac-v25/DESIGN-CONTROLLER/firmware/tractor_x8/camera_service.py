@@ -967,7 +967,11 @@ _VECTOR_SEQ = 0
 # the first VECTOR frame, and its first frame() paid the process's numpy/cv2
 # first-call costs (l0 79.6 ms vs ~15 ms steady on the 2026-10-04 2d_r4 leg):
 # the switch left a 1.038 s TX gap, which on FHSS breaks the strict < 1000 ms
-# clock-authority TX streak. 0 restores the lazy build.
+# clock-authority TX streak. 0 restores the lazy build. What such a gap does
+# on the L072 is pinned by firmware/murata_l072/bench/host_proto/
+# rx_grid_policy.c sequences 10-11 (`make check-rx-grid-policy`): at 2 fps a
+# base frame in the gap, or before the 8th frame after it, is adopted, and
+# the next demotion resets the tractor's clock; 0.99 s keeps authority.
 VECTOR_PREBUILD = os.environ.get("LIFETRAC_VECTOR_PREBUILD", "1").strip() != "0"
 
 
