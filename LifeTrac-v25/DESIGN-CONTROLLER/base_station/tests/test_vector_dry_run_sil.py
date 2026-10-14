@@ -5,7 +5,7 @@ Pins: the one-fragment limits match the real packers (203 / 243 B for a
 every check; oversize, foreign and unparseable payloads fail the right
 checks; a DIGEST mismatch fails the digest check; the VS header peek reads
 the codec's own bits; camera_service's ``vector_stats`` line round-trips
-through the log parser.
+through the log parser, and its cumulative counters add up over a restart.
 """
 from __future__ import annotations
 
@@ -258,13 +258,21 @@ class TractorLogTests(unittest.TestCase):
         sys.modules[spec.name] = cls.cs
         spec.loader.exec_module(cls.cs)  # type: ignore[union-attr]
 
+    def _line(self, st: dict) -> str:
+        with self.assertLogs(self.cs.LOG, level="INFO") as cm:
+            self.cs._log_vector_stats(st)
+        return cm.output[-1]
+
     def test_camera_service_line_round_trips(self) -> None:
         # ``detail`` on the line is the dial camera_service holds, not the
         # encoder's 0..1 band position (which ``%d`` printed as 0, RS-13.1 A5).
         st = {"ms": {"resize": 3.14159, "l0": 8.0, "l1": 20.49, "total": 41.26},
               "frame_bytes": 203, "level": 0, "detail": 0.5, "epoch": 3, "n_live": 17,
               "residual": 0.0312, "epoch_pending": False, "epochs": 4, "epoch_trigger": None,
-              "last_epoch_trigger": "safety", "ttl_dropped": 1, "waiting": 2}
+              "last_epoch_trigger": "safety", "ttl_dropped": 1, "waiting": 2, "frames": 600,
+              "epochs_by_trigger": {"first": 1, "forced": 0, "horizon": 0, "safety": 3, "relabel": 0},
+              "share_frames": 150, "share_resends": 960, "share_repeats": 12,
+              "carousel_resends": 1000, "del_repeats": 1560}
         saved = self.cs.VECTOR_DETAIL
         self.cs.VECTOR_DETAIL = 80
         try:
@@ -282,6 +290,9 @@ class TractorLogTests(unittest.TestCase):
         self.assertEqual(d["ms_total"], 41.3)
         self.assertEqual(d["residual"], 0.031)
         self.assertEqual(d["epoch_pending"], 0)
+        self.assertEqual((d["frames"], d["share_frames"], d["share_resends"], d["share_repeats"],
+                          d["carousel_resends"], d["del_repeats"]), (600, 150, 960, 12, 1000, 1560))
+        self.assertEqual(d["epochs_by"], st["epochs_by_trigger"])
         summ = vdr.summarise_tractor_log([line, "unrelated noise", line.replace("41.3", "55.0")])
         self.assertEqual(summ["n"], 2)
         self.assertEqual(summ["ms_total"], {"p50": 41.3, "p95": 55.0, "max": 55.0})
@@ -290,7 +301,39 @@ class TractorLogTests(unittest.TestCase):
         self.assertEqual(summ["epoch_pending_lines"], 0)
         self.assertIn("ms_total: p50 41.3 / p95 55.0", vdr.format_tractor_summary(summ))
         self.assertIn("epochs 4 trigger safety ttl_dropped 1 waiting 2", vdr.format_tractor_summary(summ))
+        self.assertIn("counters to the last line (1 run): frames 600; epoch starts 4 = first 1 forced 0 "
+                      "horizon 0 safety 3 relabel 0; repair share 150 frames, 960 re-sends (12 repeat-once); "
+                      "carousel re-sends 1000; DEL repeats 1560; ttl_dropped 1",
+                      vdr.format_tractor_summary(summ))
         self.assertIn("no vector_stats lines", vdr.format_tractor_summary(vdr.summarise_tractor_log([])))
+
+    def test_counters_add_up_over_a_restart(self) -> None:
+        # Each counter is cumulative over one encoder, which camera_service
+        # builds once per process: after a restart they start from 0 again,
+        # so a total is each run's last sample added up. Lines from a
+        # camera_service without the counters are left out of them.
+        def st(frames: int, safety: int, relabel: int, share: int, dels: int) -> dict:
+            return {"ms": {"total": 40.0}, "frame_bytes": 203, "epochs": 1 + safety + relabel,
+                    "last_epoch_trigger": "relabel", "frames": frames,
+                    "epochs_by_trigger": {"first": 1, "forced": 0, "horizon": 0, "safety": safety,
+                                          "relabel": relabel},
+                    "share_frames": share, "share_resends": 6 * share, "share_repeats": share // 2,
+                    "carousel_resends": 5 * share, "del_repeats": dels}
+        lines = [self._line(st(100, 0, 2, 25, 250)), self._line(st(240, 1, 3, 60, 600)),
+                 self._line(st(40, 0, 1, 10, 100))]                     # restarted
+        old = lines[0].split(" frames=")[0]                             # the line before the counters
+        self.assertIsNotNone(vdr.parse_vector_stats_line(old))
+        c = vdr.summarise_tractor_log([old] + lines)["counters"]
+        self.assertEqual(c["runs"], 2)
+        self.assertEqual((c["frames"], c["epochs"], c["share_frames"], c["share_resends"], c["share_repeats"],
+                          c["carousel_resends"], c["del_repeats"]), (280, 7, 70, 420, 35, 350, 700))
+        self.assertEqual(c["epochs_by"], {"first": 2, "forced": 0, "horizon": 0, "safety": 1, "relabel": 4})
+        text = vdr.format_counters(c)
+        self.assertIn("(2 runs): frames 280; epoch starts 7 = first 2 forced 0 horizon 0 safety 1 relabel 4;", text)
+        self.assertNotIn("MISMATCH", text)
+        summ = vdr.summarise_tractor_log([old])
+        self.assertIsNone(summ["counters"])
+        self.assertIn("counters: none on these lines", vdr.format_tractor_summary(summ))
 
     def test_empty_stats_log_nothing(self) -> None:
         with self.assertNoLogs(self.cs.LOG, level="INFO"):

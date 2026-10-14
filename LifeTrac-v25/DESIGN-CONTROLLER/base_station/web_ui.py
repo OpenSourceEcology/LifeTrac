@@ -1476,8 +1476,13 @@ def _ingest_vector_frame(frame) -> None:
     capture-time estimate conservative by at most one slot."""
     global _vector_active
     if _vector_store is not None:
+        if not _vector_active:
+            # The VS seq is its own counter, so the loss count (§4.5.2)
+            # restarts its chain after a frame of another codec.
+            _vector_store.break_seq()
         _vector_store.ingest(frame.vector_body, frame.frame_kind,
-                             int(time.monotonic() * 1000), 0.0)
+                             int(time.monotonic() * 1000), 0.0,
+                             seq=frame.base_seq)
     _vector_active = True
     _image_publisher.encode_mode = "vector"
     _image_publisher.safety_detector = "no_pixels"
@@ -1501,8 +1506,11 @@ def _ingest_tile_delta(payload: bytes) -> None:
         if _vector_active:
             _vector_active = False
             _image_publisher.safety_detector = "pixels"
-            _image_publisher.encode_mode = _CODEC_TO_MODE.get(
-                frame.codec, _image_publisher.encode_mode)
+        # encode_mode names the codec actually received (§7.1) on every
+        # tile frame, not only after a VECTOR run: the console's "enc:" pill
+        # compares it with the operator's pin.
+        _image_publisher.encode_mode = _CODEC_TO_MODE.get(
+            frame.codec, _image_publisher.encode_mode)
         # 2026-05-27: auto-adopt the upstream camera's grid on the first
         # keyframe whose layout differs from our current Canvas. Before
         # this, _image_canvas was hardcoded 12x8@32px and any camera with
@@ -1763,7 +1771,9 @@ async def _bounded_json_body(request: Request) -> dict:
 @app.post("/api/health/refusal")
 async def api_health_refusal(request: Request,
                              _session: str = Depends(_require_session)):
-    """Browser badge_renderer.js posts here when it refuses a tile.
+    """Browser badge_renderer.js posts here when it refuses a tile, and
+    vector_renderer.js when it refuses a vector scene (VECTOR_SCENE.md §7.5
+    rule 1; once per fault episode, at most every 10 s).
 
     We append to the audit log via the same channel as MQTT events so
     refusal events become part of the black-box record. Session-gated and

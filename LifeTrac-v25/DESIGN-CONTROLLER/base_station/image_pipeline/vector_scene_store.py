@@ -40,6 +40,9 @@ RESYNC_ORPHAN_WINDOW_MS = 10_000
 RESYNC_ORPHAN_RATIO = 0.20
 RESYNC_ORPHAN_MIN_ITEMS = 8         # a ratio over fewer records is noise, not desync
 RESYNC_DIGEST_RUN = 3               # consecutive DIGEST mismatches enter a resync, matches end it (§4.3)
+LOSS_WINDOW_MS = 10_000             # frame loss from seq gaps over 10 s (§4.5.2, §4.5.4), the banner's "loss" (§7.5)
+SEQ_GAP_MAX = 128                   # a longer jump of the u8 seq is a restart or a reorder, not loss
+REORDER_MAX = 8                     # a seq at most this far behind the newest is late or a copy; further back, a restart
 ZOOM_DROP_RATIO = 2.0               # r'/r above this is dropped as PREDICTED (§4.4)
 BADGE_CACHED, BADGE_PREDICTED, BADGE_VECTOR = 1, 4, 7
 MIN_OBJECT_PLACEHOLDER = "n/a (no calibration)"
@@ -241,6 +244,13 @@ class VectorSceneStore:
         self._last_bits: dict | None = None
         self._last_level = 0                    # LL of the last applied frame (§3.2)
         self._resync = False
+        self._newest_cap: int | None = None     # newest applied capture time, for frame_age_ms
+        self._seq_seen = False                  # any frame carried a seq: loss is known (§4.5.2)
+        self._last_seq: int | None = None       # seq chain for the loss count; None after break_seq()
+        self._last_seq_rx = 0
+        self._seq_win: deque = deque()          # [rx_ms, seq, frames lost just before it, chain] per received frame
+        self._seq_missing: dict = {}            # seq counted lost -> the _seq_win entry that counted it
+        self._seq_chain = 0                     # bumped at every new chain; copies are looked for in this one only
         self._bad_reasons: dict[str, int] = {}
         self._st = {k: 0 for k in ("frames_rx", "frames_bad", "frames_applied", "epoch_behind",
                                    "orphans", "digest_checks", "digest_mismatch", "bad_version",
@@ -281,10 +291,67 @@ class VectorSceneStore:
         st["cached_shapes"] = len(self._cached)
         return st
 
-    def ingest(self, body: bytes, frame_kind: int, rx_ms: int, airtime_ms: float = 0.0) -> IngestResult:
-        """Apply one VS body. Never raises: a bad frame is counted per reason."""
+    def ingest(self, body: bytes, frame_kind: int, rx_ms: int, airtime_ms: float = 0.0,
+               seq: int | None = None) -> IngestResult:
+        """Apply one VS body. Never raises: a bad frame is counted per reason.
+        ``seq`` is the frame's ``TileDeltaFrame`` base_seq; without it the
+        snapshot's ``loss`` stays None."""
         with self._lock:
+            self._note_seq(seq, rx_ms)
             return self._ingest(body, frame_kind, rx_ms, airtime_ms)
+
+    def break_seq(self) -> None:
+        """Start a new seq chain with the next frame. The caller saw a frame
+        of another codec: the VS seq is its own counter (RS-13.1 leg 2d: tile
+        seq 124, then VS seq 1), so a jump across the switch is no loss."""
+        with self._lock:
+            self._last_seq = None
+
+    def _note_seq(self, seq: int | None, rx_ms: int) -> None:
+        """Frame loss from seq gaps (§4.5.2): every VS frame is one fragment,
+        so a gap of n is n frames that never arrived, whether or not the
+        frames around it decode. The same seq again inside the window (an
+        epoch-start copy) is not a new frame. A gap is counted only when the
+        frame before it is inside the window; a longer silence shows in
+        ``frame_age_ms``, and the frame after it starts a new chain, even
+        with the same seq.
+        A seq at most REORDER_MAX behind the newest is late or a copy: it
+        never moves the chain back, a copy of a frame of this chain in the
+        window is not counted again, and a late frame takes back the loss its
+        gap counted."""
+        if not isinstance(seq, int):
+            return
+        seq &= 0xFF
+        self._seq_seen = True
+        lost, chained = 0, False
+        if self._last_seq is not None:
+            d = (seq - self._last_seq) & 0xFF
+            fresh = rx_ms - self._last_seq_rx <= LOSS_WINDOW_MS
+            if fresh and d == 0:
+                return                                      # the same frame again
+            if fresh and 256 - d <= REORDER_MAX:
+                if any(e[1] == seq and e[3] == self._seq_chain for e in self._seq_win):
+                    return                                  # a copy of a frame already counted
+                gap = self._seq_missing.pop(seq, None)
+                if gap is not None and gap[2] > 0:
+                    gap[2] -= 1                             # counted lost, but it arrived late
+                self._append_seq([rx_ms, seq, 0, self._seq_chain])
+                return
+            if fresh and d <= SEQ_GAP_MAX:
+                lost, chained = d - 1, True
+        if not chained:
+            self._seq_missing.clear()                       # a new chain: a restart, a silence or another codec
+            self._seq_chain += 1
+        entry = [rx_ms, seq, lost, self._seq_chain]
+        for k in range(1, lost + 1):
+            self._seq_missing[(seq - k) & 0xFF] = entry
+        self._last_seq, self._last_seq_rx = seq, rx_ms
+        self._append_seq(entry)
+
+    def _append_seq(self, entry: list) -> None:
+        self._seq_win.append(entry)
+        while self._seq_win and self._seq_win[0][0] < entry[0] - LOSS_WINDOW_MS:
+            self._seq_win.popleft()
 
     def _ingest(self, body, frame_kind: int, rx_ms: int, airtime_ms: float) -> IngestResult:
         self._st["frames_rx"] += 1
@@ -426,6 +493,8 @@ class VectorSceneStore:
         self._last_rx = rx_ms
         if clk[1]:
             self._last_cap = clk[0] if self._last_cap is None else max(self._last_cap, clk[0])
+        # Like every age here, a saturated AAAA counts at its bound (§3.2).
+        self._newest_cap = clk[0] if self._newest_cap is None else max(self._newest_cap, clk[0])
         self._tick_ttl()
         self._orphan_win.append((rx_ms, self._items, self._frame_orphans))
         self._check_orphan_rate(rx_ms)
@@ -987,6 +1056,10 @@ class VectorSceneStore:
             "v": 1, "epoch": self._epoch, "badge": BADGE_VECTOR, "lab": False, "level": self._last_level,
             "handover": cached, "cached_epoch": self._cached_epoch if cached else None,
             "anchor_age_ms": horizon["age_ms"], "digest_ok": self._digest_ok, "resync": self._resync,
+            # the banner's "age · loss" (§0.2, §7.5): the newest applied frame,
+            # whatever its records, and the seq-gap loss of the last 10 s
+            "frame_age_ms": None if self._newest_cap is None else now_ms - self._newest_cap,
+            "loss": self._loss(now_ms),
             "corr_detected": self._status[0].corr_n if self._status else 0,
             "corr_shown": len(anoms) + sum(1 for s in masses if s["id"] in vs.ID_CORRIDOR),
             "min_object": MIN_OBJECT_PLACEHOLDER,
@@ -995,6 +1068,16 @@ class VectorSceneStore:
             "warp": {"applied": False, "source": None, "since_capture_ms": 0},
             "status": status, "cal_rev": cal, "stats": self.stats,
         }
+
+    def _loss(self, now_ms: int) -> dict | None:
+        """Frames received and lost in the last LOSS_WINDOW_MS, or None while
+        no frame has carried a seq. ``ratio`` is None when the window is empty."""
+        if not self._seq_seen:
+            return None
+        win = [e[2] for e in self._seq_win if e[0] >= now_ms - LOSS_WINDOW_MS]
+        frames, lost = len(win), sum(win)
+        return {"window_ms": LOSS_WINDOW_MS, "frames": frames, "lost": lost,
+                "ratio": round(lost / (frames + lost), 3) if frames + lost else None}
 
     @staticmethod
     def _area(flat: list[float]) -> float:

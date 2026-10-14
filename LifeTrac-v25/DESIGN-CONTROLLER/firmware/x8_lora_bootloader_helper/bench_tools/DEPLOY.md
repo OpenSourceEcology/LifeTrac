@@ -85,9 +85,22 @@ Options: `--ssh | --adb`, `--unlocked`, `--no-build`, `--no-broker`,
 
 On the PC:
 1. `git -c core.autocrlf=false -c core.eol=lf archive` the commit's
-   `base_station/ firmware/ Dockerfile docker-compose*.yml deploy/` (the
-   Dockerfile COPYs `base_station/` and `firmware/`; compose needs the yml files
-   and `base_station/mosquitto.conf`). Docs, `bench-evidence/`, `hil/` and
+   `base_station/ firmware/ Dockerfile docker-compose.yml` (the Dockerfile
+   COPYs `base_station/` and `firmware/`; the broker step needs
+   `docker-compose.yml` and `base_station/mosquitto.conf`). Nothing else is
+   shipped, whatever the commit: since 2026-10-14 not
+   `docker-compose.video-test.yml` (the May video-test stack) and not
+   `deploy/` (its retired unit files). Inside `firmware/`, the tractor's
+   `firmware/tractor_x8/docker-compose*.yml` and `mosquitto.video-test.conf`
+   stay on the PC too (RS-5.20): each of those compose files maps
+   `/dev/ttymxc3` with `restart: unless-stopped`, and the base uses none of
+   them. The script stops before anything is copied if a YAML file in the
+   tarball, other than the base's own `docker-compose.yml`, names a
+   `ttymxc` UART or `LIFETRAC_LORA_DEVICE` outside a comment (a device
+   entry, a `${VAR:-/dev/ttymxc3}` default, an environment value), or uses
+   a compose route to host devices that names none: `privileged` with any
+   value, `device_cgroup_rules`, or all of `/dev` as a device or volume.
+   Docs, `bench-evidence/`, `hil/` and
    `tools/` stay on the PC. The tarball (about 2 MB) is kept as
    `$ARCHIVE_DIR/deploy/dc_deploy_<sha8>.tar.gz`.
 2. It refuses a tarball whose text files hold more CR bytes than the commit's
@@ -103,10 +116,23 @@ On the base, the script runs as root and:
    (early in a boot), if any running container maps `/dev/ttymxc3`, or if the
    board looks like the tractor. It warns when a `lifetrac-base*` unit is
    enabled. On the original base both units are retired since 2026-10-12, so
-   neither check fires there ([Radio safety](#radio-safety)).
-2. saves the old tree as `/home/fio/lifetrac_deploy/prev_tree_<oldsha>_<time>.tgz`,
-   deletes `base_station/ firmware/ deploy/` (skip with `--no-clean`; stale files
-   would otherwise end up in the image), and extracts the new tree.
+   neither check fires there ([Radio safety](#radio-safety)). It also
+   refuses while the tree still has `docker-compose.video-test.yml` and
+   either a container made from that file (compose project `lifetrac-vtest`,
+   or that file among the container's compose config files) is in any state
+   but exited, or `docker ps -a` fails; it never runs `docker compose` on
+   that file.
+2. renames an old `docker-compose.video-test.yml` in the tree to
+   `docker-compose.video-test.yml.RETIRED-<PC UTC date>` (`-2`, `-3` … when
+   that name is taken), so no `docker compose up` there finds it: a rename,
+   nothing deleted, as on the tractor
+   ([BENCH_BOARDS.md](BENCH_BOARDS.md#rules), rule 7). Then it saves the old
+   tree as `/home/fio/lifetrac_deploy/prev_tree_<oldsha>_<time>.tgz` (so no
+   backup holds that file under its old name), deletes `base_station/` and
+   `firmware/` and an old `deploy/` (skip with `--no-clean`; stale files
+   would otherwise end up in the image), removes an old copy of the
+   tractor's compose files from `firmware/tractor_x8/` (with `--no-clean`
+   too; the backup keeps them), and extracts the new tree.
 3. writes `DEPLOYED_FROM.txt`: the full SHA on line 1 (as before), then the
    subject, time, paths, tarball md5, and after the build the image id.
 4. creates `.env` and `secrets/` **only when missing**: a 16-byte random fleet
@@ -202,7 +228,7 @@ file the script saved and update the header.
 
 | where | `deploy_base.sh` | `build_tractor_image.sh` |
 |---|---|---|
-| base | `BASE_DEPLOY_DIR` tree, `DEPLOYED_FROM.txt`, `.env` + `secrets/` if missing, `lifetrac-v25:latest/:<sha8>/:previous`, broker container, files in `/home/fio/lifetrac_deploy/`, `/home/fio/docker_build_<sha8>.log`, `/home/fio/pip_freeze_lifetrac-v25_<sha8>.txt` | `lifetrac-tractor-x8:<sha8>/:latest` (a build product; the base does not run it), `/home/fio/lifetrac_build/`, `/home/fio/docker_build_tractor_<sha8>.log` |
+| base | `BASE_DEPLOY_DIR` tree (an old `docker-compose.video-test.yml` there renamed `docker-compose.video-test.yml.RETIRED-<date>`; an old copy of `firmware/tractor_x8/docker-compose*.yml` and `mosquitto.video-test.conf` removed), `DEPLOYED_FROM.txt`, `.env` + `secrets/` if missing, `lifetrac-v25:latest/:<sha8>/:previous`, broker container, files in `/home/fio/lifetrac_deploy/`, `/home/fio/docker_build_<sha8>.log`, `/home/fio/pip_freeze_lifetrac-v25_<sha8>.txt` | `lifetrac-tractor-x8:<sha8>/:latest` (a build product; the base does not run it), `/home/fio/lifetrac_build/`, `/home/fio/docker_build_tractor_<sha8>.log` |
 | tractor | nothing | loaded image, `:latest`, `:previous`; `/home/fio/lifetrac_images/` while loading |
 | PC | `$ARCHIVE_DIR/deploy/` | `$ARCHIVE_DIR/images/`, `$ARCHIVE_DIR/build/` |
 | never | `/etc`, systemd units, the radios, the L072 firmware, `/tmp/lifetrac_strict`, any container other than the broker | `/etc`, systemd units, the radios, any running container |
@@ -217,7 +243,11 @@ file the script saved and update the header.
   ```
 
   Keep the `cd` and the `rm` on one line joined by `&&`: if the `cd` fails,
-  the `rm` must not run in whatever directory you are in.
+  the `rm` must not run in whatever directory you are in. A backup that
+  `deploy_base.sh` made since 2026-10-14 does not hold
+  `docker-compose.video-test.yml` (it is renamed first). An older backup or
+  tarball may: if the restore brings that file back, rename it again as
+  step 2 does.
 - **Base image:** `docker tag lifetrac-v25:previous lifetrac-v25:latest`, or any
   `lifetrac-v25:<sha8>`. The broker runs `eclipse-mosquitto:2`, so nothing
   needs a restart; the next leg's daemon containers start from the new
@@ -265,8 +295,9 @@ file the script saved and update the header.
   broker alone, without deploying a tree, run its broker line as root in
   `BASE_DEPLOY_DIR`:
   `docker compose -p design-controller -f docker-compose.yml up -d --no-deps mosquitto`.
-- **`docker-compose.video-test.yml` is shipped too** (the archive takes
-  `docker-compose*.yml`), and it is armed: see
+- **`docker-compose.video-test.yml` is no longer shipped** (2026-10-14), and
+  the copy an earlier deploy left on the base is renamed by the next
+  `deploy_base.sh` run. Until then it is armed: see
   [Radio safety](#radio-safety). Never bring it up on the bench.
 - **A moved `:latest` does not restart anything.** A container already running
   the old image keeps it until it is recreated.
@@ -349,35 +380,42 @@ file the script saved and update the header.
     clash with those containers was the only barrier, and without it the
     tractor transmits at the next boot. Disable first. On the original
     tractor `/opt/lifetrac/video-test/docker-compose.yml` is also renamed,
-    which disarms the May scripts that run `docker compose up` in that
-    folder; do not rename it back.
+    which disarms any `docker compose up` in that folder (the May scripts
+    that ran one were deleted on 2026-10-14); do not rename it back.
 
   `deploy_base.sh` warns while a `lifetrac-base*` unit is enabled. It refuses
   to run while one is anything but `failed` or `inactive`, or has a systemd
-  job queued. It never installs, enables or starts them, and the bench kit
-  does not install the unit files in `deploy/`.
-  `provision_bench_board.sh` retires the units of the board's role while
-  they are `failed` or `inactive`: `systemctl disable` without `--now`, then
-  the unit files and `.d` directories moved to
-  `/etc/lifetrac-retired/<PC UTC time>/`. A unit that is already disabled
-  but still has its file in `/etc/systemd/system` is moved the same way. If
-  a unit is active, starting or stopping, or has a job queued, that step
-  fails and changes nothing. It reports leftover containers and never
-  removes them.
-- **The base's video-test compose file is still armed.**
-  `docker-compose.video-test.yml` is in the deployed tree, and every deploy
-  ships it again. Its `image_rx` maps `/dev/ttymxc3`, sends a soft RESET_REQ
-  that un-parks the L072, and has `restart: unless-stopped`, so after one
-  successful `up` it comes back at every boot until the container is
-  removed. The only thing that makes a manual `up` of it fail is the bench
-  broker holding `127.0.0.1:1883`. Whenever nothing holds that port, nothing
-  stops it: in [RS13_2_DESK_CHECK.md](RS13_2_DESK_CHECK.md) that is the gap
-  between the bench broker's stop and the desk `up`, the gap between the desk
-  `down` and the bench broker's start, and after a base reboot in between
-  (while the desk stack is up, its broker holds the port). Never bring it up
-  on the bench;
-  rule 7 in [BENCH_BOARDS.md](BENCH_BOARDS.md#rules) lists the repo-root May
-  scripts that do.
+  job queued. It never installs, enables or starts them, and it no longer
+  ships the unit files in `deploy/`.
+  `provision_bench_board.sh` reads its item "old boot units retired" as `ok`
+  only when systemd cannot load the units of the board's role from a file:
+  `is-enabled` finds no unit file and nothing of that name is left in
+  `/etc/systemd/system`, or the unit is masked by a symlink to `/dev/null`
+  there; and each is `inactive` or `failed` with no job queued. Otherwise it
+  retires them while they are `failed` or `inactive`: `systemctl disable`
+  without `--now`, then the unit files, `.d` directories and any symlink
+  there that is not a mask moved to `/etc/lifetrac-retired/<PC UTC time>/`.
+  A unit that is already disabled but still has its file in
+  `/etc/systemd/system` is moved the same way. If a unit is active, starting
+  or stopping, has a job queued, or is in a state a disable and a move cannot
+  retire (a `-runtime` form, `alias`, `indirect`, `generated`, `transient`),
+  that step fails and changes nothing. It reports leftover containers and
+  never removes them. The full rule is in
+  [BENCH_BOARDS.md](BENCH_BOARDS.md#retired-boot-units-2026-10-12).
+- **The base's video-test compose file is armed until the next deploy.**
+  `docker-compose.video-test.yml` is still in the base's deployed tree. Since
+  2026-10-14 `deploy_base.sh` no longer ships it and renames that copy to
+  `docker-compose.video-test.yml.RETIRED-<PC UTC date>` (step 2 of the
+  board-side list above), as on the tractor; until that run it is armed.
+  Its `image_rx` maps `/dev/ttymxc3`, sends a soft RESET_REQ that un-parks
+  the L072, and has `restart: unless-stopped`, so after one successful `up`
+  it comes back at every boot until the container is removed. The only
+  thing that makes a manual `up` of it fail is a broker holding
+  `127.0.0.1:1883`: the bench broker, or the desk broker while the
+  [RS13_2_DESK_CHECK.md](RS13_2_DESK_CHECK.md) stack is up. Never bring it
+  up on the bench, and do not rename it back; rule 7 in
+  [BENCH_BOARDS.md](BENCH_BOARDS.md#rules) has the details and the deleted
+  May scripts that did.
 - On the tractor, `lifetrac-camera.service` (started by udev at boot) runs
   `lifetrac-tractor-x8:latest` with `/dev/ttymxc3` mapped as its M7 port. Loading
   a new `:latest` does not start it. The next time it starts, it runs the new

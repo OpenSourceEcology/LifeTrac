@@ -5,7 +5,11 @@ requests a keyframe, flips ``encode_mode``/``safety_detector`` and shows up
 as ``vector_scene`` in the snapshot; a tile frame afterwards restores pixel
 mode; garbage bodies are counted, not raised; the settings endpoint accepts
 ``vector`` and uses its own 60–100 detail dial instead of the carried tile
-quality. Same import recipe as test_web_ui_radio_profile.py.
+quality. The RS-13.2 desk-check fixes: the frame ``seq`` reaches the store for
+the banner's loss (§7.5) and its chain restarts after a tile frame,
+``encode_mode`` names every received tile codec (the console's "enc:" pill,
+F8), and the renderer's scene-fault refusal reaches the audit topic (rule 1,
+F3). Same import recipe as test_web_ui_radio_profile.py.
 """
 from __future__ import annotations
 
@@ -28,7 +32,8 @@ except ImportError:  # pragma: no cover
     raise unittest.SkipTest("paho-mqtt + fastapi required for web_ui vector tests")
 
 from image_pipeline.frame_format import (  # noqa: E402
-    CODEC_VECTOR, TileDeltaFrame, encode_tile_delta_frame, parse_tile_delta_frame,
+    CODEC_MONO_G4, CODEC_VECTOR, CODEC_WEBP_LUMA, TileDeltaFrame, encode_tile_delta_frame,
+    parse_tile_delta_frame,
 )
 from image_pipeline.vector_scene import codec as vs  # noqa: E402
 from tests.test_kf_on_seq_gap import _frame as tile_frame  # noqa: E402
@@ -117,6 +122,44 @@ class WebUiVectorTests(unittest.TestCase):
         self.assertFalse(self.web_ui._vector_active)
         pub = self.web_ui._image_publisher
         self.assertEqual((pub.encode_mode, pub.safety_detector), ("full", "pixels"))
+
+    def test_snapshot_carries_the_banner_age_and_the_seq_gap_loss(self) -> None:
+        body = vs.encode_frame(vs.Header(True, 1, 3), worked_scene(), 197)
+        for seq in (1, 2, 4):                                  # seq 3 never arrived
+            self._ingest(vector_frame(body, key=True, seq=seq))
+        scene = self.web_ui._image_publisher.snapshot()["vector_scene"]
+        self.assertEqual((scene["loss"]["frames"], scene["loss"]["lost"]), (3, 1))
+        self.assertEqual(scene["loss"]["ratio"], 0.25)
+        self.assertGreaterEqual(scene["frame_age_ms"], 200)    # AAAA = 1: captured 200 ms before arrival
+
+    def test_the_vs_seq_chain_restarts_after_a_tile_frame(self) -> None:
+        # RS-13.1 leg 2d: tile seq 124, then the first VECTOR frame is VS seq 1
+        body = vs.encode_frame(vs.Header(True, 1, 3), worked_scene(), 197)
+        self._ingest(vector_frame(body, seq=200))
+        self._ingest(tile_frame(124, range(96), keyframe=True))
+        self._ingest(vector_frame(body, seq=1))
+        self._ingest(vector_frame(body, seq=2))
+        loss = self.web_ui._image_publisher.snapshot()["vector_scene"]["loss"]
+        self.assertEqual((loss["frames"], loss["lost"]), (3, 0))
+
+    def test_encode_mode_names_every_received_tile_codec(self) -> None:
+        # not only after a VECTOR run: the "enc:" pill compares it with the pin
+        pub = self.web_ui._image_publisher
+        self._ingest(tile_frame(0, range(96), keyframe=True, codec=CODEC_MONO_G4))
+        self.assertEqual(pub.encode_mode, "mono_g4")
+        self._ingest(tile_frame(1, [3], codec=CODEC_WEBP_LUMA))
+        self.assertEqual(pub.encode_mode, "y_only")
+        self.assertEqual(pub.snapshot()["encode_mode"], "y_only")
+
+    def test_a_scene_fault_refusal_reaches_the_audit_topic(self) -> None:
+        # vector_renderer.js posts this once per fault episode (§7.5 rule 1)
+        fault = {"reason": "vector_scene_fault", "fault": "v", "v": 2, "badge": 9, "epoch": 3,
+                 "ts_ms": 1791128371009}
+        r = self.client.post("/api/health/refusal", json=fault)
+        self.assertEqual(r.status_code, 200, r.text)
+        pubs = [c for c in self.mqtt.publish.call_args_list
+                if c.args and c.args[0] == "lifetrac/v25/control/badge_refusal"]
+        self.assertEqual([json.loads(c.args[1]) for c in pubs], [fault])
 
     def test_garbage_vector_body_is_counted_not_raised(self) -> None:
         self._ingest(vector_frame(bytes([0xFE, 0x00, 0xFF, 0x12]), key=False))

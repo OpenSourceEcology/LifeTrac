@@ -14,9 +14,10 @@
 #                   Default: --build-arg LOCKED=1, the flown wheel versions.
 #   --no-build      deploy the tree only and keep the current image.
 #   --no-broker     do not touch the broker container.
-#   --no-clean      extract over the old tree. Default: base_station/, firmware/
-#                   and deploy/ are replaced, after a backup tarball of the old
-#                   tree is saved on the base.
+#   --no-clean      extract over the old tree. Default: base_station/ and
+#                   firmware/ are replaced and an old deploy/ (no longer
+#                   shipped) is removed, after a backup tarball of the old tree
+#                   is saved on the base.
 #   --dry-run       make the tarball and the board-side script locally, print the
 #                   plan and stop. Never contacts a board.
 #   -h | --help
@@ -41,15 +42,22 @@
 # What it changes on the base: the tree in BASE_DEPLOY_DIR (backup first),
 # DEPLOYED_FROM.txt, .env and secrets/ ONLY when missing (random PIN and fleet
 # key, generated on the board, never printed), the lifetrac-v25:latest /
-# :<sha> / :previous image tags, and the compose broker container. Files go to
-# /home/<user>/lifetrac_deploy/ and the build log to
+# :<sha> / :previous image tags, and the compose broker container. An old
+# docker-compose.video-test.yml in the tree (the May video-test stack, no
+# longer shipped) is renamed docker-compose.video-test.yml.RETIRED-<PC UTC
+# date>, as the tractor's compose file was (BENCH_BOARDS.md, "Retired boot
+# units"). The tractor's compose files under firmware/tractor_x8 are not
+# shipped either, and an old copy of them in the tree is removed (the backup
+# keeps it). Files go to /home/<user>/lifetrac_deploy/ and the build log to
 # /home/<user>/docker_build_<sha>.log.
 #
 # RADIO SAFETY: nothing here opens /dev/ttymxc3 (the L072 radio UART) or starts
 # a radio daemon. The board-side script refuses to run while a container maps
-# /dev/ttymxc3, or while a lifetrac-base* unit is anything but failed or
-# inactive or has a job queued, and it never starts lora_bridge (see the
-# comment at the broker step). See DEPLOY.md.
+# /dev/ttymxc3, while a lifetrac-base* unit is anything but failed or inactive
+# or has a job queued, or while that old video-test file is there and one of
+# its containers is in any state but exited. It never starts lora_bridge (see
+# the comment at the broker step) and never runs docker compose on the
+# video-test file. See DEPLOY.md.
 set -euo pipefail
 
 BT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -172,11 +180,20 @@ SUBJECT=$(git -C "$REPO" log -1 --format=%s "$SHA")
 git -C "$REPO" cat-file -e "$SHA:$DC_REL/Dockerfile" 2>/dev/null || die "$SHORT has no $DC_REL/Dockerfile"
 
 # The image's build context needs base_station/ and firmware/ (the Dockerfile
-# COPYs both); compose needs docker-compose*.yml and base_station/mosquitto.conf;
-# deploy/ carries the unit files. Docs, bench-evidence, hil/ and tools/ stay home.
+# COPYs both); the broker step needs docker-compose.yml and
+# base_station/mosquitto.conf. Nothing else is shipped: not
+# docker-compose.video-test.yml (the May video-test stack, whose image_rx
+# opens /dev/ttymxc3) and not deploy/ (its retired unit files), whatever the
+# commit. Docs, bench-evidence, hil/ and tools/ stay home. Inside firmware/,
+# the tractor's compose files stay home too (RS-5.20): docker-compose.yml and
+# the two video-test ones each map /dev/ttymxc3 with restart: unless-stopped,
+# and the base needs none of them. The tractor image is built from its own
+# archive (RS13_VECTOR_LEG.md, step 0).
+NO_SHIP=(':(exclude,glob)firmware/tractor_x8/docker-compose*.yml'
+         ':(exclude)firmware/tractor_x8/mosquitto.video-test.conf')
 PATHS=()
 while IFS= read -r p; do
-    case $p in base_station|firmware|deploy|Dockerfile|docker-compose*.yml) PATHS+=("$p") ;; esac
+    case $p in base_station|firmware|Dockerfile|docker-compose.yml) PATHS+=("$p") ;; esac
 done < <(git -C "$REPO" ls-tree --name-only "$SHA:$DC_REL")
 for need in base_station firmware Dockerfile docker-compose.yml; do
     found=0
@@ -199,7 +216,22 @@ RSCRIPT=$STAGE/deploy_base_remote.sh
 # attribute and core.eol=crlf, git archive writes CRLF, and every shell script
 # and config on the board then breaks. Force LF.
 say "archive $SHORT ($SUBJECT): ${PATHS[*]}"
-git -C "$REPO" -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz -o "$TGZ" "$SHA:$DC_REL" -- "${PATHS[@]}"
+git -C "$REPO" -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz -o "$TGZ" "$SHA:$DC_REL" -- "${PATHS[@]}" "${NO_SHIP[@]}"
+# Check: no YAML file in the tarball but the base's own docker-compose.yml
+# (whose lora_bridge maps the radio by design; only its broker is started
+# here) can reach the radio UART. Outside comments, none may name a ttymxc
+# UART or LIFETRAC_LORA_DEVICE (the base's .env sets it to /dev/ttymxc3), in
+# any form (a device entry, "${VAR:-/dev/ttymxc3}", an environment value), nor
+# use a route compose has to host devices without naming one: `privileged`
+# (any spelling or value: false is the default, and a value can come from
+# "${VAR}"), `device_cgroup_rules`, or /dev itself as a device or volume.
+DEVICE_RE='ttymxc|LIFETRAC_LORA_DEVICE|privileged|device_cgroup_rules|(^|[^[:alnum:]_./~-])/dev/?([^[:alnum:]_./-]|$)'
+while IFS= read -r f; do
+    [ "$f" != docker-compose.yml ] || continue
+    if (set +o pipefail; tar -xzOf "$TGZ" "$f" | grep -v '^[[:space:]]*#' | grep -qiE "$DEVICE_RE"); then
+        die "the tarball would ship $f, which can reach the radio UART (a ttymxc UART, LIFETRAC_LORA_DEVICE, privileged, device_cgroup_rules or all of /dev); nothing was copied"
+    fi
+done < <(tar -tzf "$TGZ" | grep -iE '\.ya?ml$')
 # Check: the text files in the tarball must hold no more CR bytes than the same
 # blobs in git (a few committed logs carry CRs of their own). More CRs means an
 # eol conversion slipped in. (Needs GNU tar's --wildcards, else it is skipped.)
@@ -231,7 +263,8 @@ cat > "$RSCRIPT" <<'REMOTE'
 set -eu
 TGZ=$1 STAMP=$2 SHORT=$3 SHA=$4 DEST=$5 OWNER=$6 DO_CLEAN=$7 DO_BUILD=$8 LOCKED=$9
 shift 9
-DO_BROKER=$1 PROJECT=$2 WORK=$3
+DO_BROKER=$1 PROJECT=$2 WORK=$3 DAY=$4
+VT=docker-compose.video-test.yml   # the May video-test stack: no longer shipped, an old copy is renamed
 
 say() { echo "[base $(date -u +%H:%M:%SZ)] $*"; }
 die() { echo "[base] ERROR: $*" >&2; exit 1; }
@@ -324,14 +357,42 @@ for u in lifetrac-base.service lifetrac-base-compose.service; do
 done
 busy=$(radio_containers)
 [ -z "$busy" ] || die "running containers map /dev/ttymxc3 (a leg in progress?): $busy. Deploy only with the radio daemons stopped."
+# Step 1 renames an old $VT in the tree, as the tractor's compose file was on
+# 2026-10-12, so that no `docker compose up` there finds it. It does so only
+# while every container made from that file is exited, as the tractor's were
+# then. A running or created one (a radio container that is up, or the
+# remains of an `up` that failed) needs the manual cleanup first:
+# BENCH_BOARDS.md, "Retired boot units". The containers are found by their
+# compose labels (project lifetrac-vtest, or $VT among the config files),
+# without docker compose; a docker ps that fails stops the deploy too.
+case $DAY in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;; *) die "bad date argument '$DAY' (expected YYYY-MM-DD)" ;; esac
+if [ -e "$DEST/$VT" ] || [ -L "$DEST/$VT" ]; then
+    vt_ps=$(docker ps -a --format '{{.Names}}|{{.State}}|{{.Label "com.docker.compose.project"}}|{{.Label "com.docker.compose.project.config_files"}}') \
+        || die "'docker ps -a' failed, so no container of $DEST/$VT could be ruled out. Nothing was changed."
+    vt_ps=$(printf '%s\n' "$vt_ps" | awk -F'|' -v f="$VT" '$3 == "lifetrac-vtest" || index($4, f) {print $1 " (" $2 ")"}')
+    vt_live=$(printf '%s\n' "$vt_ps" | grep -v ' (exited)$' | tr '\n' ' ' | sed 's/ *$//' || true)
+    [ -z "$vt_live" ] || die "$DEST/$VT is still there, and containers made from it are not exited: $vt_live. Nothing was changed. Look at them first: if one is running, stop it by name (docker stop <container>; rule 3 in BENCH_BOARDS.md, \"Retired boot units\"); remove what is left as BENCH_BOARDS.md describes (no -f, no -v), then deploy again. Never bring that file up."
+    [ -z "$vt_ps" ] || say "exited containers made from $VT are left (not removed here; BENCH_BOARDS.md): $(printf '%s\n' "$vt_ps" | tr '\n' ' ' | sed 's/ *$//')"
+fi
 free_kb=$(df -Pk "$WORK" | awk 'NR==2 {print $4}')
 [ "$DO_BUILD" != 1 ] || [ "$free_kb" -gt 1500000 ] || die "less than 1.5 GB free under $WORK"
 
-# ---- 1. back up the old tree, then replace it
+# ---- 1. disarm the old video-test file, back up the old tree, then replace it
 mkdir -p "$DEST"
 old_sha=$(head -n 1 "$DEST/DEPLOYED_FROM.txt" 2>/dev/null | cut -c1-8 || true)
 old_conf_md5=$(md5sum "$DEST/base_station/mosquitto.conf" 2>/dev/null | cut -d' ' -f1 || true)
 cd "$DEST"
+# A rename, nothing is deleted; never onto an existing name. It comes before
+# the backup, so no backup holds the file under its old name and restoring
+# one cannot re-arm it.
+if [ -e "$VT" ] || [ -L "$VT" ]; then
+    n=1; retired=$VT.RETIRED-$DAY
+    while [ -e "$retired" ] || [ -L "$retired" ]; do
+        n=$((n + 1)); retired=$VT.RETIRED-$DAY-$n
+    done
+    mv "$VT" "$retired" || die "could not rename $DEST/$VT; nothing was changed"
+    say "renamed $DEST/$VT to $retired, so no docker compose up here finds it"
+fi
 set --
 for p in base_station firmware deploy Dockerfile DEPLOYED_FROM.txt docker-compose*.yml; do
     if [ -e "$p" ]; then set -- "$@" "$p"; fi
@@ -342,8 +403,12 @@ if [ $# -gt 0 ]; then
     say "old tree (${old_sha:-no DEPLOYED_FROM}) saved to $backup"
 fi
 if [ "$DO_CLEAN" = 1 ]; then
+    # deploy/ is no longer shipped: an old copy goes, the backup keeps it
     rm -rf "$DEST/base_station" "$DEST/firmware" "$DEST/deploy"
 fi
+# Nor are the tractor's compose files (RS-5.20); with --no-clean an old copy
+# would stay, so it goes here. The backup keeps it.
+rm -f "$DEST"/firmware/tractor_x8/docker-compose*.yml "$DEST/firmware/tractor_x8/mosquitto.video-test.conf"
 tar -xzf "$TGZ" -C "$DEST"
 cp "$STAMP" "$DEST/DEPLOYED_FROM.txt"
 chown -R "$OWNER:$OWNER" "$DEST"
@@ -466,7 +531,8 @@ tr -d '\r' < "$RSCRIPT" > "$RSCRIPT.tmp" && mv "$RSCRIPT.tmp" "$RSCRIPT"
 sh -n "$RSCRIPT" || die "generated board script has a syntax error"
 tr -d '\r' < "$STAMP" > "$STAMP.tmp" && mv "$STAMP.tmp" "$STAMP"
 
-R_ARGS="$(sq "$REMOTE_WORK/dc_deploy_$SHORT.tar.gz") $(sq "$REMOTE_WORK/DEPLOYED_FROM_$SHORT.txt") $SHORT $SHA $(sq "$BASE_DEPLOY_DIR") $(sq "$BASE_USER") $DO_CLEAN $DO_BUILD $LOCKED $DO_BROKER $COMPOSE_PROJECT $(sq "$REMOTE_WORK")"
+DAY=$(date -u +%Y-%m-%d)   # the PC's date names the renamed video-test file (a board clock may not be wall time)
+R_ARGS="$(sq "$REMOTE_WORK/dc_deploy_$SHORT.tar.gz") $(sq "$REMOTE_WORK/DEPLOYED_FROM_$SHORT.txt") $SHORT $SHA $(sq "$BASE_DEPLOY_DIR") $(sq "$BASE_USER") $DO_CLEAN $DO_BUILD $LOCKED $DO_BROKER $COMPOSE_PROJECT $(sq "$REMOTE_WORK") $DAY"
 
 if [ "$BASE_TRANSPORT" = ssh ]; then TARGET="$BASE_USER@$BASE_HOST (ssh)"; else TARGET="adb $BASE_SERIAL"; fi
 say "commit   $SHA"
@@ -474,6 +540,8 @@ say "target   $TARGET -> $BASE_DEPLOY_DIR"
 say "tarball  $TGZ ($(wc -c < "$TGZ") B, md5 $TGZ_MD5)"
 say "build    $([ "$DO_BUILD" = 1 ] && echo "yes, locked=$LOCKED (commit has lock file: $HAS_LOCK)" || echo no)"
 say "broker   $([ "$DO_BROKER" = 1 ] && echo "docker compose -p $COMPOSE_PROJECT up -d --no-deps mosquitto" || echo untouched)"
+say "disarm   an old docker-compose.video-test.yml in the tree is renamed docker-compose.video-test.yml.RETIRED-$DAY (refused while a container made from it is not exited)"
+say "disarm   firmware/tractor_x8/docker-compose*.yml and mosquitto.video-test.conf are not shipped; an old copy in the tree is removed (the backup keeps it)"
 if [ "$DRY_RUN" = 1 ]; then
     say "dry run: board script $RSCRIPT"
     say "dry run: would copy the tarball, $STAMP and the script to $REMOTE_WORK, then run as root:"

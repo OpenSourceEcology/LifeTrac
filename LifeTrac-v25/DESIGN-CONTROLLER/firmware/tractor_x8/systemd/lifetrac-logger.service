@@ -1,3 +1,16 @@
+# OBSOLETE - DO NOT INSTALL.
+#
+# April-2026 sketch (commit a90ae759, 2026-04-27). No script installs it,
+# and it is installed on neither bench board.
+#
+# What it would run: the host's /usr/bin/python3 on
+# /opt/lifetrac/firmware/tractor_x8/logger_service.py, a path that does not
+# exist on the tractor, and it wants a host mosquitto.service.
+#
+# Board facts: firmware/x8_lora_bootloader_helper/bench_tools/BENCH_BOARDS.md
+# ("LifeTrac software living in the X8 Linux"). Unit lists:
+# bench-evidence/board_state_2026-10-04/base/10_systemd.txt,
+# bench-evidence/board_state_2026-10-10/tractor/10_systemd.txt
 [Unit]
 Description=LifeTrac v25 tractor X8 logger (MQTT → SQLite + JSONL audit)
 After=network-online.target mosquitto.service

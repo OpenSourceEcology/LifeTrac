@@ -79,12 +79,12 @@ class StoreCase(unittest.TestCase):
         self.rx = 10_000
 
     def feed(self, recs, epoch: int = 0, key_: bool = False, rx: int | None = None,
-             age: int = 1, airtime: float = 0.0) -> IngestResult:
+             age: int = 1, airtime: float = 0.0, seq: int | None = None) -> IngestResult:
         if rx is None:
             self.rx += 500
         else:
             self.rx = rx
-        return self.st.ingest(body(key_, epoch, recs, age), 1 if key_ else 0, self.rx, airtime)
+        return self.st.ingest(body(key_, epoch, recs, age), 1 if key_ else 0, self.rx, airtime, seq=seq)
 
     def snap(self, now: int | None = None) -> dict:
         return self.st.snapshot(self.rx + 100 if now is None else now)
@@ -855,11 +855,13 @@ class SnapshotGoldenTests(StoreCase):
         s = self.snap(10_100)
         json.dumps(s)
         for k in ("v", "epoch", "badge", "lab", "level", "anchor_age_ms", "digest_ok", "resync", "corr_detected",
-                  "corr_shown", "min_object", "bits", "horizon", "layers", "masked", "warp", "stats", "status"):
+                  "corr_shown", "min_object", "bits", "horizon", "layers", "masked", "warp", "stats", "status",
+                  "frame_age_ms", "loss"):
             self.assertIn(k, s)
         self.assertEqual((s["v"], s["badge"], s["lab"], s["level"], s["masked"]), (1, 7, False, 0, []))
         self.assertEqual(s["warp"], {"applied": False, "source": None, "since_capture_ms": 0})
         self.assertEqual(s["anchor_age_ms"], 10_100 - (10_000 - 60 - 600))    # rx − airtime − 200·AAAA
+        self.assertEqual((s["frame_age_ms"], s["loss"]), (760, None))          # the same capture; no seq given
         self.assertEqual((s["corr_detected"], s["corr_shown"]), (2, 1))
         self.assertEqual([layer["id"] for layer in s["layers"]], ["L1", "L2", "L3", "L4"])
         self.assertEqual(s["status"]["arm_deg"], 0)
@@ -968,6 +970,112 @@ class SnapshotGoldenTests(StoreCase):
                            vs.Anom(0, 1, 1, 1, 1, 0xFFF), vs.Hole(1, 0, False, 30, 47, 1)], epoch=0, key_=True)
         kinds = [(s["id"], s["k"]) for s in self.snap()["layers"][0]["shapes"]]
         self.assertEqual(kinds, [(2, "poly"), (1, "poly"), (1, "hole"), (80, "anom")])
+
+
+# ---------------------------------------------------------------- the banner's age and loss (§7.5)
+
+class BannerAgeLossTests(StoreCase):
+    """"VECTOR — NOT CAMERA PIXELS · age · loss" (§0.2, §7.5): ``frame_age_ms``
+    is the capture age of the newest applied frame, ``loss`` the frames that
+    seq gaps show missing in the last 10 s (§4.5.2)."""
+
+    def test_frame_age_is_the_newest_applied_capture(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000)        # capture 9_800
+        self.assertEqual(self.snap(10_100)["frame_age_ms"], 300)
+        self.feed([tri(1)], epoch=0, rx=10_500, age=4)                    # capture 9_700: older
+        self.assertEqual(self.snap(10_600)["frame_age_ms"], 800)
+        self.feed([tri(1)], epoch=0, rx=11_000)                           # capture 10_800
+        self.assertEqual(self.snap(11_100)["frame_age_ms"], 300)
+        self.assertEqual(self.feed([tri(1)], epoch=15, rx=11_500).reason, "epoch_behind")
+        self.st.ingest(b"\xff" * 10, 0, 11_500)                           # undecodable
+        self.assertEqual(self.snap(11_600)["frame_age_ms"], 800)          # neither is on screen
+
+    def test_loss_counts_seq_gaps_over_ten_seconds(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=1)
+        for rx, seq in ((10_500, 2), (11_000, 3), (11_500, 5), (12_000, 6)):     # 4 never arrived
+            self.feed([tri(1)], epoch=0, rx=rx, seq=seq)
+        self.assertEqual(self.snap(12_100)["loss"],
+                         {"window_ms": 10_000, "frames": 5, "lost": 1, "ratio": 0.167})
+        self.assertEqual(self.snap(21_600)["loss"],                       # the gap left the window
+                         {"window_ms": 10_000, "frames": 1, "lost": 0, "ratio": 0.0})
+        self.assertEqual(self.snap(22_100)["loss"]["ratio"], None)       # nothing in the window
+        json.dumps(self.snap(12_100))
+
+    def test_undecodable_frames_arrived_and_the_same_seq_is_one_frame(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=7)
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=7)    # an epoch-start copy
+        self.st.ingest(b"\xff" * 10, 0, 10_500, seq=8)
+        self.feed([tri(1)], epoch=0, rx=11_000, seq=10)
+        loss = self.snap(11_100)["loss"]
+        self.assertEqual((loss["frames"], loss["lost"]), (3, 1))
+
+    def test_wrap_restarts_and_silences(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=254)
+        self.feed([tri(1)], epoch=0, rx=10_500, seq=1)                    # 255 and 0 lost across the wrap
+        self.assertEqual(self.snap(10_600)["loss"]["lost"], 2)
+        self.feed([tri(1)], epoch=0, rx=11_000, seq=150)                  # a jump past 128: a restart
+        self.st.break_seq()
+        self.feed([tri(1)], epoch=0, rx=11_500, seq=1)                    # a new chain after another codec
+        self.assertEqual(self.snap(11_600)["loss"]["lost"], 2)
+        self.feed([tri(1)], epoch=0, rx=22_000, seq=3)                    # after > 10 s of silence
+        self.assertEqual(self.snap(22_100)["loss"], {"window_ms": 10_000, "frames": 1, "lost": 0, "ratio": 0.0})
+        self.assertEqual(self.snap(22_100)["frame_age_ms"], 300)
+
+    def test_the_same_seq_after_a_silence_is_a_new_frame(self):
+        # Copilot review of #150: 14, then 14 again after more than 10 s (a
+        # restart, or a wrap during an outage), read frames=0.
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=14)
+        self.feed([tri(1)], epoch=0, rx=21_000, seq=14)
+        self.assertEqual(self.snap(21_100)["loss"], {"window_ms": 10_000, "frames": 1, "lost": 0, "ratio": 0.0})
+        self.feed([tri(1)], epoch=0, rx=21_500, seq=16)                   # the new chain counts its gap
+        loss = self.snap(21_600)["loss"]
+        self.assertEqual((loss["frames"], loss["lost"]), (2, 1))
+
+    def test_copies_and_late_frames_are_not_loss(self):
+        # Copilot review of #150: 10, 11, 10, 12 read one lost of four, and
+        # 10, 9, 11 one lost, although every distinct frame arrived.
+        for seqs, frames in (((10, 11, 10, 12), 3),                      # a copy after a newer frame
+                             ((10, 9, 11), 3),                            # a reorder before the chain's first
+                             ((20, 22, 21, 23), 4),                       # a late frame fills its gap
+                             ((30, 33, 31, 31, 32, 34), 5)):              # two late, one of them twice
+            with self.subTest(seqs=seqs):
+                self.st.reset()
+                self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=seqs[0])
+                for i, seq in enumerate(seqs[1:], 1):
+                    self.feed([tri(1)], epoch=0, rx=10_000 + 500 * i, seq=seq)
+                loss = self.snap(10_000 + 500 * len(seqs))["loss"]
+                self.assertEqual((loss["frames"], loss["lost"], loss["ratio"]), (frames, 0, 0.0))
+
+    def test_a_new_chain_does_not_take_the_old_chains_seqs_as_copies(self):
+        # Copilot review of #150: 1, 2, another codec, then 1, 3, 2 read one
+        # lost of five, because the old chain's 2 hid the new chain's late 2.
+        for rx, seq in ((10_000, 1), (10_500, 2)):
+            self.feed(key() + [tri(1)], epoch=0, key_=True, rx=rx, seq=seq)
+        self.st.break_seq()
+        for rx, seq in ((11_000, 1), (11_500, 3), (12_000, 2)):
+            self.feed([tri(1)], epoch=0, rx=rx, seq=seq)
+        loss = self.snap(12_100)["loss"]
+        self.assertEqual((loss["frames"], loss["lost"]), (5, 0))
+
+    def test_a_gap_left_open_stays_lost_and_a_long_step_back_is_a_restart(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=40)
+        for rx, seq in ((10_500, 43), (11_000, 41), (11_500, 44)):        # 42 never arrives
+            self.feed([tri(1)], epoch=0, rx=rx, seq=seq)
+        self.assertEqual(self.snap(11_600)["loss"]["lost"], 1)
+        self.feed([tri(1)], epoch=0, rx=12_000, seq=30)                   # 14 back: a restart, no loss
+        self.feed([tri(1)], epoch=0, rx=12_500, seq=31)
+        loss = self.snap(12_600)["loss"]
+        self.assertEqual((loss["frames"], loss["lost"]), (6, 1))
+
+    def test_no_seq_means_unknown_loss(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True)
+        self.assertIsNone(self.snap()["loss"])
+        self.st.reset()
+        self.feed(key() + [tri(1)], epoch=0, key_=True, seq=1)
+        self.assertEqual(self.snap()["loss"]["frames"], 1)
+        self.st.reset()
+        self.feed(key() + [tri(1)], epoch=0, key_=True)
+        self.assertIsNone(self.snap()["loss"])
 
 
 # ---------------------------------------------------------------- robustness (§3.4)

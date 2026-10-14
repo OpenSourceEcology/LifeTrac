@@ -967,7 +967,11 @@ _VECTOR_SEQ = 0
 # the first VECTOR frame, and its first frame() paid the process's numpy/cv2
 # first-call costs (l0 79.6 ms vs ~15 ms steady on the 2026-10-04 2d_r4 leg):
 # the switch left a 1.038 s TX gap, which on FHSS breaks the strict < 1000 ms
-# clock-authority TX streak. 0 restores the lazy build.
+# clock-authority TX streak. 0 restores the lazy build. What such a gap does
+# on the L072 is pinned by firmware/murata_l072/bench/host_proto/
+# rx_grid_policy.c sequences 10-11 (`make check-rx-grid-policy`): at 2 fps a
+# base frame in the gap, or before the 8th frame after it, is adopted, and
+# the next demotion resets the tractor's clock; 0.99 s keeps authority.
 VECTOR_PREBUILD = os.environ.get("LIFETRAC_VECTOR_PREBUILD", "1").strip() != "0"
 
 
@@ -1022,8 +1026,9 @@ def _prebuild_vector_encoder(warm: bool = True) -> bool:
 def _log_vector_stats(st: dict) -> None:
     """RS-13 bench evidence: one INFO line per health period while in VECTOR
     mode with the encoder's ``last_stats`` (ms per stage, wire bytes, level,
-    epoch state). ``tools/vector_dry_run.py tractor-log`` parses the
-    ``key=value`` shape, so keep it stable."""
+    epoch state, the cumulative epoch-start and repair counters).
+    ``tools/vector_dry_run.py tractor-log`` parses the ``key=value`` shape,
+    so keep it stable."""
     if not st:
         return
     import json as _json
@@ -1034,16 +1039,30 @@ def _log_vector_stats(st: dict) -> None:
     # boot (a 2 s sample of this line still shows the rate, RS-13.1 anomaly
     # A3), ``trigger`` names the cause of the last committed one, and
     # ``waiting`` is how many fresh defines were refused an id last frame.
+    # The rest are cumulative since the encoder was built, so a sample counts
+    # every frame: ``frames`` encoded, ``epochs_by`` the committed starts per
+    # cause (exact, where A8's trigger samples were a lower bound), and the
+    # A16 repair (encode_vector.py module doc): ``share_frames`` frames given
+    # a repair share, ``share_resends`` re-sends the share packed and
+    # ``share_repeats`` the repeat-once copies among them,
+    # ``carousel_resends`` slot-7 re-sends however packed, ``del_repeats``.
     LOG.info("camera_service: vector_stats ms_total=%.1f ms=%s bytes=%d level=%d "
              "detail=%d epoch=%d n_live=%d residual=%.3f epoch_pending=%d "
-             "epochs=%d trigger=%s ttl_dropped=%d waiting=%d",
+             "epochs=%d trigger=%s ttl_dropped=%d waiting=%d frames=%d "
+             "epochs_by=%s share_frames=%d share_resends=%d share_repeats=%d "
+             "carousel_resends=%d del_repeats=%d",
              ms.get("total", 0.0), _json.dumps(ms, separators=(",", ":")),
              int(st.get("frame_bytes", 0)), int(st.get("level", 0)),
              int(VECTOR_DETAIL), int(st.get("epoch", 0)),
              int(st.get("n_live", 0)), float(st.get("residual", 0.0)),
              int(bool(st.get("epoch_pending"))),
              int(st.get("epochs", 0)), st.get("last_epoch_trigger") or "none",
-             int(st.get("ttl_dropped", 0)), int(st.get("waiting", 0)))
+             int(st.get("ttl_dropped", 0)), int(st.get("waiting", 0)),
+             int(st.get("frames", 0)),
+             _json.dumps(st.get("epochs_by_trigger") or {}, separators=(",", ":")),
+             int(st.get("share_frames", 0)), int(st.get("share_resends", 0)),
+             int(st.get("share_repeats", 0)), int(st.get("carousel_resends", 0)),
+             int(st.get("del_repeats", 0)))
 
 
 def _build_vector_frame(canvas: bytes, force_epoch: bool,

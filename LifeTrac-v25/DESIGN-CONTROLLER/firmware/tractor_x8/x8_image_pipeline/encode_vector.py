@@ -96,6 +96,16 @@ Quality byte (§4.5.4): its band is the level (60–100 V0, 40–59 V1, 20–39 
 only the absolute anchor and STATUS. The position inside the band is the
 detail scale, reported in ``last_stats`` (INSERT/L4 are not built yet).
 
+Counters (``last_stats``). Beside the per-frame fields, cumulative counts
+since the encoder was built, so camera_service's periodic ``vector_stats``
+sample still counts every frame: ``frames``, the committed epoch starts per
+cause (``epochs_by_trigger``), and what the A16 repair sent —
+``share_frames`` (frames given a repair share), ``share_resends``
+(re-sends the share packed) and ``share_repeats`` (the repeat-once copies
+among them), ``carousel_resends`` (slot-7 re-sends, by the share or under
+the κ cap) and ``del_repeats``. They only count: the frames are the same
+bytes with or without them.
+
 Layers produced: L0 (HZN ABS / RESID / NO_HORIZON with measured vfills),
 L1 POLY masses, L2 TREE/SHRUB ellipses, L3 EDGE polylines (rut / structure /
 overhead classes, chamfer-matched), plus STATUS, GAIN, LAYER_CLEAR, UPD,
@@ -155,6 +165,7 @@ LEVEL_BANDS = ((60, 100), (40, 59), (20, 39), (1, 19))
 
 SAFETY_REFRESH_S = 60.0                          # §4.3 new-epoch trigger
 RELABEL_EPOCH_FRACTION = 0.50                    # of the labelled area, per pixel (_relabelled_fraction)
+EPOCH_TRIGGERS = ("first", "forced", "horizon", "safety", "relabel")   # causes, as _epoch_trigger names them
 MATCH_IOU = 0.5                                  # same id (§4 T)
 VERIFY_IOU = 0.7                                 # re-verification (§4.3)
 VERIFY_DE = 6.0
@@ -288,6 +299,7 @@ class _Cand:
     repair: object = None           # sort key in the repair share (_pack_frame; None: not eligible)
     exempt: bool = False            # not bound by the CONFIRM/DIGEST reserve (a DEL's repeat)
     unless: object = None           # packed only if this candidate is not (a DEL's repeat vs a re-use define)
+    by_share: bool = False          # packed by the repair share (set by _pack_frame; counters only)
 
 
 def _paint_labels(shapes: list, shape: tuple, with_second: bool = False) -> tuple:
@@ -478,6 +490,15 @@ class VectorEncoder:
         self._mask_cache: tuple = (None, {})          # (region_map, index -> region_map == index), per capture
         self._l0_cache: tuple = (None, None)          # (key, render_l0 picture), the last L0 drawn
         self._last_stats: dict = {}
+        # Cumulative counters since this encoder was built, for last_stats
+        # (camera_service's vector_stats line). Counting only: nothing reads
+        # them back, so the frames are byte-identical with or without them.
+        self._epochs_by_trigger: dict = dict.fromkeys(EPOCH_TRIGGERS, 0)   # committed starts per cause
+        self._share_frames = 0                        # frames given a repair share (_share_due)
+        self._share_resends = 0                       # re-sends the repair share packed
+        self._share_repeats = 0                       # ... of them repeat-once copies (slot 6)
+        self._carousel_resends = 0                    # slot-7 carousel re-sends packed (share or κ cap)
+        self._del_repeats = 0                         # DEL repeats packed (§4.3)
 
     # ------------------------------------------------------------ public API
 
@@ -550,6 +571,18 @@ class VectorEncoder:
                                   else (self._pending_reason if stats["epoch_start"] else None))
         stats["last_epoch_trigger"] = self._last_trigger       # the last committed start's cause
         stats["waiting"] = self._waiting
+        # Cumulative since the encoder was built, so a periodic sample still
+        # counts every frame: the committed epoch starts per cause (RS-13.1
+        # A8 counted them from 2 s samples of the trigger, a lower bound), and
+        # what the A16 repair sent (the module doc's DEL-repeat and
+        # repair-share items).
+        stats["frames"] = self._frame_no
+        stats["epochs_by_trigger"] = dict(self._epochs_by_trigger)
+        stats["share_frames"] = self._share_frames
+        stats["share_resends"] = self._share_resends
+        stats["share_repeats"] = self._share_repeats
+        stats["carousel_resends"] = self._carousel_resends
+        stats["del_repeats"] = self._del_repeats
         self._last_stats = stats
         return header + body
 
@@ -782,6 +815,7 @@ class VectorEncoder:
         self._pending_epoch = None
         self._last_trigger, self._pending_reason = self._pending_reason, None
         self._epochs_committed += 1
+        self._epochs_by_trigger[self._last_trigger] = self._epochs_by_trigger.get(self._last_trigger, 0) + 1
         self._anchor_repeat_left = LEVEL_REPEATS[level]
         # A DEL's repeat is moot for a layer the epoch start clears: the base
         # drops that layer's old shapes at the hand-over (§3.5).
@@ -1062,6 +1096,7 @@ class VectorEncoder:
         packed, used = self._pack(cands, total_bits, reserve, carousel_bits)
         for c in packed:
             c.apply()
+        self._count_repair(packed)
         mentioned = {id_ for c in packed for id_ in c.mentions}
         records = _defines_first([r for c in packed for r in _records_of(c)])
         for rec in records:
@@ -1108,6 +1143,22 @@ class VectorEncoder:
                                  id(c) in packed_ids)
                                 for c in cands]}
         return body, records, stats
+
+    def _count_repair(self, packed: list) -> None:
+        """The A16 repair's cumulative counters (``last_stats``) from the
+        packed candidates: a frame given a repair share, the re-sends the
+        share took (repeat-once copies among them), the slot-7 carousel
+        re-sends however they were packed, and the DEL repeats."""
+        if self._share_bits:
+            self._share_frames += 1
+        for c in packed:
+            if c.by_share:
+                self._share_resends += 1
+                self._share_repeats += c.slot == 6
+            if c.slot == 7:
+                self._carousel_resends += 1
+            elif c.exempt and isinstance(c.record, vs.Del):
+                self._del_repeats += 1
 
     def _carousel_due(self, level: int) -> bool:
         """κ of §4.2 as a duty cycle: one carousel frame every 1/κ frames on
@@ -1716,6 +1767,7 @@ class VectorEncoder:
                         packed_ids.add(id(x))
                         used += x.bits
                         car_used += x.bits
+                        x.by_share = True
             if id(c) in packed_ids or c.unless is not None:
                 continue
             if not fits(c, total_bits if (c.slot < 5 or c.exempt) else total_bits - reserve):

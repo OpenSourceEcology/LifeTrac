@@ -783,6 +783,41 @@ class TemporalTests(unittest.TestCase):
         self.assertTrue(frame.header.key)
         self.assertEqual(enc.epoch, 1)
 
+    def test_epoch_starts_are_counted_per_trigger(self):
+        # last_stats['epochs_by_trigger'] counts the committed epoch starts by
+        # cause since the encoder was built, for camera_service's vector_stats
+        # line (RS-13.1 A8 had only the trigger of a 2 s sample). Every cause
+        # in turn — the all-ground view is a horizon flip one capture after
+        # it relabels the scene — and the failed attempts at 8 B report their
+        # trigger but count only when the start commits.
+        t = [1000.0]
+        enc = ev.VectorEncoder(clock=lambda: t[0])
+        other = scene(y0=112.0, rects=[(0, 30, 95, 63, (200, 200, 40))])
+        ground = scene(y0=-40.0)
+        plan = ([(self.img, BUDGET, None)] * 2 + [(self.img, BUDGET, "force"), (self.img, BUDGET, "argument")]
+                + [(other, BUDGET, None)] * 2 + [(ground, BUDGET, None)] * 3 + [(self.img, BUDGET, None)] * 3
+                + [(self.img, BUDGET, "61 s"), (self.img, 8, "force"), (self.img, 8, None), (self.img, BUDGET, None)])
+        tally = dict.fromkeys(ev.EPOCH_TRIGGERS, 0)
+        for i, (img, budget, action) in enumerate(plan):
+            if action == "force":
+                enc.force_epoch()
+            if action == "61 s":
+                t[0] += 61.0
+            enc.frame(img, budget, epoch_start=action == "argument", seq=i)
+            t[0] += 0.5
+            st, at = enc.last_stats, f"frame {i + 1}"
+            if budget == 8:
+                self.assertEqual(st["epoch_trigger"], "forced", at)
+                self.assertFalse(st["epoch_committed"], at)
+            if st["epoch_committed"]:
+                tally[st["epoch_trigger"]] += 1
+            self.assertEqual(st["frames"], i + 1, at)
+            self.assertEqual(st["epochs_by_trigger"], tally, at)
+            self.assertEqual(sum(st["epochs_by_trigger"].values()), st["epochs"], at)
+        self.assertEqual(tally["first"], 1)
+        self.assertEqual(tally["forced"], 3)                          # two by force_epoch(), one by argument
+        self.assertTrue(all(tally.values()), tally)
+
     def test_id_exhaustion_lets_the_rest_wait(self):
         rects = [(2 + 9 * i, 34 + 12 * j, 7 + 9 * i, 40 + 12 * j, (200, 60, 60))
                  for i in range(10) for j in range(2)]
