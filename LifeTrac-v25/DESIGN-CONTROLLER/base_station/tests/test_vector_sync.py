@@ -1423,5 +1423,81 @@ class SaturatedLossTests(unittest.TestCase):
                 self.assertLess(worst[0], TTL_FRAMES - 2, f"hard-verify gap {worst}")
 
 
+@unittest.skipUnless(_HAVE_CV, "numpy + cv2 required for the encoder")
+class RepairCounterTests(unittest.TestCase):
+    """The A16 repair's cumulative counters in ``last_stats``, which
+    camera_service logs on its ``vector_stats`` line so the repair can be
+    read on air: frame by frame against what the frames of the saturated
+    stream carry, and on a hand-built pack."""
+
+    KEYS = ("share_frames", "share_resends", "share_repeats", "carousel_resends", "del_repeats")
+
+    def test_counters_follow_the_frames_of_a_saturated_stream(self):
+        for budget in (243, 203):
+            with self.subTest(f"{budget} B"):
+                stream = SaturatedLossTests.stream(budget)
+                prev = dict.fromkeys(self.KEYS, 0)
+                for i, fr in enumerate(stream):
+                    st, at = fr["stats"], f"frame {i + 1}"
+                    step = {k: st[k] - prev[k] for k in self.KEYS}
+                    prev = {k: st[k] for k in self.KEYS}
+                    self.assertEqual(st["frames"], i + 1, at)
+                    # V0: a share frame one in four (the carousel frame); on
+                    # this scene every one of them re-sends something.
+                    self.assertEqual(step["share_frames"], int((i + 1) % 4 == 0), at)
+                    if step["share_frames"]:
+                        self.assertGreater(step["share_resends"], 0, at)
+                    else:
+                        self.assertEqual(step["share_resends"], 0, at)
+                    packed = [c for c in st["candidates"] if c[4]]
+                    self.assertEqual(step["carousel_resends"], sum(1 for c in packed if c[0] == 7), at)
+                    self.assertLessEqual(step["share_resends"], sum(1 for c in packed if c[0] in (6, 7)), at)
+                    self.assertLessEqual(step["share_repeats"],
+                                         min(step["share_resends"], sum(1 for c in packed if c[0] == 6)), at)
+                    # A repeat names an id the mirror had already dropped
+                    # before this frame; a first DEL, one it still held.
+                    held = stream[i - 1]["mirror"] if i else {}
+                    repeats = [r.id for r in fr["decoded"].records if isinstance(r, vs.Del) and r.id not in held]
+                    self.assertEqual(step["del_repeats"], len(repeats), at)
+                last = stream[-1]["stats"]
+                self.assertEqual(last["share_frames"], len(stream) // 4)
+                self.assertGreater(last["del_repeats"], 2 * len(stream))       # ≈ 2.5 a frame on this scene
+                self.assertGreater(last["share_repeats"], 0)                   # repeat-pending shapes too
+
+    def test_the_packer_marks_what_the_share_took(self):
+        # 260 bits, no reserve, a 50-bit κ cap. On a share frame the share
+        # (60 bits) takes the re-sends oldest statement first — the carousel
+        # shape stated at frame 1, then the repeat-once copy of frame 2 —
+        # before the slot-5 changes, which fit behind it with the DEL's
+        # repeat; the newer carousel shape meets the κ cap the share spent.
+        # Without the share the carousel takes the older shape under the cap.
+        # (Records from the encoder's own codec copy, as it packs them.)
+        def run(share_bits: int) -> tuple:
+            noop = lambda: None                                          # noqa: E731
+            changes = [ev._Cand(5, (3, -k), ev.vs.Upd(k + 1, 1, 0), 40, noop) for k in range(3)]
+            repeat = ev._Cand(6, (-10,), None, 30, noop, repair=(2, 9))
+            old = ev._Cand(7, (1, 4), None, 30, noop, repair=(1, 4))
+            new = ev._Cand(7, (8, 5), None, 30, noop, repair=(8, 5))
+            del_repeat = ev._Cand(5, (-1, 7), ev.vs.Del(7), 12, noop, exempt=True)
+            cands = changes + [repeat, old, new, del_repeat]
+            packed, _ = ev.VectorEncoder._pack_frame(list(cands), 260, 0, 50, share_bits)
+            enc = ev.VectorEncoder()
+            enc._share_bits = share_bits
+            enc._count_repair(packed)
+            counts = {k: getattr(enc, "_" + k) for k in self.KEYS}
+            return [c in packed for c in cands], [c.by_share for c in cands], counts
+
+        packed, shared, counts = run(60)
+        self.assertEqual(packed, [True] * 3 + [True, True, False, True])
+        self.assertEqual(shared, [False] * 3 + [True, True, False, False])
+        self.assertEqual(counts, dict(share_frames=1, share_resends=2, share_repeats=1,
+                                      carousel_resends=1, del_repeats=1))
+        packed, shared, counts = run(0)
+        self.assertEqual(packed, [True] * 3 + [True, True, False, True])
+        self.assertEqual(shared, [False] * 7)
+        self.assertEqual(counts, dict(share_frames=0, share_resends=0, share_repeats=0,
+                                      carousel_resends=1, del_repeats=1))
+
+
 if __name__ == "__main__":
     unittest.main()
