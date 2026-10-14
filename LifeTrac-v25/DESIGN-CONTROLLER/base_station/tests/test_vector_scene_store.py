@@ -1021,6 +1021,16 @@ class BannerAgeLossTests(StoreCase):
         self.assertEqual(self.snap(22_100)["loss"], {"window_ms": 10_000, "frames": 1, "lost": 0, "ratio": 0.0})
         self.assertEqual(self.snap(22_100)["frame_age_ms"], 300)
 
+    def test_the_same_seq_after_a_silence_is_a_new_frame(self):
+        # Copilot review of #150: 14, then 14 again after more than 10 s (a
+        # restart, or a wrap during an outage), read frames=0.
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=14)
+        self.feed([tri(1)], epoch=0, rx=21_000, seq=14)
+        self.assertEqual(self.snap(21_100)["loss"], {"window_ms": 10_000, "frames": 1, "lost": 0, "ratio": 0.0})
+        self.feed([tri(1)], epoch=0, rx=21_500, seq=16)                   # the new chain counts its gap
+        loss = self.snap(21_600)["loss"]
+        self.assertEqual((loss["frames"], loss["lost"]), (2, 1))
+
     def test_copies_and_late_frames_are_not_loss(self):
         # Copilot review of #150: 10, 11, 10, 12 read one lost of four, and
         # 10, 9, 11 one lost, although every distinct frame arrived.

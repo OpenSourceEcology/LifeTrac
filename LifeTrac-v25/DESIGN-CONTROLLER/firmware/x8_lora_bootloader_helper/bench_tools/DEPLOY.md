@@ -95,10 +95,12 @@ On the PC:
    stay on the PC too (RS-5.20): each of those compose files maps
    `/dev/ttymxc3` with `restart: unless-stopped`, and the base uses none of
    them. The script stops before anything is copied if a YAML file in the
-   tarball, other than the base's own `docker-compose.yml`, names `ttymxc3`
-   or `LIFETRAC_LORA_DEVICE` outside a comment (a device entry, a
-   `${VAR:-/dev/ttymxc3}` default, an environment value) or runs
-   privileged. Docs, `bench-evidence/`, `hil/` and
+   tarball, other than the base's own `docker-compose.yml`, names a
+   `ttymxc` UART or `LIFETRAC_LORA_DEVICE` outside a comment (a device
+   entry, a `${VAR:-/dev/ttymxc3}` default, an environment value), or uses
+   a compose route to host devices that names none: `privileged` with any
+   value, `device_cgroup_rules`, or all of `/dev` as a device or volume.
+   Docs, `bench-evidence/`, `hil/` and
    `tools/` stay on the PC. The tarball (about 2 MB) is kept as
    `$ARCHIVE_DIR/deploy/dc_deploy_<sha8>.tar.gz`.
 2. It refuses a tarball whose text files hold more CR bytes than the commit's

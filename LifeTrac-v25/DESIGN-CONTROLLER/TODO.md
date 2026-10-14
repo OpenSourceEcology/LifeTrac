@@ -1491,8 +1491,9 @@ No-regrets work, correct under every surviving architecture (do first):
   tree nor the image, and removes an old copy from the deployed tree (also
   with `--no-clean`; the backup keeps it). It stops before copying anything
   if a YAML file in the tarball, other than the base's own
-  `docker-compose.yml`, names `ttymxc3` or `LIFETRAC_LORA_DEVICE` outside a
-  comment or runs privileged. The files stay in
+  `docker-compose.yml`, names a `ttymxc` UART or `LIFETRAC_LORA_DEVICE`
+  outside a comment, or uses `privileged` (any value),
+  `device_cgroup_rules` or all of `/dev`. The files stay in
   git: the tractor image is built from its own archive. Close this item when
   the next deploy's tree has none of them. Renaming or deleting them in git
   is left to the design owner. Still on the base for a while:

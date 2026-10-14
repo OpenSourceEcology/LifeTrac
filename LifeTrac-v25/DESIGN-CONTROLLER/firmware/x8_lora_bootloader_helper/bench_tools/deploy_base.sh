@@ -219,17 +219,19 @@ say "archive $SHORT ($SUBJECT): ${PATHS[*]}"
 git -C "$REPO" -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz -o "$TGZ" "$SHA:$DC_REL" -- "${PATHS[@]}" "${NO_SHIP[@]}"
 # Check: no YAML file in the tarball but the base's own docker-compose.yml
 # (whose lora_bridge maps the radio by design; only its broker is started
-# here) can reach the radio UART. Outside comments, none may name ttymxc3 or
-# LIFETRAC_LORA_DEVICE (the base's .env sets it to /dev/ttymxc3), in any form
-# (a device entry, "${VAR:-/dev/ttymxc3}", an environment value), or run
-# privileged.
+# here) can reach the radio UART. Outside comments, none may name a ttymxc
+# UART or LIFETRAC_LORA_DEVICE (the base's .env sets it to /dev/ttymxc3), in
+# any form (a device entry, "${VAR:-/dev/ttymxc3}", an environment value), nor
+# use a route compose has to host devices without naming one: `privileged`
+# (any spelling or value: false is the default, and a value can come from
+# "${VAR}"), `device_cgroup_rules`, or /dev itself as a device or volume.
+DEVICE_RE='ttymxc|LIFETRAC_LORA_DEVICE|privileged|device_cgroup_rules|(^|[^[:alnum:]_./~-])/dev/?([^[:alnum:]_./-]|$)'
 while IFS= read -r f; do
     [ "$f" != docker-compose.yml ] || continue
-    if (set +o pipefail; tar -xzOf "$TGZ" "$f" | grep -v '^[[:space:]]*#' \
-            | grep -qiE 'ttymxc3|LIFETRAC_LORA_DEVICE|privileged:[[:space:]]*["'"'"']?true'); then
-        die "the tarball would ship $f, which can reach the radio UART (ttymxc3, LIFETRAC_LORA_DEVICE or privileged); nothing was copied"
+    if (set +o pipefail; tar -xzOf "$TGZ" "$f" | grep -v '^[[:space:]]*#' | grep -qiE "$DEVICE_RE"); then
+        die "the tarball would ship $f, which can reach the radio UART (a ttymxc UART, LIFETRAC_LORA_DEVICE, privileged, device_cgroup_rules or all of /dev); nothing was copied"
     fi
-done < <(tar -tzf "$TGZ" | grep -E '\.ya?ml$')
+done < <(tar -tzf "$TGZ" | grep -iE '\.ya?ml$')
 # Check: the text files in the tarball must hold no more CR bytes than the same
 # blobs in git (a few committed logs carry CRs of their own). More CRs means an
 # eol conversion slipped in. (Needs GNU tar's --wildcards, else it is skipped.)

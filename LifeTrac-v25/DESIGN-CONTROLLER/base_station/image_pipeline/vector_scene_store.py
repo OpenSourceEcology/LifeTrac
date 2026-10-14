@@ -310,9 +310,11 @@ class VectorSceneStore:
     def _note_seq(self, seq: int | None, rx_ms: int) -> None:
         """Frame loss from seq gaps (§4.5.2): every VS frame is one fragment,
         so a gap of n is n frames that never arrived, whether or not the
-        frames around it decode. The same seq again (an epoch-start copy) is
-        not a new frame. A gap is counted only when the frame before it is
-        inside the window; a longer silence shows in ``frame_age_ms``.
+        frames around it decode. The same seq again inside the window (an
+        epoch-start copy) is not a new frame. A gap is counted only when the
+        frame before it is inside the window; a longer silence shows in
+        ``frame_age_ms``, and the frame after it starts a new chain, even
+        with the same seq.
         A seq at most REORDER_MAX behind the newest is late or a copy: it
         never moves the chain back, a copy of a frame of this chain in the
         window is not counted again, and a late frame takes back the loss its
@@ -324,9 +326,9 @@ class VectorSceneStore:
         lost, chained = 0, False
         if self._last_seq is not None:
             d = (seq - self._last_seq) & 0xFF
-            if d == 0:
-                return
             fresh = rx_ms - self._last_seq_rx <= LOSS_WINDOW_MS
+            if fresh and d == 0:
+                return                                      # the same frame again
             if fresh and 256 - d <= REORDER_MAX:
                 if any(e[1] == seq and e[3] == self._seq_chain for e in self._seq_win):
                     return                                  # a copy of a frame already counted
