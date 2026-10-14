@@ -13,7 +13,8 @@ Subcommands::
     capture      subscribe to a topic, save every payload as JSONL, analyse live
     replay       analyse a saved JSONL capture (no broker, no paho needed)
     tractor-log  summarise camera_service's ``vector_stats`` lines (encoder ms
-                 per stage, wire bytes, level) from a ``docker logs`` dump
+                 per stage, wire bytes, level, and the cumulative epoch-start
+                 and A16 repair counters) from a ``docker logs`` dump
 
 Where it runs (bench_tools/RS13_VECTOR_LEG.md):
 
@@ -408,7 +409,8 @@ _KV_RE = re.compile(r"(\w+)=(\{[^}]*\}|\S+)")
 
 def parse_vector_stats_line(line: str) -> Optional[dict]:
     """camera_service: ``vector_stats ms_total=12.3 ms={"resize":1.2,...} bytes=203
-    level=0 detail=80 epoch=3 n_live=17 residual=0.031 epoch_pending=0``"""
+    level=0 detail=80 epoch=3 n_live=17 residual=0.031 epoch_pending=0 ...
+    frames=600 epochs_by={"first":1,...} share_frames=150 ... del_repeats=1560``"""
     m = _VSTATS_RE.search(line)
     if not m:
         return None
@@ -430,6 +432,38 @@ def parse_vector_stats_line(line: str) -> Optional[dict]:
     return out if "ms_total" in out else None
 
 
+# The cumulative counters on the line (since camera_service built its
+# encoder): a 2 s sample still counts every frame up to that sample.
+COUNTER_KEYS = ("frames", "epochs", "share_frames", "share_resends", "share_repeats",
+                "carousel_resends", "del_repeats", "ttl_dropped")
+
+
+def summarise_counters(rows: list) -> Optional[dict]:
+    """Totals of the cumulative counters up to the log's last line, None when
+    no line carries them (a camera_service older than ``frames``). The lines
+    split into runs where ``frames`` falls (a camera_service restart starts a
+    new encoder at 0); a total is the sum of each run's last value.
+    ``epochs_by`` holds the committed epoch starts per cause, the exact
+    counts behind RS-13.1 A8's sampled ``trigger`` lower bounds."""
+    rows = [r for r in rows if isinstance(r.get("frames"), int)]
+    if not rows:
+        return None
+    runs: list = [[rows[0]]]
+    for a, b in zip(rows, rows[1:]):
+        if b["frames"] < a["frames"]:
+            runs.append([])
+        runs[-1].append(b)
+    out: dict = {"runs": len(runs)}
+    for k in COUNTER_KEYS:
+        out[k] = sum(int(run[-1].get(k, 0)) for run in runs)
+    by: dict = {}
+    for run in runs:
+        for cause, n in (run[-1].get("epochs_by") or {}).items():
+            by[cause] = by.get(cause, 0) + int(n)
+    out["epochs_by"] = by
+    return out
+
+
 def summarise_tractor_log(lines: Iterable[str]) -> dict:
     rows = [r for r in (parse_vector_stats_line(ln) for ln in lines) if r]
     totals = [float(r["ms_total"]) for r in rows]
@@ -448,8 +482,26 @@ def summarise_tractor_log(lines: Iterable[str]) -> dict:
         "bytes": {"p50": _pct(nbytes, 0.5), "max": max(nbytes) if nbytes else 0},
         "levels": {str(k): v for k, v in sorted(levels.items())},
         "epoch_pending_lines": sum(1 for r in rows if int(r.get("epoch_pending", 0))),
+        "counters": summarise_counters(rows),
         "last": rows[-1] if rows else None,
     }
+
+
+def format_counters(c: Optional[dict]) -> str:
+    """``counters to the last line (1 run): frames 600; epoch starts 19 = first 1
+    forced 0 horizon 0 safety 4 relabel 14; repair share 150 frames, 960
+    re-sends (12 repeat-once); carousel re-sends 1000; DEL repeats 1560;
+    ttl_dropped 0``"""
+    if c is None:
+        return "counters: none on these lines (camera_service predates them)"
+    by = " ".join(f"{k} {v}" for k, v in c["epochs_by"].items())
+    mismatch = sum(c["epochs_by"].values()) != c["epochs"]
+    return (f"counters to the last line ({c['runs']} run{'s' if c['runs'] != 1 else ''}): "
+            f"frames {c['frames']}; epoch starts {c['epochs']} = {by or 'none'}"
+            f"{' (MISMATCH)' if mismatch else ''}; repair share {c['share_frames']} frames, "
+            f"{c['share_resends']} re-sends ({c['share_repeats']} repeat-once); "
+            f"carousel re-sends {c['carousel_resends']}; DEL repeats {c['del_repeats']}; "
+            f"ttl_dropped {c['ttl_dropped']}")
 
 
 def format_tractor_summary(d: dict) -> str:
@@ -468,6 +520,7 @@ def format_tractor_summary(d: dict) -> str:
         f"last: epoch {last.get('epoch')} n_live {last.get('n_live')} residual {last.get('residual')} "
         f"detail {last.get('detail')} epochs {last.get('epochs', 'n/a')} trigger {last.get('trigger', 'n/a')} "
         f"ttl_dropped {last.get('ttl_dropped', 'n/a')} waiting {last.get('waiting', 'n/a')}",
+        format_counters(d.get("counters")),
     ])
 
 

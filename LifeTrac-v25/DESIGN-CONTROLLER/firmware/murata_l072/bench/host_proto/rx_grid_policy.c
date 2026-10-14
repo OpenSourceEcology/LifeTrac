@@ -25,6 +25,13 @@
  *   9. a forged "leading" epoch+2 is REJECTED_EPOCH_DRIFT (the originator
  *      hands STALE, not UNANCHORED, so the drift barrier holds); epoch+1
  *      is still adopted.
+ *  10. RS-13: a 1.038 s TX gap at a mode switch, in a 2 fps stream, lets
+ *      the base's lagged copy of our grid in: a base frame in the gap or
+ *      before the 8th frame after it is adopted (the tractor follows its
+ *      follower), streaming on does not win authority back, and the next
+ *      demotion resets the adopted clock;
+ *  11. RS-13: the same switch with a 0.99 s gap keeps authority -- the
+ *      base frame is refused and the clock survives a demotion.
  */
 
 #include <stdio.h>
@@ -300,6 +307,142 @@ static void test_forged_leading_epoch_is_drift_rejected(void) {
           "(9b) epoch+1 within the drift window: SNAPPED + adopted (got %d)", (int)dec);
 }
 
+/* RS-13 switch gaps (10, 11). A VECTOR stream at 2 fps puts one fragment
+ * on air every 500 ms. The base is a follower: it adopted our grid from our
+ * frames, and its RX service time and ToA rounding leave its copy a few ms
+ * late. Its frames (commands, probes) are short. */
+#define FPS2_MS      500U
+#define BASE_LAG_MS  6U
+#define BASE_TOA_MS  20U
+
+/* n own frames at 2 fps from t0; returns the time of the last one. */
+static uint32_t stream_2fps(uint32_t t0, uint32_t n) {
+    uint32_t t = t0;
+    for (uint32_t i = 0U; i < n; ++i) {
+        t = t0 + i * FPS2_MS;
+        tx_step(t);
+    }
+    return t;
+}
+
+/* A frame the base sends at tx_ms on its copy of our grid (whose slot
+ * grid_abs started at grid_ms on ours): the slot current on that copy,
+ * with its offset in the header, heard BASE_TOA_MS later. */
+static sx1276_fhss_snap_decision_t base_frame(uint32_t grid_ms, uint32_t grid_abs,
+                                              uint32_t tx_ms,
+                                              sx1276_rx_grid_verdict_t *out_v) {
+    const uint32_t elapsed = tx_ms - (grid_ms + BASE_LAG_MS);
+    const uint32_t abs = grid_abs + elapsed / SX1276_FHSS_SLOT_MS;
+    return rx_frame_ep(tx_ms + BASE_TOA_MS, BASE_TOA_MS * 1000U,
+                       (uint8_t)(elapsed % SX1276_FHSS_SLOT_MS),
+                       sx1276_fhss_clock_epoch_of(abs),
+                       sx1276_fhss_clock_hop_of(abs), out_v);
+}
+
+static void test_switch_gap_1038ms_lets_the_follower_in(void) {
+    /* The 2026-10-04 2d_r4 leg: the switch to VECTOR built the encoder
+     * inside its first frame and left a 1.038 s TX gap. Authority decays
+     * at last TX + 1000 ms and the first frame after the gap restarts the
+     * streak at 1, so at 2 fps the tractor holds no authority from +1000
+     * until its 8th frame after the gap: 38 ms + 7 x 500 ms = 3.54 s. A
+     * base frame in that window is handed UNANCHORED and adopted -- the
+     * tractor re-anchors on its follower's lagged copy of its own grid and
+     * becomes a follower, which streaming does not undo; the next
+     * demotion (a base command LOCKs the tractor's scan machine, the 2 s
+     * loss timer demotes it) then RESETS the adopted clock and the next TX
+     * renumbers the grid under the base: the RS-12.12/14 lock-loss
+     * mechanism that v2's authority streak exists to stop. The guard is
+     * on the X8: camera_service.py builds and warms the VS1 encoder at
+     * boot (VECTOR_PREBUILD, _prebuild_vector_encoder), pinned by
+     * base_station/tests/test_vector_entry_guards.py VectorEncoderPrebuild
+     * (test_main_builds_the_encoder_before_the_first_capture,
+     * test_first_vector_frame_reuses_the_prebuilt_encoder). */
+    fresh_scheduler();
+    const uint32_t t0 = 100000U;
+    const uint32_t last = stream_2fps(t0, 10U);        /* 104500, the old mode */
+    const uint32_t grid_abs = sx1276_fhss_clock_abs_slot(t0);   /* our grid starts at t0 */
+    const uint32_t probe = t0 + 40U * SX1276_FHSS_SLOT_MS;      /* one of our slot starts */
+    sx1276_rx_grid_verdict_t v;
+    CHECK(sx1276_rx_grid_consider(last + 10U, 0U, 0U, grid_abs).originator == 1U,
+          "(10) streaming at 2 fps: originator before the switch");
+    /* In the gap, 20 ms past the decay: refused 20 ms earlier (see 11). */
+    sx1276_fhss_snap_decision_t dec = base_frame(t0, grid_abs, last + 1020U - BASE_TOA_MS, &v);
+    CHECK(v.originator == 0U && v.health == SX1276_FHSS_CLOCK_UNANCHORED && v.adopt == 1U,
+          "(10) in the gap: no authority, UNANCHORED + adopt");
+    CHECK(dec == SX1276_FHSS_SNAP_DEC_SNAPPED && sx1276_rx_grid_adopted() == 1U,
+          "(10) the base's frame is SNAPPED and adopted (got %d)", (int)dec);
+    CHECK(sx1276_fhss_clock_in_slot_ms(probe + BASE_LAG_MS) == 0U &&
+          sx1276_fhss_clock_abs_slot(probe + BASE_LAG_MS) == grid_abs + 40U,
+          "(10) our slots now start BASE_LAG_MS late: the base's copy");
+    /* The switch's first VECTOR frame at +1038, then streaming on. */
+    const uint32_t last2 = stream_2fps(last + 1038U, 10U);
+    v = sx1276_rx_grid_consider(last2 + 10U, 0U, 0U, grid_abs);
+    CHECK(v.originator == 0U && sx1276_fhss_authority_streak() >= SX1276_FHSS_AUTHORITY_MIN_STREAK,
+          "(10) streaming on: a full streak, but an adopted grid holds no authority");
+    CHECK(sx1276_rx_grid_on_demotion() == 1U && sx1276_fhss_clock_valid() == 0U,
+          "(10) the demotion resets the adopted clock");
+    const uint32_t tn = last2 + FPS2_MS;
+    tx_step(tn);                                        /* "the next slot starts now" */
+    CHECK(sx1276_fhss_clock_abs_slot(tn) != grid_abs + (tn - t0) / SX1276_FHSS_SLOT_MS ||
+          sx1276_fhss_clock_in_slot_ms(tn) != (tn - t0) % SX1276_FHSS_SLOT_MS,
+          "(10) the next TX renumbers the grid the base follows");
+
+    /* Just after the gap: the first frame after it is streak 1, not 11. */
+    fresh_scheduler();
+    const uint32_t t1 = 120000U;
+    const uint32_t last3 = stream_2fps(t1, 10U);
+    tx_step(last3 + 1038U);
+    CHECK(sx1276_fhss_authority_streak() == 1U, "(10b) the gap restarts the streak");
+    dec = base_frame(t1, sx1276_fhss_clock_abs_slot(t1), last3 + 1100U - BASE_TOA_MS, &v);
+    CHECK(v.originator == 0U && v.adopt == 1U && dec == SX1276_FHSS_SNAP_DEC_ALIGNED,
+          "(10b) after the gap: ALIGNED + adopt (got %d)", (int)dec);
+    CHECK(sx1276_rx_grid_adopted() == 1U && sx1276_fhss_authority_streak() == 0U,
+          "(10b) adopted: a follower, streak cleared");
+
+    /* The window closes at the 8th frame after the gap, not before. */
+    fresh_scheduler();
+    const uint32_t t2 = 130000U;
+    const uint32_t s7 = stream_2fps(stream_2fps(t2, 10U) + 1038U, 7U);
+    dec = base_frame(t2, sx1276_fhss_clock_abs_slot(t2), s7 + 100U, &v);
+    CHECK(v.originator == 0U && sx1276_rx_grid_adopted() == 1U,
+          "(10c) after 7 frames: still no authority, adopted (got %d)", (int)dec);
+    fresh_scheduler();
+    const uint32_t t3 = 140000U;
+    const uint32_t s8 = stream_2fps(stream_2fps(t3, 10U) + 1038U, 8U);
+    dec = base_frame(t3, sx1276_fhss_clock_abs_slot(t3), s8 + 100U, &v);
+    CHECK(v.originator == 1U && v.adopt == 0U && sx1276_rx_grid_adopted() == 0U,
+          "(10c) after 8 frames: originator again, not adopted (got %d)", (int)dec);
+}
+
+static void test_switch_gap_990ms_keeps_authority(void) {
+    /* The control for (10): with the encoder built at boot the switch
+     * stays inside the strict < 1000 ms chain. In the gap the tractor is
+     * still the originator, so the base's lagging frame is handed FRESH
+     * and refused; the first VECTOR frame continues the streak; and a
+     * demotion keeps the self-anchored clock. */
+    fresh_scheduler();
+    const uint32_t t0 = 150000U;
+    const uint32_t last = stream_2fps(t0, 10U);        /* 154500 */
+    const uint32_t grid_abs = sx1276_fhss_clock_abs_slot(t0);
+    const uint32_t probe = t0 + 40U * SX1276_FHSS_SLOT_MS;
+    sx1276_rx_grid_verdict_t v;
+    sx1276_fhss_snap_decision_t dec = base_frame(t0, grid_abs, last + 980U - BASE_TOA_MS, &v);
+    CHECK(v.originator == 1U && v.adopt == 0U && v.health == SX1276_FHSS_CLOCK_FRESH,
+          "(11) in the gap: originator, FRESH, no adopt");
+    CHECK(dec == SX1276_FHSS_SNAP_DEC_REJECTED_LOCKED_OUT && sx1276_rx_grid_adopted() == 0U,
+          "(11) the base's frame is refused: LOCKED_OUT (got %d)", (int)dec);
+    tx_step(last + 990U);                               /* the first VECTOR frame */
+    CHECK(sx1276_fhss_authority_streak() == 11U, "(11) the streak runs on through 0.99 s");
+    dec = base_frame(t0, grid_abs, last + 1100U - BASE_TOA_MS, &v);
+    CHECK(v.originator == 1U && v.adopt == 0U && sx1276_rx_grid_adopted() == 0U,
+          "(11) after the gap: originator, not adopted (got %d)", (int)dec);
+    CHECK(sx1276_fhss_clock_in_slot_ms(probe) == 0U &&
+          sx1276_fhss_clock_abs_slot(probe) == grid_abs + 40U,
+          "(11) our grid untouched by the base's frames");
+    CHECK(sx1276_rx_grid_on_demotion() == 0U && sx1276_fhss_clock_valid() == 1U,
+          "(11) a demotion keeps the self-anchored clock");
+}
+
 int main(void) {
     test_cold_follower_adopts();
     test_follower_demotion_resets();
@@ -310,10 +453,12 @@ int main(void) {
     test_authority_decays_then_echo_adopted();
     test_exact_1s_commands_never_earn_authority();
     test_forged_leading_epoch_is_drift_rejected();
+    test_switch_gap_1038ms_lets_the_follower_in();
+    test_switch_gap_990ms_keeps_authority();
     if (g_failures != 0) {
         fprintf(stderr, "[FAIL] rx_grid_policy: %d failure(s)\n", g_failures);
         return 1;
     }
-    printf("[PASS] rx_grid_policy: 9 sequences incl. demotion->TX->RX recovery and the forged-epoch drift barrier, against the real consider_remote\n");
+    printf("[PASS] rx_grid_policy: 11 sequences incl. demotion->TX->RX recovery, the forged-epoch drift barrier and the RS-13 switch gap (1.038 s adopts the follower, 0.99 s refuses it), against the real consider_remote\n");
     return 0;
 }

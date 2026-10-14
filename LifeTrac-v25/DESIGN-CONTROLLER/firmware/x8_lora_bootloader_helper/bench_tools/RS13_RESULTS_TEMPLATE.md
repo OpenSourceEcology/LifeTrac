@@ -66,6 +66,9 @@ Final `scene:` lines (from `legs/step1_tractor_*.txt`):
 
 Stage p50 ms from `tractor-log` (bw250 landscape): `<resize= l0= l1= l3= temporal_pack=>`.
 
+Epoch starts per cause from `tractor-log`'s `counters` line, per pass (exact, A8):
+`<bw250 moving: first forced horizon safety relabel>`, `<bw250 landscape: …>`, `<bw500 landscape: …>`.
+
 <PASS | FAIL per the step-1 table in the procedure; if the encoder time failed,
 say that the radio legs ran at 1 fps — and that the FHSS leg's P2/P3 are then
 read from lock (A7) and the tractor is not FHSS time authority (A11)>

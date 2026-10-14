@@ -1,0 +1,889 @@
+{
+ "bw500/real": {
+  "case": "bw500/real",
+  "frame_bytes": {
+   "min": 172,
+   "p50": 238,
+   "max": 243,
+   "ge_cap_minus7": "304/395"
+  },
+  "records_p50": 46,
+  "n_live_p50": 35,
+  "residual_p50": 1656.6,
+  "slot5_unpacked_mean": 3.39,
+  "epoch_starts": [
+   [
+    0,
+    "first"
+   ],
+   [
+    120,
+    "safety"
+   ],
+   [
+    240,
+    "safety"
+   ],
+   [
+    360,
+    "safety"
+   ]
+  ],
+  "lossfree_out_of_step_frames": 0,
+  "carousel": {
+   "due_frames": 99,
+   "due_with_zero_packed": 2,
+   "records_per_due_frame_mean": 6.09,
+   "offered_per_due_frame_mean": 10.4
+  },
+  "drops": 100,
+  "drops_lost_frame_had_del": 100,
+  "disturbed": 94,
+  "recovered_within_window": "94/94",
+  "recovery_frames": {
+   "p10": 2,
+   "p50": 3,
+   "p90": 7,
+   "max": 10,
+   "hist": {
+    "1-3": 69,
+    "4-10": 25,
+    "11-20": 0,
+    "21-25": 0,
+    "26-40": 0,
+    "41-70": 0
+   },
+   "unrecovered": 0
+  },
+  "resync_ended_by": {
+   "digest": 23,
+   "epoch_start": 0,
+   "not_ended": 0
+  },
+  "ghost_episodes": 100,
+  "a16_like": "0/100",
+  "a16_like_drops": [],
+  "a16_waited_for_epoch": 0,
+  "a16_unrecovered_in_window": 0,
+  "a16_lost_frame_had_del": 0,
+  "a16_missing_run": {
+   "p50": null,
+   "max": null
+  },
+  "a16_orph_per_missing_frame": null,
+  "a16_car_due_frames_zero_packed": "0/0",
+  "a16_base_vs_enc_ttl_drops": "0 vs 0",
+  "a16_missing_ids_never_resent": 0,
+  "a16_missing_ids_total": 0,
+  "a16_missing_id_frames_why": {},
+  "encode_ms_p50": 31.5,
+  "replay_s": 27.8
+ },
+ "bw500/norefresh": {
+  "case": "bw500/norefresh",
+  "frame_bytes": {
+   "min": 191,
+   "p50": 238,
+   "max": 243,
+   "ge_cap_minus7": "316/395"
+  },
+  "records_p50": 46,
+  "n_live_p50": 35,
+  "residual_p50": 1656.8,
+  "slot5_unpacked_mean": 3.34,
+  "epoch_starts": [
+   [
+    0,
+    "first"
+   ]
+  ],
+  "lossfree_out_of_step_frames": 0,
+  "carousel": {
+   "due_frames": 99,
+   "due_with_zero_packed": 0,
+   "records_per_due_frame_mean": 6.42,
+   "offered_per_due_frame_mean": 10.4
+  },
+  "drops": 100,
+  "drops_lost_frame_had_del": 100,
+  "disturbed": 95,
+  "recovered_within_window": "95/95",
+  "recovery_frames": {
+   "p10": 2,
+   "p50": 3,
+   "p90": 7,
+   "max": 9,
+   "hist": {
+    "1-3": 67,
+    "4-10": 28,
+    "11-20": 0,
+    "21-25": 0,
+    "26-40": 0,
+    "41-70": 0
+   },
+   "unrecovered": 0
+  },
+  "resync_ended_by": {
+   "digest": 28,
+   "epoch_start": 0,
+   "not_ended": 0
+  },
+  "ghost_episodes": 100,
+  "a16_like": "0/100",
+  "a16_like_drops": [],
+  "a16_waited_for_epoch": 0,
+  "a16_unrecovered_in_window": 0,
+  "a16_lost_frame_had_del": 0,
+  "a16_missing_run": {
+   "p50": null,
+   "max": null
+  },
+  "a16_orph_per_missing_frame": null,
+  "a16_car_due_frames_zero_packed": "0/0",
+  "a16_base_vs_enc_ttl_drops": "0 vs 0",
+  "a16_missing_ids_never_resent": 0,
+  "a16_missing_ids_total": 0,
+  "a16_missing_id_frames_why": {},
+  "encode_ms_p50": 31.3,
+  "replay_s": 28.4
+ },
+ "bw500/norefresh+keepdel": {
+  "case": "bw500/norefresh+keepdel",
+  "frame_bytes": {
+   "min": 191,
+   "p50": 238,
+   "max": 243,
+   "ge_cap_minus7": "316/395"
+  },
+  "records_p50": 46,
+  "n_live_p50": 35,
+  "residual_p50": 1656.8,
+  "slot5_unpacked_mean": 3.34,
+  "epoch_starts": [
+   [
+    0,
+    "first"
+   ]
+  ],
+  "lossfree_out_of_step_frames": 0,
+  "carousel": {
+   "due_frames": 99,
+   "due_with_zero_packed": 0,
+   "records_per_due_frame_mean": 6.42,
+   "offered_per_due_frame_mean": 10.4
+  },
+  "drops": 100,
+  "drops_lost_frame_had_del": 100,
+  "disturbed": 95,
+  "recovered_within_window": "95/95",
+  "recovery_frames": {
+   "p10": 2,
+   "p50": 3,
+   "p90": 7,
+   "max": 9,
+   "hist": {
+    "1-3": 67,
+    "4-10": 28,
+    "11-20": 0,
+    "21-25": 0,
+    "26-40": 0,
+    "41-70": 0
+   },
+   "unrecovered": 0
+  },
+  "resync_ended_by": {
+   "digest": 28,
+   "epoch_start": 0,
+   "not_ended": 0
+  },
+  "ghost_episodes": 0,
+  "a16_like": "0/100",
+  "a16_like_drops": [],
+  "a16_waited_for_epoch": 0,
+  "a16_unrecovered_in_window": 0,
+  "a16_lost_frame_had_del": 0,
+  "a16_missing_run": {
+   "p50": null,
+   "max": null
+  },
+  "a16_orph_per_missing_frame": null,
+  "a16_car_due_frames_zero_packed": "0/0",
+  "a16_base_vs_enc_ttl_drops": "0 vs 0",
+  "a16_missing_ids_never_resent": 0,
+  "a16_missing_ids_total": 0,
+  "a16_missing_id_frames_why": {},
+  "encode_ms_p50": 31.3,
+  "replay_s": 27.7
+ },
+ "bw500/norefresh+confirm": {
+  "case": "bw500/norefresh+confirm",
+  "frame_bytes": {
+   "min": 191,
+   "p50": 238,
+   "max": 243,
+   "ge_cap_minus7": "316/395"
+  },
+  "records_p50": 46,
+  "n_live_p50": 35,
+  "residual_p50": 1656.8,
+  "slot5_unpacked_mean": 3.34,
+  "epoch_starts": [
+   [
+    0,
+    "first"
+   ]
+  ],
+  "lossfree_out_of_step_frames": 0,
+  "carousel": {
+   "due_frames": 99,
+   "due_with_zero_packed": 0,
+   "records_per_due_frame_mean": 6.42,
+   "offered_per_due_frame_mean": 10.4
+  },
+  "drops": 100,
+  "drops_lost_frame_had_del": 100,
+  "disturbed": 95,
+  "recovered_within_window": "95/95",
+  "recovery_frames": {
+   "p10": 2,
+   "p50": 3,
+   "p90": 7,
+   "max": 9,
+   "hist": {
+    "1-3": 67,
+    "4-10": 28,
+    "11-20": 0,
+    "21-25": 0,
+    "26-40": 0,
+    "41-70": 0
+   },
+   "unrecovered": 0
+  },
+  "resync_ended_by": {
+   "digest": 28,
+   "epoch_start": 0,
+   "not_ended": 0
+  },
+  "ghost_episodes": 100,
+  "a16_like": "0/100",
+  "a16_like_drops": [],
+  "a16_waited_for_epoch": 0,
+  "a16_unrecovered_in_window": 0,
+  "a16_lost_frame_had_del": 0,
+  "a16_missing_run": {
+   "p50": null,
+   "max": null
+  },
+  "a16_orph_per_missing_frame": null,
+  "a16_car_due_frames_zero_packed": "0/0",
+  "a16_base_vs_enc_ttl_drops": "0 vs 0",
+  "a16_missing_ids_never_resent": 0,
+  "a16_missing_ids_total": 0,
+  "a16_missing_id_frames_why": {},
+  "encode_ms_p50": 31.3,
+  "replay_s": 28.2
+ },
+ "bw500/floor(norefresh)": {
+  "case": "bw500/floor(norefresh)",
+  "frame_bytes": {
+   "min": 191,
+   "p50": 238,
+   "max": 243,
+   "ge_cap_minus7": "311/395"
+  },
+  "records_p50": 48,
+  "n_live_p50": 35,
+  "residual_p50": 1656.8,
+  "slot5_unpacked_mean": 0.67,
+  "epoch_starts": [
+   [
+    0,
+    "first"
+   ]
+  ],
+  "lossfree_out_of_step_frames": 0,
+  "carousel": {
+   "due_frames": 99,
+   "due_with_zero_packed": 0,
+   "records_per_due_frame_mean": 6.72,
+   "offered_per_due_frame_mean": 9.96
+  },
+  "drops": 100,
+  "drops_lost_frame_had_del": 100,
+  "disturbed": 99,
+  "recovered_within_window": "99/99",
+  "recovery_frames": {
+   "p10": 2,
+   "p50": 3,
+   "p90": 8,
+   "max": 31,
+   "hist": {
+    "1-3": 53,
+    "4-10": 41,
+    "11-20": 4,
+    "21-25": 0,
+    "26-40": 1,
+    "41-70": 0
+   },
+   "unrecovered": 0
+  },
+  "resync_ended_by": {
+   "digest": 46,
+   "epoch_start": 0,
+   "not_ended": 0
+  },
+  "ghost_episodes": 100,
+  "a16_like": "0/100",
+  "a16_like_drops": [],
+  "a16_waited_for_epoch": 0,
+  "a16_unrecovered_in_window": 0,
+  "a16_lost_frame_had_del": 0,
+  "a16_missing_run": {
+   "p50": null,
+   "max": null
+  },
+  "a16_orph_per_missing_frame": null,
+  "a16_car_due_frames_zero_packed": "0/0",
+  "a16_base_vs_enc_ttl_drops": "0 vs 0",
+  "a16_missing_ids_never_resent": 0,
+  "a16_missing_ids_total": 0,
+  "a16_missing_id_frames_why": {},
+  "encode_ms_p50": 31.3,
+  "replay_s": 28.0
+ },
+ "bw500/floorall(norefresh)": {
+  "case": "bw500/floorall(norefresh)",
+  "frame_bytes": {
+   "min": 226,
+   "p50": 237,
+   "max": 242,
+   "ge_cap_minus7": "271/395"
+  },
+  "records_p50": 47,
+  "n_live_p50": 35,
+  "residual_p50": 1658.8,
+  "slot5_unpacked_mean": 1.36,
+  "epoch_starts": [
+   [
+    0,
+    "first"
+   ]
+  ],
+  "lossfree_out_of_step_frames": 0,
+  "carousel": {
+   "due_frames": 395,
+   "due_with_zero_packed": 0,
+   "records_per_due_frame_mean": 5.59,
+   "offered_per_due_frame_mean": 5.59
+  },
+  "drops": 100,
+  "drops_lost_frame_had_del": 100,
+  "disturbed": 100,
+  "recovered_within_window": "93/100",
+  "recovery_frames": {
+   "p10": 3,
+   "p50": 7,
+   "p90": 11,
+   "max": 19,
+   "hist": {
+    "1-3": 14,
+    "4-10": 69,
+    "11-20": 10,
+    "21-25": 0,
+    "26-40": 0,
+    "41-70": 0
+   },
+   "unrecovered": 7
+  },
+  "resync_ended_by": {
+   "digest": 79,
+   "epoch_start": 0,
+   "not_ended": 7
+  },
+  "ghost_episodes": 99,
+  "a16_like": "7/100",
+  "a16_like_drops": [
+   51,
+   207,
+   228,
+   240,
+   261,
+   285,
+   327
+  ],
+  "a16_waited_for_epoch": 0,
+  "a16_unrecovered_in_window": 7,
+  "a16_lost_frame_had_del": 7,
+  "a16_missing_run": {
+   "p50": 70,
+   "max": 70
+  },
+  "a16_orph_per_missing_frame": 1.61,
+  "a16_car_due_frames_zero_packed": "0/490",
+  "a16_base_vs_enc_ttl_drops": "13 vs 0",
+  "a16_missing_ids_never_resent": 8,
+  "a16_missing_ids_total": 48,
+  "a16_missing_id_frames_why": {
+   "carousel_packed": 0,
+   "define_sent_other": 19,
+   "carousel_offered_not_packed": 0,
+   "repeat_pending_not_packed": 702,
+   "upd_or_ucol_no_carousel": 0,
+   "confirm_tag_only": 0,
+   "released_by_encoder": 21,
+   "nothing_named": 0
+  },
+  "encode_ms_p50": 32.6,
+  "replay_s": 27.1
+ },
+ "bw250/real": {
+  "case": "bw250/real",
+  "frame_bytes": {
+   "min": 192,
+   "p50": 201,
+   "max": 203,
+   "ge_cap_minus7": "387/395"
+  },
+  "records_p50": 39,
+  "n_live_p50": 34,
+  "residual_p50": 1668.6,
+  "slot5_unpacked_mean": 4.7,
+  "epoch_starts": [
+   [
+    0,
+    "first"
+   ],
+   [
+    120,
+    "safety"
+   ],
+   [
+    240,
+    "safety"
+   ],
+   [
+    360,
+    "safety"
+   ]
+  ],
+  "lossfree_out_of_step_frames": 0,
+  "carousel": {
+   "due_frames": 99,
+   "due_with_zero_packed": 3,
+   "records_per_due_frame_mean": 4.33,
+   "offered_per_due_frame_mean": 7.99
+  },
+  "drops": 100,
+  "drops_lost_frame_had_del": 100,
+  "disturbed": 100,
+  "recovered_within_window": "100/100",
+  "recovery_frames": {
+   "p10": 3,
+   "p50": 7,
+   "p90": 9,
+   "max": 11,
+   "hist": {
+    "1-3": 21,
+    "4-10": 77,
+    "11-20": 2,
+    "21-25": 0,
+    "26-40": 0,
+    "41-70": 0
+   },
+   "unrecovered": 0
+  },
+  "resync_ended_by": {
+   "digest": 69,
+   "epoch_start": 1,
+   "not_ended": 0
+  },
+  "ghost_episodes": 100,
+  "a16_like": "0/100",
+  "a16_like_drops": [],
+  "a16_waited_for_epoch": 0,
+  "a16_unrecovered_in_window": 0,
+  "a16_lost_frame_had_del": 0,
+  "a16_missing_run": {
+   "p50": null,
+   "max": null
+  },
+  "a16_orph_per_missing_frame": null,
+  "a16_car_due_frames_zero_packed": "0/0",
+  "a16_base_vs_enc_ttl_drops": "0 vs 0",
+  "a16_missing_ids_never_resent": 0,
+  "a16_missing_ids_total": 0,
+  "a16_missing_id_frames_why": {},
+  "encode_ms_p50": 33.9,
+  "replay_s": 26.4
+ },
+ "bw250/norefresh": {
+  "case": "bw250/norefresh",
+  "frame_bytes": {
+   "min": 192,
+   "p50": 201,
+   "max": 203,
+   "ge_cap_minus7": "393/395"
+  },
+  "records_p50": 40,
+  "n_live_p50": 34,
+  "residual_p50": 1670.5,
+  "slot5_unpacked_mean": 4.59,
+  "epoch_starts": [
+   [
+    0,
+    "first"
+   ]
+  ],
+  "lossfree_out_of_step_frames": 0,
+  "carousel": {
+   "due_frames": 99,
+   "due_with_zero_packed": 0,
+   "records_per_due_frame_mean": 4.58,
+   "offered_per_due_frame_mean": 8.15
+  },
+  "drops": 100,
+  "drops_lost_frame_had_del": 100,
+  "disturbed": 100,
+  "recovered_within_window": "100/100",
+  "recovery_frames": {
+   "p10": 3,
+   "p50": 7,
+   "p90": 9,
+   "max": 12,
+   "hist": {
+    "1-3": 17,
+    "4-10": 78,
+    "11-20": 5,
+    "21-25": 0,
+    "26-40": 0,
+    "41-70": 0
+   },
+   "unrecovered": 0
+  },
+  "resync_ended_by": {
+   "digest": 75,
+   "epoch_start": 0,
+   "not_ended": 0
+  },
+  "ghost_episodes": 100,
+  "a16_like": "0/100",
+  "a16_like_drops": [],
+  "a16_waited_for_epoch": 0,
+  "a16_unrecovered_in_window": 0,
+  "a16_lost_frame_had_del": 0,
+  "a16_missing_run": {
+   "p50": null,
+   "max": null
+  },
+  "a16_orph_per_missing_frame": null,
+  "a16_car_due_frames_zero_packed": "0/0",
+  "a16_base_vs_enc_ttl_drops": "0 vs 0",
+  "a16_missing_ids_never_resent": 0,
+  "a16_missing_ids_total": 0,
+  "a16_missing_id_frames_why": {},
+  "encode_ms_p50": 33.4,
+  "replay_s": 27.7
+ },
+ "bw250/norefresh+keepdel": {
+  "case": "bw250/norefresh+keepdel",
+  "frame_bytes": {
+   "min": 192,
+   "p50": 201,
+   "max": 203,
+   "ge_cap_minus7": "393/395"
+  },
+  "records_p50": 40,
+  "n_live_p50": 34,
+  "residual_p50": 1670.5,
+  "slot5_unpacked_mean": 4.59,
+  "epoch_starts": [
+   [
+    0,
+    "first"
+   ]
+  ],
+  "lossfree_out_of_step_frames": 0,
+  "carousel": {
+   "due_frames": 99,
+   "due_with_zero_packed": 0,
+   "records_per_due_frame_mean": 4.58,
+   "offered_per_due_frame_mean": 8.15
+  },
+  "drops": 100,
+  "drops_lost_frame_had_del": 100,
+  "disturbed": 100,
+  "recovered_within_window": "100/100",
+  "recovery_frames": {
+   "p10": 3,
+   "p50": 7,
+   "p90": 9,
+   "max": 12,
+   "hist": {
+    "1-3": 17,
+    "4-10": 78,
+    "11-20": 5,
+    "21-25": 0,
+    "26-40": 0,
+    "41-70": 0
+   },
+   "unrecovered": 0
+  },
+  "resync_ended_by": {
+   "digest": 75,
+   "epoch_start": 0,
+   "not_ended": 0
+  },
+  "ghost_episodes": 0,
+  "a16_like": "0/100",
+  "a16_like_drops": [],
+  "a16_waited_for_epoch": 0,
+  "a16_unrecovered_in_window": 0,
+  "a16_lost_frame_had_del": 0,
+  "a16_missing_run": {
+   "p50": null,
+   "max": null
+  },
+  "a16_orph_per_missing_frame": null,
+  "a16_car_due_frames_zero_packed": "0/0",
+  "a16_base_vs_enc_ttl_drops": "0 vs 0",
+  "a16_missing_ids_never_resent": 0,
+  "a16_missing_ids_total": 0,
+  "a16_missing_id_frames_why": {},
+  "encode_ms_p50": 33.4,
+  "replay_s": 27.1
+ },
+ "bw250/norefresh+confirm": {
+  "case": "bw250/norefresh+confirm",
+  "frame_bytes": {
+   "min": 192,
+   "p50": 201,
+   "max": 203,
+   "ge_cap_minus7": "393/395"
+  },
+  "records_p50": 40,
+  "n_live_p50": 34,
+  "residual_p50": 1670.5,
+  "slot5_unpacked_mean": 4.59,
+  "epoch_starts": [
+   [
+    0,
+    "first"
+   ]
+  ],
+  "lossfree_out_of_step_frames": 0,
+  "carousel": {
+   "due_frames": 99,
+   "due_with_zero_packed": 0,
+   "records_per_due_frame_mean": 4.58,
+   "offered_per_due_frame_mean": 8.15
+  },
+  "drops": 100,
+  "drops_lost_frame_had_del": 100,
+  "disturbed": 100,
+  "recovered_within_window": "100/100",
+  "recovery_frames": {
+   "p10": 3,
+   "p50": 7,
+   "p90": 9,
+   "max": 12,
+   "hist": {
+    "1-3": 17,
+    "4-10": 78,
+    "11-20": 5,
+    "21-25": 0,
+    "26-40": 0,
+    "41-70": 0
+   },
+   "unrecovered": 0
+  },
+  "resync_ended_by": {
+   "digest": 75,
+   "epoch_start": 0,
+   "not_ended": 0
+  },
+  "ghost_episodes": 100,
+  "a16_like": "0/100",
+  "a16_like_drops": [],
+  "a16_waited_for_epoch": 0,
+  "a16_unrecovered_in_window": 0,
+  "a16_lost_frame_had_del": 0,
+  "a16_missing_run": {
+   "p50": null,
+   "max": null
+  },
+  "a16_orph_per_missing_frame": null,
+  "a16_car_due_frames_zero_packed": "0/0",
+  "a16_base_vs_enc_ttl_drops": "0 vs 0",
+  "a16_missing_ids_never_resent": 0,
+  "a16_missing_ids_total": 0,
+  "a16_missing_id_frames_why": {},
+  "encode_ms_p50": 33.4,
+  "replay_s": 28.3
+ },
+ "bw250/floor(norefresh)": {
+  "case": "bw250/floor(norefresh)",
+  "frame_bytes": {
+   "min": 194,
+   "p50": 200,
+   "max": 203,
+   "ge_cap_minus7": "381/395"
+  },
+  "records_p50": 41,
+  "n_live_p50": 34,
+  "residual_p50": 1670.8,
+  "slot5_unpacked_mean": 2.54,
+  "epoch_starts": [
+   [
+    0,
+    "first"
+   ]
+  ],
+  "lossfree_out_of_step_frames": 0,
+  "carousel": {
+   "due_frames": 99,
+   "due_with_zero_packed": 0,
+   "records_per_due_frame_mean": 5.37,
+   "offered_per_due_frame_mean": 6.28
+  },
+  "drops": 100,
+  "drops_lost_frame_had_del": 100,
+  "disturbed": 100,
+  "recovered_within_window": "97/100",
+  "recovery_frames": {
+   "p10": 6,
+   "p50": 7,
+   "p90": 11,
+   "max": 31,
+   "hist": {
+    "1-3": 9,
+    "4-10": 73,
+    "11-20": 12,
+    "21-25": 1,
+    "26-40": 2,
+    "41-70": 0
+   },
+   "unrecovered": 3
+  },
+  "resync_ended_by": {
+   "digest": 88,
+   "epoch_start": 0,
+   "not_ended": 3
+  },
+  "ghost_episodes": 100,
+  "a16_like": "3/100",
+  "a16_like_drops": [
+   33,
+   51,
+   327
+  ],
+  "a16_waited_for_epoch": 0,
+  "a16_unrecovered_in_window": 3,
+  "a16_lost_frame_had_del": 3,
+  "a16_missing_run": {
+   "p50": 68,
+   "max": 69
+  },
+  "a16_orph_per_missing_frame": 1.94,
+  "a16_car_due_frames_zero_packed": "0/52",
+  "a16_base_vs_enc_ttl_drops": "9 vs 0",
+  "a16_missing_ids_never_resent": 2,
+  "a16_missing_ids_total": 22,
+  "a16_missing_id_frames_why": {
+   "carousel_packed": 0,
+   "define_sent_other": 15,
+   "carousel_offered_not_packed": 0,
+   "repeat_pending_not_packed": 375,
+   "upd_or_ucol_no_carousel": 0,
+   "confirm_tag_only": 0,
+   "released_by_encoder": 5,
+   "nothing_named": 0
+  },
+  "encode_ms_p50": 32.0,
+  "replay_s": 29.1
+ },
+ "bw250/floorall(norefresh)": {
+  "case": "bw250/floorall(norefresh)",
+  "frame_bytes": {
+   "min": 189,
+   "p50": 197,
+   "max": 203,
+   "ge_cap_minus7": "301/395"
+  },
+  "records_p50": 41,
+  "n_live_p50": 33,
+  "residual_p50": 1704.1,
+  "slot5_unpacked_mean": 5.58,
+  "epoch_starts": [
+   [
+    0,
+    "first"
+   ]
+  ],
+  "lossfree_out_of_step_frames": 0,
+  "carousel": {
+   "due_frames": 395,
+   "due_with_zero_packed": 0,
+   "records_per_due_frame_mean": 5.27,
+   "offered_per_due_frame_mean": 5.27
+  },
+  "drops": 100,
+  "drops_lost_frame_had_del": 100,
+  "disturbed": 100,
+  "recovered_within_window": "93/100",
+  "recovery_frames": {
+   "p10": 6,
+   "p50": 8,
+   "p90": 12,
+   "max": 20,
+   "hist": {
+    "1-3": 5,
+    "4-10": 72,
+    "11-20": 16,
+    "21-25": 0,
+    "26-40": 0,
+    "41-70": 0
+   },
+   "unrecovered": 7
+  },
+  "resync_ended_by": {
+   "digest": 88,
+   "epoch_start": 0,
+   "not_ended": 7
+  },
+  "ghost_episodes": 100,
+  "a16_like": "7/100",
+  "a16_like_drops": [
+   33,
+   51,
+   207,
+   228,
+   240,
+   273,
+   327
+  ],
+  "a16_waited_for_epoch": 0,
+  "a16_unrecovered_in_window": 7,
+  "a16_lost_frame_had_del": 7,
+  "a16_missing_run": {
+   "p50": 70,
+   "max": 70
+  },
+  "a16_orph_per_missing_frame": 1.59,
+  "a16_car_due_frames_zero_packed": "0/490",
+  "a16_base_vs_enc_ttl_drops": "15 vs 0",
+  "a16_missing_ids_never_resent": 11,
+  "a16_missing_ids_total": 44,
+  "a16_missing_id_frames_why": {
+   "carousel_packed": 0,
+   "define_sent_other": 16,
+   "carousel_offered_not_packed": 0,
+   "repeat_pending_not_packed": 728,
+   "upd_or_ucol_no_carousel": 0,
+   "confirm_tag_only": 0,
+   "released_by_encoder": 18,
+   "nothing_named": 0
+  },
+  "encode_ms_p50": 31.5,
+  "replay_s": 26.0
+ }
+}
