@@ -2791,20 +2791,25 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   The reverse-delivery half below still stands.**
 - [~] **RS-12.15 (reverse-delivery half) — the tractor's RX does not follow
   the slot clock between trains (opened 2026-09-12 from RS-12.12/14 data).**
-  **FIX CODED 2026-10-14 (de2ae16 + f9cc98b), SIL green. NOT built for the
-  boards, NOT flashed (needs the GO).** On v2 the self-anchored TX clock
-  survives demotion, but `sx1276_rx_slot_follow` still ran only while LOCKED,
-  so between trains the tractor listened on its last TX channel or the scan
-  walker's (v2 legs R/T/U: 19/72, 2/43, 7/49 commands heard). Fix: follow =
+  **FIX CODED 2026-10-14 (de2ae16 + f9cc98b, final-FAIL guard 65963c1), SIL
+  green. NOT built for the boards, NOT flashed (needs the GO).** On v2 the
+  self-anchored TX clock survives demotion, but `sx1276_rx_slot_follow` still
+  ran only while LOCKED, so between trains the tractor listened on its last TX
+  channel or the scan walker's (v2 legs R/T/U: 19/72, 2/43, 7/49 commands
+  heard). Fix: follow =
   (LOCKED && adopted) || originator authority. While streaming (>= 8 own TX
   each < 1 s apart) the tractor's own clock drives its receiver in any scan
   state and the walker leaves the synth alone. Followers are unchanged (they
   never hold authority). The rule reads a fresh ms clock. LOCKED on the own
-  grid without authority (the RS-13 decay window) no longer follows.
-  `check-rx-reverse-delivery` (8 SIL sequences, real sx1276_rx.c/tx.c): 17/59
+  grid without authority (the RS-13 decay window) no longer follows. The final
+  scan FAIL still commits FAILED and sends its fault, but it no longer parks
+  the receiver under authority (the follower would re-arm only at the next
+  slot boundary).
+  `check-rx-reverse-delivery` (9 SIL sequences, real sx1276_rx.c/tx.c): 17/59
   -> 59/59 between trains, 15/28 -> 28/28 (leg H shape), 159/182 -> 182/182
-  (leg I shape), 10/33 -> 33/33 in scan FAILED; the follower's radio calls are
-  identical to pre-fix; the remaining misses are half-duplex collisions.
+  (leg I shape), 10/33 -> 33/33 in scan FAILED, 0/1 -> 1/1 with a command on
+  air at the final FAIL; the follower's radio calls are identical to pre-fix;
+  the remaining misses are half-duplex collisions.
   Limit: authority only, so at 1 fps, or ~3.5 s after a >= 1 s stall, it is
   the old behaviour.
   **BENCH (no radio):** build both images on the bench PC with the reference
@@ -2830,8 +2835,9 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   that touches the F6 recovery tier; the 1 fps gap is the same question); a
   lead tolerance in the originator's leading-grid test if validation shows the
   tractor adopting (the SIL margin is ~0.5 ms); whether self-follow should also
-  run in scan FAILED, as it does now; and the half-duplex collisions that
-  remain (D-VS9's reserved control slot).
+  run in scan FAILED, as it does now (if not, the final FAIL's park comes back
+  with it); and the half-duplex collisions that remain (D-VS9's reserved
+  control slot).
   **SHARPENED 2026-09-12 (RS-12.14 gate leg J): the dominant mechanism is FHSS
   CLOCK AUTHORITY, not reverse delivery. Every follower lock loss in the three
   profile-1 legs starts 1–2 s after a base command the TRACTOR RECEIVED (H: 1
