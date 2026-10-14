@@ -1477,14 +1477,23 @@ No-regrets work, correct under every surviving architecture (do first):
   second board pair. Not checked by the retire item: units moved by hand
   without a `daemon-reload`, and dangling `multi-user.target.wants` links
   (the `units_gone` guard in BENCH_BOARDS.md catches those).
-- [ ] **RS-5.20 The tractor's video-test compose files reach the base**
-  (found 2026-10-14) — `firmware/tractor_x8/docker-compose.video-test.yml`,
-  `docker-compose.video-test.v2.yml` and `mosquitto.video-test.conf` ship to
-  the base inside `firmware/`, which the base Dockerfile COPYs in full. Both
-  compose files run `image_tx` on `/dev/ttymxc3` with
+- [~] **RS-5.20 The tractor's compose files reached the base** (found
+  2026-10-14) — `firmware/tractor_x8/docker-compose.video-test.yml`,
+  `docker-compose.video-test.v2.yml` and `mosquitto.video-test.conf` shipped
+  to the base inside `firmware/`, which the base Dockerfile COPYs in full.
+  Both compose files run `image_tx` on `/dev/ttymxc3` with
   `restart: unless-stopped` and publish no ports, so no broker blocks a
-  manual `up` of them on the base. Decide: keep them out of the base archive
-  and image, or rename or delete them in git.
+  manual `up` of them on the base. The tractor's production
+  `docker-compose.yml` maps `/dev/ttymxc3` the same way.
+  **Done in the bench kit 2026-10-14; not yet run on the base.**
+  `deploy_base.sh` leaves `firmware/tractor_x8/docker-compose*.yml` and
+  `mosquitto.video-test.conf` out of the tarball, so they are in neither the
+  tree nor the image, and removes an old copy from the deployed tree (also
+  with `--no-clean`; the backup keeps it). It stops before copying anything
+  if a compose file in the tarball maps `/dev/ttymxc3`. The files stay in
+  git: the tractor image is built from its own archive. Close this item when
+  the next deploy's tree has none of them. Renaming or deleting them in git
+  is left to the design owner.
 
 ### RS-6 — Keyframe elimination (K-phases, now LoRa-only)
 

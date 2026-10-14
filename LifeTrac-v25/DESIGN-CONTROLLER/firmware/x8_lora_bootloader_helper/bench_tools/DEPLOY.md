@@ -90,7 +90,12 @@ On the PC:
    `docker-compose.yml` and `base_station/mosquitto.conf`). Nothing else is
    shipped, whatever the commit: since 2026-10-14 not
    `docker-compose.video-test.yml` (the May video-test stack) and not
-   `deploy/` (its retired unit files). Docs, `bench-evidence/`, `hil/` and
+   `deploy/` (its retired unit files). Inside `firmware/`, the tractor's
+   `firmware/tractor_x8/docker-compose*.yml` and `mosquitto.video-test.conf`
+   stay on the PC too (RS-5.20): each of those compose files maps
+   `/dev/ttymxc3` with `restart: unless-stopped`, and the base uses none of
+   them. The script stops before anything is copied if a compose file in the
+   tarball maps `/dev/ttymxc3`. Docs, `bench-evidence/`, `hil/` and
    `tools/` stay on the PC. The tarball (about 2 MB) is kept as
    `$ARCHIVE_DIR/deploy/dc_deploy_<sha8>.tar.gz`.
 2. It refuses a tarball whose text files hold more CR bytes than the commit's
@@ -120,7 +125,9 @@ On the base, the script runs as root and:
    tree as `/home/fio/lifetrac_deploy/prev_tree_<oldsha>_<time>.tgz` (so no
    backup holds that file under its old name), deletes `base_station/` and
    `firmware/` and an old `deploy/` (skip with `--no-clean`; stale files
-   would otherwise end up in the image), and extracts the new tree.
+   would otherwise end up in the image), removes an old copy of the
+   tractor's compose files from `firmware/tractor_x8/` (with `--no-clean`
+   too; the backup keeps them), and extracts the new tree.
 3. writes `DEPLOYED_FROM.txt`: the full SHA on line 1 (as before), then the
    subject, time, paths, tarball md5, and after the build the image id.
 4. creates `.env` and `secrets/` **only when missing**: a 16-byte random fleet
@@ -216,7 +223,7 @@ file the script saved and update the header.
 
 | where | `deploy_base.sh` | `build_tractor_image.sh` |
 |---|---|---|
-| base | `BASE_DEPLOY_DIR` tree (an old `docker-compose.video-test.yml` there renamed `docker-compose.video-test.yml.RETIRED-<date>`), `DEPLOYED_FROM.txt`, `.env` + `secrets/` if missing, `lifetrac-v25:latest/:<sha8>/:previous`, broker container, files in `/home/fio/lifetrac_deploy/`, `/home/fio/docker_build_<sha8>.log`, `/home/fio/pip_freeze_lifetrac-v25_<sha8>.txt` | `lifetrac-tractor-x8:<sha8>/:latest` (a build product; the base does not run it), `/home/fio/lifetrac_build/`, `/home/fio/docker_build_tractor_<sha8>.log` |
+| base | `BASE_DEPLOY_DIR` tree (an old `docker-compose.video-test.yml` there renamed `docker-compose.video-test.yml.RETIRED-<date>`; an old copy of `firmware/tractor_x8/docker-compose*.yml` and `mosquitto.video-test.conf` removed), `DEPLOYED_FROM.txt`, `.env` + `secrets/` if missing, `lifetrac-v25:latest/:<sha8>/:previous`, broker container, files in `/home/fio/lifetrac_deploy/`, `/home/fio/docker_build_<sha8>.log`, `/home/fio/pip_freeze_lifetrac-v25_<sha8>.txt` | `lifetrac-tractor-x8:<sha8>/:latest` (a build product; the base does not run it), `/home/fio/lifetrac_build/`, `/home/fio/docker_build_tractor_<sha8>.log` |
 | tractor | nothing | loaded image, `:latest`, `:previous`; `/home/fio/lifetrac_images/` while loading |
 | PC | `$ARCHIVE_DIR/deploy/` | `$ARCHIVE_DIR/images/`, `$ARCHIVE_DIR/build/` |
 | never | `/etc`, systemd units, the radios, the L072 firmware, `/tmp/lifetrac_strict`, any container other than the broker | `/etc`, systemd units, the radios, any running container |

@@ -46,7 +46,9 @@
 # docker-compose.video-test.yml in the tree (the May video-test stack, no
 # longer shipped) is renamed docker-compose.video-test.yml.RETIRED-<PC UTC
 # date>, as the tractor's compose file was (BENCH_BOARDS.md, "Retired boot
-# units"). Files go to /home/<user>/lifetrac_deploy/ and the build log to
+# units"). The tractor's compose files under firmware/tractor_x8 are not
+# shipped either, and an old copy of them in the tree is removed (the backup
+# keeps it). Files go to /home/<user>/lifetrac_deploy/ and the build log to
 # /home/<user>/docker_build_<sha>.log.
 #
 # RADIO SAFETY: nothing here opens /dev/ttymxc3 (the L072 radio UART) or starts
@@ -182,7 +184,13 @@ git -C "$REPO" cat-file -e "$SHA:$DC_REL/Dockerfile" 2>/dev/null || die "$SHORT 
 # base_station/mosquitto.conf. Nothing else is shipped: not
 # docker-compose.video-test.yml (the May video-test stack, whose image_rx
 # opens /dev/ttymxc3) and not deploy/ (its retired unit files), whatever the
-# commit. Docs, bench-evidence, hil/ and tools/ stay home.
+# commit. Docs, bench-evidence, hil/ and tools/ stay home. Inside firmware/,
+# the tractor's compose files stay home too (RS-5.20): docker-compose.yml and
+# the two video-test ones each map /dev/ttymxc3 with restart: unless-stopped,
+# and the base needs none of them. The tractor image is built from its own
+# archive (RS13_VECTOR_LEG.md, step 0).
+NO_SHIP=(':(exclude,glob)firmware/tractor_x8/docker-compose*.yml'
+         ':(exclude)firmware/tractor_x8/mosquitto.video-test.conf')
 PATHS=()
 while IFS= read -r p; do
     case $p in base_station|firmware|Dockerfile|docker-compose.yml) PATHS+=("$p") ;; esac
@@ -208,7 +216,13 @@ RSCRIPT=$STAGE/deploy_base_remote.sh
 # attribute and core.eol=crlf, git archive writes CRLF, and every shell script
 # and config on the board then breaks. Force LF.
 say "archive $SHORT ($SUBJECT): ${PATHS[*]}"
-git -C "$REPO" -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz -o "$TGZ" "$SHA:$DC_REL" -- "${PATHS[@]}"
+git -C "$REPO" -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz -o "$TGZ" "$SHA:$DC_REL" -- "${PATHS[@]}" "${NO_SHIP[@]}"
+# Check: no compose file in the tarball maps the radio UART as a device.
+while IFS= read -r f; do
+    if (set +o pipefail; tar -xzOf "$TGZ" "$f" | grep -qE "^[[:space:]]*-[[:space:]]*[\"']?/dev/ttymxc3"); then
+        die "the tarball would ship $f, which maps /dev/ttymxc3; nothing was copied"
+    fi
+done < <(tar -tzf "$TGZ" | grep -E '\.ya?ml$')
 # Check: the text files in the tarball must hold no more CR bytes than the same
 # blobs in git (a few committed logs carry CRs of their own). More CRs means an
 # eol conversion slipped in. (Needs GNU tar's --wildcards, else it is skipped.)
@@ -383,6 +397,9 @@ if [ "$DO_CLEAN" = 1 ]; then
     # deploy/ is no longer shipped: an old copy goes, the backup keeps it
     rm -rf "$DEST/base_station" "$DEST/firmware" "$DEST/deploy"
 fi
+# Nor are the tractor's compose files (RS-5.20); with --no-clean an old copy
+# would stay, so it goes here. The backup keeps it.
+rm -f "$DEST"/firmware/tractor_x8/docker-compose*.yml "$DEST/firmware/tractor_x8/mosquitto.video-test.conf"
 tar -xzf "$TGZ" -C "$DEST"
 cp "$STAMP" "$DEST/DEPLOYED_FROM.txt"
 chown -R "$OWNER:$OWNER" "$DEST"
@@ -515,6 +532,7 @@ say "tarball  $TGZ ($(wc -c < "$TGZ") B, md5 $TGZ_MD5)"
 say "build    $([ "$DO_BUILD" = 1 ] && echo "yes, locked=$LOCKED (commit has lock file: $HAS_LOCK)" || echo no)"
 say "broker   $([ "$DO_BROKER" = 1 ] && echo "docker compose -p $COMPOSE_PROJECT up -d --no-deps mosquitto" || echo untouched)"
 say "disarm   an old docker-compose.video-test.yml in the tree is renamed docker-compose.video-test.yml.RETIRED-$DAY (refused while a container made from it is not exited)"
+say "disarm   firmware/tractor_x8/docker-compose*.yml and mosquitto.video-test.conf are not shipped; an old copy in the tree is removed (the backup keeps it)"
 if [ "$DRY_RUN" = 1 ]; then
     say "dry run: board script $RSCRIPT"
     say "dry run: would copy the tarball, $STAMP and the script to $REMOTE_WORK, then run as root:"

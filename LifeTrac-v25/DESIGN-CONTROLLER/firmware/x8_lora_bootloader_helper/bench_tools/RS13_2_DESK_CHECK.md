@@ -140,12 +140,16 @@ stale-tile worker would publish `0x6C` at least every 10 s (RS-13.1 RESULTS,
   in any state but exited ([BENCH_BOARDS](BENCH_BOARDS.md#rules), rule 7);
 - or, if that script is not in your tree yet, by hand: `git archive` of
   `base_station/ firmware/ Dockerfile docker-compose.yml` (not
-  `docker-compose.video-test.yml`, not `deploy/`) → `scp` the tarball to
+  `docker-compose.video-test.yml`, not `deploy/`), with the pathspecs
+  `':(exclude,glob)firmware/tractor_x8/docker-compose*.yml'
+  ':(exclude)firmware/tractor_x8/mosquitto.video-test.conf'` → `scp` the tarball to
   the base (never `git archive | ssh sudo -S tar`: `sudo -S` eats the
   stream) → extract over `/var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER` →
   write the SHA to `DEPLOYED_FROM.txt` there →
   `docker build --pull=false -t lifetrac-v25:latest .` in that directory.
-  This route renames nothing: an old video-test file there stays armed.
+  This route renames and removes nothing: an old video-test file there
+  stays armed, and so do old copies of the tractor's compose files in
+  `firmware/tractor_x8/`.
 
 Either way, start and restart nothing else. Then check that the image
 carries the VECTOR code, without importing web_ui (its import connects to a

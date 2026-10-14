@@ -361,9 +361,11 @@ state on a re-provisioned board, in its item "old boot units retired":
    (running, created, restarting, paused, dead), or a `docker ps` that
    fails, stops the deploy before anything changes; clean up as in [Doing
    the same on another board pair](#doing-the-same-on-another-board-pair),
-   step 2. It never runs `docker compose` on that file. Until that first
-   deploy the file on the base is armed: never bring it up. Its `image_rx`
-   maps `/dev/ttymxc3`, sends a soft RESET_REQ on open that un-parks the
+   step 2. It never runs `docker compose` on that file. It also leaves the
+   tractor's compose files in `firmware/tractor_x8/` out of the tarball
+   (RS-5.20) and removes an old copy of them from the deployed tree. Until
+   that first deploy the file on the base is armed: never bring it up. Its
+   `image_rx` maps `/dev/ttymxc3`, sends a soft RESET_REQ on open that un-parks the
    L072, and has `restart: unless-stopped`, so after one successful `up` it
    comes back at every boot, with no unit involved, until the container is
    removed. Only a broker on `127.0.0.1:1883` blocks a manual `up` of it:
