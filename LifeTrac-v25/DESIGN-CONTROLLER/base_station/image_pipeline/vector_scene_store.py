@@ -42,6 +42,7 @@ RESYNC_ORPHAN_MIN_ITEMS = 8         # a ratio over fewer records is noise, not d
 RESYNC_DIGEST_RUN = 3               # consecutive DIGEST mismatches enter a resync, matches end it (§4.3)
 LOSS_WINDOW_MS = 10_000             # frame loss from seq gaps over 10 s (§4.5.2, §4.5.4), the banner's "loss" (§7.5)
 SEQ_GAP_MAX = 128                   # a longer jump of the u8 seq is a restart or a reorder, not loss
+REORDER_MAX = 8                     # a seq at most this far behind the newest is late or a copy; further back, a restart
 ZOOM_DROP_RATIO = 2.0               # r'/r above this is dropped as PREDICTED (§4.4)
 BADGE_CACHED, BADGE_PREDICTED, BADGE_VECTOR = 1, 4, 7
 MIN_OBJECT_PLACEHOLDER = "n/a (no calibration)"
@@ -247,7 +248,8 @@ class VectorSceneStore:
         self._seq_seen = False                  # any frame carried a seq: loss is known (§4.5.2)
         self._last_seq: int | None = None       # seq chain for the loss count; None after break_seq()
         self._last_seq_rx = 0
-        self._seq_win: deque = deque()          # (rx_ms, frames lost just before it) per received frame
+        self._seq_win: deque = deque()          # [rx_ms, seq, frames lost just before it] per received frame
+        self._seq_missing: dict = {}            # seq counted lost -> the _seq_win entry that counted it
         self._bad_reasons: dict[str, int] = {}
         self._st = {k: 0 for k in ("frames_rx", "frames_bad", "frames_applied", "epoch_behind",
                                    "orphans", "digest_checks", "digest_mismatch", "bad_version",
@@ -309,21 +311,41 @@ class VectorSceneStore:
         so a gap of n is n frames that never arrived, whether or not the
         frames around it decode. The same seq again (an epoch-start copy) is
         not a new frame. A gap is counted only when the frame before it is
-        inside the window; a longer silence shows in ``frame_age_ms``."""
+        inside the window; a longer silence shows in ``frame_age_ms``.
+        A seq at most REORDER_MAX behind the newest is late or a copy: it
+        never moves the chain back, a copy of a frame in the window is not
+        counted again, and a late frame takes back the loss its gap counted."""
         if not isinstance(seq, int):
             return
         seq &= 0xFF
         self._seq_seen = True
-        lost = 0
+        lost, chained = 0, False
         if self._last_seq is not None:
             d = (seq - self._last_seq) & 0xFF
             if d == 0:
                 return
-            if d <= SEQ_GAP_MAX and rx_ms - self._last_seq_rx <= LOSS_WINDOW_MS:
-                lost = d - 1
+            fresh = rx_ms - self._last_seq_rx <= LOSS_WINDOW_MS
+            if fresh and 256 - d <= REORDER_MAX:
+                if any(e[1] == seq for e in self._seq_win):
+                    return                                  # a copy of a frame already counted
+                gap = self._seq_missing.pop(seq, None)
+                if gap is not None and gap[2] > 0:
+                    gap[2] -= 1                             # counted lost, but it arrived late
+                self._append_seq([rx_ms, seq, 0])
+                return
+            if fresh and d <= SEQ_GAP_MAX:
+                lost, chained = d - 1, True
+        if not chained:
+            self._seq_missing.clear()                       # a new chain: a restart, a silence or another codec
+        entry = [rx_ms, seq, lost]
+        for k in range(1, lost + 1):
+            self._seq_missing[(seq - k) & 0xFF] = entry
         self._last_seq, self._last_seq_rx = seq, rx_ms
-        self._seq_win.append((rx_ms, lost))
-        while self._seq_win and self._seq_win[0][0] < rx_ms - LOSS_WINDOW_MS:
+        self._append_seq(entry)
+
+    def _append_seq(self, entry: list) -> None:
+        self._seq_win.append(entry)
+        while self._seq_win and self._seq_win[0][0] < entry[0] - LOSS_WINDOW_MS:
             self._seq_win.popleft()
 
     def _ingest(self, body, frame_kind: int, rx_ms: int, airtime_ms: float) -> IngestResult:
@@ -1047,7 +1069,7 @@ class VectorSceneStore:
         no frame has carried a seq. ``ratio`` is None when the window is empty."""
         if not self._seq_seen:
             return None
-        win = [lost for rx, lost in self._seq_win if rx >= now_ms - LOSS_WINDOW_MS]
+        win = [lost for rx, _seq, lost in self._seq_win if rx >= now_ms - LOSS_WINDOW_MS]
         frames, lost = len(win), sum(win)
         return {"window_ms": LOSS_WINDOW_MS, "frames": frames, "lost": lost,
                 "ratio": round(lost / (frames + lost), 3) if frames + lost else None}

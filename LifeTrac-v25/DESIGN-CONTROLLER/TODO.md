@@ -1493,7 +1493,10 @@ No-regrets work, correct under every surviving architecture (do first):
   if a compose file in the tarball maps `/dev/ttymxc3`. The files stay in
   git: the tractor image is built from its own archive. Close this item when
   the next deploy's tree has none of them. Renaming or deleting them in git
-  is left to the design owner.
+  is left to the design owner. Still on the base for a while:
+  `build_tractor_image.sh` unpacks the tractor tree, compose files included,
+  under `/home/fio/lifetrac_build/` for the build and removes it afterwards;
+  a failed build leaves it there.
 
 ### RS-6 — Keyframe elimination (K-phases, now LoRa-only)
 

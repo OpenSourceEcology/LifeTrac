@@ -1021,6 +1021,31 @@ class BannerAgeLossTests(StoreCase):
         self.assertEqual(self.snap(22_100)["loss"], {"window_ms": 10_000, "frames": 1, "lost": 0, "ratio": 0.0})
         self.assertEqual(self.snap(22_100)["frame_age_ms"], 300)
 
+    def test_copies_and_late_frames_are_not_loss(self):
+        # Copilot review of #150: 10, 11, 10, 12 read one lost of four, and
+        # 10, 9, 11 one lost, although every distinct frame arrived.
+        for seqs, frames in (((10, 11, 10, 12), 3),                      # a copy after a newer frame
+                             ((10, 9, 11), 3),                            # a reorder before the chain's first
+                             ((20, 22, 21, 23), 4),                       # a late frame fills its gap
+                             ((30, 33, 31, 31, 32, 34), 5)):              # two late, one of them twice
+            with self.subTest(seqs=seqs):
+                self.st.reset()
+                self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=seqs[0])
+                for i, seq in enumerate(seqs[1:], 1):
+                    self.feed([tri(1)], epoch=0, rx=10_000 + 500 * i, seq=seq)
+                loss = self.snap(10_000 + 500 * len(seqs))["loss"]
+                self.assertEqual((loss["frames"], loss["lost"], loss["ratio"]), (frames, 0, 0.0))
+
+    def test_a_gap_left_open_stays_lost_and_a_long_step_back_is_a_restart(self):
+        self.feed(key() + [tri(1)], epoch=0, key_=True, rx=10_000, seq=40)
+        for rx, seq in ((10_500, 43), (11_000, 41), (11_500, 44)):        # 42 never arrives
+            self.feed([tri(1)], epoch=0, rx=rx, seq=seq)
+        self.assertEqual(self.snap(11_600)["loss"]["lost"], 1)
+        self.feed([tri(1)], epoch=0, rx=12_000, seq=30)                   # 14 back: a restart, no loss
+        self.feed([tri(1)], epoch=0, rx=12_500, seq=31)
+        loss = self.snap(12_600)["loss"]
+        self.assertEqual((loss["frames"], loss["lost"]), (6, 1))
+
     def test_no_seq_means_unknown_loss(self):
         self.feed(key() + [tri(1)], epoch=0, key_=True)
         self.assertIsNone(self.snap()["loss"])
