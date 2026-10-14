@@ -1,0 +1,36 @@
+## guard
+lifetrac-tractor-compose.service is-active=failed
+camera check (before): lifetrac-camera.service=inactive running-radio-containers=[]
+## step 1: disable (no --now) + reset-failed
+Removed /etc/systemd/system/multi-user.target.wants/lifetrac-tractor-compose.service.
+camera check (after-disable): lifetrac-camera.service=inactive running-radio-containers=[]
+lifetrac-tractor-compose.service is-enabled=disabled is-active=inactive
+## step 2: move the unit file aside
+camera check (after-daemon-reload): lifetrac-camera.service=inactive running-radio-containers=[]
+camera check (5s-later): lifetrac-camera.service=inactive running-radio-containers=[]
+## after
+UNIT FILE STATE VENDOR PRESET
+
+0 unit files listed.
+/etc/lifetrac-retired:
+total 12
+drwxr-xr-x  3 root root 4096 Sep 23 14:19 .
+drwxr-xr-x 45 root root 4096 Sep 23 14:19 ..
+drwxr-xr-x  2 root root 4096 Sep 23 14:19 20261012T212515Z
+
+/etc/lifetrac-retired/20261012T212515Z:
+total 16
+drwxr-xr-x 2 root root 4096 Sep 23 14:19 .
+drwxr-xr-x 3 root root 4096 Sep 23 14:19 ..
+-rw-r--r-- 1 root root  422 Sep 23 14:19 README.txt
+-rw-r--r-- 1 root root  517 May 27 06:36 lifetrac-tractor-compose.service
+no lifetrac wants links
+## failed units
+* psplash-start.service loaded failed failed Start psplash boot splash screen
+## uart holders
+
+__UART_CHK_DONE__
+## running containers
+x8-devel	Up 2 days
+x8-provisioning	Up 2 days
+x8-webapp	Up 2 days

@@ -1,0 +1,29 @@
+## guard: unit gone or not enabled
+lifetrac-base-compose.service is-enabled: Failed to get unit file state for lifetrac-base-compose.service: No such file or directory
+## guard: each container never started
+lifetrac-vtest-mosquitto-1: created started=0001-01-01T00:00:00Z project=lifetrac-vtest
+lifetrac-vtest-image_rx-1: created started=0001-01-01T00:00:00Z project=lifetrac-vtest
+lifetrac-vtest-web_ui-1: created started=0001-01-01T00:00:00Z project=lifetrac-vtest
+lifetrac-vtest-audit_tail-1: created started=0001-01-01T00:00:00Z project=lifetrac-vtest
+## remove (no -f, no -v: volumes kept)
+lifetrac-vtest-mosquitto-1
+lifetrac-vtest-image_rx-1
+lifetrac-vtest-web_ui-1
+lifetrac-vtest-audit_tail-1
+lifetrac-vtest_default
+## after
+rx_smoke	lifetrac-v25:latest	Exited (137) 8 days ago
+bench_mqtt	eclipse-mosquitto:2	Exited (1) 2 months ago
+f11_webui	c6ded786130c	Exited (0) 2 months ago
+design-controller-mosquitto-1	2a23a3e427e4	Up 2 days
+NAME                STATUS              CONFIG FILES
+design-controller   running(1)          /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER/docker-compose.yml
+bridge design-controller_default host none 
+design-controller_lifetrac_logs design-controller_lifetrac_state design-controller_mosquitto_data design-controller_mosquitto_logs lifetrac-vtest_lifetrac_logs lifetrac-vtest_lifetrac_state lifetrac-vtest_mosquitto_data lifetrac-vtest_mosquitto_logs 
+## listeners
+none on 1883/8080
+## uart holders
+
+__UART_CHK_DONE__
+## failed units
+● psplash-start.service loaded failed failed Start psplash boot splash screen

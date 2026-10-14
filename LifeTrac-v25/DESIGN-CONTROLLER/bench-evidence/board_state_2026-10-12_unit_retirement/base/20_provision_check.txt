@@ -1,0 +1,36 @@
+WARN: no /c/Users/dorkm/Documents/GitHub/LifeTrac/LifeTrac-v25/DESIGN-CONTROLLER/firmware/x8_lora_bootloader_helper/bench_tools/bench.env -- the original bench's serials and address apply unless set in the environment (cp bench.env.example bench.env; BENCH_SETUP.md 5.3)
+== provision_bench_board.sh: base on 192.168.1.117 over ssh (check)
+  [info]    soc serial 2D0A1209DABC240B, LmP 4.0.11-934-91, kernel 6.1.24-lmp-standard, shell user fio
+  [ok]      sudo without a password (sudoers.d/99-lifetrac-bench-nopasswd)
+  [ok]      compose-apps-early-start-recovery.service masked (it wipes /var/lib/docker on 934)
+  [ok]      compose-apps-early-start.service masked (its failure triggers the recovery unit)
+  [info]    eth0 'Wired connection 1': speed=100 duplex=full auto-negotiate=yes (--nic-100 pins 100/full)
+  [ok]      PC ssh key (/c/Users/dorkm/.ssh/lifetrac_base_ed25519.pub) in fio's authorized_keys
+  [ok]      docker running
+  [TODO]    probe image hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44
+  [ok]      eclipse-mosquitto:2 (the base broker image)
+  [ok]      old boot units retired (not enabled, not active, no unit file left): lifetrac-base.service lifetrac-base-compose.service
+  [info]    eclipse-mosquitto:2 image id 0db28dca6f11 (a moving tag: note the id in the session evidence)
+  [info]    /dev/ttymxc3 (radio UART) is free
+
+== summary: base 192.168.1.117 (check)
+  [info]    soc serial 2D0A1209DABC240B, LmP 4.0.11-934-91, kernel 6.1.24-lmp-standard, shell user fio
+  [ok]      sudo without a password (sudoers.d/99-lifetrac-bench-nopasswd)
+  [ok]      compose-apps-early-start-recovery.service masked (it wipes /var/lib/docker on 934)
+  [ok]      compose-apps-early-start.service masked (its failure triggers the recovery unit)
+  [info]    eth0 'Wired connection 1': speed=100 duplex=full auto-negotiate=yes (--nic-100 pins 100/full)
+  [ok]      PC ssh key (/c/Users/dorkm/.ssh/lifetrac_base_ed25519.pub) in fio's authorized_keys
+  [ok]      docker running
+  [TODO]    probe image hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44
+  [ok]      eclipse-mosquitto:2 (the base broker image)
+  [ok]      old boot units retired (not enabled, not active, no unit file left): lifetrac-base.service lifetrac-base-compose.service
+  [info]    eclipse-mosquitto:2 image id 0db28dca6f11 (a moving tag: note the id in the session evidence)
+  [info]    /dev/ttymxc3 (radio UART) is free
+
+Still to do by hand (BENCH_SETUP.md):
+  [ ] verify: HC-01 / HC-02 health checks, then 'provision_bench_board.sh base --check' shows no TODO
+  [ ] L072 bench firmware (build md5 0c1bb0a9573f813137f941dfa47177d0): ../FLASH_RUNBOOK.md
+  [ ] deploy the base tree, image lifetrac-v25 and the broker: DEPLOY.md (deploy_base.sh)
+  [ ] power: the base boots again after 'systemctl poweroff'; remove power to keep it down
+  [ ] radios: the LifeTrac L072 firmware boots listening (RXCONT); park it with radio_park.py
+      if the radios must stay off, and confirm later with radio_state.py

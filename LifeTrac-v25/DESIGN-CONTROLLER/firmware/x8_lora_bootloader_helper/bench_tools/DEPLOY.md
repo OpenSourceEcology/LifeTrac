@@ -98,9 +98,12 @@ On the PC:
 
 On the base, the script runs as root and:
 1. **refuses** to run if `compose-apps-early-start-recovery.service` is not
-   masked, if a `lifetrac-base*` unit is active, if any running container maps
-   `/dev/ttymxc3`, or if the board looks like the tractor. It warns when a
-   `lifetrac-base*` unit is enabled.
+   masked, if a `lifetrac-base*` unit is anything but `failed` or `inactive`
+   (active, activating, deactivating, reloading) or has a systemd job queued
+   (early in a boot), if any running container maps `/dev/ttymxc3`, or if the
+   board looks like the tractor. It warns when a `lifetrac-base*` unit is
+   enabled. On the original base both units are retired since 2026-10-12, so
+   neither check fires there ([Radio safety](#radio-safety)).
 2. saves the old tree as `/home/fio/lifetrac_deploy/prev_tree_<oldsha>_<time>.tgz`,
    deletes `base_station/ firmware/ deploy/` (skip with `--no-clean`; stale files
    would otherwise end up in the image), and extracts the new tree.
@@ -251,8 +254,20 @@ file the script saved and update the header.
   `systemctl stop docker; rm -rf /var/lib/docker` every 60 s unless it is
   masked. Both scripts refuse to run while it is unmasked; masking is part of
   [provisioning](BENCH_SETUP.md).
-- **`docker compose up -d` with no service name** on the base starts
-  `lora_bridge` on `/dev/ttymxc3`. Always name `mosquitto`.
+- **`docker compose up -d` with no service name** on the base starts every
+  service: `lora_bridge` with `/dev/ttymxc3` mapped, and `web_ui`, which
+  publishes retained control topics into the bench broker at startup. Always
+  name `mosquitto`.
+- **A bare `docker compose down`** in `BASE_DEPLOY_DIR` removes the bench
+  broker container `design-controller-mosquitto-1` (compose project
+  `design-controller`; its volume survives). Never run it on a bench base.
+  If it happened, `deploy_base.sh` recreates the broker. To recreate the
+  broker alone, without deploying a tree, run its broker line as root in
+  `BASE_DEPLOY_DIR`:
+  `docker compose -p design-controller -f docker-compose.yml up -d --no-deps mosquitto`.
+- **`docker-compose.video-test.yml` is shipped too** (the archive takes
+  `docker-compose*.yml`), and it is armed: see
+  [Radio safety](#radio-safety). Never bring it up on the bench.
 - **A moved `:latest` does not restart anything.** A container already running
   the old image keeps it until it is recreated.
 - **`/tmp` is a RAM tmpfs** on both boards, aged at 5 days and emptied at
@@ -272,27 +287,97 @@ file the script saved and update the header.
   GO.
 - **Never start `lora_bridge`** on the bench. `docker-compose.yml` maps
   `${LIFETRAC_LORA_DEVICE}`, which the bench `.env` sets to `/dev/ttymxc3`,
-  the L072 radio UART. `lora_bridge` would open it and drive the radio with
-  the old framing, which the Method-G firmware does not speak.
+  the L072 radio UART, into the container as `/dev/ttyACM0`.
+  - As deployed, `lora_bridge` would probably crash-loop without reaching the
+    radio. Its `command:` line (`docker-compose.yml:54`) uses a single `$`,
+    so compose fills in `LIFETRAC_LORA_DEVICE` and `LIFETRAC_MQTT_HOST` from
+    the host `.env` when it reads the file. The live config on the base
+    showed `lora_bridge.py "/dev/ttymxc3" --mqtt ""`
+    ([2026-10-11](../../../bench-evidence/board_state_2026-10-12_unit_retirement/base/00_failure_journal_2026-10-11.txt)):
+    the bridge is told to open `/dev/ttymxc3`, which does not exist inside
+    the container. This is inferred from the config, not observed.
+  - With that line fixed to `$$`, it would open the L072 and drive it with
+    KISS framing at 115200 baud, which the Method-G firmware does not speak.
+    So the `$` is a real bug, but fix it only together with replacing
+    `lora_bridge` by a Method-G daemon: today the bug is what keeps
+    `lora_bridge` off the radio.
+
   `deploy_base.sh` starts only `mosquitto`, with `--no-deps`. It refuses to run
   while any container maps `/dev/ttymxc3` (a leg in progress) and warns if one
   appears afterwards.
-- **The base's `lifetrac-base.service` and `lifetrac-base-compose.service` must
-  stay disabled.** On the bench base both are currently **enabled but failing
-  at every boot** (capture
-  [`board_state_2026-10-04/base/10_systemd.txt`](../../../bench-evidence/board_state_2026-10-04/base/10_systemd.txt)).
-  `lifetrac-base.service` runs `docker compose up -d --build --remove-orphans`,
-  which starts `lora_bridge` on `/dev/ttymxc3` and rebuilds the image on the boot
-  path. `lifetrac-base-compose.service` brings up the video-test stack, whose
-  `image_rx` maps `/dev/ttymxc3`. If either ever succeeded, a radio daemon would
-  start at boot without a GO. **Recommendation:** disable both, after the
-  operator agrees (an open item in [BENCH_BOARDS.md](BENCH_BOARDS.md)):
-  ```sh
-  sudo systemctl disable lifetrac-base.service lifetrac-base-compose.service
-  ```
-  `deploy_base.sh` warns while they are enabled and refuses to run if either is
-  active. It never installs, enables or starts them, and the bench kit does not
-  install the unit files in `deploy/`.
+- **Three boot units are retired on the bench and must stay retired:**
+  `lifetrac-base.service` and `lifetrac-base-compose.service` on the base,
+  and `lifetrac-tractor-compose.service` on the tractor. All three were
+  enabled and failed at every boot that was captured (captures
+  [`board_state_2026-10-04/base/10_systemd.txt`](../../../bench-evidence/board_state_2026-10-04/base/10_systemd.txt)
+  and
+  [`board_state_2026-10-10/tractor/10_systemd.txt`](../../../bench-evidence/board_state_2026-10-10/tractor/10_systemd.txt),
+  and the journals of the 10-10 boot in the record below).
+  Each failure was the only thing keeping a radio daemon from starting at
+  boot without a GO, so the units were not repaired. On 2026-10-12, with the
+  operator's approval, they were disabled and their files moved to
+  `/etc/lifetrac-retired/20261012T212515Z/` on each board
+  ([record](../../../bench-evidence/board_state_2026-10-12_unit_retirement/README.md)).
+  The full table, the procedure and the undo are in
+  [BENCH_BOARDS.md](BENCH_BOARDS.md#retired-boot-units-2026-10-12).
+  - `lifetrac-base.service` is the production compose stack. It runs
+    `docker compose up -d --build --remove-orphans`: it rebuilds and retags
+    `lifetrac-v25:latest` on the boot path, starts `web_ui`, which
+    republishes a retained `control/radio_profile` into the bench broker at
+    startup, and starts `lora_bridge` (see above).
+  - `lifetrac-base-compose.service` is a May-2026 video-test demo unit. Its
+    `image_rx` opens `/dev/ttymxc3` with a soft RESET_REQ, which un-parks
+    the L072, at `LIFETRAC_REG_PROFILE=0` (fixed 915 MHz).
+  - `lifetrac-tractor-compose.service` is the same demo on the tractor. It
+    starts `tractor-image-tx-v2` on `/dev/ttymxc3` and a camera with
+    `LIFETRAC_USE_LORA_BRIDGE=1`: image TX at every boot.
+
+  On a bench board that still has one of them:
+  - **Do not repair, reinstall or re-enable it.** `systemctl mask` does not
+    work either: the real unit files sit in `/etc/systemd/system`, where
+    `mask` wants to put its symlink ("File exists"). Disable, then move the
+    files out.
+  - **Stop rule.** systemd runs `ExecStop` only if the start succeeded, and
+    `lifetrac-base.service`'s `ExecStop` is a bare `docker compose down` in
+    `BASE_DEPLOY_DIR`, which removes the bench broker container. So what to
+    do depends on the unit's state. The rule, with the one route for an
+    `active` unit (stop its radio containers by name, then stop the unit,
+    then retire it), is rule 3 in
+    [BENCH_BOARDS.md](BENCH_BOARDS.md#rules); it is kept there only.
+  - **Order on the tractor.** Never remove the old `tractor-*-v2` containers,
+    and never "fix" the unit's `-p`, while the unit is enabled. The name
+    clash with those containers was the only barrier, and without it the
+    tractor transmits at the next boot. Disable first. On the original
+    tractor `/opt/lifetrac/video-test/docker-compose.yml` is also renamed,
+    which disarms the May scripts that run `docker compose up` in that
+    folder; do not rename it back.
+
+  `deploy_base.sh` warns while a `lifetrac-base*` unit is enabled. It refuses
+  to run while one is anything but `failed` or `inactive`, or has a systemd
+  job queued. It never installs, enables or starts them, and the bench kit
+  does not install the unit files in `deploy/`.
+  `provision_bench_board.sh` retires the units of the board's role while
+  they are `failed` or `inactive`: `systemctl disable` without `--now`, then
+  the unit files and `.d` directories moved to
+  `/etc/lifetrac-retired/<PC UTC time>/`. A unit that is already disabled
+  but still has its file in `/etc/systemd/system` is moved the same way. If
+  a unit is active, starting or stopping, or has a job queued, that step
+  fails and changes nothing. It reports leftover containers and never
+  removes them.
+- **The base's video-test compose file is still armed.**
+  `docker-compose.video-test.yml` is in the deployed tree, and every deploy
+  ships it again. Its `image_rx` maps `/dev/ttymxc3`, sends a soft RESET_REQ
+  that un-parks the L072, and has `restart: unless-stopped`, so after one
+  successful `up` it comes back at every boot until the container is
+  removed. The only thing that makes a manual `up` of it fail is the bench
+  broker holding `127.0.0.1:1883`. Whenever nothing holds that port, nothing
+  stops it: in [RS13_2_DESK_CHECK.md](RS13_2_DESK_CHECK.md) that is the gap
+  between the bench broker's stop and the desk `up`, the gap between the desk
+  `down` and the bench broker's start, and after a base reboot in between
+  (while the desk stack is up, its broker holds the port). Never bring it up
+  on the bench;
+  rule 7 in [BENCH_BOARDS.md](BENCH_BOARDS.md#rules) lists the repo-root May
+  scripts that do.
 - On the tractor, `lifetrac-camera.service` (started by udev at boot) runs
   `lifetrac-tractor-x8:latest` with `/dev/ttymxc3` mapped as its M7 port. Loading
   a new `:latest` does not start it. The next time it starts, it runs the new

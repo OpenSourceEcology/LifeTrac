@@ -15,7 +15,8 @@
 #   both     sudoers drop-in (../install_lifetrac_nopasswd.sh), docker running,
 #            the probe image hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44
 #            (repo-root foundries_python.tar; radio_park.py / radio_state.py /
-#            rs116_health_probe.py run in it)
+#            rs116_health_probe.py run in it), the old boot units retired
+#            (see below)
 #   base     compose-apps-early-start{,-recovery}.service masked, the PC's ssh
 #            key in fio's authorized_keys, eclipse-mosquitto:2 pulled,
 #            optional eth0 100BASE-TX full pin (--nic-100)
@@ -27,9 +28,32 @@
 #            compose-apps mask too, unless the board still runs the factory
 #            674 image (where that unit succeeds)
 #
+# Retired boot units (BENCH_BOARDS.md; retired by hand on the original pair on
+# 2026-10-12): lifetrac-base.service and lifetrac-base-compose.service on the
+# base, lifetrac-tractor-compose.service on the tractor. If one of them ever
+# succeeds at boot it starts compose services that map /dev/ttymxc3, without
+# a GO. The step passes when each unit is neither enabled nor active and
+# neither its unit file nor its <unit>.d directory is left in
+# /etc/systemd/system (a symlink there, such as a mask, passes); a unit that
+# is not installed passes. Otherwise, and only while every listed unit is
+# failed or inactive with no start or stop job queued, it runs
+# 'systemctl disable' (never --now) and 'systemctl reset-failed', moves the
+# unit file and its <unit>.d directory from /etc/systemd/system into a new
+# /etc/lifetrac-retired/<PC UTC time>/ (never an existing directory), writes a
+# README.txt there, and runs 'systemctl daemon-reload'. A unit that is already
+# disabled but still has its file there gets the same treatment. If any listed
+# unit is active, starting or stopping, or has a job queued (early in a boot an
+# enabled unit reads inactive while its start job waits), the step fails,
+# changes nothing and prints what to do. The step never starts, stops or masks
+# a unit, never runs docker compose and never stops or removes a container
+# (the base broker design-controller-mosquitto-1 included). The leftover
+# video-test containers and the tractor's
+# /opt/lifetrac/video-test/docker-compose.yml are only reported; their
+# manual, ordered cleanup is in BENCH_BOARDS.md.
+#
 # Radio safety: this script never opens /dev/ttymxc3 (the L072 radio UART),
-# never starts lifetrac-base.service, lifetrac-base-compose.service or
-# lifetrac-tractor-compose.service, and on the tractor it leaves
+# never starts or stops lifetrac-base.service, lifetrac-base-compose.service
+# or lifetrac-tractor-compose.service, and on the tractor it leaves
 # lifetrac-camera.service and the tractor-camera container stopped (both map
 # /dev/ttymxc3; they come back at the next boot).
 #
@@ -148,10 +172,13 @@ unixpath() {  # scp reads C:/... as host "C": give it /c/... (e.g. --mosquitto-t
   if command -v cygpath >/dev/null 2>&1; then cygpath -u "$1"; else printf '%s' "$1"; fi
 }
 
-# on <adb|ssh> <serial|host> <command>: run a shell command on a board, CR stripped
+# on <adb|ssh> <serial|host> <command>: run a shell command on a board, CR stripped.
+# LogLevel=ERROR: stderr is merged into the output, and a client warning (OpenSSH 10
+# prints three "post-quantum key exchange" lines per connection) would otherwise be
+# read as command output. Connection errors still print.
 on() {
   if [ "$1" = ssh ]; then
-    ssh -i "$BASE_SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 "$BASE_USER@$2" "$3" 2>&1 | tr -d '\r'
+    ssh -i "$BASE_SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 -o LogLevel=ERROR "$BASE_USER@$2" "$3" 2>&1 | tr -d '\r'
   else
     MSYS_NO_PATHCONV=1 "$ADB" -s "$2" shell "$3" 2>&1 | tr -d '\r'
   fi
@@ -365,24 +392,251 @@ app_camera() {
   app_camera_stopped
 }
 
-# tractor: lifetrac-camera.service and the tractor-camera container map /dev/ttymxc3
+# tractor: lifetrac-camera.service and the tractor-camera container map /dev/ttymxc3.
+# The unit's state is read as text and only inactive or failed passes:
+# 'activating' (its 2 s auto-restart window) is not stopped, and neither is a
+# query that did not answer.
 chk_camera_stopped() {
-  ! rtest 'systemctl is-active -q lifetrac-camera.service' \
-    && rtest "sudo -n docker ps >/dev/null && ! sudo -n docker ps --format '{{.Names}}' | grep -qx tractor-camera"
+  case "$(rval 'systemctl is-active lifetrac-camera.service 2>/dev/null')" in inactive|failed) ;; *) return 1 ;; esac
+  rtest "sudo -n docker ps >/dev/null && ! sudo -n docker ps --format '{{.Names}}' | grep -qx tractor-camera"
 }
 app_camera_stopped() {
   rsh 'sudo -n systemctl stop lifetrac-camera.service 2>/dev/null; sudo -n docker stop tractor-camera >/dev/null 2>&1; true' >/dev/null
 }
 
-unit_report() {  # never started or changed here
-  local u st
+# The old boot units: lifetrac-base.service and lifetrac-base-compose.service on
+# the base, lifetrac-tractor-compose.service on the tractor. The original pair
+# had them enabled, and they failed at every boot that was captured; they were
+# retired, not repaired, on 2026-10-12 (BENCH_BOARDS.md), because that failure
+# was all that kept a radio daemon from starting at boot without a GO. This
+# step leaves a board in the same state. systemd runs ExecStop only after a
+# successful start, so a failed or inactive unit needs no stop and is disabled
+# WITHOUT --now. 'systemctl mask' is not used: the real unit file sits where
+# the mask symlink would go. Nothing here starts or stops a unit, runs docker
+# compose, or stops or removes a container.
+UNIT_DIR=/etc/systemd/system
+RETIRE_ROOT=/etc/lifetrac-retired
+RETIRE_ERR=""   # set when a retirement only half worked, so the re-check fails
+
+unit_state() {  # prints <is-enabled>/<is-active>; a unit that is not installed reads "/inactive"
+  rval "echo \$(systemctl is-enabled $1 2>/dev/null || true)/\$(systemctl is-active $1 2>/dev/null || true)"
+}
+unit_job() {  # prints "job=" when systemd has no start or stop job queued for the unit, else "job=<id>"
+  rval "j=\$(systemctl show -p Job --value $1 2>/dev/null) && echo job=\$j"
+}
+unit_path_kind() {  # unit_path_kind <name>: prints file, link or none for $UNIT_DIR/<name> (file = a real file or directory)
+  rval "if test -L $UNIT_DIR/$1; then echo link; elif test -e $UNIT_DIR/$1; then echo file; else echo none; fi"
+}
+# Only a reply that ends in /inactive or /failed passes, and only the replies
+# "none" and "link" for the unit file and the <unit>.d directory, so a query
+# that did not work reads as TODO, not as ok. The file test is what lets a
+# re-run finish a retirement that stopped after the disable.
+chk_units_retired() {
+  local u f st
+  [ -z "$RETIRE_ERR" ] || return 1
   for u in "$@"; do
-    st=$(rval "echo \$(systemctl is-enabled $u 2>/dev/null || true)/\$(systemctl is-active $u 2>/dev/null || true)")
-    case "$st" in
-      /*|not-found/*|/inactive) ;;   # not installed: nothing to say
-      *) info "$u is $st -- left alone; do not start it on the bench (it would run the radio stack)" ;;
+    st=$(unit_state "$u")
+    case "${st#*/}" in inactive|failed) ;; *) return 1 ;; esac
+    case "${st%%/*}" in enabled*) return 1 ;; esac
+    for f in "$u" "$u.d"; do
+      case "$(unit_path_kind "$f")" in none|link) ;; *) return 1 ;; esac
+    done
+  done
+  return 0
+}
+# unit_job_msg <unit> <unit_job reply>: returns 0 when no job is queued; else
+# prints why the unit is not touched and returns 1. Early in a boot an enabled
+# unit reads inactive while its start job waits for docker.service, and
+# 'systemctl disable' does not cancel a queued job.
+unit_job_msg() {
+  case "$2" in
+    job=) return 0 ;;
+    job=*[!0-9]*|'') ;;
+    job=*)
+      say "      $1 does not read active, but systemd has a job queued for it (job ${2#job=}):"
+      say "      the board is still booting, or the unit has just been started or stopped."
+      say "      Not touched: 'systemctl disable' does not cancel a queued start. Wait until"
+      say "      'systemctl list-jobs' no longer lists the unit, then re-run."
+      return 1 ;;
+  esac
+  say "      $1: could not read whether systemd has a job queued for it (reply '${2:-none}'). Not touched."
+  return 1
+}
+unit_blocked_msg() {  # unit_blocked_msg <unit> <is-active>: why it is not touched, and what to do
+  local d
+  case "$2" in
+    activating|reloading|deactivating)
+      say "      $1 is $2: a start or stop job is still running. Not touched. Wait until it"
+      say "      has failed or is inactive, then re-run. Do not stop it and do not interrupt a build." ;;
+    active)
+      case "$1" in
+        lifetrac-base.service)         d="lora_bridge and web_ui" ;;
+        lifetrac-base-compose.service) d="image_rx and web_ui" ;;
+        *)                             d="image_tx and camera" ;;
+      esac
+      say "      $1 is active: its start succeeded, so its compose services were started"
+      say "      and may be running ($d; /dev/ttymxc3 is mapped). Not touched:"
+      say "      this step stops no unit and no container. Stop those containers by name"
+      say "      (sudo docker ps; sudo docker stop <container>), then"
+      say "      'sudo systemctl stop $1' and re-run this script before the next boot."
+      if [ "$1" = lifetrac-base.service ]; then
+        say "      That stop runs the unit's ExecStop, a bare 'docker compose down' in DESIGN-CONTROLLER:"
+        say "      it also removes the broker container design-controller-mosquitto-1 (its volume stays)."
+        say "      Recreate the broker with deploy_base.sh. Never run that bare 'down' by hand."
+      fi ;;
+    *)
+      say "      $1: is-active returned '${2:-nothing}' (expected inactive or failed). Not touched." ;;
+  esac
+}
+retire_readme() {  # retire_readme <timestamp> <moved paths> <retire dir>
+  rsh "mkdir -p $RSTAGE" >/dev/null
+  printf '%s\n' \
+    "Retired $1 (PC UTC; a board clock may not be wall time) by bench_tools/provision_bench_board.sh." \
+    "Moved here from:$2" \
+    "Why: on a LifeTrac bench board these units must not run at boot. If one of them succeeds it" \
+    "starts compose services that map /dev/ttymxc3 (the L072 radio UART) without a GO. The bench" \
+    "retired them on 2026-10-12: see bench_tools/BENCH_BOARDS.md in the LifeTrac repo." \
+    "Do not reinstall or re-enable them on a bench board." \
+    "Undo: mv the files back to $UNIT_DIR/, systemctl daemon-reload, systemctl enable <unit>." \
+    > "$LSTAGE/README.txt" || return 1
+  push_to "$TRANSPORT" "$TARGET" "$LSTAGE/README.txt" "$RSTAGE/README.txt" || return 1
+  rtest "sudo -n cp $RSTAGE/README.txt $3/README.txt && sudo -n chown root:root $3/README.txt && sudo -n chmod 0644 $3/README.txt; rm -f $RSTAGE/README.txt; test -f $3/README.txt"
+}
+app_units_retired() {
+  local u f st out ts n dir="" files="" blocked=0
+  # Guard first, as on 2026-10-12: nothing changes unless every unit is failed or
+  # inactive. Beyond that run's guard, none may have a job queued either.
+  for u in "$@"; do
+    st=$(unit_state "$u")
+    case "${st#*/}" in
+      inactive|failed) unit_job_msg "$u" "$(unit_job "$u")" || blocked=1 ;;
+      *) unit_blocked_msg "$u" "${st#*/}"; blocked=1 ;;
     esac
   done
+  if [ "$blocked" = 1 ]; then say "      nothing was changed"; return 1; fi
+
+  for u in "$@"; do
+    st=$(unit_state "$u")
+    case "$st" in
+      /inactive|/failed|not-found/*)
+        # is-enabled knows no such unit: nothing to disable. That holds only if no
+        # unit file is there either; otherwise the reply cannot be trusted.
+        case "$(unit_path_kind "$u")" in
+          none|link) ;;
+          *) say "      $u: is-enabled does not know it, but $UNIT_DIR/$u was not shown to be absent; nothing was moved"
+             RETIRE_ERR=1 ;;
+        esac
+        continue ;;
+      */inactive|*/failed) ;;
+      *) say "      $u: its state could not be read again (reply '${st:-none}'); nothing was moved"
+         RETIRE_ERR=1; continue ;;
+    esac
+    # The board reads is-active and the job once more, right before the change,
+    # and is-enabled after it: only a reply that names a not-enabled state counts
+    # (no reply counts only when the unit file is gone, which is what 'disable'
+    # does to a 'systemctl link' symlink). reset-failed complains when the unit is
+    # not loaded; that is fine.
+    out=$(rsh "a=\$(systemctl is-active $u 2>/dev/null); j=\$(systemctl show -p Job --value $u 2>/dev/null) || j=unknown; case \$a/\$j in inactive/|failed/) sudo -n systemctl disable $u; sudo -n systemctl reset-failed $u 2>/dev/null; e=\$(systemctl is-enabled $u 2>/dev/null); case \$e in disabled|static|indirect|generated|transient|masked*|linked*|not-found) echo __DISABLED__ ;; ?*) echo is-enabled after disable: \$e ;; *) if test -e $UNIT_DIR/$u || test -L $UNIT_DIR/$u; then echo is-enabled after disable: no reply; else echo __DISABLED__; fi ;; esac ;; *) echo is-active: \$a, queued job: \$j ;; esac")
+    printf '%s\n' "$out" | grep -v -e '^__DISABLED__$' -e '^$' | indent
+    if ! printf '%s\n' "$out" | grep -q '^__DISABLED__$'; then
+      say "      $u was NOT disabled (see above); no unit file was moved"
+      RETIRE_ERR=1
+    fi
+  done
+
+  for u in "$@"; do
+    for f in "$u" "$u.d"; do
+      # A symlink there is a mask and is left alone ('disable' has already removed
+      # a 'systemctl link' symlink).
+      case "$(unit_path_kind "$f")" in
+        file) files="$files $UNIT_DIR/$f" ;;
+        none|link) ;;
+        *) say "      could not look at $UNIT_DIR/$f; nothing was moved"; RETIRE_ERR=1 ;;
+      esac
+    done
+  done
+  if [ -n "$files" ] && [ -z "$RETIRE_ERR" ]; then
+    ts=$(date -u +%Y%m%dT%H%M%SZ)   # the PC's clock: the tractor's is not wall time
+    for n in "" -2 -3 -4 -5; do
+      # plain mkdir fails on an existing directory: an earlier retirement is never reused
+      if rtest "sudo -n mkdir -p $RETIRE_ROOT && sudo -n mkdir $RETIRE_ROOT/$ts$n"; then dir=$RETIRE_ROOT/$ts$n; break; fi
+    done
+    if [ -z "$dir" ]; then
+      say "      could not create a new directory under $RETIRE_ROOT, so nothing was moved:$files"
+      RETIRE_ERR=1
+    else
+      out=$(rsh "sudo -n mv$files $dir/ && echo __MOVED__")
+      printf '%s\n' "$out" | grep -v -e '^__MOVED__$' -e '^$' | indent
+      if printf '%s\n' "$out" | grep -q '^__MOVED__$'; then
+        say "      moved to $dir:$files"
+        say "      undo: sudo mv them back to $UNIT_DIR/, sudo systemctl daemon-reload, sudo systemctl enable <unit>"
+        if ! retire_readme "$ts" "$files" "$dir"; then
+          say "      could not write $dir/README.txt: the units are retired, but the directory has no note."
+          say "      Write one by hand (a re-run reads ok: the check does not look for the note)."
+          RETIRE_ERR=1
+        fi
+      else
+        say "      the move to $dir failed; part of the paths may be there already, without a README.txt."
+        say "      Check $UNIT_DIR and $dir on the board, then re-run: what is left goes to a new directory."
+        RETIRE_ERR=1
+      fi
+    fi
+  fi
+  rsh 'sudo -n systemctl daemon-reload' | indent
+  # 'disable' and 'daemon-reload' make systemd re-read its units. On the tractor
+  # the camera step must follow (it is the next step); the 2026-10-12 run looked
+  # again 5 s after the reload, so give systemd that time first.
+  if [ "$ROLE" = tractor ]; then sleep 5; fi
+  [ -z "$RETIRE_ERR" ]
+}
+retired_report() {  # retired_report <1 when the step passed, else 0> <unit>...: info only, changes nothing
+  local ok=$1 u f st pat names en=0 act=0 left n0=${#RESULTS[@]}
+  shift
+  for u in "$@"; do
+    st=$(unit_state "$u")
+    left=1   # 1: the unit's state alone would pass, so a leftover file gets its own line
+    case "${st%%/*}" in enabled*) en=1; left=0 ;; esac
+    case "$st" in
+      /inactive|/failed|not-found/*) ;;   # no unit file anywhere: nothing to say about its state
+      ''|*/|*[!a-z/-]*) info "$u: its state could not be read" ;;
+      */inactive|*/failed) [ "$ok" = 1 ] || info "$u is $st" ;;
+      *)
+        left=0
+        case "${st#*/}" in active) act=1 ;; esac
+        if [ "$CHECK_ONLY" = 1 ]; then
+          info "$u is $st: a unit in this state is not retired; without --check the step prints what to do"
+        else
+          info "$u is $st: not retired; the step's message above says what to do"
+        fi ;;
+    esac
+    for f in "$u" "$u.d"; do
+      case "$(unit_path_kind "$f")" in
+        file) [ "$ok" = 1 ] || [ "$left" = 0 ] || info "$UNIT_DIR/$f is still there: not retired until it is moved to $RETIRE_ROOT" ;;
+        link) info "$UNIT_DIR/$f is a symlink (a mask, or a link to a unit file elsewhere): left alone" ;;
+      esac
+    done
+  done
+  if [ "$ok" != 1 ] && [ -z "$RETIRE_ERR" ] && [ "${#RESULTS[@]}" = "$n0" ]; then
+    info "no unit state or leftover file explains that result: a query to the board may have failed; run it again"
+  fi
+  # What the retired units left behind. Never removed here: on the tractor the old
+  # containers' names are what makes an enabled unit fail at boot, so the order matters.
+  if [ "$ROLE" = base ]; then pat='^lifetrac-vtest-'; else pat='^tractor-.*-v2$'; fi
+  names=$(rsh "sudo -n docker ps -a --format '{{.Names}}' 2>/dev/null" | grep -E "$pat" | tr '\n' ' ' | sed 's/ $//')
+  if [ -n "$names" ]; then
+    if [ "$ok" = 1 ]; then
+      info "old video-test containers still exist: $names -- not removed here; manual cleanup, in order: BENCH_BOARDS.md"
+    elif [ "$act" = 1 ]; then
+      info "video-test containers exist: $names -- a unit is active, so these may be its running containers; do not remove them (BENCH_BOARDS.md, rule 3)"
+    elif [ "$ROLE" = tractor ] && [ "$en" = 1 ]; then
+      info "WARNING: do NOT remove $names while lifetrac-tractor-compose.service is enabled: their names are what makes it fail at boot (BENCH_BOARDS.md)"
+    else
+      info "old video-test containers exist: $names -- leave them until the units are retired (BENCH_BOARDS.md)"
+    fi
+  fi
+  if [ "$ROLE" = tractor ] && rtest 'test -f /opt/lifetrac/video-test/docker-compose.yml'; then
+    info "/opt/lifetrac/video-test/docker-compose.yml still exists: 'docker compose up' in that folder would start the image_tx container on /dev/ttymxc3 -- manual cleanup, in order: BENCH_BOARDS.md"
+  fi
 }
 image_report() {  # image ids for the session record
   local id
@@ -393,9 +647,15 @@ image_report() {  # image ids for the session record
   return 0
 }
 uart_report() {
-  local h
+  local out h
   if ! rtest 'command -v fuser'; then info "/dev/ttymxc3 holders: fuser not available on this image"; return; fi
-  h=$(rsh 'sudo -n fuser /dev/ttymxc3 2>/dev/null' | tr -s ' \n' ' ' | sed 's/^ //; s/ $//')
+  # The marker tells "nobody holds it" from "the query never ran" (as lib/bench_env.sh does).
+  out=$(rsh 'sudo -n fuser /dev/ttymxc3 2>/dev/null; echo; echo __UART_CHK_DONE__')
+  case $out in
+    *__UART_CHK_DONE__*) ;;
+    *) info "WARNING: /dev/ttymxc3 (radio UART) holders could not be read (sudo or transport)"; return ;;
+  esac
+  h=$(printf '%s\n' "$out" | grep -v '__UART_CHK_DONE__' | tr -s ' \n' ' ' | sed 's/^ //; s/ $//')
   if [ -z "$h" ]; then info "/dev/ttymxc3 (radio UART) is free"
   else info "WARNING: /dev/ttymxc3 (radio UART) is held by pid(s) $h"; fi
 }
@@ -472,12 +732,22 @@ item "docker running" chk_docker app_docker
 item "probe image $FOUNDRIES_IMG" "chk_image $FOUNDRIES_IMG" app_foundries
 if [ "$ROLE" = base ]; then
   item "$MOSQ_IMG (the base broker image)" "chk_image $MOSQ_IMG" app_mosq_pull
-  unit_report lifetrac-base.service lifetrac-base-compose.service
+  RETIRE_UNITS="lifetrac-base.service lifetrac-base-compose.service"
 else
   item "$MOSQ_IMG (the tractor's local broker; it cannot pull)" "chk_image $MOSQ_IMG" app_mosq_tractor
-  item "radio UART free: lifetrac-camera.service and tractor-camera stopped" chk_camera_stopped app_camera_stopped
-  unit_report lifetrac-tractor-compose.service
+  RETIRE_UNITS="lifetrac-tractor-compose.service"
 fi
+# On the tractor this step stays BEFORE the camera step: its 'systemctl disable'
+# and 'daemon-reload' make systemd re-read its units, and lifetrac-camera.service
+# (started by udev, maps /dev/ttymxc3) is checked, and stopped, after that.
+retired_ok=1
+item "old boot units retired (not enabled, not active, no unit file left): $RETIRE_UNITS" \
+     "chk_units_retired $RETIRE_UNITS" "app_units_retired $RETIRE_UNITS" || retired_ok=0
+if [ "$ROLE" = tractor ]; then
+  item "radio UART free: lifetrac-camera.service and tractor-camera stopped" chk_camera_stopped app_camera_stopped
+fi
+# shellcheck disable=SC2086
+retired_report "$retired_ok" $RETIRE_UNITS
 image_report
 uart_report
 

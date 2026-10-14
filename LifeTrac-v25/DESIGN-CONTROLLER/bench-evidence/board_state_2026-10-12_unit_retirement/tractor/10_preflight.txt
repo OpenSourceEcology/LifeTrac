@@ -1,0 +1,85 @@
+## date/uptime (board clock is not wall time)
+2026-09-23T14:18:11Z
+ 14:18:11 up 2 days,  4:26,  1 user,  load average: 0.02, 0.01, 0.00
+6a71475f-47a3-45fc-8d5a-aefd357bfb2f
+## unit state
+lifetrac-tractor-compose.service active=failed enabled=enabled
+lifetrac-camera.service active=inactive enabled=disabled
+## systemd version
+systemd 250 (250.5+)
+## uart holders
+
+__UART_CHK_DONE__
+## docker ps -a
+camera_svc	lifetrac-tractor-x8:latest	Exited (137) 2 days ago
+tx_smoke	hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44	Exited (137) 2 days ago
+bench_mqtt	eclipse-mosquitto:2	Exited (0) 2 days ago
+tractor-camera	9bfbbc8d06cb	Exited (137) 3 weeks ago
+tractor-camera-v2	9bfbbc8d06cb	Exited (137) 8 weeks ago
+tractor-image-tx-v2	9bfbbc8d06cb	Exited (0) 3 months ago
+tractor-mosquitto-v2	eclipse-mosquitto:2	Exited (0) 8 weeks ago
+tractor-mosquitto	eclipse-mosquitto:2	Exited (0) 3 weeks ago
+lifetrac-camera-x8	hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44	Exited (127) 4 months ago
+x8-devel	hub.foundries.io/arduino/arduino-ootb-python-devel	Up 2 days
+x8-provisioning	hub.foundries.io/arduino/arduino-iot-cloud-provisioning	Up 2 days
+x8-webapp	hub.foundries.io/arduino/arduino-ootb-webapp	Up 2 days
+## compose ls
+NAME                STATUS              CONFIG FILES
+arduino-ootb        running(3)          /var/sota/compose-apps/arduino-ootb/docker-compose.yml
+lifetrac-camera     exited(2)           /var/rootdirs/opt/lifetrac/compose-apps/lifetrac-camera/docker-compose.yml,/opt/lifetrac/compose-apps/lifetrac-camera/docker-compose.yml
+video-test          exited(3)           /opt/lifetrac/video-test/docker-compose.yml
+## networks
+arduino-ootb_default
+bridge
+host
+lifetrac-camera_default
+none
+tractor-vtest_default
+video-test_default
+## volumes
+(335 anonymous volumes, names omitted)
+lifetrac-camera_mosquitto_config
+lifetrac-camera_mosquitto_data
+tractor-vtest_mosquitto_data
+video-test_mosquitto_data
+## unit files
+-rw-r--r--  1 root root  230 May 26 22:00 disable-wifi.service
+-rw-r--r--  1 root root  728 May  9  2022 lifetrac-camera.service
+-rw-r--r--  1 root root  517 May 27 06:36 lifetrac-tractor-compose.service
+lrwxrwxrwx  1 root root   40 May 26 22:00 disable-wifi.service -> /etc/systemd/system/disable-wifi.service
+lrwxrwxrwx  1 root root   52 May 27 06:36 lifetrac-tractor-compose.service -> /etc/systemd/system/lifetrac-tractor-compose.service
+## retired dir
+ls: cannot access '/etc/lifetrac-retired': No such file or directory
+## video-test tree
+/opt/lifetrac/video-test:
+total 48
+drwxr-xr-x 4 fio  fio  4096 May 30 15:24 .
+drwxr-xr-x 5 root root 4096 May 27 18:22 ..
+-rw-rw-rw- 1 fio  fio  5177 May 30 16:23 docker-compose.yml
+-rw-r--r-- 1 root root 5002 May 27 18:26 docker-compose.yml.bak-1779906398
+-rw-r--r-- 1 root root 5146 May 30 15:23 docker-compose.yml.bak_
+-rw-r--r-- 1 root root 5111 May 27 20:20 docker-compose.yml.bak_20260527_152255
+drwxr-xr-x 2 fio  fio  4096 May 27 00:12 mosquitto
+drwxr-xr-x 2 fio  fio  4096 May 29 23:53 src
+
+/opt/lifetrac/video-test/mosquitto:
+total 12
+drwxr-xr-x 2 fio fio 4096 May 27 00:12 .
+drwxr-xr-x 4 fio fio 4096 May 30 15:24 ..
+-rw-rw-rw- 1 fio fio  258 May 27 00:11 mosquitto.conf
+
+/opt/lifetrac/video-test/src:
+total 280
+drwxr-xr-x 2 fio fio   4096 May 29 23:53 .
+drwxr-xr-x 4 fio fio   4096 May 30 15:24 ..
+-rw-rw-rw- 1 fio fio  54883 May 30 00:52 camera_service.py
+-rw-rw-rw- 1 fio fio  19712 May 25 11:43 image_tx_daemon.py
+-rw-rw-rw- 1 fio fio  38778 May 26 03:11 lora_proto.py
+-rw-rw-rw- 1 fio fio  31530 May 26 22:06 method_g_stage1_probe.py
+-rw-rw-rw- 1 fio fio 125692 May 26 22:06 method_h_stage2_tx_probe_v2.py
+## who wants it
+RequiredBy=
+WantedBy=multi-user.target
+## failed
+* lifetrac-tractor-compose.... loaded failed failed LifeTrac tractor video st...
+* psplash-start.service        loaded failed failed Start psplash boot splash...

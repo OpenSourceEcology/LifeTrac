@@ -1,0 +1,63 @@
+## date/uptime
+2026-10-12T21:24:41Z
+ 21:24:41 up 2 days,  4:26,  1 user,  load average: 0.66, 0.39, 0.29
+95ac984e-8ba7-4713-ba7f-c339094e29f2
+## unit state
+lifetrac-base.service active=failed enabled=enabled
+lifetrac-base-compose.service active=failed enabled=enabled
+## uart holders
+
+__UART_CHK_DONE__
+## docker ps -a
+lifetrac-vtest-audit_tail-1	lifetrac-v25:latest	Created
+lifetrac-vtest-web_ui-1	lifetrac-v25:latest	Created
+lifetrac-vtest-image_rx-1	lifetrac-v25:latest	Created
+rx_smoke	lifetrac-v25:latest	Exited (137) 8 days ago
+lifetrac-vtest-mosquitto-1	eclipse-mosquitto:2	Created
+bench_mqtt	eclipse-mosquitto:2	Exited (1) 2 months ago
+f11_webui	c6ded786130c	Exited (0) 2 months ago
+design-controller-mosquitto-1	2a23a3e427e4	Up 2 days
+## compose ls
+NAME                STATUS              CONFIG FILES
+design-controller   running(1)          /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER/docker-compose.yml
+lifetrac-vtest      created(4)          /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER/docker-compose.video-test.yml
+## networks
+bridge
+design-controller_default
+host
+lifetrac-vtest_default
+none
+## volumes
+7da27d3d69fcd68b0b2d11f1a6b1213526811f94f798277a742f000c174d4b3d
+7f36a739688e1f97e0a2c9a9a90a0a4dbb7038c83d79ac2b2928952987b83f47
+design-controller_lifetrac_logs
+design-controller_lifetrac_state
+design-controller_mosquitto_data
+design-controller_mosquitto_logs
+lifetrac-vtest_lifetrac_logs
+lifetrac-vtest_lifetrac_state
+lifetrac-vtest_mosquitto_data
+lifetrac-vtest_mosquitto_logs
+## unit files
+-rw-r--r--  1 root root  789 May 27 06:38 lifetrac-base-compose.service
+-rw-r--r--  1 root root  480 May 26 15:05 lifetrac-base.service
+drwxr-xr-x  2 root root 4096 May 26 23:04 lifetrac-base.service.d
+/etc/systemd/system/lifetrac-base.service.d/:
+-rw-r--r--  1 root root   31 May 26 23:04 timeout.conf
+/etc/systemd/system/multi-user.target.wants/:
+lrwxrwxrwx  1 root root   49 May 27 06:38 lifetrac-base-compose.service -> /etc/systemd/system/lifetrac-base-compose.service
+lrwxrwxrwx  1 root root   41 May 26 15:05 lifetrac-base.service -> /etc/systemd/system/lifetrac-base.service
+## retired dir
+ls: cannot access '/etc/lifetrac-retired': No such file or directory
+## who wants them
+Id=lifetrac-base.service
+RequiredBy=
+WantedBy=multi-user.target
+
+Id=lifetrac-base-compose.service
+RequiredBy=
+WantedBy=multi-user.target
+## failed
+● lifetrac-base-compose.service loaded failed failed LifeTrac base-station video stack (lifetrac-vtest compose project)
+● lifetrac-base.service         loaded failed failed LifeTrac v25 base station (compose stack)
+● psplash-start.service         loaded failed failed Start psplash boot splash screen

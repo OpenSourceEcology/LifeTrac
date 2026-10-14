@@ -1,3 +1,8 @@
+# DO NOT RUN on a bench board, not even with a radio GO: over adb, flips
+# /opt/lifetrac/video-test/docker-compose.yml on the tractor to REG_PROFILE 1
+# (FHSS), then re-creates image_tx (compose project video-test), which opens
+# /dev/ttymxc3 = transmits.
+# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units", rule 6.
 $adb='C:\Users\dorkm\AppData\Local\Microsoft\WinGet\Packages\Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe\platform-tools\adb.exe'
 $serial='2E2C1209DABC240B'
 Write-Host "=== current REG_PROFILE / FHSS state on tractor ==="

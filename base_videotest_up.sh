@@ -1,4 +1,9 @@
 #!/bin/sh
+# DO NOT RUN on a bench board, not even with a radio GO: runs a bare
+# `docker compose down` that removes the bench broker
+# (design-controller-mosquitto-1), then starts the lifetrac-vtest stack, whose
+# image_rx opens /dev/ttymxc3 with a RESET_REQ that un-parks the L072.
+# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units", rule 4.
 # Bring up the video-test stack, replacing the production stack.
 set -e
 cd /opt/lifetrac/DESIGN-CONTROLLER

@@ -1,4 +1,8 @@
 #!/bin/sh
+# DO NOT RUN on a bench board, not even with a radio GO: starts
+# lifetrac-base.service (retired on the bench base 2026-10-12), which builds on
+# the board, retags lifetrac-v25:latest and starts web_ui and lora_bridge.
+# May-2026 one-off; see BENCH_BOARDS.md "Retired boot units", rule 1.
 set -x
 systemctl reset-failed lifetrac-base.service 2>/dev/null
 systemctl start --no-block lifetrac-base.service

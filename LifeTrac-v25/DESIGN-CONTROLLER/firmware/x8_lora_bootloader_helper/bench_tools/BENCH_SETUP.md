@@ -7,7 +7,8 @@ images. Work through it in order. Each step names the doc that has the details.
 It reproduces the state measured on the original pair. The base was captured
 in [`board_state_2026-10-04/base/`](../../../bench-evidence/board_state_2026-10-04/base/)
 and the tractor in [`board_state_2026-10-10/tractor/`](../../../bench-evidence/board_state_2026-10-10/tractor/);
-[BENCH_BOARDS.md](BENCH_BOARDS.md) describes both captures.
+[BENCH_BOARDS.md](BENCH_BOARDS.md) describes both captures and what
+changed on 2026-10-12, when three old boot units were retired.
 
 | step | what | where |
 |---|---|---|
@@ -62,11 +63,18 @@ radio test.
 5. **The base does not stay off.** After `systemctl poweroff` the base
    booted again about 4.5 minutes later (2026-10-04). To keep it down,
    remove its power. The tractor stays off after `systemctl poweroff`.
-6. **Never start the production units on the bench.** These are
-   `lifetrac-base.service`, `lifetrac-base-compose.service` and
-   `lifetrac-tractor-compose.service`. They would start `lora_bridge` or the
-   tractor stack on the radio UART. This kit does not install them. The
-   original pair has them enabled, and they fail at every boot.
+6. **Never install, enable or start the old boot units on the bench.**
+   Only `lifetrac-base.service` is a production unit: the base compose
+   stack, with `web_ui` and `lora_bridge`. `lifetrac-base-compose.service`
+   and `lifetrac-tractor-compose.service` are May-2026 video-test demo
+   units; they would start `image_rx` (base) and `image_tx` (tractor) on
+   the radio UART at boot. This kit does not install any of them. On the
+   original pair all three were enabled and failed at every boot that was
+   captured, and all three were retired on 2026-10-12
+   ([BENCH_BOARDS.md](BENCH_BOARDS.md#retired-boot-units-2026-10-12)).
+   `provision_bench_board.sh` retires them on a re-provisioned board
+   (step 6). It does so only while they are failed or inactive; if one is
+   active or starting, its step fails and changes nothing.
 7. **Radio tests need a GO.** On a shared bench, every round of radio
    tests needs the operator's explicit GO, and both radios are parked
    after it.
@@ -226,16 +234,20 @@ What it applies, and why:
 | camera USB provisioning: runs the repo's [`provision_x8.sh`](../provision_x8.sh) unchanged | tractor | Installs the `snd_usb_audio` blacklist, the C2 udev rules (autosuspend off, `/dev/lifetrac-c2`) and `lifetrac-camera.service`, and adds `fio` to `video`. The script skips this when all three files already match. It refuses when a camera compose app is installed and the C2 is attached, because `provision_x8.sh` would restart the camera, whose container maps the radio UART; pass `--allow-camera-restart` to accept that. |
 | docker running; probe image `hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44` loaded from the repo-root `foundries_python.tar` (image id `9a454afe48f7`) | both | `radio_park.py`, `radio_state.py` and `rs116_health_probe.py` run in it. The tractor cannot pull images, and the base's own `lifetrac-v25` image exists only after step 9. |
 | `eclipse-mosquitto:2` | base: `docker pull`. Tractor: `--mosquitto-from-base` (docker save on the base, then through the PC) or `--mosquitto-tar FILE` | The base broker and the tractor's local broker. The tag moves, so note the image id the script prints. |
+| the old boot units retired: `lifetrac-base.service` and `lifetrac-base-compose.service` on the base, `lifetrac-tractor-compose.service` on the tractor. A unit that is failed or inactive is disabled without `--now`, and its unit file and `<unit>.d` directory are moved to a new `/etc/lifetrac-retired/<PC UTC time>/`. A unit that is already disabled but still has its file in `/etc/systemd/system` is moved the same way. If a unit is active, starting or stopping, or systemd has a job queued for it, the step fails and changes nothing | both | Rule 6. A freshly flashed board has none of them, so this step changes nothing there. On the tractor it runs before the next step, because its `daemon-reload` makes systemd re-read the units. [BENCH_BOARDS.md](BENCH_BOARDS.md#retired-boot-units-2026-10-12) has the details. |
 | `lifetrac-camera.service` and `tractor-camera` stopped | tractor | Keeps the radio UART free (rule 4). Both come back at the next boot. |
 
-It never opens `/dev/ttymxc3` and never starts the production units. It
-reports any of them it finds, and who holds the radio UART. It ends with a
-checklist of what is left. Exit codes: 0 done, 1 a step failed, 2 usage or
-board unreachable, 3 `--check` found work to do. Run
-`bash provision_bench_board.sh --help` for all options.
+It never opens `/dev/ttymxc3` and never starts the old boot units. It
+reports leftover video-test containers but never removes them: on the
+tractor the order matters, and
+[BENCH_BOARDS.md](BENCH_BOARDS.md#retired-boot-units-2026-10-12) has it. It
+also reports who holds the radio UART. It ends with a checklist of what is
+left. Exit codes: 0 done, 1 a step failed, 2 usage or board unreachable,
+3 `--check` found work to do. Run `bash provision_bench_board.sh --help`
+for all options.
 
-It does not touch the L072 firmware or option bytes, the H747, the deployed
-tree or the production units. It does not rotate the WiFi password either.
+It does not touch the L072 firmware or option bytes, the H747 or the
+deployed tree. It does not rotate the WiFi password either.
 **That password must be treated as compromised:** it was committed in seven
 repo-root WiFi scripts, and although the bench kit replaced the literals
 with the `LIFETRAC_WIFI_SSID` / `LIFETRAC_WIFI_PSK` environment variables, it
@@ -357,6 +369,10 @@ does the full staging.
   the readback is not `0x80`, run `radio_park.py`.
 - **Base:** if it does not show up on USB, use ssh
   (`provision_bench_board.sh base --ssh --check` works over ssh).
+- **Original pair, at the first power-up after 2026-10-12:** the boot-unit
+  retirement has not been seen across a boot yet. Do the checks in
+  [BENCH_BOARDS.md](BENCH_BOARDS.md#not-yet-observed-the-next-boot) first,
+  before any probe.
 
 ## Troubleshooting
 

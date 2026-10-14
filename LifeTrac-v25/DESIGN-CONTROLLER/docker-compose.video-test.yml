@@ -9,14 +9,14 @@
 # producing zero MQTT traffic on `lifetrac/v25/video/tile_delta` since
 # the firmware migration.
 #
-# Bring up (replaces the production stack — only run on the bench while
-# debugging the video pipeline):
-#     docker compose -f docker-compose.video-test.yml -p lifetrac-vtest up -d
-# Logs:
-#     docker compose -p lifetrac-vtest logs -f image_rx
-# Tear down (restore the production stack):
-#     docker compose -p lifetrac-vtest down
-#     docker compose up -d
+# DO NOT BRING THIS UP ON A BENCH BOARD, not even for a session with a radio
+# GO (bench_tools/BENCH_BOARDS.md, "Retired boot units", rule 7). image_rx
+# opens /dev/ttymxc3 with a soft RESET_REQ, which un-parks the L072, and it
+# has restart: unless-stopped: after one `up` it comes back at every boot.
+# The May-2026 commands were `docker compose -f docker-compose.video-test.yml
+# -p lifetrac-vtest up -d` and `docker compose -p lifetrac-vtest down`. The
+# old advice to "restore the production stack" with a bare
+# `docker compose up -d` starts lora_bridge and web_ui: not on the bench.
 #
 # NOTE: this file does NOT define `lora_bridge`. Control TX (estop,
 # camera_select, link_tune, req_keyframe) will not work while this

@@ -1,0 +1,50 @@
+## guard: unit gone or not enabled
+lifetrac-tractor-compose.service is-enabled: Failed to get unit file state for lifetrac-tractor-compose.service: No such file or directory
+## guard: containers exited, project video-test
+tractor-image-tx-v2: exited project=video-test
+tractor-camera-v2: exited project=video-test
+tractor-mosquitto-v2: exited project=video-test
+## step 4: disarm the compose file (rename, nothing deleted)
+total 48
+drwxr-xr-x 4 fio  fio  4096 Sep 23 14:20 .
+drwxr-xr-x 5 root root 4096 May 27 18:22 ..
+-rw-rw-rw- 1 fio  fio  5177 May 30 16:23 docker-compose.yml.RETIRED-2026-10-12
+-rw-r--r-- 1 root root 5002 May 27 18:26 docker-compose.yml.bak-1779906398
+-rw-r--r-- 1 root root 5146 May 30 15:23 docker-compose.yml.bak_
+-rw-r--r-- 1 root root 5111 May 27 20:20 docker-compose.yml.bak_20260527_152255
+drwxr-xr-x 2 fio  fio  4096 May 27 00:12 mosquitto
+drwxr-xr-x 2 fio  fio  4096 May 29 23:53 src
+-- compose now finds no file here (config only parses, starts nothing):
+no configuration file provided: not found
+## step 5: remove the three exited containers (no -f, no -v) and their two networks
+tractor-image-tx-v2
+tractor-camera-v2
+tractor-mosquitto-v2
+video-test_default
+tractor-vtest_default
+## after
+camera_svc	lifetrac-tractor-x8:latest	Exited (137) 2 days ago
+tx_smoke	hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44	Exited (137) 2 days ago
+bench_mqtt	eclipse-mosquitto:2	Exited (0) 2 days ago
+tractor-camera	9bfbbc8d06cb	Exited (137) 3 weeks ago
+tractor-mosquitto	eclipse-mosquitto:2	Exited (0) 3 weeks ago
+lifetrac-camera-x8	hub.foundries.io/arduino/arduino-ootb-python-devel:738bc44	Exited (127) 4 months ago
+x8-devel	hub.foundries.io/arduino/arduino-ootb-python-devel	Up 2 days
+x8-provisioning	hub.foundries.io/arduino/arduino-iot-cloud-provisioning	Up 2 days
+x8-webapp	hub.foundries.io/arduino/arduino-ootb-webapp	Up 2 days
+NAME                STATUS              CONFIG FILES
+arduino-ootb        running(3)          /var/sota/compose-apps/arduino-ootb/docker-compose.yml
+lifetrac-camera     exited(2)           /var/rootdirs/opt/lifetrac/compose-apps/lifetrac-camera/docker-compose.yml,/opt/lifetrac/compose-apps/lifetrac-camera/docker-compose.yml
+arduino-ootb_default bridge host lifetrac-camera_default none 
+lifetrac-camera_mosquitto_config lifetrac-camera_mosquitto_data tractor-vtest_mosquitto_data video-test_mosquitto_data 
+lifetrac-tractor-x8:latest 2727dfd36f9f
+lifetrac-tractor-x8:rs13-65869517 2727dfd36f9f
+lifetrac-tractor-x8:pre-rs13 9bfbbc8d06cb
+eclipse-mosquitto:2 2a23a3e427e4
+## camera service
+lifetrac-camera.service=inactive
+## uart holders
+
+__UART_CHK_DONE__
+## failed units
+* psplash-start.service loaded failed failed Start psplash boot splash screen

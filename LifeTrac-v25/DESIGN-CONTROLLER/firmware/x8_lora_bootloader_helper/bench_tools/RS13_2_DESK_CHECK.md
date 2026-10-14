@@ -7,6 +7,11 @@ Input record: [RS-13.1 RESULTS](../../../bench-evidence/RS_13_vector_scene_2026-
 §7.5 (renderer and fail-closed rules), §4.3 (resync, TTL, age styling), §3.5
 (epochs and hand-over), §6 (mode integration). TODO: RS-13 "RS-13.2 desk check".*
 
+*Updated 2026-10-12 for the bench base as it is now: the `lifetrac-base*`
+boot units are retired, and the bench broker holds `127.0.0.1:1883` after
+every boot (Rules 2 and 3, Steps 1, 3, 7 and 8). Like the rest, these
+changes were written without touching a board.*
+
 The desk check is the first look at VECTOR **in the operator's browser**:
 RS-13.1 judged every leg from captures and the store's numbers, and web_ui was
 never in the loop. Here the rebuilt base image serves the console from the
@@ -58,9 +63,14 @@ Does not check:
    `sudo fuser /dev/ttymxc3` on the base (it opens nothing) is the only
    radio-side check, before and after.
 2. **Never start `lora_bridge`**, never the video-test compose (its `image_rx`
-   opens `/dev/ttymxc3`), never `lifetrac-base*.service` (enabled but failing;
-   it would bring up that video-test stack). Start only `mosquitto` and
-   `web_ui` (and, optionally, `audit_tail`) through the desk-check override
+   opens `/dev/ttymxc3`), and never a `lifetrac-base*.service` unit.
+   `lifetrac-base.service` would bring up the production stack with
+   `lora_bridge`; `lifetrac-base-compose.service` would bring up the
+   video-test stack with `image_rx`. Both are retired on the bench base
+   since 2026-10-12
+   ([BENCH_BOARDS](BENCH_BOARDS.md#retired-boot-units-2026-10-12)); never
+   reinstall them. Start only `mosquitto` and `web_ui` (and, optionally,
+   `audit_tail`) through the desk-check override
    [`rs13_2_desk.compose.yml`](rs13_2_desk.compose.yml), which puts
    `lora_bridge` behind a profile nobody enables and turns web_ui's bench radio
    endpoint off (`LIFETRAC_ENABLE_BENCH_RADIO=0`).
@@ -68,6 +78,10 @@ Does not check:
    volumes). web_ui publishes retained `control/encode_mode_override` and
    `control/radio_profile` (`{"profile": 2}`) at every start; they must not
    survive into the next radio session. Tear down with `down -v` (Step 8).
+   For the same reason, do not reuse the bench broker
+   `design-controller-mosquitto-1`: the radio harness uses it. It holds
+   `127.0.0.1:1883` after every boot, so Step 3 stops it and Step 8 starts
+   it again.
 4. In the console, **do not use** the radio-profile selector, Auto, the bench
    radio buttons, E-STOP or the joysticks. With no daemon running nothing goes
    on air, but retained state and audit entries would. The encode-mode
@@ -111,7 +125,9 @@ stale-tile worker would publish `0x6C` at least every 10 s (RS-13.1 RESULTS,
 "Remaining radio tests"). Rebuild it first:
 
 - with `deploy_base.sh` (this directory, from the bench-kit change) at the
-  SHA of Step 0: it copies the tree and builds the image, and starts nothing;
+  SHA of Step 0: it copies the tree and builds the image. The only container
+  it (re)starts is the bench broker `design-controller-mosquitto-1`
+  (`--no-broker` leaves the broker alone; [DEPLOY.md](DEPLOY.md));
 - or, if that script is not in your tree yet, by hand: `git archive` of
   `base_station/ firmware/ Dockerfile docker-compose*.yml deploy/` →
   `scp` the tarball to the base (never `git archive | ssh sudo -S tar`:
@@ -120,8 +136,9 @@ stale-tile worker would publish `0x6C` at least every 10 s (RS-13.1 RESULTS,
   `DEPLOYED_FROM.txt` there → `docker build --pull=false -t lifetrac-v25:latest .`
   in that directory.
 
-Either way, start and restart nothing. Then check that the image carries the
-VECTOR code, without importing web_ui (its import connects to a broker):
+Either way, start and restart nothing else. Then check that the image
+carries the VECTOR code, without importing web_ui (its import connects to a
+broker):
 
 ```sh
 docker images -q lifetrac-v25:latest                       # record the id
@@ -154,17 +171,46 @@ printf '%s' '<a desk-check PIN, 4-6 digits>' > lifetrac_pin
 head -c 16 /dev/urandom > unused_fleet_key   # satisfies compose only; lora_bridge cannot start
 ```
 
-`/tmp` is tmpfs and ages out after 5 days; stage on the day.
+`/tmp` is tmpfs: it ages out after 5 days and a reboot empties it. Stage on
+the day.
 
 ## Step 3 — bring up `mosquitto` + `web_ui`, nothing else
 
 On the base (prefix `sudo` to the docker commands if `fio` is not in the
-`docker` group):
+`docker` group). First the checks, which change nothing:
 
 ```sh
-sudo fuser /dev/ttymxc3; echo "uart holders: (expect none above)"
-docker ps --format '{{.Names}}\t{{.Image}}\t{{.Status}}'      # expect no leg or compose containers
-ss -ltn | grep -E ':(1883|8080) ' || echo "1883 and 8080 free"
+export PATH=$PATH:/usr/sbin:/sbin
+uart_chk() { sudo -n sh -c 'if command -v fuser >/dev/null; then fuser /dev/ttymxc3; echo; echo __UART_CHK_DONE__; else echo __UART_NO_FUSER__; fi' 2>&1; }
+uart_chk                                                      # expect __UART_CHK_DONE__ with nothing before it
+systemctl list-unit-files 'lifetrac-base*' --no-pager         # expect "0 unit files listed"; no line may say "enabled"
+docker ps -a --format '{{.Names}}\t{{.Image}}\t{{.Status}}'   # see below
+```
+
+`uart_chk` is the marker form of the holder check
+([BENCH_BOARDS](BENCH_BOARDS.md#doing-the-same-on-another-board-pair)):
+`__UART_NO_FUSER__`, or no marker at all, means the check did not run, not
+that the port is free. In the `docker ps -a` list the only container that is
+Up must be the bench broker `design-controller-mosquitto-1`. Exited harness
+leftovers (`rx_smoke`, `bench_mqtt`, `f11_webui` on the original base) are
+fine. There must be no leg container, no other compose container, and no
+`lifetrac-desk-*` container: one of those is left from a desk check that was
+not torn down (see "If the base rebooted" under Step 8).
+
+**Precondition: the boot units are retired.** If a `lifetrac-base*` unit is
+listed as `enabled`, **stop here** and retire it first
+([BENCH_BOARDS](BENCH_BOARDS.md#retired-boot-units-2026-10-12)). With
+`lifetrac-base-compose.service` enabled, the next command is dangerous: it
+stops the bench broker, then nothing holds `127.0.0.1:1883`, and at the next
+base boot that unit would start `image_rx` on `/dev/ttymxc3`. The base boots
+again by itself after a poweroff.
+
+Then free the port and bring the desk stack up:
+
+```sh
+date -u +%FT%TZ; docker stop design-controller-mosquitto-1    # the bench broker; record the UTC time printed. Step 8 starts it again
+L=$(netstat -ltn) && { echo "$L" | grep -E ':(1883|8080) ' || echo "netstat ran: 1883 and 8080 free"; } || echo "LISTENER CHECK DID NOT RUN"
+docker ps --format '{{.Names}}\t{{.Ports}}'                   # no container may publish 1883 or 8080
 cd /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER
 C="docker compose -p lifetrac-desk -f docker-compose.yml -f /tmp/rs13_2/rs13_2_desk.compose.yml"
 $C config --services        # must print mosquitto, web_ui, audit_tail -- never lora_bridge
@@ -173,9 +219,40 @@ $C ps
 $C logs --tail 30 web_ui    # uvicorn "Application startup complete"
 ```
 
-If 1883 or 8080 is already taken, find out what holds it before going on;
-do not stop a container you did not start without recording it. If
-`config --services` lists `lora_bridge`, stop: the override is not applied.
+**The bench broker.** `design-controller-mosquitto-1` holds
+`127.0.0.1:1883` after every boot (docker restart policy `unless-stopped`),
+so the desk broker cannot bind while it runs. Stop it with that one
+`docker stop` and write the time into the evidence (Step 7). Only stop it:
+do not `docker rm` it, and never run `docker compose down` in this directory
+without `-p lifetrac-desk`. The project name is what keeps a `down` away
+from the bench broker: the bare form is project `design-controller` and
+removes the bench broker container. A container stopped by hand stays down,
+across a reboot too, until Step 8 starts it. If the bench broker was not
+running in the `docker ps -a` above, record that and skip the stop.
+
+`127.0.0.1:1883` being taken is the only thing that keeps the video-test
+compose file in this directory from coming up by hand
+([BENCH_BOARDS](BENCH_BOARDS.md#rules), rule 7). While the desk stack is up,
+its broker holds the port and blocks that file just as the bench broker does.
+The port is free only in the gaps: between the `docker stop` above and the
+desk `up`, between the desk `down` and the bench broker's start in Step 8,
+and after a base reboot in between, until the bench broker is started again.
+Rule 2 matters most in those gaps.
+
+If 1883 or 8080 is still taken after the stop, find out what holds it before
+going on; do not stop any other container you did not start without
+recording it. The listener check uses `netstat` because `ss` does not work
+on the base: in the 10-04 capture the `ss` call fell through to `netstat`
+([`20_network.txt`](../../../bench-evidence/board_state_2026-10-04/base/20_network.txt)),
+and on 2026-10-12 a bare `ss | grep` reported no listener on 1883 while the
+bench broker was Up
+([log](../../../bench-evidence/board_state_2026-10-12_unit_retirement/base/12_remove_dead_containers.txt)).
+A bare `ss … || echo free` therefore prints "free" whatever holds the port.
+The line above says "free" only when `netstat` itself ran, and
+`LISTENER CHECK DID NOT RUN` otherwise.
+
+If `config --services` lists `lora_bridge`, stop: the override is not
+applied.
 
 ## Step 4 — open the console on the PC
 
@@ -376,6 +453,7 @@ Evidence directory `bench-evidence/RS_13_2_desk_check_<YYYY-MM-DD>/`:
 |---|---|
 | deployed tree / image | `<sha>` (`DEPLOYED_FROM.txt`), `lifetrac-v25:latest` `<id>` |
 | stack | `docker compose -p lifetrac-desk -f docker-compose.yml -f rs13_2_desk.compose.yml`: mosquitto + web_ui only; `fuser /dev/ttymxc3` empty before and after |
+| bench broker | `systemctl list-unit-files 'lifetrac-base*'`: <output>; `design-controller-mosquitto-1` stopped <UTC>, started again <UTC> |
 | tool | `tools/vector_replay_publish.py` @ `<sha>`, speed 1 |
 | browser | <browser, version>, window <w×h> (and <w×h>) |
 
@@ -396,7 +474,7 @@ Evidence directory `bench-evidence/RS_13_2_desk_check_<YYYY-MM-DD>/`:
 |---|---|---|---|
 
 ## Teardown
-<`down -v` output, `ss -ltn` and `fuser` after, retained topics gone>
+<`down -v` output, the listener check and `fuser` after, retained topics gone, the bench broker Up again>
 ```
 
 ## Step 8 — tear down
@@ -406,9 +484,51 @@ cd /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER
 C="docker compose -p lifetrac-desk -f docker-compose.yml -f /tmp/rs13_2/rs13_2_desk.compose.yml"
 $C down -v                       # containers and the desk broker's volumes, with its retained topics
 docker ps -a --filter name=lifetrac-desk --format '{{.Names}}'     # expect nothing
-ss -ltn | grep -E ':(1883|8080) ' || echo "1883 and 8080 free"
-sudo fuser /dev/ttymxc3; echo "uart holders: (expect none above)"
+export PATH=$PATH:/usr/sbin:/sbin
+L=$(netstat -ltn) && { echo "$L" | grep -E ':(1883|8080) ' || echo "netstat ran: 1883 and 8080 free"; } || echo "LISTENER CHECK DID NOT RUN"
+date -u +%FT%TZ; docker start design-controller-mosquitto-1        # the bench broker stopped in Step 3; record the UTC time printed
+docker ps --filter name=design-controller-mosquitto-1 --format '{{.Names}}\t{{.Status}}\t{{.Ports}}'   # expect it listed: Up, 127.0.0.1:1883->1883/tcp
+netstat -ltn | grep ':1883 '                                       # 127.0.0.1:1883 is listening again
+uart_chk() { sudo -n sh -c 'if command -v fuser >/dev/null; then fuser /dev/ttymxc3; echo; echo __UART_CHK_DONE__; else echo __UART_NO_FUSER__; fi' 2>&1; }
+uart_chk                                                           # expect __UART_CHK_DONE__ with nothing before it
 ```
+
+Start the bench broker again in the same session and check that it is Up:
+the next radio leg needs it on `127.0.0.1:1883`
+([BENCH_QUICKSTART](BENCH_QUICKSTART.md) §4). The desk check published
+nothing into it, because it was stopped the whole time. Do this before any
+base reboot or power-down: a broker left stopped does not come back at boot.
+
+If `docker start` fails or says there is no such container, recreate the
+broker alone, as root in this directory, with the line `deploy_base.sh`
+uses ([DEPLOY.md](DEPLOY.md)):
+`docker compose -p design-controller -f docker-compose.yml up -d --no-deps mosquitto`.
+Never add another service name, and never leave out `mosquitto`.
+A plain `deploy_base.sh` run also recreates it, but it deploys and builds
+`HEAD` on the way.
+
+**If the base rebooted between Step 3 and Step 8** (it boots again by itself
+after a poweroff):
+
+- Nothing radio-related should be running. The desk containers have
+  `restart: "no"` and stay Exited. The bench broker stays down, because
+  docker does not restart a container that was stopped by hand. Check with
+  `docker ps -a` and `uart_chk`.
+- `/tmp/rs13_2` is gone: the override file, the PIN and the replay logs in
+  `out/`. So the `$C` line above fails on the missing override file. Do not
+  fall back to a bare `docker compose down`.
+- Tear down by project name, which does not need the override file:
+
+  ```sh
+  cd /var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER
+  docker compose -p lifetrac-desk -f docker-compose.yml down -v      # -p lifetrac-desk confines it to the desk stack
+  ```
+
+  Then go on with Step 8 from its `docker ps -a` line; the lines after it
+  start the bench broker again. (Staging the directory again as in Step 2
+  and running Step 8 as written does the same.)
+- The replay logs of that session are lost. Repeat the replays if the
+  evidence is needed.
 
 Copy `/tmp/rs13_2/out` to the PC, then `rm -rf /tmp/rs13_2` (it holds the
 desk-check PIN). The image stays built, which is what the next radio session

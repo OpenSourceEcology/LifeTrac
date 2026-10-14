@@ -283,7 +283,7 @@ None of these decisions is implemented. Each one lists its options and a **RECOM
 
 ### D-VS6 — Automatic use of the vector mode
 
-**Context:** there is no automatic encode ladder in production; mode selection is operator-only (`base_station/web_ui.py:91-104`). `AutoRadioPolicy` (`base_station/web_ui.py:378-538`) already demotes DTS → FHSS on 10 s dead air or > 25 % loss and promotes back after 60 s healthy; dead air and promote-back were validated on air 2026-09-15, while the loss input is blind to single-fragment frames (RS-12.20). Base → tractor commands on FHSS were delivered 1/17 and 49/281 in the RS-12.12 legs (`TODO.md:2661-2676`).
+**Context:** there is no automatic encode ladder in production; mode selection is operator-only (`base_station/web_ui.py:91-104`). `AutoRadioPolicy` (`base_station/web_ui.py:378-538`) already demotes DTS → FHSS on 10 s dead air or > 25 % loss and promotes back after 60 s healthy; dead air and promote-back were validated on air 2026-09-15, while the loss input is blind to single-fragment frames (RS-12.20). Base → tractor commands on FHSS were delivered 1/17 and 49/281 in the RS-12.12 legs (`TODO.md:2756-2771`).
 
 | Option | Pros | Cons |
 |---|---|---|
@@ -301,7 +301,7 @@ None of these decisions is implemented. Each one lists its options and a **RECOM
 
 ### D-VS8 — Coordinated modem-rung switch (spreading factor on the fly)
 
-**Context:** SF is fixed at 7 in all three regulatory profiles and there is no host CFG key (`SETTINGS_REFERENCE.md:50, 1247`), although the radio layer already validates any tuple through `sx1276_set_sf_bw_cr_checked()` (`firmware/murata_l072/radio/sx1276.c:393`). The only sensitivity lever today is the DTS → FHSS bandwidth switch (+3 dB). No bench leg has run at the range edge. Each SF step buys about 2.5 dB and doubles airtime; under the 170 ms fragment cap the body falls to 96 B at SF8/BW250 and 35 B at SF9/BW250 (computed), so a tile frame is reduced to a single unusually compressible tile (a minimum one-tile `mono_g4` frame is about 31 B against a 41 B payload) while the vector mode still carries a whole-scene update of about 4 records per frame. An SX1276 demodulates one SF at a time, so a switch one side misses leaves both deaf; the protocol must cover the rendezvous. Full specification: [VECTOR_SCENE.md §4.6](VECTOR_SCENE.md#46-coordinated-modem-rung-change-the-d-vs8-protocol).
+**Context:** SF is fixed at 7 in all three regulatory profiles and there is no host CFG key (`SETTINGS_REFERENCE.md:50, 1249`), although the radio layer already validates any tuple through `sx1276_set_sf_bw_cr_checked()` (`firmware/murata_l072/radio/sx1276.c:393`). The only sensitivity lever today is the DTS → FHSS bandwidth switch (+3 dB). No bench leg has run at the range edge. Each SF step buys about 2.5 dB and doubles airtime; under the 170 ms fragment cap the body falls to 96 B at SF8/BW250 and 35 B at SF9/BW250 (computed), so a tile frame is reduced to a single unusually compressible tile (a minimum one-tile `mono_g4` frame is about 31 B against a 41 B payload) while the vector mode still carries a whole-scene update of about 4 records per frame. An SX1276 demodulates one SF at a time, so a switch one side misses leaves both deaf; the protocol must cover the rendezvous. Full specification: [VECTOR_SCENE.md §4.6](VECTOR_SCENE.md#46-coordinated-modem-rung-change-the-d-vs8-protocol).
 
 | Option | Pros | Cons |
 |---|---|---|
@@ -320,7 +320,7 @@ None of these decisions is implemented. Each one lists its options and a **RECOM
 
 ### D-VS9 — Control-plane resilience before the drive plane ships
 
-**Context:** the vector mode is a "look, then move" view, so in degraded signal the stop and steer commands matter more than the picture. Firmware Batch 2 (reserved control slot, mute gate, skip/ditto) was demoted to an optimisation after smooth pacing gave 99.8 % single-copy delivery on DTS (`TODO.md:157-159`); base → tractor delivery on FHSS was 1/17 and 49/281 (`TODO.md:2661-2676`).
+**Context:** the vector mode is a "look, then move" view, so in degraded signal the stop and steer commands matter more than the picture. Firmware Batch 2 (reserved control slot, mute gate, skip/ditto) was demoted to an optimisation after smooth pacing gave 99.8 % single-copy delivery on DTS (`TODO.md:157-159`); base → tractor delivery on FHSS was 1/17 and 49/281 (`TODO.md:2756-2771`).
 
 **RECOMMENDATION:** treat both as prerequisites of RS-9 / Route B rather than optimisations: (1) revive Batch 2 so control has a guaranteed slot every period regardless of image pacing; (2) fix the FHSS reverse direction with a reserved reverse slot or by making the base the hop-clock originator; (3) prefer repetition (3-copy sticky state, ditto in consecutive slots) over any acknowledgement, and never slow the modulation for control. See `VECTOR_SCENE.md` §4.5 and §7.4.
 

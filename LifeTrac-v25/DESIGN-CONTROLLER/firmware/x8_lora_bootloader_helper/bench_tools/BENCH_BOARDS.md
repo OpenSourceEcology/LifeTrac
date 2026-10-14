@@ -1,9 +1,15 @@
 # Bench boards: chips, firmware and board-resident software
 
-State as of **2026-10-10**. Both boards are measured from read-only
-captures:
+State as of **2026-10-10**, plus the boot-unit retirement of **2026-10-12**.
+Both boards are measured from read-only captures:
 - base: [`bench-evidence/board_state_2026-10-04/base/`](../../../bench-evidence/board_state_2026-10-04/base/);
 - tractor: [`bench-evidence/board_state_2026-10-10/tractor/`](../../../bench-evidence/board_state_2026-10-10/tractor/).
+
+On 2026-10-12 three boot units were retired and their leftover containers
+removed. That change is recorded in
+[`bench-evidence/board_state_2026-10-12_unit_retirement/`](../../../bench-evidence/board_state_2026-10-12_unit_retirement/README.md)
+and marked "Changed 2026-10-12" in the sections below; see
+[Retired boot units](#retired-boot-units-2026-10-12).
 
 The rest comes from a review of AI NOTES, bench-evidence,
 X8_HEALTH_AND_RECOVERY and git history.
@@ -13,8 +19,11 @@ It covers hardware, the OS image pinned by URL and sha256, the reflash,
 first boot, verification and the L072 firmware.
 [`provision_bench_board.sh`](provision_bench_board.sh) applies the `/etc`
 and docker changes listed under *LifeTrac software living in the X8 Linux*
-below, except the production units, which it never installs. `--check`
-reports how far a board is from that state.
+below. It never installs the three retired boot units. If it finds one that
+is failed or inactive, it retires it; if one is active, starting or
+stopping, that step fails and changes nothing
+([Retired boot units](#retired-boot-units-2026-10-12)). `--check` reports
+how far a board is from that state.
 
 ## The two boards
 
@@ -25,7 +34,7 @@ reports how far a board is from that state.
 | OS (LmP) | **4.0.11-934-91**, kernel 6.1.24-lmp-standard (uuu reflash 2026-05-13 and 05-24). The bundle is `https://downloads.arduino.cc/portentax8image/934.tar.gz`; its sha256 list is in [T3a](../../../X8_HEALTH_AND_RECOVERY/recovery/T3a_sdp_uuu_reflash.md). | **4.0.3-674-88**, kernel 5.10.93-lmp-standard (factory, never reflashed). Arduino still hosts the image at `https://downloads.arduino.cc/portentax8image/674.tar.gz` (854,998,055 B). Nobody here has downloaded or byte-verified it, so there is no sha256 on record. Reflashing to 934 would move it to 6.1.24; BENCH_SETUP §3 compares the two. |
 | access | adb; ethernet 192.168.1.117 with eth0 pinned to 100BASE-TX full (marginal cable); ssh key `~/.ssh/lifetrac_base_ed25519`. On 2026-10-10 it did not enumerate on USB after a power cycle, but ssh worked. | adb only (WiFi off by policy) |
 | power-down | `systemctl poweroff` did **not** keep it off: it booted again about 4.5 min later (2026-10-04). Remove power to keep it down. | stayed off after `systemctl poweroff` |
-| clock | NTP | no time source; it lags by hours to days |
+| clock | NTP, but no battery-backed clock: the wall clock is stepped forward early in a boot (239 s at the 10-10 boot, the one boot measured; the size presumably follows how long the board was off), so journal time spans across that step are inflated | no time source; it lags by days to weeks (it read 2026-09-23 on 2026-10-12, 19 days behind) |
 
 Pairing matters for recovery. The L072 firmware and option bytes, the
 carrier's J-Link OB and the DIP switches belong to the **carrier**. The H747
@@ -65,9 +74,13 @@ Repo L072 binaries that are on no board:
   - `sudoers.d/99-lifetrac-bench-nopasswd` (`fio ALL=(ALL) NOPASSWD: ALL`).
   - `compose-apps-early-start.service` and `…-recovery.service` are masked.
     **Unmasking the recovery unit wipes `/var/lib/docker`.**
-  - `lifetrac-base.service` and `lifetrac-base-compose.service` are
-    **enabled but fail at every boot**. If one ever succeeded, compose would
-    start `lora_bridge` on `/dev/ttymxc3`.
+  - `lifetrac-base.service` (the production base compose stack, with the
+    drop-in `lifetrac-base.service.d/timeout.conf`, `TimeoutStartSec=1800`)
+    and `lifetrac-base-compose.service` (a May-2026 video-test demo unit).
+    When measured, both were enabled and had failed at boot.
+    **Changed 2026-10-12:** both are retired. systemd no longer lists them,
+    and the files are in `/etc/lifetrac-retired/20261012T212515Z/`
+    ([Retired boot units](#retired-boot-units-2026-10-12)).
   - NetworkManager `Wired connection 1` (the eth0 pin).
   - Removed wants: `lmp-auto-hostname`, `resize-helper`, `run-postinsts`.
   - `aktualizr-lite` is enabled but inactive, with no compose-apps registered.
@@ -82,8 +95,11 @@ Repo L072 binaries that are on no board:
   None rebuilds byte-identically: the requirements are floors and the tags are
   mutable. The two LifeTrac images are exported to the private archive.
 - **Containers:** `design-controller-mosquitto-1` runs (restart
-  unless-stopped). Leftovers: `lifetrac-vtest-*` (Created), `rx_smoke`,
-  `bench_mqtt`, `f11_webui` (Exited).
+  unless-stopped). That docker restart policy is what brings it up at boot;
+  no systemd unit starts it. Leftovers: `rx_smoke`, `bench_mqtt`, `f11_webui`
+  (Exited). **Changed 2026-10-12:** the four `lifetrac-vtest-*` containers
+  (Created, never started) and the network `lifetrac-vtest_default` were
+  removed. The `lifetrac-vtest_*` volumes were kept.
 - **Retained topics** on that broker (`retained_topics.txt`) include a
   leftover `control/encode_mode_override {"mode":"mono_g4"}` from leg 2d_r4.
   The leg prep's `clear_retained.py` clears it.
@@ -115,14 +131,23 @@ Repo L072 binaries that are on no board:
     `tractor_x8/systemd/`. It reads "disabled", but udev starts it anyway.
     **It grabs `/dev/ttymxc3`, the radio UART, at every boot.** Stop it
     before any probe.
-  - `lifetrac-tractor-compose.service`, **enabled, failing at boot**;
+  - `lifetrac-tractor-compose.service`, a May-2026 video-test demo unit.
+    When measured it was enabled and had failed at boot. **Changed
+    2026-10-12:** retired; the file is in
+    `/etc/lifetrac-retired/20261012T212515Z/`
+    ([Retired boot units](#retired-boot-units-2026-10-12));
   - `disable-wifi.service`, enabled: an rfkill block at boot;
   - `wpa_supplicant.service` masked;
   - `fio` added to `video` / `docker`;
   - `docker/key.json`.
 
-  All of these were installed by `provision_x8.sh` (2026-05-15) and the May
-  WiFi-off steps. The `disable-wifi.service` unit is now in git as
+  These were installed by `provision_x8.sh` (2026-05-15) and the May
+  WiFi-off steps, with one exception: `lifetrac-tractor-compose.service`.
+  The only unit `provision_x8.sh` installs is `lifetrac-camera.service`.
+  The compose unit was installed and enabled on 2026-05-27 06:36 UTC by the
+  repo-root `tmp_install_tractor_unit.sh`.
+
+  The `disable-wifi.service` unit is now in git as
   [`units/disable-wifi.service`](units/disable-wifi.service), copied from
   the capture. `provision_bench_board.sh tractor` installs and enables it,
   masks `wpa_supplicant`, and reruns `provision_x8.sh` when the camera
@@ -132,8 +157,23 @@ Repo L072 binaries that are on no board:
 - **`/var/rootdirs/opt/lifetrac`:**
   - `compose-apps/lifetrac-camera`, which runs `lifetrac-tractor-x8:latest`
     with `/dev/video1` and `/dev/ttymxc3`;
-  - the hand-edited May `video-test` stack;
+  - the hand-edited May `video-test` stack, which is not in git. **Changed
+    2026-10-12:** the folder is still on the board, but its
+    `docker-compose.yml` is renamed `docker-compose.yml.RETIRED-2026-10-12`,
+    so no `docker compose up` in that folder finds a file. A copy of the
+    tree as it was before the rename (10 files, sha256 verified) is in the
+    private archive;
   - `bin/ffmpeg`.
+- **Containers** (2026-10-12; the 10-10 capture has the earlier list).
+  Running: the Arduino `x8-devel`, `x8-provisioning`, `x8-webapp`. Exited:
+  `tractor-camera` and `tractor-mosquitto` (the `lifetrac-camera` compose
+  app), the harness containers `camera_svc`, `tx_smoke`, `bench_mqtt`, and
+  `lifetrac-camera-x8`. **Changed 2026-10-12:** the three Exited video-test
+  containers `tractor-image-tx-v2`, `tractor-camera-v2` and
+  `tractor-mosquitto-v2` and the networks `video-test_default` and
+  `tractor-vtest_default` were removed. The volumes
+  `video-test_mosquitto_data` and `tractor-vtest_mosquitto_data` were kept.
+  The board also holds 335 anonymous docker volumes (see *Open items*).
 - **Images:**
   - `lifetrac-tractor-x8:latest` / `:rs13-65869517` `2727dfd36f9f`;
   - `lifetrac-tractor-x8:pre-rs13` `9bfbbc8d06cb` (594 MB);
@@ -151,6 +191,372 @@ Repo L072 binaries that are on no board:
   - `base_station/` is an old copy of the repo's `base_station` (with a
     `.pytest_cache`); `lifetrac_p0c/` is old flash staging.
 
+## Retired boot units (2026-10-12)
+
+Three LifeTrac units were enabled on the original pair and failed at every
+boot that was captured: on the base at the 10-04 capture and at the 10-10
+boot, on the tractor at the 10-10 boot. Earlier boots are not on record
+(for `lifetrac-base.service` the July notes cited in the table say its build
+path worked again on 07-26, and the broker container that blocked the
+video-test unit was created that day). On 2026-10-12, with the operator's
+approval, they were retired, not repaired: each one failed for an incidental
+reason, and that failure was the only thing keeping a radio daemon from
+starting at boot without a GO. Record, logs and the scripts that ran:
+[`board_state_2026-10-12_unit_retirement/`](../../../bench-evidence/board_state_2026-10-12_unit_retirement/README.md).
+
+| unit | what it was | why it failed | what it would have started |
+|---|---|---|---|
+| `lifetrac-base.service` (base), with the drop-in `lifetrac-base.service.d/timeout.conf` (`TimeoutStartSec=1800`) | The **production** base compose stack: [`base_station/systemd/lifetrac-base.service`](../../../base_station/systemd/lifetrac-base.service), commit `a90ae759` (2026-04-27). Installed on the base by hand on 2026-05-26 15:05 UTC; no script in git installs it. | Its `ExecStart` is `docker compose up -d --build --remove-orphans`. `lora_bridge`, `web_ui` and `audit_tail` each `build: .` to the same tag `lifetrac-v25:latest`, and all three BuildKit exports fail with `layer does not exist` (exit 17). Root cause unknown; the same error was diagnosed as docker layer-store corruption in July ([NOTES](../../../bench-evidence/RS_throughput_rebaseline_2026-07-25/NOTES.md), "Base redeploy"). | A retag of `lifetrac-v25:latest` away from the flown image `4623980c2dac`: the same `d3751286` tree, but a new image id that cannot be reproduced, and the base has no `:previous` tag. `web_ui`, which republishes a retained `control/radio_profile` into the harness broker at startup; on 2026-07-26 that caused a live FHSS→DTS switch on air (same NOTES, "Run R"). `lora_bridge` with `/dev/ttymxc3` mapped: as configured it is told to open `/dev/ttymxc3`, which inside the container is `/dev/ttyACM0`, so it would probably crash-loop (inferred, not observed). It speaks KISS at 115200, which the Method-G L072 firmware does not. |
+| `lifetrac-base-compose.service` (base) | A **May-2026 video-test demo** unit: [`deploy/lifetrac-base-compose.service`](../../../deploy/lifetrac-base-compose.service), commit `03998936` (2026-05-27). Installed and enabled by the repo-root `tmp_install_base_unit.sh` on 2026-05-27 06:38 UTC. | Its mosquitto publishes `127.0.0.1:1883`, which the bench broker `design-controller-mosquitto-1` already holds. The 10-04 capture records `Bind for 127.0.0.1:1883 failed: port is already allocated`. At the 10-10 boot it hung at "Starting" instead, until its 180 s start timeout. | `image_rx` on `/dev/ttymxc3` with `LIFETRAC_SKIP_RESET_REQ=0`, a soft RESET_REQ that un-parks the L072, at `LIFETRAC_REG_PROFILE=0` (fixed 915 MHz). |
+| `lifetrac-tractor-compose.service` (tractor) | The same May demo: [`deploy/lifetrac-tractor-compose.service`](../../../deploy/lifetrac-tractor-compose.service), commit `03998936`. Installed and enabled by the repo-root `tmp_install_tractor_unit.sh` on 2026-05-27 06:36 UTC, not by `provision_x8.sh`. It runs `docker compose -p tractor-vtest up -d` in the non-git `/opt/lifetrac/video-test`. | That compose file pins `container_name` to `tractor-*-v2`, and those names were held by Exited containers of compose project `video-test`. | `tractor-image-tx-v2` on `/dev/ttymxc3` at `LIFETRAC_REG_PROFILE=0`, plus `tractor-camera-v2` with `LIFETRAC_USE_LORA_BRIDGE=1`: image TX at every boot without a GO. |
+
+Base journal times need care, because the wall clock is stepped forward
+early in a boot. At the 10-10 boot the step was 239 s: the 419 s the journal
+shows for `lifetrac-base-compose.service` is its 180 s start timeout, which
+systemd counts on the monotonic clock. The same journal jumps from 16:55:00
+to 16:59:04 inside `lifetrac-base.service`'s build, so the step most likely
+fell there: the unit then failed about 7 s after it started, not the
+4 minutes the journal shows, and BuildKit's "exporting layers 243.4s" is the
+same artefact (inferred; no monotonic timestamps were captured). Only this
+one boot was measured, so do not subtract 239 s from another boot's journal.
+
+**What was done.** On each board: `systemctl disable` without `--now`,
+`systemctl reset-failed`, the unit file (and the `.d` directory) moved to
+`/etc/lifetrac-retired/20261012T212515Z/` with a `README.txt`, then
+`systemctl daemon-reload`. Only after that were the leftover containers
+removed; the *Base* and *Tractor* sections above list them. No board was
+rebooted and nothing opened `/dev/ttymxc3`: the holder check showed nobody
+on either board, before and after. On the tractor `lifetrac-camera.service`
+stayed inactive through both `daemon-reload`s (systemd 250). End state:
+`systemctl --failed` lists only the stock `psplash-start.service` on both
+boards.
+
+Left alone: `design-controller-mosquitto-1` (still Up),
+`lifetrac-camera.service` with `tractor-camera` / `tractor-mosquitto`, the
+harness containers, the `x8-*` containers, all volumes and all images.
+
+[`provision_bench_board.sh`](provision_bench_board.sh) now enforces this
+state on a re-provisioned board, in its item "old boot units retired":
+
+- The item is `ok` when each unit of the board's role is neither enabled nor
+  active, and neither its unit file nor its `<unit>.d` directory is left in
+  `/etc/systemd/system` (a symlink there, such as a mask, passes). A board
+  that never had the units passes.
+- Otherwise, and only while every listed unit is `failed` or `inactive` and
+  systemd has no start or stop job queued for it, the script runs
+  `systemctl disable` without `--now` and `systemctl reset-failed`, moves the
+  unit files and `.d` directories into a new
+  `/etc/lifetrac-retired/<PC UTC time>/`, writes a `README.txt` there, and
+  runs `systemctl daemon-reload`. A unit that is already disabled but still
+  has its file there is moved the same way.
+- If a listed unit is `active`, `activating`, `deactivating` or `reloading`,
+  or has a job queued (early in a boot an enabled unit reads `inactive` while
+  its start job waits), the item is `FAILED`, nothing is changed, and the
+  script prints what to do (rule 3). The board reads the state once more
+  right before each unit's `disable`. If a unit has changed by then, it is
+  refused there: units handled before it stay disabled, no file is moved,
+  and the item is `FAILED`.
+- With `--check` nothing is changed: the item reads `TODO` (exit 3), and
+  info lines name the unit or the leftover file that is the reason.
+- A query to the board that does not answer never reads as `ok`: the item
+  is `TODO` or `FAILED`, and nothing is moved.
+- It never starts, stops or masks a unit, never runs `docker compose`, and
+  never stops or removes a container. It reports the leftover video-test
+  containers and the tractor's `video-test/docker-compose.yml`; removing them
+  stays manual, in the order given below.
+
+### Rules
+
+1. **Do not repair, reinstall or re-enable these units on a bench board.**
+   Removing the incidental failure is what puts a radio daemon on
+   `/dev/ttymxc3` at boot. Do not run the repo-root May scripts that install
+   or start them: `tmp_install_base_unit.sh`, `tmp_install_tractor_unit.sh`,
+   `start_base.sh`, `start_base_long.sh`. Do not run `bringup_retry.sh`
+   either: it runs the `ExecStart` of `lifetrac-base.service` as a transient
+   unit, so it works with the unit retired.
+2. **`systemctl mask` is not possible.** The real unit files sit in
+   `/etc/systemd/system`, which is where `mask` wants to put its `/dev/null`
+   symlink ("File exists"). Disable, then move the files out.
+3. **Stopping.** systemd runs `ExecStop` only if the start succeeded. For a
+   failed or activating unit, `stop` and `disable --now` run no `ExecStop`.
+   `lifetrac-base.service`'s `ExecStop` is a bare `docker compose down` in
+   `DESIGN-CONTROLLER`, which is compose project `design-controller`: it
+   removes the bench broker container (rule 4 says how to recreate it; the
+   broker's volume survives). So the unit's state decides:
+   - `failed` or `inactive`: `systemctl disable` without `--now`, then move
+     the files out. `provision_bench_board.sh` does both.
+   - `activating`: wait until it is `failed` or `active`, then follow that
+     branch. Do not interrupt the build.
+   - `deactivating`: a stop is running. Wait until it is `inactive` or
+     `failed`.
+   - `active`: the start succeeded, so radio daemons may be up. There is one
+     route, in this order; both scripts print it:
+     1. `sudo docker stop` the unit's radio containers by name (`sudo docker
+        ps` lists them): `design-controller-lora_bridge-1` and
+        `design-controller-web_ui-1` for `lifetrac-base.service`,
+        `lifetrac-vtest-image_rx-1` and `lifetrac-vtest-web_ui-1` for
+        `lifetrac-base-compose.service`, `tractor-image-tx-v2` and
+        `tractor-camera-v2` for `lifetrac-tractor-compose.service`.
+     2. `sudo systemctl stop <unit>`. For `lifetrac-base.service`, and only
+        for it, this removes the broker container; recreate it afterwards
+        (rule 4). The two demo units' `ExecStop` names its own compose
+        project (`-p lifetrac-vtest`, `-p tractor-vtest`), so it does not
+        touch the broker.
+     3. Retire the unit: run `provision_bench_board.sh` again.
+
+     Stopping only the containers is not enough. The units are
+     `Type=oneshot` with `RemainAfterExit=yes`, so the unit stays `active`
+     and enabled, and `provision_bench_board.sh` and `deploy_base.sh` keep
+     refusing.
+4. **Never run a bare `docker compose down` in `DESIGN-CONTROLLER` on a
+   bench base.** It removes `design-controller-mosquitto-1`. The repo-root
+   `base_videotest_up.sh` does exactly that and then starts the video-test
+   stack, and `_bench_up2.ps1` force-removes the broker over adb before it
+   starts `image_rx`; do not run them. If the broker container is gone,
+   recreate it alone, as root in the deployed tree, with the line
+   `deploy_base.sh` uses:
+   `docker compose -p design-controller -f docker-compose.yml up -d --no-deps mosquitto`.
+5. **Order on the tractor.** Never remove the old `tractor-*-v2` containers,
+   and never "fix" the unit's `-p`, while the unit is enabled. That removes
+   the only barrier, and the tractor transmits at the next boot. Disable
+   first.
+6. **The compose-file rename disarms the manual paths on the tractor too.**
+   Six May scripts run `docker compose -p tractor-vtest up` in
+   `/opt/lifetrac/video-test`: the repo-root `tmp_tractor_vtest_up.sh`,
+   `tmp_recreate_both.sh`, `tmp_recreate_camera.sh`,
+   `tmp_recreate_image_tx.sh`, `tmp_short_keyframe.sh`, and
+   `firmware/x8_lora_bootloader_helper/tractor_restart_video_test.sh`.
+   `_tractor_flip.ps1`, `_tractor_flip2.ps1` and `_tractor_flip_remote.sh`
+   do the same without `-p`, under project `video-test`. With
+   `docker-compose.yml` renamed, compose finds no file in that folder,
+   whatever `-p` is used. Do not rename it back, not even for a session with
+   a radio GO: the containers have `restart: unless-stopped`, so one
+   successful `up` comes back at every boot.
+7. **The base has no such disarm.** `docker-compose.video-test.yml` is still
+   in the deployed tree, and `deploy_base.sh` ships it again with every
+   deploy (it ships `docker-compose*.yml`). Never bring it up on the bench.
+   Its `image_rx` maps `/dev/ttymxc3`, sends a soft RESET_REQ on open that
+   un-parks the L072, and has `restart: unless-stopped`: after one
+   successful `up` it comes back at every boot, with no unit involved, until
+   the container is removed. What makes a manual
+   `docker compose -p lifetrac-vtest -f docker-compose.video-test.yml up`
+   fail today is incidental again: its mosquitto wants `127.0.0.1:1883`,
+   which the bench broker holds. Whenever nothing holds that port, nothing
+   stops it. During [RS13_2_DESK_CHECK.md](RS13_2_DESK_CHECK.md) the desk
+   broker holds the port while the desk stack is up; the port is free only
+   between the bench broker's stop and the desk `up`, between the desk `down`
+   and the bench broker's start, and after a base reboot in between. The
+   repo-root May scripts on this path, and what still blocks each one:
+   - `tmp_base_up.sh` (the whole stack) and `tmp_restart_image_rx.sh`
+     (`image_rx` and, through `depends_on`, its mosquitto): port 1883, while
+     the bench broker runs.
+   - `tmp_hot_patch.sh`: it needs `lifetrac-vtest-web_ui-1`, which was
+     removed on 2026-10-12.
+   - `_bench_up.ps1`: nothing on the board. It starts `image_rx` in project
+     `design-controller`, the bench broker's own project, so there is no
+     port clash. It runs over adb, and the base does not enumerate on adb
+     at present (*Open items*).
+   - `_bench_up2.ps1` and `base_videotest_up.sh` (rule 4): they remove the
+     bench broker first, so the port is free. `_bench_up2.ps1` also needs
+     adb.
+8. **Build on the base only with `deploy_base.sh`.** It keeps the image it
+   replaces as `lifetrac-v25:previous` and labels the new one with its
+   commit. The repo-root one-offs `base_build_bg.sh`, `tmp_base_build.sh`,
+   `tmp_base_prune_build.sh`, `_bench_build3.ps1` and `_bench_build4.ps1`
+   run `docker compose build` in the deployed tree instead: a build that
+   succeeds moves `lifetrac-v25:latest` off the flown image and keeps
+   nothing. `tmp_base_prune_build.sh` first deletes the whole build cache
+   and every image that no container uses; `_bench_build4.ps1` deletes the
+   build cache. None of them starts a container.
+
+### Doing the same on another board pair
+
+This changes board configuration, so it needs the operator's approval. It
+needs no radio GO: nothing opens `/dev/ttymxc3`.
+
+**Step 1: retire the units with the script.** `provision_bench_board.sh` is
+the one implementation of the disable and the move, and its guards refuse
+(see above). From Git Bash on the PC, in `bench_tools/`:
+
+```sh
+bash provision_bench_board.sh base --ssh --check      # leave out --ssh when the base is on adb
+bash provision_bench_board.sh tractor --check
+```
+
+Read both reports first: without `--check` the script applies every
+provisioning step that reads `TODO`, not only this one
+([BENCH_SETUP.md](BENCH_SETUP.md), step 6). Then run each line again
+without `--check`. The item "old boot units retired" must read `ok` or
+`applied`. If it reads `FAILED`, follow the printed message (rule 3) and run
+the script again. Go on to step 2 only after the item has read `ok` or
+`applied` on that board.
+
+The scripts that ran by hand on 2026-10-12 are in
+[`scripts/`](../../../bench-evidence/board_state_2026-10-12_unit_retirement/scripts/).
+They are the record of that day and carry its names and dates; they are not
+a tool for another pair.
+
+**Step 2: remove the leftover containers by hand.** Run these as `fio` on
+the board, the base over ssh and the tractor in `adb shell`. Each cleanup is
+a shell function, so a guard that fails returns before anything is removed.
+The commands and guards are those of the 10-12 scripts; wrapped in functions
+like this they have not been run on a board. The container lists and the
+states the guards expect are those of the original pair; if a guard aborts
+on another pair, stop and look.
+
+On both boards, first:
+
+```sh
+export PATH=$PATH:/usr/sbin:/sbin
+uart_chk() { sudo -n sh -c 'if command -v fuser >/dev/null; then fuser /dev/ttymxc3; echo; echo __UART_CHK_DONE__; else echo __UART_NO_FUSER__; fi' 2>&1; }
+units_gone() {   # units_gone <unit>...: fails unless every unit is not enabled, not active and has no wants link left
+  for u in "$@"; do
+    e=$(systemctl is-enabled "$u" 2>&1); a=$(systemctl is-active "$u" 2>/dev/null)
+    echo "$u: is-enabled=[$e] is-active=[$a]"
+    case $e in enabled*) echo "ABORT: $u is still enabled"; return 1 ;; esac
+    case $a in inactive|failed) ;; *) echo "ABORT: $u is not inactive or failed"; return 1 ;; esac
+    if [ -L "/etc/systemd/system/multi-user.target.wants/$u" ]; then echo "ABORT: $u still has a wants link"; return 1; fi
+  done
+}
+```
+
+`uart_chk` is the marker form of the UART holder check. Only
+`__UART_CHK_DONE__` with nothing before it means nobody holds the port.
+`__UART_NO_FUSER__`, or no marker at all, means the check did not run.
+
+**Base:**
+
+```sh
+base_cleanup() {
+  units_gone lifetrac-base.service lifetrac-base-compose.service || return 1
+  C="lifetrac-vtest-mosquitto-1 lifetrac-vtest-image_rx-1 lifetrac-vtest-web_ui-1 lifetrac-vtest-audit_tail-1"
+  for c in $C; do   # guard: each container was created and never started
+    s=$(sudo -n docker inspect -f '{{.State.Status}} started={{.State.StartedAt}} project={{index .Config.Labels "com.docker.compose.project"}}' $c 2>&1)
+    echo "$c: $s"
+    case $s in "created started=0001-01-01T00:00:00Z project=lifetrac-vtest") ;; *) echo "ABORT: unexpected state"; return 1 ;; esac
+  done
+  sudo -n docker rm $C && sudo -n docker network rm lifetrac-vtest_default    # no -f, no -v: the volumes stay
+}
+uart_chk
+base_cleanup
+# verify
+systemctl --failed --no-legend --no-pager                  # expect only psplash-start.service
+sudo -n docker ps --format '{{.Names}}\t{{.Status}}'       # design-controller-mosquitto-1 Up
+uart_chk
+```
+
+**Tractor.** First save what the cleanup removes for good. From Git Bash on
+the PC, with `TRACTOR_SERIAL` and `ARCHIVE_DIR` set as in `bench.env`
+(`ARCHIVE_DIR` is a folder outside git). The commands used on 2026-10-12
+were typed by hand and not kept; these are the equivalent, and they have not
+been run:
+
+```sh
+S=${TRACTOR_SERIAL:?set TRACTOR_SERIAL first}
+A=${ARCHIVE_DIR:?set ARCHIVE_DIR first}/board_state_$(date -u +%Y-%m-%d)/tractor
+mkdir -p "$A"
+MSYS_NO_PATHCONV=1 adb -s "$S" pull /var/rootdirs/opt/lifetrac/video-test "$(cygpath -m "$A")"
+MSYS_NO_PATHCONV=1 adb -s "$S" shell 'cd /var/rootdirs/opt/lifetrac && find video-test -type f -exec sha256sum {} \;' | tr -d '\r' > "$A/video-test.board.sha256"
+(cd "$A" && sha256sum -c video-test.board.sha256)     # every line must end in OK
+for c in tractor-image-tx-v2 tractor-camera-v2 tractor-mosquitto-v2; do
+  MSYS_NO_PATHCONV=1 adb -s "$S" shell "sudo -n docker inspect $c" | tr -d '\r' > "$A/inspect_$c.json"
+done
+```
+
+Without `MSYS_NO_PATHCONV=1` Git Bash rewrites the board path into a
+Windows path. Then, in `adb shell` on the tractor, set `DAY` to today's UTC
+date as the PC shows it, for example `DAY=2026-10-12`. The tractor's clock
+is not wall time, and `tractor_cleanup` refuses without `DAY`. Then:
+
+```sh
+U=lifetrac-tractor-compose.service
+VT=/var/rootdirs/opt/lifetrac/video-test
+camchk() { echo "lifetrac-camera.service=$(systemctl is-active lifetrac-camera.service) running=[$(sudo -n docker ps --format '{{.Names}}' | grep -x -E 'tractor-camera|tractor-camera-v2|tractor-image-tx-v2|camera_svc|tx_smoke' | tr '\n' ' ')]"; }
+tractor_cleanup() {
+  [ -n "${DAY:-}" ] || { echo "ABORT: set DAY first"; return 1; }
+  units_gone $U || return 1
+  C="tractor-image-tx-v2 tractor-camera-v2 tractor-mosquitto-v2"
+  for c in $C; do   # guard: each container is Exited and belongs to project video-test
+    s=$(sudo -n docker inspect -f '{{.State.Status}} project={{index .Config.Labels "com.docker.compose.project"}}' $c 2>&1)
+    echo "$c: $s"
+    case $s in "exited project=video-test") ;; *) echo "ABORT: unexpected state"; return 1 ;; esac
+  done
+  # disarm the compose file: a rename, nothing is deleted
+  [ -f $VT/docker-compose.yml ] || { echo "ABORT: no $VT/docker-compose.yml"; return 1; }
+  sudo -n mv $VT/docker-compose.yml $VT/docker-compose.yml.RETIRED-$DAY || { echo "ABORT: rename failed"; return 1; }
+  (cd $VT && sudo -n docker compose -p tractor-vtest config --services 2>&1 | head -n 3)    # expect: no configuration file provided: not found
+  # remove the three Exited containers and their two networks (no -f, no -v)
+  sudo -n docker rm $C && sudo -n docker network rm video-test_default tractor-vtest_default
+}
+camchk; uart_chk
+tractor_cleanup
+# verify
+systemctl --failed --no-legend --no-pager                  # expect only psplash-start.service
+camchk; uart_chk
+```
+
+`camchk` must show the camera unit `inactive` and `running=[]`. If it ever
+shows the camera unit active or a container running, apply the standard
+bench stop before going on:
+`sudo -n systemctl stop lifetrac-camera.service; sudo -n docker stop <name>`.
+On 2026-10-12 there were no container logs to save: the tractor's docker
+log driver is `journald`, and its journal holds only the current boot.
+
+### Undo
+
+Move the files back from `/etc/lifetrac-retired/<TS>/` to
+`/etc/systemd/system/`, run `systemctl daemon-reload`, then
+`systemctl enable <unit>`. On the tractor also rename the compose file
+back. The same unit text is in git at the commits named in the table; the
+repo files have since gained a comment header. The board copies are 480,
+789 and 517 bytes, each larger than its git blob at those commits by
+exactly its line count, so they have CRLF line endings: the byte-exact
+originals are the retired files on the boards. The drop-in is in the
+[10-04 capture](../../../bench-evidence/board_state_2026-10-04/base/files/etc/systemd/system/lifetrac-base.service.d/timeout.conf).
+The removed containers cannot be restored exactly. `docker inspect` output
+of the tractor's three is in the private archive and in the 10-10 capture.
+The base's four had never started; they came from
+`docker-compose.video-test.yml`, which is in git.
+
+Do not undo any of this on a bench board. After a full undo on the tractor
+(unit file back and enabled, compose file renamed back) the unit would
+succeed and transmit at the next boot: the old containers that blocked it
+are gone, so the rename is now the only barrier. With
+`lifetrac-base-compose.service` enabled again, stopping the bench broker
+(as [RS13_2_DESK_CHECK.md](RS13_2_DESK_CHECK.md) Step 3 does) would let it
+start `image_rx` at the next base boot.
+
+### Not yet observed: the next boot
+
+No board was rebooted on 2026-10-12. At the next power-up of each board, do
+these checks first, before any probe, and record the output:
+
+1. `bash provision_bench_board.sh base --ssh --check` and
+   `bash provision_bench_board.sh tractor --check`. The item "old boot units
+   retired" must read `ok`, with no info line about a unit or a leftover
+   file. (The tractor's "radio UART free" item reads `TODO` until the camera
+   is stopped, point 3.)
+2. `sudo docker ps` on each board. On the base expect only
+   `design-controller-mosquitto-1`, Up again through its `unless-stopped`
+   restart policy. On the tractor expect the three `x8-*` containers, plus
+   `tractor-camera` and `tractor-mosquitto` until the camera is stopped. No
+   `lifetrac-vtest-*` and no `tractor-*-v2` container may be listed.
+3. On the tractor `lifetrac-camera.service` comes up at boot, started by
+   udev, and holds `/dev/ttymxc3`. That is the known fourth path (*Open
+   items*), not a failed retirement. Stop it as at every power-up
+   ([BENCH_SETUP.md](BENCH_SETUP.md#after-every-power-up)). After that,
+   `uart_chk` (defined above) must print `__UART_CHK_DONE__` alone, on both
+   boards.
+4. `systemctl --failed` lists only `psplash-start.service`. On its own this
+   proves little: a retired unit that had started successfully would not be
+   listed either.
+
+If a radio container is up (`image_rx`, `image_tx`, `lora_bridge` or a
+`tractor-*-v2` container), `sudo docker stop` it by name at once. Then
+record what ran and since when (`sudo docker ps -a`,
+`journalctl -b -u <unit>`) before changing anything else. This is an open
+item below.
+
 ## Where everything is saved
 
 - **Repo:**
@@ -166,7 +572,10 @@ Repo L072 binaries that are on no board:
   `C:\Users\dorkm\Documents\LifeTrac-bench-archive\board_state_2026-10-04\`
   and `…\board_state_2026-10-10\` (the tractor capture, its
   `opt_lifetrac_no_secrets.tgz`, and image `pre-rs13` `9bfbbc8d06cb`, the
-  only off-board copy).
+  only off-board copy), and `…\board_state_2026-10-12\` (the tractor's
+  `/opt/lifetrac/video-test` tree as it was before its compose file was
+  renamed, and the `docker inspect` output of the three removed containers
+  and the two removed networks).
   - `images/`: base `lifetrac-v25` `4623980c2dac` and tractor
     `2727dfd36f9f` (docker save).
   - `base/`: the full capture tarball and the deployed tree without
@@ -203,9 +612,33 @@ Repo L072 binaries that are on no board:
 - [x] **Tractor capture.** Done 2026-10-10 with images, `pre-rs13`
   included (`board_state_2026-10-10/`).
 - [ ] The base did not enumerate on USB/adb after the 2026-10-10 power cycle
-  (ssh works). Check its USB cable and port.
-- [ ] **Decide on the tractor's `lifetrac-tractor-compose.service`.** It is
-  enabled and fails at every boot, like the base's units.
+  (ssh works). Check its USB cable and port. Once adb to the base works
+  again, nothing but rule 7 keeps the repo-root `_bench_up.ps1` and
+  `_bench_up2.ps1` from starting `image_rx` there.
+- [x] **Decide on the tractor's `lifetrac-tractor-compose.service`.** Done
+  2026-10-12: retired, its compose file disarmed and the three old
+  `tractor-*-v2` containers removed
+  ([record](../../../bench-evidence/board_state_2026-10-12_unit_retirement/README.md)).
+- [ ] **Confirm the retirement at the next boot of each board,** with the
+  four checks under
+  [Not yet observed: the next boot](#not-yet-observed-the-next-boot). No
+  board was rebooted on 2026-10-12.
+- [ ] **Decide on the base's `docker-compose.video-test.yml`** (rule 7). It
+  is the base-side counterpart of the tractor's renamed compose file and is
+  still armed. Proposed, on the operator's OK: `deploy_base.sh` stops
+  shipping it and `deploy/`, and the copy on the base is renamed as on the
+  tractor (TODO RS-5.18).
+- [ ] **Decide on the tractor's udev-started `lifetrac-camera.service`.** It
+  is a fourth path that maps `/dev/ttymxc3` at boot: it reads "disabled",
+  but the udev rule's `SYSTEMD_WANTS` starts it, and it is bound (`BindsTo`)
+  to the C2 camera device. The bench stops it at every power-up. It needs
+  its own operator decision.
+- [ ] The tractor holds 335 anonymous docker volumes, probably leftovers of
+  repeated mosquitto `docker run`s (cause unverified; only the count was
+  captured). A cleanup candidate; it needs an OK first.
+- [ ] Delete `/opt/lifetrac/video-test` on the tractor and the volumes
+  `lifetrac-vtest_*` (base), `video-test_*` and `tractor-vtest_*` (tractor)
+  later, only on an explicit OK. Deleting them is permanent.
 - [ ] Delete the stored `5star` WiFi profile on the tractor once the password
   is rotated (`nmcli con delete 5star`). `provision_bench_board.sh tractor`
   backs up the stored WiFi profiles to a root-only directory on the board,
@@ -228,9 +661,19 @@ Repo L072 binaries that are on no board:
   - [ ] **Change the passphrase on the access point.** The old value is
     still in the public git history, so treat it as compromised. Rewriting a
     public history with forks is not practical; rotation is the fix.
-- [ ] **Decide on the base's `lifetrac-base.service` /
-  `lifetrac-base-compose.service`.** Both are enabled and fail at every boot;
-  they would start `lora_bridge` on the radio UART if they ever succeeded.
+- [x] **Decide on the base's `lifetrac-base.service` /
+  `lifetrac-base-compose.service`.** Done 2026-10-12: both retired, with the
+  `timeout.conf` drop-in, and the four never-started `lifetrac-vtest-*`
+  containers removed
+  ([record](../../../bench-evidence/board_state_2026-10-12_unit_retirement/README.md)).
+- [ ] **Base docker store.** The broker container
+  `design-controller-mosquitto-1` references image `sha256:2a23a3e427e4`,
+  which is no longer in the base's image list (`eclipse-mosquitto:2` is now
+  `0db28dca6f11`), so the layer store is not fully consistent. The first
+  `deploy_base.sh` run is expected to recreate the broker container on the
+  current image; its volume is kept. Before any image purge, make sure the
+  flown image `4623980c2dac` is saved (a `docker save` of it is in the
+  private archive).
 - [ ] Optional, on GO: read back the L072 option bytes; their current values
   are recorded nowhere.
 - [ ] Record the carrier ↔ module pairing, both carriers' DIP switch
