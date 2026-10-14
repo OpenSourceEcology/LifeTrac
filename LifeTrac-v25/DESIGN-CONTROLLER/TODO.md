@@ -3394,9 +3394,34 @@ explicit GO)
   - `bench_tools/RS13_2_DESK_CHECK.md`;
   - a compose override.
 
-  Running it needs the rebuilt base image. A rehearsal already found renderer
-  gaps F1–F10: the RESYNC chip is clipped, the buttons cover the banner, and
-  fail-closed rules 1 and 5 are missing.
+  Running it needs the base image rebuilt with the renderer fixes of
+  2026-10-14 (store, `web_ui`, `vector_renderer.js`, `app.js`; Step 1 checks
+  the image for them). The PC rehearsal found renderer gaps F1–F10
+  (Appendix A):
+  - **Fixed 2026-10-14** (checked on the PC in Chromium at 1280×720 and
+    1920×1080 over the 2a A16 window, plus console injections):
+    - F1/F2: the banner and chips sit below the button bar and beside open
+      side panels, and wrap instead of running off the edge;
+    - F3: rule 1 (black "VECTOR?" and one refusal POST per fault episode, at
+      most one per 10 s);
+    - F5: the banner reads "· age · loss" from the store's new
+      `frame_age_ms` and `loss` (seq gaps over 10 s);
+    - F6: the "SAFETY DETECTOR: NO PIXELS" chip;
+    - F8: the top line counts VS frames, and the "enc:" pill shows the
+      received codec when the pin cannot produce it.
+  - Also changed: a horizon without measured colours stays black instead of
+    showing an invented sky (principle 4).
+  - **Open, design owner's call:**
+    - F4, rule 5 for old clients: `canvas_renderer.js`, `diagnostics.js`
+      and `map.js` connect without `?schema=2`, so a web_ui-only rule 5 would
+      black out today's console; the black tiles' badge (5 SYNTHETIC is
+      proposed; the pre-#135 `badge_renderer.js` refuses 7) and their
+      `age_ms` need choosing;
+    - F7, the anchor chip on NO_HORIZON epochs (proposed: "epoch N · no
+      horizon" instead of a climbing anchor age);
+    - F9, no link-lost cue (proposed: a "NO FRAMES · N s" chip from 3 s,
+      "NO VECTOR DATA · N s" from 10 s, the aged scene kept underneath);
+    - F10 (harmless today).
 - [~] **VECTOR_SCENE.md amendments** listed in #138, #138's DIGEST exit from
   resync (§4.3) and the A16 fix (#143): written 2026-10-14 as dated
   "Amended:" notes in the sections they change (§3.3, §3.4 rule 4, §4.2,
@@ -3449,8 +3474,8 @@ explicit GO)
 - [~] Shared pure-stdlib codec `base_station/image_pipeline/vector_scene/` — `codec.py` landed (#135; mirrored on the tractor as `vs1_codec.py`, parity test); `scene_state.py`, `extract.py`, `selfmask.py`, `self_model_geom.py` not written
 - [x] `opencv-python-headless` in `base_station/requirements-dev.txt` (`4.14.0.94`, the CI pin; numpy landed with #130)
 - [~] `base_station/image_pipeline/vector_scene_store.py` landed (#135, fixed in #138); `self_model.py` not written
-- [~] Snapshot keys `vector_scene`, `self_model`, `safety_detector` landed (#135); populating `encode_mode` (`state_publisher.py:45`) not verified
-- [~] `web/img/vector_renderer.js` on its own overlay canvas and badges 7 `VECTOR` / 8 `MODEL` in `badge_renderer.js` landed (#135); `self_model_overlay.js` not written
+- [~] Snapshot keys `vector_scene`, `self_model`, `safety_detector` landed (#135); `encode_mode` names the codec of every received frame (2026-10-14, desk check C19, `test_web_ui_vector.py`); `vector_scene` gained `frame_age_ms` and `loss` for the banner; `safety_detector` follows the codec, not §7.5's "no pixels younger than 3 s" (spec or code to change)
+- [~] `web/img/vector_renderer.js` on its own overlay canvas and badges 7 `VECTOR` / 8 `MODEL` in `badge_renderer.js` landed (#135); the RS-13.2 rehearsal fixes landed 2026-10-14 (banner "· age · loss", chips clear of the console chrome, safety chip, rule 1); rule 5 (old clients, F4) and `self_model_overlay.js` not written
 - [ ] Vector Lab: `/vector_lab` page, `/api/vector_lab/*`, `vector_lab` sidecar worker, `tools/feed_canvas.py` on `lab/*` topics, bounded hand-drawn self-mask
 - [x] **B2** `EncodeMode.VECTOR = 9` in `lora_proto.py` and **B3** the codec-6 branch in `frame_format` (#135); **B7** `register.py` sign and confidence (#130, merged)
 - [ ] Degradation ladder V0–V3 (the encoder has per-level frame/carousel/repeat parameters; only V0 has ever been seen on air, and nothing selects a level yet) (`VECTOR_SCENE.md` §4.5): frame-size / carousel / repeat / detail per level, loss from the VS frame `seq`, SNR margin from `RX_FRAME_URC`, level carried as the band of the `0x63` quality byte (one mapping, §4.5.4), tractor self-select from received-frame SNR and heartbeat silence (`LINK_HB` every 5 s of command silence; no silence-based step without it)
