@@ -61,7 +61,11 @@
  *       fires while a clean command is on air. The fault is reported and
  *       FAILED committed, but the receiver is not parked: the slot
  *       follower would re-arm it only at the next boundary, so the
- *       command must still be received.
+ *       command must still be received;
+ *   10  CRC errors, then a clean retry: commands with payload-CRC errors
+ *       early in the first scan attempt, then silence. Each FAIL's
+ *       crc_seen bit covers its own window (the last dwell) only, as on
+ *       a walking node, so neither of the first two FAILs reports one.
  * In EVERY scenario, per main-loop pass: the walker retunes exactly when
  * the scan machine dispatches BEGIN_SCAN / ADVANCE (or a non-final FAIL)
  * unless the node holds originator authority; no scan action takes the
@@ -242,6 +246,7 @@ typedef struct {
     /* ... by what last tuned the synth the adopted frame came in on */
     uint32_t adopt_via_follow, adopt_via_walker, adopt_via_tx;
     uint32_t fail_final;
+    uint32_t crc_sent, crc_err;       /* commands sent corrupt / CRC IRQs */
     /* loop-structure checks */
     uint32_t walker_retunes, walker_suppressed, viol_walker;
     uint32_t viol_scan_park;          /* scan action left RX under authority */
@@ -298,6 +303,7 @@ static void trace_mix(uint32_t op, uint32_t arg) {
 #define REG_MODEM_CONFIG3     0x26U
 #define IRQ_TX_DONE           0x08U
 #define IRQ_VALID_HEADER      0x10U
+#define IRQ_PAYLOAD_CRC_ERROR 0x20U
 #define IRQ_RX_DONE           0x40U
 
 typedef struct {
@@ -322,6 +328,7 @@ static sim_radio_t g_radio;
 typedef enum { PKT_CMD = 1, PKT_FRAME = 2 } pkt_kind_t;
 typedef struct {
     uint8_t  used, started, collided, auth_start;
+    uint8_t  corrupt;              /* heard with a payload-CRC error */
     pkt_kind_t kind;
     uint64_t start_us, end_us;
     uint32_t freq_hz;
@@ -512,10 +519,12 @@ static uint8_t g_last_fail_sub;
 static uint8_t g_fail_seen;
 static uint32_t g_pass_now_ms;     /* the current pass's now_ms */
 static uint32_t g_fail_ms[4];      /* pass now_ms of the first four FAILs */
+static uint8_t  g_fail_sub[4];     /* ... and their sub-bytes */
 static uint64_t g_final_fail_us;   /* when the final FAIL fired (0 = not yet) */
+static uint64_t g_last_crc_us;     /* last payload-CRC IRQ serviced */
 
 void host_stats_radio_rx_ok(void) {}
-void host_stats_radio_crc_err(void) {}
+void host_stats_radio_crc_err(void) { ++g_sc.crc_err; g_last_crc_us = g_now_us; }
 void host_stats_radio_tx_ok(void) { ++g_sc.fw_tx_ok; }
 void host_stats_radio_tx_abort_airtime(void) {}
 void host_stats_rx_fifo_skip(void) {}
@@ -537,6 +546,7 @@ void host_cmd_emit_fault(uint8_t code, uint8_t sub) {
     if (code == HOST_FAULT_CODE_RX_SCAN_FAILED) {
         if (g_sc.scan_fail_urc < 4U) {
             g_fail_ms[g_sc.scan_fail_urc] = g_pass_now_ms;
+            g_fail_sub[g_sc.scan_fail_urc] = sub;
         }
         if ((sub & (1U << SX1276_RX_SCAN_FAIL_SUB_BIT_FINAL)) != 0U) {
             g_final_fail_us = g_now_us;
@@ -619,6 +629,7 @@ typedef struct {
     uint64_t last_frag_us;
     uint64_t next_drain_us;
     uint16_t next_id;
+    uint8_t  corrupt;                       /* commands arrive with bad CRC */
 } base_model_t;
 static base_model_t g_base;
 
@@ -643,14 +654,14 @@ static air_pkt_t *air_alloc(void) {
     return NULL;
 }
 
-static void air_schedule(pkt_kind_t kind, uint16_t id, uint64_t start_us,
-                         uint32_t abs_slot, uint8_t slot_offset_ms,
-                         const uint8_t *payload, uint8_t payload_len) {
+static air_pkt_t *air_schedule(pkt_kind_t kind, uint16_t id, uint64_t start_us,
+                               uint32_t abs_slot, uint8_t slot_offset_ms,
+                               const uint8_t *payload, uint8_t payload_len) {
     air_pkt_t *p = air_alloc();
     lora_pkt_hdr_t h;
     if (p == NULL) {
         CHECK(0, "air table full");
-        return;
+        return NULL;
     }
     h.profile_id     = (uint8_t)REG_PROFILE_FCC_15_247_FHSS_50CH_BW250;
     h.hop_idx        = sx1276_fhss_clock_hop_of(abs_slot);
@@ -669,6 +680,7 @@ static void air_schedule(pkt_kind_t kind, uint16_t id, uint64_t start_us,
         p->start_us < g_radio.tx_end_us && p->end_us > g_radio.tx_start_us) {
         p->collided = 1U;
     }
+    return p;
 }
 
 /* Offset of the base's ms clock against sim time at t (drifting). */
@@ -698,10 +710,15 @@ static void base_key_cmd(uint64_t t, uint64_t slot) {
     payload[0] = MARK_CMD;
     payload[1] = (uint8_t)(id & 0xFFU);
     payload[2] = (uint8_t)(id >> 8);
-    air_schedule(PKT_CMD, id, key, g_base.anchor_abs + (uint32_t)slot,
-                 (uint8_t)off_ms, payload, CMD_PAYLOAD_LEN);
+    air_pkt_t *p = air_schedule(PKT_CMD, id, key, g_base.anchor_abs + (uint32_t)slot,
+                                (uint8_t)off_ms, payload, CMD_PAYLOAD_LEN);
     g_base.busy_until_us = key + toa + 2000ULL;
-    ++g_sc.sent;
+    if (g_base.corrupt != 0U) {
+        if (p != NULL) { p->corrupt = 1U; }
+        ++g_sc.crc_sent;
+    } else {
+        ++g_sc.sent;
+    }
 }
 
 /* The base's L072 admits a command at t: its own slot rule on its copy of
@@ -821,8 +838,9 @@ static void air_start(air_pkt_t *p) {
 static void air_end(air_pkt_t *p) {
     const uint8_t auth_end = auth_now_ms((uint32_t)(g_now_us / 1000ULL));
     const uint8_t covered = (uint8_t)(p->auth_start != 0U && auth_end != 0U);
+    const uint8_t is_cmd = (uint8_t)(p->kind == PKT_CMD && p->corrupt == 0U);
     uint8_t heard = 0U;
-    if (p->kind == PKT_CMD) {
+    if (is_cmd != 0U) {
         if (covered != 0U) {
             ++g_sc.covered;
             if (p->collided == 0U) {
@@ -832,18 +850,18 @@ static void air_end(air_pkt_t *p) {
         }
     }
     if (p->collided != 0U) {
-        if (p->kind == PKT_CMD) { ++g_sc.miss_coll; }
+        if (is_cmd != 0U) { ++g_sc.miss_coll; }
     } else if (g_radio.mode != SX1276_STATE_RX_CONT) {
-        if (p->kind == PKT_CMD) { ++g_sc.miss_not_rx; }
+        if (is_cmd != 0U) { ++g_sc.miss_not_rx; }
     } else if (g_radio.freq_hz != p->freq_hz) {
-        if (p->kind == PKT_CMD) { ++g_sc.miss_wrong_ch; }
+        if (is_cmd != 0U) { ++g_sc.miss_wrong_ch; }
     } else if (g_radio.rx_since_us > p->start_us + LATE_ARM_TOL_US) {
-        if (p->kind == PKT_CMD) { ++g_sc.miss_late_arm; }
+        if (is_cmd != 0U) { ++g_sc.miss_late_arm; }
     } else {
         heard = 1U;
         g_heard_tuner = g_tuner;
     }
-    if (heard == 0U && p->kind == PKT_CMD && covered != 0U && p->collided == 0U &&
+    if (heard == 0U && is_cmd != 0U && covered != 0U && p->collided == 0U &&
         g_sc.first_miss_us == 0U) {
         /* First clean covered miss: where the receiver was, and who put it
          * there (printed with the reverse-delivery CHECK). */
@@ -865,7 +883,8 @@ static void air_end(air_pkt_t *p) {
         g_radio.regs[REG_RX_NB_BYTES] = p->len;
         g_radio.regs[REG_PKT_SNR] = 40U;    /* +10 dB */
         g_radio.regs[REG_PKT_RSSI] = 95U;   /* -62 dBm */
-        g_radio.irq = (uint8_t)(g_radio.irq | IRQ_RX_DONE | IRQ_VALID_HEADER);
+        g_radio.irq = (uint8_t)(g_radio.irq | IRQ_RX_DONE | IRQ_VALID_HEADER |
+                                ((p->corrupt != 0U) ? IRQ_PAYLOAD_CRC_ERROR : 0U));
         g_radio.dio0 = 1U;
     }
     p->used = 0U;
@@ -1345,7 +1364,9 @@ static void scenario_begin(const char *name, role_t role, uint32_t seed) {
     g_prev_auth = 0U;
     g_decay_at_us = 0U;
     memset(g_fail_ms, 0, sizeof(g_fail_ms));
+    memset(g_fail_sub, 0, sizeof(g_fail_sub));
     g_final_fail_us = 0U;
+    g_last_crc_us = 0U;
     (void)sx1276_rx_arm();
     g_ctx = CTX_NONE;
     g_role = role;
@@ -1372,6 +1393,11 @@ static void print_scenario(void) {
     if (g_sc.frames_sent != 0U) {
         printf("    originator frames sent=%u recv=%u\n",
                g_sc.frames_sent, g_sc.frames_recv);
+    }
+    if (g_sc.crc_sent != 0U) {
+        printf("    corrupt cmds sent=%u crc_irqs=%u | FAIL sub-bytes %02x %02x %02x %02x\n",
+               g_sc.crc_sent, g_sc.crc_err, g_fail_sub[0], g_fail_sub[1],
+               g_fail_sub[2], g_fail_sub[3]);
     }
     printf("    fw tx_ok=%u first_anchor=%u demotion kept=%u reset=%u adoptions=%u"
            " (via follow=%u walker=%u tx=%u) locks=%u demotions=%u"
@@ -1607,6 +1633,44 @@ static void test_final_fail_mid_command(void) {
           g_sc.miss_late_arm, g_sc.miss_wrong_ch, g_sc.miss_coll);
 }
 
+static void test_crc_then_clean_retry(void) {
+    /* (10) the stream of (8). Early in the first scan attempt the base's
+     * commands arrive with payload-CRC errors, then the base goes quiet.
+     * A FAIL's crc_seen bit covers its own window (the last dwell) only,
+     * as on a walking node: neither the first FAIL, ~20 s after the
+     * errors, nor the CRC-free retry's may report one. */
+    const uint8_t crc_bit = (uint8_t)(1U << SX1276_RX_SCAN_FAIL_SUB_BIT_CRC_SEEN);
+    tractor_setup("10 CRC errors, then a clean retry", 0xABCDEF1U, 600U, 40U,
+                  k_short_trains, CMD_IN_GAP, 1000U, 0U, 5U, 60U);
+    g_base.corrupt = 1U;
+    const uint64_t t0 = g_now_us;
+    while (g_sc.crc_err == 0U && g_now_us - t0 < 20000000ULL) {
+        fw_pass();
+    }
+    g_base.next_allowed_us = 0xFFFFFFFFFFFFFFFFULL;   /* the base goes quiet */
+    g_base.decide_at_us = 0U;
+    const uint32_t passes0 = g_sc.passes, auth0 = g_sc.auth_passes;
+    while (g_sc.scan_fail_urc < 2U && g_now_us - t0 < 100000000ULL) {
+        fw_pass();
+    }
+    print_scenario();
+    check_structure();
+    /* The path under test: authority on every pass from the CRC error on,
+     * so no walker step could have cleared the flag. */
+    CHECK(g_sc.crc_err >= 1U && g_sc.scan_fail_urc >= 2U && g_sc.locks == 0U &&
+          g_last_crc_us + (uint64_t)SX1276_RX_SCAN_DWELL_MS * 2000ULL <
+              (uint64_t)g_fail_ms[0] * 1000ULL &&
+          g_sc.auth_passes - auth0 == g_sc.passes - passes0,
+          "[%s] setup: CRC IRQs=%u, FAILs=%u, locks=%u, last CRC error %llu us"
+          " before the first FAIL, authority over %u of the %u passes after it",
+          g_sc.name, g_sc.crc_err, g_sc.scan_fail_urc, g_sc.locks,
+          (unsigned long long)((uint64_t)g_fail_ms[0] * 1000ULL - g_last_crc_us),
+          g_sc.auth_passes - auth0, g_sc.passes - passes0);
+    CHECK((g_fail_sub[0] & crc_bit) == 0U && (g_fail_sub[1] & crc_bit) == 0U,
+          "[%s] a FAIL reported a CRC error from an earlier window"
+          " (sub-bytes %02x, %02x)", g_sc.name, g_fail_sub[0], g_fail_sub[1]);
+}
+
 /* Base role: the firmware follows an ideal originator. */
 static void orig_start(uint64_t first_boundary_us, uint32_t first_abs) {
     g_orig.on = 1U;
@@ -1728,11 +1792,12 @@ int main(int argc, char **argv) {
     test_decay_window();
     test_scan_failed();
     test_final_fail_mid_command();
+    test_crc_then_clean_retry();
     if (g_failures != 0) {
         fprintf(stderr, "[FAIL] rx_reverse_delivery: %d failure(s)\n", g_failures);
         return 1;
     }
-    printf("[PASS] rx_reverse_delivery: 9 SIL sequences against the real"
+    printf("[PASS] rx_reverse_delivery: 10 SIL sequences against the real"
            " sx1276_rx.c/sx1276_tx.c -- reverse delivery between trains,"
            " follower path unchanged, self-follow bounded by authority\n");
     return 0;

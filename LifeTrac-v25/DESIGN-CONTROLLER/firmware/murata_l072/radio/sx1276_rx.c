@@ -580,8 +580,12 @@ static void scan_dispatch_action(sx1276_rx_scan_action_t action,
              * scan_drive, so a SCANNING walker resumes within one dwell
              * of the authority decaying. An adopted follower holds no
              * authority (sx1276_rx_grid_policy.h), so its walk is
-             * unchanged. */
+             * unchanged. The dwell is still a fresh scan window: clear
+             * the per-window flags as below, or a CRC error would stay
+             * latched into every later FAIL's sub-byte. */
             if (rx_follow_own_now() != 0U) {
+                s_scan_got_any_irq = false;
+                s_scan_crc_seen    = false;
                 return;
             }
             /* FCC-A6c-2-c-i-α' (2026-05-27): walk the chantab DIRECTLY

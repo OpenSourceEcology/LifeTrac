@@ -918,13 +918,13 @@ check-fhss-clock: $(BUILD)
 # simulated SX1276 (registers, FIFO, IRQs, modes, synthesiser), clock and
 # air in bench/host_proto/rx_reverse_delivery.c, driven in main.c's loop
 # order: a streaming tractor with an ideal follower base (between-trains
-# and camera+pump command planes, a scan machine run out to FAILED, and a
-# command on air at its final FAIL), a base-role node following an ideal
-# originator (follower path unchanged), a base burst (self-follow bounded
-# by authority) and camera stalls (no self-follow in the decay window).
-# Fails 20 checks against the pre-fix sx1276_rx.c (3 against the one
-# without the final-FAIL guard). sx1276_rx_scan_counters.c is NOT linked:
-# the harness provides sx1276_rx_scan_counter_record() to mirror the scan
+# and camera+pump command planes, a scan machine run out to FAILED, a
+# command on air at its final FAIL, and CRC errors before a clean scan
+# retry), a base-role node following an ideal originator (follower path
+# unchanged), a base burst (self-follow bounded by authority) and camera
+# stalls (no self-follow in the decay window). Fails 21 checks against the
+# pre-fix sx1276_rx.c. sx1276_rx_scan_counters.c is NOT linked: the
+# harness provides sx1276_rx_scan_counter_record() to mirror the scan
 # state machine.
 check-rx-reverse-delivery: $(BUILD)
 	@echo "[RXREV] Building rx-reverse-delivery SIL test (real sx1276_rx.c/sx1276_tx.c) ..."
