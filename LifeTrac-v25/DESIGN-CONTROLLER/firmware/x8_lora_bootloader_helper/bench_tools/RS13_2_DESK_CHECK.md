@@ -134,14 +134,18 @@ stale-tile worker would publish `0x6C` at least every 10 s (RS-13.1 RESULTS,
 - with `deploy_base.sh` (this directory, from the bench-kit change) at the
   SHA of Step 0: it copies the tree and builds the image. The only container
   it (re)starts is the bench broker `design-controller-mosquitto-1`
-  (`--no-broker` leaves the broker alone; [DEPLOY.md](DEPLOY.md));
+  (`--no-broker` leaves the broker alone; [DEPLOY.md](DEPLOY.md)). It also
+  renames the old `docker-compose.video-test.yml` in the deployed tree, and
+  stops before changing anything while a container made from that file is
+  in any state but exited ([BENCH_BOARDS](BENCH_BOARDS.md#rules), rule 7);
 - or, if that script is not in your tree yet, by hand: `git archive` of
-  `base_station/ firmware/ Dockerfile docker-compose*.yml deploy/` →
-  `scp` the tarball to the base (never `git archive | ssh sudo -S tar`:
-  `sudo -S` eats the stream) → extract over
-  `/var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER` → write the SHA to
-  `DEPLOYED_FROM.txt` there → `docker build --pull=false -t lifetrac-v25:latest .`
-  in that directory.
+  `base_station/ firmware/ Dockerfile docker-compose.yml` (not
+  `docker-compose.video-test.yml`, not `deploy/`) → `scp` the tarball to
+  the base (never `git archive | ssh sudo -S tar`: `sudo -S` eats the
+  stream) → extract over `/var/rootdirs/opt/lifetrac/DESIGN-CONTROLLER` →
+  write the SHA to `DEPLOYED_FROM.txt` there →
+  `docker build --pull=false -t lifetrac-v25:latest .` in that directory.
+  This route renames nothing: an old video-test file there stays armed.
 
 Either way, start and restart nothing else. Then check that the image
 carries the VECTOR code, without importing web_ui (its import connects to a
@@ -242,14 +246,17 @@ removes the bench broker container. A container stopped by hand stays down,
 across a reboot too, until Step 8 starts it. If the bench broker was not
 running in the `docker ps -a` above, record that and skip the stop.
 
-`127.0.0.1:1883` being taken is the only thing that keeps the video-test
-compose file in this directory from coming up by hand
-([BENCH_BOARDS](BENCH_BOARDS.md#rules), rule 7). While the desk stack is up,
-its broker holds the port and blocks that file just as the bench broker does.
-The port is free only in the gaps: between the `docker stop` above and the
-desk `up`, between the desk `down` and the bench broker's start in Step 8,
-and after a base reboot in between, until the bench broker is started again.
-Rule 2 matters most in those gaps.
+Until a `deploy_base.sh` run has renamed it (Step 1;
+[BENCH_BOARDS](BENCH_BOARDS.md#rules), rule 7), `127.0.0.1:1883` being taken
+is the only thing that keeps the video-test compose file in this directory
+from coming up by hand. While the desk stack is up, its broker holds the
+port and blocks that file just as the bench broker does. The port is free
+only in the gaps: between the `docker stop` above and the desk `up`, between
+the desk `down` and the bench broker's start in Step 8, and after a base
+reboot in between, until the bench broker is started again. Rule 2 matters
+most in those gaps. `ls docker-compose.video-test.yml*` in this directory
+tells which case applies: a plain `docker-compose.video-test.yml` in the
+list is still armed.
 
 If 1883 or 8080 is still taken after the stop, find out what holds it before
 going on; do not stop any other container you did not start without

@@ -32,24 +32,28 @@
 # 2026-10-12): lifetrac-base.service and lifetrac-base-compose.service on the
 # base, lifetrac-tractor-compose.service on the tractor. If one of them ever
 # succeeds at boot it starts compose services that map /dev/ttymxc3, without
-# a GO. The step passes when each unit is neither enabled nor active and
-# neither its unit file nor its <unit>.d directory is left in
-# /etc/systemd/system (a symlink there, such as a mask, passes); a unit that
-# is not installed passes. Otherwise, and only while every listed unit is
-# failed or inactive with no start or stop job queued, it runs
+# a GO. The step passes only when systemd cannot load any of them: for each,
+# 'systemctl is-enabled' finds no unit file and nothing named <unit> or
+# <unit>.d is left in /etc/systemd/system, or the unit is masked by a symlink
+# to /dev/null there; and it is inactive or failed with no job queued. A board
+# that never had the units passes. Otherwise, and only while every listed unit
+# is failed or inactive with no start or stop job queued, it runs
 # 'systemctl disable' (never --now) and 'systemctl reset-failed', moves the
-# unit file and its <unit>.d directory from /etc/systemd/system into a new
-# /etc/lifetrac-retired/<PC UTC time>/ (never an existing directory), writes a
-# README.txt there, and runs 'systemctl daemon-reload'. A unit that is already
-# disabled but still has its file there gets the same treatment. If any listed
-# unit is active, starting or stopping, or has a job queued (early in a boot an
-# enabled unit reads inactive while its start job waits), the step fails,
-# changes nothing and prints what to do. The step never starts, stops or masks
-# a unit, never runs docker compose and never stops or removes a container
-# (the base broker design-controller-mosquitto-1 included). The leftover
-# video-test containers and the tractor's
-# /opt/lifetrac/video-test/docker-compose.yml are only reported; their
-# manual, ordered cleanup is in BENCH_BOARDS.md.
+# unit file (or a symlink there that is not a mask) and its <unit>.d directory
+# from /etc/systemd/system into a new /etc/lifetrac-retired/<PC UTC time>/
+# (never an existing directory), writes a README.txt there, and runs
+# 'systemctl daemon-reload'. A unit that is already disabled but still has its
+# file there gets the same treatment. If any listed unit is active, starting
+# or stopping, has a job queued (early in a boot an enabled unit reads
+# inactive while its start job waits), or is in a state a disable and a move
+# cannot retire (is-enabled reads a -runtime form, generated, transient, alias
+# or indirect, or a word that does not match what is in /etc/systemd/system),
+# the step fails, changes nothing and prints what to do. The step never
+# starts, stops or masks a unit, never runs docker compose and never stops or
+# removes a container (the base broker design-controller-mosquitto-1
+# included). The leftover video-test containers and the tractor's
+# /opt/lifetrac/video-test/docker-compose.yml are only reported; their manual,
+# ordered cleanup is in BENCH_BOARDS.md.
 #
 # Radio safety: this script never opens /dev/ttymxc3 (the L072 radio UART),
 # never starts or stops lifetrac-base.service, lifetrac-base-compose.service
@@ -418,29 +422,43 @@ UNIT_DIR=/etc/systemd/system
 RETIRE_ROOT=/etc/lifetrac-retired
 RETIRE_ERR=""   # set when a retirement only half worked, so the re-check fails
 
-unit_state() {  # prints <is-enabled>/<is-active>; a unit that is not installed reads "/inactive"
-  rval "echo \$(systemctl is-enabled $1 2>/dev/null || true)/\$(systemctl is-active $1 2>/dev/null || true)"
+# What 'systemctl is-enabled' says for a unit that has no unit file anywhere:
+# on both bench boards (systemd 250 on the tractor) no word, only this error on
+# stderr, as captured on 2026-10-12; later systemd versions print not-found.
+enoent_msg() { printf 'Failed to get unit file state for %s: No such file or directory' "$1"; }
+unit_state() {  # prints <is-enabled>/<is-active>; is-enabled reads not-found when there is no unit file of that name
+  rval "e=\$(systemctl is-enabled $1 2>&1); case \$e in '$(enoent_msg "$1")') e=not-found ;; esac; echo \$e/\$(systemctl is-active $1 2>/dev/null || true)"
 }
 unit_job() {  # prints "job=" when systemd has no start or stop job queued for the unit, else "job=<id>"
   rval "j=\$(systemctl show -p Job --value $1 2>/dev/null) && echo job=\$j"
 }
-unit_path_kind() {  # unit_path_kind <name>: prints file, link or none for $UNIT_DIR/<name> (file = a real file or directory)
-  rval "if test -L $UNIT_DIR/$1; then echo link; elif test -e $UNIT_DIR/$1; then echo file; else echo none; fi"
+# unit_path_kind <name>: prints mask, link, file or none for $UNIT_DIR/<name>.
+# mask = a symlink to /dev/null, as 'systemctl mask' makes it; link = any other
+# symlink, dangling or not; file = a real file or directory.
+unit_path_kind() {
+  rval "if test -L $UNIT_DIR/$1; then case \$(readlink $UNIT_DIR/$1) in /dev/null) echo mask ;; *) echo link ;; esac; elif test -e $UNIT_DIR/$1; then echo file; else echo none; fi"
 }
-# Only a reply that ends in /inactive or /failed passes, and only the replies
-# "none" and "link" for the unit file and the <unit>.d directory, so a query
-# that did not work reads as TODO, not as ok. The file test is what lets a
-# re-run finish a retirement that stopped after the disable.
+# Retired means systemd cannot load the unit from a file: is-enabled reads
+# not-found and nothing named <unit> is left in $UNIT_DIR, or it reads masked
+# and $UNIT_DIR/<unit> is a symlink to /dev/null. Every other is-enabled word
+# (systemctl(1)) names a unit file systemd can still load, and start by hand,
+# from udev or as another unit's dependency: enabled, linked (a 'systemctl
+# link' symlink), alias, static, indirect, disabled, generated, transient, and
+# the -runtime forms, which /run keeps until the next boot. The unit must also
+# be inactive or failed, with no <unit>.d left and no job queued: systemd keeps
+# a loaded unit until a daemon-reload, and a queued start of it still runs.
+# Only these exact replies pass, so a query that did not work reads as TODO,
+# not as ok. The file test is what lets a re-run finish a retirement that
+# stopped after the disable.
 chk_units_retired() {
-  local u f st
+  local u st
   [ -z "$RETIRE_ERR" ] || return 1
   for u in "$@"; do
     st=$(unit_state "$u")
-    case "${st#*/}" in inactive|failed) ;; *) return 1 ;; esac
-    case "${st%%/*}" in enabled*) return 1 ;; esac
-    for f in "$u" "$u.d"; do
-      case "$(unit_path_kind "$f")" in none|link) ;; *) return 1 ;; esac
-    done
+    case "${st##*/}" in inactive|failed) ;; *) return 1 ;; esac
+    case "${st%/*}/$(unit_path_kind "$u")" in not-found/none|masked/mask) ;; *) return 1 ;; esac
+    [ "$(unit_path_kind "$u.d")" = none ] || return 1
+    [ "$(unit_job "$u")" = job= ] || return 1
   done
   return 0
 }
@@ -460,6 +478,45 @@ unit_job_msg() {
       return 1 ;;
   esac
   say "      $1: could not read whether systemd has a job queued for it (reply '${2:-none}'). Not touched."
+  return 1
+}
+# unit_enabled_msg <unit> <is-enabled word>: returns 0 when 'systemctl disable'
+# and a move out of $UNIT_DIR can retire a unit that reads that word, and what
+# is at $UNIT_DIR/<unit> agrees with the word; else prints why the unit is not
+# touched and returns 1.
+unit_enabled_msg() {
+  local k
+  case "$2" in
+    not-found|enabled|disabled|static|linked|masked)
+      k=$(unit_path_kind "$1")
+      case "$2/$k" in
+        not-found/none|not-found/link|masked/mask|linked/link) return 0 ;;
+        enabled/file|enabled/link|disabled/file|disabled/link|static/file|static/link) return 0 ;;
+        masked/none) say "      $1 is masked, but not by a symlink to /dev/null in $UNIT_DIR." ;;
+        */none)
+          say "      $1 is $2, but its unit file is not in $UNIT_DIR (systemctl cat $1"
+          say "      shows where), and this step moves files from there only." ;;
+        */file) say "      $1 is $2, but $UNIT_DIR/$1 is a file: the two do not agree." ;;
+        */link) say "      $1 is $2, but $UNIT_DIR/$1 is a symlink: the two do not agree." ;;
+        */mask) say "      $1 is $2, but $UNIT_DIR/$1 is a symlink to /dev/null: the two do not agree." ;;
+        *) say "      $1: could not look at $UNIT_DIR/$1." ;;
+      esac ;;
+    *-runtime)
+      say "      $1 is $2: /run holds that state until the next boot, and a plain"
+      say "      'systemctl disable' does not change it." ;;
+    alias)
+      say "      $1 is an alias, a symlink to another unit file: 'systemctl disable'"
+      say "      would act on that unit, and moving the alias does not retire it." ;;
+    indirect)
+      say "      $1 is indirect: its [Install] section names other units (Also=), or it"
+      say "      is enabled under another name; 'systemctl disable' would change those too." ;;
+    generated|transient)
+      say "      $1 is $2: systemd makes it at run time (a generator, or the runtime"
+      say "      API as systemd-run uses it), so there is no file of it in $UNIT_DIR to move." ;;
+    *)
+      say "      $1: is-enabled returned '${2:-nothing}', not a state this step knows." ;;
+  esac
+  say "      Not touched. Look at it by hand (systemctl status $1), then re-run."
   return 1
 }
 unit_blocked_msg() {  # unit_blocked_msg <unit> <is-active>: why it is not touched, and what to do
@@ -505,12 +562,16 @@ retire_readme() {  # retire_readme <timestamp> <moved paths> <retire dir>
 app_units_retired() {
   local u f st out ts n dir="" files="" blocked=0
   # Guard first, as on 2026-10-12: nothing changes unless every unit is failed or
-  # inactive. Beyond that run's guard, none may have a job queued either.
+  # inactive. Beyond that run's guard, none may have a job queued, and each must
+  # read an is-enabled word that a disable and a move can retire, and that
+  # agrees with what is at $UNIT_DIR/<unit>.
   for u in "$@"; do
     st=$(unit_state "$u")
-    case "${st#*/}" in
-      inactive|failed) unit_job_msg "$u" "$(unit_job "$u")" || blocked=1 ;;
-      *) unit_blocked_msg "$u" "${st#*/}"; blocked=1 ;;
+    case "${st##*/}" in
+      inactive|failed)
+        unit_enabled_msg "$u" "${st%/*}" || blocked=1
+        unit_job_msg "$u" "$(unit_job "$u")" || blocked=1 ;;
+      *) unit_blocked_msg "$u" "${st##*/}"; blocked=1 ;;
     esac
   done
   if [ "$blocked" = 1 ]; then say "      nothing was changed"; return 1; fi
@@ -518,25 +579,27 @@ app_units_retired() {
   for u in "$@"; do
     st=$(unit_state "$u")
     case "$st" in
-      /inactive|/failed|not-found/*)
-        # is-enabled knows no such unit: nothing to disable. That holds only if no
-        # unit file is there either; otherwise the reply cannot be trusted.
+      not-found/inactive|not-found/failed)
+        # No unit file of that name anywhere systemd looks: nothing to disable. A
+        # symlink left in $UNIT_DIR (a dangling one) is moved below; a file or a
+        # mask there contradicts the reply, so it cannot be trusted.
         case "$(unit_path_kind "$u")" in
           none|link) ;;
-          *) say "      $u: is-enabled does not know it, but $UNIT_DIR/$u was not shown to be absent; nothing was moved"
+          *) say "      $u: is-enabled does not know it, but $UNIT_DIR/$u is there; nothing was moved"
              RETIRE_ERR=1 ;;
         esac
         continue ;;
-      */inactive|*/failed) ;;
-      *) say "      $u: its state could not be read again (reply '${st:-none}'); nothing was moved"
+      masked/inactive|masked/failed) continue ;;   # nothing to disable; the mask stays, a <unit>.d is moved below
+      enabled/*|disabled/*|static/*|linked/*) ;;
+      *) say "      $u: its state changed or could not be read again (reply '${st:-none}'); nothing was moved"
          RETIRE_ERR=1; continue ;;
     esac
     # The board reads is-active and the job once more, right before the change,
-    # and is-enabled after it: only a reply that names a not-enabled state counts
-    # (no reply counts only when the unit file is gone, which is what 'disable'
-    # does to a 'systemctl link' symlink). reset-failed complains when the unit is
-    # not loaded; that is fine.
-    out=$(rsh "a=\$(systemctl is-active $u 2>/dev/null); j=\$(systemctl show -p Job --value $u 2>/dev/null) || j=unknown; case \$a/\$j in inactive/|failed/) sudo -n systemctl disable $u; sudo -n systemctl reset-failed $u 2>/dev/null; e=\$(systemctl is-enabled $u 2>/dev/null); case \$e in disabled|static|indirect|generated|transient|masked*|linked*|not-found) echo __DISABLED__ ;; ?*) echo is-enabled after disable: \$e ;; *) if test -e $UNIT_DIR/$u || test -L $UNIT_DIR/$u; then echo is-enabled after disable: no reply; else echo __DISABLED__; fi ;; esac ;; *) echo is-active: \$a, queued job: \$j ;; esac")
+    # and is-enabled after it: only a word that names no enablement counts.
+    # 'disable' removes a 'systemctl link' symlink, so the unit may read not-found
+    # then; a symlink it leaves is moved below. reset-failed complains when the
+    # unit is not loaded; that is fine.
+    out=$(rsh "a=\$(systemctl is-active $u 2>/dev/null); j=\$(systemctl show -p Job --value $u 2>/dev/null) || j=unknown; case \$a/\$j in inactive/|failed/) sudo -n systemctl disable $u; sudo -n systemctl reset-failed $u 2>/dev/null; e=\$(systemctl is-enabled $u 2>&1); case \$e in disabled|static|masked|linked|not-found|'$(enoent_msg "$u")') echo __DISABLED__ ;; *) echo is-enabled after disable: \${e:-no reply} ;; esac ;; *) echo is-active: \$a, queued job: \$j ;; esac")
     printf '%s\n' "$out" | grep -v -e '^__DISABLED__$' -e '^$' | indent
     if ! printf '%s\n' "$out" | grep -q '^__DISABLED__$'; then
       say "      $u was NOT disabled (see above); no unit file was moved"
@@ -546,11 +609,11 @@ app_units_retired() {
 
   for u in "$@"; do
     for f in "$u" "$u.d"; do
-      # A symlink there is a mask and is left alone ('disable' has already removed
-      # a 'systemctl link' symlink).
-      case "$(unit_path_kind "$f")" in
-        file) files="$files $UNIT_DIR/$f" ;;
-        none|link) ;;
+      # A mask of the unit (a symlink to /dev/null) stays. Any other symlink is
+      # moved like a file: mv moves the link, not what it points to.
+      case "$f:$(unit_path_kind "$f")" in
+        "$u:mask"|*:none) ;;
+        *:file|*:link|*:mask) files="$files $UNIT_DIR/$f" ;;
         *) say "      could not look at $UNIT_DIR/$f; nothing was moved"; RETIRE_ERR=1 ;;
       esac
     done
@@ -590,29 +653,50 @@ app_units_retired() {
   [ -z "$RETIRE_ERR" ]
 }
 retired_report() {  # retired_report <1 when the step passed, else 0> <unit>...: info only, changes nothing
-  local ok=$1 u f st pat names en=0 act=0 left n0=${#RESULTS[@]}
+  local ok=$1 u f st w j pat names en=0 act=0 left n0=${#RESULTS[@]}
   shift
   for u in "$@"; do
-    st=$(unit_state "$u")
-    left=1   # 1: the unit's state alone would pass, so a leftover file gets its own line
-    case "${st%%/*}" in enabled*) en=1; left=0 ;; esac
+    st=$(unit_state "$u"); w=${st%/*}
+    left=1   # 1: the unit's state alone would pass, so a leftover path gets its own line
+    case "$w" in enabled*) en=1 ;; esac
     case "$st" in
-      /inactive|/failed|not-found/*) ;;   # no unit file anywhere: nothing to say about its state
-      ''|*/|*[!a-z/-]*) info "$u: its state could not be read" ;;
-      */inactive|*/failed) [ "$ok" = 1 ] || info "$u is $st" ;;
+      ''|/*|*/|*[!a-z/-]*) info "$u: its state could not be read" ;;
+      not-found/inactive|not-found/failed|masked/inactive|masked/failed) ;;   # the path lines below say the rest
+      enabled/inactive|enabled/failed|disabled/inactive|disabled/failed|static/inactive|static/failed|linked/inactive|linked/failed)
+        left=0
+        if [ "$CHECK_ONLY" = 1 ]; then
+          info "$u is $st: systemd can still load it, so it is not retired; without --check the step disables it and moves its files out of $UNIT_DIR, or says why it cannot"
+        else
+          info "$u is $st: systemd can still load it, so it is not retired (see the step's messages above)"
+        fi ;;
+      */inactive|*/failed)
+        left=0
+        info "$u is $st: the step does not retire a unit in that state (without --check it says why); look at it by hand" ;;
       *)
         left=0
-        case "${st#*/}" in active) act=1 ;; esac
+        case "${st##*/}" in active) act=1 ;; esac
         if [ "$CHECK_ONLY" = 1 ]; then
           info "$u is $st: a unit in this state is not retired; without --check the step prints what to do"
         else
           info "$u is $st: not retired; the step's message above says what to do"
         fi ;;
     esac
+    j=$(unit_job "$u")
+    case "$j" in
+      job=) ;;
+      job=*[!0-9]*) info "$u: could not read whether systemd has a job queued for it" ;;
+      job=*) info "$u: systemd has a job queued for it (job ${j#job=}): not retired until the job is gone" ;;
+      *) info "$u: could not read whether systemd has a job queued for it" ;;
+    esac
     for f in "$u" "$u.d"; do
-      case "$(unit_path_kind "$f")" in
-        file) [ "$ok" = 1 ] || [ "$left" = 0 ] || info "$UNIT_DIR/$f is still there: not retired until it is moved to $RETIRE_ROOT" ;;
-        link) info "$UNIT_DIR/$f is a symlink (a mask, or a link to a unit file elsewhere): left alone" ;;
+      case "$f:$(unit_path_kind "$f")" in
+        *:none) [ "$f:$w" != "$u:masked" ] || info "$u is masked, but not by a symlink to /dev/null in $UNIT_DIR: look at it by hand (systemctl status $u)" ;;
+        "$u:mask")
+          if [ "$w" = masked ]; then info "$UNIT_DIR/$f is a mask (a symlink to /dev/null): left alone"
+          else info "$UNIT_DIR/$f is a symlink to /dev/null, but is-enabled reads '$w': look at it by hand"; fi ;;
+        *:file) [ "$ok" = 1 ] || [ "$left" = 0 ] || info "$UNIT_DIR/$f is still there: not retired until it is moved to $RETIRE_ROOT" ;;
+        *:link|*:mask) [ "$ok" = 1 ] || [ "$left" = 0 ] || info "$UNIT_DIR/$f is a symlink, not a mask: not retired until it is moved to $RETIRE_ROOT" ;;
+        *) info "$UNIT_DIR/$f: could not look at it" ;;
       esac
     done
   done
@@ -741,7 +825,7 @@ fi
 # and 'daemon-reload' make systemd re-read its units, and lifetrac-camera.service
 # (started by udev, maps /dev/ttymxc3) is checked, and stopped, after that.
 retired_ok=1
-item "old boot units retired (not enabled, not active, no unit file left): $RETIRE_UNITS" \
+item "old boot units retired (no unit file systemd can load, not active, no job queued): $RETIRE_UNITS" \
      "chk_units_retired $RETIRE_UNITS" "app_units_retired $RETIRE_UNITS" || retired_ok=0
 if [ "$ROLE" = tractor ]; then
   item "radio UART free: lifetrac-camera.service and tractor-camera stopped" chk_camera_stopped app_camera_stopped
