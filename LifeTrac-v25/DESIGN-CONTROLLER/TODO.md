@@ -2792,7 +2792,7 @@ conflicts. Every leg needs GO; radios stay parked between legs.
 - [~] **RS-12.15 (reverse-delivery half) — the tractor's RX does not follow
   the slot clock between trains (opened 2026-09-12 from RS-12.12/14 data).**
   **FIX CODED 2026-10-14 (de2ae16 + f9cc98b; review fixes 65963c1, 1b45cfa),
-  SIL green. NOT built for the boards, NOT flashed (needs the GO).** On v2 the
+  SIL green, bench images built 2026-10-14. NOT flashed (needs the GO).** On v2 the
   self-anchored TX clock survives demotion, but `sx1276_rx_slot_follow` still
   ran only while LOCKED, so between trains the tractor listened on its last TX
   channel or the scan walker's (v2 legs R/T/U: 19/72, 2/43, 7/49 commands
@@ -2814,9 +2814,9 @@ conflicts. Every leg needs GO; radios stay parked between legs.
   half-duplex collisions.
   Limit: authority only, so at 1 fps, or ~3.5 s after a >= 1 s stall, it is
   the old behaviour.
-  **BENCH (no radio):** build both images on the bench PC with the reference
-  toolchain (`murata_l072/README.md`, "Building"), record the new md5 pair in
-  the README and `l072-bench-md5.yml`, and commit `build/firmware.bin`.
+  **BENCH (no radio) — DONE 2026-10-14:** bench `e083ae46a64686031b39866eca42e094`,
+  production `148de24e1f9acce417c46c2c69a5be6b` (24 972 B each, same after a clean rebuild; the
+  toolchain re-made 0c1bb0a9 / 589c1203 on main first); README, `l072-bench-md5.yml`, `build/firmware.bin`.
   **ON-AIR (needs GO):** flash BOTH L072s with the bench image (Verify OK,
   radio_state 4); profile 1, 300 s legs, STATS pre/post on both nodes.
   (V) camera A/B vs legs T/U: -TxFeed camera -RegProfile 1 -DurationS 300

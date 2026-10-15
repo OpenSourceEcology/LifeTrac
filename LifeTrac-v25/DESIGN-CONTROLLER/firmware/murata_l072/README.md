@@ -107,18 +107,19 @@ python3 tools/check_size_budget.py build/firmware.elf
 
 ### Expected md5s
 
-At `main` `bb4a2071` (re-checked 2026-10-04; `firmware/murata_l072` unchanged
-since), built with the toolchain above and the default flags:
+At `13f20aa1` (the RS-12.15 reverse-delivery fix, built on the bench PC
+2026-10-14 and repeated after `mingw32-make clean`), with the toolchain above
+and the default flags:
 
 | image | md5 | size |
 |---|---|---|
-| `build/firmware_bench_diag.bin` (bench, on both boards since 2026-09-15) | `0c1bb0a9573f813137f941dfa47177d0` | 24 860 B |
-| `build/firmware.bin` (production, committed) | `589c120323c2d5e7ef9f459d7a4ba42d` | 24 860 B |
+| `build/firmware_bench_diag.bin` (bench; not flashed yet) | `e083ae46a64686031b39866eca42e094` | 24 972 B |
+| `build/firmware.bin` (production, committed) | `148de24e1f9acce417c46c2c69a5be6b` | 24 972 B |
 
-**Stale since the RS-12.15 reverse-delivery fix** (`de2ae16`, 2026-10-14): the
-source changed and was not built with this toolchain. Build both images on
-the bench PC, then replace this pair, the md5s in `l072-bench-md5.yml` and
-the committed `build/firmware.bin` before flashing.
+Both bench boards still run the previous bench build, `0c1bb0a9573f813137f941dfa47177d0`
+(production twin `589c120323c2d5e7ef9f459d7a4ba42d`, 24 860 B, from `main`
+`bb4a2071`). The same toolchain reproduced both at `main` `f6e4b463` on
+2026-10-14, before this pair was built.
 
 Check with `certutil -hashfile build\firmware_bench_diag.bin MD5`
 (PowerShell) or `md5sum build/firmware_bench_diag.bin`.
