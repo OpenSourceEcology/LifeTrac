@@ -143,7 +143,9 @@ Check with `certutil -hashfile build\firmware_bench_diag.bin MD5`
   the same release is byte-identical is what this job tests. So far it is
   not: on a source unchanged since `bb4a2071`, the runs on 2026-10-11 (main)
   and 2026-10-14 (#150) both built bench `6f5073c0…` and production
-  `7983744b…`. Take md5s from the bench PC, and read this job's warnings as
+  `7983744b…`. At `13f20aa1` (#152) both runs built bench `81a98296…` and
+  production `70a6418f…`, against the bench PC's `e083ae46…` and
+  `148de24e…`. Take md5s from the bench PC, and read this job's warnings as
   that difference unless a bench PC build disagrees too.
 
 ## Not yet present
