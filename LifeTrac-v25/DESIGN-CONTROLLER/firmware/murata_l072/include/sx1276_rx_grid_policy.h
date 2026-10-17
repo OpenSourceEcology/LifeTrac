@@ -34,6 +34,9 @@
  *                never depended on hearing the base, and resetting it was
  *                the RS-12.12/14 lock-loss mechanism.
  *   reset():     scan reset -- clock, authority and adoption all cleared.
+ *   follow_own() / follow(): which clock drives the receiver's channel
+ *                between received frames -- see the RS-12.15
+ *                reverse-delivery block at the end of this header.
  */
 
 #include <stdint.h>
@@ -69,5 +72,44 @@ void sx1276_rx_grid_adopt(uint32_t now_ms, uint32_t toa_us,
  * reset, 0 if a self-anchored clock was kept. Adoption is cleared either
  * way (the lock is gone). */
 uint8_t sx1276_rx_grid_on_demotion(void);
+
+/*
+ * RS-12.15 reverse delivery (2026-10-14): which clock drives the
+ * receiver's channel BETWEEN received frames (sx1276_rx_slot_follow)?
+ *
+ * Before this the slot follower ran only while the scan machine was
+ * LOCKED, and LOCK demotes 2 s after the last valid frame -- which a node
+ * that mostly TRANSMITS rarely receives. Between trains the streaming
+ * tractor therefore listened on its last TX channel or on the scan
+ * walker's, while the base hops every command onto the tractor's own
+ * grid: 1/17 and 49/281 commands heard on profile 1 (RS-12.12 legs H/I),
+ * 19/72, 2/43 and 7/49 on v2 (RS-12.15 legs R/T/U), vs 56/58 on profile 2.
+ *
+ *   follow_own(now) := originator(now, clock_valid, adopted)
+ *                The node holds originator authority (sustained own-TX
+ *                streaming, sx1276_fhss_authority.h): its OWN TX clock IS
+ *                the shared grid and every peer frame is hopped onto it.
+ *                The slot follower tracks it in ANY scan state (no LOCK
+ *                needed) and the scan walker leaves the synth alone (the
+ *                scan machine's state, timers and counters run on).
+ *                Authority decays STREAK_GAP_MS after the last own TX, so
+ *                this ends at most 1 s after a stream stops, and a SCANNING
+ *                walker retunes again within one dwell after that. An
+ *                adopted follower holds no authority, and a command sender
+ *                earns it only by bursting >= MIN_STREAK commands each
+ *                < STREAK_GAP_MS apart (base tx_stream_streak_max = 1 on
+ *                every leg on record) -- then for the burst + 1 s at most.
+ *   follow(now, locked) := (locked && adopted) || follow_own(now)
+ *                LOCKED on an ADOPTED grid is the follower, unchanged.
+ *                LOCKED on the node's own grid WITHOUT authority (an own-TX
+ *                gap >= STREAK_GAP_MS while an echo still holds the lock)
+ *                no longer follows: a frame heard there is handed
+ *                UNANCHORED and adopted, so tracking the own grid in that
+ *                window would only feed the RS-12.12/14 renumbering.
+ *
+ * Both are pure reads of this TU's, the clock's and the authority's state.
+ */
+uint8_t sx1276_rx_grid_follow_own(uint32_t now_ms);
+uint8_t sx1276_rx_grid_follow(uint32_t now_ms, uint8_t scan_locked);
 
 #endif /* LIFETRAC_MURATA_L072_SX1276_RX_GRID_POLICY_H */

@@ -94,3 +94,19 @@ uint8_t sx1276_rx_grid_on_demotion(void) {
     s_grid_adopted = 0U;
     return reset;
 }
+
+/* RS-12.15 reverse delivery (2026-10-14): see the header. The originator's
+ * own clock drives the receiver between frames in any scan state; an
+ * adopted grid drives it only while LOCKED, as before. */
+uint8_t sx1276_rx_grid_follow_own(uint32_t now_ms) {
+    return sx1276_fhss_authority_is_originator(now_ms,
+                                               sx1276_fhss_clock_valid(),
+                                               s_grid_adopted);
+}
+
+uint8_t sx1276_rx_grid_follow(uint32_t now_ms, uint8_t scan_locked) {
+    if (scan_locked != 0U && s_grid_adopted != 0U) {
+        return 1U;
+    }
+    return sx1276_rx_grid_follow_own(now_ms);
+}
