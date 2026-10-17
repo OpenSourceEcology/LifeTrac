@@ -3895,6 +3895,40 @@ in Debian containers, and no effect on the H747). Rationale, current state and
   unused services (aktualizr-lite, compose-apps units) measured against
   X8OS-2. Keeps OSTree rollback and the uuu recovery path.
 
+### Reboot and power cycle (PWR)
+
+From the 2026-10-17 research: the X8 already has a 60 s hardware watchdog
+that power-cycles the module through the PMIC, but nothing in userspace uses
+it, and no part of the system can cut the carrier's power without a person.
+Design, hardware facts and the five-layer plan:
+[X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md](X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md).
+Valve safety stays with the M4/Opta 200 ms watchdogs; none of this may gate it.
+
+- [ ] **PWR-1 Bench reset-reach checks** — the §4 list: which of reboot,
+  WDOG1 timeout and sysrq-crash reset the L072 and H7 (L072 `uptime_ms`),
+  what Max Carrier PB1 and HDC J1-73 `RESET` do on the X8, and whether a
+  12 V cut with an 18650 fitted is a real cycle. No RF transmit involved.
+- [ ] **PWR-2 systemd owns the hardware watchdog** — drop-in with
+  `RuntimeWatchdogSec=30s`, `RebootWatchdogSec=2min`; land together with a
+  `wdt_pet.sh` / flash-pipeline change that tolerates `EBUSY` and relies on
+  systemd's petting.
+- [ ] **PWR-3 Container and unit health** — `healthcheck:` on radio, bridge
+  and web containers with an unhealthy-restart policy; `WatchdogSec=` on
+  LifeTrac units that can hang. Builds on RS-4.8.
+- [ ] **PWR-4 `lifetrac-supervisor`** — host service with the escalation
+  ladder (container → L072 NRST → H7 NRST → reboot → sysrq-crash PMIC cycle),
+  persistent reboot counter and rate limit, reset reason in telemetry,
+  disarmed by default on the bench.
+- [ ] **PWR-5 Tractor hard power cycle** — normally-closed interrupt relay in
+  the Max Carrier 12 V feed on a spare D1608S SSR, Opta logic (H747 counter
+  stalled 120 s, 3 cycles/hour max, Modbus request register), and the 18650
+  decision (battery-side cut, BQ24195 ship mode, or supercap) together with
+  POWER_MANAGEMENT.md.
+- [ ] **PWR-6 Remote restart and bench power control** — authenticated
+  "Restart tractor" command after RS-8 (add to CYBERSECURITY_CASE.md), base
+  smart plug, and a bench smart plug/USB relay plus per-port-switched USB hub
+  so the Toughbook can run T2 itself.
+
 ---
 
 ## Phase 2 — Common firmware (shared by all three nodes)

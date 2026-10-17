@@ -70,7 +70,7 @@ Health Check (HC-xx).
 | 1.10 | SysRq trigger | `echo b > /proc/sysrq-trigger` (immediate reboot), `echo c` (panic+reboot if `kernel.panic` set), `echo s` (sync), `echo u` (remount RO) | kernel-level reboot independent of userspace | not currently in any Tier | Requires `kernel.sysrq != 0`; worth probing on this LmP image. **GAP.** |
 | 1.11 | `kill -9` of adbd | `pkill -9 adbd` (systemd respawns it) | one daemon | not currently in any Tier | Quicker than `systemctl restart adbd` when ADB just needs a kick and adbd is still pet-able. **GAP.** |
 | 1.12 | USB gadget soft-disconnect | `echo 0 > /sys/class/udc/<udc>/soft_connect; echo 1 > /sys/class/udc/<udc>/soft_connect` | forces host re-enumeration of the X8 composite without rebooting Linux | not currently in any Tier | Useful when Linux is healthy but Windows transport is wedged. **GAP — verify UDC name on this image.** |
-| 1.13 | Kill watchdog petter to force WDT reboot | `bash wdt_pet.sh stop` then stop kernel `[watchdogd]` somehow | i.MX2+ HW watchdog fires after 60 s → full reboot | helper exists (`wdt_pet.sh`) but explicitly listed under "What NOT to do" in `2026-05-12_X8_Board1_Recovery_Plan.md` | The kernel's `[watchdogd]` keeps petting it; can't be reliably triggered from the keyboard. |
+| 1.13 | Kill watchdog petter to force WDT reboot | `bash wdt_pet.sh stop` then stop kernel `[watchdogd]` somehow | i.MX2+ HW watchdog fires after 60 s → full reboot | helper exists (`wdt_pet.sh`) but explicitly listed under "What NOT to do" in `2026-05-12_X8_Board1_Recovery_Plan.md` | Corrected 2026-10-17: the kernel keepalive stops once userspace opens `/dev/watchdog0`; closing without `'V'` leaves the dog unpetted and the board power-cycles 60 s later (see 4.3). |
 
 ---
 
@@ -102,7 +102,7 @@ Health Check (HC-xx).
 |---|---|---|---|---|---|
 | 4.1 | Linux reboot (via 1.8 / 1.9 / 1.10) | see Layer 1 | full SoC re-boot from eMMC, **but NOT a power-on-reset** — IOMUXC retention behaviour applies | T1 (indirectly) | Does **not** clear post-camera IOMUXC drift on Board 1 (proven 2026-05-13 after overnight disconnect). |
 | 4.2 | `kexec` into a recovery kernel | `kexec -l <kernel> --initrd=<initrd> --command-line=...; kexec -e` | jumps to a fresh kernel without re-running U-Boot, mask-ROM, or hitting the i.MX reset controller | not currently used | UNTESTED on this LmP image; same IOMUXC-non-clearing limitation as 4.1. **GAP — research only.** |
-| 4.3 | i.MX `WDOG_B` self-reset via watchdog daemon stop | requires both `wdt_pet.sh stop` AND killing kernel `[watchdogd]` | full SoC reset including IOMUXC (POR-equivalent for most blocks) | NOT REACHABLE from soft path (kernel watchdogd is unkillable from userspace) | Theoretically the only soft path that resets IOMUXC. In practice: not achievable. |
+| 4.3 | i.MX `WDOG_B` self-reset via watchdog daemon stop | requires both `wdt_pet.sh stop` AND killing kernel `[watchdogd]` | full SoC reset including IOMUXC (POR-equivalent for most blocks) | **Reachable (corrected 2026-10-17):** open `/dev/watchdog0` and close it without the magic `'V'`; WDOG1 fires 60 s later and the PMIC power-cycles the module (tractor, 2026-09-12, see `wdt_pet.sh`). | Soft path to a PMIC power cycle. Whether it clears the IOMUXC/SWD wedge is untested. See [../REBOOT_AND_POWER_CYCLE.md](../REBOOT_AND_POWER_CYCLE.md). |
 | 4.4 | SDP entry without DIP flip | requires asserting `BOOT_MODE` straps via the carrier's BMP firmware | i.MX mask-ROM SDP mode (Layer 5 below) | not implemented; would need carrier firmware change | **GAP — investigate whether the on-carrier J-Link can drive the BOOT_MODE pins.** Would convert T3a from a physical to a soft procedure. |
 
 ---
@@ -137,7 +137,7 @@ bench. See [T3a_sdp_uuu_reflash.md](T3a_sdp_uuu_reflash.md) and
 10. **Carrier BMP-driven BOOT_MODE strap** (4.4) — research item; would soft-ify T3a if feasible.
 
 **Cannot be made into soft resets (documented for "do not waste time on"):**
-- 1.13 / 4.3 (kill watchdog petter) — kernel `[watchdogd]` is unkillable.
+- ~~1.13 / 4.3 (kill watchdog petter) — kernel `[watchdogd]` is unkillable.~~ Corrected 2026-10-17: a userspace open + close without `'V'` does trip WDOG1 (see 4.3).
 - Any path that requires clearing i.MX IOMUXC pad-retention without POR — confirmed empirically on Board 1 across 4 soft attempts + 12 h overnight disconnect.
 
 ---
