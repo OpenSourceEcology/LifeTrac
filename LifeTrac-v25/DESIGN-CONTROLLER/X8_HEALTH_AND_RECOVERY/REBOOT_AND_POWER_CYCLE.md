@@ -1,206 +1,383 @@
 # Reboot and power cycle — X8 + Max Carrier
 
-**Status: research + design proposal, 2026-10-17.** Nothing here has been
-run on the bench yet. Items marked **VERIFY** are inferred from datasheets
-or schematics and need a bench check before anyone relies on them. Tracked
-as TODO.md items **PWR-1..PWR-6** (Phase 1, after X8OS).
+**Status: revised 2026-10-17** after an adversarial review (hardware facts,
+repo consistency, safety/security, buildability; 74 findings survived
+verification) and Copilot's review of PR #153. The software layers that can
+be built without board access are in the repo but **installed nowhere and
+disarmed by default**: [`firmware/x8_recovery/`](../firmware/x8_recovery/README.md)
+(watchdog drop-ins, `install_watchdog.sh`, `lifetrac-supervisor`) and the
+compose healthchecks. The hardware layer (L4) and remote restart (L5) are
+design only. Nothing here has been run on a board. **VERIFY** marks claims
+inferred from datasheets, schematics or source code that need a bench check
+(collected in §6 / TODO PWR-1). Tracked as TODO.md **PWR-1..PWR-12**.
 
 Question this answers: *how can we reboot or power-cycle the Portenta X8 and
 the Max Carrier, which of those do we already use, and how do we build them
 into the system so a wedged node recovers on its own or on command?*
 
-Companions: [recovery/SOFT_RESET_INDEX.md](recovery/SOFT_RESET_INDEX.md)
-(every keyboard reset, layer by layer), [recovery/T2_cold_power_cycle.md](recovery/T2_cold_power_cycle.md),
-[../POWER_MANAGEMENT.md](../POWER_MANAGEMENT.md) (key-off shutdown and the
-self-holding power relay), [../SAFETY_CASE.md](../SAFETY_CASE.md) (valve
-watchdog chain).
+Companions: [recovery/SOFT_RESET_INDEX.md](recovery/SOFT_RESET_INDEX.md),
+[recovery/T2_cold_power_cycle.md](recovery/T2_cold_power_cycle.md),
+[../POWER_MANAGEMENT.md](../POWER_MANAGEMENT.md),
+[../SAFETY_CASE.md](../SAFETY_CASE.md),
+[../CYBERSECURITY_CASE.md](../CYBERSECURITY_CASE.md) §4.4,
+[../OTA_STRATEGY.md](../OTA_STRATEGY.md).
 
 ---
 
-## 1. What a "reset" actually reaches
+## 1. The short version
 
-| Method | i.MX Linux | H747 (M7+M4) | L072 LoRa | Carrier 5 V domain (modem, Coral, USB hub) | Survives an 18650 in the carrier |
+1. **A plain reboot is probably already a full PMIC power cycle of the X8
+   module.** The kernel reboots through PSCI `SYSTEM_RESET`; NXP's TF-A for
+   the i.MX8M Mini is built with `IMX_WDOG_B_RESET` and asserts `WDOG_B`,
+   which is wired to the BD71847 PMIC. The X8 device tree also sets
+   `fsl,ext-reset-output` on `wdog1`. Inferred from source; **VERIFY** with
+   `wdog_regs.py` (WRSR `POR=1` vs `SFTW=1`) after the next reboot. The old
+   "reboot is a warm reset, only a watchdog bite is a POR" idea is dropped,
+   and with it the deliberate kernel-crash rung.
+2. **The hardware watchdog exists but nothing in userspace owns it**, so a
+   hung systemd never recovers. Fix: systemd `RuntimeWatchdogSec=30s` (L2).
+3. **On the tractor, every module reset is also an engine stop.** In the
+   production design the H747 is the Modbus master; any X8 reset resets it
+   (tractor: `stm32h7-program` halts and reflashes it at every boot), the
+   Opta trips at 200 ms, the PSR drops, the engine stops, and the latch needs
+   a person at the machine. Automatic recovery restores comms and telemetry,
+   **never motion**. That is why tractor reboots are off by default in
+   everything built here.
+4. **The carrier cannot be power-cycled by anything on the carrier.** The
+   only full cold cycle is cutting the 12 V input (and the 18650, and the X8
+   USB-C). That needs an external, independently time-limited switch (L4),
+   which has real hardware decisions behind it.
+
+## 2. What a reset actually reaches
+
+| Method | i.MX Linux | H747 (M7+M4) | Carrier +3V3 = X8 VCC (L072, USB hub, microSD) | Carrier +5V (USB-A VBUS, mPCIe) / +3V8 (modem) | Tractor safety effect (production design) |
 |---|---|---|---|---|---|
-| `systemctl reboot` / `reboot -f` | warm reset | reflashed + restarted by `stm32h7-program.service` on boot | not reset (**VERIFY**) | no | n/a |
-| i.MX WDOG1 timeout (`WDOG_B` → PMIC) | PMIC power cycle | power cycled (**VERIFY**) | power cycled if fed from the X8 3V3 out (**VERIFY**) | no | n/a |
-| H7 NRST (`gpio10`, openocd `reset run`) | no | hard reset | no | no | n/a |
-| L072 NRST (`gpio163`) | no | no | hard reset | no | n/a |
-| Max Carrier PWRON button PB1 (HDC J2-05 `POWER_ON_REQ`) | PMIC power key: off/on per BD71847 config (**VERIFY**) | follows PMIC | follows PMIC | no | n/a |
-| Cut carrier 12 V input (barrel / screw terminal) | full cold cycle **only if** no battery and no X8 USB-C | yes | yes | yes | **no** — the BQ24195 switches to the battery |
-| Cut 12 V **and** X8 USB-C, no battery | full cold cycle (= T2) | yes | yes | yes | — |
+| `systemctl reboot` | PSCI `SYSTEM_RESET` → TF-A asserts `WDOG_B` → PMIC to SNVS and back (**VERIFY**) | Tractor: held and reflashed by `stm32h7-program` at boot (~13 s). Base: script says "No Update", so reset only if the reboot is a PMIC cycle (**VERIFY**) | follows the PMIC 3.3 V rail if it is a PMIC cycle (**VERIFY** drop time) | no | Opta trip → PSR → engine stop, latched |
+| `reboot -ff` / sysrq `b` | same path as above, no clean shutdown | same | same | no | same |
+| i.MX WDOG1 timeout | PMIC power cycle (bench: WRSR `POR=1`, 2026-09-12) | power cycled (H747 on PMIC `BUCK6` VDD_3V3, **VERIFY**) | yes (**VERIFY** drop time) | no | same |
+| `systemctl poweroff` / `halt` | not a final state: base (934/6.1) booted again ~4.5 min after poweroff; a halted kernel stops petting and `imx2_wdt` re-arms to 128 s at shutdown, so a halt ends in a PMIC reset (inferred) | follows | follows | no | same |
+| H7 NRST (`gpio10`, openocd `reset run`) | no | hard reset; does **not** revive the Linux x8h7 drivers, and reloading them OOPSes the 6.1 kernel | no | no | same (M7 RAM E-stop latch is cleared) |
+| L072 NRST (`gpio163`) | no | no | L072 only; needs a live x8h7 bridge; dead on the tractor today (RS-5.2) | no | stop-by-absence, no latch |
+| L072 `RESET_REQ` (0x03) over `/dev/ttymxc3` | no | no | L072 soft reset; sent by the radio daemons at every link open | no | stop-by-absence, no latch |
+| Max Carrier PB1 / X8 module PB1 (`PWRON`, HDC J2-05) | short press: PMIC IRQ → key event → systemd-logind default `HandlePowerKey=poweroff`; long press (≥3 s by DT, 10 ms OTP before the driver loads): PMIC off/on (**VERIFY** both) | follows | follows | no | same as reboot |
+| Max Carrier PB2 RESET, HDC J1-73 `RESET` | target **VERIFY** (repo notes say i.MX nRST; J1-73 is driven only by the on-carrier debugger, so it is not a field path) | ? | ? | no | ? |
+| Cut 12 V input, no 18650, no X8 USB-C | full cold start | yes | yes | yes | same |
+| Cut 12 V with an 18650 fitted | depends on the BQ24195: the cell reaches +5V (and the X8) only in boost/OTG mode (REG01[5:4]=10); the reset default is charge mode. **VERIFY** | depends | depends | +3V8 modem stays up on the cell via BATFET | depends |
 
 Hardware facts behind the table:
 
-- **X8 PMIC** is a ROHM BD71847. Its `WDOG` input is tied (R3, 0 Ω) to the
-  i.MX `WDOG_B` net, its `POR` output drives i.MX `POR_B`, and it has a
-  `PWRON` power-key input ([ABX00049 schematics](https://docs.arduino.cc/resources/schematics/ABX00049-schematics.pdf)).
-- **WDOG1 is already armed by u-boot** on both bench boards: `WCR=0x773d`,
-  60 s, `WDT=1` (assert `WDOG_B`). A timeout power-cycles the module through
-  the PMIC, and `WRSR` then reads POR, so the register cannot tell a watchdog
-  reboot from a power-on ([wdog_regs.py](../firmware/x8_lora_bootloader_helper/bench_tools/wdog_regs.py),
+- **PMIC:** ROHM BD71847. `WDOG` pin ← i.MX `WDOG_B` (R3, 0 Ω); `POR` →
+  i.MX `POR_B`; `PWRON` ← both PB1 buttons. The X8 DT sets
+  `rohm,reset-snvs-powered`, so a WDOG/power-key reset goes to SNVS, not to
+  full off: every rail except the SNVS domain cycles. Sources:
+  [ABX00049 schematics](https://docs.arduino.cc/resources/schematics/ABX00049-schematics.pdf),
+  [BD71847 DT binding](https://www.kernel.org/doc/Documentation/devicetree/bindings/mfd/rohm%2Cbd71847-pmic.yaml).
+- **Reboot path:** Linux arm64 `machine_restart` → PSCI `SYSTEM_RESET`
+  (priority 129 beats `imx2_wdt`'s 128); NXP imx-atf
+  `plat/imx/imx8m/imx8mm/include/platform_def.h` defines
+  `IMX_WDOG_B_RESET` on every branch checked, and `imx_wdog_restart(true)`
+  clears WDA "to assert WDOG_B". Arduino's TF-A patch set does not touch
+  that file. A `reboot=warm` command line would take PSCI `SYSTEM_RESET2`
+  instead; LifeTrac must not set it.
+- **WDOG1** is armed by u-boot on both bench boards: `WCR=0x773d`, 60 s,
+  `WDT=1`. A timeout reads `POR` in WRSR, so WRSR cannot tell a watchdog
+  reset from a power-on ([wdog_regs.py](../firmware/x8_lora_bootloader_helper/bench_tools/wdog_regs.py),
   [FLASH_RUNBOOK §3](../firmware/x8_lora_bootloader_helper/FLASH_RUNBOOK.md)).
-- **Nothing in userspace owns the watchdog.** `RuntimeWatchdogSec=off` in
-  `/etc/systemd/system.conf` on both boards (captured in
-  `bench-evidence/board_state_2026-10-04/base` and `board_state_2026-10-10/tractor`).
-  The kernel's boot keepalive pets it forever, so a hung systemd or a
-  userspace lockup never trips it.
+  The PMIC's own `RESETSRC` register (0x29: `RWDOG`, `RPWRON`, `RSWRST`,
+  `RVSYS_2P7`, ...) is cleared only by UVLO and could tell them apart
+  (**VERIFY**).
+- **Nothing in userspace owns the watchdog today.** `system.conf` has only
+  the commented default `#RuntimeWatchdogSec=off` and no `/etc` drop-in; the
+  direct proof is that `wdt_pet.sh` opened `/dev/watchdog0` without `EBUSY`
+  on both boards (2026-09-12). Vendor drop-ins under `/usr/lib` were never
+  captured; `capture_board_state.sh` now records the effective value.
+- **Early boot is uncovered:** from `imx2_wdt` probe until PID 1 opens the
+  device, the kernel pets WDOG1 forever (`watchdog.open_timeout=0`), so a
+  hang in the initramfs or early systemd never resets. The kernel argument
+  `watchdog.open_timeout=` fixes that, but only together with L2 (otherwise
+  every boot resets) — X8OS-4.
 - **Max Carrier power** ([ABX00043 datasheet](https://docs.arduino.cc/resources/datasheets/ABX00043-datasheet.pdf),
-  [full pinout](https://docs.arduino.cc/resources/pinouts/ABX00043-full-pinout.pdf)):
-  jack input 6–36 V; an 18650 cell on J16/J18 through a BQ24195 charger, jack
-  has priority, battery takes over when the jack drops. **PB1 "PWRON"** goes
-  to HDC J2-05 (`POWER_ON_REQ`). **HDC J1-73 `RESET`** is driven by the
-  carrier's on-board debugger ("JTAG RESET"); on the X8 its target (H7 NRST
-  vs. i.MX) is **VERIFY**. No documented carrier-side power-enable signal.
-- **X8 module input**: VIN 4.5–5.5 V from the carrier, or its own USB-C. Either
-  one keeps the module alive, which is why T2 unplugs both.
+  [pinout](https://docs.arduino.cc/resources/pinouts/ABX00043-full-pinout.pdf)):
+  jack 6–36 V → MPM3550 (enable tied to input) → +5V; 18650 via BQ24195
+  ("can be used as backup power source if the external power supply fails";
+  "Priority is with the jack delivered power"). Nothing powers the whole
+  carrier off. Sub-rails are switchable through x8h7 GPIOs: SARA modem
+  `PWR_ON`/`RESET`, the mPCIe 3V3 buck `EN`, USB-A VBUS via the USB2514B
+  port-power pins. Cellular is archived, so the modem can simply be held off.
+- **X8 module input:** VIN 4.5–5.5 V from the carrier, or its own USB-C;
+  either keeps the module alive, which is why T2 unplugs both.
 
-## 2. What LifeTrac already uses
+## 3. What LifeTrac already uses
 
 | Layer | Mechanism | Where | State |
 |---|---|---|---|
-| Containers | `restart: unless-stopped` on all compose services | [`docker-compose.yml`](../docker-compose.yml), tractor compose files | In use. No `healthcheck:`; a hung-but-running container is never restarted. Image tx/rx daemons run via bare `docker run` and are unsupervised (TODO RS-4.8). |
-| systemd services | `Restart=on-failure` | `firmware/tractor_x8/systemd/lifetrac-*.service` | In use for time, camera, params, logger. No `WatchdogSec=`. |
-| Linux reboot | `systemctl reboot` | `full_flash_pipeline.sh` / `run_flash_bench.sh` `REVIVE_MODE=reboot` | In use on the bench; boards back in 12–24 s. |
-| i.MX hardware watchdog | u-boot arms WDOG1, kernel pets; `wdt_pet.sh` holds it during L072 flashes and hands it back with magic close `'V'` | `firmware/x8_lora_bootloader_helper/wdt_pet.sh` | In use on the bench only. Proven 2026-09-12 that closing without `'V'` power-cycles the board 60 s later. |
-| H7 reset | `gpio10` NRST pulse, openocd `reset run` | `pulse_h7_nrst.sh`, `revive_bridge.sh` | Bench scripts only. |
-| L072 reset | `gpio163` NRST, openocd BOOT0/NRST, `AT+REBOOT` | `revive_bridge.sh`, flash pipeline | Bench scripts only. L072 IWDG designed but never started (TODO RS-4.10). |
-| Valve safety | M4 200 ms software watchdog → PSR relay; Opta 200 ms Modbus watchdog | `tractor_h7_m4`, `tractor_opta` | Designed. These make valves safe; they do **not** restart anything. |
-| Full power cycle | Unplug 12 V + USB-C by hand (T2) | [T2_cold_power_cycle.md](recovery/T2_cold_power_cycle.md) | Manual only. TODO bench idea (2026-08-22): smart plug / relay on the bench supplies. |
-| Key-off power | Self-holding relay held by an H747 output | [POWER_MANAGEMENT.md](../POWER_MANAGEMENT.md) | Design draft, not built. |
+| Containers | `restart: unless-stopped` | [`docker-compose.yml`](../docker-compose.yml), [`firmware/tractor_x8/docker-compose.yml`](../firmware/tractor_x8/docker-compose.yml) | Declared, but no production stack runs on either board: the base runs only the bench broker; `lifetrac-base.service` is retired and not installable (RS-5.11); the tractor camera app starts only through the udev unit and is stopped at every bench power-up. |
+| systemd units | `Restart=on-failure` | `firmware/x8_lora_bootloader_helper/lifetrac-camera.service` (tractor, udev-started `docker compose up` wrapper), `bench_tools/units/disable-wifi.service` | The only LifeTrac units installed. `firmware/tractor_x8/systemd/*.service` are OBSOLETE and installed nowhere (RS-5.16). No `WatchdogSec=` anywhere. |
+| LmP auto-reboot | `docker.service` `FailureAction=reboot` (tractor) / `StartLimitAction=reboot` (base) after 3 failed starts in 60 s; `aktualizr-lite` `StartLimitAction=reboot` (inactive: no `sota.toml`) | LmP image | Live. Restarting `docker.service` in a loop can reboot the board; the supervisor never does it. |
+| OTA rollback | u-boot `bootcount` / `bootlimit=5`, `upgrade_available` in `/mnt/boot/uboot.env` (FAT, single copy) | LmP image | Every reboot, WDOG bite or power cut during a trial boot counts toward rollback. |
+| Linux reboot | `systemctl reboot` | flash pipeline `REVIVE_MODE=reboot` | Bench; boards back in 12–24 s. |
+| i.MX watchdog | u-boot arms WDOG1, kernel keepalive pets; `wdt_pet.sh` holds it during L072 flashes and hands it back with magic close `'V'` | `firmware/x8_lora_bootloader_helper/wdt_pet.sh` | Bench. Closing without `'V'` power-cycles the board 60 s later (tractor, 2026-09-12). |
+| H7 reset | `gpio10` NRST, openocd `reset run` | `pulse_h7_nrst.sh`, `revive_bridge.sh` | Bench only. |
+| L072 reset | `RESET_REQ` (0x03) at every radio link open; `gpio163` NRST and openocd BOOT0/NRST | `image_tx_daemon.py`, `image_rx_daemon.py`; bench scripts | `RESET_REQ` is in the production daemons. There is no `AT+REBOOT` in the LifeTrac L072 firmware. The L072 IWDG is designed but never started (RS-4.10). Under the H7↔L072 contract the H7 owns NRST and its own throttled recovery ([04 §5](../DESIGN-LORAFIRMWARE/04_Hardware_Interface_and_Recovery.md)). |
+| Valve safety | M4 200 ms software watchdog → PSR; Opta 200 ms Modbus watchdog | `tractor_h7_m4`, `tractor_opta` | Designed. They make valves safe; they restart nothing. The draft Opta firmware latches `WATCHDOG_TRIPPED` until the Opta itself is power-cycled, which contradicts TRACTOR_NODE.md's "re-enables after ≥10 advances" (PWR-11). |
+| Full power cycle | Unplug 12 V + USB-C by hand (T2) | [T2](recovery/T2_cold_power_cycle.md) | Manual only. |
+| Key-off power | Self-holding relay held by an H747 output | [POWER_MANAGEMENT.md](../POWER_MANAGEMENT.md) | Design draft. The hold drops whenever the H747 resets (PWR-12). |
 
-Correction to the soft-reset index: rows 1.13 and 4.3 say a watchdog-driven
-SoC reset is "not reachable" from userspace. The 2026-09-12 finding above
-shows it is: open `/dev/watchdog0`, then close it without `'V'` (or stop
-petting), and WDOG1 fires a PMIC power cycle at its timeout.
+## 4. Safety and security consequences (read before arming anything)
 
-## 3. Recommended design — five layers, cheapest first
+- **Tractor resets stop the engine.** Every rung that restarts the H747 (any
+  reboot, WDOG bite, L4 cut, H7 NRST) stops the Modbus master, trips the
+  Opta within 200 ms and drops the PSR. The M7's E-stop latch lives in RAM
+  and is cleared by the reset, so the **Opta and PSR latches are the
+  authoritative ones and must survive every rung**; the M7 must read the
+  Opta `safety_state` at boot and stay latched if it is not `NORMAL`
+  (PWR-11). Recovery restores comms and telemetry, not motion. The base node
+  has no such effect.
+- **Reboot loops wear the valve controller's flash.** On the tractor every
+  boot erases and reprograms H747 bank 1 (~13 s). Any automatic reboot path
+  on the tractor waits on PWR-8 (program only on mismatch, or X8OS-3).
+- **More boots weaken the tractor's GCM nonces.** The H7 builds nonces from
+  `seq`, seconds-since-boot (both restart at 0) and 5 bytes from an xorshift
+  seeded once from UID ⊕ millis ⊕ micros. More reboots raise the odds of a
+  (key, nonce) collision, which would leak the GHASH key. Tractor arming
+  waits on PWR-9 (hardware RNG). The base uses `os.urandom` and is not
+  affected.
+- **Unplanned cuts need crash-only storage.** A WDOG bite, a forced reboot
+  and an L4 cut can land mid-write, including on `/mnt/boot` (FAT, no
+  journal, the only u-boot env copy; the tractor already logs "Volume was
+  not properly unmounted"). Production arming of the forced-reboot rung and
+  of L4 waits on PWR-7.
+- **An L072 reset wipes the FCC dwell accountant** (rolling 10 s / 20 s
+  windows in RAM). Any reset rung, and the planned IWDG, must be followed by
+  a TX hold-off of one dwell window (PWR-10, L072 firmware; SIL only, no air
+  time).
+- **New attack surfaces** (remote restart opcode, Opta power-request
+  register, a root supervisor, a network-controlled supply relay) are listed
+  in [CYBERSECURITY_CASE.md §4.4](../CYBERSECURITY_CASE.md).
 
-Each layer catches what the one above it cannot. All of it stays out of the
-valve-safety path: the M4 and Opta watchdogs make the hydraulics safe within
-200 ms no matter what this design does, and nothing here may wait on or
-override them.
+## 5. Design
 
-### L1 — Service self-healing (software, both nodes)
+Each layer catches what the one above it cannot. None of it may delay or
+override the valve watchdogs.
 
-- Add `healthcheck:` to the radio, bridge and web containers, and an
-  autoheal policy (a small sidecar or the L3 supervisor) that restarts
-  containers reported `unhealthy`. Promote the image tx/rx daemons to compose
-  services per RS-4.8, after the RS-1.2 heartbeat counter lands.
-- `WatchdogSec=` + `sd_notify` on the LifeTrac systemd units that can hang
-  rather than exit.
+### L1 — Health status for containers (built)
 
-### L2 — Kernel/PID 1 hang → hardware watchdog (software config, both nodes)
+- Compose `healthcheck:` on **mosquitto** (base and tractor) and **web_ui**
+  (base). Status only: Docker never restarts a container for being
+  unhealthy; the L3 supervisor acts on the status.
+- Not on `lora_bridge` (KISS, obsolete, replaced under RS-5.11),
+  `audit_tail` (idle by design), or the radio daemons until RS-1.2 gives
+  them a heartbeat written from the worker loop. Never as a Dockerfile
+  `HEALTHCHECK`: the bench harness runs the same images with bare
+  `docker run` and must keep failing loudly (RS-4.8).
+- The tractor compose now mounts a repo `mosquitto.conf` with a non-loopback
+  listener; without it `eclipse-mosquitto:2` refuses the camera container.
+- **Restart side effects:** restarting `web_ui` republishes retained radio
+  settings (once switched a live profile on air); restarting a radio daemon
+  sends `RESET_REQ`. Neither belongs on the supervisor's restart allowlist.
+- Blocked for production on a deploy path: RS-5.11 (base) and a scripted
+  install of the tractor compose app.
 
-- Set `RuntimeWatchdogSec=30s` and `RebootWatchdogSec=2min` in a
-  `/etc/systemd/system.conf.d/lifetrac-watchdog.conf` drop-in. systemd then
-  owns `/dev/watchdog0`; if PID 1 or the kernel stops scheduling, WDOG1 fires
-  and the PMIC power-cycles the module. This is the only layer that recovers
-  a frozen Linux with no operator.
-- **Bench impact:** `wdt_pet.sh start` will get `EBUSY` once systemd owns the
-  device. The flash pipeline must detect that and skip its own petter
-  (systemd already pets every 15 s). Land the drop-in only together with that
-  script change.
-- Ship it through the OSTree/LmP image (X8OS-4) or a provisioning step; on
-  the bench, provision with `provision_bench_board.sh`.
+### L2 — systemd owns the hardware watchdog (built, not installed)
 
-### L3 — `lifetrac-supervisor`: health checks with an escalation ladder (software, both nodes)
+- `firmware/x8_recovery/systemd/system.conf.d/90-lifetrac-watchdog.conf`:
+  `RuntimeWatchdogSec=30s`, `RebootWatchdogSec=2min`. If PID 1 or the
+  kernel stops scheduling, WDOG1 bites and the PMIC cycles the module.
+  `RebootWatchdogSec` covers only the systemd-shutdown phase; `imx2_wdt`
+  re-arms to 128 s at device shutdown.
+- `systemd/reboot.target.d/90-lifetrac-timeout.conf`: `JobTimeoutSec=3min`,
+  `JobTimeoutAction=reboot-force`, so a shutdown stuck on a D-state process
+  (wedged camera USB) cannot hold a reboot for upstream's 30 min.
+- `install_watchdog.sh check|install|remove --role base|tractor|bench`:
+  base can be armed in production now; tractor refuses without an explicit
+  prerequisites flag (PWR-8, PWR-9, operator decision); bench needs an
+  explicit opt-in and is only for the PWR-1 checks.
+- Coexistence: once systemd owns `/dev/watchdog0`, `wdt_pet.sh start` sees
+  that and relies on systemd instead of reporting a false failure. The
+  runtime timeout becomes 30 s, and the close-without-`'V'` trick
+  (SOFT_RESET_INDEX 4.3) returns `EBUSY`.
+- Follow-ups: `watchdog.open_timeout=` (X8OS-4); decide `HandlePowerKey`
+  (a stray PB1 short press is a clean poweroff today).
 
-A small systemd service (host, not a container, so it survives Docker
-trouble) that runs the HC-02-style checks every few seconds and escalates
-only as far as needed:
+### L3 — `lifetrac-supervisor` (built, disarmed)
 
-1. restart the failing container or unit;
-2. L072 NRST (`gpio163`) if the radio stops answering;
-3. H7 NRST (`gpio10` / openocd `reset run`) if the x8h7 bridge is dead;
-4. `systemctl reboot`;
-5. **deliberate PMIC power cycle**: `echo c > /proc/sysrq-trigger`. With L2
-   in place, the crashed kernel stops petting and WDOG1 power-cycles the
-   module within `RuntimeWatchdogSec`. (Writing `/proc/sysrq-trigger` as root
-   works whatever `kernel.sysrq` is set to.) This is the soft path to a POR,
-   which a plain reboot is not.
+POSIX sh (the tractor's host Python lacks `json`, `select`, `socket` and
+working `subprocess`), every external command under `timeout`. Source and
+details: [`firmware/x8_recovery/`](../firmware/x8_recovery/README.md).
 
-Guards: a reboot counter in persistent storage (`/var/lib/lifetrac`), at most
-N escalations to step 4/5 per hour, then stop escalating and stay up for
-diagnosis (no boot loops). Log every action with a reason code before acting,
-fsync'd, and publish the last reset reason in telemetry after boot. Default
-**disarmed on the bench** (same gating rule as `power_mgmt_enabled` in
-POWER_MANAGEMENT.md), so bench sessions never get surprise reboots.
+Ladder, cheapest first:
 
-### L4 — Independent hard power cycle of the whole node (hardware, tractor)
+1. restart an **allowlisted** container that is unhealthy for N passes
+   (per-boot cap, then it counts as a node fault);
+2. `systemctl reboot`, bounded by the L2 `reboot.target` timeout;
+3. if the reboot command fails or the supervisor is still alive after a
+   timeout: `sysrq` `s`, `u`, `b` (sync, read-only remount, immediate
+   reboot), falling back to `systemctl reboot -ff`.
 
-Needed for the cases L2/L3 cannot fix: the carrier 5 V domain (modem,
-Coral, USB hub), a wedge that survives a module-only PMIC cycle, or a
-module that will not boot. Requires something outside the X8 to cut the
-carrier's input.
+Removed from the earlier draft, with reasons:
 
-- **Tractor: Opta-driven interrupt relay.** The Opta is powered separately,
-  already sees the H747's `watchdog_counter` (0x0004), and can see Modbus
-  silence. Put a **normally-closed** relay contact (automotive 12 V relay, or
-  a high-side load switch) in series with the Max Carrier 12 V feed, driven by
-  one of the 4 spare D1608S SSR channels ([TRACTOR_NODE.md](../TRACTOR_NODE.md)). Opta logic: if the H747 counter has not moved
-  for a long window (proposal 120 s, never the 200 ms valve window), and not
-  in the first 180 s after Opta boot, open the contact for 15 s, then close
-  it; at most 3 cycles per hour. Also expose a Modbus register so the H747
-  can *request* a cycle (from the L3 supervisor after step 5 fails, or from an
-  operator command, below).
-  Normally-closed means a dead Opta leaves the carrier powered, so this can
-  only ever add a recovery, never cause an outage by failing.
-- **Battery interaction:** with the 18650 UPS cell fitted, cutting 12 V does
-  nothing, because the BQ24195 runs the carrier from the cell. Options:
-  (a) cut on the battery side too (second contact in the cell lead);
-  (b) before the cut, have Linux put the BQ24195 in ship mode (BATFET off over
-  I²C) so the cell disconnects, then the 12 V cut drops everything (**VERIFY**
-  the BATFET re-enables when input returns); (c) replace the cell with the
-  supercap bridge POWER_MANAGEMENT.md already prefers, sized so it drains
-  within the 15 s off window. Pick together with the POWER_MANAGEMENT battery
-  decision.
-- **Fit with POWER_MANAGEMENT.md's self-holding relay:** that relay cannot
-  power-cycle while the key is on, because the ignition leg re-energizes the
-  coil at once. The interrupt contact therefore sits downstream of it, in the
-  carrier feed only. The H747 hold output stays the owner of key-off.
-- **Alternative if no Opta channel is free:** a standalone watchdog timer
-  board (heartbeat input from a carrier GPIO, timed NC relay output).
+- **L072 NRST** — the H7 owns NRST under the H7↔L072 contract, `gpio163`
+  needs a live bridge and is dead on the tractor (RS-5.2), and restarting a
+  radio container already sends `RESET_REQ`. L072 recovery belongs to the
+  radio owner (H7 or daemon) and RS-4.10's IWDG.
+- **H7 NRST** — does not revive the Linux x8h7 drivers, the module reload
+  OOPSes the 6.1 kernel, and a reboot resets the H747 anyway.
+- **Deliberate kernel crash (`sysrq c`)** — no gain if a reboot is already
+  a PMIC cycle (§1), and it skips the sync.
 
-### L5 — Remote command (both nodes)
+Guards:
 
-- **Operator "Restart tractor" button** on the base web UI → an
-  authenticated LoRa command → H747 → either `SHUTDOWN_REQ`-style clean
-  reboot (L3 step 4) or a power-cycle request to the Opta (L4). Must wait for
-  the AEAD work (RS-8); an unauthenticated reboot opcode is a denial-of-service
-  hole (add to CYBERSECURITY_CASE.md). Refused while the tractor reports
-  motion or valves active.
-- **Base station** (mains + UPS, reachable by ssh): L1–L3 as above; for a hard
-  cycle, a network smart plug or outlet-switched UPS on the base's 12 V supply,
-  on a network path that does not depend on the X8.
-- **Bench (Toughbook):** put both bench boards' 12 V supplies on a smart plug
-  or USB relay **and** the X8 USB-C cables on a hub with per-port power
-  switching (Windows CLI support needed, so check the hub before buying).
-  This turns T2 into a command for the Toughbook agent. 18650s stay out of
-  bench carriers, or T2 is not a cold cycle.
+| Guard | Rule |
+|---|---|
+| Arming | Acts only if `/etc/lifetrac/supervisor.armed` exists; otherwise logs `WOULD …` and does nothing. Bench boards never get the file without a GO. |
+| Tractor | Reboot rungs off unless `TRACTOR_REBOOT_ENABLED=1` (§4: engine stop, flash wear, nonces). |
+| Grace | No reboot before 600 s uptime. |
+| Boot loop | Consecutive supervisor reboots persisted; at the cap (default 3) it enters HELD and stops rebooting until `clear-hold`. The count resets after 30 min of continuous health. |
+| Clock | No wall clock anywhere (no RTC; the tractor clock is not wall time): uptime and `boot_id` only. Heartbeat staleness = mtime unchanged for N seconds of uptime. |
+| OTA trial boot | While `upgrade_available=1`, the cap is raised to `bootlimit + 1` so a bad image still rolls back. |
+| Reason | Writes an atomic `last_action` record before every reboot; on the next start classifies the previous reset as `supervisor:<action>:<reason>` or `external_or_unknown`. |
+| Self-liveness | `WatchdogSec=300` with `systemd-notify WATCHDOG=1` after each pass. |
+| Never | GPIOs, openocd, x8h7 modules, `stm32h7-program`, `docker.service`, `/dev/ttymxc3`, L072 flash/unprotect tools, `sysrq c`. |
 
-## 4. Bench checks before building (no RF transmit needed)
+Trigger definitions: `docker info` failing (node fault), allowlisted
+container `status != running` or `health == unhealthy`, heartbeat files
+stale. Radio and bridge liveness come only from the owning daemon's
+heartbeat file, never from a second opener of `/dev/ttymxc3` or from
+`/sys/kernel/x8h7_firmware/version` (which times out on healthy boards).
 
-These touch only power and resets; none keys the radio. Each still needs
-Dorkmo's OK for bench time.
+Open items: install path in provisioning; merging with OTA_STRATEGY's
+`lifetrac-health` as its probation mode (one service, one set of checks);
+publishing the reset reason (base: local broker; tractor: through the H747
+once X8OS-3 lands); the tractor reboot decision.
 
-- [ ] Does `systemctl reboot` reset the L072? Compare L072 `uptime_ms`
-  (FAULT_URC offset 20) before and after.
-- [ ] Does a WDOG1 timeout (close `/dev/watchdog0` without `'V'`) also reset
-  the L072 and the H7? Same `uptime_ms` check; H7 via its boot banner.
-- [ ] Does `echo c > /proc/sysrq-trigger` with `RuntimeWatchdogSec=30s`
-  power-cycle the board in ~30 s and come back clean?
-- [ ] What does a short and a long press of Max Carrier PB1 do on the X8
-  (BD71847 PWRON config)? What does HDC J1-73 `RESET` reset on the X8?
-- [ ] With an 18650 fitted, confirm a 12 V cut keeps the board up, and test
-  the BQ24195 ship-mode path.
-- [ ] Does any module-only reset (reboot, WDOG1, sysrq) clear the
-  camera/IOMUXC class of wedge (T2 history), or is the L4 input cut required?
+### L4 — Independent hard power cycle (design only)
 
-## 5. Not recommended
+Needed for what L2/L3 cannot fix: carrier +5V/+3V8 devices, a module that
+will not boot, a Linux that hangs before L3 starts. It must cut the
+carrier's input from outside the X8. Requirements:
 
-- `kexec` as a recovery path: same non-POR limits as reboot, no known-good
-  rescue kernel (SOFT_RESET_INDEX 4.2).
-- Folding power-cycle logic into the 200 ms valve watchdogs. Different time
-  scale and different failure direction; keep them separate.
-- Powering the carrier through a normally-open relay that must be actively
-  held by the supervisor: a supervisor fault would then take the node down.
+1. **Trigger from node health, monitored outside Linux.** The H747's
+   `watchdog_counter` advances on its own 20 Hz loop regardless of Linux, so
+   it cannot see a Linux hang or a boot failure. L4 needs (a) a
+   **supervisor heartbeat** that originates in Linux (from L3, only after a
+   healthy pass) and a separate **boot-complete timeout** after every
+   power-up, both watched by the L4 device; (b) the H747 counter only as an
+   extra "H747 dead" signal. Keep the valve-safety counter independent of
+   Linux.
+2. **Hardware-bounded off pulse.** A controller that hangs or a shorted SSR
+   must not keep the carrier off. The off time is limited by hardware (a
+   one-shot or timer relay, or a capacitor-coupled coil drive), and no
+   single switch can hold the cut (two switches in series). Flyback diode on
+   the coil; carrier-side 12 V fed back to an input to detect a stuck cut.
+3. **Contact.** An SPDT relay used on its normally-closed contact, rated for
+   low-level loads (gold-clad; the carrier draws only ~0.3–0.5 A, below the
+   wetting current of silver power contacts) and for tractor vibration,
+   mounted in the isolated enclosure. Not a plain high-side switch, which
+   fails off.
+4. **Battery.** For autonomous recovery the 18650 must be cut by the same
+   independent device (second contact in the cell lead), or the bridge store
+   must sit upstream of the contact. BQ24195 ship mode (BATFET off; TI:
+   "can be turned on by plugging in adapter") works only for planned cycles
+   while Linux is alive, with a guard that re-enables it if the cut never
+   comes.
+5. **Arming and inhibits.** Disarmed by default (provisioned flag or
+   jumper); disarmed while ignition I1 is low, so a parked tractor is never
+   cycled; a timed maintenance/flash inhibit (L072 flash and H7 debug hold
+   the H747 for 45–165 s); a "planned off" flag set before any deliberate
+   shutdown; never during an OTA confirm window.
+6. **State machine.** Grace after every power-up and every re-close, at
+   least the measured cold boot plus the H747 reflash; back-off between
+   cycles; give up after K consecutive cycles without recovery until the
+   next key cycle; status reported in telemetry.
+7. **Key-off hold.** POWER_MANAGEMENT's self-holding relay must survive an
+   H747 reset (an Opta OR leg, or a hardware hold timer); until then L3 and
+   L4 refuse to act while I1 is low.
+
+Where it lives:
+
+- **Recommended: a standalone node-watchdog board** (small MCU, DPDT relay,
+  hardware off-time limit, ignition input, maintenance jumper) fed by the
+  L3 heartbeat on a carrier GPIO. It keeps power supervision out of the
+  safety PLC, sees Linux health directly, and does not wait on X8OS-3 or on
+  the Opta latch rework.
+- **Alternative: the Opta.** Use EMR R4 (MASTER_PLAN §8.18 "spare", after
+  the §8.18 coil rework) or, interim, D1608S channel 7 (0-based; the only
+  channel the firmware leaves free; the "4 spare" text in TRACTOR_NODE.md
+  and HARDWARE_BOM.md is wrong). It needs latch-exempt registers (0x0007
+  request with magic + nonce, a heartbeat register), its own timer outside
+  `all_coils_off()` and the boot self-test, a coil feed that the PSR does
+  not switch, and X8OS-3 to forward the Linux heartbeat.
+
+### L5 — Remote restart and bench/base power control (design only)
+
+- **"Restart tractor" from the base UI.** Requirements: name the transport
+  and put the command inside the GCM envelope (never plaintext 0xFB); bind
+  it to the tractor's current boot with a fresh per-boot challenge
+  published in authenticated telemetry (the replay window is RAM-only and
+  unprimed at boot); share the persistent rate limit with L3; the H747
+  checks at execution time that valves are neutral, no E-stop is latched and
+  no handheld is the active source; the UI says that motion needs a reset at
+  the machine.
+- **Base station.** It runs from a 12 V supply through a DC mini-UPS, so a
+  mains smart plug cuts nothing. Put a normally-closed contact of a
+  network- or USB-controlled DC relay between the UPS output and the Max
+  Carrier jack, driven from a host that does not depend on the base X8. No
+  18650 and no X8 USB-C on the base, or the cut is not a cold cycle.
+- **Bench (Toughbook).** Same DC relay on each board's 12 V feed, plus an
+  inline USB VBUS switch with data pass-through on a direct PC port (the
+  bench rule is no hub for adb or reflash). Keep the carrier's debug
+  micro-USB (J10) unplugged during automated cycles. Leg launchers compare
+  `/proc/sys/kernel/random/boot_id` at the start and end of each leg so an
+  unattended reboot is caught.
+
+## 6. Bench checks (PWR-1)
+
+None of these asks the L072 to transmit, but each reboots or power-cycles a
+board, so each follows the bench power-up procedure: the first boot of each
+board after 2026-10-12 starts with the checks in BENCH_BOARDS "Not yet
+observed: the next boot"; arm `legs/power_up_guard.sh --wait-power-cycle
+--no-park` before every test reboot or cut (it stops `lifetrac-camera` and
+`tractor-camera` and restages `/tmp`); park both radios at the end. Each
+check needs Dorkmo's OK for bench time.
+
+Read-only first (no reboot): run `capture_board_state.sh`, which now records
+the effective watchdog owner, `kernel.panic`, sysrq availability, the PMIC
+power-key DT properties and input device, `HandlePowerKey`, and the
+u-boot trial-boot variables.
+
+Then, in this order:
+
+- [ ] **Does `systemctl reboot` go through `WDOG_B`?** Free: after the next
+  `REVIVE_MODE=reboot` flash, run `wdog_regs.py`. `POR=1` → PMIC path;
+  `SFTW=1` → internal reset. Do it on both boards (the base's H7 is not
+  reflashed at boot).
+- [ ] **Does a reboot reset the L072?** Compare `uptime` in the periodic
+  `RFCO_SUMMARY` URC (payload offset 8, every 60 s, no RF needed) before and
+  after, and record elapsed time so continued uptime is distinguishable
+  from a reset. (FAULT_URC is event-driven and may not repeat.)
+- [ ] **WDOG1 bite** (open `/dev/watchdog0` and close it without `'V'`;
+  only before L2 is installed): same two readings, plus PMIC `RESETSRC`.
+- [ ] **L2 installed** (bench opt-in on the board under test, removed
+  afterwards): `systemctl show -p RuntimeWatchdogUSec`, `wdt_pet.sh start`
+  prints that it relies on systemd, `wdog_regs.py` shows the 30 s timeout.
+- [ ] **PB1 short and long press, PB2, J1-73:** answer from the DT and the
+  input device first; press only with an OK.
+- [ ] **18650 behaviour:** with a cell fitted, does a 12 V cut keep the X8
+  up? Read BQ24195 REG01 mode first.
+- [ ] **`systemctl poweroff` / `halt`:** does each board stay off? Time the
+  base's restart against 128 s.
+- [ ] **Does a module-only reset clear the camera USB-host wedge / Linux
+  soft hang** (T2 rows 2026-05-12 and 2026-05-13 manual unplug)? Out of
+  scope: the Board 1 SWD wedge, which survived T2 and a T3a reflash.
+
+## 7. Not recommended
+
+- `sysrq c` or any deliberate kernel crash as a recovery rung.
+- `kexec` as recovery (no rescue kernel; truly non-POR).
+- Restarting `docker.service` in a loop (LmP reboots after 3 failed starts).
+- L072 or H7 resets from the Linux supervisor (owned by the H7 / reboot).
+- Dockerfile `HEALTHCHECK`, or an autoheal sidecar with the Docker socket.
+- A supply relay that must be actively held on to power the node, or a
+  high-side switch standing in for a normally-closed contact.
+- A mains smart plug upstream of the base's DC UPS.
+- Folding power-cycle logic into the 200 ms valve watchdogs.

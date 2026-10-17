@@ -3946,37 +3946,81 @@ in Debian containers, and no effect on the H747). Rationale, current state and
 
 ### Reboot and power cycle (PWR)
 
-From the 2026-10-17 research: the X8 already has a 60 s hardware watchdog
-that power-cycles the module through the PMIC, but nothing in userspace uses
-it, and no part of the system can cut the carrier's power without a person.
+From the 2026-10-17 research and its adversarial review: the X8 already has
+a 60 s hardware watchdog that power-cycles the module through the PMIC, and a
+plain reboot probably does too, but nothing in userspace owns the watchdog
+and no part of the system can cut the carrier's power without a person.
 Design, hardware facts and the five-layer plan:
 [X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md](X8_HEALTH_AND_RECOVERY/REBOOT_AND_POWER_CYCLE.md).
-Valve safety stays with the M4/Opta 200 ms watchdogs; none of this may gate it.
+The built pieces live in [firmware/x8_recovery/](firmware/x8_recovery/README.md),
+installed nowhere and disarmed. Valve safety stays with the M4/Opta 200 ms
+watchdogs; none of this may gate it. **On the tractor every module reset is
+an engine stop**, so tractor arming waits on PWR-8, PWR-9 and PWR-11.
 
-- [ ] **PWR-1 Bench reset-reach checks** — the §4 list: which of reboot,
-  WDOG1 timeout and sysrq-crash reset the L072 and H7 (L072 `uptime_ms`),
-  what Max Carrier PB1 and HDC J1-73 `RESET` do on the X8, and whether a
-  12 V cut with an 18650 fitted is a real cycle. No RF transmit involved.
-- [ ] **PWR-2 systemd owns the hardware watchdog** — drop-in with
-  `RuntimeWatchdogSec=30s`, `RebootWatchdogSec=2min`; land together with a
-  `wdt_pet.sh` / flash-pipeline change that tolerates `EBUSY` and relies on
-  systemd's petting.
-- [ ] **PWR-3 Container and unit health** — `healthcheck:` on radio, bridge
-  and web containers with an unhealthy-restart policy; `WatchdogSec=` on
-  LifeTrac units that can hang. Builds on RS-4.8.
-- [ ] **PWR-4 `lifetrac-supervisor`** — host service with the escalation
-  ladder (container → L072 NRST → H7 NRST → reboot → sysrq-crash PMIC cycle),
-  persistent reboot counter and rate limit, reset reason in telemetry,
-  disarmed by default on the bench.
-- [ ] **PWR-5 Tractor hard power cycle** — normally-closed interrupt relay in
-  the Max Carrier 12 V feed on a spare D1608S SSR, Opta logic (H747 counter
-  stalled 120 s, 3 cycles/hour max, Modbus request register), and the 18650
-  decision (battery-side cut, BQ24195 ship mode, or supercap) together with
-  POWER_MANAGEMENT.md.
-- [ ] **PWR-6 Remote restart and bench power control** — authenticated
-  "Restart tractor" command after RS-8 (add to CYBERSECURITY_CASE.md), base
-  smart plug, and a bench smart plug/USB relay plus per-port-switched USB hub
-  so the Toughbook can run T2 itself.
+- [ ] **PWR-1 Bench reset-reach checks** — the plan's §6 list, each with
+  Dorkmo's OK and the bench power-up procedure (`power_up_guard.sh`): does
+  `systemctl reboot` go through `WDOG_B` (`wdog_regs.py`, both boards); does a
+  reboot or WDOG1 bite reset the L072 (`RFCO_SUMMARY` uptime); L2 installed
+  on one board with the bench opt-in; PB1/PB2/J1-73 from the DT first; 18650
+  behaviour (BQ24195 REG01 first); `poweroff`/`halt` vs the 128 s re-arm;
+  whether a module-only reset clears the camera USB wedge. No RF transmit.
+  Start with the new read-only `capture_board_state.sh` captures.
+- [ ] **PWR-2 systemd owns the hardware watchdog (L2)** — built:
+  `x8_recovery/systemd/` drop-ins (`RuntimeWatchdogSec=30s`,
+  `RebootWatchdogSec=2min`, `reboot.target` `JobTimeoutSec=3min`),
+  `install_watchdog.sh`, and `wdt_pet.sh` now relies on systemd instead of
+  reporting a false start failure. Remaining: install on the base, verify per
+  PWR-1, then `watchdog.open_timeout=` (X8OS-4) and a `HandlePowerKey`
+  decision. Tractor waits on PWR-8/PWR-9.
+- [ ] **PWR-3 Container health status (L1)** — built: compose healthchecks on
+  mosquitto (base, tractor) and web_ui (base), and a tractor
+  `mosquitto.conf` with a non-loopback listener. Remaining: radio daemons
+  after RS-1.2 gives them a worker-loop heartbeat; a deploy path (RS-5.11,
+  tractor compose install).
+- [ ] **PWR-4 `lifetrac-supervisor` (L3)** — built and disarmed: allowlisted
+  container restart → `systemctl reboot` → sysrq `s`,`u`,`b`; uptime-based
+  boot-loop cap with HELD state, OTA probation, reset-reason record, tractor
+  reboots off. Remaining: install path in provisioning, merge with
+  OTA_STRATEGY's `lifetrac-health`, publish the reset reason, and the tractor
+  reboot decision.
+- [ ] **PWR-5 Independent hard power cycle (L4)** — decide where it lives
+  (recommended: standalone node-watchdog board; alternative: Opta R4 or
+  D1608S channel 7) against the plan's seven requirements: trigger from a
+  Linux-originated heartbeat plus a boot-complete timeout, hardware-bounded
+  off pulse, NC low-level-rated contact, 18650 handling, ignition and
+  maintenance inhibits, give-up state machine, key-off hold.
+- [ ] **PWR-6 Remote restart and base/bench power control (L5)** — tractor
+  restart inside the GCM envelope, bound to a per-boot challenge, rate limit
+  shared with L3, H747 checks at execution (after RS-8; add to
+  CYBERSECURITY_CASE.md §4.4). Base and bench: NC DC relay between the UPS
+  or bench supply and the carrier jack, inline USB VBUS switch on a direct
+  Toughbook port, `boot_id` check in leg launchers.
+- [ ] **PWR-7 Crash-only storage** — every rung that can land mid-write (WDOG
+  bite, forced reboot, L4 cut): survey writers on `/var`, the container
+  volumes and `/mnt/boot` (FAT, single u-boot env copy, already "not properly
+  unmounted" on the tractor). Gates production arming of the forced-reboot
+  rung and of L4.
+- [ ] **PWR-8 No H747 erase on every tractor boot** — `stm32h7-program`
+  erases and reprograms bank 1 at each boot (~13 s); program only on
+  mismatch, or settle it under X8OS-3. Gates any automatic tractor reboot.
+- [ ] **PWR-9 H747 nonce RNG** — seed the GCM nonce's random bytes from the
+  STM32H7 hardware RNG instead of a once-seeded xorshift; more reboots raise
+  the (key, nonce) collision odds. Gates tractor arming.
+- [ ] **PWR-10 L072 TX hold-off after reset** — a reset wipes the RAM-only
+  FCC dwell accountant; hold TX for one dwell window after any reset
+  (including the planned IWDG, RS-4.10). L072 firmware, SIL only.
+- [ ] **PWR-11 Opta latch semantics** — the draft Opta latches
+  `WATCHDOG_TRIPPED` until it is power-cycled, which contradicts
+  TRACTOR_NODE.md ("re-enables after ≥10 advances", around line 184); pick
+  one and fix the doc. TRACTOR_NODE.md and HARDWARE_BOM.md also say "4 spare"
+  D1608S SSRs; only channel 7 is free. The M7 must read the Opta
+  `safety_state` at boot and stay latched unless it is `NORMAL` (its own
+  E-stop latch is in RAM).
+- [ ] **PWR-12 POWER_MANAGEMENT corrections** — `halt` is not a final state
+  (the base came back ~4.5 min after `poweroff`; `imx2_wdt` re-arms to
+  128 s), so use `poweroff` and plan for it; the self-holding relay drops
+  whenever the H747 resets and must survive it; the 18650 reaches +5V only in
+  BQ24195 boost mode.
 
 ---
 
